@@ -67,13 +67,13 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, text from an atlas of multi-channel distance fields, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
   <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [dxf.rs](#render2ddxfrs) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [hl.rs](#render2dhlrs) · [overlay.rs](#render2doverlayrs) · [pick.rs](#render2dpickrs) · [cpu.rs](#render2dcpurs) · [text.rs](#render2dtextrs)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
-  <br>[lib.rs](#gltf-crate-root)
+  <br>[lib.rs](#gltf-crate-root) · [write.rs](#gltfwriters)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
   <br>[lib.rs](#shader-crate-root) · [bench.rs](#shaderbenchrs) · [dis.rs](#shaderdisrs) · [layout.rs](#shaderlayoutrs) · [module.rs](#shadermodulers) · [msl.rs](#shadermslrs) · [parse.rs](#shaderparsers) · [reflect.rs](#shaderreflectrs) · [samples.rs](#shadersamplesrs) · [spv.rs](#shaderspvrs) · [val.rs](#shadervalrs)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -85,7 +85,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery
   <br>[lib.rs](#datastore-crate-root) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
-  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [der.rs](#netioderrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [x509.rs](#netiox509rs)
+  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [der.rs](#netioderrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs) · [x509.rs](#netiox509rs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng
   <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs) · [uri.rs](#netpkturirs) · [ssh.rs](#netpktsshrs) · [snmpv3.rs](#netpktsnmpv3rs) · [eap.rs](#netpkteaprs) · [imap.rs](#netpktimaprs) · [cookie.rs](#netpktcookiers) · [x509.rs](#netpktx509rs) · [tls.rs](#netpkttlsrs)
 - [eapm](#eapm) -- EAP-MD5 and EAP-PWD as peer and server state machines without I/O
@@ -110,6 +110,14 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#dxf-crate-root) · [src/fonts.rs](#dxfsrcfontsrs) · [src/mtext.rs](#dxfsrcmtextrs) · [src/strings.rs](#dxfsrcstringsrs)
 - [physics](#physics) -- Collision shapes, broad phase and deterministic queries for games
   <br>[src/bvh.rs](#physicssrcbvhrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
+- [game](#game) -- The game core: a world of entities and components, a fixed tick, input actions, cameras
+  <br>[lib.rs](#game-crate-root) · [src/camera.rs](#gamesrccamerars) · [src/input.rs](#gamesrcinputrs) · [src/pose.rs](#gamesrcposers) · [src/sparse.rs](#gamesrcsparsers) · [src/tick.rs](#gamesrctickrs) · [src/world.rs](#gamesrcworldrs)
+- [game_render3d](#game_render3d) -- The bridge from the game core to render3d: entities with a mesh as scene instances
+  <br>[lib.rs](#game_render3d-crate-root)
+- [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
+  <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
+- [netchan](#netchan) -- Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network
+  <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 
 ## ui
 
@@ -9530,9 +9538,9 @@ wanted, never possible) views make a device of their own (gp_view_device).  A lo
 
 A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
-usable adapter or surface, a display that takes or imports no dma-bufs: the CPU path for good,
-silently.  plat::gpu_out_state tells the platform how the first start went (Android keeps it across
-runs: a driver that killed the program does not get a third chance).
+usable adapter or surface, a display that takes or imports no dma-bufs: the CPU path for good, silently
+but for one line in the log (level info) that says why.  plat::gpu_out_state tells the platform how the first
+start went (Android keeps it across runs: a driver that killed the program does not get a third chance).
 
 Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON, DEFAULT_ON_LINUX, DEFAULT_ON_BROWSER; Android:
 GalleryActivity always sets it, GPU_DEFAULT there; the browser: ?gpu=0|1), jfgui_GPU_VERIFY=1 (every presented
@@ -23868,6 +23876,8 @@ Document on the GPU (render3d::gltf); a CAD or game tool can read the same witho
   doc.instances(scene) -> Vec<InstanceRef>      each node's mesh primitives with its world matrix
   doc.lights_of(scene) -> Vec<LightRef>         (G5c) each node's KHR_lights_punctual light with its world matrix
   gltf::decompose(&matrix) -> Trs               translation, rotation, scale (a mirror: x negative), shear
+  gltf::write_document(&doc) -> Result<Vec<u8>>   (G7g) a Document as a .glb: meshes, materials by their factors,
+       nodes, scenes; load reads the same Document back (textures, images and lights: Unsupported)
 
 Files are untrusted input: every index, offset, length and count is checked, sizes and counts are limited
 (Limits), and a file that breaks a rule is an Err, never a panic.  A file whose extensionsRequired names
@@ -24073,7 +24083,8 @@ IDENTITY: [f64; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0 
   the JSON and the BIN chunk of a .glb
 
 - **`fn write_glb(json: &[u8], bin: Option<&[u8]>) -> Vec<u8>`**
-  a .glb of a JSON text and a binary buffer (tools and tests): chunks padded with spaces and zeros
+  a .glb of a JSON text and a binary buffer (tools and tests; write_document builds both from a Document):
+  chunks padded with spaces and zeros
 
 - **`fn base64_decode(s: &[u8]) -> Option<Vec<u8>>`**
   standard base64 (padding optional); None for anything else
@@ -24100,6 +24111,26 @@ IDENTITY: [f64; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0 
   - `shear: f64`
 
 - **`fn decompose(m: &[f64; 16]) -> Trs`**
+
+### `gltf/write.rs`
+
+Source: [`lib/gltf/write.rs`](../lib/gltf/write.rs)
+
+```text
+write -- a Document as a .glb (G7g): meshes with positions, normals and one uv set, materials by their
+factors, nodes with their local transforms, scenes.  What load reads back is the same Document (the
+numbers are written as the shortest text that parses to the same value).  Not written: textures,
+images and samplers, lights; a Document with any of them is Error::Unsupported rather than written
+without them.
+```
+
+- **`fn write_document(doc: &Document) -> Result<Vec<u8>>`**
+  The document as a .glb: meshes (positions with min and max, normals, TEXCOORD_0 when the primitive has
+  UV, indices as u16 or u32), materials (factors, alpha mode and cutoff, double-sided), nodes (name, mesh,
+  children, the local matrix unless it is the identity), scenes and the default scene; `asset.generator`
+  is the document's.  Err(Invalid) for arrays that do not fit (an index out of range, normals or UV of
+  another length, a number that is not finite, a reference to a mesh, material or node that is not
+  there), Err(Unsupported) for textures, images or lights, which this writer leaves to later.
 
 ## shader
 
@@ -27661,6 +27692,11 @@ net -- TCP, UDP and Unix domain sockets (IPv4 and IPv6) with timeouts
             (GetAddrInfoW).  Linux names go through netio::dns (no libc here).
   NetError: the kinds callers act on, with the OS code
 
+(G7d) Everywhere: the addresses, NetError and host_port.  The sockets, names and interfaces are
+Windows', Linux's and Apple's; the browser has WebSocket instead (web_net.rs: the page's
+WebSocket through the JS host, net.connect checked on the URL's host and port), Android nothing
+yet (docs/ANDROID.md).
+
 The app's permissions (policy.rs, net.connect / net.listen) are checked before connect,
 bind, send_to and a name lookup; Unix sockets follow the file rules (fs.write on the path).
 A refusal is NetErrorKind::Denied.
@@ -27824,6 +27860,102 @@ one thread may read while another writes (Arc<TcpStream>).
 
 - **`fn host_port(host: &str, port: u16) -> String`**
   "host:port" with brackets around IPv6 literals
+
+### `plat/web_net.rs`
+
+Source: [`lib/plat/web_net.rs`](../lib/plat/web_net.rs)
+
+```text
+web_net -- the browser's WebSocket (G7d): plat::net::WebSocket through the JS host
+
+  WebSocket::connect(url) / connect_with(url, WsLimits) -> NetResult<WebSocket>
+           "ws://host:port/path", "wss://...", or "/path": the page's own server (ws:// for a
+           page over http, wss:// over https); net.connect is checked on the URL's host and
+           port first (policy::net_host_allowed), a refusal is NetErrorKind::Denied.  The
+           page's own server (the host and port of the page's origin) needs no rule: it served
+           the app (the user's decision of 2026-11-18)
+  ws.state() -> WsState (Connecting, Open, Closing, Closed)
+  ws.send_text(&str) / send_binary(&[u8])     while Open
+  ws.recv() -> Option<WsMessage>                never blocks
+  ws.close(code, reason) / close_info() / protocol()
+
+The worker (web/worker.js) holds the browser's WebSocket objects, so frames never pass the
+page: REQUEST_WEBSOCKET with the socket's id as the request's id, one op byte and its data; the
+host answers through jfgui_ws(id, kind, len) with the bytes in the inbox and wakes the app
+(plat::wake: E_WAKE, the UI runs a pass).  The browser does the handshake, the masking,
+fragments and pings itself.  What a socket keeps for the app is bounded (WsLimits): a bigger
+message or more queued bytes close it with 1009.  The sockets belong to the app's thread (the
+worker that runs it): compute threads of the threaded build do not reach them.
+```
+
+```rust
+/// (browser) a WebSocket operation for the worker: the socket's id as the request's id, one op
+/// byte (1 open: the URL; 2 send text; 3 send binary; 4 close: u16 code, the reason), its data
+REQUEST_WEBSOCKET: u32 = 32
+/// sockets an app may hold at once in the browser
+WS_MAX_SOCKETS: usize = 64
+```
+
+- **`enum WsState`**
+  where a browser WebSocket stands
+  - `Connecting` -- the browser connects (handshake on the way)
+  - `Open` -- connected: messages go both ways
+  - `Closing` -- close() was called, or a limit closed it; the browser's close has not come yet
+  - `Closed` -- ended: close_info() says how
+
+- **`enum WsMessage`**
+  a whole message from the server
+  - `Text(String)` -- a text message
+  - `Binary(Vec<u8>)` -- a binary message
+
+- **`struct WsLimits`**
+  what a browser WebSocket keeps for the app until recv takes it
+  - `max_message: usize` -- the largest message; a bigger one closes the socket (1009)
+  - `max_queued: usize` -- bytes received and not taken yet; more close the socket (1009)
+
+- **`struct WebSocket`**
+  a WebSocket of the page (the browser's object lives in the worker).  Dropping it closes it
+
+- **`fn ws_url_split(url: &str, origin: Option<&str>) -> Option<(String, String, u16)>`**
+  a WebSocket URL -> (the absolute URL, the host as written, the port); "/path" against the
+  page's origin (jfgui_PAGE_ORIGIN, which the worker sets); None: not a ws:// / wss:// URL
+
+- **`fn page_origin() -> Option<String>`**
+  the page's origin (jfgui_PAGE_ORIGIN at the start); None outside a page
+
+- **`fn is_page_server(origin: Option<&str>, host: &str, port: u16) -> bool`**
+  whether host and port are the page's own server (the host and port of `origin`, its default port
+  when it names none)
+
+**`impl WebSocket`**
+
+- **`fn connect(url: &str) -> NetResult<WebSocket>`**
+  connect to a WebSocket server with the default limits (see the top of this file)
+- **`fn connect_with(url: &str, lim: WsLimits) -> NetResult<WebSocket>`**
+  connect with these limits: Connecting at once, Open when the browser's handshake is done
+- **`fn state(&self) -> WsState`**
+  where it stands
+- **`fn recv(&self) -> Option<WsMessage>`**
+  the next message, or None (never waits)
+- **`fn pending(&self) -> usize`**
+  messages waiting for recv
+- **`fn send_text(&self, s: &str) -> NetResult<()>`**
+  send a text message (Open only: Other while Connecting, Eof after the close)
+- **`fn send_binary(&self, b: &[u8]) -> NetResult<()>`**
+  send a binary message (as send_text)
+- **`fn close(&self, code: u16, reason: &str)`**
+  close with `code` (1000 or 3000-4999, others become 1000; the browser allows no more) and
+  a reason of at most 123 bytes
+- **`fn close_info(&self) -> Option<(u16, String)>`**
+  how it ended: the close code (1006: no close frame, the browser's word for a failed
+  connection too) and reason; None while it is not closed
+- **`fn protocol(&self) -> String`**
+  the subprotocol the server chose (empty: none)
+
+- **`extern "C" fn jfgui_ws(id: u32, kind: u32, len: u32) -> u32`**
+  (browser host) a WebSocket's event: kind 1 open (the inbox holds the chosen subprotocol),
+  2 a text message, 3 a binary message, 4 closed (u16 code little-endian, the reason); the host
+  calls jfgui_input after a burst.  -> 1 taken
 
 ### `plat/fs.rs`
 
@@ -28400,6 +28532,8 @@ start-up, then checked by the public file, process, shell, plugin and print func
   audio_granted() -> bool                sound is allowed now, without asking or recording a
                                          refusal (ui's dialog sounds stay silent without it)
   net_connect_allowed(addr) / net_listen_allowed(addr) / net_name_allowed(host) -> bool
+  net_host_allowed(host, port) -> bool   (G7d) a connection to a host as written, name or
+                                         address (the browser's WebSocket resolves itself)
   net_resolved(host, addrs)              (resolvers) the addresses of a permitted name:
                                          connections to them follow that name's rules
   Key::grant(path, FS_*) / Key::grant_dir(dir, FS_*)   a file / folder the user handed over
@@ -28759,6 +28893,12 @@ STORE: &str = "config://permission-decisions.txt"
 
 - **`fn net_listen_allowed(addr: &crate::net::SocketAddr) -> bool`**
   whether a TCP listener (or a UDP socket with a fixed port) may bind addr
+
+- **`fn net_host_allowed(host: &str, port: u16) -> bool`**
+  (G7d) whether a connection to `host` as written (a name, an IPv4 address, an IPv6 address with
+  or without brackets, localhost) on `port` is allowed: a net.connect rule for that name, block
+  or address and port.  The browser's WebSocket asks this (the browser resolves names itself, so
+  there is no lookup to check first)
 
 - **`fn net_name_allowed(host: &str) -> bool`**
   whether host may be resolved: a net.connect rule names it (or allows every host)
@@ -41136,6 +41276,8 @@ netio -- network protocols on top of plat::net
              first use (the presented CA comes back for the user's decision); https to
              public servers with the system's CAs
   smtp       sending mail: STARTTLS / TLS, AUTH PLAIN / LOGIN, UTF-8 messages
+  ws         WebSocket (RFC 6455): ws::Acceptor in a Server's handler (the upgrade, a thread
+             per connection), ws::connect for clients, the frame codec for untrusted bytes
   Stream     what HTTP runs over (plat::net::TcpStream, tls::TlsStream)
 
 Everything is blocking with timeouts and size limits on every read; a malformed peer gets an
@@ -41389,6 +41531,8 @@ http -- HTTP/1.1 messages and their wire format
   Reader: buffered reading of a Stream (lines, heads, bodies by Content-Length or chunked;
           body_to hands a body over piece by piece)
   write_response / write_request
+  Body::Upgrade(Upgrade): a 101 answer whose connection a protocol takes over (ws::Acceptor);
+          the server runs it on a thread of its own with the Upgraded connection
 
 Limits: a message head of at most 16 KiB and 100 header lines, bodies up to the caller's
 limit, chunk sizes checked before use.
@@ -41444,6 +41588,28 @@ MAX_HEADERS: usize = 100
   - `Bytes(Vec<u8>)`
   - `Stream { len: Option<u64>, next: Box<dyn FnMut(&mut Vec<u8>) -> bool + Send> }` -- produced piece by piece and sent chunked: the callback appends the next piece to the
     buffer and returns false after the last one (Content-Length when `len` is known)
+  - `Upgrade(Upgrade)` -- (G7d) with status 101: the server sends the head as it is (Connection and Upgrade as the
+    handler set them, no length), then hands the connection to the upgrade on a thread of its
+    own (`ws::Acceptor::accept` makes such answers).  With any other status: no body
+
+- **`struct Upgrade(Box<dyn FnOnce(Upgraded) + Send>)`**
+  (G7d) what takes over a connection after `101 Switching Protocols` (a WebSocket): runs once on
+  a thread of the server's own, with the connection
+
+**`impl Upgrade`**
+
+- **`fn new(f: impl FnOnce(Upgraded) + Send + 'static) -> Upgrade`**
+  the code that takes over the connection (it ends the connection by returning)
+- **`fn run(self, up: Upgraded)`**
+  run it with the connection (the server does this)
+
+- **`struct Upgraded`**
+  (G7d) a connection after an upgrade, as the server hands it over
+  - `stream: Box<dyn crate::Stream>` -- the connection (TCP, or TLS under `Server::start_with`); reads and writes have no timeouts
+    set, the protocol sets its own
+  - `buffered: Vec<u8>` -- bytes the client sent after its request that the server had already read
+  - `peer: Option<SocketAddr>` -- the client's address
+  - `stop: Arc<AtomicBool>` -- set when the server stops (`Server::stop` waits for the upgraded connections to end)
 
 - **`struct Response`**
   - `status: u16`
@@ -41487,6 +41653,9 @@ MAX_HEADERS: usize = 100
   where the stream's timeout counts each read)
 - **`fn has_buffered(&self) -> bool`**
   whether unread bytes are buffered (a pipelined next request)
+- **`fn take_buffered(&mut self) -> Vec<u8>`**
+  (G7d) the bytes read from the stream but not consumed yet, taken out of the reader (what
+  came after a head that ended the HTTP part of a connection: a WebSocket's first frames)
 - **`fn head(&mut self) -> Result<(String, Headers), ReadError>`**
   the start line and the headers of a message
 - **`fn body(&mut self, h: &Headers, max: usize, until_close: bool) -> Result<Vec<u8>, ReadError>`**
@@ -41498,6 +41667,10 @@ MAX_HEADERS: usize = 100
 
 - **`fn write_response(s: &dyn Stream, r: &mut Response, head_only: bool, keep_alive: bool) -> bool`**
   send a response; `head_only` for HEAD requests; false when the connection broke
+
+- **`fn write_switch(s: &dyn Stream, r: &Response) -> bool`**
+  (G7d) send the head of a `101 Switching Protocols` answer as the handler built it (Connection,
+  Upgrade and the protocol's headers; no length, no body); false when the connection broke
 
 - **`fn write_request(s: &dyn Stream, method: &str, target: &str, h: &Headers, body: &[u8]) -> bool`**
   send a request (the body as Content-Length)
@@ -41550,6 +41723,10 @@ worker serves one connection at a time (keep-alive, pipelined requests in order)
                                        runs over (TLS) and the identity it proved
   server.local_addr() / server.stop()
 
+(G7d) A handler's answer with status 101 and Body::Upgrade (ws::Acceptor::accept) takes the
+connection out of HTTP: the head goes out, the upgrade runs on a thread of its own (the worker
+is free again), and stop() sets the Upgraded's stop flag and waits for those threads too.
+
 The handler runs on a worker thread; it must not panic (panics abort the process).
 Requests with both Content-Length and Transfer-Encoding are refused (request smuggling).
 A slow client holds a worker only so long: the head must arrive within read_ms, a body at
@@ -41585,8 +41762,11 @@ MIN_BODY_RATE: u32 = 1024
 - **`fn start(addr: &SocketAddr, cfg: ServerConfig, handler: Handler) -> NetResult<Server>`**
 - **`fn start_with(addr: &SocketAddr, cfg: ServerConfig, handler: Handler, wrap: Option<Wrap>) -> NetResult<Server>`**
 - **`fn local_addr(&self) -> SocketAddr`**
+- **`fn upgraded(&self) -> usize`**
+  (G7d) upgraded connections (WebSockets) still running
 - **`fn stop(self)`**
-  stop accepting, finish the requests in progress, wait for the threads
+  stop accepting, finish the requests in progress, wait for the threads; upgraded
+  connections see their stop flag set and are waited for as well
 
 ### `netio/smtp.rs`
 
@@ -42140,6 +42320,213 @@ url -- absolute http(s) URLs, percent encoding, query strings
 
 - **`fn split_target(target: &str) -> (&str, &str)`**
   split a target into its path and query ("" when there is none)
+
+### `netio/ws.rs`
+
+Source: [`lib/netio/ws.rs`](../lib/netio/ws.rs)
+
+```text
+ws -- WebSocket (RFC 6455): the frame codec, the server side in netio's HTTP server, a client (G7d)
+
+  Acceptor::new(Limits) [.origins(..)] [.protocols(..)]   shared by a Server's handler
+  acceptor.accept(&req, |ws| ..) -> Response    101 with the upgrade (on_open runs on a thread
+                                    of its own until it returns), or 400 / 403 / 426 / 503
+  connect(url, &ClientConfig) -> WebSocket       ws://host[:port]/path (wss:// with a connector)
+  WebSocket: recv() / recv_timeout(ms) -> Message; send_text / send_binary / ping / close(code,
+             reason); &self everywhere: one thread reads while others send (Arc<WebSocket>)
+  Decoder: untrusted bytes -> Frame events, no I/O (the fuzzing in apps/nettest drives it)
+  encode_frame(out, opcode, fin, payload, mask)
+
+Limits: a frame's and a message's size, frames per message, messages and bytes a second
+(token buckets with a burst of two seconds), idle and handshake timeouts, connections per
+Acceptor.  A malformed or excessive peer gets the close code RFC 6455 gives it (1002 protocol,
+1007 bad UTF-8 in text, 1008 rate, 1009 too big) and the connection ends; nothing panics, no
+allocation goes past the limits.  No extensions (permessage-deflate) are offered or accepted.
+```
+
+```rust
+/// a continuation frame
+OP_CONT: u8 = 0x0
+/// a text frame (UTF-8)
+OP_TEXT: u8 = 0x1
+/// a binary frame
+OP_BINARY: u8 = 0x2
+/// a close frame
+OP_CLOSE: u8 = 0x8
+/// a ping
+OP_PING: u8 = 0x9
+/// a pong
+OP_PONG: u8 = 0xA
+/// close code: normal end
+CLOSE_NORMAL: u16 = 1000
+/// close code: the endpoint goes away (server stop, idle)
+CLOSE_GOING_AWAY: u16 = 1001
+/// close code: a protocol error
+CLOSE_PROTOCOL: u16 = 1002
+/// close code: a kind of data the endpoint does not take
+CLOSE_UNSUPPORTED: u16 = 1003
+/// (never sent) a close frame without a code
+CLOSE_NO_STATUS: u16 = 1005
+/// (never sent) the connection ended without a close frame
+CLOSE_ABNORMAL: u16 = 1006
+/// close code: a text message that is not UTF-8
+CLOSE_BAD_DATA: u16 = 1007
+/// close code: a policy was violated (rate limits)
+CLOSE_POLICY: u16 = 1008
+/// close code: a frame or message over the limits
+CLOSE_TOO_BIG: u16 = 1009
+/// close code: the server failed
+CLOSE_INTERNAL: u16 = 1011
+```
+
+- **`struct Limits`**
+  the limits of one connection
+  - `max_message: usize` -- the largest message (all its frames together)
+  - `max_frame: usize` -- the largest frame
+  - `max_fragments: usize` -- frames per message
+  - `send_frame: usize` -- outgoing messages longer than this go as several frames
+  - `messages_per_s: u32` -- messages (and control frames) a second from the peer, on average; bursts of two seconds
+  - `bytes_per_s: u32` -- bytes a second from the peer, on average; bursts of two seconds
+  - `idle_ms: u32` -- nothing received for this long ends the connection (1001)
+  - `ping_ms: u32` -- a ping goes out after this long without anything received (0: none)
+  - `handshake_ms: u32` -- (client) the connection and the server's answer within this long
+  - `write_ms: u32` -- the longest a send waits for the peer to take bytes
+  - `max_connections: usize` -- (Acceptor) connections at once
+
+- **`enum WsError`**
+  why a WebSocket call failed
+  - `Url(String)` -- not a ws:// or wss:// URL, or wss:// without a connector
+  - `Net(NetError)` -- the network (connect, read, write)
+  - `Tls(String)` -- the TLS layer refused (certificate, handshake)
+  - `Handshake(String)` -- the server's answer was not the upgrade (its status, a missing or wrong header)
+  - `Closed(u16, String)` -- the connection ended: the peer's close code and reason (1005: its close frame had no
+    code, 1006: no close frame came)
+  - `Protocol(u16)` -- this side ended it: the peer broke the protocol or a limit (the close code sent)
+  - `TooLarge` -- a message to send over max_message, or a control payload over 125 bytes
+  - `TimedOut` -- nothing came within idle_ms (the connection is closed), or the handshake took too long
+
+- **`enum Message`**
+  a whole message
+  - `Text(String)` -- a text message (UTF-8, checked)
+  - `Binary(Vec<u8>)` -- a binary message
+
+**`impl Message`**
+
+- **`fn bytes(&self) -> &[u8]`**
+  the payload's bytes
+
+- **`fn close_code_valid(code: u16) -> bool`**
+  whether a close code may appear in a close frame (RFC 6455 7.4: 1000-1003, 1007-1014 and the
+  ranges 3000-4999 for libraries and applications)
+
+- **`enum Role`**
+  which side a decoder reads for: a server reads masked frames from clients, a client
+  unmasked frames from servers
+  - `Server` -- reads a client's frames: masked
+  - `Client` -- reads a server's frames: unmasked
+
+- **`enum Frame`**
+  one event of the incoming frames
+  - `Message(Message)` -- a whole message (its fragments put together)
+  - `Ping(Vec<u8>)` -- a ping with its payload (at most 125 bytes)
+  - `Pong(Vec<u8>)` -- a pong with its payload
+  - `Close(Option<(u16, String)>)` -- a close frame: its code and reason (None: it had no code)
+
+- **`fn apply_mask(data: &mut [u8], mask: [u8; 4], offset: usize)`**
+  xor `data` with the mask, starting at byte `offset` of the payload
+
+- **`fn encode_frame(out: &mut Vec<u8>, op: u8, fin: bool, payload: &[u8], mask: Option<[u8; 4]>)`**
+  append one frame to `out`: header, the mask key (a client's frames), the payload (masked)
+
+- **`struct Decoder`**
+  the frames of untrusted bytes: feed what arrives, take events until next() says it needs
+  more.  Memory stays below one frame (max_frame) plus one feed (64 KiB) plus one message
+  (max_message); a feed beyond that, or anything malformed, is an error with the close code
+
+**`impl Decoder`**
+
+- **`fn new(role: Role, lim: Limits) -> Decoder`**
+  a decoder for frames a `role` reads, within `lim`
+- **`fn feed(&mut self, data: &[u8]) -> Result<(), u16>`**
+  bytes from the peer; Err(1009) when that would buffer more than one frame and a feed
+  (the caller fed again before next() asked for more)
+- **`fn buffered(&self) -> usize`**
+  bytes fed but not decoded yet
+- **`fn closed(&self) -> bool`**
+  whether a close frame came (nothing is decoded after it)
+- **`fn next(&mut self) -> Result<Option<Frame>, u16>`**
+  the next event: Ok(None) when more bytes are needed, Err(close code) for a malformed or
+  excessive stream (the decoder takes nothing more then)
+
+- **`struct WebSocket`**
+  one end of a WebSocket connection.  `&self` everywhere: one thread may block in recv while
+  others send (`Arc<WebSocket>`).  Dropping it closes the connection (1000) if it is open
+
+**`impl WebSocket`**
+
+- **`fn peer(&self) -> Option<SocketAddr>`**
+  the peer's address (server side)
+- **`fn protocol(&self) -> Option<&str>`**
+  the subprotocol both sides agreed on (Sec-WebSocket-Protocol)
+- **`fn limits(&self) -> &Limits`**
+  the limits of this connection
+- **`fn is_open(&self) -> bool`**
+  whether the connection is open (no close sent or received)
+- **`fn recv(&self) -> Result<Message, WsError>`**
+  the next message, waiting as long as it takes (pings are answered, the peer's close is
+  returned as Err(Closed))
+- **`fn recv_timeout(&self, ms: Option<u32>) -> Result<Option<Message>, WsError>`**
+  the next message within `ms` (None: wait as long as it takes) -> Ok(None) when none came
+- **`fn send_text(&self, s: &str) -> Result<(), WsError>`**
+  send a text message
+- **`fn send_binary(&self, b: &[u8]) -> Result<(), WsError>`**
+  send a binary message
+- **`fn ping(&self, payload: &[u8]) -> Result<(), WsError>`**
+  send a ping (at most 125 bytes); the peer's pong is taken by recv
+- **`fn send_fragmented(&self, op: u8, payload: &[u8], frame: usize) -> Result<(), WsError>`**
+  send a message as frames of exactly `frame` bytes (tests of the peer's reassembly)
+- **`fn close(&self, code: u16, reason: &str)`**
+  close the connection: our close frame with `code` (1000, 3000-4999 ...) and a reason of at
+  most 123 bytes, then (when no other thread reads) wait up to a second for the peer's close
+
+- **`struct Acceptor`**
+  the server side's check of upgrade requests, shared by a Server's handler: limits for its
+  connections, the origins and subprotocols it takes, the count of open connections
+
+**`impl Acceptor`**
+
+- **`fn new(lim: Limits) -> Acceptor`**
+  connections with these limits (max_connections at once)
+- **`fn origins(mut self, list: &[&str]) -> Acceptor`**
+  take only requests with one of these Origin headers ("https://game.example.org"; a page
+  on another site cannot open a connection with its visitor's cookies then).  Empty: any
+- **`fn protocols(mut self, list: &[&str]) -> Acceptor`**
+  the subprotocols this side speaks, preferred first; the first the client offers is chosen
+- **`fn connections(&self) -> usize`**
+  connections open now
+- **`fn accept(&self, req: &Request, on_open: impl FnOnce(WebSocket) + Send + 'static) -> Response`**
+  answer an upgrade request: 101 with `on_open` running on a thread of the server's own
+  once the answer is out (the connection ends when it returns), or 400 (not a WebSocket
+  request), 403 (an origin not on the list), 426 (another version) or 503 (max_connections)
+
+- **`fn accept_key(key: &str) -> String`**
+  Sec-WebSocket-Accept for a key: base64 of SHA-1 over the key and the GUID
+
+- **`struct ClientConfig`**
+  how a client connects
+  - `limits: Limits` -- the connection's limits (handshake_ms for the whole handshake)
+  - `connect_ms: u32` -- the TCP connection within this long (the handshake has limits.handshake_ms in all)
+  - `protocols: Vec<String>` -- subprotocols to offer (Sec-WebSocket-Protocol)
+  - `origin: Option<String>` -- an Origin header (a browser always sends one; servers with an origin list check it)
+  - `headers: Headers` -- further headers of the upgrade request (Authorization, cookies)
+  - `connector: Option<Connector>` -- the TLS layer for wss:// (the same as Client::with_connector's)
+
+- **`fn parse_url(url: &str) -> Option<Url>`**
+  a ws:// or wss:// URL as netio's Url (scheme http / https)
+
+- **`fn connect(url: &str, cfg: &ClientConfig) -> Result<WebSocket, WsError>`**
+  connect to a WebSocket server: TCP (and TLS for wss:// through `cfg.connector`), the upgrade
+  request, the server's 101 with the right Sec-WebSocket-Accept, all within handshake_ms
 
 ### `netio/x509.rs`
 
@@ -54492,3 +54879,2181 @@ bodies gets the same answer from them, as long as the bodies have the same ids.
   to `out` by body and triangle: what pushes a figure out of the level
 - **`fn closest_point(&self, point: Vec3, max_dist: f64, filter: &Filter) -> Option<(BodyId, PointHit)>`**
   the nearest point of any body to `point` within `max_dist` (equal distance: the lower body, triangle)
+
+## game
+
+*The game core: a world of entities and components, a fixed tick, input actions, cameras* -- crate root [`lib/game/src/lib.rs`](../lib/game/src/lib.rs)
+
+```text
+game -- the core of the game engine (docs/GAME.md, G7b): a world of entities and components, a fixed
+tick, input actions, camera controllers; without a GPU, so a game's server runs it headless
+
+  World          entities with a generation (stale ids are refused), components in dense columns per
+                 type (SparseSet: sparse sets, versions of every change), spawn_with / despawn /
+                 insert / remove / get / get_mut / column / pair_mut; begin_tick settles the poses
+  Pose           where an entity is (Transform: f64 position, rotation, scale), now and at the start of
+                 the tick: a frame shows interpolate(alpha)
+  FixedTick      the fixed rate (60 Hz unless set), an exact accumulator over time from outside, a cap
+                 on catch-up steps, alpha; Systems (functions in a fixed order), Game (all of it)
+  Input          ActionMap (Button, Axis, Motion actions bound to keys by their place, mouse buttons,
+                 the wheel, the raw motion), MouseSettings (sensitivity, inversion, a factor per
+                 platform), the pointer lock's click and end; store / load in a settings file (base::Ini)
+  camera         FirstPerson, Follow (an orbit, pulled in front of walls through lib/physics), FreeFly;
+                 View (eye, forward, up)
+
+render3d is not a dependency: the bridge that puts entities with a mesh into a render3d scene is the
+crate game_render3d.  Everything here is deterministic: no unordered containers, no threads, no clock
+of its own (time comes from outside), floats only through + - * / and lib/physics' math (its correctly
+rounded square root, rt's portable sin and cos).  docs/GAMECORE.md describes the design and the tests
+(apps/gametest).
+```
+
+### `game` crate root
+
+Re-exports: `physics::{Quat, Vec3}`
+
+### `game/src/camera.rs`
+
+Source: [`lib/game/src/camera.rs`](../lib/game/src/camera.rs)
+
+```text
+camera -- camera controllers in f64: first person (yaw and pitch, the pitch held within a limit),
+follow (an orbit around a target at a distance, pulled in front of what is in the way) and free fly
+
+  View              eye, forward, up (unit vectors at right angles): what a renderer needs besides the
+                    lens (the bridge makes a render3d::Camera of it)
+  FirstPerson       eye, yaw, pitch; look(dx, dy) from Motion actions, walk_dir for moving on the
+                    ground, view()
+  Follow            target, yaw, pitch, distance (min..max); look, zoom, eye, view, view_in (a sphere
+                    cast through a physics World from the target to the eye)
+  FreeFly           eye, yaw, pitch, speed; look, fly(forward, right, up, dt), view
+  basis(yaw, pitch) (forward, right, up) of a turn; wrap_angle into (-pi, pi]
+
+Conventions as lib/physics (Quat::from_yaw_pitch): right-handed, Y up; yaw 0 and pitch 0 look along -Z;
+yaw turns about +Y (positive: to the left), pitch about the turned +X (positive: up).  look(dx, dy)
+takes what the mouse did, right and down positive (the values of Motion actions), and turns right and
+down: yaw -= dx, pitch -= dy.  sin and cos are physics::math's (rt's portable ones): the same bits on
+every target, as the server's simulation needs.
+```
+
+```rust
+/// the pitch limit unless set: 89 degrees (straight up or down would leave the yaw undefined)
+PITCH_LIMIT: f64 = 89.0 * core::f64::consts::PI / 180.0
+```
+
+- **`struct View`**
+  what a camera sees from: the eye, the unit vectors forward and up (at right angles)
+  - `eye: Vec3` -- the eye's position (metres, f64)
+  - `forward: Vec3` -- where it looks
+  - `up: Vec3` -- up on the screen
+
+**`impl View`**
+
+- **`fn look_at(eye: Vec3, target: Vec3, up: Vec3) -> Option<View>`**
+  from eye to target, `up` saying which way is up (None: target at the eye, or up along the line)
+- **`fn right(&self) -> Vec3`**
+  right on the screen (forward x up)
+
+- **`fn wrap_angle(a: f64) -> f64`**
+  an angle in (-pi, pi]
+
+- **`fn basis(yaw: f64, pitch: f64) -> (Vec3, Vec3, Vec3)`**
+  (forward, right, up) of a camera turned by yaw and pitch (see the module header): the columns of
+  Quat::from_yaw_pitch(yaw, pitch) applied to -Z, +X and +Y
+
+- **`fn yaw_pitch_of(dir: Vec3) -> Option<(f64, f64)>`**
+  yaw and pitch of a direction (the inverse of basis' forward; None for a zero vector)
+
+- **`struct FirstPerson`**
+  a first-person camera: at the eye, turned by yaw and pitch
+  - `eye: Vec3` -- the eye (a figure's position plus its eye height)
+  - `yaw: f64` -- the turn about +Y (radians, positive to the left), kept in (-pi, pi]
+  - `pitch: f64` -- the turn up and down (radians, positive up), kept within pitch_limit
+  - `pitch_limit: f64` -- the largest pitch up and down (PITCH_LIMIT unless set)
+
+**`impl FirstPerson`**
+
+- **`fn new(eye: Vec3) -> FirstPerson`**
+  at eye, looking along -Z
+- **`fn look(&mut self, dx: f64, dy: f64)`**
+  turn by what the mouse did (radians, right and down positive: the values of Motion actions)
+- **`fn forward(&self) -> Vec3`**
+  where it looks
+- **`fn rotation(&self) -> Quat`**
+  the rotation of the camera (-Z forward, +Y up)
+- **`fn walk_dir(&self, forward: f64, right: f64) -> Vec3`**
+  a direction on the ground (y 0) from two Axis values: forward along the yaw, right across it; its
+  length at most 1 (diagonal walking is not faster)
+- **`fn view(&self) -> View`**
+  the view from the eye
+
+- **`fn walk_dir(yaw: f64, forward: f64, right: f64) -> Vec3`**
+  (FirstPerson::walk_dir) a direction on the ground from the yaw and two Axis values, length at most 1
+
+- **`struct Follow`**
+  a third-person camera: an orbit around a target, at a distance
+  - `target: Vec3` -- what it looks at (a figure's head)
+  - `yaw: f64` -- the turn about +Y (radians), kept in (-pi, pi]
+  - `pitch: f64` -- the turn up and down (positive: looking up, so the eye sinks), kept in pitch_min ..= pitch_max
+  - `distance: f64` -- the eye's distance from the target, kept in min_distance ..= max_distance
+  - `min_distance: f64` -- the nearest the eye comes
+  - `max_distance: f64` -- the farthest
+  - `pitch_min: f64` -- the lowest pitch (looking down most: the eye above the target)
+  - `pitch_max: f64` -- the highest pitch
+
+**`impl Follow`**
+
+- **`fn new(target: Vec3, distance: f64) -> Follow`**
+  around target at distance (kept in 0.5 ..= 50), slightly from above (pitch -0.3)
+- **`fn look(&mut self, dx: f64, dy: f64)`**
+  turn around the target by what the mouse did (radians, right and down positive)
+- **`fn zoom(&mut self, notches: f64)`**
+  nearer (notches > 0, the wheel up) or farther: 10 % of the distance a notch
+- **`fn eye(&self) -> Vec3`**
+  the eye: distance behind the target along the view
+- **`fn view(&self) -> View`**
+  the view from the eye to the target
+- **`fn view_in(&self, world: &PhysicsWorld, filter: &Filter, radius: f64) -> (View, f64)`**
+  the view with the eye pulled in front of what is in the way: a sphere of `radius` cast from the
+  target towards the eye through `world` (the figure's own body left out by `filter`) -> the view and
+  the distance used (at least min_distance, nearer still when the target itself sits in something)
+
+- **`struct FreeFly`**
+  a free camera: flies where it looks
+  - `eye: Vec3` -- the eye
+  - `yaw: f64` -- the turn about +Y (radians), kept in (-pi, pi]
+  - `pitch: f64` -- the turn up and down, kept within pitch_limit
+  - `pitch_limit: f64` -- the largest pitch (PITCH_LIMIT unless set)
+  - `speed: f64` -- metres a second at full input
+
+**`impl FreeFly`**
+
+- **`fn new(eye: Vec3) -> FreeFly`**
+  at eye, looking along -Z, 10 m/s
+- **`fn look(&mut self, dx: f64, dy: f64)`**
+  turn by what the mouse did (radians, right and down positive)
+- **`fn fly(&mut self, forward: f64, right: f64, up: f64, dt: f64)`**
+  fly for dt seconds: forward along the view (pitch included), right across it, up along +Y; each
+  input in -1 ..= 1, the three together at most speed
+- **`fn view(&self) -> View`**
+  the view from the eye
+
+### `game/src/input.rs`
+
+Source: [`lib/game/src/input.rs`](../lib/game/src/input.rs)
+
+```text
+input -- named actions bound to keys by where they sit, mouse buttons, the wheel and the raw motion of
+the locked pointer; sensitivity, inversion and a factor per platform for the motion; the pointer
+lock's click and its end; bindings and settings in a settings file
+
+  Source            where an input comes from: Key(KC_*: the key's place, KeyEvent::code, never its
+                    character), Mouse(MOUSE_*), WheelUp / WheelDown (a notch as a press), MouseX /
+                    MouseY (raw motion), Wheel (the turn in notches); name / parse for the file,
+                    label for a menu (plat::key_label: what the layout prints on the key)
+  ActionMap         actions (name, ActionKind, bindings and their defaults); store / load in an Ini
+  ActionKind        Button (down, pressed, released), Axis (keys with a scale each, -1 ..= 1),
+                    Motion (raw motion: an angle in radians, the wheel in notches)
+  MouseSettings     sensitivity, invert_x, invert_y, factor (None: the platform's,
+                    platform_motion_factor); store / load in an Ini
+  Input             takes the events (key, button, buttons, motion, wheel, set_lock, plat_event) and
+                    answers per frame (down, pressed, released, axis, motion; end_frame) and per tick
+                    (tick() -> TickInput); the lock: take_lock_request, playing, take_pause
+
+The pointer lock (docs/GAME.md, the user's decisions of 2026-11-18).  While the game needs the lock
+(require_lock, the default) and does not hold it, no action fires: a mouse press asks for the lock
+(take_lock_request -> the app calls ui.pointer_lock(true) in the same frame: the browser grants it only
+from a press) and is swallowed with its release, so the click that starts playing never fires.  Esc
+belongs to the lock and never reaches the game: the game only sees the lock end (set_lock with
+ui.pointer_lock_state(), or E_POINTER_LOCK) and takes that as its pause (take_pause): every held input
+is let go, the actions report their release.  A platform without a lock (Unsupported: phones) plays
+without one.
+
+Motion units.  ui.pointer_motion / plat::win_raw_motion_take report what each platform has: the
+mouse's counts (Windows, X11), libinput's unaccelerated motion normalised to 1000 dpi (Wayland),
+points after the system's acceleration (macOS), raw counts with unadjustedMovement or CSS pixels after
+the acceleration (the browser).  The reference unit is a count of a 1000-dpi mouse; the factor of a
+platform (platform_motion_factor) turns its unit into that, MouseSettings::factor overrides it.  A
+Motion action's value is then counts x factor x sensitivity x DEGREES_PER_COUNT (0.022 degrees: Quake's
+and Source's m_yaw, so sensitivities read as in those games) in radians, the sign flipped by invert_x /
+invert_y; a wheel's motion is in notches (no sensitivity).
+
+Frames and ticks.  Events come with the frames, the simulation runs in ticks.  Every action counts
+its presses and releases and sums its motion twice: for the frame (end_frame clears them: the camera
+turns per frame) and for the tick (tick() takes them: a press between two ticks reaches the next tick
+even when the frame had none, a press and a release between two ticks make one tick with down,
+pressed and released).  An Axis reads the keys held at the moment it is asked.
+
+Room for gamepads (G7a part 2): Source is #[non_exhaustive] (pad buttons and sticks come as more
+sources), an Axis takes analog values the same way as the scales of keys, a pad gets settings of its
+own beside MouseSettings.
+```
+
+```rust
+/// the left mouse button (plat::BTN_LEFT, ui::BTN_LEFT)
+MOUSE_LEFT: u8 = 1
+/// the right mouse button
+MOUSE_RIGHT: u8 = 2
+/// the middle mouse button (the wheel pressed)
+MOUSE_MIDDLE: u8 = 3
+/// the first side button (back)
+MOUSE_X1: u8 = 4
+/// the second side button (forward)
+MOUSE_X2: u8 = 5
+/// the angle one count of the reference mouse turns at sensitivity 1 (degrees): Quake's and Source's
+/// m_yaw, so that sensitivities read as in those games
+DEGREES_PER_COUNT: f64 = 0.022
+/// the factor of Windows' motion: the mouse's counts (Raw Input) are the reference unit
+FACTOR_WINDOWS: f64 = 1.0
+/// the factor of Linux' motion: X11's raw counts and Wayland's 1000-dpi normalised motion are the
+/// reference unit
+FACTOR_LINUX: f64 = 1.0
+/// the factor of macOS' motion: points after the system's acceleration.  At a moderate speed and the
+/// default tracking speed a 1000-dpi mouse makes about 0.4 points per count (the system takes a mouse for
+/// 400 dpi and moves the pointer 96 points per inch at gain 1, about 1.7 at that speed): an estimate,
+/// checked by hand in G7b part 2
+FACTOR_MACOS: f64 = 2.5
+/// the factor of the browser's motion: raw counts with unadjustedMovement (Chrome on Windows and
+/// macOS), else CSS pixels after the system's acceleration, about one per count at a moderate speed
+FACTOR_BROWSER: f64 = 1.0
+/// the factor where the pointer cannot be locked (Android, iOS): no motion comes
+FACTOR_OTHER: f64 = 1.0
+```
+
+- **`const fn platform_motion_factor() -> f64`**
+  the factor that turns this platform's raw motion into counts of a 1000-dpi mouse (the FACTOR_\*
+  constants)
+
+- **`enum Source`**
+  where an input comes from
+  - `Key(u32)` -- a key by where it sits: a USB HID usage, plat::KC_\* (KeyEvent::code), whatever the layout prints
+  - `Mouse(u8)` -- a mouse button, MOUSE_LEFT ..= MOUSE_X2 (up to 7)
+  - `WheelUp` -- a notch of the wheel up: a press and a release at once
+  - `WheelDown` -- a notch of the wheel down
+  - `MouseX` -- the raw motion of the locked pointer to the right
+  - `MouseY` -- the raw motion of the locked pointer downwards
+  - `Wheel` -- the wheel's turn in notches, up positive
+
+**`impl Source`**
+
+- **`fn is_motion(self) -> bool`**
+  a motion (MouseX, MouseY, Wheel): for Motion actions; the others are pressed and released
+- **`fn name(self) -> String`**
+  the name in a settings file, the same on every platform: a key's KeyboardEvent.code name ("KeyW",
+  "ShiftLeft"; "Code0x99" without one), "Mouse1" .. "Mouse7", "WheelUp", "WheelDown", "MouseX",
+  "MouseY", "Wheel"
+- **`fn parse(s: &str) -> Option<Source>`**
+  the source of a name (Source::name); None: unknown
+- **`fn label(self) -> String`**
+  what a menu shows: for a key what the current layout prints on it (plat::key_label: "Z" for KC_W on
+  a French keyboard), where the platform does not say (the browser, phones) the name without "Key" /
+  "Digit"; for the mouse German texts an app translates with its catalogue (ui::i18n::t)
+
+- **`struct Bind`**
+  a binding: a source and its scale (an Axis: +1 / -1 for the two directions; a Motion: a multiplier,
+  -1 turns it round)
+  - `source: Source` -- where the input comes from
+  - `scale: f64` -- what the source counts for
+
+**`impl Bind`**
+
+- **`const fn new(source: Source) -> Bind`**
+  the source with scale 1
+- **`const fn scaled(source: Source, scale: f64) -> Bind`**
+  the source with a scale
+- **`const fn key(code: u32) -> Bind`**
+  a key by its place (plat::KC_\*) with scale 1
+- **`fn text(&self) -> String`**
+  the text of the binding in a settings file: the source's name, "-" before it for scale -1,
+  "\*SCALE" after it for another scale ("KeyD", "-KeyA", "MouseY\*0.5")
+- **`fn parse(s: &str) -> Option<Bind>`**
+  the binding of a text (Bind::text); None: not readable
+
+- **`enum ActionKind`**
+  what an action reports
+  - `Button` -- pressed and released (fire, jump, use): sources that press (keys, mouse buttons, wheel notches)
+  - `Axis` -- a value in -1 ..= 1 from the sources held, each with its scale (walking forward and back from W
+    and S); pads' sticks later
+  - `Motion` -- raw motion summed (looking around): MouseX, MouseY (radians), Wheel (notches)
+
+**`impl ActionKind`**
+
+- **`fn takes(self, s: Source) -> bool`**
+  a source this kind takes
+
+- **`struct ActionId(u16)`**
+  an action of an ActionMap (its index)
+
+**`impl ActionId`**
+
+- **`const fn index(self) -> usize`**
+  the index in the map (and in TickInput)
+
+- **`struct ActionMap`**
+  the actions of a game and their bindings
+
+**`impl ActionMap`**
+
+- **`const fn new() -> ActionMap`**
+  no actions
+- **`fn add(&mut self, name: &str, kind: ActionKind, defaults: &[Bind]) -> ActionId`**
+  a new action with its default bindings (bindings of a source the kind does not take are left out).
+  Panics for a name used before or one that is not ASCII letters, digits, '_', '-', '.' (at most 64)
+- **`fn len(&self) -> usize`**
+  actions
+- **`fn is_empty(&self) -> bool`**
+  none
+- **`fn ids(&self) -> impl Iterator<Item = ActionId>`**
+  every action in order
+- **`fn find(&self, name: &str) -> Option<ActionId>`**
+  the action of that name
+- **`fn name(&self, a: ActionId) -> &str`**
+  its name
+- **`fn kind(&self, a: ActionId) -> ActionKind`**
+  its kind
+- **`fn binds(&self, a: ActionId) -> &[Bind]`**
+  its bindings now
+- **`fn defaults(&self, a: ActionId) -> &[Bind]`**
+  its default bindings
+- **`fn bind(&mut self, a: ActionId, b: Bind) -> bool`**
+  one more binding (false: the kind does not take the source, or the action has it already)
+- **`fn unbind(&mut self, a: ActionId, s: Source) -> bool`**
+  the binding of that source goes (false: none)
+- **`fn set_binds(&mut self, a: ActionId, binds: &[Bind]) -> bool`**
+  these bindings instead (false: one of them the kind does not take or one source twice; nothing
+  changes then)
+- **`fn reset(&mut self, a: ActionId)`**
+  its default bindings again
+- **`fn reset_all(&mut self)`**
+  every action's default bindings again
+- **`fn users(&self, s: Source) -> Vec<ActionId>`**
+  the actions a source drives (two actions on one key: a settings page shows the clash)
+- **`fn store(&self, ini: &mut Ini, section: &str)`**
+  the bindings into section `section` of a settings file: a line "bind.NAME=..." (the bindings'
+  texts separated by blanks, "none" for none) for every action whose bindings differ from its
+  defaults; the line of one that has its defaults goes (a new default reaches who never changed it)
+- **`fn load(&mut self, ini: &Ini, section: &str) -> usize`**
+  the bindings from section `section` of a settings file (Self::store): an action without a line
+  gets its defaults -> the bindings that could not be read (an unknown source, a source the kind does
+  not take, a source twice): left out, the rest of the line counts
+
+- **`struct MouseSettings`**
+  how the raw motion of the mouse turns into angles
+  - `sensitivity: f64` -- the multiplier of DEGREES_PER_COUNT (1: 0.022 degrees a count of the reference mouse)
+  - `invert_x: bool` -- right turns left
+  - `invert_y: bool` -- down looks up
+  - `factor: Option<f64>` -- the factor from this platform's units to counts of a 1000-dpi mouse; None: the platform's
+    (platform_motion_factor)
+
+**`impl MouseSettings`**
+
+- **`const DEFAULT: MouseSettings = MouseSettings { sensitivity: 1.0, invert_x: false, invert ...`**
+  sensitivity 1, nothing inverted, the platform's factor
+- **`fn motion_factor(&self) -> f64`**
+  the factor in use (factor, else the platform's)
+- **`fn radians_per_unit(&self) -> (f64, f64)`**
+  radians per raw unit of this platform along x and y (the sign of the inversion included)
+- **`fn store(&self, ini: &mut Ini, section: &str)`**
+  into section `section` of a settings file: "sensitivity", "invert_x", "invert_y",
+  "motion_factor", each only when it differs from the default (else its line goes)
+- **`fn load(ini: &Ini, section: &str) -> MouseSettings`**
+  from section `section` of a settings file (Self::store): what is missing or unreadable is the
+  default, the sensitivity is kept in 0.001 ..= 100, a factor in 0.001 ..= 1000
+
+- **`struct ActionState`**
+  an action in a tick (TickInput) or a frame
+  - `down: bool` -- held at the tick, or pressed since the tick before (a tap between two ticks counts once)
+  - `pressed: bool` -- pressed since the tick before
+  - `released: bool` -- released since the tick before
+  - `value: f64` -- an Axis: its value at the tick (-1 ..= 1); a Motion: the motion since the tick before; a Button:
+    1 when down
+
+- **`struct TickInput`**
+  the actions of one tick (Input::tick), indexed by ActionId
+
+**`impl TickInput`**
+
+- **`fn get(&self, a: ActionId) -> ActionState`**
+  the state of a (all false and 0 for an action the map did not have)
+- **`fn down(&self, a: ActionId) -> bool`**
+  a is down
+- **`fn pressed(&self, a: ActionId) -> bool`**
+  a was pressed since the tick before
+- **`fn released(&self, a: ActionId) -> bool`**
+  a was released since the tick before
+- **`fn value(&self, a: ActionId) -> f64`**
+  a's value
+- **`fn states(&self) -> &[ActionState]`**
+  every action's state in the map's order
+
+- **`struct Input`**
+  the input of a game: events in, actions out (see the module header)
+
+**`impl Input`**
+
+- **`fn new(map: ActionMap) -> Input`**
+  the input of these actions: mouse settings at their defaults, the lock required
+- **`fn map(&self) -> &ActionMap`**
+  the actions and their bindings
+- **`fn edit_map<V>(&mut self, f: impl FnOnce(&mut ActionMap) -> V) -> V`**
+  change the actions or their bindings (a settings page, ActionMap::load); afterwards every action
+  is held as its sources are (a binding that came or went presses or releases it)
+- **`fn mouse(&self) -> &MouseSettings`**
+  the mouse settings
+- **`fn set_mouse(&mut self, m: MouseSettings)`**
+  other mouse settings
+- **`fn set_require_lock(&mut self, on: bool)`**
+  whether the actions need the pointer lock (true, the default: a game that looks with the mouse);
+  false: actions always fire, clicks too
+- **`fn require_lock(&self) -> bool`**
+  the lock is required (set_require_lock)
+- **`fn playing(&self) -> bool`**
+  the actions fire: the lock is held, or not required, or the platform has none (Unsupported)
+- **`fn lock(&self) -> PointerLock`**
+  the state of the lock as the input knows it (set_lock)
+- **`fn set_lock(&mut self, state: PointerLock)`**
+  the state of the pointer lock now (ui.pointer_lock_state() every frame, or E_POINTER_LOCK through
+  plat_event).  Its end (from Locked to anything else) pauses: every held input is let go, the actions
+  report their release, take_pause says so once
+- **`fn take_lock_request(&mut self) -> bool`**
+  a press asked for the lock since the last call: the app asks for it now (ui.pointer_lock(true), in
+  the frame of the press)
+- **`fn take_pause(&mut self) -> bool`**
+  the lock ended since the last call: the game pauses (shows its menu)
+- **`fn pauses(&self) -> u32`**
+  how often the lock has ended so far
+- **`fn release_all(&mut self)`**
+  every held key and button is let go (the actions report their release); motion not yet taken goes
+- **`fn key(&mut self, code: u32, down: bool)`**
+  the key at usage `code` (plat::KC_\*, KeyEvent::code) went down or up; a down while held (the
+  system's repeat) changes nothing
+- **`fn key_held(&self, code: u32) -> bool`**
+  the key at usage `code` is held
+- **`fn button(&mut self, b: u8, down: bool)`**
+  mouse button b (MOUSE_\*) went down or up.  While the game needs the lock and does not hold it, a
+  press asks for the lock (take_lock_request) and is swallowed with its release
+- **`fn buttons(&mut self, pressed: u32, released: u32)`**
+  the buttons of a frame as ui reports them (UiInput::pressed and released: bit 1 &lt;&lt; BTN_\*): a
+  button held before with both bits went up and down again, one not held went down and up
+- **`fn button_held(&self, b: u8) -> bool`**
+  the mouse button b is held (not the lock's click)
+- **`fn motion(&mut self, dx: f64, dy: f64)`**
+  raw motion of the locked pointer (ui.pointer_motion(), plat::win_raw_motion_take): right and down
+  positive, in this platform's units; nothing while not playing
+- **`fn wheel(&mut self, notches: f64)`**
+  the wheel turned by `notches` (up positive; ui's 120 per notch is 1): Wheel motion, and a press
+  of WheelUp / WheelDown per whole notch
+- **`fn axis(&self, a: ActionId) -> f64`**
+  an Axis' value now: the scales of its sources held, kept in -1 ..= 1 (a Button: 1 when held)
+- **`fn down(&self, a: ActionId) -> bool`**
+  a is held now (a source bound to it is held, while playing)
+- **`fn pressed(&self, a: ActionId) -> bool`**
+  a was pressed in this frame (since end_frame)
+- **`fn released(&self, a: ActionId) -> bool`**
+  a was released in this frame
+- **`fn motion_of(&self, a: ActionId) -> f64`**
+  a Motion's motion in this frame (radians for the mouse, notches for the wheel)
+- **`fn end_frame(&mut self)`**
+  the frame is over: its presses, releases and motion are cleared (the tick's stay for tick())
+- **`fn tick(&mut self) -> TickInput`**
+  the actions for a tick, and the presses, releases and motion since the tick before are taken (the
+  next tick starts from nothing)
+- **`fn start_capture(&mut self)`**
+  the next key, mouse button or wheel notch pressed is not an input but the answer to a settings
+  page's "press a key" (take_capture); the actions keep their state meanwhile
+- **`fn take_capture(&mut self) -> Option<Source>`**
+  the source pressed since start_capture (the capture ends with it); None: none yet, or no capture
+- **`fn capturing(&self) -> bool`**
+  a capture is running (start_capture, nothing pressed yet)
+- **`fn plat_event(&mut self, ev: &plat::Event) -> bool`**
+  an event of plat's window (a game with its own window and swapchain, without ui): keys
+  (E_KEY_DOWN / E_KEY_UP by plat::key_code of their scancode), buttons (E_DOWN / E_UP), the wheel
+  (E_WHEEL), the lock (E_POINTER_LOCK: data 1 Locked, else plat::win_pointer_lock_state of the
+  window), its motion (E_RAW_MOTION: plat::win_raw_motion_take of the window), E_FOCUS_OUT lets
+  everything go -> the event was one of these
+- **`fn store(&self, ini: &mut Ini, section: &str)`**
+  the bindings and the mouse settings into section `section` of a settings file (ActionMap::store,
+  MouseSettings::store): with base::Settings, `input.store(settings.ini_mut(), "input")`
+- **`fn load(&mut self, ini: &Ini, section: &str) -> usize`**
+  the bindings and the mouse settings from section `section` (Self::store) -> the bindings that
+  could not be read
+
+### `game/src/pose.rs`
+
+Source: [`lib/game/src/pose.rs`](../lib/game/src/pose.rs)
+
+```text
+pose -- where an entity is: position (f64), rotation, scale; now and at the end of the tick before,
+so that a frame between two ticks shows a state between the two
+
+  Transform         pos (Vec3, f64 as in render3d), rot (Quat, x y z w), scale ([f32; 3] as in
+                    render3d); lerp: positions and scales straight, rotations by nlerp
+  Pose              now (what the systems write) and prev (the state when the tick began);
+                    interpolate(alpha) for a frame, teleport for a jump without the in-between
+  nlerp(a, b, t)    the normalised straight blend of two rotations on the shorter way
+
+The world settles the poses at every tick (World::begin_tick -> settle): a pose written in the tick
+before gets prev = now.  Only the poses with a newer version than the mark of the tick before are
+touched, so a world of standing things costs a scan of their versions.  Everything is + - * / and the
+correctly rounded square root of lib/physics: the same bits on every target.
+```
+
+- **`struct Transform`**
+  a placement: rotate (rot), scale (scale, along the rotated axes), move (pos)
+  - `pos: Vec3` -- the position in the world (metres)
+  - `rot: Quat` -- the rotation, a unit quaternion (x, y, z, w)
+  - `scale: [f32; 3]` -- the scale per axis (render3d's; negative values mirror)
+
+**`impl Transform`**
+
+- **`const IDENTITY: Transform = Transform { pos: Vec3::ZERO, rot: Quat::IDENTITY, scale: ...`**
+  at the origin, not rotated, scale 1
+- **`const fn at(pos: Vec3) -> Transform`**
+  at pos, not rotated, scale 1
+- **`const fn new(pos: Vec3, rot: Quat) -> Transform`**
+  at pos with rotation rot, scale 1
+- **`const fn scaled(self, scale: [f32; 3]) -> Transform`**
+  the same with another scale
+- **`fn lerp(&self, b: &Transform, t: f64) -> Transform`**
+  the state t of the way from self (0) to b (1): positions and scales straight, the rotation by
+  nlerp; t = 0 and t = 1 give self and b exactly
+
+- **`fn nlerp(a: Quat, b: Quat, t: f64) -> Quat`**
+  the straight blend of two unit quaternions, normalised, on the shorter of the two ways (b's sign
+  flipped when a . b &lt; 0); t = 0 and 1 give a and b (or -b) exactly up to the normalisation
+
+- **`struct Pose`**
+  where an entity is now and where it was when the tick began: the component the world interpolates
+  (World::begin_tick) and the bridge to render3d draws
+  - `now: Transform` -- the state the systems write
+  - `prev: Transform` -- the state at the start of the tick (World::begin_tick sets it from now)
+
+**`impl Pose`**
+
+- **`const fn new(t: Transform) -> Pose`**
+  standing at t (prev = now)
+- **`const fn at(pos: Vec3) -> Pose`**
+  standing at pos, not rotated
+- **`fn teleport(&mut self, t: Transform)`**
+  a jump to t without the frames in between (prev = now = t)
+- **`fn moving(&self) -> bool`**
+  now differs from prev: frames show it between the two
+- **`fn interpolate(&self, alpha: f64) -> Transform`**
+  the state a frame shows at alpha (FixedTick::alpha: 0 at the start of the tick, towards 1 at its
+  end): prev.lerp(now, alpha)
+
+### `game/src/sparse.rs`
+
+Source: [`lib/game/src/sparse.rs`](../lib/game/src/sparse.rs)
+
+```text
+sparse -- a component column: the values of one type in dense arrays, found by entity through a
+paged sparse index (a sparse set)
+
+  SparseSet<T>      insert / remove / get / get_mut / contains in O(1); iter, iter_mut in the order of
+                    the dense arrays; the version of every entry's last change (changed_since)
+  Mut<'a, T>        what get_mut and iter_mut hand out: reading leaves the entry as it was, writing
+                    through it (DerefMut) stamps the entry with a new version
+
+The order of iteration is the order of the dense arrays: an insert appends, a remove moves the last
+entry into the hole (swap remove).  It follows from the sequence of operations alone, never from
+addresses or hashes, so two columns with the same history iterate alike on every target; sort()
+puts the entries in ascending entity order (a column rebuilt another way, from a snapshot, iterates
+as the original after both are sorted).  The sparse index is paged (1024 entity indices a page,
+allocated when an entity of the page gets a value): a column of a few entities among a million
+costs a few pages, not four bytes per entity.
+
+Versions: every column counts its changes (version()); an insert, a get_mut written through, a
+touch, and the entries iter_mut writes through take a new version.  A consumer (the bridge to
+render3d, a network snapshot) remembers the version it saw last and asks for what changed since
+(changed_since); removals() counts the entries that left, so a consumer knows when to look for
+gone ones.
+```
+
+- **`struct SparseSet<T>`**
+  the values of one component type, by entity (see the module header)
+
+- **`struct Mut<'a, T>`**
+  a value of a column handed out for writing: reads leave it unchanged, a write through it (DerefMut)
+  stamps its entry with the version the access took
+
+**`impl<'a, T> Mut<'a, T>`**
+
+- **`fn untracked(self) -> &'a mut T`**
+  the value for writing without stamping it (a change no consumer needs to see, such as a cache
+  inside the component)
+
+**`impl<T> SparseSet<T>`**
+
+- **`const fn new() -> SparseSet<T>`**
+  an empty column
+- **`fn len(&self) -> usize`**
+  entities with a value
+- **`fn is_empty(&self) -> bool`**
+  no entity has a value
+- **`fn position(&self, e: Entity) -> Option<usize>`**
+  the position of e's value in the dense arrays (the order of iteration), None without one.  A stale
+  id (an older generation of the index) has none
+- **`fn contains(&self, e: Entity) -> bool`**
+  e has a value
+- **`fn get(&self, e: Entity) -> Option<&T>`**
+  e's value
+- **`fn get_mut(&mut self, e: Entity) -> Option<Mut<'_, T>>`**
+  e's value for writing; a write through it takes a new version
+- **`fn insert(&mut self, e: Entity, value: T) -> Option<T>`**
+  e gets the value (a new version); the value it had, if any.  The column does not know which
+  entities live (World::insert refuses dead ones): another generation of the same index loses its
+  value to e, and that value comes back
+- **`fn remove(&mut self, e: Entity) -> Option<T>`**
+  e's value goes (the last entry takes its place in the order)
+- **`fn touch(&mut self, e: Entity) -> bool`**
+  stamp e's value with a new version without writing it (true: e has one)
+- **`fn clear(&mut self)`**
+  every value goes
+- **`fn entities(&self) -> &[Entity]`**
+  the entities with a value, in the order of iteration
+- **`fn values(&self) -> &[T]`**
+  the values, in the order of iteration
+- **`fn iter(&self) -> impl Iterator<Item = (Entity, &T)> + '_`**
+  (entity, value) in the order of iteration
+- **`fn iter_mut(&mut self) -> impl Iterator<Item = (Entity, Mut<'_, T>)> + '_`**
+  (entity, value for writing) in the order of iteration; the entries written through take one new
+  version
+- **`fn version(&self) -> u64`**
+  the column's version: the newest any of its entries can have
+- **`fn changed_at(&self, e: Entity) -> Option<u64>`**
+  the version of e's last change (None: no value)
+- **`fn versions(&self) -> &[u64]`**
+  the versions of the entries' last changes, in the order of iteration
+- **`fn changed_since(&self, v: u64) -> impl Iterator<Item = (Entity, &T)> + '_`**
+  (entity, value) of the entries changed after version v (inserted, written, touched), in the order
+  of iteration.  The whole column is looked at: a scan of one u64 per entry
+- **`fn changed_mut_since(&mut self, v: u64) -> impl Iterator<Item = (Entity, Mut<'_, T>)> + '_`**
+  (entity, value for writing) of the entries changed after version v, in the order of iteration; the
+  ones written through take one new version (newer than every entry the walk skips)
+- **`fn removals(&self) -> u64`**
+  how many values have left the column so far (remove, clear, despawned entities): a consumer that
+  sees the same number as last time has nothing gone to look for
+- **`fn sort(&mut self)`**
+  the entries in ascending order of their entity index: the canonical order, the same for every
+  history that ends with the same entities (versions are kept)
+- **`fn index_bytes(&self) -> usize`**
+  the bytes of the sparse index's pages (a measure for tests)
+
+### `game/src/tick.rs`
+
+Source: [`lib/game/src/tick.rs`](../lib/game/src/tick.rs)
+
+```text
+tick -- the fixed simulation rate: an accumulator over time that comes from outside, a cap on the
+steps a frame may catch up, the alpha of the frame between two ticks; systems as functions run in a
+fixed order; Game ties world, systems and clock together
+
+  FixedTick         rate (60 Hz unless set), advance_to(now_ns) / advance_by(elapsed_ns) -> steps
+                    due, alpha() in [0, 1), at most max_steps (8 unless set) per call: the rest of a
+                    long frame is dropped (dropped_ns), reset() forgets the clock (after a pause)
+  Step              what a system gets: the tick's number and dt (1 / rate seconds)
+  Systems<R>        functions fn(&mut World, &mut R, &Step) in the order they were added
+  Game<R>           a World, the resources R (everything that is not a component: the physics
+                    world, the input of the tick, the map), the Systems and the FixedTick;
+                    frame(now_ns) runs the steps due, step() one step now
+
+Time is counted exactly: the accumulator holds nanoseconds times the rate, and a step takes
+10^9 of it, so 60 Hz loses nothing to the 16.666... ms of a tick (no float sums, no drift after
+hours).  The clock comes from outside (plat::now_us in a window, follows the script's virtual clock
+in a headless run; a test passes its own numbers), so a test runs the same ticks every time.
+```
+
+```rust
+/// the simulation rate unless set (Hz)
+DEFAULT_RATE: u32 = 60
+/// the steps one call may catch up unless set (8 ticks at 60 Hz: 133 ms of a frame that hung)
+DEFAULT_MAX_STEPS: u32 = 8
+```
+
+- **`struct FixedTick`**
+  the fixed rate's accumulator (see the module header)
+
+**`impl FixedTick`**
+
+- **`fn new(rate: u32) -> FixedTick`**
+  `rate` ticks a second (1 to 10 000), at most DEFAULT_MAX_STEPS per call
+- **`fn with_max_steps(mut self, n: u32) -> FixedTick`**
+  the same with another cap on the steps one call may return (at least 1)
+- **`fn rate(&self) -> u32`**
+  ticks a second
+- **`fn max_steps(&self) -> u32`**
+  the cap on the steps of one call
+- **`fn dt(&self) -> f64`**
+  the length of a tick in seconds
+- **`fn advance_to(&mut self, now_ns: u64) -> u32`**
+  the clock stands at now_ns (any monotonic clock in nanoseconds) -> the steps due.  The first call
+  only starts the clock (0); a clock that goes back counts as standing still
+- **`fn advance_by(&mut self, elapsed_ns: u64) -> u32`**
+  elapsed_ns more have passed -> the steps due (at most max_steps; the time beyond them is dropped,
+  what is left of a step stays for the next call and the alpha)
+- **`fn alpha(&self) -> f64`**
+  how far the clock is into the next tick, in [0, 1): the alpha a frame interpolates with
+  (Pose::interpolate)
+- **`fn dropped_ns(&self) -> u64`**
+  the time the cap has dropped so far (frames that hung longer than max_steps ticks)
+- **`fn reset(&mut self)`**
+  forget the clock and the part of a tick: the next advance_to starts again (after a pause, so that
+  the time paused is not caught up)
+
+- **`struct Step`**
+  what a system gets for its tick
+  - `tick: u64` -- the tick's number (World::tick: 1 for the first)
+  - `dt: f64` -- its length in seconds (1 / rate)
+
+- **`type System<R> = fn(&mut World, &mut R, &Step)`**
+  a system: a function over the world and the game's resources, once per tick
+
+- **`struct Systems<R>`**
+  systems run in the order they were added (no scheduler: the order is the program's)
+
+**`impl<R> Systems<R>`**
+
+- **`const fn new() -> Systems<R>`**
+  none
+- **`fn add(&mut self, name: &'static str, f: System<R>) -> &mut Systems<R>`**
+  a system after the others (the name is for lists and messages)
+- **`fn add_before(&mut self, before: &str, name: &'static str, f: System<R>) -> &mut Systems<R>`**
+  a system right before the one named `before` (at the end without it)
+- **`fn remove(&mut self, name: &str) -> bool`**
+  the system named so goes (false: none)
+- **`fn run(&self, world: &mut World, res: &mut R, step: &Step)`**
+  every system once, in order
+- **`fn names(&self) -> Vec<&'static str>`**
+  their names in order
+- **`fn len(&self) -> usize`**
+  how many
+- **`fn is_empty(&self) -> bool`**
+  none
+
+- **`struct Game<R>`**
+  a world, the game's resources, its systems and its clock (see the module header)
+  - `world: World` -- the entities and their components
+  - `res: R` -- everything else the systems use
+  - `systems: Systems<R>` -- what runs every tick, in order
+  - `clock: FixedTick` -- the fixed rate
+
+**`impl<R> Game<R>`**
+
+- **`fn new(res: R) -> Game<R>`**
+  an empty world with these resources, no systems, 60 Hz
+- **`fn frame(&mut self, now_ns: u64) -> u32`**
+  the clock stands at now_ns: the steps due run (FixedTick::advance_to) -> how many ran.  Then
+  alpha() says where the frame lies between the last two states
+- **`fn step(&mut self)`**
+  one tick now, whatever the clock says: World::begin_tick, then every system
+- **`fn alpha(&self) -> f64`**
+  the frame's place between the last two ticks (FixedTick::alpha)
+
+### `game/src/world.rs`
+
+Source: [`lib/game/src/world.rs`](../lib/game/src/world.rs)
+
+```text
+world -- entities with a generation and their components, one column per component type
+
+  Entity            an index and a generation: an id of a despawned entity never means the entity
+                    that gets its index next (every use of it is refused or finds nothing)
+  Entities          the allocator: spawn takes the index freed last (a free list), despawn raises the
+                    generation; a slot whose generations are spent is never handed out again
+  World             the entities and a column (SparseSet) per component type, found by the type;
+                    spawn / despawn / insert / remove / get / get_mut / column / column_mut / pair_mut;
+                    begin_tick: the interpolation's bookkeeping of Pose (pose.rs)
+
+No archetypes and no scheduler (docs/GAME.md, G7b: until a measurement asks for them).  A system is a
+function over the world (tick.rs) that takes the columns it needs: one column is a slice of values in
+the order of iteration, a join walks the smaller column and looks the entity up in the other.  The
+world keeps no unordered container: columns are found by their TypeId in a sorted list (a lookup,
+nothing iterates in that order), entities and values iterate in index and column order.
+```
+
+- **`struct Entity`**
+  an entity: an index (its slot) and a generation (how often the slot was handed out before).  Plain
+  data: the world decides whether it lives
+
+**`impl Entity`**
+
+- **`const NONE: Entity = Entity { index: u32::MAX, generation: u32::MAX }`**
+  no entity: never alive, in no column
+- **`const fn index(self) -> u32`**
+  the slot of the entity
+- **`const fn generation(self) -> u32`**
+  how often its slot was handed out before it
+- **`const fn to_bits(self) -> u64`**
+  generation in the high, index in the low 32 bits (for a message or a file)
+- **`const fn from_bits(bits: u64) -> Entity`**
+  the entity of to_bits
+
+- **`struct Entities`**
+  the allocator of entities (World holds one)
+
+**`impl Entities`**
+
+- **`const fn new() -> Entities`**
+  no entities
+- **`fn spawn(&mut self) -> Entity`**
+  a new entity: the slot freed last, with its next generation, else a new slot
+- **`fn despawn(&mut self, e: Entity) -> bool`**
+  e dies, its slot is free for the next generation (false: e was not alive)
+- **`fn alive(&self, e: Entity) -> bool`**
+  e lives: its slot is taken and has e's generation
+- **`fn at(&self, index: u32) -> Option<Entity>`**
+  the entity alive in slot `index`
+- **`fn len(&self) -> u32`**
+  entities alive
+- **`fn is_empty(&self) -> bool`**
+  none alive
+- **`fn slots(&self) -> u32`**
+  slots so far (alive, free, spent)
+- **`fn iter(&self) -> impl Iterator<Item = Entity> + '_`**
+  the live entities in ascending order of their index
+
+- **`trait Bundle`**
+  a bundle of components for World::spawn_with: a tuple of one to six values of different types
+  - `fn insert_into(self, world: &mut World, e: Entity)`
+    every value to e (World::insert)
+
+- **`struct World`**
+  entities and their components (see the module header)
+
+**`impl World`**
+
+- **`fn new() -> World`**
+  an empty world
+- **`fn entities(&self) -> &Entities`**
+  the allocator: which entities live
+- **`fn spawn(&mut self) -> Entity`**
+  a new entity without components
+- **`fn spawn_with<B: Bundle>(&mut self, bundle: B) -> Entity`**
+  a new entity with the components of a tuple: `world.spawn_with((Pose::at(p), Health(100)))`
+- **`fn despawn(&mut self, e: Entity) -> bool`**
+  e dies with all its components (false: e was not alive: a stale id changes nothing)
+- **`fn alive(&self, e: Entity) -> bool`**
+  e lives
+- **`fn len(&self) -> u32`**
+  entities alive
+- **`fn is_empty(&self) -> bool`**
+  none alive
+- **`fn register<T: 'static>(&mut self)`**
+  make the column of T now (a column is otherwise made by its first insert or column_mut)
+- **`fn column<T: 'static>(&self) -> Option<&SparseSet<T>>`**
+  the column of T (None: nothing ever asked for it)
+- **`fn column_mut<T: 'static>(&mut self) -> &mut SparseSet<T>`**
+  the column of T for writing, made if there is none.  Its values may be written; insert values
+  through World::insert, which refuses dead entities (the column alone does not know them)
+- **`fn pair_mut<A: 'static, B: 'static>(&mut self) -> (&mut SparseSet<A>, &mut SparseSet<B>)`**
+  the columns of two different types for writing at once (a system that writes one by the other).
+  Panics when A and B are the same type
+- **`fn insert<T: 'static>(&mut self, e: Entity, value: T) -> bool`**
+  e gets the component (replacing one of the same type); false: e is not alive, nothing changes
+- **`fn remove<T: 'static>(&mut self, e: Entity) -> Option<T>`**
+  e's component of type T goes; the value
+- **`fn get<T: 'static>(&self, e: Entity) -> Option<&T>`**
+  e's component of type T
+- **`fn get_mut<T: 'static>(&mut self, e: Entity) -> Option<Mut<'_, T>>`**
+  e's component of type T for writing (a write through it takes a new version)
+- **`fn has<T: 'static>(&self, e: Entity) -> bool`**
+  e has a component of type T
+- **`fn columns(&self) -> Vec<(&'static str, usize)>`**
+  (type name, values) of every column, in the order they were made (what a world holds: tests, an
+  inspector)
+- **`fn sort_columns(&mut self)`**
+  every column in ascending entity order (SparseSet::sort): the canonical order of iteration, the
+  same for a world rebuilt from a snapshot as for the one it came from
+- **`fn begin_tick(&mut self)`**
+  the start of a tick, before its systems (Game::step calls it): the tick count goes up, and every
+  Pose written in the tick before gets that state as its previous one (prev = now), the state the
+  next frames interpolate from.  Only those poses are touched: a scan of one version per pose
+- **`fn tick(&self) -> u64`**
+  ticks begun so far (begin_tick)
+- **`fn pose_mark(&self) -> u64`**
+  the Pose column's version when the systems of the latest tick began: poses with a newer version
+  moved in that tick and are between two states (the bridge to render3d writes them every frame)
+
+## game_render3d
+
+*The bridge from the game core to render3d: entities with a mesh as scene instances* -- crate root [`lib/game_render3d/src/lib.rs`](../lib/game_render3d/src/lib.rs)
+
+```text
+game_render3d -- the bridge from the game core (lib/game) to render3d: entities with a mesh are
+instances of a render3d scene, only what changed is written, the scene's origin follows the camera
+
+  MeshRef            the component: a render3d mesh and material (an entity with one is drawn, at its
+                     Pose, or at the origin without one)
+  Bridge::sync       the world into the scene: new MeshRefs are added (Scene::add), changed ones
+                     switched (set_mesh, set_material), gone ones removed (Scene::remove), poses that
+                     changed written (set_transform) at the frame's alpha (Pose::interpolate); a pose
+                     between two ticks is written every frame, a standing one once
+  Bridge::follow     the scene's origin (Scene::set_origin) follows the camera's eye in steps of
+                     origin_step metres (512 unless set): f32 on the GPU stays fine near the camera
+  Bridge::retire_* / collect   meshes and materials the game is done with go from the renderer
+                     (Renderer::remove_mesh / remove_material) once no instance of the bridge uses them
+  camera, transform  a game View as render3d::Camera, a game Transform as render3d::Transform
+
+Why a crate of its own and not a module of lib/game behind a feature: a game's server is built from the
+same workspace as its client, and Cargo unifies a crate's features over everything one `cargo build`
+builds (build_rs.py builds an app and its BINS together).  A feature "render3d" of lib/game would put
+render3d, gpu and their link directives into the server's program; a crate the server does not name
+never enters its graph.  The library has no features besides std either (docs/CRATES.md).
+
+What the bridge reads: the versions of the MeshRef and Pose columns (SparseSet::changed_since), the
+MeshRef column's removals (a sweep over its own entries only when something left), World::pose_mark
+(the poses that moved in the latest tick: between two states, written every frame).  Per frame that is
+a scan of one u64 per pose while something moved in the latest tick (none when no column changed), plus
+the work for what changed.  The bridge keeps per entity index its instance and the transform it wrote
+last: a write that would change nothing is left out.
+```
+
+### `game_render3d` crate root
+
+- **`struct MeshRef`**
+  what an entity looks like: a mesh and a material of the renderer the scene belongs to
+  - `mesh: MeshId` -- the mesh (Renderer::add_mesh)
+  - `material: MaterialId` -- the material (Renderer::add_material)
+
+- **`struct SyncStats`**
+  what a sync did
+  - `added: u32` -- instances added (Scene::add)
+  - `removed: u32` -- instances removed (Scene::remove)
+  - `switched: u32` -- meshes or materials switched (Scene::set_mesh, set_material)
+  - `moved: u32` -- transforms written (Scene::set_transform)
+  - `visited: u32` -- poses looked at (changed since the last sync, or between two ticks)
+
+```rust
+/// the origin's step unless set (metres): f32 has a step of 0.06 mm at 1 km from the origin
+ORIGIN_STEP: f64 = 512.0
+```
+
+- **`struct Bridge`**
+  the world's entities with a MeshRef as instances of one scene (see the module header)
+
+- **`fn transform(t: &game::Transform) -> render3d::Transform`**
+  a game transform as render3d's (the position stays f64)
+
+- **`fn camera(v: &View, fov_y: f64, aspect: f64, near: f64, far: f64) -> Camera`**
+  a game view through a lens: vertical field of view (radians), width / height, near, far
+  (f64::INFINITY: none)
+
+**`impl Bridge`**
+
+- **`fn new() -> Bridge`**
+  no instances yet
+- **`fn len(&self) -> u32`**
+  instances the bridge holds
+- **`fn is_empty(&self) -> bool`**
+  none
+- **`fn instance(&self, e: Entity) -> Option<InstanceId>`**
+  the instance of entity e
+- **`fn mesh_users(&self, m: MeshId) -> u32`**
+  instances using mesh m
+- **`fn material_users(&self, m: MaterialId) -> u32`**
+  instances using material m
+- **`fn sync(&mut self, world: &World, scene: &mut Scene, alpha: f64) -> Result<SyncStats>`**
+  the world into the scene for a frame at `alpha` (FixedTick::alpha; Pose::interpolate) -> what it
+  did.  The scene is the one the bridge has filled so far (another one after reset).  An error of
+  render3d (a mesh or material it does not have, a removed one) ends the sync there; the next one goes
+  on from the same place
+- **`fn reset(&mut self)`**
+  the scene went with its device (GpuContent::detach): forget every instance, the next sync adds
+  everything to the new scene
+- **`fn clear(&mut self, scene: &mut Scene) -> Result<()>`**
+  every instance of the bridge goes from the scene (the next sync adds them again)
+- **`fn retire_mesh(&mut self, m: MeshId)`**
+  the game is done with mesh m: collect removes it from the renderer once no instance of the bridge
+  uses it (no entity may get a MeshRef with it afterwards)
+- **`fn retire_material(&mut self, m: MaterialId)`**
+  the game is done with material m (see retire_mesh)
+- **`fn collect(&mut self, r: &mut Renderer) -> Result<u32>`**
+  meshes and materials retired and not used by any instance of the bridge go from the renderer
+  (Renderer::remove_mesh, remove_material; after a sync, before the next prepare) -> how many went.
+  One the renderer refuses (another scene uses it, a mesh takes it as a detail level) stays retired
+  for the next call; the first refusal is the error when nothing went
+- **`fn retired(&self) -> (usize, usize)`**
+  meshes and materials retired and still waiting (in use)
+- **`fn set_origin_step(&mut self, step: f64)`**
+  the step the origin moves in (metres, a power of two keeps positions exact; at least 1)
+- **`fn origin_step(&self) -> f64`**
+  the origin's step
+- **`fn follow(&mut self, scene: &mut Scene, eye: [f64; 3]) -> bool`**
+  the scene's origin follows the eye: once the eye is more than one step from the origin on an
+  axis, the origin moves to the eye rounded to the step (Scene::set_origin uploads every instance
+  once) -> it moved
+
+## geom
+
+*Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks* -- crate root [`lib/geom/src/lib.rs`](../lib/geom/src/lib.rs)
+
+```text
+geom -- the modelling kernel of the game engine (docs/GEOM.md, GAME.md stage G7g): indexed triangle meshes
+built from primitives, profiles and operations, checked, the same bits on every target
+
+  Mesh           positions, normals, UV (f64), indices and points (the topology: a hard edge does not
+                 open a surface, touching parts stay apart); transformed, translated, rotated (degrees,
+                 exact at multiples of 90), scaled, mirrored, flipped, merge, array, radial, weld; flat,
+                 smooth (angle threshold), uv_box (box projection in metres); bounds, area, volume,
+                 fingerprint; check() -> Report
+  build          cuboid, cylinder, cone, sphere, torus, stairs, arch (standing on y = 0, centred over
+                 the origin), extrude (front-view profile along Z), prism (floor plan up along Y), sweep
+                 (profile along a path, mitred corners, rotation-minimising frames), lathe (profile about Y)
+  poly           2D profiles: area, cleaning, triangulation (ear clipping), rect, circle, arc, rounded_rect
+  Report         closed, manifold, outward, degenerate triangles, normals, bounds, area, volume, Euler
+                 characteristic, components; json()
+  math           Vec3, Aabb, Affine in f64; sqrt correctly rounded, sin / cos / atan2 from rt's portable
+                 math, sin_cos_deg exact at multiples of 90 degrees
+
+Metres, right-handed, Y up, faces counter-clockwise from outside (render3d, lib/physics, glTF).  A script
+describes a model (apps/modeltool binds JFScript), this crate does the geometry: it has a plain Rust API and
+knows no script.  Deterministic: only + - * / and correctly rounded square roots in f64, trigonometry from
+rt's portable math, sorting with unique keys, no unordered containers, no threads, so the same calls give the
+same mesh bits on every target (the checksum of apps/modeltool).  Error texts are German, like JFScript's: they
+end up in front of whoever wrote the script.
+```
+
+### `geom` crate root
+
+```rust
+/// The most triangles a mesh may have (2^24): a limit against runaway parameters, far above a game model.
+MAX_TRIANGLES: usize = 1 << 24
+/// The most segments of a round primitive, a lathe or stairs.
+MAX_SEGMENTS: usize = 4096
+/// The most copies of an array.
+MAX_COPIES: usize = 100_000
+```
+
+- **`enum Error`**
+  Why an operation made no mesh; the text (German) says what to change.
+  - `Param(String)` -- a parameter out of range: a length not above 0, a segment count, an arch that does not fit
+  - `Profile(String)` -- a profile with too few points, no area, crossing edges or one that cannot be triangulated
+  - `Path(String)` -- a path with too few points or one that turns back on itself
+  - `TooBig(String)` -- more triangles, points or copies than the limits allow
+  - `Invalid(String)` -- arrays of a mesh that do not fit together (from_triangles, validate)
+
+**`impl Error`**
+
+- **`fn message(&self) -> &str`**
+  the text
+
+### `geom/src/build.rs`
+
+Source: [`lib/geom/src/build.rs`](../lib/geom/src/build.rs)
+
+```text
+build -- the generators: primitives (box, cylinder, cone, sphere, torus, stairs, arch) and the operations
+that make solids from profiles (extrude, prism, sweep along a path, lathe).  Every one gives a closed
+mesh whose faces point outward, with normals and box-projected UV in metres.  Every primitive stands on
+the ground: its lowest point at y = 0, centred over the origin (the rule a script relies on to stack
+parts); profiles are counter-clockwise or not, the generators turn them as needed.
+```
+
+```rust
+/// the threshold in degrees for the normals of extrusions, sweeps and lathes: edges sharper than it stay hard
+DEFAULT_SMOOTH_DEG: f64 = 30.0
+```
+
+- **`fn cuboid(w: f64, h: f64, d: f64) -> Result<Mesh, Error>`**
+  A box `w` x `h` x `d` (x, y, z) standing on y = 0, centred over the origin: 8 corners, 12 triangles, flat
+  normals (24 vertices), box UV in metres.
+
+- **`fn cylinder(r: f64, h: f64, n: usize) -> Result<Mesh, Error>`**
+  A cylinder of radius `r` and height `h` on y = 0 about the Y axis, `n` segments: smooth sides, flat caps.
+
+- **`fn cone(r: f64, h: f64, n: usize, top: f64) -> Result<Mesh, Error>`**
+  A cone (or with `top` > 0 a frustum) of base radius `r`, top radius `top` and height `h` on y = 0 about
+  the Y axis, `n` segments.
+
+- **`fn sphere(r: f64, n: usize, stacks: usize) -> Result<Mesh, Error>`**
+  A UV sphere of radius `r` resting on y = 0 (centre at y = r), `n` segments around and `stacks` from pole
+  to pole, smooth (flat where a step is 85 degrees or more).
+
+- **`fn torus(major: f64, minor: f64, n: usize, sides: usize) -> Result<Mesh, Error>`**
+  A torus lying flat on y = 0 about the Y axis: `major` from the axis to the middle of the tube, tube
+  radius `minor` (less than `major`), `n` segments around the axis and `sides` around the tube, smooth
+  (flat where a step is 85 degrees or more).
+
+- **`fn stairs(w: f64, h: f64, d: f64, steps: usize) -> Result<Mesh, Error>`**
+  Stairs `w` wide (x), `h` high and `d` deep (z) with `steps` steps on y = 0, centred over the origin: the
+  first riser at the front (z = d / 2), rising towards the back, a solid block under the steps.  Flat.
+
+- **`fn arch(w: f64, h: f64, d: f64, thickness: f64, n: usize) -> Result<Mesh, Error>`**
+  An arch `w` wide (x), `h` high and `d` deep (z) on y = 0, centred over the origin: two piers
+  `thickness` thick, the opening below a half circle of `n` segments, `thickness` of material over its
+  crown.  The opening is `w - 2 thickness` wide and needs room for the half circle.
+
+- **`fn extrude(profile: &[[f64; 2]], depth: f64) -> Result<Mesh, Error>`**
+  The profile (x, y; the front view) extruded `depth` along Z, centred on z = 0: the front cap at
+  z = depth / 2.  Smooth up to [`DEFAULT_SMOOTH_DEG`].
+
+- **`fn prism(footprint: &[[f64; 2]], height: f64) -> Result<Mesh, Error>`**
+  The footprint (x, z; the top view) raised `height` along Y from y = 0: walls from a floor plan.
+
+- **`fn sweep(profile: &[[f64; 2]], path: &[Vec3], closed: bool, smooth_deg: f64) -> Result<Mesh, Error>`**
+  The profile swept along a path of points.  The profile's x runs to the right of the path, y up (the
+  world's Y where the path is not vertical; for a vertical path x is X and y is Z), seen looking along
+  the path; frames turn with the path without twisting (rotation-minimising), corners are mitred, the ends
+  capped.  A closed path joins its last point to the first (no caps; a twist the loop leaves is spread
+  over its segments).  Smooth up to `smooth_deg` degrees (0: flat).
+
+- **`fn lathe(profile: &[[f64; 2]], n: usize, smooth_deg: f64) -> Result<Mesh, Error>`**
+  The profile (radius, height) turned about the Y axis in `n` segments: a solid of revolution.  The
+  profile is a closed polygon in the half plane radius >= 0; edges on the axis make no faces, points on it
+  become poles, so a profile from the axis around to the axis gives a solid without a hole (a column, a
+  vase), one away from the axis a ring.  Smooth up to `smooth_deg` degrees (0: flat).
+
+### `geom/src/check.rs`
+
+Source: [`lib/geom/src/check.rs`](../lib/geom/src/check.rs)
+
+```text
+check -- what a model must be, measured: closed and manifold (every edge between exactly two triangles,
+one fan around every point), consistently wound with the faces outward (positive volume per closed
+part), normals that agree with the faces, no degenerate triangles; bounds, area, volume, counts.  The
+topology is the mesh's points (Mesh::points), so hard edges and UV seams do not open a mesh and parts
+that only touch are not counted as non-manifold.  The report is plain data and JSON for tools
+(apps/modeltool).
+```
+
+```rust
+/// A triangle counts as degenerate when two corners are one point or its height above the longest edge is
+/// below this fraction of that edge (collinear corners, slivers no renderer shows)
+DEGENERATE_RATIO: f64 = 1e-9
+/// A stored normal counts as wrong when its length is off 1 by more than this, or when it points away from
+/// its triangle's face (a dot product of 0 or less)
+NORMAL_TOLERANCE: f64 = 1e-6
+```
+
+- **`struct Report`**
+  The checks of a mesh (see [`Mesh::check`]).  Counts of problems are 0 for a good mesh.
+  - `vertices: usize` -- vertices of the mesh
+  - `triangles: usize` -- triangles of the mesh
+  - `points: usize` -- points of the topology (`Mesh::points`)
+  - `edges: usize` -- distinct edges between points
+  - `bounds: Option<Aabb>` -- the bounds in metres (None for an empty mesh)
+  - `area: f64` -- square metres
+  - `volume: f64` -- cubic metres, signed (outward faces: positive); meaningful when closed
+  - `components: usize` -- parts connected across edges
+  - `euler: i64` -- V - E + F summed over the components (2 per closed part without a hole, 0 for a torus)
+  - `open_edges: usize` -- edges with one triangle: the mesh has a hole there
+  - `nonmanifold_edges: usize` -- edges with more than two triangles
+  - `flipped_edges: usize` -- edges whose two triangles run the same way: one of them is turned
+  - `nonmanifold_points: usize` -- points whose triangles form more than one fan (two parts touching at a point)
+  - `inverted_components: usize` -- closed components with a negative volume: inside out
+  - `degenerate: usize` -- triangles without area (see [`DEGENERATE_RATIO`])
+  - `bad_normals: usize` -- vertex normals that are not unit length or point away from their face (see [`NORMAL_TOLERANCE`])
+
+**`impl Report`**
+
+- **`fn closed(&self) -> bool`**
+  closed and manifold: no open, non-manifold or flipped edges, no pinched points
+- **`fn outward(&self) -> bool`**
+  faces point outward: consistently wound (no flipped edges) and no closed part inside out
+- **`fn ok(&self) -> bool`**
+  every check passed: closed, outward, no degenerate triangles, good normals
+- **`fn size(&self) -> Vec3`**
+  width, height, depth in metres (0 for an empty mesh)
+- **`fn json(&self) -> String`**
+  the report as one JSON object, keys in a fixed order, numbers rounded to 1e-9 (metres: a nanometre)
+
+- **`fn fnum(v: f64) -> String`**
+  a number for JSON: rounded to 9 decimals, without trailing zeros, -0 as 0, NaN and infinities as null
+
+**`impl Mesh`**
+
+- **`fn check(&self) -> Report`**
+  Measure the mesh: counts, bounds, area, volume and the topology checks of [`Report`].
+
+### `geom/src/math.rs`
+
+Source: [`lib/geom/src/math.rs`](../lib/geom/src/math.rs)
+
+```text
+math -- the vectors and affine maps of the crate, in f64, with operations that give the same bits on every
+target: + - * / and a correctly rounded square root, never a fused multiply-add (Rust does not contract
+a * b + c on its own); sin, cos and atan2 from rt's portable math (docs/ARM64.md, ARM2), the same code on
+every target.  Angles of the modelling API are degrees: a multiple of 90 degrees turns exactly (sin and cos
+are 0 and +-1 there), so a box turned by 90 degrees keeps exact corners and copies of a radial array in
+four meet without a gap.  The same scheme as lib/physics' math (docs/PHYSICS.md, "Bitgleich").
+```
+
+- **`fn sqrt(x: f64) -> f64`**
+  The square root, correctly rounded (IEEE 754), so the same bits on every target: the processor's
+  instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64), elsewhere (the browser, the x86-64
+  Android emulator) [`sqrt_portable`].  A negative argument gives NaN, -0.0 gives -0.0.
+
+- **`fn sqrt_portable(x: f64) -> f64`**
+  The correctly rounded square root from f64 operations and one 64 x 64 bit product (lib/physics has the
+  same function and its tests against the processor): Newton's method gives an estimate within a few units
+  in the last place, the integer test (R - 1/2)^2 &lt; X &lt;= (R + 1/2)^2 on the significand picks the right
+  neighbour.  Public for the tests.
+
+- **`fn sin(x: f64) -> f64`**
+  sin of `x` (radians), the same bits on every target (within half an ulp)
+
+- **`fn cos(x: f64) -> f64`**
+  cos of `x` (radians), the same bits on every target
+
+- **`fn atan2(y: f64, x: f64) -> f64`**
+  atan2(y, x) in radians, the same bits on every target
+
+```rust
+/// The largest angle in degrees [`sin_cos_deg`] takes (beyond it NaN): far more than any modelling needs, and
+/// small enough that the reduction stays exact.
+MAX_DEGREES: f64 = 1e12
+```
+
+- **`fn sin_cos_deg(deg: f64) -> (f64, f64)`**
+  (sin, cos) of an angle in degrees, the same bits on every target and exact at every multiple of 90
+  degrees (0 and +-1): the angle is reduced exactly to the nearest multiple of 90 and a rest of at most 45
+  degrees, whose sine and cosine come from rt's portable math.  NaN for a NaN angle or one beyond
+  [`MAX_DEGREES`].
+
+- **`fn floor(x: f64) -> f64`**
+  the largest integer not above `x` for |x| &lt; 2^62 (the crate's reductions; larger ones as they are), the
+  same on every target
+
+- **`fn abs(x: f64) -> f64`**
+  |x| (the sign bit cleared)
+
+- **`fn angle_deg(a: Vec3, b: Vec3) -> f64`**
+  the angle between two directions in degrees, 0 ..= 180 (atan2 of the cross product's length and the dot
+  product: accurate at 0 and 180 too); 0 when one of them is zero
+
+- **`fn min(a: f64, b: f64) -> f64`**
+  the smaller of two numbers (`b` when they are equal or one is NaN)
+
+- **`fn max(a: f64, b: f64) -> f64`**
+  the larger of two numbers (`b` when they are equal or one is NaN)
+
+- **`fn unsign_zero(x: f64) -> f64`**
+  `x` with -0.0 turned into +0.0 (the same bits for the same point; welding and hashing compare bits)
+
+- **`struct Vec3`**
+  A point or a direction in metres, `f64`; right-handed, Y up (render3d's and lib/physics' convention).
+  - `x: f64` -- metres (or a direction's component)
+  - `y: f64` -- metres, up
+  - `z: f64` -- metres, towards the viewer of the front view
+
+**`impl Vec3`**
+
+- **`const ZERO: Vec3 = Vec3::new(0.0, 0.0, 0.0)`**
+  (0, 0, 0)
+- **`const X: Vec3 = Vec3::new(1.0, 0.0, 0.0)`**
+  the unit vector along X
+- **`const Y: Vec3 = Vec3::new(0.0, 1.0, 0.0)`**
+  the unit vector along Y (up)
+- **`const Z: Vec3 = Vec3::new(0.0, 0.0, 1.0)`**
+  the unit vector along Z (towards the front view's camera)
+- **`const fn new(x: f64, y: f64, z: f64) -> Vec3`**
+  (x, y, z)
+- **`fn dot(self, o: Vec3) -> f64`**
+  the dot product, summed x, y, z in this order
+- **`fn cross(self, o: Vec3) -> Vec3`**
+  the cross product (right-handed)
+- **`fn length_sq(self) -> f64`**
+  the squared length
+- **`fn length(self) -> f64`**
+  the length (correctly rounded root)
+- **`fn try_normalize(self) -> Option<Vec3>`**
+  the unit vector in this direction, None for a zero (or not finite) vector
+- **`fn normalize_or_zero(self) -> Vec3`**
+  the unit vector in this direction; a zero vector stays zero
+- **`fn min(self, o: Vec3) -> Vec3`**
+  the smaller coordinates of both
+- **`fn max(self, o: Vec3) -> Vec3`**
+  the larger coordinates of both
+- **`fn is_finite(self) -> bool`**
+  whether every coordinate is finite
+- **`fn unsigned_zeros(self) -> Vec3`**
+  the same point with -0.0 coordinates as +0.0
+- **`fn key(self) -> [u64; 3]`**
+  the bits of the coordinates with -0.0 as +0.0: equal for equal points (the key of welding)
+- **`fn to_f32(self) -> [f32; 3]`**
+  the coordinates as f32 (render3d, glTF)
+- **`fn get(self, axis: Axis) -> f64`**
+  the coordinate along an axis
+
+- **`enum Axis`**
+  one of the three axes (mirror planes, rotations, the dominant axis of a normal)
+  - `X` -- left to right
+  - `Y` -- up
+  - `Z` -- back to front
+
+- **`struct Aabb`**
+  An axis-aligned box in metres (the bounds of a mesh).
+  - `min: Vec3` -- the smallest coordinates
+  - `max: Vec3` -- the largest coordinates
+
+**`impl Aabb`**
+
+- **`fn point(p: Vec3) -> Aabb`**
+  the box around one point
+- **`fn grow(&mut self, p: Vec3)`**
+  the box grown to hold `p`
+- **`fn union(self, o: Aabb) -> Aabb`**
+  the box around both
+- **`fn size(&self) -> Vec3`**
+  width, height, depth (max - min)
+- **`fn center(&self) -> Vec3`**
+  the middle
+
+- **`struct Affine`**
+  An affine map p -> m p + t in f64: rotations, scales, mirrors and moves of the modelling operations.
+  `m` holds rows.
+  - `m: [[f64; 3]; 3]` -- the linear part, rows
+  - `t: Vec3` -- the move after it
+
+**`impl Affine`**
+
+- **`const IDENTITY: Affine = Affine { m: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, ...`**
+  the map that changes nothing
+- **`fn translation(t: Vec3) -> Affine`**
+  a move by `t`
+- **`fn scale(s: Vec3) -> Affine`**
+  a scale along the axes (a negative factor mirrors)
+- **`fn mirror(axis: Axis) -> Affine`**
+  the mirror at the plane through the origin across `axis` (x -> -x for Axis::X)
+- **`fn rotation(axis: Axis, deg: f64) -> Affine`**
+  a rotation by `deg` degrees about an axis through the origin, counter-clockwise when the axis points
+  at the viewer (right-handed); exact at multiples of 90 degrees
+- **`fn rotation_about(axis: Vec3, deg: f64) -> Option<Affine>`**
+  a rotation by `deg` degrees about the direction `axis` (any length) through the origin, right-handed
+  (Rodrigues); None for a zero axis
+- **`fn then_after(&self, first: &Affine) -> Affine`**
+  `self` after `first`: p -> self(first(p))
+- **`fn apply(&self, p: Vec3) -> Vec3`**
+  m p + t, with -0.0 coordinates as +0.0
+- **`fn apply_vector(&self, v: Vec3) -> Vec3`**
+  m v (a direction: without the move)
+- **`fn determinant(&self) -> f64`**
+  the determinant of the linear part (negative: the map mirrors, faces must turn)
+- **`fn normal_matrix(&self) -> [[f64; 3]; 3]`**
+  the map of normals: the inverse transposed linear part up to a positive factor (the cofactor matrix,
+  times the determinant's sign), so that a normal maps to a normal pointing the same way out
+- **`fn is_finite(&self) -> bool`**
+  whether every number is finite
+- **`fn is_similarity(&self) -> bool`**
+  whether the linear part keeps angles: a rotation, a mirror or a uniform scale (m^T m = s^2 I to 1e-12),
+  so normals can simply be turned with it
+
+### `geom/src/mesh.rs`
+
+Source: [`lib/geom/src/mesh.rs`](../lib/geom/src/mesh.rs)
+
+```text
+mesh -- the indexed triangle mesh of the crate and the operations that keep its topology: moves,
+rotations, scales, mirrors, arrays, merging, turning the faces; bounds, area, volume; the fingerprint of
+its bits.  Normals and UV are in normals.rs, the checks in check.rs.
+```
+
+- **`struct Mesh`**
+  An indexed triangle mesh in metres: one normal and one UV per position, three indices per triangle,
+  counter-clockwise seen from outside (render3d's and glTF's convention), and the topology: each vertex
+  belongs to a point of the surface (`points`).  A hard edge or a UV seam is two vertices of one point, as a
+  GPU needs it; normals and the checks follow the points, so such a split does not open the mesh, while two
+  parts that only touch (the pieces of a wall) stay two closed parts.  [`Mesh::weld`] joins the points of
+  vertices at the same place (a half and its mirror image).
+  - `positions: Vec<Vec3>` -- metres
+  - `normals: Vec<Vec3>` -- unit vectors, one per position (zero until a normal operation ran on a raw mesh)
+  - `uvs: Vec<[f64; 2]>` -- texture coordinates, one per position; the box projection gives metres (normals.rs)
+  - `points: Vec<u32>` -- the point of each vertex, numbered 0 .. point count without gaps
+  - `indices: Vec<u32>` -- three per triangle
+
+**`impl Mesh`**
+
+- **`fn new() -> Mesh`**
+  an empty mesh
+- **`fn from_triangles(positions: Vec<Vec3>, indices: Vec<u32>) -> Result<Mesh, Error>`**
+  a mesh of positions and triangles, every vertex its own point, normals and UV zero (a raw mesh: the
+  generators share vertices where the surface is connected and give it to [`Mesh::smooth`] or
+  [`Mesh::flat`]); Err for an index count that is no multiple of 3, an index out of range or a position
+  that is not finite
+- **`fn validate(&self) -> Result<(), Error>`**
+  whether the arrays fit together: as many normals, UV and points as positions, points numbered without
+  gaps, whole triangles, indices in range, every number finite, at most [`MAX_TRIANGLES`]
+- **`fn vertex_count(&self) -> usize`**
+  the number of vertices (positions)
+- **`fn point_count(&self) -> usize`**
+  the number of points (vertices joined by the topology)
+- **`fn triangle_count(&self) -> usize`**
+  the number of triangles
+- **`fn triangle(&self, t: usize) -> [u32; 3]`**
+  the three indices of triangle `t`
+- **`fn corners(&self, t: usize) -> [Vec3; 3]`**
+  the three corners of triangle `t`
+- **`fn bounds(&self) -> Option<Aabb>`**
+  the box around every position, None for a mesh without positions
+- **`fn area(&self) -> f64`**
+  the surface area in square metres: the triangles' areas summed in order
+- **`fn volume(&self) -> f64`**
+  the signed volume in cubic metres (divergence theorem, relative to the middle of the bounds for
+  accuracy): positive for a closed mesh whose faces point outward, meaningless for an open one
+- **`fn transformed(&self, a: &Affine) -> Mesh`**
+  The mesh mapped by `a`: positions moved; a map that keeps angles (rotation, mirror, uniform scale)
+  turns the normals with it, any other (a scale that differs per axis) computes them again from the
+  mapped faces within the same smoothing groups, so hard edges stay hard and smooth ones smooth; a map
+  that mirrors (negative determinant) turns the triangles, so faces keep pointing outward.  UV stay
+  (call [`Mesh::uv_box`] again for metres in the new place).
+- **`fn translated(&self, v: Vec3) -> Mesh`**
+  moved by (x, y, z) metres
+- **`fn rotated(&self, axis: Axis, deg: f64) -> Mesh`**
+  turned by `deg` degrees about an axis through the origin (right-handed; exact at multiples of 90)
+- **`fn scaled(&self, s: Vec3) -> Mesh`**
+  scaled along the axes about the origin (a negative factor mirrors; faces are turned to stay outward)
+- **`fn mirrored(&self, axis: Axis) -> Mesh`**
+  mirrored at the plane through the origin across `axis` (x -> -x for Axis::X), faces turned so they
+  point outward
+- **`fn flipped(&self) -> Mesh`**
+  the triangles turned the other way (normals negated): inside out
+- **`fn append(&mut self, o: &Mesh)`**
+  append `o` (its indices and points shifted: its points stay its own)
+- **`fn merge(meshes: &[&Mesh]) -> Result<Mesh, Error>`**
+  the meshes as one, in order (each keeps its own vertices and points: parts that touch stay apart in the
+  topology; [`Mesh::weld`] joins them)
+- **`fn array(&self, count: usize, step: Vec3) -> Result<Mesh, Error>`**
+  `count` copies, copy i moved by i \* `step` (copy 0 where the mesh is), as one mesh
+- **`fn radial(&self, count: usize, step_deg: f64) -> Result<Mesh, Error>`**
+  `count` copies about the Y axis through the origin, copy i turned by i \* `step_deg` degrees (counter-
+  clockwise seen from above), as one mesh; 360 / count for a full circle
+- **`fn positions_f32(&self) -> Vec<[f32; 3]>`**
+  the positions as f32 (render3d's MeshData, glTF)
+- **`fn normals_f32(&self) -> Vec<[f32; 3]>`**
+  the normals as f32
+- **`fn uvs_f32(&self) -> Vec<[f32; 2]>`**
+  the UV as f32
+- **`fn fingerprint(&self) -> u64`**
+  FNV-1a (64 bits) over the bits of every position, normal, UV and index in order: equal for equal
+  meshes on every target (the determinism checksums, cache checks)
+- **`fn weld(&self, tolerance: f64) -> Mesh`**
+  The points of vertices at the same place joined: at the bit-equal position (-0.0 = +0.0) for
+  `tolerance` 0, else within `tolerance` metres on every axis (and through chains of such pairs).
+  Positions stay; only the topology changes, so a half and its mirror image merged and welded are one
+  closed surface.  Points are numbered again in the order of their first vertex.
+
+- **`struct Fnv(pub u64)`**
+  FNV-1a over 64-bit words, the hash of [`Mesh::fingerprint`] (public for checksums over several meshes and
+  numbers)
+
+**`impl Fnv`**
+
+- **`fn new() -> Fnv`**
+  the offset basis
+- **`fn u(&mut self, v: u64)`**
+  fold the 8 bytes of a word in, little-endian
+- **`fn f(&mut self, v: f64)`**
+  fold a number's bits in
+- **`fn v(&mut self, v: Vec3)`**
+  fold a vector's bits in, x, y, z
+
+### `geom/src/normals.rs`
+
+Source: [`lib/geom/src/normals.rs`](../lib/geom/src/normals.rs)
+
+```text
+normals -- vertex normals and texture coordinates: flat (each triangle its own normal), smooth with an
+angle threshold (the triangles around a point share a normal across every edge flatter than the
+threshold, split at sharper ones), and UV by box projection in metres.  Each rebuilds the vertices from
+the triangles' corners: corners with the same position, normal and UV become one vertex, in the order of
+their first corner, so the result is the same on every target.
+```
+
+**`impl Mesh`**
+
+- **`fn flat(&self) -> Mesh`**
+  Flat normals: every corner gets the normal of its triangle (hard edges everywhere).
+- **`fn smooth(&self, max_angle_deg: f64) -> Mesh`**
+  Smooth normals with an angle threshold in degrees: around each point the triangles that meet across
+  an edge whose faces differ by at most `max_angle_deg` share one normal (their normals weighted by
+  the corner angles), split at sharper edges, open edges and edges of more than two triangles.  Edges
+  are those of the points (`Mesh::points`), so a hard edge split before can become smooth again; parts
+  that only touch are never smoothed together.  0 gives flat normals except across exactly flat edges,
+  180 smooths every manifold edge.
+- **`fn uv_box(&self, metres_per_unit: f64) -> Mesh`**
+  UV by box projection in world scale: each triangle is projected along the axis its normal points
+  most along (ties: Y, then X), so one UV unit is `metres_per_unit` metres on every face, without
+  mirrored textures: +X faces (u, v) = (-z, y), -X (z, y), +Y (x, -z), -Y (x, z), +Z (x, y), -Z (-x, y).
+  Normals stay; vertices split where the projection changes.
+
+### `geom/src/poly.rs`
+
+Source: [`lib/geom/src/poly.rs`](../lib/geom/src/poly.rs)
+
+```text
+poly -- 2D profiles: signed area, orientation, cleaning, triangulation by ear clipping, and the profiles
+the modelling API offers (rectangle, circle, rounded rectangle, arc).  A profile is a simple polygon
+(no self-intersections, no holes) as a list of points; the closing edge from the last point to the
+first is implied.
+```
+
+```rust
+/// the most points a profile or path may have
+MAX_PROFILE_POINTS: usize = 65_536
+```
+
+- **`fn signed_area2(p: &[[f64; 2]]) -> f64`**
+  twice the signed area (shoelace): positive counter-clockwise (x right, y up)
+
+- **`fn area(p: &[[f64; 2]]) -> f64`**
+  the signed area in square metres: positive counter-clockwise
+
+```rust
+/// Points of a profile or path closer than this fraction of its extent count as one (a script's
+/// arithmetic, `(y + r) - r`, leaves such near-duplicates; they would make triangles without area).
+MERGE_RATIO: f64 = 1e-9
+```
+
+- **`fn clean(p: &[[f64; 2]], what: &str) -> Result<Vec<[f64; 2]>, Error>`**
+  the profile checked and cleaned: finite numbers, consecutive points closer than [`MERGE_RATIO`] of its
+  extent merged (the first one stays) and so a repeated first point at the end, at least 3 points with
+  an area; `what` names it in the message
+
+- **`fn ccw(mut p: Vec<[f64; 2]>) -> Vec<[f64; 2]>`**
+  the profile counter-clockwise (reversed if it ran clockwise)
+
+- **`fn check_simple(p: &[[f64; 2]], what: &str) -> Result<(), Error>`**
+  Err when two edges of the profile cross (it must be simple); O(n^2), profiles are small
+
+- **`fn triangulate(p: &[[f64; 2]]) -> Result<Vec<[u32; 3]>, Error>`**
+  Triangles of a simple counter-clockwise polygon by ear clipping: n - 2 triangles over its own points,
+  counter-clockwise, none without area (a point on a straight run is never the tip of an ear, so it stays
+  on the boundary and the walls next to a cap meet it).  Err when no ear is left (a self-intersecting or
+  degenerate polygon).  Deterministic: the first ear from where the last one was cut.
+
+- **`fn rect(w: f64, h: f64) -> Vec<[f64; 2]>`**
+  a rectangle `w` x `h` centred on the origin, counter-clockwise from the lower left corner
+
+- **`fn circle(r: f64, n: usize) -> Vec<[f64; 2]>`**
+  a regular polygon of `n` corners on a circle of radius `r` about the origin, counter-clockwise from
+  (r, 0); exact at the axes when n is a multiple of 4
+
+- **`fn arc(r: f64, from_deg: f64, to_deg: f64, n: usize) -> Vec<[f64; 2]>`**
+  points on an arc of radius `r` about the origin from `from_deg` to `to_deg` (counter-clockwise for
+  to > from), `n` segments, both ends included (n + 1 points): an open polyline for profiles and paths
+
+- **`fn rounded_rect(w: f64, h: f64, r: f64, n: usize) -> Vec<[f64; 2]>`**
+  a rectangle `w` x `h` centred on the origin with corners rounded by radius `r` (at most half the shorter
+  side), `n` segments per corner, counter-clockwise
+
+## netchan
+
+*Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network* -- crate root [`lib/netchan/src/lib.rs`](../lib/netchan/src/lib.rs)
+
+```text
+netchan -- message channels for games (G7d, docs/TRANSPORT.md)
+
+  Client::connect(Endpoint::Udp(addr) | Endpoint::WebSocket(url), ClientConfig)
+           poll() -> ClientEvent (Connected, Message { seq, data }, Delivered(seq), Lost(seq),
+           Disconnected(reason)), send(payload) -> seq, state, reliable, max_payload, stats
+  Server::new(ServerConfig) [.bind_udp(addr)] [.listen_ws(addr, path) | .ws_endpoint()]
+           poll() -> ServerEvent, send(id, payload) -> seq, disconnect(id), stats(id)
+           (Windows, Linux, Apple: it needs netio's HTTP server)
+  WebSocket::connect(url): one non-blocking client type for the browser and the desktop
+  packet / conn / endpoint: the wire format, the sequence numbers and acks, the handshake --
+           without I/O, for tests on a simulated network and for other transports
+
+The same channel over two transports: unreliable and unordered over UDP (a handshake with a
+stateless cookie, a token in every packet, keep-alives and timeouts), reliable and ordered
+over a WebSocket (the browser's only way, docs/GAME.md E8).  Both carry the same header: a
+sequence number per packet and acks of the newest 33 received, so the netcode (G7e) learns
+which packets arrived over either.  Limits everywhere: payload sizes, packets and bytes a
+second per connection, connections per server and per address, handshake answers a second.
+
+Why a crate of its own and not netio: netio is not built for the browser and Android (plat had
+no sockets there), and the client side must run in the browser; the WebSocket client type
+needs netio on the desktop (names on Linux go through netio::dns) and plat's JS host in the
+browser, which only a crate above both can choose per target.  Not lib/game either (G7b builds
+it at the same time; the transport has no game in it).
+```
+
+### `netchan` crate root
+
+- **`enum Transport`**
+  which transport a connection runs over
+  - `Udp` -- UDP: unreliable, unordered
+  - `WebSocket` -- a WebSocket: reliable, ordered
+
+- **`enum Reason`**
+  why a connection ended
+  - `Local` -- this side ended it
+  - `Peer(u8)` -- the peer sent DISCONNECT with this code (packet::BYE_\*)
+  - `Timeout` -- nothing came for timeout_ms
+  - `ConnectTimeout` -- the handshake did not finish within connect_ms
+  - `Full` -- the server refused: it is full (or the address has max_per_ip connections)
+  - `Protocol` -- the server speaks another protocol id
+  - `RateLimit` -- the peer broke the rate limits (the server ended it)
+  - `Closed(u16)` -- the WebSocket under it closed with this code (1006: without a close frame)
+  - `Replaced` -- the same address made a new handshake
+
+- **`enum Error`**
+  why a call failed
+  - `Unsupported` -- not on this target: UDP in the browser; everything on Android for now (plat has no sockets
+    there yet, docs/ANDROID.md)
+  - `Net(plat::net::NetError)` -- the network; NetErrorKind::Denied: the app's permissions (net.connect / net.listen)
+  - `Url(String)` -- not a ws:// or wss:// URL (or "/path" in the browser)
+  - `Size` -- an empty payload, or one over the limit of the connection
+  - `Backlog` -- more waits to be sent than the WebSocket's queue takes (WsOptions::max_unsent)
+  - `NotConnected` -- not connected (yet, or any more)
+
+### `netchan/src/client.rs`
+
+Source: [`lib/netchan/src/client.rs`](../lib/netchan/src/client.rs)
+
+```text
+client -- a game client's channel to its server (G7d)
+
+  Client::connect(Endpoint, ClientConfig) -> Result<Client, Error>    Connecting at once
+  client.poll() -> Option<ClientEvent>    every frame until None: reads, keep-alives, timeouts
+  client.send(payload) -> Result<u16, Error>    the message's sequence number
+  client.state() / reliable() / max_payload() / stats() / rtt_ms() / disconnect()
+
+Nothing blocks.  UDP (Windows, Linux, Apple): a thread of its own reads the socket, keeps only
+the server's datagrams (a bounded queue) and wakes the UI (plat::wake); sends go out at once.
+WebSocket: netchan::ws (the browser's own, or netio's on threads).  In the browser only
+Endpoint::WebSocket exists; on Android nothing yet (Unsupported).
+```
+
+- **`enum Endpoint`**
+  where a client connects to
+  - `Udp(plat::net::SocketAddr)` -- a server's UDP socket (not in the browser)
+  - `WebSocket(String)` -- a server's WebSocket: ws://host:port/path, wss://..., in the browser also "/path"
+
+- **`struct Client`**
+  a client's channel (see the top of this file)
+
+**`impl Client`**
+
+- **`fn connect(ep: Endpoint, cfg: ClientConfig) -> Result<Client, Error>`**
+  connect: the handshake starts at once (UDP) or once the WebSocket is open; poll() reports
+  Connected or Disconnected(reason)
+- **`fn poll(&mut self) -> Option<ClientEvent>`**
+  the next event; call it until None every frame (it reads, sends keep-alives, notices
+  timeouts)
+- **`fn send(&mut self, payload: &[u8]) -> Result<u16, Error>`**
+  send a message -> its sequence number (Delivered / Lost name it later; Backlog: the
+  WebSocket has WsOptions::max_unsent bytes waiting, nothing was sent)
+- **`fn state(&self) -> State`**
+  where it stands
+- **`fn reliable(&self) -> bool`**
+  whether the transport is reliable and ordered (a WebSocket)
+- **`fn max_payload(&self) -> usize`**
+  the largest payload the server takes (0 before Connected)
+- **`fn stats(&self) -> Stats`**
+  the connection's counts
+- **`fn rtt_ms(&self) -> f32`**
+  the smoothed round-trip time in ms (0 before the first ack)
+- **`fn disconnect(&mut self)`**
+  end the connection (DISCONNECT goes out; Disconnected(Local) follows)
+
+### `netchan/src/conn.rs`
+
+Source: [`lib/netchan/src/conn.rs`](../lib/netchan/src/conn.rs)
+
+```text
+conn -- one connection's sequence numbers and acks, without I/O (docs/TRANSPORT.md "Folgenummern")
+
+  Conn::new(token, reliable, Settings, now_us)
+  conn.write_data(payload, now, &mut out) -> seq     a DATA packet (empty payload: keep-alive)
+  conn.on_data(seq, ack, bits, payload, now)         a DATA packet that came (token checked by
+                                                     the caller)
+  conn.take_event() -> Message / Delivered / Lost    conn.rate_ok(bytes, now), keepalive_due,
+                                                     timed_out, stats, rtt_ms
+
+Every DATA packet has its own sequence number (u16, wrapping) and acknowledges the newest
+number received plus the 32 before it as bits.  Unreliable (UDP): packets may come late, twice
+or not at all; a number seen before (1024 back) is dropped, older ones too; whatever arrives
+new is delivered at once, in the order it came.  A sent packet is Delivered when an ack names
+it, Lost when the acks have moved more than 32 past it without naming it.  Reliable (WebSocket):
+the transport keeps order and loses nothing, so an ack of n delivers everything up to n.
+A peer that only receives (or sends less than one packet per 32 received) would let packets
+pass the bits unacknowledged: after ACK_EVERY packets without one of its own, an unreliable
+connection owes an empty DATA packet at once (ack_due).
+The round-trip time comes from the newest ack only (bits name older packets, whose wait would
+count twice), smoothed as TCP does (RFC 6298).
+```
+
+```rust
+/// how far back sequence numbers are remembered (sent and received)
+WINDOW: usize = 1024
+/// (unreliable) packets received without sending one, after which an ack is due (half the bits)
+ACK_EVERY: u32 = 16
+```
+
+- **`struct Settings`**
+  the timing and limits of a connection
+  - `timeout_ms: u32` -- nothing received for this long ends the connection
+  - `keepalive_ms: u32` -- an empty DATA packet goes out when nothing was sent for this long (it carries the acks)
+  - `packets_per_s: u32` -- packets a second from the peer, on average (bursts of two seconds)
+  - `bytes_per_s: u32` -- bytes a second from the peer, on average (bursts of two seconds)
+
+- **`struct Stats`**
+  what a connection counted
+  - `sent: u64` -- DATA packets sent (keep-alives included)
+  - `received: u64` -- DATA packets taken in (duplicates and stale ones not counted)
+  - `delivered: u64` -- sent packets an ack named
+  - `lost: u64` -- sent packets the acks passed by
+  - `duplicates: u64` -- packets that came a second time
+  - `stale: u64` -- packets older than the window
+  - `dropped: u64` -- packets dropped for the rate limits or their size
+  - `bytes_sent: u64` -- bytes of DATA packets sent (headers included)
+  - `bytes_received: u64` -- bytes of DATA packets taken in (headers included)
+  - `rtt_ms: f32` -- the smoothed round-trip time (0 before the first sample)
+  - `rtt_var_ms: f32` -- its variation
+
+- **`enum Event`**
+  what a connection reports
+  - `Message { seq: u16, data: Vec<u8> }` -- a message of the peer with its sequence number
+  - `Delivered(u16)` -- the peer has a packet this side sent
+  - `Lost(u16)` -- the peer's acks passed this packet by
+
+- **`struct Conn`**
+  the state of one connection (see the top of this file)
+
+**`impl Conn`**
+
+- **`fn new(token: u32, reliable: bool, set: Settings, now_us: u64) -> Conn`**
+  a connection with the token both sides put into DATA (0 over a WebSocket)
+- **`fn token(&self) -> u32`**
+  the token of DATA and DISCONNECT packets
+- **`fn reliable(&self) -> bool`**
+  whether the transport is reliable (a WebSocket)
+- **`fn ack_fields(&self) -> (u16, u32)`**
+  the newest number received and the bits of the 32 before it (0xffff, 0 before any)
+- **`fn write_data(&mut self, payload: &[u8], now: u64, out: &mut Vec<u8>) -> u16`**
+  append a DATA packet with `payload` (empty: a keep-alive) -> its sequence number
+- **`fn rate_ok(&mut self, bytes: usize, now: u64) -> bool`**
+  whether a packet of `bytes` from the peer stays within the rate limits (false: drop it,
+  or end a reliable connection)
+- **`fn count_dropped(&mut self)`**
+  count a packet dropped by the caller (its size)
+- **`fn on_data(&mut self, seq: u16, ack: u16, bits: u32, payload: &[u8], now: u64)`**
+  a DATA packet of the peer (its token already checked)
+- **`fn take_event(&mut self) -> Option<Event>`**
+  the next event (messages, deliveries, losses in the order they happened)
+- **`fn ack_due(&self) -> bool`**
+  (unreliable) whether an empty DATA packet is due at once: ACK_EVERY packets came without
+  one of this side's, so the older ones would pass the bits unacknowledged
+- **`fn keepalive_due(&self, now: u64) -> bool`**
+  whether a keep-alive is due (nothing sent for keepalive_ms)
+- **`fn timed_out(&self, now: u64) -> bool`**
+  whether nothing came for timeout_ms
+- **`fn stats(&self) -> Stats`**
+  what the connection counted
+- **`fn rtt_ms(&self) -> f32`**
+  the smoothed round-trip time in ms (0 before the first ack)
+- **`fn next_seq(&self) -> u16`**
+  the sequence number the next packet gets
+
+### `netchan/src/endpoint.rs`
+
+Source: [`lib/netchan/src/endpoint.rs`](../lib/netchan/src/endpoint.rs)
+
+```text
+endpoint -- the server's and the client's protocol without I/O (docs/TRANSPORT.md "Handschlag")
+
+  ServerCore::new(ServerConfig, secret)
+    .datagram(from, bytes, now)        a UDP datagram
+    .stream_open(id, addr, now) / .stream_message(id, bytes, now) / .stream_closed(id, code)
+                                       a WebSocket (or any reliable message stream)
+    .tick(now)                         keep-alives, timeouts, streams that never said CONNECT
+    .send(conn, payload, now) -> seq   .disconnect(conn, now)
+    .take_out() -> Out (what to send where, streams to close)   .poll_event() -> ServerEvent
+  ClientCore::new(ClientConfig, nonce, stream)
+    .start(now) / .packet(bytes, now) / .tick(now) / .send(payload, now) / .disconnect(now)
+    .transport_closed(code) / .take_out() -> bytes / .poll_event() -> ClientEvent
+
+Time is the caller's (microseconds), so tests run them on a virtual clock over a simulated
+network (apps/nettest).  The UDP handshake: CONNECT (padded) -> CHALLENGE with a stateless
+cookie, HMAC-SHA256 over the client's address, its nonce and the time -> RESPONSE (padded) with
+the cookie -> ACCEPT with a random token, which every DATA and DISCONNECT then carries.  Nothing
+is kept for an address before its RESPONSE proves it receives there, the answers before that
+are smaller than the requests, and challenges_per_s bounds the work for all of them.  A
+WebSocket sends CONNECT and gets ACCEPT (token 0); TCP has proved the address.  The token is no
+encryption: it keeps senders out that do not see the traffic.
+```
+
+- **`struct ServerConfig`**
+  a server's limits and timing
+  - `protocol: u32` -- the app's protocol id: clients with another one are refused (another game, another version)
+  - `max_connections: usize` -- connections at once (UDP and WebSocket together)
+  - `max_per_ip: usize` -- connections from one IP address
+  - `max_payload: usize` -- the largest payload of a UDP message, both ways (at most MAX_UDP_PAYLOAD)
+  - `max_stream_payload: usize` -- the largest payload of a message over a WebSocket, both ways
+  - `timeout_ms: u32` -- nothing received for this long ends a connection
+  - `keepalive_ms: u32` -- an empty DATA packet after this long without sending (carries the acks)
+  - `packets_per_s: u32` -- packets a second from one client (UDP: more are dropped; WebSocket: it is disconnected)
+  - `bytes_per_s: u32` -- bytes a second from one client (as packets_per_s)
+  - `challenges_per_s: u32` -- answers to handshakes a second, for all addresses together
+  - `handshake_ms: u32` -- a WebSocket must send its CONNECT within this long
+
+- **`enum Route`**
+  where a packet goes
+  - `Udp(SocketAddr)` -- a UDP datagram to this address
+  - `Stream(u32)` -- a message on this stream (WebSocket)
+
+- **`enum Out`**
+  what a core wants done
+  - `Send(Route, Vec<u8>)` -- send these bytes
+  - `Close(u32)` -- close this stream (after what was sent on it)
+
+- **`enum ServerEvent`**
+  what happened on the server
+  - `Connected { id: u32, transport: Transport, addr: Option<SocketAddr> }` -- a client came (`addr`: its address, if the transport knows it)
+  - `Message { id: u32, seq: u16, data: Vec<u8> }` -- a message of a client
+  - `Delivered { id: u32, seq: u16 }` -- a client has a packet the server sent
+  - `Lost { id: u32, seq: u16 }` -- a packet the server sent did not reach the client (UDP)
+  - `Disconnected { id: u32, reason: Reason }` -- a client is gone
+
+- **`struct ServerStats`**
+  what the server counted beyond its connections
+  - `challenges: u64` -- CHALLENGE answers sent
+  - `accepted: u64` -- connections taken
+  - `denied: u64` -- clients refused (full, protocol, address)
+  - `bad: u64` -- packets that were no packet, a wrong kind or a wrong cookie or token
+  - `throttled: u64` -- handshakes over challenges_per_s, left without an answer
+  - `unknown: u64` -- DATA from addresses without a connection
+
+- **`struct ServerCore`**
+  the server's protocol (see the top of this file)
+
+**`impl ServerCore`**
+
+- **`fn new(cfg: ServerConfig, secret: [u8; 32], now: u64) -> ServerCore`**
+  a server with these limits; `secret` keys the cookies and tokens (random in a real server,
+  fixed in tests)
+- **`fn config(&self) -> &ServerConfig`**
+  the limits in force (max_payload clamped)
+- **`fn datagram(&mut self, from: SocketAddr, data: &[u8], now: u64)`**
+  a UDP datagram from `from`
+- **`fn stream_open(&mut self, stream: u32, addr: Option<SocketAddr>, now: u64)`**
+  a stream (WebSocket) opened; it must send CONNECT within handshake_ms
+- **`fn stream_message(&mut self, stream: u32, data: &[u8], now: u64)`**
+  a message on a stream
+- **`fn stream_closed(&mut self, stream: u32, code: u16)`**
+  a stream ended (`code`: its close code, 1006 without one)
+- **`fn tick(&mut self, now: u64)`**
+  keep-alives, timeouts, streams without a CONNECT
+- **`fn send(&mut self, id: u32, payload: &[u8], now: u64) -> Result<u16, Error>`**
+  send a message to a client -> its sequence number (Size: empty or over the limit of its
+  transport; NotConnected: no such client)
+- **`fn disconnect(&mut self, id: u32, reason: u8)`**
+  end a client's connection (DISCONNECT goes out, Disconnected(Local) follows)
+- **`fn disconnect_all(&mut self)`**
+  end every connection (the server stops)
+- **`fn take_out(&mut self) -> Option<Out>`**
+  the next thing to send or close
+- **`fn poll_event(&mut self) -> Option<ServerEvent>`**
+  the next event
+- **`fn connections(&self) -> usize`**
+  connections now
+- **`fn ids(&self) -> Vec<u32>`**
+  the ids of the connections
+- **`fn stats(&self, id: u32) -> Option<Stats>`**
+  a connection's counts and round-trip time
+- **`fn peer(&self, id: u32) -> Option<(Transport, Option<SocketAddr>)>`**
+  a connection's transport and address
+- **`fn route(&self, id: u32) -> Option<Route>`**
+  where a connection's packets go
+- **`fn server_stats(&self) -> ServerStats`**
+  what the server counted beyond its connections
+
+- **`struct ClientConfig`**
+  a client's limits and timing
+  - `protocol: u32` -- the app's protocol id (the server's must be the same)
+  - `max_payload: usize` -- the largest payload this side takes from the server (UDP at most MAX_UDP_PAYLOAD)
+  - `timeout_ms: u32` -- nothing received for this long ends the connection
+  - `keepalive_ms: u32` -- an empty DATA packet after this long without sending
+  - `connect_ms: u32` -- the handshake within this long
+  - `resend_ms: u32` -- UDP: CONNECT / RESPONSE again after this long without an answer
+  - `packets_per_s: u32` -- packets a second from the server, on average (more are dropped)
+  - `bytes_per_s: u32` -- bytes a second from the server, on average (more are dropped)
+
+- **`enum State`**
+  where a client stands
+  - `Connecting` -- the handshake is on its way
+  - `Connected` -- the server took the connection
+  - `Disconnected(Reason)` -- ended, and why
+
+- **`enum ClientEvent`**
+  what happened on the client
+  - `Connected` -- the server took the connection
+  - `Message { seq: u16, data: Vec<u8> }` -- a message of the server
+  - `Delivered(u16)` -- the server has a packet this side sent
+  - `Lost(u16)` -- a packet this side sent did not reach the server (UDP)
+  - `Disconnected(Reason)` -- the connection ended
+
+- **`struct ClientCore`**
+  the client's protocol (see the top of this file)
+
+**`impl ClientCore`**
+
+- **`fn new(cfg: ClientConfig, nonce: u64, stream: bool) -> ClientCore`**
+  a client with a random `nonce` (it names this attempt); `stream`: over a WebSocket
+- **`fn start(&mut self, now: u64)`**
+  begin the handshake (CONNECT goes out)
+- **`fn packet(&mut self, data: &[u8], now: u64)`**
+  a packet from the server (the caller checked that it came from the server)
+- **`fn tick(&mut self, now: u64)`**
+  resends of the handshake, keep-alives, timeouts
+- **`fn send(&mut self, payload: &[u8], now: u64) -> Result<u16, Error>`**
+  send a message -> its sequence number (Size: empty or over the server's limit;
+  NotConnected before Connected and after the end)
+- **`fn disconnect(&mut self)`**
+  end the connection (DISCONNECT goes out; UDP several times)
+- **`fn transport_closed(&mut self, code: u16)`**
+  the transport under a stream ended (the WebSocket closed with `code`)
+- **`fn take_out(&mut self) -> Option<Vec<u8>>`**
+  the next packet to send to the server
+- **`fn poll_event(&mut self) -> Option<ClientEvent>`**
+  the next event
+- **`fn state(&self) -> State`**
+  where it stands
+- **`fn max_payload(&self) -> usize`**
+  the largest payload the server takes (0 before Connected)
+- **`fn reliable(&self) -> bool`**
+  whether the transport is reliable (a WebSocket)
+- **`fn stats(&self) -> Stats`**
+  the connection's counts (zeros before Connected)
+
+### `netchan/src/packet.rs`
+
+Source: [`lib/netchan/src/packet.rs`](../lib/netchan/src/packet.rs)
+
+```text
+packet -- the channel's wire format, version 1 (docs/TRANSPORT.md "Paketformat")
+
+  byte 0: VERSION << 4 | kind; then, little-endian:
+  CONNECT     client -> server  protocol u32, nonce u64              13 bytes (UDP: padded to 64)
+  CHALLENGE   server -> client  nonce u64, time u32, mac [16]        29 bytes (UDP only)
+  RESPONSE    client -> server  protocol u32, nonce u64, time u32,   33 bytes (UDP only, padded
+                                mac [16]                                       to 64)
+  ACCEPT      server -> client  nonce u64, token u32, max payload u16   15 bytes
+  DENY        server -> client  nonce u64, reason u8                 10 bytes
+  DATA        both              token u32, seq u16, ack u16, ack bits u32, payload   13 + n
+  DISCONNECT  both              token u32, reason u8                  6 bytes
+
+A UDP client pads CONNECT and RESPONSE to HANDSHAKE_SIZE, and every answer of the server before
+a connection is smaller: a forged sender address gets back less than was sent (no
+amplification).  Over a WebSocket the CONNECT is not padded and CHALLENGE / RESPONSE do not
+occur (TCP has proved the address).  parse() reads untrusted bytes: exact sizes, no panics,
+no allocation.
+```
+
+```rust
+/// the format's version (the high nibble of byte 0)
+VERSION: u8 = 1
+/// a client asks for a connection
+KIND_CONNECT: u8 = 1
+/// the server's stateless cookie for a UDP client
+KIND_CHALLENGE: u8 = 2
+/// the client returns the cookie
+KIND_RESPONSE: u8 = 3
+/// the server took the client
+KIND_ACCEPT: u8 = 4
+/// the server refused the client
+KIND_DENY: u8 = 5
+/// a message (or an empty keep-alive) with sequence number and acks
+KIND_DATA: u8 = 6
+/// one side ends the connection
+KIND_DISCONNECT: u8 = 7
+/// the bytes of a DATA packet before its payload
+DATA_HEADER: usize = 13
+/// the size a UDP client pads CONNECT and RESPONSE to (at most the server takes)
+HANDSHAKE_SIZE: usize = 64
+/// the largest payload of a UDP DATA packet that may be configured (1400 + 13 + 8 + 40 bytes
+/// stay below the 1500 of Ethernet also over IPv6)
+MAX_UDP_PAYLOAD: usize = 1400
+/// DENY: the server has max_connections clients
+DENY_FULL: u8 = 1
+/// DENY: the client speaks another protocol id (another game or version)
+DENY_PROTOCOL: u8 = 2
+/// DENY: the client's address has max_per_ip connections
+DENY_ADDRESS: u8 = 3
+/// DISCONNECT: an orderly end
+BYE_NORMAL: u8 = 0
+/// DISCONNECT: nothing came for timeout_ms
+BYE_TIMEOUT: u8 = 1
+/// DISCONNECT: the peer broke the rate limits
+BYE_RATE: u8 = 2
+/// DISCONNECT: the peer sent something malformed
+BYE_PROTOCOL: u8 = 3
+/// DISCONNECT: the same address connected again
+BYE_REPLACED: u8 = 4
+/// DISCONNECT: the server stops
+BYE_SHUTDOWN: u8 = 5
+```
+
+- **`enum Packet<'a>`**
+  one packet, borrowed from the bytes it was read from
+  - `Connect { protocol: u32, nonce: u64 }` -- a client asks: the app's protocol id, the nonce of this attempt
+  - `Challenge { nonce: u64, time: u32, mac: [u8; 16] }` -- the server's cookie for a UDP client: the time (seconds) and the MAC over address, nonce, time
+  - `Response { protocol: u32, nonce: u64, time: u32, mac: [u8; 16] }` -- the client returns the cookie
+  - `Accept { nonce: u64, token: u32, max_payload: u16 }` -- the server took the client: the token of its packets, the largest payload it takes
+  - `Deny { nonce: u64, reason: u8 }` -- the server refused the client (DENY_\*)
+  - `Data { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] }` -- a message (empty: a keep-alive) with its number, the newest number received and the bits of the 32 before
+  - `Disconnect { token: u32, reason: u8 }` -- one side ends the connection (BYE_\*)
+
+- **`fn parse(b: &[u8]) -> Option<Packet<'_>>`**
+  read one packet: None for anything that is not exactly a packet of this version (handshake
+  packets between their size and HANDSHAKE_SIZE, the fixed-size ones exactly)
+
+**`impl Packet<'_>`**
+
+- **`fn write(&self, out: &mut Vec<u8>, pad: bool)`**
+  append the packet to `out`; `pad`: CONNECT and RESPONSE filled with zeros to HANDSHAKE_SIZE
+- **`fn to_vec(&self, pad: bool) -> Vec<u8>`**
+  the packet as new bytes
+
+- **`fn seq_newer(a: u16, b: u16) -> bool`**
+  whether sequence number `a` is newer than `b` (wrapping: within half the range ahead)
+
+### `netchan/src/server.rs`
+
+Source: [`lib/netchan/src/server.rs`](../lib/netchan/src/server.rs)
+
+```text
+server -- a game server's channels (G7d): UDP and WebSocket clients in one table
+
+  Server::new(ServerConfig) -> Server
+  server.bind_udp(&addr) -> NetResult<SocketAddr>        a UDP socket with its reading thread
+  server.listen_ws(&addr, "/game") -> NetResult<SocketAddr>   a netio HTTP server for the
+                                       WebSockets (404 elsewhere); or server.ws_endpoint() and
+                                       endpoint.accept(&req) in the app's own handler (with
+                                       its page's files beside it, say)
+  server.poll() -> Option<ServerEvent>   send(id, payload) -> seq   disconnect(id)
+  server.wait(ms)                        sleep until something arrives (a loop without a tick)
+  connections() / ids() / stats(id) / peer(id) / server_stats() / stop()
+
+Threads: one reads the UDP socket; each WebSocket has a reading one (netio's thread of the
+upgrade) and a writing one, so neither a full socket buffer nor a slow client holds the
+game's loop.  What they read goes into one bounded queue (UDP drops when it is full, a
+WebSocket waits); poll() takes it on the caller's thread, where the protocol runs
+(endpoint::ServerCore).  send to a WebSocket client with LINK_UNSENT bytes waiting fails with
+Error::Backlog; one that still does not take what the server's own packets add is closed.
+```
+
+```rust
+/// bytes a WebSocket client may have waiting to be written; more close it
+LINK_UNSENT: usize = 1 << 20
+```
+
+- **`struct WsEndpoint(Arc<Shared>)`**
+  what an HTTP handler needs to hand WebSockets to a Server (clone it into the handler)
+
+**`impl WsEndpoint`**
+
+- **`fn accept(&self, req: &Request) -> Response`**
+  answer an upgrade request on the game's path: 101 and the client joins the server's
+  table once it sent CONNECT, or the Acceptor's 4xx / 503
+- **`fn connections(&self) -> usize`**
+  WebSockets open now (also those that have not sent CONNECT yet)
+
+- **`struct Server`**
+  a game server's channels (see the top of this file).  Dropping it stops it
+
+**`impl Server`**
+
+- **`fn new(cfg: ServerConfig) -> Server`**
+  a server with these limits and no transport yet (bind_udp, listen_ws, ws_endpoint)
+- **`fn bind_udp(&mut self, addr: &SocketAddr) -> NetResult<SocketAddr>`**
+  listen for UDP clients on `addr` (port 0: a free one) -> the address it got
+- **`fn ws_endpoint(&self) -> WsEndpoint`**
+  the handle an HTTP handler hands WebSockets in with
+- **`fn listen_ws(&mut self, addr: &SocketAddr, path: &str) -> NetResult<SocketAddr>`**
+  a netio HTTP server on `addr` whose `path` takes the WebSockets (404 elsewhere) -> its
+  address
+- **`fn udp_addr(&self) -> Option<SocketAddr>`**
+  the UDP socket's address
+- **`fn ws_addr(&self) -> Option<SocketAddr>`**
+  the address of listen_ws's HTTP server
+- **`fn wait(&mut self, ms: u32)`**
+  sleep until a datagram or a WebSocket message arrives, at most `ms` (a server without a
+  tick of its own; keep `ms` below keepalive_ms).  poll() then reports it
+- **`fn poll(&mut self) -> Option<ServerEvent>`**
+  the next event; call it until None every tick (it takes what came, sends keep-alives,
+  ends connections that timed out)
+- **`fn send(&mut self, id: u32, payload: &[u8]) -> Result<u16, Error>`**
+  send a message to a client -> its sequence number (Backlog: a WebSocket client has
+  LINK_UNSENT bytes waiting)
+- **`fn disconnect(&mut self, id: u32)`**
+  end a client's connection (Disconnected(Local) follows)
+- **`fn connections(&self) -> usize`**
+  connections now
+- **`fn ids(&self) -> Vec<u32>`**
+  the ids of the connections
+- **`fn stats(&self, id: u32) -> Option<Stats>`**
+  a connection's counts and round-trip time
+- **`fn peer(&self, id: u32) -> Option<(Transport, Option<SocketAddr>)>`**
+  a connection's transport and address
+- **`fn server_stats(&self) -> ServerStats`**
+  what the server counted beyond its connections
+- **`fn stop(self)`**
+  end every connection, stop the threads and the HTTP server
+
+### `netchan/src/ws.rs`
+
+Source: [`lib/netchan/src/ws.rs`](../lib/netchan/src/ws.rs)
+
+```text
+ws -- one WebSocket client type for every target, which never blocks (G7d)
+
+  WebSocket::connect(url) / connect_with(url, WsOptions) -> Result<WebSocket, Error>
+           ws://host:port/path, wss://... (the browser; on the desktop wss:// is part 2), and in
+           the browser "/path" for the page's own server
+  ws.state() -> WsState   send_text / send_binary (queued)   recv() -> Option<WsMessage>
+  ws.close(code, reason) / close_info()
+
+The browser: plat::net::WebSocket (the page's, through the JS host).  Windows, Linux, Apple:
+netio::ws::connect on a thread of its own, which then reads; a second thread writes what send
+queues, so no call waits for the network.  Both wake the UI (plat::wake) when a message comes.
+Android: Unsupported for now.  net.connect is checked on the URL's host and port before
+anything else (Error::Net with NetErrorKind::Denied).
+```
+
+- **`enum WsState`**
+  where a WebSocket stands
+  - `Connecting` -- connecting (TCP, TLS, the upgrade)
+  - `Open` -- connected: messages go both ways
+  - `Closing` -- close() was called; the end has not come yet
+  - `Closed` -- ended: close_info() says how
+
+- **`enum WsMessage`**
+  a whole message
+  - `Text(String)` -- a text message
+  - `Binary(Vec<u8>)` -- a binary message
+
+- **`struct WsOptions`**
+  a WebSocket's limits
+  - `max_message: usize` -- the largest message received; bigger ones close the connection (1009)
+  - `max_queued: usize` -- bytes received and not taken by recv; more close the connection (1009)
+  - `max_unsent: usize` -- (desktop) bytes queued by send and not written yet; send fails with Error::Backlog beyond
+  - `connect_ms: u32` -- (desktop) the connection and the upgrade within this long
+  - `idle_ms: u32` -- (desktop) nothing received for this long ends the connection
+  - `ping_ms: u32` -- (desktop) a ping after this long without anything received (0: none)
+
+- **`struct WebSocket`**
+  a WebSocket client that never blocks (see the top of this file); dropping it closes it
+
+**`impl WebSocket`**
+
+- **`fn connect(url: &str) -> Result<WebSocket, Error>`**
+  connect with the default limits
+- **`fn connect_with(url: &str, o: WsOptions) -> Result<WebSocket, Error>`**
+  connect with these limits: Connecting at once, Open once the upgrade is done
+- **`fn state(&self) -> WsState`**
+  where it stands
+- **`fn send_text(&self, s: &str) -> Result<(), Error>`**
+  send a text message (Open only; desktop: queued, Backlog beyond max_unsent)
+- **`fn send_binary(&self, b: &[u8]) -> Result<(), Error>`**
+  send a binary message (as send_text)
+- **`fn recv(&self) -> Option<WsMessage>`**
+  the next message, or None (never waits)
+- **`fn close(&self, code: u16, reason: &str)`**
+  close with `code` (1000, 3000-4999) and a reason (at most 123 bytes)
+- **`fn close_info(&self) -> Option<(u16, String)>`**
+  how it ended (code and reason; 1006: without a close frame or never connected); None
+  while it is not Closed
+- **`fn unsent(&self) -> usize`**
+  (desktop) bytes queued by send and not written yet (the browser buffers on its own: 0)

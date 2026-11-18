@@ -10,10 +10,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
+- WebSocket (RFC 6455, G7d): `ws::Acceptor` answers upgrade requests in a `Server`'s handler (`accept(&req, on_open)`: 101 and the connection on a thread of its own, or 400 / 403 for an origin not on `origins` / 426 / 503 past `max_connections`; subprotocols by `protocols`), `ws::connect(url, &ClientConfig)` for clients (ws://, wss:// through a connector; the server's Sec-WebSocket-Accept checked, extensions refused), `ws::WebSocket` with `recv` / `recv_timeout`, `send_text`, `send_binary`, `send_fragmented`, `ping`, `close`; pings answered, pongs taken, the close handshake both ways, a ping after `ping_ms` of quiet, the end after `idle_ms`. `ws::Decoder` reads frames of untrusted bytes without I/O within `ws::Limits` (frame, message, fragments) and names the close code of anything malformed (1002, 1007 for bad UTF-8, 1008, 1009); `ws::encode_frame`, `ws::apply_mask`, `ws::accept_key`, `ws::close_code_valid`, `ws::parse_url`. Messages and bytes a second per connection as token buckets (1008 beyond). docs/TRANSPORT.md
+- `http::Body::Upgrade(http::Upgrade)`: with status 101 the server sends the head as the handler built it and hands the connection (`http::Upgraded`: the stream, the bytes read after the request, the peer, the server's stop flag) to the upgrade on a thread of its own; `Server::stop` waits for those threads, `Server::upgraded()` counts them. `http::write_switch`, `http::Reader::take_buffered`; `http::reason(101)`.
+
 - `ssh::Client::set_time_limit(ms)`: each following `auth_password`, `auth_key` and `exec` ends with `TimedOut` after that time in all.
 
 ### Fixed
 
+- `dns::resolve` (Linux, macOS): a numeric address or `localhost` no longer reads /etc/hosts and /etc/resolv.conf, which an app's rules do not grant on macOS (PERMDENY lines for every WebSocket and HTTP connection to an address).
 - SSH: a peer that sends only messages to skip (ignore, debug, banners, global requests) while an answer is due ends the session after 1024 of them (login and opening a channel never returned); data past the channel window the client granted is a protocol error.
 
 ### Security

@@ -1,0 +1,26 @@
+[package]
+name = "jflib-geom"
+description = "Deterministic modelling kernel: indexed meshes from primitives, profiles and operations, with checks"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "geom"
+path = "src/lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+
+# docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
+# of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "wasm32-unknown-unknown", "aarch64-linux-android"]

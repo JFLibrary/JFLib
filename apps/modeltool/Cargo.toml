@@ -1,0 +1,36 @@
+[package]
+name = "modeltool"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "modeltool"
+path = "src/main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+geom.workspace = true
+gltf.workspace = true
+gpu.workspace = true
+render3d.workspace = true
+img_png.workspace = true
+crypto.workspace = true
+agent_core.workspace = true
+# JFScript lives in its own repository and comes by git, as for editortest (docs/GAME.md, E7); the root
+# Cargo.toml takes its jflib-agent-core from this workspace ([patch.crates-io])
+script = { package = "jfscript", git = "https://github.com/JFLibrary/JFScript" }
+
+[build-dependencies]
+jflib-build.workspace = true

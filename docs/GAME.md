@@ -1,6 +1,7 @@
 # Spiel-Engine: Plan für G7
 
-Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1, siehe dort; Stand 2026-11-18). Die Zahl der Läufe je Stufe ist
+Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1) und von G7b, G7d und G7g (Welle 2), siehe
+dort; Stand 2026-11-18. Die Zahl der Läufe je Stufe ist
 geschätzt (ein Lauf ist eine Arbeitsrunde eines Agenten mit Durchsicht, wie bei G5 und G6).
 
 ## Ziel
@@ -52,20 +53,22 @@ Was es gibt (Code auf `main` ab7e77e1):
   wird deckend), Skinning, Kantenglättung, Nachbearbeitung, viele Lichter (je Licht rund 0,1 ms bei 1 Mio. Würfeln),
   Schatten für Punkt- und Spotlichter, komprimierte Texturen, Meshes und Texturen entfernen (die Pools wachsen nur),
   doppelseitige Materialien, Partikel. Durchsichtiges, Entfernen und doppelseitige Materialien bringt G7f Teil 1.
-- **glTF:** [`lib/gltf`](GLTF.md) liest keine Animationen, Skins und Morph-Ziele und schreibt nur `.glb` für Tests.
+- **glTF:** [`lib/gltf`](GLTF.md) liest keine Animationen, Skins und Morph-Ziele; seit G7g Teil 1 schreibt `write_document` ein
+  `.glb` aus einem Dokument (Meshes, Materialien nach ihren Faktoren, Knoten, Szenen).
 - **Eingabe:** Tastatur, Maus und Touch auf allen Zielen. Kein Gamepad, keine relative Maus, kein Pointer-Lock
   (die beiden letzten bringt G7a Teil 1).
 - **Klang:** [`plat::audio`](../lib/plat/audio.rs) mit einem gemeinsamen Mischer (`play(&Sound) -> Voice`), ohne
   Raumklang.
 - **Netz:** `plat::net::UdpSocket` und TCP auf Windows, Linux und Apple; [`netio`](../lib/netio/README.md) mit
-  HTTP/1.1-Server und -Client und TLS 1.3. Kein WebSocket. Im Browser und auf Android hat `plat` kein Netz
+  HTTP/1.1-Server und -Client und TLS 1.3. WebSocket seit G7d Teil 1 (`netio::ws`, im Browser
+  `plat::net::WebSocket`). Im Browser und auf Android hat `plat` kein Netz
   ([ANDROID.md](ANDROID.md) bringt es für Android).
 - **JFScript:** lebt im eigenen Repository [JFLibrary/JFScript](https://github.com/JFLibrary/JFScript); `editortest`
   nimmt es per git, die Wurzel-`Cargo.toml` legt `jflib-agent-core` per `[patch.crates-io]` auf diesen Workspace.
   Deterministisch (Gleitkomma in Software, keine Uhr, kein Zufall), mit Brennstoff, Grenzen und Sprachdiensten. Für
   schwere Geometrie zu langsam; die Rechnung gehört deshalb in Rust, das Skript beschreibt.
-- **Nicht da:** Physik (seit G7c Teil 1 die Kollision in `lib/physics`), Animation, ein Weltmodell, Netcode,
-  Werkzeuge zum Modellieren.
+- **Nicht da:** Physik (seit G7c Teil 1 die Kollision in `lib/physics`), Animation, Netcode. Werkzeuge zum
+  Modellieren seit G7g Teil 1 (`lib/geom`, `apps/modeltool`).
 
 ## Crates
 
@@ -75,16 +78,20 @@ Was es gibt (Code auf `main` ab7e77e1):
 | `plat` (wächst) | Gamepad, relative Maus, Pointer-Lock, Tasten nach Lage; WebSocket im Browser | – | JFLib |
 | `lib/physics` (neu) | Formen, Kollision, Abfragen, Character-Controller, später Starrkörper | nur Mathematik | Vorschlag: JFLib |
 | `lib/anim` (neu, G7i) | Skelette, Clips, Überblenden, IK (die CPU-Seite) | `gltf` | Vorschlag: JFLib |
-| `lib/geom` (neu, G7g) | der Modellierkern: Netze, Grundkörper, Extrudieren, CSG, UV, Vereinfachen | nur Mathematik | Vorschlag: JFLib |
-| `lib/game` (neu) | Weltmodell, Takt, Eingabe-Aktionen, Assets, Raumklang, Netcode; eine Brücke zu `render3d` | `physics`, `plat`, `netio`; `render3d` nur in der Brücke | eigenes Repository |
-| `apps/gametest` | Tests des Kerns ohne Fenster | `game` | eigenes Repository |
-| `apps/modeltool` (G7g) | JFScript → Mesh → Bilder und Prüfungen, für KI und Mensch | `geom`, `render3d`, JFScript | eigenes Repository |
+| `lib/geom` (neu, G7g) | der Modellierkern: Netze, Grundkörper, Extrudieren, CSG, UV, Vereinfachen | `rt` (nur Mathematik) | Vorschlag: JFLib |
+| `lib/game` (neu, G7b) | Weltmodell, Takt, Eingabe-Aktionen, Kameras, Assets, Raumklang, Netcode | `physics`, `plat`, `base` (`netchan` mit G7e); `render3d` nicht | eigenes Repository |
+| `lib/netchan` (neu, G7d) | Kanal mit Folgenummern über UDP und WebSocket; ein WebSocket-Typ für alle Ziele | `plat`, `crypto`; `netio` nur auf dem Desktop | Vorschlag: JFLib |
+| `lib/game_render3d` (neu, G7b) | Brücke: Entitäten mit Mesh → Instanzen von `render3d` | `game`, `render3d`, `gpu` | eigenes Repository (mit `game`) |
+| `apps/gametest`, `apps/gamedemo` | Tests des Kerns ohne Fenster; Demo mit Ego-Kamera | `game`, `game_render3d` | eigenes Repository |
+| `apps/modeltool` (G7g) | JFScript → Mesh → Bilder und Prüfungen, für KI und Mensch | `geom`, `render3d`, `gltf`, JFScript | eigenes Repository |
 | `apps/<spiel1>`, `apps/<spiel1>-server` | Spiel 1 | `game` | eigenes Repository |
 
 Regeln:
 
 - **Spiellogik, Physik und Netz ohne GPU.** Der Server läuft ohne Fenster; unter Linux bleibt er wie alle
-  Serverprogramme statisch ohne libc. Deshalb kennt `lib/game` `render3d` nur in seinem Brückenmodul.
+  Serverprogramme statisch ohne libc. Deshalb kennt `lib/game` `render3d` nicht; die Brücke ist das eigene Crate
+  `lib/game_render3d`. Ein Feature von `lib/game` ginge nicht: Cargo vereinigt die Features eines Crates über alles,
+  was ein Build baut, und hätte `render3d` mit `gpu` in den Server gezogen, der mit seinem Client gebaut wird.
 - **Die neuen Bibliotheken wie die übrigen:** `#![no_std]`, `#![forbid(unsafe_code)]`, keine fremden Crates,
   gebaut für Windows, Linux, Browser und Android, dazu die Apple-Ziele.
 - **Die JFScript-Anbindung liegt nicht in einem veröffentlichten Crate** (ein Crate auf crates.io darf nicht von
@@ -122,7 +129,7 @@ anfassen:
 | Welle | Stufen | Warum so |
 | --- | --- | --- |
 | 1 | G7a, G7c, G7f (je Teil 1) | `plat` (Eingabe), `lib/physics`, `render3d`: keine gemeinsamen Dateien. G7a liegt auf dem längsten Weg (G7a → G7b → G7e → G7h). Fertig und gepusht am 18.11.2026. |
-| 2 | G7b, G7d, G7g | G7b braucht G7a; G7d fasst den Browser-Host in `plat` an, den in Welle 1 G7a ändert. |
+| 2 | G7b, G7d, G7g (je Teil 1) | G7b braucht G7a; G7d fasst den Browser-Host in `plat` an, den in Welle 1 G7a ändert. Fertig am 18.11.2026. |
 | 3 | G7e, G7c Teil 2, G7f Teil 2 | G7e braucht G7b und G7d; der Controller (`lib/physics`) und `render3d` Teil 2 berühren `lib/game` nicht. |
 | 4 | G7a Teil 2, G7h | die Gamepads fassen den Browser-Host an wie G7d, deshalb nach Welle 2; Spiel 1 braucht alles davor, Gamepads nur als Zugabe. |
 
@@ -174,6 +181,16 @@ anfassen:
 - Brücke zu `render3d`: Entitäten mit Mesh ↔ Instanzen der Szene, nur Geändertes; der Ursprung folgt der Kamera.
 - Fertig, wenn: `apps/gametest` Takt, Weltmodell und Brücke ohne Fenster prüft (die Brücke gegen `render3d`
   offscreen) und eine Demo-Szene mit Ego-Kamera auf Windows, Linux, macOS und im Browser läuft.
+- **Stand 2026-11-18: Teil 1 fertig** ([GAMECORE.md](GAMECORE.md)). `lib/game` (`jflib-game`): Entitäten mit
+  Generation, Sparse-Sets mit einer Version je Änderung, Systeme in fester Reihenfolge; fester Takt mit genauem
+  Akkumulator und Interpolation (`Pose`); Eingabe-Aktionen nach der Lage der Tasten mit den Regeln des Pointer-Locks
+  (der auslösende Klick feuert nichts, das Ende des Locks ist die Pause), Empfindlichkeit in 0,022° je Zählwert und
+  ein Faktor je Plattform (macOS 2,5 nur geschätzt); Ego-, Verfolger- und freie Kamera. Die Brücke
+  `lib/game_render3d` schreibt nur Geändertes und lässt den Ursprung der Kamera folgen. `apps/gametest`: 901
+  Prüfungen auf Windows, Linux und macOS, Prüfsumme überall gleich; `apps/gamedemo` baut für alle Ziele, lief
+  aber nur ohne Fenster. Offen: Teil 2 (Spielfenster messen, Assets, Raumklang), die Prüfung von Hand.
+- Vom Nutzer bestätigt am 18.11.2026: die Brücke bleibt das eigene Crate `lib/game_render3d` (statt eines Moduls
+  in `lib/game`), damit ein Server ohne GPU sie nie mitbaut.
 
 **G7c Physik 1** (`lib/physics`)
 
@@ -207,6 +224,24 @@ anfassen:
 - Grenzen wie überall in `netio`: Größe je Nachricht, Rate je Verbindung, Zeitlimits.
 - Fertig, wenn: Desktop und Browser denselben Server erreichen, gemessen mit Umlaufzeit und Durchsatz, und Fuzzing
   der Rahmen nichts zum Absturz bringt.
+- **Stand 2026-11-18: Teil 1 fertig** ([TRANSPORT.md](TRANSPORT.md)). WebSocket nach RFC 6455 in `netio`
+  (`ws::Acceptor` im HTTP-Server über `Body::Upgrade`, `ws::connect`, ein Decoder für fremde Bytes mit den
+  Schließcodes 1002/1007/1008/1009); `plat::net` auf allen Zielen, im Browser `plat::net::WebSocket` über den Worker
+  (Anfrage 32, die Sockets leben im Worker), geprüft gegen `net.connect` (`policy::net_host_allowed`). Das neue
+  Crate `lib/netchan` (`jflib-netchan`): Kanal mit Folgenummern und Bestätigungen, über UDP mit zustandslosem
+  Cookie-Handschlag ohne Verstärkung, über WebSocket zuverlässig mit demselben Kopf; das Protokoll auch ohne E/A für
+  Simulationen. Ein eigenes Crate, weil `netio` nicht für den Browser gebaut wird. `apps/nettest`: 475 Prüfungen
+  auf Windows, Linux und macOS, 2,12 Millionen Fuzz-Fälle ohne Absturz; Chrome und Firefox erreichen denselben
+  Server wie der Desktop. Umlauf auf Loopback: UDP etwa 0,05 ms, WebSocket 0,1 ms, Browser 0,3–0,4 ms.
+  Offen: Teil 2 (`wss:` prüfen, echtes Netz zwischen Rechnern, Grenzen abstimmen), iOS nicht gebaut, Android
+  `Unsupported`.
+- Vom Nutzer entschieden am 18.11.2026 (Fragen nach Teil 1): der Name `lib/netchan` bleibt; der eigene Server der
+  Seite braucht im Browser keine `net.connect`-Regel (er hat die App ausgeliefert; umgesetzt); UDP bekommt später
+  eine Verschlüsselung mit Authentisierung (AEAD, ChaCha20-Poly1305 aus `crypto`, in Teil 2 oder danach);
+  netchan stückelt nicht: Karten und Assets kommen über HTTP, der volle Stand beim Beitreten über WebSocket, die
+  laufenden Stände bleiben mit Delta-Kompression unter 1200 Bytes (neu zu entscheiden, wenn G7e zeigt, dass sie
+  nicht passen); die Grenzen je Client (300 Pakete/s, 256 KiB/s, 64 Verbindungen, 16 je Adresse, 5 s) gelten als
+  Anfang und werden in Teil 2 mit Messungen abgestimmt.
 
 **G7e Netcode** (`lib/game`)
 
@@ -265,6 +300,18 @@ anfassen:
 - Fertig, wenn: ein Agent aus einer Beschreibung in Text eine Reihe von Bezugsobjekten baut (Kiste, Treppe, Tür,
   Haus aus Modulen, eine kleine Karte), mit den Bildern als einziger Sicht, und der Nutzer die Ergebnisse angesehen
   hat.
+- **Stand 2026-11-18: Teil 1 fertig** ([GEOM.md](GEOM.md)). `lib/geom` (`jflib-geom`): Netze in `f64` mit einer
+  Topologie aus Punkten (Teile, die sich nur berühren, bleiben getrennt, `weld` verbindet ausdrücklich),
+  Grundkörper (Quader, Zylinder, Kegel, Kugel, Torus, Treppe, Bogen), Extrudieren, Prisma, Sweep entlang eines
+  Pfads, Drehkörper, Verschieben, Drehen in Grad (bei Vielfachen von 90° exakt), Spiegeln, Felder, Normalen, UV per
+  Box-Projektion; Prüfungen (geschlossen, mannigfaltig, Normalen nach außen, entartete Dreiecke) mit JSON.
+  `gltf::write_document` schreibt `.glb`. `apps/modeltool`: JFScript per git, Host-Funktionen `geom.*`,
+  `profile.*`, `vec.*`, `model.*`; je Lauf `report.json`, `model.glb`, Ansichten von vorn, Seite, oben, schräg und
+  ein Blatt mit allen vier; Cache über SHA-256. 31 338 Prüfungen, Prüfsumme `8d93441afd1b79d7` gleich auf Windows,
+  Linux, macOS und im Browser. Fünf Beispiele (Kiste, Treppe, Tür, Haus aus Modulen, Säule) als Maßstab.
+  Offen: Teil 2 (konvexe Booleans mit exakten Prädikaten, Abschrägen, Beobachtungsmodus, der Lauf, in dem ein
+  Agent nur mit den Bildern modelliert); die Liste der Wünsche an JFScript in GEOM.md (Vektoren mit Operatoren,
+  Host-Objekte, Position des Aufrufs, benannte Argumente, mehr Mathematik), gebaut erst nach dem Ja des Nutzers.
 
 **G7h Spiel 1**
 
@@ -321,7 +368,8 @@ PaintCraft zu JFPainter. `render3d` bleibt (E2); für `physics`, `anim` und `geo
 
 ## Offen
 
-Später zu entscheiden: der Weg des Spielfensters (nach der Messung in G7b), der Look des Cartoon-Materials (G7f, an
+Später zu entscheiden: der Weg des Spielfensters (nach der Messung in G7b), der Faktor der Mausbewegung unter macOS
+(G7b Teil 2, von Hand), der Look des Cartoon-Materials (G7f, an
 Bildern), Name und Server von Spiel 1 (G7h), Kartendaten aus OpenStreetMap für G7n (Lizenz ODbL), welche Crates beim
 Auszug in JFLib bleiben (G7p).
 

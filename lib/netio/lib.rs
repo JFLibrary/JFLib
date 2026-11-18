@@ -20,6 +20,8 @@
 //              first use (the presented CA comes back for the user's decision); https to
 //              public servers with the system's CAs
 //   smtp       sending mail: STARTTLS / TLS, AUTH PLAIN / LOGIN, UTF-8 messages
+//   ws         WebSocket (RFC 6455): ws::Acceptor in a Server's handler (the upgrade, a thread
+//              per connection), ws::connect for clients, the frame codec for untrusted bytes
 //   Stream     what HTTP runs over (plat::net::TcpStream, tls::TlsStream)
 //
 // Everything is blocking with timeouts and size limits on every read; a malformed peer gets an
@@ -41,6 +43,7 @@ pub mod ssh;
 pub mod tls;
 pub mod trust;
 pub mod url;
+pub mod ws;
 pub mod x509;
 
 pub use client::{Client, HttpError, Part};

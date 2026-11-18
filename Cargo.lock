@@ -438,6 +438,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "gamedemo"
+version = "0.1.0"
+dependencies = [
+ "jflib-build",
+ "jflib-game",
+ "jflib-game-render3d",
+ "jflib-gpu",
+ "jflib-physics",
+ "jflib-plat",
+ "jflib-render3d",
+ "jflib-rt",
+ "jflib-style-winui",
+ "jflib-ui",
+]
+
+[[package]]
+name = "gametest"
+version = "0.1.0"
+dependencies = [
+ "jflib-base",
+ "jflib-build",
+ "jflib-game",
+ "jflib-game-render3d",
+ "jflib-gpu",
+ "jflib-physics",
+ "jflib-plat",
+ "jflib-render3d",
+ "jflib-rt",
+ "jflib-style-winui",
+ "jflib-ui",
+]
+
+[[package]]
 name = "gfxtest"
 version = "0.0.0"
 dependencies = [
@@ -543,6 +576,9 @@ dependencies = [
  "jflib-dxf",
  "jflib-eapm",
  "jflib-fx",
+ "jflib-game",
+ "jflib-game-render3d",
+ "jflib-geom",
  "jflib-gfx",
  "jflib-gltf",
  "jflib-gpu",
@@ -565,6 +601,7 @@ dependencies = [
  "jflib-img-tga",
  "jflib-img-tiff",
  "jflib-img-webp",
+ "jflib-netchan",
  "jflib-netio",
  "jflib-netpkt",
  "jflib-physics",
@@ -730,6 +767,32 @@ dependencies = [
  "jflib-plat",
  "jflib-rt",
  "jflib-simd",
+]
+
+[[package]]
+name = "jflib-game"
+version = "0.2.1"
+dependencies = [
+ "jflib-base",
+ "jflib-physics",
+ "jflib-plat",
+ "jflib-rt",
+]
+
+[[package]]
+name = "jflib-game-render3d"
+version = "0.2.1"
+dependencies = [
+ "jflib-game",
+ "jflib-gpu",
+ "jflib-render3d",
+]
+
+[[package]]
+name = "jflib-geom"
+version = "0.2.1"
+dependencies = [
+ "jflib-rt",
 ]
 
 [[package]]
@@ -1021,6 +1084,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "jflib-netchan"
+version = "0.2.1"
+dependencies = [
+ "jflib-crypto",
+ "jflib-netio",
+ "jflib-plat",
+ "jflib-rt",
+]
+
+[[package]]
 name = "jflib-netio"
 version = "0.2.1"
 dependencies = [
@@ -1267,6 +1340,34 @@ dependencies = [
  "jflib-plat",
  "jflib-style-winui",
  "jflib-ui",
+]
+
+[[package]]
+name = "modeltool"
+version = "0.1.0"
+dependencies = [
+ "jflib-agent-core",
+ "jflib-build",
+ "jflib-crypto",
+ "jflib-geom",
+ "jflib-gltf",
+ "jflib-gpu",
+ "jflib-img-png",
+ "jflib-plat",
+ "jflib-render3d",
+ "jflib-rt",
+ "jfscript",
+]
+
+[[package]]
+name = "nettest"
+version = "0.1.0"
+dependencies = [
+ "jflib-build",
+ "jflib-netchan",
+ "jflib-netio",
+ "jflib-plat",
+ "jflib-rt",
 ]
 
 [[package]]

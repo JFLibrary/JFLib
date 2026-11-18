@@ -23,3 +23,7 @@ rust-project.json
 *.jks
 /SECURITY_REVIEW_LIB.md
 /temp
+# modeltool --examples writes every view and the glTF; the repository keeps the sheet and the report
+/apps/modeltool/examples/out/*/*.png
+!/apps/modeltool/examples/out/*/sheet.png
+/apps/modeltool/examples/out/*/model.glb

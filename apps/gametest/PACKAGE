@@ -1,0 +1,18 @@
+# apps/gametest/PACKAGE: the app's identity (docs/PACKAGING.md) -- the test program of lib/game
+# version= is the app's own version (MAJOR.MINOR.PATCH, docs/VERSIONING.md); the program reads it
+# as rt::app_version!().  A test program: --check runs in the console, the probe window only in
+# scripts (headless).
+display=Spielkern-Test
+version=0.1.0
+publisher=JFLib
+summary=Tests des Spielkerns (lib/game) und seiner Brücke zu render3d
+description=Spielkern-Test: Weltmodell, fester Takt, Eingabe-Aktionen, Kameras und die Brücke zu render3d gegen eigene Referenzen; ein Fenster für die Skripte der Eingabe.
+generic=Testprogramm
+categories=Development;
+deb_name=gametest
+# Flatpak, AppStream and the MSIX identity: reverse DNS of a domain or project you control
+app_id=org.jflib.gametest
+homepage=https://github.com/JFLibrary/JFLib
+default_win=winui
+default_linux=winui
+styles=winui
