@@ -877,6 +877,13 @@ impl Test {
                 if self.after(800) {
                     let i = self.view_info(ui, 0, VIEW_ID);
                     out(&format!("  view {:?}, {:?}, {:?}", i.size, i.level, i.error));
+                    // (the views' own device takes the first usable adapter: none on this machine, as wait_on's SKIP)
+                    if !i.device && gpu::Instance::new().and_then(|inst| inst.adapter()).is_err() {
+                        out(&format!("SKIP: no usable GPU for the view's own device: {}", i.error.as_deref().unwrap_or("")));
+                        self.done = true;
+                        ui.quit();
+                        return;
+                    }
                     self.ok(!o.wanted && !o.on && o.frames == 0, "jfgui_GPU_OUTPUT=0: the window on the CPU path");
                     self.ok(i.device && !i.output && i.level == Some(top_level()), &format!("the view on a device of its own ({:?})", i.level));
                     self.ok(!i.apart && i.frames >= 1 && i.reads >= i.frames, &format!("every frame read back: {} frames, {} read-backs", i.frames, i.reads));

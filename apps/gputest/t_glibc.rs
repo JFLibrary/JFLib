@@ -288,8 +288,10 @@ mod imp {
     }
 
     fn crash_hook(ci: &plat::CrashInfo) {
-        let fault = plat::crash_test as *const () as u64 + 5;
-        let ret = plat::crash_test_caller as *const () as u64 + 5;
+        // after `mov eax, 16` and `call` (5 bytes each, x86-64) / `mov x0, #16` and `bl` (4 bytes, ARM64)
+        let step = if cfg!(target_arch = "aarch64") { 4 } else { 5 };
+        let fault = plat::crash_test as *const () as u64 + step;
+        let ret = plat::crash_test_caller as *const () as u64 + step;
         let n = (ci.nframes as usize).min(ci.frames.len());
         if ci.kind == plat::CK_ACCESS && ci.addr == 16 && ci.ip == fault && ci.code0 <= fault && fault < ci.code1
             && ci.frames[..n].contains(&ret) {
