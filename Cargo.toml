@@ -65,6 +65,7 @@ members = [
     "lib/gltf",
     "lib/dxf",
     "lib/physics",
+    "lib/geom",
     "lib/jflib",
     "lib/jflib_build",
     "lib/cargo_jflib",
@@ -152,6 +153,7 @@ members = [
     "apps/a11ytest",
     "apps/inputtest",
     "apps/physicstest",
+    "apps/modeltool",
 ]
 
 # The one version of the library (rt::VERSION; `build_rs.py release` writes it, docs/VERSIONING.md)
@@ -219,6 +221,7 @@ render2d = { package = "jflib-render2d", path = "lib/render2d", version = "=0.2.
 gltf = { package = "jflib-gltf", path = "lib/gltf", version = "=0.2.1" }
 dxf = { package = "jflib-dxf", path = "lib/dxf", version = "=0.2.1" }
 physics = { package = "jflib-physics", path = "lib/physics", version = "=0.2.1" }
+geom = { package = "jflib-geom", path = "lib/geom", version = "=0.2.1" }
 style_winui = { package = "jflib-style-winui", path = "styles/winui", version = "=0.2.1" }
 style_classic = { package = "jflib-style-classic", path = "styles/classic", version = "=0.2.1" }
 style_kde = { package = "jflib-style-kde", path = "styles/kde", version = "=0.2.1" }
@@ -255,7 +258,7 @@ strip = "symbols"
 
 # the crates whose speed matters in development builds too (build_rs.py's compute_crate): pixels and
 # codecs stay fast in the tests, Kritzel draws with its own pixel loops, physicstest's references run
-# hundreds of thousands of queries
+# hundreds of thousands of queries, modeltool's checks build meshes of a few 100 000 triangles
 [profile.dev.package.jflib-gfx]
 opt-level = 2
 
@@ -338,6 +341,9 @@ opt-level = 2
 opt-level = 2
 
 [profile.dev.package.jflib-physics]
+opt-level = 2
+
+[profile.dev.package.jflib-geom]
 opt-level = 2
 
 [profile.dev.package.Kritzel]

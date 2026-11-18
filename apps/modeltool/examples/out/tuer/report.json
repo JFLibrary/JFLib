@@ -1,0 +1,70 @@
+{
+  "tool": "modeltool 0.1.0",
+  "script": "tuer.jfs",
+  "key": "e0d68a61a331207d45f2b16a050714b2",
+  "ok": true,
+  "errors": [],
+  "findings": [],
+  "params": {},
+  "model": {
+    "name": "Tür",
+    "parts": 7,
+    "materials": 4,
+    "vertices": 1004,
+    "triangles": 688,
+    "budget": 4000,
+    "within_budget": true,
+    "min": [-0.5125, 0, -0.0775],
+    "max": [0.5125, 2.08, 0.0675],
+    "size": [1.025, 2.08, 0.145],
+    "center": [0, 1.04, -0.005],
+    "area": 6.802119541,
+    "volume": 0.123953796,
+    "uv_scale": 1
+  },
+  "checks": {
+    "ok": true,
+    "closed": true,
+    "outward": true,
+    "vertices": 1004,
+    "triangles": 688,
+    "min": [-0.5125, 0, -0.0775],
+    "max": [0.5125, 2.08, 0.0675],
+    "size": [1.025, 2.08, 0.145],
+    "area": 6.802119541,
+    "volume": 0.123953796,
+    "components": 26,
+    "euler": 52,
+    "open_edges": 0,
+    "nonmanifold_edges": 0,
+    "flipped_edges": 0,
+    "nonmanifold_points": 0,
+    "inverted_components": 0,
+    "degenerate": 0,
+    "bad_normals": 0
+  },
+  "parts": [
+    {"name": "zarge", "material": "zarge", "ok": true, "closed": true, "outward": true, "triangles": 44, "vertices": 72, "min": [-0.5125, 0, -0.0675], "size": [1.025, 2.08, 0.135], "area": 2.23195, "volume": 0.051697125, "degenerate": 0},
+    {"name": "blatt", "material": "blatt", "ok": true, "closed": true, "outward": true, "triangles": 12, "vertices": 24, "min": [-0.4385, 0.007, -0.0275], "size": [0.877, 1.999, 0.04], "area": 3.736326, "volume": 0.07012492, "degenerate": 0},
+    {"name": "füllungen vorn", "material": "füllung", "ok": true, "closed": true, "outward": true, "triangles": 96, "vertices": 192, "min": [-0.3185, 0.18, 0.0125], "size": [0.637, 1.67, 0.006], "area": 0.392256, "volume": 0.00097344, "degenerate": 0},
+    {"name": "füllungen hinten", "material": "füllung", "ok": true, "closed": true, "outward": true, "triangles": 96, "vertices": 192, "min": [-0.3185, 0.18, -0.0335], "size": [0.637, 1.67, 0.006], "area": 0.392256, "volume": 0.00097344, "degenerate": 0},
+    {"name": "drücker vorn", "material": "drücker", "ok": true, "closed": true, "outward": true, "triangles": 172, "vertices": 204, "min": [0.2575, 1.024, 0.0125], "size": [0.147, 0.052, 0.05], "area": 0.018815512, "volume": 0.000071315, "degenerate": 0},
+    {"name": "drücker hinten", "material": "drücker", "ok": true, "closed": true, "outward": true, "triangles": 172, "vertices": 204, "min": [0.2575, 1.024, -0.0775], "size": [0.147, 0.052, 0.05], "area": 0.018815512, "volume": 0.000071315, "degenerate": 0},
+    {"name": "bänder", "material": "drücker", "ok": true, "closed": true, "outward": true, "triangles": 96, "vertices": 116, "min": [-0.4495, 0.25, -0.0155], "size": [0.016, 1.51, 0.016], "area": 0.011700516, "volume": 0.00004224, "degenerate": 0}
+  ],
+  "expect": [
+    {"rule": "size", "expected": [1.025, 2.08, null], "actual": [1.025, 2.08, 0.145], "tolerance": 0.001, "ok": true}
+  ],
+  "materials": [
+    {"name": "zarge", "color": "#d8d2c4", "roughness": 0.5, "metallic": 0},
+    {"name": "blatt", "color": "#f3f1ec", "roughness": 0.45, "metallic": 0},
+    {"name": "füllung", "color": "#e1dccf", "roughness": 0.45, "metallic": 0},
+    {"name": "drücker", "color": "#b9bcc0", "roughness": 0.3, "metallic": 1}
+  ],
+  "fingerprint": "3602602c81a28ddd",
+  "output": "",
+  "imports": [],
+  "files": {"report": "report.json", "glb": "model.glb", "sheet": "sheet.png", "front": "front.png", "side": "side.png", "top": "top.png", "iso": "iso.png"},
+  "views": {"images": true, "size": 512, "grid_on": true, "grid": 0.5, "sheet": "front | side over top | iso", "cameras": "front: from +Z; side: from +X; top: from +Y, front at the bottom; the three at one scale; iso: from front right above", "adapter": "NVIDIA GeForce RTX 2070 SUPER"},
+  "timing": {"script_ms": 0.545, "geometry_ms": 0.587, "checks_ms": 0.675, "render_ms": 281.015, "export_ms": 0.225, "total_ms": 320.276, "fuel": 499}
+}

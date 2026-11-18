@@ -543,6 +543,7 @@ dependencies = [
  "jflib-dxf",
  "jflib-eapm",
  "jflib-fx",
+ "jflib-geom",
  "jflib-gfx",
  "jflib-gltf",
  "jflib-gpu",
@@ -730,6 +731,13 @@ dependencies = [
  "jflib-plat",
  "jflib-rt",
  "jflib-simd",
+]
+
+[[package]]
+name = "jflib-geom"
+version = "0.2.1"
+dependencies = [
+ "jflib-rt",
 ]
 
 [[package]]
@@ -1267,6 +1275,23 @@ dependencies = [
  "jflib-plat",
  "jflib-style-winui",
  "jflib-ui",
+]
+
+[[package]]
+name = "modeltool"
+version = "0.1.0"
+dependencies = [
+ "jflib-agent-core",
+ "jflib-build",
+ "jflib-crypto",
+ "jflib-geom",
+ "jflib-gltf",
+ "jflib-gpu",
+ "jflib-img-png",
+ "jflib-plat",
+ "jflib-render3d",
+ "jflib-rt",
+ "jfscript",
 ]
 
 [[package]]

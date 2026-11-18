@@ -1,0 +1,63 @@
+{
+  "tool": "modeltool 0.1.0",
+  "script": "saeule.jfs",
+  "key": "2a5b88473ff4f46c06416606de5c2bbc",
+  "ok": true,
+  "errors": [],
+  "findings": [],
+  "params": {},
+  "model": {
+    "name": "Säule",
+    "parts": 3,
+    "materials": 1,
+    "vertices": 2374,
+    "triangles": 3304,
+    "budget": 6000,
+    "within_budget": true,
+    "min": [-0.39, 0, -0.39],
+    "max": [0.39, 3.54, 0.39],
+    "size": [0.78, 3.54, 0.78],
+    "center": [0, 1.77, 0],
+    "area": 8.992798462,
+    "volume": 0.754591016,
+    "uv_scale": 1
+  },
+  "checks": {
+    "ok": true,
+    "closed": true,
+    "outward": true,
+    "vertices": 2374,
+    "triangles": 3304,
+    "min": [-0.39, 0, -0.39],
+    "max": [0.39, 3.54, 0.39],
+    "size": [0.78, 3.54, 0.78],
+    "area": 8.992798462,
+    "volume": 0.754591016,
+    "components": 3,
+    "euler": 6,
+    "open_edges": 0,
+    "nonmanifold_edges": 0,
+    "flipped_edges": 0,
+    "nonmanifold_points": 0,
+    "inverted_components": 0,
+    "degenerate": 0,
+    "bad_normals": 0
+  },
+  "parts": [
+    {"name": "säule", "material": "marmor", "ok": true, "closed": true, "outward": true, "triangles": 3280, "vertices": 2326, "min": [-0.38, 0.12, -0.38], "size": [0.76, 3.32, 0.76], "area": 6.076798462, "volume": 0.629743016, "degenerate": 0},
+    {"name": "plinthe", "material": "marmor", "ok": true, "closed": true, "outward": true, "triangles": 12, "vertices": 24, "min": [-0.39, 0, -0.39], "size": [0.78, 0.12, 0.78], "area": 1.5912, "volume": 0.073008, "degenerate": 0},
+    {"name": "abakus", "material": "marmor", "ok": true, "closed": true, "outward": true, "triangles": 12, "vertices": 24, "min": [-0.36, 3.44, -0.36], "size": [0.72, 0.1, 0.72], "area": 1.3248, "volume": 0.05184, "degenerate": 0}
+  ],
+  "expect": [
+    {"rule": "size", "expected": [0.78, 3.54, 0.78], "actual": [0.78, 3.54, 0.78], "tolerance": 0.001, "ok": true}
+  ],
+  "materials": [
+    {"name": "marmor", "color": "#e9e5db", "roughness": 0.55, "metallic": 0}
+  ],
+  "fingerprint": "1ffff0c0f45d7d71",
+  "output": "",
+  "imports": [],
+  "files": {"report": "report.json", "glb": "model.glb", "sheet": "sheet.png", "front": "front.png", "side": "side.png", "top": "top.png", "iso": "iso.png"},
+  "views": {"images": true, "size": 512, "grid_on": true, "grid": 0.5, "sheet": "front | side over top | iso", "cameras": "front: from +Z; side: from +X; top: from +Y, front at the bottom; the three at one scale; iso: from front right above", "adapter": "NVIDIA GeForce RTX 2070 SUPER"},
+  "timing": {"script_ms": 1.21, "geometry_ms": 3.425, "checks_ms": 2.898, "render_ms": 332.462, "export_ms": 0.225, "total_ms": 369.534, "fuel": 787}
+}

@@ -1,0 +1,71 @@
+// Haus: ein kleines Haus aus Bauteilen (haus_teile.jfs): vier Wände mit Fenstern und einer Haustür, ein
+// Satteldach mit Überstand, ein Schornstein, eine Bodenplatte
+//   modeltool haus.jfs [--param laenge=8] [--param breite=6] [--param neigung=35]
+// Der Grundriss liegt mittig über dem Ursprung, die Haustür vorn (+Z), der First entlang X.
+
+let teile = import("haus_teile.jfs")
+
+model.name("Haus")
+model.material("putz", {color: "#e8e1d3", roughness: 0.9})
+model.material("rahmen", {color: "#f7f7f5", roughness: 0.5})
+model.material("tuer", {color: "#3d5a73", roughness: 0.5})
+
+let L = params.get("laenge", 8.0)     // außen, entlang x
+let W = params.get("breite", 6.0)     // außen, entlang z
+let H = 2.75                          // Wandhöhe bis zur Traufe
+let t = 0.3                           // Wandstärke
+let neigung = params.get("neigung", 35)
+let ueber = 0.5                       // Dachüberstand
+
+/// ein Teil aus dem Bezug einer Wand an seine Seite: vorn und hinten über die ganze Länge, links und
+/// rechts zwischen ihnen
+fn an(m, seite) {
+  if seite == "vorn" { return m.move(-L / 2, 0, W / 2) }
+  if seite == "hinten" { return m.rotate_y(180).move(L / 2, 0, -W / 2) }
+  if seite == "rechts" { return m.rotate_y(90).move(L / 2, 0, W / 2 - t) }
+  return m.rotate_y(-90).move(-L / 2, 0, -W / 2 + t)
+}
+
+let fenster = {y: 0.9, b: 1.2, h: 1.3}
+let tuer = {x: L / 2 - 0.55, y: 0, b: 1.1, h: 2.2}
+let seiten = [
+  {name: "vorn", laenge: L, oeffnungen: [fenster.merge({x: 1.0}), tuer, fenster.merge({x: L - 2.2})]},
+  {name: "hinten", laenge: L, oeffnungen: [fenster.merge({x: 1.5}), fenster.merge({x: L - 2.7})]},
+  {name: "rechts", laenge: W - 2 * t, oeffnungen: [fenster.merge({x: (W - 2 * t) / 2 - 0.6})]},
+  {name: "links", laenge: W - 2 * t, oeffnungen: [fenster.merge({x: (W - 2 * t) / 2 - 0.6})]},
+]
+
+for s in seiten {
+  model.add(an(teile.wand(s.laenge, H, t, s.oeffnungen), s.name), "putz", "wand ${s.name}")
+  for o in s.oeffnungen {
+    if o.y > 0 {
+      let f = teile.fenster(o.b, o.h)
+      let hin = fn(m) { return an(m.move(o.x, o.y, 0), s.name) }
+      model.add(hin(f.rahmen), "rahmen", "fenster ${s.name} ${o.x}")
+      model.add(hin(f.glas), "glas", "glas ${s.name} ${o.x}")
+      model.add(hin(f.bank), "stein", "bank ${s.name} ${o.x}")
+    } else {
+      let d = teile.haustuer(o.b, o.h)
+      model.add(an(d.zarge.move(o.x, 0, 0), s.name), "rahmen", "zarge")
+      model.add(an(d.blatt.move(o.x, 0, 0), s.name), "tuer", "haustür")
+      model.add(an(d.griff.move(o.x, 0, 0), s.name), "metall", "griff")
+    }
+  }
+}
+
+let dach = teile.dach(L, W, H, neigung, ueber)
+model.add(dach.giebel, "putz", "giebel")
+model.add(dach.deckung, "dach", "dach")
+
+// der Schornstein: hinten rechts, 60 cm über die Dachfläche
+let sx = L / 4
+let sz = -W / 4
+let tan = math.sin(neigung * math.pi / 180) / math.cos(neigung * math.pi / 180)
+let unten = H + (W / 2 - sz * -1) * tan
+model.add(geom.box(0.5, dach.hoehe + 0.6 - unten, 0.5).move(sx, unten, sz), "ziegel", "schornstein")
+
+// die Bodenplatte unter dem Gelände
+model.add(geom.box(L + 0.4, 0.15, W + 0.4).move(0, -0.15, 0), "beton", "bodenplatte")
+
+model.budget(12000)
+model.expect_size(L + 2 * ueber, nil, W + 2 * ueber, 0.001)

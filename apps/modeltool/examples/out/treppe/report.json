@@ -1,0 +1,67 @@
+{
+  "tool": "modeltool 0.1.0",
+  "script": "treppe.jfs",
+  "key": "57146fb25e58c7b4bc1c7733d51a6fea",
+  "ok": true,
+  "errors": [],
+  "findings": [],
+  "params": {},
+  "model": {
+    "name": "Treppe",
+    "parts": 6,
+    "materials": 2,
+    "vertices": 990,
+    "triangles": 964,
+    "budget": 3000,
+    "within_budget": true,
+    "min": [-0.54, 0, -2.025],
+    "max": [0.5, 3.32547002, 2.025],
+    "size": [1.04, 3.32547002, 4.05],
+    "center": [-0.02, 1.66273501, 0],
+    "area": 40.579791974,
+    "volume": 6.119336199,
+    "uv_scale": 1
+  },
+  "checks": {
+    "ok": true,
+    "closed": true,
+    "outward": true,
+    "vertices": 990,
+    "triangles": 964,
+    "min": [-0.54, 0, -2.025],
+    "max": [0.5, 3.32547002, 2.025],
+    "size": [1.04, 3.32547002, 4.05],
+    "area": 40.579791974,
+    "volume": 6.119336199,
+    "components": 10,
+    "euler": 20,
+    "open_edges": 0,
+    "nonmanifold_edges": 0,
+    "flipped_edges": 0,
+    "nonmanifold_points": 0,
+    "inverted_components": 0,
+    "degenerate": 0,
+    "bad_normals": 0
+  },
+  "parts": [
+    {"name": "stufen", "material": "beton", "ok": true, "closed": true, "outward": true, "triangles": 124, "vertices": 192, "min": [-0.5, 0, -2.025], "size": [1, 2.7, 4.05], "area": 25.164, "volume": 5.832, "degenerate": 0},
+    {"name": "wange", "material": "beton", "ok": true, "closed": true, "outward": true, "triangles": 12, "vertices": 24, "min": [-0.54, 0, -2.025], "size": [0.04, 2.95, 4.05], "area": 14.177, "volume": 0.27378, "degenerate": 0},
+    {"name": "pfosten", "material": "handlauf", "ok": true, "closed": true, "outward": true, "triangles": 320, "vertices": 370, "min": [0.43, 0.18, -1.37], "size": [0.04, 3.06, 3.28], "area": 0.574105997, "volume": 0.005510641, "degenerate": 0},
+    {"name": "rohr", "material": "handlauf", "ok": true, "closed": true, "outward": true, "triangles": 60, "vertices": 72, "min": [0.425, 1.003728723, -1.447072534], "size": [0.05, 2.312542554, 3.434145069], "area": 0.642785936, "volume": 0.007833521, "degenerate": 0},
+    {"name": "kugel unten", "material": "handlauf", "ok": true, "closed": true, "outward": true, "triangles": 224, "vertices": 166, "min": [0.42, 0.99452998, 1.943205029], "size": [0.06, 0.06, 0.06], "area": 0.01095002, "volume": 0.000106018, "degenerate": 0},
+    {"name": "kugel oben", "material": "handlauf", "ok": true, "closed": true, "outward": true, "triangles": 224, "vertices": 166, "min": [0.42, 3.26547002, -1.463205029], "size": [0.06, 0.06, 0.06], "area": 0.01095002, "volume": 0.000106018, "degenerate": 0}
+  ],
+  "expect": [
+    {"rule": "size", "expected": [1.04, null, 4.05], "actual": [1.04, 3.32547002, 4.05], "tolerance": 0.001, "ok": true}
+  ],
+  "materials": [
+    {"name": "beton", "color": "#a8a8a3", "roughness": 0.9, "metallic": 0},
+    {"name": "handlauf", "color": "#2f2f33", "roughness": 0.4, "metallic": 1}
+  ],
+  "fingerprint": "b7d61f0eedff3a35",
+  "output": "",
+  "imports": [],
+  "files": {"report": "report.json", "glb": "model.glb", "sheet": "sheet.png", "front": "front.png", "side": "side.png", "top": "top.png", "iso": "iso.png"},
+  "views": {"images": true, "size": 512, "grid_on": true, "grid": 0.5, "sheet": "front | side over top | iso", "cameras": "front: from +Z; side: from +X; top: from +Y, front at the bottom; the three at one scale; iso: from front right above", "adapter": "NVIDIA GeForce RTX 2070 SUPER"},
+  "timing": {"script_ms": 0.507, "geometry_ms": 0.685, "checks_ms": 0.915, "render_ms": 290.493, "export_ms": 0.247, "total_ms": 321.464, "fuel": 275}
+}

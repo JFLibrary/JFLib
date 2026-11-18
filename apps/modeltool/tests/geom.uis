@@ -1,0 +1,4 @@
+#!args --test prims,ops,normals,checks,poly
+# modeltool is a console program: lib/geom against independent references (refs.rs) and against what its
+# operations must keep, the topology checks against meshes broken on purpose, the triangulation; exit code 1
+# when a check fails.

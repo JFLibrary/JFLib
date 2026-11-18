@@ -155,6 +155,7 @@ CRATES = [
      "full"),
     ("dxf", "DXF import (ASCII): tables, blocks and entities of model space, without a GPU", "full"),
     ("physics", "Collision shapes, broad phase and deterministic queries for games", "full"),
+    ("geom", "Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks", "full"),
 ]
 SKIP_FILES = {"rt": {"os.rs", "mem.rs"}}            # rt::os: the OS calls plat is built on
 # codec crates: further items to show, per module ("*" = all public items of the module)
