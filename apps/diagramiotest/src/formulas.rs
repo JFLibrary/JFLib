@@ -5,6 +5,18 @@
 //   diagramiotest --corpus DIR --only formulas --show 20   also prints 20 differing cells with
 //                                                    their formulas (local use only: the files
 //                                                    are Microsoft content and stay on this machine)
+//   diagramiotest --growth REPS                      the times of the built drawings for 1000 ..
+//                                                    16000 shapes, REPS runs each (min, median)
+//
+// The growth check guards against work that grows with the square of the drawing (a scan of
+// every cell per cell): eight times the shapes take at most 32 times as long, the minimum of
+// three runs each.  Linear work does not give 8x in practice: the memory hierarchy adds a
+// factor of its own -- measured 2026-11-19 on a busy machine (other sessions building), 2000 ->
+// 16000 shapes: calculate 13 to 16x, an edit 14x; a plain loop that only resolves every formula cell
+// 21x, filling a vector 20x -- and quadratic work would give 64x.  32x lies between with room on
+// both sides.  The minimum keeps out what a busy machine adds to one run (a 4000-shape run of
+// 30 ms once took 131 ms); the sizes are large enough (13 ms and 170 ms) that a time slice
+// does not decide the ratio.
 //
 // Kinds of cells: own formula (F is an expression), F="Inh" (the formula comes from the master
 // shape or a style, V is this sheet's result) and inherited without a cell of its own (the
@@ -265,15 +277,52 @@ fn growth(n: u32) -> (u64, u64, bool) {
     (full, inc, ok && (got - want).abs() < 1e-6)
 }
 
+// `reps` runs of growth(n) -> the minimum times of calculate and edit, every result right, the
+// median time of calculate (a typical run under the machine's load, for oracle-time)
+fn growth_min(n: u32, reps: u32) -> (u64, u64, bool, u64) {
+    let (mut full, mut edit, mut ok) = (Vec::new(), Vec::new(), true);
+    for _ in 0..reps.max(1) {
+        let (f, i, good) = growth(n);
+        full.push(f);
+        edit.push(i);
+        ok &= good;
+    }
+    full.sort_unstable();
+    edit.sort_unstable();
+    (full[0], edit[0], ok, full[full.len() / 2])
+}
+
+/// --growth REPS: the times of growth() for 1000 .. 16000 shapes, REPS runs each: minimum and
+/// median in microseconds (a diagnosis of the growth check)
+pub fn growth_table(reps: u32) -> i32 {
+    let reps = reps.clamp(1, 50) as usize;
+    for n in [1000u32, 2000, 4000, 8000, 16000] {
+        let (mut full, mut edit) = (Vec::new(), Vec::new());
+        for _ in 0..reps {
+            let (f, i, ok) = growth(n);
+            if !ok {
+                out(&format!("{n}: wrong result\n"));
+                return 1;
+            }
+            full.push(f);
+            edit.push(i);
+        }
+        full.sort_unstable();
+        edit.sort_unstable();
+        out(&format!("{n:6} shapes: calculate min {:7} us median {:7} us   edit min {:7} us median {:7} us\n", full[0], full[reps / 2], edit[0], edit[reps / 2]));
+    }
+    0
+}
+
 pub fn run(h: &mut H, arg: Option<String>, show: usize) {
-    // (4000 built shapes have 12 000 formula cells: Height, PinX and a User row each)
-    // growth: four times the shapes must not take sixteen times as long
-    let (f1, i1, ok1) = growth(1000);
-    let (f4, i4, ok4) = growth(4000);
+    // (16000 built shapes have 48 000 formula cells: Height, PinX and a User row each)
+    // growth: eight times the shapes take at most 32 times as long (see the file header)
+    let (f1, i1, ok1, _) = growth_min(2000, 3);
+    let (f8, i8, ok8, f8_median) = growth_min(16000, 3);
     let ratio = |a: u64, b: u64| b as f64 / (a.max(1)) as f64;
-    out(&format!("     built drawings: 1000 shapes {} ms (+ edit {} ms), 4000 shapes {} ms (+ edit {} ms)\n", f1 / 1000, i1 / 1000, f4 / 1000, i4 / 1000));
-    h.check("formulas/built", ok1 && ok4, String::from("the chain of PinX through all shapes after an edit of the first"));
-    h.check("formulas/growth", ratio(f1, f4) < 10.0 && ratio(i1.max(1000), i4) < 10.0, format!("4x the shapes: {:.1}x the time, edit {:.1}x", ratio(f1, f4), ratio(i1.max(1000), i4)));
+    out(&format!("     built drawings (the fastest of 3 runs): 2000 shapes {} ms (+ edit {} ms), 16000 shapes {} ms (+ edit {} ms)\n", f1 / 1000, i1 / 1000, f8 / 1000, i8 / 1000));
+    h.check("formulas/built", ok1 && ok8, String::from("the chain of PinX through all shapes after an edit of the first"));
+    h.check("formulas/growth", ratio(f1, f8) < 32.0 && ratio(i1.max(1000), i8) < 32.0, format!("8x the shapes: {:.1}x the time, edit {:.1}x (quadratic: 64x)", ratio(f1, f8), ratio(i1.max(1000), i8)));
     let Some(dir) = folder(arg) else {
         out("skip formulas/oracle: no apps/JFDiagrammer/context/files above the current folder (--corpus DIR)\n");
         return;
@@ -352,12 +401,18 @@ pub fn run(h: &mut H, arg: Option<String>, show: usize) {
     h.check("formulas/oracle", stored.rate() >= 94.0 && total.rate() >= 97.5, format!("{:.2} % of the stored formula cells, {:.2} % with inherited ones", stored.rate(), total.rate()));
     // the cost of a cell against the built drawings' (machine independent: a loaded Linux
     // runner is several times slower than an idle Windows one), and a coarse ceiling; the
-    // three files take about half a second on Windows
-    let built_us = f4 as f64 / 12_000.0;
+    // three files take about half a second on Windows.  The files run once, so the built
+    // drawings count with a typical run too (the median, not the fastest).  The ceiling of
+    // 10 s holds for a machine as fast as an idle Windows one (built drawings about 3.5 us a
+    // cell) and grows with how much slower the machine is now: on 2026-11-19 a loaded WSL run
+    // took 11.3 s at 11.2 us a built cell, while its cells cost only 6.6 times the built ones
+    let built_us = f8_median as f64 / 48_000.0;
     let corpus_us = all.ms as f64 * 1000.0 / total.total.max(1) as f64;
+    let slower = (built_us / 3.5).max(1.0);
+    let ceiling = (10_000.0 * slower) as u64;
     h.check(
         "formulas/oracle-time",
-        all.ms < 10_000 && corpus_us < 15.0 * built_us.max(0.05),
-        format!("{} ms for the three files ({} cells): {:.1} us a cell, built drawings {:.1} us", all.ms, total.total, corpus_us, built_us),
+        all.ms < ceiling && corpus_us < 15.0 * built_us.max(0.05),
+        format!("{} ms for the three files ({} cells, at most {} ms now): {:.1} us a cell, built drawings {:.1} us", all.ms, total.total, ceiling, corpus_us, built_us),
     );
 }

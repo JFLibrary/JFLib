@@ -10,6 +10,8 @@
 //   diagramiotest --write-golden DIR      (JD4) the golden images of the viewer tests anew
 //   diagramiotest --write-drawings DIR    (JD4) the viewer tests' drawings as .vsdx
 //   diagramiotest --write-gegenprobe DIR  (JD7) the glue drawing for the Visio counter-check
+//   diagramiotest --growth REPS           the formula engine's times on built drawings of 1000 ..
+//                                         16000 shapes (min, median of REPS runs)
 //   diagramiotest --render-corpus DIR [--width PX]   (JD4) the local files' pages as PNG and SVG
 //   diagramiotest --write-export-golden DIR   (JD12) the export's golden images anew
 //   diagramiotest --write-exports DIR [--corpus DIR]   (JD12) the self-built drawings and the local
@@ -138,6 +140,9 @@ fn run() -> i32 {
     }
     if let Some(dir) = arg(&args, "--write-stencils") {
         return stencils::write(&dir);
+    }
+    if let Some(reps) = arg(&args, "--growth") {
+        return formulas::growth_table(reps.parse().unwrap_or(5));
     }
     if let Some(dir) = arg(&args, "--write-gegenprobe") {
         return gegenprobe::write(&dir);
