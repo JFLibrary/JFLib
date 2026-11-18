@@ -65,6 +65,8 @@ members = [
     "lib/gltf",
     "lib/dxf",
     "lib/physics",
+    "lib/game",
+    "lib/game_render3d",
     "lib/jflib",
     "lib/jflib_build",
     "lib/cargo_jflib",
@@ -219,6 +221,8 @@ render2d = { package = "jflib-render2d", path = "lib/render2d", version = "=0.2.
 gltf = { package = "jflib-gltf", path = "lib/gltf", version = "=0.2.1" }
 dxf = { package = "jflib-dxf", path = "lib/dxf", version = "=0.2.1" }
 physics = { package = "jflib-physics", path = "lib/physics", version = "=0.2.1" }
+game = { package = "jflib-game", path = "lib/game", version = "=0.2.1" }
+game_render3d = { package = "jflib-game-render3d", path = "lib/game_render3d", version = "=0.2.1" }
 style_winui = { package = "jflib-style-winui", path = "styles/winui", version = "=0.2.1" }
 style_classic = { package = "jflib-style-classic", path = "styles/classic", version = "=0.2.1" }
 style_kde = { package = "jflib-style-kde", path = "styles/kde", version = "=0.2.1" }

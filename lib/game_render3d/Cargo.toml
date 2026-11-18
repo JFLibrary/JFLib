@@ -1,0 +1,29 @@
+[package]
+name = "jflib-game-render3d"
+description = "The bridge from the game core to render3d: entities with a mesh as scene instances"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "game_render3d"
+path = "src/lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# gpu: render3d's errors (gpu::Result); game: the world, its poses, the camera's View
+gpu.workspace = true
+render3d.workspace = true
+game.workspace = true
+
+# docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
+# of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "wasm32-unknown-unknown", "aarch64-linux-android"]

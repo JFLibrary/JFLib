@@ -438,6 +438,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "gamedemo"
+version = "0.1.0"
+dependencies = [
+ "jflib-build",
+ "jflib-game",
+ "jflib-game-render3d",
+ "jflib-gpu",
+ "jflib-physics",
+ "jflib-plat",
+ "jflib-render3d",
+ "jflib-rt",
+ "jflib-style-winui",
+ "jflib-ui",
+]
+
+[[package]]
+name = "gametest"
+version = "0.1.0"
+dependencies = [
+ "jflib-base",
+ "jflib-build",
+ "jflib-game",
+ "jflib-game-render3d",
+ "jflib-gpu",
+ "jflib-physics",
+ "jflib-plat",
+ "jflib-render3d",
+ "jflib-rt",
+ "jflib-style-winui",
+ "jflib-ui",
+]
+
+[[package]]
 name = "gfxtest"
 version = "0.0.0"
 dependencies = [
@@ -543,6 +576,8 @@ dependencies = [
  "jflib-dxf",
  "jflib-eapm",
  "jflib-fx",
+ "jflib-game",
+ "jflib-game-render3d",
  "jflib-gfx",
  "jflib-gltf",
  "jflib-gpu",
@@ -730,6 +765,25 @@ dependencies = [
  "jflib-plat",
  "jflib-rt",
  "jflib-simd",
+]
+
+[[package]]
+name = "jflib-game"
+version = "0.2.1"
+dependencies = [
+ "jflib-base",
+ "jflib-physics",
+ "jflib-plat",
+ "jflib-rt",
+]
+
+[[package]]
+name = "jflib-game-render3d"
+version = "0.2.1"
+dependencies = [
+ "jflib-game",
+ "jflib-gpu",
+ "jflib-render3d",
 ]
 
 [[package]]
