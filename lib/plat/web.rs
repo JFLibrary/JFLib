@@ -7,7 +7,9 @@
 // Android differs where its system offers more: real files on internal storage
 // (android_files.rs), the documents of other apps as content:// names, the system clipboard and
 // the persisted grants (android_host.rs), the system's file picker behind file_dialog
-// (FD_PENDING, file_dialog_poll), download() as "save a copy" through the picker.
+// (FD_PENDING, file_dialog_poll), download() as "save a copy" through the picker, real threads,
+// semaphores and the wake-up through the host's looper (android_thread.rs: the pool, task and aio run
+// on threads there, not between frames).
 // The browser with the File System Access API (Chromium; the host says so, HOST_HANDLES):
 // file_dialog shows the system's pickers too and answers later; the chosen file is the user's
 // own, bound to a path /handles/ID/NAME (web/handles.js keeps the handle in IndexedDB), and every
@@ -104,6 +106,17 @@ pub use android_edges::*;
 mod threads;
 #[cfg(web_threads)]
 pub use threads::{Sem, Thread, spawn as thread_spawn};
+// Android: real threads (Bionic), futex semaphores, the wake-up through an eventfd the host's looper
+// watches, sleeps, the system's numbers (docs/ANDROID.md AN1)
+#[cfg(target_os = "android")]
+#[path = "android_thread.rs"]
+mod android_thread;
+#[cfg(target_os = "android")]
+pub use android_thread::{Sem, Thread, cpu_count, jfgui_wake_fd, mem_total, sleep_ms, thread_spawn, thread_yield, wait_events, wake};
+#[cfg(target_os = "android")]
+pub(crate) use android_thread::{plat_tid, proc_file, thread_background};
+#[cfg(target_os = "android")]
+use android_thread::drain_wake;
 
 #[cfg_attr(target_arch = "wasm32", link(wasm_import_module = "jfgui"))]
 unsafe extern "C" {
@@ -227,6 +240,8 @@ static CALENDAR: SpinLock<Date> = SpinLock::new(Date {
     wday: 4,
 });
 static STARTED: AtomicBool = AtomicBool::new(false);
+// (Android: android_thread.rs's flag and eventfd)
+#[cfg(not(target_os = "android"))]
 static WAKE_PENDING: AtomicBool = AtomicBool::new(false);
 static AGENT: AtomicBool = AtomicBool::new(false);
 /// the page's main pointer is a finger (`pointer: coarse`, a capability bit of the host)
@@ -445,7 +460,7 @@ pub fn capabilities() -> Capabilities {
             // Rich formats are instance-local. System text writes need browser permission.
             | crate::CAP_CLIPBOARD_RICH
             | crate::CAP_WINDOWING
-            | if cfg!(web_threads) { crate::CAP_THREADS } else { 0 }
+            | if cfg!(any(web_threads, target_os = "android")) { crate::CAP_THREADS } else { 0 }
             // Android: internal storage and the ClipboardManager (images: GalleryFiles)
             | if cfg!(target_os = "android") {
                 crate::CAP_PERSISTENT_STORAGE | crate::CAP_CLIPBOARD_TEXT | crate::CAP_CLIPBOARD_IMAGE
@@ -468,7 +483,7 @@ pub fn time_us() -> u64 {
     unsafe { host_time_us().max(0.0) as u64 }
 }
 /// No blocking sleep occurs in the browser; callers must return to their step loop.
-#[cfg(not(target_os = "ios"))]
+#[cfg(target_arch = "wasm32")]
 pub fn sleep_ms(_ms: u32) {}
 /// Read a per-instance virtual environment setting.
 #[cfg(not(target_os = "ios"))]
@@ -545,7 +560,7 @@ pub fn theme() -> i32 {
     }
 }
 /// Available compute workers in a shared-memory bundle, otherwise one app worker.
-#[cfg(not(target_os = "ios"))]
+#[cfg(target_arch = "wasm32")]
 pub fn cpu_count() -> u32 {
     #[cfg(web_threads)]
     { threads::cpu_count() }
@@ -553,40 +568,30 @@ pub fn cpu_count() -> u32 {
     { 1 }
 }
 /// Current WASM linear-memory allocation; zero when the embedded host does not report RAM.
-#[cfg(not(target_os = "ios"))]
+#[cfg(target_arch = "wasm32")]
 pub fn mem_total() -> u64 {
-    #[cfg(target_arch = "wasm32")]
-    { core::arch::wasm32::memory_size::<0>() as u64 * 65536 }
-    #[cfg(target_os = "android")]
-    { 0 }
+    core::arch::wasm32::memory_size::<0>() as u64 * 65536
 }
 /// Cooperative yield is achieved by returning from the current runtime step.
-#[cfg(not(target_os = "ios"))]
+#[cfg(target_arch = "wasm32")]
 pub fn thread_yield() {}
-/// Browser thread handle placeholder; spawning native threads is unsupported (Android: the GPU
-/// output's jobs have threads of their own, android_gpu.rs).
-#[cfg(all(not(web_threads), not(target_os = "ios")))]
-pub struct Thread {
-    #[cfg(target_os = "android")]
-    handle: usize,
-}
-#[cfg(all(not(web_threads), not(target_os = "ios")))]
+/// Browser thread handle placeholder; spawning native threads is unsupported.
+#[cfg(all(not(web_threads), target_arch = "wasm32"))]
+pub struct Thread;
+#[cfg(all(not(web_threads), target_arch = "wasm32"))]
 impl Thread {
     /// Wait for it (no thread was started in the browser).
-    pub fn join(self) {
-        #[cfg(target_os = "android")]
-        android_gpu::thread_join(self.handle);
-    }
+    pub fn join(self) {}
 }
 /// Reject native thread creation. Use Job for cooperative background work.
-#[cfg(all(not(web_threads), not(target_os = "ios")))]
+#[cfg(all(not(web_threads), target_arch = "wasm32"))]
 pub fn thread_spawn(_stack: usize, _f: Box<dyn FnOnce() + Send>) -> Option<Thread> {
     None
 }
 /// Nonblocking counting semaphore used only by portable try-wait paths.
-#[cfg(all(not(web_threads), not(target_os = "ios")))]
+#[cfg(all(not(web_threads), target_arch = "wasm32"))]
 pub struct Sem(AtomicU32);
-#[cfg(all(not(web_threads), not(target_os = "ios")))]
+#[cfg(all(not(web_threads), target_arch = "wasm32"))]
 impl Sem {
     /// Create a logical semaphore inside this worker.
     pub fn new(initial: u32) -> Option<Self> {
@@ -604,7 +609,7 @@ impl Sem {
     }
 }
 /// Coalesce job/repaint notifications without occupying the bounded input ring.
-#[cfg(not(target_os = "ios"))]
+#[cfg(target_arch = "wasm32")]
 pub fn wake() {
     WAKE_PENDING.store(true, Ordering::Release);
 }
@@ -624,6 +629,7 @@ pub(crate) fn installed() -> bool {
     // SAFETY: the main thread only; no borrow survives.
     unsafe { (*APP.0.get()).is_some() }
 }
+#[cfg(not(target_os = "android"))]
 fn drain_wake() {
     if WAKE_PENDING.swap(false, Ordering::AcqRel)
         && !crate::evq_push(Event { typ: crate::E_WAKE, ..Event::default() })
@@ -637,7 +643,7 @@ pub fn wait(_deadline_us: u64) -> u32 {
     crate::evq_count()
 }
 /// Dispatch already queued events without blocking the browser worker.
-#[cfg(not(target_os = "ios"))]
+#[cfg(target_arch = "wasm32")]
 pub fn wait_events(_deadline_us: u64, on_event: &mut dyn FnMut(&Event)) -> u32 {
     let mut count = 0;
     while let Some(event) = crate::evq_pop() {
@@ -1017,7 +1023,7 @@ pub extern "C" fn jfgui_gpu_test(op: u32) -> u32 {
 /// Advance the owned runtime and cooperative jobs, then submit the composed framebuffer.
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_tick(time_ms: u32) {
-    #[cfg(all(not(web_threads), not(target_os = "ios")))]
+    #[cfg(all(not(web_threads), target_arch = "wasm32"))]
     crate::pump_jobs(16);
     drain_wake();
     let _ = with_app(|app| app.tick(time_ms));

@@ -3,10 +3,8 @@
 //
 //   dl_open(name) / dl_sym(handle, name) / dl_close(handle)   libvulkan.so at run time: no
 //                                      DT_NEEDED, the program starts on a phone without it
-//   gpu_thread_spawn(stack, f)         a real thread for the output's jobs.  thread_spawn stays
-//                                      None here: the pools and tasks of this target are cooperative
-//                                      and start nothing behind the UI's back; nothing but the
-//                                      output's jobs, which end by themselves, runs on these
+//   gpu_thread_spawn(stack, f)         a thread for the output's jobs: thread_spawn's
+//                                      (android_thread.rs, Bionic's pthreads)
 //   win_gpu_child(w)                   the surface of the SurfaceView (ANativeWindow), the analogue
 //                                      of Windows' child window; only for window 0 while nothing
 //                                      else shows on the canvas (tool windows and popups are
@@ -34,18 +32,6 @@ unsafe extern "C" {
     fn dlopen(name: *const u8, flags: i32) -> *mut c_void;
     fn dlsym(handle: *mut c_void, name: *const u8) -> *mut c_void;
     fn dlclose(handle: *mut c_void) -> i32;
-}
-
-#[repr(C, align(8))]
-struct PthreadAttr([u64; 8]);
-
-#[link(name = "c")]
-unsafe extern "C" {
-    fn pthread_attr_init(attr: *mut PthreadAttr) -> i32;
-    fn pthread_attr_setstacksize(attr: *mut PthreadAttr, size: usize) -> i32;
-    fn pthread_attr_destroy(attr: *mut PthreadAttr) -> i32;
-    fn pthread_create(out: *mut usize, attr: *const PthreadAttr, start: extern "C" fn(*mut c_void) -> *mut c_void, arg: *mut c_void) -> i32;
-    fn pthread_join(thread: usize, out: *mut *mut c_void) -> i32;
 }
 
 /// open a shared library (a name as the linker searches it, or a path) -> its handle
@@ -81,40 +67,9 @@ pub unsafe fn dl_close(handle: usize) {
     unsafe { dlclose(handle as *mut c_void) };
 }
 
-type Start = Box<dyn FnOnce() + Send>;
-
-extern "C" fn thread_main(arg: *mut c_void) -> *mut c_void {
-    // SAFETY: gpu_thread_spawn hands over this box, once.
-    let f = unsafe { Box::from_raw(arg as *mut Start) };
-    rt::abort_on_unwind(f); // feature unwind: a panic that leaves the thread ends the program
-    core::ptr::null_mut()
-}
-
-/// a real thread with stack bytes of stack (the output's jobs) -> its handle
-pub fn gpu_thread_spawn(stack: usize, f: Start) -> Option<super::Thread> {
-    let arg = Box::into_raw(Box::new(f));
-    let mut attr = PthreadAttr([0; 8]);
-    let mut handle = 0usize;
-    // SAFETY: attr is at least as large as bionic's pthread_attr_t and lives across the calls;
-    // thread_main takes the box when the thread started, else it is taken back below.
-    let r = unsafe {
-        pthread_attr_init(&mut attr);
-        pthread_attr_setstacksize(&mut attr, stack);
-        let r = pthread_create(&mut handle, &attr, thread_main, arg as *mut c_void);
-        pthread_attr_destroy(&mut attr);
-        r
-    };
-    if r != 0 {
-        // SAFETY: no thread started, the box is still ours.
-        drop(unsafe { Box::from_raw(arg) });
-        return None;
-    }
-    Some(super::Thread { handle })
-}
-
-pub(super) fn thread_join(handle: usize) {
-    // SAFETY: a thread of gpu_thread_spawn, joined once (Thread::join takes self).
-    unsafe { pthread_join(handle, core::ptr::null_mut()) };
+/// a thread with stack bytes of stack (the output's jobs) -> its handle
+pub fn gpu_thread_spawn(stack: usize, f: Box<dyn FnOnce() + Send>) -> Option<super::Thread> {
+    super::thread_spawn(stack, f)
 }
 
 #[link(name = "android")]

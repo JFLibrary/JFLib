@@ -33,6 +33,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   wait of 0 ms, Linux, Apple and Android `kill(pid, 0)`; a process of another user counts, the
   browser has none), `plat::process_id()` for apps without std and `process::Child::id()`.
   docs/GUIDE.md section 17.
+- Android has real threads (docs/ANDROID.md, AN1): `thread_spawn`, `Thread::join` and `Sem` over Bionic's pthreads and futexes, `plat::sync` with Linux's futex code, the pool of Windows, Linux and Apple (`parallel_for`, `Job`, `thr_count()` = `cpu_count()`, `render_par` in bands), task's blocking pool and `aio` on threads instead of between frames on the UI thread, their workers below the UI thread (nice 10, Android's `THREAD_PRIORITY_BACKGROUND`); `cpu_count()` (sysconf), `mem_total()` (/proc/meminfo), `thread_yield()`, a `sleep_ms()` that sleeps, `cpu_brand()` from /proc/cpuinfo; `capabilities()` reports `CAP_THREADS`. `wake()` from any thread writes an eventfd that the UI thread's looper watches (android/bridge.c, `ALooper_addFd`): a frame comes at once instead of with the idle host's next tick (up to 250 ms)
 
 ### Changed
 

@@ -11,7 +11,7 @@
 use alloc::string::String;
 
 pub use rt::cpu::{CPU_AVX2, CPU_BMI2, CPU_FMA, CPU_POPCNT, CPU_SSE41};
-#[cfg(not(all(any(target_os = "linux", windows), target_arch = "aarch64")))] use rt::cpu::cpuid;
+#[cfg(not(any(all(any(target_os = "linux", windows), target_arch = "aarch64"), target_os = "android")))] use rt::cpu::cpuid;
 
 /// CPU_* bits (cached; rt::cpu)  [cpu_features]
 pub fn cpu_features() -> u32 {
@@ -27,7 +27,7 @@ pub(crate) fn simd_override() {
 
 /// the processor name from CPUID 0x80000002..4 (macOS, iOS: sysctl machdep.cpu.brand_string,
 /// "Apple M2", on an Intel Mac Intel's name; under Rosetta 2 the Mac's own chip), blanks trimmed  [cpu_brand]
-#[cfg(not(all(any(target_os = "linux", windows), target_arch = "aarch64")))] pub fn cpu_brand() -> String {
+#[cfg(not(any(all(any(target_os = "linux", windows), target_arch = "aarch64"), target_os = "android")))] pub fn cpu_brand() -> String {
     #[cfg(target_vendor = "apple")]
     {
         let mut b = [0u8; 128];
@@ -115,7 +115,13 @@ pub fn cpu_brand() -> String {
     let midr: u64;
     // SAFETY: with HWCAP_CPUID the kernel emulates reads of the ID registers for user space.
     unsafe { core::arch::asm!("mrs {}, midr_el1", out(reg) midr, options(nomem, nostack, preserves_flags)) };
-    let (imp, part) = ((midr >> 24) & 0xFF, (midr >> 4) & 0xFFF);
+    midr_name((midr >> 24) & 0xFF, (midr >> 4) & 0xFFF)
+}
+
+/// an ARM core's name from MIDR's implementer and part ("ARM Cortex-A720"; "Qualcomm CPU 0x001" for
+/// parts not listed)
+#[cfg(any(all(target_os = "linux", target_arch = "aarch64"), target_os = "android"))]
+fn midr_name(imp: u64, part: u64) -> String {
     let vendor = match imp {
         0x41 => "ARM",
         0x42 => "Broadcom",
@@ -165,6 +171,47 @@ pub fn cpu_brand() -> String {
         (v, "") => alloc::format!("{v} CPU 0x{part:03x}"),
         (v, c) => alloc::format!("{v} {c}"),
     }
+}
+
+// ---- Android (docs/ANDROID.md AN1): rt has no CPUID there (portable cpu.rs); the kernel's /proc/cpuinfo,
+// which an app may read
+
+/// the processor's name from /proc/cpuinfo: x86-64 its "model name" (the emulator: the host's processor),
+/// ARM64 "Hardware" where the kernel still writes it, else every kind of core once from "CPU implementer"
+/// and "CPU part" ("ARM Cortex-A55 + ARM Cortex-A78" on big.LITTLE); "" when it says nothing
+#[cfg(target_os = "android")]
+pub fn cpu_brand() -> String {
+    crate::proc_file("/proc/cpuinfo\0").map(|t| cpuinfo_brand(&t)).unwrap_or_default()
+}
+
+/// (Android) the name in the text of /proc/cpuinfo
+#[cfg(target_os = "android")]
+fn cpuinfo_brand(text: &str) -> String {
+    fn field<'a>(line: &'a str, key: &str) -> Option<&'a str> {
+        let (k, v) = line.split_once(':')?;
+        (k.trim() == key).then(|| v.trim())
+    }
+    fn hex(v: &str) -> Option<u64> {
+        u64::from_str_radix(v.strip_prefix("0x").unwrap_or(v), 16).ok()
+    }
+    for key in ["model name", "Hardware"] {
+        if let Some(v) = text.lines().find_map(|l| field(l, key)).filter(|v| !v.is_empty()) {
+            return String::from(v);
+        }
+    }
+    let mut names: alloc::vec::Vec<String> = alloc::vec::Vec::new();
+    let mut imp = None;
+    for l in text.lines() {
+        if let Some(v) = field(l, "CPU implementer") {
+            imp = hex(v);
+        } else if let (Some(i), Some(p)) = (imp, field(l, "CPU part").and_then(hex)) {
+            let n = midr_name(i, p);
+            if !names.contains(&n) {
+                names.push(n);
+            }
+        }
+    }
+    names.join(" + ")
 }
 
 // ---- Windows on ARM64 (docs/ARM64.md, ARM5): no AVX2 and the stack pointer as on Linux (above); the name

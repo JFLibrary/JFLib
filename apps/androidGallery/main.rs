@@ -6,7 +6,7 @@
 // finger: pg_basic.rs, pg_menus.rs, pg_text.rs, pg_lists.rs, pg_boxes.rs, pg_colors.rs,
 // pg_windows.rs, pg_edge.rs, pg_image.rs, pg_view.rs (G5e2: a 3D view), pg_r2d.rs (G6e3, Android: a render2d drawing,
 // its check against the CPU path and its measurement); the phone's own: pg_sensors.rs (Wasserwaage, Handylage, Kompass,
-// GPS).
+// GPS); jobtest.rs (AN1: jfgui_SELFTEST=job, the UI while a long job runs on the pool).
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -17,6 +17,7 @@ use ui::*;
 use ui::i18n::{t, tf, Catalog};
 
 mod files;
+mod jobtest;
 mod nav;
 mod pg_basic;
 mod pg_boxes;
@@ -87,7 +88,7 @@ struct Gallery {
     page: Page, next: Option<Page>, started: bool, home_y: i32, home_restore: u32,
     basic: pg_basic::Basic, menus: pg_menus::Menus, texts: pg_text::Texts, lists: pg_lists::Lists,
     boxes: pg_boxes::Boxes, colors: pg_colors::Colors, windows: pg_windows::Windows, edge: pg_edge::Edge,
-    images: pg_image::Images, sensors: pg_sensors::Sensors,
+    images: pg_image::Images, sensors: pg_sensors::Sensors, job: jobtest::JobTest,
     #[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
     view3d: pg_view::View3d,
     #[cfg(target_os = "android")]
@@ -100,7 +101,7 @@ impl Default for Gallery {
             page: Page::Home, next: None, started: false, home_y: 0, home_restore: 0,
             basic: Default::default(), menus: Default::default(), texts: Default::default(), lists: Default::default(),
             boxes: Default::default(), colors: Default::default(), windows: Default::default(), edge: Default::default(),
-            images: Default::default(), sensors: Default::default(),
+            images: Default::default(), sensors: Default::default(), job: Default::default(),
             #[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
             view3d: Default::default(),
             #[cfg(target_os = "android")]
@@ -192,6 +193,10 @@ impl App for Gallery {
                 ui.invalidate();
             }
             return;
+        }
+        // (jfgui_SELFTEST=job) a long job on the pool: the progress bar of card 01 follows it
+        if let Some(v) = self.job.frame(ui) {
+            self.value = v;
         }
         ui.next_size(0, SIZE_FILL);
         ui.scroll_begin(ID_HOME, SC_V);
@@ -291,6 +296,7 @@ impl App for Gallery {
         }
     }
     fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
+        self.job.command(ui, id, arg); // (jfgui_SELFTEST=job) its timer, a job's wake-up; the others see them too
         // a reading, a fix, the age's timer (pg_sensors.rs)
         if self.sensors.command(ui, id, arg) {
             return true;

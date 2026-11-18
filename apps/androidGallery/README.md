@@ -479,6 +479,21 @@ und was noch offen ist in
 python apps/androidGallery/tests/android_perf.py --serial SERIAL --apk BUILD.apk --page colors
 ```
 
+## Langer Job, flüssige Oberfläche (seit 18.11.2026)
+
+Seit AN1 ([`docs/ANDROID.md`](../../docs/ANDROID.md)) rechnet der Pool auf Android auf echten Threads. Mit
+`jfgui_SELFTEST=job` ([`jobtest.rs`](jobtest.rs), ohne eigene Texte) läuft ein langer Job (240 Stücke zu 20 ms)
+auf `plat::Job`, während ein Timer alle 16 ms ein Bild anfordert; der Fortschrittsbalken der Karte 01 folgt ihm.
+Danach enden fünf kurze Jobs, während die Oberfläche ruht: Gemessen wird, wie schnell das Wecken ankommt.
+
+```powershell
+python apps/androidGallery/tests/android_job.py --serial SERIAL [--apk build/android/androidGallery-x86_64-debug.apk] [--gpu 0] [--rounds 3]
+```
+
+Am 18.11.2026 auf dem x86_64-Emulator (API 35, 4 Kerne), je drei Runden: während des Jobs 53–63 Bilder/s
+(ohne Job 43–53), längste Lücke 63–82 ms (ohne Job 61–63 ms), Wecken nach Job-Ende 0–32 ms; im Bitmap-Weg
+(`--gpu 0`) Lücken bis 140 ms. Vorher liefen die Stücke zwischen den Bildern auf dem UI-Thread.
+
 ## Regressionstest für Android-Eingabe und Leerlauf
 
 Die Debug-APK enthält einen explizit startbaren Instrumentation-Test. Er startet die

@@ -70,7 +70,7 @@
 //            select                                                            (task.rs)
 //   aio:     files without blocking: read_file / write_file / copy_file with progress and
 //            cancellation, Reader / Writer chunk by chunk (AtomicFile underneath)  (aio.rs)
-//   sync:    Mutex, Condvar, RwLock, channel (futex / WaitOnAddress)          (sync.rs)
+//   sync:    Mutex, Condvar, RwLock, channel (futex / WaitOnAddress; Android too)  (sync.rs)
 //   rand:    fill_random, random_bytes, random_u64 (the OS CSPRNG)             (rand.rs)
 //   net:     TcpListener, TcpStream, UdpSocket, SocketAddr, resolve            (net.rs)
 //   fs:      stat / lstat / read_dir / links / set_times / free_space /
@@ -103,7 +103,7 @@ extern crate alloc;
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub mod process;
 /// Mutex, Condvar, RwLock and bounded channels for worker threads.
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub mod sync;
 /// TCP and UDP sockets (IPv4 / IPv6) with timeouts, numeric names.
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
@@ -314,7 +314,8 @@ mod control_stream;
 pub use control_stream::*;
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub mod control_ipc;
-#[cfg_attr(all(any(target_arch = "wasm32", target_os = "android"), not(web_threads)), path = "web_pool.rs")]
+// (the browser without shared memory: items between frames; Android and iOS: pool.rs on real threads)
+#[cfg_attr(all(target_arch = "wasm32", not(web_threads)), path = "web_pool.rs")]
 mod pool;
 /// Async execution: executors in the event loop and for block_on, a pool for blocking work,
 /// timers, cancellation, progress, joins.
