@@ -1,7 +1,7 @@
 # Spiel-Engine: Plan für G7
 
-Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1) und von G7b (Welle 2), siehe dort; Stand
-2026-11-18. Die Zahl der Läufe je Stufe ist
+Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1) und von G7b und G7g (Welle 2), siehe dort;
+Stand 2026-11-18. Die Zahl der Läufe je Stufe ist
 geschätzt (ein Lauf ist eine Arbeitsrunde eines Agenten mit Durchsicht, wie bei G5 und G6).
 
 ## Ziel
@@ -53,7 +53,8 @@ Was es gibt (Code auf `main` ab7e77e1):
   wird deckend), Skinning, Kantenglättung, Nachbearbeitung, viele Lichter (je Licht rund 0,1 ms bei 1 Mio. Würfeln),
   Schatten für Punkt- und Spotlichter, komprimierte Texturen, Meshes und Texturen entfernen (die Pools wachsen nur),
   doppelseitige Materialien, Partikel. Durchsichtiges, Entfernen und doppelseitige Materialien bringt G7f Teil 1.
-- **glTF:** [`lib/gltf`](GLTF.md) liest keine Animationen, Skins und Morph-Ziele und schreibt nur `.glb` für Tests.
+- **glTF:** [`lib/gltf`](GLTF.md) liest keine Animationen, Skins und Morph-Ziele; seit G7g Teil 1 schreibt `write_document` ein
+  `.glb` aus einem Dokument (Meshes, Materialien nach ihren Faktoren, Knoten, Szenen).
 - **Eingabe:** Tastatur, Maus und Touch auf allen Zielen. Kein Gamepad, keine relative Maus, kein Pointer-Lock
   (die beiden letzten bringt G7a Teil 1).
 - **Klang:** [`plat::audio`](../lib/plat/audio.rs) mit einem gemeinsamen Mischer (`play(&Sound) -> Voice`), ohne
@@ -65,8 +66,8 @@ Was es gibt (Code auf `main` ab7e77e1):
   nimmt es per git, die Wurzel-`Cargo.toml` legt `jflib-agent-core` per `[patch.crates-io]` auf diesen Workspace.
   Deterministisch (Gleitkomma in Software, keine Uhr, kein Zufall), mit Brennstoff, Grenzen und Sprachdiensten. Für
   schwere Geometrie zu langsam; die Rechnung gehört deshalb in Rust, das Skript beschreibt.
-- **Nicht da:** Physik (seit G7c Teil 1 die Kollision in `lib/physics`), Animation, Netcode,
-  Werkzeuge zum Modellieren.
+- **Nicht da:** Physik (seit G7c Teil 1 die Kollision in `lib/physics`), Animation, Netcode. Werkzeuge zum
+  Modellieren seit G7g Teil 1 (`lib/geom`, `apps/modeltool`).
 
 ## Crates
 
@@ -76,11 +77,11 @@ Was es gibt (Code auf `main` ab7e77e1):
 | `plat` (wächst) | Gamepad, relative Maus, Pointer-Lock, Tasten nach Lage; WebSocket im Browser | – | JFLib |
 | `lib/physics` (neu) | Formen, Kollision, Abfragen, Character-Controller, später Starrkörper | nur Mathematik | Vorschlag: JFLib |
 | `lib/anim` (neu, G7i) | Skelette, Clips, Überblenden, IK (die CPU-Seite) | `gltf` | Vorschlag: JFLib |
-| `lib/geom` (neu, G7g) | der Modellierkern: Netze, Grundkörper, Extrudieren, CSG, UV, Vereinfachen | nur Mathematik | Vorschlag: JFLib |
+| `lib/geom` (neu, G7g) | der Modellierkern: Netze, Grundkörper, Extrudieren, CSG, UV, Vereinfachen | `rt` (nur Mathematik) | Vorschlag: JFLib |
 | `lib/game` (neu, G7b) | Weltmodell, Takt, Eingabe-Aktionen, Kameras, Assets, Raumklang, Netcode | `physics`, `plat`, `base` (`netio` mit G7e); `render3d` nicht | eigenes Repository |
 | `lib/game_render3d` (neu, G7b) | Brücke: Entitäten mit Mesh → Instanzen von `render3d` | `game`, `render3d`, `gpu` | eigenes Repository (mit `game`) |
 | `apps/gametest`, `apps/gamedemo` | Tests des Kerns ohne Fenster; Demo mit Ego-Kamera | `game`, `game_render3d` | eigenes Repository |
-| `apps/modeltool` (G7g) | JFScript → Mesh → Bilder und Prüfungen, für KI und Mensch | `geom`, `render3d`, JFScript | eigenes Repository |
+| `apps/modeltool` (G7g) | JFScript → Mesh → Bilder und Prüfungen, für KI und Mensch | `geom`, `render3d`, `gltf`, JFScript | eigenes Repository |
 | `apps/<spiel1>`, `apps/<spiel1>-server` | Spiel 1 | `game` | eigenes Repository |
 
 Regeln:
@@ -277,6 +278,18 @@ anfassen:
 - Fertig, wenn: ein Agent aus einer Beschreibung in Text eine Reihe von Bezugsobjekten baut (Kiste, Treppe, Tür,
   Haus aus Modulen, eine kleine Karte), mit den Bildern als einziger Sicht, und der Nutzer die Ergebnisse angesehen
   hat.
+- **Stand 2026-11-18: Teil 1 fertig** ([GEOM.md](GEOM.md)). `lib/geom` (`jflib-geom`): Netze in `f64` mit einer
+  Topologie aus Punkten (Teile, die sich nur berühren, bleiben getrennt, `weld` verbindet ausdrücklich),
+  Grundkörper (Quader, Zylinder, Kegel, Kugel, Torus, Treppe, Bogen), Extrudieren, Prisma, Sweep entlang eines
+  Pfads, Drehkörper, Verschieben, Drehen in Grad (bei Vielfachen von 90° exakt), Spiegeln, Felder, Normalen, UV per
+  Box-Projektion; Prüfungen (geschlossen, mannigfaltig, Normalen nach außen, entartete Dreiecke) mit JSON.
+  `gltf::write_document` schreibt `.glb`. `apps/modeltool`: JFScript per git, Host-Funktionen `geom.*`,
+  `profile.*`, `vec.*`, `model.*`; je Lauf `report.json`, `model.glb`, Ansichten von vorn, Seite, oben, schräg und
+  ein Blatt mit allen vier; Cache über SHA-256. 31 338 Prüfungen, Prüfsumme `8d93441afd1b79d7` gleich auf Windows,
+  Linux, macOS und im Browser. Fünf Beispiele (Kiste, Treppe, Tür, Haus aus Modulen, Säule) als Maßstab.
+  Offen: Teil 2 (konvexe Booleans mit exakten Prädikaten, Abschrägen, Beobachtungsmodus, der Lauf, in dem ein
+  Agent nur mit den Bildern modelliert); die Liste der Wünsche an JFScript in GEOM.md (Vektoren mit Operatoren,
+  Host-Objekte, Position des Aufrufs, benannte Argumente, mehr Mathematik), gebaut erst nach dem Ja des Nutzers.
 
 **G7h Spiel 1**
 
