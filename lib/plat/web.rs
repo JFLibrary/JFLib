@@ -294,6 +294,14 @@ pub(crate) fn notice(kind: u32, data: &[u8]) {
         host_request(kind, 0, data.as_ptr(), data.len());
     }
 }
+/// (G7d) a request about one of the host's objects (a WebSocket): its id travels as the request's id
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn notice_id(kind: u32, id: u32, data: &[u8]) {
+    // SAFETY: as notice: the host copies the bytes before it returns.
+    unsafe {
+        host_request(kind, id, data.as_ptr(), data.len());
+    }
+}
 /// hand R, G, B, A rows (stride bytes each) and the rectangles to show of them to the host
 /// (order 1: RGBA; hosts take a missing order as the former B, G, R, x)
 pub(super) fn present_bytes(data: &[u8], width: i32, height: i32, stride: i32, rects: &[[i32; 4]]) {

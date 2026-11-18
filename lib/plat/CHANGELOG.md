@@ -10,6 +10,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
+- (G7d) `plat::net` on every target: the addresses (`IpAddr`, `SocketAddr`, `ip_scope_parse`, `if_index`), `NetError`, `NetErrorKind`, `NetResult` and `host_port` also in the browser and on Android; sockets, names and interfaces stay Windows', Linux's and Apple's.
+- (G7d) The browser's WebSocket: `plat::net::WebSocket` (`connect` / `connect_with(url, WsLimits)`, `state`, `send_text`, `send_binary`, `recv` without blocking, `close`, `close_info`, `protocol`, `pending`), `WsState`, `WsMessage`, `WsLimits` (a message and the bytes queued for the app; more close the socket, 1009 in `close_info`), `WS_MAX_SOCKETS`. ws:// and wss:// URLs, and "/path" for the page's own server (`jfgui_PAGE_ORIGIN`, which the worker sets). The worker holds the browser's WebSocket objects (request `REQUEST_WEBSOCKET` 32 with the socket's id, the host's events through `jfgui_ws`), so frames never pass the page; a burst of them wakes the app once (`plat::wake`, E_WAKE).
+- (G7d) `policy::net_host_allowed(host, port)`: a connection to a host as written, name or address, against the `net.connect` rules (the browser's WebSocket asks it before it connects; a refusal is `NetErrorKind::Denied`). IPv6 rules now parse in the browser and on Android too.
+
 - `fs::fd_path(&File)`: a path that leads a program this one starts (QEMU given a disk file made
   through a `Dir`) to the open file itself, whatever its name has become or was put in its
   place. Linux `/proc/<pid>/fd/<n>`, valid while the file stays open; None on Windows and macOS.

@@ -24,6 +24,11 @@
 //             (GetAddrInfoW).  Linux names go through netio::dns (no libc here).
 //   NetError: the kinds callers act on, with the OS code
 //
+// (G7d) Everywhere: the addresses, NetError and host_port.  The sockets, names and interfaces are
+// Windows', Linux's and Apple's; the browser has WebSocket instead (web_net.rs: the page's
+// WebSocket through the JS host, net.connect checked on the URL's host and port), Android nothing
+// yet (docs/ANDROID.md).
+//
 // The app's permissions (policy.rs, net.connect / net.listen) are checked before connect,
 // bind, send_to and a name lookup; Unix sockets follow the file rules (fs.write on the path).
 // A refusal is NetErrorKind::Denied.
@@ -37,6 +42,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 use core::sync::atomic::{AtomicU32, Ordering};
 
 // ------------------------------------------------------------------ addresses
@@ -252,11 +258,20 @@ pub fn if_index(name: &str) -> Option<u32> {
     if name.is_empty() || name.len() > 255 || name.bytes().any(|b| b == 0 || b == b'/') || name == "." || name == ".." {
         return None;
     }
-    sys::if_index(name).filter(|i| *i != 0)
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+    {
+        sys::if_index(name).filter(|i| *i != 0)
+    }
+    // (the browser, Android: no interfaces to name; a zone by number still parses)
+    #[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
+    {
+        None
+    }
 }
 
 /// this computer's addresses (port 0; link-local IPv6 addresses with their scope), see the top
 /// of this file
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub fn local_addrs() -> Vec<SocketAddr> {
     let mut v = sys::local_addrs();
     v.dedup();
@@ -266,6 +281,7 @@ pub fn local_addrs() -> Vec<SocketAddr> {
 /// (Windows) the DNS servers of the network adapters that are up (port 53, link-local ones
 /// with their scope), in the system's adapter order; Linux: empty (netio::dns reads
 /// /etc/resolv.conf)
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub fn dns_servers() -> Vec<SocketAddr> {
     let mut out: Vec<SocketAddr> = Vec::new();
     for a in sys::dns_servers() {
@@ -330,10 +346,12 @@ impl fmt::Display for NetError {
 
 pub type NetResult<T> = Result<T, NetError>;
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn timed_out() -> NetError {
     NetError::new(NetErrorKind::TimedOut, 0)
 }
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn denied() -> NetError {
     NetError::new(NetErrorKind::Denied, 0)
 }
@@ -1220,7 +1238,7 @@ fn decode_sockaddr(b: &[u8]) -> Option<SocketAddr> {
     }
 }
 
-#[cfg(not(target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux"))]
 fn encode_sockaddr(a: &SocketAddr) -> Vec<u8> {
     match a.ip {
         IpAddr::V4(ip) => {
@@ -1241,7 +1259,7 @@ fn encode_sockaddr(a: &SocketAddr) -> Vec<u8> {
     }
 }
 
-#[cfg(not(target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux"))]
 fn decode_sockaddr(b: &[u8]) -> Option<SocketAddr> {
     if b.len() < 8 {
         return None;
@@ -1260,19 +1278,23 @@ fn decode_sockaddr(b: &[u8]) -> Option<SocketAddr> {
     }
 }
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn family(a: &SocketAddr) -> i32 {
     if matches!(a.ip, IpAddr::V4(_)) { sys::AF_INET } else { sys::AF_INET6 }
 }
 
 /// an owned socket
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 struct Sock(sys::Raw);
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 impl Drop for Sock {
     fn drop(&mut self) {
         sys::close(self.0);
     }
 }
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 impl Sock {
     /// wait until readable (or closed) -> false on timeout; ms None: no wait at all
     fn wait(&self, events: i16, ms: Option<u32>) -> NetResult<bool> {
@@ -1289,16 +1311,19 @@ impl Sock {
     }
 }
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn ms_opt(v: u32) -> Option<u32> {
     if v == 0 { None } else { Some(v) }
 }
 
 // ------------------------------------------------------------------ TCP
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub struct TcpListener {
     s: Sock,
 }
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 impl TcpListener {
     /// listen on an address (port 0: any free port, see local_addr)
     pub fn bind(addr: &SocketAddr) -> NetResult<TcpListener> {
@@ -1337,12 +1362,14 @@ impl TcpListener {
     }
 }
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub struct TcpStream {
     s: Sock,
     read_ms: AtomicU32,
     write_ms: AtomicU32,
 }
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 impl TcpStream {
     fn from_raw(s: sys::Raw) -> TcpStream {
         TcpStream { s: Sock(s), read_ms: AtomicU32::new(0), write_ms: AtomicU32::new(0) }
@@ -1474,10 +1501,12 @@ impl TcpStream {
 
 // ------------------------------------------------------------------ UDP
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub struct UdpSocket {
     s: Sock,
 }
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 impl UdpSocket {
     /// a socket on addr; a fixed port needs net.listen, port 0 (a client's) does not
     pub fn bind(addr: &SocketAddr) -> NetResult<UdpSocket> {
@@ -1516,9 +1545,11 @@ impl UdpSocket {
 // ------------------------------------------------------------------ Unix domain sockets
 
 /// AF_UNIX (1 on Linux, Windows, macOS and iOS)
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 const AF_UNIX: i32 = 1;
 
 /// a connected Unix domain stream socket (the stream calls of TcpStream)
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub type UnixStream = TcpStream;
 
 /// sockaddr_un of a socket path on Apple: sun_len, sun_family, sun_path of 104 bytes
@@ -1536,7 +1567,7 @@ fn unix_addr(path: &str) -> NetResult<Vec<u8>> {
 }
 
 /// sockaddr_un of a socket path (sun_path holds 108 bytes on both systems)
-#[cfg(not(target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux"))]
 fn unix_addr(path: &str) -> NetResult<Vec<u8>> {
     let p = path.as_bytes();
     if p.is_empty() || p.len() >= 108 || p.contains(&0) {
@@ -1548,6 +1579,7 @@ fn unix_addr(path: &str) -> NetResult<Vec<u8>> {
     Ok(b)
 }
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub struct UnixListener {
     s: Sock,
     path: String,
@@ -1555,6 +1587,7 @@ pub struct UnixListener {
     id: Option<(u64, u64)>,
 }
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 impl UnixListener {
     /// listen on a socket file.  A socket file left at `path` by a listener that is gone (a
     /// connection to it is refused) is removed first; anything else there -- a file, a folder,
@@ -1596,6 +1629,7 @@ impl UnixListener {
     }
 }
 
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 impl Drop for UnixListener {
     fn drop(&mut self) {
         // only its own socket file: a name deleted and taken again meanwhile (a file, another
@@ -1607,6 +1641,7 @@ impl Drop for UnixListener {
 }
 
 // a socket file at path that nobody listens on (a connection is refused at once) -> removed
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn remove_stale(path: &str, a: &[u8]) -> bool {
     let Some(id) = crate::fs::socket_id(path) else { return false };
     let refused = match sys::socket(AF_UNIX, 1, 0) {
@@ -1622,6 +1657,7 @@ fn remove_stale(path: &str, a: &[u8]) -> bool {
 }
 
 /// connect to a socket file within `timeout_ms` (0: block)
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub fn connect_unix(path: &str, timeout_ms: u32) -> NetResult<UnixStream> {
     if !crate::policy::fs_allowed(path, crate::policy::FS_WRITE) {
         return Err(denied());
@@ -1655,6 +1691,7 @@ pub fn connect_unix(path: &str, timeout_ms: u32) -> NetResult<UnixStream> {
 
 /// the addresses of a host: numeric forms and "localhost" everywhere; on Windows, macOS and iOS
 /// other names through the system resolver (Linux: netio::dns)
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
     let h = host.trim_start_matches('[').trim_end_matches(']');
     if let Some((ip, scope)) = ip_scope_parse(h) {
@@ -1688,6 +1725,7 @@ pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
 }
 
 /// the host name of this computer
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub fn hostname() -> String {
     #[cfg(windows)]
     {
@@ -1719,3 +1757,11 @@ pub fn hostname() -> String {
 pub fn host_port(host: &str, port: u16) -> String {
     if host.contains(':') && !host.starts_with('[') { format!("[{}]:{}", host, port) } else { format!("{}:{}", host, port) }
 }
+
+// ------------------------------------------------------------------ the browser's WebSocket (G7d)
+
+#[cfg(target_arch = "wasm32")]
+#[path = "web_net.rs"]
+mod web_net;
+#[cfg(target_arch = "wasm32")]
+pub use web_net::*;

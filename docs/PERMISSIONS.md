@@ -91,7 +91,7 @@ sandbox                               # let the OS enforce the manifest too (OS 
 | `screen.capture` | – | `plat::screen::capture_start` / `ui.screenshot`: pictures of the whole screen or a part of it (BitBlt, GetImage, the screenshot portal). Picking one pixel's colour (`ui.pick_color`, the colour picker's pipette) needs no right: the user chooses the pixel, as a file in the file dialog |
 | `location` | – | `plat::sensors::location_watch`: where the device is, however it knows (Android's `LocationManager`, the browser's geolocation). The system's own permission comes on top: Android asks `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` (the app's `android/AndroidManifest.xml` must list them: `build_rs.py` refuses to build otherwise), the browser asks by itself. Windows and Linux have no location yet: `LocationState::Unavailable` |
 | `sensors` | – | `plat::sensors::watch`: accelerometer, gravity, gyroscope, magnetic field, the rotation estimate. Android and the browsers ask no permission for them (Safari does), but they tell a lot: how the user walks, what the fingers type. Hence a rule of its own. Windows and Linux have no sensors yet: `SensorState::Unavailable` |
-| `net.connect` | `HOST:PORT` | TCP connections and UDP datagrams (`TcpStream::connect`, `UdpSocket::send_to`, and everything built on them: `netio` HTTP, TLS, SMTP, SSH) |
+| `net.connect` | `HOST:PORT` | TCP connections and UDP datagrams (`TcpStream::connect`, `UdpSocket::send_to`, and everything built on them: `netio` HTTP, TLS, SMTP, SSH, WebSocket, `netchan`); in the browser the page's WebSocket (`plat::net::WebSocket`, `netchan`) |
 | `net.listen` | `ADDR:PORT` | `TcpListener::bind` and UDP sockets with a fixed port |
 | `ask KEY ...` | a rule of any key but `fs.user`, then an optional `"reason"` | the same access after the user agreed ([Asking the user](#asking-the-user)) |
 | `agent.confirm` | action names (`*`, `?`) | external control runs these actions after the user's confirmation |
@@ -133,6 +133,11 @@ sandbox                               # let the OS enforce the manifest too (OS 
   therefore cannot carry data out. The addresses of a permitted name are remembered with the ports
   of its rules, so the following `TcpStream::connect` to such an address is allowed.
 - As soon as a rule names a host (or `*`), port 53 is open for the DNS queries of `netio`.
+- In the browser the page resolves names itself: a WebSocket (`plat::net::WebSocket::connect`)
+  is checked on its URL's host as written and its port (`policy::net_host_allowed`), before the
+  page is asked to connect. A URL `/path` means the page's own server; its host needs a rule as
+  well (`net.connect localhost:*` for a test server, `net.connect game.example.org:443` for the
+  real one).
 - Unix domain sockets (`UnixListener::bind`, `connect_unix`) are files. They need `fs.write` on
   the socket path.
 

@@ -14,6 +14,8 @@
 //   audio_granted() -> bool                sound is allowed now, without asking or recording a
 //                                          refusal (ui's dialog sounds stay silent without it)
 //   net_connect_allowed(addr) / net_listen_allowed(addr) / net_name_allowed(host) -> bool
+//   net_host_allowed(host, port) -> bool   (G7d) a connection to a host as written, name or
+//                                          address (the browser's WebSocket resolves itself)
 //   net_resolved(host, addrs)              (resolvers) the addresses of a permitted name:
 //                                          connections to them follow that name's rules
 //   Key::grant(path, FS_*) / Key::grant_dir(dir, FS_*)   a file / folder the user handed over
@@ -851,6 +853,8 @@ enum Req<'a> {
     #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
     Listen([u8; 16], u16),
     Name(String),
+    /// (G7d) a host as written (a name, an address, localhost) and a port: the browser's WebSocket
+    HostPort(String, u16),
     /// a path normalize refuses
     Never,
 }
@@ -931,6 +935,17 @@ impl Policy {
             #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
             Req::Listen(ip, port) => grant(self.listen.iter().filter(|r| (r.lo..=r.hi).contains(port) && r.host.has_ip(ip)).map(|r| r.ask)),
             Req::Name(h) => grant(self.connect.iter().filter(|r| r.host.has_name(h)).map(|r| r.ask)),
+            Req::HostPort(h, port) => {
+                let ip = ip16(h).map(|(ip, _)| ip);
+                let local = h == "localhost";
+                grant(
+                    self.connect
+                        .iter()
+                        .filter(|r| (r.lo..=r.hi).contains(port))
+                        .filter(|r| r.host.has_name(h) || (local && r.host == Host::Loopback) || ip.is_some_and(|ip| r.host.has_ip(&ip)))
+                        .map(|r| r.ask),
+                )
+            }
             Req::Never => Grant::No,
         }
     }
@@ -2030,7 +2045,8 @@ fn appimage_dir() -> Option<String> {
 
 // ---------------------------------------------------------------- the network
 
-/// the host of a net.connect / net.listen rule (the browser keeps the rules unused)
+/// the host of a net.connect / net.listen rule (the browser asks net.connect for its WebSocket only,
+/// Android keeps the rules unused)
 #[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(dead_code))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Host {
@@ -2054,7 +2070,6 @@ struct NetRule {
 
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 const RESOLVED_MAX: usize = 4096;
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 const V6_LOOPBACK: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
 
 impl Host {
@@ -2069,7 +2084,6 @@ impl Host {
         }
     }
 
-    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
     fn has_ip(&self, ip: &[u8; 16]) -> bool {
         match self {
             Host::Any => true,
@@ -2084,7 +2098,6 @@ fn mapped(v4: [u8; 4]) -> [u8; 16] {
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, v4[0], v4[1], v4[2], v4[3]]
 }
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn prefix_eq(a: &[u8; 16], b: &[u8; 16], bits: u8) -> bool {
     let (whole, rest) = ((bits / 8) as usize, bits % 8);
     if a[..whole] != b[..whole] {
@@ -2151,22 +2164,12 @@ fn net_rule(a: &str, listen: bool) -> Result<NetRule, String> {
     Ok(NetRule { host, lo, hi, ask: 0 })
 }
 
-// an IPv4 / IPv6 address -> 16 bytes, is IPv4
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+// an IPv4 / IPv6 address -> 16 bytes, is IPv4 (every target: the browser's WebSocket asks too)
 fn ip16(s: &str) -> Option<([u8; 16], bool)> {
     match crate::net::IpAddr::parse(s)? {
         crate::net::IpAddr::V4(a) => Some((mapped(a), true)),
         crate::net::IpAddr::V6(a) => Some((a, false)),
     }
-}
-
-// the browser has no sockets: a dotted IPv4 address (numeric labels) still parses, the rules
-// are never asked
-#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
-fn ip16(s: &str) -> Option<([u8; 16], bool)> {
-    let p: Vec<&str> = s.split('.').collect();
-    let v: Vec<u8> = p.iter().filter_map(|x| x.parse::<u8>().ok()).collect();
-    if p.len() == 4 && v.len() == 4 { Some((mapped([v[0], v[1], v[2], v[3]]), true)) } else if s.contains(':') { Some(([0; 16], false)) } else { None }
 }
 
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
@@ -2188,6 +2191,16 @@ pub fn net_connect_allowed(addr: &crate::net::SocketAddr) -> bool {
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub fn net_listen_allowed(addr: &crate::net::SocketAddr) -> bool {
     decide("net.listen", &alloc::format!("{}", addr), &Req::Listen(to16(&addr.ip), addr.port), false) == Verdict::Allow
+}
+
+/// (G7d) whether a connection to `host` as written (a name, an IPv4 address, an IPv6 address with
+/// or without brackets, localhost) on `port` is allowed: a net.connect rule for that name, block
+/// or address and port.  The browser's WebSocket asks this (the browser resolves names itself, so
+/// there is no lookup to check first)
+pub fn net_host_allowed(host: &str, port: u16) -> bool {
+    let h = host.trim_start_matches('[').trim_end_matches(']').trim_end_matches('.').to_ascii_lowercase();
+    let target = crate::net::host_port(&h, port);
+    decide("net.connect", &target, &Req::HostPort(h, port), false) == Verdict::Allow
 }
 
 /// whether host may be resolved: a net.connect rule names it (or allows every host)
