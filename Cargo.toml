@@ -53,6 +53,7 @@ members = [
     "lib/netpkt",
     "lib/datastore",
     "lib/netio",
+    "lib/netchan",
     "lib/cas",
     "lib/update",
     "lib/gpu",
@@ -158,6 +159,7 @@ members = [
     "apps/gametest",
     "apps/gamedemo",
     "apps/modeltool",
+    "apps/nettest",
 ]
 
 # The one version of the library (rt::VERSION; `build_rs.py release` writes it, docs/VERSIONING.md)
@@ -215,6 +217,7 @@ wgsl = { package = "jflib-wgsl", path = "lib/wgsl", version = "=0.2.1" }
 netpkt = { package = "jflib-netpkt", path = "lib/netpkt", version = "=0.2.1" }
 datastore = { package = "jflib-datastore", path = "lib/datastore", version = "=0.2.1" }
 netio = { package = "jflib-netio", path = "lib/netio", version = "=0.2.1" }
+netchan = { package = "jflib-netchan", path = "lib/netchan", version = "=0.2.1" }
 cas = { package = "jflib-cas", path = "lib/cas", version = "=0.2.1" }
 update = { package = "jflib-update", path = "lib/update", version = "=0.2.1" }
 gpu = { package = "jflib-gpu", path = "lib/gpu", version = "=0.2.1" }

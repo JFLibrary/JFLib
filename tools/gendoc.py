@@ -158,6 +158,7 @@ CRATES = [
     ("game", "The game core: a world of entities and components, a fixed tick, input actions, cameras", "full"),
     ("game_render3d", "The bridge from the game core to render3d: entities with a mesh as scene instances", "full"),
     ("geom", "Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks", "full"),
+    ("netchan", "Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network", "full"),
 ]
 SKIP_FILES = {"rt": {"os.rs", "mem.rs"}}            # rt::os: the OS calls plat is built on
 # codec crates: further items to show, per module ("*" = all public items of the module)

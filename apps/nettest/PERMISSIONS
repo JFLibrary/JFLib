@@ -1,0 +1,11 @@
+# nettest: what the program may do (docs/PERMISSIONS.md).  Without this file an app may do
+# everything; with it, everything that is not listed is refused (in the library, plugins,
+# scripts and agent actions too).  The app's own folders (config://, data://, cache://,
+# logs://) and app:// need no line.  The build checks the syntax; the packages follow the file
+# (Flatpak finish-args, MSIX capabilities: docs/PACKAGING.md).
+#
+# The tests run servers and clients on the loopback addresses only; --serve DIR reads the browser
+# build named on the command line (fs.user)
+net.listen localhost:*
+net.connect localhost:*
+fs.user
