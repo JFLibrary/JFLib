@@ -120,6 +120,11 @@ pub struct Session {
     pub tick_us: Vec<u32>,
     /// the server's messages (connection, payload) folded by the checksum, when set
     pub record: Option<Vec<(u32, Vec<u8>)>>,
+    /// the lag compensation's error of every shot: how far the target the server rewound (to the view time
+    /// clamped to max_rewind, and unclamped) stood from where the shooter saw it (m)
+    pub shot_errors: Vec<(f64, f64)>,
+    /// shots waiting for the server's states of their view time: (target, tick, view, where it was seen)
+    pending_shots: Vec<(u16, u32, u16, Vec3)>,
     clock: game::FixedTick,
     sev: Vec<ServerEvent>,
     cev: Vec<ClientEvent>,
@@ -154,6 +159,8 @@ impl Session {
             worlds: BTreeMap::new(),
             tick_us: Vec::new(),
             record: None,
+            shot_errors: Vec::new(),
+            pending_shots: Vec::new(),
             sev: Vec::new(),
             cev: Vec::new(),
         }
@@ -281,6 +288,24 @@ impl Session {
                 if let Some(s) = c.client.predicted() {
                     c.first.insert(t, s);
                 }
+                // a shot: the target the bot aimed at (the nearest it saw) and where it saw it
+                if input.buttons & game::net::walker::BTN_FIRE != 0 {
+                    if let Some(me) = own {
+                        let near = c.feet.iter().min_by(|a, b| {
+                            let da = (a.1.x - me.x) * (a.1.x - me.x) + (a.1.z - me.z) * (a.1.z - me.z);
+                            let db = (b.1.x - me.x) * (b.1.x - me.x) + (b.1.z - me.z) * (b.1.z - me.z);
+                            da.partial_cmp(&db).unwrap_or(core::cmp::Ordering::Equal)
+                        });
+                        if let Some(&(id, seen)) = near {
+                            // (the view the client put into the input it sent)
+                            let view = match c.client.render_time() {
+                                Some((a, f)) => game::net::quant::round_i64((tick_diff(t, a) as f64 - f) * 256.0).clamp(0, 65535) as u16,
+                                None => 0,
+                            };
+                            self.pending_shots.push((id, t, view, seen));
+                        }
+                    }
+                }
             }
             while c.first.len() > 1200 {
                 c.first.pop_first();
@@ -300,6 +325,26 @@ impl Session {
         for (id, f) in a.figures() {
             self.server_states.insert((*id, t), f.state);
         }
+        // the shots of this tick: the target rewound as the server does (clamped) and without the limit
+        let max_back = a.config().max_rewind;
+        let states = &self.server_states;
+        let at = |id: u16, view: u16, tick: u32, max: u32| -> Option<Vec3> {
+            let (vt, frac) = game::net::lagcomp::view_time(tick, view, max);
+            let p = states.get(&(id, vt))?.feet();
+            let q = states.get(&(id, vt.wrapping_add(1))).map(|s| s.feet()).unwrap_or(p);
+            Some(Vec3::new(p.x + (q.x - p.x) * frac, p.y + (q.y - p.y) * frac, p.z + (q.z - p.z) * frac))
+        };
+        let mut keep = Vec::new();
+        for &(id, tick, view, seen) in &self.pending_shots {
+            if tick_diff(tick, t) > 0 {
+                keep.push((id, tick, view, seen));
+                continue;
+            }
+            if let (Some(a), Some(b)) = (at(id, view, tick, max_back), at(id, view, tick, 255)) {
+                self.shot_errors.push(((a - seen).length(), (b - seen).length()));
+            }
+        }
+        self.pending_shots = keep;
         let mut w = Snapshot::new(t);
         a.snapshot(t, &mut w);
         self.worlds.insert(t, w);

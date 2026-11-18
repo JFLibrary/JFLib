@@ -198,6 +198,10 @@ pub struct Measure {
     pub hits: u64,
     pub clamped: u64,
     pub view_ms: (f64, f64),
+    /// the lag compensation's error at the limit: mean, p50, p99, max (m)
+    pub lag_err: (f64, f64, f64, f64),
+    /// the same without the limit
+    pub lag_err_free: (f64, f64, f64, f64),
     pub playing: usize,
     pub disconnected: usize,
 }
@@ -234,6 +238,7 @@ pub fn measure_rewind(name: &str, seed: u64, players: usize, w: Weather, props: 
     let partial0 = s.server.stats().partial;
     let snaps0 = s.server.stats().snapshots;
     s.tick_us.clear();
+    s.shot_errors.clear();
     let shots0 = s.server.room(&s.room.unwrap_or(game::net::RoomCode(*b"AAAAAA"))).map(|a| a.stats()).unwrap_or_default();
     s.run(secs * 1000);
     let t = secs as f64;
@@ -265,6 +270,8 @@ pub fn measure_rewind(name: &str, seed: u64, players: usize, w: Weather, props: 
     let full_bytes = s.clients.iter().filter_map(|k| k.client.welcome().map(|w| w.full_bytes)).max().unwrap_or(0);
     let playing = s.playing();
     let disconnected = s.clients.iter().filter(|k| k.client.phase() == Phase::Closed).count();
+    let mut le: Vec<f64> = s.shot_errors.iter().map(|x| x.0).collect();
+    let mut lf: Vec<f64> = s.shot_errors.iter().map(|x| x.1).collect();
     Measure {
         name: String::from(name),
         players,
@@ -285,6 +292,8 @@ pub fn measure_rewind(name: &str, seed: u64, players: usize, w: Weather, props: 
         shots: arena.shots - shots0.shots,
         hits: arena.hits - shots0.hits,
         clamped: arena.clamped - shots0.clamped,
+        lag_err: stats_of(&mut le),
+        lag_err_free: stats_of(&mut lf),
         view_ms: ((arena.view_sum - shots0.view_sum) as f64 / 256.0 / (arena.shots - shots0.shots).max(1) as f64 * 1000.0 / 60.0, arena.view_max as f64 / 256.0 * 1000.0 / 60.0),
         playing,
         disconnected,
@@ -293,8 +302,8 @@ pub fn measure_rewind(name: &str, seed: u64, players: usize, w: Weather, props: 
 
 pub fn print_measure(m: &Measure) {
     crate::out(&format!(
-        "  {:<22} {:>2} bots {:>3.0} s | predict: {:>6.1} mismatches/min/player, error mean {:.3} p99 {:.3} max {:.3} m, shift p99 {:.3} m | up {:>5.0} B/s {:>4.1} pkt/s (wire {:>5.0}), down {:>6.0} B/s {:>4.1} pkt/s (wire {:>6.0}) | snapshot mean {:>4.0} p50 {:>4.0} p99 {:>4.0} max {:>4.0} B, cut {:.1} % | tick mean {:>4.0} p50 {:>4.0} p99 {:>5.0} max {:>6.0} us | full {} B | shots {} hits {} clamped {} view lag mean {:.0} max {:.0} ms | playing {} closed {}\n",
-        m.name, m.players, m.secs, m.mismatch_per_min, m.err.0, m.err.2, m.err.3, m.shift.2, m.up_bps, m.up_pps, m.wire_up_bps, m.down_bps, m.down_pps, m.wire_down_bps, m.snap.0, m.snap.1, m.snap.2, m.snap.3, m.partial * 100.0, m.tick_us.0, m.tick_us.1, m.tick_us.2, m.tick_us.3, m.full_bytes, m.shots, m.hits, m.clamped, m.view_ms.0, m.view_ms.1, m.playing, m.disconnected
+        "  {:<22} {:>2} bots {:>3.0} s | predict: {:>6.1} mismatches/min/player, error mean {:.3} p99 {:.3} max {:.3} m, shift p99 {:.3} m | up {:>5.0} B/s {:>4.1} pkt/s (wire {:>5.0}), down {:>6.0} B/s {:>4.1} pkt/s (wire {:>6.0}) | snapshot mean {:>4.0} p50 {:>4.0} p99 {:>4.0} max {:>4.0} B, cut {:.1} % | tick mean {:>4.0} p50 {:>4.0} p99 {:>5.0} max {:>6.0} us | full {} B | shots {} hits {} clamped {} view lag mean {:.0} max {:.0} ms, rewind error mean {:.3} p99 {:.3} m (unlimited {:.3} / {:.3}) | playing {} closed {}\n",
+        m.name, m.players, m.secs, m.mismatch_per_min, m.err.0, m.err.2, m.err.3, m.shift.2, m.up_bps, m.up_pps, m.wire_up_bps, m.down_bps, m.down_pps, m.wire_down_bps, m.snap.0, m.snap.1, m.snap.2, m.snap.3, m.partial * 100.0, m.tick_us.0, m.tick_us.1, m.tick_us.2, m.tick_us.3, m.full_bytes, m.shots, m.hits, m.clamped, m.view_ms.0, m.view_ms.1, m.lag_err.0, m.lag_err.2, m.lag_err_free.0, m.lag_err_free.2, m.playing, m.disconnected
     ));
 }
 
