@@ -74,6 +74,42 @@ treats host keys. The
 system's certificate authorities are those of CryptoAPI on Windows, of the Security framework on
 macOS and iOS, and the distribution's CA bundle on Linux.
 
+## WebSocket
+
+`ws::Acceptor` answers WebSocket upgrades (RFC 6455) in the handler of a `Server`: the 101 goes
+out, and the connection leaves HTTP for a thread of its own, where the code given to `accept` runs
+with a `ws::WebSocket` until it returns. Over `Server::start_with` the same works with TLS
+(`wss:`). `ws::connect` is the client for tests and desktop tools. Both ends answer pings, run the
+close handshake, send a ping after a quiet while and end a connection that stays silent. The
+limits are those of `ws::Limits`: the size of a frame and of a message, frames per message,
+messages and bytes a second per connection, idle and handshake timeouts, connections per
+Acceptor; an Acceptor may also take only listed `Origin`s. Anything malformed ends the connection
+with the close code RFC 6455 gives it. `ws::Decoder`, the frame parser, takes untrusted bytes
+without I/O and keeps its memory within one frame, one read and one message.
+
+```rust
+use alloc::sync::Arc;
+use jflib::netio::ws::{Acceptor, Limits, Message};
+use jflib::netio::{Request, Response, Server, ServerConfig};
+
+let ws = Arc::new(Acceptor::new(Limits::default()).origins(&["https://game.example.org"]));
+let handler = Arc::new(move |req: &Request| match req.path() {
+    "/echo" => ws.accept(req, |sock| {
+        while let Ok(m) = sock.recv() {
+            let _ = match m {
+                Message::Text(t) => sock.send_text(&t),
+                Message::Binary(b) => sock.send_binary(&b),
+            };
+        }
+    }),
+    _ => Response::new(404),
+});
+let server = Server::start(&addr, ServerConfig::default(), handler);
+```
+
+A game's channel over UDP and WebSocket, for the desktop and the browser, is
+[`jflib-netchan`](https://docs.rs/jflib-netchan)'s.
+
 ## Names, SSH and mail
 
 `dns::resolve(host, port)` takes numeric addresses and `localhost` as they are. On Windows it asks

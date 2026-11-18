@@ -6,6 +6,10 @@
 //                                        runs over (TLS) and the identity it proved
 //   server.local_addr() / server.stop()
 //
+// (G7d) A handler's answer with status 101 and Body::Upgrade (ws::Acceptor::accept) takes the
+// connection out of HTTP: the head goes out, the upgrade runs on a thread of its own (the worker
+// is free again), and stop() sets the Upgraded's stop flag and waits for those threads too.
+//
 // The handler runs on a worker thread; it must not panic (panics abort the process).
 // Requests with both Content-Length and Transfer-Encoding are refused (request smuggling).
 // A slow client holds a worker only so long: the head must arrive within read_ms, a body at
@@ -21,7 +25,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use plat::net::{NetResult, SocketAddr, TcpListener, TcpStream};
 use plat::sync::{channel, Mutex, Receiver};
 
-use crate::http::{self, ReadError, Reader, Request, Response};
+use crate::http::{self, Body, ReadError, Reader, Request, Response, Upgrade, Upgraded};
 use crate::Stream;
 
 /// the slowest request body a server waits for, in bytes a second on average (after a first
@@ -59,9 +63,12 @@ pub struct Server {
     addr: SocketAddr,
     stop: Arc<AtomicBool>,
     threads: Vec<plat::Thread>,
+    upgraded: Upgrades,
 }
 
 type Queue = Arc<Mutex<Receiver<(TcpStream, SocketAddr)>>>;
+/// (G7d) the threads of upgraded connections, each with the flag it sets when it is done
+type Upgrades = Arc<Mutex<Vec<(Arc<AtomicBool>, plat::Thread)>>>;
 
 impl Server {
     pub fn start(addr: &SocketAddr, cfg: ServerConfig, handler: Handler) -> NetResult<Server> {
@@ -72,12 +79,13 @@ impl Server {
         let listener = TcpListener::bind(addr)?;
         let local = listener.local_addr()?;
         let stop = Arc::new(AtomicBool::new(false));
+        let upgraded: Upgrades = Arc::new(Mutex::new(Vec::new()));
         let (tx, rx) = channel::<(TcpStream, SocketAddr)>(cfg.threads.max(1) * 4);
         let rx: Queue = Arc::new(Mutex::new(rx));
         let mut threads = Vec::new();
         for _ in 0..cfg.threads.max(1) {
-            let (rx, handler, wrap, stop) = (rx.clone(), handler.clone(), wrap.clone(), stop.clone());
-            if let Some(t) = plat::thread_spawn(256 * 1024, Box::new(move || worker(rx, cfg, handler, wrap, stop))) {
+            let (rx, handler, wrap, stop, up) = (rx.clone(), handler.clone(), wrap.clone(), stop.clone(), upgraded.clone());
+            if let Some(t) = plat::thread_spawn(256 * 1024, Box::new(move || worker(rx, cfg, handler, wrap, stop, up))) {
                 threads.push(t);
             }
         }
@@ -99,23 +107,56 @@ impl Server {
         if let Some(t) = accept {
             threads.push(t);
         }
-        Ok(Server { addr: local, stop, threads })
+        Ok(Server { addr: local, stop, threads, upgraded })
     }
 
     pub fn local_addr(&self) -> SocketAddr {
         self.addr
     }
 
-    /// stop accepting, finish the requests in progress, wait for the threads
+    /// (G7d) upgraded connections (WebSockets) still running
+    pub fn upgraded(&self) -> usize {
+        self.upgraded.lock().iter().filter(|(done, _)| !done.load(Ordering::Acquire)).count()
+    }
+
+    /// stop accepting, finish the requests in progress, wait for the threads; upgraded
+    /// connections see their stop flag set and are waited for as well
     pub fn stop(self) {
         self.stop.store(true, Ordering::Relaxed);
         for t in self.threads {
             t.join();
         }
+        let up = core::mem::take(&mut *self.upgraded.lock());
+        for (_, t) in up {
+            t.join();
+        }
     }
 }
 
-fn worker(rx: Queue, cfg: ServerConfig, handler: Handler, wrap: Option<Wrap>, stop: Arc<AtomicBool>) {
+/// (G7d) run an upgrade on a thread of its own; finished ones are joined on the way
+fn spawn_upgrade(upgrades: &Upgrades, up: Upgrade, conn: Upgraded) {
+    let done = Arc::new(AtomicBool::new(false));
+    let d = done.clone();
+    let t = plat::thread_spawn(256 * 1024, Box::new(move || {
+        up.run(conn);
+        d.store(true, Ordering::Release);
+    }));
+    let mut list = upgrades.lock();
+    let mut i = 0;
+    while i < list.len() {
+        if list[i].0.load(Ordering::Acquire) {
+            let (_, t) = list.swap_remove(i);
+            t.join();
+        } else {
+            i += 1;
+        }
+    }
+    if let Some(t) = t {
+        list.push((done, t));
+    }
+}
+
+fn worker(rx: Queue, cfg: ServerConfig, handler: Handler, wrap: Option<Wrap>, stop: Arc<AtomicBool>, upgrades: Upgrades) {
     loop {
         let next = rx.lock().recv();
         let Some((tcp, peer)) = next else { return };
@@ -131,7 +172,10 @@ fn worker(rx: Queue, cfg: ServerConfig, handler: Handler, wrap: Option<Wrap>, st
             }
             None => (Box::new(tcp), None),
         };
-        serve(&*stream, peer, id, &cfg, &handler, &stop);
+        if let Some((up, buffered)) = serve(&*stream, peer, id, &cfg, &handler, &stop) {
+            stream.set_timeouts(None, None);
+            spawn_upgrade(&upgrades, up, Upgraded { stream, buffered, peer: Some(peer), stop: stop.clone() });
+        }
     }
 }
 
@@ -139,12 +183,13 @@ fn worker(rx: Queue, cfg: ServerConfig, handler: Handler, wrap: Option<Wrap>, st
 const LINGER_MS: u64 = 2000;
 const LINGER_BYTES: usize = 1 << 20;
 
-/// answer an error and end the connection
-fn error(s: &dyn Stream, status: u16, stop: &AtomicBool) {
+/// answer an error and end the connection (-> None: serve's end without an upgrade)
+fn error<T>(s: &dyn Stream, status: u16, stop: &AtomicBool) -> Option<T> {
     let mut r = Response::text(status, http::reason(status));
     if http::write_response(s, &mut r, false, false) {
         linger(s, stop);
     }
+    None
 }
 
 /// end a connection whose request was not read to its end: send the end, then read and drop
@@ -167,8 +212,9 @@ fn linger(s: &dyn Stream, stop: &AtomicBool) {
     }
 }
 
-/// serve the requests of one connection
-fn serve(s: &dyn Stream, peer: SocketAddr, id: Option<String>, cfg: &ServerConfig, handler: &Handler, stop: &AtomicBool) {
+/// serve the requests of one connection -> an upgrade that takes it over (101 + Body::Upgrade),
+/// with the bytes read after its request
+fn serve(s: &dyn Stream, peer: SocketAddr, id: Option<String>, cfg: &ServerConfig, handler: &Handler, stop: &AtomicBool) -> Option<(Upgrade, Vec<u8>)> {
     let mut rd = Reader::new(s);
     for n in 0..cfg.max_requests {
         if n > 0 && !rd.has_buffered() {
@@ -177,7 +223,7 @@ fn serve(s: &dyn Stream, peer: SocketAddr, id: Option<String>, cfg: &ServerConfi
             loop {
                 if stop.load(Ordering::Relaxed) {
                     s.shutdown();
-                    return;
+                    return None;
                 }
                 if s.wait_readable(250) {
                     break;
@@ -185,7 +231,7 @@ fn serve(s: &dyn Stream, peer: SocketAddr, id: Option<String>, cfg: &ServerConfi
                 waited += 250;
                 if waited >= cfg.idle_ms {
                     s.shutdown();
-                    return;
+                    return None;
                 }
             }
         }
@@ -195,7 +241,7 @@ fn serve(s: &dyn Stream, peer: SocketAddr, id: Option<String>, cfg: &ServerConfi
         rd.set_deadline(None);
         let (start, headers) = match head {
             Ok(x) => x,
-            Err(ReadError::Closed) | Err(ReadError::Net(_)) => return,
+            Err(ReadError::Closed) | Err(ReadError::Net(_)) => return None,
             Err(ReadError::HeadTooLarge) => return error(s, 431, stop),
             Err(_) => return error(s, 400, stop),
         };
@@ -225,7 +271,7 @@ fn serve(s: &dyn Stream, peer: SocketAddr, id: Option<String>, cfg: &ServerConfi
                 _ => {}
             }
             if s.write_all(b"HTTP/1.1 100 Continue\r\n\r\n").is_err() {
-                return;
+                return None;
             }
         }
         // the body must keep moving: MIN_BODY_RATE bytes a second on average after a first
@@ -236,16 +282,27 @@ fn serve(s: &dyn Stream, peer: SocketAddr, id: Option<String>, cfg: &ServerConfi
         let body = match body {
             Ok(b) => b,
             Err(ReadError::BodyTooLarge) => return error(s, 413, stop),
-            Err(ReadError::Net(_)) | Err(ReadError::Closed) => return,
+            Err(ReadError::Net(_)) | Err(ReadError::Closed) => return None,
             Err(_) => return error(s, 400, stop),
         };
         let req = Request { method: String::from(method), target: String::from(target), headers, body, peer: Some(peer), client_id: id.clone() };
         let mut resp = handler(&req);
+        // (G7d) a protocol takes the connection over: the head, then the upgrade's thread
+        if resp.status == 101 {
+            let Body::Upgrade(up) = core::mem::replace(&mut resp.body, Body::Empty) else {
+                return error(s, 500, stop);
+            };
+            if !http::write_switch(s, &resp) {
+                return None;
+            }
+            return Some((up, rd.take_buffered()));
+        }
         let keep = keep && !stop.load(Ordering::Relaxed) && !resp.headers.has_token("connection", "close");
         if !http::write_response(s, &mut resp, method == "HEAD", keep) || !keep {
             s.shutdown();
-            return;
+            return None;
         }
     }
     s.shutdown();
+    None
 }

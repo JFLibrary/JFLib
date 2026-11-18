@@ -4,6 +4,8 @@
 //   Reader: buffered reading of a Stream (lines, heads, bodies by Content-Length or chunked;
 //           body_to hands a body over piece by piece)
 //   write_response / write_request
+//   Body::Upgrade(Upgrade): a 101 answer whose connection a protocol takes over (ws::Acceptor);
+//           the server runs it on a thread of its own with the Upgraded connection
 //
 // Limits: a message head of at most 16 KiB and 100 header lines, bodies up to the caller's
 // limit, chunk sizes checked before use.
@@ -11,7 +13,9 @@
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::sync::atomic::AtomicBool;
 
 use agent_core::json::{self, Value};
 use plat::net::{NetError, NetErrorKind, SocketAddr};
@@ -129,6 +133,39 @@ pub enum Body {
     /// produced piece by piece and sent chunked: the callback appends the next piece to the
     /// buffer and returns false after the last one (Content-Length when `len` is known)
     Stream { len: Option<u64>, next: Box<dyn FnMut(&mut Vec<u8>) -> bool + Send> },
+    /// (G7d) with status 101: the server sends the head as it is (Connection and Upgrade as the
+    /// handler set them, no length), then hands the connection to the upgrade on a thread of its
+    /// own (`ws::Acceptor::accept` makes such answers).  With any other status: no body
+    Upgrade(Upgrade),
+}
+
+/// (G7d) what takes over a connection after `101 Switching Protocols` (a WebSocket): runs once on
+/// a thread of the server's own, with the connection
+pub struct Upgrade(Box<dyn FnOnce(Upgraded) + Send>);
+
+impl Upgrade {
+    /// the code that takes over the connection (it ends the connection by returning)
+    pub fn new(f: impl FnOnce(Upgraded) + Send + 'static) -> Upgrade {
+        Upgrade(Box::new(f))
+    }
+
+    /// run it with the connection (the server does this)
+    pub fn run(self, up: Upgraded) {
+        (self.0)(up)
+    }
+}
+
+/// (G7d) a connection after an upgrade, as the server hands it over
+pub struct Upgraded {
+    /// the connection (TCP, or TLS under `Server::start_with`); reads and writes have no timeouts
+    /// set, the protocol sets its own
+    pub stream: Box<dyn crate::Stream>,
+    /// bytes the client sent after its request that the server had already read
+    pub buffered: Vec<u8>,
+    /// the client's address
+    pub peer: Option<SocketAddr>,
+    /// set when the server stops (`Server::stop` waits for the upgraded connections to end)
+    pub stop: Arc<AtomicBool>,
 }
 
 impl core::fmt::Debug for Body {
@@ -137,6 +174,7 @@ impl core::fmt::Debug for Body {
             Body::Empty => f.write_str("Empty"),
             Body::Bytes(b) => write!(f, "Bytes({})", b.len()),
             Body::Stream { len, .. } => write!(f, "Stream({:?})", len),
+            Body::Upgrade(_) => f.write_str("Upgrade"),
         }
     }
 }
@@ -194,6 +232,7 @@ impl Response {
 pub fn reason(status: u16) -> &'static str {
     match status {
         100 => "Continue",
+        101 => "Switching Protocols",
         200 => "OK",
         201 => "Created",
         202 => "Accepted",
@@ -283,6 +322,14 @@ impl<'a> Reader<'a> {
     /// whether unread bytes are buffered (a pipelined next request)
     pub fn has_buffered(&self) -> bool {
         self.pos < self.buf.len()
+    }
+
+    /// (G7d) the bytes read from the stream but not consumed yet, taken out of the reader (what
+    /// came after a head that ended the HTTP part of a connection: a WebSocket's first frames)
+    pub fn take_buffered(&mut self) -> Vec<u8> {
+        let rest = self.buf[self.pos..].to_vec();
+        self.pos = self.buf.len();
+        rest
     }
 
     fn fill(&mut self) -> Result<usize, NetError> {
@@ -493,7 +540,7 @@ pub fn write_response(s: &dyn Stream, r: &mut Response, head_only: bool, keep_al
     let mut h = core::mem::take(&mut r.headers);
     h.set("Connection", if keep_alive { "keep-alive" } else { "close" });
     let chunked = match &r.body {
-        Body::Empty => {
+        Body::Empty | Body::Upgrade(_) => {
             if r.status >= 200 && r.status != 204 && r.status != 304 {
                 h.set("Content-Length", "0");
             }
@@ -523,7 +570,7 @@ pub fn write_response(s: &dyn Stream, r: &mut Response, head_only: bool, keep_al
             s.write_all(&all).is_ok()
         }
         Body::Bytes(b) => s.write_all(&head).is_ok() && (head_only || s.write_all(b).is_ok()),
-        Body::Empty => s.write_all(&head).is_ok(),
+        Body::Empty | Body::Upgrade(_) => s.write_all(&head).is_ok(),
         Body::Stream { next, .. } => {
             if s.write_all(&head).is_err() {
                 return false;
@@ -555,6 +602,12 @@ pub fn write_response(s: &dyn Stream, r: &mut Response, head_only: bool, keep_al
             !chunked || s.write_all(b"0\r\n\r\n").is_ok()
         }
     }
+}
+
+/// (G7d) send the head of a `101 Switching Protocols` answer as the handler built it (Connection,
+/// Upgrade and the protocol's headers; no length, no body); false when the connection broke
+pub fn write_switch(s: &dyn Stream, r: &Response) -> bool {
+    s.write_all(&head_bytes(&format!("HTTP/1.1 {} {}", r.status, reason(r.status)), &r.headers)).is_ok()
 }
 
 /// send a request (the body as Content-Length)
