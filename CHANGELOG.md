@@ -161,6 +161,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **web:** Browser: a stored file that cannot be imported at the start (too big, no memory) is left out and named in the console; it stopped the whole start, so the app never started again on that origin
 - **android:** Android: a text longer than 256 KiB goes to the keyboard as a window of 192 KiB around the caret, and its edits are put back into the whole text: such a text gave the keyboard no copy, and its next key replaced the text by an old one
 - **render3d:** A scene whose draw records grew without its list_first (once detail levels had made that grow first) drew nothing: the culling counted into the old records
+- **plat:** Windows: files and folders made by `fs::write_file_private` and `fs::mkdir_private` grant the user the process runs as by name, besides SYSTEM, the administrators and the owner. Made by a process run as administrator, their owner is the administrators' group, and the same user without administrator rights could no longer open them.
 
 ### Security
 
