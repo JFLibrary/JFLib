@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -85,7 +85,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery
   <br>[lib.rs](#datastore-crate-root) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
-  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [der.rs](#netioderrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [x509.rs](#netiox509rs)
+  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [der.rs](#netioderrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs) · [x509.rs](#netiox509rs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng
   <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs) · [uri.rs](#netpkturirs) · [ssh.rs](#netpktsshrs) · [snmpv3.rs](#netpktsnmpv3rs) · [eap.rs](#netpkteaprs) · [imap.rs](#netpktimaprs) · [cookie.rs](#netpktcookiers) · [x509.rs](#netpktx509rs) · [tls.rs](#netpkttlsrs)
 - [eapm](#eapm) -- EAP-MD5 and EAP-PWD as peer and server state machines without I/O
@@ -116,6 +116,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#game_render3d-crate-root)
 - [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
   <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
+- [netchan](#netchan) -- Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network
+  <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 
 ## ui
 
@@ -27690,6 +27692,11 @@ net -- TCP, UDP and Unix domain sockets (IPv4 and IPv6) with timeouts
             (GetAddrInfoW).  Linux names go through netio::dns (no libc here).
   NetError: the kinds callers act on, with the OS code
 
+(G7d) Everywhere: the addresses, NetError and host_port.  The sockets, names and interfaces are
+Windows', Linux's and Apple's; the browser has WebSocket instead (web_net.rs: the page's
+WebSocket through the JS host, net.connect checked on the URL's host and port), Android nothing
+yet (docs/ANDROID.md).
+
 The app's permissions (policy.rs, net.connect / net.listen) are checked before connect,
 bind, send_to and a name lookup; Unix sockets follow the file rules (fs.write on the path).
 A refusal is NetErrorKind::Denied.
@@ -27853,6 +27860,93 @@ one thread may read while another writes (Arc<TcpStream>).
 
 - **`fn host_port(host: &str, port: u16) -> String`**
   "host:port" with brackets around IPv6 literals
+
+### `plat/web_net.rs`
+
+Source: [`lib/plat/web_net.rs`](../lib/plat/web_net.rs)
+
+```text
+web_net -- the browser's WebSocket (G7d): plat::net::WebSocket through the JS host
+
+  WebSocket::connect(url) / connect_with(url, WsLimits) -> NetResult<WebSocket>
+           "ws://host:port/path", "wss://...", or "/path": the page's own server (ws:// for a
+           page over http, wss:// over https); net.connect is checked on the URL's host and
+           port first (policy::net_host_allowed), a refusal is NetErrorKind::Denied
+  ws.state() -> WsState (Connecting, Open, Closing, Closed)
+  ws.send_text(&str) / send_binary(&[u8])     while Open
+  ws.recv() -> Option<WsMessage>                never blocks
+  ws.close(code, reason) / close_info() / protocol()
+
+The worker (web/worker.js) holds the browser's WebSocket objects, so frames never pass the
+page: REQUEST_WEBSOCKET with the socket's id as the request's id, one op byte and its data; the
+host answers through jfgui_ws(id, kind, len) with the bytes in the inbox and wakes the app
+(plat::wake: E_WAKE, the UI runs a pass).  The browser does the handshake, the masking,
+fragments and pings itself.  What a socket keeps for the app is bounded (WsLimits): a bigger
+message or more queued bytes close it with 1009.  The sockets belong to the app's thread (the
+worker that runs it): compute threads of the threaded build do not reach them.
+```
+
+```rust
+/// (browser) a WebSocket operation for the worker: the socket's id as the request's id, one op
+/// byte (1 open: the URL; 2 send text; 3 send binary; 4 close: u16 code, the reason), its data
+REQUEST_WEBSOCKET: u32 = 32
+/// sockets an app may hold at once in the browser
+WS_MAX_SOCKETS: usize = 64
+```
+
+- **`enum WsState`**
+  where a browser WebSocket stands
+  - `Connecting` -- the browser connects (handshake on the way)
+  - `Open` -- connected: messages go both ways
+  - `Closing` -- close() was called, or a limit closed it; the browser's close has not come yet
+  - `Closed` -- ended: close_info() says how
+
+- **`enum WsMessage`**
+  a whole message from the server
+  - `Text(String)` -- a text message
+  - `Binary(Vec<u8>)` -- a binary message
+
+- **`struct WsLimits`**
+  what a browser WebSocket keeps for the app until recv takes it
+  - `max_message: usize` -- the largest message; a bigger one closes the socket (1009)
+  - `max_queued: usize` -- bytes received and not taken yet; more close the socket (1009)
+
+- **`struct WebSocket`**
+  a WebSocket of the page (the browser's object lives in the worker).  Dropping it closes it
+
+- **`fn ws_url_split(url: &str, origin: Option<&str>) -> Option<(String, String, u16)>`**
+  a WebSocket URL -> (the absolute URL, the host as written, the port); "/path" against the
+  page's origin (jfgui_PAGE_ORIGIN, which the worker sets); None: not a ws:// / wss:// URL
+
+**`impl WebSocket`**
+
+- **`fn connect(url: &str) -> NetResult<WebSocket>`**
+  connect to a WebSocket server with the default limits (see the top of this file)
+- **`fn connect_with(url: &str, lim: WsLimits) -> NetResult<WebSocket>`**
+  connect with these limits: Connecting at once, Open when the browser's handshake is done
+- **`fn state(&self) -> WsState`**
+  where it stands
+- **`fn recv(&self) -> Option<WsMessage>`**
+  the next message, or None (never waits)
+- **`fn pending(&self) -> usize`**
+  messages waiting for recv
+- **`fn send_text(&self, s: &str) -> NetResult<()>`**
+  send a text message (Open only: Other while Connecting, Eof after the close)
+- **`fn send_binary(&self, b: &[u8]) -> NetResult<()>`**
+  send a binary message (as send_text)
+- **`fn close(&self, code: u16, reason: &str)`**
+  close with `code` (1000 or 3000-4999, others become 1000; the browser allows no more) and
+  a reason of at most 123 bytes
+- **`fn close_info(&self) -> Option<(u16, String)>`**
+  how it ended: the close code (1006: no close frame, the browser's word for a failed
+  connection too) and reason; None while it is not closed
+- **`fn protocol(&self) -> String`**
+  the subprotocol the server chose (empty: none)
+
+- **`extern "C" fn jfgui_ws(id: u32, kind: u32, len: u32) -> u32`**
+  (browser host) a WebSocket's event: kind 1 open (the inbox holds the chosen subprotocol),
+  2 a text message, 3 a binary message, 4 closed (u16 code little-endian, the reason); the host
+  calls jfgui_input after a burst.  -> 1 taken
 
 ### `plat/fs.rs`
 
@@ -28429,6 +28523,8 @@ start-up, then checked by the public file, process, shell, plugin and print func
   audio_granted() -> bool                sound is allowed now, without asking or recording a
                                          refusal (ui's dialog sounds stay silent without it)
   net_connect_allowed(addr) / net_listen_allowed(addr) / net_name_allowed(host) -> bool
+  net_host_allowed(host, port) -> bool   (G7d) a connection to a host as written, name or
+                                         address (the browser's WebSocket resolves itself)
   net_resolved(host, addrs)              (resolvers) the addresses of a permitted name:
                                          connections to them follow that name's rules
   Key::grant(path, FS_*) / Key::grant_dir(dir, FS_*)   a file / folder the user handed over
@@ -28788,6 +28884,12 @@ STORE: &str = "config://permission-decisions.txt"
 
 - **`fn net_listen_allowed(addr: &crate::net::SocketAddr) -> bool`**
   whether a TCP listener (or a UDP socket with a fixed port) may bind addr
+
+- **`fn net_host_allowed(host: &str, port: u16) -> bool`**
+  (G7d) whether a connection to `host` as written (a name, an IPv4 address, an IPv6 address with
+  or without brackets, localhost) on `port` is allowed: a net.connect rule for that name, block
+  or address and port.  The browser's WebSocket asks this (the browser resolves names itself, so
+  there is no lookup to check first)
 
 - **`fn net_name_allowed(host: &str) -> bool`**
   whether host may be resolved: a net.connect rule names it (or allows every host)
@@ -41165,6 +41267,8 @@ netio -- network protocols on top of plat::net
              first use (the presented CA comes back for the user's decision); https to
              public servers with the system's CAs
   smtp       sending mail: STARTTLS / TLS, AUTH PLAIN / LOGIN, UTF-8 messages
+  ws         WebSocket (RFC 6455): ws::Acceptor in a Server's handler (the upgrade, a thread
+             per connection), ws::connect for clients, the frame codec for untrusted bytes
   Stream     what HTTP runs over (plat::net::TcpStream, tls::TlsStream)
 
 Everything is blocking with timeouts and size limits on every read; a malformed peer gets an
@@ -41418,6 +41522,8 @@ http -- HTTP/1.1 messages and their wire format
   Reader: buffered reading of a Stream (lines, heads, bodies by Content-Length or chunked;
           body_to hands a body over piece by piece)
   write_response / write_request
+  Body::Upgrade(Upgrade): a 101 answer whose connection a protocol takes over (ws::Acceptor);
+          the server runs it on a thread of its own with the Upgraded connection
 
 Limits: a message head of at most 16 KiB and 100 header lines, bodies up to the caller's
 limit, chunk sizes checked before use.
@@ -41473,6 +41579,28 @@ MAX_HEADERS: usize = 100
   - `Bytes(Vec<u8>)`
   - `Stream { len: Option<u64>, next: Box<dyn FnMut(&mut Vec<u8>) -> bool + Send> }` -- produced piece by piece and sent chunked: the callback appends the next piece to the
     buffer and returns false after the last one (Content-Length when `len` is known)
+  - `Upgrade(Upgrade)` -- (G7d) with status 101: the server sends the head as it is (Connection and Upgrade as the
+    handler set them, no length), then hands the connection to the upgrade on a thread of its
+    own (`ws::Acceptor::accept` makes such answers).  With any other status: no body
+
+- **`struct Upgrade(Box<dyn FnOnce(Upgraded) + Send>)`**
+  (G7d) what takes over a connection after `101 Switching Protocols` (a WebSocket): runs once on
+  a thread of the server's own, with the connection
+
+**`impl Upgrade`**
+
+- **`fn new(f: impl FnOnce(Upgraded) + Send + 'static) -> Upgrade`**
+  the code that takes over the connection (it ends the connection by returning)
+- **`fn run(self, up: Upgraded)`**
+  run it with the connection (the server does this)
+
+- **`struct Upgraded`**
+  (G7d) a connection after an upgrade, as the server hands it over
+  - `stream: Box<dyn crate::Stream>` -- the connection (TCP, or TLS under `Server::start_with`); reads and writes have no timeouts
+    set, the protocol sets its own
+  - `buffered: Vec<u8>` -- bytes the client sent after its request that the server had already read
+  - `peer: Option<SocketAddr>` -- the client's address
+  - `stop: Arc<AtomicBool>` -- set when the server stops (`Server::stop` waits for the upgraded connections to end)
 
 - **`struct Response`**
   - `status: u16`
@@ -41516,6 +41644,9 @@ MAX_HEADERS: usize = 100
   where the stream's timeout counts each read)
 - **`fn has_buffered(&self) -> bool`**
   whether unread bytes are buffered (a pipelined next request)
+- **`fn take_buffered(&mut self) -> Vec<u8>`**
+  (G7d) the bytes read from the stream but not consumed yet, taken out of the reader (what
+  came after a head that ended the HTTP part of a connection: a WebSocket's first frames)
 - **`fn head(&mut self) -> Result<(String, Headers), ReadError>`**
   the start line and the headers of a message
 - **`fn body(&mut self, h: &Headers, max: usize, until_close: bool) -> Result<Vec<u8>, ReadError>`**
@@ -41527,6 +41658,10 @@ MAX_HEADERS: usize = 100
 
 - **`fn write_response(s: &dyn Stream, r: &mut Response, head_only: bool, keep_alive: bool) -> bool`**
   send a response; `head_only` for HEAD requests; false when the connection broke
+
+- **`fn write_switch(s: &dyn Stream, r: &Response) -> bool`**
+  (G7d) send the head of a `101 Switching Protocols` answer as the handler built it (Connection,
+  Upgrade and the protocol's headers; no length, no body); false when the connection broke
 
 - **`fn write_request(s: &dyn Stream, method: &str, target: &str, h: &Headers, body: &[u8]) -> bool`**
   send a request (the body as Content-Length)
@@ -41579,6 +41714,10 @@ worker serves one connection at a time (keep-alive, pipelined requests in order)
                                        runs over (TLS) and the identity it proved
   server.local_addr() / server.stop()
 
+(G7d) A handler's answer with status 101 and Body::Upgrade (ws::Acceptor::accept) takes the
+connection out of HTTP: the head goes out, the upgrade runs on a thread of its own (the worker
+is free again), and stop() sets the Upgraded's stop flag and waits for those threads too.
+
 The handler runs on a worker thread; it must not panic (panics abort the process).
 Requests with both Content-Length and Transfer-Encoding are refused (request smuggling).
 A slow client holds a worker only so long: the head must arrive within read_ms, a body at
@@ -41614,8 +41753,11 @@ MIN_BODY_RATE: u32 = 1024
 - **`fn start(addr: &SocketAddr, cfg: ServerConfig, handler: Handler) -> NetResult<Server>`**
 - **`fn start_with(addr: &SocketAddr, cfg: ServerConfig, handler: Handler, wrap: Option<Wrap>) -> NetResult<Server>`**
 - **`fn local_addr(&self) -> SocketAddr`**
+- **`fn upgraded(&self) -> usize`**
+  (G7d) upgraded connections (WebSockets) still running
 - **`fn stop(self)`**
-  stop accepting, finish the requests in progress, wait for the threads
+  stop accepting, finish the requests in progress, wait for the threads; upgraded
+  connections see their stop flag set and are waited for as well
 
 ### `netio/smtp.rs`
 
@@ -42169,6 +42311,213 @@ url -- absolute http(s) URLs, percent encoding, query strings
 
 - **`fn split_target(target: &str) -> (&str, &str)`**
   split a target into its path and query ("" when there is none)
+
+### `netio/ws.rs`
+
+Source: [`lib/netio/ws.rs`](../lib/netio/ws.rs)
+
+```text
+ws -- WebSocket (RFC 6455): the frame codec, the server side in netio's HTTP server, a client (G7d)
+
+  Acceptor::new(Limits) [.origins(..)] [.protocols(..)]   shared by a Server's handler
+  acceptor.accept(&req, |ws| ..) -> Response    101 with the upgrade (on_open runs on a thread
+                                    of its own until it returns), or 400 / 403 / 426 / 503
+  connect(url, &ClientConfig) -> WebSocket       ws://host[:port]/path (wss:// with a connector)
+  WebSocket: recv() / recv_timeout(ms) -> Message; send_text / send_binary / ping / close(code,
+             reason); &self everywhere: one thread reads while others send (Arc<WebSocket>)
+  Decoder: untrusted bytes -> Frame events, no I/O (the fuzzing in apps/nettest drives it)
+  encode_frame(out, opcode, fin, payload, mask)
+
+Limits: a frame's and a message's size, frames per message, messages and bytes a second
+(token buckets with a burst of two seconds), idle and handshake timeouts, connections per
+Acceptor.  A malformed or excessive peer gets the close code RFC 6455 gives it (1002 protocol,
+1007 bad UTF-8 in text, 1008 rate, 1009 too big) and the connection ends; nothing panics, no
+allocation goes past the limits.  No extensions (permessage-deflate) are offered or accepted.
+```
+
+```rust
+/// a continuation frame
+OP_CONT: u8 = 0x0
+/// a text frame (UTF-8)
+OP_TEXT: u8 = 0x1
+/// a binary frame
+OP_BINARY: u8 = 0x2
+/// a close frame
+OP_CLOSE: u8 = 0x8
+/// a ping
+OP_PING: u8 = 0x9
+/// a pong
+OP_PONG: u8 = 0xA
+/// close code: normal end
+CLOSE_NORMAL: u16 = 1000
+/// close code: the endpoint goes away (server stop, idle)
+CLOSE_GOING_AWAY: u16 = 1001
+/// close code: a protocol error
+CLOSE_PROTOCOL: u16 = 1002
+/// close code: a kind of data the endpoint does not take
+CLOSE_UNSUPPORTED: u16 = 1003
+/// (never sent) a close frame without a code
+CLOSE_NO_STATUS: u16 = 1005
+/// (never sent) the connection ended without a close frame
+CLOSE_ABNORMAL: u16 = 1006
+/// close code: a text message that is not UTF-8
+CLOSE_BAD_DATA: u16 = 1007
+/// close code: a policy was violated (rate limits)
+CLOSE_POLICY: u16 = 1008
+/// close code: a frame or message over the limits
+CLOSE_TOO_BIG: u16 = 1009
+/// close code: the server failed
+CLOSE_INTERNAL: u16 = 1011
+```
+
+- **`struct Limits`**
+  the limits of one connection
+  - `max_message: usize` -- the largest message (all its frames together)
+  - `max_frame: usize` -- the largest frame
+  - `max_fragments: usize` -- frames per message
+  - `send_frame: usize` -- outgoing messages longer than this go as several frames
+  - `messages_per_s: u32` -- messages (and control frames) a second from the peer, on average; bursts of two seconds
+  - `bytes_per_s: u32` -- bytes a second from the peer, on average; bursts of two seconds
+  - `idle_ms: u32` -- nothing received for this long ends the connection (1001)
+  - `ping_ms: u32` -- a ping goes out after this long without anything received (0: none)
+  - `handshake_ms: u32` -- (client) the connection and the server's answer within this long
+  - `write_ms: u32` -- the longest a send waits for the peer to take bytes
+  - `max_connections: usize` -- (Acceptor) connections at once
+
+- **`enum WsError`**
+  why a WebSocket call failed
+  - `Url(String)` -- not a ws:// or wss:// URL, or wss:// without a connector
+  - `Net(NetError)` -- the network (connect, read, write)
+  - `Tls(String)` -- the TLS layer refused (certificate, handshake)
+  - `Handshake(String)` -- the server's answer was not the upgrade (its status, a missing or wrong header)
+  - `Closed(u16, String)` -- the connection ended: the peer's close code and reason (1005: its close frame had no
+    code, 1006: no close frame came)
+  - `Protocol(u16)` -- this side ended it: the peer broke the protocol or a limit (the close code sent)
+  - `TooLarge` -- a message to send over max_message, or a control payload over 125 bytes
+  - `TimedOut` -- nothing came within idle_ms (the connection is closed), or the handshake took too long
+
+- **`enum Message`**
+  a whole message
+  - `Text(String)` -- a text message (UTF-8, checked)
+  - `Binary(Vec<u8>)` -- a binary message
+
+**`impl Message`**
+
+- **`fn bytes(&self) -> &[u8]`**
+  the payload's bytes
+
+- **`fn close_code_valid(code: u16) -> bool`**
+  whether a close code may appear in a close frame (RFC 6455 7.4: 1000-1003, 1007-1014 and the
+  ranges 3000-4999 for libraries and applications)
+
+- **`enum Role`**
+  which side a decoder reads for: a server reads masked frames from clients, a client
+  unmasked frames from servers
+  - `Server` -- reads a client's frames: masked
+  - `Client` -- reads a server's frames: unmasked
+
+- **`enum Frame`**
+  one event of the incoming frames
+  - `Message(Message)` -- a whole message (its fragments put together)
+  - `Ping(Vec<u8>)` -- a ping with its payload (at most 125 bytes)
+  - `Pong(Vec<u8>)` -- a pong with its payload
+  - `Close(Option<(u16, String)>)` -- a close frame: its code and reason (None: it had no code)
+
+- **`fn apply_mask(data: &mut [u8], mask: [u8; 4], offset: usize)`**
+  xor `data` with the mask, starting at byte `offset` of the payload
+
+- **`fn encode_frame(out: &mut Vec<u8>, op: u8, fin: bool, payload: &[u8], mask: Option<[u8; 4]>)`**
+  append one frame to `out`: header, the mask key (a client's frames), the payload (masked)
+
+- **`struct Decoder`**
+  the frames of untrusted bytes: feed what arrives, take events until next() says it needs
+  more.  Memory stays below one frame (max_frame) plus one feed (64 KiB) plus one message
+  (max_message); a feed beyond that, or anything malformed, is an error with the close code
+
+**`impl Decoder`**
+
+- **`fn new(role: Role, lim: Limits) -> Decoder`**
+  a decoder for frames a `role` reads, within `lim`
+- **`fn feed(&mut self, data: &[u8]) -> Result<(), u16>`**
+  bytes from the peer; Err(1009) when that would buffer more than one frame and a feed
+  (the caller fed again before next() asked for more)
+- **`fn buffered(&self) -> usize`**
+  bytes fed but not decoded yet
+- **`fn closed(&self) -> bool`**
+  whether a close frame came (nothing is decoded after it)
+- **`fn next(&mut self) -> Result<Option<Frame>, u16>`**
+  the next event: Ok(None) when more bytes are needed, Err(close code) for a malformed or
+  excessive stream (the decoder takes nothing more then)
+
+- **`struct WebSocket`**
+  one end of a WebSocket connection.  `&self` everywhere: one thread may block in recv while
+  others send (`Arc<WebSocket>`).  Dropping it closes the connection (1000) if it is open
+
+**`impl WebSocket`**
+
+- **`fn peer(&self) -> Option<SocketAddr>`**
+  the peer's address (server side)
+- **`fn protocol(&self) -> Option<&str>`**
+  the subprotocol both sides agreed on (Sec-WebSocket-Protocol)
+- **`fn limits(&self) -> &Limits`**
+  the limits of this connection
+- **`fn is_open(&self) -> bool`**
+  whether the connection is open (no close sent or received)
+- **`fn recv(&self) -> Result<Message, WsError>`**
+  the next message, waiting as long as it takes (pings are answered, the peer's close is
+  returned as Err(Closed))
+- **`fn recv_timeout(&self, ms: Option<u32>) -> Result<Option<Message>, WsError>`**
+  the next message within `ms` (None: wait as long as it takes) -> Ok(None) when none came
+- **`fn send_text(&self, s: &str) -> Result<(), WsError>`**
+  send a text message
+- **`fn send_binary(&self, b: &[u8]) -> Result<(), WsError>`**
+  send a binary message
+- **`fn ping(&self, payload: &[u8]) -> Result<(), WsError>`**
+  send a ping (at most 125 bytes); the peer's pong is taken by recv
+- **`fn send_fragmented(&self, op: u8, payload: &[u8], frame: usize) -> Result<(), WsError>`**
+  send a message as frames of exactly `frame` bytes (tests of the peer's reassembly)
+- **`fn close(&self, code: u16, reason: &str)`**
+  close the connection: our close frame with `code` (1000, 3000-4999 ...) and a reason of at
+  most 123 bytes, then (when no other thread reads) wait up to a second for the peer's close
+
+- **`struct Acceptor`**
+  the server side's check of upgrade requests, shared by a Server's handler: limits for its
+  connections, the origins and subprotocols it takes, the count of open connections
+
+**`impl Acceptor`**
+
+- **`fn new(lim: Limits) -> Acceptor`**
+  connections with these limits (max_connections at once)
+- **`fn origins(mut self, list: &[&str]) -> Acceptor`**
+  take only requests with one of these Origin headers ("https://game.example.org"; a page
+  on another site cannot open a connection with its visitor's cookies then).  Empty: any
+- **`fn protocols(mut self, list: &[&str]) -> Acceptor`**
+  the subprotocols this side speaks, preferred first; the first the client offers is chosen
+- **`fn connections(&self) -> usize`**
+  connections open now
+- **`fn accept(&self, req: &Request, on_open: impl FnOnce(WebSocket) + Send + 'static) -> Response`**
+  answer an upgrade request: 101 with `on_open` running on a thread of the server's own
+  once the answer is out (the connection ends when it returns), or 400 (not a WebSocket
+  request), 403 (an origin not on the list), 426 (another version) or 503 (max_connections)
+
+- **`fn accept_key(key: &str) -> String`**
+  Sec-WebSocket-Accept for a key: base64 of SHA-1 over the key and the GUID
+
+- **`struct ClientConfig`**
+  how a client connects
+  - `limits: Limits` -- the connection's limits (handshake_ms for the whole handshake)
+  - `connect_ms: u32` -- the TCP connection within this long (the handshake has limits.handshake_ms in all)
+  - `protocols: Vec<String>` -- subprotocols to offer (Sec-WebSocket-Protocol)
+  - `origin: Option<String>` -- an Origin header (a browser always sends one; servers with an origin list check it)
+  - `headers: Headers` -- further headers of the upgrade request (Authorization, cookies)
+  - `connector: Option<Connector>` -- the TLS layer for wss:// (the same as Client::with_connector's)
+
+- **`fn parse_url(url: &str) -> Option<Url>`**
+  a ws:// or wss:// URL as netio's Url (scheme http / https)
+
+- **`fn connect(url: &str, cfg: &ClientConfig) -> Result<WebSocket, WsError>`**
+  connect to a WebSocket server: TCP (and TLS for wss:// through `cfg.connector`), the upgrade
+  request, the server's 101 with the right Sec-WebSocket-Accept, all within handshake_ms
 
 ### `netio/x509.rs`
 
@@ -56078,3 +56427,624 @@ MERGE_RATIO: f64 = 1e-9
 - **`fn rounded_rect(w: f64, h: f64, r: f64, n: usize) -> Vec<[f64; 2]>`**
   a rectangle `w` x `h` centred on the origin with corners rounded by radius `r` (at most half the shorter
   side), `n` segments per corner, counter-clockwise
+
+## netchan
+
+*Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network* -- crate root [`lib/netchan/src/lib.rs`](../lib/netchan/src/lib.rs)
+
+```text
+netchan -- message channels for games (G7d, docs/TRANSPORT.md)
+
+  Client::connect(Endpoint::Udp(addr) | Endpoint::WebSocket(url), ClientConfig)
+           poll() -> ClientEvent (Connected, Message { seq, data }, Delivered(seq), Lost(seq),
+           Disconnected(reason)), send(payload) -> seq, state, reliable, max_payload, stats
+  Server::new(ServerConfig) [.bind_udp(addr)] [.listen_ws(addr, path) | .ws_endpoint()]
+           poll() -> ServerEvent, send(id, payload) -> seq, disconnect(id), stats(id)
+           (Windows, Linux, Apple: it needs netio's HTTP server)
+  WebSocket::connect(url): one non-blocking client type for the browser and the desktop
+  packet / conn / endpoint: the wire format, the sequence numbers and acks, the handshake --
+           without I/O, for tests on a simulated network and for other transports
+
+The same channel over two transports: unreliable and unordered over UDP (a handshake with a
+stateless cookie, a token in every packet, keep-alives and timeouts), reliable and ordered
+over a WebSocket (the browser's only way, docs/GAME.md E8).  Both carry the same header: a
+sequence number per packet and acks of the newest 33 received, so the netcode (G7e) learns
+which packets arrived over either.  Limits everywhere: payload sizes, packets and bytes a
+second per connection, connections per server and per address, handshake answers a second.
+
+Why a crate of its own and not netio: netio is not built for the browser and Android (plat had
+no sockets there), and the client side must run in the browser; the WebSocket client type
+needs netio on the desktop (names on Linux go through netio::dns) and plat's JS host in the
+browser, which only a crate above both can choose per target.  Not lib/game either (G7b builds
+it at the same time; the transport has no game in it).
+```
+
+### `netchan` crate root
+
+- **`enum Transport`**
+  which transport a connection runs over
+  - `Udp` -- UDP: unreliable, unordered
+  - `WebSocket` -- a WebSocket: reliable, ordered
+
+- **`enum Reason`**
+  why a connection ended
+  - `Local` -- this side ended it
+  - `Peer(u8)` -- the peer sent DISCONNECT with this code (packet::BYE_\*)
+  - `Timeout` -- nothing came for timeout_ms
+  - `ConnectTimeout` -- the handshake did not finish within connect_ms
+  - `Full` -- the server refused: it is full (or the address has max_per_ip connections)
+  - `Protocol` -- the server speaks another protocol id
+  - `RateLimit` -- the peer broke the rate limits (the server ended it)
+  - `Closed(u16)` -- the WebSocket under it closed with this code (1006: without a close frame)
+  - `Replaced` -- the same address made a new handshake
+
+- **`enum Error`**
+  why a call failed
+  - `Unsupported` -- not on this target: UDP in the browser; everything on Android for now (plat has no sockets
+    there yet, docs/ANDROID.md)
+  - `Net(plat::net::NetError)` -- the network; NetErrorKind::Denied: the app's permissions (net.connect / net.listen)
+  - `Url(String)` -- not a ws:// or wss:// URL (or "/path" in the browser)
+  - `Size` -- an empty payload, or one over the limit of the connection
+  - `Backlog` -- more waits to be sent than the WebSocket's queue takes (WsOptions::max_unsent)
+  - `NotConnected` -- not connected (yet, or any more)
+
+### `netchan/src/client.rs`
+
+Source: [`lib/netchan/src/client.rs`](../lib/netchan/src/client.rs)
+
+```text
+client -- a game client's channel to its server (G7d)
+
+  Client::connect(Endpoint, ClientConfig) -> Result<Client, Error>    Connecting at once
+  client.poll() -> Option<ClientEvent>    every frame until None: reads, keep-alives, timeouts
+  client.send(payload) -> Result<u16, Error>    the message's sequence number
+  client.state() / reliable() / max_payload() / stats() / rtt_ms() / disconnect()
+
+Nothing blocks.  UDP (Windows, Linux, Apple): a thread of its own reads the socket, keeps only
+the server's datagrams (a bounded queue) and wakes the UI (plat::wake); sends go out at once.
+WebSocket: netchan::ws (the browser's own, or netio's on threads).  In the browser only
+Endpoint::WebSocket exists; on Android nothing yet (Unsupported).
+```
+
+- **`enum Endpoint`**
+  where a client connects to
+  - `Udp(plat::net::SocketAddr)` -- a server's UDP socket (not in the browser)
+  - `WebSocket(String)` -- a server's WebSocket: ws://host:port/path, wss://..., in the browser also "/path"
+
+- **`struct Client`**
+  a client's channel (see the top of this file)
+
+**`impl Client`**
+
+- **`fn connect(ep: Endpoint, cfg: ClientConfig) -> Result<Client, Error>`**
+  connect: the handshake starts at once (UDP) or once the WebSocket is open; poll() reports
+  Connected or Disconnected(reason)
+- **`fn poll(&mut self) -> Option<ClientEvent>`**
+  the next event; call it until None every frame (it reads, sends keep-alives, notices
+  timeouts)
+- **`fn send(&mut self, payload: &[u8]) -> Result<u16, Error>`**
+  send a message -> its sequence number (Delivered / Lost name it later; Backlog: the
+  WebSocket has WsOptions::max_unsent bytes waiting, nothing was sent)
+- **`fn state(&self) -> State`**
+  where it stands
+- **`fn reliable(&self) -> bool`**
+  whether the transport is reliable and ordered (a WebSocket)
+- **`fn max_payload(&self) -> usize`**
+  the largest payload the server takes (0 before Connected)
+- **`fn stats(&self) -> Stats`**
+  the connection's counts
+- **`fn rtt_ms(&self) -> f32`**
+  the smoothed round-trip time in ms (0 before the first ack)
+- **`fn disconnect(&mut self)`**
+  end the connection (DISCONNECT goes out; Disconnected(Local) follows)
+
+### `netchan/src/conn.rs`
+
+Source: [`lib/netchan/src/conn.rs`](../lib/netchan/src/conn.rs)
+
+```text
+conn -- one connection's sequence numbers and acks, without I/O (docs/TRANSPORT.md "Folgenummern")
+
+  Conn::new(token, reliable, Settings, now_us)
+  conn.write_data(payload, now, &mut out) -> seq     a DATA packet (empty payload: keep-alive)
+  conn.on_data(seq, ack, bits, payload, now)         a DATA packet that came (token checked by
+                                                     the caller)
+  conn.take_event() -> Message / Delivered / Lost    conn.rate_ok(bytes, now), keepalive_due,
+                                                     timed_out, stats, rtt_ms
+
+Every DATA packet has its own sequence number (u16, wrapping) and acknowledges the newest
+number received plus the 32 before it as bits.  Unreliable (UDP): packets may come late, twice
+or not at all; a number seen before (1024 back) is dropped, older ones too; whatever arrives
+new is delivered at once, in the order it came.  A sent packet is Delivered when an ack names
+it, Lost when the acks have moved more than 32 past it without naming it.  Reliable (WebSocket):
+the transport keeps order and loses nothing, so an ack of n delivers everything up to n.
+A peer that only receives (or sends less than one packet per 32 received) would let packets
+pass the bits unacknowledged: after ACK_EVERY packets without one of its own, an unreliable
+connection owes an empty DATA packet at once (ack_due).
+The round-trip time comes from the newest ack only (bits name older packets, whose wait would
+count twice), smoothed as TCP does (RFC 6298).
+```
+
+```rust
+/// how far back sequence numbers are remembered (sent and received)
+WINDOW: usize = 1024
+/// (unreliable) packets received without sending one, after which an ack is due (half the bits)
+ACK_EVERY: u32 = 16
+```
+
+- **`struct Settings`**
+  the timing and limits of a connection
+  - `timeout_ms: u32` -- nothing received for this long ends the connection
+  - `keepalive_ms: u32` -- an empty DATA packet goes out when nothing was sent for this long (it carries the acks)
+  - `packets_per_s: u32` -- packets a second from the peer, on average (bursts of two seconds)
+  - `bytes_per_s: u32` -- bytes a second from the peer, on average (bursts of two seconds)
+
+- **`struct Stats`**
+  what a connection counted
+  - `sent: u64` -- DATA packets sent (keep-alives included)
+  - `received: u64` -- DATA packets taken in (duplicates and stale ones not counted)
+  - `delivered: u64` -- sent packets an ack named
+  - `lost: u64` -- sent packets the acks passed by
+  - `duplicates: u64` -- packets that came a second time
+  - `stale: u64` -- packets older than the window
+  - `dropped: u64` -- packets dropped for the rate limits or their size
+  - `bytes_sent: u64` -- bytes of DATA packets sent (headers included)
+  - `bytes_received: u64` -- bytes of DATA packets taken in (headers included)
+  - `rtt_ms: f32` -- the smoothed round-trip time (0 before the first sample)
+  - `rtt_var_ms: f32` -- its variation
+
+- **`enum Event`**
+  what a connection reports
+  - `Message { seq: u16, data: Vec<u8> }` -- a message of the peer with its sequence number
+  - `Delivered(u16)` -- the peer has a packet this side sent
+  - `Lost(u16)` -- the peer's acks passed this packet by
+
+- **`struct Conn`**
+  the state of one connection (see the top of this file)
+
+**`impl Conn`**
+
+- **`fn new(token: u32, reliable: bool, set: Settings, now_us: u64) -> Conn`**
+  a connection with the token both sides put into DATA (0 over a WebSocket)
+- **`fn token(&self) -> u32`**
+  the token of DATA and DISCONNECT packets
+- **`fn reliable(&self) -> bool`**
+  whether the transport is reliable (a WebSocket)
+- **`fn ack_fields(&self) -> (u16, u32)`**
+  the newest number received and the bits of the 32 before it (0xffff, 0 before any)
+- **`fn write_data(&mut self, payload: &[u8], now: u64, out: &mut Vec<u8>) -> u16`**
+  append a DATA packet with `payload` (empty: a keep-alive) -> its sequence number
+- **`fn rate_ok(&mut self, bytes: usize, now: u64) -> bool`**
+  whether a packet of `bytes` from the peer stays within the rate limits (false: drop it,
+  or end a reliable connection)
+- **`fn count_dropped(&mut self)`**
+  count a packet dropped by the caller (its size)
+- **`fn on_data(&mut self, seq: u16, ack: u16, bits: u32, payload: &[u8], now: u64)`**
+  a DATA packet of the peer (its token already checked)
+- **`fn take_event(&mut self) -> Option<Event>`**
+  the next event (messages, deliveries, losses in the order they happened)
+- **`fn ack_due(&self) -> bool`**
+  (unreliable) whether an empty DATA packet is due at once: ACK_EVERY packets came without
+  one of this side's, so the older ones would pass the bits unacknowledged
+- **`fn keepalive_due(&self, now: u64) -> bool`**
+  whether a keep-alive is due (nothing sent for keepalive_ms)
+- **`fn timed_out(&self, now: u64) -> bool`**
+  whether nothing came for timeout_ms
+- **`fn stats(&self) -> Stats`**
+  what the connection counted
+- **`fn rtt_ms(&self) -> f32`**
+  the smoothed round-trip time in ms (0 before the first ack)
+- **`fn next_seq(&self) -> u16`**
+  the sequence number the next packet gets
+
+### `netchan/src/endpoint.rs`
+
+Source: [`lib/netchan/src/endpoint.rs`](../lib/netchan/src/endpoint.rs)
+
+```text
+endpoint -- the server's and the client's protocol without I/O (docs/TRANSPORT.md "Handschlag")
+
+  ServerCore::new(ServerConfig, secret)
+    .datagram(from, bytes, now)        a UDP datagram
+    .stream_open(id, addr, now) / .stream_message(id, bytes, now) / .stream_closed(id, code)
+                                       a WebSocket (or any reliable message stream)
+    .tick(now)                         keep-alives, timeouts, streams that never said CONNECT
+    .send(conn, payload, now) -> seq   .disconnect(conn, now)
+    .take_out() -> Out (what to send where, streams to close)   .poll_event() -> ServerEvent
+  ClientCore::new(ClientConfig, nonce, stream)
+    .start(now) / .packet(bytes, now) / .tick(now) / .send(payload, now) / .disconnect(now)
+    .transport_closed(code) / .take_out() -> bytes / .poll_event() -> ClientEvent
+
+Time is the caller's (microseconds), so tests run them on a virtual clock over a simulated
+network (apps/nettest).  The UDP handshake: CONNECT (padded) -> CHALLENGE with a stateless
+cookie, HMAC-SHA256 over the client's address, its nonce and the time -> RESPONSE (padded) with
+the cookie -> ACCEPT with a random token, which every DATA and DISCONNECT then carries.  Nothing
+is kept for an address before its RESPONSE proves it receives there, the answers before that
+are smaller than the requests, and challenges_per_s bounds the work for all of them.  A
+WebSocket sends CONNECT and gets ACCEPT (token 0); TCP has proved the address.  The token is no
+encryption: it keeps senders out that do not see the traffic.
+```
+
+- **`struct ServerConfig`**
+  a server's limits and timing
+  - `protocol: u32` -- the app's protocol id: clients with another one are refused (another game, another version)
+  - `max_connections: usize` -- connections at once (UDP and WebSocket together)
+  - `max_per_ip: usize` -- connections from one IP address
+  - `max_payload: usize` -- the largest payload of a UDP message, both ways (at most MAX_UDP_PAYLOAD)
+  - `max_stream_payload: usize` -- the largest payload of a message over a WebSocket, both ways
+  - `timeout_ms: u32` -- nothing received for this long ends a connection
+  - `keepalive_ms: u32` -- an empty DATA packet after this long without sending (carries the acks)
+  - `packets_per_s: u32` -- packets a second from one client (UDP: more are dropped; WebSocket: it is disconnected)
+  - `bytes_per_s: u32` -- bytes a second from one client (as packets_per_s)
+  - `challenges_per_s: u32` -- answers to handshakes a second, for all addresses together
+  - `handshake_ms: u32` -- a WebSocket must send its CONNECT within this long
+
+- **`enum Route`**
+  where a packet goes
+  - `Udp(SocketAddr)` -- a UDP datagram to this address
+  - `Stream(u32)` -- a message on this stream (WebSocket)
+
+- **`enum Out`**
+  what a core wants done
+  - `Send(Route, Vec<u8>)` -- send these bytes
+  - `Close(u32)` -- close this stream (after what was sent on it)
+
+- **`enum ServerEvent`**
+  what happened on the server
+  - `Connected { id: u32, transport: Transport, addr: Option<SocketAddr> }` -- a client came (`addr`: its address, if the transport knows it)
+  - `Message { id: u32, seq: u16, data: Vec<u8> }` -- a message of a client
+  - `Delivered { id: u32, seq: u16 }` -- a client has a packet the server sent
+  - `Lost { id: u32, seq: u16 }` -- a packet the server sent did not reach the client (UDP)
+  - `Disconnected { id: u32, reason: Reason }` -- a client is gone
+
+- **`struct ServerStats`**
+  what the server counted beyond its connections
+  - `challenges: u64` -- CHALLENGE answers sent
+  - `accepted: u64` -- connections taken
+  - `denied: u64` -- clients refused (full, protocol, address)
+  - `bad: u64` -- packets that were no packet, a wrong kind or a wrong cookie or token
+  - `throttled: u64` -- handshakes over challenges_per_s, left without an answer
+  - `unknown: u64` -- DATA from addresses without a connection
+
+- **`struct ServerCore`**
+  the server's protocol (see the top of this file)
+
+**`impl ServerCore`**
+
+- **`fn new(cfg: ServerConfig, secret: [u8; 32], now: u64) -> ServerCore`**
+  a server with these limits; `secret` keys the cookies and tokens (random in a real server,
+  fixed in tests)
+- **`fn config(&self) -> &ServerConfig`**
+  the limits in force (max_payload clamped)
+- **`fn datagram(&mut self, from: SocketAddr, data: &[u8], now: u64)`**
+  a UDP datagram from `from`
+- **`fn stream_open(&mut self, stream: u32, addr: Option<SocketAddr>, now: u64)`**
+  a stream (WebSocket) opened; it must send CONNECT within handshake_ms
+- **`fn stream_message(&mut self, stream: u32, data: &[u8], now: u64)`**
+  a message on a stream
+- **`fn stream_closed(&mut self, stream: u32, code: u16)`**
+  a stream ended (`code`: its close code, 1006 without one)
+- **`fn tick(&mut self, now: u64)`**
+  keep-alives, timeouts, streams without a CONNECT
+- **`fn send(&mut self, id: u32, payload: &[u8], now: u64) -> Result<u16, Error>`**
+  send a message to a client -> its sequence number (Size: empty or over the limit of its
+  transport; NotConnected: no such client)
+- **`fn disconnect(&mut self, id: u32, reason: u8)`**
+  end a client's connection (DISCONNECT goes out, Disconnected(Local) follows)
+- **`fn disconnect_all(&mut self)`**
+  end every connection (the server stops)
+- **`fn take_out(&mut self) -> Option<Out>`**
+  the next thing to send or close
+- **`fn poll_event(&mut self) -> Option<ServerEvent>`**
+  the next event
+- **`fn connections(&self) -> usize`**
+  connections now
+- **`fn ids(&self) -> Vec<u32>`**
+  the ids of the connections
+- **`fn stats(&self, id: u32) -> Option<Stats>`**
+  a connection's counts and round-trip time
+- **`fn peer(&self, id: u32) -> Option<(Transport, Option<SocketAddr>)>`**
+  a connection's transport and address
+- **`fn route(&self, id: u32) -> Option<Route>`**
+  where a connection's packets go
+- **`fn server_stats(&self) -> ServerStats`**
+  what the server counted beyond its connections
+
+- **`struct ClientConfig`**
+  a client's limits and timing
+  - `protocol: u32` -- the app's protocol id (the server's must be the same)
+  - `max_payload: usize` -- the largest payload this side takes from the server (UDP at most MAX_UDP_PAYLOAD)
+  - `timeout_ms: u32` -- nothing received for this long ends the connection
+  - `keepalive_ms: u32` -- an empty DATA packet after this long without sending
+  - `connect_ms: u32` -- the handshake within this long
+  - `resend_ms: u32` -- UDP: CONNECT / RESPONSE again after this long without an answer
+  - `packets_per_s: u32` -- packets a second from the server, on average (more are dropped)
+  - `bytes_per_s: u32` -- bytes a second from the server, on average (more are dropped)
+
+- **`enum State`**
+  where a client stands
+  - `Connecting` -- the handshake is on its way
+  - `Connected` -- the server took the connection
+  - `Disconnected(Reason)` -- ended, and why
+
+- **`enum ClientEvent`**
+  what happened on the client
+  - `Connected` -- the server took the connection
+  - `Message { seq: u16, data: Vec<u8> }` -- a message of the server
+  - `Delivered(u16)` -- the server has a packet this side sent
+  - `Lost(u16)` -- a packet this side sent did not reach the server (UDP)
+  - `Disconnected(Reason)` -- the connection ended
+
+- **`struct ClientCore`**
+  the client's protocol (see the top of this file)
+
+**`impl ClientCore`**
+
+- **`fn new(cfg: ClientConfig, nonce: u64, stream: bool) -> ClientCore`**
+  a client with a random `nonce` (it names this attempt); `stream`: over a WebSocket
+- **`fn start(&mut self, now: u64)`**
+  begin the handshake (CONNECT goes out)
+- **`fn packet(&mut self, data: &[u8], now: u64)`**
+  a packet from the server (the caller checked that it came from the server)
+- **`fn tick(&mut self, now: u64)`**
+  resends of the handshake, keep-alives, timeouts
+- **`fn send(&mut self, payload: &[u8], now: u64) -> Result<u16, Error>`**
+  send a message -> its sequence number (Size: empty or over the server's limit;
+  NotConnected before Connected and after the end)
+- **`fn disconnect(&mut self)`**
+  end the connection (DISCONNECT goes out; UDP several times)
+- **`fn transport_closed(&mut self, code: u16)`**
+  the transport under a stream ended (the WebSocket closed with `code`)
+- **`fn take_out(&mut self) -> Option<Vec<u8>>`**
+  the next packet to send to the server
+- **`fn poll_event(&mut self) -> Option<ClientEvent>`**
+  the next event
+- **`fn state(&self) -> State`**
+  where it stands
+- **`fn max_payload(&self) -> usize`**
+  the largest payload the server takes (0 before Connected)
+- **`fn reliable(&self) -> bool`**
+  whether the transport is reliable (a WebSocket)
+- **`fn stats(&self) -> Stats`**
+  the connection's counts (zeros before Connected)
+
+### `netchan/src/packet.rs`
+
+Source: [`lib/netchan/src/packet.rs`](../lib/netchan/src/packet.rs)
+
+```text
+packet -- the channel's wire format, version 1 (docs/TRANSPORT.md "Paketformat")
+
+  byte 0: VERSION << 4 | kind; then, little-endian:
+  CONNECT     client -> server  protocol u32, nonce u64              13 bytes (UDP: padded to 64)
+  CHALLENGE   server -> client  nonce u64, time u32, mac [16]        29 bytes (UDP only)
+  RESPONSE    client -> server  protocol u32, nonce u64, time u32,   33 bytes (UDP only, padded
+                                mac [16]                                       to 64)
+  ACCEPT      server -> client  nonce u64, token u32, max payload u16   15 bytes
+  DENY        server -> client  nonce u64, reason u8                 10 bytes
+  DATA        both              token u32, seq u16, ack u16, ack bits u32, payload   13 + n
+  DISCONNECT  both              token u32, reason u8                  6 bytes
+
+A UDP client pads CONNECT and RESPONSE to HANDSHAKE_SIZE, and every answer of the server before
+a connection is smaller: a forged sender address gets back less than was sent (no
+amplification).  Over a WebSocket the CONNECT is not padded and CHALLENGE / RESPONSE do not
+occur (TCP has proved the address).  parse() reads untrusted bytes: exact sizes, no panics,
+no allocation.
+```
+
+```rust
+/// the format's version (the high nibble of byte 0)
+VERSION: u8 = 1
+/// a client asks for a connection
+KIND_CONNECT: u8 = 1
+/// the server's stateless cookie for a UDP client
+KIND_CHALLENGE: u8 = 2
+/// the client returns the cookie
+KIND_RESPONSE: u8 = 3
+/// the server took the client
+KIND_ACCEPT: u8 = 4
+/// the server refused the client
+KIND_DENY: u8 = 5
+/// a message (or an empty keep-alive) with sequence number and acks
+KIND_DATA: u8 = 6
+/// one side ends the connection
+KIND_DISCONNECT: u8 = 7
+/// the bytes of a DATA packet before its payload
+DATA_HEADER: usize = 13
+/// the size a UDP client pads CONNECT and RESPONSE to (at most the server takes)
+HANDSHAKE_SIZE: usize = 64
+/// the largest payload of a UDP DATA packet that may be configured (1400 + 13 + 8 + 40 bytes
+/// stay below the 1500 of Ethernet also over IPv6)
+MAX_UDP_PAYLOAD: usize = 1400
+/// DENY: the server has max_connections clients
+DENY_FULL: u8 = 1
+/// DENY: the client speaks another protocol id (another game or version)
+DENY_PROTOCOL: u8 = 2
+/// DENY: the client's address has max_per_ip connections
+DENY_ADDRESS: u8 = 3
+/// DISCONNECT: an orderly end
+BYE_NORMAL: u8 = 0
+/// DISCONNECT: nothing came for timeout_ms
+BYE_TIMEOUT: u8 = 1
+/// DISCONNECT: the peer broke the rate limits
+BYE_RATE: u8 = 2
+/// DISCONNECT: the peer sent something malformed
+BYE_PROTOCOL: u8 = 3
+/// DISCONNECT: the same address connected again
+BYE_REPLACED: u8 = 4
+/// DISCONNECT: the server stops
+BYE_SHUTDOWN: u8 = 5
+```
+
+- **`enum Packet<'a>`**
+  one packet, borrowed from the bytes it was read from
+  - `Connect { protocol: u32, nonce: u64 }` -- a client asks: the app's protocol id, the nonce of this attempt
+  - `Challenge { nonce: u64, time: u32, mac: [u8; 16] }` -- the server's cookie for a UDP client: the time (seconds) and the MAC over address, nonce, time
+  - `Response { protocol: u32, nonce: u64, time: u32, mac: [u8; 16] }` -- the client returns the cookie
+  - `Accept { nonce: u64, token: u32, max_payload: u16 }` -- the server took the client: the token of its packets, the largest payload it takes
+  - `Deny { nonce: u64, reason: u8 }` -- the server refused the client (DENY_\*)
+  - `Data { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] }` -- a message (empty: a keep-alive) with its number, the newest number received and the bits of the 32 before
+  - `Disconnect { token: u32, reason: u8 }` -- one side ends the connection (BYE_\*)
+
+- **`fn parse(b: &[u8]) -> Option<Packet<'_>>`**
+  read one packet: None for anything that is not exactly a packet of this version (handshake
+  packets between their size and HANDSHAKE_SIZE, the fixed-size ones exactly)
+
+**`impl Packet<'_>`**
+
+- **`fn write(&self, out: &mut Vec<u8>, pad: bool)`**
+  append the packet to `out`; `pad`: CONNECT and RESPONSE filled with zeros to HANDSHAKE_SIZE
+- **`fn to_vec(&self, pad: bool) -> Vec<u8>`**
+  the packet as new bytes
+
+- **`fn seq_newer(a: u16, b: u16) -> bool`**
+  whether sequence number `a` is newer than `b` (wrapping: within half the range ahead)
+
+### `netchan/src/server.rs`
+
+Source: [`lib/netchan/src/server.rs`](../lib/netchan/src/server.rs)
+
+```text
+server -- a game server's channels (G7d): UDP and WebSocket clients in one table
+
+  Server::new(ServerConfig) -> Server
+  server.bind_udp(&addr) -> NetResult<SocketAddr>        a UDP socket with its reading thread
+  server.listen_ws(&addr, "/game") -> NetResult<SocketAddr>   a netio HTTP server for the
+                                       WebSockets (404 elsewhere); or server.ws_endpoint() and
+                                       endpoint.accept(&req) in the app's own handler (with
+                                       its page's files beside it, say)
+  server.poll() -> Option<ServerEvent>   send(id, payload) -> seq   disconnect(id)
+  server.wait(ms)                        sleep until something arrives (a loop without a tick)
+  connections() / ids() / stats(id) / peer(id) / server_stats() / stop()
+
+Threads: one reads the UDP socket; each WebSocket has a reading one (netio's thread of the
+upgrade) and a writing one, so neither a full socket buffer nor a slow client holds the
+game's loop.  What they read goes into one bounded queue (UDP drops when it is full, a
+WebSocket waits); poll() takes it on the caller's thread, where the protocol runs
+(endpoint::ServerCore).  send to a WebSocket client with LINK_UNSENT bytes waiting fails with
+Error::Backlog; one that still does not take what the server's own packets add is closed.
+```
+
+```rust
+/// bytes a WebSocket client may have waiting to be written; more close it
+LINK_UNSENT: usize = 1 << 20
+```
+
+- **`struct WsEndpoint(Arc<Shared>)`**
+  what an HTTP handler needs to hand WebSockets to a Server (clone it into the handler)
+
+**`impl WsEndpoint`**
+
+- **`fn accept(&self, req: &Request) -> Response`**
+  answer an upgrade request on the game's path: 101 and the client joins the server's
+  table once it sent CONNECT, or the Acceptor's 4xx / 503
+- **`fn connections(&self) -> usize`**
+  WebSockets open now (also those that have not sent CONNECT yet)
+
+- **`struct Server`**
+  a game server's channels (see the top of this file).  Dropping it stops it
+
+**`impl Server`**
+
+- **`fn new(cfg: ServerConfig) -> Server`**
+  a server with these limits and no transport yet (bind_udp, listen_ws, ws_endpoint)
+- **`fn bind_udp(&mut self, addr: &SocketAddr) -> NetResult<SocketAddr>`**
+  listen for UDP clients on `addr` (port 0: a free one) -> the address it got
+- **`fn ws_endpoint(&self) -> WsEndpoint`**
+  the handle an HTTP handler hands WebSockets in with
+- **`fn listen_ws(&mut self, addr: &SocketAddr, path: &str) -> NetResult<SocketAddr>`**
+  a netio HTTP server on `addr` whose `path` takes the WebSockets (404 elsewhere) -> its
+  address
+- **`fn udp_addr(&self) -> Option<SocketAddr>`**
+  the UDP socket's address
+- **`fn ws_addr(&self) -> Option<SocketAddr>`**
+  the address of listen_ws's HTTP server
+- **`fn wait(&mut self, ms: u32)`**
+  sleep until a datagram or a WebSocket message arrives, at most `ms` (a server without a
+  tick of its own; keep `ms` below keepalive_ms).  poll() then reports it
+- **`fn poll(&mut self) -> Option<ServerEvent>`**
+  the next event; call it until None every tick (it takes what came, sends keep-alives,
+  ends connections that timed out)
+- **`fn send(&mut self, id: u32, payload: &[u8]) -> Result<u16, Error>`**
+  send a message to a client -> its sequence number (Backlog: a WebSocket client has
+  LINK_UNSENT bytes waiting)
+- **`fn disconnect(&mut self, id: u32)`**
+  end a client's connection (Disconnected(Local) follows)
+- **`fn connections(&self) -> usize`**
+  connections now
+- **`fn ids(&self) -> Vec<u32>`**
+  the ids of the connections
+- **`fn stats(&self, id: u32) -> Option<Stats>`**
+  a connection's counts and round-trip time
+- **`fn peer(&self, id: u32) -> Option<(Transport, Option<SocketAddr>)>`**
+  a connection's transport and address
+- **`fn server_stats(&self) -> ServerStats`**
+  what the server counted beyond its connections
+- **`fn stop(self)`**
+  end every connection, stop the threads and the HTTP server
+
+### `netchan/src/ws.rs`
+
+Source: [`lib/netchan/src/ws.rs`](../lib/netchan/src/ws.rs)
+
+```text
+ws -- one WebSocket client type for every target, which never blocks (G7d)
+
+  WebSocket::connect(url) / connect_with(url, WsOptions) -> Result<WebSocket, Error>
+           ws://host:port/path, wss://... (the browser; on the desktop wss:// is part 2), and in
+           the browser "/path" for the page's own server
+  ws.state() -> WsState   send_text / send_binary (queued)   recv() -> Option<WsMessage>
+  ws.close(code, reason) / close_info()
+
+The browser: plat::net::WebSocket (the page's, through the JS host).  Windows, Linux, Apple:
+netio::ws::connect on a thread of its own, which then reads; a second thread writes what send
+queues, so no call waits for the network.  Both wake the UI (plat::wake) when a message comes.
+Android: Unsupported for now.  net.connect is checked on the URL's host and port before
+anything else (Error::Net with NetErrorKind::Denied).
+```
+
+- **`enum WsState`**
+  where a WebSocket stands
+  - `Connecting` -- connecting (TCP, TLS, the upgrade)
+  - `Open` -- connected: messages go both ways
+  - `Closing` -- close() was called; the end has not come yet
+  - `Closed` -- ended: close_info() says how
+
+- **`enum WsMessage`**
+  a whole message
+  - `Text(String)` -- a text message
+  - `Binary(Vec<u8>)` -- a binary message
+
+- **`struct WsOptions`**
+  a WebSocket's limits
+  - `max_message: usize` -- the largest message received; bigger ones close the connection (1009)
+  - `max_queued: usize` -- bytes received and not taken by recv; more close the connection (1009)
+  - `max_unsent: usize` -- (desktop) bytes queued by send and not written yet; send fails with Error::Backlog beyond
+  - `connect_ms: u32` -- (desktop) the connection and the upgrade within this long
+  - `idle_ms: u32` -- (desktop) nothing received for this long ends the connection
+  - `ping_ms: u32` -- (desktop) a ping after this long without anything received (0: none)
+
+- **`struct WebSocket`**
+  a WebSocket client that never blocks (see the top of this file); dropping it closes it
+
+**`impl WebSocket`**
+
+- **`fn connect(url: &str) -> Result<WebSocket, Error>`**
+  connect with the default limits
+- **`fn connect_with(url: &str, o: WsOptions) -> Result<WebSocket, Error>`**
+  connect with these limits: Connecting at once, Open once the upgrade is done
+- **`fn state(&self) -> WsState`**
+  where it stands
+- **`fn send_text(&self, s: &str) -> Result<(), Error>`**
+  send a text message (Open only; desktop: queued, Backlog beyond max_unsent)
+- **`fn send_binary(&self, b: &[u8]) -> Result<(), Error>`**
+  send a binary message (as send_text)
+- **`fn recv(&self) -> Option<WsMessage>`**
+  the next message, or None (never waits)
+- **`fn close(&self, code: u16, reason: &str)`**
+  close with `code` (1000, 3000-4999) and a reason (at most 123 bytes)
+- **`fn close_info(&self) -> Option<(u16, String)>`**
+  how it ended (code and reason; 1006: without a close frame or never connected); None
+  while it is not Closed
+- **`fn unsent(&self) -> usize`**
+  (desktop) bytes queued by send and not written yet (the browser buffers on its own: 0)
