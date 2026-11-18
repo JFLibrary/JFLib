@@ -565,6 +565,7 @@ dependencies = [
  "jflib-img-tga",
  "jflib-img-tiff",
  "jflib-img-webp",
+ "jflib-netchan",
  "jflib-netio",
  "jflib-netpkt",
  "jflib-physics",
@@ -1021,6 +1022,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "jflib-netchan"
+version = "0.2.1"
+dependencies = [
+ "jflib-crypto",
+ "jflib-netio",
+ "jflib-plat",
+ "jflib-rt",
+]
+
+[[package]]
 name = "jflib-netio"
 version = "0.2.1"
 dependencies = [
@@ -1267,6 +1278,17 @@ dependencies = [
  "jflib-plat",
  "jflib-style-winui",
  "jflib-ui",
+]
+
+[[package]]
+name = "nettest"
+version = "0.1.0"
+dependencies = [
+ "jflib-build",
+ "jflib-netchan",
+ "jflib-netio",
+ "jflib-plat",
+ "jflib-rt",
 ]
 
 [[package]]

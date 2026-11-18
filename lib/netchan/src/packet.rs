@@ -1,0 +1,188 @@
+// packet -- the channel's wire format, version 1 (docs/TRANSPORT.md "Paketformat")
+//
+//   byte 0: VERSION << 4 | kind; then, little-endian:
+//   CONNECT     client -> server  protocol u32, nonce u64              13 bytes (UDP: padded to 64)
+//   CHALLENGE   server -> client  nonce u64, time u32, mac [16]        29 bytes (UDP only)
+//   RESPONSE    client -> server  protocol u32, nonce u64, time u32,   33 bytes (UDP only, padded
+//                                 mac [16]                                       to 64)
+//   ACCEPT      server -> client  nonce u64, token u32, max payload u16   15 bytes
+//   DENY        server -> client  nonce u64, reason u8                 10 bytes
+//   DATA        both              token u32, seq u16, ack u16, ack bits u32, payload   13 + n
+//   DISCONNECT  both              token u32, reason u8                  6 bytes
+//
+// A UDP client pads CONNECT and RESPONSE to HANDSHAKE_SIZE, and every answer of the server before
+// a connection is smaller: a forged sender address gets back less than was sent (no
+// amplification).  Over a WebSocket the CONNECT is not padded and CHALLENGE / RESPONSE do not
+// occur (TCP has proved the address).  parse() reads untrusted bytes: exact sizes, no panics,
+// no allocation.
+
+use alloc::vec::Vec;
+
+/// the format's version (the high nibble of byte 0)
+pub const VERSION: u8 = 1;
+/// a client asks for a connection
+pub const KIND_CONNECT: u8 = 1;
+/// the server's stateless cookie for a UDP client
+pub const KIND_CHALLENGE: u8 = 2;
+/// the client returns the cookie
+pub const KIND_RESPONSE: u8 = 3;
+/// the server took the client
+pub const KIND_ACCEPT: u8 = 4;
+/// the server refused the client
+pub const KIND_DENY: u8 = 5;
+/// a message (or an empty keep-alive) with sequence number and acks
+pub const KIND_DATA: u8 = 6;
+/// one side ends the connection
+pub const KIND_DISCONNECT: u8 = 7;
+
+/// the bytes of a DATA packet before its payload
+pub const DATA_HEADER: usize = 13;
+/// the size a UDP client pads CONNECT and RESPONSE to (at most the server takes)
+pub const HANDSHAKE_SIZE: usize = 64;
+/// the largest payload of a UDP DATA packet that may be configured (1400 + 13 + 8 + 40 bytes
+/// stay below the 1500 of Ethernet also over IPv6)
+pub const MAX_UDP_PAYLOAD: usize = 1400;
+
+/// DENY: the server has max_connections clients
+pub const DENY_FULL: u8 = 1;
+/// DENY: the client speaks another protocol id (another game or version)
+pub const DENY_PROTOCOL: u8 = 2;
+/// DENY: the client's address has max_per_ip connections
+pub const DENY_ADDRESS: u8 = 3;
+
+/// DISCONNECT: an orderly end
+pub const BYE_NORMAL: u8 = 0;
+/// DISCONNECT: nothing came for timeout_ms
+pub const BYE_TIMEOUT: u8 = 1;
+/// DISCONNECT: the peer broke the rate limits
+pub const BYE_RATE: u8 = 2;
+/// DISCONNECT: the peer sent something malformed
+pub const BYE_PROTOCOL: u8 = 3;
+/// DISCONNECT: the same address connected again
+pub const BYE_REPLACED: u8 = 4;
+/// DISCONNECT: the server stops
+pub const BYE_SHUTDOWN: u8 = 5;
+
+/// one packet, borrowed from the bytes it was read from
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Packet<'a> {
+    Connect { protocol: u32, nonce: u64 },
+    Challenge { nonce: u64, time: u32, mac: [u8; 16] },
+    Response { protocol: u32, nonce: u64, time: u32, mac: [u8; 16] },
+    Accept { nonce: u64, token: u32, max_payload: u16 },
+    Deny { nonce: u64, reason: u8 },
+    Data { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] },
+    Disconnect { token: u32, reason: u8 },
+}
+
+fn u16_at(b: &[u8], i: usize) -> u16 {
+    u16::from_le_bytes([b[i], b[i + 1]])
+}
+
+fn u32_at(b: &[u8], i: usize) -> u32 {
+    u32::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]])
+}
+
+fn u64_at(b: &[u8], i: usize) -> u64 {
+    let mut a = [0u8; 8];
+    a.copy_from_slice(&b[i..i + 8]);
+    u64::from_le_bytes(a)
+}
+
+fn mac_at(b: &[u8], i: usize) -> [u8; 16] {
+    let mut m = [0u8; 16];
+    m.copy_from_slice(&b[i..i + 16]);
+    m
+}
+
+/// read one packet: None for anything that is not exactly a packet of this version (handshake
+/// packets between their size and HANDSHAKE_SIZE, the fixed-size ones exactly)
+pub fn parse(b: &[u8]) -> Option<Packet<'_>> {
+    let first = *b.first()?;
+    if first >> 4 != VERSION {
+        return None;
+    }
+    let n = b.len();
+    let sized = |min: usize| n >= min && n <= HANDSHAKE_SIZE;
+    match first & 0x0f {
+        KIND_CONNECT if sized(13) => Some(Packet::Connect { protocol: u32_at(b, 1), nonce: u64_at(b, 5) }),
+        KIND_CHALLENGE if n == 29 => Some(Packet::Challenge { nonce: u64_at(b, 1), time: u32_at(b, 9), mac: mac_at(b, 13) }),
+        KIND_RESPONSE if sized(33) => Some(Packet::Response { protocol: u32_at(b, 1), nonce: u64_at(b, 5), time: u32_at(b, 13), mac: mac_at(b, 17) }),
+        KIND_ACCEPT if n == 15 => Some(Packet::Accept { nonce: u64_at(b, 1), token: u32_at(b, 9), max_payload: u16_at(b, 13) }),
+        KIND_DENY if n == 10 => Some(Packet::Deny { nonce: u64_at(b, 1), reason: b[9] }),
+        KIND_DATA if n >= DATA_HEADER => {
+            Some(Packet::Data { token: u32_at(b, 1), seq: u16_at(b, 5), ack: u16_at(b, 7), bits: u32_at(b, 9), payload: &b[DATA_HEADER..] })
+        }
+        KIND_DISCONNECT if n == 6 => Some(Packet::Disconnect { token: u32_at(b, 1), reason: b[5] }),
+        _ => None,
+    }
+}
+
+impl Packet<'_> {
+    /// append the packet to `out`; `pad`: CONNECT and RESPONSE filled with zeros to HANDSHAKE_SIZE
+    pub fn write(&self, out: &mut Vec<u8>, pad: bool) {
+        let start = out.len();
+        match *self {
+            Packet::Connect { protocol, nonce } => {
+                out.push(VERSION << 4 | KIND_CONNECT);
+                out.extend_from_slice(&protocol.to_le_bytes());
+                out.extend_from_slice(&nonce.to_le_bytes());
+            }
+            Packet::Challenge { nonce, time, mac } => {
+                out.push(VERSION << 4 | KIND_CHALLENGE);
+                out.extend_from_slice(&nonce.to_le_bytes());
+                out.extend_from_slice(&time.to_le_bytes());
+                out.extend_from_slice(&mac);
+            }
+            Packet::Response { protocol, nonce, time, mac } => {
+                out.push(VERSION << 4 | KIND_RESPONSE);
+                out.extend_from_slice(&protocol.to_le_bytes());
+                out.extend_from_slice(&nonce.to_le_bytes());
+                out.extend_from_slice(&time.to_le_bytes());
+                out.extend_from_slice(&mac);
+            }
+            Packet::Accept { nonce, token, max_payload } => {
+                out.push(VERSION << 4 | KIND_ACCEPT);
+                out.extend_from_slice(&nonce.to_le_bytes());
+                out.extend_from_slice(&token.to_le_bytes());
+                out.extend_from_slice(&max_payload.to_le_bytes());
+            }
+            Packet::Deny { nonce, reason } => {
+                out.push(VERSION << 4 | KIND_DENY);
+                out.extend_from_slice(&nonce.to_le_bytes());
+                out.push(reason);
+            }
+            Packet::Data { token, seq, ack, bits, payload } => {
+                out.push(VERSION << 4 | KIND_DATA);
+                out.extend_from_slice(&token.to_le_bytes());
+                out.extend_from_slice(&seq.to_le_bytes());
+                out.extend_from_slice(&ack.to_le_bytes());
+                out.extend_from_slice(&bits.to_le_bytes());
+                out.extend_from_slice(payload);
+            }
+            Packet::Disconnect { token, reason } => {
+                out.push(VERSION << 4 | KIND_DISCONNECT);
+                out.extend_from_slice(&token.to_le_bytes());
+                out.push(reason);
+            }
+        }
+        if pad && matches!(self, Packet::Connect { .. } | Packet::Response { .. }) {
+            out.resize(start + HANDSHAKE_SIZE, 0);
+        }
+    }
+
+    /// the packet as new bytes
+    pub fn to_vec(&self, pad: bool) -> Vec<u8> {
+        let mut v = Vec::with_capacity(match self {
+            Packet::Data { payload, .. } => DATA_HEADER + payload.len(),
+            _ => HANDSHAKE_SIZE,
+        });
+        self.write(&mut v, pad);
+        v
+    }
+}
+
+/// whether sequence number `a` is newer than `b` (wrapping: within half the range ahead)
+pub fn seq_newer(a: u16, b: u16) -> bool {
+    a != b && a.wrapping_sub(b) < 0x8000
+}
