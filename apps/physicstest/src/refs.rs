@@ -396,3 +396,60 @@ pub fn first_root(f: &dyn Fn(f64) -> f64, target: f64) -> (Option<f64>, f64) {
     }
     (Some(b), fmin)
 }
+
+/// The correctly rounded square root by an integer root of the significand, bit by bit, with the results of
+/// `sqrtsd` for the special values (signed zero kept, NaN quieted, a negative number gives the negative
+/// default NaN): the reference for rt's `sqrt_portable` on every target, also where rt's `sqrtd` is that
+/// function itself (the browser, the x86-64 Android emulator)
+pub fn sqrt_ref(x: f64) -> f64 {
+    let b = x.to_bits();
+    if x.is_nan() {
+        return f64::from_bits(b | (1u64 << 51));
+    }
+    if x == 0.0 || x == f64::INFINITY {
+        return x;
+    }
+    if x < 0.0 {
+        return f64::from_bits(0xfff8_0000_0000_0000);
+    }
+    // x = m * 2^e with an integer m
+    let biased = ((b >> 52) & 0x7ff) as i64;
+    let frac = b & ((1u64 << 52) - 1);
+    let (mut m, mut e) = if biased == 0 { (frac as u128, -1074i64) } else { ((frac | (1u64 << 52)) as u128, biased - 1075) };
+    if e & 1 != 0 {
+        m <<= 1;
+        e -= 1;
+    }
+    // M = m * 2^sh with 105 or 106 bits and sh even: sqrt(M) has 53 bits
+    let bits = 128 - m.leading_zeros() as i64;
+    let mut sh = 106 - bits;
+    if sh & 1 != 0 {
+        sh -= 1;
+    }
+    let big = m << sh;
+    e -= sh;
+    // the integer root, bit by bit
+    let (mut rem, mut root, mut bit) = (big, 0u128, 1u128 << 126);
+    while bit > rem {
+        bit >>= 2;
+    }
+    while bit != 0 {
+        if rem >= root + bit {
+            rem -= root + bit;
+            root = (root >> 1) + bit;
+        } else {
+            root >>= 1;
+        }
+        bit >>= 2;
+    }
+    // to nearest: sqrt(M) > root + 1/2 exactly when M - root^2 > root (no ties: M is an integer)
+    if rem > root {
+        root += 1;
+    }
+    let mut half = e / 2;
+    if root == 1u128 << 53 {
+        root >>= 1;
+        half += 1;
+    }
+    f64::from_bits((((half + 52 + 1023) as u64) << 52) | (root as u64 & ((1u64 << 52) - 1)))
+}
