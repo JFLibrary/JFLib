@@ -223,7 +223,7 @@ def run_cmd(cmd, quiet=False, env=None):
 def compute_crate(name):
     """crates whose speed matters in development builds too (opt-level 2; Kritzel draws with its
     own pixel loops)"""
-    return (name in ("gfx", "text", "simd", "fx", "Kritzel", "crypto", "compress", "cas", "spell", "physics")
+    return (name in ("gfx", "text", "simd", "fx", "Kritzel", "crypto", "compress", "cas", "spell", "physics", "geom")
             or name.startswith("img_"))
 
 
@@ -1439,6 +1439,21 @@ def derived_profiles(members):
     return "\n".join(out)
 
 
+def derived_patches():
+    """the root manifest's [patch.*] tables with absolute paths: JFScript (modeltool, editortest) names
+    jflib-agent-core from crates.io, the patch takes it from this workspace, so that there is one jflib-rt
+    (links = "jflib_rt") in the browser's and Android's builds too"""
+    out = ""
+    for registry, table in manifests.read(ROOT / "Cargo.toml").get("patch", {}).items():
+        out += f"\n[patch.{registry}]\n"
+        for key, spec in table.items():
+            s = dict(spec)
+            if "path" in s:
+                s["path"] = (ROOT / s["path"]).resolve().as_posix()
+            out += f"{key} = {toml_value(s)}\n"
+    return out
+
+
 def derived_workspace(out, target, names, style=None):
     """a workspace of the tool's own in <out>/cargo-<target>-ws with a package per app: for the browser
     and Android its main.rs as [lib] (cdylib, staticlib), else as a program; its manifest's
@@ -1490,7 +1505,8 @@ def derived_workspace(out, target, names, style=None):
             members[pkg] = n
         write_changed(index, json.dumps(members, indent=1, sort_keys=True) + "\n")
         write_changed(ws / "Cargo.toml", "# made by build_rs.py (derived_workspace): the apps as libraries, other styles\n[workspace]\n"
-                      'resolver = "3"\nmembers = [\n' + "".join(f'    "{m}",\n' for m in sorted(members)) + "]\n\n" + derived_profiles(members))
+                      'resolver = "3"\nmembers = [\n' + "".join(f'    "{m}",\n' for m in sorted(members)) + "]\n\n" + derived_profiles(members)
+                      + derived_patches())
         if not (ws / "Cargo.lock").exists():
             shutil.copyfile(ROOT / "Cargo.lock", ws / "Cargo.lock")
     return ws / "Cargo.toml"

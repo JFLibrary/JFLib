@@ -328,5 +328,10 @@ pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
     if cfg!(windows) {
         return plat::net::resolve(host, port);
     }
+    // numbers and localhost need no system files (on macOS the app's rules do not grant them)
+    let h = host.trim_start_matches('[').trim_end_matches(']');
+    if plat::net::ip_scope_parse(h).is_some() || h.eq_ignore_ascii_case("localhost") {
+        return resolve_with(host, port, &Config::default());
+    }
     resolve_with(host, port, &Config::system())
 }

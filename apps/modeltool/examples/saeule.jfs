@@ -1,0 +1,44 @@
+// Säule: eine toskanische Säule aus einem Drehkörper (Basis, Schaft mit Schwellung, Halsring, Kapitell) auf
+// einer Plinthe, oben die Deckplatte
+//   modeltool saeule.jfs [--param hoehe=3.0] [--param radius=0.25]
+// Das Profil läuft von der Achse unten nach außen, an der Außenseite hinauf und oben zurück zur Achse:
+// [radius, y]-Punkte, gedreht um die Y-Achse.
+
+model.name("Säule")
+model.material("marmor", {color: "#e9e5db", roughness: 0.55})
+
+let hoehe = params.get("hoehe", 3.0)      // Schaft von der Basis bis zum Halsring
+let r = params.get("radius", 0.25)        // Radius des Schafts unten
+let plinthe = 0.12
+
+// die Basis: ein Torus (Halbkreis nach außen), darüber ein Absatz
+let profil = [[0, plinthe], [r + 0.07, plinthe]]
+profil = profil + profile.move(profile.arc(0.06, -90, 90, 10), r + 0.07, plinthe + 0.06)
+profil = profil + [[r + 0.02, plinthe + 0.12], [r + 0.02, plinthe + 0.15], [r, plinthe + 0.16]]
+
+// der Schaft: bis zu einem Drittel zylindrisch, dann bis oben auf 0,8 r verjüngt (Entasis)
+let y0 = plinthe + 0.16
+let y1 = plinthe + 0.16 + hoehe
+let oben = r * 0.8
+for i in 1..13 {
+  let t = i / 12.0
+  let k = math.max(0, (t - 1 / 3.0) / (2 / 3.0))
+  profil.push([r - (r - oben) * k * k, y0 + (y1 - y0) * t])
+}
+
+// der Halsring: ein kleiner Halbkreis, dann das Kapitell (Echinus) als Viertelbogen nach außen
+profil = profil + profile.move(profile.arc(0.025, -90, 90, 6), oben, y1 + 0.025)
+profil = profil + [[oben, y1 + 0.06]]
+profil = profil + profile.move(profile.arc(0.1, -90, 0, 8), oben, y1 + 0.16).slice(1)
+profil = profil + [[0, y1 + 0.16]]
+
+let saeule = geom.lathe(profil, 40)
+model.add(saeule, "marmor", "säule")
+
+// Plinthe unten, Deckplatte (Abakus) oben
+let breite = 2 * (r + 0.14)
+model.add(geom.box(breite, plinthe, breite), "marmor", "plinthe")
+model.add(geom.box(2 * (oben + 0.16), 0.1, 2 * (oben + 0.16)).move(0, y1 + 0.16, 0), "marmor", "abakus")
+
+model.budget(6000)
+model.expect_size(breite, y1 + 0.26, breite, 0.001)

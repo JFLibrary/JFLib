@@ -1,0 +1,10 @@
+# gametest: what the program may do (docs/PERMISSIONS.md).  Without this file an app may do
+# everything; with it, everything that is not listed is refused (in the library, plugins,
+# scripts and agent actions too).  The app's own folders (config://, data://, cache://,
+# logs://) and app:// need no line.  The build checks the syntax; the packages follow the file
+# (Flatpak finish-args, MSIX capabilities: docs/PACKAGING.md).
+# nothing: the tests compute, keep their settings files in mem:// and write to stdout
+#
+# Remove the # of a rule the program needs:
+# fs.read  $HOME/**                  read below the home folder
+# fs.write $TEMP/gametest-*/**       write (and read) below a folder

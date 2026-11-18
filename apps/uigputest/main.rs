@@ -1752,8 +1752,12 @@ impl Test {
         }
     }
 
-    // the canvas's cells in the framebuffer -> how many are wrong
+    // the canvas's cells in the framebuffer -> how many are wrong (the first three printed)
     fn canvas_fb_wrong(&self, ui: &Ui) -> u32 {
+        self.canvas_fb_bad(ui, true)
+    }
+
+    fn canvas_fb_bad(&self, ui: &Ui, say: bool) -> u32 {
         let Some(c) = self.sc.canvas.as_ref() else { return 0 };
         let fb = ui.fb();
         let mut bad = 0;
@@ -1765,7 +1769,7 @@ impl Test {
                 if let Some(want) = canvas_expected(c, x, y) {
                     let o = y as usize * fb.stride as usize + x as usize * 4;
                     let have = u32::from_le_bytes([fb.px[o], fb.px[o + 1], fb.px[o + 2], 0]);
-                    if have != want && bad < 3 {
+                    if have != want && bad < 3 && say {
                         out(&format!("  at {x}, {y}: {have:06x}, not {want:06x}"));
                     }
                     bad += (have != want) as u32;
@@ -1842,7 +1846,9 @@ impl Test {
                 self.next();
             }
             1 => {
-                if self.after(50) {
+                // (its first frame: on a slow machine with a display that never waits, such as Xvfb in the ARM64 VM,
+                // two passes take less than the CPU's first picture of the canvas; at most 3 s, as pixel_becomes waits)
+                if self.after(50) && (self.canvas_fb_bad(ui, false) == 0 || self.after(3000)) {
                     self.ok(self.canvas_fb_wrong(ui) == 0, "the framebuffer holds the canvas");
                     self.next();
                 }

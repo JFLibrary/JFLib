@@ -108,8 +108,8 @@ pub mod process;
 /// Mutex, Condvar, RwLock and bounded channels for worker threads.
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub mod sync;
-/// TCP and UDP sockets (IPv4 / IPv6) with timeouts, numeric names.
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+/// TCP and UDP sockets (IPv4 / IPv6) with timeouts, numeric names; everywhere the addresses and
+/// errors, in the browser the page's WebSocket (G7d).
 pub mod net;
 /// Metadata, directory listings, links, times, free space, owner-only files, the local zone.
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]

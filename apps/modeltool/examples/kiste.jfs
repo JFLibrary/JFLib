@@ -1,0 +1,53 @@
+// Kiste: eine Holzkiste aus Brettern mit Rahmenleisten
+//   modeltool kiste.jfs [--param groesse=0.8]
+// Außenmaß groesse x groesse x groesse.  Bretter mit Fugen auf allen sechs Seiten, ein dunkler Kern
+// dahinter (durch die Fugen sieht man nicht hindurch), vorn und hinten ein Rahmen aus Leisten, an den
+// Seiten senkrechte Leisten an den Kanten.
+
+model.name("Kiste")
+model.material("brett", {color: "#b48252", roughness: 0.8})
+model.material("leiste", {color: "#7c5130", roughness: 0.8})
+
+let s = params.get("groesse", 0.8)   // Außenmaß in Metern
+let l = 0.025                        // Stärke der Leisten
+let lb = 0.07                        // Breite der Leisten
+let d = 0.018                        // Stärke der Bretter
+let n = 4                            // Bretter je Seite
+let fuge = 0.008
+let innen = s - 2 * l                // die Bretter liegen innerhalb der Leisten
+let bw = (s - (n - 1) * fuge) / n    // Breite eines Bretts vorn und an den Seiten (über die Höhe)
+let dw = (innen - 2 * d - (n - 1) * fuge) / n   // Breite eines Deckel- und Bodenbretts
+
+// der Kern
+model.add(geom.box(innen - 2 * d, s - 2 * d, innen - 2 * d).move(0, d, 0), "dunkelholz", "kern")
+
+for i in 0..n {
+  let y = i * (bw + fuge)
+  // vorn und hinten: waagrecht über die Breite innerhalb der Leisten
+  let vorn = geom.box(innen, bw, d).move(0, y, innen / 2 - d / 2)
+  model.add(vorn, "brett", "vorn ${i + 1}")
+  model.add(vorn.mirror("z"), "brett", "hinten ${i + 1}")
+  // links und rechts: zwischen vorn und hinten
+  let rechts = geom.box(d, bw, innen - 2 * d).move(innen / 2 - d / 2, y, 0)
+  model.add(rechts, "brett", "rechts ${i + 1}")
+  model.add(rechts.mirror("x"), "brett", "links ${i + 1}")
+  // Deckel und Boden: von links nach rechts, nebeneinander von vorn nach hinten
+  let z = -(innen - 2 * d) / 2 + dw / 2 + i * (dw + fuge)
+  let deckel = geom.box(innen - 2 * d, d, dw).move(0, s - d, z)
+  model.add(deckel, "brett", "deckel ${i + 1}")
+  model.add(deckel.move(0, -(s - d), 0), "brett", "boden ${i + 1}")
+}
+
+// vorn und hinten ein Rahmen: zwei senkrechte Leisten über die ganze Höhe, zwei waagrechte dazwischen
+let senkrecht = geom.box(lb, s, l).move(s / 2 - lb / 2, 0, innen / 2 + l / 2)
+let waagrecht = geom.box(s - 2 * lb, lb, l).move(0, 0, innen / 2 + l / 2)
+let rahmen = geom.merge(senkrecht, senkrecht.mirror("x"), waagrecht, waagrecht.move(0, s - lb, 0))
+model.add(rahmen, "leiste", "rahmen vorn")
+model.add(rahmen.mirror("z"), "leiste", "rahmen hinten")
+
+// an den Seiten: senkrechte Leisten an den vier Kanten, hinter den Rahmenleisten
+let kante = geom.box(l, s, lb - l).move(innen / 2 + l / 2, 0, innen / 2 - (lb - l) / 2)
+model.add(geom.merge(kante, kante.mirror("z"), kante.mirror("x"), kante.mirror("x").mirror("z")), "leiste", "kantenleisten")
+
+model.budget(800)
+model.expect_size(s, s, s, 0.0005)

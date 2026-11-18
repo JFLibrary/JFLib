@@ -9,6 +9,8 @@
 //   doc.instances(scene) -> Vec<InstanceRef>      each node's mesh primitives with its world matrix
 //   doc.lights_of(scene) -> Vec<LightRef>         (G5c) each node's KHR_lights_punctual light with its world matrix
 //   gltf::decompose(&matrix) -> Trs               translation, rotation, scale (a mirror: x negative), shear
+//   gltf::write_document(&doc) -> Result<Vec<u8>>   (G7g) a Document as a .glb: meshes, materials by their factors,
+//        nodes, scenes; load reads the same Document back (textures, images and lights: Unsupported)
 //
 // Files are untrusted input: every index, offset, length and count is checked, sizes and counts are limited
 // (Limits), and a file that breaks a rule is an Err, never a panic.  A file whose extensionsRequired names
@@ -29,6 +31,9 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 mod read;
+mod write;
+
+pub use write::write_document;
 
 /// what went wrong; the text says where
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -447,7 +452,8 @@ pub fn glb_chunks(b: &[u8]) -> Result<(&[u8], Option<&[u8]>)> {
     }
 }
 
-/// a .glb of a JSON text and a binary buffer (tools and tests): chunks padded with spaces and zeros
+/// a .glb of a JSON text and a binary buffer (tools and tests; write_document builds both from a Document):
+/// chunks padded with spaces and zeros
 pub fn write_glb(json: &[u8], bin: Option<&[u8]>) -> Vec<u8> {
     let pad = |n: usize| (n + 3) & !3;
     let total = 12 + 8 + pad(json.len()) + bin.map_or(0, |b| 8 + pad(b.len()));

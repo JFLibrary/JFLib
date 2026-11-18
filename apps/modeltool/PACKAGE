@@ -1,0 +1,20 @@
+# apps/modeltool/PACKAGE: the app's identity and packages (docs/PACKAGING.md)
+#   python tools/package.py modeltool --formats all
+# version= is the app's own version (MAJOR.MINOR.PATCH, docs/VERSIONING.md); the program reads it
+# as rt::app_version!(), the packages and lib/update use it.  The library has its own (Cargo.toml).
+# A program without a window: tools/package.py makes desktop packages for window apps; here
+# version= (rt::app_version!()) and app_id= matter.
+display=Modellier-Werkzeug
+version=0.1.0
+publisher=JFLib
+summary=Modelle aus JFScript: Meshes, Bilder, Prüfungen
+description=Modellier-Werkzeug: ein JFScript-Skript beschreibt ein Modell, lib/geom baut die Meshes, das Werkzeug prüft sie, zeichnet sie aus festen Kameras und schreibt einen Bericht und glTF.
+generic=Kommandozeilenprogramm
+categories=Graphics;3DGraphics;ConsoleOnly;
+deb_name=modeltool
+# Flatpak, AppStream and the MSIX identity: reverse DNS of a domain or project you control
+app_id=org.jflib.modeltool
+homepage=https://github.com/JFLibrary/JFLib
+default_win=winui
+default_linux=winui
+styles=winui

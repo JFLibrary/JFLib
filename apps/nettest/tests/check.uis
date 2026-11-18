@@ -1,0 +1,4 @@
+#!args --check
+# nettest is a console program: every test group of the transport (codec, ws, sim, udp, wschan,
+# fuzz) against loopback servers it starts itself; exit code 1 when a check fails.  The browser
+# test is tests/web.mjs (docs/TRANSPORT.md, "Tests").

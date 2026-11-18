@@ -1,0 +1,59 @@
+// Tür: ein Türblatt in einer Zarge mit Anschlag, Bekleidung vorn und hinten, Drücker auf beiden Seiten
+//   modeltool tuer.jfs [--param breite=0.885] [--param hoehe=2.01] [--param wand=0.115]
+// Die Öffnung ist breite x hoehe (lichte Maße), die Zarge so tief wie die Wand.  Vorn ist +Z, die Bänder
+// sind links, der Drücker rechts.
+
+model.name("Tür")
+model.material("zarge", {color: "#d8d2c4", roughness: 0.5})
+model.material("blatt", {color: "#f3f1ec", roughness: 0.45})
+model.material("füllung", {color: "#e1dccf", roughness: 0.45})
+model.material("drücker", {color: "#b9bcc0", roughness: 0.3, metallic: 1})
+
+let b = params.get("breite", 0.885)
+let h = params.get("hoehe", 2.01)
+let wand = params.get("wand", 0.115)
+
+// Die Zarge: ein Profil entlang der Kante der Öffnung, links hoch, oben quer, rechts herunter; die Ecken
+// auf Gehrung.  Profil-x zeigt in die Öffnung, Profil-y nach vorn (+Z).  Die Bekleidung reicht 7 cm über
+// die Wand, 1 cm vor und hinter ihr; der Anschlag steht 1,5 cm in die Öffnung.
+let vorn = wand / 2 + 0.01
+let anschlag = wand / 2 - 0.045
+let profil = [[-0.07, -vorn], [0, -vorn], [0, anschlag], [0.015, anschlag], [0.015, vorn], [-0.07, vorn]]
+let kante = [[-b / 2, 0, 0], [-b / 2, h, 0], [b / 2, h, 0], [b / 2, 0, 0]]
+model.add(geom.sweep(profil, kante, false, 0), "zarge", "zarge")
+
+// das Türblatt hinter dem Anschlag: 4 mm Luft an den Seiten und oben, 7 mm über dem Boden
+let dicke = 0.04
+let zb = anschlag - dicke / 2                 // Mitte des Blatts in z
+let blatt = geom.box(b - 0.008, h - 0.011, dicke).move(0, 0.007, zb)
+model.add(blatt, "blatt", "blatt")
+
+// zwei Füllungen auf jeder Seite des Blatts, 6 mm erhaben, als Rahmen aus vier Leisten
+fn fuellung(x, y, w, hh) {
+  let s = 0.03
+  let oben = geom.box(w, s, 0.006).move(x, y + hh - s, 0)
+  let unten = geom.box(w, s, 0.006).move(x, y, 0)
+  let links = geom.box(s, hh - 2 * s, 0.006).move(x - w / 2 + s / 2, y + s, 0)
+  return geom.merge(oben, unten, links, links.move(w - s, 0, 0))
+}
+let fw = b - 0.008 - 0.24
+let felder = geom.merge(fuellung(0, 0.18, fw, 0.95), fuellung(0, 1.25, fw, 0.6))
+model.add(felder.move(0, 0, zb + dicke / 2 + 0.003), "füllung", "füllungen vorn")
+model.add(felder.mirror("z").move(0, 0, zb - dicke / 2 - 0.003), "füllung", "füllungen hinten")
+
+// der Drücker in 1,05 m Höhe, 6 cm vom Rand: Rosette (ein Zylinder entlang z) und Griff
+let dx = b / 2 - 0.004 - 0.06
+let rosette = geom.cylinder(0.026, 0.008, 24).rotate_x(90)        // jetzt entlang +z, von z = 0 bis 0.008
+let hals = geom.cylinder(0.009, 0.05, 16).rotate_x(90)
+let griff = geom.box(0.13, 0.018, 0.018).move(-0.065 + 0.009, -0.009, 0.05 - 0.009)
+let druecker = geom.merge(rosette, hals, griff).move(dx, 1.05, zb + dicke / 2)
+model.add(druecker, "drücker", "drücker vorn")
+// hinten dasselbe gespiegelt an der Mittelebene des Blatts
+model.add(druecker.move(0, 0, -zb).mirror("z").move(0, 0, zb), "drücker", "drücker hinten")
+
+// zwei Bänder links
+let band = geom.cylinder(0.008, 0.11, 12).move(-b / 2 + 0.001, 0, zb)
+model.add(geom.merge(band.move(0, 0.25, 0), band.move(0, h - 0.36, 0)), "drücker", "bänder")
+
+model.budget(4000)
+model.expect_size(b + 0.14, h + 0.07, nil, 0.001)   // in der Tiefe stehen die Drücker über die Zarge

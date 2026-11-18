@@ -1,0 +1,55 @@
+# gametest's probe: ui's real input path into game::Input, as a headless run plays the pointer lock (locked at
+# once, `motion DX DY`, Esc lets it go).  Before the lock no action fires; the click that asks for the lock fires
+# nothing; keys count by where they sit (here a French keyboard's Z, Q, S, D at the places of W, A, S, D); Esc is the
+# lock's and pauses; a click plays on.
+expect text:"Zustand: Pause" exists
+expect text:"Sperre: aus" exists
+click canvas:"Spiel"
+expect text:"Sperre: gefangen" exists
+expect text:"Zustand: spielt" exists
+expect text:"Klicks: 0 · Anfragen: 1 · Pausen: 0" exists
+# keys by their place
+keydown z code 26
+expect text:"Vor: 1 · Seite: 0 · Springen: 0" exists
+keydown q code 4
+expect text:"Vor: 1 · Seite: -1 · Springen: 0" exists
+keydown d code 7
+expect text:"Vor: 1 · Seite: 0 · Springen: 0" exists
+keyup q code 4
+keyup d code 7
+keyup z code 26
+keydown s code 22
+expect text:"Vor: -1 · Seite: 0 · Springen: 0" exists
+keyup s code 22
+expect text:"Vor: 0 · Seite: 0 · Springen: 0" exists
+# the raw motion: 1000 counts at sensitivity 1 and factor 1 are 22 degrees
+motion 1000 -500
+expect text:"Blick: 22.000 -11.000" exists
+# a click while locked fires; the right button jumps
+click canvas:"Spiel"
+expect text:"Klicks: 1 · Anfragen: 1 · Pausen: 0" exists
+down canvas:"Spiel" r
+expect text:"Vor: 0 · Seite: 0 · Springen: 1" exists
+up canvas:"Spiel" r
+# Esc: the lock ends, the game pauses; the key never reaches the game
+keydown space code 44
+expect text:"Vor: 0 · Seite: 0 · Springen: 1" exists
+key esc
+expect text:"Sperre: aus" exists
+expect text:"Zustand: Pause" exists
+expect text:"Vor: 0 · Seite: 0 · Springen: 0" exists
+expect text:"Klicks: 1 · Anfragen: 1 · Pausen: 1" exists
+keyup space code 44
+# paused: no motion, no keys
+motion 300 300
+keydown z code 26
+expect text:"Blick: 22.000 -11.000" exists
+expect text:"Vor: 0 · Seite: 0 · Springen: 0" exists
+keyup z code 26
+# a click plays on: it asks again and fires nothing
+click canvas:"Spiel"
+expect text:"Zustand: spielt" exists
+expect text:"Klicks: 1 · Anfragen: 2 · Pausen: 1" exists
+click canvas:"Spiel"
+expect text:"Klicks: 2 · Anfragen: 2 · Pausen: 1" exists
+shot build/gametest_input.png

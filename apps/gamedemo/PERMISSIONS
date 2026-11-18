@@ -1,0 +1,9 @@
+# gamedemo: what the program may do (docs/PERMISSIONS.md).  Without this file an app may do
+# everything; with it, everything that is not listed is refused (in the library, plugins,
+# scripts and agent actions too).  The app's own folders (config://, data://, cache://,
+# logs://) and app:// need no line.  The build checks the syntax; the packages follow the file
+# (Flatpak finish-args, MSIX capabilities: docs/PACKAGING.md).
+# nothing: the demo draws, takes the mouse and the keys and keeps nothing
+#
+# Remove the # of a rule the app needs:
+# audio.output                       play sound (plat::audio, ui.beep; Flatpak: --socket=pulseaudio)

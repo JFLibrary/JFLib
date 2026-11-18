@@ -51,6 +51,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   window holds 61 MB of tiles, no longer 128. A tile shows 254 x 254 pixels, its texture with the
   border around them is 256 x 256, so it takes what the budget counts (NVIDIA laid the 258 x 258
   one out as 408 KiB instead of 260).
+- A run whose UI output stays on the CPU for good (no Vulkan loader, no usable adapter, a display that takes no dma-bufs, ...) says why in one line of the log at info level, `gpu: output: none in this run (REASON): the windows go through the CPU path`: in the ring for crash reports and `plat::log_recent` and in the log file, on stderr only with `jfgui_LOG=info`; the screen stays silent as before. On Linux `GpuOutput::error` names a display without dma-bufs so instead of "no child window" (docs/ARM64.md, ARM8)
 
 ### Fixed
 
