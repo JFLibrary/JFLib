@@ -9,68 +9,22 @@ use core::ops::{Add, AddAssign, Div, Index, Mul, Neg, Sub, SubAssign};
 
 // ---------------------------------------------------------------- scalar functions
 
-/// The square root, correctly rounded (IEEE 754), so the same bits on every target: the processor's
-/// instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64), elsewhere (the browser, the x86-64
-/// Android emulator) [`sqrt_portable`].  A negative argument gives NaN, -0.0 gives -0.0.
+/// The square root, correctly rounded (IEEE 754), so the same bits on every target, NaN included:
+/// `rt::fx::sqrtd`, the processor's instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64),
+/// elsewhere (the browser, the x86-64 Android emulator) [`sqrt_portable`].  A negative argument gives NaN,
+/// -0.0 gives -0.0.
 #[inline]
 pub fn sqrt(x: f64) -> f64 {
-    #[cfg(any(all(target_arch = "x86_64", not(target_os = "android")), target_arch = "aarch64"))]
-    {
-        rt::fx::sqrtd(x)
-    }
-    #[cfg(not(any(all(target_arch = "x86_64", not(target_os = "android")), target_arch = "aarch64")))]
-    {
-        sqrt_portable(x)
-    }
+    rt::fx::sqrtd(x)
 }
 
-/// The correctly rounded square root from f64 operations and one 64 x 64 bit product (lib/physics has the
-/// same function and its tests against the processor): Newton's method gives an estimate within a few units
+/// The correctly rounded square root from f64 operations and one 64 x 64 bit product (`rt::fx::sqrt_portable`,
+/// tested against the processor in apps/physicstest): Newton's method gives an estimate within a few units
 /// in the last place, the integer test (R - 1/2)^2 < X <= (R + 1/2)^2 on the significand picks the right
-/// neighbour.  Public for the tests.
+/// neighbour.  Equal to `sqrtsd` for every input, NaN included.  Public for the tests.
+#[inline]
 pub fn sqrt_portable(x: f64) -> f64 {
-    if !(x > 0.0) || x == f64::INFINITY {
-        // 0, -0, +inf and NaN as they are; a negative number gives NaN
-        return if x < 0.0 { f64::NAN } else { x };
-    }
-    let bits = x.to_bits();
-    let mut exp = ((bits >> 52) & 0x7ff) as i32;
-    let mut m = bits & ((1u64 << 52) - 1);
-    if exp == 0 {
-        let sh = m.leading_zeros() - 11; // subnormal: bring the leading one to bit 52
-        m <<= sh;
-        exp = 1 - sh as i32;
-    } else {
-        m |= 1u64 << 52;
-    }
-    // x = m * 2^e with m in [2^52, 2^53); X = m * 2^52 or m * 2^53 so that the exponent is even
-    let e = exp - 1075;
-    let odd = (e & 1) != 0;
-    let big: u128 = (m as u128) << (if odd { 53 } else { 52 });
-    let mut half = (e - if odd { 53 } else { 52 }) / 2; // sqrt(x) = sqrt(X) * 2^half, sqrt(X) in [2^52, 2^53)
-    let mf = if odd { (m as f64) * 2.0 } else { m as f64 };
-    let mut r = f64::from_bits((mf.to_bits() >> 1) + (1023u64 << 51)); // within 6 %
-    r = 0.5 * (r + mf / r);
-    r = 0.5 * (r + mf / r);
-    r = 0.5 * (r + mf / r);
-    r = 0.5 * (r + mf / r); // a few ulp
-    let mut q = (r * 67108864.0) as u64; // * 2^26: the root of X
-    // R is right when R^2 - R < X <= R^2 + R
-    loop {
-        let q2 = (q as u128) * (q as u128);
-        if big > q2 + q as u128 {
-            q += 1;
-        } else if big <= q2 - q as u128 {
-            q -= 1;
-        } else {
-            break;
-        }
-    }
-    if q == 1u64 << 53 {
-        q >>= 1;
-        half += 1;
-    }
-    f64::from_bits((((half + 1075) as u64) << 52) | (q & ((1u64 << 52) - 1)))
+    rt::fx::sqrt_portable(x)
 }
 
 // rt::x87 is the x87 unit on x86-64 and portable/math.rs elsewhere; rt::portable::math is portable/math.rs
