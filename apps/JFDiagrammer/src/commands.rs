@@ -289,11 +289,75 @@ static HANDLERS: &[(u32, Handler)] = &[
     (PANE_SIZEPOS, |a, _| a.panes.toggle(crate::panes::P_SIZEPOS)),
     (PANE_DATA, |a, _| a.panes.toggle(crate::panes::P_DATA)),
     (PANE_PANZOOM, |a, _| a.panes.toggle(crate::panes::P_PANZOOM)),
+    // (JD7) editing: files, undo, the clipboard, tools, arrange, group, text, view toggles
+    (SAVE, |a, ui| crate::edit_doc::save(a, ui, false)),
+    (SAVE_AS, |a, ui| crate::edit_doc::save(a, ui, true)),
+    (UNDO, crate::edit_cmds::undo),
+    (REDO, crate::edit_cmds::redo),
+    (CUT, crate::edit_cmds::cut),
+    (COPY, crate::edit_cmds::copy),
+    (PASTE, crate::edit_cmds::paste),
+    (DUPLICATE, crate::edit_cmds::duplicate),
+    (SELECT_ALL, crate::edit_cmds::select_all),
+    (CONNECTOR_TOOL, |a, _| crate::edit_cmds::tool(a, CONNECTOR_TOOL)),
+    (INSERT_CONNECTOR, |a, _| crate::edit_cmds::tool(a, CONNECTOR_TOOL)),
+    (TEXT_TOOL, |a, _| crate::edit_cmds::tool(a, TEXT_TOOL)),
+    (TEXT_BOX, |a, _| crate::edit_cmds::tool(a, TEXT_TOOL)),
+    (TEXT_BOX_H, |a, _| crate::edit_cmds::tool(a, TEXT_TOOL)),
+    (RECTANGLE, |a, _| crate::edit_cmds::tool(a, RECTANGLE)),
+    (ELLIPSE, |a, _| crate::edit_cmds::tool(a, ELLIPSE)),
+    (LINE_TOOL, |a, _| crate::edit_cmds::tool(a, LINE_TOOL)),
+    (PENCIL, |a, _| crate::edit_cmds::tool(a, PENCIL)),
+    (BRING_FRONT, |a, ui| crate::edit_cmds::arrange(a, ui, diagram_core::ops::Z::Front)),
+    (BRING_FORWARD, |a, ui| crate::edit_cmds::arrange(a, ui, diagram_core::ops::Z::Forward)),
+    (SEND_BACK, |a, ui| crate::edit_cmds::arrange(a, ui, diagram_core::ops::Z::Back)),
+    (SEND_BACKWARD, |a, ui| crate::edit_cmds::arrange(a, ui, diagram_core::ops::Z::Backward)),
+    (GROUP, crate::edit_cmds::group),
+    (UNGROUP, crate::edit_cmds::ungroup),
+    (ROTATE_LEFT, |a, ui| crate::edit_cmds::rotate90(a, ui, 1.0)),
+    (ROTATE_RIGHT, |a, ui| crate::edit_cmds::rotate90(a, ui, -1.0)),
+    (FLIP_H, |a, ui| crate::edit_cmds::flip(a, ui, true)),
+    (FLIP_V, |a, ui| crate::edit_cmds::flip(a, ui, false)),
+    (ALIGN_LEFT, |a, ui| crate::edit_cmds::align(a, ui, 0)),
+    (ALIGN_CENTER, |a, ui| crate::edit_cmds::align(a, ui, 1)),
+    (ALIGN_RIGHT, |a, ui| crate::edit_cmds::align(a, ui, 2)),
+    (ALIGN_TOP, |a, ui| crate::edit_cmds::align(a, ui, 3)),
+    (ALIGN_MIDDLE, |a, ui| crate::edit_cmds::align(a, ui, 4)),
+    (ALIGN_BOTTOM, |a, ui| crate::edit_cmds::align(a, ui, 5)),
+    (DISTRIBUTE_H, |a, ui| crate::edit_cmds::distribute(a, ui, true)),
+    (DISTRIBUTE_V, |a, ui| crate::edit_cmds::distribute(a, ui, false)),
+    (EDIT_TEXT, crate::edit_cmds::edit_text),
+    (RULER, |a, _| a.view_rulers = !a.view_rulers),
+    (PAGE_BREAKS, |a, _| a.view_breaks = !a.view_breaks),
+    (GUIDES, |a, _| a.view_guides = !a.view_guides),
+    (DYN_GRID, |a, _| a.se.dyn_grid = !a.se.dyn_grid),
+    (CONN_POINTS, |a, _| a.se.show_points = !a.se.show_points),
+    (SNAP_GLUE, |a, _| {
+        a.snap = !a.snap;
+        a.se.glue = a.snap;
+    }),
+    (CONN_RIGHT_ANGLE, |a, ui| crate::edit_cmds::conn_style(a, ui, diagram_core::glue::Style::RightAngle)),
+    (CONN_STRAIGHT, |a, ui| crate::edit_cmds::conn_style(a, ui, diagram_core::glue::Style::Straight)),
+    (CONN_CURVED, |a, ui| crate::edit_cmds::conn_style(a, ui, diagram_core::glue::Style::Curved)),
+    (CONN_RESET, crate::edit_cmds::conn_reset),
+    (REROUTE, crate::edit_cmds::conn_reset),
 ];
 
 // toggles: whether the command is on
 static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (POINTER, |a| a.tool == POINTER),
+    (CONNECTOR_TOOL, |a| a.tool == CONNECTOR_TOOL),
+    (TEXT_TOOL, |a| a.tool == TEXT_TOOL),
+    (RECTANGLE, |a| a.tool == RECTANGLE),
+    (ELLIPSE, |a| a.tool == ELLIPSE),
+    (LINE_TOOL, |a| a.tool == LINE_TOOL),
+    (PENCIL, |a| a.tool == PENCIL),
+    (RULER, |a| a.view_rulers),
+    (PAGE_BREAKS, |a| a.view_breaks),
+    (GUIDES, |a| a.view_guides),
+    (DYN_GRID, |a| a.se.dyn_grid),
+    (CONN_POINTS, |a| a.se.show_points),
+    (SNAP_GLUE, |a| a.snap),
     (GRID, |a| a.view_grid),
     (PANE_SHAPES, |a| a.panes.visible(crate::panes::P_SHAPES)),
     (PANE_FORMAT, |a| a.panes.visible(crate::panes::P_FORMAT)),
@@ -332,7 +396,8 @@ pub(crate) fn run(app: &mut Diagrammer, ui: &mut Ui, id: u32) -> bool {
 /// every pass: the commands' states for the menus and the shortcuts
 pub(crate) fn states(app: &Diagrammer, ui: &mut Ui) {
     for d in DEFS {
-        let f = if enabled(d.id) { 0 } else { CF_DISABLED } | if checked(app, d.id) { CF_CHECKED } else { 0 };
+        let on = enabled(d.id) && crate::edit_cmds::available(app, d.id);
+        let f = if on { 0 } else { CF_DISABLED } | if checked(app, d.id) { CF_CHECKED } else { 0 };
         ui.cmd_state(d.id, f);
     }
 }

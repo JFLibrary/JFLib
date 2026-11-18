@@ -26,6 +26,8 @@
 //             golden images (tests/golden) through render2d's CPU path, the local pages drawn
 //   formulas  the formula oracle (JD6): every formula cell of the local files recomputed and
 //             compared with the stored value (--show N prints N misses, locally)
+//   editview  (JD7, edit_view.rs) PageView::update against a page built anew, Metrics' text
+//             sizes against the drawn text, the time an edit of one of 1000 shapes takes
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -44,6 +46,7 @@ mod build;
 mod corpus;
 mod drawings;
 mod dump;
+mod edit_view;
 mod formulas;
 mod hostile;
 mod hostile_write;
@@ -128,6 +131,9 @@ fn run() -> i32 {
         hostile::run(&mut h);
         if h.on("render") {
             render::run(&mut h);
+        }
+        if h.on("editview") {
+            edit_view::run(&mut h);
         }
         roundtrip::run(&mut h, corpus_dir.as_deref());
     }

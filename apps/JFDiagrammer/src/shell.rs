@@ -24,6 +24,7 @@ const ID_TABS: u32 = 100;
 const ID_QAT_MORE: u32 = 120;
 const ID_NOTICE: u32 = 130;
 const ID_OPEN_DLG: u32 = 0x7000;
+const ID_SAVE_DLG: u32 = 0x7100;
 
 /// the main window
 pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
@@ -35,6 +36,7 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
     ui.box_begin(0, BOX_V, 0);
     titlebar(ui, &title);
     open_dialog(app, ui);
+    save_dialog(app, ui);
     if app.backstage.is_some() {
         backstage::frame(app, ui);
         ui.box_end();
@@ -96,6 +98,16 @@ fn open_dialog(app: &mut Diagrammer, ui: &mut Ui) {
     if ui.filedlg(ID_OPEN_DLG, FD_OPEN, &dlg, &mut app.open_path, 4096, &exts) & EV_ACT != 0 {
         let path = app.open_path.clone();
         crate::viewer::open(app, ui, &path);
+    }
+}
+
+// (JD7) the file dialog of Speichern unter (shown while app.save_dlg is set)
+fn save_dialog(app: &mut Diagrammer, ui: &mut Ui) {
+    let dlg = app.save_dlg.clone();
+    let exts: alloc::vec::Vec<&str> = crate::viewer::SAVE_EXTS.iter().map(|e| ui::i18n::t(e)).collect();
+    if ui.filedlg(ID_SAVE_DLG, FD_SAVE, &dlg, &mut app.save_path, 4096, &exts) & EV_ACT != 0 {
+        let path = app.save_path.clone();
+        crate::edit_doc::save_to(app, ui, &path);
     }
 }
 

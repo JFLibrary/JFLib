@@ -1,0 +1,57 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD7 (editing on the canvas): a new drawing at start; the rectangle tool draws a
+# shape snapped to the grid (10 mm at the fitted zoom); the pointer moves it (snapped), the
+# right sizing handle widens it, the rotation handle turns it in 5-degree steps at this distance,
+# Horizontal spiegeln and Um 90° nach links drehen; undo and redo step through the gestures;
+# Del deletes, Ctrl+A selects everything, Esc clears the selection
+expect text:"Zeichnung1 – JFDiagrammer" exists
+expect tab:"Seite-1" selected
+expect canvas:"Zeichenfläche" exists
+# Start › Tools › Zeichentools › Rechteck
+cmd 4404
+drag 500,330 640,420
+expect listitem:"Sheet.4" selected
+expect listitem:"Sheet.4" rect 500 324 151 100
+expect button:"Breite: 60 mm  Höhe: 40 mm  Winkel: 0°" exists
+expect button:"Größengriff unten rechts" exists
+expect button:"Drehgriff" exists
+# the pointer: move by two and one grid steps
+cmd 4400
+drag 600,380 650,400
+expect listitem:"Sheet.4" rect 550 349 151 100
+# wider by 20 mm from the right handle
+drag button:"Größengriff rechts" 750,400
+expect button:"Breite: 80 mm  Höhe: 40 mm  Winkel: 0°" exists
+expect listitem:"Sheet.4" rect 550 349 202 100
+# turn: 5-degree steps this far from the pin
+drag button:"Drehgriff" 800,500
+expect button:"Breite: 80 mm  Höhe: 40 mm  Winkel: -125°" exists
+# undo the turn, the size; redo them
+key ctrl+z
+expect button:"Breite: 80 mm  Höhe: 40 mm  Winkel: 0°" exists
+key ctrl+z
+expect button:"Breite: 60 mm  Höhe: 40 mm  Winkel: 0°" exists
+key ctrl+y
+key ctrl+y
+expect button:"Breite: 80 mm  Höhe: 40 mm  Winkel: -125°" exists
+# Start › Anordnen › Positionieren: turn left by 90 degrees, flip horizontally
+cmd 4443
+expect button:"Breite: 80 mm  Höhe: 40 mm  Winkel: -35°" exists
+cmd 4445
+expect button:"Breite: 80 mm  Höhe: 40 mm  Winkel: 35°" exists
+shot build/JFDiagrammer-edit-shapes.png
+# a second shape, Ctrl+A, Del, undo
+cmd 4404
+drag 800,550 900,620
+cmd 4400
+key ctrl+a
+expect listitem:"Sheet.4" selected
+expect listitem:"Sheet.5" selected
+key delete
+expect listitem:"Sheet.4" missing
+expect listitem:"Sheet.5" missing
+key ctrl+z
+expect listitem:"Sheet.4" exists
+expect listitem:"Sheet.5" exists
+key esc
+expect listitem:"Sheet.4" unselected

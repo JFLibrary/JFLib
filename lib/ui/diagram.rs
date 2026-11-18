@@ -102,6 +102,10 @@ pub const DG_SELECT: u32 = 0; // select, move, connect from ports, waypoints
 pub const DG_PAN: u32 = 1; // a left drag pans
 pub const DG_CONNECT: u32 = 2; // a drag (or two clicks) from a node / port to another connects
 pub const DG_PLACE: u32 = 3; // a click reports DEv::Click (snapped) to place something
+/// the view only (zoom, pan with the middle button, Space + drag and the wheel, the keys that zoom):
+/// the left button, the other keys, the cursor and the overlays belong to ui.shape_edit, called
+/// right after ui.diagram with the same DiagramState (shape_edit.rs)
+pub const DG_EDIT: u32 = 4;
 /// edge routes (DEdge::route)
 pub const DR_STRAIGHT: u8 = 0;
 pub const DR_BEZIER: u8 = 1;
@@ -244,7 +248,7 @@ impl Viewport {
     }
 }
 
-fn clampz(z: f32) -> f32 {
+pub(crate) fn clampz(z: f32) -> f32 {
     if z > 0.0 { z.clamp(Viewport::ZOOM_MIN, Viewport::ZOOM_MAX) } else { 1.0 }
 }
 
@@ -451,6 +455,13 @@ pub trait DgPaint {
     fn paint(&self, g: &mut Gfx, f: &DgFrame);
     /// what lies under the grid (a backdrop image), painted before it; nothing by default
     fn paint_under(&self, _g: &mut Gfx, _f: &DgFrame) {}
+    /// the world rectangle x0, y0, x1, y1 whose look changed from the content version `from` to
+    /// `to` (ui.diagram's ver) while everything else stayed: only that part of the backing store
+    /// is painted again (an edit of a few shapes in a large drawing); None (the default): unknown,
+    /// all of it
+    fn damage(&self, _from: u32, _to: u32) -> Option<[f32; 4]> {
+        None
+    }
 }
 
 // ------------------------------------------------------------------ state
@@ -499,6 +510,8 @@ pub struct DiagramState {
     pub grid: f32,
     /// moves, waypoints and DG_PLACE clicks snap to the grid (Alt held: free)
     pub snap: bool,
+    /// the grid's lines are drawn (false: the grid only snaps, Visio's hidden grid)
+    pub grid_lines: bool,
     /// what the pointer is over (after the last diagram call)
     pub hover: DHit,
     /// the stroke width of the edges in world units (hit testing, the highlight)
@@ -514,6 +527,11 @@ pub struct DiagramState {
     /// side of its DN_TOGGLE button)
     pub frame_bar: f32,
     fit_req: bool,
+    /// (DG_EDIT) the pointer as ui.diagram saw it, for ui.shape_edit; the cursor and whether an
+    /// edit gesture moves shapes, from ui.shape_edit's last call
+    pub(crate) ext: ExtIn,
+    pub(crate) ext_cursor: u32,
+    pub(crate) ext_moving: bool,
     pending_sel: bool,
     g: Gesture,
     ix: Index,
@@ -553,6 +571,7 @@ impl DiagramState {
             focus: 0,
             grid: 16.0,
             snap: true,
+            grid_lines: true,
             hover: DHit::None,
             edge_width: 2.0,
             test_keys: 0,
@@ -560,6 +579,9 @@ impl DiagramState {
             name: String::new(),
             frame_bar: 24.0,
             fit_req: true,
+            ext: ExtIn::default(),
+            ext_cursor: CUR_ARROW,
+            ext_moving: false,
             pending_sel: false,
             g: Gesture::Idle,
             ix: Index::default(),
@@ -848,7 +870,7 @@ impl DiagramState {
             let btn = if mpress { BTN_MIDDLE } else { BTN_LEFT };
             return Gesture::Pan { btn, px: i.px, cx: self.vp.cx, cy: self.vp.cy };
         }
-        if !lpress {
+        if !lpress || i.tool == DG_EDIT {
             return Gesture::Idle;
         }
         // a double click: the second press on the same thing, in time and near the first
@@ -1256,6 +1278,28 @@ struct In {
     lim: i32,
     now: u32,
     dbl: u32,
+}
+
+/// (DG_EDIT) the pointer of one ui.diagram call as ui.shape_edit needs it: behave's events, the
+/// position (absolute px as drawn, window px, world), the buttons held and pressed, the
+/// modifiers, whether the canvas holds the pointer, whether the pointer is tracked (over the
+/// canvas or captured), the drag threshold, the clock, Space held, a pan running
+#[derive(Clone, Copy, Default)]
+pub(crate) struct ExtIn {
+    pub ev: u32,
+    pub px: [i32; 2],
+    pub wx: i32,
+    pub p: [f32; 2],
+    pub btn: u32,
+    pub pressed: u32,
+    pub mods: u32,
+    pub mine: bool,
+    pub track: bool,
+    pub lim: i32,
+    pub now: u32,
+    pub dbl: u32,
+    pub space: bool,
+    pub panning: bool,
 }
 
 // ------------------------------------------------------------------ index and routes
@@ -1809,6 +1853,9 @@ pub fn dg_stroke_edge(g: &mut Gfx, vp: &Viewport, pts: &[[f32; 2]], width: f32, 
 #[derive(Default)]
 struct Backing {
     hash: u64,
+    // the hash without the content version, and that version (DgPaint::damage)
+    base: u64,
+    ver: u32,
     sf: Surface,
     // what it holds, in full detail or not, through which view, in which rectangle
     content: u64,
@@ -1903,6 +1950,9 @@ struct Wrap {
     direct: bool,
     hash: u64,
     content: u64,
+    // the hash without the content version, the version (DgPaint::damage)
+    base: u64,
+    ver: u32,
     store: Rc<RefCell<Backing>>,
 }
 
@@ -1923,6 +1973,27 @@ impl Draw for Wrap {
             self.paint_all(g, r);
             return;
         }
+        // only the content version changed and the paint knows where: paint that part again
+        let same_rest = b.base == self.base && b.ver != self.ver && b.full == !self.moving && b.rect == v && b.sf.w == w && b.sf.h == h && !b.sf.px.is_empty();
+        if b.hash != self.hash && same_rest {
+            if let Some(d) = self.paint.as_ref().and_then(|p| p.damage(b.ver, self.ver)) {
+                let q = self.vp.rect_to_screen([d[0], d[1], d[2] - d[0], d[3] - d[1]]);
+                let x0 = (fl(q[0]) - 2).max(v[0]);
+                let y0 = (fl(q[1]) - 2).max(v[1]);
+                let x1 = (fl(q[0] + q[2]) + 3).min(v[0] + v[2]);
+                let y1 = (fl(q[1] + q[3]) + 3).min(v[1] + v[3]);
+                let Backing { hash, sf, content, ver, .. } = &mut *b;
+                if x1 > x0 && y1 > y0 {
+                    g.dc.begin(sf);
+                    g.dc.clip_push(x0, y0, x1 - x0, y1 - y0);
+                    self.paint_all(&mut Gfx { dc: &mut *g.dc, sf, text: &mut *g.text }, [x0, y0, x1 - x0, y1 - y0]);
+                    g.dc.end();
+                }
+                *hash = self.hash;
+                *content = self.content;
+                *ver = self.ver;
+            }
+        }
         if b.hash != self.hash || b.sf.w != w || b.sf.h != h || b.sf.px.is_empty() {
             if b.sf.w != w || b.sf.h != h || b.sf.px.is_empty() {
                 b.sf = Surface::new(w, h, FMT_XRGB);
@@ -1934,12 +2005,14 @@ impl Draw for Wrap {
                 self.paint_all(g, r);
                 return;
             }
-            let Backing { hash, sf, content, full, view, rect } = &mut *b;
+            let Backing { hash, base, ver, sf, content, full, view, rect } = &mut *b;
             g.dc.begin(sf);
             g.dc.clip_push(v[0], v[1], v[2], v[3]);
             self.paint_all(&mut Gfx { dc: &mut *g.dc, sf, text: &mut *g.text }, v);
             g.dc.end();
             *hash = self.hash;
+            *base = self.base;
+            *ver = self.ver;
             *content = self.content;
             *full = !self.moving;
             *view = view_of(&self.vp);
@@ -2077,20 +2150,20 @@ impl Fnv {
 
 // ------------------------------------------------------------------ small maths
 
-fn fabs(x: f32) -> f32 {
+pub(crate) fn fabs(x: f32) -> f32 {
     if x < 0.0 { -x } else { x }
 }
 
 // floor for any float (non-finite: 0)
-fn fl(x: f32) -> i32 {
+pub(crate) fn fl(x: f32) -> i32 {
     if x.is_finite() { floor_i(x.clamp(-1.0e9, 1.0e9)) } else { 0 }
 }
 
-fn snapv(v: f32, g: f32) -> f32 {
+pub(crate) fn snapv(v: f32, g: f32) -> f32 {
     fl(v / g + 0.5) as f32 * g
 }
 
-fn dist(a: [f32; 2], b: [f32; 2]) -> f32 {
+pub(crate) fn dist(a: [f32; 2], b: [f32; 2]) -> f32 {
     let (dx, dy) = (a[0] - b[0], a[1] - b[1]);
     sqrt(dx * dx + dy * dy)
 }
@@ -2100,12 +2173,12 @@ fn xyxy(r: [f32; 4]) -> [f32; 4] {
     [r[0], r[1], r[0] + r[2], r[1] + r[3]]
 }
 
-fn overlaps(a: [f32; 4], b: [f32; 4]) -> bool {
+pub(crate) fn overlaps(a: [f32; 4], b: [f32; 4]) -> bool {
     a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3]
 }
 
 // a inside b (both x0, y0, x1, y1)
-fn inside(a: [f32; 4], b: [f32; 4]) -> bool {
+pub(crate) fn inside(a: [f32; 4], b: [f32; 4]) -> bool {
     a[0] >= b[0] && a[1] >= b[1] && a[2] <= b[2] && a[3] <= b[3]
 }
 
@@ -2123,19 +2196,19 @@ fn range_of(r: &Range<u32>, len: usize) -> Range<usize> {
 }
 
 // a px rectangle x, y, w, h (fractional) rounded to whole px
-fn ipx(r: [f32; 4]) -> [i32; 4] {
+pub(crate) fn ipx(r: [f32; 4]) -> [i32; 4] {
     let (x0, y0) = (fl(r[0] + 0.5), fl(r[1] + 0.5));
     let (x1, y1) = (fl(r[0] + r[2] + 0.5), fl(r[1] + r[3] + 0.5));
     [x0, y0, (x1 - x0).max(1), (y1 - y0).max(1)]
 }
 
 // px -> 24.8
-fn fx(v: f32) -> i32 {
+pub(crate) fn fx(v: f32) -> i32 {
     (v.clamp(-4.0e6, 4.0e6) * 256.0) as i32
 }
 
 // the semantic id of a node of diagram id
-fn node_sem_id(id: u32, key: u64) -> u32 {
+pub(crate) fn node_sem_id(id: u32, key: u64) -> u32 {
     let mut h = Fnv::new();
     h.u64(id as u64);
     h.u64(key);
@@ -2188,8 +2261,9 @@ impl Ui {
         let space = st.test_keys & 1 != 0 || self.key_down(VK_SPACE);
         let p = st.vp.to_world(mx as f32 + 0.5, my as f32 + 0.5);
         let track = (hot || mine0) && inside_r && !space && !matches!(st.g, Gesture::Pan { .. });
-        st.hover = if track { st.hit(m, p, tool, dpi) } else { DHit::None };
-        let cur = st.cursor(m, tool, space);
+        st.hover = if track && tool != DG_EDIT { st.hit(m, p, tool, dpi) } else { DHit::None };
+        let edit_cur = tool == DG_EDIT && !space && matches!(st.g, Gesture::Idle | Gesture::Hold);
+        let cur = if edit_cur { st.ext_cursor } else { st.cursor(m, tool, space) };
         // Enter activates; behave would take it as a click
         let enter = self.wp.ctx.focus == id && self.key_peek(VK_RETURN);
         let lim = self.dp(DRAG_DIP);
@@ -2208,12 +2282,16 @@ impl Ui {
             st.moving_until = now.wrapping_add(MOVING_MS);
         }
         st.step(m, &inp, &mut out);
-        if ev & EV_RCLICK != 0 {
+        if tool == DG_EDIT {
+            let c = &self.wp.ctx;
+            st.ext = ExtIn { ev, px: [mx, my], wx: c.mx, p, btn: c.mbtn, pressed: c.pressed, mods, mine: c.active == id, track: track || c.active == id, lim, now, dbl, space, panning: matches!(st.g, Gesture::Pan { .. }) };
+        }
+        if ev & EV_RCLICK != 0 && tool != DG_EDIT {
             let at = [self.wp.ctx.mx, my];
             st.context(st.hover, at, &mut out);
         }
         if self.wp.ctx.focus == id {
-            self.dg_keys(st, m, enter, &mut out);
+            self.dg_keys(st, m, enter, tool, &mut out);
         }
         if (st.vp.zoom, st.vp.cx, st.vp.cy) != view0 {
             out.push(DEv::ViewChanged);
@@ -2221,7 +2299,7 @@ impl Ui {
         if !out.is_empty() {
             // the view or the selection moved: what the pointer is over now
             let p = st.vp.to_world(mx as f32 + 0.5, my as f32 + 0.5);
-            st.hover = if track { st.hit(m, p, tool, dpi) } else { DHit::None };
+            st.hover = if track && tool != DG_EDIT { st.hit(m, p, tool, dpi) } else { DHit::None };
             self.repass();
         }
         // drawing: the paint, then the overlays
@@ -2235,7 +2313,7 @@ impl Ui {
             self.animating = true;
         }
         let view_moves = wheel || matches!(st.g, Gesture::Pan { .. });
-        let moving = view_moves || matches!(st.g, Gesture::Move { .. } | Gesture::Waypoint { .. } | Gesture::Resize { .. });
+        let moving = view_moves || st.ext_moving || matches!(st.g, Gesture::Move { .. } | Gesture::Waypoint { .. } | Gesture::Resize { .. });
         let (h, obj, content) = self.dg_paint_obj(st, m, paint, ver, moving, view_moves);
         self.cmd_custom(r[0], r[1], r[2], r[3], Some(obj.clone()), 0, h as u32);
         let view = view_of(&st.vp);
@@ -2254,7 +2332,7 @@ impl Ui {
 
     // an unconsumed key vk whose modifiers & mask == need -> its queue index and modifiers
     // (Left / Right as drawn: the canvas is not mirrored)
-    fn dg_key_find(&self, vk: u32, need: u32, mask: u32) -> Option<(usize, u32)> {
+    pub(crate) fn dg_key_find(&self, vk: u32, need: u32, mask: u32) -> Option<(usize, u32)> {
         for (i, &k) in self.wp.ctx.keyq.iter().enumerate() {
             if (k as i32) < 0 {
                 continue;
@@ -2275,14 +2353,19 @@ impl Ui {
         None
     }
 
-    fn dg_key_take(&mut self, i: usize) {
+    pub(crate) fn dg_key_take(&mut self, i: usize) {
         if let Some(k) = self.wp.ctx.keyq.get_mut(i) {
             *k |= 0x8000_0000;
         }
     }
 
     // the keys of a focused diagram
-    fn dg_keys(&mut self, st: &mut DiagramState, m: &DModel, enter: bool, out: &mut Vec<DEv>) {
+    fn dg_keys(&mut self, st: &mut DiagramState, m: &DModel, enter: bool, tool: u32, out: &mut Vec<DEv>) {
+        // DG_EDIT: the edit layer takes the other keys
+        if tool == DG_EDIT {
+            self.dg_zoom_keys(st);
+            return;
+        }
         // a key after a click on the background: the next click is a click of its own
         if st.last_hit == Some(DHit::None) && !self.wp.ctx.keyq.is_empty() {
             st.last_hit = None;
@@ -2392,7 +2475,12 @@ impl Ui {
             let at = [self.rtl_map(at[0], r[0], r[2]), at[1]];
             st.context(subject, at, out);
         }
-        // Ctrl + plus / minus / 0: zoom around the centre, fit
+        self.dg_zoom_keys(st);
+    }
+
+    // Ctrl + plus / minus / 0: zoom around the centre, fit
+    fn dg_zoom_keys(&mut self, st: &mut DiagramState) {
+        let r = st.vp.rect;
         let (cx, cy) = (r[0] as f32 + r[2] as f32 * 0.5, r[1] as f32 + r[3] as f32 * 0.5);
         for (vk, dir) in [(VK_OEM_PLUS, 1), (VK_ADD, 1), (VK_OEM_MINUS, -1), (VK_SUBTRACT, -1)] {
             if let Some((i, _)) = self.dg_key_find(vk, MOD_CTRL, MOD_CTRL | MOD_ALT) {
@@ -2418,42 +2506,57 @@ impl Ui {
             *f = self.text.get_font();
         }
         let vp = st.vp;
-        // what the canvas shows, wherever it lies
+        // what the canvas shows, wherever it lies; the same without the content version (base)
         let mut h = Fnv::new();
+        let mut hb = Fnv::new();
         h.u64(ver as u64 | (m.ver as u64) << 32);
-        h.u64(Rc::as_ptr(&st.ix.geo) as usize as u64);
-        h.u64(paint.as_ref().map_or(0, |p| Rc::as_ptr(p) as *const () as usize as u64));
-        h.u64(vp.dpi as u64);
-        h.u64(st.grid.to_bits() as u64 | (self.theme_dark as u64) << 32);
+        hb.u64((m.ver as u64) << 32);
+        for x in [
+            Rc::as_ptr(&st.ix.geo) as usize as u64,
+            paint.as_ref().map_or(0, |p| Rc::as_ptr(p) as *const () as usize as u64),
+            vp.dpi as u64,
+            st.grid.to_bits() as u64 | (self.theme_dark as u64) << 32 | (st.grid_lines as u64) << 33,
+        ] {
+            h.u64(x);
+            hb.u64(x);
+        }
         for &c in self.theme.iter() {
             h.u64(c as u64);
+            hb.u64(c as u64);
         }
         for &(f, s) in &fonts {
             h.u64(f as u64 | (s as u32 as u64) << 32);
+            hb.u64(f as u64 | (s as u32 as u64) << 32);
         }
         let content = h.0;
         // a move of the view that comes from tiles shows the full detail wherever the CPU has to
         // paint a part; else the moving view has less of it
         let moving = direct && !(view_moves && st.gpu != CanvasGpu::Cpu && self.gp_canvas_steady(st.id, (content ^ content >> 32) as u32));
-        h.u64(vp.zoom.to_bits() as u64);
-        h.u64(vp.cx.to_bits());
-        h.u64(vp.cy.to_bits());
-        h.u64(vp.rect[0] as u32 as u64 | (vp.rect[1] as u32 as u64) << 32);
-        h.u64(vp.rect[2] as u32 as u64 | (vp.rect[3] as u32 as u64) << 32);
-        h.u64(moving as u64);
+        for x in [
+            vp.zoom.to_bits() as u64,
+            vp.cx.to_bits(),
+            vp.cy.to_bits(),
+            vp.rect[0] as u32 as u64 | (vp.rect[1] as u32 as u64) << 32,
+            vp.rect[2] as u32 as u64 | (vp.rect[3] as u32 as u64) << 32,
+            moving as u64,
+        ] {
+            h.u64(x);
+            hb.u64(x);
+        }
         let hash = h.0;
+        let base = hb.0;
         if let Some((k, d)) = &st.paint_obj {
             if *k == hash {
                 return (hash, d.clone(), content);
             }
         }
-        let d = Rc::new(Wrap { paint, vp, geo: st.ix.geo.clone(), theme: self.theme, fonts, grid: st.grid, dark: self.theme_dark, moving, direct, hash, content, store: st.store.clone() });
+        let d = Rc::new(Wrap { paint, vp, geo: st.ix.geo.clone(), theme: self.theme, fonts, grid: if st.grid_lines { st.grid } else { 0.0 }, dark: self.theme_dark, moving, direct, hash, content, base, ver, store: st.store.clone() });
         st.paint_obj = Some((hash, d.clone()));
         (hash, d, content)
     }
 
     // a polyline (world) as recorded lines w px wide
-    fn dg_poly(&mut self, vp: &Viewport, pts: &[[f32; 2]], w: f32, c: u32) {
+    pub(crate) fn dg_poly(&mut self, vp: &Viewport, pts: &[[f32; 2]], w: f32, c: u32) {
         if pts.len() < 2 {
             return;
         }
@@ -2474,7 +2577,7 @@ impl Ui {
     }
 
     // a dashed line between two px points
-    fn dg_dashed(&mut self, a: [f32; 2], b: [f32; 2], w: f32, c: u32) {
+    pub(crate) fn dg_dashed(&mut self, a: [f32; 2], b: [f32; 2], w: f32, c: u32) {
         let len = dist(a, b);
         if !(len > 0.5) {
             return;
@@ -2495,7 +2598,7 @@ impl Ui {
     }
 
     // a round handle / port dot at px (x, y): radius r, fill, ring t px in stroke
-    fn dg_dot(&mut self, p: [f32; 2], r: i32, t: i32, fill: u32, stroke: u32) {
+    pub(crate) fn dg_dot(&mut self, p: [f32; 2], r: i32, t: i32, fill: u32, stroke: u32) {
         let (x, y) = (fl(p[0] + 0.5) - r, fl(p[1] + 0.5) - r);
         self.cmd_rrect(x, y, r * 2, r * 2, r, t, fill, stroke, stroke);
     }

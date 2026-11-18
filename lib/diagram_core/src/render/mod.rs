@@ -3,14 +3,21 @@
 // gfx, later the exports of diagram_io)
 //
 //   render::build(&doc, page, &mut measure, &Options) -> Drawing
+//   render::rebuild(&doc, &mut drawing, &mut measure, &Options, &shapes) -> bool
+//                                   (JD7, rebuild.rs) the items of some top-level shapes made
+//                                   anew in their place; false: shapes came, went or changed
+//                                   their order (build anew)
 //   Drawing { width, height, scale, items, fonts, notes }   in paper inches, y up, the origin at
 //                                   the page's bottom left corner; items in painter's order
 //   drawing.query(rect, &mut out)   the items whose boxes touch a rectangle (a grid over the
 //                                   page: culling and hit tests without looking at every item)
+//   drawing.range_of(top) / tops()  the items of a top-level shape: they lie together
 //   Item { shape, top, bbox, role, kind }   role: Shape | Arrow | Shadow | Text; kind: Fill { path, paint } | Stroke { path, stroke } |
 //                                   Text(TextItem) | Image(ImageItem)
 //   Paint::Solid | Hatch | Gradient, Stroke { color, width, dash, cap, join }
 //   Measure / Face / ApproxMeasure  (text.rs) what the text layout asks of fonts
+//   measure_text(&mut measure, &face, size, text, max_width)   (text.rs) a text's size as the
+//                                   layout wraps it (the formula engine's TEXTWIDTH, JD7)
 //   ThemeInfo                       (theme.rs) colours and fonts of a theme part
 //   style::{dash, fill_pattern, arrow, PALETTE}   the tables behind lines and fills
 //
@@ -33,6 +40,7 @@
 // inches (geometry times PageScale / DrawingScale).
 
 mod index;
+mod rebuild;
 pub mod style;
 mod text;
 mod theme;
@@ -41,6 +49,7 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeSet;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::ops::Range;
 
 use crate::cell::Value;
 use crate::document::{Document, Owner, PageRef, ShapeRef, SheetRef};
@@ -51,7 +60,8 @@ use crate::sheet::{CellAddr, RowKey, SecKey};
 use crate::strings::Sym;
 
 pub use index::Grid;
-pub use text::{ApproxMeasure, Face, Measure, TextItem, TextRun};
+pub use rebuild::rebuild;
+pub use text::{measure_text, ApproxMeasure, Face, Measure, TextItem, TextRun};
 pub use theme::{no_theme_color, ThemeInfo};
 
 /// what build draws
@@ -86,6 +96,18 @@ pub struct Drawing {
     /// what was left out or drawn only roughly, with counts
     pub notes: Vec<(Note, u32)>,
     grid: Grid,
+    /// the top-level shapes in painter's order (background pages' first) with their items
+    pub(crate) tops: Vec<Top>,
+    /// the document's themes, parsed once (rebuild uses them again)
+    themes: Vec<Option<ThemeInfo>>,
+}
+
+/// a top-level shape of a drawing: where its items start, what it noted
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Top {
+    pub shape: ShapeRef,
+    pub start: u32,
+    pub notes: Vec<(Note, u32)>,
 }
 
 impl Drawing {
@@ -99,12 +121,59 @@ impl Drawing {
         self.items.iter().map(|i| i.bbox).reduce(union)
     }
 
-    fn note(&mut self, n: Note) {
-        match self.notes.iter_mut().find(|(k, _)| *k == n) {
-            Some((_, c)) => *c += 1,
-            None => self.notes.push((n, 1)),
+    /// the items of a top-level shape (they lie together in painter's order; empty when it
+    /// draws nothing); None: not a top-level shape of this drawing
+    pub fn range_of(&self, top: ShapeRef) -> Option<Range<usize>> {
+        let k = self.tops.iter().position(|t| t.shape == top)?;
+        Some(self.top_range(k))
+    }
+
+    /// the top-level shapes in painter's order (those of the background pages first) with
+    /// their items
+    pub fn tops(&self) -> impl Iterator<Item = (ShapeRef, Range<usize>)> + '_ {
+        (0..self.tops.len()).map(|k| (self.tops[k].shape, self.top_range(k)))
+    }
+
+    pub(crate) fn top_range(&self, k: usize) -> Range<usize> {
+        let s = self.tops[k].start as usize;
+        let e = self.tops.get(k + 1).map_or(self.items.len(), |t| t.start as usize);
+        s..e.max(s)
+    }
+
+    /// the index in `tops` of the top-level shape item `i` belongs to
+    pub(crate) fn top_of_item(&self, i: usize) -> Option<usize> {
+        let k = self.tops.partition_point(|t| t.start as usize <= i);
+        k.checked_sub(1)
+    }
+}
+
+/// the notes of the top-level shapes added up, in the order they first came
+fn merge_notes(tops: &[Top]) -> Vec<(Note, u32)> {
+    let mut out: Vec<(Note, u32)> = Vec::new();
+    for t in tops {
+        for &(n, c) in &t.notes {
+            match out.iter_mut().find(|(k, _)| *k == n) {
+                Some((_, x)) => *x += c,
+                None => out.push((n, c)),
+            }
         }
     }
+    out
+}
+
+/// the font families of the items' texts
+fn fonts_of(items: &[Item]) -> BTreeSet<String> {
+    let mut set = BTreeSet::new();
+    for it in items {
+        if let ItemKind::Text(t) = &it.kind {
+            for r in &t.runs {
+                if !set.contains(&r.family) {
+                    set.insert(r.family.clone());
+                }
+            }
+        }
+    }
+    set
 }
 
 /// what the viewer does not draw (yet), or draws only roughly
@@ -257,14 +326,28 @@ pub enum ImageSource {
 pub fn build(doc: &Document, page: PageRef, measure: &mut dyn Measure, opts: &Options) -> Drawing {
     let mut b = Builder::new(doc, measure, *opts);
     b.drawing.page = Some(page);
-    let ps = SheetRef::Page(page);
-    let (w, h) = (b.num_sym(ps, names::PAGE_WIDTH).unwrap_or(8.5), b.num_sym(ps, names::PAGE_HEIGHT).unwrap_or(11.0));
-    let scale = page_scale(&b, ps);
-    b.drawing.width = w * scale;
-    b.drawing.height = h * scale;
+    let (w, h, scale) = page_frame(doc, page);
+    b.drawing.width = w;
+    b.drawing.height = h;
     b.drawing.scale = scale;
     b.drawing.color = 0xFFFFFF;
     // background pages first, the farthest one first
+    for &p in chain_of(doc, page, opts).iter().rev() {
+        b.page(p);
+    }
+    let mut d = core::mem::take(&mut b.drawing);
+    d.items = core::mem::take(&mut b.items);
+    d.fonts = core::mem::take(&mut b.fonts);
+    d.tops = core::mem::take(&mut b.tops);
+    d.notes = merge_notes(&d.tops);
+    d.themes = core::mem::take(&mut b.themes);
+    let bounds = d.bounds().map_or([0.0, 0.0, d.width, d.height], |bb| union(bb, [0.0, 0.0, d.width, d.height]));
+    d.grid = Grid::build(&d.items, bounds);
+    d
+}
+
+/// the page and its background pages (with opts.background), the page first
+fn chain_of(doc: &Document, page: PageRef, opts: &Options) -> Vec<PageRef> {
     let mut chain = alloc::vec![page];
     if opts.background {
         let mut cur = page;
@@ -276,20 +359,21 @@ pub fn build(doc: &Document, page: PageRef, measure: &mut dyn Measure, opts: &Op
             cur = bg;
         }
     }
-    for &p in chain.iter().rev() {
-        b.page(p);
-    }
-    let mut d = core::mem::take(&mut b.drawing);
-    d.items = core::mem::take(&mut b.items);
-    d.fonts = core::mem::take(&mut b.fonts);
-    let bounds = d.bounds().map_or([0.0, 0.0, d.width, d.height], |bb| union(bb, [0.0, 0.0, d.width, d.height]));
-    d.grid = Grid::build(&d.items, bounds);
-    d
+    chain
 }
 
-fn page_scale(b: &Builder, ps: SheetRef) -> f64 {
-    let page = b.num_sym(ps, names::PAGE_SCALE).filter(|v| *v > 0.0 && v.is_finite());
-    let drawing = b.num_sym(ps, names::DRAWING_SCALE).filter(|v| *v > 0.0 && v.is_finite());
+/// a page's width and height in paper inches and its scale (paper inches per drawing inch)
+fn page_frame(doc: &Document, page: PageRef) -> (f64, f64, f64) {
+    let ps = SheetRef::Page(page);
+    let num = |c: Sym| doc.resolve(ps, &CellAddr::single(c)).num().filter(|v| v.is_finite());
+    let scale = page_scale(doc, ps);
+    (num(names::PAGE_WIDTH).unwrap_or(8.5) * scale, num(names::PAGE_HEIGHT).unwrap_or(11.0) * scale, scale)
+}
+
+fn page_scale(doc: &Document, ps: SheetRef) -> f64 {
+    let num = |c: Sym| doc.resolve(ps, &CellAddr::single(c)).num().filter(|v| v.is_finite());
+    let page = num(names::PAGE_SCALE).filter(|v| *v > 0.0 && v.is_finite());
+    let drawing = num(names::DRAWING_SCALE).filter(|v| *v > 0.0 && v.is_finite());
     match (page, drawing) {
         (Some(p), Some(d)) if (p / d).is_finite() && p / d > 1e-9 => p / d,
         _ => 1.0,
@@ -320,11 +404,18 @@ pub(crate) struct Builder<'d, 'm> {
     top: ShapeRef,
     /// the page's shadow offset (inches)
     shadow: [f64; 2],
+    /// the top-level shapes built, and what the one being built noted
+    tops: Vec<Top>,
+    notes: Vec<(Note, u32)>,
 }
 
 impl<'d, 'm> Builder<'d, 'm> {
     fn new(doc: &'d Document, measure: &'m mut dyn Measure, opts: Options) -> Builder<'d, 'm> {
         let themes = doc.themes.iter().map(|t| ThemeInfo::parse(&t.data)).collect();
+        Builder::with_themes(doc, measure, opts, themes)
+    }
+
+    fn with_themes(doc: &'d Document, measure: &'m mut dyn Measure, opts: Options, themes: Vec<Option<ThemeInfo>>) -> Builder<'d, 'm> {
         Builder {
             doc,
             measure,
@@ -339,6 +430,15 @@ impl<'d, 'm> Builder<'d, 'm> {
             scale: 1.0,
             top: ShapeRef { owner: Owner::Page(PageRef(0)), slot: 0 },
             shadow: [0.125, -0.125],
+            tops: Vec::new(),
+            notes: Vec::new(),
+        }
+    }
+
+    fn note(&mut self, n: Note) {
+        match self.notes.iter_mut().find(|(k, _)| *k == n) {
+            Some((_, c)) => *c += 1,
+            None => self.notes.push((n, 1)),
         }
     }
 
@@ -431,9 +531,28 @@ impl<'d, 'm> Builder<'d, 'm> {
     // ---- pages and shapes
 
     fn page(&mut self, page: PageRef) {
+        self.context(page);
+        let m = Xform::scale(self.scale, self.scale);
+        let tops: Vec<ShapeRef> = self.doc.top_shapes(Owner::Page(page)).collect();
+        for r in tops {
+            self.top_shape(r, &m);
+        }
+    }
+
+    /// a top-level shape with everything below it (m: the page's drawing -> paper inches)
+    fn top_shape(&mut self, r: ShapeRef, m: &Xform) {
+        self.top = r;
+        let start = self.items.len() as u32;
+        self.shape(r, m, 0);
+        let notes = core::mem::take(&mut self.notes);
+        self.tops.push(Top { shape: r, start, notes });
+    }
+
+    /// what the shapes of a page draw with: its scale, theme, variation, shadow offset, layers
+    fn context(&mut self, page: PageRef) {
         let doc = self.doc;
         let ps = SheetRef::Page(page);
-        self.scale = page_scale(self, ps);
+        self.scale = page_scale(doc, ps);
         // the theme: by relationship, else the schemeEnum of ThemeIndex (colours of
         // ColorSchemeIndex, fonts of FontSchemeIndex)
         self.theme = self.page_theme(page);
@@ -454,12 +573,6 @@ impl<'d, 'm> Builder<'d, 'm> {
                 Some((ix, Layer { visible, color }))
             })
             .collect();
-        let m = Xform::scale(self.scale, self.scale);
-        let tops: Vec<ShapeRef> = doc.top_shapes(Owner::Page(page)).collect();
-        for r in tops {
-            self.top = r;
-            self.shape(r, &m, 0);
-        }
     }
 
     fn page_theme(&self, page: PageRef) -> Option<ThemeInfo> {
@@ -519,7 +632,7 @@ impl<'d, 'm> Builder<'d, 'm> {
         match header.kind {
             ShapeKind::Unspecified => return,
             ShapeKind::Guide => {
-                self.drawing.note(Note::Guide);
+                self.note(Note::Guide);
                 return;
             }
             _ => {}
@@ -570,7 +683,7 @@ impl<'d, 'm> Builder<'d, 'm> {
             let fill = fill.map(m);
             let line = line.map(m);
             if self.effects(sheet) {
-                self.drawing.note(Note::Effects);
+                self.note(Note::Effects);
             }
             self.shadow_of(r, sheet, &fill, &line);
             if !fill.is_empty() {
@@ -601,7 +714,7 @@ impl<'d, 'm> Builder<'d, 'm> {
             off = self.shadow;
         }
         if kind > 1.0 || self.num(sheet, "ShapeShdwBlur").is_some_and(|v| v > 0.0) || self.num(sheet, "ShapeShdwScaleFactor").is_some_and(|v| v != 1.0 && v != 0.0) {
-            self.drawing.note(Note::SimpleShadow);
+            self.note(Note::SimpleShadow);
         }
         let color = self.color_cell(sheet, None, "ShdwForegnd", 0, 0x000000);
         let color = with_alpha(color, self.num(sheet, "ShdwForegndTrans").unwrap_or(0.0));
@@ -734,14 +847,14 @@ impl<'d, 'm> Builder<'d, 'm> {
             depth += 1;
         }
         let Some(fd) = fd else {
-            self.drawing.note(Note::NoPicture);
+            self.note(Note::NoPicture);
             return;
         };
         let source = match &fd.payload {
             ForeignPayload::Part(p) => ImageSource::Part(*p),
             ForeignPayload::Inline(b) => ImageSource::Inline(b.clone()),
             ForeignPayload::None => {
-                self.drawing.note(Note::NoPicture);
+                self.note(Note::NoPicture);
                 return;
             }
         };
@@ -754,7 +867,7 @@ impl<'d, 'm> Builder<'d, 'm> {
             _ => String::new(),
         };
         if matches!(format.as_str(), "emf" | "wmf") || attr("ForeignType").is_some_and(|t| t == "object") {
-            self.drawing.note(Note::Metafile);
+            self.note(Note::Metafile);
         }
         let ox = self.num(sheet, "ImgOffsetX").unwrap_or(0.0);
         let oy = self.num(sheet, "ImgOffsetY").unwrap_or(0.0);
@@ -797,16 +910,16 @@ impl<'d, 'm> Builder<'d, 'm> {
             }
             None => {
                 if pattern > 23 {
-                    self.drawing.note(Note::CustomLinePattern);
+                    self.note(Note::CustomLinePattern);
                 }
                 Vec::new()
             }
         };
         if self.num(sheet, "CompoundType").is_some_and(|v| v > 0.0) {
-            self.drawing.note(Note::CompoundLine);
+            self.note(Note::CompoundLine);
         }
         if self.num(sheet, "LineGradientEnabled").is_some_and(|v| v != 0.0) {
-            self.drawing.note(Note::LineGradient);
+            self.note(Note::LineGradient);
         }
         Some(Stroke { color, width: weight, dash, cap, join })
     }
