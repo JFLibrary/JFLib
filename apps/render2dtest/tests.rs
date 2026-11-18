@@ -700,6 +700,81 @@ fn layers_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
 
 // ---------------------------------------------------------------- Voll and Basis
 
+/// (G6e3) more changed records in one frame than one dispatch of the scatter shader reaches where a dispatch has 65 535
+/// workgroups (Metal, WebGPU, many phones): 4.5 million hairlines in 300 layers (more than 256 runs: the scatter shader,
+/// not copies), all going up with the first frame; the pieces must all be written.  The GPU against the CPU path at the
+/// first and the last layer (the first and the last changes).  Before G6e3 Metal refused the frame ("dispatch: too many
+/// workgroups"); on Vulkan with 2^31 workgroups it is one piece, as before.  A device whose storage bindings end at
+/// 128 MiB (Mesa's Dozen under WSL, WebGPU's default limit) holds 2 097 152 records of 64 bytes in its pool
+/// (Renderer::max_records, beyond it prepare says Unsupported): there the 300 layers take fewer lines each, as many as
+/// the pool holds, and the change buffer's binding (80 bytes a change) cuts a dispatch's piece before the pool ends,
+/// so the frame still goes up in pieces
+fn bigscatter(t: &mut T) {
+    let Some(g) = setup(t) else { return };
+    let Some(dev) = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "device") else { return };
+    let Some(mut r) = t.res(Renderer::new(&dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new") else { return };
+    let lim = dev.limits();
+    out(&format!("  (the device: {} workgroups a dispatch, storage bindings to {} MiB, {} records a pool)", lim.max_compute_workgroups[0], lim.max_storage_binding >> 20, r.max_records()));
+    let Some(mut s) = t.res(Scene::new(&r), "Scene::new") else { return };
+    // (300 layers: 300 runs, the scatter shader's (copies up to 256); a layer holds whole pages of the pool on its first
+    // layout, so as many lines as the pool's pages hold, at most 15 000, and half a page short: layers that fill their
+    // pages lie next to each other and make one run)
+    let layers = 300usize;
+    let page = render2d::PAGE as usize;
+    let per = 15_000usize.min((r.max_records() as usize / layers / page * page).saturating_sub(page / 2));
+    if !t.ok(per >= 1000, &format!("bigscatter: {layers} layers of {per} lines fit this device's pool")) {
+        return;
+    }
+    let t0 = plat::time_us();
+    for k in 0..layers {
+        let Some(lay) = t.res(s.add_layer(&Layer::new(k as i32)), "add_layer") else { return };
+        let Some(st) = t.res(s.add_style(&style(INK[k % 4], 0.0, Cap::Butt, Join::Miter)), "add_style") else { return };
+        let y0 = k as f64 * 10.0;
+        for j in 0..per {
+            let (x, y) = (j as f64 * 2.0, y0 + (j % 8) as f64 + 0.3);
+            if t.res(s.insert(lay, st, &Shape::Line { a: [x, y], b: [x + 1.5, y] }), "insert").is_none() {
+                return;
+            }
+        }
+    }
+    out(&format!("  {} lines in {layers} layers inserted in {:.0} ms", layers * per, (plat::time_us() - t0) as f64 / 1000.0));
+    let (w, h) = (320u32, 240u32);
+    let Some(mut off) = t.res(Off::new(&dev, w, h), "target") else { return };
+    // (the first frame: everything goes up)
+    let first = Camera::new([20.0, 4.0], 0.05);
+    if t.res(s.set_camera(&first), "set_camera").is_none() {
+        return;
+    }
+    let Some(img0) = shot(t, &dev, &mut off, &mut r, &mut s, "bigscatter, the first frame") else { return };
+    let up = s.upload_info();
+    // (what one dispatch takes, as render2d's scatter_chunk: workgroups of 64, the change buffer's binding at 80 bytes a
+    // change, each piece's bytes a multiple of the binding offsets' alignment)
+    let align = (lim.min_storage_offset_alignment as u64).max(1);
+    let mut chunk = (lim.max_compute_workgroups[0] as u64 * 64).min(lim.max_storage_binding as u64 / 80).min(u32::MAX as u64 / 2).max(1);
+    while chunk > 1 && (chunk * 80) % align != 0 {
+        chunk -= 1;
+    }
+    t.ok(up.scatter && up.records as usize >= layers * per, &format!("the first frame sent {} records in {} runs by the scatter shader ({}): {} piece(s) of at most {chunk} for this device's dispatch and binding",
+                                                                     up.records, up.runs, up.scatter, (up.records as u64).div_ceil(chunk)));
+    let last = Camera::new([20.0, (layers - 1) as f64 * 10.0 + 4.0], 0.05);
+    for (what, cam, img) in [("the first layer (the first changes)", first, Some(img0)), ("the last layer (the last changes)", last, None)] {
+        if t.res(s.set_camera(&cam), "set_camera").is_none() {
+            return;
+        }
+        let img = match img {
+            Some(i) => i,
+            None => {
+                let Some(i) = shot(t, &dev, &mut off, &mut r, &mut s, what) else { return };
+                i
+            }
+        };
+        let cpu = cpu_image(&mut s, w, h, BG);
+        let c = refimg::compare(&img, &cpu, w, BG, 2);
+        let ink = 100.0 * (c.ink[0] - c.ink[1]) / c.ink[1].max(1.0);
+        t.ok(c.ink[1] > 1000.0 && c.over == 0 && ink.abs() <= 0.05, &format!("bigscatter, {what}: the GPU against the CPU path: {} pixels beyond 2 codes, largest {}, ink {ink:+.3} %", c.over, c.max));
+    }
+}
+
 fn levels(t: &mut T) {
     let Some(g) = setup(t) else { return };
     if g.adapter.level() != Level::Voll {
@@ -975,6 +1050,24 @@ pub fn run() -> i32 {
         }
         return crate::demo::launch();
     }
+    // (G6e2) DXF drawings
+    if let Some(path) = plat::arg_value("--dxf") {
+        if args.iter().any(|a| a == "--no-gpu") {
+            plat::setenv("jfgui_GPU", Some("0"));
+        }
+        return crate::dxftest::viewer(&path);
+    }
+    if let Some(path) = plat::arg_value("--dxf-shot") {
+        let pos = args.iter().position(|a| a == "--dxf-shot").map_or(0, |p| p + 2);
+        let Some(png) = args.get(pos) else {
+            plat::write_stderr(b"render2dtest: --dxf-shot PATH OUT.png\n");
+            return 2;
+        };
+        return crate::dxftest::shot_file(&path, png);
+    }
+    if let Some(path) = plat::arg_value("--bench-dxf") {
+        return crate::dxftest::bench(&path);
+    }
     if let Some(n) = plat::arg_value("--bench").and_then(|v| v.parse::<u32>().ok()).filter(|&n| n > 0) {
         return crate::bench::bench(n);
     }
@@ -983,13 +1076,13 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate, inst: None };
-    let list: [(&str, fn(&mut T)); 31] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
+    let list: [(&str, fn(&mut T)); 33] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
                                           ("arcs", arcs), ("dashes", dashes), ("curves", curves), ("fills", fills), ("hatches", hatches), ("layers", layers),
                                           ("changes", crate::scenes::changes), ("churn", crate::scenes::churn), ("visibility", crate::scenes::visibility), ("coords", crate::scenes::coords),
                                           ("phase", crate::scenes::phase), ("blocks", crate::blocks::blocks), ("transparency", crate::blocks::transparency), ("levels", levels), ("errors", errors),
                                           ("text", crate::textgpu::text), ("textdeep", crate::textgpu::textdeep), ("pick", crate::picks::pick), ("select", crate::picks::select),
-                                          ("snap", crate::picks::snap), ("pickchurn", crate::picks::churn), ("highlight", crate::hlov::highlight), ("overlay", crate::hlov::overlay),
-                                          ("cpu", crate::cpucmp::cpu)];
+                                          ("snap", crate::picks::snap), ("pickchurn", crate::picks::churn), ("highlight", crate::hlov::highlight), ("repeat", crate::hlov::repeat), ("overlay", crate::hlov::overlay),
+                                          ("cpu", crate::cpucmp::cpu), ("dxf", crate::dxftest::dxf)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {
@@ -1001,6 +1094,18 @@ pub fn run() -> i32 {
     if test == "window" {
         out(&format!("== window{}", if validate { " (validation)" } else { "" }));
         return crate::demo::window_test(validate);
+    }
+    // (G6e3; not in `all`: 4.5 million records, about a gigabyte of memory and some seconds)
+    if test == "bigscatter" {
+        out("== bigscatter");
+        bigscatter(&mut t);
+        ran = true;
+    }
+    // (G6e2; not in `all`: it reads the corpus outside the repository)
+    if test == "dxfcorpus" {
+        out("== dxfcorpus");
+        crate::dxftest::corpus(&mut t);
+        ran = true;
     }
     if !ran {
         plat::write_stderr(format!("render2dtest: no test {test}\n").as_bytes());

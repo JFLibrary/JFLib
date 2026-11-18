@@ -26,6 +26,8 @@
 //                                                relative to it, never through a link (the
 //                                                section "folders by handle")
 //   set_file_times / set_file_mode (File)        through the open file's own handle
+//   fd_path(File) (Linux)                        a name of the open file itself for a program
+//                                                this one starts (/proc/<pid>/fd/<n>)
 //
 // Windows: reparse points count as links only for symbolic links and junctions; other tags
 // (deduplication, cloud placeholders) are ordinary files whose data is read.  Files are
@@ -381,12 +383,18 @@ pub fn mkdir_private(path: &str) -> bool {
 ///   set_file_times / set_file_mode    through an open File's own handle (whatever its name
 ///                                     has become meanwhile)
 ///
-/// macOS: openat with O_NOFOLLOW component by component, the *at calls on the folder.  Windows
-/// has no calls relative to an open folder in its API: a Dir holds every folder from its start
-/// down open without FILE_SHARE_DELETE (checked to be a folder, not a junction or a link), so
-/// none of them can be renamed, removed or replaced while it lives, and its entries are named
-/// by path below them (with OPEN_REPARSE_POINT).  The manifest's rules (policy.rs) are checked
-/// on the path an entry has below the start.
+/// macOS: openat with O_NOFOLLOW component by component, the *at calls on the folder.  Windows:
+/// the native calls relative to an open folder -- NtCreateFile with OBJECT_ATTRIBUTES.
+/// RootDirectory = the folder's handle and FILE_OPEN_REPARSE_POINT, one name at a time (a
+/// folder on the way that is a junction, a symbolic link or another name surrogate is refused,
+/// one that is no folder too), renames to a name relative to the target folder's handle
+/// (FILE_RENAME_INFORMATION.RootDirectory), removals through the entry's own handle, links as
+/// reparse data set on the new entry (FSCTL_SET_REPARSE_POINT, what CreateSymbolicLinkW writes).
+/// What lies below an open folder is found through the handles, never through a path, so a
+/// folder on the way renamed or swapped for a junction -- also one another program holds open
+/// with delete access -- changes nothing, and no folder is locked against renaming or removal
+/// meanwhile.  On a network share the server looks the names up by path itself.  The
+/// manifest's rules (policy.rs) are checked on the path an entry has below the start.
 pub struct Dir {
     path: String,
     os: sys::OsDir,
@@ -528,13 +536,21 @@ pub fn set_file_mode(f: &crate::File, mode: u32) -> bool {
     f.os().is_some_and(|o| sys::set_file_mode(o, mode))
 }
 
+/// A path that leads a program of this user (one this process starts, such as QEMU given a disk
+/// file made through a Dir) to the open file `f` itself, whatever its name has become or was put
+/// in its place meanwhile.  Linux: /proc/<this process>/fd/<n>, valid while `f` stays open and
+/// this process runs (keep `f` as long as the other program may open the path again); None on
+/// Windows and macOS and for a mount's stream.
+pub fn fd_path(f: &crate::File) -> Option<String> {
+    sys::fd_path(f.os()?)
+}
+
 // ------------------------------------------------------------------ Windows
 
 #[cfg(windows)]
 mod win {
     use super::{DirEntry, FileKind, Meta};
     use alloc::string::String;
-    use alloc::sync::Arc;
     use alloc::vec::Vec;
 
     const FILE_READ_ATTRIBUTES: u32 = 0x80;
@@ -800,7 +816,11 @@ mod win {
     }
 
     fn read_link_raw(path: &str) -> Option<String> {
-        let h = open(path, FILE_READ_ATTRIBUTES, OPEN_REPARSE_POINT)?;
+        link_of(&open(path, FILE_READ_ATTRIBUTES, OPEN_REPARSE_POINT)?)
+    }
+
+    // the target of the symbolic link or junction an open handle (OPEN_REPARSE_POINT) is
+    fn link_of(h: &H) -> Option<String> {
         let mut buf = alloc::vec![0u8; 16 * 1024];
         let mut got = 0u32;
         // SAFETY: a valid handle and output buffer.
@@ -898,9 +918,13 @@ mod win {
         true // NTFS journals the directory change with the rename
     }
 
-    /// a security descriptor: full access for SYSTEM, the administrators and the owner only
+    /// A security descriptor: full access for SYSTEM, the administrators, the owner and the user
+    /// this process runs as.  That user by name as well: in a process run as administrator a new
+    /// object's owner is the administrators' group (an elevated token's default owner), so "the
+    /// owner" alone would lock the same user out of it in a process without those rights.
     fn private_sa() -> Option<(SecurityAttributes, usize)> {
-        let sddl = wz("D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;OW)");
+        let me = user_sid().map(|s| alloc::format!("(A;OICI;FA;;;{})", s)).unwrap_or_default();
+        let sddl = wz(&alloc::format!("D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;OW){}", me));
         let mut sd = 0usize;
         // SAFETY: valid SDDL; the descriptor is freed with LocalFree by the caller.
         if unsafe { ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.as_ptr(), 1, &mut sd, core::ptr::null_mut()) } == 0 {
@@ -1118,89 +1142,326 @@ mod win {
         Some(alloc::format!("win:{}", String::from_utf16_lossy(&w)))
     }
 
-    // ---- Dir: every folder from the start down held open without FILE_SHARE_DELETE
+    // ---- Dir: every entry opened relative to the handle of its folder
+
+    #[link(name = "ntdll", kind = "raw-dylib")]
+    unsafe extern "system" {
+        fn NtCreateFile(h: *mut isize, access: u32, oa: *const ObjAttrs, io: *mut [usize; 2], alloc: *const i64, attrs: u32, share: u32, disp: u32, opts: u32, ea: *const u8, ea_len: u32) -> i32;
+        fn NtSetInformationFile(h: isize, io: *mut [usize; 2], info: *const u8, len: u32, class: u32) -> i32;
+    }
+
+    #[link(name = "kernel32", kind = "raw-dylib")]
+    unsafe extern "system" {
+        fn SetFileInformationByHandle(h: isize, class: u32, info: *const u8, size: u32) -> i32;
+        fn GetCurrentThread() -> isize;
+    }
+
+    #[link(name = "advapi32", kind = "raw-dylib")]
+    unsafe extern "system" {
+        fn ImpersonateSelf(level: u32) -> i32;
+        fn RevertToSelf() -> i32;
+        fn OpenThreadToken(thread: isize, access: u32, as_self: i32, token: *mut isize) -> i32;
+        fn AdjustTokenPrivileges(token: isize, disable_all: i32, new: *const u8, len: u32, old: *mut u8, ret: *mut u32) -> i32;
+    }
+
+    /// UNICODE_STRING (lengths in bytes)
+    #[repr(C)]
+    struct UnicodeStr {
+        len: u16,
+        max: u16,
+        buf: *const u16,
+    }
+
+    /// OBJECT_ATTRIBUTES: a name relative to the folder `root`
+    #[repr(C)]
+    struct ObjAttrs {
+        len: u32,
+        root: isize,
+        name: *const UnicodeStr,
+        attrs: u32,
+        sd: usize,
+        qos: usize,
+    }
 
     const GENERIC_READ: u32 = 0x8000_0000;
-    const SHARE_NO_DELETE: u32 = 3;
-    const ERROR_SHARING_VIOLATION: u32 = 32;
+    const FILE_LIST_DIRECTORY: u32 = 1;
+    const DELETE: u32 = 0x1_0000;
+    const SYNCHRONIZE: u32 = 0x10_0000;
+    const SHARE_READ: u32 = 1;
+    const ATTR_NORMAL: u32 = 0x80;
+    const OBJ_CASE_INSENSITIVE: u32 = 0x40;
+    // NtCreateFile: disposition and options
+    const FILE_OPEN: u32 = 1;
+    const FILE_CREATE: u32 = 2;
+    const FILE_DIRECTORY_FILE: u32 = 0x1;
+    const FILE_SYNCHRONOUS_IO_NONALERT: u32 = 0x20;
+    const FILE_NON_DIRECTORY_FILE: u32 = 0x40;
+    const FILE_OPEN_FOR_BACKUP_INTENT: u32 = 0x4000;
+    const FILE_OPEN_REPARSE_POINT: u32 = 0x20_0000;
+    // a reparse point that names another place (symbolic link, junction, ...)
+    const TAG_NAME_SURROGATE: u32 = 0x2000_0000;
+    const FSCTL_SET_REPARSE_POINT: u32 = 0x0009_00A4;
+    // FILE_INFORMATION_CLASS (NtSetInformationFile) and FILE_INFO_BY_HANDLE_CLASS
+    const FILE_RENAME_INFORMATION: u32 = 10;
+    const FILE_RENAME_INFORMATION_EX: u32 = 65;
+    const FILE_BASIC_INFO: u32 = 0;
+    const FILE_DISPOSITION_INFO: u32 = 4;
+    const FILE_FULL_DIR_INFO: u32 = 14;
+    const FILE_DISPOSITION_INFO_EX: u32 = 21;
+    const ERROR_FILE_NOT_FOUND: u32 = 2;
+    const ERROR_PRIVILEGE_NOT_HELD: u32 = 1314;
+    const SE_CREATE_SYMBOLIC_LINK_PRIVILEGE: u32 = 35;
+    const STATUS_NOT_IMPLEMENTED: i32 = 0xC000_0002_u32 as i32;
+    const STATUS_INVALID_INFO_CLASS: i32 = 0xC000_0003_u32 as i32;
+    const STATUS_INVALID_PARAMETER: i32 = 0xC000_000D_u32 as i32;
+    const STATUS_ACCESS_DENIED: i32 = 0xC000_0022_u32 as i32;
+    const STATUS_OBJECT_NAME_INVALID: i32 = 0xC000_0033_u32 as i32;
+    const STATUS_SHARING_VIOLATION: i32 = 0xC000_0043_u32 as i32;
+    const STATUS_FILE_LOCK_CONFLICT: i32 = 0xC000_0054_u32 as i32;
+    const STATUS_LOCK_NOT_GRANTED: i32 = 0xC000_0055_u32 as i32;
+    const STATUS_NOT_SUPPORTED: i32 = 0xC000_00BB_u32 as i32;
 
-    // a folder held open, and the folders above it
-    struct Pin {
-        h: H,
-        _up: Option<Arc<Pin>>,
+    /// an open folder: its handle (FILE_READ_ATTRIBUTES); every entry below is opened relative
+    /// to it, one name at a time
+    pub struct OsDir(H);
+
+    // `name` (one component; "": the folder itself once more) opened in the folder `root`:
+    // NtCreateFile with OBJECT_ATTRIBUTES.RootDirectory, so the name is looked up in that very
+    // folder, whatever path leads to it now (synchronous, as CreateFileW) -> else the NTSTATUS
+    fn nt_open(root: isize, name: &str, access: u32, share: u32, disp: u32, opts: u32, attrs: u32) -> Result<H, i32> {
+        let w: Vec<u16> = name.encode_utf16().collect();
+        let bytes = u16::try_from(w.len() * 2).map_err(|_| STATUS_OBJECT_NAME_INVALID)?;
+        let us = UnicodeStr { len: bytes, max: bytes, buf: if w.is_empty() { core::ptr::null() } else { w.as_ptr() } };
+        let oa = ObjAttrs { len: core::mem::size_of::<ObjAttrs>() as u32, root, name: &us, attrs: OBJ_CASE_INSENSITIVE, sd: 0, qos: 0 };
+        let (mut h, mut io) = (0isize, [0usize; 2]);
+        // SAFETY: the records (and the name they point to) live during the call; no allocation
+        // size, no extended attributes.
+        let st = unsafe { NtCreateFile(&mut h, access | SYNCHRONIZE | FILE_READ_ATTRIBUTES, &oa, &mut io, core::ptr::null(), attrs, share, disp, opts | FILE_SYNCHRONOUS_IO_NONALERT, core::ptr::null(), 0) };
+        if st < 0 { Err(st) } else { Ok(H(h)) }
     }
 
-    /// an open folder: its \\?\ path, below folders that cannot move while it lives
-    pub struct OsDir {
-        path: String,
-        pin: Arc<Pin>,
+    // an existing entry of `root` as itself: a link (or junction) is opened as the link
+    fn entry_h(root: isize, name: &str, access: u32, opts: u32) -> Result<H, i32> {
+        nt_open(root, name, access, SHARE_ALL, FILE_OPEN, opts | FILE_OPEN_REPARSE_POINT | FILE_OPEN_FOR_BACKUP_INTENT, 0)
     }
 
-    // a folder opened so that it cannot be renamed or removed, nor anything put in its place,
-    // while the handle lives (`follow`: a link to it is followed: the start).  One that another
-    // program already holds with delete access cannot be opened that way: it is held without
-    // the guarantee (checked to be a folder all the same)
-    fn hold(path: &str, follow: bool) -> Option<H> {
-        let w = lp(path);
-        let flags = BACKUP_SEMANTICS | if follow { 0 } else { OPEN_REPARSE_POINT };
-        // SAFETY: a valid wide path; no security attributes; GetLastError right after the call.
-        let (mut h, e) = unsafe { (CreateFileW(w.as_ptr(), FILE_READ_ATTRIBUTES, SHARE_NO_DELETE, 0, OPEN_EXISTING, flags, 0), GetLastError()) };
-        if h == INVALID && e == ERROR_SHARING_VIOLATION {
-            // SAFETY: as above.
-            h = unsafe { CreateFileW(w.as_ptr(), FILE_READ_ATTRIBUTES, SHARE_ALL, 0, OPEN_EXISTING, flags, 0) };
-        }
-        if h == INVALID {
+    // the folder `name` in `root`: no link, junction or other name surrogate, and a folder;
+    // another reparse point (a cloud folder) through its driver when that is the same folder
+    fn sub_dir(root: isize, name: &str) -> Option<H> {
+        let h = entry_h(root, name, 0, FILE_DIRECTORY_FILE).ok()?;
+        let m = meta_of(&h)?;
+        if !m.is_dir() || m.attrs & ATTR_REPARSE != 0 && reparse_tag(&h) & TAG_NAME_SURROGATE != 0 {
             return None;
         }
-        let h = H(h);
-        // (a junction or a symbolic link counts as a link, not as a folder)
-        meta_of(&h).is_some_and(|m| m.is_dir()).then_some(h)
+        if m.attrs & ATTR_REPARSE == 0 {
+            return Some(h);
+        }
+        match nt_open(root, name, 0, SHARE_ALL, FILE_OPEN, FILE_DIRECTORY_FILE | FILE_OPEN_FOR_BACKUP_INTENT, 0) {
+            Ok(f) => meta_of(&f).is_some_and(|n| n.is_dir() && (n.dev, n.ino) == (m.dev, m.ino)).then_some(f),
+            Err(_) => Some(h), // no driver for it: the folder itself
+        }
     }
 
-    fn owned(h: H) -> crate::File {
-        let raw = h.0;
-        core::mem::forget(h);
-        crate::File::from_os(crate::OsFile::from_raw(raw))
+    // the entry of an open handle (DELETE) removed: at once (POSIX semantics) where the file
+    // system can, else when the last handle closes; a folder only when it is empty
+    fn delete_h(h: &H) -> bool {
+        let ex: u32 = 1 | 2; // FILE_DISPOSITION_FLAG_DELETE | FILE_DISPOSITION_FLAG_POSIX_SEMANTICS
+        let del: u32 = 1; // FILE_DISPOSITION_INFO.DeleteFile
+        // SAFETY: 4-byte FILE_DISPOSITION_INFO_EX / FILE_DISPOSITION_INFO records.
+        unsafe {
+            SetFileInformationByHandle(h.0, FILE_DISPOSITION_INFO_EX, &ex as *const u32 as *const u8, 4) != 0
+                || SetFileInformationByHandle(h.0, FILE_DISPOSITION_INFO, &del as *const u32 as *const u8, 4) != 0
+        }
+    }
+
+    // the entry of an open handle (DELETE) renamed to `name` in the folder `root`, replacing a
+    // file there (POSIX semantics where the file system has them) -> the NTSTATUS, and whether
+    // it came from the plain rename (a file system without the POSIX one)
+    fn rename_h(h: &H, root: isize, name: &str) -> Result<(), (i32, bool)> {
+        let w: Vec<u16> = name.encode_utf16().collect();
+        let n = w.len() * 2;
+        // FILE_RENAME_INFORMATION: Flags (ReplaceIfExists), RootDirectory (at 8), FileNameLength
+        // (bytes, at 16), FileName (at 20); at least the record's own size (24)
+        let size = (20 + n + 2).max(24);
+        let mut info = alloc::vec![0u64; size.div_ceil(8)];
+        let p = info.as_mut_ptr() as *mut u8;
+        // SAFETY: info holds size bytes, 8-byte aligned; the name is copied without overlap.
+        unsafe {
+            (p.add(8) as *mut isize).write(root);
+            (p.add(16) as *mut u32).write(n as u32);
+            core::ptr::copy_nonoverlapping(w.as_ptr() as *const u8, p.add(20), n);
+        }
+        let set = |flags: u32, class: u32| -> i32 {
+            let mut io = [0usize; 2];
+            // SAFETY: the record above, size bytes; the handle is open with DELETE.
+            unsafe {
+                (p as *mut u32).write(flags);
+                NtSetInformationFile(h.0, &mut io, p, size as u32, class)
+            }
+        };
+        // FILE_RENAME_REPLACE_IF_EXISTS | FILE_RENAME_POSIX_SEMANTICS
+        let st = set(1 | 2, FILE_RENAME_INFORMATION_EX);
+        if st >= 0 {
+            return Ok(());
+        }
+        if !matches!(st, STATUS_INVALID_INFO_CLASS | STATUS_INVALID_PARAMETER | STATUS_NOT_SUPPORTED | STATUS_NOT_IMPLEMENTED) {
+            return Err((st, false));
+        }
+        let st = set(1, FILE_RENAME_INFORMATION);
+        if st >= 0 { Ok(()) } else { Err((st, true)) }
+    }
+
+    // the reparse data CreateSymbolicLinkW writes for `target`: a relative one (also "\x") as it
+    // is, SYMLINK_FLAG_RELATIVE; an absolute one ("C:\x", "\\server\share\x", "\\?\...") as the
+    // NT path "\??\..." with the name as given to show ("C:x" made absolute, shown so)
+    fn symlink_data(target: &str) -> Option<Vec<u8>> {
+        let b = target.as_bytes();
+        let sep = |i: usize| b.get(i).is_some_and(|c| *c == b'\\' || *c == b'/');
+        let drive = b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':';
+        let (flags, sub, print) = if sep(0) && sep(1) && matches!(b.get(2), Some(b'?' | b'.')) && sep(3) {
+            (0u32, alloc::format!(r"\??\{}", &target[4..]), String::from(target))
+        } else if (sep(0) && sep(1)) || drive {
+            // \\?\C:\... or \\?\UNC\server\...: absolute, the separators and dots as Windows has them
+            let full = long_path(target);
+            let rest = full.strip_prefix(r"\\?\")?;
+            (0, alloc::format!(r"\??\{}", rest), if drive && !sep(2) { String::from(rest) } else { String::from(target) })
+        } else {
+            (1, String::from(target), String::from(target))
+        };
+        let (p, s): (Vec<u16>, Vec<u16>) = (print.encode_utf16().collect(), sub.encode_utf16().collect());
+        let (pn, sn) = (p.len() * 2, s.len() * 2);
+        let len = u16::try_from(12 + pn + sn).ok().filter(|l| *l as usize + 8 <= 16 * 1024)?;
+        // REPARSE_DATA_BUFFER: tag, data length, reserved; substitute name offset and length,
+        // print name offset and length (the print name first in the buffer), flags; the names
+        let mut v = Vec::with_capacity(8 + len as usize);
+        v.extend_from_slice(&TAG_SYMLINK.to_le_bytes());
+        for x in [len, 0, pn as u16, sn as u16, 0, pn as u16] {
+            v.extend_from_slice(&x.to_le_bytes());
+        }
+        v.extend_from_slice(&flags.to_le_bytes());
+        for c in p.iter().chain(s.iter()) {
+            v.extend_from_slice(&c.to_le_bytes());
+        }
+        Some(v)
+    }
+
+    // a link made as `name` in the folder `root`: the new entry, then its reparse data; the
+    // entry is removed again when the data cannot be set -> the error of FSCTL_SET_REPARSE_POINT
+    // (0: the entry could not be made)
+    fn new_link(root: isize, name: &str, dir: bool, data: &[u8]) -> Result<(), u32> {
+        let opts = FILE_OPEN_REPARSE_POINT | if dir { FILE_DIRECTORY_FILE } else { FILE_NON_DIRECTORY_FILE };
+        let h = nt_open(root, name, FILE_WRITE_ATTRIBUTES | DELETE, 0, FILE_CREATE, opts, if dir { 0 } else { ATTR_NORMAL }).map_err(|_| 0u32)?;
+        let mut got = 0u32;
+        // SAFETY: the reparse data and its length, no output; GetLastError right after a failure.
+        let e = unsafe {
+            if DeviceIoControl(h.0, FSCTL_SET_REPARSE_POINT, data.as_ptr() as usize, data.len() as u32, core::ptr::null_mut(), 0, &mut got, 0) != 0 {
+                return Ok(());
+            }
+            GetLastError()
+        };
+        delete_h(&h);
+        Err(e)
+    }
+
+    // f() with the privilege to create symbolic links enabled for this thread alone (on a copy
+    // of the process's token, as CreateSymbolicLinkW does): an administrator or a service holds
+    // it without having it enabled.  It counts when the entry is created (its handle opened),
+    // not when the reparse data is set.  false when the thread already impersonates someone (its
+    // token stays untouched) or the privilege is not held
+    fn with_link_privilege(f: impl FnOnce() -> bool) -> bool {
+        let mut t = 0isize;
+        // SAFETY: the pseudo handle of this thread; a thread that already impersonates someone
+        // keeps its token untouched (and the call fails)
+        unsafe {
+            if OpenThreadToken(GetCurrentThread(), 8, 1, &mut t) != 0 {
+                CloseHandle(t);
+                return false;
+            }
+            if ImpersonateSelf(2) == 0 {
+                return false;
+            }
+        }
+        // TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY; TOKEN_PRIVILEGES with one LUID_AND_ATTRIBUTES:
+        // the privilege's LUID, SE_PRIVILEGE_ENABLED
+        let tp: [u32; 4] = [1, SE_CREATE_SYMBOLIC_LINK_PRIVILEGE, 0, 2];
+        // SAFETY: the thread's own impersonation token, closed below; a 16-byte TOKEN_PRIVILEGES;
+        // GetLastError right after AdjustTokenPrivileges (ERROR_NOT_ALL_ASSIGNED: not held)
+        let ok = unsafe {
+            OpenThreadToken(GetCurrentThread(), 0x20 | 8, 1, &mut t) != 0 && {
+                let t = H(t);
+                AdjustTokenPrivileges(t.0, 0, tp.as_ptr() as *const u8, 0, core::ptr::null_mut(), core::ptr::null_mut()) != 0 && GetLastError() == 0
+            }
+        } && f();
+        // SAFETY: ends the impersonation started above.
+        unsafe { RevertToSelf() };
+        ok
     }
 
     impl OsDir {
         pub fn open(path: &str) -> Option<OsDir> {
-            let path = long_path(path);
-            Some(OsDir { pin: Arc::new(Pin { h: hold(&path, true)?, _up: None }), path })
+            // the start as it is (a link to it followed); every share mode: nothing is locked
+            let h = open(path, FILE_READ_ATTRIBUTES, 0)?;
+            meta_of(&h).is_some_and(|m| m.is_dir()).then_some(OsDir(h))
         }
 
         pub fn open_dir(&self, names: &[&str]) -> Option<OsDir> {
-            let mut path = self.path.clone();
-            let mut pin = self.pin.clone();
+            let mut cur: Option<H> = None;
             for n in names {
-                path = super::join(&path, n);
-                pin = Arc::new(Pin { h: hold(&path, false)?, _up: Some(pin) });
+                let base = cur.as_ref().map_or((self.0).0, |h| h.0);
+                cur = Some(sub_dir(base, n)?);
             }
-            Some(OsDir { path, pin })
-        }
-
-        fn full(&self, name: &str) -> String {
-            if name.is_empty() { self.path.clone() } else { super::join(&self.path, name) }
+            cur.map(OsDir)
         }
 
         pub fn lstat(&self, name: &str) -> Option<Meta> {
             if name.is_empty() {
-                return meta_of(&self.pin.h);
+                return meta_of(&self.0);
             }
-            meta_of(&open(&self.full(name), FILE_READ_ATTRIBUTES, OPEN_REPARSE_POINT)?)
+            meta_of(&entry_h((self.0).0, name, 0, 0).ok()?)
         }
 
         pub fn read_link(&self, name: &str) -> Option<String> {
-            read_link_raw(&self.full(name))
+            link_of(&entry_h((self.0).0, name, 0, 0).ok()?)
         }
 
         pub fn read_dir(&self) -> Option<Vec<DirEntry>> {
-            read_dir_raw(&self.path)
+            // a handle of its own (the position of a listing belongs to the handle)
+            let h = nt_open((self.0).0, "", FILE_LIST_DIRECTORY, SHARE_ALL, FILE_OPEN, FILE_DIRECTORY_FILE | FILE_OPEN_FOR_BACKUP_INTENT, 0).ok()?;
+            let mut buf = alloc::vec![0u64; 8 * 1024];
+            let mut out = Vec::new();
+            let mut first = true;
+            loop {
+                // SAFETY: the buffer holds its size in bytes; GetLastError right after a failure.
+                if unsafe { GetFileInformationByHandleEx(h.0, FILE_FULL_DIR_INFO, buf.as_mut_ptr() as *mut u8, (buf.len() * 8) as u32) } == 0 {
+                    let e = unsafe { GetLastError() };
+                    // only the end of the listing is a whole listing (a volume's root may be empty)
+                    return (e == ERROR_NO_MORE_FILES || first && e == ERROR_FILE_NOT_FOUND).then_some(out);
+                }
+                first = false;
+                // SAFETY: the buffer as bytes (u64s are 8 bytes each).
+                let b = unsafe { core::slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len() * 8) };
+                let rd = |o: usize| b.get(o..o + 4).map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]]));
+                // FILE_FULL_DIR_INFO: next entry, ..., attributes (56), name length (60), EA size
+                // = the reparse tag of a reparse point (64), name (68)
+                let mut off = 0usize;
+                loop {
+                    let (next, attrs, n, tag) = (rd(off)?, rd(off + 56)?, rd(off + 60)? as usize, rd(off + 64)?);
+                    let w: Vec<u16> = b.get(off + 68..off + 68 + n)?.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+                    let name = String::from_utf16_lossy(&w);
+                    if name != "." && name != ".." {
+                        out.push(DirEntry { kind: kind_of(attrs, tag), name });
+                    }
+                    if next == 0 {
+                        break;
+                    }
+                    off += next as usize;
+                }
+            }
         }
 
         pub fn open_file(&self, name: &str) -> Option<crate::File> {
-            let p = self.full(name);
-            let first = open(&p, GENERIC_READ, OPEN_REPARSE_POINT)?;
+            let root = (self.0).0;
+            let first = entry_h(root, name, GENERIC_READ, FILE_NON_DIRECTORY_FILE).ok()?;
             let m = meta_of(&first)?;
             if !m.is_file() {
                 return None;
@@ -1208,38 +1469,62 @@ mod win {
             if m.attrs & ATTR_REPARSE == 0 {
                 return Some(owned(first));
             }
-            // another reparse point (deduplication, a cloud file): its data, if the name still
-            // leads to the same file
-            let h = open(&p, GENERIC_READ, 0)?;
+            // another reparse point (deduplication, a cloud file): its data through its driver,
+            // if the name still leads to the same file
+            let h = nt_open(root, name, GENERIC_READ, SHARE_ALL, FILE_OPEN, FILE_NON_DIRECTORY_FILE | FILE_OPEN_FOR_BACKUP_INTENT, 0).ok()?;
             meta_of(&h).is_some_and(|n| n.is_file() && (n.dev, n.ino) == (m.dev, m.ino)).then(|| owned(h))
         }
 
         pub fn create_new(&self, name: &str) -> Option<crate::File> {
-            crate::OsFile::create_new_raw(&self.full(name)).map(crate::File::from_os)
+            // (as OsFile::create_new_raw: read and write, others may read)
+            nt_open((self.0).0, name, GENERIC_READ | GENERIC_WRITE, SHARE_READ, FILE_CREATE, FILE_NON_DIRECTORY_FILE, ATTR_NORMAL).ok().map(owned)
         }
 
         pub fn mkdir(&self, name: &str) -> bool {
-            let w = lp(&self.full(name));
-            // SAFETY: a valid wide path; default security.
-            unsafe { CreateDirectoryW(w.as_ptr(), 0) != 0 }
+            // (default security, as CreateDirectoryW)
+            nt_open((self.0).0, name, FILE_LIST_DIRECTORY, SHARE_ALL, FILE_CREATE, FILE_DIRECTORY_FILE | FILE_OPEN_FOR_BACKUP_INTENT, ATTR_NORMAL).is_ok()
         }
 
         pub fn remove(&self, name: &str) -> bool {
-            crate::delete_raw(&self.full(name))
+            entry_h((self.0).0, name, DELETE, 0).is_ok_and(|h| delete_h(&h))
         }
 
         pub fn rename(&self, name: &str, to: &OsDir, to_name: &str) -> bool {
-            crate::rename_raw(&self.full(name), &to.full(to_name))
+            // a program that holds the file (or the one replaced) without sharing deletion, a
+            // virus scanner for a moment, is waited for up to about a quarter second (replace_move)
+            let mut wait = 1u32;
+            for left in (0..9).rev() {
+                let e = match entry_h((self.0).0, name, DELETE, 0).map_err(|st| (st, false)).and_then(|h| rename_h(&h, (to.0).0, to_name)) {
+                    Ok(()) => return true,
+                    Err(e) => e,
+                };
+                let busy = matches!(e.0, STATUS_SHARING_VIOLATION | STATUS_FILE_LOCK_CONFLICT | STATUS_LOCK_NOT_GRANTED) || (e.1 && e.0 == STATUS_ACCESS_DENIED);
+                if left == 0 || !busy {
+                    return false;
+                }
+                crate::sleep_ms(wait);
+                wait *= 2;
+            }
+            false
         }
 
         pub fn symlink(&self, target: &str, name: &str, dir: bool) -> bool {
-            let (t, l) = (wz(target), lp(&self.full(name)));
-            // SAFETY: valid wide strings.
-            unsafe { CreateSymbolicLinkW(l.as_ptr(), t.as_ptr(), if dir { 1 } else { 0 } | 2) != 0 }
+            // (the developer mode lets anyone make one; else the privilege, enabled for the
+            // thread and the entry made anew)
+            let Some(data) = symlink_data(target) else { return false };
+            let root = (self.0).0;
+            match new_link(root, name, dir, &data) {
+                Ok(()) => true,
+                Err(ERROR_PRIVILEGE_NOT_HELD) => with_link_privilege(|| new_link(root, name, dir, &data).is_ok()),
+                Err(_) => false,
+            }
         }
 
         pub fn set_times(&self, name: &str, atime_ns: i64, mtime_ns: i64) -> bool {
-            set_times_raw(&self.full(name), atime_ns, mtime_ns)
+            let Ok(h) = entry_h((self.0).0, name, FILE_WRITE_ATTRIBUTES, 0) else { return false };
+            let (a, m) = (ns_ft(atime_ns), ns_ft(mtime_ns));
+            // SAFETY: a handle with FILE_WRITE_ATTRIBUTES; creation time unchanged (null).
+            unsafe { SetFileTime(h.0, core::ptr::null(), &a, &m) != 0 }
         }
 
         pub fn set_mode(&self, _name: &str, _mode: u32) -> bool {
@@ -1247,8 +1532,20 @@ mod win {
         }
 
         pub fn set_attrs(&self, name: &str, attrs: u32) -> bool {
-            set_attrs_raw(&self.full(name), attrs)
+            let Ok(h) = entry_h((self.0).0, name, FILE_WRITE_ATTRIBUTES, 0) else { return false };
+            // FILE_BASIC_INFO: four times (0: unchanged), the attributes (as set_attrs: never 0,
+            // which would mean unchanged)
+            let mut info = [0u64; 5];
+            info[4] = (attrs & 0x27 | if attrs & 0x27 == 0 { ATTR_NORMAL } else { 0 }) as u64;
+            // SAFETY: a 40-byte FILE_BASIC_INFO; a handle with FILE_WRITE_ATTRIBUTES.
+            unsafe { SetFileInformationByHandle(h.0, FILE_BASIC_INFO, info.as_ptr() as *const u8, 40) != 0 }
         }
+    }
+
+    fn owned(h: H) -> crate::File {
+        let raw = h.0;
+        core::mem::forget(h);
+        crate::File::from_os(crate::OsFile::from_raw(raw))
     }
 
     pub fn set_file_times(f: &crate::OsFile, atime_ns: i64, mtime_ns: i64) -> bool {
@@ -1259,6 +1556,10 @@ mod win {
 
     pub fn set_file_mode(_f: &crate::OsFile, _mode: u32) -> bool {
         true
+    }
+
+    pub fn fd_path(_f: &crate::OsFile) -> Option<String> {
+        None
     }
 }
 
@@ -1856,6 +2157,11 @@ mod lnx {
         unsafe { syscall3(SYS_FCHMOD, f.raw() as usize, (mode & 0o7777) as usize, 0) >= 0 }
     }
 
+    /// (the magic link of /proc leads to the open file, not through its name)
+    pub fn fd_path(f: &crate::OsFile) -> Option<String> {
+        Some(alloc::format!("/proc/{}/fd/{}", crate::process_id(), f.raw()))
+    }
+
     /// the \\?\ form exists on Windows only
     pub fn long_path(path: &str) -> String {
         String::from(path)
@@ -2431,6 +2737,11 @@ mod apl {
     pub fn set_file_mode(f: &crate::OsFile, mode: u32) -> bool {
         // SAFETY: the file's descriptor.
         unsafe { ffi::fchmod(f.raw(), (mode & 0o7777) as u16) == 0 }
+    }
+
+    /// (/dev/fd/<n> names a descriptor of the process that opens it, not of this one)
+    pub fn fd_path(_f: &crate::OsFile) -> Option<String> {
+        None
     }
 
     /// the \\?\ form exists on Windows only

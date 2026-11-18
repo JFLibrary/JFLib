@@ -122,9 +122,10 @@ fn why_of(e: PortalError) -> HotkeyError {
     }
 }
 
-// an Activated signal of our session -> Pressed
-fn activated(m: &Msg, session: &str, bound: &[u32]) {
-    if m.typ != T_SIGNAL || m.iface != IFACE || m.member != "Activated" {
+// an Activated signal of our session from the portal (any client of the bus may send a signal
+// of that name on the session's path) -> Pressed
+fn activated(m: &Msg, portal: &str, session: &str, bound: &[u32]) {
+    if m.typ != T_SIGNAL || m.iface != IFACE || m.member != "Activated" || portal.is_empty() || m.sender != portal {
         return;
     }
     if m.body.first().and_then(|v| v.as_str()) != Some(session) {
@@ -155,6 +156,8 @@ fn service() {
     c.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "AddMatch", alloc::vec![Value::S(rule)]));
     let mut session: Option<String> = None;
     let mut bound: Vec<u32> = Vec::new();
+    // the portal's unique name (asked again after a new binding: the portal may have restarted)
+    let mut portal = c.name_owner(PORTAL).unwrap_or_default();
     loop {
         let dirty = {
             let mut s = SVC.lock();
@@ -173,6 +176,7 @@ fn service() {
                 continue;
             }
             let ids: Vec<u32> = want.iter().map(|e| e.0).collect();
+            portal = c.name_owner(PORTAL).unwrap_or_default();
             match bind(&mut c, &want, &mut session) {
                 Ok(got) => {
                     for &id in &ids {
@@ -187,7 +191,7 @@ fn service() {
         }
         if let Some(m) = c.read(100) {
             if let Some(s) = session.as_deref() {
-                activated(&m, s, &bound);
+                activated(&m, &portal, s, &bound);
             }
         } else if c.broken {
             let ids: Vec<u32> = hotkey::hotkey_entries().iter().map(|e| e.0).collect();
@@ -218,8 +222,8 @@ fn bind(c: &mut Conn, want: &[(u32, Chord, String)], session: &mut Option<String
         })
         .collect();
     let args = alloc::vec![Value::O(s.clone()), Value::A(String::from("(sa{sv})"), list), Value::str("")];
-    let bound_so_far: Vec<u32> = Vec::new();
-    let (code, res) = portal_request(c, IFACE, "BindShortcuts", args, Vec::new(), "hk", WAIT_MS, &mut |m| activated(m, &s, &bound_so_far)).map_err(why_of)?;
+    // (nothing is bound before the answer: an Activated meanwhile counts for nothing)
+    let (code, res) = portal_request(c, IFACE, "BindShortcuts", args, Vec::new(), "hk", WAIT_MS, &mut |_| {}).map_err(why_of)?;
     if code != 0 {
         return Err(if code == 1 { HotkeyError::Dismissed } else { HotkeyError::Failed(String::from("the portal refused the shortcuts")) });
     }

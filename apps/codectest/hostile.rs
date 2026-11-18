@@ -4,6 +4,7 @@
 // valid, and encoder round trips, still decode.  Exit code 1 when a check fails.
 //
 //   jpeg_scans       20000 empty scans of a 2048 x 2048 progressive JPEG with restarts (200 KB)
+//   png_iccp         60 iCCP chunks, each a zlib bomb past the 16 MB metadata limit (1 MB)
 //   jxl_box64        a container box with a 64-bit size reaching to the end of u64 (28 bytes)
 //   jxl_crop         a frame of its own size (custom crop) larger than the pixel budget
 //   jxl_palettes     273 palette transforms of 137727 entries each on a 1 x 1 image
@@ -433,6 +434,26 @@ pub fn run(only: Option<&str>) -> i32 {
         let us = plat::time_us().wrapping_sub(t0);
         t.check("jpeg_scans", r.as_ref().is_ok_and(|s| s.w == 2048 && s.h == 2048) && us < 4 * QUICK_US,
             format!("{} bytes: {} in {} ms", d.len(), if r.is_ok() { "the image" } else { "an error" }, us / 1000));
+    }
+
+    // 0b: 60 iCCP chunks, each inflating past the 16 MB metadata limit: every one was tried again
+    // (about 32 MB of inflating each, two seconds); now the first one only, its profile dropped
+    if t.on("png_iccp") {
+        let bomb = img_core::deflate::zlib_deflate(&vec![0u8; 17 << 20], 9);
+        let mut d = img_core::io::PNG_SIG.to_vec();
+        img_png::put_chunk(&mut d, b"IHDR", &[0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 0, 0, 0]);
+        let mut iccp = b"bomb\0\0".to_vec();
+        iccp.extend_from_slice(&bomb);
+        for _ in 0..60 {
+            img_png::put_chunk(&mut d, b"iCCP", &iccp);
+        }
+        img_png::put_chunk(&mut d, b"IEND", &[]);
+        let mut m = ImgMeta::default();
+        let t0 = plat::time_us();
+        let r = img_png::glue::scan(&d, &mut m, img_core::IMGD_ICC);
+        let us = plat::time_us().wrapping_sub(t0);
+        t.check("png_iccp", r == 0 && m.icc.is_empty() && m.w == 1 && us < QUICK_US / 4,
+            format!("{} bytes: result {r}, profile {} bytes, in {} ms", d.len(), m.icc.len(), us / 1000));
     }
 
     // 1: box with a 64-bit size up to u64::MAX - 3 (the next box position overflowed)

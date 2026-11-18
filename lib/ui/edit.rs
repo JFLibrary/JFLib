@@ -6,13 +6,15 @@
 //        the asm's buffer in bytes incl. the NUL (bits 0..22: the text holds at most cap - 1
 //        bytes) | TB_PASSWORD | TB_READONLY | TB_DIGITS | TB_SIGNED.  placeholder (or None)
 //        TB_PASSWORD: while it has the keyboard the input method's purpose is IP_PASSWORD (set
-//        by the box itself, the purpose of before put back after; no plat::ime_purpose needed).
+//        by the box itself, the purpose of before put back after; no plat::ime_purpose needed);
+//        always one line (TB_MULTI with it is ignored).
 //        shows while the text is empty (cut with "…" where the box is narrower).
 //        ST_DISABLED via next_flags.
 //        EV_ACT: the text changed this frame; EV_COMMIT: Enter, Esc or focus lost; EV_FOCUS
 //        while it has the keyboard focus.
 //        Semantic record K_TEXTBOX: label = the text (one dot per character for passwords),
-//        value = caret, max = selection anchor (byte indices; 0 while not focused), min = the
+//        value = caret, max = selection anchor (byte indices of the label, of the dots for
+//        passwords; 0 while not focused), min = the
 //        kind of box: (TB_MULTI | TB_PASSWORD | TB_READONLY) >> 24.
 //        TB_MULTI (U1): several lines (natural height 5 lines): Enter inserts a line break,
 //        Ctrl+Enter commits, Up / Down keep the preferred x, PgUp / PgDn move a view, Home /
@@ -332,6 +334,40 @@ fn u8_clip(s: &[u8], n: usize) -> usize {
     k
 }
 
+// pw_apply(buf, t) -> (text, caret): the text a screen reader set for a password box applied to
+// its hidden text.  The box's record shows a dot per character (at most PW_MAX), so the reader's
+// text is those dots with the user's change: the dots kept at the start and at the end stand for
+// the hidden characters there (and the ones past PW_MAX), what lies between them is new.  The
+// caret goes after the new part.  (The dots themselves became the password before: a Backspace
+// of TalkBack set "●●●".)
+fn pw_apply(buf: &[u8], t: &str) -> (Vec<u8>, usize) {
+    const DOT: char = '\u{25CF}';
+    let Ok(old) = core::str::from_utf8(buf) else {
+        return (t.as_bytes().to_vec(), t.len());
+    };
+    // byte offset of every character of the hidden text, and its end
+    let at: Vec<usize> = old.char_indices().map(|(i, _)| i).chain(core::iter::once(old.len())).collect();
+    let shown = (at.len() - 1).min(PW_MAX);
+    let new: Vec<char> = t.chars().collect();
+    let mut p = 0;
+    while p < shown && p < new.len() && new[p] == DOT {
+        p += 1;
+    }
+    let mut s = 0;
+    while s < shown - p && s < new.len() - p && new[new.len() - 1 - s] == DOT {
+        s += 1;
+    }
+    let mut out = Vec::with_capacity(buf.len() + t.len());
+    out.extend_from_slice(&buf[..at[p]]);
+    for c in &new[p..new.len() - s] {
+        let mut b = [0u8; 4];
+        out.extend_from_slice(c.encode_utf8(&mut b).as_bytes());
+    }
+    let caret = out.len();
+    out.extend_from_slice(&buf[at[shown - s]..]);
+    (out, caret)
+}
+
 // utf8_encode(cp) appended (1..4 bytes; above U+10FFFF: U+FFFD).  (port) A surrogate code
 // point becomes U+FFFD too (the asm writes its 3-byte form, which a String cannot hold; the
 // platforms never deliver one: Win32 pairs WM_CHAR halves, xkb gives scalar values)
@@ -491,6 +527,19 @@ impl Ui {
         } else { None }
     }
 
+    // (a11y.rs) select bytes anchor..caret of the focused box's record text: a password box's
+    // record holds one dot per character, its indices map to the characters of the text
+    pub(crate) fn textbox_select_record(&mut self, id: u32, record: &str, anchor: usize, caret: usize) -> bool {
+        if self.ed_is(id) && self.focused() == id && self.m.edit.tb_flags & TB_PASSWORD != 0 {
+            let (a, c) = (self.tb_from_disp(anchor), self.tb_from_disp(caret));
+            let text = core::mem::take(&mut self.m.edit.buf);
+            let ok = core::str::from_utf8(&text).is_ok_and(|t| self.textbox_select(id, t, a, c));
+            self.m.edit.buf = text;
+            return ok;
+        }
+        self.textbox_select(id, record, anchor, caret)
+    }
+
     /// Select valid UTF-8 byte boundaries in an already focused/drawn textbox. Pass the
     /// same current text used by textbox(); returns false without changes for invalid ranges.
     pub fn textbox_select(&mut self, id: u32, text: &str, anchor: usize, caret: usize) -> bool {
@@ -550,27 +599,34 @@ impl Ui {
             buf.truncate(p); // the asm's text ends at its NUL
         }
         core::mem::swap(buf, &mut self.m.edit.buf);
-        // a text a screen reader set (a11y.rs): replaces the content, the caret at its end
+        // a text a screen reader set (a11y.rs): replaces the content, the caret at its end; in a
+        // password box it is the dots of its record with the user's change (pw_apply)
         let set = self.a11y_text(id).map(|t| {
+            let (bytes, caret) = if cap_flags & TB_PASSWORD != 0 {
+                pw_apply(&self.m.edit.buf, &t)
+            } else {
+                let n = t.len();
+                (t.into_bytes(), n)
+            };
             let max = ((cap_flags & TB_CAP_MASK) as usize).saturating_sub(1);
-            let mut n = if max > 0 { t.len().min(max) } else { t.len() };
-            while !t.is_char_boundary(n) {
-                n -= 1;
-            }
+            let n = u8_clip(&bytes, if max > 0 { bytes.len().min(max) } else { bytes.len() });
+            let caret = u8_clip(&bytes, caret.min(n));
             let held = self.ed_is(id);
             let e = &mut self.m.edit;
-            e.buf = t.as_bytes()[..n].to_vec();
+            e.buf = bytes[..n].to_vec();
             if held {
-                e.ed_caret = n;
-                e.ed_anchor = n;
+                e.ed_caret = caret;
+                e.ed_anchor = caret;
             }
             self.repass();
         });
         let ph = placeholder.map(|p| p.split('\0').next().unwrap_or(""));
-        let ev = if cap_flags & TB_MULTI != 0 {
+        // TB_PASSWORD wins over TB_MULTI: the multi-line box has no hidden text (it showed the
+        // password in plain text), a password is one line
+        let ev = if cap_flags & (TB_MULTI | TB_PASSWORD) == TB_MULTI {
             self.tbm_core(id, ph, cap_flags)
         } else {
-            self.tb_core1(id, ph, cap_flags, icon)
+            self.tb_core1(id, ph, cap_flags & !TB_MULTI, icon)
         };
         core::mem::swap(buf, &mut self.m.edit.buf);
         if set.is_some() { ev | EV_ACT | EV_COMMIT } else { ev }
@@ -752,7 +808,12 @@ impl Ui {
         if !editing {
             self.wp.ctx.last_state &= !(SS_FOCUSED as u32);
         }
-        let (v, mx) = if editing { (self.m.edit.ed_caret as i32, self.m.edit.ed_anchor as i32) } else { (0, 0) };
+        // caret and anchor as indices of the record's text: a password box's are those of its dots
+        let (v, mx) = if editing {
+            (self.tb_to_disp(self.m.edit.ed_caret) as i32, self.tb_to_disp(self.m.edit.ed_anchor) as i32)
+        } else {
+            (0, 0)
+        };
         let pw = self.m.edit.tb_flags & TB_PASSWORD != 0;
         let d = core::mem::take(if pw { &mut self.m.edit.disp } else { &mut self.m.edit.buf });
         let n0 = self.sems.len();
@@ -1069,11 +1130,14 @@ impl Ui {
         let mut hyph = core::mem::take(&mut self.m.edit.ml_hyph);
         starts.clear();
         hyph.clear();
+        // the text, checked for UTF-8 once (for every visual line it walked the whole buffer)
+        let buf = core::mem::take(&mut self.m.edit.buf);
+        let st = core::str::from_utf8(&buf).ok();
         let mut pos = 0;
         'para: loop {
             // paragraph end: the next '\n' or the end
             let mut pe = pos;
-            while pe < len && self.m.edit.buf[pe] != b'\n' {
+            while pe < len && buf[pe] != b'\n' {
                 pe += 1;
             }
             loop {
@@ -1085,7 +1149,7 @@ impl Ui {
                 if !wrap {
                     break;
                 }
-                let (e, hy) = self.tbm_wrap(pos, pe);
+                let (e, hy) = self.tbm_wrap(&buf, st, pos, pe);
                 if e >= pe {
                     break;
                 }
@@ -1099,32 +1163,31 @@ impl Ui {
             }
             pos = pe + 1; // after the '\n'
         }
+        self.m.edit.buf = buf;
         self.m.edit.ml_start = starts;
         self.m.edit.ml_hyph = hyph;
     }
 
-    // tbm_wrap(pos, pe) -> (where the visual line starting at pos ends (pos < end <= pe),
-    // hyphenated): the last line break opportunity (UAX #14, a soft hyphen) whose text fits, a
-    // hyphenation point (TB_HYPHENATE), else grapheme clusters
-    fn tbm_wrap(&mut self, pos: usize, pe: usize) -> (usize, bool) {
-        if self.tw_fits(pos, pe - pos) {
-            return (pe, false);
-        }
+    // tbm_wrap(buf, st, pos, pe) -> (where the visual line starting at pos ends (pos < end <= pe),
+    // hyphenated): the whole rest when it fits, else the last line break opportunity (UAX #14, a
+    // soft hyphen) whose text fits, a hyphenation point (TB_HYPHENATE), else grapheme clusters.
+    // buf: the text (taken out of the box by tbm_layout), st: buf as a str (None: not UTF-8).
+    // The rest of the paragraph is not measured first: that was quadratic over a long one
+    fn tbm_wrap(&mut self, buf: &[u8], st: Option<&str>, pos: usize, pe: usize) -> (usize, bool) {
         let w = self.m.edit.ml_w;
         let hw = self.text.width("-");
         let hyph = self.m.edit.hyph.clone();
         let text = &mut self.text;
-        match core::str::from_utf8(&self.m.edit.buf) {
-            Ok(s) => {
+        match st {
+            Some(s) => {
                 let mut fits = |a: usize, b: usize, h: bool| text.width_n(&s.as_bytes()[a..], b - a) + if h { hw } else { 0 } <= w;
                 match hyph.as_deref() {
                     Some(hy) => segment::wrap_end_hyph(s, pos, pe, &mut fits, Some(&mut |wd: &str, out: &mut Vec<usize>| *out = hy.hyphenate(wd))),
                     None => segment::wrap_end_hyph(s, pos, pe, &mut fits, None),
                 }
             }
-            Err(_) => {
+            None => {
                 // not UTF-8: code points while they fit (at least one)
-                let buf = &self.m.edit.buf;
                 let mut best = u8_next(buf, pos);
                 while best < pe {
                     let n = u8_next(buf, best);
@@ -1136,11 +1199,6 @@ impl Ui {
                 (best, false)
             }
         }
-    }
-
-    // .tw_fits(pos, n): n bytes from pos fit into ml_w
-    fn tw_fits(&mut self, pos: usize, n: usize) -> bool {
-        self.text.width_n(&self.m.edit.buf[pos..], n) <= self.m.edit.ml_w
     }
 
     // tbm_line_of(index) -> visual line that shows the index (a soft break index belongs
@@ -2192,7 +2250,8 @@ impl Ui {
         let k = self.ud_slot(i);
         let e = &mut self.m.edit;
         let [len, caret, anchor] = e.ud_hdr[k];
-        let n = len.min(e.tb_max);
+        // at the capacity on a character's start (a smaller tb_max since the snapshot cut one)
+        let n = u8_clip(&e.ud_data[k], len.min(e.tb_max).min(e.ud_data[k].len()));
         e.buf.clear();
         e.buf.extend_from_slice(&e.ud_data[k][..n]);
         if e.surface.is_some() { e.surface_start = Some(0); }

@@ -54,6 +54,13 @@ pub struct View2d {
     pub hover: Option<EntityId>,
     pub selected: Vec<EntityId>,
     pub boxa: Option<[f64; 2]>,
+    // ---- G6e2: a DXF drawing (render2dtest --dxf PATH)
+    /// what it became (its groups: the render2d entities of one DXF entity are picked and highlighted together)
+    pub dxf: Option<render2d::dxf::Loaded>,
+    /// the box to show once the view knows its size (the drawing's extents)
+    pub fit: Option<[f64; 4]>,
+    /// the title's text
+    pub title: Option<alloc::string::String>,
 }
 
 impl View2d {
@@ -61,8 +68,31 @@ impl View2d {
         let mut s = Scene::new_cpu();
         // (the drawing's values are all valid: fill refuses none of them)
         let _ = fill(&mut s);
+        View2d::of(s)
+    }
+
+    /// a view of a scene
+    pub fn of(s: Scene) -> Rc<RefCell<View2d>> {
         Rc::new(RefCell::new(View2d { cam: Camera::new([0.0, 0.0], 1.0), size: (0, 0), dev: None, r: None, s: RefCell::new(s), draws: 0, attaches: 0, paints: Cell::new(0), paint_us: Cell::new(0),
-                                      pointer: None, snap: None, hover: None, selected: Vec::new(), boxa: None }))
+                                      pointer: None, snap: None, hover: None, selected: Vec::new(), boxa: None, dxf: None, fit: None, title: None }))
+    }
+
+    /// (G6e2) the render2d entities an entity stands for: its DXF entity's, else itself
+    pub fn group(&self, id: EntityId) -> Vec<EntityId> {
+        match self.dxf.as_ref().and_then(|l| l.group_of(id).map(|g| l.members(g).to_vec())) {
+            Some(v) if !v.is_empty() => v,
+            _ => alloc::vec![id],
+        }
+    }
+
+    /// (G6e2) the camera that shows a box in the view's size, with a margin of 4 %
+    pub fn fit_to(&mut self, b: [f64; 4]) {
+        if self.size.0 == 0 || self.size.1 == 0 {
+            return;
+        }
+        let (w, h) = ((b[2] - b[0]).max(1e-9), (b[3] - b[1]).max(1e-9));
+        let scale = (w / self.size.0 as f64).max(h / self.size.1 as f64) * 1.08;
+        self.cam = Camera::new([(b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0], scale);
     }
 
     /// (G6d) the pointer moved (px of the view; None: it left): the snap and the entity under it, their highlight
@@ -80,11 +110,14 @@ impl View2d {
         };
         self.snap = snap;
         if hover != self.hover {
-            if let Some(h) = self.hover {
+            let old = self.hover.map(|h| self.group(h)).unwrap_or_default();
+            let new = hover.map(|h| self.group(h)).unwrap_or_default();
+            let s = self.s.get_mut();
+            for h in old {
                 let keep = if self.selected.contains(&h) { render2d::HL_SELECTED } else { 0 };
                 let _ = s.set_highlight(h, keep);
             }
-            if let Some(h) = hover {
+            for h in new {
                 let b = s.highlight(h) | render2d::HL_HOVER;
                 let _ = s.set_highlight(h, b);
             }
@@ -102,7 +135,8 @@ impl View2d {
         let mut sel = if add { self.selected.clone() } else { Vec::new() };
         if let Some(h) = hit {
             if add && sel.contains(&h) {
-                sel.retain(|&x| x != h);
+                let g = self.group(h);
+                sel.retain(|x| !g.contains(x));
             } else if !sel.contains(&h) {
                 sel.push(h);
             }
@@ -129,6 +163,16 @@ impl View2d {
 
     /// (G6d) what is selected now: the highlights follow (the hover stays on top)
     pub fn select_set(&mut self, sel: Vec<EntityId>) {
+        // (G6e2) a DXF entity's parts together
+        let mut all: Vec<EntityId> = Vec::new();
+        for id in sel {
+            for g in self.group(id) {
+                if !all.contains(&g) {
+                    all.push(g);
+                }
+            }
+        }
+        let sel = all;
         let s = self.s.get_mut();
         for &old in &self.selected {
             if !sel.contains(&old) {
@@ -333,8 +377,13 @@ pub struct Demo {
 
 impl Demo {
     pub fn new() -> Demo {
+        Demo::with(View2d::new())
+    }
+
+    /// (G6e2) the demo's window on another view (a DXF drawing)
+    pub fn with(view: Rc<RefCell<View2d>>) -> Demo {
         Demo {
-            view: View2d::new(),
+            view,
             ver: 1,
             last: None,
             press: None,
@@ -360,11 +409,25 @@ impl App for Demo {
             let v = self.view.borrow();
             (v.selected.len(), v.snap.map(|s| s.0))
         };
-        ui.draw_text(12, 22, &format!("render2d: Mitte/rechts ziehen schiebt, Rad zoomt, Klick wählt, links ziehen: Fenster/Kreuzen (1 px = {:.3e} mm; {nsel} gewählt{})", c.scale,
-                                      snap.map(|k| format!(", Fang {k:?}")).unwrap_or_default()), (13u32 << 16) | FONT_REG);
+        let title = self.view.borrow().title.clone();
+        let line = match title {
+            Some(t) => format!("{t} (1 px = {:.3e}; {nsel} gewählt{})", c.scale, snap.map(|k| format!(", Fang {k:?}")).unwrap_or_default()),
+            None => format!("render2d: Mitte/rechts ziehen schiebt, Rad zoomt, Klick wählt, links ziehen: Fenster/Kreuzen (1 px = {:.3e} mm; {nsel} gewählt{})", c.scale,
+                            snap.map(|k| format!(", Fang {k:?}")).unwrap_or_default()),
+        };
+        ui.draw_text(12, 22, &line, (13u32 << 16) | FONT_REG);
         let r = view_rect(w, h);
         // (the view's size for the pointer's mapping: also without a device, where no frame tells it)
-        self.view.borrow_mut().size = (r[2].max(0) as u32, r[3].max(0) as u32);
+        {
+            let mut v = self.view.borrow_mut();
+            v.size = (r[2].max(0) as u32, r[3].max(0) as u32);
+            // (G6e2) a DXF drawing shown whole once the size is known
+            if let (Some(b), true) = (v.fit, v.size.0 > 0 && v.size.1 > 0) {
+                v.fit = None;
+                v.fit_to(b);
+                self.ver += 1;
+            }
+        }
         ui.next_rect_px(r[0], r[1], r[2], r[3]);
         let inp = ui.gpu_view(VIEW_ID, &self.view, self.ver).clone();
         // a drag with the middle or right button (a finger: any): the drawing follows the pointer; the wheel zooms at the
@@ -524,6 +587,12 @@ impl Demo {
         off.read().ok()
     }
 
+    /// (G6e3) the framebuffer can hold the view's newest frame: the output composes the view, or its newest frame is read back
+    fn newest(ui: &mut Ui) -> bool {
+        let i = ui.gpu_view_info(0, VIEW_ID).unwrap_or_default();
+        i.apart || i.read_frame >= i.frames
+    }
+
     /// the view in the framebuffer against offscreen -> the offscreen image
     fn check_view(&mut self, ui: &mut Ui, what: &str) -> Vec<u8> {
         let r = view_rect(ui.fb().w, ui.fb().h);
@@ -567,8 +636,12 @@ impl Demo {
         match pc {
             0 => {
                 let i = ui.gpu_view_info(0, VIEW_ID).unwrap_or_default();
-                if i.device && i.frames >= 1 && after(300) {
-                    say(&format!("  view {:?} on {:?}, output {}", i.size, i.level, i.output));
+                // (G6e3) without the UI's output (macOS by default) the view's frames come to the framebuffer when they are
+                // read back: wait for the newest there (Demo::newest).  The 300 ms count from the start, and under load the
+                // first frame came late in them: the framebuffer still held an older picture, presumably the CPU path's (1904
+                // pixels, up to 151 codes, on the M2 in the suite)
+                if i.device && i.frames >= 1 && Demo::newest(ui) && after(300) {
+                    say(&format!("  view {:?} on {:?}, output {}, apart {}, frame {} of {} read back", i.size, i.level, i.output, i.apart, i.read_frame, i.frames));
                     self.ok(i.device && i.attaches == 1, &format!("the view has a device ({} attach)", i.attaches));
                     let img = self.check_view(ui, "the first frame");
                     let paper = [(PAPER & 255) as u8, (PAPER >> 8) as u8, (PAPER >> 16) as u8];
@@ -598,7 +671,7 @@ impl Demo {
                 next(self);
             }
             2 => {
-                if after(300) {
+                if after(300) && Demo::newest(ui) {
                     let img = self.check_view(ui, "after the pan");
                     let before = self.test.as_ref().map_or(Vec::new(), |t| t.before.clone());
                     // the image moved: 40 px right and 25 px down, the same pixels where both show the drawing
@@ -632,7 +705,7 @@ impl Demo {
                 next(self);
             }
             4 => {
-                if after(300) {
+                if after(300) && Demo::newest(ui) {
                     let _ = self.check_view(ui, "after the zoom");
                     let i = ui.gpu_view_info(0, VIEW_ID).unwrap_or_default();
                     say(&format!("  {} frames of the view, {} read-backs, output {}", i.frames, i.reads, i.output));

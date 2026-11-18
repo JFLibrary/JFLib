@@ -142,9 +142,9 @@ pub struct KeyEvent {
     pub down: bool,
     /// a down of the system's auto-repeat while the key is held
     pub repeat: bool,
-    /// the key's place on the keyboard, whatever the layout: Windows' scan code (0xE0.. for
-    /// extended keys), Linux's evdev code; 0 where the platform does not tell (macOS, the
-    /// browser, Android)
+    /// the platform's code of the key's place on the keyboard, whatever the layout: Windows' scan
+    /// code (0xE0.. for extended keys), Linux's evdev code, (G7a) the USB HID usage on macOS,
+    /// iOS and in the browser; 0 where the platform does not tell (Android)
     pub scancode: u32,
     /// KL_STANDARD, KL_LEFT / KL_RIGHT (the two Shift, Ctrl, Alt, Windows keys), KL_NUMPAD
     pub location: u32,
@@ -159,6 +159,10 @@ pub struct KeyEvent {
     /// the key is a dead key (´ ^ ~ ...): ch is its spacing character, the text it makes
     /// comes with the next key
     pub dead: bool,
+    /// (G7a) where the key sits as a USB HID usage, the same on every platform and layout
+    /// (plat::KC_*: KC_W is the key right of Q on a US keyboard, Z on a French one); 0 where the
+    /// platform does not tell (Android).  plat::key_label(code) says what the layout prints on it
+    pub code: u32,
 }
 
 // (E2) a KeyEvent of the batch: the index of its down in keyq (-1: an up), taken
@@ -317,6 +321,8 @@ pub(crate) struct W {
     pub(crate) wheel_kind: u8,
     /// (wheel_steps) the widget whose whole lines the wheel scrolled last and the fraction left
     pub(crate) wheel_acc: (u32, i32),
+    /// (G7a) the raw motion of the locked pointer for this pass (ui.pointer_motion)
+    pub(crate) motion: [f64; 2],
     pub(crate) moved: bool,
     pub(crate) press_x: i32,
     pub(crate) press_y: i32,
@@ -373,6 +379,7 @@ impl W {
             wheel_rem: [0; 2],
             wheel_kind: 0,
             wheel_acc: (0, 0),
+            motion: [0.0; 2],
             moved: false,
             press_x: 0,
             press_y: 0,
@@ -472,6 +479,62 @@ impl Ui {
     /// ui_pen: (pressure 0 = none / 1..UI_PRESSURE_ONE, PTR_*) of the last pointer event
     pub fn pen(&self) -> (u32, u32) {
         (self.mpress, self.mptype)
+    }
+
+    /// (G7a) lock the pointer to this window (on) or let it go (off) -> the state right after the
+    /// call (plat::win_pointer_lock): Locked, Pending while the platform waits (the window has no
+    /// focus yet, the browser waits for the next press in the page, Wayland for the compositor),
+    /// Unsupported (Android, iOS, a display without the means), Refused.  While locked the pointer
+    /// is hidden and stays put, ui.pointer_motion has its raw motion, a change of the state gives a
+    /// pass.  Esc, the window losing the focus, minimizing and closing it always let it go (Esc
+    /// then reaches the app as no key); it is never taken back by itself.  A headless run (scripts)
+    /// plays the lock: Locked at once, Esc lets it go, `motion DX DY` moves it
+    pub fn pointer_lock(&mut self, on: bool) -> plat::PointerLock {
+        let w = self.uiw_cur;
+        if self.headless {
+            let s = if on {
+                plat::PointerLock::Locked
+            } else if self.plock_sim.0 == w as i32 {
+                plat::PointerLock::Off
+            } else {
+                return self.pointer_lock_state();
+            };
+            if self.plock_sim != (w as i32, s) {
+                self.plock_sim = (w as i32, s);
+                self.repass = true;
+            }
+            return s;
+        }
+        let pw = self.uiw_pw(w);
+        if pw < 0 {
+            return plat::PointerLock::Refused;
+        }
+        plat::win_pointer_lock(pw, on)
+    }
+
+    /// (G7a) the state of this window's pointer lock (Off when another window holds it)
+    pub fn pointer_lock_state(&self) -> plat::PointerLock {
+        let w = self.uiw_cur as i32;
+        if self.headless {
+            return if self.plock_sim.0 == w { self.plock_sim.1 } else { plat::PointerLock::Off };
+        }
+        let pw = self.uiw_pw(self.uiw_cur);
+        if pw < 0 { plat::PointerLock::Off } else { plat::win_pointer_lock_state(pw) }
+    }
+
+    /// (G7a) the raw motion of the locked pointer since the last pass of this window: (dx, dy),
+    /// right and down positive, in the device's counts where the platform gives them (Windows,
+    /// Wayland, X11, the browser with unadjustedMovement), else in its accelerated pixels (macOS,
+    /// the browser without it); (0, 0) while the pointer is not locked.  A game turns its camera by
+    /// it times a sensitivity
+    pub fn pointer_motion(&self) -> (f64, f64) {
+        (self.wp.ctx.motion[0], self.wp.ctx.motion[1])
+    }
+
+    /// (G7a) the key at USB HID usage `code` (plat::KC_*: where it sits, whatever the layout) is
+    /// held; KeyEvent::code of its down and up
+    pub fn key_code_down(&self, code: u32) -> bool {
+        code != 0 && code < 256 && self.codedown[code as usize] != 0
     }
 
     /// ui_focus(id): give the keyboard focus to a widget (focus ring shown).  The id is
@@ -782,12 +845,17 @@ impl Ui {
                 if self.dnd_input(ev) {
                     return 1; // Esc ended a drag
                 }
+                if self.headless && self.plock_sim_key(ev.data & 0xFF, true) {
+                    return 1; // (G7a) Esc let the played pointer lock go
+                }
                 let vk = ev.data & 0xFFFF;
                 self.keydown[(vk & 255) as usize] = 1;
                 let n = self.wp.ctx.keyq.len();
                 self.key_push((vk | self.mods << 16) & 0x7FFF_FFFF);
                 // (E2) as it went down
                 let kq = if self.wp.ctx.keyq.len() > n { n as i32 } else { -1 };
+                let code = plat::key_code(ev.x as u32);
+                self.codedown[(code & 255) as usize] = (code != 0) as u8;
                 let ev = KeyEvent {
                     vk,
                     mods: self.mods,
@@ -797,13 +865,19 @@ impl Ui {
                     location: plat::key_location(ev.y),
                     ch: plat::key_char(ev.y),
                     dead: plat::key_dead(ev.y),
+                    code,
                 };
                 self.raw_push(ev, kq);
                 1
             }
             plat::E_KEY_UP => {
                 let k = ev.data & 255;
+                if self.headless && self.plock_sim_key(k, false) {
+                    return 0;
+                }
                 self.keydown[k as usize] = 0;
+                let code = plat::key_code(ev.x as u32);
+                self.codedown[(code & 255) as usize] = 0;
                 // (E2) as it went up: a pass of its own for a canvas that takes the keyboard
                 let keys = self.focus_has_keys();
                 let ev = KeyEvent {
@@ -815,6 +889,7 @@ impl Ui {
                     location: plat::key_location(ev.y),
                     ch: plat::key_char(ev.y),
                     dead: plat::key_dead(ev.y),
+                    code,
                 };
                 self.raw_push(ev, -1);
                 // (popup agent) Alt release: a pass for the menu bar's Alt tap
@@ -844,6 +919,26 @@ impl Ui {
             plat::E_FOCUS_OUT => {
                 self.wp.ctx.mbtn = 0;
                 self.keydown = [0; 256];
+                self.codedown = [0; 256];
+                1
+            }
+            plat::E_RAW_MOTION => {
+                // (G7a) the locked pointer's motion for the next pass (a script's: plock_sim_motion)
+                let (dx, dy) = if self.headless {
+                    let m = core::mem::take(&mut self.plock_sim_motion);
+                    (m[0], m[1])
+                } else {
+                    plat::win_raw_motion_take(self.uiw_pw(self.uiw_cur))
+                };
+                let m = &mut self.wp.ctx.motion;
+                m[0] += dx;
+                m[1] += dy;
+                1
+            }
+            plat::E_POINTER_LOCK => {
+                if self.wp.ctx.motion != [0.0; 2] && self.pointer_lock_state() != plat::PointerLock::Locked {
+                    self.wp.ctx.motion = [0.0; 2];
+                }
                 1
             }
             _ => 0,
@@ -940,9 +1035,38 @@ impl Ui {
         (t / 120).clamp(i32::MIN as i64, i32::MAX as i64) as i32
     }
 
+    /// (G7a, headless) a key of a script while the pointer lock is played: Esc going down lets it
+    /// go (true: the key is the lock's), its up is the lock's too
+    fn plock_sim_key(&mut self, vk: u32, down: bool) -> bool {
+        if vk != VK_ESCAPE {
+            return false;
+        }
+        if !down {
+            return core::mem::take(&mut self.plock_sim_esc);
+        }
+        if self.plock_sim.0 >= 0 && matches!(self.plock_sim.1, plat::PointerLock::Locked | plat::PointerLock::Pending) {
+            self.plock_sim.1 = plat::PointerLock::Off;
+            self.plock_sim_esc = true;
+            return true;
+        }
+        false
+    }
+
+    /// (G7a, headless) a script's raw motion of the played lock of window w -> true: it holds the
+    /// lock (an E_RAW_MOTION is to follow)
+    pub(crate) fn plock_sim_motion(&mut self, w: u32, dx: f64, dy: f64) -> bool {
+        if self.plock_sim != (w as i32, plat::PointerLock::Locked) {
+            return false;
+        }
+        self.plock_sim_motion[0] += dx;
+        self.plock_sim_motion[1] += dy;
+        true
+    }
+
     /// ui_input_clear_edges: after the first pass of a batch the edges are consumed
     pub(crate) fn input_clear_edges(&mut self) {
         let c = &mut self.wp.ctx;
+        c.motion = [0.0; 2];
         c.pressed = 0;
         c.released = 0;
         c.wheel_x = 0;

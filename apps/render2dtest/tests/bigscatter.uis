@@ -1,0 +1,6 @@
+#!args --test bigscatter
+#!serial about a gigabyte of memory and a few seconds of the GPU, which beside the other scripts only slows them
+# G6e3: 4.5 million hairlines in 300 layers going up with the first frame by the scatter shader: on devices whose dispatch has
+# 65 535 workgroups (Metal, WebGPU, many phones) in more than one piece, each written; the GPU against the CPU path at the first
+# and the last layer; where storage bindings end at 128 MiB (Dozen under WSL) the 300 layers with as many lines as the pool holds (2 097 152 records),
+# still more than one dispatch's piece

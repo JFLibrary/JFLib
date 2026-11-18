@@ -223,42 +223,48 @@ fn counts(sub: &str) -> Option<(u32, u32)> {
     (r == 0).then_some((subs, vals))
 }
 
-/// everything below HKCU\sub as record lines: bakkey (every key), bak (every value)
+/// everything below HKCU\sub as record lines: bakkey (every key), bak (every value), in the
+/// order of a walk that finishes a key's subkeys before its next sibling.  A list of keys to
+/// visit instead of recursion (keys nest up to 512 deep, and each level held a 32 KB name
+/// buffer on the stack); one value-name buffer on the heap for all
 fn dump(sub: &str, out: &mut Vec<Line>) {
-    out.push(alloc::vec![String::from("bakkey"), String::from(sub)]);
-    let Some(k) = Key::open(HKCU, sub, KEY_READ) else { return };
-    let mut i = 0u32;
-    loop {
-        let mut name = [0u16; 16384];
-        let mut n = name.len() as u32;
-        let mut typ = 0u32;
-        let mut len = 0u32;
-        // SAFETY: the key is open; first the name and the data's size.
-        let r = unsafe { RegEnumValueW(k.0, i, name.as_mut_ptr(), &mut n, 0, &mut typ, core::ptr::null_mut(), &mut len) };
-        if r != 0 {
-            break;
+    let mut name = alloc::vec![0u16; 16384];
+    let mut todo = alloc::vec![String::from(sub)];
+    while let Some(sub) = todo.pop() {
+        out.push(alloc::vec![String::from("bakkey"), sub.clone()]);
+        let Some(k) = Key::open(HKCU, &sub, KEY_READ) else { continue };
+        let mut i = 0u32;
+        loop {
+            let mut n = name.len() as u32;
+            let mut typ = 0u32;
+            let mut len = 0u32;
+            // SAFETY: the key is open; name holds n characters; first the name and the data's
+            // size.
+            let r = unsafe { RegEnumValueW(k.0, i, name.as_mut_ptr(), &mut n, 0, &mut typ, core::ptr::null_mut(), &mut len) };
+            if r != 0 {
+                break;
+            }
+            let vname = from_wide(&name[..n as usize]);
+            if let Some((t, d)) = get_raw(HKCU, &sub, &vname) {
+                out.push(alloc::vec![String::from("bak"), sub.clone(), vname, format!("{t}"), hex(&d)]);
+            }
+            i += 1;
         }
-        let vname = from_wide(&name[..n as usize]);
-        if let Some((t, d)) = get_raw(HKCU, sub, &vname) {
-            out.push(alloc::vec![String::from("bak"), String::from(sub), vname, format!("{t}"), hex(&d)]);
+        let mut j = 0u32;
+        let mut children = Vec::new();
+        loop {
+            let mut kn = [0u16; 256];
+            let mut n = kn.len() as u32;
+            // SAFETY: the key is open; kn holds 255 characters + NUL (the limit of key names).
+            if unsafe { RegEnumKeyExW(k.0, j, kn.as_mut_ptr(), &mut n, 0, 0, 0, 0) } != 0 {
+                break;
+            }
+            children.push(format!("{sub}\\{}", from_wide(&kn[..n as usize])));
+            j += 1;
         }
-        i += 1;
-    }
-    let mut j = 0u32;
-    let mut children = Vec::new();
-    loop {
-        let mut name = [0u16; 256];
-        let mut n = name.len() as u32;
-        // SAFETY: the key is open; name holds 255 characters + NUL (the limit of key names).
-        if unsafe { RegEnumKeyExW(k.0, j, name.as_mut_ptr(), &mut n, 0, 0, 0, 0) } != 0 {
-            break;
-        }
-        children.push(format!("{sub}\\{}", from_wide(&name[..n as usize])));
-        j += 1;
-    }
-    drop(k);
-    for c in children {
-        dump(&c, out);
+        drop(k);
+        // the first child on top: visited next, with everything below it
+        todo.extend(children.into_iter().rev());
     }
 }
 

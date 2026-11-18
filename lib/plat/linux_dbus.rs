@@ -403,28 +403,55 @@ fn encode(m: &Msg, serial: u32) -> Vec<u8> {
     out
 }
 
-// one message from the start of b -> (message, its length); None: incomplete or malformed
-// (Err: malformed, the connection must close)
-fn decode(b: &[u8]) -> Result<Option<(Msg, usize)>, ()> {
+// a message decode does not take
+#[derive(Debug, PartialEq)]
+enum Bad {
+    /// not D-Bus framing: the connection must close
+    Fatal,
+    /// framed but too large or not readable here (big-endian, a type or depth this reader does
+    /// not take): this many bytes from its start are skipped.  The bus checks every message
+    /// before it routes one, so any other client could otherwise end the connection for good
+    /// with a message of 2 MiB sent to us
+    Skip(usize),
+}
+
+// one message from the start of b -> (message, its length); None: incomplete
+fn decode(b: &[u8]) -> Result<Option<(Msg, usize)>, Bad> {
     if b.len() < 16 {
         return Ok(None);
     }
-    if b[0] != b'l' || b[3] != 1 {
-        return Err(());
+    let le = match b[0] {
+        b'l' => true,
+        b'B' => false,
+        _ => return Err(Bad::Fatal),
+    };
+    if b[3] != 1 {
+        return Err(Bad::Fatal);
     }
-    let body_len = u32::from_le_bytes(b[4..8].try_into().map_err(|_| ())?) as usize;
-    let fields_len = u32::from_le_bytes(b[12..16].try_into().map_err(|_| ())?) as usize;
+    let word = |at: usize| {
+        let w = [b[at], b[at + 1], b[at + 2], b[at + 3]];
+        (if le { u32::from_le_bytes(w) } else { u32::from_be_bytes(w) }) as usize
+    };
+    let (body_len, fields_len) = (word(4), word(12));
     let head = 16 + fields_len;
     let total = head + (8 - head % 8) % 8 + body_len;
-    if body_len > MSG_MAX || fields_len > MSG_MAX {
-        return Err(());
+    if !le || body_len > MSG_MAX || fields_len > MSG_MAX {
+        return Err(Bad::Skip(total));
     }
     if b.len() < total {
         return Ok(None);
     }
-    let mut m = Msg { typ: b[1], flags: b[2], serial: u32::from_le_bytes(b[8..12].try_into().map_err(|_| ())?), ..Msg::default() };
+    match decode_whole(b, head, total) {
+        Some(m) => Ok(Some((m, total))),
+        None => Err(Bad::Skip(total)),
+    }
+}
+
+// the message b[..total] (fields up to head) -> None: not readable here
+fn decode_whole(b: &[u8], head: usize, total: usize) -> Option<Msg> {
+    let mut m = Msg { typ: b[1], flags: b[2], serial: u32::from_le_bytes(b[8..12].try_into().ok()?), ..Msg::default() };
     let mut r = Rd { b: &b[..head], p: 12, depth: 0 };
-    let Some(Value::A(_, fields)) = r.value(b"a(yv)") else { return Err(()) };
+    let Some(Value::A(_, fields)) = r.value(b"a(yv)") else { return None };
     let mut sig = String::new();
     for f in fields {
         let Value::R(pair) = f else { continue };
@@ -447,11 +474,11 @@ fn decode(b: &[u8]) -> Result<Option<(Msg, usize)>, ()> {
     let sb = sig.as_bytes();
     let mut i = 0;
     while i < sb.len() {
-        let e = type_end(sb, i).ok_or(())?;
-        m.body.push(r.value(&sb[i..e]).ok_or(())?);
+        let e = type_end(sb, i)?;
+        m.body.push(r.value(&sb[i..e])?);
         i = e;
     }
-    Ok(Some((m, total)))
+    Some(m)
 }
 
 // ---------------------------------------------------------------- the connection
@@ -463,6 +490,8 @@ pub(crate) struct Conn {
     rbuf: Vec<u8>,
     pub(crate) unique: String,
     pub(crate) broken: bool,
+    /// bytes of a skipped message still to come (Bad::Skip)
+    skip: usize,
     /// the bus agreed to descriptor passing (Conn::session_fds)
     pub(crate) fds_ok: bool,
 }
@@ -554,7 +583,7 @@ impl Conn {
         if fd < 0 {
             return None;
         }
-        let mut c = Conn { fd: fd as i32, serial: 0, rbuf: Vec::new(), unique: String::new(), broken: false, fds_ok: false };
+        let mut c = Conn { fd: fd as i32, serial: 0, rbuf: Vec::new(), unique: String::new(), broken: false, skip: 0, fds_ok: false };
         // SAFETY: the address record lives during the call.
         if unsafe { syscall6(SYS_CONNECT, fd as usize, addr.as_ptr() as usize, len, 0, 0, 0) } < 0 {
             return None;
@@ -651,9 +680,16 @@ impl Conn {
         }
         self.serial = self.serial.wrapping_add(1).max(1);
         let s = self.serial;
-        let b = encode(m, s);
+        let mut b = encode(m, s);
+        // the encoded message is overwritten once written (a secret's value passes through here)
+        let r = self.send_encoded(m, s, &b);
+        crypto::zeroize(&mut b);
+        r
+    }
+
+    fn send_encoded(&mut self, m: &Msg, s: u32, b: &[u8]) -> Option<u32> {
         if m.fds.is_empty() {
-            return self.write_all(&b).then_some(s);
+            return self.write_all(b).then_some(s);
         }
         // the descriptors ride with the first bytes (SCM_RIGHTS), the rest follows plainly
         let iov = [b.as_ptr() as usize, b.len()];
@@ -684,20 +720,40 @@ impl Conn {
     /// the next message, waiting up to ms (-1: as long as it takes)
     pub(crate) fn read(&mut self, ms: i32) -> Option<Msg> {
         loop {
-            match decode(&self.rbuf) {
-                Ok(Some((m, n))) => {
-                    self.rbuf.drain(..n);
-                    return Some(m);
-                }
-                Ok(None) => {}
-                Err(()) => {
-                    self.broken = true;
-                    return None;
+            if self.skip > 0 {
+                let n = self.skip.min(self.rbuf.len());
+                self.consume(n);
+                self.skip -= n;
+            }
+            if self.skip == 0 {
+                match decode(&self.rbuf) {
+                    Ok(Some((m, n))) => {
+                        self.consume(n);
+                        return Some(m);
+                    }
+                    Ok(None) => {}
+                    Err(Bad::Skip(n)) => {
+                        self.skip = n;
+                        continue;
+                    }
+                    Err(Bad::Fatal) => {
+                        self.broken = true;
+                        return None;
+                    }
                 }
             }
             if self.broken || !self.fill(ms) {
                 return None;
             }
+        }
+    }
+
+    // the first n bytes read are done with; the bytes moved down leave a stale copy past the end:
+    // overwritten (a secret's value passes through here)
+    fn consume(&mut self, n: usize) {
+        self.rbuf.drain(..n);
+        for x in self.rbuf.spare_capacity_mut().iter_mut().take(n) {
+            x.write(0);
         }
     }
 

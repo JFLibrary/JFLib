@@ -1,0 +1,4 @@
+#!args --test repeat
+# the same frame twelve times (G6e3): a layer with an arc (fs_full) and one with fills (fs_fill), the same bytes each time,
+# by the renderer as the adapter decides and with a render pass of its own for each such run; both alike (on Intel's Gen9
+# under Mesa the two fragment shaders spilled to the same scratch memory with their own strides: 2 x 2 pixels at random)

@@ -201,6 +201,9 @@ function dispatch(m) {
     case "gpu-test": {const n=wasm.jfgui_gpu_test(m.op>>>0);postMessage({type:"gpu-test",id:m.id,text:decode.decode(bytes(wasm.jfgui_response(),n).slice())});break;}
     // (L7) the page's full screen of the canvas changed (or was refused): lib/plat/web_windows.rs
     case "fullscreen": if(wasm.jfgui_fullscreen) {wasm.jfgui_fullscreen(+!!m.on);input();} break;
+    // (G7a) the canvas's pointer lock (1 held, 0 let go, 2 refused) and the locked pointer's motion: lib/plat/web_windows.rs
+    case "pointerlock": if(wasm.jfgui_pointer_lock) {wasm.jfgui_pointer_lock(m.state>>>0);input();} break;
+    case "motion": if(wasm.jfgui_motion) {wasm.jfgui_motion(Number(m.dx)||0,Number(m.dy)||0);input();} break;
     case "closeSession": {
       if(typeof m.session!=="string" || m.session.length>128) throw new Error("Ungültige Agentensitzung.");
       const data=encode.encode(JSON.stringify({session:m.session,close:true}));
@@ -281,7 +284,12 @@ self.onmessage = async ({data:m}) => {
       wasm.jfgui_capabilities(m.capabilities);
       // the app's secrets (loader.js, secrets.js) before it starts; the inbox is wiped by Rust
       if (m.secrets && wasm.jfgui_secrets) { inbox(m.secrets); wasm.jfgui_secrets(m.secrets.length); m.secrets.fill(0); }
-      for (const file of m.files) importFile(file.path, file.bytes, false, true);
+      // the stored files: one that does not fit (too big, no memory) is left out and named in the
+      // log -- it failed the whole start, so the app never started again on this origin
+      for (const file of m.files) {
+        try { importFile(file.path, file.bytes, false, true); }
+        catch (error) { postMessage({type:"log", stream:2, text:`Gespeicherte Datei ausgelassen: ${file.path}: ${error?.message || error}\n`}); }
+      }
       const now = new Date();
       wasm.jfgui_date(now.getFullYear(), now.getMonth()+1, now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds(), now.getDay());
       // the page's list: a test's emulated locale does not reach a worker

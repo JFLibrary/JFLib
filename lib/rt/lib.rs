@@ -4,7 +4,8 @@
 //   rt::os::{pages_alloc, pages_free, write_stdout, write_stderr, exit, yield_now}   (and on
 //   Linux the raw syscall helpers plat builds on); write_stderr_crash: stderr for crash paths,
 //   which gives up a stuck non-blocking stderr instead of waiting for it (Linux)
-//   rt::kernel the Linux kernel ABI per architecture: SYS_*, O_*, Stat, clone_args (also as rt::os::*)
+//   rt::kernel the Linux kernel ABI per architecture: SYS_*, O_*, Stat, clone_args (also as rt::os::*;
+//            Android has the table too, without rt::os's helpers: docs/ANDROID.md, decision 2)
 //   rt::fx   cvtt / cvt / sqrt / minss / maxss / floor_i / ceil_i / div255
 //   rt::x87  the extended-precision steps of f64 <-> decimal text (ini.s), fpatan
 //   rt::sync SpinLock
@@ -205,7 +206,7 @@ pub mod cpu; // (Intel Macs: CPUID and x87 as on Windows and Linux, docs/INTEL_M
 pub mod crash;
 #[cfg_attr(target_arch = "aarch64", path = "aarch64/fx.rs")] #[cfg_attr(all(not(target_arch = "aarch64"), any(target_arch = "wasm32", target_os = "android")), path = "portable/fx.rs")]
 pub mod fx;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod kernel;
 // Android and Apple: the system's malloc and memory functions (android.rs, apple.rs)
 #[cfg(not(any(target_os = "android", target_vendor = "apple")))]
@@ -254,6 +255,17 @@ pub use hosted::{abort_on_unwind, panic_take};
 #[inline(always)]
 pub fn abort_on_unwind<R>(f: impl FnOnce() -> R) -> R {
     f()
+}
+
+/// (tests, docs/ARM64.md ARM7) the way compiler-builtins' outline atomics went: Some(true) LSE, Some(false)
+/// the LL/SC loops (a CPU without LSE, or jfgui_ARM_LLSC=1); None where the program has none of them (x86-64;
+/// Windows and Apple on ARM64 inline their atomics; Android, glibc and std leave it to the C library)
+#[doc(hidden)]
+pub fn outline_lse() -> Option<bool> {
+    #[cfg(all(target_os = "linux", target_arch = "aarch64", not(jfgui_glibc), not(feature = "std")))]
+    return Some(os::lse_atomics_flag());
+    #[allow(unreachable_code)]
+    None
 }
 
 pub(crate) fn panic_report(info: &dyn core::fmt::Display) -> ! {

@@ -41,9 +41,11 @@
 // later access) and is put before the caller's command buffers in the next vkQueueSubmit.
 // The staging ring: 256 KiB chunks of Upload memory, filled front to back across submissions;
 // a full chunk is reused once the GPU has passed the last submission that reads from it (two
-// are kept free, more go back).  An upload above half a chunk gets a buffer of its own, reused
-// by the next one that fits and released when none came for a second (Device::poll): a frame of
-// small rectangles costs what they hold, not a full frame or a new allocation.
+// are kept free, more go back).  An upload above half a chunk gets a buffer of its own (its size
+// rounded up to 64 KiB), reused by a later one that fits it without wasting half of it; once the GPU
+// is done with them only the largest free one stays, and only until a second after the last such
+// upload (Device::poll): a frame of small rectangles costs what they hold, not a full frame or a new
+// allocation, and a frame of many canvas tiles does not keep twice their bytes around afterwards.
 // Device lost: VK_ERROR_DEVICE_LOST from any call sets the device's lost flag; every later
 // call returns GpuError::DeviceLost (objects are still destroyed normally).
 // (G5d) The compute queue comes only when asked for (DeviceOptions; without it a device is what it was in 0.1.0: one
@@ -83,8 +85,10 @@ pub(crate) enum Garbage {
     Query(vk::Handle),
     #[cfg_attr(jfgui_glibc, allow(dead_code))] // (vk_swap.rs)
     Semaphore(vk::Handle),
+    /// a swapchain and its surface, kept until the swapchain is gone (Vulkan: a surface outlives
+    /// its swapchains; the Swapchain's own surface went first when it was dropped)
     #[cfg_attr(jfgui_glibc, allow(dead_code))]
-    Swapchain(vk::Handle),
+    Swapchain(vk::Handle, crate::vk_swap::Surface),
     #[cfg_attr(not(jfgui_glibc), allow(dead_code))] // (vk_dmabuf.rs: an image's dedicated allocation)
     Memory(vk::Handle),
 }
@@ -115,6 +119,7 @@ struct Chunk {
     buf: vk::Handle,
     a: Alloc,
     used: u64, // bytes used, front to back
+    big: bool, // one upload's own buffer (above half a chunk), not one of the ring
 }
 
 /// the pending staged uploads: the command buffer, the chunks full since the last submission
@@ -635,9 +640,11 @@ impl Shared {
         let mut st = self.st.lock();
         // (G5d) and the compute queue's latest submission
         let vc = self.lane_submitted();
-        // an open upload, or one another thread took to submit, may name a buffer or image:
-        // it waits until every upload up to the newest of them is submitted (State::pending)
-        if matches!(g, Garbage::Buffer(..) | Garbage::Image(..)) && !self.lost.load(Ordering::Relaxed) {
+        // an open upload, or one another thread took to submit, may name a buffer or image, or
+        // reset a query pool (a device without hostQueryReset: Timestamps::new records the reset
+        // there): it waits until every upload up to the newest of them is submitted
+        // (State::pending)
+        if matches!(g, Garbage::Buffer(..) | Garbage::Image(..) | Garbage::Query(..)) && !self.lost.load(Ordering::Relaxed) {
             if let Some(num) = st.upload.as_ref().map(|u| u.num).or_else(|| st.in_flight.iter().max().copied()) {
                 st.pending.push((num, vc, g));
                 return;
@@ -700,10 +707,11 @@ impl Shared {
                 Garbage::Pool(h) => (f.destroy_descriptor_pool)(d, h, n),
                 Garbage::Query(h) => (f.destroy_query_pool)(d, h, n),
                 Garbage::Semaphore(h) => (f.destroy_semaphore)(d, h, n),
-                Garbage::Swapchain(h) => {
+                Garbage::Swapchain(h, surface) => {
                     if let Some(ds) = f.destroy_swapchain_khr {
                         ds(d, h, n);
                     }
+                    drop(surface); // only now
                 }
                 Garbage::Memory(h) => (f.free_memory)(d, h, n),
             }
@@ -837,19 +845,23 @@ impl Shared {
     }
 
     /// the free chunks beyond what the ring keeps go back: ordinary ones above CHUNKS_FREE,
-    /// large ones a second after the last large upload (all but the largest at once; the largest
-    /// too when the last large upload was far smaller: one big image's buffer does not stay
-    /// around for the frames after it)
+    /// large ones a second after the last large upload (all but one of the largest at once -- a
+    /// frame of many tiles has as many buffers of one size; that one too when the last large
+    /// upload was far smaller: one big image's buffer does not stay around for the frames after it)
     fn ring_trim(&self, st: &mut State) {
         let now = plat::time_us();
         let keep_big = now.saturating_sub(st.ring.big_at) < BIG_KEEP_US;
-        let largest = st.ring.free.iter().map(|c| c.a.size).max().unwrap_or(0);
+        let largest = st.ring.free.iter().filter(|c| c.big).map(|c| c.a.size).max().unwrap_or(0);
+        let mut kept_big = false;
         let mut small = 0;
         let mut i = 0;
         while i < st.ring.free.len() {
-            let size = st.ring.free[i].a.size;
-            let keep = if size >= CHUNK * 2 {
-                keep_big && size == largest && size <= st.ring.big_size.saturating_mul(BIG_KEEP_RATIO).max(CHUNK * 2)
+            let c = &st.ring.free[i];
+            let size = c.a.size;
+            let keep = if c.big {
+                let k = !kept_big && keep_big && size == largest && size <= st.ring.big_size.saturating_mul(BIG_KEEP_RATIO).max(CHUNK * 2);
+                kept_big |= k;
+                k
             } else {
                 small += 1;
                 small <= CHUNKS_FREE
@@ -863,16 +875,16 @@ impl Shared {
         }
     }
 
-    /// a chunk of at least size bytes, reused or new (its `used` is 0); the ring's own chunks
-    /// (size = CHUNK) are never large ones, those would stay around
-    fn ring_chunk(&self, st: &mut State, size: u64) -> Result<Chunk> {
-        let top = if size == CHUNK { CHUNK * 2 } else { u64::MAX };
-        let best = st.ring.free.iter().enumerate().filter(|(_, c)| c.a.size >= size && c.a.size < top).min_by_key(|(_, c)| c.a.size).map(|(i, _)| i);
+    /// a chunk of at least size bytes, reused or new (its `used` is 0): one of the ring (big =
+    /// false, size = CHUNK) or an upload's own buffer (big; a free one at most twice the size)
+    fn ring_chunk(&self, st: &mut State, size: u64, big: bool) -> Result<Chunk> {
+        let top = size.saturating_mul(2);
+        let best = st.ring.free.iter().enumerate().filter(|(_, c)| c.big == big && c.a.size >= size && c.a.size <= top).min_by_key(|(_, c)| c.a.size).map(|(i, _)| i);
         if let Some(i) = best {
             return Ok(st.ring.free.swap_remove(i));
         }
         let (buf, a) = self.raw_buffer(st, size, vk::BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryKind::Upload)?;
-        Ok(Chunk { buf, a, used: 0 })
+        Ok(Chunk { buf, a, used: 0, big })
     }
 
     /// the upload command buffer (begun when there is none): it runs first in the next submit
@@ -912,7 +924,7 @@ impl Shared {
             st.ring.big_at = plat::time_us();
             st.ring.big_size = n;
             let size = (n + 0xFFFF) & !0xFFFF;
-            let mut c = self.ring_chunk(st, size.max(CHUNK * 2))?;
+            let mut c = self.ring_chunk(st, size, true)?;
             c.used = n;
             let (buf, ptr) = (c.buf, c.a.ptr);
             st.upload.as_mut().unwrap_or_else(|| unreachable!()).retired.push(c);
@@ -928,7 +940,7 @@ impl Shared {
                     st.ring.busy.push((v, c));
                 }
             }
-            let c = self.ring_chunk(st, CHUNK)?;
+            let c = self.ring_chunk(st, CHUNK, false)?;
             st.ring.cur = Some(c);
             st.ring.cur_open = false;
         }

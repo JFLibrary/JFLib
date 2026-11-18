@@ -747,6 +747,25 @@ fn t_stand_in(t: &mut T, s: &Server, dir: &str) {
     t.check(!update::healthy(&c), "apply: a second healthy() does nothing");
     t.eq(update::startup(&c), Startup::Normal, "apply: later starts are normal");
 
+    // the package's own version is not its manifest's (2.0.0; the program says 1.9.0): the trial
+    // could never end and 2.0.0 would be offered again and again; it ends at once, 2.0.0 bad
+    let inst_m = format!("{}/inst-mismatch", dir);
+    let prog_m = format!("{}/app.bin", inst_m);
+    plat::mkdir(&inst_m);
+    plat::write_file(&prog_m, b"old program 1.0.0");
+    let mut m = config(s, dir, "good", "1.0.0", "s-mismatch");
+    m.exe = prog_m.clone();
+    let u = Updater::new(m.clone());
+    t.check(matches!(u.check(), Ok(Check::Available(o)) if o.version == "2.0.0") && u.download().is_ok(), "mismatch: 2.0.0 checked and downloaded");
+    t.eq(update::startup(&m), Startup::Applied(String::from("2.0.0")), "mismatch: 2.0.0 put in place");
+    m.version = String::from("1.9.0");
+    t.eq(update::startup(&m), Startup::Normal, "mismatch: a program that calls itself 1.9.0 ends the trial");
+    let st = update::state(&m);
+    t.check(st.stage == Stage::None && st.bad == ["2.0.0"], "mismatch: no trial any more, 2.0.0 recorded as bad");
+    t.eq(Updater::new(m.clone()).check(), Ok(Check::UpToDate), "mismatch: 2.0.0 is not offered again");
+    m.version = String::from("1.0.0");
+    t.eq(update::startup(&m), Startup::Normal, "mismatch: ... nor put in place again");
+
     // 3.0.0 fails its start: rolled back at the next one, never offered again
     c.url = format!("{}/bad/update.json", s.base);
     let u = Updater::new(c.clone());
@@ -778,6 +797,14 @@ fn t_stand_in(t: &mut T, s: &Server, dir: &str) {
     t.check(plat::read_file(&module).as_deref() == Some(&b"Modul 2.0.0\n"[..]), "bundle: the new module in its folder");
     c.version = String::from("2.0.0");
     t.eq(update::startup(&c), Startup::Trial(String::from("2.0.0")), "bundle: trial");
+    // a backup copy that changed since it was made (its SHA-256 in backup/list): nothing is put
+    // back, the new version stays whole
+    let copy = format!("{}/backup/files/app.bin", c.dir);
+    let kept = plat::read_file(&copy).unwrap_or_default();
+    plat::write_file(&copy, b"changed backup");
+    t.check(matches!(update::startup(&c), Startup::Failed(_)), "bundle: a changed backup copy is not rolled back");
+    t.check(plat::read_file(&prog).is_some_and(|b| b.starts_with(b"Programm 2.0.0\n")) && plat::file_exists(&module) == 1, "bundle: ... the new program and module stay");
+    plat::write_file(&copy, &kept);
     t.eq(update::startup(&c), Startup::RollingBack(String::from("2.0.0")), "bundle: rolled back without healthy()");
     t.check(plat::read_file(&prog).as_deref() == Some(&b"old bundle program"[..]), "bundle: the old program is back");
     t.check(plat::file_exists(&module) == 0, "bundle: the new module is gone");

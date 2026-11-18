@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- A character or note mark wider than its line stands alone on a line, a line taller than the page alone on a page, both past the edge: content that can never fit made `paginate` fail with `Error::Limit` for the whole document (the note-aware paths keep their rules).
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

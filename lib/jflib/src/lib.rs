@@ -68,6 +68,8 @@ pub use diagram_core;
 pub use diagram_io;
 pub use pdf;
 pub use diagram_view;
+pub use dxf;
+pub use physics;
 #[doc(hidden)]
 pub use style_assets;
 

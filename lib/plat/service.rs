@@ -11,6 +11,11 @@
 //       Windows: the service control manager (automatic start as LocalSystem, restart after a
 //       failure); Linux: a systemd unit in /etc/systemd/system and systemctl.  Both need
 //       administrator / root rights; the errors say so.
+//       A failure is a crash or a run() that returned another code than 0 without a stop having
+//       been asked for: the service manager then starts the program again (Windows: 5 s after
+//       the first failure, 15 s after the second, 60 s after every further one, counted anew
+//       after a day without one; systemd: after 5 s; launchd: at the earliest 5 s after the
+//       last start).
 //   program_path(&ServiceSpec) -> the program install registers: Windows: a program outside
 //       Program Files is copied to %ProgramFiles%\<name>\ first (only administrators may change
 //       it there; uninstall leaves the copy, a new install replaces it); Linux, macOS: the program
@@ -84,7 +89,9 @@ pub fn unit_text(s: &ServiceSpec) -> String {
     }
     format!(
         "[Unit]\nDescription={}\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=simple\nExecStart={}\nRestart=on-failure\nRestartSec=5\nUMask=0077\n\n[Install]\nWantedBy=multi-user.target\n",
-        s.description.replace('\n', " "),
+        // every control character a space: systemd ends a line at \r as well as at \n, so a
+        // \r in the text let it add directives of its own
+        s.description.chars().map(|c| if c.is_control() { ' ' } else { c }).collect::<String>(),
         exec
     )
 }
@@ -139,6 +146,11 @@ mod win {
         command: *const u16,
         count: u32,
         actions: *const Action,
+    }
+
+    #[repr(C)]
+    struct FailureActionsFlag {
+        on_non_crash_failures: i32,
     }
 
     #[link(name = "advapi32", kind = "raw-dylib")]
@@ -228,7 +240,10 @@ mod win {
             None => EXIT.store(1, Ordering::Release), // run() never started: not a success
         }
         let code = EXIT.load(Ordering::Acquire);
-        report(STOPPED, if code == 0 { 0 } else { 1066 }, 0);
+        // a stop with an error code is a failure: the service control manager starts the program
+        // again (install's failure actions flag).  A stop that was asked for is none, whatever
+        // run() returned on its way out: the service stays stopped, as with systemd and launchd.
+        report(STOPPED, if code == 0 || stop_requested() { 0 } else { 1066 }, 0);
     }
 
     pub fn run_service(name: &str, run: fn() -> i32) -> i32 {
@@ -400,10 +415,15 @@ mod win {
         let d = Description { text: text.as_ptr() };
         let actions = [Action { kind: 1, delay: 5000 }, Action { kind: 1, delay: 15_000 }, Action { kind: 1, delay: 60_000 }];
         let fa = FailureActions { reset_period: 86_400, reboot_msg: core::ptr::null(), command: core::ptr::null(), count: 3, actions: actions.as_ptr() };
+        // the failure actions also after a stop with an error code (run() returned another code than
+        // 0, service_main reports it): without this flag they only follow a process that ends
+        // without reporting STOPPED, and such a service would stay stopped
+        let flag = FailureActionsFlag { on_non_crash_failures: 1 };
         // SAFETY: records that live through the calls.
         unsafe {
             ChangeServiceConfig2W(h.0, 1, &d as *const Description as *const c_void);
             ChangeServiceConfig2W(h.0, 2, &fa as *const FailureActions as *const c_void);
+            ChangeServiceConfig2W(h.0, 4, &flag as *const FailureActionsFlag as *const c_void);
         }
         Ok(())
     }

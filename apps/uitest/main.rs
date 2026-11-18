@@ -101,10 +101,23 @@ fn history(t: &mut T) {
     g.undo(&mut list);
     t.eq("undo reverts the whole group", list.len(), 0);
     g.redo(&mut list);
-    t.eq("redo applies it again in order", list, alloc::vec![1, 2, 3]);
+    t.eq("redo applies it again in order", list.clone(), alloc::vec![1, 2, 3]);
     g.group_begin("leer");
     g.group_end();
     t.eq("an empty group records nothing", g.len(), 1);
+    // undo / redo while a group is open: its edits so far are the newest step
+    g.group_begin("offen");
+    g.apply(&mut list, Box::new(Push(4)));
+    g.apply(&mut list, Box::new(Push(5)));
+    t.check("an open group can be undone", g.can_undo() && !g.can_redo() && g.undo_label() == Some("offen"));
+    t.check("undo closes the open group first", g.undo(&mut list) && list == alloc::vec![1, 2, 3] && g.redo_label() == Some("offen"));
+    g.group_end(); // closed already: nothing
+    t.check("redo applies the open group's edits", g.redo(&mut list) && list == alloc::vec![1, 2, 3, 4, 5] && g.len() == 2);
+    g.undo(&mut list);
+    g.group_begin("neu");
+    g.apply(&mut list, Box::new(Push(6)));
+    t.check("redo with edits in an open group: nothing to redo", !g.can_redo() && !g.redo(&mut list) && list == alloc::vec![1, 2, 3, 6]);
+    t.check("the older steps undo in order", g.undo(&mut list) && list == alloc::vec![1, 2, 3] && g.undo(&mut list) && list.is_empty());
     // the limit
     let mut n = 0i32;
     let mut l: History<i32> = History::new(3);
@@ -571,6 +584,45 @@ fn segment(t: &mut T) {
     t.eq("many soft hyphens: the line", r, (8, true));
     t.check("many soft hyphens: a few measurements, not one per soft hyphen", calls < 20);
     t.eq("wrap_end ignores soft hyphens' hyphen", wrap_end(s, 0, s.len(), &mut fits(9)), 9);
+    // a paragraph of 100000 words: a line reads about its own length (a window that grows while
+    // its text fits), not the rest of the paragraph -- measuring that was quadratic over the lines
+    let para = "word ".repeat(100_000);
+    let (mut measured, mut lines, mut pos) = (0usize, 0usize, 0usize);
+    while pos < para.len() {
+        let mut m = |a: usize, b: usize, h: bool| {
+            measured += b - a;
+            b - a + h as usize <= 40
+        };
+        let (e, _) = wrap_end_hyph(&para, pos, para.len(), &mut m, None);
+        if e <= pos {
+            break;
+        }
+        lines += 1;
+        pos = e;
+    }
+    t.check(&alloc::format!("100000 words: 12500 lines of 8 words, {} KB measured", measured / 1024), lines == 12500 && pos == para.len() && measured < 32 * para.len());
+    let ab = "ab ".repeat(10_000);
+    t.eq("a line of 999 bytes (the window grows)", wrap_end(&ab, 0, ab.len(), &mut fits(1000)), 999);
+    t.eq("a line of 999 bytes from the middle", wrap_end(&ab, 3000, ab.len(), &mut fits(1000)), 3999);
+    t.eq("the rest fits after windows", wrap_end(&ab, 27_000, ab.len(), &mut fits(3000)), ab.len());
+    // a word of 100000 letters with a hook: not looked up whole for every line (that took the
+    // whole paragraph each time) nor hyphenated; its lines are cut at graphemes
+    let word = "x".repeat(100_000);
+    let mut longest = 0usize;
+    let mut hk = |w: &str, out: &mut Vec<usize>| {
+        longest = longest.max(w.len());
+        out.clear();
+    };
+    t.eq("a word of 100000 letters: graphemes", wrap_end_hyph(&word, 500, word.len(), &mut hfits(40), Some(&mut hk)), (540, false));
+    t.eq("... the hook never saw it", longest, 0);
+    t.eq("a start inside a character: from its start", (wrap_end("\u{E4} bc", 1, 5, &mut fits(10)), wrap_end_hyph("\u{E4} bc", 1, 5, &mut hfits(10), None)), (5, (5, false)));
+    // 60001 regional indicators: pairs, the run counted along (walking back over it for every
+    // pair was quadratic)
+    let flags = "\u{1F1E9}".repeat(60_001);
+    let t0 = plat::time_us();
+    let wf = word_bounds(&flags);
+    let ms = plat::time_us().wrapping_sub(t0) / 1000;
+    t.check(&alloc::format!("60001 regional indicators: pairs ({ms} ms)"), wf.len() == 30_002 && wf[1] == 8 && wf[30_000] == 240_000 && wf[30_001] == flags.len() && ms < 500);
     t.check("version", unicode_version().starts_with("15."));
 }
 

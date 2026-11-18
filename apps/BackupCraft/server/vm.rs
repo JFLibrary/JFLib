@@ -631,6 +631,9 @@ fn export(repo: Arc<Repo>, name: &str, node: Node) -> Export {
 struct Live {
     child: Mutex<Option<plat::process::Child>>,
     nbd: Mutex<Option<NbdServer>>,
+    /// the disk files a merge made, open while the VM lives: QEMU knows them by their
+    /// descriptors' paths (plat::fs::fd_path) and may open them by those again
+    merged: Mutex<Vec<plat::File>>,
     dir: String,
     qmp: String,
     console: String,
@@ -727,7 +730,7 @@ fn launch(ctx: &Arc<Ctx>, sid: &str, pv: &PointVm, memory_mb: u64, network: &str
         }
         plat::sleep_ms(100);
     }
-    let live = Arc::new(Live { child: Mutex::new(Some(child)), nbd: Mutex::new(Some(server)), dir, qmp, console, stopping: core::sync::atomic::AtomicBool::new(false) });
+    let live = Arc::new(Live { child: Mutex::new(Some(child)), nbd: Mutex::new(Some(server)), merged: Mutex::new(Vec::new()), dir, qmp, console, stopping: core::sync::atomic::AtomicBool::new(false) });
     LIVE.lock().insert(String::from(sid), live.clone());
     // keep the pipes empty, note the end of the VM
     let (c, id, l2) = (ctx.clone(), String::from(sid), live.clone());
@@ -908,15 +911,18 @@ pub fn instant_migrate(ctx: &Arc<Ctx>, c: &Call) -> Response {
     }
     let target = String::from(r.target.trim());
     let Some(host) = server_host(ctx) else { return util::internal("") };
-    if !bc_fs::absolute(&target, cfg!(windows)) || !bc_fs::inside_os(&crate::restore::allowed_roots(ctx, &host), &target, cfg!(windows)) {
+    let roots = crate::restore::allowed_roots(ctx, &host);
+    if !bc_fs::absolute(&target, cfg!(windows)) || !bc_fs::inside_os(&roots, &target, cfg!(windows)) {
         return field(code::FORBIDDEN, "Der Zielordner muss in einem Wiederherstellungsordner des Servers liegen", "target");
     }
+    // (the restore folder it lies in: the target is opened from there, as a restore's)
+    let root = bc_fs::root_of(&roots, &target).map(String::from);
     set_session(ctx, &id, |x| x.state = String::from("migrating"));
     let disks = point_of(ctx, &s.point_id).and_then(|p| point_vm(ctx, &p, &s.vm).ok()).map_or(0, |pv| pv.disks.len());
     let vm = s.vm.clone();
     let op = Ops::start(ctx, "instant.migrate", &format!("{}: zusammenführen", s.vm), &c.actor(), &id.clone(), "", Box::new(move |o| {
         let ctx = o.ctx().clone();
-        let res = migrate(o, &id, &vm, disks, &target);
+        let res = migrate(o, &id, &vm, disks, &target, root.as_deref());
         match &res {
             Ok(_) => set_session(&ctx, &id, |x| {
                 x.state = String::from("migrated");
@@ -934,19 +940,35 @@ pub fn instant_migrate(ctx: &Arc<Ctx>, c: &Call) -> Response {
     util::accepted(&op)
 }
 
-fn migrate(o: &OpCtl, sid: &str, vm: &str, disks: usize, target: &str) -> Result<String, String> {
+/// the disks of a running instant VM mirrored into `target` and the VM switched over to them.
+/// The folder is made and opened from the restore folder `root` without following a link
+/// (bc_fs::open_dir), each disk file made in it as a new file (never an existing name, never
+/// through a link) and handed to QEMU by its descriptor's path (plat::fs::fd_path): QEMU writes
+/// the very file made here, whatever the target's path leads to meanwhile
+fn migrate(o: &OpCtl, sid: &str, vm: &str, disks: usize, target: &str, root: Option<&str>) -> Result<String, String> {
     let live = LIVE.lock().get(sid).cloned().ok_or("Die VM läuft nicht mehr")?;
-    bc_fs::ensure_dir(target)?;
+    let dir = bc_fs::open_dir(root, target, true)?;
     let mut q = Qmp::connect(&live.qmp, 3000)?;
     let mut files = Vec::new();
     for k in 0..disks {
-        let file = plat::fs::join(target, &format!("{}-disk{}.qcow2", vm, k));
-        if plat::fs::lstat(&file).is_some() {
+        let name = format!("{}-disk{}.qcow2", vm, k);
+        let file = plat::fs::join(target, &name);
+        if dir.lstat(&name).is_some() {
             return Err(format!("{} gibt es schon", file));
         }
-        q.cmd("drive-mirror", j::obj([("device", Value::string(format!("disk{}", k))), ("job-id", Value::string(format!("mig{}", k))),
-                                      ("target", Value::string(file.as_str())), ("format", Value::string("qcow2")), ("sync", Value::string("full")),
-                                      ("mode", Value::string("absolute-paths"))]))?;
+        let f = dir.create_new(&name).ok_or_else(|| format!("{} kann nicht angelegt werden", file))?;
+        let Some(path) = plat::fs::fd_path(&f) else {
+            dir.remove(&name);
+            return Err(String::from("Das Zusammenführen braucht einen Linux-Server"));
+        };
+        if let Err(e) = q.cmd("drive-mirror", j::obj([("device", Value::string(format!("disk{}", k))), ("job-id", Value::string(format!("mig{}", k))),
+                                                     ("target", Value::string(path.as_str())), ("format", Value::string("qcow2")), ("sync", Value::string("full")),
+                                                     ("mode", Value::string("absolute-paths"))])) {
+            drop(f);
+            dir.remove(&name);
+            return Err(e);
+        }
+        live.merged.lock().push(f);
         files.push(file);
     }
     for k in 0..disks {

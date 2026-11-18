@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Security
+
+- Metadata: only the first iCCP chunk (and the first compressed XMP) is inflated, also when it fails. Each further chunk with a bomb past the 16 MB limit was inflated again, up to about 32 MB of work each.
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

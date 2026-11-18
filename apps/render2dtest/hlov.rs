@@ -7,25 +7,29 @@
 //   overlay    rubber bands in drawing units and pixels, window and crossing boxes, grips, every snap marker, a filled
 //              polygon: against the same geometry as plain entities (GPU) and against lib/gfx; an empty overlay changes no
 //              pixel and sends nothing; a rubber band to a point at 1e7 seen at 1e-6 units per pixel where the camera puts it
+//   repeat     (G6e3) the highlight test's drawing (a layer with an arc: fs_full, one with fills: fs_fill) drawn twelve times:
+//              the same bytes each time, by the renderer as the adapter decides and by one that gives each such run a render
+//              pass of its own; both alike (on Intel's Gen9 under Mesa both fragment shaders spill to scratch memory, which
+//              the driver gave them with their own strides at one place: 2 x 2 pixels wrong at random in every frame)
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 use alloc::format;
 use alloc::vec;
 use alloc::vec::Vec;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 use gpu::*;
 use render2d::{Cap, Join, Layer, Scene, SnapKind, Space, Style, Unit};
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 use render2d::{Camera, Renderer, RendererDesc, Shape};
 
 use crate::gallery::*;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 use crate::refimg::{self, Tol};
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 use crate::tests::{dump, gpu_image, on_levels, shot, T};
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 /// hl.wgsl's colour on the CPU: selected 3/4 of the way to blue, hovered 7/8 of the way to orange, alpha at least 0xB0
 pub fn hl_ink(c: u32, bits: u8) -> u32 {
     if bits == 0 {
@@ -37,7 +41,7 @@ pub fn hl_ink(c: u32, bits: u8) -> u32 {
     (a << 24) | ch(16) | ch(8) | ch(0)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 /// a style as the highlight draws it at a camera's scale: hl_ink's colour, the half width in pixels (as the vertex shader
 /// has it: at least half a pixel) wider by a quarter pixel (selected) or a pixel (hovered)
 pub fn hl_style(st: &Style, bits: u8, scale: f64) -> Style {
@@ -81,7 +85,7 @@ pub fn hl_drawing() -> (Drawing, Vec<u8>) {
     (d, bits)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub fn highlight(t: &mut T) {
     let mut shots: Vec<(&str, Vec<u8>)> = Vec::new();
     on_levels(t, &mut |t, dev, level| {
@@ -95,7 +99,56 @@ pub fn highlight(t: &mut T) {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+pub fn repeat(t: &mut T) {
+    on_levels(t, &mut |t, dev, level| {
+        let _ = repeat_on(t, dev, level);
+    });
+}
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+fn repeat_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
+    let (w, h) = (360u32, 270u32);
+    let cam = pixel_camera(w, h);
+    let (d, _) = hl_drawing();
+    let mut firsts = Vec::new();
+    for sep in [None, Some(true)] {
+        let mut off = t.res(Off::new(dev, w, h), "target")?;
+        let mut rd = RendererDesc::new(Format::Bgra8Unorm);
+        rd.separate_scratch = sep;
+        let mut r = t.res(Renderer::new(dev, &rd), "Renderer::new")?;
+        let mut s = t.res(Scene::new(&r), "Scene::new")?;
+        t.res(s.set_camera(&cam), "camera")?;
+        let mut layers = Vec::new();
+        for &(v, o) in &d.layers {
+            let mut l = Layer::new(o);
+            l.visible = v;
+            layers.push(t.res(s.add_layer(&l), "add_layer")?);
+        }
+        for it in &d.items {
+            let st = t.res(s.add_style(&it.style), "add_style")?;
+            t.res(with_shape(&it.geo, |sh| s.insert(layers[it.layer], st, sh)), "insert")?;
+        }
+        let first = shot(t, dev, &mut off, &mut r, &mut s, "first")?;
+        let (mut frames, mut pixels) = (0u32, 0u32);
+        for _ in 1..12 {
+            let img = shot(t, dev, &mut off, &mut r, &mut s, "again")?;
+            let (n, _) = differ(&img, &first);
+            if n > 0 {
+                frames += 1;
+                pixels += n;
+            }
+        }
+        let how = if sep.is_none() { "the renderer as the adapter decides" } else { "each such run in a pass of its own" };
+        t.ok(frames == 0, &format!("{level}: a layer with an arc and one with fills drawn 12 times, {how}: {frames} of 11 frames differ from the first ({pixels} pixels)"));
+        firsts.push(first);
+    }
+    let (n, m) = differ(&firsts[0], &firsts[1]);
+    t.ok(n == 0, &format!("{level}: a pass of its own for such runs changes no pixel: {n} pixels differ (largest {m})"));
+    Some(())
+}
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 fn highlight_on(t: &mut T, dev: &Device, level: &str) -> Option<Vec<u8>> {
     let (w, h) = (360u32, 270u32);
     let mut off = t.res(Off::new(dev, w, h), "target")?;
@@ -245,7 +298,7 @@ fn fill_overlay(s: &mut Scene, h: u32) -> Drawing {
     d
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub fn overlay(t: &mut T) {
     let mut shots: Vec<Vec<u8>> = Vec::new();
     on_levels(t, &mut |t, dev, level| {
@@ -259,7 +312,7 @@ pub fn overlay(t: &mut T) {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 fn overlay_on(t: &mut T, dev: &Device, level: &str) -> Option<Vec<u8>> {
     let (w, h) = (340u32, 260u32);
     let mut off = t.res(Off::new(dev, w, h), "target")?;
@@ -383,7 +436,7 @@ fn overlay_on(t: &mut T, dev: &Device, level: &str) -> Option<Vec<u8>> {
     Some(img)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 /// pixels whose colour differs, and the largest difference
 pub fn differ(a: &[u8], b: &[u8]) -> (u32, u8) {
     let (mut n, mut m) = (0u32, 0u8);

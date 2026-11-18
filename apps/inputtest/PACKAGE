@@ -1,0 +1,18 @@
+# apps/inputtest/PACKAGE: the app's identity and packages (docs/PACKAGING.md)
+#   python tools/package.py inputtest --formats all
+# version= is the app's own version (MAJOR.MINOR.PATCH, docs/VERSIONING.md); the program reads it
+# as rt::app_version!(), the packages and lib/update use it.  The library has its own (Cargo.toml).
+display=Eingabetest
+version=0.1.0
+publisher=Graphsto
+summary=Zeiger fangen, rohe Mausbewegung und Tastenlagen von Hand prüfen
+description=Eingabetest: der Pointer-Lock, die rohe relative Mausbewegung und die Lage der Tasten (USB-HID) für Spiele, zum Prüfen von Hand.
+generic=Anwendung
+categories=Utility;
+deb_name=inputtest
+# Flatpak, AppStream and the MSIX identity: reverse DNS of a domain or project you control
+app_id=org.jflib.inputtest
+homepage=https://github.com/JFLibrary/JFLib
+default_win=winui
+default_linux=winui
+styles=winui

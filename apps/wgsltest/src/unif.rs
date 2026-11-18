@@ -485,6 +485,29 @@ fn suggestions(t: &mut T) {
         t.check(&format!("suggestion: {}: {:?}", name, r.as_ref().err().and_then(|d| d.first().map(|x| x.msg.clone()))), r.as_ref().err().is_some_and(|d| d.iter().any(|x| x.msg.contains(part))));
     }
     t.check("no suggestion when nothing is close", wgsl::check("fn f() { let a = qqqqqq; }").err().is_some_and(|d| !d[0].msg.contains("meintest")));
+    // names of 50000 characters: only the band of the edit distance is computed (the whole
+    // table was 2.5e9 steps per candidate)
+    let long = "n".repeat(50_000);
+    let src = format!("const {long}a = 1;\nconst {long}b = 2;\nfn f() -> i32 {{ return {long}c; }}");
+    let t0 = plat::time_us();
+    let r = wgsl::check(&src);
+    let ms = plat::time_us().wrapping_sub(t0) / 1000;
+    t.check(&format!("suggestion for a name of 50001 characters in {ms} ms"), ms < 1000 && r.err().is_some_and(|d| d.iter().any(|x| x.msg.contains(&format!("meintest du `{long}a`")))));
+    // 2000 unknown names among 20000 known ones: past MAX_ERRORS (whose messages are dropped)
+    // no walk over every name for each one
+    let mut src = String::new();
+    for k in 0..20_000 {
+        src.push_str(&format!("const known{k} = {k};\n"));
+    }
+    src.push_str("fn f() { let a = array(");
+    src.push_str(&(0..2_000).map(|k| format!("unknown{k}")).collect::<Vec<_>>().join(", "));
+    src.push_str("); }\n");
+    let t0 = plat::time_us();
+    let r = wgsl::check(&src);
+    let ms = plat::time_us().wrapping_sub(t0) / 1000;
+    let first = r.as_ref().err().and_then(|d| d.first().map(|x| x.msg.chars().take(120).collect::<String>())).unwrap_or_default();
+    let errs = r.as_ref().err().map_or(0, |d| d.iter().filter(|x| x.error).count());
+    t.check(&format!("2000 unknown names in {ms} ms ({errs} errors, the first: {first})"), ms < 1000 && r.err().is_some_and(|d| d.iter().filter(|x| x.error).count() <= 60 && d[0].msg.contains("meintest du `known")));
 }
 
 pub fn run(t: &mut T) {

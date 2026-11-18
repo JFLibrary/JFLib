@@ -280,12 +280,17 @@ paint.net or X.Org.
 
 ## Tools and test data
 
-These files are not part of any build or package:
+These files are not part of the library or of any package:
 
 - `tools/wlproxy/keymap.xkb` is the keymap WSLg's compositor sends, compiled from
   xkeyboard-config data (copyright Joseph Moss, the Free Software Foundation, Digital
   Equipment Corporation, Silicon Graphics and many others; MIT / X11-style permissions).
   The full notices are in `tools/wlproxy/xkeyboard-config-COPYING.txt`.
+- `apps/render2dtest/dxf/` holds four DXF drawings of ezdxf (copyright (c) 2020 Manfred
+  Moitzi, MIT): three from its `examples_dxf/` and `bin_dxf_r12.dxf`, which came to GDAL's test
+  data from ezdxf. The test program render2dtest embeds them for `--test dxf`; it is no part of
+  the library and is not packaged. The license text and where each file comes from are in
+  that folder (`LICENSE-ezdxf.txt`, `README.md`).
 - `tools/update_manifest.py` implements Ed25519 from the algorithm of RFC 8032 section 5.1
   and the Explicit-Formulas Database. RFC 8032 is an IRTF document, whose example code is
   not licensed for modified use (IETF Trust Legal Provisions, section 8.g), so that code is

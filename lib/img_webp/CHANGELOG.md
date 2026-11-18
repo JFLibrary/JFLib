@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- The decoders' frame-sized buffers (VP8 planes, VP8L pixels and groups, the alpha plane) are allocated with ERR_NOMEM when there is no room instead of ending the process.
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

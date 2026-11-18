@@ -520,6 +520,11 @@ pub fn pow(x: f64, y: f64) -> f64 {
     if x == f64::INFINITY {
         return if y > 0.0 { x } else { 0.0 };
     }
+    if x == 1.0 {
+        // y log2 x = 0 (the x87's fyl2x too; inf * 0 is NaN): two_prod's split of y overflowed
+        // from |y| > ~1.3e300 on and gave NaN
+        return if y.is_finite() { 1.0 } else { f64::NAN };
+    }
     let (lh, ll) = log2_dd(x);
     let w = y * lh;
     if w.is_nan() {

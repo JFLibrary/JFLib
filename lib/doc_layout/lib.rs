@@ -377,9 +377,7 @@ fn wrap_with(
                 if current.width + atom.width > current.available && !current.atoms.is_empty() {
                     flush(&mut lines, &mut current,prepare)?;
                 }
-                if atom.width > current.available {
-                    return Err(Error::Limit);
-                }
+                // wider than the line: alone on one, past its end (it failed the whole document)
                 append(&mut current, atom.clone());
                 continue;
             }
@@ -417,8 +415,10 @@ fn wrap_with(
                     }
                     part.push(ch);
                     part_width = measure.width(&part, atom.format);
-                    if part_width < 0 || part_width > current.available {
-                        return Err(Error::Limit);
+                    // a character wider than the line stands alone on one, past its end: content
+                    // that can never fit made the whole document fail
+                    if !(0..=100_000_000).contains(&part_width) {
+                        return Err(Error::Metrics);
                     }
                 } else {
                     part = candidate;
@@ -537,10 +537,9 @@ pub fn paginate(d: &Document, measure: &mut impl Measure) -> Result<Layout, Erro
                 line.width -= line.atoms.pop().unwrap().width;
             }
             let (height, ascent) = line_height(line, default, pf.line);
-            if height > bottom - top {
-                return Err(Error::Limit);
-            }
-            if y + height > bottom {
+            // a line taller than the page: alone on a page, past its bottom (it failed the whole
+            // document)
+            if y + height > bottom && (height <= bottom - top || !layout.pages.last().unwrap().lines.is_empty()) {
                 layout.pages.push(Page::default());
                 y = top;
             }

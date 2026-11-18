@@ -541,6 +541,12 @@ fn eapol(t: &mut T) {
     t.eq("rsne bytes", b.clone(), vec![48, 20, 1, 0, 0x00, 0x0F, 0xAC, 4, 1, 0, 0x00, 0x0F, 0xAC, 4, 1, 0, 0x00, 0x0F, 0xAC, 2, 0, 0]);
     let sae = Rsne { akm: eapol::AKM_SAE, caps: eapol::RSN_MFPR | eapol::RSN_MFPC };
     t.eq("rsne parse", (Rsne::parse(&b), Rsne::parse(&sae.to_bytes())), (Some(rsne), Some(sae)));
+    // two AKM suites (SAE, PSK): the capabilities come after both (they were read from the
+    // second suite); no AKM suite at all: no element
+    let two = vec![48, 24, 1, 0, 0x00, 0x0F, 0xAC, 4, 1, 0, 0x00, 0x0F, 0xAC, 4, 2, 0, 0x00, 0x0F, 0xAC, 8, 0x00, 0x0F, 0xAC, 2, 0xC0, 0];
+    t.eq("rsne with two AKM suites", Rsne::parse(&two), Some(Rsne { akm: eapol::AKM_SAE, caps: 0xC0 }));
+    let none = vec![48, 16, 1, 0, 0x00, 0x0F, 0xAC, 4, 1, 0, 0x00, 0x0F, 0xAC, 4, 0, 0, 0xC0, 0];
+    t.eq("rsne without an AKM suite", Rsne::parse(&none), None);
     // KDEs: the GTK and the IGTK, padding of the key data
     let gtk = [0x47u8; 16];
     let mut data = b.clone();

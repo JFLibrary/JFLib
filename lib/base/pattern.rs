@@ -702,6 +702,7 @@ impl Regex {
         let mut cur: Vec<(usize, usize)> = Vec::new();
         let mut next: Vec<(usize, usize)> = Vec::new();
         let mut seen = vec![usize::MAX; self.prog.len()];
+        let mut stack: Vec<usize> = Vec::new();
         let mut best: Option<(usize, usize)> = None;
         let byte_at = |k: usize| chars.get(k).map_or(s.len(), |x| x.0);
         let ch = |k: usize| chars.get(k).map(|x| x.1);
@@ -711,7 +712,7 @@ impl Regex {
             let here = ch(k);
             // a new thread at this position while nothing matched yet
             if best.is_none() {
-                self.add(&mut cur, &mut seen, k, 0, byte_at(k), prev, here);
+                self.add(&mut cur, &mut seen, &mut stack, k, 0, byte_at(k), prev, here);
             }
             next.clear();
             for &(pc, st) in cur.iter() {
@@ -729,7 +730,7 @@ impl Regex {
                     _ => false,
                 };
                 if step {
-                    self.add(&mut next, &mut seen, k + 1, pc + 1, st, here, ch(k + 1));
+                    self.add(&mut next, &mut seen, &mut stack, k + 1, pc + 1, st, here, ch(k + 1));
                 }
             }
             // a thread that started after the best match's start cannot win any more
@@ -746,33 +747,39 @@ impl Regex {
     }
 
     /// adds a thread at character `k` (prev / here: the characters around the position),
-    /// following jumps, splits and edges
+    /// following jumps, splits and edges.  `stack` (scratch): the steps still to follow, in the
+    /// order a recursion takes them (a split's first branch with all it leads to first) -- a
+    /// recursion went one level deeper per alternative and per optional repetition
     #[allow(clippy::too_many_arguments)]
-    fn add(&self, list: &mut Vec<(usize, usize)>, seen: &mut [usize], k: usize, pc: usize, st: usize, prev: Option<char>, here: Option<char>) {
-        if seen[pc] == k {
-            return;
-        }
-        seen[pc] = k;
-        match &self.prog[pc] {
-            Inst::Jmp(t) => self.add(list, seen, k, *t, st, prev, here),
-            Inst::Split(a, b) => {
-                self.add(list, seen, k, *a, st, prev, here);
-                self.add(list, seen, k, *b, st, prev, here);
+    fn add(&self, list: &mut Vec<(usize, usize)>, seen: &mut [usize], stack: &mut Vec<usize>, k: usize, pc: usize, st: usize, prev: Option<char>, here: Option<char>) {
+        stack.clear();
+        stack.push(pc);
+        while let Some(pc) = stack.pop() {
+            if seen[pc] == k {
+                continue;
             }
-            Inst::Edge(e) => {
-                let ok = match e {
-                    Edge::Bol => prev.is_none() || prev == Some('\n'),
-                    Edge::Eol => here.is_none() || here == Some('\n'),
-                    Edge::WordStart => !is_word(prev) && is_word(here),
-                    Edge::WordEnd => is_word(prev) && !is_word(here),
-                    Edge::Word => is_word(prev) != is_word(here),
-                    Edge::NotWord => is_word(prev) == is_word(here),
-                };
-                if ok {
-                    self.add(list, seen, k, pc + 1, st, prev, here);
+            seen[pc] = k;
+            match &self.prog[pc] {
+                Inst::Jmp(t) => stack.push(*t),
+                Inst::Split(a, b) => {
+                    stack.push(*b);
+                    stack.push(*a);
                 }
+                Inst::Edge(e) => {
+                    let ok = match e {
+                        Edge::Bol => prev.is_none() || prev == Some('\n'),
+                        Edge::Eol => here.is_none() || here == Some('\n'),
+                        Edge::WordStart => !is_word(prev) && is_word(here),
+                        Edge::WordEnd => is_word(prev) && !is_word(here),
+                        Edge::Word => is_word(prev) != is_word(here),
+                        Edge::NotWord => is_word(prev) == is_word(here),
+                    };
+                    if ok {
+                        stack.push(pc + 1);
+                    }
+                }
+                _ => list.push((pc, st)),
             }
-            _ => list.push((pc, st)),
         }
     }
 }

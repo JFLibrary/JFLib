@@ -201,6 +201,13 @@ def main():
         check(wait_for(lambda: "boot=0003" in console(sess["id"]), 30), "second instant boot")
         st, e = api.call("POST", f"/api/instant-start/{sess['id']}/migrate", {"target": "/somewhere/else"})
         check(st == 403, "merge only into restore folders")
+        # a link in the restore folder that leads out of it: the merge does not follow it
+        (tmp / "outside").mkdir()
+        os.symlink(str(tmp / "outside"), str(tmp / "restore" / "linked"))
+        o = wait_op(api, api.ok("POST", f"/api/instant-start/{sess['id']}/migrate", {"target": str(tmp / "restore" / "linked" / "m")}, 202)["operation_id"], success=False)
+        cur = [s for s in api.ok("GET", "/api/instant-start") if s["id"] == sess["id"]][0]
+        check(o["status"] == "failed" and "Verknüpfung" in o["error"] and cur["state"] == "running" and not any((tmp / "outside").iterdir()),
+              f"no merge through a link: {o.get('error')} {cur['state']}")
         o = wait_op(api, api.ok("POST", f"/api/instant-start/{sess['id']}/migrate", {"target": str(tmp / "restore" / "merged")}, 202)["operation_id"])
         merged = tmp / "restore" / "merged" / "vm1-disk0.qcow2"
         cur = [s for s in api.ok("GET", "/api/instant-start") if s["id"] == sess["id"]][0]

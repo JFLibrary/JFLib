@@ -82,6 +82,13 @@ visited=\"2026-10-02T09:00:00.000000Z\">\n    <info>\n      <metadata owner=\"ht
 }
 
 /// python's XML parser accepts the file (None: no python)
+#[cfg(target_os = "android")]
+fn well_formed(_: &str) -> Option<bool> {
+    None // no child processes on Android
+}
+
+/// python's XML parser accepts the file (None: no python)
+#[cfg(not(target_os = "android"))]
 fn well_formed(path: &str) -> Option<bool> {
     let py = if cfg!(windows) { "python" } else { "python3" };
     let cmd = plat::process::Command {

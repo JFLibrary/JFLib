@@ -1,0 +1,4 @@
+#!args --test sides
+# (G7f) double-sided materials: plates seen from behind (single-sided culled; double-sided, MASK, mirrored, with a normal
+# map), open boxes seen into, against the ray caster; their lists, a material switched, with and without the occlusion
+# test; back faces lit by the sun with its shadows against exact shadow rays; Voll and Basis

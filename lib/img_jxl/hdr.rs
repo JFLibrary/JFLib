@@ -287,7 +287,7 @@ impl Jx {
             return;
         }
         let (b, f, x) = bitdepth(br);
-        if b == 0 || b > 31 {
+        if b == 0 || b > 32 || (b == 32 && f == 0) {
             br.err = ERR_HDR;
             return;
         }
@@ -362,7 +362,9 @@ impl Jx {
             }
         }
         let (b, f, x) = bitdepth(br);
-        if b == 0 || b > 31 {
+        // 32 bits only as float (binary32): such a file is a JXL (probe, meta) whose decode is
+        // ERR_UNSUPPORTED; it was ERR_HDR, not a JXL at all
+        if b == 0 || b > 32 || (b == 32 && f == 0) {
             return ERR_HDR;
         }
         self.bits = b;

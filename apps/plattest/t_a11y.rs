@@ -209,7 +209,44 @@ impl Run {
     }
 }
 
+// Node::offset_at walks the text once: the same offsets as the nearest char_rect (with a caret
+// on the second line and without one), and 200000 characters at once (char_rect for every
+// offset counted from the start each time: quadratic)
+fn t_offset_at(t: &mut T) {
+    let mut n = Node { role: Role::TextBox, rect: [10, 20, 300, 80], text: String::from("ab\ncde\n\nfg h"), caret: 5, anchor: 5, caret_rect: [40, 40, 1, 20], ..Node::default() };
+    let mut differ = 0;
+    for caret in [5, -1] {
+        n.caret = caret;
+        let len = n.text.chars().count() as i32;
+        for y in (15..105).step_by(3) {
+            for x in (5..315).step_by(7) {
+                let inside = x >= 10 && y >= 20 && x < 310 && y < 100;
+                let mut best = (i64::MAX, -1);
+                for k in 0..=len {
+                    let q = n.char_rect(k);
+                    let dy = if y < q[1] { q[1] - y } else if y >= q[1] + q[3] { y - q[1] - q[3] + 1 } else { 0 };
+                    let d = dy as i64 * 100_000 + (x - q[0]).abs() as i64;
+                    if d < best.0 {
+                        best = (d, k);
+                    }
+                }
+                if n.offset_at(x, y) != if inside { best.1 } else { -1 } {
+                    differ += 1;
+                }
+            }
+        }
+    }
+    t.check(differ == 0, &format!("a11y: offset_at = the nearest char_rect ({differ} points differ)"));
+    n.text = "abcdefghi\n".repeat(20_000);
+    n.caret = 100_000;
+    let t0 = plat::time_us();
+    let k = n.offset_at(300, 99);
+    let ms = plat::time_us().wrapping_sub(t0) / 1000;
+    t.check(k >= 0 && ms < 500, &format!("a11y: offset_at on 200000 characters -> {k} in {ms} ms"));
+}
+
 pub fn t_a11y(t: &mut T) {
+    t_offset_at(t);
     let rt = match ui::Runtime::new(&DESC, Demo::new(), &style::STYLE) {
         Ok(rt) => rt,
         Err(_) => {

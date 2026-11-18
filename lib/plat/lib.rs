@@ -80,6 +80,9 @@
 //            signals, the stderr line of ASMLIB) and panics; crash_test() crashes on purpose
 //   windows: the window-indexed API of the assembly (win_create / win_show / win_present /
 //            wait ..., popups, clipboard, drops, pen, cursors; consts.rs, evq.rs, pwin0.rs)
+//   input:   (G7a) win_pointer_lock / win_pointer_lock_state / win_raw_motion_take: the pointer
+//            locked to a window, hidden, its raw relative motion (plock.rs); KC_* key_code /
+//            key_label: where a key sits as a USB HID usage on every platform (keycode.rs)
 //   dnd:     drag and drop between programs: DragData (files, text, URLs, HTML, image),
 //            the drop target hook, the pending drop, drag_start (dragging out)    (dnd.rs)
 //   (plat-shared) print(job) + page layout / PDF writer (print.rs; win_print.rs,
@@ -375,6 +378,13 @@ mod ui_only;
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 mod cursor_art;
 mod evq;
+// (G7a) where a key sits: USB HID usages on every platform, the tables of the platforms' codes
+mod keycode;
+pub use keycode::*;
+// (G7a) the pointer lock and the raw relative motion (the shared part; win_plock.rs,
+// linux_wl_lock.rs, linux_x11_lock.rs, apple_mac.rs, web_windows.rs)
+mod plock;
+pub use plock::*;
 mod ime;
 pub use ime::*;
 #[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), path = "web_icc.rs")]
@@ -423,7 +433,7 @@ pub const FO_READ: u32 = 0; // existing file, read only
 pub const FO_WRITE: u32 = 1; // create or truncate, read + write
 pub const FO_RW: u32 = 2; // open or create (contents kept), read + write
 
-/// a date and time (date(): Windows local time, Linux UTC)
+/// a date and time (date(): Windows local time, Linux, Apple and Android UTC, the browser the page's)
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Date {
     pub year: u16,
@@ -434,6 +444,36 @@ pub struct Date {
     pub sec: u16,
     pub ms: u16,
     pub wday: u16, // 0 = Sunday
+}
+
+/// nanoseconds since 1970-01-01 00:00 UTC (before it: that moment) -> the date and time in UTC
+/// (date() on Linux, Apple and Android)
+#[cfg(any(target_os = "linux", target_vendor = "apple", target_os = "android"))]
+pub(crate) fn utc_date(ns: i64) -> Date {
+    let ns = ns.max(0) as u64;
+    let secs = ns / 1_000_000_000;
+    let days = secs / 86400;
+    let sod = secs % 86400;
+    // civil from days (H. Hinnant)
+    let z = days + 719468;
+    let era = z / 146097;
+    let doe = z - era * 146097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + (month <= 2) as u64;
+    Date {
+        year: year as u16,
+        month: month as u16,
+        day: day as u16,
+        hour: (sod / 3600) as u16,
+        min: (sod % 3600 / 60) as u16,
+        sec: (sod % 60) as u16,
+        ms: (ns % 1_000_000_000 / 1_000_000) as u16,
+        wday: ((days + 4) % 7) as u16,
+    }
 }
 
 /// The name under which a file the user chose stays reachable after a restart, for a list of

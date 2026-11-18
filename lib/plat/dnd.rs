@@ -460,10 +460,23 @@ static RUNNING: AtomicBool = AtomicBool::new(false);
 
 /// drag `data` out of the app (call while the left button is held) -> started; E_DRAG_END
 /// (data = the effect, 0 = cancelled or refused) follows.  Only the standard kinds leave
-/// the app.
-pub fn drag_start(data: DragData) -> bool {
+/// the app; files only when the manifest lets the app read them (false otherwise), a move only
+/// when it may write them all (else the drag offers copy and link).
+pub fn drag_start(mut data: DragData) -> bool {
     if data.types() & DT_STD == 0 || RUNNING.load(Ordering::Acquire) {
         return false;
+    }
+    // the files go to another program: only those the manifest lets the app read, and a move
+    // (the target deletes the original) only when it may write every one of them
+    use crate::policy::{fs_allowed, FS_READ, FS_WRITE};
+    if !data.files.iter().all(|f| fs_allowed(f, FS_READ)) {
+        return false;
+    }
+    if data.files.iter().any(|f| !fs_allowed(f, FS_WRITE)) {
+        data.effects = if data.effects == 0 { DE_ALL } else { data.effects } & !DE_MOVE;
+        if data.effects == 0 {
+            return false;
+        }
     }
     RUNNING.store(true, Ordering::Release);
     let ok = crate::os_drag_start(data);

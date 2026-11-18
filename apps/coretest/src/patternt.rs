@@ -44,6 +44,27 @@ fn limits(t: &mut T) {
     let ones = alloc::format!("a{}", "{1}".repeat(5000));
     t.check("a{1}{1}... is a", ere(&ones, "a") && !ere(&ones, "b"));
     t.check("32 nested groups still work", ere(&alloc::format!("{}a{}", "(".repeat(32), ")".repeat(32)), "a"));
+    // 6000 alternatives and 6000 optional atoms: following the splits went one recursion level
+    // deeper for each (about a megabyte of stack); a thread with 64 KB matches them now
+    let alts = alloc::format!("^({}b)$", "a|".repeat(5999));
+    let opts = alloc::format!("^{}b$", "a?".repeat(6000));
+    let built = (Regex::new(&alts, Syntax::Extended, false), Regex::new(&opts, Syntax::Extended, false));
+    t.check("6000 alternatives, 6000 a?: built", built.0.is_ok() && built.1.is_ok());
+    #[cfg(target_os = "android")]
+    t.later("6000 alternatives, 6000 a? on a 64 KB stack (a thread)");
+    #[cfg(not(target_os = "android"))]
+    if let (Ok(ra), Ok(ro)) = built {
+        let res = alloc::sync::Arc::new(plat::sync::Mutex::new(None));
+        let r2 = res.clone();
+        let th = plat::thread_spawn(64 * 1024, alloc::boxed::Box::new(move || {
+            let got = (ra.is_match("b"), ra.is_match("a"), ra.is_match("c"), ro.is_match(&"a".repeat(1000)), ro.is_match("ab"), ro.is_match("ba"));
+            *r2.lock() = Some(got);
+        }));
+        if let Some(th) = th {
+            th.join();
+        }
+        t.eq("6000 alternatives, 6000 a? on a 64 KB stack", *res.lock(), Some((true, true, false, false, true, false)));
+    }
 }
 
 pub fn run(t: &mut T) {

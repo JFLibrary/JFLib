@@ -50,6 +50,9 @@ click button:"Container"
 expect #5000 exists
 key esc
 expect "Randfälle" rect 36 * 318 48
+# (G6e3: the page "2D-Zeichnung" makes the card a row longer, its second row lies above the view at the end: two notches up)
+wheel 100,400 240
+wait 50
 click button:"Menüs & Auswahl"
 expect #2001 exists
 expect_nowarn

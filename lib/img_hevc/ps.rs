@@ -588,6 +588,11 @@ impl Hevc<'_> {
         }
         self.p.cboff = self.rse();
         self.p.croff = self.rse();
+        // (7.4.3.3.1) pps_cb_qp_offset / pps_cr_qp_offset in -12 ..= 12 (the deblocking filter
+        // takes them as they come)
+        if !(-12..=12).contains(&self.p.cboff) || !(-12..=12).contains(&self.p.croff) {
+            return ERR_HDR;
+        }
         self.p.slcqppres = self.rd1();
         self.skip(2); // weighted pred / bipred
         self.p.tqbypass = self.rd1();
@@ -758,6 +763,11 @@ impl Hevc<'_> {
             if self.p.slcqppres != 0 {
                 self.l.cboff = self.rse();
                 self.l.croff = self.rse();
+                // (7.4.7.1) slice_cb_qp_offset in -12 ..= 12, and with the PPS's as well
+                let ok = |o: i32, p: i32| (-12..=12).contains(&o) && (-12..=12).contains(&(o + p));
+                if !ok(self.l.cboff, self.p.cboff) || !ok(self.l.croff, self.p.croff) {
+                    return ERR_HDR;
+                }
             }
             let mut ovr = 0; // deblocking_filter_override_flag
             if self.p.dbovr != 0 {

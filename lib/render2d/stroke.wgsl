@@ -418,7 +418,8 @@ fn arc_from(x: vec4f, fu: vec2f, rr: vec2f) -> vec2f {
     var s = dd_add(dd_mul(t3, vec2f(-0.1666666716337204, 4.967053879312289e-09)), dd_mul(t5, vec2f(0.008333333767950535, -4.34617203337595e-10)));
     s = dd_add_f(s, t5.x * t2.x * (-1.0 / 5040.0 + t2.x / 362880.0));
     s = dd_add_f(s, t0);
-    let th = dd_add_f(vec2f(t0, 0.0), ((y.x - s.x) + (y.y - s.y)) / cos_p(t0));
+    // (G6e3: both differences through opq, the first cancels exactly; regrouped, y.y and s.y were lost)
+    let th = dd_add_f(vec2f(t0, 0.0), (opq(y.x - s.x) + opq(y.y - s.y)) / cos_p(t0));
     return dd_mul(dd_mul_f(th, 2.0), rr);
 }
 

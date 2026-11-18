@@ -88,7 +88,9 @@ crates.io, 1 for the rest (quick rebuilds), stripped; lib/ui/build.rs gives ui -
 ui/hotreload.rs).  --release: opt-level 2, one codegen unit, fat LTO (as fast as opt-level 3 and
 6-10 % smaller, rewrite/REPORT.md section 2; R13 measured with 3).  --profile adds --config to
 it.  The rustflags are the tool's: -D warnings, no build paths in the panic locations, LLVM's
-linkers.  An incremental cache left by a rustc killed during ThinLTO is discarded before the next
+linkers; JFLIB_EXTRA_RUSTFLAGS (separated by blanks) adds to them, e.g. the other way of the atomics
+(docs/ARM64.md ARM7: -C target-feature=-lse on a Mac, =+lse for Windows ARM64), best with an --out of
+its own.  An incremental cache left by a rustc killed during ThinLTO is discarded before the next
 development build (incremental_flags).
 
 Rules checked before every build (`check`):
@@ -221,7 +223,7 @@ def run_cmd(cmd, quiet=False, env=None):
 def compute_crate(name):
     """crates whose speed matters in development builds too (opt-level 2; Kritzel draws with its
     own pixel loops)"""
-    return (name in ("gfx", "text", "simd", "fx", "Kritzel", "crypto", "compress", "cas", "spell")
+    return (name in ("gfx", "text", "simd", "fx", "Kritzel", "crypto", "compress", "cas", "spell", "physics")
             or name.startswith("img_"))
 
 
@@ -695,6 +697,24 @@ def kernel_lint(f, text):
     return [f"{f.relative_to(ROOT)}:{text.count(chr(10), 0, m.start()) + 1}: {why} (lib/rt/kernel.rs)" for m, why in found]
 
 
+def keycode_lint():
+    """(G7a) the browser host's KeyboardEvent.code table (CODES in web/loader.js) holds the rows of
+    lib/plat/keycode.rs (name -> USB HID usage) and its older Firefox names, nothing else -> problems"""
+    src = (ROOT / "lib/plat/keycode.rs").read_text(encoding="utf-8")
+    usage = {m.group(1): int(m.group(2), 16) for m in re.finditer(r"pub const (KC_\w+): u32 = 0x([0-9A-Fa-f]+);", src)}
+    want = {m.group(2): usage.get(m.group(1), -1) for m in re.finditer(r'r\((KC_\w+), [^"]*"(\w+)"\)', src)}
+    want.update({m.group(1): usage.get(m.group(2), -1) for m in re.finditer(r'"(\w+)" => (KC_\w+),', src)})
+    js = (ROOT / "web/loader.js").read_text(encoding="utf-8")
+    m = re.search(r"const CODES=\{([^}]*)\};", js)
+    if not m:
+        return ["web/loader.js: no CODES table (the key positions of lib/plat/keycode.rs)"]
+    have = {k: int(v) for k, v in re.findall(r"(\w+):(\d+)", m.group(1))}
+    if not want or have != want:
+        diff = sorted(set(have.items()) ^ set(want.items()))[:6]
+        return [f"web/loader.js: CODES differs from the rows of lib/plat/keycode.rs: {diff}"]
+    return []
+
+
 def kernel_table_lint():
     """both tables of lib/rt/kernel.rs name the same things (only x86-64 builds today, so the
     compiler would not tell) -> problems"""
@@ -724,8 +744,10 @@ def program_manifest_lint(members):
             return bad.append(f"{member}: no member of the workspace (the root Cargo.toml; python build_rs.py new writes both)")
         m = manifests.read(ROOT / member / "Cargo.toml")
         deps = m.get("dependencies", {})
+        # what a target leaves out ([target.'cfg(...)'.dependencies], coretest on Android) counts as well
+        named = set(deps) | {d for t in m.get("target", {}).values() for d in t.get("dependencies", {})}
         own = m.get("lib", {}).get("name")
-        for d in sorted(named_crates(root, names) - set(deps) - {own}):
+        for d in sorted(named_crates(root, names) - named - {own}):
             bad.append(f"{member}/Cargo.toml: {d} is missing, its sources name it")
         if version is not None and m["package"]["version"] != version:
             bad.append(f"{member}/Cargo.toml: version {m['package']['version']}, PACKAGE says {version}")
@@ -805,7 +827,7 @@ def manifest_lint():
 
 def lint():
     """the rules of the module docstring -> list of problems"""
-    bad = kernel_table_lint()
+    bad = kernel_table_lint() + keycode_lint()
     libs = all_libs()
     roots = [(n, RS / r, "lib") for n, (r, _) in libs.items()] + \
             [(a, entrypoint(RS / "apps" / a, "app"), "app") for a in apps()] + \
@@ -1005,7 +1027,8 @@ class Builder:
     def cargo_flags(self):
         """the rustflags of this target (the profile is Cargo's): warnings are errors, no build paths in
         the panic locations, the linker of LLVM, what the Linux and browser builds need"""
-        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}="] + list((self.profile or {}).get("rustflags", []))
+        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}="] + list((self.profile or {}).get("rustflags", [])) + \
+            os.environ.get("JFLIB_EXTRA_RUSTFLAGS", "").split()
         if self.target == "win":
             return flags + ["-C", f"linker={tool('lld-link')}"]
         if self.target == "android":
@@ -1210,7 +1233,9 @@ class Builder:
         if self.target == "android":
             from tools.android import build_apk, build_exe
             archive = own.cargo_out[pkg][0]
-            if "ui" not in app_crates(name):
+            # a program without a UI, or without android/AndroidManifest.xml (plattest, asynctest: their
+            # headless tests): an executable for `adb shell` and its test APK (tools/android.py)
+            if "ui" not in app_crates(name) or not (ROOT / "apps" / name / "android" / "AndroidManifest.xml").is_file():
                 return build_exe(self, name, archive)
             return build_apk(self, name, style, variant, archive, app_notices([style] + [c[len("style_"):] for c in extra]))
         vdir = (self.web_public / style if variant else self.web_public) / name if self.target == "web" else \
@@ -1432,15 +1457,23 @@ def derived_workspace(out, target, names, style=None):
             deps = man.get("dependencies", {})
             if style is not None and "style" in deps and f"style_{style}" in deps:
                 raise BuildError(f"apps/{n} names style_{style} itself: a variant in {style} would name it twice (Cargo refuses that)")
-            lines = []
-            for key, spec in deps.items():
-                s = dict(root["dependencies"][key]) if spec.get("workspace") else dict(spec)
-                if "path" in s:
-                    s["path"] = ((ROOT if spec.get("workspace") else ROOT / "apps" / n) / s["path"]).resolve().as_posix()
-                s.pop("version", None)
-                if key == "style" and style is not None:
-                    s = {"package": f"jflib-style-{style}", "path": (ROOT / "styles" / style).as_posix()}
-                lines.append(f"{key} = {toml_value(s)}\n")
+
+            def dep_lines(table):
+                lines = []
+                for key, spec in table.items():
+                    s = dict(root["dependencies"][key]) if spec.get("workspace") else dict(spec)
+                    if "path" in s:
+                        s["path"] = ((ROOT if spec.get("workspace") else ROOT / "apps" / n) / s["path"]).resolve().as_posix()
+                    s.pop("version", None)
+                    if key == "style" and style is not None:
+                        s = {"package": f"jflib-style-{style}", "path": (ROOT / "styles" / style).as_posix()}
+                    lines.append(f"{key} = {toml_value(s)}\n")
+                return lines
+            lines = dep_lines(deps)
+            # [target.'cfg(...)'.dependencies]: what the app leaves out on a target (coretest on Android)
+            for cond, table in man.get("target", {}).items():
+                if table.get("dependencies"):
+                    lines += [f"\n[target.{toml_value(cond)}.dependencies]\n"] + dep_lines(table["dependencies"])
             pkg = derived_name(n, target, style)
             entry = (ROOT / "apps" / n / man["bin"][0]["path"]).resolve().as_posix()
             # named after the package: Cargo puts the programs of all packages into one folder, two of
@@ -2022,18 +2055,24 @@ def run_tests(builders, out, quick, jobs=1):
     print(f"{total - len(fails)} of {total} scripts passed" + (f" ({skipped} pending)" if skipped else "")
           + (f" ({only} skipped: #!only)" if only else ""))
     # what only runs on a device (G4c): the serial of a device or emulator in jfgui_TEST_ANDROID, its builds
-    # with `app androidGallery|gputest --target android`; nobody's phone is touched without it
+    # with `app androidGallery|gputest|coretest|asynctest --target android`; nobody's phone is touched without
+    # it (the test APKs of tools/android_console.py only on an emulator); a missing build SKIPs
     serial = os.environ.get("jfgui_TEST_ANDROID")
     if serial:
-        for script in ("apps/gputest/tests/android.py", "apps/androidGallery/tests/android_gpu.py"):
-            r = subprocess.run([sys.executable, str(RS / script), "--serial", serial], cwd=ROOT, capture_output=True, text=True,
+        for script, *rest in (("apps/gputest/tests/android.py",), ("apps/androidGallery/tests/android_gpu.py",),
+                              # the programs without a UI per adb shell and in an app's process (docs/ANDROID.md, AN0)
+                              ("tools/android_console.py", "coretest", "--quiet"),
+                              ("tools/android_console.py", "asynctest", "--quiet", "--file", "apps/asynctest/tests/tasks.uis", "--",
+                               "--script", "tasks.uis")):
+            r = subprocess.run([sys.executable, str(RS / script), "--serial", serial, *rest], cwd=ROOT, capture_output=True, text=True,
                                encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
             total += 1
             if r.returncode:
-                fails.append(script)
-                print(f"FAIL {script}\n" + (r.stdout + r.stderr).strip())
+                fails.append(" ".join([script, *rest]))
+                print(f"FAIL {' '.join([script, *rest])}\n" + (r.stdout + r.stderr).strip())
     else:
-        print("note: the GPU tests on Android need jfgui_TEST_ANDROID=SERIAL (apps/gputest/tests/android.py, apps/androidGallery/tests/android_gpu.py)")
+        print("note: the tests on an Android device need jfgui_TEST_ANDROID=SERIAL (apps/gputest/tests/android.py, "
+              "apps/androidGallery/tests/android_gpu.py, tools/android_console.py)")
     if check_runs is None:
         check_runs = [check_pool.submit(run) for run, _ in checks]
     for (_, show), f in zip(checks, check_runs):

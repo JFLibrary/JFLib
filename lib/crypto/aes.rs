@@ -217,12 +217,13 @@ impl Aes {
                 for c in 0..4 {
                     b[c * 4..c * 4 + 4].copy_from_slice(&w[r * 4 + c]);
                 }
-                pack(&[b; 4])
+                let p = pack(&[b; 4]);
+                crate::zeroize(&mut b);
+                p
             })
             .collect();
-        for x in w.iter_mut() {
-            *x = [0; 4];
-        }
+        // the expanded key words: a plain store before the free could be dropped as dead
+        crate::zeroize(w.as_flattened_mut());
         Some(Aes { rk })
     }
 

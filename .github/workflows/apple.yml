@@ -40,13 +40,22 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
+      # x86_64-apple-darwin: the .dmg at the end is universal (tools/package.py, docs/INTEL_MAC.md decision 1a)
       - name: Rust and Xcode
         run: |
-          rustup toolchain install stable --profile minimal --target aarch64-apple-darwin,aarch64-apple-ios,aarch64-apple-ios-sim --no-self-update
+          rustup toolchain install stable --profile minimal --target aarch64-apple-darwin,x86_64-apple-darwin,aarch64-apple-ios,aarch64-apple-ios-sim --no-self-update
           rustup default stable
           rustc --version
           xcodebuild -version
           xcrun simctl list devices available | grep -m 3 iPhone || true
+      # what the gallery's gpu scripts find here (2026-11-14: a virtual GPU, "Apple Paravirtual device" of family Apple4
+      # at level Basis, and a screen too small for their windows, so they SKIP; docs/APPLE.md AP8b); information only,
+      # never a failure (system_profiler SPDisplaysDataType says nothing on these runners)
+      - name: The screen and the GPU
+        run: |
+          osascript -l JavaScript -e 'ObjC.import("AppKit"); var s = $.NSScreen.mainScreen; s.isNil() ? "no screen" : "screen " + s.frame.size.width + "x" + s.frame.size.height + ", visible " + s.visibleFrame.size.width + "x" + s.visibleFrame.size.height + ", scale " + s.backingScaleFactor' || true
+          python build_rs.py app gputest --target mac
+          build/mac/gputest --info || echo "gputest --info: exit $?"
       - name: coretest (the foundation's self-checks)
         run: python build_rs.py test coretest --target mac
       - name: gallery's scripts

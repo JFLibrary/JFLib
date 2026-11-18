@@ -5,6 +5,7 @@ package org.jflib.gallery;
 
 import android.content.Context;
 import android.text.Editable;
+import android.text.InputType;
 import android.text.Selection;
 import android.text.SpannableStringBuilder;
 import android.view.KeyEvent;
@@ -19,10 +20,14 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 
 final class GalleryInputConnection extends BaseInputConnection {
+    // the text box's flags in the snapshot (lib/ui consts.rs): TB_PASSWORD, TB_MULTI
+    private static final int TB_PASSWORD = 0x0100_0000, TB_MULTI = 0x0800_0000;
     private final View view;
     private final Runnable wake;
     private final Editable editable = new SpannableStringBuilder();
     private int editorId, batches;
+    // the box's kind (TB_PASSWORD or TB_MULTI or 0) now, and the one the EditorInfo was made for
+    private int editorKind, infoKind;
     private int notifiedStart = -2, notifiedEnd = -2, notifiedCompStart = -2, notifiedCompEnd = -2;
     private String nativeText = "";
     private int nativeStart, nativeEnd;
@@ -35,10 +40,30 @@ final class GalleryInputConnection extends BaseInputConnection {
         syncFromNative();
     }
     @Override public Editable getEditable() { return editable; }
+    // the keyboard for the box's kind: a password one (no learning, no suggestions), a multi-line
+    // one whose Enter breaks the line, else one line with "Done" (Enter for the app).  A fixed text
+    // field gave Gboard a password to learn and a multi-line box no line break.
     void fillEditorInfo(EditorInfo info) {
+        infoKind = editorKind;
+        int type = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
+        int options = EditorInfo.IME_FLAG_NO_EXTRACT_UI;
+        if (editorKind == TB_PASSWORD) {
+            type = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD;
+            options |= EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING;
+        } else if (editorKind == TB_MULTI) {
+            type |= InputType.TYPE_TEXT_FLAG_MULTI_LINE;
+            options |= EditorInfo.IME_FLAG_NO_ENTER_ACTION;
+        } else {
+            options |= EditorInfo.IME_ACTION_DONE;
+        }
+        info.inputType = type;
+        info.imeOptions = options;
         info.initialSelStart = Selection.getSelectionStart(editable);
         info.initialSelEnd = Selection.getSelectionEnd(editable);
     }
+    // (frames) another kind of box has the keyboard than the EditorInfo was made for: the view
+    // restarts the input (a new connection, a new EditorInfo)
+    boolean needsRestart() { return !closed && editorId != 0 && editorKind != infoKind; }
     private InputMethodManager ime() {
         return (InputMethodManager)view.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
     }
@@ -55,6 +80,8 @@ final class GalleryInputConnection extends BaseInputConnection {
         int start = new String(snapshot, 16, anchor, StandardCharsets.UTF_8).length();
         int end = new String(snapshot, 16, caret, StandardCharsets.UTF_8).length();
         syncing = true;
+        // (a password box is one line also with TB_MULTI: lib/ui edit.rs)
+        editorKind = id == 0 ? 0 : (flags & TB_PASSWORD) != 0 ? TB_PASSWORD : (flags & TB_MULTI) != 0 ? TB_MULTI : 0;
         if (editorId != id || !editable.toString().equals(text)) {
             removeComposingSpans(editable);
             editable.replace(0, editable.length(), text);
@@ -121,7 +148,7 @@ final class GalleryInputConnection extends BaseInputConnection {
         text.selectionEnd = Selection.getSelectionEnd(editable);
         text.partialStartOffset = -1;
         text.partialEndOffset = -1;
-        text.flags = ExtractedText.FLAG_SINGLE_LINE;
+        text.flags = editorKind == TB_MULTI ? 0 : ExtractedText.FLAG_SINGLE_LINE;
         return text;
     }
     @Override public boolean sendKeyEvent(KeyEvent event) {
@@ -129,8 +156,14 @@ final class GalleryInputConnection extends BaseInputConnection {
         syncFromNative();
         return true;
     }
+    // "Done" of a one-line box: Enter for the app (EV_COMMIT; it never got one), then the keyboard
+    // goes; a multi-line box has no action (its Enter is a key)
     @Override public boolean performEditorAction(int action) {
         finishComposingText();
+        if (editorId != 0 && editorKind != TB_MULTI) {
+            view.onKeyDown(KeyEvent.KEYCODE_ENTER, new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER));
+            syncFromNative();
+        }
         ime().hideSoftInputFromWindow(view.getWindowToken(), 0);
         return true;
     }

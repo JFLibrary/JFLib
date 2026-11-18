@@ -15,6 +15,7 @@
 use super::child::*;
 use super::clip::*;
 use super::input::*;
+use super::lock::*;
 use super::popup::*;
 use super::present::*;
 use super::tablet::*;
@@ -121,6 +122,9 @@ pub(crate) const SUBSURFACE_PLACE_ABOVE: Req = rq(2, "place_above:o");
 pub(crate) const SUBSURFACE_SET_DESYNC: Req = rq(5, "set_desync:");
 pub(crate) const RPM_GET_RELATIVE_POINTER: Req = rq(1, "get_relative_pointer:no");
 pub(crate) const RP_DESTROY: Req = rd(0, "destroy:");
+// (G7a) pointer-constraints-unstable-v1: the pointer lock (linux_wl_lock.rs)
+pub(crate) const PC_LOCK_POINTER: Req = rq(1, "lock_pointer:noo?ou");
+pub(crate) const LP_DESTROY: Req = rd(0, "destroy:");
 pub(crate) const VIEWPORTER_GET_VIEWPORT: Req = rq(1, "get_viewport:no");
 pub(crate) const VIEWPORT_DESTROY: Req = rd(0, "destroy:");
 pub(crate) const VIEWPORT_SET_SOURCE: Req = rq(1, "set_source:ffff");
@@ -265,6 +269,12 @@ pub(crate) static IFACE_ZWP_RPM: Iface = Iface { name: "zwp_relative_pointer_man
 pub(crate) static IFACE_ZWP_RP: Iface =
     Iface { name: "zwp_relative_pointer_v1", evs: &[ev("relative_motion:uuffff", wlh_rel_motion)] };
 
+/// (G7a) pointer-constraints-unstable-v1: the pointer lock (linux_wl_lock.rs)
+pub(crate) static IFACE_ZWP_PC: Iface = Iface { name: "zwp_pointer_constraints_v1", evs: &[] };
+
+pub(crate) static IFACE_ZWP_LP: Iface =
+    Iface { name: "zwp_locked_pointer_v1", evs: &[ev("locked:", wlh_lp_locked), ev("unlocked:", wlh_lp_unlocked)] };
+
 pub(crate) static IFACE_WP_VIEWPORTER: Iface = Iface { name: "wp_viewporter", evs: &[] };
 
 pub(crate) static IFACE_WP_VIEWPORT: Iface = Iface { name: "wp_viewport", evs: &[] };
@@ -328,6 +338,6 @@ pub(crate) static IFACE_TABLET_TOOL: Iface = Iface {
 };
 
 /// the interfaces linuxtest's synthetic events can address by name (first match wins)
-pub(crate) static ALL_IFACES: [&Iface; 9] = [&IFACE_WL_POINTER, &IFACE_WL_KEYBOARD, &IFACE_WL_SEAT, &IFACE_WL_OUTPUT,
+pub(crate) static ALL_IFACES: [&Iface; 11] = [&IFACE_WL_POINTER, &IFACE_WL_KEYBOARD, &IFACE_WL_SEAT, &IFACE_WL_OUTPUT,
                                               &IFACE_XDG_TOPLEVEL, &IFACE_WL_DATA_DEVICE, &IFACE_TABLET_SEAT,
-                                              &IFACE_TABLET_TOOL, &IFACE_WL_TOUCH];
+                                              &IFACE_TABLET_TOOL, &IFACE_WL_TOUCH, &IFACE_ZWP_RP, &IFACE_ZWP_LP];

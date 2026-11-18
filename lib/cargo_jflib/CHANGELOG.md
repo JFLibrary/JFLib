@@ -8,6 +8,15 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- Debian package: a pre-release version is written with `~` (`1.2.0~beta.1`, older than `1.2.0` for dpkg; with `-` it counted as newer), the description's lines are indented and a multi-line summary is joined (a line break ended the field and broke `control`); Android: `versionCode` is MAJOR * 1 000 000 + MINOR * 1000 + PATCH (with 10000 / 100, 1.0.100 had the code of 1.1.0), a version outside that is an error.
+- The browser and Android hosts it carries: browser: a key that writes a punctuation mark gives the key code the native hosts give (+ , - . as VK_OEM_PLUS / COMMA / MINUS / PERIOD, the keypad as VK_NUMPAD*, others by the key's place) instead of its capital letter's code: typing "$" was Shift+Home and replaced the text before the caret, "." was Delete, "%" Shift+Left, "#" End; browser: a stored file that cannot be imported at the start (too big, no memory) is left out and named in the console; it stopped the whole start, so the app never started again on that origin; android: the keyboard gets the box's kind -- a password keyboard without personalised learning for TB_PASSWORD, a multi-line one whose Enter breaks the line for TB_MULTI, one line with Done (sent to the app as Enter, EV_COMMIT) otherwise -- and restarts when the focus goes to another kind of box; it was always a plain text field (Gboard learned passwords, no line break, Done never reached the app).
+
+### Security
+
+- jfgui_SIGN_PFX_PASS is taken out of the environment when cargo-jflib starts, so the processes it starts (cargo, linkers, gpg, the app under `run`) no longer inherit it. signtool still gets it on its command line (it has no other way); a certificate from the store (jfgui_SIGN_THUMBPRINT) needs none.
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

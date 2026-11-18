@@ -17,6 +17,18 @@
 // its signals count only from the unique name that answered the Notify:
 // ActionInvoked -> NoteClicked (the ActivationToken signal before it -> the token, as for the
 // symbol), NotificationClosed -> NoteClosed (unless it was clicked).
+// Who may act on the item: any client of the session bus can call its methods, so Activate,
+// SecondaryActivate, ProvideXdgActivationToken and the menu's clicks (Event, EventGroup) count
+// only from a program that shows it -- the unique name that owns org.kde.StatusNotifierWatcher
+// (GNOME's AppIndicator extension: gnome-shell; Cinnamon: xapp-sn-watcher) or one that owns an
+// org.kde.StatusNotifierHost-* / org.freedesktop.StatusNotifierHost-* name (KDE: kded owns the
+// watcher, plasmashell is the host that calls).  A sender not known yet waits until the bus
+// said who owns those names (ListNames, GetNameOwner); the answers of the bus and its
+// NameOwnerChanged count only from org.freedesktop.DBus itself.  Reading the item and its menu
+// stays open to every client.  A program of the same user that claims a host name passes (the
+// session bus lets any client own any free name): this keeps out clients that may only talk to
+// some names (a Flatpak app's D-Bus proxy) and plain dbus-send calls, not a program that may do
+// anything on the bus.
 // The UI thread hands its requests over in a queue and wakes the thread with an eventfd.
 
 use alloc::boxed::Box;
@@ -37,12 +49,27 @@ const SNI_IFACE: &str = "org.kde.StatusNotifierItem";
 const MENU_IFACE: &str = "com.canonical.dbusmenu";
 const WATCHER: &str = "org.kde.StatusNotifierWatcher";
 const NOTES: &str = "org.freedesktop.Notifications";
+const DBUS: &str = "org.freedesktop.DBus";
+const DBUS_PATH: &str = "/org/freedesktop/DBus";
+// the names of the programs that show items; their owners may act on the item
+const HOSTS: [&str; 2] = ["org.kde.StatusNotifierHost-", "org.freedesktop.StatusNotifierHost-"];
+// actions waiting for the bus's answer, host names asked about at a time; unique names kept as
+// hosts and as refused senders; a refused sender is asked about again after 2 s at the earliest
+const HELD_MAX: usize = 32;
+const KNOWN_MAX: usize = 16;
+const REASK_US: u64 = 2_000_000;
 
 enum Op {
     Set(Tray),
     Remove,
     Notify(u32, Note),
     Close(u32),
+}
+
+/// what a call to the item asks for (done only for a sender that shows the item)
+enum Act {
+    Event(TrayEvent),
+    Token(String),
 }
 
 static OPS: SpinLock<Vec<Op>> = SpinLock::new(Vec::new());
@@ -130,8 +157,20 @@ struct Item {
     own_name: bool,
     /// the RequestName call waiting for its answer (0 = none)
     req: u32,
-    /// the NameHasOwner(watcher) call waiting for its answer (0 = none)
+    /// the GetNameOwner(watcher) call waiting for its answer (0 = none)
     has: u32,
+    /// the unique name that owns the StatusNotifierWatcher ("": none)
+    watcher: String,
+    /// unique names seen owning a StatusNotifierHost name (the newest last); senders found
+    /// owning none, and when
+    hosts: Vec<String>,
+    refused: Vec<(String, u64)>,
+    /// actions of senders not known yet: (sender, action), until the bus answered
+    held: Vec<(String, Act)>,
+    /// the ListNames call waiting for its answer (0 = none), then the GetNameOwner calls for
+    /// the host names it listed
+    lookup: u32,
+    owners: Vec<u32>,
     revision: u32,
     /// dbusmenu id -> the row (ids from 1 in depth-first order)
     rows: Vec<(i32, TrayItem, Vec<i32>)>,
@@ -158,11 +197,29 @@ fn run() {
     c.send(&rule("type='signal',sender='org.freedesktop.Notifications',interface='org.freedesktop.Notifications'"));
     c.send(&rule("type='signal',sender='org.freedesktop.DBus',member='NameOwnerChanged',arg0='org.kde.StatusNotifierWatcher'"));
     // (after the match: a watcher that starts meanwhile is seen either way)
-    let has = c.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "NameHasOwner", alloc::vec![Value::str(WATCHER)]));
+    let has = c.send(&Msg::call(DBUS, DBUS_PATH, DBUS, "GetNameOwner", alloc::vec![Value::str(WATCHER)]));
     if has.is_none() {
         WATCHER_UP.store(0, Ordering::Release);
     }
-    let mut it = Item { tray: None, named: false, own_name: false, req: 0, has: has.unwrap_or(0), revision: 1, rows: Vec::new(), notes: BTreeMap::new(), note_srv: BTreeMap::new(), pending: BTreeMap::new(), clicked: Vec::new() };
+    let mut it = Item {
+        tray: None,
+        named: false,
+        own_name: false,
+        req: 0,
+        has: has.unwrap_or(0),
+        watcher: String::new(),
+        hosts: Vec::new(),
+        refused: Vec::new(),
+        held: Vec::new(),
+        lookup: 0,
+        owners: Vec::new(),
+        revision: 1,
+        rows: Vec::new(),
+        notes: BTreeMap::new(),
+        note_srv: BTreeMap::new(),
+        pending: BTreeMap::new(),
+        clicked: Vec::new(),
+    };
     loop {
         let ops = core::mem::take(&mut *OPS.lock());
         for op in ops {
@@ -426,14 +483,94 @@ fn note_of(it: &Item, m: &Msg) -> Option<(u32, u32)> {
     it.notes.get(&srv).filter(|n| !n.1.is_empty() && n.1 == m.sender).map(|n| (srv, n.0))
 }
 
+// what a call asked for: done at once when its sender shows the item, held until the bus said
+// who owns the host names when the sender is not known yet (the header: who may act)
+fn allow(c: &mut Conn, it: &mut Item, sender: &str, a: Act) {
+    if trusted(it, sender) {
+        perform(a);
+        return;
+    }
+    let now = crate::time_us();
+    if sender.is_empty() || it.refused.iter().any(|(r, t)| r == sender && now.saturating_sub(*t) < REASK_US) || it.held.len() >= HELD_MAX {
+        return;
+    }
+    it.held.push((String::from(sender), a));
+    if it.lookup == 0 && it.owners.is_empty() {
+        match c.send(&Msg::call(DBUS, DBUS_PATH, DBUS, "ListNames", Vec::new())) {
+            Some(s) => it.lookup = s,
+            None => settle(it),
+        }
+    }
+}
+
+fn trusted(it: &Item, sender: &str) -> bool {
+    !sender.is_empty() && (sender == it.watcher || it.hosts.iter().any(|h| h == sender))
+}
+
+// the bus answered: the held actions of senders that show the item are done, the others go
+// (their senders are not asked about again for a while)
+fn settle(it: &mut Item) {
+    let now = crate::time_us();
+    for (s, a) in core::mem::take(&mut it.held) {
+        if trusted(it, &s) {
+            perform(a);
+        } else {
+            it.refused.retain(|(r, _)| *r != s);
+            remember(&mut it.refused, (s, now));
+        }
+    }
+}
+
+fn remember<T>(list: &mut Vec<T>, x: T) {
+    if list.len() >= KNOWN_MAX {
+        list.remove(0);
+    }
+    list.push(x);
+}
+
+fn perform(a: Act) {
+    match a {
+        Act::Event(e) => tray::push(e),
+        Act::Token(t) => crate::act_provide(&t),
+    }
+}
+
 fn handle(c: &mut Conn, it: &mut Item, m: &Msg) {
     match m.typ {
-        T_RETURN | T_ERROR if it.has != 0 && m.reply_to == it.has => {
+        // (the answers of the bus itself: any client may send a reply with our serial)
+        T_RETURN | T_ERROR if it.has != 0 && m.reply_to == it.has && m.sender == DBUS => {
             it.has = 0;
-            let up = m.typ == T_RETURN && matches!(m.body.first(), Some(Value::B(true)));
-            WATCHER_UP.store(up as i32, Ordering::Release);
+            let owner = if m.typ == T_RETURN { m.body.first().and_then(|v| v.as_str()).unwrap_or("") } else { "" };
+            it.watcher = String::from(owner);
+            WATCHER_UP.store(!owner.is_empty() as i32, Ordering::Release);
         }
-        T_RETURN | T_ERROR if it.req != 0 && m.reply_to == it.req => {
+        T_RETURN | T_ERROR if it.lookup != 0 && m.reply_to == it.lookup && m.sender == DBUS => {
+            // ListNames: who owns each host name
+            it.lookup = 0;
+            if let Some(Value::A(_, names)) = m.body.first().filter(|_| m.typ == T_RETURN) {
+                for n in names.iter().filter_map(|v| v.as_str()).filter(|n| HOSTS.iter().any(|p| n.starts_with(p))).take(HELD_MAX) {
+                    if let Some(s) = c.send(&Msg::call(DBUS, DBUS_PATH, DBUS, "GetNameOwner", alloc::vec![Value::str(n)])) {
+                        it.owners.push(s);
+                    }
+                }
+            }
+            if it.owners.is_empty() {
+                settle(it);
+            }
+        }
+        T_RETURN | T_ERROR if m.sender == DBUS && it.owners.contains(&m.reply_to) => {
+            it.owners.retain(|&s| s != m.reply_to);
+            if let Some(o) = m.body.first().and_then(|v| v.as_str()).filter(|_| m.typ == T_RETURN) {
+                if !it.hosts.iter().any(|h| h == o) {
+                    remember(&mut it.hosts, String::from(o));
+                }
+                it.refused.retain(|(r, _)| r != o);
+            }
+            if it.owners.is_empty() {
+                settle(it);
+            }
+        }
+        T_RETURN | T_ERROR if it.req != 0 && m.reply_to == it.req && m.sender == DBUS => {
             // RequestName: 1 primary owner, 4 already the owner
             it.req = 0;
             it.own_name = m.typ == T_RETURN && matches!(m.body.first().and_then(|v| v.as_u32()), Some(1 | 4));
@@ -473,9 +610,10 @@ fn handle(c: &mut Conn, it: &mut Item, m: &Msg) {
                     }
                 }
             }
-            ("org.freedesktop.DBus", "NameOwnerChanged") if arg_s(m, 0) == WATCHER => {
+            ("org.freedesktop.DBus", "NameOwnerChanged") if arg_s(m, 0) == WATCHER && m.sender == DBUS => {
                 // the watcher came or went (supported()); started anew: announce the item again
                 let up = !arg_s(m, 2).is_empty();
+                it.watcher = String::from(arg_s(m, 2));
                 WATCHER_UP.store(up as i32, Ordering::Release);
                 if up && it.tray.is_some() {
                     if it.named && it.req == 0 {
@@ -488,20 +626,24 @@ fn handle(c: &mut Conn, it: &mut Item, m: &Msg) {
             _ => {}
         },
         T_CALL => {
-            let r = call(it, m);
+            let mut acts = Vec::new();
+            let r = call(it, m, &mut acts);
             if m.flags & crate::linux_dbus::F_NO_REPLY == 0 {
                 c.send(&match r {
                     Some(body) => Msg::reply(m, body),
                     None => Msg::error(m, "org.freedesktop.DBus.Error.UnknownMethod", "unknown method"),
                 });
             }
+            for a in acts {
+                allow(c, it, &m.sender, a);
+            }
         }
         _ => {}
     }
 }
 
-// the answer body of a call to one of our objects (None: unknown)
-fn call(it: &Item, m: &Msg) -> Option<Vec<Value>> {
+// the answer body of a call to one of our objects (None: unknown); what it asks to be done in acts
+fn call(it: &Item, m: &Msg, acts: &mut Vec<Act>) -> Option<Vec<Value>> {
     match (m.path.as_str(), m.iface.as_str(), m.member.as_str()) {
         (_, "org.freedesktop.DBus.Peer", "Ping") => Some(Vec::new()),
         (p, "org.freedesktop.DBus.Introspectable", "Introspect") => Some(alloc::vec![Value::S(introspection(p))]),
@@ -510,15 +652,15 @@ fn call(it: &Item, m: &Msg) -> Option<Vec<Value>> {
             Some(alloc::vec![Value::dict(SNI_PROPS.iter().filter_map(|n| sni_property(it, n).map(|v| (*n, v))).collect())])
         }
         (SNI_PATH, SNI_IFACE, "Activate") => {
-            tray::push(TrayEvent::Activate);
+            acts.push(Act::Event(TrayEvent::Activate));
             Some(Vec::new())
         }
         (SNI_PATH, SNI_IFACE, "SecondaryActivate") => {
-            tray::push(TrayEvent::SecondaryActivate);
+            acts.push(Act::Event(TrayEvent::SecondaryActivate));
             Some(Vec::new())
         }
         (SNI_PATH, SNI_IFACE, "ProvideXdgActivationToken") => {
-            crate::act_provide(arg_s(m, 0));
+            acts.push(Act::Token(String::from(arg_s(m, 0))));
             Some(Vec::new())
         }
         (SNI_PATH, SNI_IFACE, "ContextMenu" | "Scroll") => Some(Vec::new()),
@@ -540,7 +682,7 @@ fn call(it: &Item, m: &Msg) -> Option<Vec<Value>> {
         }
         (MENU_PATH, MENU_IFACE, "GetProperty") => Some(alloc::vec![Value::var(Value::str(""))]),
         (MENU_PATH, MENU_IFACE, "Event") => {
-            menu_event(it, arg_i(m, 0), arg_s(m, 1));
+            menu_event(it, arg_i(m, 0), arg_s(m, 1), acts);
             Some(Vec::new())
         }
         (MENU_PATH, MENU_IFACE, "EventGroup") => {
@@ -548,7 +690,7 @@ fn call(it: &Item, m: &Msg) -> Option<Vec<Value>> {
                 for e in evs {
                     if let Value::R(f) = e {
                         let id = f.first().and_then(|v| v.as_u32()).unwrap_or(0) as i32;
-                        menu_event(it, id, f.get(1).and_then(|v| v.as_str()).unwrap_or(""));
+                        menu_event(it, id, f.get(1).and_then(|v| v.as_str()).unwrap_or(""), acts);
                     }
                 }
             }
@@ -562,13 +704,13 @@ fn call(it: &Item, m: &Msg) -> Option<Vec<Value>> {
     }
 }
 
-fn menu_event(it: &Item, id: i32, event: &str) {
+fn menu_event(it: &Item, id: i32, event: &str, acts: &mut Vec<Act>) {
     if event != "clicked" {
         return;
     }
     if let Some(r) = it.rows.iter().find(|r| r.0 == id) {
         if r.1.id != 0 && r.1.flags & (TI_DISABLED | TI_SEPARATOR) == 0 && r.1.sub.is_empty() {
-            tray::push(TrayEvent::Menu(r.1.id));
+            acts.push(Act::Event(TrayEvent::Menu(r.1.id)));
         }
     }
 }

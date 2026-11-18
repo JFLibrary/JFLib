@@ -16,7 +16,6 @@ import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
-import android.text.InputType;
 import android.view.Choreographer;
 import android.view.InputDevice;
 import android.view.KeyEvent;
@@ -435,6 +434,7 @@ public final class GalleryActivity extends Activity {
             render();
             ((GalleryActivity)getContext()).edgesFollow();
             if (connection != null) connection.syncFromNative();
+            restartIfKindChanged();
             a11y.pull();
             // a text box went away (its dialog closed): the keyboard goes with it
             boolean ime = nativeIme();
@@ -540,9 +540,16 @@ public final class GalleryActivity extends Activity {
             return true;
         }
         // a tap or a drag ended: the system's click, the text field's state, the keyboard follows
+        // the focused box is another kind (password, multi-line, one line) than the keyboard's
+        // EditorInfo: a new one (GalleryInputConnection.fillEditorInfo)
+        private void restartIfKindChanged() {
+            if (connection != null && connection.needsRestart())
+                ((InputMethodManager)getContext().getSystemService(Context.INPUT_METHOD_SERVICE)).restartInput(this);
+        }
         private void afterGesture() {
             performClick();
             if (connection != null) connection.syncFromNative();
+            restartIfKindChanged();
             InputMethodManager ime = (InputMethodManager)getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
             if (nativeIme()) ime.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT);
             else ime.hideSoftInputFromWindow(getWindowToken(), 0);
@@ -652,8 +659,6 @@ public final class GalleryActivity extends Activity {
         }
         @Override public boolean onCheckIsTextEditor() { return true; }
         @Override public InputConnection onCreateInputConnection(EditorInfo info) {
-            info.inputType = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
-            info.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_ACTION_DONE;
             if (connection != null) connection.closeConnection();
             connection = new GalleryInputConnection(this, this::requestFrame);
             connection.fillEditorInfo(info);

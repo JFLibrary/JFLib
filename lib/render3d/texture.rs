@@ -14,6 +14,11 @@
 // An array grows by doubling its layers: a new texture, the old layers copied through a buffer, the old one
 // dropped once the GPU is done with it.  Uploads go through Queue::write_texture (staged before the next
 // submission, after a barrier from Sampled: frames still reading the array finish first).
+//
+// (G7f) Removing a texture: its id becomes invalid (store.rs: a slot and a generation), its layer goes on its array's
+// list of free layers and the next texture of that class and colour space takes it (the barrier from Sampled above is
+// what makes that safe against frames in flight).  Refused while a material names it: each texture counts the material
+// rows that do.
 
 use alloc::vec;
 use alloc::vec::Vec;
@@ -21,6 +26,7 @@ use alloc::vec::Vec;
 use gpu::*;
 
 use crate::math;
+use crate::store::{Ids, slot};
 
 /// the size classes: 128 << k texels square
 pub const CLASSES: usize = 5;
@@ -45,7 +51,7 @@ pub struct TextureData<'a> {
     pub nearest: bool,
 }
 
-/// a texture of a Renderer
+/// a texture of a Renderer.  (G7f) As MeshId: a place and how often it was used before (Renderer::remove_texture)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TextureId(pub u32);
 
@@ -334,12 +340,13 @@ pub fn mip_chain(d: &TextureData) -> Vec<Vec<u8>> {
 
 // ---------------------------------------------------------------- the GPU's part: arrays per class
 
-/// one class's array in one colour space
+/// one class's array in one colour space; (G7f) the layers removed textures left
 struct ClassArray {
     tex: Option<Texture>,
     view: TextureView,
     used: u32,
     cap: u32,
+    free: Vec<u32>,
 }
 
 /// a renderer's textures: the arrays, the sampler, the bind group of draw.wgsl's group 1
@@ -351,7 +358,10 @@ pub(crate) struct Textures {
     /// the split-sum's table (G5c)
     dfg: Buffer,
     pub group: BindGroup,
-    pub info: Vec<TextureInfo>,
+    /// per slot (store.rs): where its texture lies, (G7f) the material rows that name it
+    info: Vec<TextureInfo>,
+    users: Vec<u32>,
+    ids: Ids,
     pub srgb: Srgb,
     max_layers: u32,
 }
@@ -369,7 +379,7 @@ fn placeholder(dev: &Device, srgb: bool) -> Result<ClassArray> {
     let t = dev.create_texture(&TextureDesc { width: 1, height: 1, depth: 1, layers: 1, mips: 1, format: format_of(srgb),
                                               usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST, cube: false })?;
     dev.queue().write_texture(&TextureRegion::mip(&t, 0), &[255u8; 4], DataLayout::default(), Layout::Undefined, Layout::Sampled)?;
-    Ok(ClassArray { view: array_view(&t)?, tex: Some(t), used: 0, cap: 0 })
+    Ok(ClassArray { view: array_view(&t)?, tex: Some(t), used: 0, cap: 0, free: Vec::new() })
 }
 
 impl Textures {
@@ -390,7 +400,8 @@ impl Textures {
         let dfg = dev.create_buffer(&BufferDesc { size: (crate::DFG.len() * 8) as u64, usage: BufferUsage::STORAGE, memory: MemoryKind::Device })?;
         dev.queue().write_buffer(&dfg, 0, &crate::DFG)?;
         let group = Textures::make_group(dev, &layout, &arrays, &sampler, &dfg)?;
-        Ok(Textures { arrays, layout, sampler, dfg, group, info: Vec::new(), srgb: Srgb::new(), max_layers: dev.limits().max_texture_layers.clamp(1, 1 << 16) })
+        Ok(Textures { arrays, layout, sampler, dfg, group, info: Vec::new(), users: Vec::new(), ids: Ids::new(), srgb: Srgb::new(),
+                      max_layers: dev.limits().max_texture_layers.clamp(1, 1 << 16) })
     }
 
     fn make_group(dev: &Device, layout: &BindGroupLayout, arrays: &[[ClassArray; CLASSES]; 2], sampler: &Sampler, dfg: &Buffer) -> Result<BindGroup> {
@@ -414,29 +425,73 @@ impl Textures {
         if (d.rgba.len() as u64) < d.width as u64 * d.height as u64 * 4 {
             return Err(GpuError::Invalid("add_texture: fewer bytes than width x height x 4"));
         }
-        if self.info.len() >= u32::MAX as usize - 1 {
-            return Err(GpuError::Invalid("add_texture: too many textures"));
-        }
         let class = class_of(d.width, d.height);
         let size = CLASS_MIN << class;
         let (s, c) = (d.srgb as usize, class as usize);
-        if self.arrays[s][c].used >= self.max_layers {
+        // (G7f) a layer a removed texture left, else the next one
+        let reuse = self.arrays[s][c].free.last().copied();
+        if reuse.is_none() && self.arrays[s][c].used >= self.max_layers {
             return Err(GpuError::Unsupported("add_texture: more textures of one size class than the device's array layers"));
         }
         let mips = class + 8;
-        if self.arrays[s][c].used == self.arrays[s][c].cap {
+        if reuse.is_none() && self.arrays[s][c].used == self.arrays[s][c].cap {
             self.grow(dev, s, c, size, mips)?;
         }
-        let layer = self.arrays[s][c].used;
+        let layer = reuse.unwrap_or(self.arrays[s][c].used);
         let Some(tex) = self.arrays[s][c].tex.clone() else { return Err(GpuError::Invalid("add_texture: no array")) };
         for (mip, level) in levels(d, &self.srgb).iter().enumerate() {
             let n = (size >> mip).max(1);
             let region = TextureRegion { texture: &tex, mip: mip as u32, origin: [0; 3], size: [n, n, 1], base_layer: layer, layers: 1 };
             dev.queue().write_texture(&region, level, DataLayout::default(), Layout::Sampled, Layout::Sampled)?;
         }
-        self.arrays[s][c].used += 1;
-        self.info.push(TextureInfo { class, size, layer, srgb: d.srgb, width: d.width, height: d.height, resampled: (d.width, d.height) != (size, size) });
-        Ok(TextureId(self.info.len() as u32 - 1))
+        let Some((t, id)) = self.ids.make() else { return Err(GpuError::Unsupported("add_texture: no place left for a texture (2^24)")) };
+        if reuse.is_some() {
+            self.arrays[s][c].free.pop();
+        } else {
+            self.arrays[s][c].used += 1;
+        }
+        let info = TextureInfo { class, size, layer, srgb: d.srgb, width: d.width, height: d.height, resampled: (d.width, d.height) != (size, size) };
+        if t == self.info.len() {
+            self.info.push(info);
+            self.users.push(0);
+        } else {
+            self.info[t] = info;
+            self.users[t] = 0;
+        }
+        Ok(TextureId(id))
+    }
+
+    /// (G7f) a texture goes: Invalid when it is not there or a material names it; its layer comes free
+    pub fn remove(&mut self, id: TextureId) -> Result<()> {
+        let Some(t) = self.ids.get(id.0) else { return Err(GpuError::Invalid("remove_texture: no such texture")) };
+        if self.users[t] > 0 {
+            return Err(GpuError::Invalid("remove_texture: a material names it"));
+        }
+        let i = self.info[t];
+        self.arrays[i.srgb as usize][i.class as usize].free.push(i.layer);
+        self.ids.kill(t);
+        Ok(())
+    }
+
+    /// (G7f) where a live texture lies
+    pub fn info_of(&self, id: TextureId) -> Option<TextureInfo> {
+        self.ids.get(id.0).map(|t| self.info[t])
+    }
+
+    /// (G7f) live textures
+    pub fn count(&self) -> u32 {
+        self.ids.count()
+    }
+
+    /// (G7f) a material row names these textures (u32::MAX: none) or no longer does (they are alive: its words checked them)
+    pub fn use_all(&mut self, ids: &[u32; 5], add: bool) {
+        for &id in ids {
+            if id != u32::MAX {
+                if let Some(u) = self.users.get_mut(slot(id)) {
+                    *u = if add { *u + 1 } else { u.saturating_sub(1) };
+                }
+            }
+        }
     }
 
     /// twice the layers (4 at first): a new array, the old layers copied across through a buffer
@@ -480,7 +535,8 @@ impl Textures {
         }
         e.texture_barrier(&t, Layout::CopyDst, Layout::Sampled);
         dev.queue().submit([e.finish()?])?;
-        self.arrays[s][c] = ClassArray { view: array_view(&t)?, tex: Some(t), used, cap };
+        let free = core::mem::take(&mut self.arrays[s][c].free);
+        self.arrays[s][c] = ClassArray { view: array_view(&t)?, tex: Some(t), used, cap, free };
         self.group = Textures::make_group(dev, &self.layout, &self.arrays, &self.sampler, &self.dfg)?;
         Ok(())
     }
@@ -488,7 +544,7 @@ impl Textures {
     /// the texture word of a material slot: layer | class << 16 | mode << 20 | linear << 28
     pub fn word(&self, r: &Option<TextureRef>) -> Result<u32> {
         let Some(r) = r else { return Ok(NO_TEXTURE) };
-        let Some(i) = self.info.get(r.texture.0 as usize) else { return Err(GpuError::Invalid("Material: a texture the renderer does not have")) };
+        let Some(i) = self.ids.get(r.texture.0).map(|t| &self.info[t]) else { return Err(GpuError::Invalid("Material: a texture the renderer does not have")) };
         Ok(i.layer | i.class << 16 | r.sampling.bits() << 20 | (!i.srgb as u32) << 28)
     }
 

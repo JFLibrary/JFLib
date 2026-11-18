@@ -88,6 +88,7 @@ pub(crate) const UWI_NEWSHOW: u32 = 128; // became visible in this frame
 pub(crate) const UWI_BUILDING: u32 = 256; // between window_begin and window_end
 pub(crate) const UWI_FRESH: u32 = 512; // shown again: its focus starts empty
 pub(crate) const UWI_DEFPOS: u32 = 1024; // placed by the default rule (re-centred while its height settles)
+pub(crate) const UWI_SAVEDPOS: u32 = 2048; // placed from the state file: moved onto a monitor once (winstate)
 
 // pending platform operations (UWW_*)
 const UWW_SHOW: u32 = 1;
@@ -1456,7 +1457,7 @@ impl Ui {
                 }
                 w
             }
-            plat::E_FOCUS_OUT => w,
+            plat::E_FOCUS_OUT | plat::E_RAW_MOTION | plat::E_POINTER_LOCK => w, // ((G7a) the lock's own window)
             _ => {
                 // pointer: another window than the last one -> that one is left first
                 let last = self.m.win.ptr;
@@ -2391,6 +2392,26 @@ impl Ui {
                 // not known yet: placed when it is (uiw_winpos of the owner)
             }
             plat::win_set_rect(pw, x, y, fw, fh);
+            // a tool window at its saved place: onto the nearest monitor's work area when (almost)
+            // nothing of it is on one (a monitor that is gone, another arrangement), as the main
+            // window; the new place is its rectangle from then on
+            let iu = (i as usize) & (WIN_MAX - 1);
+            if x != plat::PW_KEEP && self.m.win.recs[iu].state & UWI_SAVEDPOS != 0 {
+                self.m.win.recs[iu].state &= !UWI_SAVEDPOS;
+                if let (Some(r), Some(area)) = (plat::win_get_rect(pw), plat::win_work_area(pw)) {
+                    let (fx, fy) = super::winstate::fit_area(r[0], r[1], r[2], r[3], area);
+                    if (fx, fy) != (r[0], r[1]) {
+                        plat::win_set_rect(pw, fx, fy, plat::PW_KEEP, plat::PW_KEEP);
+                        let owner = self.m.win.recs[iu].owner;
+                        let odpi = self.win_dpi(owner);
+                        let (ox, oy) = self.uiw_owner_origin(i);
+                        let mut nr = *rc;
+                        nr.x = super::layout::px2dip_at(x + fx - r[0] - ox, odpi);
+                        nr.y = super::layout::px2dip_at(y + fy - r[1] - oy, odpi);
+                        self.m.win.recs[iu].rect.set(nr);
+                    }
+                }
+            }
             return;
         }
         let dpi = self.win_dpi(0);

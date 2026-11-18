@@ -17,6 +17,8 @@
 //   scene.add_block(&Block) -> BlockId, insert_in(block, style, &Shape); Shape::Insert(Insert) places a block on a
 //        layer or in another block (moved by update, arrays as DXF's MINSERT)
 //   scene.set_camera(&Camera)                                   centre (f64), scale (units per pixel), rotation
+//   dxf::load(&mut scene, &bytes, &dxf::Options) -> Loaded      (G6e2) a DXF drawing into the scene (dxf.rs, dxftext.rs;
+//        the reader is the crate jflib-dxf)
 //   a frame:
 //        scene.prepare(&mut renderer, (w, h))?;         waits for this slot's last frame, uploads what changed
 //        renderer.record(&mut encoder, &scene, color)?;
@@ -39,6 +41,8 @@ use gpu::*;
 mod atlas;
 mod block;
 pub mod curve;
+pub mod dxf;
+mod dxftext;
 pub mod fill;
 mod geo;
 mod index;
@@ -89,6 +93,18 @@ pub(crate) const DRAW_BYTES: u64 = 20;
 /// timestamps per frame: start, after the uploads, after the visibility, after the draw
 pub(crate) const STAMPS: u32 = 4;
 pub(crate) const WG_SCATTER: u32 = 64;
+
+/// (G6e3) the scatter's changes in one dispatch: as many as its workgroups (of WG_SCATTER) and a storage binding reach, a
+/// piece's bytes a multiple of the binding offsets' alignment (the change buffer is bound per piece)
+fn scatter_chunk(l: &Limits) -> u32 {
+    let bytes = CHANGE_WORDS as u64 * 4;
+    let align = (l.min_storage_offset_alignment as u64).max(1);
+    let mut n = (l.max_compute_workgroups[0] as u64 * WG_SCATTER as u64).min(l.max_storage_binding as u64 / bytes).min(u32::MAX as u64 / 2).max(1);
+    while n > 1 && (n * bytes) % align != 0 {
+        n -= 1;
+    }
+    n as u32
+}
 
 /// the shaders, compiled from the *.wgsl beside this file with common.wgsl in front (render2dtest --test shaders
 /// compares them with what wgsl::compile makes of them, --gen-shaders writes them again); the browser takes the WGSL
@@ -187,11 +203,18 @@ pub struct RendererDesc {
     pub color: Format,
     /// frames the CPU may record ahead of the GPU (1 ..= FRAMES_MAX)
     pub frames_in_flight: usize,
+    /// (G6e3) a render pass of its own, after a barrier, for a run of layers whose fragment shader needs scratch memory
+    /// (fs_full, fs_fill, fs_text_all, the overlay's fs_fill) when the last such run before it took another pipeline: None
+    /// decides by the adapter (on for Intel under Vulkan: Mesa's driver gives such shaders of two draws the same scratch
+    /// memory with their own strides, on Gen9 they overwrote each other's spilled registers; docs/RENDER2D.md "Die anderen
+    /// Ziele (G6e3)"), Some forces it either way.  No pixel changes; on GPUs that draw in tiles each pass costs a store and
+    /// a load of the target
+    pub separate_scratch: Option<bool>,
 }
 
 impl RendererDesc {
     pub const fn new(color: Format) -> RendererDesc {
-        RendererDesc { color, frames_in_flight: 2 }
+        RendererDesc { color, frames_in_flight: 2, separate_scratch: None }
     }
 }
 
@@ -204,8 +227,13 @@ pub struct Renderer {
     pub(crate) desc: RendererDesc,
     /// level Voll: one multi-draw for all visible layers; else one indirect draw per layer
     pub(crate) multi: bool,
+    /// (G6e3) RendererDesc::separate_scratch as decided
+    pub(crate) separate: bool,
     pub(crate) max_records: u32,
     pub(crate) max_entries: u32,
+    /// (G6e3) the changes one dispatch of the scatter shader reaches: its workgroups and its binding (each piece's offset
+    /// aligned for a storage binding); more in one frame go up in pieces
+    pub(crate) scatter_chunk: u32,
     pub(crate) tag: Arc<Tag>,
     count: ComputePipeline,
     scan: ComputePipeline,
@@ -389,12 +417,17 @@ impl Renderer {
         let by_dispatch = max_entries as u64 * PAGE as u64;
         // (below 2^29: bits 29 and 30 of a visible list's word carry the highlight, G6d)
         let max_records = (by_binding / PAGE as u64 * PAGE as u64).min(by_dispatch).min(1 << 29) as u32;
+        let scatter_chunk = scatter_chunk(&l);
+        let info = dev.info();
+        let separate = desc.separate_scratch.unwrap_or(info.vendor_id == 0x8086 && info.backend == "Vulkan");
         Ok(Renderer {
             dev: dev.clone(),
             desc: *desc,
             multi,
+            separate,
             max_records,
             max_entries,
+            scatter_chunk,
             tag: Arc::new(Tag),
             count,
             scan,
@@ -593,11 +626,28 @@ impl Renderer {
             }
         }
         if s.up.scatter > 0 {
-            let Some(group) = &f.scatter_group else { return Err(GpuError::Invalid("record: Scene::prepare comes first")) };
+            // (G6e3) in pieces of what one dispatch reaches, each with its binding of the change buffer: one piece on most
+            // desktop GPUs, more on Metal, in the browser and on phones (65 535 workgroups) for millions of records
+            if f.scatter_groups.len() < s.up.scatter.div_ceil(self.scatter_chunk) as usize {
+                return Err(GpuError::Invalid("record: Scene::prepare comes first"));
+            }
             e.set_compute_pipeline(&self.scatter);
-            e.set_bind_group(0, group);
-            e.push_constants(0, &[s.up.scatter]);
-            e.dispatch(s.up.scatter.div_ceil(WG_SCATTER), 1, 1);
+            let mut left = s.up.scatter;
+            for (k, group) in f.scatter_groups.iter().enumerate() {
+                if left == 0 {
+                    break;
+                }
+                let n = left.min(self.scatter_chunk);
+                if k > 0 {
+                    // (the pieces write other records of the pool; the barrier keeps the validation's view of one buffer
+                    // written by two dispatches quiet)
+                    e.barrier(Access::COMPUTE_WRITE, Access::COMPUTE_WRITE);
+                }
+                e.set_bind_group(0, group);
+                e.push_constants(0, &[n]);
+                e.dispatch(n.div_ceil(WG_SCATTER), 1, 1);
+                left -= n;
+            }
         }
         // the uploads (copies, scatter) before the visibility and the vertex shader read them
         e.barrier(Access::COPY_WRITE | Access::COMPUTE_WRITE, Access::COMPUTE_READ | Access::GRAPHICS_READ);
@@ -651,7 +701,9 @@ impl Renderer {
         if let Some(ts) = ts {
             e.timestamp(ts, base + 2);
         }
-        e.begin_render(&RenderPassDesc { color: &[color], depth: None });
+        // the runs to draw: (the first layer and how many, or None: the overlay), the pipeline, its bind group, whether its
+        // fragment shader needs scratch memory (fs_full, fs_fill, fs_text_all: they spill on Intel's Gen9)
+        let mut runs: alloc::vec::Vec<(Option<(u32, u32)>, &RenderPipeline, &BindGroup, bool)> = alloc::vec::Vec::new();
         if layers > 0 {
             // runs of visible layers that take the same pipeline: those with fills fs_fill, with arcs or dash patterns
             // fs_full, the others fs; text alone fs_text, text among others fs_text_all (G6c: their own bind group)
@@ -677,22 +729,8 @@ impl Renderer {
                     (None, scene::CLASS_FULL) => (&self.stroke_full, Some(&g.draw)),
                     (None, _) => (&self.stroke, Some(&g.draw)),
                 };
-                let Some(group) = group else {
-                    k += n;
-                    continue;
-                };
-                e.set_render_pipeline(pipe);
-                e.set_bind_group(0, group);
-                e.set_index_buffer(&self.quads, 0, IndexFormat::U16);
-                if self.multi {
-                    e.push_constants(0, &[0u32]);
-                    e.draw_indexed_indirect_multi(&s.draws_buf, k as u64 * DRAW_BYTES, n, DRAW_BYTES as u32);
-                } else {
-                    // WebGPU and Vulkan 1.1: no first instance is sure to work; the layer comes as a push constant
-                    for j in k..k + n {
-                        e.push_constants(0, &[j]);
-                        e.draw_indexed_indirect(&s.draws_buf, j as u64 * DRAW_BYTES);
-                    }
+                if let Some(group) = group {
+                    runs.push((Some((k, n)), pipe, group, matches!(cls, scene::CLASS_FULL | scene::CLASS_FILL | scene::CLASS_TEXT_ALL)));
                 }
                 k += n;
             }
@@ -700,11 +738,58 @@ impl Renderer {
         // (G6d) the overlay over everything: its own records, one draw of fs_fill (strokes, arcs, dashes, fills)
         if let (Some(ov), Some(gg)) = (&s.up.ov, &s.ov_gpu) {
             if let (true, Some(group)) = (ov.quads > 0, &gg.group) {
-                e.set_render_pipeline(&self.stroke_fill);
-                e.set_bind_group(0, group);
-                e.set_index_buffer(&self.quads, 0, IndexFormat::U16);
-                e.push_constants(0, &[0u32]);
-                e.draw_indexed(6 * ov.quads.min(BATCH), ov.quads.div_ceil(BATCH), 0, 0, 0);
+                runs.push((None, &self.stroke_fill, group, true));
+            }
+        }
+        // (G6e3) where a pass ends: before a run whose fragment shader needs scratch memory, when the last such run before it
+        // had another pipeline (RendererDesc::separate_scratch; Mesa's Intel driver gives the fragment shaders of both draws
+        // the same scratch memory with their own strides and lets the second start while the first runs: on Gen9 they
+        // overwrote each other's spilled registers, 2 x 2 pixels wrong at random)
+        let mut cut = alloc::vec![false; runs.len()];
+        if self.separate {
+            let mut last: Option<&RenderPipeline> = None;
+            for (c, r) in cut.iter_mut().zip(&runs) {
+                if r.3 {
+                    *c = last.is_some_and(|q| !core::ptr::eq(q, r.1));
+                    last = Some(r.1);
+                }
+            }
+        }
+        let cuts = cut.iter().filter(|&&c| c).count();
+        let first = if cuts > 0 { ColorAttachment { store: true, after: Layout::ColorTarget, ..color } } else { color };
+        e.begin_render(&RenderPassDesc { color: &[first], depth: None });
+        let mut passes = 0;
+        for (r, &c) in runs.iter().zip(&cut) {
+            if c {
+                e.end_render();
+                // (the colour writes of the pass before, done, before this one's: the driver waits for its threads)
+                e.barrier(Access::COLOR_TARGET, Access::COLOR_TARGET);
+                passes += 1;
+                let next = ColorAttachment { load: Load::Keep, before: Layout::ColorTarget, ..color };
+                let next = if passes < cuts { ColorAttachment { store: true, after: Layout::ColorTarget, ..next } } else { next };
+                e.begin_render(&RenderPassDesc { color: &[next], depth: None });
+            }
+            e.set_render_pipeline(r.1);
+            e.set_bind_group(0, r.2);
+            e.set_index_buffer(&self.quads, 0, IndexFormat::U16);
+            match r.0 {
+                Some((k, n)) if self.multi => {
+                    e.push_constants(0, &[0u32]);
+                    e.draw_indexed_indirect_multi(&s.draws_buf, k as u64 * DRAW_BYTES, n, DRAW_BYTES as u32);
+                }
+                Some((k, n)) => {
+                    // WebGPU and Vulkan 1.1: no first instance is sure to work; the layer comes as a push constant
+                    for j in k..k + n {
+                        e.push_constants(0, &[j]);
+                        e.draw_indexed_indirect(&s.draws_buf, j as u64 * DRAW_BYTES);
+                    }
+                }
+                None => {
+                    if let Some(ov) = &s.up.ov {
+                        e.push_constants(0, &[0u32]);
+                        e.draw_indexed(6 * ov.quads.min(BATCH), ov.quads.div_ceil(BATCH), 0, 0, 0);
+                    }
+                }
             }
         }
         e.end_render();

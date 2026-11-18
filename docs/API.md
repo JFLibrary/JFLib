@@ -65,7 +65,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
 - [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, text from an atlas of multi-channel distance fields, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
-  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [hl.rs](#render2dhlrs) · [overlay.rs](#render2doverlayrs) · [pick.rs](#render2dpickrs) · [cpu.rs](#render2dcpurs) · [text.rs](#render2dtextrs)
+  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [dxf.rs](#render2ddxfrs) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [hl.rs](#render2dhlrs) · [overlay.rs](#render2doverlayrs) · [pick.rs](#render2dpickrs) · [cpu.rs](#render2dcpurs) · [text.rs](#render2dtextrs)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -109,11 +109,15 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
-  <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs (Linux)](#rtkernelrs-linux) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
+  <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
   <br>[lib.rs](#pdf-crate-root) · [src/canvas.rs](#pdfsrccanvasrs) · [src/font.rs](#pdfsrcfontrs) · [src/geom.rs](#pdfsrcgeomrs) · [src/image.rs](#pdfsrcimagers)
 - [diagram_view](#diagram_view) -- draws diagram pages (the display list of diagram_core) on render2d and gfx
   <br>[src/fonts.rs](#diagram_viewsrcfontsrs) · [src/image.rs](#diagram_viewsrcimagers) · [src/view.rs](#diagram_viewsrcviewrs)
+- [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
+  <br>[lib.rs](#dxf-crate-root) · [src/fonts.rs](#dxfsrcfontsrs) · [src/mtext.rs](#dxfsrcmtextrs) · [src/strings.rs](#dxfsrcstringsrs)
+- [physics](#physics) -- Collision shapes, broad phase and deterministic queries for games
+  <br>[src/bvh.rs](#physicssrcbvhrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
 
 ## ui
 
@@ -169,13 +173,13 @@ hclip_text_* / open_folder / open_url (ui-edit).
 
 - [App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks): `fb`, `client_size`, `anim_off`, `set_anim_off`, `headless`, `invalidate`, `quit`, `set_title`, `title`, `spawn`, `spawner`, `tasks_live`
 - [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
-- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `key_event_take`, `text_take`, `cursor_at`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
+- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `pointer_lock`, `pointer_lock_state`, `pointer_motion`, `key_code_down`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `key_event_take`, `text_take`, `cursor_at`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`, `canvas_label`
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `popup_close_id`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_preedit`, `ime_enable`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_reveal`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
-- [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
+- [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `list_end_full`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
 - [Data views: grid, tree, badges, meters](#data-views-grid-tree-badges-meters): `grid_begin`, `grid_row`, `grid_cell`, `grid_text`, `grid_text_ts`, `grid_end`, `tree`, `badge`, `status_dot`, `meter`
 - [Shell parts: navigation, command bar, splitter, breadcrumb, wizard steps](#shell-parts-navigation-command-bar-splitter-breadcrumb-wizard-steps): `nav_begin`, `nav_toggle`, `nav_section`, `nav_item`, `nav_footer`, `nav_end`, `command_bar`, `split_begin`, `split_next`, `split_end`, `breadcrumb`, `segmented`, `wizard_steps`, `page_header`, `key_value`, `empty_state`
 - [Docking: panels at the sides, tab groups, floating tool windows](#docking-panels-at-the-sides-tab-groups-floating-tool-windows): `dock_begin`, `dock_next`, `dock_end`
@@ -202,6 +206,8 @@ Re-exports: `img_svg::Svg`
 Re-exports: `plat::{Preedit, IP_EMAIL, IP_NUMBER, IP_PASSWORD, IP_PHONE, IP_SEARCH, IP_TEXT, IP_URL}`
 
 Re-exports: `plat::BrowserStatus`
+
+Re-exports: `plat::PointerLock`
 
 Re-exports: `rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH}`
 
@@ -418,9 +424,11 @@ event carries its window (Event::win).
 
 - **`fn launch(desc: &AppDesc, app: impl App + 'static, style: &'static dyn Style) -> i32`**
   Launch the same owned app on a desktop event loop, browser worker, Android or iOS host.
-  Host-driven applications remain alive after their entrypoint returns.  iOS: a headless run
-  (--shot, --script, --agent-json, --agent-mcp) stays the desktop's, the rest is the UIKit host's
-  (plat apple_ios.rs, which takes the main thread when this returned 0).
+  Host-driven applications remain alive after their entrypoint returns.  iOS and Android: a
+  headless run (--shot, --script, --agent-json, --agent-mcp) stays the desktop's, the rest is the
+  UIKit host's (plat apple_ios.rs, which takes the main thread when this returned 0) or the Java
+  host's (Android: a program without a UI runs its scripts that way, docs/ANDROID.md AN0; the
+  desktop's runner adds about 290 KB to an APK).
 
 - **`struct Runtime`**
   An owned application driven one event/tick at a time. Browser hosts and automation
@@ -644,9 +652,9 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
   - `mods: u32` -- MOD_\* at the time
   - `down: bool` -- down (true) or up
   - `repeat: bool` -- a down of the system's auto-repeat while the key is held
-  - `scancode: u32` -- the key's place on the keyboard, whatever the layout: Windows' scan code (0xE0.. for
-    extended keys), Linux's evdev code; 0 where the platform does not tell (macOS, the
-    browser, Android)
+  - `scancode: u32` -- the platform's code of the key's place on the keyboard, whatever the layout: Windows' scan
+    code (0xE0.. for extended keys), Linux's evdev code, (G7a) the USB HID usage on macOS,
+    iOS and in the browser; 0 where the platform does not tell (Android)
   - `location: u32` -- KL_STANDARD, KL_LEFT / KL_RIGHT (the two Shift, Ctrl, Alt, Windows keys), KL_NUMPAD
   - `ch: u32` -- the character the keyboard layout gives the key with Shift, Caps Lock and AltGr as they
     are but without Ctrl, Alt and the Windows / Super key (0: none) -- what a browser names
@@ -657,6 +665,9 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
     Android; a headless run's keys have the US layout's (scripts: `keydown ... char "c"`)
   - `dead: bool` -- the key is a dead key (´ ^ ~ ...): ch is its spacing character, the text it makes
     comes with the next key
+  - `code: u32` -- (G7a) where the key sits as a USB HID usage, the same on every platform and layout
+    (plat::KC_\*: KC_W is the key right of Q on a US keyboard, Z on a French one); 0 where the
+    platform does not tell (Android).  plat::key_label(code) says what the layout prints on it
 
 - **`struct Sem`**
   semantic record (dump / expect)  [SR_\*]
@@ -726,6 +737,26 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
   ui_mouse: pointer position in px (-1 when outside)
 - **`fn pen(&self) -> (u32, u32)`**
   ui_pen: (pressure 0 = none / 1..UI_PRESSURE_ONE, PTR_\*) of the last pointer event
+- **`fn pointer_lock(&mut self, on: bool) -> plat::PointerLock`**
+  (G7a) lock the pointer to this window (on) or let it go (off) -> the state right after the
+  call (plat::win_pointer_lock): Locked, Pending while the platform waits (the window has no
+  focus yet, the browser waits for the next press in the page, Wayland for the compositor),
+  Unsupported (Android, iOS, a display without the means), Refused.  While locked the pointer
+  is hidden and stays put, ui.pointer_motion has its raw motion, a change of the state gives a
+  pass.  Esc, the window losing the focus, minimizing and closing it always let it go (Esc
+  then reaches the app as no key); it is never taken back by itself.  A headless run (scripts)
+  plays the lock: Locked at once, Esc lets it go, `motion DX DY` moves it
+- **`fn pointer_lock_state(&self) -> plat::PointerLock`**
+  (G7a) the state of this window's pointer lock (Off when another window holds it)
+- **`fn pointer_motion(&self) -> (f64, f64)`**
+  (G7a) the raw motion of the locked pointer since the last pass of this window: (dx, dy),
+  right and down positive, in the device's counts where the platform gives them (Windows,
+  Wayland, X11, the browser with unadjustedMovement), else in its accelerated pixels (macOS,
+  the browser without it); (0, 0) while the pointer is not locked.  A game turns its camera by
+  it times a sensitivity
+- **`fn key_code_down(&self, code: u32) -> bool`**
+  (G7a) the key at USB HID usage `code` (plat::KC_\*: where it sits, whatever the layout) is
+  held; KeyEvent::code of its down and up
 - **`fn focus(&mut self, id: u32)`**
   ui_focus(id): give the keyboard focus to a widget (focus ring shown).  The id is
   looked up in whichever window emits it in the next pass (that window is activated).
@@ -1237,13 +1268,15 @@ widgets                                                             [src/ui/ui_e
        the asm's buffer in bytes incl. the NUL (bits 0..22: the text holds at most cap - 1
        bytes) | TB_PASSWORD | TB_READONLY | TB_DIGITS | TB_SIGNED.  placeholder (or None)
        TB_PASSWORD: while it has the keyboard the input method's purpose is IP_PASSWORD (set
-       by the box itself, the purpose of before put back after; no plat::ime_purpose needed).
+       by the box itself, the purpose of before put back after; no plat::ime_purpose needed);
+       always one line (TB_MULTI with it is ignored).
        shows while the text is empty (cut with "…" where the box is narrower).
        ST_DISABLED via next_flags.
        EV_ACT: the text changed this frame; EV_COMMIT: Enter, Esc or focus lost; EV_FOCUS
        while it has the keyboard focus.
        Semantic record K_TEXTBOX: label = the text (one dot per character for passwords),
-       value = caret, max = selection anchor (byte indices; 0 while not focused), min = the
+       value = caret, max = selection anchor (byte indices of the label, of the dots for
+       passwords; 0 while not focused), min = the
        kind of box: (TB_MULTI | TB_PASSWORD | TB_READONLY) >> 24.
        TB_MULTI (U1): several lines (natural height 5 lines): Enter inserts a line break,
        Ctrl+Enter commits, Up / Down keep the preferred x, PgUp / PgDn move a view, Home /
@@ -2682,15 +2715,20 @@ list -- scroll views, scroll bars, lists, tabs and expanders (WinUI 3 style)
        around it.
        LF_REORDER (U1): a row dragged more than 4 DIP is moved: an accent insertion line
        follows the pointer, the view scrolls near its edges, Esc cancels; on release
-       list_end returns EV_DRAG with from | to << 16 (the app moves item `from` so that it
-       ends at index `to`) and sel = to.  Widgets inside custom rows keep their clicks.
-       The keyboard moves the selected row the same way: Ctrl+Up / Ctrl+Down one place,
-       Ctrl+Home / Ctrl+End to the top / bottom.
+       list_end_full reports EV_DRAG with drop = Some((from, to)) (the app moves item `from`
+       so that it ends at index `to`) and sel = to.  Widgets inside custom rows keep their
+       clicks.  The keyboard moves the selected row the same way: Ctrl+Up / Ctrl+Down one
+       place, Ctrl+Home / Ctrl+End to the top / bottom.
   list_item(i, label) -> EV              text row (EV_ACT clicked, EV_DOUBLE, EV_RCLICK)
   list_item_begin(i) -> EV               custom row: opens a BOX_H inside the row
   list_item_end()
-  list_end(&mut sel) -> (EV, sel)        EV_ACT if sel changed this pass, EV_DOUBLE;
-                                         EV_DRAG: a row was dropped (from | to << 16)
+  list_end_full(&mut sel) -> ListEnd     { ev, sel, drop }: EV_ACT if sel changed this pass,
+                                         EV_DOUBLE; EV_DRAG with drop = Some((from, to)): a row
+                                         was dropped (any number of rows)
+  list_end(&mut sel) -> (EV, sel)        the same with the drop packed as from | to << 16 in
+                                         place of sel -- 16 bits each: a drop that does not fit
+                                         (a row from 65 536 on) is not reported, the selection
+                                         stays on the row (lists that long: list_end_full)
        (Rust: list_begin reads the selection into the list, list_end writes it back --
        the asm keeps a pointer to the app's variable in between; list_sel() reads it in
        the rows)
@@ -2704,6 +2742,13 @@ list -- scroll views, scroll bars, lists, tabs and expanders (WinUI 3 style)
 Widget ids used internally: (id << 3 | k) | 0x80000000 for sub parts (k = 1..7),
 (id + 1 + i) | 0xC0000000 for the content box of custom list rows.
 ```
+
+- **`struct ListEnd`**
+  What `Ui::list_end_full` reports at the end of a list.
+  - `ev: u32` -- EV_ACT the selection changed this pass, EV_DOUBLE (a double click or Enter on a row),
+    EV_DRAG a row was dropped (LF_REORDER)
+  - `sel: i32` -- the selection (-1 = none), also written to the `sel` handed to list_end_full
+  - `drop: Option<(usize, usize)>` -- with EV_DRAG: (from, to) -- the app moves item `from` so that it ends at index `to`
 
 **`impl Ui`**
 
@@ -2735,7 +2780,14 @@ Widget ids used internally: (id << 3 | k) | 0x80000000 for sub parts (k = 1..7),
   ui_list_item_end
 - **`fn list_end(&mut self, sel: &mut i32) -> (u32, i32)`**
   ui_list_end(&mut sel) -> (EV_\* (EV_ACT if sel changed, EV_DOUBLE), sel); EV_DRAG: a
-  row was dropped, the second value is from | to &lt;&lt; 16
+  row was dropped, the second value is from | to &lt;&lt; 16.  Only while both fit in 16 bits:
+  a drop from or to a row past 65 535 is not reported (no EV_DRAG, the selection stays on
+  the row) -- `list_end_full` reports every drop as two numbers
+- **`fn list_end_full(&mut self, sel: &mut i32) -> ListEnd`**
+  The end of a list: its events (EV_ACT the selection changed this pass, EV_DOUBLE,
+  EV_DRAG a row was dropped), the selection written back to `sel` (-1 = none) and, with
+  EV_DRAG, `drop = Some((from, to))`: the app moves item `from` so that it ends at index
+  `to` (sel is `to` then).  Any number of rows (`list_end` packs the drop into 16 bits each).
 - **`fn tabs_scrolling(&mut self, id: u32, sel: &mut i32, names: &[&str]) -> u32`**
   Tab strip with horizontal overflow arrows. Mouse scrolling and Left/Right,
   Home/End on the strip retain ordinary tab semantics; changed selections
@@ -8881,7 +8933,9 @@ history -- undo / redo for an app's own state
   h.undo(&mut state) / h.redo(&mut state) -> bool
   h.can_undo() / can_redo()            undo_label() / redo_label() -> the step's label;
                                        undo_value() / redo_value() -> the step as data
-  h.group_begin(label) / group_end()   the edits between them are one step
+  h.group_begin(label) / group_end()   the edits between them are one step (undo / redo
+                                       while one is open close it first: its edits so far
+                                       are the newest step, a later group_end does nothing)
   h.mark_saved() / dirty()             whether the state differs from the saved one
   h.mark_unsaved()                     the state counts as unsaved (a recovered copy)
   h.clear()
@@ -8928,13 +8982,15 @@ all back.  Text fields keep their own undo; the edits here are the app's.
 - **`fn record(&mut self, mut edit: Box<dyn Edit<S>>)`**
   record an edit that was already applied
 - **`fn undo(&mut self, s: &mut S) -> bool`**
-  take the newest step back -> false when there is none
+  take the newest step back -> false when there is none (an open group is closed first)
 - **`fn redo(&mut self, s: &mut S) -> bool`**
-  do the last undone step again -> false when there is none
+  do the last undone step again -> false when there is none (an open group is closed
+  first: with edits in it there is nothing to redo any more)
 - **`fn can_undo(&self) -> bool`**
 - **`fn can_redo(&self) -> bool`**
 - **`fn undo_label(&self) -> Option<&str>`**
-  the label of the step undo would take back
+  the label of the step undo would take back (an open group with edits: the outermost
+  group's)
 - **`fn redo_label(&self) -> Option<&str>`**
   the label of the step redo would do again
 - **`fn undo_value(&self) -> Option<&dyn core::any::Any>`**
@@ -9517,7 +9573,9 @@ is drawn by the output's render pass: every frame read back into the framebuffer
 lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 
 Script command `gpu` (headless runs stay on the CPU path without it; on other targets (a static
-Linux program, the browser), or without a GPU, it prints a SKIP once and does nothing):
+Linux program, the browser), without a GPU, or when the screen's work area cannot hold the
+window at `gpu on` (the system keeps it smaller, on the CPU path), it prints a SKIP once and
+does nothing):
   gpu on [fast]          a real window per UI window (shown without activation) with
                          the output, every presented image compared with the framebuffer (fast:
                          not compared, for measurements), a render after every input edge; waits
@@ -10762,7 +10820,9 @@ TK_KEY: u32 = 0x8000_0000  // TermEv::Raw: a key (VK | MOD_* << 16), not a chara
 - **`fn set_prompt(&mut self, s: &str)`**
   the prompt before the input (SGR allowed)
 - **`fn set_mode(&mut self, mode: u8)`**
-  TM_LINE, TM_BUSY, TM_RAW or TM_SECRET
+  TM_LINE, TM_BUSY, TM_RAW or TM_SECRET; into or out of TM_SECRET the input typed so far
+  is dropped (overwritten): a hidden line showed in the next mode's input line, a visible
+  one became part of the secret
 - **`fn input_set(&mut self, s: &str, caret: usize)`**
   replace the input line; caret: a byte index (clamped to a character start)
 - **`fn input(&self) -> &str`**
@@ -11129,7 +11189,7 @@ state_save / state_load work there as well (the main window: its size only).
 and ignores them), w / h (DIP, the size before maximizing or minimizing), max (0 / 1).  A
 position off every monitor (a monitor that is gone) is centred on the work area of the
 nearest one.  [window ID] (decimal id): open (0 / 1) and x / y / w / h (DIP, relative to
-the owner's client area: the WinRect).  Only tool windows (WF_TOOL, not WF_DIALOG /
+the owner's client area: the WinRect; off every monitor: centred like the main window).  Only tool windows (WF_TOOL, not WF_DIALOG /
 WF_MODAL) are kept; sections of windows that did not run this time stay in the file.
 ```
 
@@ -13117,7 +13177,8 @@ rcurveline, rlinecurve, flex, hflex, hflex1, flex1), hint operators (stems are c
 hintmask / cntrmask and skipped), callsubr / callgsubr (bias 107 / 1131 / 32768, nesting
 <= 10), return, endchar (a seac accent is ignored), the arithmetic / storage operators
 (abs add sub div neg eq drop put get ifelse random mul sqrt dup exch index roll and or
-not).  Argument stack 48, transient array 32, at most 200000 operators per glyph.  The
+not).  Argument stack 48, transient array 32, at most 200000 operators per glyph, at most
+256 font DICTs, a Private DICT read to at most 64 KiB.  The
 width argument is dropped (advances come from hmtx).  Like the assembly, the transient
 array and the random generator are process-wide.
 
@@ -14144,7 +14205,8 @@ WK_PUNCT: u32 = 2
   fit, hyph(word, &mut offsets) gives the places where that whole word (UAX #29) may break
   (byte offsets inside it, ascending) and the line ends at the last one that fits with a
   hyphen -- also inside a single word too long for a line, before graphemes are cut.  Words
-  with a digit or a soft hyphen of their own are never hyphenated.  fits(a, b, hyphen):
+  with a digit or a soft hyphen of their own, or longer than about 256 characters, are never
+  hyphenated.  fits(a, b, hyphen):
   the text a..b fits (with a hyphen after it).
 
 - **`fn unicode_version() -> &'static str`**
@@ -20081,9 +20143,11 @@ copies into one upload command buffer that ends with a global barrier (copy writ
 later access) and is put before the caller's command buffers in the next vkQueueSubmit.
 The staging ring: 256 KiB chunks of Upload memory, filled front to back across submissions;
 a full chunk is reused once the GPU has passed the last submission that reads from it (two
-are kept free, more go back).  An upload above half a chunk gets a buffer of its own, reused
-by the next one that fits and released when none came for a second (Device::poll): a frame of
-small rectangles costs what they hold, not a full frame or a new allocation.
+are kept free, more go back).  An upload above half a chunk gets a buffer of its own (its size
+rounded up to 64 KiB), reused by a later one that fits it without wasting half of it; once the GPU
+is done with them only the largest free one stays, and only until a second after the last such
+upload (Device::poll): a frame of small rectangles costs what they hold, not a full frame or a new
+allocation, and a frame of many canvas tiles does not keep twice their bytes around afterwards.
 Device lost: VK_ERROR_DEVICE_LOST from any call sets the device's lost flag; every later
 call returns GpuError::DeviceLost (objects are still destroyed normally).
 (G5d) The compute queue comes only when asked for (DeviceOptions; without it a device is what it was in 0.1.0: one
@@ -21535,8 +21599,9 @@ mtl_swap -- swapchains on Metal (AP6c, docs/APPLE.md): a CAMetalLayer on a plat 
   device.create_swapchain(&surface, &desc)   the layer gets the device, the format (BGRA8, sRGB
        when asked), framebufferOnly unless copy_src, three drawables, the window's size
   try_acquire() never waits: nextDrawable only while fewer drawables are in use than the layer
-       has (in use: taken and not yet on the screen, plus the one on the screen; the drawables'
-       presented handlers count what reached it); NotReady otherwise
+       has (in use: this swapchain's taken and not presented, the layer's presented and not yet
+       on the screen -- also those of an earlier swapchain on it --, plus the one on the screen;
+       the drawables' presented handlers count what reached it); NotReady otherwise
   present(frame, cmds)                   the last command buffer presents the drawable
 
 Present modes: Fifo only.  Without displaySyncEnabled a window on macOS still shows at the rate of
@@ -21642,6 +21707,10 @@ ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
        scene.submitted(id);
   gltf::upload(&mut renderer, &document) -> Result<Imported>  a jflib-gltf Document: meshes, textures,
        materials, and its instances for a Scene (gltf.rs)
+  (G7f) renderer.remove_mesh(id), remove_material(id), remove_texture(id)   their places are used again, the ids stay
+       invalid (store.rs); refused while a scene's instances, a material or a detail level use them
+  (G7f) renderer.add_material_desc(&MaterialDesc)             glTF's BLEND (blended after the rest, sorted back to front
+       per instance on the GPU: sort.wgsl) and doubleSided (no culling of back faces, their normal turned round)
 
 Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
 of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, light in the
@@ -21668,8 +21737,17 @@ SCATTER_WGSL: &str = include_str!("scatter.wgsl")
 DRAW_WGSL: &str = include_str!("draw.wgsl")
 /// (G5d) the depth pyramid of the occlusion test
 HIZ_WGSL: &str = include_str!("hiz.wgsl")
+/// (G7f) the blended instances sorted back to front
+SORT_WGSL: &str = include_str!("sort.wgsl")
+SORT_LOCAL_SPV: &[u32] = spv::SORT_LOCAL
+SORT_GLOBAL_SPV: &[u32] = spv::SORT_GLOBAL
+/// (G7f) the blended instances' vertex and fragment shaders
+VS_BLEND_SPV: &[u32] = spv::VS_BLEND
+FS_BLEND_SPV: &[u32] = spv::FS_BLEND
 CULL_SPV: &[u32] = spv::CULL
 CULL_EARLY_SPV: &[u32] = spv::CULL_EARLY
+/// (G7f) the camera's culling without the occlusion test when the scene has blended instances
+CULL_BLEND_SPV: &[u32] = spv::CULL_BLEND
 CULL_LATE_SPV: &[u32] = spv::CULL_LATE
 HIZ_DEPTH_SPV: &[u32] = spv::HIZ_DEPTH
 HIZ_DOWN_SPV: &[u32] = spv::HIZ_DOWN
@@ -21708,7 +21786,9 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   - `indices: &'a [u32]`
 
 - **`struct MeshId(pub u32)`**
-  a mesh of a Renderer
+  a mesh of a Renderer.  (G7f) The low 24 bits are its place in the renderer's tables, the high 8 bits how often that
+  place was used before (Renderer::remove_mesh): the id of a removed mesh stays invalid.  A renderer that removes nothing
+  numbers its meshes 0, 1, 2, ...
 
 - **`struct Lod`**
   (G5d) a detail level of a mesh (Renderer::set_lods): an instance whose bounding sphere's projected diameter is less
@@ -21717,13 +21797,15 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   - `below: f32`
 
 - **`struct MaterialId(pub u32)`**
-  a material of a Renderer
+  a material of a Renderer.  (G7f) As MeshId: a place and how often it was used before (Renderer::remove_material)
 
 - **`enum AlphaClass`**
   how a material's alpha is drawn, and so the lists and pipelines its instances take (docs/RENDER3D.md "Listen je
-  Alpha-Modus"; Material::alpha_class).  glTF's BLEND is drawn opaque.  A third class (blended, sorted) may come
+  Alpha-Modus"; Material::alpha_class, MaterialDesc::alpha_class)
   - `Opaque` -- nothing is dropped: pipelines without a discard (the early depth test stays theirs)
   - `Mask` -- glTF's MASK: fragments whose alpha is below the cutoff are dropped
+  - `Blend` -- (G7f) glTF's BLEND (MaterialDesc::blend): drawn after the others, sorted back to front per instance, blended
+    (premultiplied alpha), the depth tested and not written; no shadows, not in the occlusion test's pyramid
 
 - **`struct MeshInfo`**
   where a mesh lies in the pools, and its bounding sphere in its own coordinates
@@ -21761,7 +21843,27 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 - **`const fn textured(t: TextureRef) -> Material`**
   a dull material of a texture (white times the texture)
 - **`const fn alpha_class(&self) -> AlphaClass`**
-  the lists and pipelines its instances take: Mask with an alpha_cutoff, else Opaque
+  the lists and pipelines its instances take: Mask with an alpha_cutoff, else Opaque (blended: MaterialDesc)
+
+- **`struct MaterialDesc`**
+  (G7f) a material with what a Material cannot hold (it is not #[non_exhaustive], a field more would break code that
+  writes all of them): glTF's alpha mode BLEND and doubleSided.  Made with `new` (or `from` a Material) and changed field
+  by field (it may grow); Renderer::add_material_desc, set_material_desc.  Renderer::add_material(m) is
+  add_material_desc(&MaterialDesc::new(m))
+  - `material: Material`
+  - `blend: bool` -- glTF's BLEND: the instances are drawn after the opaque and MASK ones, sorted back to front per instance (by the
+    distance of their bounding sphere's centre from the eye), over what is there: the shader multiplies its colour by
+    the base colour's alpha (times the texture's), blended as premultiplied alpha (One, OneMinusSrcAlpha), in the
+    target's code values; the depth is tested, not written.  They cast no shadows and hide nothing from the occlusion
+    test.  Not together with an alpha_cutoff (Invalid)
+  - `double_sided: bool` -- glTF's doubleSided: back faces are not culled; they are lit with their normal turned round (the whole shading
+    normal, as the glTF sample viewer turns the tangent frame).  Both sides cast shadows (every material does)
+
+**`impl MaterialDesc`**
+
+- **`const fn new(material: Material) -> MaterialDesc`**
+- **`const fn alpha_class(&self) -> AlphaClass`**
+  the lists and pipelines its instances take: Blend when blended, else the Material's
 
 - **`struct Renderer`**
   the pipelines of one colour format, the mesh pools and the material table of one device
@@ -21791,6 +21893,17 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 - **`fn add_mesh(&mut self, m: &MeshData) -> Result<MeshId>`**
   a mesh into the pools (they grow; nothing waits).  The vertices must be there in equal numbers, the
   indices in threes and in range, positions finite.
+- **`fn remove_mesh(&mut self, id: MeshId) -> Result<()>`**
+  (G7f) a mesh goes: its id is invalid from now on, its vertices and indices are used again (once the frames that may
+  still draw it are done, store.rs), its place gets the next mesh with a new id.  Invalid for a mesh the renderer does
+  not have, one that instances of a scene use (Scene::remove them first; a dropped scene uses nothing) and one that
+  another mesh takes as a detail level (set_lods of that one first).  Its own detail levels go with it.  A scene
+  prepared before the removal does not record (Invalid): it prepares again
+- **`fn mesh_count(&self) -> u32`**
+  (G7f) live meshes
+- **`fn pool_use(&self) -> [(u32, u32, u32); 3]`**
+  (G7f; tests, tools) per pool (vertices, 16-bit, 32-bit indices): elements up to its end, its room, and the free
+  elements below the end that removals left (ranges, handed out again before the end grows)
 - **`fn mesh_info(&self, id: MeshId) -> Option<MeshInfo>`**
 - **`fn set_lods(&mut self, mesh: MeshId, lods: &[Lod]) -> Result<()>`**
   (G5d) a mesh's detail levels: other meshes (or none) for its instances below a projected size, thresholds
@@ -21805,20 +21918,42 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   grown to hold its detail levels
 - **`fn add_texture(&mut self, d: &TextureData) -> Result<TextureId>`**
   a texture into the array of its size class with all its mip levels (texture.rs: resampled when it is
-  not 128, 256, 512, 1024 or 2048 square).  The upload goes with the next submission
+  not 128, 256, 512, 1024 or 2048 square).  The upload goes with the next submission.  (G7f) A layer a removed
+  texture left is used first
+- **`fn remove_texture(&mut self, id: TextureId) -> Result<()>`**
+  (G7f) a texture goes: its id is invalid from now on, its layer is used again by the next texture of its class and
+  colour space (the arrays do not shrink).  Invalid for a texture the renderer does not have and one that a material
+  names (set_material without it, or remove_material, first).  A scene prepared before the removal does not record
+  (Invalid): it prepares again
 - **`fn texture_info(&self, id: TextureId) -> Option<TextureInfo>`**
 - **`fn texture_count(&self) -> u32`**
+  live textures
 - **`fn texture_bytes(&self) -> u64`**
   bytes of GPU memory the texture arrays take
 - **`fn texture_array(&self, class: u32, srgb: bool) -> Option<&Texture>`**
   (tests) the array of a size class and colour space (layers: TextureInfo::layer), None without a texture
 - **`fn add_material(&mut self, m: &Material) -> Result<MaterialId>`**
   a row of the table; its textures must be this renderer's
+- **`fn add_material_desc(&mut self, d: &MaterialDesc) -> Result<MaterialId>`**
+  (G7f) a row of the table with glTF's BLEND and doubleSided (MaterialDesc); its textures must be this renderer's.
+  The first blended or double-sided material makes the pipelines they need
 - **`fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()>`**
   a row of the table; the next frame shows it.  A new alpha class moves the material's instances to the lists of
-  that class with their scenes' next prepare
+  that class with their scenes' next prepare.  (G7f) The material stays blended and double-sided as it was
+  (set_material_desc changes those)
+- **`fn set_material_desc(&mut self, id: MaterialId, d: &MaterialDesc) -> Result<()>`**
+  (G7f) a row of the table with glTF's BLEND and doubleSided; the next frame shows it.  A new alpha class or side
+  moves the material's instances to their new lists with their scenes' next prepare
+- **`fn remove_material(&mut self, id: MaterialId) -> Result<()>`**
+  (G7f) a material goes: its id is invalid from now on, its textures lose a user, its place gets the next material
+  with a new id.  Invalid for a material the renderer does not have and one that instances of a scene use.  A scene
+  prepared before the removal does not record (Invalid): it prepares again
+- **`fn material_count(&self) -> u32`**
+  (G7f) live materials
 - **`fn alpha_class(&self, id: MaterialId) -> AlphaClass`**
   the alpha class of a material (Opaque for one the renderer does not have)
+- **`fn double_sided(&self, id: MaterialId) -> bool`**
+  (G7f) a material is double-sided (false for one the renderer does not have)
 - **`fn set_size(&mut self, w: u32, h: u32) -> Result<()>`**
   a depth buffer the renderer keeps, for frames recorded with depth None (sampled too: the occlusion test builds
   its pyramid from it)
@@ -21930,8 +22065,8 @@ Source: [`lib/render3d/gltf.rs`](../lib/render3d/gltf.rs)
 gltf -- a jflib-gltf Document into a Renderer (G5b; docs/GLTF.md): each primitive as a mesh, each image as a
 texture (once per image, colour space and filter: base colour and emissive sRGB, the others linear), each
 material as a row, and the instances of a scene with their world matrices taken apart (gltf::decompose)
-for Scene::add.  What the engine cannot show yet is counted in notes: BLEND drawn opaque, double-sided
-materials drawn from the front, uv sets other than 0, world matrices with shear (drawn without it).
+for Scene::add.  (G7f) BLEND and doubleSided go through MaterialDesc.  What the engine cannot show yet is counted in
+notes: uv sets other than 0, world matrices with shear (drawn without it).
 
   let doc = ::gltf::load(&bytes, &mut |uri| read(dir, uri), &::gltf::Limits::DEFAULT)?;
   let imported = render3d::gltf::upload(&mut renderer, &doc, None)?;
@@ -22027,6 +22162,13 @@ slots through the scatter shader (a run of (slot, record) in the slot's own Uplo
 4096 changes and an eighth of the slots at once, a new origin, new capacities: everything, from a
 temporary buffer.  Queue::write_buffer would not do for this: its copies run ahead of the frame's
 commands without a barrier against the frames still on the GPU.
+
+(G7f) Removal (store.rs): a scene counts its instances per mesh and material and tells the renderer's shared table
+when it has the first or no longer any of one (and when it goes); lists belong to a mesh's slot, so a removed mesh's
+lists serve the next mesh in that slot.  Lists per side, class and faces: double-sided materials have lists of their
+own (drawn without culling).  Blended instances (class Blend) have lists for their mesh like the others, without room in
+the visible lists: the camera's culling puts them into one list for all of them (`blend`), sort.wgsl sorts it, one draw
+draws it (lib.rs draw_blend).
 ```
 
 - **`struct Transform`**
@@ -22112,12 +22254,17 @@ commands without a barrier against the frames still on the GPU.
   - `lists: bool` -- the lists' layout changed
   - `bytes: u64` -- everything prepare wrote for the GPU, view and lights included
 
+- **`struct ListKind`**
+  (G7f) what ListInfo cannot say (it is not #[non_exhaustive]): more about a list, in the order of Scene::lists
+  - `double_sided: bool` -- its instances' materials are double-sided: drawn without culling, back faces lit with their normal turned round
+
 - **`struct ListInfo`**
   a list of the scene
   - `mesh: MeshId`
   - `mirrored: bool` -- its instances are mirrored (drawn with clockwise front faces)
   - `class: AlphaClass` -- the alpha class of its instances' materials (drawn with or without a discard)
-  - `count: u32` -- the instances of this mesh, side and class, and the room for them in the visible list
+  - `count: u32` -- the instances of this mesh, side and class, and the room for them in the visible list (G7f: none for blended
+    instances, they go into the blended instances' list)
   - `capacity: u32`
   - `room: u32` -- (G5d) the instances that may land here: its own and those of meshes that take it as a detail level
   - `first: u32` -- its first place in the visible list
@@ -22199,6 +22346,15 @@ commands without a barrier against the frames still on the GPU.
 - **`fn lists(&self) -> Vec<ListInfo>`**
   the lists as the last prepare settled them, in order (list i is what list_of holds for its instances; its draw
   record: ListInfo::record)
+- **`fn list_kinds(&self) -> Vec<ListKind>`**
+  (G7f) more about the lists, in the order of lists(): double-sided or not
+- **`fn blend_buffer(&self) -> &Buffer`**
+  (G7f; tests, tools) the blended instances' list after a frame: a VkDrawIndirectCommand (vertices per instance, the
+  instances), then per instance 4 u32: the bits of !(distance squared from the eye; f32), its slot, the draw record of
+  its list (lists().record), the list's flags (1: 32-bit indices, 2: double-sided, 4: mirrored); sorted, farthest
+  first.  Its draw: blend_drawn()
+- **`fn blend_drawn(&self) -> bool`**
+  (G7f) the last prepare found blended instances that may be drawn (a list of them has room)
 - **`fn draws_buffer(&self) -> &Buffer`**
   (tests, tools) the camera's draw records after a frame's culling: 5 u32 per list at ListInfo::record,
   instance_count second
@@ -22298,6 +22454,11 @@ classes are powers of two.
 An array grows by doubling its layers: a new texture, the old layers copied through a buffer, the old one
 dropped once the GPU is done with it.  Uploads go through Queue::write_texture (staged before the next
 submission, after a barrier from Sampled: frames still reading the array finish first).
+
+(G7f) Removing a texture: its id becomes invalid (store.rs: a slot and a generation), its layer goes on its array's
+list of free layers and the next texture of that class and colour space takes it (the barrier from Sampled above is
+what makes that safe against frames in flight).  Refused while a material names it: each texture counts the material
+rows that do.
 ```
 
 ```rust
@@ -22316,7 +22477,7 @@ CLASS_MAX: u32 = CLASS_MIN << (CLASSES - 1)
   - `nearest: bool` -- it is drawn with a nearest filter: a resampling to its class keeps the texels (else bilinear)
 
 - **`struct TextureId(pub u32)`**
-  a texture of a Renderer
+  a texture of a Renderer.  (G7f) As MeshId: a place and how often it was used before (Renderer::remove_texture)
 
 - **`struct TextureInfo`**
   where a texture lies
@@ -22389,6 +22550,8 @@ same WGSL on every path: compiled ahead (shaders_spv.rs) on Vulkan, handed to th
   scene.add_block(&Block) -> BlockId, insert_in(block, style, &Shape); Shape::Insert(Insert) places a block on a
        layer or in another block (moved by update, arrays as DXF's MINSERT)
   scene.set_camera(&Camera)                                   centre (f64), scale (units per pixel), rotation
+  dxf::load(&mut scene, &bytes, &dxf::Options) -> Loaded      (G6e2) a DXF drawing into the scene (dxf.rs, dxftext.rs;
+       the reader is the crate jflib-dxf)
   a frame:
        scene.prepare(&mut renderer, (w, h))?;         waits for this slot's last frame, uploads what changed
        renderer.record(&mut encoder, &scene, color)?;
@@ -22466,6 +22629,12 @@ WRITE_HL_SPV: &[u32] = spv::WRITE_HL
   Renderer::new.  Made with `new` and changed field by field (it may grow)
   - `color: Format` -- the format of the colour targets: one without sRGB (the codes are blended as they are)
   - `frames_in_flight: usize` -- frames the CPU may record ahead of the GPU (1 ..= FRAMES_MAX)
+  - `separate_scratch: Option<bool>` -- (G6e3) a render pass of its own, after a barrier, for a run of layers whose fragment shader needs scratch memory
+    (fs_full, fs_fill, fs_text_all, the overlay's fs_fill) when the last such run before it took another pipeline: None
+    decides by the adapter (on for Intel under Vulkan: Mesa's driver gives such shaders of two draws the same scratch
+    memory with their own strides, on Gen9 they overwrote each other's spilled registers; docs/RENDER2D.md "Die anderen
+    Ziele (G6e3)"), Some forces it either way.  No pixel changes; on GPUs that draw in tiles each pass costs a store and
+    a load of the target
 
 **`impl RendererDesc`**
 
@@ -22576,6 +22745,100 @@ CURVE_MAX: usize = 16384
 
 - **`fn pow2(b: i32) -> f64`**
   2^b
+
+### `render2d/dxf.rs`
+
+Source: [`lib/render2d/dxf.rs`](../lib/render2d/dxf.rs)
+
+```text
+dxf -- a DXF drawing into a Scene (G6e2; docs/RENDER2D.md "DXF"): lib/dxf reads the file (streaming, bounded), this
+module maps what it reads onto render2d as it comes: a render2d layer per run of entities on one DXF layer (the file's
+order is the painter's order, as in AutoCAD), styles from colours, linetypes, lineweights and transparency resolved
+by layer and by block, blocks as blocks (DIMENSION and ACAD_TABLE through their anonymous blocks), the object
+coordinate systems projected onto the drawing's plane, polyline bulges as arcs, text in substitute fonts of the
+repository, MTEXT's format codes laid out here into single-line texts.
+
+  dxf::load(&mut scene, &bytes, &Options) -> Result<Loaded, ::dxf::Error>      a file in memory
+  dxf::read(&mut scene, &mut source, &Options) -> Result<Loaded, ::dxf::Error> piece by piece (a file of a gigabyte)
+  loaded.extents, kinds (per DXF kind: read, drawn, skipped in paper space, hidden, unsupported, failed, approximated),
+       layers (each DXF layer's render2d layers), set_layer_visible, group_of / members (the render2d entities one
+       DXF entity became)
+
+What render2d refuses of an entity (a degenerate arc, a ring without area) is counted as failed, the rest goes on.
+```
+
+Re-exports: `::dxf::Family`
+
+- **`struct Options<'a>`**
+  how a drawing is mapped.  Made with `new` and changed field by field (it may grow)
+  - `background: u32` -- the view's background (0xFFRRGGBB): colour 7 is black on a light one and white on a dark one, wipeouts take it
+  - `lineweights: Option<bool>` -- lineweights shown (None: as the header's $LWDISPLAY says, off without it); pixels per millimetre of lineweight
+    (96 / 25.4: 0.25 mm and less a hairline, as AutoCAD shows them in model space)
+  - `px_per_mm: f64`
+  - `fonts: Option<&'a dyn Fn(Family) -> Option<&'a [u8]>>` -- the bytes of a family of the repository's fonts (None, or a family without bytes: Family::Sans's; no fonts: no
+    text)
+  - `limits: d::Limits`
+  - `groups: bool` -- keep which render2d entities came from one DXF entity (Loaded::group_of, members; 12 bytes per entity)
+  - `max_layers: u32` -- render2d layers at most for the runs of DXF layers (beyond: an entity goes to the last run of its layer, the order
+    across layers then approximate)
+  - `order: i32` -- the order of the first render2d layer (the next ones count up)
+
+**`impl<'a> Options<'a>`**
+
+- **`fn new() -> Options<'a>`**
+
+- **`struct Count`**
+  what happened to the entities of one DXF kind (an entity in a block once, however often it is inserted)
+  - `read: u64` -- read (top level and in blocks), of which drawn (one render2d entity or more), skipped in paper space, hidden
+    (invisible, or in a block on a layer that is off or frozen), unsupported (a kind this module does not draw),
+    failed (render2d refused its geometry, or there was none), approximated (drawn, but simplified: see the notes)
+  - `drawn: u64`
+  - `paper: u64`
+  - `hidden: u64`
+  - `unsupported: u64`
+  - `failed: u64`
+  - `approximated: u64`
+
+- **`struct LayerOf`**
+  a DXF layer: its render2d layers (one per run of entities on it, in order), whether it is shown
+  - `name: String`
+  - `runs: Vec<LayerId>`
+  - `visible: bool`
+  - `transparency: u32`
+
+- **`struct Loaded`**
+  what a drawing became
+  - `header: d::Header`
+  - `layers: Vec<LayerOf>`
+  - `extents: Option<[f64; 4]>` -- the box of what was drawn in model space (min x, min y, max x, max y), without rays and xlines
+  - `kinds: BTreeMap<String, Count>` -- per DXF kind
+  - `entities: u64` -- render2d entities inserted (on layers and in blocks), blocks made
+  - `blocks: u32`
+  - `stats: d::Stats` -- the reader's counts and notes
+  - `notes: Vec<String>` -- what was simplified or skipped, each once (at most 64)
+
+**`impl Loaded`**
+
+- **`fn group_of(&self, id: EntityId) -> Option<u32>`**
+  the DXF entity a render2d entity on a layer came from (Options::groups): its group, numbered from 1 in the order
+  of the drawing's entities that drew something
+- **`fn members(&self, g: u32) -> &[EntityId]`**
+  the render2d entities a DXF entity became (group_of)
+- **`fn set_layer_visible(&mut self, scene: &mut Scene, name: &str, on: bool) -> gpu::Result<bool>`**
+  a DXF layer shown or hidden: its render2d layers (entities of blocks on other layers keep what they had when they
+  were read: docs/RENDER2D.md "DXF")
+
+- **`fn load(scene: &mut Scene, bytes: &[u8], o: &Options) -> Result<Loaded, d::Error>`**
+  a drawing in memory into a scene
+
+- **`fn read(scene: &mut Scene, source: &mut dyn FnMut(&mut [u8]) -> usize, o: &Options) -> Result<Loaded, d::Error>`**
+  a drawing read piece by piece into a scene (::dxf::read: only the tables and blocks are kept)
+
+- **`fn linetype_pattern(src: &[f64], scale: f64, max: usize) -> Option<(Vec<f64>, f64)>`**
+  a linetype's or hatch line's dashes as DXF has them (positive on, negative off, 0 a dot), scaled, as render2d's
+  pattern (on, off, ... at most `max` entries) and its phase; None: solid (no gap in it).  Runs of one sign merge, a
+  leading gap moves to the end (the phase says where an entity starts), too many entries lose their shortest dashes
+  (dots first) to the gaps around them, so the period stays
 
 ### `render2d/fill.rs`
 
@@ -23773,7 +24036,7 @@ folder (absolute paths, "..", a scheme) are refused before the closure sees them
   - `json_bytes: usize` -- bytes of the JSON part, and the values in it (objects, arrays, numbers, ...)
   - `json_values: usize`
   - `buffer_bytes: u64` -- bytes of all buffers together, as given (a file two buffers name counts twice), and the zeros of
-    accessors without a buffer view
+    accessors without a buffer view; the image files read count against it too (apart)
   - `vertices: u64` -- vertices and indices of all primitives together, as the model holds them (flat normals split vertices)
   - `indices: u64`
   - `nodes: usize` -- nodes, and how deep they nest
@@ -27102,6 +27365,9 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
            signals, the stderr line of ASMLIB) and panics; crash_test() crashes on purpose
   windows: the window-indexed API of the assembly (win_create / win_show / win_present /
            wait ..., popups, clipboard, drops, pen, cursors; consts.rs, evq.rs, pwin0.rs)
+  input:   (G7a) win_pointer_lock / win_pointer_lock_state / win_raw_motion_take: the pointer
+           locked to a window, hidden, its raw relative motion (plock.rs); KC_* key_code /
+           key_label: where a key sits as a USB HID usage on every platform (keycode.rs)
   dnd:     drag and drop between programs: DragData (files, text, URLs, HTML, image),
            the drop target hook, the pending drop, drag_start (dragging out)    (dnd.rs)
   (plat-shared) print(job) + page layout / PDF writer (print.rs; win_print.rs,
@@ -27185,7 +27451,7 @@ FO_RW: u32 = 2  // open or create (contents kept), read + write
 ```
 
 - **`struct Date`**
-  a date and time (date(): Windows local time, Linux UTC)
+  a date and time (date(): Windows local time, Linux, Apple and Android UTC, the browser the page's)
   - `year: u16`
   - `month: u16`
   - `day: u16`
@@ -27732,6 +27998,8 @@ fs -- file system access for backup and restore
                                                relative to it, never through a link (the
                                                section "folders by handle")
   set_file_times / set_file_mode (File)        through the open file's own handle
+  fd_path(File) (Linux)                        a name of the open file itself for a program
+                                               this one starts (/proc/<pid>/fd/<n>)
 
 Windows: reparse points count as links only for symbolic links and junctions; other tags
 (deduplication, cloud placeholders) are ordinary files whose data is read.  Files are
@@ -27864,12 +28132,18 @@ modes or free space.
                                     has become meanwhile)
   ```
 
-  macOS: openat with O_NOFOLLOW component by component, the \*at calls on the folder.  Windows
-  has no calls relative to an open folder in its API: a Dir holds every folder from its start
-  down open without FILE_SHARE_DELETE (checked to be a folder, not a junction or a link), so
-  none of them can be renamed, removed or replaced while it lives, and its entries are named
-  by path below them (with OPEN_REPARSE_POINT).  The manifest's rules (policy.rs) are checked
-  on the path an entry has below the start.
+  macOS: openat with O_NOFOLLOW component by component, the \*at calls on the folder.  Windows:
+  the native calls relative to an open folder -- NtCreateFile with OBJECT_ATTRIBUTES.
+  RootDirectory = the folder's handle and FILE_OPEN_REPARSE_POINT, one name at a time (a
+  folder on the way that is a junction, a symbolic link or another name surrogate is refused,
+  one that is no folder too), renames to a name relative to the target folder's handle
+  (FILE_RENAME_INFORMATION.RootDirectory), removals through the entry's own handle, links as
+  reparse data set on the new entry (FSCTL_SET_REPARSE_POINT, what CreateSymbolicLinkW writes).
+  What lies below an open folder is found through the handles, never through a path, so a
+  folder on the way renamed or swapped for a junction -- also one another program holds open
+  with delete access -- changes nothing, and no folder is locked against renaming or removal
+  meanwhile.  On a network share the server looks the names up by path itself.  The
+  manifest's rules (policy.rs) are checked on the path an entry has below the start.
 
 **`impl Dir`**
 
@@ -27915,6 +28189,13 @@ modes or free space.
   permission bits (07777) of an open file, through its handle (Windows: nothing to do); a
   mount's stream: false
 
+- **`fn fd_path(f: &crate::File) -> Option<String>`**
+  A path that leads a program of this user (one this process starts, such as QEMU given a disk
+  file made through a Dir) to the open file `f` itself, whatever its name has become or was put
+  in its place meanwhile.  Linux: /proc/&lt;this process>/fd/&lt;n>, valid while `f` stays open and
+  this process runs (keep `f` as long as the other program may open the path again); None on
+  Windows and macOS and for a mount's stream.
+
 ### `plat/service.rs`
 
 Source: [`lib/plat/service.rs`](../lib/plat/service.rs)
@@ -27933,6 +28214,11 @@ service -- programs that run as a system service
       Windows: the service control manager (automatic start as LocalSystem, restart after a
       failure); Linux: a systemd unit in /etc/systemd/system and systemctl.  Both need
       administrator / root rights; the errors say so.
+      A failure is a crash or a run() that returned another code than 0 without a stop having
+      been asked for: the service manager then starts the program again (Windows: 5 s after
+      the first failure, 15 s after the second, 60 s after every further one, counted anew
+      after a day without one; systemd: after 5 s; launchd: at the earliest 5 s after the
+      last start).
   program_path(&ServiceSpec) -> the program install registers: Windows: a program outside
       Program Files is copied to %ProgramFiles%\<name>\ first (only administrators may change
       it there; uninstall leaves the copy, a new install replaces it); Linux, macOS: the program
@@ -29343,7 +29629,11 @@ Windows (win_tray.rs): Shell_NotifyIconW on a message-only window of the UI thre
 with TrackPopupMenuEx, notifications as the symbol's balloon (Windows 10 / 11 show it as a
 toast; without a visible symbol a hidden one is added for the time it is shown).  Linux
 (linux_tray.rs): StatusNotifierItem with a com.canonical.dbusmenu menu and
-org.freedesktop.Notifications, on a session-bus connection of its own thread.  Browser and
+org.freedesktop.Notifications, on a session-bus connection of its own thread; clicks on the
+symbol and its menu count only from the program that shows it (the owner of the
+StatusNotifierWatcher or of a StatusNotifierHost name -- a program of the same user that
+claims such a name passes too, so a tray command that destroys something should still ask in
+a window).  Browser and
 Android (web_notify.rs): notifications only -- the Notification API (the permission asked for
 from the user's gesture), NotificationManager with POST_NOTIFICATIONS; no symbol.  macOS
 (apple_mac_services.rs): an NSStatusItem in the menu bar (with a menu a click opens it, the Mac's
@@ -30542,7 +30832,7 @@ SOUND_NOTIFY: u32 = 5
 
 - **`fn ring_check(n: usize, piece: usize, take: usize, threaded: bool) -> bool`**
   (tests) the ring of a push stream: n samples written in pieces of `piece` and read in
-  pieces of `take`, by turns or (threaded, Windows / Linux) by a writer thread while this one
+  pieces of `take`, by turns or (threaded, Windows / Linux / macOS / iOS) by a writer thread while this one
   reads -> whether every sample arrived once and in order.  The reader gives up after 20 s
   (a loaded machine): then it tells the writer to stop, which may wait at a full ring, and
   the check fails instead of waiting for it forever
@@ -32953,6 +33243,36 @@ the focus.  It is destroyed together with its parent.
   the PCI vendor and device id of the GPU that drives the monitor window w is on (None: not
   known, not a PCI device)
 
+### `plat/win_plock.rs` (Windows)
+
+Source: [`lib/plat/win_plock.rs`](../lib/plat/win_plock.rs)
+
+```text
+win_plock -- (G7a) the pointer lock on Windows (the shared part: plock.rs)
+
+  win_plock_set(w, on) -> PointerLock    lock the pointer to window w / let it go
+  (window procedure, win_api.rs)
+    input(w, lparam)        WM_INPUT of the mouse: raw motion -> plock_motion
+    focus_in(w)             WM_SETFOCUS: a request that waited (Pending) takes effect
+    release(w)              WM_KILLFOCUS, minimized, WM_DESTROY, Esc: the lock goes
+    follow(w)               WM_MOVE / WM_SIZE: the clip follows the window
+    locked(w) -> bool       WM_SETCURSOR (no cursor), WM_NCHITTEST (all client: a hidden
+                            pointer never drags the title bar), win_set_cursor (kept for later)
+
+Locked: the mouse's Raw Input (usage page 1, usage 2) goes to the window (WM_INPUT, only while
+it is in the foreground: no RIDEV_INPUTSINK), the cursor is clipped to one pixel in the middle
+of the client area (ClipCursor; again after every move and size) and hidden (WM_SETCURSOR sets
+none).  The legacy mouse messages stay (no RIDEV_NOLEGACY): buttons and the wheel come as
+before.  Relative devices give counts (lLastX / lLastY); absolute ones (MOUSE_MOVE_ABSOLUTE: a
+remote desktop, a tablet, a virtual machine's pointer) positions 0..65535 of the primary
+monitor or the whole desktop (MOUSE_VIRTUAL_DESKTOP), whose differences are the motion in
+pixels.  The release unregisters the device (RIDEV_REMOVE), lifts the clip and puts the
+cursor back where it was before the lock.
+```
+
+- **`fn win_plock_set(w: i32, on: bool) -> PointerLock`**
+  (plock.rs) lock the pointer to window w (on) or let it go -> the state now
+
 ### `plat/win_shell.rs` (Windows)
 
 Source: [`lib/plat/win_shell.rs`](../lib/plat/win_shell.rs)
@@ -33788,6 +34108,9 @@ BK_X11: u32 = 2
   - `fn drag_start(&mut self, _data: crate::DragData) -> bool`
     drag data out of the app (dnd.rs drag_start; the left button is held) -> started;
     E_DRAG_END follows -- added with a default for the drag and drop work (X11, Wayland)
+  - `fn pointer_lock(&mut self, w: i32, on: bool) -> crate::PointerLock`
+    (G7a) lock the pointer to window w (on) or let it go -> the state now (plock.rs: the
+    backend calls plock_set); default: Unsupported
 
 - **`fn disp_backend() -> u32`**
   0 none, 1 Wayland, 2 X11
@@ -33963,6 +34286,11 @@ UI thread calls in; wake() from other threads goes through the eventfd of linux_
 - **`fn wl_test_event_u(iface: &str, event: &str, args: &[u64], udata: u64) -> bool`**
   (main agent) wl_test_event with the handler's udata (a tablet tool's slot ...), as
   plattest --test pen does  [tcall in apps/plattest/src/pen.s]
+
+- **`fn wl_test_lock(w: i32)`**
+  (G7a, plattest --test input) play a pointer lock of window w without a compositor: its
+  zwp_locked_pointer_v1 and zwp_relative_pointer_v1 are object 1 (the id of wl_test_event's
+  events), the request Pending until a "locked" event; the protocols count as there
 
 - **`fn wl_test_scale(s120: i32)`**
   (main agent) the pointer scale while there is no window (g_wl_s120, 120ths) alone
@@ -34163,6 +34491,10 @@ plat::xkb_\*)
 - **`fn event_bytes(pkt: &[u8])`**
   one X event packet of any length (a GenericEvent: 32 bytes + its extra length)
   through the event handler (x11_event)
+
+- **`fn lock_setup(w: i32, on: bool, abs: &[(u16, [i32; 2], [i32; 2])])`**
+  (G7a, plattest --test input) play the pointer lock of window w without a server: held
+  (on) or not; absolute devices (id, range of valuator 0, of valuator 1) for its raw events
 
 - **`fn xi_setup(op: u32, atoms: [u32; 3])`**
   XInput 2 without a server: its major opcode and the valuator label atoms ("Abs
@@ -35755,6 +36087,13 @@ REQUEST_UNSAVED: u32 = 22
 - **`fn date() -> (Date, bool)`**
   Host-supplied UTC calendar, updated independently from the monotonic clock.
 
+- **`fn date() -> (Date, bool)`**
+  (Android) the date and time in UTC from the system's clock, as on Linux; the flag is true (UTC).
+  The calendar jfgui_date sets is the browser's: no Android host calls it.
+
+- **`fn unix_time_ns() -> i64`**
+  (Android) wall-clock time: nanoseconds since 1970-01-01 00:00 UTC (Bionic's CLOCK_REALTIME)
+
 - **`fn unix_time_ns() -> i64`**
   Wall-clock time from the host calendar: nanoseconds since 1970-01-01 00:00 UTC.
 
@@ -36112,6 +36451,10 @@ that frame (flush).
 it shows WST_FULLSCREEN at once, the page's answer jfgui_fullscreen confirms it or takes it
 back: refused without the user's gesture, left with Esc); a tool window covers the canvas
 (its place comes back after).  Android: nothing.
+(G7a) The pointer lock (plock.rs): the page locks the canvas (REQUEST_POINTER_LOCK; Pending) from
+the user's gesture -- at once while the page still has the activation of the press that made the
+app ask, else with the next press in it -- and answers with jfgui_pointer_lock; the raw motion
+comes through jfgui_motion.  Android and iOS: Unsupported.
 ```
 
 - **`fn win_create( title: &str, width: i32, height: i32, _flags: u32, _owner: i32, x: i32, y: i32, ) -> i32`**
@@ -36146,6 +36489,21 @@ back: refused without the user's gesture, left with Esc); a tool window covers t
 
 - **`fn win_cmd(id: i32, command: u32)`**
   Apply library-window commands; close is delivered to the normal app close workflow.
+
+```rust
+/// (G7a) (browser) ask the page for the pointer lock of the canvas (one byte, 1 lock / 0 let go):
+/// requestPointerLock from the user's gesture (with unadjustedMovement where the browser has it);
+/// the page answers with jfgui_pointer_lock, the motion comes with jfgui_motion
+REQUEST_POINTER_LOCK: u32 = 31
+```
+
+- **`extern "C" fn jfgui_pointer_lock(state: u32) -> u32`**
+  (G7a) the page's pointer lock changed: 1 the canvas holds it, 0 it let go (Esc, the browser, the
+  page lost the focus), 2 the browser refused it (pointerlockerror after a press) -> 1 taken
+
+- **`extern "C" fn jfgui_motion(dx: f64, dy: f64) -> u32`**
+  (G7a) the locked pointer's motion from the page (movementX / movementY, summed since the last
+  call): raw with unadjustedMovement, else the browser's CSS pixels -> 1 taken
 
 ```rust
 /// (L7) (browser) ask the page to show the canvas in full screen (one byte, 1 on / 0 off): the
@@ -36961,10 +37319,11 @@ DE_ALL: u32 = 7  // every effect
   effect's action; Wayland: taken wl_data_offer.finish (the action stays the one negotiated
   before the drop), not taken the offer destroyed without finish
 
-- **`fn drag_start(data: DragData) -> bool`**
+- **`fn drag_start(mut data: DragData) -> bool`**
   drag `data` out of the app (call while the left button is held) -> started; E_DRAG_END
   (data = the effect, 0 = cancelled or refused) follows.  Only the standard kinds leave
-  the app.
+  the app; files only when the manifest lets the app read them (false otherwise), a move only
+  when it may write them all (else the drag offers copy and link).
 
 - **`fn drag_running() -> bool`**
   an outgoing drag runs (until its E_DRAG_END is queued)
@@ -37031,6 +37390,11 @@ E_SESSION_END: u8 = 21  // the user logs off, the system shuts down, SIGTERM: sa
 E_SETTINGS: u8 = 22  // data = SET_* bits: system settings changed
 E_DRAG: u8 = 23  // a drag over the window: x, y, data = DT_* | DE_* << 8 (0: it left; dnd.rs)
 E_DRAG_END: u8 = 24  // our outgoing drag (drag_start) ended: data = DE_* effect, 0 = none
+/// (G7a) raw relative motion of the pointer waits for win_raw_motion_take(win) while the window
+/// holds the pointer lock (one event until it is taken, however much motion comes)
+E_RAW_MOTION: u8 = 25
+/// (G7a) the pointer lock of the window changed (win_pointer_lock_state): data 1 locked now, 0 not
+E_POINTER_LOCK: u8 = 26
 // E_SETTINGS: what changed
 SET_THEME: u32 = 1  // light / dark, accent colour
 SET_LOCALE: u32 = 2  // language, regional format
@@ -37078,7 +37442,8 @@ MOD_NUM: u8 = 64
 *(E2) where a key sits (key_location of Event::y of E_KEY_DOWN / E_KEY_UP; Event::x is its scancode:*
 
 ```rust
-// Windows' scan code (0xE0.. for extended keys), Linux's evdev code, 0 where unknown)
+// Windows' scan code (0xE0.. for extended keys), Linux's evdev code, (G7a) the USB HID usage on macOS,
+// iOS and in the browser, 0 where unknown; keycode.rs key_code turns it into the same KC_* everywhere)
 KL_STANDARD: u32 = 0
 KL_LEFT: u32 = 1  // the left Shift, Ctrl, Alt, Windows key
 KL_RIGHT: u32 = 2
@@ -37378,6 +37743,321 @@ PRESSURE_ONE: i32 = 65535
 
 - **`fn pen_enabled() -> bool`**
 
+### `plat/keycode.rs`
+
+Source: [`lib/plat/keycode.rs`](../lib/plat/keycode.rs)
+
+```text
+keycode -- (G7a) where a key sits on the keyboard, the same number on every platform: the USB
+HID usage IDs of the keyboard page (page 7), whatever the layout prints on the key
+
+  KC_*                              the usages (KC_W is the key right of Q on a US keyboard: the
+                                    Z of a French one, still KC_W)
+  key_code(scancode) -> code        Event::x of a key event on this platform -> its usage
+                                    (0: unknown); KeyEvent::code of the UI
+  key_scancode(code) -> scancode    the other way (scripts, tests); 0: this platform has none
+  key_code_set1(sc) / key_code_evdev(code) / key_code_mac(kvk)   the tables of the
+                                    platforms, on every target (tests): Windows' scan codes
+                                    of set 1 (0xE0.. for the extended keys, as Event::x),
+                                    Linux's evdev codes, the virtual key codes of macOS (kVK_*)
+  key_code_name(code) / key_code_from_name(name)   the browser's KeyboardEvent.code names
+                                    ("KeyW", "ShiftLeft"); "" / 0 unknown
+  key_label(code) -> Option<String> what the current layout prints on that key ("Z" for KC_W
+                                    on a French keyboard), None where the platform does not
+                                    say (the browser, Android, iOS) or the key has no label
+
+What Event::x of E_KEY_DOWN / E_KEY_UP holds per platform: Windows' scan code (set 1, 0xE0..
+extended), Linux's evdev code (X11 and Wayland), the usage itself on macOS, iOS and in the
+browser (their own codes are turned into usages where the event is made); Android 0.
+
+The rows follow the USB HID usage tables (keyboard page) and the mapping of the UI Events
+KeyboardEvent.code specification (W3C) to the native codes of each system.
+```
+
+```rust
+/// (G7a) USB HID usages of the keyboard page: where a key sits (KeyEvent::code)
+KC_A: u32 = 0x04
+KC_B: u32 = 0x05
+KC_C: u32 = 0x06
+KC_D: u32 = 0x07
+KC_E: u32 = 0x08
+KC_F: u32 = 0x09
+KC_G: u32 = 0x0A
+KC_H: u32 = 0x0B
+KC_I: u32 = 0x0C
+KC_J: u32 = 0x0D
+KC_K: u32 = 0x0E
+KC_L: u32 = 0x0F
+KC_M: u32 = 0x10
+KC_N: u32 = 0x11
+KC_O: u32 = 0x12
+KC_P: u32 = 0x13
+KC_Q: u32 = 0x14
+KC_R: u32 = 0x15
+KC_S: u32 = 0x16
+KC_T: u32 = 0x17
+KC_U: u32 = 0x18
+KC_V: u32 = 0x19
+KC_W: u32 = 0x1A
+KC_X: u32 = 0x1B
+KC_Y: u32 = 0x1C
+KC_Z: u32 = 0x1D
+KC_1: u32 = 0x1E
+KC_2: u32 = 0x1F
+KC_3: u32 = 0x20
+KC_4: u32 = 0x21
+KC_5: u32 = 0x22
+KC_6: u32 = 0x23
+KC_7: u32 = 0x24
+KC_8: u32 = 0x25
+KC_9: u32 = 0x26
+KC_0: u32 = 0x27
+KC_ENTER: u32 = 0x28
+KC_ESCAPE: u32 = 0x29
+KC_BACKSPACE: u32 = 0x2A
+KC_TAB: u32 = 0x2B
+KC_SPACE: u32 = 0x2C
+KC_MINUS: u32 = 0x2D
+KC_EQUAL: u32 = 0x2E
+KC_BRACKET_LEFT: u32 = 0x2F
+KC_BRACKET_RIGHT: u32 = 0x30
+/// the US layout's backslash; on an ISO keyboard the key left of Enter (# on a German one)
+KC_BACKSLASH: u32 = 0x31
+KC_SEMICOLON: u32 = 0x33
+KC_QUOTE: u32 = 0x34
+/// left of 1 on a US keyboard (` ~), ^ on a German one
+KC_BACKQUOTE: u32 = 0x35
+KC_COMMA: u32 = 0x36
+KC_PERIOD: u32 = 0x37
+KC_SLASH: u32 = 0x38
+KC_CAPS_LOCK: u32 = 0x39
+KC_F1: u32 = 0x3A
+KC_F2: u32 = 0x3B
+KC_F3: u32 = 0x3C
+KC_F4: u32 = 0x3D
+KC_F5: u32 = 0x3E
+KC_F6: u32 = 0x3F
+KC_F7: u32 = 0x40
+KC_F8: u32 = 0x41
+KC_F9: u32 = 0x42
+KC_F10: u32 = 0x43
+KC_F11: u32 = 0x44
+KC_F12: u32 = 0x45
+KC_PRINT_SCREEN: u32 = 0x46
+KC_SCROLL_LOCK: u32 = 0x47
+KC_PAUSE: u32 = 0x48
+KC_INSERT: u32 = 0x49
+KC_HOME: u32 = 0x4A
+KC_PAGE_UP: u32 = 0x4B
+KC_DELETE: u32 = 0x4C
+KC_END: u32 = 0x4D
+KC_PAGE_DOWN: u32 = 0x4E
+KC_RIGHT: u32 = 0x4F
+KC_LEFT: u32 = 0x50
+KC_DOWN: u32 = 0x51
+KC_UP: u32 = 0x52
+KC_NUM_LOCK: u32 = 0x53
+KC_NUMPAD_DIVIDE: u32 = 0x54
+KC_NUMPAD_MULTIPLY: u32 = 0x55
+KC_NUMPAD_SUBTRACT: u32 = 0x56
+KC_NUMPAD_ADD: u32 = 0x57
+KC_NUMPAD_ENTER: u32 = 0x58
+KC_NUMPAD1: u32 = 0x59
+KC_NUMPAD2: u32 = 0x5A
+KC_NUMPAD3: u32 = 0x5B
+KC_NUMPAD4: u32 = 0x5C
+KC_NUMPAD5: u32 = 0x5D
+KC_NUMPAD6: u32 = 0x5E
+KC_NUMPAD7: u32 = 0x5F
+KC_NUMPAD8: u32 = 0x60
+KC_NUMPAD9: u32 = 0x61
+KC_NUMPAD0: u32 = 0x62
+KC_NUMPAD_DECIMAL: u32 = 0x63
+/// the ISO keyboard's key left of Z (< > on a German one)
+KC_INTL_BACKSLASH: u32 = 0x64
+KC_CONTEXT_MENU: u32 = 0x65
+KC_POWER: u32 = 0x66
+KC_NUMPAD_EQUAL: u32 = 0x67
+KC_F13: u32 = 0x68
+KC_F14: u32 = 0x69
+KC_F15: u32 = 0x6A
+KC_F16: u32 = 0x6B
+KC_F17: u32 = 0x6C
+KC_F18: u32 = 0x6D
+KC_F19: u32 = 0x6E
+KC_F20: u32 = 0x6F
+KC_F21: u32 = 0x70
+KC_F22: u32 = 0x71
+KC_F23: u32 = 0x72
+KC_F24: u32 = 0x73
+KC_VOLUME_MUTE: u32 = 0x7F
+KC_VOLUME_UP: u32 = 0x80
+KC_VOLUME_DOWN: u32 = 0x81
+KC_NUMPAD_COMMA: u32 = 0x85
+KC_INTL_RO: u32 = 0x87
+KC_KANA_MODE: u32 = 0x88
+KC_INTL_YEN: u32 = 0x89
+KC_CONVERT: u32 = 0x8A
+KC_NON_CONVERT: u32 = 0x8B
+KC_LANG1: u32 = 0x90
+KC_LANG2: u32 = 0x91
+KC_CONTROL_LEFT: u32 = 0xE0
+KC_SHIFT_LEFT: u32 = 0xE1
+KC_ALT_LEFT: u32 = 0xE2
+/// the left Windows / Super / Command key
+KC_META_LEFT: u32 = 0xE3
+KC_CONTROL_RIGHT: u32 = 0xE4
+KC_SHIFT_RIGHT: u32 = 0xE5
+/// the right Alt (AltGr on many layouts)
+KC_ALT_RIGHT: u32 = 0xE6
+KC_META_RIGHT: u32 = 0xE7
+```
+
+- **`fn key_code_set1(sc: u32) -> u32`**
+  (G7a) the usage of a Windows scan code of set 1 as a key event of Windows carries it in
+  Event::x (0xE0.. for the extended keys); 0 unknown.  Alt+Print (0x54) is Print, Ctrl+Pause
+  (0xE046) is Pause
+
+- **`fn key_code_evdev(code: u32) -> u32`**
+  (G7a) the usage of a Linux evdev key code (KEY_\*, the X keycode minus 8); 0 unknown
+
+- **`fn key_code_mac(kvk: u32) -> u32`**
+  (G7a) the usage of a macOS virtual key code (kVK_\*, NSEvent.keyCode; kVK_ANSI_A is 0); 0
+  unknown
+
+- **`fn key_code_name(code: u32) -> &'static str`**
+  (G7a) the browser's KeyboardEvent.code name of a usage ("KeyW", "ShiftLeft"); "" unknown
+
+- **`fn key_code_from_name(name: &str) -> u32`**
+  (G7a) the usage of a KeyboardEvent.code name; 0 unknown.  Older names of Firefox ("OSLeft",
+  "OSRight", "VolumeMute", "VolumeUp", "VolumeDown") too
+
+- **`fn key_code(scancode: u32) -> u32`**
+  (G7a) the usage (KC_\*) of a key event's Event::x on this platform: Windows' scan code, Linux's
+  and Android's evdev code, on macOS, iOS and in the browser the usage itself; 0 unknown
+
+- **`fn key_scancode(code: u32) -> u32`**
+  (G7a) Event::x of a key event on this platform for a usage (KC_\*): what key_code turns back
+  into it; 0 where this platform has no code for it
+
+- **`fn key_label(code: u32) -> Option<String>`**
+  (G7a) what the current keyboard layout prints on the key at usage `code`: its character
+  without Shift in upper case ("Z" for KC_W on a French keyboard, "Ü" for KC_BRACKET_LEFT on a
+  German one), else the system's name of the key where it has one (Windows: "Esc", "Enter" in
+  the system's language).  Windows (the thread's layout), Linux (the keymap of X11 or Wayland,
+  once a window has the keyboard), macOS (the current input source); None in the browser, on
+  Android and iOS and for keys the layout gives nothing
+
+- **`fn key_code_rows_test() -> alloc::vec::Vec<(u32, u32, u32, u32, &'static str)>`**
+  (test aid, plattest --test input) every row of the table: (usage, Windows scan code, evdev
+  code, macOS key code or 0xFF, the browser's name)
+
+### `plat/plock.rs`
+
+Source: [`lib/plat/plock.rs`](../lib/plat/plock.rs)
+
+```text
+plock -- (G7a) the pointer lock of a window and the raw relative motion while it holds it,
+the part every platform shares
+
+  win_pointer_lock(w, on) -> PointerLock    lock the pointer to window w (on) or let it go;
+                                            the state right after the call
+  win_pointer_lock_state(w) -> PointerLock  the state now
+  win_raw_motion_take(w) -> (dx, dy)        the raw motion since the last call (0, 0 when none
+                                            or w does not hold the lock)
+  E_POINTER_LOCK                            the state changed (data 1: locked now, 0: not)
+  E_RAW_MOTION                              raw motion waits (one event until it is taken)
+
+While a window holds the lock the pointer is hidden, stays where it is (or inside the window)
+and its motion comes raw: without the system's acceleration where the platform has it, in the
+device's counts.  Per platform:
+  Windows  Raw Input (WM_INPUT of usage page 1, usage 2), the cursor clipped to the middle of
+           the window (ClipCursor) and hidden; motion in mouse counts; absolute devices (a
+           remote desktop, a tablet, some virtual machines) as differences of their positions
+           in pixels (win_plock.rs)
+  Wayland  zwp_pointer_constraints_v1.lock_pointer and zwp_relative_pointer_v1's
+           unaccelerated motion; Unsupported when the compositor lacks one of them
+           (linux_wl_lock.rs)
+  X11      XInput 2.1 raw motion (XI_RawMotion: the device's values before acceleration) and a
+           pointer grab confined to the window with an invisible cursor; Unsupported without
+           XInput 2, Refused when another client holds a grab (linux_x11_lock.rs)
+  macOS    CGAssociateMouseAndMouseCursorPosition(false), the cursor hidden; motion from the
+           events' deltaX / deltaY (points, after the system's acceleration) (apple_mac.rs)
+  browser  requestPointerLock on the canvas (unadjustedMovement where the browser has it:
+           raw; else the browser's accelerated CSS pixels); the browser grants it only from a
+           user's gesture: Pending until the next press in the page (web_windows.rs, loader.js)
+  Android, iOS  Unsupported (touch controls are a later stage)
+
+The lock always lets go: Esc (the key goes to the lock, not to the app; the browser owns Esc
+itself), the window losing the keyboard focus, being minimized or closed, and
+win_pointer_lock(w, false).  It is never taken back by itself: after a release the app asks
+again (a click "to play").  A request while the window has no focus waits (Pending) and takes
+effect when it gets the focus.  One window holds the lock at a time (there is one pointer):
+asking for another lets the first go.
+```
+
+- **`enum PointerLock`**
+  (G7a) the state of a window's pointer lock (win_pointer_lock, ui.pointer_lock)
+  - `Off` -- not locked: never asked for, or let go (by the app, Esc, the focus going elsewhere, the
+    window minimized or closed)
+  - `Pending` -- asked for, not granted yet: the window has no focus yet, the browser waits for the next
+    press in the page, the Wayland compositor has not confirmed it
+  - `Locked` -- locked: the pointer is hidden and stays put, win_raw_motion_take has its motion
+  - `Unsupported` -- this platform or display cannot lock the pointer: Android, iOS; a Wayland compositor
+    without zwp_pointer_constraints_v1 or zwp_relative_pointer_manager_v1, an X server without
+    XInput 2.1
+  - `Refused` -- the system said no: the browser's pointerlockerror, another X11 client holds a grab, no
+    such window
+
+- **`fn win_pointer_lock(w: i32, on: bool) -> PointerLock`**
+  (G7a) lock the pointer to window w (on) or let it go (off) -> the state right after the call:
+  Locked at once where the platform grants it, Pending while it waits (see PointerLock), Off
+  after a release.  E_POINTER_LOCK follows every change.  The pointer is hidden while locked and
+  its motion comes through win_raw_motion_take; Esc, the focus going elsewhere, minimizing and
+  closing the window always let it go.  A window that is not the one holding (or waiting for)
+  the lock lets nothing go with off
+
+- **`fn win_pointer_lock_state(w: i32) -> PointerLock`**
+  (G7a) the state of window w's pointer lock (Off for a window that neither holds nor waits for
+  it; Unsupported / Refused stay until the next request)
+
+- **`fn win_raw_motion_take(w: i32) -> (f64, f64)`**
+  (G7a) the raw relative motion of window w's pointer since the last call, while w holds the
+  lock: (dx, dy), right and down positive, in the device's counts where the platform gives them
+  (Windows' Raw Input, Wayland's unaccelerated motion, X11's raw values, the browser with
+  unadjustedMovement), else in its accelerated pixels (macOS' deltas, the browser without it);
+  (0, 0) when there is none.  E_RAW_MOTION says that some waits
+
+- **`fn pointer_lock_test(w: i32, s: PointerLock)`**
+  (test aid, plattest --test input) the shared state without a platform: window w's lock is in
+  state s now, as a backend says it (E_POINTER_LOCK on a change)
+
+- **`fn raw_motion_test(w: i32, dx: f64, dy: f64)`**
+  (test aid) raw motion of window w as a backend reports it
+
+- **`fn pointer_lock_key_test(vk: u32, down: bool) -> bool`**
+  (test aid) a key as a backend asks the lock about it -> true: the key is the lock's (Esc)
+
+- **`fn raw_mouse_decode(rec: &[u8]) -> Option<(u16, i32, i32)>`**
+  (G7a) the motion of a Windows RAWINPUT record of a mouse (the bytes GetRawInputData fills: the
+  64-bit RAWINPUTHEADER, then RAWMOUSE) -> (usFlags, lLastX, lLastY); None for another device or
+  a short record.  MOUSE_MOVE_ABSOLUTE (usFlags bit 0) gives positions 0..65535 instead of
+  motion (MOUSE_VIRTUAL_DESKTOP, bit 1: of the whole desktop)
+
+- **`fn raw_abs_delta(prev: Option<[i32; 2]>, now: [i32; 2], span: [i32; 2]) -> (f64, f64)`**
+  (G7a) the motion of an absolute pointer (a remote desktop, a tablet, a virtual machine) between
+  two of its positions (0..65535 across the screen or the desktop of `span` pixels) -> pixels;
+  the first position after a pause (prev None) moves nothing
+
+- **`fn xi_raw_decode(ev: &[u8]) -> Option<(u16, u16, u32, f64, f64, u32)>`**
+  (G7a) the raw motion of an XInput 2 raw event (XI_RawMotion, the whole GenericEvent as the
+  server sends it) -> (deviceid, sourceid, time, raw value of valuator 0, of valuator 1, which
+  of the two it carries: bit 0 / bit 1); None for a short or malformed event.  The raw values
+  (FP3232, before acceleration) follow the mask and the transformed values
+
+- **`fn wl_fixed(v: i32) -> f64`**
+  (G7a) Wayland's fixed-point value (24.8) as a number
+
 ### `plat/ime.rs`
 
 Source: [`lib/plat/ime.rs`](../lib/plat/ime.rs)
@@ -37391,8 +38071,8 @@ Source: [`lib/plat/ime.rs`](../lib/plat/ime.rs)
 
 - **`fn ime_commit_text(win:u8,text:&str) -> usize`**
   Committed text of any length: commits of at most 4096 bytes, split between characters ->
-  the bytes queued (fewer: the commit queue or the event ring is full, the rest can follow
-  once the app took these).
+  the bytes taken (queued now, or waiting until the app took the commits before them; fewer
+  only past PENDING_MAX waiting bytes or for a window number out of range).
 
 *(E4) what the text being typed is (ime_purpose): the input method and an on-screen*
 
@@ -39536,7 +40216,8 @@ argon2 -- Argon2id (RFC 9106, version 0x13) and PHC strings
   argon2id(password, salt, &Params, out)          raw tag (secret / associated data empty)
   argon2id_ex(password, salt, secret, ad, &Params, out)
   hash(password, salt, &Params) -> "$argon2id$v=19$m=..,t=..,p=..$salt$hash"
-  verify(phc, password) -> bool                   (constant-time comparison)
+  verify(phc, password) -> bool                   (constant-time comparison; a string that
+                                                   asks for more than VERIFY_WORK is refused)
 
 Lanes are filled one after the other in each slice (the result is the same as with
 threads); memory is m KiB, allocated per call.
@@ -39568,8 +40249,15 @@ threads); memory is m KiB, allocated per call.
 - **`fn parse(phc: &str) -> Option<(Params, Vec<u8>, Vec<u8>)>`**
   the parameters, salt and tag of a PHC string
 
+```rust
+/// the most work verify does for a PHC string, in KiB times passes (memory m_kib x passes t):
+/// 2^24, so 1 GiB with 16 passes or 64 MiB with 256.  A stored string comes from outside; valid()
+/// alone let it ask for 4 GiB and 2^32 - 1 passes
+VERIFY_WORK: u64 = 1 << 24
+```
+
 - **`fn verify(phc: &str, password: &[u8]) -> bool`**
-  whether the password matches a PHC string
+  whether the password matches a PHC string (false beyond VERIFY_WORK)
 
 ### `crypto/b64.rs`
 
@@ -40276,7 +40964,8 @@ ROUNDS: u8 = 40
 
 - **`fn shared(pwe: &[u8; 64], rand: &[u8; 32], peer_scalar: &[u8; 32], peer_element: &[u8; 64]) -> Option<[u8; 32]>`**
   the x coordinate of k = rand \* (peer_scalar \* PWE + peer_element); None for a scalar out of
-  range, an element off the curve, or k at the identity
+  range or of 1 (RFC 8146 2.1: a scalar of 1 lets the element reveal mask \* PWE, as hostapd
+  refuses it since CVE-2019-9497), an element off the curve, or k at the identity
 
 - **`fn confirm(ss: &[u8; 32], element_a: &[u8; 64], scalar_a: &[u8; 32], element_b: &[u8; 64], scalar_b: &[u8; 32]) -> [u8; 32]`**
   Confirm of a side: H(ss | its element | its scalar | the other's element | scalar | ciphersuite)
@@ -41106,6 +41795,9 @@ ssh -- SSH-2 for running commands on a machine (RFC 4253 / 4252 / 4254)
   client.host_key()                                    type, blob, "SHA256:..." fingerprint
   client.auth_password(user, pw) / auth_key(user, &Keypair)
   client.exec(command, stdin, max_out) -> Exec { status, stdout, stderr }
+  client.set_time_limit(Some(ms))                       auth_* and exec end with TimedOut after
+                                                       ms in all (a server that keeps sending
+                                                       held them forever); None: no limit
   Transport::accept(stream, &host_key)                 the server side of the transport
                                                        (tests drive it with OpenSSH's client)
   private_key(text) -> Keypair      an unencrypted Ed25519 key ("OPENSSH PRIVATE KEY")
@@ -41117,6 +41809,9 @@ the Terrapin prefix truncation), ssh-ed25519 host and user keys, chacha20-poly13
 The host key is checked by the caller's rule: HostKeyCheck::Pinned(fingerprint) or Any (only
 to learn the fingerprint).  Not here: RSA / ECDSA keys, compression, port forwarding, PTYs,
 rekeying (a peer that starts a new key exchange ends the session; commands here are short).
+A peer that sends only messages to skip (ignore, debug, banners, global requests) while an
+answer is due ends the session after MAX_SKIPPED of them in a row; data past the window the
+client granted is a protocol error.
 ```
 
 ```rust
@@ -41233,11 +41928,17 @@ MSG_CHANNEL_FAILURE: u8 = 100
 **`impl Client`**
 
 - **`fn connect(s: Box<dyn Stream>, check: HostKeyCheck) -> Result<Client, SshError>`**
+- **`fn set_time_limit(&mut self, ms: Option<u32>)`**
+  Each following `auth_password`, `auth_key` and `exec` ends with `SshError::Net` (TimedOut)
+  when it takes longer than `ms` in all; `None` (the default): no limit.  The stream's read
+  timeout only limits each wait: a server that keeps sending (banners, endless output)
+  held these calls forever.  After a TimedOut the session is in an unknown state: close it.
 - **`fn host_key(&self) -> &HostKey`**
 - **`fn auth_password(&mut self, user: &str, password: &str) -> Result<(), SshError>`**
 - **`fn auth_key(&mut self, user: &str, key: &Keypair) -> Result<(), SshError>`**
 - **`fn exec(&mut self, command: &str, stdin: &[u8], max_out: usize) -> Result<Exec, SshError>`**
-  run a command, feed it `stdin`, collect at most `max_out` bytes of each output
+  run a command, feed it `stdin`, collect at most `max_out` bytes of each output (the rest
+  is read and dropped until the command ends: set_time_limit bounds a command that does not)
 - **`fn close(mut self)`**
 
 ### `netio/tls/mod.rs`
@@ -42566,8 +43267,8 @@ RFC 2308; the EDNS(0) OPT record of RFC 6891 is kept as raw data)
   RData            A, Aaaa, Ns, Cname, Ptr, Mx { pref, host }, Soa(Soa), Txt(strings),
                    Other(bytes); rtype() / text()
   Message { header, questions, answers, authority, additional }
-                   parse(b) (names with compression pointers; loops, forward pointers and
-                   names over 255 bytes are refused) / to_bytes() (names compressed against
+                   parse(b) (names with compression pointers; loops, forward pointers, more
+                   than 126 pointers and names over 255 bytes are refused) / to_bytes() (names compressed against
                    earlier ones, RFC 1035 4.1.4) / to_bytes_max(limit) -> (bytes, truncated):
                    whole records only, TC set when something was left out /
                    query(id, name, qtype, rd) / reply_to(&query)
@@ -45092,8 +45793,9 @@ KDE_IGTK: u8 = 9
 - **`fn to_bytes(&self) -> Vec<u8>`**
   the element with its id and length (22 bytes)
 - **`fn parse(elems: &[u8]) -> Option<Rsne>`**
-  the first RSN element of a list of elements (key data); one pairwise and one AKM suite
-  of 00-0F-AC are read, the counts are little endian as in every element
+  the first RSN element of a list of elements (key data): the first AKM suite's type (of
+  00-0F-AC) and the capabilities after every AKM suite; the counts are little endian as in
+  every element
 
 - **`fn elements(b: &[u8]) -> Vec<(u8, &[u8])>`**
   the elements of a list: (id, contents); stops at one that does not fit
@@ -47429,8 +48131,11 @@ Algorithms: curve25519-sha256 (also under the name @libssh.org), host and user k
 and rsa-sha2-256 (host keys; user keys too), ciphers chacha20-poly1305@openssh.com, aes128-ctr
 and aes256-ctr with hmac-sha2-256, compression none.  Not here: encrypted key files, the older
 ssh-rsa with SHA-1, port forwarding (a channel of another type is the embedder's to refuse),
-the extension negotiation of RFC 8308 (SSH_MSG_EXT_INFO is tolerated, none is sent) and
-OpenSSH's strict key exchange (ignored when offered).
+the extension negotiation of RFC 8308 (SSH_MSG_EXT_INFO is tolerated, none is sent).
+OpenSSH's strict key exchange (kex-strict-c/s-v00@openssh.com, against the Terrapin prefix
+truncation, CVE-2023-48795) is offered in the first KEXINIT and kept when the peer offers it
+too: the peer's KEXINIT must be its first packet, nothing but key exchange messages may come
+during the first exchange, and each direction counts its packets from 0 again after a NEWKEYS.
 
 The embedder decides what the protocol leaves open: which host key to trust, who logs in, which
 channels and requests to take.  A protocol error from the peer sends SSH_MSG_DISCONNECT and
@@ -48945,7 +49650,8 @@ format "bcrepo-1")
 Signers: snapshots are saved and loaded only with trusted keys -- CreateOptions::signer and
 the keys given to trust_signer (save_snapshot: UntrustedSigner, load_snapshot: Corrupt).
 The list sits in repo.json under the MAC of the repository key, so it keeps out other keys
-and mistakes, not someone who holds the repository key (who could call trust_signer).
+and mistakes, not someone who holds the repository key (who could call trust_signer).  A
+repo.json without a MAC (taken away) does not open (Corrupt).
 
 Layout:  repo.json  data/<xx>/<pack>.pack  index/<pack>.idx  snapshots/<id>.snap  LOCK
 Keys:    one random repository key, wrapped in repo.json for the server's master key, for
@@ -49367,7 +50073,9 @@ back a version that does not start
                                restart, max_size, ca_pem, timeout_ms
   startup(&cfg) -> Startup     first thing in main (before ui::launch): puts a downloaded
                                update in place and restarts into it, counts the starts of a
-                               new version, rolls back one that never reported healthy
+                               new version, rolls back one that never reported healthy;
+                               a program that calls itself neither the trial's version nor
+                               the old one ends the trial (the version recorded as bad)
   healthy(&cfg) -> bool        the health marker: the new version works (after its first
                                frame, for example); without it the next start rolls back
   Updater::new(cfg)            check() / download() / apply() (blocking), start_check() /
@@ -49577,7 +50285,9 @@ Re-exports: `plat::pkg::Packaged`
 - **`fn startup(cfg: &Config) -> Startup`**
   at the start of the program, before its UI: a staged update is put in place and the
   program restarted into it; a new version on trial counts its start, and one that already
-  had cfg.attempts starts without healthy() is rolled back (the old version restarted).
+  had cfg.attempts starts without healthy() is rolled back (the old version restarted).  A
+  program whose version is neither the trial's nor the one before (the package's own number
+  differs from its manifest's) ends the trial: Normal, the trial's version recorded as bad.
   Another process holding the updater's lock: Normal.
 
 - **`fn healthy(cfg: &Config) -> bool`**
@@ -49626,7 +50336,9 @@ the new version and the way back
   healthy(cfg) -> bool         (lib.rs) the health marker
 
 Every file of an update is written next to its target as NAME.jfupd-new; the old file is
-copied to backup/files/ (backup/list: "R path" replaced, "N path" new), renamed away
+copied to backup/files/ (backup/list: "H sha256 path" replaced, with the copy's SHA-256, which
+the way back checks for every copy before it puts one back, and again while it copies -- "R
+path" of earlier versions without one; "N path" new), renamed away
 (NAME.jfupd-old-<n>: Windows can rename a running exe, not replace it) and the new file takes
 its name.  Leftover .jfupd-* files are removed at a later start, once no process uses them.
 An AppImage update has one file, the .AppImage itself ($APPIMAGE): copied (and hashed on the
@@ -55163,7 +55875,8 @@ semantics, the minimal OS calls the runtime itself needs, panic handling.
   rt::os::{pages_alloc, pages_free, write_stdout, write_stderr, exit, yield_now}   (and on
   Linux the raw syscall helpers plat builds on); write_stderr_crash: stderr for crash paths,
   which gives up a stuck non-blocking stderr instead of waiting for it (Linux)
-  rt::kernel the Linux kernel ABI per architecture: SYS_*, O_*, Stat, clone_args (also as rt::os::*)
+  rt::kernel the Linux kernel ABI per architecture: SYS_*, O_*, Stat, clone_args (also as rt::os::*;
+           Android has the table too, without rt::os's helpers: docs/ANDROID.md, decision 2)
   rt::fx   cvtt / cvt / sqrt / minss / maxss / floor_i / ceil_i / div255
   rt::x87  the extended-precision steps of f64 <-> decimal text (ini.s), fpatan
   rt::sync SpinLock
@@ -55255,6 +55968,11 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
   that leaves it ends the program as an uncaught panic: JFLib's crash report, exit code 3.  plat
   runs its threads and the program's start through it.  Without that feature a panic never
   unwinds, and this is `f()`.
+
+- **`fn outline_lse() -> Option<bool>`**
+  (tests, docs/ARM64.md ARM7) the way compiler-builtins' outline atomics went: Some(true) LSE, Some(false)
+  the LL/SC loops (a CPU without LSE, or jfgui_ARM_LLSC=1); None where the program has none of them (x86-64;
+  Windows and Apple on ARM64 inline their atomics; Android, glibc and std leave it to the C library)
 
 **`mod portable`**
 
@@ -55456,7 +56174,7 @@ are bit-identical to ASMLIB.  Rust never fuses a multiply and an add into an FMA
 - **`fn cvttd64(x: f64) -> i64`**
   cvttsd2si (64-bit): truncate (i64::MIN for NaN / out of range)
 
-### `rt/kernel.rs` (Linux)
+### `rt/kernel.rs`
 
 Source: [`lib/rt/kernel.rs`](../lib/rt/kernel.rs)
 
@@ -56353,3 +57071,1302 @@ SYNTHETIC_ITALIC: f64 = 0.2
 - **`fn render(&mut self, w: u32, h: u32) -> Surface`**
   the page fitted into w x h pixels (a margin of 2 % around it) on the canvas grey, the
   page in its colour: an XRGB surface
+
+## dxf
+
+*DXF import (ASCII): tables, blocks and entities of model space, without a GPU* -- crate root [`lib/dxf/src/lib.rs`](../lib/dxf/src/lib.rs)
+
+```text
+dxf -- DXF import (G6e2; docs/RENDER2D.md "DXF"): the ASCII format of AutoCAD R12 to 2018 read into a data model
+that needs no GPU: the header's variables, the tables of layers, linetypes, text styles, block records and
+dimension styles, blocks with their entities, and the entities of the drawing.  lib/render2d puts it into a scene
+(render2d::dxf); a converter or a test reads the same without a device.
+
+  dxf::load(bytes, &Limits) -> Result<Document>        the whole file in memory, every entity kept
+  dxf::read(&mut source, &Limits, &mut sink) -> Result<Stats>   streaming: the source hands out the file in pieces,
+       the sink gets the header, the tables, each block when it is complete and each entity of ENTITIES as it is
+       read (nothing of ENTITIES is kept: a file of a gigabyte loads in bounded memory)
+  mtext::parse(text, height) -> Mtext                   MTEXT's inline format codes as paragraphs of runs
+  specials(text) -> Vec<Special>                       TEXT's %% codes (degree, diameter, under- and overline)
+  aci_rgb(index), font_substitute(name)                AutoCAD's colour index, which repository font stands in
+
+Binary DXF is refused (Error::Binary).  Files are untrusted input: every count, length and size is bounded
+(Limits), a malformed value is skipped with a note, a group code that is no number ends the file with an error;
+nothing nests deeper than POLYLINE / VERTEX and INSERT / ATTRIB, so there is no recursion.  Strings before AutoCAD
+2007 are in the header's code page ($DWGCODEPAGE, codepages.rs), from AC1021 on UTF-8; \U+XXXX is decoded
+everywhere, %% codes and MTEXT's codes where the text is drawn (specials, mtext).
+```
+
+### `dxf` crate root
+
+- **`enum Error`**
+  what went wrong; the text says where
+  - `Binary` -- a binary DXF ("AutoCAD Binary DXF"): not read (decision 31: the ASCII format)
+  - `Invalid(String)` -- not a DXF: a group code that is no number, a pair cut off (the line in the text)
+  - `Limit(String)` -- a Limits value exceeded
+
+- **`type Result<T> = core::result::Result<T, Error>`**
+
+- **`struct Limits`**
+  the bounds a file must stay in (Limits::DEFAULT; raise them for large files you trust more)
+  - `line_bytes: usize` -- bytes of one line (a group code or a value)
+  - `entity_pairs: usize` -- group pairs of one entity (with its vertices and attributes) and the bytes of their values
+  - `entity_bytes: usize`
+  - `entity_points: usize` -- points of one entity: vertices, control points, knots, a hatch's edges and its pattern's dashes
+  - `kept_entities: u64` -- entities kept: all of a Document's, or the blocks' while streaming
+  - `kept_points: u64` -- points kept (as entity_points, summed over what is kept)
+  - `blocks: usize` -- blocks, distinct names (layers, linetypes, styles, blocks), entries of all tables
+  - `names: usize`
+  - `table_entries: usize`
+
+**`impl Limits`**
+
+- **`const DEFAULT: Limits = Limits { line_bytes: 1 << 20, entity_pairs: 1 << 24, enti ...`**
+
+- **`type P3 = [f64; 3]`**
+  a point (x, y, z)
+
+- **`struct Name(pub u32)`**
+  a name of the file (a layer, linetype, text style, block, an entity's kind): an index into Names; names that differ
+  only in the case of ASCII letters are one (AutoCAD's rule)
+
+- **`struct Names`**
+  the names of a file, in the order they were first seen (Name(0) is the layer "0")
+
+**`impl Names`**
+
+- **`fn get(&self, n: Name) -> &str`**
+  the name's text as the file first spelled it
+- **`fn find(&self, s: &str) -> Option<Name>`**
+  a name that is already known
+- **`fn len(&self) -> usize`**
+- **`fn is_empty(&self) -> bool`**
+
+- **`enum Color`**
+  an entity's colour (62, 420): by layer, by block, an index of AutoCAD's palette (1 to 255; aci_rgb) or a true
+  colour 0xRRGGBB (420 wins over 62)
+  - `ByLayer`
+  - `ByBlock`
+  - `Aci(u8)`
+  - `Rgb(u32)`
+
+- **`enum Linetype`**
+  an entity's linetype (6): by layer (also when absent), by block, or a linetype of the table ("CONTINUOUS" is one)
+  - `ByLayer`
+  - `ByBlock`
+  - `Named(Name)`
+
+- **`enum Lineweight`**
+  a lineweight (370): by layer, by block, the drawing's default ($LWDEFAULT), or hundredths of a millimetre
+  - `ByLayer`
+  - `ByBlock`
+  - `Default`
+  - `Mm100(u16)`
+
+- **`enum Transparency`**
+  a transparency (440): by layer, by block, or an alpha (255: opaque, 0: invisible)
+  - `ByLayer`
+  - `ByBlock`
+  - `Alpha(u8)`
+
+- **`struct Common`**
+  what every entity has
+  - `kind: Name` -- the entity's kind as the file names it (LINE, LWPOLYLINE, ...)
+  - `handle: u64` -- 5 (0: none)
+  - `layer: Name` -- 8 (the layer "0" when absent)
+  - `linetype: Linetype`
+  - `color: Color`
+  - `lineweight: Lineweight`
+  - `ltscale: f64` -- 48 (1 when absent)
+  - `transparency: Transparency`
+  - `extrusion: P3` -- 210 (0, 0, 1 when absent): the normal of the entity's object coordinate system (OCS)
+  - `thickness: f64` -- 39
+  - `invisible: bool` -- 60 = 1
+  - `paper: bool` -- 67 = 1: in paper space
+
+- **`struct Entity`**
+  an entity: what all have, and its kind's geometry
+  - `common: Common`
+  - `kind: Kind`
+
+- **`struct Vertex`**
+  a vertex of a polyline: its point (OCS for 2D polylines, WCS for 3D), the bulge of the segment that starts here (the
+  tangent of a quarter of its arc's angle, positive: counter-clockwise), the widths at its start and end
+  - `at: P3`
+  - `bulge: f64`
+  - `start_width: f64`
+  - `end_width: f64`
+
+- **`struct Polyline`**
+  LWPOLYLINE, and POLYLINE with its VERTEXes (2D and 3D; meshes are Kind::Mesh)
+  - `vertices: Vec<Vertex>`
+  - `closed: bool` -- 70 bit 1
+  - `plinegen: bool` -- 70 bit 128: the linetype's pattern runs on across the vertices (else it starts anew at each)
+  - `three_d: bool` -- a 3D polyline (POLYLINE 70 bit 8): points in WCS, no bulges, no widths
+  - `const_width: f64` -- 43 (LWPOLYLINE) or 40 / 41 of POLYLINE: the width where a vertex has none of its own
+  - `elevation: f64` -- 38 (LWPOLYLINE) or 30 of POLYLINE's point: the OCS z
+
+- **`struct Mesh`**
+  POLYLINE as a polyface mesh (70 bit 64: faces of up to four vertices, an edge invisible where its index is
+  negative) or a polygon mesh (70 bit 16: m by n vertices, closed in m or n)
+  - `vertices: Vec<P3>`
+  - `faces: Vec<[i32; 4]>` -- polyface: per face its vertex indices from 1 (negative: the edge from it is invisible; 0: none)
+  - `m: u32` -- polygon mesh: its size and whether it closes
+  - `n: u32`
+  - `closed_m: bool`
+  - `closed_n: bool`
+
+- **`struct Spline`**
+  SPLINE (and the spline of a HELIX): degree, knots, control points with weights, fit points
+  - `degree: u32`
+  - `flags: u32` -- 70: 1 closed, 2 periodic, 4 rational, 8 planar, 16 linear
+  - `knots: Vec<f64>`
+  - `control: Vec<P3>`
+  - `weights: Vec<f64>` -- one per control point, or empty (all 1)
+  - `fit: Vec<P3>`
+  - `start_tangent: Option<P3>`
+  - `end_tangent: Option<P3>`
+
+- **`struct Text`**
+  TEXT, ATTRIB and ATTDEF
+  - `text: String` -- 1, decoded (\\U+XXXX; the %% codes stay: specials())
+  - `style: Option<Name>` -- 7 (Standard when absent)
+  - `at: P3` -- 10, 11 (OCS)
+  - `at2: Option<P3>`
+  - `height: f64` -- 40
+  - `rotation: f64` -- 50 (degrees)
+  - `width: Option<f64>` -- 41, 51 (degrees): None when absent (the style's)
+  - `oblique: Option<f64>`
+  - `generation: Option<u32>` -- 71: 2 backward, 4 upside down (None: the style's)
+  - `halign: u32` -- 72 (0 left, 1 center, 2 right, 3 aligned, 4 middle, 5 fit), 73 (0 baseline, 1 bottom, 2 middle, 3 top)
+  - `valign: u32`
+  - `tag: Option<String>` -- ATTRIB and ATTDEF: the tag (2) and the flags (70: 1 invisible, 2 constant, 4 verify, 8 preset)
+  - `attr_flags: u32`
+  - `mtext: Option<alloc::boxed::Box<MText>>` -- ATTRIB / ATTDEF of several lines (R2018: an MTEXT inside them)
+
+- **`struct MText`**
+  MTEXT
+  - `text: String` -- 3 ... and 1, joined, decoded (\\U+XXXX); the format codes stay (mtext::parse)
+  - `style: Option<Name>`
+  - `at: P3` -- 10 (WCS)
+  - `height: f64` -- 40, 41 (the reference rectangle's width: 0, no wrapping), 46 (its height, for columns)
+  - `width: f64`
+  - `rect_height: f64`
+  - `attach: u32` -- 71 (1 top left to 9 bottom right), 72 (1 left to right, 3 top to bottom, 5 by style)
+  - `direction: u32`
+  - `x_dir: Option<P3>` -- 11 (WCS): the x axis' direction; else 50 (radians, in the OCS)
+  - `rotation: f64`
+  - `spacing_style: u32` -- 73 (1 at least, 2 exactly), 44 (the factor of the single spacing)
+  - `spacing: f64`
+  - `bg_flags: u32` -- 90 (1 a background fill, 2 in the background colour, 16 a text frame), 63 / 421 its colour, 45 how far
+    beyond the text (a factor of the height)
+  - `bg_color: Color`
+  - `bg_scale: f64`
+  - `column_type: u32` -- R2018's columns (75 type: 0 none, 1 static, 2 dynamic; 76 count; 48 width; 49 gutter; 50 heights)
+  - `column_count: u32`
+  - `column_width: f64`
+  - `column_gutter: f64`
+  - `column_heights: Vec<f64>`
+
+- **`struct Insert`**
+  INSERT (also MINSERT's array) with its ATTRIBs
+  - `block: Name` -- 2
+  - `at: P3` -- 10 (OCS), 41 42 43, 50 (degrees)
+  - `scale: P3`
+  - `rotation: f64`
+  - `columns: u32` -- 70, 71 (0 read as 1), 44, 45
+  - `rows: u32`
+  - `spacing: [f64; 2]`
+  - `attribs: Vec<Entity>` -- the ATTRIBs after it (each an Entity of Kind::Text)
+
+- **`enum Edge`**
+  an edge of a hatch's boundary path (angles in degrees, as the file has them)
+  - `Line { a: [f64; 2], b: [f64; 2] }`
+  - `Arc { center: [f64; 2], radius: f64, start: f64, end: f64, ccw: bool }`
+  - `Ellipse { center: [f64; 2], major: [f64; 2], ratio: f64, start: f64, end: f64, ccw: bool }` -- major: the end of the major axis relative to the centre; ratio: minor over major
+  - `Spline { degree: u32, rational: bool, periodic: bool, knots: Vec<f64>, control: Vec<[f64; 2]>, weights: Vec<f64>, fit: Vec<[f64; 2]> }`
+  - `Poly { vertices: Vec<[f64; 3]>, closed: bool }` -- a polyline path: its vertices (x, y, bulge), closed
+
+- **`struct Path`**
+  a hatch's boundary path: its flags (92: 1 external, 2 polyline, 4 derived, 8 textbox, 16 outermost) and edges
+  - `flags: u32`
+  - `edges: Vec<Edge>`
+
+- **`struct PatternLine`**
+  a line family of a hatch pattern as the file stores it, already scaled and turned: angle (53, degrees), a base
+  point (43, 44), the offset to the next line (45, 46) and dashes (49: positive on, negative off, 0 a dot)
+  - `angle: f64`
+  - `base: [f64; 2]`
+  - `offset: [f64; 2]`
+  - `dashes: Vec<f64>`
+
+- **`struct Hatch`**
+  HATCH
+  - `pattern: String` -- 2, 70 (solid fill), 75 (0 normal, 1 outer, 2 ignore islands), 52, 41, 77
+  - `solid: bool`
+  - `style: u32`
+  - `angle: f64`
+  - `scale: f64`
+  - `double: bool`
+  - `elevation: f64` -- 30: the OCS z of the boundary
+  - `paths: Vec<Path>`
+  - `lines: Vec<PatternLine>`
+  - `gradient: bool` -- 450 = 1: a gradient (its two colours, 63/421 after 453)
+  - `gradient_colors: Vec<Color>`
+
+- **`struct Quad`**
+  SOLID, TRACE (the outline 10, 11, 13, 12 in OCS) and 3DFACE (10, 11, 12, 13 in WCS; 70: invisible edges)
+  - `points: [P3; 4]`
+  - `face: bool`
+  - `invisible_edges: u32`
+
+- **`struct BlockRef`**
+  what draws through an anonymous block: DIMENSION (and its kinds ARC_DIMENSION, LARGE_RADIAL_DIMENSION) and
+  ACAD_TABLE (2: the block; 10 its insertion point for a table)
+  - `block: Option<Name>`
+  - `at: P3`
+  - `x_dir: Option<P3>` -- ACAD_TABLE's 11: its horizontal direction (WCS)
+
+- **`struct Leader`**
+  LEADER: its vertices (WCS), an arrowhead (71), a spline path (72), the dimension style (3)
+  - `vertices: Vec<P3>`
+  - `arrow: bool`
+  - `spline: bool`
+  - `dimstyle: Option<Name>`
+
+- **`struct Wipeout`**
+  WIPEOUT (and IMAGE's frame, read alike): insertion point, the u and v vectors of a pixel, the size in pixels, the
+  clip boundary in pixel coordinates (71: 1 a rectangle of two corners, 2 a polygon)
+  - `at: P3`
+  - `u: P3`
+  - `v: P3`
+  - `size: [f64; 2]`
+  - `clip_type: u32`
+  - `clip: Vec<[f64; 2]>`
+
+- **`enum Kind`**
+  an entity's geometry
+  - `Line { a: P3, b: P3 }`
+  - `Point { at: P3, angle: f64 }` -- POINT: WCS, 50 the angle of its symbol (degrees)
+  - `Circle { center: P3, radius: f64 }` -- CIRCLE and ARC (OCS centre; angles in degrees, counter-clockwise from start to end)
+  - `Arc { center: P3, radius: f64, start: f64, end: f64 }`
+  - `Ellipse { center: P3, major: P3, ratio: f64, start: f64, end: f64 }` -- ELLIPSE: WCS centre, the major axis' end relative to it, minor / major, the parameters (radians)
+  - `Spline(Spline)`
+  - `Polyline(Polyline)`
+  - `Mesh(Mesh)`
+  - `Text(Text)`
+  - `MText(MText)`
+  - `Insert(Insert)`
+  - `Hatch(Hatch)`
+  - `Quad(Quad)`
+  - `BlockRef(BlockRef)`
+  - `Leader(Leader)`
+  - `Wipeout(Wipeout)`
+  - `Ray { at: P3, dir: P3, both: bool }` -- RAY (from `at`) and XLINE (both ways)
+  - `Other` -- what this reader does not read (its kind in Common::kind): counted, not drawn
+
+- **`struct Layer`**
+  a layer of the table
+  - `name: Name`
+  - `color: Color` -- 62 (its magnitude) or 420
+  - `on: bool` -- 62 negative: off; 70 bit 1: frozen, bit 4: locked; 290: plotted
+  - `frozen: bool`
+  - `locked: bool`
+  - `plot: bool`
+  - `linetype: Option<Name>` -- 6 (None: CONTINUOUS)
+  - `lineweight: Lineweight` -- 370 (Default when absent)
+  - `transparency: Option<u8>` -- the XDATA AcCmTransparency (1071): an alpha
+
+- **`struct Dash`**
+  an element of a linetype: a dash (positive), a gap (negative) or a dot (0); a shape or text of a complex linetype
+  is kept as a flag (74) and its text
+  - `length: f64`
+  - `complex: u32`
+  - `text: Option<String>`
+
+- **`struct LinetypeDef`**
+  a linetype of the table
+  - `name: Name`
+  - `description: String`
+  - `dashes: Vec<Dash>`
+  - `total: f64` -- 40
+
+- **`struct StyleDef`**
+  a text style of the table
+  - `name: Name`
+  - `font: String` -- 3: the font file (txt, simplex.shx, arial.ttf, ...), 4 the big font file
+  - `bigfont: String`
+  - `family: Option<String>` -- the TrueType family the XDATA "ACAD" names (1000), if any
+  - `height: f64` -- 40 (0: none fixed), 41, 50 (degrees)
+  - `width: f64`
+  - `oblique: f64`
+  - `flags: u32` -- 70: 1 a shape file (not a text font), 4 vertical; 71: 2 backward, 4 upside down
+  - `generation: u32`
+
+- **`struct BlockRecord`**
+  a block record of the table
+  - `name: Name`
+  - `handle: u64`
+  - `units: i32` -- 70: the insertion units
+
+- **`struct DimStyle`**
+  a dimension style (what a LEADER's arrow needs)
+  - `name: Name`
+  - `arrow_size: f64` -- 41 DIMASZ, 40 DIMSCALE
+  - `scale: f64`
+
+- **`struct Tables`**
+  the tables
+  - `layers: Vec<Layer>`
+  - `linetypes: Vec<LinetypeDef>`
+  - `styles: Vec<StyleDef>`
+  - `block_records: Vec<BlockRecord>`
+  - `dimstyles: Vec<DimStyle>`
+
+**`impl Tables`**
+
+- **`fn layer(&self, n: Name) -> Option<&Layer>`**
+- **`fn linetype(&self, n: Name) -> Option<&LinetypeDef>`**
+- **`fn style(&self, n: Name) -> Option<&StyleDef>`**
+- **`fn dimstyle(&self, n: Name) -> Option<&DimStyle>`**
+
+- **`struct Header`**
+  the header's variables this reader uses
+  - `version: String` -- $ACADVER (AC1009 R12 ... AC1032 2018; empty without a header), $DWGCODEPAGE
+  - `codepage: String`
+  - `insunits: i32` -- $INSUNITS (0 unitless, 1 inch, 4 mm, 6 m, ...)
+  - `ltscale: f64` -- $LTSCALE, $CELTSCALE
+  - `lwdisplay: Option<bool>` -- $LWDISPLAY (None: not in the file), $LWDEFAULT (hundredths of a mm)
+  - `lwdefault: u16`
+  - `pdmode: i32` -- $PDMODE, $PDSIZE
+  - `pdsize: f64`
+  - `extmin: Option<P3>` -- $EXTMIN, $EXTMAX
+  - `extmax: Option<P3>`
+  - `dimscale: f64` -- $DIMSCALE, $DIMASZ, $TEXTSIZE, $MIRRTEXT
+  - `dimasz: f64`
+  - `textsize: f64`
+  - `mirrtext: bool`
+  - `present: bool` -- whether the file had a HEADER section
+
+- **`struct Block`**
+  a block: its name, base point, flags (70: 1 anonymous, 2 attributes, 4 xref, 8 xref overlay, 16 external,
+  32 resolved, 64 referenced), entities
+  - `name: Name`
+  - `base: P3`
+  - `flags: u32`
+  - `xref: String` -- 1: the file an xref names
+  - `entities: Vec<Entity>`
+  - `paper: bool` -- \*Paper_Space...: a layout's
+
+- **`enum Where`**
+  where an entity marker was
+  - `Entities`
+  - `Blocks`
+
+- **`struct Stats`**
+  what was read
+  - `kinds: BTreeMap<(Where, String), u64>` -- entity markers per section and kind as the reader took them (VERTEX, ATTRIB, SEQEND, BLOCK, ENDBLK count too)
+  - `paper: u64` -- entities of ENTITIES in paper space (67 = 1)
+  - `bytes: u64` -- bytes and lines read, group pairs
+  - `lines: u64`
+  - `pairs: u64`
+  - `sections: Vec<String>` -- sections seen
+  - `notes: Vec<String>` -- what was skipped or guessed, each once (at most 64)
+
+**`impl Stats`**
+
+- **`fn count(&self, w: Where, kind: &str) -> u64`**
+  the count of a kind in a section
+
+- **`trait Sink`**
+  what a streaming read hands out, in the file's order: the header (also an empty one, before anything else), the
+  tables (once, when the TABLES section ends, or empty before the first block or entity), each block when its ENDBLK
+  is read, each entity of ENTITIES (paper space too: Common::paper)
+  - `fn header(&mut self, _h: &Header, _names: &Names)`
+  - `fn tables(&mut self, _t: &Tables, _names: &Names)`
+  - `fn block(&mut self, _b: Block, _names: &Names)`
+  - `fn entity(&mut self, _e: Entity, _names: &Names)`
+
+- **`struct Document`**
+  a whole file
+  - `header: Header`
+  - `tables: Tables`
+  - `blocks: Vec<Block>`
+  - `entities: Vec<Entity>`
+  - `names: Names`
+  - `stats: Stats`
+
+**`impl Document`**
+
+- **`fn name(&self, n: Name) -> &str`**
+  a name's text
+- **`fn block(&self, n: Name) -> Option<&Block>`**
+  a block by its name
+
+- **`fn load(bytes: &[u8], limits: &Limits) -> Result<Document>`**
+  a whole file in memory into a Document (every entity kept: Limits::kept_entities and kept_points bound them)
+
+- **`fn read(source: &mut dyn FnMut(&mut [u8]) -> usize, limits: &Limits, sink: &mut dyn Sink) -> Result<(Stats, Names)>`**
+  a file read piece by piece: `source` fills a buffer and says how many bytes it put there (0: the end); the sink
+  gets what was read in the file's order.  Only the tables and the blocks are kept (Limits bound them); the entities
+  of ENTITIES go to the sink one by one
+
+- **`fn is_binary(bytes: &[u8]) -> bool`**
+  whether bytes begin like a binary DXF
+
+- **`fn aci_rgb(i: u8) -> u32`**
+  AutoCAD's colour index (ACI) as 0xRRGGBB: 1 red, 2 yellow, 3 green, 4 cyan, 5 blue, 6 magenta, 7 white (black on a
+  light background: the caller decides), 8 and 9 greys, 10 to 249 24 hues of 15 degrees, each in five brightnesses
+  (255, 204, 153, 127, 76) and each of those mixed half with white of that brightness, 250 to 255 greys; 0 and 256
+  (by block, by layer) are white
+
+### `dxf/src/fonts.rs`
+
+Source: [`lib/dxf/src/fonts.rs`](../lib/dxf/src/fonts.rs)
+
+```text
+fonts -- which font of the repository stands in for a text style's font (decision 31: SHX fonts belong to Autodesk,
+and there are no Microsoft fonts in the repository).  A substitute names a family (the caller has the bytes) and how
+wide the original runs: the advance of the sample "a..z A..Z 0..9" over its cap height, from the original's metrics
+(Helvetica / Arial, Times, Courier: their published advance widths; SHX fonts: estimates from their glyph grids,
+docs/RENDER2D.md "DXF").  render2d::dxf turns that into a width factor against the substitute's own advance.
+```
+
+- **`enum Family`**
+  a family of the fonts in the repository
+  - `Sans` -- Inter (styles/netlab/assets): sans-serif, for Arial, Helvetica, Calibri, Verdana, Tahoma and every SHX font
+  - `SansBold` -- Inter SemiBold: bold sans-serif (Arial Black, "... Bold")
+  - `Serif` -- DejaVu Serif (lib/doc_view/assets): Times, Georgia, Cambria, Garamond, Book Antiqua
+  - `SerifBold`
+  - `Mono` -- DejaVu Sans Mono: Courier, Consolas, Lucida Console, Source Code Pro, monotxt.shx
+  - `MonoBold`
+  - `Ui` -- Selawik (styles/winui/assets): Segoe UI
+
+- **`struct Substitute`**
+  a font's stand-in
+  - `family: Family`
+  - `sample_advance: f64` -- the original's advance of the sample "a..z A..Z 0..9" (62 characters) in cap heights; 0: keep the substitute's width
+  - `shx: bool` -- an SHX font (single strokes) or a shape file
+
+```rust
+/// the sample whose advance sets the width factor of a substitute
+SAMPLE: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123 ...
+```
+
+- **`fn font_substitute(file: &str, family: Option<&str>) -> Substitute`**
+  the stand-in of a style's font file (3) or TrueType family (its XDATA), compared without case and path: TrueType
+  names by their family, everything else (".shx", no extension, unknown) as an SHX font
+
+### `dxf/src/mtext.rs`
+
+Source: [`lib/dxf/src/mtext.rs`](../lib/dxf/src/mtext.rs)
+
+```text
+mtext -- MTEXT's inline format codes (G6e2): a text as paragraphs of runs, each run with its format.
+
+  \P paragraph   \N column break   \X (dimension text: a line break)   \~ no-break space   \\ \{ \} the characters
+  { } a group: the format inside ends with it
+  \L \l underline on, off   \O \o overline   \K \k strike-through
+  \f<family>|b<0|1>|i<0|1>|c<charset>|p<pitch>;  a TrueType family    \F<file>;  a font file (SHX)
+  \H<v>; \H<v>x;  height (absolute, or times the current)    \W<v>; \W<v>x;  width factor
+  \Q<deg>;  oblique   \T<v>; \T<v>x;  tracking (spacing of characters)   \A<0|1|2>;  bottom, centre, top
+  \C<aci>;  colour of the palette (0 by block, 256 by layer)   \c<bgr>;  a true colour (blue in the high byte)
+  \S<top><sep><bottom>;  stacked: / with a bar, # diagonal, ^ without a bar (tolerances)
+  \p...;  paragraph: i<first line indent>, l<left indent>, r<right>, q<l|c|r|j|d> alignment, t<tabs> (x: ignored)
+  \U+XXXX  a character   \M+NXXXX  a double-byte character (read as U+FFFD)   ^I tab, ^J line break, ^<c> control
+  %%c %%d %%p %%% %%nnn  as in TEXT (strings::specials)
+
+Unknown codes are dropped with their letter (a code with a ';' to its end); nothing recurses (the groups are a stack
+of at most GROUP_DEPTH formats; deeper ones share the deepest).
+```
+
+```rust
+/// the deepest nesting of { } groups that keeps formats of its own
+GROUP_DEPTH: usize = 64
+```
+
+- **`struct Format`**
+  how a run looks
+  - `font: Option<String>` -- \\f's family or \\F's file (None: the entity's style), \\f's bold and italic flags
+  - `shx: bool`
+  - `bold: bool`
+  - `italic: bool`
+  - `height: f64` -- the cap height (drawing units)
+  - `width: Option<f64>` -- width factor, oblique angle (degrees; None: the style's), tracking factor
+  - `oblique: Option<f64>`
+  - `tracking: f64`
+  - `color: Option<Color>` -- None: the entity's colour
+  - `underline: bool`
+  - `overline: bool`
+  - `strike: bool`
+  - `valign: u8` -- \\A: 0 bottom, 1 centre, 2 top (where a smaller run sits on the line)
+
+- **`enum StackKind`**
+  a stacked text's separator
+  - `Bar` -- '/': above and below a horizontal bar
+  - `Diagonal` -- '#': a diagonal fraction
+  - `Tolerance` -- '^': above and below, no bar (tolerances)
+
+- **`enum Item`**
+  a piece of a paragraph
+  - `Text(String, Format)`
+  - `Stack { top: String, bottom: String, kind: StackKind, format: Format }`
+  - `Tab(Format)`
+
+- **`enum Align`**
+  a paragraph's alignment (\\pq; Default: the attachment point's)
+  - `Default`
+  - `Left`
+  - `Center`
+  - `Right`
+  - `Justify`
+  - `Distribute`
+
+- **`struct Paragraph`**
+  a paragraph: its alignment, indents (drawing units), tab stops, items; whether a column break came before it
+  - `align: Align`
+  - `indent_first: f64`
+  - `indent_left: f64`
+  - `indent_right: f64`
+  - `tabs: Vec<f64>`
+  - `column_break: bool`
+  - `items: Vec<Item>`
+
+- **`struct Mtext`**
+  an MTEXT's content
+  - `paragraphs: Vec<Paragraph>`
+
+**`impl Mtext`**
+
+- **`fn plain(&self, height: f64) -> Option<String>`**
+  the text, paragraphs joined by '\\n', when it has nothing but text in the entity's own format, left aligned (what
+  render2d's MText draws as it is); None otherwise
+- **`fn text(&self) -> String`**
+  all text without formats (for counts and tests): paragraphs by '\\n', stacks as top/bottom, tabs as '\\t'
+
+- **`fn parse(text: &str, height: f64) -> Mtext`**
+  MTEXT's text (3 and 1 joined) as paragraphs of runs; `height` is the entity's cap height
+
+### `dxf/src/strings.rs`
+
+Source: [`lib/dxf/src/strings.rs`](../lib/dxf/src/strings.rs)
+
+```text
+strings -- a DXF's bytes as text: UTF-8 from AutoCAD 2007 (AC1021) on, before that the header's code page
+($DWGCODEPAGE; codepages.rs), \U+XXXX in any version; TEXT's %% codes (specials).
+```
+
+- **`fn decode_unicode_escapes(s: &str) -> String`**
+  \\U+XXXX (four or five hex digits) as the character it names; \\M+NXXXX (a double byte of an East Asian page) as
+  U+FFFD.  Everything else stays (also "\\\\": TEXT has no escapes; MTEXT is parsed by mtext::parse)
+
+- **`struct Special`**
+  a run of a TEXT after its %% codes: the text and how it is decorated
+  - `text: String`
+  - `underline: bool`
+  - `overline: bool`
+  - `strike: bool`
+
+- **`fn specials(s: &str) -> Vec<Special>`**
+  TEXT's %% codes: %%c the diameter sign (U+2205), %%d the degree sign, %%p plus-minus, %%nnn the character of that
+  code (Windows-1252 above 127), %%% a percent sign; %%u, %%o and %%k switch underline, overline and strike-through on
+  and off (the runs they start).  Unknown codes stay as they are
+
+## physics
+
+*Collision shapes, broad phase and deterministic queries for games* -- crate root [`lib/physics/src/lib.rs`](../lib/physics/src/lib.rs)
+
+```text
+physics -- collision for games: shapes, broad phase, queries; deterministic, the same bits on every target
+
+  Shape          sphere, capsule, box, convex hull (ConvexHull::new: quickhull), static triangle mesh
+                 (TriMesh: f32 vertices, a binned-SAH tree, active edges against ghost collisions)
+  World          bodies (shape, Iso, layers) in dynamic AABB trees; ray_cast, ray_cast_all, cast (a
+                 swept convex shape: time of impact, normal, contact point), overlap, contacts
+                 (penetration depth and normal per body and triangle), closest_point
+  query          the same for one shape against one placed shape, without a world
+  math           Vec3, Quat, Iso, Aabb in f64; sqrt correctly rounded, sin / cos / atan2 from rt's
+                 portable math
+
+Narrow phase: GJK for distances, EPA for penetration, GJK ray casting with conservative advancement for
+the casts (radii as margins outside GJK), watertight ray/triangle tests, analytic rays against the other
+primitives.  Deterministic: only + - * / and correctly rounded square roots in f64, never a fused
+multiply-add, no unordered containers, no threads, fixed iteration limits and tie-breaks; checked by the
+checksums of apps/physicstest on every target.  docs/PHYSICS.md describes the design, the tests and the
+measurements.
+```
+
+### `physics/src/bvh.rs`
+
+Source: [`lib/physics/src/bvh.rs`](../lib/physics/src/bvh.rs)
+
+```text
+bvh -- the fixed bounding volume hierarchy of a triangle mesh: binned SAH, built once
+
+Boxes in f32 (a mesh's vertices are f32, so the box of a triangle is exact in f32 and so is every
+union).  A node is 32 bytes; the two children of an inner node sit next to each other.  The build splits
+a node where the surface area heuristic over 16 bins per axis is cheapest (cost of a node visit 1, of a
+triangle 1); a node becomes a leaf when that is not cheaper than testing its triangles (at most
+`max_leaf`).  Past depth 40 it splits at the median along the widest axis, which bounds the depth for
+any input.  Every choice has a tie-break by axis, bin or index: the same tree on every target.
+```
+
+- **`struct BvhNode`**
+  a node of a [`crate::TriMesh`]'s tree: an inner node when `count` is 0 (children at `first` and
+  `first + 1`), else a leaf with the triangles `first .. first + count`
+  - `min: [f32; 3]` -- the box, in the mesh's frame
+  - `max: [f32; 3]`
+  - `first: u32` -- the left child (an inner node) or the first triangle (a leaf)
+  - `count: u32` -- 0 for an inner node, else the number of triangles
+
+**`impl BvhNode`**
+
+- **`fn is_leaf(&self) -> bool`**
+  a leaf (it has triangles)
+
+### `physics/src/gjk.rs`
+
+Source: [`lib/physics/src/gjk.rs`](../lib/physics/src/gjk.rs)
+
+```text
+gjk -- distance, penetration and time of impact between two convex shapes given as support functions
+
+GJK (Gilbert, Johnson, Keerthi) finds the point of the Minkowski difference D = A - B closest to the
+origin; the simplex is reduced by the Voronoi regions of its vertices, edges and faces (Ericson,
+"Real-Time Collision Detection", 5.1.5 and 9.5).  EPA expands a polytope inside D to find the shallowest
+way out when the cores overlap.  The cast is GJK ray casting with conservative advancement (van den
+Bergen 2004, as in Box2D's b2ShapeCast): the support plane of D in the direction of the current closest
+point bounds the distance at every later time, so the time advances to where that bound meets the target
+distance and never beyond the first contact.  The radii of spheres and capsules stay outside GJK as
+margins: the cores of two such shapes are apart at contact, which keeps the casts well conditioned.
+```
+
+```rust
+/// two shapes without radius (boxes, hulls, triangles) stop a cast at this gap (metres): a positive
+/// distance keeps the direction of the closest points well defined
+CAST_SKIN: f64 = 1e-6
+```
+
+- **`fn cast_fallbacks() -> u32`**
+  how many casts so far fell back from GJK ray casting to Newton's method on the distance (GJK at one time
+  stalled by rounding, or its iterations ran out); the result is right either way, only slower
+
+### `physics/src/hull.rs`
+
+Source: [`lib/physics/src/hull.rs`](../lib/physics/src/hull.rs)
+
+```text
+hull -- a convex hull from points (quickhull in 3D) and its support function
+
+Quickhull: a first tetrahedron from extreme points, every other point in the outside set of the face it
+lies farthest above; then, as long as a face has an outside set, its farthest point (the eye) removes the
+faces it sees (a connected region from that face), the horizon around them gets new faces to the eye,
+and the points of the removed faces go to the new ones (or are inside now).  A point within `eps` of a
+face's plane counts as on it, so the hull can leave out points that lie that close to it.  Everything in
+a fixed order (faces and points by index, ties to the lower index): the same hull on every target.
+```
+
+```rust
+/// at most this many input points for [`ConvexHull::new`]
+MAX_HULL_POINTS: usize = 1 << 16
+```
+
+- **`enum HullError`**
+  why [`ConvexHull::new`] refused the points
+  - `Count` -- fewer than 4 points, or more than [`MAX_HULL_POINTS`]
+  - `NotFinite` -- a coordinate is NaN or infinite
+  - `Flat` -- all points lie on a plane (or a line or a point), within the tolerance: no volume
+
+- **`struct ConvexHull`**
+  A convex polyhedron: the hull of the points it was made from.  Vertices, triangles (counter-clockwise
+  seen from outside) and their planes, in its own coordinates.
+
+**`impl ConvexHull`**
+
+- **`fn new(points: &[Vec3]) -> Result<ConvexHull, HullError>`**
+  the convex hull of `points` (at least 4, not all on a plane)
+- **`fn points(&self) -> &[Vec3]`**
+  the vertices (a subset of the input points, in their order)
+- **`fn faces(&self) -> &[[u32; 3]]`**
+  the triangles, as indices into [`ConvexHull::points`], counter-clockwise seen from outside
+- **`fn planes(&self) -> &[(Vec3, f64)]`**
+  per face the outward unit normal n and d, with n . p = d on the face
+- **`fn aabb(&self) -> Aabb`**
+  the box around the hull in its own coordinates
+- **`fn tolerance(&self) -> f64`**
+  the tolerance of the construction: an input point lies at most this far outside the hull
+- **`fn support(&self, d: Vec3) -> Vec3`**
+  a vertex farthest in direction `d`: the first of equals among up to 32 vertices, beyond that by hill
+  climbing over the vertex adjacency (exact for a convex polyhedron, always the same path)
+- **`fn volume(&self) -> f64`**
+  the volume (for tests and mass properties later)
+
+### `physics/src/math.rs`
+
+Source: [`lib/physics/src/math.rs`](../lib/physics/src/math.rs)
+
+```text
+math -- the vectors, rotations and boxes of the crate, in f64, with operations that give the same bits on
+every target: + - * / and a correctly rounded square root, never a fused multiply-add (Rust does not
+contract a * b + c on its own); sin, cos and atan2 from rt's portable math (docs/ARM64.md, ARM2), which is
+the same code on every target.
+```
+
+- **`fn sqrt(x: f64) -> f64`**
+  The square root, correctly rounded (IEEE 754), so the same bits on every target: the processor's
+  instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64), elsewhere (the browser, the x86-64
+  Android emulator) [`sqrt_portable`].  A negative argument gives NaN, -0.0 gives -0.0.
+
+- **`fn sqrt_portable(x: f64) -> f64`**
+  The correctly rounded square root from f64 operations and one 64 x 64 bit product: Newton's method
+  gives an estimate within a few units in the last place, the integer test (R - 1/2)^2 &lt; X &lt; (R + 1/2)^2
+  on the significand picks the right neighbour.  Equal to the processor's square root for every input;
+  on the browser it is several times faster than rt's bit-by-bit root.  Public for the tests.
+
+- **`fn sincos(x: f64) -> (f64, f64)`**
+  sin and cos of `x` (radians) from rt's portable math: the same bits on every target (within half an
+  ulp of the exact value)
+
+- **`fn sin(x: f64) -> f64`**
+  sin of `x` (radians), the same bits on every target
+
+- **`fn cos(x: f64) -> f64`**
+  cos of `x` (radians), the same bits on every target
+
+- **`fn atan2(y: f64, x: f64) -> f64`**
+  atan2(y, x) in radians, the same bits on every target
+
+- **`fn min(a: f64, b: f64) -> f64`**
+  the smaller of two numbers (`b` when they are equal or one is NaN), the same on every target
+
+- **`fn max(a: f64, b: f64) -> f64`**
+  the larger of two numbers (`b` when they are equal or one is NaN)
+
+- **`fn clamp(x: f64, lo: f64, hi: f64) -> f64`**
+  `x` limited to [lo, hi] (lo when x is NaN)
+
+- **`struct Vec3`**
+  A point or a direction in metres, `f64` (docs/PHYSICS.md, "f64").  Converts from and to `[f64; 3]`,
+  render3d's positions.
+  - `x: f64` -- metres (or a direction's component)
+  - `y: f64`
+  - `z: f64`
+
+**`impl Vec3`**
+
+- **`const ZERO: Vec3 = Vec3::new(0.0, 0.0, 0.0)`**
+  (0, 0, 0)
+- **`const X: Vec3 = Vec3::new(1.0, 0.0, 0.0)`**
+  the unit vectors along the axes (Y is up)
+- **`const Y: Vec3 = Vec3::new(0.0, 1.0, 0.0)`**
+- **`const Z: Vec3 = Vec3::new(0.0, 0.0, 1.0)`**
+- **`const fn new(x: f64, y: f64, z: f64) -> Vec3`**
+  (x, y, z)
+- **`const fn splat(v: f64) -> Vec3`**
+  (v, v, v)
+- **`fn dot(self, o: Vec3) -> f64`**
+  the dot product, summed x, y, z in this order
+- **`fn cross(self, o: Vec3) -> Vec3`**
+  the cross product (right-handed)
+- **`fn length_sq(self) -> f64`**
+  the squared length
+- **`fn length(self) -> f64`**
+  the length (correctly rounded root)
+- **`fn try_normalize(self) -> Option<Vec3>`**
+  the unit vector in this direction, None for a zero (or not finite) vector
+- **`fn normalize_or_zero(self) -> Vec3`**
+  the unit vector in this direction; a zero vector stays zero
+- **`fn min(self, o: Vec3) -> Vec3`**
+  the smaller component by component
+- **`fn max(self, o: Vec3) -> Vec3`**
+  the larger component by component
+- **`fn abs(self) -> Vec3`**
+  the absolute value of each component
+- **`fn mul_elem(self, o: Vec3) -> Vec3`**
+  component by component
+- **`fn lerp(self, b: Vec3, t: f64) -> Vec3`**
+  a + (b - a) \* t
+- **`fn max_elem(self) -> f64`**
+  the largest component
+- **`fn is_finite(self) -> bool`**
+  every component is finite
+- **`const fn to_array(self) -> [f64; 3]`**
+  [x, y, z] (render3d's positions)
+- **`fn any_perpendicular(self) -> Vec3`**
+  a unit vector perpendicular to this unit vector (chosen the same way on every target)
+
+- **`struct Quat`**
+  A rotation as a unit quaternion (x, y, z, w), `f64`.  render3d keeps rotations as `[f32; 4]` in the same
+  order: [`Quat::from_f32`], [`Quat::to_f32`].
+  - `x: f64` -- the vector part (sin of half the angle times the axis)
+  - `y: f64`
+  - `z: f64`
+  - `w: f64` -- the scalar part (cos of half the angle)
+
+**`impl Quat`**
+
+- **`const IDENTITY: Quat = Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 }`**
+  no rotation
+- **`const fn new(x: f64, y: f64, z: f64, w: f64) -> Quat`**
+  as given (normalise it with [`Quat::normalize`] unless it is a unit quaternion already)
+- **`fn from_axis_angle(axis: Vec3, angle: f64) -> Quat`**
+  the rotation by `angle` radians about the unit vector `axis` (right-handed)
+- **`fn from_yaw_pitch(yaw: f64, pitch: f64) -> Quat`**
+  the rotation about +Y by `yaw`, then about the rotated +X by `pitch` (a camera's or a figure's turn)
+- **`fn from_rotation_arc(from: Vec3, to: Vec3) -> Quat`**
+  the shortest rotation that turns the unit vector `from` into the unit vector `to`
+- **`fn from_f32(q: [f32; 4]) -> Quat`**
+  from render3d's `[f32; 4]` (x, y, z, w)
+- **`fn to_f32(self) -> [f32; 4]`**
+  to render3d's `[f32; 4]` (x, y, z, w)
+- **`fn normalize(self) -> Quat`**
+  the unit quaternion in this direction (the identity for a zero quaternion)
+- **`fn conjugate(self) -> Quat`**
+  the inverse rotation of a unit quaternion
+- **`fn mul(self, o: Quat) -> Quat`**
+  the product self \* o, which rotates by `o` first and then by `self`
+- **`fn rotate(self, v: Vec3) -> Vec3`**
+  `v` rotated (a unit quaternion)
+- **`fn inverse_rotate(self, v: Vec3) -> Vec3`**
+  `v` rotated back (by the conjugate)
+- **`fn to_mat3(self) -> Mat3`**
+  the rotation as a matrix
+- **`fn is_identity(self) -> bool`**
+  is this the identity, bit for bit (no rotation work needed)
+
+- **`struct Mat3`**
+  A 3 x 3 matrix by columns (a rotation from [`Quat::to_mat3`])
+  - `cols: [Vec3; 3]` -- the columns: the images of X, Y and Z
+
+**`impl Mat3`**
+
+- **`const IDENTITY: Mat3 = Mat3 { cols: [Vec3::X, Vec3::Y, Vec3::Z] }`**
+  the unit matrix
+- **`fn mul_vec(&self, v: Vec3) -> Vec3`**
+  M v
+- **`fn mul_vec_t(&self, v: Vec3) -> Vec3`**
+  M^T v (the inverse of a rotation)
+
+- **`struct Iso`**
+  A placement: rotate, then move (no scale).  The pose of a body and of a query shape.
+  - `pos: Vec3` -- where the local origin lies
+  - `rot: Quat` -- the rotation (a unit quaternion)
+
+**`impl Iso`**
+
+- **`const IDENTITY: Iso = Iso { pos: Vec3::ZERO, rot: Quat::IDENTITY }`**
+  at the origin, not rotated
+- **`const fn new(pos: Vec3, rot: Quat) -> Iso`**
+  rotated by `rot`, then moved to `pos`
+- **`const fn at(pos: Vec3) -> Iso`**
+  moved to `pos`, not rotated
+- **`fn transform_point(&self, p: Vec3) -> Vec3`**
+  a local point in world coordinates
+- **`fn inverse_transform_point(&self, p: Vec3) -> Vec3`**
+  a world point in local coordinates
+- **`fn transform_vector(&self, v: Vec3) -> Vec3`**
+  a local direction in world coordinates
+- **`fn inverse_transform_vector(&self, v: Vec3) -> Vec3`**
+  a world direction in local coordinates
+- **`fn mul(&self, o: &Iso) -> Iso`**
+  self \* o: first o, then self
+- **`fn inv_mul(&self, o: &Iso) -> Iso`**
+  the placement of `o` relative to self: self^-1 \* o
+
+- **`struct Aabb`**
+  An axis-aligned box in metres
+  - `min: Vec3` -- the corner with the smallest coordinates
+  - `max: Vec3` -- the corner with the largest coordinates
+
+**`impl Aabb`**
+
+- **`const EMPTY: Aabb = Aabb { min: Vec3::splat(f64::INFINITY), max: Vec3::splat( ...`**
+  the empty box (min above max), the start of a union
+- **`const fn new(min: Vec3, max: Vec3) -> Aabb`**
+  the box between two corners
+- **`fn from_center(c: Vec3, h: Vec3) -> Aabb`**
+  the box around `c` with half sizes `h`
+- **`fn union(&self, o: &Aabb) -> Aabb`**
+  the box around both
+- **`fn add_point(&self, p: Vec3) -> Aabb`**
+  the box around this one and `p`
+- **`fn expanded(&self, m: f64) -> Aabb`**
+  grown by `m` on every side
+- **`fn intersects(&self, o: &Aabb) -> bool`**
+  the boxes touch or overlap
+- **`fn contains(&self, o: &Aabb) -> bool`**
+  `o` lies inside (or on the border)
+- **`fn contains_point(&self, p: Vec3) -> bool`**
+  `p` lies inside (or on the border)
+- **`fn center(&self) -> Vec3`**
+  the middle
+- **`fn half_extents(&self) -> Vec3`**
+  half the size on each axis
+- **`fn half_area(&self) -> f64`**
+  half the surface (the cost measure of the trees; 0 for the empty box)
+- **`fn is_valid(&self) -> bool`**
+  the box is not empty and finite
+- **`fn ray_enter(&self, o: Vec3, inv: Vec3, tmax: f64) -> Option<f64>`**
+  where the ray o + t d (inv = 1 / d per axis) enters the box, if it does within [0, tmax]
+
+### `physics/src/mesh.rs`
+
+Source: [`lib/physics/src/mesh.rs`](../lib/physics/src/mesh.rs)
+
+```text
+mesh -- a static triangle mesh: vertices in f32 (as render3d's meshes), a fixed BVH, the active edges,
+and the queries against it in its own frame
+
+Seams: every triangle is tested as the closed triangle it is, so a shape sweeping across a shared edge
+meets the edge of one triangle or the other, there is no gap.  The opposite trouble -- a shape sliding over
+a flat or concave edge between two triangles hits the edge itself with a normal that leans backwards
+(a "ghost" collision) -- is handled by the active edges: an edge is active when the surface bends
+outwards there by more than the threshold angle (or the edge is open or shared by more than two
+triangles).  A contact on an inactive edge (or on a vertex whose two edges of this triangle are inactive)
+gets the triangle's normal, and a cast ignores it unless the shape moves into that face.  As in Jolt's
+"active edges"; the side matters, an edge that is concave from the front is convex from the back.
+```
+
+```rust
+/// at most this many triangles in one mesh
+MAX_TRIANGLES: usize = 1 << 28
+/// cos 5 degrees: two triangles whose normals differ by less than this meet at a flat edge
+ACTIVE_EDGE_COS: f64 = 0.996_194_698_091_745_5
+```
+
+- **`enum MeshError`**
+  why [`TriMesh::new`] refused the data
+  - `IndexCount` -- the index count is not a multiple of 3, or there are more than [`MAX_TRIANGLES`] triangles
+  - `IndexRange` -- an index is not below the vertex count
+  - `NotFinite` -- a coordinate is NaN or infinite
+
+- **`struct MeshOptions`**
+  how a [`TriMesh`] is built
+  - `active_edge_cos: f64` -- an edge between two triangles whose normals have a cosine of at least this is flat (inactive); above
+    1 every edge is active (no handling of ghost collisions)
+  - `max_leaf: usize` -- at most so many triangles in a leaf of the tree
+
+- **`struct TriMesh`**
+  A static triangle mesh with its tree.  Triangles have two sides.  Triangles without area (all three
+  corners on a line) are left out: they cannot be hit and their edges belong to their neighbours.
+
+**`impl TriMesh`**
+
+- **`fn new(positions: &[[f32; 3]], indices: &[u32]) -> Result<TriMesh, MeshError>`**
+  a mesh from positions and a triangle list (three indices per triangle), with [`MeshOptions`]'
+  defaults
+- **`fn with_options(positions: &[[f32; 3]], indices: &[u32], opt: &MeshOptions) -> Result<TriMesh, MeshError>`**
+  a mesh as [`TriMesh::new`] makes it, with the threshold of the active edges and the leaf size of `opt`
+- **`fn triangle_count(&self) -> usize`**
+  the number of triangles in the caller's list (with the ones left out for having no area)
+- **`fn stored_triangle_count(&self) -> usize`**
+  the number of triangles in the tree
+- **`fn vertices(&self) -> &[[f32; 3]]`**
+  the positions as given, in the mesh's frame
+- **`fn aabb(&self) -> Aabb`**
+  the box around the mesh in its own frame
+- **`fn nodes(&self) -> &[BvhNode]`**
+  the tree's nodes (the root first)
+- **`fn depth(&self) -> u32`**
+  the depth of the tree
+- **`fn triangles(&self) -> impl Iterator<Item = (u32, [Vec3; 3])> + '_`**
+  the stored triangles in tree order: their caller's index and corners (for brute-force references)
+- **`fn edge_flags(&self, id: u32) -> Option<u8>`**
+  the active-edge bits of the triangle with the caller's index `id` (bit e: edge e from the front,
+  bit 3 + e: from the back), None when it was left out
+- **`fn memory_bytes(&self) -> usize`**
+  the bytes the mesh holds (vertices, triangles, ids, flags, nodes)
+
+### `physics/src/query.rs`
+
+Source: [`lib/physics/src/query.rs`](../lib/physics/src/query.rs)
+
+```text
+query -- one shape against one placed shape, without a world: rays, casts, distance and contacts, the
+nearest point.  The work happens in the frame of the target shape (positions far from the origin cancel
+once, in the relative placement); results come back in world coordinates.  The query shape of a cast,
+a distance or a contact must be convex: with a mesh as the query shape these give nothing.
+```
+
+```rust
+/// `triangle` of a hit on anything but a mesh
+NO_TRIANGLE: u32 = u32::MAX
+```
+
+- **`struct RayHit`**
+  where a ray hits
+  - `t: f64` -- the ray parameter: point = origin + dir \* t (metres when dir is a unit vector)
+  - `point: Vec3` -- origin + dir \* t
+  - `normal: Vec3` -- the unit normal, against the ray (a ray starting inside a convex shape: t = 0, normal = -dir)
+  - `triangle: u32` -- the triangle's index in the mesh's index list, or [`NO_TRIANGLE`]
+
+- **`struct CastHit`**
+  where a moving shape first touches another
+  - `fraction: f64` -- how far along the motion: the shape stops at iso.pos + motion \* fraction (0..=1).  With a radius
+    (sphere, capsule) on either side the gap there is at most 1e-9 m, between two shapes without one
+    at most [`crate::CAST_SKIN`] + 1e-9 m; never a penetration that was not there at the start.
+  - `point: Vec3` -- the contact point on the other shape's surface
+  - `normal: Vec3` -- the unit normal of that surface towards the moving shape
+  - `triangle: u32` -- the triangle's index in the mesh's index list, or [`NO_TRIANGLE`]
+  - `depth: f64` -- > 0: the shapes overlapped at the start by this much (then fraction = 0)
+
+- **`struct Contact`**
+  how two shapes touch or nearly touch
+  - `point: Vec3` -- on the other shape's surface (with overlap: its deepest point)
+  - `normal: Vec3` -- the unit normal from the other shape towards the query shape: moving the query shape by
+    normal \* depth separates them (for a triangle of a mesh along the triangle's normal, unless the
+    contact is on an active edge)
+  - `depth: f64` -- the overlap; negative: the gap (contacts within a margin)
+  - `triangle: u32` -- the triangle's index in the mesh's index list, or [`NO_TRIANGLE`]
+
+- **`struct Separation`**
+  the distance between two shapes
+  - `distance: f64` -- the gap; negative: the penetration depth
+  - `point_a: Vec3` -- the nearest (or deepest) points on the query shape and on the other one
+  - `point_b: Vec3` -- on the other shape
+  - `normal: Vec3` -- the unit normal from the other shape towards the query shape
+  - `triangle: u32` -- the nearest triangle of a mesh, or [`NO_TRIANGLE`]
+
+- **`struct PointHit`**
+  the point of a shape nearest to a given point
+  - `point: Vec3` -- the nearest point of the surface, or the point itself when it is inside a convex shape
+  - `distance: f64` -- 0 inside
+  - `inside: bool` -- the point lies inside a convex shape
+  - `triangle: u32` -- the nearest triangle of a mesh, or [`NO_TRIANGLE`]
+
+- **`fn ray(target: &Shape, target_iso: &Iso, origin: Vec3, dir: Vec3, max_t: f64) -> Option<RayHit>`**
+  the first hit of the ray origin + dir \* t (0 &lt;= t &lt;= max_t) on `target` placed by `target_iso`
+
+- **`fn ray_all(target: &Shape, target_iso: &Iso, origin: Vec3, dir: Vec3, max_t: f64, out: &mut Vec<RayHit>)`**
+  every hit of the ray on `target` (one for a convex shape, one per triangle for a mesh), appended to
+  `out` sorted by t and then by triangle
+
+- **`fn cast(shape: &Shape, iso: &Iso, motion: Vec3, target: &Shape, target_iso: &Iso) -> Option<CastHit>`**
+  the first contact of convex `shape`, moved from `iso` by `motion`, with `target`.  Shapes that touch or
+  overlap at the start give a hit at fraction 0 only when the motion goes into the other shape (normal .
+  motion &lt; 0); a motion along or away from it is free, so sliding along a surface works.
+
+- **`fn separation(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso, max_dist: f64) -> Option<Separation>`**
+  the gap (negative: depth) between convex `shape` and `target` if it is at most `max_dist`; for a mesh the
+  nearest triangle
+
+- **`fn intersects(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso) -> bool`**
+  do convex `shape` and `target` touch or overlap
+
+- **`fn contacts(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso, margin: f64, out: &mut Vec<Contact>)`**
+  the contacts of convex `shape` with `target` whose gap is at most `margin` (0: only touching and
+  overlapping), appended to `out` (a mesh: one per triangle, by triangle)
+
+- **`fn closest_point(target: &Shape, target_iso: &Iso, point: Vec3, max_dist: f64) -> Option<PointHit>`**
+  the point of `target` nearest to `point`, if within `max_dist`
+
+**`mod brute`**
+
+The same queries without a mesh's tree: every triangle in turn, through the same per-triangle code and
+tie-breaks, so the results must equal those of the tree bit for bit.  For tests (apps/physicstest) and
+for checking a mesh that behaves oddly; for convex shapes they are the queries above.
+
+- **`fn ray(target: &Shape, target_iso: &Iso, origin: Vec3, dir: Vec3, max_t: f64) -> Option<RayHit>`**
+  the first hit, every triangle of a mesh tested
+
+- **`fn ray_all(target: &Shape, target_iso: &Iso, origin: Vec3, dir: Vec3, max_t: f64, out: &mut Vec<RayHit>)`**
+  every hit, every triangle of a mesh tested
+
+- **`fn cast(shape: &Shape, iso: &Iso, motion: Vec3, target: &Shape, target_iso: &Iso) -> Option<CastHit>`**
+  the first contact, every triangle of a mesh tested
+
+- **`fn separation(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso, max_dist: f64) -> Option<Separation>`**
+  the nearest triangle of a mesh without its tree
+
+- **`fn intersects(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso) -> bool`**
+  touch or overlap, every triangle of a mesh tested
+
+- **`fn contacts(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso, margin: f64, out: &mut Vec<Contact>)`**
+  the contacts, every triangle of a mesh tested
+
+- **`fn closest_point(target: &Shape, target_iso: &Iso, point: Vec3, max_dist: f64) -> Option<PointHit>`**
+  the nearest point, every triangle of a mesh tested
+
+### `physics/src/shape.rs`
+
+Source: [`lib/physics/src/shape.rs`](../lib/physics/src/shape.rs)
+
+```text
+shape -- the collision shapes: sphere, capsule, box, convex hull (convex, solid) and the static triangle
+mesh (two-sided triangles)
+```
+
+- **`enum Shape`**
+  A collision shape in its own frame.  Hulls and meshes are shared ([`Arc`]): cloning a shape is cheap,
+  one map mesh can sit in several worlds (server, prediction, tests).
+  - `Sphere { radius: f64 }` -- a ball around the origin
+  - `Capsule { half_height: f64, radius: f64 }` -- the points within `radius` of the segment (0, -half_height, 0) .. (0, half_height, 0): upright,
+    total height 2 (half_height + radius)
+  - `Box { half: Vec3 }` -- a box around the origin with half sizes `half`
+  - `Hull(Arc<ConvexHull>)` -- a convex hull (shared)
+  - `Mesh(Arc<TriMesh>)` -- a static triangle mesh (only as a body, not as a query shape)
+
+**`impl Shape`**
+
+- **`fn sphere(radius: f64) -> Shape`**
+  a ball of `radius`
+- **`fn capsule(half_height: f64, radius: f64) -> Shape`**
+  an upright capsule: the segment (0, ±half_height, 0) grown by `radius`
+- **`fn cuboid(half: Vec3) -> Shape`**
+  a box with half sizes `half`
+- **`fn hull(hull: ConvexHull) -> Shape`**
+  a convex hull, shared
+- **`fn hull_from_points(points: &[Vec3]) -> Result<Shape, HullError>`**
+  the convex hull of `points`
+- **`fn mesh(mesh: TriMesh) -> Shape`**
+  a static triangle mesh, shared
+- **`fn is_convex(&self) -> bool`**
+  everything but a mesh
+- **`fn margin(&self) -> f64`**
+  the radius around the core (spheres and capsules), 0 for the others
+- **`fn aabb(&self, iso: &Iso) -> Aabb`**
+  the box around the shape placed by `iso`
+
+### `physics/src/tree.rs`
+
+Source: [`lib/physics/src/tree.rs`](../lib/physics/src/tree.rs)
+
+```text
+tree -- the dynamic AABB tree of a world's bodies: leaves with (fattened) boxes, inserted where the
+growth of the surface is smallest, kept balanced by rotations on the way up (the scheme of Box2D's
+b2DynamicTree, written anew).  A moving body keeps its leaf while its box stays inside the fattened
+one.  Deterministic: the same sequence of inserts, moves and removes gives the same tree.
+```
+
+- **`struct DynamicTree`**
+  a dynamic AABB tree over items (u32)
+
+**`impl DynamicTree`**
+
+- **`fn new() -> DynamicTree`**
+  an empty tree
+- **`fn insert(&mut self, aabb: Aabb, item: u32) -> u32`**
+  a new leaf for `item` with box `aabb` -> its id
+- **`fn remove(&mut self, leaf: u32)`**
+  remove a leaf
+- **`fn update(&mut self, leaf: u32, aabb: Aabb)`**
+  give a leaf a new box (it keeps its id)
+- **`fn aabb(&self, leaf: u32) -> Aabb`**
+  the box of a leaf
+- **`fn len(&self) -> usize`**
+  the number of leaves
+- **`fn is_empty(&self) -> bool`**
+  no leaves
+- **`fn height(&self) -> u32`**
+  the height of the root (0 for one leaf or none)
+- **`fn query(&self, bx: &Aabb, mut f: impl FnMut(u32))`**
+  call `f(item)` for every leaf whose box touches `bx`
+- **`fn ray(&self, o: Vec3, d: Vec3, ext: Vec3, mut tmax: f64, mut f: impl FnMut(u32, f64) -> f64) -> f64`**
+  the leaves whose box, grown by `ext`, the ray o + t d enters at t &lt;= tmax, nearer subtrees first;
+  `f(item, tmax)` returns the new tmax -> the last tmax
+- **`fn validate(&self) -> Result<(), &'static str>`**
+  (tests) the tree is consistent: parents, heights, boxes holding their children, the leaf count -> an
+  error text
+
+### `physics/src/world.rs`
+
+Source: [`lib/physics/src/world.rs`](../lib/physics/src/world.rs)
+
+```text
+world -- bodies (a shape, a placement, layers) in three dynamic AABB trees, and the queries over all of them
+
+A body starts in a tree of the bodies that stand still, with its exact box: meshes in one, the other
+shapes in another; it goes to the tree of the moving bodies when it is first moved (with a box 0.05 m
+larger, so small moves keep their leaf).  So the large box of a map never widens the nodes of the props
+and figures: rays and casts look at the map's mesh first, and its hit prunes the other trees
+(docs/PHYSICS.md, measurements).
+
+Results never depend on the shape of the tree: a first hit is the smallest (t, body, triangle), lists
+are sorted by body and triangle (rays by t first).  So a client that holds only some of the server's
+bodies gets the same answer from them, as long as the bodies have the same ids.
+```
+
+- **`struct BodyId`**
+  a body of a [`World`]: an index and a generation (an id stays dead after remove, also when the index
+  is used again).  Ordered by index, then generation: the tie-break of the queries.
+
+**`impl BodyId`**
+
+- **`fn index(self) -> u32`**
+  the slot (used again after a remove)
+- **`fn generation(self) -> u32`**
+  how often the slot was used before
+
+- **`struct Body`**
+  a body: what [`World::add`] took, readable through [`World::body`]
+  - `shape: Shape` -- its shape
+  - `iso: Iso` -- where it is (set with [`World::set_iso`])
+  - `layers: u32` -- the layers the body is in (bit mask); a query sees it when its filter's mask shares a bit
+  - `user: u64` -- free for the caller (an entity id)
+
+**`impl Body`**
+
+- **`fn is_moving(&self) -> bool`**
+  has the body been moved since it was added (it is in the tree of the moving bodies)
+
+- **`struct Filter`**
+  which bodies a query sees
+  - `mask: u32` -- bodies with `layers & mask != 0`
+  - `exclude: Option<BodyId>` -- one body to leave out (the query's own, e.g. a figure's capsule)
+
+**`impl Filter`**
+
+- **`const ALL: Filter = Filter { mask: u32::MAX, exclude: None }`**
+  every body
+- **`const fn mask(mask: u32) -> Filter`**
+  the bodies in one of the layers of `mask`
+- **`const fn excluding(self, id: BodyId) -> Filter`**
+  the same without body `id`
+
+- **`struct World`**
+  A set of bodies and the queries over them.  Bodies move with [`World::set_iso`]; nothing moves by itself
+  (no dynamics in this stage).
+
+**`impl World`**
+
+- **`fn new() -> World`**
+  an empty world; a moving body's box in the tree is 0.05 m larger than the body on every side
+- **`fn with_margin(margin: f64) -> World`**
+  an empty world with this margin around a moving body's box (a body that has never moved has none)
+- **`fn add(&mut self, shape: Shape, iso: Iso) -> BodyId`**
+  add a body in layer 1
+- **`fn add_with_layers(&mut self, shape: Shape, iso: Iso, layers: u32) -> BodyId`**
+  add a body in `layers`
+- **`fn remove(&mut self, id: BodyId) -> Option<Body>`**
+  remove a body -> it, None when the id is dead
+- **`fn body(&self, id: BodyId) -> Option<&Body>`**
+  the body, None when the id is dead
+- **`fn set_iso(&mut self, id: BodyId, iso: Iso) -> bool`**
+  move a body -> false when the id is dead.  The first move takes it to the tree of the moving bodies.
+- **`fn set_layers(&mut self, id: BodyId, layers: u32) -> bool`**
+  a body's layers -> false when the id is dead
+- **`fn set_user(&mut self, id: BodyId, user: u64) -> bool`**
+  a body's value for the caller -> false when the id is dead
+- **`fn len(&self) -> usize`**
+  the number of bodies
+- **`fn is_empty(&self) -> bool`**
+  no bodies
+- **`fn bodies(&self) -> impl Iterator<Item = (BodyId, &Body)> + '_`**
+  every body with its id, by index
+- **`fn trees(&self) -> [&DynamicTree; 3]`**
+  the broad phase (for tests and statistics): the trees of the meshes and of the other bodies that
+  never moved, and the one of the moving bodies
+- **`fn ray_cast(&self, origin: Vec3, dir: Vec3, max_t: f64, filter: &Filter) -> Option<(BodyId, RayHit)>`**
+  the first hit of the ray origin + dir \* t, 0 &lt;= t &lt;= max_t
+- **`fn ray_cast_all(&self, origin: Vec3, dir: Vec3, max_t: f64, filter: &Filter, out: &mut Vec<(BodyId, RayHit)>)`**
+  every hit of the ray (one per convex body, one per triangle of a mesh), appended to `out` sorted by
+  t, body, triangle
+- **`fn cast(&self, shape: &Shape, iso: &Iso, motion: Vec3, filter: &Filter) -> Option<(BodyId, CastHit)>`**
+  the first body convex `shape`, moved from `iso` by `motion`, touches (see [`query::cast`])
+- **`fn overlap(&self, shape: &Shape, iso: &Iso, filter: &Filter, out: &mut Vec<BodyId>)`**
+  the bodies convex `shape` at `iso` touches or overlaps, appended to `out` by id
+- **`fn contacts(&self, shape: &Shape, iso: &Iso, margin: f64, filter: &Filter, out: &mut Vec<(BodyId, Contact)>)`**
+  the contacts of convex `shape` at `iso` with every body (every triangle) within `margin`, appended
+  to `out` by body and triangle: what pushes a figure out of the level
+- **`fn closest_point(&self, point: Vec3, max_dist: f64, filter: &Filter) -> Option<(BodyId, PointHit)>`**
+  the nearest point of any body to `point` within `max_dist` (equal distance: the lower body, triangle)

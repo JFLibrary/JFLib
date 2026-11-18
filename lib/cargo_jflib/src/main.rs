@@ -155,6 +155,7 @@ fn test_only(args: &[String]) -> Result<(), String> {
 }
 
 fn main() -> ExitCode {
+    sign::take_secrets();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     if args.first().map(String::as_str) == Some("jflib") {
         args.remove(0); // `cargo jflib X` runs `cargo-jflib jflib X`

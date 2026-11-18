@@ -1,0 +1,11 @@
+#!args --test dxf
+# G6e2: lib/dxf and render2d::dxf on drawings written in dxftest.rs (no corpus needed): the header, the tables (layers by
+# name without case, off, frozen, transparent; linetypes, a complex one; text styles), a block, every kind this reader
+# draws, paper space and an unsupported kind counted; the kinds against an independent count of the file's markers; LF,
+# CR LF, a lone CR; the file handed out in pieces of 1, 7 and 4093 bytes; R12 without a header; a section's name without
+# 0 SECTION; code pages (ANSI_1251, ANSI_1252, UTF-8 from AC1021, a multi-byte page without a table), \U+XXXX, TEXT's %%
+# codes, MTEXT's format codes, the colour index, font substitutes, linetype patterns; the mapping per kind, the extents,
+# the runs of layers, groups, set_layer_visible; a binary DXF, not a DXF, a broken group code, a cut file, a long line,
+# limits, counts that lie, 600 randomly damaged files, a CR at the end of the full window, a hatch of 1000 line families,
+# a long spline of degree 5; four drawings of ezdxf (apps/render2dtest/dxf: clockwise arcs in a hatch's boundary, caret
+# codes, MTEXT's inline codes, a binary DXF); the GPU against the CPU path on five drawings

@@ -49,13 +49,15 @@ use text::Text;
 const MAX_PASSES: u32 = 4;
 
 /// Launch the same owned app on a desktop event loop, browser worker, Android or iOS host.
-/// Host-driven applications remain alive after their entrypoint returns.  iOS: a headless run
-/// (--shot, --script, --agent-json, --agent-mcp) stays the desktop's, the rest is the UIKit host's
-/// (plat apple_ios.rs, which takes the main thread when this returned 0).
+/// Host-driven applications remain alive after their entrypoint returns.  iOS and Android: a
+/// headless run (--shot, --script, --agent-json, --agent-mcp) stays the desktop's, the rest is the
+/// UIKit host's (plat apple_ios.rs, which takes the main thread when this returned 0) or the Java
+/// host's (Android: a program without a UI runs its scripts that way, docs/ANDROID.md AN0; the
+/// desktop's runner adds about 290 KB to an APK).
 pub fn launch(desc: &AppDesc, app: impl App + 'static, style: &'static dyn Style) -> i32 {
     #[cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))]
     { let mut app = app; run(desc, &mut app, style) }
-    #[cfg(target_os = "ios")]
+    #[cfg(any(target_os = "ios", target_os = "android"))]
     {
         let a = Args(plat::args());
         if a.value("--shot").is_some() || a.value("--script").is_some() || a.flag("--agent-json") || a.flag("--agent-mcp") {
@@ -401,6 +403,10 @@ impl Ui {
             semtext_len: 0,
             sem_dummy: Default::default(),
             keydown: [0; 256],
+            codedown: [0; 256],
+            plock_sim: (-1, plat::PointerLock::Off),
+            plock_sim_esc: false,
+            plock_sim_motion: [0.0; 2],
             mpts: Vec::new(),
             mprs: Vec::new(),
             mtilt: [0; 2],

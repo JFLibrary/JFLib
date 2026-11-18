@@ -1068,6 +1068,23 @@ pub fn xkb_key_y(evdev: u32) -> i32 {
     crate::key_y(crate::evdev_location(evdev), c, dead)
 }
 
+/// (G7a, keycode.rs key_label) what the keymap prints on the key evdev: its first level's
+/// character in upper case (dead keys their spacing character); None for keys without one (Esc,
+/// F1, the arrows, the modifiers, the number block's navigation)
+pub(crate) fn xkb_key_label(evdev: u32) -> Option<alloc::string::String> {
+    let v = {
+        let x = XKB.lock();
+        if evdev >= 256 || x.keys[evdev as usize].flags & KF_DEF == 0 {
+            return None;
+        }
+        x.keys[evdev as usize].cp[0]
+    };
+    if v & KV_KP != 0 && v & KV_CP < 0x20 {
+        return None;
+    }
+    crate::keycode::label_of(v & KV_CP)
+}
+
 /// the dead key held back by xkb_key_typed (its spacing character, 0 = none)
 static DEAD: AtomicU32 = AtomicU32::new(0);
 

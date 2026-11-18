@@ -1,0 +1,4 @@
+#!args --test input
+# (G7a) where keys sit (the platforms' key codes as USB HID usages, the browser's code names), raw
+# motion decoding (RAWINPUT, XInput 2 raw events, Wayland fixed point), the pointer lock's shared
+# state; Linux: the Wayland and X11 paths with synthetic events.  No real input

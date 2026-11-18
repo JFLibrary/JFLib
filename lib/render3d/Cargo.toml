@@ -18,6 +18,8 @@ doctest = false
 workspace = true
 
 [dependencies]
+# (G7f) rt: its spin lock guards the table of live meshes and materials a renderer shares with its scenes (store.rs)
+rt.workspace = true
 gpu.workspace = true
 gltf.workspace = true
 
