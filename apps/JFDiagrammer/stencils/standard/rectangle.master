@@ -1,0 +1,36 @@
+# Rechteck: das einfachste 2D-Shape, Verbindungspunkte in der Mitte jeder Seite
+master: Rectangle
+name.de: Rechteck
+name.en: Rectangle
+name.es: Rectángulo
+name.it: Rettangolo
+name.fr: Rectangle
+prompt.de: Rechteck. Ziehen Sie es auf die Seite und tippen Sie, um Text einzugeben.
+prompt.en: Rectangle. Drag it onto the page and type to add text.
+prompt.es: Rectángulo. Arrástrelo a la página y escriba para agregar texto.
+prompt.it: Rettangolo. Trascinalo sulla pagina e digita per aggiungere testo.
+prompt.fr: Rectangle. Faites-le glisser sur la page et tapez pour ajouter du texte.
+keywords.de: Viereck, Kasten, Box, Block, Quadrat, Prozess
+keywords.en: square, box, block, quadrilateral, process
+keywords.es: cuadrado, caja, bloque, cuadrilátero, proceso
+keywords.it: quadrato, riquadro, blocco, quadrilatero, processo
+keywords.fr: carré, boîte, bloc, quadrilatère, processus
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

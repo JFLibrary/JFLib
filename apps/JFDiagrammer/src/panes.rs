@@ -13,8 +13,8 @@
 //                             (background pages after the others), Alle Seiten as a list
 //   status(app, ui)           page, measures of the selection, zoom
 //
-// Contents are placeholders until their stages: the Shapes panel shows the empty state (JD9
-// brings stencils), the format and data panes their layout with disabled fields (JD7, JD11),
+// Contents are placeholders until their stages: the Shapes panel shows the stencils (JD9,
+// stencils_panel.rs), the format and data panes their layout with disabled fields (JD7, JD11),
 // Verschieben und Zoomen the overview of the canvas and a working zoom slider.  The context
 // menus list their commands (disabled until a handler exists, commands.rs).
 
@@ -96,12 +96,6 @@ static TAB_MENU: [Mi; 8] = [
     Mi::Cmd(PAGE_INSERT), Mi::Cmd(PAGE_DELETE), Mi::Cmd(PAGE_RENAME), Mi::Cmd(PAGE_DUPLICATE), Mi::Cmd(PAGE_REORDER), Mi::Sep,
     Mi::Cmd(PAGE_SETUP), Mi::Cmd(DRAWING_SCALE),
 ];
-// i18n
-static STENCIL_MENU: [Mi; 7] = [
-    Mi::Cmd(STENCIL_CLOSE), Mi::Cmd(STENCIL_SAVE), Mi::Cmd(STENCIL_EDIT),
-    Mi::Sub("Ansichtsoptionen", &[Mi::Cmd(STENCIL_VIEW_ICONS), Mi::Cmd(STENCIL_VIEW_ICONS_ONLY), Mi::Cmd(STENCIL_VIEW_NAMES)]),
-    Mi::Sep, Mi::Cmd(STENCIL_NEW_MASTER), Mi::Cmd(STENCIL_ORDER),
-];
 
 // ------------------------------------------------------------------ the canvas and its pages
 
@@ -122,10 +116,13 @@ pub(crate) fn center(app: &mut Diagrammer, ui: &mut Ui) {
     let nodes: alloc::vec::Vec<DNode> = crate::viewer::sheet_node(app, k).into_iter().collect();
     let ver = app.opened.as_ref().map_or(0, |o| o.serial.wrapping_mul(4096).wrapping_add(k as u32 + 1));
     let model = DModel { nodes: &nodes, ports: &[], edges: &[], wps: &[], ver };
-    let st = &mut app.canvas;
     let paint: Option<alloc::rc::Rc<dyn DgPaint>> = paint.map(|p| p as alloc::rc::Rc<dyn DgPaint>);
     ui.next_size(-1, -1);
-    ui.diagram(ID_CANVAS, st, &model, DG_SELECT, paint, ver);
+    let tool = crate::stencils_drop::tool(app);
+    let st = &mut app.canvas;
+    let events = ui.diagram(ID_CANVAS, st, &model, tool, paint, ver);
+    // (JD9) shapes from the Shapes panel: dropped, click + click
+    crate::stencils_drop::canvas(app, ui, ID_CANVAS, &events);
     if app.fit_again {
         app.fit_again = false;
         app.canvas.request_fit();
@@ -198,41 +195,9 @@ fn pages_list(app: &mut Diagrammer, ui: &mut Ui, id0: u32) {
 
 // ------------------------------------------------------------------ the panels
 
-// Shapes: the title row with the stencils' menu, the search box, the empty state (SL-09)
-fn shapes(_app: &mut Diagrammer, ui: &mut Ui) {
-    ui.next_size(-1, -1);
-    ui.box_begin(ID_PANE, BOX_V | pad(10), 8);
-    ui.box_begin(0, BOX_H | BOX_XCENTER, 4);
-    ui.next_size(-1, 0);
-    ui.text(TS_BODY_STRONG, t("Schablonen"));
-    ui.next_size(28, 24);
-    ui.next_flags(ST_SUBTLE | ST_ICON_ONLY | ST_COMPACT);
-    ui.next_icon(JD_STENCIL_MENU);
-    ui.dropdown_button(ID_PANE + 1, t("Schablonenmenü"));
-    if ui.flyout_begin(ID_PANE + 1, 0) {
-        for id in [STENCIL_CLOSE, STENCIL_SAVE, STENCIL_EDIT, STENCIL_NEW_MASTER, STENCIL_ORDER] {
-            ui.menu_cmd(id);
-        }
-    }
-    ui.flyout_end();
-    ui.box_end();
-    let mut q = alloc::string::String::new();
-    ui.next_size(-1, 0);
-    ui.next_flags(ST_DISABLED);
-    ui.textbox_icon(ID_PANE + 2, IC_SEARCH, Some(t("Shapes suchen")), &mut q, 128);
-    ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Keine Schablone geöffnet."));
-    ui.next_size(-1, 28);
-    ui.cmd_button(MORE_SHAPES, 0);
-    ui.tooltip(&commands::tip(ui, MORE_SHAPES));
-    // the stencil's menu on a right click into the panel (SL-08)
-    ui.next_size(-1, -1);
-    ui.box_begin(ID_PANE + 3, BOX_V, 0);
-    ui.box_end();
-    let r = ui.last_rect();
-    ui.hit_rect(ID_PANE + 3, r[0], r[1], r[2], r[3], 0);
-    ui.sem(K_BOX, ID_PANE + 3, Some(t("Schablonenbereich")), 0);
-    ui.context_menu(i18n::menu(&STENCIL_MENU));
-    ui.box_end();
+// Shapes: the stencils (JD9, stencils_panel.rs)
+fn shapes(app: &mut Diagrammer, ui: &mut Ui) {
+    crate::stencils_panel::panel(app, ui);
 }
 
 // Shape formatieren (AB-05): its registers and sections, disabled until shapes have formats

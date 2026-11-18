@@ -20,6 +20,13 @@
 //   src/icons.rs      the ribbon icons (JD14: own artwork in icons/*.svg, mkicons.py)
 //   src/viewer.rs     (JD4) the drawing opened read-only: loading, pages, the canvas' paint
 //                     (diagram_core's display list drawn by diagram_view on render2d)
+//   src/stencils.rs   (JD9) the stencils of the Shapes panel: built-in (build.rs builds them
+//                     from stencils/), files, favourites, "Weitere Shapes", the search
+//   src/stencils_panel.rs   (JD9) the panel (ui.stencil_panel), previews, its menus
+//   src/stencils_drop.rs    (JD9) shapes onto the page: drag and drop, click + click, Enter
+//   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
+//                     when the app is built (README there; build_rs.py's derived builds for the
+//                     browser and Android run build_steps.rs too)
 //   lang/shortcuts.tsv   the shortcuts of each language (Office conventions, LG-08)
 //   lang/glossary.tsv    the binding terms in five languages (LG-06)
 //   check_lang.py        the language check (LG-11): catalogue, glossary, shortcuts
@@ -34,7 +41,8 @@
 // JD7 brings real ones (context registers, the shape's menu, the measures in the status bar);
 // --config PATH keeps the settings in that file (headless runs keep them in memory otherwise);
 // a drawing on the command line opens at start (JD4); --no-system-fonts draws with the style's
-// fonts only (the same on every machine).
+// fonts only (the same on every machine); --write-stencils DIR writes the built-in stencils
+// (.vssx, metric and US) into DIR and ends (JD9: the user's check in Visio).
 //
 //   python build_rs.py run JFDiagrammer
 //   python build_rs.py test JFDiagrammer          tests/*.uis
@@ -55,6 +63,9 @@ mod options;
 mod panes;
 mod ribbon;
 mod shell;
+mod stencils;
+mod stencils_drop;
+mod stencils_panel;
 mod viewer;
 
 use base::settings::Settings;
@@ -116,6 +127,8 @@ pub(crate) struct Diagrammer {
     /// fit the page once more after the canvas was laid out (a notice that came with the
     /// drawing changes the canvas' height after the first fit)
     pub fit_again: bool,
+    /// (JD9) the Shapes panel: stencils, search, favourites, click-placing
+    pub stencils: stencils::Stencils,
 }
 
 impl Diagrammer {
@@ -143,6 +156,7 @@ impl Diagrammer {
             open_path: alloc::string::String::new(),
             pages_menu: false,
             fit_again: false,
+            stencils: stencils::Stencils::new(),
         }
     }
 
@@ -243,6 +257,7 @@ impl App for Diagrammer {
             ui.theme_set(options::theme_mode(theme));
         }
         self.fonts = viewer::fonts();
+        stencils::init(self);
         // a drawing named on the command line
         if let Some(path) = viewer::command_line_file() {
             viewer::open(self, ui, &path);
@@ -255,11 +270,12 @@ impl App for Diagrammer {
             icons.update(ui); // the theme may have changed (the system, high contrast)
         }
         commands::states(self, ui);
+        stencils_panel::states(self, ui);
         shell::frame(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
-        commands::run(self, ui, id)
+        stencils::command(self, ui, id) || commands::run(self, ui, id)
     }
 }
 
@@ -272,6 +288,14 @@ pub(crate) fn tc(s: &'static str) -> &'static str {
 }
 
 ui::main!({
+    // (JD9) --write-stencils DIR: the built-in stencils into a folder, no window
+    if let Some(dir) = plat::arg_value("--write-stencils") {
+        let written = stencils::write_builtin(&dir);
+        for p in &written {
+            plat::write_stdout(alloc::format!("{p}\n").as_bytes());
+        }
+        return if written.len() == 2 * stencils::BUILTIN.len() { 0 } else { 1 };
+    }
     i18n::set_catalog(Catalog::from_tsv(include_str!("../locales/ui.tsv")));
     ui::launch(&DESC.translated(), Diagrammer::new(), &style::STYLE)
 });

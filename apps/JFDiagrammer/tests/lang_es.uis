@@ -9,7 +9,7 @@ expect text:"Portapapeles" exists
 expect button:"Pegar" disabled
 expect tab:"Formas" exists
 expect text:"No hay ninguna colección de formas abierta." exists
-expect button:"Más formas" disabled
+expect button:"Más formas" enabled
 expect canvas:"Lienzo de dibujo" exists
 expect button:"Página 1 de 1" exists
 expect text:"100 %" exists

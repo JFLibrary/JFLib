@@ -1,6 +1,6 @@
 # JFDiagrammer, JD8: the task panes in the dock area (Ansicht › Aufgabenbereiche, the dialog
 # launcher of Formenarten, the measures in the status bar), the status bar's zoom, the grid
-# toggle and the context menus of the page, the page tab and the stencils
+# toggle and the context menus of the page, the page tab and a stencil's title
 expect tab:"Shapes" exists
 expect tab:"Shape-Daten" missing
 click tab:"Ansicht"
@@ -53,6 +53,12 @@ key esc
 rclick tab:"Seite-1"
 expect "Seite umbenennen" disabled
 key esc
-rclick "Schablonenbereich"
-expect "Schablone schließen" disabled
+# (JD9) the stencil's menu on its title: closing works, saving only for own stencils
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+rclick tab:"Standard-Shapes"
+expect "Schablone schließen" enabled
+expect "Schablone speichern" disabled
+expect "Neues Master-Shape" disabled
 key esc

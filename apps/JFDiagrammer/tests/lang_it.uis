@@ -9,7 +9,7 @@ expect text:"Appunti" exists
 expect button:"Incolla" disabled
 expect tab:"Forme" exists
 expect text:"Nessuna raccolta di forme aperta." exists
-expect button:"Altre forme" disabled
+expect button:"Altre forme" enabled
 expect canvas:"Area di disegno" exists
 expect button:"Pagina 1 di 1" exists
 expect text:"100%" exists

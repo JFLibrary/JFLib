@@ -257,6 +257,11 @@ commands! {
     STENCIL_NEW_MASTER = 0x1706, "Neues Master-Shape", 0, 0;
     STENCIL_ORDER = 0x1707, "Reihenfolge der Schablonen", 0, 0;
     MORE_SHAPES = 0x1708, "Weitere Shapes", JD_MORE_SHAPES, 0;
+    // (JD9) the Shapes panel: view option, "Weitere Shapes" commands
+    STENCIL_VIEW_DETAILS = 0x1709, "Symbole und Details", 0, 0;
+    STENCIL_OPEN = 0x170A, "Schablone öffnen...", 0, 0;
+    STENCIL_NEW_METRIC = 0x170B, "Neue Schablone (metrisch)", 0, 0;
+    STENCIL_NEW_US = 0x170C, "Neue Schablone (US-Einheiten)", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -289,6 +294,25 @@ static HANDLERS: &[(u32, Handler)] = &[
     (PANE_SIZEPOS, |a, _| a.panes.toggle(crate::panes::P_SIZEPOS)),
     (PANE_DATA, |a, _| a.panes.toggle(crate::panes::P_DATA)),
     (PANE_PANZOOM, |a, _| a.panes.toggle(crate::panes::P_PANZOOM)),
+    // (JD9) the Shapes panel (stencils.rs, stencils_panel.rs)
+    (MORE_SHAPES, |a, _| a.stencils.more_menu = true),
+    (STENCIL_OPEN, |a, _| a.stencils.open_dlg.set(1)),
+    (STENCIL_NEW_METRIC, |a, ui| crate::stencils::open_new(a, ui, diagram_io::vsdx::Measure::Metric)),
+    (STENCIL_NEW_US, |a, ui| crate::stencils::open_new(a, ui, diagram_io::vsdx::Measure::Us)),
+    (STENCIL_CLOSE, |a, ui| {
+        if let Some(k) = crate::stencils_panel::target_stencil(a) {
+            crate::stencils::close(a, ui, k);
+        }
+    }),
+    (STENCIL_SAVE, |a, ui| {
+        if let Some(k) = crate::stencils_panel::target_stencil(a) {
+            crate::stencils::save(a, ui, k);
+        }
+    }),
+    (STENCIL_VIEW_ICONS, |a, _| a.stencils.panel.view = SV_ICONS_NAMES),
+    (STENCIL_VIEW_ICONS_ONLY, |a, _| a.stencils.panel.view = SV_ICONS),
+    (STENCIL_VIEW_NAMES, |a, _| a.stencils.panel.view = SV_NAMES),
+    (STENCIL_VIEW_DETAILS, |a, _| a.stencils.panel.view = SV_DETAILS),
 ];
 
 // toggles: whether the command is on
@@ -300,6 +324,10 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (PANE_SIZEPOS, |a| a.panes.visible(crate::panes::P_SIZEPOS)),
     (PANE_DATA, |a| a.panes.visible(crate::panes::P_DATA)),
     (PANE_PANZOOM, |a| a.panes.visible(crate::panes::P_PANZOOM)),
+    (STENCIL_VIEW_ICONS, |a| a.stencils.panel.view == SV_ICONS_NAMES),
+    (STENCIL_VIEW_ICONS_ONLY, |a| a.stencils.panel.view == SV_ICONS),
+    (STENCIL_VIEW_NAMES, |a| a.stencils.panel.view == SV_NAMES),
+    (STENCIL_VIEW_DETAILS, |a| a.stencils.panel.view == SV_DETAILS),
 ];
 
 /// the handler of a command (None: not available yet)

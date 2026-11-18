@@ -54,5 +54,30 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   indexes [MS-VSDX] fixes, one page (A4 or Letter landscape; a stencil's without contents), an
   empty `windows.xml` and the own DrawingML theme "NetLab" from the NetLab style's palette;
   nothing comes from Visio's files
+- The stencil build tool (stage JD9): `stencil::build(&files, Measure)` compiles the text
+  sources of a stencil (a `stencil.txt`, one `.master` file per master, optional SVG drawings;
+  the format is apps/JFDiagrammer/stencils/README.md) into a stencil document,
+  `stencil::build_vssx` also into `.vssx` bytes; `Built { doc, stencil, file, category,
+  measure }`, `Built::vssx_name`, `SourceError { file, line, message }`, `CATEGORIES`:
+  - header lines, ShapeSheet sections, rows with continuation lines, `;`-separated cells,
+    language suffixes (`.de` `.en` `.es` `.it` `.fr`, all five or an error) and measure
+    suffixes (`.metric`, `.us`); section, row and cell names checked against what each section
+    holds
+  - constants as values with their unit, everything else as formulas whose values the formula
+    engine of jflib-diagram-core computes; an unknown function, a reference into nothing, an
+    error value or a cycle is an error naming the source line
+  - the Master attributes Visio writes (Name and Prompt in the build language, IsCustomName(U),
+    IconSize, AlignName, MatchByName, IconUpdate, PatternFlags, Hidden, MasterType),
+    name-based BaseID and UniqueID (SHA-1, RFC 4122 version 5; the UniqueID follows the
+    content), the master page sized to the shape at 1:1, `ShapeKeywords`, and JFDiagrammer's
+    JFD_ User cells with the names, QuickInfos, keywords, texts and translated cells in five
+    languages (`diagram_core::instance` reads them)
+  - icons rendered from the shapes themselves: 32x32 ICO with 16 colours and a mask, the kind
+    Visio writes
+  - SVG drawings as Geometry: path (M L H V C S Q T A Z), rect, circle, ellipse, line,
+    polyline, polygon, g, transforms; lines as `LineTo`, curves as exact cubic `NURBSTo` rows,
+    arcs in pieces of at most 90 degrees; one format on the master shape, several as a group
+    of full-size subshapes
+  - the same sources give the same bytes; no panic, bounded counts, no recursion
 
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD

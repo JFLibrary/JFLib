@@ -30,6 +30,22 @@ ohne Neustart; jede Sprache hat ihre Office-Tastenkürzel ([`lang/shortcuts.tsv`
 Befehle ohne Funktion sind sichtbar und ausgegraut: [`src/commands.rs`](src/commands.rs) hat je
 Befehl eine Zeile, spätere Etappen hängen nur einen Handler in `HANDLERS` an.
 
+**JD9 (Seitenleiste und Schablonen):** Die Seitenleiste „Shapes“ ist das Schablonen-Widget der
+Bibliothek (`ui.stencil_panel`):
+- Aufbau: Suchfeld mit Verlauf, „Weitere Shapes“ mit den Kategorien, Titel der offenen Schablonen,
+  Schnell-Shapes je Schablone und als Sammelansicht, vier Ansichten, Leerzustand.
+- Die Suche läuft über die Namen in allen fünf Sprachen, NameU und die Stichworte.
+- Favoriten werden als `.vssx` im Benutzerordner gespeichert.
+- Shapes legt man per Ziehen, per Klick + Klick oder mit Enter ab. Der Master kommt dabei einmal ins
+  Dokument, das Shape heißt wie in der aktuellen Sprache (NameU bleibt der Schlüssel), alles in einer
+  Transaktion mit Neuberechnung.
+
+Die mitgelieferten Schablonen sind `.vssx`, die beim Bauen aus Textquellen in
+[`stencils/`](stencils/README.md) entstehen (Entscheidung V2, `build_steps.rs` mit
+`diagram_io::stencil`), metrisch und in US-Einheiten. Gewählt wird nach der Region. Den Startsatz
+„Standard-Shapes“ mit sieben Grundformen schreibt `JFDiagrammer --write-stencils ORDNER` zum Ansehen
+in Visio heraus.
+
 ## Bauen, starten, testen
 
 ```sh
@@ -81,11 +97,14 @@ Wort mit zwei Bedeutungen trägt im Katalog einen Kontext nach `|` (`Einfügen|Z
 | `src/backstage.rs`, `src/options.rs` | Datei-Register (Backstage) und Optionen (`base::settings`) |
 | `src/panes.rs` | Aufgabenbereiche, Zeichenfläche mit Seitenregistern, Statusleiste, Kontextmenüs |
 | `src/lang.rs` | die fünf Sprachen, Umschalten zur Laufzeit, Buchstaben-Icons für F/K/U |
+| `src/viewer.rs` | (JD4) die geöffnete Zeichnung: Laden, Seiten, Zeichnen über `diagram_view` |
+| `src/stencils.rs`, `src/stencils_panel.rs`, `src/stencils_drop.rs` | (JD9) Schablonen, Favoriten, Suche, „Weitere Shapes“; das Panel mit Vorschauen und Menüs; Ablegen auf der Seite |
+| `build.rs`, `build_steps.rs`, `stencils/` | (JD9) die Quellen der mitgelieferten Schablonen und ihr Bau zu `.vssx` ([`stencils/README.md`](stencils/README.md): das Quellformat) |
 | `lang/shortcuts.tsv`, `lang/glossary.tsv`, `check_lang.py` | Tastenkürzel je Sprache, Glossar, Sprachprüfung |
 | `src/icons.rs`, `src/icons_data.rs` | die eigenen Menüband-Icons (Hook, Farben; Daten aus `mkicons.py`) |
 | `icons/icons.txt`, `icons/*.svg`, `mkicons.py` | Liste und Quellen der Icons, ihr Skript; `icons/probeblatt.png` (abgenommen), `icons/uebersicht.png` |
 | `locales/ui.tsv` | die Texte in fünf Sprachen |
-| `tests/*.uis` | die Testskripte (`smoke.uis`, `backstage.uis`, `options.uis`, `panes.uis`, `keytips.uis`, `context*.uis` deutsch, `lang_*.uis` je Sprache, `lang_switch.uis` der Wechsel) |
+| `tests/*.uis` | die Testskripte (`smoke.uis`, `backstage.uis`, `options.uis`, `panes.uis`, `keytips.uis`, `context*.uis` deutsch, `lang_*.uis` je Sprache, `lang_switch.uis` der Wechsel, `viewer.uis`, `stencils*.uis` die Seitenleiste) |
 | `STYLE`, `TARGETS`, `PACKAGE`, `PERMISSIONS` | Stil (`netlab`), Zielplattformen, Identität (`org.jfreund.JFDiagrammer`), Rechte |
 | `android/` | Manifest und Platzhalter-Symbol für die APK (`--target android`) |
 

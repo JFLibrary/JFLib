@@ -33,7 +33,7 @@ expect button:"Text: Schriftart" disabled
 # the Shapes panel, the canvas, the page tab, the status bar
 expect tab:"Shapes" exists
 expect text:"Keine Schablone geöffnet." exists
-expect button:"Weitere Shapes" disabled
+expect button:"Weitere Shapes" enabled
 expect canvas:"Zeichenfläche" exists
 expect tab:"Seite-1" selected
 expect button:"Seite 1 von 1" exists

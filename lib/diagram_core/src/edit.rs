@@ -589,7 +589,7 @@ impl Change {
 
 /// edits that become one undo step (Document::transaction)
 pub struct Transaction<'d> {
-    doc: &'d mut Document,
+    pub(crate) doc: &'d mut Document,
     label: String,
     ops: Vec<Op>,
     open: bool,
@@ -646,7 +646,7 @@ impl<'d> Transaction<'d> {
     /// take every edit of the transaction back
     pub fn rollback(self) {}
 
-    fn run(&mut self, op: Op) -> Result<(), EditError> {
+    pub(crate) fn run(&mut self, op: Op) -> Result<(), EditError> {
         match op.exec(self.doc) {
             Ok(inv) => {
                 self.ops.push(inv);
@@ -657,7 +657,7 @@ impl<'d> Transaction<'d> {
     }
 
     // run an edit made of several steps: on an error its steps so far are taken back
-    fn atomic<T>(&mut self, f: impl FnOnce(&mut Self) -> Result<T, EditError>) -> Result<T, EditError> {
+    pub(crate) fn atomic<T>(&mut self, f: impl FnOnce(&mut Self) -> Result<T, EditError>) -> Result<T, EditError> {
         let mark = self.ops.len();
         let r = f(self);
         if r.is_err() && self.ops.len() > mark {

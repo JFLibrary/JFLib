@@ -23,6 +23,8 @@
 //   Extras                        what the file had and the model does not know (DF-03)
 //   formula::Engine               the formula engine: parse, evaluate, recalculate (JD6)
 //
+//   instance::*                   (JD9) masters from stencils into documents and onto pages:
+//                                 import_master, place, the texts in five languages
 //   geometry::*                   (JD4) Geometry rows as paths of lines and cubic curves,
 //                                 transforms (pin, local pin, angle, flips, groups)
 //   render::build(..) -> Drawing  (JD4) a page as a display list: fills, lines, line ends,
@@ -45,6 +47,7 @@ mod edit;
 pub mod formula;
 pub mod geometry;
 mod inherit;
+pub mod instance;
 mod names;
 mod page;
 pub mod render;

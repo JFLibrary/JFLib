@@ -9,7 +9,7 @@ expect text:"Presse-papiers" exists
 expect button:"Coller" disabled
 expect tab:"Formes" exists
 expect text:"Aucune bibliothèque de formes ouverte." exists
-expect button:"Plus de formes" disabled
+expect button:"Plus de formes" enabled
 expect canvas:"Zone de dessin" exists
 expect button:"Page 1 sur 1" exists
 expect text:"100 %" exists

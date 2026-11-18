@@ -30,6 +30,14 @@ The codecs are being built in stages; the plan is
   not rerouted, so a drawing looks as it was saved.
 - **Macros are never run.** The macro project of a macro-enabled file is kept as bytes and
   written back unchanged; a file that may not carry macros but does is refused.
+- **Stencils from text sources:** `stencil::build` compiles the sources of a stencil -- a
+  `stencil.txt`, one `.master` file per master with its ShapeSheet sections, optional SVG
+  drawings -- into a stencil, and `stencil::build_vssx` into `.vssx` bytes, metric or US: masters
+  with names, QuickInfos, keywords and translated cell texts in five languages, every formula
+  computed by jflib-diagram-core's formula engine, icons rendered from the shapes themselves,
+  name-based GUIDs, the same bytes for the same sources. A fault names the file and the line.
+  [JFDiagrammer](https://github.com/JFLibrary/JFLib/blob/main/apps/JFDiagrammer/stencils/README.md)
+  builds its stencils with it.
 
 ```rust
 use jflib::diagram_io::vsdx::{self, Limits};

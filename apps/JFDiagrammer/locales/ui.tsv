@@ -284,10 +284,7 @@ Formatieren	Format	Formato	Formato	Format
 Verbinderart	Connector Type	Tipo de conector	Tipo di connettore	Type de connecteur
 Ansichtsoptionen	View Options	Opciones de vista	Opzioni di visualizzazione	Options d'affichage
 Seite-{}	Page-{}	Página-{}	Pagina-{}	Page-{}
-Schablonen	Stencils	Colecciones de formas	Raccolte di forme	Bibliothèques de formes
-Schablonenmenü	Stencil menu	Menú de colección de formas	Menu raccolta di forme	Menu de la bibliothèque de formes
 Shapes suchen	Search shapes	Buscar formas	Cerca forme	Rechercher des formes
-Schablonenbereich	Stencil area	Área de colección de formas	Area raccolta di forme	Zone de bibliothèque de formes
 Füllung und Linie	Fill & Line	Relleno y línea	Riempimento e linea	Remplissage et trait
 3D-Drehung	3-D Rotation	Giro 3D	Rotazione 3D	Rotation 3D
 3D-Format	3-D Format	Formato 3D	Formato 3D	Format 3D
@@ -330,6 +327,38 @@ Die Datei lässt sich nicht lesen.	The file cannot be read.	No se puede leer el 
 Bearbeiten und Speichern kommen in einer späteren Version.	Editing and saving come in a later version.	La edición y el guardado llegarán en una versión posterior.	La modifica e il salvataggio arriveranno in una versione successiva.	La modification et l'enregistrement arriveront dans une version ultérieure.
 Die Makros der Datei bleiben erhalten und werden nie ausgeführt.	The file's macros are kept and never run.	Las macros del archivo se conservan y nunca se ejecutan.	Le macro del file vengono conservate e mai eseguite.	Les macros du fichier sont conservées et ne sont jamais exécutées.
 {} Hinweise beim Lesen.	{} notes while reading.	{} avisos al leer.	{} avvisi durante la lettura.	{} remarques lors de la lecture.
-Eine Schablone hat keine Seiten; ihre Shapes zeigt die Shapes-Seitenleiste in einer späteren Version.	A stencil has no pages; the Shapes pane shows its shapes in a later version.	Una colección de formas no tiene páginas; el panel Formas mostrará sus formas en una versión posterior.	Una raccolta di forme non ha pagine; il riquadro Forme ne mostrerà le forme in una versione successiva.	Une bibliothèque de formes n'a pas de pages ; le volet Formes affichera ses formes dans une version ultérieure.
 Schreibgeschützt geöffnet	Opened read-only	Abierto en modo de solo lectura	Aperto in sola lettura	Ouvert en lecture seule
 Ersetzte Schriften: {}.	Substituted fonts: {}.	Fuentes sustituidas: {}.	Tipi di carattere sostituiti: {}.	Polices remplacées : {}.
+Favoriten	Favorites	Favoritos	Preferiti	Favoris
+„{}“ ist keine Schablone.	“{}” is not a stencil.	«{}» no es una colección de formas.	«{}» non è una raccolta di forme.	« {} » n'est pas une bibliothèque de formes.
+Schablone{}	Stencil{}	Colección de formas{}	Raccolta di forme{}	Bibliothèque de formes{}
+Shape verschieben	Move shape	Mover forma	Sposta forma	Déplacer la forme
+„{}“ lässt sich nicht speichern.	“{}” cannot be saved.	No se puede guardar «{}».	Impossibile salvare «{}».	Impossible d'enregistrer « {} ».
+Meine Shapes	My Shapes	Mis formas	Forme personali	Mes formes
+Allgemein	General	General	Generale	Général
+Flussdiagramm	Flowchart	Diagrama de flujo	Diagramma di flusso	Organigramme
+Geschäft	Business	Negocios	Business	Entreprise
+Konstruktion	Engineering	Ingeniería	Ingegneria	Ingénierie
+Netzwerk	Network	Red	Rete	Réseau
+Pläne und Grundrisse	Maps and floor plans	Mapas y planos de planta	Mappe e piante	Cartes et plans
+Software und Datenbank	Software and database	Software y base de datos	Software e database	Logiciels et bases de données
+Terminplan	Schedule	Programación	Pianificazione	Planification
+Extras	Extras	Extras	Extra	Extras
+Folgt in einer späteren Version	Coming in a later version	Llegará en una versión posterior	In arrivo in una versione successiva	Prévu dans une version ultérieure
+Symbole und Details	Icons and Details	Iconos y detalles	Icone e dettagli	Icônes et détails
+Schablone öffnen...	Open Stencil...	Abrir colección de formas...	Apri raccolta di forme...	Ouvrir une bibliothèque de formes...
+Neue Schablone (metrisch)	New Stencil (Metric)	Nueva colección de formas (métrica)	Nuova raccolta di forme (metrica)	Nouvelle bibliothèque de formes (métrique)
+Neue Schablone (US-Einheiten)	New Stencil (US Units)	Nueva colección de formas (unidades de EE. UU.)	Nuova raccolta di forme (unità USA)	Nouvelle bibliothèque de formes (unités US)
+Aus Schablone entfernen	Remove from Stencil	Quitar de la colección de formas	Rimuovi dalla raccolta di forme	Supprimer de la bibliothèque de formes
+Suchergebnisse ({})	Search results ({})	Resultados de la búsqueda ({})	Risultati della ricerca ({})	Résultats de la recherche ({})
+Schnell-Shapes	Top shapes	Formas principales	Forme principali	Formes principales
+Öffnen Sie eine Schablone über „Weitere Shapes“.	Open a stencil from “More Shapes”.	Abra una colección de formas desde «Más formas».	Apri una raccolta di forme da «Altre forme».	Ouvrez une bibliothèque de formes à partir de « Plus de formes ».
+Keine Shapes gefunden	No shapes found	No se encontraron formas	Nessuna forma trovata	Aucune forme trouvée
+Die Suche prüft die Namen in allen fünf Sprachen und die Suchbegriffe.	The search looks at the names in all five languages and at the search terms.	La búsqueda examina los nombres en los cinco idiomas y los términos de búsqueda.	La ricerca esamina i nomi in tutte e cinque le lingue e i termini di ricerca.	La recherche porte sur les noms dans les cinq langues et sur les termes de recherche.
+Hinweis	Note	Aviso	Avviso	Remarque
+{} ablegen	Drop {}	Colocar {}	Rilascia {}	Déposer {}
+Das Shape lässt sich nicht ablegen: {}	The shape cannot be dropped: {}	No se puede colocar la forma: {}	Impossibile rilasciare la forma: {}	Impossible de déposer la forme : {}
+„{}“ abgelegt	“{}” dropped	«{}» colocada	«{}» rilasciata	« {} » déposée
+Letzte Suchen	Recent searches	Búsquedas recientes	Ricerche recenti	Recherches récentes
+Ziehen Sie Shapes hierher, um sie hinzuzufügen.	Drag shapes here to add them.	Arrastre formas aquí para agregarlas.	Trascina qui le forme per aggiungerle.	Faites glisser des formes ici pour les ajouter.
+Hier Schnell-Shapes ablegen	Drop top shapes here	Coloque aquí las formas principales	Rilascia qui le forme principali	Déposez ici les formes principales

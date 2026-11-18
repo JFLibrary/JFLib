@@ -16,6 +16,11 @@
 //   vsdx::new_document(kind, Measure::Metric)   a new drawing, template or stencil with JFLib's
 //                       own styles, document sheet and DrawingML theme "NetLab"
 //   vsdx::Format        the six formats by main content type or extension
+//   stencil::build(&files, Measure::Metric) -> Result<stencil::Built, stencil::SourceError>
+//                       (JD9) the text sources of a stencil (stencil.txt, *.master, SVG
+//                       drawings; apps/JFDiagrammer/stencils/README.md) into a stencil:
+//                       masters in five languages, formulas computed, icons rendered from the
+//                       shapes, name-based GUIDs; stencil::build_vssx gives the .vssx bytes too
 //
 // What is to come here, by stage of the plan:
 //   JD12  exports: SVG, PNG and PDF through the library's writers
@@ -33,6 +38,10 @@ extern crate alloc;
 mod blank;
 mod pack;
 mod read;
+pub mod stencil;
+mod stencil_icon;
+mod stencil_src;
+mod stencil_svg;
 mod theme;
 pub mod vsdx;
 mod write;

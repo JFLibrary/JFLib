@@ -33,3 +33,9 @@ style = { package = "jflib-style-netlab", path = "../../styles/netlab" }
 
 [build-dependencies]
 jflib-build.workspace = true
+# (JD9) the built-in stencils: stencils/ -> .vssx when the app is built (build.rs, PLAN.md V2);
+# a build script runs with std, so rt and plat take std's panic handler, allocator, memory
+# functions and C runtime there (docs/CRATES.md, CR6)
+diagram_io.workspace = true
+rt = { workspace = true, features = ["std"] }
+plat = { workspace = true, features = ["std"] }

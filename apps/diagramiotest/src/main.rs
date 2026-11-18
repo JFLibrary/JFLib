@@ -10,6 +10,7 @@
 //   diagramiotest --write-golden DIR      (JD4) the golden images of the viewer tests anew
 //   diagramiotest --write-drawings DIR    (JD4) the viewer tests' drawings as .vsdx
 //   diagramiotest --render-corpus DIR [--width PX]   (JD4) the local files' pages as PNG and SVG
+//   diagramiotest --write-stencils DIR   (JD9) the start set's stencils as .vssx (stencils.rs)
 //
 // Groups:
 //   samples   self-built files of all six formats: what lands where in the model (fields,
@@ -26,6 +27,7 @@
 //             golden images (tests/golden) through render2d's CPU path, the local pages drawn
 //   formulas  the formula oracle (JD6): every formula cell of the local files recomputed and
 //             compared with the stored value (--show N prints N misses, locally)
+//   stencils  (JD9, stencils.rs) the stencil build tool: the start set, the SVG import, faults
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -51,6 +53,7 @@ mod pkg;
 mod render;
 mod roundtrip;
 mod samples;
+mod stencils;
 mod svgdump;
 mod zipkit;
 
@@ -110,13 +113,16 @@ fn run() -> i32 {
         let width = arg(&args, "--width").and_then(|w| w.parse().ok()).unwrap_or(2000);
         return render::render_corpus(&dir, arg(&args, "--corpus"), width);
     }
+    if let Some(dir) = arg(&args, "--write-stencils") {
+        return stencils::write(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-probe") {
         return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
     }
     let check = args.iter().any(|a| a == "--check");
     let corpus_dir = arg(&args, "--corpus");
     if !check && corpus_dir.is_none() {
-        out("Aufruf: diagramiotest --check [--only NAME] [--corpus DIR] | --corpus DIR | --write-samples DIR | --write-golden DIR | --write-drawings DIR | --render-corpus DIR [--width PX]\n");
+        out("Aufruf: diagramiotest --check [--only NAME] [--corpus DIR] | --corpus DIR | --write-samples DIR | --write-golden DIR | --write-drawings DIR | --render-corpus DIR [--width PX] | --write-stencils DIR\n");
         return 2;
     }
     let mut h = H { ok: 0, failed: 0, only: arg(&args, "--only") };
@@ -130,6 +136,9 @@ fn run() -> i32 {
             render::run(&mut h);
         }
         roundtrip::run(&mut h, corpus_dir.as_deref());
+        if h.on("stencils") {
+            stencils::run(&mut h);
+        }
     }
     if h.on("corpus") {
         corpus::run(&mut h, corpus_dir.clone());

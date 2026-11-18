@@ -8,6 +8,9 @@
 //                                (DM-09): a notice says so, names substituted fonts (TX-09) and
 //                                macros (kept, never run, DF-04)
 //   close(app, ui)               back to the empty drawing
+//   adopt(app, ui, doc, name) / changed(app)   (JD9) a new document as the drawing (the first
+//                                shape dropped on the empty drawing), its pages drawn again
+//                                after a change; a .vssx opened here goes to the Shapes panel
 //   paint(app, k) -> PagePaint   page k as a ui.diagram content (DgPaint): built on first use,
 //                                kept while the document is open
 //   model(app, k)                the canvas' model: one node, the page's sheet (fit, overview)
@@ -128,6 +131,11 @@ pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
         }
     };
     let doc = loaded.doc;
+    // (JD9) a stencil goes into the Shapes panel; the drawing stays
+    if doc.kind == DocKind::Stencil {
+        app.backstage = None;
+        return crate::stencils::open_file(app, ui, path);
+    }
     let mut tabs: Vec<PageTab> = Vec::new();
     for bg in [false, true] {
         for p in doc.pages() {
@@ -150,11 +158,6 @@ pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
         msg.push(' ');
         msg.push_str(&tf("{} Hinweise beim Lesen.", &[&format!("{warnings}")]));
     }
-    let stencil = doc.kind == DocKind::Stencil;
-    if stencil {
-        msg.push(' ');
-        msg.push_str(t("Eine Schablone hat keine Seiten; ihre Shapes zeigt die Shapes-Seitenleiste in einer späteren Version."));
-    }
     let serial = app.opened.as_ref().map_or(1, |o| o.serial.wrapping_add(1));
     let n = tabs.len();
     app.opened = Some(Opened { doc, name: stem, tabs, paints: (0..n).map(|_| None).collect(), notice: Some((String::from(t("Schreibgeschützt geöffnet")), msg)), serial });
@@ -166,6 +169,35 @@ pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
     ui.recent_add(path);
     ui.repass();
     true
+}
+
+/// (JD9) a new document as the open drawing, editable, without notice (the first shape
+/// dropped on the empty drawing creates it; JD7 replaces this with its own document state)
+pub(crate) fn adopt(app: &mut Diagrammer, ui: &mut Ui, doc: Document, name: &str) {
+    let mut tabs: Vec<PageTab> = Vec::new();
+    for p in doc.foreground_pages().chain(doc.background_pages()) {
+        let Some(pg) = doc.page(p) else { continue };
+        let n = pg.header.name.or(pg.header.name_u).map(|s| String::from(doc.str(s))).unwrap_or_else(|| tf("Seite-{}", &[&format!("{}", tabs.len() + 1)]));
+        tabs.push(PageTab { page: p, name: n });
+    }
+    let serial = app.opened.as_ref().map_or(1, |o| o.serial.wrapping_add(1));
+    let n = tabs.len();
+    app.opened = Some(Opened { doc, name: String::from(name), tabs, paints: (0..n).map(|_| None).collect(), notice: None, serial });
+    app.error = None;
+    app.page_tab = 0;
+    app.canvas.request_fit();
+    app.fit_again = true;
+    ui.repass();
+}
+
+/// (JD9) the document changed: its pages are drawn again
+pub(crate) fn changed(app: &mut Diagrammer) {
+    if let Some(o) = app.opened.as_mut() {
+        for p in o.paints.iter_mut() {
+            *p = None;
+        }
+        o.serial = o.serial.wrapping_add(1);
+    }
 }
 
 /// close the drawing: back to the empty one

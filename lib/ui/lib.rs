@@ -195,6 +195,7 @@ mod ribbon_shell; // register row, key tips, backstage (ribbon_shell.rs)
 mod settings_page;
 mod shell;
 mod slider;
+mod stencil; // the Shapes window of a diagram editor: stencils, tiles, search (stencil.rs)
 // the system's sounds: ui.beep, the sound of a message dialog, the app's switch (sound.rs)
 mod sound;
 mod rtl;
@@ -257,6 +258,10 @@ pub use plat::{DE_ALL, DE_COPY, DE_LINK, DE_MOVE, DT_FILES, DT_HTML, DT_IMAGE, D
 pub use popup::{Command, Mi}; // ui-popup: the command table and menu records
 pub use ribbon::{RibbonGroup, RibbonGroupMode, RibbonLayout, RibbonMetrics, RibbonSample};
 pub use ribbon_shell::{BackstageItem, RibbonTab, BS_ACTION, BS_FOOTER, BS_SEP, RT_CONTEXT, RT_FILE};
+pub use stencil::{
+    stencil_drag_decode, StencilDef, StencilEvent, StencilHit, StencilLabels, StencilPanel, StencilState, StencilTile, SD_EDITABLE, SK_QUICK,
+    SK_SEARCH, SV_DETAILS, SV_ICONS, SV_ICONS_NAMES, SV_NAMES, TL_ARMED, TL_DISABLED, TL_QUICK,
+}; // the Shapes window (stencil.rs)
 pub use runtime::{Runtime, launch, run, run_window};
 pub use style::{Sp, Style, StyleBasic, StyleChrome, StyleData, StyleEdit, StyleList, StyleMisc, StylePopup, StyleShell, StyleValue};
 pub use data::{GridCol, GridEv, GridState, TreeEv, TreeRow, TreeState};

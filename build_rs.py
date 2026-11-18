@@ -1443,7 +1443,8 @@ def derived_workspace(out, target, names, style=None):
     """a workspace of the tool's own in <out>/cargo-<target>-ws with a package per app: for the browser
     and Android its main.rs as [lib] (cdylib, staticlib), else as a program; its manifest's
     dependencies, `style` the one given; a build.rs that reads the app's files (jflib-build's
-    part_of); the root manifest's profiles and lints, Cargo.lock's versions -> its Cargo.toml"""
+    part_of) and runs the app's own steps when it has apps/NAME/build_steps.rs (with its build
+    dependencies); the root manifest's profiles and lints, Cargo.lock's versions -> its Cargo.toml"""
     ws = out / f"cargo-{target}-ws"
     root = manifests.workspace()
     lib = target in ("web", "android")
@@ -1461,7 +1462,16 @@ def derived_workspace(out, target, names, style=None):
             def dep_lines(table):
                 lines = []
                 for key, spec in table.items():
-                    s = dict(root["dependencies"][key]) if spec.get("workspace") else dict(spec)
+                    if spec.get("workspace"):
+                        # the workspace's entry with what the app adds to it (features, as Cargo does)
+                        s = dict(root["dependencies"][key])
+                        for k, v in spec.items():
+                            if k == "features":
+                                s["features"] = sorted(set(s.get("features", [])) | set(v))
+                            elif k != "workspace":
+                                s[k] = v
+                    else:
+                        s = dict(spec)
                     if "path" in s:
                         s["path"] = ((ROOT if spec.get("workspace") else ROOT / "apps" / n) / s["path"]).resolve().as_posix()
                     s.pop("version", None)
@@ -1480,13 +1490,25 @@ def derived_workspace(out, target, names, style=None):
             # the same name (an app in two styles) would overwrite each other there
             unit = (f'[lib]\nname = "{pkg.replace("-", "_").lower()}"\npath = "{entry}"\ncrate-type = ["{"cdylib" if target == "web" else "staticlib"}"]\n'
                     "test = false\ndoctest = false\n" if lib else f'[[bin]]\nname = "{pkg}"\npath = "{entry}"\ntest = false\nbench = false\n')
+            # an app's own build steps (apps/NAME/build_steps.rs, `pub fn run(app: &Path)`) run here
+            # too, with the build dependencies they need (JFDiagrammer's stencils)
+            app_dir = (ROOT / "apps" / n).as_posix()
+            steps = ROOT / "apps" / n / "build_steps.rs"
+            build_deps = {k: v for k, v in man.get("build-dependencies", {}).items() if k != "jflib-build"} if steps.is_file() else {}
             write_changed(ws / pkg / "Cargo.toml",
                           f'[package]\nname = "{pkg}"\nversion = "{man["package"]["version"]}"\nedition = "2024"\npublish = false\n'
                           "autobins = false\nautoexamples = false\nautotests = false\nautobenches = false\n\n" + unit + "\n"
                           + lints + "\n[dependencies]\n" + "".join(lines)
-                          + f'\n[build-dependencies]\njflib-build = {{ path = "{(ROOT / "lib" / "jflib_build").as_posix()}" }}\n')
-            write_changed(ws / pkg / "build.rs", "// made by build_rs.py (derived_workspace): the app's files and link arguments\n"
-                          f'fn main() {{\n    jflib_build::Build::app().part_of("{n}", "{(ROOT / "apps" / n).as_posix()}").run();\n}}\n')
+                          + f'\n[build-dependencies]\njflib-build = {{ path = "{(ROOT / "lib" / "jflib_build").as_posix()}" }}\n'
+                          + "".join(dep_lines(build_deps)))
+            if steps.is_file():
+                write_changed(ws / pkg / "build.rs", "// made by build_rs.py (derived_workspace): the app's files and link arguments, its own steps\n"
+                              f'#[path = "{steps.as_posix()}"]\nmod build_steps;\n\n'
+                              f'fn main() {{\n    jflib_build::Build::app().part_of("{n}", "{app_dir}").run();\n'
+                              f'    build_steps::run(std::path::Path::new("{app_dir}"));\n}}\n')
+            else:
+                write_changed(ws / pkg / "build.rs", "// made by build_rs.py (derived_workspace): the app's files and link arguments\n"
+                              f'fn main() {{\n    jflib_build::Build::app().part_of("{n}", "{app_dir}").run();\n}}\n')
             members[pkg] = n
         write_changed(index, json.dumps(members, indent=1, sort_keys=True) + "\n")
         write_changed(ws / "Cargo.toml", "# made by build_rs.py (derived_workspace): the apps as libraries, other styles\n[workspace]\n"

@@ -1,0 +1,70 @@
+# stencil_search.uis -- the Shapes window's search (test hook 9106): typing reports Search and
+# shows the results as their own title (active while there is a query), Enter keeps the query
+# in the history (newest first, no duplicates), Down or the button beside the box list it,
+# Esc clears the query and the view before returns; no hit: the empty state.
+size 720 560
+theme light
+cmd 9106
+click tab:"Flussdiagramm"
+expect button:"Letzte Suchen" disabled
+# #393217: the search box (panel id + 1)
+click #393217
+type "eck"
+expect text:"Ereignis: Suche: eck" exists
+expect tab:"Suchergebnisse (3)" selected
+expect tab:"Flussdiagramm" unselected
+expect text:"Aktiv: Suchergebnisse" exists
+expect button:"Rechteck" exists
+expect button:"Abgerundetes Rechteck" exists
+expect button:"Dreieck" exists
+expect button:"Prozess" missing
+a11y expect announced "Suchergebnisse (3)"
+shot build/stencil/search.png
+# the results are tiles like the others
+click button:"Dreieck"
+expect text:"Ereignis: Aktivieren: Dreieck" exists
+# another title while the query stays; the results title stays too
+click tab:"Allgemein"
+expect tab:"Suchergebnisse (3)" unselected
+click tab:"Suchergebnisse (3)"
+expect tab:"Suchergebnisse (3)" selected
+# Enter keeps the query
+click #393217
+key enter
+expect button:"Letzte Suchen" enabled
+# Esc clears it: the view before the search returns (Flussdiagramm)
+key esc
+expect #393217 focused
+expect tab:"Suchergebnisse (3)" missing
+expect tab:"Flussdiagramm" selected
+expect text:"Ereignis: Suche: " exists
+# no hit
+type "zzz"
+expect tab:"Suchergebnisse (0)" selected
+expect text:"Keine Shapes gefunden" exists
+key enter
+key esc
+type "pfeil"
+key enter
+expect tab:"Suchergebnisse (1)" selected
+key esc
+# the history: newest first; Down in the box lists it, a pick searches again
+key down
+expect menuitem:"pfeil" exists
+expect menuitem:"zzz" exists
+expect menuitem:"eck" exists
+expect menuitem:"pfeil" rect 12 88 200 32
+click menuitem:"eck"
+expect tab:"Suchergebnisse (3)" selected
+expect text:"Ereignis: Suche: eck" exists
+# the button beside the box: the pick moved to the top
+key esc
+click button:"Letzte Suchen"
+expect menuitem:"eck" exists
+key esc
+expect menuitem:"eck" missing
+# Esc in an empty box gives the focus up
+click #393217
+key esc
+expect #393217 unfocused
+expect_nowarn

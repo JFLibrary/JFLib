@@ -105,9 +105,9 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/shape.rs](#diagram_coresrcshapers) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/shape.rs](#diagram_coresrcshapers) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
-  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
+  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
@@ -1066,7 +1066,8 @@ Commands (the table AppDesc::cmds, Command records):
   accel_order_set(1): "Strg+Alt+Umschalt+S" (ui_accel_order)
   cmd_button(id, ST_*) -> EV          button from the table (icon, label, tooltip with
                                       the accelerator, disabled / checked); queues it
-Menus (Mi records; Mi::List rows come from menu_list(base, rows), row k = id base + k; a
+Menus (Mi records; Mi::List rows come from menu_list(base, rows), row k = id base + k with
+the CF_CHECKED / CF_DISABLED state of cmd_state(base + k, ..); a
 checked row with an icon gives the flyout a check column and an icon column):
   menubar(None | Some(bar)) -> EV_OPEN   WinUI MenuBar (None = AppDesc::menubar): items,
                                       flyouts, submenus, keys (Alt / F10, Alt+mnemonic,
@@ -1126,7 +1127,8 @@ numbers for them.
   - `Item(u32, &'static str, u32)` -- MI_ITEM id, "Label", icon: a plain row, runs App::command(id, 0)
   - `List(u32, u16, &'static str)` -- MI_LIST base, max, "placeholder": one row per string of the rows set with
     Ui::menu_list(base, ..) (at most max); row k runs App::command(base + k, 0) and has
-    the widget id base + k; no rows: the placeholder as a disabled row ("" = none)  (U1)
+    the widget id base + k, checked or disabled by cmd_state(base + k, CF_\*) like a command;
+    no rows: the placeholder as a disabled row ("" = none)  (U1)
 
 **`impl Ui`**
 
@@ -10356,6 +10358,199 @@ Source: [`lib/ui/slider.rs`](../lib/ui/slider.rs)
   Map pixel travel to the nearest integer value, before step snapping. The
   logarithmic inverse uses bounded binary search (at most 31 iterations).
   Keyboard steps and semantic values always remain in the original units.
+
+#### `ui/stencil.rs`
+
+Source: [`lib/ui/stencil.rs`](../lib/ui/stencil.rs)
+
+```text
+stencil -- the Shapes window of a diagram editor (Visio's Shapes pane), generic: the app hands
+in stencils with tiles (a name, a QuickInfo, a preview drawn through ui::Draw); the panel lays
+them out, takes the pointer, the keyboard and drags, tells screen readers, and reports what
+happened.  It knows nothing about diagrams; every text it shows comes from the app.
+
+  stencil_panel(id, &mut StencilState, &StencilPanel) -> Vec<StencilEvent>
+       top to bottom: the search box (IC_SEARCH, labels.search as its placeholder) with a
+       button for the recent searches (labels.history), the "More shapes" button
+       (StencilPanel::more_id, labels.more), the title rows -- the quick shapes collection
+       (SK_QUICK, labels.quick), the search results while StencilPanel::results is Some
+       (SK_SEARCH, labels.results with "{}" = their number), a row per stencil --, a movable
+       splitter (StencilState::split, DIP; 0 = automatic), the tiles of the active view in a
+       scroll view.  Give it a size with next_size first (none: it fills its box).
+  stencil_drag_decode(bytes) -> Option<(stencil, tile)>   the keys a tile drag carries
+       (DragData::bytes of the app's kind StencilPanel::drag_kind: two u32, little-endian)
+
+Views (StencilState::active = the key of a title; a key that names none -- the default --
+shows the first stencil): a stencil shows its TL_QUICK tiles, a thin line, then the others
+(MS-04); an SD_EDITABLE stencil always has both parts, an empty part shows a hint
+(labels.quick_empty, labels.drop_hint).  The quick collection shows the TL_QUICK tiles of
+every stencil under small captions (none: labels.quick_empty).  The results show the hits
+the app found (none: labels.no_results_title / _text).  No stencil at all: an empty state
+(labels.empty_title / _text) with a link labels.more (StencilEvent::More).
+View modes (StencilState::view): SV_ICONS_NAMES tiles of 72 x 76 DIP (the preview on top,
+the name in up to two lines, cut with "…"), SV_ICONS 40 x 40 (the name in the tooltip only),
+SV_NAMES rows with the name, SV_DETAILS rows with the preview, the name and the QuickInfo.
+The tooltip of a tile is "name – QuickInfo".  Tiles without a preview show IC_SHAPES.
+
+Search: typing reports Search (the app recomputes `results`; the results become the active
+view, an empty query returns to the view before); Enter keeps the query in
+StencilState::history (newest first, at most 10, no duplicates); Down, Alt+Down or F4 in the
+box, or the button beside it, list the history (a pick searches again); Esc clears the query
+(in an empty box Esc gives up the focus).  The number of results is announced politely.
+Input: a click on a title activates it; Up / Down / Home / End move between the titles (the
+focused title is the active one).  A click on a tile -> Activate (the app arms click placing
+and marks the tile TL_ARMED), Enter / Space / a double click -> Place; a right click,
+Shift+F10 or the menu key -> TileMenu / StencilMenu with a point (window px) for
+ui.menu_popup_at -- or open the menu in the same pass with ui.menu_popup, which for the menu
+key opens at the widget with its first row focused.  The tiles are one Tab stop (entered at
+the armed tile): the arrows move in the grid, Home / End to the first / last tile.  "More
+shapes" (a click, Enter / Space, Alt+Down / F4) and the empty state's link -> More with the
+lower left corner of the button (the app opens its menu there with ui.menu_popup_at).
+Drags: every tile that is not disabled is a drag source (DragData::of_app(drag_kind, the
+stencil and tile key), the tile's name as its label, DE_COPY): DragStart, DragEnd.  An
+SD_EDITABLE stencil takes tile drags on its title row (appended) and, while it is shown, on
+its tile area (an accent mark shows where): Dropped with the index into its tiles to insert
+before (counted with the dragged tile still in place) and whether it went into the quick
+part; the app moves the tile when it came from the same stencil.
+Screen readers and scripts: the panel is a box named labels.panel; the title rows are tabs
+(K_TAB, selected = active: `click tab:"Allgemein"`, `expect tab:"Allgemein" selected`) --
+a vertical tab list is what the title rows are, and scripts and the platforms' screen
+readers know tabs with a selection; the tiles are buttons named by the tile (checked with
+TL_ARMED, disabled with TL_DISABLED, the QuickInfo as their description: `click
+button:"Rechteck"`, `drag button:"Rechteck" tab:"Favoriten"`); the quick collection's
+captions are headings; the search box is an edit named labels.search (`#ID+1`); the
+splitter is a slider named "Teiler" (F8 reaches it, the arrows move it).
+Only the rows of tiles in view (and those of the focused and the dragged tile) are laid out
+and drawn: a stencil of 300 tiles costs what a screenful costs.
+
+Ids: the panel `id`; the search box id + 1, the history button and its list id + 2 (its rows
+id + 0x10 + k), the splitter id + 4, the title view id + 5, the tile view id + 6, the empty
+state's link id + 7, the tile area's drop target id + 8; the titles id + 0x100 (quick),
+id + 0x101 (results), id + 0x102 + i (stencil i); the tiles id + 0x1000 + n (n: the place
+in the view).  StencilPanel::more_id is the app's own.
+```
+
+```rust
+/// StencilTile::flags: a quick shape of its stencil (shown above the line, in the quick
+/// collection)
+TL_QUICK: u32 = 1 << 20
+/// StencilTile::flags: armed for click placing (drawn checked)
+TL_ARMED: u32 = 1 << 21
+/// StencilTile::flags: disabled (no input, no drag)
+TL_DISABLED: u32 = ST_DISABLED
+/// StencilDef::flags: the stencil takes dropped tiles (favourites, "My shapes"): added and
+/// reordered by the app on StencilEvent::Dropped
+SD_EDITABLE: u32 = 1 << 20
+/// StencilState::view: icons with the names below (the default)
+SV_ICONS_NAMES: u8 = 0
+/// StencilState::view: icons only (the name in the tooltip)
+SV_ICONS: u8 = 1
+/// StencilState::view: names only, one row each
+SV_NAMES: u8 = 2
+/// StencilState::view: rows with the icon, the name and the QuickInfo
+SV_DETAILS: u8 = 3
+/// StencilState::active: the quick shapes collection
+SK_QUICK: u32 = 0xFFFF_FFFE
+/// StencilState::active: the search results
+SK_SEARCH: u32 = 0xFFFF_FFFF
+```
+
+- **`struct StencilTile<'a>`**
+  a tile of a stencil (a master): what the panel shows of it
+  - `key: u32` -- the app's key for it (unique within its stencil; a drag and the events carry it)
+  - `name: &'a str` -- its name (the label, the button's name for screen readers and scripts)
+  - `tip: &'a str` -- its QuickInfo: the tooltip after the name, the details view, the description
+  - `draw: Option<DrawRef>` -- its preview (None: a generic shapes icon)
+  - `ver: u32` -- the preview's version (cmd_custom: change it when the drawing changes)
+  - `flags: u32` -- TL_QUICK, TL_ARMED, TL_DISABLED
+
+**`impl<'a> StencilTile<'a>`**
+
+- **`const fn new(key: u32, name: &'a str) -> StencilTile<'a>`**
+  a tile without a QuickInfo, a preview or flags
+- **`const fn tip(mut self, tip: &'a str) -> StencilTile<'a>`**
+  with a QuickInfo
+- **`fn preview(mut self, draw: Option<DrawRef>, ver: u32) -> StencilTile<'a>`**
+  with a preview and its version
+- **`const fn flags(mut self, f: u32) -> StencilTile<'a>`**
+  add flags (TL_QUICK, TL_ARMED, TL_DISABLED)
+
+- **`struct StencilDef<'a>`**
+  a stencil: its title row and its tiles
+  - `key: u32` -- the app's key (below 0xFFFF_FFF0: the SK_\* keys are the panel's)
+  - `title: &'a str`
+  - `tiles: &'a [StencilTile<'a>]`
+  - `flags: u32` -- SD_EDITABLE
+
+- **`struct StencilHit<'a>`**
+  a hit of the app's search: the tile and the stencil it belongs to
+  - `stencil: u32`
+  - `tile: StencilTile<'a>`
+
+- **`struct StencilLabels<'a>`**
+  the texts of the panel (the app translates them; the panel has none of its own)
+  - `panel: &'a str` -- the panel's name for screen readers ("Shapes")
+  - `search: &'a str` -- the search box's placeholder and name ("Shapes suchen")
+  - `history: &'a str` -- the history button's tooltip and name ("Letzte Suchen")
+  - `more: &'a str` -- the "More shapes" button and the empty state's link ("Weitere Shapes")
+  - `quick: &'a str` -- the quick collection's title ("Quick-Shapes")
+  - `results: &'a str` -- the results' title, "{}" = their number ("Suchergebnisse ({})"); also announced
+  - `quick_empty: &'a str` -- the hint of an empty quick collection and of an empty quick part of an editable stencil
+    ("Hier Quick-Shapes ablegen")
+  - `drop_hint: &'a str` -- the hint of an editable stencil without other tiles ("Shapes hierher ziehen")
+  - `empty_title: &'a str` -- the empty state without stencils
+  - `empty_text: &'a str`
+  - `no_results_title: &'a str` -- the results without a hit
+  - `no_results_text: &'a str`
+
+- **`struct StencilPanel<'a>`**
+  what stencil_panel shows in a pass
+  - `stencils: &'a [StencilDef<'a>]`
+  - `results: Option<&'a [StencilHit<'a>]>` -- the hits of StencilState::query: Some while the app searches (the query is not empty)
+  - `drag_kind: u32` -- the app's own drag kind of a tile (DT_USER0 &lt;&lt; k)
+  - `more_id: u32` -- the widget id of the "More shapes" button (activated: StencilEvent::More)
+  - `labels: StencilLabels<'a>`
+
+- **`struct StencilState`**
+  what the panel keeps between passes (the app owns it; the public fields are the app's to
+  read and set)
+  - `active: u32` -- the key of the active title: a stencil's, SK_QUICK or SK_SEARCH
+  - `view: u8` -- SV_ICONS_NAMES, SV_ICONS, SV_NAMES, SV_DETAILS
+  - `query: String` -- the search box's text
+  - `history: Vec<String>` -- the recent searches, newest first (at most 10; the app may store and restore them)
+  - `split: i32` -- the height of the title rows in DIP (the splitter; 0 = automatic: up to 40 % of the
+    panel); the panel keeps it between one row and all of them
+
+**`impl StencilState`**
+
+- **`fn new() -> StencilState`**
+  a new state: the first stencil active, icons and names, no query
+
+- **`enum StencilEvent`**
+  what happened in the panel in a pass (stencil_panel returns them in order)
+  - `Activate { stencil: u32, tile: u32 }` -- a click on a tile: the app arms click placing (and marks the tile TL_ARMED)
+  - `Place { stencil: u32, tile: u32 }` -- Enter / Space on a tile or a double click: place it in the middle of the view
+  - `TileMenu { stencil: u32, tile: u32, at: [i32; 2] }` -- a right click, Shift+F10 or the menu key on a tile: its menu at `at` (window px)
+  - `StencilMenu { stencil: u32, at: [i32; 2] }` -- the same on a title row (SK_QUICK / SK_SEARCH for those two)
+  - `Search` -- StencilState::query changed: the app recomputes the results
+  - `Dropped { stencil: u32, before: usize, quick: bool, from_stencil: u32, from_tile: u32 }` -- a tile was dropped onto the SD_EDITABLE stencil `stencil`: insert it before its tile
+    `before` (an index into its tiles, counted with a dragged tile of its own still in
+    place; its length = at the end); `quick`: into the quick part
+  - `More { at: [i32; 2] }` -- "More shapes" or the empty state's link: the app opens its menu at `at` (window px, the
+    lower left corner of the button), ui.menu_popup_at
+  - `DragStart { stencil: u32, tile: u32 }` -- a tile began to be dragged
+  - `DragEnd` -- that drag ended (dropped somewhere or cancelled; ui.drag_effect tells)
+
+- **`fn stencil_drag_decode(bytes: &[u8]) -> Option<(u32, u32)>`**
+  the stencil and tile keys of a tile drag's bytes (DragData::bytes of StencilPanel::
+  drag_kind), None when they are no tile drag's
+
+**`impl Ui`**
+
+- **`fn stencil_panel(&mut self, id: u32, st: &mut StencilState, p: &StencilPanel<'_>) -> Vec<StencilEvent>`**
+  The Shapes window of a diagram editor (see the module header): the search box, "More
+  shapes", the title rows, a splitter and the tiles of the active view, in the size
+  next_size gave (else it fills its box).  Returns what happened, in order.
 
 #### `ui/sound.rs`
 
@@ -53005,6 +53200,8 @@ a file loses nothing, and the behaviour Visio files carry works without translat
   Extras                        what the file had and the model does not know (DF-03)
   formula::Engine               the formula engine: parse, evaluate, recalculate (JD6)
 
+  instance::*                   (JD9) masters from stencils into documents and onto pages:
+                                import_master, place, the texts in five languages
   geometry::*                   (JD4) Geometry rows as paths of lines and cubic curves,
                                 transforms (pin, local pin, angle, flips, groups)
   render::build(..) -> Drawing  (JD4) a page as a display list: fills, lines, line ends,
@@ -54495,6 +54692,125 @@ is at most 64 sheets long (a cycle of styles or masters in a broken file ends th
 - **`fn guarded(formula: &str) -> bool`**
   whether a formula text is GUARD(...) as a whole
 
+### `diagram_core/src/instance.rs`
+
+Source: [`lib/diagram_core/src/instance.rs`](../lib/diagram_core/src/instance.rs)
+
+```text
+instance -- masters from stencils onto pages (JD9): a master taken into a document, an
+instance of it dropped on a page, the texts of masters and stencils in five languages
+
+  LANGS, lang_index("fr")            de en es it fr: the order of every five-language value
+  join_fields(&[..]) / split_fields(text)   the '|'-separated values of a JFD_ cell
+                                     ("\|" and "\\" escape)
+  MasterTexts::of(&doc, master)      names, QuickInfos, keywords, text and translated cells in
+                                     five languages, the quick flag (JFD_ cells of the master's
+                                     page sheet; a master without them: Name, Prompt and
+                                     ShapeKeywords for every language)
+    texts.name(lang) / matches(&words, any)   the name shown, the search (NameU, the names in
+                                     all five languages, the keywords)
+  StencilTexts::of(&doc)             a stencil's title in five languages and its category
+                                     (User.JFD_Name, User.JFD_Category of the document sheet)
+  import_master(&mut tx, &src, m) -> MasterRef   master m of document src in tx's document:
+                                     the copy already there with the same UniqueID (MS-02),
+                                     else a new copy: strings into this document's table,
+                                     styles matched by NameU (missing ones copied with their
+                                     bases), masters its shapes are instances of first,
+                                     pictures of package parts inline
+  move_master(&mut tx, m, pos)      a master to another place in the order (own stencils)
+  place(&mut tx, page, master, x, y, lang) -> ShapeRef   an instance at (x, y) inches on the
+                                     page (y up): Name in language lang, NameU the master's
+                                     (LG-04; "Rechteck.7" when the page has one already), its
+                                     text and translated cells in that language
+
+The JFD_ cells are JFDiagrammer's own (apps/JFDiagrammer/stencils/README.md); diagram_io's
+stencil builder writes them, the Shapes panel reads them.  Visio keeps them as ordinary User
+cells.  The caller recalculates after place (formula::Engine::recalc with the new shapes'
+sheets) inside the same transaction, so undo takes the drop back as one step.
+```
+
+```rust
+/// the five languages, in the order of every five-language value
+LANGS: [&str; 5] = ["de", "en", "es", "it", "fr"]
+/// User cells of a stencil's document sheet and of a master's page sheet (README of the stencils)
+JFD_NAME: &str = "JFD_Name"
+/// the QuickInfos of a master
+JFD_PROMPT: &str = "JFD_Prompt"
+/// the search words of a master, per language separated by commas
+JFD_KEYWORDS: &str = "JFD_Keywords"
+/// the text a master's instance carries
+JFD_TEXT: &str = "JFD_Text"
+/// 1: the master is a quick shape of its stencil (MS-04)
+JFD_QUICK: &str = "JFD_Quick"
+/// the category of a stencil in "Weitere Shapes"
+JFD_CATEGORY: &str = "JFD_Category"
+/// JFD_Tr1, JFD_Tr2 ...: "Section.Row.Cell|de|en|es|it|fr" for translated cells of the master shape
+JFD_TR: &str = "JFD_Tr"
+```
+
+- **`fn lang_index(code: &str) -> Option<usize>`**
+  the position of a language code in LANGS
+
+- **`fn join_fields(values: &[&str]) -> String`**
+  values joined with '|' ('|' and '\\' escaped with '\\')
+
+- **`fn split_fields(text: &str) -> Vec<String>`**
+  the values of a '|'-joined text
+
+- **`struct MasterTexts`**
+  the texts of a master in five languages
+  - `name_u: String` -- NameU: the key (LG-04)
+  - `names: [String; 5]` -- the names shown, by LANGS
+  - `prompts: [String; 5]` -- the QuickInfos
+  - `keywords: [String; 5]` -- the search words, comma separated
+  - `text: Option<[String; 5]>` -- the text an instance carries
+  - `translated: Vec<(String, [String; 5])>` -- translated cells of the master shape: "Section.Row.Cell" and its five texts
+  - `quick: bool` -- a quick shape of its stencil (MS-04)
+
+**`impl MasterTexts`**
+
+- **`fn of(doc: &Document, m: MasterRef) -> MasterTexts`**
+  the texts of master `m` (empty for a master that is not there)
+- **`fn name(&self, lang: usize) -> &str`**
+  the name in language `lang` (index into LANGS), else the first one there, else NameU
+- **`fn prompt(&self, lang: usize) -> &str`**
+  the QuickInfo in language `lang`
+- **`fn matches(&self, words: &[&str], any: bool) -> bool`**
+  whether the master matches the search words (lower case expected): all of them
+  (any = false) or one of them, each a part of NameU, of a name in any language or of a
+  keyword (SL-04)
+
+- **`fn fold(s: &str) -> String`**
+  a text in lower case without the accents of the five languages (search ignores both)
+
+- **`struct StencilTexts`**
+  the texts of a stencil
+  - `names: [String; 5]` -- the title in five languages (empty: the stencil has none; the app takes its file name)
+  - `category: String` -- the category in "Weitere Shapes" ("" when none)
+
+**`impl StencilTexts`**
+
+- **`fn of(doc: &Document) -> StencilTexts`**
+  the texts of the stencil `doc`
+- **`fn name(&self, lang: usize) -> &str`**
+  the title in language `lang`, else the first one there ("" when none)
+
+- **`fn import_master(tx: &mut Transaction, src: &Document, m: MasterRef) -> Result<MasterRef, EditError>`**
+  master `m` of document `src` in the document of `tx`: the copy already there with the same
+  UniqueID, else a new copy (see the head of this file)
+
+- **`fn place(tx: &mut Transaction, page: PageRef, master: MasterRef, x: f64, y: f64, lang: usize) -> Result<ShapeRef, EditError>`**
+  drop an instance of `master` at (x, y) inches on `page` (MS-02, LG-04): Name in language
+  `lang` (an index into LANGS), NameU the master's, unique on the page with ".ID" like Visio;
+  the text and translated cells in that language where they differ from the master's
+
+- **`fn base64(data: &[u8]) -> String`**
+  base64 (RFC 4648, with padding)
+
+- **`fn move_master(tx: &mut Transaction, m: MasterRef, pos: usize) -> Result<(), EditError>`**
+  move master `m` to position `pos` among the masters (a stencil's order: MS-04, SL-07);
+  a master in use by shapes of the document stays where it is (InUse)
+
 ### `diagram_core/src/names.rs`
 
 Source: [`lib/diagram_core/src/names.rs`](../lib/diagram_core/src/names.rs)
@@ -55604,6 +55920,11 @@ format follows the public specification [MS-VSDX]; no code of other implementati
   vsdx::new_document(kind, Measure::Metric)   a new drawing, template or stencil with JFLib's
                       own styles, document sheet and DrawingML theme "NetLab"
   vsdx::Format        the six formats by main content type or extension
+  stencil::build(&files, Measure::Metric) -> Result<stencil::Built, stencil::SourceError>
+                      (JD9) the text sources of a stencil (stencil.txt, *.master, SVG
+                      drawings; apps/JFDiagrammer/stencils/README.md) into a stencil:
+                      masters in five languages, formulas computed, icons rendered from the
+                      shapes, name-based GUIDs; stencil::build_vssx gives the .vssx bytes too
 
 What is to come here, by stage of the plan:
   JD12  exports: SVG, PNG and PDF through the library's writers
@@ -55653,6 +55974,96 @@ default guide style.  The page is A4 (metric, millimetres) or Letter (US, inches
 - **`fn new_document(kind: DocKind, measure: Measure) -> Document`**
   a new document of this kind with JFLib's own defaults (see the module comment); a stencil
   has no masters yet, a drawing and a template one empty page
+
+### `diagram_io/src/stencil.rs`
+
+Source: [`lib/diagram_io/src/stencil.rs`](../lib/diagram_io/src/stencil.rs)
+
+```text
+stencil -- the stencil build tool (JD9): the text sources of a stencil into a stencil document
+and a .vssx file
+
+  stencil::build(&files, Measure::Metric) -> Result<Built, SourceError>
+  stencil::build_vssx(&files, Measure::Us) -> Result<(Built, Vec<u8>), SourceError>
+  Built { doc, stencil, file, category, measure }   the stencil document (DocKind::Stencil),
+                                  its universal name, the output stem, the category
+  built.vssx_name()               "standard_m.vssx" / "standard_u.vssx"
+  SourceError { file, line, message }   shown as "rectangle.master:12: unbekannter
+                                  Abschnitt [Geometrie]" (line 0: the whole file)
+
+`files(name)` gives the text of "stencil.txt", of "<stem>.master" and of an SVG file named by
+a master, all of one stencil folder (None: there is none).  The source format, and what goes
+into the file, is apps/JFDiagrammer/stencils/README.md; the app's build.rs calls this for each
+stencil and both measures.  The parser is stencil_src.rs, the SVG import stencil_svg.rs, the
+icons stencil_icon.rs.
+
+How a stencil is built, in this order:
+1. stencil.txt and every master file are parsed and checked for the chosen measure: header
+   keys, sections, row heads, cell names (each section's own list), the five languages of
+   every language-suffixed key or cell, Width and Height as lengths, formulas that parse and
+   call only functions the engine knows.  A ".metric" / ".us" line replaces the line
+   without suffix.
+2. A new stencil (vsdx::new_document: the own styles and the NetLab theme) gets the masters in
+   one transaction: the Master attributes (Name and Prompt in the build language,
+   IsCustomName(U), IconSize 1, AlignName 2, MatchByName 0, IconUpdate 1, PatternFlags 0,
+   Hidden 0, MasterType 2, BaseID and UniqueID), the master page (PageWidth / PageHeight =
+   the shape's size, scale 1:1 in mm or in, ShapeKeywords, the JFD_ User cells), the master
+   shape with its cells, sections, text and the SVG geometry.  Constants are written as values
+   with their unit (lengths in inches with U = MM, IN ...), everything else as a formula; the
+   tool adds PinX / PinY (half the size), LocPinX = Width*0.5, LocPinY = Height*0.5.
+3. Every reference of every formula must name something that is there (a cell of the sheet
+   or of its styles, a single cell of the ShapeSheet's own list, Sheet.N of the master).  The
+   formula engine computes every formula and its values are stored: a cell the engine keeps
+   (unknown function, unknown section, cycle) or that comes out as an error is a build error
+   naming the source line.  No stale value goes into the file.
+4. Each master's icon is rendered from an instance on the stencil's page (stencil_icon.rs);
+   the instance goes again, the page stays empty.
+
+The GUIDs are name-based (SHA-1, RFC 4122 version 5, namespace of this tool): BaseID from the
+stencil's NameU, the master's NameU and the measure; UniqueID from the same and the master's
+content as built (the resolved lines, the SVG, the build language, the quick flag, the tool's
+version), so an unchanged master keeps its UniqueID and a changed one gets a new one (MS-02).
+Upper case in braces, as Visio writes them.  The same sources always give the same document
+and the same bytes.
+
+The JFD_ cells (diagram_core::instance reads them): the document sheet's User.JFD_Name (the
+title in de|en|es|it|fr) and User.JFD_Category; per master page User.JFD_Name, JFD_Prompt,
+JFD_Keywords, JFD_Text, JFD_Quick (1 for the first `quick` masters) and JFD_Tr1, JFD_Tr2 ...
+("Section.Row.Cell|de|en|es|it|fr" with VSDX section names: Control.Row_1.Tip).
+
+Sources are files of the repository, trusted but checked all the same: no panic on any input,
+counts bounded, no recursion.
+```
+
+- **`struct Built`**
+  a stencil built from its sources
+  - `doc: Document` -- the stencil (DocKind::Stencil)
+  - `stencil: String` -- its universal name (stencil.txt `stencil`)
+  - `file: String` -- the stem of the output files (stencil.txt `file`)
+  - `category: String` -- the category in "Weitere Shapes" (stencil.txt `category`)
+  - `measure: Measure` -- the measure it was built for
+
+**`impl Built`**
+
+- **`fn vssx_name(&self) -> String`**
+  the file name of the .vssx: `<file>_m.vssx` (metric) or `<file>_u.vssx` (US)
+
+- **`struct SourceError`**
+  why a stencil did not build: the source file, the line (from 1; 0: the whole file) and why
+  - `file: String` -- the file in the stencil's folder ("rectangle.master")
+  - `line: u32` -- the line, from 1 (0: the file as a whole)
+  - `message: String` -- what is wrong
+
+```rust
+/// the categories of "Weitere Shapes" a stencil may name
+CATEGORIES: [&str; 9] = ["general", "flowchart", "business", "engineering", "netw ...
+```
+
+- **`fn build(files: &dyn Fn(&str) -> Option<String>, measure: Measure) -> Result<Built, SourceError>`**
+  build the stencil of one folder for one measure (see the module comment)
+
+- **`fn build_vssx(files: &dyn Fn(&str) -> Option<String>, measure: Measure) -> Result<(Built, Vec<u8>), SourceError>`**
+  build the stencil and write it as .vssx bytes (vsdx::write with the default options)
 
 ### `diagram_io/src/vsdx.rs`
 
