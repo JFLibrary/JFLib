@@ -110,6 +110,7 @@ DOCS = [
     ("docs/GLTF.md", "glTF import", "Reference", "de", "glTF 2.0 scenes (.gltf, .glb) read without a GPU, checked as untrusted input"),
     ("docs/PHYSICS.md", "Physics", "Reference", "de", "Collision shapes, broad phase and queries for games, the same bits on every target"),
     ("docs/GAMECORE.md", "Game core", "Reference", "de", "Entities and components, a fixed tick, input actions, cameras and the bridge to the 3D engine"),
+    ("docs/GEOM.md", "Modelling", "Reference", "de", "Models described in JFScript: meshes from primitives and profiles, checks, pictures, glTF"),
     ("docs/SHADER.md", "Shaders (SPIR-V)", "Reference", "de", "Writing, reading and validating SPIR-V"),
     ("docs/WGSL.md", "WGSL compiler", "Reference", "de", "From WGSL text to a checked, typed module and on to SPIR-V"),
     ("apps/Kritzel/README.md", "Kritzel", "Apps", "en", "A small drawing and image-editing app"),

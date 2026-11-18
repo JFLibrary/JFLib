@@ -661,6 +661,7 @@ rust-analyzer reads the Cargo workspace in the root `Cargo.toml` directly.
 | [Game engine plan](docs/GAME.md) | A game engine on render3d: decisions, crates, stages G7a to G7p from a first multiplayer game to procedural cities, tests (German) |
 | [Physics](docs/PHYSICS.md) | Collision for games: shapes, broad phase, rays, swept shapes, contacts; f64, the same bits on every target; tests and measurements (German) |
 | [Game core](docs/GAMECORE.md) | The game engine's core: entities and components, a fixed tick with interpolation, input actions bound to key positions with the pointer lock, cameras, the bridge to render3d; tests (German) |
+| [Modelling](docs/GEOM.md) | Models described in JFScript: lib/geom (meshes from primitives, profiles and operations, checks), apps/modeltool (pictures, report, glTF), what JFScript needs (German) |
 | [Android Gallery](apps/androidGallery/README.md) | APKs, Android prerequisites, input, and port status |
 | [Web and agent control](docs/AGENT_WEB.md) | Browser host and explicit CLI/JSON/MCP interfaces |
 | [jfWord](apps/jfWord/README.md) | Document editing and current feature coverage |

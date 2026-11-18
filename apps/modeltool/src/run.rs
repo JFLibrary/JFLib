@@ -1,0 +1,470 @@
+// run -- a script from source to a checked model: compile (an unknown name is an error before the run), run in
+// a VM with limits, finish the parts (box UV in metres), measure them (geom's checks per part and for the whole
+// model, the script's expectations, the budget) and write the report.  Errors carry the file, line and
+// column, the source line with a caret and the calls, because an AI reads them and has to find the place.
+
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+
+use geom::{Fnv, Mesh, Report, Vec3};
+use script::{Limits, Status, Value, Vm};
+
+use crate::host::{self, Model, ModelHost};
+use crate::json::J;
+
+/// the limits of a script: 64 MiB heap, 200 million steps
+pub const LIMITS: Limits = Limits { heap: 64 << 20, stack: 100_000, depth: 500, fuel: 200_000_000, output: 256 << 10 };
+
+/// an error of the compiler or the run
+#[derive(Clone, Debug)]
+pub struct Problem {
+    pub file: String,
+    pub line: u32,
+    pub col: u32,
+    pub message: String,
+    /// "in name (file:line:col)", innermost first
+    pub trace: Vec<String>,
+}
+
+/// what a run gives
+pub struct Run {
+    pub file: String,
+    pub model: Model,
+    pub problems: Vec<Problem>,
+    /// what the script printed
+    pub output: String,
+    /// (path, source) of the modules it imported
+    pub imports: Vec<(String, String)>,
+    pub params: Vec<(String, String)>,
+    /// the cache key: SHA-256 (hex, 32 digits) of the tool's version, the script, the parameters and the modules
+    pub key: String,
+    pub fuel: u64,
+    pub script_us: u64,
+    pub host_us: u64,
+}
+
+impl Run {
+    pub fn ok(&self) -> bool {
+        self.problems.is_empty()
+    }
+}
+
+/// a parameter's text as a script value: int, float, true / false, else str
+fn param_value(vm: &mut Vm, s: &str) -> Value {
+    if let Ok(i) = s.parse::<i64>() {
+        return Value::Int(i);
+    }
+    if let Ok(f) = s.parse::<f64>() {
+        if f.is_finite() {
+            return Value::Float(f);
+        }
+    }
+    match s {
+        "true" => Value::Bool(true),
+        "false" => Value::Bool(false),
+        _ => vm.new_str(s).unwrap_or(Value::Nil),
+    }
+}
+
+/// the text with CR LF line ends as LF
+pub fn lf(s: &str) -> String {
+    s.replace("\r\n", "\n")
+}
+
+/// the cache key of a script, its parameters and its modules
+pub fn cache_key(src: &str, params: &[(String, String)], imports: &[(String, String)]) -> String {
+    let mut text = String::new();
+    text.push_str("modeltool-key-1\n");
+    text.push_str(crate::APP_VERSION);
+    text.push('\n');
+    text.push_str(rt::VERSION);
+    // line ends as LF: a checkout with CRLF gives the same key
+    text.push_str("\n--script\n");
+    text.push_str(&lf(src));
+    let mut p: Vec<&(String, String)> = params.iter().collect();
+    p.sort();
+    for (k, v) in p {
+        text.push_str(&format!("\n--param {}={}", k, v));
+    }
+    for (path, s) in imports {
+        text.push_str(&format!("\n--import {}\n", path));
+        text.push_str(&lf(s));
+    }
+    let h = crypto::sha2::sha256(text.as_bytes());
+    h[..16].iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+/// Compile and run the script `src` (named `file` in messages) with its parameters; `loader` reads a module
+/// for import(path) (the path relative to the script).
+pub fn run_script(file: &str, src: &str, params: &[(String, String)], loader: &mut dyn FnMut(&str) -> Result<String, String>) -> Run {
+    let t0 = plat::time_us();
+    let mut run = Run {
+        file: String::from(file),
+        model: Model::default(),
+        problems: Vec::new(),
+        output: String::new(),
+        imports: Vec::new(),
+        params: params.to_vec(),
+        key: String::new(),
+        fuel: 0,
+        script_us: 0,
+        host_us: 0,
+    };
+    let prog = match script::compile_with(file, src, host::GLOBALS) {
+        Ok(p) => p,
+        Err(diags) => {
+            for d in diags {
+                let f = if d.file.is_empty() { String::from(file) } else { d.file };
+                run.problems.push(Problem { file: f, line: d.line, col: d.col, message: d.msg, trace: Vec::new() });
+            }
+            run.key = cache_key(src, params, &[]);
+            return run;
+        }
+    };
+    let mut vm = Vm::new(&prog, LIMITS);
+    if let Ok(m) = vm.new_map() {
+        for (k, v) in params {
+            let val = param_value(&mut vm, v);
+            if let Ok(key) = vm.new_str(k) {
+                let _ = vm.map_set(m, key, val);
+            }
+        }
+        vm.set_global("params", m);
+    }
+    let mut host = ModelHost::new(loader);
+    loop {
+        match vm.run(&mut host, 10_000_000) {
+            Status::Done(_) => break,
+            Status::Yielded | Status::Paused(_) => continue,
+            Status::Error(e) => {
+                let f = if e.file.is_empty() { String::from(file) } else { e.file.clone() };
+                let trace = e
+                    .trace
+                    .iter()
+                    .map(|t| {
+                        let tf = if t.file.is_empty() { file } else { t.file.as_str() };
+                        let at = format!("{}:{}:{}", tf, t.line, t.col);
+                        if t.func.is_empty() { format!("im Hauptprogramm ({})", at) } else { format!("in {} ({})", t.func, at) }
+                    })
+                    .collect();
+                run.problems.push(Problem { file: f, line: e.line, col: e.col, message: e.msg, trace });
+                break;
+            }
+        }
+    }
+    run.fuel = vm.call_fuel();
+    run.output = vm.take_output();
+    run.host_us = host.host_us;
+    run.imports = core::mem::take(&mut host.imports);
+    run.model = core::mem::take(&mut host.model);
+    drop(host);
+    if run.problems.is_empty() && run.model.parts.is_empty() {
+        run.problems.push(Problem {
+            file: String::from(file),
+            line: 0,
+            col: 0,
+            message: String::from("Das Skript hat dem Modell nichts hinzugefügt: model.add(mesh, material) fehlt"),
+            trace: Vec::new(),
+        });
+    }
+    // the parts' UV in metres where they ended up
+    let s = run.model.uv_scale;
+    for p in run.model.parts.iter_mut() {
+        p.mesh = p.mesh.uv_box(s);
+    }
+    run.key = cache_key(src, params, &run.imports);
+    run.script_us = plat::time_us().saturating_sub(t0).saturating_sub(run.host_us);
+    run
+}
+
+/// a problem as the console shows it: "file:line:col: Fehler: message", the source line with a caret, the calls
+pub fn format_problem(p: &Problem, sources: &[(String, String)]) -> String {
+    let mut s = if p.line > 0 { format!("{}:{}:{}: Fehler: {}\n", p.file, p.line, p.col, p.message) } else { format!("{}: Fehler: {}\n", p.file, p.message) };
+    if p.line > 0 {
+        if let Some((_, src)) = sources.iter().find(|(f, _)| *f == p.file) {
+            if let Some(text) = src.lines().nth(p.line as usize - 1) {
+                let text = text.replace('\t', " ");
+                let no = format!("{}", p.line);
+                s.push_str(&format!("  {} | {}\n", no, text.trim_end()));
+                let caret: String = core::iter::repeat_n(' ', (p.col as usize).saturating_sub(1)).collect();
+                s.push_str(&format!("  {} | {}^\n", " ".repeat(no.len()), caret));
+            }
+        }
+    }
+    for t in &p.trace {
+        s.push_str(&format!("  {}\n", t));
+    }
+    s
+}
+
+/// the measurements of a model
+pub struct Analysis {
+    /// the whole model (every part merged)
+    pub whole: Report,
+    pub parts: Vec<Report>,
+    /// per expectation: met, the actual size
+    pub expects: Vec<(bool, Vec3)>,
+    pub within_budget: Option<bool>,
+    /// FNV-1a over every part's mesh bits and material
+    pub fingerprint: u64,
+    pub check_us: u64,
+}
+
+impl Analysis {
+    /// every check passed, every expectation met, within the budget
+    pub fn ok(&self) -> bool {
+        self.whole.ok() && self.parts.iter().all(|p| p.ok()) && self.expects.iter().all(|e| e.0) && self.within_budget != Some(false)
+    }
+}
+
+/// measure a model
+pub fn analyse(model: &Model) -> Analysis {
+    let t0 = plat::time_us();
+    let parts: Vec<Report> = model.parts.iter().map(|p| p.mesh.check()).collect();
+    let refs: Vec<&Mesh> = model.parts.iter().map(|p| &p.mesh).collect();
+    let whole = Mesh::merge(&refs).unwrap_or_default().check();
+    let size = whole.size();
+    let expects = model
+        .expects
+        .iter()
+        .map(|e| {
+            let d = [size.x - e.size[0], size.y - e.size[1], size.z - e.size[2]];
+            (d.iter().zip(&e.size).all(|(x, want)| want.is_nan() || geom::math::abs(*x) <= e.tolerance), size)
+        })
+        .collect();
+    let mut h = Fnv::new();
+    for p in &model.parts {
+        h.u(p.mesh.fingerprint());
+        h.u(p.material as u64);
+    }
+    Analysis {
+        whole,
+        parts,
+        expects,
+        within_budget: model.budget.map(|b| (model.parts.iter().map(|p| p.mesh.triangle_count() as u64).sum::<u64>()) <= b),
+        fingerprint: h.0,
+        check_us: plat::time_us().saturating_sub(t0),
+    }
+}
+
+/// a German one-line summary of what failed, for the console and the report
+pub fn findings(model: &Model, a: &Analysis) -> Vec<String> {
+    let mut out = Vec::new();
+    let w = &a.whole;
+    if w.open_edges > 0 {
+        out.push(format!("nicht geschlossen: {} offene Kanten", w.open_edges));
+    }
+    if w.nonmanifold_edges > 0 {
+        out.push(format!("{} Kanten mit mehr als zwei Dreiecken", w.nonmanifold_edges));
+    }
+    if w.flipped_edges > 0 {
+        out.push(format!("Umlaufsinn uneinheitlich: {} Kanten mit zwei gleich laufenden Dreiecken", w.flipped_edges));
+    }
+    if w.nonmanifold_points > 0 {
+        out.push(format!("{} Punkte, an denen sich Teile nur berühren", w.nonmanifold_points));
+    }
+    if w.inverted_components > 0 {
+        out.push(format!("{} geschlossene Teile stehen innen nach außen (Normalen nach innen)", w.inverted_components));
+    }
+    if w.degenerate > 0 {
+        out.push(format!("{} entartete Dreiecke (ohne Fläche)", w.degenerate));
+    }
+    if w.bad_normals > 0 {
+        out.push(format!("{} Normalen falsch (nicht Länge 1 oder gegen die Fläche)", w.bad_normals));
+    }
+    for (i, p) in a.parts.iter().enumerate() {
+        if !p.ok() && w.ok() {
+            out.push(format!("Teil {} ({}) besteht die Prüfungen nicht", i + 1, model.parts[i].name));
+        }
+    }
+    for (e, (ok, size)) in model.expects.iter().zip(&a.expects) {
+        if !ok {
+            let want = |v: f64| if v.is_nan() { String::from("beliebig") } else { geom::fnum(v) };
+            out.push(format!(
+                "Maße {} x {} x {} m erwartet (Toleranz {}), sind {} x {} x {} m",
+                want(e.size[0]), want(e.size[1]), want(e.size[2]), geom::fnum(e.tolerance),
+                geom::fnum(size.x), geom::fnum(size.y), geom::fnum(size.z)
+            ));
+        }
+    }
+    if a.within_budget == Some(false) {
+        out.push(format!("über dem Budget: {} Dreiecke, erlaubt {}", w.triangles, model.budget.unwrap_or(0)));
+    }
+    out
+}
+
+/// "#rrggbb" of an sRGB colour
+pub fn hex(c: [f64; 3]) -> String {
+    let b = |v: f64| (geom::math::floor(v.clamp(0.0, 1.0) * 255.0 + 0.5)) as u8;
+    format!("#{:02x}{:02x}{:02x}", b(c[0]), b(c[1]), b(c[2]))
+}
+
+/// a geom report as JSON
+pub fn report_json(r: &Report) -> J {
+    let b = r.bounds.unwrap_or(geom::Aabb::point(Vec3::ZERO));
+    J::obj(alloc::vec![
+        ("ok", J::Bool(r.ok())),
+        ("closed", J::Bool(r.closed())),
+        ("outward", J::Bool(r.outward())),
+        ("vertices", J::Int(r.vertices as i64)),
+        ("triangles", J::Int(r.triangles as i64)),
+        ("min", J::vec3(b.min)),
+        ("max", J::vec3(b.max)),
+        ("size", J::vec3(r.size())),
+        ("area", J::Num(r.area)),
+        ("volume", J::Num(r.volume)),
+        ("components", J::Int(r.components as i64)),
+        ("euler", J::Int(r.euler)),
+        ("open_edges", J::Int(r.open_edges as i64)),
+        ("nonmanifold_edges", J::Int(r.nonmanifold_edges as i64)),
+        ("flipped_edges", J::Int(r.flipped_edges as i64)),
+        ("nonmanifold_points", J::Int(r.nonmanifold_points as i64)),
+        ("inverted_components", J::Int(r.inverted_components as i64)),
+        ("degenerate", J::Int(r.degenerate as i64)),
+        ("bad_normals", J::Int(r.bad_normals as i64)),
+    ])
+}
+
+/// what the report adds when images and files were written
+pub struct Outputs {
+    pub files: J,
+    pub views: J,
+}
+
+/// The report: the part every run of the same script gives (tool, key, script, ok, errors, findings, params,
+/// model, checks, parts, expectations, materials, output, imports, fingerprint) and, when given, the files,
+/// the views and the timing, each on one line at the end.
+pub fn report(run: &Run, a: Option<&Analysis>, outputs: Option<&Outputs>, timing: Option<J>) -> J {
+    let mut f: Vec<(&str, J)> = Vec::new();
+    f.push(("tool", J::Str(format!("modeltool {}", crate::APP_VERSION))));
+    f.push(("script", J::str(&run.file)));
+    f.push(("key", J::str(&run.key)));
+    let ok = run.ok() && a.is_some_and(|a| a.ok());
+    f.push(("ok", J::Bool(ok)));
+    let errors: Vec<J> = run
+        .problems
+        .iter()
+        .map(|p| {
+            J::obj(alloc::vec![
+                ("file", J::str(&p.file)),
+                ("line", J::Int(p.line as i64)),
+                ("col", J::Int(p.col as i64)),
+                ("message", J::str(&p.message)),
+                ("trace", J::Arr(p.trace.iter().map(|t| J::str(t)).collect())),
+            ])
+            .compact()
+        })
+        .collect();
+    f.push(("errors", J::Arr(errors)));
+    let fnd = a.map(|a| findings(&run.model, a)).unwrap_or_default();
+    f.push(("findings", J::Arr(fnd.iter().map(|s| J::str(s)).collect())));
+    f.push(("params", J::Obj(run.params.iter().map(|(k, v)| (k.clone(), J::str(v))).collect())));
+    if let Some(a) = a {
+        let m = &run.model;
+        let w = &a.whole;
+        let b = w.bounds.unwrap_or(geom::Aabb::point(Vec3::ZERO));
+        f.push((
+            "model",
+            J::obj(alloc::vec![
+                ("name", J::str(&m.name)),
+                ("parts", J::Int(m.parts.len() as i64)),
+                ("materials", J::Int(m.materials.len() as i64)),
+                ("vertices", J::Int(w.vertices as i64)),
+                ("triangles", J::Int(w.triangles as i64)),
+                ("budget", m.budget.map_or(J::Null, |b| J::Int(b as i64))),
+                ("within_budget", a.within_budget.map_or(J::Null, J::Bool)),
+                ("min", J::vec3(b.min)),
+                ("max", J::vec3(b.max)),
+                ("size", J::vec3(w.size())),
+                ("center", J::vec3(b.center())),
+                ("area", J::Num(w.area)),
+                ("volume", J::Num(w.volume)),
+                ("uv_scale", J::Num(m.uv_scale)),
+            ]),
+        ));
+        f.push(("checks", report_json(w)));
+        let parts: Vec<J> = m
+            .parts
+            .iter()
+            .zip(&a.parts)
+            .map(|(p, r)| {
+                let b = r.bounds.unwrap_or(geom::Aabb::point(Vec3::ZERO));
+                J::obj(alloc::vec![
+                    ("name", J::str(&p.name)),
+                    ("material", J::str(&m.materials[p.material].name)),
+                    ("ok", J::Bool(r.ok())),
+                    ("closed", J::Bool(r.closed())),
+                    ("outward", J::Bool(r.outward())),
+                    ("triangles", J::Int(r.triangles as i64)),
+                    ("vertices", J::Int(r.vertices as i64)),
+                    ("min", J::vec3(b.min)),
+                    ("size", J::vec3(r.size())),
+                    ("area", J::Num(r.area)),
+                    ("volume", J::Num(r.volume)),
+                    ("degenerate", J::Int(r.degenerate as i64)),
+                ])
+                .compact()
+            })
+            .collect();
+        f.push(("parts", J::Arr(parts)));
+        let expects: Vec<J> = m
+            .expects
+            .iter()
+            .zip(&a.expects)
+            .map(|(e, (ok, size))| {
+                J::obj(alloc::vec![
+                    ("rule", J::str("size")),
+                    ("expected", J::nums(&e.size)),
+                    ("actual", J::vec3(*size)),
+                    ("tolerance", J::Num(e.tolerance)),
+                    ("ok", J::Bool(*ok)),
+                ])
+                .compact()
+            })
+            .collect();
+        f.push(("expect", J::Arr(expects)));
+        let mats: Vec<J> = m
+            .materials
+            .iter()
+            .map(|x| {
+                J::obj(alloc::vec![
+                    ("name", J::str(&x.name)),
+                    ("color", J::Str(hex(x.color))),
+                    ("roughness", J::Num(x.roughness)),
+                    ("metallic", J::Num(x.metallic)),
+                ])
+                .compact()
+            })
+            .collect();
+        f.push(("materials", J::Arr(mats)));
+        f.push(("fingerprint", J::Str(format!("{:016x}", a.fingerprint))));
+    }
+    f.push(("output", J::str(&run.output)));
+    let imports: Vec<J> = run
+        .imports
+        .iter()
+        .map(|(p, s)| {
+            let h = crypto::sha2::sha256(lf(s).as_bytes());
+            J::obj(alloc::vec![("path", J::str(p)), ("sha256", J::Str(h.iter().map(|b| format!("{:02x}", b)).collect()))]).compact()
+        })
+        .collect();
+    f.push(("imports", J::Arr(imports)));
+    if let Some(o) = outputs {
+        f.push(("files", o.files.clone().compact()));
+        f.push(("views", o.views.clone().compact()));
+    }
+    if let Some(t) = timing {
+        f.push(("timing", t.compact()));
+    }
+    J::obj(f)
+}
+
+/// the report's lines without those that change between runs and options ("files", "views", "timing"),
+/// trailing commas dropped: what selftest compares
+pub fn stable_lines(text: &str) -> Vec<String> {
+    text.lines()
+        .filter(|l| !(l.starts_with("  \"files\"") || l.starts_with("  \"views\"") || l.starts_with("  \"timing\"")))
+        .map(|l| l.trim_end().trim_end_matches(',').to_string())
+        .collect()
+}

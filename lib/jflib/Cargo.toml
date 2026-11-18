@@ -88,6 +88,7 @@ dxf.workspace = true
 physics.workspace = true
 game.workspace = true
 game_render3d.workspace = true
+geom.workspace = true
 style_winui.workspace = true
 style_classic.workspace = true
 style_kde.workspace = true

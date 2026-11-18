@@ -1,0 +1,43 @@
+// Treppe: eine gerade Betontreppe mit Wange links und Handlauf rechts
+//   modeltool treppe.jfs [--param stufen=15] [--param hoehe=2.7]
+// Die erste Stufe liegt vorn (+Z), die Treppe steigt nach hinten.  Auftritt 27 cm, die Steigung folgt
+// aus Höhe und Stufenzahl (2,70 m / 15 = 18 cm).
+
+model.name("Treppe")
+model.material("handlauf", {color: "#2f2f33", roughness: 0.4, metallic: 1})
+
+let stufen = params.get("stufen", 15)
+let hoehe = params.get("hoehe", 2.7)
+let breite = 1.0
+let auftritt = 0.27
+let tiefe = stufen * auftritt
+let steig = hoehe / stufen
+
+// die Stufen als ein Block bis zum Boden
+model.add(geom.stairs(breite, hoehe, tiefe, stufen), "beton", "stufen")
+
+// die Wange links: eine Platte 4 cm stark, 25 cm über der Linie der Stufenkanten
+// (das Profil von der Seite gesehen, dann um 90 Grad gedreht: Profil-x wird -z)
+let wange = geom.extrude([[-tiefe / 2, 0], [tiefe / 2, 0], [tiefe / 2, hoehe + 0.25], [-tiefe / 2, steig + 0.25]], 0.04)
+model.add(wange.rotate_y(90).move(-breite / 2 - 0.02, 0, 0), "beton", "wange")
+
+// Pfosten rechts auf jeder dritten Stufe, 90 cm hoch
+let px = breite / 2 - 0.05
+let erste = [px, steig, tiefe / 2 - auftritt / 2]           // Mitte des ersten Auftritts
+let anzahl = (stufen + 2) / 3                               // ganzzahlige Division
+let pfosten = geom.cylinder(0.02, 0.9, 16).move(erste)
+model.add(pfosten.array(anzahl, 0, 3 * steig, -3 * auftritt), "handlauf", "pfosten")
+
+// der Handlauf: ein Rohr über den Pfosten, an beiden Enden 10 cm länger, mit Kugeln als Abschluss
+let a = vec.add(erste, [0, 0.9, 0])
+let b = vec.add(a, [0, 3 * steig * (anzahl - 1), -3 * auftritt * (anzahl - 1)])
+let richtung = vec.norm(vec.sub(b, a))
+let a2 = vec.sub(a, vec.mul(richtung, 0.1))
+let b2 = vec.add(b, vec.mul(richtung, 0.1))
+model.add(geom.sweep(profile.circle(0.025, 16), [a2, b2]), "handlauf", "rohr")
+let kugel = geom.sphere(0.03, 16)
+model.add(kugel.move(a2[0], a2[1] - 0.03, a2[2]), "handlauf", "kugel unten")
+model.add(kugel.move(b2[0], b2[1] - 0.03, b2[2]), "handlauf", "kugel oben")
+
+model.budget(3000)
+model.expect_size(breite + 0.04, nil, tiefe, 0.001)

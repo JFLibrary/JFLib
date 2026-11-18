@@ -68,6 +68,7 @@ pub use dxf;
 pub use physics;
 pub use game;
 pub use game_render3d;
+pub use geom;
 #[doc(hidden)]
 pub use style_assets;
 
