@@ -91,6 +91,15 @@ pub trait Display: Send {
     fn drag_start(&mut self, _data: crate::DragData) -> bool {
         false
     }
+    /// (G7a) lock the pointer to window w (on) or let it go -> the state now (plock.rs: the
+    /// backend calls plock_set); default: Unsupported
+    fn pointer_lock(&mut self, w: i32, on: bool) -> crate::PointerLock {
+        if !on {
+            return crate::PointerLock::Off;
+        }
+        crate::plock_set(w, crate::PointerLock::Unsupported);
+        crate::PointerLock::Unsupported
+    }
 }
 
 struct Disp {
@@ -295,6 +304,11 @@ pub fn win_present(w: i32, f: &Frame, rects: Option<&[[i32; 4]]>) {
 
 pub fn win_set_cursor(w: i32, shape: u32) {
     with(|b| b.win_set_cursor(w, shape));
+}
+
+/// (G7a, plock.rs) the pointer lock of window w through the backend (no display: Refused)
+pub(crate) fn disp_pointer_lock(w: i32, on: bool) -> crate::PointerLock {
+    with(|b| b.pointer_lock(w, on)).unwrap_or(if on { crate::PointerLock::Refused } else { crate::PointerLock::Off })
 }
 
 /// stored: the compositor needs no hit tests, the Wayland backend asks it for the click

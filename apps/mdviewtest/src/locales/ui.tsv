@@ -50,3 +50,6 @@ Oben einfügen	Insert at top
 Zu Zeile 50000	Go to row 50000
 Auswahl: {} · oben: {} +{}	Selection: {} · top: {} +{}
 Aufgeklappt: diese Zeile zeigt mehr Text und wird dadurch höher; die Zeilen darunter rücken nach.	Expanded: this row shows more text and so gets taller; the rows below move down.
+Sortieren	Reorder
+Eintrag {}	Entry {}
+Auswahl {}: {}	Selection {}: {}

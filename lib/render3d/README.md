@@ -12,11 +12,16 @@ without the standard library and without a line of `unsafe` code.
 
 - **Meshes** with positions, normals, texture coordinates and indices go into shared pools of the
   `Renderer`. A mesh can have detail levels: below a projected size an instance takes a simpler
-  mesh, or none at all (`Renderer::set_lods`).
+  mesh, or none at all (`Renderer::set_lods`). Meshes, materials and textures can be removed again
+  (`remove_mesh`, `remove_material`, `remove_texture`): their places and their room in the pools
+  and texture arrays are used again, the ids of removed ones stay invalid, and what a scene still
+  uses is refused.
 - **Materials** are glTF 2.0's metallic-roughness materials with all five textures (base colour,
-  metallic-roughness, normal, occlusion, emission) and the alpha mode MASK. Textures live in one
-  texture array per size class, from 128 to 2048 texels, with mip levels made on the CPU, and the
-  shader follows glTF's wrap and filter modes exactly.
+  metallic-roughness, normal, occlusion, emission), the alpha modes MASK and BLEND, and
+  double-sided materials (`MaterialDesc`). Blended instances are sorted back to front per instance
+  on the GPU and drawn by one draw after the rest. Textures live in one texture array per size
+  class, from 128 to 2048 texels, with mip levels made on the CPU, and the shader follows glTF's
+  wrap and filter modes exactly.
 - **Instances** place a mesh with a material: a position in `f64`, a rotation and a scale per
   axis. Mirrored instances (the product of their scales negative) are drawn by their own pipeline
   with their faces turned the right way.
@@ -81,8 +86,8 @@ The same WGSL shaders run on every path: compiled ahead to SPIR-V for Vulkan and
 to WebGPU as text in the browser, where each list gets a draw of its own and there are no GPU
 timings. Inside a window, a scene is the content of a `ui.gpu_view` of
 [`jflib-ui`](https://crates.io/crates/jflib-ui), next to the widgets: the app connects the two with
-a `GpuContent` of its own. Not built: translucent materials (glTF's BLEND is drawn opaque), an
-orthographic camera, multisampling, and removing meshes.
+a `GpuContent` of its own. Not built: an orthographic camera, multisampling, sorting the triangles
+of one blended instance, and shadows of blended materials.
 
 Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::render3d`. All of JFLib's crates share one

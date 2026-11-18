@@ -847,10 +847,12 @@ if self.tab == 0 {
 
   A page that passes the keyboard on as it is (a web page's `keydown` / `keyup` with `key`,
   `repeat`, `code` and `location`) takes `ui.key_event_take()` instead of `key_take`: the next
-  `KeyEvent { vk, mods, down, repeat, scancode, location, ch, dead }` of the batch until `None`
-  -- downs and ups, the system's auto-repeat, the key's place on the keyboard whatever the layout
-  (`scancode`: Windows' scan code with 0xE0.. for extended keys, Linux's evdev code; 0 on macOS,
-  Android and in the browser) and `location` (`KL_STANDARD`, `KL_LEFT` / `KL_RIGHT` for the two
+  `KeyEvent { vk, mods, down, repeat, scancode, location, ch, dead, code }` of the batch until
+  `None` -- downs and ups, the system's auto-repeat, the key's place on the keyboard whatever the
+  layout (`code`: a USB HID usage, the same on every platform, `plat::KC_*`, section 39;
+  `plat::key_code_name(code)` is the web page's `code` name; `scancode`: the platform's own code,
+  Windows' scan code with 0xE0.. for extended keys, Linux's evdev code, the usage on macOS, iOS and
+  in the browser; both 0 on Android) and `location` (`KL_STANDARD`, `KL_LEFT` / `KL_RIGHT` for the two
   Shift, Ctrl, Alt and Windows keys, `KL_NUMPAD`). `ch` is the character the keyboard layout
   gives the key with Shift, Caps Lock and AltGr as they are but without Ctrl, Alt and the
   Windows / Super key -- what a browser names the key also when Ctrl or Alt is held and the key
@@ -874,8 +876,9 @@ if self.tab == 0 {
   }
   ```
 
-  Scripts hold keys with `keydown CHORD [scan N] [left|right|numpad] [char "c"|none] [dead]` and
-  let them go with `keyup CHORD ...`; a script's keys have the US layout's characters, `char "c"`
+  Scripts hold keys with `keydown CHORD [scan N | code N] [left|right|numpad] [char "c"|none] [dead]` and
+  let them go with `keyup CHORD ...` (`code N`: the key at USB HID usage N, this platform's scan code
+  for it); a script's keys have the US layout's characters, `char "c"`
   gives another layout's (`viewtest` `tests/keyraw.uis`, `tests/keychar.uis`). The platform's
   events carry the character in `Event::y` with the location (`plat::key_y`, `key_location`,
   `key_char`, `key_dead`).
@@ -2162,7 +2165,8 @@ in DIP):
 | `pan2 S DX DY [MS]` | two fingers around S, 80 DIP apart, move by DX, DY (DIP) in MS ms (default 300), then they lift |
 | `wheel S DY [DX] [fine\|pixels] [shift] [ctrl] [alt]` | raw wheel units (120 = one notch; DX sideways, right positive); the modifiers are held during the wheel event (Ctrl + wheel zoom); `fine`: a device in fine steps of the 120 (`plat::WHEEL_FINE`, a precision touchpad on Windows), `pixels`: DY and DX are DIP of a device that scrolls by pixels (`plat::WHEEL_PIXELS`, a trackpad) |
 | `key CHORD...` | `key ctrl+s`, `key tab shift+tab enter esc left f4`, also `[ ] , . - + /`, `num0`..`num9`, `numadd` ... (every key a pass of its own, as the platform delivers them; with the US layout's character, `KeyEvent::ch`) |
-| `keydown CHORD [scan N] [left\|right\|numpad] [char "c"\|none] [dead]`, `keyup CHORD ...` | a key down and held (shift / ctrl / alt stay held for the following events; down again: an auto-repeat) and up again, with a scancode, location and character for `ui.key_event_take` (the US layout's character for the key and its Shift; `char "c"` another layout's, `char none` none, `dead` a dead key) |
+| `keydown CHORD [scan N\|code N] [left\|right\|numpad] [char "c"\|none] [dead]`, `keyup CHORD ...` | a key down and held (shift / ctrl / alt stay held for the following events; down again: an auto-repeat) and up again, with a scancode (`code N`: the key at USB HID usage N, `KeyEvent::code`), location and character for `ui.key_event_take` (the US layout's character for the key and its Shift; `char "c"` another layout's, `char none` none, `dead` a dead key) |
+| `motion DX DY` | raw motion of the pointer while the window holds the pointer lock a headless run plays (`ui.pointer_lock`, `ui.pointer_motion`; section 39); nothing without the lock |
 | `keys [N] CHORD...` | the chords N times over, queued for ONE pass of the window with the keyboard (more keys than frames, as a tool window hands them on) |
 | `type "text"` | typed text (`"\n"` presses Enter), a character per event; the whole quoted string, as long as a script line (16 KiB) |
 | `commit "text" [N]` | an input method commits the text (N times over: one long commit, as the platform queues it); the text as long as a script line |
@@ -5867,3 +5871,71 @@ Test it on the desktop: `system env jfgui_FORM phone` in a script (`apps/gallery
 `apps/androidGallery/tests/touch_phone.uis`), or a program started with `jfgui_FORM=phone` in a window
 of a phone's size. On Android a tablet comes from the emulator's `pixel_tablet` profile, a phone from the
 same emulator with `adb shell wm size 1080x2400` and `wm density 420`.
+
+
+## 39. Games: pointer lock, raw mouse motion, key positions
+
+A game that turns its camera with the mouse locks the pointer to its window: the pointer is hidden,
+stays where it is, and its motion comes raw, without the system's acceleration where the platform
+has it. `ui.pointer_lock(true)` asks for it for the window of the pass, `ui.pointer_lock(false)` lets
+it go; both answer the state (`ui::PointerLock`, the same as `plat::PointerLock`):
+
+| State | Meaning |
+| --- | --- |
+| `Off` | not locked: never asked, or let go (by the app, Esc, the focus going elsewhere, minimized, closed) |
+| `Pending` | asked, not granted yet: the window has no focus yet, the browser waits for the next press in the page, the Wayland compositor has not confirmed it |
+| `Locked` | locked: no cursor, `ui.pointer_motion()` has the motion |
+| `Unsupported` | the platform cannot: Android and iOS (touch controls come later), a Wayland compositor without `zwp_pointer_constraints_v1` or `zwp_relative_pointer_manager_v1`, an X server without XInput 2 |
+| `Refused` | the system said no: the browser's `pointerlockerror`, another X11 program holds a grab |
+
+`ui.pointer_lock_state()` says the state at any time; every change gives a pass. While locked,
+`ui.pointer_motion()` is the motion since the window's last pass, `(dx, dy)` as `f64`, right and down
+positive; a frame multiplies it by its sensitivity:
+
+```rust
+if ui.pointer_lock_state() == PointerLock::Locked {
+    let (dx, dy) = ui.pointer_motion();
+    self.yaw += dx * self.sens;
+    self.pitch = (self.pitch + dy * self.sens).clamp(-89.0, 89.0);
+} else if inp.pressed & (1 << BTN_LEFT) != 0 {
+    ui.pointer_lock(true); // "click to play": in the browser only a press may ask
+}
+```
+
+The lock always lets go: Esc (it then reaches the app as no key; in the browser Esc is the
+browser's), the window losing the focus, being minimized or closed, and `ui.pointer_lock(false)`.
+It never comes back by itself: after a release the app asks again, best from a press ("click to
+play"). A request while the window has no focus waits and takes effect when it gets it. One window
+holds the lock at a time. What the motion is, per platform:
+
+| Platform | How | Units of `pointer_motion` |
+| --- | --- | --- |
+| Windows | Raw Input (`WM_INPUT`), the cursor clipped to the window's middle (`ClipCursor`) and hidden; afterwards back where it was | the mouse's counts; an absolute device (remote desktop, tablet, some virtual machines) in pixels |
+| Linux, Wayland | `zwp_pointer_constraints_v1.lock_pointer`, `zwp_relative_pointer_v1` | unaccelerated (`dx_unaccel`; libinput: 1000 dpi counts) |
+| Linux, X11 | `XI_RawMotion` (XInput 2), a pointer grab confined to the window with no cursor; afterwards back where it was | the device's raw values; an absolute device in pixels |
+| macOS | `CGAssociateMouseAndMouseCursorPosition(false)`, the cursor hidden | the events' `deltaX` / `deltaY`: points, after the system's acceleration |
+| Browser | `requestPointerLock` on the canvas, with `unadjustedMovement` where the browser has it (Chrome on Windows and macOS) | `movementX` / `movementY`: raw with `unadjustedMovement`, else CSS pixels after acceleration |
+
+In the browser the page may only lock from a user's press: the host asks at once while the press
+that made the app ask is still recent (`navigator.userActivation`), else with the next press in the
+canvas, `Pending` until then. A game that drives its own window (its own swapchain, no `ui`) has the
+same at the window level: `plat::win_pointer_lock(w, on)`, `plat::win_pointer_lock_state(w)`,
+`plat::win_raw_motion_take(w)` and the events `E_POINTER_LOCK` (data 1: locked) and `E_RAW_MOTION`
+(motion waits; one event until it is taken).
+
+**Keys by where they sit.** A game binds WASD to the keys at those places, whatever the layout
+prints on them (Z Q S D on a French keyboard, W A S D on a German one): `KeyEvent::code` is the
+key's place as a USB HID usage, the same on every platform, `plat::KC_W` and so on; `scancode` stays
+the platform's own code (Windows' scan code, Linux's evdev code, the usage itself on macOS, iOS and
+in the browser), `vk` and `ch` what the layout makes of the key. `ui.key_code_down(KC_W)` says
+whether the key at W's place is held, as `ui.key_down(vk)` does for a key code; the downs and ups
+themselves a canvas with `HB_KEYS` takes with `ui.key_event_take()` (section 5). `plat::key_label(code)` gives what the current layout prints on
+the key for a settings page ("Z" for `KC_W` on a French keyboard; Windows, Linux and macOS, `None` in
+the browser and on phones), `plat::key_code_name(code)` the browser's `KeyboardEvent.code` name
+("KeyW"), `plat::key_code_from_name` the other way. Android's keys carry no place yet (`code` 0).
+
+Scripts play the lock in a headless run: `ui.pointer_lock(true)` locks at once, `motion DX DY` moves
+the locked pointer, `key esc` lets it go; `keydown CHORD code N` presses the key at usage N (this
+platform's scan code for it). `apps/inputtest` shows the lock, the summed motion and the keys by
+place; its `README.md` has the check list for trying it by hand on each platform, and
+`plattest --test input` checks the tables and the decoding of the raw records without real input.

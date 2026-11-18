@@ -36,6 +36,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   + k` in the main window as before, an id of its own hashed from area and window in any other.
   docs/GUIDE.md section 15.
 - `Ui::list_end_full(&mut sel) -> ListEnd { ev, sel, drop }`: the end of a list with a dropped row (LF_REORDER) as `drop = Some((from, to))`, for any number of rows.
+- (G7a) `KeyEvent::code`: where the key sits as a USB HID usage (`plat::KC_*`), whatever the layout prints on it; `ui.key_code_down(code)`; `ui.pointer_lock(on)`, `ui.pointer_lock_state()`, `ui.pointer_motion()` (the raw motion of the locked pointer for the pass) for the window of the pass, `ui::PointerLock`; a change of the lock and the motion give passes. Scripts: `motion DX DY` and `keydown CHORD code N`; a headless run plays the lock (locked at once, Esc lets it go). docs/GUIDE.md section 39
 
 ### Changed
 

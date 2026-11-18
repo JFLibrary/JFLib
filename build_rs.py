@@ -223,7 +223,7 @@ def run_cmd(cmd, quiet=False, env=None):
 def compute_crate(name):
     """crates whose speed matters in development builds too (opt-level 2; Kritzel draws with its
     own pixel loops)"""
-    return (name in ("gfx", "text", "simd", "fx", "Kritzel", "crypto", "compress", "cas", "spell")
+    return (name in ("gfx", "text", "simd", "fx", "Kritzel", "crypto", "compress", "cas", "spell", "physics")
             or name.startswith("img_"))
 
 
@@ -697,6 +697,24 @@ def kernel_lint(f, text):
     return [f"{f.relative_to(ROOT)}:{text.count(chr(10), 0, m.start()) + 1}: {why} (lib/rt/kernel.rs)" for m, why in found]
 
 
+def keycode_lint():
+    """(G7a) the browser host's KeyboardEvent.code table (CODES in web/loader.js) holds the rows of
+    lib/plat/keycode.rs (name -> USB HID usage) and its older Firefox names, nothing else -> problems"""
+    src = (ROOT / "lib/plat/keycode.rs").read_text(encoding="utf-8")
+    usage = {m.group(1): int(m.group(2), 16) for m in re.finditer(r"pub const (KC_\w+): u32 = 0x([0-9A-Fa-f]+);", src)}
+    want = {m.group(2): usage.get(m.group(1), -1) for m in re.finditer(r'r\((KC_\w+), [^"]*"(\w+)"\)', src)}
+    want.update({m.group(1): usage.get(m.group(2), -1) for m in re.finditer(r'"(\w+)" => (KC_\w+),', src)})
+    js = (ROOT / "web/loader.js").read_text(encoding="utf-8")
+    m = re.search(r"const CODES=\{([^}]*)\};", js)
+    if not m:
+        return ["web/loader.js: no CODES table (the key positions of lib/plat/keycode.rs)"]
+    have = {k: int(v) for k, v in re.findall(r"(\w+):(\d+)", m.group(1))}
+    if not want or have != want:
+        diff = sorted(set(have.items()) ^ set(want.items()))[:6]
+        return [f"web/loader.js: CODES differs from the rows of lib/plat/keycode.rs: {diff}"]
+    return []
+
+
 def kernel_table_lint():
     """both tables of lib/rt/kernel.rs name the same things (only x86-64 builds today, so the
     compiler would not tell) -> problems"""
@@ -809,7 +827,7 @@ def manifest_lint():
 
 def lint():
     """the rules of the module docstring -> list of problems"""
-    bad = kernel_table_lint()
+    bad = kernel_table_lint() + keycode_lint()
     libs = all_libs()
     roots = [(n, RS / r, "lib") for n, (r, _) in libs.items()] + \
             [(a, entrypoint(RS / "apps" / a, "app"), "app") for a in apps()] + \

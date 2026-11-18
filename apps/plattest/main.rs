@@ -102,6 +102,11 @@
 //   plattest --test keychar                (t_keychar.rs) the layout's character of a key event
 //                                          (plat::key_y): Windows the user's layouts through
 //                                          ToUnicodeEx (German, US), Linux the fallback keymap
+//   plattest --test input                  (t_input.rs, G7a) where keys sit (the tables of
+//                                          set 1, evdev, macOS and the browser's code names to
+//                                          USB HID usages), raw motion decoding (RAWINPUT, XI 2 raw
+//                                          events, Wayland fixed point), the pointer lock's shared
+//                                          state; Linux: Wayland and X11 with synthetic events
 //   plattest --test a11y-rich / uia-rich / a11y-rich-bus   (t_a11y_rich.rs) a web page's
 //                                          accessibility tree (apps/a11ytest's page): headless
 //                                          model, requests, live regions, the rich update format;
@@ -335,6 +340,8 @@ mod t_secret;
 mod t_settings;
 // the layout's character of a key event
 mod t_keychar;
+// (G7a) where keys sit, raw motion, the pointer lock
+mod t_input;
 mod t_tray;
 // the desktop integration: keeping awake, autostart, the taskbar button
 #[cfg(not(target_os = "android"))]
@@ -556,6 +563,7 @@ fn plattest() -> i32 {
         Some("life-bus") => t_life::t_life_bus,        // Linux: against tools/platshared/life_bus.py
         Some("settings") => t_settings::t_settings,    // the system settings: overrides, defaults
         Some("keychar") => t_keychar::t_keychar,       // the layout's character of a key event
+        Some("input") => t_input::t_input,             // (G7a) key positions, raw motion, the pointer lock
         Some("settings-bus") => t_settings::t_settings_bus, // Linux: against tools/platshared/settings_bus.py
         Some("settings-bus-files") => t_settings::t_settings_bus_files, // Linux: the same, a portal without appearance keys
         Some("a11y-rich") => t_a11y_rich::t_a11y_rich, // a web page's accessibility tree, headless

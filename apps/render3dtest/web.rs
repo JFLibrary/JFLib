@@ -48,8 +48,9 @@ fn hex_line(name: &str, bytes: &[u8]) -> String {
 }
 
 /// (G5e2) the gallery's images drawn into an sRGB target too (tests/engine_web.mjs: against `--dump --format rgba8srgb`)
-const SRGB_TARGET: [(&str, &str); 8] = [("mix", "srgb_mix"), ("tex", "srgb_tex"), ("gltf", "srgb_gltf"), ("pbr", "srgb_pbr"), ("shadow", "srgb_shadow"),
-                                        ("lights", "srgb_lights"), ("env", "srgb_env"), ("occl", "srgb_occl")];
+const SRGB_TARGET: [(&str, &str); 11] = [("mix", "srgb_mix"), ("tex", "srgb_tex"), ("gltf", "srgb_gltf"), ("pbr", "srgb_pbr"), ("shadow", "srgb_shadow"),
+                                         ("lights", "srgb_lights"), ("env", "srgb_env"), ("occl", "srgb_occl"), ("sides", "srgb_sides"), ("blend", "srgb_blend"),
+                                         ("churn", "srgb_churn")];
 /// (G5e2) and with the shader's sRGB in Rgba8Unorm (against `--dump --format rgba8`), with their float images
 const ENCODED: [(&str, &str, &str); 8] = [("mix", "enc_mix", "f_mix"), ("tex", "enc_tex", "f_tex"), ("gltf", "enc_gltf", "f_gltf"), ("pbr", "enc_pbr", "f_pbr"),
                                          ("shadow", "enc_shadow", "f_shadow"), ("lights", "enc_lights", "f_lights"), ("env", "enc_env", "f_env"),
@@ -149,8 +150,8 @@ impl Probe {
             self.scenes.push(s);
             self.more.push(r);
         }
-        // G5c
-        for name in LATER {
+        // G5c; (G7f) double-sided, blended, after removals
+        for &name in LATER.iter().chain(G7F.iter()) {
             let mut r = Renderer::new(dev, &linear_desc(Format::Rgba8Unorm))?;
             let mut s = later_gallery_in(name, &mut r, Format::Rgba8Unorm)?;
             let mut off = Off::new(dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm)?;

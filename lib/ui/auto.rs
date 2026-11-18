@@ -854,12 +854,13 @@ impl Ui {
                 }
             }
         }
-        const CMDS: [&str; 58] = [
+        const CMDS: [&str; 59] = [
             "a11y", "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
             "key", "keys", "keydown", "keyup", "type", "commit", "preedit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
             "movewin", "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop",
             "clip", "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
             "style", "sensor", "location", "tap", "longpress", "swipe", "flick", "finger", "pinch", "pan2", "gpu",
+            "motion",
         ];
         let Some(&c) = CMDS.iter().find(|c| word_eq(l, c).is_some()) else {
             let mut o = alloc::format!("error: line {}: unknown command: ", self.sc.lineno).into_bytes();
@@ -983,6 +984,7 @@ impl Ui {
             }
             "drag" => self.sc_drag(app, a),
             "wheel" => self.sc_wheel(app, a),
+            "motion" => self.sc_motion(app, a),
             "tap" => self.sc_tap(app, a, 0),
             "longpress" => self.sc_tap(app, a, 600),
             "swipe" => self.sc_swipe(app, a),
@@ -1847,6 +1849,21 @@ impl Ui {
         self.sc.finger_id = 0;
     }
 
+    // (G7a) motion DX DY: raw motion of the pointer while the window that holds the played pointer
+    // lock has it (ui.pointer_lock in a headless run; ui.pointer_motion); nothing while none does,
+    // as a platform drops the motion of a pointer that is not locked
+    fn sc_motion(&mut self, app: &mut dyn App, a: &[u8]) {
+        let (dx, r) = parse_int(skip_ws(a));
+        let (dy, _) = parse_int(skip_ws(r));
+        let w = self.plock_sim.0;
+        if w < 0 || !self.plock_sim_motion(w as u32, dx as f64, dy as f64) {
+            return;
+        }
+        let ev = Event { typ: plat::E_RAW_MOTION, btn: 0, mods: self.sc.script_mods as u8, win: (w as u32 & (WIN_MAX as u32 - 1)) as u8, x: 0, y: 0, data: 0 };
+        plat::evq_push(ev);
+        self.process_events(app);
+    }
+
     // wheel S DY [DX] [fine|pixels] [shift|ctrl|alt]...: the words hold those modifiers during
     // the wheel event (not during the move to S); fine: the 120 per notch of a device in fine
     // steps (plat::WHEEL_FINE, a precision touchpad on Windows), pixels: DY and DX are DIP of a
@@ -2003,9 +2020,10 @@ impl Ui {
         self.sc.script_mods = held;
     }
 
-    // (E2) keydown / keyup CHORD [scan N] [left|right|numpad] [char "c"|none] [dead]: one key
-    // down (an auto-repeat when it is down already) or up; shift / ctrl / alt stay held between
-    // their keydown and keyup.  The key's character (KeyEvent::ch) is the US layout's for it and
+    // (E2) keydown / keyup CHORD [scan N | code N] [left|right|numpad] [char "c"|none] [dead]: one
+    // key down (an auto-repeat when it is down already) or up; shift / ctrl / alt stay held between
+    // their keydown and keyup.  scan N: the platform's code as it is (Event::x); (G7a) code N: the
+    // key's place as a USB HID usage (KeyEvent::code), this platform's scan code for it.  The key's character (KeyEvent::ch) is the US layout's for it and
     // Shift, char "c" another layout's (a German keyboard's Ctrl++: keydown ctrl++ char "+"),
     // char none none; dead: a dead key
     fn sc_keyraw(&mut self, app: &mut dyn App, a: &[u8], down: bool) {
@@ -2020,6 +2038,12 @@ impl Ui {
             if let Some(r) = word_eq(q, "scan") {
                 let (n, r) = parse_int(skip_ws(r));
                 scan = n;
+                q = skip_ws(r);
+                continue;
+            }
+            if let Some(r) = word_eq(q, "code") {
+                let (n, r) = parse_int(skip_ws(r));
+                scan = plat::key_scancode(n as u32) as i32;
                 q = skip_ws(r);
                 continue;
             }

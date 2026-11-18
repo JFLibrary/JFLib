@@ -8,10 +8,20 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- Removing meshes, materials and textures (G7f): `Renderer::remove_mesh`, `remove_material`, `remove_texture`; their places, vertex and index ranges and texture layers are used again, the ids of removed ones stay invalid (ids carry a generation in their high 8 bits; a renderer that removes nothing numbers 0, 1, 2 as before); refused while a scene's instances, a material or another mesh's detail levels use them, and a scene prepared before a removal does not record; `mesh_count`, `material_count`, `pool_use`. docs/RENDER3D.md section Entfernen
+- Double-sided materials and glTF's BLEND (G7f): `MaterialDesc` (`#[non_exhaustive]`: `blend`, `double_sided`) with `Renderer::add_material_desc`, `set_material_desc`, `double_sided`; `AlphaClass::Blend`. Double-sided lists are drawn without culling, back faces lit with the shading normal turned round (`Scene::list_kinds`, `ListKind`); blended instances go into one list per frame, sorted back to front per instance on the GPU (sort.wgsl) and drawn by one indirect draw after the rest with premultiplied alpha, the depth tested and not written, without shadows and outside the occlusion test's pyramid (`Scene::blend_buffer`, `blend_drawn`). `gltf::upload` draws BLEND and doubleSided as the file says. docs/RENDER3D.md sections Doppelseitige Materialien, Durchsichtiges
+
+### Changed
+
+- The camera's culling without the occlusion test and the shadow cascades claim the places of their lists in four turns by list: lists that share warps (opaque and MASK instances of a mesh, a few meshes in turn) no longer cost an atomicAdd per instance (10 % MASK: 0.145 to 0.067 ms for 1 million cubes). docs/RENDER3D.md section Zähler der Listen
+
 ### Fixed
 
 - Textures taller than wide are resampled columns first: rows first held height x size floats (a 1 x 32768 texture: 1 GiB for 128 KB of texels).
 - `Scene`: a buffer that could not be made while growing makes every capacity start again at the next frame (the raised ones no longer fit the buffers); `wait_slot` after a timeout waits again at the next call (it went on writing into a slot the GPU still used).
+- A scene whose draw records grew without its list_first (once detail levels had made that grow first) drew nothing: the culling counted into the old records
 
 ## [0.2.1] - 2026-11-16
 

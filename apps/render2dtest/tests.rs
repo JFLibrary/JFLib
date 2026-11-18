@@ -704,15 +704,27 @@ fn layers_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
 /// workgroups (Metal, WebGPU, many phones): 4.5 million hairlines in 300 layers (more than 256 runs: the scatter shader,
 /// not copies), all going up with the first frame; the pieces must all be written.  The GPU against the CPU path at the
 /// first and the last layer (the first and the last changes).  Before G6e3 Metal refused the frame ("dispatch: too many
-/// workgroups"); on Vulkan with 2^31 workgroups it is one piece, as before
+/// workgroups"); on Vulkan with 2^31 workgroups it is one piece, as before.  A device whose storage bindings end at
+/// 128 MiB (Mesa's Dozen under WSL, WebGPU's default limit) holds 2 097 152 records of 64 bytes in its pool
+/// (Renderer::max_records, beyond it prepare says Unsupported): there the 300 layers take fewer lines each, as many as
+/// the pool holds, and the change buffer's binding (80 bytes a change) cuts a dispatch's piece before the pool ends,
+/// so the frame still goes up in pieces
 fn bigscatter(t: &mut T) {
     let Some(g) = setup(t) else { return };
     let Some(dev) = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "device") else { return };
     let Some(mut r) = t.res(Renderer::new(&dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new") else { return };
     let lim = dev.limits();
-    out(&format!("  (the device: {} workgroups a dispatch, storage bindings to {} MiB)", lim.max_compute_workgroups[0], lim.max_storage_binding >> 20));
+    out(&format!("  (the device: {} workgroups a dispatch, storage bindings to {} MiB, {} records a pool)", lim.max_compute_workgroups[0], lim.max_storage_binding >> 20, r.max_records()));
     let Some(mut s) = t.res(Scene::new(&r), "Scene::new") else { return };
-    let (layers, per) = (300usize, 15_000usize);
+    // (300 layers: 300 runs, the scatter shader's (copies up to 256); a layer holds whole pages of the pool on its first
+    // layout, so as many lines as the pool's pages hold, at most 15 000, and half a page short: layers that fill their
+    // pages lie next to each other and make one run)
+    let layers = 300usize;
+    let page = render2d::PAGE as usize;
+    let per = 15_000usize.min((r.max_records() as usize / layers / page * page).saturating_sub(page / 2));
+    if !t.ok(per >= 1000, &format!("bigscatter: {layers} layers of {per} lines fit this device's pool")) {
+        return;
+    }
     let t0 = plat::time_us();
     for k in 0..layers {
         let Some(lay) = t.res(s.add_layer(&Layer::new(k as i32)), "add_layer") else { return };
@@ -735,8 +747,14 @@ fn bigscatter(t: &mut T) {
     }
     let Some(img0) = shot(t, &dev, &mut off, &mut r, &mut s, "bigscatter, the first frame") else { return };
     let up = s.upload_info();
-    let chunk = lim.max_compute_workgroups[0] as u64 * 64;
-    t.ok(up.scatter && up.records as usize >= layers * per, &format!("the first frame sent {} records in {} runs by the scatter shader ({}): {} piece(s) of at most {chunk} for this device's dispatch",
+    // (what one dispatch takes, as render2d's scatter_chunk: workgroups of 64, the change buffer's binding at 80 bytes a
+    // change, each piece's bytes a multiple of the binding offsets' alignment)
+    let align = (lim.min_storage_offset_alignment as u64).max(1);
+    let mut chunk = (lim.max_compute_workgroups[0] as u64 * 64).min(lim.max_storage_binding as u64 / 80).min(u32::MAX as u64 / 2).max(1);
+    while chunk > 1 && (chunk * 80) % align != 0 {
+        chunk -= 1;
+    }
+    t.ok(up.scatter && up.records as usize >= layers * per, &format!("the first frame sent {} records in {} runs by the scatter shader ({}): {} piece(s) of at most {chunk} for this device's dispatch and binding",
                                                                      up.records, up.runs, up.scatter, (up.records as u64).div_ceil(chunk)));
     let last = Camera::new([20.0, (layers - 1) as f64 * 10.0 + 4.0], 0.05);
     for (what, cam, img) in [("the first layer (the first changes)", first, Some(img0)), ("the last layer (the last changes)", last, None)] {

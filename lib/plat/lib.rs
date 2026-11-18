@@ -80,6 +80,9 @@
 //            signals, the stderr line of ASMLIB) and panics; crash_test() crashes on purpose
 //   windows: the window-indexed API of the assembly (win_create / win_show / win_present /
 //            wait ..., popups, clipboard, drops, pen, cursors; consts.rs, evq.rs, pwin0.rs)
+//   input:   (G7a) win_pointer_lock / win_pointer_lock_state / win_raw_motion_take: the pointer
+//            locked to a window, hidden, its raw relative motion (plock.rs); KC_* key_code /
+//            key_label: where a key sits as a USB HID usage on every platform (keycode.rs)
 //   dnd:     drag and drop between programs: DragData (files, text, URLs, HTML, image),
 //            the drop target hook, the pending drop, drag_start (dragging out)    (dnd.rs)
 //   (plat-shared) print(job) + page layout / PDF writer (print.rs; win_print.rs,
@@ -376,6 +379,13 @@ mod ui_only;
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 mod cursor_art;
 mod evq;
+// (G7a) where a key sits: USB HID usages on every platform, the tables of the platforms' codes
+mod keycode;
+pub use keycode::*;
+// (G7a) the pointer lock and the raw relative motion (the shared part; win_plock.rs,
+// linux_wl_lock.rs, linux_x11_lock.rs, apple_mac.rs, web_windows.rs)
+mod plock;
+pub use plock::*;
 mod ime;
 pub use ime::*;
 #[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), path = "web_icc.rs")]

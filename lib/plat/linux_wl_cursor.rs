@@ -137,6 +137,12 @@ impl Wl {
         let mut shape = self.win[wi].cursor;
         self.cur.shape = shape;
         let serial = self.inp.enter_serial;
+        if self.lock_hides(wi) {
+            // (G7a) the locked pointer has no cursor
+            self.w.send(ptr, &POINTER_SET_CURSOR, &[A::U(serial), A::O(0), A::I(0), A::I(0)]);
+            self.w.flush();
+            return;
+        }
         let k = shape.wrapping_sub(CUR_USER0);
         if k < CUR_USER_MAX {
             let c = self.cur.cust[k as usize];

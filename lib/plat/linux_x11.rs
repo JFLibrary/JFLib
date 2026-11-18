@@ -50,6 +50,9 @@ mod dnd;
 mod gpu;
 #[path = "linux_x11_input.rs"]
 mod input;
+// (G7a) the pointer lock (plock.rs)
+#[path = "linux_x11_lock.rs"]
+mod lock;
 #[path = "linux_x11_misc.rs"]
 mod misc;
 #[path = "linux_x11_present.rs"]
@@ -545,6 +548,8 @@ struct X11 {
     sc_pick: screen::Pick,
     sc_changed: bool,
     sc_xt_op: u32,
+    // ---- (G7a) the pointer lock (linux_x11_lock.rs)
+    lk: lock::XLock,
     #[cfg(jfgui_glibc)]
     g: gpu::XGpu,         // DRI3, Present (linux_x11_gpu.rs)
 }
@@ -725,6 +730,7 @@ impl X11 {
             sc_pick: screen::Pick::default(),
             sc_changed: false,
             sc_xt_op: 0,
+            lk: Default::default(),
             #[cfg(jfgui_glibc)]
             g: Default::default(),
         }
@@ -877,6 +883,9 @@ impl Display for Backend {
     fn win_set_cursor(&mut self, w: i32, shape: u32) {
         with_x(|s| s.win_set_cursor(w, shape))
     }
+    fn pointer_lock(&mut self, w: i32, on: bool) -> crate::PointerLock {
+        with_x(|s| s.pointer_lock(w, on))
+    }
     fn set_refresh(&mut self, f: Option<fn()>) {
         // X11 delivers ConfigureNotify to the normal event loop: stored only
         with_x(|s| s.refresh = f)
@@ -948,6 +957,12 @@ pub mod x11t {
             let mut p = pkt.to_vec();
             s.event(&mut p);
         })
+    }
+
+    /// (G7a, plattest --test input) play the pointer lock of window w without a server: held
+    /// (on) or not; absolute devices (id, range of valuator 0, of valuator 1) for its raw events
+    pub fn lock_setup(w: i32, on: bool, abs: &[(u16, [i32; 2], [i32; 2])]) {
+        with_x(|s| super::lock::lock_test(s, w, on, abs))
     }
 
     /// XInput 2 without a server: its major opcode and the valuator label atoms ("Abs
