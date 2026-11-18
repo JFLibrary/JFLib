@@ -140,8 +140,8 @@ fn timing(r: &run::Run, a: Option<&run::Analysis>, render_us: u64, export_us: u6
     ])
 }
 
-/// whether DIR's report is of this key with these options and every file is there
-fn cached(dir: &str, src: &str, params: &[(String, String)], o: &Options) -> Option<(bool, String)> {
+/// whether DIR's report is of this key with these options and every file is there: (ok, its findings)
+fn cached(dir: &str, src: &str, params: &[(String, String)], o: &Options) -> Option<(bool, Vec<String>)> {
     let text = plat::read_file(&format!("{dir}report.json"))?;
     let big = usize::MAX / 2;
     let limits = agent_core::json::Limits { bytes: big, depth: 32, values: big, string_bytes: big, members: big };
@@ -171,7 +171,8 @@ fn cached(dir: &str, src: &str, params: &[(String, String)], o: &Options) -> Opt
     if names.iter().any(|n| plat::file_exists(&format!("{dir}{n}")) != 1) {
         return None;
     }
-    Some((v.get("ok")?.as_bool()?, String::from_utf8(text).ok()?))
+    let findings = v.get("findings")?.as_array()?.iter().filter_map(|f| f.as_str().map(String::from)).collect();
+    Some((v.get("ok")?.as_bool()?, findings))
 }
 
 /// build one script into `dir` (ending in "/"): report, glTF, pictures
@@ -373,10 +374,10 @@ fn run_main() -> i32 {
         None => format!("{}.out/", file.strip_suffix(".jfs").unwrap_or(&file)),
     };
     if !o.force {
-        if let Some((ok, text)) = cached(&dir, &src, &params, &o) {
-            out(&format!("{}: unverändert seit dem letzten Lauf (Schlüssel im Bericht), nicht neu gebaut\n", file));
-            for l in text.lines().filter(|l| l.starts_with("  \"findings\"")) {
-                out(&format!("{}\n", l.trim()));
+        if let Some((ok, findings)) = cached(&dir, &src, &params, &o) {
+            out(&format!("{}: {} - unverändert seit dem letzten Lauf (derselbe Schlüssel), nicht neu gebaut\n", file, if ok { "ok" } else { "PRÜFUNG FEHLGESCHLAGEN" }));
+            for f in &findings {
+                out(&format!("  FEHLER: {}\n", f));
             }
             out(&format!("  Bericht: {}report.json\n", dir));
             return if ok { 0 } else { 3 };
