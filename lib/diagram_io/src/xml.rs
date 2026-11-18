@@ -28,7 +28,7 @@ pub(crate) const NS_VISIO: &str = "http://schemas.microsoft.com/office/visio/201
 /// the namespace of r:id
 pub(crate) const NS_REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 /// the namespace of r:id in strict OOXML
-const NS_REL_STRICT: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
+pub(crate) const NS_REL_STRICT: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 const NS_XML: &str = "http://www.w3.org/XML/1998/namespace";
 const NS_XMLNS: &str = "http://www.w3.org/2000/xmlns/";
 /// the most namespace declarations in scope at a time (a name is looked up through them)

@@ -40,12 +40,16 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+mod build;
 mod corpus;
 mod drawings;
+mod dump;
 mod formulas;
 mod hostile;
+mod hostile_write;
 mod pkg;
 mod render;
+mod roundtrip;
 mod samples;
 mod svgdump;
 mod zipkit;
@@ -106,6 +110,9 @@ fn run() -> i32 {
         let width = arg(&args, "--width").and_then(|w| w.parse().ok()).unwrap_or(2000);
         return render::render_corpus(&dir, arg(&args, "--corpus"), width);
     }
+    if let Some(dir) = arg(&args, "--write-probe") {
+        return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
+    }
     let check = args.iter().any(|a| a == "--check");
     let corpus_dir = arg(&args, "--corpus");
     if !check && corpus_dir.is_none() {
@@ -122,6 +129,7 @@ fn run() -> i32 {
         if h.on("render") {
             render::run(&mut h);
         }
+        roundtrip::run(&mut h, corpus_dir.as_deref());
     }
     if h.on("corpus") {
         corpus::run(&mut h, corpus_dir.clone());

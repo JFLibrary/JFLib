@@ -107,7 +107,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
   <br>[src/cell.rs](#diagram_coresrccellrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/shape.rs](#diagram_coresrcshapers) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
-  <br>[src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
+  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs (Linux)](#rtkernelrs-linux) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
@@ -54885,11 +54885,15 @@ format follows the public specification [MS-VSDX]; no code of other implementati
                       connects, masters, themes (raw), windows.xml, properties, media,
                       comments and data recordsets (kept as parts); unknown items in the
                       Extras where they stood (DF-03); nothing recomputed or rerouted
+  vsdx::write(&doc, &vsdx::WriteOptions::DEFAULT) -> Result<Vec<u8>, vsdx::WriteError>
+                      the model as a file of any of the six formats, with everything it does
+                      not know where it stood; deterministic, DEFLATE; a file read and written
+                      unchanged reads back as the same model
+  vsdx::new_document(kind, Measure::Metric)   a new drawing, template or stencil with JFLib's
+                      own styles, document sheet and DrawingML theme "NetLab"
   vsdx::Format        the six formats by main content type or extension
 
 What is to come here, by stage of the plan:
-  JD5   writing the model back with everything it does not know; new documents with the own
-        default theme; .vssx stencils
   JD12  exports: SVG, PNG and PDF through the library's writers
   later the XML formats of 2003-2010 (.vdx, .vsx) and importing the binary .vss / .vsd
 
@@ -54899,15 +54903,57 @@ rule is an error and never a panic, external links are kept as data and never fo
 nothing in a file is ever run (the macro project of a .vsdm is kept as bytes).
 ```
 
+### `diagram_io/src/blank.rs`
+
+Source: [`lib/diagram_io/src/blank.rs`](../lib/diagram_io/src/blank.rs)
+
+```text
+blank -- new documents from scratch: drawing, template, stencil (vsdx::new_document)
+
+Everything here is JFLib's own: the style sheets and the document sheet hold values chosen
+for the NetLab look, the theme is the own DrawingML theme "NetLab" (theme.rs); nothing comes
+from Visio's files.  What a file needs so that Visio opens it follows the public [MS-VSDX]:
+the document part with its root style sheet ID 0 "No Style" (every other style inherits from
+it), Colors and FaceNames with at least one entry each, a Pages part with one page whose
+PageSheet is there (a drawing's and template's page has its own part, a stencil's none), the
+theme part named by the document part, the document properties (optional, written with the
+application's name only: no user data).  And windows.xml: [MS-VSDX] calls the windows part
+unused, but desktop Visio refuses a file without it (error 271, found with the user's Visio
+on 2026-11-17); an empty Windows element with the client size is enough (windows_xml).
+
+The styles (IDs as Visio's own documents number them, universal names as Visio knows them,
+so that formulas and Visio's connector detection find them):
+  0 No Style   the root: every line, fill, text block, character and paragraph cell with a
+               plain value (anthracite 0.75 pt line, white fill, Inter 10 pt, centred text)
+  1 Normal     based on No Style: the NetLab shape look (Signalblau 1 pt line, light blue fill)
+  2 Connector  based on Normal: grey 1 pt line, no fill, white text background
+  3 Guide      based on No Style: thin light blue dashed line, no fill
+  4 Text Only  based on Normal: no line, no fill
+DocumentSettings name Normal as the default text, line and fill style and Guide as the
+default guide style.  The page is A4 (metric, millimetres) or Letter (US, inches), landscape.
+```
+
+- **`enum Measure`**
+  the measuring system of a new document (FEATURES LG-07, MS-07)
+  - `Metric` -- millimetres, A4
+  - `Us` -- inches, Letter
+
+- **`fn new_document(kind: DocKind, measure: Measure) -> Document`**
+  a new document of this kind with JFLib's own defaults (see the module comment); a stencil
+  has no masters yet, a drawing and a template one empty page
+
 ### `diagram_io/src/vsdx.rs`
 
 Source: [`lib/diagram_io/src/vsdx.rs`](../lib/diagram_io/src/vsdx.rs)
 
 ```text
-vsdx -- reading the VSDX family (.vsdx .vsdm .vstx .vstm .vssx .vssm) into diagram_core's model
+vsdx -- the VSDX family (.vsdx .vsdm .vstx .vstm .vssx .vssm) and diagram_core's model
 
   vsdx::read(&bytes, &Limits::VSDX) -> Result<Loaded, Error>
   Loaded { doc, format, warnings, more_warnings }
+  vsdx::write(&doc, &WriteOptions::DEFAULT) -> Result<Vec<u8>, WriteError>
+  WriteOptions { format, level, zip }    another format (EX-11), the DEFLATE level, ZIP bounds
+  vsdx::new_document(kind, Measure)      a new drawing, template or stencil (blank.rs)
   Format::from_content_type(ct) / from_extension("vsdx") / extension() / content_type()
   Limits::VSDX                 the bounds of a file: ZIP (archive::Limits), XML nesting and
                                attributes, counts of shapes, cells, rows and sections, the
@@ -54934,6 +54980,22 @@ values of the file, connectors are not rerouted, Cell::stale stays false.
 The macro project of a macro-enabled file (vbaProject.bin and its relationship) is kept as a
 part and never run; Document::macros says the file has the right for one.  A file whose main
 content type is not macro-enabled but that carries a macro project is refused (Error::Macros).
+
+Writing (pack.rs names the parts and keeps the relationships, write.rs makes the XML) puts
+every part of the model back: document.xml, pages.xml and masters.xml with their parts, the
+themes and every part kept as bytes (unknown packages pass through), the unknown items of
+every element at their place, the relationships with their ids (raw XML may name them), the
+main part's relationship of Visio's own type, deleted subshapes with ID 4294967295, children
+in [MS-VSDX]'s order, numbers in the shortest form that reads back the same.  The same model
+always gives the same bytes, and a file read and written again reads as the same model and
+writes the same bytes once more.  A document without windows.xml gets one of its own: desktop
+Visio refuses a file without it (error 271), although [MS-VSDX] calls the part unused.  A
+macro project is written back unchanged into a format
+that may carry it (never run); into one that may not it is WriteError::Macros.  The writer
+does not compute anything either: a cell whose formula changed (Cell::stale) keeps the value
+it has until the formula engine sets one.  It does not recurse and never panics; XML the
+model only holds as written must be well-formed where it stands, or the part is refused
+(WriteError::Xml) rather than written broken.
 
 Every file is untrusted input.  The ZIP and OPC rules come from archive::opc (names, content
 types, relationships, sizes, the ratio of compressed parts); this module adds the XML bounds,
@@ -55020,6 +55082,36 @@ never stack.
   - `format: Format` -- which of the six formats the main content type says
   - `warnings: Vec<Warning>` -- what was odd, at most Limits::warnings of them
   - `more_warnings: usize` -- how many warnings more there were
+
+- **`struct WriteOptions`**
+  how vsdx::write writes a file
+  - `format: Option<Format>` -- the format to write; None: the document's own (Document::kind, Document::macros).  A
+    drawing can be written as a template and the other way round (EX-11); the content stays
+    as it is, only the main part's content type changes
+  - `level: u8` -- DEFLATE level 1 (fastest) to 9 (smallest), 0: stored; 6 by default
+  - `zip: archive::Limits` -- the bounds of the ZIP container written (Limits::VSDX.zip by default): a document that
+    needs more is refused instead of written into a file the reader would refuse
+
+**`impl WriteOptions`**
+
+- **`const DEFAULT: WriteOptions = WriteOptions { format: None, level: 6, zip: Limits::VSDX. ...`**
+  the document's own format, DEFLATE level 6, the reader's ZIP bounds
+
+- **`enum WriteError`**
+  why a document could not be written
+  - `Package(opc::Error)` -- the package: a part name or content type OPC does not take, a part too large for
+    WriteOptions::zip, more parts than it allows (archive::opc)
+  - `Macros` -- the document carries a macro project (vbaProject.bin and its relationship) and the format
+    may not: write it as .vsdm, .vstm or .vssm, or take the project out of Document::parts
+  - `Part { part: String, what: &'static str, }` -- a part the model keeps as bytes (Document::parts) has a name that is no valid part name
+    or that another part has, or no content type
+  - `Xml { part: String, line: u32, }` -- XML the model holds as written (unknown elements in the extras, unknown text marks,
+    trigger contents) does not fit where it stands: the part would not be well-formed
+
+- **`fn write(doc: &Document, options: &WriteOptions) -> Result<Vec<u8>, WriteError>`**
+  write a document as a file of the VSDX family (see the module comment); the same document
+  always gives the same bytes, and a document read from a file and written unchanged reads
+  back as the same model
 
 - **`fn read(bytes: &[u8], limits: &Limits) -> Result<Loaded, Error>`**
   read a file of the VSDX family; `limits` bound everything (Limits::VSDX for real files)

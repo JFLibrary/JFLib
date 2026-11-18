@@ -30,5 +30,29 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
     formula and text length; an XML reader of its own without recursion (mixed content, no
     DOCTYPE, no entities); cycles of styles, masters and background pages are `Error::Cycle`;
     references that name nothing are kept and reported (`Warning`)
+- Writing the VSDX family (stage JD5): `vsdx::write(&doc, &WriteOptions)` writes a
+  `diagram_core::Document` as any of the six files (`WriteOptions::format`: a drawing as a
+  template and so on, EX-11; the DEFLATE level; the ZIP bounds, `Limits::VSDX.zip` by default):
+  - document.xml, pages.xml, masters.xml and their parts, the themes and every part kept as
+    bytes (unknown packages pass through)
+  - the unknown attributes, elements and text of every element at their place; every
+    relationship with its id (new ones `rIdN`, the main part's of Visio's own type); deleted
+    subshapes with ID 4294967295; children in [MS-VSDX]'s order; numbers in the shortest form
+    that reads back the same
+  - deterministic: a file read and written unchanged reads back as the same model and writes
+    the same bytes again
+  - a document without `windows.xml` gets one of its own: desktop Visio refuses a file without
+    it (error 271), although [MS-VSDX] calls the part unused
+  - the macro project of a `.vsdm`, `.vstm` or `.vssm` goes back unchanged and is never run;
+    into a format without macros it is `WriteError::Macros`
+  - no recursion, no panic: a part kept as bytes without a valid name or content type is
+    `WriteError::Part`, raw XML from the model that is not well-formed where it stands
+    `WriteError::Xml`
+- New documents of JFLib's own (decision V3): `vsdx::new_document(kind, Measure::Metric |
+  Measure::Us)` makes a drawing, template or stencil with own styles (No Style, Normal,
+  Connector, Guide, Text Only in NetLab colours and Inter), the document sheet, the 24 colour
+  indexes [MS-VSDX] fixes, one page (A4 or Letter landscape; a stencil's without contents), an
+  empty `windows.xml` and the own DrawingML theme "NetLab" from the NetLab style's palette;
+  nothing comes from Visio's files
 
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD

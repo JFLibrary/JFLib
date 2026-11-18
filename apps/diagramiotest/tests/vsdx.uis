@@ -1,5 +1,6 @@
 #!args --check
 # diagramiotest is a console program: --check runs every group (src/main.rs: samples, xml, limits,
-# refs, rels, zip, and corpus when apps/JFDiagrammer/context/files is found above the current
-# folder, else it is skipped) and ignores the script (build_rs.py test passes --script); a failing
-# check exits with code 1
+# refs, rels, zip, roundtrip/samples, roundtrip/new, roundtrip/hostile, and corpus and
+# roundtrip/corpus when apps/JFDiagrammer/context/files is found above the current folder, else
+# they are skipped) and ignores the script (build_rs.py test passes --script); a failing check
+# exits with code 1
