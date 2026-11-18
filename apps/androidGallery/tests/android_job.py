@@ -2,7 +2,8 @@
 while the UI rests wakes it at once (docs/ANDROID.md, AN1; apps/androidGallery/jobtest.rs,
 lib/plat/android_thread.rs, android/bridge.c).
 
-    python apps/androidGallery/tests/android_job.py [--serial SERIAL] [--apk PATH] [--gpu 0|1] [--extra NAME=VALUE ...]
+    python apps/androidGallery/tests/android_job.py [--serial SERIAL] [--apk PATH] [--package NAME] [--gpu 0|1]
+                                                     [--extra NAME=VALUE ...]
                                                      [--max-gap-ms 150] [--max-over 2] [--min-rate 0.5]
                                                      [--max-wake-ms 100] [--rounds 1]
 
@@ -23,7 +24,8 @@ Also prints `dumpsys gfxinfo`'s janky frames of the run (frames through the GPU'
 among them).
 
 Without --apk it installs build/android/androidGallery-<ro.product.cpu.abi>-debug.apk when that exists;
-the APK must be a debug build (jfgui_* extras and run-as).  The phone is its owner's: this starts only
+the APK must be a debug build (jfgui_* extras and run-as).  On a phone whose gallery has another debug key:
+a build with jfgui_ANDROID_PACKAGE=NAME and --package NAME, beside it (tools/android.py).  The phone is its owner's: this starts only
 from the launcher or the gallery itself (exit code 1 otherwise); it injects no input.  The app is stopped
 at the end.  Exit code 0 when every round passes.  adb comes from ANDROID_SDK_ROOT / ANDROID_HOME /
 %LOCALAPPDATA%\\Android\\Sdk.
@@ -37,8 +39,6 @@ import sys
 import time
 from pathlib import Path
 
-PKG = "org.jflib.gallery"
-ACTIVITY = f"{PKG}/.GalleryActivity"
 STATE = "files/fs/data/androidGallery/job-state.txt"
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -58,6 +58,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--serial", help="adb device (default: the only one)")
     ap.add_argument("--apk", help="install this APK first (default: build/android/androidGallery-<abi>-debug.apk if it exists)")
+    ap.add_argument("--package", default="org.jflib.gallery", help="the APK's package (a test build: jfgui_ANDROID_PACKAGE)")
     ap.add_argument("--gpu", help="jfgui_GPU for the run (default: the app's own choice)")
     ap.add_argument("--extra", action="append", default=[], help="another jfgui_* extra of the start (jfgui_RENDER_PAR=0)")
     ap.add_argument("--max-gap-ms", type=int, default=150)
@@ -67,6 +68,8 @@ def main():
     ap.add_argument("--rounds", type=int, default=1)
     a = ap.parse_args()
     adb = [adb_path()] + (["-s", a.serial] if a.serial else [])
+    PKG = a.package
+    ACTIVITY = f"{PKG}/org.jflib.gallery.GalleryActivity"
 
     def run(*args, timeout=120):
         r = subprocess.run(adb + list(args), capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -92,7 +95,11 @@ def main():
     if a.apk or apk.is_file():
         if not apk.is_file():
             sys.exit(f"no APK {apk} (python build_rs.py app androidGallery --target android --android-abi {abi})")
-        print(run("install", "-r", str(apk), timeout=300).strip().splitlines()[-1], flush=True)
+        r = subprocess.run(adb + ["install", "-r", str(apk)], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=300)
+        print((r.stdout + r.stderr).strip().splitlines()[-1], flush=True)
+        if r.returncode != 0:
+            return 1  # (another debug key: see above)
         sh("am", "start", "-W", "-n", ACTIVITY)  # the first start after an install compiles: not measured
         time.sleep(4)
 

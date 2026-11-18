@@ -492,7 +492,10 @@ python apps/androidGallery/tests/android_job.py --serial SERIAL [--apk build/and
 
 Am 18.11.2026 auf dem x86_64-Emulator (API 35, 4 Kerne), je drei Runden: während des Jobs 53–63 Bilder/s
 (ohne Job 43–53), längste Lücke 63–82 ms (ohne Job 61–63 ms), Wecken nach Job-Ende 0–32 ms; im Bitmap-Weg
-(`--gpu 0`) Lücken bis 140 ms. Vorher liefen die Stücke zwischen den Bildern auf dem UI-Thread.
+(`--gpu 0`) Lücken bis 140 ms. Auf dem SM-A566B (Android 16, 8 Kerne; ein Test-Build unter eigenem Paket,
+`jfgui_ANDROID_PACKAGE=org.jflib.gallery.an1` und `--package`, weil die installierte Galerie einen anderen
+Debug-Schlüssel hat): während des Jobs 80 Bilder/s, keine Lücke über 27 ms, Wecken 3–22 ms, auf beiden Wegen.
+Vorher liefen die Stücke zwischen den Bildern auf dem UI-Thread.
 
 ## Regressionstest für Android-Eingabe und Leerlauf
 

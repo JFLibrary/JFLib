@@ -177,6 +177,8 @@
 //                                          outputs; the portals against a fake bus
 //                                          (tools/platshared/screen_bus.py); the permissions
 //   plattest --test all                    threads, files, ini, cpu
+//   plattest --test pool-bench             (t_poolbench.rs) parallel_for with 1 .. cpu_count + 1 threads:
+//                                          arithmetic and memory items (not in "all": timings; big.LITTLE)
 //   --repeat N                             run the selected tests N times (only failures are
 //                                          printed then) -- a stress loop for races
 //
@@ -218,6 +220,8 @@ mod t_a11y_rich;
 mod t_a11y_cost;
 mod t_async;
 mod t_atomics;
+// how parallel_for scales with the threads (big.LITTLE: how many workers)
+mod t_poolbench;
 // plat-win: the R4 tests of the Windows platform layer
 mod t_cursor;
 // the user's folders, the log folder and the trash
@@ -486,6 +490,7 @@ fn plattest() -> i32 {
     let test: fn(&mut T) = match args.value("--test") {
         Some("threads") => t_threads,
         Some("atomics") => t_atomics::t_atomics,  // ARM7: memory order under load (--secs N for long runs)
+        Some("pool-bench") => t_poolbench::t_poolbench, // parallel_for with 1 .. cpu_count + 1 threads (not in "all": timings)
         Some("files") => t_files,
         Some("kernel") => t_kernel::t_kernel,
         #[cfg(target_os = "android")]
