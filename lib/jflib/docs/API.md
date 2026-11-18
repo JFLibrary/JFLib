@@ -21459,8 +21459,9 @@ mtl_swap -- swapchains on Metal (AP6c, docs/APPLE.md): a CAMetalLayer on a plat 
   device.create_swapchain(&surface, &desc)   the layer gets the device, the format (BGRA8, sRGB
        when asked), framebufferOnly unless copy_src, three drawables, the window's size
   try_acquire() never waits: nextDrawable only while fewer drawables are in use than the layer
-       has (in use: taken and not yet on the screen, plus the one on the screen; the drawables'
-       presented handlers count what reached it); NotReady otherwise
+       has (in use: this swapchain's taken and not presented, the layer's presented and not yet
+       on the screen -- also those of an earlier swapchain on it --, plus the one on the screen;
+       the drawables' presented handlers count what reached it); NotReady otherwise
   present(frame, cmds)                   the last command buffer presents the drawable
 
 Present modes: Fifo only.  Without displaySyncEnabled a window on macOS still shows at the rate of
