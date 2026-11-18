@@ -17,6 +17,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Browser: `write_texture` checks that the region's bytes lie inside the data after the offset (only the offset was checked, and writeTexture read past the slice).
 - Metal: binding a Bindless table keeps what it holds retained while useResources reads it; the ids were taken under the table's lock and handed to Metal after it, so a set_* on another thread could free a texture first (a dangling pointer to Metal).
 - Metal: the swapchain's throttle counts per layer what was presented and what reached the screen, and per swapchain only what is taken and not presented; the layer's entry goes with its last surface. A new swapchain on a window's layer (after a lost one) did not see the old one's drawables on their way, so nextDrawable could block up to a second, and dropping a second surface reset the count, so the window drew about once a second.
+- Vulkan: a render pass that recorded no draw clears its clearing attachments once more at its end (vkCmdClearAttachments). On Intel's Windows driver (UHD 615, 31.0.101.2135) a pass that only cleared, after a global barrier earlier in the command buffer, was written after the copy behind it, so the copy read the image before (render3d's empty scene showed the frame before); the barriers are Vulkan's, with a draw in the pass it was right
 
 ## [0.2.1] - 2026-11-16
 

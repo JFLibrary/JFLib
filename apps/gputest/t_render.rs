@@ -4,7 +4,8 @@
 // 0.75 over the lower right, both counter-clockwise, drawn red first: with the depth test the
 // overlap stays red.  Probes in a 64 x 64 target: (12, 48) red only, (32, 48) the overlap (red),
 // (51, 48) green only, (32, 6) the clear colour (blue) -- a missing viewport flip, depth test
-// or a wrong front face changes one of them.
+// or a wrong front face changes one of them.  graphics also: a pass that only clears, after a barrier, three frames with
+// their own colours read back (clear_only).
 
 use alloc::format;
 use alloc::vec;
@@ -158,6 +159,38 @@ pub fn graphics(t: &mut T) {
             e.end_render();
             t.ok(matches!(e.finish(), Err(GpuError::Invalid(_))), "pipeline of another colour format: Invalid");
         }
+    }
+    clear_only(t, dev);
+}
+
+/// a pass that only clears (render3d's empty scene), after a fill and a global barrier earlier in the command buffer, then
+/// a copy of the image: three frames on one target, each with its own colour, the first from Undefined.  Intel's Windows
+/// driver (UHD 615, 31.0.101.2135) wrote such a pass after the copy (each frame read the one before) until end_render
+/// cleared once more in a pass without a draw
+fn clear_only(t: &mut T, dev: &Device) {
+    let Some(tg) = Target::new(t, dev) else { return };
+    let Some(buf) = storage(t, dev, 256, BufferUsage::NONE) else { return };
+    let colours = [[0.8f32, 0.2, 0.1, 1.0], [0.1, 0.6, 0.3, 1.0], [0.4, 0.1, 0.9, 1.0]];
+    for (k, c) in colours.iter().enumerate() {
+        let Some(mut e) = t.res(dev.encoder(), "encoder") else { return };
+        e.fill_buffer(&buf, 0, 256, k as u32);
+        e.barrier(Access::COPY_WRITE, Access::COMPUTE_READ | Access::GRAPHICS_READ | Access::COPY_READ);
+        let before = if k == 0 { Layout::Undefined } else { Layout::CopySrc };
+        e.begin_render(&RenderPassDesc {
+            color: &[ColorAttachment { view: tg.color.view(), load: Load::Clear, clear: *c, store: true, before, after: Layout::CopySrc }],
+            depth: Some(DepthAttachment { view: tg.depth.view(), load: Load::Clear, clear: 1.0, store: false,
+                                          before: if k == 0 { Layout::Undefined } else { Layout::DepthTarget }, after: Layout::DepthTarget }),
+        });
+        e.end_render();
+        tg.read_back(&mut e);
+        if run_wait(t, dev, e.finish(), "a pass that only clears").is_none() {
+            return;
+        }
+        let Some(p) = tg.pixels(t) else { return };
+        let want = c.map(|v| (v * 255.0 + 0.5) as u8);
+        let wrong = p.chunks(4).filter(|q| q.iter().zip(want.iter()).any(|(a, b)| a.abs_diff(*b) > 1)).count();
+        t.ok(wrong == 0, &format!("a pass that only clears, frame {k} (after a barrier, then copied): {:?} for {want:?}, {wrong} pixels other",
+                                  px(&p, SIZE * 4, 0, 0)));
     }
 }
 

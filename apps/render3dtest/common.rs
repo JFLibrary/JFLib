@@ -200,10 +200,15 @@ impl Off {
 
     /// one frame of the scene, with the image copied to the read-back
     pub fn submit(&mut self, r: &mut Renderer, s: &mut Scene) -> Result<SubmitId> {
+        self.submit_clear(r, s, CLEAR)
+    }
+
+    /// submit with another clear colour
+    pub fn submit_clear(&mut self, r: &mut Renderer, s: &mut Scene, clear: [f32; 4]) -> Result<SubmitId> {
         s.prepare(r)?;
         let dev = r.device().clone();
         let mut e = dev.encoder()?;
-        let color = ColorAttachment { view: self.color.view(), load: Load::Clear, clear: CLEAR, store: true,
+        let color = ColorAttachment { view: self.color.view(), load: Load::Clear, clear, store: true,
                                       before: if self.used { Layout::CopySrc } else { Layout::Undefined }, after: Layout::CopySrc };
         let depth = DepthAttachment { view: self.depth.view(), load: Load::Clear, clear: render3d::DEPTH_CLEAR, store: true,
                                       before: if self.used { Layout::Sampled } else { Layout::Undefined }, after: Layout::Sampled };
