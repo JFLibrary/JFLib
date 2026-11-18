@@ -1,8 +1,9 @@
 // geom -- the modelling kernel of the game engine (docs/GEOM.md, GAME.md stage G7g): indexed triangle meshes
 // built from primitives, profiles and operations, checked, the same bits on every target
 //
-//   Mesh           positions, normals, UV (f64) and indices; transformed, translated, rotated (degrees,
-//                  exact at multiples of 90), scaled, mirrored, flipped, merge, array, radial; flat,
+//   Mesh           positions, normals, UV (f64), indices and points (the topology: a hard edge does not
+//                  open a surface, touching parts stay apart); transformed, translated, rotated (degrees,
+//                  exact at multiples of 90), scaled, mirrored, flipped, merge, array, radial, weld; flat,
 //                  smooth (angle threshold), uv_box (box projection in metres); bounds, area, volume,
 //                  fingerprint; check() -> Report
 //   build          cuboid, cylinder, cone, sphere, torus, stairs, arch (standing on y = 0, centred over
