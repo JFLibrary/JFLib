@@ -1,6 +1,6 @@
 # Spiel-Engine: Plan für G7
 
-Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1, siehe dort). Die Zahl der Läufe je Stufe ist
+Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1, siehe dort; Stand 2026-11-18). Die Zahl der Läufe je Stufe ist
 geschätzt (ein Lauf ist eine Arbeitsrunde eines Agenten mit Durchsicht, wie bei G5 und G6).
 
 ## Ziel
@@ -121,10 +121,10 @@ anfassen:
 
 | Welle | Stufen | Warum so |
 | --- | --- | --- |
-| 1 | G7a, G7c, G7f | `plat` (Eingabe), `lib/physics`, `render3d`: keine gemeinsamen Dateien. G7a liegt auf dem längsten Weg (G7a → G7b → G7e → G7h). |
+| 1 | G7a, G7c, G7f (je Teil 1) | `plat` (Eingabe), `lib/physics`, `render3d`: keine gemeinsamen Dateien. G7a liegt auf dem längsten Weg (G7a → G7b → G7e → G7h). Fertig und gepusht am 18.11.2026. |
 | 2 | G7b, G7d, G7g | G7b braucht G7a; G7d fasst den Browser-Host in `plat` an, den in Welle 1 G7a ändert. |
-| 3 | G7e | braucht G7b und G7d. |
-| 4 | G7h | braucht alles davor. |
+| 3 | G7e, G7c Teil 2, G7f Teil 2 | G7e braucht G7b und G7d; der Controller (`lib/physics`) und `render3d` Teil 2 berühren `lib/game` nicht. |
+| 4 | G7a Teil 2, G7h | die Gamepads fassen den Browser-Host an wie G7d, deshalb nach Welle 2; Spiel 1 braucht alles davor, Gamepads nur als Zugabe. |
 
 ### Phase 1: Grundlagen und Spiel 1
 
@@ -149,6 +149,10 @@ anfassen:
   (Browser). Test-App `apps/inputtest` mit einer Checkliste für die Prüfung von Hand. Wayland kann nur von Hand
   geprüft werden: ein Compositor ohne Bildschirm hat keinen Zeiger und gewährt den Lock nicht. Offen: die Prüfung
   von Hand und Teil 2 (Gamepads).
+- Vom Nutzer entschieden am 18.11.2026 (Vorschläge nach Teil 1): Esc gehört dem Lock, die App sieht nur, dass er
+  endet (ein Spiel zeigt dann sein Pausenmenü); der Zeiger kommt unter Windows und X11 an die alte Stelle zurück wie
+  unter macOS und Wayland; der Klick, der den Lock auslöst, kommt bei der App als Klick an und `lib/game` übergeht
+  ihn (G7b); die Einheiten der Bewegung gleicht `lib/game` mit einem Faktor je Plattform aus (G7b).
 
 **G7b Spielkern und Spielfenster** (`lib/game`)
 
@@ -161,7 +165,10 @@ anfassen:
   Swapchain mit der UI als Textur über dem Bild. Die Stufe schlägt einen Weg vor; im Browser ein Canvas mit
   `requestAnimationFrame`.
 - Kamera-Steuerungen (Ego, Verfolger, frei), Eingabe-Aktionen mit Belegung, Empfindlichkeit und Invertieren, in den
-  Einstellungen gespeichert.
+  Einstellungen gespeichert. Die Belegung geht nach der Lage der Tasten (`KeyEvent::code`), die Anzeige nach
+  `key_label`. Die rohe Bewegung (`ui.pointer_motion`) bekommt einen Faktor je Plattform, damit dieselbe
+  Empfindlichkeit überall ähnlich dreht; der Klick, der den Pointer-Lock auslöst, löst keine Aktion aus (beides
+  entschieden am 18.11.2026).
 - Assets: glTF und Texturen über das VFS laden, im Hintergrund, mit Handles; Raumklang über den Mischer von
   `plat::audio` (Lautstärke und Panorama nach Entfernung und Richtung).
 - Brücke zu `render3d`: Entitäten mit Mesh ↔ Instanzen der Szene, nur Geändertes; der Ursprung folgt der Kamera.
