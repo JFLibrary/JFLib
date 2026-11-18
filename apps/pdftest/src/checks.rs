@@ -12,6 +12,11 @@
 //   text       glyph positions (kerning in TJ), y-down text, ToUnicode, fallback, modes
 //   links      URI and destination annotations, rectangles of turned links
 //   outlines   the outline tree: First / Last / Prev / Next / Parent / Count
+//   shadings   gradients: shading and function objects, stops sanitized, hard edges, alpha as ca
+//              or a luminosity soft mask in the right space, degenerate and invalid gradients
+//   hatches    hatch lines: positions, directions in both origins, state restored, alpha, solid
+//              and invalid hatches
+//   reader     reader.rs itself: damaged shadings, functions, soft masks and patterns refused
 //   errors     refusals and damaged input (never a panic)
 
 use alloc::collections::BTreeMap;
@@ -20,7 +25,7 @@ use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use pdf::{Dest, Document, Error, FillRule, Image, LineCap, LineJoin, Matrix, Origin, Rgb, TextMode};
+use pdf::{Dest, Document, Error, FillRule, Hatch, Image, LineCap, LineJoin, Matrix, Origin, Rgb, Shading, ShadingKind, TextMode};
 
 use crate::reader::{self, Obj, Pdf};
 use crate::sample;
@@ -35,6 +40,9 @@ pub const GROUPS: &[(&str, fn(&mut T))] = &[
     ("text", text),
     ("links", links),
     ("outlines", outlines),
+    ("shadings", shadings),
+    ("hatches", hatches),
+    ("reader", reader_self),
     ("errors", errors),
 ];
 
@@ -231,7 +239,7 @@ fn sample_doc(t: &mut T) {
     t.ok("check_all", pdf.check_all());
     t.eq("version", pdf.version, (1, 7));
     let pages = pdf.pages().unwrap_or_default();
-    t.eq("pages", pages.len(), 4);
+    t.eq("pages", pages.len(), 5);
     let sizes: Vec<Vec<f64>> = (0..pages.len()).map(|i| page_dict(&pdf, i).and_then(|d| val(&pdf, d, "MediaBox")).and_then(Obj::as_array).map(nums).unwrap_or_default()).collect();
     t.check("A4 portrait", sizes[0] == [0.0, 0.0, 595.27559, 841.88976]);
     t.check("Letter landscape", sizes[2] == [0.0, 0.0, 792.0, 612.0]);
@@ -906,6 +914,424 @@ fn outlines(t: &mut T) {
     t.eq("B closed: Count -2", bd.and_then(|d| d.get("Count")).and_then(Obj::as_int), Some(-2));
     t.check("Last = B", title(get(root.get("Last"))) == want);
     t.check("B Parent = root", bd.and_then(|d| d.get("Parent")).and_then(Obj::as_ref_id) == pdf.root().ok().and_then(|r| r.get("Outlines")).and_then(Obj::as_ref_id));
+}
+
+// ------------------------------------------------------------------ shadings
+
+const RED: Rgb = Rgb::new(1.0, 0.0, 0.0);
+const GREEN: Rgb = Rgb::new(0.0, 1.0, 0.0);
+const BLUE: Rgb = Rgb::new(0.0, 0.0, 1.0);
+
+/// a page's resources of one category: name -> resolved object
+fn resources<'a>(pdf: &'a Pdf, page: usize, cat: &str) -> Vec<(String, &'a Obj)> {
+    let d = page_dict(pdf, page).and_then(|d| val(pdf, d, "Resources")).and_then(Obj::as_dict).and_then(|r| val(pdf, r, cat)).and_then(Obj::as_dict);
+    d.map(|d| d.0.iter().map(|(k, v)| (String::from_utf8_lossy(k).into_owned(), pdf.resolve(v))).collect()).unwrap_or_default()
+}
+
+fn resource<'a>(pdf: &'a Pdf, page: usize, cat: &str, name: &str) -> Option<&'a reader::Dict> {
+    resources(pdf, page, cat).into_iter().find(|(k, _)| k == name).and_then(|(_, o)| o.as_dict())
+}
+
+/// d[key] as numbers (resolved)
+fn num_array(pdf: &Pdf, d: &reader::Dict, key: &str) -> Vec<f64> {
+    pdf.lookup(d, key).and_then(Obj::as_array).map(|a| a.iter().filter_map(|x| pdf.resolve(x).as_num()).collect()).unwrap_or_default()
+}
+
+/// a Type 2 function with N 1 over [0 1] -> (C0, C1)
+fn type2_fn(t: &mut T, pdf: &Pdf, f: Option<&Obj>, what: &str) -> (Vec<f64>, Vec<f64>) {
+    let Some(d) = f.map(|o| pdf.resolve(o)).and_then(Obj::as_dict) else {
+        t.check(&format!("{what}: a function"), false);
+        return (vec![], vec![]);
+    };
+    let ok = pdf.lookup(d, "FunctionType").and_then(Obj::as_int) == Some(2) && pdf.lookup(d, "N").and_then(Obj::as_num) == Some(1.0) && num_array(pdf, d, "Domain") == [0.0, 1.0];
+    t.check(&format!("{what}: FunctionType 2, N 1, Domain [0 1]"), ok);
+    (num_array(pdf, d, "C0"), num_array(pdf, d, "C1"))
+}
+
+/// the gradients of the structure checks: a two-stop axial twice, a messy radial by shade(), one stop
+fn shading_doc() -> Document {
+    let mut doc = Document::new();
+    let p = new_page(&mut doc);
+    {
+        let mut c = doc.canvas(p, Origin::BottomLeft);
+        let two = Shading::axial([10.0, 0.0], [60.0, 0.0], &[(0.0, RED, 1.0), (1.0, BLUE, 1.0)]);
+        c.rect(10.0, 10.0, 50.0, 30.0);
+        c.fill_shading(FillRule::NonZero, &two);
+        c.rect(10.0, 50.0, 50.0, 30.0);
+        c.fill_shading(FillRule::EvenOdd, &two);
+        // unsorted, a NaN t, a t below 0, two stops at 0.3 (a hard edge: green, then red)
+        let messy = Shading {
+            kind: ShadingKind::Radial { from: [100.0, 50.0], r0: 0.0, to: [100.0, 50.0], r1: 40.0 },
+            stops: vec![(0.7, BLUE, 1.0), (0.3, GREEN, 1.0), (f64::NAN, Rgb::WHITE, 1.0), (0.3, RED, 1.0), (-2.0, Rgb::BLACK, 1.0)],
+            extend: (false, true),
+        };
+        // the path being built survives shade()
+        c.move_to(0.0, 0.0);
+        c.line_to(5.0, 5.0);
+        c.shade(&messy);
+        c.stroke();
+        c.rect(150.0, 10.0, 20.0, 20.0);
+        c.fill_shading(FillRule::NonZero, &Shading::axial([150.0, 0.0], [170.0, 0.0], &[(0.4, GREEN, 1.0)]));
+    }
+    doc
+}
+
+fn shadings(t: &mut T) {
+    let doc = shading_doc();
+    let Some((bytes, pdf)) = read_back(t, "shadings", &doc) else { return };
+    t.check("same input, same bytes", shading_doc().write().ok() == Some(bytes));
+    let s = content(t, &pdf, 0);
+    t.check("fill_shading: q, clip, sh, Q", s.contains("q\n10 10 50 30 re\nW n\n/Sh0 sh\nQ\n"));
+    t.check("the same gradient again: the same object, even-odd clip", s.contains("q\n10 50 50 30 re\nW* n\n/Sh0 sh\nQ\n"));
+    t.check("shade: sh between q and Q, the open path after it", s.contains("q\n/Sh1 sh\nQ\n0 0 m\n5 5 l\nS\n"));
+    let sh = resources(&pdf, 0, "Shading");
+    t.eq("three shadings on the page", sh.len(), 3);
+    t.eq("three shading objects in the file", pdf.objects.values().filter(|o| o.as_dict().is_some_and(|d| d.has("ShadingType"))).count(), 3);
+    if let Some(d) = resource(&pdf, 0, "Shading", "Sh0") {
+        t.check("Sh0: axial in DeviceRGB", pdf.lookup(d, "ShadingType").and_then(Obj::as_int) == Some(2) && name_is(pdf.lookup(d, "ColorSpace"), "DeviceRGB"));
+        t.eq("Sh0: Coords", num_array(&pdf, d, "Coords"), vec![10.0, 0.0, 60.0, 0.0]);
+        t.check("Sh0: Extend [true true]", pdf.lookup(d, "Extend").and_then(Obj::as_array).is_some_and(|a| a == [Obj::Bool(true), Obj::Bool(true)]));
+        let (c0, c1) = type2_fn(t, &pdf, d.get("Function"), "Sh0");
+        t.check("Sh0: red to blue", c0 == [1.0, 0.0, 0.0] && c1 == [0.0, 0.0, 1.0]);
+    } else {
+        t.check("Sh0", false);
+    }
+    if let Some(d) = resource(&pdf, 0, "Shading", "Sh1") {
+        t.check("Sh1: radial", pdf.lookup(d, "ShadingType").and_then(Obj::as_int) == Some(3));
+        t.eq("Sh1: Coords", num_array(&pdf, d, "Coords"), vec![100.0, 50.0, 0.0, 100.0, 50.0, 40.0]);
+        t.check("Sh1: Extend [false true]", pdf.lookup(d, "Extend").and_then(Obj::as_array).is_some_and(|a| a == [Obj::Bool(false), Obj::Bool(true)]));
+        let f = pdf.lookup(d, "Function").and_then(Obj::as_dict);
+        t.check("Sh1: a stitching function", f.is_some_and(|f| pdf.lookup(f, "FunctionType").and_then(Obj::as_int) == Some(3)));
+        let f = f.cloned().unwrap_or_default();
+        // sorted: black (t -2 -> 0), green and red at 0.3, blue at 0.7, padded to 1; the empty
+        // stretch between green and red is left out
+        t.eq("Sh1: Bounds", num_array(&pdf, &f, "Bounds"), vec![0.3, 0.7]);
+        t.eq("Sh1: Encode", num_array(&pdf, &f, "Encode"), vec![0.0, 1.0, 0.0, 1.0, 0.0, 1.0]);
+        let fs = pdf.lookup(&f, "Functions").and_then(Obj::as_array).unwrap_or(&[]).to_vec();
+        t.eq("Sh1: three pieces", fs.len(), 3);
+        let want = [([0.0, 0.0, 0.0], [0.0, 1.0, 0.0]), ([1.0, 0.0, 0.0], [0.0, 0.0, 1.0]), ([0.0, 0.0, 1.0], [0.0, 0.0, 1.0])];
+        for (i, (f, (a, b))) in fs.iter().zip(want).enumerate() {
+            let (c0, c1) = type2_fn(t, &pdf, Some(f), &format!("Sh1 piece {i}"));
+            t.check(&format!("Sh1 piece {i}: colours (hard edge green | red, NaN stop dropped)"), c0 == a && c1 == b);
+        }
+    } else {
+        t.check("Sh1", false);
+    }
+    if let Some(d) = resource(&pdf, 0, "Shading", "Sh2") {
+        let (c0, c1) = type2_fn(t, &pdf, d.get("Function"), "Sh2");
+        t.check("one stop: a constant green", c0 == [0.0, 1.0, 0.0] && c1 == c0);
+    } else {
+        t.check("Sh2", false);
+    }
+
+    // alpha: one for all stops -> ca (times the canvas's), varying -> a luminosity soft mask whose
+    // group lives in the user space of the gs
+    let mut doc = Document::new();
+    let p = new_page(&mut doc);
+    {
+        let mut c = doc.canvas(p, Origin::TopLeft);
+        c.set_fill_alpha(0.5);
+        c.rect(10.0, 10.0, 40.0, 40.0);
+        c.fill_shading(FillRule::NonZero, &Shading::axial([10.0, 0.0], [50.0, 0.0], &[(0.0, RED, 0.5), (1.0, BLUE, 0.5)]));
+        c.rect(60.0, 10.0, 40.0, 40.0);
+        c.fill(FillRule::NonZero);
+        c.set_fill_alpha(1.0);
+        c.translate(120.0, 50.0);
+        c.rotate(0.5);
+        c.scale(2.0, 1.5);
+        c.rect(-10.0, -10.0, 20.0, 20.0);
+        c.fill_shading(FillRule::NonZero, &Shading::axial([-10.0, 0.0], [10.0, 0.0], &[(0.0, RED, 1.0), (1.0, RED, 0.0)]));
+    }
+    let Some((_, pdf)) = read_back(t, "alpha", &doc) else { return };
+    let s = content(t, &pdf, 0);
+    let o = ops(t, &pdf, 0);
+    t.check("constant alpha: gs before sh inside the scope", s.contains("q\n10 10 40 40 re\nW n\n/G0 gs\n/Sh0 sh\nQ\n"));
+    t.check("after Q the canvas's own alpha again", s.contains("Q\n/G1 gs\n60 10 40 40 re\nf\n"));
+    let g0 = resource(&pdf, 0, "ExtGState", "G0");
+    t.check("ca 0.5 x 0.5 = 0.25", g0.is_some_and(|g| pdf.lookup(g, "ca").and_then(Obj::as_num) == Some(0.25) && g.get("SMask").is_none()));
+    let Some(m0) = resource(&pdf, 0, "ExtGState", "M0") else {
+        t.check("soft mask ExtGState M0", false);
+        return;
+    };
+    let sm = pdf.lookup(m0, "SMask").and_then(Obj::as_dict);
+    t.check("SMask /Luminosity", sm.is_some_and(|m| name_is(pdf.lookup(m, "S"), "Luminosity") && name_is(pdf.lookup(m, "Type"), "Mask")));
+    let form = sm.and_then(|m| pdf.lookup(m, "G")).and_then(Obj::as_dict).cloned().unwrap_or_default();
+    let grp = pdf.lookup(&form, "Group").and_then(Obj::as_dict);
+    t.check("group: transparency in DeviceGray", grp.is_some_and(|g| name_is(pdf.lookup(g, "S"), "Transparency") && name_is(pdf.lookup(g, "CS"), "DeviceGray")));
+    t.check("group without /Matrix (its space is the user space at gs)", form.get("Matrix").is_none());
+    let bb = num_array(&pdf, &form, "BBox");
+    t.check("group BBox covers the path (user space)", bb.len() == 4 && bb[0] <= -10.0 && bb[1] <= -10.0 && bb[2] >= 10.0 && bb[3] >= 10.0 && bb[2] - bb[0] < 40.0);
+    let fdata = sm.and_then(|m| m.get("G")).map(|g| pdf.stream_data(g).unwrap_or_default()).unwrap_or_default();
+    t.check("group paints the gray shading", fdata == b"/Sh2 sh\n");
+    let gray = pdf.lookup(&form, "Resources").and_then(Obj::as_dict).and_then(|r| pdf.lookup(r, "Shading")).and_then(Obj::as_dict).and_then(|d| pdf.lookup(d, "Sh2")).and_then(Obj::as_dict).cloned().unwrap_or_default();
+    t.check("gray shading: DeviceGray, the same Coords", name_is(pdf.lookup(&gray, "ColorSpace"), "DeviceGray") && num_array(&pdf, &gray, "Coords") == [-10.0, 0.0, 10.0, 0.0]);
+    let (c0, c1) = type2_fn(t, &pdf, gray.get("Function"), "gray shading");
+    t.check("gray shading: alpha 1 to 0", c0 == [1.0] && c1 == [0.0]);
+    t.check("colour shading on the page, the gray one only in the group", resources(&pdf, 0, "Shading").len() == 2);
+    // between the scope's q and sh only the clip and the gs: the CTM of the gs is the shading's
+    let ms = o.iter().position(|(a, op)| op == b"gs" && a.first().is_some_and(|n| n.is_name("M0")));
+    let ok = ms.is_some_and(|i| {
+        let q = o[..i].iter().rposition(|(_, op)| op == b"q").unwrap_or(0);
+        let sh = o[i..].iter().position(|(_, op)| op == b"sh").map_or(0, |k| i + k);
+        sh > i && !o[q..sh].iter().any(|(_, op)| op == b"cm")
+    });
+    t.check("no cm between the scope's q, the soft mask's gs and sh", ok);
+    t.check("the transform, then the scope", s.contains("cm\nq\n-10 -10 20 20 re\nW n\n/G2 gs\n/M0 gs\n/Sh1 sh\nQ\n"));
+    t.check("page transparency group", page_dict(&pdf, 0).and_then(|d| val(&pdf, d, "Group")).is_some());
+
+    // degenerate and invalid gradients
+    let mut doc = Document::new();
+    let p = new_page(&mut doc);
+    {
+        let mut c = doc.canvas(p, Origin::BottomLeft);
+        // axial from = to (1e-9 apart is written the same): the last colour over the path
+        c.rect(0.0, 0.0, 10.0, 10.0);
+        c.fill_shading(FillRule::NonZero, &Shading::axial([5.0, 5.0], [5.0 + 1e-9, 5.0], &[(0.0, RED, 1.0), (1.0, BLUE, 1.0)]));
+        // radial with both radii 0 by shade(): the last colour (and its alpha) over the page
+        c.shade(&Shading::radial([5.0, 5.0], 0.0, [8.0, 5.0], 0.0, &[(0.0, RED, 1.0), (1.0, GREEN, 0.5)]));
+        // two equal circles: only that disk, inside the path
+        c.rect(20.0, 20.0, 30.0, 30.0);
+        c.fill_shading(FillRule::EvenOdd, &Shading::radial([30.0, 30.0], 7.0, [30.0, 30.0], 7.0, &[(0.0, RED, 1.0), (1.0, BLUE, 1.0)]));
+        // invalid: nothing, the path dropped
+        let invalid = [
+            Shading::axial([0.0, 0.0], [1.0, 0.0], &[]),
+            Shading::axial([0.0, 0.0], [1.0, 0.0], &[(f64::NAN, RED, 1.0)]),
+            Shading::axial([f64::NAN, 0.0], [1.0, 0.0], &[(0.0, RED, 1.0)]),
+            Shading::radial([0.0, 0.0], -1.0, [0.0, 0.0], 5.0, &[(0.0, RED, 1.0)]),
+            Shading::radial([0.0, 0.0], 1.0, [0.0, 0.0], f64::INFINITY, &[(0.0, RED, 1.0)]),
+        ];
+        for sh in &invalid {
+            c.rect(100.0, 10.0, 5.0, 5.0);
+            c.fill_shading(FillRule::NonZero, sh);
+            c.shade(sh);
+        }
+        c.rect(150.0, 10.0, 5.0, 5.0);
+        c.fill(FillRule::NonZero);
+    }
+    let Some((_, pdf)) = read_back(t, "degenerate", &doc) else { return };
+    let s = content(t, &pdf, 0);
+    let o = ops(t, &pdf, 0);
+    t.eq("no sh at all", count_op(&o, "sh"), 0);
+    t.check("axial from = to: the path in the last colour", s.contains("q\n0 0 1 rg\n0 0 10 10 re\nf\nQ\n"));
+    t.check("radii 0: the page in the last colour and alpha", s.contains("q\n0 1 0 rg\n/G0 gs\n0 0 m\n200 0 l\n200 100 l\n0 100 l\nh\nf\nQ\n"));
+    t.check("equal circles: the disk inside the even-odd clip", s.contains("q\n20 20 30 30 re\nW* n\n0 0 1 rg\n37 30 m\n"));
+    t.check("invalid gradients: nothing, their paths dropped", !s.contains("100 10 5 5 re") && s.contains("150 10 5 5 re\nf\n"));
+    t.eq("q and Q balanced", count_op(&o, "Q"), count_op(&o, "q"));
+}
+
+// ------------------------------------------------------------------ hatches
+
+/// the m / l pairs of the first stroke after the n-th clip of a page: (x0, y0, x1, y1)
+fn hatch_lines(o: &[(Vec<Obj>, Vec<u8>)], clip: usize) -> Vec<[f64; 4]> {
+    let Some(start) = o.iter().enumerate().filter(|(_, (_, op))| op == b"W" || op == b"W*").nth(clip).map(|(i, _)| i) else { return vec![] };
+    let mut out = Vec::new();
+    let mut at = None;
+    for (a, op) in &o[start..] {
+        match op.as_slice() {
+            b"m" => at = Some(nums(a)),
+            b"l" => {
+                if let Some(m) = at.take() {
+                    let l = nums(a);
+                    out.push([m[0], m[1], l[0], l[1]]);
+                }
+            }
+            b"S" => break,
+            _ => {}
+        }
+    }
+    out
+}
+
+fn hatch_doc() -> Document {
+    let mut doc = Document::new();
+    let p = new_page(&mut doc);
+    let q = new_page(&mut doc);
+    let brown = Rgb::new(0.5, 0.25, 0.0);
+    {
+        let mut c = doc.canvas(p, Origin::BottomLeft);
+        c.set_stroke_color(BLUE);
+        c.move_to(0.0, 0.0);
+        c.line_to(1.0, 1.0);
+        c.stroke();
+        c.rect(0.0, 0.0, 100.0, 50.0);
+        c.fill_hatch(FillRule::NonZero, &Hatch { origin: [0.0, 5.0], ..Hatch::new(0.0, 10.0, 2.0, brown) });
+        // blue again without RG: the Q brought it back
+        c.move_to(2.0, 2.0);
+        c.line_to(3.0, 3.0);
+        c.stroke();
+        // the canvas's fill alpha times the hatch's, even-odd, 45 degrees
+        c.set_fill_alpha(0.5);
+        c.rect(120.0, 0.0, 50.0, 50.0);
+        c.fill_hatch(FillRule::EvenOdd, &Hatch { alpha: 0.5, ..Hatch::new(core::f64::consts::FRAC_PI_4, 5.0, 1.0, brown) });
+        c.set_fill_alpha(1.0);
+        // as wide as the spacing: solid
+        c.rect(180.0, 0.0, 10.0, 10.0);
+        c.fill_hatch(FillRule::NonZero, &Hatch::new(0.3, 2.0, 2.0, RED));
+        // invalid (and 30 million lines): nothing, the path dropped
+        let invalid = [
+            Hatch::new(0.0, 0.0, 1.0, RED),
+            Hatch::new(0.0, -1.0, 1.0, RED),
+            Hatch::new(0.0, 5.0, 0.0, RED),
+            Hatch::new(f64::NAN, 5.0, 1.0, RED),
+            Hatch { origin: [f64::INFINITY, 0.0], ..Hatch::new(0.0, 5.0, 1.0, RED) },
+            Hatch::new(0.0, 1e-6, 1e-7, RED),
+        ];
+        for h in &invalid {
+            c.rect(150.0, 60.0, 30.0, 30.0);
+            c.fill_hatch(FillRule::NonZero, h);
+        }
+        c.rect(190.0, 90.0, 5.0, 5.0);
+        c.fill(FillRule::NonZero);
+    }
+    {
+        // the same angle on a y-down canvas
+        let mut c = doc.canvas(q, Origin::TopLeft);
+        c.rect(10.0, 10.0, 50.0, 50.0);
+        c.fill_hatch(FillRule::NonZero, &Hatch::new(core::f64::consts::FRAC_PI_4, 8.0, 1.0, RED));
+    }
+    doc
+}
+
+fn hatches(t: &mut T) {
+    let doc = hatch_doc();
+    let Some((bytes, pdf)) = read_back(t, "hatches", &doc) else { return };
+    t.check("same input, same bytes", hatch_doc().write().ok() == Some(bytes));
+    let s = content(t, &pdf, 0);
+    let o = ops(t, &pdf, 0);
+    t.check("clip, stroke state, lines, S in a scope", s.contains("q\n0 0 100 50 re\nW n\n0.5 0.25 0 RG\n2 w\n-2 5 m\n102 5 l\n-2 15 m\n102 15 l\n"));
+    let l = hatch_lines(&o, 0);
+    t.eq("horizontal: five lines through y 5 + 10 k", l.iter().map(|l| l[1]).collect::<Vec<f64>>(), vec![5.0, 15.0, 25.0, 35.0, 45.0]);
+    t.check("horizontal: across the box and a width beyond", l.iter().all(|l| l[0] == -2.0 && l[2] == 102.0 && l[3] == l[1]));
+    t.check("state back after Q: no RG for the next stroke", s.contains("S\nQ\n2 2 m\n3 3 l\nS\n"));
+    // 45 degrees, spacing 5: every line through a multiple of 5 along the normal, all that touch
+    let l = hatch_lines(&o, 1);
+    let (sn, cs) = (core::f64::consts::FRAC_1_SQRT_2, core::f64::consts::FRAC_1_SQRT_2);
+    let ks: Vec<f64> = l.iter().map(|l| (-l[0] * sn + l[1] * cs) / 5.0).collect();
+    let whole = |k: f64| (k - if k < 0.0 { (k - 0.5) as i64 } else { (k + 0.5) as i64 } as f64).abs() < 1e-4;
+    t.check("45 degrees: lines on the spacing", !ks.is_empty() && ks.iter().all(|&k| whole(k)));
+    t.eq("45 degrees: the 15 lines that reach the box", l.len(), 15);
+    t.check("45 degrees: direction (1, 1)", l.iter().all(|l| ((l[3] - l[1]) - (l[2] - l[0])).abs() < 1e-4 && l[2] > l[0]));
+    t.check("even-odd clip", s.contains("120 0 50 50 re\nW* n\n"));
+    let g0 = resource(&pdf, 0, "ExtGState", "G0");
+    t.check("stroke alpha 0.5 x 0.5, fill alpha 0.5", g0.is_some_and(|g| pdf.lookup(g, "CA").and_then(Obj::as_num) == Some(0.25) && pdf.lookup(g, "ca").and_then(Obj::as_num) == Some(0.5)));
+    t.check("as wide as the spacing: a solid fill", s.contains("q\n1 0 0 rg\n180 0 10 10 re\nf\nQ\n"));
+    t.check("invalid hatches: nothing, their paths dropped", !s.contains("150 60 30 30 re") && s.contains("190 90 5 5 re\nf\n"));
+    t.eq("q and Q balanced", count_op(&o, "Q"), count_op(&o, "q"));
+    // the angle goes from +x towards +y of the canvas: on a y-down page that is clockwise
+    let up = hatch_lines(&o, 1).first().map(|l| (l[3] - l[1]) / (l[2] - l[0]));
+    let o2 = ops(t, &pdf, 1);
+    let down = hatch_lines(&o2, 0).first().map(|l| {
+        let flip = Matrix::new(1.0, 0.0, 0.0, -1.0, 0.0, 100.0);
+        let (a, b) = (flip.apply(l[0], l[1]), flip.apply(l[2], l[3]));
+        (b.1 - a.1) / (b.0 - a.0)
+    });
+    t.check("bottom-left: 45 degrees rise on the page", up.is_some_and(|v| (v - 1.0).abs() < 1e-6));
+    t.check("top-left: 45 degrees fall on the page", down.is_some_and(|v| (v + 1.0).abs() < 1e-6));
+}
+
+// ------------------------------------------------------------------ reader
+
+/// the first place of `pat` in `b`
+fn find(b: &[u8], pat: &str) -> Option<usize> {
+    b.windows(pat.len()).position(|w| w == pat.as_bytes())
+}
+
+/// a PDF of these objects (1 0 obj ...) with a classic xref table and /Root 1 0 R
+fn mini_pdf(objs: &[String]) -> Vec<u8> {
+    let mut o = Vec::from(&b"%PDF-1.7\n%\xE2\xE3\xCF\xD3\n"[..]);
+    let mut offs = Vec::new();
+    for (i, body) in objs.iter().enumerate() {
+        offs.push(o.len());
+        o.extend_from_slice(format!("{} 0 obj\n{body}\nendobj\n", i + 1).as_bytes());
+    }
+    let x = o.len();
+    o.extend_from_slice(format!("xref\n0 {}\n0000000000 65535 f \n", objs.len() + 1).as_bytes());
+    for off in offs {
+        o.extend_from_slice(format!("{off:010} 00000 n \n").as_bytes());
+    }
+    o.extend_from_slice(format!("trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{x}\n%%EOF\n", objs.len() + 1).as_bytes());
+    o
+}
+
+fn stream_obj(dict: &str, data: &str) -> String {
+    format!("<< {dict} /Length {} >>\nstream\n{data}\nendstream", data.len())
+}
+
+/// one page whose content is `content` and whose /P0 pattern is `pattern`
+fn pattern_pdf(content: &str, pattern: &str) -> Vec<u8> {
+    mini_pdf(&[
+        String::from("<< /Type /Catalog /Pages 2 0 R >>"),
+        String::from("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+        String::from("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] /Resources << /Pattern << /P0 5 0 R >> >> /Contents 4 0 R >>"),
+        stream_obj("", content),
+        String::from(pattern),
+    ])
+}
+
+fn reader_self(t: &mut T) {
+    // damaged gradients: an uncompressed document, changed in place (same lengths keep the xref)
+    let mut doc = Document::new();
+    doc.set_compression(0);
+    let p = new_page(&mut doc);
+    {
+        let mut c = doc.canvas(p, Origin::BottomLeft);
+        c.rect(10.0, 10.0, 50.0, 30.0);
+        c.fill_shading(FillRule::NonZero, &Shading::axial([10.0, 0.0], [60.0, 0.0], &[(0.0, RED, 1.0), (0.3, GREEN, 1.0), (0.7, BLUE, 0.5), (1.0, RED, 0.0)]));
+    }
+    let Some(good) = t.ok("write", doc.write().map_err(|e| format!("{e}"))) else { return };
+    t.ok("undamaged: check_all", reader::parse(&good).and_then(|p| p.check_all()));
+    let cases = [
+        ("/ShadingType 2", "/ShadingType 8", "ShadingType"),
+        ("/FunctionType 3", "/FunctionType 1", "FunctionType"),
+        ("/Bounds [0.3 0.7]", "/Bounds [0.7 0.3]", "Bounds"),
+        ("/Encode [0 1 0 1 0 1]", "/Encode [0 1 0 1 0  ]", "Encode"),
+        ("/C1 [0 1 0]", "/C1 [0 1  ]", "C1"),
+        ("/N 1 >>", "/N -1>>", "negative"),
+        ("/Domain [0 1]", "/Domain [1 0]", "Domain"),
+        ("/Extend [true true]", "/Extend [true 1234]", "Extend"),
+        ("/ColorSpace /DeviceRGB", "/ColorSpace /DeviceRGX", "colour space"),
+        ("/S /Luminosity", "/S /Luminositx", "/S"),
+        ("/CS /DeviceGray", "/CS /Pattern   ", "Pattern"),
+        ("/Subtype /Form", "/Subtype /Forx", "form XObject"),
+        ("/Sh0 sh", "/Sh7 sh", "Sh7"),
+        ("/Sh1 sh", "/Sh0 sh", "Sh0"),
+        ("/M0 gs", "/M5 gs", "M5"),
+    ];
+    for (from, to, want) in cases {
+        let Some(at) = find(&good, from).filter(|_| from.len() == to.len()) else {
+            t.check(&format!("{from}: in the file, {to} as long"), false);
+            continue;
+        };
+        let mut bad = good.clone();
+        bad[at..at + from.len()].copy_from_slice(to.as_bytes());
+        let r = reader::parse(&bad).and_then(|p| p.check_all());
+        t.check(&format!("{from} -> {to}: refused, naming {want} ({r:?})"), r.as_ref().is_err_and(|e| e.contains(want)));
+    }
+    // patterns in hand-made files
+    let tiling = |d: &str, cell: &str| stream_obj(&format!("/Type /Pattern /PatternType 1 {d}"), cell);
+    let good_tiling = "/PaintType 1 /TilingType 1 /BBox [0 0 10 10] /XStep 10 /YStep 10 /Resources << >>";
+    let fill = "/Pattern cs /P0 scn\n0 0 100 100 re\nf\n";
+    let shading_pattern = "<< /Type /Pattern /PatternType 2 /Shading << /ShadingType 2 /ColorSpace /DeviceGray /Coords [0 0 100 0] /Function << /FunctionType 2 /Domain [0 1] /N 1 >> >> >>";
+    let check = |content: &str, pattern: &str| reader::parse(&pattern_pdf(content, pattern)).and_then(|p| p.check_all());
+    t.ok("coloured tiling pattern", check(fill, &tiling(good_tiling, "1 0 0 rg 0 0 5 5 re f")));
+    t.ok("shading pattern", check(fill, shading_pattern));
+    let refused = [
+        ("no XStep", check(fill, &tiling("/PaintType 1 /TilingType 1 /BBox [0 0 10 10] /YStep 10 /Resources << >>", "")), "XStep"),
+        ("BBox without area", check(fill, &tiling("/PaintType 1 /TilingType 1 /BBox [0 0 0 10] /XStep 10 /YStep 10 /Resources << >>", "")), "area"),
+        ("PaintType 3", check(fill, &tiling("/PaintType 3 /TilingType 1 /BBox [0 0 10 10] /XStep 10 /YStep 10 /Resources << >>", "")), "PaintType"),
+        ("TilingType 0", check(fill, &tiling("/PaintType 1 /TilingType 0 /BBox [0 0 10 10] /XStep 10 /YStep 10 /Resources << >>", "")), "TilingType"),
+        ("no Resources", check(fill, &tiling("/PaintType 1 /TilingType 1 /BBox [0 0 10 10] /XStep 10 /YStep 10", "")), "Resources"),
+        ("cell uses a missing shading", check(fill, &tiling(good_tiling, "/Sh0 sh")), "Sh0"),
+        ("uncoloured pattern without components", check(fill, &tiling("/PaintType 2 /TilingType 1 /BBox [0 0 10 10] /XStep 10 /YStep 10 /Resources << >>", "")), "PaintType 2"),
+        ("pattern name outside a Pattern space", check("/P0 scn\n0 0 1 1 re\nf\n", &tiling(good_tiling, "")), "not a Pattern space"),
+        ("Pattern space left by Q", check("q\n/Pattern cs\nQ\n/P0 scn\n0 0 1 1 re\nf\n", &tiling(good_tiling, "")), "not a Pattern space"),
+        ("numbers in a Pattern space", check("/Pattern cs\n0.5 scn\n0 0 1 1 re\nf\n", &tiling(good_tiling, "")), "needs a pattern name"),
+        ("shading pattern in a Pattern space", check(fill, &shading_pattern.replace("/DeviceGray", "/Pattern")), "Pattern colour space"),
+        ("PatternType 3", check(fill, &shading_pattern.replace("/PatternType 2", "/PatternType 3")), "PatternType"),
+    ];
+    for (what, r, want) in refused {
+        t.check(&format!("{what}: refused, naming {want} ({r:?})"), r.as_ref().is_err_and(|e| e.contains(want)));
+    }
 }
 
 // ------------------------------------------------------------------ errors

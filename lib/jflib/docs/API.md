@@ -111,9 +111,9 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
-  <br>[lib.rs](#pdf-crate-root) · [src/canvas.rs](#pdfsrccanvasrs) · [src/font.rs](#pdfsrcfontrs) · [src/geom.rs](#pdfsrcgeomrs) · [src/image.rs](#pdfsrcimagers)
+  <br>[lib.rs](#pdf-crate-root) · [src/canvas.rs](#pdfsrccanvasrs) · [src/font.rs](#pdfsrcfontrs) · [src/geom.rs](#pdfsrcgeomrs) · [src/image.rs](#pdfsrcimagers) · [src/shading.rs](#pdfsrcshadingrs)
 - [diagram_view](#diagram_view) -- draws diagram pages (the display list of diagram_core) on render2d and gfx
-  <br>[src/fonts.rs](#diagram_viewsrcfontsrs) · [src/image.rs](#diagram_viewsrcimagers) · [src/view.rs](#diagram_viewsrcviewrs)
+  <br>[src/export/mod.rs](#diagram_viewsrcexportmodrs) · [src/export/pdf.rs](#diagram_viewsrcexportpdfrs) · [src/export/raster.rs](#diagram_viewsrcexportrasterrs) · [src/export/svg.rs](#diagram_viewsrcexportsvgrs) · [src/fonts.rs](#diagram_viewsrcfontsrs) · [src/image.rs](#diagram_viewsrcimagers) · [src/view.rs](#diagram_viewsrcviewrs)
 - [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
   <br>[lib.rs](#dxf-crate-root) · [src/fonts.rs](#dxfsrcfontsrs) · [src/mtext.rs](#dxfsrcmtextrs) · [src/strings.rs](#dxfsrcstringsrs)
 - [physics](#physics) -- Collision shapes, broad phase and deterministic queries for games
@@ -56437,7 +56437,8 @@ callback such as a window procedure: core panics once more there, with one of NO
 ```text
 pdf -- a vector PDF writer: pages of their own size drawn on a canvas (paths, fills with the
 non-zero or even-odd rule, strokes with width, dashes, caps, joins and miter limit,
-transforms, clipping, alpha, RGB colours), images (JPEG passed through, other pixels with
+transforms, clipping, alpha, RGB colours, axial and radial gradients with any number of stops
+and alpha, hatches of parallel lines), images (JPEG passed through, other pixels with
 FlateDecode and their alpha as a soft mask), text in embedded TrueType / OpenType subsets
 (CID fonts with Identity-H, ToUnicode for search and copy, glyphs and widths from the
 library's shaping), links to URIs and to places in the document, nested outlines
@@ -56465,10 +56466,14 @@ the same document always gives the same bytes.  Not here: PDF/A, encryption, for
   Canvas       save / restore, transform / translate / scale / rotate, fill / stroke colour and
                alpha, line width, cap, join, miter limit, dash, path building (move_to,
                line_to, curve_to, quad_to, rect, rounded_rect, ellipse, circle, arc, close,
-               append_path), fill / stroke / fill_stroke / clip / end_path, image /
-               image_transform, text / text_fallback / glyphs, set_text_mode, link_uri /
-               link_dest, dest (a destination at a point of this canvas)
+               append_path), fill / stroke / fill_stroke / clip / end_path, shade /
+               fill_shading (gradients), fill_hatch, image / image_transform, text /
+               text_fallback / glyphs, set_text_mode, link_uri / link_dest, dest (a
+               destination at a point of this canvas)
   Path         the same path building, kept and drawn later (Canvas::fill_path, stroke_path)
+  Shading      a gradient: ShadingKind Axial / Radial (PDF shading types 2 and 3), stops
+               (t, colour, alpha), extend; Shading::axial / radial
+  Hatch        parallel lines: angle, spacing, width, colour, alpha, a point on a line
   Image        jpeg(file), gray / rgb / rgba(w, h, pixels), from_surface(gfx::Surface),
                with_alpha, interpolate
 
@@ -56479,6 +56484,13 @@ font's glyph ids.  The first glyph of each cluster maps to the cluster's text in
 Variable fonts are embedded at their default instance, colour glyphs as their outlines.
 Fonts whose OS/2 fsType forbids embedding are refused (Error::FontLicense); fsType "no
 subsetting" embeds every glyph.
+
+Gradients (shading.rs): DeviceRGB shadings with a Type 2 function per stretch between stops,
+stitched by a Type 3 function; one alpha for all stops is the fill alpha (ExtGState ca), varying
+alpha a luminosity soft mask (a transparency group painting the alphas as a DeviceGray shading
+in the same user space).  Degenerate gradients paint the last stop's colour as SVG does.
+Hatches are clipped, stroked lines in one path, not tiling patterns (pdfium shows seams between
+rotated pattern cells, and readers round the cell step to device pixels).
 ```
 
 ### `pdf` crate root
@@ -56690,6 +56702,21 @@ buffered until it is painted, so no state operator ever lands inside a path obje
   drops the path without painting it
 - **`fn fill_path(&mut self, p: &Path, rule: FillRule)`**
 - **`fn stroke_path(&mut self, p: &Path)`**
+- **`fn shade(&mut self, s: &Shading)`**
+  paints the gradient over the whole current clip (`sh`), its coordinates in the current user
+  space, times the canvas's fill alpha.  Degenerate geometry paints the last stop's colour
+  (axial from = to, radial with both radii 0: everywhere; two equal circles: that disk); no
+  stops, coordinates that are not finite or a negative radius: nothing.  The path being built
+  is kept.
+- **`fn fill_shading(&mut self, rule: FillRule, s: &Shading)`**
+  fills the path with the gradient (q, clip with `rule`, sh, Q) and starts a new path, as
+  fill() does; what shade() does with degenerate and invalid gradients, within the path (an
+  invalid one drops the path)
+- **`fn fill_hatch(&mut self, rule: FillRule, h: &Hatch)`**
+  fills the path with the hatch's lines (q, clip with `rule`, the lines stroked, Q) and starts
+  a new path, as fill() does.  Lines at least as wide as their spacing fill the path solid;
+  an angle, spacing, width or origin that is not finite (or a spacing or width &lt;= 0), a path
+  with coordinates that are not finite or more than 100 000 lines: nothing, the path dropped
 - **`fn image(&mut self, img: ImageId, x: f64, y: f64, w: f64, h: f64)`**
   the image upright (as it looks on the page) in the rectangle x, y, w, h of the current
   coordinates
@@ -56887,6 +56914,65 @@ FlateDecode with PNG predictors and their alpha as a soft mask (SMask)
 - **`fn is_jpeg(&self) -> bool`**
 - **`fn has_alpha(&self) -> bool`**
 
+### `pdf/src/shading.rs`
+
+Source: [`lib/pdf/src/shading.rs`](../lib/pdf/src/shading.rs)
+
+```text
+shading -- gradients (axial and radial shadings, ISO 32000-1 8.7.4.5) and hatches for
+Canvas::shade, fill_shading and fill_hatch
+
+A gradient becomes a shading dictionary of type 2 (axial) or 3 (radial) in DeviceRGB.  Its
+colour function: one Type 2 function (exponential, N 1) from colour to colour, or for more stops
+a Type 3 stitching function of such pieces, one per stretch between two stops; stops at the same
+t (a hard edge) leave out the empty stretch between them, so Bounds always rise.  Before the
+first stop and after the last the colour stays the first / last stop's.  The stops' alpha:
+all the same -> the constant fill alpha (ExtGState ca); different -> a luminosity soft mask whose
+group paints the same geometry as a DeviceGray shading of the alphas (Canvas builds it).
+
+Hatches are stroked lines, not tiling patterns: pdfium draws the cells of a rotated tiling
+pattern with hairline gaps and one-pixel steps where they meet, and both pdfium and Poppler round
+the cell step to whole device pixels, so the lines drift from where they belong.  A hatch clips
+to the path and strokes parallel lines over its bounding box in one path (one `S`, so a hatch's
+alpha applies once).
+```
+
+- **`enum ShadingKind`**
+  the geometry of a gradient, in the user space of the canvas at the time it is painted
+  - `Axial { from: [f64; 2], to: [f64; 2] }` -- colour runs from `from` (t = 0) to `to` (t = 1), constant across (PDF type 2)
+  - `Radial { from: [f64; 2], r0: f64, to: [f64; 2], r1: f64 }` -- circles from (from, r0) at t = 0 to (to, r1) at t = 1 (PDF type 3); radii >= 0
+
+- **`struct Shading`**
+  a gradient for Canvas::shade and Canvas::fill_shading
+  - `kind: ShadingKind`
+  - `stops: Vec<(f64, Rgb, f64)>` -- (t in 0..=1 ascending, colour, alpha 0..=1); at least one stop.  Stops with a NaN t are
+    dropped, t is clamped to 0..=1 and the stops sorted by it (stable: two stops at the same t
+    make a hard edge); a NaN alpha is opaque
+  - `extend: (bool, bool)` -- paint beyond t &lt; 0 / t > 1 with the end colours (PDF /Extend), default (true, true)
+
+**`impl Shading`**
+
+- **`fn axial(from: [f64; 2], to: [f64; 2], stops: &[(f64, Rgb, f64)]) -> Shading`**
+  an axial gradient from `from` to `to`, extended at both ends
+- **`fn radial(from: [f64; 2], r0: f64, to: [f64; 2], r1: f64, stops: &[(f64, Rgb, f64)]) -> Shading`**
+  a radial gradient from the circle (from, r0) to (to, r1), extended at both ends
+
+- **`struct Hatch`**
+  parallel lines for Canvas::fill_hatch; two hatches over the same path cross
+  - `angle: f64` -- direction of the lines in the canvas's user space, radians from +x towards +y: counter-
+    clockwise on the page where y points up (Origin::BottomLeft), clockwise where it points down
+    (Origin::TopLeft, as Canvas::rotate)
+  - `spacing: f64` -- distance between neighbouring lines (user space units), > 0
+  - `width: f64` -- line width (user space units), > 0; at least `spacing` fills the path solid
+  - `color: Rgb`
+  - `alpha: f64` -- 0 to 1, times the canvas's fill alpha
+  - `origin: [f64; 2]` -- a point one of the lines runs through (user space)
+
+**`impl Hatch`**
+
+- **`fn new(angle: f64, spacing: f64, width: f64, color: Rgb) -> Hatch`**
+  opaque lines through (0, 0)
+
 ## diagram_view
 
 *draws diagram pages (the display list of diagram_core) on render2d and gfx* -- crate root [`lib/diagram_view/src/lib.rs`](../lib/diagram_view/src/lib.rs)
@@ -56904,6 +56990,7 @@ diagram_view -- draws diagram pages (the display list of diagram_core) on render
   view.fit(size, margin) -> Camera
   image::{bytes, decode, base64}   Foreign shapes' pictures: PNG and JPEG decoded, EMF / WMF
                                    and the rest as placeholders
+  export::{pdf, svg, raster}       (JD12) pages as PDF (lib/pdf), SVG, PNG and JPEG
 
 Why a crate of its own (JD4): diagram_core holds the model and the display list without any
 dependency, so that diagram_io's exports (SVG, PDF, JD12) and JD7's hit tests use the same
@@ -56916,6 +57003,229 @@ two of the scene's layers on the CPU path; a scene attached to a GPU (Scene::att
 everything else.  Coordinates: paper inches, y up, the origin at the page's bottom left
 corner (render2d's camera has y up too).
 ```
+
+### `diagram_view/src/export/mod.rs`
+
+Source: [`lib/diagram_view/src/export/mod.rs`](../lib/diagram_view/src/export/mod.rs)
+
+```text
+export -- the pages of a diagram as files (JD12: EX-01 PDF, EX-03 SVG, EX-04 PNG, EX-05 JPEG)
+
+  pages(doc, &Pages) -> Vec<PageRef>     which pages: the one shown, every foreground page, a
+                                         range of them (from 1), a list
+  page_name(doc, page) -> String         Name, else NameU, else its number among the pages
+  links(doc, drawing) -> Vec<Link>       the shapes' hyperlinks with their boxes on the page
+  pdf::write(doc, fonts, &PdfOptions)    a vector PDF: a PDF page per page in its size, text
+                                         as text in embedded subsets, links, a bookmark per page
+  pdf::Sheets                            drawings placed on sheets of paper (printing: tiles,
+                                         margins, scaling) through the same drawing code
+  svg::write(doc, drawing, &SvgOptions)  one page as SVG: paths, text, pictures, gradients,
+                                         hatches, links
+  raster::render(view, &RasterOptions)   a page (or a part of it) at a resolution, on a colour
+                                         or transparent; raster::png / raster::jpeg encode it
+
+Why here and not in diagram_io: a page is exported as the screen shows it, so the texts must
+be measured with the fonts they are drawn with (PageView builds the display list with this
+crate's FontSet and render2d's text layout), the PDF must embed the very faces the screen
+uses (FontSet's substitution, TX-09), and PNG / JPEG are this crate's renderer.  diagram_io
+stays the file format crate without render2d; lib/pdf adds no crate this one did not pull in
+already (gfx, img_core, text_shape).
+
+Every export reads the display list (diagram_core::render::Drawing: paper inches, y up, the
+origin at the page's bottom left corner).  PDF and SVG write it in points (1/72 inch); SVG
+with y down (its own convention), PDF with y up.  Text runs keep the width the layout
+measured: the PDF scales each run horizontally to it, the SVG gives textLength.
+```
+
+- **`enum Pages`**
+  which pages an export takes
+  - `Current(PageRef)` -- one page (the one shown; may be a background page)
+  - `All` -- every foreground page in the document's order
+  - `Range { from: u32, to: u32 }` -- foreground pages from..=to, counted from 1 (clamped to the pages there are)
+  - `List(Vec<PageRef>)` -- these pages in this order
+
+- **`fn foreground_pages(doc: &Document) -> Vec<PageRef>`**
+  the foreground pages in the document's order
+
+- **`fn pages(doc: &Document, sel: &Pages) -> Vec<PageRef>`**
+  the pages a selection names
+
+- **`fn page_name(doc: &Document, page: PageRef) -> String`**
+  a page's name: Name, else NameU, else its number among all pages (from 1)
+
+- **`fn page_by_name(doc: &Document, sub_address: &str) -> Option<PageRef>`**
+  the page a hyperlink's sub-address names ("Seite-2", "Seite-2/Sheet.5", "Page-2,200"), by
+  Name or NameU, case-insensitive
+
+- **`enum LinkTarget`**
+  where a hyperlink goes
+  - `Uri(String)` -- an address (URL, mail, file) as the file has it
+  - `Page(PageRef)` -- a page of the same document
+
+- **`struct Link`**
+  a shape's hyperlink on the page
+  - `shape: ShapeRef`
+  - `bbox: [f64; 4]` -- the box of what the shape draws (paper inches, y up)
+  - `target: LinkTarget`
+  - `description: String` -- Description (may be empty)
+
+- **`fn links(doc: &Document, drawing: &Drawing) -> Vec<Link>`**
+  the hyperlinks of the shapes a drawing shows: per shape its first Hyperlink row with an
+  address (else a sub-address naming a page), on the box of the items of the shape and its
+  subshapes; shapes without anything drawn have no link
+
+### `diagram_view/src/export/pdf.rs`
+
+Source: [`lib/diagram_view/src/export/pdf.rs`](../lib/diagram_view/src/export/pdf.rs)
+
+```text
+pdf -- pages as a vector PDF through lib/pdf (EX-01), and drawings placed on sheets of paper
+
+  write(doc, fonts, &PdfOptions) -> Result<bytes, pdf::Error>   the export: a PDF page per
+                                    page in the page's size (points), text as text in embedded
+                                    subsets, the shapes' hyperlinks (addresses and pages of the
+                                    export), a bookmark per page, the document information
+  Sheets::new(fonts)                drawings on sheets of any size (printing: paper, margins,
+                                    scale, tiles)
+    sheets.add(doc, drawing, (w, h), place, clip, links) -> pdf::PageId
+    sheets.pdf() -> &mut pdf::Document   outlines, information, language
+    sheets.finish() -> Result<bytes, pdf::Error>
+
+The display list (paper inches, y up) is drawn in the sheet's space through `place` (paper
+inches -> points, y up from the sheet's bottom left corner).  Fills: solid with their alpha,
+gradients as PDF shadings (axial, radial; varying alpha as a soft mask, lib/pdf), hatches as
+lines through the page's origin (a pixel at 96 DPI wide) stroked inside the clipped area
+(lib/pdf's fill_hatch: tiling patterns showed seams in pdfium); lines with
+width (0: the thinnest line the device draws), dashes, caps, joins, miter limit 4; pictures
+clipped to the shape's box (JPEG passed through, PNG as pixels with alpha, metafiles as the
+screen's placeholder); texts per run in the face the screen uses (diagram_view's FontSet with
+its substitution), scaled horizontally so that the run is as wide as the layout measured it,
+Letterspace as added advance, a synthetic italic slanted like the screen's.  A font whose
+licence forbids embedding (or that lib/pdf refuses) is replaced by the set's face of its class.
+Pages larger than PDF allows (200 inches a side) are scaled down to fit.
+```
+
+- **`struct PdfOptions`**
+  what write puts into the PDF
+  - `pages: Vec<PageRef>` -- the pages in order (export::pages)
+  - `render: render::Options` -- background pages under the pages, hidden layers
+  - `links: bool` -- the shapes' hyperlinks as PDF links
+  - `bookmarks: bool` -- a bookmark per page (its name)
+  - `info: pdf::Info` -- the document information (title, author ...)
+  - `language: String` -- the document's language ("de-DE"; empty: none)
+
+- **`fn write(doc: &Document, fonts: &mut FontSet, opts: &PdfOptions) -> Result<Vec<u8>, pdf::Error>`**
+  the export: the pages of `opts` as a PDF document
+
+- **`struct Sheets<'f>`**
+  drawings on sheets of paper
+
+**`impl<'f> Sheets<'f>`**
+
+- **`fn new(fonts: &'f mut FontSet) -> Sheets<'f>`**
+  an empty document whose texts take their faces from `fonts`
+- **`fn pdf(&mut self) -> &mut pdf::Document`**
+  the document being written (outlines, information, language, compression)
+- **`fn skipped_runs(&self) -> u32`**
+  text runs left out so far because no font could be embedded
+- **`fn add(&mut self, doc: &Document, d: &Drawing, size: (f64, f64), place: Xform, clip: Option<[f64; 4]>, targets: &[(PageRef, PageId)], with_links: bool) -> PageId`**
+  a sheet of `size` points with the drawing on it: `place` maps paper inches (y up) to
+  sheet points (y up from the bottom left corner), `clip` (x0, y0, x1, y1 in sheet points)
+  cuts it (None: the sheet); `targets` names the PDF pages of the pages links may go to;
+  `with_links` writes the shapes' hyperlinks
+- **`fn finish(self) -> Result<Vec<u8>, pdf::Error>`**
+  the PDF's bytes
+
+### `diagram_view/src/export/raster.rs`
+
+Source: [`lib/diagram_view/src/export/raster.rs`](../lib/diagram_view/src/export/raster.rs)
+
+```text
+raster -- a page as pixels (EX-04 PNG, EX-05 JPEG) through the CPU path
+
+  render(view, &RasterOptions) -> Option<Surface>   the page (or a part of it) at a resolution:
+                                        XRGB on a colour, straight ARGB when transparent
+  size(view, &RasterOptions) -> (w, h)  the pixels render would make
+  png(sf, dpi) -> Option<Vec<u8>>       PNG (lossless, palette when it fits, pHYs = dpi)
+  jpeg(sf, quality, dpi, under)         JPEG (transparency over the colour `under`, JFIF density)
+  flatten(sf, color) -> Surface         straight ARGB over a colour -> XRGB
+
+The picture's top left pixel is the region's top left corner; one pixel is 1/dpi inch.  A
+transparent picture is drawn twice, on black and on white: where they differ the page let
+the background through, and colour and alpha follow from the two (exact for anything that
+blends linearly, which the CPU path does), so render2d needs no premultiplied target.
+```
+
+```rust
+/// the largest side render makes (larger requests give None)
+MAX_SIDE: u32 = 30_000
+/// the most pixels render makes (larger requests give None)
+MAX_PIXELS: u64 = 200_000_000
+```
+
+- **`enum Background`**
+  what lies under the page's shapes
+  - `Page` -- the page's own colour (white unless the page says otherwise)
+  - `Color(u32)` -- a colour 0xRRGGBB
+  - `Transparent` -- nothing: alpha 0 where no shape is
+
+- **`struct RasterOptions`**
+  what render draws
+  - `dpi: f64` -- pixels per paper inch (Visio: screen 96, printer 300, own)
+  - `region: Option<[f64; 4]>` -- the part of the page (paper inches, y up: x0, y0, x1, y1); None: the whole page
+  - `background: Background`
+
+- **`fn size(view: &PageView, opts: &RasterOptions) -> (u32, u32)`**
+  the size in pixels render makes for these options (0 when the resolution is not usable)
+
+- **`fn render(view: &mut PageView, opts: &RasterOptions) -> Option<Surface>`**
+  the page drawn at the options' resolution: FMT_XRGB on a colour, FMT_ARGB (straight) when
+  transparent; None when it would be larger than MAX_SIDE / MAX_PIXELS or memory is short
+
+- **`fn flatten(sf: &Surface, color: u32) -> Surface`**
+  a surface over a colour (0xRRGGBB) as XRGB: straight ARGB and premultiplied PARGB blend,
+  anything else counts as opaque
+
+- **`fn png(sf: &Surface, dpi: f64) -> Option<Vec<u8>>`**
+  PNG of a surface (render's): RGB or RGBA, a palette when there are few colours, the
+  resolution as pHYs
+
+- **`fn jpeg(sf: &Surface, quality: i32, dpi: f64, under: u32) -> Option<Vec<u8>>`**
+  JPEG of a surface at quality 1..100; a transparent one over `under` (0xRRGGBB); the
+  resolution as JFIF density
+
+### `diagram_view/src/export/svg.rs`
+
+Source: [`lib/diagram_view/src/export/svg.rs`](../lib/diagram_view/src/export/svg.rs)
+
+```text
+svg -- a page as an SVG document (EX-03)
+
+  write(doc, drawing, &SvgOptions) -> String     the display list of one page (PageView::
+                                                 drawing: measured with the fonts drawn)
+
+The document: width and height in inches, the viewBox in points (1/72 inch) with y down;
+the page's colour as a rectangle (unless transparent); per top-level shape a group
+(id "shape<ID>", data-name, optionally its shape data as data-prop-* attributes), the
+shape's hyperlinks as <a> around what the linked shape draws.  Items: fills as paths with
+fill-rule evenodd (solid, a linear or radial gradient in user space, a hatch as one pattern
+per line family: lines through the page's origin, a pixel at 96 DPI wide), lines as paths
+with width, dashes, caps and joins (a hairline stays one pixel: non-scaling-stroke), texts
+as <text> per run with its font family (and a generic family after it), size, weight, style,
+colour and the measured width as textLength (lengthAdjust spacingAndGlyphs, so a reader with
+another font keeps the layout), pictures as <image> with the file's own PNG / JPEG / GIF /
+BMP bytes (data: URI) cut at the shape's box, metafiles as the screen's placeholder.
+```
+
+- **`struct SvgOptions`**
+  what write puts into the SVG
+  - `background: bool` -- the page's colour under the shapes (false: transparent)
+  - `links: bool` -- the shapes' hyperlinks as &lt;a> elements (links to other pages as "#page-&lt;n>")
+  - `shape_data: bool` -- the shapes' shape data as data-prop-&lt;name> attributes of their groups
+  - `title: String` -- the document's &lt;title> (empty: none)
+
+- **`fn write(doc: &Document, drawing: &Drawing, opts: &SvgOptions) -> String`**
+  the page of `drawing` as an SVG document
 
 ### `diagram_view/src/fonts.rs`
 

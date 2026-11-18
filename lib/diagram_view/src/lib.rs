@@ -10,6 +10,7 @@
 //   view.fit(size, margin) -> Camera
 //   image::{bytes, decode, base64}   Foreign shapes' pictures: PNG and JPEG decoded, EMF / WMF
 //                                    and the rest as placeholders
+//   export::{pdf, svg, raster}       (JD12) pages as PDF (lib/pdf), SVG, PNG and JPEG
 //
 // Why a crate of its own (JD4): diagram_core holds the model and the display list without any
 // dependency, so that diagram_io's exports (SVG, PDF, JD12) and JD7's hit tests use the same
@@ -27,6 +28,7 @@
 extern crate alloc;
 
 mod direct;
+pub mod export;
 pub mod fonts;
 pub mod image;
 mod view;

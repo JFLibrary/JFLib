@@ -3,7 +3,9 @@
 // Objects in a fixed order: 1 catalog, 2 page tree, 3 document information, 4 XMP metadata,
 // then per page its page object, content stream and link annotations, then the fonts the
 // pages use (Type0, CIDFont, FontDescriptor, font program, ToUnicode), the images they use
-// (with their soft masks) and the outlines.  Fonts and images no page draws are left out.
+// (with their soft masks), the shadings (gradients), the soft mask groups of gradients with
+// varying alpha (form XObjects; their ExtGStates sit in the page resources like the alpha ones)
+// and the outlines.  Fonts, images and shadings no page draws are left out.
 // The file ID is a hash of the bytes before the xref table.
 
 use alloc::boxed::Box;
@@ -81,6 +83,8 @@ struct Plan {
     annots: Vec<Vec<u32>>,
     fonts: BTreeMap<usize, u32>,
     images: BTreeMap<usize, (u32, Option<u32>)>,
+    shadings: BTreeMap<usize, u32>,
+    masks: BTreeMap<usize, u32>,
     outline_root: u32,
     outlines: Vec<u32>,
     size: u32,
@@ -115,6 +119,8 @@ pub(crate) fn write(doc: &Document) -> Result<Vec<u8>, Error> {
     // the font programs first: a damaged font fails before anything is written
     let used_fonts: BTreeSet<usize> = doc.pages.iter().flat_map(|p| p.fonts.iter().copied()).collect();
     let used_images: BTreeSet<usize> = doc.pages.iter().flat_map(|p| p.images.iter().copied()).collect();
+    let used_masks: BTreeSet<usize> = doc.pages.iter().flat_map(|p| p.masks.iter().copied()).collect();
+    let used_shadings: BTreeSet<usize> = doc.pages.iter().flat_map(|p| p.shadings.iter().copied()).chain(used_masks.iter().map(|&m| doc.masks[m].0)).collect();
     let mut programs = BTreeMap::new();
     for &f in &used_fonts {
         programs.insert(f, doc.fonts[f].program()?);
@@ -126,7 +132,7 @@ pub(crate) fn write(doc: &Document) -> Result<Vec<u8>, Error> {
         next += k;
         n
     };
-    let mut plan = Plan { page: vec![], content: vec![], annots: vec![], fonts: BTreeMap::new(), images: BTreeMap::new(), outline_root: 0, outlines: vec![], size: 0 };
+    let mut plan = Plan { page: vec![], content: vec![], annots: vec![], fonts: BTreeMap::new(), images: BTreeMap::new(), shadings: BTreeMap::new(), masks: BTreeMap::new(), outline_root: 0, outlines: vec![], size: 0 };
     for p in &doc.pages {
         plan.page.push(take(1));
         plan.content.push(take(1));
@@ -139,6 +145,12 @@ pub(crate) fn write(doc: &Document) -> Result<Vec<u8>, Error> {
         let n = take(1);
         let m = doc.images[i].alpha.as_ref().map(|_| take(1));
         plan.images.insert(i, (n, m));
+    }
+    for &s in &used_shadings {
+        plan.shadings.insert(s, take(1));
+    }
+    for &m in &used_masks {
+        plan.masks.insert(m, take(1));
     }
     if !doc.outlines.is_empty() {
         plan.outline_root = take(1);
@@ -205,7 +217,7 @@ pub(crate) fn write(doc: &Document) -> Result<Vec<u8>, Error> {
             }
             b.extend_from_slice(b" >>");
         }
-        if !p.gstates.is_empty() {
+        if !p.gstates.is_empty() || !p.masks.is_empty() {
             b.extend_from_slice(b" /ExtGState <<");
             for &g in &p.gstates {
                 let (fa, sa) = doc.alphas[g];
@@ -214,6 +226,19 @@ pub(crate) fn write(doc: &Document) -> Result<Vec<u8>, Error> {
                 b.extend_from_slice(b" /CA ");
                 num(&mut b, sa as f64 / 1000.0);
                 b.extend_from_slice(b" >>");
+            }
+            for &m in &p.masks {
+                let _ = write!(Fmt(&mut b), " /M{m} << /Type /ExtGState /SMask << /Type /Mask /S /Luminosity /G ");
+                obj::r(&mut b, plan.masks[&m]);
+                b.extend_from_slice(b" >> >>");
+            }
+            b.extend_from_slice(b" >>");
+        }
+        if !p.shadings.is_empty() {
+            b.extend_from_slice(b" /Shading <<");
+            for &s in &p.shadings {
+                let _ = write!(Fmt(&mut b), " /Sh{s} ");
+                obj::r(&mut b, plan.shadings[&s]);
             }
             b.extend_from_slice(b" >>");
         }
@@ -337,6 +362,25 @@ pub(crate) fn write(doc: &Document) -> Result<Vec<u8>, Error> {
             }
             samples(&mut w, m, b, a, img.w, 1);
         }
+    }
+
+    // shadings, and the soft mask groups painting the gray ones: their form space is the user
+    // space at the time of the page's gs (no /Matrix), where the gray shading has its coordinates
+    for (&s, &n) in &plan.shadings {
+        w.dict(n, &doc.shadings[s]);
+    }
+    for (&m, &n) in &plan.masks {
+        let (g, bbox) = doc.masks[m];
+        let mut b = Vec::new();
+        b.extend_from_slice(b"/Type /XObject /Subtype /Form /BBox ");
+        obj::nums(&mut b, &bbox);
+        b.extend_from_slice(b" /Group << /Type /Group /S /Transparency /CS /DeviceGray >> /Resources << /Shading <<");
+        let _ = write!(Fmt(&mut b), " /Sh{g} ");
+        obj::r(&mut b, plan.shadings[&g]);
+        b.extend_from_slice(b" >> >>");
+        let mut content = Vec::new();
+        let _ = write!(Fmt(&mut content), "/Sh{g} sh\n");
+        w.stream(n, &b, &content);
     }
 
     // outlines

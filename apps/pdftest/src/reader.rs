@@ -14,7 +14,13 @@
 // On top: the page tree (pages), stream decoding (stream_data: FlateDecode with PNG predictors,
 // DCTDecode returned raw), content stream tokens (content_ops) and their grammar (check_content:
 // operators, operand types, path / text object nesting, q/Q, BT/ET, BMC/EMC balance), ToUnicode
-// CMaps (cmap_map) and check_all, which runs all of these over a whole document.
+// CMaps (cmap_map) and check_all, which runs all of these over a whole document.  What a content
+// stream uses is checked where it is used: shadings for sh (check_shading: types 1 .. 7, colour
+// space, Coords, Domain, Extend, and their functions by check_function: types 0, 2, 3, 4 with
+// Domain, Range, C0 / C1, N, Functions, Bounds, Encode), graphics states for gs (alpha values,
+// soft masks with their transparency group, whose content is checked like a form), patterns for
+// scn / SCN (tiling: PaintType, TilingType, BBox, XStep / YStep, Resources, content; shading
+// patterns), pattern names only in a Pattern colour space.
 //
 // No panics on any input: every index is checked, nesting is limited, all work is linear in the
 // input (plus the decoded stream sizes, capped at 256 MiB per stream).
@@ -1624,7 +1630,7 @@ impl Pdf {
             let tiling = self.lookup(d, "PatternType").and_then(Obj::as_int) == Some(1);
             if form && !forms.done.contains(num) {
                 self.check_form(*num, None, &mut forms)?;
-            } else if tiling {
+            } else if tiling && forms.done.insert(*num) {
                 let data = self.stream_data(o).map_err(|e| format!("object {num}: {e}"))?;
                 let res = self.lookup(d, "Resources").and_then(Obj::as_dict);
                 self.check_drawing(&data, res, &format!("tiling pattern object {num}"), &mut forms)?;
@@ -1675,11 +1681,62 @@ impl Pdf {
         r
     }
 
-    /// a content stream: grammar, resource names, the form XObjects it draws
+    /// a content stream: grammar, resource names, the form XObjects it draws, the shadings (sh),
+    /// graphics states (gs, soft masks among them) and patterns (scn / SCN) it uses, and pattern
+    /// colours only in a Pattern colour space (cs / CS, q / Q) and only there
     fn check_drawing(&self, data: &[u8], res: Option<&Dict>, what: &str, forms: &mut FormWalk) -> Result<(), String> {
         let ops = ops_at(data, "content offset").map_err(|e| format!("{what}: {e}"))?;
         check_ops(&ops).map_err(|e| format!("{what}: {e}"))?;
+        // per q level: (stroking, nonstroking) colour space is a Pattern space; DeviceGray at first
+        let mut spaces: Vec<(bool, bool)> = vec![(false, false)];
         for (at, operands, op) in &ops {
+            let e = |msg: String| Err(format!("{what}: content offset {at}: '{}': {msg}", show(op)));
+            let cur = spaces.last().copied().unwrap_or((false, false));
+            match op.as_slice() {
+                b"q" => spaces.push(cur),
+                b"Q" if spaces.len() > 1 => {
+                    spaces.pop();
+                }
+                b"CS" | b"cs" => {
+                    let n = operands.first().and_then(Obj::as_name).unwrap_or(b"");
+                    let pattern = match n {
+                        b"Pattern" => true,
+                        b"DeviceGray" | b"DeviceRGB" | b"DeviceCMYK" => false,
+                        _ => self.res_entry(res, "ColorSpace", n).map(|o| self.resolve(o)).is_some_and(|cs| match cs {
+                            Obj::Name(x) => x == b"Pattern",
+                            Obj::Array(a) => a.first().is_some_and(|f| f.is_name("Pattern")),
+                            _ => false,
+                        }),
+                    };
+                    if let Some(s) = spaces.last_mut() {
+                        if op.as_slice() == b"CS" { s.0 = pattern } else { s.1 = pattern }
+                    }
+                }
+                b"G" | b"RG" | b"K" => {
+                    if let Some(s) = spaces.last_mut() {
+                        s.0 = false;
+                    }
+                }
+                b"g" | b"rg" | b"k" => {
+                    if let Some(s) = spaces.last_mut() {
+                        s.1 = false;
+                    }
+                }
+                b"SC" | b"SCN" | b"sc" | b"scn" => {
+                    let pattern = if op.first() == Some(&b'S') { cur.0 } else { cur.1 };
+                    let named = operands.last().is_some_and(|o| o.as_name().is_some());
+                    if named && !pattern {
+                        return e(String::from("a pattern name, but the colour space is not a Pattern space"));
+                    }
+                    if !named && pattern {
+                        return e(String::from("a Pattern colour space needs a pattern name"));
+                    }
+                    if named && matches!(op.as_slice(), b"SC" | b"sc") {
+                        return e(String::from("SC / sc take no pattern name (SCN / scn do)"));
+                    }
+                }
+                _ => {}
+            }
             let need: Option<(&str, &[u8])> = match (op.as_slice(), operands.as_slice()) {
                 (b"Tf", [Obj::Name(n), ..]) => Some(("Font", n)),
                 (b"Do", [Obj::Name(n)]) => Some(("XObject", n)),
@@ -1734,8 +1791,383 @@ impl Pdf {
                     _ => return Err(format!("{what}: XObject /{} has /Subtype /{}", show(name), show(sub))),
                 }
             }
+            match op.as_slice() {
+                b"sh" => self.check_shading(found).map_err(|e| format!("{what}: shading /{}: {e}", show(name)))?,
+                b"gs" => self.check_gstate(found, forms).map_err(|e| format!("{what}: ExtGState /{}: {e}", show(name)))?,
+                b"SCN" | b"scn" => {
+                    let num = self.res_entry(res, "Pattern", name).and_then(Obj::as_ref_id).map(|r| r.0);
+                    let paint = self.check_pattern(found, num, forms).map_err(|e| format!("{what}: pattern /{}: {e}", show(name)))?;
+                    // a coloured pattern (and a shading pattern) takes the name alone, an uncoloured
+                    // one colour components before it
+                    let ok = if paint == 2 { operands.len() >= 2 } else { operands.len() == 1 };
+                    if !ok {
+                        return Err(format!("{what}: content offset {at}: '{}' with {} operands for a pattern of PaintType {paint}", show(op), operands.len()));
+                    }
+                }
+                _ => {}
+            }
         }
         Ok(())
+    }
+
+    /// a resource's entry as written (unresolved): res / cat / name
+    fn res_entry<'a>(&'a self, res: Option<&'a Dict>, cat: &str, name: &[u8]) -> Option<&'a Obj> {
+        res.and_then(|r| self.lookup(r, cat)).and_then(Obj::as_dict).and_then(|c| c.0.iter().find(|(k, _)| k.as_slice() == name)).map(|(_, v)| v)
+    }
+
+    /// the number of colour components of a colour space for shadings (8.6): the device spaces,
+    /// [/CalGray ..] [/CalRGB ..] [/Lab ..] [/ICCBased stream] [/Separation ..] [/DeviceN names ..]
+    /// [/Indexed ..]; a Pattern space is an error
+    fn components(&self, cs: Option<&Obj>) -> Result<usize, String> {
+        let Some(cs) = cs else { return Err(String::from("no /ColorSpace")) };
+        let fam = match cs {
+            Obj::Name(n) => n.as_slice(),
+            Obj::Array(a) => a.first().map(|f| self.resolve(f)).and_then(Obj::as_name).unwrap_or(b""),
+            o => return Err(format!("/ColorSpace is {}", o.kind())),
+        };
+        let arg = |i: usize| cs.as_array().and_then(|a| a.get(i)).map(|o| self.resolve(o));
+        Ok(match fam {
+            b"DeviceGray" | b"CalGray" | b"Separation" | b"Indexed" => 1,
+            b"DeviceRGB" | b"CalRGB" | b"Lab" => 3,
+            b"DeviceCMYK" => 4,
+            b"ICCBased" => match arg(1).and_then(Obj::as_dict).and_then(|d| self.lookup(d, "N")).and_then(Obj::as_int) {
+                Some(n @ (1 | 3 | 4)) => n as usize,
+                n => return Err(format!("/ICCBased /N is {n:?}, not 1, 3 or 4")),
+            },
+            b"DeviceN" => match arg(1).and_then(Obj::as_array) {
+                Some(names) if !names.is_empty() && names.iter().all(|n| self.resolve(n).as_name().is_some()) => names.len(),
+                _ => return Err(String::from("/DeviceN without an array of colorant names")),
+            },
+            b"Pattern" => return Err(String::from("a Pattern colour space where a colour is needed")),
+            other => return Err(format!("unknown colour space family /{}", show(other))),
+        })
+    }
+
+    /// an array of n numbers (n None: any length), each resolved
+    fn numbers(&self, o: Option<&Obj>, n: Option<usize>, key: &str) -> Result<Vec<f64>, String> {
+        let Some(a) = o.and_then(Obj::as_array) else { return Err(format!("/{key} is not an array")) };
+        let v: Vec<f64> = a.iter().filter_map(|x| self.resolve(x).as_num()).collect();
+        if v.len() != a.len() {
+            return Err(format!("/{key} holds something else than numbers"));
+        }
+        if n.is_some_and(|n| n != v.len()) {
+            return Err(format!("/{key} has {} numbers, not {}", v.len(), n.unwrap_or(0)));
+        }
+        Ok(v)
+    }
+
+    /// a shading (8.7.4.5): ShadingType 1 .. 7 (1 .. 3 dictionaries, 4 .. 7 streams), ColorSpace
+    /// (not Pattern), Background (one number per component), BBox (four numbers), AntiAlias (a
+    /// boolean); types 2 and 3: Coords (4 numbers; 6 with both radii >= 0), Domain (t0 < t1),
+    /// Extend (two booleans) and Function (one input and a value per component, or one function of
+    /// one input and output per component); type 1: Function and Domain (four numbers)
+    pub fn check_shading(&self, o: &Obj) -> Result<(), String> {
+        let d = match o {
+            Obj::Dict(d) | Obj::Stream(d, _) => d,
+            o => return Err(format!("a shading is {}", o.kind())),
+        };
+        let ty = match self.lookup(d, "ShadingType") {
+            Some(Obj::Int(t)) if (1..=7).contains(t) => *t,
+            t => return Err(format!("/ShadingType is {t:?}, not 1 .. 7")),
+        };
+        if (ty <= 3) != matches!(o, Obj::Dict(_)) {
+            return Err(format!("a shading of type {ty} must be a {}", if ty <= 3 { "dictionary" } else { "stream" }));
+        }
+        let n = self.components(self.lookup(d, "ColorSpace"))?;
+        if d.has("Background") {
+            self.numbers(self.lookup(d, "Background"), Some(n), "Background")?;
+        }
+        if d.has("BBox") {
+            self.numbers(self.lookup(d, "BBox"), Some(4), "BBox")?;
+        }
+        if d.has("AntiAlias") && self.lookup(d, "AntiAlias").and_then(Obj::as_bool).is_none() {
+            return Err(String::from("/AntiAlias is not a boolean"));
+        }
+        let indexed = self.lookup(d, "ColorSpace").and_then(Obj::as_array).and_then(|a| a.first()).is_some_and(|f| self.resolve(f).is_name("Indexed"));
+        match ty {
+            2 | 3 => {
+                let c = self.numbers(self.lookup(d, "Coords"), Some(if ty == 2 { 4 } else { 6 }), "Coords")?;
+                if ty == 3 && (c[2] < 0.0 || c[5] < 0.0) {
+                    return Err(format!("radial /Coords with a negative radius: {c:?}"));
+                }
+                if d.has("Domain") {
+                    let dom = self.numbers(self.lookup(d, "Domain"), Some(2), "Domain")?;
+                    if dom[0] >= dom[1] {
+                        return Err(format!("/Domain {dom:?} is not t0 < t1"));
+                    }
+                }
+                if d.has("Extend") {
+                    let ext = self.lookup(d, "Extend").and_then(Obj::as_array).unwrap_or(&[]);
+                    if ext.len() != 2 || !ext.iter().all(|b| self.resolve(b).as_bool().is_some()) {
+                        return Err(String::from("/Extend is not an array of two booleans"));
+                    }
+                }
+                if indexed {
+                    return Err(String::from("an Indexed colour space with a /Function"));
+                }
+                self.shading_function(d, 1, n)
+            }
+            1 => {
+                if d.has("Domain") {
+                    self.numbers(self.lookup(d, "Domain"), Some(4), "Domain")?;
+                }
+                self.shading_function(d, 2, n)
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// a shading's /Function: one function of `inputs` inputs and n outputs, or an array of n
+    /// functions of one output each
+    fn shading_function(&self, d: &Dict, inputs: usize, n: usize) -> Result<(), String> {
+        match self.lookup(d, "Function") {
+            None => Err(String::from("no /Function")),
+            Some(Obj::Array(fs)) => {
+                if fs.len() != n {
+                    return Err(format!("/Function is an array of {}, the colour space has {n} components", fs.len()));
+                }
+                for f in fs {
+                    let out = self.check_function(f, inputs, 0)?;
+                    if out != 1 {
+                        return Err(format!("a function of the /Function array has {out} outputs, not 1"));
+                    }
+                }
+                Ok(())
+            }
+            Some(f) => {
+                let out = self.check_function(f, inputs, 0)?;
+                if out != n {
+                    return Err(format!("/Function has {out} outputs, the colour space {n} components"));
+                }
+                Ok(())
+            }
+        }
+    }
+
+    /// a function (7.10) with `inputs` inputs -> its number of outputs.  FunctionType 0 (a stream:
+    /// Size, BitsPerSample, Range), 2 (a dictionary: C0 and C1 of one length, N a number; a
+    /// non-integer N needs a domain without negative values, a negative N one without 0), 3 (a
+    /// dictionary: Functions of one input with the same outputs, Bounds k - 1 numbers rising
+    /// strictly inside Domain, Encode 2 k numbers), 4 (a stream with Range); Domain always (2 m
+    /// numbers, each pair ordered), Range where given (pairs ordered, one per output)
+    pub fn check_function(&self, o: &Obj, inputs: usize, depth: usize) -> Result<usize, String> {
+        if depth > 16 {
+            return Err(String::from("stitching functions nested deeper than 16"));
+        }
+        let o = self.resolve(o);
+        let (Obj::Dict(d) | Obj::Stream(d, _)) = o else { return Err(format!("a function is {}", o.kind())) };
+        let ty = match self.lookup(d, "FunctionType") {
+            Some(Obj::Int(t @ (0 | 2 | 3 | 4))) => *t,
+            t => return Err(format!("/FunctionType is {t:?}, not 0, 2, 3 or 4")),
+        };
+        if matches!(ty, 0 | 4) != matches!(o, Obj::Stream(..)) {
+            return Err(format!("a function of type {ty} must be a {}", if matches!(ty, 0 | 4) { "stream" } else { "dictionary" }));
+        }
+        let dom = self.numbers(self.lookup(d, "Domain"), Some(2 * inputs), "Domain")?;
+        if dom.chunks(2).any(|p| p[0] > p[1]) {
+            return Err(format!("/Domain {dom:?} has a pair with its minimum above its maximum"));
+        }
+        let range = if d.has("Range") {
+            let r = self.numbers(self.lookup(d, "Range"), None, "Range")?;
+            if r.is_empty() || r.len() % 2 != 0 || r.chunks(2).any(|p| p[0] > p[1]) {
+                return Err(format!("/Range {r:?} is not pairs of minimum and maximum"));
+            }
+            Some(r.len() / 2)
+        } else {
+            None
+        };
+        let out = match ty {
+            0 => {
+                let size = self.lookup(d, "Size").and_then(Obj::as_array).unwrap_or(&[]);
+                if size.len() != inputs || !size.iter().all(|s| self.resolve(s).as_int().is_some_and(|v| v > 0)) {
+                    return Err(format!("/Size is not {inputs} positive integers"));
+                }
+                if !self.lookup(d, "BitsPerSample").and_then(Obj::as_int).is_some_and(|b| matches!(b, 1 | 2 | 4 | 8 | 12 | 16 | 24 | 32)) {
+                    return Err(String::from("/BitsPerSample is not 1, 2, 4, 8, 12, 16, 24 or 32"));
+                }
+                range.ok_or_else(|| String::from("a sampled function without /Range"))?
+            }
+            2 => {
+                if inputs != 1 {
+                    return Err(format!("an exponential function has one input, not {inputs}"));
+                }
+                let c0 = if d.has("C0") { self.numbers(self.lookup(d, "C0"), None, "C0")? } else { vec![0.0] };
+                let c1 = if d.has("C1") { self.numbers(self.lookup(d, "C1"), None, "C1")? } else { vec![1.0] };
+                if c0.len() != c1.len() || c0.is_empty() {
+                    return Err(format!("/C0 has {} values, /C1 {}", c0.len(), c1.len()));
+                }
+                let Some(n) = self.lookup(d, "N").and_then(Obj::as_num) else {
+                    return Err(String::from("an exponential function without a number /N"));
+                };
+                if n != (n as i64) as f64 && dom[0] < 0.0 {
+                    return Err(format!("/N {n} is not an integer, but /Domain {dom:?} reaches below 0"));
+                }
+                if n < 0.0 && dom[0] <= 0.0 && dom[1] >= 0.0 {
+                    return Err(format!("/N {n} is negative, but /Domain {dom:?} holds 0"));
+                }
+                c0.len()
+            }
+            3 => {
+                if inputs != 1 {
+                    return Err(format!("a stitching function has one input, not {inputs}"));
+                }
+                let fs = self.lookup(d, "Functions").and_then(Obj::as_array).unwrap_or(&[]);
+                if fs.is_empty() {
+                    return Err(String::from("a stitching function without /Functions"));
+                }
+                let mut out = None;
+                for f in fs {
+                    let o = self.check_function(f, 1, depth + 1)?;
+                    if out.is_some_and(|x| x != o) {
+                        return Err(String::from("the /Functions of a stitching function differ in their outputs"));
+                    }
+                    out = Some(o);
+                }
+                let k = fs.len();
+                let b = self.numbers(self.lookup(d, "Bounds"), Some(k - 1), "Bounds")?;
+                if k > 1 && dom[0] >= dom[1] {
+                    return Err(format!("/Domain {dom:?} of a stitching function is empty"));
+                }
+                // rising strictly: an empty subdomain would make its /Encode map divide by zero
+                if b.windows(2).any(|w| w[0] >= w[1]) || b.iter().any(|&x| x < dom[0] || x > dom[1]) {
+                    return Err(format!("/Bounds {b:?} do not rise strictly inside /Domain {dom:?}"));
+                }
+                self.numbers(self.lookup(d, "Encode"), Some(2 * k), "Encode")?;
+                out.unwrap_or(0)
+            }
+            _ => range.ok_or_else(|| String::from("a PostScript calculator function without /Range"))?,
+        };
+        if range.is_some_and(|r| r != out) {
+            return Err(format!("/Range has {} pairs, the function {out} outputs", range.unwrap_or(0)));
+        }
+        Ok(out)
+    }
+
+    /// a graphics state parameter dictionary (8.4.5): /Type /ExtGState if given, ca / CA numbers
+    /// 0 .. 1, LW >= 0, SMask /None or a soft-mask dictionary (11.6.5.2, Table 144: /Type /Mask if
+    /// given, /S /Alpha or /Luminosity, /G an indirect form XObject that is a transparency group
+    /// (11.6.6), for Luminosity with a /CS, BC one number per component of it, TR /Identity or a
+    /// function of one input and output); the group's content is checked like a form's
+    fn check_gstate(&self, o: &Obj, forms: &mut FormWalk) -> Result<(), String> {
+        let Obj::Dict(d) = o else { return Err(format!("an ExtGState is {}", o.kind())) };
+        if d.has("Type") && !self.lookup(d, "Type").is_some_and(|t| t.is_name("ExtGState")) {
+            return Err(String::from("/Type is not /ExtGState"));
+        }
+        for key in ["ca", "CA"] {
+            if d.has(key) && !self.lookup(d, key).and_then(Obj::as_num).is_some_and(|v| (0.0..=1.0).contains(&v)) {
+                return Err(format!("/{key} is not a number from 0 to 1"));
+            }
+        }
+        if d.has("LW") && !self.lookup(d, "LW").and_then(Obj::as_num).is_some_and(|v| v >= 0.0) {
+            return Err(String::from("/LW is not a number >= 0"));
+        }
+        let Some(sm) = self.lookup(d, "SMask") else { return Ok(()) };
+        let m = match sm {
+            Obj::Name(n) if n == b"None" => return Ok(()),
+            Obj::Dict(m) => m,
+            o => return Err(format!("/SMask is {}, not /None or a soft-mask dictionary", o.kind())),
+        };
+        if m.has("Type") && !self.lookup(m, "Type").is_some_and(|t| t.is_name("Mask")) {
+            return Err(String::from("the soft mask's /Type is not /Mask"));
+        }
+        let lum = match self.lookup(m, "S").and_then(Obj::as_name) {
+            Some(b"Luminosity") => true,
+            Some(b"Alpha") => false,
+            s => return Err(format!("the soft mask's /S is {s:?}, not /Alpha or /Luminosity")),
+        };
+        let Some((gnum, _)) = m.get("G").and_then(Obj::as_ref_id) else {
+            return Err(String::from("the soft mask's /G is not an indirect reference"));
+        };
+        let Some(Obj::Stream(g, _)) = self.get(gnum) else {
+            return Err(format!("the soft mask's /G (object {gnum}) is not a stream"));
+        };
+        if !self.lookup(g, "Subtype").is_some_and(|s| s.is_name("Form")) {
+            return Err(format!("the soft mask's /G (object {gnum}) is not a form XObject"));
+        }
+        let Some(grp) = self.lookup(g, "Group").and_then(Obj::as_dict) else {
+            return Err(format!("the soft mask's /G (object {gnum}) has no /Group"));
+        };
+        if !self.lookup(grp, "S").is_some_and(|s| s.is_name("Transparency")) {
+            return Err(format!("the soft mask's group (object {gnum}) is not /S /Transparency"));
+        }
+        if grp.has("CS") || lum {
+            let n = self.components(self.lookup(grp, "CS")).map_err(|e| format!("the soft mask's group (object {gnum}): {e}"))?;
+            if m.has("BC") {
+                self.numbers(self.lookup(m, "BC"), Some(n), "BC")?;
+            }
+        }
+        match self.lookup(m, "TR") {
+            None => {}
+            Some(Obj::Name(n)) if n == b"Identity" => {}
+            Some(f) => {
+                if self.check_function(f, 1, 0)? != 1 {
+                    return Err(String::from("the soft mask's /TR has more than one output"));
+                }
+            }
+        }
+        self.check_form(gnum, None, forms)
+    }
+
+    /// a pattern (8.7.3) -> its PaintType (1 for shading patterns).  PatternType 1, tiling: a
+    /// stream with PaintType 1 or 2, TilingType 1 .. 3, BBox four numbers with an area, XStep and
+    /// YStep numbers other than 0, Resources a dictionary, Matrix six numbers; its content checked
+    /// like a form's with those resources (once per object).  PatternType 2, shading: a dictionary
+    /// whose Shading check_shading takes, Matrix six numbers, ExtGState checked by check_gstate
+    fn check_pattern(&self, o: &Obj, num: Option<u32>, forms: &mut FormWalk) -> Result<i64, String> {
+        let (Obj::Dict(d) | Obj::Stream(d, _)) = o else { return Err(format!("a pattern is {}", o.kind())) };
+        if d.has("Type") && !self.lookup(d, "Type").is_some_and(|t| t.is_name("Pattern")) {
+            return Err(String::from("/Type is not /Pattern"));
+        }
+        if d.has("Matrix") {
+            self.numbers(self.lookup(d, "Matrix"), Some(6), "Matrix")?;
+        }
+        match self.lookup(d, "PatternType").and_then(Obj::as_int) {
+            Some(1) => {
+                let Obj::Stream(..) = o else { return Err(String::from("a tiling pattern is not a stream")) };
+                let paint = match self.lookup(d, "PaintType").and_then(Obj::as_int) {
+                    Some(p @ (1 | 2)) => p,
+                    p => return Err(format!("/PaintType is {p:?}, not 1 or 2")),
+                };
+                if !self.lookup(d, "TilingType").and_then(Obj::as_int).is_some_and(|t| (1..=3).contains(&t)) {
+                    return Err(String::from("/TilingType is not 1, 2 or 3"));
+                }
+                let bb = self.numbers(self.lookup(d, "BBox"), Some(4), "BBox")?;
+                if bb[0] == bb[2] || bb[1] == bb[3] {
+                    return Err(format!("/BBox {bb:?} has no area"));
+                }
+                for key in ["XStep", "YStep"] {
+                    if !self.lookup(d, key).and_then(Obj::as_num).is_some_and(|v| v != 0.0) {
+                        return Err(format!("/{key} is not a number other than 0"));
+                    }
+                }
+                let Some(res) = self.lookup(d, "Resources").and_then(Obj::as_dict) else {
+                    return Err(String::from("a tiling pattern without a /Resources dictionary"));
+                };
+                if let Some(n) = num {
+                    if forms.stack.contains(&n) {
+                        return Err(format!("tiling pattern object {n} paints itself"));
+                    }
+                    if forms.done.insert(n) {
+                        let data = self.stream_data(o)?;
+                        forms.stack.push(n);
+                        let r = self.check_drawing(&data, Some(res), &format!("tiling pattern object {n}"), forms);
+                        forms.stack.pop();
+                        r?;
+                    }
+                }
+                Ok(paint)
+            }
+            Some(2) => {
+                let Obj::Dict(_) = o else { return Err(String::from("a shading pattern is not a dictionary")) };
+                let Some(sh) = self.lookup(d, "Shading") else { return Err(String::from("a shading pattern without /Shading")) };
+                self.check_shading(sh)?;
+                if let Some(gs) = self.lookup(d, "ExtGState") {
+                    self.check_gstate(gs, forms)?;
+                }
+                Ok(1)
+            }
+            t => Err(format!("/PatternType is {t:?}, not 1 or 2")),
+        }
     }
 }
 

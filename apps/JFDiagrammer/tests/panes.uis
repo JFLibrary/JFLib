@@ -48,8 +48,13 @@ expect checkbox:"Gitternetz" checked
 expect checkbox:"Lineal" disabled
 # the page's context menu on the canvas, the page tab's, the stencils'
 rclick canvas:"Zeichenfläche"
-expect "Seite einrichten" disabled
+expect "Seite einrichten" enabled
+# (JD12) Seite einrichten without a drawing: the dialog says what is missing
+click "Seite einrichten"
+expect dialog:"Seite einrichten" exists
+expect text:"Öffnen Sie eine Zeichnung, um ihre Seiten einzurichten." exists
 key esc
+expect dialog:"Seite einrichten" missing
 rclick tab:"Seite-1"
 expect "Seite umbenennen" disabled
 key esc

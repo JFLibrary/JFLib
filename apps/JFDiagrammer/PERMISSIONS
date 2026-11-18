@@ -4,5 +4,5 @@
 #
 # Stage JD0 (the empty window) needs no rule.  The rules come with the functions (PLAN.md):
 fs.user                              # JD4: the drawings and stencils the user opens (the file dialog, the command line), later saves
-# print                              JD12: printing (plat::print)
+print                                # JD12: printing (plat::PrintDoc: the system's print dialog, the portal)
 # url https mailto                   JD8: a shape's hyperlink, after the app shows the address

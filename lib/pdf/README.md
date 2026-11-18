@@ -13,6 +13,10 @@ JFDiagrammer exports its drawings with it; jfWord can use it for its documents a
   rectangles, ellipses and arcs; fills with the non-zero or even-odd rule; strokes with width,
   dash pattern, caps, joins and miter limit; transforms, clipping, separate alpha for fills and
   strokes, RGB colours.
+- **Gradients and hatches:** axial and radial gradients with any number of colour stops (hard
+  edges too) and alpha per stop, either filling a path or painting the whole clip; varying alpha
+  becomes a soft mask. Hatches fill a path with parallel lines of any angle, spacing, width and
+  colour; two hatches cross.
 - **Images:** JPEG files go in unchanged (DCTDecode, also progressive and CMYK); any other pixels
   (gray, RGB, RGBA or a `gfx::Surface`) are compressed with PNG predictors and DEFLATE, their
   alpha becomes a soft mask.
@@ -31,7 +35,7 @@ PDF/A, encryption and forms. Fonts whose licence (OS/2 `fsType`) forbids embeddi
 ## How it is used
 
 ```rust
-use jflib::pdf::{Dest, Document, FillRule, Origin, Rgb, A4};
+use jflib::pdf::{Dest, Document, FillRule, Hatch, Origin, Rgb, Shading, A4};
 
 let mut doc = Document::new();
 let page = doc.add_page(A4.0, A4.1);                     // points, 1/72 inch
@@ -41,6 +45,11 @@ let font = doc.add_font(font_bytes, 0)?;                 // a .ttf, .otf or a co
     c.set_fill_color(Rgb::hex(0x2060C0));
     c.rounded_rect(50.0, 50.0, 200.0, 80.0, 8.0);
     c.fill(FillRule::NonZero);
+    c.rect(50.0, 200.0, 200.0, 40.0);                    // a gradient from left to right
+    c.fill_shading(FillRule::NonZero, &Shading::axial([50.0, 0.0], [250.0, 0.0],
+        &[(0.0, Rgb::hex(0x2060C0), 1.0), (1.0, Rgb::hex(0x2060C0), 0.0)]));
+    c.rect(50.0, 260.0, 200.0, 40.0);                    // hatched at 45 degrees
+    c.fill_hatch(FillRule::NonZero, &Hatch::new(0.785, 6.0, 1.0, Rgb::BLACK));
     c.set_fill_color(Rgb::BLACK);
     let w = c.text(font, 12.0, 50.0, 160.0, "Hallo, Welt");
     c.link_uri(50.0, 148.0, w, 16.0, "https://jflib.org");

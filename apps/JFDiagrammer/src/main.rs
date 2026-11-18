@@ -20,6 +20,9 @@
 //   src/icons.rs      the ribbon icons (JD14: own artwork in icons/*.svg, mkicons.py)
 //   src/viewer.rs     (JD4) the drawing opened read-only: loading, pages, the canvas' paint
 //                     (diagram_core's display list drawn by diagram_view on render2d)
+//   src/export_ui.rs  (JD12) Datei › Exportieren: PDF, SVG, PNG, JPEG, the page on the clipboard
+//   src/print_ui.rs   (JD12) Datei › Drucken with its preview, the dialog Seite einrichten
+//   src/print_layout.rs  (JD12) the print setup, sheets and tiles, the job (plat::PrintDoc)
 //   lang/shortcuts.tsv   the shortcuts of each language (Office conventions, LG-08)
 //   lang/glossary.tsv    the binding terms in five languages (LG-06)
 //   check_lang.py        the language check (LG-11): catalogue, glossary, shortcuts
@@ -34,7 +37,8 @@
 // JD7 brings real ones (context registers, the shape's menu, the measures in the status bar);
 // --config PATH keeps the settings in that file (headless runs keep them in memory otherwise);
 // a drawing on the command line opens at start (JD4); --no-system-fonts draws with the style's
-// fonts only (the same on every machine).
+// fonts only (the same on every machine); --export-dir DIR puts DIR in front of the name the
+// export's save dialog proposes (JD12).
 //
 //   python build_rs.py run JFDiagrammer
 //   python build_rs.py test JFDiagrammer          tests/*.uis
@@ -49,10 +53,13 @@ extern crate alloc;
 
 mod backstage;
 mod commands;
+mod export_ui;
 mod icons;
 mod lang;
 mod options;
 mod panes;
+mod print_layout;
+mod print_ui;
 mod ribbon;
 mod shell;
 mod viewer;
@@ -116,6 +123,10 @@ pub(crate) struct Diagrammer {
     /// fit the page once more after the canvas was laid out (a notice that came with the
     /// drawing changes the canvas' height after the first fit)
     pub fit_again: bool,
+    /// (JD12) Datei › Exportieren
+    pub export: export_ui::ExportState,
+    /// (JD12) Datei › Drucken, Seite einrichten
+    pub print: print_ui::PrintState,
 }
 
 impl Diagrammer {
@@ -143,6 +154,8 @@ impl Diagrammer {
             open_path: alloc::string::String::new(),
             pages_menu: false,
             fit_again: false,
+            export: export_ui::ExportState::new(),
+            print: print_ui::PrintState::new(),
         }
     }
 
@@ -256,6 +269,8 @@ impl App for Diagrammer {
         }
         commands::states(self, ui);
         shell::frame(self, ui);
+        export_ui::dialogs(self, ui);
+        print_ui::dialogs(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

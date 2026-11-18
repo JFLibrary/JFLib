@@ -26,6 +26,8 @@ dependencies = [
  "jflib-diagram-core",
  "jflib-diagram-io",
  "jflib-diagram-view",
+ "jflib-gfx",
+ "jflib-pdf",
  "jflib-plat",
  "jflib-render2d",
  "jflib-rt",
@@ -353,6 +355,8 @@ dependencies = [
  "jflib-img-core",
  "jflib-img-jpeg",
  "jflib-img-png",
+ "jflib-img-svg",
+ "jflib-pdf",
  "jflib-plat",
  "jflib-rt",
 ]
@@ -730,6 +734,7 @@ dependencies = [
  "jflib-gfx",
  "jflib-img-jpeg",
  "jflib-img-png",
+ "jflib-pdf",
  "jflib-render2d",
  "jflib-rt",
 ]

@@ -29,6 +29,9 @@ diagram_io.workspace = true
 diagram_view.workspace = true
 render2d.workspace = true
 text.workspace = true
+# (JD12) printing and exporting: surfaces, the PDF's document information
+gfx.workspace = true
+pdf.workspace = true
 style = { package = "jflib-style-netlab", path = "../../styles/netlab" }
 
 [build-dependencies]

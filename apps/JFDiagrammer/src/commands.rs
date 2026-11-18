@@ -281,6 +281,8 @@ static HANDLERS: &[(u32, Handler)] = &[
         ui.repass();
     }),
     (CLOSE, |a, ui| crate::viewer::close(a, ui)),
+    (PAGE_SETUP, |a, ui| crate::print_ui::open_setup(a, ui, 0)),
+    (LAYOUT_ROUTING, |a, ui| crate::print_ui::open_setup(a, ui, 4)),
     (ZOOM_IN, |a, _| a.zoom_step(1)),
     (ZOOM_OUT, |a, _| a.zoom_step(-1)),
     (FORMAT_PANE, |a, _| a.panes.show(crate::panes::P_FORMAT)),

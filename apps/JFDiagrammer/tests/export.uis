@@ -1,0 +1,69 @@
+#!args apps/JFDiagrammer/tests/viewer.vsdx --no-system-fonts --export-dir build
+# JFDiagrammer, JD12: Datei › Exportieren -- the formats PDF, SVG, PNG and JPEG with their options,
+# the save dialog (headless: the library's own, the name proposed in build/ by --export-dir),
+# several pages as one PDF and as numbered SVG files, a page range, the current page as PNG
+# with a transparent background, the page on the clipboard.  viewer.vsdx has two foreground
+# pages (Seite-1, Massstab) and a background page.  The files' contents are diagramiotest's
+# business (group export); here the way through the window.
+click tab:"Datei"
+click button:"Exportieren"
+expect text:"Vektorgrafik mit eingebetteten Schriften, Text zum Suchen und Kopieren, Hyperlinks und einem Lesezeichen je Seite." exists
+expect checkbox:"Hyperlinks übernehmen" checked
+expect checkbox:"Lesezeichen je Seite" checked
+expect checkbox:"Hintergrundseiten einschließen" checked
+expect button:"Als Webseite speichern" disabled
+shot build/JFDiagrammer-export.png
+# PDF: every foreground page into one file (#26160: the large Exportieren button)
+click #26160
+wait 600
+expect dialog:"Speichern unter" exists
+click button:"Speichern"
+wait 600
+expect text:"Gespeichert: viewer.pdf (Seiten: 2)" exists
+# SVG: one file per page
+click button:"SVG-Grafik"
+expect checkbox:"Seitenfarbe als Hintergrund" checked
+expect checkbox:"Shape-Daten als Attribute" unchecked
+click #26160
+wait 600
+click button:"Speichern"
+wait 600
+expect text:"Gespeichert: viewer-1.svg und weitere (Dateien: 2)" exists
+# PNG: the current page, transparent, at 150 dpi (6 x 4 in: 900 x 600 pixels)
+click button:"PNG-Grafik"
+expect text:"Aktuelle Seite: 576 × 384 Pixel" exists
+click combo:"Bildschirm (96 dpi)"
+click "Mittel (150 dpi)"
+expect text:"Aktuelle Seite: 900 × 600 Pixel" exists
+click checkbox:"Transparenter Hintergrund"
+expect checkbox:"Transparenter Hintergrund" checked
+click combo:"Alle Seiten"
+click "Aktuelle Seite"
+click #26160
+wait 600
+click button:"Speichern"
+wait 600
+expect text:"Gespeichert: viewer.png" exists
+# JPEG: a page range (1 to 2, the default), quality
+click button:"JPEG-Grafik"
+expect text:"Qualität" exists
+click combo:"Aktuelle Seite"
+click "Seitenbereich"
+expect text:"Von" exists
+click #26160
+wait 600
+click button:"Speichern"
+wait 600
+expect text:"Gespeichert: viewer-1.jpg und weitere (Dateien: 2)" exists
+# the page on the clipboard: as a picture (#26161), as SVG text (#26162)
+click #26161
+expect text:"Die Seite ist als Bild in der Zwischenablage." exists
+click #26162
+expect text:"Die Seite ist als SVG in der Zwischenablage." exists
+# without a drawing nothing can be exported
+key esc
+key ctrl+w
+click tab:"Datei"
+click button:"Exportieren"
+expect text:"Öffnen Sie eine Zeichnung, um sie zu exportieren." exists
+expect #26160 disabled

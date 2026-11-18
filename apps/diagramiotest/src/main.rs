@@ -10,6 +10,9 @@
 //   diagramiotest --write-golden DIR      (JD4) the golden images of the viewer tests anew
 //   diagramiotest --write-drawings DIR    (JD4) the viewer tests' drawings as .vsdx
 //   diagramiotest --render-corpus DIR [--width PX]   (JD4) the local files' pages as PNG and SVG
+//   diagramiotest --write-export-golden DIR   (JD12) the export's golden images anew
+//   diagramiotest --write-exports DIR [--corpus DIR]   (JD12) the self-built drawings and the local
+//                                         files as PDF, SVG and PNG (to compare with Visio)
 //
 // Groups:
 //   samples   self-built files of all six formats: what lands where in the model (fields,
@@ -24,6 +27,9 @@
 //             1.6; nothing is copied, only numbers are printed
 //   render    (JD4, render.rs, drawings.rs) the viewer: display lists of self-built drawings,
 //             golden images (tests/golden) through render2d's CPU path, the local pages drawn
+//   export    (JD12, export.rs) PDF through pdftest's reader, SVG read back by img_svg and
+//             compared with the pixels, PNG / JPEG golden images and round trips, transparency,
+//             the page selection, the shapes' links
 //   formulas  the formula oracle (JD6): every formula cell of the local files recomputed and
 //             compared with the stored value (--show N prints N misses, locally)
 //
@@ -44,10 +50,14 @@ mod build;
 mod corpus;
 mod drawings;
 mod dump;
+mod export;
 mod formulas;
 mod hostile;
 mod hostile_write;
 mod pkg;
+// (JD12) pdftest's independent PDF reader checks the exported PDFs
+#[path = "../../pdftest/src/reader.rs"]
+mod pdfreader;
 mod render;
 mod roundtrip;
 mod samples;
@@ -110,6 +120,12 @@ fn run() -> i32 {
         let width = arg(&args, "--width").and_then(|w| w.parse().ok()).unwrap_or(2000);
         return render::render_corpus(&dir, arg(&args, "--corpus"), width);
     }
+    if let Some(dir) = arg(&args, "--write-export-golden") {
+        return export::write_golden(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-exports") {
+        return export::write_exports(&dir, arg(&args, "--corpus"));
+    }
     if let Some(dir) = arg(&args, "--write-probe") {
         return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
     }
@@ -128,6 +144,9 @@ fn run() -> i32 {
         hostile::run(&mut h);
         if h.on("render") {
             render::run(&mut h);
+        }
+        if h.on("export") {
+            export::run(&mut h);
         }
         roundtrip::run(&mut h, corpus_dir.as_deref());
     }

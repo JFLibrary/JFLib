@@ -28,5 +28,13 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   `fsType` forbids embedding are refused.
 - Links to URIs and to places in the document (`Dest`), nested outlines, the document
   information with XMP metadata, the document's language.
+- Gradients: `Shading` (`ShadingKind::Axial` / `Radial`, PDF shading types 2 and 3) with any
+  number of stops (sorted, clamped, NaN dropped; two at one place make a hard edge) and alpha per
+  stop, painted with `Canvas::shade` (the whole clip) or `Canvas::fill_shading` (a path). One
+  alpha for all stops is the fill alpha, varying alpha a luminosity soft mask; degenerate
+  geometry paints the last stop's colour.
+- Hatches: `Hatch` and `Canvas::fill_hatch` fill a path with parallel lines (angle, spacing,
+  width, colour, alpha, a point on a line), drawn as clipped strokes rather than tiling patterns,
+  which pdfium shows with seams.
 
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD

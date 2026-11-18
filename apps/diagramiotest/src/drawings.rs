@@ -3,6 +3,8 @@
 //
 //   all() -> Vec<(name, Pkg)>     the drawings; each foreground page becomes a golden image
 //                                  (tests/golden/<name>-<page>.png)
+//   links() -> Pkg                (JD12) hyperlinks to an address and to a page, shape data:
+//                                  the exports' links (not in all(): no golden image)
 //
 // Generic content only: shapes made up for these tests, nothing taken from a Visio file.  The
 // document's "No Style" holds the defaults (0.75 pt black lines, white fill, Calibri 12 pt
@@ -444,5 +446,23 @@ fn pages() -> Pkg {
     let b = d.page("Hintergrund-1", 6.0, 4.0, "", s3);
     d.pages[b].background = true;
     d.pages[b].id = 2;
+    d.pkg()
+}
+
+/// (JD12) two pages: on "Start" a shape linking to an address (with shape data), one linking to
+/// the page "Ziel", one without a link; on "Ziel" a shape linking back
+pub fn links() -> Pkg {
+    let mut d = Doc::new();
+    let link = |row: &str, addr: &str, sub: &str, desc: &str| {
+        format!("<Section N='Hyperlink'><Row N='{row}'><Cell N='Description' V='{desc}'/><Cell N='Address' V='{addr}'/><Cell N='SubAddress' V='{sub}'/></Row></Section>")
+    };
+    let data = "<Section N='Property'><Row N='Kosten'><Cell N='Label' V='Kosten'/><Cell N='Value' V='42'/></Row><Row N='Ort'><Cell N='Label' V='Ort'/><Cell N='Value' V='Halle &amp; Lager' U='STR'/></Row></Section>";
+    let mut s = String::new();
+    s += &shape(1, (1.5, 2.0), (2.0, 1.0), &c("FillForegnd", "#9dc3e6"), &format!("{}{}{data}", rect(2.0, 1.0), link("Row_1", "https://example.org/jfd", "", "Beispiel")), "Adresse\n");
+    s += &shape(2, (4.5, 2.0), (2.0, 1.0), &c("FillForegnd", "#c5e0b4"), &format!("{}{}", rect(2.0, 1.0), link("Row_1", "", "Ziel", "Zur Zielseite")), "Seite\n");
+    s += &shape(3, (3.0, 0.7), (1.0, 0.6), "", &rect(1.0, 0.6), "");
+    d.page("Start", 6.0, 3.0, "", s);
+    let back = shape(1, (3.0, 1.5), (2.0, 1.0), &c("FillForegnd", "#ffd966"), &format!("{}{}", rect(2.0, 1.0), link("Row_1", "", "Start/Sheet.1", "")), "Zurück\n");
+    d.page("Ziel", 6.0, 3.0, "", back);
     d.pkg()
 }

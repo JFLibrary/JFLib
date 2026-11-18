@@ -1,7 +1,8 @@
 // pdftest -- self-checks of lib/pdf, the vector PDF writer: every file it writes is read back by
 // reader.rs, a small PDF reader of its own that shares no code with the writer (header, xref
-// offsets, objects complete, references resolved, stream lengths, FlateDecode), and its pages,
-// fonts, images, links and outlines are checked against what was drawn.
+// offsets, objects complete, references resolved, stream lengths, FlateDecode, shadings,
+// functions, soft masks, patterns), and its pages, fonts, images, gradients, hatches, links and
+// outlines are checked against what was drawn.
 // Console program; exit code 1 when a check fails.
 //
 //   python build_rs.py app pdftest

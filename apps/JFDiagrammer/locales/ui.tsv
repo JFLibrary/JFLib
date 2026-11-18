@@ -83,18 +83,12 @@ Zeichnungen lassen sich noch nicht speichern.	Drawings cannot be saved yet.	Toda
 Dateityp	File type	Tipo de archivo	Tipo di file	Type de fichier
 Exemplare	Copies	Copias	Copie	Copies
 Drucker	Printer	Impresora	Stampante	Imprimante
-Standarddrucker	Default printer	Impresora predeterminada	Stampante predefinita	Imprimante par défaut
 Einstellungen	Settings	Configuración	Impostazioni	Paramètres
 Aktuelle Seite drucken	Print Current Page	Imprimir página actual	Stampa pagina corrente	Imprimer la page active
 Alle Seiten drucken	Print All Pages	Imprimir todas las páginas	Stampa tutte le pagine	Imprimer toutes les pages
-Auswahl drucken	Print Selection	Imprimir selección	Stampa selezione	Imprimer la sélection
 Seitenansicht	Print Preview	Vista previa de impresión	Anteprima di stampa	Aperçu avant impression
-Die Zeichnung als PDF mit Text, Links und Lesezeichen.	The drawing as a PDF with text, links and bookmarks.	El dibujo como PDF con texto, vínculos y marcadores.	Il disegno come PDF con testo, collegamenti e segnalibri.	Le dessin au format PDF avec texte, liens et signets.
-PDF/XPS-Dokument erstellen	Create PDF/XPS Document	Crear documento PDF/XPS	Crea documento PDF/XPS	Créer un document PDF/XPS
-Als Zeichnung, Vorlage, Schablone oder Grafik (SVG, PNG) speichern.	Save as a drawing, template, stencil or graphic (SVG, PNG).	Guardar como dibujo, plantilla, colección de formas o gráfico (SVG, PNG).	Salva come disegno, modello, raccolta di forme o grafica (SVG, PNG).	Enregistrer en tant que dessin, modèle, bibliothèque de formes ou graphique (SVG, PNG).
 Dateityp ändern	Change File Type	Cambiar el tipo de archivo	Cambia tipo di file	Modifier le type de fichier
 Als Webseite speichern	Save as Web Page	Guardar como página web	Salva come pagina Web	Enregistrer en tant que page web
-Seiten und Shapes als HTML mit SVG-Grafiken.	Pages and shapes as HTML with SVG graphics.	Páginas y formas como HTML con gráficos SVG.	Pagine e forme come HTML con grafica SVG.	Pages et formes au format HTML avec graphiques SVG.
 Version {}	Version {}	Versión {}	Versione {}	Version {}
 Lizenzen	Licenses	Licencias	Licenze	Licences
 JFDiagrammer und JFLib stehen unter der MIT- oder der Apache-2.0-Lizenz, nach Ihrer Wahl.	JFDiagrammer and JFLib are licensed under the MIT or the Apache 2.0 license, at your option.	JFDiagrammer y JFLib se distribuyen con la licencia MIT o la licencia Apache 2.0, a su elección.	JFDiagrammer e JFLib sono distribuiti con licenza MIT o Apache 2.0, a scelta dell'utente.	JFDiagrammer et JFLib sont distribués sous licence MIT ou Apache 2.0, au choix.
@@ -333,3 +327,168 @@ Die Makros der Datei bleiben erhalten und werden nie ausgeführt.	The file's mac
 Eine Schablone hat keine Seiten; ihre Shapes zeigt die Shapes-Seitenleiste in einer späteren Version.	A stencil has no pages; the Shapes pane shows its shapes in a later version.	Una colección de formas no tiene páginas; el panel Formas mostrará sus formas en una versión posterior.	Una raccolta di forme non ha pagine; il riquadro Forme ne mostrerà le forme in una versione successiva.	Une bibliothèque de formes n'a pas de pages ; le volet Formes affichera ses formes dans une version ultérieure.
 Schreibgeschützt geöffnet	Opened read-only	Abierto en modo de solo lectura	Aperto in sola lettura	Ouvert en lecture seule
 Ersetzte Schriften: {}.	Substituted fonts: {}.	Fuentes sustituidas: {}.	Tipi di carattere sostituiti: {}.	Polices remplacées : {}.
+PDF-Dokument erstellen	Create PDF Document	Crear documento PDF	Crea documento PDF	Créer un document PDF
+Vektorgrafik mit eingebetteten Schriften, Text zum Suchen und Kopieren, Hyperlinks und einem Lesezeichen je Seite.	Vector graphics with embedded fonts, searchable and copyable text, hyperlinks and one bookmark per page.	Gráficos vectoriales con fuentes incrustadas, texto que se puede buscar y copiar, hipervínculos y un marcador por página.	Grafica vettoriale con tipi di carattere incorporati, testo ricercabile e copiabile, collegamenti ipertestuali e un segnalibro per pagina.	Format vectoriel avec polices incorporées, texte que vous pouvez rechercher et copier, liens hypertexte et un signet par page.
+SVG-Grafik	SVG Image	Imagen SVG	Immagine SVG	Image SVG
+Vektorgrafik für Browser und Grafikprogramme: Pfade, Text, Bilder und Verläufe.	Vector graphics for browsers and graphics programs: paths, text, pictures and gradients.	Gráficos vectoriales para exploradores y programas de gráficos: trazados, texto, imágenes y degradados.	Grafica vettoriale per browser e programmi di grafica: tracciati, testo, immagini e sfumature.	Format vectoriel pour les navigateurs et les logiciels graphiques : tracés, texte, images et dégradés.
+PNG-Grafik	PNG Image	Imagen PNG	Immagine PNG	Image PNG
+Rastergrafik ohne Verluste, mit wählbarer Auflösung und auf Wunsch transparentem Hintergrund.	Lossless raster image with a choice of resolution and an optional transparent background.	Imagen rasterizada sin pérdida, con la resolución que elija y, si lo desea, fondo transparente.	Immagine raster senza perdita, con risoluzione selezionabile e sfondo trasparente facoltativo.	Image matricielle sans perte, avec la résolution de votre choix et, si vous le souhaitez, un arrière-plan transparent.
+JPEG-Grafik	JPEG Image	Imagen JPEG	Immagine JPEG	Image JPEG
+Rastergrafik mit wählbarer Qualität, klein für Fotos und Webseiten.	Raster image with a choice of quality, compact for photos and web pages.	Imagen rasterizada con la calidad que elija, compacta para fotos y páginas web.	Immagine raster con qualità selezionabile, compatta per foto e pagine Web.	Image matricielle avec la qualité de votre choix, compacte pour les photos et les pages web.
+Öffnen Sie eine Zeichnung, um sie zu exportieren.	Open a drawing to export it.	Abra un dibujo para exportarlo.	Aprire un disegno per esportarlo.	Ouvrez un dessin pour l'exporter.
+Aktuelle Seite	Current Page	Página actual	Pagina corrente	Page active
+Seitenbereich	Page Range	Intervalo de páginas	Intervallo di pagine	Plage de pages
+Von	From	Desde	Da	De
+bis	to	hasta	a	à
+Hintergrundseiten einschließen	Include background pages	Incluir páginas de fondo	Includi pagine di sfondo	Inclure les pages d'arrière-plan
+Hyperlinks übernehmen	Include hyperlinks	Incluir hipervínculos	Includi collegamenti ipertestuali	Inclure les liens hypertexte
+Lesezeichen je Seite	One bookmark per page	Un marcador por página	Un segnalibro per pagina	Un signet par page
+Dokumenteigenschaften übernehmen	Include document properties	Incluir propiedades del documento	Includi proprietà documento	Inclure les propriétés du document
+Seitenfarbe als Hintergrund	Page color as background	Color de página como fondo	Colore pagina come sfondo	Couleur de page comme arrière-plan
+Shape-Daten als Attribute	Shape data as attributes	Datos de forma como atributos	Dati forma come attributi	Données de forme comme attributs
+Auflösung	Resolution	Resolución	Risoluzione	Résolution
+Benutzerdefiniert	Custom	Personalizada	Personalizzata	Personnalisée
+Bildschirm (96 dpi)	Screen (96 dpi)	Pantalla (96 dpi)	Schermo (96 dpi)	Écran (96 dpi)
+Drucker (300 dpi)	Printer (300 dpi)	Impresora (300 dpi)	Stampante (300 dpi)	Imprimante (300 dpi)
+Mittel (150 dpi)	Medium (150 dpi)	Media (150 dpi)	Media (150 dpi)	Moyenne (150 dpi)
+Transparenter Hintergrund	Transparent background	Fondo transparente	Sfondo trasparente	Arrière-plan transparent
+Qualität	Quality	Calidad	Qualità	Qualité
+Die gewählten Seiten in eine Datei schreiben	Save the selected pages to a file	Guardar las páginas seleccionadas en un archivo	Salva le pagine selezionate in un file	Enregistrer les pages sélectionnées dans un fichier
+Als Bild kopieren	Copy as Picture	Copiar como imagen	Copia come immagine	Copier en tant qu'image
+Die aktuelle Seite als Bild (PNG) in die Zwischenablage kopieren	Copy the current page to the Clipboard as a picture (PNG)	Copiar la página actual en el Portapapeles como imagen (PNG)	Copia la pagina corrente negli Appunti come immagine (PNG)	Copier la page active dans le Presse-papiers en tant qu'image (PNG)
+Als SVG kopieren	Copy as SVG	Copiar como SVG	Copia come SVG	Copier au format SVG
+Die aktuelle Seite als SVG-Text in die Zwischenablage kopieren (für Grafikprogramme und Webseiten)	Copy the current page to the Clipboard as SVG text (for graphics programs and web pages)	Copiar la página actual en el Portapapeles como texto SVG (para programas de gráficos y páginas web)	Copia la pagina corrente negli Appunti come testo SVG (per programmi di grafica e pagine Web)	Copier la page active dans le Presse-papiers sous forme de texte SVG (pour les logiciels graphiques et les pages web)
+Aktuelle Seite: {} × {} Pixel	Current page: {} × {} pixels	Página actual: {} × {} píxeles	Pagina corrente: {} × {} pixel	Page active : {} × {} pixels
+jpg;jpeg=JPEG-Grafik	jpg;jpeg=JPEG Image	jpg;jpeg=Imagen JPEG	jpg;jpeg=Immagine JPEG	jpg;jpeg=Image JPEG
+pdf=PDF-Dokument	pdf=PDF Document	pdf=Documento PDF	pdf=Documento PDF	pdf=Document PDF
+png=PNG-Grafik	png=PNG Image	png=Imagen PNG	png=Immagine PNG	png=Image PNG
+svg=SVG-Grafik	svg=SVG Image	svg=Imagen SVG	svg=Immagine SVG	svg=Image SVG
+Es sind keine Seiten zum Exportieren gewählt.	No pages are selected for export.	No hay ninguna página seleccionada para exportar.	Nessuna pagina selezionata per l'esportazione.	Aucune page n'est sélectionnée pour l'exportation.
+Es ist keine Zeichnung geöffnet.	No drawing is open.	No hay ningún dibujo abierto.	Nessun disegno aperto.	Aucun dessin n'est ouvert.
+Das PDF ließ sich nicht schreiben: {}	The PDF could not be created: {}	No se pudo crear el PDF: {}	Impossibile creare il PDF: {}	Impossible de créer le PDF : {}
+„{}“ ließ sich nicht schreiben.	“{}” could not be saved.	No se pudo guardar «{}».	Impossibile salvare «{}».	Impossible d'enregistrer « {} ».
+Gespeichert: {} (Seiten: {})	Saved: {} (pages: {})	Guardado: {} (páginas: {})	Salvato: {} (pagine: {})	Enregistré : {} (pages : {})
+Das Bild wäre zu groß; wählen Sie eine kleinere Auflösung.	The image would be too large; choose a lower resolution.	La imagen sería demasiado grande; elija una resolución menor.	L'immagine sarebbe troppo grande; scegliere una risoluzione inferiore.	L'image serait trop grande ; choisissez une résolution plus faible.
+„{}“ ließ sich nicht kodieren.	“{}” could not be encoded.	No se pudo codificar «{}».	Impossibile codificare «{}».	Impossible d'encoder « {} ».
+Gespeichert: {} und weitere (Dateien: {})	Saved: {} and more (files: {})	Guardado: {} y otros (archivos: {})	Salvato: {} e altri (file: {})	Enregistré : {} et autres (fichiers : {})
+Die Seite ist als Bild in der Zwischenablage.	The page is on the Clipboard as a picture.	La página está en el Portapapeles como imagen.	La pagina è negli Appunti come immagine.	La page est dans le Presse-papiers en tant qu'image.
+Die Seite ist als SVG in der Zwischenablage.	The page is on the Clipboard as SVG.	La página está en el Portapapeles como SVG.	La pagina è negli Appunti come SVG.	La page est dans le Presse-papiers au format SVG.
+Die Seite ließ sich nicht kopieren.	The page could not be copied.	No se pudo copiar la página.	Impossibile copiare la pagina.	Impossible de copier la page.
+Es sind keine Seiten zum Drucken gewählt.	No pages are selected for printing.	No hay ninguna página seleccionada para imprimir.	Nessuna pagina selezionata per la stampa.	Aucune page n'est sélectionnée pour l'impression.
+Drucken abgebrochen.	Printing canceled.	Impresión cancelada.	Stampa annullata.	Impression annulée.
+Drucken ist auf diesem System oder ohne Berechtigung nicht möglich.	Printing is not possible on this system or without permission.	No es posible imprimir en este sistema o sin permiso.	Impossibile stampare su questo sistema o senza autorizzazione.	Impossible d'imprimer sur ce système ou sans autorisation.
+Drucken fehlgeschlagen (Fehler {}).	Printing failed (error {}).	No se pudo imprimir (error {}).	Stampa non riuscita (errore {}).	Échec de l'impression (erreur {}).
+Der Drucker hat das Dokument nicht angenommen.	The printer did not accept the document.	La impresora no aceptó el documento.	La stampante non ha accettato il documento.	L'imprimante n'a pas accepté le document.
+Im gewählten Bereich liegt kein Blatt.	There is no sheet in the selected range.	No hay ninguna hoja en el intervalo seleccionado.	Nessun foglio nell'intervallo selezionato.	Aucune feuille dans la plage sélectionnée.
+Drucken fehlgeschlagen: {}	Printing failed: {}	No se pudo imprimir: {}	Stampa non riuscita: {}	Échec de l'impression : {}
+Für das Blatt reicht der Speicher nicht.	There is not enough memory for the sheet.	No hay suficiente memoria para la hoja.	Memoria insufficiente per il foglio.	Mémoire insuffisante pour la feuille.
+Die gewählten Seiten drucken (Strg+P)	Print the selected pages (Ctrl+P)	Imprimir las páginas seleccionadas (Ctrl+P)	Stampa le pagine selezionate (Ctrl+P)	Imprimer les pages sélectionnées (Ctrl+P)
+Systemdrucker	System printer	Impresora del sistema	Stampante di sistema	Imprimante système
+Drucker, Papierfach und Seitenbereich wählen Sie im Druckdialog des Systems.	You choose the printer, paper tray and page range in the system's print dialog.	Puede elegir la impresora, la bandeja de papel y el intervalo de páginas en el cuadro de diálogo de impresión del sistema.	La stampante, il cassetto della carta e l'intervallo di pagine si scelgono nella finestra di dialogo di stampa del sistema.	Vous choisissez l'imprimante, le bac à papier et la plage de pages dans la boîte de dialogue d'impression du système.
+Seitenbereich drucken	Print Page Range	Imprimir intervalo de páginas	Stampa intervallo di pagine	Imprimer une plage de pages
+Hintergrundseiten drucken	Print background pages	Imprimir páginas de fondo	Stampa pagine di sfondo	Imprimer les pages d'arrière-plan
+Auf ein Blatt anpassen	Fit to One Sheet	Ajustar a una hoja	Adatta a un foglio	Ajuster à une feuille
+Benutzerdefiniert (Seite einrichten)	Custom (Page Setup)	Personalizado (Configurar página)	Personalizzato (Imposta pagina)	Personnalisé (Mise en page)
+Tatsächliche Größe	Actual Size	Tamaño real	Dimensioni effettive	Taille réelle
+Farbe	Color	Color	Colore	Couleur
+Graustufen	Grayscale	Escala de grises	Scala di grigi	Nuances de gris
+Gedruckte Blätter: {}	Sheets printed: {}	Hojas impresas: {}	Fogli stampati: {}	Feuilles imprimées : {}
+{}: Blatt {} von {}	{}: Sheet {} of {}	{}: hoja {} de {}	{}: foglio {} di {}	{} : feuille {} sur {}
+Keine Seite zum Drucken	No page to print	No hay ninguna página para imprimir	Nessuna pagina da stampare	Aucune page à imprimer
+Vorheriges Blatt	Previous Sheet	Hoja anterior	Foglio precedente	Feuille précédente
+Blatt {} von {}	Sheet {} of {}	Hoja {} de {}	Foglio {} di {}	Feuille {} sur {}
+Nächstes Blatt	Next Sheet	Hoja siguiente	Foglio successivo	Feuille suivante
+Kacheln: {} × {} Blätter	Tiles: {} × {} sheets	Mosaicos: {} × {} hojas	Riquadri: {} × {} fogli	Mosaïque : {} × {} feuilles
+A4: 210 × 297 mm	A4: 210 × 297 mm	A4: 210 × 297 mm	A4: 210 × 297 mm	A4 : 210 × 297 mm
+A3: 297 × 420 mm	A3: 297 × 420 mm	A3: 297 × 420 mm	A3: 297 × 420 mm	A3 : 297 × 420 mm
+A5: 148 × 210 mm	A5: 148 × 210 mm	A5: 148 × 210 mm	A5: 148 × 210 mm	A5 : 148 × 210 mm
+A2: 420 × 594 mm	A2: 420 × 594 mm	A2: 420 × 594 mm	A2: 420 × 594 mm	A2 : 420 × 594 mm
+A1: 594 × 841 mm	A1: 594 × 841 mm	A1: 594 × 841 mm	A1: 594 × 841 mm	A1 : 594 × 841 mm
+Letter: 8,5 × 11 in	Letter: 8.5 × 11 in	Letter: 8,5 × 11 in	Letter: 8,5 × 11 in	Letter : 8,5 × 11 in
+Legal: 8,5 × 14 in	Legal: 8.5 × 14 in	Legal: 8,5 × 14 in	Legal: 8,5 × 14 in	Legal : 8,5 × 14 in
+Tabloid: 11 × 17 in	Tabloid: 11 × 17 in	Tabloid: 11 × 17 in	Tabloid: 11 × 17 in	Tabloid : 11 × 17 in
+Metrisch 1:2	Metric 1:2	Métrica 1:2	Metrica 1:2	Métrique 1:2
+Metrisch 1:5	Metric 1:5	Métrica 1:5	Metrica 1:5	Métrique 1:5
+Metrisch 1:10	Metric 1:10	Métrica 1:10	Metrica 1:10	Métrique 1:10
+Metrisch 1:20	Metric 1:20	Métrica 1:20	Metrica 1:20	Métrique 1:20
+Metrisch 1:50	Metric 1:50	Métrica 1:50	Metrica 1:50	Métrique 1:50
+Metrisch 1:100	Metric 1:100	Métrica 1:100	Metrica 1:100	Métrique 1:100
+Metrisch 1:200	Metric 1:200	Métrica 1:200	Metrica 1:200	Métrique 1:200
+Metrisch 1:500	Metric 1:500	Métrica 1:500	Metrica 1:500	Métrique 1:500
+Metrisch 1:1000	Metric 1:1000	Métrica 1:1000	Metrica 1:1000	Métrique 1:1000
+Maschinenbau 2:1	Mechanical Engineering 2:1	Ingeniería mecánica 2:1	Ingegneria meccanica 2:1	Génie mécanique 2:1
+Maschinenbau 5:1	Mechanical Engineering 5:1	Ingeniería mecánica 5:1	Ingegneria meccanica 5:1	Génie mécanique 5:1
+Maschinenbau 10:1	Mechanical Engineering 10:1	Ingeniería mecánica 10:1	Ingegneria meccanica 10:1	Génie mécanique 10:1
+Fuß	Feet	Pies	Piedi	Pieds
+Meter	Meters	Metros	Metri	Mètres
+Öffnen Sie eine Zeichnung, um ihre Seiten einzurichten.	Open a drawing to set up its pages.	Abra un dibujo para configurar sus páginas.	Aprire un disegno per impostarne le pagine.	Ouvrez un dessin pour configurer ses pages.
+Drucken einrichten	Print Setup	Configurar impresión	Imposta stampa	Configuration de l'impression
+Seiteneigenschaften	Page Properties	Propiedades de página	Proprietà pagina	Propriétés de la page
+Seitengröße	Page Size	Tamaño de página	Dimensioni pagina	Taille de la page
+Druckerpapier	Printer paper	Papel de impresora	Carta stampante	Papier d'imprimante
+Druckzoom	Print zoom	Zoom de impresión	Zoom di stampa	Zoom d'impression
+Anpassen auf	Adjust to	Ajustar al	Imposta al	Réduire/agrandir à
+Anpassen an	Fit to	Ajustar a	Adatta a	Ajuster à
+Blätter breit und	sheets across by	hojas de ancho por	fogli di larghezza per	feuilles en largeur sur
+hoch	sheets down	de alto	di altezza	en hauteur
+Ränder (mm)	Margins (mm)	Márgenes (mm)	Margini (mm)	Marges (mm)
+Oben	Top	Superior	Superiore	Haut
+Rechts	Right	Derecho	Destro	Droite
+Unten	Bottom	Inferior	Inferiore	Bas
+Horizontal zentrieren	Center horizontally	Centrar horizontalmente	Centra orizzontalmente	Centrer horizontalement
+Vertikal zentrieren	Center vertically	Centrar verticalmente	Centra verticalmente	Centrer verticalement
+Wie Druckerpapier ({})	Same as printer paper ({})	Igual que el papel de la impresora ({})	Come la carta della stampante ({})	Identique au papier de l'imprimante ({})
+Vordefinierte Größe	Pre-defined size	Tamaño predefinido	Dimensioni predefinite	Taille prédéfinie
+Benutzerdefinierte Größe	Custom size	Tamaño personalizado	Dimensioni personalizzate	Taille personnalisée
+Seitenausrichtung	Page orientation	Orientación de página	Orientamento pagina	Orientation de la page
+Neue Seitengröße: {}	New page size: {}	Nuevo tamaño de página: {}	Nuove dimensioni pagina: {}	Nouvelle taille de page : {}
+Kein Maßstab (1:1)	No scale (1:1)	Sin escala (1:1)	Nessuna scala (1:1)	Aucune échelle (1:1)
+Vordefinierter Maßstab	Pre-defined scale	Escala predefinida	Scala predefinita	Échelle prédéfinie
+Benutzerdefinierter Maßstab	Custom scale	Escala personalizada	Scala personalizzata	Échelle personnalisée
+Seitengröße in Zeichnungseinheiten: {}	Page size in drawing units: {}	Tamaño de página en unidades de dibujo: {}	Dimensioni pagina in unità di disegno: {}	Taille de la page en unités de dessin : {}
+Typ	Type	Tipo	Tipo	Type
+Vordergrund	Foreground	Primer plano	Primo piano	Premier plan
+Hintergrund	Background	Fondo	Sfondo	Arrière-plan
+Name	Name	Nombre	Nome	Nom
+Kein	None	Ninguno	Nessuno	Aucun
+Maßeinheit	Measurement units	Unidades de medida	Unità di misura	Unités de mesure
+Schattenrichtung	Shadow direction	Dirección de la sombra	Direzione ombreggiatura	Direction de l'ombre
+links	left	a la izquierda	a sinistra	à gauche
+rechts	right	a la derecha	a destra	à droite
+oben	top	arriba	in alto	en haut
+unten	bottom	abajo	in basso	en bas
+kein Versatz	no offset	sin desplazamiento	nessuno spostamento	aucun décalage
+Die Einstellungen werden angezeigt; ändern lassen sie sich mit den Verbindern.	For now the settings are only shown; you can change them once the connectors arrive.	Por ahora, la configuración solo se muestra; podrá cambiarla cuando lleguen los conectores.	Per ora le impostazioni vengono solo visualizzate; sarà possibile modificarle con l'arrivo dei connettori.	Pour l'instant, les paramètres sont uniquement affichés ; vous pourrez les modifier avec l'arrivée des connecteurs.
+Flussdiagramm (von oben nach unten)	Flowchart (Top to Bottom)	Diagrama de flujo (de arriba abajo)	Diagramma di flusso (dall'alto in basso)	Diagramme de flux (de haut en bas)
+Organigramm (von links nach rechts)	Organization Chart (Left to Right)	Organigrama (de izquierda a derecha)	Organigramma (da sinistra a destra)	Organigramme (de gauche à droite)
+Organigramm (von oben nach unten)	Organization Chart (Top to Bottom)	Organigrama (de arriba abajo)	Organigramma (dall'alto in basso)	Organigramme (de haut en bas)
+Baum (von links nach rechts)	Tree (Left to Right)	Árbol (de izquierda a derecha)	Albero (da sinistra a destra)	Arborescence (de gauche à droite)
+Baum (von oben nach unten)	Tree (Top to Bottom)	Árbol (de arriba abajo)	Albero (dall'alto in basso)	Arborescence (de haut en bas)
+Flussdiagramm (von links nach rechts)	Flowchart (Left to Right)	Diagrama de flujo (de izquierda a derecha)	Diagramma di flusso (da sinistra a destra)	Diagramme de flux (de gauche à droite)
+Netzwerk	Network	Red	Rete	Réseau
+Organigramm (von unten nach oben)	Organization Chart (Bottom to Top)	Organigrama (de abajo arriba)	Organigramma (dal basso in alto)	Organigramme (de bas en haut)
+Baum (von unten nach oben)	Tree (Bottom to Top)	Árbol (de abajo arriba)	Albero (dal basso in alto)	Arborescence (de bas en haut)
+Flussdiagramm (von rechts nach links)	Flowchart (Right to Left)	Diagrama de flujo (de derecha a izquierda)	Diagramma di flusso (da destra a sinistra)	Diagramme de flux (de droite à gauche)
+Flussdiagramm (von unten nach oben)	Flowchart (Bottom to Top)	Diagrama de flujo (de abajo arriba)	Diagramma di flusso (dal basso in alto)	Diagramme de flux (de bas en haut)
+Organigramm (von rechts nach links)	Organization Chart (Right to Left)	Organigrama (de derecha a izquierda)	Organigramma (da destra a sinistra)	Organigramme (de droite à gauche)
+Baum (von rechts nach links)	Tree (Right to Left)	Árbol (de derecha a izquierda)	Albero (da destra a sinistra)	Arborescence (de droite à gauche)
+Mittig zu Mittig	Center to Center	De centro a centro	Da centro a centro	Centre à centre
+Horizontale Linien	Horizontal Lines	Líneas horizontales	Linee orizzontali	Lignes horizontales
+Vertikale Linien	Vertical Lines	Líneas verticales	Linee verticali	Lignes verticales
+Zuletzt gezeichnete Linien	Last Drawn Lines	Últimas líneas dibujadas	Ultime linee disegnate	Dernières lignes tracées
+Zuletzt gezeichnete Linien (umgekehrt)	Last Drawn Lines (Reversed)	Últimas líneas dibujadas (orden inverso)	Ultime linee disegnate (ordine inverso)	Dernières lignes tracées (ordre inverse)
+Andere	Other	Otro	Altro	Autre
+Lücke	Gap	Hueco	Spazio	Espace
+Quadrat	Square	Cuadrado	Quadrato	Carré
+Mehrseitig	Multi-sided	Poligonal	Poligonale	Polygonal
+Routing-Stil	Routing style	Estilo de enrutamiento	Stile di routing	Style de routage
+Linienübergänge	Line jumps	Saltos de línea	Salti di linea	Sauts de ligne
+Stil der Linienübergänge	Line jump style	Estilo de salto de línea	Stile salto di linea	Style de saut de ligne
+Abstand zwischen Shapes	Space between shapes	Espacio entre formas	Spazio tra le forme	Espace entre les formes
+Ja	Yes	Sí	Sì	Oui
+Nein	No	No	No	Non
+Shapes beim Ablegen verschieben	Move other shapes away on drop	Apartar otras formas al colocar	Sposta le altre forme al rilascio	Écarter les autres formes au dépôt
+Shapes auf Verbinder teilen	Split connectors with shapes	Dividir conectores con formas	Dividi i connettori con le forme	Fractionner les connecteurs par formes
+Die Seite ließ sich nicht ändern.	The page could not be changed.	No se pudo cambiar la página.	Impossibile modificare la pagina.	Impossible de modifier la page.
+Links|Rand	Left	Izquierdo	Sinistro	Gauche
+Standard|Routing	Default	Predeterminado	Predefinito	Par défaut

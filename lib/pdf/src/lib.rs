@@ -1,6 +1,7 @@
 // pdf -- a vector PDF writer: pages of their own size drawn on a canvas (paths, fills with the
 // non-zero or even-odd rule, strokes with width, dashes, caps, joins and miter limit,
-// transforms, clipping, alpha, RGB colours), images (JPEG passed through, other pixels with
+// transforms, clipping, alpha, RGB colours, axial and radial gradients with any number of stops
+// and alpha, hatches of parallel lines), images (JPEG passed through, other pixels with
 // FlateDecode and their alpha as a soft mask), text in embedded TrueType / OpenType subsets
 // (CID fonts with Identity-H, ToUnicode for search and copy, glyphs and widths from the
 // library's shaping), links to URIs and to places in the document, nested outlines
@@ -28,10 +29,14 @@
 //   Canvas       save / restore, transform / translate / scale / rotate, fill / stroke colour and
 //                alpha, line width, cap, join, miter limit, dash, path building (move_to,
 //                line_to, curve_to, quad_to, rect, rounded_rect, ellipse, circle, arc, close,
-//                append_path), fill / stroke / fill_stroke / clip / end_path, image /
-//                image_transform, text / text_fallback / glyphs, set_text_mode, link_uri /
-//                link_dest, dest (a destination at a point of this canvas)
+//                append_path), fill / stroke / fill_stroke / clip / end_path, shade /
+//                fill_shading (gradients), fill_hatch, image / image_transform, text /
+//                text_fallback / glyphs, set_text_mode, link_uri / link_dest, dest (a
+//                destination at a point of this canvas)
 //   Path         the same path building, kept and drawn later (Canvas::fill_path, stroke_path)
+//   Shading      a gradient: ShadingKind Axial / Radial (PDF shading types 2 and 3), stops
+//                (t, colour, alpha), extend; Shading::axial / radial
+//   Hatch        parallel lines: angle, spacing, width, colour, alpha, a point on a line
 //   Image        jpeg(file), gray / rgb / rgba(w, h, pixels), from_surface(gfx::Surface),
 //                with_alpha, interpolate
 //
@@ -42,6 +47,13 @@
 // Variable fonts are embedded at their default instance, colour glyphs as their outlines.
 // Fonts whose OS/2 fsType forbids embedding are refused (Error::FontLicense); fsType "no
 // subsetting" embeds every glyph.
+//
+// Gradients (shading.rs): DeviceRGB shadings with a Type 2 function per stretch between stops,
+// stitched by a Type 3 function; one alpha for all stops is the fill alpha (ExtGState ca), varying
+// alpha a luminosity soft mask (a transparency group painting the alphas as a DeviceGray shading
+// in the same user space).  Degenerate gradients paint the last stop's colour as SVG does.
+// Hatches are clipped, stroked lines in one path, not tiling patterns (pdfium shows seams between
+// rotated pattern cells, and readers round the cell step to device pixels).
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -53,6 +65,7 @@ mod font;
 mod geom;
 mod image;
 mod obj;
+mod shading;
 mod write;
 
 use alloc::collections::{BTreeMap, BTreeSet};
@@ -63,6 +76,7 @@ pub use canvas::{Canvas, Origin};
 pub use font::FontMetrics;
 pub use geom::{FillRule, LineCap, LineJoin, Matrix, Path, Rgb, TextMode};
 pub use image::Image;
+pub use shading::{Hatch, Shading, ShadingKind};
 
 /// A4 portrait in points
 pub const A4: (f64, f64) = (595.275_590_551_181_1, 841.889_763_779_527_6);
@@ -219,6 +233,8 @@ pub(crate) struct PageData {
     pub(crate) fonts: BTreeSet<usize>,
     pub(crate) images: BTreeSet<usize>,
     pub(crate) gstates: BTreeSet<usize>,
+    pub(crate) shadings: BTreeSet<usize>,
+    pub(crate) masks: BTreeSet<usize>,
     pub(crate) links: Vec<Link>,
     pub(crate) transparency: bool,
 }
@@ -238,6 +254,12 @@ pub struct Document {
     /// ExtGState table: (fill alpha, stroke alpha) in thousandths
     pub(crate) alphas: Vec<(u16, u16)>,
     pub(crate) alpha_ids: BTreeMap<(u16, u16), usize>,
+    /// shading dictionaries (without << >>), each written once
+    pub(crate) shadings: Vec<Vec<u8>>,
+    pub(crate) shading_ids: BTreeMap<Vec<u8>, usize>,
+    /// soft masks: the DeviceGray shading their group paints and the group's /BBox
+    pub(crate) masks: Vec<(usize, [f64; 4])>,
+    pub(crate) mask_ids: BTreeMap<(usize, Vec<u8>), usize>,
     pub(crate) outlines: Vec<OutlineItem>,
     pub(crate) info: Info,
     pub(crate) lang: Option<String>,
@@ -258,6 +280,10 @@ impl Document {
             images: Vec::new(),
             alphas: Vec::new(),
             alpha_ids: BTreeMap::new(),
+            shadings: Vec::new(),
+            shading_ids: BTreeMap::new(),
+            masks: Vec::new(),
+            mask_ids: BTreeMap::new(),
             outlines: Vec::new(),
             info: Info::default(),
             lang: None,
@@ -275,6 +301,8 @@ impl Document {
             fonts: BTreeSet::new(),
             images: BTreeSet::new(),
             gstates: BTreeSet::new(),
+            shadings: BTreeSet::new(),
+            masks: BTreeSet::new(),
             links: Vec::new(),
             transparency: false,
         });
@@ -369,5 +397,27 @@ impl Document {
     /// the PDF file
     pub fn write(&self) -> Result<Vec<u8>, Error> {
         write::write(self)
+    }
+
+    /// a shading dictionary's index (the same dictionary twice: one object)
+    pub(crate) fn add_shading(&mut self, dict: Vec<u8>) -> usize {
+        let next = self.shadings.len();
+        let i = *self.shading_ids.entry(dict.clone()).or_insert(next);
+        if i == next {
+            self.shadings.push(dict);
+        }
+        i
+    }
+
+    /// a soft mask's index: the group painting gray shading g over bbox
+    pub(crate) fn add_mask(&mut self, g: usize, bbox: [f64; 4]) -> usize {
+        let mut key = Vec::new();
+        obj::nums(&mut key, &bbox);
+        let next = self.masks.len();
+        let i = *self.mask_ids.entry((g, key)).or_insert(next);
+        if i == next {
+            self.masks.push((g, bbox));
+        }
+        i
     }
 }

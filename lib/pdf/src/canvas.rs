@@ -13,6 +13,7 @@ use alloc::vec::Vec;
 
 use crate::geom::{FillRule, LineCap, LineJoin, Matrix, Path, Rgb, Seg, TextMode};
 use crate::obj::{self, num};
+use crate::shading::{self, Alpha, Hatch, Prepared, Shading};
 use crate::{Dest, Document, FontId, Glyph, ImageId, Link, LinkTarget, PageId};
 
 /// where a canvas puts (0, 0) and which way y grows
@@ -25,8 +26,13 @@ pub enum Origin {
 }
 
 /// alpha in thousandths
-fn alpha_key(a: f64) -> u16 {
+pub(crate) fn alpha_key(a: f64) -> u16 {
     if a.is_finite() { (a.clamp(0.0, 1.0) * 1000.0 + 0.5) as u16 } else { 1000 }
+}
+
+/// two alphas in thousandths multiplied
+fn alpha_mul(a: u16, b: u16) -> u16 {
+    ((a as u32 * b as u32 + 500) / 1000) as u16
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -447,6 +453,200 @@ impl<'a> Canvas<'a> {
         self.path.clear();
         self.path.append(p);
         self.stroke();
+    }
+
+    // ------------------------------------------------------------------ gradients and hatches
+
+    /// paints the gradient over the whole current clip (`sh`), its coordinates in the current user
+    /// space, times the canvas's fill alpha.  Degenerate geometry paints the last stop's colour
+    /// (axial from = to, radial with both radii 0: everywhere; two equal circles: that disk); no
+    /// stops, coordinates that are not finite or a negative radius: nothing.  The path being built
+    /// is kept.
+    pub fn shade(&mut self, s: &Shading) {
+        let prepared = shading::prepare(s);
+        if matches!(prepared, Prepared::Invalid) {
+            return;
+        }
+        let kept = core::mem::take(&mut self.path);
+        let (area, bb) = self.page_area();
+        self.scoped(|c| match prepared {
+            Prepared::Invalid => {}
+            Prepared::Solid(col, a) => {
+                c.path = area;
+                c.paint_solid(col, a, FillRule::NonZero);
+            }
+            Prepared::Disk(at, r, col, a) => {
+                c.path.circle(at[0], at[1], r);
+                c.paint_solid(col, a, FillRule::NonZero);
+            }
+            Prepared::Shade(dict, alpha) => c.paint_shading(dict, alpha, bb),
+        });
+        self.path = kept;
+    }
+
+    /// fills the path with the gradient (q, clip with `rule`, sh, Q) and starts a new path, as
+    /// fill() does; what shade() does with degenerate and invalid gradients, within the path (an
+    /// invalid one drops the path)
+    pub fn fill_shading(&mut self, rule: FillRule, s: &Shading) {
+        if self.path.is_empty() {
+            return;
+        }
+        let prepared = shading::prepare(s);
+        if matches!(prepared, Prepared::Invalid) {
+            self.path.clear();
+            return;
+        }
+        // the soft mask's group covers the path (with a margin against edge antialiasing)
+        let bb = match self.path_bbox() {
+            Some(b) => {
+                let m = (b[2] - b[0]).max(b[3] - b[1]) * 0.05 + 1.0;
+                [b[0] - m, b[1] - m, b[2] + m, b[3] + m]
+            }
+            None => self.page_area().1,
+        };
+        self.scoped(|c| match prepared {
+            Prepared::Invalid => c.path.clear(),
+            Prepared::Solid(col, a) => c.paint_solid(col, a, rule),
+            Prepared::Disk(at, r, col, a) => {
+                c.clip(rule);
+                c.path.circle(at[0], at[1], r);
+                c.paint_solid(col, a, FillRule::NonZero);
+            }
+            Prepared::Shade(dict, alpha) => {
+                c.clip(rule);
+                c.paint_shading(dict, alpha, bb);
+            }
+        });
+    }
+
+    /// fills the path with the hatch's lines (q, clip with `rule`, the lines stroked, Q) and starts
+    /// a new path, as fill() does.  Lines at least as wide as their spacing fill the path solid;
+    /// an angle, spacing, width or origin that is not finite (or a spacing or width <= 0), a path
+    /// with coordinates that are not finite or more than 100 000 lines: nothing, the path dropped
+    pub fn fill_hatch(&mut self, rule: FillRule, h: &Hatch) {
+        if self.path.is_empty() {
+            return;
+        }
+        let ok = h.angle.is_finite() && h.spacing.is_finite() && h.spacing > 0.0 && h.width.is_finite() && h.width > 0.0 && h.origin.iter().all(|v| v.is_finite());
+        let (true, Some(bb)) = (ok, self.path_bbox()) else {
+            self.path.clear();
+            return;
+        };
+        let color = h.color.clamped();
+        let a = alpha_key(h.alpha);
+        if h.width >= h.spacing {
+            self.scoped(|c| c.paint_solid(color, a, rule));
+            return;
+        }
+        let lines = match shading::hatch_lines(h, bb) {
+            Some(l) if !l.is_empty() => l,
+            _ => {
+                self.path.clear();
+                return;
+            }
+        };
+        self.scoped(|c| {
+            c.clip(rule);
+            c.want.stroke = color;
+            c.want.width = h.width;
+            c.want.cap = LineCap::Butt;
+            c.want.join = c.have.join;
+            c.want.miter = c.have.miter;
+            c.want.dash.clear();
+            c.want.phase = 0.0;
+            c.want.stroke_alpha = alpha_mul(c.want.fill_alpha, a);
+            c.sync_stroke();
+            for l in &lines {
+                pts(&mut c.out, &[l[0], l[1]], b"m\n");
+                pts(&mut c.out, &[l[2], l[3]], b"l\n");
+            }
+            c.out.extend_from_slice(b"S\n");
+        });
+    }
+
+    /// f between q and Q; the state the canvas knows is what it was before
+    fn scoped(&mut self, f: impl FnOnce(&mut Self)) {
+        let (want, have) = (self.want.clone(), self.have.clone());
+        self.out.extend_from_slice(b"q\n");
+        f(self);
+        self.out.extend_from_slice(b"Q\n");
+        self.want = want;
+        self.have = have;
+    }
+
+    /// fills the path in one colour, its alpha times the fill alpha
+    fn paint_solid(&mut self, col: Rgb, a: u16, rule: FillRule) {
+        self.want.fill = col;
+        self.want.fill_alpha = alpha_mul(self.want.fill_alpha, a);
+        self.fill(rule);
+    }
+
+    /// `sh` with its alpha: a constant (times the fill alpha) or a soft mask over `bb`
+    fn paint_shading(&mut self, dict: Vec<u8>, alpha: Alpha, bb: [f64; 4]) {
+        let i = self.doc.add_shading(dict);
+        match alpha {
+            Alpha::Const(a) => {
+                self.want.fill_alpha = alpha_mul(self.want.fill_alpha, a);
+                self.sync_alpha();
+            }
+            Alpha::Mask(gray) => {
+                self.sync_alpha();
+                let g = self.doc.add_shading(gray);
+                let m = self.doc.add_mask(g, bb);
+                let page = &mut self.doc.pages[self.page];
+                page.masks.insert(m);
+                page.transparency = true;
+                // the group's space is the user space at this gs, the same as the shading's below
+                let _ = core::fmt::Write::write_fmt(&mut obj::Fmt(&mut self.out), format_args!("/M{m} gs\n"));
+            }
+        }
+        self.doc.pages[self.page].shadings.insert(i);
+        let _ = core::fmt::Write::write_fmt(&mut obj::Fmt(&mut self.out), format_args!("/Sh{i} sh\n"));
+    }
+
+    /// the bounding box of the path's points and control points; None for an empty path or one
+    /// with coordinates that are not finite
+    fn path_bbox(&self) -> Option<[f64; 4]> {
+        let mut b = [f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY];
+        let mut finite = true;
+        let mut add = |x: f64, y: f64| {
+            finite &= x.is_finite() && y.is_finite();
+            b = [b[0].min(x), b[1].min(y), b[2].max(x), b[3].max(y)];
+        };
+        for s in &self.path.segs {
+            match *s {
+                Seg::Move(x, y) | Seg::Line(x, y) => add(x, y),
+                Seg::Cubic(x1, y1, x2, y2, x, y) => {
+                    add(x1, y1);
+                    add(x2, y2);
+                    add(x, y);
+                }
+                Seg::Rect(x, y, w, h) => {
+                    add(x, y);
+                    add(x + w, y + h);
+                }
+                Seg::Close => {}
+            }
+        }
+        (finite && b.iter().all(|v| v.is_finite())).then_some(b)
+    }
+
+    /// the page in the current user space: its outline and bounding box
+    fn page_area(&self) -> (Path, [f64; 4]) {
+        let (w, h) = self.page_size();
+        let inv = self.ctm.invert().unwrap_or(Matrix::IDENTITY);
+        let c = [inv.apply(0.0, 0.0), inv.apply(w, 0.0), inv.apply(w, h), inv.apply(0.0, h)];
+        let mut p = Path::new();
+        p.move_to(c[0].0, c[0].1);
+        for q in &c[1..] {
+            p.line_to(q.0, q.1);
+        }
+        p.close();
+        let mut b = [c[0].0, c[0].1, c[0].0, c[0].1];
+        for q in &c[1..] {
+            b = [b[0].min(q.0), b[1].min(q.1), b[2].max(q.0), b[3].max(q.1)];
+        }
+        (p, b)
     }
 
     // ------------------------------------------------------------------ images

@@ -29,10 +29,10 @@ expect text:"Zeichnungen lassen sich noch nicht speichern." exists
 click button:"Speichern unter"
 expect text:"Dateityp" exists
 click button:"Drucken"
-expect text:"Seitenansicht" exists
+expect text:"Keine Seite zum Drucken" exists
 expect text:"Exemplare" exists
 click button:"Exportieren"
-expect button:"PDF/XPS-Dokument erstellen" disabled
+expect text:"Öffnen Sie eine Zeichnung, um sie zu exportieren." exists
 expect button:"Schließen" enabled
 click button:"Info"
 expect text:"JFDiagrammer" exists
@@ -58,6 +58,6 @@ key ctrl+o
 expect text:"Zuletzt verwendet" exists
 key esc
 key ctrl+p
-expect text:"Seitenansicht" exists
+expect text:"Exemplare" exists
 key esc
 expect tab:"Start" selected

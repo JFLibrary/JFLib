@@ -3,13 +3,16 @@
 // clipping, alpha, images (JPEG passed through, RGBA with a soft mask, gray scaled with and
 // without interpolation), text in TrueType and CFF subsets (kerning, ligatures, Greek,
 // Cyrillic, Arabic, a fallback font, stroked and invisible text), links to a URI and to pages,
-// nested outlines and the document information.  Fonts only from the repository: DejaVu
+// gradients (axial and radial, hard edges, varying alpha as a soft mask, turned) and hatches
+// (angles, crossing, turned, in both origins), nested outlines and the document information.
+// Page 5 is laid out for reader_check.py's pixel checks (see the comments there).  Fonts only
+// from the repository: DejaVu
 // (lib/doc_view/assets, DejaVu licence), Inter (styles/netlab/assets, SIL OFL 1.1) and the
 // synthetic CFF fixtures of apps/fonttest.
 
 use alloc::vec::Vec;
 
-use pdf::{Date, Dest, Document, Error, FillRule, FontId, Image, Info, LineCap, LineJoin, Origin, Rgb, TextMode, A4, LETTER};
+use pdf::{Date, Dest, Document, Error, FillRule, FontId, Hatch, Image, Info, LineCap, LineJoin, Origin, Rgb, Shading, TextMode, A4, LETTER};
 
 pub const SERIF: &[u8] = include_bytes!("../../../lib/doc_view/assets/DejaVuSerif.ttf");
 pub const MONO: &[u8] = include_bytes!("../../../lib/doc_view/assets/DejaVuSansMono.ttf");
@@ -111,6 +114,7 @@ pub fn document() -> Result<Document, Error> {
     let p2 = doc.add_page(A4.0, A4.1);
     let p3 = doc.add_page(LETTER.1, LETTER.0);
     let p4 = doc.add_page(pdf::mm(100.0), pdf::mm(100.0));
+    let p5 = doc.add_page(A4.0, A4.1);
     let jpeg = doc.add_image(Image::jpeg(test_jpeg(240, 150))?);
     let rgba = doc.add_image(Image::rgba(64, 64, &test_rgba(64, 64))?);
     let gray_px: Vec<u8> = (0..64).map(|i| if (i / 8 + i % 8) % 2 == 0 { 40 } else { 200 } + (i as u8 % 8) * 6).collect();
@@ -384,6 +388,8 @@ pub fn document() -> Result<Document, Error> {
         c.text(f.serif, 9.0, 22.0, 58.0, "Jede Seite hat ihre eigene Größe.");
         c.image(jpeg, 22.0, 70.0, 120.0, 75.0);
     }
+    // ------------------------------------------------------------ page 5: gradients and hatches
+    let d_p5 = gradients_page(&mut doc, &f, p5);
     // ------------------------------------------------------------ outlines
     let o1 = doc.add_outline(None, "1 Vektorgrafik", Dest::Fit(p1));
     doc.add_outline(Some(o1), "1.1 Füllregeln", d_fill);
@@ -397,7 +403,124 @@ pub fn document() -> Result<Document, Error> {
     doc.set_outline_open(o2, false);
     doc.add_outline(None, "3 Querformat (Letter, y nach oben)", d_p3);
     doc.add_outline(None, "4 Kleine Seite (100 × 100 mm)", d_p4);
+    doc.add_outline(None, "5 Verläufe und Schraffuren", d_p5);
     Ok(doc)
+}
+
+/// page 5 (A4): gradients and hatches.  reader_check.py samples pixels of it at 72 dpi (one pixel
+/// per point, the top-left canvas's coordinates); keep the places it names in step.
+fn gradients_page(doc: &mut Document, f: &Fonts, page: pdf::PageId) -> Dest {
+    let red = Rgb::new(1.0, 0.0, 0.0);
+    let blue = Rgb::new(0.0, 0.0, 1.0);
+    let d;
+    {
+        let mut c = doc.canvas(page, Origin::TopLeft);
+        d = c.dest(0.0, 0.0);
+        c.set_fill_color(Rgb::hex(0x1F3A60));
+        c.text(f.inter, 20.0, 50.0, 60.0, "Seite 5: Verläufe und Schraffuren");
+
+        heading(&mut c, f, 50.0, 100.0, "5.1 Lineare Verläufe");
+        // red to blue over x 50 .. 250 (checked at x 52, 150, 248, y 145)
+        c.rect(50.0, 115.0, 200.0, 60.0);
+        c.fill_shading(FillRule::NonZero, &Shading::axial([50.0, 145.0], [250.0, 145.0], &[(0.0, red, 1.0), (1.0, blue, 1.0)]));
+        // four stops with a hard edge at x 420 (checked at x 416 and 424)
+        c.rect(300.0, 115.0, 240.0, 60.0);
+        let four = [(0.0, Rgb::hex(0xFFE040), 1.0), (0.5, Rgb::hex(0xF08000), 1.0), (0.5, Rgb::hex(0x20A040), 1.0), (1.0, Rgb::hex(0x104020), 1.0)];
+        c.fill_shading(FillRule::NonZero, &Shading::axial([300.0, 0.0], [540.0, 0.0], &four));
+        label(&mut c, f, 50.0, 188.0, "zwei Stufen, rot nach blau · vier Stufen mit harter Kante in der Mitte");
+
+        heading(&mut c, f, 50.0, 215.0, "5.2 Transparenz und Drehung");
+        // alpha 1 to 0 on the white page (checked at x 52, 150, 248, y 260)
+        c.rect(50.0, 230.0, 200.0, 60.0);
+        c.fill_shading(FillRule::NonZero, &Shading::axial([50.0, 0.0], [250.0, 0.0], &[(0.0, Rgb::hex(0x2050C0), 1.0), (1.0, Rgb::hex(0x2050C0), 0.0)]));
+        // three stops of varying alpha over a checkerboard
+        for y in 0..3 {
+            for x in 0..12 {
+                c.set_fill_color(if (x + y) % 2 == 0 { Rgb::hex(0xBBBBBB) } else { Rgb::WHITE });
+                c.rect(300.0 + x as f64 * 20.0, 230.0 + y as f64 * 20.0, 20.0, 20.0);
+                c.fill(FillRule::NonZero);
+            }
+        }
+        c.rect(300.0, 230.0, 240.0, 60.0);
+        c.fill_shading(FillRule::NonZero, &Shading::axial([300.0, 0.0], [540.0, 0.0], &[(0.0, red, 1.0), (0.5, Rgb::hex(0x20C040), 0.25), (1.0, blue, 1.0)]));
+        // one alpha for all stops (ExtGState ca), turned with the canvas
+        c.save();
+        c.translate(150.0, 345.0);
+        c.rotate(-0.25);
+        c.rounded_rect(-90.0, -30.0, 180.0, 60.0, 12.0);
+        c.fill_shading(FillRule::NonZero, &Shading::axial([-90.0, 0.0], [90.0, 0.0], &[(0.0, Rgb::hex(0x803080), 0.6), (0.5, Rgb::hex(0xF0C040), 0.6), (1.0, Rgb::hex(0x208080), 0.6)]));
+        c.restore();
+        // the canvas's fill alpha times a soft mask, turned the other way
+        c.save();
+        c.translate(420.0, 345.0);
+        c.rotate(0.25);
+        c.set_fill_alpha(0.7);
+        c.rounded_rect(-100.0, -30.0, 200.0, 60.0, 30.0);
+        c.fill_shading(FillRule::NonZero, &Shading::axial([0.0, -30.0], [0.0, 30.0], &[(0.0, Rgb::hex(0xC03030), 0.0), (1.0, Rgb::hex(0xC03030), 1.0)]));
+        c.restore();
+        label(&mut c, f, 50.0, 412.0, "Alpha 1 bis 0 · Alpha 1, 0,25, 1 · gedreht mit Alpha 0,6 · Füll-Alpha 0,7 mal Verlaufs-Alpha");
+
+        heading(&mut c, f, 50.0, 430.0, "5.3 Radiale Verläufe");
+        // white centre to dark blue at radius 60 (checked at the centre 120, 510 and at radius 57)
+        c.circle(120.0, 510.0, 60.0);
+        c.fill_shading(FillRule::NonZero, &Shading::radial([120.0, 510.0], 0.0, [120.0, 510.0], 60.0, &[(0.0, Rgb::WHITE, 1.0), (1.0, Rgb::hex(0x102060), 1.0)]));
+        // an offset inner circle, four stops, extended to the rectangle's corners (checked at 212, 452)
+        c.rect(210.0, 450.0, 140.0, 120.0);
+        let rings = [(0.0, Rgb::hex(0xFFF0A0), 1.0), (0.3, Rgb::hex(0xF09030), 1.0), (0.7, Rgb::hex(0xC03020), 1.0), (1.0, Rgb::hex(0x401010), 1.0)];
+        c.fill_shading(FillRule::NonZero, &Shading::radial([265.0, 495.0], 6.0, [280.0, 510.0], 55.0, &rings));
+        // shade() paints the whole clip: here an ellipse
+        c.save();
+        c.ellipse(460.0, 510.0, 80.0, 55.0);
+        c.clip(FillRule::NonZero);
+        c.shade(&Shading::radial([460.0, 510.0], 10.0, [460.0, 510.0], 80.0, &[(0.0, Rgb::hex(0x30C0F0), 1.0), (1.0, Rgb::hex(0x2040A0), 1.0)]));
+        c.restore();
+        label(&mut c, f, 50.0, 588.0, "von der Mitte nach außen · versetzter Innenkreis, vier Stufen, fortgesetzt · shade() in einer Ellipse");
+
+        heading(&mut c, f, 50.0, 615.0, "5.4 Schraffuren");
+        // horizontal lines 3 wide every 8 through y 640.5 (checked at y 640 line, 644 gap, x 120)
+        c.rect(50.0, 627.0, 140.0, 80.0);
+        c.fill_hatch(FillRule::NonZero, &Hatch { origin: [0.0, 640.5], ..Hatch::new(0.0, 8.0, 3.0, Rgb::hex(0xA02020)) });
+        c.set_stroke_color(Rgb::hex(0x404040));
+        c.set_line_width(1.0);
+        c.rect(50.0, 627.0, 140.0, 80.0);
+        c.stroke();
+        // two crossing families
+        c.rect(210.0, 627.0, 140.0, 80.0);
+        c.fill_hatch(FillRule::NonZero, &Hatch::new(core::f64::consts::FRAC_PI_4, 10.0, 1.2, Rgb::hex(0x2050C0)));
+        c.rect(210.0, 627.0, 140.0, 80.0);
+        c.fill_hatch(FillRule::NonZero, &Hatch::new(-core::f64::consts::FRAC_PI_4, 10.0, 1.2, Rgb::hex(0x2050C0)));
+        c.rect(210.0, 627.0, 140.0, 80.0);
+        c.stroke();
+        // turned with the canvas, alpha 0.6, in an ellipse; a star with the even-odd rule
+        c.save();
+        c.translate(450.0, 667.0);
+        c.rotate(0.3);
+        c.ellipse(0.0, 0.0, 85.0, 38.0);
+        c.fill_hatch(FillRule::NonZero, &Hatch { alpha: 0.6, ..Hatch::new(0.0, 6.0, 2.0, Rgb::hex(0x208040)) });
+        c.ellipse(0.0, 0.0, 85.0, 38.0);
+        c.stroke();
+        c.restore();
+        star(&mut c, 557.0, 667.0, 30.0);
+        c.fill_hatch(FillRule::EvenOdd, &Hatch::new(1.2, 4.0, 1.0, Rgb::BLACK));
+        star(&mut c, 557.0, 667.0, 30.0);
+        c.set_line_width(0.5);
+        c.stroke();
+        label(&mut c, f, 50.0, 722.0, "waagrecht · gekreuzt (±45°) · gedreht mit Alpha 0,6 · Stern mit even-odd");
+    }
+    {
+        // the same page with y upwards: angles turn counter-clockwise here
+        let mut c = doc.canvas(page, Origin::BottomLeft);
+        c.set_fill_color(Rgb::hex(0x404040));
+        c.text(f.serif, 8.0, 50.0, 20.0, "Ursprung unten links: Schraffur 30° (gegen den Uhrzeigersinn), Verlauf nach oben");
+        c.rect(50.0, 35.0, 200.0, 70.0);
+        c.fill_hatch(FillRule::NonZero, &Hatch::new(core::f64::consts::PI / 6.0, 7.0, 1.5, Rgb::hex(0x6030A0)));
+        c.set_stroke_color(Rgb::hex(0x404040));
+        c.rect(50.0, 35.0, 200.0, 70.0);
+        c.stroke();
+        c.rect(300.0, 35.0, 240.0, 70.0);
+        c.fill_shading(FillRule::NonZero, &Shading::axial([0.0, 35.0], [0.0, 105.0], &[(0.0, Rgb::hex(0x104020), 1.0), (1.0, Rgb::hex(0xE0F0E0), 1.0)]));
+    }
+    d
 }
 
 pub fn build() -> Result<Vec<u8>, Error> {

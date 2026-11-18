@@ -10,6 +10,7 @@
 //   close(app, ui)               back to the empty drawing
 //   paint(app, k) -> PagePaint   page k as a ui.diagram content (DgPaint): built on first use,
 //                                kept while the document is open
+//   refresh(app)                 (JD12) after a change of the document: pages drawn anew
 //   model(app, k)                the canvas' model: one node, the page's sheet (fit, overview)
 //   page_width(app)              zoom to the page's width (Ansicht › Seitenbreite)
 //   fonts(ui)                    the fonts pages are drawn with: the style's Inter (sans) and
@@ -176,6 +177,23 @@ pub(crate) fn close(app: &mut Diagrammer, ui: &mut Ui) {
     app.backstage = None;
     app.canvas.request_fit();
     ui.repass();
+}
+
+/// (JD12) the document changed (Seite einrichten): every page is drawn anew, the tabs take the
+/// pages' names again, the canvas gets a new version
+pub(crate) fn refresh(app: &mut Diagrammer) {
+    let Some(o) = app.opened.as_mut() else { return };
+    for p in o.paints.iter_mut() {
+        *p = None;
+    }
+    for tab in o.tabs.iter_mut() {
+        if let Some(n) = o.doc.page(tab.page).and_then(|pg| pg.header.name.or(pg.header.name_u)) {
+            tab.name = String::from(o.doc.str(n));
+        }
+    }
+    o.serial = o.serial.wrapping_add(1);
+    app.canvas.request_fit();
+    app.fit_again = true;
 }
 
 /// page k of the open drawing, built on first use

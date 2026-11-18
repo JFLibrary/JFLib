@@ -10,8 +10,8 @@
 // the templates, JD13); a click opens the template's preview with its description, metric or
 // US units and "Erstellen" (UI-04), which works for the blank drawing.  Öffnen (JD4) browses
 // with the file dialog and lists the drawings opened last; they open read-only (viewer.rs).
-// Speichern, Drucken and Exportieren show their layout with the commands disabled until
-// writing exists (JD5, JD12).  Info names the version, the licences and the place of the
+// Speichern shows its layout with the commands disabled until writing exists (JD7); Drucken
+// and Exportieren are print_ui.rs and export_ui.rs (JD12).  Info names the version, the licences and the place of the
 // AWS attribution.  Optionen lists its pages at the side (options.rs).
 
 use alloc::format;
@@ -86,8 +86,8 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
         PAGE_NEW => new_page(app, ui),
         PAGE_OPEN => open_page(app, ui),
         PAGE_SAVE | PAGE_SAVE_AS => save_page(ui, page == PAGE_SAVE_AS),
-        PAGE_PRINT => print_page(ui),
-        PAGE_EXPORT => export_page(ui),
+        PAGE_PRINT => crate::print_ui::page(app, ui),
+        PAGE_EXPORT => crate::export_ui::page(app, ui),
         PAGE_INFO => info_page(ui),
         _ => options_page(app, ui),
     }
@@ -271,59 +271,6 @@ fn save_page(ui: &mut Ui, as_new: bool) {
     ui.next_flags(ST_DISABLED);
     let names: alloc::vec::Vec<&str> = FILE_TYPES.iter().map(|s| t(s)).collect();
     ui.combobox(ID_PAGE + 2, &mut sel, &names);
-    ui.box_end();
-}
-
-// ------------------------------------------------------------------ Drucken, Exportieren
-
-fn print_page(ui: &mut Ui) {
-    title(ui, t("Drucken"));
-    ui.box_begin(ID_PAGE, BOX_H, 32);
-    ui.next_size(280, 0);
-    ui.box_begin(0, BOX_V, 10);
-    unavailable(ui, ID_PAGE + 1, t("Drucken"), JD_PRINT_L);
-    let mut copies = 1;
-    ui.text(TS_BODY, t("Exemplare"));
-    ui.next_flags(ST_DISABLED);
-    ui.number_box(ID_PAGE + 2, &mut copies, &Range::new(1, 999, 1, 0));
-    let mut sel = 0;
-    ui.text(TS_BODY, t("Drucker"));
-    ui.next_size(-1, 0);
-    ui.next_flags(ST_DISABLED);
-    ui.combobox(ID_PAGE + 3, &mut sel, &[t("Standarddrucker")]);
-    ui.text(TS_BODY, t("Einstellungen"));
-    ui.next_size(-1, 0);
-    ui.next_flags(ST_DISABLED);
-    ui.combobox(ID_PAGE + 4, &mut sel, &[t("Alle Seiten drucken"), t("Aktuelle Seite drucken"), t("Auswahl drucken")]);
-    ui.box_end();
-    // the preview: an empty sheet
-    ui.next_size(300, 400);
-    ui.box_begin(ID_PAGE + 5, BOX_V | BOX_CARD | pad(16), 0);
-    let r = ui.box_rect();
-    let frame = ui.color(T_CTRL_STROKE);
-    ui.cmd_rrect(r[0], r[1], r[2], r[3], 0, ui.hair(), 0xFFFF_FFFF, frame, frame);
-    ui.text(TS_CAPTION | TX_SECONDARY, t("Seitenansicht"));
-    ui.box_end();
-    ui.box_end();
-}
-
-// i18n
-static EXPORTS: [(&str, &str); 3] = [
-    ("PDF/XPS-Dokument erstellen", "Die Zeichnung als PDF mit Text, Links und Lesezeichen."),
-    ("Dateityp ändern", "Als Zeichnung, Vorlage, Schablone oder Grafik (SVG, PNG) speichern."),
-    ("Als Webseite speichern", "Seiten und Shapes als HTML mit SVG-Grafiken."),
-];
-
-fn export_page(ui: &mut Ui) {
-    title(ui, t("Exportieren"));
-    ui.box_begin(ID_PAGE, BOX_V, 12);
-    for (k, (name, about)) in EXPORTS.iter().enumerate() {
-        ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
-        unavailable(ui, ID_PAGE + 1 + k as u32, t(name), [JD_SEND_PDF_L, JD_EXPORT_L, JD_FILE_DRAWING_L][k]);
-        ui.next_size(380, 0);
-        ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t(about));
-        ui.box_end();
-    }
     ui.box_end();
 }
 
