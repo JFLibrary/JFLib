@@ -660,6 +660,7 @@ rust-analyzer reads the Cargo workspace in the root `Cargo.toml` directly.
 | [Android plan](docs/ANDROID.md) | Bringing Android up to Windows, Linux and Apple: threads, network, file system, printing, system fonts; milestones, traps, tests (German) |
 | [Game engine plan](docs/GAME.md) | A game engine on render3d: decisions, crates, stages G7a to G7p from a first multiplayer game to procedural cities, tests (German) |
 | [Physics](docs/PHYSICS.md) | Collision for games: shapes, broad phase, rays, swept shapes, contacts; f64, the same bits on every target; tests and measurements (German) |
+| [Transport](docs/TRANSPORT.md) | The network of games: WebSocket in netio, the browser's WebSocket, lib/netchan's channel over UDP and WebSocket; wire format, limits, tests, measurements (German) |
 | [Android Gallery](apps/androidGallery/README.md) | APKs, Android prerequisites, input, and port status |
 | [Web and agent control](docs/AGENT_WEB.md) | Browser host and explicit CLI/JSON/MCP interfaces |
 | [jfWord](apps/jfWord/README.md) | Document editing and current feature coverage |
