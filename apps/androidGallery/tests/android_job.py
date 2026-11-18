@@ -85,7 +85,11 @@ def main():
     def stop_unless_free(when):
         front = in_front()
         if not any(p == PKG or "launcher" in p for p in front):
-            raise SystemExit(f"STOP {when}: {', '.join(front) or 'nothing'} in front, the phone is in use")
+            # no package: a system window such as "Application Not Responding: com.android.systemui" (an
+            # emulator under load: tap its "Wait"), said as it is
+            raw = re.findall(r"mCurrentFocus=(.*)", sh("dumpsys window | grep mCurrentFocus"))
+            what = ", ".join(front) or "; ".join(r.strip() for r in raw if r.strip() != "null") or "nothing"
+            raise SystemExit(f"STOP {when}: {what} in front, the phone is in use")
 
     abi = sh("getprop", "ro.product.cpu.abi").strip()
     print(f"device: {sh('getprop', 'ro.product.model').strip()} (API {sh('getprop', 'ro.build.version.sdk').strip()}, {abi})",
