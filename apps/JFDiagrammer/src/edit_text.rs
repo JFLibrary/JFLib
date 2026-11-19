@@ -16,10 +16,10 @@
 // (JD8 rest) Fields (TX-06) show their text in the editor and stay fields as long as their text
 // is not touched: the text before the first and after the last change keeps its fields, a field
 // in the changed part becomes the characters it showed.  The caret at the end goes to
-// TextCmds::last, so that a field or a link asked for next goes there.  A click on the ribbon
-// (a register, a command button) does not end the editing: the register Textwerkzeuge stays, the
-// command runs with the text being edited, the editor gets the focus back.  TextCmds::caret
-// places the caret of the next start.  A vertical text
+// TextCmds::last, so that a field or a link asked for next goes there.  A click on the register
+// row or on a command of the register Textwerkzeuge does not end the editing: the register stays,
+// the command runs with the text being edited, the editor gets the focus back; the File register
+// ends it (cmds_text::frame).  TextCmds::caret places the caret of the next start.  A vertical text
 // (TextDirection 1) is edited in a box across the shape.
 
 use alloc::string::String;
@@ -217,19 +217,19 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
         ui.repass();
         return;
     }
-    // (JD8 rest) the ribbon (its registers, its command buttons) takes the focus without ending
-    // the editing: the register Textwerkzeuge stays, a command runs with the text being edited
-    // (Feld, Link: at the caret), then the editor has the focus again; the font boxes and open
-    // menus keep it while they are used
+    // (JD8 rest) the register row and the commands of the register Textwerkzeuge (Feld, Link,
+    // Symbol, QuickInfo, the dialog Text) take the focus without ending the editing: the register
+    // stays, the command runs with the text being edited (Feld at the caret), then the editor has
+    // the focus again (open menus keep it while they are used); every other widget ends it
     let f = ui.focused();
-    let ribbon = f == crate::shell::ID_TABS || crate::commands::def(f).is_some();
+    let ribbon = f == crate::shell::ID_TABS || matches!(f, FIELD | LINK | SYMBOL | SCREEN_TIP | TEXT_DIALOG);
     // (the box commits when it loses the focus: to the ribbon that is no end)
     if ev & EV_COMMIT != 0 && !(ribbon && f != ID_TEXT) {
         end(app, ui);
     } else if f != ID_TEXT && ev & EV_FOCUS == 0 {
         if !ribbon {
             end(app, ui);
-        } else if ui.mbtn() & (1 << BTN_LEFT) == 0 && ui.popup_count() == 0 && !matches!(f, FONT | FONT_SIZE) {
+        } else if ui.mbtn() & (1 << BTN_LEFT) == 0 && ui.popup_count() == 0 {
             ui.focus(ID_TEXT);
             ui.repass();
         }

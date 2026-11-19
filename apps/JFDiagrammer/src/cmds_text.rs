@@ -86,6 +86,10 @@ pub(crate) fn available(app: &Diagrammer, id: u32) -> bool {
 
 /// every pass: the fields' locale and clock, the dialogs, the shape menu's links
 pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
+    // the File register opened from the register row while a text was edited: the text goes in
+    if app.backstage.is_some() && app.text.is_some() {
+        crate::edit_text::finish(app, ui);
+    }
     env(app);
     crate::dlg_text::dialog(app, ui);
     crate::dlg_field::dialog(app, ui);
@@ -111,16 +115,33 @@ pub(crate) fn command(app: &mut Diagrammer, ui: &mut Ui, id: u32) -> bool {
 // the local time as days since 30 Dec 1899 and the zone's offset in days
 fn local_now() -> (f64, f64) {
     let ns = plat::unix_time_ns();
-    let secs = ns.div_euclid(1_000_000_000);
+    let off = zone_offset(ns.div_euclid(1_000_000_000));
+    let days = (ns as f64 / 1e9 + off) / 86_400.0 + 25_569.0;
+    (days, off / 86_400.0)
+}
+
+// the local zone's offset from UTC in seconds at an instant (the system's zone)
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+fn zone_offset(secs: i64) -> f64 {
     let zone = plat::fs::local_zone_id()
         .and_then(|id| match id.strip_prefix("win:") {
             Some(k) => datetime::Zone::from_windows(k),
             None => datetime::Zone::by_name(&id),
         })
         .unwrap_or_else(datetime::Zone::utc);
-    let off = zone.offset_at(secs) as f64;
-    let days = (ns as f64 / 1e9 + off) / 86_400.0 + 25_569.0;
-    (days, off / 86_400.0)
+    zone.offset_at(secs) as f64
+}
+
+// elsewhere the local time plat::date gives (the browser's; Android's is UTC), to the quarter hour
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
+fn zone_offset(secs: i64) -> f64 {
+    let (d, utc) = plat::date();
+    if utc {
+        return 0.0;
+    }
+    let local = diagram_core::field::ole_days(d.year as i64, d.month as u32, d.day as u32, d.hour as u32, d.min as u32, d.sec as u32);
+    let off = (local - (secs as f64 / 86_400.0 + 25_569.0)) * 86_400.0;
+    diagram_core::formula::math::round(off / 900.0) * 900.0
 }
 
 /// the day names of the current language, Sunday first

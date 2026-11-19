@@ -270,8 +270,12 @@ fn apply(app: &mut Diagrammer, ui: &mut Ui) {
                         let n = format!("Row_{next}");
                         next += 1;
                         let taken = rows.iter().any(|x| x.name.as_deref() == Some(n.as_str()) && k == 0) || {
+                            // a row the shape has, also an inherited one it deleted (its Del mark)
                             let doc = tx.doc();
-                            doc.sym(&n).is_some_and(|sym| doc.has_row(sheet, sec, RowKey::Named(sym)))
+                            doc.sym(&n).is_some_and(|sym| {
+                                let key = RowKey::Named(sym);
+                                doc.has_row(sheet, sec, key) || doc.sheet(sheet).and_then(|sh| sh.section(sec)).is_some_and(|sc| sc.rows.iter().any(|r| r.key == key))
+                            })
                         };
                         if !taken {
                             break n;
