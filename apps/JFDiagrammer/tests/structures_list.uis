@@ -1,0 +1,38 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD10: lists (ST-04) -- the list of "Container und Listen" dropped on the page; its
+# insert triangle (shown near the pointer) adds an item of its item master and starts its text;
+# the list fits its items; an item dragged above another changes the order (the items are laid
+# out again, top to bottom); undo takes the new order back
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Container und Listen"
+drag button:"Liste" 600,400
+expect listitem:"Liste" rect 525 350 150 100
+expect button:"Element einfügen" exists
+click button:"Element einfügen"
+type "Eins"
+key esc
+expect listitem:"Eins" rect 530 375 140 20
+expect listitem:"Liste" rect 525 350 150 50
+# the triangle after "Eins", then after "Zwei"
+move 600,385
+click 520,394
+type "Zwei"
+key esc
+move 600,385
+click 520,414
+type "Drei"
+key esc
+expect listitem:"Eins" rect 530 375 140 20
+expect listitem:"Zwei" rect 530 395 140 20
+expect listitem:"Drei" rect 530 415 140 20
+expect listitem:"Liste" rect 525 350 150 90
+# "Drei" dragged above "Eins": first in the list
+drag 600,425 600,378
+expect listitem:"Drei" rect 530 375 140 20
+expect listitem:"Eins" rect 530 395 140 20
+expect listitem:"Zwei" rect 530 415 140 20
+shot build/JFDiagrammer-structures-list.png
+key ctrl+z
+expect listitem:"Eins" rect 530 375 140 20
+expect listitem:"Drei" rect 530 415 140 20

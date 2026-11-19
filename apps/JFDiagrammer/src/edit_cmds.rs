@@ -28,6 +28,9 @@ pub(crate) fn available(app: &Diagrammer, id: u32) -> bool {
     let open = app.opened.is_some();
     let sel = !app.se.sel.is_empty();
     match id {
+        // (JD10) structures and layout
+        id if crate::structures_cmds::owns(id) => crate::structures_cmds::available(app, id),
+        id if crate::layout_ui::owns(id) => crate::layout_ui::available(app, id),
         UNDO => app.opened.as_ref().is_some_and(|o| o.ed.history.can_undo()),
         REDO => app.opened.as_ref().is_some_and(|o| o.ed.history.can_redo()),
         CUT | COPY | DUPLICATE | BRING_FRONT | BRING_FORWARD | SEND_BACK | SEND_BACKWARD | ROTATE_LEFT | ROTATE_RIGHT | FLIP_H | FLIP_V => sel,
@@ -73,7 +76,8 @@ pub(crate) fn redo(app: &mut Diagrammer, ui: &mut Ui) {
 pub(crate) fn copy(app: &mut Diagrammer, _ui: &mut Ui) {
     let shapes = selected(app);
     if let (Some(o), false) = (app.opened.as_ref(), shapes.is_empty()) {
-        app.clip = Some(ops::copy(&o.doc, &shapes));
+        // (JD10) members and callouts come along
+        app.clip = Some(ops::copy(&o.doc, &crate::structures::carried(&o.doc, &shapes)));
         app.clip_offset = 1;
     }
 }
@@ -99,7 +103,11 @@ pub(crate) fn paste(app: &mut Diagrammer, ui: &mut Ui) {
     let n = app.clip_offset as f32;
     let d = geo.page_vec([step * n, step * n]);
     let r = match app.opened.as_mut() {
-        Some(o) => edit_doc::edit(o, t("Einfügen"), true, |tx, eng| ops::paste(tx, eng, ow, &clip, d)),
+        Some(o) => edit_doc::edit(o, t("Einfügen"), true, |tx, eng| {
+            let new = ops::paste(tx, eng, ow, &clip, d)?;
+            crate::structures::pasted(tx, eng, ow, &new)?;
+            Ok(new)
+        }),
         None => Ok(Vec::new()),
     };
     app.clip = Some(clip);

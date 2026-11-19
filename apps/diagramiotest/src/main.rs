@@ -9,12 +9,15 @@
 //                                         to DIR, to open them elsewhere
 //   diagramiotest --write-golden DIR      (JD4) the golden images of the viewer tests anew
 //   diagramiotest --write-drawings DIR    (JD4) the viewer tests' drawings as .vsdx
-//   diagramiotest --write-gegenprobe DIR  (JD7) the glue drawing for the Visio counter-check
+//   diagramiotest --write-gegenprobe DIR  (JD7) the glue drawing for the Visio counter-check,
+//                                         (JD10) JD10-Gegenprobe-Strukturen.vsdx
 //   diagramiotest --render-corpus DIR [--width PX]   (JD4) the local files' pages as PNG and SVG
 //   diagramiotest --write-export-golden DIR   (JD12) the export's golden images anew
 //   diagramiotest --write-exports DIR [--corpus DIR]   (JD12) the self-built drawings and the local
 //                                         files as PDF, SVG and PNG (to compare with Visio)
 //   diagramiotest --write-stencils DIR   (JD9) the start set's stencils as .vssx (stencils.rs)
+//   diagramiotest --write-stencil-previews DIR   (JD10) the structure stencils' masters as PNG
+//                                         (containers, cff, callouts; stencil_structs.rs)
 //
 // Groups:
 //   samples   self-built files of all six formats: what lands where in the model (fields,
@@ -39,6 +42,10 @@
 //   edit      (JD7, gegenprobe.rs) static and dynamic glue through ops and glue, moved, written
 //             and read back: the Connect entries and glue formulas stay, ends follow again
 //   stencils  (JD9, stencils.rs) the stencil build tool: the start set, the SVG import, faults
+//             (JD10, stencil_structs.rs) the structure stencils: containers, lists, lanes, callouts
+//   structures  (JD10, structures.rs) a container, a list, a cross-functional flowchart and a
+//             callout built as JFDiagrammer builds them: relationships on both sides, written and
+//             read back unchanged, members, steps and callouts carried after reading
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -70,7 +77,9 @@ mod pdfreader;
 mod render;
 mod roundtrip;
 mod samples;
+mod stencil_structs;
 mod stencils;
+mod structures;
 mod svgdump;
 mod zipkit;
 
@@ -139,8 +148,12 @@ fn run() -> i32 {
     if let Some(dir) = arg(&args, "--write-stencils") {
         return stencils::write(&dir);
     }
+    if let Some(dir) = arg(&args, "--write-stencil-previews") {
+        return stencil_structs::previews(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-gegenprobe") {
-        return gegenprobe::write(&dir);
+        // (JD7) the glue drawing, (JD10) the structures drawing
+        return gegenprobe::write(&dir).max(structures::write(&dir));
     }
     if let Some(dir) = arg(&args, "--write-probe") {
         return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
@@ -148,7 +161,7 @@ fn run() -> i32 {
     let check = args.iter().any(|a| a == "--check");
     let corpus_dir = arg(&args, "--corpus");
     if !check && corpus_dir.is_none() {
-        out("Aufruf: diagramiotest --check [--only NAME] [--corpus DIR] | --corpus DIR | --write-samples DIR | --write-golden DIR | --write-drawings DIR | --render-corpus DIR [--width PX] | --write-stencils DIR | --write-gegenprobe DIR\n");
+        out("Aufruf: diagramiotest --check [--only NAME] [--corpus DIR] | --corpus DIR | --write-samples DIR | --write-golden DIR | --write-drawings DIR | --render-corpus DIR [--width PX] | --write-stencils DIR | --write-stencil-previews DIR | --write-gegenprobe DIR\n");
         return 2;
     }
     let mut h = H { ok: 0, failed: 0, only: arg(&args, "--only") };
@@ -173,6 +186,10 @@ fn run() -> i32 {
         roundtrip::run(&mut h, corpus_dir.as_deref());
         if h.on("stencils") {
             stencils::run(&mut h);
+            stencil_structs::run(&mut h);
+        }
+        if h.on("structures") {
+            structures::check(&mut h);
         }
     }
     if h.on("corpus") {

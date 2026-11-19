@@ -39,7 +39,10 @@
 //   hit::*                        (JD7) the shape under a point of a display list, shapes in a
 //                                 rectangle
 //
-// What is to come here, by stage of the plan: layout (JD10), containers and callouts (JD10)
+//   structure::*                  (JD10) containers, lists, callouts: membership in the
+//                                 Relationships cell, automatic size, list order and layout
+//
+// What is to come here, by stage of the plan: page layout (CN-13, P2)
 //
 // Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 // opening a file (connectors, layout and containers move only when something moves), and a
@@ -64,6 +67,7 @@ mod page;
 pub mod render;
 pub mod route;
 mod shape;
+pub mod structure;
 mod sheet;
 mod strings;
 mod units;

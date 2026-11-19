@@ -70,6 +70,7 @@ der App landen sie in `OUT_DIR`; zum Ansehen in Visio schreibt
 | `style` | nein | Formatvorlage für Linie, Füllung und Text, über ihren NameU; Standard `Normal` |
 | `line_style`, `fill_style`, `text_style` | nein | einzeln statt `style` |
 | `svg` | nein | Grafikdatei im selben Ordner: ihre Pfade werden zu Geometrie (siehe unten) |
+| `hidden` | nein | `true`: verborgener Master (`Hidden="1"`), steht in der `.vssx`, erscheint aber nicht in der Seitenleiste; die App legt ihn per Code ab (z. B. die Listen des funktionsübergreifenden Flussdiagramms). Standard `false` |
 
 ### Abschnitte
 
@@ -178,11 +179,54 @@ den Shape-Kasten abgebildet (x nach rechts, y nach oben gedreht).
 - Farben werden als `#RRGGBB` übernommen (`FillForegnd`, `FillBkgnd`, `LineColor`, Deckkraft
   als `…Trans`), die Linienbreite im Verhältnis viewBox zu Shape-Größe (`LineWeight` in pt).
 
+## Strukturen: Container, Listen, Beschriftungen (JD10)
+
+Die Schablonen `containers`, `cff` und `callouts` liefern Shapes, die andere aufnehmen oder auf
+sie zeigen. Die App (`diagram_core::structure`) liest nur diese Zellen; ihre Namen sind Visios
+Namen (Kompatibilität), Werte, Formeln und Aussehen sind eigene Arbeit. Längen metrisch mit
+`.us`-Fassung in Zoll.
+
+| Zelle | Inhalt |
+|---|---|
+| `User.msvStructureType` | `"Container"`, `"List"` oder `"Callout"` |
+| `User.msvShapeCategories` | Kategorien, `;`-getrennt ohne Leerzeichen (`"Swimlane;DoNotContain"`) |
+| `User.msvSDContainerMargin` | Abstand der Mitglieder zum Inneren (Länge) |
+| `User.msvSDContainerResize` | 0 keine Größenänderung, 1 nach Bedarf erweitern, 2 immer anpassen |
+| `User.msvSDContainerLocked`, `…NoHighlight`, `…NoRibbon` | `FALSE` |
+| `User.msvSDContainerStyle`, `…StyleCount`, `msvSDHeadingStyle`, `…HeadingStyleCount` | Stil und Kopfzeilenstil (1-basiert) und ihre Anzahl; der Master schaltet seine Looks selbst per Formel |
+| `User.msvSDContainerRequiredCategories`, `…ExcludedCategories` | wer Mitglied werden darf |
+| `User.msvSDListDirection` | 0 links→rechts, 1 rechts→links, 2 oben→unten, 3 unten→oben |
+| `User.msvSDListSpacing`, `…Alignment`, `…RequiredCategories`, `…ExcludedCategories`, `…ItemMaster` | Abstand Kante zu Kante, Ausrichtung 0/1/2, Elementfilter, NameU des Standard-Elements |
+| `User.JFD_ListStretch` | `TRUE`: alle Elemente quer so lang wie die Liste |
+| `User.JFD_HeadingEdge` | Kante, an der die Kopfzeile liegt: `"Top"`, `"Bottom"`, `"Left"`, `"Right"`, `"None"` |
+| `User.JFD_HeadingSize` | Tiefe der Kopfzeile (Länge, 0: ohne Kopf) |
+| `User.JFD_LabelUpright` | Bahnen und Trennlinien: `TRUE` = Text im seitlichen Kopf waagerecht statt um 90° gedreht |
+| `Controls.Association` | Beschriftungen: die Spitze des Zeigers, die der Nutzer auf das Ziel zieht |
+| `User.msvSDCalloutNoHighlight` | Beschriftungen: `FALSE` |
+
+Regeln für die Master:
+
+- Der Text ist die Überschrift; der Textblock (`TxtPinX/Y`, `TxtWidth/Height`, `TxtAngle`) liegt
+  in der Kopfzeile. Kopfband, Kopflinie und Textblock hängen nur von `JFD_HeadingEdge` und
+  `JFD_HeadingSize` ab (Hilfszellen `HeadTop` … `HeadRight`): setzt die App `JFD_HeadingSize = 0`,
+  verschwindet der Kopf samt Text (`HideText`), die Box bleibt sauber gezeichnet. Beim Master
+  `Container` sind beide Formeln aus `msvSDHeadingStyle` (1 Kopfband oben, 2 nur Titel oben,
+  3 Kopfband links, 4 ohne Kopf).
+- Geometrie nur aus `Width`, `Height` und Zellformeln: die App vergrößert die Shapes per Code.
+  Teile, die ein Stil nicht zeigt, schaltet `NoShow` im Geometrieabschnitt ab; ein Shape hat
+  eine Linie und eine Füllung, verschiedene Looks entstehen über `NoFill`/`NoLine` je Abschnitt.
+- Beschriftungen zeichnen den Zeiger per Formel vom Körper zu `Controls.Association`; liegt der
+  Punkt im Körper, ist der Zeiger aus (`NoShow` bzw. Keilpunkte auf der Kante).
+- Die Listen des funktionsübergreifenden Flussdiagramms und sein Rahmen sind verborgene Master
+  (`hidden: true`); die Listen zeichnen nichts (`NoShow`).
+- Vorschau aller Master mit allen Stilen: `diagramiotest --write-stencil-previews ORDNER`;
+  Prüfungen: `diagramiotest --check --only stencils/structure`.
+
 ## Was in der `.vssx` steht
 
 Visio-Attribute je Master: `ID`, `NameU`, `Name` und `Prompt` in der Bausprache,
 `IsCustomName(U)=1`, `UniqueID`, `BaseID`, `IconSize=1`, `AlignName=2`, `MatchByName=0`,
-`IconUpdate=1`, `PatternFlags=0`, `Hidden=0`, `MasterType=2`. Das Symbol ist ein 32×32-Icon mit
+`IconUpdate=1`, `PatternFlags=0`, `Hidden=0` (`1` mit `hidden: true`), `MasterType=2`. Das Symbol ist ein 32×32-Icon mit
 16 Farben, aus dem Shape gerendert (SH-G03): eine ICO-Datei wie die, die Visio schreibt (4 Bit
 je Pixel, eigene Palette, Maske für die Durchsicht, 766 Bytes), mit 2 Pixeln Rand eingepasst;
 Text erscheint darin als Balken. Die Suchbegriffe der Bausprache stehen im PageSheet des Masters

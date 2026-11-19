@@ -1,0 +1,117 @@
+# Liste: ein Container, der seine Elemente von oben nach unten ohne Abstand stapelt und immer
+# genau um sie herum passt (msvSDContainerResize 2).  Alle Elemente werden so breit wie die Liste
+# (JFD_ListStretch).  Der Text ist der Titel im Kopfband oben; Kopfband, Trennlinie und
+# Textblock folgen nur JFD_HeadingEdge und JFD_HeadingSize (JFD_HeadingSize = 0: kein Kopf).
+master: List
+name.de: Liste
+name.en: List
+name.es: Lista
+name.it: Elenco
+name.fr: Liste
+prompt.de: Liste mit Titel. Legen Sie Listenelemente hinein, sie reihen sich untereinander auf.
+prompt.en: List with a title. Drop list items into it and they line up one below the other.
+prompt.es: Lista con título. Coloque elementos de lista dentro y se alinean uno debajo de otro.
+prompt.it: Elenco con titolo. Rilascia gli elementi al suo interno e si allineano uno sotto l'altro.
+prompt.fr: Liste avec titre. Déposez des éléments de liste à l'intérieur, ils s'alignent les uns sous les autres.
+keywords.de: Liste, Aufzählung, Tabelle, Klasse, Elemente, Spalte
+keywords.en: list, enumeration, table, class, items, column
+keywords.es: lista, enumeración, tabla, clase, elementos, columna
+keywords.it: elenco, lista, tabella, classe, elementi, colonna
+keywords.fr: liste, énumération, tableau, classe, éléments, colonne
+text.de: Liste
+text.en: List
+text.es: Lista
+text.it: Elenco
+text.fr: Liste
+
+[Shape]
+Width = 60 mm
+Width.us = 2.4 in
+Height = 40 mm
+Height.us = 1.5 in
+LineWeight = 0.75 pt
+LineColor = #4D5560
+FillForegnd = #E6EFF8
+FillBkgnd = #E6EFF8
+FillPattern = 1
+TxtWidth = IF(User.HeadLeft+User.HeadRight>0,Height,Width)
+TxtHeight = IF(User.HeadLeft+User.HeadRight>0,User.HeadLeft+User.HeadRight,User.HeadTop+User.HeadBottom)
+TxtPinX = IF(User.HeadLeft>0,User.HeadLeft*0.5,IF(User.HeadRight>0,Width-User.HeadRight*0.5,Width*0.5))
+TxtPinY = IF(User.HeadTop>0,Height-User.HeadTop*0.5,IF(User.HeadBottom>0,User.HeadBottom*0.5,Height*0.5))
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = IF(User.HeadLeft+User.HeadRight>0,90 deg,0 deg)
+HideText = NOT(User.HeadShown)
+LeftMargin = 2 mm
+LeftMargin.us = 0.08 in
+RightMargin = 2 mm
+RightMargin.us = 0.08 in
+TopMargin = 1 mm
+TopMargin.us = 0.04 in
+BottomMargin = 1 mm
+BottomMargin.us = 0.04 in
+VerticalAlign = 1
+
+[User]
+msvStructureType:                 Value = "List"
+msvShapeCategories:               Value = ""
+msvSDContainerMargin:             Value = 2 mm
+                                  Value.us = 0.1 in
+msvSDContainerResize:             Value = 2
+msvSDContainerLocked:             Value = FALSE
+msvSDContainerNoHighlight:        Value = FALSE
+msvSDContainerNoRibbon:           Value = FALSE
+msvSDContainerStyle:              Value = 1
+msvSDContainerStyleCount:         Value = 1
+msvSDHeadingStyle:                Value = 1
+msvSDHeadingStyleCount:           Value = 1
+msvSDContainerRequiredCategories: Value = ""
+msvSDContainerExcludedCategories: Value = "DoNotContain"
+msvSDListDirection:               Value = 2
+msvSDListSpacing:                 Value = 0 mm
+                                  Value.us = 0 in
+msvSDListAlignment:               Value = 0
+msvSDListRequiredCategories:      Value = ""
+msvSDListExcludedCategories:      Value = ""
+msvSDListItemMaster:              Value = "List item"
+JFD_ListStretch:                  Value = TRUE
+JFD_HeadingEdge:                  Value = "Top"
+JFD_HeadingSize:                  Value = 8 mm
+                                  Value.us = 0.3 in
+HeadTop:          Value = IF(STRSAME(User.JFD_HeadingEdge,"Top",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Height),0)
+HeadBottom:       Value = IF(STRSAME(User.JFD_HeadingEdge,"Bottom",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Height),0)
+HeadLeft:         Value = IF(STRSAME(User.JFD_HeadingEdge,"Left",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Width),0)
+HeadRight:        Value = IF(STRSAME(User.JFD_HeadingEdge,"Right",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Width),0)
+HeadShown:        Value = User.HeadTop+User.HeadBottom+User.HeadLeft+User.HeadRight>0
+
+# 1 der Rahmen
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# 2 das Kopfband
+[Geometry]
+NoLine = TRUE
+NoShow = NOT(User.HeadShown)
+MoveTo  X = IF(User.HeadRight>0,Width-User.HeadRight,0); Y = IF(User.HeadTop>0,Height-User.HeadTop,0)
+LineTo  X = IF(User.HeadLeft>0,User.HeadLeft,Width); Y = Geometry2.Y1
+LineTo  X = Geometry2.X2; Y = IF(User.HeadBottom>0,User.HeadBottom,Height)
+LineTo  X = Geometry2.X1; Y = Geometry2.Y3
+LineTo  X = Geometry2.X1; Y = Geometry2.Y1
+
+# 3 die Trennlinie zwischen Kopf und Elementen
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(User.HeadShown)
+MoveTo  X = IF(User.HeadLeft>0,User.HeadLeft,IF(User.HeadRight>0,Width-User.HeadRight,0)); Y = IF(User.HeadTop>0,Height-User.HeadTop,IF(User.HeadBottom>0,User.HeadBottom,0))
+LineTo  X = IF(User.HeadLeft+User.HeadRight>0,Geometry3.X1,Width); Y = IF(User.HeadLeft+User.HeadRight>0,Height,Geometry3.Y1)
+
+[Character]
+Row  Style = 1
+
+[Paragraph]
+Row  HorzAlign = IF(User.HeadLeft+User.HeadRight>0,1,0)

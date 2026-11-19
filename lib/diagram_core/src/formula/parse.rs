@@ -109,7 +109,7 @@ macro_rules! funcs {
 
 funcs! {
     // math and logic (FX-06)
-    Abs = "ABS", And = "AND", Or = "OR", Not = "NOT", If = "IF", Min = "MIN", Max = "MAX", Sum = "SUM",
+    IfError = "IFERROR", Abs = "ABS", And = "AND", Or = "OR", Not = "NOT", If = "IF", Min = "MIN", Max = "MAX", Sum = "SUM",
     Sqrt = "SQRT", Pow = "POW", Exp = "EXP", Ln = "LN", Log10 = "LOG10", Sin = "SIN", Cos = "COS",
     Tan = "TAN", Asin = "ASIN", Acos = "ACOS", Atan = "ATAN", Atan2 = "ATAN2", Sinh = "SINH",
     Cosh = "COSH", Tanh = "TANH", Pi = "PI", Round = "ROUND", Int = "INT", IntUp = "INTUP",
@@ -147,6 +147,11 @@ funcs! {
     GotoPage = "GOTOPAGE", Hyperlink = "HYPERLINK", PlaySound = "PLAYSOUND", DoCmd = "DOCMD",
     RunAddon = "RUNADDON", RunAddonWArgs = "RUNADDONWARGS", RunMacro = "RUNMACRO",
     CallThis = "CALLTHIS",
+    // structure: containers, lists, callouts (FX-12, sfuncs.rs)
+    ContainerCount = "CONTAINERCOUNT", ContainerSheetRef = "CONTAINERSHEETREF",
+    ContainerMemberCount = "CONTAINERMEMBERCOUNT", ListMemberCount = "LISTMEMBERCOUNT",
+    ListOrder = "LISTORDER", ListSheetRef = "LISTSHEETREF", CalloutCount = "CALLOUTCOUNT",
+    CalloutTargetRef = "CALLOUTTARGETREF", HasCategory = "HASCATEGORY",
     // Visio's own helpers in glue and trigger cells
     XfTrigger = "_XFTRIGGER", WalkGlue = "_WALKGLUE",
 }
@@ -172,6 +177,9 @@ impl Func {
 pub enum SheetName {
     /// none: the sheet the formula belongs to
     Local,
+    /// the sheet a function gives (CONTAINERSHEETREF(1,"Swimlane")!User.visHeadingText): the
+    /// node of the call
+    Call(u32),
     /// Sheet.5!: the shape with this ID on the same page or in the same master
     Id(u32),
     /// a shape by its NameU ("Name.7!", "'My name'!")
@@ -840,7 +848,13 @@ impl Parser<'_> {
     // a name: function call, TRUE/FALSE, sheet prefix or cell reference
     fn name(&mut self, at: usize, n: String) -> Result<u32, ParseError> {
         if self.tok == Tok::LParen && !n.contains('.') {
-            return self.call(at, &n, u32::MAX);
+            let c = self.call(at, &n, u32::MAX)?;
+            // a function that gives a sheet, then a cell of it
+            if self.tok == Tok::Bang {
+                self.bump()?;
+                return self.after_sheet(at, SheetName::Call(c));
+            }
+            return Ok(c);
         }
         if self.tok == Tok::Bang {
             self.bump()?;

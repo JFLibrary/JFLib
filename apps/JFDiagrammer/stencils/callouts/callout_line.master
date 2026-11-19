@@ -1,0 +1,75 @@
+# Beschriftung Linie: ohne Rahmen, der Text steht auf einem Unterstrich, die Leitlinie geht vom
+# Ende des Unterstrichs, das der Spitze näher ist, zur Spitze (ein offener Pfad).
+master: Callout line
+name.de: Beschriftung Linie
+name.en: Callout line
+name.es: Llamada línea
+name.it: Richiamo linea
+name.fr: Bulle d'annotation ligne
+prompt.de: Unterstrichener Text mit Leitlinie, ohne Rahmen. Ziehen Sie den gelben Steuerpunkt auf das Ziel.
+prompt.en: Underlined text with a leader line, without a frame. Drag the yellow control handle onto the target.
+prompt.es: Texto subrayado con línea guía, sin marco. Arrastre el controlador amarillo hasta el destino.
+prompt.it: Testo sottolineato con linea guida, senza cornice. Trascina la maniglia di controllo gialla sulla destinazione.
+prompt.fr: Texte souligné avec ligne de repère, sans cadre. Faites glisser la poignée de contrôle jaune sur la cible.
+keywords.de: Beschriftung, Legende, Hinweis, Kommentar, Anmerkung, Zeiger, Linie, Unterstrich, Leitlinie
+keywords.en: callout, label, note, comment, annotation, pointer, line, underline, leader
+keywords.es: llamada, etiqueta, nota, comentario, anotación, puntero, línea, subrayado, línea guía
+keywords.it: richiamo, didascalia, etichetta, nota, commento, annotazione, puntatore, linea, sottolineatura, linea guida
+keywords.fr: bulle d'annotation, légende, étiquette, note, commentaire, pointeur, ligne, soulignement, ligne de repère
+text.de: Text
+text.en: Text
+text.es: Texto
+text.it: Testo
+text.fr: Texte
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 16 mm
+Height.us = 0.6 in
+FillForegnd = #1F5FA8
+FillBkgnd = #1F5FA8
+VerticalAlign = 2
+BottomMargin = 1 mm
+BottomMargin.us = 0.04 in
+
+[User]
+msvStructureType:        Value = "Callout"
+msvShapeCategories:      Value = "Callout"
+msvSDCalloutNoHighlight: Value = FALSE
+# die Spitze des Zeigers
+Ax:   Value = Controls.Association
+Ay:   Value = Controls.Association.Y
+Out:  Value = OR(User.Ax<0,User.Ax>Width,User.Ay<0,User.Ay>Height)
+# die Spitze links der Mitte: die Leitlinie beginnt am linken Ende
+Left: Value = User.Ax<Width*0.5
+E1:   Value = IF(User.Left,0,Width)
+E2:   Value = IF(User.Left,Width,0)
+Dot:  Value = 0.8 mm
+      Value.us = 0.03 in
+
+# Leitlinie und Unterstrich (liegt die Spitze im Körper, beginnt der Pfad am Unterstrich)
+[Geometry]
+NoFill = TRUE
+MoveTo  X = IF(User.Out,User.Ax,User.E1); Y = IF(User.Out,User.Ay,0)
+LineTo  X = User.E1; Y = 0
+LineTo  X = User.E2; Y = 0
+
+# der Punkt an der Spitze
+[Geometry]
+NoShow = NOT(User.Out)
+Ellipse  X = User.Ax; Y = User.Ay; A = User.Ax+User.Dot; B = User.Ay; C = User.Ax; D = User.Ay+User.Dot
+
+[Paragraph]
+Row  HorzAlign = IF(User.Left,0,2)
+
+[Controls]
+Association:  X = -12 mm; Y = -10 mm
+              X.us = -0.5 in; Y.us = -0.4 in
+              XDyn = User.E1; YDyn = 0
+              XCon = 2; YCon = 2; CanGlue = FALSE
+              Tip.de = "Zeiger auf das Ziel ziehen"
+              Tip.en = "Drag the pointer onto the target"
+              Tip.es = "Arrastre el puntero hasta el destino"
+              Tip.it = "Trascina il puntatore sulla destinazione"
+              Tip.fr = "Faites glisser le pointeur sur la cible"

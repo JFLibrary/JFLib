@@ -1,0 +1,49 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD10: containers (ST-01, ST-02, RK-01) -- Einfügen › Container puts a container
+# around the selection (its member), the register Container-Tools › Format shows; a shape dragged
+# wholly into it joins it, dragged partly out it stays and the container grows (automatic size
+# "expand"); moving the container by its heading moves its members; a click inside it reaches
+# the page (the inside clicks through); An Inhalt anpassen fits it again; Container auflösen
+# takes the container away and leaves the members
+cmd 4404
+drag 500,330 640,420
+expect listitem:"Sheet.4" rect 500 324 151 100
+# Einfügen › Container › Klar
+cmd 5409
+expect listitem:"Container" selected
+expect listitem:"Container" rect 488 291 176 146
+expect tab:"Format" exists
+# a second rectangle dragged wholly in
+cmd 4404
+drag 800,500 860,540
+cmd 4400
+drag 830,520 590,400
+expect listitem:"Sheet.6" rect 550 374 51 50
+expect listitem:"Container" rect 488 291 176 146
+# partly out to the right: still a member, the container grows
+drag 590,400 650,400
+expect listitem:"Sheet.6" rect 613 374 51 50
+expect listitem:"Container" rect 488 291 188 146
+# the container by its heading: both members come along
+drag 520,300 520,500
+expect listitem:"Container" rect 475 487 189 146
+expect listitem:"Sheet.4" rect 488 520 150 100
+expect listitem:"Sheet.6" rect 601 570 50 50
+shot build/JFDiagrammer-structures-container.png
+# a click inside it (not on a member) selects nothing: the inside clicks through
+click 655,520
+expect listitem:"Container" unselected
+# undo takes the move back with the members
+key ctrl+z
+expect listitem:"Container" rect 488 291 188 146
+expect listitem:"Sheet.4" rect 500 324 151 100
+# Container-Tools › Format › An Inhalt anpassen: around the members again
+click 520,300
+expect listitem:"Container" selected
+cmd 5377
+expect listitem:"Container" rect 488 291 188 146
+# Container auflösen: the members stay
+cmd 5383
+expect listitem:"Container" missing
+expect listitem:"Sheet.4" rect 500 324 151 100
+expect listitem:"Sheet.6" rect 613 374 51 50

@@ -52,6 +52,13 @@ pub(crate) fn call(ev: &mut Ev, f: Func, start: u32, n: u32, sheet: u32) -> R {
     use Func::*;
     match f {
         // ---- logic
+        IfError => {
+            need!(n, 2, 2);
+            match ev.eval(a[0]) {
+                Ok(Val::Err(_)) | Err(_) => ev.eval(a[1]),
+                ok => ok,
+            }
+        }
         If => {
             need!(n, 2, 3);
             if ev.truth(a[0])? {
@@ -600,6 +607,9 @@ pub(crate) fn call(ev: &mut Ev, f: Func, start: u32, n: u32, sheet: u32) -> R {
             }
             Ok(Val::Num(if t.sheet == ev.sheet { 1.0 } else { 2.0 }))
         }
+        // structure (FX-12)
+        ContainerCount | ContainerSheetRef | ContainerMemberCount | ListMemberCount | ListOrder | ListSheetRef | CalloutCount
+        | CalloutTargetRef | HasCategory => super::sfuncs::call(ev, f, &a),
         // where walking glue puts a connector end: the routing of JD7 computes it
         WalkGlue => Err(ev.keep(Keep::NotComputed("_WALKGLUE"))),
         Unknown(i) => {
