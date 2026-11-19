@@ -172,9 +172,9 @@ Verbinder|Layout	Connectors	Conectores	Connettori	Connecteurs
 Rechtwinklig	Right-Angle	En ángulo recto	Ad angolo retto	Angle droit
 Gerade	Straight	Recto	Diritto	Droit
 Gebogen	Curved	Curvo	Curvo	Courbe
-Linienübergänge anzeigen	Show Line Jumps	Mostrar saltos de línea	Mostra salti di linea	Afficher les sauts de ligne
+Linienübergänge anzeigen	Show Line Jumps	Mostrar saltos en los cruces	Mostra salti agli incroci	Afficher les sauts aux croisements
 Verbinder neu routen	Reroute Connectors	Volver a enrutar conectores	Reindirizza connettori	Réacheminer les connecteurs
-Layout und Routing	Layout and Routing	Diseño y enrutamiento	Layout e routing	Disposition et routage
+Layout und Routing	Layout and Routing	Disposición y enrutamiento	Layout e routing	Disposition et routage
 Seitenumbrüche	Page Breaks	Saltos de página	Interruzioni di pagina	Sauts de page
 Gitternetz	Grid	Cuadrícula	Griglia	Grille
 Dynamisches Gitter	Dynamic Grid	Cuadrícula dinámica	Griglia dinamica	Grille dynamique
@@ -301,7 +301,7 @@ Textwerkzeuge	Text Tools	Herramientas de texto	Strumenti testo	Outils de texte
 Text|Register	Text	Texto	Testo	Texte
 Shapes drehen	Rotate Shapes	Girar formas	Ruota forme	Faire pivoter les formes
 Formenarten	Shape Styles	Estilos de forma	Stili forma	Styles de forme
-Layout	Layout	Diseño	Layout	Disposition
+Layout	Layout	Disposición	Layout	Disposition
 Visuelle Unterstützung	Visual Aids	Ayudas visuales	Supporti visivi	Aides visuelles
 Mitgliedschaft	Membership	Pertenencia	Appartenenza	Appartenance
 Vorschauen folgen mit den Designs	Previews will come with the themes	Las vistas previas llegarán con los temas	Le anteprime arriveranno con i temi	Les aperçus arriveront avec les thèmes

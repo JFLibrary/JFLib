@@ -19,15 +19,27 @@
 #        Ctrl+Shift+G
 #   fr   Gras Ctrl+G: Grouper goes to Ctrl+Shift+G
 # Flip horizontal moves from Visio's Ctrl+H to Ctrl+Shift+H in every language (Ctrl+H is
-# Replace in Office; KB-02).  The es / it / fr cells for the file commands are Office's as far
-# as known here and are still to be checked against an Office of that language.
+# Replace in Office; KB-02).
+#
+# Checked on 2026-11-19 (JD8 rest) against Microsoft's public shortcut pages in each language
+# ("Keyboard shortcuts in Word" and "Keyboard shortcuts for Visio", support.microsoft.com es-es,
+# it-it, fr-fr): fr every file and text command as here; it Apri Ctrl+F12, Salva Ctrl+B (and
+# Shift+F12), Sostituisci Ctrl+Shift+S, collegamento Ctrl+Alt+K, Chiudi Ctrl+Alt+W as well;
+# es Nuevo Ctrl+U, Abrir Ctrl+A, Buscar Ctrl+B, Negrita Ctrl+N, Subrayado Ctrl+S, Seleccionar
+# todo Ctrl+E, hipervínculo Ctrl+Alt+K, Reemplazar Ctrl+H (Ctrl+L stays as well).  Not settled
+# by those pages (they contradict themselves): es Guardar (the Word page: Ctrl+S, which the
+# Visio page gives Subrayado; Ctrl+G stays), es Cursiva (both pages: Ctrl+I, which the Visio
+# page also gives Girar a la izquierda; Ctrl+K stays first, Ctrl+I is added), it Trova (no
+# desktop key; Word for the web: Ctrl+Shift+T, Oben ausrichten here; Ctrl+F stays).  The
+# localized Visio pages move some Visio keys (it: in primo piano Ctrl+O, ruota a sinistra
+# Ctrl+T; fr: rectangle Ctrl+Shift+I); this table keeps Visio's English keys for those.
 # command	de	en	es	it	fr
 NEW	Ctrl+N	Ctrl+N	Ctrl+U	Ctrl+N	Ctrl+N
-OPEN	Ctrl+O	Ctrl+O	Ctrl+A	Ctrl+O	Ctrl+O
-SAVE	Ctrl+S	Ctrl+S	Ctrl+G	Shift+F12	Ctrl+S
+OPEN	Ctrl+O	Ctrl+O	Ctrl+A	Ctrl+F12	Ctrl+O
+SAVE	Ctrl+S	Ctrl+S	Ctrl+G	Ctrl+B|Shift+F12	Ctrl+S
 SAVE_AS	F12	F12	F12	F12	F12
 PRINT	Ctrl+P	Ctrl+P	Ctrl+P	Ctrl+P	Ctrl+P
-CLOSE	Ctrl+W|Ctrl+F4	Ctrl+W|Ctrl+F4	Ctrl+W|Ctrl+F4	Ctrl+W|Ctrl+F4	Ctrl+W|Ctrl+F4
+CLOSE	Ctrl+W|Ctrl+F4	Ctrl+W|Ctrl+F4	Ctrl+W|Ctrl+F4	Ctrl+W|Ctrl+F4|Ctrl+Alt+W	Ctrl+W|Ctrl+F4
 UNDO	Ctrl+Z	Ctrl+Z	Ctrl+Z	Ctrl+Z	Ctrl+Z
 REDO	Ctrl+Y	Ctrl+Y	Ctrl+Y	Ctrl+Y	Ctrl+Y
 CUT	Ctrl+X	Ctrl+X	Ctrl+X	Ctrl+X	Ctrl+X
@@ -37,9 +49,9 @@ DUPLICATE	Ctrl+D	Ctrl+D	Ctrl+D	Ctrl+D	Ctrl+D
 FORMAT_PAINTER	Ctrl+Shift+P	Ctrl+Shift+P	Ctrl+Shift+P	Ctrl+Shift+P	Ctrl+Shift+P
 SELECT_ALL	Ctrl+A	Ctrl+A	Ctrl+E	Ctrl+A	Ctrl+A
 FIND	Ctrl+F	Ctrl+F	Ctrl+B	Ctrl+F	Ctrl+F
-REPLACE	Ctrl+H	Ctrl+H	Ctrl+L	Ctrl+H	Ctrl+H
+REPLACE	Ctrl+H	Ctrl+H	Ctrl+L|Ctrl+H	Ctrl+Shift+S	Ctrl+H
 BOLD	Ctrl+Shift+F	Ctrl+B	Ctrl+N	Ctrl+G	Ctrl+G
-ITALIC	Ctrl+Shift+K	Ctrl+I	Ctrl+K	Ctrl+I	Ctrl+I
+ITALIC	Ctrl+Shift+K	Ctrl+I	Ctrl+K|Ctrl+I	Ctrl+I	Ctrl+I
 UNDERLINE	Ctrl+Shift+U	Ctrl+U	Ctrl+S	Ctrl+S	Ctrl+U
 TEXT_DIALOG	F11	F11	F11	F11	F11
 EDIT_TEXT	F2	F2	F2	F2	F2
@@ -68,7 +80,7 @@ ROTATE_LEFT	Ctrl+L	Ctrl+L	Alt+Shift+Left	Ctrl+L	Ctrl+L
 ROTATE_RIGHT	Ctrl+R	Ctrl+R	Alt+Shift+Right	Ctrl+R	Ctrl+R
 FLIP_H	Ctrl+Shift+H	Ctrl+Shift+H	Ctrl+Shift+H	Ctrl+Shift+H	Ctrl+Shift+H
 FLIP_V	Ctrl+J	Ctrl+J	Ctrl+J	Ctrl+J	Ctrl+J
-LINK	Ctrl+K	Ctrl+K	Ctrl+Alt+K	Ctrl+K	Ctrl+K
+LINK	Ctrl+K	Ctrl+K	Ctrl+Alt+K	Ctrl+Alt+K	Ctrl+K
 NEW_PAGE	Shift+F11	Shift+F11	Shift+F11	Shift+F11	Shift+F11
 PAGE_NEXT	Ctrl+PgDn	Ctrl+PgDn	Ctrl+PgDn	Ctrl+PgDn	Ctrl+PgDn
 PAGE_PREV	Ctrl+PgUp	Ctrl+PgUp	Ctrl+PgUp	Ctrl+PgUp	Ctrl+PgUp
