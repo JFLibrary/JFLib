@@ -63,7 +63,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan, Metal, WebGPU)
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs) · [mtl_cmd.rs (Apple)](#gpumtl_cmdrs-apple) · [mtl_dev.rs (Apple)](#gpumtl_devrs-apple) · [mtl_res.rs (Apple)](#gpumtl_resrs-apple) · [mtl_swap.rs (Apple)](#gpumtl_swaprs-apple)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
-  <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
+  <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [particles.rs](#render3dparticlesrs) · [post.rs](#render3dpostrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
 - [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, text from an atlas of multi-channel distance fields, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
   <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [dxf.rs](#render2ddxfrs) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [hl.rs](#render2dhlrs) · [overlay.rs](#render2doverlayrs) · [pick.rs](#render2dpickrs) · [cpu.rs](#render2dcpurs) · [text.rs](#render2dtextrs)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
@@ -21578,7 +21578,12 @@ ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
   (G7f) renderer.remove_mesh(id), remove_material(id), remove_texture(id)   their places are used again, the ids stay
        invalid (store.rs); refused while a scene's instances, a material or a detail level use them
   (G7f) renderer.add_material_desc(&MaterialDesc)             glTF's BLEND (blended after the rest, sorted back to front
-       per instance on the GPU: sort.wgsl) and doubleSided (no culling of back faces, their normal turned round)
+       per instance on the GPU: sort.wgsl) and doubleSided (no culling of back faces, their normal turned round);
+       MaterialDesc::toon, the cartoon look (draw.wgsl)
+  (G7f) Camera::ortho, an orthographic camera; scene.set_viewmodel, add_viewmodel (a weapon before the camera, drawn
+       with its own lens in front of the world: the world's depth 0 ..= 0.5, its own 0.5 ..= 1); scene.set_outline (lines
+       from the depth buffer) and set_antialias (FXAA): post.rs, post.wgsl; scene.set_particles, add_emitter, emit,
+       set_time (billboards moved in a compute shader, sorted, one draw): particles.rs, particles.wgsl
 
 Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
 of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, light in the
@@ -21607,6 +21612,16 @@ DRAW_WGSL: &str = include_str!("draw.wgsl")
 HIZ_WGSL: &str = include_str!("hiz.wgsl")
 /// (G7f) the blended instances sorted back to front
 SORT_WGSL: &str = include_str!("sort.wgsl")
+/// (G7f) outlines and FXAA; the particles
+POST_WGSL: &str = include_str!("post.wgsl")
+PARTICLES_WGSL: &str = include_str!("particles.wgsl")
+CULL_VM_SPV: &[u32] = spv::CULL_VM
+VS_FULL_SPV: &[u32] = spv::VS_FULL
+FS_OUTLINE_SPV: &[u32] = spv::FS_OUTLINE
+FS_FXAA_SPV: &[u32] = spv::FS_FXAA
+CS_PARTICLES_SPV: &[u32] = spv::CS_PARTICLES
+VS_PARTICLE_SPV: &[u32] = spv::VS_PARTICLE
+FS_PARTICLE_SPV: &[u32] = spv::FS_PARTICLE
 SORT_LOCAL_SPV: &[u32] = spv::SORT_LOCAL
 SORT_GLOBAL_SPV: &[u32] = spv::SORT_GLOBAL
 /// (G7f) the blended instances' vertex and fragment shaders
@@ -21675,6 +21690,23 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   - `Blend` -- (G7f) glTF's BLEND (MaterialDesc::blend): drawn after the others, sorted back to front per instance, blended
     (premultiplied alpha), the depth tested and not written; no shadows, not in the occlusion test's pyramid
 
+- **`struct Toon`**
+  (G7f) the cartoon look of a material (MaterialDesc::toon; docs/RENDER3D.md "Cartoon-Material"): flat colours, the sun's
+  and the lights' n.l in bands, a flat ambient light, a light rim on the silhouette.  Metallic, roughness and the
+  metallic-roughness texture are not used; the base colour (with its texture), the normal map, occlusion (on the ambient
+  light), emission, MASK, BLEND and double-sided work as for PBR.  Made with `new` and changed field by field (it may
+  grow).  The values go to the GPU in bytes: softness, rim and rim_width in steps of 1/255
+  - `bands: u32` -- 1 ..= 16 levels of light: 0, 1 / (bands - 1), ..., 1 of the light's colour (the first step at the terminator n.l =
+    0, the others evenly up to n.l = 1); 1: no shading at all, the base colour under the full light
+  - `softness: f32` -- 0 ..= 1: how soft a step is (0 hard; 1 a whole band wide)
+  - `rim: f32` -- 0 ..= 1: how bright the rim is (its colour is the light a white surface facing the sun gets)
+  - `rim_width: f32` -- 0 ..= 1: where the rim begins, as 1 - n.v (0: no rim)
+
+**`impl Toon`**
+
+- **`const fn new(bands: u32) -> Toon`**
+  `bands` levels, hard steps, no rim
+
 - **`struct MeshInfo`**
   where a mesh lies in the pools, and its bounding sphere in its own coordinates
   - `first_index: u32`
@@ -21726,6 +21758,7 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
     test.  Not together with an alpha_cutoff (Invalid)
   - `double_sided: bool` -- glTF's doubleSided: back faces are not culled; they are lit with their normal turned round (the whole shading
     normal, as the glTF sample viewer turns the tangent frame).  Both sides cast shadows (every material does)
+  - `toon: Option<Toon>` -- (G7f) the cartoon look in place of glTF's BRDF (None: PBR)
 
 **`impl MaterialDesc`**
 
@@ -21807,7 +21840,7 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   The first blended or double-sided material makes the pipelines they need
 - **`fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()>`**
   a row of the table; the next frame shows it.  A new alpha class moves the material's instances to the lists of
-  that class with their scenes' next prepare.  (G7f) The material stays blended and double-sided as it was
+  that class with their scenes' next prepare.  (G7f) The material stays blended, double-sided and cartoon as it was
   (set_material_desc changes those)
 - **`fn set_material_desc(&mut self, id: MaterialId, d: &MaterialDesc) -> Result<()>`**
   (G7f) a row of the table with glTF's BLEND and doubleSided; the next frame shows it.  A new alpha class or side
@@ -22006,6 +22039,102 @@ math -- what the scene computes on the CPU, in f64 (no libm in no_std; the matri
 - **`fn pow(x: f64, y: f64) -> f64`**
   x^y for x > 0 (else 0)
 
+### `render3d/particles.rs`
+
+Source: [`lib/render3d/particles.rs`](../lib/render3d/particles.rs)
+
+```text
+particles -- (G7f) billboards from a buffer (docs/RENDER3D.md "Partikel"): emitters on the CPU, a ring of particles on
+the GPU, their motion in a compute shader (particles.wgsl), sorted back to front (sort.wgsl), one indirect draw.
+
+A particle is born on the CPU (Scene::emit): its randomness comes from a hash of the emitter's seed and the particle's
+serial number in that emitter, so the same calls give the same particles on every device and in every run.  Its record
+(64 bytes: place, birth in microseconds, velocity, life, sizes, colours, gravity and drag, flags) goes into the next places
+of the ring (the oldest are overwritten), copied inside the frame's commands.  Nothing changes it afterwards: the compute
+shader evaluates its motion in closed form at its age every frame (constant gravity along -y and a linear drag), and
+puts each living particle into the frame's list with the key of its distance; sort.wgsl sorts the list, one draw with six
+vertices per particle draws it.  No read-back, no state on the GPU besides the births.
+```
+
+- **`enum ParticleBlend`**
+  (G7f) how a particle is laid over the image (both through the premultiplied blend state: an additive particle returns
+  alpha 0)
+  - `Additive` -- adds its light (fire, sparks, muzzle flashes)
+  - `Alpha` -- covers what is behind by its alpha, premultiplied (smoke, dust)
+
+- **`enum ParticleShape`**
+  (G7f) the shape of a particle's billboard
+  - `Disc` -- a soft disc facing the camera (opacity 1 - r^2 from the middle to the rim)
+  - `Streak` -- the disc stretched along the particle's velocity on the screen by Emitter::stretch (sparks)
+
+- **`struct Emitter`**
+  (G7f) an emitter of a Scene (Scene::add_emitter): what the particles it emits look like and how they move.  Made with
+  `new` and changed field by field (it may grow).  Ranges [a, b] are drawn uniformly per particle
+  - `seed: u32` -- the seed of its particles' randomness: particle k of this emitter (counted from its first emit) is the same in every
+    run with the same calls
+  - `blend: ParticleBlend`
+  - `shape: ParticleShape`
+  - `stretch: f32` -- ParticleShape::Streak: how long the streak is per speed (seconds): its length is size + speed \* stretch
+  - `viewmodel: bool` -- its particles live in the viewmodel's space (Scene::add_viewmodel; Scene::emit takes the camera's space: x right, y
+    up, -z forward) and are drawn with the viewmodel, in front of the world (a muzzle flash at the weapon); gravity
+    acts along the camera's -y.  false: the world's
+  - `life: [f32; 2]` -- seconds a particle lives (above 0)
+  - `speed: [f32; 2]` -- the speed at birth (world units per second), along a direction in a cone around Scene::emit's direction
+  - `spread: f32` -- the cone's half angle in radians (0: along the direction, pi: any direction)
+  - `radius: f32` -- particles are born within a ball of this radius around Scene::emit's point
+  - `size: [f32; 2]` -- the billboard's width at birth and at death (world units), linear in between
+  - `color: [[f32; 4]; 2]` -- linear colour (radiance, before the exposure) and opacity at birth and at death, linear in between
+  - `gravity: f32` -- acceleration downwards (along -y; negative: rising), world units per second squared
+  - `drag: f32` -- linear drag (1 / seconds): the velocity falls by e^(-drag t) towards gravity / drag
+
+**`impl Emitter`**
+
+- **`const fn new(seed: u32) -> Emitter`**
+  additive white discs of 0.1 that fade out over a second, at speed 1 straight along the direction
+
+- **`struct EmitterId`**
+  (G7f) an emitter of a Scene; dead after Scene::remove_emitter
+  - `slot: u32`
+
+- **`fn hash(x: u32) -> u32`**
+  the hash of the randomness (a PCG step and its output permutation, as in PCG-RXS-M-XS)
+
+- **`fn motion(rec: &[u32; 16], t: f64) -> (V3, V3)`**
+  a point and its velocity of a record at age t (seconds), in its own space, as particles.wgsl's `motion` computes it:
+  gravity along -y, drag k: v(t) = a + (v0 - a) e^(-k t) with a = g / k, p(t) = p0 + a t + (v0 - a)(1 - e^(-k t)) / k; without
+  drag (k below 1e-4) p0 + v0 t + g t^2 / 2.  In f64 (tests and tools)
+
+### `render3d/post.rs`
+
+Source: [`lib/render3d/post.rs`](../lib/render3d/post.rs)
+
+```text
+post -- (G7f) what comes after the scene's passes (post.wgsl; docs/RENDER3D.md "Umrisse", "Kantenglättung") and the
+particles' pipelines (particles.wgsl): outlines from the depth buffer, FXAA from an image of the scene's own.  Per depth
+attachment the renderer was given, in a chain a shared borrow can grow (as hiz.rs: Renderer::record takes &self): the
+outline's bind group (that depth view) and FXAA's image (the attachment's size, the renderer's colour format) with its
+group.  Scene::prepare drops those not used lately.
+```
+
+- **`struct Outline`**
+  (G7f) lines on the edges of the depth buffer (Scene::set_outline): silhouettes and creases, drawn over the opaque image
+  before blended instances and particles.  Made with `new` and changed field by field (it may grow)
+  - `width: u32` -- 1 ..= 8 pixels: on a silhouette's near side the line is this wide, across a crease about twice
+  - `color: [f32; 4]` -- linear colour and opacity
+  - `crease: f32` -- how sharp a crease must be to get a line: the change of the surface's slope across it (tan of its angle to the
+    view; 0.5 at first, about 30 degrees seen head on).  Larger: fewer creases; jumps of the depth always get one
+
+**`impl Outline`**
+
+- **`const fn new(width: u32, color: [f32; 4]) -> Outline`**
+  lines `width` pixels wide in this colour, creases from 0.5
+
+- **`enum Antialias`**
+  (G7f) anti-aliasing as a pass over the finished image (Scene::set_antialias)
+  - `None`
+  - `Fxaa` -- FXAA 3.11, quality preset 12: the scene is drawn into an image of the renderer's (the target's size and format), FXAA
+    writes it to the target.  The target's old contents are replaced (Load::Keep becomes a clear)
+
 ### `render3d/scene.rs`
 
 Source: [`lib/render3d/scene.rs`](../lib/render3d/scene.rs)
@@ -22065,19 +22194,39 @@ draws it (lib.rs draw_blend).
   - `slot: u32` -- the place in the instance arrays
 
 - **`struct Camera`**
-  a right-handed perspective camera; reverse Z
+  a right-handed camera, perspective or (G7f) orthographic; reverse Z
   - `eye: [f64; 3]`
   - `forward: [f64; 3]` -- unit vectors: where it looks, and up (at right angles)
   - `up: [f64; 3]`
-  - `fov_y: f64` -- the vertical field of view in radians, width / height
+  - `fov_y: f64` -- the vertical field of view in radians (perspective), width / height
   - `aspect: f64`
-  - `near: f64`
-  - `far: f64` -- f64::INFINITY: no far plane
+  - `near: f64` -- distances along forward; (G7f) an orthographic camera's near may be 0 or below
+  - `far: f64` -- f64::INFINITY: no far plane (perspective only: an orthographic camera needs a finite one)
+  - `ortho: Option<f64>` -- (G7f) Some(h): orthographic, the view h world units high and h \* aspect wide, fov_y unused (top, front and side
+    views, editors); depth falls linearly from 1 at near to 0 at far.  Culling, the occlusion test, detail levels (the
+    size of an instance is its sphere's diameter over h, at any distance) and the sun's shadows (the cascades split the
+    view's box uniformly) work as for a perspective camera.  None: perspective
 
 **`impl Camera`**
 
 - **`fn look_at(eye: [f64; 3], target: [f64; 3], up: [f64; 3], fov_y: f64, aspect: f64, near: f64, far: f64) -> Camera`**
   at eye looking at target; `up` says which way is up on the screen
+- **`fn ortho_at(eye: [f64; 3], target: [f64; 3], up: [f64; 3], height: f64, aspect: f64, near: f64, far: f64) -> Camera`**
+  (G7f) an orthographic camera at eye looking at target, the view `height` world units high; near and far along
+  the view (far finite)
+
+- **`struct Viewmodel`**
+  (G7f) the viewmodel's lens (Scene::set_viewmodel): the instances of Scene::add_viewmodel (a weapon before the camera) are
+  drawn with this field of view and depth range after the world, in front of all of it (the world's depth takes 0 ..= 0.5,
+  the viewmodel's 0.5 ..= 1), lit by the scene's sun, shadows, lights and environment.  Made with `new` and changed field
+  by field (it may grow)
+  - `fov_y: f64` -- the vertical field of view in radians
+  - `near: f64` -- its own near and far planes (finite, 0 &lt; near &lt; far), distances along the camera's forward
+  - `far: f64`
+
+**`impl Viewmodel`**
+
+- **`const fn new(fov_y: f64, near: f64, far: f64) -> Viewmodel`**
 
 - **`struct Sun`**
   one sun and an ambient light, linear, in the units of KHR_lights_punctual: a white matte surface facing
@@ -22158,6 +22307,12 @@ draws it (lib.rs draw_blend).
 - **`fn new(r: &Renderer) -> Result<Scene>`**
 - **`fn add(&mut self, i: Instance) -> Result<InstanceId>`**
   a new instance, on a place that came free if there is one (its list: with the next prepare)
+- **`fn add_viewmodel(&mut self, i: Instance) -> Result<InstanceId>`**
+  (G7f) an instance of the viewmodel (Scene::set_viewmodel; without one it is not drawn): its transform is in the camera's
+  space (x right, y up, -z forward, as glTF's cameras), it follows the camera, is drawn with the viewmodel's lens in
+  front of the world, lit by the scene's sun, shadows and lights (it casts no shadows and hides nothing from the
+  occlusion test).  set_transform, set_material, set_mesh and remove work as for the others.  Its material may not be
+  blended (prepare: Invalid)
 - **`fn remove(&mut self, id: InstanceId) -> Result<()>`**
   the instance goes; its place comes free (and its list loses it with the next prepare)
 - **`fn set_transform(&mut self, id: InstanceId, t: &Transform) -> Result<()>`**
@@ -22228,6 +22383,50 @@ draws it (lib.rs draw_blend).
   instance_count second
 - **`fn visible_buffer(&self) -> &Buffer`**
   (tests, tools) the camera's visible list after a frame's culling: slots, a list's at ListInfo::first
+- **`fn set_viewmodel(&mut self, v: Option<&Viewmodel>) -> Result<()>`**
+  (G7f) the viewmodel's lens (None at first: its instances are not drawn, the world's depth is as it was); Invalid for
+  values out of range.  With one the world's depth takes 0 ..= 0.5 (halved: the image stays the same but where two
+  depths tie, as GPUs interpolate depth in steps of their own), the
+  viewmodel's 0.5 ..= 1
+- **`fn viewmodel(&self) -> Option<Viewmodel>`**
+- **`fn viewmodel_buffers(&self) -> Option<(&Buffer, &Buffer)>`**
+  (G7f; tests, tools) the viewmodel's draw records and visible list after a frame (as draws_buffer, visible_buffer)
+- **`fn set_outline(&mut self, o: Option<&Outline>) -> Result<()>`**
+  (G7f) lines on the edges of the depth buffer, over the opaque image (None at first); Invalid for values out of
+  range.  They need a depth attachment with TextureUsage::SAMPLED (the renderer's own has it): record says Invalid
+  otherwise
+- **`fn outline(&self) -> Option<Outline>`**
+- **`fn set_antialias(&mut self, a: Antialias)`**
+  (G7f) anti-aliasing over the finished image (Antialias::None at first)
+- **`fn antialias(&self) -> Antialias`**
+- **`fn set_particles(&mut self, capacity: u32) -> Result<()>`**
+  (G7f) room for this many particles (0, at first: none); a new capacity starts with none alive.  Unsupported beyond what
+  a binding reaches
+- **`fn particle_capacity(&self) -> u32`**
+  (G7f) the particles' room (0: none)
+- **`fn set_time(&mut self, t: f64)`**
+  (G7f) the particles' clock in seconds (the game's time; 0 at first): births and ages are read from it, so the same
+  times give the same frames.  It should not go back
+- **`fn time(&self) -> f64`**
+- **`fn add_emitter(&mut self, e: &Emitter) -> Result<EmitterId>`**
+  (G7f) an emitter: what its particles look like and how they move; Invalid for values out of range
+- **`fn set_emitter(&mut self, id: EmitterId, e: &Emitter) -> Result<()>`**
+  (G7f) a new description (its next particles take it; the living keep theirs); its serial numbers go on
+- **`fn remove_emitter(&mut self, id: EmitterId) -> Result<()>`**
+  (G7f) the emitter goes (its living particles stay until they die)
+- **`fn emit(&mut self, id: EmitterId, at: [f64; 3], dir: [f64; 3], count: u32) -> Result<()>`**
+  (G7f) `count` particles of an emitter, born now (Scene::set_time) at a point in a cone around a direction (the world's,
+  or for a viewmodel emitter the camera's space).  They take the next places of the ring, the oldest are overwritten.
+  Invalid without room for particles (set_particles) or for values not finite
+- **`fn clear_particles(&mut self)`**
+  (G7f) every particle dies now
+- **`fn particle_buffer(&self) -> Option<&Buffer>`**
+  (G7f; tests, tools) the particles' list after a frame: a VkDrawIndirectCommand (6 vertices per particle, the particles
+  alive), then per particle 4 u32: its key (farthest first), its place in the ring, 0, 0; sorted.  None without room
+- **`fn particle_records(&self) -> Option<&Buffer>`**
+  (G7f; tests, tools) the ring of records (particles.rs: 16 u32 each; particles::motion reads one)
+- **`fn particle_epoch(&self) -> f64`**
+  (G7f; tests, tools) the epoch of the particles' clock: a record's birth counts microseconds from it
 - **`fn wait_slot(&mut self) -> Result<()>`**
   wait for the frame that last used this frame's slot, so its data can be written (the window's
   acquire has usually done so).  prepare does it too; call it first to tell the wait from the work.

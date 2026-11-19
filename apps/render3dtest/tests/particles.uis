@@ -1,0 +1,3 @@
+#!args --test particles
+# (G7f part 2) the same records for the same emits, the sorted list against the CPU's motion, the image against the
+# particles laid on the CPU (additive, alpha, streaks, the viewmodel's), the ring's end, a lost frame, refusals; Voll and Basis

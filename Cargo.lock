@@ -1568,6 +1568,7 @@ dependencies = [
  "jflib-gpu",
  "jflib-img-core",
  "jflib-img-jpeg",
+ "jflib-img-png",
  "jflib-plat",
  "jflib-render3d",
  "jflib-rt",

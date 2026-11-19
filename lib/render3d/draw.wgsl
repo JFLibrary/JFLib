@@ -41,6 +41,10 @@
 // mesh's indices it puts the triangle outside the view) and the mesh from its list's draw record.  fs_blend drops the
 // back faces of single-sided materials (the draw has no culling: it holds mirrored instances and both kinds of faces)
 // and returns premultiplied alpha.
+//
+// (G7f) Orthographic views: the direction to the eye is -forward everywhere (View::dir).  The cartoon look (Material::flags
+// 4, MaterialDesc::toon): flat colours, the sun's and the lights' n.l in bands (toon_step), a flat ambient light, a rim
+// along the silhouette; emission, exposure and the tone mapper as for PBR.
 
 // (G5e2) encode the colour to sRGB before it goes to the target (lib.rs sets it for 8-bit targets without sRGB)
 @id(0) override ENCODE_SRGB: bool = false;
@@ -51,6 +55,11 @@ struct View {
     view_proj: mat4x4f,
     planes: array<vec4f, 6>,
     eye: vec4f,
+    // (cull.wgsl's: the occlusion test's scales, the detail levels' camera)
+    proj: vec4f,
+    lod: vec4f,
+    // (G7f) forward, w 1: orthographic
+    dir: vec4f,
 }
 
 // rows of the 3 x 4 matrix; a normal goes through m * (normal * normal_scale), which is the inverse
@@ -100,9 +109,10 @@ struct Material {
     alpha_cutoff: f32,
     textures: vec4u,
     emissive_texture: u32,
-    // (G7f) 1: blended, 2: double-sided
+    // (G7f) 1: blended, 2: double-sided, 4: the cartoon look
     flags: u32,
-    reserved1: u32,
+    // (G7f) the cartoon look: bands, then softness, rim and its width in 1/255 (a byte each)
+    toon: u32,
     reserved2: u32,
 }
 
@@ -549,7 +559,30 @@ fn shade(m: Material, c: vec4f, normal: vec3f, uv: vec2f, world: vec3f, dx: vec2
     if m.emissive_texture != NO_TEXTURE {
         emissive = emissive * sample_texture(m.emissive_texture, uv, dx, dy).xyz;
     }
-    let v = normalize(view.eye.xyz - world);
+    // (G7f) an orthographic view: towards the eye is -forward everywhere
+    var v = -view.dir.xyz;
+    if view.dir.w == 0.0 {
+        v = normalize(view.eye.xyz - world);
+    }
+    var light = vec3f(0.0);
+    if (m.flags & TOON) != 0u {
+        light = toon_light(m.toon, c.xyz, n, ng, v, world, ao) + emissive;
+    } else {
+        light = pbr_light(c.xyz, metallic, roughness, n, ng, v, world, ao, emissive);
+    }
+    var out = light * lights.sun_dir.w;
+    if lights.sun_color.w != 0.0 {
+        out = neutral(out);
+    }
+    if ENCODE_SRGB {
+        out = srgb_encode(out);
+    }
+    return vec4f(out, 1.0);
+}
+
+// glTF's BRDF for the sun (its shadow), the point and spot lights, the ambient light or the environment, emission: the
+// light leaving the point towards v, before the exposure
+fn pbr_light(c: vec3f, metallic: f32, roughness: f32, n: vec3f, ng: vec3f, v: vec3f, world: vec3f, ao: f32, emissive: vec3f) -> vec3f {
     let c_diff = c.xyz * (1.0 - metallic);
     let f0 = mix(vec3f(0.04), c.xyz, metallic);
     let a = max(roughness * roughness, ALPHA_MIN);
@@ -572,14 +605,69 @@ fn shade(m: Material, c: vec4f, normal: vec3f, uv: vec2f, world: vec3f, dx: vec2
         specular = textureSampleLevel(env_cube, env_smp, reflect(-v, n), roughness * lights.env.y).xyz * lights.env.x;
     }
     light = light + (specular * spec + diffuse * c_diff * (1.0 - spec)) * ao + emissive;
-    var out = light * lights.sun_dir.w;
-    if lights.sun_color.w != 0.0 {
-        out = neutral(out);
+    return light;
+}
+
+// (G7f) Material::flags: the cartoon look
+const TOON: u32 = 4u;
+
+// (G7f) the cartoon look's step function: levels 0, 1 / (bands - 1), ..., 1; the first step at x = 0 (the terminator),
+// the others at k / (bands - 1); soft: each step a smoothstep that many bands wide (0: hard); bands 1: flat (always 1)
+fn toon_step(x: f32, bands: f32, soft: f32) -> f32 {
+    if bands < 1.5 {
+        return 1.0;
     }
-    if ENCODE_SRGB {
-        out = srgb_encode(out);
+    let steps = bands - 1.0;
+    let y = x * steps;
+    let j = clamp(floor(y + 0.5), 0.0, steps - 1.0);
+    let hw = max(0.5 * soft, 1e-4);
+    return (j + smoothstep(j - hw, j + hw, y)) / steps;
+}
+
+// (G7f) the cartoon look's light (before the exposure): the base colour under the sun's n.l (times its shadow) and each
+// point or spot light's n.l in bands, a flat ambient light (the environment's mean), a rim of the light's colour where
+// n.v falls below the rim's width.  w: the material's toon word (unpacked here, late)
+fn toon_light(w: u32, c: vec3f, n: vec3f, ng: vec3f, v: vec3f, world: vec3f, ao: f32) -> vec3f {
+    let bands = f32(w & 255u);
+    let soft = f32((w >> 8u) & 255u) * (1.0 / 255.0);
+    let nl = dot(n, lights.sun_dir.xyz);
+    var x = nl;
+    // (in the shadow as if turned away: -1 fully shadowed, n.l in full sun, in between at a shadow's soft edge)
+    if lights.shadow.x > 0.0 && nl > 0.0 {
+        x = sun_shadow(world, ng) * (nl + 1.0) - 1.0;
     }
-    return vec4f(out, 1.0);
+    var direct = lights.sun_color.xyz * toon_step(x, bands, soft);
+    let count = u32(lights.shadow.z);
+    for (var i = 0u; i < count; i++) {
+        let q = punctual[i];
+        let d = q.pos_range.xyz - world;
+        let dist2 = dot(d, d);
+        if dist2 > 0.0 {
+            var att = 1.0 / dist2;
+            let range = q.pos_range.w;
+            if range > 0.0 {
+                let r2 = dist2 / (range * range);
+                att = att * clamp(1.0 - r2 * r2, 0.0, 1.0);
+            }
+            let l = d * inverseSqrt(dist2);
+            if q.color_kind.w != 0.0 {
+                let t = clamp(dot(q.dir.xyz, -l) * q.cone.x + q.cone.y, 0.0, 1.0);
+                att = att * t * t;
+            }
+            direct = direct + q.color_kind.xyz * (att * toon_step(dot(n, l), bands, soft));
+        }
+    }
+    var ambient = lights.ambient.xyz;
+    if lights.env.x > 0.0 {
+        ambient = lights.sh[0].xyz * (0.282095 * lights.env.x);
+    }
+    let rim = f32((w >> 16u) & 255u) * (1.0 / 255.0);
+    let width = f32(w >> 24u) * (1.0 / 255.0);
+    let edge = 1.0 - width;
+    let e = 1.0 - clamp(dot(n, v), 0.0, 1.0);
+    let r = rim * smoothstep(edge, edge + max(width * soft, 1e-4), e);
+    let white = lights.sun_color.xyz * (1.0 / PI) + ambient;
+    return c * (direct * (1.0 / PI) + ambient * ao) + white * r;
 }
 
 // (G5e2) linear light to sRGB's code values by the definition (IEC 61966-2-1, not a gamma of 2.2), after clamping to

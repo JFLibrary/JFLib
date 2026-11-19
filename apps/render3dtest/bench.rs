@@ -199,6 +199,15 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     };
     let mut masked = 0;
     let (mut blended, mut doubled) = (0, 0);
+    // (G7f part 2) --toon B: every material in the cartoon look with B bands (softness 0.2, a rim); --outline W: lines W
+    // pixels wide; --fxaa; --particles N: N long-lived particles over the scene (half additive, half alpha, sorted);
+    // --viewmodel: a weapon of three cubes; --ortho: an orthographic camera
+    let fnum = |name: &str| plat::arg_value(name).and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+    let toon_bands = fnum("--toon");
+    let outline_w = fnum("--outline");
+    let particle_n = fnum("--particles");
+    let flag = |name: &str| plat::args().iter().any(|a| a == name);
+    let (fxaa, vm, ortho) = (flag("--fxaa"), flag("--viewmodel"), flag("--ortho"));
     for (i, o) in objs.iter().take(1024).enumerate() {
         let mut m = Material::color(o.color[0], o.color[1], o.color[2]);
         if !tex.is_empty() {
@@ -219,6 +228,13 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
         if i % 100 >= 100 - g7f[1] {
             d.double_sided = true;
             doubled += 1;
+        }
+        if toon_bands > 0 {
+            let mut k = render3d::Toon::new(toon_bands);
+            k.softness = 0.2;
+            k.rim = 0.3;
+            k.rim_width = 0.3;
+            d.toon = Some(k);
         }
         t.res(r.add_material_desc(&d), "add_material")?;
     }
@@ -257,6 +273,39 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
         let transform = Transform { pos: [o.pos[0] as f64, o.pos[1] as f64, o.pos[2] as f64], rot: o.rot, scale: [o.scale; 3] };
         ids.push(t.res(s.add(render3d::Instance { mesh: MeshId(i as u32 % meshes as u32), material: MaterialId(i as u32 % palette), transform }), "add")?);
     }
+    // (G7f part 2) the new passes
+    if outline_w > 0 {
+        t.res(s.set_outline(Some(&render3d::Outline::new(outline_w, [0.0, 0.0, 0.0, 1.0]))), "set_outline")?;
+    }
+    if fxaa {
+        s.set_antialias(render3d::Antialias::Fxaa);
+    }
+    if vm {
+        t.res(s.set_viewmodel(Some(&render3d::Viewmodel::new(0.95, 0.02, 4.0))), "set_viewmodel")?;
+        for (pos, sc) in [([0.22, -0.2, -0.45], [0.05f32, 0.06, 0.18]), ([0.22, -0.16, -0.75], [0.022, 0.022, 0.16]), ([0.22, -0.3, -0.38], [0.035, 0.09, 0.05])] {
+            t.res(s.add_viewmodel(render3d::Instance { mesh: bases[0], material: MaterialId(0), transform: Transform { pos, rot: [0.0, 0.0, 0.0, 1.0], scale: sc } }), "add_viewmodel")?;
+        }
+        out("  a viewmodel: three cubes before the camera, its own lens");
+    }
+    if particle_n > 0 {
+        t.res(s.set_particles(particle_n), "set_particles")?;
+        for (k, additive) in [(0u32, true), (1, false)] {
+            let mut e = render3d::Emitter::new(100 + k);
+            e.blend = if additive { render3d::ParticleBlend::Additive } else { render3d::ParticleBlend::Alpha };
+            e.life = [3000.0, 3000.0];
+            e.speed = [0.0, 0.5];
+            e.spread = core::f32::consts::PI;
+            e.radius = extent * 0.45;
+            e.size = [extent / 400.0, extent / 200.0];
+            e.color = [[1.0, 0.6, 0.3, 0.6], [0.4, 0.4, 0.4, 0.3]];
+            let id = t.res(s.add_emitter(&e), "add_emitter")?;
+            t.res(s.emit(id, [0.0, 0.0, 0.0], [0.0, 1.0, 0.0], particle_n / 2), "emit")?;
+        }
+        out(&format!("  {particle_n} particles over the scene (half additive, half alpha), sorted every frame"));
+    }
+    if toon_bands > 0 {
+        out(&format!("  the cartoon look, {toon_bands} bands"));
+    }
     let t_add = (plat::time_us() - t0) as f64 / 1000.0;
     s.set_stats(true);
     s.set_occlusion(occlusion);
@@ -284,7 +333,13 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
         let tw = plat::time_us();
         t.res(s.wait_slot(), "wait")?;
         let t0 = plat::time_us();
-        s.set_camera(&bench_camera(time_of(f), extent, aspect));
+        let mut cam = bench_camera(time_of(f), extent, aspect);
+        if ortho {
+            cam.ortho = Some(extent as f64 * 0.35);
+            cam.near = 0.0;
+        }
+        s.set_camera(&cam);
+        s.set_time(f as f64 / 60.0);
         for _ in 0..moved {
             let id = ids[rng.below(n) as usize];
             let mut tr = t.res(s.transform(id), "transform")?;
@@ -367,8 +422,8 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     }
     let fps = if fs.mean > 0.0 { 1000.0 / fs.mean } else { 0.0 };
     out(&format!("  frame: {:.3} ms mean ({fps:.0} fps), {:.3} median, {:.3} p99", fs.mean, fs.med, fs.p99));
-    out(&format!("RESULT engine n={n} res={w}x{h} lists={meshes} moved={moved} textures={textures}x{tex_size} mask={mask} blend={} double={} level={:?} inflight={k} frames={} occl={} ball={ball_n} lods={lods} minpx={min_px} vis={:.4} late={:.4} prep={:.4}/{:.4} rec={:.4}/{:.4} cpu={:.4}/{:.4} wait={:.4}/{:.4} up={:.4}/{:.4} cull={:.4}/{:.4} shcull={:.4}/{:.4} shdraw={:.4}/{:.4} draw={:.4}/{:.4} hiz={:.4}/{:.4}/{:.4} gpu={:.4}/{:.4} gpuframe={:.4}/{:.4} frame={:.4}/{:.4} framemean={:.4} busy={:.3}",
-                 g7f[0], g7f[1], dev.level(), m.len(), occlusion as u32, vis.med / n as f64, late.med / n as f64, ps.med, ps.p99, rs.med, rs.p99, cs.med, cs.p99, ws.med, ws.p99, up.med, up.p99, cull.med, cull.p99,
+    out(&format!("RESULT engine n={n} res={w}x{h} lists={meshes} moved={moved} textures={textures}x{tex_size} mask={mask} blend={} double={} toon={toon_bands} outline={outline_w} fxaa={} vm={} particles={particle_n} ortho={} level={:?} inflight={k} frames={} occl={} ball={ball_n} lods={lods} minpx={min_px} vis={:.4} late={:.4} prep={:.4}/{:.4} rec={:.4}/{:.4} cpu={:.4}/{:.4} wait={:.4}/{:.4} up={:.4}/{:.4} cull={:.4}/{:.4} shcull={:.4}/{:.4} shdraw={:.4}/{:.4} draw={:.4}/{:.4} hiz={:.4}/{:.4}/{:.4} gpu={:.4}/{:.4} gpuframe={:.4}/{:.4} frame={:.4}/{:.4} framemean={:.4} busy={:.3}",
+                 g7f[0], g7f[1], fxaa as u32, vm as u32, ortho as u32, dev.level(), m.len(), occlusion as u32, vis.med / n as f64, late.med / n as f64, ps.med, ps.p99, rs.med, rs.p99, cs.med, cs.p99, ws.med, ws.p99, up.med, up.p99, cull.med, cull.p99,
                  shcull.med, shcull.p99, shdraw.med, shdraw.p99, draw.med, draw.p99, hiz[0].med, hiz[1].med, hiz[2].med, all.med, all.p99, gap.med, gap.p99, fs.med, fs.p99, fs.mean, busy));
     if verify {
         // (G5d) the lists of a frame without the occlusion test at the last frame's camera: everything in the view

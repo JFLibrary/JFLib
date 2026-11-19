@@ -37,6 +37,10 @@ struct View {
     // (G5d) the camera's eye (relative to the origin) and fy: a sphere of radius r at distance d has the size
     // r fy / d (the same in every view)
     lod: vec4f,
+    // (G7f) forward, and w 1 for an orthographic view (proj: depth = proj.z + proj.w z, clip x and y without a division)
+    dir: vec4f,
+    // (G7f) x 1: the detail levels' camera is orthographic (a sphere's size is r lod.w at any distance)
+    lodx: vec4f,
 }
 
 // VkDrawIndexedIndirectCommand
@@ -82,10 +86,11 @@ struct BlendList {
 @group(1) @binding(0) var pyramid: texture_2d<f32>;
 var<immediate> pc: Push;
 
-// (G7f) lists[l].z: the number of detail levels in the low 16 bits; bit 28 32-bit indices, 29 double-sided, 30 mirrored,
-// 31 blended
+// (G7f) lists[l].z: the number of detail levels in the low 16 bits; bit 27 the viewmodel's, 28 32-bit indices, 29
+// double-sided, 30 mirrored, 31 blended
 const LEVELS: u32 = 0xffffu;
 const BLENDED: u32 = 0x80000000u;
+const VIEWMODEL: u32 = 0x08000000u;
 
 // (G5d) the bits of a workgroup's 256 slots, put together before they are written
 var<workgroup> hid: array<atomic<u32>, 8>;
@@ -110,7 +115,8 @@ fn pick(i: u32, s: vec4f) -> u32 {
     let info = lists[l];
     let levels = info.z & LEVELS;
     if levels > 0u && view.lod.w > 0.0 {
-        let size = s.w * view.lod.w / max(distance(s.xyz, view.lod.xyz), 1e-30);
+        let d = select(max(distance(s.xyz, view.lod.xyz), 1e-30), 1.0, view.lodx.x != 0.0);
+        let size = s.w * view.lod.w / d;
         for (var k = 0u; k < levels; k++) {
             let e = lists[info.y + k];
             if size >= bitcast<f32>(e.x) {
@@ -147,10 +153,25 @@ fn blended(l: u32) -> bool {
     return (lists[l].z & BLENDED) != 0u;
 }
 
+// (G7f) the list l is not drawn list by list in the world's views: blended instances, or the viewmodel's (drawn by its
+// own view, `main_vm`)
+fn apart(l: u32) -> bool {
+    return (lists[l].z & (BLENDED | VIEWMODEL)) != 0u;
+}
+
+// (G7f) the list l is the viewmodel's
+fn viewmodel(l: u32) -> bool {
+    return (lists[l].z & VIEWMODEL) != 0u;
+}
+
 // (G7f) slot i with sphere s, picked list l (blended), into the blended instances' list
 fn add_blend(i: u32, s: vec4f, l: u32) {
     let d = s.xyz - view.eye.xyz;
-    let key = ~bitcast<u32>(dot(d, d));
+    var key = ~bitcast<u32>(dot(d, d));
+    if view.dir.w != 0.0 {
+        // (G7f) orthographic: by the depth of the centre, the smallest (farthest) first
+        key = bitcast<u32>(max(view.proj.z + view.proj.w * dot(d, view.dir.xyz), 0.0));
+    }
     let info = lists[l];
     let n = atomicAdd(&blend.count, 1u);
     if n < arrayLength(&blend.items) {
@@ -176,8 +197,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         return;
     }
     let l = chosen(i, spheres[i]);
-    if l != NONE && !blended(l) {
+    if l != NONE && !apart(l) {
         add_turns(i, l);
+    }
+}
+
+// (G7f) the viewmodel's view: its instances only (they are in no other view's lists)
+@compute @workgroup_size(256)
+fn main_vm(@builtin(global_invocation_id) gid: vec3u) {
+    let i = gid.x;
+    if i >= pc.count {
+        return;
+    }
+    let l = chosen(i, spheres[i]);
+    if l != NONE && viewmodel(l) {
+        add(i, l);
     }
 }
 
@@ -190,7 +224,7 @@ fn main_blend(@builtin(global_invocation_id) gid: vec3u) {
     }
     let s = spheres[i];
     let l = chosen(i, s);
-    if l == NONE {
+    if l == NONE || viewmodel(l) {
         return;
     }
     if blended(l) {
@@ -213,8 +247,9 @@ fn early(@builtin(global_invocation_id) gid: vec3u) {
     let s = spheres[i];
     if in_view(s) {
         let l = pick(i, s);
-        // (G7f) blended instances only in phase 2: they need the whole opaque depth, and draw nothing into it
-        if l != NONE && !blended(l) {
+        // (G7f) blended instances only in phase 2: they need the whole opaque depth, and draw nothing into it; the
+        // viewmodel's in its own view
+        if l != NONE && !apart(l) {
             add(i, l);
         }
     }
@@ -229,22 +264,37 @@ fn occluded(s: vec4f) -> bool {
     // larger by what f32 rounds in the centre, the eye and the matrix
     let big = max(max(max(abs(s.x), abs(s.y)), abs(s.z)), max(max(abs(view.eye.x), abs(view.eye.y)), abs(view.eye.z)));
     let r = s.w * 1.0001 + big * 4e-6;
-    let zn = c.w - r;
-    // the near plane cuts it, or it reaches behind the eye: not tested
-    if !(zn > 0.0) {
-        return false;
+    let rx = view.proj.x * r;
+    let ry = view.proj.y * r;
+    var dn = 0.0;
+    var x0 = 0.0;
+    var x1 = 0.0;
+    var y0 = 0.0;
+    var y1 = 0.0;
+    if view.dir.w != 0.0 {
+        // (G7f) orthographic: the box's sides without a division, its nearest depth linear in z
+        dn = view.proj.z + view.proj.w * (dot(view.dir.xyz, s.xyz - view.eye.xyz) - r);
+        x0 = c.x - rx;
+        x1 = c.x + rx;
+        y0 = c.y - ry;
+        y1 = c.y + ry;
+    } else {
+        let zn = c.w - r;
+        // the near plane cuts it, or it reaches behind the eye: not tested
+        if !(zn > 0.0) {
+            return false;
+        }
+        dn = view.proj.z + view.proj.w / zn;
+        let zf = c.w + r;
+        x0 = min((c.x - rx) / zn, (c.x - rx) / zf);
+        x1 = max((c.x + rx) / zn, (c.x + rx) / zf);
+        y0 = min((c.y - ry) / zn, (c.y - ry) / zf);
+        y1 = max((c.y + ry) / zn, (c.y + ry) / zf);
     }
-    let dn = view.proj.z + view.proj.w / zn;
+    // (the near plane cuts it: not tested)
     if !(dn < 1.0) {
         return false;
     }
-    let zf = c.w + r;
-    let rx = view.proj.x * r;
-    let ry = view.proj.y * r;
-    let x0 = min((c.x - rx) / zn, (c.x - rx) / zf);
-    let x1 = max((c.x + rx) / zn, (c.x + rx) / zf);
-    let y0 = min((c.y - ry) / zn, (c.y - ry) / zf);
-    let y1 = max((c.y + ry) / zn, (c.y + ry) / zf);
     // pixels from the top left (NDC y up), clamped before they become integers
     let size = vec2f(f32(pc.w), f32(pc.h));
     let lo = clamp(vec2f(x0 * 0.5 + 0.5, 0.5 - y1 * 0.5) * size, vec2f(-2.0), size + 2.0);
@@ -281,7 +331,7 @@ fn late(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
         let drawn = ((hidden[i >> 5u] >> (i & 31u)) & 1u) == 0u;
         if in_view(s) {
             let l = pick(i, s);
-            if l != NONE {
+            if l != NONE && !viewmodel(l) {
                 hide = occluded(s);
                 // (G7f) every blended instance phase 2 finds visible (phase 1 draws none)
                 if !hide && blended(l) {
