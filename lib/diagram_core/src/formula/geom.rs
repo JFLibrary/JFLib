@@ -318,7 +318,16 @@ pub(crate) fn shape_text(ev: &mut Ev, i: u32) -> Result<String, CellError> {
     if let Some(the_text) = ev.doc.sym("TheText") {
         let _ = cell_value(ev.doc, ev.run, SheetRef::Shape(r), &CellAddr::single(the_text));
     }
-    Ok(ev.doc.shape(r).and_then(|s| s.text()).map(|t| t.chars()).unwrap_or_default())
+    // the end of the last paragraph is no character of the text (a file writes "Vertrieb\n",
+    // the text is "Vertrieb": the lane title the flowchart's formulas read, JD10)
+    let mut t = ev.doc.shape(r).and_then(|s| s.text()).map(|t| t.chars()).unwrap_or_default();
+    for end in ["\r\n", "\n", "\u{2029}"] {
+        if t.ends_with(end) {
+            t.truncate(t.len() - end.len());
+            break;
+        }
+    }
+    Ok(t)
 }
 
 fn named_num(ev: &mut Ev, s: SheetRef, addr: Option<CellAddr>, default: f64) -> f64 {

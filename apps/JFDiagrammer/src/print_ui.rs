@@ -15,8 +15,8 @@
 // centring: the print setup, PR-05), Seitengröße (as the printer's paper, a predefined size or
 // an own one, orientation, PR-06), Zeichnungsmaßstab (none, predefined, own; the page's size in
 // drawing units, PR-07), Seiteneigenschaften (type, name, background page, measuring unit, the
-// shadow direction shown, PR-08), Layout und Routing (the page's cells shown, PR-09; changing
-// them comes with the connectors, JD10).  OK writes what changed of the page registers into
+// shadow direction shown, PR-08), Layout und Routing (the page's routing cells, PR-09 and
+// PG-11; layout_ui.rs since JD10, its own undo step).  OK writes what changed of the page registers into
 // the page as one undo step of the editing layer (edit_doc::edit, JD7): Strg+Z takes it back,
 // Speichern writes it.
 
@@ -465,6 +465,7 @@ pub(crate) fn open_setup(app: &mut Diagrammer, ui: &mut Ui, tab: i32) {
         background,
         unit: 0,
     });
+    crate::layout_ui::load(app, page);
     app.print.tab = tab;
     app.print.dlg.set(1);
     ui.repass();
@@ -506,13 +507,14 @@ pub(crate) fn dialogs(app: &mut Diagrammer, ui: &mut Ui) {
         1 => tab_size(app, ui, &mut e),
         2 => tab_scale(app, ui, &mut e),
         3 => tab_props(app, ui, &mut e),
-        _ => tab_routing(app, ui, &e),
+        _ => crate::layout_ui::tab(app, ui, ID_DLG + 60),
     }
     ui.box_end();
     let r = ui.dialog_buttons(Some(t("OK")), None, Some(t("Abbrechen")));
     ui.dialog_end();
     app.print.edit = Some(e.clone());
     if r == DLG_PRIMARY {
+        crate::layout_ui::commit(app, ui);
         apply(app, ui, &e);
     }
     if r != DLG_NONE {
@@ -720,53 +722,6 @@ fn shadow_direction(dx: f64, dy: f64) -> String {
         (false, true) => String::from(h),
         (true, false) => String::from(v),
         _ => format!("{v} {h}"),
-    }
-}
-
-fn tab_routing(app: &mut Diagrammer, ui: &mut Ui, e: &PageEdit) {
-    ui.next_size(480, 0);
-    ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Die Einstellungen werden angezeigt; ändern lassen sie sich mit den Verbindern."));
-    let Some(o) = app.opened.as_ref() else { return };
-    let doc = &o.doc;
-    let num = |name: &str| doc.sym(name).and_then(|c| doc.resolve(SheetRef::Page(e.page), &CellAddr::single(c)).num()).filter(|v| v.is_finite());
-    // i18n
-    static STYLES: [&str; 17] = [
-        "Standard|Routing", "Rechtwinklig", "Gerade", "Organigramm (von oben nach unten)", "Organigramm (von links nach rechts)", "Flussdiagramm (von oben nach unten)",
-        "Flussdiagramm (von links nach rechts)", "Baum (von oben nach unten)", "Baum (von links nach rechts)", "Netzwerk", "Organigramm (von unten nach oben)",
-        "Organigramm (von rechts nach links)", "Flussdiagramm (von unten nach oben)", "Flussdiagramm (von rechts nach links)", "Baum (von unten nach oben)",
-        "Baum (von rechts nach links)", "Mittig zu Mittig",
-    ];
-    let style = num("RouteStyle").map_or(0, |v| v as usize);
-    let jumps = match num("LineJumpCode").map(|v| v as i64) {
-        Some(0) => t("Keine"),
-        Some(1) | None => t("Horizontale Linien"),
-        Some(2) => t("Vertikale Linien"),
-        Some(3) => t("Zuletzt gezeichnete Linien"),
-        Some(4) => t("Zuletzt gezeichnete Linien (umgekehrt)"),
-        _ => t("Andere"),
-    };
-    let jump_style = match num("LineJumpStyle").map(|v| v as i64) {
-        Some(1) => t("Bogen"),
-        Some(2) => t("Lücke"),
-        Some(3) => t("Quadrat"),
-        Some(k) if k >= 4 => t("Mehrseitig"),
-        _ => crate::tc("Standard|Routing"),
-    };
-    let mm = |v: Option<f64>, d: f64| format!("{:.1} mm", v.unwrap_or(d) * 25.4);
-    let rows: [(&str, String); 6] = [
-        (t("Routing-Stil"), String::from(crate::tc(STYLES.get(style).copied().unwrap_or("Standard|Routing")))),
-        (t("Linienübergänge"), String::from(jumps)),
-        (t("Stil der Linienübergänge"), String::from(jump_style)),
-        (t("Abstand zwischen Shapes"), format!("{} × {}", mm(num("AvenueSizeX"), 0.375), mm(num("AvenueSizeY"), 0.375))),
-        (t("Shapes beim Ablegen verschieben"), String::from(if num("PlowCode").unwrap_or(0.0) == 1.0 { t("Ja") } else { t("Nein") })),
-        (t("Shapes auf Verbinder teilen"), String::from(if num("PageShapeSplit").unwrap_or(0.0) == 1.0 { t("Ja") } else { t("Nein") })),
-    ];
-    for (k, (label, value)) in rows.iter().enumerate() {
-        ui.box_begin(ID_DLG + 60 + k as u32, BOX_H | BOX_XCENTER, 8);
-        ui.next_size(220, 0);
-        ui.text(TS_BODY, label);
-        ui.text(TS_BODY | TX_SECONDARY, value);
-        ui.box_end();
     }
 }
 

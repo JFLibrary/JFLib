@@ -233,6 +233,8 @@ pub(crate) fn install(app: &mut Diagrammer, ui: &mut Ui, doc: Document, name: St
     app.page_tab = 0;
     app.backstage = None;
     app.se = SeState::new();
+    // (JD10) the drawing's own switch for the Verbindungspfeile
+    app.structs.arrows = app.opened.as_ref().is_none_or(|o| crate::structures_cmds::arrows_of(&o.doc));
     app.canvas.request_fit();
     app.fit_again = true;
     ui.repass();

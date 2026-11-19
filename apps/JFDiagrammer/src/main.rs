@@ -40,6 +40,12 @@
 //   src/format_menus.rs     (JD11) Start › Schriftart, Absatz, Formenarten, Format übertragen
 //   src/format_pane.rs      (JD11) the task pane Shape formatieren
 //   src/format_quick.rs     (JD11) Schnellformatvorlagen (from Shape formatieren)
+//   src/structures.rs       (JD10) containers, lists, swimlanes, callouts on the canvas: the
+//                     gestures with them (diagram_core::structure), the glow, the insert marks
+//   src/structures_cmds.rs  (JD10) Einfügen › Container / Beschriftung, Container-Tools ›
+//                     Format, Shapes verbinden, the Verbindungspfeile
+//   src/structures_cff.rs   (JD10) the register Funktionsübergreifendes Flussdiagramm
+//   src/layout_ui.rs  (JD10) Layout-Verhalten per shape, Seite einrichten › Layout und Routing
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too)
@@ -88,6 +94,7 @@ mod format_pane;
 mod format_quick;
 mod icons;
 mod lang;
+mod layout_ui;
 mod options;
 mod panes;
 mod print_layout;
@@ -97,6 +104,9 @@ mod shell;
 mod stencils;
 mod stencils_drop;
 mod stencils_panel;
+mod structures;
+mod structures_cff;
+mod structures_cmds;
 mod viewer;
 
 use base::settings::Settings;
@@ -190,6 +200,10 @@ pub(crate) struct Diagrammer {
     pub format: format_menus::FormatState,
     /// (JD11) the quick styles' tiles
     pub quick: format_quick::QuickTiles,
+    /// (JD10) structures: a running move, the selection's order, the list marks; the layout
+    /// dialog and register
+    pub structs: structures::Structs,
+    pub layout: layout_ui::LayoutState,
 }
 
 impl Diagrammer {
@@ -237,6 +251,8 @@ impl Diagrammer {
             design_save: design_store::SaveDialog::default(),
             format: format_menus::FormatState::default(),
             quick: format_quick::QuickTiles::default(),
+            structs: structures::Structs::default(),
+            layout: layout_ui::LayoutState::default(),
         }
     }
 
@@ -374,6 +390,7 @@ impl App for Diagrammer {
         format_menus::after(self, ui);
         export_ui::dialogs(self, ui);
         print_ui::dialogs(self, ui);
+        layout_ui::dialog(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

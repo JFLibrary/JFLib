@@ -448,7 +448,6 @@ rechts	right	a la derecha	a destra	à droite
 oben	top	arriba	in alto	en haut
 unten	bottom	abajo	in basso	en bas
 kein Versatz	no offset	sin desplazamiento	nessuno spostamento	aucun décalage
-Die Einstellungen werden angezeigt; ändern lassen sie sich mit den Verbindern.	For now the settings are only shown; you can change them once the connectors arrive.	Por ahora, la configuración solo se muestra; podrá cambiarla cuando lleguen los conectores.	Per ora le impostazioni vengono solo visualizzate; sarà possibile modificarle con l'arrivo dei connettori.	Pour l'instant, les paramètres sont uniquement affichés ; vous pourrez les modifier avec l'arrivée des connecteurs.
 Flussdiagramm (von oben nach unten)	Flowchart (Top to Bottom)	Diagrama de flujo (de arriba abajo)	Diagramma di flusso (dall'alto in basso)	Diagramme de flux (de haut en bas)
 Organigramm (von links nach rechts)	Organization Chart (Left to Right)	Organigrama (de izquierda a derecha)	Organigramma (da sinistra a destra)	Organigramme (de gauche à droite)
 Organigramm (von oben nach unten)	Organization Chart (Top to Bottom)	Organigrama (de arriba abajo)	Organigramma (dall'alto in basso)	Organigramme (de haut en bas)
@@ -467,14 +466,12 @@ Horizontale Linien	Horizontal Lines	Líneas horizontales	Linee orizzontali	Ligne
 Vertikale Linien	Vertical Lines	Líneas verticales	Linee verticali	Lignes verticales
 Zuletzt gezeichnete Linien	Last Drawn Lines	Últimas líneas dibujadas	Ultime linee disegnate	Dernières lignes tracées
 Zuletzt gezeichnete Linien (umgekehrt)	Last Drawn Lines (Reversed)	Últimas líneas dibujadas (orden inverso)	Ultime linee disegnate (ordine inverso)	Dernières lignes tracées (ordre inverse)
-Andere	Other	Otro	Altro	Autre
 Lücke	Gap	Hueco	Spazio	Espace
 Quadrat	Square	Cuadrado	Quadrato	Carré
 Mehrseitig	Multi-sided	Poligonal	Poligonale	Polygonal
 Routing-Stil	Routing style	Estilo de enrutamiento	Stile di routing	Style de routage
 Linienübergänge	Line jumps	Saltos de línea	Salti di linea	Sauts de ligne
 Stil der Linienübergänge	Line jump style	Estilo de salto de línea	Stile salto di linea	Style de saut de ligne
-Abstand zwischen Shapes	Space between shapes	Espacio entre formas	Spazio tra le forme	Espace entre les formes
 Ja	Yes	Sí	Sì	Oui
 Nein	No	No	No	Non
 Shapes beim Ablegen verschieben	Move other shapes away on drop	Apartar otras formas al colocar	Sposta le altre forme al rilascio	Écarter les autres formes au dépôt
@@ -609,3 +606,51 @@ Die Seite hat kein Design.	The page has no theme.	La página no tiene tema.	La p
 Variantenstile	Variant Styles	Estilos de variante	Stili variante	Styles de variante
 Variantenstil	Variant Style	Estilo de variante	Stile variante	Style de variante
 Designstile	Theme Styles	Estilos del tema	Stili tema	Styles du thème
+Klar|Container	Plain	Simple	Semplice	Simple
+Akzent|Container	Accent	Énfasis	Accento	Accent
+Gestrichelt|Container	Dashed	Discontinuo	Tratteggiato	Pointillé
+Fläche|Container	Filled	Relleno	Pieno	Rempli
+Eckwinkel|Container	Corners	Esquinas	Angoli	Coins
+Abgerundet|Container	Rounded	Redondeado	Arrotondato	Arrondi
+Kopfband oben	Heading band at top	Banda de encabezado arriba	Banda intestazione in alto	Bandeau d'en-tête en haut
+Titel oben	Title at top	Título arriba	Titolo in alto	Titre en haut
+Kopfband links	Heading band at left	Banda de encabezado a la izquierda	Banda intestazione a sinistra	Bandeau d'en-tête à gauche
+Ohne Kopfzeile	No heading	Sin encabezado	Senza intestazione	Sans en-tête
+Kein Rand	No margin	Sin margen	Nessun margine	Aucune marge
+Schmal|Rand	Narrow	Estrecho	Stretto	Étroite
+Mittel|Rand	Medium	Medio	Medio	Moyenne
+Breit|Rand	Wide	Ancho	Largo	Large
+Keine automatische Größe	No automatic resize	Sin cambio de tamaño automático	Nessun ridimensionamento automatico	Pas de redimensionnement automatique
+Nach Bedarf erweitern	Expand as needed	Expandir según sea necesario	Espandi se necessario	Agrandir si nécessaire
+Immer an Inhalt anpassen	Always fit to contents	Ajustar siempre al contenido	Adatta sempre al contenuto	Toujours ajuster au contenu
+Rechteck|Beschriftung	Rectangle	Rectángulo	Rettangolo	Rectangle
+Abgerundet|Beschriftung	Rounded	Redondeada	Arrotondato	Arrondie
+Sprechblase	Speech bubble	Bocadillo	Fumetto	Bulle de dialogue
+Linie|Beschriftung	Line	Línea	Linea	Ligne
+Klammer	Bracket	Corchete	Parentesi	Crochet
+Kreis|Beschriftung	Circle	Círculo	Cerchio	Cercle
+Shapes verbinden	Connect Shapes	Conectar formas	Collega forme	Relier les formes
+Layout-Verhalten	Layout Behavior	Comportamiento de diseño	Comportamento layout	Comportement de disposition
+Bahn	Lane	Calle	Corsia	Couloir
+Ausrichtung|Flussdiagramm	Orientation	Orientación	Orientamento	Orientation
+Horizontal	Horizontal	Horizontal	Orizzontale	Horizontal
+Vertikal	Vertical	Vertical	Verticale	Vertical
+Titelleiste anzeigen	Show Title Bar	Mostrar barra de título	Mostra barra del titolo	Afficher la barre de titre
+Trennlinien anzeigen	Show Separators	Mostrar separadores	Mostra separatori	Afficher les séparateurs
+Bahnbeschriftungen waagerecht	Horizontal Lane Labels	Etiquetas de calle horizontales	Etichette corsia orizzontali	Étiquettes de couloir horizontales
+Platzierung	Placement	Colocación	Posizionamento	Placement
+Automatisch entscheiden	Decide automatically	Decidir automáticamente	Decidi automaticamente	Décider automatiquement
+Layout und Routing um das Shape	Lay out and route around the shape	Diseñar y enrutar alrededor de la forma	Disponi e instrada intorno alla forma	Disposer et router autour de la forme
+Kein Layout und Routing um das Shape	Do not lay out and route around the shape	No diseñar ni enrutar alrededor de la forma	Non disporre né instradare intorno alla forma	Ne pas disposer ni router autour de la forme
+Beim Layout der Seite nicht verschieben	Do not move when the page is laid out	No mover al diseñar la página	Non spostare durante il layout della pagina	Ne pas déplacer lors de la disposition de la page
+Andere Shapes beim Ablegen verschieben	Move other shapes away on drop	Apartar otras formas al colocar	Sposta altre forme al rilascio	Écarter les autres formes lors du dépôt
+Verbindungspunkte beim Routing nicht benutzen	Do not use connection points for routing	No usar puntos de conexión al enrutar	Non usare i punti di connessione per l'instradamento	Ne pas utiliser les points de connexion pour le routage
+Abstand zwischen Shapes (0,1 mm)	Space between shapes (0.1 mm)	Espacio entre formas (0,1 mm)	Spazio tra le forme (0,1 mm)	Espace entre les formes (0,1 mm)
+Abstand Linie zu Shape (0,1 mm)	Space between line and shape (0.1 mm)	Espacio entre línea y forma (0,1 mm)	Spazio tra linea e forma (0,1 mm)	Espace entre ligne et forme (0,1 mm)
+Funktion	Function	Función	Funzione	Fonction
+Bahn einfügen	Insert Lane	Insertar calle	Inserisci corsia	Insérer un couloir
+Trennlinie einfügen	Insert Separator	Insertar separador	Inserisci separatore	Insérer un séparateur
+Containerformatvorlage	Container style	Estilo de contenedor	Stile contenitore	Style de conteneur
+Container einfügen	Insert Container	Insertar contenedor	Inserisci contenitore	Insérer un conteneur
+Beschriftung einfügen	Insert Callout	Insertar llamada	Inserisci richiamo	Insérer une bulle d'annotation
+Verbindungspfeil	Connect arrow	Flecha de conexión	Freccia di collegamento	Flèche de liaison

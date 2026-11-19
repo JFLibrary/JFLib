@@ -232,13 +232,56 @@ commands! {
     CT_MARGINS = 0x1500, "Ränder", JD_CT_MARGINS, JD_CT_MARGINS_L;
     CT_FIT = 0x1501, "An Inhalt anpassen", JD_CT_FIT_CONTENTS, JD_CT_FIT_CONTENTS_L;
     CT_AUTOSIZE = 0x1502, "Automatische Größe", JD_CT_AUTO_SIZE, JD_CT_AUTO_SIZE_L;
-    CT_STYLES = 0x1503, "Containerformatvorlagen", 0, 0;
+    CT_STYLES = 0x1503, "Containerformatvorlagen", JD_CONTAINER, JD_CONTAINER_L;
     CT_HEADING = 0x1504, "Kopfzeilenstil", JD_CT_HEADING, JD_CT_HEADING_L;
     CT_LOCK = 0x1505, "Container sperren", JD_CT_LOCK, JD_CT_LOCK_L;
     CT_SELECT = 0x1506, "Inhalt auswählen", JD_CT_SELECT_CONTENTS, JD_CT_SELECT_CONTENTS_L;
     CT_DISBAND = 0x1507, "Container auflösen", JD_CT_DISBAND, JD_CT_DISBAND_L;
     CT_ADD = 0x1508, "Zu Container hinzufügen", 0, 0;
     CT_REMOVE = 0x1509, "Aus Container entfernen", 0, 0;
+    // (JD10) the container's styles, headings, margins and automatic size (structures_cmds.rs)
+    CT_STYLE_1 = 0x1510, "Klar|Container", JD_CONTAINER, 0;
+    CT_STYLE_2 = 0x1511, "Akzent|Container", JD_CONTAINER, 0;
+    CT_STYLE_3 = 0x1512, "Gestrichelt|Container", JD_CONTAINER, 0;
+    CT_STYLE_4 = 0x1513, "Fläche|Container", JD_CONTAINER, 0;
+    CT_STYLE_5 = 0x1514, "Eckwinkel|Container", JD_CONTAINER, 0;
+    CT_STYLE_6 = 0x1515, "Abgerundet|Container", JD_CONTAINER, 0;
+    CT_HEADING_1 = 0x1516, "Kopfband oben", 0, 0;
+    CT_HEADING_2 = 0x1517, "Titel oben", 0, 0;
+    CT_HEADING_3 = 0x1518, "Kopfband links", 0, 0;
+    CT_HEADING_4 = 0x1519, "Ohne Kopfzeile", 0, 0;
+    CT_MARGIN_0 = 0x151A, "Kein Rand", 0, 0;
+    CT_MARGIN_1 = 0x151B, "Schmal|Rand", 0, 0;
+    CT_MARGIN_2 = 0x151C, "Mittel|Rand", 0, 0;
+    CT_MARGIN_3 = 0x151D, "Breit|Rand", 0, 0;
+    CT_RESIZE_0 = 0x151E, "Keine automatische Größe", 0, 0;
+    CT_RESIZE_1 = 0x151F, "Nach Bedarf erweitern", 0, 0;
+    CT_RESIZE_2 = 0x1520, "Immer an Inhalt anpassen", 0, 0;
+    // (JD10) Einfügen › Container, Einfügen › Beschriftung
+    CONTAINER_1 = 0x1521, "Klar|Container", JD_CONTAINER, 0;
+    CONTAINER_2 = 0x1522, "Akzent|Container", JD_CONTAINER, 0;
+    CONTAINER_3 = 0x1523, "Gestrichelt|Container", JD_CONTAINER, 0;
+    CONTAINER_4 = 0x1524, "Fläche|Container", JD_CONTAINER, 0;
+    CONTAINER_5 = 0x1525, "Eckwinkel|Container", JD_CONTAINER, 0;
+    CONTAINER_6 = 0x1526, "Abgerundet|Container", JD_CONTAINER, 0;
+    CALLOUT_1 = 0x1527, "Rechteck|Beschriftung", JD_CALLOUT, 0;
+    CALLOUT_2 = 0x1528, "Abgerundet|Beschriftung", JD_CALLOUT, 0;
+    CALLOUT_3 = 0x1529, "Sprechblase", JD_CALLOUT, 0;
+    CALLOUT_4 = 0x152A, "Linie|Beschriftung", JD_CALLOUT, 0;
+    CALLOUT_5 = 0x152B, "Klammer", JD_CALLOUT, 0;
+    CALLOUT_6 = 0x152C, "Kreis|Beschriftung", JD_CALLOUT, 0;
+    // (JD10) Shapes verbinden (CN-16), Layout-Verhalten (CN-17)
+    CONNECT_SHAPES = 0x152D, "Shapes verbinden", JD_CONNECTOR, 0;
+    LAYOUT_BEHAVIOR = 0x152E, "Layout-Verhalten", 0, 0;
+    // (JD10) the register Funktionsübergreifendes Flussdiagramm (RK-03, structures_cff.rs)
+    CFF_LANE = 0x1530, "Bahn", JD_CFF_SWIMLANE, JD_CFF_SWIMLANE_L;
+    CFF_SEPARATOR = 0x1531, "Trennlinie", JD_CFF_SEPARATOR, JD_CFF_SEPARATOR_L;
+    CFF_ORIENTATION = 0x1532, "Ausrichtung|Flussdiagramm", JD_CFF_ORIENTATION, 0;
+    CFF_HORIZONTAL = 0x1533, "Horizontal", 0, 0;
+    CFF_VERTICAL = 0x1534, "Vertikal", 0, 0;
+    CFF_TITLE = 0x1535, "Titelleiste anzeigen", JD_CFF_TITLE_BAR, 0;
+    CFF_SEPARATORS = 0x1536, "Trennlinien anzeigen", JD_CFF_SEPARATORS, 0;
+    CFF_ROTATE = 0x1537, "Bahnbeschriftungen waagerecht", JD_CFF_ROTATE_LABELS, 0;
     // the shape's context menu
     SHAPE_DATA_DEFINE = 0x1600, "Shape-Daten definieren", 0, 0;
     HYPERLINK = 0x1601, "Hyperlink", 0, 0;
@@ -449,7 +492,7 @@ pub(crate) fn handler(id: u32) -> Option<Handler> {
 
 /// the command exists and works
 pub(crate) fn enabled(id: u32) -> bool {
-    handler(id).is_some()
+    handler(id).is_some() || crate::structures_cmds::owns(id) || crate::layout_ui::owns(id)
 }
 
 /// (JD7) the command exists and can run now (a selection, something to undo ...)
@@ -459,11 +502,21 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
 
 /// the toggle is on
 pub(crate) fn checked(app: &Diagrammer, id: u32) -> bool {
+    if crate::structures_cmds::owns(id) {
+        return crate::structures_cmds::checked(app, id);
+    }
     CHECKED.iter().find(|c| c.0 == id).is_some_and(|c| (c.1)(app))
 }
 
 /// App::command: run the handler -> handled
 pub(crate) fn run(app: &mut Diagrammer, ui: &mut Ui, id: u32) -> bool {
+    // (JD10) structures and layout run their own commands
+    if crate::structures_cmds::owns(id) {
+        return crate::structures_cmds::run(app, ui, id);
+    }
+    if crate::layout_ui::owns(id) {
+        return crate::layout_ui::run(app, ui, id);
+    }
     match handler(id) {
         Some(h) => {
             h(app, ui);

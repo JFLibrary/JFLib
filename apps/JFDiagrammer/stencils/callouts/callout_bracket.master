@@ -1,0 +1,86 @@
+# Beschriftung Klammer: eine eckige Klammer an der Seite zur Spitze hin (links oder rechts), der
+# Text daneben, die Leitlinie von der Mitte der Klammer zur Spitze.
+master: Callout bracket
+name.de: Beschriftung Klammer
+name.en: Callout bracket
+name.es: Llamada corchete
+name.it: Richiamo parentesi
+name.fr: Bulle d'annotation crochet
+prompt.de: Text mit Klammer und Leitlinie. Ziehen Sie den gelben Steuerpunkt auf das Ziel, die Klammer wechselt die Seite.
+prompt.en: Text with a bracket and a leader line. Drag the yellow control handle onto the target; the bracket changes sides.
+prompt.es: Texto con corchete y línea guía. Arrastre el controlador amarillo hasta el destino; el corchete cambia de lado.
+prompt.it: Testo con parentesi e linea guida. Trascina la maniglia di controllo gialla sulla destinazione; la parentesi cambia lato.
+prompt.fr: Texte avec crochet et ligne de repère. Faites glisser la poignée de contrôle jaune sur la cible ; le crochet change de côté.
+keywords.de: Beschriftung, Legende, Hinweis, Kommentar, Anmerkung, Zeiger, Klammer, Leitlinie, Randnotiz
+keywords.en: callout, label, note, comment, annotation, pointer, bracket, leader, side note
+keywords.es: llamada, etiqueta, nota, comentario, anotación, puntero, corchete, línea guía, nota al margen
+keywords.it: richiamo, didascalia, etichetta, nota, commento, annotazione, puntatore, parentesi, linea guida, nota a margine
+keywords.fr: bulle d'annotation, légende, étiquette, note, commentaire, pointeur, crochet, ligne de repère, note en marge
+text.de: Text
+text.en: Text
+text.es: Texto
+text.it: Testo
+text.fr: Texte
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 16 mm
+Height.us = 0.6 in
+FillForegnd = #1F5FA8
+FillBkgnd = #1F5FA8
+LeftMargin = 3 mm
+LeftMargin.us = 0.12 in
+RightMargin = 3 mm
+RightMargin.us = 0.12 in
+
+[User]
+msvStructureType:        Value = "Callout"
+msvShapeCategories:      Value = "Callout"
+msvSDCalloutNoHighlight: Value = FALSE
+# die Spitze des Zeigers
+Ax:   Value = Controls.Association
+Ay:   Value = Controls.Association.Y
+Out:  Value = OR(User.Ax<0,User.Ax>Width,User.Ay<0,User.Ay>Height)
+# die Spitze rechts der Mitte: die Klammer rechts
+Right:  Value = User.Ax>Width*0.5
+Bx:     Value = IF(User.Right,Width,0)
+ArmLen: Value = 2.5 mm
+        Value.us = 0.1 in
+Bk:     Value = IF(User.Right,Width-MIN(User.ArmLen,Width*0.2),MIN(User.ArmLen,Width*0.2))
+Dot:  Value = 0.8 mm
+      Value.us = 0.03 in
+
+# die Klammer
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.Bk; Y = 0
+LineTo  X = User.Bx; Y = 0
+LineTo  X = User.Bx; Y = Height
+LineTo  X = User.Bk; Y = Height
+
+# die Leitlinie
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(User.Out)
+MoveTo  X = User.Bx; Y = Height*0.5
+LineTo  X = User.Ax; Y = User.Ay
+
+# der Punkt an der Spitze
+[Geometry]
+NoShow = NOT(User.Out)
+Ellipse  X = User.Ax; Y = User.Ay; A = User.Ax+User.Dot; B = User.Ay; C = User.Ax; D = User.Ay+User.Dot
+
+[Paragraph]
+Row  HorzAlign = IF(User.Right,2,0)
+
+[Controls]
+Association:  X = -12 mm; Y = -10 mm
+              X.us = -0.5 in; Y.us = -0.4 in
+              XDyn = User.Bx; YDyn = Height*0.5
+              XCon = 2; YCon = 2; CanGlue = FALSE
+              Tip.de = "Zeiger auf das Ziel ziehen"
+              Tip.en = "Drag the pointer onto the target"
+              Tip.es = "Arrastre el puntero hasta el destino"
+              Tip.it = "Trascina il puntatore sulla destinazione"
+              Tip.fr = "Faites glisser le pointeur sur la cible"

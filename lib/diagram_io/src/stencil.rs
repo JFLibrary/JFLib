@@ -24,7 +24,8 @@
 // 2. A new stencil (vsdx::new_document: the own styles and the NetLab theme) gets the masters in
 //    one transaction: the Master attributes (Name and Prompt in the build language,
 //    IsCustomName(U), IconSize 1, AlignName 2, MatchByName 0, IconUpdate 1, PatternFlags 0,
-//    Hidden 0, MasterType 2, BaseID and UniqueID), the master page (PageWidth / PageHeight =
+//    Hidden 0 (1 with the header key `hidden: true`: a master the Shapes panel does not show,
+//    which code drops), MasterType 2, BaseID and UniqueID), the master page (PageWidth / PageHeight =
 //    the shape's size, scale 1:1 in mm or in, ShapeKeywords, the JFD_ User cells), the master
 //    shape with its cells, sections, text and the SVG geometry.  Constants are written as values
 //    with their unit (lengths in inches with U = MM, IN ...), everything else as a formula; the
@@ -259,6 +260,9 @@ struct MasterInfo {
     // line, fill, text style by NameU with the line naming it
     styles: [Option<(String, u32)>; 3],
     svg: Option<(Art, u32)>,
+    // `hidden: true`: the master is in the file but not shown in the Shapes panel (Hidden="1";
+    // dropped by code, e.g. the lists of a cross-functional flowchart)
+    hidden: bool,
     width: f64,
     height: f64,
     shape: Vec<Cell0>,
@@ -416,7 +420,7 @@ fn master_info(file: &str, text: &str, m: Measure, files: &dyn Fn(&str) -> Optio
     }
     let line = first.line;
     let es = stencil_src::resolve(file, &src.header, m)?;
-    keys_known(file, &es, &["master", "name", "prompt", "keywords", "text", "style", "line_style", "fill_style", "text_style", "svg"])?;
+    keys_known(file, &es, &["master", "name", "prompt", "keywords", "text", "style", "line_style", "fill_style", "text_style", "svg", "hidden"])?;
     let name_u = single(file, &es, "master")?.map(|e| e.value.clone()).unwrap_or_default();
     if name_u.is_empty() {
         return Err(err(file, line, "master: NameU fehlt"));
@@ -425,6 +429,12 @@ fn master_info(file: &str, text: &str, m: Measure, files: &dyn Fn(&str) -> Optio
     let prompts = five(file, &es, "prompt", true, line)?.unwrap_or_default();
     let keywords = five(file, &es, "keywords", false, line)?;
     let text = five(file, &es, "text", false, line)?;
+    let hidden = match single(file, &es, "hidden")? {
+        None => false,
+        Some(e) if e.value.eq_ignore_ascii_case("true") => true,
+        Some(e) if e.value.eq_ignore_ascii_case("false") => false,
+        Some(e) => return Err(err(file, e.line, format!("hidden: „{}“ ist weder true noch false", e.value))),
+    };
     let style_of = |key: &str| -> Result<Option<(String, u32)>, SourceError> { Ok(single(file, &es, key)?.map(|e| (e.value.clone(), e.line))) };
     let all = style_of("style")?;
     let styles = [style_of("line_style")?.or(all.clone()), style_of("fill_style")?.or(all.clone()), style_of("text_style")?.or(all)];
@@ -496,7 +506,7 @@ fn master_info(file: &str, text: &str, m: Measure, files: &dyn Fn(&str) -> Optio
         }
     };
     let (width, height) = (length("Width")?, length("Height")?);
-    Ok(MasterInfo { file: String::from(file), line, name_u, names, prompts, keywords, text, styles, svg, width, height, shape, sections, canon })
+    Ok(MasterInfo { file: String::from(file), line, name_u, names, prompts, keywords, text, styles, svg, hidden, width, height, shape, sections, canon })
 }
 
 fn canon_cells(canon: &mut String, cells: &[Cell0]) {
@@ -688,7 +698,7 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
         ("MatchByName", "0"),
         ("IconUpdate", "1"),
         ("PatternFlags", "0"),
-        ("Hidden", "0"),
+        ("Hidden", if mi.hidden { "1" } else { "0" }),
         ("MasterType", "2"),
     ];
     h.attrs = attrs.iter().map(|&(n, v)| (tx.intern(n), tx.intern(v))).collect();
@@ -964,6 +974,8 @@ fn check_refs(doc: &Document, f: &FormulaAt) -> Result<(), String> {
             }),
             SheetName::Style(name) => doc.style_by_name_u(name).map(SheetRef::Style),
             SheetName::Page(..) => None,
+            // a sheet a function gives (CONTAINERSHEETREF(..)!): known only on a page
+            SheetName::Call(_) => continue,
         };
         let Some(sheet) = sheet else {
             return Err(String::from("Bezug auf ein Blatt, das es nicht gibt"));

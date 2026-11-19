@@ -16,8 +16,12 @@
 //   ui.shape_edit_sems(id, &mut st, &dg, &model, &label)   one K_LISTITEM record per visible
 //                                   top-level shape (label(key)) and one K_BUTTON record per
 //                                   handle of a single selection ("Größengriff unten rechts",
-//                                   "Drehgriff", "Anfangspunkt", "Steuerpunkt 1" ...): scripts
-//                                   click and drag them, screen readers name them
+//                                   "Drehgriff", "Anfangspunkt", "Steuerpunkt 1" ...), per
+//                                   connection arrow while they show ("Verbindungspfeil rechts",
+//                                   "... unten", "... links", "... oben") and per insertion mark
+//                                   while it shows ("Element einfügen", value = its tag): scripts
+//                                   click and drag them, screen readers name them (a screen
+//                                   reader's click on an arrow or a mark reports it as a click)
 //   tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT, SE_PLACE
 //
 // Model (SeModel, borrowed per call; world units are the canvas's, y down):
@@ -30,6 +34,8 @@
 //                       shown while connecting), SP_VERTEX (shown for a single selection when
 //                       the app lists them: vertex editing)
 //   SeGuide { key, vertical, at }   guides (blue, dashed, across the canvas); moves snap to them
+//   SeMark { at, dir, tag, owner }  the app's insertion marks (Visio's blue triangle between two
+//                       items of a list): a small triangle, its tip at `at`, pointing in `dir`
 //   hit(p, tol, within) -> key      the topmost shape at world point p within tol world units
 //                       (within = 0: a top-level shape; a group's key: the child of that group
 //                       under p, for the second click into a group), 0 = none; the app asks its
@@ -61,13 +67,40 @@
 // character is handed on).  A right click selects the shape under the pointer first and reports
 // SeEv::Context; the menu itself (also from Shift+F10 and the menu key) is the app's
 // ui.context_menu right after this call.
+//
+// Connection arrows (SeState::arrows, on by default; Ansicht › Verbindungspfeile): with the
+// pointer tool and no gesture, a pointer on a top-level shape shows four small filled triangles
+// in the accent colour around its box (SeShape::bbox), in the middle of each side, ARROW_GAP
+// (12) DIP out from the box and ARROW_LEN (10) DIP long; half transparent, the one under the
+// pointer opaque.  Directions as seen: 0 right, 1 down, 2 left, 3 up.  They stay while the
+// pointer is on the shape, on one of its handles, on an arrow or in the strip between the box
+// and an arrow (as wide as the arrow), and go at once elsewhere (on another shape: that
+// shape's arrows).  None for 1D shapes, SEF_NOSELECT, SEF_NOARROWS (the app's choice: shapes
+// whose file refuses them, ...), children of groups, shapes smaller than ARROW_MIN (16) DIP on
+// the screen, nor right after a gesture or a click until the pointer moves again.  An arrow
+// that would cover a rotation handle of the selection (the single shape's, or the one of the
+// box around several) moves out along its direction until it clears the handle by a few DIP
+// (Visio puts its top arrow beyond the rotation handle too); the strip that keeps the arrows
+// grows with it.  Handles and control points stay on top and are hit first.  A click on an
+// arrow reports SeEv::Arrow { key, dir } and leaves the selection alone (the app selects what
+// it made); a drag from an arrow is the connector tool from that shape: a rubber band from
+// the middle of the box's side, glue and the target's highlight as SE_CONNECT, released
+// SeEv::Connect { tool: SE_CONNECT, a: that middle, ga: SeGlue::Shape(key), b, gb }; Esc
+// cancels.  The arrow under the pointer is SeState::arrow_hover(), and each change of it is
+// SeEv::ArrowHover { key, dir } once (dir 255: off the arrows of `key`), for a preview.
+//
+// Insertion marks (SeModel::marks): with the pointer tool and no gesture each mark shows while
+// the pointer is on its owner (the shape under the pointer, or inside the owner's box) or
+// within MARK_NEAR (16) DIP of it; a click reports SeEv::Mark { tag }, a drag does nothing.
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
+use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::ops::Range;
 
+use crate::cmd::{Draw, Gfx};
 use crate::consts::*;
 use crate::diagram::{dist, fl, fx, inside, ipx, node_sem_id, overlaps, snapv, DiagramState, ExtIn};
 use crate::keys::*;
@@ -108,6 +141,7 @@ pub const SEF_BEGIN_DYN: u32 = 0x2000; // the begin is glued to a whole shape (d
 pub const SEF_END_GLUED: u32 = 0x4000;
 pub const SEF_END_DYN: u32 = 0x8000;
 pub const SEF_LOCK_PIN: u32 = 0x1_0000; // no rotation pin handle
+pub const SEF_NOARROWS: u32 = 0x2_0000; // no connection arrows around it (see the file header)
 
 /// kinds of SePoint
 pub const SP_CONTROL: u8 = 0;
@@ -204,12 +238,26 @@ pub struct SeGuide {
     pub at: f32,
 }
 
+/// an insertion mark of the app (Visio's blue triangle between two items of a list): a small
+/// triangle with its tip at `at` (world) pointing in `dir` (0 right, 1 down, 2 left, 3 up, as
+/// seen); it shows with the pointer tool while the pointer is on the shape `owner` or near the
+/// mark, and a click on it reports SeEv::Mark { tag }
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct SeMark {
+    pub at: [f32; 2],
+    pub dir: u8,
+    pub tag: u32,
+    pub owner: u64,
+}
+
 /// the app's shapes, borrowed for one call
 #[derive(Clone, Copy)]
 pub struct SeModel<'a> {
     pub shapes: &'a [SeShape],
     pub points: &'a [SePoint],
     pub guides: &'a [SeGuide],
+    /// insertion marks (lists: between two items)
+    pub marks: &'a [SeMark],
     /// changes whenever shapes are added, removed or reordered
     pub ver: u32,
     /// the topmost shape at a world point (see the file header)
@@ -261,6 +309,14 @@ pub enum SeEv {
     Context { key: u64, at: [i32; 2] },
     /// Del with a selection
     Delete,
+    /// a click on the connection arrow `dir` (0 right, 1 down, 2 left, 3 up, as seen) of the
+    /// top-level shape `key`; the selection stays as it was
+    Arrow { key: u64, dir: u8 },
+    /// the pointer went onto the connection arrow `dir` of shape `key`, or off the arrows of
+    /// `key` (dir 255); once per change
+    ArrowHover { key: u64, dir: u8 },
+    /// a click on the insertion mark with this tag (SeModel::marks)
+    Mark { tag: u32 },
 }
 
 // what a point of the canvas shows
@@ -279,6 +335,10 @@ enum SHit {
     End(u64, u8),
     /// a control point or vertex: index into SeModel::points
     Point(u64, u32),
+    /// a connection arrow of a shape: its direction
+    Arrow(u64, u8),
+    /// an insertion mark: index into SeModel::marks, its tag
+    Mark(u32, u32),
 }
 
 // handle positions: top left, top, top right, right, bottom right, bottom, bottom left, left
@@ -292,6 +352,125 @@ const ROT_DIP: i32 = 22; // the rotation handle's distance from the frame
 const HANDLE_DIP: i32 = 4; // half the side of a handle
 const GLUE_DIP: i32 = 8; // the reach of a connection point
 const ALIGN_DIP: i32 = 6; // the reach of the dynamic grid and of guides
+// i18n (library texts, i18n.rs LIB_TEXTS): the connection arrows by direction
+const ARROW_NAMES: [&str; 4] = ["Verbindungspfeil rechts", "Verbindungspfeil unten", "Verbindungspfeil links", "Verbindungspfeil oben"];
+const MARK_NAME: &str = "Element einfügen"; // an insertion mark
+const ARROW_GAP: i32 = 12; // from a shape's box to the base of a connection arrow
+const ARROW_LEN: i32 = 10; // a connection arrow from its base to its tip
+const ARROW_HALF: i32 = 6; // half the base of a connection arrow
+const ARROW_MIN: i32 = 16; // no arrows around a shape smaller than this on the screen
+const MARK_LEN: i32 = 9; // an insertion mark from its base to its tip
+const MARK_HALF: i32 = 5; // half its base
+const MARK_NEAR: i32 = 16; // a mark shows while the pointer is this near to it
+// the directions 0 right, 1 down, 2 left, 3 up (y down)
+const DIRS: [[f32; 2]; 4] = [[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0], [0.0, -1.0]];
+
+// the connection arrows around a shape (canvas px, the content's LTR coordinates): its box
+// x0, y0, x1, y1 and per direction the distance from the box's side to the arrow's base
+#[derive(Clone, Copy)]
+struct ArrowSet {
+    b: [f32; 4],
+    base: [f32; 4],
+    len: f32,
+    half: f32,
+}
+
+impl ArrowSet {
+    // the middle of the box's side in direction d
+    fn edge(&self, d: usize) -> [f32; 2] {
+        let b = self.b;
+        let (cx, cy) = ((b[0] + b[2]) * 0.5, (b[1] + b[3]) * 0.5);
+        match d & 3 {
+            0 => [b[2], cy],
+            1 => [cx, b[3]],
+            2 => [b[0], cy],
+            _ => [cx, b[1]],
+        }
+    }
+
+    // p seen from the side d: outwards from it, across it
+    fn local(&self, d: usize, p: [f32; 2]) -> (f32, f32) {
+        let e = self.edge(d);
+        let v = DIRS[d & 3];
+        let (dx, dy) = (p[0] - e[0], p[1] - e[1]);
+        (dx * v[0] + dy * v[1], dy * v[0] - dx * v[1])
+    }
+
+    fn tri(&self, d: usize) -> [[f32; 2]; 3] {
+        let e = self.edge(d);
+        let v = DIRS[d & 3];
+        let out = self.base[d & 3] + self.len;
+        tri_at([e[0] + v[0] * out, e[1] + v[1] * out], d, self.len, self.half)
+    }
+
+    // the arrow at p (tol px around it)
+    fn hit(&self, p: [f32; 2], tol: f32) -> Option<u8> {
+        (0..4).find(|&d| {
+            let (t, l) = self.local(d, p);
+            t >= self.base[d] - tol && t <= self.base[d] + self.len + tol && l.abs() <= self.half + tol
+        })
+        .map(|d| d as u8)
+    }
+
+    // p on the box, on an arrow or in the strip between them
+    fn zone(&self, p: [f32; 2], tol: f32) -> bool {
+        let b = self.b;
+        if p[0] >= b[0] - tol && p[0] <= b[2] + tol && p[1] >= b[1] - tol && p[1] <= b[3] + tol {
+            return true;
+        }
+        (0..4).any(|d| {
+            let (t, l) = self.local(d, p);
+            t >= -tol && t <= self.base[d] + self.len + tol && l.abs() <= self.half + tol
+        })
+    }
+}
+
+// a triangle with its tip at `tip` pointing in direction d: len long, its base 2 half wide
+fn tri_at(tip: [f32; 2], d: usize, len: f32, half: f32) -> [[f32; 2]; 3] {
+    let v = DIRS[d & 3];
+    let n = [-v[1], v[0]];
+    let b = [tip[0] - v[0] * len, tip[1] - v[1] * len];
+    [tip, [b[0] + n[0] * half, b[1] + n[1] * half], [b[0] - n[0] * half, b[1] - n[1] * half]]
+}
+
+// the px box x, y, w, h around a triangle (a pixel more on each side)
+fn tri_box(t: &[[f32; 2]; 3]) -> [i32; 4] {
+    let (mut x0, mut y0, mut x1, mut y1) = (t[0][0], t[0][1], t[0][0], t[0][1]);
+    for p in &t[1..] {
+        x0 = x0.min(p[0]);
+        y0 = y0.min(p[1]);
+        x1 = x1.max(p[0]);
+        y1 = y1.max(p[1]);
+    }
+    let (a, b) = (fl(x0) - 1, fl(y0) - 1);
+    [a, b, (fl(x1) + 2 - a).max(1), (fl(y1) + 2 - b).max(1)]
+}
+
+// a filled triangle, anti-aliased (a custom draw: the path fills it); its points relative to
+// the command's rectangle, which a mirrored window moves
+struct Tri {
+    pts: [[f32; 2]; 3],
+    c: u32,
+}
+
+impl Draw for Tri {
+    fn draw(&self, g: &mut Gfx, r: [i32; 4]) {
+        let path = &mut g.text.path;
+        path.reset();
+        path.set_origin(0, 0);
+        for (k, p) in self.pts.iter().enumerate() {
+            let (x, y) = (r[0] as f32 + p[0], r[1] as f32 + p[1]);
+            if k == 0 {
+                path.move_f(x, y);
+            } else {
+                path.line_f(x, y);
+            }
+        }
+        path.close();
+        g.dc.set_color(self.c);
+        path.fill(&mut g.text.ras, g.dc, g.sf, gfx::RULE_NONZERO);
+    }
+}
 
 #[derive(Clone, Default)]
 enum G {
@@ -341,6 +520,21 @@ pub struct SeState {
     pub lasso: bool,
     /// the vertex chosen with a click (Del removes it): its shape and tag
     pub vertex: Option<(u64, u32)>,
+    /// connection arrows around the shape under the pointer (Ansicht › Verbindungspfeile; see
+    /// the file header)
+    pub arrows: bool,
+    // the shape whose connection arrows show (0: none), the arrow under the pointer (255: none)
+    // and what SeEv::ArrowHover said last (key, dir)
+    arrow_key: u64,
+    arrow_hot: u8,
+    arrow_said: (u64, u8),
+    // the pointer (world) while insertion marks may show, the mark under it (index, tag)
+    mark_p: Option<[f32; 2]>,
+    mark_hot: Option<(u32, u32)>,
+    // where the last gesture or click ended: no arrows or marks until the pointer leaves it
+    quiet: Option<[i32; 2]>,
+    // clicks of a screen reader on arrows and marks (shape_edit_sems), reported next call
+    pend: Vec<SeEv>,
     // the shape whose rotation pin shows (after the pointer rested on its rotation handle, as
     // in Visio: a press in a shape's middle moves the shape, not its pin)
     pin_shown: u64,
@@ -366,7 +560,7 @@ impl Default for SeState {
 }
 
 impl SeState {
-    /// nothing selected; dynamic grid and glue on
+    /// nothing selected; dynamic grid, glue and connection arrows on
     pub fn new() -> SeState {
         SeState {
             sel: BTreeSet::new(),
@@ -377,6 +571,14 @@ impl SeState {
             show_points: false,
             lasso: false,
             vertex: None,
+            arrows: true,
+            arrow_key: 0,
+            arrow_hot: 255,
+            arrow_said: (0, 255),
+            mark_p: None,
+            mark_hot: None,
+            quiet: None,
+            pend: Vec::new(),
             pin_shown: 0,
             g: G::Idle,
             hover: SHit::None,
@@ -400,6 +602,31 @@ impl SeState {
     /// a live gesture is in progress (the app shows a preview of it)
     pub fn live(&self) -> bool {
         matches!(self.g, G::Move { .. } | G::Resize { .. } | G::Rotate { .. } | G::Pin { .. } | G::End { .. } | G::Point { .. })
+    }
+
+    /// the connection arrow under the pointer: the shape's key and the direction (0 right,
+    /// 1 down, 2 left, 3 up, as seen)
+    pub fn arrow_hover(&self) -> Option<(u64, u8)> {
+        (self.arrow_key != 0 && self.arrow_hot < 4).then_some((self.arrow_key, self.arrow_hot))
+    }
+
+    // no arrows, no marks
+    fn extras_off(&mut self, out: &mut Vec<SeEv>) {
+        self.arrow_key = 0;
+        self.arrow_hot = 255;
+        self.mark_p = None;
+        self.mark_hot = None;
+        self.say_arrow(out);
+    }
+
+    // SeEv::ArrowHover when the arrow under the pointer changed
+    fn say_arrow(&mut self, out: &mut Vec<SeEv>) {
+        let now = self.arrow_hover().unwrap_or((0, 255));
+        if now != self.arrow_said {
+            let key = if now.1 == 255 { self.arrow_said.0 } else { now.0 };
+            out.push(SeEv::ArrowHover { key, dir: now.1 });
+            self.arrow_said = now;
+        }
     }
 
     /// select exactly these shapes (the app's commands: paste, group, a new shape)
@@ -659,6 +886,7 @@ impl Ui {
             st.pending_sel = false;
             out.push(SeEv::Select);
         }
+        out.append(&mut st.pend);
         let i = dg.ext;
         let r = dg.vp.rect;
         let scale = dg.vp.scale() as f32;
@@ -680,6 +908,9 @@ impl Ui {
         if st.single(m).is_none_or(|s| s.key != st.pin_shown) {
             st.pin_shown = 0;
         }
+        // connection arrows and insertion marks (they may take the hover)
+        self.se_extras(st, dg, m, &i, tool, &mut out);
+        let was_idle = matches!(st.g, G::Idle);
         // the gesture
         let g = core::mem::take(&mut st.g);
         st.g = match g {
@@ -705,7 +936,9 @@ impl Ui {
                 dg.vp.step(-1, i.px[0] as f32 + 0.5, i.px[1] as f32 + 0.5);
             } else {
                 let k = match st.hover {
-                    SHit::Shape(k) | SHit::Handle(k, _) | SHit::Rotate(k) | SHit::Pin(k) | SHit::End(k, _) | SHit::Point(k, _) => k,
+                    SHit::Shape(k) | SHit::Handle(k, _) | SHit::Rotate(k) | SHit::Pin(k) | SHit::End(k, _) | SHit::Point(k, _) | SHit::Arrow(k, _) => k,
+                    // a mark lies on a shape: that one
+                    SHit::Mark(..) => st.shape(m, st.hover_shape).filter(|s| s.flags & SEF_NOSELECT == 0).map_or(0, |s| s.key),
                     _ => 0,
                 };
                 if k != 0 && !st.sel.contains(&k) {
@@ -718,6 +951,14 @@ impl Ui {
         // the keys while the canvas has the focus and no popup (a menu keeps its own keys)
         if self.wp.ctx.focus == id && self.popup_count() == 0 {
             self.se_keys(st, dg, m, &mut out);
+        }
+        // a gesture or a click that ended: the arrows wait until the pointer moves; a gesture
+        // hides them (a press on an arrow or a mark keeps them)
+        if !was_idle && matches!(st.g, G::Idle) {
+            st.quiet = Some(i.px);
+        }
+        if st.quiet.is_some() || !matches!(st.g, G::Idle | G::Press { hit: SHit::Arrow(..) | SHit::Mark(..), .. }) {
+            st.extras_off(&mut out);
         }
         // the cursor for the next call of ui.diagram
         dg.ext_cursor = self.se_cursor(st, m, tool);
@@ -802,6 +1043,132 @@ impl Ui {
             Some(s) if s.flags & SEF_NOSELECT == 0 => SHit::Shape(k),
             _ => SHit::None,
         }
+    }
+
+    // the connection arrows of shape `key` (None: it gets none)
+    fn se_arrow_set(&self, st: &SeState, dg: &DiagramState, m: &SeModel, key: u64) -> Option<ArrowSet> {
+        let sh = st.shape(m, key)?;
+        if sh.parent != 0 || sh.flags & (SEF_1D | SEF_NOSELECT | SEF_NOARROWS) != 0 {
+            return None;
+        }
+        let vp = dg.vp;
+        let (a, z) = (vp.to_screen([sh.bbox[0], sh.bbox[1]]), vp.to_screen([sh.bbox[2], sh.bbox[3]]));
+        let b = [a[0].min(z[0]), a[1].min(z[1]), a[0].max(z[0]), a[1].max(z[1])];
+        if !b.iter().all(|v| v.is_finite()) || !((b[2] - b[0]).max(b[3] - b[1]) >= self.dp(ARROW_MIN) as f32) {
+            return None;
+        }
+        let mut set = ArrowSet { b, base: [self.dp(ARROW_GAP) as f32; 4], len: self.dp(ARROW_LEN) as f32, half: self.dp(ARROW_HALF) as f32 };
+        // the rotation handle of the selection: an arrow that would cover it goes beyond it
+        let rot_d = self.dp(ROT_DIP) as f32 / vp.scale() as f32;
+        let handle = match st.single(m) {
+            Some(one) if one.flags & (SEF_1D | SEF_LOCK_ROTATE) == 0 => Some(rot_point(&one.bx, rot_d)),
+            Some(_) => None,
+            None => st.multi_box(m).map(|bx| rot_point(&bx, rot_d)),
+        };
+        if let Some(q) = handle.map(|q| vp.to_screen(q)) {
+            let rr = (self.dp(HANDLE_DIP + 3) + self.hair().max(1)) as f32;
+            for d in 0..4 {
+                let (t, l) = set.local(d, q);
+                if l.abs() < set.half + rr && t + rr > set.base[d] && t - rr < set.base[d] + set.len {
+                    set.base[d] = t + rr;
+                }
+            }
+        }
+        Some(set)
+    }
+
+    // the triangle of an insertion mark (canvas px)
+    fn se_mark_tri(&self, dg: &DiagramState, mk: &SeMark) -> [[f32; 2]; 3] {
+        tri_at(dg.vp.to_screen(mk.at), mk.dir as usize, self.dp(MARK_LEN) as f32, self.dp(MARK_HALF) as f32)
+    }
+
+    // does the insertion mark show: the pointer on its owner or near it
+    fn se_mark_shown(&self, st: &SeState, dg: &DiagramState, m: &SeModel, mk: &SeMark) -> bool {
+        let Some(p) = st.mark_p else { return false };
+        if mk.owner != 0 && st.hover_shape == mk.owner {
+            return true;
+        }
+        let tol = self.dp(3) as f32 / dg.vp.scale() as f32;
+        if mk.owner != 0 && st.shape(m, mk.owner).is_some_and(|s| inside([p[0], p[1], p[0], p[1]], [s.bbox[0] - tol, s.bbox[1] - tol, s.bbox[2] + tol, s.bbox[3] + tol])) {
+            return true;
+        }
+        let t = self.se_mark_tri(dg, mk);
+        let c = [(t[0][0] + t[1][0] + t[2][0]) / 3.0, (t[0][1] + t[1][1] + t[2][1]) / 3.0];
+        dist(dg.vp.to_screen(p), c) <= self.dp(MARK_NEAR) as f32
+    }
+
+    // the arrows and marks while the pointer rests on the canvas with the pointer tool (no
+    // gesture, no button but a press now): which show, which one is under the pointer; that one
+    // becomes the hover unless a handle is there
+    fn se_extras(&mut self, st: &mut SeState, dg: &DiagramState, m: &SeModel, i: &ExtIn, tool: u32, out: &mut Vec<SeEv>) {
+        if st.quiet.is_some_and(|q| q != i.px) {
+            st.quiet = None;
+        }
+        if let G::Press { hit: hit @ (SHit::Arrow(..) | SHit::Mark(..)), .. } = st.g {
+            // held on one: it stays as it was
+            st.hover = hit;
+            return;
+        }
+        let left = 1 << BTN_LEFT;
+        let rest = matches!(st.g, G::Idle) && (i.btn & left == 0 || i.pressed & left != 0);
+        if tool != SE_POINTER || !rest || !i.track || i.space || i.panning || st.quiet.is_some() {
+            st.extras_off(out);
+            return;
+        }
+        let p = dg.vp.to_screen(i.p);
+        let tol = self.dp(2) as f32;
+        // the arrows: the current shape's while the pointer is on one of them, on one of its
+        // handles or in their zone; else those of the top-level shape under the pointer
+        let (mut key, mut hot) = (0u64, 255u8);
+        if st.arrows {
+            let cur = if st.arrow_key != 0 { self.se_arrow_set(st, dg, m, st.arrow_key) } else { None };
+            let on_handle = matches!(st.hover, SHit::Handle(k, _) | SHit::Rotate(k) | SHit::Pin(k) | SHit::Point(k, _) if k == st.arrow_key);
+            if let Some(d) = cur.and_then(|a| a.hit(p, tol)) {
+                (key, hot) = (st.arrow_key, d);
+            } else if cur.is_some() && on_handle {
+                key = st.arrow_key;
+            } else if st.hover_shape != 0 && self.se_arrow_set(st, dg, m, st.hover_shape).is_some() {
+                key = st.hover_shape;
+            } else if cur.is_some_and(|a| a.zone(p, tol)) {
+                key = st.arrow_key;
+            }
+        }
+        st.arrow_key = key;
+        st.arrow_hot = hot;
+        // the marks
+        st.mark_p = (!m.marks.is_empty()).then_some(i.p);
+        st.mark_hot = None;
+        let mut best = f32::MAX;
+        for (k, mk) in m.marks.iter().enumerate() {
+            if !self.se_mark_shown(st, dg, m, mk) {
+                continue;
+            }
+            let t = self.se_mark_tri(dg, mk);
+            let v = DIRS[mk.dir as usize & 3];
+            let (dx, dy) = (t[0][0] - p[0], t[0][1] - p[1]);
+            // back from the tip, across
+            let (along, across) = (dx * v[0] + dy * v[1], dy * v[0] - dx * v[1]);
+            let (len, half) = (self.dp(MARK_LEN) as f32, self.dp(MARK_HALF) as f32);
+            if along >= -tol && along <= len + tol && across.abs() <= half + tol {
+                let d = (along - len * 0.5).abs() + across.abs();
+                if d < best {
+                    best = d;
+                    st.mark_hot = Some((k as u32, mk.tag));
+                }
+            }
+        }
+        // the hover: handles first (they lie on top), then a mark, then an arrow
+        let handle = matches!(st.hover, SHit::Handle(..) | SHit::SelHandle(_) | SHit::Rotate(_) | SHit::SelRotate | SHit::Pin(_) | SHit::End(..) | SHit::Point(..));
+        if handle {
+            st.arrow_hot = 255;
+            st.mark_hot = None;
+        } else if let Some((k, tag)) = st.mark_hot {
+            st.arrow_hot = 255;
+            st.hover = SHit::Mark(k, tag);
+        } else if hot != 255 {
+            st.hover = SHit::Arrow(key, hot);
+        }
+        st.say_arrow(out);
     }
 
     // what an end or a control point at p would glue to; the point it would go to
@@ -975,6 +1342,9 @@ impl Ui {
                     out.push(SeEv::Select);
                 }
             }
+            // the selection stays: the app selects what it makes
+            SHit::Arrow(key, dir) => out.push(SeEv::Arrow { key, dir }),
+            SHit::Mark(_, tag) => out.push(SeEv::Mark { tag }),
             _ => {}
         }
         G::Idle
@@ -983,6 +1353,24 @@ impl Ui {
     fn se_drag(&mut self, st: &mut SeState, dg: &mut DiagramState, m: &SeModel, tool: u32, hit: SHit, at: [f32; 2], mods: u32) -> G {
         // the drawing tools draw wherever the press was (on a shape too), but on a handle
         let on_handle = matches!(hit, SHit::Handle(..) | SHit::Rotate(_) | SHit::Pin(_) | SHit::Point(..) | SHit::End(..));
+        match hit {
+            // a drag from a connection arrow: the connector tool from the middle of that side
+            SHit::Arrow(k, d) => {
+                let Some(sh) = st.shape(m, k) else { return G::Hold };
+                let b = sh.bbox;
+                let (cx, cy) = ((b[0] + b[2]) * 0.5, (b[1] + b[3]) * 0.5);
+                let a = match d & 3 {
+                    0 => [b[2], cy],
+                    1 => [cx, b[3]],
+                    2 => [b[0], cy],
+                    _ => [cx, b[1]],
+                };
+                return G::Connect { tool: SE_CONNECT, a, ga: SeGlue::Shape(k), b: a };
+            }
+            // a mark is for clicks only
+            SHit::Mark(..) => return G::Hold,
+            _ => {}
+        }
         if tool == SE_PLACE {
             return G::Idle;
         }
@@ -1466,6 +1854,23 @@ impl Ui {
                 }
             }
         }
+        // connection arrows and insertion marks (under the handles): half transparent, the one
+        // under the pointer opaque
+        if tool == SE_POINTER {
+            let (soft, full) = ((accent & 0x00FF_FFFF) | 0xA000_0000, accent | 0xFF00_0000);
+            if let Some(a) = (st.arrow_key != 0).then(|| self.se_arrow_set(st, dg, m, st.arrow_key)).flatten() {
+                for d in 0..4 {
+                    self.se_tri(&a.tri(d), if st.arrow_hot == d as u8 { full } else { soft });
+                }
+            }
+            for (k, mk) in m.marks.iter().enumerate() {
+                if self.se_mark_shown(st, dg, m, mk) {
+                    let hot = st.mark_hot.is_some_and(|h| h.0 == k as u32);
+                    let t = self.se_mark_tri(dg, mk);
+                    self.se_tri(&t, if hot { full } else { soft });
+                }
+            }
+        }
         // handles of a single selection
         if let Some(sh) = st.single(m) {
             let hs = self.dp(HANDLE_DIP);
@@ -1634,6 +2039,16 @@ impl Ui {
         }
     }
 
+    // a filled triangle (canvas px) in colour c
+    fn se_tri(&mut self, t: &[[f32; 2]; 3], c: u32) {
+        if !t.iter().all(|p| p[0].is_finite() && p[1].is_finite()) {
+            return;
+        }
+        let b = tri_box(t);
+        let pts = t.map(|p| [p[0] - b[0] as f32, p[1] - b[1] as f32]);
+        self.cmd_custom(b[0], b[1], b[2], b[3], Some(Rc::new(Tri { pts, c })), 0, 0);
+    }
+
     // a diamond (a square turned by 45 degrees) of half-diagonal e px at p
     fn se_diamond(&mut self, p: [f32; 2], e: f32, fill: u32, stroke: u32, t: f32) {
         // filled with lines across, then the outline
@@ -1697,6 +2112,34 @@ impl Ui {
             self.last_set(rect, state as u32);
             let l = label(sh.key);
             self.sem(K_LISTITEM, sid, Some(&l), i as i32);
+        }
+        // the connection arrows and the insertion marks while they show (a screen reader's
+        // click: the click's event with the next call of ui.shape_edit)
+        let mut extra: Vec<([[f32; 2]; 3], u32, &'static str, i32, SeEv)> = Vec::new();
+        if let Some(a) = (st.arrow_key != 0).then(|| self.se_arrow_set(st, dg, m, st.arrow_key)).flatten() {
+            let k = st.arrow_key;
+            for d in 0..4usize {
+                let sid = node_sem_id(id ^ 0xA770, k.wrapping_mul(4).wrapping_add(d as u64));
+                extra.push((a.tri(d), sid, ARROW_NAMES[d], 0, SeEv::Arrow { key: k, dir: d as u8 }));
+            }
+        }
+        for mk in m.marks {
+            if self.se_mark_shown(st, dg, m, mk) {
+                let sid = node_sem_id(id ^ 0x4D4B, mk.owner.rotate_left(32) ^ mk.tag as u64);
+                extra.push((self.se_mark_tri(dg, mk), sid, MARK_NAME, mk.tag as i32, SeEv::Mark { tag: mk.tag }));
+            }
+        }
+        for (t, sid, name, value, ev) in extra {
+            let Some(mut rect) = clip(tri_box(&t)) else { continue };
+            if self.rtl {
+                rect[0] = self.rtl_map(rect[0] + rect[2] - 1, r[0], r[2]);
+            }
+            if self.m.a11y.pending() && self.a11y_click(sid) {
+                st.pend.push(ev);
+                self.repass();
+            }
+            self.last_set(rect, 0);
+            self.sem(K_BUTTON, sid, Some(crate::i18n::tr(name)), value);
         }
         // the handles of a single selection
         let Some(sh) = st.single(m) else { return };

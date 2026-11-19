@@ -79,6 +79,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
     arcs in pieces of at most 90 degrees; one format on the master shape, several as a group
     of full-size subshapes
   - the same sources give the same bytes; no panic, bounded counts, no recursion
+- (JD10) The stencil build tool takes `hidden: true` in a master's header (the master's `Hidden="1"`: in the file, not in the Shapes panel; JFDiagrammer's flowchart frame and lists)
 
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
 

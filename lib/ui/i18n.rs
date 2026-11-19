@@ -909,6 +909,12 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Endpunkt", "End point", "Point de fin", "Punto final", "Punto finale", "Eindpunt", "Punkt końcowy", "نقطة النهاية", "נקודת סיום"],
     ["Steuerpunkt", "Control handle", "Poignée de contrôle", "Controlador de control", "Maniglia di controllo", "Besturingsgreep", "Uchwyt sterujący", "مقبض التحكم", "ידית בקרה"],
     ["Scheitelpunkt", "Vertex", "Sommet", "Vértice", "Vertice", "Hoekpunt", "Wierzchołek", "رأس", "קודקוד"],
+    // (JD10) the connection arrows and insertion marks of ui.shape_edit
+    ["Verbindungspfeil rechts", "Connection arrow right", "Flèche de connexion vers la droite", "Flecha de conexión a la derecha", "Freccia di connessione a destra", "Verbindingspijl rechts", "Strzałka połączenia w prawo", "سهم الاتصال لليمين", "חץ חיבור ימינה"],
+    ["Verbindungspfeil unten", "Connection arrow down", "Flèche de connexion vers le bas", "Flecha de conexión hacia abajo", "Freccia di connessione in basso", "Verbindingspijl onder", "Strzałka połączenia w dół", "سهم الاتصال للأسفل", "חץ חיבור למטה"],
+    ["Verbindungspfeil links", "Connection arrow left", "Flèche de connexion vers la gauche", "Flecha de conexión a la izquierda", "Freccia di connessione a sinistra", "Verbindingspijl links", "Strzałka połączenia w lewo", "سهم الاتصال لليسار", "חץ חיבור שמאלה"],
+    ["Verbindungspfeil oben", "Connection arrow up", "Flèche de connexion vers le haut", "Flecha de conexión hacia arriba", "Freccia di connessione in alto", "Verbindingspijl boven", "Strzałka połączenia w górę", "سهم الاتصال للأعلى", "חץ חיבור למעלה"],
+    ["Element einfügen", "Insert item", "Insérer un élément", "Insertar elemento", "Inserisci elemento", "Element invoegen", "Wstaw element", "إدراج عنصر", "הוספת פריט"],
     // (JD7) the rulers (ui.ruler)
     ["Lineal", "Ruler", "Règle", "Regla", "Righello", "Liniaal", "Linijka", "مسطرة", "סרגל"],
 ];

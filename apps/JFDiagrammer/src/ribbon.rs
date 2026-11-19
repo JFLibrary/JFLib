@@ -1,6 +1,7 @@
 // ribbon -- the registers of the ribbon: Start, Einfügen, Entwurf, Ansicht with every P1
-// command of FEATURES.md 3.3-3.9 and the context registers Container-Tools › Format (RK-01)
-// and Textwerkzeuge › Text (RK-11)
+// command of FEATURES.md 3.3-3.9, the context registers Container-Tools › Format (RK-01)
+// and Textwerkzeuge › Text (RK-11), and (JD10) Funktionsübergreifendes Flussdiagramm (RK-03)
+// while the page holds one
 //
 //   tabs(app) -> Vec<Reg>         the registers shown now: File, the four, the context ones
 //                                 the selection asks for (app.selection_kind)
@@ -42,6 +43,8 @@ pub(crate) enum Reg {
     View,
     Container,
     Text,
+    /// (JD10) the cross-functional flowchart's register
+    Cff,
 }
 
 // the registers' labels (German, translated where drawn)
@@ -55,10 +58,14 @@ const L_CONTAINER_SET: &str = "Container-Tools";
 const L_CONTAINER: &str = "Format|Register";
 const L_TEXT_SET: &str = "Textwerkzeuge";
 const L_TEXT: &str = "Text|Register";
+const L_CFF: &str = "Funktionsübergreifendes Flussdiagramm";
 
 /// the registers shown now (the File register first)
 pub(crate) fn tabs(app: &Diagrammer) -> Vec<Reg> {
     let mut v = alloc::vec![Reg::File, Reg::Start, Reg::Insert, Reg::Design, Reg::View];
+    if crate::structures::has_cff(app) {
+        v.push(Reg::Cff);
+    }
     match app.selection_kind() {
         SEL_CONTAINER => v.push(Reg::Container),
         SEL_TEXT => v.push(Reg::Text),
@@ -78,6 +85,7 @@ pub(crate) fn tab_descs(ui: &Ui, regs: &[Reg]) -> Vec<RibbonTab<'static>> {
             Reg::View => RibbonTab::new(t(L_VIEW)),
             Reg::Container => RibbonTab::context(tc(L_CONTAINER), t(L_CONTAINER_SET), ui.color(T_OK)),
             Reg::Text => RibbonTab::context(tc(L_TEXT), t(L_TEXT_SET), ui.color(T_WARN)),
+            Reg::Cff => RibbonTab::new(t(L_CFF)),
         })
         .collect()
 }
@@ -132,15 +140,20 @@ static LAYER_MENU: [It; 2] = [C(LAYER_ASSIGN), C(LAYER_PROPERTIES)];
 static SELECT_MENU_ITEMS: [It; 4] = [C(SELECT_ALL), C(SELECT_BY_TYPE), C(SELECT_AREA), C(LASSO)];
 static PAGE_MENU: [It; 3] = [C(PAGE_BLANK), C(PAGE_BACKGROUND), C(PAGE_DUPLICATE)];
 static PICTURE_MENU: [It; 1] = [C(PICTURE_FILE)];
-static CONTAINER_MENU: [It; 0] = [];
+static CONTAINER_MENU: [It; 6] = [C(CONTAINER_1), C(CONTAINER_2), C(CONTAINER_3), C(CONTAINER_4), C(CONTAINER_5), C(CONTAINER_6)];
+static CALLOUT_MENU: [It; 6] = [C(CALLOUT_1), C(CALLOUT_2), C(CALLOUT_3), C(CALLOUT_4), C(CALLOUT_5), C(CALLOUT_6)];
+static CT_STYLE_MENU: [It; 6] = [C(CT_STYLE_1), C(CT_STYLE_2), C(CT_STYLE_3), C(CT_STYLE_4), C(CT_STYLE_5), C(CT_STYLE_6)];
+static CT_HEADING_MENU: [It; 4] = [C(CT_HEADING_1), C(CT_HEADING_2), C(CT_HEADING_3), C(CT_HEADING_4)];
+static CT_AUTOSIZE_MENU: [It; 3] = [C(CT_RESIZE_0), C(CT_RESIZE_1), C(CT_RESIZE_2)];
+static CFF_ORIENT_MENU: [It; 2] = [C(CFF_HORIZONTAL), C(CFF_VERTICAL)];
 static TEXTBOX_MENU: [It; 2] = [C(TEXT_BOX_H), C(TEXT_BOX_V)];
 static ORIENT_MENU: [It; 2] = [C(PORTRAIT), C(LANDSCAPE)];
 static SIZE_MENU: [It; 3] = [C(FIT_DRAWING), Sep, C(MORE_SIZES)];
 // (JD11) the variants' own menus (TH-05: new colours, effects, connectors, fonts, embellishment) are P2
 static THEME_MENU: [It; 0] = [];
-static CONN_MENU: [It; 6] = [C(CONN_RIGHT_ANGLE), C(CONN_STRAIGHT), C(CONN_CURVED), Sep, C(LINE_JUMPS), C(REROUTE)];
+static CONN_MENU: [It; 8] = [C(CONN_RIGHT_ANGLE), C(CONN_STRAIGHT), C(CONN_CURVED), Sep, C(LINE_JUMPS), C(REROUTE), Sep, C(CONNECT_SHAPES)];
 static PANES_MENU: [It; 5] = [C(PANE_SHAPES), C(PANE_DATA), C(PANE_SIZEPOS), C(PANE_PANZOOM), C(PANE_FORMAT)];
-static MARGIN_MENU: [It; 0] = [];
+static MARGIN_MENU: [It; 4] = [C(CT_MARGIN_0), C(CT_MARGIN_1), C(CT_MARGIN_2), C(CT_MARGIN_3)];
 
 // i18n
 static START: [Group; 7] = [
@@ -167,7 +180,7 @@ static START: [Group; 7] = [
 static INSERT: [Group; 5] = [
     Group("Seiten", 0, &[Col::BigSplit(NEW_PAGE, &PAGE_MENU)]),
     Group("Illustrationen", 0, &[Col::BigMenu(PICTURES, &PICTURE_MENU)]),
-    Group("Diagrammteile", 0, &[Col::BigMenu(CONTAINER, &CONTAINER_MENU), Col::BigMenu(CALLOUT, &CONTAINER_MENU), Col::Big(INSERT_CONNECTOR)]),
+    Group("Diagrammteile", 0, &[Col::BigMenu(CONTAINER, &CONTAINER_MENU), Col::BigMenu(CALLOUT, &CALLOUT_MENU), Col::Big(INSERT_CONNECTOR)]),
     Group("Links", 0, &[Col::Big(LINK)]),
     Group("Text", 0, &[Col::BigSplit(TEXT_BOX, &TEXTBOX_MENU), Col::Big(FIELD)]),
 ];
@@ -197,8 +210,8 @@ static VIEW: [Group; 3] = [
 
 // i18n
 static CONTAINER_FORMAT: [Group; 3] = [
-    Group("Größe", 0, &[Col::BigMenu(CT_MARGINS, &MARGIN_MENU), Col::Big(CT_FIT), Col::BigMenu(CT_AUTOSIZE, &MARGIN_MENU)]),
-    Group("Containerformatvorlagen", 0, &[Col::Gallery(CT_STYLES, 5, 0xFF2E7D32), Col::BigMenu(CT_HEADING, &MARGIN_MENU)]),
+    Group("Größe", 0, &[Col::BigMenu(CT_MARGINS, &MARGIN_MENU), Col::Big(CT_FIT), Col::BigMenu(CT_AUTOSIZE, &CT_AUTOSIZE_MENU)]),
+    Group("Containerformatvorlagen", 0, &[Col::BigMenu(CT_STYLES, &CT_STYLE_MENU), Col::BigMenu(CT_HEADING, &CT_HEADING_MENU)]),
     Group("Mitgliedschaft", 0, &[Col::Big(CT_LOCK), Col::Big(CT_SELECT), Col::Big(CT_DISBAND)]),
 ];
 
@@ -227,8 +240,16 @@ const SIZE_W: i32 = 56; // the size box
 const ICON_W: i32 = 28; // a small button showing its icon only
 const TILE_W: i32 = 56;
 
+// i18n
+static CFF: [Group; 3] = [
+    Group("Einfügen", 0, &[Col::Big(CFF_LANE), Col::Big(CFF_SEPARATOR)]),
+    Group("Anordnen", 0, &[Col::Small(&[Sm::Menu(CFF_ORIENTATION, &CFF_ORIENT_MENU)])]),
+    Group("Entwurf", 0, &[Col::Small(&[Sm::Check(CFF_TITLE), Sm::Check(CFF_SEPARATORS), Sm::Check(CFF_ROTATE)])]),
+];
+
 fn groups(reg: Reg) -> &'static [Group] {
     match reg {
+        Reg::Cff => &CFF,
         Reg::Insert => &INSERT,
         Reg::Design => &DESIGN,
         Reg::View => &VIEW,

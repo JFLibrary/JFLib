@@ -136,7 +136,7 @@ fn lookup<'a>(table: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String
     move |name: &str| table.iter().find(|(n, _)| *n == name).map(|(_, t)| String::from(*t))
 }
 
-fn build_set(table: &[(&str, &str)], m: Measure) -> Result<(Built, Vec<u8>), SourceError> {
+pub(crate) fn build_set(table: &[(&str, &str)], m: Measure) -> Result<(Built, Vec<u8>), SourceError> {
     let f = lookup(table);
     stencil::build_vssx(&f, m)
 }
@@ -221,7 +221,7 @@ fn icon_check(b: &[u8]) -> Result<(u32, bool), String> {
     Ok((opaque, corners))
 }
 
-fn read_back(h: &mut H, name: &str, bytes: &[u8]) -> Option<Document> {
+pub(crate) fn read_back(h: &mut H, name: &str, bytes: &[u8]) -> Option<Document> {
     let l1 = match vsdx::read(bytes, &Limits::VSDX) {
         Ok(l) => l,
         Err(e) => {
@@ -243,7 +243,7 @@ fn read_back(h: &mut H, name: &str, bytes: &[u8]) -> Option<Document> {
     Some(l1.doc)
 }
 
-fn sym_text(doc: &Document, v: Value) -> String {
+pub(crate) fn sym_text(doc: &Document, v: Value) -> String {
     match v {
         Value::Text(t) => String::from(doc.str(t)),
         Value::Num(x) => format!("{x}"),
@@ -251,12 +251,12 @@ fn sym_text(doc: &Document, v: Value) -> String {
     }
 }
 
-fn master_shape(doc: &Document, m: MasterRef) -> Option<SheetRef> {
+pub(crate) fn master_shape(doc: &Document, m: MasterRef) -> Option<SheetRef> {
     let ms = doc.master(m)?.master_shape()?;
     Some(SheetRef::Shape(diagram_core::ShapeRef { owner: Owner::Master(m), slot: ms }))
 }
 
-fn cell(doc: &Document, sheet: SheetRef, sec: Option<(&str, u32)>, row: Option<RowKey>, name: &str) -> Option<diagram_core::Cell> {
+pub(crate) fn cell(doc: &Document, sheet: SheetRef, sec: Option<(&str, u32)>, row: Option<RowKey>, name: &str) -> Option<diagram_core::Cell> {
     let c = doc.sym(name)?;
     let addr = match (sec, row) {
         (None, _) => CellAddr::single(c),
@@ -269,7 +269,7 @@ fn cell(doc: &Document, sheet: SheetRef, sec: Option<(&str, u32)>, row: Option<R
     }
 }
 
-fn named(doc: &Document, n: &str) -> Option<RowKey> {
+pub(crate) fn named(doc: &Document, n: &str) -> Option<RowKey> {
     doc.sym(n).map(RowKey::Named)
 }
 
