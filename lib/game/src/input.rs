@@ -67,6 +67,11 @@ use alloc::vec::Vec;
 
 use base::Ini;
 use plat::{Gamepad, PAD_AXES, PAD_BUTTONS, PAD_MAX, PadStyle, PointerLock};
+// the portable x^y, the same bits on every target (in the browser rt's x87 module is that code)
+#[cfg(not(target_arch = "wasm32"))]
+use rt::portable::math::pow;
+#[cfg(target_arch = "wasm32")]
+use rt::x87::pow;
 
 /// the left mouse button (plat::BTN_LEFT, ui::BTN_LEFT)
 pub const MOUSE_LEFT: u8 = 1;
@@ -703,7 +708,7 @@ impl PadSettings {
         } else if c == 2.0 {
             m
         } else {
-            rt::portable::math::pow(m, c - 1.0)
+            pow(m, c - 1.0)
         };
         let rate = TURN_RATE * self.sensitivity * (core::f64::consts::PI / 180.0);
         let k = f * rate;

@@ -324,7 +324,8 @@ Abgleich).
 | macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | 901 von 901 | `input`, `tick`, `shot` bestanden (das Bild über Metal) | Apple M2, Voll und Basis |
 
 Die Zahlen sind die von G7b Teil 1. Seit G7a Teil 2 hat die Gruppe `input` 190 Prüfungen (84 für die Pads); sie bestehen auf
-Windows (Rust 1.100), Linux in WSL und macOS (M2), die Skripte `input.uis` und `tick.uis` ebenso, die Prüfsumme ist unverändert.
+Windows (Rust 1.100), Linux in WSL, macOS (M2) und als WebAssembly in Node (`tests/web.mjs`), die Skripte `input.uis` und
+`tick.uis` ebenso, die Prüfsumme ist überall unverändert.
 
 Die Zahlen der Prüfungen zählen Fälle grob: eine Schleife über 200 000 Schritte ist eine Prüfung „0 Antworten anders“. Gemessen
 im Entwicklungs-Build (Ryzen 5 3600 / M2): eine Million Entitäten mit Komponenten anlegen 211 / 54 ms, Summe und Verbund 11 /
