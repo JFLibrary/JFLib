@@ -229,7 +229,10 @@ pub fn t_window(t: &mut T) {
     win_test(WT_SEND, 0, [TS_KEY, 0, 'a' as i32, 0]); // kVK_ANSI_A
     win_test(WT_SEND, 0, [TS_TEXT, 0x1F600, 0, 0]);
     let got = drain();
-    let want = [(E_MOVE, 0, 0, 10, 40, 0), (E_DOWN, BTN_LEFT, 0, 12, 42, 0), (E_UP, BTN_LEFT, 0, 14, 44, 0), (E_KEY_DOWN, 0, 0, 0, 0, 0x41),
+    // the key's x: where it sits (G7a, kVK_ANSI_A -> the USB HID usage of A); its y: the location and
+    // the character without modifiers (E2, charge 12)
+    let key = (E_KEY_DOWN, 0, 0, KC_A as i32, key_y(KL_STANDARD, 'a' as u32, false), 0x41);
+    let want = [(E_MOVE, 0, 0, 10, 40, 0), (E_DOWN, BTN_LEFT, 0, 12, 42, 0), (E_UP, BTN_LEFT, 0, 14, 44, 0), key,
                 (E_TEXT, 0, 0, 0, 0, 'a' as u32), (E_TEXT, 0, 0, 0, 0, 0x1F600)];
     t.check(got == want, "input: move, button, key (VK, the input system's text), a character beyond the BMP -> events");
     if got != want {
