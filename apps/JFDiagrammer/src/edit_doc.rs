@@ -33,7 +33,7 @@ use diagram_io::vsdx::{self, Format, Measure, WriteOptions};
 use ui::i18n::{t, tf};
 use ui::*;
 
-use crate::viewer::{Opened, PageTab};
+use crate::viewer::Opened;
 use crate::Diagrammer;
 
 /// one undo step: a committed transaction
@@ -74,6 +74,9 @@ pub(crate) struct EditState {
     pub rebuild: bool,
     /// (JD11) Design auf neue Shapes anwenden: off, shapes an edit adds get no design
     pub theme_new_shapes: bool,
+    /// (JD8 rest: pages) pages the last gesture grew or shrank (Automatisch anpassen) and how far
+    /// their drawing moved in world units (pages::sync moves the view along)
+    pub grown: Vec<(diagram_core::PageRef, [f32; 2])>,
 }
 
 impl EditState {
@@ -91,6 +94,7 @@ impl EditState {
             changed: Vec::new(),
             rebuild: false,
             theme_new_shapes: true,
+            grown: Vec::new(),
         }
     }
 
@@ -110,6 +114,12 @@ pub(crate) fn edit<T>(o: &mut Opened, label: &str, done: bool, f: impl FnOnce(&m
     let r = f(&mut tx, &mut ed.eng).and_then(|v| {
         if !ed.theme_new_shapes {
             crate::design_gallery::unthemed_new(&mut tx, &mut ed.eng, &before)?;
+        }
+        // (JD8 rest: pages) Automatisch anpassen: the pages a finished gesture changed grow or
+        // shrink in tiles of their printed sheet, in the same undo step
+        if done {
+            let grown = crate::page_size::after_gesture(&mut tx, &mut ed.eng)?;
+            ed.grown.extend(grown);
         }
         Ok(v)
     });
@@ -212,17 +222,8 @@ pub(crate) fn new_drawing(app: &mut Diagrammer, ui: &mut Ui, us: bool) {
 
 /// make `doc` the open drawing (opened from a file, or new)
 pub(crate) fn install(app: &mut Diagrammer, ui: &mut Ui, doc: Document, name: String, path: Option<String>, format: Format, notice: Option<(String, String)>) {
-    let mut tabs: Vec<PageTab> = Vec::new();
-    for bg in [false, true] {
-        for p in doc.pages() {
-            let Some(pg) = doc.page(p) else { continue };
-            if pg.header.background != bg {
-                continue;
-            }
-            let n = pg.header.name.or(pg.header.name_u).map(|s| String::from(doc.str(s))).unwrap_or_else(|| tf("Seite-{}", &[&format!("{}", tabs.len() + 1)]));
-            tabs.push(PageTab { page: p, name: n });
-        }
-    }
+    // (JD8 rest: pages) foreground pages first, then the background pages
+    let tabs = crate::pages::tabs_of(&doc);
     let serial = app.opened.as_ref().map_or(1, |o| o.serial.wrapping_add(1));
     let metrics = Some(crate::viewer::metrics(app));
     let ed = EditState::new(path, format, metrics);

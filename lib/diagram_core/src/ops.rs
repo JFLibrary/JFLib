@@ -6,6 +6,8 @@
 //   bounds(doc, shapes)                 the box of a selection on the page
 //   locks(eng, doc, shape) -> Locks     the protection cells that are set (Locks::MOVE_X ...)
 //   move_shapes(tx, eng, shapes, d)     2D: the pin; 1D: BeginX/Y, EndX/Y of the free ends
+//   shift_all(tx, eng, owner, d)        every top-level shape, locks or not (the page's origin
+//                                       moves: pagesetup::grow, fit_to_drawing)
 //   set_frame(tx, eng, shape, &frame)   size and place, same turn (the eight grips)
 //   scale_shapes(tx, eng, shapes, from, to)   a selection from one box into another
 //   rotate_shapes(tx, eng, shapes, centre, angle) / flip_shapes(tx, eng, shapes, horizontal)
@@ -496,6 +498,18 @@ fn pt_sets(x: Sym, y: Sym, p: [f64; 2], doc: &Document, sheet: SheetRef) -> [(Ce
 /// glue::update); a shape inside another one of the list moves with it; LockMoveX/LockMoveY
 /// keep that part of the move away
 pub fn move_shapes(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], d: [f64; 2]) -> Result<(), EditError> {
+    move_by(tx, eng, shapes, d, true)
+}
+
+/// move every top-level shape of a page or master by `d`, whatever their locks say: the page's
+/// origin moves under the drawing (a page that grows to the left or down, a page fitted to
+/// its drawing; pagesetup.rs).  Free 1D ends move, glued ones follow their formulas
+pub fn shift_all(tx: &mut Transaction, eng: &mut Engine, owner: Owner, d: [f64; 2]) -> Result<(), EditError> {
+    let tops: Vec<ShapeRef> = tx.doc().top_shapes(owner).collect();
+    move_by(tx, eng, &tops, d, false)
+}
+
+fn move_by(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], d: [f64; 2], obey_locks: bool) -> Result<(), EditError> {
     let list = outermost(tx.doc(), shapes);
     let mut w = Writer::new();
     for s in list {
@@ -503,10 +517,10 @@ pub fn move_shapes(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], 
         let sets = {
             let doc = tx.doc();
             let mut dp = d;
-            if locked(eng, doc, s, "LockMoveX") {
+            if obey_locks && locked(eng, doc, s, "LockMoveX") {
                 dp[0] = 0.0;
             }
-            if locked(eng, doc, s, "LockMoveY") {
+            if obey_locks && locked(eng, doc, s, "LockMoveY") {
                 dp[1] = 0.0;
             }
             if dp == [0.0, 0.0] {

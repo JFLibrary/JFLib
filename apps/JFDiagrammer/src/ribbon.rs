@@ -148,7 +148,11 @@ static CT_AUTOSIZE_MENU: [It; 3] = [C(CT_RESIZE_0), C(CT_RESIZE_1), C(CT_RESIZE_
 static CFF_ORIENT_MENU: [It; 2] = [C(CFF_HORIZONTAL), C(CFF_VERTICAL)];
 static TEXTBOX_MENU: [It; 2] = [C(TEXT_BOX_H), C(TEXT_BOX_V)];
 static ORIENT_MENU: [It; 2] = [C(PORTRAIT), C(LANDSCAPE)];
-static SIZE_MENU: [It; 3] = [C(FIT_DRAWING), Sep, C(MORE_SIZES)];
+// (JD8 rest: pages) the paper sizes with their measures (page_size.rs)
+static SIZE_MENU: [It; 12] = [
+    C(SIZE_LETTER), C(SIZE_LEGAL), C(SIZE_TABLOID), C(SIZE_EXECUTIVE), C(SIZE_A5), C(SIZE_A4), C(SIZE_A3), C(SIZE_B5), C(SIZE_B4),
+    Sep, C(FIT_DRAWING), C(MORE_SIZES),
+];
 // (JD11) the variants' own menus (TH-05: new colours, effects, connectors, fonts, embellishment) are P2
 static THEME_MENU: [It; 0] = [];
 static CONN_MENU: [It; 8] = [C(CONN_RIGHT_ANGLE), C(CONN_STRAIGHT), C(CONN_CURVED), Sep, C(LINE_JUMPS), C(REROUTE), Sep, C(CONNECT_SHAPES)];
@@ -579,7 +583,9 @@ fn rows(app: &mut Diagrammer, ui: &mut Ui, items: &[It]) {
                     ui.next_icon(ic);
                 }
                 ui.next_flags(cflags(app, *id));
-                if ui.menu_item_keys(*id, commands::label(*id), &shortcut(ui, *id)) & EV_ACT != 0 {
+                // (JD8 rest: pages) a paper size shows its measures where shortcuts stand
+                let keys = crate::page_size::size_note(*id).unwrap_or_else(|| shortcut(ui, *id));
+                if ui.menu_item_keys(*id, commands::label(*id), &keys) & EV_ACT != 0 {
                     ui.cmd_run(*id, 0);
                 }
             }

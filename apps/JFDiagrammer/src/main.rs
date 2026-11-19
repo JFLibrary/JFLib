@@ -54,6 +54,10 @@
 //   src/qat.rs        (JD8 rest) the quick access toolbar and its customization
 //   src/cmds_shell.rs (JD8 rest) menu buttons' commands open their menus; Schrift, Linie,
 //                     Schnellformatvorlagen, the dialog Zoom
+//   src/pages.rs      (JD8 rest) the page tabs kept in step with the pages, Neue Seite,
+//                     Hintergrundseite, duplicate, delete, rename, reorder (dialogs)
+//   src/page_size.rs  (JD8 rest) Entwurf › Ausrichtung, Größe, Automatisch anpassen, the
+//                     automatic size after a gesture (diagram_core::pagesetup)
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too)
@@ -112,6 +116,8 @@ mod options;
 mod pane_data;
 mod pane_panzoom;
 mod pane_sizepos;
+mod page_size;
+mod pages;
 mod panes;
 mod print_layout;
 mod print_ui;
@@ -230,6 +236,8 @@ pub(crate) struct Diagrammer {
     pub panzoom: pane_panzoom::PanZoom,
     /// (JD8 rest) the quick access toolbar's dialog
     pub qat: qat::QatState,
+    /// (JD8 rest) the dialogs Seite umbenennen, Seiten neu anordnen
+    pub pages: pages::PagesState,
 }
 
 impl Diagrammer {
@@ -284,6 +292,7 @@ impl Diagrammer {
             data: pane_data::DataState::default(),
             panzoom: pane_panzoom::PanZoom::default(),
             qat: qat::QatState::default(),
+            pages: pages::PagesState::default(),
         }
     }
 
@@ -417,6 +426,8 @@ impl App for Diagrammer {
         if let Some((key, ch, fresh)) = self.text_req.take() {
             edit_text::begin_with(self, ui, key, ch, fresh);
         }
+        // (JD8 rest) the page tabs follow the pages (also after undo and redo)
+        pages::sync(self);
         commands::states(self, ui);
         stencils_panel::states(self, ui);
         shell::frame(self, ui);
@@ -429,6 +440,7 @@ impl App for Diagrammer {
         cmds_shell::zoom_dialog(self, ui);
         pane_data::define_dialog(self, ui);
         qat::dialog(self, ui);
+        pages::dialogs(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
