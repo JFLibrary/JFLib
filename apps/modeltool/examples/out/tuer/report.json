@@ -66,5 +66,5 @@
   "imports": [],
   "files": {"report": "report.json", "glb": "model.glb", "sheet": "sheet.png", "front": "front.png", "side": "side.png", "top": "top.png", "iso": "iso.png"},
   "views": {"images": true, "size": 512, "grid_on": true, "grid": 0.5, "sheet": "front | side over top | iso", "cameras": "front: from +Z; side: from +X; top: from +Y, front at the bottom; the three at one scale; iso: from front right above", "adapter": "NVIDIA GeForce RTX 2070 SUPER"},
-  "timing": {"script_ms": 0.545, "geometry_ms": 0.587, "checks_ms": 0.675, "render_ms": 281.015, "export_ms": 0.225, "total_ms": 320.276, "fuel": 499}
+  "timing": {"script_ms": 0.671, "geometry_ms": 0.82, "checks_ms": 0.755, "render_ms": 8223.382, "export_ms": 0.272, "total_ms": 8256.129, "fuel": 499}
 }

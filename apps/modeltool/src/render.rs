@@ -2,10 +2,11 @@
 // (from +X, looking along -X: the right side), top (from +Y, the front at the bottom of the picture), the three
 // at one scale like the views of a drawing, and a three-quarter view (from front right above), each with a grid
 // behind the model whose spacing the report names; and the four as one sheet (front | side over top |
-// three-quarter).  render3d has only perspective
-// cameras and no anti-aliasing: the three plan views use a narrow field of view from far away (4 degrees, the
-// far side of a model looks at most a few per cent smaller), and every picture is drawn at twice the size
-// and averaged down.  Pictures are not part of any checksum: GPUs differ in the last bit.
+// three-quarter).  The three plan views are orthographic (render3d's Camera::ortho, G7f) with outlines from the depth
+// buffer (render3d's Outline): faces of one colour that lie parallel at different depths, which a plan view shows as
+// one area, get a line where their depth jumps (creases only from a slope change of 3, so the grid's thin slabs stay
+// without); the three-quarter view stays perspective.  Every picture is drawn at twice the size and averaged down
+// (render3d has no MSAA).  Pictures are not part of any checksum: GPUs differ in the last bit.
 
 use alloc::format;
 use alloc::string::String;
@@ -14,7 +15,7 @@ use alloc::vec::Vec;
 
 use geom::{Mesh, Vec3};
 use gpu::*;
-use render3d::{Camera, Instance, Material, MaterialId, MeshData, MeshId, Renderer, RendererDesc, Scene, Sun, Transform};
+use render3d::{Camera, Instance, Material, MaterialId, MeshData, MeshId, Outline, Renderer, RendererDesc, Scene, Sun, Transform};
 
 use crate::export::srgb_to_linear;
 use crate::host::Model;
@@ -25,8 +26,13 @@ const SUPER: u32 = 2;
 /// the background, linear rgb (an sRGB target would encode it; Rgba8Unorm takes it as it is)
 const CLEAR: [f32; 4] = [0.78, 0.81, 0.86, 1.0];
 
-/// the field of view of the plan views in degrees
-const PLAN_FOV: f64 = 4.0;
+/// the plan views' lines: a pixel of the picture wide (two of the picture drawn at twice the size), dark, on depth jumps
+/// and on creases from a slope change of 3
+fn plan_outline() -> Outline {
+    let mut o = Outline::new(SUPER, [0.03, 0.035, 0.05, 1.0]);
+    o.crease = 3.0;
+    o
+}
 
 /// the field of view of the three-quarter view
 const ISO_FOV: f64 = 20.0;
@@ -242,7 +248,7 @@ fn draw(dev: &Device, model: &Model, size: u32, no_grid: bool) -> Result<(Vec<(&
             scene.add(Instance { mesh: m, material: mat, transform: Transform::at([0.0; 3]) })?;
         }
         let gap = diag * 0.02;
-        let (eye, fov, grid_parts) = if vname == "iso" {
+        let (eye, ortho, grid_parts) = if vname == "iso" {
             let (sa, ca) = geom::math::sin_cos_deg(35.0);
             let (se, ce) = geom::math::sin_cos_deg(28.0);
             let d = Vec3::new(sa * ce, se, ca * ce);
@@ -251,22 +257,21 @@ fn draw(dev: &Device, model: &Model, size: u32, no_grid: bool) -> Result<(Vec<(&
             // the ground under the model
             let ground = b.min.y.min(0.0) - gap;
             let gp = grid(Vec3::new(c.x, 0.0, c.z), Vec3::X, -Vec3::Z, Vec3::Y, ground, diag * 6.0, step, diag / (px as f64) * 2.5);
-            (c + d * dist, ISO_FOV, gp)
+            (c + d * dist, None, gp)
         } else {
             // u right, v up on the screen, n towards the camera
             let n = d;
             let u = n.cross(up) * -1.0;
             let v = up;
-            // one scale for the three plan views: the largest extent of the model
+            // one scale for the three plan views: the largest extent of the model, orthographic (2 half high)
             let half = s.x.max(s.y).max(s.z).max(1e-3) * 0.5 * 1.15;
-            let dist = half / geom::math::sin_cos_deg(PLAN_FOV * 0.5).0 * geom::math::sin_cos_deg(PLAN_FOV * 0.5).1;
-            // the plate behind the model (the far side along n), larger than what the camera sees there
+            // the plate behind the model (the far side along n), larger than the view
             let back = b.min.dot(n).min(b.max.dot(n)) - gap;
             let back = if vname == "top" { back.min(-gap) } else { back };
-            let reach = half * (dist + c.dot(n) - back) / dist * 1.6;
-            let line = 2.0 * reach / 1.6 / px as f64 * 2.5;
+            let reach = half * 1.6;
+            let line = 2.0 * half / px as f64 * 2.5;
             let gp = grid(c, u, v, n, back, reach, step, line);
-            (c + n * (dist + diag * 0.5), PLAN_FOV, gp)
+            (c + n * diag, Some(2.0 * half), gp)
         };
         if !no_grid {
             for (m, mat) in [(&grid_parts.0, plate_mat), (&grid_parts.1, line_mat), (&grid_parts.2, axis_mat)] {
@@ -276,8 +281,17 @@ fn draw(dev: &Device, model: &Model, size: u32, no_grid: bool) -> Result<(Vec<(&
             }
         }
         let dist = (eye - c).length();
-        let near = (dist - diag * 2.0).max(dist * 1e-3);
-        let cam = Camera::look_at(eye.into(), c.into(), up.into(), fov * core::f64::consts::PI / 180.0, 1.0, near, f64::INFINITY);
+        let cam = match ortho {
+            // (from the eye's plane, a diagonal before the model's middle, to beyond the plate behind it)
+            Some(h) => {
+                scene.set_outline(Some(&plan_outline()))?;
+                Camera::ortho_at(eye.into(), c.into(), up.into(), h, 1.0, 0.0, dist + diag * 2.0 + gap * 4.0)
+            }
+            None => {
+                let near = (dist - diag * 2.0).max(dist * 1e-3);
+                Camera::look_at(eye.into(), c.into(), up.into(), ISO_FOV * core::f64::consts::PI / 180.0, 1.0, near, f64::INFINITY)
+            }
+        };
         scene.set_camera(&cam);
         scene.set_sun(&sun);
         let big = off.shot(&mut r, &mut scene)?;
