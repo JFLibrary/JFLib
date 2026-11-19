@@ -149,7 +149,8 @@ impl Game1 {
             None
         };
         let play = if how == ID_PRACTICE {
-            Ok(Play::practice(&name, PRACTICE_BOTS, self.map.clone(), plat::random_u64()))
+            // (the bots' randomness from the clock: plat has no system random numbers in the browser)
+            Ok(Play::practice(&name, PRACTICE_BOTS, self.map.clone(), plat::time_us().wrapping_mul(0x9e37_79b9_7f4a_7c15)))
         } else {
             match endpoint(&self.server) {
                 Ok(ep) => Play::online(ep, &name, room, self.map.clone()),

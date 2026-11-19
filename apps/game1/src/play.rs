@@ -140,6 +140,7 @@ pub struct Play {
     rem: Vec<Remote>,
     shots: BTreeMap<u16, u8>,
     deaths: BTreeMap<u16, i32>,
+    healths: BTreeMap<u16, i32>,
     phases: BTreeMap<u16, (f64, Vec3)>,
     last_hits: Option<(u8, u8, i32)>,
     last_health: i32,
@@ -186,6 +187,7 @@ impl Play {
             rem: Vec::new(),
             shots: BTreeMap::new(),
             deaths: BTreeMap::new(),
+            healths: BTreeMap::new(),
             phases: BTreeMap::new(),
             last_hits: None,
             last_health: HEALTH,
@@ -333,6 +335,12 @@ impl Play {
                 self.push_feed(killer, r.id, head, own_id);
             }
             self.deaths.insert(r.id, deaths);
+            // a hit: the health went down
+            let health = near.fields[F_HEALTH];
+            if self.healths.get(&r.id).is_some_and(|h| health < *h) && health > 0 {
+                self.fx.push(Fx::Hit { at: feet + Vec3::new(0.0, if pose.crouched { 0.7 } else { 1.1 }, 0.0) });
+            }
+            self.healths.insert(r.id, health);
             if flags & F_DEAD == 0 {
                 figures.push((r.id, pose));
             }

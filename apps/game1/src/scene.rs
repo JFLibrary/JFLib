@@ -54,6 +54,8 @@ pub enum Fx {
     Tracer { from: Vec3, to: Vec3 },
     /// a shot ended on the map: sparks and dust along the surface's normal
     Impact { at: Vec3, normal: Vec3 },
+    /// a figure was hit: sparks at its chest
+    Hit { at: Vec3 },
     /// a figure was ended: a puff in its colour
     Poof { at: Vec3, color: [f32; 3] },
 }
@@ -130,7 +132,7 @@ impl View {
     pub fn new(map: Arc<Map>) -> View {
         let figure = ModelData::decode(look::FIGURE).unwrap_or_default();
         let (anchor, muzzle) = look::weapon_points(&figure);
-        View { frame: Frame::default(), fx: Vec::new(), map, figure, anchor, muzzle, stats: DrawStats::default(), sky: [0.56, 0.77, 0.95, 1.0], gpu: None }
+        View { frame: Frame::default(), fx: Vec::new(), map, figure, anchor, muzzle, stats: DrawStats::default(), sky: [0.19, 0.40, 0.62, 1.0], gpu: None }
     }
 
     /// the renderer and scene, to measure
@@ -238,6 +240,7 @@ impl View {
                     g.s.emit(g.em.sparks, v(at), v(normal), 8)?;
                     g.s.emit(g.em.dust, v(at), v(normal), 5)?;
                 }
+                Fx::Hit { at } => g.s.emit(g.em.sparks, v(at), [0.0, 1.0, 0.0], 14)?,
                 Fx::Poof { at, color } => {
                     g.em.poof_e.color = [[color[0], color[1], color[2], 0.9], [color[0] * 0.6, color[1] * 0.6, color[2] * 0.6, 0.0]];
                     g.s.set_emitter(g.em.poof, &g.em.poof_e)?;
