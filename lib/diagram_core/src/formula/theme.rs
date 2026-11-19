@@ -88,6 +88,14 @@ impl Theme {
         th
     }
 
+    /// the scheme numbers of its components: the theme (vt:themeScheme), the colours, the
+    /// format scheme (vt:fmtSchemeEx), the connector scheme, the fonts -- in the order of the
+    /// cells ThemeIndex, ColorSchemeIndex, EffectSchemeIndex, ConnectorSchemeIndex,
+    /// FontSchemeIndex
+    pub fn scheme_ids(&self) -> [Option<u32>; 5] {
+        [self.theme_id, self.clr_id, self.fmt_id, self.conn_id, self.font_id]
+    }
+
     fn ext_list(&self, name: &str) -> Vec<u32> {
         let t = &self.tree;
         match self.ext.and_then(|e| t.find(e, name)) {
@@ -103,6 +111,10 @@ impl Theme {
 pub(crate) struct Themes {
     parsed: Vec<Option<Rc<Theme>>>,
     done: bool,
+    // the parts parsed (to see a change of Document::themes: a design applied, undone), and
+    // whether this run compared them already
+    src: Vec<Vec<u8>>,
+    checked: bool,
     sheets: alloc::collections::BTreeMap<SheetRef, (Rc<Ctx>, Vec<super::engine::NodeKey>)>,
 }
 
@@ -116,13 +128,23 @@ impl Themes {
     /// forget the sheets' contexts (a new calculation)
     pub(crate) fn new_run(&mut self) {
         self.sheets.clear();
+        self.checked = false;
     }
 }
 
 impl Themes {
     fn all(&mut self, doc: &Document) -> Vec<Rc<Theme>> {
+        if self.done && !self.checked {
+            let same = self.src.len() == doc.themes.len() && self.src.iter().zip(&doc.themes).all(|(a, t)| *a == t.data);
+            if !same {
+                self.done = false;
+                self.sheets.clear();
+            }
+        }
+        self.checked = true;
         if !self.done {
             self.parsed = doc.themes.iter().map(|t| Some(Rc::new(Theme::parse(&t.data)))).collect();
+            self.src = doc.themes.iter().map(|t| t.data.clone()).collect();
             self.done = true;
         }
         self.parsed.iter().flatten().cloned().collect()

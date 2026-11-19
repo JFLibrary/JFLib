@@ -50,6 +50,7 @@
 extern crate alloc;
 
 mod cell;
+pub mod design;
 mod document;
 mod edit;
 pub mod formula;

@@ -11,25 +11,32 @@
 // unused, but desktop Visio refuses a file without it (error 271, found with the user's Visio
 // on 2026-11-17); an empty Windows element with the client size is enough (windows_xml).
 //
-// The styles (IDs as Visio's own documents number them, universal names as Visio knows them,
-// so that formulas and Visio's connector detection find them):
+// The styles (universal names as Visio knows them, so that formulas and Visio's connector
+// detection find them):
 //   0 No Style   the root: every line, fill, text block, character and paragraph cell with a
-//                plain value (anthracite 0.75 pt line, white fill, Inter 10 pt, centred text)
-//   1 Normal     based on No Style: the NetLab shape look (Signalblau 1 pt line, light blue fill)
-//   2 Connector  based on Normal: grey 1 pt line, no fill, white text background
+//                plain value -- the NetLab look without a design (Signalblau 1 pt line, light
+//                blue fill, anthracite Inter 10 pt, centred text); themed cells fall back to it
+//   5 Theme      based on No Style (JD11): every cell a design sets is THEMEVAL() (V "Themed"),
+//                the QuickStyle cells 100 (the variant's colour 1 and style 1), the theme index
+//                cells 65534 (the page's design)
+//   1 Normal     based on Theme: what shapes use
+//   2 Connector  based on Normal: the connector scheme's style 1 (line with its arrow, text),
+//                no fill, the background colour behind the text
 //   3 Guide      based on No Style: thin light blue dashed line, no fill
-//   4 Text Only  based on Normal: no line, no fill
+//   4 Text Only  based on Normal: no line, no fill, the dark text of font style 1, with
+//                Visio's contrast rule for text (QuickStyleVariation 2)
 // DocumentSettings name Normal as the default text, line and fill style and Guide as the
-// default guide style.  The page is A4 (metric, millimetres) or Letter (US, inches), landscape.
+// default guide style.  The page is A4 (metric, millimetres) or Letter (US, inches), landscape,
+// and shows the design NetLab, variant 1 (design::catalog).
 
 use alloc::vec::Vec;
 
+use diagram_core::design::{self, catalog::NETLAB};
 use diagram_core::{
     Cell, ColorEntry, DocKind, DocSettings, Document, FaceName, Formula, Page, PageHeader, Part, Row, RowKey, SecKey, Section,
     Sheet, Style, StyleHeader, StyleRefs, Theme, Unit, Value,
 };
 
-use crate::theme;
 use crate::vsdx::CT_WINDOWS;
 use crate::xml::{NS_REL, NS_VISIO};
 
@@ -62,7 +69,6 @@ const COLORS: [&str; 24] = [
 
 // the NetLab colours the styles use (styles/netlab: palette.rs, lib.rs)
 const ANTHRACITE: &str = "#1D2228"; // text primary
-const SLATE: &str = "#4D5560"; // text secondary
 const SIGNALBLAU: &str = "#1F5FA8"; // the accent
 const SIGNALBLAU_LIGHT: &str = "#6FA3E0"; // the accent of the dark theme
 const INFO_BG: &str = "#E6EFF8"; // the info background
@@ -145,8 +151,8 @@ fn no_style(doc: &mut Document) -> Style {
             ("EnableTextProps", num(1.0)),
             ("HideForApply", num(0.0)),
             // line
-            ("LineWeight", pt(0.75)),
-            ("LineColor", V::T(ANTHRACITE)),
+            ("LineWeight", pt(1.0)),
+            ("LineColor", V::T(SIGNALBLAU)),
             ("LinePattern", num(1.0)),
             ("Rounding", V::N(0.0, Some(Unit::DrawingLength))),
             ("EndArrowSize", num(2.0)),
@@ -157,8 +163,8 @@ fn no_style(doc: &mut Document) -> Style {
             ("LineColorTrans", V::N(0.0, Some(Unit::Percent))),
             ("CompoundType", num(0.0)),
             // fill
-            ("FillForegnd", V::T(WHITE)),
-            ("FillBkgnd", V::T(WHITE)),
+            ("FillForegnd", V::T(INFO_BG)),
+            ("FillBkgnd", V::T(INFO_BG)),
             ("FillPattern", num(1.0)),
             ("ShdwForegnd", V::T(ANTHRACITE)),
             ("ShdwPattern", num(0.0)),
@@ -224,14 +230,60 @@ fn no_style(doc: &mut Document) -> Style {
     style(doc, 0, "No Style", None, sh)
 }
 
+// the cells a design sets: THEMEVAL(), stored as "Themed"
+const THEMED: [&str; 22] = [
+    "LineWeight", "LineColor", "LinePattern", "Rounding", "LineCap", "LineColorTrans", "CompoundType", "FillForegnd", "FillBkgnd",
+    "FillPattern", "ShdwForegnd", "ShdwPattern", "FillForegndTrans", "FillBkgndTrans", "ShdwForegndTrans", "ShapeShdwType",
+    "ShapeShdwOffsetX", "ShapeShdwOffsetY", "ShapeShdwObliqueAngle", "ShapeShdwScaleFactor", "ShapeShdwBlur", "FillGradientEnabled",
+];
+
+const QUICK: [&str; 8] = [
+    "QuickStyleLineColor", "QuickStyleFillColor", "QuickStyleShadowColor", "QuickStyleFontColor", "QuickStyleLineMatrix",
+    "QuickStyleFillMatrix", "QuickStyleEffectsMatrix", "QuickStyleFontMatrix",
+];
+
+const INDEXES: [&str; 8] = [
+    "ColorSchemeIndex", "EffectSchemeIndex", "ConnectorSchemeIndex", "FontSchemeIndex", "ThemeIndex", "VariationColorIndex",
+    "VariationStyleIndex", "EmbellishmentIndex",
+];
+
+fn themed() -> V {
+    V::F("Themed", "THEMEVAL()")
+}
+
+// 5 Theme (see the module comment)
+fn theme_style(doc: &mut Document) -> Style {
+    let mut list: Vec<(&str, V)> = THEMED.iter().map(|n| (*n, themed())).collect();
+    list.extend(QUICK.iter().map(|n| (*n, num(100.0))));
+    list.push(("QuickStyleType", num(0.0)));
+    list.push(("QuickStyleVariation", num(0.0)));
+    list.extend(INDEXES.iter().map(|n| (*n, num(65534.0))));
+    let mut sh = Sheet::new();
+    sh.cells = cells(doc, list);
+    let character = one_row(doc, "Character", alloc::vec![("Font", themed()), ("Color", themed()), ("Style", themed())]);
+    sh.sections.push(character);
+    style(doc, 5, "Theme", Some(0), sh)
+}
+
 fn styles(doc: &mut Document) -> Vec<Style> {
     let root = no_style(doc);
-    let mut normal = Sheet::new();
-    normal.cells = cells(doc, alloc::vec![("LineWeight", pt(1.0)), ("LineColor", V::T(SIGNALBLAU)), ("FillForegnd", V::T(INFO_BG)), ("FillBkgnd", V::T(INFO_BG))]);
+    let theme = theme_style(doc);
+    let normal = Sheet::new();
     let mut connector = Sheet::new();
     connector.cells = cells(
         doc,
-        alloc::vec![("LineWeight", pt(1.0)), ("LineColor", V::T(SLATE)), ("FillPattern", num(0.0)), ("TextBkgnd", V::F(WHITE, "RGB(255,255,255)"))],
+        alloc::vec![
+            ("QuickStyleLineMatrix", num(1.0)),
+            ("QuickStyleFillMatrix", num(1.0)),
+            ("QuickStyleEffectsMatrix", num(1.0)),
+            ("QuickStyleFontMatrix", num(1.0)),
+            ("BeginArrow", themed()),
+            ("EndArrow", themed()),
+            ("BeginArrowSize", themed()),
+            ("EndArrowSize", themed()),
+            ("FillPattern", num(0.0)),
+            ("TextBkgnd", V::F(WHITE, "THEMEVAL(\"BackgroundColor\")+1")),
+        ],
     );
     let mut guide = Sheet::new();
     guide.cells = cells(
@@ -239,10 +291,14 @@ fn styles(doc: &mut Document) -> Vec<Style> {
         alloc::vec![("LineWeight", pt(0.0)), ("LineColor", V::T(SIGNALBLAU_LIGHT)), ("LinePattern", num(2.0)), ("FillPattern", num(0.0))],
     );
     let mut text_only = Sheet::new();
-    text_only.cells = cells(doc, alloc::vec![("LinePattern", num(0.0)), ("FillPattern", num(0.0))]);
+    text_only.cells = cells(
+        doc,
+        alloc::vec![("LinePattern", num(0.0)), ("FillPattern", num(0.0)), ("QuickStyleFontMatrix", num(1.0)), ("QuickStyleVariation", num(2.0))],
+    );
     alloc::vec![
         root,
-        style(doc, 1, "Normal", Some(0), normal),
+        theme,
+        style(doc, 1, "Normal", Some(5), normal),
         style(doc, 2, "Connector", Some(1), connector),
         style(doc, 3, "Guide", Some(0), guide),
         style(doc, 4, "Text Only", Some(1), text_only),
@@ -272,6 +328,15 @@ fn page_sheet(doc: &mut Document, measure: Measure) -> Sheet {
             ("PageShapeSplit", num(1.0)),
             ("PrintPageOrientation", num(2.0)),
             ("PaperKind", num(paper)),
+            // the design NetLab, variant 1
+            ("ThemeIndex", num(NETLAB as f64)),
+            ("ColorSchemeIndex", num(NETLAB as f64)),
+            ("EffectSchemeIndex", num(NETLAB as f64)),
+            ("ConnectorSchemeIndex", num(NETLAB as f64)),
+            ("FontSchemeIndex", num(NETLAB as f64)),
+            ("VariationColorIndex", num(0.0)),
+            ("VariationStyleIndex", num(0.0)),
+            ("EmbellishmentIndex", num(0.0)),
         ],
     );
     sh
@@ -314,7 +379,7 @@ pub fn new_document(kind: DocKind, measure: Measure) -> Document {
     let _ = doc.insert_page(page);
     // the theme and the document properties
     let part = doc.intern("/visio/theme/theme1.xml");
-    doc.themes.push(Theme { part, data: theme::netlab() });
+    doc.themes.push(Theme { part, data: design::catalog::netlab().theme_xml() });
     let props: [(&str, &str, &str, Vec<u8>); 2] = [
         (
             "/docProps/core.xml",

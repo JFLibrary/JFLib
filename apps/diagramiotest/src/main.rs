@@ -15,6 +15,8 @@
 //   diagramiotest --write-exports DIR [--corpus DIR]   (JD12) the self-built drawings and the local
 //                                         files as PDF, SVG and PNG (to compare with Visio)
 //   diagramiotest --write-stencils DIR   (JD9) the start set's stencils as .vssx (stencils.rs)
+//   diagramiotest --design-probe DIR     (JD11) the own designs on the sample drawing as PNG, and
+//                                         one .vsdx a design for the Visio counter-check (designs.rs)
 //
 // Groups:
 //   samples   self-built files of all six formats: what lands where in the model (fields,
@@ -55,6 +57,7 @@ use alloc::vec::Vec;
 
 mod build;
 mod corpus;
+mod designs;
 mod drawings;
 mod dump;
 mod edit_view;
@@ -141,6 +144,9 @@ fn run() -> i32 {
     }
     if let Some(dir) = arg(&args, "--write-gegenprobe") {
         return gegenprobe::write(&dir);
+    }
+    if let Some(dir) = arg(&args, "--design-probe") {
+        return designs::probe(&dir);
     }
     if let Some(dir) = arg(&args, "--write-probe") {
         return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());

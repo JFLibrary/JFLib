@@ -42,7 +42,6 @@ pub mod stencil;
 mod stencil_icon;
 mod stencil_src;
 mod stencil_svg;
-mod theme;
 pub mod vsdx;
 mod write;
 mod xml;

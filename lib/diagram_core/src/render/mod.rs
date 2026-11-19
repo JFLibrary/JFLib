@@ -44,6 +44,7 @@ mod rebuild;
 pub mod style;
 mod text;
 mod theme;
+mod themed;
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeSet;
@@ -407,6 +408,8 @@ pub(crate) struct Builder<'d, 'm> {
     /// the top-level shapes built, and what the one being built noted
     tops: Vec<Top>,
     notes: Vec<(Note, u32)>,
+    /// "Themed" values worked out by the formula engine
+    themed: themed::Themed,
 }
 
 impl<'d, 'm> Builder<'d, 'm> {
@@ -432,6 +435,7 @@ impl<'d, 'm> Builder<'d, 'm> {
             shadow: [0.125, -0.125],
             tops: Vec::new(),
             notes: Vec::new(),
+            themed: themed::Themed::default(),
         }
     }
 
@@ -449,7 +453,16 @@ impl<'d, 'm> Builder<'d, 'm> {
     }
 
     fn num_sym(&self, sheet: SheetRef, c: Sym) -> Option<f64> {
-        self.doc.resolve(sheet, &CellAddr::single(c)).num().filter(|v| v.is_finite())
+        self.num_at(sheet, &CellAddr::single(c))
+    }
+
+    /// a number; a "Themed" value is worked out by the engine
+    fn num_at(&self, sheet: SheetRef, a: &CellAddr) -> Option<f64> {
+        match self.doc.resolve(sheet, a).value() {
+            Value::Num(x) => Some(x).filter(|v| v.is_finite()),
+            Value::Text(s) if themed::is_themed(self.doc.str(s)) => self.themed.num(self.doc, sheet, a),
+            _ => None,
+        }
     }
 
     fn num(&self, sheet: SheetRef, name: &str) -> Option<f64> {
@@ -471,7 +484,7 @@ impl<'d, 'm> Builder<'d, 'm> {
     }
 
     fn row_num(&self, sheet: SheetRef, sec: SecKey, key: RowKey, name: &str) -> Option<f64> {
-        self.row_val(sheet, sec, key, name).num().filter(|v| v.is_finite())
+        self.num_at(sheet, &CellAddr::row(sec, key, self.sym(name)?))
     }
 
     fn text_cell(&self, sheet: SheetRef, sec: SecKey, key: RowKey, name: &str) -> Option<String> {
@@ -483,7 +496,17 @@ impl<'d, 'm> Builder<'d, 'm> {
 
     /// whether a single cell's value is "Themed"
     fn themed(&self, sheet: SheetRef, name: &str) -> bool {
-        matches!(self.val(sheet, name), Value::Text(s) if self.doc.str(s).eq_ignore_ascii_case("Themed"))
+        matches!(self.val(sheet, name), Value::Text(s) if themed::is_themed(self.doc.str(s)))
+    }
+
+    /// the engine's value of a "Themed" cell (single, or of a row)
+    fn themed_value(&self, sheet: SheetRef, row: Option<(SecKey, RowKey)>, name: &str) -> Option<themed::Tv> {
+        let c = self.sym(name)?;
+        let a = match row {
+            Some((sec, key)) => CellAddr::row(sec, key, c),
+            None => CellAddr::single(c),
+        };
+        self.themed.get(self.doc, sheet, &a)
     }
 
     /// a colour index: the document's Colors table, else Visio's 24 colours
@@ -504,6 +527,11 @@ impl<'d, 'm> Builder<'d, 'm> {
             Value::Text(s) => {
                 let t = self.doc.str(s);
                 if t.eq_ignore_ascii_case("Themed") {
+                    match self.themed_value(sheet, row, name) {
+                        Some(themed::Tv::Rgb(c)) => return c,
+                        Some(themed::Tv::Index(i)) => return self.palette(i),
+                        _ => {}
+                    }
                     let q = match name {
                         "LineColor" => "QuickStyleLineColor",
                         "FillForegnd" | "FillBkgnd" => "QuickStyleFillColor",
@@ -732,7 +760,7 @@ impl<'d, 'm> Builder<'d, 'm> {
 
     #[allow(clippy::too_many_arguments)]
     fn fill(&mut self, r: ShapeRef, sheet: SheetRef, fill: &Path, m: &Xform, w: f64, h: f64, layer_color: Option<u32>) {
-        let pattern = if self.themed(sheet, "FillPattern") { 1 } else { self.num(sheet, "FillPattern").unwrap_or(1.0) as u32 };
+        let pattern = self.num(sheet, "FillPattern").unwrap_or(1.0) as u32;
         let mut fg = self.color_cell(sheet, None, "FillForegnd", 100, 0xFFFFFF);
         let mut bg = self.color_cell(sheet, None, "FillBkgnd", 100, 0xFFFFFF);
         if let Some(c) = layer_color {
@@ -882,15 +910,17 @@ impl<'d, 'm> Builder<'d, 'm> {
 
     /// LinePattern, LineWeight, LineColor (+Trans), LineCap; None: no line
     fn line_style(&mut self, sheet: SheetRef, layer_color: Option<u32>) -> Option<Stroke> {
-        let pattern = if self.themed(sheet, "LinePattern") { 1 } else { self.num(sheet, "LinePattern").unwrap_or(1.0) as u32 };
+        let pattern = self.num(sheet, "LinePattern").unwrap_or(1.0) as u32;
         if pattern == 0 {
             return None;
         }
-        let weight = if self.themed(sheet, "LineWeight") {
-            let k = self.num(sheet, "QuickStyleLineMatrix").map_or(1, |v| v as usize).max(1);
-            self.theme.as_ref().and_then(|t| t.line_widths.get(k - 1).copied()).unwrap_or(0.75 / 72.0)
-        } else {
-            self.num_sym(sheet, names::LINE_WEIGHT).unwrap_or(0.75 / 72.0).max(0.0)
+        let weight = match self.num_sym(sheet, names::LINE_WEIGHT) {
+            Some(w) => w.max(0.0),
+            None if self.themed(sheet, "LineWeight") => {
+                let k = self.num(sheet, "QuickStyleLineMatrix").map_or(1, |v| v as usize).max(1);
+                self.theme.as_ref().and_then(|t| t.line_widths.get(k - 1).copied()).unwrap_or(0.75 / 72.0)
+            }
+            None => 0.75 / 72.0,
         };
         let mut color = self.color_cell(sheet, None, "LineColor", 100, 0x000000);
         if let Some(c) = layer_color {

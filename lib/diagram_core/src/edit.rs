@@ -55,7 +55,7 @@ use alloc::vec::Vec;
 use core::mem;
 
 use crate::cell::{Cell, CellError, Formula, Value};
-use crate::document::{DocSettings, Document, MasterRef, Owner, PageRef, ShapeRef, SheetRef, StyleRef};
+use crate::document::{DocSettings, Document, MasterRef, Owner, PageRef, ShapeRef, SheetRef, StyleRef, Theme};
 use crate::names::{self, Category};
 use crate::page::{Connect, Master, MasterHeader, Page, PageHeader, Style, StyleHeader};
 use crate::shape::{ForeignData, Node, ShapeData, ShapeHeader, ShapeKind, StyleRefs, Text};
@@ -138,6 +138,7 @@ pub(crate) enum Op {
     ConnectInsert { owner: Owner, pos: u32, connect: Box<Connect> },
     ConnectRemove { owner: Owner, pos: u32 },
     Settings { settings: Box<DocSettings> },
+    Themes { themes: Box<Vec<Theme>> },
 }
 
 fn cells_mut(doc: &mut Document, sheet: SheetRef, scope: Scope) -> Option<&mut Vec<Cell>> {
@@ -365,6 +366,7 @@ impl Op {
                 None => fail!(Op::ConnectRemove { owner, pos }),
             },
             Op::Settings { settings } => Op::Settings { settings: Box::new(mem::replace(&mut doc.settings, *settings)) },
+            Op::Themes { themes } => Op::Themes { themes: Box::new(mem::replace(&mut doc.themes, *themes)) },
         })
     }
 
@@ -413,7 +415,7 @@ impl Op {
             Op::StyleHeader { style, .. } => {
                 out.insert(SheetRef::Style(*style));
             }
-            Op::Settings { .. } => {
+            Op::Settings { .. } | Op::Themes { .. } => {
                 out.insert(SheetRef::Document);
             }
         }
@@ -1591,6 +1593,15 @@ impl<'d> Transaction<'d> {
             return Ok(());
         }
         self.run(Op::Settings { settings: Box::new(s) })
+    }
+
+    /// replace the document's theme parts (JD11: a design applied brings its part); pages
+    /// keep their Page::theme indices, so a caller that removes a part fixes those first
+    pub fn set_themes(&mut self, themes: Vec<Theme>) -> Result<(), EditError> {
+        if themes == self.doc.themes {
+            return Ok(());
+        }
+        self.run(Op::Themes { themes: Box::new(themes) })
     }
 }
 

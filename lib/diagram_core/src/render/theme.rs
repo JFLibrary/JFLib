@@ -97,7 +97,8 @@ impl ThemeInfo {
                                     Some(0)
                                 } else if stack.iter().any(|s| local_str(s) == "fontScheme") {
                                     Some(1)
-                                } else if stack.iter().any(|s| local_str(s) == "fmtScheme") {
+                                } else if parent == "fmtSchemeEx" || stack.iter().any(|s| local_str(s) == "fmtScheme") {
+                                    // Visio's files name the format scheme in vt:fmtSchemeEx
                                     Some(2)
                                 } else if parent == "themeScheme" {
                                     Some(3)

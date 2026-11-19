@@ -1149,8 +1149,9 @@ pub enum Basic {
     /// the ellipse tool: one Ellipse row (X Width*0.5, Y Height*0.5, A Width*1, B Height*0.5,
     /// C Width*0.5, D Height*1), style "Normal"
     Ellipse,
-    /// the text tool: a box without line and fill (style "Text Only" for line and fill,
-    /// "Normal" for text) whose Height follows its text: TEXTHEIGHT(TheText,Width)
+    /// the text tool: a box without line and fill (style "Text Only", as Visio's text tool
+    /// gives it; JD11: so that its text keeps the style's dark font style in every design)
+    /// whose Height follows its text: TEXTHEIGHT(TheText,Width)
     TextBox,
 }
 
@@ -1203,7 +1204,7 @@ pub fn new_shape(tx: &mut Transaction, eng: &mut Engine, owner: Owner, kind: Bas
     };
     let mut d = ShapeData::new(ShapeKind::Shape);
     d.header.styles = match kind {
-        Basic::TextBox => StyleRefs { line: text_only.or(normal), fill: text_only.or(normal), text: normal },
+        Basic::TextBox => StyleRefs { line: text_only.or(normal), fill: text_only.or(normal), text: text_only.or(normal) },
         _ => StyleRefs { line: normal, fill: normal, text: normal },
     };
     d.sheet.cells = basic_cells(tx, pin, w, h, unit);

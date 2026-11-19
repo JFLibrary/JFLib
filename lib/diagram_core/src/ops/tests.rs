@@ -1104,7 +1104,8 @@ fn new_shapes_of_the_drawing_tools_and_text() {
     assert_eq!(path_points(d, r), alloc::vec![[0.0, 0.0], [2.0, 0.0], [2.0, 1.0], [0.0, 1.0], [0.0, 0.0]]);
     let a = d.sym("A").unwrap();
     assert_eq!(row_formula(d, e, gaddr(1, a)), "Width*1");
-    assert_eq!(d.shape(t).unwrap().header().styles, StyleRefs { line: Some(4), fill: Some(4), text: Some(1) });
+    // (JD11) the text tool gives "Text Only" for the text too, as Visio does
+    assert_eq!(d.shape(t).unwrap().header().styles, StyleRefs::all(4));
     assert_eq!(formula(d, t, "Height"), "TEXTHEIGHT(TheText,Width)");
     let h0 = num(d, t, "Height");
     assert!(h0 > 0.0 && h0 < 0.5, "{h0}");

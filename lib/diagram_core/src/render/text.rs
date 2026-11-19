@@ -461,7 +461,12 @@ impl Builder<'_, '_> {
         match self.row_val(sheet, sec, key, "Font") {
             Value::Text(s) => {
                 let t = doc.str(s);
-                if t.eq_ignore_ascii_case("Themed") || t.is_empty() {
+                if t.eq_ignore_ascii_case("Themed") {
+                    match self.themed_value(sheet, Some((sec, key)), "Font") {
+                        Some(super::themed::Tv::Text(f)) if !f.is_empty() => f,
+                        _ => minor(),
+                    }
+                } else if t.is_empty() {
                     minor()
                 } else {
                     String::from(t)

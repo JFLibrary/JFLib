@@ -568,6 +568,12 @@ impl Engine {
         *self = Engine::with_metrics(self.metrics.clone());
     }
 
+    /// forget the parsed theme parts (JD11: a design was applied or a part replaced); the
+    /// caller recalculates the sheets that use them
+    pub fn themes_changed(&mut self) {
+        self.themes = Themes::default();
+    }
+
     fn run(&mut self, dirty: Option<BTreeSet<NodeKey>>) -> Run {
         Run {
             cache: core::mem::take(&mut self.cache),
