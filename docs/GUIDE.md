@@ -980,8 +980,12 @@ ui.menubar(None);                        // the menu bar of the AppDesc
 * On a Mac the menus of the `AppDesc` go into the menu bar of macOS, between the app menu and
   the Window menu, as every Mac app has them: `ui.menubar(None)` of the main window draws no row
   then, a row chosen up there runs as from the window's bar, `MOD_CTRL` is the Command key.
-  Headless runs (scripts) keep the row in the window, `jfgui_SYSMENU=0` too
-  (`plat::sysmenu`).
+  On an iPad they go into the menu bar of iPadOS as well (between the application menu and
+  Window; the rows with a key also show while Command is held), and the window keeps its row:
+  iPadOS shows its bar only after a swipe down from the top or with the pointer at the top edge,
+  the row stays the way for the finger. A pass that draws no `menubar(None)` takes the menus out
+  of the system's bar again (a page without the bar). Headless runs (scripts) keep the row in
+  the window, `jfgui_SYSMENU=0` too (`plat::sysmenu`).
 * `cmd_state(cmd, CF_DISABLED | CF_CHECKED | CF_HIDDEN)` is persistent; set it every frame from
   your model. Accelerators fire only when no widget consumed the key first (`ui.key(VK_*)`).
   `accel_text(cmd)` gives the shortcut as shown in menus ("Strg+S").
@@ -5844,7 +5848,9 @@ phone or a tablet ([`lib/ui/form.rs`](../lib/ui/form.rs)). The platform decides,
 Windows, Linux, macOS and the browser are `FF_DESKTOP` however small a window is dragged, so a narrow
 desktop window keeps the desktop's behaviour. Android and iOS are `FF_TABLET`, and `FF_PHONE` where the
 main window's shorter side is below 600 DIP (Android's line, `sw600dp`; a turned phone stays a phone, a
-tablet's app in a narrow split screen is laid out like a phone's). `jfgui_FORM=desktop|tablet|phone`
+tablet's app in a narrow split screen is laid out like a phone's). An iPad stays `FF_TABLET` in Split
+View, Slide Over and Stage Manager as long as the window is not that narrow, also in a large window
+(iPadOS owns the window and draws its controls; docs/APPLE.md AP9). `jfgui_FORM=desktop|tablet|phone`
 decides instead, on any platform: for tests and for a look at the phone's layout on the desktop.
 
 What the library does by itself on a phone or a tablet, and only there:
@@ -5870,7 +5876,9 @@ the desktop's row as it was), which hints speak of a mouse.
 Test it on the desktop: `system env jfgui_FORM phone` in a script (`apps/gallery/tests/form_factor.uis`,
 `apps/androidGallery/tests/touch_phone.uis`), or a program started with `jfgui_FORM=phone` in a window
 of a phone's size. On Android a tablet comes from the emulator's `pixel_tablet` profile, a phone from the
-same emulator with `adb shell wm size 1080x2400` and `wm density 420`.
+same emulator with `adb shell wm size 1080x2400` and `wm density 420`. On an iPad simulator
+`jfgui_IOS_WINDOW=320x1376` starts the app in a window of that size inside its scene (Slide Over's
+width; Split View's and Stage Manager's sizes likewise), `plattest --test ipad` goes through them.
 
 
 ## 39. Games: pointer lock, raw mouse motion, key positions

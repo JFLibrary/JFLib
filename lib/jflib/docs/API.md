@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -8661,7 +8661,9 @@ FF_DESKTOP however small a window is dragged (a narrow desktop window keeps the 
 behaviour); Android and iOS are FF_TABLET, and FF_PHONE where the main window's shorter side is
 below 600 DIP (Android's own line between a phone and a tablet, `sw600dp`; a tablet's app in a
 narrow split screen is laid out like a phone's then).  The shorter side keeps a phone a phone
-when it is turned.
+when it is turned.  An iPad stays FF_TABLET in every window that is not that narrow, also a
+large one in Stage Manager or iPadOS 26's windows (the user's decision of 2026-11-19: iPadOS owns
+the window and draws its controls, the finger stays the main way; docs/APPLE.md AP9).
 
 jfgui_FORM=desktop|tablet|phone decides instead (any platform: tests, and a look at the phone's
 layout on the desktop; scripts: `system env jfgui_FORM phone`).
@@ -29917,19 +29919,25 @@ Source: [`lib/plat/sysmenu.rs`](../lib/plat/sysmenu.rs)
 
 ```text
 sysmenu -- the app's menus in the system's own menu bar (macOS: between the app menu and the Window
-menu, as every Mac app has them; docs/APPLE.md "Menüs in der Menüleiste")
+menu, as every Mac app has them; iPadOS: between the application menu and Window as well;
+docs/APPLE.md "Menüs in der Menüleiste" and AP9)
 
   sysmenu_supported() -> bool        whether this system shows an app's menus in its own bar (macOS
-                                     with a window of the app; elsewhere false: the app draws its menu
-                                     bar in the window)
+                                     with a window of the app, an iPad under UIKit; elsewhere false:
+                                     the app draws its menu bar in the window)
+  sysmenu_window_row() -> bool       whether the window keeps its own menu row as well (iPadOS: its
+                                     bar hides until a swipe down from the top or the pointer there
+                                     reveals it, the row stays the way for the finger; macOS: false)
   sysmenu_set(&[SysMenuItem])        the app's menus: the top level are the menus of the bar, their
-                                     `sub` the rows; the same list again changes nothing
+                                     `sub` the rows; the same list again changes nothing; an empty
+                                     list takes them out again
   sysmenu_take() -> Vec<u32>         the ids of the rows chosen since the last call (each choice calls
                                      wake())
 
 A row's key equivalent is a character ("s", or a function key's: "\u{F704}" = F1) with MOD_* bits;
 MOD_CTRL is the Mac's Command key, MOD_ALT its Option key.  A disabled row cannot be chosen, its key
-then reaches the window as a normal key press.
+then reaches the window as a normal key press.  On the iPad the rows with a key also show while
+Command is held; Insert has no key there.
 ```
 
 - **`struct SysMenuItem`**
@@ -29946,6 +29954,10 @@ then reaches the window as a normal key press.
 
 - **`fn sysmenu_supported() -> bool`**
   whether the app's menus go into the system's menu bar here
+
+- **`fn sysmenu_window_row() -> bool`**
+  whether the window keeps drawing its own menu row besides the system's bar (iPadOS; false where
+  the system's bar is the only place, macOS, and where sysmenu_supported is false)
 
 - **`fn sysmenu_set(menus: &[SysMenuItem])`**
   put the app's menus into the system's menu bar (an unchanged list does nothing)
@@ -35617,6 +35629,119 @@ semantic groups with their names.
 
 - **`fn ios_ax_type(t: &str) -> bool`**
   (tests, any thread) the keyboard's view types text (UIKeyInput / UITextInput of JFView)
+
+### `plat/apple_ios_pad.rs` (Apple)
+
+Source: [`lib/plat/apple_ios_pad.rs`](../lib/plat/apple_ios_pad.rs)
+
+```text
+apple_ios_pad -- the iPad's parts of iOS's host (docs/APPLE.md AP9): the app's menus in the menu bar
+of iPadOS, the pointer of a trackpad or mouse without a button, its wheel and pinch, and the test
+aids of plattest --test ipad
+
+  is_pad() -> bool                 the device is an iPad (UIUserInterfaceIdiomPad)
+  sysmenu_supported() / sysmenu_window_row() / sysmenu_set()   plat::sysmenu on the iPad
+  app_methods() / view_methods()   (apple_ios.rs register) the app delegate's menu methods, JFView's
+                                   actions of the recognizers
+  add_recognizers(view)            (apple_ios.rs vc_load_view) hover, wheel and pinch on JFView
+  ios_pad_*                        (tests, any thread) window sizes, the keyboard, turning, the menus
+                                   built with a stand-in for UIKit's builder, the pointer's paths
+                                   without a pointer; on the main thread
+
+The menus: UIKit asks the app delegate (a UIResponder) for the main menu (buildMenuWithBuilder:).
+With menus of the app the system's File, Edit, Format and View menus go and the app's follow the
+application menu, before Window, as on the Mac (apple_mac_app.rs).  Every row is a UICommand, with
+a key equivalent a UIKeyCommand, whose action jfSysMenu: goes up the responder chain to the app
+delegate; its propertyList is the row's id.  Separators become inline groups (UIMenu has none).
+sysmenu_set asks for a rebuild; iPadOS builds when it needs the menu (the bar revealed, Command
+held), never without input.  iPadOS 26 shows the menus in its menu bar (a swipe down from the top
+edge or the pointer there reveals it), every iPadOS shows the rows with a key while Command is
+held.  The window keeps its own menu row (sysmenu_window_row, the user's decision of 2026-11-19):
+the bar of iPadOS hides until it is revealed, the row stays the way for the finger.  The iPhone
+has no menu bar: unsupported there.
+
+The pointer: a UIHoverGestureRecognizer moves the mouse without a button (the Apple Pencil's hover
+on the iPads that have it: a pen without pressure), a UIPanGestureRecognizer that takes no touches,
+only scroll events, turns a trackpad's two fingers and a mouse wheel into E_WHEEL (WHEEL_PIXELS,
+as the Mac's trackpad), a UIPinchGestureRecognizer for the indirect pointer alone turns a
+trackpad's pinch into Ctrl + wheel (as macOS).  None of them takes or delays a finger.
+```
+
+- **`struct IosMenuRow`**
+  one row as UIKit holds it (tests)
+  - `label: String`
+  - `id: u32` -- the id of its command (0: a submenu or a row without action)
+  - `disabled: bool`
+  - `checked: bool`
+  - `key: String` -- the key equivalent's input (UIKit's names for special keys) and its UIKeyModifierFlags
+  - `key_flags: isize`
+  - `sub: usize` -- the rows of a submenu (0: none)
+  - `sep_before: bool` -- a separator (an inline group's border) comes before it
+
+- **`struct IosPadView`**
+  what the host shows (ios_pad_view): sizes in points unless named px
+  - `pad: bool` -- the device is an iPad
+  - `scene: (f64, f64)` -- the window scene's bounds (the window iPadOS gave the app), the window's, JFView's
+  - `window: (f64, f64)`
+  - `view: (f64, f64)`
+  - `safe: (f64, f64, f64, f64)` -- the safe area's insets of the root view: top, left, bottom, right
+  - `canvas: (i32, i32)` -- the canvas in px as last sent (E_RESIZE) and its px per point
+  - `scale: f64`
+  - `screen_scale: f64` -- the screen's own scale
+  - `orientation: isize` -- the interface orientation of the scene (UIInterfaceOrientation: 1 portrait .. 4 landscape)
+  - `window_row: bool` -- the app's menus in the window row stay (sysmenu_window_row)
+  - `shown: (i32, i32)` -- the size of the last picture shown (px)
+  - `keyboard: bool` -- the on-screen keyboard is asked for (JFView first responder)
+  - `last_wheel: (u8, u8, u32)` -- the last E_WHEEL the wheel or the pinch sent: btn, mods, data
+
+- **`fn ios_pad_view() -> Option<IosPadView>`**
+  (tests, any thread) the host's sizes now; None without UIKit's host
+
+- **`fn ios_pad_window(w: f64, h: f64) -> bool`**
+  (tests, any thread) the window's frame inside its scene in points, as Split View, Slide Over or
+  Stage Manager would give it (w or h 0: the scene's whole bounds again) -> false without the host
+
+- **`fn ios_pad_rotate(landscape: bool) -> bool`**
+  (tests, any thread) the scene turned to landscape (true) or portrait, as the user turning the
+  iPad would (requestGeometryUpdateWithPreferences:) -> false without the host
+
+- **`fn ios_pad_keyboard(show: bool) -> bool`**
+  (tests, any thread) the on-screen keyboard as a tap into a text box brings it (JFView first
+  responder) or "Done" hides it -> false without the host
+
+- **`fn ios_pad_menu_build() -> Option<Vec<String>>`**
+  (tests, any thread) the main menu built as UIKit would, with a stand-in for its UIMenuBuilder
+  (iPadOS builds its own only when the menu is needed: the bar revealed, Command held, a key of a
+  hardware keyboard -- none of which a test without input can bring): it starts with the system's
+  menus (application, File, Edit, Format, View, Window, Help) and answers what the build asks; the
+  app's menus, rows and commands are UIKit's own objects -> the identifiers of the top level after
+  the build (ios_pad_menus reads the rows), None without the host
+
+- **`struct IosPadMenus`**
+  the main menu after the last build (ios_pad_menus)
+  - `builds: u32` -- builds so far (UIKit's and ios_pad_menu_build's), rebuilds sysmenu_set asked UIKit for
+  - `rebuilds: u32`
+  - `system_gone: bool` -- the system's File, Edit, Format and View menus went
+  - `menus: Vec<(String, Vec<IosMenuRow>)>` -- the app's menus with their rows as the builder holds them
+
+- **`fn ios_pad_menus() -> IosPadMenus`**
+  (tests, any thread) the main menu after the last build
+
+- **`fn ios_pad_menu_choose(menu: usize, row: usize) -> bool`**
+  (tests, any thread) choose row `row` of the app's menu `menu` as the menu bar does: its action
+  goes up the responder chain from the first responder -> false: no such row, or no one took it
+
+- **`enum IosPadPointer`**
+  what the tests feed in where a pointer would (ios_pad_pointer)
+  - `Hover { x: f64, y: f64, pen: Option<(i32, i32)> }` -- the pointer (pen: the pencil's hover with this tilt) over the view without a button at (x, y)
+    points; Leave: it left the view
+  - `Leave`
+  - `Scroll { dx: f64, dy: f64, x: f64, y: f64 }` -- two fingers on the trackpad move the content by (dx, dy) points at (x, y)
+  - `Pinch { m: f64, x: f64, y: f64 }` -- a trackpad's pinch: the scale changed by m (0.1 = 10 % larger)
+
+- **`fn ios_pad_pointer(p: IosPadPointer) -> bool`**
+  (tests, any thread) the recognizers' paths with the values a pointer would give (the simulator
+  has no pointer of its own to drive) -> false without the host
 
 ### `plat/apple_mac.rs` (Apple)
 

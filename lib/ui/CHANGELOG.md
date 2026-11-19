@@ -52,6 +52,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   border around them is 256 x 256, so it takes what the budget counts (NVIDIA laid the 258 x 258
   one out as 408 KiB instead of 260).
 - A run whose UI output stays on the CPU for good (no Vulkan loader, no usable adapter, a display that takes no dma-bufs, ...) says why in one line of the log at info level, `gpu: output: none in this run (REASON): the windows go through the CPU path`: in the ring for crash reports and `plat::log_recent` and in the log file, on stderr only with `jfgui_LOG=info`; the screen stays silent as before. On Linux `GpuOutput::error` names a display without dma-bufs so instead of "no child window" (docs/ARM64.md, ARM8)
+- (AP9) `ui.menubar(None)` of the main window gives the menus to the iPad's menu bar too and keeps drawing its row there (the user's decision of 2026-11-19); a pass whose main window draws no `menubar(None)` takes the app's menus out of the system's bar again (macOS as well: a page without the bar leaves no stale menus up there). The iPad stays `FF_TABLET` (`FF_PHONE` below 600 points) in every window, also a large one in Stage Manager (the user's decision of 2026-11-19)
 
 ### Fixed
 
