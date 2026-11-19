@@ -55442,7 +55442,7 @@ RANGE: f64 = 100.0
     they make the full state of a join larger, not the snapshots after it)
   - `crates: usize` -- crates on the floor (static, in the map)
   - `rate: u32` -- ticks a second (the props' motion)
-  - `max_rewind: u32` -- how far back hits are rewound at most (ticks)
+  - `max_rewind: u32` -- how far back hits are rewound at most (ticks; 18 unless set: 300 ms at 60 Hz, as ServerOptions::max_rewind_ms)
   - `fire: bool` -- figures may shoot
 
 - **`fn schema() -> Schema`**
@@ -55903,7 +55903,8 @@ Source: [`lib/game/src/net/lagcomp.rs`](../lib/game/src/net/lagcomp.rs)
 
 ```text
 lagcomp -- hits with lag compensation: the server keeps where the figures were over the last ticks and,
-for a shot, puts them back to the time the shooter saw them, at most about 200 ms back
+for a shot, puts them back to the time the shooter saw them, at most 300 ms back unless set (the interpolation's
+100 ms and 200 ms beyond them, the user's decision of 2026-11-19)
 
   view_time(tick, view, max_back)   the shooter's view time from its input (NetInput::view: the lag of
                                     its picture in 1/256 ticks), clamped to max_back ticks before tick
@@ -56389,7 +56390,8 @@ most important things at once.
   - `budget: usize` -- the bytes of a snapshot (UDP's limit; netchan's max_payload)
   - `stream_budget: usize` -- the bytes of a join's state over a WebSocket and of a FULL (below netchan's max_stream_payload)
   - `margin: u8` -- the margin the clients' inputs should arrive with (ticks)
-  - `max_rewind_ms: u32` -- how far back hits are rewound at most (ms)
+  - `max_rewind_ms: u32` -- how far back hits are rewound at most (ms; 300 unless set: the 100 ms of the interpolation buffer and
+    200 ms beyond them, the user's decision of 2026-11-19)
   - `ws_port: u16` -- the WebSocket's port (WELCOME tells UDP clients where to fetch a full state; 0: none)
   - `hello_ms: u32` -- a connection must send HELLO within this long (ms)
   - `ticket_ms: u32` -- a ticket stays good this long (ms)
