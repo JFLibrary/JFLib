@@ -7830,11 +7830,11 @@ total each step, and keeps the last one as the undo step.  The frames of the sel
 the model (the app's preview), the gesture keeps what it had at the start.  The connector and
 line tools and the drawing tools draw a rubber band and report Connect / Draw when released;
 a click with them selects like the pointer.  With Shift the rectangle and the ellipse tool draw
-a square and a circle (KB-09).  The freeform tool records the pointer's way (a point every 2 px)
-and reports SeEv::Stroke when released; the arc tool shows a quarter ellipse from the press to
-the pointer, bowing the way the drag started (horizontally or vertically, decided once the
-pointer left the drag threshold), and reports SeEv::Arc; both start and end glued to
-connection points like the line tool (CN-12).
+a square and a circle, and a move with Shift keeps to one axis (KB-09).  The freeform tool
+records the pointer's way (a point every 2 px) and reports SeEv::Stroke when released; the arc
+tool shows a quarter ellipse from the press to the pointer, bowing the way the drag started
+(horizontally or vertically, decided once the pointer left the drag threshold), and reports
+SeEv::Arc; both start and end glued to connection points like the line tool (CN-12).
 
 Input (pointer tool): a press on a handle of the selection starts its drag; on a shape it
 selects it (Shift adds, Ctrl toggles) and a drag moves the selection (grid, dynamic grid,
