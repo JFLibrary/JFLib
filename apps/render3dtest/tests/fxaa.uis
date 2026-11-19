@@ -1,0 +1,3 @@
+#!args --test fxaa
+# (G7f part 2) FXAA against FXAA 3.11 on the CPU over the GPU's image (linear, an sRGB target, the shader's sRGB); a plain
+# image stays as it is, only edges change; Voll and Basis

@@ -33,6 +33,12 @@
 // (the engine's: the middle of the mesh's box under the transform; ties by the order they were added), each instance's
 // triangles in their order (a draw blends its primitives in order), premultiplied alpha over the 8-bit value before
 // (the target holds 8 bits between two layers), a single-sided look's back faces left out.
+//
+// (G7f part 2) Orthographic cameras: parallel rays from points of the near plane (RefCamera::ortho; untextured looks: the
+// quad's derivatives assume one eye).  The cartoon look (Look::toon), written from its description in docs/RENDER3D.md:
+// the base colour under the sun's n.l (in shadow -1) and each light's n.l in bands, the ambient light flat, a rim of the
+// light's colour.  Instances that only cast shadows or only take rays (RefScene::add_look_as): a viewmodel's reference is
+// a scene of its own whose shadow rays meet the world's instances.
 
 use alloc::format;
 use alloc::vec::Vec;
@@ -127,7 +133,7 @@ pub enum Seen {
     No,
 }
 
-/// a perspective camera as the tests see it
+/// a perspective camera as the tests see it; (G7f) or an orthographic one (tx, ty: half its width and height)
 #[derive(Clone, Copy, Debug)]
 pub struct RefCamera {
     pub eye: V,
@@ -138,6 +144,10 @@ pub struct RefCamera {
     pub ty: f64,
     pub near: f64,
     pub far: f64,
+    pub ortho: bool,
+    /// (G7f) how far behind the eye's plane an orthographic camera's rays start (the light towards the eye is then along
+    /// -forward also for points behind that plane, as the GPU takes it); its rays' parameter counts from there
+    pub back: f64,
 }
 
 impl RefCamera {
@@ -146,13 +156,36 @@ impl RefCamera {
         let r = norm(cross(f, up));
         let u = cross(r, f);
         let (s, c) = sincos(fov_y * 0.5);
-        RefCamera { eye, f, r, u, tx: s / c * aspect, ty: s / c, near, far }
+        RefCamera { eye, f, r, u, tx: s / c * aspect, ty: s / c, near, far, ortho: false, back: 0.0 }
+    }
+
+    /// (G7f) an orthographic camera h high
+    pub fn ortho(eye: V, forward: V, up: V, h: f64, aspect: f64, near: f64, far: f64) -> RefCamera {
+        RefCamera { tx: 0.5 * h * aspect, ty: 0.5 * h, ortho: true, back: 1e4, ..RefCamera::new(eye, forward, up, 1.0, aspect, near, far) }
+    }
+
+    /// (G7f) the span of a ray's parameter: near and far as the rays count them
+    pub fn span(&self) -> (f64, f64) {
+        (self.near + self.back, self.far + self.back)
+    }
+
+    /// (G7f) where the ray of a point of the image starts: the eye, or (orthographic) its point on the eye's plane
+    pub fn origin(&self, x: f64, y: f64, w: u32, h: u32) -> V {
+        if !self.ortho {
+            return self.eye;
+        }
+        let nx = 2.0 * x / w as f64 - 1.0;
+        let ny = 1.0 - 2.0 * y / h as f64;
+        add(add(add(self.eye, mul(self.r, nx * self.tx)), mul(self.u, ny * self.ty)), mul(self.f, -self.back))
     }
 
     /// the distance of a point to each face of the frustum, in the frustum's inside direction
     pub fn distances(&self, p: V) -> [f64; 6] {
         let d = sub(p, self.eye);
         let (x, y, z) = (dot(d, self.r), dot(d, self.u), dot(d, self.f));
+        if self.ortho {
+            return [x + self.tx, self.tx - x, y + self.ty, self.ty - y, z - self.near, self.far - z];
+        }
         let lx = sqrt(1.0 + self.tx * self.tx);
         let ly = sqrt(1.0 + self.ty * self.ty);
         [(x + z * self.tx) / lx, (z * self.tx - x) / lx, (y + z * self.ty) / ly, (z * self.ty - y) / ly, z - self.near,
@@ -177,8 +210,11 @@ impl RefCamera {
         seen
     }
 
-    /// the ray of a point of the image (pixels; y down): its parameter is the distance along forward
+    /// the ray of a point of the image (pixels; y down): its parameter is the distance along forward (from origin)
     pub fn ray(&self, x: f64, y: f64, w: u32, h: u32) -> V {
+        if self.ortho {
+            return self.f;
+        }
         let nx = 2.0 * x / w as f64 - 1.0;
         let ny = 1.0 - 2.0 * y / h as f64;
         add(add(self.f, mul(self.r, nx * self.tx)), mul(self.u, ny * self.ty))
@@ -188,11 +224,17 @@ impl RefCamera {
     pub fn pixel(&self, p: V, w: u32, h: u32) -> Option<[f64; 2]> {
         let d = sub(p, self.eye);
         let z = dot(d, self.f);
+        if self.ortho {
+            return (z > self.near).then(|| [(dot(d, self.r) / self.tx + 1.0) * 0.5 * w as f64, (1.0 - dot(d, self.u) / self.ty) * 0.5 * h as f64]);
+        }
         (z > self.near).then(|| [(dot(d, self.r) / (z * self.tx) + 1.0) * 0.5 * w as f64, (1.0 - dot(d, self.u) / (z * self.ty)) * 0.5 * h as f64])
     }
 
     /// reverse Z: the depth buffer's value at distance z along forward
     pub fn depth(&self, z: f64) -> f64 {
+        if self.ortho {
+            return (self.far - (z - self.back)) / (self.far - self.near);
+        }
         if self.far.is_finite() { self.near * (self.far - z) / (z * (self.far - self.near)) } else { self.near / z }
     }
 }
@@ -464,6 +506,8 @@ pub struct Surface {
     pub n: V,
     pub ao: f64,
     pub emissive: [f64; 3],
+    /// (G7f) the cartoon look's bands, softness, rim, rim's width
+    pub toon: Option<[f64; 4]>,
 }
 
 // ---------------------------------------------------------------- the ray caster
@@ -497,13 +541,15 @@ pub struct Look {
     /// (G7f) glTF's doubleSided and BLEND
     pub double_sided: bool,
     pub blend: bool,
+    /// (G7f) the cartoon look: bands, softness, rim, rim's width (as the GPU holds them: in 1/255)
+    pub toon: Option<[f64; 4]>,
 }
 
 impl Look {
     /// render3d's Material::color: dull (metallic 0, roughness 1)
     pub const DULL: Look = Look { factor: [1.0; 4], texture: None, cutoff: None, metallic: 0.0, roughness: 1.0, mr_texture: None, normal_texture: None,
                                   normal_scale: 1.0, occlusion_texture: None, occlusion: 1.0, emissive: [0.0; 3], emissive_texture: None, double_sided: false,
-                                  blend: false };
+                                  blend: false, toon: None };
 
     pub fn color(c: [f32; 3]) -> Look {
         Look { factor: [c[0] as f64, c[1] as f64, c[2] as f64, 1.0], ..Look::DULL }
@@ -523,6 +569,9 @@ struct RefInstance {
     /// (G7f) where the engine's bounding sphere has its centre: the middle of the mesh's box under the transform (the key
     /// of the blended instances' order)
     sphere: V,
+    /// (G7f) rays from the camera see it; it blocks the sun's rays
+    primary: bool,
+    casts: bool,
 }
 
 /// a scene for rays
@@ -548,6 +597,9 @@ pub struct RefScene {
     /// (G7f) a look is blended; what blended layers lie over where no opaque hit is
     pub has_blend: bool,
     pub clear: [u8; 3],
+    /// (G7f part 2) blended instances in the order of their depth along this axis (an orthographic camera's forward), not
+    /// of their distance from the eye
+    pub blend_axis: Option<V>,
 }
 
 /// (G5c) the environment as the GPU holds it (data like a texture's texels): the irradiance's harmonics over pi,
@@ -722,7 +774,7 @@ pub struct Quad {
 impl RefScene {
     pub fn new(sun_dir: V, sun: [f64; 3], ambient: [f64; 3]) -> RefScene {
         RefScene { tris: Vec::new(), inst: Vec::new(), textures: Vec::new(), sun_dir: norm(sun_dir), sun, ambient, exposure: 1.0, tonemap: true, shadows: false, lights: Vec::new(),
-                   env: None, srgb: false, has_blend: false, clear: crate::common::CLEAR8 }
+                   env: None, srgb: false, has_blend: false, clear: crate::common::CLEAR8, blend_axis: None }
     }
 
     /// an instance of one colour: its triangles in the world
@@ -751,22 +803,38 @@ impl RefScene {
             [cof(0, 0) * n[0] + cof(0, 1) * n[1] + cof(0, 2) * n[2], cof(1, 0) * n[0] + cof(1, 1) * n[1] + cof(1, 2) * n[2],
              cof(2, 0) * n[0] + cof(2, 1) * n[1] + cof(2, 2) * n[2]]
         };
-        self.add_with(geo, &world, &normal, det < 0.0, look);
+        self.add_with(geo, &world, &normal, det < 0.0, look, true, true);
+    }
+
+    /// (G7f) add_matrix for an instance only rays see or only the sun meets
+    pub fn add_matrix_as(&mut self, geo: &Geo, m: &[f64; 16], look: Look, primary: bool, casts: bool) {
+        let n = self.inst.len();
+        self.add_matrix(geo, m, look);
+        if let Some(i) = self.inst.get_mut(n) {
+            i.primary = primary;
+            i.casts = casts;
+        }
     }
 
     /// an instance with a look.  A mirrored transform (the product of the scales negative) keeps the
     /// mesh's outside in front: its triangles are turned round
     pub fn add_look(&mut self, geo: &Geo, s: &Spec, look: Look) {
+        self.add_look_as(geo, s, look, true, true);
+    }
+
+    /// (G7f) an instance that the camera's rays see (primary) and that blocks the sun (casts), or one of the two
+    pub fn add_look_as(&mut self, geo: &Geo, s: &Spec, look: Look, primary: bool, casts: bool) {
         let q = unit_quat(s.rot);
         let scale = [s.scale[0] as f64, s.scale[1] as f64, s.scale[2] as f64];
         let mirrored = scale[0] * scale[1] * scale[2] < 0.0;
         let world = |p: [f32; 3]| add(s.pos, turn(q, [p[0] as f64 * scale[0], p[1] as f64 * scale[1], p[2] as f64 * scale[2]]));
         // the inverse transpose of rotation * scale (signs included)
         let normal = |n: [f32; 3]| turn(q, [n[0] as f64 / scale[0], n[1] as f64 / scale[1], n[2] as f64 / scale[2]]);
-        self.add_with(geo, &world, &normal, mirrored, look);
+        self.add_with(geo, &world, &normal, mirrored, look, primary, casts);
     }
 
-    fn add_with(&mut self, geo: &Geo, world: &dyn Fn([f32; 3]) -> V, normal: &dyn Fn([f32; 3]) -> V, mirrored: bool, look: Look) {
+    #[allow(clippy::too_many_arguments)]
+    fn add_with(&mut self, geo: &Geo, world: &dyn Fn([f32; 3]) -> V, normal: &dyn Fn([f32; 3]) -> V, mirrored: bool, look: Look, primary: bool, casts: bool) {
         let first = self.tris.len();
         let (mut lo, mut hi) = ([f64::MAX; 3], [f64::MIN; 3]);
         for p in &geo.pos {
@@ -795,7 +863,7 @@ impl RefScene {
             let (v0, v1, v2) = (world(geo.pos[a]), world(geo.pos[b]), world(geo.pos[c]));
             self.tris.push(Tri { v0, e1: sub(v1, v0), e2: sub(v2, v0), n: [normal(geo.nrm[a]), normal(geo.nrm[b]), normal(geo.nrm[c])], uv: [uv(a), uv(b), uv(c)] });
         }
-        self.inst.push(RefInstance { look, center, r2: dot(half, half) * 1.0001, first, last: self.tris.len(), sphere });
+        self.inst.push(RefInstance { look, center, r2: dot(half, half) * 1.0001, first, last: self.tris.len(), sphere, primary, casts });
     }
 
     /// uv where a ray meets the plane of a triangle (inside or not), by its barycentric coordinates
@@ -879,13 +947,16 @@ impl RefScene {
         if let Some(c) = self.tex_at(look.emissive_texture, t, u, v, eye, quad) {
             emissive = [emissive[0] * c[0], emissive[1] * c[1], emissive[2] * c[2]];
         }
-        Surface { base, metallic: metallic.clamp(0.0, 1.0), roughness: roughness.clamp(0.0, 1.0), n, ao, emissive }
+        Surface { base, metallic: metallic.clamp(0.0, 1.0), roughness: roughness.clamp(0.0, 1.0), n, ao, emissive, toon: look.toon }
     }
 
     /// the light a surface at p sends towards the eye, times the exposure (before the tone mapper), the sun
     /// shadowed by vis; and the sun's part unshadowed
     pub fn light(&self, sf: &Surface, p: V, eye: V, vis: f64) -> ([f64; 3], [f64; 3]) {
         let v = norm(sub(eye, p));
+        if let Some(t) = sf.toon {
+            return self.toon_light(sf, p, v, vis, t);
+        }
         let m = sf.metallic;
         let c_diff = [sf.base[0] * (1.0 - m), sf.base[1] * (1.0 - m), sf.base[2] * (1.0 - m)];
         let f0 = [0.04 + (sf.base[0] - 0.04) * m, 0.04 + (sf.base[1] - 0.04) * m, 0.04 + (sf.base[2] - 0.04) * m];
@@ -919,12 +990,65 @@ impl RefScene {
         (out, sun_part)
     }
 
+    /// (G7f) the cartoon look's step: levels 0, 1 / (bands - 1), ..., 1, the first step at x = 0, the others at k / (bands -
+    /// 1), each a smoothstep `softness` bands wide (at least 1e-4); one band: 1
+    pub fn toon_step(x: f64, bands: f64, soft: f64) -> f64 {
+        if bands < 1.5 {
+            return 1.0;
+        }
+        let steps = bands - 1.0;
+        let y = x * steps;
+        let j = floor(y + 0.5).clamp(0.0, steps - 1.0);
+        let hw = (0.5 * soft).max(1e-4);
+        let t = ((y - (j - hw)) / (2.0 * hw)).clamp(0.0, 1.0);
+        (j + t * t * (3.0 - 2.0 * t)) / steps
+    }
+
+    /// (G7f) the cartoon look's light: base times (the sun's light times its step of n.l, in shadow of -1, plus each light's
+    /// times its step, over pi, plus the flat ambient light times occlusion), plus a rim of the light's colour where 1 - n.v
+    /// passes 1 - width; emission; times the exposure
+    fn toon_light(&self, sf: &Surface, p: V, v: V, vis: f64, t: [f64; 4]) -> ([f64; 3], [f64; 3]) {
+        let (bands, soft, rim, width) = (t[0], t[1], t[2], t[3]);
+        let nl = dot(sf.n, self.sun_dir);
+        let lit = Self::toon_step(nl, bands, soft);
+        let x = if self.shadows && nl > 0.0 { vis * (nl + 1.0) - 1.0 } else { nl };
+        let q = Self::toon_step(x, bands, soft);
+        let mut punctual = [0.0; 3];
+        for light in &self.lights {
+            if let Some((att, l)) = light.at(p) {
+                let k = Self::toon_step(dot(sf.n, l), bands, soft);
+                for c in 0..3 {
+                    punctual[c] += light.color[c] * att * k;
+                }
+            }
+        }
+        let ambient = match &self.env {
+            Some(env) => [env.sh[0][0] * 0.282095 * env.k, env.sh[0][1] * 0.282095 * env.k, env.sh[0][2] * 0.282095 * env.k],
+            None => self.ambient,
+        };
+        let e = 1.0 - dot(sf.n, v).clamp(0.0, 1.0);
+        let edge = 1.0 - width;
+        let span = (width * soft).max(1e-4);
+        let a = ((e - edge) / span).clamp(0.0, 1.0);
+        let r = rim * a * a * (3.0 - 2.0 * a);
+        let (mut out, mut sun_part) = ([0.0; 3], [0.0; 3]);
+        for c in 0..3 {
+            let base = sf.base[c];
+            sun_part[c] = base * self.sun[c] / PI * lit * self.exposure;
+            let white = self.sun[c] / PI + ambient[c];
+            // (vis is 0 or 1 here: the shadowed step is 0, so the sun's part times vis is what it leaves)
+            let sun = base * self.sun[c] / PI * q * self.exposure;
+            out[c] = (base * (punctual[c] / PI + ambient[c] * sf.ao) + white * r + sf.emissive[c]) * self.exposure + sun;
+        }
+        (out, sun_part)
+    }
+
     /// (G5c) something lies between p and the sun: any triangle, either side, beyond a hair of p; MASK's
     /// holes (base alpha at level 0) let it through
     pub fn occluded(&self, p: V, dir: V) -> bool {
         let dd = dot(dir, dir);
-        // (G7f) blended instances cast no shadows
-        for inst in self.inst.iter().filter(|i| !i.look.blend) {
+        // (G7f) blended instances cast no shadows; (G7f part 2) nor do those that only take rays
+        for inst in self.inst.iter().filter(|i| !i.look.blend && i.casts) {
             let oc = sub(inst.center, p);
             let along = dot(oc, dir);
             if along < -sqrt(inst.r2) || dot(oc, oc) - along * along / dd > inst.r2 {
@@ -1020,9 +1144,9 @@ impl RefScene {
     /// (G7f) the blended layers along a ray between near and zmax, in the order the engine draws them: (premultiplied
     /// colour as the target takes it, alpha), the farthest instance first, each instance's triangles in their order
     fn blend_layers(&self, eye: V, d: V, near: f64, zmax: f64, quad: Option<&Quad>) -> Vec<([f64; 3], f64, usize)> {
-        let mut order: Vec<(f64, usize)> = self.inst.iter().enumerate().filter(|(_, i)| i.look.blend).map(|(k, i)| {
+        let mut order: Vec<(f64, usize)> = self.inst.iter().enumerate().filter(|(_, i)| i.look.blend && i.primary).map(|(k, i)| {
             let e = sub(i.sphere, eye);
-            (dot(e, e), k)
+            (self.blend_axis.map_or(dot(e, e), |a| dot(e, a)), k)
         }).collect();
         // farthest first; a tie: in the order they were added
         order.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(core::cmp::Ordering::Equal).then(a.1.cmp(&b.1)));
@@ -1081,8 +1205,8 @@ impl RefScene {
         let mut best: Option<(f64, usize, usize, f64, f64, bool)> = None;
         let dd = dot(d, d);
         for (k, inst) in self.inst.iter().enumerate() {
-            // (G7f) blended instances hide nothing: they are laid over the opaque hit below
-            if inst.look.blend {
+            // (G7f) blended instances hide nothing: they are laid over the opaque hit below; (part 2) some only cast shadows
+            if inst.look.blend || !inst.primary {
                 continue;
             }
             // past the box's sphere?
@@ -1174,7 +1298,7 @@ impl RefScene {
             ((centre[0] - a[0]) * ey - (centre[1] - a[1]) * ex).abs() / sqrt(ex * ex + ey * ey).max(1e-12)
         };
         for (k, inst) in self.inst.iter().enumerate() {
-            if !inst.look.textured() || inst.look.blend {
+            if !inst.look.textured() || inst.look.blend || !inst.primary {
                 continue;
             }
             for ti in inst.first..inst.last {
@@ -1253,7 +1377,9 @@ pub fn compare_tol(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u8; 3
     const NEAR_EDGE: f64 = 1.0 / 64.0;
     let mut out = Compared::default();
     let mut seen = alloc::vec![false; sc.inst.len()];
-    let shoot = |x: f64, y: f64, q: &Quad| sc.trace_quad(cam.eye, cam.ray(x, y, w, h), cam.near, cam.far, Some(q));
+    // ((G7f) an orthographic camera's rays start on its plane; its eye for shading at a pixel: that pixel's start)
+    let (near, far) = cam.span();
+    let shoot = |x: f64, y: f64, q: &Quad| sc.trace_quad(cam.origin(x, y, w, h), cam.ray(x, y, w, h), near, far, Some(q));
     let rgb = |h: &Option<Hit>| h.map_or(clear, |v| v.rgb);
     for y in 0..h {
         for x in 0..w {
@@ -1263,6 +1389,7 @@ pub fn compare_tol(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u8; 3
             let (qx, qy) = ((x & !1) as f64 + 0.5, (y & !1) as f64 + 0.5);
             let q = Quad { x0: cam.ray(qx, cy, w, h), x1: cam.ray(qx + 1.0, cy, w, h), y0: cam.ray(cx, qy, w, h), y1: cam.ray(cx, qy + 1.0, w, h) };
             let c = shoot(cx, cy, &q);
+            let eye = cam.origin(cx, cy, w, h);
             let around = [shoot(cx - NEAR_EDGE, cy, &q), shoot(cx + NEAR_EDGE, cy, &q), shoot(cx, cy - NEAR_EDGE, &q), shoot(cx, cy + NEAR_EDGE, &q)];
             let same = |h: &Option<Hit>| h.map(|v| v.inst) == c.map(|v| v.inst) && near_rgb(rgb(h), rgb(&c), 1);
             let want = rgb(&c);
@@ -1277,7 +1404,7 @@ pub fn compare_tol(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u8; 3
                 if !near_rgb(got, want, tol) {
                     let wide = [shoot(cx - 1.0, cy, &q), shoot(cx + 1.0, cy, &q), shoot(cx, cy - 1.0, &q), shoot(cx, cy + 1.0, &q), shoot(cx - 1.0, cy - 1.0, &q),
                                 shoot(cx + 1.0, cy - 1.0, &q), shoot(cx - 1.0, cy + 1.0, &q), shoot(cx + 1.0, cy + 1.0, &q)];
-                    if wide.iter().any(|h| h.is_some_and(|v| sc.could_show(&v, cam.eye, got))) {
+                    if wide.iter().any(|h| h.is_some_and(|v| sc.could_show(&v, eye, got))) {
                         out.slivers += 1;
                     } else if sc.beyond_rim(cam, w, h, [cx, cy], &q, c.map_or(f64::INFINITY, |v| v.z), got, tol) {
                         out.rims += 1;
@@ -1302,8 +1429,8 @@ pub fn compare_tol(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u8; 3
                 }
             } else {
                 out.edges += 1;
-                let fine = near_rgb(got, want, tol) || around.iter().any(|h| near_rgb(got, rgb(h), tol) || h.is_some_and(|v| sc.could_show(&v, cam.eye, got)))
-                    || c.is_some_and(|v| sc.could_show(&v, cam.eye, got));
+                let fine = near_rgb(got, want, tol) || around.iter().any(|h| near_rgb(got, rgb(h), tol) || h.is_some_and(|v| sc.could_show(&v, eye, got)))
+                    || c.is_some_and(|v| sc.could_show(&v, eye, got));
                 if !fine {
                     if sc.beyond_rim(cam, w, h, [cx, cy], &q, c.map_or(f64::INFINITY, |v| v.z), got, tol) {
                         out.rims += 1;
@@ -1337,13 +1464,16 @@ pub struct ShadowCompared {
     pub edges_bad: u32,
     pub first: Option<(u32, u32, [u8; 3], [u8; 3])>,
     pub first_inside: Option<(u32, u32, f64, f64)>,
+    /// (G7f part 2) solid pixels showing a mix of what a neighbouring pixel's ray sees (another face of the same instance,
+    /// seen almost edge on: the GPU's snapping drew it there)
+    pub slivers: u32,
 }
 
 impl ShadowCompared {
     pub fn text(&self) -> alloc::string::String {
         let share = |n: u32| n as f64 * 100.0 / self.on_objects.max(1) as f64;
-        format!("{} solid ({} on objects, {} shadowed by the rays): {} other side at a shadow's edge ({:.2} %), {} inside ({:.3} %), {} wrong; {} at geometric edges, {} wrong{}{}",
-                self.solid, self.on_objects, self.shadowed, self.at_edges, share(self.at_edges), self.inside, share(self.inside), self.bad, self.edges, self.edges_bad,
+        format!("{} solid ({} on objects, {} shadowed by the rays): {} other side at a shadow's edge ({:.2} %), {} inside ({:.3} %), {} wrong, {} slivers; {} at geometric edges, {} wrong{}{}",
+                self.solid, self.on_objects, self.shadowed, self.at_edges, share(self.at_edges), self.inside, share(self.inside), self.bad, self.slivers, self.edges, self.edges_bad,
                 self.first.map_or(alloc::string::String::new(), |f| format!(" (first wrong at {}, {}: {:?}, expected {:?})", f.0, f.1, f.2, f.3)),
                 self.first_inside.map_or(alloc::string::String::new(), |f| format!(" (first inside at {}, {}: shows {:.2}, rays {})", f.0, f.1, f.2, f.3)))
     }
@@ -1354,7 +1484,8 @@ impl ShadowCompared {
 pub fn compare_shadows(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u8; 3], image: &[u8], tol: u8) -> ShadowCompared {
     const NEAR_EDGE: f64 = 1.0 / 64.0;
     let mut out = ShadowCompared::default();
-    let shoot = |x: f64, y: f64| sc.trace(cam.eye, cam.ray(x, y, w, h), cam.near, cam.far);
+    let (near, far) = cam.span();
+    let shoot = |x: f64, y: f64| sc.trace(cam.origin(x, y, w, h), cam.ray(x, y, w, h), near, far);
     // the rays' answer per pixel first: -1 for no object
     let mut vis = alloc::vec![-1.0f64; (w * h) as usize];
     let mut hits = alloc::vec![None; (w * h) as usize];
@@ -1395,7 +1526,7 @@ pub fn compare_shadows(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u
             if !same {
                 out.edges += 1;
                 let fine = c.iter().chain(around.iter().flatten()).any(|h| nearest(h, got).0 <= tol + 1) || near_rgb(got, clear, tol)
-                    || c.iter().chain(around.iter().flatten()).any(|h| sc.could_show(h, cam.eye, got));
+                    || c.iter().chain(around.iter().flatten()).any(|hit| sc.could_show(hit, cam.origin(cx, cy, w, h), got));
                 if !fine {
                     out.edges_bad += 1;
                 }
@@ -1413,6 +1544,11 @@ pub fn compare_shadows(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u
             out.shadowed += (hit.vis < 0.5) as u32;
             let (d, t) = nearest(&hit, got);
             if d > tol {
+                let wide = [shoot(cx - 1.0, cy), shoot(cx + 1.0, cy), shoot(cx, cy - 1.0), shoot(cx, cy + 1.0)];
+                if wide.iter().flatten().any(|v| v.tri != hit.tri && nearest(v, got).0 <= tol) {
+                    out.slivers += 1;
+                    continue;
+                }
                 out.bad += 1;
                 out.first.get_or_insert((x, y, got, hit.rgb));
                 continue;
@@ -1422,7 +1558,8 @@ pub fn compare_shadows(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u
             if (0..3).map(|i| lit[i].abs_diff(dark[i])).max().unwrap_or(0) < 4 {
                 continue;
             }
-            if (t - hit.vis).abs() > 0.5 {
+            // ((G7f part 2) half way counts too: the cartoon look's bands give 0.5 for a point taken as being on the terminator)
+            if (t - hit.vis).abs() >= 0.5 {
                 let mut edge = false;
                 for dy in -3i32..=3 {
                     for dx in -3i32..=3 {

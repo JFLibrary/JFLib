@@ -24,6 +24,8 @@ plat.workspace = true
 base.workspace = true
 physics.workspace = true
 game.workspace = true
+# the netcode's tests: netchan's cores on the simulated link (src/net_*.rs), its sockets for --loopback
+netchan.workspace = true
 # the bridge against render3d offscreen (src/bridge.rs); ui: the probe window the scripts drive (src/probe.rs)
 game_render3d.workspace = true
 render3d.workspace = true

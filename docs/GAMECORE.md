@@ -304,7 +304,8 @@ eine Physik-Welt), ein Läufer mit Kapsel-Cast, interpolierte Posen. Die Maus mi
 | Linux x86-64 (glibc) in WSL Ubuntu 24.04 | Entwicklung | `8edfe993e4ffcb65` |
 | macOS ARM64 (Mac mini M2), Rust 1.98.1 | Entwicklung | `8edfe993e4ffcb65` |
 
-Nicht gelaufen: der Browser, Android, ARM64 unter Linux und Windows, iOS. Die Physik ist dort bitgleich gezeigt
+Im Browser (WebAssembly in Node 22.17, einfach, SIMD und Threads, `apps/gametest/tests/web.mjs`, seit G7e) ebenfalls
+`8edfe993e4ffcb65`. Nicht gelaufen: Android, ARM64 unter Linux und Windows, iOS. Die Physik ist dort bitgleich gezeigt
 ([PHYSICS.md](PHYSICS.md#prüfsummen)), der Kern nimmt nur `+ − × ÷` und deren Mathematik dazu.
 
 ## Was nicht getestet ist
@@ -332,8 +333,9 @@ Nicht gelaufen: der Browser, Android, ARM64 unter Linux und Windows, iOS. Die Ph
   Handles, Raumklang über `plat::audio`.
 - Ein Spiel mit eigenem Fenster bekommt `Input::plat_event`; ein Weg, die Ereignisse eines Fensters ohne `ui` zu holen, ist in
   `lib/game` nicht gebaut (das gehört zur Messung des eigenen Swapchain-Wegs).
-- Entitäten mit vorgegebener Id (`spawn` mit der Id des Servers) für den Netcode (G7e); bis dahin bildet ein Client die Ids des
-  Servers auf eigene ab.
+- Entitäten mit vorgegebener Id (`spawn` mit der Id des Servers): Der Netcode (G7e Teil 1, [NETCODE.md](NETCODE.md)) gibt
+  jeder replizierten Entität eine eigene Netz-Id (u16 mit Generation); ein Client, der eine `World` aus Schnappschüssen baut,
+  bildet sie auf eigene Entitäten ab.
 - Abfragen über mehr als zwei Spalten in einem Aufruf, Ereignisse beim Entfernen von Komponenten, Hierarchien (Eltern und
   Kinder), Ressourcen in der Welt: was davon nötig ist, zeigt Spiel 1.
 - Die Brücke nimmt keine Lichter, keine Detailstufen und keine Materialwechsel je Instanz außerhalb von `MeshRef`; eine Entität
@@ -351,5 +353,7 @@ Nicht gelaufen: der Browser, Android, ARM64 unter Linux und Windows, iOS. Die Ph
   nur ohne Fenster (das Skript `shot.uis` unter Windows, in WSL und auf dem M2), im Browser gar nicht.
 - **Bewegte Plattformen und der Controller** (G7c Teil 2) setzen auf `Pose` und `World::begin_tick` auf: der Controller als
   System, seine Kapsel aus der Pose.
-- **Netcode** (G7e): die Versionen der Spalten tragen die Schnappschüsse (was seit dem bestätigten Stand geändert wurde),
-  `TickInput` die Eingabe eines Takts, `sort_columns` die kanonische Reihenfolge eines aus Schnappschüssen gebauten Clients.
+- **Netcode**: gebaut in G7e Teil 1 als `game::net` ([NETCODE.md](NETCODE.md)). Er nimmt die Versionen der Spalten nicht: Ein
+  Schnappschuss vergleicht die quantisierten Zustände mit dem, was der Client hat (je Client verschieden), das ist billig
+  genug (rund 0,2 ms je Tick für 16 Spieler und 300 Requisiten). Die Eingabe eines Takts geht als `net::NetInput` (aus
+  `TickInput` gebaut) über die Leitung.

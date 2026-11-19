@@ -1,0 +1,3 @@
+#!args --test toon
+# (G7f part 2) the cartoon look against the ray caster: bands, softness, rims, the sun's shadows against exact shadow rays,
+# a point and a spot light, the environment's mean, MASK, double-sided and blended; refusals; Voll and Basis

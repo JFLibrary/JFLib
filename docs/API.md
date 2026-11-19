@@ -63,7 +63,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan, Metal, WebGPU)
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs) · [mtl_cmd.rs (Apple)](#gpumtl_cmdrs-apple) · [mtl_dev.rs (Apple)](#gpumtl_devrs-apple) · [mtl_res.rs (Apple)](#gpumtl_resrs-apple) · [mtl_swap.rs (Apple)](#gpumtl_swaprs-apple)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
-  <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
+  <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [particles.rs](#render3dparticlesrs) · [post.rs](#render3dpostrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
 - [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, text from an atlas of multi-channel distance fields, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
   <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [dxf.rs](#render2ddxfrs) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [hl.rs](#render2dhlrs) · [overlay.rs](#render2doverlayrs) · [pick.rs](#render2dpickrs) · [cpu.rs](#render2dcpurs) · [text.rs](#render2dtextrs)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
@@ -109,9 +109,9 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
   <br>[lib.rs](#dxf-crate-root) · [src/fonts.rs](#dxfsrcfontsrs) · [src/mtext.rs](#dxfsrcmtextrs) · [src/strings.rs](#dxfsrcstringsrs)
 - [physics](#physics) -- Collision shapes, broad phase and deterministic queries for games
-  <br>[src/bvh.rs](#physicssrcbvhrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
+  <br>[src/bvh.rs](#physicssrcbvhrs) · [src/character.rs](#physicssrccharacterrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
 - [game](#game) -- The game core: a world of entities and components, a fixed tick, input actions, cameras
-  <br>[lib.rs](#game-crate-root) · [src/camera.rs](#gamesrccamerars) · [src/input.rs](#gamesrcinputrs) · [src/pose.rs](#gamesrcposers) · [src/sparse.rs](#gamesrcsparsers) · [src/tick.rs](#gamesrctickrs) · [src/world.rs](#gamesrcworldrs)
+  <br>[lib.rs](#game-crate-root) · [src/camera.rs](#gamesrccamerars) · [src/input.rs](#gamesrcinputrs) · [src/net/arena.rs](#gamesrcnetarenars) · [src/net/bits.rs](#gamesrcnetbitsrs) · [src/net/bot.rs](#gamesrcnetbotrs) · [src/net/client.rs](#gamesrcnetclientrs) · [src/net/clock.rs](#gamesrcnetclockrs) · [src/net/input.rs](#gamesrcnetinputrs) · [src/net/lagcomp.rs](#gamesrcnetlagcomprs) · [src/net/link.rs](#gamesrcnetlinkrs) · [src/net/predict.rs](#gamesrcnetpredictrs) · [src/net/proto.rs](#gamesrcnetprotors) · [src/net/quant.rs](#gamesrcnetquantrs) · [src/net/room.rs](#gamesrcnetroomrs) · [src/net/server.rs](#gamesrcnetserverrs) · [src/net/sim.rs](#gamesrcnetsimrs) · [src/net/snapshot.rs](#gamesrcnetsnapshotrs) · [src/net/walker.rs](#gamesrcnetwalkerrs) · [src/pose.rs](#gamesrcposers) · [src/sparse.rs](#gamesrcsparsers) · [src/tick.rs](#gamesrctickrs) · [src/world.rs](#gamesrcworldrs)
 - [game_render3d](#game_render3d) -- The bridge from the game core to render3d: entities with a mesh as scene instances
   <br>[lib.rs](#game_render3d-crate-root)
 - [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
@@ -21578,7 +21578,12 @@ ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
   (G7f) renderer.remove_mesh(id), remove_material(id), remove_texture(id)   their places are used again, the ids stay
        invalid (store.rs); refused while a scene's instances, a material or a detail level use them
   (G7f) renderer.add_material_desc(&MaterialDesc)             glTF's BLEND (blended after the rest, sorted back to front
-       per instance on the GPU: sort.wgsl) and doubleSided (no culling of back faces, their normal turned round)
+       per instance on the GPU: sort.wgsl) and doubleSided (no culling of back faces, their normal turned round);
+       MaterialDesc::toon, the cartoon look (draw.wgsl)
+  (G7f) Camera::ortho, an orthographic camera; scene.set_viewmodel, add_viewmodel (a weapon before the camera, drawn
+       with its own lens in front of the world: the world's depth 0 ..= 0.5, its own 0.5 ..= 1); scene.set_outline (lines
+       from the depth buffer) and set_antialias (FXAA): post.rs, post.wgsl; scene.set_particles, add_emitter, emit,
+       set_time (billboards moved in a compute shader, sorted, one draw): particles.rs, particles.wgsl
 
 Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
 of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, light in the
@@ -21607,6 +21612,16 @@ DRAW_WGSL: &str = include_str!("draw.wgsl")
 HIZ_WGSL: &str = include_str!("hiz.wgsl")
 /// (G7f) the blended instances sorted back to front
 SORT_WGSL: &str = include_str!("sort.wgsl")
+/// (G7f) outlines and FXAA; the particles
+POST_WGSL: &str = include_str!("post.wgsl")
+PARTICLES_WGSL: &str = include_str!("particles.wgsl")
+CULL_VM_SPV: &[u32] = spv::CULL_VM
+VS_FULL_SPV: &[u32] = spv::VS_FULL
+FS_OUTLINE_SPV: &[u32] = spv::FS_OUTLINE
+FS_FXAA_SPV: &[u32] = spv::FS_FXAA
+CS_PARTICLES_SPV: &[u32] = spv::CS_PARTICLES
+VS_PARTICLE_SPV: &[u32] = spv::VS_PARTICLE
+FS_PARTICLE_SPV: &[u32] = spv::FS_PARTICLE
 SORT_LOCAL_SPV: &[u32] = spv::SORT_LOCAL
 SORT_GLOBAL_SPV: &[u32] = spv::SORT_GLOBAL
 /// (G7f) the blended instances' vertex and fragment shaders
@@ -21675,6 +21690,23 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   - `Blend` -- (G7f) glTF's BLEND (MaterialDesc::blend): drawn after the others, sorted back to front per instance, blended
     (premultiplied alpha), the depth tested and not written; no shadows, not in the occlusion test's pyramid
 
+- **`struct Toon`**
+  (G7f) the cartoon look of a material (MaterialDesc::toon; docs/RENDER3D.md "Cartoon-Material"): flat colours, the sun's
+  and the lights' n.l in bands, a flat ambient light, a light rim on the silhouette.  Metallic, roughness and the
+  metallic-roughness texture are not used; the base colour (with its texture), the normal map, occlusion (on the ambient
+  light), emission, MASK, BLEND and double-sided work as for PBR.  Made with `new` and changed field by field (it may
+  grow).  The values go to the GPU in bytes: softness, rim and rim_width in steps of 1/255
+  - `bands: u32` -- 1 ..= 16 levels of light: 0, 1 / (bands - 1), ..., 1 of the light's colour (the first step at the terminator n.l =
+    0, the others evenly up to n.l = 1); 1: no shading at all, the base colour under the full light
+  - `softness: f32` -- 0 ..= 1: how soft a step is (0 hard; 1 a whole band wide)
+  - `rim: f32` -- 0 ..= 1: how bright the rim is (its colour is the light a white surface facing the sun gets)
+  - `rim_width: f32` -- 0 ..= 1: where the rim begins, as 1 - n.v (0: no rim)
+
+**`impl Toon`**
+
+- **`const fn new(bands: u32) -> Toon`**
+  `bands` levels, hard steps, no rim
+
 - **`struct MeshInfo`**
   where a mesh lies in the pools, and its bounding sphere in its own coordinates
   - `first_index: u32`
@@ -21726,6 +21758,7 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
     test.  Not together with an alpha_cutoff (Invalid)
   - `double_sided: bool` -- glTF's doubleSided: back faces are not culled; they are lit with their normal turned round (the whole shading
     normal, as the glTF sample viewer turns the tangent frame).  Both sides cast shadows (every material does)
+  - `toon: Option<Toon>` -- (G7f) the cartoon look in place of glTF's BRDF (None: PBR)
 
 **`impl MaterialDesc`**
 
@@ -21807,7 +21840,7 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   The first blended or double-sided material makes the pipelines they need
 - **`fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()>`**
   a row of the table; the next frame shows it.  A new alpha class moves the material's instances to the lists of
-  that class with their scenes' next prepare.  (G7f) The material stays blended and double-sided as it was
+  that class with their scenes' next prepare.  (G7f) The material stays blended, double-sided and cartoon as it was
   (set_material_desc changes those)
 - **`fn set_material_desc(&mut self, id: MaterialId, d: &MaterialDesc) -> Result<()>`**
   (G7f) a row of the table with glTF's BLEND and doubleSided; the next frame shows it.  A new alpha class or side
@@ -22006,6 +22039,102 @@ math -- what the scene computes on the CPU, in f64 (no libm in no_std; the matri
 - **`fn pow(x: f64, y: f64) -> f64`**
   x^y for x > 0 (else 0)
 
+### `render3d/particles.rs`
+
+Source: [`lib/render3d/particles.rs`](../lib/render3d/particles.rs)
+
+```text
+particles -- (G7f) billboards from a buffer (docs/RENDER3D.md "Partikel"): emitters on the CPU, a ring of particles on
+the GPU, their motion in a compute shader (particles.wgsl), sorted back to front (sort.wgsl), one indirect draw.
+
+A particle is born on the CPU (Scene::emit): its randomness comes from a hash of the emitter's seed and the particle's
+serial number in that emitter, so the same calls give the same particles on every device and in every run.  Its record
+(64 bytes: place, birth in microseconds, velocity, life, sizes, colours, gravity and drag, flags) goes into the next places
+of the ring (the oldest are overwritten), copied inside the frame's commands.  Nothing changes it afterwards: the compute
+shader evaluates its motion in closed form at its age every frame (constant gravity along -y and a linear drag), and
+puts each living particle into the frame's list with the key of its distance; sort.wgsl sorts the list, one draw with six
+vertices per particle draws it.  No read-back, no state on the GPU besides the births.
+```
+
+- **`enum ParticleBlend`**
+  (G7f) how a particle is laid over the image (both through the premultiplied blend state: an additive particle returns
+  alpha 0)
+  - `Additive` -- adds its light (fire, sparks, muzzle flashes)
+  - `Alpha` -- covers what is behind by its alpha, premultiplied (smoke, dust)
+
+- **`enum ParticleShape`**
+  (G7f) the shape of a particle's billboard
+  - `Disc` -- a soft disc facing the camera (opacity 1 - r^2 from the middle to the rim)
+  - `Streak` -- the disc stretched along the particle's velocity on the screen by Emitter::stretch (sparks)
+
+- **`struct Emitter`**
+  (G7f) an emitter of a Scene (Scene::add_emitter): what the particles it emits look like and how they move.  Made with
+  `new` and changed field by field (it may grow).  Ranges [a, b] are drawn uniformly per particle
+  - `seed: u32` -- the seed of its particles' randomness: particle k of this emitter (counted from its first emit) is the same in every
+    run with the same calls
+  - `blend: ParticleBlend`
+  - `shape: ParticleShape`
+  - `stretch: f32` -- ParticleShape::Streak: how long the streak is per speed (seconds): its length is size + speed \* stretch
+  - `viewmodel: bool` -- its particles live in the viewmodel's space (Scene::add_viewmodel; Scene::emit takes the camera's space: x right, y
+    up, -z forward) and are drawn with the viewmodel, in front of the world (a muzzle flash at the weapon); gravity
+    acts along the camera's -y.  false: the world's
+  - `life: [f32; 2]` -- seconds a particle lives (above 0)
+  - `speed: [f32; 2]` -- the speed at birth (world units per second), along a direction in a cone around Scene::emit's direction
+  - `spread: f32` -- the cone's half angle in radians (0: along the direction, pi: any direction)
+  - `radius: f32` -- particles are born within a ball of this radius around Scene::emit's point
+  - `size: [f32; 2]` -- the billboard's width at birth and at death (world units), linear in between
+  - `color: [[f32; 4]; 2]` -- linear colour (radiance, before the exposure) and opacity at birth and at death, linear in between
+  - `gravity: f32` -- acceleration downwards (along -y; negative: rising), world units per second squared
+  - `drag: f32` -- linear drag (1 / seconds): the velocity falls by e^(-drag t) towards gravity / drag
+
+**`impl Emitter`**
+
+- **`const fn new(seed: u32) -> Emitter`**
+  additive white discs of 0.1 that fade out over a second, at speed 1 straight along the direction
+
+- **`struct EmitterId`**
+  (G7f) an emitter of a Scene; dead after Scene::remove_emitter
+  - `slot: u32`
+
+- **`fn hash(x: u32) -> u32`**
+  the hash of the randomness (a PCG step and its output permutation, as in PCG-RXS-M-XS)
+
+- **`fn motion(rec: &[u32; 16], t: f64) -> (V3, V3)`**
+  a point and its velocity of a record at age t (seconds), in its own space, as particles.wgsl's `motion` computes it:
+  gravity along -y, drag k: v(t) = a + (v0 - a) e^(-k t) with a = g / k, p(t) = p0 + a t + (v0 - a)(1 - e^(-k t)) / k; without
+  drag (k below 1e-4) p0 + v0 t + g t^2 / 2.  In f64 (tests and tools)
+
+### `render3d/post.rs`
+
+Source: [`lib/render3d/post.rs`](../lib/render3d/post.rs)
+
+```text
+post -- (G7f) what comes after the scene's passes (post.wgsl; docs/RENDER3D.md "Umrisse", "Kantenglättung") and the
+particles' pipelines (particles.wgsl): outlines from the depth buffer, FXAA from an image of the scene's own.  Per depth
+attachment the renderer was given, in a chain a shared borrow can grow (as hiz.rs: Renderer::record takes &self): the
+outline's bind group (that depth view) and FXAA's image (the attachment's size, the renderer's colour format) with its
+group.  Scene::prepare drops those not used lately.
+```
+
+- **`struct Outline`**
+  (G7f) lines on the edges of the depth buffer (Scene::set_outline): silhouettes and creases, drawn over the opaque image
+  before blended instances and particles.  Made with `new` and changed field by field (it may grow)
+  - `width: u32` -- 1 ..= 8 pixels: on a silhouette's near side the line is this wide, across a crease about twice
+  - `color: [f32; 4]` -- linear colour and opacity
+  - `crease: f32` -- how sharp a crease must be to get a line: the change of the surface's slope across it (tan of its angle to the
+    view; 0.5 at first, about 30 degrees seen head on).  Larger: fewer creases; jumps of the depth always get one
+
+**`impl Outline`**
+
+- **`const fn new(width: u32, color: [f32; 4]) -> Outline`**
+  lines `width` pixels wide in this colour, creases from 0.5
+
+- **`enum Antialias`**
+  (G7f) anti-aliasing as a pass over the finished image (Scene::set_antialias)
+  - `None`
+  - `Fxaa` -- FXAA 3.11, quality preset 12: the scene is drawn into an image of the renderer's (the target's size and format), FXAA
+    writes it to the target.  The target's old contents are replaced (Load::Keep becomes a clear)
+
 ### `render3d/scene.rs`
 
 Source: [`lib/render3d/scene.rs`](../lib/render3d/scene.rs)
@@ -22065,19 +22194,39 @@ draws it (lib.rs draw_blend).
   - `slot: u32` -- the place in the instance arrays
 
 - **`struct Camera`**
-  a right-handed perspective camera; reverse Z
+  a right-handed camera, perspective or (G7f) orthographic; reverse Z
   - `eye: [f64; 3]`
   - `forward: [f64; 3]` -- unit vectors: where it looks, and up (at right angles)
   - `up: [f64; 3]`
-  - `fov_y: f64` -- the vertical field of view in radians, width / height
+  - `fov_y: f64` -- the vertical field of view in radians (perspective), width / height
   - `aspect: f64`
-  - `near: f64`
-  - `far: f64` -- f64::INFINITY: no far plane
+  - `near: f64` -- distances along forward; (G7f) an orthographic camera's near may be 0 or below
+  - `far: f64` -- f64::INFINITY: no far plane (perspective only: an orthographic camera needs a finite one)
+  - `ortho: Option<f64>` -- (G7f) Some(h): orthographic, the view h world units high and h \* aspect wide, fov_y unused (top, front and side
+    views, editors); depth falls linearly from 1 at near to 0 at far.  Culling, the occlusion test, detail levels (the
+    size of an instance is its sphere's diameter over h, at any distance) and the sun's shadows (the cascades split the
+    view's box uniformly) work as for a perspective camera.  None: perspective
 
 **`impl Camera`**
 
 - **`fn look_at(eye: [f64; 3], target: [f64; 3], up: [f64; 3], fov_y: f64, aspect: f64, near: f64, far: f64) -> Camera`**
   at eye looking at target; `up` says which way is up on the screen
+- **`fn ortho_at(eye: [f64; 3], target: [f64; 3], up: [f64; 3], height: f64, aspect: f64, near: f64, far: f64) -> Camera`**
+  (G7f) an orthographic camera at eye looking at target, the view `height` world units high; near and far along
+  the view (far finite)
+
+- **`struct Viewmodel`**
+  (G7f) the viewmodel's lens (Scene::set_viewmodel): the instances of Scene::add_viewmodel (a weapon before the camera) are
+  drawn with this field of view and depth range after the world, in front of all of it (the world's depth takes 0 ..= 0.5,
+  the viewmodel's 0.5 ..= 1), lit by the scene's sun, shadows, lights and environment.  Made with `new` and changed field
+  by field (it may grow)
+  - `fov_y: f64` -- the vertical field of view in radians
+  - `near: f64` -- its own near and far planes (finite, 0 &lt; near &lt; far), distances along the camera's forward
+  - `far: f64`
+
+**`impl Viewmodel`**
+
+- **`const fn new(fov_y: f64, near: f64, far: f64) -> Viewmodel`**
 
 - **`struct Sun`**
   one sun and an ambient light, linear, in the units of KHR_lights_punctual: a white matte surface facing
@@ -22158,6 +22307,12 @@ draws it (lib.rs draw_blend).
 - **`fn new(r: &Renderer) -> Result<Scene>`**
 - **`fn add(&mut self, i: Instance) -> Result<InstanceId>`**
   a new instance, on a place that came free if there is one (its list: with the next prepare)
+- **`fn add_viewmodel(&mut self, i: Instance) -> Result<InstanceId>`**
+  (G7f) an instance of the viewmodel (Scene::set_viewmodel; without one it is not drawn): its transform is in the camera's
+  space (x right, y up, -z forward, as glTF's cameras), it follows the camera, is drawn with the viewmodel's lens in
+  front of the world, lit by the scene's sun, shadows and lights (it casts no shadows and hides nothing from the
+  occlusion test).  set_transform, set_material, set_mesh and remove work as for the others.  Its material may not be
+  blended (prepare: Invalid)
 - **`fn remove(&mut self, id: InstanceId) -> Result<()>`**
   the instance goes; its place comes free (and its list loses it with the next prepare)
 - **`fn set_transform(&mut self, id: InstanceId, t: &Transform) -> Result<()>`**
@@ -22228,6 +22383,50 @@ draws it (lib.rs draw_blend).
   instance_count second
 - **`fn visible_buffer(&self) -> &Buffer`**
   (tests, tools) the camera's visible list after a frame's culling: slots, a list's at ListInfo::first
+- **`fn set_viewmodel(&mut self, v: Option<&Viewmodel>) -> Result<()>`**
+  (G7f) the viewmodel's lens (None at first: its instances are not drawn, the world's depth is as it was); Invalid for
+  values out of range.  With one the world's depth takes 0 ..= 0.5 (halved: the image stays the same but where two
+  depths tie, as GPUs interpolate depth in steps of their own), the
+  viewmodel's 0.5 ..= 1
+- **`fn viewmodel(&self) -> Option<Viewmodel>`**
+- **`fn viewmodel_buffers(&self) -> Option<(&Buffer, &Buffer)>`**
+  (G7f; tests, tools) the viewmodel's draw records and visible list after a frame (as draws_buffer, visible_buffer)
+- **`fn set_outline(&mut self, o: Option<&Outline>) -> Result<()>`**
+  (G7f) lines on the edges of the depth buffer, over the opaque image (None at first); Invalid for values out of
+  range.  They need a depth attachment with TextureUsage::SAMPLED (the renderer's own has it): record says Invalid
+  otherwise
+- **`fn outline(&self) -> Option<Outline>`**
+- **`fn set_antialias(&mut self, a: Antialias)`**
+  (G7f) anti-aliasing over the finished image (Antialias::None at first)
+- **`fn antialias(&self) -> Antialias`**
+- **`fn set_particles(&mut self, capacity: u32) -> Result<()>`**
+  (G7f) room for this many particles (0, at first: none); a new capacity starts with none alive.  Unsupported beyond what
+  a binding reaches
+- **`fn particle_capacity(&self) -> u32`**
+  (G7f) the particles' room (0: none)
+- **`fn set_time(&mut self, t: f64)`**
+  (G7f) the particles' clock in seconds (the game's time; 0 at first): births and ages are read from it, so the same
+  times give the same frames.  It should not go back
+- **`fn time(&self) -> f64`**
+- **`fn add_emitter(&mut self, e: &Emitter) -> Result<EmitterId>`**
+  (G7f) an emitter: what its particles look like and how they move; Invalid for values out of range
+- **`fn set_emitter(&mut self, id: EmitterId, e: &Emitter) -> Result<()>`**
+  (G7f) a new description (its next particles take it; the living keep theirs); its serial numbers go on
+- **`fn remove_emitter(&mut self, id: EmitterId) -> Result<()>`**
+  (G7f) the emitter goes (its living particles stay until they die)
+- **`fn emit(&mut self, id: EmitterId, at: [f64; 3], dir: [f64; 3], count: u32) -> Result<()>`**
+  (G7f) `count` particles of an emitter, born now (Scene::set_time) at a point in a cone around a direction (the world's,
+  or for a viewmodel emitter the camera's space).  They take the next places of the ring, the oldest are overwritten.
+  Invalid without room for particles (set_particles) or for values not finite
+- **`fn clear_particles(&mut self)`**
+  (G7f) every particle dies now
+- **`fn particle_buffer(&self) -> Option<&Buffer>`**
+  (G7f; tests, tools) the particles' list after a frame: a VkDrawIndirectCommand (6 vertices per particle, the particles
+  alive), then per particle 4 u32: its key (farthest first), its place in the ring, 0, 0; sorted.  None without room
+- **`fn particle_records(&self) -> Option<&Buffer>`**
+  (G7f; tests, tools) the ring of records (particles.rs: 16 u32 each; particles::motion reads one)
+- **`fn particle_epoch(&self) -> f64`**
+  (G7f; tests, tools) the epoch of the particles' clock: a record's birth counts microseconds from it
 - **`fn wait_slot(&mut self) -> Result<()>`**
   wait for the frame that last used this frame's slot, so its data can be written (the window's
   acquire has usually done so).  prepare does it too; call it first to tell the wait from the work.
@@ -53507,7 +53706,8 @@ Source: [`lib/rt/portable/fx.rs`](../lib/rt/portable/fx.rs)
 
 ```text
 Scalar IEEE-754 operations matching the native SSE conversion and operand-selection
-rules. Integer square root avoids libm imports and gives correctly rounded results.
+rules. The square roots avoid libm imports and give correctly rounded results: binary32 by an
+integer root, binary64 by Newton's method with an integer correction (sqrt_portable).
 ```
 
 - **`fn nearest(x: f64) -> f64`**
@@ -53541,7 +53741,18 @@ rules. Integer square root avoids libm imports and gives correctly rounded resul
   Correctly rounded binary32 square root; preserves signed zero and quiets NaNs.
 
 - **`fn sqrtd(x: f64) -> f64`**
-  Correctly rounded binary64 square root; preserves signed zero and quiets NaNs.
+  Correctly rounded binary64 square root; preserves signed zero and quiets NaNs.  The same function as
+  [`sqrt_portable`].
+
+- **`fn sqrt_portable(x: f64) -> f64`**
+  The correctly rounded binary64 square root from f64 operations and one 64 x 64 bit product, with the
+  results of `sqrtsd` for every input (signed zero kept, NaN quieted, a negative number gives the
+  negative default NaN): Newton's method gives an estimate within a few units in the last place, the
+  integer test (R - 1/2)^2 &lt; X &lt;= (R + 1/2)^2 on the significand picks the right neighbour.  `rt::fx::sqrtd`
+  is this function where the processor has no square root rt uses (the browser, the x86-64 Android
+  emulator); on the other targets it is here for comparisons and for lib/physics' and lib/geom's tests.
+  Several times faster than the bit-by-bit integer root it replaced (docs/PHYSICS.md, measurements).
+  `#[inline]`: compiled in the calling crate, with its optimisation level (rt has 1 in development builds).
 
 - **`fn minss(a: f32, b: f32) -> f32`**
   SSE minimum: return the second operand for equal or unordered operands.
@@ -54266,6 +54477,9 @@ physics -- collision for games: shapes, broad phase, queries; deterministic, the
                  swept convex shape: time of impact, normal, contact point), overlap, contacts
                  (penetration depth and normal per body and triangle), closest_point
   query          the same for one shape against one placed shape, without a world
+  CharacterController  the kinematic figure: an upright capsule that walks, runs, jumps, crouches, takes
+                 steps and ramps up to a slope limit, slides along walls, snaps down; one step a pure
+                 function of (state, input, world, dt)
   math           Vec3, Quat, Iso, Aabb in f64; sqrt correctly rounded, sin / cos / atan2 from rt's
                  portable math
 
@@ -54304,6 +54518,159 @@ any input.  Every choice has a tie-break by axis, bin or index: the same tree on
 
 - **`fn is_leaf(&self) -> bool`**
   a leaf (it has triangles)
+
+### `physics/src/character.rs`
+
+Source: [`lib/physics/src/character.rs`](../lib/physics/src/character.rs)
+
+```text
+character -- the kinematic character controller: an upright capsule that walks, runs, jumps and crouches
+on the world's queries.  Steps up to a step height, ramps up to a slope limit (steeper surfaces are walls
+it slides down), sliding along walls and into corners, ground snapping on the way down ramps and steps,
+steering in the air.  The feel hangs on CharacterParams; the defaults suit a fast cartoon arena shooter.
+
+One step is a function of (state, input, world, dt) alone: f64 with + - * /, the correctly rounded
+square root and rt's portable cosine (once, in new), no fused multiply-add, no unordered iteration.  So
+it gives the same bits on every target, and a client predicts exactly what the server computes (G7e).
+The step derives the ground itself; position, velocity and crouched are all the state it reads.
+
+A step (docs/PHYSICS.md, "Der Character-Controller"):
+  1. push out of anything the capsule overlaps (only after a teleport or a body moved into it: the
+     controller's own moves are casts and never end inside anything)
+  2. find the ground: a short cast down; it carries the figure when the normal is walkable (y >=
+     cos(max slope)), or when the contact is on the edge of a walkable surface (a step, a ledge: a ray
+     down just beyond the contact finds that surface), and the figure does not move away from it
+  3. crouch (on the ground the head comes down, in the air the legs come up) or stand up (only where a
+     cast of the crouched capsule finds room for the standing one)
+  4. jump (sets the vertical speed); on the ground with input the velocity moves towards the wish
+     velocity along the ground (accel), without input Quake's friction brakes it; in the air Quake's
+     acceleration (the speed along the wish direction grows up to the wish speed, scaled by air_control)
+  5. move: collide and slide with up to four casts, stopping `skin` before each contact; Quake 3's clip
+     planes (two planes: along their crease, three: stop), so corners neither jitter nor trap; on the
+     ground steep surfaces count as vertical walls (no climbing them by pushing), a walkable one turns
+     the velocity onto it at the same speed; blocked on the ground, a step: up, forward, down onto
+     walkable ground, taken when it gets farther
+  6. on the ground at the start and no jump: snap down onto ground up to step_height below (stairs and
+     ramps downwards); in the air: land on ground within the probe distance
+
+Gravity in the air uses the mean velocity of the tick (v - g dt / 2) for the move, so the height after k
+free ticks is y0 + v0 t - g t^2 / 2 at t = k dt (up to rounding), whatever the tick rate.
+```
+
+```rust
+/// at most so many walls one step reports in [`StepEvents::walls`]
+MAX_WALL_TOUCHES: usize = 4
+```
+
+- **`struct CharacterParams`**
+  How a figure moves: its capsule, speeds, acceleration, friction, gravity, jump, steps and slopes.
+  Metres, seconds, degrees.  [`CharacterParams::default`] is tuned for a fast cartoon arena shooter
+  (docs/PHYSICS.md lists the values and why); [`CharacterController::new`] limits values that make no sense.
+  - `radius: f64` -- the capsule's radius (default 0.4 m)
+  - `height: f64` -- standing height, feet to the top of the head (1.8 m), at least twice the radius
+  - `crouch_height: f64` -- crouched height (1.2 m), between twice the radius and `height`
+  - `walk_speed: f64` -- wish speed without `run` (5 m/s)
+  - `run_speed: f64` -- wish speed with `run` (9 m/s)
+  - `crouch_speed: f64` -- wish speed while crouched (3 m/s)
+  - `accel: f64` -- ground acceleration (12 per second): with input the velocity moves towards the wish velocity (wish
+    direction along the ground times wish speed) by up to `accel` times the wish speed per second; 0 to
+    full speed in 1/12 s, sliding along a wall at the wish velocity's part along it
+  - `friction: f64` -- ground friction without input (6 per second, Quake's): each second the speed drops by `friction`
+    times max(speed, `stop_speed`); from run speed to a stop in about 0.4 s
+  - `stop_speed: f64` -- below this speed friction brakes as if the figure moved this fast, so it stops (2.5 m/s)
+  - `air_control: f64` -- acceleration in the air as a fraction of `accel` (0.3; 0: no steering in the air), Quake's model:
+    the speed along the wish direction grows by up to air_control times accel times the wish speed per
+    second, not beyond the wish speed; steering at an angle to the velocity can gain speed (strafe
+    jumping) up to `max_speed`
+  - `gravity: f64` -- downwards (20 m/s², about twice the earth's: short, snappy jumps)
+  - `jump_height: f64` -- height of a jump's apex above the take-off (1.2 m: onto a crate)
+  - `step_height: f64` -- the highest step the figure walks up and the deepest it snaps down to (0.4 m)
+  - `max_slope_deg: f64` -- the steepest walkable slope (45 degrees); steeper surfaces are walls it slides down
+  - `skin: f64` -- the gap kept between the capsule and everything (0.005 m)
+  - `max_speed: f64` -- the horizontal speed never gets above this (30 m/s)
+  - `max_fall_speed: f64` -- falling never gets faster than this (50 m/s)
+
+- **`struct CharacterState`**
+  What a figure is: all a step reads is `position`, `velocity` and `crouched`; `grounded`,
+  `ground_normal` and `ground_body` are what the last step found (a step finds them again).
+  - `position: Vec3` -- the feet: the lowest point of the capsule (m)
+  - `velocity: Vec3` -- m/s; on the ground along the ground
+  - `crouched: bool` -- the capsule has the crouched height
+  - `grounded: bool` -- stands on walkable ground (output)
+  - `ground_normal: Vec3` -- the normal of that ground, [`Vec3::Y`] in the air (output)
+  - `ground_body: Option<BodyId>` -- the body the figure stands on (output)
+
+**`impl CharacterState`**
+
+- **`const fn new(position: Vec3) -> CharacterState`**
+  standing at `position` (the feet), not moving, in the air until the first step finds ground
+
+- **`struct CharacterInput`**
+  What the player wants in one tick
+  - `wish: Vec3` -- the direction to move in, in world space; y is ignored.  Length 1 moves at the full wish speed,
+    shorter moves slower (a stick), longer counts as 1.  From a yaw: `math::sincos` (rt's portable sine
+    and cosine), never std's, which differs between targets.
+  - `run: bool` -- the run speed instead of the walk speed
+  - `jump: bool` -- jump when on the ground (held: again on every landing)
+  - `crouch: bool` -- crouch while held; on release stand up as soon as there is room
+
+- **`struct Touch`**
+  one contact of a step with a wall
+  - `body: BodyId` -- the body
+  - `point: Vec3` -- the contact point on its surface
+  - `normal: Vec3` -- the surface normal towards the figure
+  - `triangle: u32` -- the triangle of a mesh, or [`crate::NO_TRIANGLE`]
+
+- **`struct StepEvents`**
+  What happened in one step
+  - `landed: bool` -- was in the air (after a jump of this step too) and stands at the end
+  - `impact_speed: f64` -- the speed into the ground at the landing (m/s, for sounds and damage)
+  - `jumped: bool` -- jumped at the start of this step
+  - `left_ground: bool` -- stood at the start, did not jump and is in the air at the end (walked off a ledge)
+  - `hit_ceiling: bool` -- touched a surface facing down (the normal's y at most -cos(max slope))
+  - `walls: [Option<Touch>; MAX_WALL_TOUCHES]` -- the walls touched, in order, each body and triangle once, at most [`MAX_WALL_TOUCHES`]
+  - `stepped_up: f64` -- how far a step lifted the figure (m)
+  - `snapped_down: f64` -- how far ground snapping lowered it (m)
+  - `stand_blocked: bool` -- wanted to stand up and had no room
+  - `pushed_out: f64` -- how far it was pushed out of an overlap at the start (m)
+  - `casts: u32` -- the casts this step made (for statistics)
+
+**`impl StepEvents`**
+
+- **`fn walls(&self) -> impl Iterator<Item = &Touch> + '_`**
+  the walls touched
+- **`fn wall_count(&self) -> usize`**
+  how many walls were touched
+
+- **`struct CharacterController`**
+  The controller: the parameters checked and the values derived from them.  One controller serves any
+  number of figures; [`CharacterController::step`] takes `&self`.
+
+**`impl CharacterController`**
+
+- **`fn new(params: CharacterParams) -> CharacterController`**
+  a controller with `params`, limited to what makes sense: radius at least 1 cm, heights at least twice
+  the radius (crouched not above standing), skin between 0.1 mm and a quarter of the radius, slope 0 to
+  89 degrees, no negative speeds; a value that is not finite takes the default
+- **`fn params(&self) -> &CharacterParams`**
+  the parameters as the controller uses them
+- **`fn jump_speed(&self) -> f64`**
+  the vertical speed a jump starts with: sqrt(2 gravity jump_height)
+- **`fn walkable_y(&self) -> f64`**
+  cos(max_slope_deg): a normal with at least this y is walkable
+- **`fn walkable(&self, normal: Vec3) -> bool`**
+  can a figure stand on a surface with this unit normal
+- **`fn height(&self, crouched: bool) -> f64`**
+  the capsule's total height
+- **`fn capsule(&self, crouched: bool) -> Shape`**
+  the capsule (upright, its centre half the height above the feet)
+- **`fn capsule_iso(&self, state: &CharacterState) -> Iso`**
+  where the capsule of `state` is: for [`World::set_iso`] when the figure is a body of the world
+- **`fn step(&self, state: &CharacterState, world: &World, filter: &Filter, input: &CharacterInput, dt: f64) -> (CharacterState, StepEvents)`**
+  One tick: the state after `dt` seconds of `input` among the bodies of `world` that `filter` lets
+  through (leave the figure's own body out: `Filter::ALL.excluding(id)`), and what happened.  The same
+  bits on every target for the same arguments.  A `dt` that is not positive and finite, or a position
+  that is not finite, changes nothing; a velocity that is not finite counts as 0.
 
 ### `physics/src/gjk.rs`
 
@@ -54394,15 +54761,16 @@ the same code on every target.
 ```
 
 - **`fn sqrt(x: f64) -> f64`**
-  The square root, correctly rounded (IEEE 754), so the same bits on every target: the processor's
-  instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64), elsewhere (the browser, the x86-64
-  Android emulator) [`sqrt_portable`].  A negative argument gives NaN, -0.0 gives -0.0.
+  The square root, correctly rounded (IEEE 754), so the same bits on every target, NaN included:
+  `rt::fx::sqrtd`, the processor's instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64),
+  elsewhere (the browser, the x86-64 Android emulator) [`sqrt_portable`].  A negative argument gives NaN,
+  -0.0 gives -0.0.
 
 - **`fn sqrt_portable(x: f64) -> f64`**
-  The correctly rounded square root from f64 operations and one 64 x 64 bit product: Newton's method
-  gives an estimate within a few units in the last place, the integer test (R - 1/2)^2 &lt; X &lt; (R + 1/2)^2
-  on the significand picks the right neighbour.  Equal to the processor's square root for every input;
-  on the browser it is several times faster than rt's bit-by-bit root.  Public for the tests.
+  The correctly rounded square root from f64 operations and one 64 x 64 bit product (`rt::fx::sqrt_portable`):
+  Newton's method gives an estimate within a few units in the last place, the integer test (R - 1/2)^2 &lt; X
+  &lt;= (R + 1/2)^2 on the significand picks the right neighbour.  Equal to the processor's square root
+  (`sqrtsd`) for every input, NaN included.  Public for the tests.
 
 - **`fn sincos(x: f64) -> (f64, f64)`**
   sin and cos of `x` (radians) from rt's portable math: the same bits on every target (within half an
@@ -55450,6 +55818,1395 @@ FACTOR_OTHER: f64 = 1.0
   the bindings and the mouse settings from section `section` (Self::store) -> the bindings that
   could not be read
 
+### `game/src/net/arena.rs`
+
+Source: [`lib/game/src/net/arena.rs`](../lib/game/src/net/arena.rs)
+
+```text
+arena -- the netcode's reference game: a square arena with walls and crates, walking figures
+(walker::Walker), props (some move along circles) and a hitscan weapon with lag compensation.  The
+tests, the bots and the measurements of G7e run it; G7h can read it as an example of a RoomSim
+
+  ArenaConfig    its size, the props and how many of them move, the rate, the lag compensation's limit
+  schema()       KIND_PLAYER (13 fields: the walker's 7, yaw, pitch, health, kills, deaths, the tick of the
+                 last shot) and KIND_PROP (7: the position, the rotation's smallest three)
+  map(cfg)       the static map as a physics::World (the same on the server and every client)
+  baseline(cfg)  the props as the map places them (the clients' first base)
+  Arena          the RoomSim: join (a figure at a spawn point), leave, step (move every figure with its
+                 input, move the props, remember the hit volumes, fire: rewind the others to the shooter's
+                 view time, cast the ray), snapshot, priority (figures over props, near over far)
+
+The props are not in the physics world: they do not block the figures in this first part, so the map
+every client predicts against stays the server's.
+```
+
+```rust
+/// the kind of a figure
+KIND_PLAYER: u8 = 1
+/// the kind of a prop
+KIND_PROP: u8 = 2
+/// a figure's fields
+PLAYER_FIELDS: usize = 13
+/// a prop's fields
+PROP_FIELDS: usize = 7
+/// the fields of a figure after the walker's: yaw, pitch, health, kills, deaths, shot
+F_YAW: usize = 7
+/// see F_YAW
+F_PITCH: usize = 8
+/// see F_YAW
+F_HEALTH: usize = 9
+/// see F_YAW
+F_KILLS: usize = 10
+/// see F_YAW
+F_DEATHS: usize = 11
+/// see F_YAW
+F_SHOT: usize = 12
+/// the first net id of the props (figures have 1 ..= 255)
+FIRST_PROP: u16 = 1000
+/// a hit's damage, a figure's health
+DAMAGE: i32 = 25
+/// see DAMAGE
+HEALTH: i32 = 100
+/// ticks between two shots
+FIRE_TICKS: u32 = 6
+/// how far a shot reaches (m)
+RANGE: f64 = 100.0
+```
+
+- **`struct ArenaConfig`**
+  the arena's settings
+  - `half: f64` -- half the side of the square (m)
+  - `props: usize` -- props
+  - `moving: usize` -- of those, how many move (the first ones)
+  - `displaced: usize` -- of the others, how many stand away from the map's place from the start (moved earlier in a round:
+    they make the full state of a join larger, not the snapshots after it)
+  - `crates: usize` -- crates on the floor (static, in the map)
+  - `rate: u32` -- ticks a second (the props' motion)
+  - `max_rewind: u32` -- how far back hits are rewound at most (ticks; 18 unless set: 300 ms at 60 Hz, as ServerOptions::max_rewind_ms)
+  - `fire: bool` -- figures may shoot
+
+- **`fn schema() -> Schema`**
+  the schema of the arena's entities
+
+- **`fn crates(cfg: &ArenaConfig) -> Vec<(Vec3, Vec3)>`**
+  the crates of the map: (centre, half extents)
+
+- **`fn map(cfg: &ArenaConfig) -> physics::World`**
+  the static map: a floor (its top at y = 0), four walls, the crates
+
+- **`fn spawn_point(cfg: &ArenaConfig, k: u32) -> Vec3`**
+  where the k-th figure appears (a ring round the middle)
+
+- **`fn baseline(cfg: &ArenaConfig) -> Snapshot`**
+  the props as the map places them: every client's first base
+
+- **`struct Figure`**
+  a figure of the arena
+  - `name: String` -- its name
+  - `state: WalkState` -- the walker's state
+  - `yaw: u16` -- the view (quant steps)
+  - `pitch: i16` -- see yaw
+  - `health: i32` -- health 0 ..= 100
+  - `kills: i32` -- hits that ended another figure
+  - `deaths: i32` -- how often it was ended
+  - `shot: u32` -- the tick of its last shot
+  - `generation: u8` -- its generation (the net id's)
+
+- **`struct ArenaStats`**
+  what the arena counted
+  - `shots: u64` -- shots fired
+  - `hits: u64` -- of those, hits on a figure
+  - `clamped: u64` -- shots whose view time lay further back than max_rewind (clamped)
+  - `kills: u64` -- figures ended
+  - `view_sum: u64` -- the shooters' view lag summed over the shots (1/256 ticks) and the largest
+  - `view_max: u32` -- see view_sum
+
+- **`struct Arena`**
+  the reference RoomSim (see the module header)
+
+**`impl Arena`**
+
+- **`fn new(cfg: ArenaConfig) -> Arena`**
+  an arena with these settings
+- **`fn config(&self) -> &ArenaConfig`**
+  the settings
+- **`fn map(&self) -> &physics::World`**
+  the map
+- **`fn walker(&self) -> &Walker`**
+  the movement
+- **`fn figures(&self) -> &BTreeMap<u16, Figure>`**
+  the figures by net id
+- **`fn history(&self) -> &HitHistory`**
+  the remembered hit volumes
+- **`fn stats(&self) -> ArenaStats`**
+  what it counted
+- **`fn teleport(&mut self, id: u16, feet: Vec3)`**
+  put a figure somewhere else (a teleport: its client reconciles)
+- **`fn figure_state(&self, f: &Figure) -> NetState`**
+  a figure's replicated state
+
+### `game/src/net/bits.rs`
+
+Source: [`lib/game/src/net/bits.rs`](../lib/game/src/net/bits.rs)
+
+```text
+bits -- a bit stream for the netcode's messages: values of any width up to 32 bits, little-endian
+bit order (the first bit written is bit 0 of byte 0), and two variable-length codes
+
+  BitWriter   bits(value, n), bool, uvar (counts, gaps: 0 + 4 | 10 + 8 | 110 + 16 | 111 + 32 bits),
+              svar (field deltas, zigzag: 0 + 6 | 10 + 10 | 110 + 16 | 111 + 32 bits), u8 / u16 / u32,
+              bit_len, finish
+  BitReader   the same reads; past the end or on a value out of range it returns 0 and sets a sticky
+              error flag (ok() false): bytes from the network never panic, the caller checks once
+
+The codes are sized for a game's snapshots: an id gap is mostly 0 (5 bits), a position delta of a
+walking figure between two snapshots (a few hundred steps of 1/1024 m) takes 12 bits, an unchanged
+field is not written at all (the field mask of the snapshot says which are).
+```
+
+- **`struct BitWriter`**
+  writes bits into bytes (see the module header)
+
+**`impl BitWriter`**
+
+- **`fn new() -> BitWriter`**
+  an empty stream
+- **`fn with_prefix(prefix: &[u8]) -> BitWriter`**
+  an empty stream after `prefix` (whole bytes, such as a message type)
+- **`fn bits(&mut self, v: u32, n: u32)`**
+  the low `n` bits of `v` (n at most 32)
+- **`fn bool(&mut self, b: bool)`**
+  one bit
+- **`fn u8(&mut self, v: u8)`**
+  8 bits
+- **`fn u16(&mut self, v: u16)`**
+  16 bits
+- **`fn u32(&mut self, v: u32)`**
+  32 bits
+- **`fn uvar(&mut self, v: u32)`**
+  an unsigned number in the code for counts and gaps: 0 + 4 bits, 10 + 8, 110 + 16, 111 + 32
+- **`fn svar(&mut self, d: i32)`**
+  a signed difference in the code for field deltas (zigzag: 0, -1, 1, -2, ...): 0 + 6 bits (-32 ..= 31),
+  10 + 10 (-512 ..= 511), 110 + 16, 111 + 32
+- **`fn bit_len(&self) -> usize`**
+  bits written so far (prefix included)
+- **`fn finish(mut self) -> Vec<u8>`**
+  the bytes, the last one filled up with zero bits
+
+- **`fn uvar_bits(v: u32) -> usize`**
+  the bits uvar takes for v
+
+- **`fn svar_bits(d: i32) -> usize`**
+  the bits svar takes for d
+
+- **`fn zigzag(d: i32) -> u32`**
+  0, -1, 1, -2, 2 ... -> 0, 1, 2, 3, 4 ...
+
+- **`fn unzigzag(z: u32) -> i32`**
+  the inverse of zigzag
+
+- **`struct BitReader<'a>`**
+  reads bits from bytes (see the module header)
+
+**`impl<'a> BitReader<'a>`**
+
+- **`fn new(buf: &'a [u8]) -> BitReader<'a>`**
+  a stream over `buf`
+- **`fn bits(&mut self, n: u32) -> u32`**
+  `n` bits (at most 32); 0 and the error flag past the end
+- **`fn bool(&mut self) -> bool`**
+  one bit
+- **`fn u8(&mut self) -> u8`**
+  8 bits
+- **`fn u16(&mut self) -> u16`**
+  16 bits
+- **`fn u32(&mut self) -> u32`**
+  32 bits
+- **`fn uvar(&mut self) -> u32`**
+  BitWriter::uvar
+- **`fn svar(&mut self) -> i32`**
+  BitWriter::svar
+- **`fn fail(&mut self)`**
+  mark the stream as bad (a value the caller found out of range)
+- **`fn ok(&self) -> bool`**
+  no read went past the end and nothing was marked bad
+- **`fn bytes_left(&self) -> usize`**
+  whole bytes not yet touched (the bits of a started byte do not count)
+
+### `game/src/net/bot.rs`
+
+Source: [`lib/game/src/net/bot.rs`](../lib/game/src/net/bot.rs)
+
+```text
+bot -- a player without a person for tests and load: it wanders the arena, turns, strafes, runs and
+jumps now and then, and (with fire) aims at the nearest other figure and shoots.  It sees what its
+client sees (its predicted figure, the others interpolated) and makes the input of one tick from it;
+deterministic from its seed
+
+  BotConfig    seed, whether it shoots, how often it jumps, how fast it turns
+  Bot::think   the input of a tick from the own figure's feet (None before the first snapshot) and the
+               others' feet
+```
+
+- **`struct BotConfig`**
+  a bot's settings
+  - `seed: u64` -- its random numbers
+  - `fire: bool` -- it shoots at others within `range`
+  - `range: f64` -- see fire (m)
+  - `jumps: f64` -- jumps a second on average
+  - `turn: f64` -- the fastest turn (rad/s)
+  - `half: f64` -- half the side of the arena (where it wanders)
+  - `rate: u32` -- ticks a second
+
+- **`struct Bot`**
+  a bot (see the module header)
+
+**`impl Bot`**
+
+- **`fn new(cfg: BotConfig) -> Bot`**
+  a bot with these settings
+- **`fn think(&mut self, own: Option<Vec3>, others: &[(u16, Vec3)]) -> NetInput`**
+  the input of one tick: `own` the figure's feet (None: not known yet), `others` the other figures'
+  feet
+
+- **`fn remote_feet(remotes: &[super::client::Remote], out: &mut Vec<(u16, Vec3)>)`**
+  the feet of the other figures of a client's view (KIND_PLAYER remotes, blended), for Bot::think
+
+### `game/src/net/client.rs`
+
+Source: [`lib/game/src/net/client.rs`](../lib/game/src/net/client.rs)
+
+```text
+client -- the client side of the netcode, without I/O: netchan's events in, messages out
+
+  NetClient<M>   joins a room (HELLO -> WELCOME), runs its own ticks ahead of the server (SteeredClock),
+                 predicts its figure with M (Predictor) and sends every tick's input with the ones the
+                 server may still lack; decodes snapshots against the base they name (a ring of the last
+                 64 it decoded, the map's baseline), reconciles its figure with each newer one, and shows
+                 the other entities interp_ms behind the newest snapshot (InterpClock, remotes)
+  fetch          a UDP client whose full state does not fit a datagram is told so in WELCOME:
+                 fetch_request() names the server's WebSocket port and a ticket, the app opens a second
+                 netchan connection there and feeds its events to on_fetch_event (FETCH -> FULL)
+
+Per frame: on_event for every netchan event (main channel), advance(now) -> n, then n times step(map,
+input) with the input of that tick; take_out what to send.  The figure is predicted() (and
+predicted_prev() with alpha() for a frame between two ticks); the others are remotes().
+```
+
+- **`struct ClientOptions`**
+  a client's settings
+  - `name: String` -- the player's name
+  - `room: Option<RoomCode>` -- the room to join (None: make one)
+  - `interp_ms: u32` -- how far behind the newest snapshot the others are shown (ms)
+  - `margin: Option<f64>` -- the margin the inputs aim for (None: the server's)
+  - `ring: usize` -- snapshots kept as bases and for interpolation
+  - `min_redundancy: usize` -- inputs every packet repeats at least (the newest and the ones before it)
+
+- **`enum Phase`**
+  where a client stands
+  - `Connecting` -- the channel is not connected yet
+  - `Joining` -- HELLO went out, no WELCOME yet
+  - `Playing` -- in a room
+  - `Refused(u8)` -- the server refused (proto::REFUSE_\*)
+  - `Closed` -- the channel ended
+
+- **`struct ClientStats`**
+  what a client counted
+  - `snapshots: u64` -- snapshots decoded (FULL included)
+  - `fulls: u64` -- FULLs decoded
+  - `stale: u64` -- snapshots older than the newest (kept as bases only)
+  - `no_base: u64` -- snapshots whose base was not in the ring
+  - `bad: u64` -- messages that did not decode
+  - `early: u64` -- snapshots before WELCOME (it was lost or overtaken: they are dropped)
+  - `bytes_in: u64` -- payload bytes received (snapshots and FULLs)
+  - `inputs_sent: u64` -- INPUT messages sent and their payload bytes
+  - `bytes_out: u64` -- see inputs_sent
+  - `start_lead: u32` -- ticks between the server's tick and the client's when WELCOME came (the first estimate)
+
+- **`struct Remote`**
+  another entity as a frame shows it: its states in the two snapshots around the render time and the
+  fraction between them (a == b and t == 0 when the newer one is missing: it holds)
+  - `id: u16` -- the net id
+  - `generation: u8` -- the generation
+  - `a: NetState` -- the state before the render time
+  - `b: NetState` -- the state after it
+  - `t: f64` -- the fraction from a to b
+
+- **`fn lerp_field(a: i32, b: i32, t: f64) -> f64`**
+  a field blended linearly
+
+- **`fn lerp_angle_field(a: i32, b: i32, t: f64) -> f64`**
+  a field holding an angle in u16 steps (quant::angle_q), blended the short way -> the angle's step as f64
+
+- **`struct NetClient<M: Movement>`**
+  the client (see the module header)
+
+**`impl<M: Movement> NetClient<M>`**
+
+- **`fn new(opts: ClientOptions, mover: M, schema: Schema, baseline: Snapshot) -> NetClient<M>`**
+  a client of a game with this schema and map baseline (both as the server has them), predicting with
+  `mover`
+- **`fn phase(&self) -> Phase`**
+  where it stands
+- **`fn welcome(&self) -> Option<&Welcome>`**
+  the server's WELCOME (in a room)
+- **`fn own_id(&self) -> u16`**
+  the net id of the own figure (0 before WELCOME)
+- **`fn mover(&self) -> &M`**
+  the movement
+- **`fn schema(&self) -> &Schema`**
+  the schema
+- **`fn stats(&self) -> &ClientStats`**
+  what it counted
+- **`fn predictor(&self) -> &Predictor<M>`**
+  the prediction (its counts: steps, mismatches, errors)
+- **`fn clock(&self) -> &SteeredClock`**
+  the prediction clock
+- **`fn interp(&self) -> &InterpClock`**
+  the interpolation clock
+- **`fn last_outcome(&self) -> Option<Outcome>`**
+  what the last reconciliation found
+- **`fn on_event(&mut self, map: &physics::World, e: &ClientEvent, now_ns: u64)`**
+  one of netchan's client events of the main channel at time now_ns
+- **`fn fetch_request(&mut self) -> Option<(u16, u64)>`**
+  (UDP whose full state does not fit) the server's WebSocket port and the ticket, once: open a second
+  netchan connection there (Endpoint::WebSocket) and feed its events to on_fetch_event
+- **`fn on_fetch_event(&mut self, map: &physics::World, e: &ClientEvent, now_ns: u64)`**
+  one of netchan's client events of the fetch's connection
+- **`fn take_out(&mut self) -> Option<Vec<u8>>`**
+  the next message for the main channel
+- **`fn take_fetch_out(&mut self) -> Option<Vec<u8>>`**
+  the next message for the fetch's connection
+- **`fn advance(&mut self, now_ns: u64) -> u32`**
+  the clock stands at now_ns -> the ticks due (call step once for each)
+- **`fn tick(&self) -> u32`**
+  the next tick step predicts
+- **`fn alpha(&self) -> f64`**
+  the clock's place between two ticks (a frame blends predicted_prev and predicted by it)
+- **`fn step(&mut self, map: &physics::World, input: NetInput) -> u32`**
+  one tick with this input: predict, queue the INPUT (its view time is set here) -> the tick
+- **`fn predicted(&self) -> Option<M::State>`**
+  the predicted state of the own figure after the last step (None before the first snapshot)
+- **`fn predicted_prev(&self) -> Option<M::State>`**
+  the predicted state a tick before (for alpha)
+- **`fn newest(&self) -> Option<&Snapshot>`**
+  the newest snapshot decoded
+- **`fn render_time(&self) -> Option<(u32, f64)>`**
+  the render time of the others (a tick and the fraction), None before the first snapshot
+- **`fn remotes(&self, out: &mut Vec<Remote>)`**
+  the other entities at the render time (the own figure left out), in id order
+
+### `game/src/net/clock.rs`
+
+Source: [`lib/game/src/net/clock.rs`](../lib/game/src/net/clock.rs)
+
+```text
+clock -- a client's two clocks: the ticks it predicts and sends inputs for (ahead of the server by the
+trip of its inputs plus a margin), and the time it shows the other entities at (behind the newest
+snapshot by an interpolation delay); both run on time from outside, like FixedTick
+
+  SteeredClock    the prediction's ticks.  The server reports how early the client's inputs arrive (the
+                  smallest margin per snapshot, in ticks); the clock runs up to 10 % faster or slower to
+                  hold the margin at its target (2 ticks unless set), jumps ahead when far too late and
+                  holds still when far too early.  All in integers: the speed in ppm, the accumulator in
+                  ns x rate x ppm
+  InterpClock     the picture of the others: a render time in server ticks (a tick and a fraction, so it
+                  survives the wrap of u32), interp_ticks behind the newest snapshot, steered by up to
+                  10 % towards that place at every snapshot, snapped when it is far off, never past the
+                  newest snapshot (it holds)
+
+The two are separate from the tick interpolation of Pose (that blends the last two predicted ticks of
+the own figure); docs/NETCODE.md, "Zeit".
+```
+
+- **`struct SteeredClock`**
+  the prediction's clock (see the module header)
+
+**`impl SteeredClock`**
+
+- **`fn new(rate: u32, target: f64) -> SteeredClock`**
+  `rate` ticks a second, holding the margin of the inputs at `target` ticks
+- **`fn set_tick(&mut self, tick: u32)`**
+  start at `tick` (the next tick advance hands out)
+- **`fn advance(&mut self, now_ns: u64) -> u32`**
+  the clock stands at now_ns -> the ticks due (take each with next_tick)
+- **`fn next_tick(&mut self) -> u32`**
+  the tick to run now (call once per tick advance returned)
+- **`fn tick(&self) -> u32`**
+  the next tick next_tick hands out
+- **`fn alpha(&self) -> f64`**
+  how far the clock is into the next tick, in [0, 1) (a frame blends the last two predicted states)
+- **`fn on_margin(&mut self, m: i32)`**
+  the server's report: the smallest margin of the client's inputs (ticks they arrived early)
+- **`fn speed_ppm(&self) -> u32`**
+  the speed now in ppm (1 000 000: nominal)
+- **`fn margin(&self) -> Option<f64>`**
+  the smoothed margin (None before the first report)
+- **`fn jumps(&self) -> u32`**
+  how often it jumped or held
+
+- **`struct InterpClock`**
+  the time the others are shown at (see the module header)
+
+**`impl InterpClock`**
+
+- **`fn new(rate: u32, delay: f64) -> InterpClock`**
+  `rate` ticks a second, `delay` ticks behind the newest snapshot
+- **`fn on_snapshot(&mut self, tick: u32)`**
+  a snapshot of `tick` came (older ones than the newest only count as nothing)
+- **`fn advance(&mut self, now_ns: u64)`**
+  the clock stands at now_ns
+- **`fn time(&self) -> Option<(u32, f64)>`**
+  the render time: a tick and the fraction towards the next (None before the first snapshot)
+- **`fn behind(&self) -> f64`**
+  how far the render time is behind the newest snapshot, in ticks
+
+### `game/src/net/input.rs`
+
+Source: [`lib/game/src/net/input.rs`](../lib/game/src/net/input.rs)
+
+```text
+input -- what a client sends every tick, the redundancy that makes a lost datagram cost nothing, and
+the server's buffer that hands each tick its input
+
+  NetInput        one tick's input, quantised: held buttons (the game's bits), two axes, yaw, pitch and
+                  the view time for lag compensation (how far behind the tick the client's picture of
+                  the others was, in 1/256 ticks)
+  write_inputs    the newest input whole, every older one against the next newer (1 bit when it is the
+                  same); read_inputs the inverse (None when malformed)
+  InputBuffer     the server's: put what arrives (late and far-future ticks are refused), take(tick)
+                  hands the tick its input or repeats the last one (a missed input), have() says up to
+                  which tick the inputs are complete (the client resends from there), the margin says
+                  how early inputs arrive (the client steers its clock by it)
+
+Ticks are u32 and wrap; every comparison goes through tick_diff.
+```
+
+```rust
+/// inputs a packet carries at most (the newest and the 15 before it)
+MAX_REDUNDANT: usize = 16
+/// ticks the server's buffer looks ahead (inputs further in the future are refused)
+BUFFER: usize = 64
+```
+
+- **`struct NetInput`**
+  one tick's input (see the module header)
+  - `buttons: u16` -- the buttons held (the game's bits; edges come from comparing with the previous tick)
+  - `move_x: i8` -- right (+) and left (-), quant::axis_q
+  - `move_z: i8` -- forward (+) and back (-), quant::axis_q
+  - `yaw: u16` -- the view's yaw, quant::angle_q
+  - `pitch: i16` -- the view's pitch, quant::pitch_q
+  - `view: u16` -- how far the client's picture of the other entities lagged behind this tick, in 1/256 ticks (the
+    lag compensation's view time is tick - view / 256)
+
+- **`fn write_inputs(w: &mut BitWriter, newest: u32, inputs: &[NetInput])`**
+  write `inputs` (the newest first, at most MAX_REDUNDANT) whose newest is for tick `newest`
+
+- **`fn read_inputs(r: &mut BitReader) -> Option<(u32, Vec<NetInput>)>`**
+  read what write_inputs wrote -> (the newest tick, the inputs newest first); None when malformed
+
+- **`struct InputStats`**
+  what an input buffer counted
+  - `received: u64` -- inputs taken in (each tick once)
+  - `repeated: u64` -- inputs that came again (redundancy)
+  - `late: u64` -- inputs for ticks already simulated
+  - `early: u64` -- inputs too far in the future (refused)
+  - `missed: u64` -- ticks simulated without the client's input (the last one repeated)
+
+- **`struct InputBuffer`**
+  the server's inputs of one client (see the module header)
+
+**`impl InputBuffer`**
+
+- **`fn new(next: u32) -> InputBuffer`**
+  a buffer whose first tick is `next`
+- **`fn put_packet(&mut self, newest: u32, inputs: &[NetInput])`**
+  a packet's inputs (newest first, the newest for tick `newest`)
+- **`fn put(&mut self, tick: u32, input: NetInput) -> bool`**
+  one input for `tick`; false when refused (late, too far ahead, or already there)
+- **`fn take(&mut self, tick: u32) -> (NetInput, bool)`**
+  the input of `tick` (the buffer moves past it) and whether it is the client's own (false: missed,
+  the last one repeated)
+- **`fn have(&self) -> u32`**
+  the newest tick up to which every input from the next one on is here (next - 1 when the next is
+  missing)
+- **`fn take_margin(&mut self) -> Option<i32>`**
+  the smallest margin since the last call (None: no packet came)
+- **`fn next(&self) -> u32`**
+  the next tick take() hands out
+- **`fn stats(&self) -> InputStats`**
+  what it counted
+
+### `game/src/net/lagcomp.rs`
+
+Source: [`lib/game/src/net/lagcomp.rs`](../lib/game/src/net/lagcomp.rs)
+
+```text
+lagcomp -- hits with lag compensation: the server keeps where the figures were over the last ticks and,
+for a shot, puts them back to the time the shooter saw them, at most 300 ms back unless set (the interpolation's
+100 ms and 200 ms beyond them, the user's decision of 2026-11-19)
+
+  view_time(tick, view, max_back)   the shooter's view time from its input (NetInput::view: the lag of
+                                    its picture in 1/256 ticks), clamped to max_back ticks before tick
+  HitHistory      the centres of the figures' hit volumes per tick (a ring); rewind(view time) blends the
+                  two recorded ticks around it as a client blends two snapshots
+  hitscan         a ray against the map (physics::World::ray_cast) and the rewound figures
+                  (physics::query::ray against each capsule): the nearest hit, the shooter left out
+
+What the client saw and what the server rewinds differ by the quantisation of the snapshots (under a
+millimetre) and, when a figure turns within a snapshot's interval, by blending ticks one apart where
+the client blended snapshots two apart (docs/NETCODE.md, "Treffer").
+```
+
+- **`fn view_time(tick: u32, view: u16, max_back: u32) -> (u32, f64)`**
+  the view time (a tick and the fraction towards the next) of an input of `tick` whose picture lagged
+  `view` / 256 ticks, at most `max_back` ticks back
+
+- **`struct HitHistory`**
+  the figures' hit volumes over the last ticks (see the module header)
+
+**`impl HitHistory`**
+
+- **`fn new(cap: usize) -> HitHistory`**
+  remember `cap` ticks
+- **`fn record(&mut self, tick: u32, figures: &[(u16, Vec3)])`**
+  where the figures (id, centre of the hit volume) are after `tick`; ids ascending
+- **`fn span(&self) -> Option<(u32, u32)>`**
+  the oldest and newest tick remembered
+- **`fn rewind(&self, tick: u32, frac: f64, out: &mut Vec<(u16, Vec3)>) -> bool`**
+  the figures at view time (tick, frac): blended between tick and tick + 1 where both have them,
+  clamped to the ticks remembered; false when nothing is remembered
+
+- **`enum Hit`**
+  what a shot hit
+  - `Figure { id: u16, t: f64, point: Vec3 }` -- a figure: its id, the distance along the ray and the point
+  - `World { t: f64, point: Vec3 }` -- the map
+
+- **`fn hitscan(map: &physics::World, figures: &[(u16, Vec3)], shape: &Shape, shooter: u16, origin: Vec3, dir: Vec3, max_t: f64) -> Option<Hit>`**
+  a ray from `origin` along `dir` (unit length) up to `max_t` against the map and the figures (`shape`
+  at each centre), the figure `shooter` left out: the nearest hit
+
+### `game/src/net/link.rs`
+
+Source: [`lib/game/src/net/link.rs`](../lib/game/src/net/link.rs)
+
+```text
+link -- the netcode on real sockets: netchan's Server and Client under NetServer and NetClient
+
+  serve(server, game, now_ns)   one round of a server's loop: netchan's events into the game, the ticks
+                                due, the game's messages out, the connections it ends closed (Windows,
+                                Linux, Apple: netchan::Server needs netio)
+  NetLink<M>                    a client's channel and, when WELCOME asks for it, the fetch's WebSocket
+                                (ws://host:port/path of the server's UDP address); pump(map, now) reads
+                                both, flush() sends what the game queued
+
+A server's loop: serve(..) then server.wait(ms to the next tick) (never plat::sleep_ms(1) on Windows:
+docs/TRANSPORT.md).  A client's frame: link.pump(map, now), n = link.game.advance(now), n times
+link.game.step(map, input), link.flush().
+```
+
+- **`fn serve<S: super::server::RoomSim>(server: &mut netchan::Server, game: &mut super::server::NetServer<S>, now_ns: u64) -> u32`**
+  one round of a server's loop (see the module header) -> the ticks run
+
+- **`struct NetLink<M: Movement>`**
+  a client's channels (see the module header)
+  - `game: NetClient<M>` -- the game's client
+  - `send_errors: u64` -- sends netchan refused (Size, Backlog, NotConnected)
+
+**`impl<M: Movement> NetLink<M>`**
+
+- **`fn connect(ep: Endpoint, cfg: ClientConfig, game: NetClient<M>, path: &str) -> Result<NetLink<M>, netchan::Error>`**
+  connect to `ep`; `path` is the server's WebSocket path (for a fetch of a UDP client)
+- **`fn pump(&mut self, map: &physics::World, now_ns: u64)`**
+  read the channels, feed the game, open the fetch when asked
+- **`fn flush(&mut self)`**
+  send what the game queued
+- **`fn channel(&self) -> &Client`**
+  the main channel (its state, stats, round-trip time)
+- **`fn fetching(&self) -> bool`**
+  a fetch's WebSocket is open
+
+### `game/src/net/predict.rs`
+
+Source: [`lib/game/src/net/predict.rs`](../lib/game/src/net/predict.rs)
+
+```text
+predict -- the client predicts its own figure: every tick it applies its input at once, and when the
+server's state for a tick comes it compares; on a difference it goes back to the server's state and
+applies its inputs since then again (reconciliation)
+
+  Movement      a figure's movement: the tick's input in, the next state out.  The same code runs on the
+                server and in the prediction, so it must give the same bits: f64 with + - * /, the square
+                root and the trigonometry of lib/physics::math, no mul_add, no unordered containers, no
+                time; and its state must stay on the grid of quant.rs (it is replicated as integers, and
+                the server's state must be what the snapshot says).  Whatever the step needs from the past
+                (the buttons held before, for edges) belongs in the state.  The reference is
+                walker::Walker; G7h's character controller takes its place
+  Predictor     the inputs and predicted states since the newest confirmed tick; step, reconcile, the
+                current and previous state (a frame blends the two by the tick's alpha)
+
+A prediction is exact when the server used the client's own inputs: reconcile then finds the same
+state and only drops history.  It differs after a missed input (the server repeated the last one), a
+teleport, damage or anything else the server did to the figure; then the replay puts the figure where
+the server's state and the client's later inputs lead.
+```
+
+- **`trait Movement`**
+  a figure's movement (see the module header)
+  - `type State: Copy + PartialEq + Default + core::fmt::Debug`
+    the movement state (on the grid; Default: before the server said where the figure is)
+  - `const FIELDS: usize`
+    the fields of the state at the start of the figure's replicated entity
+  - `fn step(&self, map: &physics::World, state: &Self::State, input: &NetInput, dt: f64) -> Self::State`
+    the state after one tick of `input` (dt: the tick's length in seconds)
+  - `fn to_fields(state: &Self::State, out: &mut [i32])`
+    the state as FIELDS integers (lossless)
+  - `fn from_fields(f: &[i32]) -> Self::State`
+    the state of FIELDS integers
+  - `fn position(state: &Self::State) -> Vec3`
+    where the figure is (the error measure, the camera)
+
+- **`enum Outcome`**
+  what reconcile found
+  - `Stale` -- the server's state is older than one already confirmed (a late snapshot)
+  - `Match` -- the prediction for that tick was exact
+  - `Corrected { error: f64, shift: f64 }` -- it differed by `error` metres there; the replay moved the current state by `shift` metres
+  - `Reset` -- there was no prediction for that tick (the first state, or history ran out): started from it
+
+- **`struct PredictStats`**
+  what a predictor counted
+  - `steps: u64` -- ticks predicted
+  - `checks: u64` -- server states compared
+  - `mismatches: u64` -- of those, different (Corrected)
+  - `resets: u64` -- starts without a prediction to compare (Reset)
+  - `replayed: u64` -- ticks applied again in replays
+  - `errors: Vec<f32>` -- the error of every mismatch in metres (for percentiles; the first 100 000)
+  - `shifts: Vec<f32>` -- the shift of the current state of every mismatch
+
+- **`struct Predictor<M: Movement>`**
+  the history of a prediction (see the module header)
+
+**`impl<M: Movement> Predictor<M>`**
+
+- **`fn new() -> Predictor<M>`**
+  nothing predicted; history of up to 256 ticks
+- **`fn known(&self) -> bool`**
+  whether a server state has come (before it the figure stands at the default state)
+- **`fn step(&mut self, mover: &M, map: &physics::World, tick: u32, input: NetInput, dt: f64) -> M::State`**
+  predict `tick` with `input` -> the state after it
+- **`fn current(&self) -> Option<M::State>`**
+  the newest predicted state (the base without history)
+- **`fn previous(&self) -> Option<M::State>`**
+  the state one tick before the current one (for the alpha of a frame)
+- **`fn at(&self, tick: u32) -> Option<M::State>`**
+  the predicted state of `tick`, if still in the history
+- **`fn reconcile(&mut self, mover: &M, map: &physics::World, tick: u32, server: M::State, dt: f64) -> Outcome`**
+  the server's state of `tick`: compare, and on a difference go back to it and replay
+- **`fn confirmed(&self) -> Option<(u32, M::State)>`**
+  the newest confirmed tick and state
+- **`fn pending(&self) -> usize`**
+  ticks predicted beyond the confirmed one
+- **`fn stats(&self) -> &PredictStats`**
+  what it counted
+- **`fn clear(&mut self)`**
+  forget everything (a new figure, a new room)
+
+### `game/src/net/proto.rs`
+
+Source: [`lib/game/src/net/proto.rs`](../lib/game/src/net/proto.rs)
+
+```text
+proto -- the netcode's messages over a netchan channel (one message a packet; byte 0 is the type, the
+rest a bit stream of bits.rs)
+
+  HELLO      client -> server   the version, a room code (none: make a new room), the player's name
+  WELCOME    server -> client   the room's code, the player's net id, rate and snapshot interval, the
+                                server's tick now, the input margin to aim for, the lag compensation's
+                                limit, and for a UDP client whose full state does not fit a datagram a
+                                ticket and the WebSocket port to fetch it with
+  REFUSE     server -> client   why not (version, room full, no such room, no name, server full, ticket)
+  INPUT      client -> server   the newest snapshot it decoded, the full state it fetched (until
+                                confirmed), its inputs (input.rs: the newest and those the server may lack)
+  SNAPSHOT   server -> client   the tick, the base (none, the map's baseline, or a tick back), the
+                                player's id, up to which tick its inputs are complete, the margin of its
+                                inputs, then the entities (snapshot.rs)
+  FETCH      client -> server   (on a WebSocket of its own) the ticket of WELCOME
+  FULL       server -> client   (on that WebSocket) a SNAPSHOT against the baseline without a budget
+
+Every reader returns None for anything malformed or too large (bytes from the network never panic).
+```
+
+```rust
+/// the netcode's own version (HELLO); a game's version goes into netchan's protocol id
+VERSION: u16 = 1
+/// message types (byte 0)
+MSG_HELLO: u8 = 1
+/// see the module header
+MSG_WELCOME: u8 = 2
+/// see the module header
+MSG_REFUSE: u8 = 3
+/// see the module header
+MSG_INPUT: u8 = 4
+/// see the module header
+MSG_SNAPSHOT: u8 = 5
+/// see the module header
+MSG_FETCH: u8 = 6
+/// see the module header
+MSG_FULL: u8 = 7
+/// REFUSE: another version of the netcode
+REFUSE_VERSION: u8 = 1
+/// REFUSE: the room has its players
+REFUSE_ROOM_FULL: u8 = 2
+/// REFUSE: no room has that code
+REFUSE_NO_ROOM: u8 = 3
+/// REFUSE: the name is empty after cleaning
+REFUSE_NAME: u8 = 4
+/// REFUSE: the server has its rooms
+REFUSE_SERVER_FULL: u8 = 5
+/// REFUSE: the ticket of a FETCH is unknown or used
+REFUSE_TICKET: u8 = 6
+/// REFUSE: the message was not what the server expected
+REFUSE_PROTOCOL: u8 = 7
+```
+
+- **`struct Hello`**
+  HELLO
+  - `version: u16` -- VERSION of the client
+  - `room: Option<RoomCode>` -- the room to join (None: make one)
+  - `name: String` -- the player's name as typed (the server cleans it)
+
+- **`struct Welcome`**
+  WELCOME
+  - `room: RoomCode` -- the room's code
+  - `player: u16` -- the net id of the player's figure
+  - `rate: u16` -- the server's ticks a second
+  - `snapshot_every: u8` -- a snapshot every this many ticks
+  - `tick: u32` -- the server's tick when it sent this
+  - `margin: u8` -- the margin of inputs to aim for (ticks)
+  - `max_rewind: u8` -- how far back the server rewinds for hits (ticks)
+  - `fetch: bool` -- (UDP) the full state does not fit a datagram: fetch it over a WebSocket with `ticket`
+  - `ticket: u64` -- the ticket for FETCH
+  - `ws_port: u16` -- the port of the server's WebSocket (0: none)
+  - `full_bytes: u32` -- the bytes of the full state when the player joined
+
+- **`enum Base`**
+  a snapshot's base
+  - `None` -- nothing: every entity is an add
+  - `Map` -- the map's baseline (the client has it from the map)
+  - `Back(u8)` -- the snapshot this many ticks back (1 ..= 255)
+
+- **`struct SnapHeader`**
+  a SNAPSHOT's or FULL's header
+  - `tick: u32` -- the tick
+  - `base: Base` -- what the entities are encoded against
+  - `player: u16` -- the net id of the receiver's figure (0: none)
+  - `have: u32` -- the receiver's inputs are complete up to this tick
+  - `margin: Option<i8>` -- the smallest margin of its inputs since the last snapshot (None: none came)
+
+- **`struct InputMsg`**
+  an INPUT
+  - `newest: u32` -- the tick of the newest input
+  - `inputs: Vec<NetInput>` -- the inputs, the newest first
+  - `ack: Option<u32>` -- the newest snapshot the client decoded
+  - `full: Option<u32>` -- the FULL it fetched (repeated until the server bases on it)
+
+- **`fn msg_type(b: &[u8]) -> Option<u8>`**
+  the type of a message (None: empty)
+
+- **`fn write_hello(h: &Hello) -> Vec<u8>`**
+  HELLO as bytes
+
+- **`fn read_hello(b: &[u8]) -> Option<Hello>`**
+  HELLO from bytes
+
+- **`fn write_welcome(m: &Welcome) -> Vec<u8>`**
+  WELCOME as bytes
+
+- **`fn read_welcome(b: &[u8]) -> Option<Welcome>`**
+  WELCOME from bytes
+
+- **`fn write_refuse(reason: u8) -> Vec<u8>`**
+  REFUSE as bytes
+
+- **`fn read_refuse(b: &[u8]) -> Option<u8>`**
+  REFUSE's reason
+
+- **`fn write_input(m: &InputMsg) -> Vec<u8>`**
+  INPUT as bytes
+
+- **`fn read_input(b: &[u8]) -> Option<InputMsg>`**
+  INPUT from bytes
+
+- **`fn write_snap_header(kind: u8, h: &SnapHeader) -> BitWriter`**
+  the header of a SNAPSHOT (`kind` MSG_SNAPSHOT) or FULL (MSG_FULL); the entities follow in the same
+  writer (snapshot::encode)
+
+- **`fn read_snap_header(b: &[u8]) -> Option<(u8, SnapHeader, BitReader<'_>)>`**
+  the header of a SNAPSHOT or FULL and the reader at its entities
+
+- **`fn write_fetch(ticket: u64) -> Vec<u8>`**
+  FETCH as bytes
+
+- **`fn read_fetch(b: &[u8]) -> Option<u64>`**
+  FETCH's ticket
+
+### `game/src/net/quant.rs`
+
+Source: [`lib/game/src/net/quant.rs`](../lib/game/src/net/quant.rs)
+
+```text
+quant -- quantisation: the netcode keeps what it predicts and sends on fixed grids, so the server's
+state, what it sends and what a client rebuilds are the same integers
+
+  POS_STEPS        steps a metre (1024: 0.98 mm, exact in f64 because it is a power of two)
+  pos_q / pos_f    a coordinate to its step and back (round half away from 0); vec_q / vec_f for three
+  ANGLE_STEPS      a turn in 65 536 steps (0.0055 degrees); angle_q (wraps), angle_f in (-pi, pi]
+  pitch_q / pitch_f  a pitch in i16 steps of the same size (+-90 degrees fit)
+  axis_q / axis_f  an axis value -1 ..= 1 as -127 ..= 127
+  rot_q / rot_f    a rotation by its smallest three components (which one is left out, 2 bits, and three
+                   of ROT_BITS each): at most about 0.07 degrees at ROT_BITS = 12
+  round_i64        rounding without std (core has no f64::round)
+
+A grid of 2^-10 m reaches +-2 097 km in an i32.  Whatever a client predicts (the movement state of its
+figure) stays on the grid on both sides after every step (docs/NETCODE.md, "Bitgleich"), so the state a
+snapshot carries is the server's state exactly, not an approximation of it.
+```
+
+```rust
+/// steps a metre of the position grid
+POS_STEPS: f64 = 1024.0
+/// steps a full turn of an angle
+ANGLE_STEPS: f64 = 65536.0
+/// bits of each of the three components of rot_q
+ROT_BITS: u32 = 12
+```
+
+- **`fn round_i64(x: f64) -> i64`**
+  x rounded to the nearest whole number, halves away from 0 (saturating at the ends of i64; NaN is 0)
+
+- **`fn pos_q(x: f64) -> i32`**
+  a coordinate in steps of POS_STEPS (saturating at the ends of i32)
+
+- **`fn pos_f(q: i32) -> f64`**
+  the coordinate of a step
+
+- **`fn vec_q(v: Vec3) -> [i32; 3]`**
+  a vector in steps
+
+- **`fn vec_f(q: [i32; 3]) -> Vec3`**
+  the vector of steps
+
+- **`fn angle_q(a: f64) -> u16`**
+  an angle in radians as a step of ANGLE_STEPS a turn (any angle: it wraps)
+
+- **`fn angle_f(q: u16) -> f64`**
+  the angle of a step in (-pi, pi]
+
+- **`fn pitch_q(p: f64) -> i16`**
+  a pitch in radians as an i16 step of the same size as angle_q (clamped to +-pi/2)
+
+- **`fn pitch_f(q: i16) -> f64`**
+  the pitch of a step
+
+- **`fn axis_q(v: f64) -> i8`**
+  an axis value -1 ..= 1 as -127 ..= 127
+
+- **`fn axis_f(q: i8) -> f64`**
+  the axis value of a step (-128 counts as -127)
+
+- **`fn rot_q(q: Quat) -> [i32; 4]`**
+  a rotation as (index of the largest component, its three others in ROT_BITS each, signed so that the
+  largest is positive); a quaternion and its negative give the same
+
+- **`fn rot_f(r: [i32; 4]) -> Quat`**
+  the rotation of rot_q (the left-out component from the unit length); a bad index gives the identity
+
+### `game/src/net/room.rs`
+
+Source: [`lib/game/src/net/room.rs`](../lib/game/src/net/room.rs)
+
+```text
+room -- rooms by a code or a link, players by a name, no accounts
+
+  RoomCode       six characters of an alphabet without look-alikes (no 0 O 1 I L: 31 characters, about
+                 887 million codes); random from the server's generator, parse accepts any case and
+                 ignores spaces and dashes ("k7m-2qx")
+  room_link      a link to a room: the page's address with "#CODE" (the fragment never reaches a server
+                 log); room_from_link takes a code back out of such a link, "?room=CODE", ".../r/CODE"
+                 or a bare code
+  clean_name     a player's name: trimmed, inner runs of white space as one space, no control or
+                 direction-changing characters, 1 to 16 characters; unique_name appends " 2", " 3" ...
+                 when the room has it already (compared without case)
+```
+
+```rust
+/// the characters of a room code
+CODE_ALPHABET: &[u8; 31] = b"ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+/// characters a name may have at most
+MAX_NAME: usize = 16
+```
+
+- **`struct RoomCode(pub [u8; 6])`**
+  a room's code (see the module header)
+
+**`impl RoomCode`**
+
+- **`fn from_random(mut r: u64) -> RoomCode`**
+  a code from 64 random bits (the server's generator)
+- **`fn parse(s: &str) -> Option<RoomCode>`**
+  a code typed by a person: any case, spaces and dashes ignored; None unless six characters of the
+  alphabet remain
+- **`fn as_str(&self) -> &str`**
+  the six characters
+- **`fn valid(&self) -> bool`**
+  the code's bytes are all of the alphabet (a code read from the network)
+
+- **`fn room_link(base: &str, code: &RoomCode) -> String`**
+  a link to a room: `base` (the page, such as "https://spiel.example/") with "#CODE"
+
+- **`fn room_from_link(link: &str) -> Option<RoomCode>`**
+  the code of a link (fragment "#CODE", query "room=CODE", a path ending in "/r/CODE") or a bare code
+
+- **`fn clean_name(raw: &str) -> Option<String>`**
+  a player's name as the room shows it (see the module header); None when nothing is left
+
+- **`fn unique_name(name: &str, taken: &[&str]) -> String`**
+  `name` made unique among `taken` (compared ASCII-case-insensitively): " 2", " 3" ... appended, the
+  name shortened to keep MAX_NAME characters
+
+### `game/src/net/server.rs`
+
+Source: [`lib/game/src/net/server.rs`](../lib/game/src/net/server.rs)
+
+```text
+server -- the server-authoritative side of the netcode, without I/O: netchan's events in, messages out
+
+  RoomSim        what a game puts into a room: its schema, the map's baseline, join and leave, one tick
+                 with the players' inputs, the replicated world, the priority of an entity for a viewer
+  NetServer      rooms by code, connections by netchan id; on_event takes netchan's ServerEvents (of a
+                 netchan::Server with sockets or of an endpoint::ServerCore on a simulated network),
+                 advance(now) runs the ticks due at the fixed rate, take_out / take_close say what to send
+                 and which connections to end
+
+A tick: every room hands each player the input of this tick (InputBuffer: the client's own, or the last
+one repeated when it did not arrive in time) to its RoomSim; every snapshot_every ticks each client gets
+a snapshot.  A snapshot is a delta against a base the client holds: over a WebSocket the last one sent
+(reliable and ordered), over UDP the newest the client confirmed it decoded (INPUT's ack) or, when that
+is better, the newest complete one it confirmed (the FULL it fetched), else the map's baseline.  Its
+changes are ordered -- the client's own figure, what is gone, then by a priority added up per snapshot
+until the entity is sent -- and cut to the budget (1200 bytes unless set: netchan does not fragment).
+What was sent is remembered per client exactly as the client will hold it.
+
+Joining: HELLO -> WELCOME.  The full state goes with the first snapshot when it fits (a WebSocket always:
+up to stream_budget); a UDP client whose full state does not fit a datagram gets a ticket and fetches it
+over a WebSocket of its own (FETCH -> FULL at the next snapshot tick), the user's decision of 18.11.2026.
+Until the FULL arrives the client's snapshots are cut by priority, so it sees its own figure and the
+most important things at once.
+```
+
+- **`trait RoomSim`**
+  what a game puts into a room (see the module header)
+  - `fn schema(&self) -> &Schema`
+    the kinds of the replicated entities and their field counts
+  - `fn baseline(&self) -> &Snapshot`
+    the replicated entities as the map places them (every client builds the same from the map)
+  - `fn join(&mut self, name: &str) -> Option<u16>`
+    a player joins with this (cleaned, unique) name -> the net id of its figure (None: no place)
+  - `fn leave(&mut self, player: u16)`
+    the player's figure goes
+  - `fn step(&mut self, tick: u32, dt: f64, inputs: &[(u16, NetInput, bool)])`
+    one tick: every player's input (net id, input, false when it is the last one repeated)
+  - `fn snapshot(&self, tick: u32, out: &mut Snapshot)`
+    the replicated world after the tick (tick set, entities sorted by id)
+  - `fn priority(&self, viewer: u16, e: &Ent) -> u32`
+    how much `e` matters to the player `viewer` now (added up every snapshot until it is sent)
+
+- **`struct ServerOptions`**
+  a server's settings
+  - `rate: u32` -- ticks a second
+  - `snapshot_every: u32` -- a snapshot every this many ticks
+  - `max_players: usize` -- players a room takes
+  - `max_rooms: usize` -- rooms at once
+  - `budget: usize` -- the bytes of a snapshot (UDP's limit; netchan's max_payload)
+  - `stream_budget: usize` -- the bytes of a join's state over a WebSocket and of a FULL (below netchan's max_stream_payload)
+  - `margin: u8` -- the margin the clients' inputs should arrive with (ticks)
+  - `max_rewind_ms: u32` -- how far back hits are rewound at most (ms; 300 unless set: the 100 ms of the interpolation buffer and
+    200 ms beyond them, the user's decision of 2026-11-19)
+  - `ws_port: u16` -- the WebSocket's port (WELCOME tells UDP clients where to fetch a full state; 0: none)
+  - `hello_ms: u32` -- a connection must send HELLO within this long (ms)
+  - `ticket_ms: u32` -- a ticket stays good this long (ms)
+  - `empty_room_ms: u32` -- a room without players closes after this long (ms)
+  - `start_tick: u32` -- the first tick (tests start near the wrap)
+  - `history: usize` -- snapshots remembered per client
+
+- **`struct ServerStats`**
+  what the server counted
+  - `ticks: u64` -- ticks run
+  - `snapshots: u64` -- snapshots sent (FULL included)
+  - `snapshot_bytes: u64` -- their payload bytes
+  - `max_snapshot: usize` -- the largest payload
+  - `partial: u64` -- snapshots cut by the budget
+  - `fulls: u64` -- FULL sent over a fetch's WebSocket, and their bytes
+  - `full_bytes: u64` -- the bytes of the FULLs
+  - `joins: u64` -- players who joined, refusals
+  - `refused: u64` -- HELLOs refused
+  - `sizes: Vec<u16>` -- the payload size of every snapshot (the first 200 000, for percentiles)
+
+- **`struct LinkStats`**
+  what the server counted for one client
+  - `snapshots: u64` -- snapshots sent
+  - `bytes: u64` -- their payload bytes
+  - `partial: u64` -- cut by the budget
+  - `from_map: u64` -- based on the map's baseline
+  - `inputs: InputStats` -- the inputs
+
+- **`type RoomFactory<S> = Box<dyn FnMut(&RoomCode) -> S + Send>`**
+  the factory of a room's simulation
+
+- **`struct NetServer<S: RoomSim>`**
+  the server (see the module header)
+
+**`impl<S: RoomSim> NetServer<S>`**
+
+- **`fn new(opts: ServerOptions, seed: u64, factory: RoomFactory<S>) -> NetServer<S>`**
+  a server with these settings; `seed` drives room codes and tickets (random in a real server),
+  `factory` makes a room's simulation
+- **`fn options(&self) -> &ServerOptions`**
+  the settings
+- **`fn tick(&self) -> u32`**
+  the next tick to run
+- **`fn stats(&self) -> &ServerStats`**
+  what it counted
+- **`fn link_stats(&self, conn: u32) -> Option<LinkStats>`**
+  a client's counts (None: no player on that connection)
+- **`fn rooms(&self) -> Vec<RoomCode>`**
+  the codes of the rooms
+- **`fn room(&self, code: &RoomCode) -> Option<&S>`**
+  a room's simulation
+- **`fn room_mut(&mut self, code: &RoomCode) -> Option<&mut S>`**
+  a room's simulation for changing it
+- **`fn players(&self, code: &RoomCode) -> Vec<(u32, u16, String)>`**
+  a room's players: (connection, figure id, name)
+- **`fn player_of(&self, conn: u32) -> Option<(RoomCode, u16)>`**
+  the room and figure of a connection
+- **`fn create_room(&mut self) -> Option<RoomCode>`**
+  make an empty room (a lobby could hand its code out) -> its code; None when the server has its rooms
+- **`fn take_out(&mut self) -> Option<(u32, Vec<u8>)>`**
+  the next message to send: (connection, payload)
+- **`fn take_close(&mut self) -> Option<u32>`**
+  the next connection to end (after what was sent to it)
+- **`fn on_event(&mut self, e: &ServerEvent)`**
+  one of netchan's server events
+- **`fn max_rewind_ticks(&self) -> u32`**
+  the lag compensation's limit in ticks (max_rewind_ms at the rate)
+- **`fn advance(&mut self, now_ns: u64) -> u32`**
+  the clock stands at now_ns (any monotonic clock): the ticks due run -> how many
+- **`fn step(&mut self)`**
+  one tick now
+
+### `game/src/net/sim.rs`
+
+Source: [`lib/game/src/net/sim.rs`](../lib/game/src/net/sim.rs)
+
+```text
+sim -- a simulated network in the process: netchan's protocol (endpoint::ServerCore, ClientCore) on a
+virtual clock, with delay, jitter, loss, duplicates and reordering per peer, from a seed
+
+  Weather        what the network does to a packet: loss, duplicates, a chance of extra delay (packets
+                 overtake each other), the delay and its jitter; CLEAR, TYPICAL, ROUGH, STORM
+  SimNet         one server and its peers; a peer has a main channel (UDP or a WebSocket) and maybe a
+                 fetch's WebSocket.  UDP datagrams meet the weather; a WebSocket is reliable and ordered
+                 (a loss is a retransmission: two delays and 20 ms later, and nothing behind it overtakes)
+  step(dt_us)    the clock moves on, what is due arrives, the cores tick, what they send goes out
+
+Nothing here reads a clock or a socket: the same seed gives the same packets on every target, so a whole
+networked session can be checked by a checksum (apps/gametest --netsum).  The template was apps/nettest's
+simulation of G7d.
+```
+
+- **`struct Weather`**
+  what the network does to a packet
+  - `loss: f64` -- the chance a datagram is lost (on a WebSocket: retransmitted)
+  - `dup: f64` -- the chance a datagram comes twice
+  - `reorder: f64` -- the chance of an extra delay of up to extra_us (packets overtake each other)
+  - `extra_us: u64` -- see reorder
+  - `delay_us: u64` -- the delay one way
+  - `jitter_us: u64` -- up to this much more, evenly spread
+
+**`impl Weather`**
+
+- **`const CLEAR: Weather = Weather { loss: 0.0, dup: 0.0, reorder: 0.0, extra_us: 0, ...`**
+  20 ms each way, nothing else
+- **`const TYPICAL: Weather = Weather { loss: 0.01, dup: 0.0, reorder: 0.02, extra_us: ...`**
+  a good home connection: 30 ms +- 5 each way, 1 % loss, 2 % a little later
+- **`const ROUGH: Weather = Weather { loss: 0.2, dup: 0.1, reorder: 0.2, extra_us: 30 ...`**
+  nettest's rough weather: 20 % loss, 10 % twice, 20 % up to 30 ms later, 20 ms +- 5
+- **`const STORM: Weather = Weather { loss: 0.5, dup: 0.2, reorder: 0.3, extra_us: 60 ...`**
+  nettest's storm: 50 % loss, 20 % twice, 30 % up to 60 ms later, 40 ms +- 20
+
+- **`enum Which`**
+  which of a peer's links
+  - `Main` -- the main channel
+  - `Fetch` -- a fetch's WebSocket
+
+- **`struct Link`**
+  one link of a peer: a netchan client core and how it reaches the server
+  - `core: ClientCore` -- netchan's client protocol
+
+**`impl Link`**
+
+- **`fn reliable(&self) -> bool`**
+  a reliable stream (a WebSocket)
+- **`fn closed(&self) -> bool`**
+  the stream ended or the core disconnected
+
+- **`struct PeerStats`**
+  what went over a peer's links (netchan's packets, without IP and UDP headers)
+  - `up_bytes: u64` -- bytes to the server
+  - `up_packets: u64` -- packets to the server
+  - `down_bytes: u64` -- bytes from the server
+  - `down_packets: u64` -- packets from the server
+
+- **`struct Peer`**
+  a client machine on the network
+  - `weather: Weather` -- what its network does
+  - `main: Option<Link>` -- the main channel
+  - `fetch: Option<Link>` -- a fetch's WebSocket
+  - `stats: PeerStats` -- what went over its links
+
+- **`struct SimNet`**
+  a server and its peers on one simulated network (see the module header)
+  - `now_us: u64` -- the virtual clock (microseconds)
+  - `server: ServerCore` -- netchan's server protocol
+  - `peers: Vec<Peer>` -- the peers
+  - `down: bool` -- the network carries nothing (a cut cable)
+
+**`impl SimNet`**
+
+- **`fn new(seed: u64, cfg: ServerConfig) -> SimNet`**
+  a server with these limits; `seed` drives the network and the server's secret
+- **`fn add_udp(&mut self, cfg: ClientConfig, w: Weather) -> usize`**
+  a peer whose main channel is UDP -> its index (the handshake starts now)
+- **`fn add_ws(&mut self, cfg: ClientConfig, w: Weather) -> usize`**
+  a peer whose main channel is a WebSocket -> its index
+- **`fn open_fetch(&mut self, i: usize, cfg: ClientConfig)`**
+  a fetch's WebSocket for peer `i` (replacing an old one)
+- **`fn set_weather(&mut self, i: usize, w: Weather)`**
+  the peer's network from now on
+- **`fn flush(&mut self)`**
+  hand what the cores want sent to the network
+- **`fn step(&mut self, dt_us: u64)`**
+  the clock moves on by dt_us: what is due arrives, the cores tick, what they send goes out
+- **`fn server_events(&mut self, out: &mut Vec<ServerEvent>)`**
+  the server's events since the last call
+- **`fn link_events(&mut self, i: usize, which: Which, out: &mut Vec<ClientEvent>)`**
+  a link's events since the last call
+- **`fn server_send(&mut self, id: u32, data: &[u8]) -> Result<u16, Error>`**
+  the server sends to a connection
+- **`fn server_disconnect(&mut self, id: u32)`**
+  the server ends a connection
+- **`fn link_send(&mut self, i: usize, which: Which, data: &[u8]) -> Result<u16, Error>`**
+  a link sends to the server
+- **`fn link_close(&mut self, i: usize, which: Which)`**
+  a link ends (DISCONNECT goes out; a WebSocket's stream closes behind it)
+- **`fn link_state(&self, i: usize, which: Which) -> Option<State>`**
+  a link's netchan state
+- **`fn in_flight(&self) -> usize`**
+  packets on their way
+
+### `game/src/net/snapshot.rs`
+
+Source: [`lib/game/src/net/snapshot.rs`](../lib/game/src/net/snapshot.rs)
+
+```text
+snapshot -- the replicated world of one tick and its delta encoding
+
+  NetState      what is replicated of one entity: a kind (the game's) and up to MAX_FIELDS integers
+                (already quantised by the game: positions on the grid of quant.rs, angles in steps)
+  Ent           a net id (u16), a generation (u8: a new entity under an old id) and its NetState
+  Snapshot      a tick and its entities, sorted by id
+  Schema        how many fields each kind has (both sides know it; a kind with none is invalid)
+  diff          the changes from a base to a snapshot: Update (fields that differ), Add (new, or a new
+                generation or kind under an old id), Remove
+  encode        the chosen changes as bits: a count, then per change its id gap, an op (2 bits), and for
+                an update a mask of the changed fields with their differences (svar); an add sends its
+                generation, kind and fields against the map's baseline entry (when it has one of the same
+                kind) or against zero
+  decode        the inverse against the same base (None for anything malformed: never a panic)
+  select        the changes that fit a budget in a given order (the caller's priorities), exactly
+                measured; apply builds what the client will hold: the base with the chosen changes
+
+The delta is taken against a base the client holds (docs/NETCODE.md): the newest snapshot it confirmed
+over UDP, the last one sent over a WebSocket, or the map's baseline before it has any.  A change left out
+for the budget is simply not in the as-sent snapshot; the next delta carries it.
+```
+
+```rust
+/// fields an entity may have at most
+MAX_FIELDS: usize = 16
+/// entities a snapshot may have at most (a decoder refuses more)
+MAX_ENTITIES: usize = 8192
+```
+
+- **`struct NetState`**
+  the replicated values of one entity (fields past its kind's count stay 0)
+  - `kind: u8` -- the game's kind of entity (Schema says its field count)
+  - `fields: [i32; MAX_FIELDS]` -- the values, quantised by the game
+
+**`impl NetState`**
+
+- **`fn new(kind: u8, f: &[i32]) -> NetState`**
+  a state of `kind` with these fields (the rest 0)
+
+- **`struct Ent`**
+  an entity of a snapshot
+  - `id: u16` -- the net id (the server's; not the World's Entity)
+  - `generation: u8` -- counts up when the id is given to a new entity, so a client never blends the old into the new
+  - `state: NetState` -- the values
+
+- **`struct Snapshot`**
+  the replicated world of a tick
+  - `tick: u32` -- the server's tick (wraps: compare with tick_diff)
+  - `ents: Vec<Ent>` -- the entities, sorted by id, ids unique
+
+- **`fn tick_diff(a: u32, b: u32) -> i32`**
+  a - b for ticks that wrap (positive: a is later)
+
+**`impl Snapshot`**
+
+- **`fn new(tick: u32) -> Snapshot`**
+  an empty snapshot of a tick
+- **`fn get(&self, id: u16) -> Option<&Ent>`**
+  the entity with this id
+- **`fn put(&mut self, e: Ent)`**
+  put an entity in (replacing one with its id)
+- **`fn remove(&mut self, id: u16) -> Option<Ent>`**
+  take an entity out
+- **`fn sort(&mut self) -> bool`**
+  sort by id (a builder that pushed in another order); false when two share an id
+
+- **`struct Schema`**
+  the field count of every kind (both sides of a game share it)
+
+**`impl Schema`**
+
+- **`const fn new() -> Schema`**
+  no kinds
+- **`fn with(mut self, kind: u8, fields: usize) -> Schema`**
+  the same with `kind` having `fields` fields (1 ..= MAX_FIELDS)
+- **`fn fields(&self, kind: u8) -> usize`**
+  the fields of a kind (0: not a kind of this game)
+
+- **`enum Op`**
+  what a change does
+  - `Update` -- fields of an entity the base has changed
+  - `Add` -- an entity the base does not have (or has under another generation or kind)
+  - `Remove` -- an entity of the base is gone
+
+- **`struct Change`**
+  one change from a base to a snapshot
+  - `id: u16` -- the entity
+  - `op: Op` -- what happens to it
+  - `bits: usize` -- the bits of its op and body (without the id gap)
+
+- **`fn diff(schema: &Schema, base: Option<&Snapshot>, cur: &Snapshot, baseline: Option<&Snapshot>, out: &mut Vec<Change>)`**
+  the changes from `base` (None: nothing) to `cur`, in id order
+
+- **`fn encoded_bits(chosen: &[Change]) -> usize`**
+  the exact bits of encoding `chosen` (in id order): the count and every change with its id gap
+
+- **`fn select(changes: &[Change], order: &[usize], budget: usize) -> Vec<Change>`**
+  the changes of `order` (indices into `changes`, the most important first) that fit `budget` bits, in id
+  order.  Greedy by importance with the id gaps counted at 10 bits, then measured exactly and the least
+  important dropped while too large
+
+- **`fn encode(w: &mut BitWriter, schema: &Schema, base: Option<&Snapshot>, cur: &Snapshot, baseline: Option<&Snapshot>, chosen: &[Change])`**
+  write `chosen` (from diff, in id order) against `base`
+
+- **`fn apply(base: Option<&Snapshot>, cur: &Snapshot, chosen: &[Change]) -> Snapshot`**
+  base with the chosen changes of cur: what the client holds after decoding them (the as-sent snapshot)
+
+- **`fn decode(r: &mut BitReader, schema: &Schema, base: Option<&Snapshot>, baseline: Option<&Snapshot>, tick: u32) -> Option<Snapshot>`**
+  read the changes against `base` into the snapshot of `tick` (None: malformed, an update or remove of
+  an id the base lacks, a kind the schema does not know, ids out of order)
+
+- **`fn full_bits(schema: &Schema, base: Option<&Snapshot>, cur: &Snapshot, baseline: Option<&Snapshot>) -> usize`**
+  the bits of the whole snapshot encoded against `base` without a budget (the size of a join's state)
+
+### `game/src/net/walker.rs`
+
+Source: [`lib/game/src/net/walker.rs`](../lib/game/src/net/walker.rs)
+
+```text
+walker -- the netcode's reference movement: a kinematic capsule that walks, runs, jumps, falls and
+slides along what it touches (like apps/gamedemo's walker, with gravity); deterministic and on the
+grid, so a client predicts exactly what the server computes.  G7h's character controller (lib/physics,
+G7c part 2) takes its place behind the same trait (predict::Movement)
+
+  WalkState    feet position and velocity on the grid of quant.rs (1/1024 m, 1/1024 m/s), flags (on the
+               ground) and the buttons of the tick before (for edges: a jump is a press, not a hold)
+  Walker       the parameters (capsule, speeds, jump, gravity, air control); Movement::step
+  BTN_*        the buttons the walker reads (and the arena's FIRE)
+
+A step: on the ground the horizontal velocity is the wish (walk or run along the view's yaw), a jump
+press lifts off; in the air the wish pulls the velocity a little (air control) and gravity pulls it
+down.  The capsule is cast through the map along the motion, up to four times: to the contact less a
+millimetre, the rest projected onto the surface, the velocity into the surface taken away.  Then a
+short cast down decides "on the ground" (a surface steeper than about 45 degrees is a wall), and the
+position and velocity are rounded onto the grid.
+```
+
+```rust
+/// a button: jump (a press lifts off)
+BTN_JUMP: u16 = 1
+/// a button: run (held)
+BTN_RUN: u16 = 2
+/// a button: fire (the arena's hitscan)
+BTN_FIRE: u16 = 4
+/// the walker's state flag: standing on the ground
+FLAG_GROUND: u32 = 1
+```
+
+- **`struct WalkState`**
+  the walker's movement state (see the module header)
+  - `pos: [i32; 3]` -- the feet (the bottom of the capsule), in 1/1024 m
+  - `vel: [i32; 3]` -- the velocity in 1/1024 m/s
+  - `flags: u32` -- FLAG_GROUND in bit 0, the buttons of the tick before in bits 16 ..= 31
+
+**`impl WalkState`**
+
+- **`fn at(p: Vec3) -> WalkState`**
+  standing at feet position p (metres) on the ground
+- **`fn feet(&self) -> Vec3`**
+  the feet in metres
+- **`fn velocity(&self) -> Vec3`**
+  the velocity in m/s
+- **`fn grounded(&self) -> bool`**
+  on the ground
+- **`fn last_buttons(&self) -> u16`**
+  the buttons of the tick before
+
+- **`struct Walker`**
+  the walker's parameters (see the module header)
+  - `half: f64` -- the capsule's half height (of its straight part) and radius
+  - `radius: f64` -- see half
+  - `walk: f64` -- walking and running speed (m/s)
+  - `run: f64` -- see walk
+  - `jump: f64` -- the upward speed of a jump (m/s)
+  - `gravity: f64` -- gravity (m/s^2)
+  - `air: f64` -- how fast the wish pulls the velocity in the air (1/s)
+  - `max_fall: f64` -- the fastest fall (m/s)
+  - `ground_cos: f64` -- the smallest normal.y of a surface to stand on (cos of the steepest slope)
+
+**`impl Walker`**
+
+- **`fn shape(&self) -> Shape`**
+  the capsule
+- **`fn centre(&self) -> Vec3`**
+  the capsule's centre above the feet
+- **`fn eye(&self) -> f64`**
+  where the eye is above the feet
+
 ### `game/src/pose.rs`
 
 Source: [`lib/game/src/pose.rs`](../lib/game/src/pose.rs)
@@ -56152,15 +57909,16 @@ four meet without a gap.  The same scheme as lib/physics' math (docs/PHYSICS.md,
 ```
 
 - **`fn sqrt(x: f64) -> f64`**
-  The square root, correctly rounded (IEEE 754), so the same bits on every target: the processor's
-  instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64), elsewhere (the browser, the x86-64
-  Android emulator) [`sqrt_portable`].  A negative argument gives NaN, -0.0 gives -0.0.
+  The square root, correctly rounded (IEEE 754), so the same bits on every target, NaN included:
+  `rt::fx::sqrtd`, the processor's instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64),
+  elsewhere (the browser, the x86-64 Android emulator) [`sqrt_portable`].  A negative argument gives NaN,
+  -0.0 gives -0.0.
 
 - **`fn sqrt_portable(x: f64) -> f64`**
-  The correctly rounded square root from f64 operations and one 64 x 64 bit product (lib/physics has the
-  same function and its tests against the processor): Newton's method gives an estimate within a few units
+  The correctly rounded square root from f64 operations and one 64 x 64 bit product (`rt::fx::sqrt_portable`,
+  tested against the processor in apps/physicstest): Newton's method gives an estimate within a few units
   in the last place, the integer test (R - 1/2)^2 &lt; X &lt;= (R + 1/2)^2 on the significand picks the right
-  neighbour.  Public for the tests.
+  neighbour.  Equal to `sqrtsd` for every input, NaN included.  Public for the tests.
 
 - **`fn sin(x: f64) -> f64`**
   sin of `x` (radians), the same bits on every target (within half an ulp)

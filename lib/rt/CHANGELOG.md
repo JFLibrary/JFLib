@@ -15,6 +15,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - `os::SYS_IO_URING_SETUP` / `_ENTER` / `_REGISTER`, `SYS_OPEN_TREE`, `SYS_MOVE_MOUNT`, `SYS_FSOPEN`, `SYS_FSCONFIG`, `SYS_FSMOUNT`, `SYS_FSPICK`, `SYS_CLONE3`, `SYS_PIDFD_GETFD`, `SYS_MOUNT_SETATTR` (x86-64 and ARM64).
 - `rt::os` on Android: `syscall6`, `syscall3`, `poll` and the kernel table of `rt::kernel`, as on Linux (plat's futexes, eventfd, /proc; docs/ANDROID.md decision 2)
 
+### Changed
+
+- `fx::sqrt_portable`: the correctly rounded binary64 square root from f64 operations and one 64 x 64 bit product (Newton's method, then an integer test picks the neighbour), with the bits of `sqrtsd` for every input, NaN included, on every target (lib/physics and lib/geom had a copy each and use this one now). Where the processor's root is not used (the browser, the x86-64 Android emulator) `fx::sqrtd` is this function now instead of the bit-by-bit integer root: the same bits, several times faster (docs/PHYSICS.md, Messwerte)
+
 ### Fixed
 
 - Portable `pow(1.0, y)` is 1 for every finite y (from |y| > ~1.3e300 on it was NaN), NaN for an infinite one as on the x87.

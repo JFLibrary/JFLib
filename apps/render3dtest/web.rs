@@ -150,8 +150,9 @@ impl Probe {
             self.scenes.push(s);
             self.more.push(r);
         }
-        // G5c; (G7f) double-sided, blended, after removals
-        for &name in LATER.iter().chain(G7F.iter()) {
+        // G5c; (G7f) double-sided, blended, after removals; (G7f part 2) orthographic, the cartoon look, outlines, FXAA,
+        // particles, the viewmodel
+        for &name in LATER.iter().chain(G7F.iter()).chain(G7F2.iter()) {
             let mut r = Renderer::new(dev, &linear_desc(Format::Rgba8Unorm))?;
             let mut s = later_gallery_in(name, &mut r, Format::Rgba8Unorm)?;
             let mut off = Off::new(dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm)?;

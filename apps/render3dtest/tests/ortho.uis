@@ -1,0 +1,4 @@
+#!args --test ortho
+# (G7f part 2) an orthographic camera: the arena against parallel rays and the linear depth, lists against the exact test
+# of the box and spheres at its faces, the occlusion test = none, detail levels by size, the sun's shadows against exact
+# shadow rays, blended plates by depth; Voll and Basis

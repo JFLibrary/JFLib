@@ -204,7 +204,10 @@ fn build(t: &mut T, dev: &Device, geos: &[Geo], specs: &[Spec], colors: &[[f32; 
 }
 
 pub fn ref_camera(c: &Camera) -> RefCamera {
-    RefCamera::new(c.eye, c.forward, c.up, c.fov_y, c.aspect, c.near, c.far)
+    match c.ortho {
+        Some(h) => RefCamera::ortho(c.eye, c.forward, c.up, h, c.aspect, c.near, c.far),
+        None => RefCamera::new(c.eye, c.forward, c.up, c.fov_y, c.aspect, c.near, c.far),
+    }
 }
 
 fn check_image(t: &mut T, b: &Built, cam: &Camera, off: &Off, img: &[u8], depth: Option<&[f32]>, what: &str) {
@@ -311,6 +314,13 @@ pub struct Seen {
     slots: Vec<u32>,
     per_list: Vec<u32>,
     wrong_list: u32,
+}
+
+impl Seen {
+    /// (G7f part 2) a slot is in the lists
+    pub fn has(&self, slot: u32) -> bool {
+        self.slots.contains(&slot)
+    }
 }
 
 pub fn read_lists(t: &mut T, dev: &Device, s: &mut Scene, off: &mut Off, r: &mut Renderer, specs: &[(u32, u32)]) -> Option<Seen> {
@@ -533,7 +543,8 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     // nothing changed: only view and lights go up
     let _ = shot(t, dev, &mut off, &mut r, &mut s, "idle")?;
     let idle = s.upload_info();
-    t.ok(idle.bytes == 208 + 480 && idle.changed == 0 && !idle.full, &format!("{level}: a frame without changes sends {} bytes (view and lights)", idle.bytes));
+    // (G7f: a view's block 240 bytes since the orthographic camera)
+    t.ok(idle.bytes == 240 + 480 && idle.changed == 0 && !idle.full, &format!("{level}: a frame without changes sends {} bytes (view and lights)", idle.bytes));
     // moving a few: k changes, 96 bytes each
     let mut rng = Rng(5);
     for _ in 0..37 {
@@ -660,7 +671,7 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     }
     let got = shot(t, dev, &mut off, &mut r, &mut big, "200 moved")?;
     let info = big.upload_info();
-    t.ok(info.changed == 200 && !info.full && info.bytes == 208 + 480 + 200 * 96, &format!("{level}: 200 of 10 000 moved: {} changes, {} bytes", info.changed, info.bytes));
+    t.ok(info.changed == 200 && !info.full && info.bytes == 240 + 480 + 200 * 96, &format!("{level}: 200 of 10 000 moved: {} changes, {} bytes", info.changed, info.bytes));
     let mut f = rebuilt(t, &r, &blist, &cam, false)?;
     let want = shot(t, dev, &mut off, &mut r, &mut f, "200 moved")?;
     let (n, m) = diff(&got, &want);
@@ -767,7 +778,7 @@ pub fn gallery_image_in(t: &mut T, dev: &Device, desc: RendererDesc) -> Option<V
     let e = shot(t, dev, &mut off, &mut rg, &mut sg, "gallery, glTF")?;
     let mut all = vec![a, b, c, d, e];
     // (G7f: then G7F's)
-    for &name in LATER.iter().chain(G7F.iter()) {
+    for &name in LATER.iter().chain(G7F.iter()).chain(G7F2.iter()) {
         let mut r = t.res(Renderer::new(dev, &desc), "Renderer::new")?;
         let mut s = t.res(later_gallery_in(name, &mut r, format), name)?;
         all.push(shot(t, dev, &mut off, &mut r, &mut s, name)?);
@@ -788,6 +799,7 @@ fn levels(t: &mut T) {
     let mut names = vec!["3000 instances, 48 meshes, 96 materials", "changed", "far away", "7 textures in 4 classes, 600 instances, a third mirrored, MASK", "the glTF scene"];
     names.extend_from_slice(&LATER);
     names.extend_from_slice(&G7F);
+    names.extend_from_slice(&G7F2);
     for (i, name) in names.iter().enumerate() {
         let (n, m) = diff(&a[i], &b[i]);
         // (Apple's GPUs: the textured gallery picks levels and texels from derivatives that vary from run to run,
@@ -1082,11 +1094,14 @@ fn errors(t: &mut T) {
 fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
     let opt = wgsl::CompileOptions { robust: false, ..wgsl::CompileOptions::new(shader::BASIS) };
     let mut outv = Vec::new();
-    for (src, list) in [(render3d::CULL_WGSL, &[("CULL", "main"), ("CULL_BLEND", "main_blend"), ("CULL_EARLY", "early"), ("CULL_LATE", "late")][..]), (render3d::SCATTER_WGSL, &[("SCATTER", "main")][..]),
+    for (src, list) in [(render3d::CULL_WGSL, &[("CULL", "main"), ("CULL_BLEND", "main_blend"), ("CULL_EARLY", "early"), ("CULL_LATE", "late"), ("CULL_VM", "main_vm")][..]),
+                        (render3d::SCATTER_WGSL, &[("SCATTER", "main")][..]),
                         (render3d::DRAW_WGSL, &[("VS", "vs"), ("FS", "fs"), ("FS_MASK", "fs_mask"), ("VS_DEPTH", "vs_depth"), ("VS_SHADOW", "vs_shadow"), ("FS_SHADOW", "fs_shadow"),
                                                 ("VS_BLEND", "vs_blend"), ("FS_BLEND", "fs_blend")][..]),
                         (render3d::HIZ_WGSL, &[("HIZ_DEPTH", "from_depth"), ("HIZ_DOWN", "down")][..]),
-                        (render3d::SORT_WGSL, &[("SORT_LOCAL", "sort_local"), ("SORT_GLOBAL", "sort_global")][..])] {
+                        (render3d::SORT_WGSL, &[("SORT_LOCAL", "sort_local"), ("SORT_GLOBAL", "sort_global")][..]),
+                        (render3d::POST_WGSL, &[("VS_FULL", "vs_full"), ("FS_OUTLINE", "fs_outline"), ("FS_FXAA", "fs_fxaa")][..]),
+                        (render3d::PARTICLES_WGSL, &[("CS_PARTICLES", "cs_particles"), ("VS_PARTICLE", "vs_particle"), ("FS_PARTICLE", "fs_particle")][..])] {
         match wgsl::compile(src, &opt) {
             Ok(o) => {
                 for (name, entry) in list {
@@ -1104,7 +1119,7 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
 
 fn gen_shaders(path: &str) -> i32 {
     let Some(v) = compile_shaders() else { return 1 };
-    let mut s = String::from("// written by render3dtest --gen-shaders from cull.wgsl, scatter.wgsl, draw.wgsl, hiz.wgsl, sort.wgsl (shader::BASIS, no robustness); do not edit\n");
+    let mut s = String::from("// written by render3dtest --gen-shaders from cull.wgsl, scatter.wgsl, draw.wgsl, hiz.wgsl, sort.wgsl, post.wgsl, particles.wgsl (shader::BASIS, no robustness); do not edit\n");
     for (name, w) in &v {
         s.push_str(&format!("pub const {name}: &[u32] = &[\n"));
         for row in w.chunks(10) {
@@ -1131,12 +1146,14 @@ fn shaders(t: &mut T) {
         t.ok(false, "the WGSL compiles");
         return;
     };
-    let table: [(&str, &[u32]); 17] = [("CULL", render3d::CULL_SPV), ("CULL_BLEND", render3d::CULL_BLEND_SPV), ("CULL_EARLY", render3d::CULL_EARLY_SPV), ("CULL_LATE", render3d::CULL_LATE_SPV),
+    let table: [(&str, &[u32]); 24] = [("CULL", render3d::CULL_SPV), ("CULL_BLEND", render3d::CULL_BLEND_SPV), ("CULL_EARLY", render3d::CULL_EARLY_SPV), ("CULL_LATE", render3d::CULL_LATE_SPV),
                                        ("SCATTER", render3d::SCATTER_SPV), ("VS", render3d::VS_SPV), ("FS", render3d::FS_SPV), ("FS_MASK", render3d::FS_MASK_SPV),
                                        ("VS_DEPTH", render3d::VS_DEPTH_SPV),
                                        ("VS_SHADOW", render3d::VS_SHADOW_SPV), ("FS_SHADOW", render3d::FS_SHADOW_SPV), ("HIZ_DEPTH", render3d::HIZ_DEPTH_SPV),
                                        ("HIZ_DOWN", render3d::HIZ_DOWN_SPV), ("VS_BLEND", render3d::VS_BLEND_SPV), ("FS_BLEND", render3d::FS_BLEND_SPV),
-                                       ("SORT_LOCAL", render3d::SORT_LOCAL_SPV), ("SORT_GLOBAL", render3d::SORT_GLOBAL_SPV)];
+                                       ("SORT_LOCAL", render3d::SORT_LOCAL_SPV), ("SORT_GLOBAL", render3d::SORT_GLOBAL_SPV), ("CULL_VM", render3d::CULL_VM_SPV),
+                                       ("VS_FULL", render3d::VS_FULL_SPV), ("FS_OUTLINE", render3d::FS_OUTLINE_SPV), ("FS_FXAA", render3d::FS_FXAA_SPV),
+                                       ("CS_PARTICLES", render3d::CS_PARTICLES_SPV), ("VS_PARTICLE", render3d::VS_PARTICLE_SPV), ("FS_PARTICLE", render3d::FS_PARTICLE_SPV)];
     for (name, embedded) in table {
         let made = v.iter().find(|x| x.0 == name).map_or(&[][..], |x| &x.1[..]);
         t.ok(made == embedded, &format!("{name}: {} words embedded, as wgsl::compile makes them (if not: render3dtest --gen-shaders lib/render3d/shaders_spv.rs)", embedded.len()));
@@ -1313,7 +1330,7 @@ fn dump(dir: &str) -> i32 {
     for (level, dev) in [("voll", voll), ("basis", basis)] {
         let Some(dev) = dev else { continue };
         let Some(imgs) = gallery_image_in(&mut t, &dev, desc) else { continue };
-        for (i, name) in GALLERY_NAMES.iter().chain(LATER.iter()).chain(G7F.iter()).enumerate() {
+        for (i, name) in GALLERY_NAMES.iter().chain(LATER.iter()).chain(G7F.iter()).chain(G7F2.iter()).enumerate() {
             let file = format!("{dir}/{level}_{name}.{ext}");
             t.ok(plat::write_file(&file, &imgs[i]), &format!("write {file}"));
             names.push(file);
@@ -1368,6 +1385,9 @@ pub fn run() -> i32 {
     if let Some(d) = plat::arg_value("--shadow-shots") {
         return shadow_shots(&d);
     }
+    if let Some(d) = plat::arg_value("--toon-sheet") {
+        return crate::g7f2test::toon_sheet(&d);
+    }
     if args.iter().any(|a| a == "--bench-upload") {
         return crate::bench::bench_upload();
     }
@@ -1382,13 +1402,15 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate, inst: None };
-    let list: [(&str, fn(&mut T)); 23] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
+    let list: [(&str, fn(&mut T)); 29] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
                                           ("levels", levels), ("coords", coords), ("frames", frames), ("errors", errors), ("textures", crate::tex::textures),
                                           ("mirror", crate::tex::mirror), ("gltf", crate::gltftest::gltf), ("pbr", crate::pbr::pbr),
                                           ("shadows", crate::shadowtest::shadows), ("lights", crate::lighttest::lights), ("env", crate::envtest::env),
                                           ("occlusion", crate::occl::occlusion), ("lods", crate::lodtest::lods), ("alpha", crate::alphatest::alpha),
                                           ("srgb", crate::srgbtest::srgb), ("sides", crate::g7ftest::sides), ("blend", crate::g7ftest::blend),
-                                          ("remove", crate::g7ftest::remove)];
+                                          ("remove", crate::g7ftest::remove), ("ortho", crate::g7f2test::ortho), ("toon", crate::g7f2test::toon),
+                                          ("outline", crate::g7f2test::outline), ("fxaa", crate::g7f2test::fxaa), ("viewmodel", crate::g7f2test::viewmodel),
+                                          ("particles", crate::g7f2test::particles)];
     // --test A,B,...: those tests in the list's order; --except A,B,...: not those (for `all`: the suite runs the
     // validation in parts side by side, the rest of `all` in one, so a new test is in it by itself)
     let names: Vec<&str> = test.split(',').collect();
