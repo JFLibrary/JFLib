@@ -191,6 +191,38 @@ Die App legt einen 1D-Master heute wie ein 2D-Shape ab (`instance::place` setzt 
 als Konstanten, die Enden bleiben auf den Werten der Masterseite); siehe Prüfung
 `diagramiotest --check --only stencils/shapes/drop`.
 
+## Stilregeln (SH-G01, vom Nutzer mit dem JD13-Probeblatt abgenommen)
+
+Verbindlich für alle mitgelieferten Master; das Probeblatt (`diagramiotest
+--write-stencil-previews DIR`, `probeblatt.png`) zeigt sie, `<ordner>-alle.png` zeigt je
+Schablone alle Master.
+
+- **Formatvorlage:** 2D-Master ohne `style:` (also `Normal`), Linien- und Umrissverbinder
+  `style: Connector`. Keine Farben, Linienstärken oder Schriftfarben im Master, damit die
+  Designs (JD11) wirken. Ausnahmen nur begründet im Kopfkommentar (Tipp: `LineWeight 3 pt`,
+  `LineCap 1`; 3D-Feld: `Rounding 0`; Hohler Verbinder: `BeginArrow`/`EndArrow 0`).
+- **Form:** ein Umriss je Fläche, eckig mit geraden Kanten. Bögen nur, wo Name oder Norm sie
+  verlangen (`ArcTo`, `EllipticalArcTo`; Ellipsenbögen durch den 45°-Punkt). Mehrere Flächen
+  nur nebeneinander (Visio füllt nach der Gerade-Ungerade-Regel); Innenkanten als eigener
+  Abschnitt mit `NoFill TRUE`. Keine Rundung im Master, `Rounding` kommt aus dem Design.
+- **Genormte Symbole** (ISO 5807 …) sehen normgerecht aus; Flussdiagramm-Shapes 36 × 24 mm (3:2).
+- **Maße:** 5-mm-Raster (40 × 20, 40 × 30, 40 × 25, 30 × 30 mm), US-Fassung in runden Zoll
+  (1.5 × 0.75, 1.5 × 1.125, 1.25 × 1.25, 1.5 × 1). Pfeile: Spitze etwa 0,4 × Länge, Schaft halb
+  so dick wie die Spitze, Bogen außen 1,5 × Schaft. 1D-Flächenpfeile: Dicke 10 mm, Spitze 8 mm.
+- **Steuerpunkte:** ein gelber Punkt je Formparameter auf der Ecke, die er bewegt; unnötige
+  Richtung gesperrt (`XCon`/`YCon` 1); anteilig (0) für Formen, die mitskalieren, Abstand vom
+  Rand (2 oder 4) für Maße, die beim Strecken bleiben (Tiefe, Spitze eines 1D-Pfeils,
+  Zylinderenden). Werte in `User`-Zellen mit `MIN`/`MAX` begrenzt; `Tip` in fünf Sprachen.
+- **Verbindungspunkte:** Mitte jeder Seite in der Reihenfolge unten, rechts, oben, links,
+  `DirX`/`DirY` nach innen. Pfeile: Schaftende und Spitze(n); Raute: an den Ecken; Dokument:
+  unten auf der Welle. 1D-Shapes haben keine, dort kleben die Enden.
+- **Text:** Textblock auf der Hauptfläche (Kasten, Vorderseite, über der Welle, Bandmitte),
+  `TxtLocPin` die halbe Größe; Linienverbinder: Block 30 × 8 mm mittig auf dem Verlauf.
+- **Sprachen:** Name, ein Prompt-Satz (was es ist, dazu einer zu den Steuerpunkten) und 5–8
+  Stichworte je Sprache; NameU ist der naheliegende englische Begriff.
+- **Kategorien für Regeln:** Flussdiagramm-Shapes tragen `User.msvShapeCategories`
+  (`"Flowchart"`, die Entscheidung `"Flowchart;Decision"`, Start/Ende `"Flowchart;Terminator"`).
+
 ## SVG-Grafik (`svg:`)
 
 Für gestaltete Shapes im JFNetworker-Stil. Die SVG-Datei braucht eine `viewBox`; sie wird auf

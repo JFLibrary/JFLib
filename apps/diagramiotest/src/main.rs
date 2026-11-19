@@ -23,7 +23,9 @@
 //                                         one .vsdx a design for the Visio counter-check (designs.rs)
 //   diagramiotest --write-stencil-previews DIR   (JD10) the structure stencils' masters as PNG
 //                                         (containers, cff, callouts; stencil_structs.rs), (JD13)
-//                                         probeblatt.png: the shape stencils (stencil_shapes.rs)
+//                                         probeblatt.png: the shape stencils (stencil_shapes.rs),
+//                                         <folder>-alle.png: every master of each stencil
+//                                         (stencil_overview.rs)
 //   diagramiotest --write-templates DIR  (JD13) every form of JFDiagrammer's templates as .vstx,
 //                                         metric and US (templates.rs)
 //
@@ -94,6 +96,7 @@ mod pdfreader;
 mod render;
 mod roundtrip;
 mod samples;
+mod stencil_overview;
 mod stencil_shapes;
 mod stencil_structs;
 mod stencils;
@@ -171,7 +174,7 @@ fn run() -> i32 {
         return formulas::growth_table(reps.parse().unwrap_or(5));
     }
     if let Some(dir) = arg(&args, "--write-stencil-previews") {
-        return stencil_structs::previews(&dir).max(stencil_shapes::previews(&dir));
+        return stencil_structs::previews(&dir).max(stencil_shapes::previews(&dir)).max(stencil_overview::write_all(&dir));
     }
     if let Some(dir) = arg(&args, "--write-gegenprobe") {
         // (JD7) the glue drawing, (JD10) the structures drawing

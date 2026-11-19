@@ -36,7 +36,7 @@ use diagram_io::vsdx::{self, Limits, Measure, WriteOptions};
 use crate::{out, H};
 
 /// (kind "stencils" / "templates", folder, file name, text) of every source file
-static SOURCES: &[(&str, &str, &str, &str)] = include!(concat!(env!("OUT_DIR"), "/jfd_sources.rs"));
+pub(crate) static SOURCES: &[(&str, &str, &str, &str)] = include!(concat!(env!("OUT_DIR"), "/jfd_sources.rs"));
 
 fn folders(kind: &str) -> Vec<&'static str> {
     let mut v: Vec<&'static str> = SOURCES.iter().filter(|s| s.0 == kind).map(|s| s.1).collect();
@@ -44,7 +44,7 @@ fn folders(kind: &str) -> Vec<&'static str> {
     v
 }
 
-fn files_of(kind: &'static str, folder: &'static str) -> impl Fn(&str) -> Option<String> {
+pub(crate) fn files_of(kind: &'static str, folder: &'static str) -> impl Fn(&str) -> Option<String> {
     move |name: &str| SOURCES.iter().find(|s| s.0 == kind && s.1 == folder && s.2 == name).map(|s| String::from(s.3))
 }
 
