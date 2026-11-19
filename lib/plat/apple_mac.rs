@@ -78,6 +78,10 @@ mod dnd;
 mod sysapp;
 #[path = "apple_mac_services.rs"]
 pub(crate) mod services;
+// (G7a part 2) game pads: GameController (pad.rs is the shared part)
+#[path = "apple_mac_pad.rs"]
+pub(crate) mod pad_os;
+pub use pad_os::{gc_test_disconnect, gc_test_pad};
 // (AP6) the GPU's layer in a window: lib/gpu's Metal swapchains
 #[path = "apple_mac_gpu.rs"]
 mod gpu;
@@ -941,6 +945,10 @@ pub fn set_refresh(f: Option<fn()>) {
 /// pump AppKit until an event is queued or the deadline passes (0 = poll, u64::MAX = forever);
 /// before any window: sleep until the deadline or a wake() (headless)
 pub fn wait(deadline_us: u64) -> u32 {
+    crate::pad::pad_wait(deadline_us, &mut wait_os) // (G7a) the pads polled when their time comes
+}
+
+fn wait_os(deadline_us: u64) -> u32 {
     let Some(app) = app() else {
         if evq_count() == 0 {
             crate::wait_events(deadline_us, &mut |e| {

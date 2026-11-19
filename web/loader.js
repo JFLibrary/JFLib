@@ -57,6 +57,8 @@ function send(message) {
   if(message.type==="start") {worker.postMessage(message);return;}
   const last=outgoing[outgoing.length-1];
   if(message.type==="motion" && last?.type==="motion") {last.dx+=message.dx;last.dy+=message.dy;schedule();return;}
+  // (G7a) a pad's newer state replaces one that waits, unless a button changed in between (its edge stays)
+  if(message.type==="pad" && last?.type==="pad" && last.index===message.index && last.connected && message.connected && last.pressed===message.pressed) {outgoing[outgoing.length-1]=message;schedule();return;}
   if(message.hover && last?.hover && last.event[2]===message.event[2]) outgoing[outgoing.length-1]=message;
   else outgoing.push(message);
   schedule();
@@ -205,6 +207,43 @@ document.addEventListener("pointerlockerror",()=>{
   const press=lockTried;
   setTimeout(()=>{if(document.pointerLockElement!==canvas && lockWanted && press) {lockWanted=false;if(started)send({type:"pointerlock",state:2});}},100);
 });
+// (G7a part 2) game pads (lib/plat/pad.rs): while the app watches (service 33) and a pad is connected, the page reads
+// navigator.getGamepads() every animation frame and hands each change to the worker: the first 17 buttons (value,
+// pressed) and 4 axes, the "standard" mapping or not, the id; nothing held while the page has no focus (as the keyboard).
+// A pad appears only after one of its buttons was pressed in the page (the browser's rule); indices beyond 7 are left out.
+let padWanted=false, padFrame=0;
+const padSent=new Map();
+function padPoll() {
+  padFrame=0;
+  if(!padWanted) return;
+  let list=[];
+  try {list=navigator.getGamepads?.()||[];} catch {}
+  const focused=document.hasFocus() && !document.hidden, seen=new Set();
+  for(const g of list) {
+    if(!g || !g.connected || g.index>7) continue;
+    seen.add(g.index);
+    const buttons=new Array(17).fill(0), axes=[0,0,0,0];
+    let pressed=0;
+    for(let i=0;focused && i<17 && i<g.buttons.length;i++) {
+      const b=g.buttons[i], value=typeof b==="number"?b:Number(b?.value)||0;
+      buttons[i]=value;
+      if(typeof b==="number"?b>0.5:b?.pressed) pressed|=1<<i;
+    }
+    for(let i=0;focused && i<4 && i<g.axes.length;i++) axes[i]=Number(g.axes[i])||0;
+    const key=`${g.id}|${pressed}|${buttons.join(",")}|${axes.join(",")}`;
+    if(padSent.get(g.index)===key) continue;
+    padSent.set(g.index,key);
+    send({type:"pad",index:g.index,connected:true,mapped:g.mapping==="standard",pressed,buttons,axes,name:String(g.id||"")});
+  }
+  for(const index of [...padSent.keys()]) if(!seen.has(index)) {padSent.delete(index);send({type:"pad",index,connected:false});}
+  if(seen.size) padFrame=requestAnimationFrame(padPoll);
+}
+const padWake=()=>{if(padWanted && !padFrame) padFrame=requestAnimationFrame(padPoll);};
+window.addEventListener("gamepadconnected",padWake);
+window.addEventListener("gamepaddisconnected",padWake);
+window.addEventListener("focus",padWake);
+window.addEventListener("blur",padWake);
+document.addEventListener("visibilitychange",padWake);
 const pen=e=>{
   const type=e.pointerType==="pen"?(e.button===5?2:1):e.pointerType==="touch"?3:0;
   if(!type)return 0;
@@ -438,6 +477,12 @@ async function service(m) {
     else if(m.kind===31) {
       if(data[0]===1) {lockWanted=true;if(navigator.userActivation?.isActive!==false)lockNow(false);}
       else {lockWanted=false;if(document.pointerLockElement===canvas)document.exitPointerLock();}
+    }
+    // (G7a part 2) game pads: 1 watch (the pads already connected come at once), 0 stop
+    else if(m.kind===33) {
+      padWanted=data[0]===1;
+      if(padWanted) {if(padFrame)cancelAnimationFrame(padFrame);padFrame=0;padPoll();}
+      else {if(padFrame)cancelAnimationFrame(padFrame);padFrame=0;padSent.clear();}
     }
     // unsaved work (plat::set_unsaved): leaving the page asks first
     else if(m.kind===22) unsaved=data[0]===1;

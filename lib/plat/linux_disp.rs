@@ -348,8 +348,13 @@ pub fn set_refresh(f: Option<fn()>) {
 
 /// pump the display until an event is queued or the deadline passes (0 = poll, u64::MAX =
 /// forever); without a display (headless) sleep until the deadline or a wake()
-/// [lx_wait_nodisp]
+/// [lx_wait_nodisp].  (G7a) While pads are watched, their nodes are read when their time comes
+/// (pad.rs pad_wait)
 pub fn wait(deadline_us: u64) -> u32 {
+    crate::pad::pad_wait(deadline_us, &mut wait_os)
+}
+
+fn wait_os(deadline_us: u64) -> u32 {
     crate::life_poll(); // a SIGTERM: E_SESSION_END
     if crate::evq_count() != 0 {
         return crate::evq_count();

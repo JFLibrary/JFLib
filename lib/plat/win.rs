@@ -23,6 +23,10 @@ pub use wprint::*;
 #[path = "win_lib.rs"]
 mod wlib;
 pub use wlib::*;
+// (G7a part 2) game pads: XInput (pad.rs is the shared part)
+#[path = "win_pad.rs"]
+pub(crate) mod pad_os;
+pub use pad_os::{xinput_test_end, xinput_test_feed};
 
 #[link(name = "kernel32", kind = "raw-dylib")]
 unsafe extern "system" {

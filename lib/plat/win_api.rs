@@ -2023,8 +2023,13 @@ pub fn wait_refresh(deadline_us: u64, refresh: &mut dyn FnMut()) -> u32 {
 const PUMP_MAX: u32 = (crate::EVQ_CAP - 64) as u32;
 
 /// pump the OS until an event is queued or the deadline (plat::time_us; 0 = poll without
-/// blocking, u64::MAX = forever) passes -> events queued (wake() makes it return at once)
+/// blocking, u64::MAX = forever) passes -> events queued (wake() makes it return at once).  (G7a)
+/// While pads are watched, XInput is polled when its time comes (pad.rs pad_wait)
 pub fn wait(deadline_us: u64) -> u32 {
+    crate::pad::pad_wait(deadline_us, &mut wait_os)
+}
+
+fn wait_os(deadline_us: u64) -> u32 {
     // SAFETY: a plain MSG record, filled by PeekMessageW.
     let mut m: Msg = unsafe { core::mem::zeroed() };
     loop {

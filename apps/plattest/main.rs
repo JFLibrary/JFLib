@@ -111,6 +111,12 @@
 //                                          USB HID usages), raw motion decoding (RAWINPUT, XI 2 raw
 //                                          events, Wayland fixed point), the pointer lock's shared
 //                                          state; Linux: Wayland and X11 with synthetic events
+//   plattest --test pad                    (t_pad.rs, G7a part 2) game pads: the shared state
+//                                          (events, edges, the axes' threshold), XInput records,
+//                                          the evdev parser (Xbox, Sony, simple HID pads), the
+//                                          browser's record; the backend of the platform through
+//                                          a test hook (Windows XINPUT_STATE records, Linux a pipe
+//                                          as a pad's node, macOS controllerWithExtendedGamepad)
 //   plattest --test a11y-rich / uia-rich / a11y-rich-bus   (t_a11y_rich.rs) a web page's
 //                                          accessibility tree (apps/a11ytest's page): headless
 //                                          model, requests, live regions, the rich update format;
@@ -348,6 +354,8 @@ mod t_settings;
 mod t_keychar;
 // (G7a) where keys sit, raw motion, the pointer lock
 mod t_input;
+// (G7a part 2) game pads: the shared state, the decoders, each platform's backend through a test hook
+mod t_pad;
 mod t_tray;
 // the desktop integration: keeping awake, autostart, the taskbar button
 #[cfg(not(target_os = "android"))]
@@ -570,6 +578,7 @@ fn plattest() -> i32 {
         Some("settings") => t_settings::t_settings,    // the system settings: overrides, defaults
         Some("keychar") => t_keychar::t_keychar,       // the layout's character of a key event
         Some("input") => t_input::t_input,             // (G7a) key positions, raw motion, the pointer lock
+        Some("pad") => t_pad::t_pad,                   // (G7a part 2) game pads without real input
         Some("settings-bus") => t_settings::t_settings_bus, // Linux: against tools/platshared/settings_bus.py
         Some("settings-bus-files") => t_settings::t_settings_bus_files, // Linux: the same, a portal without appearance keys
         Some("a11y-rich") => t_a11y_rich::t_a11y_rich, // a web page's accessibility tree, headless

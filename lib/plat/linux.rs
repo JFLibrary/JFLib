@@ -46,6 +46,10 @@ pub(crate) mod linux_hotkey;
 // the system settings from the settings portal (settings.rs)
 #[path = "linux_settings.rs"]
 pub(crate) mod linux_settings;
+// (G7a part 2) game pads: evdev (pad.rs is the shared part)
+#[path = "linux_pad.rs"]
+pub(crate) mod pad_os;
+pub use pad_os::{EvdevTestNode, evdev_test_attach};
 pub(crate) use linux_settings::sys_settings_os;
 pub use linux_life::{life_poll, life_start};
 pub use linux_ibus::{IBUS_RELEASE, ibus_available, ibus_focus, ibus_key, ibus_ready};
