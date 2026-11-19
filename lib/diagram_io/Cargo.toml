@@ -22,6 +22,11 @@ workspace = true
 diagram_core.workspace = true
 archive.workspace = true
 
+# the unit tests (cargo test --lib): a test binary has std's start, panic handler and allocator
+[dev-dependencies]
+rt = { workspace = true, features = ["std"] }
+plat = { workspace = true, features = ["std"] }
+
 # docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
 # of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)
 [package.metadata.docs.rs]

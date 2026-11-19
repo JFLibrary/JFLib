@@ -17,4 +17,6 @@ homepage=https://github.com/JFLibrary/JFLib/tree/main/apps/JFDiagrammer
 default_win=netlab
 default_linux=netlab
 styles=netlab
-# file types ("Open with" .vsdx, .vssx, ...) come with reading them (PLAN.md, JD3)
+# file types ("Open with"): drawings and stencils open, a template starts a new drawing (JD13,
+# VL-03); the MIME types are the system's (shared-mime-info knows them), so none is "own"
+filetypes=vsdx|application/vnd.ms-visio.drawing.main+xml|Visio-Zeichnung; vsdm|application/vnd.ms-visio.drawing.macroenabled.main+xml|Visio-Zeichnung mit Makros; vssx|application/vnd.ms-visio.stencil.main+xml|Visio-Schablone; vssm|application/vnd.ms-visio.stencil.macroenabled.main+xml|Visio-Schablone mit Makros; vstx|application/vnd.ms-visio.template.main+xml|Visio-Vorlage; vstm|application/vnd.ms-visio.template.macroenabled.main+xml|Visio-Vorlage mit Makros

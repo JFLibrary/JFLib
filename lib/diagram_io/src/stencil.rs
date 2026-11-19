@@ -18,9 +18,9 @@
 // How a stencil is built, in this order:
 // 1. stencil.txt and every master file are parsed and checked for the chosen measure: header
 //    keys, sections, row heads, cell names (each section's own list), the five languages of
-//    every language-suffixed key or cell, Width and Height as lengths, formulas that parse and
-//    call only functions the engine knows.  A ".metric" / ".us" line replaces the line
-//    without suffix.
+//    every language-suffixed key or cell, Width and Height as lengths (a 1-D master: BeginX,
+//    BeginY, EndX, EndY as lengths and Height), formulas that parse and call only functions the
+//    engine knows.  A ".metric" / ".us" line replaces the line without suffix.
 // 2. A new stencil (vsdx::new_document: the own styles and the NetLab theme) gets the masters in
 //    one transaction: the Master attributes (Name and Prompt in the build language,
 //    IsCustomName(U), IconSize 1, AlignName 2, MatchByName 0, IconUpdate 1, PatternFlags 0,
@@ -29,7 +29,11 @@
 //    the shape's size, scale 1:1 in mm or in, ShapeKeywords, the JFD_ User cells), the master
 //    shape with its cells, sections, text and the SVG geometry.  Constants are written as values
 //    with their unit (lengths in inches with U = MM, IN ...), everything else as a formula; the
-//    tool adds PinX / PinY (half the size), LocPinX = Width*0.5, LocPinY = Height*0.5.
+//    tool adds PinX / PinY (half the size), LocPinX = Width*0.5, LocPinY = Height*0.5.  A 1-D
+//    master (one that sets BeginX ...) gets Visio's 1-D formulas instead: PinX =
+//    GUARD((BeginX+EndX)/2), Width = GUARD(SQRT(...)), Angle = GUARD(ATAN2(EndY-BeginY,
+//    EndX-BeginX)), LocPin = GUARD(Width*0.5) ...; its master page is BeginX+EndX wide and
+//    BeginY+EndY high.
 // 3. Every reference of every formula must name something that is there (a cell of the sheet
 //    or of its styles, a single cell of the ShapeSheet's own list, Sheet.N of the master).  The
 //    formula engine computes every formula and its values are stored: a cell the engine keeps
@@ -169,7 +173,7 @@ const EFFECT_FAMILIES: &[&str] = &["Bevel", "Glow", "Reflection", "Sketch", "Rot
 const PAGE_CELLS: &[&str] = &["PageWidth", "PageHeight", "PageScale", "DrawingScale", "DrawingSizeType", "DrawingScaleType", "ShdwOffsetX", "ShdwOffsetY"];
 
 // a cell [Shape] may set
-fn shape_cell_known(name: &str) -> bool {
+pub(crate) fn shape_cell_known(name: &str) -> bool {
     SINGLE_CELLS.contains(&name) || LOCKS.contains(&name) || EFFECT_FAMILIES.iter().any(|p| name.starts_with(p) && name.len() > p.len())
 }
 
@@ -182,7 +186,7 @@ const GEO_SECTION_CELLS: &[&str] = &["NoFill", "NoLine", "NoShow", "NoSnap", "No
 const GEO_ROW_CELLS: &[&str] = &["X", "Y", "A", "B", "C", "D", "E"];
 
 // the cells of a row of a section (by its VSDX name)
-fn row_cells(model: &str) -> &'static [&'static str] {
+pub(crate) fn row_cells(model: &str) -> &'static [&'static str] {
     match model {
         "Connection" => &["X", "Y", "DirX", "DirY", "Type", "AutoGen", "Prompt", "A", "B", "C", "D"],
         "Control" => &["X", "Y", "XDyn", "YDyn", "XCon", "YCon", "CanGlue", "Tip"],
@@ -263,8 +267,12 @@ struct MasterInfo {
     // `hidden: true`: the master is in the file but not shown in the Shapes panel (Hidden="1";
     // dropped by code, e.g. the lists of a cross-functional flowchart)
     hidden: bool,
+    // the size of the master page: the shape's Width x Height (2-D), BeginX+EndX x BeginY+EndY
+    // (1-D)
     width: f64,
     height: f64,
+    // (1-D) the master sets BeginX, BeginY, EndX, EndY: PinX, Width, Angle ... follow the ends
+    one_d: bool,
     shape: Vec<Cell0>,
     sections: Vec<Sec0>,
     // the content for the UniqueID
@@ -272,7 +280,7 @@ struct MasterInfo {
 }
 
 // the values of a key in five languages (`required`: an error when there is none)
-fn five(file: &str, es: &[&Entry], key: &str, required: bool, line: u32) -> Result<Option<[String; 5]>, SourceError> {
+pub(crate) fn five(file: &str, es: &[&Entry], key: &str, required: bool, line: u32) -> Result<Option<[String; 5]>, SourceError> {
     let mut out: [Option<String>; 5] = Default::default();
     let mut first = None;
     for e in es.iter().filter(|e| e.name == key) {
@@ -292,14 +300,14 @@ fn five(file: &str, es: &[&Entry], key: &str, required: bool, line: u32) -> Resu
 }
 
 // the one entry of a key without language
-fn single<'e>(file: &str, es: &[&'e Entry], key: &str) -> Result<Option<&'e Entry>, SourceError> {
+pub(crate) fn single<'e>(file: &str, es: &[&'e Entry], key: &str) -> Result<Option<&'e Entry>, SourceError> {
     match es.iter().find(|e| e.name == key) {
         Some(e) if e.lang.is_some() => Err(err(file, e.line, format!("{key} hat keine Sprachendung"))),
         found => Ok(found.copied()),
     }
 }
 
-fn keys_known(file: &str, es: &[&Entry], known: &[&str]) -> Result<(), SourceError> {
+pub(crate) fn keys_known(file: &str, es: &[&Entry], known: &[&str]) -> Result<(), SourceError> {
     match es.iter().find(|e| !known.contains(&e.name.as_str())) {
         Some(e) => Err(err(file, e.line, format!("unbekannter Schlüssel {} (bekannt: {})", e.name, known.join(", ")))),
         None => Ok(()),
@@ -498,15 +506,55 @@ fn master_info(file: &str, text: &str, m: Measure, files: &dyn Fn(&str) -> Optio
         }
     }
     canon_cells(&mut canon, &shape);
-    let length = |n: &str| -> Result<f64, SourceError> {
-        match shape.iter().find(|c| c.name == n) {
-            None => Err(err(file, line, format!("{n} fehlt ([Shape] {n} = …, z. B. 40 mm)"))),
-            Some(Cell0 { val: CellVal::Plain(Value0::Num(x, u)), .. }) if *x > 0.0 && u.is_none_or(|u| u.dimension() == diagram_core::Dimension::Length) => Ok(*x),
-            Some(c) => Err(err(file, c.line, format!("{n} muss eine positive Länge sein (z. B. 40 mm)"))),
-        }
-    };
-    let (width, height) = (length("Width")?, length("Height")?);
-    Ok(MasterInfo { file: String::from(file), line, name_u, names, prompts, keywords, text, styles, svg, hidden, width, height, shape, sections, canon })
+    let one_d = shape.iter().any(|c| ENDS.contains(&c.name.as_str()));
+    let (width, height) = if one_d { one_d_page(file, line, &shape)? } else { (length(file, line, &shape, "Width")?, length(file, line, &shape, "Height")?) };
+    Ok(MasterInfo { file: String::from(file), line, name_u, names, prompts, keywords, text, styles, svg, hidden, width, height, one_d, shape, sections, canon })
+}
+
+// the cells that make a master 1-D (README: 1D-Shapes)
+const ENDS: [&str; 4] = ["BeginX", "BeginY", "EndX", "EndY"];
+
+// a length constant of [Shape]: Some(value) when the cell is one (no unit: inches), None when it
+// is something else; Err when it is missing
+fn length_const(file: &str, line: u32, shape: &[Cell0], n: &str, example: &str) -> Result<(Option<f64>, u32), SourceError> {
+    match shape.iter().find(|c| c.name == n) {
+        None => Err(err(file, line, format!("{n} fehlt ([Shape] {n} = …, z. B. {example})"))),
+        Some(Cell0 { val: CellVal::Plain(Value0::Num(x, u)), line, .. }) if u.is_none_or(|u| u.dimension() == diagram_core::Dimension::Length) => Ok((Some(*x), *line)),
+        Some(c) => Ok((None, c.line)),
+    }
+}
+
+// Width or Height of a 2-D master: a positive length constant
+fn length(file: &str, line: u32, shape: &[Cell0], n: &str) -> Result<f64, SourceError> {
+    match length_const(file, line, shape, n, "40 mm")? {
+        (Some(x), _) if x > 0.0 => Ok(x),
+        (_, at) => Err(err(file, at, format!("{n} muss eine positive Länge sein (z. B. 40 mm)"))),
+    }
+}
+
+// a 1-D master: BeginX, BeginY, EndX, EndY are length constants from 0 (the ends on the master
+// page), Height is given (a length from 0, or a formula); the master page is BeginX+EndX wide
+// and BeginY+EndY high (the ends lie as far from its edges as from the other end's edges)
+fn one_d_page(file: &str, line: u32, shape: &[Cell0]) -> Result<(f64, f64), SourceError> {
+    let mut e = [0.0; 4];
+    for (i, n) in ENDS.iter().enumerate() {
+        e[i] = match length_const(file, line, shape, n, "0 mm; ein 1D-Master braucht BeginX, BeginY, EndX und EndY")? {
+            (Some(x), _) if x >= 0.0 => x,
+            (_, at) => return Err(err(file, at, format!("{n} muss eine Länge ab 0 sein (eine Konstante wie 40 mm): das Ende auf der Masterseite"))),
+        };
+    }
+    match length_const(file, line, shape, "Height", "10 mm, 0 mm für eine Linie, oder eine Formel wie GUARD(EndY-BeginY)")? {
+        (Some(x), at) if x < 0.0 => return Err(err(file, at, "Height muss eine Länge ab 0 oder eine Formel sein")),
+        _ => {}
+    }
+    if (e[0] - e[2]).abs() < 1e-12 && (e[1] - e[3]).abs() < 1e-12 {
+        return Err(err(file, line, "BeginX/BeginY und EndX/EndY liegen aufeinander"));
+    }
+    let (w, h) = (e[0] + e[2], e[1] + e[3]);
+    if w <= 0.0 || h <= 0.0 {
+        return Err(err(file, line, "die Masterseite (BeginX+EndX mal BeginY+EndY) wäre leer: die Enden brauchen Abstand zum Rand (z. B. BeginY = EndY = 5 mm)"));
+    }
+    Ok((w, h))
 }
 
 fn canon_cells(canon: &mut String, cells: &[Cell0]) {
@@ -733,11 +781,27 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
     };
     tx.set_shape_styles(shape, refs).map_err(|e| sink.fail(line, "die Formatvorlagen", e))?;
     let sheet = SheetRef::Shape(shape);
-    const FIRST: [&str; 6] = ["PinX", "PinY", "Width", "Height", "LocPinX", "LocPinY"];
-    for name in FIRST {
+    // the transform first, in Visio's order; a 1-D master's box follows its ends (Visio's own
+    // formulas for a 1-D shape, README: 1D-Shapes) unless the master writes a cell itself
+    const FIRST: &[&str] = &["PinX", "PinY", "Width", "Height", "LocPinX", "LocPinY"];
+    const FIRST_1D: &[&str] = &["PinX", "PinY", "Width", "Height", "LocPinX", "LocPinY", "Angle", "BeginX", "BeginY", "EndX", "EndY"];
+    let first = if mi.one_d { FIRST_1D } else { FIRST };
+    for &name in first {
         let a = single_addr(tx, name);
         match mi.shape.iter().find(|c| c.name == name) {
             Some(c) => sink.put(tx, sheet, &a, c, Some(String::from(name)))?,
+            None if mi.one_d => {
+                let f = match name {
+                    "PinX" => "GUARD((BeginX+EndX)/2)",
+                    "PinY" => "GUARD((BeginY+EndY)/2)",
+                    "Width" => "GUARD(SQRT((EndX-BeginX)^2+(EndY-BeginY)^2))",
+                    "LocPinX" => "GUARD(Width*0.5)",
+                    "LocPinY" => "GUARD(Height*0.5)",
+                    "Angle" => "GUARD(ATAN2(EndY-BeginY,EndX-BeginX))",
+                    _ => continue,
+                };
+                sink.formula(tx, sheet, &a, f, line)?;
+            }
             None => match name {
                 "PinX" => sink.constant(tx, sheet, &a, Value::Num(w / 2.0), Some(len_unit), line)?,
                 "PinY" => sink.constant(tx, sheet, &a, Value::Num(h / 2.0), Some(len_unit), line)?,
@@ -747,7 +811,7 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
             },
         }
     }
-    for c in mi.shape.iter().filter(|c| !FIRST.contains(&c.name.as_str())) {
+    for c in mi.shape.iter().filter(|c| !first.contains(&c.name.as_str())) {
         let a = single_addr(tx, &c.name);
         sink.put(tx, sheet, &a, c, Some(c.name.clone()))?;
     }

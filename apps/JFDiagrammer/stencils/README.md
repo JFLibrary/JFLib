@@ -144,7 +144,52 @@ Fehlt die Zelle im Master, setzt das Werkzeug:
 - Masterseite: `PageWidth`, `PageHeight` = Shape-Größe, Maßstab 1:1 in mm bzw. Zoll
 
 `Width` und `Height` sind Pflicht, und zwar als Längen (Konstanten wie `40 mm`, keine Formeln):
-aus ihnen entstehen Pin und Masterseite.
+aus ihnen entstehen Pin und Masterseite. Ausnahme sind 1D-Master (nächster Abschnitt).
+
+## 1D-Shapes (Verbinder, Linienpfeile)
+
+Ein Master ist ein 1D-Shape, wenn `[Shape]` die Enden `BeginX`, `BeginY`, `EndX` und `EndY`
+setzt (eine davon genügt für die Erkennung, dann sind alle vier Pflicht). Das ist Visios eigene
+Speicherform: Es gibt kein eigenes Kennzeichen, ein Shape mit `BeginX` ist eindimensional; die
+App (`diagram_core::glue::is_one_d`) liest es genauso.
+
+- `BeginX` … `EndY` sind Längen ab 0 (Konstanten wie `40 mm`, keine Formeln): die Enden auf der
+  Masterseite. Die Masterseite ist `BeginX+EndX` breit und `BeginY+EndY` hoch, die Enden haben
+  also zum Rand so viel Abstand wie zum anderen Rand; eine waagrechte Linie braucht deshalb
+  `BeginY = EndY = 2.5 mm` o. ä. statt 0. Fallen die Enden zusammen oder wäre die Seite leer, ist
+  das ein Baufehler.
+- `Height` ist Pflicht: die Dicke (Länge ab 0, eine Linie hat `0 mm`) oder eine Formel.
+- Fehlt die Zelle, setzt das Werkzeug Visios 1D-Formeln, so dass der Kasten den Enden folgt:
+
+  | Zelle | Formel |
+  |---|---|
+  | `PinX`, `PinY` | `GUARD((BeginX+EndX)/2)`, `GUARD((BeginY+EndY)/2)` |
+  | `Width` | `GUARD(SQRT((EndX-BeginX)^2+(EndY-BeginY)^2))` (die Länge) |
+  | `Angle` | `GUARD(ATAN2(EndY-BeginY,EndX-BeginX))` (der Kasten liegt auf der Linie) |
+  | `LocPinX`, `LocPinY` | `GUARD(Width*0.5)`, `GUARD(Height*0.5)` |
+
+  Die Geometrie zeichnet dann im gedrehten Kasten: x von 0 (Anfang) bis `Width` (Ende), die
+  Linie selbst auf `Height*0.5`.
+- **Aufrechter Kasten** (wie der dynamische Verbinder der App, für Verläufe von Seite zu Seite):
+  der Master schreibt `Width = GUARD(EndX-BeginX)`, `Height = GUARD(EndY-BeginY)`,
+  `Angle = GUARD(0DA)`; beide Maße dürfen negativ sein, lokal (0, 0) ist der Anfang und
+  (`Width`, `Height`) das Ende. Geometrie in Anteilen des Kastens (`RelMoveTo`, `RelLineTo`,
+  `RelCubBezTo`) bleibt so bei jeder Lage richtig.
+- **Kleben:** Die Enden kleben an Verbindungspunkte (statisch, `PAR(PNT(…))`, schreibt die App
+  beim Kleben selbst). `GlueType = 2` erlaubt auch das Kleben an das ganze Shape (das Ende sucht
+  sich den Rand). Trigger (`BegTrigger`, `EndTrigger`) braucht der Master nicht.
+- **Kein `ObjType = 2`** für Shapes mit eigener Geometrie: Das Kennzeichen „verlegbar“ macht ein
+  1D-Shape zum dynamischen Verbinder; die App verlegt ihn dann selbst und ersetzt seine
+  Geometrie. Formatvorlage: Linienverbinder `Connector` (Linie, Pfeilspitze und Text mit
+  Hintergrund aus dem Design), gefüllte flächige Pfeile `Normal`. Ein Verbinder nur aus Umrissen
+  (ohne Füllung) nimmt ebenfalls `Connector`, mit `BeginArrow = 0` und `EndArrow = 0`: mit
+  `Normal` verschwände er in Designs ohne Shape-Linien (Kontrast).
+- Text eines Linienverbinders: ein fester Textblock (z. B. `TxtWidth = 30 mm`) mitten auf dem
+  Verlauf; der Hintergrund aus `Connector` erscheint nur hinter vorhandenem Text.
+
+Die App legt einen 1D-Master heute wie ein 2D-Shape ab (`instance::place` setzt `PinX`/`PinY`
+als Konstanten, die Enden bleiben auf den Werten der Masterseite); siehe Prüfung
+`diagramiotest --check --only stencils/shapes/drop`.
 
 ## SVG-Grafik (`svg:`)
 

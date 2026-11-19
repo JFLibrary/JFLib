@@ -1,0 +1,46 @@
+#!args --no-system-fonts --template-dir build/jd13-own
+# JFDiagrammer, JD13: own templates (VL-03, EX-11, DF-05) -- a drawing from the flowchart's
+# starter diagram saved through Speichern unter › Als Vorlage into the own template folder
+# (--template-dir) as a .vstx with the open stencils; Neu › Meine Vorlagen lists it (no units
+# to choose: it has its own); Erstellen makes a new, unnamed drawing with its shapes and its
+# stencils; the .vstx opened from Öffnen › Zuletzt verwendet starts one more new drawing
+click tab:"Datei"
+click button:"Standardflussdiagramm"
+click button:"Beispiel: Bestellung"
+click button:"Erstellen"
+expect text:"Zeichnung2 – JFDiagrammer" exists
+expect tab:"Standardflussdiagramm-Shapes" selected
+# Speichern unter › Als Vorlage: the dialog in the own folder, the file a template
+click tab:"Datei"
+click button:"Speichern unter"
+click button:"Als Vorlage"
+expect dialog:"Speichern unter" exists
+click #28940
+key ctrl+a
+type "jd13-eigene.vstx"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+expect text:"jd13-eigene – JFDiagrammer" exists
+# Neu › Meine Vorlagen: the template, its picture rendered from the file
+click tab:"Datei"
+click button:"Neu"
+click button:"Meine Vorlagen"
+expect button:"Meine Vorlagen" checked
+expect button:"jd13-eigene" exists
+expect button:"Standardflussdiagramm" missing
+click button:"jd13-eigene"
+expect radio:"US-Einheiten" missing
+shot build/JFDiagrammer-templates-own.png
+click button:"Erstellen"
+expect text:"Zeichnung3 – JFDiagrammer" exists
+expect listitem:"Bestellung prüfen" exists
+expect listitem:"Vollständig?" exists
+expect tab:"Standardflussdiagramm-Shapes" selected
+expect tab:"Pfeil-Shapes" exists
+expect tab:"Verbinder" exists
+# the template opened like a drawing: a new one again, the file stays as it is
+key ctrl+o
+click button:"jd13-eigene.vstx"
+expect text:"Zeichnung4 – JFDiagrammer" exists
+expect listitem:"Bestellung prüfen" exists
+expect tab:"Verbinder" exists

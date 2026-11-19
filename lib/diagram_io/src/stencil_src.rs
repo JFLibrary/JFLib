@@ -124,7 +124,7 @@ fn split_ident(s: &str) -> (&str, &str) {
 }
 
 /// a name with its suffixes -> (name, language, variant)
-fn suffixes(file: &str, line: u32, full: &str) -> Result<(String, Option<usize>, Option<Measure>), SourceError> {
+pub(crate) fn suffixes(file: &str, line: u32, full: &str) -> Result<(String, Option<usize>, Option<Measure>), SourceError> {
     let mut parts = full.split('.');
     let base = parts.next().unwrap_or("");
     if base.is_empty() || !base.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') {
@@ -149,7 +149,7 @@ fn suffixes(file: &str, line: u32, full: &str) -> Result<(String, Option<usize>,
 }
 
 // split at ';' outside double quotes (a doubled "" stays inside the string)
-fn split_cells(s: &str) -> Option<Vec<&str>> {
+pub(crate) fn split_cells(s: &str) -> Option<Vec<&str>> {
     let mut out = Vec::new();
     let mut quoted = false;
     let mut start = 0;

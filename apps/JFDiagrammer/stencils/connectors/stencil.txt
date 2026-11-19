@@ -1,0 +1,16 @@
+# Verbinder (SH-277, JD13): 1D-Shapes mit festem Verlauf (README: 1D-Shapes) -- ihre Enden
+# kleben an Shapes, der Verlauf folgt per Formel den Enden; sie werden nicht neu verlegt (kein
+# ObjType "verlegbar", das ist der dynamische Verbinder der App).  Linienverbinder und Verbinder
+# aus Umrissen ohne Füllung tragen die Formatvorlage "Connector" (Linie und Pfeilspitze aus dem
+# Design, Text mit Hintergrund; Umrisse ohne Pfeilspitzen), gefüllte flächige die Formatvorlage
+# "Normal".  Probeblatt mit vier Mastern; die übrigen folgen im selben Stil.
+stencil: Connectors
+file: connectors
+name.de: Verbinder
+name.en: Connectors
+name.es: Conectores
+name.it: Connettori
+name.fr: Connecteurs
+category: extras
+masters: curved_connector, elbow_connector, hollow_connector, line_arrow
+quick: 2

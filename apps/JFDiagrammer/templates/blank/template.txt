@@ -1,0 +1,16 @@
+# Leere Zeichnung (VL-10): eine leere Seite, A4 (metrisch) bzw. Letter (US) quer, ohne
+# Schablonen.  Quellformat: ../README.md
+template: Blank Drawing
+file: blank
+name.de: Leere Zeichnung
+name.en: Blank Drawing
+name.es: Dibujo en blanco
+name.it: Disegno vuoto
+name.fr: Dessin vierge
+description.de: Eine leere Seite ohne Schablonen. Schablonen öffnen Sie über „Weitere Shapes“.
+description.en: A blank page without stencils. Open stencils from "More Shapes".
+description.es: Una página en blanco sin colecciones de formas. Abra colecciones desde «Más formas».
+description.it: Una pagina vuota senza raccolte di forme. Aprire le raccolte da «Altre forme».
+description.fr: Une page vierge sans bibliothèque de formes. Ouvrez des bibliothèques depuis « Plus de formes ».
+category: general
+order: 10

@@ -1,0 +1,16 @@
+# Standardflussdiagramm-Shapes (SH-021, JD13): die Symbole nach ISO 5807 in ihrer Normform
+# (FEATURES.md F2); Linie, Füllung und Text kommen aus der Formatvorlage "Normal".  Alle
+# rechteckigen Symbole haben dasselbe Grundmaß 36 x 24 mm (3:2, US 1.5 x 1 in), damit sie in
+# einer Spalte fluchten; jeder Master trägt die Kategorie "Flowchart" und vier
+# Verbindungspunkte in der Mitte der Seiten (die Raute an ihren Ecken).  Probeblatt mit vier
+# Mastern; die übrigen folgen im selben Stil.
+stencil: Basic Flowchart Shapes
+file: flowchart
+name.de: Standardflussdiagramm-Shapes
+name.en: Basic Flowchart Shapes
+name.es: Formas básicas de diagrama de flujo
+name.it: Forme di base per diagrammi di flusso
+name.fr: Formes de base pour diagramme de flux
+category: flowchart
+masters: process, decision, document, database
+quick: 4

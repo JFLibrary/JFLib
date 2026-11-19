@@ -62,7 +62,7 @@ fn plain(s: &str, attr: bool) -> bool {
         && !s.contains(['\u{fffe}', '\u{ffff}'])
 }
 
-fn escape(out: &mut String, s: &str, attr: bool) {
+pub(crate) fn escape(out: &mut String, s: &str, attr: bool) {
     if plain(s, attr) {
         out.push_str(s);
         return;

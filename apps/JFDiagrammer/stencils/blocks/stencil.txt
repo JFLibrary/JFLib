@@ -1,0 +1,13 @@
+# Blöcke (SH-002, JD13): Bausteine für Blockdiagramme im NetLab-Stil -- eckig und schlicht;
+# Linie, Füllung und Text kommen aus der Formatvorlage "Normal", damit die Designs wirken.
+# Probeblatt mit vier Mastern; die übrigen folgen im selben Stil.
+stencil: Blocks
+file: blocks
+name.de: Blöcke
+name.en: Blocks
+name.es: Bloques
+name.it: Blocchi
+name.fr: Blocs
+category: general
+masters: box_arrow, box_3d, partial_layer, arrow_1d
+quick: 2

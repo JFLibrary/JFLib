@@ -50,7 +50,7 @@ const CFF: &[(&str, &str)] = &[
     ("phase_list.master", include_str!("../../JFDiagrammer/stencils/cff/phase_list.master")),
 ];
 
-const CALLOUTS: &[(&str, &str)] = &[
+pub(crate) const CALLOUTS: &[(&str, &str)] = &[
     ("stencil.txt", include_str!("../../JFDiagrammer/stencils/callouts/stencil.txt")),
     ("callout_box.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_box.master")),
     ("callout_rounded.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_rounded.master")),
@@ -58,6 +58,7 @@ const CALLOUTS: &[(&str, &str)] = &[
     ("callout_line.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_line.master")),
     ("callout_bracket.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_bracket.master")),
     ("callout_circle.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_circle.master")),
+    ("tip.master", include_str!("../../JFDiagrammer/stencils/callouts/tip.master")),
 ];
 
 type Want = (&'static str, &'static str, bool);
@@ -88,6 +89,8 @@ const SETS: [(&str, &[(&str, &str)], &[Want]); 3] = [
             ("Callout line", "Callout", false),
             ("Callout bracket", "Callout", false),
             ("Callout circle", "Callout", false),
+            // (JD13) the hidden note box of the templates' start drawings: no callout
+            ("Tip", "", true),
         ],
     ),
 ];
@@ -123,11 +126,11 @@ fn geo_flag(doc: &Document, s: SheetRef, ix: u32, n: &str) -> bool {
     num(doc, s, Some(("Geometry", ix)), None, n) != 0.0
 }
 
-fn set_user(tx: &mut Transaction, s: ShapeRef, n: &str, v: f64, u: Option<Unit>) {
+pub(crate) fn set_user(tx: &mut Transaction, s: ShapeRef, n: &str, v: f64, u: Option<Unit>) {
     let _ = tx.set_user(SheetRef::Shape(s), n, Value::Num(v), u);
 }
 
-fn set_single(tx: &mut Transaction, s: SheetRef, n: &str, v: f64, u: Option<Unit>) {
+pub(crate) fn set_single(tx: &mut Transaction, s: SheetRef, n: &str, v: f64, u: Option<Unit>) {
     let a = CellAddr::single(tx.intern(n));
     let _ = tx.set_constant(s, &a, Value::Num(v), u);
 }
@@ -293,6 +296,10 @@ fn callouts(h: &mut H, mut doc: Document, shapes: &[(String, ShapeRef)]) {
     for (nu, s) in shapes {
         let s = *s;
         let ss = SheetRef::Shape(s);
+        // (JD13) the Tip has no pointer
+        if user_text(&doc, ss, "msvStructureType") != "Callout" {
+            continue;
+        }
         let geo = doc.geometry(ss);
         // the sections with a NoShow formula: the pointer and its dot
         let has_noshow = |d: &Document, g: SecKey| d.sym("NoShow").is_some_and(|n| d.resolve(ss, &CellAddr::section(g, n)).exists());
@@ -316,7 +323,7 @@ fn callouts(h: &mut H, mut doc: Document, shapes: &[(String, ShapeRef)]) {
 // ---------------------------------------------------------------- previews
 
 // a drawing page of w x h mm for the previews
-fn sheet_doc(w: f64, hh: f64) -> Option<(Document, PageRef)> {
+pub(crate) fn sheet_doc(w: f64, hh: f64) -> Option<(Document, PageRef)> {
     let mut doc = vsdx::new_document(DocKind::Drawing, Measure::Metric);
     let page = doc.pages().next()?;
     let mut tx = doc.transaction("page");
@@ -329,7 +336,7 @@ fn sheet_doc(w: f64, hh: f64) -> Option<(Document, PageRef)> {
 // one instance of master NameU `nu` of `src` with its centre at (x, y) mm, w x h mm (0: the
 // master's size), the text `text` (None: the master's)
 #[allow(clippy::too_many_arguments)]
-fn put(tx: &mut Transaction, src: &Document, page: PageRef, nu: &str, at: (f64, f64), size: (f64, f64), text: Option<&str>, more: &dyn Fn(&mut Transaction, ShapeRef)) -> Option<ShapeRef> {
+pub(crate) fn put(tx: &mut Transaction, src: &Document, page: PageRef, nu: &str, at: (f64, f64), size: (f64, f64), text: Option<&str>, more: &dyn Fn(&mut Transaction, ShapeRef)) -> Option<ShapeRef> {
     let m = src.masters().find(|&m| MasterTexts::of(src, m).name_u == nu)?;
     let local = instance::import_master(tx, src, m).ok()?;
     let s = instance::place(tx, page, local, at.0 * MM, at.1 * MM, 0).ok()?;
@@ -344,9 +351,14 @@ fn put(tx: &mut Transaction, src: &Document, page: PageRef, nu: &str, at: (f64, 
     Some(s)
 }
 
-fn none(_: &mut Transaction, _: ShapeRef) {}
+pub(crate) fn none(_: &mut Transaction, _: ShapeRef) {}
 
 fn render_page(doc: &mut Document, page: PageRef, path: &str) -> bool {
+    render_page_at(doc, page, path, 110.0)
+}
+
+/// recalculate the page's shapes and write the page as PNG at `dpi`
+pub(crate) fn render_page_at(doc: &mut Document, page: PageRef, path: &str, dpi: f64) -> bool {
     {
         let mut tx = doc.transaction("recalc");
         let sheets: Vec<SheetRef> = tx.doc().all_shapes(diagram_core::Owner::Page(page)).map(SheetRef::Shape).collect();
@@ -355,7 +367,7 @@ fn render_page(doc: &mut Document, page: PageRef, path: &str) -> bool {
     }
     let mut fonts = crate::render::fonts();
     let mut v = PageView::new(doc, page, &mut fonts, &Options::default());
-    let ro = raster::RasterOptions { dpi: 110.0, ..Default::default() };
+    let ro = raster::RasterOptions { dpi, ..Default::default() };
     let Some(img) = raster::render(&mut v, &ro) else { return false };
     let ok = plat::write_file(path, &crate::render::png(&img));
     out(&format!("{} {path} ({} x {})\n", if ok { "wrote" } else { "error: cannot write" }, img.w, img.h));

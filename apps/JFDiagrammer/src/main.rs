@@ -46,9 +46,13 @@
 //                     Format, Shapes verbinden, the Verbindungspfeile
 //   src/structures_cff.rs   (JD10) the register Funktionsübergreifendes Flussdiagramm
 //   src/layout_ui.rs  (JD10) Layout-Verhalten per shape, Seite einrichten › Layout und Routing
+//   src/templates.rs  (JD13) the templates: built-in (build.rs builds them from templates/ into
+//                     .vstx), the own ones, a new drawing from one, Speichern als Vorlage
+//   src/templates_ui.rs  (JD13) Datei › Neu: the catalogue with rendered previews
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
-//                     browser and Android run build_steps.rs too)
+//                     browser and Android run build_steps.rs too); templates/ (JD13) the
+//                     template sources, built into .vstx after the stencils
 //   lang/shortcuts.tsv   the shortcuts of each language (Office conventions, LG-08)
 //   lang/glossary.tsv    the binding terms in five languages (LG-06)
 //   check_lang.py        the language check (LG-11): catalogue, glossary, shortcuts
@@ -66,7 +70,9 @@
 // a drawing on the command line opens at start (JD4); --no-system-fonts draws with the style's
 // fonts only (the same on every machine); --write-stencils DIR writes the built-in stencils
 // (.vssx, metric and US) into DIR and ends (JD9: the user's check in Visio); --export-dir DIR
-// puts DIR in front of the name the export's save dialog proposes (JD12).
+// puts DIR in front of the name the export's save dialog proposes (JD12); --write-templates DIR
+// writes the built-in templates (.vstx) into DIR and ends, --template-dir DIR is the folder of
+// the own templates (JD13).
 //
 //   python build_rs.py run JFDiagrammer
 //   python build_rs.py test JFDiagrammer          tests/*.uis
@@ -107,6 +113,8 @@ mod stencils_panel;
 mod structures;
 mod structures_cff;
 mod structures_cmds;
+mod templates;
+mod templates_ui;
 mod viewer;
 
 use base::settings::Settings;
@@ -130,8 +138,10 @@ pub(crate) struct Diagrammer {
     pub backstage: Option<usize>,
     /// the page it opens on next time
     pub last_page: usize,
-    /// Neu: the template whose preview is shown
+    /// Neu: the template whose preview is shown (an index into the catalogue)
     pub template: Option<usize>,
+    /// (JD13) Neu: the template catalogue
+    pub catalog: templates::Catalog,
     /// the template preview's units: 0 metric, 1 US
     pub units_us: i32,
     /// the options page shown
@@ -213,6 +223,7 @@ impl Diagrammer {
             backstage: None,
             last_page: backstage::PAGE_NEW,
             template: None,
+            catalog: templates::Catalog::default(),
             units_us: 0,
             opt_page: 0,
             canvas: DiagramState::new(),
@@ -301,14 +312,10 @@ impl Diagrammer {
         self.backstage = Some(page);
         self.last_page = page;
         self.template = None;
+        // (JD13) the own templates are read again
+        self.catalog.own_read = false;
         ui.keytips_off();
         ui.repass();
-    }
-
-    /// Neu › Leere Zeichnung: a new empty drawing
-    pub(crate) fn new_blank(&mut self, ui: &mut Ui) {
-        self.template = None;
-        edit_cmds::new_drawing(self, ui);
     }
 
     /// zoom a step in (1) or out (-1) around the canvas' middle
@@ -414,6 +421,14 @@ ui::main!({
             plat::write_stdout(alloc::format!("{p}\n").as_bytes());
         }
         return if written.len() == 2 * stencils::BUILTIN.len() { 0 } else { 1 };
+    }
+    // (JD13) --write-templates DIR: the built-in templates into a folder, no window
+    if let Some(dir) = plat::arg_value("--write-templates") {
+        let written = templates::write_builtin(&dir);
+        for p in &written {
+            plat::write_stdout(alloc::format!("{p}\n").as_bytes());
+        }
+        return if written.len() == 2 * templates::BUILTIN.len() { 0 } else { 1 };
     }
     i18n::set_catalog(Catalog::from_tsv(include_str!("../locales/ui.tsv")));
     ui::launch(&DESC.translated(), Diagrammer::new(), &style::STYLE)

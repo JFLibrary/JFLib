@@ -1,0 +1,93 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD13: the template catalogue of Datei › Neu (VL-01) -- the categories, every P1
+# template as a tile with the picture of its first page (rendered from the template), the
+# preview with the forms (Leer, the starter diagrams), units and Erstellen; a flowchart from its
+# starter diagram (shapes, connectors, its stencils in the panel, the tip shape deleted); the
+# blank flowchart in US units (Letter); the cross-functional flowchart, whose register comes with
+# the template even before a lane is on the page (VL-04), and its vertical form
+click tab:"Datei"
+expect button:"Neu" selected
+expect button:"Alle Vorlagen" checked
+expect button:"Leere Zeichnung" exists
+expect button:"Standarddiagramm" exists
+expect button:"Standardflussdiagramm" exists
+expect button:"Funktionsübergreifendes Flussdiagramm" exists
+shot build/JFDiagrammer-templates.png
+# a category shows its templates only
+click button:"Flussdiagramm"
+expect button:"Flussdiagramm" checked
+expect button:"Standarddiagramm" missing
+expect button:"Standardflussdiagramm" exists
+click button:"Alle Vorlagen"
+expect button:"Standarddiagramm" exists
+# the flowchart's preview: the blank form first, the starter diagram beside it
+click button:"Standardflussdiagramm"
+expect button:"Leer" checked
+expect button:"Beispiel: Bestellung" exists
+expect text:"Abläufe, Prozesse und Entscheidungen als Flussdiagramm, mit Regeln zur Diagrammprüfung." exists
+expect radio:"Metrische Einheiten" checked
+click button:"Beispiel: Bestellung"
+expect button:"Beispiel: Bestellung" checked
+expect text:"Ein kleiner Ablauf mit Start, Schritten, einer Entscheidung und dem Ende, zum Abwandeln." exists
+shot build/JFDiagrammer-templates-preview.png
+click button:"Erstellen"
+# a new, unnamed drawing with the starter's shapes and the template's stencils
+expect tab:"Start" selected
+expect text:"Zeichnung2 – JFDiagrammer" exists
+expect listitem:"Bestellung prüfen" exists
+expect listitem:"Vollständig?" exists
+expect listitem:"Ja" exists
+expect tab:"Standardflussdiagramm-Shapes" selected
+expect tab:"Pfeil-Shapes" exists
+expect tab:"Verbinder" exists
+shot build/JFDiagrammer-templates-sample.png
+# the tip shape: selected and deleted like any shape
+click listitem:"Tipp: Ziehen Sie Shapes aus der Seitenleiste auf die Seite und verbinden Sie sie. Diesen Hinweis können Sie löschen."
+key delete
+expect listitem:"Tipp: Ziehen Sie Shapes aus der Seitenleiste auf die Seite und verbinden Sie sie. Diesen Hinweis können Sie löschen." missing
+expect listitem:"Bestellung prüfen" exists
+# the blank flowchart in US units: a Letter page in landscape
+click tab:"Datei"
+click button:"Neu"
+click button:"Standardflussdiagramm"
+click radio:"US-Einheiten"
+expect radio:"US-Einheiten" checked
+click button:"Erstellen"
+expect text:"Zeichnung3 – JFDiagrammer" exists
+expect listitem:"Bestellung prüfen" missing
+key ctrl+p
+expect combo:"Letter" exists
+expect combo:"Querformat" exists
+key esc
+# the cross-functional flowchart: its register with the blank form already (#106: the sixth
+# register, after Datei .. Ansicht; its name is a stencil's title in the Shapes panel too)
+click tab:"Datei"
+click button:"Neu"
+click button:"Funktionsübergreifendes Flussdiagramm"
+click radio:"Metrische Einheiten"
+expect button:"Horizontal" checked
+click button:"Leer"
+click button:"Erstellen"
+expect text:"Zeichnung4 – JFDiagrammer" exists
+expect #106 exists
+click #106
+expect button:"Bahn" exists
+expect listitem:"Titel" missing
+# the vertical form: the flowchart on the page, lanes side by side
+click tab:"Datei"
+click button:"Neu"
+click button:"Funktionsübergreifendes Flussdiagramm"
+click button:"Vertikal"
+click button:"Erstellen"
+expect text:"Zeichnung5 – JFDiagrammer" exists
+expect #106 exists
+expect listitem:"Titel" exists
+shot build/JFDiagrammer-templates-cff.png
+# the empty drawing has no stencils
+click tab:"Datei"
+click button:"Neu"
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+expect text:"Zeichnung6 – JFDiagrammer" exists
+expect text:"Keine Schablone geöffnet." exists
+expect #106 missing

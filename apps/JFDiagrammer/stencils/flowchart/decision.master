@@ -1,0 +1,47 @@
+# Entscheidung (ISO 5807): eine Raute im Grundmaß 3:2, die Ecken in der Mitte der Seiten des
+# Kastens, dort sind auch die Verbindungspunkte (Ausgänge Ja/Nein).  Der Textblock ist drei
+# Viertel so groß wie der Kasten.
+master: Decision
+name.de: Entscheidung
+name.en: Decision
+name.es: Decisión
+name.it: Decisione
+name.fr: Décision
+prompt.de: Eine Entscheidung mit zwei oder mehr Ausgängen, zum Beispiel Ja und Nein (ISO 5807).
+prompt.en: A decision with two or more exits, for example yes and no (ISO 5807).
+prompt.es: Una decisión con dos o más salidas, por ejemplo sí y no (ISO 5807).
+prompt.it: Una decisione con due o più uscite, ad esempio sì e no (ISO 5807).
+prompt.fr: Une décision avec deux sorties ou plus, par exemple oui et non (ISO 5807).
+keywords.de: Entscheidung, Verzweigung, Bedingung, Frage, ja, nein, Raute, Flussdiagramm
+keywords.en: decision, branch, condition, question, yes, no, diamond, flowchart
+keywords.es: decisión, bifurcación, condición, pregunta, sí, no, rombo, diagrama de flujo
+keywords.it: decisione, diramazione, condizione, domanda, sì, no, rombo, diagramma di flusso
+keywords.fr: décision, branchement, condition, question, oui, non, losange, diagramme de flux
+
+[Shape]
+Width = 36 mm
+Width.us = 1.5 in
+Height = 24 mm
+Height.us = 1 in
+TxtWidth = Width*0.75
+TxtHeight = Height*0.75
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+msvShapeCategories:  Value = "Flowchart"
+
+[Geometry]
+MoveTo  X = Width*0.5; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width*0.5; Y = Height
+LineTo  X = 0; Y = Height*0.5
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

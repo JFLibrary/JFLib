@@ -1,0 +1,79 @@
+# 3D-Feld: Vorderseite, Deckel und rechte Seite als drei Flächen mit derselben Füllung (keine
+# Schattierung: die Kanten zeigen die Tiefe).  Row_1 an der hinteren linken Ecke des Deckels
+# ändert die Tiefe (nur waagrecht, als Abstand von links: die Tiefe bleibt beim Vergrößern).
+# Der Text steht auf der Vorderseite.  Ecken immer eckig (Rounding 0): in den abgerundeten
+# Design-Varianten würde jede Fläche für sich gerundet und der Quader fiele auseinander.
+master: 3-D box
+name.de: 3D-Feld
+name.en: 3-D box
+name.es: Cuadro 3D
+name.it: Riquadro 3D
+name.fr: Bloc 3D
+prompt.de: Block mit angedeuteter Tiefe. Die Tiefe ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Block with a hint of depth. Drag the yellow control handle to change the depth.
+prompt.es: Bloque con profundidad. Arrastre el controlador amarillo para cambiar la profundidad.
+prompt.it: Blocco con profondità. Trascina la maniglia di controllo gialla per cambiare la profondità.
+prompt.fr: Bloc avec un effet de profondeur. Faites glisser la poignée de contrôle jaune pour modifier la profondeur.
+keywords.de: Block, Feld, Kasten, 3D, Quader, Tiefe, räumlich, Blockdiagramm
+keywords.en: block, box, 3D, cuboid, depth, three-dimensional, block diagram
+keywords.es: bloque, cuadro, 3D, prisma, profundidad, tridimensional, diagrama de bloques
+keywords.it: blocco, riquadro, 3D, parallelepipedo, profondità, tridimensionale, diagramma a blocchi
+keywords.fr: bloc, boîte, 3D, pavé, profondeur, tridimensionnel, diagramme de blocs
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 25 mm
+Height.us = 1 in
+Rounding = 0 mm
+TxtWidth = Width-User.D
+TxtHeight = Height-User.D
+TxtPinX = (Width-User.D)*0.5
+TxtPinY = (Height-User.D)*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Tiefe
+D:  Value = MIN(MAX(Controls.Row_1, 0), Width*0.5, Height*0.5)
+
+# 1 die Vorderseite
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width-User.D; Y = 0
+LineTo  X = Width-User.D; Y = Height-User.D
+LineTo  X = 0; Y = Height-User.D
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# 2 der Deckel
+[Geometry]
+MoveTo  X = 0; Y = Height-User.D
+LineTo  X = Width-User.D; Y = Height-User.D
+LineTo  X = Width; Y = Height
+LineTo  X = User.D; Y = Height
+LineTo  X = Geometry2.X1; Y = Geometry2.Y1
+
+# 3 die rechte Seite
+[Geometry]
+MoveTo  X = Width-User.D; Y = 0
+LineTo  X = Width; Y = User.D
+LineTo  X = Width; Y = Height
+LineTo  X = Width-User.D; Y = Height-User.D
+LineTo  X = Geometry3.X1; Y = Geometry3.Y1
+
+[Controls]
+Row_1:  X = 5 mm; Y = Height
+        X.us = 0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Tiefe ändern"
+        Tip.en = "Change the depth"
+        Tip.es = "Cambiar la profundidad"
+        Tip.it = "Cambia la profondità"
+        Tip.fr = "Modifier la profondeur"
+
+[Connection]
+Row  X = (Width-User.D)*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = (Height+User.D)*0.5; DirX = -1; DirY = 0
+Row  X = (Width+User.D)*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = (Height-User.D)*0.5; DirX = 1; DirY = 0

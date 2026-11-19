@@ -154,6 +154,14 @@ pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
         app.backstage = None;
         return crate::stencils::open_file(app, ui, path);
     }
+    // (JD13) a template starts a new, unnamed drawing (DF-05, VL-03); its folder is where
+    // stencils named by a bare file name are looked for
+    if doc.kind == DocKind::Template {
+        let dir = path.rsplit_once(['/', '\\']).map(|x| String::from(x.0));
+        crate::templates::create_from(app, ui, doc, dir.as_deref());
+        ui.recent_add(path);
+        return true;
+    }
     // the notice: macros, what the reader warned about (editing is on since JD7)
     let mut msg = String::new();
     if loaded.format.macros {

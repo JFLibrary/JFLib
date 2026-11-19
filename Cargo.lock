@@ -762,6 +762,8 @@ version = "0.2.1"
 dependencies = [
  "jflib-archive",
  "jflib-diagram-core",
+ "jflib-plat",
+ "jflib-rt",
 ]
 
 [[package]]

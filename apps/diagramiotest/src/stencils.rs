@@ -37,7 +37,7 @@ use crate::dump::{dump, first_difference};
 use crate::{out, H};
 
 /// the start set (apps/JFDiagrammer/stencils/standard)
-const STANDARD: &[(&str, &str)] = &[
+pub(crate) const STANDARD: &[(&str, &str)] = &[
     ("stencil.txt", include_str!("../../JFDiagrammer/stencils/standard/stencil.txt")),
     ("rectangle.master", include_str!("../../JFDiagrammer/stencils/standard/rectangle.master")),
     ("rounded_rectangle.master", include_str!("../../JFDiagrammer/stencils/standard/rounded_rectangle.master")),

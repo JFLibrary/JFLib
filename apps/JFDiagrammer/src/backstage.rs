@@ -6,11 +6,11 @@
 //   frame(app, ui)             the page shown (app.backstage) and the pane; back or Esc
 //                              returns to the drawing
 //
-// Pages today: Neu shows the P1 templates as placeholder previews (rendered previews come with
-// the templates, JD13); a click opens the template's preview with its description, metric or
-// US units and "Erstellen" (UI-04), which works for the blank drawing.  Öffnen (JD4) browses
+// Pages today: Neu is the template catalogue (templates_ui.rs, JD13: categories, rendered
+// previews, starter diagrams, units, Erstellen; UI-04, VL-01).  Öffnen (JD4) browses
 // with the file dialog and lists the drawings opened last; they open read-only (viewer.rs).
-// Speichern shows its layout with the commands disabled until writing exists (JD7); Drucken
+// Speichern and Speichern unter write the drawing (JD7), Speichern unter also as a template
+// into the own template folder (JD13, EX-11); Drucken
 // and Exportieren are print_ui.rs and export_ui.rs (JD12).  Info names the version, the licences and the place of the
 // AWS attribution.  Optionen lists its pages at the side (options.rs).
 
@@ -35,18 +35,6 @@ pub(crate) const PAGE_OPTIONS: usize = 8;
 
 const ID: u32 = 0x6000;
 const ID_PAGE: u32 = 0x6100;
-
-// the P1 templates (F11): name, description
-// i18n
-static TEMPLATES: [(&str, &str); 7] = [
-    ("Leere Zeichnung", "Eine leere Seite ohne Schablonen."),
-    ("Standarddiagramm", "Einfache Formen, Pfeile und Beschriftungen für allgemeine Diagramme."),
-    ("Standardflussdiagramm", "Prozessschritte, Entscheidungen und Verbinder nach ISO 5807."),
-    ("Funktionsübergreifendes Flussdiagramm", "Ein Ablauf in Bahnen je Abteilung oder Rolle."),
-    ("Standardnetzwerk", "Rechner, Server und Netzwerkgeräte mit Verbindungen."),
-    ("Detailliertes Netzwerk", "Netzwerkpläne mit Geräten, Racks und Verkabelung im Detail."),
-    ("Rack-Diagramm", "Geräte in Racks nach Höheneinheiten."),
-];
 
 /// the pane's items, in the order of PAGE_*
 fn items() -> [BackstageItem<'static>; 9] {
@@ -83,7 +71,7 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
         app.backstage = Some(page);
     }
     match page {
-        PAGE_NEW => new_page(app, ui),
+        PAGE_NEW => crate::templates_ui::page(app, ui),
         PAGE_OPEN => open_page(app, ui),
         PAGE_SAVE | PAGE_SAVE_AS => save_page(app, ui, page == PAGE_SAVE_AS),
         PAGE_PRINT => crate::print_ui::page(app, ui),
@@ -98,118 +86,6 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
 fn title(ui: &mut Ui, s: &str) {
     ui.text(TS_TITLE, s);
     ui.spacer(12);
-}
-
-// ------------------------------------------------------------------ Neu
-
-fn new_page(app: &mut Diagrammer, ui: &mut Ui) {
-    if let Some(k) = app.template {
-        preview(app, ui, k);
-        return;
-    }
-    title(ui, t("Neu"));
-    ui.text(TS_BODY_STRONG, t("Vorlagen"));
-    ui.spacer(8);
-    ui.box_begin(ID_PAGE, BOX_H | BOX_WRAP, 16);
-    for (k, (name, _)) in TEMPLATES.iter().enumerate() {
-        let id = ID_PAGE + 0x10 + k as u32 * 2;
-        ui.next_size(152, 0);
-        ui.box_begin(0, BOX_V, 4);
-        ui.next_size(152, 112);
-        let ev = thumb(ui, id, k, t(name));
-        if ev & EV_ACT != 0 {
-            app.template = Some(k);
-            ui.repass();
-        }
-        if ev & EV_DOUBLE != 0 && k == 0 {
-            app.new_blank(ui);
-        }
-        ui.next_size(152, 0);
-        ui.text(TS_BODY | TX_WRAP, t(name));
-        ui.box_end();
-    }
-    ui.box_end();
-}
-
-// a template's placeholder preview: a white page on the card with the template's motif drawn
-// from rectangles and lines (rendered previews come with the templates)
-fn thumb(ui: &mut Ui, id: u32, kind: usize, name: &str) -> u32 {
-    let r = ui.place(ui.dp(152), ui.dp(112));
-    let ev = ui.behave(id, HB_FOCUS);
-    let st = ui.style;
-    let mut sp = Sp { flags: ST_SUBTLE, ..Sp::default() };
-    sp.place(r);
-    sp.ev = ev;
-    sp.state = if ev & EV_HELD != 0 { 2 } else if ev & EV_HOVER != 0 { 1 } else { 0 };
-    st.button(ui, &sp);
-    let m = ui.dp(10);
-    let page = [r[0] + m, r[1] + m, r[2] - 2 * m, r[3] - 2 * m];
-    let frame = ui.color(T_CTRL_STROKE);
-    ui.cmd_rrect(page[0], page[1], page[2], page[3], 0, ui.hair(), 0xFFFF_FFFF, frame, frame);
-    let ink = 0xFF5A_6470;
-    let acc = 0xFF1F_5FA8;
-    let s100 = ui.dp(100);
-    let u = |v: i32| v * s100 / 100;
-    let (x, y) = (page[0], page[1]);
-    let boxes: &[(i32, i32, i32, i32, u32)] = match kind {
-        1 => &[(14, 16, 28, 18, 0), (60, 16, 28, 18, 1), (37, 48, 28, 18, 0)],
-        2 => &[(50, 6, 32, 12, 1), (50, 30, 32, 14, 0), (50, 58, 32, 14, 0)],
-        3 => &[(4, 4, 124, 26, 2), (4, 34, 124, 26, 2), (20, 10, 26, 14, 1), (70, 40, 26, 14, 0)],
-        4 => &[(12, 14, 24, 18, 0), (96, 14, 24, 18, 0), (54, 54, 24, 18, 1)],
-        5 => &[(10, 10, 22, 16, 0), (55, 10, 22, 16, 0), (100, 10, 22, 16, 0), (32, 54, 22, 16, 1), (78, 54, 22, 16, 1)],
-        6 => &[(46, 4, 40, 84, 2), (50, 10, 32, 8, 1), (50, 22, 32, 8, 0), (50, 34, 32, 8, 0), (50, 46, 32, 8, 1)],
-        _ => &[],
-    };
-    for &(bx, by, bw, bh, k) in boxes {
-        let (fill, stroke) = match k {
-            1 => (0xFFD6_E4F5, acc),
-            2 => (0x00FF_FFFF, ink),
-            _ => (0xFFF0_F2F4, ink),
-        };
-        let h = ui.hair();
-        ui.cmd_rrect(x + u(bx), y + u(by), u(bw), u(bh), 0, h, fill, stroke, stroke);
-    }
-    ui.focus_ring_draw(ev);
-    ui.sem(K_BUTTON, id, Some(name), 0);
-    ui.tooltip(name);
-    ev
-}
-
-// a template's preview (UI-04): picture, name, description, units, Erstellen
-fn preview(app: &mut Diagrammer, ui: &mut Ui, k: usize) {
-    let (name, about) = TEMPLATES[k];
-    ui.next_flags(ST_SUBTLE);
-    ui.next_icon(IC_BACK);
-    if ui.button(ID_PAGE + 1, t("Zurück zu den Vorlagen")) & EV_ACT != 0 {
-        app.template = None;
-        ui.repass();
-    }
-    ui.spacer(8);
-    ui.box_begin(ID_PAGE + 2, BOX_H, 24);
-    ui.next_size(304, 224);
-    ui.box_begin(0, BOX_V | BOX_CARD | pad(8), 0);
-    ui.next_size(-1, -1);
-    thumb(ui, ID_PAGE + 3, k, t(name));
-    ui.box_end();
-    ui.next_size(320, 0);
-    ui.box_begin(0, BOX_V, 10);
-    ui.text(TS_SUBTITLE, t(name));
-    ui.next_size(320, 0);
-    ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, t(about));
-    ui.spacer(4);
-    ui.radio(ID_PAGE + 4, t("Metrische Einheiten"), &mut app.units_us, 0);
-    ui.radio(ID_PAGE + 5, t("US-Einheiten"), &mut app.units_us, 1);
-    ui.spacer(4);
-    let ready = k == 0;
-    ui.next_flags(ST_ACCENT | if ready { 0 } else { ST_DISABLED });
-    if ui.button(ID_PAGE + 6, t("Erstellen")) & EV_ACT != 0 && ready {
-        app.new_blank(ui);
-    }
-    if !ready {
-        ui.tooltip(&format!("{} · {}", t("Erstellen"), t("Noch nicht verfügbar")));
-    }
-    ui.box_end();
-    ui.box_end();
 }
 
 // ------------------------------------------------------------------ Öffnen, Speichern
@@ -274,6 +150,14 @@ fn save_page(app: &mut Diagrammer, ui: &mut Ui, as_new: bool) {
     if ui.ribbon_button(ID_PAGE + 1, t("Durchsuchen"), JD_SAVE_AS_L, ST_LARGE | if open { 0 } else { ST_DISABLED }) & EV_ACT != 0 {
         app.backstage = None;
         crate::edit_doc::save(app, ui, true);
+    }
+    // (JD13) as a template into the own template folder (EX-11, VL-03)
+    if as_new {
+        ui.next_size(96, 66);
+        if ui.ribbon_button(ID_PAGE + 2, t("Als Vorlage"), JD_NEW_L, ST_LARGE | if open { 0 } else { ST_DISABLED }) & EV_ACT != 0 {
+            crate::templates::save_as(app, ui);
+        }
+        ui.tooltip(t("Die Zeichnung als Vorlage (.vstx) im Ordner Ihrer Vorlagen speichern; die offenen Schablonen gehen mit"));
     }
     let names: alloc::vec::Vec<&str> = FILE_TYPES.iter().map(|s| t(s)).collect();
     let _ = names;

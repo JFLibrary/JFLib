@@ -263,6 +263,31 @@ pub(crate) fn open_builtin(app: &mut Diagrammer, ui: &mut Ui, k: usize) {
     }
 }
 
+/// (JD13) open built-in stencil k in measure `m` (a template's units): the region's variant is the
+/// stencil every other place uses; the other one is read as a stencil of its own, named like
+/// its file ("flowchart_u.vssx") -> its key
+pub(crate) fn open_builtin_in(app: &mut Diagrammer, ui: &mut Ui, k: usize, m: Measure) -> Option<u32> {
+    if m == measure(app) {
+        let key = load_builtin(app, k)?;
+        app.stencils.show(key);
+        ui.repass();
+        return Some(key);
+    }
+    let b = BUILTIN.get(k)?;
+    let name = format!("{}_{}.vssx", b.file, if m == Measure::Us { "u" } else { "m" });
+    let origin = Origin::File(name);
+    let key = match app.stencils.find(&origin) {
+        Some(key) => key,
+        None => {
+            let l = vsdx::read(if m == Measure::Us { b.us } else { b.metric }, &vsdx::Limits::VSDX).ok()?;
+            app.stencils.add(origin, l.doc, b.file, false)
+        }
+    };
+    app.stencils.show(key);
+    ui.repass();
+    Some(key)
+}
+
 /// open a stencil file in the panel (Schablone öffnen, Backstage › Öffnen of a .vssx)
 pub(crate) fn open_file(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
     let origin = Origin::File(String::from(path));
