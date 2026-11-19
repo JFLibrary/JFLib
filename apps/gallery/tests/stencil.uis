@@ -1,0 +1,139 @@
+# stencil.uis -- the Shapes window (ui::stencil_panel, test hook 9106): the title rows switch
+# the view, the view modes, the quick part above the line and the quick collection, the tiles'
+# events (a click activates and arms, a double click and Enter place, a right click opens the
+# tile's menu at the pointer), the title's menu, "Weitere Shapes" and the empty state.
+size 720 560
+theme light
+cmd 9106
+expect box:"Shapes" exists
+expect tab:"Allgemein" selected
+expect tab:"Quick-Shapes" unselected
+expect text:"Aktiv: Allgemein" exists
+expect_nowarn
+# screen readers: a named panel, the titles as tabs, the tiles as buttons with their QuickInfo,
+# the search box named by its placeholder, "Weitere Shapes" with a popup
+a11y expect box:"Shapes" role group
+a11y expect tab:"Allgemein" role tab
+a11y expect tab:"Allgemein" is selected
+a11y expect button:"Rechteck" role button
+a11y expect button:"Rechteck" desc "Ein Rechteck mit geraden Ecken"
+a11y expect #393217 role textbox
+a11y expect #393217 name "Shapes suchen"
+a11y expect button:"Weitere Shapes" is haspopup
+# the quick tiles first, a line, then the others (MS-04): Rechteck, Abgerundetes Rechteck,
+# Ellipse are quick shapes, Kreis begins the next part
+expect button:"Rechteck" rect 4 258 72 76
+expect button:"Ellipse" rect 156 258 72 76
+expect button:"Kreis" rect 4 347 72 76
+shot build/stencil/icons_names.png
+# ---- titles
+click tab:"Flussdiagramm"
+expect tab:"Flussdiagramm" selected
+expect tab:"Allgemein" unselected
+expect text:"Aktiv: Flussdiagramm" exists
+expect button:"Entscheidung" exists
+expect button:"Rechteck" missing
+# a disabled tile
+expect button:"Externe Daten" disabled
+click button:"Externe Daten"
+expect text:"Ereignis: –" exists
+# the quick collection: the quick tiles of every stencil under their captions
+click tab:"Quick-Shapes"
+expect tab:"Quick-Shapes" selected
+expect heading:"Allgemein" exists
+expect heading:"Flussdiagramm" exists
+expect button:"Rechteck" exists
+expect button:"Prozess" exists
+expect button:"Kreis" missing
+expect button:"Daten" missing
+shot build/stencil/quick.png
+# ---- the events of a tile
+click tab:"Allgemein"
+click button:"Raute"
+expect text:"Ereignis: Aktivieren: Raute" exists
+expect button:"Raute" checked
+# (a second click right away would be a double click)
+wait 600
+click button:"Raute"
+expect button:"Raute" unchecked
+wait 600
+dblclick button:"Dreieck"
+expect text:"Ereignis: Platzieren: Dreieck" exists
+# the double click's release activates nothing; a single click afterwards does
+click button:"Kreis"
+expect text:"Ereignis: Aktivieren: Kreis" exists
+expect button:"Kreis" checked
+# Enter on the focused tile places it
+key enter
+expect text:"Ereignis: Platzieren: Kreis" exists
+# a right click: the tile's menu at the pointer
+rclick button:"Ellipse"
+expect text:"Ereignis: Menü: Ellipse" exists
+expect menuitem:"Zu Favoriten hinzufügen" exists
+click menuitem:"Zu Favoriten hinzufügen"
+expect text:"Favoriten: Ellipse" exists
+# the tooltip: the name and the QuickInfo
+move button:"Pfeil nach rechts"
+wait 700
+expect text:"Pfeil nach rechts – Ein Blockpfeil" exists
+move 500,300
+# ---- the view modes
+click radio:"Nur Symbole"
+expect button:"Rechteck" rect 4 258 40 40
+expect button:"Kreis" exists
+shot build/stencil/icons.png
+click radio:"Nur Namen"
+expect button:"Rechteck" rect 4 258 252 28
+shot build/stencil/names.png
+click radio:"Symbole und Details"
+expect button:"Rechteck" rect 4 258 252 44
+shot build/stencil/details.png
+click radio:"Symbole und Namen"
+# ---- the title's menu: the view, close
+rclick tab:"Flussdiagramm"
+expect text:"Ereignis: Schablonenmenü: Flussdiagramm" exists
+click menuitem:"Ansicht"
+click menuitem:"Nur Namen"
+expect radio:"Nur Namen" checked
+click radio:"Symbole und Namen"
+rclick tab:"Flussdiagramm"
+click menuitem:"Schablone schließen"
+expect tab:"Flussdiagramm" missing
+# ---- "Weitere Shapes": the app's menu below the button
+click button:"Weitere Shapes"
+expect text:"Ereignis: Weitere Shapes" exists
+expect menuitem:"Kategorien" rect 12 124 * *
+click menuitem:"Kategorien"
+click menuitem:"Alle Schablonen öffnen"
+expect tab:"Flussdiagramm" exists
+# the keyboard opens it too
+focus button:"Weitere Shapes"
+key enter
+expect menuitem:"Meine Shapes" exists
+key esc
+expect menuitem:"Meine Shapes" missing
+# ---- no stencils: the empty state with its link
+click checkbox:"Ohne Schablonen"
+expect tab:"Allgemein" missing
+expect text:"Keine Schablone geöffnet" exists
+expect link:"Weitere Shapes" exists
+shot build/stencil/empty.png
+click link:"Weitere Shapes"
+expect menuitem:"Neue Schablone" exists
+click menuitem:"Neue Schablone"
+expect text:"Ereignis: Neue Schablone" exists
+click checkbox:"Ohne Schablonen"
+expect tab:"Allgemein" selected
+# ---- the splitter: dragged up to one row, down to all of them
+expect slider:"Teiler" value 120
+drag slider:"Teiler" 130,150
+expect slider:"Teiler" value 30
+drag slider:"Teiler" 130,400
+expect slider:"Teiler" value 120
+expect_nowarn
+# the dark theme and 150 %
+theme dark
+shot build/stencil/dark.png
+theme light
+scale 150
+shot build/stencil/scale150.png

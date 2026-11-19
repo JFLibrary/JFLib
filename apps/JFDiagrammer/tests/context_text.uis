@@ -1,0 +1,12 @@
+#!args --shell-preview text
+# JFDiagrammer, JD8: the context register Textwerkzeuge › Text (RK-11) while text is edited
+# (--shell-preview stands in for it until JD7)
+expect tab:"Text" exists
+click tab:"Text"
+expect tab:"Text" selected
+expect text:"Schriftart" exists
+expect text:"Absatz" exists
+expect button:"Symbol" disabled
+expect button:"QuickInfo" disabled
+expect button:"Fett" disabled
+expect tab:"Format" missing

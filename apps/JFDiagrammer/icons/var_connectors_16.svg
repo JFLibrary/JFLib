@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Verbinder, 16 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M4 11.5H7.5V4.5H11"/>
+  <polygon class="tint" fill="#1F5FA8" points="11,2 11,7 13.5,4.5"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="10.5" width="2" height="2"/>
+</svg>

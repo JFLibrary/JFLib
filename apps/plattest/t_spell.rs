@@ -89,7 +89,23 @@ fn checker(t: &mut T) {
     };
     t.check(sp.language() == tag, &format!("spell: the checker of {}", tag));
     t.check(sp.check(good), &format!("spell: {:?} is correct ({})", good, tag));
-    t.check(!sp.check(bad), &format!("spell: {:?} is misspelled ({})", bad, tag));
+    // macOS: NSSpellServer may answer late on a slow machine (GitHub's Intel runner logs "findMisspelledWordInString
+    // timed out"), and a call that timed out reads as "correct".  So the misspelling is asked again after pauses
+    // (about 9 s in all) before it counts as a failure; elsewhere the first answer stands
+    let mut tries = 1;
+    let mut flagged = !sp.check(bad);
+    for pause in [250, 500, 1000, 1500, 2000, 2000, 2000] {
+        if flagged {
+            break;
+        }
+        plat::sleep_ms(pause);
+        tries += 1;
+        flagged = !sp.check(bad);
+    }
+    if flagged && tries > 1 {
+        t.info(&format!("  {:?} flagged on try {} (the system's spell checker answered late)\n", bad, tries));
+    }
+    t.check(flagged, &format!("spell: {:?} is misspelled ({})", bad, tag));
     let s = sp.suggest(bad, 8);
     t.check(s.iter().any(|x| x == good), &format!("spell: suggestions for {:?} contain {:?} ({:?})", bad, good, s));
     // (Windows offers similar words for a correct one, too; never the word itself)

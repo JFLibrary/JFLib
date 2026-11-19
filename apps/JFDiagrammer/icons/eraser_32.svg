@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Radierer, 32 px</title>
+  <polygon class="body" fill="#DCDEE1" points="8,17 15,10 22,17 15,24"/>
+  <polygon class="shade" fill="#B9BBBE" points="4,21 8,17 15,24 11,28"/>
+  <path class="ink" stroke="#1D2228" d="M4 21L15 10L22 17L11 28Z M8 17L15 24"/>
+  <path class="ink" stroke="#1D2228" d="M15 28.5H29"/>
+</svg>

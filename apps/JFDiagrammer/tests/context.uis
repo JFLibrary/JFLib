@@ -1,0 +1,24 @@
+#!args --shell-preview container
+# JFDiagrammer, JD8: the context register Container-Tools › Format (RK-01) while a container
+# is selected (--shell-preview stands in for the selection until JD7), the shape's context
+# menu and the measures in the status bar
+expect tab:"Format" exists
+expect tab:"Format" unselected
+click tab:"Format"
+expect tab:"Format" selected
+expect text:"Größe" exists
+expect text:"Containerformatvorlagen" exists
+expect text:"Mitgliedschaft" exists
+expect button:"Container sperren" disabled
+expect button:"Container auflösen" disabled
+shot build/JFDiagrammer-context.png
+# the shape's menu on the canvas
+rclick canvas:"Zeichenfläche"
+expect "Gruppierung" exists
+expect "Zu meinen Shapes hinzufügen" disabled
+key esc
+expect button:"Breite: 40 mm  Höhe: 20 mm  Winkel: 0°" exists
+# the other registers stay
+click tab:"Start"
+expect tab:"Format" exists
+expect text:"Zwischenablage" exists

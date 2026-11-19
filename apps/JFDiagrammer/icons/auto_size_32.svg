@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Automatisch anpassen, 32 px</title>
+  <polygon class="body" fill="#DCDEE1" points="11,10 17,10 17,14 21,14 21,22 11,22"/>
+  <polygon class="shade" fill="#B9BBBE" points="18,10 21,13 18,13"/>
+  <path class="ink" stroke="#1D2228" d="M10.5 9.5H17.5L21.5 13.5V22.5H10.5Z M17.5 10V13.5H21"/>
+  <path class="tint" fill="#1F5FA8" d="M2 16L5 13V15H9V17H5V19Z M30 16L27 13V15H23V17H27V19Z M16 2L19 5H17V8H15V5H13Z M16 30L13 27H15V24H17V27H19Z"/>
+</svg>

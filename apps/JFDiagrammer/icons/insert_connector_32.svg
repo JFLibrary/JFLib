@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Verbinder, 32 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="17.5" y="3.5" width="11" height="7"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="20.5" width="11" height="7"/>
+  <polyline class="ink" stroke="#1D2228" points="17,7.5 8.5,7.5 8.5,16"/>
+  <polygon class="ink" fill="#1D2228" points="4,16 13,16 8.5,20.5"/>
+  <path class="tint" fill="#1F5FA8" d="M22 19H24V23H28V25H24V29H22V25H18V23H22Z"/>
+</svg>

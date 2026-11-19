@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Schrift verkleinern, 16 px</title>
+  <path class="ink" fill="#1D2228" fill-rule="evenodd" d="M1 14L4.5 4H5.5L9 14H7.5L6.8 12H3.2L2.5 14Z M3.55 11H6.45L5 6.857Z"/>
+  <path class="tint" stroke="#1F5FA8" d="M12.5 4V8"/>
+  <polygon class="tint" fill="#1F5FA8" points="10,8 15,8 12.5,10.5"/>
+</svg>

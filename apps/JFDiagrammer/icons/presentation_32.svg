@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Präsentationsmodus, 32 px</title>
+  <rect class="ink" fill="#1D2228" x="2" y="4" width="27" height="2"/>
+  <rect class="body" fill="#DCDEE1" x="5" y="6" width="21" height="15"/>
+  <path class="ink" stroke="#1D2228" d="M4.5 6V21.5H26.5V6"/>
+  <polygon class="tint" fill="#1F5FA8" points="14,9.5 14,17.5 18,13.5"/>
+  <path class="ink" stroke="#1D2228" d="M15.5 22V29M9.5 28.5L15.5 22.5L21.5 28.5"/>
+</svg>

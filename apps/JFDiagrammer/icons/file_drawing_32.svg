@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Zeichnung, 32 px</title>
+  <polygon class="body" fill="#DCDEE1" points="7,3 19,3 19,9 25,9 25,29 7,29"/>
+  <polygon class="shade" fill="#B9BBBE" points="20,3 25,8 20,8"/>
+  <path class="ink" stroke="#1D2228" d="M6.5 2.5H19.5L25.5 8.5V29.5H6.5Z"/>
+  <path class="ink" stroke="#1D2228" d="M19.5 3V8.5H25"/>
+  <rect class="ink" stroke="#1D2228" x="9.5" y="10.5" width="6" height="4"/>
+  <rect class="ink" stroke="#1D2228" x="15.5" y="20.5" width="8" height="4"/>
+  <polyline class="tint" stroke="#1F5FA8" points="16,12.5 19.5,12.5 19.5,18"/>
+  <polygon class="tint" fill="#1F5FA8" points="17,18 22,18 19.5,20.5"/>
+</svg>

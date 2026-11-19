@@ -12,6 +12,7 @@
 //   sec_list.rs   page scroll view, containers, values, colour wheel, lists    (ui-list)
 //   sec_win.rs    windows section, status bar, content dialog, the windows     (ui-win)
 //   sec_edge.rs   (§6) popups at the edges of the main window (test hook 9105)
+//   sec_stencil.rs the Shapes window, ui::stencil_panel (test hook 9106, --stencils)
 // State shared by several sections lives in Gal; a section's own state in its module.
 #![no_std]
 #![no_main]
@@ -23,6 +24,7 @@ mod sec_edge;
 mod sec_edit;
 mod sec_list;
 mod sec_popup;
+mod sec_stencil;
 mod sec_win;
 
 use alloc::format;
@@ -134,6 +136,7 @@ pub(crate) struct Gal {
     pub(crate) list: sec_list::S,
     pub(crate) win: sec_win::S,
     pub(crate) edge: sec_edge::S,
+    pub(crate) stencil: sec_stencil::S,
 }
 
 impl Default for Gal {
@@ -163,6 +166,7 @@ impl Default for Gal {
             list: Default::default(),
             win: Default::default(),
             edge: Default::default(),
+            stencil: Default::default(),
         }
     }
 }
@@ -174,6 +178,10 @@ impl App for Gal {
         sec_popup::menubar_top(g, ui); // (popup agent) menu bar above the page
         if sec_edge::active(g) {
             sec_edge::frame(g, ui); // (§6) only the controls in the window's corners
+            return;
+        }
+        if sec_stencil::active(g) {
+            sec_stencil::frame(g, ui); // only the Shapes window and what it reported
             return;
         }
         // the page scrolls, the status bar stays at the bottom (container agent)
@@ -280,6 +288,9 @@ impl App for Gal {
         }
         if sec_edge::cmd(g, ui, id, arg) {
             return true; // (§6) the edge layout's hook and context menu
+        }
+        if sec_stencil::cmd(g, ui, id, arg) {
+            return true; // the Shapes window's hook and menus
         }
         if sec_popup::u1_cmd(g, ui, id, arg) || sec_list::u1_cmd(g, ui, id, arg) {
             return true; // (U1) recent list, damage demo, command states, key names

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Schnellformatvorlagen, 32 px</title>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="3.5" y="11.5" width="16" height="16"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="23.5" y="2.5" width="3" height="8"/>
+  <rect class="shade" fill="#B9BBBE" x="21" y="11" width="8" height="4"/>
+  <path class="ink" stroke="#1D2228" d="M20.5 15V10.5H29.5V15"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="20.5" y="15.5" width="9" height="9"/>
+  <path class="ink" stroke="#1D2228" d="M23.5 16V23M26.5 16V23"/>
+</svg>

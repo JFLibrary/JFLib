@@ -1,0 +1,5 @@
+#!args --archive
+# codectest is a console program: --archive runs archive_checks.rs (lib/archive's ZIP reader and
+# writer and archive::opc against crafted archives and packages: refused quickly with the right
+# error, controls read, round trips) and ignores the script (build_rs.py test passes --script); a
+# failing check exits with code 1

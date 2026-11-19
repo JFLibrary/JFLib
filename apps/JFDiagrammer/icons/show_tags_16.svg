@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Tags anzeigen, 16 px</title>
+  <polygon class="body" fill="#DCDEE1" points="2,2 14,2 14,9 8,9 8,10 5,13 5,10 2,10"/>
+  <path class="ink" stroke="#1D2228" d="M7.5 10.5L4.5 13.5V10.5H1.5V1.5H14.5V9"/>
+  <path class="tint" stroke="#1F5FA8" d="M9.5 11.5L10.5 10.5H13.5L14.5 11.5V12.5L13.5 13.5H10.5L9.5 12.5Z"/>
+  <rect class="tint" fill="#1F5FA8" x="11" y="11" width="2" height="2"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Hintergründe, 32 px</title>
+  <polygon class="body" fill="#DCDEE1" points="7,3 19,3 19,9 25,9 25,20 7,20"/>
+  <polygon class="shade" fill="#B9BBBE" points="20,3 25,8 20,8"/>
+  <polygon class="hi" fill="#C2D2E5" points="7,21 25,21 25,29 7,29"/>
+  <path class="ink" stroke="#1D2228" d="M6.5 2.5H19.5L25.5 8.5V29.5H6.5Z M19.5 3V8.5H25"/>
+  <path class="tint" stroke="#1F5FA8" d="M7 20.5H25"/>
+</svg>

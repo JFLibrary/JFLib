@@ -1458,7 +1458,8 @@ def derived_workspace(out, target, names, style=None):
     """a workspace of the tool's own in <out>/cargo-<target>-ws with a package per app: for the browser
     and Android its main.rs as [lib] (cdylib, staticlib), else as a program; its manifest's
     dependencies, `style` the one given; a build.rs that reads the app's files (jflib-build's
-    part_of); the root manifest's profiles and lints, Cargo.lock's versions -> its Cargo.toml"""
+    part_of) and runs the app's own steps when it has apps/NAME/build_steps.rs (with its build
+    dependencies); the root manifest's profiles and lints, Cargo.lock's versions -> its Cargo.toml"""
     ws = out / f"cargo-{target}-ws"
     root = manifests.workspace()
     lib = target in ("web", "android")
@@ -1476,7 +1477,16 @@ def derived_workspace(out, target, names, style=None):
             def dep_lines(table):
                 lines = []
                 for key, spec in table.items():
-                    s = dict(root["dependencies"][key]) if spec.get("workspace") else dict(spec)
+                    if spec.get("workspace"):
+                        # the workspace's entry with what the app adds to it (features, as Cargo does)
+                        s = dict(root["dependencies"][key])
+                        for k, v in spec.items():
+                            if k == "features":
+                                s["features"] = sorted(set(s.get("features", [])) | set(v))
+                            elif k != "workspace":
+                                s[k] = v
+                    else:
+                        s = dict(spec)
                     if "path" in s:
                         s["path"] = ((ROOT if spec.get("workspace") else ROOT / "apps" / n) / s["path"]).resolve().as_posix()
                     s.pop("version", None)
@@ -1495,13 +1505,25 @@ def derived_workspace(out, target, names, style=None):
             # the same name (an app in two styles) would overwrite each other there
             unit = (f'[lib]\nname = "{pkg.replace("-", "_").lower()}"\npath = "{entry}"\ncrate-type = ["{"cdylib" if target == "web" else "staticlib"}"]\n'
                     "test = false\ndoctest = false\n" if lib else f'[[bin]]\nname = "{pkg}"\npath = "{entry}"\ntest = false\nbench = false\n')
+            # an app's own build steps (apps/NAME/build_steps.rs, `pub fn run(app: &Path)`) run here
+            # too, with the build dependencies they need (JFDiagrammer's stencils)
+            app_dir = (ROOT / "apps" / n).as_posix()
+            steps = ROOT / "apps" / n / "build_steps.rs"
+            build_deps = {k: v for k, v in man.get("build-dependencies", {}).items() if k != "jflib-build"} if steps.is_file() else {}
             write_changed(ws / pkg / "Cargo.toml",
                           f'[package]\nname = "{pkg}"\nversion = "{man["package"]["version"]}"\nedition = "2024"\npublish = false\n'
                           "autobins = false\nautoexamples = false\nautotests = false\nautobenches = false\n\n" + unit + "\n"
                           + lints + "\n[dependencies]\n" + "".join(lines)
-                          + f'\n[build-dependencies]\njflib-build = {{ path = "{(ROOT / "lib" / "jflib_build").as_posix()}" }}\n')
-            write_changed(ws / pkg / "build.rs", "// made by build_rs.py (derived_workspace): the app's files and link arguments\n"
-                          f'fn main() {{\n    jflib_build::Build::app().part_of("{n}", "{(ROOT / "apps" / n).as_posix()}").run();\n}}\n')
+                          + f'\n[build-dependencies]\njflib-build = {{ path = "{(ROOT / "lib" / "jflib_build").as_posix()}" }}\n'
+                          + "".join(dep_lines(build_deps)))
+            if steps.is_file():
+                write_changed(ws / pkg / "build.rs", "// made by build_rs.py (derived_workspace): the app's files and link arguments, its own steps\n"
+                              f'#[path = "{steps.as_posix()}"]\nmod build_steps;\n\n'
+                              f'fn main() {{\n    jflib_build::Build::app().part_of("{n}", "{app_dir}").run();\n'
+                              f'    build_steps::run(std::path::Path::new("{app_dir}"));\n}}\n')
+            else:
+                write_changed(ws / pkg / "build.rs", "// made by build_rs.py (derived_workspace): the app's files and link arguments\n"
+                              f'fn main() {{\n    jflib_build::Build::app().part_of("{n}", "{app_dir}").run();\n}}\n')
             members[pkg] = n
         write_changed(index, json.dumps(members, indent=1, sort_keys=True) + "\n")
         write_changed(ws / "Cargo.toml", "# made by build_rs.py (derived_workspace): the apps as libraries, other styles\n[workspace]\n"
@@ -1957,6 +1979,31 @@ def py_check(*args):
                           encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
 
 
+def unit_test_packages():
+    """the library crates with unit tests of their own (`#[cfg(test)] mod tests` in the crate root) -> their
+    packages (diagram_core so far).  No app can reach a crate's cfg(test) items, so the suite runs them itself"""
+    pkgs = []
+    for c in LIBS:
+        for f in (ROOT / "lib" / c / "src" / "lib.rs", ROOT / "lib" / c / "lib.rs"):
+            if f.exists() and re.search(r"#\[cfg\(test\)\]\s*mod tests\b", f.read_text(encoding="utf-8")):
+                pkgs.append(f"jflib-{c.replace('_', '-')}")
+                break
+    return pkgs
+
+
+def unit_tests():
+    """`cargo test --lib` of those crates on the host, in a target folder of its own (build/unit-tests: the suite's
+    builds run beside it) -> its CompletedProcess"""
+    pkgs = unit_test_packages()
+    cmd = ["cargo", "test", "--locked", "--offline", "--lib"] + [x for p in pkgs for x in ("-p", p)]
+    if not pkgs:
+        cmd = [sys.executable, "-c", "print('unit tests: none')"]
+    env = {k: v for k, v in os.environ.items() if k != "RUSTFLAGS"}
+    env["CARGO_TARGET_DIR"] = str(ROOT / "build" / "unit-tests")
+    return subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          stdin=subprocess.DEVNULL)
+
+
 def suite_checks(exes):
     """the checks after the scripts -> [(run, show)]: run() gives a CompletedProcess, show(r) what the suite prints
     and the failure it counts (or None).  They run beside the scripts (SUITE_CHECKS_JOBS), their output comes after
@@ -1978,9 +2025,19 @@ def suite_checks(exes):
         return ((r.stdout.strip() + ("\n" + r.stderr.strip() if r.stderr.strip() else "")).strip(),
                 "tools/i18n_check.py --check" if r.returncode else None)
 
+    def units(r):
+        passed = sum(int(m) for m in re.findall(r"test result: \w+\. (\d+) passed", r.stdout))
+        crates = ", ".join(p.removeprefix("jflib-").replace("-", "_") for p in unit_test_packages())
+        if r.returncode:
+            tail = "\n".join((r.stdout + r.stderr).strip().splitlines()[-30:])
+            return f"FAIL unit tests ({crates})\n{tail}", "cargo test --lib (unit tests)"
+        return f"unit tests: {passed} passed ({crates or 'none'})", None
+
     tools = RS / "tools"
     rt = exes.get(("linux", "appimagert"))
     return [
+        # the unit tests of the library crates that have them (cargo test --lib on the host)
+        (unit_tests, units),
         # docs/API.md generated from the Rust doc comments must be current (R13); --api: the API
         # changes since the last release, for information (docs/VERSIONING.md)
         (lambda: py_check(tools / "gendoc.py", "--check", "--api"), gendoc),

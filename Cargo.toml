@@ -64,6 +64,10 @@ members = [
     "lib/render3d",
     "lib/render2d",
     "lib/gltf",
+    "lib/diagram_core",
+    "lib/diagram_io",
+    "lib/pdf",
+    "lib/diagram_view",
     "lib/dxf",
     "lib/physics",
     "lib/game",
@@ -121,6 +125,7 @@ members = [
     "apps/linuxtest",
     "apps/mdviewtest",
     "apps/officeicontest",
+    "apps/pdftest",
     "apps/permcli",
     "apps/permcli/own",
     "apps/permcli/shared",
@@ -154,6 +159,8 @@ members = [
     "apps/wgsltest",
     "apps/viewtest",
     "apps/a11ytest",
+    "apps/JFDiagrammer",
+    "apps/diagramiotest",
     "apps/inputtest",
     "apps/physicstest",
     "apps/gametest",
@@ -185,6 +192,8 @@ archive = { package = "jflib-archive", path = "lib/archive", version = "=0.2.1" 
 doc_core = { package = "jflib-doc-core", path = "lib/doc_core", version = "=0.2.1" }
 doc_layout = { package = "jflib-doc-layout", path = "lib/doc_layout", version = "=0.2.1" }
 doc_io = { package = "jflib-doc-io", path = "lib/doc_io", version = "=0.2.1" }
+diagram_core = { package = "jflib-diagram-core", path = "lib/diagram_core", version = "=0.2.1" }
+diagram_io = { package = "jflib-diagram-io", path = "lib/diagram_io", version = "=0.2.1" }
 img_png = { package = "jflib-img-png", path = "lib/img_png", version = "=0.2.1" }
 text_shape = { package = "jflib-text-shape", path = "lib/text_shape", version = "=0.2.1" }
 text = { package = "jflib-text", path = "lib/text", version = "=0.2.1" }
@@ -226,6 +235,8 @@ style_assets = { package = "jflib-style-assets", path = "lib/style_assets", vers
 render3d = { package = "jflib-render3d", path = "lib/render3d", version = "=0.2.1" }
 render2d = { package = "jflib-render2d", path = "lib/render2d", version = "=0.2.1" }
 gltf = { package = "jflib-gltf", path = "lib/gltf", version = "=0.2.1" }
+pdf = { package = "jflib-pdf", path = "lib/pdf", version = "=0.2.1" }
+diagram_view = { package = "jflib-diagram-view", path = "lib/diagram_view", version = "=0.2.1" }
 dxf = { package = "jflib-dxf", path = "lib/dxf", version = "=0.2.1" }
 physics = { package = "jflib-physics", path = "lib/physics", version = "=0.2.1" }
 game = { package = "jflib-game", path = "lib/game", version = "=0.2.1" }
@@ -347,6 +358,10 @@ opt-level = 2
 opt-level = 2
 
 [profile.dev.package.jflib-img-all]
+opt-level = 2
+
+# the formula engine recalculates whole drawings (JD6)
+[profile.dev.package.jflib-diagram-core]
 opt-level = 2
 
 [profile.dev.package.jflib-physics]

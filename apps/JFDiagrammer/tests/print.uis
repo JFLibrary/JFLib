@@ -1,0 +1,93 @@
+#!args apps/JFDiagrammer/tests/viewer.vsdx --no-system-fonts
+# JFDiagrammer, JD12: Datei › Drucken and Seite einrichten -- the settings (copies, printer,
+# range, background pages, paper, orientation, zoom, colour), the preview of each sheet with the
+# sheet navigation, tiles (PR-03: a page larger than the paper goes onto several sheets, from the
+# top left), fitting onto one sheet, the dialog Seite einrichten (its registers, the zoom, the
+# page's size), printing into a file through plat's test variant (never paper; on Linux the
+# vector PDF of the sheets, on Windows the pictures through GDI and "Microsoft Print to PDF",
+# which this script leaves to plattest's printdoc test).  viewer.vsdx: two foreground pages of
+# 6 x 4 in and a background page.
+key ctrl+p
+expect text:"Exemplare" exists
+expect combo:"Systemdrucker" exists
+expect combo:"Alle Seiten drucken" exists
+expect checkbox:"Hintergrundseiten drucken" checked
+expect combo:"A4" exists
+expect combo:"Hochformat" exists
+expect combo:"Tatsächliche Größe" exists
+expect combo:"Farbe" exists
+expect text:"Blatt 1 von 2" exists
+expect text:"Seite-1" exists
+shot build/JFDiagrammer-print.png
+click button:"Nächstes Blatt"
+expect text:"Blatt 2 von 2" exists
+expect text:"Massstab" exists
+expect button:"Nächstes Blatt" disabled
+click button:"Vorheriges Blatt"
+expect text:"Blatt 1 von 2" exists
+# only the current page
+click combo:"Alle Seiten drucken"
+click "Aktuelle Seite drucken"
+expect text:"Blatt 1 von 1" exists
+# Seite einrichten: 400 % puts the 6 x 4 in page on 4 x 2 sheets of A4 (24 x 16 in on 7.8 x
+# 11.2 in of printable area each)
+click link:"Seite einrichten"
+expect dialog:"Seite einrichten" exists
+expect tab:"Drucken einrichten" selected
+expect radio:"Anpassen auf" checked
+expect radio:"Hochformat" checked
+focus #25870
+key ctrl+a
+type "400\n"
+click button:"OK"
+expect dialog:"Seite einrichten" missing
+expect text:"Blatt 1 von 8" exists
+expect text:"Seite-1: Blatt 1 von 8" exists
+expect combo:"Benutzerdefiniert (Seite einrichten)" exists
+expect image:"Kacheln: 4 × 2 Blätter" exists
+shot build/JFDiagrammer-print-tiles.png
+click button:"Nächstes Blatt"
+expect text:"Seite-1: Blatt 2 von 8" exists
+# back onto one sheet, landscape, grey
+click combo:"Benutzerdefiniert (Seite einrichten)"
+click "Auf ein Blatt anpassen"
+expect text:"Blatt 1 von 1" exists
+click combo:"Hochformat"
+click "Querformat"
+expect combo:"Querformat" exists
+click combo:"Farbe"
+click "Graustufen"
+expect combo:"Graustufen" exists
+# the dialog's other registers: the page's size, scale, properties, layout and routing
+cmd 4871
+expect dialog:"Seite einrichten" exists
+expect radio:"Querformat" checked
+click tab:"Seitengröße"
+expect radio:"Benutzerdefinierte Größe" checked
+expect text:"Neue Seitengröße: 152 × 102 mm" exists
+click tab:"Zeichnungsmaßstab"
+expect radio:"Kein Maßstab (1:1)" checked
+click tab:"Seiteneigenschaften"
+expect radio:"Vordergrund" checked
+expect combo:"Hintergrund-1" exists
+expect text:"unten rechts" exists
+click tab:"Layout und Routing"
+expect text:"Routing-Stil" exists
+click button:"Abbrechen"
+expect dialog:"Seite einrichten" missing
+# A4 as the page's size through Seitengröße: the preview's page grows, the tab keeps its name
+cmd 4871
+click tab:"Seitengröße"
+click radio:"Vordefinierte Größe"
+expect text:"Neue Seitengröße: 297 × 210 mm" exists
+click button:"OK"
+expect text:"Blatt 1 von 1" exists
+cmd 4871
+click tab:"Seitengröße"
+expect radio:"Vordefinierte Größe" checked
+click button:"Abbrechen"
+# printing into a file (plat's test variant): the Linux way prints the sheets as vector PDF
+only linux: system env jfgui_PRINT_TO build/JFDiagrammer-print.pdf
+only linux: click #25601
+only linux: expect text:"Gedruckte Blätter: 1" exists
+only linux: system env jfgui_PRINT_TO -

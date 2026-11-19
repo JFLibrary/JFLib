@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Schablone speichern, 16 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="2.5" width="4" height="4"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="9.5" y="2.5" width="4" height="4"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="9.5" width="4" height="4"/>
+  <path class="tint" fill="#1F5FA8" fill-rule="evenodd" d="M9 9H14L15 10V15H9Z M11 10H13V11H11Z M10 12H14V14H10Z"/>
+</svg>

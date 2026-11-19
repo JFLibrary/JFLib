@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Alles markieren, 16 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M1 1.5H3M4 1.5H6M7 1.5H9M10 1.5H12M13 1.5H15M1 14.5H3M4 14.5H6M7 14.5H9M10 14.5H12M13 14.5H15M1.5 1V3M1.5 4V6M1.5 7V9M1.5 10V12M1.5 13V15M14.5 1V3M14.5 4V6M14.5 7V9M14.5 10V12M14.5 13V15"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="3.5" y="3.5" width="4" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="9.5" y="3.5" width="3" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="4.5" y="9.5" width="8" height="3"/>
+</svg>

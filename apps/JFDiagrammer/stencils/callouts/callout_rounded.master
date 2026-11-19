@@ -1,0 +1,90 @@
+# Beschriftung abgerundet: Kasten mit runden Ecken (ArcTo, Radius höchstens ein Viertel der
+# kürzeren Seite) und einem Keil zur Spitze, Körper und Keil ein Umriss.
+master: Callout rounded
+name.de: Beschriftung Abgerundet
+name.en: Callout rounded
+name.es: Llamada redondeada
+name.it: Richiamo arrotondato
+name.fr: Bulle d'annotation arrondie
+prompt.de: Sprechblase mit runden Ecken. Ziehen Sie den gelben Steuerpunkt auf das Ziel, der Keil folgt.
+prompt.en: Speech bubble with round corners. Drag the yellow control handle onto the target and the wedge follows.
+prompt.es: Bocadillo con esquinas redondeadas. Arrastre el controlador amarillo hasta el destino y la cuña lo sigue.
+prompt.it: Fumetto con angoli arrotondati. Trascina la maniglia di controllo gialla sulla destinazione e il cuneo la segue.
+prompt.fr: Bulle aux coins arrondis. Faites glisser la poignée de contrôle jaune sur la cible, la pointe suit.
+keywords.de: Beschriftung, Legende, Hinweis, Kommentar, Anmerkung, Zeiger, Sprechblase, abgerundet, Keil
+keywords.en: callout, label, note, comment, annotation, pointer, speech bubble, rounded, wedge
+keywords.es: llamada, etiqueta, nota, comentario, anotación, puntero, bocadillo, redondeado, cuña
+keywords.it: richiamo, didascalia, etichetta, nota, commento, annotazione, puntatore, fumetto, arrotondato, cuneo
+keywords.fr: bulle d'annotation, légende, étiquette, note, commentaire, pointeur, bulle, arrondi, pointe
+text.de: Text
+text.en: Text
+text.es: Texto
+text.it: Testo
+text.fr: Texte
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 16 mm
+Height.us = 0.6 in
+
+[User]
+msvStructureType:        Value = "Callout"
+msvShapeCategories:      Value = "Callout"
+msvSDCalloutNoHighlight: Value = FALSE
+# die Spitze des Zeigers
+Ax:   Value = Controls.Association
+Ay:   Value = Controls.Association.Y
+Radius: Value = 2.5 mm
+        Value.us = 0.1 in
+R:      Value = MIN(User.Radius,Width*0.25,Height*0.25)
+# der Stich eines Viertelkreises mit Radius R (ArcTo A)
+Bow:    Value = User.R*0.292893
+# wie weit die Spitze außerhalb liegt, waagerecht und senkrecht
+Dx:     Value = MAX(-User.Ax,User.Ax-Width,0)
+Dy:     Value = MAX(-User.Ay,User.Ay-Height,0)
+# die Kante mit dem Keil: 0 keine (Spitze im Körper), 1 unten, 2 rechts, 3 oben, 4 links
+Side:   Value = IF(User.Dx+User.Dy<=0,0,IF(User.Dy>=User.Dx,IF(User.Ay<0,1,3),IF(User.Ax>Width,2,4)))
+Wedge:  Value = 3 mm
+        Value.us = 0.12 in
+# die halbe Breite des Keils an der Kante und die Mitte seines Fußes (zur Spitze hin)
+Hb:     Value = MIN(User.Wedge,MAX(Width*0.5-User.R,0)*0.5)
+Hv:     Value = MIN(User.Wedge,MAX(Height*0.5-User.R,0)*0.5)
+Cx:     Value = MIN(MAX(User.Ax,User.R+User.Hb*1.5),Width-User.R-User.Hb*1.5)
+Cy:     Value = MIN(MAX(User.Ay,User.R+User.Hv*1.5),Height-User.R-User.Hv*1.5)
+
+# der Körper mit dem Keil: ein Umriss; an einer Kante ohne Keil liegen dessen drei Punkte
+# auf der Ecke davor (Strecken der Länge 0)
+[Geometry]
+MoveTo  X = User.R; Y = 0
+LineTo  X = IF(User.Side=1,User.Cx-User.Hb,User.R); Y = 0
+LineTo  X = IF(User.Side=1,User.Ax,User.R); Y = IF(User.Side=1,User.Ay,0)
+LineTo  X = IF(User.Side=1,User.Cx+User.Hb,User.R); Y = 0
+LineTo  X = Width-User.R; Y = 0
+ArcTo   X = Width; Y = User.R; A = User.Bow
+LineTo  X = Width; Y = IF(User.Side=2,User.Cy-User.Hv,User.R)
+LineTo  X = IF(User.Side=2,User.Ax,Width); Y = IF(User.Side=2,User.Ay,User.R)
+LineTo  X = Width; Y = IF(User.Side=2,User.Cy+User.Hv,User.R)
+LineTo  X = Width; Y = Height-User.R
+ArcTo   X = Width-User.R; Y = Height; A = User.Bow
+LineTo  X = IF(User.Side=3,User.Cx+User.Hb,Width-User.R); Y = Height
+LineTo  X = IF(User.Side=3,User.Ax,Width-User.R); Y = IF(User.Side=3,User.Ay,Height)
+LineTo  X = IF(User.Side=3,User.Cx-User.Hb,Width-User.R); Y = Height
+LineTo  X = User.R; Y = Height
+ArcTo   X = 0; Y = Height-User.R; A = User.Bow
+LineTo  X = 0; Y = IF(User.Side=4,User.Cy+User.Hv,Height-User.R)
+LineTo  X = IF(User.Side=4,User.Ax,0); Y = IF(User.Side=4,User.Ay,Height-User.R)
+LineTo  X = 0; Y = IF(User.Side=4,User.Cy-User.Hv,Height-User.R)
+LineTo  X = 0; Y = User.R
+ArcTo   X = Geometry1.X1; Y = Geometry1.Y1; A = User.Bow
+
+[Controls]
+Association:  X = -12 mm; Y = -10 mm
+              X.us = -0.5 in; Y.us = -0.4 in
+              XDyn = Width*0.5; YDyn = Height*0.5
+              XCon = 2; YCon = 2; CanGlue = FALSE
+              Tip.de = "Zeiger auf das Ziel ziehen"
+              Tip.en = "Drag the pointer onto the target"
+              Tip.es = "Arrastre el puntero hasta el destino"
+              Tip.it = "Trascina il puntatore sulla destinazione"
+              Tip.fr = "Faites glisser le pointeur sur la cible"

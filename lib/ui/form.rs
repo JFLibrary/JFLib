@@ -8,7 +8,9 @@
 // behaviour); Android and iOS are FF_TABLET, and FF_PHONE where the main window's shorter side is
 // below 600 DIP (Android's own line between a phone and a tablet, `sw600dp`; a tablet's app in a
 // narrow split screen is laid out like a phone's then).  The shorter side keeps a phone a phone
-// when it is turned.
+// when it is turned.  An iPad stays FF_TABLET in every window that is not that narrow, also a
+// large one in Stage Manager or iPadOS 26's windows (the user's decision of 2026-11-19: iPadOS owns
+// the window and draws its controls, the finger stays the main way; docs/APPLE.md AP9).
 //
 // jfgui_FORM=desktop|tablet|phone decides instead (any platform: tests, and a look at the phone's
 // layout on the desktop; scripts: `system env jfgui_FORM phone`).

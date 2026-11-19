@@ -1,0 +1,67 @@
+# stencil_drag.uis -- the Shapes window's drags (test hook 9106): every tile is a drag source
+# (DragStart / DragEnd), the editable "Favoriten" takes tiles on its title row (appended) and,
+# while it is shown, on its tile area: into the quick part (the hint while it is empty), before
+# a tile, reordered inside the stencil; a tile dropped onto the app's page; Esc cancels a drag.
+size 720 600
+theme light
+cmd 9106
+# the editable stencil: both parts, empty ones with their hints
+click tab:"Favoriten"
+expect text:"Hier Quick-Shapes ablegen" exists
+expect text:"Shapes hierher ziehen" exists
+shot build/stencil/favourites_empty.png
+click tab:"Allgemein"
+# onto the title row: appended
+drag button:"Rechteck" tab:"Favoriten"
+expect text:"Abgelegt: Rechteck an 0" exists
+expect text:"Favoriten: Rechteck" exists
+expect text:"Ereignis: Ziehen beendet" exists
+expect text:"Ziehen: nein" exists
+drag button:"Ellipse" tab:"Favoriten"
+expect text:"Abgelegt: Ellipse an 1" exists
+expect text:"Favoriten: Rechteck, Ellipse" exists
+# the drag shows its events while it runs
+down button:"Kreis"
+move 60,330
+move 60,380
+expect text:"Ereignis: Ziehen: Kreis" exists
+expect text:"Ziehen: ja" exists
+move tab:"Favoriten"
+up
+expect text:"Favoriten: Rechteck, Ellipse, Kreis" exists
+expect text:"Ziehen: nein" exists
+# onto the area of the shown stencil: the quick part's hint makes a quick shape
+click tab:"Favoriten"
+expect text:"Shapes hierher ziehen" missing
+drag button:"Ellipse" text:"Hier Quick-Shapes ablegen"
+expect text:"Abgelegt: Ellipse an 0 (Quick)" exists
+expect text:"Favoriten: Ellipse*, Rechteck, Kreis" exists
+expect text:"Hier Quick-Shapes ablegen" missing
+shot build/stencil/favourites.png
+# before a tile: the left half of Rechteck (Kreis moves in front of it)
+drag button:"Kreis" button:"Rechteck"
+expect text:"Favoriten: Ellipse*, Kreis, Rechteck" exists
+# after the last tile: below the rows
+drag button:"Kreis" 130,560
+expect text:"Favoriten: Ellipse*, Rechteck, Kreis" exists
+# a tile onto the app's page
+click tab:"Flussdiagramm"
+drag button:"Entscheidung" text:"Zeichenblatt"
+expect text:"Zeichenblatt: Entscheidung" exists
+expect text:"Favoriten: Ellipse*, Rechteck, Kreis" exists
+# Esc cancels a drag: nothing is dropped
+down button:"Prozess"
+move 60,330
+move text:"Zeichenblatt"
+key esc
+up
+expect text:"Zeichenblatt: Entscheidung" exists
+expect text:"Ereignis: Ziehen beendet" exists
+# a disabled tile is no drag source
+drag button:"Externe Daten" text:"Zeichenblatt"
+expect text:"Zeichenblatt: Entscheidung" exists
+# the other stencils take nothing
+drag button:"Prozess" tab:"Allgemein"
+expect text:"Favoriten: Ellipse*, Rechteck, Kreis" exists
+expect text:"Ereignis: Ziehen beendet" exists
+expect_nowarn

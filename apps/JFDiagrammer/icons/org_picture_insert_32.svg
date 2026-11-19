@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Bild einfügen, 32 px</title>
+  <path class="ink" stroke="#1D2228" d="M17 24.5H3.5V5.5H28.5V18"/>
+  <rect class="ink" stroke="#1D2228" x="6.5" y="8.5" width="9" height="12"/>
+  <polygon class="body" fill="#DCDEE1" points="7,20 7,18 10,15 12,17 13,16 15,18 15,20"/>
+  <path class="ink" stroke="#1D2228" d="M7 18L10 15L12 17L13 16L15 18"/>
+  <circle class="ink" fill="#1D2228" cx="12.5" cy="11.5" r="1.25"/>
+  <path class="ink" stroke="#1D2228" d="M18 10.5H26M18 13.5H24"/>
+  <path class="tint" fill="#1F5FA8" d="M22 19H24V23H28V25H24V29H22V25H18V23H22Z"/>
+</svg>

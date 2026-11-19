@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- JFDiagrammer on Android: the shared Java host (android/*.java, package org.jflib.gallery) with
+     the app's own package (app_id in ../PACKAGE).  Stage JD0: the empty window, no permission;
+     files will go through the system picker (PLAN.md, JD3). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.jfreund.JFDiagrammer" android:versionCode="1" android:versionName="0.1.0">
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <application android:label="JFDiagrammer" android:icon="@drawable/ic_launcher"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:allowBackup="false" android:debuggable="true" android:extractNativeLibs="false"
+        android:supportsRtl="true">
+        <activity android:name="org.jflib.gallery.GalleryActivity" android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|uiMode|fontScale"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

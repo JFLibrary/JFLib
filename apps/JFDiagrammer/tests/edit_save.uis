@@ -1,0 +1,38 @@
+#!args --no-system-fonts --save-dir build
+# JFDiagrammer, JD7: Speichern of a new drawing asks for a file (the file dialog), writes it
+# (diagram_io::vsdx::write) and names the drawing after it; the file reopened from Datei ›
+# Öffnen › Zuletzt verwendet has the shapes and the connector, still glued: a move reroutes it
+cmd 4404
+drag 500,330 640,420
+drag 820,430 960,520
+cmd 4401
+drag 560,370 880,470
+cmd 4400
+key ctrl+s
+expect dialog:"Speichern unter" exists
+click #28940
+key ctrl+a
+type "jd7-save.vsdx"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+expect text:"jd7-save – JFDiagrammer" exists
+# a change, saved to the same file without asking
+drag 900,500 900,550
+key ctrl+s
+expect dialog:"Speichern unter" missing
+# a new drawing, then the saved one again
+cmd 4097
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+expect text:"Zeichnung2 – JFDiagrammer" exists
+expect listitem:"Sheet.4" missing
+cmd 4098
+click button:"jd7-save.vsdx"
+expect text:"jd7-save – JFDiagrammer" exists
+expect listitem:"Sheet.4" exists
+expect listitem:"Sheet.5" rect 827 475 126 100
+expect listitem:"Sheet.6" rect 651 374 242 101
+# the connector is still glued: it follows the next move
+drag 900,500 900,449
+expect listitem:"Sheet.5" rect 827 424 126 101
+expect listitem:"Sheet.6" rect 651 374 242 50

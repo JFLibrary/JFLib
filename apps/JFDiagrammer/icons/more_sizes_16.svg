@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Weitere Formate, 16 px</title>
+  <polygon class="body" fill="#DCDEE1" points="3,2 8,2 8,5 11,5 11,8 8,8 8,14 3,14"/>
+  <polygon class="shade" fill="#B9BBBE" points="9,2 11,4 9,4"/>
+  <path class="ink" stroke="#1D2228" d="M9 14.5H2.5V1.5H8.5L11.5 4.5V8M8.5 2V4.5H11"/>
+  <path class="tint" fill="#1F5FA8" fill-rule="evenodd" d="M11.78 9.91L12.03 9L13.48 9.39L13.23 10.30L13.70 10.77L14.61 10.52L15 11.97L14.09 12.22L13.92 12.86L14.58 13.52L13.52 14.58L12.86 13.92L12.22 14.09L11.97 15L10.52 14.61L10.77 13.70L10.30 13.23L9.39 13.48L9 12.03L9.91 11.78L10.08 11.14L9.42 10.48L10.48 9.42L11.14 10.08Z M12.9 12A0.9 0.9 0 1 1 11.1 12A0.9 0.9 0 1 1 12.9 12Z"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Aus Auswahl erstellen, 32 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M2 4.5H5M27 4.5H30M7 4.5H9M11 4.5H13M15 4.5H17M19 4.5H21M23 4.5H25M2 27.5H5M27 27.5H30M7 27.5H9M11 27.5H13M15 27.5H17M19 27.5H21M23 27.5H25M2.5 5V7M2.5 25V27M2.5 9V11M2.5 13V15M2.5 17V19M2.5 21V23M29.5 5V7M29.5 25V27M29.5 9V11M29.5 13V15M29.5 17V19M29.5 21V23"/>
+  <path class="tint" stroke="#1F5FA8" d="M6.5 7V9M6.5 11V13M6.5 15V17M6.5 19V21M6.5 23V25M25.5 7V9M25.5 11V13M25.5 15V17M25.5 19V21M25.5 23V25"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="8.5" y="12.5" width="5" height="6"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="18.5" y="12.5" width="5" height="6"/>
+  <path class="ink" stroke="#1D2228" d="M14 15.5H18"/>
+</svg>

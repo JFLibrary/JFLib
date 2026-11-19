@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Einfügen, 16 px</title>
+  <polygon class="body" fill="#DCDEE1" points="2,3 4,3 4,4 8,4 8,3 10,3 10,5 5,5 5,14 2,14"/>
+  <path class="ink" stroke="#1D2228" d="M5 14.5H1.5V2.5H10.5V5"/>
+  <rect class="ink" fill="#1D2228" x="4" y="1" width="4" height="3"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="6.5" y="6.5" width="8" height="8"/>
+  <path class="tint" stroke="#1F5FA8" d="M8 9.5H13M8 11.5H12"/>
+</svg>

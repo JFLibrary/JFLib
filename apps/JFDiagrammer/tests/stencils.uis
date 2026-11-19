@@ -1,0 +1,48 @@
+# JFDiagrammer, JD9: the Shapes panel -- the empty state (SL-09), "Weitere Shapes" with its
+# categories (SL-05), a built-in stencil opened (the .vssx build.rs made from stencils/), its
+# tiles with the quick shapes first (MS-04), the view options and closing it (SL-08)
+expect text:"Keine Schablone geöffnet." exists
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+expect tab:"Standard-Shapes" selected
+expect button:"Rechteck" exists
+expect button:"Abgerundetes Rechteck" exists
+expect button:"Ellipse" exists
+expect button:"Dreieck" exists
+expect button:"Raute" exists
+expect button:"Pfeil" exists
+expect button:"Textfeld" exists
+expect text:"Keine Schablone geöffnet." missing
+shot build/JFDiagrammer-stencils.png
+# the menu shows the open stencil checked; a second click closes it
+click button:"Weitere Shapes"
+click "Allgemein"
+expect "Standard-Shapes" checked
+key esc
+key esc
+# the view options in the title's menu
+rclick tab:"Standard-Shapes"
+click "Ansichtsoptionen"
+click "Nur Namen"
+expect button:"Rechteck" exists
+rclick tab:"Standard-Shapes"
+click "Ansichtsoptionen"
+expect "Nur Namen" checked
+click "Symbole und Details"
+rclick tab:"Standard-Shapes"
+click "Ansichtsoptionen"
+click "Symbole und Namen"
+# the top shapes of every open stencil in one view
+click tab:"Schnell-Shapes"
+expect tab:"Schnell-Shapes" selected
+expect button:"Rechteck" exists
+expect button:"Dreieck" exists
+expect button:"Raute" missing
+click tab:"Standard-Shapes"
+expect button:"Raute" exists
+# closing the stencil: the empty state again
+rclick tab:"Standard-Shapes"
+click "Schablone schließen"
+expect tab:"Standard-Shapes" missing
+expect text:"Keine Schablone geöffnet." exists

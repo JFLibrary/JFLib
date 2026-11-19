@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Text drehen, 16 px</title>
+  <path class="ink" fill="#1D2228" fill-rule="evenodd" d="M1 15L4 5H5L8 15H6.6L6 13H3L2.4 15Z M3.3 12H5.7L4.5 8Z"/>
+  <path class="tint" stroke="#1F5FA8" d="M5 2.5H9.5L12.5 5.5V9"/>
+  <polygon class="tint" fill="#1F5FA8" points="10,9 15,9 12.5,11.5"/>
+</svg>

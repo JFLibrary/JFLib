@@ -93,7 +93,7 @@ impl Tw {
 
 // tabs_fit(widths, room, min): the widest tabs narrowed to one width so that the row fits
 // room (none below min)
-fn tabs_fit(ws: &mut [i32], room: i32, min: i32) {
+pub(crate) fn tabs_fit(ws: &mut [i32], room: i32, min: i32) {
     let mut sorted = ws.to_vec();
     sorted.sort_unstable();
     let (mut rest, mut cap) = (room, i32::MAX);
@@ -289,6 +289,11 @@ impl Ui {
     pub(crate) fn scr_top(&self) -> usize {
         let i = self.wp.list.scr_sp.wrapping_sub(1) as usize;
         if i < SCROLL_MAX { i } else { SCROLL_MAX }
+    }
+
+    // scr_rect: the viewport of the innermost scroll view (px; ribbon.rs paints the band in it)
+    pub(crate) fn scr_rect(&self) -> [i32; 4] {
+        self.wp.list.scr[self.scr_top()].rect
     }
 
     // scr_max(entry) -> (max x, max y) px from the last measured content

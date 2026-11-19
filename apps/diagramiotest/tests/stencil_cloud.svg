@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- diagramiotest (JD9): a cloud in one format for the stencil build tool's SVG import (own
+     drawing): the master shape carries the geometry itself.  One closed path of arcs, and an
+     open line with fill and stroke, which becomes a filled closed section and a stroked open
+     one. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 40">
+  <path fill="#E6EFF8" stroke="#1F5FA8" stroke-width="2"
+        d="M16 34 A8 8 0 0 1 14 18 A12 12 0 0 1 36 10 A10 10 0 0 1 52 18 A8 8 0 0 1 50 34 Z"/>
+  <polyline fill="#E6EFF8" stroke="#1F5FA8" stroke-width="2" points="20,28 32,22 44,28"/>
+</svg>

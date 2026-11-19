@@ -1,0 +1,95 @@
+# Der Rahmen eines funktionsübergreifenden Flussdiagramms (verborgen: die App legt ihn an, wenn
+# die erste Bahn auf die Seite kommt).  Er nimmt nur die beiden Listen auf (Bahnen, Phasen) und
+# passt immer um sie herum.  Titelleiste oben in Signalblau mit weißer Schrift; Titelleiste und
+# Textblock folgen nur JFD_HeadingEdge und JFD_HeadingSize (JFD_HeadingSize = 0: kein Titel).
+master: CFF Container
+hidden: true
+name.de: Funktionsübergreifendes Flussdiagramm
+name.en: Cross-functional flowchart
+name.es: Diagrama de flujo multifuncional
+name.it: Diagramma di flusso multifunzione
+name.fr: Diagramme de flux interfonctionnel
+prompt.de: Rahmen mit Titel um die Bahnen und Phasen eines funktionsübergreifenden Flussdiagramms.
+prompt.en: Frame with a title around the lanes and phases of a cross-functional flowchart.
+prompt.es: Marco con título alrededor de las calles y fases de un diagrama de flujo multifuncional.
+prompt.it: Cornice con titolo attorno alle corsie e alle fasi di un diagramma di flusso multifunzione.
+prompt.fr: Cadre avec titre autour des couloirs et des phases d'un diagramme de flux interfonctionnel.
+text.de: Titel
+text.en: Title
+text.es: Título
+text.it: Titolo
+text.fr: Titre
+
+[Shape]
+Width = 200 mm
+Width.us = 8 in
+Height = 90 mm
+Height.us = 3.4 in
+LineWeight = 1 pt
+LineColor = #4D5560
+FillForegnd = #1F5FA8
+FillBkgnd = #1F5FA8
+FillPattern = 1
+TxtWidth = IF(User.HeadLeft+User.HeadRight>0,Height,Width)
+TxtHeight = IF(User.HeadLeft+User.HeadRight>0,User.HeadLeft+User.HeadRight,User.HeadTop+User.HeadBottom)
+TxtPinX = IF(User.HeadLeft>0,User.HeadLeft*0.5,IF(User.HeadRight>0,Width-User.HeadRight*0.5,Width*0.5))
+TxtPinY = IF(User.HeadTop>0,Height-User.HeadTop*0.5,IF(User.HeadBottom>0,User.HeadBottom*0.5,Height*0.5))
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = IF(User.HeadLeft+User.HeadRight>0,90 deg,0 deg)
+HideText = NOT(User.HeadShown)
+TopMargin = 1 mm
+TopMargin.us = 0.04 in
+BottomMargin = 1 mm
+BottomMargin.us = 0.04 in
+
+[User]
+msvStructureType:                 Value = "Container"
+msvShapeCategories:               Value = "CFF Container"
+msvSDContainerMargin:             Value = 0 mm
+                                  Value.us = 0 in
+msvSDContainerResize:             Value = 2
+msvSDContainerLocked:             Value = FALSE
+msvSDContainerNoHighlight:        Value = FALSE
+msvSDContainerNoRibbon:           Value = FALSE
+msvSDContainerStyle:              Value = 1
+msvSDContainerStyleCount:         Value = 1
+msvSDHeadingStyle:                Value = 1
+msvSDHeadingStyleCount:           Value = 1
+msvSDContainerRequiredCategories: Value = "CFF List"
+msvSDContainerExcludedCategories: Value = ""
+JFD_HeadingEdge:                  Value = "Top"
+JFD_HeadingSize:                  Value = 10 mm
+                                  Value.us = 0.4 in
+HeadTop:          Value = IF(STRSAME(User.JFD_HeadingEdge,"Top",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Height),0)
+HeadBottom:       Value = IF(STRSAME(User.JFD_HeadingEdge,"Bottom",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Height),0)
+HeadLeft:         Value = IF(STRSAME(User.JFD_HeadingEdge,"Left",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Width),0)
+HeadRight:        Value = IF(STRSAME(User.JFD_HeadingEdge,"Right",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Width),0)
+HeadShown:        Value = User.HeadTop+User.HeadBottom+User.HeadLeft+User.HeadRight>0
+
+# 1 die Titelleiste
+[Geometry]
+NoLine = TRUE
+NoShow = NOT(User.HeadShown)
+MoveTo  X = IF(User.HeadRight>0,Width-User.HeadRight,0); Y = IF(User.HeadTop>0,Height-User.HeadTop,0)
+LineTo  X = IF(User.HeadLeft>0,User.HeadLeft,Width); Y = Geometry1.Y1
+LineTo  X = Geometry1.X2; Y = IF(User.HeadBottom>0,User.HeadBottom,Height)
+LineTo  X = Geometry1.X1; Y = Geometry1.Y3
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# 2 der Rahmen
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry2.X1; Y = Geometry2.Y1
+
+[Character]
+Row  Color = #FFFFFF
+     Style = 1
+     Size = 12 pt
+
+[Paragraph]
+Row  HorzAlign = 1

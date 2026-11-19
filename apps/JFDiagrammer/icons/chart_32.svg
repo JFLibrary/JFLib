@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Diagramm, 32 px</title>
+  <path class="body" fill="#DCDEE1" stroke="#1D2228" d="M8.5 27V18.5H12.5V27"/>
+  <path class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" d="M15.5 27V8.5H19.5V27"/>
+  <path class="body" fill="#DCDEE1" stroke="#1D2228" d="M22.5 27V14.5H26.5V27"/>
+  <path class="ink" stroke="#1D2228" d="M4.5 3V27.5H29"/>
+</svg>

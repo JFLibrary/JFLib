@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Unten ausrichten, 16 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M1 14.5H15"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="2.5" width="2" height="10"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="7.5" y="6.5" width="2" height="6"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="12.5" y="4.5" width="2" height="8"/>
+</svg>

@@ -1,0 +1,26 @@
+# JFDiagrammer, JD9: searching shapes (SL-04) -- over NameU, the names in all five languages
+# and the keywords of every stencil read (the built-in ones too, open or not); accents and case
+# do not count; the hits show in the current language.  #24577 is the panel's search box
+# (stencils_panel.rs ID_PANEL + 1)
+focus #24577
+type "losange"
+expect button:"Raute" exists
+expect button:"Rechteck" missing
+key esc
+# a German keyword of the ellipse, a stencil that is not open
+focus #24577
+type "kreis"
+expect button:"Ellipse" exists
+key esc
+# an English keyword without its accent, Spanish "rectángulo" without the accent
+focus #24577
+type "rectangulo"
+expect button:"Rechteck" exists
+expect button:"Abgerundetes Rechteck" exists
+key esc
+# nothing found
+focus #24577
+type "zzzz"
+expect text:"Keine Shapes gefunden" exists
+key esc
+expect text:"Keine Shapes gefunden" missing

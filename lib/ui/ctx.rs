@@ -1262,6 +1262,11 @@ impl Ui {
         if self.m.a11y.pending() && flags & HB_TEXT == 0 && self.a11y_click(id) {
             ev |= EV_ACT;
         }
+        // the widget a ribbon key tip chose in the last pass (ribbon_shell.rs)
+        if self.wp.rshell.fire == id && id != 0 {
+            self.wp.rshell.fire = 0;
+            ev |= EV_ACT;
+        }
         // an action usually changes app state that was already drawn: build the frame
         // again so everything shows the new state
         if ev & (EV_ACT | EV_COMMIT | EV_DOUBLE | EV_RCLICK) != 0 {
@@ -1629,6 +1634,7 @@ impl Ui {
     /// ui_frame_end -> another pass is needed before the frame is final
     pub(crate) fn frame_end(&mut self) -> bool {
         self.building = false;
+        self.sysmenu_frame_end(); // (popup.rs) no menubar(None) this pass: the system's bar empties
         self.uiw_frame_end();
         #[cfg(target_os = "android")]
         self.ime_frame_end();
@@ -1657,6 +1663,7 @@ impl Ui {
         let cur = c.hit_cur;
         c.hits[cur].clear();
         self.wp.chrome.cap_n = 0; // the caption buttons' boxes of this pass (chrome.rs)
+        self.wp.rshell.pass_begin(); // the key tips of this pass (ribbon_shell.rs)
         self.wp.chrome.tb_rect = None;
         let c = &mut self.wp.ctx;
         c.zones[cur].clear();

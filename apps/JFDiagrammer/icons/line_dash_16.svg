@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Striche, 16 px</title>
+  <path class="ink" stroke="#1D2228" d="M1 2.5H7M9 2.5H15"/>
+  <path class="ink" stroke="#1D2228" d="M1 7.5H3M5 7.5H7M9 7.5H11M13 7.5H15"/>
+  <path class="ink" stroke="#1D2228" d="M1 12.5H2M3 12.5H4M5 12.5H6M7 12.5H8M9 12.5H10M11 12.5H12M13 12.5H14"/>
+</svg>

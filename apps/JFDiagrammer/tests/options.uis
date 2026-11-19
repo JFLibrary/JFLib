@@ -1,0 +1,39 @@
+# JFDiagrammer, JD8: File › Optionen: the pages Allgemein, Speichern, Sprache, Erweitert and
+# Tastenkürzel (the settings of base::settings, kept in memory in a script run); a change
+# applies at once (the appearance here; the language in lang_switch.uis)
+click tab:"Datei"
+click button:"Optionen"
+expect button:"Allgemein" checked
+expect text:"Erscheinungsbild" exists
+expect text:"Benutzername" exists
+expect switch:"Startbildschirm beim Programmstart anzeigen" checked
+shot build/JFDiagrammer-options.png
+# (#24849: the options page Speichern; the File register and the toolbar have one too)
+click #24849
+expect text:"AutoWiederherstellen-Informationen speichern" exists
+click button:"Erweitert"
+expect button:"Erweitert" checked
+expect text:"Anzahl der Rückgängig-Schritte" exists
+expect switch:"Verbindungspfeile aktivieren" checked
+click switch:"Verbindungspfeile aktivieren"
+expect switch:"Verbindungspfeile aktivieren" unchecked
+expect button:"Zurücksetzen: Verbindungspfeile aktivieren" enabled
+click button:"Zurücksetzen: Verbindungspfeile aktivieren"
+expect switch:"Verbindungspfeile aktivieren" checked
+click button:"Sprache"
+expect text:"Sprache der Oberfläche" exists
+expect text:"Region für Einheiten und Formate" exists
+# the shortcuts of the language (German: Office's Strg+Umschalt+F for bold)
+click button:"Tastenkürzel"
+expect text:"Strg+Umschalt+F" exists
+expect text:"Strg+Umschalt+Bild auf" exists
+# the appearance: dark at once, light again
+theme light
+click button:"Allgemein"
+expect token bg #ECEEF1
+click #153995676
+click "Dunkel"
+expect token bg #1B1E22
+click #153995676
+click "Hell"
+expect token bg #ECEEF1

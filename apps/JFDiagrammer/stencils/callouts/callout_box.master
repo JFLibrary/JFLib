@@ -1,0 +1,74 @@
+# Beschriftung Rechteck: Kasten mit gerader Leitlinie vom nächsten Punkt des Kastens zur Spitze
+# und einem Punkt an der Spitze.
+master: Callout box
+name.de: Beschriftung Rechteck
+name.en: Callout box
+name.es: Llamada rectángulo
+name.it: Richiamo rettangolo
+name.fr: Bulle d'annotation rectangle
+prompt.de: Text im Kasten mit Leitlinie. Ziehen Sie den gelben Steuerpunkt auf das Ziel.
+prompt.en: Text in a box with a leader line. Drag the yellow control handle onto the target.
+prompt.es: Texto en un cuadro con línea guía. Arrastre el controlador amarillo hasta el destino.
+prompt.it: Testo in un riquadro con linea guida. Trascina la maniglia di controllo gialla sulla destinazione.
+prompt.fr: Texte dans un cadre avec ligne de repère. Faites glisser la poignée de contrôle jaune sur la cible.
+keywords.de: Beschriftung, Legende, Hinweis, Kommentar, Anmerkung, Zeiger, Kasten, Rechteck, Leitlinie
+keywords.en: callout, label, note, comment, annotation, pointer, box, rectangle, leader
+keywords.es: llamada, etiqueta, nota, comentario, anotación, puntero, cuadro, rectángulo, línea guía
+keywords.it: richiamo, didascalia, etichetta, nota, commento, annotazione, puntatore, riquadro, rettangolo, linea guida
+keywords.fr: bulle d'annotation, légende, étiquette, note, commentaire, pointeur, cadre, rectangle, ligne de repère
+text.de: Text
+text.en: Text
+text.es: Texto
+text.it: Testo
+text.fr: Texte
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 16 mm
+Height.us = 0.6 in
+
+[User]
+msvStructureType:        Value = "Callout"
+msvShapeCategories:      Value = "Callout"
+msvSDCalloutNoHighlight: Value = FALSE
+# die Spitze des Zeigers
+Ax:   Value = Controls.Association
+Ay:   Value = Controls.Association.Y
+Out:  Value = OR(User.Ax<0,User.Ax>Width,User.Ay<0,User.Ay>Height)
+# der nächste Punkt des Kastens
+Px:   Value = MIN(MAX(User.Ax,0),Width)
+Py:   Value = MIN(MAX(User.Ay,0),Height)
+Dot:  Value = 0.8 mm
+      Value.us = 0.03 in
+
+# der Kasten
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# die Leitlinie
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(User.Out)
+MoveTo  X = User.Px; Y = User.Py
+LineTo  X = User.Ax; Y = User.Ay
+
+# der Punkt an der Spitze
+[Geometry]
+NoShow = NOT(User.Out)
+Ellipse  X = User.Ax; Y = User.Ay; A = User.Ax+User.Dot; B = User.Ay; C = User.Ax; D = User.Ay+User.Dot
+
+[Controls]
+Association:  X = -12 mm; Y = -10 mm
+              X.us = -0.5 in; Y.us = -0.4 in
+              XDyn = User.Px; YDyn = User.Py
+              XCon = 2; YCon = 2; CanGlue = FALSE
+              Tip.de = "Zeiger auf das Ziel ziehen"
+              Tip.en = "Drag the pointer onto the target"
+              Tip.es = "Arrastre el puntero hasta el destino"
+              Tip.it = "Trascina il puntatore sulla destinazione"
+              Tip.fr = "Faites glisser le pointeur sur la cible"

@@ -1,0 +1,13 @@
+# Container und Listen (JD10, PLAN.md): Strukturen, die andere Shapes aufnehmen.  Die App liest
+# nur die msv…- und JFD_…-Zellen (diagram_core::structure; Vertrag in stencils/README.md,
+# Abschnitt „Strukturen“); Aussehen und Formeln sind eigene Arbeit im NetLab-Stil.
+stencil: Containers and Lists
+file: containers
+name.de: Container und Listen
+name.en: Containers and lists
+name.es: Contenedores y listas
+name.it: Contenitori ed elenchi
+name.fr: Conteneurs et listes
+category: general
+masters: container, list, list_item
+quick: 0

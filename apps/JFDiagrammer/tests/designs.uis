@@ -1,0 +1,69 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD11: Entwurf › Designs and Varianten (RW-05, RW-06, TH-02 .. TH-04).  A new
+# drawing shows NetLab, variant 1; pointing at a tile shows its design as a live preview and
+# leaving takes it back (the applied design stays marked); a click applies it to all pages,
+# a variant the same; undo takes both back; the tile's menu applies to the page shown; the
+# gallery's ▾ offers Kein Design.  Golden image: the rectangle in Contour, variant 4 (white
+# fill, rounded anthracite outline).
+# New references: "shot FILE X Y W H" in place of "expect same" (look first)
+theme light
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+click tab:"Entwurf"
+expect button:"NetLab" checked
+expect button:"Kontur" unchecked
+expect button:"Variante 1" checked
+# the live preview: Kontrast while the pointer is on its tile, NetLab still marked
+move button:"Kontrast"
+wait 200
+expect button:"NetLab" checked
+expect button:"Kontrast" unchecked
+move 700,600
+wait 200
+expect button:"NetLab" checked
+# applied: Kontur, then its variant 4
+click button:"Kontur"
+move 700,600
+expect button:"Kontur" checked
+expect button:"NetLab" unchecked
+click button:"Variante 4"
+move 700,600
+expect button:"Variante 4" checked
+click 700,600
+expect same apps/JFDiagrammer/tests/golden/design_contour4.png 470 300 200 150
+# undo: the variant, then the design
+key ctrl+z
+expect button:"Variante 1" checked
+key ctrl+z
+expect button:"NetLab" checked
+# the tile's menu: the page shown only
+rclick button:"Kontrast"
+click "Auf aktuelle Seite anwenden"
+move 700,600
+expect button:"Kontrast" checked
+# Alle Designs › Kein Design: no variants then
+click button:"Alle Designs"
+expect "In dieser Datei" missing
+expect "JFDiagrammer" exists
+click "Kein Design"
+move 700,600
+expect button:"Kontrast" unchecked
+expect button:"NetLab" unchecked
+expect button:"Variante 1" disabled
+key ctrl+z
+expect button:"Kontrast" checked
+# Design auf neue Shapes anwenden off: a box drawn now keeps no design (the plain look of the
+# root style beside the Kontrast box)
+click button:"Alle Designs"
+expect "Design auf neue Shapes anwenden" checked
+click "Design auf neue Shapes anwenden"
+move 700,600
+cmd 4404
+drag 700,330 840,420
+cmd 4400
+click 900,600
+expect same apps/JFDiagrammer/tests/golden/design_new_shapes.png 470 300 400 150
+click button:"Alle Designs"
+expect "Design auf neue Shapes anwenden" unchecked
+click "Design auf neue Shapes anwenden"

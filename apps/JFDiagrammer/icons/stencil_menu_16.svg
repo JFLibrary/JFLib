@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Schablonen, 16 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="2.5" width="4" height="4"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="9.5" y="2.5" width="4" height="4"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="9.5" width="4" height="4"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="9.5" y="9.5" width="4" height="4"/>
+</svg>

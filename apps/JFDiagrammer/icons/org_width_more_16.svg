@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Breite vergrößern, 16 px</title>
+  <polygon class="ink" fill="#1D2228" points="4,5.0 4,10.0 1.5,7.5"/>
+  <polygon class="ink" fill="#1D2228" points="12,5.0 12,10.0 14.5,7.5"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="5.5" y="3.5" width="5" height="8"/>
+</svg>

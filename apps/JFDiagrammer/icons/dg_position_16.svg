@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Position, 16 px</title>
+  <polygon class="body" fill="#DCDEE1" points="2,4 9,4 9,7 12,7 12,12 2,12"/>
+  <path class="ink" stroke="#1D2228" d="M9 3.5H1.5V12.5H12.5V7"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="10.5" y="1.5" width="4" height="4"/>
+</svg>

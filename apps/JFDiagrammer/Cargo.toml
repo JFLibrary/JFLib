@@ -1,0 +1,44 @@
+[package]
+name = "JFDiagrammer"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "JFDiagrammer"
+path = "src/main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+ui.workspace = true
+base.workspace = true
+plat.workspace = true
+rt.workspace = true
+# (JD4) reading drawings, their display list, drawing it (render2d's camera), installed fonts
+diagram_core.workspace = true
+diagram_io.workspace = true
+diagram_view.workspace = true
+render2d.workspace = true
+text.workspace = true
+# (JD12) printing and exporting: surfaces, the PDF's document information
+gfx.workspace = true
+pdf.workspace = true
+style = { package = "jflib-style-netlab", path = "../../styles/netlab" }
+
+[build-dependencies]
+jflib-build.workspace = true
+# (JD9) the built-in stencils: stencils/ -> .vssx when the app is built (build.rs, PLAN.md V2);
+# a build script runs with std, so rt and plat take std's panic handler, allocator, memory
+# functions and C runtime there (docs/CRATES.md, CR6)
+diagram_io.workspace = true
+rt = { workspace = true, features = ["std"] }
+plat = { workspace = true, features = ["std"] }

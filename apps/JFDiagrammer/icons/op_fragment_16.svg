@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Fragmentieren, 16 px</title>
+  <path class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" d="M1.5 1.5H9.5V4.5H4.5V9.5H1.5Z"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="6.5" y="6.5" width="3" height="3"/>
+  <path class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" d="M14.5 14.5H6.5V11.5H11.5V6.5H14.5Z"/>
+</svg>

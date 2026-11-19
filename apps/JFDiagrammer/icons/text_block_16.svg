@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Textblock, 16 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M5 5.5H11M5 13.5H11M2.5 8V11M13.5 8V11"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="4.5" width="2" height="2"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="12.5" y="4.5" width="2" height="2"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="12.5" width="2" height="2"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="12.5" y="12.5" width="2" height="2"/>
+  <path class="ink" stroke="#1D2228" d="M5 8.5H11M5 10.5H10"/>
+  <path class="ink" stroke="#1D2228" d="M5.5 4V2.5H9"/>
+  <polygon class="ink" fill="#1D2228" points="9,1 9,4 10.5,2.5"/>
+</svg>

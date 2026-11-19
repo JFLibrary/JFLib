@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Drucken, 16 px</title>
+  <polygon class="body" fill="#DCDEE1" points="2,6 14,6 14,11 13,11 13,8 3,8 3,11 2,11"/>
+  <path class="ink" stroke="#1D2228" d="M4.5 4V1.5H11.5V4"/>
+  <path class="ink" stroke="#1D2228" d="M3 11.5H1.5V5.5H14.5V11.5H13"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="4.5" y="9.5" width="7" height="5"/>
+</svg>

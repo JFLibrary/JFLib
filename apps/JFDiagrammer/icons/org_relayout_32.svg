@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Neu layouten, 32 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="7.5" y="2.5" width="6" height="4"/>
+  <path class="ink" stroke="#1D2228" d="M10.5 7V9M5.5 12V9.5H15.5V12"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="12.5" width="6" height="4"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="12.5" y="12.5" width="6" height="4"/>
+  <path class="tint" stroke="#1F5FA8" stroke-width="2" d="M19 24V26L22 29H26L29 26V22L26 19H24"/>
+  <polygon class="tint" fill="#1F5FA8" points="24,16 24,22 21,19"/>
+</svg>

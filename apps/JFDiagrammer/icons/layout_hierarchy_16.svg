@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Hierarchie, 16 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M7.5 6V11M2.5 11V8.5H12.5V11"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="5.5" y="2.5" width="4" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="11.5" width="2" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="11.5" width="2" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="11.5" y="11.5" width="2" height="3"/>
+</svg>

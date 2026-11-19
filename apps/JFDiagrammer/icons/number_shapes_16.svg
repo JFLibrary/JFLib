@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Nummerieren, 16 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="2.5" width="8" height="4"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="9.5" width="8" height="4"/>
+  <path class="tint" stroke="#1F5FA8" d="M2 4L3.5 2.5 M3.5 2V7 M1 9.5H4.5V11.5L2 14 M1 13.5H5"/>
+</svg>

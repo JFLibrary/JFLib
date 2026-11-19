@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Beschriftung, 32 px</title>
+  <path class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" d="M9.5 3.5H28.5V17.5H18.5L13.5 22.5V17.5H9.5Z"/>
+  <path class="ink" stroke="#1D2228" d="M13 8.5H25M13 12.5H21"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="3.5" y="23.5" width="7" height="5"/>
+</svg>

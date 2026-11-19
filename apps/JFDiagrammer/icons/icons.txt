@@ -1,0 +1,333 @@
+# icons.txt -- every ribbon icon of JFDiagrammer (FEATURES.md 7): the table mkicons.py reads
+#
+# [part] Title starts a part; a row:   n | stem | sizes | prio | Name | Ort | Motiv
+#   n      hex number: code point 0x10F200 + n (16 px), 0x10F600 + n (32 px); never reused
+#   stem   the files icons/STEM_16.svg and STEM_32.svg, the constants JD_STEM and JD_STEM_L
+#   sizes  16, 32 or "16 32": 16 for every ribbon command (any may land in the quick access
+#          toolbar or a small button), 32 where FEATURES has a large button
+#   prio   P1..P3 as in FEATURES
+#   Motiv  a hint for the drawing (FEATURES' suggestion in our words), not a model to copy
+# Numbers below 0x010 are the approved sample sheet (mkicons.py --sheet).  Galleries (designs,
+# variants, quick styles, containers, callouts, data graphics, pens, layouts) get rendered
+# previews, not drawn icons; the app logo has its own pipeline.  Language-dependent letters
+# (bold, italic, underline) come once per letter; the app picks by UI language:
+#   bold de F, en B, es N, it/fr G -- italic de/es K, en/fr I, it C -- underline de/en U, es/it/fr S
+
+[rahmen] Fenster, Backstage, Statusleiste, Seitenleiste
+010 | save | 16 32 | P1 | Speichern | Schnellzugriff, Backstage | Diskette
+011 | undo | 16 | P1 | Rückgängig | Schnellzugriff | Bogenpfeil nach links
+012 | redo | 16 | P1 | Wiederholen | Schnellzugriff | Bogenpfeil nach rechts
+013 | qat_customize | 16 | P2 | Symbolleiste anpassen | Schnellzugriff | Strich mit Dreieck darunter
+014 | ribbon_display | 16 | P2 | Menüband-Anzeigeoptionen | Titelleiste | Fenster mit Pfeil nach oben
+015 | search | 16 | P1 | Suchen | Registerzeile, Seitenleiste, Start · Bearbeiten | Lupe
+016 | comments | 16 | P2 | Kommentare | Registerzeile, Überprüfen · Kommentare | Sprechblase
+017 | back | 32 | P1 | Zurück | Backstage | Pfeil nach links in einem Quadrat
+018 | home | 32 | P1 | Startseite | Backstage | Haus
+019 | new | 16 32 | P1 | Neu | Backstage, Schnellzugriff | leeres Blatt mit Eselsohr
+01A | open | 16 32 | P1 | Öffnen | Backstage, Schnellzugriff | offener Ordner
+01B | info | 32 | P1 | Informationen | Backstage | i in einem Quadrat
+01C | save_as | 32 | P1 | Speichern unter | Backstage | Diskette mit Stift
+01D | print | 16 32 | P1 | Drucken | Backstage, Schnellzugriff | Drucker
+01E | export | 32 | P1 | Exportieren | Backstage | Blatt mit Pfeil hinaus
+01F | close | 32 | P1 | Schließen | Backstage | Blatt mit Kreuz
+020 | options | 32 | P1 | Optionen | Backstage | Zahnrad
+021 | file_drawing | 32 | P1 | Zeichnung | Backstage, Dateilisten | Blatt mit kleinem Diagramm (zwei Kästen, Verbinder)
+022 | send_copy | 32 | P3 | Kopie senden | Backstage · Freigeben | Umschlag mit Büroklammer
+023 | send_pdf | 32 | P3 | Als PDF senden | Backstage · Freigeben | Blatt mit Umschlag
+024 | presentation | 16 32 | P2 | Präsentationsmodus | Statusleiste, Ansicht · Ansichten | Leinwand auf Ständer
+025 | zoom_out | 16 | P1 | Verkleinern | Statusleiste | Minus
+026 | zoom_in | 16 | P1 | Vergrößern | Statusleiste | Plus
+027 | fit_window | 16 | P1 | An Fenster anpassen | Statusleiste, Ansicht · Zoom | Rahmen mit vier Pfeilen nach außen
+028 | switch_window | 16 32 | P2 | Fenster wechseln | Statusleiste, Ansicht · Fenster | zwei überlappende Fenster
+029 | page_add | 16 | P1 | Seite einfügen | Seitenregister | Plus in einem Quadrat
+02A | pages_all | 16 | P1 | Alle Seiten | Seitenregister | Dreieck nach oben über Linien
+02B | sidebar_collapse | 16 | P1 | Einklappen | Seitenleiste | Winkel nach links
+02C | stencil_menu | 16 | P1 | Schablonen | Seitenleiste | 2×2-Raster
+02D | more_shapes | 16 | P1 | Weitere Shapes | Seitenleiste | Raster mit Pfeil nach rechts
+02E | dialog_launcher | 16 | P1 | Dialogstarter | Menüband, Gruppen | Ecke mit Pfeil nach rechts unten
+02F | ribbon_collapse | 16 | P2 | Menüband reduzieren | Menüband | Winkel nach oben
+
+[start_text] Start: Zwischenablage, Schriftart, Absatz
+005 | format_painter | 16 32 | P1 | Format übertragen | Start · Zwischenablage | flacher Pinsel (abgenommen)
+040 | paste | 16 32 | P1 | Einfügen | Start · Zwischenablage | Klemmbrett mit Blatt
+041 | paste_special | 16 | P1 | Inhalte einfügen | Start · Zwischenablage | Klemmbrett mit Liste
+042 | paste_link | 16 | P2 | Als Link einfügen | Start · Zwischenablage | Klemmbrett mit Kettenglied
+043 | duplicate | 16 | P1 | Duplizieren | Start · Zwischenablage | zwei versetzte Kästen
+044 | cut | 16 | P1 | Ausschneiden | Start · Zwischenablage | Schere
+045 | copy | 16 | P1 | Kopieren | Start · Zwischenablage | zwei Blätter
+046 | font_grow | 16 | P2 | Schrift vergrößern | Start · Schriftart | A mit Pfeil nach oben
+047 | font_shrink | 16 | P2 | Schrift verkleinern | Start · Schriftart | A mit Pfeil nach unten
+048 | bold_f | 16 | P1 | Fett (F) | Start · Schriftart | fettes F (de)
+049 | bold_b | 16 | P1 | Fett (B) | Start · Schriftart | fettes B (en)
+04A | bold_n | 16 | P1 | Fett (N) | Start · Schriftart | fettes N (es)
+04B | bold_g | 16 | P1 | Fett (G) | Start · Schriftart | fettes G (it, fr)
+04C | italic_k | 16 | P1 | Kursiv (K) | Start · Schriftart | schräges K (de, es)
+04D | italic_i | 16 | P1 | Kursiv (I) | Start · Schriftart | schräges I (en, fr)
+04E | italic_c | 16 | P1 | Kursiv (C) | Start · Schriftart | schräges C (it)
+04F | underline_u | 16 | P1 | Unterstrichen (U) | Start · Schriftart | U mit Linie darunter (de, en)
+050 | underline_s | 16 | P1 | Unterstrichen (S) | Start · Schriftart | S mit Linie darunter (es, it, fr)
+051 | strikethrough | 16 | P1 | Durchgestrichen | Start · Schriftart | durchgestrichenes ab
+052 | change_case | 16 | P3 | Groß-/Kleinschreibung | Start · Schriftart | Aa
+053 | font_color | 16 | P1 | Schriftfarbe | Start · Schriftart | A über einem Farbbalken (Akzent)
+054 | valign_top | 16 | P1 | Oben ausrichten | Start · Absatz | Linien oben im Kasten
+055 | valign_middle | 16 | P1 | Mittig ausrichten | Start · Absatz | Linien mittig im Kasten
+056 | valign_bottom | 16 | P1 | Unten ausrichten | Start · Absatz | Linien unten im Kasten
+057 | text_left | 16 | P1 | Linksbündig | Start · Absatz | Linienstapel links
+058 | text_center | 16 | P1 | Zentriert | Start · Absatz | Linienstapel mittig
+059 | text_right | 16 | P1 | Rechtsbündig | Start · Absatz | Linienstapel rechts
+05A | text_justify | 16 | P1 | Blocksatz | Start · Absatz | Linienstapel gleich lang
+05B | bullets | 16 | P2 | Aufzählungszeichen | Start · Absatz | kleine Quadrate mit Linien
+05C | indent_less | 16 | P2 | Einzug verkleinern | Start · Absatz | Linien mit Pfeil nach links
+05D | indent_more | 16 | P2 | Einzug vergrößern | Start · Absatz | Linien mit Pfeil nach rechts
+05E | text_rotate | 16 | P2 | Text drehen | Start · Absatz | A mit Bogenpfeil
+
+[start_shape] Start: Tools, Formenarten, Anordnen, Bearbeiten
+000 | pointer | 16 32 | P1 | Zeigertool | Start · Tools | Mauszeiger (abgenommen)
+001 | connector | 16 32 | P1 | Verbinder | Start · Tools, Entwurf · Layout | rechtwinkliger Verbinder zwischen Kästen (abgenommen)
+002 | text | 16 32 | P1 | Text | Start · Tools | A und Textcursor (abgenommen)
+003 | rectangle | 16 32 | P1 | Rechteck | Start · Tools | Rechteck (abgenommen)
+004 | connection_point | 16 32 | P1 | Verbindungspunkt | Start · Tools | Kreuz auf einer Kante (abgenommen)
+006 | align | 16 32 | P1 | Ausrichten | Start · Anordnen | Kästen an einer Linie (abgenommen)
+007 | bring_front | 16 32 | P1 | In den Vordergrund | Start · Anordnen | vorderer Kasten betont (abgenommen)
+008 | group | 16 32 | P1 | Gruppieren | Start · Anordnen | Eckwinkel um Kästen (abgenommen)
+080 | ellipse | 16 | P1 | Ellipse | Start · Tools | Oval
+081 | line | 16 | P1 | Linie | Start · Tools | Diagonale mit Endpunkten
+082 | freeform | 16 | P2 | Freihandform | Start · Tools | Wellenlinie
+083 | arc | 16 | P2 | Bogen | Start · Tools | Viertelbogen
+084 | pencil | 16 | P2 | Bleistift | Start · Tools | Stift
+085 | text_block | 16 | P2 | Textblock | Start · Tools | Textrahmen mit Griffen und Drehpfeil
+086 | quick_styles | 32 | P2 | Schnellformatvorlagen | Start · Formenarten | Kasten mit Pinsel
+087 | fill | 16 | P1 | Füllung | Start · Formenarten | Farbeimer über einem Farbbalken
+088 | line_color | 16 | P1 | Linie | Start · Formenarten, Zeichnen · Stifte | Stift über einem Farbbalken
+089 | effects | 16 | P2 | Effekte | Start · Formenarten | Kasten mit Schatten
+08A | line_weight | 16 | P1 | Stärke | Start · Formenarten, Zeichnen · Stifte | Linien von dick nach dünn
+08B | line_dash | 16 | P1 | Striche | Start · Formenarten | gestrichelte Linien
+08C | line_arrows | 16 | P1 | Pfeile | Start · Formenarten | Linien mit Pfeilspitzen
+08D | line_options | 16 | P1 | Linienoptionen | Start · Formenarten | Linie mit Zahnrad
+08E | more_colors | 16 | P1 | Weitere Farben | Start · Formenarten | Farbfelder im Raster
+08F | position | 16 32 | P1 | Positionieren | Start · Anordnen | drei Kästen mit Abstandsmarken
+090 | align_left | 16 | P1 | Links ausrichten | Start · Anordnen | Kästen an einer Linie links
+091 | align_center | 16 | P1 | Zentriert ausrichten | Start · Anordnen | Kästen an einer Mittellinie (senkrecht)
+092 | align_right | 16 | P1 | Rechts ausrichten | Start · Anordnen | Kästen an einer Linie rechts
+093 | align_top | 16 | P1 | Oben ausrichten | Start · Anordnen | Kästen an einer Linie oben
+094 | align_middle | 16 | P1 | Mittig ausrichten | Start · Anordnen | Kästen an einer Mittellinie (waagerecht)
+095 | align_bottom | 16 | P1 | Unten ausrichten | Start · Anordnen | Kästen an einer Linie unten
+096 | auto_space | 16 | P2 | Automatischer Abstand | Start · Anordnen, Daten · Datengrafiken | Kästchenraster mit Abstandsmarken
+097 | auto_align_space | 16 | P2 | Auto-Ausrichten und Abstand | Start · Anordnen | Kästen in Reihe, an Linie, mit Marken
+098 | spacing_options | 16 | P2 | Abstandsoptionen | Start · Anordnen | Abstandsmarke mit Zahnrad
+099 | distribute_h | 16 | P1 | Horizontal verteilen | Start · Anordnen | drei Balken nebeneinander, gleiche Lücken
+09A | distribute_v | 16 | P1 | Vertikal verteilen | Start · Anordnen | drei Balken übereinander, gleiche Lücken
+09B | move_off_breaks | 16 | P2 | Von Seitenumbrüchen verschieben | Start · Anordnen | Blatt mit Trennlinie, Kasten daneben
+09C | rotate_left | 16 | P1 | 90° nach links drehen | Start · Anordnen | Kasten mit Bogenpfeil gegen den Uhrzeigersinn
+09D | rotate_right | 16 | P1 | 90° nach rechts drehen | Start · Anordnen | Kasten mit Bogenpfeil im Uhrzeigersinn
+09E | flip_h | 16 | P1 | Horizontal spiegeln | Start · Anordnen | zwei Dreiecke an einer senkrechten Achse
+09F | flip_v | 16 | P1 | Vertikal spiegeln | Start · Anordnen | zwei Dreiecke an einer waagerechten Achse
+0A0 | bring_forward | 16 | P1 | Eine Ebene nach vorne | Start · Anordnen | drei Kästen, der mittlere betont vorn
+0A1 | send_back | 16 | P1 | In den Hintergrund | Start · Anordnen | hinterer Kasten betont, verdeckt
+0A2 | send_backward | 16 | P1 | Eine Ebene nach hinten | Start · Anordnen | drei Kästen, der mittlere betont hinten
+0A3 | ungroup | 16 | P1 | Gruppierung aufheben | Start · Anordnen | Eckwinkel auseinander, Kästen frei
+0A4 | change_shape | 32 | P2 | Shape ändern | Start · Bearbeiten | Quadrat mit Pfeil zu einer anderen Form
+0A5 | replace | 16 | P1 | Ersetzen | Start · Bearbeiten | ab mit Pfeil zu c
+0A6 | layer_assign | 16 | P1 | Ebene zuweisen | Start · Bearbeiten | gestapelte Flächen mit Haken
+0A7 | layer_properties | 16 | P1 | Ebeneneigenschaften | Start · Bearbeiten | gestapelte Flächen mit Zahnrad
+0A8 | select | 16 | P1 | Markieren | Start · Bearbeiten | Pfeil vor einem Auswahlrahmen
+0A9 | select_all | 16 | P1 | Alles markieren | Start · Bearbeiten | Auswahlrahmen um mehrere Kästen
+0AA | select_by_type | 16 | P2 | Nach Typ markieren | Start · Bearbeiten | Liste mit Pfeil
+0AB | select_area | 16 | P1 | Bereichsauswahl | Start · Bearbeiten | gestricheltes Rechteck
+0AC | lasso | 16 32 | P2 | Lassoauswahl | Start · Bearbeiten, Zeichnen · Tools | gestrichelte Schlinge
+
+[einfuegen] Einfügen, Zeichnen
+009 | new_page | 16 32 | P1 | Neue Seite | Einfügen · Seiten | Blatt mit Plus (abgenommen)
+00A | container | 16 32 | P1 | Container | Einfügen · Diagrammteile | Rahmen mit Kopfleiste (abgenommen)
+0E0 | page_blank | 16 | P1 | Leere Seite | Einfügen · Seiten | leeres Blatt
+0E1 | page_background | 16 | P1 | Hintergrundseite | Einfügen · Seiten | Blatt mit Fläche
+0E2 | page_duplicate | 16 | P1 | Seite duplizieren | Einfügen · Seiten | zwei Blätter versetzt
+0E3 | pictures | 16 32 | P1 | Bilder | Einfügen · Illustrationen | Bild mit Bergen und Sonne
+0E4 | pictograms | 32 | P3 | Piktogramme | Einfügen · Illustrationen | einfaches Symbol (Figur, Stern)
+0E5 | chart | 32 | P1 | Diagramm | Einfügen · Illustrationen | Säulen auf einer Achse
+0E6 | cad | 32 | P3 | CAD-Zeichnung | Einfügen · Illustrationen | Blatt mit Bemaßung
+0E7 | callout | 16 32 | P1 | Beschriftung | Einfügen · Diagrammteile | Sprechblase, eckig
+0E8 | insert_connector | 32 | P1 | Verbinder | Einfügen · Diagrammteile | Verbinder mit Plus
+0E9 | link | 16 32 | P1 | Link | Einfügen · Links | Kettenglieder
+0EA | text_box | 32 | P1 | Textfeld | Einfügen · Text | A im Rahmen
+0EB | text_box_h | 16 | P1 | Horizontales Textfeld | Einfügen · Text | Rahmen mit liegenden Zeilen
+0EC | text_box_v | 16 | P1 | Vertikales Textfeld | Einfügen · Text | Rahmen mit stehenden Zeilen
+0ED | screen_tip | 32 | P2 | QuickInfo | Einfügen · Text | Notizzettel an einem Kasten
+0EE | object | 32 | P3 | Objekt | Einfügen · Text | Fenster mit eingebettetem Blatt
+0EF | field | 32 | P2 | Feld | Einfügen · Text | Feld mit geschweiften Klammern
+0F0 | symbol | 32 | P3 | Symbol | Einfügen · Text | Omega
+0F1 | ink_finger | 32 | P3 | Mit Finger zeichnen | Zeichnen · Tools | Fingerspitze mit Linie
+0F2 | eraser | 32 | P3 | Radierer | Zeichnen · Tools | Radiergummi
+0F3 | ink_to_text | 32 | P3 | Freihand in Text | Zeichnen · Konvertieren | geschriebenes a, Pfeil, gedrucktes a
+0F4 | ink_to_shapes | 32 | P3 | Freihand in Shapes | Zeichnen · Konvertieren | Kritzel, Pfeil, Kasten
+
+[entwurf] Entwurf
+00B | relayout | 16 32 | P1 | Seite neu layouten | Entwurf · Layout | Kastenhierarchie (abgenommen)
+110 | orientation | 32 | P1 | Ausrichtung | Entwurf · Seite einrichten | Blatt hoch und Blatt quer
+111 | portrait | 16 | P1 | Hochformat | Entwurf · Seite einrichten | Blatt hoch
+112 | landscape | 16 | P1 | Querformat | Entwurf · Seite einrichten | Blatt quer
+113 | page_size | 32 | P1 | Format | Entwurf · Seite einrichten | Blatt mit Maßpfeil
+114 | paper_size | 16 | P1 | Papierformat | Entwurf · Seite einrichten | Blattumriss
+115 | fit_drawing | 16 | P1 | An Zeichnung anpassen | Entwurf · Seite einrichten | Blattrahmen eng um Kästen
+116 | more_sizes | 16 | P1 | Weitere Formate | Entwurf · Seite einrichten | Blatt mit Zahnrad
+117 | auto_size | 32 | P1 | Automatisch anpassen | Entwurf · Seite einrichten | Blatt mit Pfeilen nach außen
+118 | var_colors | 16 | P2 | Farben | Entwurf · Varianten | Farbfelder
+119 | var_effects | 16 | P2 | Effekte | Entwurf · Varianten | Stern
+11A | var_connectors | 16 | P2 | Verbinder | Entwurf · Varianten | Verbinderlinie mit Enden
+11B | var_fonts | 16 | P2 | Schriftarten | Entwurf · Varianten | Aa
+11C | var_embellishment | 16 | P2 | Verzierung | Entwurf · Varianten | Ornamentecke
+11D | backgrounds | 32 | P2 | Hintergründe | Entwurf · Hintergründe | Blatt mit Fläche
+11E | borders_titles | 32 | P2 | Rahmen und Titel | Entwurf · Hintergründe | Blatt mit Rand und Titelfeld
+11F | background_color | 16 | P2 | Hintergrundfarbe | Entwurf · Hintergründe | Farbeimer über Blatt
+120 | layout_flow_down | 16 | P2 | Fluss nach unten | Entwurf · Layout | Kästen untereinander mit Pfeilen
+121 | layout_flow_up | 16 | P2 | Fluss nach oben | Entwurf · Layout | Kästen übereinander mit Pfeilen
+122 | layout_flow_right | 16 | P2 | Fluss nach rechts | Entwurf · Layout | Kästen nebeneinander mit Pfeilen
+123 | layout_flow_left | 16 | P2 | Fluss nach links | Entwurf · Layout | Kästen nebeneinander mit Pfeilen nach links
+124 | layout_hierarchy | 16 | P2 | Hierarchie | Entwurf · Layout | Baum von oben
+125 | layout_compact | 16 | P2 | Kompakter Baum | Entwurf · Layout | eingerückter Baum
+126 | layout_radial | 16 | P2 | Radial | Entwurf · Layout | Kasten in der Mitte, Kästen ringsum
+127 | layout_circular | 16 | P2 | Kreisförmig | Entwurf · Layout | Kästen auf einem Ring
+128 | connector_right_angle | 16 | P1 | Rechtwinklig | Entwurf · Layout | rechtwinklige Linie
+129 | connector_straight | 16 | P1 | Gerade | Entwurf · Layout | gerade Linie
+12A | connector_curved | 16 | P1 | Gebogen | Entwurf · Layout | geschwungene Linie
+12B | line_jumps | 16 | P1 | Sprünge | Entwurf · Layout | Linie mit Bogen über eine andere
+
+[daten] Daten, Prozess, Überprüfen
+150 | quick_import | 32 | P2 | Schnellimport | Daten · Externe Daten | Tabelle mit Pfeil zu einer Raute
+151 | custom_import | 32 | P3 | Benutzerdefinierter Import | Daten · Externe Daten | Zylinder mit Pfeil zu einer Raute
+152 | refresh_all | 16 32 | P2 | Alle aktualisieren | Daten · Externe Daten | Tabelle mit Kreispfeil
+153 | dg_position | 16 | P2 | Position | Daten · Datengrafiken | Kasten mit markierter Ecke
+154 | dg_configure | 16 | P2 | Konfigurieren | Daten · Datengrafiken | Balken mit Zahnrad
+155 | legend | 32 | P2 | Legende einfügen | Daten · Daten anzeigen | Tabelle mit Farbfeldern
+156 | legend_h | 32 | P2 | Legende horizontal | Daten · Daten anzeigen | Farbfelder quer
+157 | legend_v | 32 | P2 | Legende vertikal | Daten · Daten anzeigen | Farbfelder hoch
+158 | shape_data | 16 | P1 | Shape-Daten | Daten · Einblenden | Liste mit Feldern
+159 | external_data | 16 | P2 | Externe Daten | Daten · Einblenden | Tabelle
+15A | dg_fields | 16 | P2 | Datengrafikfelder | Daten · Einblenden | Liste mit Balken
+15B | link_data | 16 | P2 | Daten verknüpfen | Daten · Erweitert | Zylinder mit Kettenglied
+15C | advanced_dg | 16 | P2 | Erweiterte Datengrafiken | Daten · Erweitert | Tacho
+15D | subprocess_new | 32 | P2 | Neu erstellen | Prozess · Teilprozess | Prozesskasten mit Plus
+15E | subprocess_link | 32 | P2 | Mit vorhandenem verknüpfen | Prozess · Teilprozess | Prozesskasten mit Kettenglied
+15F | subprocess_selection | 32 | P3 | Aus Auswahl erstellen | Prozess · Teilprozess | gestrichelter Prozesskasten um Kästen
+160 | check_diagram | 32 | P2 | Diagramm überprüfen | Prozess · Überprüfung | kleines Flussdiagramm mit Haken
+161 | rules_check | 16 | P2 | Zu überprüfende Regeln | Prozess · Überprüfung | Liste mit Haken
+162 | rules_import | 16 | P2 | Regeln importieren | Prozess · Überprüfung | Liste mit Pfeil hinein
+163 | issue_ignore | 16 | P2 | Problem ignorieren | Prozess · Überprüfung | Warndreieck mit Kreuz
+164 | issues_window | 16 | P2 | Problemfenster | Prozess · Überprüfung | Fenster mit Warndreieck
+165 | rules_edit | 32 | P3 | Regeln bearbeiten | Prozess · Überprüfung | Liste mit Stift
+166 | spelling | 32 | P2 | Rechtschreibung | Überprüfen · Dokumentprüfung | abc mit Haken
+167 | thesaurus | 32 | P3 | Thesaurus | Überprüfen · Dokumentprüfung | aufgeschlagenes Buch
+168 | accessibility | 32 | P2 | Barrierefreiheit überprüfen | Überprüfen · Barrierefreiheit | Figur mit Haken
+169 | language | 32 | P2 | Sprache | Überprüfen · Sprache | A neben einem anderen Schriftzeichen
+16A | proof_language | 16 | P2 | Korrektursprache | Überprüfen · Sprache | Buch mit Globus
+16B | comment_new | 32 | P2 | Neuer Kommentar | Überprüfen · Kommentare | Sprechblase mit Plus
+16C | show_tags | 16 | P2 | Tags anzeigen | Überprüfen · Kommentare | Sprechblase mit Auge
+16D | shape_reports | 32 | P2 | Shape-Berichte | Überprüfen · Berichte | Blatt mit Balken
+16E | protect_document | 32 | P3 | Dokument schützen | Überprüfen · Schützen | Blatt mit Schloss
+
+[ansicht] Ansicht, Entwicklertools, Hilfe
+00C | task_panes | 16 32 | P1 | Aufgabenbereiche | Ansicht · Fenster | Fenster mit Seitenbereich (abgenommen)
+190 | ruler | 16 | P1 | Lineal | Ansicht · Anzeigen | Lineal mit Teilstrichen
+191 | grid | 16 | P1 | Gitternetz | Ansicht · Anzeigen | Gitter
+192 | guides | 16 | P1 | Führungslinien | Ansicht · Anzeigen | Kasten an gestrichelter Führungslinie
+193 | snap_glue | 16 | P1 | Ausrichten und Kleben | Ansicht · Visuelle Hilfsmittel | Magnet, eckig
+194 | zoom | 16 32 | P1 | Zoom | Ansicht · Zoom | Lupe mit Plus
+195 | page_width | 16 | P1 | Seitenbreite | Ansicht · Zoom | Doppelpfeil waagerecht zwischen Kanten
+196 | new_window | 32 | P2 | Neues Fenster | Ansicht · Fenster | Fenster mit Plus
+197 | arrange_all | 32 | P2 | Alle anordnen | Ansicht · Fenster | zwei Fenster nebeneinander
+198 | cascade | 32 | P3 | Überlappend | Ansicht · Fenster | Fenster gestaffelt
+199 | array_shapes | 16 32 | P2 | Shapes anordnen | Ansicht · Werkzeuge | Kästchenraster
+19A | number_shapes | 16 32 | P3 | Nummerieren | Ansicht · Werkzeuge | Kästen mit 1, 2, 3
+19B | dimension | 16 32 | P3 | Maßlinie | Ansicht · Werkzeuge | Maßpfeil zwischen Hilfslinien
+19C | shapesheet | 16 32 | P2 | ShapeSheet anzeigen | Entwicklertools · Shape-Design | Tabellengitter
+19D | op_union | 16 | P2 | Vereinigen | Entwicklertools · Vorgänge | zwei Quadrate verschmolzen
+19E | op_combine | 16 | P2 | Kombinieren | Entwicklertools · Vorgänge | zwei Quadrate, Schnitt ausgespart
+19F | op_fragment | 16 | P2 | Fragmentieren | Entwicklertools · Vorgänge | zwei Quadrate in drei Teile zerlegt
+1A0 | op_intersect | 16 | P2 | Schneiden | Entwicklertools · Vorgänge | nur die Schnittfläche
+1A1 | op_subtract | 16 | P2 | Subtrahieren | Entwicklertools · Vorgänge | erstes Quadrat ohne das zweite
+1A2 | op_join | 16 | P2 | Verbinden | Entwicklertools · Vorgänge | zwei Linien zu einer verbunden
+1A3 | op_trim | 16 | P2 | Trimmen | Entwicklertools · Vorgänge | Linien an der Kreuzung gekürzt
+1A4 | op_offset | 16 | P2 | Versatz | Entwicklertools · Vorgänge | Form mit paralleler Kontur
+1A5 | op_fit_curve | 16 | P2 | Kurve anpassen | Entwicklertools · Vorgänge | Zickzack zu glatter Kurve
+1A6 | shape_name | 16 | P2 | Shape-Name | Entwicklertools · Shape-Design | Raute mit Etikett
+1A7 | behavior | 16 | P2 | Verhalten | Entwicklertools · Shape-Design | Raute mit Zahnrad
+1A8 | protection | 16 | P2 | Schutz | Entwicklertools · Shape-Design | Raute mit Schloss
+1A9 | new_stencil | 32 | P2 | Neue Schablone | Entwicklertools · Schablone | 2×2-Raster mit Plus
+1AA | document_stencil | 16 | P2 | Dokumentschablone | Entwicklertools · Einblenden | Raster im Blatt
+1AB | drawing_explorer | 16 | P2 | Zeichnungsexplorer | Entwicklertools · Einblenden | Baum
+1AC | master_explorer | 16 | P3 | Masterexplorer | Entwicklertools · Einblenden | Baum mit Raute
+1AD | event_monitor | 16 | P3 | Ereignisüberwachung | Entwicklertools · Debuggen | Liste mit Pulslinie
+1AE | persistent_events | 16 | P3 | Beständige Ereignisse | Entwicklertools · Debuggen | Blatt mit Blitz
+1AF | print_shapesheet | 16 | P3 | ShapeSheet drucken | Entwicklertools · Debuggen | Tabellengitter mit Drucker
+1B0 | help | 32 | P2 | Hilfe | Hilfe | Fragezeichen in einem Quadrat
+1B1 | training | 32 | P3 | Schulung | Hilfe | Doktorhut
+1B2 | feedback | 32 | P3 | Feedback | Hilfe | Sprechblase mit Herz
+
+[kontext] Kontextregister
+1F0 | ct_margins | 16 32 | P1 | Ränder | Container-Tools | Rahmen mit Innenabstand
+1F1 | ct_fit_contents | 16 32 | P1 | An Inhalt anpassen | Container-Tools | Rahmen eng um Kästen, Pfeile nach innen
+1F2 | ct_auto_size | 16 32 | P1 | Automatische Größe | Container-Tools | Rahmen mit Pfeilen nach außen
+1F3 | ct_heading | 16 32 | P1 | Kopfzeilenstil | Container-Tools | Rahmen mit betonter Kopfleiste
+1F4 | ct_lock | 16 32 | P1 | Container sperren | Container-Tools | Rahmen mit Schloss
+1F5 | ct_select_contents | 16 32 | P1 | Inhalt auswählen | Container-Tools | Rahmen, Kästen darin markiert
+1F6 | ct_disband | 16 32 | P1 | Container auflösen | Container-Tools | Rahmen aufgebrochen, Kästen bleiben
+1F7 | pic_brightness | 16 | P2 | Helligkeit | Bildtools | Sonne
+1F8 | pic_contrast | 16 | P2 | Kontrast | Bildtools | Quadrat halb hell, halb dunkel
+1F9 | pic_auto_balance | 16 | P2 | Automatischer Ausgleich | Bildtools | Bild mit Zauberstab
+1FA | pic_compress | 16 | P2 | Komprimieren | Bildtools | Bild mit Pfeilen nach innen
+1FB | pic_crop | 16 32 | P2 | Zuschneiden | Bildtools | Zuschneidewinkel
+1FC | pic_frame | 16 | P2 | Bildrahmen | Bildtools | Bild mit breitem Rahmen
+1FD | cff_swimlane | 16 32 | P1 | Swimlane | Funktionsübergreifend | Bahnen mit Kopf
+1FE | cff_separator | 16 32 | P1 | Trennlinie (Phase) | Funktionsübergreifend | Bahnen mit senkrechter Trennlinie
+1FF | cff_orientation | 16 | P1 | Ausrichtung | Funktionsübergreifend | Bahnen quer und hoch
+200 | cff_direction | 16 | P1 | Richtung | Funktionsübergreifend | Bahn mit Pfeil
+201 | cff_margins | 16 | P1 | Ränder | Funktionsübergreifend | Bahn mit Innenabstand
+202 | cff_rotate_labels | 16 | P1 | Bahnbeschriftungen drehen | Funktionsübergreifend | Bahnkopf mit gedrehtem Text
+203 | cff_title_bar | 16 | P1 | Titelleiste | Funktionsübergreifend | Bahnen mit Titelleiste oben
+204 | cff_separators | 16 | P1 | Trennlinien | Funktionsübergreifend | Bahnen mit Trennlinien ein/aus
+205 | org_relayout | 16 32 | P2 | Neu layouten | Organigramm | Organigramm mit Kreispfeil
+206 | org_fit | 16 | P2 | An Seite anpassen | Organigramm | Organigramm im Blattrahmen
+207 | org_space_more | 16 | P2 | Abstand vergrößern | Organigramm | zwei Kästen, Pfeile auseinander
+208 | org_space_less | 16 | P2 | Abstand verkleinern | Organigramm | zwei Kästen, Pfeile zusammen
+209 | org_move_left | 16 | P2 | Nach links verschieben | Organigramm | Kasten mit Pfeil nach links
+20A | org_move_right | 16 | P2 | Nach rechts verschieben | Organigramm | Kasten mit Pfeil nach rechts
+20B | org_move_up | 16 | P2 | Nach oben verschieben | Organigramm | Kasten mit Pfeil nach oben
+20C | org_move_down | 16 | P2 | Nach unten verschieben | Organigramm | Kasten mit Pfeil nach unten
+20D | org_subordinates | 16 | P2 | Untergeordnete ein-/ausblenden | Organigramm | Kasten mit eingeklapptem Ast
+20E | org_height_more | 16 | P2 | Höhe vergrößern | Organigramm | Kasten mit Pfeil nach oben und unten
+20F | org_height_less | 16 | P2 | Höhe verkleinern | Organigramm | flacher Kasten mit Pfeilen nach innen
+210 | org_width_more | 16 | P2 | Breite vergrößern | Organigramm | Kasten mit Pfeilen nach außen
+211 | org_width_less | 16 | P2 | Breite verkleinern | Organigramm | schmaler Kasten mit Pfeilen nach innen
+212 | org_position_type | 16 | P2 | Positionstyp | Organigramm | Kasten mit Etikett
+213 | org_picture_insert | 16 32 | P2 | Bild einfügen | Organigramm | Kasten mit Bild und Plus
+214 | org_pictures_multiple | 16 | P2 | Mehrere Bilder | Organigramm | zwei Bilder versetzt
+215 | org_picture_change | 16 | P2 | Bild ändern | Organigramm | Bild mit Kreispfeil
+216 | org_picture_delete | 16 | P2 | Bild löschen | Organigramm | Bild mit Kreuz
+217 | org_picture_show | 16 | P2 | Bild anzeigen | Organigramm | Bild mit Auge
+218 | org_import | 16 32 | P2 | Importieren | Organigramm | Tabelle mit Pfeil zum Organigramm
+219 | org_export | 16 32 | P2 | Exportieren | Organigramm | Organigramm mit Pfeil zur Tabelle
+21A | org_compare | 16 32 | P2 | Vergleichen | Organigramm | zwei Organigramme nebeneinander
+21B | org_sync | 16 32 | P2 | Synchronisieren | Organigramm | zwei Kästen mit Pfeilen hin und her
+21C | bs_main_topic | 16 32 | P3 | Hauptthema | Brainstorming | Kasten, betont
+21D | bs_subtopic | 16 32 | P3 | Unterthema | Brainstorming | Kasten mit Ast nach unten
+21E | bs_peer_topic | 16 32 | P3 | Gleichrangiges Thema | Brainstorming | zwei Kästen nebeneinander
+21F | bs_multiple | 16 | P3 | Mehrere Unterthemen | Brainstorming | Kasten mit drei Ästen
+220 | bs_change_topic | 16 | P3 | Thema ändern | Brainstorming | Kasten mit Kreispfeil
+221 | bs_layout | 16 | P3 | Layout | Brainstorming | Themenbaum
+222 | bs_style | 16 | P3 | Diagrammformat | Brainstorming | Themenbaum mit Pinsel
+223 | bs_outline | 16 | P3 | Gliederungsfenster | Brainstorming | Fenster mit eingerückten Zeilen
+224 | bs_export | 16 | P3 | Daten exportieren | Brainstorming | Themenbaum mit Pfeil hinaus
+225 | bs_import | 16 | P3 | Daten importieren | Brainstorming | Themenbaum mit Pfeil hinein
+226 | tl_configure | 16 | P3 | Konfigurieren | Zeitachse | Zeitstrahl mit Zahnrad
+227 | tl_milestone | 16 | P3 | Meilenstein | Zeitachse | Zeitstrahl mit Raute
+228 | tl_interval | 16 | P3 | Intervall | Zeitachse | Zeitstrahl mit Balken
+229 | tl_expand | 16 | P3 | Erweitern | Zeitachse | Zeitstrahl mit Ausschnittvergrößerung
+22A | tl_sync | 16 | P3 | Synchronisieren | Zeitachse | zwei Zeitstrahlen mit Pfeil
+22B | cal_month | 16 | P3 | Monat | Kalender | Kalenderblatt
+22C | cal_appointment | 16 | P3 | Termin | Kalender | Kalenderblatt mit betontem Tag
+22D | cal_import | 16 | P3 | Termine importieren | Kalender | Kalenderblatt mit Pfeil hinein
+22E | st_master_new | 16 | P2 | Neuer Master | Schablone bearbeiten | Raute mit Plus
+22F | st_master_properties | 16 | P2 | Master-Eigenschaften | Schablone bearbeiten | Raute mit Liste
+230 | st_master_edit | 16 | P2 | Master bearbeiten | Schablone bearbeiten | Raute mit Stift
+231 | st_icon_edit | 16 | P2 | Symbol bearbeiten | Schablone bearbeiten | kleines Bildraster mit Stift
+232 | st_save | 16 | P2 | Schablone speichern | Schablone bearbeiten | 2×2-Raster mit Diskette

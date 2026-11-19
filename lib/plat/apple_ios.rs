@@ -23,7 +23,11 @@
 // elements are UITextInput (apple_ios_text.rs).
 // The ticks: a CADisplayLink while the app animates (jfgui_frame_delay 0), else paused with a timer
 // for the delay; input and wake-ups unpause it.  Px per point: the screen's scale, at most 2 and at
-// most 2048 px on the longer side (as Android's bitmap); dpi 96 x that.
+// most 2048 px on the longer side (as Android's bitmap; an iPad's screen whole, up to 2752 px);
+// dpi 96 x that.  The canvas follows the view's size whenever it changes (layoutSubviews): turning
+// the device, the keyboard, and on the iPad Split View, Slide Over and Stage Manager's windows.
+// The iPad (apple_ios_pad.rs, AP9): the app's menus in iPadOS's menu bar, the pointer of a trackpad
+// or mouse without a button (hover), its wheel and pinch; no "Done" bar above its keyboard.
 // The lifecycle: active / inactive -> E_FOCUS_IN / OUT, background / foreground -> E_POWER 2 / 3
 // (UIC_SUSPEND), termination -> E_SESSION_END.  The scene's appearance, reduced motion and darker
 // colours go to jfgui_system (web_system.rs).
@@ -56,6 +60,11 @@ pub(crate) mod motion;
 pub(crate) mod a11y_ios;
 pub use a11y_ios::{IosAxAct, IosAxElem, IosAxText, ios_ax_act, ios_ax_escape, ios_ax_events, ios_ax_listen, ios_ax_select, ios_ax_text, ios_ax_tree,
                    ios_ax_type};
+// the iPad (AP9): the menus in iPadOS's menu bar, the pointer without a button, test aids
+#[path = "apple_ios_pad.rs"]
+pub(crate) mod pad;
+pub use pad::{IosMenuRow, IosPadMenus, IosPadPointer, IosPadView, ios_pad_keyboard, ios_pad_menu_build, ios_pad_menu_choose, ios_pad_menus, ios_pad_pointer,
+              ios_pad_rotate, ios_pad_view, ios_pad_window};
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -152,6 +161,8 @@ struct Host {
     bar: Cell<isize>,
     /// the bar above the on-screen keyboard (a UIToolbar with "Done")
     accessory: Cell<Id>,
+    /// the size of the last picture shown (px; tests)
+    shown: Cell<(i32, i32)>,
 }
 // only the main thread touches the host (every function here but wake() runs there; UiOnly
 // refuses other threads)
@@ -177,6 +188,7 @@ static HOST: crate::ui_only::UiOnly<Host> = crate::ui_only::UiOnly::new(Host {
     edge: Cell::new(u32::MAX),
     bar: Cell::new(0),
     accessory: Cell::new(NIL),
+    shown: Cell::new((0, 0)),
 });
 static WAKE_QUEUED: AtomicBool = AtomicBool::new(false);
 /// the scene is not active: no GPU work (iOS refuses a background app's command buffers)
@@ -277,11 +289,15 @@ pub(crate) fn finish() -> ! {
 
 fn register() {
     type Imp = *const c_void;
-    subclass(c"NSObject", c"JFAppDelegate", &[
+    // a UIResponder: the last in the responder chain, UIKit asks it for the main menu (the iPad's
+    // menu bar) and its rows' action ends there (apple_ios_pad.rs)
+    let mut app = alloc::vec![
         (c"application:didFinishLaunchingWithOptions:", app_launched as Imp, c"B@:@@"),
         (c"application:configurationForConnectingSceneSession:options:", app_scene_config as Imp, c"@@:@@@"),
         (c"applicationWillTerminate:", app_terminate as Imp, c"v@:@"),
-    ], &[c"UIApplicationDelegate"]);
+    ];
+    app.extend(pad::app_methods());
+    subclass(c"UIResponder", c"JFAppDelegate", &app, &[c"UIApplicationDelegate"]);
     subclass(c"UIResponder", c"JFSceneDelegate", &[
         (c"scene:willConnectToSession:options:", scene_connect as Imp, c"v@:@@@"),
         (c"sceneDidBecomeActive:", scene_active as Imp, c"v@:@"),
@@ -326,6 +342,8 @@ fn register() {
     // VoiceOver's elements, UITextInput (the keyboard sees the text box, compositions)
     view.extend(a11y_ios::view_methods());
     view.extend(a11y_ios::text::view_methods());
+    // the pointer without a button, its wheel and pinch (apple_ios_pad.rs)
+    view.extend(pad::view_methods());
     subclass(c"UIView", c"JFView", &view, &[c"UITextInput"]);
 }
 
@@ -390,6 +408,7 @@ extern "C" fn scene_connect(_this: Id, _sel: Sel, scene: Id, _session: Id, _opti
         h.window.set(win);
         send_traits(msg!(scene, c"traitCollection"; Id));
         msg!(win, c"makeKeyAndVisible"; ());
+        pad::window_from_env(win);
         msg!(vc, c"becomeFirstResponder"; bool);
     }
 }
@@ -484,6 +503,7 @@ extern "C" fn vc_load_view(this: Id, _sel: Sel) {
             let c: Id = msg!(mine, c"constraintEqualToAnchor:", theirs => Id; Id);
             msg!(c, c"setActive:", true => bool; ());
         }
+        pad::add_recognizers(view);
         let link: Id = msg!(class(c"CADisplayLink"), c"displayLinkWithTarget:selector:", view => Id,
                             super::objc::sel(c"step:") => Sel; Id);
         if !link.is_null() {
@@ -668,6 +688,12 @@ pub(crate) fn gpu_release_picture() {
     });
 }
 
+/// the canvas's longer side at most (px): an iPhone's as Android's bitmap; an iPad's screen at its
+/// full 2 px per point (the largest, the 13 inch iPad Pro, has 1376 points), beyond that (an
+/// external display in Stage Manager) the layer scales up
+const LONG_PHONE: f64 = 2048.0;
+const LONG_PAD: f64 = 2752.0;
+
 /// the view's size in points -> the canvas (E_DPI, E_RESIZE) and a frame at once
 fn resize(w: f64, h: f64, screen_scale: f64) {
     if w < 1.0 || h < 1.0 {
@@ -676,8 +702,9 @@ fn resize(w: f64, h: f64, screen_scale: f64) {
     let host = host();
     let mut s = screen_scale.min(2.0);
     let long = w.max(h) * s;
-    if long > 2048.0 {
-        s *= 2048.0 / long;
+    let most = if pad::is_pad() { LONG_PAD } else { LONG_PHONE };
+    if long > most {
+        s *= most / long;
     }
     host.scale.set(s);
     let (pw, ph, dpi) = (rnd(w * s).max(1), rnd(h * s).max(1), rnd(96.0 * s).max(48));
@@ -806,6 +833,7 @@ pub extern "C" fn jfgui_host_present(src: *const u8, len: usize, width: i32, hei
             msg!(tx, c"setDisableActions:", true => bool; ());
             msg!(layer, c"setContents:", img as Id => Id; ());
             msg!(tx, c"commit"; ());
+            h.shown.set((width, height));
         }
         if !img.is_null() {
             CGImageRelease(img);
@@ -1078,8 +1106,13 @@ extern "C" fn view_insert_text(_this: Id, _sel: Sel, text: Id) {
     request_frame();
 }
 
-/// the bar above the keyboard: "Done" on the right (the system's word for it, in the system's language)
+/// the bar above the keyboard: "Done" on the right (the system's word for it, in the system's language);
+/// none on an iPad (its keyboard has a key to hide it, and with a hardware keyboard the bar would
+/// stay alone at the bottom of the screen)
 extern "C" fn view_accessory(this: Id, _sel: Sel) -> Id {
+    if pad::is_pad() {
+        return NIL;
+    }
     let h = host();
     if h.accessory.get().is_null() {
         // SAFETY: UIKit objects made here on the main thread; the bar is kept for the process.

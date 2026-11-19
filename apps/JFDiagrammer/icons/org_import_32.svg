@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Importieren, 32 px</title>
+  <rect class="body" fill="#DCDEE1" x="3" y="3" width="10" height="2"/>
+  <rect class="ink" stroke="#1D2228" x="2.5" y="2.5" width="11" height="10"/>
+  <path class="ink" stroke="#1D2228" d="M3 5.5H13M8.5 6V12M3 8.5H13M3 11.5H13"/>
+  <path class="tint" stroke="#1F5FA8" stroke-width="2" d="M16 7H21V14"/>
+  <polygon class="tint" fill="#1F5FA8" points="17,14 25,14 21,18"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="17.5" y="18.5" width="8" height="3"/>
+  <path class="ink" stroke="#1D2228" d="M21.5 22V23M16.5 25V23.5H26.5V25"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="13.5" y="25.5" width="6" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="23.5" y="25.5" width="6" height="3"/>
+</svg>

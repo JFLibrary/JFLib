@@ -34,7 +34,8 @@ runs as an async task on the UI thread (`ui.spawn`).
 The widgets an app needs: buttons, check boxes, sliders, text and number boxes, lists, grids and
 trees, tabs, menus and toolbars, a navigation pane, docking panels and tool windows, charts, a
 date picker. Larger parts are built in as well: a rich-text editor, a code editor with syntax
-highlighting and folding, a Markdown and HTML viewer, a terminal, a node-and-edge diagram view.
+highlighting and folding, a Markdown and HTML viewer, a terminal, a node-and-edge diagram view,
+the Shapes window of a diagram editor (stencils of tiles with a search and drag sources).
 Around them come several windows, the system's file dialogs (or the library's own), drag and drop
 with other programs, the clipboard, global shortcuts, the tray, notifications, languages,
 right-to-left layout and sharp output at any scale.

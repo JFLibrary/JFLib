@@ -1,0 +1,174 @@
+# Container: EIN Shape (keine Gruppe).  Der Text ist die Überschrift, er steht in der Kopfzeile.
+#
+# Sechs Containerstile (User.msvSDContainerStyle, 1-basiert), alle eigene Entwürfe im NetLab-Stil:
+#   1 Klar         dünner Schieferrahmen, helles Kopfband, Trennlinie
+#   2 Akzent       kräftiger Signalblau-Rahmen, Signalblau-Kopfband, weiße Schrift
+#   3 Gestrichelt  gestrichelter Rahmen und Trennlinie, keine Füllung
+#   4 Fläche       nur eine helle Fläche, keine Linien
+#   5 Eckwinkel    nur vier Eckwinkel und das helle Kopfband
+#   6 Abgerundet   abgerundeter Rahmen, sehr helle Fläche, Trennlinie
+# Vier Kopfzeilenstile (User.msvSDHeadingStyle): 1 Kopfband oben, 2 nur Titel oben (ohne Band),
+# 3 Kopfband links (Text um 90° gedreht), 4 ohne Kopf.  Sie setzen JFD_HeadingEdge und
+# JFD_HeadingSize per Formel; Kopfband, Trennlinie und Textblock folgen NUR diesen beiden Zellen
+# (HeadTop … HeadRight), so dass die App den Kopf mit JFD_HeadingSize = 0 abschalten kann.
+# Ein Geometrieabschnitt je Teil, ein- und ausgeschaltet über NoShow/NoFill/NoLine:
+#   1 Rahmen   2 Kopfband   3 Trennlinie   4-7 Eckwinkel
+master: Container
+name.de: Container
+name.en: Container
+name.es: Contenedor
+name.it: Contenitore
+name.fr: Conteneur
+prompt.de: Fasst Shapes zusammen. Legen Sie Shapes hinein, der Container wächst mit.
+prompt.en: Groups shapes. Drop shapes into it and the container grows with them.
+prompt.es: Agrupa formas. Coloque formas dentro y el contenedor crecerá con ellas.
+prompt.it: Raggruppa le forme. Rilascia le forme al suo interno e il contenitore cresce con esse.
+prompt.fr: Regroupe des formes. Déposez des formes à l'intérieur et le conteneur s'agrandit avec elles.
+keywords.de: Container, Gruppe, Rahmen, Bereich, Zone, Kasten, Umrandung
+keywords.en: container, group, frame, area, zone, box, boundary
+keywords.es: contenedor, grupo, marco, área, zona, caja, límite
+keywords.it: contenitore, gruppo, cornice, area, zona, riquadro, confine
+keywords.fr: conteneur, groupe, cadre, zone, région, boîte, limite
+text.de: Container
+text.en: Container
+text.es: Contenedor
+text.it: Contenitore
+text.fr: Conteneur
+
+[Shape]
+Width = 120 mm
+Width.us = 4.5 in
+Height = 80 mm
+Height.us = 3 in
+LineWeight = IF(OR(User.msvSDContainerStyle=2,User.msvSDContainerStyle=5),1.5 pt,IF(OR(User.msvSDContainerStyle=3,User.msvSDContainerStyle=6),1 pt,0.75 pt))
+LineColor = IF(OR(User.msvSDContainerStyle=1,User.msvSDContainerStyle=3),RGB(77,85,96),RGB(31,95,168))
+LinePattern = IF(User.msvSDContainerStyle=3,2,1)
+Rounding = IF(User.msvSDContainerStyle=6,User.Radius,0)
+FillForegnd = IF(User.msvSDContainerStyle=2,RGB(31,95,168),IF(User.msvSDContainerStyle=4,RGB(238,243,249),IF(User.msvSDContainerStyle=6,RGB(245,248,252),RGB(230,239,248))))
+FillBkgnd = FillForegnd
+FillPattern = 1
+# der Textblock in der Kopfzeile (links/rechts um 90° gedreht)
+TxtWidth = IF(User.HeadLeft+User.HeadRight>0,Height,Width)
+TxtHeight = IF(User.HeadLeft+User.HeadRight>0,User.HeadLeft+User.HeadRight,User.HeadTop+User.HeadBottom)
+TxtPinX = IF(User.HeadLeft>0,User.HeadLeft*0.5,IF(User.HeadRight>0,Width-User.HeadRight*0.5,Width*0.5))
+TxtPinY = IF(User.HeadTop>0,Height-User.HeadTop*0.5,IF(User.HeadBottom>0,User.HeadBottom*0.5,Height*0.5))
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = IF(User.HeadLeft+User.HeadRight>0,90 deg,0 deg)
+HideText = NOT(User.HeadShown)
+LeftMargin = 2 mm
+LeftMargin.us = 0.08 in
+RightMargin = 2 mm
+RightMargin.us = 0.08 in
+TopMargin = 1 mm
+TopMargin.us = 0.04 in
+BottomMargin = 1 mm
+BottomMargin.us = 0.04 in
+VerticalAlign = 1
+
+[User]
+msvStructureType:                 Value = "Container"
+msvShapeCategories:               Value = ""
+msvSDContainerMargin:             Value = 5 mm
+                                  Value.us = 0.2 in
+msvSDContainerResize:             Value = 1
+msvSDContainerLocked:             Value = FALSE
+msvSDContainerNoHighlight:        Value = FALSE
+msvSDContainerNoRibbon:           Value = FALSE
+msvSDContainerStyle:              Value = 1
+msvSDContainerStyleCount:         Value = 6
+msvSDHeadingStyle:                Value = 1
+msvSDHeadingStyleCount:           Value = 4
+msvSDContainerRequiredCategories: Value = ""
+msvSDContainerExcludedCategories: Value = "DoNotContain"
+# die Kopfzeile aus dem Kopfzeilenstil (die App darf beide Zellen auch selbst setzen)
+JFD_HeadingEdge:  Value = INDEX(User.msvSDHeadingStyle-1,"Top;Top;Left;None")
+JFD_HeadingSize:  Value = IF(OR(User.msvSDHeadingStyle<1,User.msvSDHeadingStyle>3),0,User.HeadDepth)
+HeadDepth:        Value = 8 mm
+                  Value.us = 0.3 in
+# die Tiefe der Kopfzeile je Kante (0: nicht an dieser Kante)
+HeadTop:          Value = IF(STRSAME(User.JFD_HeadingEdge,"Top",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Height),0)
+HeadBottom:       Value = IF(STRSAME(User.JFD_HeadingEdge,"Bottom",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Height),0)
+HeadLeft:         Value = IF(STRSAME(User.JFD_HeadingEdge,"Left",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Width),0)
+HeadRight:        Value = IF(STRSAME(User.JFD_HeadingEdge,"Right",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Width),0)
+HeadShown:        Value = User.HeadTop+User.HeadBottom+User.HeadLeft+User.HeadRight>0
+# das Kopfband und die Trennlinie zum Inneren
+BandX0:           Value = IF(User.HeadRight>0,Width-User.HeadRight,0)
+BandX1:           Value = IF(User.HeadLeft>0,User.HeadLeft,Width)
+BandY0:           Value = IF(User.HeadTop>0,Height-User.HeadTop,0)
+BandY1:           Value = IF(User.HeadBottom>0,User.HeadBottom,Height)
+SepX0:            Value = IF(User.HeadLeft>0,User.HeadLeft,IF(User.HeadRight>0,Width-User.HeadRight,0))
+SepX1:            Value = IF(User.HeadLeft+User.HeadRight>0,User.SepX0,Width)
+SepY0:            Value = IF(User.HeadTop>0,Height-User.HeadTop,IF(User.HeadBottom>0,User.HeadBottom,0))
+SepY1:            Value = IF(User.HeadLeft+User.HeadRight>0,Height,User.SepY0)
+# welche Teile der Stil zeigt (Kopfzeilenstil 2: nur der Titel, kein Band, keine Linie)
+Band:             Value = AND(User.HeadShown,User.msvSDHeadingStyle<>2,OR(User.msvSDContainerStyle=1,User.msvSDContainerStyle=2,User.msvSDContainerStyle=5))
+Sep:              Value = AND(User.HeadShown,User.msvSDHeadingStyle<>2,OR(User.msvSDContainerStyle=1,User.msvSDContainerStyle=3,User.msvSDContainerStyle=6))
+Radius:           Value = 3 mm
+                  Value.us = 0.125 in
+CornerLen:        Value = 10 mm
+                  Value.us = 0.4 in
+Corner:           Value = MIN(User.CornerLen,Width*0.3,Height*0.3)
+
+# 1 der Rahmen (Stil 4 und 6 gefüllt)
+[Geometry]
+NoFill = AND(User.msvSDContainerStyle<>4,User.msvSDContainerStyle<>6)
+NoLine = OR(User.msvSDContainerStyle=4,User.msvSDContainerStyle=5)
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# 2 das Kopfband
+[Geometry]
+NoLine = TRUE
+NoShow = NOT(User.Band)
+MoveTo  X = User.BandX0; Y = User.BandY0
+LineTo  X = User.BandX1; Y = User.BandY0
+LineTo  X = User.BandX1; Y = User.BandY1
+LineTo  X = User.BandX0; Y = User.BandY1
+LineTo  X = Geometry2.X1; Y = Geometry2.Y1
+
+# 3 die Trennlinie zwischen Kopf und Innerem
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(User.Sep)
+MoveTo  X = User.SepX0; Y = User.SepY0
+LineTo  X = User.SepX1; Y = User.SepY1
+
+# 4-7 die Eckwinkel (Stil 5)
+[Geometry]
+NoFill = TRUE
+NoShow = User.msvSDContainerStyle<>5
+MoveTo  X = 0; Y = User.Corner
+LineTo  X = 0; Y = 0
+LineTo  X = User.Corner; Y = 0
+
+[Geometry]
+NoFill = TRUE
+NoShow = User.msvSDContainerStyle<>5
+MoveTo  X = Width-User.Corner; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = User.Corner
+
+[Geometry]
+NoFill = TRUE
+NoShow = User.msvSDContainerStyle<>5
+MoveTo  X = Width; Y = Height-User.Corner
+LineTo  X = Width; Y = Height
+LineTo  X = Width-User.Corner; Y = Height
+
+[Geometry]
+NoFill = TRUE
+NoShow = User.msvSDContainerStyle<>5
+MoveTo  X = User.Corner; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = Height-User.Corner
+
+[Character]
+Row  Color = IF(AND(User.Band,User.msvSDContainerStyle=2),RGB(255,255,255),IF(OR(User.msvSDContainerStyle=2,User.msvSDContainerStyle=5,User.msvSDContainerStyle=6),RGB(31,95,168),IF(User.msvSDContainerStyle=3,RGB(77,85,96),RGB(29,34,40))))
+     Style = 1
+
+[Paragraph]
+Row  HorzAlign = IF(User.HeadLeft+User.HeadRight>0,1,0)

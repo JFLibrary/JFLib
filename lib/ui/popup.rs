@@ -20,7 +20,8 @@
 //   accel_order_set(1): "Strg+Alt+Umschalt+S" (ui_accel_order)
 //   cmd_button(id, ST_*) -> EV          button from the table (icon, label, tooltip with
 //                                       the accelerator, disabled / checked); queues it
-// Menus (Mi records; Mi::List rows come from menu_list(base, rows), row k = id base + k; a
+// Menus (Mi records; Mi::List rows come from menu_list(base, rows), row k = id base + k with
+// the CF_CHECKED / CF_DISABLED state of cmd_state(base + k, ..); a
 // checked row with an icon gives the flyout a check column and an icon column):
 //   menubar(None | Some(bar)) -> EV_OPEN   WinUI MenuBar (None = AppDesc::menubar): items,
 //                                       flyouts, submenus, keys (Alt / F10, Alt+mnemonic,
@@ -135,7 +136,8 @@ pub enum Mi {
     Item(u32, &'static str, u32),
     /// MI_LIST base, max, "placeholder": one row per string of the rows set with
     /// Ui::menu_list(base, ..) (at most max); row k runs App::command(base + k, 0) and has
-    /// the widget id base + k; no rows: the placeholder as a disabled row ("" = none)  (U1)
+    /// the widget id base + k, checked or disabled by cmd_state(base + k, CF_*) like a command;
+    /// no rows: the placeholder as a disabled row ("" = none)  (U1)
     List(u32, u16, &'static str),
 }
 
@@ -213,6 +215,8 @@ pub(crate) struct S {
     pub(crate) list_empty: Vec<(u32, String)>,
     /// (form.rs) the one-menu bars of compact menu bars, by the address of the bar
     compact: Vec<((usize, usize), &'static [Mi])>,
+    /// (plat::sysmenu) the pass whose main window gave the system's menu bar its menus
+    pub(crate) sysmenu_frame: u32,
 }
 
 /// per-window state (ui_popup_wb0 .. ui_popup_wb1: popup stack, flyouts, menu bar, tooltip)
@@ -522,7 +526,7 @@ impl Ui {
 
     // last_widget -> (id, rect) of the last semantic record with an id (0 = none); the rect
     // logical again (sems are physical right-to-left; the mirror is its own inverse)
-    fn last_widget(&self) -> (u32, [i32; 4]) {
+    pub(crate) fn last_widget(&self) -> (u32, [i32; 4]) {
         self.sems.iter().rev().find(|r| r.id != 0).map_or((0, [0; 4]), |r| (r.id, self.phys_rect(r.rect)))
     }
 
@@ -1476,7 +1480,10 @@ impl Ui {
                             break;
                         }
                         let id = base.wrapping_add(k);
-                        let ev = self.mitem(id, s, 0, None, 0);
+                        // the row's state like a command's (cmd_state(base + k, CF_*))
+                        let cf = self.cmd_flags(id);
+                        let mf = if cf & CF_CHECKED != 0 { MIF_CHECKED } else { 0 } | if cf & CF_DISABLED != 0 { MIF_DISABLED } else { 0 };
+                        let ev = self.mitem(id, s, 0, None, mf);
                         if ev & EV_ACT != 0 {
                             activated = true;
                             self.cmd_run(id, 0);
@@ -1616,14 +1623,27 @@ impl Ui {
         }
     }
 
-    // (macOS) the rows chosen in the system's menu bar run as from the window's bar; the bar's
-    // menus with the commands' labels, states and keys go to the system (unchanged: nothing)
+    // (macOS, iPadOS) the rows chosen in the system's menu bar run as from the window's bar; the
+    // bar's menus with the commands' labels, states and keys go to the system (unchanged: nothing)
     fn sysmenu_publish(&mut self, mb: &'static [Mi]) {
+        self.m.popup.sysmenu_frame = self.frame;
         for id in plat::sysmenu::sysmenu_take() {
             self.cmd_run(id, 0);
         }
         let items = self.sysmenu_items(mb);
         plat::sysmenu::sysmenu_set(&items);
+    }
+
+    /// (ctx.rs frame_end) a pass whose main window drew no menubar(None): its menus leave the
+    /// system's bar (a page without the bar); a row chosen just before still runs
+    pub(crate) fn sysmenu_frame_end(&mut self) {
+        if self.headless || self.m.popup.sysmenu_frame == self.frame || !plat::sysmenu::sysmenu_supported() {
+            return;
+        }
+        for id in plat::sysmenu::sysmenu_take() {
+            self.cmd_run(id, 0);
+        }
+        plat::sysmenu::sysmenu_set(&[]);
     }
 
     // menu records -> the system's menu rows (MI_LIST: the rows of menu_list, else its placeholder)
@@ -1657,7 +1677,9 @@ impl Ui {
                         }
                     }
                     for (k, r) in rows.iter().take(max as usize).enumerate() {
-                        v.push(SysMenuItem { id: base + k as u32, label: r.clone(), ..Default::default() });
+                        let f = self.cmd_flags(base + k as u32);
+                        let flags = if f & CF_CHECKED != 0 { TI_CHECKED } else { 0 } | if f & CF_DISABLED != 0 { TI_DISABLED } else { 0 };
+                        v.push(SysMenuItem { id: base + k as u32, label: r.clone(), flags, ..Default::default() });
                     }
                 }
             }
@@ -1680,10 +1702,13 @@ impl Ui {
             return 0;
         }
         // (macOS, a window of the app) the app's menus live in the system's menu bar, as on every
-        // Mac: they go there (plat::sysmenu) and the window draws no bar of its own
+        // Mac: they go there (plat::sysmenu) and the window draws no bar of its own.  (iPadOS) they
+        // go to its menu bar too, the window keeps its row (the system's bar hides until revealed)
         if menubar.is_none() && !self.headless && self.uiw_cur == 0 && plat::sysmenu::sysmenu_supported() {
             self.sysmenu_publish(mb);
-            return 0;
+            if !plat::sysmenu::sysmenu_window_row() {
+                return 0;
+            }
         }
         let a = (mb.as_ptr() as usize as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
         let base = ((a >> 36) as u32 & 0x0FFF_FF00) | 0xC000_0000;

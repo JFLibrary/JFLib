@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Speichern unter, 32 px</title>
+  <path class="body" fill="#DCDEE1" d="M4 4H8V12H22V4H24L28 8V17H25V16H7V28H4Z"/>
+  <path class="shade" fill="#B9BBBE" fill-rule="evenodd" d="M9 4H21V11H9Z M16 6H19V10H16Z"/>
+  <rect class="ink" fill="#1D2228" x="16" y="6" width="3" height="4"/>
+  <path class="ink" stroke="#1D2228" d="M17 28.5H3.5V3.5H23.5L28.5 8.5V17"/>
+  <path class="ink" stroke="#1D2228" d="M8.5 4V11.5H21.5V4"/>
+  <path class="ink" stroke="#1D2228" d="M7.5 28V16.5H24"/>
+  <path class="ink" stroke="#1D2228" d="M11 20.5H19M11 23.5H16"/>
+  <polygon class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" points="25,19 29,23 22.5,29.5 18.5,29.5 18.5,25.5"/>
+  <polygon class="tint" fill="#1F5FA8" points="18,26 18,30 22,30"/>
+</svg>

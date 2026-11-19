@@ -1,0 +1,15 @@
+# Beschriftungen (JD10, PLAN.md): Text mit einem Zeiger auf ein Ziel.  Jede Beschriftung hat den
+# Steuerpunkt Controls.Association (Visio verlangt ihn: die Spitze des Zeigers, die der Nutzer
+# auf das Ziel zieht); der Zeiger wird per Geometrieformel vom Körper zu diesem Punkt gezeichnet
+# und verschwindet, wenn der Punkt im Körper liegt.  Die App liest msvStructureType "Callout"
+# und die Steuerpunktzeile (diagram_core::structure); Aussehen und Formeln sind eigene Arbeit.
+stencil: Callouts
+file: callouts
+name.de: Beschriftungen
+name.en: Callouts
+name.es: Llamadas
+name.it: Richiami
+name.fr: Bulles d'annotation
+category: general
+masters: callout_box, callout_rounded, callout_bubble, callout_line, callout_bracket, callout_circle
+quick: 0

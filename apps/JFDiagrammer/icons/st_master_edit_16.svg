@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Master bearbeiten, 16 px</title>
+  <polygon class="body" fill="#DCDEE1" points="6.5,2.5 10.5,6.5 9,8 8,8 8,9 6.5,10.5 2.5,6.5"/>
+  <path class="ink" stroke="#1D2228" d="M9 8L10.5 6.5L6.5 2.5L2.5 6.5L6.5 10.5L8 9"/>
+  <polygon class="tint" fill="#1F5FA8" points="13,9 15,11 11,15 9,15 9,13"/>
+</svg>

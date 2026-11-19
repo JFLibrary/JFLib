@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Gleichrangiges Thema, 32 px</title>
+  <path class="ink" stroke="#1D2228" d="M8.5 13V8.5H23.5V13"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="13.5" width="12" height="10"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="17.5" y="13.5" width="12" height="10"/>
+</svg>

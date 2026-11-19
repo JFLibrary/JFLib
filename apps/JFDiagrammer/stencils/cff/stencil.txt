@@ -1,0 +1,15 @@
+# Funktionsübergreifendes Flussdiagramm (JD10, PLAN.md): Bahnen (Swimlanes) und Phasen
+# (Trennlinien).  Aufbau wie in Visio, damit Visio ihn erkennt: der CFF-Container umfasst eine
+# Bahnenliste (Elemente: Bahnen) und eine Phasenliste (Elemente: Trennlinien).  Container und
+# Listen sind verborgene Master (hidden: true), die App legt sie per Code an
+# (diagram_core::structure).  Aussehen und Formeln sind eigene Arbeit im NetLab-Stil.
+stencil: Cross-Functional Flowchart
+file: cff
+name.de: Funktionsübergreifendes Flussdiagramm
+name.en: Cross-functional flowchart
+name.es: Diagrama de flujo multifuncional
+name.it: Diagramma di flusso multifunzione
+name.fr: Diagramme de flux interfonctionnel
+category: flowchart
+masters: swimlane, separator, swimlane_vertical, separator_vertical, cff_container, swimlane_list, phase_list
+quick: 2
