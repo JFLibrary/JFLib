@@ -19,7 +19,7 @@ move 570,470
 click button:"Verbindungspfeil rechts"
 expect listitem:"Sheet.7" rect 670 424 151 101
 expect listitem:"Sheet.7" selected
-expect listitem:"Sheet.8" rect 651 475 19 1
+expect listitem:"Sheet.8" rect 651 472 19 6
 # off: no arrows
 cmd 5129
 move 570,470
