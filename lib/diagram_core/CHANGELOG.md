@@ -58,4 +58,5 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Fixed
 
 - (JD7) Formulas: a point computed for a cell (`PAR(PNT(...))` in EndY) is that cell's coordinate when another formula reads it -- `ATAN2(EndY-BeginY,EndX-BeginX)` of a glued line read x for EndY before. The oracle of the local files rose from 94.67 % to 95.28 % of the stored formula cells
+- (JD11) THEMEVAL's estimates of JD6 settled against [MS-VSDX], Office's notes on ECMA-376 and a Visio 16 file with computed theme values: Visio's vt:lineStyles lists lead with the entry of matrix 0 (matrix i reads entry i; read i-1 before), the "Connector..." names choose the scheme as the "Line..." ones do, FillColor2 is the fill colour slice itself, a missing ln@cap is flat (1), colour transforms chain in floating point and round once, text takes the major font when the minor one is empty; own designs write the leading line style entry
 

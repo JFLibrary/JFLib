@@ -5,8 +5,8 @@
 // themeElements: fmtConnectorScheme, themeScheme, fmtSchemeEx, fmtConnectorSchemeEx,
 // fillStyles, lineStyles, fontStylesGroup, variationStyleSchemeLst.  Each extension element
 // declares the vt namespace itself, as Visio does.  Visio's line style lists have one entry
-// more than the DrawingML lists they extend (its meaning is not known); the last style is
-// written twice.
+// more than the DrawingML lists they extend: the first stands for matrix 0 (the root style's
+// values: no line ends, solid, no rounding), matrix i reads entry i.
 
 use alloc::format;
 use alloc::string::String;
@@ -120,9 +120,9 @@ fn wrapped_id(o: &mut String, uri: &str, el: &str, id: u32) {
 }
 
 fn line_ex(o: &mut String, lines: &[Line]) {
-    // one entry more than the list, the last again
-    let extra = lines.last();
-    for l in lines.iter().chain(extra) {
+    // the entry of matrix 0 first, then one a style
+    let root = Line::solid(75, super::Clr::ph());
+    for l in core::iter::once(&root).chain(lines) {
         o.push_str(&format!(
             "<vt:lineStyle><vt:lineEx rndg=\"{}\" start=\"{}\" startSize=\"{}\" end=\"{}\" endSize=\"{}\" pattern=\"{}\"/></vt:lineStyle>",
             l.rounding, l.begin, l.begin_size, l.end, l.end_size, l.pattern

@@ -164,7 +164,12 @@ pub fn blend(a: (u8, u8, u8), b: (u8, u8, u8), part: f64) -> (u8, u8, u8) {
 
 /// RGB (0..255) -> hue, luminosity, saturation as fractions (Python's colorsys)
 pub fn rgb_to_hls_f(rgb: (u8, u8, u8)) -> (f64, f64, f64) {
-    let (r, g, b) = (rgb.0 as f64 / 255.0, rgb.1 as f64 / 255.0, rgb.2 as f64 / 255.0);
+    rgbf_to_hls(rgb.0 as f64 / 255.0, rgb.1 as f64 / 255.0, rgb.2 as f64 / 255.0)
+}
+
+/// the same from fractional channels 0 .. 1 (DrawingML's colour transforms chain in floating
+/// point and round once at the end)
+pub fn rgbf_to_hls(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
     let mx = r.max(g).max(b);
     let mn = r.min(g).min(b);
     let l = (mx + mn) / 2.0;

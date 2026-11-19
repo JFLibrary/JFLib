@@ -21,15 +21,20 @@
 //                            cell; numbers name quick style colours (THEMEVAL(QuickStyleFillColor))
 //   THEMEPROP("MultiFormat" | "Embellishment"), ISTHEMED(), CELLISTHEMED(b), THEMERESTORE(x)
 //
-// Not known from the documentation and therefore estimated: FillColor2 of a solid fill (the
-// fill colour itself), the font scheme used for text (the minor one), cap and compound line
-// codes.  JD11 applies themes; this module only reads them.
+// Settled in JD11 (jd11-research-estimates.md: [MS-VSDX], Office's notes, a Visio 16 file
+// with computed theme values): FillColor2 is the fill colour slice itself, without the fill
+// style's transforms (also for gradients); Visio's vt:lineStyles lists lead with an entry for
+// matrix 0 (the root style's), so matrix i reads entry i; the "Connector..." names choose the
+// scheme as the "Line..." ones do; cap rnd 0, flat 1, sq 2, a missing cap is flat; compound
+// sng 0, dbl 1, thickThin 2, thinThick 3, tri 4; colour transforms chain in floating point and
+// round once.  Still estimated: text takes the minor font (the major one when the minor is
+// empty; Visio's own themes have both equal).  design::apply applies themes.
 
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use super::color::{hls_to_rgb_f, rgb_to_hls_f, Color};
+use super::color::{hls_to_rgb_f, rgbf_to_hls, Color};
 use super::engine::cell_value;
 use super::eval::{page_of, Ev, R};
 use super::math;
@@ -406,8 +411,9 @@ fn modify(t: &Tree, el: u32, c: Rgb) -> Rgb {
             "tint" => rgb = (rgb.0 * v + (1.0 - v), rgb.1 * v + (1.0 - v), rgb.2 * v + (1.0 - v)),
             "shade" => rgb = (rgb.0 * v, rgb.1 * v, rgb.2 * v),
             n @ ("lumMod" | "lumOff" | "satMod" | "satOff" | "hueMod" | "hueOff") => {
-                let q = |x: f64| (math::round(x.clamp(0.0, 1.0) * 255.0)) as u8;
-                let (mut h, mut l, mut s) = rgb_to_hls_f((q(rgb.0), q(rgb.1), q(rgb.2)));
+                // in floating point, rounded once at the end (a Visio 16 file's computed line
+                // colours: rounding each step is one off in a channel)
+                let (mut h, mut l, mut s) = rgbf_to_hls(rgb.0.clamp(0.0, 1.0), rgb.1.clamp(0.0, 1.0), rgb.2.clamp(0.0, 1.0));
                 match n {
                     "lumMod" => l *= v,
                     "lumOff" => l += v,
@@ -688,9 +694,11 @@ fn rgb(c: Rgb) -> Val {
 fn themed_value(ev: &mut Ev, cx: &Ctx, p: Prop) -> Option<Val> {
     match p {
         Prop::Color(n) => cx.slice(n).map(rgb),
-        Prop::LineColor(conn) => {
+        Prop::LineColor(_) => {
             let slice = cx.slice(cx.q[0])?;
-            let scheme = if conn { cx.conn.as_ref().or(cx.fmt.as_ref()) } else { cx.scheme_for() };
+            // "ConnectorColor" chooses the scheme as "LineColor" does (QuickStyleType, the
+            // style "Connector"): the files' connector names follow the effect scheme there
+            let scheme = cx.scheme_for();
             let i = cx.matrix(0);
             let c = scheme.and_then(|(t, f)| {
                 let l = t.tree.child(*f, "lnStyleLst")?;
@@ -701,17 +709,18 @@ fn themed_value(ev: &mut Ev, cx: &Ctx, p: Prop) -> Option<Val> {
             let c = c.unwrap_or(slice);
             Some(rgb(contrast(ev, cx, 4, c)))
         }
-        Prop::FillColor | Prop::FillColor2 => {
+        Prop::FillColor2 => cx.slice(cx.q[1]).map(rgb),
+        Prop::FillColor => {
             let slice = cx.slice(cx.q[1])?;
             let i = cx.matrix(1);
             let c = cx.scheme_for().and_then(|(t, f)| {
                 let l = t.tree.child(*f, "fillStyleLst")?;
                 let fill = *t.tree.get(l)?.children.get(i.checked_sub(1)? as usize)?;
-                let el = fill_color_el(&t.tree, fill, p == Prop::FillColor2)?;
+                let el = fill_color_el(&t.tree, fill, false)?;
                 color_of(&t.tree, el, Some(slice), cx)
             });
             let c = c.unwrap_or(slice);
-            Some(rgb(if p == Prop::FillColor { contrast(ev, cx, 8, c) } else { c }))
+            Some(rgb(contrast(ev, cx, 8, c)))
         }
         Prop::ShadowColor => {
             // the effect style's shadow colour; without a shadow there black (the files)
@@ -747,32 +756,36 @@ fn themed_value(ev: &mut Ev, cx: &Ctx, p: Prop) -> Option<Val> {
         }
         Prop::Font(k) => {
             let (t, f) = cx.font.as_ref()?;
-            let minor = t.tree.child(*f, "minorFont")?;
-            let el = t.tree.child(minor, ["latin", "ea", "cs"][k as usize])?;
-            let face = t.tree.attr(el, "typeface")?;
-            (!face.is_empty()).then(|| Val::Font(Rc::from(face)))
+            let face_of = |which: &str| -> Option<&str> {
+                let el = t.tree.child(t.tree.child(*f, which)?, ["latin", "ea", "cs"][k as usize])?;
+                t.tree.attr(el, "typeface").filter(|v| !v.is_empty())
+            };
+            face_of("minorFont").or_else(|| face_of("majorFont")).map(|face| Val::Font(Rc::from(face)))
         }
         Prop::Line(cell, conn) => {
             let i = cx.matrix(0);
             if i == 0 {
                 return None;
             }
-            let scheme = if conn { cx.conn.as_ref().or(cx.fmt.as_ref()) } else { cx.scheme_for() };
-            let (t, f) = scheme?;
+            let _ = conn;
+            let (t, f) = cx.scheme_for()?;
             let is_conn = cx.conn.as_ref().is_some_and(|c| Rc::ptr_eq(&c.0, t) && c.1 == *f);
             let l = t.tree.child(*f, "lnStyleLst")?;
             let ln = t.tree.children(l, "ln").nth(i as usize - 1)?;
+            // Visio's lists have an entry for matrix 0 first: matrix i is entry i
             let ex = t.ext_list(if is_conn { "fmtConnectorSchemeLineStyles" } else { "fmtSchemeLineStyles" });
-            let line_ex = ex.get(i as usize - 1).and_then(|&ls| t.tree.child(ls, "lineEx"));
+            let line_ex = ex.get(i as usize).and_then(|&ls| t.tree.child(ls, "lineEx"));
             let tr = &t.tree;
             let exn = |a: &str| line_ex.and_then(|e| attr_num(tr, e, a));
             match cell {
                 "LineWeight" => attr_num(tr, ln, "w").map(|w| Val::Num(w / EMU)),
                 // Visio: 0 round, 1 square (ends at the point), 2 extended (half the weight beyond)
-                "LineCap" => tr.attr(ln, "cap").map(|c| Val::Num(match c {
+                // [MS-VSDX] 0 rounded, 1 square (ends at the point), 2 extended; a missing cap
+                // is flat (Office's notes on ECMA-376)
+                "LineCap" => Some(Val::Num(match tr.attr(ln, "cap").unwrap_or("flat") {
                     "rnd" => 0.0,
-                    "flat" => 1.0,
-                    _ => 2.0,
+                    "sq" => 2.0,
+                    _ => 1.0,
                 })),
                 "CompoundType" => tr.attr(ln, "cmpd").map(|c| Val::Num(match c {
                     "dbl" => 1.0,

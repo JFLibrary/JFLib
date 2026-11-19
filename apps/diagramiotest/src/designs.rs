@@ -278,6 +278,24 @@ fn themed_color(doc: &Document, s: ShapeRef, sec: Option<&str>, cell: &str) -> O
     }
 }
 
+// the theme value the engine gives a single numeric cell of a shape
+fn themed_num(doc: &Document, s: ShapeRef, cell: &str) -> Option<f64> {
+    use diagram_core::formula::{Outcome, Val};
+    let mut eng = Engine::new();
+    let c = doc.sym(cell)?;
+    let mut v = match eng.evaluate(doc, SheetRef::Shape(s), &CellAddr::single(c)) {
+        Outcome::Value(v) => v,
+        _ => return None,
+    };
+    while let Val::Themed(inner) = v {
+        v = (*inner).clone();
+    }
+    match v {
+        Val::Num(x) => Some(x),
+        _ => None,
+    }
+}
+
 /// group "designs": the own designs' parts, applying with undo, foreign parts, the golden images
 pub(crate) fn check(h: &mut crate::H) {
     let golden = crate::render::find_up("apps/diagramiotest/tests/golden");
@@ -350,6 +368,7 @@ fn behaviour(h: &mut crate::H) {
         }
     }
     let tb = labelled(&mut tx, &mut eng, owner, Basic::TextBox, [1.0, 4.0], [4.0, 4.5], "Titel").ok();
+    let conn = if made.len() == 3 { connect(&mut tx, &mut eng, owner, made[0], made[1], "").ok() } else { None };
     let _ = tx.commit();
     let (Some(tb), true) = (tb, made.len() == 3) else {
         h.check("designs/apply/shapes", false, String::from("shapes made"));
@@ -373,9 +392,14 @@ fn behaviour(h: &mut crate::H) {
     // the text box keeps dark text on Contrast's solid style (font style 1, Text Only)
     let tbc = themed_color(&doc, tb, Some("Character"), "Color");
     h.check("designs/apply/text-box-dark", tbc == Some(0x1D2228), format!("{tbc:?}"));
-    // a box shows Contrast's solid fill
+    // a box shows Contrast's solid fill; FillColor2 is the fill colour slice itself
     let fill = themed_color(&doc, made[0], None, "FillForegnd");
-    h.check("designs/apply/solid-fill", fill == Some(contrast.variants[0].colors[0]), format!("{fill:?}"));
+    let fill2 = themed_color(&doc, made[0], None, "FillBkgnd");
+    h.check("designs/apply/solid-fill", fill == Some(contrast.variants[0].colors[0]) && fill2 == fill, format!("{fill:?} {fill2:?}"));
+    // the connector's line ends come from Visio's list entry 1 (entry 0 stands for matrix 0):
+    // Contrast's connector style 1 has end 4, size 2, no begin; its cap is flat (1)
+    let ends = conn.map(|c| (themed_num(&doc, c, "BeginArrow"), themed_num(&doc, c, "EndArrow"), themed_num(&doc, c, "EndArrowSize"), themed_num(&doc, c, "LineCap")));
+    h.check("designs/apply/connector-ends", ends == Some((Some(0.0), Some(4.0), Some(2.0), Some(1.0))), format!("{ends:?}"));
     // a variant, then undo of both restores the parts and the cells
     let mut tx = doc.transaction("Variante");
     let r = apply::set_variant(&mut tx, &mut eng, Scope::Page(page), 2);
