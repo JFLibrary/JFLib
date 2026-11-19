@@ -50,6 +50,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   compared it with a `KL_*` takes `key_location(y)`.
 - Wayland's touchpad (its continuous axes) and macOS' trackpad deliver `E_WHEEL` in physical
   pixels with `WHEEL_PIXELS` instead of 120ths (Wayland: 12 a pixel, macOS: 3 a point).
+- The browser: `win_state(0)` reports `WST_MAXIMIZED` instead of `WST_CSD`, as on Android and
+  iOS: the main window fills the page's canvas and needs no title bar. On every canvas host (the
+  browser, Android, iOS) window 0's place and size follow the host alone: `win_set_rect(0, ..)`,
+  `WCMD_MAXIMIZE` and `WCMD_RESTORE` leave it.
 
 ### Fixed
 

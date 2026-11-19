@@ -35,8 +35,9 @@ try {
     const browser=await playwright[engine].launch({headless:true,...(engine==='chromium'?chromiumOptions():{})});
     try {
       for(const scale of [100,150,200]) for(const theme of ['light','dark']) {
-        // Browser host bar and the integrated app titlebar each occupy 38 DIP.
-        const context=await browser.newContext({viewport:{width:560,height:516},deviceScaleFactor:scale/100});
+        // The browser host bar occupies 38 DIP above the 560 x 440 client of the native reference
+        // (the main window has no title bar in the browser).
+        const context=await browser.newContext({viewport:{width:560,height:478},deviceScaleFactor:scale/100});
         try {
           const page=await context.newPage();
           const errors=[];

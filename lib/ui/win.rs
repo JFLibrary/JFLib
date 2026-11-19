@@ -2159,12 +2159,13 @@ impl Ui {
     }
 
     // uiw_sysframe_ok: WF_SYSFRAME gets a system frame (not: Wayland without server-side
-    // decorations, WST_CSD)
+    // decorations, WST_CSD; the browser, whose canvas draws no frame for any window: its main
+    // window fills the page and shows no WST_CSD, the others are the library's)
     fn uiw_sysframe_ok(&self) -> bool {
         if !self.uiw_os() {
             return true;
         }
-        plat::win_state(0) & plat::WST_CSD == 0
+        !cfg!(target_arch = "wasm32") && plat::win_state(0) & plat::WST_CSD == 0
     }
 
     // uiw_owner_origin(i) -> screen position (px) of the client origin of the window's
