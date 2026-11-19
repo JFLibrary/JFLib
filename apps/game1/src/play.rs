@@ -151,6 +151,8 @@ pub struct Play {
     pub ticks: u64,
     /// the yaw the server gave the figure when it came back (applied once)
     spawned: Option<i32>,
+    /// the practice mode's time not yet run (us)
+    carry_us: u64,
 }
 
 impl Play {
@@ -194,6 +196,7 @@ impl Play {
             last_ns: 0,
             ticks: 0,
             spawned: None,
+            carry_us: 0,
         }
     }
 
@@ -236,9 +239,9 @@ impl Play {
         };
         match &mut self.conn {
             Conn::Local(l) => {
-                let ms = ((dt * 1000.0) as u64).clamp(0, 250);
-                let map = self.map.clone();
-                let _ = map;
+                self.carry_us = (self.carry_us + (dt * 1e6) as u64).min(250_000);
+                let ms = self.carry_us / 1000;
+                self.carry_us -= ms * 1000;
                 for _ in 0..ms {
                     let stepped = l.step_ms(&mut |k, _c| if k == 0 { make(input) } else { NetInput::default() });
                     for (k, _) in stepped {

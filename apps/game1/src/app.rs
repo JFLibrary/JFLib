@@ -18,10 +18,9 @@ use core::cell::RefCell;
 use base::settings::{Schema, Settings};
 use game::input::{Input, MouseSettings};
 use game::net::client::Phase;
-use game::net::RoomCode;
 use game::Vec3;
 use game1_core::map::Map;
-use game1_core::rules::{DEFAULT_PORT, GAME_NAME, HEALTH, MAGAZINE, WS_PATH};
+use game1_core::rules::{GAME_NAME, HEALTH, MAGAZINE, WS_PATH};
 use ui::*;
 
 use crate::play::{Controls, Play};
@@ -162,6 +161,7 @@ impl Game1 {
                 self.play = Some(p);
                 self.input.release_all();
                 ui.pointer_lock(true);
+                ui.focus(ID_VIEW);
             }
             Err(e) => self.message = format!("Keine Verbindung: {}", e),
         }
@@ -241,6 +241,7 @@ impl Game1 {
         ui.next_size(-1, 0);
         if ui.button(ID_CONTINUE, "Weiterspielen") & EV_ACT != 0 {
             ui.pointer_lock(true);
+            ui.focus(ID_VIEW);
         }
         ui.next_size(-1, 0);
         if ui.button(ID_SETTINGS, "Einstellungen") & EV_ACT != 0 {
@@ -295,7 +296,7 @@ fn endpoint(server: &str) -> Result<netchan::Endpoint, String> {
         }
         let (host, port) = match s.rsplit_once(':') {
             Some((h, p)) if !h.contains(':') || h.ends_with(']') => (h, p.parse::<u16>().map_err(|_| format!("{} ist kein Port", p))?),
-            _ => (s, DEFAULT_PORT),
+            _ => (s, game1_core::rules::DEFAULT_PORT),
         };
         let addrs = plat::net::resolve(host, port).map_err(|e| format!("{}: {}", host, e))?;
         addrs.into_iter().next().map(netchan::Endpoint::Udp).ok_or_else(|| format!("{}: keine Adresse", host))
@@ -511,7 +512,6 @@ impl App for Game1 {
                 }
             }
         }
-        let _ = (RoomCode::parse(""), DEFAULT_PORT);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
