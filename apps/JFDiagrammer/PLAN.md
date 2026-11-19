@@ -27,7 +27,14 @@ Text, Speichern, Rückgängig; Visio-Gegenprobe bestanden), JD9 Seitenleiste und
 Schnell-Shapes, Favoriten, Suche, Ablegen, Bauwerkzeug mit Startsatz „Standard-Shapes“; Visio-Gegenprobe bestanden)
 und JD12 Export und Druck (`diagram_view::export` für PDF/SVG/PNG/JPEG, Verläufe und Schraffuren in `lib/pdf`; Druck unter
 Linux als Vektor-PDF, unter Windows als Raster mit 300 dpi). Offen: `formulas/growth` in diagramiotest schwankt unter
-Volllast (4-fache Shapes, 6,5- bis 17,8-fache Zeit). Nächste Welle: F.
+Volllast (4-fache Shapes, 6,5- bis 17,8-fache Zeit); geklärt als Last- und Speicherrauschen, der Check ist jetzt robust.
+
+**Erledigt** (2026-11-19, Welle F, Meilenstein M2 Editor): JD10 Strukturen (Container, Listen, Swimlanes mit
+funktionsübergreifendem Flussdiagramm, Beschriftungen, Verbindungspfeile, Layout-Verhalten; Visio erkennt die
+Mitgliedschaft über `Relationships`/`DEPENDSON`) und JD11 Designs und Format (eigene Designs NetLab, Kontur und
+Kontrast mit je vier Varianten, vom Nutzer abgenommen; Galerie mit Live-Vorschau, Shape formatieren, Farbwähler,
+Format übertragen, Schnellformatvorlagen). Offen: Klick auf einen Verbindungspfeil über einem vorhandenen Shape
+wirkt nicht; Visio-Gegenprobe von JD10. Nächste Welle: G.
 
 ## Ziel
 
