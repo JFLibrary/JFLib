@@ -109,7 +109,12 @@ pub fn on_levels(t: &mut T, f: &mut dyn FnMut(&mut T, &Device, &str)) {
 
 /// submit, wait, read the image
 pub fn shot(t: &mut T, dev: &Device, off: &mut Off, r: &mut Renderer, s: &mut Scene, what: &str) -> Option<Vec<u8>> {
-    let id = t.res(off.submit(r, s), what)?;
+    shot_clear(t, dev, off, r, s, what, CLEAR)
+}
+
+/// shot with another clear colour
+pub fn shot_clear(t: &mut T, dev: &Device, off: &mut Off, r: &mut Renderer, s: &mut Scene, what: &str, clear: [f32; 4]) -> Option<Vec<u8>> {
+    let id = t.res(off.submit_clear(r, s, clear), what)?;
     if !t.res(dev.wait(id, 10_000_000_000), what)? {
         t.ok(false, &format!("{what}: the GPU did not finish within 10 s"));
         return None;
@@ -1003,18 +1008,27 @@ fn errors(t: &mut T) {
             t.ok(inv(r2.record(&mut e, &s2, ca, Some(da))), "record with another renderer: Invalid");
         }
     }
-    // an empty scene: a clear, nothing else; also with an origin, and after a prepare without a frame
+    // an empty scene: a clear, nothing else; also with an origin, and after a prepare without a frame.  Each frame clears
+    // to a colour of its own: a frame that shows the one before fails (Intel's Windows driver wrote a pass that only clears
+    // after the copy behind it, until lib/gpu cleared once more in a pass without a draw)
+    let clears: [([f32; 4], [u8; 3]); 3] = [(CLEAR, CLEAR8), ([34.0 / 255.0, 170.0 / 255.0, 85.0 / 255.0, 1.0], [34, 170, 85]),
+                                             ([187.0 / 255.0, 68.0 / 255.0, 221.0 / 255.0, 1.0], [187, 68, 221])];
+    let clear_of = |img: &[u8], want: [u8; 3]| {
+        let other = img.chunks_exact(4).filter(|p| p[0..3] != want).count();
+        format!("{other} pixels other than {want:?} (the first {:?})", &img[0..3])
+    };
     let Some(mut s4) = t.res(Scene::new(&r), "Scene::new") else { return };
-    if let Some(img) = shot(t, &dev, &mut off, &mut r, &mut s4, "an empty scene") {
-        t.ok(img.chunks_exact(4).all(|p| p[0..3] == CLEAR8), "an empty scene: the clear colour");
+    if let Some(img) = shot_clear(t, &dev, &mut off, &mut r, &mut s4, "an empty scene", clears[0].0) {
+        t.ok(img.chunks_exact(4).all(|p| p[0..3] == clears[0].1), &format!("an empty scene: the clear colour, {}", clear_of(&img, clears[0].1)));
     }
     s4.set_origin([1e7, 0.0, 0.0]);
-    if let Some(img) = shot(t, &dev, &mut off, &mut r, &mut s4, "an empty scene with an origin") {
-        t.ok(img.chunks_exact(4).all(|p| p[0..3] == CLEAR8), "an empty scene with an origin: the clear colour");
+    if let Some(img) = shot_clear(t, &dev, &mut off, &mut r, &mut s4, "an empty scene with an origin", clears[1].0) {
+        t.ok(img.chunks_exact(4).all(|p| p[0..3] == clears[1].1), &format!("an empty scene with an origin: its clear colour, {}", clear_of(&img, clears[1].1)));
     }
     t.res(s4.prepare(&mut r), "prepare of an empty scene");
-    if let Some(img) = shot(t, &dev, &mut off, &mut r, &mut s4, "an empty scene after a prepare without a frame") {
-        t.ok(img.chunks_exact(4).all(|p| p[0..3] == CLEAR8), "an empty scene after a prepare without a frame: the clear colour");
+    if let Some(img) = shot_clear(t, &dev, &mut off, &mut r, &mut s4, "an empty scene after a prepare without a frame", clears[2].0) {
+        t.ok(img.chunks_exact(4).all(|p| p[0..3] == clears[2].1),
+             &format!("an empty scene after a prepare without a frame: its clear colour, {}", clear_of(&img, clears[2].1)));
     }
     // instances that come after prepare: what went up does not hold them, the next prepare takes them
     let cam = Camera::look_at([0.0, 0.0, 6.0], [0.0; 3], [0.0, 1.0, 0.0], 1.0, 1.0, 0.1, f64::INFINITY);

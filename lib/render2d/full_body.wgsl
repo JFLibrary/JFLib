@@ -11,6 +11,10 @@
     var sc = 1.0;
     var tf = 1.0;
     var duty = 1.0;
+    // the pattern's pass (pieces below), decided here where tf is computed: tested after this block as dashed && tf < 1.0,
+    // Intel's Windows driver (UHD 615, 31.0.101.2135) found it false in fs_fill with tf 0, also as two ifs (the dashes of
+    // layers with a fill were gone, docs/RENDER2D.md)
+    var pat = 0u;
     if dashed {
         // (dash units per pixel: the vertex shader's, the block's units inside an insert)
         sc = select(1.0, bitcast<f32>(i.misc.w), ((styles[si].flags >> 20u) & 15u) == UNIT_DRAWING);
@@ -18,6 +22,7 @@
         tf = clamp((DASH_EXACT - period / sc) / (DASH_EXACT - DASH_FLAT), 0.0, 1.0);
         let capl = select(select(0.0, 2.0 * h, cap == CAP_SQUARE), 1.5707963 * h, cap == CAP_ROUND) * sc;
         duty = min(1.0, styles[si].duty + styles[si].ons * capl / period);
+        pat = select(0u, 1u, tf < 1.0);
     }
     var g: Ring;
     g.m = vec2f(1.0, 0.0);
@@ -155,7 +160,7 @@
     // the pattern (pass 0), the solid stroke near its ends (pass 1): one call of pieces (inlined once)
     var c = max(body, 0.0);
     var cd = 0.0;
-    var passes = select(0u, 1u, dashed && tf < 1.0) | select(0u, 2u, tf > 0.0 && body < 0.0);
+    var passes = pat | select(0u, 2u, tf > 0.0 && body < 0.0);
     loop {
         if passes == 0u {
             break;
