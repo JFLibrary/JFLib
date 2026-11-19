@@ -13,6 +13,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - `rt::kernel` (the system call numbers, open flags and struct stat per architecture) on Android too, without rt::os's helpers
 - rt::outline_lse(): the way the outline atomics of a static Linux ARM64 program went (LSE or the LL/SC loops; None where a program has none); jfgui_ARM_LLSC=1 in the environment makes them take LL/SC on a CPU with LSE, so the same program checks both ways (docs/ARM64.md, ARM7)
 - `os::SYS_IO_URING_SETUP` / `_ENTER` / `_REGISTER`, `SYS_OPEN_TREE`, `SYS_MOVE_MOUNT`, `SYS_FSOPEN`, `SYS_FSCONFIG`, `SYS_FSMOUNT`, `SYS_FSPICK`, `SYS_CLONE3`, `SYS_PIDFD_GETFD`, `SYS_MOUNT_SETATTR` (x86-64 and ARM64).
+- `rt::os` on Android: `syscall6`, `syscall3`, `poll` and the kernel table of `rt::kernel`, as on Linux (plat's futexes, eventfd, /proc; docs/ANDROID.md decision 2)
 
 ### Changed
 

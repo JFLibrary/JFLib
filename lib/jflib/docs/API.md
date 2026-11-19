@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -27445,7 +27445,7 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
            select                                                            (task.rs)
   aio:     files without blocking: read_file / write_file / copy_file with progress and
            cancellation, Reader / Writer chunk by chunk (AtomicFile underneath)  (aio.rs)
-  sync:    Mutex, Condvar, RwLock, channel (futex / WaitOnAddress)          (sync.rs)
+  sync:    Mutex, Condvar, RwLock, channel (futex / WaitOnAddress; Android too)  (sync.rs)
   rand:    fill_random, random_bytes, random_u64 (the OS CSPRNG)             (rand.rs)
   net:     TcpListener, TcpStream, UdpSocket, SocketAddr, resolve            (net.rs)
   fs:      stat / lstat / read_dir / links / set_times / free_space /
@@ -27772,7 +27772,7 @@ sync -- blocking primitives for worker threads (servers, background jobs)
   RwLock<T> (read / write; writers first)      channel(cap) -> (Sender<T>, Receiver<T>)
 
 One primitive per OS: wait on a 32-bit word while it holds a value, wake one / all waiters
-(Windows WaitOnAddress, Linux private futexes).  Mutex and Condvar are the futex algorithms
+(Windows WaitOnAddress, Linux and Android private futexes).  Mutex and Condvar are the futex algorithms
 of Rust's std; RwLock and the channel are built on them.  A lock is not poisoned by a panic
 (panics abort the process here; with jflib's feature unwind a panic the app catches releases
 the locks its guards held).
@@ -28652,6 +28652,11 @@ applies `--simd sse2` before the app starts.
 - **`fn cpu_brand() -> String`**
   the processor's name from MIDR_EL1 ("ARM Cortex-A720"; "Qualcomm CPU 0x001" for parts not listed),
   "ARM64" when the kernel does not let user space read it
+
+- **`fn cpu_brand() -> String`**
+  the processor's name from /proc/cpuinfo: x86-64 its "model name" (the emulator: the host's processor),
+  ARM64 "Hardware" where the kernel still writes it, else every kind of core once from "CPU implementer"
+  and "CPU part" ("ARM Cortex-A55 + ARM Cortex-A78" on big.LITTLE); "" when it says nothing
 
 - **`fn cpu_brand() -> String`**
   the processor's name (HKLM\\HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0, ProcessorNameString, such as
@@ -32500,7 +32505,9 @@ leave finishes it: state DONE (from then on the owner may drop the record), wake
 background jobs, and every thread sleeping in a job wait is woken.  Idle workers spin
 briefly, then sleep on a semaphore; waiters spin, then sleep on a second one at most
 WAIT_POLL_MS at a time (a semaphore post may be taken by another waiter).  Work depends
-only on the item index, so results are the same for any number of threads.
+only on the item index, so results are the same for any number of threads.  On Android the
+workers run below the UI thread (nice 10, THREAD_PRIORITY_BACKGROUND): a busy pool must not take
+the turns of the thread that answers the Choreographer (docs/ANDROID.md AN1).
 
 The loop record lives on the caller's stack and holds a pointer to the borrowed closure:
 parallel_for returns only after the last participant left, which is what makes handing
@@ -32608,7 +32615,7 @@ owning thread go to the local list, those from other threads to the remote list 
 E_WAKE.  Timers live in one list with the thread that registered them; each executor fires
 its own.  Blocking jobs run on up to BLOCKING_MAX threads of their own (not the compute pool:
 a job waiting for a disk must not starve parallel_for); where no thread can start (the
-browser without shared memory, Android) the executors run them inline, one per run.  A panic
+browser without shared memory) the executors run them inline, one per run.  A panic
 in a task or job ends the process like any panic (rt's handler: crash hook, exit code 3), with
 jflib's feature unwind too unless the task's own code catches it (rt::abort_on_unwind).
 ```
@@ -32836,8 +32843,8 @@ aio -- files without blocking the calling thread: the work runs on the blocking 
 Names, routing and permissions are those of the blocking functions (guarded.rs, vfs.rs): the
 same calls, made on a pool thread (a caller inside policy's trusted() stays trusted there).
 A cancel is seen between chunks: the operation cleans up and ends with Err(Cancelled).
-Dropping one of the futures cancels it the same way.  Where no thread can start (browser,
-Android) the pool's jobs run on the event loop's thread between frames.
+Dropping one of the futures cancels it the same way.  Where no thread can start (the browser
+without shared memory) the pool's jobs run on the event loop's thread between frames.
 ```
 
 ```rust
@@ -36144,7 +36151,9 @@ the native ones of apple*.rs.
 Android differs where its system offers more: real files on internal storage
 (android_files.rs), the documents of other apps as content:// names, the system clipboard and
 the persisted grants (android_host.rs), the system's file picker behind file_dialog
-(FD_PENDING, file_dialog_poll), download() as "save a copy" through the picker.
+(FD_PENDING, file_dialog_poll), download() as "save a copy" through the picker, real threads,
+semaphores and the wake-up through the host's looper (android_thread.rs: the pool, task and aio run
+on threads there, not between frames).
 The browser with the File System Access API (Chromium; the host says so, HOST_HANDLES):
 file_dialog shows the system's pickers too and answers later; the chosen file is the user's
 own, bound to a path /handles/ID/NAME (web/handles.js keeps the handle in IndexedDB), and every
@@ -36310,8 +36319,7 @@ REQUEST_UNSAVED: u32 = 22
   Cooperative yield is achieved by returning from the current runtime step.
 
 - **`struct Thread`**
-  Browser thread handle placeholder; spawning native threads is unsupported (Android: the GPU
-  output's jobs have threads of their own, android_gpu.rs).
+  Browser thread handle placeholder; spawning native threads is unsupported.
 
 **`impl Thread`**
 
@@ -36915,10 +36923,8 @@ android_gpu -- what the GPU layer and the UI's output through the GPU need of An
 
   dl_open(name) / dl_sym(handle, name) / dl_close(handle)   libvulkan.so at run time: no
                                      DT_NEEDED, the program starts on a phone without it
-  gpu_thread_spawn(stack, f)         a real thread for the output's jobs.  thread_spawn stays
-                                     None here: the pools and tasks of this target are cooperative
-                                     and start nothing behind the UI's back; nothing but the
-                                     output's jobs, which end by themselves, runs on these
+  gpu_thread_spawn(stack, f)         a thread for the output's jobs: thread_spawn's
+                                     (android_thread.rs, Bionic's pthreads)
   win_gpu_child(w)                   the surface of the SurfaceView (ANativeWindow), the analogue
                                      of Windows' child window; only for window 0 while nothing
                                      else shows on the canvas (tool windows and popups are
@@ -36953,8 +36959,8 @@ not a dangling pointer.
   `handle` came from dl_open and is closed once; nothing uses what dl_sym found in it any more
   (the library may be unloaded).
 
-- **`fn gpu_thread_spawn(stack: usize, f: Start) -> Option<super::Thread>`**
-  a real thread with stack bytes of stack (the output's jobs) -> its handle
+- **`fn gpu_thread_spawn(stack: usize, f: Box<dyn FnOnce() + Send>) -> Option<super::Thread>`**
+  a thread with stack bytes of stack (the output's jobs) -> its handle
 
 - **`struct NativeWindow`**
   a target for swapchains: the ANativeWindow of the SurfaceView, with a reference of its own (a
@@ -37269,6 +37275,72 @@ enters the UI. LLD's atomic memory initializer runs once across all instances.
   Publish work and wake up to count sleeping workers.
 - **`fn wait(&self, timeout: i32) -> bool`**
   Take a unit; negative timeout waits indefinitely, zero only tries once.
+
+### `plat/android_thread.rs`
+
+Source: [`lib/plat/android_thread.rs`](../lib/plat/android_thread.rs)
+
+```text
+android_thread -- threads (Bionic's pthreads), semaphores (futex), the UI thread's wake-up (an
+eventfd), sleeps and the system's numbers on Android (docs/ANDROID.md AN1; the same functions as
+linux_thread.rs and apple_thread.rs)
+
+Threads only through pthread_create: Bionic gives every thread its TLS block, its signal stack and
+a guard page, and a thread of a raw clone would crash in the first Bionic function it calls.  The
+rest is the Linux way, with rt::kernel's numbers (decision 2): the semaphores are linux_thread.rs's
+futex counters, the wake-up is its eventfd.  The host's looper on the UI thread watches the eventfd
+(android/bridge.c, ALooper_addFd) and asks the Choreographer for a frame; that frame's tick turns
+the wake-up into E_WAKE (drain_wake).  A program without a UI (android/exe_main.c) waits on it in
+wait_events, as on Linux.  Signals stay Bionic's and debuggerd's: no handlers of our own (a panic
+that leaves a thread ends the program with exit code 3, rt::abort_on_unwind).
+```
+
+- **`struct Thread(usize)`**
+  a thread started by thread_spawn; join it to wait for its end
+
+- **`fn thread_spawn(stack: usize, f: Start) -> Option<Thread>`**
+  run f on a new thread with stack bytes of stack (0 = 1 MB; rounded up to 16 KiB)  [plat_thread_create]
+
+**`impl Thread`**
+
+- **`fn join(self)`**
+  wait until the thread has ended  [plat_thread_join]
+
+- **`fn thread_yield()`**
+  give the rest of the time slice away  [plat_thread_yield]
+
+- **`fn sleep_ms(ms: u32)`**
+  sleep ms milliseconds (ppoll without descriptors, as on Linux); not on the UI thread, which must
+  answer within five seconds (an ANR)
+
+- **`struct Sem(Box<SemInner>)`**
+  a counting semaphore
+
+**`impl Sem`**
+
+- **`fn new(initial: u32) -> Option<Sem>`**
+- **`fn post(&self, n: u32)`**
+  add n units, wake sleepers (0: nothing)
+- **`fn wait(&self, ms: i32) -> bool`**
+  take one unit: true taken, false timeout (ms -1 = forever, 0 = only try)
+
+- **`extern "C" fn jfgui_wake_fd() -> i32`**
+  (android/bridge.c) the descriptor the UI thread's looper watches (ALooper_addFd): readable after
+  a wake(); -1 without one
+
+- **`fn wake()`**
+  any thread: E_WAKE on the UI thread (coalesced); under the host its looper asks for a frame at
+  once  [plat_wake]
+
+- **`fn wait_events(deadline_us: u64, on_event: &mut dyn FnMut(&Event)) -> u32`**
+  headless wait (a program without a UI; scripts): until a wake-up (E_WAKE to on_event, returns 1)
+  or the deadline in time_us() (0 = only poll, u64::MAX = forever; returns 0)
+
+- **`fn cpu_count() -> u32`**
+  CPUs online (sysconf), >= 1.  big.LITTLE phones count every kind of core  [plat_cpu_count]
+
+- **`fn mem_total() -> u64`**
+  physical memory in bytes (MemTotal of /proc/meminfo), 0 unknown  [plat_mem_total]
 
 ### `plat/clipdrop.rs`
 

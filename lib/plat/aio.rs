@@ -19,8 +19,8 @@
 // Names, routing and permissions are those of the blocking functions (guarded.rs, vfs.rs): the
 // same calls, made on a pool thread (a caller inside policy's trusted() stays trusted there).
 // A cancel is seen between chunks: the operation cleans up and ends with Err(Cancelled).
-// Dropping one of the futures cancels it the same way.  Where no thread can start (browser,
-// Android) the pool's jobs run on the event loop's thread between frames.
+// Dropping one of the futures cancels it the same way.  Where no thread can start (the browser
+// without shared memory) the pool's jobs run on the event loop's thread between frames.
 
 use alloc::string::String;
 use alloc::sync::Arc;

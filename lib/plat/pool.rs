@@ -21,7 +21,9 @@
 // background jobs, and every thread sleeping in a job wait is woken.  Idle workers spin
 // briefly, then sleep on a semaphore; waiters spin, then sleep on a second one at most
 // WAIT_POLL_MS at a time (a semaphore post may be taken by another waiter).  Work depends
-// only on the item index, so results are the same for any number of threads.
+// only on the item index, so results are the same for any number of threads.  On Android the
+// workers run below the UI thread (nice 10, THREAD_PRIORITY_BACKGROUND): a busy pool must not take
+// the turns of the thread that answers the Choreographer (docs/ANDROID.md AN1).
 //
 // The loop record lives on the caller's stack and holds a pointer to the borrowed closure:
 // parallel_for returns only after the last participant left, which is what makes handing
@@ -426,6 +428,9 @@ fn wait_done(j: &JobCtl) {
 }
 
 fn worker(k: usize) {
+    // Android: below the UI thread, which must answer the Choreographer (docs/ANDROID.md AN1)
+    #[cfg(target_os = "android")]
+    crate::thread_background();
     let top = 0u8;
     POOL.stk[k].store(core::hint::black_box(&top) as *const u8 as usize, SeqCst);
     'outer: loop {
