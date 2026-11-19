@@ -153,6 +153,45 @@ pub(crate) fn set_on(app: &mut Diagrammer, ui: &mut Ui, label: &str, shapes: &[S
     r.is_ok()
 }
 
+/// a restyle (a quick style): the shapes' own cells of `clear` go (also THEMEGUARD formats;
+/// GUARD stays), then the formulas of `changes` are written -- one undo step
+pub(crate) fn restyle(app: &mut Diagrammer, ui: &mut Ui, label: &str, clear: &[F], changes: &[(F, String)]) -> bool {
+    let shapes = selection(app);
+    let Some(o) = app.opened.as_mut() else { return false };
+    if shapes.is_empty() {
+        return false;
+    }
+    let r = crate::edit_doc::edit(o, label, true, |tx, eng| {
+        for &s in &shapes {
+            let sheet = SheetRef::Shape(s);
+            for f in clear {
+                for a in addrs(tx.doc(), sheet, *f) {
+                    let own = tx.doc().sheet(sheet).is_some_and(|sh| match (a.section, a.row) {
+                        (None, _) => sh.cells.iter().any(|c| c.name == a.cell && c.formula != diagram_core::Formula::Inherited),
+                        _ => true,
+                    });
+                    if own && !eng.guarded(tx.doc(), sheet, &a) {
+                        tx.inherit_cell(sheet, &a)?;
+                    }
+                }
+            }
+            for (f, formula) in changes {
+                for a in addrs(tx.doc(), sheet, *f) {
+                    match eng.user_set(tx, sheet, &a, Input::Formula(formula)) {
+                        Ok(_) | Err(EditError::Guarded) => {}
+                        Err(e) => return Err(e),
+                    }
+                }
+            }
+        }
+        let sheets: Vec<SheetRef> = shapes.iter().map(|s| SheetRef::Shape(*s)).collect();
+        eng.recalc(tx, &sheets)?;
+        Ok(())
+    });
+    ui.repass();
+    r.is_ok()
+}
+
 /// the shapes' own cells go: they inherit again (from the master, the style, the design)
 pub(crate) fn inherit(app: &mut Diagrammer, ui: &mut Ui, label: &str, cells: &[F]) -> bool {
     let shapes = selection(app);

@@ -60,3 +60,12 @@ click button:"Rechtsbündig"
 expect button:"Rechtsbündig" checked
 click 600,660
 expect same apps/JFDiagrammer/tests/golden/format_shape.png 300 280 260 200
+# Schnellformatvorlagen (TH-06) from Shape formatieren: accent 3, intensity 5
+click listitem:"Box"
+click tab:"Füllung und Linie"
+click button:"Schnellformatvorlagen"
+expect text:"Variantenstile" exists
+expect text:"Designstile" exists
+click button:"Akzent 3, Stärke 5"
+click 600,660
+expect same apps/JFDiagrammer/tests/golden/format_quick.png 300 280 260 200

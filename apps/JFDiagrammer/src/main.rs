@@ -39,6 +39,7 @@
 //   src/format_cells.rs     (JD11) the selection's format cells read and written, the colour menu
 //   src/format_menus.rs     (JD11) Start › Schriftart, Absatz, Formenarten, Format übertragen
 //   src/format_pane.rs      (JD11) the task pane Shape formatieren
+//   src/format_quick.rs     (JD11) Schnellformatvorlagen (from Shape formatieren)
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too)
@@ -84,6 +85,7 @@ mod export_ui;
 mod format_cells;
 mod format_menus;
 mod format_pane;
+mod format_quick;
 mod icons;
 mod lang;
 mod options;
@@ -186,6 +188,8 @@ pub(crate) struct Diagrammer {
     pub design_save: design_store::SaveDialog,
     /// (JD11) the format commands: colours used last, the format painter, Weitere Farben
     pub format: format_menus::FormatState,
+    /// (JD11) the quick styles' tiles
+    pub quick: format_quick::QuickTiles,
 }
 
 impl Diagrammer {
@@ -232,6 +236,7 @@ impl Diagrammer {
             designs: design_gallery::Designs::default(),
             design_save: design_store::SaveDialog::default(),
             format: format_menus::FormatState::default(),
+            quick: format_quick::QuickTiles::default(),
         }
     }
 

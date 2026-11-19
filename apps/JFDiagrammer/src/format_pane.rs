@@ -174,6 +174,17 @@ pub(crate) fn pane(app: &mut Diagrammer, ui: &mut Ui, id_pane: u32) {
     ui.spacer(6);
     let sel = !fc::selection(app).is_empty();
     if sel && app.format_tab == 0 {
+        // (TH-06) the design's quick styles: the ribbon's Start register has no room for
+        // their gallery, the pane opens them as a flyout
+        ui.next_size(-1, 28);
+        ui.next_icon(crate::icons::JD_QUICK_STYLES_L);
+        if ui.dropdown_button(ID + 0x70, crate::commands::label(crate::commands::QUICK_STYLES)) & EV_ACT != 0 {
+            ui.popup_open(ID + 0x71);
+        }
+        if ui.flyout_begin(ID + 0x71, 0) {
+            crate::format_quick::flyout(app, ui);
+        }
+        ui.flyout_end();
         fill(app, ui);
         line(app, ui);
     } else if sel && app.format_tab == 1 {

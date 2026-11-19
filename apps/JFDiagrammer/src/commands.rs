@@ -119,6 +119,8 @@ commands! {
     LINE_OPTIONS = 0x1148, "Linienoptionen", JD_LINE_OPTIONS, 0;
     MORE_COLORS = 0x1149, "Weitere Farben", JD_MORE_COLORS, 0;
     FORMAT_PANE = 0x114A, "Shape formatieren", 0, 0;
+    // (JD11) the quick styles of the design (TH-06)
+    QUICK_STYLES = 0x114B, "Schnellformatvorlagen", 0, JD_QUICK_STYLES_L;
     // Start: Anordnen
     ALIGN = 0x1150, "Ausrichten", JD_ALIGN, JD_ALIGN_L;
     AUTO_ALIGN = 0x1151, "Automatisch ausrichten", 0, 0;
