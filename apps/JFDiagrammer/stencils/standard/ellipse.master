@@ -1,0 +1,32 @@
+# Ellipse: eine Ellipse-Zeile (Mittelpunkt, Punkt auf der großen und auf der kleinen Achse)
+master: Ellipse
+name.de: Ellipse
+name.en: Ellipse
+name.es: Elipse
+name.it: Ellisse
+name.fr: Ellipse
+prompt.de: Ellipse oder, bei gleicher Breite und Höhe, Kreis.
+prompt.en: Ellipse, or a circle when width and height are equal.
+prompt.es: Elipse o, con el mismo ancho y alto, círculo.
+prompt.it: Ellisse o, con larghezza e altezza uguali, cerchio.
+prompt.fr: Ellipse ou, à largeur et hauteur égales, cercle.
+keywords.de: Kreis, Oval, rund, Ellipse, Anfang, Ende
+keywords.en: circle, oval, round, ellipse, start, end
+keywords.es: círculo, óvalo, redondo, elipse, inicio, fin
+keywords.it: cerchio, ovale, rotondo, ellisse, inizio, fine
+keywords.fr: cercle, ovale, rond, ellipse, début, fin
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

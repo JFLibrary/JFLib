@@ -18,6 +18,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "JFDiagrammer"
+version = "0.1.0"
+dependencies = [
+ "jflib-base",
+ "jflib-build",
+ "jflib-diagram-core",
+ "jflib-diagram-io",
+ "jflib-diagram-view",
+ "jflib-gfx",
+ "jflib-pdf",
+ "jflib-plat",
+ "jflib-render2d",
+ "jflib-rt",
+ "jflib-style-netlab",
+ "jflib-text",
+ "jflib-ui",
+]
+
+[[package]]
 name = "Kritzel"
 version = "0.1.0"
 dependencies = [
@@ -251,6 +270,7 @@ version = "0.2.1"
 name = "codectest"
 version = "0.0.0"
 dependencies = [
+ "jflib-archive",
  "jflib-base",
  "jflib-build",
  "jflib-gfx",
@@ -320,6 +340,25 @@ dependencies = [
  "jflib-style-netlab",
  "jflib-style-winui",
  "jflib-ui",
+]
+
+[[package]]
+name = "diagramiotest"
+version = "0.1.0"
+dependencies = [
+ "jflib-archive",
+ "jflib-build",
+ "jflib-diagram-core",
+ "jflib-diagram-io",
+ "jflib-diagram-view",
+ "jflib-gfx",
+ "jflib-img-core",
+ "jflib-img-jpeg",
+ "jflib-img-png",
+ "jflib-img-svg",
+ "jflib-pdf",
+ "jflib-plat",
+ "jflib-rt",
 ]
 
 [[package]]
@@ -570,6 +609,9 @@ dependencies = [
  "jflib-crypto",
  "jflib-datastore",
  "jflib-datetime",
+ "jflib-diagram-core",
+ "jflib-diagram-io",
+ "jflib-diagram-view",
  "jflib-doc-core",
  "jflib-doc-io",
  "jflib-doc-layout",
@@ -605,6 +647,7 @@ dependencies = [
  "jflib-netchan",
  "jflib-netio",
  "jflib-netpkt",
+ "jflib-pdf",
  "jflib-physics",
  "jflib-plat",
  "jflib-render2d",
@@ -655,6 +698,7 @@ dependencies = [
 name = "jflib-archive"
 version = "0.2.1"
 dependencies = [
+ "jflib-base",
  "jflib-img-core",
  "jflib-plat",
  "jflib-rt",
@@ -707,6 +751,31 @@ dependencies = [
 [[package]]
 name = "jflib-datetime"
 version = "0.2.1"
+
+[[package]]
+name = "jflib-diagram-core"
+version = "0.2.1"
+
+[[package]]
+name = "jflib-diagram-io"
+version = "0.2.1"
+dependencies = [
+ "jflib-archive",
+ "jflib-diagram-core",
+]
+
+[[package]]
+name = "jflib-diagram-view"
+version = "0.2.1"
+dependencies = [
+ "jflib-diagram-core",
+ "jflib-gfx",
+ "jflib-img-jpeg",
+ "jflib-img-png",
+ "jflib-pdf",
+ "jflib-render2d",
+ "jflib-rt",
+]
 
 [[package]]
 name = "jflib-doc-core"
@@ -1113,6 +1182,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jflib-pdf"
+version = "0.2.1"
+dependencies = [
+ "jflib-gfx",
+ "jflib-img-core",
+ "jflib-text-shape",
+]
+
+[[package]]
 name = "jflib-physics"
 version = "0.2.1"
 dependencies = [
@@ -1389,6 +1467,20 @@ name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+
+[[package]]
+name = "pdftest"
+version = "0.0.0"
+dependencies = [
+ "jflib-build",
+ "jflib-gfx",
+ "jflib-img-core",
+ "jflib-img-jpeg",
+ "jflib-pdf",
+ "jflib-plat",
+ "jflib-rt",
+ "jflib-text-shape",
+]
 
 [[package]]
 name = "permcheck"

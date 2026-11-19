@@ -81,6 +81,23 @@ pub trait Style: StyleBasic + StyleValue + StyleEdit + StyleList + StylePopup + 
     fn ribbon_preview(&self, _typography: u32) -> Option<(u32, i32, u32)> { None }
     /// Group sizing and overflow policy. Existing styles preserve compact flyouts.
     fn ribbon_metrics(&self) -> crate::RibbonMetrics { crate::RibbonMetrics::default() }
+    /// BOX_* decoration of the ribbon's scroll box (BOX_LAYER: a framed panel). A style that
+    /// paints the band itself returns 0 and draws it in `ribbon_band`.
+    fn ribbon_box_flags(&self) -> u32 { crate::consts::BOX_LAYER }
+    /// Paint the ribbon band when `ribbon_box_flags` is 0 (sp: the band, px). It is drawn
+    /// right after the band is placed, below the groups.
+    fn ribbon_band(&self, _ui: &mut Ui, _sp: &Sp) {}
+    /// Height of the register row of `Ui::ribbon_tabs` in DIP.
+    fn ribbon_tabs_height(&self) -> i32 { 30 }
+    /// Paint the register row behind its registers (sp: the row; s[0], s[1]: x and width of
+    /// the selected register in px, width 0 when none is shown). The default draws a
+    /// divider along the bottom that leaves the selected register open toward the ribbon.
+    fn ribbon_tabs_strip(&self, ui: &mut Ui, sp: &Sp) { crate::ribbon_shell::stock_strip(ui, sp) }
+    /// Paint one register (sp: rect, label, ev, state 3 = disabled; value 1 = selected;
+    /// flags RT_FILE / RT_CONTEXT; value2 the ARGB colour of its context set or 0).
+    fn ribbon_tab(&self, ui: &mut Ui, sp: &Sp) { crate::ribbon_shell::stock_tab(ui, sp) }
+    /// Paint a key tip badge of the ribbon's access keys (sp: the badge, label = its keys).
+    fn keytip(&self, ui: &mut Ui, sp: &Sp) { crate::ribbon_shell::stock_keytip(ui, sp) }
     /// Optional optical offset of a preview card in 24.8 DIP. Opts into the
     /// fractional panel painter; None keeps the original integer painter.
     fn preview_card_offset(&self) -> Option<[i32; 2]> { None }

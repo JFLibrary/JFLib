@@ -1,0 +1,33 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD10: a cross-functional flowchart (ST-05, RK-03) -- Bahn on a page without one
+# makes a flowchart (title bar, a phase, two lanes) and its register shows; a rectangle drawn in
+# the lower lane joins it; a lane inserted after the selected one pushes the lower lane down with
+# its shape; Titelleiste anzeigen off moves everything up; Trennlinie adds a phase at the end
+cmd 5424
+expect tab:"Funktionsübergreifendes Flussdiagramm" exists
+expect listitem:"Titel" rect 518 334 502 247
+expect listitem:"Phase" rect 543 359 477 222
+cmd 4404
+drag 600,510 680,550
+cmd 4400
+expect listitem:"Sheet.10" rect 601 500 75 50
+# the upper lane by its heading, a lane after it
+click 525,430
+cmd 5424
+expect listitem:"Titel" rect 518 334 502 347
+expect listitem:"Phase" rect 543 359 477 322
+expect listitem:"Sheet.10" rect 601 600 75 51
+shot build/JFDiagrammer-structures-cff.png
+# no title bar: everything up by its height
+cmd 5429
+expect listitem:"Titel" rect 518 334 502 322
+expect listitem:"Sheet.10" rect 601 575 75 50
+# Trennlinie: a phase at the end, the lanes as long as the phases
+cmd 5425
+expect listitem:"Titel" rect 518 334 762 322
+expect listitem:"Sheet.10" rect 601 575 75 50
+# undo, undo: the title back
+key ctrl+z
+key ctrl+z
+expect listitem:"Titel" rect 518 334 502 347
+expect listitem:"Sheet.10" rect 601 600 75 51

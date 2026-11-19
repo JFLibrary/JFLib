@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Fluss nach unten, 16 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="1.5" width="6" height="2"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="6.5" width="6" height="2"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="11.5" width="6" height="2"/>
+  <path class="ink" stroke="#1D2228" d="M4.5 4V6M4.5 9V11"/>
+  <path class="tint" stroke="#1F5FA8" d="M11.5 1V11"/>
+  <polygon class="tint" fill="#1F5FA8" points="9,11 14,11 11.5,13.5"/>
+</svg>

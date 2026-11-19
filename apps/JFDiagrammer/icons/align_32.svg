@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Ausrichten, 32 px</title>
+  <line class="tint" stroke="#1F5FA8" x1="4.5" y1="2" x2="4.5" y2="30"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="4.5" width="21" height="6"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="13.5" width="12" height="6"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="22.5" width="17" height="6"/>
+</svg>

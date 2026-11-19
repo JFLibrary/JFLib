@@ -1,0 +1,20 @@
+# apps/JFDiagrammer/PACKAGE: the app's identity and packages (docs/PACKAGING.md)
+#   python tools/package.py JFDiagrammer --formats all
+# version= is the app's own version (MAJOR.MINOR.PATCH, docs/VERSIONING.md); the program reads it
+# as rt::app_version!(), the packages and lib/update use it.  The library has its own (Cargo.toml).
+display=JFDiagrammer
+version=0.1.0
+publisher=JFLib
+license=MIT OR Apache-2.0
+summary=Diagramme, Flussdiagramme und Netzwerkpläne zeichnen
+description=Diagramme zeichnen wie in Visio: Shapes aus Schablonen, Verbinder, Container und Designs; öffnet und speichert Visio-Zeichnungen (.vsdx), geschrieben in Rust mit JFLib.
+generic=Diagrammeditor
+categories=Office;Graphics;VectorGraphics;
+deb_name=jfdiagrammer
+# Flatpak, AppStream and the MSIX identity: the author's apps use jfreund.org (docs/PACKAGING.md)
+app_id=org.jfreund.JFDiagrammer
+homepage=https://github.com/JFLibrary/JFLib/tree/main/apps/JFDiagrammer
+default_win=netlab
+default_linux=netlab
+styles=netlab
+# file types ("Open with" .vsdx, .vssx, ...) come with reading them (PLAN.md, JD3)

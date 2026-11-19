@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Farben, 16 px</title>
+  <rect class="tint" fill="#1F5FA8" x="2" y="2" width="5" height="5"/>
+  <rect class="ink" fill="#1D2228" x="9" y="2" width="5" height="5"/>
+  <rect class="shade" fill="#B9BBBE" x="2" y="9" width="5" height="5"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="9.5" y="9.5" width="4" height="4"/>
+</svg>

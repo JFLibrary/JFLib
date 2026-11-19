@@ -1,0 +1,37 @@
+# Raute: die Ecken liegen in der Mitte der Seiten des Kastens, dort sind auch die
+# Verbindungspunkte
+master: Diamond
+name.de: Raute
+name.en: Diamond
+name.es: Rombo
+name.it: Rombo
+name.fr: Losange
+prompt.de: Raute, zum Beispiel für eine Entscheidung.
+prompt.en: Diamond, for example for a decision.
+prompt.es: Rombo, por ejemplo para una decisión.
+prompt.it: Rombo, ad esempio per una decisione.
+prompt.fr: Losange, par exemple pour une décision.
+keywords.de: Raute, Rhombus, Entscheidung, Verzweigung, Karo
+keywords.en: diamond, rhombus, decision, branch, lozenge
+keywords.es: rombo, decisión, bifurcación, diamante
+keywords.it: rombo, decisione, diramazione, losanga
+keywords.fr: losange, décision, branchement, rhombe, carreau
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+
+[Geometry]
+MoveTo  X = Width*0.5; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width*0.5; Y = Height
+LineTo  X = 0; Y = Height*0.5
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

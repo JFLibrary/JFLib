@@ -24,6 +24,7 @@ plat.workspace = true
 base.workspace = true
 gfx.workspace = true
 img_core.workspace = true
+archive.workspace = true
 img_png.workspace = true
 img_jpeg.workspace = true
 img_bmp.workspace = true

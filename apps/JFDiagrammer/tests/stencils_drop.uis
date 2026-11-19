@@ -1,0 +1,31 @@
+# JFDiagrammer, JD9: shapes onto the page (SL-03, MS-02, LG-04) -- click + click, drag and
+# drop, Enter on a tile; the master comes into the drawing once, each instance gets the name in
+# the current language (the second one "Rechteck.N"); the first shape makes the empty drawing a
+# document with a page
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+# click + click: the tile is armed (checked) until the click on the page
+click button:"Rechteck"
+expect button:"Rechteck" checked
+click canvas:"Zeichenfläche"
+a11y expect announced "„Rechteck“ abgelegt"
+expect button:"Rechteck" unchecked
+expect tab:"Seite-1" exists
+expect button:"Seite 1 von 1" exists
+# Esc disarms without placing
+click button:"Raute"
+expect button:"Raute" checked
+key esc
+expect button:"Raute" unchecked
+# drag and drop
+drag button:"Ellipse" canvas:"Zeichenfläche"
+a11y expect announced "„Ellipse“ abgelegt"
+# the same master again: one copy of it in the drawing, the instance named with its ID
+drag button:"Rechteck" canvas:"Zeichenfläche"
+a11y expect announced "„Rechteck.6“ abgelegt"
+# Enter on a tile: the middle of the view
+focus button:"Pfeil"
+key enter
+a11y expect announced "„Pfeil“ abgelegt"
+shot build/JFDiagrammer-stencils-drop.png

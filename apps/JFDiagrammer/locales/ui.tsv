@@ -1,0 +1,656 @@
+de	en	es	it	fr
+Start	Home	Inicio	Home	Accueil
+Einfügen	Insert	Insertar	Inserisci	Insertion
+Entwurf	Design	Diseño	Progettazione	Création
+Ansicht	View	Vista	Visualizza	Affichage
+Zwischenablage	Clipboard	Portapapeles	Appunti	Presse-papiers
+Einfügen|Zwischenablage	Paste	Pegar	Incolla	Coller
+Ausschneiden	Cut	Cortar	Taglia	Couper
+Kopieren	Copy	Copiar	Copia	Copier
+Format übertragen	Format Painter	Copiar formato	Copia formato	Reproduire la mise en forme
+Tools	Tools	Herramientas	Strumenti	Outils
+Text	Text	Texto	Testo	Texte
+Rechteck	Rectangle	Rectángulo	Rettangolo	Rectangle
+Anordnen	Arrange	Organizar	Disponi	Organiser
+Ausrichten	Align	Alinear	Allinea	Aligner
+In den Vordergrund	Bring to Front	Traer al frente	Porta in primo piano	Mettre au premier plan
+Gruppieren	Group	Agrupar	Raggruppa	Grouper
+Bearbeiten	Editing	Edición	Modifica	Édition
+Suchen	Find	Buscar	Trova	Rechercher
+Ebenen	Layers	Capas	Livelli	Calques
+Markieren	Select	Seleccionar	Seleziona	Sélectionner
+Seiten	Pages	Páginas	Pagine	Pages
+Leere Seite	Blank Page	Página en blanco	Pagina vuota	Page vierge
+Illustrationen	Illustrations	Ilustraciones	Illustrazioni	Illustrations
+Bilder	Pictures	Imágenes	Immagini	Images
+Diagrammteile	Diagram Parts	Partes del diagrama	Parti del diagramma	Composants du diagramme
+Container	Container	Contenedor	Contenitore	Conteneur
+Beschriftung	Callout	Llamada	Richiamo	Bulle d'annotation
+Links	Links	Vínculos	Collegamenti	Liens
+Hyperlink	Link	Vínculo	Collegamento	Lien
+Seite einrichten	Page Setup	Configurar página	Imposta pagina	Mise en page
+Größe	Size	Tamaño	Dimensioni	Taille
+Designs	Themes	Temas	Temi	Thèmes
+Varianten	Variants	Variantes	Varianti	Variantes
+Farben	Colors	Colores	Colori	Couleurs
+Schriftarten	Fonts	Fuentes	Tipi di carattere	Polices
+Effekte	Effects	Efectos	Effetti	Effets
+Anzeigen	Show	Mostrar	Mostra	Afficher
+Lineal	Ruler	Regla	Righello	Règle
+Führungslinien	Guides	Guías	Guide	Repères
+Zoom	Zoom	Zoom	Zoom	Zoom
+An Fenster anpassen	Fit to Window	Ajustar a la ventana	Adatta alla finestra	Ajuster à la fenêtre
+Seitenbreite	Page Width	Ancho de página	Larghezza pagina	Largeur de page
+Aufgabenbereiche	Task Panes	Paneles de tareas	Riquadri attività	Volets
+Noch nicht verfügbar	Not available yet	Aún no disponible	Non ancora disponibile	Pas encore disponible
+Shapes	Shapes	Formas	Forme	Formes
+Keine Schablone geöffnet.	No stencil open.	No hay ninguna colección de formas abierta.	Nessuna raccolta di forme aperta.	Aucune bibliothèque de formes ouverte.
+Weitere Shapes	More Shapes	Más formas	Altre forme	Plus de formes
+Zeichenfläche	Drawing canvas	Lienzo de dibujo	Area di disegno	Zone de dessin
+Seite {} von {}	Page {} of {}	Página {} de {}	Pagina {} di {}	Page {} sur {}
+{} %	{}%	{} %	{}%	{} %
+Eine leere Seite ohne Schablonen.	A blank page without stencils.	Una página en blanco sin ninguna colección de formas.	Una pagina vuota senza alcuna raccolta di forme.	Une page vierge sans bibliothèque de formes.
+Leere Zeichnung	Blank Drawing	Dibujo en blanco	Disegno vuoto	Dessin vierge
+Einfache Formen, Pfeile und Beschriftungen für allgemeine Diagramme.	Basic shapes, arrows and callouts for general diagrams.	Formas básicas, flechas y llamadas para diagramas generales.	Forme di base, frecce e richiami per diagrammi generici.	Formes simples, flèches et bulles d'annotation pour les diagrammes courants.
+Standarddiagramm	Basic Diagram	Diagrama básico	Diagramma di base	Diagramme de base
+Prozessschritte, Entscheidungen und Verbinder nach ISO 5807.	Process steps, decisions and connectors following ISO 5807.	Pasos de proceso, decisiones y conectores según ISO 5807.	Fasi di processo, decisioni e connettori secondo ISO 5807.	Étapes de processus, décisions et connecteurs selon la norme ISO 5807.
+Standardflussdiagramm	Basic Flowchart	Diagrama de flujo básico	Diagramma di flusso di base	Diagramme de flux de base
+Ein Ablauf in Bahnen je Abteilung oder Rolle.	A process in lanes by department or role.	Un proceso en calles por departamento o función.	Un processo in corsie per reparto o ruolo.	Un processus en couloirs par service ou rôle.
+Funktionsübergreifendes Flussdiagramm	Cross-Functional Flowchart	Diagrama de flujo multifuncional	Diagramma di flusso multifunzione	Diagramme de flux interfonctionnel
+Rechner, Server und Netzwerkgeräte mit Verbindungen.	Computers, servers and network devices with their connections.	Equipos, servidores y dispositivos de red con sus conexiones.	Computer, server e dispositivi di rete con i relativi collegamenti.	Ordinateurs, serveurs et périphériques réseau avec leurs connexions.
+Standardnetzwerk	Basic Network	Red básica	Rete di base	Réseau de base
+Detailliertes Netzwerk	Detailed Network	Red detallada	Rete dettagliata	Réseau détaillé
+Netzwerkpläne mit Geräten, Racks und Verkabelung im Detail.	Detailed network plans with devices, racks and cabling.	Planos de red detallados con dispositivos, racks y cableado.	Schemi di rete dettagliati con dispositivi, rack e cablaggio.	Plans réseau détaillés avec appareils, racks et câblage.
+Geräte in Racks nach Höheneinheiten.	Devices in racks by rack unit.	Dispositivos en racks por unidades de altura.	Dispositivi in rack per unità di altezza.	Appareils en rack par unités de hauteur.
+Rack-Diagramm	Rack Diagram	Diagrama de rack	Diagramma rack	Diagramme de rack
+Neu	New	Nuevo	Nuovo	Nouveau
+Exportieren	Export	Exportar	Esporta	Exporter
+Info	Info	Información	Informazioni	Informations
+Optionen	Options	Opciones	Opzioni	Options
+Vorlagen	Templates	Plantillas	Modelli	Modèles
+Zurück zu den Vorlagen	Back to Templates	Volver a las plantillas	Torna ai modelli	Retour aux modèles
+Metrische Einheiten	Metric Units	Unidades métricas	Unità metriche	Unités métriques
+US-Einheiten	US Units	Unidades de EE. UU.	Unità USA	Unités américaines
+Erstellen	Create	Crear	Crea	Créer
+Durchsuchen	Browse	Examinar	Sfoglia	Parcourir
+Zuletzt verwendet	Recent	Recientes	Recenti	Récent
+Hier erscheinen die Zeichnungen, die Sie zuletzt geöffnet oder gespeichert haben.	Drawings you have recently opened or saved appear here.	Aquí aparecen los dibujos que ha abierto o guardado recientemente.	Qui vengono visualizzati i disegni aperti o salvati di recente.	Les dessins que vous avez récemment ouverts ou enregistrés apparaissent ici.
+Visio-Schablone (.vssx)	Visio stencil (.vssx)	Colección de formas de Visio (.vssx)	Raccolta di forme di Visio (.vssx)	Bibliothèque de formes Visio (.vssx)
+Visio-Vorlage (.vstx)	Visio template (.vstx)	Plantilla de Visio (.vstx)	Modello di Visio (.vstx)	Modèle Visio (.vstx)
+Visio-Zeichnung (.vsdx)	Visio drawing (.vsdx)	Dibujo de Visio (.vsdx)	Disegno di Visio (.vsdx)	Dessin Visio (.vsdx)
+Visio-Zeichnung mit Makros (.vsdm)	Visio drawing with macros (.vsdm)	Dibujo de Visio con macros (.vsdm)	Disegno di Visio con macro (.vsdm)	Dessin Visio avec macros (.vsdm)
+Exemplare	Copies	Copias	Copie	Copies
+Drucker	Printer	Impresora	Stampante	Imprimante
+Einstellungen	Settings	Configuración	Impostazioni	Paramètres
+Aktuelle Seite drucken	Print Current Page	Imprimir página actual	Stampa pagina corrente	Imprimer la page active
+Alle Seiten drucken	Print All Pages	Imprimir todas las páginas	Stampa tutte le pagine	Imprimer toutes les pages
+Seitenansicht	Print Preview	Vista previa de impresión	Anteprima di stampa	Aperçu avant impression
+Dateityp ändern	Change File Type	Cambiar el tipo de archivo	Cambia tipo di file	Modifier le type de fichier
+Als Webseite speichern	Save as Web Page	Guardar como página web	Salva come pagina Web	Enregistrer en tant que page web
+Version {}	Version {}	Versión {}	Versione {}	Version {}
+Lizenzen	Licenses	Licencias	Licenze	Licences
+JFDiagrammer und JFLib stehen unter der MIT- oder der Apache-2.0-Lizenz, nach Ihrer Wahl.	JFDiagrammer and JFLib are licensed under the MIT or the Apache 2.0 license, at your option.	JFDiagrammer y JFLib se distribuyen con la licencia MIT o la licencia Apache 2.0, a su elección.	JFDiagrammer e JFLib sono distribuiti con licenza MIT o Apache 2.0, a scelta dell'utente.	JFDiagrammer et JFLib sont distribués sous licence MIT ou Apache 2.0, au choix.
+Namensnennungen	Attributions	Atribuciones	Attribuzioni	Attributions
+Hier stehen die Namensnennungen mitgelieferter Symbole, sobald Schablonen dazukommen (etwa die AWS-Architektursymbole).	The attributions of bundled icons appear here once stencils are added (such as the AWS architecture icons).	Aquí aparecerán las atribuciones de los iconos incluidos cuando se añadan colecciones de formas (como los iconos de arquitectura de AWS).	Qui verranno indicate le attribuzioni delle icone incluse quando si aggiungeranno raccolte di forme (ad esempio le icone di architettura AWS).	Les attributions des icônes fournies apparaîtront ici dès que des bibliothèques de formes seront ajoutées (par exemple les icônes d'architecture AWS).
+Symbolleiste für den Schnellzugriff anpassen	Customize Quick Access Toolbar	Personalizar barra de herramientas de acceso rápido	Personalizza barra di accesso rapido	Personnaliser la barre d'outils Accès rapide
+Inhalte einfügen	Paste Special	Pegado especial	Incolla speciale	Collage spécial
+Als Link einfügen	Paste as Link	Pegar como vínculo	Incolla come collegamento	Coller en tant que lien
+Duplizieren	Duplicate	Duplicar	Duplica	Dupliquer
+Schriftgrad	Font Size	Tamaño de fuente	Dimensione carattere	Taille de police
+Schriftfarbe	Font Color	Color de fuente	Colore carattere	Couleur de police
+Text|Dialogfeld	Text	Texto	Testo	Texte
+Oben ausrichten|Text	Top Align	Alinear arriba	Allinea in alto	Aligner en haut
+Mittig ausrichten|Text	Middle Align	Alinear en el medio	Allinea in mezzo	Aligner au milieu
+Unten ausrichten|Text	Bottom Align	Alinear abajo	Allinea in basso	Aligner en bas
+Zeigertool	Pointer Tool	Herramienta Puntero	Strumento puntatore	Outil Pointeur
+Verbinder|Tool	Connector	Conector	Connettore	Connecteur
+Text|Tool	Text	Texto	Testo	Texte
+Zeichentools	Drawing Tools	Herramientas de dibujo	Strumenti di disegno	Outils de dessin
+Ellipse	Ellipse	Elipse	Ellisse	Ellipse
+Linie|Zeichentool	Line	Línea	Linea	Ligne
+Freihandform	Freeform	Forma libre	Figura a mano libera	Forme libre
+Bogen	Arc	Arco	Arco	Arc
+Bleistift	Pencil	Lápiz	Matita	Crayon
+Füllung	Fill	Relleno	Riempimento	Remplissage
+Keine Füllung	No Fill	Sin relleno	Nessun riempimento	Aucun remplissage
+Füllungsoptionen	Fill Options	Opciones de relleno	Opzioni riempimento	Options de remplissage
+Linie|Format	Line	Línea	Linea	Trait
+Keine Linie	No Line	Sin línea	Nessuna linea	Aucun trait
+Stärke	Weight	Grosor	Spessore	Épaisseur
+Striche	Dashes	Guiones	Tratteggi	Tirets
+Pfeile	Arrows	Flechas	Frecce	Flèches
+Linienoptionen	Line Options	Opciones de línea	Opzioni linea	Options de trait
+Weitere Farben	More Colors	Más colores	Altri colori	Autres couleurs
+Shape formatieren	Format Shape	Formato de forma	Formato forma	Format de la forme
+Automatisch ausrichten	Auto Align	Alineación automática	Allineamento automatico	Alignement automatique
+Links ausrichten	Align Left	Alinear a la izquierda	Allinea a sinistra	Aligner à gauche
+Zentriert ausrichten	Align Center	Alinear al centro	Allinea al centro	Aligner au centre
+Rechts ausrichten	Align Right	Alinear a la derecha	Allinea a destra	Aligner à droite
+Oben ausrichten|Shapes	Align Top	Alinear arriba	Allinea in alto	Aligner en haut
+Mittig ausrichten|Shapes	Align Middle	Alinear al medio	Allinea in mezzo	Aligner au milieu
+Unten ausrichten|Shapes	Align Bottom	Alinear abajo	Allinea in basso	Aligner en bas
+Positionieren	Position	Posición	Posizione	Position
+Horizontal verteilen	Distribute Horizontally	Distribuir horizontalmente	Distribuisci orizzontalmente	Distribuer horizontalement
+Vertikal verteilen	Distribute Vertically	Distribuir verticalmente	Distribuisci verticalmente	Distribuer verticalement
+Um 90° nach links drehen	Rotate Left 90°	Girar 90° a la izquierda	Ruota a sinistra di 90°	Faire pivoter à gauche de 90°
+Um 90° nach rechts drehen	Rotate Right 90°	Girar 90° a la derecha	Ruota a destra di 90°	Faire pivoter à droite de 90°
+Horizontal spiegeln	Flip Horizontal	Voltear horizontalmente	Capovolgi orizzontalmente	Retourner horizontalement
+Vertikal spiegeln	Flip Vertical	Voltear verticalmente	Capovolgi verticalmente	Retourner verticalement
+Eine Ebene nach vorne	Bring Forward	Traer adelante	Porta avanti	Avancer
+In den Hintergrund	Send to Back	Enviar al fondo	Porta in secondo piano	Mettre à l'arrière-plan
+Eine Ebene nach hinten	Send Backward	Enviar atrás	Porta indietro	Reculer
+Gruppieren|Menü	Group	Agrupar	Raggruppa	Grouper
+Gruppierung aufheben	Ungroup	Desagrupar	Separa	Dissocier
+Suchen|Menü	Find	Buscar	Trova	Rechercher
+Ebene zuweisen	Assign to Layer	Asignar a capa	Assegna a livello	Affecter au calque
+Ebeneneigenschaften	Layer Properties	Propiedades de capa	Proprietà livello	Propriétés du calque
+Alles markieren	Select All	Seleccionar todo	Seleziona tutto	Sélectionner tout
+Nach Typ auswählen	Select by Type	Seleccionar por tipo	Seleziona per tipo	Sélectionner par type
+Bereich auswählen	Area Select	Selección de área	Selezione area	Sélection de zone
+Lassoauswahl	Lasso Select	Selección de lazo	Selezione lazo	Sélection lasso
+Neue Seite	New Page	Nueva página	Nuova pagina	Nouvelle page
+Hintergrundseite	Background Page	Página de fondo	Pagina di sfondo	Page d'arrière-plan
+Diese Seite duplizieren	Duplicate This Page	Duplicar esta página	Duplica questa pagina	Dupliquer cette page
+Bild aus Datei	Picture from File	Imagen desde archivo	Immagine da file	Image à partir d'un fichier
+Verbinder|Einfügen	Connector	Conector	Connettore	Connecteur
+Textfeld	Text Box	Cuadro de texto	Casella di testo	Zone de texte
+Horizontales Textfeld	Horizontal Text Box	Cuadro de texto horizontal	Casella di testo orizzontale	Zone de texte horizontale
+Vertikales Textfeld	Vertical Text Box	Cuadro de texto vertical	Casella di testo verticale	Zone de texte verticale
+Feld	Field	Campo	Campo	Champ
+Ausrichtung|Seite	Orientation	Orientación	Orientamento	Orientation
+Hochformat	Portrait	Vertical	Verticale	Portrait
+Querformat	Landscape	Horizontal	Orizzontale	Paysage
+Größe|Seite	Size	Tamaño	Dimensioni	Taille
+Größe an Zeichnung anpassen	Fit to Drawing	Ajustar al dibujo	Adatta al disegno	Ajuster au dessin
+Weitere Seitenformate	More Page Sizes	Más tamaños de página	Altri formati pagina	Autres formats de page
+Automatisch anpassen	Auto Size	Tamaño automático	Dimensioni automatiche	Taille automatique
+Design auf neue Shapes anwenden	Apply Theme to New Shapes	Aplicar tema a formas nuevas	Applica tema alle nuove forme	Appliquer le thème aux nouvelles formes
+Effekte|Varianten	Effects	Efectos	Effetti	Effets
+Verbinder|Varianten	Connectors	Conectores	Connettori	Connecteurs
+Verzierung	Embellishment	Adorno	Abbellimento	Embellissement
+Verbinder|Layout	Connectors	Conectores	Connettori	Connecteurs
+Rechtwinklig	Right-Angle	En ángulo recto	Ad angolo retto	Angle droit
+Gerade	Straight	Recto	Diritto	Droit
+Gebogen	Curved	Curvo	Curvo	Courbe
+Linienübergänge anzeigen	Show Line Jumps	Mostrar saltos de línea	Mostra salti di linea	Afficher les sauts de ligne
+Verbinder neu routen	Reroute Connectors	Volver a enrutar conectores	Reindirizza connettori	Réacheminer les connecteurs
+Layout und Routing	Layout and Routing	Diseño y enrutamiento	Layout e routing	Disposition et routage
+Seitenumbrüche	Page Breaks	Saltos de página	Interruzioni di pagina	Sauts de page
+Gitternetz	Grid	Cuadrícula	Griglia	Grille
+Dynamisches Gitter	Dynamic Grid	Cuadrícula dinámica	Griglia dinamica	Grille dynamique
+Verbindungspfeile	Connect Arrows	Flechas de conexión	Frecce di collegamento	Flèches de liaison
+Verbindungspunkte	Connection Points	Puntos de conexión	Punti di connessione	Points de connexion
+Ausrichten und Kleben	Snap & Glue	Ajustar y pegar	Aggancia e incolla	Magnétisme et collage
+Vergrößern	Zoom In	Acercar	Zoom avanti	Zoom avant
+Verkleinern	Zoom Out	Alejar	Zoom indietro	Zoom arrière
+Shape formatieren|Bereich	Format Shape	Formato de forma	Formato forma	Format de la forme
+Größe und Position	Size & Position	Tamaño y posición	Dimensioni e posizione	Taille et position
+Shape-Daten	Shape Data	Datos de forma	Dati forma	Données de forme
+Verschieben und Zoomen	Pan & Zoom	Desplazar y zoom	Panoramica e zoom	Panoramique et zoom
+Nächste Seite	Next Page	Página siguiente	Pagina successiva	Page suivante
+Vorherige Seite	Previous Page	Página anterior	Pagina precedente	Page précédente
+Alle Seiten	All Pages	Todas las páginas	Tutte le pagine	Toutes les pages
+Seite einfügen	Insert Page	Insertar página	Inserisci pagina	Insérer une page
+Seite löschen	Delete Page	Eliminar página	Elimina pagina	Supprimer la page
+Seite umbenennen	Rename Page	Cambiar nombre de página	Rinomina pagina	Renommer la page
+Seiten neu anordnen	Reorder Pages	Reordenar páginas	Riordina pagine	Réorganiser les pages
+Zeichnungsmaßstab	Drawing Scale	Escala de dibujo	Scala disegno	Échelle du dessin
+Text bearbeiten	Edit Text	Modificar texto	Modifica testo	Modifier le texte
+Symbol	Symbol	Símbolo	Simbolo	Symbole
+QuickInfo	ScreenTip	Información en pantalla	Descrizione comando	Info-bulle
+Ränder	Margins	Márgenes	Margini	Marges
+An Inhalt anpassen	Fit to Contents	Ajustar al contenido	Adatta al contenuto	Ajuster au contenu
+Automatische Größe	Automatic Resize	Ajuste automático	Ridimensionamento automatico	Redimensionnement automatique
+Containerformatvorlagen	Container Styles	Estilos de contenedor	Stili contenitore	Styles de conteneur
+Kopfzeilenstil	Heading Style	Estilo de encabezado	Stile intestazione	Style d'en-tête
+Container sperren	Lock Container	Bloquear contenedor	Blocca contenitore	Verrouiller le conteneur
+Inhalt auswählen	Select Contents	Seleccionar contenido	Seleziona contenuto	Sélectionner le contenu
+Container auflösen	Disband Container	Disolver contenedor	Sciogli contenitore	Dissocier le conteneur
+Zu Container hinzufügen	Add to Container	Agregar al contenedor	Aggiungi al contenitore	Ajouter au conteneur
+Aus Container entfernen	Remove from Container	Quitar del contenedor	Rimuovi dal contenitore	Retirer du conteneur
+Shape-Daten definieren	Define Shape Data	Definir datos de forma	Definisci dati forma	Définir les données de forme
+Text formatieren	Format Text	Formato de texto	Formato testo	Format du texte
+Linie formatieren	Format Line	Formato de línea	Formato linea	Format du trait
+Füllung formatieren	Format Fill	Formato de relleno	Formato riempimento	Format du remplissage
+Schatten formatieren	Format Shadow	Formato de sombra	Formato ombreggiatura	Format de l'ombre
+Verbinder zurücksetzen	Reset Connector	Restablecer conector	Reimposta connettore	Réinitialiser le connecteur
+Zu meinen Shapes hinzufügen	Add to My Shapes	Agregar a Mis formas	Aggiungi a Forme personali	Ajouter à Mes formes
+Neuer Kommentar	New Comment	Nuevo comentario	Nuovo commento	Nouveau commentaire
+Schablone schließen	Close Stencil	Cerrar colección de formas	Chiudi raccolta di forme	Fermer la bibliothèque de formes
+Schablone speichern	Save Stencil	Guardar colección de formas	Salva raccolta di forme	Enregistrer la bibliothèque de formes
+Schablone bearbeiten	Edit Stencil	Editar colección de formas	Modifica raccolta di forme	Modifier la bibliothèque de formes
+Symbole und Namen	Icons and Names	Iconos y nombres	Icone e nomi	Icônes et noms
+Nur Symbole	Icons Only	Solo iconos	Solo icone	Icônes uniquement
+Nur Namen	Names Only	Solo nombres	Solo nomi	Noms uniquement
+Neues Master-Shape	New Master Shape	Nueva forma maestra	Nuova forma master	Nouvelle forme maître
+Reihenfolge der Schablonen	Stencil Order	Orden de las colecciones de formas	Ordine delle raccolte di forme	Ordre des bibliothèques de formes
+Zeichnung{}	Drawing{}	Dibujo{}	Disegno{}	Dessin{}
+Systemeinstellung	System setting	Configuración del sistema	Impostazione di sistema	Paramètre système
+Erscheinungsbild	Appearance	Apariencia	Aspetto	Apparence
+Benutzername	User name	Nombre de usuario	Nome utente	Nom d'utilisateur
+Steht an Ihren Kommentaren.	Shown on your comments.	Aparece en sus comentarios.	Viene indicato nei commenti.	Apparaît dans vos commentaires.
+Initialen	Initials	Iniciales	Iniziali	Initiales
+Startbildschirm beim Programmstart anzeigen	Show the Start screen when the application starts	Mostrar la pantalla Inicio al iniciar la aplicación	Mostra la schermata Start all'avvio dell'applicazione	Afficher l'écran de démarrage au lancement de l'application
+Livevorschau aktivieren	Enable live preview	Habilitar vista previa activa	Abilita anteprima dinamica	Activer l'aperçu instantané
+Keine QuickInfos	No ScreenTips	Sin información en pantalla	Nessuna descrizione comando	Aucune info-bulle
+Mit Beschreibung	With descriptions	Con descripción	Con descrizione	Avec description
+Ohne Beschreibung	Without descriptions	Sin descripción	Senza descrizione	Sans description
+QuickInfos	ScreenTips	Información en pantalla	Descrizioni comandi	Info-bulles
+Dateien in diesem Format speichern	Save files in this format	Guardar archivos en este formato	Salva i file in questo formato	Enregistrer les fichiers dans ce format
+AutoWiederherstellen-Informationen speichern	Save AutoRecover information	Guardar información de Autorrecuperación	Salva informazioni di salvataggio automatico	Enregistrer les informations de récupération automatique
+Intervall (Minuten)	Interval (minutes)	Intervalo (minutos)	Intervallo (minuti)	Intervalle (minutes)
+Standardspeicherort für Zeichnungen	Default location for drawings	Ubicación predeterminada de los dibujos	Percorso predefinito dei disegni	Emplacement par défaut des dessins
+Speicherort für persönliche Vorlagen	Personal templates location	Ubicación de las plantillas personales	Percorso dei modelli personali	Emplacement des modèles personnels
+Wie das System	Same as system	Igual que el sistema	Come il sistema	Comme le système
+Sprache der Oberfläche	Display language	Idioma de la interfaz	Lingua dell'interfaccia	Langue de l'interface
+Gilt sofort, ohne Neustart.	Takes effect at once, without a restart.	Se aplica al instante, sin reiniciar.	Ha effetto subito, senza riavvio.	S'applique immédiatement, sans redémarrage.
+Deutschland	Germany	Alemania	Germania	Allemagne
+Frankreich	France	Francia	Francia	France
+Italien	Italy	Italia	Italia	Italie
+Spanien	Spain	España	Spagna	Espagne
+Vereinigte Staaten	United States	Estados Unidos	Stati Uniti	États-Unis
+Vereinigtes Königreich	United Kingdom	Reino Unido	Regno Unito	Royaume-Uni
+Wie die Sprache	Same as language	Igual que el idioma	Come la lingua	Comme la langue
+Region für Einheiten und Formate	Region for units and formats	Región para unidades y formatos	Area geografica per unità e formati	Région des unités et formats
+Livedynamik aktivieren	Enable live dynamics	Habilitar dinámica activa	Abilita dinamica in tempo reale	Activer la dynamique en temps réel
+Mit dem Rad zoomen	Zoom with the mouse wheel	Zoom con la rueda del mouse	Zoom con la rotellina del mouse	Zoom avec la roulette de la souris
+Auswahl beim Zoomen zentrieren	Center selection on zoom	Centrar la selección al hacer zoom	Centra la selezione durante lo zoom	Centrer la sélection lors du zoom
+Verbindungspfeile aktivieren	Enable connect arrows	Habilitar flechas de conexión	Abilita frecce di collegamento	Activer les flèches de liaison
+Verbinder teilen	Split connectors	Dividir conectores	Dividi connettori	Fractionner les connecteurs
+Verbinder mit Shapes löschen	Delete connectors when deleting shapes	Eliminar conectores al eliminar formas	Elimina connettori con le forme	Supprimer les connecteurs avec les formes
+Eingabetaste beendet die Textbearbeitung	Enter ends text editing	La tecla Entrar termina la edición de texto	Il tasto Invio termina la modifica del testo	La touche Entrée termine la modification du texte
+Anzahl der Rückgängig-Schritte	Number of undo levels	Número de niveles de deshacer	Numero di livelli di annullamento	Nombre de niveaux d'annulation
+Millimeter	Millimeters	Milímetros	Millimetri	Millimètres
+Punkt	Points	Puntos	Punti	Points
+Wie die Region	Same as region	Igual que la región	Come l'area geografica	Comme la région
+Zentimeter	Centimeters	Centímetros	Centimetri	Centimètres
+Zoll	Inches	Pulgadas	Pollici	Pouces
+Maßeinheit der Seite	Page measurement units	Unidad de medida de la página	Unità di misura della pagina	Unité de mesure de la page
+Im Entwicklermodus ausführen	Run in developer mode	Ejecutar en modo de programador	Esegui in modalità sviluppatore	Exécuter en mode développeur
+Erweitert	Advanced	Avanzadas	Impostazioni avanzate	Options avancées
+Tastenkürzel	Keyboard shortcuts	Métodos abreviados de teclado	Tasti di scelta rapida	Raccourcis clavier
+Die Tastenkürzel folgen der Office-Belegung der Oberflächensprache. Eigene Kürzel stehen im Abschnitt [keys] der Einstellungsdatei.	The shortcuts follow the Office layout of the display language. Your own shortcuts go in the [keys] section of the settings file.	Los métodos abreviados siguen la asignación de Office del idioma de la interfaz. Los propios se guardan en la sección [keys] del archivo de configuración.	I tasti di scelta rapida seguono l'assegnazione di Office della lingua dell'interfaccia. Quelli personalizzati si trovano nella sezione [keys] del file delle impostazioni.	Les raccourcis suivent l'affectation d'Office de la langue de l'interface. Les raccourcis personnalisés figurent dans la section [keys] du fichier de paramètres.
+Gruppierung	Group	Agrupar	Raggruppa	Groupe
+Daten	Data	Datos	Dati	Données
+Formatieren	Format	Formato	Formato	Format
+Verbinderart	Connector Type	Tipo de conector	Tipo di connettore	Type de connecteur
+Ansichtsoptionen	View Options	Opciones de vista	Opzioni di visualizzazione	Options d'affichage
+Seite-{}	Page-{}	Página-{}	Pagina-{}	Page-{}
+Shapes suchen	Search shapes	Buscar formas	Cerca forme	Rechercher des formes
+Füllung und Linie	Fill & Line	Relleno y línea	Riempimento e linea	Remplissage et trait
+3D-Drehung	3-D Rotation	Giro 3D	Rotazione 3D	Rotation 3D
+3D-Format	3-D Format	Formato 3D	Formato 3D	Format 3D
+Leuchten	Glow	Iluminado	Alone	Lumière
+Schatten	Shadow	Sombra	Ombreggiatura	Ombre
+Spiegelung	Reflection	Reflexión	Riflesso	Réflexion
+Weiche Kanten	Soft Edges	Bordes suaves	Bordi sfumati	Bordures adoucies
+Textblock	Text Block	Bloque de texto	Blocco di testo	Bloc de texte
+Linie|Abschnitt	Line	Línea	Linea	Trait
+Kein Shape ausgewählt.	No shape selected.	No hay ninguna forma seleccionada.	Nessuna forma selezionata.	Aucune forme sélectionnée.
+Breite	Width	Ancho	Larghezza	Largeur
+Höhe	Height	Alto	Altezza	Hauteur
+Winkel	Angle	Ángulo	Angolo	Angle
+Drehpunkt	Rotation point	Punto de giro	Punto di rotazione	Point de rotation
+Mitte	Center	Centro	Centro	Centre
+Keine Shape-Daten	No shape data	No hay datos de forma	Nessun dato forma	Aucune donnée de forme
+Wählen Sie ein Shape aus, um seine Daten zu sehen.	Select a shape to see its data.	Seleccione una forma para ver sus datos.	Selezionare una forma per visualizzarne i dati.	Sélectionnez une forme pour afficher ses données.
+Breite: {}  Höhe: {}  Winkel: {}	Width: {}  Height: {}  Angle: {}	Ancho: {}  Alto: {}  Ángulo: {}	Larghezza: {}  Altezza: {}  Angolo: {}	Largeur : {}  Hauteur : {}  Angle : {}
+Datei	File	Archivo	File	Fichier
+Container-Tools	Container Tools	Herramientas de contenedor	Strumenti contenitore	Outils de conteneur
+Format|Register	Format	Formato	Formato	Format
+Textwerkzeuge	Text Tools	Herramientas de texto	Strumenti testo	Outils de texte
+Text|Register	Text	Texto	Testo	Texte
+Shapes drehen	Rotate Shapes	Girar formas	Ruota forme	Faire pivoter les formes
+Formenarten	Shape Styles	Estilos de forma	Stili forma	Styles de forme
+Layout	Layout	Diseño	Layout	Disposition
+Visuelle Unterstützung	Visual Aids	Ayudas visuales	Supporti visivi	Aides visuelles
+Mitgliedschaft	Membership	Pertenencia	Appartenenza	Appartenance
+Vorschauen folgen mit den Designs	Previews will come with the themes	Las vistas previas llegarán con los temas	Le anteprime arriveranno con i temi	Les aperçus arriveront avec les thèmes
+# the settings (options.rs): labels, help texts and choice labels the settings page translates
+Hell	Light	Claro	Chiaro	Clair
+Dunkel	Dark	Oscuro	Scuro	Sombre
+Eine Zeichnung, Schablone oder Vorlage öffnen (schreibgeschützt)	Open a drawing, stencil or template (read-only)	Abrir un dibujo, una colección de formas o una plantilla (solo lectura)	Apri un disegno, una raccolta di forme o un modello (sola lettura)	Ouvrir un dessin, une bibliothèque de formes ou un modèle (lecture seule)
+=Alle Dateien	=All files	=Todos los archivos	=Tutti i file	=Tous les fichiers
+vsdx;vsdm=Visio-Zeichnung	vsdx;vsdm=Visio drawing	vsdx;vsdm=Dibujo de Visio	vsdx;vsdm=Disegno di Visio	vsdx;vsdm=Dessin Visio
+vssx;vssm=Visio-Schablone	vssx;vssm=Visio stencil	vssx;vssm=Colección de formas de Visio	vssx;vssm=Raccolta di forme di Visio	vssx;vssm=Bibliothèque de formes Visio
+vstx;vstm=Visio-Vorlage	vstx;vstm=Visio template	vstx;vstm=Plantilla de Visio	vstx;vstm=Modello di Visio	vstx;vstm=Modèle Visio
+Die Datei lässt sich nicht lesen.	The file cannot be read.	No se puede leer el archivo.	Impossibile leggere il file.	Le fichier ne peut pas être lu.
+„{}“ kann nicht geöffnet werden.	“{}” cannot be opened.	No se puede abrir «{}».	Impossibile aprire «{}».	Impossible d'ouvrir « {} ».
+Die Makros der Datei bleiben erhalten und werden nie ausgeführt.	The file's macros are kept and never run.	Las macros del archivo se conservan y nunca se ejecutan.	Le macro del file vengono conservate e mai eseguite.	Les macros du fichier sont conservées et ne sont jamais exécutées.
+{} Hinweise beim Lesen.	{} notes while reading.	{} avisos al leer.	{} avvisi durante la lettura.	{} remarques lors de la lecture.
+Ersetzte Schriften: {}.	Substituted fonts: {}.	Fuentes sustituidas: {}.	Tipi di carattere sostituiti: {}.	Polices remplacées : {}.
+PDF-Dokument erstellen	Create PDF Document	Crear documento PDF	Crea documento PDF	Créer un document PDF
+Vektorgrafik mit eingebetteten Schriften, Text zum Suchen und Kopieren, Hyperlinks und einem Lesezeichen je Seite.	Vector graphics with embedded fonts, searchable and copyable text, hyperlinks and one bookmark per page.	Gráficos vectoriales con fuentes incrustadas, texto que se puede buscar y copiar, hipervínculos y un marcador por página.	Grafica vettoriale con tipi di carattere incorporati, testo ricercabile e copiabile, collegamenti ipertestuali e un segnalibro per pagina.	Format vectoriel avec polices incorporées, texte que vous pouvez rechercher et copier, liens hypertexte et un signet par page.
+SVG-Grafik	SVG Image	Imagen SVG	Immagine SVG	Image SVG
+Vektorgrafik für Browser und Grafikprogramme: Pfade, Text, Bilder und Verläufe.	Vector graphics for browsers and graphics programs: paths, text, pictures and gradients.	Gráficos vectoriales para exploradores y programas de gráficos: trazados, texto, imágenes y degradados.	Grafica vettoriale per browser e programmi di grafica: tracciati, testo, immagini e sfumature.	Format vectoriel pour les navigateurs et les logiciels graphiques : tracés, texte, images et dégradés.
+PNG-Grafik	PNG Image	Imagen PNG	Immagine PNG	Image PNG
+Rastergrafik ohne Verluste, mit wählbarer Auflösung und auf Wunsch transparentem Hintergrund.	Lossless raster image with a choice of resolution and an optional transparent background.	Imagen rasterizada sin pérdida, con la resolución que elija y, si lo desea, fondo transparente.	Immagine raster senza perdita, con risoluzione selezionabile e sfondo trasparente facoltativo.	Image matricielle sans perte, avec la résolution de votre choix et, si vous le souhaitez, un arrière-plan transparent.
+JPEG-Grafik	JPEG Image	Imagen JPEG	Immagine JPEG	Image JPEG
+Rastergrafik mit wählbarer Qualität, klein für Fotos und Webseiten.	Raster image with a choice of quality, compact for photos and web pages.	Imagen rasterizada con la calidad que elija, compacta para fotos y páginas web.	Immagine raster con qualità selezionabile, compatta per foto e pagine Web.	Image matricielle avec la qualité de votre choix, compacte pour les photos et les pages web.
+Öffnen Sie eine Zeichnung, um sie zu exportieren.	Open a drawing to export it.	Abra un dibujo para exportarlo.	Aprire un disegno per esportarlo.	Ouvrez un dessin pour l'exporter.
+Aktuelle Seite	Current Page	Página actual	Pagina corrente	Page active
+Seitenbereich	Page Range	Intervalo de páginas	Intervallo di pagine	Plage de pages
+Von	From	Desde	Da	De
+bis	to	hasta	a	à
+Hintergrundseiten einschließen	Include background pages	Incluir páginas de fondo	Includi pagine di sfondo	Inclure les pages d'arrière-plan
+Hyperlinks übernehmen	Include hyperlinks	Incluir hipervínculos	Includi collegamenti ipertestuali	Inclure les liens hypertexte
+Lesezeichen je Seite	One bookmark per page	Un marcador por página	Un segnalibro per pagina	Un signet par page
+Dokumenteigenschaften übernehmen	Include document properties	Incluir propiedades del documento	Includi proprietà documento	Inclure les propriétés du document
+Seitenfarbe als Hintergrund	Page color as background	Color de página como fondo	Colore pagina come sfondo	Couleur de page comme arrière-plan
+Shape-Daten als Attribute	Shape data as attributes	Datos de forma como atributos	Dati forma come attributi	Données de forme comme attributs
+Auflösung	Resolution	Resolución	Risoluzione	Résolution
+Benutzerdefiniert	Custom	Personalizado	Personalizzato	Personnalisé
+Bildschirm (96 dpi)	Screen (96 dpi)	Pantalla (96 dpi)	Schermo (96 dpi)	Écran (96 dpi)
+Drucker (300 dpi)	Printer (300 dpi)	Impresora (300 dpi)	Stampante (300 dpi)	Imprimante (300 dpi)
+Mittel (150 dpi)	Medium (150 dpi)	Media (150 dpi)	Media (150 dpi)	Moyenne (150 dpi)
+Transparenter Hintergrund	Transparent background	Fondo transparente	Sfondo trasparente	Arrière-plan transparent
+Qualität	Quality	Calidad	Qualità	Qualité
+Die gewählten Seiten in eine Datei schreiben	Save the selected pages to a file	Guardar las páginas seleccionadas en un archivo	Salva le pagine selezionate in un file	Enregistrer les pages sélectionnées dans un fichier
+Als Bild kopieren	Copy as Picture	Copiar como imagen	Copia come immagine	Copier en tant qu'image
+Als SVG kopieren	Copy as SVG	Copiar como SVG	Copia come SVG	Copier au format SVG
+Aktuelle Seite: {} × {} Pixel	Current page: {} × {} pixels	Página actual: {} × {} píxeles	Pagina corrente: {} × {} pixel	Page active : {} × {} pixels
+jpg;jpeg=JPEG-Grafik	jpg;jpeg=JPEG Image	jpg;jpeg=Imagen JPEG	jpg;jpeg=Immagine JPEG	jpg;jpeg=Image JPEG
+pdf=PDF-Dokument	pdf=PDF Document	pdf=Documento PDF	pdf=Documento PDF	pdf=Document PDF
+png=PNG-Grafik	png=PNG Image	png=Imagen PNG	png=Immagine PNG	png=Image PNG
+svg=SVG-Grafik	svg=SVG Image	svg=Imagen SVG	svg=Immagine SVG	svg=Image SVG
+Es sind keine Seiten zum Exportieren gewählt.	No pages are selected for export.	No hay ninguna página seleccionada para exportar.	Nessuna pagina selezionata per l'esportazione.	Aucune page n'est sélectionnée pour l'exportation.
+Es ist keine Zeichnung geöffnet.	No drawing is open.	No hay ningún dibujo abierto.	Nessun disegno aperto.	Aucun dessin n'est ouvert.
+Das PDF ließ sich nicht schreiben: {}	The PDF could not be created: {}	No se pudo crear el PDF: {}	Impossibile creare il PDF: {}	Impossible de créer le PDF : {}
+„{}“ ließ sich nicht schreiben.	“{}” could not be saved.	No se pudo guardar «{}».	Impossibile salvare «{}».	Impossible d'enregistrer « {} ».
+Gespeichert: {} (Seiten: {})	Saved: {} (pages: {})	Guardado: {} (páginas: {})	Salvato: {} (pagine: {})	Enregistré : {} (pages : {})
+Das Bild wäre zu groß; wählen Sie eine kleinere Auflösung.	The image would be too large; choose a lower resolution.	La imagen sería demasiado grande; elija una resolución menor.	L'immagine sarebbe troppo grande; scegliere una risoluzione inferiore.	L'image serait trop grande ; choisissez une résolution plus faible.
+„{}“ ließ sich nicht kodieren.	“{}” could not be encoded.	No se pudo codificar «{}».	Impossibile codificare «{}».	Impossible d'encoder « {} ».
+Gespeichert: {} und weitere (Dateien: {})	Saved: {} and more (files: {})	Guardado: {} y otros (archivos: {})	Salvato: {} e altri (file: {})	Enregistré : {} et autres (fichiers : {})
+Die Seite ist als Bild in der Zwischenablage.	The page is on the Clipboard as a picture.	La página está en el Portapapeles como imagen.	La pagina è negli Appunti come immagine.	La page est dans le Presse-papiers en tant qu'image.
+Die Seite ist als SVG in der Zwischenablage.	The page is on the Clipboard as SVG.	La página está en el Portapapeles como SVG.	La pagina è negli Appunti come SVG.	La page est dans le Presse-papiers au format SVG.
+Die Seite ließ sich nicht kopieren.	The page could not be copied.	No se pudo copiar la página.	Impossibile copiare la pagina.	Impossible de copier la page.
+Es sind keine Seiten zum Drucken gewählt.	No pages are selected for printing.	No hay ninguna página seleccionada para imprimir.	Nessuna pagina selezionata per la stampa.	Aucune page n'est sélectionnée pour l'impression.
+Drucken abgebrochen.	Printing canceled.	Impresión cancelada.	Stampa annullata.	Impression annulée.
+Drucken ist auf diesem System oder ohne Berechtigung nicht möglich.	Printing is not possible on this system or without permission.	No es posible imprimir en este sistema o sin permiso.	Impossibile stampare su questo sistema o senza autorizzazione.	Impossible d'imprimer sur ce système ou sans autorisation.
+Drucken fehlgeschlagen (Fehler {}).	Printing failed (error {}).	No se pudo imprimir (error {}).	Stampa non riuscita (errore {}).	Échec de l'impression (erreur {}).
+Der Drucker hat das Dokument nicht angenommen.	The printer did not accept the document.	La impresora no aceptó el documento.	La stampante non ha accettato il documento.	L'imprimante n'a pas accepté le document.
+Im gewählten Bereich liegt kein Blatt.	There is no sheet in the selected range.	No hay ninguna hoja en el intervalo seleccionado.	Nessun foglio nell'intervallo selezionato.	Aucune feuille dans la plage sélectionnée.
+Drucken fehlgeschlagen: {}	Printing failed: {}	No se pudo imprimir: {}	Stampa non riuscita: {}	Échec de l'impression : {}
+Für das Blatt reicht der Speicher nicht.	There is not enough memory for the sheet.	No hay suficiente memoria para la hoja.	Memoria insufficiente per il foglio.	Mémoire insuffisante pour la feuille.
+Die gewählten Seiten drucken (Strg+P)	Print the selected pages (Ctrl+P)	Imprimir las páginas seleccionadas (Ctrl+P)	Stampa le pagine selezionate (Ctrl+P)	Imprimer les pages sélectionnées (Ctrl+P)
+Systemdrucker	System printer	Impresora del sistema	Stampante di sistema	Imprimante système
+Drucker, Papierfach und Seitenbereich wählen Sie im Druckdialog des Systems.	You choose the printer, paper tray and page range in the system's print dialog.	Puede elegir la impresora, la bandeja de papel y el intervalo de páginas en el cuadro de diálogo de impresión del sistema.	La stampante, il cassetto della carta e l'intervallo di pagine si scelgono nella finestra di dialogo di stampa del sistema.	Vous choisissez l'imprimante, le bac à papier et la plage de pages dans la boîte de dialogue d'impression du système.
+Seitenbereich drucken	Print Page Range	Imprimir intervalo de páginas	Stampa intervallo di pagine	Imprimer une plage de pages
+Hintergrundseiten drucken	Print background pages	Imprimir páginas de fondo	Stampa pagine di sfondo	Imprimer les pages d'arrière-plan
+Auf ein Blatt anpassen	Fit to One Sheet	Ajustar a una hoja	Adatta a un foglio	Ajuster à une feuille
+Benutzerdefiniert (Seite einrichten)	Custom (Page Setup)	Personalizado (Configurar página)	Personalizzato (Imposta pagina)	Personnalisé (Mise en page)
+Tatsächliche Größe	Actual Size	Tamaño real	Dimensioni effettive	Taille réelle
+Farbe	Color	Color	Colore	Couleur
+Graustufen	Grayscale	Escala de grises	Scala di grigi	Nuances de gris
+Gedruckte Blätter: {}	Sheets printed: {}	Hojas impresas: {}	Fogli stampati: {}	Feuilles imprimées : {}
+{}: Blatt {} von {}	{}: Sheet {} of {}	{}: hoja {} de {}	{}: foglio {} di {}	{} : feuille {} sur {}
+Keine Seite zum Drucken	No page to print	No hay ninguna página para imprimir	Nessuna pagina da stampare	Aucune page à imprimer
+Vorheriges Blatt	Previous Sheet	Hoja anterior	Foglio precedente	Feuille précédente
+Blatt {} von {}	Sheet {} of {}	Hoja {} de {}	Foglio {} di {}	Feuille {} sur {}
+Nächstes Blatt	Next Sheet	Hoja siguiente	Foglio successivo	Feuille suivante
+Kacheln: {} × {} Blätter	Tiles: {} × {} sheets	Mosaicos: {} × {} hojas	Riquadri: {} × {} fogli	Mosaïque : {} × {} feuilles
+A4: 210 × 297 mm	A4: 210 × 297 mm	A4: 210 × 297 mm	A4: 210 × 297 mm	A4 : 210 × 297 mm
+A3: 297 × 420 mm	A3: 297 × 420 mm	A3: 297 × 420 mm	A3: 297 × 420 mm	A3 : 297 × 420 mm
+A5: 148 × 210 mm	A5: 148 × 210 mm	A5: 148 × 210 mm	A5: 148 × 210 mm	A5 : 148 × 210 mm
+A2: 420 × 594 mm	A2: 420 × 594 mm	A2: 420 × 594 mm	A2: 420 × 594 mm	A2 : 420 × 594 mm
+A1: 594 × 841 mm	A1: 594 × 841 mm	A1: 594 × 841 mm	A1: 594 × 841 mm	A1 : 594 × 841 mm
+Letter: 8,5 × 11 in	Letter: 8.5 × 11 in	Letter: 8,5 × 11 in	Letter: 8,5 × 11 in	Letter : 8,5 × 11 in
+Legal: 8,5 × 14 in	Legal: 8.5 × 14 in	Legal: 8,5 × 14 in	Legal: 8,5 × 14 in	Legal : 8,5 × 14 in
+Tabloid: 11 × 17 in	Tabloid: 11 × 17 in	Tabloid: 11 × 17 in	Tabloid: 11 × 17 in	Tabloid : 11 × 17 in
+Metrisch 1:2	Metric 1:2	Métrica 1:2	Metrica 1:2	Métrique 1:2
+Metrisch 1:5	Metric 1:5	Métrica 1:5	Metrica 1:5	Métrique 1:5
+Metrisch 1:10	Metric 1:10	Métrica 1:10	Metrica 1:10	Métrique 1:10
+Metrisch 1:20	Metric 1:20	Métrica 1:20	Metrica 1:20	Métrique 1:20
+Metrisch 1:50	Metric 1:50	Métrica 1:50	Metrica 1:50	Métrique 1:50
+Metrisch 1:100	Metric 1:100	Métrica 1:100	Metrica 1:100	Métrique 1:100
+Metrisch 1:200	Metric 1:200	Métrica 1:200	Metrica 1:200	Métrique 1:200
+Metrisch 1:500	Metric 1:500	Métrica 1:500	Metrica 1:500	Métrique 1:500
+Metrisch 1:1000	Metric 1:1000	Métrica 1:1000	Metrica 1:1000	Métrique 1:1000
+Maschinenbau 2:1	Mechanical Engineering 2:1	Ingeniería mecánica 2:1	Ingegneria meccanica 2:1	Génie mécanique 2:1
+Maschinenbau 5:1	Mechanical Engineering 5:1	Ingeniería mecánica 5:1	Ingegneria meccanica 5:1	Génie mécanique 5:1
+Maschinenbau 10:1	Mechanical Engineering 10:1	Ingeniería mecánica 10:1	Ingegneria meccanica 10:1	Génie mécanique 10:1
+Fuß	Feet	Pies	Piedi	Pieds
+Meter	Meters	Metros	Metri	Mètres
+Öffnen Sie eine Zeichnung, um ihre Seiten einzurichten.	Open a drawing to set up its pages.	Abra un dibujo para configurar sus páginas.	Aprire un disegno per impostarne le pagine.	Ouvrez un dessin pour configurer ses pages.
+Drucken einrichten	Print Setup	Configurar impresión	Imposta stampa	Configuration de l'impression
+Seiteneigenschaften	Page Properties	Propiedades de página	Proprietà pagina	Propriétés de la page
+Seitengröße	Page Size	Tamaño de página	Dimensioni pagina	Taille de la page
+Druckerpapier	Printer paper	Papel de impresora	Carta stampante	Papier d'imprimante
+Druckzoom	Print zoom	Zoom de impresión	Zoom di stampa	Zoom d'impression
+Anpassen auf	Adjust to	Ajustar al	Imposta al	Réduire/agrandir à
+Anpassen an	Fit to	Ajustar a	Adatta a	Ajuster à
+Blätter breit und	sheets across by	hojas de ancho por	fogli di larghezza per	feuilles en largeur sur
+hoch	sheets down	de alto	di altezza	en hauteur
+Ränder (mm)	Margins (mm)	Márgenes (mm)	Margini (mm)	Marges (mm)
+Oben	Top	Superior	Superiore	Haut
+Rechts	Right	Derecho	Destro	Droite
+Unten	Bottom	Inferior	Inferiore	Bas
+Horizontal zentrieren	Center horizontally	Centrar horizontalmente	Centra orizzontalmente	Centrer horizontalement
+Vertikal zentrieren	Center vertically	Centrar verticalmente	Centra verticalmente	Centrer verticalement
+Wie Druckerpapier ({})	Same as printer paper ({})	Igual que el papel de la impresora ({})	Come la carta della stampante ({})	Identique au papier de l'imprimante ({})
+Vordefinierte Größe	Pre-defined size	Tamaño predefinido	Dimensioni predefinite	Taille prédéfinie
+Benutzerdefinierte Größe	Custom size	Tamaño personalizado	Dimensioni personalizzate	Taille personnalisée
+Seitenausrichtung	Page orientation	Orientación de página	Orientamento pagina	Orientation de la page
+Neue Seitengröße: {}	New page size: {}	Nuevo tamaño de página: {}	Nuove dimensioni pagina: {}	Nouvelle taille de page : {}
+Kein Maßstab (1:1)	No scale (1:1)	Sin escala (1:1)	Nessuna scala (1:1)	Aucune échelle (1:1)
+Vordefinierter Maßstab	Pre-defined scale	Escala predefinida	Scala predefinita	Échelle prédéfinie
+Benutzerdefinierter Maßstab	Custom scale	Escala personalizada	Scala personalizzata	Échelle personnalisée
+Seitengröße in Zeichnungseinheiten: {}	Page size in drawing units: {}	Tamaño de página en unidades de dibujo: {}	Dimensioni pagina in unità di disegno: {}	Taille de la page en unités de dessin : {}
+Typ	Type	Tipo	Tipo	Type
+Vordergrund	Foreground	Primer plano	Primo piano	Premier plan
+Hintergrund	Background	Fondo	Sfondo	Arrière-plan
+Name	Name	Nombre	Nome	Nom
+Kein	None	Ninguno	Nessuno	Aucun
+Maßeinheit	Measurement units	Unidades de medida	Unità di misura	Unités de mesure
+Schattenrichtung	Shadow direction	Dirección de la sombra	Direzione ombreggiatura	Direction de l'ombre
+links	left	a la izquierda	a sinistra	à gauche
+rechts	right	a la derecha	a destra	à droite
+oben	top	arriba	in alto	en haut
+unten	bottom	abajo	in basso	en bas
+kein Versatz	no offset	sin desplazamiento	nessuno spostamento	aucun décalage
+Flussdiagramm (von oben nach unten)	Flowchart (Top to Bottom)	Diagrama de flujo (de arriba abajo)	Diagramma di flusso (dall'alto in basso)	Diagramme de flux (de haut en bas)
+Organigramm (von links nach rechts)	Organization Chart (Left to Right)	Organigrama (de izquierda a derecha)	Organigramma (da sinistra a destra)	Organigramme (de gauche à droite)
+Organigramm (von oben nach unten)	Organization Chart (Top to Bottom)	Organigrama (de arriba abajo)	Organigramma (dall'alto in basso)	Organigramme (de haut en bas)
+Baum (von links nach rechts)	Tree (Left to Right)	Árbol (de izquierda a derecha)	Albero (da sinistra a destra)	Arborescence (de gauche à droite)
+Baum (von oben nach unten)	Tree (Top to Bottom)	Árbol (de arriba abajo)	Albero (dall'alto in basso)	Arborescence (de haut en bas)
+Flussdiagramm (von links nach rechts)	Flowchart (Left to Right)	Diagrama de flujo (de izquierda a derecha)	Diagramma di flusso (da sinistra a destra)	Diagramme de flux (de gauche à droite)
+Netzwerk	Network	Red	Rete	Réseau
+Organigramm (von unten nach oben)	Organization Chart (Bottom to Top)	Organigrama (de abajo arriba)	Organigramma (dal basso in alto)	Organigramme (de bas en haut)
+Baum (von unten nach oben)	Tree (Bottom to Top)	Árbol (de abajo arriba)	Albero (dal basso in alto)	Arborescence (de bas en haut)
+Flussdiagramm (von rechts nach links)	Flowchart (Right to Left)	Diagrama de flujo (de derecha a izquierda)	Diagramma di flusso (da destra a sinistra)	Diagramme de flux (de droite à gauche)
+Flussdiagramm (von unten nach oben)	Flowchart (Bottom to Top)	Diagrama de flujo (de abajo arriba)	Diagramma di flusso (dal basso in alto)	Diagramme de flux (de bas en haut)
+Organigramm (von rechts nach links)	Organization Chart (Right to Left)	Organigrama (de derecha a izquierda)	Organigramma (da destra a sinistra)	Organigramme (de droite à gauche)
+Baum (von rechts nach links)	Tree (Right to Left)	Árbol (de derecha a izquierda)	Albero (da destra a sinistra)	Arborescence (de droite à gauche)
+Mittig zu Mittig	Center to Center	De centro a centro	Da centro a centro	Centre à centre
+Horizontale Linien	Horizontal Lines	Líneas horizontales	Linee orizzontali	Lignes horizontales
+Vertikale Linien	Vertical Lines	Líneas verticales	Linee verticali	Lignes verticales
+Zuletzt gezeichnete Linien	Last Drawn Lines	Últimas líneas dibujadas	Ultime linee disegnate	Dernières lignes tracées
+Zuletzt gezeichnete Linien (umgekehrt)	Last Drawn Lines (Reversed)	Últimas líneas dibujadas (orden inverso)	Ultime linee disegnate (ordine inverso)	Dernières lignes tracées (ordre inverse)
+Lücke	Gap	Hueco	Spazio	Espace
+Quadrat	Square	Cuadrado	Quadrato	Carré
+Mehrseitig	Multi-sided	Poligonal	Poligonale	Polygonal
+Routing-Stil	Routing style	Estilo de enrutamiento	Stile di routing	Style de routage
+Linienübergänge	Line jumps	Saltos de línea	Salti di linea	Sauts de ligne
+Stil der Linienübergänge	Line jump style	Estilo de salto de línea	Stile salto di linea	Style de saut de ligne
+Ja	Yes	Sí	Sì	Oui
+Nein	No	No	No	Non
+Shapes beim Ablegen verschieben	Move other shapes away on drop	Apartar otras formas al colocar	Sposta le altre forme al rilascio	Écarter les autres formes au dépôt
+Shapes auf Verbinder teilen	Split connectors with shapes	Dividir conectores con formas	Dividi i connettori con le forme	Fractionner les connecteurs par formes
+Die Seite ließ sich nicht ändern.	The page could not be changed.	No se pudo cambiar la página.	Impossibile modificare la pagina.	Impossible de modifier la page.
+Links|Rand	Left	Izquierdo	Sinistro	Gauche
+Standard|Routing	Default	Predeterminado	Predefinito	Par défaut
+Speichert in	Saves to	Se guarda en	Salva in	Enregistre dans
+Wählen Sie den Ort und den Dateityp.	Choose the location and the file type.	Elija la ubicación y el tipo de archivo.	Scegliere il percorso e il tipo di file.	Choisissez l'emplacement et le type de fichier.
+Führungslinie	Guide	Guía	Guida	Repère
+Die Führungslinie lässt sich nicht anlegen.	The guide cannot be created.	No se puede crear la guía.	Impossibile creare la guida.	Impossible de créer le repère.
+Verschieben	Move	Mover	Sposta	Déplacer
+Größe ändern	Resize	Cambiar tamaño	Ridimensiona	Redimensionner
+Drehen	Rotate	Girar	Ruota	Faire pivoter
+Drehpunkt verschieben	Move Rotation Pin	Mover el centro de giro	Sposta il centro di rotazione	Déplacer le centre de rotation
+Endpunkt verschieben	Move Endpoint	Mover el extremo	Sposta l'estremità	Déplacer l'extrémité
+Scheitelpunkt verschieben	Move Vertex	Mover el vértice	Sposta il vertice	Déplacer le sommet
+Steuerpunkt verschieben	Move Control Handle	Mover el controlador	Sposta la maniglia di controllo	Déplacer la poignée de contrôle
+Scheitelpunkt hinzufügen	Add Vertex	Agregar vértice	Aggiungi vertice	Ajouter un sommet
+Scheitelpunkt löschen	Delete Vertex	Eliminar vértice	Elimina vertice	Supprimer le sommet
+Linie	Line	Línea	Linea	Ligne
+Verbinder	Connector	Conector	Connettore	Connecteur
+„{}“ kann nicht gespeichert werden.	“{}” cannot be saved.	No se puede guardar «{}».	Impossibile salvare «{}».	Impossible d'enregistrer « {} ».
+Die Datei lässt sich nicht schreiben.	The file cannot be written.	No se puede escribir el archivo.	Impossibile scrivere il file.	Impossible d'écrire le fichier.
+vsdx=Visio-Zeichnung	vsdx=Visio drawing	vsdx=Dibujo de Visio	vsdx=Disegno di Visio	vsdx=Dessin Visio
+vssx=Visio-Schablone	vssx=Visio stencil	vssx=Colección de formas de Visio	vssx=Raccolta di forme di Visio	vssx=Bibliothèque de formes Visio
+vstx=Visio-Vorlage	vstx=Visio template	vstx=Plantilla de Visio	vstx=Modello di Visio	vstx=Modèle Visio
+vsdm=Visio-Zeichnung mit Makros	vsdm=Visio drawing with macros	vsdm=Dibujo de Visio con macros	vsdm=Disegno di Visio con macro	vsdm=Dessin Visio avec macros
+Hinweise zur Datei	About this file	Avisos sobre el archivo	Avvisi sul file	Remarques sur le fichier
+Favoriten	Favorites	Favoritos	Preferiti	Favoris
+„{}“ ist keine Schablone.	“{}” is not a stencil.	«{}» no es una colección de formas.	«{}» non è una raccolta di forme.	« {} » n'est pas une bibliothèque de formes.
+Schablone{}	Stencil{}	Colección de formas{}	Raccolta di forme{}	Bibliothèque de formes{}
+Shape verschieben	Move shape	Mover forma	Sposta forma	Déplacer la forme
+„{}“ lässt sich nicht speichern.	“{}” cannot be saved.	No se puede guardar «{}».	Impossibile salvare «{}».	Impossible d'enregistrer « {} ».
+Meine Shapes	My Shapes	Mis formas	Forme personali	Mes formes
+Allgemein	General	General	Generale	Général
+Flussdiagramm	Flowchart	Diagrama de flujo	Diagramma di flusso	Organigramme
+Geschäft	Business	Negocios	Business	Entreprise
+Konstruktion	Engineering	Ingeniería	Ingegneria	Ingénierie
+Pläne und Grundrisse	Maps and floor plans	Mapas y planos de planta	Mappe e piante	Cartes et plans
+Software und Datenbank	Software and database	Software y base de datos	Software e database	Logiciels et bases de données
+Terminplan	Schedule	Programación	Pianificazione	Planification
+Extras	Extras	Extras	Extra	Extras
+Folgt in einer späteren Version	Coming in a later version	Llegará en una versión posterior	In arrivo in una versione successiva	Prévu dans une version ultérieure
+Symbole und Details	Icons and Details	Iconos y detalles	Icone e dettagli	Icônes et détails
+Schablone öffnen...	Open Stencil...	Abrir colección de formas...	Apri raccolta di forme...	Ouvrir une bibliothèque de formes...
+Neue Schablone (metrisch)	New Stencil (Metric)	Nueva colección de formas (métrica)	Nuova raccolta di forme (metrica)	Nouvelle bibliothèque de formes (métrique)
+Neue Schablone (US-Einheiten)	New Stencil (US Units)	Nueva colección de formas (unidades de EE. UU.)	Nuova raccolta di forme (unità USA)	Nouvelle bibliothèque de formes (unités US)
+Aus Schablone entfernen	Remove from Stencil	Quitar de la colección de formas	Rimuovi dalla raccolta di forme	Supprimer de la bibliothèque de formes
+Suchergebnisse ({})	Search results ({})	Resultados de la búsqueda ({})	Risultati della ricerca ({})	Résultats de la recherche ({})
+Schnell-Shapes	Top shapes	Formas principales	Forme principali	Formes principales
+Öffnen Sie eine Schablone über „Weitere Shapes“.	Open a stencil from “More Shapes”.	Abra una colección de formas desde «Más formas».	Apri una raccolta di forme da «Altre forme».	Ouvrez une bibliothèque de formes à partir de « Plus de formes ».
+Keine Shapes gefunden	No shapes found	No se encontraron formas	Nessuna forma trovata	Aucune forme trouvée
+Die Suche prüft die Namen in allen fünf Sprachen und die Suchbegriffe.	The search looks at the names in all five languages and at the search terms.	La búsqueda examina los nombres en los cinco idiomas y los términos de búsqueda.	La ricerca esamina i nomi in tutte e cinque le lingue e i termini di ricerca.	La recherche porte sur les noms dans les cinq langues et sur les termes de recherche.
+Hinweis	Note	Aviso	Avviso	Remarque
+{} ablegen	Drop {}	Colocar {}	Rilascia {}	Déposer {}
+Das Shape lässt sich nicht ablegen: {}	The shape cannot be dropped: {}	No se puede colocar la forma: {}	Impossibile rilasciare la forma: {}	Impossible de déposer la forme : {}
+„{}“ abgelegt	“{}” dropped	«{}» colocada	«{}» rilasciata	« {} » déposée
+Letzte Suchen	Recent searches	Búsquedas recientes	Ricerche recenti	Recherches récentes
+Ziehen Sie Shapes hierher, um sie hinzuzufügen.	Drag shapes here to add them.	Arrastre formas aquí para agregarlas.	Trascina qui le forme per aggiungerle.	Faites glisser des formes ici pour les ajouter.
+Hier Schnell-Shapes ablegen	Drop top shapes here	Coloque aquí las formas principales	Rilascia qui le forme principali	Déposez ici les formes principales
+Die Auswahl (ohne Auswahl die aktuelle Seite) als Bild (PNG) in die Zwischenablage kopieren	Copy the selection (without a selection, the current page) to the clipboard as a picture (PNG)	Copiar la selección (sin selección, la página actual) en el Portapapeles como imagen (PNG)	Copiare la selezione (senza selezione, la pagina corrente) negli Appunti come immagine (PNG)	Copier la sélection (sans sélection, la page active) dans le Presse-papiers en tant qu'image (PNG)
+Die Auswahl (ohne Auswahl die aktuelle Seite) als SVG-Text in die Zwischenablage kopieren (für Grafikprogramme und Webseiten)	Copy the selection (without a selection, the current page) to the clipboard as SVG text (for graphics programs and web pages)	Copiar la selección (sin selección, la página actual) en el Portapapeles como texto SVG (para programas de gráficos y páginas web)	Copiare la selezione (senza selezione, la pagina corrente) negli Appunti come testo SVG (per programmi di grafica e pagine web)	Copier la sélection (sans sélection, la page active) dans le Presse-papiers en tant que texte SVG (pour les logiciels de dessin et les pages web)
+Die Auswahl ist als Bild in der Zwischenablage.	The selection is on the clipboard as a picture.	La selección está en el Portapapeles como imagen.	La selezione è negli Appunti come immagine.	La sélection est dans le Presse-papiers en tant qu'image.
+Die Auswahl ist als SVG in der Zwischenablage.	The selection is on the clipboard as SVG.	La selección está en el Portapapeles como SVG.	La selezione è negli Appunti come SVG.	La sélection est dans le Presse-papiers en tant que SVG.
+(eigenes)	(custom)	(personalizado)	(personalizzato)	(personnalisé)
+Abrundung	Rounding	Redondeo	Arrotondamento	Arrondi
+Abschlusstyp	Cap type	Tipo de remate	Tipo estremità	Type d'extrémité
+Abstand X	Offset X	Desplazamiento X	Distanza X	Décalage X
+Abstand Y	Offset Y	Desplazamiento Y	Distanza Y	Décalage Y
+Aktuelles Design speichern	Save Current Theme	Guardar tema actual	Salva tema corrente	Enregistrer le thème actuel
+Aktuelles Design speichern ...	Save Current Theme...	Guardar tema actual...	Salva tema corrente...	Enregistrer le thème actuel...
+Akzent 1	Accent 1	Énfasis 1	Colore 1	Accentuation 1
+Akzent 2	Accent 2	Énfasis 2	Colore 2	Accentuation 2
+Akzent 3	Accent 3	Énfasis 3	Colore 3	Accentuation 3
+Akzent 4	Accent 4	Énfasis 4	Colore 4	Accentuation 4
+Akzent 5	Accent 5	Énfasis 5	Colore 5	Accentuation 5
+Akzent 6	Accent 6	Énfasis 6	Colore 6	Accentuation 6
+Alle Designs	All Themes	Todos los temas	Tutti i temi	Tous les thèmes
+Anfangsgröße	Begin size	Tamaño inicial	Dimensione iniziale	Taille de début
+Anfangspfeil	Begin arrow type	Tipo de flecha inicial	Tipo freccia iniziale	Type de flèche de début
+Auf aktuelle Seite anwenden	Apply to Current Page	Aplicar a la página actual	Applica alla pagina corrente	Appliquer à la page active
+Auf alle Seiten anwenden	Apply to All Pages	Aplicar a todas las páginas	Applica a tutte le pagine	Appliquer à toutes les pages
+Das Design der angezeigten Seite wird unter diesem Namen gespeichert und erscheint im Katalog unter „Gespeichert“.	The theme of the page shown is saved under this name and appears in the gallery under “Saved”.	El tema de la página mostrada se guarda con este nombre y aparece en la galería en «Guardados».	Il tema della pagina visualizzata viene salvato con questo nome e compare nella raccolta in «Salvati».	Le thème de la page affichée est enregistré sous ce nom et apparaît dans la galerie sous « Enregistrés ».
+Design	Theme	Tema	Tema	Thème
+Design anwenden	Apply Theme	Aplicar tema	Applica tema	Appliquer le thème
+Designfarben	Theme Colors	Colores del tema	Colori tema	Couleurs du thème
+Durchgezogene Linie	Solid line	Línea sólida	Linea continua	Trait plein
+Einfarbige Füllung	Solid fill	Relleno sólido	Riempimento a tinta unita	Remplissage uni
+Endgröße	End size	Tamaño final	Dimensione finale	Taille de fin
+Endpfeil	End arrow type	Tipo de flecha final	Tipo freccia finale	Type de flèche de fin
+Extra groß	Extra Large	Extra grande	Molto grande	Très grande
+Flach	Flat	Plano	Piatto	Plat
+Füllfarbe	Fill Color	Color de relleno	Colore riempimento	Couleur de remplissage
+gespeichert	saved	guardado	salvato	enregistré
+Gespeichert	Saved	Guardados	Salvati	Enregistrés
+Gespeicherte Designs löschen	Delete Saved Themes	Eliminar temas guardados	Elimina temi salvati	Supprimer les thèmes enregistrés
+Groß	Large	Grande	Grande	Grande
+in dieser Datei	in this file	en este archivo	in questo file	dans ce fichier
+In dieser Datei	In This File	En este archivo	In questo file	Dans ce fichier
+JFDiagrammer	JFDiagrammer	JFDiagrammer	JFDiagrammer	JFDiagrammer
+Kein Design	No Theme	Sin tema	Nessun tema	Aucun thème
+Kein Schatten	No shadow	Sin sombra	Nessuna ombreggiatura	Aucune ombre
+Klein	Small	Pequeño	Piccola	Petite
+Kolossal	Colossal	Colosal	Colossale	Colossale
+Kontrast|Design	Contrast	Contraste	Contrasto	Contraste
+Kontur|Design	Contour	Contorno	Contorno	Contour
+Linienfarbe	Line Color	Color de línea	Colore linea	Couleur du trait
+Linienstärke	Line Weight	Grosor de línea	Spessore linea	Épaisseur du trait
+Mittel	Medium	Mediano	Media	Moyenne
+Ohne	None	Ninguna	Nessuna	Aucune
+Quadratisch	Square	Cuadrado	Quadrato	Carré
+Riesig	Jumbo	Enorme	Enorme	Énorme
+Rund	Round	Redondo	Arrotondato	Rond
+Schatten außen	Outer shadow	Sombra exterior	Ombreggiatura esterna	Ombre externe
+Schattenfarbe	Shadow Color	Color de sombra	Colore ombreggiatura	Couleur de l'ombre
+Schwarz	Black	Negro	Nero	Noir
+Sehr klein	Very Small	Muy pequeño	Molto piccola	Très petite
+Standardfarben	Standard Colors	Colores estándar	Colori standard	Couleurs standard
+Strichtyp	Dash type	Tipo de guion	Tipo tratteggio	Type de tiret
+Transparenz	Transparency	Transparencia	Trasparenza	Transparence
+Transparenz der Füllung	Fill transparency	Transparencia del relleno	Trasparenza riempimento	Transparence du remplissage
+Transparenz der Linie	Line transparency	Transparencia de la línea	Trasparenza linea	Transparence du trait
+Transparenz des Schattens	Shadow transparency	Transparencia de la sombra	Trasparenza ombreggiatura	Transparence de l'ombre
+Variante	Variant	Variante	Variante	Variante
+Variante anwenden	Apply Variant	Aplicar variante	Applica variante	Appliquer la variante
+Variantenfarben	Variant Colors	Colores de variante	Colori variante	Couleurs de la variante
+Weiß	White	Blanco	Bianco	Blanc
+Schnellformatvorlagen	Quick Styles	Estilos rápidos	Stili rapidi	Styles rapides
+Schnellformatvorlage	Quick Style	Estilo rápido	Stile rapido	Style rapide
+Die Seite hat kein Design.	The page has no theme.	La página no tiene tema.	La pagina non ha alcun tema.	La page n'a pas de thème.
+Variantenstile	Variant Styles	Estilos de variante	Stili variante	Styles de variante
+Variantenstil	Variant Style	Estilo de variante	Stile variante	Style de variante
+Designstile	Theme Styles	Estilos del tema	Stili tema	Styles du thème
+Klar|Container	Plain	Simple	Semplice	Simple
+Akzent|Container	Accent	Énfasis	Accento	Accent
+Gestrichelt|Container	Dashed	Discontinuo	Tratteggiato	Pointillé
+Fläche|Container	Filled	Relleno	Pieno	Rempli
+Eckwinkel|Container	Corners	Esquinas	Angoli	Coins
+Abgerundet|Container	Rounded	Redondeado	Arrotondato	Arrondi
+Kopfband oben	Heading band at top	Banda de encabezado arriba	Banda intestazione in alto	Bandeau d'en-tête en haut
+Titel oben	Title at top	Título arriba	Titolo in alto	Titre en haut
+Kopfband links	Heading band at left	Banda de encabezado a la izquierda	Banda intestazione a sinistra	Bandeau d'en-tête à gauche
+Ohne Kopfzeile	No heading	Sin encabezado	Senza intestazione	Sans en-tête
+Kein Rand	No margin	Sin margen	Nessun margine	Aucune marge
+Schmal|Rand	Narrow	Estrecho	Stretto	Étroite
+Mittel|Rand	Medium	Medio	Medio	Moyenne
+Breit|Rand	Wide	Ancho	Largo	Large
+Keine automatische Größe	No automatic resize	Sin cambio de tamaño automático	Nessun ridimensionamento automatico	Pas de redimensionnement automatique
+Nach Bedarf erweitern	Expand as needed	Expandir según sea necesario	Espandi se necessario	Agrandir si nécessaire
+Immer an Inhalt anpassen	Always fit to contents	Ajustar siempre al contenido	Adatta sempre al contenuto	Toujours ajuster au contenu
+Rechteck|Beschriftung	Rectangle	Rectángulo	Rettangolo	Rectangle
+Abgerundet|Beschriftung	Rounded	Redondeada	Arrotondato	Arrondie
+Sprechblase	Speech bubble	Bocadillo	Fumetto	Bulle de dialogue
+Linie|Beschriftung	Line	Línea	Linea	Ligne
+Klammer	Bracket	Corchete	Parentesi	Crochet
+Kreis|Beschriftung	Circle	Círculo	Cerchio	Cercle
+Shapes verbinden	Connect Shapes	Conectar formas	Collega forme	Relier les formes
+Layout-Verhalten	Layout Behavior	Comportamiento de diseño	Comportamento layout	Comportement de disposition
+Bahn	Lane	Calle	Corsia	Couloir
+Ausrichtung|Flussdiagramm	Orientation	Orientación	Orientamento	Orientation
+Horizontal	Horizontal	Horizontal	Orizzontale	Horizontal
+Vertikal	Vertical	Vertical	Verticale	Vertical
+Titelleiste anzeigen	Show Title Bar	Mostrar barra de título	Mostra barra del titolo	Afficher la barre de titre
+Trennlinien anzeigen	Show Separators	Mostrar separadores	Mostra separatori	Afficher les séparateurs
+Bahnbeschriftungen waagerecht	Horizontal Lane Labels	Etiquetas de calle horizontales	Etichette corsia orizzontali	Étiquettes de couloir horizontales
+Platzierung	Placement	Colocación	Posizionamento	Placement
+Automatisch entscheiden	Decide automatically	Decidir automáticamente	Decidi automaticamente	Décider automatiquement
+Layout und Routing um das Shape	Lay out and route around the shape	Diseñar y enrutar alrededor de la forma	Disponi e instrada intorno alla forma	Disposer et router autour de la forme
+Kein Layout und Routing um das Shape	Do not lay out and route around the shape	No diseñar ni enrutar alrededor de la forma	Non disporre né instradare intorno alla forma	Ne pas disposer ni router autour de la forme
+Beim Layout der Seite nicht verschieben	Do not move when the page is laid out	No mover al diseñar la página	Non spostare durante il layout della pagina	Ne pas déplacer lors de la disposition de la page
+Andere Shapes beim Ablegen verschieben	Move other shapes away on drop	Apartar otras formas al colocar	Sposta altre forme al rilascio	Écarter les autres formes lors du dépôt
+Verbindungspunkte beim Routing nicht benutzen	Do not use connection points for routing	No usar puntos de conexión al enrutar	Non usare i punti di connessione per l'instradamento	Ne pas utiliser les points de connexion pour le routage
+Abstand zwischen Shapes (0,1 mm)	Space between shapes (0.1 mm)	Espacio entre formas (0,1 mm)	Spazio tra le forme (0,1 mm)	Espace entre les formes (0,1 mm)
+Abstand Linie zu Shape (0,1 mm)	Space between line and shape (0.1 mm)	Espacio entre línea y forma (0,1 mm)	Spazio tra linea e forma (0,1 mm)	Espace entre ligne et forme (0,1 mm)
+Funktion	Function	Función	Funzione	Fonction
+Bahn einfügen	Insert Lane	Insertar calle	Inserisci corsia	Insérer un couloir
+Trennlinie einfügen	Insert Separator	Insertar separador	Inserisci separatore	Insérer un séparateur
+Containerformatvorlage	Container style	Estilo de contenedor	Stile contenitore	Style de conteneur
+Container einfügen	Insert Container	Insertar contenedor	Inserisci contenitore	Insérer un conteneur
+Beschriftung einfügen	Insert Callout	Insertar llamada	Inserisci richiamo	Insérer une bulle d'annotation
+Verbindungspfeil	Connect arrow	Flecha de conexión	Freccia di collegamento	Flèche de liaison

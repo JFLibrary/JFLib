@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Schließen, 32 px</title>
+  <polygon class="body" fill="#DCDEE1" points="4,3 16,3 16,9 22,9 22,17 17,17 17,29 4,29"/>
+  <polygon class="shade" fill="#B9BBBE" points="17,3 22,8 17,8"/>
+  <path class="ink" stroke="#1D2228" d="M17 29.5H3.5V2.5H16.5L22.5 8.5V17"/>
+  <path class="ink" stroke="#1D2228" d="M16.5 3V8.5H22"/>
+  <path class="tint" stroke="#1F5FA8" stroke-width="2" d="M19 19L28 28M28 19L19 28"/>
+</svg>

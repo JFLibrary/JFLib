@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Schriftarten, 16 px</title>
+  <path class="ink" fill="#1D2228" fill-rule="evenodd" d="M1 14L4.5 3H5.5L9 14H7.6L6.645 11H3.355L2.4 14Z M3.67 10H6.33L5 5.83Z"/>
+  <path class="tint" fill="#1F5FA8" fill-rule="evenodd" d="M10 9H13L14 10V14H11L10 13V12L11 11H13V10H10Z M11 12V13H13V12Z"/>
+</svg>

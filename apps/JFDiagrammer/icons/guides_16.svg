@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Führungslinien, 16 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M1 2.5H3M4 2.5H6M7 2.5H9M10 2.5H12M13 2.5H15M2.5 1V3M2.5 4V6M2.5 7V9M2.5 10V12M2.5 13V15"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="4.5" y="4.5" width="9" height="7"/>
+</svg>

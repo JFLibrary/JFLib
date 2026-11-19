@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Trimmen, 16 px</title>
+  <path class="ink" fill="#1D2228" d="M11 9h1v1h-1Z M13 9h1v1h-1Z M9 11h1v1h-1Z M9 13h1v1h-1Z"/>
+  <path class="tint" stroke="#1F5FA8" d="M1 9.5H9.5V1"/>
+</svg>

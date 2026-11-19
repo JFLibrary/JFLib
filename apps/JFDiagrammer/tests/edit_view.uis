@@ -1,0 +1,33 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD7: the rulers (Ansicht › Lineal), a guide dragged out of the top ruler that a
+# moved shape snaps to, the dynamic grid (a moved shape's top meets another one's top), the
+# magnifier (Ctrl + Shift + click zooms in, with the right button out), the view toggles
+expect #23296 exists
+expect #23297 exists
+cmd 4404
+drag 500,330 640,420
+drag 820,500 960,560
+cmd 4400
+# a guide from the top ruler at y = 600; the second shape's bottom snaps to it
+drag #23296 700,600
+drag 890,530 890,578
+expect listitem:"Sheet.5" rect 827 550 126 51
+# the dynamic grid: the top of the first shape catches the second one's top
+drag 890,575 890,355
+expect listitem:"Sheet.5" rect 827 324 126 50
+# Alt moves freely
+drag 890,350 890,357 alt
+expect listitem:"Sheet.5" rect 827 331 126 50
+key ctrl+z
+# the magnifier: 66.7 %, 75 %, back
+expect text:"67 %" exists
+click 700,500 ctrl shift
+click 700,500 ctrl shift
+expect text:"75 %" exists
+click 700,500 r ctrl shift
+expect text:"67 %" exists
+# the rulers off and on again
+cmd 5120
+expect #23296 missing
+cmd 5120
+expect #23296 exists

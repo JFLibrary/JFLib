@@ -1,0 +1,19 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD7, golden images (light theme, the style's fonts): a dynamic connector glued
+# to two shapes routes around a third one between them (both ends glued: green); the third
+# shape turned by its rotation handle and moved into the connector's way: the connector routes
+# again (below), the turned frame shows its eight handles and the rotation handle.
+# New references: the same script with "shot FILE X Y W H" in place of "expect same" (look first)
+theme light
+cmd 4404
+drag 500,330 640,420
+drag 840,330 980,420
+drag 690,290 770,470
+cmd 4401
+drag 560,370 900,370
+expect same apps/JFDiagrammer/tests/golden/edit_route.png 380 180 640 380
+cmd 4400
+click 730,330
+drag button:"Drehgriff" 800,250
+drag 735,380 735,330
+expect same apps/JFDiagrammer/tests/golden/edit_handles.png 380 180 640 380

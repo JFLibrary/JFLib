@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Startseite, 32 px</title>
+  <polygon class="body" fill="#DCDEE1" points="8,28 8,12 16,4 24,12 24,28 19,28 19,20 13,20 13,28"/>
+  <rect class="hi" fill="#C2D2E5" x="14" y="21" width="4" height="7"/>
+  <path class="ink" stroke="#1D2228" d="M4.5 15.5L16 4L27.5 15.5"/>
+  <path class="ink" stroke="#1D2228" d="M7.5 13V28.5H24.5V13"/>
+  <path class="tint" stroke="#1F5FA8" d="M13.5 28V20.5H18.5V28"/>
+</svg>

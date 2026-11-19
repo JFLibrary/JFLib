@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Ereignisüberwachung, 16 px</title>
+  <path class="ink" fill="#1D2228" d="M1 2H3V4H1Z M1 6H3V8H1Z"/>
+  <path class="ink" stroke="#1D2228" d="M5 2.5H14M5 6.5H11"/>
+  <path class="tint" stroke="#1F5FA8" d="M1 11.5H4L6 8.5L9 14L11 11.5H15"/>
+</svg>

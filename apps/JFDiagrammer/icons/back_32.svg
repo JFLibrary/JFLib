@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Zurück, 32 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="3.5" y="3.5" width="25" height="25"/>
+  <path class="ink" fill="#1D2228" d="M8 16L13 11V15H24V17H13V21Z"/>
+</svg>

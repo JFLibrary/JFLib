@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Bild anzeigen, 16 px</title>
+  <polygon class="body" fill="#DCDEE1" points="2,12 2,11 5.5,7.5 7.5,9.5 8,10 8,12"/>
+  <path class="ink" stroke="#1D2228" d="M2 11L5.5 7.5L7.5 9.5"/>
+  <circle class="ink" fill="#1D2228" cx="10.5" cy="5.5" r="1.25"/>
+  <path class="ink" stroke="#1D2228" d="M8 12.5H1.5V2.5H13.5V8"/>
+  <path class="tint" stroke="#1F5FA8" d="M9.5 11.5L10.5 10.5H13.5L14.5 11.5V12.5L13.5 13.5H10.5L9.5 12.5Z"/>
+  <rect class="tint" fill="#1F5FA8" x="11" y="11" width="2" height="2"/>
+</svg>

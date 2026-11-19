@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Legende einfügen, 32 px</title>
+  <rect class="body" fill="#DCDEE1" x="4" y="4" width="24" height="4"/>
+  <rect class="ink" stroke="#1D2228" x="3.5" y="3.5" width="25" height="25"/>
+  <path class="ink" stroke="#1D2228" d="M4 8.5H28M12.5 9V28"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="6.5" y="10.5" width="4" height="4"/>
+  <rect class="shade" fill="#B9BBBE" stroke="#1D2228" x="6.5" y="16.5" width="4" height="4"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="22.5" width="4" height="4"/>
+  <path class="ink" stroke="#1D2228" d="M15 12.5H25M15 18.5H23M15 24.5H24"/>
+</svg>

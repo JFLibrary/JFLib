@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Ebeneneigenschaften, 16 px</title>
+  <polygon class="body" fill="#DCDEE1" points="5,2 13,2 11,4 3,4"/>
+  <path class="ink" stroke="#1D2228" d="M5.5 1.5H13.5L10.5 4.5H2.5Z"/>
+  <polygon class="body" fill="#DCDEE1" points="4,6 12,6 11,7 3,7"/>
+  <path class="ink" stroke="#1D2228" d="M4 6L2.5 7.5H10.5L12 6"/>
+  <polygon class="body" fill="#DCDEE1" points="4,9 8,9 8,10 3,10"/>
+  <path class="ink" stroke="#1D2228" d="M4 9L2.5 10.5H8"/>
+  <path class="tint" fill="#1F5FA8" fill-rule="evenodd" d="M11.78 9.91L12.03 9L13.48 9.39L13.23 10.30L13.70 10.77L14.61 10.52L15 11.97L14.09 12.22L13.92 12.86L14.58 13.52L13.52 14.58L12.86 13.92L12.22 14.09L11.97 15L10.52 14.61L10.77 13.70L10.30 13.23L9.39 13.48L9 12.03L9.91 11.78L10.08 11.14L9.42 10.48L10.48 9.42L11.14 10.08Z M12.9 12A0.9 0.9 0 1 1 11.1 12A0.9 0.9 0 1 1 12.9 12Z"/>
+</svg>

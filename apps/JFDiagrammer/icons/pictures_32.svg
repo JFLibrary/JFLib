@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Bilder, 32 px</title>
+  <polygon class="hi" fill="#C2D2E5" points="4,22 11,15 16,20 20,16 28,24 28,26 4,26"/>
+  <path class="tint" stroke="#1F5FA8" d="M3.5 22.5L11 15L16 20L20 16L28.5 24.5"/>
+  <circle class="body" fill="#DCDEE1" stroke="#1D2228" cx="22.5" cy="10.5" r="2.5"/>
+  <rect class="ink" stroke="#1D2228" x="3.5" y="5.5" width="25" height="21"/>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Gerade, 16 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M2 14L12 4"/>
+  <polygon class="tint" fill="#1F5FA8" points="10,2 14,2 14,6"/>
+</svg>

@@ -1,0 +1,51 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD11: Format übertragen (FM-07, RS-03).  The left box gets a 6 pt dashed line
+# and a shadow; Format übertragen once carries it to the middle box (the painter ends with that
+# click); a double click keeps it on for the right box until Esc.  Golden image: the three
+# boxes, all formatted alike.
+# New references: "shot FILE X Y W H" in place of "expect same" (look first)
+theme light
+cmd 4404
+drag 420,330 520,410
+drag 600,330 700,410
+drag 780,330 880,410
+cmd 4400
+click 650,520
+expect button:"Format übertragen" disabled
+click 470,370
+click button:"Shape formatieren: Formenarten"
+click tab:"Effekte"
+click radio:"Schatten außen"
+click tab:"Start"
+click button:"Linie"
+click "Stärke"
+wait 100
+click "6 pt"
+click button:"Linie"
+click "Striche"
+wait 100
+click "– – – – –"
+# once: the middle box, then the painter is off
+click button:"Format übertragen"
+expect button:"Format übertragen" checked
+click listitem:"Sheet.5"
+wait 100
+expect button:"Format übertragen" unchecked
+click tab:"Effekte"
+expect radio:"Schatten außen" checked
+# kept on: two boxes, Esc ends it
+click listitem:"Sheet.4"
+dblclick button:"Format übertragen"
+expect button:"Format übertragen" checked
+click listitem:"Sheet.6"
+wait 100
+expect button:"Format übertragen" checked
+key esc
+wait 100
+expect button:"Format übertragen" unchecked
+click listitem:"Sheet.6"
+wait 100
+click tab:"Effekte"
+expect radio:"Schatten außen" checked
+click 600,660
+expect same apps/JFDiagrammer/tests/golden/format_painter.png 268 280 500 160

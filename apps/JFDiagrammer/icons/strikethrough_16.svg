@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Durchgestrichen, 16 px</title>
+  <path class="ink" fill="#1D2228" fill-rule="evenodd" d="M9 3H10V7H13L14 8V12L13 13H9Z M2 8L3 7H7V13H3L2 12Z M3 8V12H6V8Z M10 8V12H13V8Z"/>
+  <path class="tint" stroke="#1F5FA8" d="M1 9.5H15"/>
+</svg>

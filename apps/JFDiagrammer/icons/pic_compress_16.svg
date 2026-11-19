@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Komprimieren, 16 px</title>
+  <path class="ink" fill="#1D2228" d="M1 4L4 1V4Z M15 4L12 1V4Z M15 12L12 15V12Z M1 12L4 15V12Z"/>
+  <polygon class="hi" fill="#C2D2E5" points="6,10 7.5,8.5 9,10"/>
+  <path class="tint" stroke="#1F5FA8" d="M6 10L7.5 8.5L9 10"/>
+  <rect class="ink" stroke="#1D2228" x="5.5" y="5.5" width="5" height="5"/>
+</svg>

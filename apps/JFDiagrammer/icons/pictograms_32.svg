@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Piktogramme, 32 px</title>
+  <circle class="body" fill="#DCDEE1" stroke="#1D2228" cx="10.5" cy="9.5" r="3.5"/>
+  <path class="body" fill="#DCDEE1" stroke="#1D2228" d="M4.5 27.5V19.5L7.5 16.5H13.5L16.5 19.5V27.5Z"/>
+  <polygon class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" points="22.5,5.5 23.97,9.48 28.21,9.65 24.88,12.27 26.03,16.35 22.5,14 18.97,16.35 20.12,12.27 16.79,9.65 21.03,9.48"/>
+</svg>

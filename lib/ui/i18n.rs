@@ -895,6 +895,28 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     // (SK6) the code editor's completion list: its undo step and its name for screen readers
     ["Vervollständigen", "Complete", "Compléter", "Completar", "Completa", "Aanvullen", "Uzupełnij", "إكمال", "השלמה"],
     ["Vorschläge", "Suggestions", "Suggestions", "Sugerencias", "Suggerimenti", "Suggesties", "Podpowiedzi", "اقتراحات", "הצעות"],
+    // (JD7) the handles of ui.shape_edit
+    ["Größengriff oben links", "Top left sizing handle", "Poignée de redimensionnement en haut à gauche", "Controlador de tamaño superior izquierdo", "Maniglia di ridimensionamento in alto a sinistra", "Formaatgreep linksboven", "Uchwyt zmiany rozmiaru w lewym górnym rogu", "مقبض تغيير الحجم أعلى اليسار", "ידית שינוי גודל שמאלית עליונה"],
+    ["Größengriff oben", "Top sizing handle", "Poignée de redimensionnement en haut", "Controlador de tamaño superior", "Maniglia di ridimensionamento in alto", "Formaatgreep boven", "Górny uchwyt zmiany rozmiaru", "مقبض تغيير الحجم العلوي", "ידית שינוי גודל עליונה"],
+    ["Größengriff oben rechts", "Top right sizing handle", "Poignée de redimensionnement en haut à droite", "Controlador de tamaño superior derecho", "Maniglia di ridimensionamento in alto a destra", "Formaatgreep rechtsboven", "Uchwyt zmiany rozmiaru w prawym górnym rogu", "مقبض تغيير الحجم أعلى اليمين", "ידית שינוי גודל ימנית עליונה"],
+    ["Größengriff rechts", "Right sizing handle", "Poignée de redimensionnement à droite", "Controlador de tamaño derecho", "Maniglia di ridimensionamento a destra", "Formaatgreep rechts", "Prawy uchwyt zmiany rozmiaru", "مقبض تغيير الحجم الأيمن", "ידית שינוי גודל ימנית"],
+    ["Größengriff unten rechts", "Bottom right sizing handle", "Poignée de redimensionnement en bas à droite", "Controlador de tamaño inferior derecho", "Maniglia di ridimensionamento in basso a destra", "Formaatgreep rechtsonder", "Uchwyt zmiany rozmiaru w prawym dolnym rogu", "مقبض تغيير الحجم أسفل اليمين", "ידית שינוי גודל ימנית תחתונה"],
+    ["Größengriff unten", "Bottom sizing handle", "Poignée de redimensionnement en bas", "Controlador de tamaño inferior", "Maniglia di ridimensionamento in basso", "Formaatgreep onder", "Dolny uchwyt zmiany rozmiaru", "مقبض تغيير الحجم السفلي", "ידית שינוי גודל תחתונה"],
+    ["Größengriff unten links", "Bottom left sizing handle", "Poignée de redimensionnement en bas à gauche", "Controlador de tamaño inferior izquierdo", "Maniglia di ridimensionamento in basso a sinistra", "Formaatgreep linksonder", "Uchwyt zmiany rozmiaru w lewym dolnym rogu", "مقبض تغيير الحجم أسفل اليسار", "ידית שינוי גודל שמאלית תחתונה"],
+    ["Größengriff links", "Left sizing handle", "Poignée de redimensionnement à gauche", "Controlador de tamaño izquierdo", "Maniglia di ridimensionamento a sinistra", "Formaatgreep links", "Lewy uchwyt zmiany rozmiaru", "مقبض تغيير الحجم الأيسر", "ידית שינוי גודל שמאלית"],
+    ["Drehgriff", "Rotation handle", "Poignée de rotation", "Controlador de giro", "Maniglia di rotazione", "Draaigreep", "Uchwyt obrotu", "مقبض التدوير", "ידית סיבוב"],
+    ["Anfangspunkt", "Begin point", "Point de départ", "Punto inicial", "Punto iniziale", "Beginpunt", "Punkt początkowy", "نقطة البداية", "נקודת התחלה"],
+    ["Endpunkt", "End point", "Point de fin", "Punto final", "Punto finale", "Eindpunt", "Punkt końcowy", "نقطة النهاية", "נקודת סיום"],
+    ["Steuerpunkt", "Control handle", "Poignée de contrôle", "Controlador de control", "Maniglia di controllo", "Besturingsgreep", "Uchwyt sterujący", "مقبض التحكم", "ידית בקרה"],
+    ["Scheitelpunkt", "Vertex", "Sommet", "Vértice", "Vertice", "Hoekpunt", "Wierzchołek", "رأس", "קודקוד"],
+    // (JD10) the connection arrows and insertion marks of ui.shape_edit
+    ["Verbindungspfeil rechts", "Connection arrow right", "Flèche de connexion vers la droite", "Flecha de conexión a la derecha", "Freccia di connessione a destra", "Verbindingspijl rechts", "Strzałka połączenia w prawo", "سهم الاتصال لليمين", "חץ חיבור ימינה"],
+    ["Verbindungspfeil unten", "Connection arrow down", "Flèche de connexion vers le bas", "Flecha de conexión hacia abajo", "Freccia di connessione in basso", "Verbindingspijl onder", "Strzałka połączenia w dół", "سهم الاتصال للأسفل", "חץ חיבור למטה"],
+    ["Verbindungspfeil links", "Connection arrow left", "Flèche de connexion vers la gauche", "Flecha de conexión a la izquierda", "Freccia di connessione a sinistra", "Verbindingspijl links", "Strzałka połączenia w lewo", "سهم الاتصال لليسار", "חץ חיבור שמאלה"],
+    ["Verbindungspfeil oben", "Connection arrow up", "Flèche de connexion vers le haut", "Flecha de conexión hacia arriba", "Freccia di connessione in alto", "Verbindingspijl boven", "Strzałka połączenia w górę", "سهم الاتصال للأعلى", "חץ חיבור למעלה"],
+    ["Element einfügen", "Insert item", "Insérer un élément", "Insertar elemento", "Inserisci elemento", "Element invoegen", "Wstaw element", "إدراج عنصر", "הוספת פריט"],
+    // (JD7) the rulers (ui.ruler)
+    ["Lineal", "Ruler", "Règle", "Regla", "Righello", "Liniaal", "Linijka", "مسطرة", "סרגל"],
 ];
 
 /// a library text in the current language: the UI language when the library has it

@@ -1,0 +1,54 @@
+# Listenelement: schlichtes Rechteck mit linksbündigem Text, das Standard-Element der Liste
+# (List: msvSDListItemMaster).  Weiß mit dünner Schieferlinie, damit die Zeilen einer Liste wie
+# Tabellenzeilen wirken; Verbindungspunkte links und rechts.
+master: List item
+name.de: Listenelement
+name.en: List item
+name.es: Elemento de lista
+name.it: Elemento dell'elenco
+name.fr: Élément de liste
+prompt.de: Eine Zeile einer Liste. Ziehen Sie es in eine Liste.
+prompt.en: One row of a list. Drag it into a list.
+prompt.es: Una fila de una lista. Arrástrelo a una lista.
+prompt.it: Una riga di un elenco. Trascinalo in un elenco.
+prompt.fr: Une ligne d'une liste. Faites-le glisser dans une liste.
+keywords.de: Listenelement, Zeile, Eintrag, Element, Attribut, Feld
+keywords.en: list item, row, entry, item, attribute, field
+keywords.es: elemento de lista, fila, entrada, elemento, atributo, campo
+keywords.it: elemento dell'elenco, riga, voce, elemento, attributo, campo
+keywords.fr: élément de liste, ligne, entrée, élément, attribut, champ
+text.de: Element
+text.en: Item
+text.es: Elemento
+text.it: Elemento
+text.fr: Élément
+
+[Shape]
+Width = 56 mm
+Width.us = 2.2 in
+Height = 8 mm
+Height.us = 0.3 in
+LineWeight = 0.75 pt
+LineColor = #4D5560
+FillForegnd = #FFFFFF
+FillBkgnd = #FFFFFF
+LeftMargin = 2 mm
+LeftMargin.us = 0.08 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Connection]
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+
+[Paragraph]
+Row  HorzAlign = 0

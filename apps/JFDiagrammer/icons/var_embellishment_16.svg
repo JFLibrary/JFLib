@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Verzierung, 16 px</title>
+  <path class="ink" stroke="#1D2228" d="M1.5 14V1.5H14"/>
+  <path class="tint" stroke="#1F5FA8" d="M4.5 12V4.5H12"/>
+  <rect class="tint" fill="#1F5FA8" x="6" y="6" width="2" height="2"/>
+</svg>

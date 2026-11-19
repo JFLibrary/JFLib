@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Leere Seite, 16 px</title>
+  <polygon class="body" fill="#DCDEE1" points="4,2 9,2 9,5 12,5 12,14 4,14"/>
+  <polygon class="shade" fill="#B9BBBE" points="10,2 12,4 10,4"/>
+  <path class="ink" stroke="#1D2228" d="M3.5 1.5H9.5L12.5 4.5V14.5H3.5Z M9.5 2V4.5H12"/>
+</svg>

@@ -1,0 +1,33 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD7: the text of a shape edited in place -- F2 opens a text box over the shape,
+# a click elsewhere puts the text into the shape (one undo step; the shape's record is named by
+# its text); typing on a selected shape replaces its text; the text tool makes a text box
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+key f2
+expect tab:"Text" exists
+type "Prozess"
+click 900,650
+expect tab:"Text" missing
+expect listitem:"Prozess" exists
+key ctrl+z
+expect listitem:"Sheet.4" exists
+key ctrl+y
+expect listitem:"Prozess" exists
+# typing on the selection replaces the text
+click 570,375
+type "Start"
+click 900,650
+expect listitem:"Start" exists
+# the text tool: a click makes a text box of the default size, ready for text
+cmd 4402
+click 800,560
+type "Notiz"
+click 1000,680
+expect listitem:"Notiz" exists
+# the click made another text box: left empty, it goes again
+click 1000,600
+cmd 4400
+expect listitem:"Sheet.6" missing
+shot build/JFDiagrammer-edit-text.png

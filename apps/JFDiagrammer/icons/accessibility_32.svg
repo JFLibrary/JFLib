@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Barrierefreiheit überprüfen, 32 px</title>
+  <circle class="ink" fill="#1D2228" cx="10" cy="6" r="2.5"/>
+  <path class="ink" fill="#1D2228" d="M2 11H18V13H11V18H9V13H2Z"/>
+  <path class="ink" stroke="#1D2228" stroke-width="2" d="M10 17L4 23M10 17L16 23"/>
+  <path class="tint" stroke="#1F5FA8" stroke-width="2" d="M19 23L22 26L28 20"/>
+</svg>

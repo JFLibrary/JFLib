@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Exportieren, 32 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="2.5" width="8" height="3"/>
+  <path class="ink" stroke="#1D2228" d="M10.5 6V7M5.5 9V7.5H15.5V9"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="9.5" width="6" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="12.5" y="9.5" width="6" height="3"/>
+  <path class="tint" stroke="#1F5FA8" stroke-width="2" d="M16 4H25V13"/>
+  <polygon class="tint" fill="#1F5FA8" points="21,13 29,13 25,17"/>
+  <rect class="body" fill="#DCDEE1" x="19" y="19" width="10" height="2"/>
+  <rect class="ink" stroke="#1D2228" x="18.5" y="18.5" width="11" height="11"/>
+  <path class="ink" stroke="#1D2228" d="M19 21.5H29M24.5 22V29M19 24.5H29M19 27.5H29"/>
+</svg>

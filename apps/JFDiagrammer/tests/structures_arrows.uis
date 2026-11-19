@@ -1,0 +1,35 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD10: Verbindungspfeile (CN-07, ZF-10) and Shapes verbinden (CN-16) -- the
+# pointer on a shape shows four arrows; with a shape below, a click on the lower arrow connects to
+# it; a click on the right one puts a copy of the shape (no stencil open) to the right at the
+# page's spacing (7.5 mm) with a connector; Ansicht › Verbindungspfeile switches them off; Shapes
+# verbinden chains the selection in the order it was selected
+cmd 4404
+drag 500,430 640,520
+cmd 4404
+drag 520,640 620,700
+cmd 4400
+move 570,470
+expect button:"Verbindungspfeil rechts" exists
+expect button:"Verbindungspfeil unten" exists
+click button:"Verbindungspfeil unten"
+expect listitem:"Sheet.6" exists
+expect listitem:"Sheet.7" missing
+move 570,470
+click button:"Verbindungspfeil rechts"
+expect listitem:"Sheet.7" rect 670 424 151 101
+expect listitem:"Sheet.7" selected
+expect listitem:"Sheet.8" rect 651 472 19 6
+# off: no arrows
+cmd 5129
+move 570,470
+expect button:"Verbindungspfeil rechts" missing
+cmd 5129
+# Shapes verbinden: the copy, then the lower rectangle
+click 760,470
+click 600,670 shift
+cmd 5421
+expect listitem:"Sheet.9" exists
+shot build/JFDiagrammer-structures-arrows.png
+key ctrl+z
+expect listitem:"Sheet.9" missing

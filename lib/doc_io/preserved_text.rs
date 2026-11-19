@@ -65,7 +65,7 @@ impl TextSession {
         path: &str,
         root: &Node,
         preserved: bool,
-        types: &crate::preservation::Types,
+        types: &archive::opc::ContentTypes,
     ) -> Result<Self, Error> {
         let mut session = Self {
             parts: Vec::new(),
@@ -314,18 +314,16 @@ fn word(node: &Node, local: &str) -> bool {
 fn contains(node: &Node, local: &str) -> bool {
     word(node, local) || node.children.iter().any(|child| contains(child, local))
 }
-fn protected(entries: &[Entry], types: &crate::preservation::Types) -> bool {
+fn protected(entries: &[Entry], types: &archive::opc::ContentTypes) -> bool {
     let mut settings = Vec::new();
     for entry in entries {
-        if crate::preservation::content_type(types, &entry.name)
-            != Some("application/vnd.openxmlformats-package.relationships+xml")
-        {
+        if types.get(&entry.name) != Some(archive::opc::RELS_TYPE) {
             continue;
         }
         let Ok(relationships) = parse(&entry.data) else {
             return true;
         };
-        let Ok(source) = crate::preservation::relationship_source(&entry.name) else {
+        let Ok(source) = archive::opc::rels_source(&entry.name) else {
             return true;
         };
         for relationship in &relationships.children {
@@ -350,7 +348,7 @@ fn protected(entries: &[Entry], types: &crate::preservation::Types) -> bool {
             let Some(target) = relationship.attr("", "Target") else {
                 return true;
             };
-            let Ok(target) = crate::preservation::resolve(&source, target) else {
+            let Ok(target) = crate::preservation::RULES.resolve(&source, target) else {
                 return true;
             };
             settings.push(target);
@@ -358,9 +356,7 @@ fn protected(entries: &[Entry], types: &crate::preservation::Types) -> bool {
     }
     entries.iter().any(|entry| {
         let name = entry.name.to_ascii_lowercase();
-        let content_type = crate::preservation::content_type(types, &entry.name)
-            .unwrap_or("")
-            .to_ascii_lowercase();
+        let content_type = types.get(&entry.name).unwrap_or("").to_ascii_lowercase();
         if name.starts_with("_xmlsignatures/") || content_type.contains("digital-signature") {
             return true;
         }

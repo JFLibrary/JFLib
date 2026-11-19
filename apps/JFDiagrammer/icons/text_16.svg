@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Text, 16 px</title>
+  <path class="ink" fill="#1D2228" fill-rule="evenodd" d="M1 14L5 3H6L10 14H8.5L7.409 11H3.591L2.5 14Z M3.955 10H7.045L5.5 5.75Z"/>
+  <path class="tint" stroke="#1F5FA8" d="M12 3.5H15M13.5 3V14M12 13.5H15"/>
+</svg>

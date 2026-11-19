@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Verbindungspunkt, 32 px</title>
+  <rect class="body" fill="#DCDEE1" x="6" y="8" width="16" height="17"/>
+  <path class="ink" stroke="#1D2228" d="M22.5 12V7.5H5.5V25.5H22.5V21"/>
+  <path class="tint" stroke="#1F5FA8" stroke-width="2" d="M18 12L27 21M27 12L18 21"/>
+</svg>

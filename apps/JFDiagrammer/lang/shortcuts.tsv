@@ -1,0 +1,80 @@
+# shortcuts.tsv -- JFDiagrammer's default shortcuts per UI language (FEATURES.md 3.16, LG-08, F10)
+#
+# A row: the command (the constant's name in src/commands.rs), then its keys in de, en, es,
+# it, fr.  Keys: English names joined by '+' (Ctrl, Shift, Alt, A..Z, 0..9, F1..F24, PgUp,
+# PgDn, Del, Ins, Home, End, Enter, Left, Right, Up, Down); several chords of one command
+# with '|'; an empty cell: no shortcut in that language.  Each language follows the Office
+# convention of that language for the text formats and the file commands (bold: de
+# Ctrl+Shift+F, en Ctrl+B, es Ctrl+N, it/fr Ctrl+G); the Visio keys fill the rest where they
+# do not collide.  Own shortcuts go into the settings ([keys] NAME=Ctrl+Shift+F) and replace a
+# row's cell (prepared for UI-19).  check_lang.py reports two commands on one chord.
+#
+# Where the Office conventions take a Visio key, the command moves (decisions F10, LG-08):
+#   de   Fett/Kursiv/Unterstrichen on Ctrl+Shift+F/K/U, so In den Vordergrund / Hintergrund
+#        go to Ctrl+Shift+PgUp / PgDn and Gruppierung aufheben to Ctrl+Shift+G
+#   es   Guardar Ctrl+G, Buscar Ctrl+B, Reemplazar Ctrl+L, Nuevo Ctrl+U, Abrir Ctrl+A,
+#        Seleccionar todo Ctrl+E, Cursiva Ctrl+K: Agrupar goes to Ctrl+Shift+G, Girar a la izquierda to
+#        Alt+Shift+Left (and right to Alt+Shift+Right), Hipervínculo to Ctrl+Alt+K
+#   it   Grassetto Ctrl+G, Sottolineato Ctrl+S: Salva goes to Shift+F12, Raggruppa to
+#        Ctrl+Shift+G
+#   fr   Gras Ctrl+G: Grouper goes to Ctrl+Shift+G
+# Flip horizontal moves from Visio's Ctrl+H to Ctrl+Shift+H in every language (Ctrl+H is
+# Replace in Office; KB-02).  The es / it / fr cells for the file commands are Office's as far
+# as known here and are still to be checked against an Office of that language.
+# command	de	en	es	it	fr
+NEW	Ctrl+N	Ctrl+N	Ctrl+U	Ctrl+N	Ctrl+N
+OPEN	Ctrl+O	Ctrl+O	Ctrl+A	Ctrl+O	Ctrl+O
+SAVE	Ctrl+S	Ctrl+S	Ctrl+G	Shift+F12	Ctrl+S
+SAVE_AS	F12	F12	F12	F12	F12
+PRINT	Ctrl+P	Ctrl+P	Ctrl+P	Ctrl+P	Ctrl+P
+CLOSE	Ctrl+W|Ctrl+F4	Ctrl+W|Ctrl+F4	Ctrl+W|Ctrl+F4	Ctrl+W|Ctrl+F4	Ctrl+W|Ctrl+F4
+UNDO	Ctrl+Z	Ctrl+Z	Ctrl+Z	Ctrl+Z	Ctrl+Z
+REDO	Ctrl+Y	Ctrl+Y	Ctrl+Y	Ctrl+Y	Ctrl+Y
+CUT	Ctrl+X	Ctrl+X	Ctrl+X	Ctrl+X	Ctrl+X
+COPY	Ctrl+C	Ctrl+C	Ctrl+C	Ctrl+C	Ctrl+C
+PASTE	Ctrl+V	Ctrl+V	Ctrl+V	Ctrl+V	Ctrl+V
+DUPLICATE	Ctrl+D	Ctrl+D	Ctrl+D	Ctrl+D	Ctrl+D
+FORMAT_PAINTER	Ctrl+Shift+P	Ctrl+Shift+P	Ctrl+Shift+P	Ctrl+Shift+P	Ctrl+Shift+P
+SELECT_ALL	Ctrl+A	Ctrl+A	Ctrl+E	Ctrl+A	Ctrl+A
+FIND	Ctrl+F	Ctrl+F	Ctrl+B	Ctrl+F	Ctrl+F
+REPLACE	Ctrl+H	Ctrl+H	Ctrl+L	Ctrl+H	Ctrl+H
+BOLD	Ctrl+Shift+F	Ctrl+B	Ctrl+N	Ctrl+G	Ctrl+G
+ITALIC	Ctrl+Shift+K	Ctrl+I	Ctrl+K	Ctrl+I	Ctrl+I
+UNDERLINE	Ctrl+Shift+U	Ctrl+U	Ctrl+S	Ctrl+S	Ctrl+U
+TEXT_DIALOG	F11	F11	F11	F11	F11
+EDIT_TEXT	F2	F2	F2	F2	F2
+TEXT_LEFT	Ctrl+Shift+L	Ctrl+Shift+L	Ctrl+Shift+L	Ctrl+Shift+L	Ctrl+Shift+L
+TEXT_CENTER	Ctrl+Shift+C	Ctrl+Shift+C	Ctrl+Shift+C	Ctrl+Shift+C	Ctrl+Shift+C
+TEXT_RIGHT	Ctrl+Shift+R	Ctrl+Shift+R	Ctrl+Shift+R	Ctrl+Shift+R	Ctrl+Shift+R
+TEXT_JUSTIFY	Ctrl+Shift+J	Ctrl+Shift+J	Ctrl+Shift+J	Ctrl+Shift+J	Ctrl+Shift+J
+VALIGN_TOP	Ctrl+Shift+T	Ctrl+Shift+T	Ctrl+Shift+T	Ctrl+Shift+T	Ctrl+Shift+T
+VALIGN_MIDDLE	Ctrl+Shift+M	Ctrl+Shift+M	Ctrl+Shift+M	Ctrl+Shift+M	Ctrl+Shift+M
+VALIGN_BOTTOM	Ctrl+Shift+V	Ctrl+Shift+V	Ctrl+Shift+V	Ctrl+Shift+V	Ctrl+Shift+V
+POINTER	Ctrl+1	Ctrl+1	Ctrl+1	Ctrl+1	Ctrl+1
+TEXT_TOOL	Ctrl+2	Ctrl+2	Ctrl+2	Ctrl+2	Ctrl+2
+CONNECTOR_TOOL	Ctrl+3	Ctrl+3	Ctrl+3	Ctrl+3	Ctrl+3
+PENCIL	Ctrl+4	Ctrl+4	Ctrl+4	Ctrl+4	Ctrl+4
+FREEFORM	Ctrl+5	Ctrl+5	Ctrl+5	Ctrl+5	Ctrl+5
+LINE_TOOL	Ctrl+6	Ctrl+6	Ctrl+6	Ctrl+6	Ctrl+6
+ARC	Ctrl+7	Ctrl+7	Ctrl+7	Ctrl+7	Ctrl+7
+RECTANGLE	Ctrl+8	Ctrl+8	Ctrl+8	Ctrl+8	Ctrl+8
+ELLIPSE	Ctrl+9	Ctrl+9	Ctrl+9	Ctrl+9	Ctrl+9
+ALIGN	F8	F8	F8	F8	F8
+BRING_FRONT	Ctrl+Shift+PgUp	Ctrl+Shift+F	Ctrl+Shift+F	Ctrl+Shift+F	Ctrl+Shift+F
+SEND_BACK	Ctrl+Shift+PgDn	Ctrl+Shift+B	Ctrl+Shift+B	Ctrl+Shift+B	Ctrl+Shift+B
+GROUP	Ctrl+G	Ctrl+G|Ctrl+Shift+G	Ctrl+Shift+G	Ctrl+Shift+G	Ctrl+Shift+G
+UNGROUP	Ctrl+Shift+G	Ctrl+Shift+U	Ctrl+Shift+U	Ctrl+Shift+U	Ctrl+Shift+U
+ROTATE_LEFT	Ctrl+L	Ctrl+L	Alt+Shift+Left	Ctrl+L	Ctrl+L
+ROTATE_RIGHT	Ctrl+R	Ctrl+R	Alt+Shift+Right	Ctrl+R	Ctrl+R
+FLIP_H	Ctrl+Shift+H	Ctrl+Shift+H	Ctrl+Shift+H	Ctrl+Shift+H	Ctrl+Shift+H
+FLIP_V	Ctrl+J	Ctrl+J	Ctrl+J	Ctrl+J	Ctrl+J
+LINK	Ctrl+K	Ctrl+K	Ctrl+Alt+K	Ctrl+K	Ctrl+K
+NEW_PAGE	Shift+F11	Shift+F11	Shift+F11	Shift+F11	Shift+F11
+PAGE_NEXT	Ctrl+PgDn	Ctrl+PgDn	Ctrl+PgDn	Ctrl+PgDn	Ctrl+PgDn
+PAGE_PREV	Ctrl+PgUp	Ctrl+PgUp	Ctrl+PgUp	Ctrl+PgUp	Ctrl+PgUp
+PAGES_ALL	Alt+F3	Alt+F3	Alt+F3	Alt+F3	Alt+F3
+PAGE_SETUP	Shift+F5	Shift+F5	Shift+F5	Shift+F5	Shift+F5
+ZOOM_IN	Alt+F6	Alt+F6	Alt+F6	Alt+F6	Alt+F6
+ZOOM_OUT	Shift+Alt+F6	Shift+Alt+F6	Shift+Alt+F6	Shift+Alt+F6	Shift+Alt+F6
+FIT_WINDOW	Ctrl+Shift+W	Ctrl+Shift+W	Ctrl+Shift+W	Ctrl+Shift+W	Ctrl+Shift+W
+SNAP_GLUE	Alt+F9	Alt+F9	Alt+F9	Alt+F9	Alt+F9

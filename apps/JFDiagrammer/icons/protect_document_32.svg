@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Dokument schützen, 32 px</title>
+  <polygon class="body" fill="#DCDEE1" points="4,3 16,3 16,9 22,9 22,18 19,18 19,29 4,29"/>
+  <path class="ink" stroke="#1D2228" d="M19 29.5H3.5V2.5H16.5L22.5 8.5V18"/>
+  <polygon class="shade" fill="#B9BBBE" points="17,3 22,8 17,8"/>
+  <path class="ink" stroke="#1D2228" d="M16.5 3V8.5H22"/>
+  <path class="tint" stroke="#1F5FA8" stroke-width="2" d="M23 23V20H27V23"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="20.5" y="23.5" width="9" height="6"/>
+  <rect class="tint" fill="#1F5FA8" x="24" y="25" width="2" height="3"/>
+</svg>

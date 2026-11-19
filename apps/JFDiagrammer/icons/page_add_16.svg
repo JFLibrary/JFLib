@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Seite einfügen, 16 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="1.5" width="12" height="12"/>
+  <path class="tint" stroke="#1F5FA8" d="M4 7.5H11M7.5 4V11"/>
+</svg>

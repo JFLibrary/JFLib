@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Maßlinie, 32 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="4.5" y="4.5" width="23" height="9"/>
+  <path class="ink" stroke="#1D2228" d="M4.5 16V29M27.5 16V29"/>
+  <path class="tint" stroke="#1F5FA8" d="M9 22.5H23"/>
+  <path class="tint" fill="#1F5FA8" d="M5.5 22.5L9 19V26Z M26.5 22.5L23 19V26Z"/>
+</svg>

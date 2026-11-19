@@ -1,0 +1,39 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD10: layout and routing (PG-11, CN-17) -- Seite einrichten › Layout und Routing
+# changes the page's routing style and the space between shapes (OK: one undo step), the
+# Verbindungspfeile place a new shape at that space; Layout-Verhalten sets a shape's placement
+# and keeps it
+cmd 4404
+drag 500,430 640,520
+cmd 4400
+cmd 4886
+expect dialog:"Seite einrichten" exists
+click 734,273
+click "Gerade"
+click 659,381
+key ctrl+a
+type "150"
+click 757,381
+key ctrl+a
+type "150"
+click button:"OK"
+expect dialog:"Seite einrichten" missing
+cmd 4886
+expect combo:"Gerade" exists
+expect textbox:"75" missing
+expect textbox:"25" exists
+click button:"Abbrechen"
+# the new shape 15 mm away (38 px at 67 %)
+move 570,470
+click button:"Verbindungspfeil rechts"
+expect listitem:"Sheet.5" rect 689 424 151 101
+# Layout-Verhalten of the first shape
+click 570,470
+cmd 5422
+expect dialog:"Layout-Verhalten" exists
+click radio:"Kein Layout und Routing um das Shape"
+click button:"OK"
+cmd 5422
+expect radio:"Kein Layout und Routing um das Shape" checked
+click button:"Abbrechen"
+shot build/JFDiagrammer-structures-layout.png

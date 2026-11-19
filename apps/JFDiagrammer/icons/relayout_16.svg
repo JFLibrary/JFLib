@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Seite neu layouten, 16 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M7.5 5V8M3.5 10V7.5H11.5V10"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="5.5" y="1.5" width="4" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="10.5" width="4" height="4"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="9.5" y="10.5" width="4" height="4"/>
+</svg>

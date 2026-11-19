@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Freihand in Shapes, 32 px</title>
+  <path class="ink" stroke="#1D2228" d="M3.5 15C6 13.5 9 15.5 12 14C12.5 17 11 20.5 12.5 23.5C9 25 6 22.5 3 24C3.5 21 2 18 3.5 15Z"/>
+  <path class="ink" stroke="#1D2228" d="M15 19.5H17"/>
+  <polygon class="ink" fill="#1D2228" points="17,17 17,22 19.5,19.5"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="21.5" y="14.5" width="8" height="9"/>
+</svg>
