@@ -24,7 +24,12 @@
 //   (G7f) renderer.remove_mesh(id), remove_material(id), remove_texture(id)   their places are used again, the ids stay
 //        invalid (store.rs); refused while a scene's instances, a material or a detail level use them
 //   (G7f) renderer.add_material_desc(&MaterialDesc)             glTF's BLEND (blended after the rest, sorted back to front
-//        per instance on the GPU: sort.wgsl) and doubleSided (no culling of back faces, their normal turned round)
+//        per instance on the GPU: sort.wgsl) and doubleSided (no culling of back faces, their normal turned round);
+//        MaterialDesc::toon, the cartoon look (draw.wgsl)
+//   (G7f) Camera::ortho, an orthographic camera; scene.set_viewmodel, add_viewmodel (a weapon before the camera, drawn
+//        with its own lens in front of the world: the world's depth 0 ..= 0.5, its own 0.5 ..= 1); scene.set_outline (lines
+//        from the depth buffer) and set_antialias (FXAA): post.rs, post.wgsl; scene.set_particles, add_emitter, emit,
+//        set_time (billboards moved in a compute shader, sorted, one draw): particles.rs, particles.wgsl
 //
 // Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
 // of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, light in the
@@ -50,6 +55,8 @@ mod env;
 pub mod gltf;
 mod hiz;
 pub mod math;
+pub mod particles;
+mod post;
 mod scene;
 mod shadow;
 mod store;
@@ -60,7 +67,9 @@ pub(crate) use store::{Counts, Ids, Kind, Pool, slot};
 pub use dfg::{DFG, DFG_N, dfg_table};
 pub use env::{Environment, EnvironmentData, SKY_SIZE, Sky, env_dir, env_face, from_half, to_half};
 pub use shadow::{CASCADES_MAX, Cascade, Shadows};
-pub use scene::{Camera, FrameStats, Instance, InstanceId, Light, LightKind, ListInfo, ListKind, Scene, Sun, Tonemap, Transform, UploadInfo};
+pub use particles::{Emitter, EmitterId, ParticleBlend, ParticleShape};
+pub use post::{Antialias, Outline};
+pub use scene::{Camera, FrameStats, Instance, InstanceId, Light, LightKind, ListInfo, ListKind, Scene, Sun, Tonemap, Transform, UploadInfo, Viewmodel};
 pub use texture::{CLASSES, CLASS_MAX, CLASS_MIN, Mip, Sampling, TextureData, TextureId, TextureInfo, TextureRef, Wrap, class_of, mip_chain};
 
 /// what a depth attachment of this engine clears to (reverse Z: 0 is infinitely far)
@@ -68,8 +77,9 @@ pub const DEPTH_CLEAR: f32 = 0.0;
 /// the most frames the CPU may record ahead of the GPU
 pub const FRAMES_MAX: usize = 3;
 
-/// a view's uniform block: cull.wgsl's View (draw.wgsl declares its first 176 bytes)
-pub(crate) const VIEW_BYTES: u64 = 208;
+/// a view's uniform block: cull.wgsl's View (draw.wgsl declares its first 224 bytes); (G7f) 240 with the orthographic
+/// camera's forward and flags
+pub(crate) const VIEW_BYTES: u64 = 240;
 /// (G5d) the most detail levels of a mesh
 pub const LODS_MAX: usize = 8;
 /// draw.wgsl's Lights: sun, ambient, exposure, tone mapper, shadows, 4 cascades of 64 bytes, the environment
@@ -82,6 +92,14 @@ pub(crate) const CASCADE_AT: u64 = 736;
 pub(crate) const CASCADE_STRIDE: u64 = 256;
 /// (G7f) where the blended instances' draw lies in it (VkDrawIndirectCommand: vertices per instance, instances 0, 0, 0)
 pub(crate) const BLEND_AT: u64 = CASCADE_AT + CASCADE_STRIDE * CASCADES_MAX as u64;
+/// (G7f) where the viewmodel's view lies in it, the particles' frame (particles.wgsl Frame) and their list's head, the
+/// outline's uniform block (post.wgsl Outline); the stage's size
+pub(crate) const VM_AT: u64 = BLEND_AT + 32;
+pub(crate) const PFRAME_AT: u64 = VM_AT + 256;
+pub(crate) const PFRAME_BYTES: u64 = 80;
+pub(crate) const PHEAD_AT: u64 = PFRAME_AT + PFRAME_BYTES;
+pub(crate) const POST_AT: u64 = PHEAD_AT + 16;
+pub(crate) const STAGE_BYTES: u64 = POST_AT + post::OUTLINE_BYTES;
 /// (G7f) the blended instances' list: that draw, then 16 bytes per instance (key, slot, draw record, flags)
 pub(crate) const BLEND_HEAD: u64 = 16;
 pub(crate) const BLEND_ITEM: u64 = 16;
@@ -113,6 +131,23 @@ pub const DRAW_WGSL: &str = include_str!("draw.wgsl");
 pub const HIZ_WGSL: &str = include_str!("hiz.wgsl");
 /// (G7f) the blended instances sorted back to front
 pub const SORT_WGSL: &str = include_str!("sort.wgsl");
+/// (G7f) outlines and FXAA; the particles
+pub const POST_WGSL: &str = include_str!("post.wgsl");
+pub const PARTICLES_WGSL: &str = include_str!("particles.wgsl");
+#[cfg(not(target_arch = "wasm32"))]
+pub const CULL_VM_SPV: &[u32] = spv::CULL_VM;
+#[cfg(not(target_arch = "wasm32"))]
+pub const VS_FULL_SPV: &[u32] = spv::VS_FULL;
+#[cfg(not(target_arch = "wasm32"))]
+pub const FS_OUTLINE_SPV: &[u32] = spv::FS_OUTLINE;
+#[cfg(not(target_arch = "wasm32"))]
+pub const FS_FXAA_SPV: &[u32] = spv::FS_FXAA;
+#[cfg(not(target_arch = "wasm32"))]
+pub const CS_PARTICLES_SPV: &[u32] = spv::CS_PARTICLES;
+#[cfg(not(target_arch = "wasm32"))]
+pub const VS_PARTICLE_SPV: &[u32] = spv::VS_PARTICLE;
+#[cfg(not(target_arch = "wasm32"))]
+pub const FS_PARTICLE_SPV: &[u32] = spv::FS_PARTICLE;
 #[cfg(not(target_arch = "wasm32"))]
 pub const SORT_LOCAL_SPV: &[u32] = spv::SORT_LOCAL;
 #[cfg(not(target_arch = "wasm32"))]
@@ -257,10 +292,49 @@ impl AlphaClass {
     }
 }
 
-/// (G7f) a material row's word of flags (draw.wgsl Material::flags): blended, double-sided
+/// (G7f) a row of the table's word of flags (draw.wgsl Material::flags): blended, double-sided, the cartoon look (its
+/// word follows: Toon::word)
 const FLAGS_WORD: usize = 17;
 const FLAG_BLEND: u32 = 1;
 const FLAG_DOUBLE: u32 = 2;
+const FLAG_TOON: u32 = 4;
+const TOON_WORD: usize = 18;
+
+/// (G7f) the cartoon look of a material (MaterialDesc::toon; docs/RENDER3D.md "Cartoon-Material"): flat colours, the sun's
+/// and the lights' n.l in bands, a flat ambient light, a light rim on the silhouette.  Metallic, roughness and the
+/// metallic-roughness texture are not used; the base colour (with its texture), the normal map, occlusion (on the ambient
+/// light), emission, MASK, BLEND and double-sided work as for PBR.  Made with `new` and changed field by field (it may
+/// grow).  The values go to the GPU in bytes: softness, rim and rim_width in steps of 1/255
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct Toon {
+    /// 1 ..= 16 levels of light: 0, 1 / (bands - 1), ..., 1 of the light's colour (the first step at the terminator n.l =
+    /// 0, the others evenly up to n.l = 1); 1: no shading at all, the base colour under the full light
+    pub bands: u32,
+    /// 0 ..= 1: how soft a step is (0 hard; 1 a whole band wide)
+    pub softness: f32,
+    /// 0 ..= 1: how bright the rim is (its colour is the light a white surface facing the sun gets)
+    pub rim: f32,
+    /// 0 ..= 1: where the rim begins, as 1 - n.v (0: no rim)
+    pub rim_width: f32,
+}
+
+impl Toon {
+    /// `bands` levels, hard steps, no rim
+    pub const fn new(bands: u32) -> Toon {
+        Toon { bands, softness: 0.0, rim: 0.0, rim_width: 0.0 }
+    }
+
+    /// the material row's word: bands, softness, rim, rim_width a byte each (Invalid out of range)
+    fn word(&self) -> Result<u32> {
+        let unit = |v: f32| v.is_finite() && (0.0..=1.0).contains(&v);
+        if !((1..=16).contains(&self.bands) && unit(self.softness) && unit(self.rim) && unit(self.rim_width)) {
+            return Err(GpuError::Invalid("Toon: 1 ..= 16 bands, softness, rim and rim_width 0 ..= 1"));
+        }
+        let b = |v: f32| (v * 255.0 + 0.5) as u32;
+        Ok(self.bands | b(self.softness) << 8 | b(self.rim) << 16 | b(self.rim_width) << 24)
+    }
+}
 
 /// where a mesh lies in the pools, and its bounding sphere in its own coordinates
 #[derive(Clone, Copy, Debug)]
@@ -342,11 +416,13 @@ pub struct MaterialDesc {
     /// glTF's doubleSided: back faces are not culled; they are lit with their normal turned round (the whole shading
     /// normal, as the glTF sample viewer turns the tangent frame).  Both sides cast shadows (every material does)
     pub double_sided: bool,
+    /// (G7f) the cartoon look in place of glTF's BRDF (None: PBR)
+    pub toon: Option<Toon>,
 }
 
 impl MaterialDesc {
     pub const fn new(material: Material) -> MaterialDesc {
-        MaterialDesc { material, blend: false, double_sided: false }
+        MaterialDesc { material, blend: false, double_sided: false, toon: None }
     }
 
     /// the lists and pipelines its instances take: Blend when blended, else the Material's
@@ -365,10 +441,14 @@ impl MaterialDesc {
             Some(_) => return Err(GpuError::Invalid("Material: alpha_cutoff must be finite and not negative")),
             None => -1.0,
         };
-        let flags = if self.blend { FLAG_BLEND } else { 0 } | if self.double_sided { FLAG_DOUBLE } else { 0 };
+        let toon = match &self.toon {
+            Some(k) => k.word()?,
+            None => 0,
+        };
+        let flags = if self.blend { FLAG_BLEND } else { 0 } | if self.double_sided { FLAG_DOUBLE } else { 0 } | if self.toon.is_some() { FLAG_TOON } else { 0 };
         Ok([b(c[0]), b(c[1]), b(c[2]), b(c[3]), b(e[0]), b(e[1]), b(e[2]), b(m.metallic), b(m.roughness), b(m.normal_scale),
             b(m.occlusion_strength), b(cutoff), t.word(&m.base_color_texture)?, t.word(&m.metallic_roughness_texture)?,
-            t.word(&m.normal_texture)?, t.word(&m.occlusion_texture)?, t.word(&m.emissive_texture)?, flags, 0, 0])
+            t.word(&m.normal_texture)?, t.word(&m.occlusion_texture)?, t.word(&m.emissive_texture)?, flags, toon, 0])
     }
 
     /// the textures it names (u32::MAX: none), for their counts of users
@@ -419,6 +499,11 @@ pub struct Renderer {
     /// (G5d) the occlusion test's two phases (cull.wgsl) and the pyramid between them (hiz.rs)
     cull_early: ComputePipeline,
     cull_late: ComputePipeline,
+    /// (G7f) the viewmodel's view (main_vm)
+    cull_vm: ComputePipeline,
+    /// (G7f) outlines, FXAA, particles (post.rs), and per depth attachment the outline's group and FXAA's image
+    pub(crate) post: post::Post,
+    post_nodes: core::cell::OnceCell<alloc::boxed::Box<post::Node>>,
     hiz_maker: hiz::Maker,
     /// a pyramid per depth attachment seen lately, and the records counted (when each was last used)
     hiz: core::cell::OnceCell<alloc::boxed::Box<hiz::Node>>,
@@ -520,14 +605,19 @@ struct Modules {
     fs_blend: ShaderModule,
     sort_local: ShaderModule,
     sort_global: ShaderModule,
+    cull_vm: ShaderModule,
+    post: post::PostModules,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 fn modules(dev: &Device) -> Result<Modules> {
     let m = |w: &[u32]| ShaderModule::from_spirv(dev, w);
+    let post = post::PostModules { vs_full: m(VS_FULL_SPV)?, fs_outline: m(FS_OUTLINE_SPV)?, fs_fxaa: m(FS_FXAA_SPV)?, cs_particles: m(CS_PARTICLES_SPV)?,
+                                   vs_particle: m(VS_PARTICLE_SPV)?, fs_particle: m(FS_PARTICLE_SPV)? };
     Ok(Modules { cull: m(CULL_SPV)?, cull_blend: m(CULL_BLEND_SPV)?, cull_early: m(CULL_EARLY_SPV)?, cull_late: m(CULL_LATE_SPV)?, hiz_depth: m(HIZ_DEPTH_SPV)?, hiz_down: m(HIZ_DOWN_SPV)?,
                  scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, fs: m(FS_SPV)?, fs_mask: m(FS_MASK_SPV)?, vs_depth: m(VS_DEPTH_SPV)?, vs_shadow: m(VS_SHADOW_SPV)?,
-                 fs_shadow: m(FS_SHADOW_SPV)?, vs_blend: m(VS_BLEND_SPV)?, fs_blend: m(FS_BLEND_SPV)?, sort_local: m(SORT_LOCAL_SPV)?, sort_global: m(SORT_GLOBAL_SPV)? })
+                 fs_shadow: m(FS_SHADOW_SPV)?, vs_blend: m(VS_BLEND_SPV)?, fs_blend: m(FS_BLEND_SPV)?, sort_local: m(SORT_LOCAL_SPV)?, sort_global: m(SORT_GLOBAL_SPV)?,
+                 cull_vm: m(CULL_VM_SPV)?, post })
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -536,9 +626,12 @@ fn modules(dev: &Device) -> Result<Modules> {
     let c = ShaderModule::from_wgsl(dev, CULL_WGSL)?;
     let h = ShaderModule::from_wgsl(dev, HIZ_WGSL)?;
     let s = ShaderModule::from_wgsl(dev, SORT_WGSL)?;
-    Ok(Modules { cull: c.clone(), cull_blend: c.clone(), cull_early: c.clone(), cull_late: c, hiz_depth: h.clone(), hiz_down: h, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, vs: d.clone(),
-                 fs: d.clone(), fs_mask: d.clone(), vs_depth: d.clone(), vs_shadow: d.clone(), fs_shadow: d.clone(), vs_blend: d.clone(), fs_blend: d,
-                 sort_local: s.clone(), sort_global: s })
+    let p = ShaderModule::from_wgsl(dev, POST_WGSL)?;
+    let q = ShaderModule::from_wgsl(dev, PARTICLES_WGSL)?;
+    let post = post::PostModules { vs_full: p.clone(), fs_outline: p.clone(), fs_fxaa: p, cs_particles: q.clone(), vs_particle: q.clone(), fs_particle: q };
+    Ok(Modules { cull: c.clone(), cull_blend: c.clone(), cull_early: c.clone(), cull_late: c.clone(), cull_vm: c, hiz_depth: h.clone(), hiz_down: h, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?,
+                 vs: d.clone(), fs: d.clone(), fs_mask: d.clone(), vs_depth: d.clone(), vs_shadow: d.clone(), fs_shadow: d.clone(), vs_blend: d.clone(), fs_blend: d,
+                 sort_local: s.clone(), sort_global: s, post })
 }
 
 /// (G7f) the main pass's pipelines of one side for a listed class: back faces culled, or (double) none, the shading
@@ -634,6 +727,8 @@ impl Renderer {
         let cull_blend = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cull_pl, shader: ShaderStage::new(&md.cull_blend, "main_blend") })?;
         let cull_early = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cull_pl, shader: ShaderStage::new(&md.cull_early, "early") })?;
         let cull_late = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &late_pl, shader: ShaderStage::new(&md.cull_late, "late") })?;
+        let cull_vm = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cull_pl, shader: ShaderStage::new(&md.cull_vm, "main_vm") })?;
+        let post = post::Post::new(dev, &md.post, desc.color, desc.encodes_srgb())?;
         let scatter = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &scatter_pl, shader: ShaderStage::new(&md.scatter, "main") })?;
         let enc = desc.encodes_srgb();
         let pipeline = |class, front_cw| main_pipeline(dev, &md, &draw_pl, desc.color, enc, class, front_cw, false);
@@ -704,6 +799,9 @@ impl Renderer {
             cull_blend,
             cull_early,
             cull_late,
+            cull_vm,
+            post,
+            post_nodes: core::cell::OnceCell::new(),
             hiz_maker,
             hiz: core::cell::OnceCell::new(),
             hiz_clock: Cell::new(0),
@@ -1122,12 +1220,15 @@ impl Renderer {
     }
 
     /// a row of the table; the next frame shows it.  A new alpha class moves the material's instances to the lists of
-    /// that class with their scenes' next prepare.  (G7f) The material stays blended and double-sided as it was
+    /// that class with their scenes' next prepare.  (G7f) The material stays blended, double-sided and cartoon as it was
     /// (set_material_desc changes those)
     pub fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()> {
         let Some(i) = self.material_ids.get(id.0) else { return Err(GpuError::Invalid("set_material: no such material")) };
         let flags = self.materials[i][FLAGS_WORD];
-        self.set_material_desc(id, &MaterialDesc { material: *m, blend: flags & FLAG_BLEND != 0, double_sided: flags & FLAG_DOUBLE != 0 })
+        let w = self.materials[i][TOON_WORD];
+        let unit = |k: u32| ((w >> k) & 255) as f32 / 255.0;
+        let toon = (flags & FLAG_TOON != 0).then(|| Toon { bands: w & 255, softness: unit(8), rim: unit(16), rim_width: unit(24) });
+        self.set_material_desc(id, &MaterialDesc { material: *m, blend: flags & FLAG_BLEND != 0, double_sided: flags & FLAG_DOUBLE != 0, toon })
     }
 
     /// (G7f) a row of the table with glTF's BLEND and doubleSided; the next frame shows it.  A new alpha class or side
@@ -1224,8 +1325,9 @@ impl Renderer {
 
     /// (Scene::prepare) the table's changes for the next frame's commands
     pub(crate) fn prepare_materials(&mut self) -> Result<u64> {
-        // (G5d) the pyramids of depth attachments no record used lately go
+        // (G5d) the pyramids of depth attachments no record used lately go; (G7f) the outlines' groups and FXAA's images too
         hiz::prune(&mut self.hiz, self.hiz_clock.get().saturating_sub(hiz::KEEP));
+        post::prune(&mut self.post_nodes, self.hiz_clock.get().saturating_sub(hiz::KEEP));
         // the last ones never reached a frame: all of it again
         if !self.material_up_done.get() {
             self.material_dirty = Some((0, self.materials.len() as u32));
@@ -1314,6 +1416,29 @@ impl Renderer {
         } else {
             None
         };
+        // (G7f) outlines read the depth buffer, FXAA draws the scene into an image of its own (both kept per depth attachment)
+        let outline = s.outline.is_some();
+        let fxaa = s.antialias == post::Antialias::Fxaa;
+        // (FXAA reads its image through a bilinear sampler: 32-bit floats are not filterable everywhere, the browser
+        // refuses them)
+        if fxaa && matches!(self.desc.color, Format::Rgba32Float | Format::Rg32Float | Format::R32Float) {
+            return Err(GpuError::Invalid("record: FXAA takes no 32-bit float target (it is not filterable everywhere)"));
+        }
+        if outline && !depth.view.usage().contains(TextureUsage::SAMPLED) {
+            return Err(GpuError::Invalid("record: outlines need a depth attachment with TextureUsage::SAMPLED"));
+        }
+        let node = if outline || fxaa { Some(post::find(&self.post_nodes, depth.view, now)) } else { None };
+        let outline_group = match (outline, node) {
+            (true, Some(nd)) => Some(nd.outline(&self.dev, &self.post)?),
+            _ => None,
+        };
+        let image = match (fxaa, node) {
+            (true, Some(nd)) => Some(nd.image(&self.dev, &self.post, self.desc.color)?),
+            _ => None,
+        };
+        // (G7f) the viewmodel's view, the particles
+        let vm = s.vm.as_ref().filter(|_| s.viewmodel().is_some());
+        let parts = s.particles.as_ref().filter(|p| p.cs_group.is_some() && p.render.is_some() && p.list.sort.is_some());
         // the frame before read and wrote everything this one writes (the shadow map: its passes' own layout
         // transitions, Sampled -> DepthTarget -> Sampled)
         e.barrier(Access::COPY_READ | Access::COPY_WRITE | Access::COMPUTE_READ | Access::COMPUTE_WRITE | Access::INDIRECT | Access::INDEX_VERTEX | Access::GRAPHICS_READ,
@@ -1346,6 +1471,31 @@ impl Renderer {
         if s.blend_on {
             e.copy_buffer(&f.stage, BLEND_AT, &s.blend.buf, 0, BLEND_HEAD);
         }
+        // (G7f) the viewmodel's view; the outline's uniform block; the particles: a new ring cleared, those born for this frame
+        // into it, the frame, the list's head (6 vertices per particle, none counted yet)
+        if let Some(v) = vm {
+            e.copy_buffer(&f.stage, VM_AT, &v.ubo, 0, VIEW_BYTES);
+        }
+        if outline {
+            e.copy_buffer(&f.stage, POST_AT, &self.post.ubo, 0, post::OUTLINE_BYTES);
+        }
+        if let Some(p) = parts {
+            if p.fresh {
+                e.fill_buffer(&p.buf, 0, p.buf.size(), 0);
+                if p.copies[0].1 > 0 {
+                    e.barrier(Access::COPY_WRITE, Access::COPY_WRITE);
+                }
+            }
+            if let Some(up) = &f.spawn {
+                for &(first, count, at) in &p.copies {
+                    if count > 0 {
+                        e.copy_buffer(up, at, &p.buf, first as u64 * particles::PARTICLE_BYTES, count as u64 * particles::PARTICLE_BYTES);
+                    }
+                }
+            }
+            e.copy_buffer(&f.stage, PFRAME_AT, &p.frame_ubo, 0, PFRAME_BYTES);
+            e.copy_buffer(&f.stage, PHEAD_AT, &p.list.buf, 0, BLEND_HEAD);
+        }
         if let Some(up) = &s.full_up {
             let n = s.slots.len() as u64;
             e.copy_buffer(up, 0, &s.spheres, 0, n * 16);
@@ -1370,6 +1520,9 @@ impl Renderer {
             e.copy_buffer(&s.template, 0, &s.view.draws, 0, lists * DRAW_BYTES);
             e.copy_buffer(&s.template, 0, &s.late.draws, 0, lists * DRAW_BYTES);
             for v in &s.cascades[..cascades] {
+                e.copy_buffer(&s.template, 0, &v.draws, 0, lists * DRAW_BYTES);
+            }
+            if let Some(v) = vm {
                 e.copy_buffer(&s.template, 0, &v.draws, 0, lists * DRAW_BYTES);
             }
         }
@@ -1402,11 +1555,26 @@ impl Renderer {
                 e.timestamp(ts, base + 3 + k as u32);
             }
         }
+        // (G7f) the viewmodel's view; the particles' motion into their list, sorted
+        if let Some(v) = vm {
+            self.cull(e, s, v, &self.cull_vm, &[n, all], None);
+        }
+        if let (Some(p), Some(g), Some(sg)) = (parts, parts.and_then(|p| p.cs_group.as_ref()), parts.and_then(|p| p.list.sort.as_ref())) {
+            e.set_compute_pipeline(&self.post.particles_cs);
+            e.set_bind_group(0, g);
+            e.dispatch(p.cap.div_ceil(64), 1, 1);
+            self.sort_list(e, sg, p.list.cap);
+        }
         // every view's counts and lists before the indirect draws and the vertex shaders read them; (G7f) the sorted
-        // blended instances before their draw
+        // blended instances before their draw, the particles' list
         e.barrier(Access::COMPUTE_WRITE, Access::INDIRECT | Access::GRAPHICS_READ | Access::COPY_READ);
         if let (true, Some(rb), true) = (s.stats_on, &f.readback, lists > 0) {
             e.copy_buffer(&s.view.draws, 0, rb, 0, lists * DRAW_BYTES);
+            // (G7f part 2: without blended instances nothing wrote the blended draw's place, and FrameStats added what the
+            // memory held there: on llvmpipe garbage; 0 instead)
+            if !s.blend_on {
+                e.fill_buffer(rb, rb.size() - BLEND_HEAD, BLEND_HEAD, 0);
+            }
             if pyramid.is_none() {
                 e.copy_buffer(&s.late.draws, 0, rb, (rb.size() - BLEND_HEAD) / 2, lists * DRAW_BYTES);
                 if s.blend_on {
@@ -1430,16 +1598,38 @@ impl Renderer {
         }
         // (G5d) phase 1 keeps colour and depth for phase 2 and leaves the depth buffer to the pyramid's compute shader:
         // its pass ends with DepthTarget -> Sampled (late fragment tests and depth writes before the shaders' reads),
-        // phase 2's begins with Sampled -> DepthTarget (the pyramid's reads before the depth test writes again)
-        let (c1, d1) = match pyramid {
-            Some(_) => (ColorAttachment { store: true, after: Layout::ColorTarget, ..color }, DepthAttachment { store: true, after: Layout::Sampled, ..depth }),
-            None => (color, depth),
+        // phase 2's begins with Sampled -> DepthTarget (the pyramid's reads before the depth test writes again).  (G7f) The
+        // passes that write the scene's colour (the target, or FXAA's image): phase 1 (or the only one), phase 2, the outline,
+        // one for the blended instances and particles after it (with an outline; else they end the last pass); those with
+        // the depth buffer: phase 1, phase 2, that last one.  Between two of them colour and depth are kept, the depth in
+        // Layout::Sampled (the pyramid and the outline read it)
+        let scene_color = match image {
+            Some(im) => ColorAttachment { view: im.tex.view(), load: Load::Clear, clear: color.clear, store: true, before: Layout::Undefined, after: Layout::Sampled },
+            None => color,
         };
-        e.begin_render(&RenderPassDesc { color: &[c1], depth: Some(d1) });
-        self.draw_lists(e, s, &s.view);
-        // (G7f) the blended instances last, over everything (with the occlusion test in phase 2)
-        if pyramid.is_none() {
+        let n_color = 1 + pyramid.is_some() as usize + 2 * outline as usize;
+        let n_depth = 1 + pyramid.is_some() as usize + outline as usize;
+        let cat = |k: usize| {
+            let (first, last) = (k == 0, k + 1 == n_color);
+            ColorAttachment { load: if first { scene_color.load } else { Load::Keep }, before: if first { scene_color.before } else { Layout::ColorTarget },
+                              store: if last { scene_color.store } else { true }, after: if last { scene_color.after } else { Layout::ColorTarget }, ..scene_color }
+        };
+        let dat = |k: usize| {
+            let (first, last) = (k == 0, k + 1 == n_depth);
+            DepthAttachment { load: if first { depth.load } else { Load::Keep }, before: if first { depth.before } else { Layout::Sampled },
+                              store: if last { depth.store } else { true }, after: if last { depth.after } else { Layout::Sampled }, ..depth }
+        };
+        e.begin_render(&RenderPassDesc { color: &[cat(0)], depth: Some(dat(0)) });
+        self.draw_lists(e, s, &s.view, false);
+        // (G7f) the viewmodel, in front of the world (its depth 0.5 ..= 1); with phase 1 (it hides what lies behind it from
+        // phase 2)
+        if let Some(v) = vm {
+            self.draw_lists(e, s, v, true);
+        }
+        // (G7f) the blended instances last, over everything (with the occlusion test in phase 2, with an outline after it)
+        if pyramid.is_none() && !outline {
             self.draw_blend(e, s);
+            self.draw_particles(e, s, parts);
         }
         e.end_render();
         if let Some(ts) = ts {
@@ -1468,15 +1658,38 @@ impl Renderer {
                     e.copy_buffer(&s.blend.buf, 0, rb, rb.size() - BLEND_HEAD, BLEND_HEAD);
                 }
             }
-            let c2 = ColorAttachment { load: Load::Keep, before: Layout::ColorTarget, ..color };
-            let d2 = DepthAttachment { load: Load::Keep, before: Layout::Sampled, ..depth };
-            e.begin_render(&RenderPassDesc { color: &[c2], depth: Some(d2) });
-            self.draw_lists(e, s, &s.late);
-            self.draw_blend(e, s);
+            e.begin_render(&RenderPassDesc { color: &[cat(1)], depth: Some(dat(1)) });
+            self.draw_lists(e, s, &s.late, false);
+            if !outline {
+                self.draw_blend(e, s);
+                self.draw_particles(e, s, parts);
+            }
             e.end_render();
         } else if let Some(ts) = ts {
             e.timestamp(ts, base + 12);
             e.timestamp(ts, base + 13);
+        }
+        // (G7f) the outline over the opaque image (the depth buffer read in Layout::Sampled), then the blended instances and the
+        // particles in a pass of their own (it takes the depth buffer back for their depth test and ends as the caller said)
+        if let Some(g) = outline_group {
+            let k = 1 + pyramid.is_some() as usize;
+            e.begin_render(&RenderPassDesc { color: &[cat(k)], depth: None });
+            e.set_render_pipeline(&self.post.outline);
+            e.set_bind_group(0, g);
+            e.draw(3, 1, 0, 0);
+            e.end_render();
+            e.begin_render(&RenderPassDesc { color: &[cat(k + 1)], depth: Some(dat(k)) });
+            self.draw_blend(e, s);
+            self.draw_particles(e, s, parts);
+            e.end_render();
+        }
+        // (G7f) FXAA from the scene's image into the target (it covers every pixel)
+        if let Some(im) = image {
+            e.begin_render(&RenderPassDesc { color: &[ColorAttachment { load: Load::Discard, ..color }], depth: None });
+            e.set_render_pipeline(&self.post.fxaa);
+            e.set_bind_group(0, &im.group);
+            e.draw(3, 1, 0, 0);
+            e.end_render();
         }
         if let Some(ts) = ts {
             e.timestamp(ts, base + 14);
@@ -1511,7 +1724,8 @@ impl Renderer {
         if self.multi {
             // (first record, count, wide, holes, room) of the merged runs
             let mut merged: Vec<(u32, u32, bool, bool, bool)> = Vec::new();
-            for r in s.runs.iter().filter(|r| casts(r.class)) {
+            // ((G7f) the viewmodel casts no shadows)
+            for r in s.runs.iter().filter(|r| casts(r.class) && !r.vm) {
                 let h = holes(r.class);
                 match merged.last_mut() {
                     Some(m) if m.0 + m.1 == r.first && m.2 == r.wide && m.3 == h => {
@@ -1534,7 +1748,7 @@ impl Renderer {
             let mut wide = None;
             for &i in &s.order {
                 let l = &s.lists[i as usize];
-                if l.room > 0 && casts(l.class) {
+                if l.room > 0 && casts(l.class) && !l.vm {
                     if set(e, holes(l.class)) {
                         wide = None;
                     }
@@ -1575,12 +1789,13 @@ impl Renderer {
 
     /// one view's lists into the running pass: per side (those of instances as they are, then those of mirrored ones with
     /// the pipelines whose front faces are clockwise), alpha class (opaque without a discard, then MASK; blended ones are
-    /// draw_blend's) and (G7f) faces (back faces culled, then double-sided), only the combinations with room
-    fn draw_lists<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, v: &'a scene::ViewLists) {
+    /// draw_blend's) and (G7f) faces (back faces culled, then double-sided), only the combinations with room; (G7f) vm: the
+    /// viewmodel's lists, else the world's
+    fn draw_lists<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, v: &'a scene::ViewLists, vm: bool) {
         for mirrored in [false, true] {
             for class in AlphaClass::LISTED {
                 for double in [false, true] {
-                    let mine = |r: &&scene::Run| r.mirrored == mirrored && r.class == class && r.double == double && r.room;
+                    let mine = |r: &&scene::Run| r.mirrored == mirrored && r.class == class && r.double == double && r.vm == vm && r.room;
                     if !s.runs.iter().any(|r| mine(&r)) {
                         continue;
                     }
@@ -1607,7 +1822,7 @@ impl Renderer {
                         let mut bound = None;
                         for &i in &s.order {
                             let l = &s.lists[i as usize];
-                            if l.room > 0 && l.mirrored == mirrored && l.class == class && l.double == double {
+                            if l.room > 0 && l.mirrored == mirrored && l.class == class && l.double == double && l.vm == vm {
                                 if bound != Some(l.wide) {
                                     self.bind_indices(e, l.wide);
                                     bound = Some(l.wide);
@@ -1620,6 +1835,16 @@ impl Renderer {
                 }
             }
         }
+    }
+
+    /// (G7f) the particles into the running pass: one draw of their sorted list, six vertices each, blended (premultiplied),
+    /// the depth tested and not written
+    fn draw_particles<'a>(&'a self, e: &mut CommandEncoder<'a>, _s: &'a Scene, parts: Option<&'a scene::Particles>) {
+        let Some(p) = parts else { return };
+        let Some(g) = &p.render else { return };
+        e.set_render_pipeline(&self.post.particles);
+        e.set_bind_group(0, g);
+        e.draw_indirect(&p.list.buf, 0);
     }
 
     /// (G7f) the blended instances into the running pass: one draw of the sorted list for all of them (sorted back to
@@ -1639,7 +1864,12 @@ impl Renderer {
     /// steps over the list, the shorter ones in the tiles.  Between the steps: their writes before the next one's reads
     fn sort<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene) {
         let Some(group) = &s.blend.sort else { return };
-        let cap = s.blend.cap;
+        self.sort_list(e, group, s.blend.cap);
+    }
+
+    /// (G7f) a list laid out as the blended instances' (the particles' too) sorted by key: its group of the sort's layout, its
+    /// room (a power of two of SORT_TILE)
+    fn sort_list<'a>(&'a self, e: &mut CommandEncoder<'a>, group: &'a BindGroup, cap: u32) {
         let step = |e: &mut CommandEncoder<'a>, pipe: &'a ComputePipeline, k: u32, j: u32, groups: u32| {
             e.barrier(Access::COMPUTE_WRITE, Access::COMPUTE_READ | Access::COMPUTE_WRITE);
             e.set_compute_pipeline(pipe);

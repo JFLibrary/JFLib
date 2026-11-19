@@ -446,6 +446,7 @@ pub fn later_gallery_in(name: &str, r: &mut Renderer, format: Format) -> Result<
         "sides" => sides_gallery(r),
         "blend" => blend_gallery(r),
         "churn" => churn_gallery(r, format),
+        "ortho" | "toon" | "outline" | "fxaa" | "particles" | "viewmodel" => g7f2_gallery(name, r, format),
         _ => Err(GpuError::Invalid("no such gallery")),
     }
 }
@@ -1023,4 +1024,191 @@ fn churn_final(r: &mut Renderer, sc: &mut Scene) -> Result<()> {
         sc.add(Instance { mesh: meshes[0], material: id, transform: Transform { pos, rot: quat([0.0, 1.0, 0.0], 0.3 * k as f64 - 0.4), scale: [1.0, 0.8, 1.0] } })?;
     }
     Ok(())
+}
+
+// ---------------------------------------------------------------- (G7f part 2) the arena
+
+/// (G7f part 2) the galleries of G7f's second part: the arena seen orthographically, in the cartoon look, with outlines,
+/// through FXAA, with particles, with a viewmodel
+pub const G7F2: [&str; 6] = ["ortho", "toon", "outline", "fxaa", "particles", "viewmodel"];
+
+/// (G7f part 2) a small arena with two figures of plain shapes: ground, walls, a crate, a ramp, a pillar, a ball, two figures
+/// (body, head, legs, arms); meshes plate, cube, ball, prism; untextured.  toon: every material in that look
+pub fn arena_scene(toon: Option<render3d::Toon>) -> Described {
+    let geos = vec![plate(), cube(), ball(12, 16), prism(10, 1.0)];
+    let s = |mesh: u32, pos: [f64; 3], rot: [f32; 4], scale: [f32; 3]| Spec { mesh, material: 0, pos, rot, scale };
+    let none = [0.0f32, 0.0, 0.0, 1.0];
+    let flat = quat([1.0, 0.0, 0.0], -core::f64::consts::FRAC_PI_2);
+    let m = |r: f32, g: f32, b: f32| {
+        let mut d = render3d::MaterialDesc::new(Material { roughness: 0.7, ..Material::color(r, g, b) });
+        d.toon = toon;
+        d
+    };
+    let mut items = vec![
+        (s(0, [0.0, 0.0, 0.0], flat, [9.0, 9.0, 1.0]), m(0.45, 0.65, 0.35)),
+        (s(1, [0.0, 0.6, -8.5], none, [9.0, 0.6, 0.5]), m(0.7, 0.68, 0.6)),
+        (s(1, [-8.5, 0.6, 0.0], none, [0.5, 0.6, 8.0]), m(0.7, 0.68, 0.6)),
+        (s(1, [8.5, 0.6, 0.0], none, [0.5, 0.6, 8.0]), m(0.7, 0.68, 0.6)),
+        (s(1, [3.0, 0.6, -2.5], quat([0.0, 1.0, 0.0], 0.4), [0.6; 3]), m(0.85, 0.55, 0.2)),
+        (s(1, [-4.0, 0.45, -3.5], quat([1.0, 0.0, 0.0], -0.35), [1.5, 0.15, 2.0]), m(0.6, 0.6, 0.75)),
+        (s(3, [5.0, 1.5, -5.0], none, [0.5, 1.5, 0.5]), m(0.62, 0.62, 0.66)),
+        (s(2, [2.2, 0.5, 2.0], none, [0.5; 3]), m(0.95, 0.85, 0.2)),
+    ];
+    // two figures: body, head, legs, arms
+    for (at, turn, color) in [([0.0, 0.0, 0.0], 0.3, [0.85, 0.2, 0.15]), ([-2.6, 0.0, 1.4], -0.8, [0.2, 0.35, 0.85])] {
+        let q = quat([0.0, 1.0, 0.0], turn);
+        let rot = |p: [f64; 3]| {
+            let (sn, cs) = cpu::sincos(turn);
+            [at[0] + p[0] * cs + p[2] * sn, at[1] + p[1], at[2] - p[0] * sn + p[2] * cs]
+        };
+        items.push((s(3, rot([0.0, 0.95, 0.0]), q, [0.42, 0.45, 0.3]), m(color[0], color[1], color[2])));
+        items.push((s(2, rot([0.0, 1.72, 0.0]), q, [0.3; 3]), m(0.95, 0.78, 0.62)));
+        for side in [-1.0, 1.0] {
+            items.push((s(1, rot([0.17 * side, 0.27, 0.0]), q, [0.11, 0.25, 0.12]), m(0.2, 0.2, 0.3)));
+            items.push((s(1, rot([0.55 * side, 1.0, 0.0]), q, [0.09, 0.33, 0.09]), m(color[0], color[1], color[2])));
+        }
+    }
+    (geos, Vec::new(), items)
+}
+
+pub fn arena_camera(aspect: f64) -> Camera {
+    Camera::look_at([6.5, 4.5, 9.0], [0.0, 0.9, -1.0], [0.0, 1.0, 0.0], 0.9, aspect, 0.1, f64::INFINITY)
+}
+
+/// the arena's orthographic camera from the front and above (an editor's view)
+pub fn arena_ortho(aspect: f64) -> Camera {
+    Camera::ortho_at([8.0, 9.0, 14.0], [0.0, 0.5, -1.0], [0.0, 1.0, 0.0], 11.0, aspect, 0.0, 40.0)
+}
+
+/// the toon variants of the comparison sheet and the gallery: (name, look, outline)
+pub fn toon_variants() -> [(&'static str, render3d::Toon, Option<render3d::Outline>); 4] {
+    let t = |bands: u32, softness: f32, rim: f32, rim_width: f32| {
+        let mut k = render3d::Toon::new(bands);
+        k.softness = softness;
+        k.rim = rim;
+        k.rim_width = rim_width;
+        k
+    };
+    let o = |w: u32, c: [f32; 4], crease: f32| {
+        let mut x = render3d::Outline::new(w, c);
+        x.crease = crease;
+        x
+    };
+    [("A: 2 bands, hard, no rim, 1 px dark lines", t(2, 0.0, 0.0, 0.0), Some(o(1, [0.04, 0.03, 0.03, 1.0], 1.0))),
+     ("B: 3 bands, soft 0.15, rim 0.35 at 0.25, 2 px dark lines", t(3, 0.15, 0.35, 0.25), Some(o(2, [0.05, 0.04, 0.06, 1.0], 1.0))),
+     ("C: 4 bands, soft 0.5, rim 0.2 at 0.35, no lines", t(4, 0.5, 0.2, 0.35), None),
+     ("D: 2 bands, soft 0.05, rim 0.6 at 0.2, 2 px brown lines on silhouettes", t(2, 0.05, 0.6, 0.2), Some(o(2, [0.18, 0.09, 0.03, 1.0], 8.0)))]
+}
+
+/// (G7f part 2) an emitter of the galleries: (seed, additive, streak, life, speed, spread, size, colours, gravity, drag)
+#[allow(clippy::too_many_arguments)]
+pub fn emitter(seed: u32, additive: bool, streak: bool, life: [f32; 2], speed: [f32; 2], spread: f32, size: [f32; 2], color: [[f32; 4]; 2], gravity: f32,
+               drag: f32) -> render3d::Emitter {
+    let mut e = render3d::Emitter::new(seed);
+    e.blend = if additive { render3d::ParticleBlend::Additive } else { render3d::ParticleBlend::Alpha };
+    e.shape = if streak { render3d::ParticleShape::Streak } else { render3d::ParticleShape::Disc };
+    e.stretch = if streak { 0.04 } else { 0.0 };
+    e.life = life;
+    e.speed = speed;
+    e.spread = spread;
+    e.size = size;
+    e.color = color;
+    e.gravity = gravity;
+    e.drag = drag;
+    e
+}
+
+/// (G7f part 2) the viewmodel of the galleries: a weapon of boxes and a barrel in the camera's space (meshes of the arena:
+/// cube 1, prism 3) and their colours
+pub fn weapon() -> Vec<(Spec, [f32; 3])> {
+    let s = |mesh: u32, pos: [f64; 3], rot: [f32; 4], scale: [f32; 3]| Spec { mesh, material: 0, pos, rot, scale };
+    let along = quat([1.0, 0.0, 0.0], core::f64::consts::FRAC_PI_2);
+    vec![(s(1, [0.22, -0.2, -0.45], [0.0, 0.0, 0.0, 1.0], [0.05, 0.06, 0.18]), [0.25, 0.25, 0.28]),
+         (s(3, [0.22, -0.16, -0.75], along, [0.022, 0.16, 0.022]), [0.15, 0.15, 0.17]),
+         (s(1, [0.22, -0.3, -0.38], quat([1.0, 0.0, 0.0], 0.3), [0.035, 0.09, 0.05]), [0.45, 0.28, 0.15])]
+}
+
+pub fn weapon_lens() -> render3d::Viewmodel {
+    render3d::Viewmodel::new(0.95, 0.02, 4.0)
+}
+
+/// a described scene into a renderer (described_in), with the weapon as its viewmodel (materials of its own, the scene's
+/// look)
+pub fn arena_in(r: &mut Renderer, d: &Described, cam: &Camera, sun: &Sun, vm: bool) -> Result<(Scene, Vec<InstanceId>)> {
+    let (mut sc, ids) = described_in(r, d, cam, sun)?;
+    if vm {
+        sc.set_viewmodel(Some(&weapon_lens()))?;
+        for (spec, c) in weapon() {
+            let mut m = render3d::MaterialDesc::new(Material { roughness: 0.45, metallic: 0.3, ..Material::color(c[0], c[1], c[2]) });
+            m.toon = d.2[0].1.toon;
+            let id = r.add_material_desc(&m)?;
+            sc.add_viewmodel(Instance { mesh: MeshId(spec.mesh), material: id, ..spec.instance() })?;
+        }
+    }
+    Ok((sc, ids))
+}
+
+/// (G7f part 2) the particles of the galleries at time t: sparks from a hit on the crate, smoke over the pillar, a muzzle
+/// flash at the weapon (in the viewmodel's space when there is one)
+pub fn arena_particles(sc: &mut Scene, vm: bool, t: f64) -> Result<()> {
+    sc.set_particles(4096)?;
+    let sparks = sc.add_emitter(&emitter(11, true, true, [0.3, 0.7], [2.0, 5.0], 1.2, [0.05, 0.02], [[6.0, 3.0, 0.8, 1.0], [2.0, 0.4, 0.05, 1.0]], 9.8, 0.5))?;
+    let smoke = sc.add_emitter(&emitter(12, false, false, [1.5, 3.0], [0.3, 0.8], 0.6, [0.4, 1.6], [[0.55, 0.55, 0.58, 0.7], [0.7, 0.7, 0.72, 0.0]], -0.6, 0.8))?;
+    let mut f = emitter(13, true, false, [0.08, 0.12], [0.5, 1.5], 0.5, [0.12, 0.25], [[8.0, 5.0, 1.5, 1.0], [3.0, 1.0, 0.2, 0.0]], 0.0, 2.0);
+    f.viewmodel = vm;
+    let flash = sc.add_emitter(&f)?;
+    sc.set_time(t);
+    sc.emit(sparks, [3.0, 1.2, -1.85], [0.2, 0.5, 1.0], 60)?;
+    sc.emit(smoke, [5.0, 3.1, -5.0], [0.0, 1.0, 0.0], 40)?;
+    sc.emit(flash, if vm { [0.22, -0.16, -0.93] } else { [0.0, 1.5, 2.0] }, [0.0, 0.0, -1.0], 12)?;
+    sc.set_time(t + 0.06);
+    Ok(())
+}
+
+/// the camera of the viewmodel's gallery: close to the right wall along it, the weapon (on the right) reaching into it
+pub fn wall_camera(aspect: f64) -> Camera {
+    Camera::look_at([7.93, 1.6, 2.0], [6.75, 1.4, -4.0], [0.0, 1.0, 0.0], 1.1, aspect, 0.05, f64::INFINITY)
+}
+
+/// one of G7F2's galleries in a fresh renderer of this format (FXAA takes no 32-bit float target: "fxaa" is drawn without it
+/// there)
+pub fn g7f2_gallery(name: &str, r: &mut Renderer, format: Format) -> Result<Scene> {
+    let aspect = GALLERY_W as f64 / GALLERY_H as f64;
+    let sun = Sun::DEFAULT;
+    let toon = toon_variants()[1].1;
+    let sh = render3d::Shadows { cascades: 2, size: 1024, distance: 40.0, ..render3d::Shadows::DEFAULT };
+    Ok(match name {
+        "ortho" => {
+            let (mut sc, _) = arena_in(r, &arena_scene(None), &arena_ortho(aspect), &sun, false)?;
+            sc.set_shadows(Some(&sh))?;
+            sc
+        }
+        "toon" => {
+            let (mut sc, _) = arena_in(r, &arena_scene(Some(toon)), &arena_camera(aspect), &sun, false)?;
+            sc.set_shadows(Some(&sh))?;
+            sc
+        }
+        "outline" => {
+            let (mut sc, _) = arena_in(r, &arena_scene(Some(toon)), &arena_camera(aspect), &sun, false)?;
+            sc.set_outline(toon_variants()[1].2.as_ref())?;
+            sc
+        }
+        "fxaa" => {
+            let (mut sc, _) = arena_in(r, &arena_scene(None), &arena_camera(aspect), &sun, false)?;
+            if !matches!(format, Format::Rgba32Float | Format::Rg32Float | Format::R32Float) {
+                sc.set_antialias(render3d::Antialias::Fxaa);
+            }
+            sc
+        }
+        "particles" => {
+            let (mut sc, _) = arena_in(r, &arena_scene(None), &arena_camera(aspect), &sun, false)?;
+            arena_particles(&mut sc, false, 1.0)?;
+            sc
+        }
+        _ => {
+            let (mut sc, _) = arena_in(r, &arena_scene(None), &wall_camera(aspect), &sun, true)?;
+            arena_particles(&mut sc, true, 1.0)?;
+            sc
+        }
+    })
 }

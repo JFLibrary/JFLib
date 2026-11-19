@@ -94,7 +94,12 @@ pub(crate) fn cascades(cam: &crate::Camera, sun: V3, s: &Shadows) -> Vec<Cascade
     let axes = light_axes(sun);
     let n = s.cascades as usize;
     let near = cam.near;
-    let far = s.distance.max(near * 1.0001);
+    // (G7f) an orthographic camera: its box from near to its far plane or the shadows' distance, split uniformly (the
+    // logarithmic split is for a perspective view's depth)
+    let far = match cam.ortho {
+        Some(_) => s.distance.min(cam.far).max(near + 1e-6 * near.abs().max(1.0)),
+        None => s.distance.max(near * 1.0001),
+    };
     let ty = math::tan(cam.fov_y * 0.5);
     let tx = ty * cam.aspect;
     let k2 = tx * tx + ty * ty;
@@ -107,13 +112,20 @@ pub(crate) fn cascades(cam: &crate::Camera, sun: V3, s: &Shadows) -> Vec<Cascade
             return far;
         }
         let t = i as f64 / n as f64;
+        if cam.ortho.is_some() {
+            return near + (far - near) * t;
+        }
         s.split * near * math::pow(far / near, t) + (1.0 - s.split) * (near + (far - near) * t)
     };
     for i in 0..n {
         let (a, b) = (split(i), split(i + 1));
-        // the smallest sphere around the slice with its centre on the view's axis
+        // the smallest sphere around the slice with its centre on the view's axis; (G7f) orthographic: around the box
         let mut c = (a + b) * (1.0 + k2) * 0.5;
-        let r2 = if c >= b {
+        let r2 = if let Some(h) = cam.ortho {
+            c = (a + b) * 0.5;
+            let (hx, hy, hz) = (0.5 * h * cam.aspect, 0.5 * h, 0.5 * (b - a));
+            hx * hx + hy * hy + hz * hz
+        } else if c >= b {
             c = b;
             b * b * k2
         } else {
@@ -132,18 +144,20 @@ pub(crate) fn cascades(cam: &crate::Camera, sun: V3, s: &Shadows) -> Vec<Cascade
 }
 
 impl Cascade {
-    /// the 52 floats of a view's uniform block relative to origin (as Camera::view_block): an orthographic
+    /// the 60 floats of a view's uniform block relative to origin (as Camera::view_block): an orthographic
     /// view_proj, the planes (four sides, the far side; no near plane), the centre in place of the eye, (G5d) the
-    /// camera's eye and fy for the detail levels (`lod`, from Camera::view_block: a shadow takes its caster's pick)
-    pub(crate) fn view_block(&self, origin: V3, lod: [f32; 4]) -> [f32; 52] {
+    /// camera's eye and fy for the detail levels (`lod`, from Camera::view_block: a shadow takes its caster's pick), (G7f)
+    /// whether that camera is orthographic
+    pub(crate) fn view_block(&self, origin: V3, lod: [f32; 4], lod_ortho: f32) -> [f32; 60] {
         let [x, y, l] = self.axes;
         let r = self.radius;
         let (ox, oy, oz) = (math::dot(origin, x) - math::dot(self.center, x), math::dot(origin, y) - math::dot(self.center, y), math::dot(origin, l));
         let depth = self.z_near - self.z_far;
         let rows = [[x[0] / r, x[1] / r, x[2] / r, ox / r], [y[0] / r, y[1] / r, y[2] / r, oy / r],
                     [l[0] / depth, l[1] / depth, l[2] / depth, (oz - self.z_far) / depth], [0.0, 0.0, 0.0, 1.0]];
-        let mut out = [0.0f32; 52];
+        let mut out = [0.0f32; 60];
         out[48..52].copy_from_slice(&lod);
+        out[56] = lod_ortho;
         for c in 0..4 {
             for (k, row) in rows.iter().enumerate() {
                 out[c * 4 + k] = row[c] as f32;

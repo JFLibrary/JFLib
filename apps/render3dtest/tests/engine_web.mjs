@@ -18,7 +18,9 @@ import {loadPlaywright, chromiumOptions} from '../../../tools/tests/playwright.m
 
 const args=process.argv.slice(2), build=resolve(args.find(a=>!a.startsWith('--')) || 'build');
 const option=(name,fallback)=>args.find(a=>a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
-const WIDTH=320, HEIGHT=180, NAMES=['mix','changed','far','tex','gltf','pbr','shadow','lights','env','occl','sides','blend','churn'];
+const WIDTH=320, HEIGHT=180, NAMES=['mix','changed','far','tex','gltf','pbr','shadow','lights','env','occl','sides','blend','churn',
+  // (G7f part 2)
+  'ortho','toon','outline','fxaa','particles','viewmodel'];
 // the images the browser draws into other targets: [its name, the gallery's image, the extension of the native dump]; (G7f) the
 // galleries of G7f only in an sRGB target (the program compares the shader's sRGB with float images: blending happens in the
 // target's codes, so a blended image does not match its float image)
