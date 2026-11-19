@@ -477,6 +477,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "game1"
+version = "0.1.0"
+dependencies = [
+ "game1_core",
+ "jflib-base",
+ "jflib-build",
+ "jflib-game",
+ "jflib-game-render3d",
+ "jflib-gltf",
+ "jflib-gpu",
+ "jflib-netchan",
+ "jflib-physics",
+ "jflib-plat",
+ "jflib-render3d",
+ "jflib-rt",
+ "jflib-style-winui",
+ "jflib-ui",
+]
+
+[[package]]
+name = "game1-server"
+version = "0.1.0"
+dependencies = [
+ "game1_core",
+ "jflib-build",
+ "jflib-game",
+ "jflib-netchan",
+ "jflib-netio",
+ "jflib-plat",
+ "jflib-rt",
+]
+
+[[package]]
+name = "game1_core"
+version = "0.1.0"
+dependencies = [
+ "jflib-game",
+ "jflib-netchan",
+ "jflib-physics",
+ "jflib-plat",
+ "jflib-rt",
+]
+
+[[package]]
 name = "gamedemo"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,4 @@
+#!args --check
+# game1-server --check runs in the console: a room with 16 bots for a minute of ticks (they shoot and end each other),
+# then the server on 127.0.0.1 (never 0.0.0.0) with a client over UDP that makes a room with three bots and gets its
+# snapshots; exit code 0 = every check passed

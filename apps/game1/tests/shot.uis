@@ -1,0 +1,23 @@
+# game1's window headless: the start menu over the circling view of the map, the practice against seven bots (a
+# server in this process), walking and shooting under the pointer lock a headless run plays (locked at once, `motion`
+# for the mouse, Esc lets it go), the pause menu, back to the start; a shot of the game in between.  The settings of a
+# scripted run live in mem:// (the person's own are never read or written).
+expect text:"Ein schneller Cartoon-Shooter, jeder gegen jeden." exists
+expect "Raum erstellen" exists
+click "Üben gegen Bots"
+expect text:"Ein schneller Cartoon-Shooter, jeder gegen jeden." missing
+wait 1500
+keydown w code 26
+wait 400
+keyup w code 26
+motion 400 -60
+down canvas:"Spiel"
+wait 300
+up canvas:"Spiel"
+wait 200
+shot build/game1_play.png
+key esc
+expect "Raum verlassen" exists
+expect "Weiterspielen" exists
+click "Raum verlassen"
+expect text:"Ein schneller Cartoon-Shooter, jeder gegen jeden." exists

@@ -1,0 +1,6 @@
+#!args --loopback --secs 4
+#!only windows linux macos
+# game1 --loopback runs game 1 on real sockets in the console: the server's loop (game1_core::host) on 127.0.0.1 with
+# UDP and the WebSocket path /game1 and four bots in the room, two clients over UDP and two over WebSocket driven by
+# the bots' minds, four seconds of real time; exit code 1 when a client does not play, gets too few snapshots or one
+# that does not decode, or nobody shoots.  Not in the browser: no UDP and no server there.

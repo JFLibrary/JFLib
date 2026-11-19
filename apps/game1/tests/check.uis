@@ -1,0 +1,8 @@
+#!args --check
+#!timeout 300
+# game1 --check runs in the console: every test group of game 1 (docs/GAME1.md, "Tests"): map (the baked map and figure,
+# spawn points, way points, the collision mesh and 20 000 rays), move (the controller and the weapon on the grid),
+# match (16 bots on the server, damage, death and return, lag compensation in the room), netsim (prediction over the
+# simulated network: exact on a clean link, bounded in typical weather, a match with shooting), lagcomp (hits at
+# round trips of 50 to 250 ms) and render (the scene offscreen, SKIP without a GPU); exit code 1 when a check fails.
+# The checksums of --sums are compared across the targets by hand (docs/GAME1.md, "Prüfsummen").
