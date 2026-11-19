@@ -1,7 +1,7 @@
 # Spiel-Engine: Plan für G7
 
-Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1), von G7b, G7d und G7g (Welle 2) und von G7e
-(Welle 3), siehe dort; Stand 2026-11-19. Die Zahl der Läufe je Stufe ist
+Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1), von G7b, G7d und G7g (Welle 2), von G7e und der
+zweite Teil von G7c (Welle 3), siehe dort; Stand 2026-11-19. Die Zahl der Läufe je Stufe ist
 geschätzt (ein Lauf ist eine Arbeitsrunde eines Agenten mit Durchsicht, wie bei G5 und G6).
 
 ## Ziel
@@ -213,6 +213,19 @@ anfassen:
   dem Ryzen 5 3600 rund 1,3 Mio. Strahlen und 285 000 Kapsel-Sweeps je Sekunde gegen eine Karte mit 50 000
   Dreiecken. Noch nicht gebaut: drehende Sweeps, Netz gegen Netz, Höhenfelder, zusammengesetzte Formen. Offen:
   Teil 2, der Character-Controller.
+- **Stand 2026-11-19: Teil 2 fertig** ([PHYSICS.md](PHYSICS.md)). `CharacterController` in `lib/physics`: aufrechte
+  Kapsel; gehen, laufen, springen, ducken (Aufstehen nur mit Platz); Stufen bis `step_height` (eine Kante trägt, wenn
+  die Fläche dahinter begehbar ist); Rampen bis 45°; Gleiten mit den Clip-Ebenen von Quake 3 (kein Zittern und kein
+  Hängenbleiben in Ecken); Einrasten auf dem Weg nach unten; Luftsteuerung wie in Quake. Am Boden nähert sich die
+  Geschwindigkeit der gewünschten an, statt wie in Quake zu beschleunigen (sonst war man schräg an einer Wand
+  schneller als frei). `step` liest nur Lage, Geschwindigkeit und Ducken; das ist alles, was der Netcode abgleichen
+  muss. Vom Nutzer am 18.11.2026 freigegeben: die eine portable Wurzel `rt::fx::sqrt_portable`, die `physics` und
+  `geom` nehmen; `rt::fx::sqrtd` ist damit im Browser und im x86-64-Android-Emulator 5- bis 20-mal schneller, Bit für
+  Bit gleich (auch NaN). `apps/physicstest`: 448 Szenen-Prüfungen mit genauen Erwartungen, 86 400 zufällige Schritte
+  ohne Überlappung und ohne Durchtunneln bis 1000 m/s; Prüfsumme des Controllers `13dd288c669c6eaa` gleich auf
+  Windows, Linux, macOS, im Browser und im Android-Emulator, die alten Prüfsummen unverändert. 178 Schritte je ms
+  auf dem M2 (32 Figuren, 50 000 Dreiecke). Offen: bewegte Plattformen, `World::set_shape` für eine duckende Figur,
+  die Vorgaben von Hand (mit G7h).
 
 **G7d Transport** (`plat`, `netio`)
 
