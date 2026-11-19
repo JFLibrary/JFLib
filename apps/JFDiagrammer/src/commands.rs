@@ -375,6 +375,26 @@ static HANDLERS: &[(u32, Handler)] = &[
     (STENCIL_VIEW_ICONS_ONLY, |a, _| a.stencils.panel.view = SV_ICONS),
     (STENCIL_VIEW_NAMES, |a, _| a.stencils.panel.view = SV_NAMES),
     (STENCIL_VIEW_DETAILS, |a, _| a.stencils.panel.view = SV_DETAILS),
+    // (JD11) formats (format_menus.rs, format_pane.rs)
+    (FILL_NONE, crate::format_menus::fill_none),
+    (LINE_NONE, crate::format_menus::line_none),
+    (MORE_COLORS, crate::format_menus::more_colors),
+    (FILL_OPTIONS, |a, _| crate::format_menus::pane(a, 0)),
+    (LINE_OPTIONS, |a, _| crate::format_menus::pane(a, 0)),
+    (FORMAT_SHADOW, |a, _| crate::format_menus::pane(a, 1)),
+    (FONT_COLOR, crate::format_menus::font_color),
+    (BOLD, crate::format_menus::bold),
+    (ITALIC, crate::format_menus::italic),
+    (UNDERLINE, crate::format_menus::underline),
+    (STRIKE, crate::format_menus::strike),
+    (VALIGN_TOP, |a, ui| crate::format_menus::valign(a, ui, 0)),
+    (VALIGN_MIDDLE, |a, ui| crate::format_menus::valign(a, ui, 1)),
+    (VALIGN_BOTTOM, |a, ui| crate::format_menus::valign(a, ui, 2)),
+    (TEXT_LEFT, |a, ui| crate::format_menus::halign(a, ui, 0)),
+    (TEXT_CENTER, |a, ui| crate::format_menus::halign(a, ui, 1)),
+    (TEXT_RIGHT, |a, ui| crate::format_menus::halign(a, ui, 2)),
+    (TEXT_JUSTIFY, |a, ui| crate::format_menus::halign(a, ui, 3)),
+    (FORMAT_PAINTER, crate::format_menus::painter),
 ];
 
 // toggles: whether the command is on
@@ -404,6 +424,18 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (STENCIL_VIEW_ICONS_ONLY, |a| a.stencils.panel.view == SV_ICONS),
     (STENCIL_VIEW_NAMES, |a| a.stencils.panel.view == SV_NAMES),
     (STENCIL_VIEW_DETAILS, |a| a.stencils.panel.view == SV_DETAILS),
+    // (JD11) the format toggles of the first selected shape
+    (BOLD, |a| crate::format_menus::style_on(a, 1)),
+    (ITALIC, |a| crate::format_menus::style_on(a, 2)),
+    (UNDERLINE, |a| crate::format_menus::style_on(a, 4)),
+    (VALIGN_TOP, |a| a.format.valign_now == Some(0)),
+    (VALIGN_MIDDLE, |a| a.format.valign_now == Some(1)),
+    (VALIGN_BOTTOM, |a| a.format.valign_now == Some(2)),
+    (TEXT_LEFT, |a| a.format.halign_now == Some(0)),
+    (TEXT_CENTER, |a| a.format.halign_now == Some(1)),
+    (TEXT_RIGHT, |a| a.format.halign_now == Some(2)),
+    (TEXT_JUSTIFY, |a| a.format.halign_now == Some(3)),
+    (FORMAT_PAINTER, |a| a.format.painter.is_some()),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -418,7 +450,7 @@ pub(crate) fn enabled(id: u32) -> bool {
 
 /// (JD7) the command exists and can run now (a selection, something to undo ...)
 pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
-    enabled(id) && crate::edit_cmds::available(app, id)
+    enabled(id) && crate::edit_cmds::available(app, id) && crate::format_menus::available(app, id)
 }
 
 /// the toggle is on

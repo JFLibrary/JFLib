@@ -33,6 +33,12 @@
 //                     from stencils/), files, favourites, "Weitere Shapes", the search
 //   src/stencils_panel.rs   (JD9) the panel (ui.stencil_panel), previews, its menus
 //   src/stencils_drop.rs    (JD9) shapes onto the page: drag and drop, click + click, Enter
+//   src/design_gallery.rs   (JD11) Entwurf › Designs and Varianten: galleries, live preview,
+//                     applying (diagram_core::design)
+//   src/design_store.rs     (JD11) the user's saved designs
+//   src/format_cells.rs     (JD11) the selection's format cells read and written, the colour menu
+//   src/format_menus.rs     (JD11) Start › Schriftart, Absatz, Formenarten, Format übertragen
+//   src/format_pane.rs      (JD11) the task pane Shape formatieren
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too)
@@ -68,11 +74,16 @@ extern crate alloc;
 
 mod backstage;
 mod commands;
+mod design_gallery;
+mod design_store;
 mod edit_canvas;
 mod edit_cmds;
 mod edit_doc;
 mod edit_text;
 mod export_ui;
+mod format_cells;
+mod format_menus;
+mod format_pane;
 mod icons;
 mod lang;
 mod options;
@@ -170,6 +181,11 @@ pub(crate) struct Diagrammer {
     pub clip_offset: u32,
     /// (JD9) the Shapes panel: stencils, search, favourites, click-placing
     pub stencils: stencils::Stencils,
+    /// (JD11) Entwurf › Designs and Varianten; the dialog that saves a design
+    pub designs: design_gallery::Designs,
+    pub design_save: design_store::SaveDialog,
+    /// (JD11) the format commands: colours used last, the format painter, Weitere Farben
+    pub format: format_menus::FormatState,
 }
 
 impl Diagrammer {
@@ -213,6 +229,9 @@ impl Diagrammer {
             clip: None,
             clip_offset: 1,
             stencils: stencils::Stencils::new(),
+            designs: design_gallery::Designs::default(),
+            design_save: design_store::SaveDialog::default(),
+            format: format_menus::FormatState::default(),
         }
     }
 
@@ -345,6 +364,9 @@ impl App for Diagrammer {
         commands::states(self, ui);
         stencils_panel::states(self, ui);
         shell::frame(self, ui);
+        design_gallery::after(self, ui);
+        design_store::dialog(self, ui);
+        format_menus::after(self, ui);
         export_ui::dialogs(self, ui);
         print_ui::dialogs(self, ui);
     }

@@ -300,7 +300,7 @@ pub use theme::{contrast_ratio, luminance};
 pub use theme::{Theme, ThemeError}; // app themes over the style (theme.rs, theme_app.rs)
 pub use win::Shared; // ui-win: the app's open flags / WINRECTs the library keeps
 // ui-list: the value / colour / list API beside the Ui methods
-pub use color::{hsv_to_rgb, rgb_to_hsv};
+pub use color::{color_shades, hsv_to_rgb, rgb_to_hsv, ColorMenu, ColorPick};
 pub use value::{cvtd, deg_atan2, deg_sincos, grad_at, part_id, px_mix, RangeF, Track, NO_DEFAULT};
 
 /// the app's entry point: `ui::main!(ui::run(&DESC, &mut MyApp::default(), &style::STYLE));`

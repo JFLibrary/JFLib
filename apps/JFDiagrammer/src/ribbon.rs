@@ -387,6 +387,15 @@ fn column(app: &mut Diagrammer, ui: &mut Ui, col: &Col, width: i32, tiles: u32, 
             }
             ui.box_end();
         }
+        // (JD11) the design galleries
+        Col::Gallery(THEMES, ..) => {
+            ui.next_size(width, CONTENT_H);
+            crate::design_gallery::designs(app, ui, CONTENT_H);
+        }
+        Col::Gallery(VAR_COLORS, ..) => {
+            ui.next_size(width, CONTENT_H);
+            crate::design_gallery::variants(app, ui, CONTENT_H);
+        }
         Col::Gallery(id, n, color) => {
             ui.next_size(width, CONTENT_H);
             ui.box_begin(0, BOX_H | BOX_FIXED, 2);
@@ -404,17 +413,8 @@ fn column(app: &mut Diagrammer, ui: &mut Ui, col: &Col, width: i32, tiles: u32, 
             ui.box_begin(0, BOX_V | BOX_FIXED, 0);
             ui.next_size(-1, SMALL_H + 2);
             ui.box_begin(0, BOX_H | BOX_FIXED, 2);
-            let mut sel = 0;
-            ui.next_size(if compact { FONT_W_COMPACT } else { FONT_W }, SMALL_H);
-            ui.next_flags(ST_DISABLED | ST_COMPACT);
-            ui.combobox(FONT, &mut sel, &["Inter"]);
-            ui.tooltip(&commands::tip(ui, FONT));
-            ui.keytip(2, commands::label(FONT));
-            ui.next_size(SIZE_W, SMALL_H);
-            ui.next_flags(ST_DISABLED | ST_COMPACT);
-            ui.combobox(FONT_SIZE, &mut sel, &["11"]);
-            ui.tooltip(&commands::tip(ui, FONT_SIZE));
-            ui.keytip(2, commands::label(FONT_SIZE));
+            // (JD11) the fonts of the design first, the size
+            crate::format_menus::font_boxes(app, ui, if compact { FONT_W_COMPACT } else { FONT_W }, SIZE_W, SMALL_H);
             ui.box_end();
             small(app, ui, &Sm::Row(&[BOLD, ITALIC, UNDERLINE, STRIKE]), false);
             small(app, ui, &Sm::Split(FONT_COLOR, &COLOR_MENU), compact);
@@ -485,6 +485,10 @@ fn small(app: &mut Diagrammer, ui: &mut Ui, s: &Sm, compact: bool) {
 
 // the rows of a menu button's flyout `pid`
 fn menu(app: &mut Diagrammer, ui: &mut Ui, pid: u32, items: &[It]) {
+    // (JD11) Füllung, Linie and Schriftfarbe bring their colour menus
+    if crate::format_menus::flyout(app, ui, pid) {
+        return;
+    }
     if ui.flyout_begin(pid, 0) {
         rows(app, ui, items);
     }

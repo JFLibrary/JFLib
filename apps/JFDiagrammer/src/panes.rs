@@ -183,27 +183,9 @@ fn shapes(app: &mut Diagrammer, ui: &mut Ui) {
     crate::stencils_panel::panel(app, ui);
 }
 
-// Shape formatieren (AB-05): its registers and sections, disabled until shapes have formats
+// Shape formatieren (AB-05): (JD11) format_pane.rs
 fn format_pane(app: &mut Diagrammer, ui: &mut Ui) {
-    ui.next_size(-1, -1);
-    ui.scroll_begin(ID_PANE + 0x10, SC_V | BOX_V | pad(10));
-    ui.next_size(-1, 28);
-    ui.tabs(ID_PANE + 0x11, &mut app.format_tab, &[t("Füllung und Linie"), t("Effekte"), t("Text")]);
-    ui.spacer(6);
-    let sections: &[&str] = match app.format_tab {
-        1 => &["Schatten", "Spiegelung", "Leuchten", "Weiche Kanten", "3D-Format", "3D-Drehung"], // i18n
-        2 => &["Textfeld", "Textblock"], // i18n
-        _ => &["Füllung", "Linie|Abschnitt"], // i18n
-    };
-    for (k, s) in sections.iter().enumerate() {
-        ui.next_size(-1, 28);
-        ui.next_flags(ST_SUBTLE | ST_ALIGN_START | ST_DISABLED);
-        ui.next_icon(IC_CHEV_RIGHT);
-        ui.button(ID_PANE + 0x18 + k as u32, crate::tc(s));
-    }
-    ui.spacer(8);
-    ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Kein Shape ausgewählt."));
-    ui.scroll_end();
+    crate::format_pane::pane(app, ui, ID_PANE);
 }
 
 // Größe und Position (AB-04): the fields of a 2D shape, disabled until a shape is selected
