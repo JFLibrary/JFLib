@@ -189,7 +189,7 @@ auf 127.0.0.1) und `tests/shot.uis` (das Fenster ohne Bildschirm: Startmenü, Ü
 | `lagcomp` | ein Client schießt auf einen anderen, der mit 9 m/s hin und her läuft, und zielt dorthin, wo er ihn sieht: Umlauf 50, 100, 150, 200, 250 ms, mit und ohne Lag-Ausgleich |
 | `render` | das Bild offscreen aus fester Kamera: dasselbe Bild zweimal gleich, Himmel oben, der Hof unten bunt, sechs Figuren ändern die Mitte, die Waffe nur unten rechts, Partikel zeigen sich (kein Bezugsbild) |
 
-Ergebnisse (Windows, Ryzen 5 3600, RTX 2070 SUPER, Entwicklungs-Build): 20 239 von 20 239 Prüfungen. Klar: 1424 erste
+Ergebnisse (auf Windows, Linux, macOS und in Node dieselben Zahlen): Klar: 1424 erste
 Vorhersagen verglichen, 0 verschieden, 0 Korrekturen. Typisch 10 s: 10 Korrekturen (15 je Minute und Client), größter
 Fehler 9 cm; danach wieder jede Vorhersage exakt. Mit Schießen, typisch 15 s: 165 Schüsse, 101 Treffer, 17 Abschüsse,
 Schnappschüsse bis 329 Bytes. Lag-Ausgleich:
@@ -217,8 +217,42 @@ erste Vorhersage jedes Clients, jeder Zustand des Servers, die Zähler der Clien
 | Ziel | Build | map | rays | move | match | net |
 | --- | --- | --- | --- | --- | --- | --- |
 | Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung | `296751e538edff1f` | `864f3a7a354afce4` | `3df4a4fc907f338d` | `d64fd476dd466992` | `834566b66cd092bc` |
+| Linux x86-64 (glibc) in WSL Ubuntu 24.04 | Entwicklung | gleich | gleich | gleich | gleich | gleich |
+| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung | gleich | gleich | gleich | gleich | gleich |
+| WebAssembly in Node 22.17: einfach, SIMD, Threads (`tests/web.mjs`) | Entwicklung | gleich (alle drei) | gleich | gleich | gleich | gleich |
+
+Die Summen der Partie: 1492 Schüsse, 1144 Treffer, 198 Abschüsse; die Sitzung faltet 6881 Werte.
+
+| Ziel | `--check` | Skripte |
+| --- | --- | --- |
+| Windows x86-64 | 20 240 von 20 240 | `check`, `loopback`, `shot` bestanden; `game1-server --check` bestanden |
+| Linux x86-64 (WSL) | `check.uis` bestanden (das Bild über llvmpipe) | `check`, `loopback`, `shot` bestanden; der Server statisch ohne libc, `--check` bestanden |
+| macOS ARM64 (M2) | 20 240 von 20 240 (das Bild über Metal) | – ; `game1-server --check` bestanden |
+| Node (drei Bündel) | `--test map,move,match,netsim,lagcomp`: 20 233 von 20 233 | – |
+
+Ein echtes Fenster lief einmal (Windows, `gpu on` ohne Aktivierung, das Skript startet das Üben, geht, schießt,
+pausiert): die Ansicht über die Swapchain, 13 dargestellte Bilder zurückgelesen, keins anders als der Framebuffer.
 
 ## Messwerte
+
+`game1 --bench` im Release-Build, Windows, Ryzen 5 3600 mit RTX 2070 SUPER; der Rechner wurde von anderen Sitzungen
+mitbenutzt, drei Läufe, die Spannen stehen da.
+
+- **Das Bild offscreen in 1920 × 1080** mit 16 Figuren (176 Instanzen der Teile, 198 mit Karte und Waffe), die gehen,
+  sich drehen und schießen (Mündungsfeuer, Leuchtspuren, Funken), der Waffe vor der Kamera, Schatten, FXAA: die GPU
+  braucht im p50 **0,68–0,72 ms** je Bild (ein Lauf unter Last 3,4 ms); ein Bild für sich, CPU und GPU nacheinander,
+  im p50 1,1 ms (unter Last 28 ms); mit zwei Bildern in Arbeit **396 Bilder/s** (unter Last 115–176). Das Ziel „über 144
+  auf der RTX 2070 SUPER“ hält offscreen weit. Im Fenster liest jede Zelle mit HUD das Bild zurück (Was nicht getestet
+  ist).
+- **Der Server, ein Raum mit 16 Bots** (niemand verbunden: Bots denken, bewegen, schießen; jeder zweite Tick ein
+  Schnappschuss): p50 **139–143 µs** je Tick, Mittel 293–357 µs, p99 556–598 µs (Ausreißer bis 83 ms sind Lücken der
+  Planung des geteilten Rechners), also 1,8–2,1 % eines Kerns bei 60 Hz.
+- **Der Server mit 16 Clients** über die simulierte Leitung (typisches Wetter, sie schießen): `NetServer::step` p50
+  **174–175 µs**, Mittel 266–414 µs.
+- **Bandbreite je Spieler** (16 Clients, typisch): aufwärts **2,75 KB/s** in 60 Paketen/s (mit IPv4 und UDP 4,43 KB/s),
+  abwärts **4,97 KB/s** in 30 Paketen/s (5,81 KB/s); Schnappschüsse bis 612 Bytes, keiner geschnitten.
+
+Die Messungen auf der Iris Xe, der HD 610 und dem Mac kommen mit Teil 2.
 
 ## Entscheidungen
 
@@ -239,7 +273,8 @@ erste Vorhersage jedes Clients, jeder Zustand des Servers, die Zähler der Clien
 ## Was nicht getestet ist
 
 - **Von Hand gespielt**: niemand. Gefühl der Bewegung, Empfindlichkeit, Treffermarke, Bots: das prüft der Nutzer.
-  Ein echtes Fenster lief in diesem Lauf nicht (nur ohne Bildschirm: `shot.uis`).
+  Ein echtes Fenster lief einmal mit einem Skript (oben); die Punktetafel (Tab) und die Einstellungen sah niemand im
+  Bild.
 - **Der Browser als Client gegen den Server**: gebaut, die Prüfsummen in Node; im Browser selbst gespielt hat ihn
   niemand.
 - **Ein echtes Netz zwischen Rechnern**: nur Loopback und die simulierte Leitung.
@@ -259,6 +294,16 @@ für die Tasten, Grafik und Lautstärke, Klang; dazu aus diesem Lauf:
   Schwierigkeit;
 - der Browser im echten Fenster gegen `game1-server --web`, gemischt mit Desktop-Spielern (Bedingung für „fertig“);
 - der Server auf einem eigenen Rechner (nur mit einem Ja des Nutzers).
+
+## Fragen an den Nutzer
+
+- **Lag-Ausgleich bei 250 ms Umlauf**: Die Sicht liegt dort rund 390 ms hinter dem Tick, die Grenze von 300 ms zieht
+  sie, und ein seitlich laufendes Ziel wird meist verfehlt (23 %). Bleibt es bei 300 ms (wer so weit weg spielt, zielt
+  vor), oder soll die Grenze auf rund 400 ms?
+- **Name** des Spiels (und damit die App-Id statt `org.jfreund.game1`).
+- **Die Figur und die Karte** an den Bildern (`build/game1-content/*/sheet.png` nach `tools/content.py`, im Spiel
+  `build/game1_window.png`): Proportionen, Farben, wie groß die Waffe vor der Kamera ist.
+- **Die Startwerte** von Bewegung und Waffe (Tabellen oben) nach dem ersten Spielen von Hand.
 
 ## Name
 
