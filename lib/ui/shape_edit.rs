@@ -81,7 +81,8 @@
 // that would cover a rotation handle of the selection (the single shape's, or the one of the
 // box around several) moves out along its direction until it clears the handle by a few DIP
 // (Visio puts its top arrow beyond the rotation handle too); the strip that keeps the arrows
-// grows with it.  Handles and control points stay on top and are hit first.  A click on an
+// grows with it.  Handles and control points of that shape (or of a selection box around it)
+// stay on top and are hit first; another selected shape's handle under a hot arrow is not.  A click on an
 // arrow reports SeEv::Arrow { key, dir } and leaves the selection alone (the app selects what
 // it made); a drag from an arrow is the connector tool from that shape: a rubber band from
 // the middle of the box's side, glue and the target's highlight as SE_CONNECT, released
@@ -1157,8 +1158,16 @@ impl Ui {
                 }
             }
         }
-        // the hover: handles first (they lie on top), then a mark, then an arrow
-        let handle = matches!(st.hover, SHit::Handle(..) | SHit::SelHandle(_) | SHit::Rotate(_) | SHit::SelRotate | SHit::Pin(_) | SHit::End(..) | SHit::Point(..));
+        // the hover: handles first (they lie on top), then a mark, then an arrow.  Only the
+        // handles of the shape whose arrows show (or of a selection box around it) beat its arrow:
+        // a selected neighbour's handle under the arrow (the shape a first arrow click just made
+        // lies the page's spacing away, its side handle under the arrow) is not what the pointer,
+        // coming from the arrows' shape, is on -- the arrow shows hot and takes the click
+        let handle = match st.hover {
+            SHit::Handle(k, _) | SHit::Rotate(k) | SHit::Pin(k) | SHit::End(k, _) | SHit::Point(k, _) => hot == 255 || k == key,
+            SHit::SelHandle(_) | SHit::SelRotate => hot == 255 || st.sel.contains(&key),
+            _ => false,
+        };
         if handle {
             st.arrow_hot = 255;
             st.mark_hot = None;

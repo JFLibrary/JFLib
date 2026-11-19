@@ -83,6 +83,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Fixed
 
+- `ui.shape_edit`: a click on a connection arrow did nothing when a handle of another selected
+  shape lay under it (the shape a first arrow click had just made, its side handle under the
+  arrow); a drag from it resized that shape. The arrow shown hot now takes the click and the drag;
+  only the handles of the arrows' own shape, or of a selection box around it, still come first.
 - GPU canvases: a tile evicted for a new one hands its texture over when no frame draws it any
   more; a zoom over many levels made a new texture for every tile while the evicted ones lived on
   until the GPU had finished the frame.
