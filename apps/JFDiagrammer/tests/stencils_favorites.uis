@@ -1,0 +1,36 @@
+# JFDiagrammer, JD9: the favourites (SL-07, MS-06) -- "Zu meinen Shapes hinzufügen" on a tile
+# copies its master into the own stencil "Favoriten" (headless: in memory; windows:
+# data://shapes/favorites.vssx), the same master twice stays one, a tile dragged onto the
+# favourites' title adds it too, "Aus Schablone entfernen" takes it out again; a built-in
+# stencil takes nothing
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+rclick button:"Ellipse"
+expect "Aus Schablone entfernen" missing
+click "Zu meinen Shapes hinzufügen"
+expect tab:"Favoriten" selected
+expect button:"Ellipse" exists
+expect button:"Rechteck" missing
+# the same master once more: still one tile
+click tab:"Standard-Shapes"
+rclick button:"Ellipse"
+click "Zu meinen Shapes hinzufügen"
+expect tab:"Favoriten" selected
+# a tile dragged onto the favourites' title
+click tab:"Standard-Shapes"
+drag button:"Raute" tab:"Favoriten"
+click tab:"Favoriten"
+expect button:"Raute" exists
+expect button:"Ellipse" exists
+# taken out again
+rclick button:"Ellipse"
+click "Aus Schablone entfernen"
+expect button:"Ellipse" missing
+expect button:"Raute" exists
+# Weitere Shapes › Meine Shapes shows them checked
+click button:"Weitere Shapes"
+click "Meine Shapes"
+expect "Favoriten" checked
+key esc
+key esc

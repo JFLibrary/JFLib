@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Aufgabenbereiche, 32 px</title>
+  <rect class="body" fill="#DCDEE1" x="3" y="5" width="26" height="3"/>
+  <rect class="hi" fill="#C2D2E5" x="21" y="9" width="8" height="18"/>
+  <rect class="ink" stroke="#1D2228" x="2.5" y="4.5" width="27" height="23"/>
+  <path class="ink" stroke="#1D2228" d="M3 8.5H29"/>
+  <path class="tint" stroke="#1F5FA8" d="M20.5 9V27M23 12.5H27M23 15.5H27M23 18.5H26"/>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Regeln importieren, 16 px</title>
+  <path class="ink" fill="#1D2228" d="M2 2H4V4H2Z M2 6H4V8H2Z M2 10H4V12H2Z"/>
+  <path class="ink" stroke="#1D2228" d="M6 2.5H14M6 6.5H14M6 10.5H8"/>
+  <path class="tint" stroke="#1F5FA8" d="M12 12.5H15"/>
+  <polygon class="tint" fill="#1F5FA8" points="12,10 12,15 9.5,12.5"/>
+</svg>

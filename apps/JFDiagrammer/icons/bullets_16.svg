@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Aufzählungszeichen, 16 px</title>
+  <path class="tint" fill="#1F5FA8" d="M2 3H4V5H2Z M2 7H4V9H2Z M2 11H4V13H2Z"/>
+  <path class="ink" stroke="#1D2228" d="M6 3.5H14M6 7.5H14M6 11.5H12"/>
+</svg>

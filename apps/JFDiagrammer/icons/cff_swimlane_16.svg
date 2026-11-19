@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Swimlane, 16 px</title>
+  <rect class="body" fill="#DCDEE1" x="2" y="3" width="2" height="3"/>
+  <rect class="body" fill="#DCDEE1" x="2" y="7" width="2" height="3"/>
+  <path class="ink" stroke="#1D2228" d="M14.5 10V2.5H1.5V10 M2 6.5H14 M4.5 3V10"/>
+  <rect class="hi" fill="#C2D2E5" x="2" y="11" width="2" height="3"/>
+  <rect class="tint" stroke="#1F5FA8" x="1.5" y="10.5" width="13" height="4"/>
+  <path class="tint" stroke="#1F5FA8" d="M4.5 11V14"/>
+</svg>

@@ -1,0 +1,49 @@
+# Dreieck: die Spitze folgt dem Steuerpunkt an der oberen Kante (nur waagrecht, im Verhältnis
+# zur Breite); Verbindungspunkte an den Ecken der Grundseite, in ihrer Mitte und an der Spitze
+master: Triangle
+name.de: Dreieck
+name.en: Triangle
+name.es: Triángulo
+name.it: Triangolo
+name.fr: Triangle
+prompt.de: Dreieck. Mit dem gelben Steuerpunkt verschieben Sie die Spitze.
+prompt.en: Triangle. Drag the yellow control handle to move the apex.
+prompt.es: Triángulo. Arrastre el controlador amarillo para mover el vértice.
+prompt.it: Triangolo. Trascina la maniglia di controllo gialla per spostare il vertice.
+prompt.fr: Triangle. Faites glisser la poignée de contrôle jaune pour déplacer le sommet.
+keywords.de: Dreieck, Spitze, Warnung, Pyramide, Delta
+keywords.en: triangle, apex, warning, pyramid, delta
+keywords.es: triángulo, vértice, advertencia, pirámide, delta
+keywords.it: triangolo, vertice, avviso, piramide, delta
+keywords.fr: triangle, sommet, avertissement, pyramide, delta
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 26 mm
+Height.us = 1 in
+
+[User]
+Apex:  Value = MIN(MAX(Controls.Row_1, 0), Width)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = User.Apex; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Spitze verschieben"
+        Tip.en = "Move the apex"
+        Tip.es = "Mover el vértice"
+        Tip.it = "Sposta il vertice"
+        Tip.fr = "Déplacer le sommet"
+
+[Connection]
+Row  X = 0; Y = 0; DirX = 0; DirY = 0
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = 0; DirX = 0; DirY = 0
+Row  X = User.Apex; Y = Height; DirX = 0; DirY = -1

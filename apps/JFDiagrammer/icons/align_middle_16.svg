@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Mittig ausrichten, 16 px</title>
+  <rect class="body" fill="#DCDEE1" x="3" y="3" width="1" height="3"/>
+  <rect class="body" fill="#DCDEE1" x="3" y="9" width="1" height="3"/>
+  <path class="ink" stroke="#1D2228" d="M2.5 6V2.5H4.5V6M2.5 9V12.5H4.5V9"/>
+  <rect class="body" fill="#DCDEE1" x="8" y="5" width="1" height="1"/>
+  <rect class="body" fill="#DCDEE1" x="8" y="9" width="1" height="1"/>
+  <path class="ink" stroke="#1D2228" d="M7.5 6V4.5H9.5V6M7.5 9V10.5H9.5V9"/>
+  <rect class="body" fill="#DCDEE1" x="13" y="4" width="1" height="2"/>
+  <rect class="body" fill="#DCDEE1" x="13" y="9" width="1" height="2"/>
+  <path class="ink" stroke="#1D2228" d="M12.5 6V3.5H14.5V6M12.5 9V11.5H14.5V9"/>
+  <path class="tint" stroke="#1F5FA8" d="M1 7.5H15"/>
+</svg>

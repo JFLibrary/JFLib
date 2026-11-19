@@ -980,8 +980,12 @@ ui.menubar(None);                        // the menu bar of the AppDesc
 * On a Mac the menus of the `AppDesc` go into the menu bar of macOS, between the app menu and
   the Window menu, as every Mac app has them: `ui.menubar(None)` of the main window draws no row
   then, a row chosen up there runs as from the window's bar, `MOD_CTRL` is the Command key.
-  Headless runs (scripts) keep the row in the window, `jfgui_SYSMENU=0` too
-  (`plat::sysmenu`).
+  On an iPad they go into the menu bar of iPadOS as well (between the application menu and
+  Window; the rows with a key also show while Command is held), and the window keeps its row:
+  iPadOS shows its bar only after a swipe down from the top or with the pointer at the top edge,
+  the row stays the way for the finger. A pass that draws no `menubar(None)` takes the menus out
+  of the system's bar again (a page without the bar). Headless runs (scripts) keep the row in
+  the window, `jfgui_SYSMENU=0` too (`plat::sysmenu`).
 * `cmd_state(cmd, CF_DISABLED | CF_CHECKED | CF_HIDDEN)` is persistent; set it every frame from
   your model. Accelerators fire only when no widget consumed the key first (`ui.key(VK_*)`).
   `accel_text(cmd)` gives the shortcut as shown in menus ("Strg+S").
@@ -1033,6 +1037,26 @@ ui.menubar(None);                        // the menu bar of the AppDesc
   `ribbon_end()`. Groups first shrink, then collapse into labeled flyouts from the right.
   `ribbon_button` provides compact icon actions; `ribbon_tile` adds typography previews.
   The app still provides real command availability and actions. See `apps/jfWord/ribbon_ui.rs`.
+* The window parts around a ribbon (`ribbon_shell.rs`): `ribbon_tabs(id, &mut sel, &tabs)` is
+  the register row above it, as wide as its box. `RibbonTab::file(label)` is the File register
+  (activating it returns `EV_OPEN`, `sel` stays), `RibbonTab::new(label)` a register,
+  `RibbonTab::context(label, set, argb)` a register of a context set (a coloured edge, the set's
+  name in its tooltip) that the app lists only while its selection asks for it; `EV_ACT` when
+  `sel` changed. Registers are `K_TAB` records (`click tab:"Start"`), ids `id + 1 + i`. The
+  selected register opens toward the ribbon (`Style::ribbon_tab`, `ribbon_tabs_strip`; a style
+  that paints the band itself returns 0 from `ribbon_box_flags` and draws it in `ribbon_band`).
+  The row also runs the access keys (key tips): a tap of Alt or F10 shows a badge on every
+  register, a register's keys show a badge on every command of its ribbon (the ribbon's buttons
+  register themselves; other controls call `keytip(2, label)`, quick access buttons
+  `keytip_keys(1, "1")`), a command's keys activate it in the next pass like a click, Esc steps
+  back, a click ends the mode (`keytips_level()`, `keytips_off()`). Keys come from the labels of
+  the current language: the first free letter (accents dropped), then "0A".."0Z".
+  `backstage_begin(id, back, &items, &mut sel, nav_w)` is the File register's page: a
+  navigation pane with a back item, the `BackstageItem`s (`BS_FOOTER` at its bottom, `BS_ACTION`
+  for an action that is no page, `BS_SEP`) and a scrolling area the app fills until
+  `backstage_end()`; it returns `Some(-1)` for back (and Esc), `Some(i)` for an activated item.
+  `settings_section(id, &mut settings, section)` shows one section of a settings schema, for an
+  options page per section. See `apps/JFDiagrammer/src/shell.rs`, `ribbon.rs`, `backstage.rs`.
 * Flyouts of your own: a button's `EV_ACT` -> `popup_open(id)` (drop-down buttons do this
   themselves); then `flyout_begin(id, FL_*)` -> `true`: emit `menu_item(id, label)`,
   `menu_cmd(cmd)`, `menu_sep()` or any widgets; always `flyout_end()`:
@@ -5848,7 +5872,9 @@ phone or a tablet ([`lib/ui/form.rs`](../lib/ui/form.rs)). The platform decides,
 Windows, Linux, macOS and the browser are `FF_DESKTOP` however small a window is dragged, so a narrow
 desktop window keeps the desktop's behaviour. Android and iOS are `FF_TABLET`, and `FF_PHONE` where the
 main window's shorter side is below 600 DIP (Android's line, `sw600dp`; a turned phone stays a phone, a
-tablet's app in a narrow split screen is laid out like a phone's). `jfgui_FORM=desktop|tablet|phone`
+tablet's app in a narrow split screen is laid out like a phone's). An iPad stays `FF_TABLET` in Split
+View, Slide Over and Stage Manager as long as the window is not that narrow, also in a large window
+(iPadOS owns the window and draws its controls; docs/APPLE.md AP9). `jfgui_FORM=desktop|tablet|phone`
 decides instead, on any platform: for tests and for a look at the phone's layout on the desktop.
 
 What the library does by itself on a phone or a tablet, and only there:
@@ -5874,7 +5900,9 @@ the desktop's row as it was), which hints speak of a mouse.
 Test it on the desktop: `system env jfgui_FORM phone` in a script (`apps/gallery/tests/form_factor.uis`,
 `apps/androidGallery/tests/touch_phone.uis`), or a program started with `jfgui_FORM=phone` in a window
 of a phone's size. On Android a tablet comes from the emulator's `pixel_tablet` profile, a phone from the
-same emulator with `adb shell wm size 1080x2400` and `wm density 420`.
+same emulator with `adb shell wm size 1080x2400` and `wm density 420`. On an iPad simulator
+`jfgui_IOS_WINDOW=320x1376` starts the app in a window of that size inside its scene (Slide Over's
+width; Split View's and Stage Manager's sizes likewise), `plattest --test ipad` goes through them.
 
 
 ## 39. Games: pointer lock, raw mouse motion, key positions

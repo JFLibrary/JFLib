@@ -1,0 +1,38 @@
+[package]
+name = "diagramiotest"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "diagramiotest"
+path = "src/main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+archive.workspace = true
+img_core.workspace = true
+diagram_core.workspace = true
+diagram_io.workspace = true
+# the viewer tests (JD4): drawing pages, the pictures of the test drawings
+diagram_view.workspace = true
+gfx.workspace = true
+img_png.workspace = true
+img_jpeg.workspace = true
+# (JD12) the exports' tests: SVG read back, the PDF's document information
+img_svg.workspace = true
+pdf.workspace = true
+
+[build-dependencies]
+jflib-build.workspace = true

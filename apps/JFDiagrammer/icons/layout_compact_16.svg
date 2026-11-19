@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Kompakter Baum, 16 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M3.5 6V13.5H6M4 8.5H6"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="2.5" width="5" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="7.5" width="7" height="2"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="12.5" width="7" height="2"/>
+</svg>

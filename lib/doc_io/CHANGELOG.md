@@ -8,6 +8,12 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- The DOCX reader's package checks (content types, relationships, part names) are jflib-archive's
+  `opc` module with `Rules { exact_names: true, .. }`. DOCX files open, are refused and are saved
+  exactly as before.
+
 ## [0.2.1] - 2026-11-16
 
 ### Fixed

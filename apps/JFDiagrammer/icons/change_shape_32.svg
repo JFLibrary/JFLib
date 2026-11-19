@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Shape ändern, 32 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="3.5" y="3.5" width="11" height="11"/>
+  <path class="ink" stroke="#1D2228" stroke-width="2" d="M17 9H23V16"/>
+  <polygon class="ink" fill="#1D2228" points="19,16 27,16 23,20"/>
+  <ellipse class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" cx="23" cy="25.5" rx="6" ry="4"/>
+</svg>

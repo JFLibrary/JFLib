@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Ausrichtung, 32 px</title>
+  <polygon class="body" fill="#DCDEE1" points="3,3 11,3 11,8 16,8 16,13 8,13 8,22 3,22"/>
+  <polygon class="shade" fill="#B9BBBE" points="12,3 16,7 12,7"/>
+  <path class="ink" stroke="#1D2228" d="M8 22.5H2.5V2.5H11.5L16.5 7.5V13M11.5 3V7.5H16"/>
+  <polygon class="hi" fill="#C2D2E5" points="10,15 24,15 24,20 29,20 29,28 10,28"/>
+  <path class="tint" stroke="#1F5FA8" d="M9.5 14.5H24.5L29.5 19.5V28.5H9.5Z M24.5 15V19.5H29"/>
+</svg>

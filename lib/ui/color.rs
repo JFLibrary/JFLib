@@ -21,6 +21,16 @@
 //        sets hue and saturation; keys: Left / Right hue -/+ 1 degree, Up / Down saturation
 //        +/- 1 % (Shift: x10).  EV_ACT while it changes, EV_COMMIT on release / keys.
 //        Natural size 160 DIP.  Semantic record: K_SLIDER, value = hue, max = saturation.
+//   color_menu(id, &ColorMenu) -> Option<(ColorPick, rgb)>   (JD11) the swatches of an Office
+//        colour menu, for a flyout the app opens: the design's colours in columns with five
+//        shades under each (color_shades), the variant's colours, fixed colours, the colours
+//        used last; the swatch of the colour now is marked.  The app maps the pick to its own
+//        value (a design colour follows the design, a fixed one does not) and adds its own
+//        items ("Keine Füllung", "Weitere Farben ...").  Part ids: id + 1 .. id + 0xA0.
+//   color_shades(rgb) -> [(percent, rgb); 5]  the shades under a design colour: a dark colour
+//        gets lighter ones (+90 +75 +50 +25 +10), a light one darker ones (-5 -15 -25 -35 -50),
+//        the others +80 +60 +40 -25 -50; lighter = luminance toward white by that much,
+//        darker = luminance times (100 - n) % (DrawingML lumMod / lumOff)
 //   hsv_to_rgb(h, s, v) -> 0xFFRRGGBB       h 0..3599 (tenths of a degree), s / v 0..1000
 //   rgb_to_hsv(rgb) -> (h, s, v)            inverse (same ranges)
 //
@@ -880,5 +890,165 @@ impl Ui {
         self.ltr_end();
         self.sem(K_SLIDER, id, None, h).max = s;
         ev
+    }
+}
+
+// ------------------------------------------------------------------ colour menu (JD11)
+
+/// what a colour menu offers (Ui::color_menu)
+pub struct ColorMenu<'a> {
+    /// the design's colours, a column each (Office shows ten)
+    pub theme: &'a [u32],
+    /// their names (QuickInfo, screen reader)
+    pub theme_names: &'a [&'a str],
+    /// the variant's colours (may be empty)
+    pub variant: &'a [u32],
+    /// the app's fixed colours
+    pub standard: &'a [u32],
+    /// the colours picked last (may be empty)
+    pub recent: &'a [u32],
+    /// the captions of the sections: design, variant, fixed, last used
+    pub captions: [&'a str; 4],
+    /// the colour now (0xRRGGBB): its swatch is marked
+    pub current: Option<u32>,
+}
+
+/// a swatch picked in a colour menu
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ColorPick {
+    /// design colour `col`; `shade` 0 the colour itself, 1 .. 5 the shades of color_shades
+    Theme(u8, u8),
+    /// a variant colour
+    Variant(u8),
+    /// a fixed colour
+    Standard(u8),
+    /// a colour used last
+    Recent(u8),
+}
+
+fn rgb_hsl(c: u32) -> (f64, f64, f64) {
+    let (r, g, b) = (((c >> 16) & 255) as f64 / 255.0, ((c >> 8) & 255) as f64 / 255.0, (c & 255) as f64 / 255.0);
+    let mx = if r > g { if r > b { r } else { b } } else if g > b { g } else { b };
+    let mn = if r < g { if r < b { r } else { b } } else if g < b { g } else { b };
+    let l = (mx + mn) / 2.0;
+    if mx == mn {
+        return (0.0, 0.0, l);
+    }
+    let d = mx - mn;
+    let s = if l > 0.5 { d / (2.0 - mx - mn) } else { d / (mx + mn) };
+    let h = if mx == r {
+        (g - b) / d + if g < b { 6.0 } else { 0.0 }
+    } else if mx == g {
+        (b - r) / d + 2.0
+    } else {
+        (r - g) / d + 4.0
+    } / 6.0;
+    (h, s, l)
+}
+
+fn hsl_rgb(h: f64, s: f64, l: f64) -> u32 {
+    let q = if l < 0.5 { l * (1.0 + s) } else { l + s - l * s };
+    let p = 2.0 * l - q;
+    let f = |mut t: f64| {
+        if t < 0.0 {
+            t += 1.0;
+        }
+        if t > 1.0 {
+            t -= 1.0;
+        }
+        let v = if t < 1.0 / 6.0 {
+            p + (q - p) * 6.0 * t
+        } else if t < 0.5 {
+            q
+        } else if t < 2.0 / 3.0 {
+            p + (q - p) * (2.0 / 3.0 - t) * 6.0
+        } else {
+            p
+        };
+        ((v.clamp(0.0, 1.0) * 255.0) + 0.5) as u32
+    };
+    if s == 0.0 {
+        let v = ((l.clamp(0.0, 1.0) * 255.0) + 0.5) as u32;
+        return (v << 16) | (v << 8) | v;
+    }
+    (f(h + 1.0 / 3.0) << 16) | (f(h) << 8) | f(h - 1.0 / 3.0)
+}
+
+/// the five shades under a design colour (see the file header): (percent, 0xRRGGBB)
+pub fn color_shades(rgb: u32) -> [(i32, u32); 5] {
+    let (h, s, l) = rgb_hsl(rgb & 0xFF_FFFF);
+    let steps: [i32; 5] = if l < 0.2 {
+        [90, 75, 50, 25, 10]
+    } else if l > 0.8 {
+        [-5, -15, -25, -35, -50]
+    } else {
+        [80, 60, 40, -25, -50]
+    };
+    steps.map(|p| {
+        let k = p as f64 / 100.0;
+        let l2 = if p > 0 { l + (1.0 - l) * k } else { l * (1.0 + k) };
+        (p, hsl_rgb(h, s, l2))
+    })
+}
+
+impl Ui {
+    // one row of swatches of a colour menu
+    #[allow(clippy::too_many_arguments)]
+    fn cm_row(&mut self, id: u32, base: u32, colors: &[u32], names: Option<&[&str]>, cur: Option<u32>, make: &dyn Fn(usize) -> ColorPick, picked: &mut Option<(ColorPick, u32)>) {
+        self.box_begin(0, BOX_H, 2);
+        for (k, &c) in colors.iter().enumerate() {
+            let c = c & 0xFF_FFFF;
+            self.next_size(18, 18);
+            let ev = self.swatch(id + base + k as u32, 0xFF00_0000 | c, cur == Some(c));
+            let tip = match names.and_then(|n| n.get(k)) {
+                Some(n) => format!("{n} (#{c:06X})"),
+                None => format!("#{c:06X}"),
+            };
+            self.tooltip(&tip);
+            if ev & EV_ACT != 0 {
+                *picked = Some((make(k), c));
+            }
+        }
+        self.box_end();
+    }
+
+    /// ui_color_menu(id, menu) -> the swatch picked (see the file header)
+    #[cfg_attr(jfgui_dev, track_caller)]
+    pub fn color_menu(&mut self, id: u32, m: &ColorMenu) -> Option<(ColorPick, u32)> {
+        let _src = self.src_scope();
+        let mut picked = None;
+        let cur = m.current.map(|c| c & 0xFF_FFFF);
+        // the design's colours and their shades
+        self.text(TS_CAPTION | TX_SECONDARY, m.captions[0]);
+        self.cm_row(id, 1, m.theme, Some(m.theme_names), cur, &|k| ColorPick::Theme(k as u8, 0), &mut picked);
+        self.spacer(2);
+        let shades: alloc::vec::Vec<[(i32, u32); 5]> = m.theme.iter().map(|&c| color_shades(c)).collect();
+        for s in 0..5usize {
+            let colors: alloc::vec::Vec<u32> = shades.iter().map(|x| x[s].1).collect();
+            let names: alloc::vec::Vec<String> = m
+                .theme_names
+                .iter()
+                .zip(&shades)
+                .map(|(n, x)| format!("{n} {}{} %", if x[s].0 > 0 { "+" } else { "\u{2212}" }, x[s].0.abs()))
+                .collect();
+            let names: alloc::vec::Vec<&str> = names.iter().map(|x| x.as_str()).collect();
+            self.cm_row(id, 0x10 * (s as u32 + 1) + 1, &colors, Some(&names), cur, &|k| ColorPick::Theme(k as u8, s as u8 + 1), &mut picked);
+        }
+        if !m.variant.is_empty() {
+            self.spacer(4);
+            self.text(TS_CAPTION | TX_SECONDARY, m.captions[1]);
+            self.cm_row(id, 0x61, m.variant, None, cur, &|k| ColorPick::Variant(k as u8), &mut picked);
+        }
+        if !m.standard.is_empty() {
+            self.spacer(4);
+            self.text(TS_CAPTION | TX_SECONDARY, m.captions[2]);
+            self.cm_row(id, 0x71, m.standard, None, cur, &|k| ColorPick::Standard(k as u8), &mut picked);
+        }
+        if !m.recent.is_empty() {
+            self.spacer(4);
+            self.text(TS_CAPTION | TX_SECONDARY, m.captions[3]);
+            self.cm_row(id, 0x81, m.recent, None, cur, &|k| ColorPick::Recent(k as u8), &mut picked);
+        }
+        picked
     }
 }

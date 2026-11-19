@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Beständige Ereignisse, 16 px</title>
+  <polygon class="body" fill="#DCDEE1" points="3,2 8,2 8,5 11,5 11,8 8,8 8,14 3,14"/>
+  <polygon class="shade" fill="#B9BBBE" points="9,2 11,4 9,4"/>
+  <path class="ink" stroke="#1D2228" d="M9 14.5H2.5V1.5H8.5L11.5 4.5V8M8.5 2V4.5H11"/>
+  <polygon class="tint" fill="#1F5FA8" points="12,9 15,9 13,11 15,11 10,15 11,12 9,12"/>
+</svg>

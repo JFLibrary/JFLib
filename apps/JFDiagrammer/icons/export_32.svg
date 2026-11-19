@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Exportieren, 32 px</title>
+  <polygon class="body" fill="#DCDEE1" points="4,3 16,3 16,9 22,9 22,29 4,29"/>
+  <polygon class="shade" fill="#B9BBBE" points="17,3 22,8 17,8"/>
+  <path class="ink" stroke="#1D2228" d="M22.5 26V29.5H3.5V2.5H16.5L22.5 8.5V22"/>
+  <path class="ink" stroke="#1D2228" d="M16.5 3V8.5H22"/>
+  <path class="tint" fill="#1F5FA8" d="M12 23H25V19L30 24L25 29V25H12Z"/>
+</svg>

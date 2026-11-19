@@ -64,7 +64,8 @@ impl SessionConfig {
             ws_every: 4,
             weather,
             arena: ArenaConfig { fire: false, ..ArenaConfig::default() },
-            server: ServerOptions { ws_port: 7777, ..ServerOptions::default() },
+            // (the fetch over a WebSocket, an option since 2026-11-19: the session covers it; netsim's "fill" the default)
+            server: ServerOptions { ws_port: 7777, fetch_full: true, ..ServerOptions::default() },
             fire: false,
             room: None,
             chan: ServerConfig { protocol: PROTOCOL, ..ServerConfig::default() },

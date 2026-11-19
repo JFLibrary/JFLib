@@ -166,4 +166,53 @@ impl Ui {
         self.tooltip(label);
         ev
     }
+
+    /// (JFDiagrammer JD11) a gallery tile with a picture the app made: the theme chooser's
+    /// 56 x 66 DIP button (or next_size) with `sf` inside a page frame of 52 x 50 DIP, scaled
+    /// to fit and centred; `ver` stands for the picture's version.  `next_flags(ST_CHECKED)`
+    /// marks the current choice (accent frame), ST_DISABLED disables it.  EV_HOVER lets the
+    /// caller show a live preview, EV_ACT applies; the label is the tooltip and the name the
+    /// screen reader reads.
+    #[cfg_attr(jfgui_dev, track_caller)]
+    pub fn ribbon_image_tile(&mut self, id: u32, label: &str, sf: &alloc::rc::Rc<gfx::Surface>, ver: u32) -> u32 {
+        let _src = self.src_scope();
+        let flags = self.take_flags() | ST_SUBTLE;
+        let selected = flags & ST_CHECKED != 0;
+        let rect = self.place(self.dp(56), self.dp(66));
+        let ev = self.behave(id, HB_FOCUS | if flags & ST_DISABLED != 0 { HB_DISABLED } else { 0 });
+        let mut sp = Sp { flags, ..Sp::default() };
+        self.sp_placed(&mut sp, ev);
+        let style = self.style;
+        style.button(self, &sp);
+        let x = rect[0] + self.dp(2);
+        let y = rect[1] + self.dp(3);
+        let w = (rect[2] - self.dp(4)).max(0);
+        let h = (rect[3] - self.dp(6)).max(0);
+        if w > 0 && h > 0 {
+            let border = self.color(if selected { T_ACCENT } else { T_DIVIDER });
+            let bw = self.dp(if selected { 2 } else { 1 });
+            self.cmd_rrect(x, y, w, h, 0, bw, 0xffffffff, border, border);
+            let (iw, ih) = ((w - 2 * bw).max(0), (h - 2 * bw).max(0));
+            if sf.w > 0 && sf.h > 0 && iw > 0 && ih > 0 {
+                // the picture scaled to fit, its aspect kept
+                let k = (iw as i64 * sf.h as i64).min(ih as i64 * sf.w as i64);
+                let (dw, dh) = if iw as i64 * sf.h as i64 <= ih as i64 * sf.w as i64 {
+                    (iw, (k / sf.w as i64) as i32)
+                } else {
+                    ((k / sf.h as i64) as i32, ih)
+                };
+                let (dx, dy) = (x + bw + (iw - dw) / 2, y + bw + (ih - dh) / 2);
+                self.draw_clip(x + bw, y + bw, iw, ih);
+                self.draw_image(sf, ver, dx, dy, dw, dh);
+                self.draw_unclip();
+            }
+        }
+        self.focus_ring_draw(ev);
+        if selected {
+            self.wp.ctx.last_state |= SS_CHECKED as u32;
+        }
+        self.sem(K_BUTTON, id, Some(label), 0);
+        self.tooltip(label);
+        ev
+    }
 }

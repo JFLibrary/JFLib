@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Gruppieren, 32 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M3.5 10V3.5H10M22 3.5H28.5V10M28.5 22V28.5H22M10 28.5H3.5V22"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="7.5" y="8.5" width="10" height="7"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="14.5" y="18.5" width="10" height="6"/>
+</svg>

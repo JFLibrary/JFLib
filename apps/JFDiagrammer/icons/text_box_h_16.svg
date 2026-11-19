@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Horizontales Textfeld, 16 px</title>
+  <rect class="tint" stroke="#1F5FA8" x="1.5" y="4.5" width="13" height="8"/>
+  <path class="ink" stroke="#1D2228" d="M4 6.5H12M4 8.5H12M4 10.5H9"/>
+</svg>

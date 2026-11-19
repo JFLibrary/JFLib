@@ -1,0 +1,81 @@
+# JFDiagrammer, JD8: the UI language switches at run time through File › Optionen › Sprache
+# (LG-01, LG-02): German -> English -> Spanish -> Italian -> French -> German, without a
+# restart; each language brings its Office shortcuts (LG-08) and its letters on the bold,
+# italic and underline buttons; a shot of the window per language.
+# Ids that stay in every language: #101 the File register, #24586 its Optionen, #24850 the
+# options page Sprache, #174044583 the language box, #24833 Öffnen's Durchsuchen button
+expect tab:"Start" selected
+expect text:"Zwischenablage" exists
+shot build/JFDiagrammer-de.png
+# German: Ctrl+A selects everything (nothing to select yet), Ctrl+O opens Öffnen
+key ctrl+a
+expect #24833 missing
+# English
+click #101
+click #24586
+click #24850
+click #174044583
+click "English"
+expect text:"Options" exists
+expect button:"Back" exists
+key esc
+expect tab:"Home" selected
+expect tab:"File" exists
+expect text:"Clipboard" exists
+expect button:"Paste" disabled
+expect button:"Bold" disabled
+expect canvas:"Drawing canvas" exists
+shot build/JFDiagrammer-en.png
+# Spanish (Office: Ctrl+A opens, Ctrl+G saves, Ctrl+N is bold)
+click #101
+click #24586
+click #24850
+click #174044583
+click "Español"
+expect text:"Opciones" exists
+key esc
+expect tab:"Inicio" selected
+expect text:"Portapapeles" exists
+expect button:"Pegar" disabled
+expect button:"Negrita" disabled
+shot build/JFDiagrammer-es.png
+key ctrl+a
+expect #24833 exists
+key esc
+# Italian
+click #101
+click #24586
+click #24850
+click #174044583
+click "Italiano"
+expect text:"Opzioni" exists
+key esc
+expect tab:"Home" selected
+expect text:"Appunti" exists
+expect button:"Incolla" disabled
+expect button:"Grassetto" disabled
+shot build/JFDiagrammer-it.png
+# French
+click #101
+click #24586
+click #24850
+click #174044583
+click "Français"
+expect text:"Options" exists
+key esc
+expect tab:"Accueil" selected
+expect text:"Presse-papiers" exists
+expect button:"Coller" disabled
+expect button:"Gras" disabled
+shot build/JFDiagrammer-fr.png
+# back to German
+click #101
+click #24586
+click #24850
+click #174044583
+click "Deutsch"
+expect text:"Optionen" exists
+key esc
+expect tab:"Start" selected
+expect button:"Fett" disabled
+expect text:"Zwischenablage" exists

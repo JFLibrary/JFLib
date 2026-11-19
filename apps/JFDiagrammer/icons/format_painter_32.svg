@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Format übertragen, 32 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="14.5" y="2.5" width="3" height="10"/>
+  <rect class="shade" fill="#B9BBBE" stroke="#1D2228" x="10.5" y="12.5" width="11" height="4"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="10.5" y="17.5" width="11" height="11"/>
+  <path class="tint" stroke="#1F5FA8" d="M14.5 18V25M17.5 18V25"/>
+</svg>

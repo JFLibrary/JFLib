@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Informationen, 32 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="3.5" y="3.5" width="25" height="25"/>
+  <path class="ink" fill="#1D2228" d="M15 8H17V10H15Z M15 13H17V24H15Z"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Legende vertikal, 32 px</title>
+  <rect class="ink" stroke="#1D2228" x="7.5" y="2.5" width="17" height="27"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="10.5" y="5.5" width="5" height="5"/>
+  <rect class="shade" fill="#B9BBBE" stroke="#1D2228" x="10.5" y="13.5" width="5" height="5"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="10.5" y="21.5" width="5" height="5"/>
+  <path class="ink" stroke="#1D2228" d="M18 8.5H22M18 16.5H22M18 24.5H22"/>
+</svg>

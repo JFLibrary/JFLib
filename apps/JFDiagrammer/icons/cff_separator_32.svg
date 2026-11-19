@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Trennlinie (Phase), 32 px</title>
+  <path class="body" fill="#DCDEE1" d="M3 6H8V12H3Z M3 13H8V19H3Z M3 20H8V26H3Z"/>
+  <path class="ink" stroke="#1D2228" d="M2.5 5.5H29.5V26.5H2.5Z M3 12.5H29 M3 19.5H29 M8.5 6V26"/>
+  <path class="tint" stroke="#1F5FA8" d="M19.5 3V29"/>
+</svg>

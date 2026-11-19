@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Inhalt auswählen, 16 px</title>
+  <rect class="body" fill="#DCDEE1" x="2" y="3" width="12" height="3"/>
+  <path class="ink" stroke="#1D2228" d="M4 4.5H9"/>
+  <rect class="ink" stroke="#1D2228" x="1.5" y="2.5" width="13" height="11"/>
+  <path class="ink" stroke="#1D2228" d="M2 6.5H14"/>
+  <path class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" d="M3.5 8.5H6.5V11.5H3.5Z M9.5 8.5H12.5V11.5H9.5Z"/>
+</svg>

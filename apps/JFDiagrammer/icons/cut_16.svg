@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Ausschneiden, 16 px</title>
+  <path class="ink" stroke="#1D2228" d="M3.5 3.5L10.5 10.5M12.5 3.5L5.5 10.5"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="10.5" width="3" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="10.5" y="10.5" width="3" height="3"/>
+</svg>

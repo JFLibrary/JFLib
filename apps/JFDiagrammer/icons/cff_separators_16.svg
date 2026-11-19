@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Trennlinien, 16 px</title>
+  <path class="body" fill="#DCDEE1" d="M2 3H4V6H2Z M2 7H4V10H2Z M2 11H4V14H2Z"/>
+  <rect class="ink" stroke="#1D2228" x="1.5" y="2.5" width="13" height="12"/>
+  <path class="ink" stroke="#1D2228" d="M4.5 3V14"/>
+  <path class="tint" stroke="#1F5FA8" d="M2 6.5H14M2 10.5H14M9.5 3V14"/>
+</svg>

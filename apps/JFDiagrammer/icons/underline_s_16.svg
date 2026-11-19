@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Unterstrichen (S), 16 px</title>
+  <path class="ink" fill="#1D2228" fill-rule="evenodd" d="M4 3L5 2H11L12 3V4H11V3H5V6H11L12 7V11L11 12H5L4 11V10H5V11H11V7H5L4 6Z"/>
+  <path class="tint" stroke="#1F5FA8" d="M3 13.5H13"/>
+</svg>

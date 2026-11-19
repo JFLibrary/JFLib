@@ -70,7 +70,7 @@ link.game.remotes(&mut andere);                             // die anderen, inte
   NetInput, eigen)])`, `snapshot(tick, &mut Snapshot)`, `priority(betrachter, &Ent) -> u32`), `NetServer::new(ServerOptions,
   seed, RoomFactory)`, `on_event(&ServerEvent)`, `advance(now_ns)`, `step`, `take_out`, `take_close`, `create_room`, `rooms`,
   `room`, `room_mut`, `players`, `player_of`, `stats` (`ServerStats`), `link_stats` (`LinkStats`), `max_rewind_ticks`, `tick`.
-  `ServerOptions { rate, snapshot_every, max_players, max_rooms, budget, stream_budget, margin, max_rewind_ms, ws_port,
+  `ServerOptions { rate, snapshot_every, max_players, max_rooms, budget, stream_budget, margin, max_rewind_ms, ws_port, fetch_full,
   hello_ms, ticket_ms, empty_room_ms, start_tick, history }`.
 - **Client** (`net::client`): `NetClient::new(ClientOptions, Movement, Schema, Grundlinie)`, `on_event`, `fetch_request`,
   `on_fetch_event`, `take_out`, `take_fetch_out`, `advance(now_ns)`, `step(map, NetInput) -> tick`, `predicted`,
@@ -193,17 +193,23 @@ dem Tod sind für den Client Abweichungen wie jede andere. Sichtbare Sprünge gl
 
 HELLO (Version, Raumcode oder keiner, Name) → WELCOME (Code des Raums, Id der Figur, Rate, Abstand der Schnappschüsse, Tick des
 Servers, Marge, Grenze des Lag-Ausgleichs). Der volle Stand kommt dann mit dem ersten Schnappschuss, gegen die Grundlinie der
-Karte. Passt er nicht in ein Datagramm, gilt die Entscheidung des Nutzers vom 18.11.2026: **Er kommt über einen WebSocket.**
+Karte. Passt er nicht in ein Datagramm, **füllen ihn die Schnappschüsse nach Priorität auf** (vom Nutzer entschieden am
+19.11.2026; seine erste Entscheidung vom 18.11.2026, der WebSocket, ist eine Option: `ServerOptions::fetch_full`).
 
 - Ein Browser-Client hat ohnehin nur den WebSocket: Sein erster Schnappschuss bekommt das große Budget (`stream_budget`, 60
   KiB), danach gilt das normale.
-- Ein UDP-Client bekommt in WELCOME ein Ticket und den Port des WebSockets des Servers (`fetch`). Er öffnet eine zweite
+- Ein UDP-Client bekommt seinen vollen Stand nach und nach: Das Budget schneidet seine Schnappschüsse nach Priorität, er
+  sieht seine Figur und das Wichtigste sofort, den Rest in den nächsten Schnappschüssen (bei 300 Requisiten, von denen
+  150 bewegt wurden, ist er nach rund 200 ms vollständig, so schnell wie über den WebSocket; gemessen unten). Keine
+  zweite Verbindung, kein Ticket, kein erreichbarer WebSocket-Port nötig.
+- **Mit `fetch_full`** bekommt ein UDP-Client in WELCOME ein Ticket und den Port des WebSockets des Servers (`fetch`). Er öffnet eine zweite
   netchan-Verbindung (`Endpoint::WebSocket`) und schickt FETCH mit dem Ticket; der Server antwortet beim nächsten
   Schnappschuss-Tick mit FULL (ein Schnappschuss gegen die Grundlinie ohne Budget, beim Server als vollständiger Stand dieses
   Clients vermerkt) und schließt. Der Client meldet ihn in seinen INPUTs (`full`), und der Server nimmt ihn als Basis. Ein
   Ticket gilt 10 s und einmal.
-- **Bis dahin** schneidet das Budget die UDP-Schnappschüsse nach Priorität: Der Client sieht seine Figur und das Wichtigste
-  sofort. Ohne WebSocket (`ws_port` 0) füllt dieser Weg den Stand allein auf; gemessen unten.
+  Bis dahin füllen die Schnappschüsse wie ohne `fetch_full` auf. Die Sitzung der Prüfsumme (`--netsum`), die Messungen
+  (`--netbench`) und `--loopback` schalten `fetch_full` ein, damit dieser Weg weiter geprüft wird; die Gruppe `netsim`
+  prüft beide Wege.
 
 Ob der volle Stand passt, entscheidet der Server beim Beitritt aus seiner Größe (`Welcome::full_bytes`). Gemessen sind die
 Größen [unten](#messwerte).

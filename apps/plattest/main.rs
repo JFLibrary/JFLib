@@ -94,6 +94,10 @@
 //                                          through AppKit's accessibility entry points (a window),
 //                                          iOS through UIAccessibility under UIKit (simapp);
 //                                          a11y-show: the demo by hand, for a screen reader
+//   plattest --test ipad                   (t_ipad.rs, iOS on an iPad under UIKit: tools/apple.py simapp
+//                                          in an iPad simulator) the window's sizes (Split View, Slide
+//                                          Over, Stage Manager), the keyboard, turning, the form factor,
+//                                          the menus in iPadOS's menu bar, hover, wheel and pinch
 //   plattest --test settings / settings-bus / settings-bus-files   (t_settings.rs) the system
 //                                          settings: the jfgui_* overrides, the title bar's
 //                                          layout, the wheel's lines; Linux: GTK's / KDE's files,
@@ -219,6 +223,8 @@ use base::{Args, Ini, f64_format, f64_parse};
 
 // the accessibility tree (screen readers)
 mod t_a11y;
+// the iPad's host: window sizes, iPadOS's menu bar, the pointer (docs/APPLE.md AP9)
+mod t_ipad;
 // a web page's accessibility tree (apps/a11ytest's page)
 mod t_a11y_rich;
 // what that tree costs per frame
@@ -578,6 +584,7 @@ fn plattest() -> i32 {
         Some("a11y-mac") => t_a11y::t_a11y_mac,        // macOS, a real window: NSAccessibility (VoiceOver)
         Some("a11y-show") => t_a11y::t_a11y_show,      // by hand: the demo for a screen reader
         Some("a11y-ios") => t_a11y::t_a11y_ios,        // iOS under UIKit (simapp): UIAccessibility (VoiceOver)
+        Some("ipad") => t_ipad::t_ipad,                // iOS on an iPad under UIKit (simapp): sizes, menu bar, pointer (AP9)
         Some("secret") => t_secret::t_secret,          // the system's secret store (not in "all")
         Some("secret-bus") => t_secret::t_secret_bus,  // Linux: against tools/platshared/secret_bus.py
         Some("power") => t_power::t_power,             // plat::inhibit (Windows: real power requests)

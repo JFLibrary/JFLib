@@ -1,0 +1,19 @@
+#!args --lang fr
+# JFDiagrammer, JD9: the stencils in another language (LG-04) -- titles and tiles in French,
+# the dropped shape named in French with its universal name kept, the search over the German
+# names too; the menu of "Plus de formes"
+click button:"Plus de formes"
+click "Général"
+click "Formes de base"
+expect tab:"Formes de base" selected
+expect button:"Losange" exists
+expect button:"Zone de texte" exists
+expect tab:"Formes principales" exists
+drag button:"Losange" canvas:"Zone de dessin"
+a11y expect announced "« Losange » déposée"
+# a German name finds the French tile
+focus #24577
+type "raute"
+expect button:"Losange" exists
+key esc
+shot build/JFDiagrammer-stencils-fr.png

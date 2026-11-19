@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -95,7 +95,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [update](#update) -- signed app updates: check, download, apply at the next start, health marker, rollback
   <br>[lib.rs](#update-crate-root) · [appimage.rs](#updateappimagers) · [apply.rs](#updateapplyrs) · [fetch.rs](#updatefetchrs) · [manifest.rs](#updatemanifestrs)
 - [archive](#archive) -- bounded ZIP32 containers (stored and DEFLATE)
-  <br>[lib.rs](#archive-crate-root)
+  <br>[lib.rs](#archive-crate-root) · [opc.rs](#archiveopcrs)
 - [doc_core](#doc_core) -- structured documents, sources, citations and undo/redo
   <br>[lib.rs](#doc_core-crate-root) · [citation.rs](#doc_corecitationrs) · [format.rs](#doc_coreformatrs) · [tabs.rs](#doc_coretabsrs) · [tables.rs](#doc_coretablesrs) · [table_grid.rs](#doc_coretable_gridrs) · [table_tree.rs](#doc_coretable_treers) · [table_position.rs](#doc_coretable_positionrs) · [table_styles.rs](#doc_coretable_stylesrs) · [cell_borders.rs](#doc_corecell_bordersrs) · [character.rs](#doc_corecharacterrs) · [formula/mod.rs](#doc_coreformulamodrs) · [styles.rs](#doc_corestylesrs) · [fragment.rs](#doc_corefragmentrs) · [table_fragment.rs](#doc_coretable_fragmentrs) · [notes.rs](#doc_corenotesrs) · [paragraph_edit.rs](#doc_coreparagraph_editrs) · [text_range.rs](#doc_coretext_rangers) · [story_range.rs](#doc_corestory_rangers) · [search.rs](#doc_coresearchrs) · [source.rs](#doc_coresourcers) · [source_audit.rs](#doc_coresource_auditrs) · [source_import.rs](#doc_coresource_importrs) · [source_library.rs](#doc_coresource_libraryrs) · [source_merge.rs](#doc_coresource_mergers)
 - [doc_layout](#doc_layout) -- typographic paragraph flow and page layout
@@ -104,8 +104,16 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#doc_view-crate-root) · [src/coords.rs](#doc_viewsrccoordsrs) · [src/fonts.rs](#doc_viewsrcfontsrs) · [src/measure.rs](#doc_viewsrcmeasurers) · [src/page.rs](#doc_viewsrcpagers) · [src/cell_border_editor.rs](#doc_viewsrccell_border_editorrs) · [src/table.rs](#doc_viewsrctablers) · [src/table_editor.rs](#doc_viewsrctable_editorrs) · [src/formula_editor.rs](#doc_viewsrcformula_editorrs) · [src/table_style_editor.rs](#doc_viewsrctable_style_editorrs) · [src/table_position_editor.rs](#doc_viewsrctable_position_editorrs) · [src/ruler.rs](#doc_viewsrcrulerrs) · [src/ruler_input.rs](#doc_viewsrcruler_inputrs) · [src/tab_editor.rs](#doc_viewsrctab_editorrs)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
+- [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+- [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
+  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
+- [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
+  <br>[lib.rs](#pdf-crate-root) · [src/canvas.rs](#pdfsrccanvasrs) · [src/font.rs](#pdfsrcfontrs) · [src/geom.rs](#pdfsrcgeomrs) · [src/image.rs](#pdfsrcimagers) · [src/shading.rs](#pdfsrcshadingrs)
+- [diagram_view](#diagram_view) -- draws diagram pages (the display list of diagram_core) on render2d and gfx
+  <br>[src/export/mod.rs](#diagram_viewsrcexportmodrs) · [src/export/pdf.rs](#diagram_viewsrcexportpdfrs) · [src/export/raster.rs](#diagram_viewsrcexportrasterrs) · [src/export/svg.rs](#diagram_viewsrcexportsvgrs) · [src/fonts.rs](#diagram_viewsrcfontsrs) · [src/image.rs](#diagram_viewsrcimagers) · [src/measure.rs](#diagram_viewsrcmeasurers) · [src/view.rs](#diagram_viewsrcviewrs)
 - [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
   <br>[lib.rs](#dxf-crate-root) · [src/fonts.rs](#dxfsrcfontsrs) · [src/mtext.rs](#dxfsrcmtextrs) · [src/strings.rs](#dxfsrcstringsrs)
 - [physics](#physics) -- Collision shapes, broad phase and deterministic queries for games
@@ -186,7 +194,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Charts](#charts): `sparkline`, `bar_chart`, `donut`, `legend`, `line_chart`
 - [Toasts, spinners, progress](#toasts-spinners-progress): `toast`, `toast_dismiss`, `toast_clear`, `toasts`, `toast_host`, `spinner`, `progress_indeterminate`
 - [Date and time input](#date-and-time-input): `time_box`, `weekday_toggles`, `date_picker`, `calendar`
-- [Values and colours](#values-and-colours): `cmd_track`, `decimal_sep`, `set_decimal_sep`, `fmt_f64`, `parse_f64`, `slider_f`, `track_slider`, `prop_slider`, `prop_slider_f`, `angle`, `pan`, `swatch`, `color_picker`, `color_picker_ex`, `color_wheel`
+- [Values and colours](#values-and-colours): `cmd_track`, `decimal_sep`, `set_decimal_sep`, `fmt_f64`, `parse_f64`, `slider_f`, `track_slider`, `prop_slider`, `prop_slider_f`, `angle`, `pan`, `swatch`, `color_picker`, `color_picker_ex`, `color_wheel`, `color_menu`
 - [Windows](#windows): `window_title_height`, `window_begin`, `window_end`, `sync_hook_set`, `window_place`, `window_snap`, `window_rect`, `window_state`, `window_fullscreen`, `window_activate`, `window_destroy`, `window_current`, `window_modal`, `window_pw`
 - [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars): `dialog_begin`, `dialog_buttons`, `dialog_end`, `infobar`, `statusbar_begin`, `statusbar_end`, `titlebar_begin`, `titlebar_begin_opt`, `titlebar_begin_overlay`, `titlebar_end`, `titlebar_open`
 - [File dialog](#file-dialog): `filedlg`, `filedlg_paths`
@@ -1066,7 +1074,8 @@ Commands (the table AppDesc::cmds, Command records):
   accel_order_set(1): "Strg+Alt+Umschalt+S" (ui_accel_order)
   cmd_button(id, ST_*) -> EV          button from the table (icon, label, tooltip with
                                       the accelerator, disabled / checked); queues it
-Menus (Mi records; Mi::List rows come from menu_list(base, rows), row k = id base + k; a
+Menus (Mi records; Mi::List rows come from menu_list(base, rows), row k = id base + k with
+the CF_CHECKED / CF_DISABLED state of cmd_state(base + k, ..); a
 checked row with an icon gives the flyout a check column and an icon column):
   menubar(None | Some(bar)) -> EV_OPEN   WinUI MenuBar (None = AppDesc::menubar): items,
                                       flyouts, submenus, keys (Alt / F10, Alt+mnemonic,
@@ -1126,7 +1135,8 @@ numbers for them.
   - `Item(u32, &'static str, u32)` -- MI_ITEM id, "Label", icon: a plain row, runs App::command(id, 0)
   - `List(u32, u16, &'static str)` -- MI_LIST base, max, "placeholder": one row per string of the rows set with
     Ui::menu_list(base, ..) (at most max); row k runs App::command(base + k, 0) and has
-    the widget id base + k; no rows: the placeholder as a disabled row ("" = none)  (U1)
+    the widget id base + k, checked or disabled by cmd_state(base + k, CF_\*) like a command;
+    no rows: the placeholder as a disabled row ("" = none)  (U1)
 
 **`impl Ui`**
 
@@ -3967,6 +3977,16 @@ color -- colour swatches, the colour picker and the HSV colour wheel
        sets hue and saturation; keys: Left / Right hue -/+ 1 degree, Up / Down saturation
        +/- 1 % (Shift: x10).  EV_ACT while it changes, EV_COMMIT on release / keys.
        Natural size 160 DIP.  Semantic record: K_SLIDER, value = hue, max = saturation.
+  color_menu(id, &ColorMenu) -> Option<(ColorPick, rgb)>   (JD11) the swatches of an Office
+       colour menu, for a flyout the app opens: the design's colours in columns with five
+       shades under each (color_shades), the variant's colours, fixed colours, the colours
+       used last; the swatch of the colour now is marked.  The app maps the pick to its own
+       value (a design colour follows the design, a fixed one does not) and adds its own
+       items ("Keine Füllung", "Weitere Farben ...").  Part ids: id + 1 .. id + 0xA0.
+  color_shades(rgb) -> [(percent, rgb); 5]  the shades under a design colour: a dark colour
+       gets lighter ones (+90 +75 +50 +25 +10), a light one darker ones (-5 -15 -25 -35 -50),
+       the others +80 +60 +40 -25 -50; lighter = luminance toward white by that much,
+       darker = luminance times (100 - n) % (DrawingML lumMod / lumOff)
   hsv_to_rgb(h, s, v) -> 0xFFRRGGBB       h 0..3599 (tenths of a degree), s / v 0..1000
   rgb_to_hsv(rgb) -> (h, s, v)            inverse (same ranges)
 
@@ -3996,6 +4016,31 @@ edits its own hex text.
 - **`fn color_wheel(&mut self, id: u32, color: &mut [u32], flags: u32) -> u32`**
   ui_color_wheel(id, &mut color, flags) -> EV_\*: color = [argb], or [h, s, v] with
   CW_HSV
+
+- **`struct ColorMenu<'a>`**
+  what a colour menu offers (Ui::color_menu)
+  - `theme: &'a [u32]` -- the design's colours, a column each (Office shows ten)
+  - `theme_names: &'a [&'a str]` -- their names (QuickInfo, screen reader)
+  - `variant: &'a [u32]` -- the variant's colours (may be empty)
+  - `standard: &'a [u32]` -- the app's fixed colours
+  - `recent: &'a [u32]` -- the colours picked last (may be empty)
+  - `captions: [&'a str; 4]` -- the captions of the sections: design, variant, fixed, last used
+  - `current: Option<u32>` -- the colour now (0xRRGGBB): its swatch is marked
+
+- **`enum ColorPick`**
+  a swatch picked in a colour menu
+  - `Theme(u8, u8)` -- design colour `col`; `shade` 0 the colour itself, 1 .. 5 the shades of color_shades
+  - `Variant(u8)` -- a variant colour
+  - `Standard(u8)` -- a fixed colour
+  - `Recent(u8)` -- a colour used last
+
+- **`fn color_shades(rgb: u32) -> [(i32, u32); 5]`**
+  the five shades under a design colour (see the file header): (percent, 0xRRGGBB)
+
+**`impl Ui`**
+
+- **`fn color_menu(&mut self, id: u32, m: &ColorMenu) -> Option<(ColorPick, u32)>`**
+  ui_color_menu(id, menu) -> the swatch picked (see the file header)
 
 ### Windows
 
@@ -5158,6 +5203,23 @@ the widget families are being ported; a finished style overrides every function.
     None preserves the ordinary UI type ramp in existing style previews.
   - `fn ribbon_metrics(&self) -> crate::RibbonMetrics`
     Group sizing and overflow policy. Existing styles preserve compact flyouts.
+  - `fn ribbon_box_flags(&self) -> u32`
+    BOX_\* decoration of the ribbon's scroll box (BOX_LAYER: a framed panel). A style that
+    paints the band itself returns 0 and draws it in `ribbon_band`.
+  - `fn ribbon_band(&self, _ui: &mut Ui, _sp: &Sp)`
+    Paint the ribbon band when `ribbon_box_flags` is 0 (sp: the band, px). It is drawn
+    right after the band is placed, below the groups.
+  - `fn ribbon_tabs_height(&self) -> i32`
+    Height of the register row of `Ui::ribbon_tabs` in DIP.
+  - `fn ribbon_tabs_strip(&self, ui: &mut Ui, sp: &Sp)`
+    Paint the register row behind its registers (sp: the row; s[0], s[1]: x and width of
+    the selected register in px, width 0 when none is shown). The default draws a
+    divider along the bottom that leaves the selected register open toward the ribbon.
+  - `fn ribbon_tab(&self, ui: &mut Ui, sp: &Sp)`
+    Paint one register (sp: rect, label, ev, state 3 = disabled; value 1 = selected;
+    flags RT_FILE / RT_CONTEXT; value2 the ARGB colour of its context set or 0).
+  - `fn keytip(&self, ui: &mut Ui, sp: &Sp)`
+    Paint a key tip badge of the ribbon's access keys (sp: the badge, label = its keys).
   - `fn preview_card_offset(&self) -> Option<[i32; 2]>`
     Optional optical offset of a preview card in 24.8 DIP. Opts into the
     fractional panel painter; None keeps the original integer painter.
@@ -7447,6 +7509,10 @@ DG_SELECT: u32 = 0  // select, move, connect from ports, waypoints
 DG_PAN: u32 = 1  // a left drag pans
 DG_CONNECT: u32 = 2  // a drag (or two clicks) from a node / port to another connects
 DG_PLACE: u32 = 3  // a click reports DEv::Click (snapped) to place something
+/// the view only (zoom, pan with the middle button, Space + drag and the wheel, the keys that zoom):
+/// the left button, the other keys, the cursor and the overlays belong to ui.shape_edit, called
+/// right after ui.diagram with the same DiagramState (shape_edit.rs)
+DG_EDIT: u32 = 4
 /// edge routes (DEdge::route)
 DR_STRAIGHT: u8 = 0
 DR_BEZIER: u8 = 1
@@ -7612,6 +7678,11 @@ DPT_USED: u32 = 2  // shown filled (connected)
   - `fn paint(&self, g: &mut Gfx, f: &DgFrame)`
   - `fn paint_under(&self, _g: &mut Gfx, _f: &DgFrame)`
     what lies under the grid (a backdrop image), painted before it; nothing by default
+  - `fn damage(&self, _from: u32, _to: u32) -> Option<[f32; 4]>`
+    the world rectangle x0, y0, x1, y1 whose look changed from the content version `from` to
+    `to` (ui.diagram's ver) while everything else stayed: only that part of the backing store
+    is painted again (an edit of a few shapes in a large drawing); None (the default): unknown,
+    all of it
 
 - **`struct DiagramState`**
   the widget's state, kept by the app: the view, the selection (node and edge keys), the
@@ -7621,6 +7692,7 @@ DPT_USED: u32 = 2  // shown filled (connected)
   - `focus: u64` -- the node with the keyboard focus (0 = none): Tab walks, Enter activates it
   - `grid: f32` -- grid step in world units (0 = no grid)
   - `snap: bool` -- moves, waypoints and DG_PLACE clicks snap to the grid (Alt held: free)
+  - `grid_lines: bool` -- the grid's lines are drawn (false: the grid only snaps, Visio's hidden grid)
   - `hover: DHit` -- what the pointer is over (after the last diagram call)
   - `edge_width: f32` -- the stroke width of the edges in world units (hit testing, the highlight)
   - `test_keys: u32` -- scripts cannot hold keys: 1 = as if Space were held, 2 = Ctrl
@@ -7701,6 +7773,329 @@ DPT_USED: u32 = 2  // shown filled (connected)
   call showed (label(key); value = the edge's index; selected / focused / hover states),
   a small box around the middle of its route cut to the canvas, after the nodes' records;
   a screen reader's click on one selects the edge (and focuses it with tab_edges)
+
+#### `ui/shape_edit.rs`
+
+Source: [`lib/ui/shape_edit.rs`](../lib/ui/shape_edit.rs)
+
+```text
+shape_edit -- editing shapes on a ui.diagram canvas (DG_EDIT): selection by click, marquee,
+keyboard, Shift and Ctrl; the eight handles and the rotation handle of turned and flipped
+frames, the rotation pin, yellow control points, vertices, the ends of 1D shapes with glue to
+connection points (static) or to whole shapes (dynamic); moving with the grid, the dynamic grid
+(alignment to other shapes' edges and middles) and guides; the connector and drawing tools; the
+magnifier (Ctrl + Shift + click); one semantic record per shape and per handle.  The app owns
+the model and applies what the user did, reported as SeEv events; the widget keeps the
+selection and the gesture in SeState.  It knows nothing of diagram files: an app maps its
+shapes to SeShape frames (diagram_core for JFDiagrammer).
+
+  ui.diagram(id, &mut dg, &m, DG_EDIT, paint, ver)     the view: the paint, zoom, pan
+  ui.shape_edit(id, &mut st, &mut dg, &model, tool) -> Vec<SeEv>
+                                  right after it with the same id and DiagramState: the left
+                                  button, the keys while the canvas has the focus, the cursor,
+                                  the overlays (selection, handles, glue, guides, rubber bands)
+  ui.shape_edit_sems(id, &mut st, &dg, &model, &label)   one K_LISTITEM record per visible
+                                  top-level shape (label(key)) and one K_BUTTON record per
+                                  handle of a single selection ("Größengriff unten rechts",
+                                  "Drehgriff", "Anfangspunkt", "Steuerpunkt 1" ...), per
+                                  connection arrow while they show ("Verbindungspfeil rechts",
+                                  "... unten", "... links", "... oben") and per insertion mark
+                                  while it shows ("Element einfügen", value = its tag): scripts
+                                  click and drag them, screen readers name them (a screen
+                                  reader's click on an arrow or a mark reports it as a click)
+  tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT, SE_PLACE
+
+Model (SeModel, borrowed per call; world units are the canvas's, y down):
+  SeShape { key, parent, bx, ends, pin, bbox, flags, points }
+  SeBox { o, u, v }   the frame: the point o + fx u + fy v for fx, fy in 0..1; u runs along the
+                      shape's width, v along its height (downwards on the screen for a shape
+                      that is neither turned nor flipped; a flip reverses u or v); handles at
+                      fx, fy in {0, 0.5, 1}, the rotation handle beyond the edge fy = 0
+  SePoint { at, kind, tag, dir, flags }   SP_CONTROL (yellow), SP_CONN (connection points:
+                      shown while connecting), SP_VERTEX (shown for a single selection when
+                      the app lists them: vertex editing)
+  SeGuide { key, vertical, at }   guides (blue, dashed, across the canvas); moves snap to them
+  SeMark { at, dir, tag, owner }  the app's insertion marks (Visio's blue triangle between two
+                      items of a list): a small triangle, its tip at `at`, pointing in `dir`
+  hit(p, tol, within) -> key      the topmost shape at world point p within tol world units
+                      (within = 0: a top-level shape; a group's key: the child of that group
+                      under p, for the second click into a group), 0 = none; the app asks its
+                      display list
+
+Live gestures: Move, Resize, Rotate, Pin, End and Point report the whole change from the
+start of the drag with every step (done = false) and once more when released (done = true);
+Esc during one sends SeEv::Cancel.  So the app takes its preview back and applies the new
+total each step, and keeps the last one as the undo step.  The frames of the selection follow
+the model (the app's preview), the gesture keeps what it had at the start.  The connector and
+line tools and the drawing tools draw a rubber band and report Connect / Draw when released;
+a click with them selects like the pointer.
+
+Input (pointer tool): a press on a handle of the selection starts its drag; on a shape it
+selects it (Shift adds, Ctrl toggles) and a drag moves the selection (grid, dynamic grid,
+guides; Alt: free); a second, slow click on a selected group selects the child under the
+pointer; a double click edits the text (SeEv::Text); on the background a drag draws a marquee
+or, with SeState::lasso, a free outline (shapes fully inside; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
+handles change one side (a locked aspect: both), Ctrl resizes about the middle; locked handles
+are drawn grey and do nothing.  The rotation handle turns about the pin (one shape) or the
+middle of the selection: in 15-degree steps near the shape, in single degrees farther away.
+An end or a control point that can glue snaps to a connection point under the pointer (static
+glue); over a shape a dynamic connector's end glues to the whole shape (dynamic glue, the
+shape's frame is highlighted).  Ctrl + Shift + click zooms in at the pointer, + drag zooms to
+the rectangle, + right click zooms out (ZF-22).  Keys while the canvas has the focus: Esc
+cancels the gesture, else clears the selection; Del deletes; Ctrl+A selects all; arrows nudge
+by a grid step (Shift: a pixel) or pan without a selection; Tab / Shift+Tab walk the top-level
+shapes; F2 and Enter edit the text of the single selection, so does typing a character (the
+character is handed on).  A right click selects the shape under the pointer first and reports
+SeEv::Context; the menu itself (also from Shift+F10 and the menu key) is the app's
+ui.context_menu right after this call.
+
+Connection arrows (SeState::arrows, on by default; Ansicht › Verbindungspfeile): with the
+pointer tool and no gesture, a pointer on a top-level shape shows four small filled triangles
+in the accent colour around its box (SeShape::bbox), in the middle of each side, ARROW_GAP
+(12) DIP out from the box and ARROW_LEN (10) DIP long; half transparent, the one under the
+pointer opaque.  Directions as seen: 0 right, 1 down, 2 left, 3 up.  They stay while the
+pointer is on the shape, on one of its handles, on an arrow or in the strip between the box
+and an arrow (as wide as the arrow), and go at once elsewhere (on another shape: that
+shape's arrows).  None for 1D shapes, SEF_NOSELECT, SEF_NOARROWS (the app's choice: shapes
+whose file refuses them, ...), children of groups, shapes smaller than ARROW_MIN (16) DIP on
+the screen, nor right after a gesture or a click until the pointer moves again.  An arrow
+that would cover a rotation handle of the selection (the single shape's, or the one of the
+box around several) moves out along its direction until it clears the handle by a few DIP
+(Visio puts its top arrow beyond the rotation handle too); the strip that keeps the arrows
+grows with it.  Handles and control points stay on top and are hit first.  A click on an
+arrow reports SeEv::Arrow { key, dir } and leaves the selection alone (the app selects what
+it made); a drag from an arrow is the connector tool from that shape: a rubber band from
+the middle of the box's side, glue and the target's highlight as SE_CONNECT, released
+SeEv::Connect { tool: SE_CONNECT, a: that middle, ga: SeGlue::Shape(key), b, gb }; Esc
+cancels.  The arrow under the pointer is SeState::arrow_hover(), and each change of it is
+SeEv::ArrowHover { key, dir } once (dir 255: off the arrows of `key`), for a preview.
+
+Insertion marks (SeModel::marks): with the pointer tool and no gesture each mark shows while
+the pointer is on its owner (the shape under the pointer, or inside the owner's box) or
+within MARK_NEAR (16) DIP of it; a click reports SeEv::Mark { tag }, a drag does nothing.
+```
+
+```rust
+/// tools of ui.shape_edit
+SE_POINTER: u32 = 0
+/// draw a dynamic connector: its ends glue to connection points or whole shapes
+SE_CONNECT: u32 = 1
+/// draw a line: its ends glue to connection points only (CN-12); vertex editing when the app
+/// lists vertices
+SE_LINE: u32 = 2
+SE_RECT: u32 = 3
+SE_ELLIPSE: u32 = 4
+/// a text box: drag its frame, or click for one of the app's default size
+SE_TEXT: u32 = 5
+/// place what the app holds (a shape from a stencil, click + click): a click anywhere, on a
+/// shape too, reports Draw { tool: SE_PLACE, a, b: a } at the snapped point; no handles, a
+/// drag places nothing
+SE_PLACE: u32 = 6
+/// shape flags (SeShape::flags)
+SEF_1D: u32 = 1  // the two ends instead of the eight handles
+SEF_GROUP: u32 = 2  // a group: a second click selects the child under the pointer
+SEF_DYNAMIC: u32 = 4  // a dynamic connector: its ends also glue to whole shapes
+SEF_LOCK_W: u32 = 8
+SEF_LOCK_H: u32 = 0x10
+SEF_LOCK_ASPECT: u32 = 0x20
+SEF_LOCK_ROTATE: u32 = 0x40
+SEF_LOCK_BEGIN: u32 = 0x80
+SEF_LOCK_END: u32 = 0x100
+SEF_LOCK_MOVE: u32 = 0x200  // LockMoveX and LockMoveY: no move by dragging
+SEF_NOSELECT: u32 = 0x400  // never selected (LockSelect)
+SEF_NOGLUE: u32 = 0x800  // nothing glues to it
+SEF_BEGIN_GLUED: u32 = 0x1000  // the begin is glued to a point (static)
+SEF_BEGIN_DYN: u32 = 0x2000  // the begin is glued to a whole shape (dynamic)
+SEF_END_GLUED: u32 = 0x4000
+SEF_END_DYN: u32 = 0x8000
+SEF_LOCK_PIN: u32 = 0x1_0000  // no rotation pin handle
+SEF_NOARROWS: u32 = 0x2_0000  // no connection arrows around it (see the file header)
+/// kinds of SePoint
+SP_CONTROL: u8 = 0
+SP_CONN: u8 = 1
+SP_VERTEX: u8 = 2
+/// point flags (SePoint::flags)
+SPF_GLUE: u32 = 1  // a control point that glues to connection points (SP-04)
+```
+
+- **`struct SeBox`**
+  a frame in world units: the point o + fx u + fy v for fx, fy in 0..1
+  - `o: [f32; 2]`
+  - `u: [f32; 2]`
+  - `v: [f32; 2]`
+
+**`impl SeBox`**
+
+- **`fn rect(r: [f32; 4]) -> SeBox`**
+  an axis-parallel frame x0, y0, x1, y1
+- **`fn at(&self, fx: f32, fy: f32) -> [f32; 2]`**
+  the point at fractions fx, fy
+- **`fn frac(&self, p: [f32; 2]) -> Option<[f32; 2]>`**
+  the fractions of a world point (None: a degenerate frame)
+- **`fn aabb(&self) -> [f32; 4]`**
+  the axis-parallel box x0, y0, x1, y1 around it
+- **`fn size(&self) -> [f32; 2]`**
+  the length of u and v
+
+- **`struct SeShape`**
+  a shape as the editor sees it
+  - `key: u64`
+  - `parent: u64` -- the group it belongs to (0: on the page; such a shape is what a click selects)
+  - `bx: SeBox` -- its frame (2D shapes)
+  - `ends: [[f32; 2]; 2]` -- begin and end (SEF_1D)
+  - `pin: [f32; 2]` -- the rotation pin
+  - `bbox: [f32; 4]` -- the box x0, y0, x1, y1 around what is drawn (marquee, alignment)
+  - `flags: u32`
+  - `points: Range<u32>` -- its control points, connection points and vertices (a range of SeModel::points)
+
+- **`struct SePoint`**
+  a point of a shape: a control point, a connection point or a vertex
+  - `at: [f32; 2]`
+  - `kind: u8`
+  - `tag: u32` -- the app's name for it (a row)
+  - `dir: [f32; 2]` -- a connection point's direction (world, unit; 0 0 = none)
+  - `flags: u32`
+
+- **`struct SeGuide`**
+  a guide: a vertical (x = at) or horizontal (y = at) line
+  - `key: u64`
+  - `vertical: bool`
+  - `at: f32`
+
+- **`struct SeMark`**
+  an insertion mark of the app (Visio's blue triangle between two items of a list): a small
+  triangle with its tip at `at` (world) pointing in `dir` (0 right, 1 down, 2 left, 3 up, as
+  seen); it shows with the pointer tool while the pointer is on the shape `owner` or near the
+  mark, and a click on it reports SeEv::Mark { tag }
+  - `at: [f32; 2]`
+  - `dir: u8`
+  - `tag: u32`
+  - `owner: u64`
+
+- **`struct SeModel<'a>`**
+  the app's shapes, borrowed for one call
+  - `shapes: &'a [SeShape]`
+  - `points: &'a [SePoint]`
+  - `guides: &'a [SeGuide]`
+  - `marks: &'a [SeMark]` -- insertion marks (lists: between two items)
+  - `ver: u32` -- changes whenever shapes are added, removed or reordered
+  - `hit: &'a dyn Fn([f32; 2], f32, u64) -> u64` -- the topmost shape at a world point (see the file header)
+
+- **`enum SeGlue`**
+  what an end or a control point is glued to
+  - `None`
+  - `Point { key: u64, tag: u32 }` -- a connection point (its tag) of a shape: static glue
+  - `Shape(u64)` -- a whole shape: dynamic glue
+
+- **`enum SeEv`**
+  what the user did (ui.shape_edit's result, in order)
+  - `Select` -- st.sel changed
+  - `Move { keys: Vec<u64>, total: [f32; 2], done: bool }` -- move `keys` by total (world units, from the start of the drag; a key nudge: done at once)
+  - `Resize { keys: Vec<u64>, from: SeBox, to: SeBox, done: bool }` -- resize: the frame `from` (one shape: its frame; several: the box around them) became `to`
+  - `Rotate { keys: Vec<u64>, centre: [f32; 2], angle: f32, done: bool }` -- turn `keys` about `centre` by `angle` radians (counter-clockwise as seen)
+  - `Pin { key: u64, at: [f32; 2], done: bool }` -- the rotation pin of a shape goes to `at`
+  - `End { key: u64, end: u8, at: [f32; 2], glue: SeGlue, done: bool }` -- end 0 (begin) or 1 of a 1D shape goes to `at`, glued to `glue`
+  - `Point { key: u64, idx: u32, tag: u32, at: [f32; 2], glue: SeGlue, done: bool }` -- a control point or a vertex (index `idx` of SeModel::points, the app's tag) goes to `at`
+  - `PointInsert { key: u64, at: [f32; 2] }` -- Ctrl + click on the outline of a shape with vertices listed: add a vertex at `at`
+  - `PointDelete { key: u64, tag: u32 }` -- Del with a vertex chosen: remove it
+  - `Cancel` -- Esc during a live gesture: take the preview back
+  - `Connect { tool: u32, a: [f32; 2], ga: SeGlue, b: [f32; 2], gb: SeGlue }` -- the connector or line tool drew from a to b
+  - `Draw { tool: u32, a: [f32; 2], b: [f32; 2] }` -- a drawing tool drew the box from a to b (a == b: a click)
+  - `Text { key: u64, ch: Option<char> }` -- edit the text of a shape (double click, F2, Enter, or a typed character)
+  - `Context { key: u64, at: [i32; 2] }` -- right click, Shift+F10 or the menu key on a shape (0: the page); at = window px
+  - `Delete` -- Del with a selection
+  - `Arrow { key: u64, dir: u8 }` -- a click on the connection arrow `dir` (0 right, 1 down, 2 left, 3 up, as seen) of the
+    top-level shape `key`; the selection stays as it was
+  - `ArrowHover { key: u64, dir: u8 }` -- the pointer went onto the connection arrow `dir` of shape `key`, or off the arrows of
+    `key` (dir 255); once per change
+  - `Mark { tag: u32 }` -- a click on the insertion mark with this tag (SeModel::marks)
+
+- **`struct SeState`**
+  the editor's state, kept by the app: the selection, the focused shape, the options, the
+  gesture in progress
+  - `sel: BTreeSet<u64>` -- the selected shapes (keys)
+  - `primary: u64` -- the anchor of the selection (the first one selected; drawn thicker, ZF-06)
+  - `focus: u64` -- the shape with the keyboard focus (Tab walks)
+  - `dyn_grid: bool` -- the dynamic grid: moves snap to other shapes' edges and middles (ZF-05)
+  - `glue: bool` -- ends glue (Ansicht › Ausrichten und Kleben)
+  - `show_points: bool` -- show every connection point of the hovered shape, not only while connecting (CN-01)
+  - `lasso: bool` -- a drag on the background draws a lasso (a free outline) instead of a rectangle (ZF-06)
+  - `vertex: Option<(u64, u32)>` -- the vertex chosen with a click (Del removes it): its shape and tag
+  - `arrows: bool` -- connection arrows around the shape under the pointer (Ansicht › Verbindungspfeile; see
+    the file header)
+
+**`impl SeState`**
+
+- **`fn new() -> SeState`**
+  nothing selected; dynamic grid, glue and connection arrows on
+- **`fn busy(&self) -> bool`**
+  a gesture is in progress
+- **`fn live(&self) -> bool`**
+  a live gesture is in progress (the app shows a preview of it)
+- **`fn arrow_hover(&self) -> Option<(u64, u8)>`**
+  the connection arrow under the pointer: the shape's key and the direction (0 right,
+  1 down, 2 left, 3 up, as seen)
+- **`fn select(&mut self, keys: &[u64])`**
+  select exactly these shapes (the app's commands: paste, group, a new shape)
+
+**`impl Ui`**
+
+- **`fn shape_edit(&mut self, id: u32, st: &mut SeState, dg: &mut DiagramState, m: &SeModel, tool: u32) -> Vec<SeEv>`**
+  ui_shape_edit(id, st, dg, m, tool) -> what the user did: the edit layer of the canvas
+  `id`, called right after ui.diagram(id, dg, .., DG_EDIT, ..) (see the file header)
+- **`fn shape_edit_sems(&mut self, id: u32, st: &mut SeState, dg: &DiagramState, m: &SeModel, label: &dyn Fn(u64) -> String)`**
+  ui_shape_edit_sems(id, st, dg, m, label): one K_LISTITEM record per visible top-level
+  shape (label(key); value = its index in the model; selected / focused states) and one
+  K_BUTTON record per handle of a single selection; a screen reader's click on a shape
+  selects it
+
+#### `ui/ruler.rs`
+
+Source: [`lib/ui/ruler.rs`](../lib/ui/ruler.rs)
+
+```text
+ruler -- a ruler along a canvas (ZF-02): ticks and numbers in the document's units for the
+view of a ui.diagram canvas, the page's extent lighter, marks (the selection's edges and
+middle while it moves or changes size), the pointer's position; dragging out of it makes a
+guide (SP-10)
+
+  ui.ruler(id, &vp, &RulerSpec) -> RulerEv   a horizontal ruler (above the canvas) or a
+                                  vertical one (left of it) in the next layout slot (size it
+                                  with next_size: the canvas' width or height, 20 DIP across)
+  RulerSpec { vertical, origin, per_world, page, marks, pointer }
+  RulerEv::None | Guide { at, done }   a guide dragged out of the ruler: its world position
+                                  (y of a horizontal guide from the top ruler, x of a vertical
+                                  one from the left ruler) while the button is held, done when
+                                  released over the canvas (Esc: none)
+
+Units: a world coordinate c (the canvas', y down) shows as (c - origin) * per_world; a vertical
+ruler whose numbers grow upwards (a page with its origin at the bottom) has per_world < 0.  The
+step between numbered ticks is 1, 2 or 5 times a power of ten, at least 48 DIP apart; between
+them 10, 5 or 2 smaller ticks as there is room.  The ruler has a semantic record (K_SLIDER-like
+K_BOX "Lineal") so scripts drag from it.
+```
+
+- **`struct RulerSpec<'a>`**
+  what a ruler shows
+  - `vertical: bool` -- a vertical ruler (left of the canvas) instead of a horizontal one
+  - `origin: f32` -- the world coordinate of 0
+  - `per_world: f64` -- units per world unit (negative: the numbers grow up / to the left)
+  - `page: [f32; 2]` -- the page's extent along the ruler (world, from .. to), drawn lighter
+  - `marks: &'a [f32]` -- world coordinates to mark (edges and middle of the selection)
+  - `pointer: Option<f32>` -- the pointer's world coordinate along the ruler
+
+- **`enum RulerEv`**
+  what the user did with a ruler
+  - `None`
+  - `Guide { at: f32, done: bool }` -- a guide is dragged out of the ruler: its world coordinate across the ruler; done =
+    released over the canvas
+  - `GuideCancel` -- the drag of a guide ended outside the canvas or with Esc
+
+**`impl Ui`**
+
+- **`fn ruler(&mut self, id: u32, vp: &Viewport, spec: &RulerSpec) -> RulerEv`**
+  ui_ruler(id, vp, spec) -> what the user did: a ruler for the view vp of a canvas (see the
+  file header)
 
 #### `ui/md_doc.rs`
 
@@ -8661,7 +9056,9 @@ FF_DESKTOP however small a window is dragged (a narrow desktop window keeps the 
 behaviour); Android and iOS are FF_TABLET, and FF_PHONE where the main window's shorter side is
 below 600 DIP (Android's own line between a phone and a tablet, `sw600dp`; a tablet's app in a
 narrow split screen is laid out like a phone's then).  The shorter side keeps a phone a phone
-when it is turned.
+when it is turned.  An iPad stays FF_TABLET in every window that is not that narrow, also a
+large one in Stage Manager or iPadOS 26's windows (the user's decision of 2026-11-19: iPadOS owns
+the window and draws its controls, the finger stays the main way; docs/APPLE.md AP9).
 
 jfgui_FORM=desktop|tablet|phone decides instead (any platform: tests, and a look at the phone's
 layout on the desktop; scripts: `system env jfgui_FORM phone`).
@@ -9926,6 +10323,13 @@ This is a visual chooser, independent of an application's document commands or f
   `variant` selects one of seven sample arrangements (0..=6); larger values wrap.
   `next_flags(ST_DISABLED | ST_CHECKED)` controls behavior and selection, while
   the document sample remains fully readable. The caller applies its own theme on EV_ACT.
+- **`fn ribbon_image_tile(&mut self, id: u32, label: &str, sf: &alloc::rc::Rc<gfx::Surface>, ver: u32) -> u32`**
+  (JFDiagrammer JD11) a gallery tile with a picture the app made: the theme chooser's
+  56 x 66 DIP button (or next_size) with `sf` inside a page frame of 52 x 50 DIP, scaled
+  to fit and centred; `ver` stands for the picture's version.  `next_flags(ST_CHECKED)`
+  marks the current choice (accent frame), ST_DISABLED disables it.  EV_HOVER lets the
+  caller show a live preview, EV_ACT applies; the label is the tooltip and the name the
+  screen reader reads.
 
 #### `ui/perm.rs`
 
@@ -10181,6 +10585,115 @@ no legacy counterpart. Uses normal focus, semantics, popups and style tokens.
 - **`fn ribbon_sample_tile(&mut self, id: u32, label: &str, preview: &str, typography: u32, selected: bool, sample: Option<RibbonSample>) -> u32`**
   Style-gallery tile with explicit highlight, baseline and text decorations.
 
+#### `ui/ribbon_shell.rs`
+
+Source: [`lib/ui/ribbon_shell.rs`](../lib/ui/ribbon_shell.rs)
+
+```text
+ribbon_shell -- the window parts around a ribbon: the register row with its context sets,
+the ribbon's access keys (key tips) and the backstage frame of the File register
+
+  ribbon_tabs(id, &mut sel, tabs) -> EV_*    the register row: an optional File register
+                                    (RibbonTab::file: activating it returns EV_OPEN and
+                                    leaves `sel`), the registers, then the context sets
+                                    (RibbonTab::context: a coloured edge, the set's name in
+                                    the tooltip); EV_ACT when `sel` changed
+  keytip(level, label)              an access key for the last widget, made from its label
+  keytip_keys(level, keys)          ... with fixed keys ("1" for a quick access button)
+  keytips_level() -> 0 / 1 / 2      the key tip mode: off, the registers, the commands
+  backstage_begin(id, back, items, &mut sel) -> Option<i32>   the File register's page:
+                                    a navigation pane (a back item, the items, BS_FOOTER
+                                    items at its bottom) and a scrolling content area the
+                                    app fills; Some(-1): back (or Esc), Some(i): item i was
+                                    activated (a page item also selects itself)
+  backstage_end()
+
+Key tips (Office's access keys): Alt pressed and released alone, or F10, shows a badge with
+keys on every register (and on what the app marks with keytip at level 1, its quick access
+buttons); typing a register's keys shows its ribbon with a badge on every command (level 2:
+the ribbon's buttons register themselves between ribbon_begin and ribbon_end, other controls
+through keytip(2, label)); typing a command's keys activates it in the next pass as a click
+would.  Esc steps back a level, a click or Alt ends the mode.  Keys made from labels take the
+first free letter of the label (accents dropped), then "0A".."0Z" (never a single "0", so no
+key is the start of another); they follow the labels of the current language.
+
+Ids: a register is id + 1 + i (its record is a tab, K_TAB, so scripts click tab:"Start");
+the backstage's back item id + 1, its items id + 2 + i, its content view id + 0x40.
+```
+
+```rust
+/// RibbonTab::flags: the File register (opens the backstage; never selected)
+RT_FILE: u32 = 1 << 20
+/// RibbonTab::flags: a register of a context set (shown while the app's selection asks for it)
+RT_CONTEXT: u32 = 1 << 21
+/// BackstageItem::flags: an action (Schließen): activating it does not select it
+BS_ACTION: u32 = 1 << 20
+/// BackstageItem::flags: placed at the bottom of the pane (Optionen, Info)
+BS_FOOTER: u32 = 1 << 21
+/// BackstageItem::flags: a divider before the item
+BS_SEP: u32 = 1 << 22
+```
+
+- **`struct RibbonTab<'a>`**
+  a register of `ribbon_tabs`
+  - `label: &'a str` -- the visible name (also its record's label)
+  - `flags: u32` -- RT_FILE, RT_CONTEXT, ST_DISABLED
+  - `set: &'a str` -- RT_CONTEXT: the name of its context set ("Container-Tools"); tooltip and screen readers
+  - `color: u32` -- RT_CONTEXT: the set's colour (ARGB; 0 = the accent)
+
+**`impl<'a> RibbonTab<'a>`**
+
+- **`const fn new(label: &'a str) -> RibbonTab<'a>`**
+  a fixed register
+- **`const fn file(label: &'a str) -> RibbonTab<'a>`**
+  the File register (activating it returns EV_OPEN)
+- **`const fn context(label: &'a str, set: &'a str, color: u32) -> RibbonTab<'a>`**
+  a register of the context set `set` in `color` (ARGB, 0 = the accent)
+- **`const fn flags(mut self, f: u32) -> RibbonTab<'a>`**
+  add flags (ST_DISABLED)
+
+- **`struct BackstageItem<'a>`**
+  an item of the backstage's navigation pane
+  - `label: &'a str`
+  - `icon: u32`
+  - `flags: u32` -- BS_ACTION, BS_FOOTER, BS_SEP, ST_DISABLED
+
+**`impl<'a> BackstageItem<'a>`**
+
+- **`const fn new(label: &'a str, icon: u32) -> BackstageItem<'a>`**
+- **`const fn flags(mut self, f: u32) -> BackstageItem<'a>`**
+  add flags (BS_ACTION, BS_FOOTER, BS_SEP, ST_DISABLED)
+- **`const fn enabled(mut self, on: bool) -> BackstageItem<'a>`**
+  disabled unless `on`
+
+**`impl Ui`**
+
+- **`fn keytips_level(&self) -> u32`**
+  The key tip mode of the window: 0 off, 1 the registers' keys are shown, 2 the commands'.
+- **`fn keytips_off(&mut self)`**
+  End the key tip mode (the app opened something the keys should not reach).
+- **`fn keytip(&mut self, level: u32, label: &str)`**
+  An access key for the last widget at `level` (1: beside the registers, such as a quick
+  access button; 2: a command of the shown ribbon), made from its label: shown as a
+  badge while the mode is at that level; typing it activates the widget in the next
+  pass. The ribbon's own buttons register themselves.
+- **`fn keytip_keys(&mut self, level: u32, keys: &str)`**
+  keytip with fixed keys (upper-case letters or digits, at most three).
+- **`fn ribbon_tabs(&mut self, id: u32, sel: &mut i32, tabs: &[RibbonTab<'_>]) -> u32`**
+  The register row above a ribbon (see the module header): returns EV_ACT when `sel`
+  changed, EV_OPEN when the File register was activated (click, Enter, its key tip).
+  `sel` indexes `tabs` and never names the File register. The row is one focus stop:
+  Left / Right / Home / End choose among the enabled registers. It also runs the key
+  tip mode (Alt tap or F10): call it once per pass, before the ribbon. The row is as wide
+  as its box and as high as the style says (Style::ribbon_tabs_height).
+- **`fn backstage_begin(&mut self, id: u32, back: &str, items: &[BackstageItem<'_>], sel: &mut i32, nav_w: i32) -> Option<i32>`**
+  The File register's page (see the module header): a navigation pane `nav_w` DIP wide
+  with a back item labelled `back`, the items, then the area for the page; the app fills
+  it and calls backstage_end. Returns Some(-1) for back (also Esc), Some(i) when item i
+  was activated (a page item, not BS_ACTION, becomes `*sel`).
+- **`fn backstage_end(&mut self)`**
+  Finish the page begun with backstage_begin.
+
 #### `ui/settings_page.rs`
 
 Source: [`lib/ui/settings_page.rs`](../lib/ui/settings_page.rs)
@@ -10189,6 +10702,7 @@ Source: [`lib/ui/settings_page.rs`](../lib/ui/settings_page.rs)
 settings_page -- the settings page of a typed schema (base::settings)
 
   settings_page(id, &mut settings) -> true when a value changed in this pass
+  settings_section(id, &mut settings, section)   the same for the keys of one section
 
 The keys of the schema without KF_HIDDEN, grouped by section: the sections of
 Schema::sections first (with their titles), then the others in the order of their first
@@ -10209,6 +10723,11 @@ then the key's name ("value", "reset", "swatch", "pick" inside it; ids.rs).
 
 - **`fn settings_page(&mut self, id: u32, s: &mut Settings) -> bool`**
   the settings page of the schema of `s` (see the module header) -> a value changed
+- **`fn settings_section(&mut self, id: u32, s: &mut Settings, section: &str) -> bool`**
+  settings_page with only the keys of `section` (the part of their names before the
+  '.'): one page of a settings dialog that lists its sections at the side (an options
+  page of the File register). The section's title is shown; the ids are those
+  settings_page gives the same keys.
 
 #### `ui/slider.rs`
 
@@ -10224,6 +10743,199 @@ Source: [`lib/ui/slider.rs`](../lib/ui/slider.rs)
   Map pixel travel to the nearest integer value, before step snapping. The
   logarithmic inverse uses bounded binary search (at most 31 iterations).
   Keyboard steps and semantic values always remain in the original units.
+
+#### `ui/stencil.rs`
+
+Source: [`lib/ui/stencil.rs`](../lib/ui/stencil.rs)
+
+```text
+stencil -- the Shapes window of a diagram editor (Visio's Shapes pane), generic: the app hands
+in stencils with tiles (a name, a QuickInfo, a preview drawn through ui::Draw); the panel lays
+them out, takes the pointer, the keyboard and drags, tells screen readers, and reports what
+happened.  It knows nothing about diagrams; every text it shows comes from the app.
+
+  stencil_panel(id, &mut StencilState, &StencilPanel) -> Vec<StencilEvent>
+       top to bottom: the search box (IC_SEARCH, labels.search as its placeholder) with a
+       button for the recent searches (labels.history), the "More shapes" button
+       (StencilPanel::more_id, labels.more), the title rows -- the quick shapes collection
+       (SK_QUICK, labels.quick), the search results while StencilPanel::results is Some
+       (SK_SEARCH, labels.results with "{}" = their number), a row per stencil --, a movable
+       splitter (StencilState::split, DIP; 0 = automatic), the tiles of the active view in a
+       scroll view.  Give it a size with next_size first (none: it fills its box).
+  stencil_drag_decode(bytes) -> Option<(stencil, tile)>   the keys a tile drag carries
+       (DragData::bytes of the app's kind StencilPanel::drag_kind: two u32, little-endian)
+
+Views (StencilState::active = the key of a title; a key that names none -- the default --
+shows the first stencil): a stencil shows its TL_QUICK tiles, a thin line, then the others
+(MS-04); an SD_EDITABLE stencil always has both parts, an empty part shows a hint
+(labels.quick_empty, labels.drop_hint).  The quick collection shows the TL_QUICK tiles of
+every stencil under small captions (none: labels.quick_empty).  The results show the hits
+the app found (none: labels.no_results_title / _text).  No stencil at all: an empty state
+(labels.empty_title / _text) with a link labels.more (StencilEvent::More).
+View modes (StencilState::view): SV_ICONS_NAMES tiles of 72 x 76 DIP (the preview on top,
+the name in up to two lines, cut with "…"), SV_ICONS 40 x 40 (the name in the tooltip only),
+SV_NAMES rows with the name, SV_DETAILS rows with the preview, the name and the QuickInfo.
+The tooltip of a tile is "name – QuickInfo".  Tiles without a preview show IC_SHAPES.
+
+Search: typing reports Search (the app recomputes `results`; the results become the active
+view, an empty query returns to the view before); Enter keeps the query in
+StencilState::history (newest first, at most 10, no duplicates); Down, Alt+Down or F4 in the
+box, or the button beside it, list the history (a pick searches again); Esc clears the query
+(in an empty box Esc gives up the focus).  The number of results is announced politely.
+Input: a click on a title activates it; Up / Down / Home / End move between the titles (the
+focused title is the active one).  A click on a tile -> Activate (the app arms click placing
+and marks the tile TL_ARMED), Enter / Space / a double click -> Place; a right click,
+Shift+F10 or the menu key -> TileMenu / StencilMenu with a point (window px) for
+ui.menu_popup_at -- or open the menu in the same pass with ui.menu_popup, which for the menu
+key opens at the widget with its first row focused.  The tiles are one Tab stop (entered at
+the armed tile): the arrows move in the grid, Home / End to the first / last tile.  "More
+shapes" (a click, Enter / Space, Alt+Down / F4) and the empty state's link -> More with the
+lower left corner of the button (the app opens its menu there with ui.menu_popup_at).
+Drags: every tile that is not disabled is a drag source (DragData::of_app(drag_kind, the
+stencil and tile key), the tile's name as its label, DE_COPY): DragStart, DragEnd.  An
+SD_EDITABLE stencil takes tile drags on its title row (appended) and, while it is shown, on
+its tile area (an accent mark shows where): Dropped with the index into its tiles to insert
+before (counted with the dragged tile still in place) and whether it went into the quick
+part; the app moves the tile when it came from the same stencil.
+Screen readers and scripts: the panel is a box named labels.panel; the title rows are tabs
+(K_TAB, selected = active: `click tab:"Allgemein"`, `expect tab:"Allgemein" selected`) --
+a vertical tab list is what the title rows are, and scripts and the platforms' screen
+readers know tabs with a selection; the tiles are buttons named by the tile (checked with
+TL_ARMED, disabled with TL_DISABLED, the QuickInfo as their description: `click
+button:"Rechteck"`, `drag button:"Rechteck" tab:"Favoriten"`); the quick collection's
+captions are headings; the search box is an edit named labels.search (`#ID+1`); the
+splitter is a slider named "Teiler" (F8 reaches it, the arrows move it).
+Only the rows of tiles in view (and those of the focused and the dragged tile) are laid out
+and drawn: a stencil of 300 tiles costs what a screenful costs.
+
+Ids: the panel `id`; the search box id + 1, the history button and its list id + 2 (its rows
+id + 0x10 + k), the splitter id + 4, the title view id + 5, the tile view id + 6, the empty
+state's link id + 7, the tile area's drop target id + 8; the titles id + 0x100 (quick),
+id + 0x101 (results), id + 0x102 + i (stencil i); the tiles id + 0x1000 + n (n: the place
+in the view).  StencilPanel::more_id is the app's own.
+```
+
+```rust
+/// StencilTile::flags: a quick shape of its stencil (shown above the line, in the quick
+/// collection)
+TL_QUICK: u32 = 1 << 20
+/// StencilTile::flags: armed for click placing (drawn checked)
+TL_ARMED: u32 = 1 << 21
+/// StencilTile::flags: disabled (no input, no drag)
+TL_DISABLED: u32 = ST_DISABLED
+/// StencilDef::flags: the stencil takes dropped tiles (favourites, "My shapes"): added and
+/// reordered by the app on StencilEvent::Dropped
+SD_EDITABLE: u32 = 1 << 20
+/// StencilState::view: icons with the names below (the default)
+SV_ICONS_NAMES: u8 = 0
+/// StencilState::view: icons only (the name in the tooltip)
+SV_ICONS: u8 = 1
+/// StencilState::view: names only, one row each
+SV_NAMES: u8 = 2
+/// StencilState::view: rows with the icon, the name and the QuickInfo
+SV_DETAILS: u8 = 3
+/// StencilState::active: the quick shapes collection
+SK_QUICK: u32 = 0xFFFF_FFFE
+/// StencilState::active: the search results
+SK_SEARCH: u32 = 0xFFFF_FFFF
+```
+
+- **`struct StencilTile<'a>`**
+  a tile of a stencil (a master): what the panel shows of it
+  - `key: u32` -- the app's key for it (unique within its stencil; a drag and the events carry it)
+  - `name: &'a str` -- its name (the label, the button's name for screen readers and scripts)
+  - `tip: &'a str` -- its QuickInfo: the tooltip after the name, the details view, the description
+  - `draw: Option<DrawRef>` -- its preview (None: a generic shapes icon)
+  - `ver: u32` -- the preview's version (cmd_custom: change it when the drawing changes)
+  - `flags: u32` -- TL_QUICK, TL_ARMED, TL_DISABLED
+
+**`impl<'a> StencilTile<'a>`**
+
+- **`const fn new(key: u32, name: &'a str) -> StencilTile<'a>`**
+  a tile without a QuickInfo, a preview or flags
+- **`const fn tip(mut self, tip: &'a str) -> StencilTile<'a>`**
+  with a QuickInfo
+- **`fn preview(mut self, draw: Option<DrawRef>, ver: u32) -> StencilTile<'a>`**
+  with a preview and its version
+- **`const fn flags(mut self, f: u32) -> StencilTile<'a>`**
+  add flags (TL_QUICK, TL_ARMED, TL_DISABLED)
+
+- **`struct StencilDef<'a>`**
+  a stencil: its title row and its tiles
+  - `key: u32` -- the app's key (below 0xFFFF_FFF0: the SK_\* keys are the panel's)
+  - `title: &'a str`
+  - `tiles: &'a [StencilTile<'a>]`
+  - `flags: u32` -- SD_EDITABLE
+
+- **`struct StencilHit<'a>`**
+  a hit of the app's search: the tile and the stencil it belongs to
+  - `stencil: u32`
+  - `tile: StencilTile<'a>`
+
+- **`struct StencilLabels<'a>`**
+  the texts of the panel (the app translates them; the panel has none of its own)
+  - `panel: &'a str` -- the panel's name for screen readers ("Shapes")
+  - `search: &'a str` -- the search box's placeholder and name ("Shapes suchen")
+  - `history: &'a str` -- the history button's tooltip and name ("Letzte Suchen")
+  - `more: &'a str` -- the "More shapes" button and the empty state's link ("Weitere Shapes")
+  - `quick: &'a str` -- the quick collection's title ("Quick-Shapes")
+  - `results: &'a str` -- the results' title, "{}" = their number ("Suchergebnisse ({})"); also announced
+  - `quick_empty: &'a str` -- the hint of an empty quick collection and of an empty quick part of an editable stencil
+    ("Hier Quick-Shapes ablegen")
+  - `drop_hint: &'a str` -- the hint of an editable stencil without other tiles ("Shapes hierher ziehen")
+  - `empty_title: &'a str` -- the empty state without stencils
+  - `empty_text: &'a str`
+  - `no_results_title: &'a str` -- the results without a hit
+  - `no_results_text: &'a str`
+
+- **`struct StencilPanel<'a>`**
+  what stencil_panel shows in a pass
+  - `stencils: &'a [StencilDef<'a>]`
+  - `results: Option<&'a [StencilHit<'a>]>` -- the hits of StencilState::query: Some while the app searches (the query is not empty)
+  - `drag_kind: u32` -- the app's own drag kind of a tile (DT_USER0 &lt;&lt; k)
+  - `more_id: u32` -- the widget id of the "More shapes" button (activated: StencilEvent::More)
+  - `labels: StencilLabels<'a>`
+
+- **`struct StencilState`**
+  what the panel keeps between passes (the app owns it; the public fields are the app's to
+  read and set)
+  - `active: u32` -- the key of the active title: a stencil's, SK_QUICK or SK_SEARCH
+  - `view: u8` -- SV_ICONS_NAMES, SV_ICONS, SV_NAMES, SV_DETAILS
+  - `query: String` -- the search box's text
+  - `history: Vec<String>` -- the recent searches, newest first (at most 10; the app may store and restore them)
+  - `split: i32` -- the height of the title rows in DIP (the splitter; 0 = automatic: up to 40 % of the
+    panel); the panel keeps it between one row and all of them
+
+**`impl StencilState`**
+
+- **`fn new() -> StencilState`**
+  a new state: the first stencil active, icons and names, no query
+
+- **`enum StencilEvent`**
+  what happened in the panel in a pass (stencil_panel returns them in order)
+  - `Activate { stencil: u32, tile: u32 }` -- a click on a tile: the app arms click placing (and marks the tile TL_ARMED)
+  - `Place { stencil: u32, tile: u32 }` -- Enter / Space on a tile or a double click: place it in the middle of the view
+  - `TileMenu { stencil: u32, tile: u32, at: [i32; 2] }` -- a right click, Shift+F10 or the menu key on a tile: its menu at `at` (window px)
+  - `StencilMenu { stencil: u32, at: [i32; 2] }` -- the same on a title row (SK_QUICK / SK_SEARCH for those two)
+  - `Search` -- StencilState::query changed: the app recomputes the results
+  - `Dropped { stencil: u32, before: usize, quick: bool, from_stencil: u32, from_tile: u32 }` -- a tile was dropped onto the SD_EDITABLE stencil `stencil`: insert it before its tile
+    `before` (an index into its tiles, counted with a dragged tile of its own still in
+    place; its length = at the end); `quick`: into the quick part
+  - `More { at: [i32; 2] }` -- "More shapes" or the empty state's link: the app opens its menu at `at` (window px, the
+    lower left corner of the button), ui.menu_popup_at
+  - `DragStart { stencil: u32, tile: u32 }` -- a tile began to be dragged
+  - `DragEnd` -- that drag ended (dropped somewhere or cancelled; ui.drag_effect tells)
+
+- **`fn stencil_drag_decode(bytes: &[u8]) -> Option<(u32, u32)>`**
+  the stencil and tile keys of a tile drag's bytes (DragData::bytes of StencilPanel::
+  drag_kind), None when they are no tile drag's
+
+**`impl Ui`**
+
+- **`fn stencil_panel(&mut self, id: u32, st: &mut StencilState, p: &StencilPanel<'_>) -> Vec<StencilEvent>`**
+  The Shapes window of a diagram editor (see the module header): the search box, "More
+  shapes", the title rows, a splitter and the tiles of the active view, in the size
+  next_size gave (else it fills its box).  Returns what happened, in order.
 
 #### `ui/sound.rs`
 
@@ -29917,19 +30629,25 @@ Source: [`lib/plat/sysmenu.rs`](../lib/plat/sysmenu.rs)
 
 ```text
 sysmenu -- the app's menus in the system's own menu bar (macOS: between the app menu and the Window
-menu, as every Mac app has them; docs/APPLE.md "Menüs in der Menüleiste")
+menu, as every Mac app has them; iPadOS: between the application menu and Window as well;
+docs/APPLE.md "Menüs in der Menüleiste" and AP9)
 
   sysmenu_supported() -> bool        whether this system shows an app's menus in its own bar (macOS
-                                     with a window of the app; elsewhere false: the app draws its menu
-                                     bar in the window)
+                                     with a window of the app, an iPad under UIKit; elsewhere false:
+                                     the app draws its menu bar in the window)
+  sysmenu_window_row() -> bool       whether the window keeps its own menu row as well (iPadOS: its
+                                     bar hides until a swipe down from the top or the pointer there
+                                     reveals it, the row stays the way for the finger; macOS: false)
   sysmenu_set(&[SysMenuItem])        the app's menus: the top level are the menus of the bar, their
-                                     `sub` the rows; the same list again changes nothing
+                                     `sub` the rows; the same list again changes nothing; an empty
+                                     list takes them out again
   sysmenu_take() -> Vec<u32>         the ids of the rows chosen since the last call (each choice calls
                                      wake())
 
 A row's key equivalent is a character ("s", or a function key's: "\u{F704}" = F1) with MOD_* bits;
 MOD_CTRL is the Mac's Command key, MOD_ALT its Option key.  A disabled row cannot be chosen, its key
-then reaches the window as a normal key press.
+then reaches the window as a normal key press.  On the iPad the rows with a key also show while
+Command is held; Insert has no key there.
 ```
 
 - **`struct SysMenuItem`**
@@ -29946,6 +30664,10 @@ then reaches the window as a normal key press.
 
 - **`fn sysmenu_supported() -> bool`**
   whether the app's menus go into the system's menu bar here
+
+- **`fn sysmenu_window_row() -> bool`**
+  whether the window keeps drawing its own menu row besides the system's bar (iPadOS; false where
+  the system's bar is the only place, macOS, and where sysmenu_supported is false)
 
 - **`fn sysmenu_set(menus: &[SysMenuItem])`**
   put the app's menus into the system's menu bar (an unchanged list does nothing)
@@ -35617,6 +36339,119 @@ semantic groups with their names.
 
 - **`fn ios_ax_type(t: &str) -> bool`**
   (tests, any thread) the keyboard's view types text (UIKeyInput / UITextInput of JFView)
+
+### `plat/apple_ios_pad.rs` (Apple)
+
+Source: [`lib/plat/apple_ios_pad.rs`](../lib/plat/apple_ios_pad.rs)
+
+```text
+apple_ios_pad -- the iPad's parts of iOS's host (docs/APPLE.md AP9): the app's menus in the menu bar
+of iPadOS, the pointer of a trackpad or mouse without a button, its wheel and pinch, and the test
+aids of plattest --test ipad
+
+  is_pad() -> bool                 the device is an iPad (UIUserInterfaceIdiomPad)
+  sysmenu_supported() / sysmenu_window_row() / sysmenu_set()   plat::sysmenu on the iPad
+  app_methods() / view_methods()   (apple_ios.rs register) the app delegate's menu methods, JFView's
+                                   actions of the recognizers
+  add_recognizers(view)            (apple_ios.rs vc_load_view) hover, wheel and pinch on JFView
+  ios_pad_*                        (tests, any thread) window sizes, the keyboard, turning, the menus
+                                   built with a stand-in for UIKit's builder, the pointer's paths
+                                   without a pointer; on the main thread
+
+The menus: UIKit asks the app delegate (a UIResponder) for the main menu (buildMenuWithBuilder:).
+With menus of the app the system's File, Edit, Format and View menus go and the app's follow the
+application menu, before Window, as on the Mac (apple_mac_app.rs).  Every row is a UICommand, with
+a key equivalent a UIKeyCommand, whose action jfSysMenu: goes up the responder chain to the app
+delegate; its propertyList is the row's id.  Separators become inline groups (UIMenu has none).
+sysmenu_set asks for a rebuild; iPadOS builds when it needs the menu (the bar revealed, Command
+held), never without input.  iPadOS 26 shows the menus in its menu bar (a swipe down from the top
+edge or the pointer there reveals it), every iPadOS shows the rows with a key while Command is
+held.  The window keeps its own menu row (sysmenu_window_row, the user's decision of 2026-11-19):
+the bar of iPadOS hides until it is revealed, the row stays the way for the finger.  The iPhone
+has no menu bar: unsupported there.
+
+The pointer: a UIHoverGestureRecognizer moves the mouse without a button (the Apple Pencil's hover
+on the iPads that have it: a pen without pressure), a UIPanGestureRecognizer that takes no touches,
+only scroll events, turns a trackpad's two fingers and a mouse wheel into E_WHEEL (WHEEL_PIXELS,
+as the Mac's trackpad), a UIPinchGestureRecognizer for the indirect pointer alone turns a
+trackpad's pinch into Ctrl + wheel (as macOS).  None of them takes or delays a finger.
+```
+
+- **`struct IosMenuRow`**
+  one row as UIKit holds it (tests)
+  - `label: String`
+  - `id: u32` -- the id of its command (0: a submenu or a row without action)
+  - `disabled: bool`
+  - `checked: bool`
+  - `key: String` -- the key equivalent's input (UIKit's names for special keys) and its UIKeyModifierFlags
+  - `key_flags: isize`
+  - `sub: usize` -- the rows of a submenu (0: none)
+  - `sep_before: bool` -- a separator (an inline group's border) comes before it
+
+- **`struct IosPadView`**
+  what the host shows (ios_pad_view): sizes in points unless named px
+  - `pad: bool` -- the device is an iPad
+  - `scene: (f64, f64)` -- the window scene's bounds (the window iPadOS gave the app), the window's, JFView's
+  - `window: (f64, f64)`
+  - `view: (f64, f64)`
+  - `safe: (f64, f64, f64, f64)` -- the safe area's insets of the root view: top, left, bottom, right
+  - `canvas: (i32, i32)` -- the canvas in px as last sent (E_RESIZE) and its px per point
+  - `scale: f64`
+  - `screen_scale: f64` -- the screen's own scale
+  - `orientation: isize` -- the interface orientation of the scene (UIInterfaceOrientation: 1 portrait .. 4 landscape)
+  - `window_row: bool` -- the app's menus in the window row stay (sysmenu_window_row)
+  - `shown: (i32, i32)` -- the size of the last picture shown (px)
+  - `keyboard: bool` -- the on-screen keyboard is asked for (JFView first responder)
+  - `last_wheel: (u8, u8, u32)` -- the last E_WHEEL the wheel or the pinch sent: btn, mods, data
+
+- **`fn ios_pad_view() -> Option<IosPadView>`**
+  (tests, any thread) the host's sizes now; None without UIKit's host
+
+- **`fn ios_pad_window(w: f64, h: f64) -> bool`**
+  (tests, any thread) the window's frame inside its scene in points, as Split View, Slide Over or
+  Stage Manager would give it (w or h 0: the scene's whole bounds again) -> false without the host
+
+- **`fn ios_pad_rotate(landscape: bool) -> bool`**
+  (tests, any thread) the scene turned to landscape (true) or portrait, as the user turning the
+  iPad would (requestGeometryUpdateWithPreferences:) -> false without the host
+
+- **`fn ios_pad_keyboard(show: bool) -> bool`**
+  (tests, any thread) the on-screen keyboard as a tap into a text box brings it (JFView first
+  responder) or "Done" hides it -> false without the host
+
+- **`fn ios_pad_menu_build() -> Option<Vec<String>>`**
+  (tests, any thread) the main menu built as UIKit would, with a stand-in for its UIMenuBuilder
+  (iPadOS builds its own only when the menu is needed: the bar revealed, Command held, a key of a
+  hardware keyboard -- none of which a test without input can bring): it starts with the system's
+  menus (application, File, Edit, Format, View, Window, Help) and answers what the build asks; the
+  app's menus, rows and commands are UIKit's own objects -> the identifiers of the top level after
+  the build (ios_pad_menus reads the rows), None without the host
+
+- **`struct IosPadMenus`**
+  the main menu after the last build (ios_pad_menus)
+  - `builds: u32` -- builds so far (UIKit's and ios_pad_menu_build's), rebuilds sysmenu_set asked UIKit for
+  - `rebuilds: u32`
+  - `system_gone: bool` -- the system's File, Edit, Format and View menus went
+  - `menus: Vec<(String, Vec<IosMenuRow>)>` -- the app's menus with their rows as the builder holds them
+
+- **`fn ios_pad_menus() -> IosPadMenus`**
+  (tests, any thread) the main menu after the last build
+
+- **`fn ios_pad_menu_choose(menu: usize, row: usize) -> bool`**
+  (tests, any thread) choose row `row` of the app's menu `menu` as the menu bar does: its action
+  goes up the responder chain from the first responder -> false: no such row, or no one took it
+
+- **`enum IosPadPointer`**
+  what the tests feed in where a pointer would (ios_pad_pointer)
+  - `Hover { x: f64, y: f64, pen: Option<(i32, i32)> }` -- the pointer (pen: the pencil's hover with this tilt) over the view without a button at (x, y)
+    points; Leave: it left the view
+  - `Leave`
+  - `Scroll { dx: f64, dy: f64, x: f64, y: f64 }` -- two fingers on the trackpad move the content by (dx, dy) points at (x, y)
+  - `Pinch { m: f64, x: f64, y: f64 }` -- a trackpad's pinch: the scale changed by m (0.1 = 10 % larger)
+
+- **`fn ios_pad_pointer(p: IosPadPointer) -> bool`**
+  (tests, any thread) the recognizers' paths with the values a pointer would give (the simulator
+  has no pointer of its own to drive) -> false without the host
 
 ### `plat/apple_mac.rs` (Apple)
 
@@ -51023,8 +51858,9 @@ MAX_SIG: usize = 4096
 *bounded ZIP32 containers (stored and DEFLATE)* -- crate root [`lib/archive/lib.rs`](../lib/archive/lib.rs)
 
 ```text
-In-memory ZIP32 interchange. New native library code, independent of document/UI code.
-Raw DEFLATE and CRC reuse the existing safe codec primitives; no paths are extracted.
+In-memory ZIP interchange (ZIP32, ZIP64 when it is needed). New native library code,
+independent of document/UI code. Raw DEFLATE, inflate and CRC reuse img_core's safe codec
+primitives; no paths are extracted. `opc` builds the Open Packaging Conventions on top.
 ZipFs shows an archive as a read-only plat::vfs tree:
   plat::vfs::mount("pack", Arc::new(archive::ZipFs::new(&bytes, Limits::default())?))
   -> plat::read_file("pack://textures/a.png"), plat::File::open("pack://..", FO_READ),
@@ -51039,11 +51875,18 @@ ZipFs shows an archive as a read-only plat::vfs tree:
   - `data: Vec<u8>`
 
 - **`struct Limits`**
-  Bounds are checked before decompression or allocation of advertised sizes.
-  - `entries: usize`
-  - `part_bytes: usize`
-  - `total_bytes: usize`
-  - `archive_bytes: usize`
+  Bounds are checked before decompression or allocation of advertised sizes. The default
+  (512 parts, 8 MiB a part, 32 MiB in all, archives up to 32 MiB) suits documents; readers of
+  large packages pass larger values and a smaller `ratio`:
+  `Limits { entries: 100_000, part_bytes: 512 << 20, total_bytes: 2 << 30, archive_bytes: 1 << 30, ratio: 200 }`.
+  - `entries: usize` -- Most parts in one archive.
+  - `part_bytes: usize` -- Most bytes of one part, uncompressed.
+  - `total_bytes: usize` -- Most bytes of all parts together, uncompressed.
+  - `archive_bytes: usize` -- Most bytes of the archive itself.
+  - `ratio: usize` -- Highest ratio of a DEFLATE part's size to its compressed size, checked for parts over
+    1 MiB before they are inflated: a denser part is refused with `Limit` (a ZIP bomb). The
+    default, 1032, is the most DEFLATE can reach and so refuses nothing; a part claiming more
+    is `Invalid` whatever this value is.
 
 - **`enum Error`**
   Structural, integrity, feature or resource-limit failure.
@@ -51052,12 +51895,29 @@ ZipFs shows an archive as a read-only plat::vfs tree:
   - `Checksum`
   - `Limit`
 
+- **`enum Method`**
+  How `write_with` stores the parts.
+  - `Stored` -- Uncompressed, as `write` stores them.
+  - `Deflate(u8)` -- DEFLATE at a level from 1 (fastest) to 9 (smallest); 6 is the usual choice, 0 counts as
+    1 and higher values as 9. A part that does not get smaller is stored instead.
+
 - **`fn read(b: &[u8], limits: Limits) -> Result<Vec<Entry>, Error>`**
-  Read stored/DEFLATE ZIP32 files. Reject encryption, multi-disk/ZIP64, ambiguous names,
-  duplicate parts, overlapping local records, trailing payloads and CRC mismatches.
+  Read stored/DEFLATE ZIP files, ZIP64 included. Reject encryption, multi-disk archives,
+  ambiguous names (absolute, `..`, `\`, `:`, `%`, control characters, a case-insensitive
+  duplicate), duplicate parts, overlapping local records, data between or after the parts,
+  sizes a DEFLATE stream cannot reach and CRC mismatches.
 
 - **`fn write(entries: &[Entry], limits: Limits) -> Result<Vec<u8>, Error>`**
-  Deterministic stored ZIP32 writer (UTF-8 names, fixed DOS date 1980-01-01).
+  Deterministic stored ZIP writer (UTF-8 names, fixed DOS date 1980-01-01): the same parts
+  always give the same bytes. ZIP64 records only where an archive needs them (65535 parts or
+  more, a size or offset of 4 GiB or more).
+
+- **`fn write_with(entries: &[Entry], limits: Limits, method: Method) -> Result<Vec<u8>, Error>`**
+  `write` with DEFLATE when `method` asks for it; just as deterministic.
+
+- **`fn write_zip64_from(entries: &[Entry], limits: Limits, method: Method, at: u64) -> Result<Vec<u8>, Error>`**
+  For tests: `write_with` that writes ZIP64 records for every size and offset from `at` bytes
+  on, as if `at` were 4 GiB.
 
 - **`struct ZipFs(plat::vfs::MemFs)`**
   A ZIP archive as a read-only plat::vfs provider (mount it under a scheme of its own). The
@@ -51067,6 +51927,187 @@ ZipFs shows an archive as a read-only plat::vfs tree:
 
 - **`fn new(b: &[u8], limits: Limits) -> Result<ZipFs, Error>`**
   Read every part of the archive; Invalid also for names that collide as file and folder.
+
+### `archive/opc.rs`
+
+Source: [`lib/archive/opc.rs`](../lib/archive/opc.rs)
+
+```text
+Open Packaging Conventions (ECMA-376 Part 2) over this crate's ZIP reader and writer: a
+package's parts, their content types ([Content_Types].xml) and relationships (_rels/*.rels).
+DOCX (doc_io) and VSDX (diagram_io) share it. New native library code, taken out of doc_io's
+DOCX preservation. Nothing outside the package is ever resolved or fetched: external targets
+stay text.
+
+  Package::read(bytes, limits, rules) -> parts, content types, relationships, all checked
+  package.relationships(source) / package.resolve(source, target) / package.part(name)
+  package.set_part(..) / remove_part(..) / set_relationships(..), then package.write(..):
+  the parts nobody touched go back as they came (unknown parts are kept, never dropped)
+
+Part names are compared the way OPC says, ASCII case-insensitive and percent-escape aware
+("Word/Media/a%20b.png" names the same part as "word/media/a b.png"), unless Rules::exact_names
+asks for the older profile of exact strings without escapes.
+```
+
+```rust
+/// The ZIP item that holds the content types; it is no part of its own.
+CONTENT_TYPES: &str = "[Content_Types].xml"
+/// The package's own relationship part.
+PACKAGE_RELS: &str = "_rels/.rels"
+/// Content type of a relationship part.
+RELS_TYPE: &str = "application/vnd.openxmlformats-package.relationships+xml"
+/// Namespace of `[Content_Types].xml`.
+NS_TYPES: &str = "http://schemas.openxmlformats.org/package/2006/content-t ...
+/// Namespace of relationship parts.
+NS_RELS: &str = "http://schemas.openxmlformats.org/package/2006/relations ...
+/// Relationship type from the package to its main part (transitional OOXML).
+OFFICE_DOCUMENT: &str = "http://schemas.openxmlformats.org/officeDocument/2006/re ...
+/// Relationship type from the package to its main part (strict OOXML).
+OFFICE_DOCUMENT_STRICT: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/ ...
+```
+
+- **`enum Error`**
+  Why a package was refused.
+  - `Zip(crate::Error)` -- The ZIP container.
+  - `Xml(xml::Error)` -- `[Content_Types].xml` or a relationship part is not XML within `Rules::xml`.
+  - `Invalid` -- Package structure: a missing or duplicate part, content type or relationship id, a part
+    without a content type, a relationship part without its source, a target that leaves the
+    package or names no part, text that is not Unicode.
+  - `Root(String)` -- `[Content_Types].xml` or a relationship part has another root element, or attributes or
+    text on it; the root's local name.
+  - `Address` -- A part name or internal target this module does not resolve: empty, a backslash, `:`,
+    `?`, `#`, a control character or a bad percent-escape (also an escaped `/` or `\`);
+    with `Rules::exact_names` any `%`.
+  - `ContentType` -- An empty content type, or without `Rules::macros` one of a macro project.
+  - `MacroPart` -- Without `Rules::macros`: a part of a macro project (`vbaProject.bin`, `vbaData.xml`),
+    whatever its content type says.
+  - `MacroRelationship` -- Without `Rules::macros`: a relationship of a macro project's type.
+
+- **`struct Rules`**
+  What a package may hold and how its names compare.
+  - `macros: bool` -- Accept macro (VBA) projects. Off by default: content types, relationship types and part
+    names of a macro project refuse the package.
+  - `exact_names: bool` -- Compare part names and targets as exact strings and refuse percent-escapes, instead of
+    OPC's case-insensitive, escape-aware equivalence (and refuse `%` in ZIP names). The
+    conservative profile of jfWord's DOCX reader.
+  - `xml: xml::Limits` -- Limits of `[Content_Types].xml` and of each relationship part.
+
+**`impl Rules`**
+
+- **`const DEFAULT: Rules = Rules { macros: false, exact_names: false, xml: xml::Limi ...`**
+  No macros, OPC's name equivalence, the XML reader's default limits.
+- **`fn resolve(&self, source: &str, target: &str) -> Result<String, Error>`**
+  Resolve a relationship's target against its source part (`""` for the package) to a
+  part name without the leading `/`. `..` may not climb out of the package. With OPC's
+  equivalence the result is in canonical form (see `normalize`).
+
+- **`fn normalize(name: &str) -> Result<String, Error>`**
+  A part name in canonical form, without the leading `/`: escapes of unreserved characters
+  decoded (`%41` is `A`), other escapes in upper case, spaces, non-ASCII and other characters
+  a URI path may not hold escaped (`ä` is `%C3%A4`). `Address` for a bad name: a bad escape,
+  an escaped `/` or `\`, a control character, an empty, `.` or `..` segment.
+
+- **`fn same_part(a: &str, b: &str) -> bool`**
+  Whether two part names name the same part (OPC: ASCII case-insensitive, after `normalize`).
+
+- **`fn rels_name(source: &str) -> String`**
+  The relationship part of a source part: `_rels/.rels` for the package (`""`),
+  `dir/_rels/name.rels` for `dir/name`.
+
+- **`fn rels_source(name: &str) -> Result<String, Error>`**
+  The source part of a relationship part (`""` for `_rels/.rels`); `Invalid` for a name
+  that is no relationship part's.
+
+- **`struct ContentTypes`**
+  `[Content_Types].xml`: content types by extension (defaults) and by part (overrides).
+
+**`impl ContentTypes`**
+
+- **`fn new() -> Self`**
+  Empty: no defaults, no overrides, OPC's name equivalence.
+- **`fn get(&self, part: &str) -> Option<&str>`**
+  The content type of a part: its override, else the default for its extension
+  (case-insensitive); None when it has neither.
+- **`fn defaults(&self) -> impl Iterator<Item = (&str, &str)>`**
+  The defaults in file order: (extension, content type).
+- **`fn overrides(&self) -> impl Iterator<Item = (&str, &str)>`**
+  The overrides in file order: (part name without the leading `/`, content type).
+- **`fn set_default(&mut self, extension: &str, content_type: &str) -> Result<(), Error>`**
+  Set the default of an extension (no `.`, `/` or `\`), replacing an earlier one.
+- **`fn set_override(&mut self, part: &str, content_type: &str) -> Result<(), Error>`**
+  Set the override of a part, replacing an earlier one.
+- **`fn remove_override(&mut self, part: &str) -> bool`**
+  Remove the override of a part; false when it had none.
+- **`fn to_xml(&self) -> Result<String, Error>`**
+  `[Content_Types].xml` with an XML declaration: the defaults, then the overrides.
+
+- **`struct Relationship`**
+  One relationship of a source part.
+  - `id: String` -- Unique among the source's relationships (`rId1` …).
+  - `kind: String` -- The relationship type, a URI (`Type`).
+  - `target: String` -- The target as written: relative to the source part, or a URI when `external`.
+  - `external: bool` -- `TargetMode="External"`: the target is outside the package and never followed here.
+
+- **`fn parse_relationships(xml: &[u8], rules: Rules) -> Result<Vec<Relationship>, Error>`**
+  The relationships of one relationship part, checked but not resolved: the root element,
+  each relationship's attributes, unique ids, the target mode, macro types.
+
+- **`fn relationships_xml(list: &[Relationship]) -> Result<String, Error>`**
+  A relationship part with an XML declaration.
+
+- **`struct Package`**
+  An OPC package: every ZIP item in archive order with its bytes, the content types and the
+  main part. Parts this crate does not understand are kept as they are; `write` puts them back
+  unchanged, `[Content_Types].xml` too unless the content types changed.
+
+**`impl Package`**
+
+- **`fn new(rules: Rules) -> Package`**
+  An empty package to fill: only `[Content_Types].xml`. `write` needs the package's
+  relationships (`set_relationships("", ..)`) and a content type for every part.
+- **`fn read(bytes: &[u8], limits: Limits, rules: Rules) -> Result<Package, Error>`**
+  Read and check a package within the ZIP `limits` (percent-escapes in ZIP names only
+  without `Rules::exact_names`).
+- **`fn from_entries(entries: Vec<Entry>, rules: Rules) -> Result<Package, Error>`**
+  Check the ZIP items of a package already read.
+- **`fn entries(&self) -> &[Entry]`**
+  Every ZIP item in archive order, `[Content_Types].xml` included as it was read (or last
+  written); parts added later at the end.
+- **`fn rules(&self) -> Rules`**
+  The rules the package was read with.
+- **`fn main_part(&self) -> Option<&str>`**
+  The stored name of the part the package's internal `officeDocument` relationship names
+  (its main part, `word/document.xml` or `visio/document.xml`).
+- **`fn content_types(&self) -> &ContentTypes`**
+  The content types.
+- **`fn content_types_mut(&mut self) -> &mut ContentTypes`**
+  The content types to change; `write` checks the result.
+- **`fn content_type(&self, name: &str) -> Option<&str>`**
+  The content type of a part.
+- **`fn name_of(&self, name: &str) -> Option<&str>`**
+  The stored name of the part a name refers to.
+- **`fn part(&self, name: &str) -> Option<&[u8]>`**
+  The bytes of a part (any equivalent name finds it).
+- **`fn relationships(&self, source: &str) -> Result<Vec<Relationship>, Error>`**
+  The relationships of a part (`""` for the package's own); empty when it has none.
+- **`fn resolve(&self, source: &str, target: &str) -> Result<&str, Error>`**
+  The stored name of the part an internal target of `source` names.
+- **`fn set_part(&mut self, name: &str, content_type: &str, data: Vec<u8>) -> Result<(), Error>`**
+  Add a part or replace its bytes (an existing part keeps its stored name), and make
+  `content_type` its content type: the default of its extension when that matches,
+  otherwise an override.
+- **`fn replace(&mut self, name: &str, data: Vec<u8>) -> Result<(), Error>`**
+  Replace the bytes of an existing part, keeping its content type.
+- **`fn remove_part(&mut self, name: &str) -> bool`**
+  Remove a part with its override and its own relationship part; false when there is no
+  such part. Relationships of other parts that name it are the caller's to change.
+- **`fn set_relationships(&mut self, source: &str, list: &[Relationship]) -> Result<(), Error>`**
+  Replace the relationships of a part (`""`: the package's); an empty list removes its
+  relationship part. Adds the default for `.rels` when there is none.
+- **`fn write(&self, limits: Limits, method: Method) -> Result<Vec<u8>, Error>`**
+  The package as a ZIP archive, after checking it as `read` would: every part in its
+  order, `[Content_Types].xml` new when the content types changed. Deterministic: the same
+  package always gives the same bytes.
 
 ## doc_core
 
@@ -53152,6 +54193,7 @@ Source: [`lib/doc_io/preservation.rs`](../lib/doc_io/preservation.rs)
 ```text
 Bounded OPC inspection and original-byte preservation for foreign Word documents.
 New native library code. Unrepresented content is never exposed as an editable model.
+The package itself (content types, relationships, part names) is archive::opc's.
 ```
 
 - **`enum DocxMode`**
@@ -53285,6 +54327,4669 @@ Related Word stories resolved by OPC identity, never guessed from ZIP file names
   - `Footer` -- A section footer part.
   - `Footnote` -- A normal footnote (separator/continuation definitions are excluded).
   - `Endnote` -- A normal endnote (separator/continuation definitions are excluded).
+
+## diagram_core
+
+*the diagram model: ShapeSheet cells, formulas, geometry, routing and layout* -- crate root [`lib/diagram_core/src/lib.rs`](../lib/diagram_core/src/lib.rs)
+
+```text
+diagram_core -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
+
+The model behind JFDiagrammer (apps/JFDiagrammer, plan in its PLAN.md), usable by any app that
+draws or reads diagrams of the Visio kind.  It holds no file format (that is diagram_io) and no
+widget (the canvas is ui::diagram); it is plain data and the rules that compute it.
+
+The ShapeSheet is the model (decision V1): every cell is kept as the file has it -- formula,
+cached value, unit and where it comes from (local, inherited from the master or from a style,
+deleted) -- and documents, pages and shapes are views on these cells.  So a round trip through
+a file loses nothing, and the behaviour Visio files carry works without translation.
+
+  Document            pages (foreground, background), masters, styles, the document sheet,
+                      themes and parts kept as bytes; a stencil is a document without pages
+  Page, Master, Style  their attributes, sheets, shape trees and Connect entries
+  ShapeTree, ShapeData, Shape   shapes, groups, foreign objects, guides and their subshapes
+  Sheet, Section, Row, Cell     the ShapeSheet store; Value, Formula, Unit, Origin
+  doc.resolve(sheet, addr)      a cell with inheritance: shape -> master shape -> styles
+  doc.rows / shape_data / user_cells / hyperlinks / layers   rows as they really are
+  doc.transaction(label)        edits with undo and redo (Change; ui::history wraps it)
+  Unit, convert, Implicit       unit codes and conversion to the internal units (inches,
+                                radians, days)
+  Strings, Sym                  the document's string table (compact cells)
+  Extras                        what the file had and the model does not know (DF-03)
+  formula::Engine               the formula engine: parse, evaluate, recalculate (JD6)
+
+  instance::*                   (JD9) masters from stencils into documents and onto pages:
+                                import_master, place, the texts in five languages
+  geometry::*                   (JD4) Geometry rows as paths of lines and cubic curves,
+                                transforms (pin, local pin, angle, flips, groups)
+  render::build(..) -> Drawing  (JD4) a page as a display list: fills, lines, line ends,
+                                texts laid out, pictures, in painter's order with a grid;
+                                render::rebuild (JD7) builds some top-level shapes again
+  ops::*                        (JD7) gestures as cell writes: move, resize, rotate, flip,
+                                pin, control points, vertices, groups, z-order, new shapes,
+                                text, the clipboard inside an app
+  glue::* / route::*            (JD7) connection points, static and dynamic glue (Connect
+                                entries), the dynamic connector, right-angle routing around
+                                obstacles
+  hit::*                        (JD7) the shape under a point of a display list, shapes in a
+                                rectangle
+
+  structure::*                  (JD10) containers, lists, callouts: membership in the
+                                Relationships cell, automatic size, list order and layout
+
+What is to come here, by stage of the plan: page layout (CN-13, P2)
+
+Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
+opening a file (connectors, layout and containers move only when something moves), and a
+formula with an unknown function keeps its cached value instead of failing.
+```
+
+### `diagram_core/src/cell.rs`
+
+Source: [`lib/diagram_core/src/cell.rs`](../lib/diagram_core/src/cell.rs)
+
+```text
+cell -- one ShapeSheet cell as the file keeps it: name, formula, cached value, unit, error
+
+  Cell::new(name)                    no value, no formula attribute
+  Cell { name, value, formula, unit, error, stale }
+  Value::Num(f64) / Text(Sym) / Absent      the cached value V (internal units)
+  Formula::Absent / Inherited / NoFormula / Expr(Sym)
+  CellError::parse("#REF!")          the error state E
+  Origin                             where a cell's formula comes from (local, master shape,
+                                     style, default) or that its row was deleted
+
+Formula and value are a pair (PLAN.md, "Fallen"):
+* Formula::Absent -- no F attribute: the value itself is the formula, a constant shown in U.
+* Formula::Expr -- F holds an expression; V is its last result.  A formula the engine (JD6)
+  cannot evaluate keeps V as it is.
+* Formula::Inherited -- F="Inh": the formula belongs to the master shape or style, V is this
+  sheet's own result of it.
+* Formula::NoFormula -- F="No Formula": explicitly without formula, V is a plain value.
+`stale` says the formula changed and V is not its result yet; the engine clears it.  V holds
+numbers as f64 and everything else as text: "Themed" (theme inheritance), "#RRGGBB" colours,
+strings, NURBS(...) and POLYLINE(...) results, "1.#INF".
+```
+
+- **`enum Value`**
+  a cached value (V), numbers in internal units
+  - `Absent` -- no V attribute
+  - `Num(f64)` -- a number (lengths in inches, angles in radians ...)
+  - `Text(Sym)` -- anything that is not a number, as written
+
+**`impl Value`**
+
+- **`fn parse(text: &str, unit: Option<Unit>, strings: &mut Strings) -> Value`**
+  V as the file writes it with its unit U: a finite number parses to Num, everything else
+  stays text -- also every value of a STR or GUID cell and of an unknown unit ("007" is a
+  serial number there, not 7)
+- **`fn num(self) -> Option<f64>`**
+  the number, if the value is one
+- **`fn text(self) -> Option<Sym>`**
+  the text, if the value is one
+
+- **`enum Formula`**
+  the formula state of a cell (F)
+  - `Absent` -- no F attribute: the value is the formula (a constant)
+  - `Inherited` -- F="Inh": the formula is inherited, the value is this sheet's own
+  - `NoFormula` -- F="No Formula": no formula
+  - `Expr(Sym)` -- F holds an expression in the universal syntax
+
+**`impl Formula`**
+
+- **`fn parse(text: &str, strings: &mut Strings) -> Formula`**
+  F as the file writes it ("Inh", "No Formula" or an expression)
+- **`fn expr(self) -> Option<Sym>`**
+  the expression, if F holds one
+
+- **`enum CellError`**
+  the error state of a cell (E), after [MS-VSDX] Cell_Type
+  - `Dim` -- #DIM!: a dimension out of range
+  - `DivZero` -- #DIV/0!
+  - `Value` -- #VALUE!: an operand of the wrong type
+  - `Ref` -- #REF!: a reference to a cell that does not exist
+  - `Num` -- #NUM!: an invalid number
+  - `NotAvailable` -- #N/A: no value available
+  - `Name` -- #NAME?: an unknown name
+
+**`impl CellError`**
+
+- **`fn parse(text: &str) -> Option<CellError>`**
+  the error of an E text (None for texts the crate does not know: keep them as Sym)
+- **`fn as_str(self) -> &'static str`**
+  the text E holds
+
+- **`enum Origin`**
+  where a cell's formula comes from
+  - `Local` -- the sheet itself
+  - `Master` -- the master shape (of an instance or of a subshape of one)
+  - `Style` -- a style sheet (LineStyle, FillStyle, TextStyle and the styles they are based on)
+  - `Default` -- nowhere: the cell has its built-in default
+  - `Deleted` -- its row or section was deleted in the sheet or on the way to the master (Del="1")
+
+- **`struct Cell`**
+  one cell as the file keeps it
+  - `name: Sym` -- the cell name (N): "PinX", "X", "Value" ...
+  - `value: Value` -- the cached value (V) in internal units
+  - `formula: Formula` -- the formula state (F)
+  - `unit: Option<Unit>` -- the unit it is shown in (U); None: no U attribute
+  - `error: Option<Sym>` -- the error state (E) as written; CellError::parse types it
+  - `stale: bool` -- the formula changed and the value is not its result yet
+
+**`impl Cell`**
+
+- **`fn new(name: Sym) -> Cell`**
+  a cell without value and formula attribute
+- **`fn constant(name: Sym, value: Value, unit: Option<Unit>) -> Cell`**
+  a constant: the value is the formula
+- **`fn has_own_formula(&self) -> bool`**
+  whether the cell keeps its own formula (not F="Inh")
+
+### `diagram_core/src/design/mod.rs`
+
+Source: [`lib/diagram_core/src/design/mod.rs`](../lib/diagram_core/src/design/mod.rs)
+
+```text
+design -- typed designs: a DrawingML theme with Visio's extensions (TH-01, TH-03, TH-04)
+
+A design is what a theme part of a .vsdx holds: the DrawingML theme of ECMA-376 Part 1,
+20.1.6 (colour scheme, font scheme, format scheme with fill, line, effect and background
+style lists) and Visio's extensions of it ([MS-VSDX] 2.5.x, "dynamic theme"): a connector
+format scheme, Visio's own line, fill and font properties of the styles, four variants
+with seven colours and four styles each, the background colour, and the scheme numbers by
+which a page's ThemeIndex, ColorSchemeIndex, EffectSchemeIndex, ConnectorSchemeIndex and
+FontSchemeIndex cells find the parts again.
+
+Only Visio's identifiers are taken from Visio (the user's decision of 2026-11-18): the
+extension URIs, the namespace http://schemas.microsoft.com/office/visio/2012/theme and the
+element and attribute names, read from the user's own files.  Every value -- colours,
+fonts, widths, line ends, which style a variant uses -- is JFLib's own (catalog.rs).
+
+  Design { name, id, colors, background, major_font, minor_font, shapes, connectors, variants }
+  Design::theme_xml()         -> the theme part's bytes (xml.rs)
+  catalog::all()              -> JFDiagrammer's own designs, NetLab first
+  catalog::by_id(id)
+  apply::*                    -> a design or a variant on a page or the document (apply.rs)
+
+How a shape uses a design (formula/theme.rs evaluates it): its QuickStyle colour cells pick
+a colour (0 dark 1, 1 light 1, 2..7 accent 1..6, 8 the background, 100..106 the colours of
+the page's variant), its QuickStyle matrix cells a style of the lists (1..6, or 100..103:
+the fill, line, effect and font style the page's variant names for its style 1..4).  A
+style's colour placeholder (Clr::ph) is the colour picked.
+
+Scheme numbers: [MS-VSDX] CT_SchemeID calls schemeEnum the one-based index of a built-in
+component, 65535 a custom colour scheme found by GUID.  Visio's own designs use small
+numbers; JFLib's designs use numbers from FIRST_ID on, so that no page of ours names one of
+Visio's designs by mistake.
+```
+
+```rust
+/// the first scheme number of JFLib's own designs (far above Visio's built-in ones)
+FIRST_ID: u32 = 60001
+/// the Visio theme extension namespace
+NS_VT: &str = "http://schemas.microsoft.com/office/visio/2012/theme"
+```
+
+- **`enum Slot`**
+  a colour of the scheme, as DrawingML names it in schemeClr
+  - `Dk1` -- dark 1 (text)
+  - `Lt1` -- light 1 (background)
+  - `Dk2` -- dark 2
+  - `Lt2` -- light 2
+  - `Accent(u8)` -- accent 1 .. 6
+  - `Ph` -- the placeholder a style is coloured with (the shape's QuickStyle colour)
+
+**`impl Slot`**
+
+- **`fn name(self) -> &'static str`**
+  the schemeClr value
+
+- **`enum Mod`**
+  a DrawingML colour transform, in thousandths of a percent (100000 = 100 %)
+  - `LumMod(u32)` -- luminance times
+  - `LumOff(u32)` -- luminance plus
+  - `SatMod(u32)` -- saturation times
+  - `Alpha(u32)` -- opacity
+
+- **`enum Clr`**
+  a colour: fixed or of the scheme, with transforms
+  - `Rgb(u32, Vec<Mod>)` -- 0xRRGGBB
+  - `Scheme(Slot, Vec<Mod>)` -- a colour of the scheme or the placeholder
+
+**`impl Clr`**
+
+- **`fn ph() -> Clr`**
+  the placeholder (the colour the shape picks)
+- **`fn slot(s: Slot) -> Clr`**
+  a scheme colour
+- **`fn rgb(c: u32) -> Clr`**
+  a fixed colour
+- **`fn with(mut self, m: Mod) -> Clr`**
+  with one more transform
+- **`fn lighter(self, pct: u32) -> Clr`**
+  lighter: luminance times (100 - pct) % plus pct %, toward white
+- **`fn darker(self, pct: u32) -> Clr`**
+  darker: luminance times (100 - pct) %
+
+- **`struct Fill`**
+  a fill style: its colour and Visio's fill pattern (0 no fill, 1 solid)
+  - `color: Clr` -- the colour
+  - `pattern: u8` -- vt:fillProps pattern
+
+**`impl Fill`**
+
+- **`fn solid(color: Clr) -> Fill`**
+  a solid fill
+- **`fn none() -> Fill`**
+  no fill (Visio's pattern 0; the colour still feeds FillForegnd)
+
+- **`enum Cap`**
+  a line cap (DrawingML ln@cap)
+  - `Round` -- rnd
+  - `Square` -- sq
+  - `Flat` -- flat
+
+- **`struct Line`**
+  a line style: DrawingML's ln and Visio's vt:lineEx
+  - `width: u32` -- the width in EMU (12700 a point)
+  - `cap: Cap` -- the cap
+  - `color: Clr` -- the colour
+  - `pattern: u8` -- Visio's line pattern (0 none, 1 solid, 2 dashed ...)
+  - `rounding: u32` -- corner rounding in EMU
+  - `begin: u8` -- line ends (Visio's arrow numbers, 0 none) and their sizes (0 .. 6)
+  - `begin_size: u8`
+  - `end: u8`
+  - `end_size: u8`
+
+```rust
+/// EMU per point
+EMU_PT: u32 = 12700
+```
+
+**`impl Line`**
+
+- **`fn solid(centi_pt: u32, color: Clr) -> Line`**
+  a solid line of `pt` hundredths of a point
+- **`fn arrow(mut self, end: u8, size: u8) -> Line`**
+  with a line end at the end
+- **`fn rounded(mut self, emu: u32) -> Line`**
+  with rounded corners (EMU)
+- **`fn pattern(mut self, p: u8) -> Line`**
+  with a pattern
+
+- **`struct Shadow`**
+  an outer shadow (DrawingML outerShdw)
+  - `blur: u32` -- blur radius and distance in EMU, direction in 60000ths of a degree
+  - `dist: u32`
+  - `dir: u32`
+  - `color: Clr` -- the colour (with an alpha transform for its strength)
+
+- **`struct Effect`**
+  an effect style: nothing or a shadow
+  - `shadow: Option<Shadow>` -- the shadow
+
+- **`struct FontStyle`**
+  a font style of Visio's extension: Char.Style bits (1 bold, 2 italic, 4 underline) and
+  the text colour
+  - `style: u8` -- Char.Style
+  - `color: Clr` -- the colour
+
+**`impl FontStyle`**
+
+- **`fn regular(color: Clr) -> FontStyle`**
+  regular text in a colour
+- **`fn bold(color: Clr) -> FontStyle`**
+  bold text in a colour
+
+- **`struct Scheme`**
+  a format scheme: the style lists a QuickStyle matrix number picks from (shapes: six of
+  each, connectors: three)
+  - `name: String` -- the name (fmtScheme@name)
+  - `fills: Vec<Fill>`
+  - `lines: Vec<Line>`
+  - `effects: Vec<Effect>`
+  - `backgrounds: Vec<Fill>` -- the background fills (bgFillStyleLst, three)
+  - `fonts: Vec<FontStyle>`
+
+- **`struct VarStyle`**
+  the style a variant gives its quick style 1 .. 4: one-based indices into the lists
+  - `fill: u8`
+  - `line: u8`
+  - `effect: u8`
+  - `font: u8`
+
+**`impl VarStyle`**
+
+- **`const fn new(fill: u8, line: u8, effect: u8, font: u8) -> VarStyle`**
+  fill, line, effect, font
+
+- **`struct Variant`**
+  a variant (TH-04): seven colours and four quick styles
+  - `colors: [u32; 7]` -- varColor1 .. 7 (0xRRGGBB)
+  - `monotone: bool` -- one colour for everything (THEMEPROP("MultiFormat") false)
+  - `embellishment: u8` -- the embellishment level 1 .. 3 (low, medium, high)
+  - `styles: [VarStyle; 4]` -- quick styles 1 .. 4 (QuickStyle matrices 100 .. 103)
+
+- **`struct Design`**
+  a design (TH-01)
+  - `name: String` -- the theme's name (a:theme@name; JFDiagrammer shows its own translated names)
+  - `id: u32` -- the scheme number of every component
+  - `colors: [u32; 12]` -- dk1, lt1, dk2, lt2, accent1 .. 6, hlink, folHlink (0xRRGGBB)
+  - `background: u32` -- vt:bkgnd: the page colour themed text keeps its contrast to
+  - `major_font: String` -- the Latin typefaces for headings and body
+  - `minor_font: String`
+  - `shapes: Scheme` -- the format scheme of shapes (six styles of each kind)
+  - `connectors: Scheme` -- the connector scheme (three of each kind)
+  - `variants: [Variant; 4]` -- the four variants
+
+**`impl Design`**
+
+- **`fn theme_xml(&self) -> Vec<u8>`**
+  the theme part's bytes
+- **`fn quick_color(&self, n: u32, variant: usize) -> Option<u32>`**
+  the colour a QuickStyle colour number names in a variant (None: not a colour number)
+
+**`mod uri`**
+
+the extension URIs, as Visio names its extension elements
+
+```rust
+/// clrScheme: vt:schemeID
+COLOR_ID: &str = "{2703A3B3-D2E1-43D9-8057-6E9D74E0F44A}"
+/// clrScheme: vt:bkgnd
+BACKGROUND: &str = "{093E89EA-6996-430E-BFF9-83A9FAAAAB73}"
+/// clrScheme: vt:variationClrSchemeLst
+VARIANT_COLORS: &str = "{DDD2D869-C2EF-471E-B8FA-914AFA308C9F}"
+/// fontScheme: vt:schemeID
+FONT_ID: &str = "{B3C0788F-89CC-4CDB-A57D-0664CFDA821B}"
+/// themeElements: vt:fmtConnectorScheme
+CONNECTOR_SCHEME: &str = "{1342405F-259F-4C95-8CDF-A9DCE2D418A2}"
+/// themeElements: vt:themeScheme
+THEME_ID: &str = "{D75FF423-9257-4291-A4FE-1B2448832E17}"
+/// themeElements: vt:fmtSchemeEx
+FORMAT_ID: &str = "{27CD58D4-7086-4B73-B2AB-7AEBE2148A8C}"
+/// themeElements: vt:fmtConnectorSchemeEx
+CONNECTOR_ID: &str = "{C6430689-8E98-42EC-ADBF-087148533A3F}"
+/// themeElements: vt:fillStyles
+FILL_STYLES: &str = "{56243398-1771-4C39-BF73-A5702A9C147F}"
+/// themeElements: vt:lineStyles
+LINE_STYLES: &str = "{6CAB99AB-0A78-4BAB-B597-526D62367CB4}"
+/// themeElements: vt:fontStylesGroup
+FONT_STYLES: &str = "{EBE24D50-EC5C-4D6F-A1A3-C5F0A18B936A}"
+/// themeElements: vt:variationStyleSchemeLst
+VARIANT_STYLES: &str = "{494CE47F-D151-47DC-95E8-85652EA8A67E}"
+```
+
+### `diagram_core/src/design/apply.rs`
+
+Source: [`lib/diagram_core/src/design/apply.rs`](../lib/diagram_core/src/design/apply.rs)
+
+```text
+apply -- a design or a variant on a page or on every page (TH-02, TH-04)
+
+  apply(tx, eng, id, part, scope, variant)   the design whose theme part is `part` (its
+                                             scheme number `id`) with a variant 0 .. 3
+  set_variant(tx, eng, scope, variant)       another variant of the design the pages have
+  remove(tx, eng, scope)                     no design ("Kein Design": the index cells 0)
+  page_design(doc, page) -> Some((id, variant))
+  part_id(bytes) / find_part(doc, id)        the scheme number of a theme part, and back
+
+What applying does, in one transaction (one undo step; a live preview is that transaction
+taken back):
+1. The theme part goes into the document: a part with the same scheme number is replaced,
+   else it is added as /visio/theme/themeN.xml.  Parts of JFLib's own designs that no page
+   or shape names any more are dropped again; parts read from a file (Visio's designs) stay
+   -- they are shown, kept and saved, never shipped.
+2. Each page of the scope gets the scheme numbers of the part's components in ThemeIndex,
+   ColorSchemeIndex, EffectSchemeIndex, ConnectorSchemeIndex and FontSchemeIndex (the own
+   designs use one number for all; Visio's parts mix them), the variant in
+   VariationColorIndex and VariationStyleIndex, EmbellishmentIndex 0 (the variant's).
+3. Each shape of these pages (also inside groups) loses its own formatting of the cells a
+   design sets, so that the theme shows -- as Visio does: a design overrides formatting made
+   by hand.  Kept are: cells whose formula is protected (THEMEGUARD or GUARD at the top),
+   cells of a kind the shape locks (LockThemeColors: colours; LockThemeEffects: line, fill
+   and shadow properties; LockThemeFonts: typeface and font style; LockThemeConnectors:
+   the line of a connector), the shape's own index cells while LockThemeIndex is set, and
+   the QuickStyle cells (they choose within any design).  Removing a cell lets the shape
+   inherit again -- from its master or its style.
+4. The engine forgets the parsed theme parts and recalculates the pages and their shapes.
+```
+
+- **`enum Scope`**
+  which pages a design goes to
+  - `Page(PageRef)` -- one page
+  - `All` -- every page, foreground and background
+
+```rust
+/// the index cells that choose the design's parts
+INDEX_CELLS: [&str; 5] = ["ThemeIndex", "ColorSchemeIndex", "EffectSchemeIndex", " ...
+/// the index cells of the variant
+VARIANT_CELLS: [&str; 2] = ["VariationColorIndex", "VariationStyleIndex"]
+```
+
+- **`fn part_id(data: &[u8]) -> Option<u32>`**
+  the scheme number of a theme part (its vt:themeScheme), None without one
+
+- **`fn find_part(doc: &Document, id: u32) -> Option<usize>`**
+  the index into Document::themes of the part with this scheme number
+
+- **`fn page_design(doc: &Document, page: PageRef) -> Option<(u32, u32)>`**
+  the design a page shows: its ThemeIndex and VariationColorIndex (None: no design)
+
+- **`fn apply(tx: &mut Transaction, eng: &mut Engine, id: u32, part: &[u8], scope: Scope, variant: u32) -> Result<Vec<SheetRef>, EditError>`**
+  apply the design whose theme part is `part` (scheme number `id`) with variant 0 .. 3 to
+  the pages of `scope` -> the sheets recalculated
+
+- **`fn set_variant(tx: &mut Transaction, eng: &mut Engine, scope: Scope, variant: u32) -> Result<Vec<SheetRef>, EditError>`**
+  another variant of the design each page of `scope` shows (pages without one stay)
+
+- **`fn remove(tx: &mut Transaction, eng: &mut Engine, scope: Scope) -> Result<Vec<SheetRef>, EditError>`**
+  no design on the pages of `scope`: the index cells 0, themed cells fall back to the
+  root style ("Kein Design")
+
+### `diagram_core/src/design/catalog.rs`
+
+Source: [`lib/diagram_core/src/design/catalog.rs`](../lib/diagram_core/src/design/catalog.rs)
+
+```text
+catalog -- JFDiagrammer's own designs (V3, TH-03): NetLab first
+
+All values are JFLib's own, from the NetLab style (styles/netlab: palette.rs, lib.rs): ink
+anthracite #1D2228 and slate #4D5560, window grey #ECEEF1, the accent Signalblau #1F5FA8 and
+the chart series ochre #C9792B, teal #3D8C84, brick #B0453F, violet #7A5C99, olive #7F8C3A;
+the typeface Inter.  Lines are thin and square-ended, effects rare.
+
+  NetLab    the house look: light tinted fills, 1 pt lines in the colour, anthracite text,
+            slate connectors with a slim filled arrow.  Variants: Signalblau, Petrol, Signalblau
+            solid (white text), Graphit.
+  Contour   black on white, for print and technical drawings: white fills, 1.25 pt outlines,
+            open arrows, no effects.  Variants: Anthracite, Signalblau, Brick, Rounded.
+  Contrast  bold surfaces: solid fills without outline, white bold text, strong dark
+            connectors with a wide arrow.  Variants: Signalblau, Petrol, Brick, Anthracite rounded.
+
+How Visio reads the lists (the user's Visio, 2026-11-19): the six styles of each list go from
+subtle (1) to intense (6), as the matrix of Visio's quick styles shows them; the variants'
+styles use numbers 1 .. 5 only -- Visio's own designs never name 6 there, and Visio drew a
+variant style that named 6 as style 1.  Fill and line colours are the placeholder (the
+shape's colour) with transforms, also the neutral ones (white, light grey, dark: the colour's
+luminance set, its saturation lowered), as in Visio's own designs.
+
+Conventions every own design keeps, so the style sheets of a new document fit all of them:
+font style 1 is dark text for light ground (the style "Text Only" uses it), connector line
+style 1 is the connector with its arrow, and the variants' quick style 4 is the quiet one
+for containers and backgrounds.
+```
+
+```rust
+/// the typeface of the NetLab style
+FONT: &str = "Inter"
+/// the scheme number of NetLab
+NETLAB: u32 = FIRST_ID
+/// the scheme number of Contour
+CONTOUR: u32 = FIRST_ID + 1
+/// the scheme number of Contrast
+CONTRAST: u32 = FIRST_ID + 2
+```
+
+- **`fn netlab() -> Design`**
+  NetLab: the house look
+
+- **`fn contour() -> Design`**
+  Contour: black on white, for print
+
+- **`fn contrast() -> Design`**
+  Contrast: bold surfaces
+
+- **`fn all() -> Vec<Design>`**
+  all own designs, NetLab first
+
+- **`fn by_id(id: u32) -> Option<Design>`**
+  the own design with this scheme number
+
+### `diagram_core/src/document.rs`
+
+Source: [`lib/diagram_core/src/document.rs`](../lib/diagram_core/src/document.rs)
+
+```text
+document -- the document: pages, masters, styles, the document sheet, themes and parts
+
+  Document::new(DocKind::Drawing)        empty: no pages, masters or styles
+  doc.intern("PinX") / sym(..) / str(sym)   the document's string table (strings.rs)
+  doc.pages() / page(r) / page_by_id(id) / page_by_name_u(..)     (masters, styles alike)
+  doc.shape(r) -> Option<Shape>          a shape with its links: id, data, children,
+                                         parent, master shape, NameU and Name
+  doc.sheet(SheetRef) / sheet_styles(..)  any ShapeSheet of the document
+  doc.insert_page(page) / insert_master / insert_style      (untracked, for loaders)
+  doc.page_mut(r) / master_mut / style_mut / doc_sheet_mut  (untracked)
+  doc.unused_page_name("Page")           "Page-3": the first free number
+  doc.transaction(label)                 tracked edits with undo (edit.rs)
+
+Handles: PageRef, MasterRef and StyleRef are slots of the document like ShapeRef is a slot of
+its tree: stable for the document's life, also across undo, never reused.  The file's IDs
+(page ID, master ID, style ID, shape ID) are attributes of the objects; references inside
+the model use them as the file does (Master="2", LineStyle="3", BackPage="4", MasterShape),
+so a shape whose master is gone still says which one it was.
+
+Untracked access (the *_mut functions, the public fields) is for building a document --
+diagram_io while reading, tests -- and for data the edit API does not cover yet.  Changes
+made that way bypass the transactions, so an undo history recorded before them no longer
+fits the document: clear it.
+
+Names (LG-04): NameU is the universal key (formulas, matching masters, own shapes), Name what
+the user sees; a file's Name stays as read.  A shape without NameU is "Sheet.<ID>", an
+instance "<master's NameU>.<ID>"; without Name it shows its NameU.
+```
+
+- **`struct PageRef(pub(crate) u32)`**
+  a page of the document (a slot, stable across undo)
+
+- **`struct MasterRef(pub(crate) u32)`**
+  a master of the document
+
+- **`struct StyleRef(pub(crate) u32)`**
+  a style of the document
+
+- **`enum Owner`**
+  what holds a shape tree
+  - `Page(PageRef)` -- the shapes of a page
+  - `Master(MasterRef)` -- the shapes of a master
+
+- **`struct ShapeRef`**
+  a shape: its tree and its slot there
+  - `owner: Owner` -- the page or master
+  - `slot: u32` -- the slot in its tree
+
+- **`enum SheetRef`**
+  any ShapeSheet of the document
+  - `Document` -- the document sheet
+  - `Style(StyleRef)` -- a style sheet
+  - `Page(PageRef)` -- a page sheet
+  - `Master(MasterRef)` -- a master's page sheet
+  - `Shape(ShapeRef)` -- a shape's sheet
+
+- **`enum DocKind`**
+  what the document is
+  - `Drawing` -- a drawing (.vsdx, .vsdm)
+  - `Template` -- a template (.vstx, .vstm)
+  - `Stencil` -- a stencil: masters without pages (.vssx, .vssm)
+
+- **`struct DocSettings`**
+  the DocumentSettings element
+  - `top_page: Option<u32>` -- TopPage: the ID of the page shown first
+  - `default_text_style: Option<u32>` -- DefaultTextStyle: the style ID new text gets
+  - `default_line_style: Option<u32>` -- DefaultLineStyle
+  - `default_fill_style: Option<u32>` -- DefaultFillStyle
+  - `default_guide_style: Option<u32>` -- DefaultGuideStyle
+  - `attrs: Vec<(Sym, Sym)>` -- the other attributes in file order
+  - `items: Vec<(Sym, Sym)>` -- the child elements and their text in file order (GlueSettings, SnapSettings,
+    SnapExtensions, SnapAngles, DynamicGridEnabled, ProtectStyles ...)
+  - `extras: Extras` -- unknown items
+
+- **`struct ColorEntry`**
+  an entry of the old colour table (Colors): index -> RGB
+  - `ix: u32` -- IX
+  - `rgb: Sym` -- RGB as written ("#000000")
+
+- **`struct FaceName`**
+  a font of the document (FaceName), its attributes in file order (NameU, Panose ...)
+  - `attrs: Vec<(Sym, Sym)>` -- the attributes
+
+- **`struct DocSheet`**
+  the document's own ShapeSheet (DocumentSheet)
+  - `styles: StyleRefs` -- LineStyle, FillStyle, TextStyle
+  - `attrs: Vec<(Sym, Sym)>` -- the other attributes in file order (Name, NameU ...)
+  - `sheet: Sheet` -- the cells
+
+- **`struct Theme`**
+  a theme part, kept as read (typed later, JD11)
+  - `part: Sym` -- the part name (/visio/theme/theme1.xml)
+  - `data: Vec<u8>` -- its bytes
+
+- **`struct Part`**
+  a package part the model keeps as bytes: media, document properties, windows, comments,
+  data recordsets, the thumbnail, a macro project
+  - `name: Sym` -- the part name
+  - `content_type: Sym` -- its content type
+  - `rel_type: Sym` -- the type of the relationship that points to it
+  - `data: Vec<u8>` -- its bytes
+
+- **`struct Relationship`**
+  a relationship of the package as read: which part (or the package) points to which target
+  with which type.  The model derives the ones it owns (pages, masters, themes, pictures)
+  from its own links when it writes; the list keeps every relationship so that parts it only
+  keeps as bytes (Part), external targets and ids that kept XML refers to (r:id) survive
+  - `source: Sym` -- the source part (`/visio/document.xml`), "" for the package itself
+  - `id: Sym` -- the id (`rId3`), unique per source
+  - `kind: Sym` -- the type, a URI
+  - `target: Sym` -- the target as written: relative to the source, or a URI when external
+  - `external: bool` -- TargetMode="External": outside the package, never followed
+  - `part: Option<Sym>` -- the part an internal target names (`/visio/media/image1.png`); None when external
+
+- **`enum DocError`**
+  why an object could not be put into the document
+  - `DuplicateId(u32)` -- another object of the same kind has this ID
+
+- **`struct Document`**
+  a drawing, template or stencil
+  - `kind: DocKind` -- drawing, template or stencil
+  - `macros: bool` -- whether the file is macro-enabled (.vsdm, .vssm, .vstm); macros are kept, never run
+  - `settings: DocSettings` -- DocumentSettings
+  - `colors: Vec<ColorEntry>` -- the old colour table
+  - `faces: Vec<FaceName>` -- the fonts
+  - `themes: Vec<Theme>` -- the theme parts (Page::theme indexes them)
+  - `parts: Vec<Part>` -- the other package parts, as bytes
+  - `rels: Vec<Relationship>` -- every relationship of the package as read (see Relationship)
+  - `attrs: Vec<(Sym, Sym)>` -- the attributes of the VisioDocument element
+  - `extras: Extras` -- unknown items of the VisioDocument element (EventList, HeaderFooter, PublishSettings ...
+    until they are typed)
+  - `pages_extras: Extras` -- unknown items of the Pages element
+  - `masters_extras: Extras` -- unknown items of the Masters element
+  - `colors_extras: Extras` -- unknown items of the Colors element (a ColorEntry with more than IX and RGB too)
+  - `faces_extras: Extras` -- unknown items of the FaceNames element (a FaceName with children too)
+  - `styles_extras: Extras` -- unknown items of the StyleSheets element
+
+**`impl Document`**
+
+- **`fn new(kind: DocKind) -> Document`**
+  an empty document of this kind
+- **`fn strings(&self) -> &Strings`**
+  the string table
+- **`fn strings_mut(&mut self) -> &mut Strings`**
+  the string table to add to (loaders hand it to Value::parse, Formula::parse,
+  ShapeKind::parse); it only grows, so every Sym stays valid
+- **`fn intern(&mut self, text: &str) -> Sym`**
+  the handle of a text, added when new
+- **`fn sym(&self, text: &str) -> Option<Sym>`**
+  the handle of a text the document already has
+- **`fn str(&self, sym: Sym) -> &str`**
+  the text of a handle
+- **`fn pages(&self) -> impl Iterator<Item = PageRef> + '_`**
+  the pages in document order (foreground and background)
+- **`fn foreground_pages(&self) -> impl Iterator<Item = PageRef> + '_`**
+  the foreground pages in document order
+- **`fn background_pages(&self) -> impl Iterator<Item = PageRef> + '_`**
+  the background pages in document order
+- **`fn page_count(&self) -> usize`**
+  the number of pages
+- **`fn page(&self, r: PageRef) -> Option<&Page>`**
+  a page
+- **`fn page_mut(&mut self, r: PageRef) -> Option<&mut Page>`**
+  a page for untracked changes (see the module comment)
+- **`fn page_by_id(&self, id: u32) -> Option<PageRef>`**
+  the page with this page ID
+- **`fn page_by_name_u(&self, name_u: &str) -> Option<PageRef>`**
+  the page with this universal name
+- **`fn page_position(&self, r: PageRef) -> Option<usize>`**
+  the position of a page in document order
+- **`fn background_of(&self, r: PageRef) -> Option<PageRef>`**
+  the background page of a page
+- **`fn insert_page(&mut self, page: Page) -> Result<PageRef, DocError>`**
+  add a page at the end (untracked)
+- **`fn unused_page_name(&self, prefix: &str) -> String`**
+  "&lt;prefix>-&lt;n>" with the smallest n no page has as Name or NameU
+- **`fn masters(&self) -> impl Iterator<Item = MasterRef> + '_`**
+  the masters in document order
+- **`fn master(&self, r: MasterRef) -> Option<&Master>`**
+  a master
+- **`fn master_mut(&mut self, r: MasterRef) -> Option<&mut Master>`**
+  a master for untracked changes
+- **`fn master_by_id(&self, id: u32) -> Option<MasterRef>`**
+  the master with this master ID
+- **`fn master_by_name_u(&self, name_u: &str) -> Option<MasterRef>`**
+  the master with this universal name
+- **`fn insert_master(&mut self, master: Master) -> Result<MasterRef, DocError>`**
+  add a master at the end (untracked)
+- **`fn styles(&self) -> impl Iterator<Item = StyleRef> + '_`**
+  the styles in document order
+- **`fn style(&self, r: StyleRef) -> Option<&Style>`**
+  a style
+- **`fn style_mut(&mut self, r: StyleRef) -> Option<&mut Style>`**
+  a style for untracked changes
+- **`fn style_by_id(&self, id: u32) -> Option<StyleRef>`**
+  the style with this style ID
+- **`fn style_by_name_u(&self, name_u: &str) -> Option<StyleRef>`**
+  the style with this universal name
+- **`fn insert_style(&mut self, style: Style) -> Result<StyleRef, DocError>`**
+  add a style at the end (untracked)
+- **`fn doc_sheet(&self) -> &DocSheet`**
+  the document's own ShapeSheet
+- **`fn doc_sheet_mut(&mut self) -> &mut DocSheet`**
+  the document sheet for untracked changes
+- **`fn sheet(&self, r: SheetRef) -> Option<&Sheet>`**
+  any sheet of the document
+- **`fn sheet_styles(&self, r: SheetRef) -> StyleRefs`**
+  the styles a sheet inherits from (a style: the styles it is based on)
+- **`fn tree(&self, owner: Owner) -> Option<&ShapeTree>`**
+  the shape tree of a page or master
+- **`fn shape(&self, r: ShapeRef) -> Option<Shape<'_>>`**
+  a shape and its links
+- **`fn shape_by_id(&self, owner: Owner, id: u32) -> Option<ShapeRef>`**
+  the shape with this file ID on a page or in a master
+- **`fn top_shapes(&self, owner: Owner) -> impl Iterator<Item = ShapeRef> + '_`**
+  the top-level shapes of a page or master in z-order
+- **`fn all_shapes(&self, owner: Owner) -> impl Iterator<Item = ShapeRef> + '_`**
+  every shape of a page or master, groups before their subshapes
+- **`fn master_shape_of(&self, r: ShapeRef) -> Option<ShapeRef>`**
+  the shape `r` inherits from: for an instance its master's master shape, for a
+  subshape of an instance the shape MasterShape names in the instance's master
+- **`fn master_of(&self, r: ShapeRef) -> Option<MasterRef>`**
+  the master an instance (or a subshape of one) belongs to
+- **`fn master_in_use(&self, id: u32) -> bool`**
+  whether any shape of the document is an instance of the master with this ID
+- **`fn master_depends_on(&self, a: u32, b: u32) -> bool`**
+  whether the master with ID `a` uses the master with ID `b` (itself or through instances
+  in its shapes, at any depth)
+- **`fn style_in_use(&self, id: u32) -> bool`**
+  whether any sheet, style or setting of the document names the style with this ID
+
+- **`struct Shape<'d>`**
+  a shape with access to its document (Document::shape)
+
+**`impl<'d> Shape<'d>`**
+
+- **`fn r(&self) -> ShapeRef`**
+  its handle
+- **`fn id(&self) -> u32`**
+  its file ID (unique on its page or in its master)
+- **`fn data(&self) -> &'d ShapeData`**
+  everything it holds itself
+- **`fn header(&self) -> &'d ShapeHeader`**
+  its attributes
+- **`fn sheet(&self) -> &'d Sheet`**
+  its own cells (without inheritance)
+- **`fn sheet_ref(&self) -> SheetRef`**
+  as a sheet reference
+- **`fn parent(&self) -> Option<ShapeRef>`**
+  the group it belongs to
+- **`fn children(&self) -> impl Iterator<Item = ShapeRef> + 'd`**
+  its subshapes in z-order
+- **`fn master_shape(&self) -> Option<ShapeRef>`**
+  the shape it inherits from (Document::master_shape_of)
+- **`fn is_deleted(&self) -> bool`**
+  whether the master's subshape is deleted here (Del="1")
+- **`fn text(&self) -> Option<&'d Text>`**
+  its text, from the master shape when it has none of its own
+- **`fn name_u(&self) -> String`**
+  the universal name: NameU, else derived ("Sheet.7", "&lt;master's NameU>.7")
+- **`fn name(&self) -> String`**
+  the shown name: Name, else NameU, else derived from the master's Name
+
+### `diagram_core/src/edit.rs`
+
+Source: [`lib/diagram_core/src/edit.rs`](../lib/diagram_core/src/edit.rs)
+
+```text
+edit -- changing a document in transactions that can be undone and redone (DM-02)
+
+  let mut tx = doc.transaction("Verschieben");      every edit goes through tx
+  tx.set_length(sheet, addr, 25.0, Unit::Millimeters)?;
+  tx.set_formula(sheet, addr, "Width*0.5")?;          ... add_shape, delete_row, add_page ...
+  let change = tx.commit();                           Option<Change>: None when nothing changed
+  (dropping tx without commit takes all its edits back)
+  change.undo(&mut doc) / change.redo(&mut doc)       -> bool
+  change.label() / merging(key) / merge(&next) / sheets()
+
+With ui::history (lib/ui/history.rs) the app wraps a Change in an Edit of its own (the orphan
+rule keeps the impl in the app; diagram_core does not depend on ui):
+
+  struct Step(Change);
+  impl Edit<Document> for Step {
+      fn apply(&mut self, d: &mut Document) { self.0.redo(d); }
+      fn revert(&mut self, d: &mut Document) { self.0.undo(d); }
+      fn label(&self) -> &str { self.0.label() }
+      fn merge(&mut self, next: &mut dyn Edit<Document>) -> bool {
+          next.value().and_then(|v| v.downcast_ref::<Step>()).is_some_and(|n| self.0.merge(&n.0))
+      }
+      fn value(&self) -> Option<&dyn core::any::Any> { Some(self) }
+  }
+  history.record(Box::new(Step(change)));            the change is already applied
+
+How undo works: inverse operations, not snapshots.  Each edit is broken into primitive steps
+on the smallest part it touches -- one cell, one row, one section, one shape's attributes,
+one shape subtree, one page, master or style -- and each step, when it runs, hands back the
+step that undoes it (a cell's old content, a removed subtree, an old position).  Undo runs the
+inverse steps backwards and collects their inverses for redo.  So a step costs memory and time
+in proportion to what it changes, whatever the size of the drawing: moving 1000 shapes keeps
+2000 cells, not 1000 sheets or the document.  Handles stay valid because slots are never
+reused and deleted shapes come back into their slots.  The steps address cells and rows by
+position, which holds because undo and redo replay them in exact reverse order on the state
+they left; an untracked change in between (the *_mut functions) breaks that, a step that no
+longer fits is refused (undo returns false) and the steps run before it are taken back; when
+even that fails the change is_broken and refuses from then on.  IDs, like slots, are never
+handed out twice (NoIds once a file used the largest one, 4294967294; NO_ID is none); a step that would give two pages,
+masters or styles one ID is refused.
+
+Structure keeps inheritance: a subshape of an instance stays in its instance, the master
+shape of a master in use stays its first top-level shape (InUse), an instance never goes into
+a master it depends on (Cycle).  delete_shapes deletes a selection in one pass.
+
+Formula and value stay a pair: set_formula keeps the old value and marks the cell stale for
+the engine (JD6), set_constant writes a value whose formula is the value itself, set_result
+is the engine's way to store a formula's result; GUARD(...) formulas refuse both unless
+forced (force_formula, force_constant).  Deleting an inherited row, section or subshape writes
+a Del="1" mark; restore_row and restore_section remove it again.
+```
+
+- **`enum EditError`**
+  why an edit was refused (the transaction keeps its earlier edits)
+  - `NoSheet` -- the sheet does not exist
+  - `NoShape` -- the shape does not exist
+  - `NoPage` -- the page does not exist
+  - `NoMaster` -- the master does not exist
+  - `NoStyle` -- the style does not exist
+  - `NoSection` -- the section does not exist for the sheet
+  - `NoRow` -- the row does not exist for the sheet
+  - `Deleted` -- the row or section is deleted here (Del="1"); restore it first
+  - `Guarded` -- GUARD protects the formula; force_formula / force_constant override it
+  - `Exists` -- it exists already
+  - `InUse` -- something still refers to it (instances of a master, users of a style)
+  - `Cycle` -- the change would make a cycle (background pages, styles, groups)
+  - `NotBackground` -- the page is not a background page
+  - `Invalid` -- the request does not fit the object
+  - `Stale` -- the document no longer matches (changed outside transactions)
+  - `NoIds` -- no free ID is left (a file used the largest ID, 4294967294)
+
+- **`struct Change`**
+  a committed transaction: one undo step
+
+**`impl Change`**
+
+- **`fn label(&self) -> &str`**
+  the label of the transaction ("Verschieben")
+- **`fn steps(&self) -> usize`**
+  the number of primitive steps
+- **`fn is_undone(&self) -> bool`**
+  whether it is undone now
+- **`fn is_broken(&self) -> bool`**
+  whether it stopped working: a step no longer fitted and what ran before could not be
+  taken back (only after untracked changes); undo and redo then refuse
+- **`fn merging(mut self, key: u32) -> Change`**
+  changes with the same non-zero key merge into one step (a drag)
+- **`fn merge_key(&self) -> u32`**
+  the merge key (0: none)
+- **`fn merge(&mut self, next: &Change) -> bool`**
+  take the following change into this one when both have the same non-zero key and
+  both are applied -> whether it did (the next change is then part of this step)
+- **`fn undo(&mut self, doc: &mut Document) -> bool`**
+  take the change back -> false when it is undone already or no longer fits the document
+  (then nothing changes)
+- **`fn redo(&mut self, doc: &mut Document) -> bool`**
+  do the change again -> false when it is applied or no longer fits
+- **`fn sheets(&self) -> Vec<SheetRef>`**
+  the sheets it touches, for recalculation: whose cells, rows, sections or attributes it
+  changes, shapes it adds or removes (of a removed group only the group), the page or
+  master sheet of changed Connect entries, added or removed pages, masters and styles, the
+  document sheet for the settings
+
+- **`struct Transaction<'d>`**
+  edits that become one undo step (Document::transaction)
+
+**`impl Document`**
+
+- **`fn transaction(&mut self, label: &str) -> Transaction<'_>`**
+  start a transaction; its edits become one undo step when committed
+
+**`impl<'d> Transaction<'d>`**
+
+- **`fn doc(&self) -> &Document`**
+  the document as it is now (with the edits so far)
+- **`fn intern(&mut self, s: &str) -> Sym`**
+  the handle of a text (cell names for addresses, values)
+- **`fn single(&mut self, cell: &str) -> CellAddr`**
+  the address of a single cell by name
+- **`fn named(&mut self, section: &str, row: &str, cell: &str) -> CellAddr`**
+  the address of a cell of a named row (User, Property, Hyperlink ...)
+- **`fn commit(mut self) -> Option<Change>`**
+  end the transaction -> the change to keep for undo (None: nothing changed)
+- **`fn rollback(self)`**
+  take every edit of the transaction back
+- **`fn set_formula(&mut self, sheet: SheetRef, addr: &CellAddr, formula: &str) -> Result<(), EditError>`**
+  give the cell a formula of its own; its value stays until the engine computes the new
+  one (the cell is stale until then)
+- **`fn force_formula(&mut self, sheet: SheetRef, addr: &CellAddr, formula: &str) -> Result<(), EditError>`**
+  set_formula also over a GUARD formula
+- **`fn set_constant(&mut self, sheet: SheetRef, addr: &CellAddr, value: Value, unit: Option<Unit>) -> Result<(), EditError>`**
+  set the cell to a constant: the value (internal units) is its formula, shown in `unit`
+- **`fn force_constant(&mut self, sheet: SheetRef, addr: &CellAddr, value: Value, unit: Option<Unit>) -> Result<(), EditError>`**
+  set_constant also over a GUARD formula
+- **`fn set_length(&mut self, sheet: SheetRef, addr: &CellAddr, value: f64, unit: Unit) -> Result<(), EditError>`**
+  set a length or angle given in `unit` (converted to internal units, shown in `unit`)
+- **`fn set_string(&mut self, sheet: SheetRef, addr: &CellAddr, value: &str) -> Result<(), EditError>`**
+  set a string constant (shown as STR)
+- **`fn inherit_cell(&mut self, sheet: SheetRef, addr: &CellAddr) -> Result<(), EditError>`**
+  remove the sheet's own cell: the cell inherits again ("Formel löschen")
+- **`fn set_result(&mut self, sheet: SheetRef, addr: &CellAddr, value: Value, error: Option<CellError>) -> Result<(), EditError>`**
+  (the engine) store the result of the cell's formula for this sheet; a cell that
+  inherits its formula gets an F="Inh" cell of its own
+- **`fn add_section(&mut self, sheet: SheetRef, name: &str) -> Result<SecKey, EditError>`**
+  add a section of the sheet's own -> its key (Geometry: the next free index); Exists
+  when the sheet has it already
+- **`fn delete_section(&mut self, sheet: SheetRef, sk: SecKey) -> Result<(), EditError>`**
+  delete a section: an inherited one gets a Del="1" mark, an own one goes
+- **`fn restore_section(&mut self, sheet: SheetRef, sk: SecKey) -> Result<(), EditError>`**
+  remove the Del="1" mark of an inherited section: it is inherited again
+- **`fn add_row(&mut self, sheet: SheetRef, sk: SecKey, key: Option<RowKey>, kind: Option<&str>) -> Result<RowKey, EditError>`**
+  add a row of the sheet's own to a section (made when missing) -> its key; `key` None:
+  the next index (Geometry from 1, other indexed sections from 0); `kind` the row type
+  (Geometry: "LineTo" ...)
+- **`fn delete_row(&mut self, sheet: SheetRef, sk: SecKey, key: RowKey) -> Result<(), EditError>`**
+  delete a row: an inherited one gets a Del="1" mark (its own cells go), an own one goes
+- **`fn restore_row(&mut self, sheet: SheetRef, sk: SecKey, key: RowKey) -> Result<(), EditError>`**
+  remove the Del="1" mark of an inherited row: it is inherited again
+- **`fn set_user(&mut self, sheet: SheetRef, name: &str, value: Value, unit: Option<Unit>) -> Result<(), EditError>`**
+  set a user-defined cell (User.&lt;name>.Value) to a constant, adding the row when missing
+- **`fn set_user_formula(&mut self, sheet: SheetRef, name: &str, formula: &str) -> Result<(), EditError>`**
+  give a user-defined cell a formula, adding the row when missing
+- **`fn set_shape_data(&mut self, sheet: SheetRef, name: &str, label: &str, value: Value) -> Result<(), EditError>`**
+  set a shape data field (Prop.&lt;name>): its label and value, adding the row when missing
+- **`fn set_hyperlink(&mut self, sheet: SheetRef, name: &str, address: &str, sub_address: &str, description: &str) -> Result<(), EditError>`**
+  add or change a hyperlink (Hyperlink.&lt;name>): address, sub-address, description
+- **`fn add_layer(&mut self, page: PageRef, name: &str, name_univ: &str) -> Result<u32, EditError>`**
+  add a layer to a page -> its index; visible, printed, snapping and gluing, not locked
+- **`fn set_layers(&mut self, shape: ShapeRef, layers: &[u32]) -> Result<(), EditError>`**
+  put a shape on these layers (LayerMember; empty: on none)
+- **`fn delete_layer(&mut self, page: PageRef, ix: u32) -> Result<(), EditError>`**
+  delete a layer of a page; shapes on it leave it (their own LayerMember cells), the
+  shapes themselves stay (LY-04 asks the user first and deletes them before)
+- **`fn add_shape(&mut self, owner: Owner, parent: Option<ShapeRef>, kind: ShapeKind) -> Result<ShapeRef, EditError>`**
+  add an empty shape on a page or in a master, on top of its siblings -> its handle; a
+  parent that is not a group becomes one
+- **`fn add_shape_with(&mut self, owner: Owner, parent: Option<ShapeRef>, data: ShapeData) -> Result<ShapeRef, EditError>`**
+  add a shape with its attributes and cells (the ID is the tree's next one)
+- **`fn add_instance(&mut self, owner: Owner, master: MasterRef, pin_x: f64, pin_y: f64) -> Result<ShapeRef, EditError>`**
+  drop an instance of a master on a page (MS-02): a shape that inherits everything from
+  the master shape and sets only its pin, with subshapes for the master's subshapes
+  -> the instance; its Name is the caller's (LG-04: the name in the current language)
+- **`fn delete_shape(&mut self, shape: ShapeRef) -> Result<(), EditError>`**
+  delete a shape with its subshapes and the glue records of them; a subshape the master
+  passes on gets a Del="1" mark instead
+- **`fn delete_shapes(&mut self, shapes: &[ShapeRef]) -> Result<(), EditError>`**
+  delete several shapes in one go (a selection): the glue records are searched once, not
+  once per shape; shapes inside another one of the list go with it.  The master shape of a
+  master in use cannot be deleted (InUse: its instances would inherit from another shape)
+- **`fn undelete_shape(&mut self, shape: ShapeRef) -> Result<(), EditError>`**
+  bring a deleted subshape of an instance back (remove its Del="1" mark)
+- **`fn move_shape(&mut self, shape: ShapeRef, parent: Option<ShapeRef>, pos: Option<usize>) -> Result<(), EditError>`**
+  move a shape in the z-order or into another group of the same tree: under `parent`
+  (None: top level) at `pos` (None: on top); a parent that is not a group becomes one.
+  Coordinates stay as they are (re-grouping with transforms is the canvas's work, JD7)
+- **`fn bring_to_front(&mut self, shape: ShapeRef) -> Result<(), EditError>`**
+  put a shape on top of its siblings
+- **`fn send_to_back(&mut self, shape: ShapeRef) -> Result<(), EditError>`**
+  put a shape below its siblings
+- **`fn bring_forward(&mut self, shape: ShapeRef) -> Result<(), EditError>`**
+  move a shape one step up among its siblings
+- **`fn send_backward(&mut self, shape: ShapeRef) -> Result<(), EditError>`**
+  move a shape one step down among its siblings
+- **`fn set_shape_names(&mut self, shape: ShapeRef, name: Option<&str>, name_u: Option<&str>) -> Result<(), EditError>`**
+  set a shape's Name and NameU (None: derived again)
+- **`fn set_shape_styles(&mut self, shape: ShapeRef, styles: StyleRefs) -> Result<(), EditError>`**
+  set the styles a shape inherits from (LineStyle, FillStyle, TextStyle)
+- **`fn set_shape_header(&mut self, shape: ShapeRef, header: ShapeHeader) -> Result<(), EditError>`**
+  set a shape's attributes as a whole (kind, names, references)
+- **`fn set_text(&mut self, shape: ShapeRef, text: Option<Text>) -> Result<(), EditError>`**
+  set a shape's own text (None: inherited from the master shape again)
+- **`fn set_foreign(&mut self, shape: ShapeRef, foreign: Option<ForeignData>) -> Result<(), EditError>`**
+  set the picture data of a Foreign shape
+- **`fn add_connect(&mut self, owner: Owner, connect: Connect) -> Result<(), EditError>`**
+  add a Connect entry on a page or in a master
+- **`fn remove_connect(&mut self, owner: Owner, index: usize) -> Result<(), EditError>`**
+  remove the Connect entry at `index`
+- **`fn add_page(&mut self, name: &str, name_u: &str, background: bool, pos: Option<usize>) -> Result<PageRef, EditError>`**
+  add a page (foreground or background) at `pos` in document order (None: at the end)
+  with the next free page ID -> its handle
+- **`fn delete_page(&mut self, page: PageRef) -> Result<(), EditError>`**
+  delete a page; pages that had it as background lose that background, TopPage moves to
+  the first remaining foreground page
+- **`fn move_page(&mut self, page: PageRef, pos: usize) -> Result<(), EditError>`**
+  move a page to `pos` in document order
+- **`fn rename_page(&mut self, page: PageRef, name: &str, name_u: &str) -> Result<(), EditError>`**
+  rename a page (Name and NameU)
+- **`fn set_page_header(&mut self, page: PageRef, header: PageHeader) -> Result<(), EditError>`**
+  set the page's attributes as a whole
+- **`fn set_background(&mut self, page: PageRef, back: Option<PageRef>) -> Result<(), EditError>`**
+  give a page a background page (None: none); the background must be a background page
+  and the chain of backgrounds must not lead back to the page
+- **`fn set_page_theme(&mut self, page: PageRef, theme: Option<u32>) -> Result<(), EditError>`**
+  set the theme of a page (an index into Document::themes, None: none)
+- **`fn add_master(&mut self, name: &str, name_u: &str) -> Result<MasterRef, EditError>`**
+  add an empty master with the next free master ID -> its handle (add shapes with
+  add_shape(Owner::Master(..)))
+- **`fn delete_master(&mut self, master: MasterRef) -> Result<(), EditError>`**
+  delete a master that no shape uses (InUse otherwise)
+- **`fn rename_master(&mut self, master: MasterRef, name: &str, name_u: &str) -> Result<(), EditError>`**
+  rename a master (Name and NameU)
+- **`fn set_master_header(&mut self, master: MasterRef, header: MasterHeader) -> Result<(), EditError>`**
+  set the master's attributes as a whole
+- **`fn add_style(&mut self, name: &str, name_u: &str, based_on: StyleRefs) -> Result<StyleRef, EditError>`**
+  add a style with the next free style ID, based on `based_on` -> its handle
+- **`fn delete_style(&mut self, style: StyleRef) -> Result<(), EditError>`**
+  delete a style nothing refers to (InUse otherwise)
+- **`fn rename_style(&mut self, style: StyleRef, name: &str, name_u: &str) -> Result<(), EditError>`**
+  rename a style (Name and NameU)
+- **`fn set_based_on(&mut self, style: StyleRef, based_on: StyleRefs) -> Result<(), EditError>`**
+  set the styles a style is based on (Cycle when a chain would lead back to it)
+- **`fn update_settings(&mut self, f: impl FnOnce(&mut DocSettings)) -> Result<(), EditError>`**
+  change the document settings (snap, glue, protection, default styles ...)
+- **`fn set_themes(&mut self, themes: Vec<Theme>) -> Result<(), EditError>`**
+  replace the document's theme parts (JD11: a design applied brings its part); pages
+  keep their Page::theme indices, so a caller that removes a part fixes those first
+
+**`impl Transaction<'_>`**
+
+- **`fn insert_row(&mut self, sheet: SheetRef, sk: SecKey, at: RowKey, kind: Option<&str>) -> Result<RowKey, EditError>`**
+  insert a row of the sheet's own into an indexed section at `at` (an Index; past the
+  last row: after it): the rows from there on move one down (IX + 1) and the references
+  to them in the sheet's formulas follow; an inherited section is made the sheet's own
+  first (see above) -> the key of the new row.  `kind` is the row type (Geometry:
+  "LineTo" ...)
+- **`fn remove_row(&mut self, sheet: SheetRef, sk: SecKey, key: RowKey) -> Result<(), EditError>`**
+  take a row out of an indexed section: the rows after it move one up (IX - 1), the
+  references to them follow and references to the row itself become its values; an
+  inherited section is made the sheet's own first
+- **`fn set_row_kind(&mut self, sheet: SheetRef, sk: SecKey, key: RowKey, kind: &str) -> Result<(), EditError>`**
+  change the type (T) of a row the sheet has (Geometry: "MoveTo", "LineTo" ...); an
+  inherited row gets an entry of the sheet's own that names the type
+
+### `diagram_core/src/formula/color.rs`
+
+Source: [`lib/diagram_core/src/formula/color.rs`](../lib/diagram_core/src/formula/color.rs)
+
+```text
+color -- colours as formulas see them: indices of the document's colour table and RGB, the
+HSL scale of 0..240, and the tint and shade functions (FX-08)
+
+  Color::Index(n) / Color::Rgb(r, g, b)     V writes an index as a number, RGB as "#rrggbb"
+  Color::parse("#4d1e1a")
+  rgb_to_hsl(r, g, b) -> (h, s, l)          0..240 each, Windows' ColorRGBToHLS (HLSMAX 240)
+  hsl_to_rgb(h, s, l)                       its inverse (ColorHLSToRGB), integer rounding
+  tint / shade / tone / blend / mso_tint / mso_shade
+
+The 24 built-in indices are Visio's default colour table; a document's Colors element
+(ColorEntry IX RGB) overrides them, and indices past 23 exist only there.
+```
+
+- **`enum Color`**
+  a colour value
+  - `Index(u32)` -- an index into the document's colour table (0 black, 1 white ...)
+  - `Rgb(u8, u8, u8)` -- red, green, blue
+
+**`impl Color`**
+
+- **`fn parse(text: &str) -> Option<Color>`**
+  "#rrggbb" (any case) as an RGB colour
+- **`fn hex(r: u8, g: u8, b: u8) -> String`**
+  "#rrggbb" in lower case, as Visio writes V
+
+- **`fn rgb_to_hsl(r: u8, g: u8, b: u8) -> (i32, i32, i32)`**
+  RGB -> hue, saturation, luminosity on 0..240 (Windows ColorRGBToHLS)
+
+- **`fn hsl_to_rgb(h: i32, s: i32, l: i32) -> (u8, u8, u8)`**
+  hue, saturation, luminosity on 0..240 -> RGB (Windows ColorHLSToRGB); out-of-range
+  arguments are clamped
+
+### `diagram_core/src/formula/engine.rs`
+
+Source: [`lib/diagram_core/src/formula/engine.rs`](../lib/diagram_core/src/formula/engine.rs)
+
+```text
+engine -- recalculation over the cells of a document (FX-02, FX-04)
+
+  let mut eng = Engine::new();                 one engine per document
+  let res = eng.calculate(&doc);               every formula, in dependency order; nothing
+                                               written (res.write(&mut tx) does)
+  eng.recalc(&mut tx, &sheets)                 after an edit in tx: the cells of these sheets
+                                               (stale ones included) and all that depend on
+                                               them, results written into tx (undo keeps them)
+  eng.recalc_cells(&mut tx, &cells)            the same for single cells
+  eng.refresh(&doc, &change.sheets())          after undo/redo: dependencies again
+  eng.user_set(&mut tx, sheet, addr, input)    a user's change: GUARD, SETATREF redirection
+  eng.run_action(&mut tx, sheet, addr)         an action or event cell: SETF and effects
+  eng.evaluate(&doc, sheet, addr)              one cell with stored inputs
+
+Nothing is recalculated on its own: opening a file computes nothing (PLAN.md, "Fallen").  A
+formula that cannot be computed here -- an unknown function, a glue helper, a cycle -- keeps
+its stored value and is reported (Keep); a value is written only with the formula it
+belongs to.
+
+Dependencies are recorded while formulas run: every cell a formula reads (also the ones
+THEMEVAL, PAR or TEXTWIDTH read behind the scenes, and the master or style cell an
+inherited formula comes from) becomes an edge.  The first recalc builds the graph with a
+full calculation; later ones follow the edges from the changed sheets.  Formulas are pulled
+in: a cell that reads another cell not computed yet computes that one first (depth-limited;
+a cell met again while it is being computed is a cycle and gives its stored value).
+```
+
+- **`struct NodeKey`**
+  a cell of a sheet as a sortable key
+  - `sheet: SheetRef` -- the sheet
+  - `sec: Option<SecKey>` -- the section (None: a single cell)
+  - `row: Option<RowKey>` -- the row (None: a single cell or a cell of the section itself)
+  - `cell: Sym` -- the cell name
+
+**`impl NodeKey`**
+
+- **`fn new(sheet: SheetRef, addr: &CellAddr) -> NodeKey`**
+  the key of a cell
+- **`fn addr(&self) -> CellAddr`**
+  the cell address
+
+- **`enum Effect`**
+  what an action asks for besides changing formulas (SETF is done by the engine itself);
+  the app carries them out -- or not: a RUNADDON the app does not know, a macro, CALLTHIS
+  are reported, never run
+  - `SetFormula(Target, String)` -- SETF: give the cell this formula (the engine applies it)
+  - `OpenTextWindow(SheetRef)` -- OPENTEXTWIN(): edit the shape's text
+  - `OpenShapeSheet(SheetRef)` -- OPENSHEETWIN(): show the shape's ShapeSheet
+  - `OpenGroup(SheetRef)` -- OPENGROUPWIN(): open the group in its own window
+  - `GotoPage(String)` -- GOTOPAGE(name)
+  - `Hyperlink(String, String)` -- HYPERLINK(address, sub-address)
+  - `PlaySound(String)` -- PLAYSOUND(file or sound name)
+  - `Command(i64)` -- DOCMD(n): one of Visio's command numbers, for the app to map to its own commands
+  - `AddOn(String)` -- RUNADDON(name): the app runs its own counterpart when it has one (e.g. the shape data
+    dialog), else reports it
+  - `Refused(String)` -- RUNMACRO, CALLTHIS: foreign code, never run (FX-15)
+
+- **`enum Outcome`**
+  how a cell came out
+  - `Value(Val)` -- computed
+  - `Kept(Keep)` -- not computed: the stored value stays
+
+- **`trait TextMetrics`**
+  the size of text in the app's fonts
+  - `fn measure(&self, text: &str, font: &str, size: f64, max_width: Option<f64>) -> (f64, f64)`
+    (width, height) in inches of `text` in `font` at `size` (inches); lines break at
+    `max_width` when given, and at line breaks
+
+- **`struct Estimate`**
+  the estimate used without the app's fonts: 0.45 em a character, lines of 1.2 em
+
+- **`struct Results`**
+  the result of a calculation
+  - `cells: Vec<(SheetRef, CellAddr, Outcome)>` -- every computed or kept cell in the order computed
+  - `cycles: Vec<(SheetRef, CellAddr)>` -- cells met while being computed (cycles); they used their stored value
+
+**`impl Results`**
+
+- **`fn get(&self, sheet: SheetRef, addr: &CellAddr) -> Option<&Outcome>`**
+  the outcome of one cell
+- **`fn write(&self, tx: &mut Transaction) -> Result<usize, EditError>`**
+  write every result that differs from the stored value into the transaction (cells
+  that inherit their formula get an F="Inh" cell); -> the number of cells written
+
+- **`struct Recalc`**
+  what a recalculation did
+  - `computed: usize` -- cells computed
+  - `written: usize` -- cells whose stored value changed
+  - `kept: Vec<(SheetRef, CellAddr, Keep)>` -- cells that kept their stored value, and why
+  - `cycles: usize` -- cells in cycles
+
+```rust
+/// the protection cells ([MS-VSDX] Protection section, SS-15)
+LOCKS: &[&str] = &[ "LockWidth", "LockHeight", "LockAspect", "LockMoveX", ...
+```
+
+- **`enum Input<'a>`**
+  a user's change of a cell (Engine::user_set)
+  - `Value(Value, Option<Unit>)` -- a value in internal units, shown in the unit
+  - `Length(f64, Unit)` -- a length or angle in a unit (25 mm)
+  - `Formula(&'a str)` -- a formula
+
+- **`struct Engine`**
+  the formula engine of one document
+
+**`impl Engine`**
+
+- **`fn new() -> Engine`**
+  an engine with the text estimate
+- **`fn with_metrics(metrics: Rc<dyn TextMetrics>) -> Engine`**
+  an engine that measures text with the app's fonts
+- **`fn reset(&mut self)`**
+  forget everything (the document was replaced, or its themes changed)
+- **`fn themes_changed(&mut self)`**
+  forget the parsed theme parts (JD11: a design was applied or a part replaced); the
+  caller recalculates the sheets that use them
+- **`fn calculate(&mut self, doc: &Document) -> Results`**
+  compute every formula of the document (nothing is written; Results::write does);
+  this also records the dependencies later recalculations follow
+- **`fn evaluate(&mut self, doc: &Document, sheet: SheetRef, addr: &CellAddr) -> Outcome`**
+  compute one cell from the stored values of its inputs (nothing else is recomputed)
+- **`fn evaluate_text(&mut self, doc: &Document, sheet: SheetRef, addr: &CellAddr, text: &str) -> Result<Outcome, ParseError>`**
+  evaluate a formula text for a cell without storing anything (the formula editor's
+  preview); inputs as stored
+- **`fn recalc(&mut self, tx: &mut Transaction, sheets: &[SheetRef]) -> Result<Recalc, EditError>`**
+  recompute after an edit: the formula cells of these sheets (Change::sheets(); stale
+  cells among them) and every cell that depends on them; results go into `tx`
+- **`fn recalc_cells(&mut self, tx: &mut Transaction, cells: &[(SheetRef, CellAddr)]) -> Result<Recalc, EditError>`**
+  recompute these cells and every cell that depends on them
+- **`fn refresh(&mut self, doc: &Document, sheets: &[SheetRef])`**
+  after undo or redo (the stored values are right again): record the dependencies of
+  the cells of these sheets anew
+- **`fn locks(&mut self, doc: &Document, sheet: SheetRef) -> Vec<&'static str>`**
+  the protection cells of a sheet (SS-15) that are set, with inheritance: "LockWidth",
+  "LockMoveX", "LockThemeColors" ... -- gestures (JD7) and applying a theme (JD11) ask
+  them; a direct change in the ShapeSheet does not
+- **`fn guarded(&mut self, doc: &Document, sheet: SheetRef, addr: &CellAddr) -> bool`**
+  whether the effective formula of a cell is protected against the user's edits
+  (GUARD around it)
+- **`fn theme_guarded(&mut self, doc: &Document, sheet: SheetRef, addr: &CellAddr) -> bool`**
+  whether the formula keeps its value when a theme or style is applied (THEMEGUARD
+  around it, or GUARD)
+- **`fn user_set(&mut self, tx: &mut Transaction, sheet: SheetRef, addr: &CellAddr, input: Input) -> Result<Recalc, EditError>`**
+  a user's change of a cell (a gesture or a dialog): a guarded formula refuses it
+  (EditError::Guarded); a formula with SETATREF keeps its formula and the change goes to
+  the cells SETATREF names; then everything that depends on it is recomputed
+- **`fn run_action(&mut self, tx: &mut Transaction, sheet: SheetRef, addr: &CellAddr) -> Result<Vec<Effect>, EditError>`**
+  run an action or event cell (Actions.Row_1.Action, EventDblClick ...): SETF changes
+  formulas in `tx`, also guarded ones (then dependents are recomputed); the other effects
+  are for the app
+- **`fn graph_size(&mut self) -> (usize, usize)`**
+  the number of cells in the dependency graph (for tests and statistics)
+
+- **`fn sheet_formula_cells(doc: &Document, s: SheetRef) -> Vec<NodeKey>`**
+  the cells of one sheet whose value comes from a formula: its own cells with a formula
+  (also F="Inh") and the cells it inherits a formula for from master shapes and styles
+
+- **`fn all_sheets(doc: &Document) -> Vec<SheetRef>`**
+  every sheet of the document: the document sheet, styles, pages, masters, the shapes of
+  masters and pages
+
+- **`fn formula_cells(doc: &Document) -> Vec<NodeKey>`**
+  every cell of the document whose value comes from a formula (sheet_formula_cells of all
+  sheets)
+
+### `diagram_core/src/formula/eval.rs`
+
+Source: [`lib/diagram_core/src/formula/eval.rs`](../lib/diagram_core/src/formula/eval.rs)
+
+```text
+eval -- evaluating a parsed formula for one cell of one sheet (FX-02, FX-03)
+
+Ev holds what a formula needs while it runs: the document, the engine's run (results so far,
+themes, text metrics, the effects an action collects), the sheet and cell it is evaluated
+for, and the sheet whose cell holds the formula text.  The last two differ for inherited
+formulas: a master shape's formula runs in the instance's context (Width is the instance's
+Width), and its Sheet.N references name shapes of the master, which the instance has under
+other IDs -- they are mapped to the instance's subshape with MasterShape = N.
+
+Arithmetic works on internal units (the parser converted "10 mm"), so units need no work
+here.  Errors propagate through operators and functions; IF, AND, OR and the like evaluate
+only what they need.
+```
+
+- **`enum Keep`**
+  why a formula's value cannot be computed here (the stored value stays and the cell is
+  marked)
+  - `Parse(super::parse::ParseError)` -- the formula does not parse
+  - `Unknown(String)` -- it calls a function the engine does not know (the first such name)
+  - `NotComputed(&'static str)` -- it calls a function the engine knows but does not compute here (glue helpers,
+    add-ons, macros, values that depend on the machine: fonts, random numbers)
+  - `Reference` -- it names a section the engine does not know
+  - `Deep` -- its inputs nest deeper than the engine follows at once
+
+### `diagram_core/src/formula/math.rs`
+
+Source: [`lib/diagram_core/src/formula/math.rs`](../lib/diagram_core/src/formula/math.rs)
+
+```text
+math -- the float functions formulas need, without std and without libm
+
+Accurate to a few units in the last place over the ranges drawings use (angles of a few
+turns, lengths up to kilometres): range reduction, then series on a small interval.  The
+engine compares results with the values Visio stored, so plain truncated series that lose
+digits are not good enough; these keep about 15 significant digits.
+```
+
+- **`fn floor(x: f64) -> f64`**
+  largest integer not above x
+
+- **`fn ceil(x: f64) -> f64`**
+  smallest integer not below x
+
+- **`fn trunc(x: f64) -> f64`**
+  x without its fraction
+
+- **`fn round(x: f64) -> f64`**
+  x rounded half away from zero
+
+- **`fn sqrt(x: f64) -> f64`**
+  the square root (NaN below 0)
+
+- **`fn pow2(e: i64) -> f64`**
+  2^e for integer e (exact while the result is a normal number)
+
+- **`fn sincos(x: f64) -> (f64, f64)`**
+  sine and cosine
+
+- **`fn sin(x: f64) -> f64`**
+  sine
+
+- **`fn cos(x: f64) -> f64`**
+  cosine
+
+- **`fn tan(x: f64) -> f64`**
+  tangent
+
+- **`fn atan(x: f64) -> f64`**
+  arc tangent
+
+- **`fn atan2(y: f64, x: f64) -> f64`**
+  the angle of (x, y): atan2(y, x) in -pi ..= pi
+
+- **`fn asin(x: f64) -> f64`**
+  arc sine (NaN outside -1..1)
+
+- **`fn acos(x: f64) -> f64`**
+  arc cosine (NaN outside -1..1)
+
+- **`fn exp(x: f64) -> f64`**
+  e^x
+
+- **`fn ln(x: f64) -> f64`**
+  the natural logarithm (NaN below 0, -inf at 0)
+
+- **`fn log10(x: f64) -> f64`**
+  the logarithm to base 10
+
+- **`fn pow(x: f64, y: f64) -> f64`**
+  x to the power y (integer y by repeated squaring, exactly as Visio's ^2 needs)
+
+- **`fn sinh(x: f64) -> f64`**
+  hyperbolic sine, cosine, tangent
+
+- **`fn cosh(x: f64) -> f64`**
+  hyperbolic cosine
+
+- **`fn tanh(x: f64) -> f64`**
+  hyperbolic tangent
+
+- **`fn modulus(x: f64, y: f64) -> f64`**
+  x modulo y with the sign of y (Visio's MODULUS); NaN for y = 0
+
+### `diagram_core/src/formula/parse.rs`
+
+Source: [`lib/diagram_core/src/formula/parse.rs`](../lib/diagram_core/src/formula/parse.rs)
+
+```text
+parse -- the universal formula syntax of a ShapeSheet cell into a small tree (FX-01)
+
+  parse("IF(Width>10 mm,Height*0.5,1 in)") -> Ok(Parsed) / Err(ParseError { pos, kind })
+  p.refs()                 the cell references as written (CellRef: sheet part + cell part)
+  p.functions()            the functions it calls (Func; Func::Unknown keeps the name)
+
+What the syntax has ([MS-VSDX] universal syntax, as the files write it):
+* numbers with an optional unit right after them ("180DEG", "0.25DL", "10 mm", "1.5E-3IN");
+  the value is kept in internal units (inches, radians, days), so "10 mm" is 0.3937...;
+  "60%" is 0.6 (% is a postfix operator, also after a bracket)
+* strings in double quotes, "" inside is one quote; TRUE and FALSE; error values (#REF! ...)
+* operators, loosest first ([MS-VSDX] 2.5.2): = <>, then < <= > >=, & (text), + -, * /, ^,
+  unary - and + (so -2^2 is 4); all left to right; % after a number ("60%" is 0.6; the
+  parser also takes it after a bracket)
+* references: Width, Geometry1.X2, Geometry1.NoFill, Char.Size, Char.Size[2], Para.HorzAlign,
+  Prop.Name, Prop.Name.Format, User.Name, User.Name.Prompt, Scratch.X1, Controls.Row_1,
+  Controls.Row_1.Y, Connections.X1, Connections.Name.Y, Actions.Row_1.Action; with a sheet in
+  front: Sheet.5!Width, ThePage!PageScale, TheDoc!DocLangID, Pages[Page-1]!Sheet.3!Width,
+  Masters[Name]!Width, Masters[Name]!Sheet.5!Width, Styles[Normal]!LineColor,
+  'Some name'!Width and Name.7!Width (a shape by its NameU)
+* function calls, also with a sheet in front (Sheet.5!SheetRef()); an empty argument is
+  allowed (SETATREF(User.X,,1)); unknown names parse as Func::Unknown
+
+Errors carry the byte position where the parser stopped.  Nothing here needs a document: the
+engine binds the names to a document's string table once per formula text.
+```
+
+- **`enum ParseErrorKind`**
+  why a formula did not parse
+  - `BadChar` -- a character that starts nothing
+  - `UnexpectedEnd` -- the formula ended in the middle of an expression
+  - `Unexpected` -- a token where it does not fit
+  - `Unclosed` -- a "(" or "[" without its closing bracket
+  - `UnclosedString` -- a string without its closing quote
+  - `BadNumber` -- a number that does not parse
+  - `BadReference` -- a reference that does not parse (Sheet.x!, Geometry.X1 ...)
+  - `Trailing` -- text after the end of the expression
+  - `TooComplex` -- the formula nests too deep or is too long
+
+- **`struct ParseError`**
+  a formula that did not parse, with the byte position where it stopped
+  - `pos: usize` -- byte offset into the formula text
+  - `kind: ParseErrorKind` -- what went wrong
+
+- **`enum BinOp`**
+  binary operators
+  - `Add` -- +
+  - `Sub` -- -
+  - `Mul` -- \*
+  - `Div` -- /
+  - `Pow` -- ^
+  - `Concat` -- & (text concatenation)
+  - `Eq` -- =
+  - `Ne` -- &lt;>
+  - `Lt` -- &lt;
+  - `Gt` -- >
+  - `Le` -- &lt;=
+  - `Ge` -- >=
+
+- **`enum SheetName`**
+  the sheet part of a reference (in front of "!")
+  - `Local` -- none: the sheet the formula belongs to
+  - `Call(u32)` -- the sheet a function gives (CONTAINERSHEETREF(1,"Swimlane")!User.visHeadingText): the
+    node of the call
+  - `Id(u32)` -- Sheet.5!: the shape with this ID on the same page or in the same master
+  - `Named(Box<str>)` -- a shape by its NameU ("Name.7!", "'My name'!")
+  - `ThePage` -- ThePage!: the page sheet (in a master: the master's page sheet)
+  - `TheDoc` -- TheDoc!: the document sheet
+  - `Page(Box<str>, Option<u32>)` -- Pages[name]! with an optional Sheet.N! after it
+  - `Master(Box<str>, Option<u32>)` -- Masters[name]! (the master's page sheet) with an optional Sheet.N! after it
+  - `Style(Box<str>)` -- Styles[name]!
+
+- **`enum CellPart`**
+  the cell part of a reference
+  - `None` -- no cell: the sheet itself (Sheet.5!SheetRef())
+  - `Single(Box<str>)` -- a single cell: Width, PinX, EventXFMod, TheText
+  - `Section { section: &'static str, index: u32, cell: Box<str>, }` -- a cell of a section itself: Geometry1.NoFill (section index 0-based)
+  - `Indexed { section: &'static str, index: u32, row: u32, cell: Box<str>, }` -- a cell of an indexed row: Geometry1.X2, Connections.X1, Char.Size, Scratch.A1
+  - `Named { section: &'static str, row: Box<str>, cell: Box<str>, }` -- a cell of a named row: User.Name, Prop.Name.Format, Controls.Row_1.Y
+  - `Unknown(Box<str>)` -- a dotted name of a section the engine does not know, as written
+
+- **`struct CellRef`**
+  a reference as written: sheet part and cell part
+  - `sheet: SheetName` -- the sheet
+  - `cell: CellPart` -- the cell
+
+- **`struct Parsed`**
+  a parsed formula
+
+**`impl Parsed`**
+
+- **`fn refs(&self) -> &[CellRef]`**
+  the references in the order they are written
+- **`fn functions(&self) -> impl Iterator<Item = Func> + '_`**
+  the functions called, in the order they are written (with repeats)
+- **`fn func_name(&self, f: Func) -> &str`**
+  the name of a function call (also of an unknown one)
+- **`fn unknown(&self) -> impl Iterator<Item = &str> + '_`**
+  the names of the unknown functions it calls
+- **`fn top_is(&self, f: Func) -> bool`**
+  whether the whole formula is a call of `f` (GUARD(...), THEMEGUARD(...), SETATREF(...))
+- **`fn calls(&self, f: Func) -> bool`**
+  whether the formula calls `f` anywhere
+- **`fn constant(&self) -> Option<f64>`**
+  whether the formula is a plain number (with or without unit), and which
+
+- **`fn cell_part(name: &str, bracket: Option<u32>) -> Option<CellPart>`**
+  the cell part of a dotted name ("Geometry1.X2", "User.Name.Prompt", "Width") with an
+  optional [n] after it; None when the name does not fit a section's form
+
+- **`fn unit_code(code: &str) -> Option<Unit>`**
+  the unit of a code as written after a number ("MM", "mm", "Deg"); None: not a unit
+
+- **`fn parse(text: &str) -> Result<Parsed, ParseError>`**
+  parse a formula in the universal syntax
+
+### `diagram_core/src/formula/theme.rs`
+
+Source: [`lib/diagram_core/src/formula/theme.rs`](../lib/diagram_core/src/formula/theme.rs)
+
+```text
+theme -- THEMEVAL and its relatives over the document's themes (FX-08, TH-01)
+
+A document keeps its theme parts as a pool (Document::themes); a sheet picks five parts of
+them by number ([MS-VSDX] 2.2.7.4): ColorSchemeIndex the colour scheme, FontSchemeIndex the
+font scheme, EffectSchemeIndex the format scheme (fill, line and effect style lists),
+ConnectorSchemeIndex the connector scheme, ThemeIndex the theme as a whole -- each the
+component whose vt:schemeID schemeEnum has that number, in any part.  65534 means "the
+page's value", 0 no theme (also when any of the five is 0; a master has no page, so its
+shapes are unthemed).
+
+Within the components the shape's quick style cells choose: QuickStyleLineColor /
+FillColor / ShadowColor / FontColor a colour (0 dk1, 1 lt1, 2..7 accent1..6, 8 background,
+100..106 the variant colours of VariationColorIndex), QuickStyleLineMatrix / FillMatrix /
+EffectsMatrix / FontMatrix an entry of the style lists (1..6; 100..103 the variant style of
+VariationStyleIndex; 0 the root style sheet).  A DrawingML style colours its placeholder
+(phClr) with the chosen colour, through the modifiers it carries (lumMod, satMod, tint ...).
+
+  THEMEVAL()               the theme's value for the cell it stands in: V stores "Themed"
+  THEMEVAL(name [,dflt])   a named value (colours, line, fill, shadow, font properties);
+                           unthemed: dflt, else the "No Theme" colour or the root style's
+                           cell; numbers name quick style colours (THEMEVAL(QuickStyleFillColor))
+  THEMEPROP("MultiFormat" | "Embellishment"), ISTHEMED(), CELLISTHEMED(b), THEMERESTORE(x)
+
+Settled in JD11 (jd11-research-estimates.md: [MS-VSDX], Office's notes, a Visio 16 file
+with computed theme values): FillColor2 is the fill colour slice itself, without the fill
+style's transforms (also for gradients); Visio's vt:lineStyles lists lead with an entry for
+matrix 0 (the root style's), so matrix i reads entry i; the "Connector..." names choose the
+scheme as the "Line..." ones do; cap rnd 0, flat 1, sq 2, a missing cap is flat; compound
+sng 0, dbl 1, thickThin 2, thinThick 3, tri 4; colour transforms chain in floating point and
+round once.  Still estimated: text takes the minor font (the major one when the minor is
+empty; Visio's own themes have both equal).  design::apply applies themes.
+```
+
+- **`struct Theme`**
+  a theme part read for formulas: its element tree and the components it carries
+  - `tree: Tree` -- the element tree
+
+**`impl Theme`**
+
+- **`fn parse(data: &[u8]) -> Theme`**
+  read a theme part
+- **`fn scheme_ids(&self) -> [Option<u32>; 5]`**
+  the scheme numbers of its components: the theme (vt:themeScheme), the colours, the
+  format scheme (vt:fmtSchemeEx), the connector scheme, the fonts -- in the order of the
+  cells ThemeIndex, ColorSchemeIndex, EffectSchemeIndex, ConnectorSchemeIndex,
+  FontSchemeIndex
+
+### `diagram_core/src/formula/val.rs`
+
+Source: [`lib/diagram_core/src/formula/val.rs`](../lib/diagram_core/src/formula/val.rs)
+
+```text
+val -- what a formula computes: typed values and how they meet cells (FX-02)
+
+  Val::Num(f64)              a number in internal units (inches, radians, days); TRUE is 1
+  Val::Str / Color / Point / Err / Themed / Shape / Font / Target / Missing
+  val.to_cell(cell name) -> (Value, Option<CellError>) text   what V stores for it
+  Val::from_value(value, error, strings)   a stored V read back as a Val
+
+The stored forms (as Visio writes V): numbers as numbers, an RGB colour "#rrggbb", a colour
+index as a number, a theme result "Themed", NURBS(...)/POLYLINE(...) as their text, a point
+as its X or Y depending on the cell (PNT in BeginX gives x), strings as they are.  An error
+leaves V alone and sets E.
+```
+
+- **`struct Target`**
+  a cell or sheet as a value (GetRef, SheetRef(), SETATREF targets)
+  - `sheet: SheetRef` -- the sheet
+  - `addr: Option<CellAddr>` -- the cell (None: the sheet itself)
+
+- **`enum Val`**
+  a computed value
+  - `Num(f64)` -- a number in internal units; also truth values (1, 0)
+  - `Str(Rc<str>)` -- a string
+  - `Color(Color)` -- a colour
+  - `Point(f64, f64)` -- a point (PNT, PAR, LOC)
+  - `Err(CellError)` -- an error value
+  - `Themed(Rc<Val>)` -- a value that comes from the theme: V stores "Themed", formulas use the value inside
+  - `Shape(Rc<str>)` -- a NURBS(...) or POLYLINE(...) result as V writes it
+  - `Font(Rc<str>)` -- a font (FONT("Calibri")): a Font cell stores the name
+  - `Target(Target)` -- a reference to a cell or sheet
+  - `Missing` -- an empty argument
+
+- **`enum Axis`**
+  which coordinate of a point a cell takes
+  - `X` -- X, BeginX, PinX, LocPinX, TxtPinX, XDyn ... (also the default)
+  - `Y` -- Y, BeginY, PinY, YDyn ...
+
+**`impl Axis`**
+
+- **`fn of(cell: &str) -> Axis`**
+  the axis of a cell name: Y when the name has a Y and no X
+
+**`impl Val`**
+
+- **`fn bool(b: bool) -> Val`**
+  a truth value
+- **`fn str(s: &str) -> Val`**
+  a string value
+- **`fn plain(&self) -> &Val`**
+  the value without its Themed wrapper
+- **`fn is_err(&self) -> bool`**
+  whether it is an error value
+- **`fn err(&self) -> Option<CellError>`**
+  the error, if it is one
+- **`fn from_value(value: Value, error: Option<&str>, strings: &Strings) -> Val`**
+  a stored value read back (E set: the error; "Themed" stays text here, the engine
+  computes what is behind it)
+- **`fn num(&self, axis: Axis) -> Result<f64, CellError>`**
+  the number of a value for arithmetic (a point gives the axis' coordinate)
+- **`fn text(&self) -> Result<String, CellError>`**
+  the text of a value (numbers in their shortest form, colours as "#rrggbb")
+- **`fn stored(&self, cell: &str) -> Stored`**
+  what V stores for this result in cell `cell` -> (V as text or number, error); None
+  value: keep V as it is
+
+- **`enum Stored`**
+  what a result stores in V
+  - `Num(f64)` -- a number
+  - `Text(String)` -- a text ("#rrggbb", "Themed", a string, NURBS(...))
+  - `Error(CellError)` -- an error: V stays, E is set
+
+**`impl Stored`**
+
+- **`fn matches(&self, value: Value, error: Option<&str>, strings: &Strings, tol: f64) -> bool`**
+  whether a stored V (with its E) equals this result: numbers within `tol` relative
+  (and 1e-12 absolute), texts exactly (colours in any case)
+
+- **`fn close(a: f64, b: f64, tol: f64) -> bool`**
+  whether two numbers agree within `tol` relative or 1e-12 absolute
+
+### `diagram_core/src/formula/xml.rs`
+
+Source: [`lib/diagram_core/src/formula/xml.rs`](../lib/diagram_core/src/formula/xml.rs)
+
+```text
+xml -- a small element tree of a theme part (DrawingML with Visio's extensions)
+
+Theme parts are a few dozen kilobytes of attributes; the engine reads colours, fonts and
+style lists from them.  This reader keeps elements (local names, attributes, children) and
+drops text, comments, processing instructions and the DOCTYPE; it refuses nothing: what it
+cannot read ends the tree there.  Limits: 200 000 elements, depth 256.
+```
+
+- **`struct Elem`**
+  one element: its local name (prefix removed), attributes (local names) and children
+  - `name: String` -- the name without prefix
+  - `attrs: Vec<(String, String)>` -- the attributes without prefixes, values with entities decoded
+  - `children: Vec<u32>` -- the children (indices into Tree::elems)
+
+- **`struct Tree`**
+  a parsed part
+  - `elems: Vec<Elem>` -- all elements; 0 is the root when the part had one
+
+**`impl Tree`**
+
+- **`fn parse(data: &[u8]) -> Tree`**
+  read a part (UTF-8; a BOM is skipped)
+- **`fn get(&self, i: u32) -> Option<&Elem>`**
+  an element
+- **`fn child(&self, i: u32, name: &str) -> Option<u32>`**
+  the first child of `i` named `name`
+- **`fn children<'a>(&'a self, i: u32, name: &'a str) -> impl Iterator<Item = u32> + 'a`**
+  the children of `i` named `name`
+- **`fn path(&self, i: u32, names: &[&str]) -> Option<u32>`**
+  the element at a path of names below `i` (each step the first match)
+- **`fn find(&self, i: u32, name: &str) -> Option<u32>`**
+  the first element named `name` anywhere below `i` (depth first)
+- **`fn attr(&self, i: u32, name: &str) -> Option<&str>`**
+  an attribute of `i`
+
+### `diagram_core/src/geometry.rs`
+
+Source: [`lib/diagram_core/src/geometry.rs`](../lib/diagram_core/src/geometry.rs)
+
+```text
+geometry -- the Geometry sections of a shape as paths, and the transforms of shapes (JD4)
+
+  Xform                            an affine map (x, y) -> (a x + c y + e, b x + d y + f)
+  Path { subs } / Sub { start, segs, closed } / Seg::Line | Seg::Cubic
+                                   paths of straight lines and cubic Bézier curves: every row
+                                   type ends up as one of the two (arcs and ellipses as cubic
+                                   pieces of at most 90 degrees, NURBS and splines exactly as
+                                   Bézier pieces where they are polynomial, else sampled)
+  doc.geometry_paths(sheet, w, h)  the Geometry sections of a sheet with their flags (NoFill,
+                                   NoLine, NoShow, NoSnap) and paths in local coordinates
+  doc.local_xform(sheet)           local -> parent: Pin, LocPin, Angle, FlipX, FlipY
+  doc.page_xform(shape)            local -> page: the chain of groups up to the page
+  round_corners(path, r)           the Rounding cell: corners between straight lines rounded
+  nurbs_segments / parse_args      NURBS(...) and POLYLINE(...) values as the file keeps them
+
+Everything comes from the cached values (V) through inheritance (doc.resolve): nothing is
+recalculated (PLAN.md, "Fallen").  Local coordinates: inches, the origin at the bottom left
+corner of the shape's box, y up.  The row types follow [MS-VSDX] (Geometry section):
+MoveTo, LineTo, ArcTo (bow A: positive turns counter-clockwise, the arc's middle lies right
+of the chord), EllipticalArcTo (through the control point A, B; C the angle of the major
+axis, D major over minor), Ellipse (centre X, Y; ends of the two axes A, B and C, D),
+NURBSTo (E = NURBS(knotLast, degree, xType, yType, x, y, knot, weight, ...): the current
+point is the first control point with knot C and weight D, X, Y the last with knot A and
+weight B; type 0 means a fraction of Width / Height), PolylineTo (A = POLYLINE(xType, yType,
+x, y, ...)), SplineStart / SplineKnot, InfiniteLine (drawn 1000 inches each way), and the
+relative rows RelMoveTo, RelLineTo, RelCubBezTo, RelQuadBezTo, RelEllipticalArcTo in
+fractions of Width and Height.  Visio fills only closed sub-paths (end = start).
+
+A shape's transform to its parent (MS-VSDX, "Shape Transform"): move the local pin to the
+origin, flip (FlipX mirrors x, FlipY mirrors y), turn by Angle, move to the pin -- the pin
+lies in the parent's coordinates (the page, or the group's local ones).
+```
+
+- **`struct Xform`**
+  an affine map: (x, y) -> (a x + c y + e, b x + d y + f)
+  - `a: f64`
+  - `b: f64`
+  - `c: f64`
+  - `d: f64`
+  - `e: f64`
+  - `f: f64`
+
+**`impl Xform`**
+
+- **`const IDENTITY: Xform = Xform { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: 0.0, f: 0.0 }`**
+- **`const fn translate(x: f64, y: f64) -> Xform`**
+- **`const fn scale(sx: f64, sy: f64) -> Xform`**
+- **`fn rotate(angle: f64) -> Xform`**
+  a turn by `angle` radians, counter-clockwise (y up)
+- **`fn then(&self, next: &Xform) -> Xform`**
+  first `self`, then `next`
+- **`fn apply(&self, p: [f64; 2]) -> [f64; 2]`**
+- **`fn apply_vec(&self, v: [f64; 2]) -> [f64; 2]`**
+  a direction (without the translation)
+- **`fn det(&self) -> f64`**
+- **`fn inverse(&self) -> Option<Xform>`**
+  the inverse (None: singular)
+- **`fn angle(&self) -> f64`**
+  the angle the x axis is turned to (radians, counter-clockwise)
+- **`fn scale_factor(&self) -> f64`**
+  how much lengths grow (the square root of |det|)
+
+- **`enum Seg`**
+  a piece of a sub-path: to a point, or a cubic Bézier curve (two control points, the end)
+  - `Line([f64; 2])`
+  - `Cubic([f64; 2], [f64; 2], [f64; 2])`
+
+**`impl Seg`**
+
+- **`fn end(&self) -> [f64; 2]`**
+
+- **`struct Sub`**
+  a sub-path: a start and pieces end to end; closed when it ends where it starts
+  - `start: [f64; 2]`
+  - `segs: Vec<Seg>`
+  - `closed: bool`
+
+**`impl Sub`**
+
+- **`fn end(&self) -> [f64; 2]`**
+- **`fn map(&self, m: &Xform) -> Sub`**
+  the same under a transform
+- **`fn reversed(&self) -> Sub`**
+  the same run backwards
+- **`fn hull(&self) -> [f64; 4]`**
+  the box of its points and control points (x0, y0, x1, y1)
+- **`fn flatten(&self, per_curve: usize, out: &mut Vec<[f64; 2]>)`**
+  the points along it, curves cut into `per_curve` straight pieces
+
+- **`struct Path`**
+  a path: sub-paths drawn together (filled even-odd)
+  - `subs: Vec<Sub>`
+
+**`impl Path`**
+
+- **`fn map(&self, m: &Xform) -> Path`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn hull(&self) -> Option<[f64; 4]>`**
+  the box of all points and control points (None: no points)
+
+- **`struct GeoSection`**
+  one Geometry section of a shape: its flags and its sub-paths in local coordinates
+  - `index: u32` -- IX of the section (Geometry1 is 0)
+  - `no_fill: bool`
+  - `no_line: bool`
+  - `no_show: bool`
+  - `no_snap: bool`
+  - `path: Path`
+
+```rust
+/// how far an infinite line is drawn each way (inches)
+INFINITE: f64 = 1000.0
+```
+
+**`impl Document`**
+
+- **`fn geometry_paths(&self, sheet: SheetRef, w: f64, h: f64) -> Vec<GeoSection>`**
+  the Geometry sections `sheet` really has (inherited ones included, deleted ones left out)
+  with their rows as paths in local coordinates; `w` and `h` are the shape's Width and
+  Height (the relative rows and the relative points of NURBS and POLYLINE need them)
+- **`fn local_xform(&self, sheet: SheetRef) -> Xform`**
+  the transform of a shape's local coordinates to its parent's (the page, or the local
+  coordinates of its group): T(Pin) R(Angle) Flip T(-LocPin)
+- **`fn page_xform(&self, shape: ShapeRef) -> Xform`**
+  the transform of a shape's local coordinates to its page's (or master's): its own,
+  then those of the groups around it
+
+- **`fn arc_cubics(c: [f64; 2], r: f64, start: f64, sweep: f64, out: &mut Vec<Seg>)`**
+  a circular arc (centre, radius, start angle, sweep in radians, positive counter-clockwise)
+  as cubic pieces of at most 90 degrees
+
+- **`fn parse_args(text: &str, name: &str) -> Option<Vec<f64>>`**
+  the numbers of a NURBS(...) or POLYLINE(...) value (None: not that function, or a part that
+  is no number)
+
+- **`struct Nurbs`**
+  a B-spline (rational where the weights differ) on a full knot vector
+  - `degree: usize`
+  - `points: Vec<[f64; 2]>`
+  - `weights: Vec<f64>`
+  - `knots: Vec<f64>`
+
+**`impl Nurbs`**
+
+- **`fn valid(&self) -> bool`**
+  degree 1 to 9, a positive weight per point, n + degree + 1 knots that do not fall
+- **`fn segments(&self, out: &mut Vec<Seg>)`**
+  the curve as pieces: exact cubic Béziers for a clamped polynomial spline of degree 1 to
+  3 (knots inserted until every piece is a Bézier), else straight pieces sampled on every
+  knot span; the first piece starts at the curve's start
+- **`fn at(&self, t: f64) -> [f64; 2]`**
+  the point at parameter t (de Boor, in homogeneous coordinates)
+
+- **`fn round_corners(path: &Path, r: f64) -> Path`**
+  the corners between two straight pieces rounded with radius r (the Rounding cell; at most
+  half of each piece is taken), in every sub-path
+
+- **`fn cubic_at(p0: [f64; 2], p1: [f64; 2], p2: [f64; 2], p3: [f64; 2], t: f64) -> [f64; 2]`**
+  the point of a cubic Bézier curve at t
+
+### `diagram_core/src/glue.rs`
+
+Source: [`lib/diagram_core/src/glue.rs`](../lib/diagram_core/src/glue.rs)
+
+```text
+glue -- connection points, glue and the dynamic connector (CN-01..05, CN-12, CN-15)
+
+  connection_points(doc, shape) -> Vec<ConnPoint>   the Connection rows on the page: point,
+                                   direction (into the shape, as DirX/DirY mean it), Type
+  glued(doc, shape) -> [Target; 2]  what Begin and End are glued to (the Connect entries)
+  ends(doc, shape)                 Begin and End on the page
+  is_one_d / is_connector          a 1-D shape / one that routes (ObjType routable)
+  style(doc, shape) -> Style       right angle, straight or curved (its cells, else the page's)
+  path(doc, shape) -> points       the drawn way on the page (curves flattened)
+  glue(tx, eng, shape, end, at, to)          put an end at `at` and glue it (Target::None: free)
+  new_connector(tx, eng, owner, (at, to), (at, to)) / new_line(..)   new 1-D shapes
+  dependents(doc, owner, &moved)   the 1-D shapes glued to these shapes (or moved with them)
+  update(tx, eng, &shapes)         their ends follow, connectors route again (one gesture)
+  reset(tx, eng, &connectors)      route again, also where ConFixedCode keeps the way
+  set_style(tx, eng, &connectors, style)
+  detach(tx, eng, owner, &deleted) before deleting shapes: glue to them becomes constants
+
+Every point here is on the page in drawing units (y up); the cells hold the connector's
+parent coordinates (the page, or its group's local ones), the Geometry rows its local ones.
+
+The file's record of glue (CN-15), as Visio writes it ([MS-VSDX] Connect_Type and the cells
+of the 1-D Endpoints, Glue Info and Shape Layout sections; checked against Visio's own files):
+* static glue of Begin to connection point k (row IX k-1) of shape N:
+    BeginX, BeginY = PAR(PNT(Sheet.N!Connections.Xk,Sheet.N!Connections.Yk))
+    BegTrigger = _XFTRIGGER(Sheet.N!EventXFMod)
+    Connect FromSheet=<id> FromCell=BeginX FromPart=9 ToSheet=N ToCell=Connections.Xk
+            ToPart=100+k-1
+  (End: EndX, EndY, EndTrigger, FromCell=EndX, FromPart=12)
+* dynamic glue (to the whole shape): BeginX, BeginY = _WALKGLUE(BegTrigger,EndTrigger,
+  WalkPreference), EndX, EndY = _WALKGLUE(EndTrigger,BegTrigger,WalkPreference), the trigger as
+  above, Connect ToCell=PinX ToPart=3; the engine cannot compute _WALKGLUE, so the value comes
+  from here (Transaction::set_result, the formula stays)
+* a free end: a constant, its trigger _XFTRIGGER(EventXFMod); one Connect per glued end.
+The static formulas the engine computes itself: after the target moved, its recalculation has
+moved the end already; update() asks it again and then routes.
+
+The dynamic connector (ObjType 2 = routable, GlueType 2 = walking glue allowed) keeps its box
+on the line from Begin to End: PinX = GUARD((BeginX+EndX)/2), Width = GUARD(EndX-BeginX),
+LocPinX = GUARD(Width*0.5), Angle = GUARD(0DA), y alike; a side shorter than 5 mm becomes
+GUARD(+-0.19685039370079DL) as in Visio's files.  Its way is one Geometry section: MoveTo at
+Begin, a LineTo per corner, the last at End, constants in local coordinates (the curved style:
+MoveTo and one NURBSTo over the corners).  Controls.TextPosition goes to the middle of the
+way.  Rows of a master keep their indices where their type fits; else they get a Del mark
+and new rows follow.
+
+Dynamic glue docks in the middle of a side of the target, on its outline (the farthest point
+of its geometry on the line through its middle), on the side that gives the cheapest way
+among the obstacles (length + bends; one search over the sides of both ends, route::best);
+where the other end lies within a side's reach, the point straight opposite it is offered
+too (Visio's files show such straight connections).  The straight style docks where the line
+between the two ends leaves the outline.  Obstacles are the boxes of the page's top-level
+shapes that are not 1-D (route.rs keeps the page's LineToNodeX/Y as clearance, else 1/8 in).
+ConFixedCode 1 and 2 (reroute manually / never) keep the corners and only move the first and
+last pieces; reset() routes them anew.
+
+Nothing happens on its own: opening a file routes nothing, only the shapes handed to update.
+```
+
+- **`struct ConnPoint`**
+  a connection point of a shape on the page
+  - `row: u32` -- IX of its row (Connections.X&lt;row + 1>)
+  - `at: [f64; 2]` -- where it is on the page
+  - `dir: Option<[f64; 2]>` -- DirX/DirY turned onto the page, unit length: the direction the point faces into the
+    shape (a connector arrives along it, a route leaves against it); None: 0, 0
+  - `kind: u8` -- Type: 0 inward, 1 outward, 2 both
+
+- **`enum Target`**
+  what an end of a 1-D shape is glued to
+  - `None` -- nothing: a free end
+  - `Point { shape: ShapeRef, row: u32, }` -- a connection point (static glue): the shape and the IX of its Connection row
+  - `Shape(ShapeRef)` -- the whole shape (dynamic glue)
+
+- **`enum End`**
+  an end of a 1-D shape
+  - `Begin` -- BeginX, BeginY
+  - `End` -- EndX, EndY
+
+- **`enum Style`**
+  how a dynamic connector draws its way
+  - `RightAngle` -- right angles around obstacles (the default)
+  - `Straight` -- one straight line
+  - `Curved` -- a curve over the corners of the right-angle way
+
+- **`fn connection_points(doc: &Document, shape: ShapeRef) -> Vec<ConnPoint>`**
+  the connection points of a shape (its Connection rows with inheritance) on the page
+
+- **`fn is_one_d(doc: &Document, shape: ShapeRef) -> bool`**
+  whether the shape is 1-D (it has BeginX)
+
+- **`fn is_connector(doc: &Document, shape: ShapeRef) -> bool`**
+  whether the shape is a dynamic connector: 1-D and routable (ObjType has the routable flag)
+
+- **`fn ends(doc: &Document, shape: ShapeRef) -> Option<([f64; 2], [f64; 2])>`**
+  Begin and End of a 1-D shape on the page
+
+- **`fn glued(doc: &Document, shape: ShapeRef) -> [Target; 2]`**
+  what Begin and End are glued to, from the Connect entries of the page or master (glue to
+  something else -- a guide, a vertex -- reads as None)
+
+- **`fn style(doc: &Document, shape: ShapeRef) -> Style`**
+  how a dynamic connector draws its way: ConLineRouteExt 2 curved, ShapeRouteStyle 2 or 16
+  straight, else right angles; 0 asks the page (LineRouteExt, RouteStyle)
+
+- **`fn path(doc: &Document, shape: ShapeRef) -> Vec<[f64; 2]>`**
+  the drawn way of a shape on the page: the first shown Geometry section, curves flattened
+
+- **`fn glue(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, end: End, at: [f64; 2], to: Target) -> Result<(), EditError>`**
+  put an end of a 1-D shape at `at` (page coordinates) and glue it to `to`: a connection
+  point (static: PAR(PNT(..)) formulas), a whole shape (dynamic, connectors and walking glue
+  only: \_WALKGLUE), or nothing (constants); the Connect entries of the end are replaced.  A
+  dynamic connector routes again.  Invalid: not 1-D, a target on another page or inside the
+  shape, dynamic glue for a plain line; NoRow: no such connection point
+
+- **`fn dependents(doc: &Document, owner: Owner, moved: &[ShapeRef]) -> Vec<ShapeRef>`**
+  the 1-D shapes to update after these shapes moved (or were resized, turned ...): the ones
+  glued to them or to shapes inside them, and glued ones among them; in Connect order
+
+- **`fn detach(tx: &mut Transaction, eng: &mut Engine, owner: Owner, deleted: &[ShapeRef]) -> Result<(), EditError>`**
+  before shapes are deleted: the glue of other shapes to them (or to shapes inside them)
+  ends -- the glued cells keep their values as constants, triggers point to the shape itself,
+  the Connect entries go (Transaction::delete_shapes removes the deleted shapes' own)
+
+- **`fn new_connector(tx: &mut Transaction, eng: &mut Engine, owner: Owner, begin: ([f64; 2], Target), end: ([f64; 2], Target)) -> Result<ShapeRef, EditError>`**
+  add a dynamic connector on a page or in a master (no master shape: every cell of its own,
+  the style "Connector" when the document has one) from `begin` to `end` (page coordinates)
+  glued to the targets, routed -> its handle.  On an error the transaction holds what was
+  done so far: drop it
+
+- **`fn new_line(tx: &mut Transaction, eng: &mut Engine, owner: Owner, begin: ([f64; 2], Target), end: ([f64; 2], Target)) -> Result<ShapeRef, EditError>`**
+  add a straight line (1-D, not routed: CN-12) from `begin` to `end`, glued to connection
+  points (Target::Shape is refused: lines glue statically); its Geometry follows Width, so it
+  keeps its form when an end moves -> its handle
+
+- **`fn update(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef]) -> Result<(), EditError>`**
+  after a gesture: the ends of these 1-D shapes follow what they are glued to (static ends
+  through the engine, dynamic ones dock anew) and dynamic connectors route again; lines keep
+  their form.  Only these shapes change
+
+- **`fn reset(tx: &mut Transaction, eng: &mut Engine, connectors: &[ShapeRef]) -> Result<(), EditError>`**
+  "Verbinder zurücksetzen": route these connectors anew with few bends, also the ones whose
+  way ConFixedCode keeps
+
+- **`fn set_style(tx: &mut Transaction, eng: &mut Engine, connectors: &[ShapeRef], style: Style) -> Result<(), EditError>`**
+  give these connectors a style (ShapeRouteStyle and ConLineRouteExt: right angle 1/1,
+  straight 16/1, curved 1/2) and route them anew
+
+### `diagram_core/src/hit.rs`
+
+Source: [`lib/diagram_core/src/hit.rs`](../lib/diagram_core/src/hit.rs)
+
+```text
+hit -- hit tests on a page's display list: the shape under a point, shapes in a rectangle (JD7)
+
+  hit::at(&drawing, p, tol) -> Option<Hit>   the topmost shape drawn under p
+  hit::all_at(&drawing, p, tol) -> Vec<Hit>  every shape drawn under p, topmost first, each
+                                   once (the subselection in groups goes down this list)
+  hit::in_rect(&drawing, r, whole) -> Vec<ShapeRef>   the top-level shapes wholly inside r
+                                   (whole) or touching it, in z-order (FEATURES ZF-06)
+  hit::top_boxes(&drawing) -> Vec<(ShapeRef, [f64; 4])>   each top-level shape's box, in
+                                   z-order (alignment guides, selection frames)
+  hit::item_at(&item, p, tol) / item_box(&item)   one item: under p?  its exact box
+  Hit { shape, top, item }         the shape drawn (a subshape too), its top-level shape
+                                   (what a click selects), the item's index
+
+Everything works on render::Drawing: paper inches, y up, the origin at the page's bottom
+left corner (the app maps its pixels there: 96 DIP per inch, y down); `tol` is in paper
+inches.  Only the page's own shapes count: the items of its background pages (their shapes
+belong to another page) and shadows are never hit.  Under a point means: inside a fill
+(even-odd; curves cut into straight pieces within a hundredth of the tolerance, at least
+1e-4 in), within half its width plus tol of a line (a hairline: tol), inside a text's runs
+(each from the descent to the ascent, grown by tol), inside a picture's rectangle where the
+shape's box keeps it.  Line ends count with their line, a text background as text.
+A box (item_box) is the geometry's without the line width, a text's runs, a picture's
+visible part; a top-level shape's box is that of its geometry and line ends, of its texts
+where it has no geometry.  The drawing's grid (Drawing::query) finds the candidates: a test
+looks at the items near the point or rectangle, not at the whole page.
+```
+
+- **`struct Hit`**
+  a shape under a point
+  - `shape: ShapeRef` -- the shape the item draws (a subshape of a group too)
+  - `top: ShapeRef` -- its top-level shape: what a click selects
+  - `item: u32` -- the item's index in the drawing
+
+- **`fn at(d: &Drawing, p: [f64; 2], tol: f64) -> Option<Hit>`**
+  the topmost shape drawn under p
+
+- **`fn all_at(d: &Drawing, p: [f64; 2], tol: f64) -> Vec<Hit>`**
+  every shape drawn under p, the topmost first, each shape once (its topmost item)
+
+- **`fn in_rect(d: &Drawing, r: [f64; 4], whole: bool) -> Vec<ShapeRef>`**
+  the top-level shapes of the page wholly inside r (x0, y0, x1, y1; whole) or touching it
+  (not whole), in z-order; a shape that draws nothing is never inside
+
+- **`fn top_boxes(d: &Drawing) -> Vec<(ShapeRef, [f64; 4])>`**
+  the box of each top-level shape of the page that draws something, in z-order: its
+  geometry's and line ends' (without the line width), its texts' where it has no geometry
+
+- **`fn item_at(it: &Item, p: [f64; 2], tol: f64) -> bool`**
+  whether one item is drawn under p (see the module comment)
+
+- **`fn item_box(it: &Item) -> [f64; 4]`**
+  an item's exact box: the geometry's without the line width, a text's runs, a picture's
+  visible part
+
+### `diagram_core/src/inherit.rs`
+
+Source: [`lib/diagram_core/src/inherit.rs`](../lib/diagram_core/src/inherit.rs)
+
+```text
+inherit -- reading cells with inheritance: shape -> master shape -> styles -> default
+
+  doc.resolve(sheet, &addr) -> Resolved   the formula's origin and source cell, the value
+  doc.rows(sheet, sec) -> Vec<EffRow>     the rows a section really has: inherited ones,
+                                          overridden ones and own ones, minus deleted ones
+  doc.section_indices(sheet, name)        which Geometry sections (indices) a shape has
+  doc.parent_sheet(sheet, category)       the next sheet on the way up
+
+The way up from a sheet (FX-03, MS-10, [MS-VSDX] Style-to-Shape Inheritance):
+* a shape asks first its own style of the cell's category when it names one itself
+  (LineStyle for line cells, FillStyle for fill and effect cells, TextStyle for text);
+* otherwise the master shape (instances and their subshapes); the master shape then follows
+  the same rules, so its styles come after it;
+* a shape without master asks its style of the category, cells without category end there;
+* a style asks the style it is based on for that category; pages, masters' pages and the
+  document ask their LineStyle/FillStyle/TextStyle;
+* at the end the cell has its default (Origin::Default; the document's "No Style" style is
+  normally the last style of every chain and holds real values).
+A cell with F="Inh" on the way gives the value (its sheet's own result) but not the formula;
+the search goes on for the formula.  A row or section with Del="1" on the way ends the
+search: Origin::Deleted.  Rows are matched by IX or N, sections by name and index.  The way
+is at most 64 sheets long (a cycle of styles or masters in a broken file ends there).
+```
+
+- **`struct Resolved<'d>`**
+  a cell read with inheritance
+  - `origin: Origin` -- where the formula comes from
+  - `source: Option<SheetRef>` -- the sheet whose cell holds the formula (None: default or deleted)
+  - `cell: Option<&'d Cell>` -- that cell
+  - `cached: Option<&'d Cell>` -- the nearest cell on the way, which holds the value for the asked sheet (an F="Inh"
+    cell of the sheet itself, else the source cell)
+
+**`impl<'d> Resolved<'d>`**
+
+- **`fn value(&self) -> Value`**
+  the value for the asked sheet
+- **`fn num(&self) -> Option<f64>`**
+  the value as a number
+- **`fn formula(&self) -> Formula`**
+  the formula (Formula::Absent when the source cell is a constant or there is none)
+- **`fn unit(&self) -> Option<Unit>`**
+  the unit the value is shown in
+- **`fn error(&self) -> Option<Sym>`**
+  the error state of the value
+- **`fn exists(&self) -> bool`**
+  whether the cell exists for the sheet (not default, not deleted)
+
+- **`struct EffRow`**
+  a row a section really has (Document::rows)
+  - `key: RowKey` -- IX or N
+  - `kind: Option<Sym>` -- the row type (T), from the nearest sheet that names it
+  - `origin: Origin` -- where the row comes from: Local when only the asked sheet has it
+  - `local: bool` -- whether the asked sheet has an entry for it (own row or override)
+
+**`impl Document`**
+
+- **`fn category(&self, addr: &CellAddr) -> Option<Category>`**
+  the category of the cell at `addr` (which style it inherits from)
+- **`fn parent_sheet(&self, sheet: SheetRef, cat: Option<Category>) -> Option<SheetRef>`**
+  the next sheet up from `sheet` for a cell of this category
+- **`fn resolve(&self, sheet: SheetRef, addr: &CellAddr) -> Resolved<'_>`**
+  the cell at `addr` for `sheet`, with inheritance
+- **`fn value_of(&self, sheet: SheetRef, cell: &str) -> Value`**
+  the value of a single cell (PinX, Width ...) for `sheet`, with inheritance
+- **`fn rows(&self, sheet: SheetRef, sec: SecKey) -> Vec<EffRow>`**
+  the rows section `sec` really has for `sheet`: inherited, overridden and own rows
+  without the deleted ones; indexed rows by rising index, named rows in the order the
+  master shape or style has them, then the own ones
+- **`fn has_row(&self, sheet: SheetRef, sec: SecKey, key: RowKey) -> bool`**
+  whether section `sec` has row `key` for `sheet` (inherited or own, not deleted)
+- **`fn section_indices(&self, sheet: SheetRef, name: Sym) -> Vec<u32>`**
+  the indices of the sections named `name` that `sheet` really has (Geometry1 is 0)
+- **`fn has_section(&self, sheet: SheetRef, sec: SecKey) -> bool`**
+  whether `sheet` has section `sec` (inherited or own, not deleted)
+- **`fn is_guarded(&self, sheet: SheetRef, addr: &CellAddr) -> bool`**
+  whether the effective formula at `addr` is guarded (GUARD(...) at its top): edits of
+  the user leave it alone (FX-04; the engine of JD6 knows the rest)
+- **`fn geometry(&self, sheet: SheetRef) -> Vec<SecKey>`**
+  the Geometry sections of a sheet as keys
+
+- **`fn guarded(formula: &str) -> bool`**
+  whether a formula text is GUARD(...) as a whole
+
+### `diagram_core/src/instance.rs`
+
+Source: [`lib/diagram_core/src/instance.rs`](../lib/diagram_core/src/instance.rs)
+
+```text
+instance -- masters from stencils onto pages (JD9): a master taken into a document, an
+instance of it dropped on a page, the texts of masters and stencils in five languages
+
+  LANGS, lang_index("fr")            de en es it fr: the order of every five-language value
+  join_fields(&[..]) / split_fields(text)   the '|'-separated values of a JFD_ cell
+                                     ("\|" and "\\" escape)
+  MasterTexts::of(&doc, master)      names, QuickInfos, keywords, text and translated cells in
+                                     five languages, the quick flag (JFD_ cells of the master's
+                                     page sheet; a master without them: Name, Prompt and
+                                     ShapeKeywords for every language)
+    texts.name(lang) / matches(&words, any)   the name shown, the search (NameU, the names in
+                                     all five languages, the keywords)
+  StencilTexts::of(&doc)             a stencil's title in five languages and its category
+                                     (User.JFD_Name, User.JFD_Category of the document sheet)
+  import_master(&mut tx, &src, m) -> MasterRef   master m of document src in tx's document:
+                                     the copy already there with the same UniqueID (MS-02),
+                                     else a new copy: strings into this document's table,
+                                     styles matched by NameU (missing ones copied with their
+                                     bases), masters its shapes are instances of first,
+                                     pictures of package parts inline
+  move_master(&mut tx, m, pos)      a master to another place in the order (own stencils)
+  place(&mut tx, page, master, x, y, lang) -> ShapeRef   an instance at (x, y) inches on the
+                                     page (y up): Name in language lang, NameU the master's
+                                     (LG-04; "Rechteck.7" when the page has one already), its
+                                     text and translated cells in that language
+
+The JFD_ cells are JFDiagrammer's own (apps/JFDiagrammer/stencils/README.md); diagram_io's
+stencil builder writes them, the Shapes panel reads them.  Visio keeps them as ordinary User
+cells.  The caller recalculates after place (formula::Engine::recalc with the new shapes'
+sheets) inside the same transaction, so undo takes the drop back as one step.
+```
+
+```rust
+/// the five languages, in the order of every five-language value
+LANGS: [&str; 5] = ["de", "en", "es", "it", "fr"]
+/// User cells of a stencil's document sheet and of a master's page sheet (README of the stencils)
+JFD_NAME: &str = "JFD_Name"
+/// the QuickInfos of a master
+JFD_PROMPT: &str = "JFD_Prompt"
+/// the search words of a master, per language separated by commas
+JFD_KEYWORDS: &str = "JFD_Keywords"
+/// the text a master's instance carries
+JFD_TEXT: &str = "JFD_Text"
+/// 1: the master is a quick shape of its stencil (MS-04)
+JFD_QUICK: &str = "JFD_Quick"
+/// the category of a stencil in "Weitere Shapes"
+JFD_CATEGORY: &str = "JFD_Category"
+/// JFD_Tr1, JFD_Tr2 ...: "Section.Row.Cell|de|en|es|it|fr" for translated cells of the master shape
+JFD_TR: &str = "JFD_Tr"
+```
+
+- **`fn lang_index(code: &str) -> Option<usize>`**
+  the position of a language code in LANGS
+
+- **`fn join_fields(values: &[&str]) -> String`**
+  values joined with '|' ('|' and '\\' escaped with '\\')
+
+- **`fn split_fields(text: &str) -> Vec<String>`**
+  the values of a '|'-joined text
+
+- **`struct MasterTexts`**
+  the texts of a master in five languages
+  - `name_u: String` -- NameU: the key (LG-04)
+  - `names: [String; 5]` -- the names shown, by LANGS
+  - `prompts: [String; 5]` -- the QuickInfos
+  - `keywords: [String; 5]` -- the search words, comma separated
+  - `text: Option<[String; 5]>` -- the text an instance carries
+  - `translated: Vec<(String, [String; 5])>` -- translated cells of the master shape: "Section.Row.Cell" and its five texts
+  - `quick: bool` -- a quick shape of its stencil (MS-04)
+
+**`impl MasterTexts`**
+
+- **`fn of(doc: &Document, m: MasterRef) -> MasterTexts`**
+  the texts of master `m` (empty for a master that is not there)
+- **`fn name(&self, lang: usize) -> &str`**
+  the name in language `lang` (index into LANGS), else the first one there, else NameU
+- **`fn prompt(&self, lang: usize) -> &str`**
+  the QuickInfo in language `lang`
+- **`fn matches(&self, words: &[&str], any: bool) -> bool`**
+  whether the master matches the search words (lower case expected): all of them
+  (any = false) or one of them, each a part of NameU, of a name in any language or of a
+  keyword (SL-04)
+
+- **`fn fold(s: &str) -> String`**
+  a text in lower case without the accents of the five languages (search ignores both)
+
+- **`struct StencilTexts`**
+  the texts of a stencil
+  - `names: [String; 5]` -- the title in five languages (empty: the stencil has none; the app takes its file name)
+  - `category: String` -- the category in "Weitere Shapes" ("" when none)
+
+**`impl StencilTexts`**
+
+- **`fn of(doc: &Document) -> StencilTexts`**
+  the texts of the stencil `doc`
+- **`fn name(&self, lang: usize) -> &str`**
+  the title in language `lang`, else the first one there ("" when none)
+
+- **`fn import_master(tx: &mut Transaction, src: &Document, m: MasterRef) -> Result<MasterRef, EditError>`**
+  master `m` of document `src` in the document of `tx`: the copy already there with the same
+  UniqueID, else a new copy (see the head of this file)
+
+- **`fn place(tx: &mut Transaction, page: PageRef, master: MasterRef, x: f64, y: f64, lang: usize) -> Result<ShapeRef, EditError>`**
+  drop an instance of `master` at (x, y) inches on `page` (MS-02, LG-04): Name in language
+  `lang` (an index into LANGS), NameU the master's, unique on the page with ".ID" like Visio;
+  the text and translated cells in that language where they differ from the master's
+
+- **`fn base64(data: &[u8]) -> String`**
+  base64 (RFC 4648, with padding)
+
+- **`fn move_master(tx: &mut Transaction, m: MasterRef, pos: usize) -> Result<(), EditError>`**
+  move master `m` to position `pos` among the masters (a stencil's order: MS-04, SL-07);
+  a master in use by shapes of the document stays where it is (InUse)
+
+### `diagram_core/src/names.rs`
+
+Source: [`lib/diagram_core/src/names.rs`](../lib/diagram_core/src/names.rs)
+
+```text
+names -- the section, row and cell names the model itself refers to, and the style categories
+
+  names::PIN_X ...                 (crate) fixed Syms: every Strings table starts with them
+  Category::of(section, cell)      which style a cell inherits from: line, fill (with the
+                                   effects) or text; None: only from the master shape
+
+The categories follow the public format description [MS-VSDX] ("Style-to-Shape Inheritance",
+"Line Properties", "Fill Properties", "Effect Properties", "Text"): LineStyle carries the
+line cells and the LineGradient section, FillStyle the fill and effect cells and the
+FillGradient section, TextStyle the Character, Paragraph and Tabs sections and the text block
+cells.  The theme cells (ThemeIndex, ColorSchemeIndex ...) and the quick style cells have no
+category there; shapes take them from the document's "Theme" style, so they go with fill
+(the line and font quick style cells with line and text) -- an assumption the files cannot
+test, since every style in them names one style for all three (JD6).
+```
+
+- **`enum Category`**
+  which style sheet a cell inherits from (the style attributes LineStyle, FillStyle, TextStyle)
+  - `Line` -- LineStyle: line cells and the LineGradient section
+  - `Fill` -- FillStyle: fill and effect cells (shadow, bevel, glow, reflection, soft edges, sketch,
+    3D rotation) and the FillGradient section
+  - `Text` -- TextStyle: the Character, Paragraph and Tabs sections and the text block cells
+
+**`impl Category`**
+
+- **`fn of(section: Option<&str>, cell: &str) -> Option<Category>`**
+  the category of a cell; `section` is the name of its section (None: a single cell)
+- **`fn of_section(section: &str) -> Option<Category>`**
+  the category of a whole section (None: rows come only from the master shape)
+
+- **`fn named_rows(section: &str) -> bool`**
+  whether rows of this section are named (N) rather than indexed (IX), after [MS-VSDX] Row_Type
+
+### `diagram_core/src/ops.rs`
+
+Source: [`lib/diagram_core/src/ops.rs`](../lib/diagram_core/src/ops.rs)
+
+```text
+ops -- the editing gestures on shapes: move, size, turn, flip, pin, control points, vertices,
+groups, z-order, new shapes, text, copy and paste (JD7: SP-03..07, TX-01, TX-03, DM-02)
+
+  frame(doc, shape) -> Frame          where a shape is: local -> page, Width, Height
+  Frame::corners / bounds / centre / grip(gx, gy) / drag(gx, gy, to, keep_aspect)
+  bounds(doc, shapes)                 the box of a selection on the page
+  locks(eng, doc, shape) -> Locks     the protection cells that are set (Locks::MOVE_X ...)
+  move_shapes(tx, eng, shapes, d)     2D: the pin; 1D: BeginX/Y, EndX/Y of the free ends
+  set_frame(tx, eng, shape, &frame)   size and place, same turn (the eight grips)
+  scale_shapes(tx, eng, shapes, from, to)   a selection from one box into another
+  rotate_shapes(tx, eng, shapes, centre, angle) / flip_shapes(tx, eng, shapes, horizontal)
+  set_pin(tx, eng, shape, at)         the pin to another place, the shape stays
+  controls / set_control              the yellow control points (SP-04)
+  vertices / set_vertex / insert_vertex / delete_vertex     Geometry rows (SP-05)
+  group(tx, eng, owner, shapes) / ungroup(tx, eng, group)   (SP-06)
+  reorder(tx, shapes, Z::Front | Back | Forward | Backward) (SP-07)
+  new_shape(tx, eng, owner, Basic::Rectangle | Ellipse | TextBox, a, b)
+  set_text(tx, eng, shape, text) / text_frame / set_text_frame   (TX-01, TX-03)
+  copy(doc, shapes) -> Clip / paste(tx, eng, owner, &clip, offset)
+
+Every position is on the page in drawing units (PinX of a top-level shape as the file has
+it), y up; local coordinates have their origin at the bottom left of the shape's box.  A
+gesture runs inside the caller's transaction and becomes one undo step (DM-02):
+
+  let mut tx = doc.transaction("Verschieben");
+  ops::move_shapes(&mut tx, &mut eng, &sel, [dx, dy])?;
+  let conns = glue::dependents(tx.doc(), owner, &sel);
+  glue::update(&mut tx, &mut eng, &conns)?;
+  let change = tx.commit();            after undo/redo: eng.refresh(&doc, &change.sheets())
+
+How cells are written (as Visio writes them):
+* A value the user gives goes through the rules of a user's edit (Engine::user_set): a GUARD
+  formula refuses it and the cell is left alone (the gesture goes on without it), SETATREF
+  sends it on; the formula engine recomputes what depends on it once per step.
+* A formula of the proportional form keeps its form: a subshape's PinX "Sheet.7!Width*0.25"
+  becomes "Sheet.7!Width*<new k>", a LocPinX "Width*0.5" becomes "Width*<k>", a vertex
+  "Width*1" "Width*<k>".  Anything else becomes a constant.
+* Sizes first, then the pin: the local pin follows its own formula (mostly Width*0.5), and
+  the pin goes where the frame puts the local pin.
+* The protection cells are asked per shape (a formula is evaluated): LockMoveX/Y keep that
+  part of a move away, LockWidth/LockHeight keep a side, LockAspect the proportions,
+  LockRotate leaves a shape out of a turn, LockBegin/LockEnd keep an end of a 1D shape on a
+  resize; what only makes sense unlocked is refused with EditError::Invalid (text with
+  LockTextEdit, vertices with LockVtxEdit, ungrouping with LockGroup).
+* Glued ends of a 1D shape (a Connect entry with FromCell BeginX or EndX) are not moved here:
+  glue::update routes them.
+
+The transform of a shape (MS-VSDX "Shape Transform"; geometry.rs and formula/geom.rs use the
+same): parent = Pin + R(Angle) Flip (local - LocPin), and a subshape continues through its
+groups up to the page.  Flipping a turned shape changes its angle: a mirror M times R(a)
+equals R(-a) times M, so a horizontal flip toggles FlipX and makes the angle 2φ - a + 180°
+(φ the direction of the mirror line in the parent's coordinates, 90° on the page: -a), a
+vertical flip toggles FlipY and makes it 2φ - a.
+```
+
+- **`struct Frame`**
+  where a shape is: its local coordinates to the page and its size (a box from (0, 0) to
+  (w, h) in local coordinates; the transform is rigid, flips included)
+  - `xf: Xform` -- local -> page
+  - `w: f64` -- Width
+  - `h: f64` -- Height
+
+**`impl Frame`**
+
+- **`fn from_box(b: [f64; 4]) -> Frame`**
+  an upright box on the page (x0, y0, x1, y1)
+- **`fn at(&self, p: [f64; 2]) -> [f64; 2]`**
+  a local point on the page
+- **`fn local(&self, p: [f64; 2]) -> Option<[f64; 2]>`**
+  a page point in local coordinates (None: a degenerate transform)
+- **`fn corners(&self) -> [[f64; 2]; 4]`**
+  the corners on the page: (0, 0), (w, 0), (w, h), (0, h)
+- **`fn bounds(&self) -> [f64; 4]`**
+  the upright box around the corners (x0, y0, x1, y1)
+- **`fn centre(&self) -> [f64; 2]`**
+  the middle of the box on the page
+- **`fn grip(&self, gx: i8, gy: i8) -> [f64; 2]`**
+  a grip on the page: gx -1, 0, 1 is the left edge, the middle, the right edge of the
+  local box, gy -1, 0, 1 the bottom, the middle, the top (a flipped shape has its local
+  left edge on the right)
+- **`fn drag(&self, gx: i8, gy: i8, to: [f64; 2], keep_aspect: bool) -> Frame`**
+  the frame after grip (gx, gy) is dragged to the page point `to`: the opposite edges
+  stay, sizes stop at 0; `keep_aspect` (a corner grip, SP-03) scales both sides by the
+  larger factor and keeps the opposite corner
+
+- **`fn frame(doc: &Document, shape: ShapeRef) -> Frame`**
+  where a shape is on its page (cached values, nothing recomputed)
+
+- **`fn bounds(doc: &Document, shapes: &[ShapeRef]) -> Option<[f64; 4]>`**
+  the upright box of shapes on the page: the corners of 2D shapes, the ends of 1D shapes
+
+- **`struct Locks(pub u32)`**
+  the protection cells of a shape that are set (SS-15), one bit per name of formula::LOCKS
+
+**`impl Locks`**
+
+- **`const WIDTH: u32 = 1 << 0`**
+- **`const HEIGHT: u32 = 1 << 1`**
+- **`const ASPECT: u32 = 1 << 2`**
+- **`const MOVE_X: u32 = 1 << 3`**
+- **`const MOVE_Y: u32 = 1 << 4`**
+- **`const ROTATE: u32 = 1 << 5`**
+- **`const BEGIN: u32 = 1 << 6`**
+- **`const END: u32 = 1 << 7`**
+- **`const DELETE: u32 = 1 << 8`**
+- **`const SELECT: u32 = 1 << 9`**
+- **`const FORMAT: u32 = 1 << 10`**
+- **`const TEXT_EDIT: u32 = 1 << 11`**
+- **`const VTX_EDIT: u32 = 1 << 12`**
+- **`const CROP: u32 = 1 << 13`**
+- **`const GROUP: u32 = 1 << 14`**
+- **`const CALC_WH: u32 = 1 << 15`**
+- **`fn has(self, lock: u32) -> bool`**
+  whether a lock (one of the constants) is set
+- **`fn bit(name: &str) -> u32`**
+  the bit of a lock cell's name ("LockWidth" ...; 0: not a lock cell)
+
+- **`fn locks(eng: &mut Engine, doc: &Document, shape: ShapeRef) -> Locks`**
+  the protection cells of a shape that are set, with inheritance and formulas
+
+- **`fn move_shapes(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], d: [f64; 2]) -> Result<(), EditError>`**
+  move shapes by `d` (page): a 2D shape's pin, a 1D shape's free ends (glued ones stay for
+  glue::update); a shape inside another one of the list moves with it; LockMoveX/LockMoveY
+  keep that part of the move away
+
+- **`fn set_frame(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, to: &Frame) -> Result<(), EditError>`**
+  give a shape another size and place with the same turn and flips (`to` from Frame::drag
+  of frame(doc, shape)): Width and Height first, then the pin where the frame puts the local
+  pin; a 1D shape gets its free ends (not glued, no LockBegin/LockEnd) on the frame's line
+  through the local pin.  LockWidth, LockHeight keep a side, LockAspect the proportions
+
+- **`fn scale_shapes(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], from: [f64; 4], to: [f64; 4]) -> Result<(), EditError>`**
+  scale shapes from the page box `from` into `to` (x0, y0, x1, y1; a selection's grips):
+  each shape's middle goes where the boxes map it, its sides grow by how much the boxes
+  stretch them along its own axes (upright shapes exactly, turned ones by their axes); 1D
+  shapes map their ends
+
+- **`fn rotate_shapes(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], centre: [f64; 2], angle: f64) -> Result<(), EditError>`**
+  turn shapes by `angle` (radians, counter-clockwise) about the page point `centre`: Angle
+  grows (falls for a subshape in a mirrored group), the pin turns along; 1D shapes turn
+  their free ends; LockRotate leaves a shape out
+
+- **`fn flip_shapes(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], horizontal: bool) -> Result<(), EditError>`**
+  flip shapes about the middle of their box (`horizontal`: left and right change places):
+  a horizontal flip toggles FlipX, a vertical one FlipY, a turned shape's angle changes
+  with it (see the module comment), the pin is mirrored; a 1D shape mirrors its free ends
+  and toggles FlipY (its local y axis turns over)
+
+- **`fn set_pin(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, at: [f64; 2]) -> Result<(), EditError>`**
+  move the pin of a shape (its centre of rotation) to the page point `at` without moving
+  the shape: LocPinX/LocPinY get the local point (proportional "Width\*k" when their formula
+  has that form), the pin follows
+
+- **`fn group(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[ShapeRef]) -> Result<ShapeRef, EditError>`**
+  group shapes of one parent (SP-06): a new group shape (Type Group, the style "Normal",
+  ResizeMode 0) around the shapes, at the place of the topmost of them in the z-order; the
+  box is the upright hull of the shapes in the parent's coordinates (turned shapes with their
+  turned corners, 1D shapes with their ends).  The shapes move into it in their order and
+  get Visio's formulas for a group that scales its members: PinX "Sheet.&lt;group>!Width\*k",
+  PinY "Sheet.&lt;group>!Height\*k", and for upright members (turned by a multiple of 90°) whose
+  size is a constant Width/Height "Sheet.&lt;group>!Width\*k" (ResizeMode 1 of the member: only
+  the pin); free ends of 1D members alike, glued ends keep their formulas -> the group
+
+- **`fn ungroup(tx: &mut Transaction, eng: &mut Engine, group: ShapeRef) -> Result<Vec<ShapeRef>, EditError>`**
+  take a group apart (SP-06): its members go to the group's parent at the group's place in
+  the z-order, with the group's pin, angle and flips worked into their own; formulas that
+  name the group become their values, glue to the group is let go (Formula -> value, Connect
+  entry gone), the group shape goes -> the former members.  Instances of masters and groups
+  with LockGroup are refused (Invalid)
+
+- **`enum Z`**
+  where shapes go in the z-order among their siblings (SP-07)
+  - `Front` -- on top
+  - `Back` -- below all
+  - `Forward` -- one step up (past the next shape that is not moved too)
+  - `Backward` -- one step down
+
+- **`fn reorder(tx: &mut Transaction, shapes: &[ShapeRef], z: Z) -> Result<(), EditError>`**
+  change the z-order of shapes among their siblings; shapes of several groups move within
+  their own group, moved shapes keep their order among themselves
+
+- **`enum Basic`**
+  the shapes the drawing tools make
+  - `Rectangle` -- the rectangle tool: Geometry RelMoveTo/RelLineTo around the box, style "Normal"
+  - `Ellipse` -- the ellipse tool: one Ellipse row (X Width\*0.5, Y Height\*0.5, A Width\*1, B Height\*0.5,
+    C Width\*0.5, D Height\*1), style "Normal"
+  - `TextBox` -- the text tool: a box without line and fill (style "Text Only", as Visio's text tool
+    gives it; JD11: so that its text keeps the style's dark font style in every design)
+    whose Height follows its text: TEXTHEIGHT(TheText,Width)
+
+- **`fn new_shape(tx: &mut Transaction, eng: &mut Engine, owner: Owner, kind: Basic, a: [f64; 2], b: [f64; 2]) -> Result<ShapeRef, EditError>`**
+  a new shape of a drawing tool between the page points `a` and `b` (the dragged box), on
+  top of the owner's shapes; a box without area is refused (Invalid), except for the text
+  tool, which makes a box 1 inch wide around `a` -> the shape
+
+- **`fn set_text(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, text: Text) -> Result<(), EditError>`**
+  give a shape its own text (TX-01) and recompute what depends on it (TEXTWIDTH,
+  TEXTHEIGHT: a text box's Height, TxtHeight ...); LockTextEdit refuses (Invalid)
+
+- **`fn text_frame(doc: &Document, shape: ShapeRef) -> Frame`**
+  where a shape's text block is (TX-03): the text transform (TxtPinX/Y, TxtLocPinX/Y,
+  TxtAngle inside the shape) to the page and TxtWidth/TxtHeight; cells the shape lacks have
+  Visio's defaults (the whole box, turned 0)
+
+- **`fn set_text_frame(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, to: &Frame) -> Result<(), EditError>`**
+  move and size a shape's text block (TX-03; `to` from Frame::drag of text_frame, same
+  turn): TxtWidth and TxtHeight, then TxtPinX/Y where the frame puts the text's local pin
+  (proportional formulas keep their form); LockTextEdit refuses (Invalid)
+
+### `diagram_core/src/ops/clip.rs`
+
+Source: [`lib/diagram_core/src/ops/clip.rs`](../lib/diagram_core/src/ops/clip.rs)
+
+```text
+ops::clip -- copy and paste of shapes inside the app
+
+  copy(doc, shapes) -> Clip                     the shapes with their subshapes, as top-level
+                                                shapes (a subshape takes its groups'
+                                                transforms into its own cells)
+  paste(tx, eng, owner, &clip, offset)          the copies on a page or in a master, moved by
+                                                `offset` -> the new top-level shapes
+
+Pasted shapes get new IDs; the formulas of the pasted shapes that name a copied shape by
+Sheet.N (or by a NameU that ends in .N) name its copy, Names and NameUs that end in .<old ID>
+end in the new one, UniqueIDs are dropped, the Connect entries between copied shapes come
+along with the new IDs.  Glue to a shape outside the copy is let go: the glued cells keep
+their values as constants, the Connect entry stays behind.  A Clip holds the document's
+string handles and refers to its masters and styles by ID: it pastes into the document it
+was copied from (an app with several documents copies across them through a file format).
+```
+
+- **`struct Clip`**
+  copied shapes (copy), ready to paste
+
+**`impl Clip`**
+
+- **`fn is_empty(&self) -> bool`**
+  whether nothing was copied
+- **`fn len(&self) -> usize`**
+  the number of top-level shapes in it
+- **`fn bounds(&self) -> Option<[f64; 4]>`**
+  the box of the copied shapes on the page where they were copied
+
+- **`fn copy(doc: &Document, shapes: &[ShapeRef]) -> Clip`**
+  copy shapes with their subshapes (shapes inside another one of the list go with it); a
+  subshape becomes a top-level shape with its groups' transforms in its own pin, angle and
+  flips (1D: its ends)
+
+- **`fn paste(tx: &mut Transaction, eng: &mut Engine, owner: Owner, clip: &Clip, offset: [f64; 2]) -> Result<Vec<ShapeRef>, EditError>`**
+  paste copied shapes on a page or in a master (into the document they were copied from),
+  on top of its shapes and moved by `offset` (page) -> the new top-level shapes
+
+### `diagram_core/src/ops/points.rs`
+
+Source: [`lib/diagram_core/src/ops/points.rs`](../lib/diagram_core/src/ops/points.rs)
+
+```text
+ops::points -- control points (SP-04) and vertices (SP-05) of a shape
+
+  controls(doc, shape) -> Vec<Control>         the visible control points on the page
+  set_control(tx, eng, shape, row, at)         a control point dragged to a page point
+  vertices(doc, shape) -> Vec<Vertex>          the points of the Geometry rows on the page
+  set_vertex / insert_vertex / delete_vertex   move one, add one after a row, take one out
+
+A control point is a row of the Controls section: X and Y in local coordinates, XDyn/YDyn
+the point its rubber band starts from, XCon/YCon how it behaves ([MS-VSDX] Controls; the
+Visio constants visCtlProportional 0, visCtlLocked 1, visCtlOffsetMin 2, visCtlOffsetMid 3,
+visCtlOffsetMax 4, the same plus 5 for a hidden point), CanGlue, Prompt (the tip).  Dragging
+writes X and Y the way Visio does (seen in the local files: X "Width*0.6734" for 0,
+"Width-0.217DL" for 4, a BOUND(...) keeps its form and gets the new value as its first
+argument): proportional "Width*k" / "Height*k" for 0, the value for 2, "Width*0.5+dDL" for 3,
+"Width-dDL" for 4; a locked direction stays.  A glued control point (a Connect entry with
+FromCell Controls.<row>) is let go.
+
+Vertices are the end points of the Geometry rows that have one (MoveTo, LineTo, ArcTo,
+EllipticalArcTo, NURBSTo, PolylineTo, the spline rows, the relative rows; not Ellipse and
+InfiniteLine); the last row of a closed sub-path, which repeats its start, is not a vertex of
+its own and moves with the start.  Relative rows keep fractions of Width and Height,
+absolute rows keep the proportional form of their formulas (Visio's "Width*0.5").  Adding and
+taking out a vertex inserts or removes a row in the middle of the section
+(Transaction::insert_row / remove_row: the rows after it are renumbered, formulas follow, an
+instance's inherited section becomes its own).  LockVtxEdit refuses (Invalid).
+```
+
+- **`struct Control`**
+  a control point of a shape
+  - `row: RowKey` -- its row of the Controls section (set_control takes it back)
+  - `name: String` -- the row name (Row_1, TextPosition ...)
+  - `at: [f64; 2]` -- where it is on the page
+  - `anchor: [f64; 2]` -- where its rubber band starts on the page (XDyn, YDyn)
+  - `tip: String` -- the tip (Prompt)
+  - `can_glue: bool` -- whether it can glue to other shapes (CanGlue)
+  - `x_locked: bool` -- whether it cannot move sideways (XCon 1 or 6)
+  - `y_locked: bool` -- whether it cannot move up and down (YCon 1 or 6)
+
+- **`fn controls(doc: &Document, shape: ShapeRef) -> Vec<Control>`**
+  the visible control points of a shape on the page (hidden ones, XCon or YCon 5 to 9, left
+  out)
+
+- **`fn set_control(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, row: RowKey, at: [f64; 2]) -> Result<(), EditError>`**
+  drag a control point (its row from controls()) to the page point `at`: X and Y as Visio
+  writes them for the point's behaviour (see the module comment), the point let go when it
+  was glued
+
+- **`struct Vertex`**
+  a vertex of a shape: Geometry section (0-based index, Geometry1 is 0), row (IX) and where it
+  is on the page
+  - `section: u32` -- the Geometry section's index
+  - `row: u32` -- the row's IX
+  - `at: [f64; 2]` -- where it is on the page
+
+- **`fn vertices(doc: &Document, shape: ShapeRef) -> Vec<Vertex>`**
+  the vertices of a shape on the page, section by section (hidden sections left out)
+
+- **`fn set_vertex(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, section: u32, row: u32, at: [f64; 2]) -> Result<(), EditError>`**
+  move a vertex to the page point `at`; the start of a closed sub-path takes its closing row
+  along
+
+- **`fn insert_vertex(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, section: u32, after: u32, at: [f64; 2]) -> Result<u32, EditError>`**
+  add a vertex at the page point `at` after row `after` (on the segment to the next row):
+  a LineTo (RelLineTo among relative rows) at IX after + 1 -> its IX
+
+- **`fn delete_vertex(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, section: u32, row: u32) -> Result<(), EditError>`**
+  take a vertex out; at the start of a sub-path the next vertex becomes the start (and the
+  closing row of a closed one goes there); a sub-path keeps at least two vertices (Invalid)
+
+### `diagram_core/src/page.rs`
+
+Source: [`lib/diagram_core/src/page.rs`](../lib/diagram_core/src/page.rs)
+
+```text
+page -- pages, masters and styles: the containers of sheets and shapes
+
+  Page { header, sheet, shapes, connects, theme, extras, contents_extras, part }
+  PageHeader { id, name, name_u, background, back_page, sheet_styles, attrs ... }
+  Master { header, sheet, icon, shapes, connects, extras, contents_extras, part }
+  MasterHeader { id, name, name_u, base_id, unique_id, sheet_styles, attrs ... }
+  Style { header, sheet, extras }  StyleHeader { id, name, name_u, based_on, attrs ... }
+  Connect { from_sheet, from_cell, from_part, to_sheet, to_cell, to_part }
+  attr(&attrs, name) -> Option<Sym>   one of the attributes kept as written
+
+A foreground page names its background page by the background's page ID (back_page); a
+background page can have one of its own.  A master's content is a page of its own with
+shapes; a stencil is a document of masters without pages.  The attributes the model works
+with are fields, every other attribute stays in `attrs` in file order (ViewScale,
+ViewCenterX, Prompt, IconSize, PatternFlags ...), read with attr().
+Connect rows are the file's record of glue (CN-15): which cell of which shape (FromSheet,
+FromCell, FromPart) is glued to which part of which other shape (ToSheet, ToCell, ToPart);
+the sheets are shape IDs of the same page or master.
+```
+
+- **`fn attr(attrs: &[(Sym, Sym)], name: Sym) -> Option<Sym>`**
+  the value of an attribute kept as written
+
+- **`struct Connect`**
+  a Connect entry
+  - `from_sheet: u32` -- FromSheet: the ID of the glued shape (a connector, a callout)
+  - `from_cell: Option<Sym>` -- FromCell: its glued cell (BeginX, EndX, Controls.Row_1 ...)
+  - `from_part: Option<i32>` -- FromPart as written
+  - `to_sheet: u32` -- ToSheet: the ID of the shape it is glued to
+  - `to_cell: Option<Sym>` -- ToCell: the cell glued to (Connections.X1, PinX ...)
+  - `to_part: Option<i32>` -- ToPart as written
+  - `extras: Extras` -- unknown items
+
+- **`struct PageHeader`**
+  the attributes of a page (and of its PageSheet element)
+  - `id: u32` -- ID: unique among the pages of the document
+  - `name: Option<Sym>` -- Name: the language-dependent name ("Zeichenblatt-1")
+  - `name_u: Option<Sym>` -- NameU: the universal name ("Page-1")
+  - `is_custom_name: Option<bool>` -- IsCustomName as written
+  - `is_custom_name_u: Option<bool>` -- IsCustomNameU as written
+  - `background: bool` -- Background="1": a background page
+  - `back_page: Option<u32>` -- BackPage: the ID of this page's background page
+  - `sheet_styles: StyleRefs` -- LineStyle, FillStyle, TextStyle of the PageSheet element
+  - `attrs: Vec<(Sym, Sym)>` -- the other attributes of the Page element in file order
+
+- **`struct Page`**
+  a foreground or background page
+  - `header: PageHeader` -- the attributes
+  - `sheet: Sheet` -- the page's ShapeSheet (size, scale, layout, print, layers in the Layer section)
+  - `shapes: ShapeTree` -- the shapes on the page
+  - `connects: Vec<Connect>` -- the glue records
+  - `theme: Option<u32>` -- the theme of the page (an index into Document::themes)
+  - `extras: Extras` -- unknown items of the Page element (in pages.xml)
+  - `contents_extras: Extras` -- unknown items of the PageContents element (the page's own part)
+  - `part: Option<Sym>` -- the name of the page's part as read (None: a new page)
+
+**`impl Page`**
+
+- **`fn new(header: PageHeader) -> Page`**
+  an empty page with this header
+
+- **`struct MasterHeader`**
+  the attributes of a master (and of its PageSheet element)
+  - `id: u32` -- ID: unique among the masters of the document
+  - `name: Option<Sym>` -- Name: the language-dependent name
+  - `name_u: Option<Sym>` -- NameU: the universal name; with BaseID the key for matching masters (LG-04, MS-02)
+  - `is_custom_name: Option<bool>` -- IsCustomName as written
+  - `is_custom_name_u: Option<bool>` -- IsCustomNameU as written
+  - `base_id: Option<Sym>` -- BaseID: the GUID of the master's origin
+  - `unique_id: Option<Sym>` -- UniqueID: the GUID of this master's version
+  - `sheet_styles: StyleRefs` -- LineStyle, FillStyle, TextStyle of the PageSheet element
+  - `attrs: Vec<(Sym, Sym)>` -- the other attributes of the Master element in file order (Prompt, Hidden, IconSize ...)
+
+- **`struct Master`**
+  a master: a template shape with its own page
+  - `header: MasterHeader` -- the attributes
+  - `sheet: Sheet` -- the master page's ShapeSheet
+  - `icon: Option<Sym>` -- the icon as written (base64 text of the Icon element)
+  - `shapes: ShapeTree` -- the master's shapes; the first top-level shape is the master shape of instances
+  - `connects: Vec<Connect>` -- glue records inside the master
+  - `extras: Extras` -- unknown items of the Master element (in masters.xml)
+  - `contents_extras: Extras` -- unknown items of the MasterContents element
+  - `part: Option<Sym>` -- the name of the master's part as read
+
+**`impl Master`**
+
+- **`fn new(header: MasterHeader) -> Master`**
+  an empty master with this header
+- **`fn master_shape(&self) -> Option<u32>`**
+  the slot of the shape instances inherit from (the first top-level shape)
+
+- **`struct StyleHeader`**
+  the attributes of a style sheet
+  - `id: u32` -- ID: unique among the styles (0 is "No Style")
+  - `name: Option<Sym>` -- Name: the language-dependent name
+  - `name_u: Option<Sym>` -- NameU: the universal name
+  - `is_custom_name: Option<bool>` -- IsCustomName as written
+  - `is_custom_name_u: Option<bool>` -- IsCustomNameU as written
+  - `based_on: StyleRefs` -- LineStyle, FillStyle, TextStyle: the styles this one is based on
+  - `attrs: Vec<(Sym, Sym)>` -- the other attributes in file order
+
+- **`struct Style`**
+  a style sheet (Formatvorlage)
+  - `header: StyleHeader` -- the attributes
+  - `sheet: Sheet` -- its cells
+  - `extras: Extras` -- unknown items of the StyleSheet element
+
+### `diagram_core/src/render/mod.rs`
+
+Source: [`lib/diagram_core/src/render/mod.rs`](../lib/diagram_core/src/render/mod.rs)
+
+```text
+render -- a page as a display list (JD4, milestone "viewer"): what is drawn where, in which
+order, with which look; the drawing itself is someone else's (diagram_view on render2d and
+gfx, later the exports of diagram_io)
+
+  render::build(&doc, page, &mut measure, &Options) -> Drawing
+  render::rebuild(&doc, &mut drawing, &mut measure, &Options, &shapes) -> bool
+                                  (JD7, rebuild.rs) the items of some top-level shapes made
+                                  anew in their place; false: shapes came, went or changed
+                                  their order (build anew)
+  Drawing { width, height, scale, items, fonts, notes }   in paper inches, y up, the origin at
+                                  the page's bottom left corner; items in painter's order
+  drawing.query(rect, &mut out)   the items whose boxes touch a rectangle (a grid over the
+                                  page: culling and hit tests without looking at every item)
+  drawing.range_of(top) / tops()  the items of a top-level shape: they lie together
+  Item { shape, top, bbox, role, kind }   role: Shape | Arrow | Shadow | Text; kind: Fill { path, paint } | Stroke { path, stroke } |
+                                  Text(TextItem) | Image(ImageItem)
+  Paint::Solid | Hatch | Gradient, Stroke { color, width, dash, cap, join }
+  Measure / Face / ApproxMeasure  (text.rs) what the text layout asks of fonts
+  measure_text(&mut measure, &face, size, text, max_width)   (text.rs) a text's size as the
+                                  layout wraps it (the formula engine's TEXTWIDTH, JD7)
+  ThemeInfo                       (theme.rs) colours and fonts of a theme part
+  style::{dash, fill_pattern, arrow, PALETTE}   the tables behind lines and fills
+
+Everything comes from the cached values (decision: the viewer shows what the file cached,
+the formula engine of JD6 is not needed).  Per page: its background page first (and theirs),
+then its shapes in z-order; a group draws its children and its own geometry and text behind
+them (DisplayMode 1) or in front (2, the default; 0 hides the group's own geometry).  Per
+shape: the shadow (ShdwPattern above 0, offset by ShapeShdwOffsetX/Y), the fill of all
+closed sub-paths of the Geometry sections without NoFill (even-odd), a Foreign shape's
+picture, the lines of the sections without NoLine with their line ends, the text.  Not
+drawn: deleted subshapes (Del, ID 4294967295, no Type), guides, sections with NoShow,
+shapes whose layers are all hidden.  A layer's colour (Color not 255) colours its members.
+
+Values Visio caches as "Themed" (the Theme style and a few shapes) are resolved against the
+page's theme: the theme part whose schemeEnum the page's ThemeIndex names (colours by
+ColorSchemeIndex, fonts by FontSchemeIndex), the QuickStyle colour indices of the shape, the
+variation of VariationColorIndex; the rest falls back to plain values (solid, 0.75 pt,
+no gradient, no shadow).  On a page with a drawing scale, geometry is in drawing units and
+line weights, text sizes and margins are in page units: the display list is in paper
+inches (geometry times PageScale / DrawingScale).
+```
+
+- **`struct Options`**
+  what build draws
+  - `background: bool` -- draw the page's background pages under it
+  - `hidden_layers: bool` -- draw shapes on hidden layers too
+
+- **`struct Drawing`**
+  a page as items to draw
+  - `page: Option<PageRef>`
+  - `width: f64` -- the page's size in paper inches
+  - `height: f64`
+  - `scale: f64` -- paper inches per drawing inch (PageScale / DrawingScale)
+  - `color: u32` -- the page's colour (0xRRGGBB)
+  - `items: Vec<Item>`
+  - `fonts: BTreeSet<String>` -- the font families the texts ask for
+  - `notes: Vec<(Note, u32)>` -- what was left out or drawn only roughly, with counts
+
+**`impl Drawing`**
+
+- **`fn query(&self, rect: [f64; 4], out: &mut Vec<u32>)`**
+  the items whose boxes touch `rect` (x0, y0, x1, y1, paper inches), ascending
+- **`fn bounds(&self) -> Option<[f64; 4]>`**
+  the box of all items (None: nothing to draw)
+- **`fn range_of(&self, top: ShapeRef) -> Option<Range<usize>>`**
+  the items of a top-level shape (they lie together in painter's order; empty when it
+  draws nothing); None: not a top-level shape of this drawing
+- **`fn tops(&self) -> impl Iterator<Item = (ShapeRef, Range<usize>)> + '_`**
+  the top-level shapes in painter's order (those of the background pages first) with
+  their items
+
+- **`enum Note`**
+  what the viewer does not draw (yet), or draws only roughly
+  - `Metafile` -- a picture in a format the drawing side does not decode (EMF, WMF, OLE): a placeholder
+  - `NoPicture` -- a Foreign shape without picture data
+  - `CompoundLine` -- a double or triple line (CompoundType): drawn single
+  - `LineGradient` -- a line gradient: drawn in the first stop's colour
+  - `Effects` -- 3D, bevel, glow, reflection, soft edges, sketch: left out
+  - `CustomLinePattern` -- a line pattern of a master (LinePattern above 23): drawn solid
+  - `Guide` -- a guide: not drawn
+  - `SimpleShadow` -- a shadow drawn without blur, oblique type or scale
+
+- **`struct Item`**
+  one thing to draw
+  - `shape: ShapeRef` -- the shape it belongs to
+  - `top: ShapeRef` -- that shape's top-level group (or itself): what a click selects
+  - `bbox: [f64; 4]` -- its box (paper inches), lines with half their width
+  - `role: Role` -- what it is part of
+  - `kind: ItemKind`
+
+- **`enum Role`**
+  what an item draws of its shape
+  - `Shape` -- the geometry, its fill and its lines, or the picture
+  - `Arrow` -- a line end
+  - `Shadow`
+  - `Text` -- the text, its background, its underlines
+
+- **`enum ItemKind`**
+  - `Fill { path: Path, paint: Paint }` -- closed sub-paths filled even-odd
+  - `Stroke { path: Path, stroke: Stroke }`
+  - `Text(Box<TextItem>)`
+  - `Image(Box<ImageItem>)`
+
+- **`enum Paint`**
+  how an area is filled
+  - `Solid(u32)` -- 0xAARRGGBB
+  - `Hatch { color: u32, lines: Vec<(f64, f64)> }` -- parallel lines in a colour (the background is an item of its own before it): angle
+    (radians, counter-clockwise) and spacing (inches) per family
+  - `Gradient(Box<Gradient>)`
+
+- **`struct Gradient`**
+  a gradient: linear from `from` (position 0) to `to` (1), or radial around `from` with the
+  radius |to - from|; stops ascending
+  - `radial: bool`
+  - `from: [f64; 2]`
+  - `to: [f64; 2]`
+  - `stops: Vec<(f64, u32)>` -- (position 0..1, 0xAARRGGBB)
+
+**`impl Gradient`**
+
+- **`fn at(&self, t: f64) -> u32`**
+  the colour at position t (0 .. 1), straight alpha
+
+- **`enum Cap`**
+  how a line ends and turns
+  - `Round`
+  - `Butt`
+  - `Square`
+
+- **`enum Join`**
+  - `Round`
+  - `Miter`
+  - `Bevel`
+
+- **`struct Stroke`**
+  a line's look
+  - `color: u32` -- 0xAARRGGBB
+  - `width: f64` -- inches; 0: a hairline (one pixel)
+  - `dash: Vec<f64>` -- lengths on and off in inches (empty: solid)
+  - `cap: Cap`
+  - `join: Join`
+
+- **`struct ImageItem`**
+  a picture: its pixels' rectangle (0..1 by 0..1 of the picture, y up) mapped to the page,
+  clipped to the shape's box
+  - `xform: Xform`
+  - `clip: [[f64; 2]; 4]` -- the shape's box on the page (the picture is cut there)
+  - `source: ImageSource`
+  - `format: String` -- what ForeignData says it is (CompressionType, ForeignType), lower case: "png", "jpeg",
+    "emf", "wmf", "bmp", "gif", "tiff" ... ("" unknown); the drawing side looks at the bytes
+
+- **`enum ImageSource`**
+  - `Part(Sym)` -- a part of the package: Document::parts, by name
+  - `Inline(Box<str>)` -- base64 as the file wrote it
+
+- **`fn build(doc: &Document, page: PageRef, measure: &mut dyn Measure, opts: &Options) -> Drawing`**
+  the display list of a page
+
+- **`fn parse_color(t: &str) -> Option<u32>`**
+  "#RRGGBB" (also "RGB(r,g,b)") -> 0xRRGGBB
+
+- **`fn with_alpha(rgb: u32, trans: f64) -> u32`**
+  0xRRGGBB with a transparency 0 .. 1 -> 0xAARRGGBB
+
+### `diagram_core/src/render/index.rs`
+
+Source: [`lib/diagram_core/src/render/index.rs`](../lib/diagram_core/src/render/index.rs)
+
+```text
+index -- a uniform grid over a drawing's items: which items touch a rectangle, without
+looking at all of them (culling for the drawing side, hit tests for JD7)
+
+  Grid::build(&items, bounds)     up to 128 x 128 cells over the bounds; an item lands in
+                                  every cell its box touches, an item over more than 1024
+                                  cells in a list that every query looks at
+  grid.query(rect, &mut out)      the items touching rect, ascending (painter's order)
+  grid.replace(&changes, &items)  (JD7) ranges of items made anew (render::rebuild): the
+                                  grid keeps its cells, the items after a range that grew or
+                                  shrank are renumbered
+
+Building is linear in the items times their cells (bounded per item); a query costs the
+cells of its rectangle plus what lies in them.  Nothing is quadratic in the number of items.
+A cell's list need not be sorted (a query sorts what it found).  An item outside the bounds
+the grid was built for lies in the cells at the edge, where a query outside looks too.
+```
+
+- **`struct Grid`**
+
+**`impl Grid`**
+
+- **`fn build(items: &[Item], bounds: [f64; 4]) -> Grid`**
+- **`fn replace(&mut self, changes: &[(usize, usize, usize)], items: &[Item])`**
+  ranges of items made anew: (first item, old count, new count) each, ascending and apart,
+  in the old numbering; `items` the list as it is now
+- **`fn query(&self, rect: [f64; 4], out: &mut Vec<u32>)`**
+
+### `diagram_core/src/render/rebuild.rs`
+
+Source: [`lib/diagram_core/src/render/rebuild.rs`](../lib/diagram_core/src/render/rebuild.rs)
+
+```text
+rebuild -- the items of some top-level shapes made anew in their place (JD7: a shape that
+moves, grows or changes its look while it is dragged), the rest of the drawing kept
+
+  render::rebuild(&doc, &mut drawing, &mut measure, &opts, &shapes) -> bool
+
+A top-level shape's items lie together in painter's order (build draws a top-level shape
+with everything below it before the next one), so making one anew replaces a range of the
+items: the items after it move when the count changes, the grid follows (Grid::replace),
+the notes and the font families are added up again.  `shapes` may name subshapes: their
+top-level shape is made anew; shapes of pages the drawing does not show are passed over.
+The result is the list build would make of the document now, as long as only those shapes
+changed.  false (nothing changed in the drawing): a shape came or went, the top-level order
+changed, the page's size or scale changed, a named shape of the page is not in the drawing
+-- the caller builds anew.  Changes the shapes do not show (the page's layers, styles,
+masters, themes) are the caller's to know: they need build.
+```
+
+- **`fn rebuild(doc: &Document, d: &mut Drawing, measure: &mut dyn Measure, opts: &Options, shapes: &[ShapeRef]) -> bool`**
+  the items of the top-level shapes of `shapes` made anew in `d` -> false: build anew
+
+### `diagram_core/src/render/style.rs`
+
+Source: [`lib/diagram_core/src/render/style.rs`](../lib/diagram_core/src/render/style.rs)
+
+```text
+style -- the tables behind lines and fills (JD4): Visio's 24 colours, line patterns, fill
+patterns, and line ends drawn by JFDiagrammer itself
+
+  PALETTE[i]                      the colours of index 0 .. 23 (the document's Colors table
+                                  comes first)
+  dash(pattern) -> &[f64]         LinePattern 2 .. 23 in multiples of the line's weight
+  fill_pattern(p) -> FillKind     FillPattern 2 .. 24 as hatches, 25 .. 40 as the old
+                                  two-colour gradients
+  arrow(kind, size, weight)       BeginArrow / EndArrow 1 .. 45 with the size 0 (very small)
+                                  .. 6 (colossal): JFDiagrammer's own line ends, pointing to
+                                  +x with the tip at the origin, and how far the line stops
+                                  short of the tip
+
+The tables are JFDiagrammer's own approximations of what the numbers mean (FEATURES.md
+FM-01 .. FM-03); no artwork is taken from Visio.  Arrow kinds group into families (open,
+filled and hollow triangles, notched, circles, diamonds, squares, bars, crow's feet); where
+a number's look is unknown it gets the nearest family.  One place to tune them once the
+reference exports (PLAN.md, "Testen") show the differences.
+```
+
+```rust
+/// Visio's default colours 0 .. 23
+PALETTE: [u32; 24] = [ 0x000000, 0xFFFFFF, 0xFF0000, 0x00FF00, 0x0000FF, 0xFFF ...
+```
+
+- **`fn dash(pattern: u32) -> Option<&'static [f64]>`**
+  a line pattern as lengths on and off in multiples of the line's weight (at least 1 pt);
+  None: solid (1, unknown numbers, the patterns of masters above 23)
+
+- **`enum FillKind`**
+  what a FillPattern number draws
+  - `None`
+  - `Solid`
+  - `Hatch(&'static [(f64, f64)])` -- lines in the foreground colour over the background colour: up to two families (angle in
+    degrees, spacing in inches)
+  - `Legacy(Legacy)` -- the old gradients from the foreground to the background colour
+
+- **`enum Legacy`**
+  the old two-colour gradients (FillPattern 25 .. 40)
+  - `Linear(f64, bool)` -- along an angle (degrees, 0: left to right, 90: bottom to top), mirrored: background at
+    both ends
+  - `Radial(f64, f64)` -- from a point of the box (fractions, 0..1) outwards
+
+- **`fn fill_pattern(p: u32) -> FillKind`**
+
+- **`struct Arrow`**
+  a line end in its own space: the tip at the origin, the line coming in from -x
+  - `fill: Path` -- filled in the line's colour
+  - `stroke: Path` -- stroked with the line's style
+  - `setback: f64` -- how far the line stops short of the tip
+
+- **`fn arrow_length(size: u32, weight: f64) -> f64`**
+  how long a line end of `size` (0 .. 6) is on a line of `weight` inches
+
+- **`fn arrow(kind: u32, size: u32, weight: f64) -> Option<Arrow>`**
+  the line end `kind` (1 .. 45) of `size` on a line of `weight` inches
+
+### `diagram_core/src/render/text.rs`
+
+Source: [`lib/diagram_core/src/render/text.rs`](../lib/diagram_core/src/render/text.rs)
+
+```text
+text -- a shape's text laid out in its text block (JD4): runs of characters, paragraphs,
+wrapping, alignment, the text block's transform and margins
+
+  Measure                         what the layout asks of fonts: the advance of a text at a
+                                  font size of 1 inch, ascent and descent; the drawing side
+                                  (diagram_view) measures with the fonts it draws with
+  ApproxMeasure                   half an em per character (tests, no fonts at hand)
+  TextItem { xform, runs }        lines of runs in the text frame (paper inches, y up) and
+                                  the frame's map to the page; decorations and the text
+                                  background come as their own stroke and fill items
+  measure_text(&mut m, &face, size, text, max_width) -> (w, h)   (JD7) a text in one format
+                                  wrapped as a shape's text wraps: the widest line and the
+                                  lines' height (the formula engine's TEXTWIDTH/TEXTHEIGHT
+                                  through diagram_view's Metrics)
+
+The text comes as the file keeps it (Text: characters between cp, pp, tp and fld marks,
+JD3): a cp mark selects the Character row for what follows, a pp mark the Paragraph row; a
+field shows the text Visio cached in it (no formula is evaluated); LF ends a paragraph,
+U+2028 breaks a line inside one, the last LF of a text is Visio's end mark and makes no empty
+paragraph.  Character cells: Font, Size, Color, ColorTrans, Style (1 bold, 2 italic,
+4 underline, 8 small caps), Case (1 all caps, 2 initial caps), Pos (1 superscript,
+2 subscript), Strikethru, DblUnderline, Overline, FontScale, Letterspace.  Paragraph cells:
+IndFirst, IndLeft, IndRight, SpLine (below 0: a multiple of the font size, above 0: inches,
+0: 120 %), SpBefore, SpAfter, HorzAlign (0 left, 1 centre, 2 right, 3 justified and 4
+distributed drawn left), Bullet and BulletStr.  Text block cells: the four margins,
+VerticalAlign (0 top, 1 middle, 2 bottom), TextBkgnd (0 none, else a colour; a number is a
+colour index plus one), TextDirection (1: vertical), DefaultTabStop.  Lines wrap at spaces
+(a word wider than the line at characters); text that does not fit overflows the block
+the way VerticalAlign says.
+```
+
+- **`struct Face<'a>`**
+  a font as the text asks for it: the family the file names, bold, italic
+  - `family: &'a str`
+  - `bold: bool`
+  - `italic: bool`
+
+- **`trait Measure`**
+  what the layout needs of fonts
+  - `fn advance(&mut self, face: &Face, text: &str) -> f64`
+    the advance of `text` (one line, no control characters) at a font size of 1 inch, in
+    inches
+  - `fn metrics(&mut self, _face: &Face) -> (f64, f64)`
+    ascent and descent in em, both positive
+
+- **`struct ApproxMeasure`**
+  half an em per character, a fifth for a space
+
+- **`struct TextItem`**
+  a shape's text, laid out
+  - `xform: Xform` -- the text frame (paper inches, y up, its origin at the block's bottom left corner) to the
+    page: a turn and a move, never a mirror (a flipped shape's text stays readable)
+  - `runs: Vec<TextRun>`
+
+- **`struct TextRun`**
+  a piece of one line in one format
+  - `at: [f64; 2]` -- where its baseline starts (frame)
+  - `text: String`
+  - `family: String` -- the font family as the file names it (the drawing side substitutes)
+  - `bold: bool`
+  - `italic: bool`
+  - `size: f64` -- the font size (em) in inches
+  - `color: u32` -- 0xAARRGGBB
+  - `scale_x: f64` -- FontScale: how much wider the glyphs are (1: as they are)
+  - `spacing: f64` -- Letterspace: added after every character (inches)
+  - `width: f64` -- the measured advance with scale and spacing (inches)
+
+- **`fn measure_text(m: &mut dyn Measure, face: &Face, size: f64, text: &str, max_width: Option<f64>) -> (f64, f64)`**
+  the size of a text in one format as a shape's text block sets it: (the widest line, the
+  height of all lines), inches.  Paragraphs end at LF (the text's last LF is Visio's end mark),
+  U+2028 breaks a line, lines wrap at `max_width` the way the layout wraps them (at spaces and
+  after hyphens, a word wider than the line at characters), tabs go to stops 0.5 in apart;
+  a line is 120 % of the size high (SpLine's default).  An empty text is one empty line.
+
+### `diagram_core/src/render/theme.rs`
+
+Source: [`lib/diagram_core/src/render/theme.rs`](../lib/diagram_core/src/render/theme.rs)
+
+```text
+theme -- what the viewer needs of a DrawingML theme with Visio's extensions (JD4)
+
+  ThemeInfo::parse(bytes)          colours (dk1, lt1, dk2, lt2, accent1-6, hlink, folHlink),
+                                   the variation colours (vt:variationClrScheme, 7 each), the
+                                   background (vt:bkgnd), the major and minor Latin fonts, the
+                                   line widths of the format scheme, and the scheme IDs
+                                   (vt:schemeID schemeEnum) a page's ThemeIndex and
+                                   ColorSchemeIndex cells point at
+  ThemeInfo::quick_color(index, variation)   a QuickStyle colour index -> RGB
+
+Pages do not name their theme by a relationship: Visio keeps all themes at the document and
+a page picks one by the schemeEnum of its ThemeIndex (the theme), ColorSchemeIndex (the
+colours) and FontSchemeIndex (the fonts) cells (JD3, finding).  The viewer draws the cached
+values; a theme is needed only where a value is literally "Themed" (the Theme style and a few
+shapes) and for the theme's background.  A small tolerant scanner reads the part: elements,
+attributes, nothing else; anything it does not understand is skipped.
+```
+
+- **`struct ThemeInfo`**
+  the parts of a theme the viewer uses
+  - `name: String` -- a:theme name
+  - `colors: [Option<u32>; 12]` -- 0xRRGGBB of dk1, lt1, dk2, lt2, accent1 .. accent6, hlink, folHlink (None: not given)
+  - `variations: Vec<[Option<u32>; 7]>` -- the variation colour schemes, 7 colours each
+  - `background: Option<u32>` -- vt:bkgnd
+  - `major_font: String` -- the Latin typefaces of the major (headings) and minor (body) fonts
+  - `minor_font: String`
+  - `line_widths: Vec<f64>` -- a:lnStyleLst widths in inches (the line style matrix 1, 2, 3 ...)
+  - `scheme_ids: [Option<u32>; 4]` -- the schemeEnum of the colour scheme, the font scheme, the format scheme and the theme
+    as a whole (vt:themeScheme), in that order; every other schemeID found after them
+  - `other_ids: Vec<u32>`
+
+**`impl ThemeInfo`**
+
+- **`fn parse(data: &[u8]) -> Option<ThemeInfo>`**
+  the theme of a theme part (None: not a theme)
+- **`fn has_scheme(&self, id: u32) -> bool`**
+  whether the theme's own scheme (vt:themeScheme), or else any of its schemes, has this ID
+- **`fn color(&self, i: usize) -> u32`**
+  a scheme colour 0 .. 11 (dk1, lt1, dk2, lt2, accent1-6, hlink, folHlink)
+- **`fn quick_color(&self, index: u32, variation: usize) -> Option<u32>`**
+  a QuickStyle colour index (QuickStyleLineColor, ...FillColor, ...FontColor): 0 dark 1,
+  1 light 1, 2 to 7 accent 1 to 6, 8 dark 2, 9 light 2, 100 to 106 the variation colours
+  1 to 7 of `variation`, 200 the background
+
+- **`fn no_theme_color(index: u32) -> u32`**
+  QuickStyle colours without a theme
+
+### `diagram_core/src/route.rs`
+
+Source: [`lib/diagram_core/src/route.rs`](../lib/diagram_core/src/route.rs)
+
+```text
+route -- the ways of connectors on the page: right angles around obstacles, straight, curved
+(CN-04, CN-05)
+
+  Port { at, dir, own }              an end of a route: the point; the direction the route
+                                     leaves it in (outward, any length; None: any); the box
+                                     of the shape the end is glued to (None: a free end)
+  Opts { clearance, bend }           the distance kept to obstacles; what a bend costs, as a
+                                     length (fewer bends against a longer way)
+  orthogonal(a, b, &obstacles, &opts) -> points   a right-angle way from a.at to b.at
+  best(&a_ports, &b_ports, &obstacles, &opts) -> (i, j, points)   the cheapest way between
+                                     any two of the ports (a dynamic end offers one or two
+                                     per side)
+  straight(a, b) -> points           the line between the two ends
+  cost(&points, &opts) / bends(&points) / length(&points)
+  spline_knots(n) -> (degree, knots) a clamped uniform B-spline over n control points: the
+                                     curved style takes the right-angle way's corners as the
+                                     control polygon of one NURBS (glue.rs writes the row)
+  hits_box(p, q, &b)                 whether a segment runs through a box's inside
+
+Everything is in page coordinates (drawing units, y up); boxes are [x0, y0, x1, y1].
+
+How orthogonal finds its way (deterministic, no state between calls):
+1. Obstacles grow by the clearance.  A box that holds one of the two ends (a container, the
+   group around a glued subshape) is no obstacle; the boxes of the glued shapes (Port::own)
+   are, unless one holds the other end inside it.
+   Glued shapes closer than twice the clearance keep half their distance instead.
+2. Each end leaves its own box: with a direction along it (snapped to the nearer axis) up to
+   the grown box, without one in each of the four axis directions; a free end starts where
+   it is, in any direction.  A direction that points into the own shape counts as none.
+   best() offers several ports for an end: all their exits start (or end) one search.
+3. A sparse grid: the x and y lines of the grown boxes, of the exit points and the lines
+   halfway between the two ends' exits (so a Z bends in the middle, as Visio's do).  Grid
+   points inside a grown box and grid edges through one are blocked; the lines of a grown box
+   itself stay open, so a way keeps exactly the clearance.
+4. A* over (grid point, direction of travel) with the cost length + bend * bends; the
+   estimate is the Manhattan distance plus the fewest bends any way to a goal needs (from
+   the direction of travel and the one the goal wants), so the way found is the cheapest.
+   Arriving at the far end against its direction costs a bend, turning back two.
+5. Only the obstacles near the two ends take part at first (a window around them); when the
+   way crosses one left out, the window grows to hold the way and the search runs again (the
+   third round takes all).  A way that cannot be found (an end inside an obstacle) comes from
+   the glued boxes alone, else from a plain L.
+6. Points on one line merge: the result has the two ends and the corners only; the middle
+   piece of a Z moves halfway between the pieces around it where that stays clear.
+```
+
+- **`struct Port`**
+  an end of a route
+  - `at: [f64; 2]` -- where the route ends (page coordinates)
+  - `dir: Option<[f64; 2]>` -- the direction it leaves the end in (outward; None: any direction)
+  - `own: Option<[f64; 4]>` -- the box of the shape the end is glued to: the way does not cross it (None: free)
+
+**`impl Port`**
+
+- **`fn free(at: [f64; 2]) -> Port`**
+  a free end: any direction, no shape
+
+- **`struct Opts`**
+  what a route keeps to
+  - `clearance: f64` -- the distance to obstacles and the length of the first and last piece (drawing units)
+  - `bend: f64` -- the cost of a bend, as a length
+
+- **`fn hits_box(p: [f64; 2], q: [f64; 2], b: &[f64; 4]) -> bool`**
+  whether the segment p-q runs through the inside of box b (touching its edge is not)
+
+- **`fn length(points: &[[f64; 2]]) -> f64`**
+  the length of a polyline
+
+- **`fn bends(points: &[[f64; 2]]) -> usize`**
+  the number of bends of a polyline (corners whose two pieces are not on one line)
+
+- **`fn cost(points: &[[f64; 2]], opts: &Opts) -> f64`**
+  length + bends \* opts.bend
+
+- **`fn straight(a: &Port, b: &Port) -> Vec<[f64; 2]>`**
+  the straight route: the two ends
+
+- **`fn spline_knots(n: usize) -> (usize, Vec<f64>)`**
+  a clamped uniform B-spline over n control points (n >= 2): its degree (at most 3) and its
+  n + degree + 1 knots from 0 to 1
+
+- **`fn orthogonal(a: Port, b: Port, obstacles: &[[f64; 4]], opts: &Opts) -> Vec<[f64; 2]>`**
+  a right-angle route from a.at to b.at around the obstacles (boxes in page coordinates):
+  the two ends and the corners
+
+- **`fn best(a: &[Port], b: &[Port], obstacles: &[[f64; 4]], opts: &Opts) -> (usize, usize, Vec<[f64; 2]>)`**
+  the cheapest right-angle route from any of the ports `a` to any of the ports `b` (one
+  search: a dynamic end offers a port per side) -> the indices of the two ports and the
+  route; both lists must not be empty
+
+### `diagram_core/src/shape.rs`
+
+Source: [`lib/diagram_core/src/shape.rs`](../lib/diagram_core/src/shape.rs)
+
+```text
+shape -- shapes and their tree on a page or in a master
+
+  ShapeData { header, sheet, text, foreign, data, extras }   one shape without its children
+  ShapeHeader                     the attributes: Type, ID-based references (Master,
+                                  MasterShape, LineStyle, FillStyle, TextStyle), Name, NameU,
+                                  Del and what else stood there
+  ShapeKind                       Shape, Group, Foreign, Guide
+  StyleRefs { line, fill, text }  the style IDs of a shape, page sheet or style (based on)
+  Text / TextItem                 the shape text: characters between cp, pp, tp and fld marks
+  ForeignData                     picture data of a Foreign shape (inline or a package part)
+  ShapeTree                       the shapes of a page or master: slots, IDs, z-order
+    tree.insert(parent, id, data) -> slot     (untracked; loaders build trees with it)
+    tree.get(slot) / by_id(id) / top() / children(slot) / parent(slot) / iter()
+
+A shape lives in a slot of its tree; the slot is its handle (ShapeRef) and never changes,
+even when the shape is deleted and the deletion undone.  Slots are not reused.  The file's
+shape ID is unique per page or master (by_id, a BTreeMap: thousands of shapes, no linear
+search).  Children are kept in z-order, the last one on top.
+
+One ID is no ID: Visio writes the deleted subshapes of an instance (Del="1", no Type) with
+ID 4294967295 (NO_ID), several of them on one page.  A tree takes any number of shapes with
+it; by_id does not find them, they do not raise the next ID, and NO_ID is never handed out.
+```
+
+- **`enum ShapeKind`**
+  the shape type (attribute Type)
+  - `Shape` -- Shape: a shape with geometry
+  - `Group` -- Group: has subshapes
+  - `Foreign` -- Foreign: shows its ForeignData (a picture, a metafile, an OLE object's image)
+  - `Guide` -- Guide: a guide line or guide point, not shown
+  - `Unspecified` -- no Type attribute (the deleted subshapes of an instance)
+  - `Other(Sym)` -- a type the crate does not know, as written
+
+**`impl ShapeKind`**
+
+- **`fn parse(text: &str, strings: &mut Strings) -> ShapeKind`**
+  the kind of a Type attribute
+- **`fn as_str(self) -> Option<&'static str>`**
+  the Type attribute (None: Unspecified or Other, whose Sym holds it)
+
+- **`struct StyleRefs`**
+  the style IDs a sheet inherits from (LineStyle, FillStyle, TextStyle); for a style these
+  are the styles it is based on
+  - `line: Option<u32>` -- LineStyle
+  - `fill: Option<u32>` -- FillStyle
+  - `text: Option<u32>` -- TextStyle
+
+**`impl StyleRefs`**
+
+- **`const fn all(id: u32) -> StyleRefs`**
+  all three the same style
+- **`fn get(&self, cat: Category) -> Option<u32>`**
+  the style of a category
+- **`fn uses(&self, id: u32) -> bool`**
+  whether `id` is one of the three
+
+- **`struct ShapeHeader`**
+  the attributes of a shape
+  - `kind: ShapeKind` -- Type
+  - `name: Option<Sym>` -- Name: the language-dependent name (shown); None: derived (Shape::name)
+  - `name_u: Option<Sym>` -- NameU: the universal name (key for formulas and matching); None: derived
+  - `is_custom_name: Option<bool>` -- IsCustomName as written
+  - `is_custom_name_u: Option<bool>` -- IsCustomNameU as written
+  - `master: Option<u32>` -- Master: the ID of the master this shape is an instance of
+  - `master_shape: Option<u32>` -- MasterShape: the ID of the shape in the master that this subshape inherits from
+  - `styles: StyleRefs` -- LineStyle, FillStyle, TextStyle
+  - `del: bool` -- Del="1": the subshape the master passes on is deleted here
+  - `original_id: Option<u32>` -- OriginalID as written
+  - `unique_id: Option<Sym>` -- UniqueID as written
+
+- **`enum TextItem`**
+  one item of a shape text
+  - `Chars(Box<str>)` -- characters
+  - `Cp(u32)` -- cp IX: from here on the Character row IX applies
+  - `Pp(u32)` -- pp IX: from here on the Paragraph row IX applies
+  - `Tp(u32)` -- tp IX: from here on the Tabs row IX applies
+  - `Field(u32)` -- fld IX: the text field of Field row IX
+  - `Other(Sym)` -- an element the crate does not know, as XML text
+
+- **`struct Text`**
+  the text of a shape (element Text)
+  - `items: Vec<TextItem>` -- characters and marks in file order
+  - `extras: Extras` -- unknown attributes of the Text element
+
+**`impl Text`**
+
+- **`fn plain(text: &str) -> Text`**
+  a text of plain characters
+- **`fn chars(&self) -> String`**
+  the characters without marks (fields left out)
+
+- **`enum ForeignPayload`**
+  where the picture of a Foreign shape is
+  - `None` -- none
+  - `Inline(Box<str>)` -- inline, base64 as written
+  - `Part(Sym)` -- a part of the package (its name, e.g. /visio/media/image1.png)
+
+- **`struct ForeignData`**
+  the picture data of a Foreign shape (element ForeignData)
+  - `attrs: Vec<(Sym, Sym)>` -- the attributes in file order (ForeignType, CompressionType, ObjectWidth ...)
+  - `payload: ForeignPayload` -- the data
+  - `extras: Extras` -- unknown children
+
+- **`struct ShapeData`**
+  one shape without its subshapes
+  - `header: ShapeHeader` -- the attributes
+  - `sheet: Sheet` -- the ShapeSheet: only what the shape sets itself, the rest is inherited
+  - `text: Option<Box<Text>>` -- the text; None: inherited from the master shape (or none)
+  - `foreign: Option<Box<ForeignData>>` -- the picture of a Foreign shape
+  - `data: [Option<Sym>; 3]` -- Data1, Data2, Data3 as written
+  - `extras: Extras` -- unknown items of the Shape element
+
+**`impl ShapeData`**
+
+- **`fn new(kind: ShapeKind) -> ShapeData`**
+  a shape of this kind with nothing set
+
+```rust
+/// the ID of the deleted subshapes Visio writes (Del="1", no Type): no ID of its own, any number
+/// of shapes of a tree may have it (see ShapeTree)
+NO_ID: u32 = u32::MAX
+```
+
+- **`enum TreeError`**
+  why a shape could not be put into a tree
+  - `DuplicateId(u32)` -- another shape of the tree has this ID
+  - `NoParent` -- the parent slot holds no shape
+
+- **`struct ShapeTree`**
+  the shapes of a page or a master
+
+**`impl ShapeTree`**
+
+- **`fn new() -> ShapeTree`**
+  an empty tree; new shapes get IDs from 4 on ([MS-VSDX] ShapeSheet_Type: an ID is at least 4)
+- **`fn insert(&mut self, parent: Option<u32>, id: u32, data: ShapeData) -> Result<u32, TreeError>`**
+  add a shape with its file ID under `parent` (None: top level), on top of its siblings
+  -> its slot (untracked: no undo step; loaders build trees with it); NO_ID may repeat
+- **`fn get(&self, slot: u32) -> Option<&ShapeData>`**
+  the shape in a slot
+- **`fn id(&self, slot: u32) -> Option<u32>`**
+  the file ID of the shape in a slot
+- **`fn by_id(&self, id: u32) -> Option<u32>`**
+  the slot of the shape with this file ID (None for NO_ID)
+- **`fn top(&self) -> &[u32]`**
+  the top-level shapes in z-order (bottom first)
+- **`fn children(&self, slot: u32) -> &[u32]`**
+  the subshapes of a shape in z-order
+- **`fn parent(&self, slot: u32) -> Option<u32>`**
+  the group a shape belongs to (None: top level or no shape)
+- **`fn len(&self) -> usize`**
+  the number of shapes (all levels)
+- **`fn is_empty(&self) -> bool`**
+  whether the tree has no shapes
+- **`fn next_id(&self) -> Option<u32>`**
+  the ID the next new shape gets (None: the tree has had the ID 4294967294, no new IDs;
+  NO_ID is never handed out)
+- **`fn iter(&self) -> TreeIter<'_>`**
+  every shape slot, each group before its subshapes, in z-order
+- **`fn is_within(&self, mut slot: u32, ancestor: u32) -> bool`**
+  whether `slot` is `ancestor` or lies inside it
+
+- **`struct TreeIter<'a>`**
+  the slots of a tree, groups before their subshapes (ShapeTree::iter)
+
+### `diagram_core/src/structure.rs`
+
+Source: [`lib/diagram_core/src/structure.rs`](../lib/diagram_core/src/structure.rs)
+
+```text
+structure -- containers, lists and callouts (JD10: ST-01, ST-02, ST-04 .. ST-06)
+
+  kind(doc, shape) -> Option<Kind>        Container, List or Callout (User.msvStructureType)
+  container(doc, c) -> Option<Container>  its settings: margin, automatic size, lock, style,
+                                          heading, the categories it takes or refuses
+  list(doc, l) -> Option<List>            a list's direction, spacing and alignment
+  members(doc, c) / containers_of(doc, s) / list_of(doc, s)
+  callouts_of(doc, t) / target_of(doc, callout)
+  categories(doc, s) / has_category(doc, s, name)
+  inner_box(doc, c)                       the box members live in (the heading taken off)
+  drop_targets(doc, owner, shapes)        the containers a shape would join where it is now
+  carried(doc, shapes)                    the shapes plus what moves, copies and deletes with
+                                          them: members (nested too) and callouts
+  add_members / remove_members / set_target     both sides of a relationship
+  settle(tx, eng, owner, shapes, membership)    after a gesture: membership by position,
+                                          lists laid out, containers sized (deepest first)
+  fit(tx, eng, c, shrink)                 a container around its members (An Inhalt anpassen)
+  layout_list(tx, eng, l) / list_index_at / move_in_list / insert_marks
+  forget(tx, eng, deleted)                before deleting: the survivors let go of them
+  disband(tx, eng, c)                     the container goes, its members stay
+  repair(tx, owner)                       relationships named on one side only are dropped
+  aim_callouts(tx, eng, callouts)         a callout's tail back onto its target
+
+The file keeps the structure in the Relationships cell of both shapes (structure::rel) and
+the settings in User cells named as Visio names them (msvStructureType, msvSDContainer*,
+msvSDList*, msvSDHeadingStyle, msvShapeCategories), so Visio recognises what JFDiagrammer
+writes and the other way round.  What a container looks like is the master's (own
+stencils in apps/JFDiagrammer/stencils): the code knows only the cells.
+
+The heading: Visio's own containers are groups whose subshape with msvStructureType
+"Heading" carries msvSDContainerHeadingEdge -- the side where the inside lies, seen from the
+heading ("Bottom" for a heading on top); JFDiagrammer's containers are one shape with the
+heading drawn in it and User.JFD_HeadingEdge (the edge the heading is on: Top, Bottom, Left,
+Right, None) and User.JFD_HeadingSize on the container itself.  Both are read; the inner box
+is the frame without the heading.
+
+Rules (Visio's, as far as they are documented, else chosen and named here):
+* A 2D shape joins every container whose frame holds its whole box after a drop or move and
+  that takes it, nested ones too (Visio stores membership in each enclosing container: a
+  process shape is in its lane, its phase and the lanes' list); a list takes it as an item
+  when the list's box holds its middle and the list's item categories let it, at the index
+  its place gives.  1D shapes, guides, callouts and headings never join by position.
+* It leaves a container when it lies wholly outside it, or when it found new containers and
+  lies not wholly in this one; partly outside it stays and the container grows (automatic
+  size "expand").  A locked container (msvSDContainerLocked) neither takes nor lets go.
+* Required categories: one of them must be among the shape's (msvShapeCategories, ';'
+  separated, case-insensitive; a shape without categories is refused); excluded ones refuse.
+* Only a list's items are laid out and size the list (Visio's); its plain members are not.
+* Moving a container moves its members (nested ones too) and the callouts of everything
+  moved; deleting and copying take them along (carried).
+* Nothing is computed when a file opens: settle runs only after a gesture.
+```
+
+- **`enum Kind`**
+  what a shape is in a structured diagram
+  - `Container` -- a container: members inside its frame
+  - `List` -- a list: a container with ordered members side by side
+  - `Callout` -- a callout: a note tied to a target shape
+
+- **`enum Resize`**
+  how a container follows its members (msvSDContainerResize)
+  - `None` -- 0: never by itself
+  - `Expand` -- 1: grows when members need room (Visio's default)
+  - `Fit` -- 2: always fits its members, grows and shrinks
+
+- **`enum Edge`**
+  the edge a container's heading is on
+  - `None`
+  - `Top`
+  - `Bottom`
+  - `Left`
+  - `Right`
+
+**`impl Edge`**
+
+- **`fn parse(s: &str) -> Edge`**
+  the edge of a cell's text ("Top", "Bottom", "Left", "Right"; else none)
+- **`fn opposite(self) -> Edge`**
+  the edge across from this one
+- **`fn as_str(self) -> &'static str`**
+  the text Visio writes
+
+- **`struct Container`**
+  a container's settings
+  - `margin: f64` -- msvSDContainerMargin: between the members and the inner box (drawing units, inches)
+  - `resize: Resize`
+  - `locked: bool` -- msvSDContainerLocked: membership stays as it is
+  - `no_highlight: bool` -- msvSDContainerNoHighlight: no glow while a shape is dragged over it
+  - `style: u32` -- msvSDContainerStyle / msvSDHeadingStyle (1-based) and how many there are
+  - `style_count: u32`
+  - `heading_style: u32`
+  - `heading_style_count: u32`
+  - `required: Vec<String>` -- msvSDContainerRequiredCategories / msvSDContainerExcludedCategories
+  - `excluded: Vec<String>`
+  - `heading: Edge` -- where the heading is and how deep it is (drawing units)
+  - `heading_size: f64`
+
+- **`enum Direction`**
+  a list's order on the page
+  - `LeftToRight` -- 0: left to right
+  - `RightToLeft` -- 1: right to left
+  - `TopToBottom` -- 2: top to bottom
+  - `BottomToTop` -- 3: bottom to top
+
+**`impl Direction`**
+
+- **`fn from_code(v: i64) -> Direction`**
+- **`fn code(self) -> i64`**
+- **`fn horizontal(self) -> bool`**
+  whether the members stand side by side (else one above the other)
+
+- **`struct List`**
+  a list's settings (msvSDListDirection, msvSDListSpacing, msvSDListAlignment)
+  - `direction: Direction`
+  - `spacing: f64` -- between two members (drawing units)
+  - `align: u8` -- across the direction: 0 start (left / top), 1 middle, 2 end (right / bottom)
+  - `stretch: bool` -- User.JFD_ListStretch (JFDiagrammer's own, for lanes): every item as long across as the
+    list's inner box or the longest item
+
+- **`fn user_text(doc: &Document, s: ShapeRef, name: &str) -> Option<String>`**
+  a User cell's value as text (a number as Visio shows it)
+
+- **`fn user_num(doc: &Document, s: ShapeRef, name: &str) -> Option<f64>`**
+  a User cell's value as a number
+
+- **`fn kind(doc: &Document, s: ShapeRef) -> Option<Kind>`**
+  what a shape is in a structured diagram (None: an ordinary shape, also a heading)
+
+- **`fn is_container(doc: &Document, s: ShapeRef) -> bool`**
+  whether the shape takes members (a container or a list)
+
+- **`fn categories(doc: &Document, s: ShapeRef) -> Vec<String>`**
+  the categories of a shape (msvShapeCategories, ';' separated)
+
+- **`fn has_category(doc: &Document, s: ShapeRef, name: &str) -> bool`**
+  whether the shape has a category (case-insensitive)
+
+- **`fn container(doc: &Document, c: ShapeRef) -> Option<Container>`**
+  a container's settings (None: not a container or list)
+
+- **`fn list(doc: &Document, l: ShapeRef) -> Option<List>`**
+  a list's settings (None: not a list)
+
+- **`fn members(doc: &Document, c: ShapeRef) -> Vec<ShapeRef>`**
+  every member of a container: a list's items in list order first, then its other members
+
+- **`fn items(doc: &Document, l: ShapeRef) -> Vec<ShapeRef>`**
+  the items of a list in list order (the members it arranges)
+
+- **`fn containers_of(doc: &Document, s: ShapeRef) -> Vec<ShapeRef>`**
+  the containers and lists a shape is a member or an item of
+
+- **`fn list_of(doc: &Document, s: ShapeRef) -> Option<ShapeRef>`**
+  the list a shape is an item of
+
+- **`fn callouts_of(doc: &Document, t: ShapeRef) -> Vec<ShapeRef>`**
+  the callouts tied to a shape
+
+- **`fn target_of(doc: &Document, callout: ShapeRef) -> Option<ShapeRef>`**
+  the target of a callout
+
+- **`fn add_members(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, shapes: &[ShapeRef], at: Option<usize>) -> Result<(), EditError>`**
+  make shapes members of a container (`at`: the position in a list, else at the end); a
+  shape already in it stays where it is
+
+- **`fn remove_members(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, shapes: &[ShapeRef]) -> Result<(), EditError>`**
+  take shapes out of a container
+
+- **`fn set_target(tx: &mut Transaction, eng: &mut Engine, callout: ShapeRef, target: Option<ShapeRef>) -> Result<(), EditError>`**
+  tie a callout to a target (None: let go of it)
+
+- **`fn recalc(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef]) -> Result<(), EditError>`**
+  recompute what reads the Relationships cells of these shapes (the structure functions)
+
+- **`fn shape_box(doc: &Document, s: ShapeRef) -> [f64; 4]`**
+  a shape's upright box on the page
+
+- **`fn inner_box(doc: &Document, c: ShapeRef) -> [f64; 4]`**
+  the box members live in: the frame without the heading (page, upright)
+
+- **`fn joins_by_position(doc: &Document, s: ShapeRef) -> bool`**
+  whether a shape may join containers by its position: 2D, no guide, no callout, no heading,
+  not a connector
+
+- **`fn accepts(doc: &Document, c: ShapeRef, s: ShapeRef) -> bool`**
+  whether container `c` takes shape `s` (categories; never itself or one that holds it)
+
+- **`fn accepts_item(doc: &Document, l: ShapeRef, s: ShapeRef) -> bool`**
+  whether list `l` takes shape `s` as an item (msvSDListRequiredCategories,
+  msvSDListExcludedCategories); else it may still take it as a plain member
+
+- **`fn within(doc: &Document, inner: ShapeRef, outer: ShapeRef) -> bool`**
+  whether `inner` is (transitively) a member of `outer`
+
+- **`fn drop_targets(doc: &Document, owner: Owner, s: ShapeRef, moving: &[ShapeRef]) -> Vec<ShapeRef>`**
+  the containers on `owner` a shape joins where it lies now, leaving out `moving` (what moves
+  with it): every container that holds its whole box and takes it (Visio keeps membership in
+  each enclosing container, nested ones too: a process shape is in its lane, its phase and
+  the lanes' list), and a list whose box holds its middle and that takes it as an item
+
+- **`fn carried(doc: &Document, shapes: &[ShapeRef]) -> Vec<ShapeRef>`**
+  the shapes plus everything that moves, copies and is deleted with them: members of
+  containers (nested too) and callouts of every shape in it; the shapes come first
+
+- **`fn needed_box(doc: &Document, c: ShapeRef) -> Option<[f64; 4]>`**
+  the box a container needs for its members (a list: its items only, they alone size it):
+  their box, the margin around it, the heading
+
+- **`fn fit(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, shrink: bool) -> Result<bool, EditError>`**
+  fit a container around its members: grow only (`shrink` false) or exactly; an empty or
+  turned container stays -> whether it changed
+
+- **`fn layout_list(tx: &mut Transaction, eng: &mut Engine, l: ShapeRef) -> Result<Vec<ShapeRef>, EditError>`**
+  the items of a list in list order laid out side by side from the start of its inner box
+  (margin, spacing, alignment across), then the list fitted around them -> the shapes moved
+
+- **`fn list_index_at(doc: &Document, l: ShapeRef, p: [f64; 2], leave_out: &[ShapeRef]) -> usize`**
+  where a shape at page point `p` goes in a list: the index of the first member whose middle
+  lies beyond p along the list's direction
+
+- **`struct Mark`**
+  a mark between two members of a list (the insert triangle, the insertion bar while a
+  shape is dragged in): its page point, the direction the list runs, the index a shape
+  inserted there gets
+  - `at: [f64; 2]`
+  - `to: [f64; 2]` -- the far end of the insertion bar across the list
+  - `direction: Direction`
+  - `index: usize`
+
+- **`fn insert_marks(doc: &Document, l: ShapeRef) -> Vec<Mark>`**
+  the marks of a list: before the first member, between members, after the last
+
+- **`fn insert_marks_without(doc: &Document, l: ShapeRef, leave_out: &[ShapeRef]) -> Vec<Mark>`**
+  the marks of a list as if `leave_out` (an item being dragged) were not in it
+
+- **`fn move_in_list(tx: &mut Transaction, eng: &mut Engine, l: ShapeRef, s: ShapeRef, index: usize) -> Result<Vec<ShapeRef>, EditError>`**
+  put a member of a list at another index and lay the list out
+
+- **`fn settle(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[ShapeRef], membership: bool) -> Result<Vec<ShapeRef>, EditError>`**
+  after `shapes` were dropped, moved, resized or turned (what they carried moved with them):
+  with `membership` the containers they join and leave by their new place (a list: at the
+  index their place gives); then every container concerned, the deepest first: lists laid
+  out, containers sized by their automatic size -> every shape that moved here (for the glue
+  to follow)
+
+- **`fn forget(tx: &mut Transaction, eng: &mut Engine, deleted: &[ShapeRef]) -> Result<Vec<ShapeRef>, EditError>`**
+  before `deleted` go: the shapes that stay let go of them; lists close the gap -> the
+  shapes that moved (lists laid out)
+
+- **`fn disband(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef) -> Result<(), EditError>`**
+  the container goes, its members stay (they leave it; a nested container's members stay in
+  it); the container's own containers lose it
+
+- **`fn repair(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[ShapeRef]) -> Result<(), EditError>`**
+  relationships named on one side only (after a paste or a foreign edit) are dropped;
+  `shapes` limits the check (empty: every shape of the owner)
+
+- **`fn anchor(doc: &Document, callout: ShapeRef) -> [f64; 2]`**
+  the anchor of a callout on its target: fractions of the target's box (User.JFD_TargetX,
+  User.JFD_TargetY; the middle when missing)
+
+- **`fn target_point(doc: &Document, callout: ShapeRef) -> Option<[f64; 2]>`**
+  the page point a callout points at: the anchor on its target
+
+- **`fn set_anchor(tx: &mut Transaction, callout: ShapeRef, p: [f64; 2]) -> Result<(), EditError>`**
+  remember where on its target a callout points (the page point `p`)
+
+- **`fn association(doc: &Document, callout: ShapeRef) -> Option<ops::Control>`**
+  the control row a callout is tied by: Controls.Association (Visio requires it for callouts),
+  else the first control point
+
+- **`fn aim_callouts(tx: &mut Transaction, eng: &mut Engine, callouts: &[ShapeRef]) -> Result<(), EditError>`**
+  the tail of callouts back onto their target: the association point (the tip of the tail)
+  goes to the anchor on the target
+
+- **`fn set_user_length(tx: &mut Transaction, s: ShapeRef, name: &str, inches: f64, unit: Unit) -> Result<(), EditError>`**
+  a length cell of a User row as Visio writes it: inches with a unit to show
+
+- **`fn user_addr(doc: &Document, name: &str) -> Option<CellAddr>`**
+  a User cell's address (for the formula engine's dependencies)
+
+### `diagram_core/src/structure/cff.rs`
+
+Source: [`lib/diagram_core/src/structure/cff.rs`](../lib/diagram_core/src/structure/cff.rs)
+
+```text
+structure::cff -- the cross-functional flowchart (ST-05): lanes and phases in a pool
+
+  find(doc, s) -> Option<Cff>        the flowchart a shape belongs to (the pool itself, one of
+                                     its lists, a lane, a phase, a shape in a lane)
+  pools(doc, owner)                  every flowchart of a page
+  layout(tx, eng, &cff)              lanes stacked, phases side by side across every lane,
+                                     the lists and the pool around them -> what moved
+  lanes(doc, &cff) / phases(doc, &cff)
+
+Visio's structure, kept so that Visio recognises it (research in jd10-strukturen.md):
+
+  CFF Container   Container, categories "CFF Container", takes only "CFF List"; its heading
+                  is the title bar
+   ├ Swimlane List  List of the lanes (items: categories "Swimlane"), direction 2 (top to
+   │                bottom) for horizontal lanes, 0 for vertical ones
+   └ Phase List     List of the phases (items: "Phase"), the other direction
+  Swimlane        Container with its heading on the left (horizontal) or on top (vertical)
+  Separator       Container with its heading on top (horizontal) or on the left; it spans
+                  every lane, a shape in it is its member as well as its lane's
+
+Horizontal (lanes one above the other):
+
+  +--------------------------------------------+  title bar (the pool's heading, Ht)
+  |       | phase 1 heading  | phase 2 heading |  phase row (the phases' headings, Hp)
+  | lane1 |                  |                 |
+  +-------+------------------+-----------------+
+  | lane2 |                  |                 |
+  +--------------------------------------------+
+   Wl (the lanes' headings)
+
+The lanes keep their heights and share one width: the lane headings plus the phases (the last
+phase takes what is left), or the widest lane without phases.  The phases keep their widths
+and span the phase row and every lane.  Vertical flowcharts are the same turned: lanes side by
+side, the phases one above the other.  Lanes and phases carry their shapes; a shape in both
+moves by the larger of the two moves on each axis (once, not twice).
+```
+
+- **`struct Cff`**
+  a cross-functional flowchart
+  - `pool: ShapeRef`
+  - `lane_list: Option<ShapeRef>` -- the list of the lanes and of the phases
+  - `phase_list: Option<ShapeRef>`
+  - `horizontal: bool` -- lanes one above the other (else side by side)
+
+```rust
+/// the categories of the parts
+CAT_POOL: &str = "CFF Container"
+CAT_LIST: &str = "CFF List"
+CAT_LANE: &str = "Swimlane"
+CAT_PHASE: &str = "Phase"
+```
+
+- **`fn is_pool(doc: &Document, s: ShapeRef) -> bool`**
+  whether a shape is a flowchart's pool
+
+- **`fn of_pool(doc: &Document, pool: ShapeRef) -> Option<Cff>`**
+  the flowchart of a pool
+
+- **`fn find(doc: &Document, s: ShapeRef) -> Option<Cff>`**
+  the flowchart a shape belongs to: the pool, a list of it, a lane, a phase, a shape inside
+
+- **`fn pools(doc: &Document, owner: Owner) -> Vec<Cff>`**
+  every flowchart on a page or master
+
+- **`fn lanes(doc: &Document, f: &Cff) -> Vec<ShapeRef>`**
+  the lanes in order
+
+- **`fn phases(doc: &Document, f: &Cff) -> Vec<ShapeRef>`**
+  the phases in order
+
+- **`fn layout(tx: &mut Transaction, eng: &mut Engine, f: &Cff) -> Result<Vec<ShapeRef>, EditError>`**
+  lay the flowchart out from its pool's top left corner -> the shapes that moved
+
+- **`fn layout_with(tx: &mut Transaction, eng: &mut Engine, f: &Cff, want: Option<f64>) -> Result<Vec<ShapeRef>, EditError>`**
+  layout with the lanes' length given (a pool or lane resized by hand), else the longest
+  lane's or what the phases need
+
+### `diagram_core/src/structure/rel.rs`
+
+Source: [`lib/diagram_core/src/structure/rel.rs`](../lib/diagram_core/src/structure/rel.rs)
+
+```text
+structure::rel -- the Relationships cell: which shapes a shape is structurally tied to
+
+  relations(doc, shape) -> Relations      what the cell names, by relationship type
+  write(tx, shape, &relations)            the cell written the way Visio writes it
+
+Visio keeps container membership, list order and callout targets in the single cell
+Relationships of both shapes (Z2, Z3; learn.microsoft.com "Relationships Cell (Shape Layout
+Section)"; a plain cell under <Shape>, V="0"):
+
+  container:  SUM(DEPENDSON(1,Sheet.12!SheetRef(),Sheet.15!SheetRef()))   its members
+  member:     SUM(DEPENDSON(4,Sheet.7!SheetRef()))                         its containers
+
+  1 members of this container        4 containers of this shape
+  2 items of this list (in order)    5 the list of this item
+  3 callouts on this shape           6 the target of this callout
+  7 .. 10 the container on whose left / right / top / bottom edge the shape sits
+  11 the list this list overlaps (a cross-functional flowchart's lanes and phases)
+
+One DEPENDSON per type, the type first, the shapes after it; Visio leaves an empty term
+(SUM(DEPENDSON(4))) after the last member left, which means nothing.  The order inside a term
+is kept: a list's items are written in list order (how Visio stores list order is not
+documented; the items also stand in that order on the page, so both readings agree).  The cell has no other meaning: the formula engine evaluates it to 0 and records
+the dependencies, which is what makes Visio recompute the shapes that read the structure
+(CONTAINERSHEETREF, LISTORDER ...).  Both sides are written; a side that is missing or
+names a shape that is gone is repaired by the editing functions (structure::repair).
+```
+
+```rust
+/// the relationship types of DEPENDSON's first argument: a container names its members
+REL_CONTAINER: u32 = 1
+/// a list names its items (in list order)
+REL_LIST: u32 = 2
+/// a target names its callouts
+REL_TARGET: u32 = 3
+/// a member names its containers
+REL_MEMBER: u32 = 4
+/// an item names its list
+REL_ITEM: u32 = 5
+/// a callout names its target
+REL_CALLOUT: u32 = 6
+```
+
+- **`fn back(kind: u32) -> Option<u32>`**
+  the type the other side writes for a type (None: kept as it is, 7 .. 11)
+
+- **`struct Relations`**
+  what a Relationships cell names: per type the shapes in the order written
+  - `groups: Vec<(u32, Vec<ShapeRef>)>`
+
+**`impl Relations`**
+
+- **`fn get(&self, kind: u32) -> &[ShapeRef]`**
+  the shapes of type `kind`
+- **`fn get_mut(&mut self, kind: u32) -> &mut Vec<ShapeRef>`**
+  the list of type `kind`, made when missing
+- **`fn is_empty(&self) -> bool`**
+  whether it names nothing
+
+- **`fn formula(doc: &Document, shape: ShapeRef) -> Option<&str>`**
+  the formula text of a shape's Relationships cell (inheritance included; masters carry none
+  in practice, but a copy may)
+
+- **`fn relations(doc: &Document, shape: ShapeRef) -> Relations`**
+  what the Relationships cell of `shape` names (shapes that are gone are left out)
+
+- **`fn parse(f: &str) -> Vec<(u32, Vec<u32>)>`**
+  the DEPENDSON groups of a formula: (type, shape IDs named by Sheet.N!)
+
+- **`fn formula_of(doc: &Document, rel: &Relations) -> Option<String>`**
+  the formula Visio writes for these relations (None: nothing to name)
+
+- **`fn write(tx: &mut Transaction, shape: ShapeRef, rel: &Relations) -> Result<(), EditError>`**
+  write a shape's Relationships cell (over a GUARD, as Visio does: the cell is the
+  structure's, not the user's)
+
+- **`fn related_shapes(doc: &Document, owner: Owner) -> Vec<ShapeRef>`**
+  every shape of a page or master whose Relationships cell names something
+
+### `diagram_core/src/sheet.rs`
+
+Source: [`lib/diagram_core/src/sheet.rs`](../lib/diagram_core/src/sheet.rs)
+
+```text
+sheet -- the ShapeSheet store: sheets of single cells and sections of rows (decision V1)
+
+  Sheet { cells, sections, triggers, extras }    a shape's, page's, master's, style's or the
+                                                 document's cells
+  Section { name, index, del, cells, rows, ... }  Geometry1..n (index), Character, User ...
+  Row { key, kind, del, cells, ... }             RowKey::Index(ix) or RowKey::Named(name)
+  CellAddr::single(c) / section(s, c) / row(s, r, c)   where a cell sits in a sheet
+  SecKey { name, index }                         a section: Geometry has index 0, 1, 2 ...,
+                                                 every other section index 0
+  sheet.cell(name) / section(key) / find(addr)   plain lookups, no inheritance (inherit.rs)
+  Extras / Extra / Place / ExtraItem             what the file had and the model does not
+                                                 know (DF-03), at the place it stood
+
+Rows of the sections User, Property, Actions, Control, Hyperlink and ActionTag are named (N),
+the others indexed (IX); IX may be missing in the file, then the row's position counts
+(`ix_written` remembers which).  `del` is the file's Del="1": the row or section a master shape
+or style would pass on is deleted here.  Cells keep the file's order.
+
+Extras: diagram_io fills them while reading (JD3) and writes them back at their place (JD5):
+unknown attributes of the element, unknown child elements and text after the n-th known
+child, what stood inside a cell (RefBy, text) by the cell's position, and what stood inside
+the Shapes and Connects lists by the entries before it.  An element is kept as the file
+wrote it; a namespace prefix in it is declared on the part's root (kept with the root's
+attributes).  The model never looks into them.
+```
+
+- **`enum Place`**
+  where an unknown item stood
+  - `Element` -- an attribute of the element itself
+  - `AfterChild(u32)` -- a child after this many known children (0: before the first)
+  - `InCell(u32)` -- inside the element's cell at this position (attributes, RefBy, text)
+  - `InShapes(u32)` -- inside the element's Shapes child (a page's, master's or group's), after this many
+    Shape elements; an attribute here is one of the Shapes element itself
+  - `InConnects(u32)` -- inside the element's Connects child, after this many Connect elements; an attribute
+    here is one of the Connects element itself
+
+- **`enum ExtraItem`**
+  an unknown attribute, element or text
+  - `Attribute { name: Sym, value: Sym, }` -- name="value" (the name with its prefix as written)
+  - `Element(Sym)` -- an element with everything inside it, as XML text
+  - `Text(Sym)` -- character data
+
+- **`struct Extra`**
+  one unknown item and its place
+  - `place: Place` -- where it stood
+  - `item: ExtraItem` -- what it was
+
+- **`struct Extras(Option<Box<Vec<Extra>>>)`**
+  the unknown items of one element (nothing allocated while there are none)
+
+**`impl Extras`**
+
+- **`const fn new() -> Self`**
+  none
+- **`fn push(&mut self, extra: Extra)`**
+  add one item
+- **`fn items(&self) -> &[Extra]`**
+  the items in the order they were added
+- **`fn is_empty(&self) -> bool`**
+  whether there are none
+
+- **`struct Trigger`**
+  an update trigger (Trigger N="..." with its RefBy children kept as XML)
+  - `name: Sym` -- the trigger name (N)
+  - `inner: Sym` -- its children as XML text (Sym::EMPTY: none)
+
+- **`enum RowKey`**
+  how a row is identified in its section
+  - `Index(u32)` -- IX (rows of Geometry, Character, Connection ...)
+  - `Named(Sym)` -- N (rows of User, Property, Hyperlink ...)
+
+- **`struct SecKey`**
+  how a section is identified in its sheet: Geometry by index, every other section index 0
+  - `name: Sym` -- the section name (N)
+  - `index: u32` -- IX of the section (0-based; only Geometry has several)
+
+**`impl SecKey`**
+
+- **`const fn one(name: Sym) -> SecKey`**
+  a section that exists once per sheet
+
+- **`struct CellAddr`**
+  where a cell sits in a sheet
+  - `section: Option<SecKey>` -- None: a single cell of the sheet
+  - `row: Option<RowKey>` -- None: a cell of the section itself (Geometry's NoFill ...)
+  - `cell: Sym` -- the cell name
+
+**`impl CellAddr`**
+
+- **`const fn single(cell: Sym) -> CellAddr`**
+  a single cell (PinX, Width ...)
+- **`const fn section(section: SecKey, cell: Sym) -> CellAddr`**
+  a cell of a section itself (Geometry1.NoFill)
+- **`const fn row(section: SecKey, row: RowKey, cell: Sym) -> CellAddr`**
+  a cell of a row (Geometry1.X2, Prop.Name.Value)
+
+- **`struct Row`**
+  a row of a section
+  - `key: RowKey` -- IX or N
+  - `ix_written: bool` -- whether IX stood in the file (false: the position gave the index)
+  - `local_name: Option<Sym>` -- the language-dependent name (LocalName)
+  - `kind: Option<Sym>` -- the row type (T): MoveTo, LineTo ... in Geometry; None: inherited or none
+  - `del: bool` -- Del="1": the inherited row is deleted here
+  - `cells: Vec<Cell>` -- the cells in file order
+  - `triggers: Vec<Trigger>` -- update triggers of the row
+  - `extras: Extras` -- unknown items
+
+**`impl Row`**
+
+- **`fn new(key: RowKey) -> Row`**
+  an empty row
+- **`fn cell(&self, name: Sym) -> Option<&Cell>`**
+  the cell named `name`
+- **`fn cell_pos(&self, name: Sym) -> Option<usize>`**
+  the position of the cell named `name`
+
+- **`struct Section`**
+  a section of a sheet
+  - `name: Sym` -- the section name (N)
+  - `index: u32` -- IX (0-based; counted when the file has none)
+  - `ix_written: bool` -- whether IX stood in the file
+  - `del: bool` -- Del="1": the inherited section is deleted here
+  - `cells: Vec<Cell>` -- cells of the section itself (Geometry: NoFill, NoLine, NoShow, NoSnap, NoQuickDrag)
+  - `rows: Vec<Row>` -- the rows in file order (indexed rows by rising IX)
+  - `triggers: Vec<Trigger>` -- update triggers of the section
+  - `extras: Extras` -- unknown items
+
+**`impl Section`**
+
+- **`fn new(key: SecKey) -> Section`**
+  an empty section
+- **`fn key(&self) -> SecKey`**
+  the section's key
+- **`fn row(&self, key: RowKey) -> Option<&Row>`**
+  the row with this key
+- **`fn row_pos(&self, key: RowKey) -> Option<usize>`**
+  the position of the row with this key
+- **`fn cell(&self, name: Sym) -> Option<&Cell>`**
+  the cell of the section itself named `name`
+- **`fn insert_pos(&self, key: RowKey) -> usize`**
+  where a new indexed row with this index belongs (rows stay sorted by index)
+
+- **`struct Sheet`**
+  a ShapeSheet: single cells and sections
+  - `cells: Vec<Cell>` -- the single cells in file order
+  - `sections: Vec<Section>` -- the sections in file order
+  - `triggers: Vec<Trigger>` -- update triggers of the sheet
+  - `extras: Extras` -- unknown items
+
+- **`enum Local<'a>`**
+  what a sheet holds at an address, without inheritance
+  - `Cell(&'a Cell)` -- the cell is here
+  - `Deleted` -- the row or section is here with Del="1"
+  - `Missing` -- nothing here: ask the parent
+
+**`impl Sheet`**
+
+- **`fn new() -> Sheet`**
+  an empty sheet
+- **`fn cell(&self, name: Sym) -> Option<&Cell>`**
+  the single cell named `name`
+- **`fn section(&self, key: SecKey) -> Option<&Section>`**
+  the section with this key
+- **`fn section_pos(&self, key: SecKey) -> Option<usize>`**
+  the position of the section with this key
+- **`fn find(&self, addr: &CellAddr) -> Local<'_>`**
+  the cell at `addr` in this sheet alone (no inheritance)
+- **`fn is_empty(&self) -> bool`**
+  whether the sheet holds no cells, sections or triggers
+
+### `diagram_core/src/strings.rs`
+
+Source: [`lib/diagram_core/src/strings.rs`](../lib/diagram_core/src/strings.rs)
+
+```text
+strings -- the document's string table: names, formulas and texts kept once, as Sym
+
+  Strings::new()                  "" is Sym::EMPTY, then the names the crate knows
+  s.intern("PinX") -> Sym         the string's handle (the same text -> the same Sym)
+  s.get("PinX") -> Option<Sym>    without adding it
+  s.str(sym) -> &str
+
+A drawing with thousands of shapes repeats a few hundred cell names and formulas many times
+(THEMEVAL(), GUARD(Width*0.5) ...); each text is kept once and a cell holds four-byte
+handles.  The table only grows: a Sym stays valid as long as its document, so undo steps can
+keep them.  A Sym belongs to one document; between documents texts go through str().
+
+The texts come from files, which are untrusted: the index is an ordered map, so no choice of
+texts makes a lookup slower than log n comparisons (a hash table with a fixed hash can be
+flooded with texts that all fall on one slot).
+```
+
+- **`struct Sym(pub(crate) u32)`**
+  a text of a document's string table (cell and row names, formulas, values, raw XML)
+
+**`impl Sym`**
+
+- **`const EMPTY: Sym = Sym(0)`**
+  the empty text
+- **`fn index(self) -> u32`**
+  the position in the table (0 = the empty text)
+
+- **`struct Strings`**
+  the string table of a document
+
+**`impl Strings`**
+
+- **`fn new() -> Self`**
+  a table with the empty text and the names the crate itself refers to
+- **`fn intern(&mut self, text: &str) -> Sym`**
+  the handle of `text`, added when it is new
+- **`fn get(&self, text: &str) -> Option<Sym>`**
+  the handle of `text` when the table has it
+- **`fn str(&self, sym: Sym) -> &str`**
+  the text of a handle ("" for a handle of another, larger table)
+- **`fn len(&self) -> usize`**
+  the number of texts in the table
+- **`fn is_empty(&self) -> bool`**
+  whether the table holds nothing but the empty text and the known names
+
+### `diagram_core/src/units.rs`
+
+Source: [`lib/diagram_core/src/units.rs`](../lib/diagram_core/src/units.rs)
+
+```text
+units -- the unit codes of a cell (attribute U) and conversion to the internal units
+
+  Unit::parse("MM") / u.code()     the code as the file writes it; Unit::Other keeps codes the
+                                   crate does not know
+  u.dimension()                    Length, Angle, Duration, Date, Area, Number, Text ...
+  u.to_internal(25.4) -> 1.0       a value in the unit -> the value V stores (inches, radians,
+                                   days, square inches); u.from_internal(1.0) -> 25.4
+  convert(x, from, to)             between two units of one dimension
+  Implicit { drawing, page, text, angle, duration }   what DL, DP, DT, DA, DE stand for on a page
+
+The file keeps every value in internal units: lengths in inches, angles in radians, durations
+and dates in days; U only says how the value is shown and typed in (FEATURES.md 1.6, [MS-VSDX]
+Cell_Type).  A text size of 8 pt is V="0.1111" U="PT", an angle of 270 degrees
+V="4.7124" U="DEG".  DL, DP, DT, DA and DE are "the page's drawing, page, text, angle and
+duration unit": without the page they convert like inches, inches, points, radians and days.
+Ciceros and didots use the Didot point of 0.376065 mm (1157 dd = 1238 pt of 1/72.27 in).
+```
+
+- **`enum Unit`**
+  a unit code of the attribute U
+  - `Inches` -- IN: inches
+  - `InchesFrac` -- IN_F: inches shown as fractions
+  - `Feet` -- FT: feet
+  - `FeetInches` -- F_I: feet and inches
+  - `Yards` -- YD: yards
+  - `Miles` -- MI: miles
+  - `MilesFrac` -- MI_F: miles shown as fractions
+  - `NauticalMiles` -- NM: nautical miles (1852 m)
+  - `Millimeters` -- MM: millimetres
+  - `Centimeters` -- CM: centimetres
+  - `Meters` -- M: metres
+  - `Kilometers` -- KM: kilometres
+  - `Points` -- PT: points (1/72 in)
+  - `Picas` -- P: picas (12 pt)
+  - `PicasPoints` -- P_PT: picas and points
+  - `Didots` -- D: didots
+  - `Ciceros` -- C: ciceros (12 didots)
+  - `CicerosDidots` -- C_D: ciceros and didots
+  - `DrawingLength` -- DL: the page's drawing unit
+  - `PageLength` -- DP: the page's page unit
+  - `TextLength` -- DT: the text unit (points)
+  - `Degrees` -- DEG: degrees
+  - `DegreesMinSec` -- AD: degrees, minutes, seconds
+  - `Radians` -- RAD: radians
+  - `DefaultAngle` -- DA: the default angle unit
+  - `Days` -- ED: elapsed days
+  - `Hours` -- EH: elapsed hours
+  - `Minutes` -- EM: elapsed minutes
+  - `Seconds` -- ES: elapsed seconds
+  - `Weeks` -- EW: elapsed weeks
+  - `DefaultDuration` -- DE: the default duration unit
+  - `Date` -- DATE: a date (days)
+  - `Acres` -- AC: acres
+  - `Hectares` -- HA: hectares
+  - `Percent` -- PER: per cent (the value is a fraction: 0.5 is 50 %)
+  - `Currency` -- CY: currency
+  - `Bool` -- BOOL: a truth value
+  - `Color` -- COLOR: a colour (index or RGB)
+  - `Str` -- STR: a string
+  - `Guid` -- GUID: a GUID string
+  - `Point` -- PNT: a two-dimensional point
+  - `Nurbs` -- NURBS: the result of a NURBS() formula
+  - `Polyline` -- POLYLINE: the result of a POLYLINE() formula
+  - `Number` -- NUM: a plain number
+  - `Other(Sym)` -- a code the crate does not know, kept as written
+
+- **`enum Dimension`**
+  what a unit measures
+  - `Length` -- internal unit: inches
+  - `Angle` -- internal unit: radians
+  - `Duration` -- internal unit: days
+  - `Date` -- internal unit: days since 30 December 1899
+  - `Area` -- internal unit: square inches
+  - `Number` -- a plain number (per cent as a fraction, currency)
+  - `Typed` -- strings, colours, truth values, points, NURBS and polylines: no conversion
+  - `Unknown` -- an unknown unit
+
+**`impl Unit`**
+
+- **`fn parse(code: &str) -> Option<Unit>`**
+  the unit of a known code (None: unknown, keep it as Unit::Other)
+- **`fn code(self) -> Option<&'static str>`**
+  the code as the file writes it (None for Other: its Sym holds the code)
+- **`fn dimension(self) -> Dimension`**
+  what the unit measures
+- **`fn factor(self) -> Option<f64>`**
+  how many internal units one of this unit is (None: the unit has no factor)
+- **`fn to_internal(self, value: f64) -> f64`**
+  a value given in this unit -> the internal value V stores (unchanged without a factor)
+- **`fn from_internal(self, internal: f64) -> f64`**
+  an internal value -> the value in this unit (unchanged without a factor)
+
+- **`fn convert(value: f64, from: Unit, to: Unit) -> Option<f64>`**
+  `value` in unit `from` -> unit `to`; None when the dimensions differ or a unit has no factor
+
+- **`struct Implicit`**
+  what the implicit units stand for on a page (its drawing, page, text, angle and duration
+  units); `resolve` replaces DL, DP, DT, DA and DE by them
+  - `drawing: Unit` -- DL: the drawing unit (shown lengths of the drawing)
+  - `page: Unit` -- DP: the page unit
+  - `text: Unit` -- DT: the text unit
+  - `angle: Unit` -- DA: the angle unit
+  - `duration: Unit` -- DE: the duration unit
+
+**`impl Implicit`**
+
+- **`fn resolve(&self, unit: Unit) -> Unit`**
+  the explicit unit behind `unit` (other units unchanged)
+
+### `diagram_core/src/views.rs`
+
+Source: [`lib/diagram_core/src/views.rs`](../lib/diagram_core/src/views.rs)
+
+```text
+views -- rows of a sheet as the user knows them: shape data, user cells, hyperlinks, layers
+
+  doc.section_rows(sheet, sec) -> Vec<RowView>   every row a section really has
+  doc.shape_data(sheet)        the Property rows (DA-01: Label, Type, Format, Value ...)
+  doc.user_cells(sheet)        the User rows (Value, Prompt)
+  doc.hyperlinks(sheet)        the Hyperlink rows (Address, SubAddress, Description ...)
+  doc.layers(page)             the Layer rows of a page sheet (Name, Visible, Print, Lock ...)
+  doc.layer_members(shape)     the layer indices of a shape (LayerMember "0;2")
+  row.get("Label") -> Resolved   row.text("Label") / num(..) / flag(..)
+
+The views read through inheritance (inherit.rs): an instance shows the shape data of its
+master with its own values over them.  Shape data, user cells and hyperlinks exist on shapes,
+pages and the document alike.
+```
+
+- **`struct RowView<'d>`**
+  one row of a section with access to its cells
+  - `sheet: SheetRef` -- the sheet asked
+  - `section: SecKey` -- the section
+  - `row: EffRow` -- the row
+
+**`impl<'d> RowView<'d>`**
+
+- **`fn key(&self) -> RowKey`**
+  IX or N
+- **`fn name(&self) -> Option<&'d str>`**
+  the universal name of a named row (Prop.&lt;name>, User.&lt;name>)
+- **`fn addr(&self, cell: Sym) -> CellAddr`**
+  the address of one of its cells
+- **`fn cell(&self, cell: Sym) -> Resolved<'d>`**
+  a cell of the row
+- **`fn get(&self, cell: &str) -> Resolved<'d>`**
+  a cell of the row by name
+- **`fn text(&self, cell: &str) -> Option<&'d str>`**
+  a cell's value as text (None: a number or no value)
+- **`fn num(&self, cell: &str) -> Option<f64>`**
+  a cell's value as a number
+- **`fn flag(&self, cell: &str) -> bool`**
+  a cell's value as a truth value (a number other than 0, or "TRUE")
+
+**`impl Document`**
+
+- **`fn section_rows(&self, sheet: SheetRef, sec: SecKey) -> Vec<RowView<'_>>`**
+  every row section `sec` really has for `sheet`
+- **`fn shape_data(&self, sheet: SheetRef) -> Vec<RowView<'_>>`**
+  the shape data fields (Property rows)
+- **`fn user_cells(&self, sheet: SheetRef) -> Vec<RowView<'_>>`**
+  the user-defined cells (User rows)
+- **`fn hyperlinks(&self, sheet: SheetRef) -> Vec<RowView<'_>>`**
+  the hyperlinks (Hyperlink rows)
+- **`fn layers(&self, page: PageRef) -> Vec<RowView<'_>>`**
+  the layers of a page (Layer rows of its page sheet; the index is the layer's number)
+- **`fn layer_by_name(&self, page: PageRef, name: &str) -> Option<u32>`**
+  the layer of a page with this universal name (NameUniv, else Name) -> its index
+- **`fn layer_members(&self, shape: ShapeRef) -> Vec<u32>`**
+  the layers a shape is on (its LayerMember cell, with inheritance)
+
+- **`fn parse_members(text: &str) -> Vec<u32>`**
+  a LayerMember text ("0;2") -> the layer indices
+
+## diagram_io
+
+*Visio file formats (the VSDX family) and diagram exports* -- crate root [`lib/diagram_io/src/lib.rs`](../lib/diagram_io/src/lib.rs)
+
+```text
+diagram_io -- Visio file formats (the VSDX family) and diagram exports
+
+Reads and writes the model of diagram_core (apps/JFDiagrammer, plan in its PLAN.md).  The
+format follows the public specification [MS-VSDX]; no code of other implementations is used.
+
+  vsdx::read(&bytes, &vsdx::Limits::VSDX) -> Result<vsdx::Loaded, vsdx::Error>
+                      a .vsdx, .vsdm, .vstx, .vstm, .vssx or .vssm file into a Document:
+                      styles, the document sheet, colours and fonts, pages with shapes and
+                      connects, masters, themes (raw), windows.xml, properties, media,
+                      comments and data recordsets (kept as parts); unknown items in the
+                      Extras where they stood (DF-03); nothing recomputed or rerouted
+  vsdx::write(&doc, &vsdx::WriteOptions::DEFAULT) -> Result<Vec<u8>, vsdx::WriteError>
+                      the model as a file of any of the six formats, with everything it does
+                      not know where it stood; deterministic, DEFLATE; a file read and written
+                      unchanged reads back as the same model
+  vsdx::new_document(kind, Measure::Metric)   a new drawing, template or stencil with JFLib's
+                      own styles, document sheet and DrawingML theme "NetLab"
+  vsdx::Format        the six formats by main content type or extension
+  stencil::build(&files, Measure::Metric) -> Result<stencil::Built, stencil::SourceError>
+                      (JD9) the text sources of a stencil (stencil.txt, *.master, SVG
+                      drawings; apps/JFDiagrammer/stencils/README.md) into a stencil:
+                      masters in five languages, formulas computed, icons rendered from the
+                      shapes, name-based GUIDs; stencil::build_vssx gives the .vssx bytes too
+
+What is to come here, by stage of the plan:
+  JD12  exports: SVG, PNG and PDF through the library's writers
+  later the XML formats of 2003-2010 (.vdx, .vsx) and importing the binary .vss / .vsd
+
+The ZIP and OPC parts come from archive (archive::opc, JD1), shared with doc_io's DOCX.
+Every file is untrusted input: sizes, counts and nesting are bounded, a file that breaks a
+rule is an error and never a panic, external links are kept as data and never followed, and
+nothing in a file is ever run (the macro project of a .vsdm is kept as bytes).
+```
+
+### `diagram_io/src/blank.rs`
+
+Source: [`lib/diagram_io/src/blank.rs`](../lib/diagram_io/src/blank.rs)
+
+```text
+blank -- new documents from scratch: drawing, template, stencil (vsdx::new_document)
+
+Everything here is JFLib's own: the style sheets and the document sheet hold values chosen
+for the NetLab look, the theme is the own DrawingML theme "NetLab" (theme.rs); nothing comes
+from Visio's files.  What a file needs so that Visio opens it follows the public [MS-VSDX]:
+the document part with its root style sheet ID 0 "No Style" (every other style inherits from
+it), Colors and FaceNames with at least one entry each, a Pages part with one page whose
+PageSheet is there (a drawing's and template's page has its own part, a stencil's none), the
+theme part named by the document part, the document properties (optional, written with the
+application's name only: no user data).  And windows.xml: [MS-VSDX] calls the windows part
+unused, but desktop Visio refuses a file without it (error 271, found with the user's Visio
+on 2026-11-17); an empty Windows element with the client size is enough (windows_xml).
+
+The styles (universal names as Visio knows them, so that formulas and Visio's connector
+detection find them):
+  0 No Style   the root: every line, fill, text block, character and paragraph cell with a
+               plain value -- the NetLab look without a design (Signalblau 1 pt line, light
+               blue fill, anthracite Inter 10 pt, centred text); themed cells fall back to it
+  5 Theme      based on No Style (JD11): every cell a design sets is THEMEVAL() (V "Themed"),
+               the QuickStyle cells 100 (the variant's colour 1 and style 1), the theme index
+               cells 65534 (the page's design)
+  1 Normal     based on Theme: what shapes use
+  2 Connector  based on Normal: the connector scheme's style 1 (line with its arrow, text),
+               no fill, the background colour behind the text
+  3 Guide      based on No Style: thin light blue dashed line, no fill
+  4 Text Only  based on Normal: no line, no fill, the dark text of font style 1, with
+               Visio's contrast rule for text (QuickStyleVariation 2)
+DocumentSettings name Normal as the default text, line and fill style and Guide as the
+default guide style.  The page is A4 (metric, millimetres) or Letter (US, inches), landscape,
+and shows the design NetLab, variant 1 (design::catalog).
+```
+
+- **`enum Measure`**
+  the measuring system of a new document (FEATURES LG-07, MS-07)
+  - `Metric` -- millimetres, A4
+  - `Us` -- inches, Letter
+
+- **`fn new_document(kind: DocKind, measure: Measure) -> Document`**
+  a new document of this kind with JFLib's own defaults (see the module comment); a stencil
+  has no masters yet, a drawing and a template one empty page
+
+### `diagram_io/src/stencil.rs`
+
+Source: [`lib/diagram_io/src/stencil.rs`](../lib/diagram_io/src/stencil.rs)
+
+```text
+stencil -- the stencil build tool (JD9): the text sources of a stencil into a stencil document
+and a .vssx file
+
+  stencil::build(&files, Measure::Metric) -> Result<Built, SourceError>
+  stencil::build_vssx(&files, Measure::Us) -> Result<(Built, Vec<u8>), SourceError>
+  Built { doc, stencil, file, category, measure }   the stencil document (DocKind::Stencil),
+                                  its universal name, the output stem, the category
+  built.vssx_name()               "standard_m.vssx" / "standard_u.vssx"
+  SourceError { file, line, message }   shown as "rectangle.master:12: unbekannter
+                                  Abschnitt [Geometrie]" (line 0: the whole file)
+
+`files(name)` gives the text of "stencil.txt", of "<stem>.master" and of an SVG file named by
+a master, all of one stencil folder (None: there is none).  The source format, and what goes
+into the file, is apps/JFDiagrammer/stencils/README.md; the app's build.rs calls this for each
+stencil and both measures.  The parser is stencil_src.rs, the SVG import stencil_svg.rs, the
+icons stencil_icon.rs.
+
+How a stencil is built, in this order:
+1. stencil.txt and every master file are parsed and checked for the chosen measure: header
+   keys, sections, row heads, cell names (each section's own list), the five languages of
+   every language-suffixed key or cell, Width and Height as lengths, formulas that parse and
+   call only functions the engine knows.  A ".metric" / ".us" line replaces the line
+   without suffix.
+2. A new stencil (vsdx::new_document: the own styles and the NetLab theme) gets the masters in
+   one transaction: the Master attributes (Name and Prompt in the build language,
+   IsCustomName(U), IconSize 1, AlignName 2, MatchByName 0, IconUpdate 1, PatternFlags 0,
+   Hidden 0 (1 with the header key `hidden: true`: a master the Shapes panel does not show,
+   which code drops), MasterType 2, BaseID and UniqueID), the master page (PageWidth / PageHeight =
+   the shape's size, scale 1:1 in mm or in, ShapeKeywords, the JFD_ User cells), the master
+   shape with its cells, sections, text and the SVG geometry.  Constants are written as values
+   with their unit (lengths in inches with U = MM, IN ...), everything else as a formula; the
+   tool adds PinX / PinY (half the size), LocPinX = Width*0.5, LocPinY = Height*0.5.
+3. Every reference of every formula must name something that is there (a cell of the sheet
+   or of its styles, a single cell of the ShapeSheet's own list, Sheet.N of the master).  The
+   formula engine computes every formula and its values are stored: a cell the engine keeps
+   (unknown function, unknown section, cycle) or that comes out as an error is a build error
+   naming the source line.  No stale value goes into the file.
+4. Each master's icon is rendered from an instance on the stencil's page (stencil_icon.rs);
+   the instance goes again, the page stays empty.
+
+The GUIDs are name-based (SHA-1, RFC 4122 version 5, namespace of this tool): BaseID from the
+stencil's NameU, the master's NameU and the measure; UniqueID from the same and the master's
+content as built (the resolved lines, the SVG, the build language, the quick flag, the tool's
+version), so an unchanged master keeps its UniqueID and a changed one gets a new one (MS-02).
+Upper case in braces, as Visio writes them.  The same sources always give the same document
+and the same bytes.
+
+The JFD_ cells (diagram_core::instance reads them): the document sheet's User.JFD_Name (the
+title in de|en|es|it|fr) and User.JFD_Category; per master page User.JFD_Name, JFD_Prompt,
+JFD_Keywords, JFD_Text, JFD_Quick (1 for the first `quick` masters) and JFD_Tr1, JFD_Tr2 ...
+("Section.Row.Cell|de|en|es|it|fr" with VSDX section names: Control.Row_1.Tip).
+
+Sources are files of the repository, trusted but checked all the same: no panic on any input,
+counts bounded, no recursion.
+```
+
+- **`struct Built`**
+  a stencil built from its sources
+  - `doc: Document` -- the stencil (DocKind::Stencil)
+  - `stencil: String` -- its universal name (stencil.txt `stencil`)
+  - `file: String` -- the stem of the output files (stencil.txt `file`)
+  - `category: String` -- the category in "Weitere Shapes" (stencil.txt `category`)
+  - `measure: Measure` -- the measure it was built for
+
+**`impl Built`**
+
+- **`fn vssx_name(&self) -> String`**
+  the file name of the .vssx: `<file>_m.vssx` (metric) or `<file>_u.vssx` (US)
+
+- **`struct SourceError`**
+  why a stencil did not build: the source file, the line (from 1; 0: the whole file) and why
+  - `file: String` -- the file in the stencil's folder ("rectangle.master")
+  - `line: u32` -- the line, from 1 (0: the file as a whole)
+  - `message: String` -- what is wrong
+
+```rust
+/// the categories of "Weitere Shapes" a stencil may name
+CATEGORIES: [&str; 9] = ["general", "flowchart", "business", "engineering", "netw ...
+```
+
+- **`fn build(files: &dyn Fn(&str) -> Option<String>, measure: Measure) -> Result<Built, SourceError>`**
+  build the stencil of one folder for one measure (see the module comment)
+
+- **`fn build_vssx(files: &dyn Fn(&str) -> Option<String>, measure: Measure) -> Result<(Built, Vec<u8>), SourceError>`**
+  build the stencil and write it as .vssx bytes (vsdx::write with the default options)
+
+### `diagram_io/src/vsdx.rs`
+
+Source: [`lib/diagram_io/src/vsdx.rs`](../lib/diagram_io/src/vsdx.rs)
+
+```text
+vsdx -- the VSDX family (.vsdx .vsdm .vstx .vstm .vssx .vssm) and diagram_core's model
+
+  vsdx::read(&bytes, &Limits::VSDX) -> Result<Loaded, Error>
+  Loaded { doc, format, warnings, more_warnings }
+  vsdx::write(&doc, &WriteOptions::DEFAULT) -> Result<Vec<u8>, WriteError>
+  WriteOptions { format, level, zip }    another format (EX-11), the DEFLATE level, ZIP bounds
+  vsdx::new_document(kind, Measure)      a new drawing, template or stencil (blank.rs)
+  Format::from_content_type(ct) / from_extension("vsdx") / extension() / content_type()
+  Limits::VSDX                 the bounds of a file: ZIP (archive::Limits), XML nesting and
+                               attributes, counts of shapes, cells, rows and sections, the
+                               length of one formula and of one shape text
+  Error / Warning              why a file was refused / what was odd but kept
+
+What lands where (MS-VSDX; FEATURES.md 1.1 and 1.6):
+  document.xml   DocumentSettings, Colors, FaceNames, StyleSheets, DocumentSheet; EventList,
+                 HeaderFooter, PublishSettings and everything else unknown in doc.extras
+  pages.xml      the pages (PageSheet, the Rel to the page part), the page parts' shapes and
+                 Connect entries
+  masters.xml    the masters (PageSheet, Icon, Rel), the master parts' shapes and connects
+  themes         every part a theme relationship names, raw (doc.themes); a page part's own
+                 theme relationship sets Page::theme (Visio files pick a page's theme by its
+                 ThemeIndex cell: JD4 reads that)
+  everything else  windows.xml, docProps (core, app, custom), the thumbnail, media, comments,
+                 data connections and recordsets, validation, solutions, the macro project,
+                 unknown parts: doc.parts as bytes, in package order
+  relationships  every one as read in doc.rels (also the external ones, never followed)
+Unknown attributes, elements and text go into the Extras of the element they stood in
+(diagram_core's sheet.rs says how).  Nothing is computed on opening: values stay the cached
+values of the file, connectors are not rerouted, Cell::stale stays false.
+
+The macro project of a macro-enabled file (vbaProject.bin and its relationship) is kept as a
+part and never run; Document::macros says the file has the right for one.  A file whose main
+content type is not macro-enabled but that carries a macro project is refused (Error::Macros).
+
+Writing (pack.rs names the parts and keeps the relationships, write.rs makes the XML) puts
+every part of the model back: document.xml, pages.xml and masters.xml with their parts, the
+themes and every part kept as bytes (unknown packages pass through), the unknown items of
+every element at their place, the relationships with their ids (raw XML may name them), the
+main part's relationship of Visio's own type, deleted subshapes with ID 4294967295, children
+in [MS-VSDX]'s order, numbers in the shortest form that reads back the same.  The same model
+always gives the same bytes, and a file read and written again reads as the same model and
+writes the same bytes once more.  A document without windows.xml gets one of its own: desktop
+Visio refuses a file without it (error 271), although [MS-VSDX] calls the part unused.  A
+macro project is written back unchanged into a format
+that may carry it (never run); into one that may not it is WriteError::Macros.  The writer
+does not compute anything either: a cell whose formula changed (Cell::stale) keeps the value
+it has until the formula engine sets one.  It does not recurse and never panics; XML the
+model only holds as written must be well-formed where it stands, or the part is refused
+(WriteError::Xml) rather than written broken.
+
+Every file is untrusted input.  The ZIP and OPC rules come from archive::opc (names, content
+types, relationships, sizes, the ratio of compressed parts); this module adds the XML bounds,
+the counts, the structure (root elements, required attributes, IDs as numbers, r:id that name a
+relationship of the right type, a part used once), and refuses cycles: styles based on each
+other, masters that contain instances of each other, background pages of each other.  A
+reference that names nothing (a master, master shape, style, background page, connected shape)
+is kept as it is and reported as a Warning.  No panic, and no recursion: deep groups cost heap,
+never stack.
+```
+
+- **`struct Format`**
+  one of the six files of the VSDX family: drawing, template or stencil, with or without
+  the right to carry macros
+  - `kind: DocKind` -- drawing (.vsdx), template (.vstx) or stencil (.vssx)
+  - `macros: bool` -- macro-enabled (.vsdm, .vstm, .vssm)
+
+**`impl Format`**
+
+- **`fn from_content_type(content_type: &str) -> Option<Format>`**
+  the format of a main part's content type (exact, as [MS-VSDX] names them)
+- **`fn from_extension(ext: &str) -> Option<Format>`**
+  the format of a file extension without the dot, ASCII case ignored ("VSDX", "vssm")
+- **`fn extension(self) -> &'static str`**
+  the extension without the dot ("vsdx")
+- **`fn content_type(self) -> &'static str`**
+  the content type of the main part
+
+- **`struct Limits`**
+  the bounds of one file; Limits::VSDX is the default
+  - `zip: archive::Limits` -- the ZIP container: parts, sizes, the ratio of a compressed part (archive::Limits)
+  - `depth: usize` -- most open elements in one XML part (a group in a group costs two levels); the reader
+    does not recurse, so this bounds memory and time, never the stack
+  - `attrs: usize` -- most attributes on one element
+  - `shapes: usize` -- most shapes in the document (pages and masters, all levels)
+  - `cells: usize` -- most cells in the document (every sheet)
+  - `rows: usize` -- most rows in the document
+  - `sections: usize` -- most sections in the document
+  - `objects: usize` -- most pages, masters and styles together
+  - `items: usize` -- most other things kept: connects, triggers, text marks and runs, colours, fonts,
+    settings, relationships and unknown items (attributes, elements, text)
+  - `formula_bytes: usize` -- most bytes of one formula (F) or text value (V)
+  - `text_bytes: usize` -- most bytes of one shape text
+  - `warnings: usize` -- most warnings kept in Loaded::warnings (the others are only counted)
+
+**`impl Limits`**
+
+- **`const VSDX: Limits = Limits { zip: archive::Limits { entries: 100_000, part_by ...`**
+  large drawings: 100000 parts, 512 MiB a part, 2 GiB in all, archives up to 1 GiB, no part
+  denser than 200:1 (the proposal of archive::Limits); 256 levels of XML, 256 attributes, a
+  million shapes, 16 million cells, 4 million rows, 2 million sections, formulas and values
+  up to 1 MiB, shape texts up to 4 MiB, 100000 pages, masters and styles, 4 million other
+  items
+
+- **`enum Error`**
+  why a file was refused
+  - `Package(opc::Error)` -- the ZIP container or the OPC package: structure, names, content types, relationships,
+    sizes and ratios (archive::opc)
+  - `NotVisio` -- no main part of the VSDX family: not a Visio file (another OPC format, or no main part)
+  - `Macros` -- a macro project in a file whose main content type is not macro-enabled
+  - `Xml { part: String, line: u32, error: XmlError, }` -- a part is no XML this reader takes (`line` counts from 1)
+  - `Structure { part: String, line: u32, what: &'static str, }` -- a part breaks the structure of the format: another root element, a missing or malformed
+    attribute (an ID that is no number), an r:id that names no relationship of the right type,
+    a part used twice, a duplicate ID
+  - `Limit(&'static str)` -- the document needs more than Limits allows: "shapes", "cells", "rows", "sections",
+    "objects", "items", "formula", "text"
+  - `Cycle { what: &'static str, id: u32, }` -- a cycle: "style" (styles based on each other), "master" (masters containing instances of
+    each other), "background" (background pages of each other); the ID where it was found
+
+- **`enum Warning`**
+  something odd that was kept as it is
+  - `MissingMaster { part: String, shape: u32, master: u32, }` -- a shape names a master the document does not have
+  - `MissingMasterShape { part: String, shape: u32, master_shape: u32, }` -- a subshape of an instance names a shape its master does not have
+  - `MissingStyle { part: String, style: u32, }` -- a sheet or a setting names a style the document does not have
+  - `MissingBackPage { page: u32, back_page: u32, }` -- a page names a background page that does not exist or is no background page
+  - `MissingShape { part: String, shape: u32, }` -- a Connect entry names a shape the page or master does not have
+  - `NoContents { what: &'static str, id: u32, }` -- a page or master without a Rel to its contents: it has no shapes
+  - `ExternalPicture { part: String, shape: u32, }` -- a picture whose relationship points outside the package: kept, never fetched
+  - `UnusedPart { part: String, }` -- a page or master part that no Page or Master element names: kept as a plain part
+
+- **`struct Loaded`**
+  a file read into the model
+  - `doc: Document` -- the document
+  - `format: Format` -- which of the six formats the main content type says
+  - `warnings: Vec<Warning>` -- what was odd, at most Limits::warnings of them
+  - `more_warnings: usize` -- how many warnings more there were
+
+- **`struct WriteOptions`**
+  how vsdx::write writes a file
+  - `format: Option<Format>` -- the format to write; None: the document's own (Document::kind, Document::macros).  A
+    drawing can be written as a template and the other way round (EX-11); the content stays
+    as it is, only the main part's content type changes
+  - `level: u8` -- DEFLATE level 1 (fastest) to 9 (smallest), 0: stored; 6 by default
+  - `zip: archive::Limits` -- the bounds of the ZIP container written (Limits::VSDX.zip by default): a document that
+    needs more is refused instead of written into a file the reader would refuse
+
+**`impl WriteOptions`**
+
+- **`const DEFAULT: WriteOptions = WriteOptions { format: None, level: 6, zip: Limits::VSDX. ...`**
+  the document's own format, DEFLATE level 6, the reader's ZIP bounds
+
+- **`enum WriteError`**
+  why a document could not be written
+  - `Package(opc::Error)` -- the package: a part name or content type OPC does not take, a part too large for
+    WriteOptions::zip, more parts than it allows (archive::opc)
+  - `Macros` -- the document carries a macro project (vbaProject.bin and its relationship) and the format
+    may not: write it as .vsdm, .vstm or .vssm, or take the project out of Document::parts
+  - `Part { part: String, what: &'static str, }` -- a part the model keeps as bytes (Document::parts) has a name that is no valid part name
+    or that another part has, or no content type
+  - `Xml { part: String, line: u32, }` -- XML the model holds as written (unknown elements in the extras, unknown text marks,
+    trigger contents) does not fit where it stands: the part would not be well-formed
+
+- **`fn write(doc: &Document, options: &WriteOptions) -> Result<Vec<u8>, WriteError>`**
+  write a document as a file of the VSDX family (see the module comment); the same document
+  always gives the same bytes, and a document read from a file and written unchanged reads
+  back as the same model
+
+- **`fn read(bytes: &[u8], limits: &Limits) -> Result<Loaded, Error>`**
+  read a file of the VSDX family; `limits` bound everything (Limits::VSDX for real files)
+
+### `diagram_io/src/xml.rs`
+
+Source: [`lib/diagram_io/src/xml.rs`](../lib/diagram_io/src/xml.rs)
+
+```text
+xml -- a bounded pull reader for the XML parts of the VSDX family
+
+  Reader::new(text, depth, attrs)    a part's text (UTF-8 or UTF-16 decoded by text_of)
+  r.next() -> Event                  Start, End, Text, Eof; an empty element <a/> gives Start
+                                     (empty: true) and then End
+  r.skip(&start) -> &str             the rest of an element, returned as the file wrote it
+                                     (an unknown element kept for DF-03)
+
+Why not base::xml: shape text is mixed content (<Text>ab<cp IX='0'/>cd</Text>), and unknown
+elements must come back as written; base::xml builds trees of element-only or text-only nodes.
+
+What it reads: elements, attributes in ' or ", the five predefined entities and character
+references, CDATA, comments and processing instructions (both skipped), namespaces (each name
+is resolved to the few namespaces the reader knows, Ns).  Refused: a DOCTYPE (no entities,
+no external anything), an undefined entity, a character XML does not allow, an encoding other
+than UTF-8 / UTF-16 in the declaration, mismatched or unclosed tags, an unbound prefix, a
+duplicate attribute, more nesting than `depth` and more attributes on one element than
+`attrs`.  Line ends are normalised as XML says: CR LF and CR become LF in text; in attribute
+values a literal tab, line end or CR becomes a space (character references stay).  Nothing
+recurses: a reader's stack is its own Vec, bounded by `depth`.
+```
+
+- **`enum XmlError`**
+  what is wrong with a part's XML
+  - `Syntax` -- not well-formed: a broken tag, attribute, entity or character, tags that do not match,
+    text outside the root element, an unbound namespace prefix, a duplicate attribute
+  - `Depth` -- deeper nesting than Limits::depth
+  - `Attributes` -- more attributes on one element than Limits::attrs, or more than 64 namespace
+    declarations in scope
+  - `Unsupported` -- a DOCTYPE, or an encoding other than UTF-8 and UTF-16 (declared or as bytes)
 
 ## rt
 
@@ -53863,6 +59568,1030 @@ callback such as a window procedure: core panics once more there, with one of NO
   (`"panicked at FILE:LINE:COL:\nMESSAGE"`), taken: for a panic the app caught with
   `std::panic::catch_unwind`, whose payload holds the message alone.  None when no panic came
   since the last call (or the program is built with `panic = "abort"`).
+
+## pdf
+
+*vector PDF writer with embedded font subsets, links and outlines* -- crate root [`lib/pdf/src/lib.rs`](../lib/pdf/src/lib.rs)
+
+```text
+pdf -- a vector PDF writer: pages of their own size drawn on a canvas (paths, fills with the
+non-zero or even-odd rule, strokes with width, dashes, caps, joins and miter limit,
+transforms, clipping, alpha, RGB colours, axial and radial gradients with any number of stops
+and alpha, hatches of parallel lines), images (JPEG passed through, other pixels with
+FlateDecode and their alpha as a soft mask), text in embedded TrueType / OpenType subsets
+(CID fonts with Identity-H, ToUnicode for search and copy, glyphs and widths from the
+library's shaping), links to URIs and to places in the document, nested outlines
+(bookmarks), the document information and XMP metadata.  PDF 1.7 with a classic xref table;
+the same document always gives the same bytes.  Not here: PDF/A, encryption, forms.
+
+  let mut doc = Document::new();
+  let page = doc.add_page(A4.0, A4.1);              // points (1/72 inch); mm(210.0) converts
+  let font = doc.add_font(bytes, 0)?;                // TrueType / OpenType (CFF), a collection's face
+  {
+      let mut c = doc.canvas(page, Origin::TopLeft); // or BottomLeft (PDF's own page space)
+      c.set_fill_color(Rgb::hex(0x2060C0));
+      c.rect(40.0, 40.0, 200.0, 100.0);
+      c.fill(FillRule::NonZero);
+      c.text(font, 12.0, 40.0, 180.0, "Hallo, Welt");  // shaped; returns the advance
+      c.link_uri(40.0, 168.0, 80.0, 16.0, "https://example.org/");
+  }                                                  // the drawing goes into the page here
+  doc.add_outline(None, "Start", Dest::Fit(page));
+  let bytes = doc.write()?;
+
+  Document     add_page / page_size / page_count, canvas(page, origin) -> Canvas,
+               add_font -> FontId, font_metrics, shape, text_width, add_image(Image) -> ImageId,
+               add_outline -> OutlineId, set_outline_open, set_info(Info), set_language,
+               set_compression, write() -> bytes
+  Canvas       save / restore, transform / translate / scale / rotate, fill / stroke colour and
+               alpha, line width, cap, join, miter limit, dash, path building (move_to,
+               line_to, curve_to, quad_to, rect, rounded_rect, ellipse, circle, arc, close,
+               append_path), fill / stroke / fill_stroke / clip / end_path, shade /
+               fill_shading (gradients), fill_hatch, image / image_transform, text /
+               text_fallback / glyphs, set_text_mode, link_uri / link_dest, dest (a
+               destination at a point of this canvas)
+  Path         the same path building, kept and drawn later (Canvas::fill_path, stroke_path)
+  Shading      a gradient: ShadingKind Axial / Radial (PDF shading types 2 and 3), stops
+               (t, colour, alpha), extend; Shading::axial / radial
+  Hatch        parallel lines: angle, spacing, width, colour, alpha, a point on a line
+  Image        jpeg(file), gray / rgb / rgba(w, h, pixels), from_surface(gfx::Surface),
+               with_alpha, interpolate
+
+Text: Canvas::text shapes one line with lib/text_shape (HarfRust: kerning, ligatures, marks,
+Arabic joining, bidi); Canvas::glyphs takes glyphs a layout shaped already (pdf::Glyph).  Each glyph is
+placed where the shaping put it (TJ adjustments against the font's widths); the CIDs are the
+font's glyph ids.  The first glyph of each cluster maps to the cluster's text in ToUnicode.
+Variable fonts are embedded at their default instance, colour glyphs as their outlines.
+Fonts whose OS/2 fsType forbids embedding are refused (Error::FontLicense); fsType "no
+subsetting" embeds every glyph.
+
+Gradients (shading.rs): DeviceRGB shadings with a Type 2 function per stretch between stops,
+stitched by a Type 3 function; one alpha for all stops is the fill alpha (ExtGState ca), varying
+alpha a luminosity soft mask (a transparency group painting the alphas as a DeviceGray shading
+in the same user space).  Degenerate gradients paint the last stop's colour as SVG does.
+Hatches are clipped, stroked lines in one path, not tiling patterns (pdfium shows seams between
+rotated pattern cells, and readers round the cell step to device pixels).
+```
+
+### `pdf` crate root
+
+```rust
+/// A4 portrait in points
+A4: (f64, f64) = (595.275_590_551_181_1, 841.889_763_779_527_6)
+/// A3 portrait in points
+A3: (f64, f64) = (841.889_763_779_527_6, 1_190.551_181_102_362_2)
+/// A5 portrait in points
+A5: (f64, f64) = (419.527_559_055_118_1, 595.275_590_551_181_1)
+/// US Letter portrait in points
+LETTER: (f64, f64) = (612.0, 792.0)
+/// US Legal portrait in points
+LEGAL: (f64, f64) = (612.0, 1008.0)
+```
+
+- **`fn mm(v: f64) -> f64`**
+  millimetres in points
+
+- **`fn inch(v: f64) -> f64`**
+  inches in points
+
+```rust
+/// the smallest and largest page side PDF readers take (ISO 32000-1, Annex C)
+PAGE_MIN: f64 = 3.0
+PAGE_MAX: f64 = 14_400.0
+```
+
+- **`enum Error`**
+  - `Font(&'static str)` -- the font file cannot be used: damaged, or a kind not taken
+  - `FontLicense(&'static str)` -- the font's licence (OS/2 fsType) does not allow embedding
+  - `Image(&'static str)` -- image data that does not fit what it claims
+  - `Unsupported(&'static str)` -- valid input this writer does not handle (CFF2 fonts, arithmetic-coded JPEG, ...)
+  - `Invalid(&'static str)` -- the document cannot be written as it is (no pages, a link to a page it lacks, ...)
+
+- **`struct Glyph`**
+  a shaped glyph for Canvas::glyphs: Document::shape gives them, a text layout that shaped
+  its lines already builds its own
+  - `font: usize` -- which of the fonts passed along (0: the first)
+  - `id: u32` -- the glyph id in that font
+  - `advance: i32` -- how far the pen moves after the glyph, in font units
+  - `x: i32` -- the glyph's offset from the pen in font units (y up)
+  - `y: i32`
+  - `cluster: usize` -- the byte range of the text the glyph stands for (its cluster): cluster..end
+  - `end: usize`
+
+- **`struct PageId(pub u32)`**
+  a page of a document (Document::add_page), counted from 0
+
+- **`struct FontId(u32)`**
+  a font of a document (Document::add_font)
+
+- **`struct ImageId(u32)`**
+  an image of a document (Document::add_image)
+
+- **`struct OutlineId(u32)`**
+  an outline item (Document::add_outline)
+
+- **`enum Dest`**
+  a place in the document for links and outline items
+  - `Fit(PageId)` -- the whole page in the window
+  - `Xyz { page: PageId, left: f64, top: f64, zoom: Option<f64> }` -- the point (left, top) of PDF page space (points from the bottom left, y up) at the top
+    left of the window; zoom None keeps the reader's (Canvas::dest builds one from a
+    canvas's own coordinates)
+
+- **`struct Date`**
+  a date of the document information: local time and its offset from UTC
+  - `year: u16`
+  - `month: u8`
+  - `day: u8`
+  - `hour: u8`
+  - `minute: u8`
+  - `second: u8`
+  - `offset_minutes: i16` -- minutes east of UTC (+60: Central European Time), -1439 to 1439
+
+- **`struct Info`**
+  the document information (the Info dictionary and the same in XMP metadata); unset fields
+  are left out
+  - `title: Option<String>`
+  - `author: Option<String>`
+  - `subject: Option<String>`
+  - `keywords: Option<String>`
+  - `creator: Option<String>` -- the program the document was made with
+  - `producer: Option<String>` -- the program that wrote the PDF (None: "JFLib")
+  - `created: Option<Date>`
+  - `modified: Option<Date>`
+
+- **`struct Document`**
+  a PDF document being built: its pages, fonts, images, outlines and information
+
+**`impl Document`**
+
+- **`fn new() -> Document`**
+- **`fn add_page(&mut self, width: f64, height: f64) -> PageId`**
+  a new page at the end, width and height in points (clamped to PAGE_MIN .. PAGE_MAX)
+- **`fn page_count(&self) -> usize`**
+- **`fn page_size(&self, page: PageId) -> Option<(f64, f64)>`**
+  width and height in points
+- **`fn canvas(&mut self, page: PageId, origin: Origin) -> Canvas<'_>`**
+  drawing on a page (panics for a page this document does not have)
+- **`fn add_font(&mut self, data: Vec<u8>, face: u32) -> Result<FontId, Error>`**
+  a TrueType or OpenType font (glyf or CFF outlines; `face`: of a collection, else 0)
+- **`fn font_metrics(&self, font: FontId) -> Option<FontMetrics>`**
+- **`fn shape(&self, fonts: &[FontId], text: &str) -> Vec<Glyph>`**
+  one line shaped with the fonts (the first, then fallbacks per script run); empty for an
+  unknown font or a line beyond 64 KiB
+- **`fn text_width(&self, fonts: &[FontId], size: f64, text: &str) -> f64`**
+  the advance of one shaped line at `size` points
+- **`fn add_image(&mut self, img: Image) -> ImageId`**
+- **`fn add_outline(&mut self, parent: Option<OutlineId>, title: &str, dest: Dest) -> OutlineId`**
+  an outline item (bookmark) under `parent` (None: at the top), after its siblings; open
+  (its children shown) until set_outline_open says otherwise
+- **`fn set_outline_open(&mut self, item: OutlineId, open: bool)`**
+- **`fn set_info(&mut self, info: Info)`**
+- **`fn set_language(&mut self, lang: &str)`**
+  the document's language (BCP 47, e.g. "de-DE")
+- **`fn set_compression(&mut self, level: u8)`**
+  DEFLATE level 0 (streams uncompressed, for reading the file) to 9; default 6
+- **`fn write(&self) -> Result<Vec<u8>, Error>`**
+  the PDF file
+
+### `pdf/src/canvas.rs`
+
+Source: [`lib/pdf/src/canvas.rs`](../lib/pdf/src/canvas.rs)
+
+```text
+canvas -- drawing on one page: paths, paint, transforms, clipping, images, text, links
+
+The canvas writes the page's content stream.  Graphics state that only matters when
+something is painted (colours, alpha, line width, caps, joins, miter limit, dash, text mode)
+is kept as wanted and written just before the paint operator that needs it, so a run of
+paths in the same style writes it once.  Transforms (`cm`) are written at once; a path
+still open when the transform changes keeps where it was drawn.  Path construction is
+buffered until it is painted, so no state operator ever lands inside a path object.
+```
+
+- **`enum Origin`**
+  where a canvas puts (0, 0) and which way y grows
+  - `TopLeft` -- the top left corner of the page, y downwards (as gfx, the screen and page layout)
+  - `BottomLeft` -- the bottom left corner, y upwards (PDF's own page space)
+
+- **`struct Canvas<'a>`**
+  drawing on one page (Document::canvas).  Coordinates are points (1/72 inch) from the
+  origin the canvas was made with; what it draws goes into the page when it is dropped, with
+  every save it left open restored.  Several canvases on one page draw one after the other.
+
+**`impl<'a> Canvas<'a>`**
+
+- **`fn page(&self) -> PageId`**
+  the page this canvas draws on
+- **`fn page_size(&self) -> (f64, f64)`**
+  width and height of the page in points
+- **`fn ctm(&self) -> Matrix`**
+  the current transform from this canvas's coordinates to PDF page space (points from the
+  bottom left, y up)
+- **`fn document(&self) -> &Document`**
+  the document (fonts, metrics, shaping) while drawing
+- **`fn save(&mut self)`**
+  saves the whole state (transform, clip, colours, alpha, stroke and text settings)
+- **`fn restore(&mut self)`**
+  back to the state of the matching save (none open: nothing happens)
+- **`fn depth(&self) -> usize`**
+  how many saves are open
+- **`fn transform(&mut self, m: Matrix)`**
+  m first, then the current transform (singular or not finite: ignored)
+- **`fn translate(&mut self, tx: f64, ty: f64)`**
+- **`fn scale(&mut self, sx: f64, sy: f64)`**
+- **`fn rotate(&mut self, angle: f64)`**
+  radians: counter-clockwise where y points up, clockwise where it points down
+- **`fn set_fill_color(&mut self, c: Rgb)`**
+- **`fn set_stroke_color(&mut self, c: Rgb)`**
+- **`fn set_fill_alpha(&mut self, a: f64)`**
+  opacity of fills, text fills and images, 0 to 1 (kept in thousandths)
+- **`fn set_stroke_alpha(&mut self, a: f64)`**
+  opacity of strokes, 0 to 1 (kept in thousandths)
+- **`fn set_line_width(&mut self, w: f64)`**
+  in the coordinates at the time of the stroke (0: the thinnest line the device draws)
+- **`fn set_line_cap(&mut self, cap: LineCap)`**
+- **`fn set_line_join(&mut self, join: LineJoin)`**
+- **`fn set_miter_limit(&mut self, limit: f64)`**
+  the longest miter, as a multiple of the line width (at least 1)
+- **`fn set_dash(&mut self, pattern: &[f64], phase: f64)`**
+  dashes: lengths on, off, on, ... from `phase` into the pattern; an empty list (or one
+  with a negative length or only zeros) draws solid lines
+- **`fn set_text_mode(&mut self, mode: TextMode)`**
+- **`fn move_to(&mut self, x: f64, y: f64)`**
+- **`fn line_to(&mut self, x: f64, y: f64)`**
+- **`fn curve_to(&mut self, x1: f64, y1: f64, x2: f64, y2: f64, x: f64, y: f64)`**
+- **`fn quad_to(&mut self, x1: f64, y1: f64, x: f64, y: f64)`**
+- **`fn close(&mut self)`**
+- **`fn rect(&mut self, x: f64, y: f64, w: f64, h: f64)`**
+- **`fn rounded_rect(&mut self, x: f64, y: f64, w: f64, h: f64, r: f64)`**
+- **`fn ellipse(&mut self, cx: f64, cy: f64, rx: f64, ry: f64)`**
+- **`fn circle(&mut self, cx: f64, cy: f64, r: f64)`**
+- **`fn arc(&mut self, cx: f64, cy: f64, rx: f64, ry: f64, start: f64, sweep: f64)`**
+  Path::arc on the canvas's path
+- **`fn append_path(&mut self, p: &Path)`**
+  a prepared path's subpaths, in the current coordinates
+- **`fn fill(&mut self, rule: FillRule)`**
+  fills the path and starts a new one
+- **`fn stroke(&mut self)`**
+  strokes the path and starts a new one
+- **`fn fill_stroke(&mut self, rule: FillRule)`**
+  fills, then strokes the path, and starts a new one
+- **`fn clip(&mut self, rule: FillRule)`**
+  intersects the clip with the path (until the matching restore) and starts a new path
+- **`fn end_path(&mut self)`**
+  drops the path without painting it
+- **`fn fill_path(&mut self, p: &Path, rule: FillRule)`**
+- **`fn stroke_path(&mut self, p: &Path)`**
+- **`fn shade(&mut self, s: &Shading)`**
+  paints the gradient over the whole current clip (`sh`), its coordinates in the current user
+  space, times the canvas's fill alpha.  Degenerate geometry paints the last stop's colour
+  (axial from = to, radial with both radii 0: everywhere; two equal circles: that disk); no
+  stops, coordinates that are not finite or a negative radius: nothing.  The path being built
+  is kept.
+- **`fn fill_shading(&mut self, rule: FillRule, s: &Shading)`**
+  fills the path with the gradient (q, clip with `rule`, sh, Q) and starts a new path, as
+  fill() does; what shade() does with degenerate and invalid gradients, within the path (an
+  invalid one drops the path)
+- **`fn fill_hatch(&mut self, rule: FillRule, h: &Hatch)`**
+  fills the path with the hatch's lines (q, clip with `rule`, the lines stroked, Q) and starts
+  a new path, as fill() does.  Lines at least as wide as their spacing fill the path solid;
+  an angle, spacing, width or origin that is not finite (or a spacing or width &lt;= 0), a path
+  with coordinates that are not finite or more than 100 000 lines: nothing, the path dropped
+- **`fn image(&mut self, img: ImageId, x: f64, y: f64, w: f64, h: f64)`**
+  the image upright (as it looks on the page) in the rectangle x, y, w, h of the current
+  coordinates
+- **`fn image_transform(&mut self, img: ImageId, m: Matrix)`**
+  the image's unit square (row 0 along y = 1, column 0 along x = 0) mapped by m into the
+  current coordinates
+- **`fn text(&mut self, font: FontId, size: f64, x: f64, y: f64, s: &str) -> f64`**
+  one line of text shaped with the font (kerning, ligatures, marks, bidi), its baseline
+  starting at (x, y), `size` the em in points; upright as it looks on the page.  Returns
+  the advance along the baseline (0 when nothing was drawn).
+- **`fn text_fallback(&mut self, fonts: &[FontId], size: f64, x: f64, y: f64, s: &str) -> f64`**
+  the same with fallback fonts: a run of one script the first font cannot show comes from
+  the first of the others that can
+- **`fn glyphs(&mut self, fonts: &[FontId], size: f64, x: f64, y: f64, glyphs: &[Glyph], text: &str) -> f64`**
+  shaped glyphs (in visual order; `Glyph::font` indexes `fonts`) from the
+  pen at (x, y); `text` is the shaped string (each glyph's cluster is a byte range of it)
+  for search and copy.  Returns the advance.
+- **`fn link_uri(&mut self, x: f64, y: f64, w: f64, h: f64, uri: &str)`**
+  a link on the rectangle x, y, w, h (its box on the page when turned) to a URI
+- **`fn link_dest(&mut self, x: f64, y: f64, w: f64, h: f64, dest: Dest)`**
+  a link on the rectangle x, y, w, h to a place in the document
+- **`fn dest(&self, x: f64, y: f64) -> Dest`**
+  a destination showing the point (x, y) of this canvas at the top left of the window,
+  the zoom unchanged
+
+### `pdf/src/font.rs`
+
+Source: [`lib/pdf/src/font.rs`](../lib/pdf/src/font.rs)
+
+```text
+font -- TrueType / OpenType fonts for a document: their metrics, the glyphs a document uses,
+and what goes into the file: a Type0 font with Identity-H encoding over a CIDFont whose CIDs
+are the font's glyph ids, a subset of the font program (TrueType: unused glyphs emptied in
+glyf; CFF: unused charstrings replaced by endchar, cff.rs), the widths (W) and a ToUnicode
+CMap for search and copy.
+
+Glyph ids stay as they are (CIDToGIDMap /Identity), so nothing in the content stream depends on
+which glyphs the document uses; the emptied entries of glyf, loca and hmtx compress to
+almost nothing.
+```
+
+- **`struct FontMetrics`**
+  the vertical metrics of a font in its own units (Document::font_metrics)
+  - `units_per_em: u16`
+  - `ascent: i16` -- above the baseline (positive)
+  - `descent: i16` -- below the baseline (negative)
+  - `line_gap: i16`
+  - `cap_height: i16`
+  - `x_height: i16`
+  - `glyphs: u16` -- how many glyphs the font has
+
+### `pdf/src/geom.rs`
+
+Source: [`lib/pdf/src/geom.rs`](../lib/pdf/src/geom.rs)
+
+```text
+geom -- matrices, colours, paths and the stroke parameters of a canvas
+```
+
+- **`struct Matrix`**
+  an affine matrix as PDF writes it (`a b c d e f cm`): x' = a x + c y + e, y' = b x + d y + f
+  - `a: f64`
+  - `b: f64`
+  - `c: f64`
+  - `d: f64`
+  - `e: f64`
+  - `f: f64`
+
+**`impl Matrix`**
+
+- **`const IDENTITY: Matrix = Matrix { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: 0.0, f: 0.0 }`**
+- **`const fn new(a: f64, b: f64, c: f64, d: f64, e: f64, f: f64) -> Matrix`**
+- **`const fn translate(tx: f64, ty: f64) -> Matrix`**
+- **`const fn scale(sx: f64, sy: f64) -> Matrix`**
+- **`fn rotate(angle: f64) -> Matrix`**
+  a rotation by `angle` radians: counter-clockwise where y points up, clockwise on a canvas
+  whose y points down
+- **`fn then(&self, next: &Matrix) -> Matrix`**
+  self first, then `next` (PDF's self × next)
+- **`fn apply(&self, x: f64, y: f64) -> (f64, f64)`**
+- **`fn det(&self) -> f64`**
+- **`fn invert(&self) -> Option<Matrix>`**
+  the inverse; None when the matrix is singular or not finite
+
+- **`struct Rgb`**
+  an RGB colour, each part 0 to 1 (DeviceRGB)
+  - `r: f64`
+  - `g: f64`
+  - `b: f64`
+
+**`impl Rgb`**
+
+- **`const BLACK: Rgb = Rgb { r: 0.0, g: 0.0, b: 0.0 }`**
+- **`const WHITE: Rgb = Rgb { r: 1.0, g: 1.0, b: 1.0 }`**
+- **`const fn new(r: f64, g: f64, b: f64) -> Rgb`**
+- **`fn from_u8(r: u8, g: u8, b: u8) -> Rgb`**
+  from 0..255 parts
+- **`fn hex(rgb: u32) -> Rgb`**
+  from 0xRRGGBB
+
+- **`enum FillRule`**
+  which parts of a path a fill covers (PDF `f` / `f*`)
+  - `NonZero`
+  - `EvenOdd`
+
+- **`enum LineCap`**
+  the ends of open subpaths and dashes (PDF `J`)
+  - `Butt`
+  - `Round`
+  - `Square`
+
+- **`enum LineJoin`**
+  the corners of a stroke (PDF `j`)
+  - `Miter`
+  - `Round`
+  - `Bevel`
+
+- **`enum TextMode`**
+  how text is painted (PDF `Tr`)
+  - `Fill`
+  - `Stroke`
+  - `FillStroke`
+  - `Invisible` -- not painted, but found by search and copied (e.g. text over a scanned page)
+
+- **`struct Path`**
+  a path: subpaths of lines and cubic curves, built once and drawn on any canvas
+  (Canvas::append_path) or built on the canvas itself (its move_to, line_to, ...)
+
+**`impl Path`**
+
+- **`fn new() -> Path`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn clear(&mut self)`**
+- **`fn current(&self) -> Option<(f64, f64)>`**
+  the current point (None before the first move_to and after clear)
+- **`fn move_to(&mut self, x: f64, y: f64) -> &mut Path`**
+  starts a subpath
+- **`fn line_to(&mut self, x: f64, y: f64) -> &mut Path`**
+  a straight line from the current point (without one: a move_to)
+- **`fn curve_to(&mut self, x1: f64, y1: f64, x2: f64, y2: f64, x: f64, y: f64) -> &mut Path`**
+  a cubic Bézier curve with control points (x1, y1) and (x2, y2) to (x, y)
+- **`fn quad_to(&mut self, x1: f64, y1: f64, x: f64, y: f64) -> &mut Path`**
+  a quadratic Bézier curve (written as the same cubic)
+- **`fn close(&mut self) -> &mut Path`**
+  closes the subpath with a line to its start
+- **`fn rect(&mut self, x: f64, y: f64, w: f64, h: f64) -> &mut Path`**
+  a closed rectangle as its own subpath (PDF `re`)
+- **`fn ellipse(&mut self, cx: f64, cy: f64, rx: f64, ry: f64) -> &mut Path`**
+  a closed ellipse around (cx, cy) as four cubic curves
+- **`fn circle(&mut self, cx: f64, cy: f64, r: f64) -> &mut Path`**
+- **`fn rounded_rect(&mut self, x: f64, y: f64, w: f64, h: f64, r: f64) -> &mut Path`**
+  a closed rectangle with corners rounded by r (at most half the shorter side)
+- **`fn arc(&mut self, cx: f64, cy: f64, rx: f64, ry: f64, start: f64, sweep: f64) -> &mut Path`**
+  an elliptical arc around (cx, cy) from angle `start` over `sweep` radians (positive:
+  from +x towards +y), as cubic curves of at most 90 degrees; it continues the subpath
+  with a line to its start, or starts one
+- **`fn append(&mut self, other: &Path) -> &mut Path`**
+  appends another path's subpaths
+- **`fn transform(&mut self, m: &Matrix)`**
+  every point mapped by m (a rectangle becomes four lines when m turns it)
+
+### `pdf/src/image.rs`
+
+Source: [`lib/pdf/src/image.rs`](../lib/pdf/src/image.rs)
+
+```text
+image -- raster images for a document: JPEG files as they are (DCTDecode), all other pixels
+FlateDecode with PNG predictors and their alpha as a soft mask (SMask)
+```
+
+- **`struct Image`**
+  an image for Document::add_image: a JPEG passed through, or 8-bit pixels (gray, RGB, RGBA,
+  a gfx surface) with an optional alpha channel
+
+**`impl Image`**
+
+- **`fn jpeg(data: Vec<u8>) -> Result<Image, Error>`**
+  a JPEG file, embedded unchanged: baseline, extended or progressive, 8 bits, 1, 3 or 4
+  components (Adobe's inverted CMYK understood)
+- **`fn gray(w: u32, h: u32, px: &[u8]) -> Result<Image, Error>`**
+  8-bit gray, rows from the top
+- **`fn rgb(w: u32, h: u32, px: &[u8]) -> Result<Image, Error>`**
+  8-bit RGB, rows from the top
+- **`fn rgba(w: u32, h: u32, px: &[u8]) -> Result<Image, Error>`**
+  8-bit RGBA with straight (not premultiplied) alpha, rows from the top
+- **`fn from_surface(s: &gfx::Surface) -> Result<Image, Error>`**
+  a gfx surface: XRGB (opaque), PARGB (premultiplied, un-premultiplied here), ARGB, A8
+  (as gray)
+- **`fn with_alpha(mut self, alpha: Vec<u8>) -> Result<Image, Error>`**
+  an alpha channel (one byte per pixel, rows from the top) for any image, a JPEG too
+- **`fn interpolate(mut self, on: bool) -> Image`**
+  smooth the image when a reader scales it up (PDF /Interpolate)
+- **`fn size(&self) -> (u32, u32)`**
+  width and height in pixels
+- **`fn is_jpeg(&self) -> bool`**
+- **`fn has_alpha(&self) -> bool`**
+
+### `pdf/src/shading.rs`
+
+Source: [`lib/pdf/src/shading.rs`](../lib/pdf/src/shading.rs)
+
+```text
+shading -- gradients (axial and radial shadings, ISO 32000-1 8.7.4.5) and hatches for
+Canvas::shade, fill_shading and fill_hatch
+
+A gradient becomes a shading dictionary of type 2 (axial) or 3 (radial) in DeviceRGB.  Its
+colour function: one Type 2 function (exponential, N 1) from colour to colour, or for more stops
+a Type 3 stitching function of such pieces, one per stretch between two stops; stops at the same
+t (a hard edge) leave out the empty stretch between them, so Bounds always rise.  Before the
+first stop and after the last the colour stays the first / last stop's.  The stops' alpha:
+all the same -> the constant fill alpha (ExtGState ca); different -> a luminosity soft mask whose
+group paints the same geometry as a DeviceGray shading of the alphas (Canvas builds it).
+
+Hatches are stroked lines, not tiling patterns: pdfium draws the cells of a rotated tiling
+pattern with hairline gaps and one-pixel steps where they meet, and both pdfium and Poppler round
+the cell step to whole device pixels, so the lines drift from where they belong.  A hatch clips
+to the path and strokes parallel lines over its bounding box in one path (one `S`, so a hatch's
+alpha applies once).
+```
+
+- **`enum ShadingKind`**
+  the geometry of a gradient, in the user space of the canvas at the time it is painted
+  - `Axial { from: [f64; 2], to: [f64; 2] }` -- colour runs from `from` (t = 0) to `to` (t = 1), constant across (PDF type 2)
+  - `Radial { from: [f64; 2], r0: f64, to: [f64; 2], r1: f64 }` -- circles from (from, r0) at t = 0 to (to, r1) at t = 1 (PDF type 3); radii >= 0
+
+- **`struct Shading`**
+  a gradient for Canvas::shade and Canvas::fill_shading
+  - `kind: ShadingKind`
+  - `stops: Vec<(f64, Rgb, f64)>` -- (t in 0..=1 ascending, colour, alpha 0..=1); at least one stop.  Stops with a NaN t are
+    dropped, t is clamped to 0..=1 and the stops sorted by it (stable: two stops at the same t
+    make a hard edge); a NaN alpha is opaque
+  - `extend: (bool, bool)` -- paint beyond t &lt; 0 / t > 1 with the end colours (PDF /Extend), default (true, true)
+
+**`impl Shading`**
+
+- **`fn axial(from: [f64; 2], to: [f64; 2], stops: &[(f64, Rgb, f64)]) -> Shading`**
+  an axial gradient from `from` to `to`, extended at both ends
+- **`fn radial(from: [f64; 2], r0: f64, to: [f64; 2], r1: f64, stops: &[(f64, Rgb, f64)]) -> Shading`**
+  a radial gradient from the circle (from, r0) to (to, r1), extended at both ends
+
+- **`struct Hatch`**
+  parallel lines for Canvas::fill_hatch; two hatches over the same path cross
+  - `angle: f64` -- direction of the lines in the canvas's user space, radians from +x towards +y: counter-
+    clockwise on the page where y points up (Origin::BottomLeft), clockwise where it points down
+    (Origin::TopLeft, as Canvas::rotate)
+  - `spacing: f64` -- distance between neighbouring lines (user space units), > 0
+  - `width: f64` -- line width (user space units), > 0; at least `spacing` fills the path solid
+  - `color: Rgb`
+  - `alpha: f64` -- 0 to 1, times the canvas's fill alpha
+  - `origin: [f64; 2]` -- a point one of the lines runs through (user space)
+
+**`impl Hatch`**
+
+- **`fn new(angle: f64, spacing: f64, width: f64, color: Rgb) -> Hatch`**
+  opaque lines through (0, 0)
+
+## diagram_view
+
+*draws diagram pages (the display list of diagram_core) on render2d and gfx* -- crate root [`lib/diagram_view/src/lib.rs`](../lib/diagram_view/src/lib.rs)
+
+```text
+diagram_view -- draws diagram pages (the display list of diagram_core) on render2d and gfx
+
+  FontSet / Class / FontSource     the fonts texts are drawn with (the app hands them over:
+                                   its style's fonts, installed ones); missing families are
+                                   substituted by class with a width factor (TX-09)
+  PageView::new(&doc, page, &mut fonts, &opts)   a page as a render2d scene (made without a
+                                   device) plus gradients and pictures
+  view.update(&doc, &mut fonts, &shapes) -> Option<[f64; 4]>   (JD7) edited shapes made anew
+                                   in the list and the scene, the box of what changed
+  view.draw(dc, sf, r, &cam)       on the CPU: render2d's CPU path, gfx in between
+  view.render(w, h) -> Surface     the whole page as an XRGB image (tests, exports, thumbnails)
+  view.fit(size, margin) -> Camera
+  image::{bytes, decode, base64}   Foreign shapes' pictures: PNG and JPEG decoded, EMF / WMF
+                                   and the rest as placeholders
+  export::{pdf, svg, raster}       (JD12) pages as PDF (lib/pdf), SVG, PNG and JPEG
+  Metrics::new(&fonts)             (JD7) the formula engine's TextMetrics (TEXTWIDTH,
+                                   TEXTHEIGHT) measured as the page views draw
+
+Why a crate of its own (JD4): diagram_core holds the model and the display list without any
+dependency, so that diagram_io's exports (SVG, PDF, JD12) and JD7's hit tests use the same
+list; drawing it needs render2d (and through it the GPU layer), gfx and the image codecs,
+which neither the model nor the file formats should pull in.  ui knows nothing of diagrams:
+the app connects a PageView to its canvas (ui.diagram's DgPaint, or a ui.gpu_view later).
+
+What render2d's scene cannot hold -- gradient fills and pictures -- is drawn by gfx between
+two of the scene's layers on the CPU path; a scene attached to a GPU (Scene::attach) shows
+everything else.  Coordinates: paper inches, y up, the origin at the page's bottom left
+corner (render2d's camera has y up too).
+```
+
+### `diagram_view/src/export/mod.rs`
+
+Source: [`lib/diagram_view/src/export/mod.rs`](../lib/diagram_view/src/export/mod.rs)
+
+```text
+export -- the pages of a diagram as files (JD12: EX-01 PDF, EX-03 SVG, EX-04 PNG, EX-05 JPEG)
+
+  pages(doc, &Pages) -> Vec<PageRef>     which pages: the one shown, every foreground page, a
+                                         range of them (from 1), a list
+  page_name(doc, page) -> String         Name, else NameU, else its number among the pages
+  links(doc, drawing) -> Vec<Link>       the shapes' hyperlinks with their boxes on the page
+  pdf::write(doc, fonts, &PdfOptions)    a vector PDF: a PDF page per page in its size, text
+                                         as text in embedded subsets, links, a bookmark per page
+  pdf::Sheets                            drawings placed on sheets of paper (printing: tiles,
+                                         margins, scaling) through the same drawing code
+  svg::write(doc, drawing, &SvgOptions)  one page as SVG: paths, text, pictures, gradients,
+                                         hatches, links
+  raster::render(view, &RasterOptions)   a page (or a part of it) at a resolution, on a colour
+                                         or transparent; raster::png / raster::jpeg encode it
+
+Why here and not in diagram_io: a page is exported as the screen shows it, so the texts must
+be measured with the fonts they are drawn with (PageView builds the display list with this
+crate's FontSet and render2d's text layout), the PDF must embed the very faces the screen
+uses (FontSet's substitution, TX-09), and PNG / JPEG are this crate's renderer.  diagram_io
+stays the file format crate without render2d; lib/pdf adds no crate this one did not pull in
+already (gfx, img_core, text_shape).
+
+Every export reads the display list (diagram_core::render::Drawing: paper inches, y up, the
+origin at the page's bottom left corner).  PDF and SVG write it in points (1/72 inch); SVG
+with y down (its own convention), PDF with y up.  Text runs keep the width the layout
+measured: the PDF scales each run horizontally to it, the SVG gives textLength.
+```
+
+- **`enum Pages`**
+  which pages an export takes
+  - `Current(PageRef)` -- one page (the one shown; may be a background page)
+  - `All` -- every foreground page in the document's order
+  - `Range { from: u32, to: u32 }` -- foreground pages from..=to, counted from 1 (clamped to the pages there are)
+  - `List(Vec<PageRef>)` -- these pages in this order
+
+- **`fn foreground_pages(doc: &Document) -> Vec<PageRef>`**
+  the foreground pages in the document's order
+
+- **`fn pages(doc: &Document, sel: &Pages) -> Vec<PageRef>`**
+  the pages a selection names
+
+- **`fn page_name(doc: &Document, page: PageRef) -> String`**
+  a page's name: Name, else NameU, else its number among all pages (from 1)
+
+- **`fn page_by_name(doc: &Document, sub_address: &str) -> Option<PageRef>`**
+  the page a hyperlink's sub-address names ("Seite-2", "Seite-2/Sheet.5", "Page-2,200"), by
+  Name or NameU, case-insensitive
+
+- **`enum LinkTarget`**
+  where a hyperlink goes
+  - `Uri(String)` -- an address (URL, mail, file) as the file has it
+  - `Page(PageRef)` -- a page of the same document
+
+- **`struct Link`**
+  a shape's hyperlink on the page
+  - `shape: ShapeRef`
+  - `bbox: [f64; 4]` -- the box of what the shape draws (paper inches, y up)
+  - `target: LinkTarget`
+  - `description: String` -- Description (may be empty)
+
+- **`fn links(doc: &Document, drawing: &Drawing) -> Vec<Link>`**
+  the hyperlinks of the shapes a drawing shows: per shape its first Hyperlink row with an
+  address (else a sub-address naming a page), on the box of the items of the shape and its
+  subshapes; shapes without anything drawn have no link
+
+### `diagram_view/src/export/pdf.rs`
+
+Source: [`lib/diagram_view/src/export/pdf.rs`](../lib/diagram_view/src/export/pdf.rs)
+
+```text
+pdf -- pages as a vector PDF through lib/pdf (EX-01), and drawings placed on sheets of paper
+
+  write(doc, fonts, &PdfOptions) -> Result<bytes, pdf::Error>   the export: a PDF page per
+                                    page in the page's size (points), text as text in embedded
+                                    subsets, the shapes' hyperlinks (addresses and pages of the
+                                    export), a bookmark per page, the document information
+  Sheets::new(fonts)                drawings on sheets of any size (printing: paper, margins,
+                                    scale, tiles)
+    sheets.add(doc, drawing, (w, h), place, clip, links) -> pdf::PageId
+    sheets.pdf() -> &mut pdf::Document   outlines, information, language
+    sheets.finish() -> Result<bytes, pdf::Error>
+
+The display list (paper inches, y up) is drawn in the sheet's space through `place` (paper
+inches -> points, y up from the sheet's bottom left corner).  Fills: solid with their alpha,
+gradients as PDF shadings (axial, radial; varying alpha as a soft mask, lib/pdf), hatches as
+lines through the page's origin (a pixel at 96 DPI wide) stroked inside the clipped area
+(lib/pdf's fill_hatch: tiling patterns showed seams in pdfium); lines with
+width (0: the thinnest line the device draws), dashes, caps, joins, miter limit 4; pictures
+clipped to the shape's box (JPEG passed through, PNG as pixels with alpha, metafiles as the
+screen's placeholder); texts per run in the face the screen uses (diagram_view's FontSet with
+its substitution), scaled horizontally so that the run is as wide as the layout measured it,
+Letterspace as added advance, a synthetic italic slanted like the screen's.  A font whose
+licence forbids embedding (or that lib/pdf refuses) is replaced by the set's face of its class.
+Pages larger than PDF allows (200 inches a side) are scaled down to fit.
+```
+
+- **`struct PdfOptions`**
+  what write puts into the PDF
+  - `pages: Vec<PageRef>` -- the pages in order (export::pages)
+  - `render: render::Options` -- background pages under the pages, hidden layers
+  - `links: bool` -- the shapes' hyperlinks as PDF links
+  - `bookmarks: bool` -- a bookmark per page (its name)
+  - `info: pdf::Info` -- the document information (title, author ...)
+  - `language: String` -- the document's language ("de-DE"; empty: none)
+
+- **`fn write(doc: &Document, fonts: &mut FontSet, opts: &PdfOptions) -> Result<Vec<u8>, pdf::Error>`**
+  the export: the pages of `opts` as a PDF document
+
+- **`struct Sheets<'f>`**
+  drawings on sheets of paper
+
+**`impl<'f> Sheets<'f>`**
+
+- **`fn new(fonts: &'f mut FontSet) -> Sheets<'f>`**
+  an empty document whose texts take their faces from `fonts`
+- **`fn pdf(&mut self) -> &mut pdf::Document`**
+  the document being written (outlines, information, language, compression)
+- **`fn skipped_runs(&self) -> u32`**
+  text runs left out so far because no font could be embedded
+- **`fn add(&mut self, doc: &Document, d: &Drawing, size: (f64, f64), place: Xform, clip: Option<[f64; 4]>, targets: &[(PageRef, PageId)], with_links: bool) -> PageId`**
+  a sheet of `size` points with the drawing on it: `place` maps paper inches (y up) to
+  sheet points (y up from the bottom left corner), `clip` (x0, y0, x1, y1 in sheet points)
+  cuts it (None: the sheet); `targets` names the PDF pages of the pages links may go to;
+  `with_links` writes the shapes' hyperlinks
+- **`fn finish(self) -> Result<Vec<u8>, pdf::Error>`**
+  the PDF's bytes
+
+### `diagram_view/src/export/raster.rs`
+
+Source: [`lib/diagram_view/src/export/raster.rs`](../lib/diagram_view/src/export/raster.rs)
+
+```text
+raster -- a page as pixels (EX-04 PNG, EX-05 JPEG) through the CPU path
+
+  render(view, &RasterOptions) -> Option<Surface>   the page (or a part of it) at a resolution:
+                                        XRGB on a colour, straight ARGB when transparent
+  size(view, &RasterOptions) -> (w, h)  the pixels render would make
+  png(sf, dpi) -> Option<Vec<u8>>       PNG (lossless, palette when it fits, pHYs = dpi)
+  jpeg(sf, quality, dpi, under)         JPEG (transparency over the colour `under`, JFIF density)
+  flatten(sf, color) -> Surface         straight ARGB over a colour -> XRGB
+
+The picture's top left pixel is the region's top left corner; one pixel is 1/dpi inch.  A
+transparent picture is drawn twice, on black and on white: where they differ the page let
+the background through, and colour and alpha follow from the two (exact for anything that
+blends linearly, which the CPU path does), so render2d needs no premultiplied target.
+```
+
+```rust
+/// the largest side render makes (larger requests give None)
+MAX_SIDE: u32 = 30_000
+/// the most pixels render makes (larger requests give None)
+MAX_PIXELS: u64 = 200_000_000
+```
+
+- **`enum Background`**
+  what lies under the page's shapes
+  - `Page` -- the page's own colour (white unless the page says otherwise)
+  - `Color(u32)` -- a colour 0xRRGGBB
+  - `Transparent` -- nothing: alpha 0 where no shape is
+
+- **`struct RasterOptions`**
+  what render draws
+  - `dpi: f64` -- pixels per paper inch (Visio: screen 96, printer 300, own)
+  - `region: Option<[f64; 4]>` -- the part of the page (paper inches, y up: x0, y0, x1, y1); None: the whole page
+  - `background: Background`
+
+- **`fn size(view: &PageView, opts: &RasterOptions) -> (u32, u32)`**
+  the size in pixels render makes for these options (0 when the resolution is not usable)
+
+- **`fn render(view: &mut PageView, opts: &RasterOptions) -> Option<Surface>`**
+  the page drawn at the options' resolution: FMT_XRGB on a colour, FMT_ARGB (straight) when
+  transparent; None when it would be larger than MAX_SIDE / MAX_PIXELS or memory is short
+
+- **`fn flatten(sf: &Surface, color: u32) -> Surface`**
+  a surface over a colour (0xRRGGBB) as XRGB: straight ARGB and premultiplied PARGB blend,
+  anything else counts as opaque
+
+- **`fn png(sf: &Surface, dpi: f64) -> Option<Vec<u8>>`**
+  PNG of a surface (render's): RGB or RGBA, a palette when there are few colours, the
+  resolution as pHYs
+
+- **`fn jpeg(sf: &Surface, quality: i32, dpi: f64, under: u32) -> Option<Vec<u8>>`**
+  JPEG of a surface at quality 1..100; a transparent one over `under` (0xRRGGBB); the
+  resolution as JFIF density
+
+### `diagram_view/src/export/svg.rs`
+
+Source: [`lib/diagram_view/src/export/svg.rs`](../lib/diagram_view/src/export/svg.rs)
+
+```text
+svg -- a page as an SVG document (EX-03)
+
+  write(doc, drawing, &SvgOptions) -> String     the display list of one page (PageView::
+                                                 drawing: measured with the fonts drawn), or
+                                                 of a region of it (a selection's box)
+
+The document: width and height in inches, the viewBox in points (1/72 inch) with y down;
+the page's colour as a rectangle (unless transparent); per top-level shape a group
+(id "shape<ID>", data-name, optionally its shape data as data-prop-* attributes), the
+shape's hyperlinks as <a> around what the linked shape draws.  Items: fills as paths with
+fill-rule evenodd (solid, a linear or radial gradient in user space, a hatch as one pattern
+per line family: lines through the page's origin, a pixel at 96 DPI wide), lines as paths
+with width, dashes, caps and joins (a hairline stays one pixel: non-scaling-stroke), texts
+as <text> per run with its font family (and a generic family after it), size, weight, style,
+colour and the measured width as textLength (lengthAdjust spacingAndGlyphs, so a reader with
+another font keeps the layout), pictures as <image> with the file's own PNG / JPEG / GIF /
+BMP bytes (data: URI) cut at the shape's box, metafiles as the screen's placeholder.
+```
+
+- **`struct SvgOptions`**
+  what write puts into the SVG
+  - `background: bool` -- the page's colour under the shapes (false: transparent)
+  - `links: bool` -- the shapes' hyperlinks as &lt;a> elements (links to other pages as "#page-&lt;n>")
+  - `shape_data: bool` -- the shapes' shape data as data-prop-&lt;name> attributes of their groups
+  - `title: String` -- the document's &lt;title> (empty: none)
+  - `region: Option<[f64; 4]>` -- only this part of the page (paper inches, y up: x0, y0, x1, y1; None: the whole page),
+    e.g. the box of a selection
+
+- **`fn write(doc: &Document, drawing: &Drawing, opts: &SvgOptions) -> String`**
+  the page of `drawing` as an SVG document
+
+### `diagram_view/src/fonts.rs`
+
+Source: [`lib/diagram_view/src/fonts.rs`](../lib/diagram_view/src/fonts.rs)
+
+```text
+fonts -- the fonts a diagram's texts are drawn with, and the substitution of missing ones
+
+  FontSet::new()                          empty: the app adds what it has
+  set.add(Class::Sans, bold, italic, bytes)   a font of the substitution set (TrueType or
+                                           OpenType bytes); the app's own (its style's) fonts
+  set.add_family("Calibri", bold, italic, bytes, face)   a font under its own name (an
+                                           installed font the app found)
+  set.set_source(Box<dyn FontSource>)     asked once per family the set does not know (the
+                                           app looks at the installed fonts there)
+  set.clone()                             (JD7) another handle on the same set: what one adds
+                                           or finds, all see (Metrics keeps one)
+  class_of(family) -> Class               serif, monospaced or sans by the family's name
+  SAMPLE_WIDTHS                            how wide common fonts set a sample line (em)
+
+TX-09: a family the set does not have is drawn with the set's font of its class (sans when
+the class is missing too), stretched by the width factor that makes the sample line as wide
+as in the missing font (Calibri set in Inter: about 0.85), so lines wrap about where Visio
+wraps them.  An italic without its own face leans 0.2 radians (synthetic), a bold without its
+own face stays regular.  Only fonts the app hands over are used; the crate embeds none.
+
+The set lives behind a shared handle (Rc<RefCell<..>>): the page views and the formula
+engine's Metrics (which measures through `&self`) pick from the same faces and ask the
+source once for all of them.  One thread, as everything of a page view.
+```
+
+- **`enum Class`**
+  what kind of face a family is (the substitution goes by it)
+  - `Sans`
+  - `Serif`
+  - `Mono`
+
+- **`trait FontSource`**
+  installed fonts the app knows how to find
+  - `fn find(&mut self, family: &str, bold: bool, italic: bool) -> Option<(Vec<u8>, u32)>`
+    the bytes and face index of `family` in this style, if installed
+
+- **`struct FontSet`**
+  the fonts a page view may use; a clone is another handle on the same set
+
+**`impl FontSet`**
+
+- **`fn new() -> FontSet`**
+- **`fn add(&mut self, class: Class, bold: bool, italic: bool, data: &[u8])`**
+  a face of the substitution set
+- **`fn add_family(&mut self, family: &str, bold: bool, italic: bool, data: &[u8], index: u32)`**
+  a face under its family name
+- **`fn set_source(&mut self, source: Box<dyn FontSource>)`**
+  where faces of unknown families are looked for
+- **`fn is_empty(&self) -> bool`**
+
+- **`fn class_of(family: &str) -> Class`**
+  serif, monospaced or sans by the family's name
+
+```rust
+/// the sample line the widths are measured on
+SAMPLE: &str = "The quick brown fox jumps over the lazy dog 0123456789"
+/// how wide common fonts set SAMPLE (em, regular and bold): advance widths from the fonts'
+/// metrics, the numbers only
+SAMPLE_WIDTHS: &[(&str, f64, f64)] = &[ ("Calibri", 23.4209, 23.8364), ("Calibri Light", 23.0, ...
+```
+
+- **`fn sample_width(family: &str, bold: bool) -> Option<f64>`**
+  the sample width of a family (regular or bold), if the table knows it
+
+### `diagram_view/src/image.rs`
+
+Source: [`lib/diagram_view/src/image.rs`](../lib/diagram_view/src/image.rs)
+
+```text
+image -- the pictures of Foreign shapes: bytes from the package or inline base64, decoded
+
+  bytes(doc, &ImageSource) -> Option<Vec<u8>>   a part's bytes, or the inline data decoded
+  decode(bytes) -> Picture                      PNG and JPEG as pixels (straight ARGB rows);
+                                                EMF, WMF and anything else: a placeholder
+  base64(text)                                  RFC 4648 with padding and line breaks
+
+The format is told by the bytes (the signatures), not by the file's attributes.  A picture
+larger than MAX_SIDE on a side is not decoded (a placeholder): a page shows it scaled down
+anyway, and a hostile file must not make the view allocate gigabytes.
+```
+
+```rust
+/// the largest side of a picture the view decodes
+MAX_SIDE: u32 = 8192
+```
+
+- **`struct Picture`**
+  a decoded picture: w x h pixels, 0xAARRGGBB straight, rows top to bottom
+  - `w: u32`
+  - `h: u32`
+  - `px: Vec<u32>`
+
+- **`enum Decoded`**
+  what a picture became
+  - `Picture(Picture)`
+  - `Placeholder(&'static str)` -- not decodable here: the format's name ("EMF", "WMF", "?")
+
+- **`fn bytes(doc: &Document, src: &ImageSource) -> Option<Vec<u8>>`**
+  the bytes of a picture
+
+- **`fn decode(data: &[u8]) -> Decoded`**
+  decode a picture by its signature
+
+- **`fn base64(s: &[u8]) -> Option<Vec<u8>>`**
+  base64 with padding; whitespace is skipped; None: a character outside the alphabet
+
+### `diagram_view/src/measure.rs`
+
+Source: [`lib/diagram_view/src/measure.rs`](../lib/diagram_view/src/measure.rs)
+
+```text
+measure -- text measured with the fonts it is drawn with: the display list's Measure of a
+page view, and Metrics, the formula engine's TextMetrics (TEXTWIDTH, TEXTHEIGHT; JD7)
+
+  Metrics::new(&fonts)             measures with a handle on the app's FontSet (shared: faces
+                                   the set finds later count too); Engine::with_metrics(Rc::new(m))
+  metrics.measure(text, font, size, max_width) -> (w, h)   inches, through
+                                   render::measure_text: lines wrapped as a shape's text wraps
+
+Both measure alike: a family resolves through FontSet::pick (its own face, else the face of
+its class), a substitute is stretched by the sample line's width factor (fonts.rs), the
+advance comes from render2d's layout of the line (shaped: kerning, ligatures), in em.  So
+TEXTWIDTH(TheText) is the width the page view draws the same text with.  A family named
+nowhere ("" -- a Font cell the engine cannot name) is Calibri, the layout's default.  The
+faces resolved and the widths measured are kept (at most WIDTHS_MAX widths).
+```
+
+- **`struct Metrics`**
+  real text sizes for the formula engine (TEXTWIDTH, TEXTHEIGHT), measured as a page view
+  draws: Engine::with_metrics(Rc::new(Metrics::new(&fonts)))
+
+**`impl Metrics`**
+
+- **`fn new(fonts: &FontSet) -> Metrics`**
+  measuring with the fonts of `fonts` (a handle on the same set)
+- **`fn substitutions(&self) -> Vec<String>`**
+  the families measured with a substitute so far
+
+### `diagram_view/src/view.rs`
+
+Source: [`lib/diagram_view/src/view.rs`](../lib/diagram_view/src/view.rs)
+
+```text
+view -- a page of a diagram as a render2d scene plus what the scene cannot hold
+
+  PageView::new(&doc, page, &mut fonts, &opts)   the display list (diagram_core::render,
+                                   texts measured with the fonts drawn), the scene made of
+                                   it, pictures decoded
+  view.update(&doc, &mut fonts, &shapes) -> Option<[f64; 4]>   (JD7) the named shapes (their
+                                   top-level shapes) made anew in the list and the scene; the
+                                   box of what changed, old and new place (paper inches;
+                                   a zero box: nothing drawn either way); None: shapes came,
+                                   went or changed their order -- the page was built anew
+  view.draw(dc, sf, r, &cam)       the page on the CPU into the rectangle r of a surface
+                                   (render2d's CPU path; gradients and pictures in between)
+  view.render(w, h) -> Surface     the page fitted into w x h pixels on its colour (XRGB)
+  view.fit(size, margin_px) -> Camera   the camera showing the whole page
+  view.drawing() / substitutions() / refused() / scene()
+
+The scene: render2d layers in painter's order.  A run of items render2d can draw (solid and
+hatched fills, lines with dashes, caps and joins, texts) lies on layers of at most
+LAYER_ITEMS items each; a gradient fill or a picture ends the run and is drawn by gfx between
+two layers (direct.rs).  On the CPU the layers between two such items are drawn in one go
+(render2d keeps the painter's order across layers) while the others are hidden, so the order
+holds; without such items every layer stays shown.  On a GPU (Scene::attach, the app's
+choice) the same scene shows everything but those items.
+
+An update (JD7): render::rebuild replaces the items of the named top-level shapes, then the
+scene follows, the cheapest way that keeps the order: (1) each item keeps its kind and its
+number of entities -> every entity updated in place (render2d keeps an entity's place);
+(2) the shape's items lie on one layer and none is drawn by gfx -> its entities updated in
+order, the surplus removed, more added at the layer's end when the shape is the layer's last;
+(3) else the layers holding the shape's items are made anew from their items, with orders
+between the neighbours' (Layer::order, GAP apart, renumbered when the room runs out).  The
+fonts, the measured widths, the styles and the scene's glyph outlines stay across updates and
+across a page built anew.  Measured (diagramiotest group editview): 1000 shapes, one moved:
+update well under a millisecond, the drawing of the page dominates.
+```
+
+```rust
+/// how far a synthetic italic leans (radians)
+SYNTHETIC_ITALIC: f64 = 0.2
+```
+
+- **`struct PageView`**
+  a page ready to draw
+
+**`impl PageView`**
+
+- **`fn new(doc: &Document, page: PageRef, fonts: &mut FontSet, opts: &Options) -> PageView`**
+  the page as a scene without a device
+- **`fn drawing(&self) -> &Drawing`**
+- **`fn scene(&mut self) -> &mut Scene`**
+- **`fn substitutions(&self) -> &[String]`**
+  the font families drawn with a substitute (TX-09: shown to the user)
+- **`fn refused(&self) -> u32`**
+  items render2d did not take (geometry it calls invalid)
+- **`fn update(&mut self, doc: &Document, fonts: &mut FontSet, shapes: &[ShapeRef]) -> Option<[f64; 4]>`**
+  the named shapes made anew (their top-level shapes; subshapes name their group, shapes
+  of other pages are passed over): the box of what changed (old and new, paper inches,
+  line widths and shadows included; a zero box: they draw nothing either way); None:
+  shapes came, went or changed their order, or the page's size changed -- the page was
+  built anew.  Changes the shapes do not show (the page's layers, styles, masters,
+  themes) need PageView::new
+- **`fn fit(&self, size: (u32, u32), margin: f64) -> Camera`**
+  the camera that shows the whole page in a target of `size`, `margin` pixels around it
+- **`fn draw(&mut self, dc: &mut Dc, sf: &mut Surface, r: [i32; 4], cam: &Camera)`**
+  the page on the CPU into the rectangle r (x, y, w, h relative to dc's origin) of sf,
+  over what is there (the app paints the page's paper first).  Only the part of r that
+  dc's clip keeps is drawn, with a camera on that part alone (render2d culls by its view):
+  a changed box drawn again (update's area) costs what lies there
+- **`fn render(&mut self, w: u32, h: u32) -> Surface`**
+  the page fitted into w x h pixels (a margin of 2 % around it) on the canvas grey, the
+  page in its colour: an XRGB surface
 
 ## dxf
 
@@ -56798,10 +63527,12 @@ until the entity is sent -- and cut to the budget (1200 bytes unless set: netcha
 What was sent is remembered per client exactly as the client will hold it.
 
 Joining: HELLO -> WELCOME.  The full state goes with the first snapshot when it fits (a WebSocket always:
-up to stream_budget); a UDP client whose full state does not fit a datagram gets a ticket and fetches it
-over a WebSocket of its own (FETCH -> FULL at the next snapshot tick), the user's decision of 18.11.2026.
-Until the FULL arrives the client's snapshots are cut by priority, so it sees its own figure and the
-most important things at once.
+up to stream_budget).  A UDP client whose full state does not fit a datagram gets it filled in: its
+snapshots are cut by priority, so it sees its own figure and the most important things at once and the
+rest in the next snapshots (about 200 ms for 300 props, as fast as the fetch; the user's decision of
+19.11.2026).  With ServerOptions::fetch_full it gets a ticket instead and fetches the full state over a
+WebSocket of its own (FETCH -> FULL at the next snapshot tick; the user's first decision of 18.11.2026),
+filled in by priority until the FULL arrives.
 ```
 
 - **`trait RoomSim`**
@@ -56833,6 +63564,9 @@ most important things at once.
   - `max_rewind_ms: u32` -- how far back hits are rewound at most (ms; 300 unless set: the 100 ms of the interpolation buffer and
     200 ms beyond them, the user's decision of 2026-11-19)
   - `ws_port: u16` -- the WebSocket's port (WELCOME tells UDP clients where to fetch a full state; 0: none)
+  - `fetch_full: bool` -- a UDP client whose full state does not fit a datagram fetches it over a WebSocket of its own (ws_port, a
+    ticket); false unless set: its snapshots fill it in by priority, as fast and without a second connection
+    (the user's decision of 2026-11-19)
   - `hello_ms: u32` -- a connection must send HELLO within this long (ms)
   - `ticket_ms: u32` -- a ticket stays good this long (ms)
   - `empty_room_ms: u32` -- a room without players closes after this long (ms)

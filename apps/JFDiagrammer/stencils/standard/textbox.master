@@ -1,0 +1,42 @@
+# Textfeld: ohne Linie und Füllung (Formatvorlage "Text Only"), der Text links oben im Kasten
+master: Text box
+name.de: Textfeld
+name.en: Text box
+name.es: Cuadro de texto
+name.it: Casella di testo
+name.fr: Zone de texte
+prompt.de: Text ohne Rahmen. Ziehen Sie ihn auf die Seite und tippen Sie.
+prompt.en: Text without a frame. Drag it onto the page and type.
+prompt.es: Texto sin marco. Arrástrelo a la página y escriba.
+prompt.it: Testo senza cornice. Trascinalo sulla pagina e digita.
+prompt.fr: Texte sans cadre. Faites-le glisser sur la page et tapez.
+keywords.de: Text, Beschriftung, Notiz, Titel, Bezeichnung
+keywords.en: text, label, note, title, caption
+keywords.es: texto, etiqueta, nota, título, rótulo
+keywords.it: testo, etichetta, nota, titolo, didascalia
+keywords.fr: texte, étiquette, note, titre, légende
+text.de: Text
+text.en: Text
+text.es: Texto
+text.it: Testo
+text.fr: Texte
+style: Text Only
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 10 mm
+Height.us = 0.375 in
+VerticalAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Paragraph]
+Row  HorzAlign = 0

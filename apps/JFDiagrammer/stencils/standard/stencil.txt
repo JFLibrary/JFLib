@@ -1,0 +1,12 @@
+# Standard-Shapes: der Startsatz von JD9 (PLAN.md), die einfachen Grundformen im NetLab-Stil.
+# Die vollständigen Sätze kommen mit JD13 und Phase 3.
+stencil: Basic Shapes
+file: standard
+name.de: Standard-Shapes
+name.en: Basic Shapes
+name.es: Formas básicas
+name.it: Forme di base
+name.fr: Formes de base
+category: general
+masters: rectangle, rounded_rectangle, ellipse, triangle, diamond, arrow, textbox
+quick: 4

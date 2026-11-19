@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Schnellimport, 32 px</title>
+  <rect class="body" fill="#DCDEE1" x="3" y="4" width="12" height="2"/>
+  <rect class="ink" stroke="#1D2228" x="2.5" y="3.5" width="13" height="12"/>
+  <path class="ink" stroke="#1D2228" d="M3 6.5H15M9.5 7V15M3 9.5H15M3 12.5H15"/>
+  <polyline class="tint" stroke="#1F5FA8" points="16,9.5 23.5,9.5 23.5,15"/>
+  <polygon class="tint" fill="#1F5FA8" points="20,15 27,15 23.5,18.5"/>
+  <polygon class="body" fill="#DCDEE1" stroke="#1D2228" points="23.5,18.5 28.5,23.5 23.5,28.5 18.5,23.5"/>
+</svg>

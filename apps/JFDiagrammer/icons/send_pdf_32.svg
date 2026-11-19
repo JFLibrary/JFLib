@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Als PDF senden, 32 px</title>
+  <polygon class="hi" fill="#C2D2E5" points="5,3 17,3 17,9 23,9 23,15 11,15 11,26 5,26"/>
+  <path class="tint" stroke="#1F5FA8" d="M11 26.5H4.5V2.5H17.5L23.5 8.5V15 M17.5 3V8.5H23"/>
+  <path class="tint" stroke="#1F5FA8" d="M8 7.5H14M8 10.5H19"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="12.5" y="16.5" width="17" height="12"/>
+  <path class="ink" stroke="#1D2228" d="M12.5 16.5L21 25L29.5 16.5"/>
+</svg>

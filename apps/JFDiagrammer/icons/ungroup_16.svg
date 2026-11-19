@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Gruppierung aufheben, 16 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M5 1.5H11M5 14.5H11M1.5 5V11M14.5 5V11"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="3.5" y="3.5" width="4" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="8.5" y="9.5" width="4" height="3"/>
+</svg>

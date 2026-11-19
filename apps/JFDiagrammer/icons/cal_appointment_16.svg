@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Termin, 16 px</title>
+  <rect class="body" fill="#DCDEE1" x="2" y="3" width="12" height="3"/>
+  <path class="ink" stroke="#1D2228" d="M2 6.5H14"/>
+  <path class="ink" stroke="#1D2228" d="M4.5 1V4M11.5 1V4"/>
+  <rect class="ink" stroke="#1D2228" x="1.5" y="2.5" width="13" height="12"/>
+  <path class="shade" fill="#B9BBBE" d="M3 8H5V10H3Z M7 8H9V10H7Z M11 8H13V10H11Z M3 11H5V13H3Z M11 11H13V13H11Z"/>
+  <path class="tint" fill="#1F5FA8" d="M7 11H9V13H7Z"/>
+</svg>

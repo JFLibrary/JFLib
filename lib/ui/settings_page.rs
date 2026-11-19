@@ -1,6 +1,7 @@
 // settings_page -- the settings page of a typed schema (base::settings)
 //
 //   settings_page(id, &mut settings) -> true when a value changed in this pass
+//   settings_section(id, &mut settings, section)   the same for the keys of one section
 //
 // The keys of the schema without KF_HIDDEN, grouped by section: the sections of
 // Schema::sections first (with their titles), then the others in the order of their first
@@ -35,6 +36,20 @@ impl Ui {
     #[cfg_attr(jfgui_dev, track_caller)]
     pub fn settings_page(&mut self, id: u32, s: &mut Settings) -> bool {
         let _src = self.src_scope();
+        self.settings_page_of(id, s, None)
+    }
+
+    /// settings_page with only the keys of `section` (the part of their names before the
+    /// '.'): one page of a settings dialog that lists its sections at the side (an options
+    /// page of the File register). The section's title is shown; the ids are those
+    /// settings_page gives the same keys.
+    #[cfg_attr(jfgui_dev, track_caller)]
+    pub fn settings_section(&mut self, id: u32, s: &mut Settings, section: &str) -> bool {
+        let _src = self.src_scope();
+        self.settings_page_of(id, s, Some(section))
+    }
+
+    fn settings_page_of(&mut self, id: u32, s: &mut Settings, only: Option<&str>) -> bool {
         let schema = s.schema();
         let shown = |i: usize| schema.keys[i].flags & KF_HIDDEN == 0;
         let mut secs: Vec<&'static str> = schema.sections.iter().map(|x| x.0).collect();
@@ -48,6 +63,9 @@ impl Ui {
         self.id_push(id);
         self.box_begin(0, BOX_V, 12);
         for sec in secs {
+            if only.is_some_and(|o| o != sec) {
+                continue;
+            }
             let keys: Vec<usize> = (0..schema.keys.len()).filter(|&i| shown(i) && schema.keys[i].split().0 == sec).collect();
             if keys.is_empty() {
                 continue;

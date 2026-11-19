@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Kopfzeilenstil, 32 px</title>
+  <rect class="tint" fill="#1F5FA8" x="3" y="4" width="26" height="7"/>
+  <path class="tint" stroke="#1F5FA8" d="M3.5 11V27.5H28.5V11"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="9.5" y="15.5" width="13" height="7"/>
+</svg>

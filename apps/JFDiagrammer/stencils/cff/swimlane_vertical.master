@@ -1,0 +1,107 @@
+# Swimlane (vertical): die senkrechte Bahn, Gegenstück zu Swimlane: Kopf oben (Text waagerecht),
+# Trennlinie an der rechten Kante, an der die nächste Bahn anschließt.  Kopfband, Kopflinie und
+# Textblock folgen nur JFD_HeadingEdge und JFD_HeadingSize (JFD_HeadingSize = 0: kein Kopf).
+master: Swimlane (vertical)
+name.de: Bahn (vertikal)
+name.en: Lane (vertical)
+name.es: Calle (vertical)
+name.it: Corsia (verticale)
+name.fr: Couloir (vertical)
+prompt.de: Senkrechte Bahn für eine Funktion, Abteilung oder Rolle. Ziehen Sie sie in ein funktionsübergreifendes Flussdiagramm.
+prompt.en: Vertical lane for a function, department or role. Drag it into a cross-functional flowchart.
+prompt.es: Calle vertical para una función, un departamento o un rol. Arrástrela a un diagrama de flujo multifuncional.
+prompt.it: Corsia verticale per una funzione, un reparto o un ruolo. Trascinala in un diagramma di flusso multifunzione.
+prompt.fr: Couloir vertical pour une fonction, un service ou un rôle. Faites-le glisser dans un diagramme de flux interfonctionnel.
+keywords.de: Swimlane, Bahn, senkrecht, vertikal, Funktion, Abteilung, Rolle
+keywords.en: swimlane, lane, vertical, function, department, role
+keywords.es: calle, carril, vertical, función, departamento, rol
+keywords.it: corsia, swimlane, verticale, funzione, reparto, ruolo
+keywords.fr: couloir, bande, vertical, fonction, service, rôle
+text.de: Funktion
+text.en: Function
+text.es: Función
+text.it: Funzione
+text.fr: Fonction
+
+[Shape]
+Width = 50 mm
+Width.us = 2 in
+Height = 150 mm
+Height.us = 6 in
+LineWeight = 0.75 pt
+LineColor = #4D5560
+FillForegnd = #E6EFF8
+FillBkgnd = #E6EFF8
+FillPattern = 1
+TxtWidth = IF(User.Turn,Height,IF(User.HeadLeft+User.HeadRight>0,User.HeadLeft+User.HeadRight,Width))
+TxtHeight = IF(User.Turn,User.HeadLeft+User.HeadRight,IF(User.HeadLeft+User.HeadRight>0,Height,User.HeadTop+User.HeadBottom))
+TxtPinX = IF(User.HeadLeft>0,User.HeadLeft*0.5,IF(User.HeadRight>0,Width-User.HeadRight*0.5,Width*0.5))
+TxtPinY = IF(User.HeadTop>0,Height-User.HeadTop*0.5,IF(User.HeadBottom>0,User.HeadBottom*0.5,Height*0.5))
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = IF(User.Turn,90 deg,0 deg)
+HideText = NOT(User.HeadShown)
+LeftMargin = 1 mm
+LeftMargin.us = 0.04 in
+RightMargin = 1 mm
+RightMargin.us = 0.04 in
+TopMargin = 1 mm
+TopMargin.us = 0.04 in
+BottomMargin = 1 mm
+BottomMargin.us = 0.04 in
+
+[User]
+msvStructureType:                 Value = "Container"
+msvShapeCategories:               Value = "Swimlane;DoNotContain"
+msvSDContainerMargin:             Value = 4 mm
+                                  Value.us = 0.15 in
+msvSDContainerResize:             Value = 1
+msvSDContainerLocked:             Value = FALSE
+msvSDContainerNoHighlight:        Value = FALSE
+msvSDContainerNoRibbon:           Value = FALSE
+msvSDContainerStyle:              Value = 1
+msvSDContainerStyleCount:         Value = 1
+msvSDHeadingStyle:                Value = 1
+msvSDHeadingStyleCount:           Value = 1
+msvSDContainerRequiredCategories: Value = ""
+msvSDContainerExcludedCategories: Value = "DoNotContain"
+visHeadingText:                   Value = SHAPETEXT(TheText)
+JFD_HeadingEdge:                  Value = "Top"
+JFD_HeadingSize:                  Value = 10 mm
+                                  Value.us = 0.4 in
+JFD_LabelUpright:                 Value = FALSE
+HeadTop:          Value = IF(STRSAME(User.JFD_HeadingEdge,"Top",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Height),0)
+HeadBottom:       Value = IF(STRSAME(User.JFD_HeadingEdge,"Bottom",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Height),0)
+HeadLeft:         Value = IF(STRSAME(User.JFD_HeadingEdge,"Left",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Width),0)
+HeadRight:        Value = IF(STRSAME(User.JFD_HeadingEdge,"Right",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Width),0)
+HeadShown:        Value = User.HeadTop+User.HeadBottom+User.HeadLeft+User.HeadRight>0
+Turn:             Value = AND(User.HeadLeft+User.HeadRight>0,NOT(User.JFD_LabelUpright))
+
+# 1 das Kopfband
+[Geometry]
+NoLine = TRUE
+NoShow = NOT(User.HeadShown)
+MoveTo  X = IF(User.HeadRight>0,Width-User.HeadRight,0); Y = IF(User.HeadTop>0,Height-User.HeadTop,0)
+LineTo  X = IF(User.HeadLeft>0,User.HeadLeft,Width); Y = Geometry1.Y1
+LineTo  X = Geometry1.X2; Y = IF(User.HeadBottom>0,User.HeadBottom,Height)
+LineTo  X = Geometry1.X1; Y = Geometry1.Y3
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# 2 die Linie zwischen Kopf und Bahn
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(User.HeadShown)
+MoveTo  X = IF(User.HeadLeft>0,User.HeadLeft,IF(User.HeadRight>0,Width-User.HeadRight,0)); Y = IF(User.HeadTop>0,Height-User.HeadTop,IF(User.HeadBottom>0,User.HeadBottom,0))
+LineTo  X = IF(User.HeadLeft+User.HeadRight>0,Geometry2.X1,Width); Y = IF(User.HeadLeft+User.HeadRight>0,Height,Geometry2.Y1)
+
+# 3 die Trennlinie an der rechten Kante
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+
+[Character]
+Row  Style = 1
+
+[Paragraph]
+Row  HorzAlign = 1

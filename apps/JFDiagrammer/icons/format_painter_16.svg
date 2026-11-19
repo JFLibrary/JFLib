@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Format übertragen, 16 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="1.5" width="3" height="4"/>
+  <rect class="shade" fill="#B9BBBE" stroke="#1D2228" x="4.5" y="5.5" width="7" height="3"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="4.5" y="9.5" width="7" height="5"/>
+</svg>

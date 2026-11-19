@@ -1,5 +1,8 @@
 # Apple-Plan: macOS und iOS nativ
 
+Nachtrag 2026-11-19: AP9 (iPadOS) ist umgesetzt und im iPad-Simulator geprüft; was ein echtes iPad braucht, steht
+unter AP9 als ungeprüft.
+
 Nachtrag 2026-11-10: AP5 ist auch von Hand auf dem iPhone geprüft, AP8 (Pakete, Updates, CI, Developer ID und
 Notarisierung, Dokumentation und Website) ist fertig, AP1 (Safari auf dem Mac und dem iPhone) ebenso. AP6 (Metal) ist bis AP6f gebaut (Stufe
 Basis, macOS, iOS-Simulator und iPhone, mit Metal 3 auch Stufe Voll (AP6g); die UI-Ausgabe ist dort standardmäßig aus, unter AP6).
@@ -311,7 +314,7 @@ Nord (mit Magnetometer, sonst beliebig), der Standort „beim Verwenden“ (`NSL
 `tools/apple.py` für Apps, deren PERMISSIONS `location` nennen oder die keine haben).
 
 - **Noch offen:** Teilen (`UIActivityViewController`; die Bibliothek hat noch keine Schnittstelle dafür),
-  Mausbewegung ohne Taste auf dem iPad (`UIHoverGestureRecognizer`), dauerhafte Freigaben gewählter Dateien über einen
+  dauerhafte Freigaben gewählter Dateien über einen
   Neustart (Lesezeichen), Bildschirm anlassen, Textgröße des Systems. Markierter Text der Tastatur (`UITextInput`:
   Diktat, Vorschläge, Tastaturen mit Zusammensetzung) und Accessibility kamen mit VoiceOver ([VOICEOVER.md](VOICEOVER.md)
   VO4). Das Bild geht bei jedem Frame
@@ -704,6 +707,9 @@ Vollbild rückt die View unter diesen Streifen. Der Nutzer hat A gewählt, wie e
   Zeile im Fenster, `jfgui_SYSMENU=0` ebenso.
 - Geprüft: `plattest --test window` (Menüs, Zeilen, Häkchen, Kürzel, eine gewählte Zeile, Ersetzen, Entfernen)
   und die Skripte der Gallery auf dem Mac.
+- Das iPad (AP9, 2026-11-19) nimmt denselben Weg: Die Menüs kommen in die Leiste von iPadOS, die Zeile im Fenster
+  bleibt dort (`sysmenu_window_row`). Seitdem nimmt ein Durchgang des Hauptfensters ohne `menubar(None)` die Menüs
+  wieder aus der Leiste, auf dem Mac ebenso (eine Seite ohne Menüleiste lässt keine alten Menüs oben stehen).
 
 ### AP8: Pakete, Updates, CI, Dokumentation (M)
 
@@ -811,6 +817,52 @@ noch nie; ein iPad zum Testen fehlt bisher, der Simulator hat welche.
 **Fertig, wenn:** `androidGallery` im iPad-Simulator in allen Fenstergrößen richtig läuft, die Skripte grün sind und
 die Menüs in der Leiste von iPadOS erscheinen. Stift und Stage Manager brauchen ein echtes iPad; ohne eines bleiben sie
 als ungeprüft vermerkt.
+
+**Umgesetzt (2026-11-19):** [`apple_ios_pad.rs`](../lib/plat/apple_ios_pad.rs) neben dem Host, geprüft im Simulator
+„iPad Pro 13-inch (M5)“ mit iPadOS 27.2, der im Fenster-Modus von iPadOS 26 läuft.
+
+- **Fenstergrößen:** Der Host gab jede Größe schon weiter (`layoutSubviews` der View, darin Sicherheitsbereich und
+  `keyboardLayoutGuide`). Neu: Das Bild eines iPads hat seine vollen 2 px pro Punkt, bis 2752 px an der langen Seite
+  statt 2048 (vorher war jedes iPad unscharf, das 13-Zoll-Modell mit 1,49 px pro Punkt); ein externer Bildschirm im
+  Stage Manager bleibt darüber begrenzt. Über der Tastatur des iPads steht keine „Fertig“-Leiste mehr (sie hat eine
+  eigene Taste; mit Hardware-Tastatur stünde die Leiste allein am unteren Rand). `plattest --test ipad` stellt das
+  Fenster in seiner Szene auf die Größen von Slide Over (320 pt), Split View (1/3, 1/2, 2/3) und Stage Manager
+  (700 × 500, 500 × 700, 1000 × 760 pt) und zurück, holt die Tastatur (die View schrumpft von 1324 auf 941 pt) und
+  prüft jedes Mal Canvas, Größe der App und gezeigtes Bild. Das echte Fenster lässt iPadOS nur den Nutzer ändern:
+  `sizeRestrictions` der Szene ändert es nicht, und Drehen über `requestGeometryUpdate` behält im Fenster-Modus die
+  Ausrichtung. `jfgui_IOS_WINDOW=BxH` stellt das Fenster für Bildschirmfotos auf eine Größe.
+- **Form-Faktor:** `FF_TABLET`, unter 600 pt an der kürzeren Seite `FF_PHONE` (Slide Over, Split View 1/3 und 1/2 im
+  Hochformat, kleine Fenster im Stage Manager). Ein großes Fenster im Stage Manager bleibt Tablet (Entscheidung des
+  Nutzers vom 2026-11-19: iPadOS besitzt das Fenster und zeichnet seine Knöpfe selbst, der Finger bleibt der
+  Hauptweg; Apps richten sich trotzdem nach der Größe).
+- **Menüs:** `plat::sysmenu` auf dem iPad. `JFAppDelegate` ist jetzt ein `UIResponder` und baut das Hauptmenü
+  (`buildMenuWithBuilder:`): die Menüs der App nach dem App-Menü, vor „Window“; File, Edit, Format und View des
+  Systems gehen. Zeilen sind `UICommand`, mit Kürzel `UIKeyCommand` (Funktions- und Pfeiltasten unter UIKits Namen,
+  ein doppeltes Kürzel nur einmal, Einfügen hat keine Taste), Trenner werden Inline-Gruppen, Häkchen und gesperrte
+  Zeilen wie in der Liste; die Aktion `jfSysMenu:` läuft die Responder-Kette hinauf zum App-Delegate. Die Zeile im
+  Fenster bleibt (Entscheidung des Nutzers vom 2026-11-19, `sysmenu_window_row`): Die Leiste von iPadOS erscheint erst
+  nach einem Wischen vom oberen Rand oder mit dem Zeiger dort. `androidGallery` hat ihre Menüleiste jetzt im
+  `AppDesc` (`ui.menubar(None)`): Auf der Seite „Menüs & Auswahl“ stehen ihre Menüs in der Leiste von iPadOS.
+  iPadOS baut das Hauptmenü erst, wenn es gebraucht wird; im Test kam trotz `setNeedsRebuild` und
+  `UIMainMenuSystem setBuildConfiguration:` kein Aufruf (die Responder-Kette stimmt: der App-Delegate ist
+  `nextResponder` der App). Der Test baut es deshalb mit einem Stellvertreter für `UIMenuBuilder` aus UIKits eigenen
+  `UIMenu`-, `UICommand`- und `UIKeyCommand`-Objekten und wählt Zeilen über die Responder-Kette.
+- **Tastatur und Zeiger:** Tastenkürzel als `UIKeyCommand` im Hauptmenü (daraus kommt auch die Übersicht beim
+  Halten von ⌘), Tasten ohne Menüzeile wie bisher über `pressesBegan`. Der Zeiger ohne Taste über einen
+  `UIHoverGestureRecognizer` (`E_MOVE`, beim Verlassen der View `E_LEAVE`; das Schweben des Stifts als Stift ohne
+  Druck), zwei Finger auf dem Trackpad und das Mausrad über einen `UIPanGestureRecognizer`, der nur
+  Scroll-Ereignisse nimmt (`E_WHEEL` in Pixeln, `WHEEL_PIXELS`, wie das Trackpad des Macs), das Kneifen auf dem
+  Trackpad als Strg + Rad wie auf dem Mac. Keiner der Erkenner nimmt, verzögert oder bricht einen Finger ab. Das
+  Info.plist nennt jetzt `UIApplicationSupportsIndirectInputEvents`: Ohne den Schlüssel liefert UIKit Klicks von
+  Trackpad und Maus als Finger, der Mausweg von AP5a kam nie an.
+- **Geprüft:** `plattest --test ipad` 62 von 62, die elf Skripte von `androidGallery` im iPad-Simulator,
+  Bildschirmfotos der Gallery im ganzen Fenster, in Slide Over und im Stage Manager (700 × 500 pt mit der Menüzeile).
+- **Ungeprüft, braucht ein echtes iPad oder eine Hand-Probe:** die Leiste von iPadOS selbst und die Übersicht beim
+  Halten von ⌘ mit den Menüs der App (im Simulator von Hand: Zeiger an den oberen Rand), echte Größenwechsel durch
+  Ziehen in Split View und Stage Manager, Apple Pencil (Druck, Neigung, Schweben), Multitouch mit mehr als zwei
+  Fingern, Trackpad und Maus mit echten Ereignissen (Schweben, Rad, Kneifen), Metal-Stufe Voll.
+- **Nicht gebaut:** mehrere Fenster einer App (`UIApplicationSupportsMultipleScenes`) und Drag & Drop zwischen Apps.
+  Die Bibliothek hat auf iOS ein Fenster pro App; beides wäre ein eigener Schritt, wenn eine App es braucht.
 
 ## Reihenfolge
 

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Zoom, 16 px</title>
+  <circle class="body" fill="#DCDEE1" stroke="#1D2228" cx="6.5" cy="6.5" r="4.5"/>
+  <path class="ink" stroke="#1D2228" stroke-width="2" d="M10 10L14 14"/>
+  <path class="tint" stroke="#1F5FA8" d="M4 6.5H9M6.5 4V9"/>
+</svg>

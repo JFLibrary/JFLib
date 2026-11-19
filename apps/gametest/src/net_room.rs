@@ -164,7 +164,18 @@ fn joins(c: &mut Ctx) {
     // a big state: a UDP client gets a ticket, a WebSocket client not; FETCH with it gives FULL at the next
     // snapshot tick and the connection ends; a wrong ticket is refused
     // (the props move: after two seconds they are away from the map's baseline)
-    let mut s = server(ServerOptions { ws_port: 9000, ..ServerOptions::default() }, 300);
+    // the default (since 2026-11-19): no ticket, the snapshots fill the full state in
+    let mut d = server(ServerOptions { ws_port: 9000, ..ServerOptions::default() }, 300);
+    let made_d = d.create_room();
+    for _ in 0..120 {
+        d.step();
+    }
+    hello(&mut d, 1, false, made_d, "Udp");
+    let (o, _) = outs(&mut d);
+    let wd = o.first().and_then(|(_, b)| proto::read_welcome(b));
+    c.check(wd.as_ref().is_some_and(|w| !w.fetch && w.ticket == 0 && w.full_bytes > 1200), || format!("UDP with 300 props, no fetch_full: {:?}", wd));
+    // the option: a ticket for the fetch over a WebSocket
+    let mut s = server(ServerOptions { ws_port: 9000, fetch_full: true, ..ServerOptions::default() }, 300);
     let made = s.create_room();
     for _ in 0..120 {
         s.step();

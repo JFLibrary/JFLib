@@ -247,7 +247,7 @@ Die Zeichenzeit ändert sich nicht. Was mit Verdeckung 1 bis 2 % mehr kostet, is
 
 ## Cartoon-Material (G7f)
 
-**`MaterialDesc::toon: Option<Toon>`**, `Toon { bands, softness, rim, rim_width }` (`#[non_exhaustive]`, `Toon::new(bands)`): flache Farben, das Licht in Stufen. Wie es aussieht, entscheidet der Nutzer an Bildern (`render3dtest --toon-sheet DIR`: vier Varianten nebeneinander, unten).
+**`MaterialDesc::toon: Option<Toon>`**, `Toon { bands, softness, rim, rim_width }` (`#[non_exhaustive]`, `Toon::new(bands)`): flache Farben, das Licht in Stufen. Wie es aussieht, entschied der Nutzer an Bildern (`render3dtest --toon-sheet DIR`: vier Varianten nebeneinander, unten): am 19.11.2026 Variante C für Spiel 1, vier weiche Stufen ohne Umrisse (`bands` 4, `softness` 0,5, `rim` 0,2, `rim_width` 0,35; das Randlicht nur auf Figuren und Requisiten).
 
 - **Licht in Stufen**: `bands` Stufen 0, 1/(B−1), …, 1 des Lichts; die erste Stufe liegt am Terminator (n·l = 0), die anderen gleichmäßig bis n·l = 1; `softness` macht jede Stufe zu einem `smoothstep` von so viel Bändern Breite (0: hart; im Shader 10⁻⁴ als kleinste Breite, damit es keine Division durch 0 gibt), `bands = 1` heißt gar kein Schattieren. Das gilt für die Sonne und jedes Punkt- und Spotlicht (ihre Abschwächung bleibt stetig).
 - **Im Schatten** zählt ein Punkt, als wäre er abgewandt: `x = Schatten · (n·l + 1) − 1` (voll beschattet −1, in voller Sonne n·l, am weichen Rand des Filters dazwischen). Die naheliegende Form `n·l · Schatten` gäbe im Schatten x = 0, also genau die halbe erste Stufe (der Test `toon` sah das: 894 Pixel „halb beleuchtet“ im Schatten).

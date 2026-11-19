@@ -1,0 +1,65 @@
+# JFDiagrammer, JD8: the File register (backstage): its pane, the template preview of Neu,
+# the pages Öffnen, Speichern, Drucken, Exportieren, Info, Optionen; back and Esc
+click tab:"Datei"
+expect button:"Zurück" exists
+expect button:"Neu" selected
+expect tab:"Start" missing
+expect text:"Vorlagen" exists
+expect button:"Leere Zeichnung" exists
+expect button:"Rack-Diagramm" exists
+shot build/JFDiagrammer-backstage.png
+# a template's preview: description, units, Erstellen (only the blank drawing works yet)
+click button:"Standardflussdiagramm"
+expect text:"Prozessschritte, Entscheidungen und Verbinder nach ISO 5807." exists
+expect radio:"Metrische Einheiten" checked
+expect button:"Erstellen" disabled
+click radio:"US-Einheiten"
+expect radio:"US-Einheiten" checked
+click button:"Zurück zu den Vorlagen"
+expect text:"Vorlagen" exists
+# the other pages
+click button:"Öffnen"
+expect button:"Öffnen" selected
+expect text:"Zuletzt verwendet" exists
+# (JD4) Durchsuchen opens the file dialog, Schließen closes the drawing
+expect button:"Durchsuchen" enabled
+# (#24580: the pane's Speichern; the quick access toolbar has one too) -- JD7: a new drawing
+# has no file yet, both ask for one
+click #24580
+expect text:"Wählen Sie den Ort und den Dateityp." exists
+click button:"Speichern unter"
+expect text:"Wählen Sie den Ort und den Dateityp." exists
+click button:"Drucken"
+# (JD7: the new drawing at start has one page; JD12: one sheet of A4)
+expect text:"Blatt 1 von 1" exists
+expect text:"Exemplare" exists
+click button:"Exportieren"
+expect text:"Vektorgrafik mit eingebetteten Schriften, Text zum Suchen und Kopieren, Hyperlinks und einem Lesezeichen je Seite." exists
+expect button:"Schließen" enabled
+click button:"Info"
+expect text:"JFDiagrammer" exists
+expect text:"Lizenzen" exists
+click button:"Optionen"
+expect text:"Erscheinungsbild" exists
+# back to the drawing with Esc, and from Neu with Erstellen
+key esc
+expect tab:"Start" selected
+expect button:"Zurück" missing
+click tab:"Datei"
+expect text:"Lizenzen" missing
+click button:"Neu"
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+expect tab:"Start" selected
+# the back item
+click tab:"Datei"
+click button:"Zurück"
+expect canvas:"Zeichenfläche" exists
+# Strg+O / Strg+P open their pages (the shortcuts of the German table)
+key ctrl+o
+expect text:"Zuletzt verwendet" exists
+key esc
+key ctrl+p
+expect text:"Exemplare" exists
+key esc
+expect tab:"Start" selected

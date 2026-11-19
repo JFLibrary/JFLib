@@ -1,0 +1,38 @@
+# JFDiagrammer, JD8: the access keys (key tips, UI-37): F10 or a tap of Alt shows the keys of
+# the registers, a register's key its ribbon's keys, a command's key runs it; Esc steps back.
+# The keys come from the labels (German: Datei D, Start S, Einfügen E, Entwurf N, Ansicht A).
+key f10
+expect tab:"Start" selected
+shot build/JFDiagrammer-keytips.png
+key a
+expect tab:"Ansicht" selected
+shot build/JFDiagrammer-keytips2.png
+# Ansicht: Lineal L, Seitenumbrüche S, Gitternetz G
+key g
+expect checkbox:"Gitternetz" checked
+# the mode ended with the command: a letter is a letter again
+key g
+expect checkbox:"Gitternetz" checked
+# Esc steps back: level 2 -> 1 -> off
+key f10
+key s
+expect tab:"Start" selected
+key esc
+key e
+expect tab:"Einfügen" selected
+key esc
+key esc
+# the tap of Alt does the same as F10
+keydown alt
+keyup alt
+wait 50
+key n
+expect tab:"Entwurf" selected
+key esc
+key esc
+# the File register through its key
+key f10
+key d
+expect button:"Zurück" exists
+key esc
+expect tab:"Entwurf" selected
