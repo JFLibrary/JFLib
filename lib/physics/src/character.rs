@@ -87,7 +87,7 @@ pub struct CharacterParams {
     /// full speed in 1/12 s, sliding along a wall at the wish velocity's part along it
     pub accel: f64,
     /// ground friction without input (6 per second, Quake's): each second the speed drops by `friction`
-    /// times max(speed, `stop_speed`); from run speed to a stop in about 0.25 s
+    /// times max(speed, `stop_speed`); from run speed to a stop in about 0.4 s
     pub friction: f64,
     /// below this speed friction brakes as if the figure moved this fast, so it stops (2.5 m/s)
     pub stop_speed: f64,

@@ -619,6 +619,28 @@ fn snap_tests(c: &mut Ctx) {
 fn misc_tests(c: &mut Ctx) {
     let ctrl = CharacterController::default();
     let p = *ctrl.params();
+    // a V-shaped gully of two 60 degree slopes: the figure comes to rest in it, inside nothing (it does not
+    // count as on the ground: no surface under it is walkable)
+    let mut m = MeshData::new();
+    let rise = (2.0 * math::sin(60.0f64.to_radians_det()) / math::cos(60.0f64.to_radians_det())) as f32;
+    wedge(&mut m, 12.0, 2.0, 2.0, 10.0, 0.0, rise, 0, [12.0, 6.0]);
+    wedge(&mut m, 12.0, 2.0, 2.0, 10.0, 0.0, rise, 2, [12.0, 6.0]);
+    let w = world_of(&m);
+    let mut st = CharacterState::new(Vec3::new(12.0, 3.0, 6.0));
+    let (mut trail, mut inside, mut grounded) = (Vec::new(), 0.0f64, 0usize);
+    for _ in 0..240 {
+        let (s, _) = ctrl.step(&st, &w, &ALL, &CharacterInput::default(), DT);
+        inside = max(inside, depth(&ctrl, &w, &ALL, &s));
+        grounded += s.grounded as usize;
+        trail.push(s.position);
+        st = s;
+    }
+    let mut jitter = 0.0f64;
+    for i in trail.len() - 60..trail.len() {
+        jitter = max(jitter, (trail[i] - trail[i - 1]).length());
+    }
+    c.check(jitter < 1e-9 && inside <= 1e-9, || format!("V gully: jitter {} overlap {} at {:?}", jitter, inside, st.position));
+    out(&format!("  character: in a V gully of 60 degree slopes the figure rests at {:.4} m, {} of 240 ticks on the ground\n", st.position.y, grounded));
     let mut m = scene::flat(24, 1.0, 0.0);
     aabox(&mut m, [10.0, 0.0, 10.0], [14.0, 2.0, 14.0]);
     let w = world_of(&m);
