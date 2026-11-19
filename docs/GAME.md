@@ -1,7 +1,7 @@
 # Spiel-Engine: Plan für G7
 
-Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1), von G7b, G7d und G7g (Welle 2), von G7e und der
-zweite Teil von G7c (Welle 3), siehe dort; Stand 2026-11-19. Die Zahl der Läufe je Stufe ist
+Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1), von G7b, G7d und G7g (Welle 2), von G7e und die
+zweiten Teile von G7c und G7f (Welle 3), siehe dort; Stand 2026-11-19. Die Zahl der Läufe je Stufe ist
 geschätzt (ein Lauf ist eine Arbeitsrunde eines Agenten mit Durchsicht, wie bei G5 und G6).
 
 ## Ziel
@@ -130,7 +130,7 @@ anfassen:
 | --- | --- | --- |
 | 1 | G7a, G7c, G7f (je Teil 1) | `plat` (Eingabe), `lib/physics`, `render3d`: keine gemeinsamen Dateien. G7a liegt auf dem längsten Weg (G7a → G7b → G7e → G7h). Fertig und gepusht am 18.11.2026. |
 | 2 | G7b, G7d, G7g (je Teil 1) | G7b braucht G7a; G7d fasst den Browser-Host in `plat` an, den in Welle 1 G7a ändert. Fertig am 18.11.2026. |
-| 3 | G7e, G7c Teil 2, G7f Teil 2 | G7e braucht G7b und G7d; der Controller (`lib/physics`) und `render3d` Teil 2 berühren `lib/game` nicht. |
+| 3 | G7e (Teil 1), G7c Teil 2, G7f Teil 2 | G7e braucht G7b und G7d; der Controller (`lib/physics`) und `render3d` Teil 2 berühren `lib/game` nicht. Fertig am 19.11.2026. |
 | 4 | G7a Teil 2, G7h | die Gamepads fassen den Browser-Host an wie G7d, deshalb nach Welle 2; Spiel 1 braucht alles davor, Gamepads nur als Zugabe. |
 
 ### Phase 1: Grundlagen und Spiel 1
@@ -312,6 +312,19 @@ anfassen:
   Quadro T500, Iris Xe und dem M2, im Browser; die alten Bilder Byte für Byte gleich. Nicht geprüft: die HD 610.
   Offen: Teil 2 (Cartoon-Material, Partikel, Waffe vor der Kamera, FXAA/SMAA); dabei beachten, dass jede
   durchsichtige Instanz mit den Ecken des größten durchsichtigen Meshes läuft.
+- **Stand 2026-11-19: Teil 2 fertig** ([RENDER3D.md](RENDER3D.md)). Vom Nutzer am 18.11.2026 dazugenommen: eine
+  Kamera ohne Perspektive (`Camera::ortho`; Sichtbarkeit, Verdeckung, Detailstufen, Sortieren und Schatten wie
+  perspektivisch) und Umrisse aus dem Tiefenpuffer (Silhouetten und Falten, ein Durchgang über das Bild);
+  `modeltool`s Ansichten von vorn, Seite und oben sind seitdem ohne Perspektive mit Umrissen. Dazu das
+  Cartoon-Material (`MaterialDesc::toon`: Stufen, Weichheit, Randlicht; billiger als PBR), FXAA 3.11, die Waffe vor
+  der Kamera (eigene Linse, Tiefe 0,5–1, nie in der Wand, im Licht und Schatten der Szene) und Partikel (auf der CPU
+  aus einem Seed geboren, im Rechen-Shader in geschlossener Form bewegt, auf der GPU sortiert, ein Zeichenbefehl,
+  nicht über den Weg der durchsichtigen Instanzen). Kosten in 1080p auf der Iris Xe: Umrisse 0,27 ms, FXAA 0,43 ms,
+  10 000 Partikel 0,58 ms, alles zusammen 1,1 ms. `render3dtest --test all` bestanden auf RTX 2070 SUPER, M2, Iris
+  Xe, T500 und llvmpipe, im Browser; die alten Bilder Byte für Byte gleich; auf der Iris Xe kein Shader mit Spills.
+  Dabei behoben: `FrameStats::visible` las ohne durchsichtige Instanzen einen nie geschriebenen Platz. Nicht
+  geprüft: die HD 610. Offen: der Look des Cartoon-Materials (der Nutzer, an den Bildern in
+  `Documents\JFLib-wip-archiv\g7f2-toon`); das Randlicht bleibt je Material, auf Boden und Wänden 0.
 
 **G7g Modellieren mit JFScript 1** (`lib/geom`, `apps/modeltool`)
 
