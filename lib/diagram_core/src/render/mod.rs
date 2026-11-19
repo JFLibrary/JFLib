@@ -64,6 +64,7 @@ pub use index::Grid;
 pub use rebuild::rebuild;
 pub use text::{measure_text, ApproxMeasure, Face, Measure, TextItem, TextRun};
 pub use theme::{no_theme_color, ThemeInfo};
+pub(crate) use theme::unescape;
 
 /// what build draws
 #[derive(Clone, Copy, Debug, PartialEq)]

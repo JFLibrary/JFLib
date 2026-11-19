@@ -68,6 +68,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   page (matched by name, missing ones added with their properties) and gives the instance's shapes
   the page's layer indices (`instance::bring_layers`, LY-03); `ops::paste` on another page brings the
   copied shapes' layers along by name
+- (JD8) Text fields (TX-06), `diagram_core::field`: `shown` gives the text of a Field row -- its Value in the format picture of its Format cell (`format`: numbers with digits, decimals, digit groups, sections, percent and the unit of the cell, dates and times in `{{ }}`, texts with `@`, `@+`, `@-`, the general format), `insert` puts a new field (Value formula, Format, Type) into a shape's text at a shown position or at its end and computes it, `segments`/`plain` give a text with its fields as they show, `props` reads the document's properties (docProps core and app parts), `ole_days`/`civil` convert Visio's date values; `Document::fields` (`field::Env`) carries what fields show that the file does not hold: the app's decimal sign, digit groups, month and day names, date picture, clock, file path and zone offset. Formulas: NOW, DOCCREATION, DOCLASTSAVE, DOCLASTPRINT, DOCLASTEDIT, CREATOR, DESCRIPTION, DIRECTORY, FILENAME, KEYWORDS, SUBJECT, TITLE, MANAGER, COMPANY, CATEGORY, HYPERLINKBASE (what the engine cannot know here keeps the stored value)
 
 ### Changed
 
@@ -77,6 +78,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - (JD10) The router of `glue` leaves shapes with ObjType 4 ("do not lay out and route around", CN-17) and containers out of its obstacles
 - The theme cells (ThemeIndex, ColorSchemeIndex, EffectSchemeIndex, ConnectorSchemeIndex, FontSchemeIndex, the variation and embellishment indices) and the quick style cells inherit from the styles: the line and font ones with line and text, the others with fill (`Category::of`); shapes took them only from master shapes and so never got the document's theme
 - (JD11) The display list works out cells stored as "Themed" through the formula engine (THEMEVAL with the style lists, colour transforms, variants, line ends, fill patterns), so a design applied shows at once; `ThemeInfo` reads the format scheme's number from `vt:fmtSchemeEx` as Visio writes it; the text tool's box uses the style "Text Only" for its text too
+- (JD8) A field without cached text (a mark `<fld IX='n'/>`) shows its Field row's value in its format instead of the raw number; SHAPETEXT, TEXTWIDTH and TEXTHEIGHT count the text of a shape's fields (their Value cells are read as dependencies)
 
 ### Fixed
 

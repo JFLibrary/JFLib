@@ -456,6 +456,13 @@ pub(crate) fn call(ev: &mut Ev, f: Func, start: u32, n: u32, sheet: u32) -> R {
         MasterName | PageName | Name | TypeDesc | Data1 | Data2 | Data3 | Id | Type | Is1D | PageNumber | PageCount => {
             super::geom::info(ev, f, &a)
         }
+        Now | DocCreation | DocLastSave | DocLastPrint | DocLastEdit | Creator | Description | Directory | FileName | Keywords
+        | Subject | Title | Manager | Company | Category | HyperlinkBase => {
+            if n > 1 {
+                return Err(CellError::Value);
+            }
+            doc_info(ev, f)
+        }
         UserUi => {
             need!(n, 2, 3);
             // without a user interface state the default applies
@@ -648,4 +655,49 @@ fn formula_of(v: &Val) -> Result<String, CellError> {
         }
         other => other.text()?,
     })
+}
+
+// the document information of text fields (field.rs): the app's clock and the file's path
+// (Document::fields), the document's properties; what the engine cannot know here (no clock, a
+// drawing not saved yet, no date in the properties) keeps the stored value
+fn doc_info(ev: &mut Ev, f: Func) -> R {
+    use Func::*;
+    let doc = ev.doc;
+    let env = &doc.fields;
+    let known = |x: f64| x.is_finite().then_some(x);
+    let date = |v: Option<f64>| -> Option<Val> { v.map(Val::Num) };
+    let path = env.path.as_str();
+    let cut = path.rfind(['/', '\\']).map_or(0, |i| i + 1);
+    let v = match f {
+        Now => date(known(env.now)),
+        DocCreation | DocLastSave | DocLastPrint | DocLastEdit => {
+            let p = crate::field::props(doc);
+            date(match f {
+                DocCreation => p.created.or(known(env.created)),
+                DocLastSave => p.modified.or(known(env.saved)),
+                DocLastPrint => p.printed,
+                _ => known(env.edited).or(p.modified).or(known(env.saved)),
+            })
+        }
+        Directory => (!path.is_empty()).then(|| Val::str(&path[..cut])),
+        FileName => (!path.is_empty()).then(|| Val::str(&path[cut..])),
+        _ => {
+            let p = crate::field::props(doc);
+            Some(Val::str(match f {
+                Creator => &p.creator,
+                Description => &p.description,
+                Keywords => &p.keywords,
+                Subject => &p.subject,
+                Title => &p.title,
+                Manager => &p.manager,
+                Company => &p.company,
+                Category => &p.category,
+                _ => &p.hyperlink_base,
+            }))
+        }
+    };
+    match v {
+        Some(v) => Ok(v),
+        None => Err(ev.keep(Keep::NotComputed(f.name().unwrap_or("")))),
+    }
 }

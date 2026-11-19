@@ -105,7 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -54275,6 +54275,9 @@ a file loses nothing, and the behaviour Visio files carry works without translat
                                 orientation, sizes, fit to the drawing, automatic size in
                                 tiles of the printed sheet; Transaction::add_page_like and
                                 duplicate_page insert pages with settings or content
+  field::*                      (JD8) text fields: a Field row's value in its format picture,
+                                new fields, the text with its fields, the document's
+                                properties (Document::fields: the app's locale and clock)
 
 What is to come here, by stage of the plan: page layout (CN-13, P2)
 
@@ -54886,6 +54889,8 @@ instance "<master's NameU>.<ID>"; without Name it shows its NameU.
   - `colors_extras: Extras` -- unknown items of the Colors element (a ColorEntry with more than IX and RGB too)
   - `faces_extras: Extras` -- unknown items of the FaceNames element (a FaceName with children too)
   - `styles_extras: Extras` -- unknown items of the StyleSheets element
+  - `fields: crate::field::Env` -- what text fields show that the file does not hold: the app's locale and clock, the
+    file's path (field::Env; never written)
 
 **`impl Document`**
 
@@ -55315,6 +55320,178 @@ a Del="1" mark; restore_row and restore_section remove it again.
 - **`fn set_row_kind(&mut self, sheet: SheetRef, sk: SecKey, key: RowKey, kind: &str) -> Result<(), EditError>`**
   change the type (T) of a row the sheet has (Geometry: "MoveTo", "LineTo" ...); an
   inherited row gets an entry of the sheet's own that names the type
+
+### `diagram_core/src/field.rs`
+
+Source: [`lib/diagram_core/src/field.rs`](../lib/diagram_core/src/field.rs)
+
+```text
+field -- text fields (TX-06): a <fld IX='n'/> mark in a shape's text shows Field row n of the
+shape, the value of its Value cell in the format picture of its Format cell
+
+  Env                        what fields show that the file does not hold (Document::fields,
+                             set by the app): the decimal sign and the digit groups, month and
+                             day names, the date picture of the general format, the clock
+                             (NOW), when the drawing was made, saved and edited (when the
+                             document's properties do not say), the file's path (DIRECTORY,
+                             FILENAME), the zone's offset (the properties' times are UTC)
+  Shown / format(&v, picture, &env) -> String   a value in a picture of Visio's FORMAT
+  shown(doc, sheet, ix) -> String           the text Field row ix of a sheet shows
+  cached(xml) -> Option<String>             the text a field kept as XML (Visio's own
+                                             <fld IX='n'>text</fld>) has cached
+  Seg / segments(doc, shape)                the shape's text as runs of characters and fields,
+                                             each field with the text it shows (editing in
+                                             place, Find and Replace)
+  plain(doc, shape) -> String                the text as it shows, fields included
+  Kind / Spec / insert(tx, eng, shape, at, &spec) -> ix   a new field: its Field row (Value
+                                             formula, Format, Type) and its mark in the text,
+                                             computed at once
+  Props / props(doc)                         the document's properties (docProps/core.xml and
+                                             app.xml): title, creator, keywords, dates ...
+  ole_days(y, m, d, h, min, s) / civil(days) dates as Visio keeps them: days since 30 December
+                                             1899, the time of day as the fraction
+
+The Field section (Visio's Text Fields section, [MS-VSDX] Field_Type): Value holds the
+formula (Width, PAGENAME(), NOW(), Prop.Cost, a formula of the user's) and its result in the
+unit the field shows (U="MM" for a length in millimetres, U="DATE" for a date, U="STR" for a
+text); Format holds the format picture as a string.  Type: 0 text, 2 number, 5 date or time,
+6 duration, 7 currency (Annahme: the numbering of the shape data's Type cell, which the Text
+Fields section shares as far as known here).  The cells UICat, UICod and UIFmt, which only
+Visio's own dialog reads, are not written; Visio's dialog then opens a field of ours as a
+custom formula (Annahme).  A field the file wrote with its text inside
+(<fld IX='0'>19.11.2026</fld>, Visio's way) stays as the reader kept it (TextItem::Other) and
+shows that text (JD4); a field without text inside (ours, TextItem::Field) shows its value,
+which the formula engine computes when what it reads changes.
+
+Format pictures (Visio's FORMAT; Annahmen as far as Visio's own documentation was not at hand):
+  numbers   0 a digit or 0, # a digit or nothing, . the decimal sign, , groups of three in the
+            integer part, % times 100, u / U the unit's abbreviation (uu / UU the same), "..."
+            and \c literal text, anything else literal; "a;b;c": a for positive, b for
+            negative (without its sign), c for zero; a length, angle or duration shows in the
+            unit of its cell (25.4 mm for an inch in a cell with U="MM")
+  dates     {{ ... }} around date and time parts: d dd day, ddd dddd its name, M MM month,
+            MMM MMMM its name, yy yyyy year, H HH hours (24), h hh hours (12), m mm minutes,
+            s ss seconds, t tt AM / PM; '...' literal inside, text outside the braces literal
+  texts     @ the text, @+ in capitals, @- in small letters
+  empty     the general format: a number with up to four decimals (a length with its unit),
+            a date in Env::date, a text as it is
+```
+
+- **`struct Env`**
+  what fields show that the file does not hold (see the file header)
+  - `decimal: char` -- the decimal sign ('.' in English, ',' in German)
+  - `group: char` -- the sign between groups of three digits
+  - `months: [&'static str; 12]` -- January .. December
+  - `days: [&'static str; 7]` -- Sunday .. Saturday
+  - `am_pm: [&'static str; 2]` -- the marks of the morning and the afternoon (t, tt)
+  - `date: &'static str` -- the date picture of the general format (without the braces): "M/d/yyyy", "dd.MM.yyyy"
+  - `now: f64` -- now in local time (days since 30 Dec 1899; NaN: unknown, NOW() keeps its stored value)
+  - `created: f64` -- when the drawing was made (local time; NaN: unknown) when its properties do not say
+  - `saved: f64` -- when it was saved last (the same)
+  - `edited: f64` -- when it was edited last (NaN: when it was saved)
+  - `path: String` -- the file's path ("": not saved yet)
+  - `utc_offset: f64` -- local time minus UTC, in days (the properties' times are UTC)
+
+```rust
+/// English month names
+MONTHS_EN: [&str; 12] = ["January", "February", "March", "April", "May", "June", ...
+/// English day names, Sunday first
+DAYS_EN: [&str; 7] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", ...
+```
+
+- **`enum Shown<'a>`**
+  a value to show
+  - `Num(f64, Option<Unit>)` -- a number in internal units and the unit of its cell
+  - `Text(&'a str)` -- a text
+  - `Nothing` -- nothing (no value)
+
+- **`fn format(v: &Shown, picture: &str, env: &Env) -> String`**
+  a value in a format picture (see the file header)
+
+- **`fn unit_abbr(u: Unit) -> &'static str`**
+  the abbreviation a picture's u shows for a unit
+
+- **`fn ole_days(year: i64, month: u32, day: u32, hour: u32, min: u32, sec: u32) -> f64`**
+  the days since 30 December 1899 of a date and time (Visio's date values)
+
+- **`fn civil(days: f64) -> (i64, u32, u32, u32, u32, u32, u32)`**
+  a date value as (year, month, day, hour, minute, second, weekday with Sunday 0)
+
+- **`fn shown(doc: &Document, sheet: SheetRef, ix: u32) -> String`**
+  the text Field row ix of a sheet shows: its value in its format ("" for an error)
+
+- **`fn picture(doc: &Document, sheet: SheetRef, ix: u32) -> &str`**
+  the format picture of Field row ix ("" for none)
+
+- **`fn cached(xml: &str) -> Option<String>`**
+  the text inside a &lt;fld ...>text&lt;/fld> element (a field as Visio writes it, kept as XML)
+
+- **`enum Seg`**
+  a run of a shape's text
+  - `Text(String)` -- characters (the marks between them left out)
+  - `Field { item: usize, text: String, }` -- a field: its item in Text::items and the text it shows
+
+**`impl Seg`**
+
+- **`fn text(&self) -> &str`**
+  the text the run shows
+
+- **`fn segments_of(doc: &Document, sheet: SheetRef, text: &Text) -> Vec<Seg>`**
+  the runs of a text (`sheet`: the shape's, for the values of its fields)
+
+- **`fn segments(doc: &Document, shape: ShapeRef) -> Vec<Seg>`**
+  the runs of a shape's text (its master's when it has none of its own)
+
+- **`fn plain(doc: &Document, shape: ShapeRef) -> String`**
+  the text of a shape as it shows, fields included
+
+- **`enum Kind`**
+  what a field holds (its Type cell)
+  - `Text` -- a text (Type 0)
+  - `Number` -- a number, also a length or an angle (Type 2)
+  - `Date` -- a date or a time (Type 5)
+  - `Duration` -- a duration (Type 6)
+  - `Currency` -- an amount of money (Type 7)
+
+**`impl Kind`**
+
+- **`fn code(self) -> f64`**
+  the Type cell's value
+
+- **`struct Spec<'a>`**
+  a new field
+  - `formula: &'a str` -- the Value cell's formula (Width, PAGENAME(), NOW(), Prop.Cost ...)
+  - `format: &'a str` -- the format picture ("" the general format)
+  - `unit: Option<Unit>` -- the unit the value shows in (MM, DEG, DATE ...; None: a plain number; a text: STR)
+  - `kind: Kind` -- what it holds
+
+- **`fn insert_item(doc: &Document, sheet: SheetRef, text: &Text, at: Option<usize>, item: TextItem) -> Text`**
+  a text with `item` put in at a shown position (fields count with the text they show; a
+  position inside a field goes behind it; None: at the end, in front of the last line break)
+
+- **`fn insert(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, at: Option<usize>, spec: &Spec) -> Result<u32, EditError>`**
+  a new field in a shape's text at the shown position `at` (None: at its end, on a line of
+  its own when the text has words): a Field row with the formula, the format and the type,
+  computed at once, and its mark in the text -> the row's IX
+
+- **`struct Props`**
+  the document's properties (docProps/core.xml, docProps/app.xml); dates as days since
+  30 Dec 1899 in local time (Env::utc_offset), None when the part does not say
+  - `title: String`
+  - `subject: String`
+  - `creator: String`
+  - `keywords: String`
+  - `description: String`
+  - `category: String`
+  - `manager: String`
+  - `company: String`
+  - `hyperlink_base: String`
+  - `created: Option<f64>`
+  - `modified: Option<f64>`
+  - `printed: Option<f64>`
+
+- **`fn props(doc: &Document) -> Props`**
+  the document's properties (see Props)
 
 ### `diagram_core/src/formula/color.rs`
 
@@ -57585,7 +57762,8 @@ wrapping, alignment, the text block's transform and margins
 
 The text comes as the file keeps it (Text: characters between cp, pp, tp and fld marks,
 JD3): a cp mark selects the Character row for what follows, a pp mark the Paragraph row; a
-field shows the text Visio cached in it (no formula is evaluated); LF ends a paragraph,
+field Visio wrote with its text inside shows that text, one without text inside (a field of
+JFDiagrammer) its Field row's value in its format (field.rs); LF ends a paragraph,
 U+2028 breaks a line inside one, the last LF of a text is Visio's end mark and makes no empty
 paragraph.  Character cells: Font, Size, Color, ColorTrans, Style (1 bold, 2 italic,
 4 underline, 8 small caps), Case (1 all caps, 2 initial caps), Pos (1 superscript,

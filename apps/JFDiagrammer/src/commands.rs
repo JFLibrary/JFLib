@@ -518,6 +518,15 @@ static HANDLERS: &[(u32, Handler)] = &[
     (LAYER_ASSIGN, crate::layers::open_assign),
     (LAYER_PROPERTIES, crate::layers::open_props),
     (SELECT_BY_TYPE, crate::select_type::open),
+    // (JD8 rest: Text, Felder, Links, Suchen -- cmds_text.rs, dlg_*.rs)
+    (TEXT_DIALOG, crate::dlg_text::open),
+    (FORMAT_TEXT, crate::dlg_text::open),
+    (TEXT_BOX_V, |a, _| crate::edit_cmds::tool(a, TEXT_BOX_V)),
+    (FIELD, crate::dlg_field::open),
+    (LINK, crate::dlg_link::open),
+    (HYPERLINK, crate::dlg_link::open),
+    (FIND, |a, ui| crate::dlg_find::open(a, ui, false)),
+    (REPLACE, |a, ui| crate::dlg_find::open(a, ui, true)),
 ];
 
 // toggles: whether the command is on
@@ -577,6 +586,8 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (DRAW_TOOLS, crate::cmds_draw::any_tool),
     (FREEFORM, |a| a.tool == FREEFORM),
     (ARC, |a| a.tool == ARC),
+    // (JD8 rest: Text, Felder, Links, Suchen)
+    (TEXT_BOX_V, |a| a.tool == TEXT_BOX_V),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -594,12 +605,13 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
     enabled(id)
         && crate::edit_cmds::available(app, id)
         && crate::format_menus::available(app, id)
-        // (JD8 rest) menu buttons, panes, pages, pasting, layers
+        // (JD8 rest) menu buttons, panes, pages, pasting, layers, text
         && crate::cmds_shell::available(app, id)
         && crate::pages::available(app, id)
         && crate::page_size::available(app, id)
         && crate::cmds_paste::available(app, id)
         && crate::layers::available(app, id)
+        && crate::cmds_text::available(app, id)
 }
 
 /// the toggle is on

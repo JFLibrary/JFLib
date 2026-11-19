@@ -745,3 +745,88 @@ Gruppen	Groups	Grupos	Gruppi	Groupes
 Auswahl nach	Select by	Seleccionar por	Seleziona per	Sélectionner par
 Shapetyp	Shape type	Tipo de forma	Tipo di forma	Type de forme
 Keine Ebene	No layer	Ninguna capa	Nessun livello	Aucun calque
+Sonntag	Sunday	domingo	domenica	dimanche
+Montag	Monday	lunes	lunedì	lundi
+Dienstag	Tuesday	martes	martedì	mardi
+Mittwoch	Wednesday	miércoles	mercoledì	mercredi
+Donnerstag	Thursday	jueves	giovedì	jeudi
+Freitag	Friday	viernes	venerdì	vendredi
+Samstag	Saturday	sábado	sabato	samedi
+Datum/Uhrzeit	Date/Time	Fecha/Hora	Data/Ora	Date/Heure
+Dokumentinfo	Document Info	Información del documento	Informazioni documento	Informations sur le document
+Seiteninfo	Page Info	Información de página	Informazioni pagina	Informations sur la page
+Geometrie	Geometry	Geometría	Geometria	Géométrie
+Objektinfo	Object Info	Información del objeto	Informazioni oggetto	Informations sur l'objet
+Benutzerdefinierte Zellen	User-defined Cells	Celdas definidas por el usuario	Celle definite dall'utente	Cellules définies par l'utilisateur
+Eigene Formel	Custom Formula	Fórmula personalizada	Formula personalizzata	Formule personnalisée
+Erstellungsdatum/-uhrzeit	Creation Date/Time	Fecha/hora de creación	Data/ora di creazione	Date/heure de création
+Aktuelles Datum/aktuelle Uhrzeit	Current Date/Time	Fecha/hora actual	Data/ora corrente	Date/heure actuelle
+Letzte Bearbeitung	Last Edit Date/Time	Última edición	Ultima modifica	Dernière modification
+Druckdatum/-uhrzeit	Print Date/Time	Fecha/hora de impresión	Data/ora di stampa	Date/heure d'impression
+Ersteller	Creator	Autor	Autore	Auteur
+Beschreibung	Description	Descripción	Descrizione	Description
+Verzeichnis	Directory	Carpeta	Cartella	Dossier
+Dateiname	File Name	Nombre de archivo	Nome file	Nom du fichier
+Stichwörter	Keywords	Palabras clave	Parole chiave	Mots clés
+Betreff	Subject	Asunto	Oggetto	Objet
+Titel	Title	Título	Titolo	Titre
+Manager	Manager	Administrador	Responsabile	Responsable
+Firma	Company	Organización	Società	Société
+Kategorie	Category	Categoría	Categoria	Catégorie
+Hyperlinkbasis	Hyperlink Base	Base del vínculo	Base collegamento	Base de lien
+Seitenzahl	Page Number	Número de página	Numero di pagina	Numéro de page
+Seitenanzahl	Number of Pages	Número de páginas	Numero di pagine	Nombre de pages
+ID	ID	Id.	ID	ID
+Master-Shape	Master shape	Forma maestra	Forma master	Forme maître
+Daten 1	Data 1	Datos 1	Dati 1	Données 1
+Daten 2	Data 2	Datos 2	Dati 2	Données 2
+Daten 3	Data 3	Datos 3	Dati 3	Données 3
+Normal	Normal	Normal	Normale	Normal
+Großbuchstaben	Uppercase	Mayúsculas	Maiuscole	Majuscules
+Kleinbuchstaben	Lowercase	Minúsculas	Minuscole	Minuscules
+Formel	Formula	Fórmula	Formula	Formule
+z. B. Width*2	e.g. Width*2	p. ej. Width*2	ad es. Width*2	p. ex. Width*2
+Die Formel lässt sich nicht lesen.	The formula cannot be read.	No se puede leer la fórmula.	Impossibile leggere la formula.	La formule est illisible.
+Feldname	Field name	Nombre del campo	Nome campo	Nom du champ
+Das Shape hat keine Einträge dieser Art.	The shape has no entries of this kind.	La forma no tiene entradas de este tipo.	La forma non ha voci di questo tipo.	La forme n'a aucune entrée de ce type.
+Feld einfügen	Insert Field	Insertar campo	Inserisci campo	Insérer un champ
+Shape-Name	Shape name	Nombre de la forma	Nome forma	Nom de la forme
+Gefunden: {} ({})	Found: {} ({})	Encontrado: {} ({})	Trovato: {} ({})	Trouvé : {} ({})
+Die Suche hat wieder am Anfang begonnen.	The search started again from the beginning.	La búsqueda ha vuelto a empezar desde el principio.	La ricerca è ripartita dall'inizio.	La recherche a repris depuis le début.
+„{}“ wurde nicht gefunden.	"{}" was not found.	No se encontró "{}".	"{}" non trovato.	« {} » introuvable.
+Suchen nach	Find what	Buscar	Trova	Rechercher
+Ersetzen durch	Replace with	Reemplazar con	Sostituisci con	Remplacer par
+Suchen in	Search in	Buscar en	Cerca in	Rechercher dans
+Auswahl	Selection	Selección	Selezione	Sélection
+Seite|Bereich	Page	Página	Pagina	Page
+Auch in	Also in	También en	Anche in	Aussi dans
+Shape-Namen	Shape names	Nombres de forma	Nomi forma	Noms de forme
+Namen der Master-Shapes	Master shape names	Nombres de formas maestras	Nomi delle forme master	Noms des formes maîtres
+Groß-/Kleinschreibung beachten	Match case	Coincidir mayúsculas y minúsculas	Maiuscole/minuscole	Respecter la casse
+Nur ganzes Wort	Whole words only	Solo palabras completas	Solo parole intere	Mot entier uniquement
+Weitersuchen	Find Next	Buscar siguiente	Trova successivo	Suivant
+1 Stelle ersetzt.	1 occurrence replaced.	Se reemplazó 1 aparición.	Sostituita 1 occorrenza.	1 occurrence remplacée.
+{} Stellen ersetzt.	{} occurrences replaced.	Se reemplazaron {} apariciones.	Sostituite {} occorrenze.	{} occurrences remplacées.
+(neuer Link)	(new link)	(nuevo vínculo)	(nuovo collegamento)	(nouveau lien)
+Hyperlinks	Links	Vínculos	Collegamenti	Liens
+Adresse	Address	Dirección	Indirizzo	Adresse
+https://…, mailto:…, Datei	https://…, mailto:…, file	https://…, mailto:…, archivo	https://…, mailto:…, file	https://…, mailto:…, fichier
+Unteradresse	Sub-address	Subdirección	Sottoindirizzo	Sous-adresse
+(keine)	(none)	(ninguna)	(nessuno)	(aucune)
+Shape (optional)	Shape (optional)	Forma (opcional)	Forma (facoltativa)	Forme (facultatif)
+Links des Shapes	Links of the shape	Vínculos de la forma	Collegamenti della forma	Liens de la forme
+Als Standard	Set as default	Predeterminado	Imposta come predefinito	Par défaut
+Strg+Klicken, um dem Link zu folgen	Ctrl+click to follow the link	Ctrl+clic para seguir el vínculo	Ctrl+clic per seguire il collegamento	Ctrl+clic pour suivre le lien
+Der Link lässt sich nicht öffnen.	The link cannot be opened.	No se puede abrir el vínculo.	Impossibile aprire il collegamento.	Impossible d'ouvrir le lien.
+Die Seite „{}“ gibt es nicht.	There is no page "{}".	No existe la página "{}".	La pagina "{}" non esiste.	La page « {} » n'existe pas.
+Links der Art „{}:“ öffnet JFDiagrammer nicht.	JFDiagrammer does not open links of the kind "{}:".	JFDiagrammer no abre vínculos del tipo "{}:".	JFDiagrammer non apre collegamenti del tipo "{}:".	JFDiagrammer n'ouvre pas les liens du type « {}: ».
+Ein relativer Link braucht eine gespeicherte Zeichnung.	A relative link needs a saved drawing.	Un vínculo relativo necesita un dibujo guardado.	Un collegamento relativo richiede un disegno salvato.	Un lien relatif nécessite un dessin enregistré.
+Erste Zeile	First line	Primera línea	Prima riga	Première ligne
+Abstand	Spacing	Espaciado	Spaziatura	Espacement
+Vor	Before	Antes	Prima	Avant
+Nach	After	Después	Dopo	Après
+Zeilenabstand	Line spacing	Interlineado	Interlinea	Interligne
+Vertikale Ausrichtung	Vertical alignment	Alineación vertical	Allineamento verticale	Alignement vertical
+Texthintergrund	Text background	Fondo del texto	Sfondo del testo	Arrière-plan du texte
+Keiner	None	Ninguno	Nessuno	Aucun
+Hintergrundfarbe	Background color	Color de fondo	Colore di sfondo	Couleur d'arrière-plan

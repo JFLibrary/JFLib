@@ -358,6 +358,9 @@ pub struct Document {
     pub faces_extras: Extras,
     /// unknown items of the StyleSheets element
     pub styles_extras: Extras,
+    /// what text fields show that the file does not hold: the app's locale and clock, the
+    /// file's path (field::Env; never written)
+    pub fields: crate::field::Env,
 }
 
 impl Default for Document {
@@ -390,6 +393,7 @@ impl Document {
             colors_extras: Extras::new(),
             faces_extras: Extras::new(),
             styles_extras: Extras::new(),
+            fields: crate::field::Env::default(),
         }
     }
 

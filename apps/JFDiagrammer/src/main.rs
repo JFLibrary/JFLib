@@ -63,6 +63,12 @@
 //   src/cmds_paste.rs (JD8 rest) Inhalte einfügen, Als Link einfügen, Strg+V from the system
 //   src/layers.rs     (JD8 rest) Ebene zuweisen, Ebeneneigenschaften, the layers on the canvas
 //   src/select_type.rs  (JD8 rest) Markieren › Nach Typ auswählen
+//   src/cmds_text.rs  (JD8 rest) the text, field, link and search commands: state, target, the
+//                     fields' locale and clock, the vertical text box, a shape into view
+//   src/dlg_text.rs   (JD8 rest) the dialog Text (font, paragraph, text block)
+//   src/dlg_field.rs  (JD8 rest) the dialog Feld (fields in the text, TX-06)
+//   src/dlg_link.rs   (JD8 rest) the dialog Hyperlinks, following links, the link pointer
+//   src/dlg_find.rs   (JD8 rest) the dialog Suchen und Ersetzen
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too)
@@ -106,9 +112,14 @@ mod cmds_shell;
 mod cmds_draw;
 mod cmds_paste;
 mod cmds_picture;
+mod cmds_text;
 mod commands;
 mod design_gallery;
 mod design_store;
+mod dlg_field;
+mod dlg_find;
+mod dlg_link;
+mod dlg_text;
 mod edit_canvas;
 mod edit_cmds;
 mod edit_doc;
@@ -255,6 +266,8 @@ pub(crate) struct Diagrammer {
     pub paste: cmds_paste::PasteState,
     pub layers: layers::LayerState,
     pub select: select_type::SelectState,
+    /// (JD8 rest) the text, field, link and search commands (cmds_text.rs)
+    pub txt: cmds_text::TextCmds,
 }
 
 impl Diagrammer {
@@ -315,6 +328,7 @@ impl Diagrammer {
             paste: cmds_paste::PasteState::default(),
             layers: layers::LayerState::default(),
             select: select_type::SelectState::default(),
+            txt: cmds_text::TextCmds::default(),
         }
     }
 
@@ -471,10 +485,11 @@ impl App for Diagrammer {
         layers::assign_dialog(self, ui);
         layers::props_dialog(self, ui);
         select_type::dialog(self, ui);
+        cmds_text::frame(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
-        stencils::command(self, ui, id) || commands::run(self, ui, id)
+        cmds_text::command(self, ui, id) || stencils::command(self, ui, id) || commands::run(self, ui, id)
     }
 }
 
