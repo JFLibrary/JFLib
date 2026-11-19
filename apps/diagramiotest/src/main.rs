@@ -86,6 +86,7 @@ mod pdfreader;
 mod render;
 mod roundtrip;
 mod samples;
+mod stencil_network;
 mod stencil_structs;
 mod stencils;
 mod structures;
@@ -160,6 +161,10 @@ fn run() -> i32 {
     if let Some(reps) = arg(&args, "--growth") {
         return formulas::growth_table(reps.parse().unwrap_or(5));
     }
+    if let Some(dir) = arg(&args, "--write-network-previews") {
+        // (JD13) the network symbols and a rack with devices
+        return stencil_network::previews(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-stencil-previews") {
         return stencil_structs::previews(&dir);
     }
@@ -211,6 +216,10 @@ fn run() -> i32 {
         }
         if h.on("structures") {
             structures::check(&mut h);
+        }
+        // (JD13) the network and rack stencils
+        if h.on("stencils/network") {
+            stencil_network::run(&mut h);
         }
     }
     if h.on("corpus") {

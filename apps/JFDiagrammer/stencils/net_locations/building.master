@@ -1,0 +1,32 @@
+master: Building
+name.de: Gebäude
+name.en: Building
+name.es: Edificio
+name.it: Edificio
+name.fr: Bâtiment
+prompt.de: Gebäude: ein Standort im Netzwerkplan, etwa ein Bürogebäude.
+prompt.en: Building: a site in the network plan, such as an office building.
+prompt.es: Edificio: una ubicación del plano de red, como un edificio de oficinas.
+prompt.it: Edificio: una sede nello schema di rete, ad esempio un edificio per uffici.
+prompt.fr: Bâtiment : un site du plan réseau, par exemple un immeuble de bureaux.
+keywords.de: Gebäude, Büro, Standort, Niederlassung, WAN
+keywords.en: building, office, site, branch, WAN
+keywords.es: edificio, oficina, ubicación, sucursal, WAN
+keywords.it: edificio, ufficio, sede, filiale, WAN
+keywords.fr: bâtiment, bureau, site, agence, WAN
+svg: building.svg
+include: ../net_common/symbol.inc, ../net_common/location.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Standort
+    Value.en = Location
+    Value.es = Ubicación
+    Value.it = Sede
+    Value.fr = Site
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Gebäude
+    Value.en = Building
+    Value.es = Edificio
+    Value.it = Edificio
+    Value.fr = Bâtiment

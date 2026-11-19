@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 482.6 44.45" width="965" height="89"
+     fill="none" stroke="#2E343B" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Rack switch 1U: 24 RJ45 in two rows, 4 SFP+ cages, console, LEDs</title>
+  <rect class="body" x="17.8" y="0.6" width="447" height="43.25" fill="#F7F8FA" stroke="none"/>
+  <path class="shade" d="M2.6 0.6H17.8V43.85H2.6A2 2 0 0 1 0.6 41.85V2.6A2 2 0 0 1 2.6 0.6ZM464.8 0.6H480A2 2 0 0 1 482 2.6V41.85A2 2 0 0 1 480 43.85H464.8Z" fill="#DCDFE3" stroke="none"/>
+  <path class="ink" d="M17.8 0.6V43.85M464.8 0.6V43.85" stroke-width="1.5"/>
+  <rect class="ink" x="0.6" y="0.6" width="481.4" height="43.25" rx="2"/>
+  <g class="port" fill="#4F555D" stroke="none"><rect x="4.90" y="4.10" width="8" height="4.5" rx="2.25"/><rect x="469.70" y="4.10" width="8" height="4.5" rx="2.25"/><rect x="4.90" y="35.85" width="8" height="4.5" rx="2.25"/><rect x="469.70" y="35.85" width="8" height="4.5" rx="2.25"/></g>
+  <rect class="tint" x="25" y="6" width="38" height="32.45" rx="3" fill="#4F7396" stroke="none"/>
+  <path class="body" d="M32 16.5H55M49.5 12L55 16.5L49.5 21M55 28H32M37.5 23.5L32 28L37.5 32.5" stroke="#F7F8FA" stroke-width="2.6"/>
+  <g class="port" fill="#4F555D" stroke="none"><rect x="78.00" y="8.5" width="11" height="10" rx="1"/><rect x="91.50" y="8.5" width="11" height="10" rx="1"/><rect x="105.00" y="8.5" width="11" height="10" rx="1"/><rect x="118.50" y="8.5" width="11" height="10" rx="1"/><rect x="132.00" y="8.5" width="11" height="10" rx="1"/><rect x="145.50" y="8.5" width="11" height="10" rx="1"/><rect x="168.00" y="8.5" width="11" height="10" rx="1"/><rect x="181.50" y="8.5" width="11" height="10" rx="1"/><rect x="195.00" y="8.5" width="11" height="10" rx="1"/><rect x="208.50" y="8.5" width="11" height="10" rx="1"/><rect x="222.00" y="8.5" width="11" height="10" rx="1"/><rect x="235.50" y="8.5" width="11" height="10" rx="1"/><rect x="78.00" y="24" width="11" height="10" rx="1"/><rect x="91.50" y="24" width="11" height="10" rx="1"/><rect x="105.00" y="24" width="11" height="10" rx="1"/><rect x="118.50" y="24" width="11" height="10" rx="1"/><rect x="132.00" y="24" width="11" height="10" rx="1"/><rect x="145.50" y="24" width="11" height="10" rx="1"/><rect x="168.00" y="24" width="11" height="10" rx="1"/><rect x="181.50" y="24" width="11" height="10" rx="1"/><rect x="195.00" y="24" width="11" height="10" rx="1"/><rect x="208.50" y="24" width="11" height="10" rx="1"/><rect x="222.00" y="24" width="11" height="10" rx="1"/><rect x="235.50" y="24" width="11" height="10" rx="1"/></g>
+  <g class="shade" fill="#DCDFE3" stroke-width="1.2"><rect x="268" y="8.5" width="15" height="10" rx="1"/><rect x="286" y="8.5" width="15" height="10" rx="1"/><rect x="268" y="24" width="15" height="10" rx="1"/><rect x="286" y="24" width="15" height="10" rx="1"/></g>
+  <rect class="screen" x="316" y="16" width="13" height="11" rx="1" fill="#CAD4DF" stroke-width="1.2"/>
+  <g class="ok" fill="#3C9A5F" stroke="none"><circle cx="350" cy="15" r="1.6"/><circle cx="358" cy="15" r="1.6"/><circle cx="366" cy="15" r="1.6"/><circle cx="374" cy="15" r="1.6"/></g>
+  <path class="port" d="M346 28H378" stroke="#4F555D" stroke-width="1.6"/>
+</svg>

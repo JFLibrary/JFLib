@@ -1,0 +1,32 @@
+master: Router
+name.de: Router
+name.en: Router
+name.es: Enrutador
+name.it: Router
+name.fr: Routeur
+prompt.de: Router: verbindet Netze und leitet Pakete zwischen ihnen weiter.
+prompt.en: Router: connects networks and forwards packets between them.
+prompt.es: Enrutador: conecta redes y reenvía paquetes entre ellas.
+prompt.it: Router: collega reti e inoltra i pacchetti tra di esse.
+prompt.fr: Routeur : relie des réseaux et achemine les paquets entre eux.
+keywords.de: Router, Gateway, Layer 3, Netzwerk, WAN
+keywords.en: router, gateway, layer 3, network, WAN
+keywords.es: enrutador, router, puerta de enlace, capa 3, red
+keywords.it: router, gateway, livello 3, rete, WAN
+keywords.fr: routeur, passerelle, couche 3, réseau, WAN
+svg: router.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Router
+    Value.en = Router
+    Value.es = Enrutador
+    Value.it = Router
+    Value.fr = Routeur

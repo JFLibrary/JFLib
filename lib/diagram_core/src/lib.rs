@@ -41,6 +41,8 @@
 //
 //   structure::*                  (JD10) containers, lists, callouts: membership in the
 //                                 Relationships cell, automatic size, list order and layout
+//   dock::*                       (JD13) 2-D shapes that snap with an outward connection point
+//                                 onto an inward one (equipment into racks)
 //
 // What is to come here, by stage of the plan: page layout (CN-13, P2)
 //
@@ -54,6 +56,7 @@ extern crate alloc;
 
 mod cell;
 pub mod design;
+pub mod dock;
 mod document;
 mod edit;
 pub mod formula;

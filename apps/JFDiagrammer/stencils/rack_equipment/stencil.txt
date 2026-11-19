@@ -1,0 +1,10 @@
+stencil: Rack-mounted Equipment
+file: rackeq
+name.de: Gestellmontierte Geräte
+name.en: Rack-mounted Equipment
+name.es: Equipos montados en rack
+name.it: Apparecchiature a rack
+name.fr: Équipements montés en baie
+category: network
+masters: rack, server, switch
+quick: 3

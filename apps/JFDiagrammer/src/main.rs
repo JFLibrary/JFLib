@@ -99,6 +99,8 @@ mod options;
 mod panes;
 mod print_layout;
 mod print_ui;
+// (JD13) equipment snaps onto the units of a rack
+mod rack;
 mod ribbon;
 mod shell;
 mod stencils;

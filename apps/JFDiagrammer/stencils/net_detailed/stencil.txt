@@ -1,0 +1,10 @@
+stencil: Detailed Network Diagram
+file: netdetail
+name.de: Detailliertes Netzwerkdiagramm
+name.en: Detailed Network Diagram
+name.es: Diagrama de red detallado
+name.it: Schema di rete dettagliato
+name.fr: Diagramme réseau détaillé
+category: network
+masters: satellite_dish
+quick: 0

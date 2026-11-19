@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 482.6 88.9" width="965" height="178"
+     fill="none" stroke="#2E343B" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Rack server 2U: twelve drive bays, grille, power button, LEDs</title>
+  <rect class="body" x="17.8" y="0.6" width="447" height="87.70" fill="#F7F8FA" stroke="none"/>
+  <path class="shade" d="M2.6 0.6H17.8V88.30H2.6A2 2 0 0 1 0.6 86.30V2.6A2 2 0 0 1 2.6 0.6ZM464.8 0.6H480A2 2 0 0 1 482 2.6V86.30A2 2 0 0 1 480 88.30H464.8Z" fill="#DCDFE3" stroke="none"/>
+  <path class="ink" d="M17.8 0.6V88.30M464.8 0.6V88.30" stroke-width="1.5"/>
+  <rect class="ink" x="0.6" y="0.6" width="481.4" height="87.70" rx="2"/>
+  <g class="port" fill="#4F555D" stroke="none"><rect x="4.90" y="4.10" width="8" height="4.5" rx="2.25"/><rect x="469.70" y="4.10" width="8" height="4.5" rx="2.25"/><rect x="4.90" y="35.85" width="8" height="4.5" rx="2.25"/><rect x="469.70" y="35.85" width="8" height="4.5" rx="2.25"/><rect x="4.90" y="48.55" width="8" height="4.5" rx="2.25"/><rect x="469.70" y="48.55" width="8" height="4.5" rx="2.25"/><rect x="4.90" y="80.30" width="8" height="4.5" rx="2.25"/><rect x="469.70" y="80.30" width="8" height="4.5" rx="2.25"/></g>
+  <rect class="tint" x="25" y="8" width="22" height="72.9" rx="3" fill="#6A6390" stroke="none"/>
+  <g class="shade" fill="#DCDFE3" stroke-width="1.2"><rect x="58.00" y="9" width="17" height="70.9" rx="1.5"/><rect x="78.50" y="9" width="17" height="70.9" rx="1.5"/><rect x="99.00" y="9" width="17" height="70.9" rx="1.5"/><rect x="119.50" y="9" width="17" height="70.9" rx="1.5"/><rect x="140.00" y="9" width="17" height="70.9" rx="1.5"/><rect x="160.50" y="9" width="17" height="70.9" rx="1.5"/><rect x="181.00" y="9" width="17" height="70.9" rx="1.5"/><rect x="201.50" y="9" width="17" height="70.9" rx="1.5"/><rect x="222.00" y="9" width="17" height="70.9" rx="1.5"/><rect x="242.50" y="9" width="17" height="70.9" rx="1.5"/><rect x="263.00" y="9" width="17" height="70.9" rx="1.5"/><rect x="283.50" y="9" width="17" height="70.9" rx="1.5"/></g>
+  <path class="port" d="M62.00 71H71.00M82.50 71H91.50M103.00 71H112.00M123.50 71H132.50M144.00 71H153.00M164.50 71H173.50M185.00 71H194.00M205.50 71H214.50M226.00 71H235.00M246.50 71H255.50M267.00 71H276.00M287.50 71H296.50" stroke="#4F555D" stroke-width="2"/>
+  <g class="ok" fill="#3C9A5F" stroke="none"><circle cx="66.50" cy="15" r="1.6"/><circle cx="87.00" cy="15" r="1.6"/><circle cx="107.50" cy="15" r="1.6"/><circle cx="128.00" cy="15" r="1.6"/><circle cx="148.50" cy="15" r="1.6"/><circle cx="169.00" cy="15" r="1.6"/><circle cx="189.50" cy="15" r="1.6"/><circle cx="210.00" cy="15" r="1.6"/><circle cx="230.50" cy="15" r="1.6"/><circle cx="251.00" cy="15" r="1.6"/><circle cx="271.50" cy="15" r="1.6"/><circle cx="292.00" cy="15" r="1.6"/></g>
+  <path class="port" d="M310 20H392M310 27H392M310 34H392M310 41H392M310 48H392M310 55H392M310 62H392M310 69H392" stroke="#4F555D" stroke-width="1.6"/>
+  <circle class="body" cx="432" cy="30" r="7" fill="#F7F8FA" stroke-width="1.8"/>
+  <path class="ink" d="M432 26.5V31" stroke-width="1.8"/>
+  <g class="ok" fill="#3C9A5F" stroke="none"><circle cx="420" cy="60" r="2"/><circle cx="432" cy="60" r="2"/><circle cx="444" cy="60" r="2"/></g>
+</svg>

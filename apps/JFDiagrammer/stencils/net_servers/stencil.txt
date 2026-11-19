@@ -1,0 +1,10 @@
+stencil: Servers
+file: servers
+name.de: Server
+name.en: Servers
+name.es: Servidores
+name.it: Server
+name.fr: Serveurs
+category: network
+masters: web_server
+quick: 1

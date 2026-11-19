@@ -1,0 +1,32 @@
+master: Satellite dish
+name.de: Satellitenschüssel
+name.en: Satellite dish
+name.es: Antena parabólica
+name.it: Antenna parabolica
+name.fr: Antenne parabolique
+prompt.de: Satellitenschüssel: Funkstrecke über einen Satelliten.
+prompt.en: Satellite dish: a radio link via a satellite.
+prompt.es: Antena parabólica: enlace de radio por satélite.
+prompt.it: Antenna parabolica: collegamento radio via satellite.
+prompt.fr: Antenne parabolique : liaison radio par satellite.
+keywords.de: Satellit, Schüssel, Antenne, Funk, Parabolantenne
+keywords.en: satellite, dish, antenna, radio, uplink
+keywords.es: satélite, antena, parabólica, radio, enlace
+keywords.it: satellite, antenna, parabola, radio, collegamento
+keywords.fr: satellite, antenne, parabole, radio, liaison
+svg: satellite_dish.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Satellitenschüssel
+    Value.en = Satellite dish
+    Value.es = Antena parabólica
+    Value.it = Antenna parabolica
+    Value.fr = Antenne parabolique

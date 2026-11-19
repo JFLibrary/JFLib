@@ -1,0 +1,10 @@
+stencil: Network and Peripherals
+file: netperi
+name.de: Netzwerk und Peripheriegeräte
+name.en: Network and Peripherals
+name.es: Red y periféricos
+name.it: Rete e periferiche
+name.fr: Réseau et périphériques
+category: network
+masters: router, switch
+quick: 2

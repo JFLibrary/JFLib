@@ -71,6 +71,9 @@ der App landen sie in `OUT_DIR`; zum Ansehen in Visio schreibt
 | `line_style`, `fill_style`, `text_style` | nein | einzeln statt `style` |
 | `svg` | nein | Grafikdatei im selben Ordner: ihre Pfade werden zu Geometrie (siehe unten) |
 | `hidden` | nein | `true`: verborgener Master (`Hidden="1"`), steht in der `.vssx`, erscheint aber nicht in der Seitenleiste; die App legt ihn per Code ab (z. B. die Listen des funktionsübergreifenden Flussdiagramms). Standard `false` |
+| `include` | nein | (JD13) Dateien mit Abschnitten, die viele Master teilen, durch Komma getrennt, relativ zum Schablonenordner (`../net_common/asset.inc`); siehe „Eingebundene Dateien“ |
+| `scale` | nein | (JD13) Maßstab der Masterseite `1:N` für maßstäbliche Shapes (Rack `1:20`): `DrawingScale` = N, `DrawingScaleType` 4 (metrisch) bzw. 3 (US); die Linienbreiten aus dem SVG gelten auf dem Papier. Standard ohne Maßstab |
+| `size` | nein | (JD13) `Breite x Höhe` (`482.6 mm x 88.9 mm`, mit `.us`-Fassung): nötig, wenn `Width` oder `Height` eine Formel ist (Höhe aus Höheneinheiten); daraus entstehen Pin und Masterseite |
 
 ### Abschnitte
 
@@ -144,7 +147,21 @@ Fehlt die Zelle im Master, setzt das Werkzeug:
 - Masterseite: `PageWidth`, `PageHeight` = Shape-Größe, Maßstab 1:1 in mm bzw. Zoll
 
 `Width` und `Height` sind Pflicht, und zwar als Längen (Konstanten wie `40 mm`, keine Formeln):
-aus ihnen entstehen Pin und Masterseite.
+aus ihnen entstehen Pin und Masterseite.  Eine Formel geht nur zusammen mit `size:` im Kopf.
+
+### Eingebundene Dateien (`include:`, JD13)
+
+Eine eingebundene Datei (Endung `.inc`, in einem Ordner ohne `stencil.txt`, z. B.
+`stencils/net_common/`) hat nur Abschnitte, keine Kopfzeilen. Ihre Abschnitte werden in die des
+Masters gemischt:
+
+- Einen Abschnitt, den der Master nicht hat, bekommt er; `[Geometry]`-Abschnitte kommen immer
+  hinzu, nach den eigenen.
+- In einem Abschnitt, den der Master auch hat, stehen die eingebundenen Zellen und Zeilen vorn;
+  die des Masters gewinnen: Eine Zelle gleichen Namens (mit gleicher Sprach- und Fassungsendung)
+  fällt weg, eine benannte Zeile gleichen Namens bekommt nur die eingebundenen Zellen, die der
+  Master nicht selbst setzt (`RackUnits: Value = 2` übernimmt Bezeichnung und Typ aus der Datei).
+- Fehler nennen die eingebundene Datei und ihre Zeile; ihr Text gehört zur `UniqueID`.
 
 ## SVG-Grafik (`svg:`)
 

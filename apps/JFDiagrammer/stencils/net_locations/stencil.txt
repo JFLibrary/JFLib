@@ -1,0 +1,10 @@
+stencil: Network Locations
+file: netloc
+name.de: Netzwerkstandorte
+name.en: Network Locations
+name.es: Ubicaciones de red
+name.it: Sedi di rete
+name.fr: Sites réseau
+category: network
+masters: building
+quick: 1
