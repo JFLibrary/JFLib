@@ -1,6 +1,6 @@
 // Cooperative worker jobs for the browser. Parallel loops run sequentially in the app
 // worker; background jobs advance a bounded number of items between browser UI steps.
-// The host's one thread runs the items (Android: the UI thread); done() and items_done() read
+// The host's one thread runs the items (Android has real threads since AN1: pool.rs); done() and items_done() read
 // with Acquire what step() stores with Release, so a thread of the app that polls them also sees
 // the items' results (docs/ARM64.md, ARM7).
 

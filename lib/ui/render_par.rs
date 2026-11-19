@@ -7,7 +7,7 @@
 // When: jfgui_RENDER_PAR=0 never, =1 every render whatever its size (also without worker
 // threads), =2 every render twice, on this thread and in bands, a byte that differs is
 // warned (the identity tests); else when the worker pool has threads
-// (none in the browser without shared memory and on Android: plat::thr_count() == 0) and at
+// (none in the browser without shared memory: plat::thr_count() == 0) and at
 // least PAR_MIN_PX pixels are dirty.
 //
 // How: the framebuffer's rows are cut into bands of about BAND_BYTES (fewer rows when there

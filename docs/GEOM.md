@@ -256,10 +256,10 @@ in Ordnung); sie zu einem Körper zu vereinen ist Sache der Booleschen Operation
 
 ### Die Bilder
 
-- **Kameras**: render3d hat nur perspektivische Kameras. Die drei Ansichten kommen deshalb aus großer Entfernung mit
-  4° Sichtfeld (die Rückseite eines Modells erscheint höchstens ein paar Prozent kleiner); alle drei haben **denselben
-  Maßstab** (die größte Ausdehnung des Modells), wie die Ansichten einer Zeichnung: Verhältnisse zwischen den Bildern
-  stimmen. Die Schrägansicht hat 20° von vorn rechts oben (35° seitlich, 28° hoch).
+- **Kameras**: die drei Ansichten sind seit G7f Teil 2 ohne Perspektive (`render3d::Camera::ortho`) und mit Umrissen
+  aus dem Tiefenpuffer, so dass Kanten gleich gefärbter Flächen (Stufen, Türrahmen) zu sehen sind; vorher kamen sie
+  aus großer Entfernung mit 4° Sichtfeld. Alle drei haben **denselben Maßstab** (die größte Ausdehnung des Modells),
+  wie die Ansichten einer Zeichnung: Verhältnisse zwischen den Bildern stimmen. Die Schrägansicht hat 20° von vorn rechts oben (35° seitlich, 28° hoch).
 - **Gitter**: eine Platte hinter dem Modell (vorn: hinter seiner Rückseite, rechts: links von ihm, oben: unter ihm und
   unter y = 0) mit Linien im Abstand 1, 2 oder 5 mal einer Zehnerpotenz (höchstens 12 über das Modell), die Linien durch
   den Ursprung dunkelblau. Der Abstand steht im Bericht.
@@ -382,8 +382,7 @@ das meiste in render3d (Gerät, Szenen, vier Bilder mit Warten) und im PNG-Kodie
 - Boolesche Operationen (Teil 2: zuerst konvexe Körper mit exakten Prädikaten), Abschrägen, Vereinfachen für
   Detailstufen (G7j), Löcher in Profilen (ein Fenster in einer Wand entsteht aus Stücken um die Öffnung), Teil-Drehkörper
   (unter 360°), Texturen, Farben je Ecke, Instanzen im glTF (jedes Teil ist ein eigenes Mesh).
-- Orthografische Kameras und Umrisslinien in render3d (die Ansichten sind fast-orthografisch, gleich gefärbte Flächen
-  einer Ebene sind in der Vorderansicht nicht zu unterscheiden: die Beispiele setzen dafür leicht andere Farben).
+- (Seit G7f Teil 2 erledigt: die Ansichten sind ohne Perspektive und mit Umrissen.)
 - Der Beobachtungsmodus mit `gpu_view` und Neubau beim Speichern, Beschriftungen in den Bildern (Maße, Achsen).
 - Freigeben von Meshes während eines Laufs (wartet auf Host-Objekte in JFScript).
 
@@ -399,9 +398,8 @@ das meiste in render3d (Gerät, Szenen, vier Bilder mit Warten) und im PNG-Kodie
   `host::API` gehört dann als `HostItem`s in die Sprachdienste.
 - **Bewertungslauf**: ein Agent baut aus Beschreibungen in Text Bezugsobjekte (Kiste, Treppe, Tür, Haus aus Modulen,
   eine kleine Karte) mit den Bildern und dem Bericht als einziger Sicht; die fünf Beispiele hier sind die Messlatte.
-- **render3d**: eine orthografische Kamera (statt 4° aus der Ferne) und Umrisslinien (G7f Teil 2, Cartoon-Material)
-  machten die Ansichten lesbarer; heute unterscheiden sich gleich gefärbte Flächen einer Ebene nicht. Beschriftungen
-  (Maße, Achsennamen) im Bild brauchten Text in render3d oder ein Zeichnen danach.
+- **render3d**: die Kamera ohne Perspektive und die Umrisse sind seit G7f Teil 2 da. Beschriftungen (Maße,
+  Achsennamen) im Bild brauchten Text in render3d oder ein Zeichnen danach.
 - **JFScript**: die Liste in [Was JFScript braucht](#was-jfscript-braucht), zuerst Host-Objekte (danach können Meshes
   freigegeben werden) und die Stelle des Aufrufs für Warnungen.
 - **Geteilter Code mit `lib/physics`**: `math::sqrt`/`sqrt_portable` stehen in beiden Crates gleich; ein gemeinsamer

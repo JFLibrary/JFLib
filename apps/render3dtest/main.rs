@@ -52,6 +52,17 @@
 //        remove      (G7f) meshes, materials and textures removed: ids, places and ranges again, what is refused, a
 //                    removal between prepare and record, spent generations; the churn against a fresh renderer; 400 random
 //                    steps against a model and its images (g7ftest.rs)
+//        ortho       (G7f part 2) an orthographic camera: the arena against parallel rays (and the linear depth), lists against
+//                    the exact test of the box and spheres at its faces, the occlusion test, detail levels by size, the sun's
+//                    shadows, blended plates by depth (g7f2test.rs)
+//        toon        (G7f part 2) the cartoon look against the ray caster: bands, softness, rims, shadows, lights, the
+//                    environment's mean, MASK, double-sided, blended; refusals
+//        outline     (G7f part 2) outlines against the formula on the CPU over the GPU's depth, and against the rays' exact depth
+//        fxaa        (G7f part 2) FXAA against FXAA 3.11 on the CPU over the GPU's image (linear, sRGB, the shader's sRGB)
+//        viewmodel   (G7f part 2) a weapon close to a wall against two ray casters, in the sun and in shadow, turned under a sun
+//                    overhead; its lists apart, the world's depth halved, refusals
+//        particles   (G7f part 2) records, the sorted list against the CPU's motion, the image against the particles laid on
+//                    the CPU, the ring's end, a lost frame, a new origin, streaks, refusals
 //        all         all of the above
 //        window      a real window (one, briefly; not in `all`): the presented image = the offscreen image, and (G5e2)
 //                    the float image encoded on the CPU: the shader encodes sRGB for the swapchain's 8-bit format
@@ -67,6 +78,7 @@
 //   render3dtest --dump DIR [--format rgba8|bgra8|rgba8srgb|rgba16f|rgba32f [--linear]]   the gallery's images per level,
 //                                            for tests/engine_web.mjs (linear Rgba8Unorm; --format: renderers and targets
 //                                            of that format, as RendererDesc::new has them; --linear: encode_srgb false)
+//   render3dtest --toon-sheet DIR [--res WxH]   (G7f part 2) the arena in the four cartoon looks (and PBR) as PNGs and a sheet
 //   render3dtest --shadow-shots DIR [--res WxH]   (G5e3) the shadow gallery on Basis, 4 x 2048 and the Basis default
 //                                            2 x 1024 (Shadows::for_level), as DIR/basis_4x2048.rgba and basis_2x1024.rgba
 //   In the browser: the same gallery, step by step as the browser answers (web.rs; tests/engine_web.mjs).
@@ -92,6 +104,8 @@ mod alphatest;
 mod bench;
 #[cfg(not(target_arch = "wasm32"))]
 mod g7ftest;
+#[cfg(not(target_arch = "wasm32"))]
+mod g7f2test;
 #[cfg(not(target_arch = "wasm32"))]
 mod gltftest;
 #[cfg(not(target_arch = "wasm32"))]

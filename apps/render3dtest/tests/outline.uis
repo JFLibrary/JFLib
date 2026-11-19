@@ -1,0 +1,3 @@
+#!args --test outline
+# (G7f part 2) outlines against the formula on the CPU over the GPU's depth and image (widths, colours, orthographic, with a
+# viewmodel), against the rays' exact depth; refused without a sampled depth buffer; Voll and Basis

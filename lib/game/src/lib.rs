@@ -28,6 +28,8 @@ extern crate alloc;
 pub mod camera;
 /// actions, bindings, mouse settings, the pointer lock's click and end
 pub mod input;
+/// the netcode: server, client, prediction, snapshots, lag compensation, rooms (docs/NETCODE.md)
+pub mod net;
 mod pose;
 mod sparse;
 mod tick;

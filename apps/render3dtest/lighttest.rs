@@ -55,7 +55,8 @@ fn lights_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let bytes = l.s.upload_info().bytes;
     let _ = shot(t, dev, &mut off, &mut l.r, &mut l.s, "lights, idle")?;
     let idle = l.s.upload_info().bytes;
-    t.ok(idle == 208 + 480 && bytes >= 208 + 480 + 4 * 64, &format!("{level}: the lights go up when they change: {bytes} bytes with them, {idle} in the next frame"));
+    // (G7f: a view's block 240 bytes since the orthographic camera)
+    t.ok(idle == 240 + 480 && bytes >= 240 + 480 + 4 * 64, &format!("{level}: the lights go up when they change: {bytes} bytes with them, {idle} in the next frame"));
     // the light itself
     let mut hdr = t.res(Off::new(dev, w, h, Format::Rgba16Float), "HDR")?;
     let (mut lh, _) = build_lights(t, dev, Format::Rgba16Float, [0.0; 3], &set)?;

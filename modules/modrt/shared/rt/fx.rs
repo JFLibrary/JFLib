@@ -67,6 +67,10 @@ pub fn sqrtd(x: f64) -> f64 {
     unsafe { _mm_cvtsd_f64(_mm_sqrt_pd(_mm_set_sd(x))) }
 }
 
+/// sqrtsd from f64 operations, the same bits for every input: what `sqrtd` is in the browser and on the
+/// x86-64 Android emulator (portable/fx.rs)
+pub use crate::portable::fx::sqrt_portable;
+
 /// maxsd a, b: a > b ? a : b (b when unordered)
 #[inline]
 pub fn maxsd(a: f64, b: f64) -> f64 {

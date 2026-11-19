@@ -13,6 +13,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - `rt::kernel` (the system call numbers, open flags and struct stat per architecture) on Android too, without rt::os's helpers
 - rt::outline_lse(): the way the outline atomics of a static Linux ARM64 program went (LSE or the LL/SC loops; None where a program has none); jfgui_ARM_LLSC=1 in the environment makes them take LL/SC on a CPU with LSE, so the same program checks both ways (docs/ARM64.md, ARM7)
 - `os::SYS_IO_URING_SETUP` / `_ENTER` / `_REGISTER`, `SYS_OPEN_TREE`, `SYS_MOVE_MOUNT`, `SYS_FSOPEN`, `SYS_FSCONFIG`, `SYS_FSMOUNT`, `SYS_FSPICK`, `SYS_CLONE3`, `SYS_PIDFD_GETFD`, `SYS_MOUNT_SETATTR` (x86-64 and ARM64).
+- `rt::os` on Android: `syscall6`, `syscall3`, `poll` and the kernel table of `rt::kernel`, as on Linux (plat's futexes, eventfd, /proc; docs/ANDROID.md decision 2)
+
+### Changed
+
+- `fx::sqrt_portable`: the correctly rounded binary64 square root from f64 operations and one 64 x 64 bit product (Newton's method, then an integer test picks the neighbour), with the bits of `sqrtsd` for every input, NaN included, on every target (lib/physics and lib/geom had a copy each and use this one now). Where the processor's root is not used (the browser, the x86-64 Android emulator) `fx::sqrtd` is this function now instead of the bit-by-bit integer root: the same bits, several times faster (docs/PHYSICS.md, Messwerte)
 
 ### Fixed
 

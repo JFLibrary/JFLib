@@ -33,10 +33,12 @@ use alloc::vec::Vec;
 use gpu::*;
 
 use crate::math::{self, V3};
+use crate::particles::{self, Emitter, EmitterId, PARTICLE_BYTES};
+use crate::post::{Antialias, OUTLINE_BYTES, Outline};
 use crate::shadow::{self, CASCADES_MAX, Cascade, Shadows};
 use crate::store::{Use, give, give_all, take};
 use crate::{ALPHA_CLASSES, AlphaClass, BLEND_AT, BLEND_HEAD, BLEND_ITEM, CASCADE_AT, CASCADE_STRIDE, CHANGE_WORDS, Counts, DRAW_BYTES, INSTANCE_WORDS, Kind, MaterialId,
-            LIGHTS_AT, MeshId, Renderer, SORT_TILE, STAMPS, slot};
+            LIGHTS_AT, MeshId, PFRAME_AT, PFRAME_BYTES, PHEAD_AT, POST_AT, Renderer, SORT_TILE, STAGE_BYTES, STAMPS, VM_AT, slot};
 
 /// where an instance is: position in the world (f64), rotation (quaternion x, y, z, w), scale per axis.
 /// Negative scales mirror: an odd number of them turns the winding round, the instance goes to its mesh's
@@ -76,19 +78,25 @@ pub struct InstanceId {
     era: u32,
 }
 
-/// a right-handed perspective camera; reverse Z
+/// a right-handed camera, perspective or (G7f) orthographic; reverse Z
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Camera {
     pub eye: [f64; 3],
     /// unit vectors: where it looks, and up (at right angles)
     pub forward: [f64; 3],
     pub up: [f64; 3],
-    /// the vertical field of view in radians, width / height
+    /// the vertical field of view in radians (perspective), width / height
     pub fov_y: f64,
     pub aspect: f64,
+    /// distances along forward; (G7f) an orthographic camera's near may be 0 or below
     pub near: f64,
-    /// f64::INFINITY: no far plane
+    /// f64::INFINITY: no far plane (perspective only: an orthographic camera needs a finite one)
     pub far: f64,
+    /// (G7f) Some(h): orthographic, the view h world units high and h * aspect wide, fov_y unused (top, front and side
+    /// views, editors); depth falls linearly from 1 at near to 0 at far.  Culling, the occlusion test, detail levels (the
+    /// size of an instance is its sphere's diameter over h, at any distance) and the sun's shadows (the cascades split the
+    /// view's box uniformly) work as for a perspective camera.  None: perspective
+    pub ortho: Option<f64>,
 }
 
 impl Camera {
@@ -96,14 +104,35 @@ impl Camera {
     pub fn look_at(eye: [f64; 3], target: [f64; 3], up: [f64; 3], fov_y: f64, aspect: f64, near: f64, far: f64) -> Camera {
         let f = math::norm(math::sub(target, eye));
         let r = math::norm(math::cross(f, up));
-        Camera { eye, forward: f, up: math::cross(r, f), fov_y, aspect, near, far }
+        Camera { eye, forward: f, up: math::cross(r, f), fov_y, aspect, near, far, ortho: None }
     }
 
-    /// the 52 floats of the view's uniform block, relative to origin: view_proj, the six planes (inside:
+    /// (G7f) an orthographic camera at eye looking at target, the view `height` world units high; near and far along
+    /// the view (far finite)
+    pub fn ortho_at(eye: [f64; 3], target: [f64; 3], up: [f64; 3], height: f64, aspect: f64, near: f64, far: f64) -> Camera {
+        Camera { ortho: Some(height), ..Camera::look_at(eye, target, up, 1.0, aspect, near, far) }
+    }
+
+    /// (G7f) Scene::prepare: what an orthographic camera needs (a height above 0, a finite far plane beyond near)
+    pub(crate) fn check(&self) -> Result<()> {
+        match self.ortho {
+            Some(h) if !(h.is_finite() && h > 0.0 && self.near.is_finite() && self.far.is_finite() && self.far > self.near && self.aspect > 0.0) => {
+                Err(GpuError::Invalid("Camera: an orthographic camera needs a height above 0, finite near and far, far beyond near"))
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// the 60 floats of the view's uniform block, relative to origin: view_proj, the six planes (inside:
     /// dot(n, p) + d >= 0; left, right, bottom, top, near, far), the eye, (G5d) the projection's scales for the
-    /// occlusion test (clip x = fx x, clip y = fy y, depth = zz + zw / z in the camera's space), the eye and fy for the
-    /// detail levels
-    pub(crate) fn view_block(&self, origin: V3) -> [f32; 52] {
+    /// occlusion test (clip x = fx x, clip y = fy y, depth = zz + zw / z in the camera's space; G7f orthographic: depth =
+    /// zz + zw z), the eye and fy for the detail levels, (G7f) forward and whether the view is orthographic, whether the
+    /// detail levels' camera is.  depth: (a, b), the depth becomes a depth + b (G7f: (0.5, 0) for the world with a viewmodel,
+    /// (0.5, 0.5) for the viewmodel; 0.5 is an exact power of two, the order of depths stays; (1, 0): as it is)
+    pub(crate) fn view_block(&self, origin: V3, depth: (f64, f64)) -> [f32; 60] {
+        if let Some(h) = self.ortho {
+            return self.ortho_block(origin, h, depth);
+        }
         let e = math::sub(self.eye, origin);
         let (f, u) = (self.forward, self.up);
         let r = math::cross(f, u);
@@ -112,9 +141,10 @@ impl Camera {
         // clip.z from the distance along forward (z): near / z at infinity, near (far - z) / (z (far - near))
         let (n, fa) = (self.near, self.far);
         let (zz, zw) = if fa.is_finite() { (-n / (fa - n), n * fa / (fa - n)) } else { (0.0, n) };
+        let (zz, zw) = (zz * depth.0 + depth.1, zw * depth.0);
         // rows of the view matrix: x along r, y along u, z along forward
         let view = [[r[0], r[1], r[2], -math::dot(r, e)], [u[0], u[1], u[2], -math::dot(u, e)], [f[0], f[1], f[2], -math::dot(f, e)]];
-        let mut out = [0.0f32; 52];
+        let mut out = [0.0f32; 60];
         for c in 0..4 {
             let w = if c == 3 { 1.0 } else { 0.0 };
             out[c * 4] = (fx * view[0][c]) as f32;
@@ -143,7 +173,76 @@ impl Camera {
         out[46] = zz as f32;
         out[47] = zw as f32;
         out[48..52].copy_from_slice(&[e[0] as f32, e[1] as f32, e[2] as f32, fy as f32]);
+        out[52..55].copy_from_slice(&[f[0] as f32, f[1] as f32, f[2] as f32]);
         out
+    }
+
+    /// (G7f) view_block of an orthographic camera h high: clip x = sx x, clip y = sy y, depth = zz + zw z (1 at near, 0 at
+    /// far), w = 1; the planes are the box's six sides
+    fn ortho_block(&self, origin: V3, h: f64, depth: (f64, f64)) -> [f32; 60] {
+        let e = math::sub(self.eye, origin);
+        let (f, u) = (self.forward, self.up);
+        let r = math::cross(f, u);
+        let sy = 2.0 / h;
+        let sx = sy / self.aspect;
+        let (n, fa) = (self.near, self.far);
+        let (zz, zw) = (fa / (fa - n) * depth.0 + depth.1, -1.0 / (fa - n) * depth.0);
+        let view = [[r[0], r[1], r[2], -math::dot(r, e)], [u[0], u[1], u[2], -math::dot(u, e)], [f[0], f[1], f[2], -math::dot(f, e)]];
+        let mut out = [0.0f32; 60];
+        for c in 0..4 {
+            let w = if c == 3 { 1.0 } else { 0.0 };
+            out[c * 4] = (sx * view[0][c]) as f32;
+            out[c * 4 + 1] = (sy * view[1][c]) as f32;
+            out[c * 4 + 2] = (zw * view[2][c] + zz * w) as f32;
+            out[c * 4 + 3] = w as f32;
+        }
+        // inside: dot(m, p) + d >= 0 with m along an axis and d = at - dot(m, e) (a little outwards for what f32 rounds)
+        let plane = |m: V3, at: f64| -> [f32; 4] {
+            let a = -math::dot(m, e);
+            [m[0] as f32, m[1] as f32, m[2] as f32, (a + at + (a.abs() + at.abs()) * 5e-7) as f32]
+        };
+        let (hw, hh) = (1.0 / sx, 1.0 / sy);
+        let planes = [plane(r, hw), plane(math::mul(r, -1.0), hw), plane(u, hh), plane(math::mul(u, -1.0), hh), plane(f, -n), plane(math::mul(f, -1.0), fa)];
+        for (k, p) in planes.iter().enumerate() {
+            out[16 + k * 4..20 + k * 4].copy_from_slice(p);
+        }
+        out[40..43].copy_from_slice(&[e[0] as f32, e[1] as f32, e[2] as f32]);
+        out[44..48].copy_from_slice(&[sx as f32, sy as f32, zz as f32, zw as f32]);
+        // (the detail levels: an instance's size is r sy at any distance)
+        out[48..52].copy_from_slice(&[e[0] as f32, e[1] as f32, e[2] as f32, sy as f32]);
+        out[52..56].copy_from_slice(&[f[0] as f32, f[1] as f32, f[2] as f32, 1.0]);
+        out[56] = 1.0;
+        out
+    }
+}
+
+/// (G7f) the viewmodel's lens (Scene::set_viewmodel): the instances of Scene::add_viewmodel (a weapon before the camera) are
+/// drawn with this field of view and depth range after the world, in front of all of it (the world's depth takes 0 ..= 0.5,
+/// the viewmodel's 0.5 ..= 1), lit by the scene's sun, shadows, lights and environment.  Made with `new` and changed field
+/// by field (it may grow)
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct Viewmodel {
+    /// the vertical field of view in radians
+    pub fov_y: f64,
+    /// its own near and far planes (finite, 0 < near < far), distances along the camera's forward
+    pub near: f64,
+    pub far: f64,
+}
+
+impl Viewmodel {
+    pub const fn new(fov_y: f64, near: f64, far: f64) -> Viewmodel {
+        Viewmodel { fov_y, near, far }
+    }
+
+    fn check(&self) -> Result<()> {
+        let fine = self.fov_y.is_finite() && self.fov_y > 0.0 && self.fov_y < 3.1 && self.near.is_finite() && self.near > 0.0 && self.far.is_finite() && self.far > self.near;
+        if fine { Ok(()) } else { Err(GpuError::Invalid("Viewmodel: 0 < fov_y < pi, 0 < near < far, finite")) }
+    }
+
+    /// the camera of the viewmodel's view: the scene's eye and axes, its own lens (always perspective)
+    fn camera(&self, c: &Camera) -> Camera {
+        Camera { fov_y: self.fov_y, near: self.near, far: self.far, ortho: None, ..*c }
     }
 }
 
@@ -307,6 +406,8 @@ pub(crate) struct Slot {
     live: bool,
     dirty: bool,
     mirrored: bool,
+    /// (G7f) the viewmodel's (its transform in the camera's space)
+    vm: bool,
 }
 
 pub(crate) struct List {
@@ -317,6 +418,8 @@ pub(crate) struct List {
     pub class: AlphaClass,
     /// (G7f) for double-sided materials
     pub double: bool,
+    /// (G7f) of the viewmodel's instances (drawn by its view only)
+    pub vm: bool,
     pub count: u32,
     /// (G5d) its own instances and those that may pick its mesh as a detail level
     pub room: u32,
@@ -341,6 +444,8 @@ pub(crate) struct Run {
     pub mirrored: bool,
     pub class: AlphaClass,
     pub double: bool,
+    /// (G7f) the viewmodel's
+    pub vm: bool,
     pub room: bool,
 }
 
@@ -373,6 +478,8 @@ pub(crate) struct FrameSlot {
     pub scatter_group: Option<BindGroup>,
     pub readback: Option<Buffer>,
     last: Option<(SubmitId, u64)>,
+    /// (G7f) the particles born for this frame
+    pub spawn: Option<Buffer>,
 }
 
 /// instances, camera and sun of one scene of a Renderer
@@ -387,8 +494,9 @@ pub struct Scene {
     /// the lists in the order of their draw records, and the runs of those records (Run)
     pub(crate) order: Vec<u32>,
     pub(crate) runs: Vec<Run>,
-    /// the list of each mesh's slot per side (as it is, mirrored), alpha class and (G7f) faces (single, double-sided)
-    list_of_mesh: Vec<[[[u32; 2]; ALPHA_CLASSES]; 2]>,
+    /// the list of each mesh's slot per side (as it is, mirrored), alpha class, (G7f) faces (single, double-sided) and
+    /// layer (the world, the viewmodel)
+    list_of_mesh: Vec<[[[[u32; 2]; 2]; ALPHA_CLASSES]; 2]>,
     /// (G7f) its instances per slot of a mesh and of a material (store.rs)
     mesh_use: Vec<Use>,
     material_use: Vec<Use>,
@@ -465,6 +573,51 @@ pub struct Scene {
     finished: Vec<FrameStats>,
     /// the words of the changes, kept between frames
     scratch: Vec<[u32; CHANGE_WORDS]>,
+    /// (G7f) the viewmodel's lens, its view (made with the first frame that has one), its slots, the camera their records
+    /// were computed with
+    viewmodel: Option<Viewmodel>,
+    pub(crate) vm: Option<ViewLists>,
+    vm_slots: Vec<u32>,
+    vm_camera: Option<Camera>,
+    /// (G7f) outlines and anti-aliasing
+    pub(crate) outline: Option<Outline>,
+    pub(crate) antialias: Antialias,
+    /// (G7f) the particles: their emitters, the clock, the ring and its list
+    emitters: Vec<EmitterSlot>,
+    time: f64,
+    pub(crate) particles: Option<Particles>,
+}
+
+/// (G7f) an emitter of a scene: its description, its particles' next serial number, how often its place was left, alive
+#[derive(Clone, Copy)]
+struct EmitterSlot {
+    e: Emitter,
+    serial: u32,
+    era: u32,
+    live: bool,
+}
+
+/// (G7f) a scene's particles: the ring of records (cap of them) and the frame's list (room for cap, a power of two of the
+/// sort's tiles), their groups; the next place of the ring, the records born since the last prepare (from place `first`),
+/// those the last prepare sent (sent again when its frame never went out), the clock's epoch and the last death
+pub(crate) struct Particles {
+    pub cap: u32,
+    pub buf: Buffer,
+    pub list: BlendList,
+    pub cs_group: Option<BindGroup>,
+    pub render: Option<BindGroup>,
+    /// the ring is new: cleared by the next frame
+    pub fresh: bool,
+    head: u32,
+    pending: Vec<[u32; 16]>,
+    first: u32,
+    last: Vec<[u32; 16]>,
+    last_first: u32,
+    /// this frame's copies into the ring: (first place, records, where in the frame's upload buffer)
+    pub copies: [(u32, u32, u64); 2],
+    epoch: f64,
+    alive_until: f64,
+    pub frame_ubo: Buffer,
 }
 
 fn storage(dev: &Device, size: u64, more: BufferUsage) -> Result<Buffer> {
@@ -514,15 +667,23 @@ fn view_lists(dev: &Device, r: &Renderer, list_cap: u32, visible_cap: u32, spher
 }
 
 /// the record of a slot: its bounding sphere relative to origin, safe against what f32 rounds (nothing
-/// visible may go missing), and its instance words
-fn records(s: &Slot, r: &Renderer, origin: V3) -> ([f32; 4], [u32; INSTANCE_WORDS]) {
+/// visible may go missing), and its instance words.  (G7f) A viewmodel's slot: its transform in the camera's space (x
+/// right, y up, -z forward) taken to the world
+fn records(s: &Slot, r: &Renderer, origin: V3, cam: &Camera) -> ([f32; 4], [u32; INSTANCE_WORDS]) {
     // (G5d) the sphere grown to hold the mesh's detail levels
     let (mc, mr) = r.bounds[slot(s.mesh)];
     let t = &s.t;
     let rot = math::rotation(t.rot);
     let (sx, sy, sz) = (t.scale[0] as f64, t.scale[1] as f64, t.scale[2] as f64);
-    let p = math::sub(t.pos, origin);
-    let c = [rot[0], rot[1], rot[2]];
+    let mut p = math::sub(t.pos, origin);
+    let mut c = [rot[0], rot[1], rot[2]];
+    if s.vm {
+        let (f, u) = (cam.forward, cam.up);
+        let rr = math::cross(f, u);
+        let to_world = |v: V3| math::add(math::add(math::mul(rr, v[0]), math::mul(u, v[1])), math::mul(f, -v[2]));
+        p = math::add(math::sub(cam.eye, origin), to_world(t.pos));
+        c = [to_world(rot[0]), to_world(rot[1]), to_world(rot[2])];
+    }
     // rows of rotation * scale, then the place
     let row = |k: usize| [(c[0][k] * sx) as f32, (c[1][k] * sy) as f32, (c[2][k] * sz) as f32, p[k] as f32];
     let (r0, r1, r2) = (row(0), row(1), row(2));
@@ -566,8 +727,8 @@ impl Scene {
         let late = view_lists(&dev, r, list_cap, visible_cap, &spheres, &list_of, &list_first, &instances, &lights, &punctual_buf, &hidden, &blend.buf, Some(&view.ubo))?;
         let mut frames = Vec::new();
         for _ in 0..r.desc.frames_in_flight {
-            let stage = dev.create_buffer(&BufferDesc { size: BLEND_AT + BLEND_HEAD, usage: none, memory: MemoryKind::Upload })?;
-            frames.push(FrameSlot { stage, punctual: None, changes: None, scatter_group: None, readback: None, last: None });
+            let stage = dev.create_buffer(&BufferDesc { size: STAGE_BYTES, usage: none, memory: MemoryKind::Upload })?;
+            frames.push(FrameSlot { stage, punctual: None, changes: None, scatter_group: None, readback: None, last: None, spawn: None });
         }
         Ok(Scene {
             counts: r.counts.clone(),
@@ -639,6 +800,15 @@ impl Scene {
             upload: UploadInfo::default(),
             finished: Vec::new(),
             scratch: Vec::new(),
+            viewmodel: None,
+            vm: None,
+            vm_slots: Vec::new(),
+            vm_camera: None,
+            outline: None,
+            antialias: Antialias::None,
+            emitters: Vec::new(),
+            time: 0.0,
+            particles: None,
             dev,
         })
     }
@@ -656,19 +826,19 @@ impl Scene {
         Ok(())
     }
 
-    /// (G7f) the list of a mesh (its id), side, alpha class and faces
-    fn list_for(&mut self, mesh: u32, mirrored: bool, class: AlphaClass, double: bool) -> u32 {
+    /// (G7f) the list of a mesh (its id), side, alpha class, faces and layer (the world's, the viewmodel's)
+    fn list_for(&mut self, mesh: u32, mirrored: bool, class: AlphaClass, double: bool, vm: bool) -> u32 {
         let m = slot(mesh);
         if self.list_of_mesh.len() <= m {
-            self.list_of_mesh.resize(m + 1, [[[NO_LIST; 2]; ALPHA_CLASSES]; 2]);
+            self.list_of_mesh.resize(m + 1, [[[[NO_LIST; 2]; 2]; ALPHA_CLASSES]; 2]);
         }
-        let (side, c, d) = (mirrored as usize, class.index(), double as usize);
-        if self.list_of_mesh[m][side][c][d] == NO_LIST {
-            self.list_of_mesh[m][side][c][d] = self.lists.len() as u32;
-            self.lists.push(List { mesh: m as u32, id: mesh, mirrored, class, double, count: 0, room: 0, cap: 0, first: 0, wide: false, record: 0 });
+        let (side, c, d, v) = (mirrored as usize, class.index(), double as usize, vm as usize);
+        if self.list_of_mesh[m][side][c][d][v] == NO_LIST {
+            self.list_of_mesh[m][side][c][d][v] = self.lists.len() as u32;
+            self.lists.push(List { mesh: m as u32, id: mesh, mirrored, class, double, vm, count: 0, room: 0, cap: 0, first: 0, wide: false, record: 0 });
             self.lists_dirty = true;
         }
-        let l = self.list_of_mesh[m][side][c][d];
+        let l = self.list_of_mesh[m][side][c][d][v];
         self.lists[l as usize].id = mesh;
         l
     }
@@ -693,12 +863,12 @@ impl Scene {
             let k = r.kind_of(s.material);
             if s.list != NO_LIST {
                 let l = &self.lists[s.list as usize];
-                if l.mesh as usize == slot(s.mesh) && l.mirrored == s.mirrored && l.class == k.class && l.double == k.double {
+                if l.mesh as usize == slot(s.mesh) && l.mirrored == s.mirrored && l.class == k.class && l.double == k.double && l.vm == s.vm {
                     continue;
                 }
                 self.lists[s.list as usize].count -= 1;
             }
-            let to = self.list_for(s.mesh, s.mirrored, k.class, k.double);
+            let to = self.list_for(s.mesh, s.mirrored, k.class, k.double, s.vm);
             self.lists[to as usize].count += 1;
             self.slots[i].list = to;
             // (list_of changes: up again)
@@ -716,12 +886,13 @@ impl Scene {
         }
         for i in 0..self.lists.len() {
             let (mesh, mirrored, class, double, count) = (self.lists[i].mesh, self.lists[i].mirrored, self.lists[i].class, self.lists[i].double, self.lists[i].count);
+            let vm = self.lists[i].vm;
             if count == 0 {
                 continue;
             }
             for k in 0..r.lods[mesh as usize].len() {
                 if let Some(t) = r.lods[mesh as usize][k].mesh {
-                    let to = self.list_for(t.0, mirrored, class, double) as usize;
+                    let to = self.list_for(t.0, mirrored, class, double, vm) as usize;
                     self.lists[to].room += count;
                 }
             }
@@ -754,6 +925,19 @@ impl Scene {
 
     /// a new instance, on a place that came free if there is one (its list: with the next prepare)
     pub fn add(&mut self, i: Instance) -> Result<InstanceId> {
+        self.add_in(i, false)
+    }
+
+    /// (G7f) an instance of the viewmodel (Scene::set_viewmodel; without one it is not drawn): its transform is in the camera's
+    /// space (x right, y up, -z forward, as glTF's cameras), it follows the camera, is drawn with the viewmodel's lens in
+    /// front of the world, lit by the scene's sun, shadows and lights (it casts no shadows and hides nothing from the
+    /// occlusion test).  set_transform, set_material, set_mesh and remove work as for the others.  Its material may not be
+    /// blended (prepare: Invalid)
+    pub fn add_viewmodel(&mut self, i: Instance) -> Result<InstanceId> {
+        self.add_in(i, true)
+    }
+
+    fn add_in(&mut self, i: Instance, vm: bool) -> Result<InstanceId> {
         Scene::check_transform(&i.transform)?;
         // (G7f) the ids alive, and counted: a mesh or material a scene uses is not removed
         take(&self.counts, &mut self.mesh_use, Kind::Mesh, i.mesh.0)?;
@@ -767,7 +951,7 @@ impl Scene {
             Some(f) => f,
             None => {
                 let f = self.slots.len() as u32;
-                self.slots.push(Slot { t: i.transform, mesh: 0, material: 0, list: NO_LIST, era: 0, live: false, dirty: false, mirrored: false });
+                self.slots.push(Slot { t: i.transform, mesh: 0, material: 0, list: NO_LIST, era: 0, live: false, dirty: false, mirrored: false, vm: false });
                 f
             }
         };
@@ -778,7 +962,11 @@ impl Scene {
         s.material = i.material.0;
         s.live = true;
         s.mirrored = mirrored;
+        s.vm = vm;
         let era = s.era;
+        if vm {
+            self.vm_slots.push(slot);
+        }
         self.live += 1;
         self.mark(slot);
         Ok(InstanceId { slot, era })
@@ -800,6 +988,9 @@ impl Scene {
         let s = &mut self.slots[i];
         s.live = false;
         s.era = s.era.wrapping_add(1);
+        if s.vm {
+            self.vm_slots.retain(|&x| x != id.slot);
+        }
         self.free.push(id.slot);
         self.live -= 1;
         self.mark(id.slot);
@@ -934,6 +1125,8 @@ impl Scene {
             self.origin = origin;
             self.full_dirty = true;
             self.punctual_dirty = true;
+            // (G7f) the particles die: their places are relative to it
+            self.clear_particles();
         }
     }
 
@@ -1006,6 +1199,204 @@ impl Scene {
     /// (tests, tools) the camera's visible list after a frame's culling: slots, a list's at ListInfo::first
     pub fn visible_buffer(&self) -> &Buffer {
         &self.view.visible
+    }
+
+    // ------------------------------------------------------------ (G7f) viewmodel, outlines, anti-aliasing
+
+    /// (G7f) the viewmodel's lens (None at first: its instances are not drawn, the world's depth is as it was); Invalid for
+    /// values out of range.  With one the world's depth takes 0 ..= 0.5 (halved: the image stays the same but where two
+    /// depths tie, as GPUs interpolate depth in steps of their own), the
+    /// viewmodel's 0.5 ..= 1
+    pub fn set_viewmodel(&mut self, v: Option<&Viewmodel>) -> Result<()> {
+        if let Some(v) = v {
+            v.check()?;
+        }
+        self.viewmodel = v.copied();
+        Ok(())
+    }
+
+    pub fn viewmodel(&self) -> Option<Viewmodel> {
+        self.viewmodel
+    }
+
+    /// (G7f; tests, tools) the viewmodel's draw records and visible list after a frame (as draws_buffer, visible_buffer)
+    pub fn viewmodel_buffers(&self) -> Option<(&Buffer, &Buffer)> {
+        self.vm.as_ref().map(|v| (&v.draws, &v.visible))
+    }
+
+    /// (G7f) lines on the edges of the depth buffer, over the opaque image (None at first); Invalid for values out of
+    /// range.  They need a depth attachment with TextureUsage::SAMPLED (the renderer's own has it): record says Invalid
+    /// otherwise
+    pub fn set_outline(&mut self, o: Option<&Outline>) -> Result<()> {
+        if let Some(o) = o {
+            o.check()?;
+        }
+        self.outline = o.copied();
+        Ok(())
+    }
+
+    pub fn outline(&self) -> Option<Outline> {
+        self.outline
+    }
+
+    /// (G7f) anti-aliasing over the finished image (Antialias::None at first)
+    pub fn set_antialias(&mut self, a: Antialias) {
+        self.antialias = a;
+    }
+
+    pub fn antialias(&self) -> Antialias {
+        self.antialias
+    }
+
+    // ------------------------------------------------------------ (G7f) particles
+
+    /// (G7f) room for this many particles (0, at first: none); a new capacity starts with none alive.  Unsupported beyond what
+    /// a binding reaches
+    pub fn set_particles(&mut self, capacity: u32) -> Result<()> {
+        if self.particles.as_ref().map_or(0, |p| p.cap) == capacity {
+            return Ok(());
+        }
+        if capacity == 0 {
+            self.particles = None;
+            return Ok(());
+        }
+        if capacity as u64 * PARTICLE_BYTES > self.dev.limits().max_storage_binding as u64 || capacity > 1 << 22 {
+            return Err(GpuError::Unsupported("Scene::set_particles: more than a binding reaches or one dispatch (at most 2^22)"));
+        }
+        let none = BufferUsage::NONE;
+        let room = capacity.checked_next_power_of_two().unwrap_or(1 << 24).max(SORT_TILE);
+        let buf = storage(&self.dev, capacity as u64 * PARTICLE_BYTES, none)?;
+        let list = BlendList { buf: blend_buf(&self.dev, room)?, cap: room, render: None, sort: None };
+        let frame_ubo = self.dev.create_buffer(&BufferDesc { size: PFRAME_BYTES, usage: BufferUsage::UNIFORM, memory: MemoryKind::Device })?;
+        self.particles = Some(Particles { cap: capacity, buf, list, cs_group: None, render: None, fresh: true, head: 0, pending: Vec::new(), first: 0, last: Vec::new(),
+                                          last_first: 0, copies: [(0, 0, 0); 2], epoch: self.time, alive_until: self.time, frame_ubo });
+        Ok(())
+    }
+
+    /// (G7f) the particles' room (0: none)
+    pub fn particle_capacity(&self) -> u32 {
+        self.particles.as_ref().map_or(0, |p| p.cap)
+    }
+
+    /// (G7f) the particles' clock in seconds (the game's time; 0 at first): births and ages are read from it, so the same
+    /// times give the same frames.  It should not go back
+    pub fn set_time(&mut self, t: f64) {
+        if !t.is_finite() {
+            return;
+        }
+        self.time = t;
+        // (the clock counts microseconds in 32 bits on the GPU: a new epoch when nothing lives)
+        if let Some(p) = &mut self.particles {
+            if t >= p.alive_until && t - p.epoch > 1800.0 {
+                p.epoch = t;
+                p.fresh = true;
+                p.pending.clear();
+            }
+        }
+    }
+
+    pub fn time(&self) -> f64 {
+        self.time
+    }
+
+    /// (G7f) an emitter: what its particles look like and how they move; Invalid for values out of range
+    pub fn add_emitter(&mut self, e: &Emitter) -> Result<EmitterId> {
+        e.check()?;
+        if let Some(k) = self.emitters.iter().position(|x| !x.live) {
+            let x = &mut self.emitters[k];
+            *x = EmitterSlot { e: *e, serial: 0, era: x.era, live: true };
+            return Ok(EmitterId::new(k as u32, x.era));
+        }
+        self.emitters.push(EmitterSlot { e: *e, serial: 0, era: 0, live: true });
+        Ok(EmitterId::new(self.emitters.len() as u32 - 1, 0))
+    }
+
+    fn emitter(&self, id: EmitterId) -> Result<usize> {
+        match self.emitters.get(id.slot as usize) {
+            Some(x) if x.live && x.era == id.era() => Ok(id.slot as usize),
+            _ => Err(GpuError::Invalid("Scene: this emitter was removed")),
+        }
+    }
+
+    /// (G7f) a new description (its next particles take it; the living keep theirs); its serial numbers go on
+    pub fn set_emitter(&mut self, id: EmitterId, e: &Emitter) -> Result<()> {
+        e.check()?;
+        let k = self.emitter(id)?;
+        self.emitters[k].e = *e;
+        Ok(())
+    }
+
+    /// (G7f) the emitter goes (its living particles stay until they die)
+    pub fn remove_emitter(&mut self, id: EmitterId) -> Result<()> {
+        let k = self.emitter(id)?;
+        let x = &mut self.emitters[k];
+        x.live = false;
+        x.era = x.era.wrapping_add(1);
+        Ok(())
+    }
+
+    /// (G7f) `count` particles of an emitter, born now (Scene::set_time) at a point in a cone around a direction (the world's,
+    /// or for a viewmodel emitter the camera's space).  They take the next places of the ring, the oldest are overwritten.
+    /// Invalid without room for particles (set_particles) or for values not finite
+    pub fn emit(&mut self, id: EmitterId, at: [f64; 3], dir: [f64; 3], count: u32) -> Result<()> {
+        let k = self.emitter(id)?;
+        if !(at.iter().chain(dir.iter()).all(|v| v.is_finite())) {
+            return Err(GpuError::Invalid("Scene::emit: finite values"));
+        }
+        let origin = self.origin;
+        let time = self.time;
+        let Some(p) = &mut self.particles else { return Err(GpuError::Invalid("Scene::emit: no room for particles (Scene::set_particles)")) };
+        let x = &mut self.emitters[k];
+        let e = x.e;
+        let aim = particles::Aim::new(&e, dir);
+        let place = if e.viewmodel { at } else { math::sub(at, origin) };
+        let birth = particles::micros(time - p.epoch);
+        // (more than the ring holds: only the last ones would stay)
+        let skip = count.saturating_sub(p.cap);
+        if skip > 0 {
+            p.pending.clear();
+        }
+        if p.pending.is_empty() {
+            p.first = (p.head + skip) % p.cap;
+        }
+        for j in skip..count {
+            p.pending.push(particles::spawn(&e, &aim, x.serial.wrapping_add(j), place, birth));
+        }
+        x.serial = x.serial.wrapping_add(count);
+        p.head = ((p.head as u64 + count as u64) % p.cap as u64) as u32;
+        if p.pending.len() > p.cap as usize {
+            let drop = p.pending.len() - p.cap as usize;
+            p.pending.drain(..drop);
+            p.first = ((p.first as u64 + drop as u64) % p.cap as u64) as u32;
+        }
+        p.alive_until = p.alive_until.max(time + e.life[1] as f64);
+        Ok(())
+    }
+
+    /// (G7f) every particle dies now
+    pub fn clear_particles(&mut self) {
+        if let Some(p) = &mut self.particles {
+            p.fresh = true;
+            p.pending.clear();
+            p.last.clear();
+            p.alive_until = self.time;
+        }
+    }
+
+    /// (G7f; tests, tools) the particles' list after a frame: a VkDrawIndirectCommand (6 vertices per particle, the particles
+    /// alive), then per particle 4 u32: its key (farthest first), its place in the ring, 0, 0; sorted.  None without room
+    pub fn particle_buffer(&self) -> Option<&Buffer> {
+        self.particles.as_ref().map(|p| &p.list.buf)
+    }
+
+    /// (G7f; tests, tools) the ring of records (particles.rs: 16 u32 each; particles::motion reads one)
+    pub fn particle_records(&self) -> Option<&Buffer> {
+        self.particles.as_ref().map(|p| &p.buf)
+    }
+
+    /// (G7f; tests, tools) the epoch of the particles' clock: a record's birth counts microseconds from it
+    pub fn particle_epoch(&self) -> f64 {
+        self.particles.as_ref().map_or(0.0, |p| p.epoch)
     }
 
     // ------------------------------------------------------------ a frame
@@ -1167,8 +1558,15 @@ impl Scene {
                                &self.hidden, &self.blend.buf, None)?;
             self.cascades.push(v);
         }
+        // (G7f) the viewmodel's view
+        let mut vm_new = false;
+        if self.viewmodel.is_some() && self.vm.is_none() {
+            self.vm = Some(view_lists(&dev, r, self.list_cap, self.visible_cap, &self.spheres, &self.list_of, &self.list_first, &self.instances, &self.lights,
+                                      &self.punctual_buf, &self.hidden, &self.blend.buf, None)?);
+            vm_new = true;
+        }
         let (list_cap, visible_cap) = (self.list_cap, self.visible_cap);
-        for v in [&mut self.view, &mut self.late].into_iter().chain(self.cascades.iter_mut()) {
+        for v in [&mut self.view, &mut self.late].into_iter().chain(self.cascades.iter_mut()).chain(self.vm.iter_mut()) {
             if draws_new {
                 v.draws = storage(&dev, list_cap as u64 * DRAW_BYTES, BufferUsage::INDIRECT)?;
             }
@@ -1193,6 +1591,22 @@ impl Scene {
         }
         if self.blend_on && (self.blend.sort.is_none() || blend_new) {
             self.blend.sort = Some(dev.create_bind_group(&BindGroupDesc { layout: &r.sort_layout, entries: &[entry(0, &self.blend.buf)] })?);
+        }
+        // (G7f) the particles' groups: their motion (the frame, the ring, the list), their sort, their draw (the camera's and
+        // the viewmodel's uniform blocks, the lights)
+        if let Some(p) = &mut self.particles {
+            if p.cs_group.is_none() {
+                p.cs_group = Some(dev.create_bind_group(&BindGroupDesc { layout: &r.post.particles_cs_layout, entries: &[entry(0, &p.frame_ubo), entry(1, &p.buf), entry(2, &p.list.buf)] })?);
+                p.list.sort = Some(dev.create_bind_group(&BindGroupDesc { layout: &r.sort_layout, entries: &[entry(0, &p.list.buf)] })?);
+                p.render = None;
+            }
+            if p.render.is_none() || vm_new {
+                let vm_ubo = self.vm.as_ref().map_or(&self.view.ubo, |v| &v.ubo);
+                p.render = Some(dev.create_bind_group(&BindGroupDesc {
+                    layout: &r.post.particles_layout,
+                    entries: &[entry(0, &p.frame_ubo), entry(1, &p.buf), entry(3, &self.view.ubo), entry(4, vm_ubo), entry(5, &self.lights), entry(6, &p.list.buf)],
+                })?);
+            }
         }
         if groups {
             for f in &mut self.frames {
@@ -1222,9 +1636,10 @@ impl Scene {
         self.order.clear();
         self.order.extend(0..n as u32);
         let lists = &self.lists;
+        // ((G7f) the viewmodel's after the world's: their runs apart)
         self.order.sort_by_key(|&i| {
             let l = &lists[i as usize];
-            (l.wide, l.class.index(), l.double, l.mirrored, i)
+            (l.vm, l.wide, l.class.index(), l.double, l.mirrored, i)
         });
         for (k, &i) in self.order.iter().enumerate() {
             self.lists[i as usize].record = k as u32;
@@ -1239,10 +1654,10 @@ impl Scene {
             // same side and class
             let lods = &r.lods[l.mesh as usize];
             // (G7f) the number of levels and the list's flags (cull.wgsl: 32-bit indices, double-sided, mirrored, blended)
-            let flags = (l.wide as u32) << 28 | (l.double as u32) << 29 | (l.mirrored as u32) << 30 | ((l.class == AlphaClass::Blend) as u32) << 31;
+            let flags = (l.vm as u32) << 27 | (l.wide as u32) << 28 | (l.double as u32) << 29 | (l.mirrored as u32) << 30 | ((l.class == AlphaClass::Blend) as u32) << 31;
             places.push([first, (n + levels.len()) as u32, lods.len() as u32 | flags, l.record]);
             for d in lods {
-                let to = d.mesh.map_or(NO_LIST, |t| self.list_of_mesh.get(slot(t.0)).map_or(NO_LIST, |x| x[l.mirrored as usize][l.class.index()][l.double as usize]));
+                let to = d.mesh.map_or(NO_LIST, |t| self.list_of_mesh.get(slot(t.0)).map_or(NO_LIST, |x| x[l.mirrored as usize][l.class.index()][l.double as usize][l.vm as usize]));
                 levels.push([d.below.to_bits(), to, 0, 0]);
             }
             // (Basis: no first instance is sure to work: the list's start is an offset of the vertex buffer)
@@ -1255,8 +1670,8 @@ impl Scene {
         for &i in &self.order {
             let l = &self.lists[i as usize];
             match self.runs.last_mut() {
-                Some(r) if r.wide == l.wide && r.mirrored == l.mirrored && r.class == l.class && r.double == l.double => r.count += 1,
-                _ => self.runs.push(Run { first: l.record, count: 1, wide: l.wide, mirrored: l.mirrored, class: l.class, double: l.double, room: false }),
+                Some(r) if r.wide == l.wide && r.mirrored == l.mirrored && r.class == l.class && r.double == l.double && r.vm == l.vm => r.count += 1,
+                _ => self.runs.push(Run { first: l.record, count: 1, wide: l.wide, mirrored: l.mirrored, class: l.class, double: l.double, vm: l.vm, room: false }),
             }
         }
         let info = self.info_len as u64 * 16;
@@ -1291,7 +1706,7 @@ impl Scene {
         let size = n as u64 * 84;
         let up = self.dev.create_buffer(&BufferDesc { size, usage: BufferUsage::NONE, memory: MemoryKind::Upload })?;
         let (mut spheres, mut lists, mut words) = (Vec::with_capacity(CHUNK), Vec::with_capacity(CHUNK), Vec::with_capacity(CHUNK));
-        let origin = self.origin;
+        let (origin, cam) = (self.origin, self.camera);
         for (k, chunk) in self.slots.chunks_mut(CHUNK).enumerate() {
             spheres.clear();
             lists.clear();
@@ -1299,7 +1714,7 @@ impl Scene {
             for s in chunk.iter_mut() {
                 s.dirty = false;
                 if s.live {
-                    let (sphere, w) = records(s, r, origin);
+                    let (sphere, w) = records(s, r, origin, &cam);
                     spheres.push(sphere);
                     lists.push(s.list);
                     words.push(w);
@@ -1333,14 +1748,14 @@ impl Scene {
         }
         let mut rows = core::mem::take(&mut self.scratch);
         rows.clear();
-        let origin = self.origin;
+        let (origin, cam) = (self.origin, self.camera);
         for &i in &self.dirty {
             let s = &mut self.slots[i as usize];
             s.dirty = false;
             let mut row = [0u32; CHANGE_WORDS];
             row[0] = i;
             if s.live {
-                let (sphere, w) = records(s, r, origin);
+                let (sphere, w) = records(s, r, origin, &cam);
                 row[1] = s.list;
                 for j in 0..4 {
                     row[4 + j] = sphere[j].to_bits();
@@ -1380,6 +1795,8 @@ impl Scene {
         if !Arc::ptr_eq(&self.counts, &r.counts) {
             return Err(GpuError::Invalid("Scene::prepare: another Renderer than its own"));
         }
+        // (G7f) an orthographic camera's values
+        self.camera.check()?;
         self.wait_slot()?;
         // (G7f) a removed mesh, or a new one in an old slot: the lists' draw records again
         if self.seen_mesh_gen != r.mesh_gen {
@@ -1399,6 +1816,29 @@ impl Scene {
             self.lists_dirty = true;
             self.punctual_dirty = true;
             r.resend_materials();
+            // (G7f) the particles it sent are born again
+            if let Some(p) = &mut self.particles {
+                if !p.last.is_empty() {
+                    let mut again = core::mem::take(&mut p.last);
+                    p.first = p.last_first;
+                    again.append(&mut p.pending);
+                    let cap = p.cap as usize;
+                    if again.len() > cap {
+                        let drop = again.len() - cap;
+                        again.drain(..drop);
+                        p.first = ((p.first as u64 + drop as u64) % p.cap as u64) as u32;
+                    }
+                    p.pending = again;
+                }
+            }
+        }
+        // (G7f) the viewmodel's instances follow the camera: their records again when it moved
+        if self.viewmodel.is_some() && !self.vm_slots.is_empty() && self.vm_camera != Some(self.camera) {
+            self.vm_camera = Some(self.camera);
+            for k in 0..self.vm_slots.len() {
+                let i = self.vm_slots[k];
+                self.mark(i);
+            }
         }
         self.sent = true;
         self.prepared = false;
@@ -1412,6 +1852,10 @@ impl Scene {
         self.changed = 0;
         self.upload.bytes += r.prepare_materials()?;
         self.settle_lists(r);
+        // (G7f) the viewmodel draws no blended instances
+        if self.lists.iter().any(|l| l.vm && l.class == AlphaClass::Blend && l.count > 0) {
+            return Err(GpuError::Invalid("Scene::prepare: an instance of the viewmodel has a blended material"));
+        }
         self.fit_lists(r);
         self.grow(r)?;
         self.upload_lists(r)?;
@@ -1475,13 +1919,16 @@ impl Scene {
             self.upload.bytes += bytes;
         }
         self.punctual_dirty = false;
+        // (G7f) the particles born since the last prepare, into this frame's upload buffer
+        self.prepare_particles(slot)?;
         let f = &self.frames[slot];
-        // (G5d) the cascades take the camera's detail levels
-        let view = self.camera.view_block(self.origin);
+        // (G5d) the cascades take the camera's detail levels; (G7f) with a viewmodel the world's depth takes 0 ..= 0.5
+        let depth = if self.viewmodel.is_some() { (0.5, 0.0) } else { (1.0, 0.0) };
+        let view = self.camera.view_block(self.origin, depth);
         let lod = [view[48], view[49], view[50], view[51]];
         for (k, c) in self.cascade_info.iter().enumerate() {
             lights[16 + k * 16..32 + k * 16].copy_from_slice(&c.receiver(self.origin));
-            f.stage.write(CASCADE_AT + k as u64 * CASCADE_STRIDE, &c.view_block(self.origin, lod))?;
+            f.stage.write(CASCADE_AT + k as u64 * CASCADE_STRIDE, &c.view_block(self.origin, lod, view[56]))?;
         }
         f.stage.write(0, &view)?;
         f.stage.write(LIGHTS_AT, &lights)?;
@@ -1489,8 +1936,72 @@ impl Scene {
         if self.blend_on {
             f.stage.write(BLEND_AT, &[self.blend_k, 0u32, 0, 0])?;
         }
+        // (G7f) the viewmodel's view: the camera's eye and axes, its lens, its depth 0.5 ..= 1
+        let vm_cam = self.viewmodel.map(|v| v.camera(&self.camera));
+        if let Some(c) = &vm_cam {
+            f.stage.write(VM_AT, &c.view_block(self.origin, (0.5, 0.5)))?;
+            self.upload.bytes += crate::VIEW_BYTES;
+        }
+        // (G7f) the outline's uniform block: colour, width, crease, the lenses (post.wgsl Outline)
+        if let Some(o) = &self.outline {
+            let lens = |b: &[f32; 60]| [b[46], b[47], b[45], b[55]];
+            let world = lens(&view);
+            let vm = vm_cam.map_or([0.0; 4], |c| lens(&c.view_block(self.origin, (0.5, 0.5))));
+            let mut words = [0.0f32; OUTLINE_BYTES as usize / 4];
+            words[..4].copy_from_slice(&o.color);
+            words[4..8].copy_from_slice(&[o.width as f32, o.crease, if vm_cam.is_some() { 1.0 } else { 0.0 }, 0.0]);
+            words[8..12].copy_from_slice(&world);
+            words[12..16].copy_from_slice(&vm);
+            f.stage.write(POST_AT, &words)?;
+        }
+        // (G7f) the particles' frame (particles.wgsl Frame) and their list's head (6 vertices per particle, none counted)
+        if let Some(p) = &self.particles {
+            let e = math::sub(self.camera.eye, self.origin);
+            let (fw, u) = (self.camera.forward, self.camera.up);
+            let rr = math::cross(fw, u);
+            let now = particles::micros(self.time - p.epoch);
+            let v = |a: V3, w: f64| [(a[0] as f32).to_bits(), (a[1] as f32).to_bits(), (a[2] as f32).to_bits(), (w as f32).to_bits()];
+            let mut words = [0u32; PFRAME_BYTES as usize / 4];
+            words[..4].copy_from_slice(&[now, p.cap, self.camera.ortho.is_some() as u32, 0]);
+            words[4..8].copy_from_slice(&v(e, 0.0));
+            words[8..12].copy_from_slice(&v(fw, self.camera.near));
+            words[12..16].copy_from_slice(&v(rr, 0.0));
+            words[16..20].copy_from_slice(&v(u, 0.0));
+            f.stage.write(PFRAME_AT, &words)?;
+            f.stage.write(PHEAD_AT, &[6u32, 0, 0, 0])?;
+        }
         self.upload.bytes += crate::VIEW_BYTES * (1 + self.cascade_info.len() as u64) + crate::LIGHTS_BYTES;
         self.prepared = true;
+        Ok(())
+    }
+
+    /// (G7f) the particles born since the last prepare into this frame's upload buffer, and where they go in the ring (two
+    /// runs at most: its end, then its start)
+    fn prepare_particles(&mut self, slot: usize) -> Result<()> {
+        let Some(p) = &mut self.particles else { return Ok(()) };
+        p.copies = [(0, 0, 0); 2];
+        p.last.clear();
+        if p.pending.is_empty() {
+            return Ok(());
+        }
+        let n = p.pending.len() as u64;
+        let bytes = n * PARTICLE_BYTES;
+        let f = &mut self.frames[slot];
+        if f.spawn.as_ref().is_none_or(|b| b.size() < bytes) {
+            f.spawn = Some(self.dev.create_buffer(&BufferDesc { size: bytes.next_power_of_two().max(4096), usage: BufferUsage::NONE, memory: MemoryKind::Upload })?);
+        }
+        if let Some(b) = &f.spawn {
+            b.write(0, &p.pending)?;
+        }
+        let first = p.first;
+        let run = (p.cap - first).min(n as u32);
+        p.copies[0] = (first, run, 0);
+        if (run as u64) < n {
+            p.copies[1] = (0, n as u32 - run, run as u64 * PARTICLE_BYTES);
+        }
+        p.last_first = first;
+        p.last = core::mem::take(&mut p.pending);
+        self.upload.bytes += bytes;
         Ok(())
     }
 
@@ -1502,6 +2013,11 @@ impl Scene {
         self.prepared = false;
         self.sent = false;
         self.waited = false;
+        // (G7f) the frame cleared a new ring and took the particles born for it
+        if let Some(p) = &mut self.particles {
+            p.fresh = false;
+            p.last.clear();
+        }
     }
 }
 

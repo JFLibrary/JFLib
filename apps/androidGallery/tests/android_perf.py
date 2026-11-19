@@ -1,14 +1,17 @@
 """Android: what a frame of the gallery costs on a device while a page rolls.
 
     python apps/androidGallery/tests/android_perf.py [--serial SERIAL] [--apk PATH] [--page NAME] [--gpu 0|1]
-                                                     [--swipes 12] [--rounds 1]
+                                                     [--swipes 12] [--rounds 1] [--extra NAME=VALUE ...]
+                                                     [--package NAME]
 
 Starts the gallery with the extra jfgui_PERF, moves the page up and down with `input swipe` (500 ms each)
 and prints what the app logged (`nativeRender` over each 120 changed frames, tag jfgui-perf) and
 `dumpsys gfxinfo`, one line per round.  --gpu 0 (the default): the Bitmap's path, so the rasterizer's
 time; nothing of that is in `nativeRender` on the GPU's path.  The numbers of different builds only
 compare on the same page, with the same battery and temperature (printed), best in turns: --apk installs
-the build first.  Android Studio's screen mirroring runs as a display of its own and skews the frame
+the build first.  --extra adds another jfgui_* extra (jfgui_RENDER_PAR=0: the frame drawn on the UI thread
+alone, as before the pool had threads on Android, docs/ANDROID.md AN1); --package: a test build with
+jfgui_ANDROID_PACKAGE, beside a gallery of another debug key (tools/android.py).  Android Studio's screen mirroring runs as a display of its own and skews the frame
 times: a warning says so.  Changes nothing on the device but the app's own state; the app is stopped at
 the end.  `input swipe` goes to whatever is in front and the phone is its owner's: this only starts from
 the launcher or the gallery itself, and stops as soon as something else comes to the front (exit code 1).
@@ -24,8 +27,6 @@ import subprocess
 import time
 from pathlib import Path
 
-PKG = "org.jflib.gallery"
-ACTIVITY = f"{PKG}/.GalleryActivity"
 
 
 def adb_path():
@@ -47,8 +48,12 @@ def main():
     ap.add_argument("--gpu", default="0", help="jfgui_GPU (default 0: the Bitmap's path)")
     ap.add_argument("--swipes", type=int, default=12)
     ap.add_argument("--rounds", type=int, default=1)
+    ap.add_argument("--package", default="org.jflib.gallery", help="the APK's package (a test build: jfgui_ANDROID_PACKAGE)")
+    ap.add_argument("--extra", action="append", default=[], help="another jfgui_* extra of the start (jfgui_RENDER_PAR=0)")
     a = ap.parse_args()
     adb = [adb_path()] + (["-s", a.serial] if a.serial else [])
+    PKG = a.package
+    ACTIVITY = f"{PKG}/org.jflib.gallery.GalleryActivity"
 
     def run(*args, timeout=120):
         return subprocess.run(adb + list(args), capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -76,6 +81,9 @@ def main():
     extras = ["--es", "jfgui_PERF", "1", "--es", "jfgui_LANG", "de", "--es", "jfgui_GPU", a.gpu]
     if a.page:
         extras += ["--es", "jfgui_PAGE", a.page]
+    for e in a.extra:
+        name, _, value = e.partition("=")
+        extras += ["--es", name, value]
     sh("input", "keyevent", "KEYCODE_WAKEUP")
     for k in range(a.rounds):
         stop_unless("launcher", f"before round {k + 1}")

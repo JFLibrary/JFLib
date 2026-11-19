@@ -57,12 +57,17 @@ pub fn look_of(m: &Material) -> Look {
     Look { factor: [f[0] as f64, f[1] as f64, f[2] as f64, f[3] as f64], texture: tex(m.base_color_texture), cutoff: m.alpha_cutoff.map(|c| c as f64),
            metallic: m.metallic as f64, roughness: m.roughness as f64, mr_texture: tex(m.metallic_roughness_texture), normal_texture: tex(m.normal_texture),
            normal_scale: m.normal_scale as f64, occlusion_texture: tex(m.occlusion_texture), occlusion: m.occlusion_strength as f64,
-           emissive: [e[0] as f64, e[1] as f64, e[2] as f64], emissive_texture: tex(m.emissive_texture), double_sided: false, blend: false }
+           emissive: [e[0] as f64, e[1] as f64, e[2] as f64], emissive_texture: tex(m.emissive_texture), double_sided: false, blend: false, toon: None }
 }
 
 /// (G7f) what the reference makes of a material with glTF's BLEND and doubleSided
 pub fn look_of_desc(d: &render3d::MaterialDesc) -> Look {
-    Look { double_sided: d.double_sided, blend: d.blend, ..look_of(&d.material) }
+    // (G7f part 2) the cartoon look's values as the GPU holds them: bytes
+    let toon = d.toon.map(|t| {
+        let b = |v: f32| ((v * 255.0 + 0.5) as u32) as f64 / 255.0;
+        [t.bands as f64, b(t.softness), b(t.rim), b(t.rim_width)]
+    });
+    Look { double_sided: d.double_sided, blend: d.blend, toon, ..look_of(&d.material) }
 }
 
 pub struct Built {

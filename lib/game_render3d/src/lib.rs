@@ -108,7 +108,7 @@ pub fn transform(t: &game::Transform) -> render3d::Transform {
 /// a game view through a lens: vertical field of view (radians), width / height, near, far
 /// (f64::INFINITY: none)
 pub fn camera(v: &View, fov_y: f64, aspect: f64, near: f64, far: f64) -> Camera {
-    Camera { eye: v.eye.to_array(), forward: v.forward.to_array(), up: v.up.to_array(), fov_y, aspect, near, far }
+    Camera { eye: v.eye.to_array(), forward: v.forward.to_array(), up: v.up.to_array(), fov_y, aspect, near, far, ortho: None }
 }
 
 fn count(m: &mut BTreeMap<u32, u32>, id: u32, up: bool) {

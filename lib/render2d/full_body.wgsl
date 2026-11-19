@@ -13,7 +13,7 @@
     var duty = 1.0;
     // the pattern's pass (pieces below), decided here where tf is computed: tested after this block as dashed && tf < 1.0,
     // Intel's Windows driver (UHD 615, 31.0.101.2135) found it false in fs_fill with tf 0, also as two ifs (the dashes of
-    // layers with a fill were gone, docs/RENDER2D.md)
+    // layers with a fill were gone, docs/RENDER2D.md; the cause: lib/wgsl's && through a bool variable, a u32 since)
     var pat = 0u;
     if dashed {
         // (dash units per pixel: the vertex shader's, the block's units inside an insert)

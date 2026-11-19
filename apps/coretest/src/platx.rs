@@ -1,19 +1,38 @@
 // platx -- the server-side parts of plat: sync (threads, channel), rand, net (loopback TCP /
 // UDP over IPv4 and IPv6, Unix sockets, timeouts, refused connections), fs (private files, metadata, listing,
-// links, times, free space), the local time zone
+// links, times, free space), the local time zone; on Android sync and rand (AN1)
 
+#[cfg(not(target_os = "android"))]
 use alloc::format;
+#[cfg(not(target_os = "android"))]
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+#[cfg(not(target_os = "android"))]
 use plat::fs;
+#[cfg(not(target_os = "android"))]
 use plat::net::{IpAddr, NetErrorKind, SocketAddr, TcpListener, TcpStream, UdpSocket};
 use plat::sync::{channel, Condvar, Mutex, RecvError, RwLock};
 
 use crate::T;
 
 pub fn run(t: &mut T) {
+    // Android (docs/ANDROID.md): threads and sync since AN1, the rest waits for AN2 to AN4
+    #[cfg(target_os = "android")]
+    {
+        sync(t);
+        rand(t);
+        t.later("net: TCP, UDP, Unix sockets (AN2)");
+        t.later("fs, watch, the local zone (AN3)");
+        t.later("service (AN4: Unsupported)");
+    }
+    #[cfg(not(target_os = "android"))]
+    run_all(t);
+}
+
+#[cfg(not(target_os = "android"))]
+fn run_all(t: &mut T) {
     service(t);
     sync(t);
     rand(t);
@@ -29,6 +48,7 @@ pub fn run(t: &mut T) {
     t.check("local zone known to datetime", z.as_deref().and_then(zone_of).is_some());
 }
 
+#[cfg(not(target_os = "android"))]
 fn zone_of(id: &str) -> Option<datetime::Zone> {
     match id.strip_prefix("win:") {
         Some(k) => datetime::Zone::from_windows(k),
@@ -119,6 +139,7 @@ fn rand(t: &mut T) {
     t.check("random balance", (ones as i64 - 262_144).abs() < 2600);
 }
 
+#[cfg(not(target_os = "android"))]
 fn addrs(t: &mut T) {
     t.eq("parse v4", SocketAddr::parse("10.0.0.5:9443"), Some(SocketAddr::new(IpAddr::V4([10, 0, 0, 5]), 9443)));
     t.eq("parse v6", SocketAddr::parse("[::1]:80").map(|a| format!("{}", a)), Some(String::from("[::1]:80")));
@@ -133,6 +154,7 @@ fn addrs(t: &mut T) {
     t.check("resolve localhost", r.is_ok_and(|v| v.iter().any(|a| a.ip.is_loopback())));
 }
 
+#[cfg(not(target_os = "android"))]
 fn tcp(t: &mut T, ip: IpAddr) {
     let fam = if matches!(ip, IpAddr::V4(_)) { "v4" } else { "v6" };
     let Ok(l) = TcpListener::bind(&SocketAddr::new(ip, 0)) else {
@@ -205,6 +227,7 @@ fn tcp(t: &mut T, ip: IpAddr) {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 fn udp(t: &mut T) {
     let a = UdpSocket::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0));
     let b = UdpSocket::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0));
@@ -222,6 +245,7 @@ fn udp(t: &mut T) {
 
 /// Unix domain sockets: bind, connect, echo both ways, timeouts, the socket file goes with the
 /// listener, a missing socket is refused
+#[cfg(not(target_os = "android"))]
 fn unix(t: &mut T) {
     let path = fs::join(&plat::temp_dir().unwrap_or_else(|| String::from(".")), &format!("ct-{}.sock", plat::random_u64() % 1_000_000));
     let l = match plat::net::UnixListener::bind(&path) {
@@ -268,6 +292,7 @@ fn unix(t: &mut T) {
 /// UnixListener and the names around it: bind never removes a file, a folder or a socket that
 /// is listened on (an error), only a socket file left by a listener that is gone; a dropped
 /// listener removes only its own socket file, not a name taken again meanwhile
+#[cfg(not(target_os = "android"))]
 fn unix_names(t: &mut T, path: &str) {
     use plat::net::{NetErrorKind, UnixListener};
     let in_use = |r: Result<UnixListener, plat::net::NetError>| r.err().is_some_and(|e| e.kind == NetErrorKind::AddrInUse);
@@ -308,6 +333,7 @@ fn unix_names(t: &mut T, path: &str) {
 }
 
 /// plat::watch: new, changed, renamed and deleted files, a new folder and a file in it
+#[cfg(not(target_os = "android"))]
 fn watch(t: &mut T) {
     let base = fs::join(&plat::temp_dir().unwrap_or_else(|| String::from(".")), &format!("coretest-watch-{}", plat::random_u64() % 1_000_000));
     t.check("watch dir", fs::mkdir_private(&base) && fs::mkdir_private(&fs::join(&base, "sub")));
@@ -361,6 +387,7 @@ fn watch(t: &mut T) {
 }
 
 /// true once cond holds (polled every 50 ms), false after ms
+#[cfg(not(target_os = "android"))]
 fn wait_until(ms: u64, mut cond: impl FnMut() -> bool) -> bool {
     let dl = plat::time_us() + ms * 1000;
     loop {
@@ -375,12 +402,14 @@ fn wait_until(ms: u64, mut cond: impl FnMut() -> bool) -> bool {
 }
 
 /// a change whose path ends with suffix comes within ms
+#[cfg(not(target_os = "android"))]
 fn seen_within(w: &plat::watch::Watcher, suffix: &str, ms: u64) -> bool {
     wait_until(ms, || w.take(100).paths.iter().any(|p| p.replace('\\', "/").ends_with(suffix)))
 }
 
 /// the watcher's gaps: a change right after new, a root deleted and made again, (Linux) a root
 /// moved away, a folder whose listing failed
+#[cfg(not(target_os = "android"))]
 fn watch_gaps(t: &mut T) {
     use plat::watch::Watcher;
     let base = fs::join(&plat::temp_dir().unwrap_or_else(|| String::from(".")), &format!("coretest-watch2-{}", plat::random_u64() % 1_000_000));
@@ -461,6 +490,7 @@ fn watch_gaps(t: &mut T) {
     plat::delete(&base);
 }
 
+#[cfg(not(target_os = "android"))]
 fn files(t: &mut T) {
     let base = fs::join(&plat::temp_dir().unwrap_or_else(|| String::from(".")), &format!("coretest-{}", plat::random_u64() % 1_000_000));
     t.check("mkdir_private", fs::mkdir_private(&base));
@@ -513,6 +543,7 @@ fn files(t: &mut T) {
 
 /// '\' separates on Windows (and in vfs names); on Linux and macOS it is part of a name. The
 /// private writer's sibling is always a new file: a file of that name stays as it was.
+#[cfg(not(target_os = "android"))]
 fn names_and_siblings(t: &mut T, base: &str) {
     t.eq("parent of a vfs name with a backslash", fs::parent("mem://a\\b"), "mem://a");
     if cfg!(windows) {
@@ -540,6 +571,7 @@ fn names_and_siblings(t: &mut T, base: &str) {
     plat::delete(&planted);
 }
 
+#[cfg(not(target_os = "android"))]
 fn remove_tree(path: &str) {
     if let Some(list) = fs::read_dir(path) {
         for e in list {
@@ -555,6 +587,7 @@ fn remove_tree(path: &str) {
 }
 
 /// the systemd unit of a service: quoting of the command line, the fixed settings
+#[cfg(not(target_os = "android"))]
 fn service(t: &mut T) {
     let args = [String::from("run"), String::from("--data"), String::from("/srv/backup data"), String::from("50%"), String::from("$HOME")];
     let spec = plat::service::ServiceSpec { name: "x", display: "X", description: "Ein Dienst", exe: "/opt/x/bin", args: &args };

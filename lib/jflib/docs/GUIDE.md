@@ -1819,8 +1819,8 @@ fn brighten(sf: &mut gfx::Surface, add: u8) {
   (`Text::record_n`, the glyph masks go into the cache), the workers blend them read-only
   (`text::GlyphView`). Canvases (`Draw`), icons an icon hook or the style paints and glyphs
   too large for the cache are drawn on the UI thread: the workers draw their bands up to the
-  first of them, the UI thread the rest. Without workers (the browser without shared memory,
-  Android) everything stays on one thread; `jfgui_RENDER_PAR=0` turns it off (section 12).
+  first of them, the UI thread the rest. Without workers (the browser without shared memory)
+  everything stays on one thread; `jfgui_RENDER_PAR=0` turns it off (section 12).
 * Background work: `plat::Job` -- `set(count, f)` with a `'static + Send + Sync` closure (share
   data through `alloc::sync::Arc`), `start()`, `done()`, `wait()`, `cancel()`,
   `items_done()`. When it finishes the pool calls `plat::wake()`, which arrives as
@@ -1922,8 +1922,8 @@ impl App for Copier {
   [`apps/asynctest`](../apps/asynctest/main.rs) shows a copy with a progress bar and a cancel
   button and the scripts that step through it.
 * A panic in a task or a blocking job ends the process like any panic (exit code 3). In the
-  browser without shared memory and on Android there are no threads: blocking jobs run between
-  frames on the UI thread, one per run.
+  browser without shared memory there are no threads: blocking jobs run between frames on the
+  UI thread, one per run (Android has real threads since AN1, docs/ANDROID.md).
 
 ## 10. Effects
 

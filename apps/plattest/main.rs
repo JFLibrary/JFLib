@@ -182,12 +182,15 @@
 //                                          outputs; the portals against a fake bus
 //                                          (tools/platshared/screen_bus.py); the permissions
 //   plattest --test all                    threads, files, ini, cpu
+//   plattest --test pool-bench             (t_poolbench.rs) parallel_for with 1 .. cpu_count + 1 threads:
+//                                          arithmetic and memory items (not in "all": timings; big.LITTLE)
 //   --repeat N                             run the selected tests N times (only failures are
 //                                          printed then) -- a stress loop for races
 //
 // Android (docs/ANDROID.md, AN0): a program without a UI, python tools/android_console.py plattest -- --test all;
-// what needs plat's fs, net, sync, threads or child processes says "not on Android yet" (AN1 to
-// AN4) or, what Android does not have, "not on Android" (docs/ANDROID.md, "Bewusst nicht").
+// threads, sync and the pool run there since AN1; what needs plat's fs, net or child processes says
+// "not on Android yet" (AN2 to AN4) or, what Android does not have, "not on Android" (docs/ANDROID.md,
+// "Bewusst nicht").
 //   plattest --test syscalls               (t_syscalls.rs, Android) every system call of rt's kernel table in
 //                                          a child: allowed, or ended by the seccomp filter (SIGSYS)
 // Scratch files live in build/plattest/<os>-<id>/ and are removed at the end; the config
@@ -198,8 +201,8 @@
 #![no_main]
 #![deny(unsafe_code)]
 // macOS and iOS: the tests of windows, pens, fingers and screens wait for AP4 (docs/APPLE.md); their helpers
-// stay unused until then.  Android (a program without a UI there): the same, and what needs fs, net, sync
-// or child processes waits for AN1 to AN4 (docs/ANDROID.md)
+// stay unused until then.  Android (a program without a UI there): the same, and what needs fs, net
+// or child processes waits for AN2 to AN4 (docs/ANDROID.md)
 #![cfg_attr(any(target_vendor = "apple", target_os = "android"), allow(dead_code, unused_imports))]
 
 extern crate alloc;
@@ -221,14 +224,9 @@ mod t_a11y_rich;
 // what that tree costs per frame
 mod t_a11y_cost;
 mod t_async;
-#[cfg(not(target_os = "android"))]
 mod t_atomics;
-#[cfg(target_os = "android")]
-mod t_atomics {
-    pub fn t_atomics(t: &mut crate::T) {
-        crate::later(t, "atomics: plat::sync and threads (AN1)");
-    }
-}
+// how parallel_for scales with the threads (big.LITTLE: how many workers)
+mod t_poolbench;
 // plat-win: the R4 tests of the Windows platform layer
 mod t_cursor;
 // the user's folders, the log folder and the trash
@@ -499,6 +497,7 @@ fn plattest() -> i32 {
     let test: fn(&mut T) = match args.value("--test") {
         Some("threads") => t_threads,
         Some("atomics") => t_atomics::t_atomics,  // ARM7: memory order under load (--secs N for long runs)
+        Some("pool-bench") => t_poolbench::t_poolbench, // parallel_for with 1 .. cpu_count + 1 threads (not in "all": timings)
         Some("files") => t_files,
         Some("kernel") => t_kernel::t_kernel,
         #[cfg(target_os = "android")]
@@ -728,10 +727,7 @@ static INI_BAD: AtomicU32 = AtomicU32::new(0);
 /// all thread tests, then stop the pool (the next run starts a new one)
 fn t_threads(t: &mut T) {
     #[cfg(target_os = "android")]
-    if !plat::capabilities().supports(plat::CAP_THREADS) {
-        t.later("threads: thread_spawn, semaphores between threads, the pool on threads (AN1)");
-        return;
-    }
+    t.check(plat::capabilities().supports(plat::CAP_THREADS), "threads: capabilities() reports CAP_THREADS (Android, AN1)");
     th_raw(t);
     th_sem(t);
     th_pool(t);
@@ -1333,11 +1329,6 @@ fn t_files(t: &mut T) {
     t_env(t);
     // ---- memory, CPUs
     let mt = plat::mem_total();
-    #[cfg(target_os = "android")]
-    if mt == 0 {
-        t.later("sys: plat_mem_total (AN1: /proc/meminfo)");
-    }
-    #[cfg(not(target_os = "android"))]
     t.check(mt > 0x400_0000, "sys: plat_mem_total > 64 MB");
     t.info(&format!("  ({} MB, {} CPUs)\n", mt >> 20, plat::cpu_count()));
     t.scratch_done();
@@ -1841,11 +1832,6 @@ fn t_cpu(t: &mut T) {
     t.info(&format!("  cpu: {brand}\n"));
     t.info(&format!("  features: SSE4.1 {}  AVX2 {}  FMA {}  POPCNT {}  BMI2 {}\n", f & 1, f >> 1 & 1, f >> 2 & 1,
                     f >> 3 & 1, f >> 4 & 1));
-    #[cfg(target_os = "android")]
-    if brand.is_empty() {
-        t.later("cpu: cpu_brand (rt's portable CPU code there; /proc/cpuinfo)");
-    }
-    #[cfg(not(target_os = "android"))]
     t.check(!brand.is_empty(), "cpu: cpu_brand");
     if f & CPU_AVX2 != 0 {
         t.check(plat::avx2_probe(), "cpu: AVX2 instructions run when CPU_AVX2 is reported");

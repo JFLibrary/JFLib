@@ -9,8 +9,8 @@ Character-Controller entstehen: Strahlen (erster Treffer und alle), bewegte Form
 Linux statisch ohne libc. Und vor allem **bitgleich auf allen Zielen**, damit die Vorhersage eines Clients genau das rechnet,
 was der Server rechnet (G7e).
 
-Stand: G7c Teil 1 (dieser Lauf): Formen, Breitphase, Abfragen, Prüfsummen. Teil 2, der kinematische Character-Controller,
-fehlt noch ([Für Teil 2](#für-teil-2-den-character-controller)). Starrkörper kommen mit G7i.
+Stand: G7c Teil 1 (Formen, Breitphase, Abfragen, Prüfsummen) und Teil 2: der kinematische Character-Controller
+([Der Character-Controller](#der-character-controller)) und eine einzige portable Wurzel in `rt`. Starrkörper kommen mit G7i.
 
 | Teil | Wo |
 | --- | --- |
@@ -19,7 +19,8 @@ fehlt noch ([Für Teil 2](#für-teil-2-den-character-controller)). Starrkörper 
 | Breitphase | BVH der Netze: [`bvh.rs`](../lib/physics/src/bvh.rs); dynamischer Baum: [`tree.rs`](../lib/physics/src/tree.rs) |
 | Schmalphase | GJK, EPA, Cast: [`gjk.rs`](../lib/physics/src/gjk.rs); Stützfunktionen: [`convex.rs`](../lib/physics/src/convex.rs); Strahlen: [`ray.rs`](../lib/physics/src/ray.rs) |
 | Abfragen | eine Form gegen eine: [`query.rs`](../lib/physics/src/query.rs); über alle Körper: [`world.rs`](../lib/physics/src/world.rs) |
-| Tests, Prüfsummen, Messung | [`apps/physicstest`](../apps/physicstest/README.md): Referenzen [`refs.rs`](../apps/physicstest/src/refs.rs), Gruppen [`tests.rs`](../apps/physicstest/src/tests.rs), [`checksum.rs`](../apps/physicstest/src/checksum.rs), [`bench.rs`](../apps/physicstest/src/bench.rs), im Browser [`tests/web.mjs`](../apps/physicstest/tests/web.mjs) |
+| Character-Controller | [`character.rs`](../lib/physics/src/character.rs) |
+| Tests, Prüfsummen, Messung | [`apps/physicstest`](../apps/physicstest/README.md): Referenzen [`refs.rs`](../apps/physicstest/src/refs.rs), Gruppen [`tests.rs`](../apps/physicstest/src/tests.rs), der Controller [`character.rs`](../apps/physicstest/src/character.rs), [`checksum.rs`](../apps/physicstest/src/checksum.rs), [`bench.rs`](../apps/physicstest/src/bench.rs), im Browser [`tests/web.mjs`](../apps/physicstest/tests/web.mjs) |
 
 ## Ein Beispiel
 
@@ -52,8 +53,9 @@ welt.set_iso(figur, Iso::at(Vec3::new(0.1, 0.95, 0.0)));
   `normalize_or_zero`, `min`, `max`, `abs`, `lerp`, `any_perpendicular`, Operatoren; `From<[f64; 3]>`, `From<[f32; 3]>`),
   `Quat` (x, y, z, w wie render3d; `from_axis_angle`, `from_yaw_pitch`, `from_rotation_arc`, `mul`, `rotate`,
   `inverse_rotate`, `normalize`, `conjugate`, `to_mat3`, `from_f32`, `to_f32`), `Mat3`, `Iso { pos, rot }` (erst drehen, dann
-  verschieben; `transform_point`, `inverse_transform_point`, `mul`, `inv_mul`), `Aabb`. Funktionen: `sqrt` (korrekt gerundet),
-  `sqrt_portable`, `sin`, `cos`, `sincos` (Sinus zuerst), `atan2`, `min`, `max`, `clamp`.
+  verschieben; `transform_point`, `inverse_transform_point`, `mul`, `inv_mul`), `Aabb`. Funktionen: `sqrt` (korrekt gerundet,
+  `rt::fx::sqrtd`), `sqrt_portable` (`rt::fx::sqrt_portable`), `sin`, `cos`, `sincos` (Sinus zuerst), `atan2`, `min`, `max`,
+  `clamp`.
 - **Formen**: `Shape::{Sphere { radius }, Capsule { half_height, radius }, Box { half }, Hull(Arc<ConvexHull>),
   Mesh(Arc<TriMesh>)}` mit `sphere`, `capsule`, `cuboid`, `hull`, `hull_from_points`, `mesh`, `is_convex`, `margin`,
   `aabb(&Iso)`. Die Kapsel steht auf der Y-Achse. `ConvexHull::new(&[Vec3]) -> Result<_, HullError::{Count, NotFinite,
@@ -73,6 +75,12 @@ welt.set_iso(figur, Iso::at(Vec3::new(0.1, 0.95, 0.0)));
   Ergebnisse: `RayHit { t, point, normal, triangle }`, `CastHit { fraction, point, normal, triangle, depth }`, `Contact {
   point, normal, depth, triangle }`, `Separation { distance, point_a, point_b, normal, triangle }`, `PointHit { point,
   distance, inside, triangle }`; `NO_TRIANGLE` bei allem außer Netzen. `CAST_SKIN` (1 µm), `cast_fallbacks()` (Statistik).
+- **Character-Controller**: `CharacterController::new(CharacterParams)`, `step(&state, &world, &filter, &input, dt) ->
+  (CharacterState, StepEvents)`, `params`, `jump_speed`, `walkable_y`, `walkable`, `height`, `capsule`, `capsule_iso`;
+  `CharacterState { position, velocity, crouched, grounded, ground_normal, ground_body }` (`new`), `CharacterInput { wish,
+  run, jump, crouch }`, `StepEvents { landed, impact_speed, jumped, left_ground, hit_ceiling, walls, stepped_up, snapped_down,
+  stand_blocked, pushed_out, casts }` (`walls()`, `wall_count()`), `Touch { body, point, normal, triangle }`,
+  `MAX_WALL_TOUCHES` ([Der Character-Controller](#der-character-controller)).
 - **Bäume**: `DynamicTree` (`insert`, `remove`, `update`, `query`, `ray`, `height`, `validate`) und `BvhNode` sind öffentlich,
   damit Tests und spätere Stufen sie sehen; die Welt verwaltet sie selbst.
 
@@ -111,12 +119,16 @@ Viertelmillimeter.
 ### Bitgleich auf allen Zielen
 
 - **Nur `+ − × ÷` und korrekt gerundete Wurzeln** auf `f64`. Rust zieht `a * b + c` nie zu einem FMA zusammen, `mul_add`
-  kommt nicht vor. Die Wurzel ist auf x86-64 und ARM64 die des Prozessors (`rt::fx::sqrtd`: `sqrtsd`, `fsqrt`), im Browser und
-  im x86-64-Emulator von Android `sqrt_portable`: vier Newton-Schritte in `f64` aus einer Schätzung über die Bits, dann ein
-  Test auf der Mantisse in 128-Bit-Ganzzahlen ((R − ½)² < X ≤ (R + ½)²), der den richtigen Nachbarn wählt. IEEE 754 verlangt
-  die korrekt gerundete Wurzel, also ist das Ergebnis überall dasselbe; `rt`s eigene portable Wurzel rechnet Bit für Bit mit
-  128-Bit-Zahlen und wäre im Browser für die Physik zu langsam. Geprüft gegen `rt::fx::sqrtd` an rund 900 000 Eingaben,
-  auch an den schwersten Fällen (Doubles nächst am Quadrat eines Mittelpunkts und ihren Nachbarn).
+  kommt nicht vor. `math::sqrt` ist `rt::fx::sqrtd`: auf x86-64 und ARM64 die Wurzel des Prozessors (`sqrtsd`, `fsqrt`), im
+  Browser und im x86-64-Emulator von Android `rt::fx::sqrt_portable`: vier Newton-Schritte in `f64` aus einer Schätzung über
+  die Bits, dann ein Test auf der Mantisse in 128-Bit-Ganzzahlen ((R − ½)² < X ≤ (R + ½)²), der den richtigen Nachbarn wählt.
+  IEEE 754 verlangt die korrekt gerundete Wurzel, also ist das Ergebnis überall dasselbe; Sonderwerte (±0, Unendlich, NaN,
+  negative Zahlen) gibt sie wie `sqrtsd`, NaN eingeschlossen. Bis G7c Teil 1 hatten `lib/physics` und `lib/geom` je eine
+  Kopie davon und `rt` im Browser eine Wurzel Bit für Bit (fünf- bis elfmal langsamer, [Messwerte](#messwerte)); seit Teil 2
+  gibt es die eine in `rt` (vom Nutzer entschieden am 18.11.2026), `physics::math::sqrt_portable` und
+  `geom::math::sqrt_portable` reichen sie durch. Geprüft gegen eine Ganzzahl-Wurzel der Tests (`refs::sqrt_ref`) an rund
+  1,5 Mio. Eingaben, Bit für Bit mit NaN: Sonderwerte, zufällige Bitmuster über alles, Subnormale, jede Zweierpotenz mit
+  Nachbarn, Quadrate k²·4ʲ mit Nachbarn, die schwersten Fälle (Doubles nächst am Quadrat eines Mittelpunkts).
 - **sin, cos, atan2** kommen aus `rt`s portabler Mathematik (`portable/math.rs`, auf ein halbes ulp genau, ARM64.md, ARM2),
   auf x86-64 ausdrücklich nicht aus `rt::x87`, das dort die x87-Einheit ist. Die Abfragen selbst brauchen sie nicht; sie sind
   für die Drehungen eines Controllers da (`Quat::from_axis_angle`, `from_yaw_pitch`).
@@ -208,7 +220,7 @@ Kontakt einer Bewegung kommt aus einer Dreiteilungssuche nach dem Minimum der ko
 
 | Gruppe | Prüft | Ergebnis |
 | --- | --- | --- |
-| `math` | `sqrt_portable` und `sqrt` gegen `rt::fx::sqrtd` Bit für Bit: Sonderwerte, 200 000 zufällige Bitmuster und Zahlen, 100 000 Doubles nächst am Quadrat eines Mittelpunkts mit je vier Nachbarn; sin/cos/atan2 auf Plausibilität; Drehungen, `Iso`, `from_rotation_arc` | 1 049 912 Prüfungen, 0 falsch |
+| `math` | `sqrt_portable`, `sqrt`, `rt::fx::sqrtd` und `rt`s portables `sqrtd` gegen die Ganzzahl-Wurzel `refs::sqrt_ref` Bit für Bit, NaN eingeschlossen: 25 Sonderwerte (NaN mit Vorzeichen und Nutzlast, signalisierende), 200 000 zufällige Bitmuster über alles, 200 000 positive, 200 000 Zahlen unter 10⁴, 20 000 Subnormale, jede Zweierpotenz mit je vier Nachbarn, 50 000 Quadrate k²·4ʲ mit Nachbarn, 100 000 Doubles nächst am Quadrat eines Mittelpunkts mit je vier Nachbarn; sin/cos/atan2 auf Plausibilität; Drehungen, `Iso`, `from_rotation_arc` | 1 530 516 Prüfungen, 0 falsch |
 | `hull` | 1500 Wolken aus 4 bis gut 200 Punkten (Würfel, Kugeloberfläche, Quaderflächen mit koplanaren Punkten, flach 1:1000, bei 10⁵ m, viele Doppelte): kein Punkt außerhalb, Ecken sind Eingabepunkte, geschlossen (jede Kante zweimal, gegenläufig, V − E + F = 2), Flächen nach außen, Stützpunkt gegen alle Punkte; Volumen von Quadern; was verweigert wird | 0 falsch |
 | `ray` | 6000 Strahlen gegen Kugel, Kapsel, Quader, Hülle (Treffer auf der Oberfläche, nicht nach dem Eintritt der Referenz, kein Fehlen), die Kugel auch gegen die geometrische Formel (10⁻¹²); 20 000 gegen Dreiecke gegen Möller-Trumbore; Wasserdichtheit: Strahlen auf jede Ecke, Kante und Fläche eines Gitters mit wechselnden Diagonalen (senkrecht und schräg, von oben und unten; schräg nicht auf den offenen Rand) und 20 000 zufällige, dazu 20 000 aus einem geschlossenen Quader heraus, auch genau auf seine Ecken | 0 durchgerutscht |
 | `distance` | 8000 Paare aus allen Formen und Dreiecken: Abstand (10⁻⁹ m), Eindringtiefe von EPA gegen die Trennachsen (10⁻⁷), die Normale trennt, Punkte auf den Oberflächen; `intersects`, `contacts`; analytisch Kugel–Kugel, Kapsel–Kapsel, Kugel–Quader; 8000 nächste Punkte | größter Fehler 2,7 · 10⁻¹⁵ m getrennt, 1,3 · 10⁻¹⁵ m überlappend |
@@ -218,27 +230,32 @@ Kontakt einer Bewegung kommt aus einer Dreiteilungssuche nach dem Minimum der ko
 | `bvh` | der Baum einer Karte aus 3050 Dreiecken (jedes in einem Blatt, Boxen halten alles); 8000 Strahlen, 1000 `ray_all`, 1000 Casts, Kontakte, `intersects`, `separation`, nächste Punkte gegen `query::brute`, Bit für Bit | 0 anders |
 | `world` | Karte und 400 Körper in zufälligen Ebenen; 60 Runden mit Verschieben, Entfernen, Hinzufügen und `validate` der Bäume; je 40 Abfragen aller Arten mit vier Filtern gegen Schleifen über alle Körper, Bit für Bit; Generationen | 0 anders |
 | `fuzz` | 40 000 zufällige Paare mit Größen von 3 mm bis 300 m, ein Fünftel bei bis zu 10⁵ m: keine Panik, nichts nicht Endliches, Normalen der Länge 1, Brüche in [0, 1], `intersects` passt zum Abstand, Abstand symmetrisch | größte Asymmetrie 5 · 10⁻¹⁵ der Größe |
+| `character` | der Controller in Szenen mit genauen Erwartungen ([Tests des Controllers](#tests-des-controllers)) | 447 Prüfungen, 0 falsch |
+| `charfuzz` | 86 400 Schritte zufälliger Figuren auf 24 zufälligen, dichten Karten, Würfe bis 1000 m/s ([Tests des Controllers](#tests-des-controllers)) | 0 in etwas, 0 durch eine Wand |
 | `edge` | Netze, die verweigert werden, leere und flache Netze, ein Netz als Abfrageform, Casts ohne Bewegung, Berühren und Weggehen/Entlanggleiten/Hineinfahren, Strahl ohne Richtung, 3000 Casts bei 10⁶ m gegen dieselben am Ursprung, eine Bewegung von 1000 km, sortierte Kontakte an einer Ecke | 0 falsch |
 
 ## Prüfsummen
 
-`physicstest --checksum` rechnet feste Szenarien und faltet die Bits jedes Ergebnisses (FNV-1a über `f64::to_bits`) in eine
-Zahl: 20 000 Wurzeln (beide Wege), Sinus, Kosinus, atan2 und Drehungen; 20 Hüllen; der Baum und die Kantenbits einer Karte aus
+`physicstest --checksum` rechnet feste Szenarien und faltet die Bits jedes Ergebnisses (FNV-1a über `f64::to_bits`) in zwei
+Zahlen. Die erste (Zeile `physicstest checksum=`) seit Teil 1 unverändert: 20 000 Wurzeln (beide Wege), Sinus, Kosinus, atan2 und Drehungen; 20 Hüllen; der Baum und die Kantenbits einer Karte aus
 7778 Dreiecken; eine Welt aus Karte und 300 Körpern über 10 Runden mit Verschieben, Entfernen und Hinzufügen, darin 3000 Strahlen,
 300 `ray_cast_all`, 1500 Casts, Überlappungen, Kontakte, nächste Punkte; 3000 Paare mit Abstand und Cast; sechs Läufer mit
-Kollidieren und Gleiten über 600 Schritte. Zusammen 294 963 Werte.
+Kollidieren und Gleiten über 600 Schritte. Zusammen 294 963 Werte. Die zweite (`physicstest controller checksum=`, seit Teil 2):
+zwölf Figuren aus vier Parametersätzen (Vorgabe, schnell, klein, groß) als Körper einer Welt aus der Karte mit einem Zaun und
+40 Körpern, zufällige Eingaben (alle 20 Takte neu) und Würfe bis 30 m/s, 600 Takte; je Takt und Figur Lage, Geschwindigkeit,
+Bodennormale, die Ereignisse und die berührten Wände, zusammen 113 214 Werte.
 
-| Ziel | Build | Prüfsumme | `--check` |
-| --- | --- | --- | --- |
-| Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung und Release (fat LTO) | `0c7267a7636aaf7b` | 1 480 284 bestanden |
-| Linux x86-64, statisch ohne libc, in WSL Ubuntu 24.04 | Entwicklung | `0c7267a7636aaf7b` | 1 480 284 bestanden |
-| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung und Release | `0c7267a7636aaf7b` | 1 480 284 bestanden |
-| macOS x86-64 unter Rosetta 2 (derselbe Mac) | Entwicklung | `0c7267a7636aaf7b` | 1 480 284 bestanden |
-| Linux ARM64, statisch, unter `qemu-aarch64` in WSL | Entwicklung | `0c7267a7636aaf7b` | nicht gelaufen |
-| WebAssembly in Node 22 (V8): einfach, SIMD, Threads | Entwicklung und Release | `0c7267a7636aaf7b` | 1 480 284 bestanden (alle drei) |
-| Android 15 x86_64 im Emulator, aus `adb shell` und im Prozess einer App (`untrusted_app`, seccomp) | Entwicklung | `0c7267a7636aaf7b` | 1 480 284 bestanden |
+| Ziel | Build | Prüfsumme | Controller (Teil 2) | `--check` (Teil 2) |
+| --- | --- | --- | --- | --- |
+| Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung und Release (fat LTO) | `0c7267a7636aaf7b` | `13dd288c669c6eaa` | 2 047 737 bestanden |
+| Linux x86-64, statisch ohne libc, in WSL Ubuntu 24.04 | Entwicklung | `0c7267a7636aaf7b` | `13dd288c669c6eaa` | 2 047 737 bestanden |
+| macOS ARM64 (Mac mini M2, macOS 27.2.1), Rust 1.98.1 | Entwicklung und Release | `0c7267a7636aaf7b` | `13dd288c669c6eaa` | 2 047 737 bestanden |
+| macOS x86-64 unter Rosetta 2 (derselbe Mac) | Entwicklung | `0c7267a7636aaf7b` (Teil 1) | nicht gelaufen: Rosetta fehlt seit dem Update auf 27.2.1 | – |
+| Linux ARM64, statisch, unter `qemu-aarch64` in WSL | Entwicklung | `0c7267a7636aaf7b` (Teil 1) | nicht gelaufen | nicht gelaufen |
+| WebAssembly in Node 22 (V8): einfach, SIMD, Threads | Entwicklung und Release | `0c7267a7636aaf7b` | `13dd288c669c6eaa` | 2 047 737 bestanden |
+| Android 15 x86_64 im Emulator, aus `adb shell` und im Prozess einer App (`untrusted_app`, seccomp) | Entwicklung und Release | `0c7267a7636aaf7b` | `13dd288c669c6eaa` | 2 047 737 bestanden (`adb shell`) |
 
-Auf x86-64 und ARM64 rechnet die Wurzel der Prozessor, im Browser und im Android-Emulator `sqrt_portable`; zwei
+Auf x86-64 und ARM64 rechnet die Wurzel der Prozessor, im Browser und im Android-Emulator `rt::fx::sqrt_portable`; zwei
 Rust-Versionen, zwei Optimierungsstufen. Nicht gelaufen: ein echtes Android-Gerät mit ARM64 (nur mit einem Ja des Nutzers je
 Gerät), iOS (`cargo check` der Crate für `aarch64-apple-ios` geht, gestartet nicht), Windows auf ARM64, Firefox und Safari
 (die WebAssembly-Arithmetik ist spezifiziert; nur V8 lief).
@@ -269,6 +286,23 @@ nativ; ohne `sqrt_portable` (mit `rt`s Wurzel, 5,5-mal langsamer) wären es die 
 16 Figuren mit je vier Casts in jedem Takt bei 60 Hz sind 3840 Casts in der Sekunde, gut 1 % eines Kerns des Servers, im
 Browser für die eigene Figur samt Abgleich (zehn Takte nachrechnen) unter 1 ms je Bild.
 
+**Seit Teil 2** (`--bench sqrt`, `--bench controller`; der Entwicklungsrechner lief dabei unter Volllast anderer Agenten, seine
+Werte schwankten bis zum Fünffachen und taugen nur für Verhältnisse im selben Lauf; der M2 war ruhiger):
+
+| Messung | M2, macOS (Release) | Ryzen 5 3600, Windows (Release, unter Last) | WebAssembly in Node 22 (Release, unter Last) | Android-Emulator x86_64 (Release) |
+| --- | ---: | ---: | ---: | ---: |
+| Character-Controller: Schritte je ms, 32 Figuren als Körper auf der Karte aus 50 068 Dreiecken, zufällige Eingaben, 600 Takte | 178 | 31–69 | 15–29 | 21–40 |
+| Casts je Schritt im Mittel | 3,02 | 3,02 | 3,02 | 3,02 |
+| `rt::fx::sqrt_portable` | 15,8 ns | 42 ns | 74–273 ns | 60–90 ns |
+| `rt::fx::sqrtd` vorher (Bit für Bit) / nachher | 0,9 ns (Prozessor) | Prozessor | 474–1888 / 66–343 ns | 700–1201 / 46–76 ns |
+| die Ganzzahl-Wurzel der Tests (wie `rt`s alte) | 110 ns | 188 ns | 574–1819 ns | 627–1048 ns |
+
+Im Browser und im Emulator ist `rt::fx::sqrtd` jetzt so schnell wie `sqrt_portable`: im selben Lauf war es vorher 4,9- bis
+8,2-mal langsamer als `sqrt_portable` (Node) und 9- bis 20-mal (Emulator; in einem ruhigeren Lauf 493 gegen 44 ns). Das betrifft alles, was dort `rt::fx::sqrtd` rechnet (`gfx`, `fx`,
+`render2d` und andere), nicht die Physik, die dort schon `sqrt_portable` nahm. Der Controller braucht auf dem M2 für 32 Figuren
+bei 60 Hz rund 1 % eines Kerns (5,6 µs je Schritt); im Wechsel mit dem nativen Programm gemessen braucht er im Browser
+rund das 1,5- bis 3-Fache (nativ 65 und 31, WebAssembly 22 und 21 Schritte je ms, alles unter Last).
+
 ## Was nicht getestet ist
 
 - Die Ziele oben, die nicht liefen: ARM64 auf Android und Windows, iOS, andere JavaScript-Engines; `--check` unter
@@ -283,11 +317,18 @@ Browser für die eigene Figur samt Abgleich (zehn Takte nachrechnen) unter 1 ms 
   Fall und durch denselben Vergleich mit der Referenz.
 - Gleichzeitige Abfragen aus mehreren Threads (`World`, `Shape` und `TriMesh` sind `Send` und `Sync`, das prüft der Test beim
   Übersetzen; Abfragen nehmen `&self`, der Zähler `cast_fallbacks` ist atomar).
-- Das Gefühl einer Bewegung: das kommt mit dem Controller und dem Nutzer.
+- Das Gefühl der Bewegung (die Vorgaben des Controllers): das prüft der Nutzer von Hand, wenn eine Demo die Figur steuert.
+- Der Controller: bewegte Plattformen (nicht gebaut), Figuren in großer Zahl gegeneinander (die Prüfsumme hat zwölf, die Messung
+  32, gezielte Tests von Begegnungen keine), Netze mit uneinheitlichem Umlaufsinn als Boden, Takte anders als 60 Hz (die
+  Rechnung hängt nicht daran; geprüft ist nur 1/60 s), Figuren fern vom Ursprung (die Messung reicht bis 155 m).
 
 ## Was nicht gebaut ist
 
-- Der Character-Controller (G7c Teil 2), Starrkörper, Gelenke und Ragdolls (G7i).
+- Starrkörper, Gelenke und Ragdolls (G7i).
+- Am Controller: bewegte Plattformen (die Bewegung des Bodens überträgt er nicht; `ground_body` sagt, worauf die Figur steht),
+  eine Form ändern (`World` kann es nicht; eine geduckte Figur als Körper braucht `remove` und `add`), eine liegende oder
+  gedrehte Kapsel, Schwimmen, Leitern, Rutschen beim Ducken. In einer V-Rinne aus zwei zu steilen Flächen ruht die Figur,
+  gilt aber nicht als am Boden (kein Sprung). Unter rund 0,33 m/s nimmt sie keine Stufe.
 - Drehende Casts (eine Form dreht sich während der Bewegung), Netz gegen Netz, ein Netz als Abfrageform, Höhenfelder,
   zusammengesetzte Formen (mehrere Formen je Körper), skalierte Formen (`Iso` hat keine Skalierung; ein skaliertes Mesh von
   render3d braucht ein eigenes `TriMesh`).
@@ -300,26 +341,162 @@ Browser für die eigene Figur samt Abgleich (zehn Takte nachrechnen) unter 1 ms 
 - Flächen einer Hülle zusammenfassen: koplanare Dreiecke bleiben einzeln (der Strahl schneidet dann mit mehreren gleichen
   Ebenen, das ist richtig, nur etwas langsamer).
 
-## Für Teil 2: den Character-Controller
+## Der Character-Controller
 
-- **Der Grundbaustein ist `World::cast`** mit der Kapsel der Figur und `Filter::ALL.excluding(eigener Körper)`: bis `fraction`
-  minus einer Haut gehen (1 mm, wie `slide` in `tests.rs`), die restliche Bewegung in die Ebene von `normal` projizieren,
-  höchstens vier Runden. `normal` zeigt vom Hindernis zur Figur, `point` liegt auf dem Hindernis.
-- **Start-Kontakte**: Eine Figur, die eine Fläche berührt oder ein Haar darin steckt, gleitet frei an ihr entlang und von ihr
-  weg; ein Treffer bei 0 kommt nur, wenn die Bewegung tiefer hineinführt, mit `depth` > 0, wenn sie schon drinsteckt. Zum
-  Herausdrücken nach einem Teleport oder einem bewegten Hindernis ist `World::contacts` da (alle Körper und Dreiecke mit Tiefe
-  und Normale); mehrere Kontakte nacheinander auflösen, nicht addieren.
-- **Boden und Rampen**: kurz nach unten casten und `normal.y` mit dem Kosinus des größten Winkels vergleichen. Auf flachen und
-  konkaven Nähten kommt die Normale des Dreiecks (aktive Kanten), also stimmt der Winkel auch dort; auf einer echten Kante
-  (der Oberkante einer Stufe) kommt die schräge Normale der Kante, was das Erkennen einer Stufe erlaubt (hoch, vor, runter
-  casten).
-- **Drehung**: Die Kapsel steht auf Y und ist um Y symmetrisch, eine Figur braucht also nur `Iso::at(pos)`. Blickrichtung und
-  Bewegung aus Gier- und Nickwinkel nur mit `physics::math::{sin, cos, sincos}` oder `Quat::from_yaw_pitch`, nie mit `f64::sin`
-  aus std (das wäre auf jedem Ziel eine andere libm).
-- **Bitgleichheit**: Der Controller muss dieselben Operationen in derselben Reihenfolge rechnen (keine Parallelisierung der
-  Figuren, die das Ergebnis von der Reihenfolge abhängig macht); quantisiert das Netz Positionen (G7e), quantisieren Server und
-  Client gleich, bevor sie weiterrechnen. Die Prüfsumme in `checksum.rs` lässt sich um den Controller erweitern.
-- **Bewegte Plattformen**: `set_iso` bewegt sie, ein Cast sieht sie in ihrer jetzigen Lage; die Bewegung der Plattform muss der
-  Controller selbst auf die Figur übertragen.
-- **Kosten**: rund 285 000 Kapsel-Casts in der Sekunde auf einem Kern gegen eine Karte aus 50 000 Dreiecken, 225 000 mit 500
-  Körpern dazu ([Messwerte](#messwerte)).
+`CharacterController` ([`character.rs`](../lib/physics/src/character.rs), G7c Teil 2) bewegt eine aufrechte Kapsel kinematisch
+durch eine `World`: gehen, laufen, springen, ducken, Stufen bis `step_height`, Rampen bis `max_slope_deg` (steilere Flächen sind
+Wände, an denen die Figur herabrutscht), an Wänden und in Ecken entlanggleiten, am Boden bleiben auf dem Weg Rampen und Treppen
+hinunter, Steuerung in der Luft. Ein Schritt ist eine Funktion von Zustand, Eingabe, Welt und `dt` allein, mit denselben Bits auf
+jedem Ziel: dieselbe Rechnung wie die Abfragen (`f64`, `+ − × ÷`, die korrekt gerundete Wurzel; der Kosinus des Grenzwinkels
+einmal in `new` aus `rt`s portabler Mathematik), keine ungeordneten Container, feste Grenzen für jede Schleife.
+
+```rust
+use jflib::physics::{CharacterController, CharacterInput, CharacterParams, CharacterState, Filter, Vec3, math};
+
+let figur = CharacterController::new(CharacterParams::default());
+let mut zustand = CharacterState::new(Vec3::new(10.0, 2.0, 10.0)); // die Füße: der tiefste Punkt der Kapsel
+// als Körper der Welt, damit Strahlen und andere Figuren sie treffen
+let koerper = welt.add(figur.capsule(false), figur.capsule_iso(&zustand));
+
+// in jedem Takt (60 Hz): die Richtung aus dem Gierwinkel (0 schaut nach -Z), nur mit physics::math
+let (s, c) = math::sincos(gier);
+let eingabe = CharacterInput { wish: Vec3::new(-s, 0.0, -c), run: true, jump: springen, crouch: ducken };
+let (neu, ereignisse) = figur.step(&zustand, &welt, &Filter::ALL.excluding(koerper), &eingabe, 1.0 / 60.0);
+welt.set_iso(koerper, figur.capsule_iso(&neu));
+zustand = neu;
+// ereignisse.landed und .impact_speed, .jumped, .left_ground, .hit_ceiling, .walls(), .stepped_up, .snapped_down, ...
+```
+
+### Ein Schritt
+
+1. **Herausdrücken**, wenn die Kapsel in etwas steckt (nach einem Teleport, einem bewegten Körper, einer gerundeten Position aus
+   dem Netz): der tiefste Kontakt aus `World::contacts` zuerst, entlang seiner Normale um Tiefe und Haut, als Cast (so geht das
+   Herausdrücken durch nichts anderes hindurch), höchstens vier Runden. Die eigenen Bewegungen des Controllers sind Casts und
+   enden nie in etwas.
+2. **Boden**: ein Cast um drei Häute nach unten. Er trägt, wenn die Normale begehbar ist (`y ≥ cos(max_slope_deg)`), oder wenn
+   der Kontakt auf der Kante einer begehbaren Fläche liegt (Stufe, Sims): ein Strahl knapp hinter dem Kontakt (2 cm, weg von
+   der Achse) findet diese Fläche, ihre Normale gilt. Nicht, wenn sich die Figur schneller als 0,25 m/s von ihm entfernt
+   (Sprung, ein Stoß von außen).
+3. **Ducken und Aufstehen**: Am Boden kommt beim Ducken der Kopf herunter, in der Luft kommen die Beine hoch (ein Sprung mit
+   Ducken erreicht 0,6 m Höheres). Aufstehen nur mit Platz: Ein Cast der geduckten Kapsel um den Höhenunterschied nach oben
+   überstreicht genau die stehende Kapsel; in der Luft gehen zuerst die Beine nach unten, so weit Platz ist.
+4. **Springen, Beschleunigen, Bremsen**: Ein Sprung setzt die senkrechte Geschwindigkeit auf `sqrt(2 · gravity ·
+   jump_height)`. Am Boden mit Eingabe nähert sich die Geschwindigkeit der Wunschgeschwindigkeit (Wunschrichtung entlang des
+   Bodens mal Wunschgeschwindigkeit) um höchstens `accel` · Wunschgeschwindigkeit · `dt`; ohne Eingabe bremst Quakes Reibung
+   (um `friction` · max(Geschwindigkeit, `stop_speed`) · `dt`). In der Luft Quakes Beschleunigung: Die Geschwindigkeit entlang
+   der Wunschrichtung wächst um höchstens `air_control` · `accel` · Wunschgeschwindigkeit · `dt`, nicht über die
+   Wunschgeschwindigkeit. Danach die Grenzen `max_speed` (waagrecht) und `max_fall_speed`.
+5. **Bewegen**: Gleiten mit bis zu vier Casts, jeder hält `skin` vor dem Kontakt (entlang der Bewegung), die Geschwindigkeit
+   gedreht nach Quake 3s Clip-Ebenen (`PM_SlideMove`): die Ebene des Bodens und die ursprüngliche Richtung von Anfang an, jede
+   getroffene Fläche dazu; geht die geclippte Geschwindigkeit in eine zweite Ebene, gleitet sie entlang der Kante beider, geht
+   diese in eine dritte, hält die Figur. Am Boden zählen steile Flächen als senkrechte Wände (gegen sie drücken klettert
+   nichts hinauf), eine begehbare dreht die Geschwindigkeit auf sich bei gleichem Betrag (Rampen hinauf ohne Verlust). Bleibt
+   die Figur am Boden an etwas hängen, versucht sie eine **Stufe**: hoch (höchstens `step_height`, so weit Platz ist),
+   waagrecht vor mit derselben Geschwindigkeit (alles als senkrechte Wand: sie rutscht an keiner Kante hoch), hinunter auf
+   tragenden Boden höchstens `step_height` über den Füßen; genommen, wenn sie so weiter kommt.
+6. **Boden am Ende**: Stand sie am Anfang und sprang nicht, rastet sie auf Boden bis `step_height` darunter ein (Rampen und
+   Treppen hinunter, ohne abzuheben); sonst landet sie auf Boden innerhalb der drei Häute. Beim Landen bleibt die waagrechte
+   Geschwindigkeit, entlang des Bodens. Kein Boden: Sie fällt weiter, und wer stand, hat ihn verlassen (`left_ground`).
+
+Die Schwerkraft rechnet in der Luft mit der mittleren Geschwindigkeit des Takts (`v − g · dt / 2`): Nach k freien Takten ist die
+Höhe genau `y₀ + v₀ t − g t² / 2` mit `t = k · dt` (bis auf Rundung), bei jeder Taktrate.
+
+### Parameter
+
+`CharacterParams::default()` ist für einen schnellen Cartoon-Arena-Shooter gestimmt; `CharacterController::new` begrenzt, was
+keinen Sinn ergibt (Radius ab 1 cm, Höhen ab dem doppelten Radius, Haut 0,1 mm bis ein Viertel des Radius, Winkel 0 bis 89°,
+nichts Negatives; nicht Endliches nimmt die Vorgabe).
+
+| Feld | Vorgabe | Warum |
+| --- | --- | --- |
+| `radius` | 0,4 m | eine Breite von 0,8 m wie Quakes 32 Einheiten; Cartoon-Figuren sind breit |
+| `height`, `crouch_height` | 1,8 m, 1,2 m | geduckt ein Drittel kleiner: unter Decken ab 1,2 m hindurch |
+| `walk_speed`, `run_speed`, `crouch_speed` | 5, 9, 3 m/s | laufen (die übliche Gangart) etwas schneller als Quakes 320 Einheiten/s (8,1 m/s); gehen ist der leise Modus |
+| `accel` | 12 /s | mit Eingabe in 1/12 s auf voller Geschwindigkeit (fünf Takte bei 60 Hz), Richtungswechsel ebenso schnell |
+| `friction`, `stop_speed` | 6 /s, 2,5 m/s | Quakes Werte: ohne Eingabe aus vollem Lauf in rund 0,4 s zum Stand |
+| `air_control` | 0,3 | in der Luft 30 % der Beschleunigung am Boden; wie in Quake 3 bringt Lenken schräg zur Bewegung Geschwindigkeit (Strafe-Jumping) bis `max_speed`, Bunny-Hopping verliert nichts |
+| `gravity`, `jump_height` | 20 m/s², 1,2 m | doppelt so stark wie auf der Erde: kurze, knackige Sprünge (Absprung 6,93 m/s, 0,69 s in der Luft) auf eine Kiste |
+| `step_height` | 0,4 m | Treppen und Kanten ohne Springen (Quake: 18 Einheiten, 0,46 m) |
+| `max_slope_deg` | 45° | Quakes Grenze (Normale y ≥ 0,7, 45,6°) |
+| `skin` | 5 mm | der Abstand zu allem: unsichtbar, hält die Casts aus dem Berühren; nach einer schrägen Landung zwischen 0 und `skin` |
+| `max_speed`, `max_fall_speed` | 30 m/s, 50 m/s | Obergrenzen, auch gegen unsinnige Geschwindigkeiten von außen |
+
+### Entscheidungen
+
+- **Am Boden Annäherung statt Quakes Beschleunigung.** Quakes Formel (Geschwindigkeit entlang des Wunsches wächst bis zur
+  Wunschgeschwindigkeit, Reibung in jedem Takt) macht eine Figur, die schräg gegen eine Wand drückt, schneller als frei (bei
+  45° rund 10,6 statt 9 m/s), und ein Stick unter `stop_speed` · `friction` / `accel` (1,25 m/s) käme gegen die Reibung nie in
+  Gang. Mit der Annäherung bleibt an der Wand genau der Anteil der Wunschgeschwindigkeit entlang der Wand, und jeder Stick
+  erreicht seine Geschwindigkeit. Die Reibung bremst nur ohne Eingabe; in der Luft bleibt Quakes Modell (Luftsteuerung,
+  Strafe-Jumping), und ein Sprung im ersten Takt am Boden kommt vor jeder Reibung: Bunny-Hopping hält die Geschwindigkeit
+  Bit für Bit.
+- **Quake 3s Clip-Ebenen** statt einfachem Projizieren auf die zuletzt getroffene Fläche: In einem spitzen Winkel zwischen zwei
+  Wänden würde das Projizieren hin und her springen. Mit den Ebenen ruht die Figur in jeder Ecke (Test: 60 Takte ohne die
+  kleinste Bewegung, beide Wände innerhalb der Haut).
+- **Stufen ohne Hochrutschen.** Die Bewegung nach vorn auf Stufenhöhe ist waagrecht, und der Auflagepunkt der Landung darf
+  höchstens `step_height` über den Füßen liegen: Sonst rollte die Kugel der Kapsel über höhere Kanten (zuerst kam die Figur so
+  0,45 und 0,6 m hohe Stufen hinauf). Jetzt ist die höchste Stufe `step_height` plus die Haut.
+- **Kanten tragen.** Ohne das hinge die Kugel nach einer Stufe auf der Kante, rutschte
+  zurück, und langsam (1 m/s) käme die Figur keine Treppe hinauf. So steht sie auch an einem Sims, bis die Kugel ganz darüber
+  hinaus ist, wie in Quake mit dem Quader. Erst unter rund 0,33 m/s reicht ein Takt nicht über die Haut hinaus, und eine
+  Stufe geht nicht.
+- **Der Zustand ist Lage, Geschwindigkeit und Ducken.** `grounded`, `ground_normal`, `ground_body` sind Ausgaben; jeder Schritt
+  findet den Boden neu (ein Cast mehr). So muss das Netz (G7e) nur diese drei abgleichen, und eine gerundete Lage passt von
+  selbst wieder zum Boden.
+- **Die Haut ist 5 mm.** Die Casts halten sie entlang der Bewegung, also senkrecht zur Fläche `skin` · cos(Winkel): an einer
+  Wand, die die Figur schräg trifft, und nach einer schrägen Landung weniger, nie 0 (bis auf 10⁻⁹ m der Casts). Das Einrasten
+  am Boden zieht nur nach unten (kein Cast nach oben), eine Figur in Ruhe kriecht nicht (Schwelle 10⁻⁹ m).
+
+### Tests des Controllers
+
+`physicstest --test character` (Szenen) und `--test charfuzz` (zufällige Läufe), in `--check` enthalten:
+
+| Szene | Erwartung | Ergebnis |
+| --- | --- | --- |
+| Sprung auf einem Gitter (auf einer Ecke, einer Kante, einer Fläche) | Scheitel = Maximum von `y₀ + v₀ t − g t²/2` über die Takte (10⁻⁹ m), höchstens `g dt² / 8` unter `jump_height`; Landung genau im ersten Takt, der innerhalb von drei Häuten endet, Aufprall `g (k − ½) dt − v₀` (10⁻⁹) | gleich |
+| Fall aus 3 m, Bunny-Hopping | Landetakt und Aufprall nach der Formel; mit gehaltenem Sprung bleiben 9 m/s waagrecht über vier Sprünge (10⁻⁹) | gleich |
+| Treppen mit Stufen 0,15 / 0,25 / 0,375 m bei 9, 5, 3 und 1 m/s | oben, nie in der Luft, auf `n · Stufe + skin` (10⁻⁹) | alle 12 |
+| Stufen 0,45 und 0,6 m | angehalten mit der Achse bei `x₀ − r` (10⁻⁹), am Boden | gleich |
+| Rampen 20°, 30°, 40°, 44° (begehbar) | oben auf `Höhe + skin`, nie in der Luft; halb oben abgesetzt: steht still (200 Takte ohne Bewegung) | alle |
+| Rampen 46°, 50°, 60°, 75° (zu steil) | die Kugel hält dort, wo sie die Ebene berührt: Achse bei `x₀ + ((skin + r) cos θ − r) / sin θ` (bis 2 Häute davor), nie höher; halb oben abgesetzt: rutscht hinunter, nie am Boden auf der Rampe | alle |
+| Wand (gedrehter Quader in der Welt, gedrehtes Prisma im Netz) unter 9 Winkeln 0° bis 89°, vier Drehungen | ohne Reibung und Beschleunigung: Geschwindigkeit danach genau der Anteil entlang der Wand (10⁻⁹), Weg entlang der Wand bis auf die Haut, Abstand zwischen 0 und `skin`; mit dem Vorgabegefühl: `run_speed` · sin φ entlang der Wand (10⁻⁹), 10 Takte ohne Bewegung zur Wand hin (10⁻⁹) | 72 Fälle gleich |
+| V-Ecken 30°, 60°, 90°, 120°, 150°, entlang der Winkelhalbierenden und 10° daneben | 60 Takte ohne Bewegung (10⁻⁹), Abstand zu beiden Wänden zwischen 0 und `skin` | 15 Fälle |
+| Decke auf 1,5 m | stehend angehalten an ihrer Unterkante (Achse bei `4 − r_rand`); geduckt hindurch; Aufstehen genau, wenn die stehende Kapsel passt (jeder Takt gegen die Rechnung, 10⁻⁶ Randzone ausgenommen); Sprung mit Ducken genau 0,6 m höher | gleich |
+| Rampen 15°, 30°, 44° und eine Treppe hinunter, laufend, gehend, langsam | nie in der Luft, immer innerhalb der Haut an etwas, eingerastet | alle |
+| Sims von 1 m | einmal `left_ground`, einmal `landed` | gleich |
+| Teleport bis zu einem halben Radius in einen Quader oder den Boden (200 Fälle) | nach einem Schritt in nichts mehr (10⁻⁹), `pushed_out` > 0 | alle |
+| dieselbe Figur als Körper der Welt (vom Filter ausgelassen) | 240 Takte Bit für Bit gleich ohne ihn | gleich |
+| `dt` 0, negativ, NaN, unendlich; Lage NaN; Geschwindigkeit NaN; unsinnige Parameter | nichts ändert sich; Geschwindigkeit 0; begrenzt | gleich |
+
+**Zufällige Läufe** (`charfuzz`): 24 zufällige Karten, je eine dichte Arena von 24 × 24 × 8 m aus Hügeln, Wänden und Decke, quer
+geteilt durch eine Wand von 2 bis 30 cm Dicke ohne Lücke; darin Kisten, Rampen von 10° bis 70° in allen vier Richtungen,
+Treppen mit Stufen bis 0,45 m, niedrige Decken, dünne Wände (1 bis 5 cm), schräge Platten und 8 bis 17 konvexe Körper. In
+jeder Karte sechs Figuren mit je einem der Parametersätze Vorgabe, schnell (bis 1000 m/s), klein (Radius 0,1 m), groß
+(Radius 0,8 m, 3 m hoch), leicht (Schwerkraft 2), Eis (ohne Reibung, 30°), 600 Takte mit zufälligen Eingaben und Würfen (je
+Takt mit 1/150 eine zufällige Geschwindigkeit bis 60 m/s, für die schnelle Figur bis 1000 m/s, also 16,7 m je Takt). Nach
+jedem Schritt: endlich, in nichts (Tiefe ≤ 10⁻⁶ m), noch in der eigenen Hälfte der Arena, nicht unter den Hügeln. Ergebnis:
+86 400 Schritte, 0 Fehler, tiefste Überlappung 0; dabei 990 Landungen, 772 Sprünge, 2166 Stufen, 7853 Einrasten, 35 670
+Wandkontakte, 655 Decken. **Nichts tunnelt bis 1000 m/s** (schnellster Wurf 965 m/s). Die Gegenprobe: eine Figur, die sich
+ohne Casts bewegt, fangen dieselben Prüfungen.
+
+### Für G7e und G7h
+
+- **Vorhersage**: Der Client ruft `step` mit denselben Eingaben, `dt` und derselben Welt wie der Server und bekommt dieselben
+  Bits (Prüfsumme auf allen Zielen). Abzugleichen sind `position`, `velocity` und `crouched`; alles andere leitet der Schritt
+  ab. Quantisiert der Server Lagen für das Netz (G7e), rechnet er selbst mit dem quantisierten Stand weiter, sonst weichen
+  Client und Server ab. Steckt eine gerundete Lage in etwas, drückt der nächste Schritt sie heraus (`pushed_out`); bei einer
+  Rundung bis rund 1 mm geschieht das nie (die Haut ist 5 mm).
+- **Die Welt der Vorhersage**: Karte und Körper mit denselben Ids und Lagen (bei exakt gleichem Abstand entscheidet die Id).
+  Andere Figuren kennt der Client nur interpoliert; was daraus folgt, ist ein Vorhersagefehler, kein Determinismusfehler.
+  Der Server bewegt die Figuren in einer festen Reihenfolge (nach Id) und setzt nach jedem Schritt `set_iso` der Kapsel; die
+  Reihenfolge bestimmt, wer bei einer Begegnung zuerst ausweicht.
+- **Eine geduckte Figur als Körper**: `World` kann die Form eines Körpers nicht ändern. Bis dahin bleibt die stehende Kapsel
+  (wie in Prüfsumme und Messung) oder die Figur wird neu hinzugefügt (neue Id). Für Treffer (G7h) sind ohnehin eigene
+  Trefferzonen besser als die Kapsel.
+- **Kosten**: auf dem M2 178 Schritte je ms mit 32 Figuren auf 50 000 Dreiecken (rund 3 Casts je Schritt): der Server von
+  Spiel 1 braucht für 32 Figuren bei 60 Hz rund 1 % eines Kerns, ein Client für zehn Takte Abgleich der eigenen Figur rund
+  0,06 ms. Im Browser rund das Doppelte ([Messwerte](#messwerte)).
+- **Ereignisse** für Klang und Animation: `landed` mit `impact_speed`, `jumped`, `left_ground`, `stepped_up`, `snapped_down`,
+  `hit_ceiling`, `walls()` (Körper, Punkt, Normale, Dreieck; für Wandsprünge später).
+- **Eingabe**: `wish` aus dem Gierwinkel nur mit `physics::math::sincos` (oder `Quat::from_yaw_pitch`), nie mit `f64::sin` aus
+  std.

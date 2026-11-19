@@ -6,6 +6,9 @@
 //                  swept convex shape: time of impact, normal, contact point), overlap, contacts
 //                  (penetration depth and normal per body and triangle), closest_point
 //   query          the same for one shape against one placed shape, without a world
+//   CharacterController  the kinematic figure: an upright capsule that walks, runs, jumps, crouches, takes
+//                  steps and ramps up to a slope limit, slides along walls, snaps down; one step a pure
+//                  function of (state, input, world, dt)
 //   math           Vec3, Quat, Iso, Aabb in f64; sqrt correctly rounded, sin / cos / atan2 from rt's
 //                  portable math
 //
@@ -21,6 +24,7 @@
 extern crate alloc;
 
 mod bvh;
+mod character;
 mod convex;
 mod gjk;
 mod hull;
@@ -35,6 +39,7 @@ mod tree;
 mod world;
 
 pub use bvh::BvhNode;
+pub use character::{CharacterController, CharacterInput, CharacterParams, CharacterState, MAX_WALL_TOUCHES, StepEvents, Touch};
 pub use gjk::{CAST_SKIN, cast_fallbacks};
 pub use hull::{ConvexHull, HullError, MAX_HULL_POINTS};
 pub use math::{Aabb, Iso, Mat3, Quat, Vec3};

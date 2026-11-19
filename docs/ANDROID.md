@@ -1,7 +1,6 @@
 # Android-Plan: Android so weit wie Windows, Linux und Apple
 
-Stand 2026-11-17, auf Basis von `main` 7cdabce4. AN0 ist umgesetzt (auf dem Emulator; das A56 steht aus), der Rest
-nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
+Stand 2026-11-18, auf Basis von `main` 7cdabce4. AN0 und AN1 sind umgesetzt (Emulator und A56), der Rest nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
 und `plat` auf Linux ARM64 ohne libc.
 
 ## Ziel
@@ -31,7 +30,7 @@ Was auf Android fehlt (Code auf `main` 7cdabce4):
   ([`web.rs`](../lib/plat/web.rs)). Android nimmt den Pool des Browsers
   ([`web_pool.rs`](../lib/plat/web_pool.rs)): Jobs, `parallel_for` und `spawn_blocking` laufen zwischen den Bildern
   auf dem UI-Thread. Das A56 rechnet also auf einem seiner acht Kerne, und `render_par` läuft auf Android nicht
-  ([ARM64.md](ARM64.md), ARM6).
+  ([ARM64.md](ARM64.md), ARM6). (Seit AN1 behoben.)
 - **Keine Module ohne Oberfläche.** `process`, `sync`, `net`, `fs`, `service`, `watch` und `certs` sind in
   [`lib/plat/lib.rs`](../lib/plat/lib.rs) nur für Windows, Linux und Apple da. `rand` hat Android seit b5134991
   (`arc4random_buf`).
@@ -170,7 +169,9 @@ Funde von `plattest` (Fehler der Bibliothek auf Android):
 [`rt/kernel.rs`](../lib/rt/kernel.rs) in einem eigenen Kindprozess (`fork`), mit Argumenten, die nichts tun können
 (ein falscher Deskriptor, ein Null-Zeiger, abgelehnte Flags). Die Spalten nennen die Antwort des Kernels oder
 **SIGSYS** (vom Filter beendet). Geprüft nur auf x86-64 (Emulator, API 35); arm64 hat andere Nummern und eine eigene
-Liste des Filters, das zeigt erst der Lauf auf dem A56. AOSP-Listen wurden nicht heruntergeladen.
+Liste des Filters, das zeigt erst der Lauf auf dem A56. AOSP-Listen wurden nicht heruntergeladen. (Der Lauf auf dem
+A56 kam mit AN1: dort endet kein Aufruf mit SIGSYS, der Filter antwortet EPERM, und `openat2` erreicht den Kernel;
+siehe AN1.)
 
 | Syscall | x86-64 | arm64 | benutzt von | `adb shell` | App |
 |---|---|---|---|---|---|
@@ -256,6 +257,108 @@ und dem A56 grün sind, die Oberfläche der `androidGallery` während eines lang
 
 **Erst nach dem Merge von ARM7:** ARM7 ändert `web_pool.rs` und prüft die Speicherordnungen in `pool.rs` und
 `sync.rs` (Branch `claude/arm7-atomics-b63ee5`, Stand 2026-11-17 noch nicht in `main`).
+
+**Stand 2026-11-18:** umgesetzt, auf dem Emulator und dem A56 grün (beide Modi). Damit ist auch der A56-Teil von AN0
+erledigt (`coretest` per `adb shell` und im Test-APK).
+
+- [`android_thread.rs`](../lib/plat/android_thread.rs) (neu, aus `web.rs` eingebunden wie `android_gpu.rs`):
+  `thread_spawn` und `Thread::join` über Bionics `pthread_create` / `pthread_join`, Stack 1 MB ohne Angabe, höchstens
+  256 MB, aufgerundet auf 16 KiB; Bionic richtet TLS, Signal-Stack und Schutzseite selbst ein. `Sem` ist der
+  Futex-Zähler von `linux_thread.rs`, `plat::sync` nimmt den Futex-Teil von Linux (`sync.rs`, nur die `cfg`).
+  `cpu_count()` aus `sysconf(_SC_NPROCESSORS_ONLN)`, `mem_total()` aus `MemTotal` in `/proc/meminfo`,
+  `thread_yield()` über `sched_yield`, `sleep_ms()` schläft jetzt wirklich (`ppoll` ohne Deskriptoren, wie Linux;
+  vorher tat es auf Android nichts, was mit Threads Warteschleifen zu Spinnern machte), `plat_tid()` per `gettid`
+  (für die Executoren in `task.rs`).
+- `rt::os` hat auf Android jetzt `syscall6`, `syscall3`, `poll` und die Tabelle aus `rt::kernel` (wie unter Linux), für
+  Futex, eventfd, `/proc` und später die Linux-Module von AN2 und AN3 (Entscheidung 2).
+- Android nimmt [`pool.rs`](../lib/plat/pool.rs) statt `web_pool.rs` (wie iOS): `parallel_for`, `Job`, der
+  Blocking-Pool von `task.rs` und `aio` laufen auf Threads, `thr_count()` ist `cpu_count()`, `render_par` rechnet in
+  Bändern. `jfgui_tick` ruft `pump_jobs` nur noch im Browser. `capabilities()` meldet `CAP_THREADS`.
+- Die Arbeiter des Pools und des Blocking-Pools laufen auf Android unter dem UI-Thread: nice 10, was
+  `Process.setThreadPriority(THREAD_PRIORITY_BACKGROUND)` setzt (`thread_background` in `android_thread.rs`). Ohne
+  das verdrängten vier rechnende Arbeiter auf vier Kernen den UI-Thread im Bitmap-Weg (er rasterisiert selbst)
+  bis zu 385 ms lang; mit nice 10 ist die längste Lücke während eines Jobs so lang wie ohne Job, der Job braucht
+  etwa 8 % länger (Emulator, `android_job.py --gpu 0`). Wo die Oberfläche ruht, bekommen die Arbeiter jeden Kern.
+- Wecken nach Entscheidung 4: `wake()` setzt die Marke und schreibt in eine eventfd (beim ersten Gebrauch angelegt,
+  `jfgui_wake_fd`). [`bridge.c`](../android/bridge.c) meldet sie nach dem Start mit `ALooper_addFd` am Looper des
+  UI-Threads an; der Rückruf leert sie und ruft `GalleryActivity.frameNow()` (ein JNI-Aufruf auf dem UI-Thread,
+  keiner im weckenden Thread), dessen Bild in `jfgui_tick` aus der Marke ein `E_WAKE` macht. Fand der Rückruf nichts
+  mehr, hatte ein Bild das Wecken schon geholt. Ein Programm ohne Oberfläche (`exe_main.c`) wartet in
+  `wait_events` mit `ppoll` auf dieselbe eventfd, wie unter Linux. `android_gpu.rs` startet seine Jobs jetzt mit
+  `thread_spawn`.
+- `cpu_brand()` (Fund 3 von AN0) liest `/proc/cpuinfo`: auf x86-64 `model name` (im Emulator der Prozessor des
+  Rechners), auf ARM64 `Hardware`, wo der Kernel es noch schreibt, sonst jede Kernart einmal aus `CPU implementer`
+  und `CPU part` mit der MIDR-Liste von Linux ARM64 (`midr_name` in `cpu.rs`, jetzt geteilt).
+- Panics in Threads enden mit Exit-Code 3 (`rt::abort_on_unwind`, wie überall). Eigene Signal-Handler setzt `plat`
+  auf Android nicht: Signale gehören Bionic und `debuggerd`, das für einen Absturz einen Tombstone und den
+  Stapel in logcat schreibt. Ein eigener Handler müsste sich vor den von `debuggerd` hängen und weiterreichen; das
+  bringt nur einen `CrashInfo` für Hardwarefehler, den sonst keiner auf Android liest. Entscheidung: so lassen,
+  bis eine App Absturzberichte selbst sammeln will.
+- Tests wieder eingeschaltet: `plattest --test threads` (dazu `CAP_THREADS`), `--test atomics` (ARM7), `--test async`
+  (auch `drops` mit den Kanälen), `mem_total` und `cpu_brand` in `--test all`; `coretest`: die Gruppe `plat` mit
+  `sync` und `rand` (Netz, Dateien, `watch`, Zone und `service` melden AN2 bis AN4) und der 64-KB-Thread von `pattern`.
+- Die `androidGallery` hat einen Selbsttest ohne eigene Texte: mit `jfgui_SELFTEST=job`
+  ([`jobtest.rs`](../apps/androidGallery/jobtest.rs)) läuft ein langer Job (240 Stücke zu 20 ms Rechnung) auf dem
+  Pool, während ein Timer alle 16 ms ein Bild anfordert (der Fortschrittsbalken der Karte 01 folgt ihm); danach enden fünf
+  Jobs mit einem schlafenden Stück, während die Oberfläche ruht. Das Skript
+  [`android_job.py`](../apps/androidGallery/tests/android_job.py) startet ihn (nach einer Installation erst ein
+  Start zum Aufwärmen) und prüft: Arbeiter im Pool, höchstens `--max-over` (2) Lücken über `--max-gap-ms` (150 ms)
+  während des Jobs, eine Bildrate von mindestens der Hälfte der ohne Job, kein Wecken über `--max-wake-ms` (100).
+  Die Bilder fordert ein Timer von 16 ms an, wie eine Animation: ein `invalidate` in jedem Bild hält die UI nach acht
+  Bildern an (`UIWARN f13`), daran scheiterte der erste Entwurf.
+
+- Auf dem A56 (SM-A566B, Android 16, API 36; 4 × Cortex-A520 mit 1,95 GHz, 3 × Cortex-A720 mit 2,6 GHz, 1 × mit
+  2,91 GHz) laufen dieselben Prüfungen grün, in `adb shell` und im Test-APK. `cpu_brand()` sagt dort
+  „ARM Cortex-A520 + ARM Cortex-A720“, `mem_total()` 7417 MB. Die Gallery lief als Test-Build unter eigenem Paket
+  (`jfgui_ANDROID_PACKAGE=org.jflib.gallery.an1`, danach deinstalliert): die installierte Gallery hat einen anderen
+  Debug-Schlüssel und blieb unberührt. `android_job.py` und `android_perf.py` haben dafür `--package`.
+- **Syscalls auf arm64** (`plattest --test syscalls` auf dem A56, Fund für AN0 bis AN3): im App-Prozess erreichen alle
+  125 Aufrufe den Kernel, keiner endet mit SIGSYS. Der Filter von Android 16 auf arm64 antwortet mit EPERM, wo
+  `adb shell` etwas anderes bekommt: `chroot`, `mount`, `kexec_load`, `add_key`, `keyctl`, `io_uring_setup`,
+  `open_tree`, `mount_setattr`, `shmget` (die Probe zählt EPERM als „erreicht den Kernel“; erst der Vergleich mit
+  der Shell zeigt den Filter). **`openat2` erreicht dort den Kernel** (E2BIG), im x86-64-Emulator mit API 35 endet es
+  mit SIGSYS. AN3 braucht den Weg ohne `openat2` also trotzdem, kann ihn aber auf Geräten wie dem A56 nur als
+  Ausweichweg nehmen. Futex, eventfd2, ppoll, gettid und `sched_getaffinity` gehen auf beiden.
+- **big.LITTLE** (`plattest --test pool-bench`, neu: `parallel_for` mit 1 bis `cpu_count + 1` Threads, je 512 Stücke,
+  das beste von drei): Rechnen skaliert auf dem A56 bis zum Schluss, 1,9× mit 2 Threads, 3,3× mit 4, 4,3× mit 8 und
+  4,5× mit 9 (8 Arbeiter und der Aufrufer, so wie der Pool heute startet); im Test-APK 2,0×, 2,8×, 4,3×, 4,5×.
+  Speicherlastige Stücke (256 KB je Stück) sind dafür zu kurz und streuen (3× bis 4× ab 7 Threads). Acht Threads
+  bringen also etwa 30 % mehr als vier, die sparsamen Kerne lohnen sich; weil sich die Threads die Stücke einzeln holen,
+  bremsen sie nicht, solange eine Schleife viele kleine Stücke hat. **Entscheidung: der Pool bleibt bei `cpu_count()`
+  Arbeitern**; eine Schleife mit wenigen großen Stücken endet aber mit dem langsamsten Kern, so wenige Stücke
+  sollte man auf Telefonen nicht schneiden.
+- **`render_par` auf dem Telefon** (`android_perf.py --page colors`, Bitmap-Weg, 768 × 1496): im Automatikmodus rechnet
+  es auf dem A56 gar nicht, denn es beginnt erst bei 3 Mio. Pixeln Schaden (`PAR_MIN_PX`), das Bild hat 1,15 Mio. Mit
+  `jfgui_RENDER_PAR=1` (immer in Bändern) wird ein Bild langsamer: im Mittel 7,3 bis 7,7 ms statt 6,6 ms, 28 bis 33 %
+  ruckelnde Bilder statt 15 %. Die Schwelle bleibt also; mit und ohne den Pool kostet ein Bild auf dem A56 gleich viel
+  (6,5 ms). Während der Messung spiegelte Android Studio den Bildschirm (das Skript warnt, die Zeiten sind etwas zu hoch).
+
+| Lauf | Emulator x86-64, API 35, 4 Kerne | A56 (arm64, API 36, 8 Kerne) |
+|---|---|---|
+| `plattest --test threads` | 32 von 32 (beide Modi) | 32 von 32 (beide Modi) |
+| `plattest --test atomics` | 15 von 15 | 15 von 15 |
+| `plattest --test async` | 85 von 85 | 85 von 85 |
+| `plattest --test all` | 217 bestanden, 1 Fehler (Fund 2, offen) | dasselbe |
+| `plattest --test syscalls` (App) | (AN0) 96 erreichen den Kernel, 30 SIGSYS | 125 erreichen den Kernel, 0 SIGSYS |
+| `coretest` | 3281 von 3281 | 3281 von 3281 |
+| `asynctest --script tasks.uis`, `copy.uis` | grün | grün |
+
+`android_job.py` (je drei Runden, die Werte von–bis; ohne Job: dieselben Bilder eine Sekunde vor dem Job):
+
+| Weg | Bilder/s ohne Job | längste Lücke ohne Job | Bilder/s mit Job | längste Lücke mit Job | Job (240 × 20 ms) | Wecken nach Job-Ende |
+|---|---|---|---|---|---|---|
+| Emulator, GPU (SurfaceView, SwiftShader) | 43–53 | 61–63 ms | 53–63 | 63–82 ms | 1,42–1,46 s | 0–32 ms |
+| Emulator, Bitmap (`--gpu 0`) | 49–51 | 61–62 ms | 44–65 | 63–140 ms | 1,41–1,83 s | 0–32 ms |
+| A56, GPU (Vulkan) | 61–65 | 34–37 ms | 80–81 | 24–25 ms | 0,62–0,64 s | 5–19 ms |
+| A56, Bitmap (`--gpu 0`) | 61 | 33–48 ms | 79–82 | 24–27 ms | 0,61–0,63 s | 3–22 ms |
+
+Auf dem A56 rechnen 8 Arbeiter den Job (die Stücke sind 20 ms Zeit, nicht Rechnung: 240 × 20 ms / 8 = 0,6 s), und
+keine Lücke kam über 50 ms. Die Grundlinie ohne Job ist die erste Sekunde nach dem Aufwärmen und hat ihre eigene
+längste Lücke (33 bis 48 ms).
+Vor AN1 liefen die Stücke zwischen den Bildern auf dem UI-Thread (`pump_jobs(16)`: 16 × 20 ms je Tick, also über
+320 ms zwischen zwei Bildern), und ein Job, der endete, während die Oberfläche ruhte, kam erst mit dem nächsten
+Tick des Hosts (bis 250 ms). Ohne nice 10 für die Arbeiter lagen die längsten Lücken im Bitmap-Weg bei 86 bis
+385 ms. Die Gallery-Instrumentierungen (`GalleryInstrumentation`, `GalleryA11yInstrumentation`) bleiben grün.
 
 ### AN2: Netz (M)
 
@@ -362,7 +465,8 @@ Fassade). AN4 braucht AN3 für die Schriften des Systems.
 - **Emulator und Gerät unterscheiden sich:** `x86_64` gegen ARM64 (`struct stat`, Syscall-Nummern), API 35 gegen
   Android 16. Jeder Meilenstein läuft auf beiden.
 - **big.LITTLE:** Das A56 hat schnelle und sparsame Kerne. Wie viele Pool-Threads sinnvoll sind, misst AN1, statt
-  einfach `cpu_count()` zu nehmen.
+  einfach `cpu_count()` zu nehmen. (Gemessen in AN1: alle acht Kerne lohnen sich, der Pool bleibt bei `cpu_count()`;
+  Schleifen brauchen viele kleine Stücke, sonst wartet die Schleife auf einen sparsamen Kern.)
 
 ## Testen
 

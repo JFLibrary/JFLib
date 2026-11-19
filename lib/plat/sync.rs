@@ -4,7 +4,7 @@
 //   RwLock<T> (read / write; writers first)      channel(cap) -> (Sender<T>, Receiver<T>)
 //
 // One primitive per OS: wait on a 32-bit word while it holds a value, wake one / all waiters
-// (Windows WaitOnAddress, Linux private futexes).  Mutex and Condvar are the futex algorithms
+// (Windows WaitOnAddress, Linux and Android private futexes).  Mutex and Condvar are the futex algorithms
 // of Rust's std; RwLock and the channel are built on them.  A lock is not poisoned by a panic
 // (panics abort the process here; with jflib's feature unwind a panic the app catches releases
 // the locks its guards held).
@@ -48,7 +48,8 @@ mod os {
     }
 }
 
-#[cfg(target_os = "linux")]
+// (Android: the same system calls, rt::os has them there too; docs/ANDROID.md decision 2)
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod os {
     use core::sync::atomic::AtomicU32;
 

@@ -13,30 +13,50 @@ fn median(v: &mut [f64]) -> f64 {
     v[v.len() / 2]
 }
 
-pub fn run(runs: usize) {
-    // the square root: what lib/physics uses here, its portable one, rt's (the processor's on x86-64 and
-    // ARM64, a bit-by-bit integer root in the browser)
+/// PART: sqrt, map, controller or all
+pub fn run(runs: usize, part: &str) {
+    if part == "all" || part == "sqrt" {
+        sqrt_bench(runs);
+    }
+    if part == "all" || part == "map" {
+        map_bench(runs);
+    }
+    if part == "all" || part == "controller" {
+        crate::character::bench(runs);
+    }
+}
+
+/// the square roots: what lib/physics uses (rtfx::sqrtd: the processor's on x86-64 and ARM64, rt's portable
+/// one in the browser and on the x86-64 Android emulator), rt's portable one, and the tests' bit-by-bit
+/// integer root (the way rt's square root worked there before); in turn in every run, the medians
+fn sqrt_bench(runs: usize) {
     let xs: Vec<f64> = {
         let mut r = Rng::new(5);
         (0..1_000_000).map(|_| r.range(0.0, 1e6)).collect()
     };
-    let mut ns = [0.0f64; 3];
-    for (k, f) in [physics::math::sqrt as fn(f64) -> f64, physics::math::sqrt_portable, rtfx::sqrtd].iter().enumerate() {
-        let mut v = Vec::new();
-        for _ in 0..runs {
+    let fs: [fn(f64) -> f64; 4] = [physics::math::sqrt, physics::math::sqrt_portable, rtfx::sqrtd, crate::refs::sqrt_ref];
+    let mut v: [Vec<f64>; 4] = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+    for _ in 0..runs {
+        for (k, f) in fs.iter().enumerate() {
             let t0 = plat::time_us();
             let mut acc = 0.0f64;
             for x in &xs {
                 acc += f(*x);
             }
-            v.push((plat::time_us() - t0) as f64 * 1000.0 / xs.len() as f64);
+            v[k].push((plat::time_us() - t0) as f64 * 1000.0 / xs.len() as f64);
             if acc == 0.0 {
                 out("");
             }
         }
-        ns[k] = median(&mut v);
     }
-    out(&format!("sqrt: {:.1} ns (math::sqrt), {:.1} ns (sqrt_portable), {:.1} ns (rt fx sqrtd)\n", ns[0], ns[1], ns[2]));
+    let ns: Vec<f64> = v.iter_mut().map(|v| median(v)).collect();
+    out(&format!(
+        "sqrt: {:.1} ns (math::sqrt), {:.1} ns (sqrt_portable), {:.1} ns (rt fx sqrtd), {:.1} ns (bit-by-bit integer root)\n",
+        ns[0], ns[1], ns[2], ns[3]
+    ));
+}
+
+fn map_bench(runs: usize) {
     let data = scene::map(155, 160);
     out(&format!("bench: map of {} triangles, {} vertices, {} runs\n", data.triangles(), data.pos.len(), runs));
     let mut build_ms = Vec::new();
