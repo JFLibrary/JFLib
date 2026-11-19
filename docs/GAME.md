@@ -251,7 +251,8 @@ anfassen:
 - Vom Nutzer entschieden am 18.11.2026 (Fragen nach Teil 1): der Name `lib/netchan` bleibt; der eigene Server der
   Seite braucht im Browser keine `net.connect`-Regel (er hat die App ausgeliefert; umgesetzt); UDP bekommt später
   eine Verschlüsselung mit Authentisierung (AEAD, ChaCha20-Poly1305 aus `crypto`, in Teil 2 oder danach);
-  netchan stückelt nicht: Karten und Assets kommen über HTTP, der volle Stand beim Beitreten über WebSocket, die
+  netchan stückelt nicht: Karten und Assets kommen über HTTP, der volle Stand beim Beitreten über WebSocket (am
+  19.11.2026 geändert: über UDP nach Priorität aufgefüllt, der WebSocket als Option, siehe G7e), die
   laufenden Stände bleiben mit Delta-Kompression unter 1200 Bytes (neu zu entscheiden, wenn G7e zeigt, dass sie
   nicht passen); die Grenzen je Client (300 Pakete/s, 256 KiB/s, 64 Verbindungen, 16 je Adresse, 5 s) gelten als
   Anfang und werden in Teil 2 mit Messungen abgestimmt.
@@ -274,8 +275,9 @@ anfassen:
   Zahlen auf einem Raster von 1/1024 m); die anderen Figuren 100 ms hinter dem neuesten Schnappschuss.
   Schnappschüsse mit 30 Hz als Delta gegen den Stand, den der Client als entschlüsselt bestätigt (über WebSocket
   gegen den zuletzt gesendeten, am Anfang gegen die Grundlinie der Karte), nach aufaddierter Priorität auf 1200
-  Bytes geschnitten. Der volle Stand eines Beitritts, der nicht in ein Paket passt, kommt wie entschieden über einen
-  eigenen WebSocket (Ticket, FULL). Lag-Ausgleich mit zurückgestellten Kapseln und `hitscan`; Räume per Code oder
+  Bytes geschnitten. Den vollen Stand eines Beitritts, der nicht in ein Paket passt, füllen die Schnappschüsse nach
+  Priorität auf (vom Nutzer entschieden am 19.11.2026: so schnell wie über einen eigenen WebSocket, rund 200 ms, ohne
+  zweite Verbindung); der WebSocket mit Ticket und FULL bleibt als Option `ServerOptions::fetch_full`. Lag-Ausgleich mit zurückgestellten Kapseln und `hitscan`; Räume per Code oder
   Link, Namen; die Bewegung hinter `Movement` (Bezug `Walker`, der Controller aus G7c kommt mit G7h); das
   Bezugsspiel `Arena`, Bots, eine simulierte Leitung. Gemessen mit 16 Bots, 300 Requisiten, typisches Netz: je
   Spieler aufwärts 3,3 KB/s bei 60 Paketen/s, abwärts 13,2 KB/s; Schnappschüsse im Mittel 428, höchstens 502
@@ -284,7 +286,7 @@ anfassen:
   Hälfte bewegt wurde, ist 2035 Bytes und passt nicht in ein Paket. Prüfsumme einer aufgezeichneten Sitzung gleich
   auf Windows, Linux, macOS und im Browser (Node); echte Sockets über UDP und WebSocket auf Loopback; `netchan` baut
   für iOS. Die Grenze des Lag-Ausgleichs ist 300 ms (200 ms griffen schon ab etwa 50 ms Umlauf, weil Puffer und Marge
-  mitzählen; vom Nutzer entschieden am 19.11.2026). Offen: ob UDP-Clients den vollen Stand ohne zweiten WebSocket nach Priorität auffüllen (gleich schnell), Teil 2
+  mitzählen; vom Nutzer entschieden am 19.11.2026). Offen: Teil 2
   (echtes Netz, Browser als Client, Korrekturen glätten, Ereignisse zuverlässig, Räume auf Threads).
 
 **G7f `render3d` für Spiel 1**
