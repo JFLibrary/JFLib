@@ -81,6 +81,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   - the same sources give the same bytes; no panic, bounded counts, no recursion
 - (JD10) The stencil build tool takes `hidden: true` in a master's header (the master's `Hidden="1"`: in the file, not in the Shapes panel; JFDiagrammer's flowchart frame and lists)
 - (JD13) The stencil build tool builds 1-D masters: a master whose `[Shape]` sets `BeginX`, `BeginY`, `EndX`, `EndY` (lengths from 0) gets Visio's 1-D formulas where it writes none (`PinX = GUARD((BeginX+EndX)/2)`, `Width = GUARD(SQRT(...))`, `Angle = GUARD(ATAN2(...))`, `LocPin = GUARD(...)`), its master page is `BeginX+EndX` by `BeginY+EndY`, `Height` may be 0 or a formula; 2-D masters are written as before
+- (JD13) The template build tool `template` (apps/JFDiagrammer/templates/README.md): `build(&files, Measure, &stencils)` and `build_vstx` compile `template.txt`, `*.starter` and `rules.txt` into the forms of a template (`BuiltTemplate`: the blank one and one per starter diagram) and `.vstx` bytes, with the stencil windows in `windows.xml` as Visio writes them, the rule set in `visio/validation.xml` and the catalogue's JFD_ cells; `stencil_windows`, `set_stencil_windows`, `info`, `registers` and `to_drawing` for templates at run time; unit tests in the crate (`cargo test -p jflib-diagram-io --lib`)
 
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
 
