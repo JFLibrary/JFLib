@@ -39,6 +39,15 @@ the focus going elsewhere always let it go), and it says where a key sits on the
 HID usage whatever the layout prints on it (`KC_W` stays the key right of Q on a French keyboard),
 with `key_label` for what the layout prints there.
 
+Game pads come in one layout everywhere, the W3C Gamepad API's "standard" mapping: `pad_watch(true)`
+starts watching, `pads()` gives a snapshot of each connected pad (a stable index, its name and
+style, 17 buttons with analog values and the ones that went down and up since the last read, two
+sticks in -1..=1) and `E_GAMEPAD` says that one came, went or changed. Windows reads XInput
+(Xbox-compatible pads), Linux the evdev nodes of game controllers (Xbox, PlayStation and Nintendo
+pads mapped to the layout, hotplug through inotify), macOS GameController, the browser the Gamepad
+API; Android and iOS have none yet. Pads speak only to the app that has the focus, as the keyboard
+does, and need no permission; inside a Flatpak they need `--device=input`.
+
 ## Files, the app's folders and permissions
 
 Every file function takes paths of the operating system and names with a scheme: `app://` for

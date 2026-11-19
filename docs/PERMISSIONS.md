@@ -202,6 +202,11 @@ net.connect backup.example.org:8443
 - The platform layer's own system files: the X11 cookie, ICC profiles, CA bundles, the time
   zone, `PATH` lookups, the portal's and the print dialog's results. These calls use the
   unchecked `*_raw` functions inside `plat`.
+- Game pads (`plat::pad_watch`, `ui.gamepads`): like the keyboard they speak only to the app
+  that has the focus (`plat` reports nothing held while none of its windows is active), and the
+  user presses them for the app. On Linux `plat` opens the evdev nodes of `/dev/input` it may read
+  (udev gives the user of the seat game controllers, never keyboards or mice); a Flatpak sees them
+  only with `--device=input`, which `PACKAGE`'s `flatpak_args=` adds ([PACKAGING.md](PACKAGING.md)).
 
 ## The user's files
 
