@@ -121,12 +121,14 @@ mod os {
     // SAFETY: the pthread objects are only touched through their own (thread-safe) calls.
     unsafe impl Sync for Bucket {}
 
-    // PTHREAD_MUTEX_INITIALIZER and PTHREAD_COND_INITIALIZER: the signature, the rest zero
-    const BUCKET: Bucket = Bucket {
-        m: UnsafeCell::new(PthreadMutex { sig: 0x32AA_ABA7, opaque: [0; 56] }),
-        c: UnsafeCell::new(PthreadCond { sig: 0x3CB0_B1BB, opaque: [0; 40] }),
-    };
-    static BUCKETS: [Bucket; 64] = [BUCKET; 64];
+    // PTHREAD_MUTEX_INITIALIZER and PTHREAD_COND_INITIALIZER: the signature, the rest zero; an inline
+    // const per element, so no const item with interior mutability exists to be copied elsewhere
+    static BUCKETS: [Bucket; 64] = [const {
+        Bucket {
+            m: UnsafeCell::new(PthreadMutex { sig: 0x32AA_ABA7, opaque: [0; 56] }),
+            c: UnsafeCell::new(PthreadCond { sig: 0x3CB0_B1BB, opaque: [0; 40] }),
+        }
+    }; 64];
 
     fn bucket(a: &AtomicU32) -> &'static Bucket {
         let p = a.as_ptr() as usize;
