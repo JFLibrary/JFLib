@@ -56798,10 +56798,12 @@ until the entity is sent -- and cut to the budget (1200 bytes unless set: netcha
 What was sent is remembered per client exactly as the client will hold it.
 
 Joining: HELLO -> WELCOME.  The full state goes with the first snapshot when it fits (a WebSocket always:
-up to stream_budget); a UDP client whose full state does not fit a datagram gets a ticket and fetches it
-over a WebSocket of its own (FETCH -> FULL at the next snapshot tick), the user's decision of 18.11.2026.
-Until the FULL arrives the client's snapshots are cut by priority, so it sees its own figure and the
-most important things at once.
+up to stream_budget).  A UDP client whose full state does not fit a datagram gets it filled in: its
+snapshots are cut by priority, so it sees its own figure and the most important things at once and the
+rest in the next snapshots (about 200 ms for 300 props, as fast as the fetch; the user's decision of
+19.11.2026).  With ServerOptions::fetch_full it gets a ticket instead and fetches the full state over a
+WebSocket of its own (FETCH -> FULL at the next snapshot tick; the user's first decision of 18.11.2026),
+filled in by priority until the FULL arrives.
 ```
 
 - **`trait RoomSim`**
@@ -56833,6 +56835,9 @@ most important things at once.
   - `max_rewind_ms: u32` -- how far back hits are rewound at most (ms; 300 unless set: the 100 ms of the interpolation buffer and
     200 ms beyond them, the user's decision of 2026-11-19)
   - `ws_port: u16` -- the WebSocket's port (WELCOME tells UDP clients where to fetch a full state; 0: none)
+  - `fetch_full: bool` -- a UDP client whose full state does not fit a datagram fetches it over a WebSocket of its own (ws_port, a
+    ticket); false unless set: its snapshots fill it in by priority, as fast and without a second connection
+    (the user's decision of 2026-11-19)
   - `hello_ms: u32` -- a connection must send HELLO within this long (ms)
   - `ticket_ms: u32` -- a ticket stays good this long (ms)
   - `empty_room_ms: u32` -- a room without players closes after this long (ms)
