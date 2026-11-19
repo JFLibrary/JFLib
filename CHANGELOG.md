@@ -180,6 +180,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **render2d:** Dash patterns of strokes in a layer with a fill (fs_fill draws them) were gone on Intel's Windows driver (UHD 615, 31.0.101.2135): full_body decides the pattern's pass where it computes the share of the exact pattern (tf), not in a later test dashed && tf < 1.0 that this driver's compiler found false in fs_fill with tf 0 (G6e3)
 - **gpu:** Vulkan: a render pass that recorded no draw clears its clearing attachments once more at its end (vkCmdClearAttachments). On Intel's Windows driver (UHD 615, 31.0.101.2135) a pass that only cleared, after a global barrier earlier in the command buffer, was written after the copy behind it, so the copy read the image before (render3d's empty scene showed the frame before); the barriers are Vulkan's, with a draw in the pass it was right
 - **netio:** dns::resolve (Linux, macOS): a numeric address or localhost no longer reads /etc/hosts and /etc/resolv.conf, which an app's rules do not grant on macOS (a PERMDENY line for every connection to an address)
+- **wgsl:** SPIR-V: a && b and a || b go through a u32 variable (1 for true) instead of a bool one. Intel's Windows driver (UHD 615, 31.0.101.2135) took such a bool for false in large fragment shaders (render2d's fs_fill: the pass of a dash pattern, the end of an arc in an insert); with OpPhi instead it went wrong in far more places. The embedded SPIR-V of render2d and render3d is written again
 
 ### Security
 

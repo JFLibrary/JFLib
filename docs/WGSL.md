@@ -604,7 +604,7 @@ Modul; `spirv::compile_library` übersetzt die Funktionen eines Moduls ohne Eins
   eingesetzt. WGSL kennt keine Rekursion, die Spezialisierungen sind endlich.
 - **Kontrollfluss** strukturiert: `if` / `else` (`OpSelectionMerge`), `switch` mit
   Fallauswahl-Listen und `default` auch in einer Liste, `loop` mit `continuing` und
-  `break if`, `&&` / `||` mit Kurzschluss (über eine Funktionsvariable). Unerreichbare
+  `break if`, `&&` / `||` mit Kurzschluss (über eine Funktionsvariable vom Typ `u32`, 1 für wahr, gelesen als `!= 0`: Intels Treiber unter Windows, UHD 615 mit 31.0.101.2135, nahm eine solche Variable vom Typ `bool` in großen Fragment-Shadern für falsch, und mit `OpPhi`, wie glslang es schreibt, ging dort noch viel mehr falsch; [RENDER2D.md](RENDER2D.md#die-anderen-ziele-g6e3)). Unerreichbare
   Merge-Blöcke enden mit `OpUnreachable`, ein nie erreichter Continue-Block springt nur zurück.
 - **Alle eingebauten Funktionen** (GLSL.std.450 wo möglich): Texturen mit allen Überladungen
   (Arrays: die Schicht als Gleitkomma-Koordinate beim Abtasten, Offsets als `ConstOffset`,

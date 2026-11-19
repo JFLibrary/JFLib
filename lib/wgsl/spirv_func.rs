@@ -563,12 +563,16 @@ impl<'g, 'a> Fx<'g, 'a> {
         }
     }
 
-    /// a && b, a || b: b is evaluated only when needed
+    /// a && b, a || b: b is evaluated only when needed.  The value goes through a u32 variable (1 for true), not a bool
+    /// one and not an OpPhi: Intel's Windows driver (UHD 615, 31.0.101.2135) took such a bool for false in large fragment
+    /// shaders (render2d's fs_fill: a dash pattern's pass, an arc's end), and with OpPhi it went wrong in far more places
     fn short_circuit(&mut self, op: BinOp, a: ExprId, b: ExprId) -> Id {
-        let bt = self.g.b.ty_bool();
-        let tmp = self.g.b.local(bt, None);
+        let ut = self.g.b.ty_u32();
+        let (one, zero) = (self.g.b.const_u32(1), self.g.b.const_u32(0));
+        let tmp = self.g.b.local(ut, None);
         let va = self.val(a);
-        self.g.b.store(tmp, va);
+        let ua = self.g.b.select(va, one, zero);
+        self.g.b.store(tmp, ua);
         let (rhs, merge) = (self.g.b.label(), self.g.b.label());
         self.g.b.selection_merge(merge, 0);
         if op == BinOp::LogAnd {
@@ -579,10 +583,12 @@ impl<'g, 'a> Fx<'g, 'a> {
         self.reached.insert(merge.0);
         self.g.b.begin_block(rhs);
         let vb = self.val(b);
-        self.g.b.store(tmp, vb);
+        let ub = self.g.b.select(vb, one, zero);
+        self.g.b.store(tmp, ub);
         self.br(merge);
         self.begin_merge(merge);
-        self.g.b.load(tmp)
+        let u = self.g.b.load(tmp);
+        self.g.b.ine(u, zero)
     }
 
     /// a binary operator on lowered operands (ta, tb: their WGSL types; rt: the result's)
