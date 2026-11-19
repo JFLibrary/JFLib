@@ -42,6 +42,16 @@ fn own_ids_are_distinct_and_high() {
         assert_eq!(d.shapes.effects.len(), 6);
         assert_eq!(d.shapes.fonts.len(), 6);
         assert_eq!(d.connectors.lines.len(), 3);
+        // what Visio reads (the user's Visio, 2026-11-19): variant styles name 1 .. 5 only, fill
+        // colours are the placeholder with transforms
+        for v in &d.variants {
+            for st in &v.styles {
+                assert!([st.fill, st.line, st.effect, st.font].iter().all(|k| (1..=5).contains(k)), "{} {st:?}", d.name);
+            }
+        }
+        for f in d.shapes.fills.iter().chain(&d.shapes.backgrounds).chain(&d.connectors.fills) {
+            assert!(matches!(f.color, super::Clr::Scheme(super::Slot::Ph, _)), "{} {f:?}", d.name);
+        }
     }
     assert_eq!(all[0].name, "NetLab");
 }
