@@ -15,6 +15,9 @@ the AppStream metainfo and the icons.
                                     from the largest one there, else a plain placeholder
   logo(app, w, h)                   an icon centred on a transparent w x h canvas (wide tiles)
   release_date()                    YYYY-MM-DD (SOURCE_DATE_EPOCH or today)
+  arch_name(arch, fmt)              the processor as a format names it (package.py --arch: x86_64 is
+                                    amd64 in a .deb, x64 in an MSIX; aarch64 arm64 there)
+  setup_name(app, arch)             <App>_Setup.exe, on ARM64 <App>_Setup_arm64.exe
   Job                               one package run: the built files, the report
 """
 import datetime
@@ -27,6 +30,23 @@ import pngutil
 
 ROOT = Path(__file__).resolve().parent.parent
 ICON_SIZES = (48, 128, 256)
+# package.py --arch (docs/ARM64.md decision 5: one file per processor): how each format names it;
+# "update" is the second half of update::target() (windows-x86_64, linux-aarch64, ...)
+ARCHS = ("x86_64", "aarch64")
+ARCH_NAMES = {"x86_64": {"deb": "amd64", "rpm": "x86_64", "appimage": "x86_64", "msix": "x64", "flatpak": "x86_64",
+                         "update": "x86_64"},
+              "aarch64": {"deb": "arm64", "rpm": "aarch64", "appimage": "aarch64", "msix": "arm64", "flatpak": "aarch64",
+                          "update": "aarch64"}}
+
+
+def arch_name(arch, fmt):
+    """the processor arch (package.py --arch) as the format fmt names it"""
+    return ARCH_NAMES[arch][fmt]
+
+
+def setup_name(app, arch="x86_64"):
+    """the setup's file name: <App>_Setup.exe for x86-64 (as ever), <App>_Setup_arm64.exe for ARM64"""
+    return f"{app}_Setup.exe" if arch == "x86_64" else f"{app}_Setup_{arch_name(arch, 'msix')}.exe"
 
 
 def lf(text):
@@ -193,14 +213,16 @@ class Job:
     [(name, bytes)]} (the other system's agents), notices {relative Path: source}, units [(name,
     text)]; perms (default: permissions(app)); runtime / appimage_runtime (AppImage); signing
     (package.py's Signing, optional); glibc: the program needs the system's glibc (a program
-    with a UI, build_rs.py section "glibc": the packages name it, and Flatpak the GPU).  made /
-    skip / note collect the report, sign_done / sign_skip the signatures."""
+    with a UI, build_rs.py section "glibc": the packages name it, and Flatpak the GPU); arch: the
+    processor of the programs (default x86_64; aarch64: package.py --arch).  made / skip / note
+    collect the report, sign_done / sign_skip the signatures."""
 
     def __init__(self, **kw):
         self.__dict__.update(kw)
         if "perms" not in kw:
             self.perms = permissions(self.app)
         self.glibc = kw.get("glibc", False)
+        self.arch = kw.get("arch", "x86_64")
         self.done, self.skipped, self.notes = [], [], []
         self.signed, self.unsigned = [], []         # without a Signing (sign_done / sign_skip)
 

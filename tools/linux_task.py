@@ -1,4 +1,8 @@
-"""Small Linux runner used natively or through WSL; no shell interpolation."""
+"""Small Linux runner used natively or through WSL; no shell interpolation.
+
+--arch aarch64 (tools/package.py --arch, docs/ARM64.md): the packages of appimage, rpm and flatpak are
+for ARM64 (appimagetool's ARCH, rpmbuild --target aarch64, flatpak-builder --arch=aarch64); without
+it x86_64 as before."""
 import argparse
 import gzip
 import json
@@ -16,9 +20,12 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('--watch-stdin', action='store_true')
     p.add_argument('--cwd')
+    p.add_argument('--arch', choices=['x86_64', 'aarch64'], default='x86_64')
     p.add_argument('action', choices=['run', 'deb', 'repo', 'probe', 'appimage', 'rpm', 'flatpak', 'gpgsign', 'serve'])
     p.add_argument('args', nargs=argparse.REMAINDER)
     a = p.parse_args()
+    global ARCH
+    ARCH = a.arch
     if a.cwd:
         os.chdir(a.cwd)
     if a.action == 'serve':
@@ -122,20 +129,42 @@ def serve():
         sys.stdout.flush()
 
 
+ARCH = 'x86_64'         # --arch
 TOOLS = ('mksquashfs', 'unsquashfs', 'appimagetool', 'rpmbuild', 'rpm', 'flatpak', 'flatpak-builder',
          'desktop-file-validate', 'appstreamcli', 'dpkg-deb', 'bwrap')
 
 
 def probe():
     """the packaging tools of tools/pkg_linux.py as JSON: {tool: path or ""}, "flatpak_refs":
-    the installed runtimes and SDKs ("org.freedesktop.Platform/26.08")"""
+    the installed runtimes and SDKs ("org.freedesktop.Platform/26.08", the machine's own processor),
+    "flatpak_refs_arch" with the processor ("org.freedesktop.Platform/aarch64/26.08"), "machine"
+    (x86_64, aarch64), "binfmt_<cpu>": the flags of QEMU's binfmt_misc entry of another processor
+    (an F lets a sandbox start its programs; missing: no entry)"""
+    import platform
     out = {t: shutil.which(t) or '' for t in TOOLS}
-    refs = []
+    refs, refs_arch = [], []
+    machine = {'arm64': 'aarch64', 'amd64': 'x86_64'}.get(platform.machine().lower(), platform.machine().lower())
     if out['flatpak']:
         r = subprocess.run(['flatpak', 'list', '--runtime', '--columns=application,branch'],
                            capture_output=True, text=True)
         refs = sorted({'/'.join(line.split()[:2]) for line in r.stdout.splitlines() if len(line.split()) >= 2})
+        # every installed processor (--arch=X would filter: flatpak 1.14 takes '*' as a name and lists nothing)
+        r = subprocess.run(['flatpak', 'list', '--runtime', '--columns=application,arch,branch'],
+                           capture_output=True, text=True)
+        refs_arch = sorted({'/'.join(line.split()[:3]) for line in r.stdout.splitlines() if len(line.split()) >= 3})
     out['flatpak_refs'] = refs
+    out['flatpak_refs_arch'] = refs_arch
+    out['machine'] = machine
+    for cpu in ('x86_64', 'aarch64'):
+        if cpu == machine:
+            continue
+        try:
+            text = Path(f'/proc/sys/fs/binfmt_misc/qemu-{cpu}').read_text()
+        except OSError:
+            continue
+        if text.startswith('enabled'):
+            out['binfmt_' + cpu] = next((ln.split(':', 1)[1].strip() for ln in text.splitlines()
+                                         if ln.startswith('flags:')), '')
     print(json.dumps(out))
     return 0
 
@@ -171,7 +200,7 @@ def appimage(tree, runtime, destination, links):
         tool = shutil.which('appimagetool')
         if tool:
             subprocess.run([tool, '--runtime-file', str(runtime), str(appdir), str(image)], check=True,
-                           env=dict(os.environ, ARCH='x86_64'))
+                           env=dict(os.environ, ARCH=ARCH))
         else:
             squash = Path(tmp) / 'image.squashfs'
             subprocess.run(['mksquashfs', str(appdir), str(squash), '-all-root', '-noappend', '-comp', 'zstd', '-quiet',
@@ -192,7 +221,8 @@ def rpm(spec, source, outdir):
             (top / d).mkdir()
         shutil.copyfile(spec, top / 'SPECS' / spec.name)
         shutil.copyfile(source, top / 'SOURCES' / source.name)
-        subprocess.run(['rpmbuild', '-bb', '--define', f'_topdir {top}', str(top / 'SPECS' / spec.name)], check=True)
+        target = ['--target', ARCH] if ARCH != 'x86_64' else []
+        subprocess.run(['rpmbuild', '-bb', *target, '--define', f'_topdir {top}', str(top / 'SPECS' / spec.name)], check=True)
         for f in sorted((top / 'RPMS').rglob('*.rpm')):
             shutil.copyfile(f, outdir / f.name)
             print(f.name)
@@ -248,7 +278,8 @@ def flatpak(src, app_id, bundle, repo='', key='', url=''):
         shutil.copytree(src, work / 'src', ignore=lambda d, names: ['repo'] if Path(d) == Path(src) else [])
         if repo and Path(repo).is_dir():
             shutil.copytree(repo, work / 'repo', symlinks=True)
-        subprocess.run(['flatpak-builder', '--disable-rofiles-fuse', '--force-clean', '--disable-updates',
+        arch = [f'--arch={ARCH}'] if ARCH != 'x86_64' else []
+        subprocess.run(['flatpak-builder', '--disable-rofiles-fuse', '--force-clean', '--disable-updates', *arch,
                         f'--state-dir={work / "state"}', f'--repo={work / "repo"}', *sign, str(work / 'build'),
                         str(work / 'src' / f'{app_id}.json')], check=True)
         subprocess.run(['flatpak', 'build-update-repo', *sign, str(work / 'repo')], check=True)
@@ -262,7 +293,8 @@ def flatpak(src, app_id, bundle, repo='', key='', url=''):
             extra.append(f'--gpg-keys={work / "key.gpg"}')
         if url:
             extra.append(f'--repo-url={url}')
-        subprocess.run(['flatpak', 'build-bundle', *sign, *extra, str(work / 'repo'), str(work / 'out.flatpak'), app_id], check=True)
+        subprocess.run(['flatpak', 'build-bundle', *sign, *extra, *arch, str(work / 'repo'), str(work / 'out.flatpak'), app_id],
+                       check=True)
         shutil.copyfile(work / 'out.flatpak', bundle)
         if repo:
             writable_tree(work / 'repo')

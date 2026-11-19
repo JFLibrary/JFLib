@@ -90,7 +90,8 @@ fn updatetest() -> i32 {
             return 2;
         }
     }
-    plat::write_stdout(format!("updatetest: {}\n", if t.fails == 0 { "all passed" } else { "FAILED" }).as_bytes());
+    // the manifest name of this system (docs/ARM64.md ARM9: windows-aarch64, linux-aarch64 on ARM64)
+    plat::write_stdout(format!("updatetest: {} (target {})\n", if t.fails == 0 { "all passed" } else { "FAILED" }, update::target()).as_bytes());
     t.fails
 }
 

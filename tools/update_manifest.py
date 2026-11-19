@@ -223,12 +223,35 @@ def sha256_file(path):
     return h.hexdigest()
 
 
-def write_channel(out, app, version, files, seed, notes="", expires_days=0, base_url=""):
+def other_targets(folder, app, version, targets):
+    """the entries of a channel already in folder for targets other than these, when it is the same app and
+    version and its files are there as listed: [(target, kind, url, size, sha256)] (tools/package.py --arch:
+    one update.json for x86-64 and ARM64, each run adds its own targets); [] otherwise"""
+    f = Path(folder) / "update.json"
+    try:
+        m = json.loads(f.read_bytes())
+    except (OSError, ValueError):
+        return []
+    if m.get("app") != app or m.get("version") != version:
+        return []
+    keep = []
+    for e in m.get("files", []):
+        if e.get("target") in targets:
+            continue
+        p = Path(folder) / e["url"].rsplit("/", 1)[-1]
+        if not p.is_file() or p.stat().st_size != e["size"] or sha256_file(p) != e["sha256"]:
+            return []                   # a stale channel: start afresh
+        keep.append((e["target"], e["kind"], e["url"], e["size"], e["sha256"]))
+    return keep
+
+
+def write_channel(out, app, version, files, seed, notes="", expires_days=0, base_url="", keep=()):
     """files = [(target, kind, path, name)]: each copied to out/name; out/update.json and
-    out/update.json.sig written -> the manifest's path"""
+    out/update.json.sig written -> the manifest's path.  keep: entries listed first as they are
+    ([(target, kind, url, size, sha256)], other_targets)"""
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
-    entries = []
+    entries = list(keep)
     for target, kind, path, name in files:
         if kind not in KINDS:
             raise SystemExit(f"update_manifest: unknown kind {kind!r} ({', '.join(KINDS)})")

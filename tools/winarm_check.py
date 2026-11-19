@@ -1,9 +1,9 @@
 """ARM5 (docs/ARM64.md): the Windows programs for ARM64 on a Windows ARM64 machine (the runner windows-11-arm).
 They are built beforehand in build/win-arm64 (on an x64 PC or runner: build_rs.py app NAME --target win --arch
-aarch64), so the machine needs no compiler.  .github/workflows/arm64-windows.yml runs this there.
+aarch64), so the machine needs no compiler.  .github/workflows/arm64.yml runs this there.
 
     python tools/winarm_check.py [--target win|linux] [--dir DIR] [--other-module FILE]
-                                 [--only scripts|crash|module|gpu] [--gallery-all] [--scripts APP[/SCRIPT.uis],...]
+                                 [--only scripts|crash|module|gpu|update] [--gallery-all] [--scripts APP[/SCRIPT.uis],...]
 
 --target linux (ARM8): the Linux programs of build/linux-arm64 on an ARM64 Linux machine (ubuntu-24.04-arm, the
 ARM64 VM), with a display of its own (WAYLAND_DISPLAY or DISPLAY); scripts, crash and gpu as below, no module.
@@ -19,6 +19,11 @@ ARM64 VM), with a display of its own (WAYLAND_DISPLAY or DISPLAY); scripts, cras
     gpu      (ARM8) what the machine offers the GPU: gputest --info and a start of uigputest's output with
              jfgui_GPU_TRACE=1 (what the UI does without vulkan-1.dll or without a driver: the CPU path and
              the reason); both end with exit code 0, their lines are printed
+    update   (ARM9, only when asked: --only update) lib/update on this machine: updatetest --test update
+             (check, download, staging, applying, rollback; on Linux the AppImage updates) and --test apply
+             (an installed copy updates itself, restarts, rolls back a broken version; on Linux also as a
+             real AppImage when appimagert lies beside updatetest and mksquashfs is there) against
+             tools/update_server.py (python on PATH; Linux also gpg); the SKIP lines are printed
 
 Exit code 1 when something failed."""
 import argparse
@@ -113,6 +118,26 @@ def gpu(t, d):
     t.check(code == 0, f"uigputest --test switch with jfgui_GPU_TRACE=1: exit {code}", "\n   ".join(lines[:40]))
 
 
+def update(t, d):
+    """updatetest --test update and --test apply (ARM9): the whole of lib/update on this machine's processor, the
+    manifest's target is update::target() (windows-aarch64, linux-aarch64)"""
+    exe = prog(d, "updatetest")
+    if not exe.is_file():
+        t.check(False, "updatetest", f"{exe} is missing")
+        return
+    for test in ("update", "apply"):
+        code, out = run(exe, ["--test", test], timeout=1200)
+        lines = out.splitlines()
+        fails = [ln for ln in lines if ln.startswith("FAIL")]
+        skips = [ln for ln in lines if ln.startswith("SKIP")]
+        passed = sum(ln.startswith("PASS") for ln in lines)
+        target = next((ln.split("(target ", 1)[1].rstrip(")") for ln in lines if ln.startswith("updatetest: ") and "(target " in ln), "")
+        t.check(code == 0 and not fails and passed > 0, f"updatetest --test {test}: exit {code}, {passed} PASS, {len(skips)} SKIP"
+                + (f", target {target}" if target else ""), "\n   ".join(fails + skips + ([] if code == 0 else lines[-15:])))
+        for ln in skips:
+            print(f"   {ln}", flush=True)
+
+
 def crash(t, d):
     exe = prog(d, "plattest")
     for test in ("crash", "guardcrash", "panic"):
@@ -160,7 +185,7 @@ def main():
     ap.add_argument("--target", choices=("win", "linux"), default="win", help="the programs' system (linux: ARM8)")
     ap.add_argument("--dir", help="the built programs (default build/win-arm64, build/linux-arm64)")
     ap.add_argument("--other-module", help="jxlenc.dll built for x64 (must be refused)")
-    ap.add_argument("--only", choices=("scripts", "crash", "module", "gpu"))
+    ap.add_argument("--only", choices=("scripts", "crash", "module", "gpu", "update"))
     ap.add_argument("--gallery-all", action="store_true", help="every script of the gallery, not only a start")
     ap.add_argument("--scripts", help="APP or APP/SCRIPT.uis, separated by commas: these scripts instead of the default")
     a = ap.parse_args()
@@ -176,7 +201,7 @@ def main():
                 SCRIPTS[app] = None
     TARGET = a.target
     d = Path(a.dir or ROOT / "build" / ("win-arm64" if TARGET == "win" else "linux-arm64"))
-    first = next((prog(d, n) for n in [*SCRIPTS, "plattest"] if prog(d, n).is_file()), prog(d, "plattest"))
+    first = next((prog(d, n) for n in [*SCRIPTS, "plattest", "updatetest"] if prog(d, n).is_file()), prog(d, "plattest"))
     print(f"host {host_exec.host_arch()}, programs in {d} for {host_exec.exe_arch(first)}", flush=True)
     t = Tally()
     if a.only in (None, "crash"):
@@ -185,6 +210,8 @@ def main():
         module(t, d, a.other_module)
     if a.only == "gpu" or a.only is None and prog(d, "gputest").is_file():     # (ARM5's runs built no gputest)
         gpu(t, d)
+    if a.only == "update":
+        update(t, d)
     if a.only in (None, "scripts"):
         scripts(t, d)
     print(f"winarm_check: {t.passed} of {t.passed + t.failed} passed")

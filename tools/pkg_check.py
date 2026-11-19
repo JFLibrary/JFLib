@@ -1,7 +1,7 @@
 """pkg_check.py -- checks of the package formats of tools/package.py (docs/PACKAGING.md, "Checks")
 
     python tools/pkg_check.py --quick [--runtime FILE]     (build_rs.py test runs this)
-    python tools/pkg_check.py [--app template] [--out DIR] [--keep]
+    python tools/pkg_check.py [--app template] [--out DIR] [--keep] [--arch aarch64]
     python tools/pkg_check.py --install                    (installs test packages, see below)
 
   --quick: nothing is built
@@ -10,6 +10,11 @@
               manifest, the RPM .spec, the AppxManifest.xml (fields and mappings, the StartupTask
               id plat asks for, the execution alias), the .appinstaller; the update channel with
               an AppImage entry (package.update_channel)
+    arch      (docs/ARM64.md, package.py --arch) the ARM64 names of every format beside the
+              unchanged x86-64 ones, ExclusiveArch, ProcessorArchitecture, the .appinstaller of
+              each processor, the agents of cross_bins= per processor, one update channel that
+              lists both processors (a second run keeps the other's entries, a new version drops
+              them), the folders of RPM and Flatpak per processor, a missing aarch64 runtime
     missing   every format without its tools: skipped, the tool named, the rest written
     apps      every apps/*/PACKAGE: .desktop, metainfo (validators), AppxManifest (MakeAppx pack
               with a stand-in program)
@@ -29,6 +34,8 @@
               folder) behind the runtime: --appimage-extract gives the same tree, a start runs
               AppRun with APPIMAGE / APPDIR / ARGV0 / OWD and reuses the cache, a cut image fails
   without --quick also (a few minutes): python tools/package.py APP --formats all --out DIR
+  (--arch aarch64: the ARM64 packages, package.py --arch aarch64; the programs inside run only on
+  an ARM64 machine, elsewhere these checks say SKIP)
     appimage  ELF with "AI\\x02", the image at --appimage-offset, the AppDir (AppRun link,
               .desktop, icon, .DirIcon, metainfo, program), both validators on it, the app's
               tests/*.uis run through the AppImage
@@ -39,6 +46,8 @@
               this run (openssl, never installed) signs a copy, signtool verify reads it (the
               root is untrusted: expected)
     aab       what an Android App Bundle would need (bundletool, aapt2, java): only reported
+    deb       (Linux, the packages' processor) the .deb unpacked (dpkg-deb -x, nothing installed):
+              Architecture, every style's program runs the app's scripts
   --install: the packages installed for a moment, where that needs no administrator and no
   changed system setting (each part SKIPs with the reason otherwise; everything is removed after):
     flatpak   (WSL) updatetest as a Flatpak in a GPG-signed repository (pkg_linux.make_flatpak,
@@ -51,6 +60,20 @@
               the alias: package identity, Check::Managed, the StartupTask on and off
               (updatetest --test msix); then Remove-AppxPackage
 
+  --install-packages (with the packages built, on a machine of their processor; docs/ARM64.md ARM9:
+  windows-11-arm, ubuntu-24.04-arm): the app's own packages installed, started with its scripts and
+  removed again -- only where nothing asks: Linux needs sudo without a password (a CI runner)
+    setup     (Windows) installed in test mode (ASMINST_SHELL_DIR) into build/pkg_check, the program is
+              this machine's, runs the scripts; uninstall.exe removes it
+    msix      (Windows) Add-AppxPackage of the signed package (its certificate trusted beforehand,
+              else SKIP), ProcessorArchitecture of the installation, a start through the Start menu's
+              entry (shell:AppsFolder) runs the program from the package; Remove-AppxPackage
+    deb       (Linux) apt-get install of the .deb, /usr/bin/<deb> (update-alternatives) runs the
+              scripts; apt-get remove --purge
+    rpm       (Linux with docker) dnf install in a Fedora container (fedora:latest), the program runs
+              the scripts there; dnf remove
+    flatpak   (Linux with flatpak-builder and the runtime of this processor) a bundle of the written
+              manifest, flatpak install --user, flatpak run with the scripts; flatpak uninstall
 Work files: build/pkg_check/ (the packages: --out, default build/pkg_check/dist; removed with the
 rest unless --keep).  Prints PASS / FAIL / SKIP; exit code 1 on failures.  Nothing is installed:
 not the packages, not the certificate, not a Flatpak runtime.
@@ -455,6 +478,114 @@ def shlex_quote(s):
     return shlex.quote(s)
 
 
+def inside_deb(deb, app, arch, scripts):
+    """the .deb unpacked (dpkg-deb -x, nothing installed): its Architecture, each style's program runs the scripts"""
+    tmp = tempfile.mkdtemp(prefix="jfgui-pkgcheck-")
+    try:
+        r = subprocess.run(["dpkg-deb", "-f", deb, "Architecture"], capture_output=True, text=True)
+        check(r.returncode == 0 and r.stdout.strip() == arch, f"deb: Architecture {r.stdout.strip()} (want {arch})")
+        subprocess.run(["dpkg-deb", "-x", deb, tmp], check=True)
+        progs = sorted(str(p) for p in Path(tmp, "usr", "lib").glob(f"*/{app}-*") if p.is_file())
+        check(bool(progs), f"deb: the programs usr/lib/*/{app}-<style> ({len(progs)})")
+        for prog in progs:
+            for s in scripts:
+                r = subprocess.run([prog, "--script", s], capture_output=True, text=True, timeout=300)
+                check(r.returncode == 0, f"deb: {os.path.basename(prog)} runs {os.path.basename(s)} (unpacked)"
+                      + (f" -- exit {r.returncode}: {(r.stdout + r.stderr).strip()[-400:]}" if r.returncode else ""))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def scripts_run(cmd, scripts, what, cwd=None):
+    """cmd + [--script, s] for each script -> all passed"""
+    ok = True
+    for s in scripts:
+        r = subprocess.run([*cmd, "--script", s], capture_output=True, text=True, timeout=300, cwd=cwd)
+        ok &= check(r.returncode == 0, f"{what} runs {os.path.basename(s)}"
+                    + (f" -- exit {r.returncode}: {(r.stdout + r.stderr).strip()[-400:]}" if r.returncode else ""))
+    return ok
+
+
+def inside_install_deb(deb, pkg, arch, scripts):
+    """(--install-packages) apt-get install of the .deb (sudo without a password), /usr/bin/<pkg> runs the
+    scripts, apt-get remove --purge"""
+    if subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode:
+        print("SKIP install deb: sudo asks for a password (--install-packages changes only a machine that may be changed)")
+        return
+    apt = ["sudo", "-n", "env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "-y", "-q"]
+    r = subprocess.run(apt + ["install", os.path.abspath(deb)], capture_output=True, text=True, timeout=900)
+    if not check(r.returncode == 0, f"install deb: apt-get install {os.path.basename(deb)}"
+                 + (f" -- {(r.stdout + r.stderr).strip()[-600:]}" if r.returncode else "")):
+        return
+    try:
+        q = subprocess.run(["dpkg-query", "-W", "-f=${Architecture} ${Status}", pkg], capture_output=True, text=True)
+        target = os.path.realpath(f"/usr/bin/{pkg}")
+        check(q.stdout.strip() == f"{arch} install ok installed" and target.startswith(f"/usr/lib/{pkg}/") and os.access(target, os.X_OK),
+              f"install deb: {q.stdout.strip()}, /usr/bin/{pkg} -> {target} (update-alternatives)")
+        scripts_run([f"/usr/bin/{pkg}"], scripts, f"install deb: /usr/bin/{pkg}")
+    finally:
+        r = subprocess.run(apt + ["remove", "--purge", pkg], capture_output=True, text=True, timeout=600)
+        check(r.returncode == 0 and not os.path.exists(f"/usr/bin/{pkg}") and not os.path.exists(f"/usr/lib/{pkg}"),
+              "install deb: apt-get remove --purge leaves nothing behind" + (f" -- {r.stderr.strip()[-300:]}" if r.returncode else ""))
+
+
+def inside_install_rpm(rpm, pkg, arch, image, scripts):
+    """(--install-packages) the .rpm in a Fedora container: dnf install, the program runs the scripts (the
+    repository mounted at /w), dnf remove"""
+    if not shutil.which("docker"):
+        print("SKIP install rpm: no docker (a Fedora container installs the .rpm)")
+        return
+    root = os.getcwd()
+    rel = os.path.relpath(os.path.abspath(rpm), root)
+    if rel.startswith(".."):
+        print(f"SKIP install rpm: {rpm} is not below {root}")
+        return
+    runs = "".join(f"/usr/bin/{pkg} --script /w/{os.path.relpath(os.path.abspath(s), root)} && echo 'PASS script {os.path.basename(s)}' && "
+                   for s in scripts)
+    # without the weak dependencies (Recommends: vulkan-loader, mesa-vulkan-drivers): the scripts draw on the CPU
+    sh = (f"dnf install -y -q --setopt=install_weak_deps=False /w/{rel} >/tmp/dnf.log 2>&1 || {{ tail -20 /tmp/dnf.log; exit 10; }}; "
+          f"echo \"arch=$(rpm -q --qf '%{{ARCH}}' {pkg})\"; echo \"link=$(readlink -f /usr/bin/{pkg})\"; "
+          f"cd /w && {runs}true; dnf remove -y -q {pkg} >/dev/null 2>&1; test ! -e /usr/bin/{pkg} && echo removed=1")
+    r = subprocess.run(["docker", "run", "--rm", "-v", f"{root}:/w", image, "sh", "-c", sh], capture_output=True, text=True, timeout=1800)
+    vals = dict(ln.split("=", 1) for ln in r.stdout.splitlines() if "=" in ln and not ln.startswith("PASS"))
+    check(r.returncode != 10 and vals.get("arch") == arch, f"install rpm: dnf install in {image}, the package is {vals.get('arch')}"
+          + ("" if vals.get("arch") == arch else f" -- {(r.stdout + r.stderr).strip()[-600:]}"))
+    check(vals.get("link", "").startswith(f"/usr/lib/{pkg}/"), f"install rpm: /usr/bin/{pkg} -> {vals.get('link')} (alternatives)")
+    for s in scripts:
+        check(f"PASS script {os.path.basename(s)}" in r.stdout, f"install rpm: /usr/bin/{pkg} runs {os.path.basename(s)} in the container"
+              + ("" if f"PASS script {os.path.basename(s)}" in r.stdout else f" -- {(r.stdout + r.stderr).strip()[-400:]}"))
+    check(vals.get("removed") == "1", "install rpm: dnf remove takes it away")
+
+
+def inside_install_flatpak(src, aid, arch, scripts):
+    """(--install-packages) the written manifest built here (linux_task.py flatpak: flatpak-builder, a fresh
+    repository, a bundle), flatpak install --user, flatpak run with the scripts, flatpak uninstall"""
+    tmp = tempfile.mkdtemp(prefix="jfgui-pkgcheck-")
+    task = os.path.join(os.path.dirname(os.path.abspath(__file__)), "linux_task.py")
+    try:
+        bundle = f"{tmp}/app.flatpak"
+        r = subprocess.run([sys.executable, task, "--arch", arch, "flatpak", src, aid, bundle, f"{tmp}/repo", "-", "-"],
+                           capture_output=True, text=True, timeout=1800)
+        if not check(r.returncode == 0 and os.path.exists(bundle), f"install flatpak: bundle of {aid} for {arch} built"
+                     + (f" -- {(r.stdout + r.stderr).strip()[-2500:]}" if r.returncode else "")):
+            return
+        r = subprocess.run(["flatpak", "--user", "install", "-y", "--noninteractive", "--bundle", bundle], capture_output=True, text=True,
+                           timeout=900)
+        if not check(r.returncode == 0, "install flatpak: flatpak install --user --bundle"
+                     + (f" -- {(r.stdout + r.stderr).strip()[-600:]}" if r.returncode else "")):
+            return
+        try:
+            info = subprocess.run(["flatpak", "--user", "info", aid], capture_output=True, text=True).stdout
+            check(f"Arch: {arch}" in info, f"install flatpak: installed for {arch}")
+            scripts_run(["flatpak", "run", "--filesystem=host", aid], scripts, f"install flatpak: flatpak run {aid}")
+        finally:
+            r = subprocess.run(["flatpak", "--user", "uninstall", "-y", "--noninteractive", aid], capture_output=True, text=True)
+            check(r.returncode == 0, "install flatpak: flatpak uninstall")
+    finally:
+        subprocess.run(["chmod", "-R", "u+w", tmp], capture_output=True)
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def inside_main(args):
     action = args[0]
     if action == "runtime":
@@ -473,6 +604,14 @@ def inside_main(args):
         inside_appimagesig(args[1], args[2])
     elif action == "flatpakupdate":
         inside_flatpak_update(*args[1:])
+    elif action == "deb":
+        inside_deb(args[1], args[2], args[3], args[4:])
+    elif action == "installdeb":
+        inside_install_deb(args[1], args[2], args[3], args[4:])
+    elif action == "installrpm":
+        inside_install_rpm(args[1], args[2], args[3], args[4], args[5:])
+    elif action == "installflatpak":
+        inside_install_flatpak(args[1], args[2], args[3], args[4:])
     return 1 if FAILS else 0
 
 
@@ -482,13 +621,18 @@ def run_inside(*args, timeout=900):
     """this file's Linux part in Linux / WSL: its PASS / FAIL lines are counted here"""
     from tools.host_exec import linux_path, run_linux
     r = run_linux(["python3", linux_path(Path(__file__)), "--inside-linux", *map(str, args)], timeout=timeout)
+    detail = False                      # the lines of a FAIL's message after its first
     for line in r.stdout.splitlines():
         if line.startswith("FAIL "):
             FAILS.append(line[5:])
             print(line)
+            detail = True
         elif line.startswith(("PASS ", "SKIP ", "INFO ")):
+            detail = False
             if not QUIET or line.startswith("SKIP "):
                 print(line)
+        elif detail:
+            print("   " + line)
     if r.returncode and not any(line.startswith("FAIL ") for line in r.stdout.splitlines()):
         check(False, f"Linux part {args[0]}: exit {r.returncode} {(r.stdout + r.stderr).strip()[-600:]}")
 
@@ -667,6 +811,7 @@ def meta_checks(d):
     xml2 = pkg_msix.appx_manifest(job_none, "winui")
     check("StartupTask" not in xml2 and "internetClient" not in xml2, "msix: without autostart / net rules: no StartupTask, no capabilities")
     t_update_channel(d)
+    t_arch(d)
     caps, cnotes = pkg_msix.capabilities([("fs.user", []), ("audio.output", [])])
     check(caps == [] and any(n.startswith("audio.output") for n in cnotes), "msix: audio.output needs no capability (noted)")
     caps, cnotes = pkg_msix.capabilities([("location", []), ("sensors", [])])
@@ -737,6 +882,120 @@ def t_update_channel(d):
     check(kinds == [("linux-x86_64", "appimage", ai.name), ("linux-x86_64", "package", deb.name)]
           and not update_manifest.check_channel(out / "kde", pub),
           "update: the channel of a style lists its .deb (package) and AppImage (appimage), signed")
+
+
+def exe_arch_bytes(head):
+    """the processor of a program from its first bytes (tools/host_exec.exe_arch on bytes)"""
+    from tools import host_exec
+    if head[:4] == b"\x7fELF":
+        return host_exec.ELF_MACHINE.get(int.from_bytes(head[18:20], "little"))
+    pe = int.from_bytes(head[0x3C:0x40], "little") if head[:2] == b"MZ" else len(head)
+    if head[pe:pe + 4] == b"PE\0\0":
+        return host_exec.PE_MACHINE.get(int.from_bytes(head[pe + 4:pe + 6], "little"))
+    return None
+
+
+def t_arch(d):
+    """package.py --arch aarch64 (docs/ARM64.md decision 5): the ARM64 names and fields of every format, the
+    x86-64 ones unchanged; one update channel for both processors; the agents of cross_bins= per processor"""
+    import package
+    import update_manifest
+    x86, arm = fixture_job(d / "arch-x86"), fixture_job(d / "arch-arm")
+    arm.arch = "aarch64"
+    check(pkgmeta.setup_name("Fixture") == "Fixture_Setup.exe" and pkgmeta.setup_name("Fixture", "aarch64") == "Fixture_Setup_arm64.exe"
+          and pkg_msix.msix_name(x86) == "Fixture-1.2.3-beta-x64.msix" and pkg_msix.msix_name(arm) == "Fixture-1.2.3-beta-arm64.msix"
+          and pkg_msix.appinstaller_name(x86) == "Fixture.appinstaller" and pkg_msix.appinstaller_name(arm) == "Fixture-arm64.appinstaller"
+          and pkg_linux.rpm_top(x86).name == "rpm" and pkg_linux.rpm_top(arm).name == "rpm-aarch64"
+          and pkg_linux.flatpak_dir(x86).name == "flatpak" and pkg_linux.flatpak_dir(arm).name == "flatpak-aarch64"
+          and pkg_linux.flatpak_bundle_name(x86, "org.jflib.Fixture") == "org.jflib.Fixture.flatpak"
+          and pkg_linux.flatpak_bundle_name(arm, "org.jflib.Fixture") == "org.jflib.Fixture-aarch64.flatpak"
+          and [pkgmeta.arch_name(a, "deb") for a in pkgmeta.ARCHS] == ["amd64", "arm64"]
+          and [pkgmeta.arch_name(a, "appimage") for a in pkgmeta.ARCHS] == ["x86_64", "aarch64"],
+          "arch: the file names of each processor (setup, MSIX, .appinstaller, RPM and Flatpak folders, bundle, .deb, AppImage); "
+          "x86-64 as before")
+    sx = pkg_linux.rpm_spec(x86, "t.tar.gz", pkg_linux.rpm_tree(x86))
+    sa = pkg_linux.rpm_spec(arm, "t.tar.gz", pkg_linux.rpm_tree(arm))
+    check("ExclusiveArch:  x86_64\n" in sx and "ExclusiveArch:  aarch64\n" in sa and sx.replace("x86_64", "aarch64") == sa,
+          "arch: the .spec differs in ExclusiveArch only")
+    xa, aa = pkg_msix.appx_manifest(x86, "winui"), pkg_msix.appx_manifest(arm, "winui")
+    check('ProcessorArchitecture="x64"' in xa and 'ProcessorArchitecture="arm64"' in aa
+          and xa.replace('ProcessorArchitecture="x64"', 'ProcessorArchitecture="arm64"') == aa,
+          "arch: the AppxManifest differs in ProcessorArchitecture only (arm64)")
+    import xml.etree.ElementTree as ET
+    ns = {"a": pkg_msix.APPINSTALLER_NS}
+    root = ET.fromstring(pkg_msix.appinstaller(arm, arm.dist / pkg_msix.msix_name(arm)).encode("utf-8"))
+    main = root.find("a:MainPackage", ns)
+    check(root.get("Uri") == "https://example.org/fixture/msix/Fixture-arm64.appinstaller" and main is not None
+          and main.get("ProcessorArchitecture") == "arm64" and main.get("Uri") == "https://example.org/fixture/msix/Fixture-1.2.3-beta-arm64.msix",
+          "arch: the ARM64 .appinstaller names itself and the arm64 package (an installation updates from the file it came from)")
+    mx, _ = pkg_linux.flatpak_manifest(x86, pkg_linux.flatpak_files(x86))
+    ma, _ = pkg_linux.flatpak_manifest(arm, pkg_linux.flatpak_files(arm))
+    check(mx == ma, "arch: the Flatpak manifest is the same (flatpak-builder --arch picks the runtime)")
+    # a missing aarch64 runtime, QEMU without flag F on an x86-64 machine
+    saved = pkg_linux._probe
+    try:
+        for probe, want in (({"flatpak-builder": "/x", "machine": "x86_64", "flatpak_refs": ["org.freedesktop.Platform/26.08",
+                                                                                              "org.freedesktop.Sdk/26.08"],
+                              "flatpak_refs_arch": ["org.freedesktop.Platform/x86_64/26.08", "org.freedesktop.Sdk/x86_64/26.08"]},
+                             "Runtime für aarch64 fehlt: org.freedesktop.Platform//26.08"),
+                            ({"flatpak-builder": "/x", "machine": "x86_64", "binfmt_aarch64": "PO",
+                              "flatpak_refs_arch": ["org.freedesktop.Platform/aarch64/26.08", "org.freedesktop.Sdk/aarch64/26.08"]},
+                             "kein Flag F")):
+            pkg_linux._probe = probe
+            j = fixture_job(d / "arch-missing")
+            j.arch = "aarch64"
+            with contextlib.redirect_stdout(io.StringIO()):
+                r = pkg_linux.make_flatpak(j)
+            why = dict(j.skipped).get("flatpak", "")
+            check(r is None and want in why and (j.dist / "flatpak-aarch64" / "org.jflib.Fixture.json").exists(),
+                  f"arch: Flatpak for aarch64 skipped with the reason ({why[:70]}…), the manifest written")
+    finally:
+        pkg_linux._probe = saved
+    # cross_bins: the agents of each processor (BackupCraft's agents/<os>-<cpu>/)
+    rs = d / "arch-rsout"
+    for folder, name in (("linux", "bc-agent"), ("linux-arm64", "bc-agent"), ("win", "bc-agent.exe"), ("win-arm64", "bc-agent.exe")):
+        (rs / folder).mkdir(parents=True, exist_ok=True)
+        (rs / folder / name).write_bytes(folder.encode())
+    meta = {"cross_bins": "bc-agent"}
+    rel = rs.relative_to(ROOT)
+    with contextlib.redirect_stdout(io.StringIO()):
+        got = {(o, a): [(n, b.decode()) for n, b in package.cross_files("BC", meta, rel, o, a)]
+               for o in ("linux", "win") for a in pkgmeta.ARCHS}
+    check(got[("linux", "x86_64")] == [("agents/linux-x86_64/bc-agent", "linux")]
+          and got[("win", "x86_64")] == [("agents/windows-x86_64/bc-agent.exe", "win")]
+          and got[("linux", "aarch64")] == [("agents/linux-x86_64/bc-agent", "linux"), ("agents/linux-aarch64/bc-agent", "linux-arm64")]
+          and got[("win", "aarch64")] == [("agents/windows-x86_64/bc-agent.exe", "win"), ("agents/windows-aarch64/bc-agent.exe", "win-arm64")],
+          "arch: cross_bins: the x86-64 packages carry the x86-64 agents, the ARM64 ones those of both processors")
+    # one update channel: x86-64, then ARM64 into the same folder; again x86-64; a new version
+    out = d / "arch-channel"
+    key = d / "arch.updkey"
+    key.unlink(missing_ok=True)
+    pub = update_manifest.keygen(key)
+    files = {}
+    for a, deb, ai in (("x86_64", "jf-fixture_1.2.3_amd64.deb", "Fixture-1.2.3-kde-x86_64.AppImage"),
+                       ("aarch64", "jf-fixture_1.2.3_arm64.deb", "Fixture-1.2.3-kde-aarch64.AppImage")):
+        (d / deb).write_bytes(b"!<arch>\n" + a.encode() * 20)
+        (d / ai).write_bytes(b"\x7fELF" + a.encode() * 20)
+        files[a] = (d / deb, d / ai)
+
+    def publish(a, version="1.2.3"):
+        signing = package.Signing(False, False)
+        meta = dict(FIX_META, version=version)
+        with contextlib.redirect_stdout(io.StringIO()):
+            package.update_channel("Fixture", meta, ["kde"], d.relative_to(ROOT) / "nowork", out.relative_to(ROOT), files[a][0], "",
+                                   str(key), signing, "rs", {"kde": files[a][1]}, None, a)
+        m = json.loads((out / "kde" / "update.json").read_bytes())
+        return sorted((f["target"], f["kind"], f["url"]) for f in m["files"])
+    both = [("linux-aarch64", "appimage", "Fixture-1.2.3-kde-aarch64.AppImage"), ("linux-aarch64", "package", "jf-fixture_1.2.3_arm64.deb"),
+            ("linux-x86_64", "appimage", "Fixture-1.2.3-kde-x86_64.AppImage"), ("linux-x86_64", "package", "jf-fixture_1.2.3_amd64.deb")]
+    first = publish("x86_64")
+    second = publish("aarch64")
+    check(first == both[2:] and second == both and not update_manifest.check_channel(out / "kde", pub),
+          "arch: an ARM64 run adds linux-aarch64 to the x86-64 channel of the same version (one update.json, signed)")
+    check(publish("x86_64") == both and not update_manifest.check_channel(out / "kde", pub),
+          "arch: an x86-64 run after it keeps the aarch64 entries")
+    check(publish("aarch64", "1.2.4") == both[:2],
+          "arch: a new version starts the channel afresh (the old version's files of the other processor are not listed)")
 
 
 def t_missing(d):
@@ -915,11 +1174,12 @@ def t_runtime(rt):
 
 # ---------------------------------------------------------------- the packages of an app
 
-def t_packages(app, out, skip_build):
-    """python tools/package.py APP --formats all --out OUT, then each format"""
+def t_packages(app, out, skip_build, arch="x86_64"):
+    """python tools/package.py APP --formats all --out OUT [--arch aarch64], then each format"""
     dist = ROOT / out
     if not skip_build:
-        r = subprocess.run([sys.executable, "tools/package.py", app, "--formats", "all", "--out", out], cwd=ROOT,
+        r = subprocess.run([sys.executable, "tools/package.py", app, "--formats", "all", "--out", out,
+                            *(["--arch", arch] if arch != "x86_64" else [])], cwd=ROOT,
                            capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
         (WORK / "package.log").write_text(r.stdout + r.stderr, encoding="utf-8")
         if not check(r.returncode == 0, f"package.py {app} --formats all (log: build/pkg_check/package.log)"):
@@ -934,17 +1194,25 @@ def t_packages(app, out, skip_build):
     perms = pkgmeta.permissions(app)
     scripts = sorted((ROOT / "apps" / app / "tests").glob("*.uis"))
     probe = pkg_linux.probe()
+    job = pkgmeta.Job(app=app, meta=meta, styles=styles, root=ROOT, dist=dist, work=dist, impl="rs", pkg=pkg, version=ver,
+                      perms=perms, arch=arch)
+    runs = arch == probe.get("machine", "x86_64")      # the packages' programs run in Linux / WSL here
+    from tools.host_exec import exe_arch
+    from build_rs import app_glibc
 
     # AppImage
     for s in styles:
-        f = dist / f"{app}-{ver}-{s}-x86_64.AppImage"
+        f = dist / f"{app}-{ver}-{s}-{pkgmeta.arch_name(arch, 'appimage')}.AppImage"
         if not f.exists():
             skip(f"appimage {s}", "not built (see the [formats] lines)")
             continue
         b = f.read_bytes()
         end = pkg_linux.elf_end(b)
-        check(b[:4] == b"\x7fELF" and b[8:11] == b"AI\x02" and b[end:end + 4] == b"hsqs" and ".upd_info" in pkg_linux.elf_sections(b),
-              f"appimage {s}: ELF with AI\\x02, .upd_info, SquashFS right after the ELF data")
+        check(b[:4] == b"\x7fELF" and b[8:11] == b"AI\x02" and b[end:end + 4] == b"hsqs" and ".upd_info" in pkg_linux.elf_sections(b)
+              and exe_arch(f) == arch, f"appimage {s}: ELF ({arch}) with AI\\x02, .upd_info, SquashFS right after the ELF data")
+        if not runs:
+            skip(f"appimage {s}: start", f"the {arch} programs do not run in Linux / WSL here ({probe.get('machine', '?')})")
+            continue
         run_inside("appimage", lp(f), *[lp(x) for x in scripts])
         sig = pkg_linux.elf_sections(b).get(".sha256_sig")
         if sig and b[sig[0]:sig[0] + sig[1]].strip(b"\0"):
@@ -952,50 +1220,77 @@ def t_packages(app, out, skip_build):
         else:
             skip(f"appimage {s}: signature", "not signed (jfgui_GPG_KEY not set)")
 
+    # .deb (unpacked; installed only with --install-packages)
+    deb = dist / f"{pkg}_{ver}_{pkgmeta.arch_name(arch, 'deb')}.deb"
+    if not deb.exists():
+        skip("deb", f"{deb.name} not built")
+    elif probe.get("error") or not probe.get("dpkg-deb"):
+        skip("deb", "no dpkg-deb in Linux / WSL")
+    elif not runs:
+        skip("deb: scripts", f"the {arch} programs do not run in Linux / WSL here")
+    else:
+        run_inside("deb", lp(deb), app, pkgmeta.arch_name(arch, "deb"), *[lp(x) for x in scripts])
+
     # RPM
-    spec = dist / "rpm" / "SPECS" / f"{pkg}.spec"
-    tars = sorted((dist / "rpm" / "SOURCES").glob(f"{pkg}-*-root.tar.gz"))
-    if check(spec.exists() and tars, "rpm: .spec and the root tarball written"):
+    top = pkg_linux.rpm_top(job)
+    spec = top / "SPECS" / f"{pkg}.spec"
+    tars = sorted((top / "SOURCES").glob(f"{pkg}-*-root.tar.gz"))
+    if skip_build and not spec.exists():
+        skip("rpm", f"no {top.name}/SPECS/{pkg}.spec in {out} (--no-build: what was built elsewhere)")
+    elif check(spec.exists() and tars, f"rpm: .spec and the root tarball written ({top.name}/)"):
         text = spec.read_text(encoding="utf-8")
         listed = sorted(m.group(1) for m in re.finditer(r'^"/([^"]+)"$', text, re.M))
         with tarfile.open(tars[-1]) as t:
             files = sorted(m.name[2:] for m in t.getmembers() if m.isfile())
+            progs = [m.name[2:] for m in t.getmembers() if m.isfile() and m.name.startswith(f"./usr/lib/{pkg}/{app}-")]
+            cpu = {exe_arch_bytes(t.extractfile(f"./{p}").read(1024)) for p in progs}
         check(listed == files and f"Name:           {pkg}\n" in text, f"rpm: %files lists exactly the tarball's {len(files)} files")
-        rpms = sorted(dist.glob(f"{pkg}-*.rpm"))
+        check(f"ExclusiveArch:  {pkgmeta.arch_name(arch, 'rpm')}\n" in text and cpu == {arch},
+              f"rpm: ExclusiveArch {pkgmeta.arch_name(arch, 'rpm')}, the programs in the tarball are {sorted(cpu)}")
+        rpms = sorted(dist.glob(f"{pkg}-*.{pkgmeta.arch_name(arch, 'rpm')}.rpm"))
         if rpms:
             check(True, f"rpm: {rpms[-1].name} built")
         else:
             skip("rpm: .rpm", "rpmbuild " + ("found, but no package" if probe.get("rpmbuild") else "not installed (only the .spec)"))
 
     # Flatpak
-    mf = dist / "flatpak" / f"{aid}.json"
-    if check(mf.exists(), f"flatpak: manifest {mf.name} written"):
+    fdir = pkg_linux.flatpak_dir(job)
+    mf = fdir / f"{aid}.json"
+    if skip_build and not mf.exists():
+        skip("flatpak", f"no {fdir.name}/{mf.name} in {out} (--no-build: what was built elsewhere)")
+    elif check(mf.exists(), f"flatpak: manifest {fdir.name}/{mf.name} written"):
         man = json.loads(mf.read_text(encoding="utf-8"))
         args, _ = pkg_linux.finish_args(perms, meta.get("flatpak_args", "").split())
+        if app_glibc(app) and "--device=dri" not in args:
+            args.append("--device=dri")
         check(man["id"] == aid and man["command"] == pkg and man["finish-args"] == args,
               f"flatpak: id, command, finish-args from PERMISSIONS ({' '.join(man['finish-args'])})")
-        fd = dist / "flatpak" / "files"
+        fd = fdir / "files"
         need = [f"lib/{pkg}/{pkg}", f"share/applications/{aid}.desktop", f"share/metainfo/{aid}.metainfo.xml",
                 f"share/icons/hicolor/128x128/apps/{aid}.png"]
-        check(all((fd / n).exists() for n in need), "flatpak: files/ holds the program, .desktop, metainfo, icons")
+        check(all((fd / n).exists() for n in need) and exe_arch(fd / need[0]) == arch,
+              f"flatpak: files/ holds the program ({arch}), .desktop, metainfo, icons")
         if not probe.get("error"):
             run_inside("validate", lp(fd / need[1]), lp(fd / need[2]))
-        bundle = dist / f"{aid}.flatpak"
+        bundle = dist / pkg_linux.flatpak_bundle_name(job, aid)
         if bundle.exists():
             check(bundle.stat().st_size > 1000, f"flatpak: bundle {bundle.name} built ({bundle.stat().st_size} bytes)")
-            run_inside("flatpak", lp(dist / "flatpak"), aid, lp(ROOT), *[lp(x) for x in scripts])
+            if runs:
+                run_inside("flatpak", lp(fdir), aid, lp(ROOT), *[lp(x) for x in scripts])
+            else:
+                skip("flatpak: scripts", f"the {arch} programs do not run in Linux / WSL here")
         else:
             skip("flatpak: bundle", "flatpak-builder or the runtime missing (see the [formats] lines)")
 
     # MSIX
-    t_msix(app, meta, dist, ver)
+    t_msix(app, meta, dist, ver, arch)
 
     # AAB
     t_aab()
 
 
-def t_msix(app, meta, dist, ver):
-    f = dist / f"{app}-{ver}-x64.msix"
+def t_msix(app, meta, dist, ver, arch="x86_64"):
+    f = dist / f"{app}-{ver}-{pkgmeta.arch_name(arch, 'msix')}.msix"
     if os.name != "nt":
         return skip("msix", "Windows only")
     if not f.exists():
@@ -1005,8 +1300,13 @@ def t_msix(app, meta, dist, ver):
           f"msix: {app}.exe, AppxManifest.xml and the logos are in the package")
     xml = zipfile.ZipFile(f).read("AppxManifest.xml").decode("utf-8")
     check(f'Name="{pkg_msix.identity_name(meta, app)}"' in xml and f'Publisher="{pkg_msix.publisher(meta)}"' in xml
-          and f'Version="{pkg_msix.msix_version(ver)}"' in xml, "msix: identity of the package read back")
+          and f'Version="{pkg_msix.msix_version(ver)}"' in xml
+          and f'ProcessorArchitecture="{pkgmeta.arch_name(arch, "msix")}"' in xml
+          and exe_arch_bytes(zipfile.ZipFile(f).read(f"{app}.exe")[:1024]) == arch,
+          f"msix: identity of the package read back ({pkgmeta.arch_name(arch, 'msix')}, the program for {arch})")
     tool = pkg_msix.find_makeappx()
+    if tool is None:
+        return skip("msix: MakeAppx unpack, signing", "MakeAppx.exe not found (Windows SDK)")
     un = WORK / "msix-unpack"
     shutil.rmtree(un, ignore_errors=True)
     r = subprocess.run([str(tool), "unpack", "/p", str(f), "/d", str(un), "/o"], capture_output=True, text=True,
@@ -1081,7 +1381,11 @@ def test_cert(d, name, subject, pw):
         run = lambda args: subprocess.run([host, *args], capture_output=True, stdin=subprocess.DEVNULL).returncode  # noqa: E731
         path = str
     else:
-        run = lambda args: run_linux(["openssl", *args]).returncode  # noqa: E731
+        def run(args):
+            try:
+                return run_linux(["openssl", *args]).returncode
+            except (OSError, subprocess.SubprocessError):      # no WSL either (a Windows runner)
+                return 1
         path = lp
     if run(req + ["-keyout", path(key), "-out", path(cert)]) or \
             run(["pkcs12", "-export", "-out", path(pfx), "-inkey", path(key), "-in", path(cert), "-passout", f"pass:{pw}"]):
@@ -1091,6 +1395,102 @@ def test_cert(d, name, subject, pw):
         if 0 < ahead < 300:
             time.sleep(ahead + 1)
     return pfx
+
+
+def t_install_packages(app, out, arch):
+    """--install-packages: the built packages of app installed on a machine of their processor, started with the
+    app's scripts, removed (docs/ARM64.md ARM9)"""
+    from tools.host_exec import host_arch
+    if host_arch() != arch:
+        return skip(f"install-packages {arch}", f"this machine is {host_arch()}: its packages only")
+    dist = ROOT / out
+    meta = pkgmeta.kv_file(ROOT / "apps" / app / "PACKAGE")
+    aid, pkg, ver = pkgmeta.app_id(meta, app), meta.get("deb_name", app.lower()), meta.get("version", "0.1.0")
+    scripts = sorted((ROOT / "apps" / app / "tests").glob("*.uis"))
+    job = pkgmeta.Job(app=app, meta=meta, styles=meta.get("styles", "winui").split(), root=ROOT, dist=dist, work=dist, impl="rs",
+                      pkg=pkg, version=ver, perms=None, arch=arch)
+    if os.name == "nt":
+        install_setup(app, dist / pkgmeta.setup_name(app, arch), arch, scripts)
+        install_msix(app, meta, dist / pkg_msix.msix_name(job), arch)
+        return
+    deb = dist / f"{pkg}_{ver}_{pkgmeta.arch_name(arch, 'deb')}.deb"
+    if deb.exists():
+        run_inside("installdeb", lp(deb), pkg, pkgmeta.arch_name(arch, "deb"), *[lp(s) for s in scripts])
+    else:
+        skip("install deb", f"{deb.name} not built")
+    rpms = sorted(dist.glob(f"{pkg}-*.{pkgmeta.arch_name(arch, 'rpm')}.rpm"))
+    if rpms:
+        run_inside("installrpm", lp(rpms[-1]), pkg, pkgmeta.arch_name(arch, "rpm"), os.environ.get("jfgui_FEDORA_IMAGE", "fedora:latest"),
+                   *[lp(s) for s in scripts], timeout=2400)
+    else:
+        skip("install rpm", "no .rpm built (rpmbuild)")
+    probe = pkg_linux.probe()
+    fdir = pkg_linux.flatpak_dir(job)
+    fa = pkgmeta.arch_name(arch, "flatpak")
+    have = probe.get("flatpak_refs_arch", [])
+    if not (fdir / f"{aid}.json").exists():
+        skip("install flatpak", f"no manifest {fdir.name}/{aid}.json")
+    elif not probe.get("flatpak-builder") or f"org.freedesktop.Sdk/{fa}/{pkg_linux.FLATPAK_VERSION}" not in have:
+        skip("install flatpak", f"flatpak-builder or the runtime org.freedesktop.Sdk//{pkg_linux.FLATPAK_VERSION} for {fa} missing")
+    else:
+        run_inside("installflatpak", lp(fdir), aid, fa, *[lp(s) for s in scripts], timeout=2400)
+
+
+def install_setup(app, setup, arch, scripts):
+    """the setup installed in test mode (ASMINST_SHELL_DIR: no shortcuts, no registry) into build/pkg_check,
+    the installed program (this machine's) runs the scripts, uninstall.exe removes it"""
+    from tools.host_exec import exe_arch
+    if not setup.exists():
+        return skip("install setup", f"{setup.name} not built")
+    d = WORK / "setup-install"
+    shutil.rmtree(d, ignore_errors=True)
+    (d / "shell").mkdir(parents=True)
+    (d / "inst.uis").write_text('click "Weiter"\nclick "Installieren"\nwait 500\nexpect "Fertigstellen" exists\n', encoding="utf-8")
+    (d / "un.uis").write_text('click "Deinstallieren"\nwait 500\nexpect "Schließen" exists\n', encoding="utf-8")
+    env = dict(os.environ, ASMINST_SHELL_DIR=str(d / "shell"))
+    r = subprocess.run([str(setup), "--script", str(d / "inst.uis"), "--dir", str(d / "inst")], env=env, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", timeout=300, stdin=subprocess.DEVNULL)
+    exe = d / "inst" / f"{app}.exe"
+    if not check(r.returncode == 0 and exe.exists(), f"install setup: {setup.name} installs (test mode)"
+                 + ("" if r.returncode == 0 else f" -- exit {r.returncode}: {(r.stdout + r.stderr).strip()[-400:]}")):
+        return
+    check(exe_arch(exe) == arch and exe_arch(setup) == arch, f"install setup: the setup and the installed {exe.name} are {exe_arch(exe)}")
+    scripts_run([str(exe)], [str(s) for s in scripts], f"install setup: {exe.name}", cwd=str(ROOT))
+    r = subprocess.run([str(d / "inst" / "uninstall.exe"), "--uninstall", "--script", str(d / "un.uis")], env=env, capture_output=True,
+                       text=True, encoding="utf-8", errors="replace", timeout=300, stdin=subprocess.DEVNULL)
+    check(r.returncode == 0 and not exe.exists(), "install setup: uninstall.exe removes it again")
+
+
+def install_msix(app, meta, msix, arch):
+    """Add-AppxPackage of the signed .msix (its certificate trusted beforehand), the installation's processor, a
+    start through shell:AppsFolder (the package's own program runs), Remove-AppxPackage"""
+    if not msix.exists():
+        return skip("install msix", f"{msix.name} not built")
+    if "AppxSignature.p7x" not in zipfile.ZipFile(msix).namelist():
+        return skip("install msix", "the package is not signed (package.py with jfgui_SIGN_PFX: a certificate this machine trusts)")
+    name = pkg_msix.identity_name(meta, app)
+
+    def ps(cmd):
+        return subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", cmd], capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL, timeout=600)
+    ps(f"Get-AppxPackage -Name {name} | Remove-AppxPackage")
+    r = ps(f"Add-AppxPackage -Path '{msix}'")
+    if not check(r.returncode == 0, f"install msix: Add-AppxPackage {msix.name}" + ("" if r.returncode == 0 else f" -- {(r.stdout + r.stderr).strip()[-600:]}")):
+        return
+    try:
+        r = ps(f"$p = Get-AppxPackage -Name {name}; \"$($p.Architecture)|$($p.PackageFamilyName)|$($p.InstallLocation)\"")
+        cpu, pfn, where = (r.stdout.strip().split("|") + ["", "", ""])[:3]
+        want = {"aarch64": "Arm64", "x86_64": "X64"}[arch]
+        check(cpu == want, f"install msix: installed as {cpu} (want {want}) in {where}")
+        r = ps(f"Start-Process 'shell:AppsFolder\\{pfn}!App'; Start-Sleep 8; "
+               f"$x = Get-Process -Name {app} -ErrorAction SilentlyContinue | Where-Object {{ $_.Path -like '*WindowsApps*' }}; "
+               f"if ($x) {{ \"running=$($x[0].Path)\"; $x | Stop-Process -Force }} else {{ 'running=' }}")
+        line = next((ln for ln in r.stdout.splitlines() if ln.startswith("running=")), "running=")
+        check(line != "running=", f"install msix: started through shell:AppsFolder, the package's program runs ({line[8:]})"
+              + ("" if line != "running=" else f" -- {(r.stdout + r.stderr).strip()[-400:]}"))
+    finally:
+        r = ps(f"Get-AppxPackage -Name {name} | Remove-AppxPackage; if (Get-AppxPackage -Name {name}) {{ exit 1 }}")
+        check(r.returncode == 0, "install msix: Remove-AppxPackage removes it")
 
 
 def t_install_flatpak(d):
@@ -1253,10 +1653,15 @@ def main():
     ap.add_argument("--app", default="template", help="the app to package (without --quick; default template)")
     ap.add_argument("--out", default="build/pkg_check/dist", help="package.py --out (without --quick)")
     ap.add_argument("--no-build", action="store_true", help="check the packages already in --out")
+    ap.add_argument("--arch", choices=pkgmeta.ARCHS, default="x86_64",
+                    help="without --quick: the packages of this processor (package.py --arch)")
     ap.add_argument("--keep", action="store_true", help="keep build/pkg_check")
     ap.add_argument("--summary", action="store_true", help="print only FAIL / SKIP lines and the result")
     ap.add_argument("--install", action="store_true", help="also install test packages for a moment (Flatpak in a temporary "
                                                            "HOME, MSIX by registration in developer mode) and update them")
+    ap.add_argument("--install-packages", action="store_true",
+                    help="(with the packages built, on a machine of --arch) install the app's own packages for a moment, run its "
+                         "scripts, remove them: setup, MSIX, .deb (sudo without a password), .rpm (docker), Flatpak")
     a = ap.parse_args()
     QUIET = a.summary
     meta_dir = WORK / "meta"
@@ -1275,10 +1680,12 @@ def main():
     else:
         skip("runtime", f"{rt.relative_to(ROOT) if rt.is_relative_to(ROOT) else rt} not built (python build_rs.py app appimagert --target linux)")
     if not a.quick:
-        t_packages(a.app, a.out, a.no_build)
+        t_packages(a.app, a.out, a.no_build, a.arch)
     if a.install:
         t_install_flatpak(meta_dir)
         t_install_msix(meta_dir)
+    if a.install_packages and not a.quick:
+        t_install_packages(a.app, a.out, a.arch)
     if not a.keep:
         shutil.rmtree(meta_dir, ignore_errors=True)
         for p in (WORK / "cert", WORK / "msix-unpack"):
