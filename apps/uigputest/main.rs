@@ -157,6 +157,8 @@ struct Watch {
     bad: AtomicU32,
     covered: AtomicU32,
     last_bad: AtomicU32,
+    /// samples wrong only in the strip's outermost column on either side (a note, not wrong)
+    edge: AtomicU32,
 }
 
 /// what a test or a bench draws beside the picture: panels on the layers above the base, images
@@ -408,14 +410,23 @@ impl Test {
         let fb = ui.fb();
         let (x0, y0, w) = (r[0], r[1] + fb.h - 8, fb.w);
         let want: Vec<u32> = (0..w).map(|x| bgr(band_of(x, w))).collect();
-        let watch = Arc::new(Watch { stop: AtomicBool::new(false), samples: AtomicU32::new(0), bad: AtomicU32::new(0), covered: AtomicU32::new(0), last_bad: AtomicU32::new(0) });
+        let watch = Arc::new(Watch { stop: AtomicBool::new(false), samples: AtomicU32::new(0), bad: AtomicU32::new(0), covered: AtomicU32::new(0), last_bad: AtomicU32::new(0),
+                                     edge: AtomicU32::new(0) });
         let w2 = watch.clone();
         let ours = plat::win_native(0).map_or(0, |n| n.hwnd);
         let th = plat::thread_spawn(0, Box::new(move || {
             while !w2.stop.load(Ordering::Relaxed) {
                 let Some(px) = plat::win_test_screen(x0, y0, w, 1) else { continue };
                 w2.samples.fetch_add(1, Ordering::Relaxed);
-                let wrong = px.chunks_exact(4).zip(want.iter()).find(|(p, c)| (p[0] as u32 | (p[1] as u32) << 8 | (p[2] as u32) << 16) != **c);
+                let off = |(p, c): &(&[u8], &u32)| (p[0] as u32 | (p[1] as u32) << 8 | (p[2] as u32) << 16) != **c;
+                let all: Vec<(&[u8], &u32)> = px.chunks_exact(4).zip(want.iter()).collect();
+                // (the outermost column on either side: at 150 % on Windows 11 the strip's first column showed 30383f in
+                // every sample, the window's edge rather than its picture)
+                let inner = all.len().saturating_sub(1);
+                let wrong = all.iter().enumerate().find(|(i, q)| *i != 0 && *i != inner && off(*q)).map(|(_, q)| *q);
+                if wrong.is_none() && all.iter().any(off) {
+                    w2.edge.fetch_add(1, Ordering::Relaxed);
+                }
                 if let Some((p, c)) = wrong {
                     let i = (p.as_ptr() as usize - px.as_ptr() as usize) / 4;
                     let v = p[0] as u32 | (p[1] as u32) << 8 | (p[2] as u32) << 16;
@@ -441,6 +452,10 @@ impl Test {
         let (n, b, c) = (w.samples.load(Ordering::Relaxed), w.bad.load(Ordering::Relaxed), w.covered.load(Ordering::Relaxed));
         if c != 0 {
             out(&format!("note: {what}: another window lay on top of ours in {c} of {n} samples"));
+        }
+        let e = w.edge.load(Ordering::Relaxed);
+        if e != 0 {
+            out(&format!("note: {what}: only the strip's outermost column wrong in {e} of {n} samples"));
         }
         self.ok(b == 0, &format!("{what}: {n} screen samples, {b} wrong (last {:06x})", w.last_bad.load(Ordering::Relaxed)));
     }
@@ -1522,15 +1537,18 @@ impl Test {
                 }
             }
             7 => {
-                // an edit: the CPU at once, the tiles gone
+                // an edit: the CPU at once, the tiles gone (within a second: 20 ms after the edit the Surface Go 3's UHD 615
+                // at 150 % had drawn no frame yet, and its output's numbers came a frame later than on the RTX)
                 if let Some(c) = self.sc.canvas.as_mut() {
                     c.ver += 1;
                 }
+                self.mark[3] = o.frames;
                 self.next();
             }
             8 => {
-                if self.after(20) {
-                    self.ok(o.canvas_apart == 0 && o.canvas_tiles == 0, &format!("an edit: nothing apart, {} tiles", o.canvas_tiles));
+                let gone = o.canvas_apart == 0 && o.canvas_tiles == 0;
+                if (gone && self.after(20)) || self.after(1000) {
+                    self.ok(gone, &format!("an edit: nothing apart, {} tiles ({} frame(s) after it)", o.canvas_tiles, o.frames - self.mark[3]));
                     self.same_so_far(ui, "after an edit");
                     self.next();
                 }
