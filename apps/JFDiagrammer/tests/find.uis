@@ -1,0 +1,97 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD8 rest: Suchen und Ersetzen (TX-08, KB-02) -- Ctrl+F finds text in shapes
+# (the next hit is selected, the search starts again at the beginning), with case and whole
+# words, also in shape names; Ctrl+H (German: Replace, Flip moved to Ctrl+Shift+H) replaces one
+# hit or all of them in one undo step
+cmd 4404
+drag 500,330 640,420
+drag 760,330 900,420
+drag 500,470 640,560
+cmd 4400
+click 570,375
+key f2
+type "Alpha"
+click 1000,680
+click 830,375
+key f2
+type "Beta"
+click 1000,680
+click 570,515
+key f2
+type "alphabet Beta"
+click 1000,680
+key ctrl+f
+expect dialog:"Suchen" exists
+click #2017460225
+type "alpha"
+click button:"Weitersuchen"
+expect listitem:"Alpha" selected
+expect text:"Gefunden: Alpha (Text)" exists
+click button:"Weitersuchen"
+expect listitem:"alphabet Beta" selected
+click button:"Weitersuchen"
+expect listitem:"Alpha" selected
+expect text:"Gefunden: Alpha (Text) · Die Suche hat wieder am Anfang begonnen." exists
+# case: only the small letters
+click checkbox:"Groß-/Kleinschreibung beachten"
+click button:"Weitersuchen"
+expect listitem:"alphabet Beta" selected
+click button:"Weitersuchen"
+expect listitem:"alphabet Beta" selected
+# whole words: "alpha" in "alphabet" is no hit
+click checkbox:"Groß-/Kleinschreibung beachten"
+click checkbox:"Nur ganzes Wort"
+click button:"Weitersuchen"
+expect listitem:"Alpha" selected
+click button:"Weitersuchen"
+expect listitem:"Alpha" selected
+click checkbox:"Nur ganzes Wort"
+# nothing found
+click #2017460225
+key ctrl+a
+type "Gamma"
+click button:"Weitersuchen"
+expect text:"„Gamma“ wurde nicht gefunden." exists
+# shape names
+click checkbox:"Shape-Namen"
+click #2017460225
+key ctrl+a
+type "Sheet.5"
+click button:"Weitersuchen"
+expect listitem:"Beta" selected
+expect text:"Gefunden: Beta (Shape-Name)" exists
+click button:"Schließen"
+expect dialog:"Suchen" missing
+# Ctrl+H: replace all, one undo step
+key ctrl+h
+expect dialog:"Ersetzen" exists
+click #2017460225
+key ctrl+a
+type "Beta"
+click #2017460226
+type "Gamma"
+click button:"Alle ersetzen"
+expect text:"2 Stellen ersetzt." exists
+click button:"Schließen"
+expect listitem:"Gamma" exists
+expect listitem:"alphabet Gamma" exists
+key ctrl+z
+expect listitem:"Beta" exists
+expect listitem:"alphabet Beta" exists
+# replace one hit: the first click finds it, the second replaces it and finds the next
+key ctrl+h
+click #2017460225
+key ctrl+a
+type "alpha"
+click #2017460226
+key ctrl+a
+type "Omega"
+click button:"Ersetzen"
+expect listitem:"Alpha" selected
+click button:"Ersetzen"
+expect listitem:"Omega" exists
+expect listitem:"alphabet Beta" selected
+click button:"Ersetzen"
+expect listitem:"Omegabet Beta" exists
+click button:"Schließen"
+shot build/JFDiagrammer-find.png

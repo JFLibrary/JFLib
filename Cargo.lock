@@ -23,6 +23,7 @@ version = "0.1.0"
 dependencies = [
  "jflib-base",
  "jflib-build",
+ "jflib-datetime",
  "jflib-diagram-core",
  "jflib-diagram-io",
  "jflib-diagram-view",

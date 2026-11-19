@@ -46,6 +46,12 @@
 //                     Format, Shapes verbinden, the Verbindungspfeile
 //   src/structures_cff.rs   (JD10) the register Funktionsübergreifendes Flussdiagramm
 //   src/layout_ui.rs  (JD10) Layout-Verhalten per shape, Seite einrichten › Layout und Routing
+//   src/cmds_text.rs  (JD8 rest) the text, field, link and search commands: state, target, the
+//                     fields' locale and clock, the vertical text box, a shape into view
+//   src/dlg_text.rs   (JD8 rest) the dialog Text (font, paragraph, text block)
+//   src/dlg_field.rs  (JD8 rest) the dialog Feld (fields in the text, TX-06)
+//   src/dlg_link.rs   (JD8 rest) the dialog Hyperlinks, following links, the link pointer
+//   src/dlg_find.rs   (JD8 rest) the dialog Suchen und Ersetzen
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too)
@@ -80,9 +86,14 @@
 extern crate alloc;
 
 mod backstage;
+mod cmds_text;
 mod commands;
 mod design_gallery;
 mod design_store;
+mod dlg_field;
+mod dlg_find;
+mod dlg_link;
+mod dlg_text;
 mod edit_canvas;
 mod edit_cmds;
 mod edit_doc;
@@ -204,6 +215,8 @@ pub(crate) struct Diagrammer {
     /// dialog and register
     pub structs: structures::Structs,
     pub layout: layout_ui::LayoutState,
+    /// (JD8 rest) the text, field, link and search commands (cmds_text.rs)
+    pub txt: cmds_text::TextCmds,
 }
 
 impl Diagrammer {
@@ -253,6 +266,7 @@ impl Diagrammer {
             quick: format_quick::QuickTiles::default(),
             structs: structures::Structs::default(),
             layout: layout_ui::LayoutState::default(),
+            txt: cmds_text::TextCmds::default(),
         }
     }
 
@@ -391,10 +405,11 @@ impl App for Diagrammer {
         export_ui::dialogs(self, ui);
         print_ui::dialogs(self, ui);
         layout_ui::dialog(self, ui);
+        cmds_text::frame(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
-        stencils::command(self, ui, id) || commands::run(self, ui, id)
+        cmds_text::command(self, ui, id) || stencils::command(self, ui, id) || commands::run(self, ui, id)
     }
 }
 

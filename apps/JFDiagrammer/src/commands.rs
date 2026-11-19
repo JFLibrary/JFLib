@@ -441,6 +441,15 @@ static HANDLERS: &[(u32, Handler)] = &[
     (TEXT_JUSTIFY, |a, ui| crate::format_menus::halign(a, ui, 3)),
     (FORMAT_PAINTER, crate::format_menus::painter),
     (THEME_NEW_SHAPES, crate::design_gallery::toggle_new_shapes),
+    // (JD8 rest: Text, Felder, Links, Suchen -- cmds_text.rs, dlg_*.rs)
+    (TEXT_DIALOG, crate::dlg_text::open),
+    (FORMAT_TEXT, crate::dlg_text::open),
+    (TEXT_BOX_V, |a, _| crate::edit_cmds::tool(a, TEXT_BOX_V)),
+    (FIELD, crate::dlg_field::open),
+    (LINK, crate::dlg_link::open),
+    (HYPERLINK, crate::dlg_link::open),
+    (FIND, |a, ui| crate::dlg_find::open(a, ui, false)),
+    (REPLACE, |a, ui| crate::dlg_find::open(a, ui, true)),
 ];
 
 // toggles: whether the command is on
@@ -483,6 +492,8 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (TEXT_JUSTIFY, |a| a.format.halign_now == Some(3)),
     (FORMAT_PAINTER, |a| a.format.painter.is_some()),
     (THEME_NEW_SHAPES, crate::design_gallery::new_shapes),
+    // (JD8 rest: Text, Felder, Links, Suchen)
+    (TEXT_BOX_V, |a| a.tool == TEXT_BOX_V),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -497,7 +508,7 @@ pub(crate) fn enabled(id: u32) -> bool {
 
 /// (JD7) the command exists and can run now (a selection, something to undo ...)
 pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
-    enabled(id) && crate::edit_cmds::available(app, id) && crate::format_menus::available(app, id)
+    enabled(id) && crate::edit_cmds::available(app, id) && crate::format_menus::available(app, id) && crate::cmds_text::available(app, id)
 }
 
 /// the toggle is on

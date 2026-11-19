@@ -41,6 +41,9 @@
 //
 //   structure::*                  (JD10) containers, lists, callouts: membership in the
 //                                 Relationships cell, automatic size, list order and layout
+//   field::*                      (JD8) text fields: a Field row's value in its format picture,
+//                                 new fields, the text with its fields, the document's
+//                                 properties (Document::fields: the app's locale and clock)
 //
 // What is to come here, by stage of the plan: page layout (CN-13, P2)
 //
@@ -56,6 +59,7 @@ mod cell;
 pub mod design;
 mod document;
 mod edit;
+pub mod field;
 pub mod formula;
 pub mod geometry;
 pub mod glue;

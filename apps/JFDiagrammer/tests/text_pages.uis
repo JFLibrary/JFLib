@@ -1,0 +1,52 @@
+#!args apps/JFDiagrammer/tests/viewer.vsdx --no-system-fonts
+# JFDiagrammer, JD8 rest: links, fields and the search across the pages of a drawing
+# (viewer.vsdx: Seite-1, Massstab, the background page Hintergrund-1) -- a link to another page:
+# Ctrl+click shows it; page fields count the foreground pages; Suchen in "Alle Seiten" shows the
+# page of the hit and selects the shape
+click tab:"Massstab"
+cmd 4404
+drag 600,400 700,460
+cmd 4400
+key f2
+type "Ziel"
+click 1000,700
+cmd 4621
+expect dialog:"Feld" missing
+click tab:"Seite-1"
+cmd 4404
+drag 500,500 600,560
+cmd 4400
+key ctrl+k
+expect dialog:"Hyperlinks" exists
+click #2016411659
+click "Massstab"
+click #2016411661
+type "Zum Maßstab"
+click button:"OK"
+# the page fields of the linked shape: page 1 of 2 (the background page does not count)
+cmd 4621
+click listitem:"Seiteninfo"
+click listitem:"Seitenanzahl"
+click button:"OK"
+expect listitem:"2" exists
+# Ctrl+click: the other page
+click 1000,700
+keydown ctrl
+click listitem:"2"
+keyup ctrl
+expect tab:"Massstab" selected
+# Suchen in all pages: back on Seite-1, the hit on Massstab
+click tab:"Seite-1"
+key ctrl+f
+click #2017460225
+type "ziel"
+click radio:"Alle Seiten"
+click button:"Weitersuchen"
+expect tab:"Massstab" selected
+expect listitem:"Ziel" selected
+click button:"Schließen"
+# the menu of the linked shape follows the link too
+click tab:"Seite-1"
+rclick listitem:"2"
+click menuitem:"Zum Maßstab"
+expect tab:"Massstab" selected

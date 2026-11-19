@@ -20,7 +20,7 @@ use crate::commands::{self, REDO, SAVE, UNDO};
 use crate::icons::JD_QAT_CUSTOMIZE;
 use crate::{backstage, panes, ribbon, Diagrammer};
 
-const ID_TABS: u32 = 100;
+pub(crate) const ID_TABS: u32 = 100;
 const ID_QAT_MORE: u32 = 120;
 const ID_NOTICE: u32 = 130;
 const ID_OPEN_DLG: u32 = 0x7000;
