@@ -109,7 +109,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
   <br>[lib.rs](#dxf-crate-root) · [src/fonts.rs](#dxfsrcfontsrs) · [src/mtext.rs](#dxfsrcmtextrs) · [src/strings.rs](#dxfsrcstringsrs)
 - [physics](#physics) -- Collision shapes, broad phase and deterministic queries for games
-  <br>[src/bvh.rs](#physicssrcbvhrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
+  <br>[src/bvh.rs](#physicssrcbvhrs) · [src/character.rs](#physicssrccharacterrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
 - [game](#game) -- The game core: a world of entities and components, a fixed tick, input actions, cameras
   <br>[lib.rs](#game-crate-root) · [src/camera.rs](#gamesrccamerars) · [src/input.rs](#gamesrcinputrs) · [src/pose.rs](#gamesrcposers) · [src/sparse.rs](#gamesrcsparsers) · [src/tick.rs](#gamesrctickrs) · [src/world.rs](#gamesrcworldrs)
 - [game_render3d](#game_render3d) -- The bridge from the game core to render3d: entities with a mesh as scene instances
@@ -53435,7 +53435,8 @@ Source: [`lib/rt/portable/fx.rs`](../lib/rt/portable/fx.rs)
 
 ```text
 Scalar IEEE-754 operations matching the native SSE conversion and operand-selection
-rules. Integer square root avoids libm imports and gives correctly rounded results.
+rules. The square roots avoid libm imports and give correctly rounded results: binary32 by an
+integer root, binary64 by Newton's method with an integer correction (sqrt_portable).
 ```
 
 - **`fn nearest(x: f64) -> f64`**
@@ -53469,7 +53470,18 @@ rules. Integer square root avoids libm imports and gives correctly rounded resul
   Correctly rounded binary32 square root; preserves signed zero and quiets NaNs.
 
 - **`fn sqrtd(x: f64) -> f64`**
-  Correctly rounded binary64 square root; preserves signed zero and quiets NaNs.
+  Correctly rounded binary64 square root; preserves signed zero and quiets NaNs.  The same function as
+  [`sqrt_portable`].
+
+- **`fn sqrt_portable(x: f64) -> f64`**
+  The correctly rounded binary64 square root from f64 operations and one 64 x 64 bit product, with the
+  results of `sqrtsd` for every input (signed zero kept, NaN quieted, a negative number gives the
+  negative default NaN): Newton's method gives an estimate within a few units in the last place, the
+  integer test (R - 1/2)^2 &lt; X &lt;= (R + 1/2)^2 on the significand picks the right neighbour.  `rt::fx::sqrtd`
+  is this function where the processor has no square root rt uses (the browser, the x86-64 Android
+  emulator); on the other targets it is here for comparisons and for lib/physics' and lib/geom's tests.
+  Several times faster than the bit-by-bit integer root it replaced (docs/PHYSICS.md, measurements).
+  `#[inline]`: compiled in the calling crate, with its optimisation level (rt has 1 in development builds).
 
 - **`fn minss(a: f32, b: f32) -> f32`**
   SSE minimum: return the second operand for equal or unordered operands.
@@ -54194,6 +54206,9 @@ physics -- collision for games: shapes, broad phase, queries; deterministic, the
                  swept convex shape: time of impact, normal, contact point), overlap, contacts
                  (penetration depth and normal per body and triangle), closest_point
   query          the same for one shape against one placed shape, without a world
+  CharacterController  the kinematic figure: an upright capsule that walks, runs, jumps, crouches, takes
+                 steps and ramps up to a slope limit, slides along walls, snaps down; one step a pure
+                 function of (state, input, world, dt)
   math           Vec3, Quat, Iso, Aabb in f64; sqrt correctly rounded, sin / cos / atan2 from rt's
                  portable math
 
@@ -54232,6 +54247,159 @@ any input.  Every choice has a tie-break by axis, bin or index: the same tree on
 
 - **`fn is_leaf(&self) -> bool`**
   a leaf (it has triangles)
+
+### `physics/src/character.rs`
+
+Source: [`lib/physics/src/character.rs`](../lib/physics/src/character.rs)
+
+```text
+character -- the kinematic character controller: an upright capsule that walks, runs, jumps and crouches
+on the world's queries.  Steps up to a step height, ramps up to a slope limit (steeper surfaces are walls
+it slides down), sliding along walls and into corners, ground snapping on the way down ramps and steps,
+steering in the air.  The feel hangs on CharacterParams; the defaults suit a fast cartoon arena shooter.
+
+One step is a function of (state, input, world, dt) alone: f64 with + - * /, the correctly rounded
+square root and rt's portable cosine (once, in new), no fused multiply-add, no unordered iteration.  So
+it gives the same bits on every target, and a client predicts exactly what the server computes (G7e).
+The step derives the ground itself; position, velocity and crouched are all the state it reads.
+
+A step (docs/PHYSICS.md, "Der Character-Controller"):
+  1. push out of anything the capsule overlaps (only after a teleport or a body moved into it: the
+     controller's own moves are casts and never end inside anything)
+  2. find the ground: a short cast down; it carries the figure when the normal is walkable (y >=
+     cos(max slope)), or when the contact is on the edge of a walkable surface (a step, a ledge: a ray
+     down just beyond the contact finds that surface), and the figure does not move away from it
+  3. crouch (on the ground the head comes down, in the air the legs come up) or stand up (only where a
+     cast of the crouched capsule finds room for the standing one)
+  4. jump (sets the vertical speed); on the ground with input the velocity moves towards the wish
+     velocity along the ground (accel), without input Quake's friction brakes it; in the air Quake's
+     acceleration (the speed along the wish direction grows up to the wish speed, scaled by air_control)
+  5. move: collide and slide with up to four casts, stopping `skin` before each contact; Quake 3's clip
+     planes (two planes: along their crease, three: stop), so corners neither jitter nor trap; on the
+     ground steep surfaces count as vertical walls (no climbing them by pushing), a walkable one turns
+     the velocity onto it at the same speed; blocked on the ground, a step: up, forward, down onto
+     walkable ground, taken when it gets farther
+  6. on the ground at the start and no jump: snap down onto ground up to step_height below (stairs and
+     ramps downwards); in the air: land on ground within the probe distance
+
+Gravity in the air uses the mean velocity of the tick (v - g dt / 2) for the move, so the height after k
+free ticks is y0 + v0 t - g t^2 / 2 at t = k dt (up to rounding), whatever the tick rate.
+```
+
+```rust
+/// at most so many walls one step reports in [`StepEvents::walls`]
+MAX_WALL_TOUCHES: usize = 4
+```
+
+- **`struct CharacterParams`**
+  How a figure moves: its capsule, speeds, acceleration, friction, gravity, jump, steps and slopes.
+  Metres, seconds, degrees.  [`CharacterParams::default`] is tuned for a fast cartoon arena shooter
+  (docs/PHYSICS.md lists the values and why); [`CharacterController::new`] limits values that make no sense.
+  - `radius: f64` -- the capsule's radius (default 0.4 m)
+  - `height: f64` -- standing height, feet to the top of the head (1.8 m), at least twice the radius
+  - `crouch_height: f64` -- crouched height (1.2 m), between twice the radius and `height`
+  - `walk_speed: f64` -- wish speed without `run` (5 m/s)
+  - `run_speed: f64` -- wish speed with `run` (9 m/s)
+  - `crouch_speed: f64` -- wish speed while crouched (3 m/s)
+  - `accel: f64` -- ground acceleration (12 per second): with input the velocity moves towards the wish velocity (wish
+    direction along the ground times wish speed) by up to `accel` times the wish speed per second; 0 to
+    full speed in 1/12 s, sliding along a wall at the wish velocity's part along it
+  - `friction: f64` -- ground friction without input (6 per second, Quake's): each second the speed drops by `friction`
+    times max(speed, `stop_speed`); from run speed to a stop in about 0.4 s
+  - `stop_speed: f64` -- below this speed friction brakes as if the figure moved this fast, so it stops (2.5 m/s)
+  - `air_control: f64` -- acceleration in the air as a fraction of `accel` (0.3; 0: no steering in the air), Quake's model:
+    the speed along the wish direction grows by up to air_control times accel times the wish speed per
+    second, not beyond the wish speed; steering at an angle to the velocity can gain speed (strafe
+    jumping) up to `max_speed`
+  - `gravity: f64` -- downwards (20 m/s², about twice the earth's: short, snappy jumps)
+  - `jump_height: f64` -- height of a jump's apex above the take-off (1.2 m: onto a crate)
+  - `step_height: f64` -- the highest step the figure walks up and the deepest it snaps down to (0.4 m)
+  - `max_slope_deg: f64` -- the steepest walkable slope (45 degrees); steeper surfaces are walls it slides down
+  - `skin: f64` -- the gap kept between the capsule and everything (0.005 m)
+  - `max_speed: f64` -- the horizontal speed never gets above this (30 m/s)
+  - `max_fall_speed: f64` -- falling never gets faster than this (50 m/s)
+
+- **`struct CharacterState`**
+  What a figure is: all a step reads is `position`, `velocity` and `crouched`; `grounded`,
+  `ground_normal` and `ground_body` are what the last step found (a step finds them again).
+  - `position: Vec3` -- the feet: the lowest point of the capsule (m)
+  - `velocity: Vec3` -- m/s; on the ground along the ground
+  - `crouched: bool` -- the capsule has the crouched height
+  - `grounded: bool` -- stands on walkable ground (output)
+  - `ground_normal: Vec3` -- the normal of that ground, [`Vec3::Y`] in the air (output)
+  - `ground_body: Option<BodyId>` -- the body the figure stands on (output)
+
+**`impl CharacterState`**
+
+- **`const fn new(position: Vec3) -> CharacterState`**
+  standing at `position` (the feet), not moving, in the air until the first step finds ground
+
+- **`struct CharacterInput`**
+  What the player wants in one tick
+  - `wish: Vec3` -- the direction to move in, in world space; y is ignored.  Length 1 moves at the full wish speed,
+    shorter moves slower (a stick), longer counts as 1.  From a yaw: `math::sincos` (rt's portable sine
+    and cosine), never std's, which differs between targets.
+  - `run: bool` -- the run speed instead of the walk speed
+  - `jump: bool` -- jump when on the ground (held: again on every landing)
+  - `crouch: bool` -- crouch while held; on release stand up as soon as there is room
+
+- **`struct Touch`**
+  one contact of a step with a wall
+  - `body: BodyId` -- the body
+  - `point: Vec3` -- the contact point on its surface
+  - `normal: Vec3` -- the surface normal towards the figure
+  - `triangle: u32` -- the triangle of a mesh, or [`crate::NO_TRIANGLE`]
+
+- **`struct StepEvents`**
+  What happened in one step
+  - `landed: bool` -- was in the air (after a jump of this step too) and stands at the end
+  - `impact_speed: f64` -- the speed into the ground at the landing (m/s, for sounds and damage)
+  - `jumped: bool` -- jumped at the start of this step
+  - `left_ground: bool` -- stood at the start, did not jump and is in the air at the end (walked off a ledge)
+  - `hit_ceiling: bool` -- touched a surface facing down (the normal's y at most -cos(max slope))
+  - `walls: [Option<Touch>; MAX_WALL_TOUCHES]` -- the walls touched, in order, each body and triangle once, at most [`MAX_WALL_TOUCHES`]
+  - `stepped_up: f64` -- how far a step lifted the figure (m)
+  - `snapped_down: f64` -- how far ground snapping lowered it (m)
+  - `stand_blocked: bool` -- wanted to stand up and had no room
+  - `pushed_out: f64` -- how far it was pushed out of an overlap at the start (m)
+  - `casts: u32` -- the casts this step made (for statistics)
+
+**`impl StepEvents`**
+
+- **`fn walls(&self) -> impl Iterator<Item = &Touch> + '_`**
+  the walls touched
+- **`fn wall_count(&self) -> usize`**
+  how many walls were touched
+
+- **`struct CharacterController`**
+  The controller: the parameters checked and the values derived from them.  One controller serves any
+  number of figures; [`CharacterController::step`] takes `&self`.
+
+**`impl CharacterController`**
+
+- **`fn new(params: CharacterParams) -> CharacterController`**
+  a controller with `params`, limited to what makes sense: radius at least 1 cm, heights at least twice
+  the radius (crouched not above standing), skin between 0.1 mm and a quarter of the radius, slope 0 to
+  89 degrees, no negative speeds; a value that is not finite takes the default
+- **`fn params(&self) -> &CharacterParams`**
+  the parameters as the controller uses them
+- **`fn jump_speed(&self) -> f64`**
+  the vertical speed a jump starts with: sqrt(2 gravity jump_height)
+- **`fn walkable_y(&self) -> f64`**
+  cos(max_slope_deg): a normal with at least this y is walkable
+- **`fn walkable(&self, normal: Vec3) -> bool`**
+  can a figure stand on a surface with this unit normal
+- **`fn height(&self, crouched: bool) -> f64`**
+  the capsule's total height
+- **`fn capsule(&self, crouched: bool) -> Shape`**
+  the capsule (upright, its centre half the height above the feet)
+- **`fn capsule_iso(&self, state: &CharacterState) -> Iso`**
+  where the capsule of `state` is: for [`World::set_iso`] when the figure is a body of the world
+- **`fn step(&self, state: &CharacterState, world: &World, filter: &Filter, input: &CharacterInput, dt: f64) -> (CharacterState, StepEvents)`**
+  One tick: the state after `dt` seconds of `input` among the bodies of `world` that `filter` lets
+  through (leave the figure's own body out: `Filter::ALL.excluding(id)`), and what happened.  The same
+  bits on every target for the same arguments.  A `dt` that is not positive and finite, or a position
+  that is not finite, changes nothing; a velocity that is not finite counts as 0.
 
 ### `physics/src/gjk.rs`
 
@@ -54322,15 +54490,16 @@ the same code on every target.
 ```
 
 - **`fn sqrt(x: f64) -> f64`**
-  The square root, correctly rounded (IEEE 754), so the same bits on every target: the processor's
-  instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64), elsewhere (the browser, the x86-64
-  Android emulator) [`sqrt_portable`].  A negative argument gives NaN, -0.0 gives -0.0.
+  The square root, correctly rounded (IEEE 754), so the same bits on every target, NaN included:
+  `rt::fx::sqrtd`, the processor's instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64),
+  elsewhere (the browser, the x86-64 Android emulator) [`sqrt_portable`].  A negative argument gives NaN,
+  -0.0 gives -0.0.
 
 - **`fn sqrt_portable(x: f64) -> f64`**
-  The correctly rounded square root from f64 operations and one 64 x 64 bit product: Newton's method
-  gives an estimate within a few units in the last place, the integer test (R - 1/2)^2 &lt; X &lt; (R + 1/2)^2
-  on the significand picks the right neighbour.  Equal to the processor's square root for every input;
-  on the browser it is several times faster than rt's bit-by-bit root.  Public for the tests.
+  The correctly rounded square root from f64 operations and one 64 x 64 bit product (`rt::fx::sqrt_portable`):
+  Newton's method gives an estimate within a few units in the last place, the integer test (R - 1/2)^2 &lt; X
+  &lt;= (R + 1/2)^2 on the significand picks the right neighbour.  Equal to the processor's square root
+  (`sqrtsd`) for every input, NaN included.  Public for the tests.
 
 - **`fn sincos(x: f64) -> (f64, f64)`**
   sin and cos of `x` (radians) from rt's portable math: the same bits on every target (within half an
@@ -56080,15 +56249,16 @@ four meet without a gap.  The same scheme as lib/physics' math (docs/PHYSICS.md,
 ```
 
 - **`fn sqrt(x: f64) -> f64`**
-  The square root, correctly rounded (IEEE 754), so the same bits on every target: the processor's
-  instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64), elsewhere (the browser, the x86-64
-  Android emulator) [`sqrt_portable`].  A negative argument gives NaN, -0.0 gives -0.0.
+  The square root, correctly rounded (IEEE 754), so the same bits on every target, NaN included:
+  `rt::fx::sqrtd`, the processor's instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64),
+  elsewhere (the browser, the x86-64 Android emulator) [`sqrt_portable`].  A negative argument gives NaN,
+  -0.0 gives -0.0.
 
 - **`fn sqrt_portable(x: f64) -> f64`**
-  The correctly rounded square root from f64 operations and one 64 x 64 bit product (lib/physics has the
-  same function and its tests against the processor): Newton's method gives an estimate within a few units
+  The correctly rounded square root from f64 operations and one 64 x 64 bit product (`rt::fx::sqrt_portable`,
+  tested against the processor in apps/physicstest): Newton's method gives an estimate within a few units
   in the last place, the integer test (R - 1/2)^2 &lt; X &lt;= (R + 1/2)^2 on the significand picks the right
-  neighbour.  Public for the tests.
+  neighbour.  Equal to `sqrtsd` for every input, NaN included.  Public for the tests.
 
 - **`fn sin(x: f64) -> f64`**
   sin of `x` (radians), the same bits on every target (within half an ulp)
