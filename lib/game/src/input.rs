@@ -1,19 +1,26 @@
-// input -- named actions bound to keys by where they sit, mouse buttons, the wheel and the raw motion of
-// the locked pointer; sensitivity, inversion and a factor per platform for the motion; the pointer
-// lock's click and its end; bindings and settings in a settings file
+// input -- named actions bound to keys by where they sit, mouse buttons, the wheel, the raw motion of
+// the locked pointer and game pads; sensitivity, inversion and a factor per platform for the motion; the
+// pointer lock's click and its end; the pad's dead zone, turn rate and curve; bindings and settings in a
+// settings file
 //
 //   Source            where an input comes from: Key(KC_*: the key's place, KeyEvent::code, never its
 //                     character), Mouse(MOUSE_*), WheelUp / WheelDown (a notch as a press), MouseX /
-//                     MouseY (raw motion), Wheel (the turn in notches); name / parse for the file,
-//                     label for a menu (plat::key_label: what the layout prints on the key)
+//                     MouseY (raw motion), Wheel (the turn in notches), PadButton(plat::PAD_*), PadAxis
+//                     (a stick's axis), PadDir (a stick's direction as a button); name / parse for the
+//                     file, label for a menu (plat::key_label: what the layout prints on the key;
+//                     label_for: a pad's labels by its style)
 //   ActionMap         actions (name, ActionKind, bindings and their defaults); store / load in an Ini
-//   ActionKind        Button (down, pressed, released), Axis (keys with a scale each, -1 ..= 1),
-//                     Motion (raw motion: an angle in radians, the wheel in notches)
+//   ActionKind        Button (down, pressed, released), Axis (keys with a scale each, a pad's analog
+//                     values, -1 ..= 1), Motion (raw motion: an angle in radians, the wheel in notches,
+//                     a stick turning at a rate)
 //   MouseSettings     sensitivity, invert_x, invert_y, factor (None: the platform's,
 //                     platform_motion_factor); store / load in an Ini
+//   PadSettings       sensitivity (of TURN_RATE), dead_zone (radial), curve, invert_x, invert_y; store /
+//                     load in the same section
 //   Input             takes the events (key, button, buttons, motion, wheel, set_lock, plat_event) and
-//                     answers per frame (down, pressed, released, axis, motion; end_frame) and per tick
-//                     (tick() -> TickInput); the lock: take_lock_request, playing, take_pause
+//                     the pads' snapshots (pad_frame) and answers per frame (down, pressed, released,
+//                     axis, motion; end_frame) and per tick (tick() -> TickInput); the lock:
+//                     take_lock_request, playing, take_pause; the pad: active_pad, pin_pad, device
 //
 // The pointer lock (docs/GAME.md, the user's decisions of 2026-11-18).  While the game needs the lock
 // (require_lock, the default) and does not hold it, no action fires: a mouse press asks for the lock
@@ -39,16 +46,27 @@
 // even when the frame had none, a press and a release between two ticks make one tick with down,
 // pressed and released).  An Axis reads the keys held at the moment it is asked.
 //
-// Room for gamepads (G7a part 2): Source is #[non_exhaustive] (pad buttons and sticks come as more
-// sources), an Axis takes analog values the same way as the scales of keys, a pad gets settings of its
-// own beside MouseSettings.
+// Game pads (G7a part 2).  pad_frame takes the pads of a frame (ui.gamepads(), plat::pads()) and the
+// time since the frame before.  One pad drives a single player's input: the one used last (a button
+// pressed or a stick out of its dead zone; the first such pad, and any other that is used, takes over),
+// or the one pin_pad names (a split screen: an Input per pad).  Its buttons press and release like keys
+// (a tap between two frames is a press and a release: the snapshots carry their edges); its sticks go
+// through a radial dead zone (PadSettings::dead_zone: nearer the middle is rest, the rest of the way
+// scales to 0 ..= 1); an Axis adds a stick's value (or a trigger's) times the binding's scale to its
+// keys', a Motion turns by TURN_RATE x sensitivity degrees a second at full deflection, the deflection
+// raised to PadSettings::curve (fine aim near the middle), times the frame's time.  A pad plays without
+// the pointer lock: a pad button pressed while the game does not play starts playing (pad play) and is
+// swallowed with its release, as the lock's click; the mouse still asks for the lock with its first
+// press, the lock taken ends pad play, its end pauses as before.  The active pad going away during pad
+// play pauses.  After a pause a pad button held counts only once it was let go.  device() says what was
+// used last (prompts for keys or for a pad).
 
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
 use base::Ini;
-use plat::PointerLock;
+use plat::{Gamepad, PAD_AXES, PAD_BUTTONS, PAD_MAX, PadStyle, PointerLock};
 
 /// the left mouse button (plat::BTN_LEFT, ui::BTN_LEFT)
 pub const MOUSE_LEFT: u8 = 1;
@@ -82,6 +100,16 @@ pub const FACTOR_MACOS: f64 = 2.5;
 pub const FACTOR_BROWSER: f64 = 1.0;
 /// the factor where the pointer cannot be locked (Android, iOS): no motion comes
 pub const FACTOR_OTHER: f64 = 1.0;
+
+/// the degrees per second a stick turns at full deflection and pad sensitivity 1 (PadSettings)
+pub const TURN_RATE: f64 = 180.0;
+/// a stick's direction (Source::PadDir) is held from this far on and let go below PAD_DIR_RELEASE
+pub const PAD_DIR_PRESS: f64 = 0.5;
+/// below this a held stick direction is let go
+pub const PAD_DIR_RELEASE: f64 = 0.4;
+
+/// the names of the sticks' axes in a settings file (Source::PadAxis)
+const PAD_AXIS_NAMES: [&str; PAD_AXES] = ["PadLeftX", "PadLeftY", "PadRightX", "PadRightY"];
 
 /// the factor that turns this platform's raw motion into counts of a 1000-dpi mouse (the FACTOR_*
 /// constants)
@@ -117,6 +145,16 @@ pub enum Source {
     MouseY,
     /// the wheel's turn in notches, up positive
     Wheel,
+    /// a pad's button of the standard layout (plat::PAD_A ..= plat::PAD_HOME): pressed and released; in
+    /// an Axis its analog value (a trigger's 0 ..= 1) times the scale
+    PadButton(u8),
+    /// a pad's stick axis (plat::PAD_LX, PAD_LY, PAD_RX, PAD_RY: right and down positive) after the radial
+    /// dead zone: in an Axis its value -1 ..= 1 times the scale, in a Motion it turns (looking: TURN_RATE,
+    /// PadSettings)
+    PadAxis(u8),
+    /// one direction of a stick axis as a button (true: right / down), held from PAD_DIR_PRESS on; in an
+    /// Axis its value 0 ..= 1
+    PadDir(u8, bool),
 }
 
 impl Source {
@@ -125,9 +163,15 @@ impl Source {
         matches!(self, Source::MouseX | Source::MouseY | Source::Wheel)
     }
 
+    /// a pad's (PadButton, PadAxis, PadDir)
+    pub fn is_pad(self) -> bool {
+        matches!(self, Source::PadButton(_) | Source::PadAxis(_) | Source::PadDir(..))
+    }
+
     /// the name in a settings file, the same on every platform: a key's KeyboardEvent.code name ("KeyW",
     /// "ShiftLeft"; "Code0x99" without one), "Mouse1" .. "Mouse7", "WheelUp", "WheelDown", "MouseX",
-    /// "MouseY", "Wheel"
+    /// "MouseY", "Wheel"; a pad's "PadA" .. "PadHome" (plat::pad_button_name), "PadLeftX", "PadLeftY",
+    /// "PadRightX", "PadRightY", a direction "PadLeftX+" (right / down) or "PadLeftX-"
     pub fn name(self) -> String {
         match self {
             Source::Key(code) => match plat::key_code_name(code) {
@@ -140,6 +184,9 @@ impl Source {
             Source::MouseX => String::from("MouseX"),
             Source::MouseY => String::from("MouseY"),
             Source::Wheel => String::from("Wheel"),
+            Source::PadButton(b) => format!("Pad{}", plat::pad_button_name(b as usize)),
+            Source::PadAxis(a) => String::from(PAD_AXIS_NAMES.get(a as usize).copied().unwrap_or("PadAxis?")),
+            Source::PadDir(a, pos) => format!("{}{}", PAD_AXIS_NAMES.get(a as usize).copied().unwrap_or("PadAxis?"), if pos { '+' } else { '-' }),
         }
     }
 
@@ -152,6 +199,19 @@ impl Source {
             "MouseY" => return Some(Source::MouseY),
             "Wheel" => return Some(Source::Wheel),
             _ => {}
+        }
+        if let Some(rest) = s.strip_prefix("Pad") {
+            for (a, n) in PAD_AXIS_NAMES.iter().enumerate() {
+                if let Some(dir) = s.strip_prefix(n) {
+                    return match dir {
+                        "" => Some(Source::PadAxis(a as u8)),
+                        "+" => Some(Source::PadDir(a as u8, true)),
+                        "-" => Some(Source::PadDir(a as u8, false)),
+                        _ => None,
+                    };
+                }
+            }
+            return (0..PAD_BUTTONS).find(|&b| plat::pad_button_name(b) == rest).map(|b| Source::PadButton(b as u8));
         }
         if let Some(n) = s.strip_prefix("Mouse") {
             return match n.parse::<u8>() {
@@ -170,8 +230,17 @@ impl Source {
 
     /// what a menu shows: for a key what the current layout prints on it (plat::key_label: "Z" for KC_W on
     /// a French keyboard), where the platform does not say (the browser, phones) the name without "Key" /
-    /// "Digit"; for the mouse German texts an app translates with its catalogue (ui::i18n::t)
+    /// "Digit"; for the mouse and the pads German texts an app translates with its catalogue
+    /// (ui::i18n::t); a pad's buttons as on an Xbox pad (label_for: by the pad's style)
     pub fn label(self) -> String {
+        self.label_for(PadStyle::Xbox)
+    }
+
+    /// label, a pad's buttons as a pad of that style prints them (plat::Gamepad::style): Xbox (also for
+    /// pads of no known style) A B X Y, LB RB LT RT, Ansicht, Menü; PlayStation Kreuz, Kreis, Quadrat,
+    /// Dreieck, L1 R1 L2 R2, Create, Options, L3 R3; Nintendo by the places B A Y X, L R ZL ZR, Minus,
+    /// Plus
+    pub fn label_for(self, style: PadStyle) -> String {
         match self {
             Source::Key(code) => plat::key_label(code).filter(|l| !l.is_empty()).unwrap_or_else(|| {
                 let n = self.name();
@@ -193,8 +262,43 @@ impl Source {
             Source::MouseX => String::from("Maus waagrecht"),
             Source::MouseY => String::from("Maus senkrecht"),
             Source::Wheel => String::from("Mausrad"),
+            Source::PadButton(b) => String::from(pad_button_label(b as usize, style)),
+            Source::PadAxis(a) => String::from(match a as usize {
+                0 => "Linker Stick waagrecht",
+                1 => "Linker Stick senkrecht",
+                2 => "Rechter Stick waagrecht",
+                3 => "Rechter Stick senkrecht",
+                _ => "Stick",
+            }),
+            Source::PadDir(a, pos) => String::from(match (a as usize, pos) {
+                (0, true) => "Linker Stick rechts",
+                (0, false) => "Linker Stick links",
+                (1, true) => "Linker Stick runter",
+                (1, false) => "Linker Stick hoch",
+                (2, true) => "Rechter Stick rechts",
+                (2, false) => "Rechter Stick links",
+                (3, true) => "Rechter Stick runter",
+                (3, false) => "Rechter Stick hoch",
+                _ => "Stick",
+            }),
         }
     }
+}
+
+/// a pad button's label by the pad's style (Source::label_for)
+fn pad_button_label(b: usize, style: PadStyle) -> &'static str {
+    const XBOX: [&str; PAD_BUTTONS] = ["A", "B", "X", "Y", "LB", "RB", "LT", "RT", "Ansicht", "Menü", "Linker Stick (drücken)", "Rechter Stick (drücken)", "Steuerkreuz hoch",
+                                       "Steuerkreuz runter", "Steuerkreuz links", "Steuerkreuz rechts", "Xbox-Taste"];
+    const PS: [&str; PAD_BUTTONS] = ["Kreuz", "Kreis", "Quadrat", "Dreieck", "L1", "R1", "L2", "R2", "Create", "Options", "L3", "R3", "Steuerkreuz hoch", "Steuerkreuz runter",
+                                     "Steuerkreuz links", "Steuerkreuz rechts", "PS-Taste"];
+    const NIN: [&str; PAD_BUTTONS] = ["B", "A", "Y", "X", "L", "R", "ZL", "ZR", "Minus", "Plus", "Linker Stick (drücken)", "Rechter Stick (drücken)", "Steuerkreuz hoch",
+                                      "Steuerkreuz runter", "Steuerkreuz links", "Steuerkreuz rechts", "Home"];
+    let t = match style {
+        PadStyle::PlayStation => &PS,
+        PadStyle::Nintendo => &NIN,
+        _ => &XBOX,
+    };
+    t.get(b).copied().unwrap_or("Pad-Knopf")
 }
 
 /// a binding: a source and its scale (an Axis: +1 / -1 for the two directions; a Motion: a multiplier,
@@ -262,18 +366,22 @@ pub enum ActionKind {
     /// pressed and released (fire, jump, use): sources that press (keys, mouse buttons, wheel notches)
     Button,
     /// a value in -1 ..= 1 from the sources held, each with its scale (walking forward and back from W
-    /// and S); pads' sticks later
+    /// and S), a pad's sticks and triggers with their analog values times the scale
     Axis,
-    /// raw motion summed (looking around): MouseX, MouseY (radians), Wheel (notches)
+    /// raw motion summed (looking around): MouseX, MouseY (radians), Wheel (notches), a stick's axis
+    /// (PadAxis: radians, turning at a rate)
     Motion,
 }
 
 impl ActionKind {
-    /// a source this kind takes
+    /// a source this kind takes: a Button what presses (keys, mouse buttons, wheel notches, pad buttons and
+    /// stick directions), an Axis those and a stick's axis, a Motion the mouse's motion, the wheel and a
+    /// stick's axis
     pub fn takes(self, s: Source) -> bool {
         match self {
-            ActionKind::Button | ActionKind::Axis => !s.is_motion(),
-            ActionKind::Motion => s.is_motion(),
+            ActionKind::Button => !s.is_motion() && !matches!(s, Source::PadAxis(_)),
+            ActionKind::Axis => !s.is_motion(),
+            ActionKind::Motion => s.is_motion() || matches!(s, Source::PadAxis(_)),
         }
     }
 }
@@ -538,6 +646,146 @@ impl MouseSettings {
     }
 }
 
+/// how a pad's sticks turn into values and angles (the sticks of every pad of the input)
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PadSettings {
+    /// the multiplier of TURN_RATE (1: 180 degrees a second at full deflection)
+    pub sensitivity: f64,
+    /// the radial dead zone of both sticks, 0 ..= 0.9: nearer the middle a stick is at rest, the rest of
+    /// its way scales to 0 ..= 1 (beyond 1, a square stick's corners: 1)
+    pub dead_zone: f64,
+    /// the response curve of looking, 1 ..= 4: the deflection after the dead zone to this power (1
+    /// linear; 2, the default, turns slowly near the middle for fine aim and fast at the end)
+    pub curve: f64,
+    /// right turns left
+    pub invert_x: bool,
+    /// down looks up
+    pub invert_y: bool,
+}
+
+impl Default for PadSettings {
+    fn default() -> Self {
+        PadSettings::DEFAULT
+    }
+}
+
+impl PadSettings {
+    /// sensitivity 1, dead zone 0.15, curve 2, nothing inverted
+    pub const DEFAULT: PadSettings = PadSettings { sensitivity: 1.0, dead_zone: 0.15, curve: 2.0, invert_x: false, invert_y: false };
+
+    /// a stick (x, y as the pad reports it, -1 ..= 1) after the radial dead zone: (0, 0) up to dead_zone
+    /// from the middle, beyond it the way that is left scaled to 0 ..= 1 in the same direction
+    pub fn stick(&self, x: f64, y: f64) -> (f64, f64) {
+        if !(x.is_finite() && y.is_finite()) {
+            return (0.0, 0.0);
+        }
+        let dz = self.dead_zone.clamp(0.0, 0.9);
+        let m = physics::math::sqrt(x * x + y * y);
+        if m <= dz || m == 0.0 {
+            return (0.0, 0.0);
+        }
+        let k = (m.min(1.0) - dz) / (1.0 - dz) / m;
+        (x * k, y * k)
+    }
+
+    /// a stick's turn in radians per second (x right, y down): the dead zone, the curve on the
+    /// deflection, TURN_RATE x sensitivity at full deflection, the inversion's signs
+    pub fn look(&self, x: f64, y: f64) -> (f64, f64) {
+        let (sx, sy) = self.stick(x, y);
+        let m = physics::math::sqrt(sx * sx + sy * sy);
+        if m == 0.0 {
+            return (0.0, 0.0);
+        }
+        let c = self.curve.clamp(1.0, 4.0);
+        // the deflection to the power c, kept in its direction: (s / m) * m^c = s * m^(c - 1)
+        let f = if c == 1.0 {
+            1.0
+        } else if c == 2.0 {
+            m
+        } else {
+            rt::portable::math::pow(m, c - 1.0)
+        };
+        let rate = TURN_RATE * self.sensitivity * (core::f64::consts::PI / 180.0);
+        let k = f * rate;
+        (if self.invert_x { -sx * k } else { sx * k }, if self.invert_y { -sy * k } else { sy * k })
+    }
+
+    /// into section `section` of a settings file: "pad_sensitivity", "pad_dead_zone", "pad_curve",
+    /// "pad_invert_x", "pad_invert_y", each only when it differs from the default (else its line goes)
+    pub fn store(&self, ini: &mut Ini, section: &str) {
+        let d = PadSettings::DEFAULT;
+        for (key, v, dv) in [("pad_sensitivity", self.sensitivity, d.sensitivity), ("pad_dead_zone", self.dead_zone, d.dead_zone), ("pad_curve", self.curve, d.curve)] {
+            if v == dv {
+                ini.remove(section, key);
+            } else {
+                ini.set_f64(section, key, v);
+            }
+        }
+        for (key, v) in [("pad_invert_x", self.invert_x), ("pad_invert_y", self.invert_y)] {
+            if v {
+                ini.set(section, key, "true");
+            } else {
+                ini.remove(section, key);
+            }
+        }
+    }
+
+    /// from section `section` (Self::store): what is missing or unreadable is the default; the
+    /// sensitivity kept in 0.001 ..= 100, the dead zone in 0 ..= 0.9, the curve in 1 ..= 4
+    pub fn load(ini: &Ini, section: &str) -> PadSettings {
+        let d = PadSettings::DEFAULT;
+        let get = |key: &str, dv: f64, lo: f64, hi: f64| {
+            let v = ini.get_f64(section, key, dv);
+            if v.is_finite() { v.clamp(lo, hi) } else { dv }
+        };
+        PadSettings {
+            sensitivity: get("pad_sensitivity", d.sensitivity, SENS_MIN, SENS_MAX),
+            dead_zone: get("pad_dead_zone", d.dead_zone, 0.0, 0.9),
+            curve: get("pad_curve", d.curve, 1.0, 4.0),
+            invert_x: ini.get_int(section, "pad_invert_x", 0) != 0,
+            invert_y: ini.get_int(section, "pad_invert_y", 0) != 0,
+        }
+    }
+}
+
+/// what the player used last (Input::device): a game shows its prompts for that
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Device {
+    /// the keyboard or the mouse (also before anything was used)
+    #[default]
+    KeyboardMouse,
+    /// a game pad (Input::active_pad)
+    Pad,
+}
+
+/// the pad's part of an Input
+#[derive(Clone, Debug, Default)]
+struct PadIn {
+    settings: PadSettings,
+    /// the pad that drives the actions, the one the game pinned
+    active: Option<u8>,
+    pin: Option<u8>,
+    /// the active pad's buttons held as the input counts them (bit PAD_*), their values, its sticks after
+    /// the dead zone, their turns (rad/s), its stick directions held (bit axis * 2 + positive)
+    held: u32,
+    values: [f64; PAD_BUTTONS],
+    sticks: [f64; PAD_AXES],
+    look: [f64; PAD_AXES],
+    dirs: u8,
+    /// buttons that count only after a release: held when the input paused, when the pad became the
+    /// active one, or taken by a capture
+    latched: u32,
+    /// the press that started pad play: its release is swallowed too
+    swallowed: u32,
+    /// playing with the pad without the pointer lock
+    play: bool,
+    /// per slot: the buttons held and whether a stick was out of its dead zone at the last frame
+    prev: [u32; PAD_MAX],
+    prev_moved: u8,
+    /// per slot: the directions held at the last frame (captures)
+    prev_dirs: [u8; PAD_MAX],
+}
+
 /// an action in a tick (TickInput) or a frame
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ActionState {
@@ -624,6 +872,9 @@ pub struct Input {
     acc: Vec<Acc>,
     /// Some: the next source pressed is captured for a settings page instead of driving actions
     capture: Option<Option<Source>>,
+    /// the game pad's state and settings
+    pad: PadIn,
+    device: Device,
 }
 
 impl Input {
@@ -644,6 +895,8 @@ impl Input {
             wheel_rest: 0.0,
             acc: alloc::vec![Acc::default(); n],
             capture: None,
+            pad: PadIn { settings: PadSettings::DEFAULT, ..PadIn::default() },
+            device: Device::KeyboardMouse,
         }
     }
 
@@ -682,9 +935,21 @@ impl Input {
         self.require_lock
     }
 
-    /// the actions fire: the lock is held, or not required, or the platform has none (Unsupported)
+    /// the actions fire: the lock is held, or not required, or the platform has none (Unsupported), or the
+    /// player plays with a pad (pad_playing)
     pub fn playing(&self) -> bool {
+        self.mouse_playing() || self.pad.play
+    }
+
+    /// the mouse plays: the lock is held, not required or not there (else a press asks for it)
+    fn mouse_playing(&self) -> bool {
         !self.require_lock || matches!(self.lock, PointerLock::Locked | PointerLock::Unsupported)
+    }
+
+    /// playing with a pad without the pointer lock: a pad button pressed while the game did not play
+    /// started it (that press fired nothing); the lock taken or the pad gone ends it
+    pub fn pad_playing(&self) -> bool {
+        self.pad.play
     }
 
     /// the state of the lock as the input knows it (set_lock)
@@ -700,7 +965,14 @@ impl Input {
         self.lock = state;
         if state == PointerLock::Locked {
             self.want_lock = false;
+            self.pad.play = false; // (the mouse took over)
         }
+        self.play_changed(was);
+    }
+
+    /// playing started or ended since `was`: the end pauses (everything let go), the start takes what is
+    /// held without a press
+    fn play_changed(&mut self, was: bool) {
         if was && !self.playing() {
             self.release_all();
             self.pause_edge = true;
@@ -734,12 +1006,21 @@ impl Input {
         self.pauses
     }
 
-    /// every held key and button is let go (the actions report their release); motion not yet taken goes
+    /// every held key and button is let go (the actions report their release); motion not yet taken goes;
+    /// a pad button held counts again only after it was let go
     pub fn release_all(&mut self) {
         self.keys = [0; 4];
         self.buttons = 0;
         self.swallowed = 0;
         self.wheel_rest = 0.0;
+        let p = &mut self.pad;
+        p.latched |= p.held | p.swallowed;
+        p.held = 0;
+        p.swallowed = 0;
+        p.values = [0.0; PAD_BUTTONS];
+        p.sticks = [0.0; PAD_AXES];
+        p.look = [0.0; PAD_AXES];
+        p.dirs = 0;
         for a in &mut self.acc {
             a.frame_motion = 0.0;
             a.tick_motion = 0.0;
@@ -762,6 +1043,7 @@ impl Input {
             return;
         }
         if down {
+            self.device = Device::KeyboardMouse;
             self.keys[w] |= bit;
         } else {
             self.keys[w] &= !bit;
@@ -785,7 +1067,9 @@ impl Input {
             if self.capture_take(Source::Mouse(b)) {
                 return;
             }
-            if !self.playing() {
+            self.device = Device::KeyboardMouse;
+            if !self.mouse_playing() {
+                // (also while playing with a pad: the mouse plays only with the lock)
                 self.swallowed |= bit;
                 self.want_lock = true;
                 return;
@@ -841,6 +1125,7 @@ impl Input {
         if !self.playing() || !(dx.is_finite() && dy.is_finite()) || (dx == 0.0 && dy == 0.0) {
             return;
         }
+        self.device = Device::KeyboardMouse;
         let (kx, ky) = self.mouse.radians_per_unit();
         for (i, a) in self.acc.iter_mut().enumerate() {
             let act = &self.map.actions[i];
@@ -902,12 +1187,36 @@ impl Input {
         }
     }
 
-    /// a source is held now (keys and buttons)
+    /// a source is held now (keys, buttons, the active pad's buttons and stick directions, a stick out of
+    /// its dead zone)
     fn source_held(&self, s: Source) -> bool {
         match s {
             Source::Key(c) => self.key_held(c),
             Source::Mouse(b) => self.button_held(b),
+            Source::PadButton(b) => self.pad_held(b as usize),
+            Source::PadDir(a, pos) => (a as usize) < PAD_AXES && self.pad.dirs & (1 << (a * 2 + pos as u8)) != 0,
+            Source::PadAxis(a) => self.pad.sticks.get(a as usize).is_some_and(|&v| v != 0.0),
             _ => false,
+        }
+    }
+
+    /// a source's value in an Axis (None: not held): keys and buttons 1, a pad button its analog value
+    /// (a trigger's), a stick its value after the dead zone, a direction its part of it
+    fn source_value(&self, s: Source) -> Option<f64> {
+        match s {
+            Source::PadButton(b) => {
+                let b = b as usize;
+                let blocked = b >= PAD_BUTTONS || (self.pad.latched | self.pad.swallowed) & (1 << b) != 0;
+                let v = if blocked { 0.0 } else { self.pad.values[b] };
+                (v != 0.0).then_some(v)
+            }
+            Source::PadAxis(a) => self.pad.sticks.get(a as usize).copied().filter(|&v| v != 0.0),
+            Source::PadDir(a, pos) => {
+                let v = self.pad.sticks.get(a as usize).copied().unwrap_or(0.0);
+                let v = if pos { v } else { -v };
+                (v > 0.0).then_some(v)
+            }
+            _ => self.source_held(s).then_some(1.0),
         }
     }
 
@@ -944,8 +1253,12 @@ impl Input {
             ActionKind::Motion => 0.0,
             ActionKind::Button => if self.acc[a.index()].held { 1.0 } else { 0.0 },
             ActionKind::Axis => {
-                // (from +0.0: an empty f64 sum is -0.0, which a text would show as "-0")
-                let v = act.binds.iter().filter(|b| self.source_held(b.source)).fold(0.0, |v, b| v + b.scale);
+                // (from +0.0: an empty f64 sum is -0.0, which a text would show as "-0"; a key's value 1 times
+                // its scale is its scale, exactly)
+                let v = act.binds.iter().fold(0.0, |v, b| match self.source_value(b.source) {
+                    Some(x) => v + x * b.scale,
+                    None => v,
+                });
                 v.clamp(-1.0, 1.0)
             }
         }
@@ -1062,24 +1375,252 @@ impl Input {
                 self.motion(dx, dy);
             }
             plat::E_FOCUS_OUT => self.release_all(),
+            // (the pads come with pad_frame(&plat::pads(), dt) every frame)
+            plat::E_GAMEPAD => {}
             _ => return false,
         }
         true
     }
 
-    /// the bindings and the mouse settings into section `section` of a settings file (ActionMap::store,
-    /// MouseSettings::store): with base::Settings, `input.store(settings.ini_mut(), "input")`
+    /// the bindings, the mouse and the pad settings into section `section` of a settings file
+    /// (ActionMap::store, MouseSettings::store, PadSettings::store): with base::Settings,
+    /// `input.store(settings.ini_mut(), "input")`
     pub fn store(&self, ini: &mut Ini, section: &str) {
         self.map.store(ini, section);
         self.mouse.store(ini, section);
+        self.pad.settings.store(ini, section);
     }
 
-    /// the bindings and the mouse settings from section `section` (Self::store) -> the bindings that
-    /// could not be read
+    /// the bindings, the mouse and the pad settings from section `section` (Self::store) -> the bindings
+    /// that could not be read
     pub fn load(&mut self, ini: &Ini, section: &str) -> usize {
         let bad = self.map.load(ini, section);
         self.mouse = MouseSettings::load(ini, section);
+        self.pad.settings = PadSettings::load(ini, section);
         self.update_held();
         bad
+    }
+
+    // ------------------------------------------------------------------ game pads
+
+    /// the pad settings
+    pub fn pad_settings(&self) -> &PadSettings {
+        &self.pad.settings
+    }
+
+    /// other pad settings (from the next pad_frame on)
+    pub fn set_pad_settings(&mut self, s: PadSettings) {
+        self.pad.settings = s;
+    }
+
+    /// the pad that drives the actions (plat::Gamepad::index): the one used last, or the pinned one;
+    /// None before any pad was used
+    pub fn active_pad(&self) -> Option<u8> {
+        self.pad.active
+    }
+
+    /// only this pad drives the input from now on (an Input per player in a split screen); None: the
+    /// one used last again
+    pub fn pin_pad(&mut self, index: Option<u8>) {
+        self.pad.pin = index;
+    }
+
+    /// the pad pinned (pin_pad)
+    pub fn pinned_pad(&self) -> Option<u8> {
+        self.pad.pin
+    }
+
+    /// what the player used last: a key or the mouse, or a pad
+    pub fn device(&self) -> Device {
+        self.device
+    }
+
+    /// the active pad's button b (plat::PAD_*) is held as the input counts it (not one that waits for its
+    /// release after a pause, not the press that started pad play)
+    pub fn pad_held(&self, b: usize) -> bool {
+        b < PAD_BUTTONS && self.pad.held & (1 << b) != 0
+    }
+
+    /// the active pad's stick axis a (plat::PAD_LX ..) after the dead zone
+    pub fn pad_stick(&self, a: usize) -> f64 {
+        self.pad.sticks.get(a).copied().unwrap_or(0.0)
+    }
+
+    /// the pads of this frame (ui.gamepads(), plat::pads(): the connected ones with the edges of their
+    /// buttons) and the seconds since the frame before (a stick's turn is its rate times that; kept in
+    /// 0 ..= 0.25).  The pad used last drives the actions (or the pinned one); a pad button pressed while
+    /// the game does not play starts pad play and fires nothing, nor does its release; the active pad gone
+    /// during pad play pauses.  Call it once a frame, before reading the actions, also without pads (an
+    /// empty slice lets the active pad go)
+    pub fn pad_frame(&mut self, pads: &[Gamepad], dt: f64) {
+        let dt = if dt.is_finite() && dt > 0.0 { dt.min(0.25) } else { 0.0 };
+        let settings = self.pad.settings;
+        // which pad: the pinned one, else the active one while it is there; one that is used takes over
+        let mut active = self.pad.active.filter(|&a| pads.iter().any(|p| p.index == a && p.connected));
+        let mut used: Option<u8> = None;
+        let mut captured: Option<Source> = None;
+        for p in pads.iter().filter(|p| p.connected && (p.index as usize) < PAD_MAX) {
+            let i = p.index as usize;
+            let pressed_new = (p.pressed | p.down) & !self.pad.prev[i];
+            let (l, r) = (settings.stick(p.axes[0] as f64, p.axes[1] as f64), settings.stick(p.axes[2] as f64, p.axes[3] as f64));
+            let moved = l != (0.0, 0.0) || r != (0.0, 0.0);
+            let was_moved = self.pad.prev_moved & (1 << i) != 0;
+            // (captures: the lowest new button, else a stick's direction newly past PAD_DIR_PRESS)
+            let mut dirs = 0u8;
+            for (a, v) in [l.0, l.1, r.0, r.1].into_iter().enumerate() {
+                if v >= PAD_DIR_PRESS {
+                    dirs |= 1 << (a * 2 + 1);
+                } else if v <= -PAD_DIR_PRESS {
+                    dirs |= 1 << (a * 2);
+                }
+            }
+            if captured.is_none() {
+                if pressed_new != 0 {
+                    captured = Some(Source::PadButton(pressed_new.trailing_zeros() as u8));
+                } else if dirs & !self.pad.prev_dirs[i] != 0 {
+                    let k = (dirs & !self.pad.prev_dirs[i]).trailing_zeros() as u8;
+                    captured = Some(Source::PadDir(k / 2, k % 2 == 1));
+                }
+            }
+            self.pad.prev[i] = p.pressed;
+            self.pad.prev_dirs[i] = dirs;
+            if moved {
+                self.pad.prev_moved |= 1 << i;
+            } else {
+                self.pad.prev_moved &= !(1 << i);
+            }
+            if pressed_new != 0 || (moved && !was_moved) {
+                used = Some(p.index);
+                // (a button takes over from another pad; a stick only when none is active: a stick that
+                // drifts out of its dead zone does not steal the input)
+                if self.pad.pin.is_none() && (pressed_new != 0 || active.is_none()) {
+                    active = Some(p.index);
+                }
+            }
+        }
+        // slots that went: their memory goes
+        for i in 0..PAD_MAX {
+            if !pads.iter().any(|p| p.connected && p.index as usize == i) {
+                self.pad.prev[i] = 0;
+                self.pad.prev_dirs[i] = 0;
+                self.pad.prev_moved &= !(1 << i);
+            }
+        }
+        if let Some(pin) = self.pad.pin {
+            active = pads.iter().any(|p| p.connected && p.index == pin).then_some(pin);
+        }
+        let was_playing = self.playing();
+        // the active pad changed or went: what the old one held goes (a new one's held buttons wait for
+        // their release)
+        if active != self.pad.active {
+            let gone = self.pad.active.is_some() && active.is_none();
+            self.pad.held = 0;
+            self.pad.dirs = 0;
+            self.pad.swallowed = 0;
+            self.pad.values = [0.0; PAD_BUTTONS];
+            self.pad.sticks = [0.0; PAD_AXES];
+            self.pad.look = [0.0; PAD_AXES];
+            self.pad.latched = active.and_then(|a| pads.iter().find(|p| p.index == a)).map_or(0, |p| p.pressed & !p.down);
+            self.pad.active = active;
+            if gone && self.pad.play {
+                self.pad.play = false; // the pad went during pad play: the pause
+            }
+            self.update_held();
+        }
+        // a settings page's capture takes the press (it drives nothing, nor does its hold)
+        if let (true, Some(s)) = (self.capturing(), captured) {
+            self.capture_take(s);
+            if let Source::PadButton(b) = s {
+                self.pad.latched |= 1 << b;
+            }
+        }
+        let Some(p) = active.and_then(|a| pads.iter().find(|p| p.index == a)) else {
+            self.play_changed(was_playing);
+            return;
+        };
+        if used == Some(p.index) {
+            self.device = Device::Pad;
+        }
+        // the buttons: a latched one counts after it was let go, the press that started pad play with its
+        // release
+        let pd = &mut self.pad;
+        pd.latched &= p.pressed & !p.up;
+        pd.swallowed &= p.pressed & !p.up;
+        let new_presses = p.down & !pd.latched & !pd.swallowed;
+        let start = !was_playing && new_presses != 0 && self.capture.is_none();
+        if start {
+            pd.play = true;
+            pd.swallowed |= new_presses;
+        }
+        let mut values = [0.0f64; PAD_BUTTONS];
+        for (b, v) in values.iter_mut().enumerate() {
+            *v = p.buttons[b] as f64;
+        }
+        pd.values = values;
+        let l = settings.stick(p.axes[0] as f64, p.axes[1] as f64);
+        let r = settings.stick(p.axes[2] as f64, p.axes[3] as f64);
+        pd.sticks = [l.0, l.1, r.0, r.1];
+        let (llx, lly) = settings.look(p.axes[0] as f64, p.axes[1] as f64);
+        let (lrx, lry) = settings.look(p.axes[2] as f64, p.axes[3] as f64);
+        pd.look = [llx, lly, lrx, lry];
+        // the stick directions with their hysteresis
+        let mut dirs = pd.dirs;
+        for (a, &v) in pd.sticks.iter().enumerate() {
+            for (pos, sv) in [(false, -v), (true, v)] {
+                let bit = 1u8 << (a * 2 + pos as usize);
+                if dirs & bit != 0 && sv < PAD_DIR_RELEASE {
+                    dirs &= !bit;
+                } else if dirs & bit == 0 && sv >= PAD_DIR_PRESS {
+                    dirs |= bit;
+                }
+            }
+        }
+        pd.dirs = dirs;
+        if start {
+            // playing from now on: what is held counts without a press (play_changed), the starting press
+            // is swallowed
+            pd.held = p.pressed & !pd.latched & !pd.swallowed;
+            self.play_changed(was_playing);
+        } else {
+            // the edges since the last frame: a button that went down and up (a tap) presses and releases,
+            // one held that went up and down again releases and presses
+            let blocked = pd.latched | pd.swallowed;
+            let now = p.pressed & !blocked;
+            let was = pd.held;
+            let taps = p.down & p.up & !p.pressed & !was & !blocked;
+            let again = p.down & p.up & p.pressed & was & !blocked;
+            if again != 0 {
+                pd.held = was & !again;
+                self.update_held();
+            }
+            self.pad.held = now;
+            self.update_held();
+            for b in 0..PAD_BUTTONS {
+                if taps & (1 << b) != 0 && self.playing() {
+                    self.pulse(Source::PadButton(b as u8));
+                }
+            }
+            self.play_changed(was_playing);
+        }
+        // looking: a Motion's stick axes turn by their rate times the frame's time
+        if dt > 0.0 && self.playing() {
+            let look = self.pad.look;
+            for (i, a) in self.acc.iter_mut().enumerate() {
+                let act = &self.map.actions[i];
+                if act.kind != ActionKind::Motion {
+                    continue;
+                }
+                let mut m = 0.0;
+                for b in &act.binds {
+                    if let Source::PadAxis(k) = b.source {
+                        m += look.get(k as usize).copied().unwrap_or(0.0) * dt * b.scale;
+                    }
+                }
+                if m != 0.0 {
+                    a.frame_motion += m;
+                    a.tick_motion += m;
+                }
+            }
+        }
     }
 }

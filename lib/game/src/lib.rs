@@ -36,7 +36,7 @@ mod tick;
 mod world;
 
 pub use camera::{FirstPerson, Follow, FreeFly, View};
-pub use input::{ActionId, ActionKind, ActionMap, ActionState, Bind, Input, MouseSettings, Source, TickInput};
+pub use input::{ActionId, ActionKind, ActionMap, ActionState, Bind, Device, Input, MouseSettings, PadSettings, Source, TickInput};
 pub use pose::{Pose, Transform, nlerp};
 pub use sparse::{Mut, SparseSet};
 pub use tick::{DEFAULT_MAX_STEPS, DEFAULT_RATE, FixedTick, Game, Step, System, Systems};
