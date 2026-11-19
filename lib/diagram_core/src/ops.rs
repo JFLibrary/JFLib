@@ -19,6 +19,10 @@
 //   new_shape(tx, eng, owner, Basic::Rectangle | Ellipse | TextBox, a, b)
 //   set_text(tx, eng, shape, text) / text_frame / set_text_frame   (TX-01, TX-03)
 //   copy(doc, shapes) -> Clip / paste(tx, eng, owner, &clip, offset)
+//   new_freeform / new_arc / simplify / Spline / quarter_arc   (JD8 rest) the freeform and arc
+//                                       tools: 1-D shapes like a line (ops/draw.rs, RS-16)
+//   new_picture / probe_picture / PictureInfo   (JD8 rest) a picture file as a Foreign shape
+//                                       with its bytes as a package part (ops/picture.rs, RE-02)
 //
 // Every position is on the page in drawing units (PinX of a top-level shape as the file has
 // it), y up; local coordinates have their origin at the bottom left of the shape's box.  A
@@ -72,10 +76,14 @@ use crate::strings::Sym;
 use crate::units::Unit;
 
 mod clip;
+mod draw;
+mod picture;
 mod points;
 pub(crate) mod text;
 
 pub use clip::{copy, paste, Clip};
+pub use draw::{new_arc, new_freeform, quarter_arc, simplify, Arc, Spline};
+pub use picture::{new_picture, probe_picture, PictureFormat, PictureInfo};
 pub use points::{controls, delete_vertex, insert_vertex, set_control, set_vertex, vertices, Control, Vertex};
 
 #[cfg(test)]

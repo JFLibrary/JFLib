@@ -58,6 +58,11 @@
 //                     Hintergrundseite, duplicate, delete, rename, reorder (dialogs)
 //   src/page_size.rs  (JD8 rest) Entwurf › Ausrichtung, Größe, Automatisch anpassen, the
 //                     automatic size after a gesture (diagram_core::pagesetup)
+//   src/cmds_draw.rs  (JD8 rest) Zeichentools: the split button, the freeform and arc tools
+//   src/cmds_picture.rs  (JD8 rest) Einfügen › Bilder › Bild aus Datei
+//   src/cmds_paste.rs (JD8 rest) Inhalte einfügen, Als Link einfügen, Strg+V from the system
+//   src/layers.rs     (JD8 rest) Ebene zuweisen, Ebeneneigenschaften, the layers on the canvas
+//   src/select_type.rs  (JD8 rest) Markieren › Nach Typ auswählen
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too)
@@ -78,8 +83,9 @@
 // a drawing on the command line opens at start (JD4); --no-system-fonts draws with the style's
 // fonts only (the same on every machine); --write-stencils DIR writes the built-in stencils
 // (.vssx, metric and US) into DIR and ends (JD9: the user's check in Visio); --export-dir DIR
-// puts DIR in front of the name the export's save dialog proposes (JD12); --check-commands shows
-// which commands still lack a function as the notice (JD8 rest, cmds_later.rs).
+// puts DIR in front of the name the export's save dialog proposes (JD12); --picture-dir DIR is
+// where Bild aus Datei's dialog starts (JD8 rest); --check-commands shows which commands still
+// lack a function as the notice (JD8 rest, cmds_later.rs).
 //
 //   python build_rs.py run JFDiagrammer
 //   python build_rs.py test JFDiagrammer          tests/*.uis
@@ -97,6 +103,9 @@ mod cmds_arrange;
 mod cmds_later;
 mod cmds_myshapes;
 mod cmds_shell;
+mod cmds_draw;
+mod cmds_paste;
+mod cmds_picture;
 mod commands;
 mod design_gallery;
 mod design_store;
@@ -111,6 +120,7 @@ mod format_pane;
 mod format_quick;
 mod icons;
 mod lang;
+mod layers;
 mod layout_ui;
 mod options;
 mod pane_data;
@@ -123,6 +133,7 @@ mod print_layout;
 mod print_ui;
 mod qat;
 mod ribbon;
+mod select_type;
 mod shell;
 mod stencils;
 mod stencils_drop;
@@ -238,6 +249,12 @@ pub(crate) struct Diagrammer {
     pub qat: qat::QatState,
     /// (JD8 rest) the dialogs Seite umbenennen, Seiten neu anordnen
     pub pages: pages::PagesState,
+    /// (JD8 rest) Zeichentools, Bild aus Datei, Inhalte einfügen, Ebenen, Nach Typ auswählen
+    pub draw: cmds_draw::DrawState,
+    pub pictures: cmds_picture::PictureState,
+    pub paste: cmds_paste::PasteState,
+    pub layers: layers::LayerState,
+    pub select: select_type::SelectState,
 }
 
 impl Diagrammer {
@@ -293,6 +310,11 @@ impl Diagrammer {
             panzoom: pane_panzoom::PanZoom::default(),
             qat: qat::QatState::default(),
             pages: pages::PagesState::default(),
+            draw: cmds_draw::DrawState::default(),
+            pictures: cmds_picture::PictureState::default(),
+            paste: cmds_paste::PasteState::default(),
+            layers: layers::LayerState::default(),
+            select: select_type::SelectState::default(),
         }
     }
 
@@ -428,6 +450,8 @@ impl App for Diagrammer {
         }
         // (JD8 rest) the page tabs follow the pages (also after undo and redo)
         pages::sync(self);
+        // (JD8 rest) what the system's clipboard offers (Einfügen, Inhalte einfügen)
+        cmds_paste::poll(self, ui);
         commands::states(self, ui);
         stencils_panel::states(self, ui);
         shell::frame(self, ui);
@@ -441,6 +465,12 @@ impl App for Diagrammer {
         pane_data::define_dialog(self, ui);
         qat::dialog(self, ui);
         pages::dialogs(self, ui);
+        // (JD8 rest) the dialogs of pictures, pasting, layers, select by type
+        cmds_picture::dialog(self, ui);
+        cmds_paste::dialog(self, ui);
+        layers::assign_dialog(self, ui);
+        layers::props_dialog(self, ui);
+        select_type::dialog(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

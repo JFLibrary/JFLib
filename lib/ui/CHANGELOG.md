@@ -10,6 +10,13 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
+- (JD8 rest) `ui.shape_edit`: the freeform tool `SE_FREEFORM` (the pointer's way, reported as
+  `SeEv::Stroke` with the glue of both ends) and the arc tool `SE_ARC` (a quarter ellipse as the
+  rubber band, bowing the way the drag started, reported as `SeEv::Arc`); both glue to connection
+  points like the line tool; Shift with the rectangle and ellipse tools draws a square and a circle, Shift while moving keeps
+  to one axis;
+  `SEF_NOSNAP`: moves do not snap to such a shape (the dynamic grid leaves it out)
+
 - The Shapes window of a diagram editor, modelled on Visio's but knowing nothing about diagrams:
   `ui.stencil_panel(id, &mut StencilState, &StencilPanel) -> Vec<StencilEvent>`. The app hands in
   stencils (`StencilDef`, `SD_EDITABLE` for favourites) of tiles (`StencilTile`: a name, a

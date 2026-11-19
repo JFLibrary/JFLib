@@ -615,7 +615,7 @@ fn style_id(doc: &Document, name_u: &str) -> Option<u32> {
 }
 
 // glue both ends of a new 1-D shape, then route or recalculate it
-fn finish_new(tx: &mut Transaction, eng: &mut Engine, s: ShapeRef, begin: ([f64; 2], Target), end: ([f64; 2], Target)) -> Result<ShapeRef, EditError> {
+pub(crate) fn finish_new(tx: &mut Transaction, eng: &mut Engine, s: ShapeRef, begin: ([f64; 2], Target), end: ([f64; 2], Target)) -> Result<ShapeRef, EditError> {
     eng.recalc(tx, &[SheetRef::Shape(s)])?;
     for (e, (at, to)) in [(End::Begin, begin), (End::End, end)] {
         if to != Target::None {

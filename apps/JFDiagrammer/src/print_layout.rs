@@ -294,7 +294,7 @@ pub(crate) fn print(app: &mut Diagrammer, job: &Job) -> Result<u32, String> {
     if job.pages.is_empty() {
         return Err(String::from(t("Es sind keine Seiten zum Drucken gewählt.")));
     }
-    let opts = render::Options { background: job.setup.background, hidden_layers: false };
+    let opts = render::Options { background: job.setup.background, hidden_layers: false, print: true };
     // the views (texts measured with the fonts drawn) and the sheets on the chosen paper
     let mut views: Vec<PageView> = job.pages.iter().map(|p| PageView::new(doc, *p, &mut app.fonts, &opts)).collect();
     let count = |paper: (f64, f64), edges: [f64; 4], views: &[PageView]| -> u32 {

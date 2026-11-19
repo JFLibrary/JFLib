@@ -10,7 +10,10 @@
 // Sheet.N (or by a NameU that ends in .N) name its copy, Names and NameUs that end in .<old ID>
 // end in the new one, UniqueIDs are dropped, the Connect entries between copied shapes come
 // along with the new IDs.  Glue to a shape outside the copy is let go: the glued cells keep
-// their values as constants, the Connect entry stays behind.  A Clip holds the document's
+// their values as constants, the Connect entry stays behind.  (JD8 rest, LY-03) The layers of
+// the page the shapes were copied from come along by name: on another page the missing ones are
+// added (with their Visible, Print, Lock, Snap, Glue, Color, ColorTrans) and the copies' own
+// LayerMember cells name the target page's indices.  A Clip holds the document's
 // string handles and refers to its masters and styles by ID: it pastes into the document it
 // was copied from (an app with several documents copies across them through a file format).
 
@@ -47,6 +50,8 @@ pub struct Clip {
     // the Connect entries from copied shapes (IDs where they were copied)
     connects: Vec<Connect>,
     bounds: Option<[f64; 4]>,
+    // the layers of the page copied from: index, Name, NameUniv, the cells taken over
+    layers: Vec<(u32, String, String, Vec<(&'static str, Value)>)>,
 }
 
 impl Clip {
@@ -131,6 +136,22 @@ pub fn copy(doc: &Document, shapes: &[ShapeRef]) -> Clip {
         }
     }
     let owners: BTreeSet<Owner> = list.iter().map(|s| s.owner).collect();
+    if let Some(Owner::Page(p)) = owners.iter().next() {
+        clip.layers = doc
+            .layers(*p)
+            .into_iter()
+            .filter_map(|l| {
+                let crate::sheet::RowKey::Index(ix) = l.key() else { return None };
+                let name = String::from(l.text("Name").or_else(|| l.text("NameUniv"))?);
+                let univ = String::from(l.text("NameUniv").unwrap_or(&name));
+                let cells = crate::instance::LAYER_CELLS.iter().filter_map(|c| match l.get(c).value() {
+                    Value::Absent => None,
+                    v => Some((*c, v)),
+                }).collect();
+                Some((ix, name, univ, cells))
+            })
+            .collect();
+    }
     for owner in owners {
         for c in super::connects(doc, owner) {
             if ids.contains(&(owner, c.from_sheet)) {
@@ -139,6 +160,52 @@ pub fn copy(doc: &Document, shapes: &[ShapeRef]) -> Clip {
         }
     }
     clip
+}
+
+// the copies' own LayerMember cells: the layers of the page copied from by name on `page`,
+// missing ones added
+fn map_layers(tx: &mut Transaction, page: crate::document::PageRef, clip: &Clip, made: &[ShapeRef]) -> Result<(), EditError> {
+    if clip.layers.is_empty() {
+        return Ok(());
+    }
+    let sec = crate::sheet::SecKey::one(names::LAYER);
+    let mut map: BTreeMap<u32, u32> = BTreeMap::new();
+    for (it, &s) in clip.items.iter().zip(made) {
+        let own = match it.data.sheet.cell(names::LAYER_MEMBER).map(|c| c.value) {
+            Some(Value::Text(t)) => crate::views::parse_members(tx.doc().str(t)),
+            Some(Value::Num(x)) if x >= 0.0 => alloc::vec![x as u32],
+            _ => continue,
+        };
+        let mut mine = Vec::new();
+        for m in &own {
+            let Some((_, name, univ, cells)) = clip.layers.iter().find(|l| l.0 == *m) else { continue };
+            let ix = match map.get(m) {
+                Some(&ix) => ix,
+                None => {
+                    let ix = match tx.doc().layer_by_name(page, univ).or_else(|| tx.doc().layer_by_name(page, name)) {
+                        Some(ix) => ix,
+                        None => {
+                            let ix = tx.add_layer(page, name, univ)?;
+                            for (c, v) in cells {
+                                let c = tx.intern(c);
+                                tx.set_constant(SheetRef::Page(page), &CellAddr::row(sec, crate::sheet::RowKey::Index(ix), c), *v, None)?;
+                            }
+                            ix
+                        }
+                    };
+                    map.insert(*m, ix);
+                    ix
+                }
+            };
+            if !mine.contains(&ix) {
+                mine.push(ix);
+            }
+        }
+        if mine != own {
+            tx.set_layers(s, &mine)?;
+        }
+    }
+    Ok(())
 }
 
 // a name that ends in .<old ID> with the new ID
@@ -262,6 +329,10 @@ pub fn paste(tx: &mut Transaction, eng: &mut Engine, owner: Owner, clip: &Clip, 
                 }
             }
         }
+    }
+    // (LY-03) the copies' own layers by name onto this page
+    if let Owner::Page(page) = owner {
+        map_layers(tx, page, clip, &made)?;
     }
     // the top-level copies moved by the offset (formulas keep their formula: their value moves,
     // the recalculation then computes the ones it can)

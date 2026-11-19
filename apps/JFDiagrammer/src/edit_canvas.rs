@@ -112,7 +112,10 @@ pub(crate) fn tool_of(app: &Diagrammer) -> u32 {
     }
     match app.tool {
         CONNECTOR_TOOL => SE_CONNECT,
-        LINE_TOOL | FREEFORM | ARC | PENCIL => SE_LINE,
+        LINE_TOOL | PENCIL => SE_LINE,
+        // (JD8 rest) the freeform and the arc tool (cmds_draw.rs)
+        FREEFORM => SE_FREEFORM,
+        ARC => SE_ARC,
         RECTANGLE => SE_RECT,
         ELLIPSE => SE_ELLIPSE,
         TEXT_TOOL => SE_TEXT,
@@ -195,11 +198,20 @@ pub(crate) fn model(app: &mut Diagrammer) {
             cur = doc.shape(p).and_then(|s| s.parent());
         }
     }
+    // (JD8 rest) the page's layers: hidden shapes are left out, locked ones not selectable
+    let layer_flags = crate::layers::Flags::of(doc, page);
     let add = |r: ShapeRef, parent: u64, m: &mut Model, eng: &mut diagram_core::formula::Engine| {
         let Some(s) = doc.shape(r) else { return };
         if s.is_deleted() {
             return;
         }
+        let layered = match &layer_flags {
+            Some(lf) => match lf.flags(doc, r) {
+                Some(f) => f,
+                None => return,
+            },
+            None => 0,
+        };
         let sheet = SheetRef::Shape(r);
         // guides: lines for the edit layer, no frame
         if s.header().kind == ShapeKind::Guide {
@@ -235,6 +247,7 @@ pub(crate) fn model(app: &mut Diagrammer) {
             flags |= SEF_GROUP;
         }
         flags |= lock_flags(&ops::locks(eng, doc, r));
+        flags |= layered;
         // (JD10) no Verbindungspfeile on containers, lists, callouts
         if crate::structures_cmds::no_arrows(doc, r) {
             flags |= SEF_NOARROWS;
@@ -688,6 +701,10 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
     // (JD9) the click of an armed tile (SE_PLACE): the shape goes there (stencils_drop.rs)
     if let SeEv::Draw { tool: SE_PLACE, a, .. } = ev {
         crate::stencils_drop::clicked(app, ui, a);
+        return;
+    }
+    // (JD8 rest) a freeform stroke, an arc (cmds_draw.rs)
+    if crate::cmds_draw::apply(app, ui, &ev) {
         return;
     }
     // (JD10) a running move (the glow), the Verbindungspfeile, the insert triangles

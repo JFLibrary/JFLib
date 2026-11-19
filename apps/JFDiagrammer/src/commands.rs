@@ -508,6 +508,16 @@ static HANDLERS: &[(u32, Handler)] = &[
     (SIZE_A3, |a, ui| crate::page_size::size(a, ui, SIZE_A3)),
     (SIZE_B5, |a, ui| crate::page_size::size(a, ui, SIZE_B5)),
     (SIZE_B4, |a, ui| crate::page_size::size(a, ui, SIZE_B4)),
+    // (JD8 rest: Zeichentools, Bilder, Inhalte einfügen, Ebenen, Nach Typ auswählen)
+    (DRAW_TOOLS, crate::cmds_draw::draw_tools),
+    (FREEFORM, |a, _| crate::edit_cmds::tool(a, FREEFORM)),
+    (ARC, |a, _| crate::edit_cmds::tool(a, ARC)),
+    (PICTURE_FILE, crate::cmds_picture::open),
+    (PASTE_SPECIAL, crate::cmds_paste::special),
+    (PASTE_LINK, crate::cmds_paste::link),
+    (LAYER_ASSIGN, crate::layers::open_assign),
+    (LAYER_PROPERTIES, crate::layers::open_props),
+    (SELECT_BY_TYPE, crate::select_type::open),
 ];
 
 // toggles: whether the command is on
@@ -563,6 +573,10 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (SIZE_A3, |a| crate::page_size::checked(a, SIZE_A3)),
     (SIZE_B5, |a| crate::page_size::checked(a, SIZE_B5)),
     (SIZE_B4, |a| crate::page_size::checked(a, SIZE_B4)),
+    // (JD8 rest: Zeichentools)
+    (DRAW_TOOLS, crate::cmds_draw::any_tool),
+    (FREEFORM, |a| a.tool == FREEFORM),
+    (ARC, |a| a.tool == ARC),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -577,9 +591,15 @@ pub(crate) fn enabled(id: u32) -> bool {
 
 /// (JD7) the command exists and can run now (a selection, something to undo ...)
 pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
-    enabled(id) && crate::edit_cmds::available(app, id) && crate::format_menus::available(app, id) && crate::cmds_shell::available(app, id)
-        // (JD8 rest: pages)
-        && crate::pages::available(app, id) && crate::page_size::available(app, id)
+    enabled(id)
+        && crate::edit_cmds::available(app, id)
+        && crate::format_menus::available(app, id)
+        // (JD8 rest) menu buttons, panes, pages, pasting, layers
+        && crate::cmds_shell::available(app, id)
+        && crate::pages::available(app, id)
+        && crate::page_size::available(app, id)
+        && crate::cmds_paste::available(app, id)
+        && crate::layers::available(app, id)
 }
 
 /// the toggle is on

@@ -55,7 +55,7 @@ use alloc::vec::Vec;
 use core::mem;
 
 use crate::cell::{Cell, CellError, Formula, Value};
-use crate::document::{DocSettings, Document, MasterRef, Owner, PageRef, ShapeRef, SheetRef, StyleRef, Theme};
+use crate::document::{DocSettings, Document, MasterRef, Owner, Part, PageRef, ShapeRef, SheetRef, StyleRef, Theme};
 use crate::names::{self, Category};
 use crate::page::{Connect, Master, MasterHeader, Page, PageHeader, Style, StyleHeader};
 use crate::shape::{ForeignData, Node, ShapeData, ShapeHeader, ShapeKind, StyleRefs, Text};
@@ -139,6 +139,8 @@ pub(crate) enum Op {
     ConnectRemove { owner: Owner, pos: u32 },
     Settings { settings: Box<DocSettings> },
     Themes { themes: Box<Vec<Theme>> },
+    PartInsert { pos: u32, part: Box<Part> },
+    PartRemove { pos: u32 },
 }
 
 fn cells_mut(doc: &mut Document, sheet: SheetRef, scope: Scope) -> Option<&mut Vec<Cell>> {
@@ -367,6 +369,17 @@ impl Op {
             },
             Op::Settings { settings } => Op::Settings { settings: Box::new(mem::replace(&mut doc.settings, *settings)) },
             Op::Themes { themes } => Op::Themes { themes: Box::new(mem::replace(&mut doc.themes, *themes)) },
+            Op::PartInsert { pos, part } => {
+                if pos as usize > doc.parts.len() {
+                    fail!(Op::PartInsert { pos, part })
+                }
+                doc.parts.insert(pos as usize, *part);
+                Op::PartRemove { pos }
+            }
+            Op::PartRemove { pos } => match remove_at(&mut doc.parts, pos) {
+                Some(part) => Op::PartInsert { pos, part: Box::new(part) },
+                None => fail!(Op::PartRemove { pos }),
+            },
         })
     }
 
@@ -415,7 +428,7 @@ impl Op {
             Op::StyleHeader { style, .. } => {
                 out.insert(SheetRef::Style(*style));
             }
-            Op::Settings { .. } | Op::Themes { .. } => {
+            Op::Settings { .. } | Op::Themes { .. } | Op::PartInsert { .. } | Op::PartRemove { .. } => {
                 out.insert(SheetRef::Document);
             }
         }
@@ -1028,7 +1041,9 @@ impl<'d> Transaction<'d> {
     }
 
     /// delete a layer of a page; shapes on it leave it (their own LayerMember cells), the
-    /// shapes themselves stay (LY-04 asks the user first and deletes them before)
+    /// shapes themselves stay (LY-04 asks the user first and deletes them before).  The layers
+    /// after it move one down (IX - 1, as Visio keeps a page's layers numbered without gaps) and
+    /// the shapes' own LayerMember cells follow
     pub fn delete_layer(&mut self, page: PageRef, ix: u32) -> Result<(), EditError> {
         self.doc.page(page).ok_or(EditError::NoPage)?;
         let owner = Owner::Page(page);
@@ -1042,11 +1057,12 @@ impl<'d> Transaction<'d> {
                     Value::Num(x) if x >= 0.0 => alloc::vec![x as u32],
                     _ => return None,
                 };
-                list.contains(&ix).then(|| (s, list.into_iter().filter(|&l| l != ix).collect()))
+                let new: Vec<u32> = list.iter().filter(|&&l| l != ix).map(|&l| if l > ix { l - 1 } else { l }).collect();
+                (new != list).then_some((s, new))
             })
             .collect();
         self.atomic(|tx| {
-            tx.delete_row(SheetRef::Page(page), SecKey::one(names::LAYER), RowKey::Index(ix))?;
+            tx.remove_row(SheetRef::Page(page), SecKey::one(names::LAYER), RowKey::Index(ix))?;
             for (s, list) in &members {
                 tx.set_layers(*s, list)?;
             }
@@ -1379,6 +1395,26 @@ impl<'d> Transaction<'d> {
     pub fn set_text(&mut self, shape: ShapeRef, text: Option<Text>) -> Result<(), EditError> {
         self.doc.shape(shape).ok_or(EditError::NoShape)?;
         self.run(Op::ShapeText { shape, text: text.map(Box::new) })
+    }
+
+    /// add a part the model keeps as bytes (a picture's media part) at the end of
+    /// Document::parts -> its index; a name some part has already (ASCII case ignored, a
+    /// leading '/' too) is refused (Exists)
+    pub fn add_part(&mut self, name: &str, content_type: &str, rel_type: &str, data: Vec<u8>) -> Result<usize, EditError> {
+        let bare = |n: &str| -> String { n.trim_start_matches('/').to_ascii_lowercase() };
+        let want = bare(name);
+        if want.is_empty() || self.doc.parts.iter().any(|p| bare(self.doc.str(p.name)) == want) {
+            return Err(EditError::Exists);
+        }
+        let part = Part { name: self.intern(name), content_type: self.intern(content_type), rel_type: self.intern(rel_type), data };
+        let pos = self.doc.parts.len();
+        self.run(Op::PartInsert { pos: pos as u32, part: Box::new(part) })?;
+        Ok(pos)
+    }
+
+    /// remove the part at `index` of Document::parts (shapes that name it show no picture)
+    pub fn remove_part(&mut self, index: usize) -> Result<(), EditError> {
+        self.run(Op::PartRemove { pos: index as u32 }).map_err(|_| EditError::Invalid)
     }
 
     /// set the picture data of a Foreign shape

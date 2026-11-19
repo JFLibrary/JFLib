@@ -44,7 +44,8 @@ shot build/JFDiagrammer.png
 click tab:"Einfügen"
 expect tab:"Einfügen" selected
 expect text:"Illustrationen" exists
-expect button:"Bilder" disabled
+# (JD8 rest) Bilder › Bild aus Datei works
+expect button:"Bilder" enabled
 expect text:"Zwischenablage" missing
 click tab:"Entwurf"
 expect text:"Seite einrichten" exists
