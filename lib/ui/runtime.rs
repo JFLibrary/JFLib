@@ -407,6 +407,8 @@ impl Ui {
             plock_sim: (-1, plat::PointerLock::Off),
             plock_sim_esc: false,
             plock_sim_motion: [0.0; 2],
+            pads: Vec::new(),
+            pads_on: false,
             mpts: Vec::new(),
             mprs: Vec::new(),
             mtilt: [0; 2],
@@ -677,6 +679,12 @@ impl Ui {
                 }
                 plat::E_FOCUS_IN => {
                     self.uiw_focus_in(win);
+                    continue;
+                }
+                plat::E_GAMEPAD => {
+                    // (G7a) the pads anew (pads.rs): a frame, App::command(UIC_GAMEPAD) for one that came or went
+                    self.pads_event(ev.data);
+                    self.need = true;
                     continue;
                 }
                 plat::E_WINPOS => {

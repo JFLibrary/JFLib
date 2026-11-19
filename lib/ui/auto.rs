@@ -129,6 +129,11 @@
 //   location searching|denied|off|none   the host's answer (off: the system's switch; none: no
 //                       location service, as at the start)
 //   location expect off|searching|fix|paused|denied|disabled|unavailable
+//   pad connect N [xbox|playstation|nintendo|other] [NAME]   (G7a part 2, pads.rs) game pad N comes
+//                       (plat's shared state, as a backend reports it); pad disconnect N: it goes
+//   pad press N BUTTON [VALUE] | pad release N BUTTON   a button of the standard layout (a b x y lb
+//                       rb lt rt back start ls rs up down left right home; VALUE 0..1, default 1)
+//   pad axis N lx|ly|rx|ry VALUE   a stick's axis, -1..1 (right and down positive)
 //   expect wm none|move|menu|minimize|maximize|restore|close|lower|resize EDGE   what the title
 //                       bar or the resize band asked the window manager for since the last check
 //                       (EDGE n, s, w, e, nw, ne, sw, se: physical edges)
@@ -854,13 +859,13 @@ impl Ui {
                 }
             }
         }
-        const CMDS: [&str; 59] = [
+        const CMDS: [&str; 60] = [
             "a11y", "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
             "key", "keys", "keydown", "keyup", "type", "commit", "preedit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
             "movewin", "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop",
             "clip", "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
             "style", "sensor", "location", "tap", "longpress", "swipe", "flick", "finger", "pinch", "pan2", "gpu",
-            "motion",
+            "motion", "pad",
         ];
         let Some(&c) = CMDS.iter().find(|c| word_eq(l, c).is_some()) else {
             let mut o = alloc::format!("error: line {}: unknown command: ", self.sc.lineno).into_bytes();
@@ -985,6 +990,7 @@ impl Ui {
             "drag" => self.sc_drag(app, a),
             "wheel" => self.sc_wheel(app, a),
             "motion" => self.sc_motion(app, a),
+            "pad" => self.sc_pad(app, a), // (G7a part 2) pads.rs
             "tap" => self.sc_tap(app, a, 0),
             "longpress" => self.sc_tap(app, a, 600),
             "swipe" => self.sc_swipe(app, a),

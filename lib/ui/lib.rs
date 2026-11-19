@@ -213,6 +213,8 @@ mod runtime;
 // the monitors, global shortcuts, the colour pick, pictures of the screen (plat::screen, hotkey)
 mod screen;
 mod sensors;
+// (G7a part 2) the game pads: ui.gamepads, E_GAMEPAD, the script's `pad` (pads.rs)
+mod pads;
 // scroll copies: a scrolled view's still valid pixels are moved instead of drawn (scrollcopy.rs)
 mod scrollcopy;
 mod stock;
@@ -260,6 +262,8 @@ pub use perm::boot;
 pub use assoc::{assoc_switch, desk_boot};
 pub use plat::BrowserStatus; // (E13) ui.default_browser
 pub use plat::PointerLock; // (G7a) ui.pointer_lock
+// (G7a part 2) ui.gamepads (the buttons' and axes' numbers are plat's: plat::PAD_A .., not ui's PAD_8 padding)
+pub use plat::{Gamepad, PadStyle};
 pub use recent::{RECENT_KEEP, RecentOpen};
 // the library's version (the root Cargo.toml, docs/VERSIONING.md) and the app's own (apps/NAME/PACKAGE)
 pub use rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH};
@@ -721,6 +725,9 @@ pub struct Ui {
     pub(crate) plock_sim: (i32, plat::PointerLock),
     pub(crate) plock_sim_esc: bool,
     pub(crate) plock_sim_motion: [f64; 2],
+    /// (G7a part 2) the pads of this batch (pads.rs) and whether the app asked for them
+    pub(crate) pads: Vec<plat::Gamepad>,
+    pub(crate) pads_on: bool,
     pub(crate) mpts: Vec<[i32; 2]>,
     pub(crate) mprs: Vec<u32>,
     pub(crate) mtilt: [i32; 2],
