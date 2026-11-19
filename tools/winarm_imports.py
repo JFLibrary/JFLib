@@ -5,7 +5,7 @@ them first.  Every import comes from raw-dylib: the program states DLL and funct
     python tools/winarm_imports.py [--libs DIR] PROGRAM_OR_DIR...
 
 Without --libs the DLLs of this machine's System32 answer (on windows-11-arm: the ARM64 ones, see
-.github/workflows/arm64-windows.yml); --libs DIR takes the import libraries of an SDK instead, e.g.
+.github/workflows/arm64.yml); --libs DIR takes the import libraries of an SDK instead, e.g.
 "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/um/arm64" on an x64 PC (only the members for the
 program's own processor count; a DLL without an import library there, such as combase.dll, is looked up in
 System32 after all).  API sets (api-ms-win-*) are resolved by the loader, not by a file: listed,

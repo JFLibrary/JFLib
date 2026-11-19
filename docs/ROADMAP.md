@@ -1953,13 +1953,15 @@ Fensterrand hinaus.
     auf Linux ARM64, Plugins und Module mit `rt::plugin_abi!` und `LIBE_ARCH` (ARM4, 2026-11-10), NEON für
     `lib/simd` (ARM6), das auf Android schon jetzt wirkt; Windows ARM64 (ARM5, 2026-11-11: `__chkstk`, TEB über `x18`,
     `CONTEXT`, Unwind-Daten des Trampolins; `coretest`, `plattest` und die `gallery` auf `windows-11-arm` grün bis auf
-    `screen.uis`, Workflow `arm64-windows.yml`); das Speichermodell (ARM7, 2026-11-17: jedes `Relaxed` in `lib/` durchgesehen,
+    `screen.uis`, Workflow `arm64-windows.yml`, seit ARM9 `arm64.yml`); das Speichermodell (ARM7, 2026-11-17: jedes `Relaxed` in `lib/` durchgesehen,
     Funktionszeiger-Caches unter Windows mit Release/Acquire, `plattest --test atomics` auf Mac mini, `ubuntu-24.04-arm` und
     `windows-11-arm` mit LSE und LL/SC ohne Fehler, ebenso auf dem A56, Workflow `arm64-atomics.yml`); Fenster und GPU (ARM8,
     2026-11-17: alle Skripte von `gallery` und `jfWord`, `gputest` und `uigputest` in der VM unter Wayland und X11, auf
     `ubuntu-24.04-arm` und `windows-11-arm`, dazu mit lavapipe; ohne Vulkan oder Treiber bleibt die UI auf dem CPU-Weg und nennt den
-    Grund im Log).
-  - Zu tun: ein echtes ARM-Gerät mit GPU von Hand (ARM8, Paket für das Surface bereit), Pakete und CI (ARM9). Die Arbeit nützt später
+    Grund im Log); Pakete und Updates (ARM9, 2026-11-19: `tools/package.py --arch aarch64` macht jedes Format als eigene
+    ARM64-Datei, ein Update-Kanal dient beiden Prozessoren, `lib/update` lief in der ARM64-VM und auf beiden Runnern komplett durch;
+    `arm64.yml` installiert und startet jedes Format auf den Runnern).
+  - Zu tun: ein echtes ARM-Gerät mit GPU von Hand (ARM8, Paket für das Surface bereit). Die Arbeit nützt später
     auch macOS und iOS auf ARM.
   - Getestet wird mit QEMU in WSL und den ARM-Runnern von GitHub; für das Speichermodell und die GPU
     braucht es echte Hardware.

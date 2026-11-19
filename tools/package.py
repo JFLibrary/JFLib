@@ -34,6 +34,19 @@ docs/PACKAGING.md):
 A missing tool skips that package and says what it wrote instead; --no-win / --no-deb drop
 every Windows / Linux format.
 
+--arch aarch64 (docs/ARM64.md, decision 5: one file per processor) packages the ARM64 programs
+(build_rs.py --arch aarch64) into files of their own beside the x86-64 ones, which keep their names:
+  <App>_Setup_arm64.exe   <deb>_<ver>_arm64.deb   <App>-<ver>-<style>-aarch64.AppImage (the runtime
+  apps/appimagert for ARM64)   <App>-<ver>-arm64.msix + <App>-arm64.appinstaller   rpm-aarch64/
+  (ExclusiveArch aarch64, rpmbuild --target aarch64)   flatpak-aarch64/ (flatpak-builder
+  --arch=aarch64: the runtime for aarch64 and, on an x86-64 PC, QEMU's binfmt with flag F; the same
+  repository flatpak/repo) and <app id>-aarch64.flatpak
+The work files go to <out>/<App>-arm64/.  On an x86-64 PC the setup's previews come from the x86-64
+program of the same style (built too: it looks the same); cross_bins= takes the other system's agents
+of both processors (agents/<os>-x86_64/ and agents/<os>-aarch64/).  --update writes into the same
+channel: the files of the other processor already there stay listed (same app and version), so one
+update.json serves both.  macOS (.dmg) is one program for both Mac processors anyway.
+
 Signing (tools/codesign.py, docs/PACKAGING.md "Signing"): with a certificate in the environment
 (jfgui_SIGN_PFX + jfgui_SIGN_PFX_PASS or jfgui_SIGN_THUMBPRINT, optional jfgui_SIGN_TIMESTAMP)
 signtool signs every Windows program variant, its modules and the finished setup (Authenticode;
@@ -75,7 +88,8 @@ next to its real path).
 
 app-bins: cross_bins=NAME .. puts the other system's build of these BINS beside the program,
 agents/linux-x86_64/NAME in the setup and agents/windows-x86_64/NAME.exe in the .deb (BackupCraft:
-a Windows server installs the Linux agent over SSH).  unit_<name>=<description>|<BIN> <args>
+a Windows server installs the Linux agent over SSH; the ARM64 packages carry the x86-64 and the
+ARM64 agents, agents/<os>-x86_64/ and agents/<os>-aarch64/).  unit_<name>=<description>|<BIN> <args>
 ships the systemd unit /lib/systemd/system/<name>.service in the .deb (ExecStart=/usr/lib/<deb>/
 <BIN> <args>); it is not enabled -- systemctl enable --now <name> starts it.
 """
@@ -104,7 +118,8 @@ sys.path.insert(0, str(ROOT))
 from build_rs import APP_MODULES, module_file, app_notices  # noqa: E402  (jxl-module)
 from build_rs import app_bin_files  # noqa: E402  (app-bins)
 from build_rs import app_glibc, set_static_ui  # noqa: E402  (section "glibc")
-from tools.host_exec import linux_path, run_linux
+from build_rs import arch_folder  # noqa: E402  (--arch: win-arm64, linux-arm64)
+from tools.host_exec import exe_arch, host_arch, linux_path, run_linux
 STYLES = {"rs": ROOT / "styles", "asm": ROOT.parent / "legacy" / "ASMLIB" / "styles"}  # <style>/INFO
 WSL = ["wsl.exe", "-d", "Ubuntu-24.04"]
 PREVIEW = (1100, 700)           # rendered size (DIP, 100 %)
@@ -147,20 +162,26 @@ def rs_mode(profile):
 STATIC_ARGS = []       # --static
 
 
-def build_variants_rs(app, styles, work, targets, rsout, profile):
+def arch_args(arch):
+    """build_rs.py's --arch for the package's processor (x86_64: nothing, as before)"""
+    return ["--arch", arch] if arch != "x86_64" else []
+
+
+def build_variants_rs(app, styles, work, targets, rsout, profile, arch="x86_64"):
     """--impl rs: one build_rs.py run into the shared rsout for every style and target (the
     libraries built once, both targets side by side, the style variants linked in parallel:
     <rsout>/<t>/<style>/ for several styles), each exe copied to work/<style>/<target>/ as
-    build.py would place it (jxl-module: and the app's modules next to it)"""
+    build.py would place it (jxl-module: and the app's modules next to it); arch aarch64: the
+    ARM64 programs (<rsout>/win-arm64, linux-arm64)"""
     tgt = "both" if set(targets) == {"win", "linux"} else targets[0]
     run([sys.executable, "build_rs.py", "app", app, "--target", tgt, "--style", ",".join(styles),
-         *rs_mode(profile), "--out", rsout, *STATIC_ARGS])
+         *rs_mode(profile), "--out", rsout, *STATIC_ARGS, *arch_args(arch)])
     if "mac" in targets:        # the Intel Macs' part (docs/INTEL_MAC.md): into mac-x86_64, joined below
         run([sys.executable, "build_rs.py", "app", app, "--target", "mac", "--arch", "x86_64", "--style", ",".join(styles),
              *rs_mode(profile), "--out", rsout])
     for s in styles:
         for t in targets:
-            src = ROOT / rsout / t / s if len(styles) > 1 else ROOT / rsout / t
+            src = ROOT / rsout / arch_folder(t, arch) / s if len(styles) > 1 else ROOT / rsout / arch_folder(t, arch)
             (ROOT / work / s / t).mkdir(parents=True, exist_ok=True)
             if t == "mac":      # one program for every Mac (lipo), the app's further programs too (no modules)
                 sys.path.insert(0, str(ROOT))
@@ -173,7 +194,25 @@ def build_variants_rs(app, styles, work, targets, rsout, profile):
             shutil.copyfile(src / exe_name(app, t), ROOT / work / s / t / exe_name(app, t))
             shutil.copymode(src / exe_name(app, t), ROOT / work / s / t / exe_name(app, t))   # executable
             for m in app_modules(app, t, "rs") + app_bins(app, t, "rs"):
-                shutil.copyfile(ROOT / rsout / t / m, ROOT / work / s / t / m)
+                shutil.copyfile(ROOT / rsout / arch_folder(t, arch) / m, ROOT / work / s / t / m)
+
+
+def build_host_variants(app, styles, targets, rsout, profile):
+    """--arch aarch64 on another machine: the x86-64 programs too (build_rs.py, the same output folder),
+    for what must run here (the setup's previews) and the other system's x86-64 agents (cross_bins=)"""
+    tgt = "both" if set(targets) == {"win", "linux"} else targets[0]
+    run([sys.executable, "build_rs.py", "app", app, "--target", tgt, "--style", ",".join(styles),
+         *rs_mode(profile), "--out", rsout, *STATIC_ARGS])
+
+
+def preview_exe(app, style, styles, work, rsout):
+    """the program whose picture is the style's preview: the packaged one when it runs here, else (an
+    ARM64 setup made on an x86-64 PC) the x86-64 program of the same style, which looks the same"""
+    exe = ROOT / work / style / "win" / f"{app}.exe"
+    if exe_arch(exe) in (None, host_arch()) or rsout is None:
+        return exe
+    other = ROOT / rsout / "win" / (style if len(styles) > 1 else "") / f"{app}.exe"
+    return other if other.is_file() else exe
 
 
 def app_modules(app, target, impl):
@@ -197,12 +236,13 @@ def package_notices(styles, impl):
     return app_notices(styles)
 
 
-def build_stub(impl, work, rsout, profile="size"):
-    """the setup stub (apps/installer, or legacy/apps/installer) -> its bytes"""
+def build_stub(impl, work, rsout, profile="size", arch="x86_64"):
+    """the setup stub (apps/installer, or legacy/apps/installer) -> its bytes; arch aarch64: the
+    ARM64 stub (an ARM64 setup runs natively, its payload is ARM64 programs)"""
     if impl == "rs":
         run([sys.executable, "build_rs.py", "app", "installer", "--target", "win", *rs_mode(profile),
-             "--out", rsout])
-        return (ROOT / rsout / "win" / "installer.exe").read_bytes()
+             "--out", rsout, *arch_args(arch)])
+        return (ROOT / rsout / arch_folder("win", arch) / "installer.exe").read_bytes()
     stub_out = work / "setup"
     run([sys.executable, str(ROOT.parent / "legacy" / "build.py"), "app", "installer", "--target", "win",
          "--out", str(ROOT / stub_out)])
@@ -231,9 +271,9 @@ def payload(entries):
     return head + recs + blobs
 
 
-def make_setup(app, meta, styles, dist, work, impl="asm", rsout=None, profile="size"):
+def make_setup(app, meta, styles, dist, work, impl="asm", rsout=None, profile="size", arch="x86_64"):
     print("[win] setup")
-    stub = build_stub(impl, work, rsout, profile)
+    stub = build_stub(impl, work, rsout, profile, arch)
     man = [f"app={app}", f"display={meta.get('display', app)}", f"version={meta.get('version', '')}",
            f"publisher={meta.get('publisher', '')}", f"default={meta.get('default_win', styles[0])}"]
     entries = []
@@ -253,13 +293,13 @@ def make_setup(app, meta, styles, dist, work, impl="asm", rsout=None, profile="s
         label, _ = style_info(s, impl)
         exe = (ROOT / work / s / "win" / f"{app}.exe").read_bytes()
         entries.append((PK_STYLE, PF_ZLIB, s, label, zlib.compress(exe, 9), len(exe)))
-        png = preview(ROOT / work / s / "win" / f"{app}.exe", ROOT / work / f"preview_{s}.png")
+        png = preview(preview_exe(app, s, styles, work, rsout), ROOT / work / f"preview_{s}.png")
         entries.append((PK_PREVIEW, 0, s, label, png, len(png)))
     # jxl-module: the app's modules (the same file for every style) next to the exe
     for m in app_modules(app, "win", impl) + app_bins(app, "win", impl):     # app-bins: installed alike
         data = (ROOT / work / styles[0] / "win" / m).read_bytes()
         entries.append((PK_FILE, PF_ZLIB, m, "", zlib.compress(data, 9), len(data)))
-    for name, data in cross_files(app, meta, rsout, "linux"):    # app-bins: the other system's build
+    for name, data in cross_files(app, meta, rsout, "linux", arch):    # app-bins: the other system's build
         entries.append((PK_FILE, PF_ZLIB, name, "", zlib.compress(data, 9), len(data)))
     # notices whose path is longer than a payload name (47 bytes) go, complete and with their
     # paths as headings, into one ALL-LICENSES.txt of their library folder
@@ -279,27 +319,32 @@ def make_setup(app, meta, styles, dist, work, impl="asm", rsout=None, profile="s
         entries.append((PK_FILE, PF_ZLIB, name, "", zlib.compress(data, 9), len(data)))
     pay = payload(entries)
     trailer = b"ASMINST1" + struct.pack("<QQ", len(stub), len(pay))
-    out = ROOT / dist / f"{app}_Setup.exe"
+    out = ROOT / dist / pkgmeta.setup_name(app, arch)
     out.write_bytes(stub + pay + trailer)
     print(f"[win] {out.relative_to(ROOT)}: {out.stat().st_size} bytes "
           f"({len(styles)} styles, stub {len(stub)}, payload {len(pay)})")
     return out
 
 
-def cross_files(app, meta, rsout, other):
-    """(app-bins) cross_bins=: the BINS built for the other system -> [(agents/<os>/file, bytes)]"""
+def cross_files(app, meta, rsout, other, arch="x86_64"):
+    """(app-bins) cross_bins=: the BINS built for the other system -> [(agents/<os>-<cpu>/file, bytes)];
+    the x86-64 packages carry the x86-64 agents, the ARM64 ones those of both processors (a server on ARM
+    serves machines of either kind)"""
     out = []
     names = meta.get("cross_bins", "").split()
     if not names:
         return out
-    folder = "linux-x86_64" if other == "linux" else "windows-x86_64"
-    for n in names:
-        f = exe_name(n, other)
-        src = ROOT / rsout / other / f if rsout else None
-        if src is None or not src.exists():
-            print(f"  (cross_bins: {f} for {other} is not built -- package without it)")
-            continue
-        out.append((f"agents/{folder}/{f}", src.read_bytes()))
+    system = "linux" if other == "linux" else "windows"
+    for cpu in ["x86_64"] + ([arch] if arch != "x86_64" else []):
+        folder = f"{system}-{cpu}"
+        for n in names:
+            f = exe_name(n, other)
+            src = ROOT / rsout / arch_folder(other, cpu) / f if rsout else None
+            if src is None or not src.exists():
+                print(f"  (cross_bins: {f} for {other}" + (f" {cpu}" if arch != "x86_64" else "")
+                      + " is not built -- package without it)")
+                continue
+            out.append((f"agents/{folder}/{f}", src.read_bytes()))
     return out
 
 
@@ -324,8 +369,9 @@ def wslpath(p):
     return r.stdout.strip()
 
 
-def make_deb(app, meta, styles, dist, work, impl="rs", rsout=None):
+def make_deb(app, meta, styles, dist, work, impl="rs", rsout=None, arch="x86_64"):
     print("[linux] deb")
+    debarch = pkgmeta.arch_name(arch, "deb")
     pkg = meta.get("deb_name", app.lower())
     ver = meta.get("version", "0.1.0")
     display = meta.get("display", app)
@@ -349,7 +395,7 @@ def make_deb(app, meta, styles, dist, work, impl="rs", rsout=None):
         src = ROOT / work / styles[0] / "linux" / m
         shutil.copyfile(src, lib / m)
         size += src.stat().st_size
-    for name, data in cross_files(app, meta, rsout, "win"):     # app-bins: the other system's build
+    for name, data in cross_files(app, meta, rsout, "win", arch):     # app-bins: the other system's build
         (lib / name).parent.mkdir(parents=True, exist_ok=True)
         (lib / name).write_bytes(data)
         size += len(data)
@@ -381,7 +427,7 @@ def make_deb(app, meta, styles, dist, work, impl="rs", rsout=None):
     labels = [style_info(s, impl)[0] for s in styles]
     desc = meta.get("description", "")
     (deb / "control").write_bytes(lf(
-        f"Package: {pkg}\nVersion: {ver}\nArchitecture: amd64\nSection: {meta.get('section', 'graphics')}\nPriority: optional\n"
+        f"Package: {pkg}\nVersion: {ver}\nArchitecture: {debarch}\nSection: {meta.get('section', 'graphics')}\nPriority: optional\n"
         f"Maintainer: jfguiLib Test <test@localhost>\nInstalled-Size: {size // 1024 + 64}\n"
         "Depends: debconf (>= 0.5) | debconf-2.0" + (", libc6\nRecommends: libvulkan1, mesa-vulkan-drivers\n" if app_glibc(app) else "\n") +
         f"Description: {meta.get('summary', display)}\n {desc}\n .\n"
@@ -425,7 +471,7 @@ def make_deb(app, meta, styles, dist, work, impl="rs", rsout=None):
         'if [ "$1" = "purge" ] && [ -e /usr/share/debconf/confmodule ]; then\n'
         "  . /usr/share/debconf/confmodule\n  db_purge\nfi\nexit 0\n"))
     # build inside the Linux file system (permissions), copy the result back
-    out = ROOT / dist / f"{pkg}_{ver}_amd64.deb"
+    out = ROOT / dist / f"{pkg}_{ver}_{debarch}.deb"
     result = run_linux(["python3", linux_path(ROOT / "tools/linux_task.py"), "deb", linux_path(tree), linux_path(out)])
     if result.returncode:
         raise RuntimeError(result.stdout + result.stderr)
@@ -482,14 +528,17 @@ def sign_variants(app, styles, work, signing, impl):
     signing.windows([f for f in files if f.exists()])
 
 
-def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signing, impl, appimages=None, dmgs=None):
+def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signing, impl, appimages=None, dmgs=None,
+                   arch="x86_64"):
     """--update OUT: a signed channel per style (OUT/<style>/update.json + .sig, lib/update):
     Windows the program (kind exe) or, with modules / further programs, a bundle of the program
     folder (kind bundle); Linux the .deb (kind package: the package manager installs it) and the
     style's AppImage (kind appimage: an AppImage replaces its own file; appimages {style: path});
     macOS the app bundle (kind app, a JFA1 bundle of NAME.app: an installed app replaces its
     bundle) and the .dmg (kind package; dmgs {style: path}), the same files for Apple Silicon and
-    Intel Macs (one program for both, docs/INTEL_MAC.md)"""
+    Intel Macs (one program for both, docs/INTEL_MAC.md).  arch aarch64: the targets windows-aarch64
+    and linux-aarch64, the Windows files named -arm64; a channel of the same app and version already
+    in OUT/<style> keeps its entries for the other targets (one update.json for both processors)"""
     seed = update_manifest.load_key(key_file)
     if seed is None:
         signing.skip("Update-Kanal: kein Signierschlüssel (--update-key DATEI, jfgui_UPDATE_KEY_FILE oder jfgui_UPDATE_KEY; "
@@ -497,6 +546,8 @@ def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signin
         return
     version = meta.get("version", "0.1.0")
     app_id = meta.get("update_app", app)
+    cpu = pkgmeta.arch_name(arch, "update")
+    tag = "" if arch == "x86_64" else "-" + pkgmeta.arch_name(arch, "msix")     # -arm64 in the Windows names
     for s in styles:
         files = []
         win = ROOT / work / s / "win"
@@ -505,15 +556,15 @@ def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signin
             if extra:
                 bundle = assetpack.pack_files({f"{app}.exe": (win / f"{app}.exe").read_bytes(),
                                                **{m: (win / m).read_bytes() for m in extra}}, compress=False)
-                tmp = ROOT / work / f"{app}-{version}-{s}-win.jfa"
+                tmp = ROOT / work / f"{app}-{version}-{s}-win{tag}.jfa"
                 tmp.write_bytes(bundle)
-                files.append(("windows-x86_64", "bundle", tmp, tmp.name))
+                files.append((f"windows-{cpu}", "bundle", tmp, tmp.name))
             else:
-                files.append(("windows-x86_64", "exe", win / f"{app}.exe", f"{app}-{version}-{s}.exe"))
+                files.append((f"windows-{cpu}", "exe", win / f"{app}.exe", f"{app}-{version}-{s}{tag}.exe"))
         if deb:
-            files.append(("linux-x86_64", "package", deb, Path(deb).name))
+            files.append((f"linux-{cpu}", "package", deb, Path(deb).name))
         if (appimages or {}).get(s):
-            files.append(("linux-x86_64", "appimage", appimages[s], Path(appimages[s]).name))
+            files.append((f"linux-{cpu}", "appimage", appimages[s], Path(appimages[s]).name))
         bundle = ROOT / work / s / "mac" / f"{app}.app"
         if (dmgs or {}).get(s) and bundle.is_dir():
             tmp = ROOT / work / f"{app}-{version}-{s}-mac.jfa"
@@ -523,9 +574,12 @@ def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signin
                 files.append((target, "package", dmgs[s], Path(dmgs[s]).name))
         if not files:
             continue
+        keep = update_manifest.other_targets(ROOT / out / s, app_id, version, {t for t, _, _, _ in files})
         m = update_manifest.write_channel(ROOT / out / s, app_id, version, files, seed, notes=meta.get("update_notes", ""),
                                           expires_days=int(meta.get("update_expires_days", "0")),
-                                          base_url=(base_url.rstrip("/") + "/" + s) if base_url else "")
+                                          base_url=(base_url.rstrip("/") + "/" + s) if base_url else "", keep=keep)
+        if keep:
+            print(f"[update] {s}: also listed, from the channel already there: {', '.join(sorted({e[0] for e in keep}))}")
         signing.done.append(f"Update-Kanal ({s}): {m.relative_to(ROOT)} (Schlüssel {update_manifest.public_key(seed).hex()[:16]}…)")
         print(f"[update] {m.relative_to(ROOT)}")
 
@@ -557,15 +611,21 @@ def main():
     ap.add_argument("--static", action="store_true",
                     help="Linux: the program static, without the GPU and without glibc (build_rs.py --static): "
                          "for systems such as Alpine")
+    ap.add_argument("--arch", choices=pkgmeta.ARCHS, default="x86_64",
+                    help="the processor of the programs (default x86_64; aarch64: the ARM64 packages, files of their "
+                         "own, docs/ARM64.md)")
     a = ap.parse_args()
     if a.static:
         set_static_ui(True)
         STATIC_ARGS.append("--static")
     formats = formats_of(a.formats, a.no_win, a.no_deb)
+    if a.arch != "x86_64" and (a.impl != "rs" or "dmg" in formats):
+        raise SystemExit(f"--arch {a.arch}: the Rust build (--impl rs) of the Windows and Linux formats; the .dmg is for "
+                         "every Mac anyway")
     meta = kv_file(ROOT / "apps" / a.app / "PACKAGE")
     styles = (a.styles.split(",") if a.styles else meta.get("styles", "winui").split())
     dist = Path(a.out or ("build/dist_asm" if a.impl == "asm" else "build/dist"))
-    work = dist / a.app
+    work = dist / (a.app if a.arch == "x86_64" else f"{a.app}-{pkgmeta.arch_name(a.arch, 'msix')}")
     rsout = dist / f"rs_{a.profile}"    # --impl rs: build_rs.py's output, shared by every app / style
     (ROOT / dist).mkdir(parents=True, exist_ok=True)
     targets = [t for t in ("win", "linux", "mac") if any(FORMATS[f] == t for f in formats)]
@@ -573,27 +633,30 @@ def main():
         raise SystemExit("dmg builds on a Mac and alone (--formats dmg): Apple's tools (docs/APPLE.md)")
     signing = Signing(a.sign, "win" in targets)
     if a.impl == "rs":
-        print(f"[{', '.join(styles)}] build")
-        build_variants_rs(a.app, styles, work, targets, rsout, a.profile)
+        print(f"[{', '.join(styles)}] build" + (f" ({a.arch})" if a.arch != "x86_64" else ""))
+        build_variants_rs(a.app, styles, work, targets, rsout, a.profile, a.arch)
+        if a.arch != "x86_64" and a.arch != host_arch() and ("setup" in formats or meta.get("cross_bins")):
+            print(f"[{', '.join(styles)}] build (x86_64: the setup's previews, the x86-64 agents)")
+            build_host_variants(a.app, styles, targets, rsout, a.profile)
     else:
         for s in styles:
             print(f"[{s}] build")
             build_variant(a.app, s, work / s, targets)
-    job = make_job(a.app, meta, styles, dist, work, a.impl, rsout, targets)
+    job = make_job(a.app, meta, styles, dist, work, a.impl, rsout, targets, a.arch)
     job.signing = signing             # AppImage and Flatpak signatures go into the report
     if "appimage" in formats and not (a.appimage_runtime or os.environ.get("jfgui_APPIMAGE_RUNTIME")):
-        job.runtime = build_runtime(rsout, a.profile)
+        job.runtime = build_runtime(rsout, a.profile, a.arch)
     job.appimage_runtime = a.appimage_runtime
     deb = None
     if "win" in targets:
         sign_variants(a.app, styles, work, signing, a.impl)
     if "setup" in formats:
-        setup = make_setup(a.app, meta, styles, dist, work, a.impl, rsout, a.profile)
+        setup = make_setup(a.app, meta, styles, dist, work, a.impl, rsout, a.profile, a.arch)
         signing.windows([setup], f"{meta.get('display', a.app)} Setup")
     if "msix" in formats:
         pkg_msix.make_msix(job, signing)
     if "deb" in formats:
-        deb = make_deb(a.app, meta, styles, dist, work, a.impl, rsout if a.impl == "rs" else None)
+        deb = make_deb(a.app, meta, styles, dist, work, a.impl, rsout if a.impl == "rs" else None, a.arch)
         if a.repo:
             why = codesign.apt_repo([deb], ROOT / a.repo, meta.get("publisher", "JFLib"))
             if why:
@@ -614,7 +677,8 @@ def main():
             dmgs[s] = make_dmg(a.app, meta, s, dist, work, multi=len(styles) > 1)
             job.done.append(("dmg", dmgs[s]))
     if a.update:
-        update_channel(a.app, meta, styles, work, a.update, deb, a.update_url, a.update_key, signing, a.impl, appimages, dmgs)
+        update_channel(a.app, meta, styles, work, a.update, deb, a.update_url, a.update_key, signing, a.impl, appimages, dmgs,
+                       a.arch)
     if set(formats) - {"setup", "deb"}:
         job.report()
     signing.report()
@@ -648,7 +712,7 @@ def formats_of(text, no_win=False, no_deb=False):
             and not (text.strip() == "all" and FORMATS[f] == "mac")]   # (all: the PC's formats; dmg on a Mac)
 
 
-def make_job(app, meta, styles, dist, work, impl, rsout, targets):
+def make_job(app, meta, styles, dist, work, impl, rsout, targets, arch="x86_64"):
     """the built files for pkg_linux.py / pkg_msix.py (pkgmeta.Job)"""
     pkg = meta.get("deb_name", app.lower())
     return pkgmeta.Job(
@@ -658,16 +722,17 @@ def make_job(app, meta, styles, dist, work, impl, rsout, targets):
         extra={t: [(m, ROOT / work / styles[0] / t / m) for m in app_modules(app, t, impl) + app_bins(app, t, impl)]
                for t in ("win", "linux")},
         bins={t: app_bins(app, t, impl) for t in ("win", "linux")},
-        cross={"linux": cross_files(app, meta, rsout if impl == "rs" else None, "win") if "linux" in targets else [],
-               "win": cross_files(app, meta, rsout if impl == "rs" else None, "linux") if "win" in targets else []},
+        cross={"linux": cross_files(app, meta, rsout if impl == "rs" else None, "win", arch) if "linux" in targets else [],
+               "win": cross_files(app, meta, rsout if impl == "rs" else None, "linux", arch) if "win" in targets else []},
         notices=package_notices(styles, impl), units=unit_files(pkg, meta), runtime=None, appimage_runtime=None,
-        glibc=app_glibc(app))
+        glibc=app_glibc(app), arch=arch)
 
 
-def build_runtime(rsout, profile):
-    """apps/appimagert, the AppImage runtime (Linux, the same profile) -> its path"""
-    run([sys.executable, "build_rs.py", "app", "appimagert", "--target", "linux", *rs_mode(profile), "--out", rsout])
-    return ROOT / rsout / "linux" / "appimagert"
+def build_runtime(rsout, profile, arch="x86_64"):
+    """apps/appimagert, the AppImage runtime (Linux, the same profile and processor) -> its path"""
+    run([sys.executable, "build_rs.py", "app", "appimagert", "--target", "linux", *rs_mode(profile), "--out", rsout,
+         *arch_args(arch)])
+    return ROOT / rsout / arch_folder("linux", arch) / "appimagert"
 
 
 if __name__ == "__main__":

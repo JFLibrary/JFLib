@@ -3294,6 +3294,10 @@ ui::main!({
   the Store or snapd update it ([UPDATES.md](UPDATES.md), "Packages").  On macOS a program in an
   app bundle takes the channel's `app` entry: the whole `NAME.app` is replaced in one step after
   its signature checked against the installed one ([UPDATES.md](UPDATES.md), "macOS app bundles").
+* Windows and Linux on ARM64 ([ARM64.md](ARM64.md)) are targets of their own in the channel,
+  `windows-aarch64` and `linux-aarch64` (`update::target()`): `tools/package.py APP --arch aarch64
+  --update DIR` adds their files to the channel the x86-64 run wrote for the same version, so one
+  `update.json` serves both processors and each program takes its own entry.
 
 ## 19. Accessibility (screen readers)
 
