@@ -74,7 +74,8 @@ pub struct ServerOptions {
     pub stream_budget: usize,
     /// the margin the clients' inputs should arrive with (ticks)
     pub margin: u8,
-    /// how far back hits are rewound at most (ms)
+    /// how far back hits are rewound at most (ms; 300 unless set: the 100 ms of the interpolation buffer and
+    /// 200 ms beyond them, the user's decision of 2026-11-19)
     pub max_rewind_ms: u32,
     /// the WebSocket's port (WELCOME tells UDP clients where to fetch a full state; 0: none)
     pub ws_port: u16,
@@ -100,7 +101,7 @@ impl Default for ServerOptions {
             budget: 1200,
             stream_budget: 60 * 1024,
             margin: 2,
-            max_rewind_ms: 200,
+            max_rewind_ms: 300,
             ws_port: 0,
             hello_ms: 5000,
             ticket_ms: 10_000,

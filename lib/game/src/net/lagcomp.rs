@@ -1,5 +1,6 @@
 // lagcomp -- hits with lag compensation: the server keeps where the figures were over the last ticks and,
-// for a shot, puts them back to the time the shooter saw them, at most about 200 ms back
+// for a shot, puts them back to the time the shooter saw them, at most 300 ms back unless set (the interpolation's
+// 100 ms and 200 ms beyond them, the user's decision of 2026-11-19)
 //
 //   view_time(tick, view, max_back)   the shooter's view time from its input (NetInput::view: the lag of
 //                                     its picture in 1/256 ticks), clamped to max_back ticks before tick

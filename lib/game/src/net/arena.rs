@@ -76,7 +76,7 @@ pub struct ArenaConfig {
     pub crates: usize,
     /// ticks a second (the props' motion)
     pub rate: u32,
-    /// how far back hits are rewound at most (ticks)
+    /// how far back hits are rewound at most (ticks; 18 unless set: 300 ms at 60 Hz, as ServerOptions::max_rewind_ms)
     pub max_rewind: u32,
     /// figures may shoot
     pub fire: bool,
@@ -84,7 +84,7 @@ pub struct ArenaConfig {
 
 impl Default for ArenaConfig {
     fn default() -> Self {
-        ArenaConfig { half: 30.0, props: 0, moving: 0, displaced: 0, crates: 12, rate: 60, max_rewind: 12, fire: true }
+        ArenaConfig { half: 30.0, props: 0, moving: 0, displaced: 0, crates: 12, rate: 60, max_rewind: 18, fire: true }
     }
 }
 

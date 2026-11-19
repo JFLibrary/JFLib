@@ -5,7 +5,8 @@ und simuliert mit fester Rate, Clients schicken ihre Eingaben mit Tick-Nummer (m
 kostet), der Server schickt Schnappschüsse als Delta gegen den Stand, den der Client hat, quantisiert und unter 1200 Bytes. Der
 Client sagt seine eigene Figur voraus und gleicht sie mit dem Server ab; die anderen Figuren zeigt er rund 100 ms hinter dem
 neuesten Schnappschuss. Treffer prüft der Server mit Lag-Ausgleich: Er stellt die Trefferzonen der anderen auf die Zeit zurück,
-die der Schütze sah, höchstens rund 200 ms. Räume gibt es per Code oder Link, Spieler haben einen Namen, kein Konto; Bots spielen
+die der Schütze sah, höchstens 300 ms (die 100 ms der Interpolation und 200 ms darüber hinaus, vom Nutzer entschieden
+am 19.11.2026). Räume gibt es per Code oder Link, Spieler haben einen Namen, kein Konto; Bots spielen
 in den Tests. Der Transport ist [`lib/netchan`](TRANSPORT.md) (UDP und WebSocket); `lib/game` bleibt ohne GPU und ohne
 Betriebssystem (`#![no_std]`, `#![forbid(unsafe_code)]`, keine fremden Crates), der Server läuft unter Linux statisch.
 
@@ -212,11 +213,12 @@ Größen [unten](#messwerte).
 Jede Eingabe trägt, wie weit das Bild der anderen beim Client hinter ihrem Tick lag (`NetInput::view`, in 1/256 Ticks: die
 Render-Zeit der Interpolation). Der Server merkt sich die Mittelpunkte der Trefferzonen aller Figuren je Tick (`HitHistory`, die
 letzten `max_rewind + 8` Ticks). Schießt eine Figur in Tick T, stellt er die anderen auf T − view zurück (zwischen den zwei Ticks
-darum geblendet wie ein Client zwei Schnappschüsse blendet), höchstens `max_rewind_ms` (200 ms, 12 Ticks); was weiter zurück
+darum geblendet wie ein Client zwei Schnappschüsse blendet), höchstens `max_rewind_ms` (300 ms, 18 Ticks; bis zum 19.11.2026 200 ms); was weiter zurück
 läge, wird auf die Grenze gezogen und gezählt (`ArenaStats::clamped`). Dann ein Strahl: gegen die Karte mit `World::ray_cast`,
 gegen jede zurückgestellte Kapsel mit `physics::query::ray`; der nächste Treffer zählt, der Schütze selbst nicht. Die Zeit hinter
-dem Tick enthält Marge, Umlauf und die 100 ms der Interpolation: Bei 200 ms Grenze wird schon ab rund 50 ms Umlauf gezogen; wie
-weit das Ziel dann daneben steht, steht unter [Messwerte](#messwerte), mit der offenen Frage, wie die Grenze gemeint ist.
+dem Tick enthält Marge, Umlauf und die 100 ms der Interpolation: Bei der ersten Grenze von 200 ms wurde schon ab rund 50 ms
+Umlauf gezogen (siehe [Messwerte](#messwerte)); deshalb zählt die Grenze seit dem 19.11.2026 die 100 ms der Interpolation
+nicht mit: 300 ms.
 
 ### Die anderen: Interpolation
 
@@ -329,10 +331,13 @@ die Folgenummern und die Acks.
 
 | Ziel | Build | `--netsum` | `--checksum` (der Kern, G7b) |
 | --- | --- | --- | --- |
-| Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung und Release | `52c4613d8ffdd103` (177 304 Werte) | `8edfe993e4ffcb65` |
-| Linux x86-64 (glibc) in WSL Ubuntu 24.04 | Entwicklung und Release | `52c4613d8ffdd103` | `8edfe993e4ffcb65` |
-| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung und Release | `52c4613d8ffdd103` | `8edfe993e4ffcb65` |
-| WebAssembly in Node 22.17 (V8): einfach, SIMD, Threads (`tests/web.mjs`) | Entwicklung | `52c4613d8ffdd103` (alle drei) | `8edfe993e4ffcb65` (alle drei; für den Kern neu) |
+| Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung und Release | `4118995e45c0c067` (177 246 Werte) | `8edfe993e4ffcb65` |
+| Linux x86-64 (glibc) in WSL Ubuntu 24.04 | Entwicklung | `4118995e45c0c067` | `8edfe993e4ffcb65` |
+| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung und Release | `52c4613d8ffdd103` mit der alten Grenze von 200 ms (wie die anderen damals); mit 300 ms nicht neu gerechnet | `8edfe993e4ffcb65` |
+| WebAssembly in Node 22.17 (V8): einfach, SIMD, Threads (`tests/web.mjs`) | Entwicklung | `4118995e45c0c067` (alle drei) | `8edfe993e4ffcb65` (alle drei; für den Kern neu) |
+
+Die Grenze des Lag-Ausgleichs ging am 19.11.2026 von 200 auf 300 ms; damit treffen andere Schüsse, und die Prüfsumme der
+Sitzung wechselte von `52c4613d8ffdd103` (177 304 Werte, auf allen vier Zielen gleich) zu `4118995e45c0c067`.
 
 Die Messungen von `--netbench` ergeben auf Windows und dem M2 dieselben Zahlen bis auf die Zeiten (siehe unten).
 
@@ -426,7 +431,7 @@ Die Sicht liegt um Marge (33 ms), Umlauf und Alter des Schnappschusses und die 1
 im Mittel 8 cm, im p99 fast eine Kapselbreite (30 cm) neben dem, was der Schütze sah. Mit 60-Hz-Schnappschüssen ist der Abstand
 ohne Grenze null (der Server blendet Ticks, der Client Schnappschüsse; mit einem Schnappschuss je Tick ist das dasselbe); mit 30 Hz
 bleiben im Mittel 1 cm (eine Figur, die innerhalb von zwei Ticks dreht, an einer Wand hält oder neu startet). Die Frage an den
-Nutzer steht im Bericht: die Grenze ohne den Puffer der Interpolation zählen (200 ms + 100 ms) oder 300 ms.
+Nutzer: Er entschied am 19.11.2026 für 300 ms (die Zeilen mit 300 ms oben).
 
 **Der Server** (16 Bots, ein Raum, alles in einem Thread; die Zeit eines Ticks: die Eingaben, die Bewegung aller Figuren, die
 Requisiten, die Treffer, und jeden zweiten Tick 16 Schnappschüsse):
@@ -487,8 +492,8 @@ die Kopie des gesendeten Stands je Client; geschnittene Schnappschüsse kosten d
   (die Grundlinie), `priority` nach Entfernung und Sichtbarkeit, Treffer mit `HitHistory` und `hitscan`. Teams, Runden,
   Punktetafel, Waffen, Geschosse mit Flugzeit sind des Spiels. Ein Spiel mit `World` und `Pose` baut den Schnappschuss aus den
   Spalten (eine Hilfe dafür gibt es noch nicht).
-- **Die Grenze des Lag-Ausgleichs** nach der Entscheidung des Nutzers setzen (`ServerOptions::max_rewind_ms` und dieselbe Zahl
-  im RoomSim).
+- **Die Grenze des Lag-Ausgleichs**: 300 ms (entschieden am 19.11.2026); ein RoomSim für Spiel 1 nimmt dieselbe Zahl wie
+  `ServerOptions::max_rewind_ms` (in Ticks, wie `ArenaConfig::max_rewind`).
 - **Korrekturen glätten**: ein abklingender Versatz im Bild der eigenen Figur nach `Outcome::Corrected` (die Physik bleibt beim
   korrigierten Zustand).
 - **Treffermarken und Abschüsse** zuverlässig melden: heute stehen sie als Felder in den Figuren (das letzte Schuss-Tick, Leben,

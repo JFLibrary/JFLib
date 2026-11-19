@@ -249,8 +249,8 @@ anfassen:
   schickt Schnappschüsse als Delta gegen den zuletzt bestätigten Stand, quantisiert.
 - Client: Vorhersage der eigenen Figur, Abgleich bei Abweichung (zurück zum Stand des Servers, Eingaben neu
   anwenden), die anderen Figuren interpoliert mit rund 100 ms Puffer.
-- Treffer mit Lag-Ausgleich: Der Server stellt die Trefferzonen auf die Zeit des Schützen zurück, höchstens rund
-  200 ms.
+- Treffer mit Lag-Ausgleich: Der Server stellt die Trefferzonen auf die Zeit des Schützen zurück, höchstens 300 ms
+  (die 100 ms der Interpolation und 200 ms darüber hinaus; vom Nutzer entschieden am 19.11.2026, vorher rund 200 ms).
 - Räume per Code oder Link, ein Name, kein Konto. Bots für Tests.
 - Fertig, wenn: eine simulierte Leitung im Prozess (Verzögerung, Schwankung, Verlust, Umordnung) Vorhersagefehler,
   Bandbreite je Spieler und die CPU des Servers bei 16 Bots misst und die Werte im Plan stehen.
@@ -270,8 +270,8 @@ anfassen:
   Vorhersage exakt; der Server braucht 110 µs je Tick auf dem M2. Ein Beitritt mit 300 Requisiten, von denen die
   Hälfte bewegt wurde, ist 2035 Bytes und passt nicht in ein Paket. Prüfsumme einer aufgezeichneten Sitzung gleich
   auf Windows, Linux, macOS und im Browser (Node); echte Sockets über UDP und WebSocket auf Loopback; `netchan` baut
-  für iOS. Offen: die Grenze des Lag-Ausgleichs (200 ms greift schon ab etwa 50 ms Umlauf, weil Puffer und Marge
-  mitzählen), ob UDP-Clients den vollen Stand ohne zweiten WebSocket nach Priorität auffüllen (gleich schnell), Teil 2
+  für iOS. Die Grenze des Lag-Ausgleichs ist 300 ms (200 ms griffen schon ab etwa 50 ms Umlauf, weil Puffer und Marge
+  mitzählen; vom Nutzer entschieden am 19.11.2026). Offen: ob UDP-Clients den vollen Stand ohne zweiten WebSocket nach Priorität auffüllen (gleich schnell), Teil 2
   (echtes Netz, Browser als Client, Korrekturen glätten, Ereignisse zuverlässig, Räume auf Threads).
 
 **G7f `render3d` für Spiel 1**
