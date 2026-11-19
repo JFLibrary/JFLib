@@ -1,10 +1,14 @@
 // gametest -- lib/game (and its bridge to render3d, lib/game_render3d) against references of its own
 //
 //   gametest --check [--quick]   every test group (tests/check.uis); exit code 1 when a check fails
-//   gametest --test NAME         one group: world tick input camera bridge
+//   gametest --test NAME         one group: world tick input camera bridge netcodec lagcomp room netsim bots
 //   gametest --checksum          the determinism harness: one line "gametest checksum=HEX" over the bits
 //                                of a fixed run (world, systems, poses, input replayed, cameras); the same on
 //                                every target
+//   gametest --netsum            the netcode's: "gametest netsum=HEX" over a recorded networked session (a
+//                                server and six bots on the simulated link, rough then clear, a fixed seed)
+//   gametest --netbench          the netcode's measurements with 16 bots (docs/NETCODE.md; release build)
+//   gametest --loopback [--secs S] [--udp N] [--ws N]   the netcode on real sockets on 127.0.0.1
 //   gametest [--script S]        the probe window (src/probe.rs): ui's real input path into an Input, for
 //                                the scripts tests/input.uis and tests/tick.uis (headless)
 //
@@ -24,6 +28,14 @@ mod bridge;
 mod camera_t;
 mod checksum;
 mod input_t;
+mod net_codec;
+mod net_lag;
+// (real sockets: not in the browser, where only the console paths run in Node: tests/web.mjs)
+#[cfg(not(target_arch = "wasm32"))]
+mod net_loop;
+mod net_room;
+mod net_session;
+mod net_sim;
 mod probe;
 mod tick_t;
 mod world_t;
@@ -104,7 +116,7 @@ impl Ctx {
     }
 }
 
-pub const ALL: &[&str] = &["world", "tick", "input", "camera", "bridge"];
+pub const ALL: &[&str] = &["world", "tick", "input", "camera", "bridge", "netcodec", "lagcomp", "room", "netsim", "bots"];
 
 fn run_groups(names: &[&str], quick: bool) -> i32 {
     let (mut checks, mut failed) = (0u64, 0u64);
@@ -120,10 +132,15 @@ fn run_groups(names: &[&str], quick: bool) -> i32 {
             "tick" => tick_t::run(&mut c),
             "input" => input_t::run(&mut c),
             "camera" => camera_t::run(&mut c),
+            "netcodec" => net_codec::run(&mut c),
+            "lagcomp" => net_lag::run(&mut c),
+            "room" => net_room::run(&mut c),
+            "netsim" => net_sim::run(&mut c),
+            "bots" => net_sim::bots(&mut c),
             _ => bridge::run(&mut c),
         }
         let ms = (plat::time_us() - t0) / 1000;
-        out(&format!("{:<7} {:>9} checks, {} failed ({} ms)\n", group, c.checks, c.failed, ms));
+        out(&format!("{:<8} {:>9} checks, {} failed ({} ms)\n", group, c.checks, c.failed, ms));
         checks += c.checks;
         failed += c.failed;
     }
@@ -143,6 +160,19 @@ fn run() -> i32 {
         let (sum, n) = checksum::run();
         out(&format!("gametest checksum={:016x} results={}\n", sum, n));
         return 0;
+    }
+    if args.iter().any(|a| a == "--netsum") {
+        let (sum, n) = net_sim::checksum();
+        out(&format!("gametest netsum={:016x} values={}\n", sum, n));
+        return 0;
+    }
+    if args.iter().any(|a| a == "--netbench") {
+        return net_sim::bench();
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    if args.iter().any(|a| a == "--loopback") {
+        let num = |name: &str, d: u64| value(name).and_then(|v| v.parse::<u64>().ok()).unwrap_or(d);
+        return net_loop::run(num("--secs", 6), num("--udp", 4) as usize, num("--ws", 4) as usize);
     }
     if let Some(name) = value("--test") {
         let names: Vec<&str> = name.split(',').collect();

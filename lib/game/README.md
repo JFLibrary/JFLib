@@ -1,7 +1,7 @@
 # jflib-game
 
 The core of a game engine, part of [JFLib](https://jflib.org): a world of entities and components, a
-fixed simulation rate, input actions and camera controllers. It needs no GPU and no operating system
+fixed simulation rate, input actions, camera controllers and the netcode of a multiplayer game. It needs no GPU and no operating system
 service beyond the input events an app hands it, so a game's server runs the same code headless. It
 is plain Rust, without the standard library and without a line of `unsafe` code.
 
@@ -58,6 +58,13 @@ camera.look(input.motion_of(look_x), 0.0);
   fires nothing, the end of the lock pauses. Bindings and settings go into a settings file.
 - **Cameras**: first person, an orbit that follows a target and comes in front of walls (through
   [jflib-physics](https://crates.io/crates/jflib-physics)), and free flight, all in `f64`.
+- **Netcode** (`game::net`, over [jflib-netchan](https://crates.io/crates/jflib-netchan): UDP and
+  WebSocket): the server decides at a fixed rate; clients send their inputs with tick numbers, several
+  in every packet, predict their own figure and reconcile it bit for bit with the server's state; the
+  others are shown 100 ms behind the newest snapshot. Snapshots are deltas against what each client
+  holds, quantised and cut by priority to fit one 1200-byte datagram; a join's full state that does not
+  fit comes over a WebSocket. Hits are lag-compensated (the others rewound to what the shooter saw).
+  Rooms by a code or a link, a name, no account; bots and a simulated network for tests.
 
 The bridge that draws entities through JFLib's 3D renderer is the crate
 [jflib-game-render3d](https://crates.io/crates/jflib-game-render3d): a server never links a renderer.
@@ -80,6 +87,8 @@ This crate is new and not part of 0.2.1: it comes with a later release. The
   item of `game`, also on [docs.rs](https://docs.rs/jflib-game)
 - [GAMECORE.md](https://github.com/JFLibrary/JFLib/blob/main/docs/GAMECORE.md) (in German): the
   design and its reasons, the units of the raw motion per platform, the tests
+- [NETCODE.md](https://github.com/JFLibrary/JFLib/blob/main/docs/NETCODE.md) (in German): the
+  netcode's design, the measurements with 16 bots, the tests
 
 ## License
 

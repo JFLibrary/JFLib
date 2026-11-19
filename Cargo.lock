@@ -462,6 +462,7 @@ dependencies = [
  "jflib-game",
  "jflib-game-render3d",
  "jflib-gpu",
+ "jflib-netchan",
  "jflib-physics",
  "jflib-plat",
  "jflib-render3d",
@@ -774,6 +775,7 @@ name = "jflib-game"
 version = "0.2.1"
 dependencies = [
  "jflib-base",
+ "jflib-netchan",
  "jflib-physics",
  "jflib-plat",
  "jflib-rt",
