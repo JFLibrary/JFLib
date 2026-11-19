@@ -203,3 +203,11 @@ pub fn run() -> (u64, u64) {
     }
     (h.h, h.n)
 }
+
+/// the character controller's checksum (character.rs): its own number, so the one above stays what it was
+/// -> (the checksum, the number of values in it)
+pub fn controller() -> (u64, u64) {
+    let mut h = Hash { h: 0xcbf2_9ce4_8422_2325, n: 0 };
+    crate::character::checksum(|v| h.u(v));
+    (h.h, h.n)
+}

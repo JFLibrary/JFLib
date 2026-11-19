@@ -9,13 +9,15 @@ Linux, the browser, Android and macOS.
 ```sh
 python build_rs.py test physicstest                       # tests/check.uis: --check on Windows and Linux
 python build_rs.py run physicstest -- --test seams        # one group (math hull ray distance cast tunnel
-                                                          # seams bvh world fuzz edge), --quick: a tenth
-python build_rs.py run physicstest -- --checksum          # the determinism checksum
+                                                          # seams bvh world fuzz edge character charfuzz),
+                                                          # --quick: a tenth
+python build_rs.py run physicstest -- --checksum          # the determinism checksums (queries, controller)
 python build_rs.py app physicstest --release
-build/release/win/physicstest.exe --bench --runs 3        # the numbers of PHYSICS.md
+build/release/win/physicstest.exe --bench --runs 3        # the numbers of PHYSICS.md (or --bench sqrt,
+                                                          # --bench map, --bench controller)
 ```
 
-The checksum must be the same on every target:
+Both checksum lines must be the same on every target:
 
 ```sh
 wsl.exe -d Ubuntu-24.04 -- build/linux/physicstest --checksum           # Linux (static, no libc)
@@ -33,7 +35,8 @@ On a Mac: `python build_rs.py run physicstest --target mac -- --checksum`.
 |---|---|
 | `src/main.rs` | the arguments, the counters of a test group, the random numbers (xorshift64*) |
 | `src/tests.rs` | the test groups of `--check` |
-| `src/refs.rs` | the references: closest points, polytope distances by brute force, penetration by separating axes, first contact by bisection on the convex gap |
+| `src/character.rs` | the character controller: its scenarios, the random runs on random maps, its part of the checksum, its measurement |
+| `src/refs.rs` | the references: closest points, polytope distances by brute force, penetration by separating axes, first contact by bisection on the convex gap, the square root by an integer root |
 | `src/scene.rs` | the meshes: hilly ground, boxes, steps, ramps, a flat grid |
 | `src/checksum.rs` | the determinism harness |
 | `src/bench.rs` | the measurements |

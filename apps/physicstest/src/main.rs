@@ -2,10 +2,13 @@
 //
 //   physicstest --check [--quick]   every test group (tests/check.uis); exit code 1 when a check fails
 //   physicstest --test NAME         one group: math hull ray distance cast tunnel seams bvh world fuzz edge
-//   physicstest --checksum          the determinism harness: one line "physicstest checksum=HEX" over the
-//                                   bits of every result of a fixed set of scenarios; the same on every target
-//   physicstest --bench [--runs N]  BVH build of a 50 000-triangle map, rays and capsule casts per second,
-//                                   bytes per triangle (medians of N runs, default 3)
+//                                   character charfuzz
+//   physicstest --checksum          the determinism harness: "physicstest checksum=HEX" over the bits of every
+//                                   result of a fixed set of scenarios, "physicstest controller checksum=HEX"
+//                                   over figures moved by the character controller; the same on every target
+//   physicstest --bench [PART] [--runs N]  PART sqrt, map or controller (default all): the square roots,
+//                                   the BVH build of a 50 000-triangle map, rays and capsule casts per second,
+//                                   bytes per triangle, controllers stepped per ms (medians of N runs, default 3)
 //   physicstest --version | --help
 //
 // The references (refs.rs) share no code with lib/physics: closest points by projection and edge
@@ -19,6 +22,7 @@
 extern crate alloc;
 
 mod bench;
+mod character;
 mod checksum;
 mod refs;
 mod scene;
@@ -126,7 +130,7 @@ impl Ctx {
 }
 
 fn usage() -> i32 {
-    out("Aufruf: physicstest --check [--quick] | --test NAME | --checksum | --bench [--runs N] | --version | --help\n");
+    out("Aufruf: physicstest --check [--quick] | --test NAME | --checksum | --bench [sqrt|map|controller] [--runs N] | --version | --help\n");
     0
 }
 
@@ -144,11 +148,14 @@ fn run() -> i32 {
     if args.iter().any(|a| a == "--checksum") {
         let (sum, n) = checksum::run();
         out(&format!("physicstest checksum={:016x} results={}\n", sum, n));
+        let (sum, n) = checksum::controller();
+        out(&format!("physicstest controller checksum={:016x} results={}\n", sum, n));
         return 0;
     }
     if args.iter().any(|a| a == "--bench") {
         let runs = value("--runs").and_then(|v| v.parse::<usize>().ok()).unwrap_or(3).max(1);
-        bench::run(runs);
+        let part = value("--bench").filter(|v| !v.starts_with("--")).unwrap_or_else(|| "all".into());
+        bench::run(runs, &part);
         return 0;
     }
     if let Some(name) = value("--test") {

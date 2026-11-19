@@ -4,6 +4,8 @@ use crate::refs::{self, Poly};
 use crate::scene;
 use crate::{Ctx, Rng, out};
 use rt::fx as rtfx;
+#[cfg(not(target_arch = "wasm32"))]
+use rt::portable::fx as portable_fx;
 use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -12,7 +14,7 @@ use alloc::vec::Vec;
 use physics::math::{self, sqrt};
 use physics::{Aabb, BodyId, CAST_SKIN, ConvexHull, Filter, HullError, Iso, MeshError, MeshOptions, Quat, Shape, TriMesh, Vec3, World, query};
 
-pub const ALL: &[&str] = &["math", "hull", "ray", "distance", "cast", "tunnel", "seams", "bvh", "world", "fuzz", "edge"];
+pub const ALL: &[&str] = &["math", "hull", "ray", "distance", "cast", "tunnel", "seams", "bvh", "world", "fuzz", "edge", "character", "charfuzz"];
 
 pub fn run(names: &[&str], quick: bool) -> i32 {
     let (mut checks, mut failed) = (0u64, 0u64);
@@ -34,6 +36,8 @@ pub fn run(names: &[&str], quick: bool) -> i32 {
             "bvh" => bvh_tests(&mut c),
             "world" => world_tests(&mut c),
             "fuzz" => fuzz_tests(&mut c),
+            "character" => crate::character::scenario_tests(&mut c),
+            "charfuzz" => crate::character::fuzz_tests(&mut c),
             _ => edge_tests(&mut c),
         }
         let ms = (plat::time_us() - t0) / 1000;
@@ -118,14 +122,21 @@ fn poly_of(s: &Shape, iso: &Iso) -> Poly {
 
 fn math_tests(c: &mut Ctx) {
     let mut rng = Rng::new(1);
-    // the square root: lib/physics' portable one against rt's correctly rounded one (the processor's on
-    // x86-64 and ARM64, rt's integer root elsewhere), bit for bit
+    // the square root: rt's portable one (math::sqrt_portable), rtfx::sqrtd (the processor's on x86-64 and
+    // ARM64, the portable one elsewhere), math::sqrt and sqrtd of rt's portable fx against an integer root
+    // (refs::sqrt_ref), bit for bit, NaN included
     let check_sqrt = |c: &mut Ctx, x: f64| {
-        let a = math::sqrt_portable(x);
-        let b = rtfx::sqrtd(x);
-        let s = math::sqrt(x);
-        let same = (a.is_nan() && b.is_nan() && s.is_nan()) || (a.to_bits() == b.to_bits() && s.to_bits() == b.to_bits());
-        c.check(same, || format!("sqrt({:e} = {:016x}): portable {:016x}, rt {:016x}, sqrt {:016x}", x, x.to_bits(), a.to_bits(), b.to_bits(), s.to_bits()));
+        let r = refs::sqrt_ref(x).to_bits();
+        let a = math::sqrt_portable(x).to_bits();
+        let b = rtfx::sqrtd(x).to_bits();
+        let s = math::sqrt(x).to_bits();
+        #[cfg(not(target_arch = "wasm32"))]
+        let pf = portable_fx::sqrtd(x).to_bits();
+        #[cfg(target_arch = "wasm32")]
+        let pf = b;
+        c.check(a == r && b == r && s == r && pf == r, || {
+            format!("sqrt({:e} = {:016x}): reference {:016x}, portable {:016x}, rt {:016x}, sqrt {:016x}, rt portable {:016x}", x, x.to_bits(), r, a, b, s, pf)
+        });
     };
     let specials = [
         0.0,
@@ -133,30 +144,56 @@ fn math_tests(c: &mut Ctx) {
         f64::INFINITY,
         f64::NEG_INFINITY,
         f64::NAN,
+        f64::from_bits(0x7ff0_0000_0000_0001), // signalling NaNs and NaNs with a sign and a payload
+        f64::from_bits(0xfff8_0000_0000_0000),
+        f64::from_bits(0xfff0_0000_0000_0001),
+        f64::from_bits(0x7fff_ffff_ffff_ffff),
+        f64::from_bits(0x7ff4_0000_dead_beef),
         -1.0,
+        -f64::MIN_POSITIVE,
+        -f64::from_bits(1),
+        f64::MIN,
         f64::MIN_POSITIVE,
         f64::from_bits(1),
         f64::from_bits(0x000f_ffff_ffff_ffff),
         f64::MAX,
         1.0,
         2.0,
+        3.0,
         4.0,
         0.25,
-        3.0,
         1e-300,
         1e300,
     ];
     for x in specials {
         check_sqrt(c, x);
     }
+    // random bit patterns over everything (negative numbers, NaN and infinity among them), random positive
+    // ones, random numbers below 1e4
     for _ in 0..c.n(200_000) {
-        let b = rng.next_u64() & 0x7fff_ffff_ffff_ffff;
-        let x = f64::from_bits(b);
-        if x.is_finite() {
-            check_sqrt(c, x);
-        }
+        check_sqrt(c, f64::from_bits(rng.next_u64()));
+        check_sqrt(c, f64::from_bits(rng.next_u64() & 0x7fff_ffff_ffff_ffff));
         let y = rng.range(0.0, 1e4);
         check_sqrt(c, y);
+    }
+    // subnormal numbers of every length
+    for _ in 0..c.n(20_000) {
+        check_sqrt(c, f64::from_bits(rng.next_u64() >> (12 + rng.below(52))));
+    }
+    // every power of two and its neighbours
+    for e in -1074i32..=1023 {
+        let bits = if e >= -1022 { ((e + 1023) as u64) << 52 } else { 1u64 << (e + 1074) };
+        for k in [-2i64, -1, 0, 1, 2] {
+            check_sqrt(c, f64::from_bits((bits as i64 + k) as u64));
+        }
+    }
+    // perfect squares k^2 4^j and their neighbours (the root is exact or next to an exact one)
+    for _ in 0..c.n(50_000) {
+        let k = 1 + rng.below(1 << 26) as u64;
+        let x = (k * k) as f64 * pow2(2 * (rng.below(961) as i32 - 480));
+        for d in [-2i64, -1, 0, 1, 2] {
+            check_sqrt(c, f64::from_bits((x.to_bits() as i64 + d) as u64));
+        }
     }
     // near the midpoints: x = the double nearest to ((2q + 1) / 2)^2 and its neighbours
     for _ in 0..c.n(100_000) {
