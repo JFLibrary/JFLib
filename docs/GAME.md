@@ -1,7 +1,7 @@
 # Spiel-Engine: Plan für G7
 
-Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1) und von G7b, G7d und G7g (Welle 2), siehe
-dort; Stand 2026-11-18. Die Zahl der Läufe je Stufe ist
+Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1), von G7b, G7d und G7g (Welle 2) und von G7e
+(Welle 3), siehe dort; Stand 2026-11-19. Die Zahl der Läufe je Stufe ist
 geschätzt (ein Lauf ist eine Arbeitsrunde eines Agenten mit Durchsicht, wie bei G5 und G6).
 
 ## Ziel
@@ -254,6 +254,25 @@ anfassen:
 - Räume per Code oder Link, ein Name, kein Konto. Bots für Tests.
 - Fertig, wenn: eine simulierte Leitung im Prozess (Verzögerung, Schwankung, Verlust, Umordnung) Vorhersagefehler,
   Bandbreite je Spieler und die CPU des Servers bei 16 Bots misst und die Werte im Plan stehen.
+- **Stand 2026-11-19: Teil 1 fertig** ([NETCODE.md](NETCODE.md)). `game::net` in `lib/game` über `lib/netchan`:
+  Der Server rechnet mit 60 Hz und gibt jeder Figur die Eingabe ihres Clients für den Tick (fehlt sie, die letzte
+  noch einmal). Clients laufen auf einer gesteuerten Uhr 2 Ticks vor, schicken mit jeder Eingabe die, die dem
+  Server fehlen können, sagen ihre Figur voraus und gleichen Bit für Bit ab (der Bewegungszustand liegt als ganze
+  Zahlen auf einem Raster von 1/1024 m); die anderen Figuren 100 ms hinter dem neuesten Schnappschuss.
+  Schnappschüsse mit 30 Hz als Delta gegen den Stand, den der Client als entschlüsselt bestätigt (über WebSocket
+  gegen den zuletzt gesendeten, am Anfang gegen die Grundlinie der Karte), nach aufaddierter Priorität auf 1200
+  Bytes geschnitten. Der volle Stand eines Beitritts, der nicht in ein Paket passt, kommt wie entschieden über einen
+  eigenen WebSocket (Ticket, FULL). Lag-Ausgleich mit zurückgestellten Kapseln und `hitscan`; Räume per Code oder
+  Link, Namen; die Bewegung hinter `Movement` (Bezug `Walker`, der Controller aus G7c kommt mit G7h); das
+  Bezugsspiel `Arena`, Bots, eine simulierte Leitung. Gemessen mit 16 Bots, 300 Requisiten, typisches Netz: je
+  Spieler aufwärts 3,3 KB/s bei 60 Paketen/s, abwärts 13,2 KB/s; Schnappschüsse im Mittel 428, höchstens 502
+  Bytes; ohne Schießen 10,6 Korrekturen je Minute mit 7 mm im Mittel, nach dem Ende schlechten Wetters jede
+  Vorhersage exakt; der Server braucht 110 µs je Tick auf dem M2. Ein Beitritt mit 300 Requisiten, von denen die
+  Hälfte bewegt wurde, ist 2035 Bytes und passt nicht in ein Paket. Prüfsumme einer aufgezeichneten Sitzung gleich
+  auf Windows, Linux, macOS und im Browser (Node); echte Sockets über UDP und WebSocket auf Loopback; `netchan` baut
+  für iOS. Offen: die Grenze des Lag-Ausgleichs (200 ms greift schon ab etwa 50 ms Umlauf, weil Puffer und Marge
+  mitzählen), ob UDP-Clients den vollen Stand ohne zweiten WebSocket nach Priorität auffüllen (gleich schnell), Teil 2
+  (echtes Netz, Browser als Client, Korrekturen glätten, Ereignisse zuverlässig, Räume auf Threads).
 
 **G7f `render3d` für Spiel 1**
 
