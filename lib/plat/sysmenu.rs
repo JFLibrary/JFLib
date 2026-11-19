@@ -1,17 +1,23 @@
 // sysmenu -- the app's menus in the system's own menu bar (macOS: between the app menu and the Window
-// menu, as every Mac app has them; docs/APPLE.md "Menüs in der Menüleiste")
+// menu, as every Mac app has them; iPadOS: between the application menu and Window as well;
+// docs/APPLE.md "Menüs in der Menüleiste" and AP9)
 //
 //   sysmenu_supported() -> bool        whether this system shows an app's menus in its own bar (macOS
-//                                      with a window of the app; elsewhere false: the app draws its menu
-//                                      bar in the window)
+//                                      with a window of the app, an iPad under UIKit; elsewhere false:
+//                                      the app draws its menu bar in the window)
+//   sysmenu_window_row() -> bool       whether the window keeps its own menu row as well (iPadOS: its
+//                                      bar hides until a swipe down from the top or the pointer there
+//                                      reveals it, the row stays the way for the finger; macOS: false)
 //   sysmenu_set(&[SysMenuItem])        the app's menus: the top level are the menus of the bar, their
-//                                      `sub` the rows; the same list again changes nothing
+//                                      `sub` the rows; the same list again changes nothing; an empty
+//                                      list takes them out again
 //   sysmenu_take() -> Vec<u32>         the ids of the rows chosen since the last call (each choice calls
 //                                      wake())
 //
 // A row's key equivalent is a character ("s", or a function key's: "\u{F704}" = F1) with MOD_* bits;
 // MOD_CTRL is the Mac's Command key, MOD_ALT its Option key.  A disabled row cannot be chosen, its key
-// then reaches the window as a normal key press.
+// then reaches the window as a normal key press.  On the iPad the rows with a key also show while
+// Command is held; Insert has no key there.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -64,7 +70,24 @@ pub fn sysmenu_supported() -> bool {
     {
         crate::apple::mac::sysmenu_supported()
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "ios")]
+    {
+        crate::apple::ios::pad::sysmenu_supported()
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    {
+        false
+    }
+}
+
+/// whether the window keeps drawing its own menu row besides the system's bar (iPadOS; false where
+/// the system's bar is the only place, macOS, and where sysmenu_supported is false)
+pub fn sysmenu_window_row() -> bool {
+    #[cfg(target_os = "ios")]
+    {
+        crate::apple::ios::pad::sysmenu_window_row()
+    }
+    #[cfg(not(target_os = "ios"))]
     {
         false
     }
@@ -81,4 +104,12 @@ pub fn sysmenu_set(menus: &[SysMenuItem]) {
     }
     #[cfg(target_os = "macos")]
     crate::apple::mac::sysmenu_set(menus);
+    #[cfg(target_os = "ios")]
+    crate::apple::ios::pad::sysmenu_set();
+}
+
+/// (iOS: UIKit asks when it builds the main menu) the menus of the last sysmenu_set
+#[allow(dead_code)]
+pub(crate) fn current() -> Vec<SysMenuItem> {
+    LAST.lock().clone()
 }

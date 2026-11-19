@@ -1629,6 +1629,7 @@ impl Ui {
     /// ui_frame_end -> another pass is needed before the frame is final
     pub(crate) fn frame_end(&mut self) -> bool {
         self.building = false;
+        self.sysmenu_frame_end(); // (popup.rs) no menubar(None) this pass: the system's bar empties
         self.uiw_frame_end();
         #[cfg(target_os = "android")]
         self.ime_frame_end();

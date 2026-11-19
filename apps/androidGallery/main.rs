@@ -75,7 +75,7 @@ use nav::Page;
 const DESC: AppDesc = AppDesc {
     title: "JFLib Pocket Gallery", // i18n
     w: 390, h: 780, min_w: 280, min_h: 240,
-    flags: AF_RESIZABLE | AF_LIGHT, cmds: &pg_menus::CMDS, ..AppDesc::NONE
+    flags: AF_RESIZABLE | AF_LIGHT, cmds: &pg_menus::CMDS, menubar: &pg_menus::MENUBAR, ..AppDesc::NONE
 };
 const ID_HOME: u32 = 10; // the start page's scroll view
 const ID_PAGE: u32 = 20; // a page's scroll view: + the page's number
