@@ -259,6 +259,54 @@ fn groups(reg: Reg) -> &'static [Group] {
     }
 }
 
+// (JD8 rest) the registers with their own ribbon, in the row's order
+const RIBBONS: [Reg; 7] = [Reg::Start, Reg::Insert, Reg::Design, Reg::View, Reg::Cff, Reg::Container, Reg::Text];
+
+// the menu of the button whose command is `id`: its register, its popup id, its rows
+fn menu_of(id: u32) -> Option<(Reg, u32, &'static [It])> {
+    for reg in RIBBONS {
+        for g in groups(reg) {
+            for col in g.2 {
+                match col {
+                    Col::BigMenu(c, items) if *c == id => return Some((reg, id, items)),
+                    Col::BigSplit(c, items) if *c == id => return Some((reg, id | SPLIT, items)),
+                    Col::Small(sms) => {
+                        for s in *sms {
+                            match s {
+                                Sm::Menu(c, items) if *c == id => return Some((reg, id, items)),
+                                Sm::Split(c, items) if *c == id => return Some((reg, id | SPLIT, items)),
+                                _ => {}
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    None
+}
+
+/// (JD8 rest) where the menu of the button whose command is `id` opens: its register and the
+/// popup's id (Designs: the gallery's list of all designs)
+pub(crate) fn menu_place(id: u32) -> Option<(Reg, u32)> {
+    if id == THEMES {
+        return Some((Reg::Design, crate::design_gallery::ID_ALL));
+    }
+    menu_of(id).map(|(reg, pid, _)| (reg, pid))
+}
+
+/// (JD8 rest) a menu button's own command: usable while one of its rows is (None: `id` opens
+/// no menu of the ribbon)
+pub(crate) fn menu_usable(app: &Diagrammer, id: u32) -> Option<bool> {
+    let (_, _, items) = menu_of(id)?;
+    // a split button's action is a command of its own (Neue Seite, Zeichentools)
+    if matches!(id, NEW_PAGE | DRAW_TOOLS | PASTE | TEXT_BOX | BRING_FRONT | SEND_BACK | FONT_COLOR) {
+        return None;
+    }
+    Some(any_enabled(app, items))
+}
+
 // the flags of a command's control: disabled without a handler, checked when on
 fn cflags(app: &Diagrammer, id: u32) -> u32 {
     (if commands::usable(app, id) { 0 } else { ST_DISABLED }) | if commands::checked(app, id) { ST_CHECKED } else { 0 }

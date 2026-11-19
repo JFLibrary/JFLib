@@ -40,7 +40,8 @@ use crate::Diagrammer;
 const ID_TILES: u32 = 0x5D00_0000;
 const ID_VARIANTS: u32 = 0x5D10_0000;
 const ID_MORE: u32 = 0x5D20_0000;
-const ID_ALL: u32 = 0x5D30_0000;
+/// the flyout with all designs (the gallery's ▾; Entwurf › Designs' command opens it, cmds_shell.rs)
+pub(crate) const ID_ALL: u32 = 0x5D30_0000;
 const ID_MENU: u32 = 0x5D40_0000;
 const ID_VMENU: u32 = 0x5D50_0000;
 /// the tiles in the ribbon (the gallery's width in ribbon.rs: 6)

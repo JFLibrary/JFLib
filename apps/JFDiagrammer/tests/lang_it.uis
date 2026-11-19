@@ -12,7 +12,7 @@ expect text:"Nessuna raccolta di forme aperta." exists
 expect button:"Altre forme" enabled
 expect canvas:"Area di disegno" exists
 expect button:"Pagina 1 di 1" exists
-expect text:"67%" exists
+expect button:"67%" exists
 click tab:"Inserisci"
 expect text:"Illustrazioni" exists
 expect text:"Appunti" missing

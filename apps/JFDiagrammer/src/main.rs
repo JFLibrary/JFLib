@@ -46,6 +46,14 @@
 //                     Format, Shapes verbinden, the Verbindungspfeile
 //   src/structures_cff.rs   (JD10) the register Funktionsübergreifendes Flussdiagramm
 //   src/layout_ui.rs  (JD10) Layout-Verhalten per shape, Seite einrichten › Layout und Routing
+//   src/cmds_arrange.rs  (JD8 rest) Automatisch ausrichten
+//   src/cmds_later.rs    (JD8 rest) the commands left for later with their reasons, the check
+//   src/cmds_myshapes.rs (JD8 rest) Zu meinen Shapes hinzufügen (shapes of the page into Favoriten)
+//   src/pane_sizepos.rs, pane_data.rs, pane_panzoom.rs  (JD8 rest) the task panes Größe und
+//                     Position, Shape-Daten, Verschieben und Zoomen; Shape-Daten definieren
+//   src/qat.rs        (JD8 rest) the quick access toolbar and its customization
+//   src/cmds_shell.rs (JD8 rest) menu buttons' commands open their menus; Schrift, Linie,
+//                     Schnellformatvorlagen, the dialog Zoom
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too)
@@ -66,7 +74,8 @@
 // a drawing on the command line opens at start (JD4); --no-system-fonts draws with the style's
 // fonts only (the same on every machine); --write-stencils DIR writes the built-in stencils
 // (.vssx, metric and US) into DIR and ends (JD9: the user's check in Visio); --export-dir DIR
-// puts DIR in front of the name the export's save dialog proposes (JD12).
+// puts DIR in front of the name the export's save dialog proposes (JD12); --check-commands shows
+// which commands still lack a function as the notice (JD8 rest, cmds_later.rs).
 //
 //   python build_rs.py run JFDiagrammer
 //   python build_rs.py test JFDiagrammer          tests/*.uis
@@ -80,6 +89,10 @@
 extern crate alloc;
 
 mod backstage;
+mod cmds_arrange;
+mod cmds_later;
+mod cmds_myshapes;
+mod cmds_shell;
 mod commands;
 mod design_gallery;
 mod design_store;
@@ -96,9 +109,13 @@ mod icons;
 mod lang;
 mod layout_ui;
 mod options;
+mod pane_data;
+mod pane_panzoom;
+mod pane_sizepos;
 mod panes;
 mod print_layout;
 mod print_ui;
+mod qat;
 mod ribbon;
 mod shell;
 mod stencils;
@@ -204,6 +221,15 @@ pub(crate) struct Diagrammer {
     /// dialog and register
     pub structs: structures::Structs,
     pub layout: layout_ui::LayoutState,
+    /// (JD8 rest) the dialog Zoom
+    pub shell: cmds_shell::ShellState,
+    /// (JD8 rest) Größe und Position, Shape-Daten (the field being typed into, the dialog)
+    pub sizepos: pane_sizepos::SizePos,
+    pub data: pane_data::DataState,
+    /// (JD8 rest) Verschieben und Zoomen: the overview's picture, the drag
+    pub panzoom: pane_panzoom::PanZoom,
+    /// (JD8 rest) the quick access toolbar's dialog
+    pub qat: qat::QatState,
 }
 
 impl Diagrammer {
@@ -253,6 +279,11 @@ impl Diagrammer {
             quick: format_quick::QuickTiles::default(),
             structs: structures::Structs::default(),
             layout: layout_ui::LayoutState::default(),
+            shell: cmds_shell::ShellState::default(),
+            sizepos: pane_sizepos::SizePos::default(),
+            data: pane_data::DataState::default(),
+            panzoom: pane_panzoom::PanZoom::default(),
+            qat: qat::QatState::default(),
         }
     }
 
@@ -372,6 +403,10 @@ impl App for Diagrammer {
         if !opened && self.preview == ribbon::SEL_NONE {
             edit_doc::new_drawing(self, ui, false);
         }
+        // (JD8 rest) --check-commands: which commands still lack a function (cmds_later.rs)
+        if plat::args().iter().any(|a| a == "--check-commands") {
+            self.error = Some((alloc::format!("Befehlsprüfung: {}", cmds_later::report_text()), alloc::string::String::new()));
+        }
         true
     }
 
@@ -391,6 +426,9 @@ impl App for Diagrammer {
         export_ui::dialogs(self, ui);
         print_ui::dialogs(self, ui);
         layout_ui::dialog(self, ui);
+        cmds_shell::zoom_dialog(self, ui);
+        pane_data::define_dialog(self, ui);
+        qat::dialog(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

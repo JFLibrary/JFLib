@@ -13,10 +13,11 @@
 //                             (background pages after the others), Alle Seiten as a list
 //   status(app, ui)           page, measures of the selection, zoom
 //
-// Contents are placeholders until their stages: the Shapes panel shows the stencils (JD9,
-// stencils_panel.rs), the format and data panes their layout with disabled fields (JD7, JD11),
-// Verschieben und Zoomen the overview of the canvas and a working zoom slider.  The context
-// menus list their commands (disabled until a handler exists, commands.rs).
+// The contents live in their own files: the Shapes panel (JD9, stencils_panel.rs), Shape
+// formatieren (JD11, format_pane.rs), Größe und Position, Shape-Daten, Verschieben und Zoomen
+// (JD8 rest: pane_sizepos.rs, pane_data.rs, pane_panzoom.rs).  The context menus list their
+// commands (disabled while a command cannot run, commands.rs); the zoom value of the status bar
+// opens the dialog Zoom.
 
 use alloc::format;
 use ui::i18n::{self, t, tf};
@@ -34,7 +35,8 @@ pub(crate) const P_DATA: u32 = 13;
 pub(crate) const P_PANZOOM: u32 = 14;
 
 pub(crate) const ID_DOCK: u32 = 500;
-const ID_CANVAS: u32 = 300;
+/// the canvas (JD8 rest: the task panes hand the keyboard back to it after Enter)
+pub(crate) const ID_CANVAS: u32 = 300;
 const ID_PAGES: u32 = 310;
 const ID_PAGES_ALL: u32 = 0x5A00;
 const ID_PANE: u32 = 0x5000;
@@ -74,9 +76,11 @@ pub(crate) fn content(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
 // ------------------------------------------------------------------ the context menus
 
 // i18n
-static SHAPE_MENU: [Mi; 16] = [
+static SHAPE_MENU: [Mi; 17] = [
     Mi::Cmd(CUT), Mi::Cmd(COPY), Mi::Cmd(PASTE), Mi::Sep,
     Mi::Sub("Gruppierung", &[Mi::Cmd(GROUP), Mi::Cmd(UNGROUP)]),
+    // (JD8 rest) ZF-12's Shape ▸
+    Mi::Sub("Shape", &[Mi::Cmd(ROTATE_LEFT), Mi::Cmd(ROTATE_RIGHT), Mi::Cmd(FLIP_H), Mi::Cmd(FLIP_V), Mi::Sep, Mi::Cmd(PANE_SIZEPOS)]),
     Mi::Sub("Container", &[Mi::Cmd(CT_ADD), Mi::Cmd(CT_REMOVE), Mi::Sep, Mi::Cmd(CT_SELECT), Mi::Cmd(CT_LOCK), Mi::Cmd(CT_DISBAND)]),
     Mi::Cmd(CONNECT_SHAPES), Mi::Cmd(LAYOUT_BEHAVIOR),
     Mi::Sub("Anordnen", &[Mi::Cmd(BRING_FRONT), Mi::Cmd(BRING_FORWARD), Mi::Cmd(SEND_BACK), Mi::Cmd(SEND_BACKWARD)]),
@@ -189,57 +193,19 @@ fn format_pane(app: &mut Diagrammer, ui: &mut Ui) {
     crate::format_pane::pane(app, ui, ID_PANE);
 }
 
-// Größe und Position (AB-04): the fields of a 2D shape, disabled until a shape is selected
+// Größe und Position (AB-04): (JD8 rest) pane_sizepos.rs
 fn size_pos(app: &mut Diagrammer, ui: &mut Ui) {
-    ui.next_size(-1, -1);
-    ui.scroll_begin(ID_PANE + 0x20, SC_V | BOX_V | pad(10));
-    // (JD7) the measures of the single selection
-    let m = crate::edit_canvas::measures(app);
-    let sel = m.is_some();
-    let unit = if crate::edit_canvas::metric(app) { "mm" } else { "in" };
-    let v = m.unwrap_or([0.0; 6]);
-    let rows = [
-        ("X", length(v[0], unit)),
-        ("Y", length(v[1], unit)),
-        (t("Breite"), length(v[2], unit)),
-        (t("Höhe"), length(v[3], unit)),
-        (t("Winkel"), angle(v[4])),
-        (t("Drehpunkt"), alloc::string::String::from(if v[5] != 0.0 { t("Mitte") } else { t("Benutzerdefiniert") })),
-    ];
-    for (k, (label, v)) in rows.iter().enumerate() {
-        ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-        ui.next_size(90, 0);
-        ui.text(TS_BODY, label);
-        let mut s = if sel { v.clone() } else { alloc::string::String::new() };
-        ui.next_size(-1, 0);
-        ui.next_flags(ST_DISABLED);
-        ui.textbox(ID_PANE + 0x21 + k as u32, None, &mut s, 32);
-        ui.box_end();
-    }
-    if !sel {
-        ui.spacer(6);
-        ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Kein Shape ausgewählt."));
-    }
-    ui.scroll_end();
+    crate::pane_sizepos::pane(app, ui, ID_PANE + 0x20);
 }
 
-// Shape-Daten (AB-03): the empty state until shapes carry data
-fn shape_data(_app: &mut Diagrammer, ui: &mut Ui) {
-    ui.next_size(-1, -1);
-    ui.box_begin(ID_PANE + 0x30, BOX_V | pad(10), 0);
-    ui.empty_state(JD_SHAPE_DATA, t("Keine Shape-Daten"), t("Wählen Sie ein Shape aus, um seine Daten zu sehen."));
-    ui.box_end();
+// Shape-Daten (AB-03): (JD8 rest) pane_data.rs
+fn shape_data(app: &mut Diagrammer, ui: &mut Ui) {
+    crate::pane_data::pane(app, ui, ID_PANE + 0x30);
 }
 
-// Verschieben und Zoomen (AB-06): the canvas' overview and a zoom slider
+// Verschieben und Zoomen (AB-06): (JD8 rest) pane_panzoom.rs
 fn pan_zoom(app: &mut Diagrammer, ui: &mut Ui) {
-    ui.next_size(-1, -1);
-    ui.box_begin(ID_PANE + 0x40, BOX_V | pad(10), 8);
-    let model = DModel { nodes: &[], ports: &[], edges: &[], wps: &[], ver: 0 };
-    ui.next_size(-1, 160);
-    ui.diagram_minimap(ID_PANE + 0x41, &mut app.canvas, &model);
-    zoom_slider(app, ui, ID_PANE + 0x42, -1);
-    ui.box_end();
+    crate::pane_panzoom::pane(app, ui, ID_PANE + 0x40);
 }
 
 // a zoom slider 10 .. 400 % (width -1: the rest of the row)
@@ -285,8 +251,13 @@ pub(crate) fn status(app: &mut Diagrammer, ui: &mut Ui) {
     status_cmd(ui, ID_STATUS + 5, ZOOM_OUT);
     zoom_slider(app, ui, ID_STATUS + 4, 120);
     status_cmd(ui, ID_STATUS + 6, ZOOM_IN);
+    // (JD8 rest, SB-04) the zoom value: a click opens the dialog Zoom
     ui.next_size(48, 0);
-    ui.text(TS_CAPTION | TX_CENTER, &tf("{} %", &[&format!("{}", zoom.max(1))]));
+    ui.next_flags(ST_SUBTLE);
+    if ui.label_button(ID_STATUS + 8, &tf("{} %", &[&format!("{}", zoom.max(1))]), TS_CAPTION, 0) & EV_ACT != 0 {
+        crate::cmds_shell::zoom_open(app, ui);
+    }
+    ui.tooltip(&commands::tip(ui, ZOOM));
     status_cmd(ui, ID_STATUS + 7, FIT_WINDOW);
     ui.statusbar_end();
 }

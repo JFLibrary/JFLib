@@ -290,7 +290,6 @@ Kein Shape ausgewählt.	No shape selected.	No hay ninguna forma seleccionada.	Ne
 Breite	Width	Ancho	Larghezza	Largeur
 Höhe	Height	Alto	Altezza	Hauteur
 Winkel	Angle	Ángulo	Angolo	Angle
-Drehpunkt	Rotation point	Punto de giro	Punto di rotazione	Point de rotation
 Mitte	Center	Centro	Centro	Centre
 Keine Shape-Daten	No shape data	No hay datos de forma	Nessun dato forma	Aucune donnée de forme
 Wählen Sie ein Shape aus, um seine Daten zu sehen.	Select a shape to see its data.	Seleccione una forma para ver sus datos.	Selezionare una forma per visualizzarne i dati.	Sélectionnez une forme pour afficher ses données.
@@ -654,3 +653,44 @@ Containerformatvorlage	Container style	Estilo de contenedor	Stile contenitore	St
 Container einfügen	Insert Container	Insertar contenedor	Inserisci contenitore	Insérer un conteneur
 Beschriftung einfügen	Insert Callout	Insertar llamada	Inserisci richiamo	Insérer une bulle d'annotation
 Verbindungspfeil	Connect arrow	Flecha de conexión	Freccia di collegamento	Flèche de liaison
+Shape	Shape	Forma	Forma	Forme
+Zoom auf	Zoom to	Zoom a	Zoom a	Zoom à
+Ganze Seite	Whole page	Página completa	Pagina intera	Page entière
+Prozent:	Percent:	Porcentaje:	Percentuale:	Pourcentage :
+Boolesch	Boolean	Booleano	Booleano	Booléen
+Datum	Date	Fecha	Data	Date
+Dauer	Duration	Duración	Durata	Durée
+Feste Liste	Fixed list	Lista fija	Elenco fisso	Liste fixe
+Variable Liste	Variable list	Lista variable	Elenco variabile	Liste variable
+Währung	Currency	Moneda	Valuta	Devise
+Zahl	Number	Número	Numero	Nombre
+Zeichenfolge	String	Cadena	Stringa	Chaîne
+Das Shape hat keine Shape-Daten.	The shape has no shape data.	La forma no tiene datos de forma.	La forma non ha dati forma.	La forme n'a pas de données de forme.
+Felder	Fields	Campos	Campi	Champs
+Eingabeaufforderung	Prompt	Indicación	Messaggio di richiesta	Invite
+Sortierschlüssel	Sort key	Clave de ordenación	Chiave di ordinamento	Clé de tri
+Beim Ablegen fragen	Ask when dropped	Preguntar al colocar	Chiedi al rilascio	Demander lors du dépôt
+Ausgeblendet	Hidden	Oculto	Nascosto	Masqué
+Listen: die Einträge im Format durch Semikolon getrennt.	Lists: the entries in Format, separated by semicolons.	Listas: las entradas en Formato, separadas por punto y coma.	Elenchi: le voci in Formato, separate da punto e virgola.	Listes : les entrées dans Format, séparées par des points-virgules.
+Ziehen verschiebt die Ansicht, ein Rechteck zoomt dorthin.	Drag to move the view; draw a rectangle to zoom there.	Arrastre para mover la vista; dibuje un rectángulo para acercarse a esa zona.	Trascina per spostare la vista; disegna un rettangolo per ingrandire quella zona.	Faites glisser pour déplacer la vue ; tracez un rectangle pour zoomer sur cette zone.
+Oben links	Top left	Arriba a la izquierda	In alto a sinistra	En haut à gauche
+Oben Mitte	Top center	Arriba en el centro	In alto al centro	En haut au centre
+Oben rechts	Top right	Arriba a la derecha	In alto a destra	En haut à droite
+Mitte links	Middle left	Centro a la izquierda	Al centro a sinistra	Au milieu à gauche
+Mitte rechts	Middle right	Centro a la derecha	Al centro a destra	Au milieu à droite
+Unten links	Bottom left	Abajo a la izquierda	In basso a sinistra	En bas à gauche
+Unten Mitte	Bottom center	Abajo en el centro	In basso al centro	En bas au centre
+Unten rechts	Bottom right	Abajo a la derecha	In basso a destra	En bas à droite
+Mehrere Shapes ausgewählt.	Several shapes selected.	Varias formas seleccionadas.	Più forme selezionate.	Plusieurs formes sélectionnées.
+Drehpunktposition	Rotation point	Posición del punto de giro	Posizione del punto di rotazione	Position du point de rotation
+Anfang X	Begin X	Inicio X	Inizio X	Début X
+Anfang Y	Begin Y	Inicio Y	Inizio Y	Début Y
+Ende X	End X	Fin X	Fine X	Fin X
+Ende Y	End Y	Fin Y	Fine Y	Fin Y
+Länge	Length	Longitud	Lunghezza	Longueur
+Befehle	Commands	Comandos	Comandi	Commandes
+Hinzufügen	Add	Agregar	Aggiungi	Ajouter
+Entfernen	Remove	Quitar	Rimuovi	Supprimer
+Nach oben	Move up	Subir	Sposta su	Monter
+Nach unten	Move down	Bajar	Sposta giù	Descendre
+Symbolleiste für den Schnellzugriff	Quick access toolbar	Barra de herramientas de acceso rápido	Barra di accesso rapido	Barre d'outils Accès rapide

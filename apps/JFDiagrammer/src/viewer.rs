@@ -351,6 +351,16 @@ impl PagePaint {
         self.view.borrow()
     }
 
+    /// (JD8 rest) the page's size in paper inches
+    pub(crate) fn size(&self) -> (f64, f64) {
+        (self.w, self.h)
+    }
+
+    /// (JD8 rest) the page fitted into w x h pixels (Verschieben und Zoomen)
+    pub(crate) fn thumbnail(&self, w: u32, h: u32) -> Option<gfx::Surface> {
+        self.view.try_borrow_mut().ok().map(|mut v| v.render(w.max(8), h.max(8)))
+    }
+
     /// render2d's camera for the canvas' view: the paper point at the middle, inches per pixel
     fn camera(&self, vp: &Viewport) -> Camera {
         let s = vp.scale();

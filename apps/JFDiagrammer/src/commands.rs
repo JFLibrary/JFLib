@@ -441,6 +441,39 @@ static HANDLERS: &[(u32, Handler)] = &[
     (TEXT_JUSTIFY, |a, ui| crate::format_menus::halign(a, ui, 3)),
     (FORMAT_PAINTER, crate::format_menus::painter),
     (THEME_NEW_SHAPES, crate::design_gallery::toggle_new_shapes),
+    // (JD8 rest: shell) a menu button's own command opens its menu; Schrift, Stärke/Striche/Pfeile,
+    // Schnellformatvorlagen, Linie/Füllung formatieren, Zoom (cmds_shell.rs)
+    (FILL, |a, ui| crate::cmds_shell::open_menu(a, ui, FILL)),
+    (LINE_FORMAT, |a, ui| crate::cmds_shell::open_menu(a, ui, LINE_FORMAT)),
+    (ALIGN, |a, ui| crate::cmds_shell::open_menu(a, ui, ALIGN)),
+    (POSITION, |a, ui| crate::cmds_shell::open_menu(a, ui, POSITION)),
+    (GROUP_MENU, |a, ui| crate::cmds_shell::open_menu(a, ui, GROUP_MENU)),
+    (FIND_MENU, |a, ui| crate::cmds_shell::open_menu(a, ui, FIND_MENU)),
+    (LAYERS, |a, ui| crate::cmds_shell::open_menu(a, ui, LAYERS)),
+    (SELECT_MENU, |a, ui| crate::cmds_shell::open_menu(a, ui, SELECT_MENU)),
+    (PICTURES, |a, ui| crate::cmds_shell::open_menu(a, ui, PICTURES)),
+    (ORIENTATION, |a, ui| crate::cmds_shell::open_menu(a, ui, ORIENTATION)),
+    (PAGE_SIZE, |a, ui| crate::cmds_shell::open_menu(a, ui, PAGE_SIZE)),
+    (TASK_PANES, |a, ui| crate::cmds_shell::open_menu(a, ui, TASK_PANES)),
+    (CONNECTORS, |a, ui| crate::cmds_shell::open_menu(a, ui, CONNECTORS)),
+    (CT_MARGINS, |a, ui| crate::cmds_shell::open_menu(a, ui, CT_MARGINS)),
+    (CT_AUTOSIZE, |a, ui| crate::cmds_shell::open_menu(a, ui, CT_AUTOSIZE)),
+    (CT_STYLES, |a, ui| crate::cmds_shell::open_menu(a, ui, CT_STYLES)),
+    (CT_HEADING, |a, ui| crate::cmds_shell::open_menu(a, ui, CT_HEADING)),
+    (THEMES, |a, ui| crate::cmds_shell::open_menu(a, ui, THEMES)),
+    (FONT, |a, ui| crate::cmds_shell::font_focus(a, ui, FONT)),
+    (FONT_SIZE, |a, ui| crate::cmds_shell::font_focus(a, ui, FONT_SIZE)),
+    (LINE_WEIGHT, |a, ui| crate::cmds_shell::line_choice(a, ui, LINE_WEIGHT)),
+    (LINE_DASH, |a, ui| crate::cmds_shell::line_choice(a, ui, LINE_DASH)),
+    (LINE_ARROWS, |a, ui| crate::cmds_shell::line_choice(a, ui, LINE_ARROWS)),
+    (QUICK_STYLES, crate::cmds_shell::quick_styles),
+    (FORMAT_LINE, |a, _| crate::format_menus::pane(a, 0)),
+    (FORMAT_FILL, |a, _| crate::format_menus::pane(a, 0)),
+    (ZOOM, crate::cmds_shell::zoom_open),
+    (AUTO_ALIGN, crate::cmds_arrange::auto_align),
+    (SHAPE_DATA_DEFINE, crate::pane_data::define_open),
+    (QAT_CUSTOMIZE, crate::qat::open_menu),
+    (ADD_TO_MY_SHAPES, crate::cmds_myshapes::add),
 ];
 
 // toggles: whether the command is on
@@ -497,7 +530,7 @@ pub(crate) fn enabled(id: u32) -> bool {
 
 /// (JD7) the command exists and can run now (a selection, something to undo ...)
 pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
-    enabled(id) && crate::edit_cmds::available(app, id) && crate::format_menus::available(app, id)
+    enabled(id) && crate::edit_cmds::available(app, id) && crate::format_menus::available(app, id) && crate::cmds_shell::available(app, id)
 }
 
 /// the toggle is on
