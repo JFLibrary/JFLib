@@ -35,15 +35,17 @@
 // is the frame without the heading.
 //
 // Rules (Visio's, as far as they are documented, else chosen and named here):
-// * A 2D shape joins the containers whose frame holds its whole box after a drop or move:
-//   the innermost ones (a container that holds another candidate is left out, so nesting is
-//   one level per container; a lane and a phase of a cross-functional flowchart overlap and
-//   both take the shape).  1D shapes, guides, callouts and headings never join by position.
-// * It leaves a container when it lies wholly outside it; partly outside it stays and the
-//   container grows (automatic size "expand").  A locked container (msvSDContainerLocked)
-//   neither takes nor lets go by dragging.
+// * A 2D shape joins every container whose frame holds its whole box after a drop or move and
+//   that takes it, nested ones too (Visio stores membership in each enclosing container: a
+//   process shape is in its lane, its phase and the lanes' list); a list takes it as an item
+//   when the list's box holds its middle and the list's item categories let it, at the index
+//   its place gives.  1D shapes, guides, callouts and headings never join by position.
+// * It leaves a container when it lies wholly outside it, or when it found new containers and
+//   lies not wholly in this one; partly outside it stays and the container grows (automatic
+//   size "expand").  A locked container (msvSDContainerLocked) neither takes nor lets go.
 // * Required categories: one of them must be among the shape's (msvShapeCategories, ';'
-//   separated, case-insensitive); excluded ones refuse.
+//   separated, case-insensitive; a shape without categories is refused); excluded ones refuse.
+// * Only a list's items are laid out and size the list (Visio's); its plain members are not.
 // * Moving a container moves its members (nested ones too) and the callouts of everything
 //   moved; deleting and copying take them along (carried).
 // * Nothing is computed when a file opens: settle runs only after a gesture.
