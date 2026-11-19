@@ -323,8 +323,10 @@ anfassen:
   10 000 Partikel 0,58 ms, alles zusammen 1,1 ms. `render3dtest --test all` bestanden auf RTX 2070 SUPER, M2, Iris
   Xe, T500 und llvmpipe, im Browser; die alten Bilder Byte für Byte gleich; auf der Iris Xe kein Shader mit Spills.
   Dabei behoben: `FrameStats::visible` las ohne durchsichtige Instanzen einen nie geschriebenen Platz. Nicht
-  geprüft: die HD 610. Offen: der Look des Cartoon-Materials (der Nutzer, an den Bildern in
-  `Documents\JFLib-wip-archiv\g7f2-toon`); das Randlicht bleibt je Material, auf Boden und Wänden 0.
+  geprüft: die HD 610.
+- Vom Nutzer gewählt am 19.11.2026 (an den vier Bildern in `Documents\JFLib-wip-archiv\g7f2-toon`): Variante C,
+  vier weiche Stufen ohne Umrisse (`Toon { bands: 4, softness: 0.5, rim: 0.2, rim_width: 0.35 }`, kein
+  `set_outline`). Das Randlicht bleibt je Material: auf Figuren und Requisiten, auf Boden und Wänden 0.
 
 **G7g Modellieren mit JFScript 1** (`lib/geom`, `apps/modeltool`)
 
@@ -414,8 +416,7 @@ PaintCraft zu JFPainter. `render3d` bleibt (E2); für `physics`, `anim` und `geo
 ## Offen
 
 Später zu entscheiden: der Weg des Spielfensters (nach der Messung in G7b), der Faktor der Mausbewegung unter macOS
-(G7b Teil 2, von Hand), der Look des Cartoon-Materials (G7f, an
-Bildern), Name und Server von Spiel 1 (G7h), Kartendaten aus OpenStreetMap für G7n (Lizenz ODbL), welche Crates beim
+(G7b Teil 2, von Hand), Name und Server von Spiel 1 (G7h), Kartendaten aus OpenStreetMap für G7n (Lizenz ODbL), welche Crates beim
 Auszug in JFLib bleiben (G7p).
 
 ## Arbeitsweise und Tests
