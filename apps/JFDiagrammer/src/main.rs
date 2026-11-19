@@ -33,6 +33,12 @@
 //                     from stencils/), files, favourites, "Weitere Shapes", the search
 //   src/stencils_panel.rs   (JD9) the panel (ui.stencil_panel), previews, its menus
 //   src/stencils_drop.rs    (JD9) shapes onto the page: drag and drop, click + click, Enter
+//   src/structures.rs       (JD10) containers, lists, swimlanes, callouts on the canvas: the
+//                     gestures with them (diagram_core::structure), the glow, the insert marks
+//   src/structures_cmds.rs  (JD10) Einfügen › Container / Beschriftung, Container-Tools ›
+//                     Format, Shapes verbinden, the Verbindungspfeile
+//   src/structures_cff.rs   (JD10) the register Funktionsübergreifendes Flussdiagramm
+//   src/layout_ui.rs  (JD10) Layout-Verhalten per shape, Seite einrichten › Layout und Routing
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too)
@@ -75,6 +81,7 @@ mod edit_text;
 mod export_ui;
 mod icons;
 mod lang;
+mod layout_ui;
 mod options;
 mod panes;
 mod print_layout;
@@ -84,6 +91,9 @@ mod shell;
 mod stencils;
 mod stencils_drop;
 mod stencils_panel;
+mod structures;
+mod structures_cff;
+mod structures_cmds;
 mod viewer;
 
 use base::settings::Settings;
@@ -170,6 +180,10 @@ pub(crate) struct Diagrammer {
     pub clip_offset: u32,
     /// (JD9) the Shapes panel: stencils, search, favourites, click-placing
     pub stencils: stencils::Stencils,
+    /// (JD10) structures: a running move, the selection's order, the list marks; the layout
+    /// dialog and register
+    pub structs: structures::Structs,
+    pub layout: layout_ui::LayoutState,
 }
 
 impl Diagrammer {
@@ -213,6 +227,8 @@ impl Diagrammer {
             clip: None,
             clip_offset: 1,
             stencils: stencils::Stencils::new(),
+            structs: structures::Structs::default(),
+            layout: layout_ui::LayoutState::default(),
         }
     }
 
@@ -347,6 +363,7 @@ impl App for Diagrammer {
         shell::frame(self, ui);
         export_ui::dialogs(self, ui);
         print_ui::dialogs(self, ui);
+        layout_ui::dialog(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

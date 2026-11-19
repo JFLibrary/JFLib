@@ -1,0 +1,26 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD10: callouts (ST-06) -- Einfügen › Beschriftung › Rechteck with a shape selected
+# ties the callout to it, up to the right, its tip on the shape; moving the shape moves the
+# callout along; moving the callout leaves its tip on the shape; deleting the shape deletes the
+# callout too
+cmd 4404
+drag 500,430 640,520
+cmd 5415
+expect listitem:"Text" rect 611 368 157 83
+expect button:"Steuerpunkt 1" rect 608 444 10 10
+cmd 4400
+drag 520,500 520,600
+expect listitem:"Sheet.4" rect 500 525 151 100
+expect listitem:"Text" rect 611 469 157 83
+shot build/JFDiagrammer-structures-callout.png
+# the callout by its box: the tip stays where it was on the shape
+drag 720,488 820,388
+expect listitem:"Text" selected
+expect button:"Steuerpunkt 1" rect 608 545 10 10
+# the shape deleted: the callout goes with it
+click 520,600
+key delete
+expect listitem:"Sheet.4" missing
+expect listitem:"Text" missing
+key ctrl+z
+expect listitem:"Text" exists

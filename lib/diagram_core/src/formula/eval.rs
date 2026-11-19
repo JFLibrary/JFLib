@@ -211,7 +211,7 @@ impl<'a, 'd> Ev<'a, 'd> {
     /// where a reference points for this evaluation: the sheet and, unless it names a sheet
     /// only, the cell
     pub(crate) fn target(&mut self, r: &CellRef) -> Result<(SheetRef, Option<CellAddr>), CellError> {
-        let sheet = self.sheet_of(&r.sheet).ok_or(CellError::Ref)?;
+        let sheet = self.sheet_for(&r.sheet)?;
         let addr = match &r.cell {
             CellPart::None => return Ok((sheet, None)),
             CellPart::Unknown(_) => {
@@ -226,7 +226,7 @@ impl<'a, 'd> Ev<'a, 'd> {
     fn reference(&mut self, i: u32) -> R {
         let p = self.p.clone();
         let r = &p.refs[i as usize];
-        let sheet = self.sheet_of(&r.sheet).ok_or(CellError::Ref)?;
+        let sheet = self.sheet_for(&r.sheet)?;
         let addr = match (&r.cell, p.addrs.get(i as usize)) {
             (CellPart::Unknown(_), _) => {
                 self.keep(Keep::Reference);
@@ -254,10 +254,23 @@ impl<'a, 'd> Ev<'a, 'd> {
         }
     }
 
-    /// the sheet a sheet name stands for in this evaluation
+    // the sheet of a reference: a function's sheet reference is computed
+    fn sheet_for(&mut self, s: &SheetName) -> Result<SheetRef, CellError> {
+        match s {
+            SheetName::Call(i) => match self.eval(*i)? {
+                Val::Target(t) => Ok(t.sheet),
+                _ => Err(CellError::Ref),
+            },
+            _ => self.sheet_of(s).ok_or(CellError::Ref),
+        }
+    }
+
+    /// the sheet a sheet name stands for in this evaluation (a function's: computed by
+    /// sheet_for)
     pub(crate) fn sheet_of(&self, s: &SheetName) -> Option<SheetRef> {
         let doc = self.doc;
         match s {
+            SheetName::Call(_) => None,
             SheetName::Local => Some(self.sheet),
             SheetName::TheDoc => Some(SheetRef::Document),
             SheetName::ThePage => page_of(self.sheet),

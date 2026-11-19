@@ -761,7 +761,9 @@ pub fn set_style(tx: &mut Transaction, eng: &mut Engine, connectors: &[ShapeRef]
 }
 
 // the obstacles of a page or master: the boxes of its top-level shapes that are not 1-D,
-// guides or permeable both ways (ShapePermeableX and Y)
+// guides, permeable both ways (ShapePermeableX and Y), set to "do not lay out and route
+// around" (ObjType 4, CN-17) or containers (JD10: their members sit inside them, Visio's
+// containers are not routed around either)
 fn obstacles(doc: &Document, owner: Owner) -> Vec<(ShapeRef, [f64; 4])> {
     let mut out = Vec::new();
     for s in doc.top_shapes(owner) {
@@ -772,6 +774,9 @@ fn obstacles(doc: &Document, owner: Owner) -> Vec<(ShapeRef, [f64; 4])> {
         let sheet = SheetRef::Shape(s);
         let perm = |c: &str| num(doc, sheet, c).is_some_and(|v| v != 0.0);
         if perm("ShapePermeableX") && perm("ShapePermeableY") {
+            continue;
+        }
+        if num(doc, sheet, "ObjType").is_some_and(|v| (v as i64) & 4 != 0) || crate::structure::is_container(doc, s) {
             continue;
         }
         if let Some(b) = page_box(doc, s) {

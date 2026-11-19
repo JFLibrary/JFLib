@@ -235,6 +235,10 @@ pub(crate) fn model(app: &mut Diagrammer) {
             flags |= SEF_GROUP;
         }
         flags |= lock_flags(&ops::locks(eng, doc, r));
+        // (JD10) no Verbindungspfeile on containers, lists, callouts
+        if crate::structures_cmds::no_arrows(doc, r) {
+            flags |= SEF_NOARROWS;
+        }
         let lp = [num(doc, sheet, "LocPinX").unwrap_or(f.w * 0.5), num(doc, sheet, "LocPinY").unwrap_or(f.h * 0.5)];
         let pin = geo.world(f.xf.apply(lp));
         let bbox = boxes.get(&r).map(|b| geo.world_box(*b)).unwrap_or_else(|| {
@@ -359,7 +363,9 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
     ui.diagram(id, &mut app.canvas, &dm, DG_EDIT, paint, ver);
     // (JD9) the canvas takes the Shapes panel's tiles (its rectangle is the last one)
     crate::stencils_drop::drop_target(app, ui, id);
-    // the edit layer
+    // the edit layer; (JD10) the insert triangles of the lists
+    let marks = crate::structures::marks(app);
+    app.se.arrows = app.structs.arrows && app.opts.get(&crate::options::CONNECT_ARROWS);
     let tool = tool_of(app);
     let evs = {
         let m = &app.model;
@@ -373,12 +379,15 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
             let (Some(view), Some(geo), Some(page), Some(doc)) = (view.as_ref(), geo, page, doc) else { return 0 };
             hit_at(doc, view.drawing(), &geo, page, p, tol, within)
         };
-        let sm = SeModel { shapes: &m.shapes, points: &m.points, guides: &m.guides, ver: m.ver, hit: &hitf };
+        let sm = SeModel { shapes: &m.shapes, points: &m.points, guides: &m.guides, marks: &marks, ver: m.ver, hit: &hitf };
         ui.shape_edit(id, &mut app.se, &mut app.canvas, &sm, tool)
     };
     for ev in evs {
         apply(app, ui, ev);
     }
+    // (JD10) the selection's order, the glow of a container under a dragged shape
+    crate::structures::sync_order(app);
+    crate::structures::overlay(app, ui);
     menu(app, ui);
     // one record per shape and per handle (scripts, screen readers)
     {
@@ -392,7 +401,7 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
             }
         };
         let nohit = |_: [f32; 2], _: f32, _: u64| 0u64;
-        let sm = SeModel { shapes: &m.shapes, points: &m.points, guides: &m.guides, ver: m.ver, hit: &nohit };
+        let sm = SeModel { shapes: &m.shapes, points: &m.points, guides: &m.guides, marks: &marks, ver: m.ver, hit: &nohit };
         ui.shape_edit_sems(id, &mut app.se, &app.canvas, &sm, &label);
     }
     // page breaks, a guide being dragged out of a ruler
@@ -427,13 +436,14 @@ pub(crate) fn shape_label(doc: &Document, s: ShapeRef) -> String {
     sh.name()
 }
 
-/// whether the selection is a container (User.msvStructureType = "Container")
+/// whether the selection is a container (User.msvStructureType = "Container"; JD10: a list too,
+/// not a flowchart's pool, which has its own register)
 pub(crate) fn container_selected(app: &Diagrammer) -> bool {
     let (Some(o), Some(page)) = (app.opened.as_ref(), app.model.page) else { return false };
     let doc = &o.doc;
     app.se.sel.iter().any(|&k| {
-        let sh = SheetRef::Shape(shape_of(page, k));
-        doc.user_cells(sh).iter().any(|r| r.name().is_some_and(|n| n.eq_ignore_ascii_case("msvStructureType")) && r.text("Value").is_some_and(|v| v.eq_ignore_ascii_case("Container")))
+        let s = shape_of(page, k);
+        diagram_core::structure::is_container(doc, s) && !diagram_core::structure::cff::is_pool(doc, s)
     })
 }
 
@@ -647,6 +657,10 @@ fn hit_at(doc: &Document, d: &diagram_core::render::Drawing, geo: &Geo, page: Pa
         if h.shape.owner != Owner::Page(page) {
             continue;
         }
+        // (JD10) a container's inside is clicked through (ST-01)
+        if within == 0 && crate::structures::click_through(doc, h.top, geo.page(p), tol as f64 / DIP / geo.scale) {
+            continue;
+        }
         if within == 0 {
             return key_of(h.top);
         }
@@ -673,6 +687,13 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
         crate::stencils_drop::clicked(app, ui, a);
         return;
     }
+    // (JD10) a running move (the glow), the Verbindungspfeile, the insert triangles
+    crate::structures::track(app, &ev);
+    match ev {
+        SeEv::Arrow { key, dir } => return crate::structures_cmds::arrow(app, ui, key, dir),
+        SeEv::Mark { tag } => return crate::structures::insert_at(app, ui, tag),
+        _ => {}
+    }
     let (Some(geo), Some(page)) = (app.model.geo, app.model.page) else { return };
     let owner = Owner::Page(page);
     let refs = |keys: &[u64]| -> Vec<ShapeRef> { keys.iter().map(|&k| shape_of(page, k)).collect() };
@@ -683,10 +704,8 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
         SeEv::Move { keys, total, done } => {
             let shapes = refs(&keys);
             let d = geo.page_vec(total);
-            edit_doc::edit(o, t("Verschieben"), done, |tx, eng| {
-                ops::move_shapes(tx, eng, &shapes, d)?;
-                follow(tx, eng, owner, &shapes)
-            })
+            // (JD10) members and callouts come along; released: containers, lists
+            edit_doc::edit(o, t("Verschieben"), done, |tx, eng| crate::structures::move_shapes(tx, eng, owner, &shapes, d, done))
         }
         SeEv::Resize { keys, from, to, done } => {
             let shapes = refs(&keys);
@@ -701,7 +720,8 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
                     let tb = [c[0].min(e[0]), c[1].min(e[1]), c[0].max(e[0]), c[1].max(e[1])];
                     ops::scale_shapes(tx, eng, &shapes, fb, tb)?;
                 }
-                follow(tx, eng, owner, &shapes)
+                follow(tx, eng, owner, &shapes)?;
+                crate::structures::changed(tx, eng, owner, &shapes)
             })
         }
         SeEv::Rotate { keys, centre, angle, done } => {
@@ -709,7 +729,8 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
             let c = geo.page(centre);
             edit_doc::edit(o, t("Drehen"), done, |tx, eng| {
                 ops::rotate_shapes(tx, eng, &shapes, c, angle as f64)?;
-                follow(tx, eng, owner, &shapes)
+                follow(tx, eng, owner, &shapes)?;
+                crate::structures::changed(tx, eng, owner, &shapes)
             })
         }
         SeEv::Pin { key, at, done } => {
@@ -742,6 +763,8 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
                 match row {
                     Some(row) => edit_doc::edit(o, t("Steuerpunkt verschieben"), done, |tx, eng| {
                         ops::set_control(tx, eng, s, row, p)?;
+                        // (JD10) a callout's tip dropped on a shape ties it there
+                        crate::structures::callout_point(tx, eng, owner, s, row, p, done)?;
                         follow(tx, eng, owner, &[s])
                     }),
                     None => Ok(()),
@@ -798,7 +821,12 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
             if (pa[0] - pb[0]).abs() < 1e-9 || (pa[1] - pb[1]).abs() < 1e-9 {
                 Ok(())
             } else {
-                match edit_doc::edit(o, label, true, |tx, eng| ops::new_shape(tx, eng, owner, kind, pa, pb)) {
+                match edit_doc::edit(o, label, true, |tx, eng| {
+                    let s = ops::new_shape(tx, eng, owner, kind, pa, pb)?;
+                    // (JD10) drawn inside a container: a member
+                    crate::structures::joined(tx, eng, owner, &[s])?;
+                    Ok(s)
+                }) {
                     Ok(s) => {
                         select = Some(alloc::vec![key_of(s)]);
                         if tool == SE_TEXT {
@@ -879,17 +907,10 @@ fn target_of(page: PageRef, g: SeGlue) -> glue::Target {
     }
 }
 
-/// delete shapes: connections to them go first (their connectors keep their place)
+/// delete shapes: connections to them go first (their connectors keep their place); (JD10)
+/// members and callouts go along, lists close the gap (structures::delete)
 pub(crate) fn delete(o: &mut crate::viewer::Opened, owner: Owner, shapes: &[ShapeRef]) -> Result<(), diagram_core::EditError> {
-    if shapes.is_empty() {
-        return Ok(());
-    }
-    let shapes: Vec<ShapeRef> = shapes.to_vec();
-    edit_doc::edit(o, t("Löschen"), true, |tx, eng| {
-        let keep: Vec<ShapeRef> = shapes.iter().copied().filter(|&s| !ops::locks(eng, tx.doc(), s).has(ops::Locks::DELETE)).collect();
-        glue::detach(tx, eng, owner, &keep)?;
-        tx.delete_shapes(&keep)
-    })
+    crate::structures::delete(o, owner, shapes)
 }
 
 /// the measures of the single selection for the status bar and Größe und Position: x, y (the

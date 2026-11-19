@@ -105,7 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -7762,8 +7762,12 @@ shapes to SeShape frames (diagram_core for JFDiagrammer).
   ui.shape_edit_sems(id, &mut st, &dg, &model, &label)   one K_LISTITEM record per visible
                                   top-level shape (label(key)) and one K_BUTTON record per
                                   handle of a single selection ("Größengriff unten rechts",
-                                  "Drehgriff", "Anfangspunkt", "Steuerpunkt 1" ...): scripts
-                                  click and drag them, screen readers name them
+                                  "Drehgriff", "Anfangspunkt", "Steuerpunkt 1" ...), per
+                                  connection arrow while they show ("Verbindungspfeil rechts",
+                                  "... unten", "... links", "... oben") and per insertion mark
+                                  while it shows ("Element einfügen", value = its tag): scripts
+                                  click and drag them, screen readers name them (a screen
+                                  reader's click on an arrow or a mark reports it as a click)
   tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT, SE_PLACE
 
 Model (SeModel, borrowed per call; world units are the canvas's, y down):
@@ -7776,6 +7780,8 @@ Model (SeModel, borrowed per call; world units are the canvas's, y down):
                       shown while connecting), SP_VERTEX (shown for a single selection when
                       the app lists them: vertex editing)
   SeGuide { key, vertical, at }   guides (blue, dashed, across the canvas); moves snap to them
+  SeMark { at, dir, tag, owner }  the app's insertion marks (Visio's blue triangle between two
+                      items of a list): a small triangle, its tip at `at`, pointing in `dir`
   hit(p, tol, within) -> key      the topmost shape at world point p within tol world units
                       (within = 0: a top-level shape; a group's key: the child of that group
                       under p, for the second click into a group), 0 = none; the app asks its
@@ -7807,6 +7813,31 @@ shapes; F2 and Enter edit the text of the single selection, so does typing a cha
 character is handed on).  A right click selects the shape under the pointer first and reports
 SeEv::Context; the menu itself (also from Shift+F10 and the menu key) is the app's
 ui.context_menu right after this call.
+
+Connection arrows (SeState::arrows, on by default; Ansicht › Verbindungspfeile): with the
+pointer tool and no gesture, a pointer on a top-level shape shows four small filled triangles
+in the accent colour around its box (SeShape::bbox), in the middle of each side, ARROW_GAP
+(12) DIP out from the box and ARROW_LEN (10) DIP long; half transparent, the one under the
+pointer opaque.  Directions as seen: 0 right, 1 down, 2 left, 3 up.  They stay while the
+pointer is on the shape, on one of its handles, on an arrow or in the strip between the box
+and an arrow (as wide as the arrow), and go at once elsewhere (on another shape: that
+shape's arrows).  None for 1D shapes, SEF_NOSELECT, SEF_NOARROWS (the app's choice: shapes
+whose file refuses them, ...), children of groups, shapes smaller than ARROW_MIN (16) DIP on
+the screen, nor right after a gesture or a click until the pointer moves again.  An arrow
+that would cover a rotation handle of the selection (the single shape's, or the one of the
+box around several) moves out along its direction until it clears the handle by a few DIP
+(Visio puts its top arrow beyond the rotation handle too); the strip that keeps the arrows
+grows with it.  Handles and control points stay on top and are hit first.  A click on an
+arrow reports SeEv::Arrow { key, dir } and leaves the selection alone (the app selects what
+it made); a drag from an arrow is the connector tool from that shape: a rubber band from
+the middle of the box's side, glue and the target's highlight as SE_CONNECT, released
+SeEv::Connect { tool: SE_CONNECT, a: that middle, ga: SeGlue::Shape(key), b, gb }; Esc
+cancels.  The arrow under the pointer is SeState::arrow_hover(), and each change of it is
+SeEv::ArrowHover { key, dir } once (dir 255: off the arrows of `key`), for a preview.
+
+Insertion marks (SeModel::marks): with the pointer tool and no gesture each mark shows while
+the pointer is on its owner (the shape under the pointer, or inside the owner's box) or
+within MARK_NEAR (16) DIP of it; a click reports SeEv::Mark { tag }, a drag does nothing.
 ```
 
 ```rust
@@ -7843,6 +7874,7 @@ SEF_BEGIN_DYN: u32 = 0x2000  // the begin is glued to a whole shape (dynamic)
 SEF_END_GLUED: u32 = 0x4000
 SEF_END_DYN: u32 = 0x8000
 SEF_LOCK_PIN: u32 = 0x1_0000  // no rotation pin handle
+SEF_NOARROWS: u32 = 0x2_0000  // no connection arrows around it (see the file header)
 /// kinds of SePoint
 SP_CONTROL: u8 = 0
 SP_CONN: u8 = 1
@@ -7895,11 +7927,22 @@ SPF_GLUE: u32 = 1  // a control point that glues to connection points (SP-04)
   - `vertical: bool`
   - `at: f32`
 
+- **`struct SeMark`**
+  an insertion mark of the app (Visio's blue triangle between two items of a list): a small
+  triangle with its tip at `at` (world) pointing in `dir` (0 right, 1 down, 2 left, 3 up, as
+  seen); it shows with the pointer tool while the pointer is on the shape `owner` or near the
+  mark, and a click on it reports SeEv::Mark { tag }
+  - `at: [f32; 2]`
+  - `dir: u8`
+  - `tag: u32`
+  - `owner: u64`
+
 - **`struct SeModel<'a>`**
   the app's shapes, borrowed for one call
   - `shapes: &'a [SeShape]`
   - `points: &'a [SePoint]`
   - `guides: &'a [SeGuide]`
+  - `marks: &'a [SeMark]` -- insertion marks (lists: between two items)
   - `ver: u32` -- changes whenever shapes are added, removed or reordered
   - `hit: &'a dyn Fn([f32; 2], f32, u64) -> u64` -- the topmost shape at a world point (see the file header)
 
@@ -7926,6 +7969,11 @@ SPF_GLUE: u32 = 1  // a control point that glues to connection points (SP-04)
   - `Text { key: u64, ch: Option<char> }` -- edit the text of a shape (double click, F2, Enter, or a typed character)
   - `Context { key: u64, at: [i32; 2] }` -- right click, Shift+F10 or the menu key on a shape (0: the page); at = window px
   - `Delete` -- Del with a selection
+  - `Arrow { key: u64, dir: u8 }` -- a click on the connection arrow `dir` (0 right, 1 down, 2 left, 3 up, as seen) of the
+    top-level shape `key`; the selection stays as it was
+  - `ArrowHover { key: u64, dir: u8 }` -- the pointer went onto the connection arrow `dir` of shape `key`, or off the arrows of
+    `key` (dir 255); once per change
+  - `Mark { tag: u32 }` -- a click on the insertion mark with this tag (SeModel::marks)
 
 - **`struct SeState`**
   the editor's state, kept by the app: the selection, the focused shape, the options, the
@@ -7938,15 +7986,20 @@ SPF_GLUE: u32 = 1  // a control point that glues to connection points (SP-04)
   - `show_points: bool` -- show every connection point of the hovered shape, not only while connecting (CN-01)
   - `lasso: bool` -- a drag on the background draws a lasso (a free outline) instead of a rectangle (ZF-06)
   - `vertex: Option<(u64, u32)>` -- the vertex chosen with a click (Del removes it): its shape and tag
+  - `arrows: bool` -- connection arrows around the shape under the pointer (Ansicht › Verbindungspfeile; see
+    the file header)
 
 **`impl SeState`**
 
 - **`fn new() -> SeState`**
-  nothing selected; dynamic grid and glue on
+  nothing selected; dynamic grid, glue and connection arrows on
 - **`fn busy(&self) -> bool`**
   a gesture is in progress
 - **`fn live(&self) -> bool`**
   a live gesture is in progress (the app shows a preview of it)
+- **`fn arrow_hover(&self) -> Option<(u64, u8)>`**
+  the connection arrow under the pointer: the shape's key and the direction (0 right,
+  1 down, 2 left, 3 up, as seen)
 - **`fn select(&mut self, keys: &[u64])`**
   select exactly these shapes (the app's commands: paste, group, a new shape)
 
@@ -53883,7 +53936,10 @@ a file loses nothing, and the behaviour Visio files carry works without translat
   hit::*                        (JD7) the shape under a point of a display list, shapes in a
                                 rectangle
 
-What is to come here, by stage of the plan: layout (JD10), containers and callouts (JD10)
+  structure::*                  (JD10) containers, lists, callouts: membership in the
+                                Relationships cell, automatic size, list order and layout
+
+What is to come here, by stage of the plan: page layout (CN-13, P2)
 
 Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 opening a file (connectors, layout and containers move only when something moves), and a
@@ -54912,6 +54968,8 @@ engine binds the names to a document's string table once per formula text.
 - **`enum SheetName`**
   the sheet part of a reference (in front of "!")
   - `Local` -- none: the sheet the formula belongs to
+  - `Call(u32)` -- the sheet a function gives (CONTAINERSHEETREF(1,"Swimlane")!User.visHeadingText): the
+    node of the call
   - `Id(u32)` -- Sheet.5!: the shape with this ID on the same page or in the same master
   - `Named(Box<str>)` -- a shape by its NameU ("Name.7!", "'My name'!")
   - `ThePage` -- ThePage!: the page sheet (in a master: the master's page sheet)
@@ -56876,6 +56934,457 @@ NO_ID: u32 = u32::MAX
 - **`struct TreeIter<'a>`**
   the slots of a tree, groups before their subshapes (ShapeTree::iter)
 
+### `diagram_core/src/structure.rs`
+
+Source: [`lib/diagram_core/src/structure.rs`](../lib/diagram_core/src/structure.rs)
+
+```text
+structure -- containers, lists and callouts (JD10: ST-01, ST-02, ST-04 .. ST-06)
+
+  kind(doc, shape) -> Option<Kind>        Container, List or Callout (User.msvStructureType)
+  container(doc, c) -> Option<Container>  its settings: margin, automatic size, lock, style,
+                                          heading, the categories it takes or refuses
+  list(doc, l) -> Option<List>            a list's direction, spacing and alignment
+  members(doc, c) / containers_of(doc, s) / list_of(doc, s)
+  callouts_of(doc, t) / target_of(doc, callout)
+  categories(doc, s) / has_category(doc, s, name)
+  inner_box(doc, c)                       the box members live in (the heading taken off)
+  drop_targets(doc, owner, shapes)        the containers a shape would join where it is now
+  carried(doc, shapes)                    the shapes plus what moves, copies and deletes with
+                                          them: members (nested too) and callouts
+  add_members / remove_members / set_target     both sides of a relationship
+  settle(tx, eng, owner, shapes, membership)    after a gesture: membership by position,
+                                          lists laid out, containers sized (deepest first)
+  fit(tx, eng, c, shrink)                 a container around its members (An Inhalt anpassen)
+  layout_list(tx, eng, l) / list_index_at / move_in_list / insert_marks
+  forget(tx, eng, deleted)                before deleting: the survivors let go of them
+  disband(tx, eng, c)                     the container goes, its members stay
+  repair(tx, owner)                       relationships named on one side only are dropped
+  aim_callouts(tx, eng, callouts)         a callout's tail back onto its target
+
+The file keeps the structure in the Relationships cell of both shapes (structure::rel) and
+the settings in User cells named as Visio names them (msvStructureType, msvSDContainer*,
+msvSDList*, msvSDHeadingStyle, msvShapeCategories), so Visio recognises what JFDiagrammer
+writes and the other way round.  What a container looks like is the master's (own
+stencils in apps/JFDiagrammer/stencils): the code knows only the cells.
+
+The heading: Visio's own containers are groups whose subshape with msvStructureType
+"Heading" carries msvSDContainerHeadingEdge -- the side where the inside lies, seen from the
+heading ("Bottom" for a heading on top); JFDiagrammer's containers are one shape with the
+heading drawn in it and User.JFD_HeadingEdge (the edge the heading is on: Top, Bottom, Left,
+Right, None) and User.JFD_HeadingSize on the container itself.  Both are read; the inner box
+is the frame without the heading.
+
+Rules (Visio's, as far as they are documented, else chosen and named here):
+* A 2D shape joins every container whose frame holds its whole box after a drop or move and
+  that takes it, nested ones too (Visio stores membership in each enclosing container: a
+  process shape is in its lane, its phase and the lanes' list); a list takes it as an item
+  when the list's box holds its middle and the list's item categories let it, at the index
+  its place gives.  1D shapes, guides, callouts and headings never join by position.
+* It leaves a container when it lies wholly outside it, or when it found new containers and
+  lies not wholly in this one; partly outside it stays and the container grows (automatic
+  size "expand").  A locked container (msvSDContainerLocked) neither takes nor lets go.
+* Required categories: one of them must be among the shape's (msvShapeCategories, ';'
+  separated, case-insensitive; a shape without categories is refused); excluded ones refuse.
+* Only a list's items are laid out and size the list (Visio's); its plain members are not.
+* Moving a container moves its members (nested ones too) and the callouts of everything
+  moved; deleting and copying take them along (carried).
+* Nothing is computed when a file opens: settle runs only after a gesture.
+```
+
+- **`enum Kind`**
+  what a shape is in a structured diagram
+  - `Container` -- a container: members inside its frame
+  - `List` -- a list: a container with ordered members side by side
+  - `Callout` -- a callout: a note tied to a target shape
+
+- **`enum Resize`**
+  how a container follows its members (msvSDContainerResize)
+  - `None` -- 0: never by itself
+  - `Expand` -- 1: grows when members need room (Visio's default)
+  - `Fit` -- 2: always fits its members, grows and shrinks
+
+- **`enum Edge`**
+  the edge a container's heading is on
+  - `None`
+  - `Top`
+  - `Bottom`
+  - `Left`
+  - `Right`
+
+**`impl Edge`**
+
+- **`fn parse(s: &str) -> Edge`**
+  the edge of a cell's text ("Top", "Bottom", "Left", "Right"; else none)
+- **`fn opposite(self) -> Edge`**
+  the edge across from this one
+- **`fn as_str(self) -> &'static str`**
+  the text Visio writes
+
+- **`struct Container`**
+  a container's settings
+  - `margin: f64` -- msvSDContainerMargin: between the members and the inner box (drawing units, inches)
+  - `resize: Resize`
+  - `locked: bool` -- msvSDContainerLocked: membership stays as it is
+  - `no_highlight: bool` -- msvSDContainerNoHighlight: no glow while a shape is dragged over it
+  - `style: u32` -- msvSDContainerStyle / msvSDHeadingStyle (1-based) and how many there are
+  - `style_count: u32`
+  - `heading_style: u32`
+  - `heading_style_count: u32`
+  - `required: Vec<String>` -- msvSDContainerRequiredCategories / msvSDContainerExcludedCategories
+  - `excluded: Vec<String>`
+  - `heading: Edge` -- where the heading is and how deep it is (drawing units)
+  - `heading_size: f64`
+
+- **`enum Direction`**
+  a list's order on the page
+  - `LeftToRight` -- 0: left to right
+  - `RightToLeft` -- 1: right to left
+  - `TopToBottom` -- 2: top to bottom
+  - `BottomToTop` -- 3: bottom to top
+
+**`impl Direction`**
+
+- **`fn from_code(v: i64) -> Direction`**
+- **`fn code(self) -> i64`**
+- **`fn horizontal(self) -> bool`**
+  whether the members stand side by side (else one above the other)
+
+- **`struct List`**
+  a list's settings (msvSDListDirection, msvSDListSpacing, msvSDListAlignment)
+  - `direction: Direction`
+  - `spacing: f64` -- between two members (drawing units)
+  - `align: u8` -- across the direction: 0 start (left / top), 1 middle, 2 end (right / bottom)
+  - `stretch: bool` -- User.JFD_ListStretch (JFDiagrammer's own, for lanes): every item as long across as the
+    list's inner box or the longest item
+
+- **`fn user_text(doc: &Document, s: ShapeRef, name: &str) -> Option<String>`**
+  a User cell's value as text (a number as Visio shows it)
+
+- **`fn user_num(doc: &Document, s: ShapeRef, name: &str) -> Option<f64>`**
+  a User cell's value as a number
+
+- **`fn kind(doc: &Document, s: ShapeRef) -> Option<Kind>`**
+  what a shape is in a structured diagram (None: an ordinary shape, also a heading)
+
+- **`fn is_container(doc: &Document, s: ShapeRef) -> bool`**
+  whether the shape takes members (a container or a list)
+
+- **`fn categories(doc: &Document, s: ShapeRef) -> Vec<String>`**
+  the categories of a shape (msvShapeCategories, ';' separated)
+
+- **`fn has_category(doc: &Document, s: ShapeRef, name: &str) -> bool`**
+  whether the shape has a category (case-insensitive)
+
+- **`fn container(doc: &Document, c: ShapeRef) -> Option<Container>`**
+  a container's settings (None: not a container or list)
+
+- **`fn list(doc: &Document, l: ShapeRef) -> Option<List>`**
+  a list's settings (None: not a list)
+
+- **`fn members(doc: &Document, c: ShapeRef) -> Vec<ShapeRef>`**
+  every member of a container: a list's items in list order first, then its other members
+
+- **`fn items(doc: &Document, l: ShapeRef) -> Vec<ShapeRef>`**
+  the items of a list in list order (the members it arranges)
+
+- **`fn containers_of(doc: &Document, s: ShapeRef) -> Vec<ShapeRef>`**
+  the containers and lists a shape is a member or an item of
+
+- **`fn list_of(doc: &Document, s: ShapeRef) -> Option<ShapeRef>`**
+  the list a shape is an item of
+
+- **`fn callouts_of(doc: &Document, t: ShapeRef) -> Vec<ShapeRef>`**
+  the callouts tied to a shape
+
+- **`fn target_of(doc: &Document, callout: ShapeRef) -> Option<ShapeRef>`**
+  the target of a callout
+
+- **`fn add_members(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, shapes: &[ShapeRef], at: Option<usize>) -> Result<(), EditError>`**
+  make shapes members of a container (`at`: the position in a list, else at the end); a
+  shape already in it stays where it is
+
+- **`fn remove_members(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, shapes: &[ShapeRef]) -> Result<(), EditError>`**
+  take shapes out of a container
+
+- **`fn set_target(tx: &mut Transaction, eng: &mut Engine, callout: ShapeRef, target: Option<ShapeRef>) -> Result<(), EditError>`**
+  tie a callout to a target (None: let go of it)
+
+- **`fn recalc(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef]) -> Result<(), EditError>`**
+  recompute what reads the Relationships cells of these shapes (the structure functions)
+
+- **`fn shape_box(doc: &Document, s: ShapeRef) -> [f64; 4]`**
+  a shape's upright box on the page
+
+- **`fn inner_box(doc: &Document, c: ShapeRef) -> [f64; 4]`**
+  the box members live in: the frame without the heading (page, upright)
+
+- **`fn joins_by_position(doc: &Document, s: ShapeRef) -> bool`**
+  whether a shape may join containers by its position: 2D, no guide, no callout, no heading,
+  not a connector
+
+- **`fn accepts(doc: &Document, c: ShapeRef, s: ShapeRef) -> bool`**
+  whether container `c` takes shape `s` (categories; never itself or one that holds it)
+
+- **`fn accepts_item(doc: &Document, l: ShapeRef, s: ShapeRef) -> bool`**
+  whether list `l` takes shape `s` as an item (msvSDListRequiredCategories,
+  msvSDListExcludedCategories); else it may still take it as a plain member
+
+- **`fn within(doc: &Document, inner: ShapeRef, outer: ShapeRef) -> bool`**
+  whether `inner` is (transitively) a member of `outer`
+
+- **`fn drop_targets(doc: &Document, owner: Owner, s: ShapeRef, moving: &[ShapeRef]) -> Vec<ShapeRef>`**
+  the containers on `owner` a shape joins where it lies now, leaving out `moving` (what moves
+  with it): every container that holds its whole box and takes it (Visio keeps membership in
+  each enclosing container, nested ones too: a process shape is in its lane, its phase and
+  the lanes' list), and a list whose box holds its middle and that takes it as an item
+
+- **`fn carried(doc: &Document, shapes: &[ShapeRef]) -> Vec<ShapeRef>`**
+  the shapes plus everything that moves, copies and is deleted with them: members of
+  containers (nested too) and callouts of every shape in it; the shapes come first
+
+- **`fn needed_box(doc: &Document, c: ShapeRef) -> Option<[f64; 4]>`**
+  the box a container needs for its members (a list: its items only, they alone size it):
+  their box, the margin around it, the heading
+
+- **`fn fit(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, shrink: bool) -> Result<bool, EditError>`**
+  fit a container around its members: grow only (`shrink` false) or exactly; an empty or
+  turned container stays -> whether it changed
+
+- **`fn layout_list(tx: &mut Transaction, eng: &mut Engine, l: ShapeRef) -> Result<Vec<ShapeRef>, EditError>`**
+  the items of a list in list order laid out side by side from the start of its inner box
+  (margin, spacing, alignment across), then the list fitted around them -> the shapes moved
+
+- **`fn list_index_at(doc: &Document, l: ShapeRef, p: [f64; 2], leave_out: &[ShapeRef]) -> usize`**
+  where a shape at page point `p` goes in a list: the index of the first member whose middle
+  lies beyond p along the list's direction
+
+- **`struct Mark`**
+  a mark between two members of a list (the insert triangle, the insertion bar while a
+  shape is dragged in): its page point, the direction the list runs, the index a shape
+  inserted there gets
+  - `at: [f64; 2]`
+  - `to: [f64; 2]` -- the far end of the insertion bar across the list
+  - `direction: Direction`
+  - `index: usize`
+
+- **`fn insert_marks(doc: &Document, l: ShapeRef) -> Vec<Mark>`**
+  the marks of a list: before the first member, between members, after the last
+
+- **`fn insert_marks_without(doc: &Document, l: ShapeRef, leave_out: &[ShapeRef]) -> Vec<Mark>`**
+  the marks of a list as if `leave_out` (an item being dragged) were not in it
+
+- **`fn move_in_list(tx: &mut Transaction, eng: &mut Engine, l: ShapeRef, s: ShapeRef, index: usize) -> Result<Vec<ShapeRef>, EditError>`**
+  put a member of a list at another index and lay the list out
+
+- **`fn settle(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[ShapeRef], membership: bool) -> Result<Vec<ShapeRef>, EditError>`**
+  after `shapes` were dropped, moved, resized or turned (what they carried moved with them):
+  with `membership` the containers they join and leave by their new place (a list: at the
+  index their place gives); then every container concerned, the deepest first: lists laid
+  out, containers sized by their automatic size -> every shape that moved here (for the glue
+  to follow)
+
+- **`fn forget(tx: &mut Transaction, eng: &mut Engine, deleted: &[ShapeRef]) -> Result<Vec<ShapeRef>, EditError>`**
+  before `deleted` go: the shapes that stay let go of them; lists close the gap -> the
+  shapes that moved (lists laid out)
+
+- **`fn disband(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef) -> Result<(), EditError>`**
+  the container goes, its members stay (they leave it; a nested container's members stay in
+  it); the container's own containers lose it
+
+- **`fn repair(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[ShapeRef]) -> Result<(), EditError>`**
+  relationships named on one side only (after a paste or a foreign edit) are dropped;
+  `shapes` limits the check (empty: every shape of the owner)
+
+- **`fn anchor(doc: &Document, callout: ShapeRef) -> [f64; 2]`**
+  the anchor of a callout on its target: fractions of the target's box (User.JFD_TargetX,
+  User.JFD_TargetY; the middle when missing)
+
+- **`fn target_point(doc: &Document, callout: ShapeRef) -> Option<[f64; 2]>`**
+  the page point a callout points at: the anchor on its target
+
+- **`fn set_anchor(tx: &mut Transaction, callout: ShapeRef, p: [f64; 2]) -> Result<(), EditError>`**
+  remember where on its target a callout points (the page point `p`)
+
+- **`fn association(doc: &Document, callout: ShapeRef) -> Option<ops::Control>`**
+  the control row a callout is tied by: Controls.Association (Visio requires it for callouts),
+  else the first control point
+
+- **`fn aim_callouts(tx: &mut Transaction, eng: &mut Engine, callouts: &[ShapeRef]) -> Result<(), EditError>`**
+  the tail of callouts back onto their target: the association point (the tip of the tail)
+  goes to the anchor on the target
+
+- **`fn set_user_length(tx: &mut Transaction, s: ShapeRef, name: &str, inches: f64, unit: Unit) -> Result<(), EditError>`**
+  a length cell of a User row as Visio writes it: inches with a unit to show
+
+- **`fn user_addr(doc: &Document, name: &str) -> Option<CellAddr>`**
+  a User cell's address (for the formula engine's dependencies)
+
+### `diagram_core/src/structure/cff.rs`
+
+Source: [`lib/diagram_core/src/structure/cff.rs`](../lib/diagram_core/src/structure/cff.rs)
+
+```text
+structure::cff -- the cross-functional flowchart (ST-05): lanes and phases in a pool
+
+  find(doc, s) -> Option<Cff>        the flowchart a shape belongs to (the pool itself, one of
+                                     its lists, a lane, a phase, a shape in a lane)
+  pools(doc, owner)                  every flowchart of a page
+  layout(tx, eng, &cff)              lanes stacked, phases side by side across every lane,
+                                     the lists and the pool around them -> what moved
+  lanes(doc, &cff) / phases(doc, &cff)
+
+Visio's structure, kept so that Visio recognises it (research in jd10-strukturen.md):
+
+  CFF Container   Container, categories "CFF Container", takes only "CFF List"; its heading
+                  is the title bar
+   ├ Swimlane List  List of the lanes (items: categories "Swimlane"), direction 2 (top to
+   │                bottom) for horizontal lanes, 0 for vertical ones
+   └ Phase List     List of the phases (items: "Phase"), the other direction
+  Swimlane        Container with its heading on the left (horizontal) or on top (vertical)
+  Separator       Container with its heading on top (horizontal) or on the left; it spans
+                  every lane, a shape in it is its member as well as its lane's
+
+Horizontal (lanes one above the other):
+
+  +--------------------------------------------+  title bar (the pool's heading, Ht)
+  |       | phase 1 heading  | phase 2 heading |  phase row (the phases' headings, Hp)
+  | lane1 |                  |                 |
+  +-------+------------------+-----------------+
+  | lane2 |                  |                 |
+  +--------------------------------------------+
+   Wl (the lanes' headings)
+
+The lanes keep their heights and share one width: the lane headings plus the phases (the last
+phase takes what is left), or the widest lane without phases.  The phases keep their widths
+and span the phase row and every lane.  Vertical flowcharts are the same turned: lanes side by
+side, the phases one above the other.  Lanes and phases carry their shapes; a shape in both
+moves by the larger of the two moves on each axis (once, not twice).
+```
+
+- **`struct Cff`**
+  a cross-functional flowchart
+  - `pool: ShapeRef`
+  - `lane_list: Option<ShapeRef>` -- the list of the lanes and of the phases
+  - `phase_list: Option<ShapeRef>`
+  - `horizontal: bool` -- lanes one above the other (else side by side)
+
+```rust
+/// the categories of the parts
+CAT_POOL: &str = "CFF Container"
+CAT_LIST: &str = "CFF List"
+CAT_LANE: &str = "Swimlane"
+CAT_PHASE: &str = "Phase"
+```
+
+- **`fn is_pool(doc: &Document, s: ShapeRef) -> bool`**
+  whether a shape is a flowchart's pool
+
+- **`fn of_pool(doc: &Document, pool: ShapeRef) -> Option<Cff>`**
+  the flowchart of a pool
+
+- **`fn find(doc: &Document, s: ShapeRef) -> Option<Cff>`**
+  the flowchart a shape belongs to: the pool, a list of it, a lane, a phase, a shape inside
+
+- **`fn pools(doc: &Document, owner: Owner) -> Vec<Cff>`**
+  every flowchart on a page or master
+
+- **`fn lanes(doc: &Document, f: &Cff) -> Vec<ShapeRef>`**
+  the lanes in order
+
+- **`fn phases(doc: &Document, f: &Cff) -> Vec<ShapeRef>`**
+  the phases in order
+
+- **`fn layout(tx: &mut Transaction, eng: &mut Engine, f: &Cff) -> Result<Vec<ShapeRef>, EditError>`**
+  lay the flowchart out from its pool's top left corner -> the shapes that moved
+
+- **`fn layout_with(tx: &mut Transaction, eng: &mut Engine, f: &Cff, want: Option<f64>) -> Result<Vec<ShapeRef>, EditError>`**
+  layout with the lanes' length given (a pool or lane resized by hand), else the longest
+  lane's or what the phases need
+
+### `diagram_core/src/structure/rel.rs`
+
+Source: [`lib/diagram_core/src/structure/rel.rs`](../lib/diagram_core/src/structure/rel.rs)
+
+```text
+structure::rel -- the Relationships cell: which shapes a shape is structurally tied to
+
+  relations(doc, shape) -> Relations      what the cell names, by relationship type
+  write(tx, shape, &relations)            the cell written the way Visio writes it
+
+Visio keeps container membership, list order and callout targets in the single cell
+Relationships of both shapes (Z2, Z3; learn.microsoft.com "Relationships Cell (Shape Layout
+Section)"; a plain cell under <Shape>, V="0"):
+
+  container:  SUM(DEPENDSON(1,Sheet.12!SheetRef(),Sheet.15!SheetRef()))   its members
+  member:     SUM(DEPENDSON(4,Sheet.7!SheetRef()))                         its containers
+
+  1 members of this container        4 containers of this shape
+  2 items of this list (in order)    5 the list of this item
+  3 callouts on this shape           6 the target of this callout
+  7 .. 10 the container on whose left / right / top / bottom edge the shape sits
+  11 the list this list overlaps (a cross-functional flowchart's lanes and phases)
+
+One DEPENDSON per type, the type first, the shapes after it; Visio leaves an empty term
+(SUM(DEPENDSON(4))) after the last member left, which means nothing.  The order inside a term
+is kept: a list's items are written in list order (how Visio stores list order is not
+documented; the items also stand in that order on the page, so both readings agree).  The cell has no other meaning: the formula engine evaluates it to 0 and records
+the dependencies, which is what makes Visio recompute the shapes that read the structure
+(CONTAINERSHEETREF, LISTORDER ...).  Both sides are written; a side that is missing or
+names a shape that is gone is repaired by the editing functions (structure::repair).
+```
+
+```rust
+/// the relationship types of DEPENDSON's first argument: a container names its members
+REL_CONTAINER: u32 = 1
+/// a list names its items (in list order)
+REL_LIST: u32 = 2
+/// a target names its callouts
+REL_TARGET: u32 = 3
+/// a member names its containers
+REL_MEMBER: u32 = 4
+/// an item names its list
+REL_ITEM: u32 = 5
+/// a callout names its target
+REL_CALLOUT: u32 = 6
+```
+
+- **`fn back(kind: u32) -> Option<u32>`**
+  the type the other side writes for a type (None: kept as it is, 7 .. 11)
+
+- **`struct Relations`**
+  what a Relationships cell names: per type the shapes in the order written
+  - `groups: Vec<(u32, Vec<ShapeRef>)>`
+
+**`impl Relations`**
+
+- **`fn get(&self, kind: u32) -> &[ShapeRef]`**
+  the shapes of type `kind`
+- **`fn get_mut(&mut self, kind: u32) -> &mut Vec<ShapeRef>`**
+  the list of type `kind`, made when missing
+- **`fn is_empty(&self) -> bool`**
+  whether it names nothing
+
+- **`fn formula(doc: &Document, shape: ShapeRef) -> Option<&str>`**
+  the formula text of a shape's Relationships cell (inheritance included; masters carry none
+  in practice, but a copy may)
+
+- **`fn relations(doc: &Document, shape: ShapeRef) -> Relations`**
+  what the Relationships cell of `shape` names (shapes that are gone are left out)
+
+- **`fn parse(f: &str) -> Vec<(u32, Vec<u32>)>`**
+  the DEPENDSON groups of a formula: (type, shape IDs named by Sheet.N!)
+
+- **`fn formula_of(doc: &Document, rel: &Relations) -> Option<String>`**
+  the formula Visio writes for these relations (None: nothing to name)
+
+- **`fn write(tx: &mut Transaction, shape: ShapeRef, rel: &Relations) -> Result<(), EditError>`**
+  write a shape's Relationships cell (over a GUARD, as Visio does: the cell is the
+  structure's, not the user's)
+
+- **`fn related_shapes(doc: &Document, owner: Owner) -> Vec<ShapeRef>`**
+  every shape of a page or master whose Relationships cell names something
+
 ### `diagram_core/src/sheet.rs`
 
 Source: [`lib/diagram_core/src/sheet.rs`](../lib/diagram_core/src/sheet.rs)
@@ -57389,7 +57898,8 @@ How a stencil is built, in this order:
 2. A new stencil (vsdx::new_document: the own styles and the NetLab theme) gets the masters in
    one transaction: the Master attributes (Name and Prompt in the build language,
    IsCustomName(U), IconSize 1, AlignName 2, MatchByName 0, IconUpdate 1, PatternFlags 0,
-   Hidden 0, MasterType 2, BaseID and UniqueID), the master page (PageWidth / PageHeight =
+   Hidden 0 (1 with the header key `hidden: true`: a master the Shapes panel does not show,
+   which code drops), MasterType 2, BaseID and UniqueID), the master page (PageWidth / PageHeight =
    the shape's size, scale 1:1 in mm or in, ShapeKeywords, the JFD_ User cells), the master
    shape with its cells, sections, text and the SVG geometry.  Constants are written as values
    with their unit (lengths in inches with U = MM, IN ...), everything else as a formula; the

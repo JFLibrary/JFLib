@@ -76,6 +76,8 @@ fn place_world(app: &mut Diagrammer, ui: &mut Ui, key: u32, k: usize, at: [f32; 
     let Some((l, e)) = st.entry(key, k) else { return };
     let Some(o) = app.opened.as_mut() else { return };
     let label = tf("{} ablegen", &[e.texts.name(lang)]);
+    // (JD10) the structure masters: a dropped lane may bring its flowchart
+    let masters = crate::structures::masters(st);
     let placed = crate::edit_doc::edit(o, &label, true, |tx, eng| {
         let m = instance::import_master(tx, &l.doc, e.master)?;
         let shape = instance::place(tx, page, m, x, y, lang)?;
@@ -84,6 +86,8 @@ fn place_world(app: &mut Diagrammer, ui: &mut Ui, key: u32, k: usize, at: [f32; 
         collect(tx.doc(), shape, &mut sheets);
         eng.recalc(tx, &sheets)?;
         edit_canvas::follow(tx, eng, Owner::Page(page), &[shape])?;
+        // (JD10) it joins the containers it lies in, a callout ties to the shape under it
+        crate::structures::dropped(tx, eng, &masters, Owner::Page(page), shape)?;
         Ok(shape)
     });
     match placed {

@@ -1,0 +1,72 @@
+# Beschriftung Kreis: Kreis (verzogen eine Ellipse) mit gerader Leitlinie vom Rand (in Richtung
+# der Spitze) und einem Punkt an der Spitze.
+master: Callout circle
+name.de: Beschriftung Kreis
+name.en: Callout circle
+name.es: Llamada círculo
+name.it: Richiamo cerchio
+name.fr: Bulle d'annotation cercle
+prompt.de: Text in einem Kreis mit Leitlinie, etwa eine Positionsnummer. Ziehen Sie den gelben Steuerpunkt auf das Ziel.
+prompt.en: Text in a circle with a leader line, such as an item number. Drag the yellow control handle onto the target.
+prompt.es: Texto en un círculo con línea guía, por ejemplo un número de posición. Arrastre el controlador amarillo hasta el destino.
+prompt.it: Testo in un cerchio con linea guida, ad esempio un numero di posizione. Trascina la maniglia di controllo gialla sulla destinazione.
+prompt.fr: Texte dans un cercle avec ligne de repère, par exemple un numéro de repère. Faites glisser la poignée de contrôle jaune sur la cible.
+keywords.de: Beschriftung, Legende, Hinweis, Kommentar, Anmerkung, Zeiger, Kreis, Ellipse, Positionsnummer, Leitlinie
+keywords.en: callout, label, note, comment, annotation, pointer, circle, ellipse, item number, leader
+keywords.es: llamada, etiqueta, nota, comentario, anotación, puntero, círculo, elipse, número de posición, línea guía
+keywords.it: richiamo, didascalia, etichetta, nota, commento, annotazione, puntatore, cerchio, ellisse, numero di posizione, linea guida
+keywords.fr: bulle d'annotation, légende, étiquette, note, commentaire, pointeur, cercle, ellipse, numéro de repère, ligne de repère
+text.de: Text
+text.en: Text
+text.es: Texto
+text.it: Testo
+text.fr: Texte
+
+[Shape]
+Width = 20 mm
+Width.us = 0.75 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+msvStructureType:        Value = "Callout"
+msvShapeCategories:      Value = "Callout"
+msvSDCalloutNoHighlight: Value = FALSE
+# die Spitze des Zeigers
+Ax:   Value = Controls.Association
+Ay:   Value = Controls.Association.Y
+# die Lage der Spitze zur Ellipse: über 1 außerhalb
+Q:    Value = POW((User.Ax-Width*0.5)/MAX(Width*0.5,0.001),2)+POW((User.Ay-Height*0.5)/MAX(Height*0.5,0.001),2)
+Out:  Value = User.Q>1
+# der Punkt des Rands auf dem Weg von der Mitte zur Spitze
+Px:   Value = Width*0.5+(User.Ax-Width*0.5)/SQRT(MAX(User.Q,0.000001))
+Py:   Value = Height*0.5+(User.Ay-Height*0.5)/SQRT(MAX(User.Q,0.000001))
+Dot:  Value = 0.8 mm
+      Value.us = 0.03 in
+
+# der Kreis
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# die Leitlinie
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(User.Out)
+MoveTo  X = User.Px; Y = User.Py
+LineTo  X = User.Ax; Y = User.Ay
+
+# der Punkt an der Spitze
+[Geometry]
+NoShow = NOT(User.Out)
+Ellipse  X = User.Ax; Y = User.Ay; A = User.Ax+User.Dot; B = User.Ay; C = User.Ax; D = User.Ay+User.Dot
+
+[Controls]
+Association:  X = -12 mm; Y = -10 mm
+              X.us = -0.5 in; Y.us = -0.4 in
+              XDyn = User.Px; YDyn = User.Py
+              XCon = 2; YCon = 2; CanGlue = FALSE
+              Tip.de = "Zeiger auf das Ziel ziehen"
+              Tip.en = "Drag the pointer onto the target"
+              Tip.es = "Arrastre el puntero hasta el destino"
+              Tip.it = "Trascina il puntatore sulla destinazione"
+              Tip.fr = "Faites glisser le pointeur sur la cible"

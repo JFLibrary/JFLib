@@ -10,6 +10,8 @@
 //   eng.evaluate / evaluate_text                     one cell or a formula text, stored inputs
 //   eng.guarded / theme_guarded / locks              GUARD, THEMEGUARD and the Lock cells
 //   Val, Stored, Outcome, Keep, Effect, TextMetrics
+//   the structure functions (FX-12: CONTAINERSHEETREF, LISTORDER ...) read the Relationships
+//   cells of structure::rel (sfuncs.rs)
 //
 // The engine follows the file's own rules (decision V1): a cell's formula runs in the context
 // of the sheet that has the cell -- also when the formula is inherited from a master shape or a
@@ -29,6 +31,7 @@ mod geom;
 mod keymap;
 pub mod math;
 mod parse;
+mod sfuncs;
 mod theme;
 mod val;
 mod xml;

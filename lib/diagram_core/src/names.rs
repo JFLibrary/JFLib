@@ -80,6 +80,9 @@ known! {
     SPLINE_START = "SplineStart", SPLINE_KNOT = "SplineKnot", INFINITE_LINE = "InfiniteLine",
     REL_MOVE_TO = "RelMoveTo", REL_LINE_TO = "RelLineTo", REL_CUB_BEZ_TO = "RelCubBezTo",
     REL_QUAD_BEZ_TO = "RelQuadBezTo", REL_ELLIPTICAL_ARC_TO = "RelEllipticalArcTo",
+    // structure (JD10): read by the structure functions before any shape has them
+    RELATIONSHIPS = "Relationships", MSV_SHAPE_CATEGORIES = "msvShapeCategories",
+    MSV_STRUCTURE_TYPE = "msvStructureType",
 }
 
 /// which style sheet a cell inherits from (the style attributes LineStyle, FillStyle, TextStyle)
