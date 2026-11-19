@@ -31,8 +31,8 @@
 // Automatic size (Step by Step, chapter 3: "Auto Size works both horizontally and vertically",
 // the extended page goes again when its last shape leaves it): a tile is the printed sheet,
 // the first one the whole paper, each further one the paper less the margins left and right
-// (top and bottom) -- the files of the corpus agree: A4 landscape with 0.25 in margins and two
-// by two tiles is 2 x 11.69 - 0.5 = 22.89 in wide and 2 x 8.27 - 0.5 = 16.04 in high.  After a
+// (top and bottom) -- a page of the local corpus agrees: A4 landscape with 0.25 in margins and
+// two by two tiles is 2 x 11.69 - 0.5 = 22.89 in wide and 2 x 8.27 - 0.5 = 16.04 in high.  After a
 // gesture the page gains a tile on each side where a shape juts out and loses an empty tile at
 // an edge, never below the first one; a page that grows to the left or down moves its drawing
 // (the origin stays at the bottom left corner, as every coordinate of the file says).  Nothing
