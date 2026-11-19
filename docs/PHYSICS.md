@@ -291,7 +291,7 @@ Werte schwankten bis zum Fünffachen und taugen nur für Verhältnisse im selben
 
 | Messung | M2, macOS (Release) | Ryzen 5 3600, Windows (Release, unter Last) | WebAssembly in Node 22 (Release, unter Last) | Android-Emulator x86_64 (Release) |
 | --- | ---: | ---: | ---: | ---: |
-| Character-Controller: Schritte je ms, 32 Figuren als Körper auf der Karte aus 50 068 Dreiecken, zufällige Eingaben, 600 Takte | 178 | 38–69 | 5–16 | 21–40 |
+| Character-Controller: Schritte je ms, 32 Figuren als Körper auf der Karte aus 50 068 Dreiecken, zufällige Eingaben, 600 Takte | 178 | 31–69 | 15–29 | 21–40 |
 | Casts je Schritt im Mittel | 3,02 | 3,02 | 3,02 | 3,02 |
 | `rt::fx::sqrt_portable` | 15,8 ns | 42 ns | 74–273 ns | 60–90 ns |
 | `rt::fx::sqrtd` vorher (Bit für Bit) / nachher | 0,9 ns (Prozessor) | Prozessor | 474–1888 / 66–343 ns | 700–1201 / 46–76 ns |
@@ -300,7 +300,8 @@ Werte schwankten bis zum Fünffachen und taugen nur für Verhältnisse im selben
 Im Browser und im Emulator ist `rt::fx::sqrtd` jetzt so schnell wie `sqrt_portable`: im selben Lauf war es vorher 4,9- bis
 8,2-mal langsamer als `sqrt_portable` (Node) und 9- bis 20-mal (Emulator; in einem ruhigeren Lauf 493 gegen 44 ns). Das betrifft alles, was dort `rt::fx::sqrtd` rechnet (`gfx`, `fx`,
 `render2d` und andere), nicht die Physik, die dort schon `sqrt_portable` nahm. Der Controller braucht auf dem M2 für 32 Figuren
-bei 60 Hz rund 1 % eines Kerns (5,6 µs je Schritt); im Browser rechnet er nach den Messungen von Teil 1 etwa doppelt so lange.
+bei 60 Hz rund 1 % eines Kerns (5,6 µs je Schritt); im Wechsel mit dem nativen Programm gemessen braucht er im Browser
+rund das 1,5- bis 3-Fache (nativ 65 und 31, WebAssembly 22 und 21 Schritte je ms, alles unter Last).
 
 ## Was nicht getestet ist
 
