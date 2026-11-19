@@ -76,6 +76,14 @@ impl Opened {
     pub(crate) fn paint_of(&self, k: usize) -> Option<Rc<PagePaint>> {
         self.paints.get(k).and_then(|p| p.clone())
     }
+
+    /// (JD8 rest: pages) other tabs (pages.rs, after the pages changed): a page keeps the paint
+    /// built for it
+    pub(crate) fn set_tabs(&mut self, tabs: Vec<PageTab>) {
+        let old: Vec<(PageRef, Option<Rc<PagePaint>>)> = self.tabs.iter().map(|t| t.page).zip(self.paints.drain(..)).collect();
+        self.paints = tabs.iter().map(|t| old.iter().find(|o| o.0 == t.page).and_then(|o| o.1.clone())).collect();
+        self.tabs = tabs;
+    }
 }
 
 /// the extensions the file dialog offers

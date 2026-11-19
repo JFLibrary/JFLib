@@ -105,7 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -2743,7 +2743,9 @@ list -- scroll views, scroll bars, lists, tabs and expanders (WinUI 3 style)
        the asm keeps a pointer to the app's variable in between; list_sel() reads it in
        the rows)
   tabs(id, &mut sel, names) -> EV        text tab header row, tab i has the id
-                                         `id + 1 + i`; EV_ACT when sel changed; placed
+                                         `id + 1 + i`; EV_ACT when sel changed (a click
+                                         or a right click on a tab), EV_DOUBLE when a
+                                         tab was double-clicked; placed
                                          narrower than the tabs, the widest ones give
                                          way (labels cut with "…")
   expander_begin(id, header, &mut open) -> open   (emit the content when 1)
@@ -2804,7 +2806,8 @@ Widget ids used internally: (id << 3 | k) | 0x80000000 for sub parts (k = 1..7),
   and resized viewports reveal the selected tab. Internal IDs follow the
   usual `(id * 8 + part) | 0x80000000` convention (parts 1, 2, 3 and 7).
 - **`fn tabs(&mut self, id: u32, sel: &mut i32, names: &[&str]) -> u32`**
-  ui_tabs(id, &mut sel, names) -> EV_\* (EV_ACT when sel changed)
+  ui_tabs(id, &mut sel, names) -> EV_\* (EV_ACT when sel changed: a click or a right click
+  on a tab selects it; EV_DOUBLE when a tab was double-clicked: it is the selected one then)
 - **`fn expander_begin(&mut self, id: u32, header: &str, open: &mut i32) -> i32`**
   ui_expander_begin(id, header, &mut open) -> open: a card-like header (48 DIP) with a
   chevron; when open the content follows in a padded card below it (BOX_V, PAD_16, gap
@@ -54251,6 +54254,10 @@ a file loses nothing, and the behaviour Visio files carry works without translat
 
   structure::*                  (JD10) containers, lists, callouts: membership in the
                                 Relationships cell, automatic size, list order and layout
+  pagesetup::*                  (JD8) a page's size against its drawing and its paper:
+                                orientation, sizes, fit to the drawing, automatic size in
+                                tiles of the printed sheet; Transaction::add_page_like and
+                                duplicate_page insert pages with settings or content
 
 What is to come here, by stage of the plan: page layout (CN-13, P2)
 
@@ -55118,6 +55125,9 @@ a Del="1" mark; restore_row and restore_section remove it again.
   end the transaction -> the change to keep for undo (None: nothing changed)
 - **`fn rollback(self)`**
   take every edit of the transaction back
+- **`fn sheets(&self) -> Vec<SheetRef>`**
+  the sheets the edits so far touch, as Change::sheets names them once committed (an app
+  that follows a gesture with more work in the same step asks which pages it changed)
 - **`fn set_formula(&mut self, sheet: SheetRef, addr: &CellAddr, formula: &str) -> Result<(), EditError>`**
   give the cell a formula of its own; its value stays until the engine computes the new
   one (the cell is stale until then)
@@ -55227,6 +55237,21 @@ a Del="1" mark; restore_row and restore_section remove it again.
   and the chain of backgrounds must not lead back to the page
 - **`fn set_page_theme(&mut self, page: PageRef, theme: Option<u32>) -> Result<(), EditError>`**
   set the theme of a page (an index into Document::themes, None: none)
+- **`fn add_page_like(&mut self, like: PageRef, name: &str, name_u: &str, background: bool, pos: Option<usize>) -> Result<PageRef, EditError>`**
+  add an empty page with the settings of page `like` (PG-03: Visio gives a new page the
+  properties of the active page -- size, scale, units, print setup, layout and routing,
+  background page, design): its page sheet without the Layer section (layers belong to a
+  page's shapes), the styles of its PageSheet element, its theme; a foreground page keeps
+  `like`'s background page, a background page gets none.  At `pos` in document order (None:
+  the end) with the next free page ID -> its handle
+- **`fn duplicate_page(&mut self, page: PageRef, name: &str, name_u: &str, pos: Option<usize>) -> Result<PageRef, EditError>`**
+  a copy of a page with its shapes, glue records and settings (PG-03 Duplizieren) at `pos`
+  in document order (None: right after the original, as Visio's Page.Duplicate puts it)
+  -> its handle.  The shapes keep their IDs (IDs count per page), so formulas that name
+  Sheet.N, the Connect entries and the Relationships of containers and lists stay inside
+  the copy; UniqueIDs are dropped (each names one shape of the document), the copy gets the
+  next free page ID, the names given (not marked as custom names) and a part of its own
+  when it is written.  Pages that use the original as their background keep it
 - **`fn add_master(&mut self, name: &str, name_u: &str) -> Result<MasterRef, EditError>`**
   add an empty master with the next free master ID -> its handle (add shapes with
   add_shape(Owner::Master(..)))
@@ -56511,6 +56536,8 @@ groups, z-order, new shapes, text, copy and paste (JD7: SP-03..07, TX-01, TX-03,
   bounds(doc, shapes)                 the box of a selection on the page
   locks(eng, doc, shape) -> Locks     the protection cells that are set (Locks::MOVE_X ...)
   move_shapes(tx, eng, shapes, d)     2D: the pin; 1D: BeginX/Y, EndX/Y of the free ends
+  shift_all(tx, eng, owner, d)        every top-level shape, locks or not (the page's origin
+                                      moves: pagesetup::grow, fit_to_drawing)
   set_frame(tx, eng, shape, &frame)   size and place, same turn (the eight grips)
   scale_shapes(tx, eng, shapes, from, to)   a selection from one box into another
   rotate_shapes(tx, eng, shapes, centre, angle) / flip_shapes(tx, eng, shapes, horizontal)
@@ -56627,6 +56654,11 @@ vertical flip toggles FlipY and makes it 2φ - a.
   move shapes by `d` (page): a 2D shape's pin, a 1D shape's free ends (glued ones stay for
   glue::update); a shape inside another one of the list moves with it; LockMoveX/LockMoveY
   keep that part of the move away
+
+- **`fn shift_all(tx: &mut Transaction, eng: &mut Engine, owner: Owner, d: [f64; 2]) -> Result<(), EditError>`**
+  move every top-level shape of a page or master by `d`, whatever their locks say: the page's
+  origin moves under the drawing (a page that grows to the left or down, a page fitted to
+  its drawing; pagesetup.rs).  Free 1D ends move, glued ones follow their formulas
 
 - **`fn set_frame(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, to: &Frame) -> Result<(), EditError>`**
   give a shape another size and place with the same turn and flips (`to` from Frame::drag
@@ -56940,6 +56972,104 @@ the sheets are shape IDs of the same page or master.
   - `header: StyleHeader` -- the attributes
   - `sheet: Sheet` -- its cells
   - `extras: Extras` -- unknown items of the StyleSheet element
+
+### `diagram_core/src/pagesetup.rs`
+
+Source: [`lib/diagram_core/src/pagesetup.rs`](../lib/diagram_core/src/pagesetup.rs)
+
+```text
+pagesetup -- a page's size against its drawing and its printer paper (PG-04, PG-05, RW-01 ..
+RW-03): orientation, a size of the menu, the page fitted to its drawing, automatic size in
+tiles of the printed sheet
+
+  size(doc, page) -> [w, h]              PageWidth, PageHeight (drawing units, inches)
+  scale(doc, page)                       paper inches per drawing inch (PageScale / DrawingScale)
+  landscape(doc, page)                   the page is wider than high
+  set_orientation(tx, eng, page, landscape)   Hochformat / Querformat: width and height
+                                         swapped when the page lies the other way,
+                                         PrintPageOrientation 1 / 2
+  set_paper_size(tx, eng, page, [w, h])  the page to w x h paper inches in its orientation
+  auto_size(doc, page) / set_auto_size(tx, page, on)   Automatisch anpassen
+  content(doc, page) -> Option<[x0, y0, x1, y1]>   the box of the page's top-level shapes
+  fit_to_drawing(tx, eng, page, margins) the page around its drawing, the shapes moved in
+  Tiles::new(paper, margins, zoom); grow(tx, eng, page, &tiles)   automatic size after a
+                                         gesture: whole tiles added or taken away
+
+The cells (Visio's ShapeSheet reference, Page Properties and Print Properties sections):
+* DrawingSizeType: 0 same as printer (visPrintSetup), 1 fit page to drawing contents
+  (visTight), 2 standard (visStandard), 3 custom page size (visCustom), 4 custom scaled, 5
+  metric (ISO), 6 ANSI engineering, 7 ANSI architectural.
+* DrawingResizeType: 0 the page resizes automatically when DrawingSizeType is 0, else not;
+  1 the page resizes automatically; 2 it does not.  set_auto_size writes 1 or 2.
+* PrintPageOrientation: 0 same as printer, 1 portrait, 2 landscape.
+A size chosen from the menu or fitted to the drawing turns the automatic size off: the Page
+Size register of Visio's Page Setup offers "let Visio expand the page" and a fixed size as
+alternatives (Visio 2016 Step by Step, chapter 3).  Assumption, not checked in Visio: fitting
+to the drawing turns it off as well (DrawingResizeType 2), so the next gesture does not cut
+the fitted page back into tiles.
+
+Automatic size (Step by Step, chapter 3: "Auto Size works both horizontally and vertically",
+the extended page goes again when its last shape leaves it): a tile is the printed sheet,
+the first one the whole paper, each further one the paper less the margins left and right
+(top and bottom) -- the files of the corpus agree: A4 landscape with 0.25 in margins and two
+by two tiles is 2 x 11.69 - 0.5 = 22.89 in wide and 2 x 8.27 - 0.5 = 16.04 in high.  After a
+gesture the page gains a tile on each side where a shape juts out and loses an empty tile at
+an edge, never below the first one; a page that grows to the left or down moves its drawing
+(the origin stays at the bottom left corner, as every coordinate of the file says).  Nothing
+happens on opening a file (PLAN.md, "Fallen"): only the app's gesture asks.
+```
+
+- **`fn size(doc: &Document, page: PageRef) -> [f64; 2]`**
+  PageWidth and PageHeight in drawing units (inches; Visio's 8.5 x 11 in when missing)
+
+- **`fn scale(doc: &Document, page: PageRef) -> f64`**
+  paper inches per drawing inch: PageScale / DrawingScale (1 without a scale)
+
+- **`fn landscape(doc: &Document, page: PageRef) -> bool`**
+  whether the page lies landscape (wider than high)
+
+- **`fn set_orientation(tx: &mut Transaction, eng: &mut Engine, page: PageRef, landscape: bool) -> Result<bool, EditError>`**
+  Hochformat (landscape = false) / Querformat: width and height swapped when the page lies
+  the other way, PrintPageOrientation 1 or 2, then what depends on the page computed again
+  -> whether anything changed
+
+- **`fn set_paper_size(tx: &mut Transaction, eng: &mut Engine, page: PageRef, paper: [f64; 2]) -> Result<bool, EditError>`**
+  a size of the menu (paper inches, portrait or landscape alike): the page gets it in its
+  own orientation (DrawingSizeType 2, standard; the automatic size goes off) -> changed
+
+- **`fn auto_size(doc: &Document, page: PageRef) -> bool`**
+  whether the page grows and shrinks with its drawing (Automatisch anpassen): DrawingResizeType
+  1, or 0 with DrawingSizeType 0
+
+- **`fn set_auto_size(tx: &mut Transaction, page: PageRef, on: bool) -> Result<bool, EditError>`**
+  turn the automatic size on (DrawingResizeType 1) or off (2) -> changed
+
+- **`fn content(doc: &Document, page: PageRef) -> Option<[f64; 4]>`**
+  the box of the page's top-level shapes on the page (drawing units, y up; guides and deleted
+  shapes left out); None for a page without shapes
+
+- **`fn fit_to_drawing(tx: &mut Transaction, eng: &mut Engine, page: PageRef, margins: [f64; 4]) -> Result<bool, EditError>`**
+  the page around its drawing (Größe an Zeichnung anpassen): the box of its shapes and
+  `margins` (left, top, right, bottom; paper inches) around it, the shapes moved so that the
+  box starts at the left and bottom margin; DrawingSizeType 1 (fit page to drawing contents),
+  the automatic size off -> changed (false for a page without shapes)
+
+- **`struct Tiles`**
+  the tiles of the automatic size on paper (inches): the first tile, each further one
+  - `base: [f64; 2]` -- the first tile: the paper (over the print zoom)
+  - `step: [f64; 2]` -- each further tile: the paper less the margins (over the print zoom)
+
+**`impl Tiles`**
+
+- **`fn new(paper: [f64; 2], margins: [f64; 4], zoom: f64) -> Tiles`**
+  the tiles of a sheet of `paper` (width, height; inches, in the page's print
+  orientation) with `margins` (left, top, right, bottom) printed at `zoom` (1 = 100 %)
+
+- **`fn grow(tx: &mut Transaction, eng: &mut Engine, page: PageRef, tiles: &Tiles) -> Result<Option<[f64; 2]>, EditError>`**
+  the automatic size after a gesture (see the file header): the page gains or loses whole
+  tiles where its drawing juts out or left empty space, the drawing moves by what the page
+  grew or shrank at its left and bottom edge -> that move (drawing units) when the page
+  changed, None when it stays (the automatic size is off, it fits, a step is too small)
 
 ### `diagram_core/src/render/mod.rs`
 

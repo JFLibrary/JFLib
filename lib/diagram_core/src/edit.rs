@@ -648,6 +648,16 @@ impl<'d> Transaction<'d> {
     /// take every edit of the transaction back
     pub fn rollback(self) {}
 
+    /// the sheets the edits so far touch, as Change::sheets names them once committed (an app
+    /// that follows a gesture with more work in the same step asks which pages it changed)
+    pub fn sheets(&self) -> Vec<SheetRef> {
+        let mut set = BTreeSet::new();
+        for op in &self.ops {
+            op.sheets(&mut set);
+        }
+        set.into_iter().collect()
+    }
+
     pub(crate) fn run(&mut self, op: Op) -> Result<(), EditError> {
         match op.exec(self.doc) {
             Ok(inv) => {
@@ -1488,6 +1498,58 @@ impl<'d> Transaction<'d> {
             return Err(EditError::Invalid);
         }
         self.run(Op::PageTheme { page, theme })
+    }
+
+    /// add an empty page with the settings of page `like` (PG-03: Visio gives a new page the
+    /// properties of the active page -- size, scale, units, print setup, layout and routing,
+    /// background page, design): its page sheet without the Layer section (layers belong to a
+    /// page's shapes), the styles of its PageSheet element, its theme; a foreground page keeps
+    /// `like`'s background page, a background page gets none.  At `pos` in document order (None:
+    /// the end) with the next free page ID -> its handle
+    pub fn add_page_like(&mut self, like: PageRef, name: &str, name_u: &str, background: bool, pos: Option<usize>) -> Result<PageRef, EditError> {
+        let src = self.doc.page(like).ok_or(EditError::NoPage)?;
+        let mut sheet = src.sheet.clone();
+        sheet.sections.retain(|s| s.name != names::LAYER);
+        let back_page = if background { None } else { src.header.back_page.filter(|&id| self.doc.page_by_id(id).is_some()) };
+        let (sheet_styles, theme) = (src.header.sheet_styles, src.theme);
+        let (n, nu) = (self.intern(name), self.intern(name_u));
+        let len = self.doc.pages.len();
+        let (slot, id) = self.doc.pages.alloc().ok_or(EditError::NoIds)?;
+        let header = PageHeader { id, name: Some(n), name_u: Some(nu), background, back_page, sheet_styles, ..PageHeader::default() };
+        let page = Page { sheet, theme, ..Page::new(header) };
+        let pos = pos.unwrap_or(len).min(len) as u32;
+        self.run(Op::PageInsert { slot, pos, page: Box::new(page) })?;
+        Ok(PageRef(slot))
+    }
+
+    /// a copy of a page with its shapes, glue records and settings (PG-03 Duplizieren) at `pos`
+    /// in document order (None: right after the original, as Visio's Page.Duplicate puts it)
+    /// -> its handle.  The shapes keep their IDs (IDs count per page), so formulas that name
+    /// Sheet.N, the Connect entries and the Relationships of containers and lists stay inside
+    /// the copy; UniqueIDs are dropped (each names one shape of the document), the copy gets the
+    /// next free page ID, the names given (not marked as custom names) and a part of its own
+    /// when it is written.  Pages that use the original as their background keep it
+    pub fn duplicate_page(&mut self, page: PageRef, name: &str, name_u: &str, pos: Option<usize>) -> Result<PageRef, EditError> {
+        let mut copy = self.doc.page(page).ok_or(EditError::NoPage)?.clone();
+        let at = self.doc.page_position(page).ok_or(EditError::NoPage)? + 1;
+        let slots: Vec<u32> = copy.shapes.iter().collect();
+        for s in slots {
+            if let Some(d) = copy.shapes.data_mut(s) {
+                d.header.unique_id = None;
+            }
+        }
+        copy.part = None;
+        let (n, nu) = (self.intern(name), self.intern(name_u));
+        let len = self.doc.pages.len();
+        let (slot, id) = self.doc.pages.alloc().ok_or(EditError::NoIds)?;
+        copy.header.id = id;
+        copy.header.name = Some(n);
+        copy.header.name_u = Some(nu);
+        copy.header.is_custom_name = None;
+        copy.header.is_custom_name_u = None;
+        let pos = pos.unwrap_or(at).min(len) as u32;
+        self.run(Op::PageInsert { slot, pos, page: Box::new(copy) })?;
+        Ok(PageRef(slot))
     }
 
     // ---- masters

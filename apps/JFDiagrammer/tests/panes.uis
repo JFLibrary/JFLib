@@ -62,7 +62,7 @@ expect tab:"Drucken einrichten" selected
 key esc
 expect dialog:"Seite einrichten" missing
 rclick tab:"Seite-1"
-expect "Seite umbenennen" disabled
+expect "Seite umbenennen" enabled
 key esc
 # (JD9) the stencil's menu on its title: closing works, saving only for own stencils
 click button:"Weitere Shapes"

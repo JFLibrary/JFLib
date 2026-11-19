@@ -46,6 +46,10 @@
 //                     Format, Shapes verbinden, the Verbindungspfeile
 //   src/structures_cff.rs   (JD10) the register Funktionsübergreifendes Flussdiagramm
 //   src/layout_ui.rs  (JD10) Layout-Verhalten per shape, Seite einrichten › Layout und Routing
+//   src/pages.rs      (JD8 rest) the page tabs kept in step with the pages, Neue Seite,
+//                     Hintergrundseite, duplicate, delete, rename, reorder (dialogs)
+//   src/page_size.rs  (JD8 rest) Entwurf › Ausrichtung, Größe, Automatisch anpassen, the
+//                     automatic size after a gesture (diagram_core::pagesetup)
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too)
@@ -96,6 +100,8 @@ mod icons;
 mod lang;
 mod layout_ui;
 mod options;
+mod page_size;
+mod pages;
 mod panes;
 mod print_layout;
 mod print_ui;
@@ -204,6 +210,8 @@ pub(crate) struct Diagrammer {
     /// dialog and register
     pub structs: structures::Structs,
     pub layout: layout_ui::LayoutState,
+    /// (JD8 rest) the dialogs Seite umbenennen, Seiten neu anordnen
+    pub pages: pages::PagesState,
 }
 
 impl Diagrammer {
@@ -253,6 +261,7 @@ impl Diagrammer {
             quick: format_quick::QuickTiles::default(),
             structs: structures::Structs::default(),
             layout: layout_ui::LayoutState::default(),
+            pages: pages::PagesState::default(),
         }
     }
 
@@ -382,6 +391,8 @@ impl App for Diagrammer {
         if let Some((key, ch, fresh)) = self.text_req.take() {
             edit_text::begin_with(self, ui, key, ch, fresh);
         }
+        // (JD8 rest) the page tabs follow the pages (also after undo and redo)
+        pages::sync(self);
         commands::states(self, ui);
         stencils_panel::states(self, ui);
         shell::frame(self, ui);
@@ -391,6 +402,7 @@ impl App for Diagrammer {
         export_ui::dialogs(self, ui);
         print_ui::dialogs(self, ui);
         layout_ui::dialog(self, ui);
+        pages::dialogs(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

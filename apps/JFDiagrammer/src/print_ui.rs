@@ -769,7 +769,8 @@ fn apply(app: &mut Diagrammer, ui: &mut Ui, e: &PageEdit) {
             tx.set_length(sheet, &dscale, to_unit(1.0 / r), unit)?;
         }
         if rename {
-            tx.rename_page(page, e.name.trim(), e.name.trim())?;
+            // (JD8 rest: pages) Name and NameU, marked as own names (pages.rs)
+            crate::pages::set_name(tx, page, e.name.trim())?;
         }
         if want_bg != old_bg {
             tx.set_background(page, want_bg)?;

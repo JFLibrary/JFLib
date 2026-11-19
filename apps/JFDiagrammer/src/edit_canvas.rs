@@ -357,7 +357,10 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
     let paint = crate::viewer::paint(app, k);
     let nodes: Vec<DNode> = crate::viewer::sheet_node(app, k).into_iter().collect();
     let ver = app.opened.as_ref().map_or(0, |o| crate::viewer::canvas_ver(o.serial, k, o.ed.rev));
-    let dm = DModel { nodes: &nodes, ports: &[], edges: &[], wps: &[], ver: app.opened.as_ref().map_or(0, |o| o.serial.wrapping_mul(4096).wrapping_add(k as u32 + 1)) };
+    // (JD8 rest: pages) the page's size in the version: ui.diagram fits and scrolls by the node's
+    // box, which it takes anew only when the version changes (orientation, size, automatic size)
+    let size_key = nodes.first().map_or(0, |n| (n.rect[2].to_bits() ^ n.rect[3].to_bits().rotate_left(13)).wrapping_mul(0x9E37_79B9));
+    let dm = DModel { nodes: &nodes, ports: &[], edges: &[], wps: &[], ver: app.opened.as_ref().map_or(0, |o| o.serial.wrapping_mul(4096).wrapping_add(k as u32 + 1)) ^ size_key };
     let paint: Option<Rc<dyn DgPaint>> = paint.map(|p| p as Rc<dyn DgPaint>);
     ui.next_size(-1, -1);
     ui.diagram(id, &mut app.canvas, &dm, DG_EDIT, paint, ver);

@@ -122,10 +122,14 @@ pub(crate) fn center(app: &mut Diagrammer, ui: &mut Ui) {
     let names: alloc::vec::Vec<&str> = names.iter().map(|s| s.as_str()).collect();
     let before = app.page_tab;
     ui.next_size(-1, 26);
-    ui.tabs_scrolling(ID_PAGES, &mut app.page_tab, &names);
+    let ev = ui.tabs_scrolling(ID_PAGES, &mut app.page_tab, &names);
     if app.page_tab != before {
         app.canvas.request_fit();
         app.fit_again = true;
+    }
+    // (JD8 rest: pages) a double click on a tab renames its page (ZF-14)
+    if ev & EV_DOUBLE != 0 && commands::usable(app, PAGE_RENAME) {
+        crate::pages::open_rename(app, ui);
     }
     // the page tab's menu: the menu key on the strip, a right click on a tab (the strip's
     // record is the last widget, its tabs lie above it)
@@ -163,10 +167,16 @@ pub(crate) fn page_names(app: &Diagrammer) -> alloc::vec::Vec<alloc::string::Str
     }
 }
 
-// the pages as menu items (the page shown checked); a click shows that page
+// the pages as menu items (the page shown checked), the background pages after a line; a click
+// shows that page
 fn pages_list(app: &mut Diagrammer, ui: &mut Ui, id0: u32) {
     let names = page_names(app);
+    // (JD8 rest: pages) where the background pages begin
+    let first_bg = app.opened.as_ref().and_then(|o| o.tabs.iter().position(|t| o.doc.page(t.page).is_some_and(|p| p.header.background)));
     for (k, n) in names.iter().enumerate() {
+        if Some(k) == first_bg && k > 0 {
+            ui.menu_sep();
+        }
         ui.next_flags(if k == app.page_index() { ST_CHECKED } else { 0 });
         if ui.menu_item(id0 + k as u32, n) & EV_ACT != 0 && k != app.page_index() {
             app.page_tab = k as i32;

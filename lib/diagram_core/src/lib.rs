@@ -41,6 +41,10 @@
 //
 //   structure::*                  (JD10) containers, lists, callouts: membership in the
 //                                 Relationships cell, automatic size, list order and layout
+//   pagesetup::*                  (JD8) a page's size against its drawing and its paper:
+//                                 orientation, sizes, fit to the drawing, automatic size in
+//                                 tiles of the printed sheet; Transaction::add_page_like and
+//                                 duplicate_page insert pages with settings or content
 //
 // What is to come here, by stage of the plan: page layout (CN-13, P2)
 //
@@ -65,6 +69,7 @@ pub mod instance;
 mod names;
 pub mod ops;
 mod page;
+pub mod pagesetup;
 pub mod render;
 pub mod route;
 mod shape;

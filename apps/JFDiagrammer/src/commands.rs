@@ -307,6 +307,16 @@ commands! {
     STENCIL_OPEN = 0x170A, "Schablone öffnen...", 0, 0;
     STENCIL_NEW_METRIC = 0x170B, "Neue Schablone (metrisch)", 0, 0;
     STENCIL_NEW_US = 0x170C, "Neue Schablone (US-Einheiten)", 0, 0;
+    // (JD8 rest: pages) Entwurf › Größe: the paper sizes (page_size.rs)
+    SIZE_LETTER = 0x1800, "Letter", 0, 0;
+    SIZE_LEGAL = 0x1801, "Legal", 0, 0;
+    SIZE_TABLOID = 0x1802, "Tabloid", 0, 0;
+    SIZE_EXECUTIVE = 0x1803, "Executive", 0, 0;
+    SIZE_A5 = 0x1804, "A5", 0, 0;
+    SIZE_A4 = 0x1805, "A4", 0, 0;
+    SIZE_A3 = 0x1806, "A3", 0, 0;
+    SIZE_B5 = 0x1807, "B5 (JIS)", 0, 0;
+    SIZE_B4 = 0x1808, "B4 (JIS)", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -441,6 +451,30 @@ static HANDLERS: &[(u32, Handler)] = &[
     (TEXT_JUSTIFY, |a, ui| crate::format_menus::halign(a, ui, 3)),
     (FORMAT_PAINTER, crate::format_menus::painter),
     (THEME_NEW_SHAPES, crate::design_gallery::toggle_new_shapes),
+    // (JD8 rest: pages) pages and Seite einrichten (pages.rs, page_size.rs)
+    (NEW_PAGE, |a, ui| crate::pages::new_page(a, ui, NEW_PAGE)),
+    (PAGE_BLANK, |a, ui| crate::pages::new_page(a, ui, PAGE_BLANK)),
+    (PAGE_INSERT, |a, ui| crate::pages::new_page(a, ui, PAGE_INSERT)),
+    (PAGE_BACKGROUND, crate::pages::background_page),
+    (PAGE_DUPLICATE, crate::pages::duplicate),
+    (PAGE_DELETE, crate::pages::delete),
+    (PAGE_RENAME, crate::pages::open_rename),
+    (PAGE_REORDER, crate::pages::open_reorder),
+    (PORTRAIT, |a, ui| crate::page_size::orientation(a, ui, false)),
+    (LANDSCAPE, |a, ui| crate::page_size::orientation(a, ui, true)),
+    (FIT_DRAWING, crate::page_size::fit_drawing),
+    (MORE_SIZES, |a, ui| crate::print_ui::open_setup(a, ui, 1)),
+    (AUTO_SIZE, crate::page_size::auto_size),
+    (DRAWING_SCALE, |a, ui| crate::print_ui::open_setup(a, ui, 2)),
+    (SIZE_LETTER, |a, ui| crate::page_size::size(a, ui, SIZE_LETTER)),
+    (SIZE_LEGAL, |a, ui| crate::page_size::size(a, ui, SIZE_LEGAL)),
+    (SIZE_TABLOID, |a, ui| crate::page_size::size(a, ui, SIZE_TABLOID)),
+    (SIZE_EXECUTIVE, |a, ui| crate::page_size::size(a, ui, SIZE_EXECUTIVE)),
+    (SIZE_A5, |a, ui| crate::page_size::size(a, ui, SIZE_A5)),
+    (SIZE_A4, |a, ui| crate::page_size::size(a, ui, SIZE_A4)),
+    (SIZE_A3, |a, ui| crate::page_size::size(a, ui, SIZE_A3)),
+    (SIZE_B5, |a, ui| crate::page_size::size(a, ui, SIZE_B5)),
+    (SIZE_B4, |a, ui| crate::page_size::size(a, ui, SIZE_B4)),
 ];
 
 // toggles: whether the command is on
@@ -483,6 +517,19 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (TEXT_JUSTIFY, |a| a.format.halign_now == Some(3)),
     (FORMAT_PAINTER, |a| a.format.painter.is_some()),
     (THEME_NEW_SHAPES, crate::design_gallery::new_shapes),
+    // (JD8 rest: pages) the orientation, the size and the automatic size of the page shown
+    (PORTRAIT, |a| crate::page_size::checked(a, PORTRAIT)),
+    (LANDSCAPE, |a| crate::page_size::checked(a, LANDSCAPE)),
+    (AUTO_SIZE, |a| crate::page_size::checked(a, AUTO_SIZE)),
+    (SIZE_LETTER, |a| crate::page_size::checked(a, SIZE_LETTER)),
+    (SIZE_LEGAL, |a| crate::page_size::checked(a, SIZE_LEGAL)),
+    (SIZE_TABLOID, |a| crate::page_size::checked(a, SIZE_TABLOID)),
+    (SIZE_EXECUTIVE, |a| crate::page_size::checked(a, SIZE_EXECUTIVE)),
+    (SIZE_A5, |a| crate::page_size::checked(a, SIZE_A5)),
+    (SIZE_A4, |a| crate::page_size::checked(a, SIZE_A4)),
+    (SIZE_A3, |a| crate::page_size::checked(a, SIZE_A3)),
+    (SIZE_B5, |a| crate::page_size::checked(a, SIZE_B5)),
+    (SIZE_B4, |a| crate::page_size::checked(a, SIZE_B4)),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -498,6 +545,8 @@ pub(crate) fn enabled(id: u32) -> bool {
 /// (JD7) the command exists and can run now (a selection, something to undo ...)
 pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
     enabled(id) && crate::edit_cmds::available(app, id) && crate::format_menus::available(app, id)
+        // (JD8 rest: pages)
+        && crate::pages::available(app, id) && crate::page_size::available(app, id)
 }
 
 /// the toggle is on
