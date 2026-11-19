@@ -39,6 +39,21 @@ world.contacts(&figure, &Iso::at(eye), 0.0, &Filter::ALL, &mut contacts);
 ```
 
 `physics::query` has the same queries for one shape against one placed shape, without a world.
+
+A figure of a game moves with the kinematic character controller: an upright capsule that walks,
+runs, jumps and crouches, takes steps and ramps up to a slope limit, slides along walls and into
+corners and stays on the ground on the way down ramps and stairs. One step is a function of the
+state, the input, the world and the tick's length, with the same bits on every platform:
+
+```rust
+use jflib::physics::{CharacterController, CharacterInput, CharacterParams, CharacterState};
+
+let controller = CharacterController::new(CharacterParams::default()); // tuned for a fast arena shooter
+let mut figure = CharacterState::new(Vec3::new(10.0, 2.0, 10.0)); // its feet
+let input = CharacterInput { wish: Vec3::new(0.0, 0.0, -1.0), run: true, jump: false, crouch: false };
+let (next, events) = controller.step(&figure, &world, &Filter::ALL, &input, 1.0 / 60.0);
+figure = next; // events.landed, events.jumped, events.walls(), ...
+```
 Positions are `f64` (large worlds need no shifting of the origin for the physics); a mesh keeps its
 vertices in `f32` in its own frame, as a render3d mesh does.
 
@@ -50,7 +65,8 @@ multiply-add), `sin`, `cos` and `atan2` from JFLib's own portable math, no unord
 no threads; every iteration has a fixed limit and every choice a tie-break. A first hit is the
 smallest (time, body, triangle), so the answer does not depend on the shape of the trees. The test
 program prints one checksum over the bits of all results of a fixed set of scenarios; it is the
-same on Windows, Linux, macOS, in the browser and on Android.
+same on Windows, Linux, macOS, in the browser and on Android, and so is a second one over figures
+moved by the character controller.
 
 ## How it works
 
@@ -60,7 +76,9 @@ a nanometre of contact), watertight ray/triangle tests, quickhull for the convex
 tree with 32-byte nodes for the meshes, dynamic AABB trees for the bodies (one for the meshes that stand still, one
 for the other bodies that stand still, one for those that move). Triangle meshes
 know their active edges: a shape that slides over the seam between two triangles of a flat or concave
-surface is not stopped by the edge ("ghost collisions").
+surface is not stopped by the edge ("ghost collisions"). The character controller slides with Quake 3's
+clip planes (no jitter in corners), steps up, forward and down, and lets the edge of a walkable surface
+carry the capsule.
 
 ## How to get it
 
