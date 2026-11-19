@@ -20,8 +20,8 @@
 //   build/win/coretest.exe [--only NAME] [--bench] [--vectors FILE]  (FILE: tools/crypto_check.py)
 //   (build_rs.py test runs it through tests/all.uis; --script is ignored)
 //   Android (docs/ANDROID.md, AN0): a program without a UI, python tools/android_console.py coretest;
-//   the groups and parts that need what plat lacks there so far (fs, net, sync, threads: AN1 to
-//   AN3) say "not on Android yet" instead
+//   the groups and parts that need what plat lacks there so far (fs, net: AN2, AN3) say "not on
+//   Android yet" instead
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -46,7 +46,6 @@ mod lz;
 mod metricst;
 mod netpktt;
 mod ntpt;
-#[cfg(not(target_os = "android"))]
 mod platx;
 mod rngt;
 #[cfg(not(target_os = "android"))]
@@ -79,8 +78,8 @@ mod patternt;
 mod eapt;
 mod imapt;
 
-/// a group that needs what plat lacks on Android so far: fs, net, sync, threads (docs/ANDROID.md,
-/// AN1 to AN3) -> (name, None) there
+/// a group that needs what plat lacks on Android so far: fs, net (docs/ANDROID.md, AN2, AN3) ->
+/// (name, None) there
 #[cfg(not(target_os = "android"))]
 macro_rules! native {
     ($name:literal, $f:path) => {
@@ -157,7 +156,7 @@ fn run() -> i32 {
         ("datetime", Some(dt::run)),
         ("crypto", Some(crypto::run)),
         ("compress", Some(lz::run)),
-        native!("plat", platx::run),
+        ("plat", Some(platx::run)), // (Android: sync and rand, AN1)
         native!("datastore", store::run),
         native!("http", httpt::run),
         native!("cas", cast::run),

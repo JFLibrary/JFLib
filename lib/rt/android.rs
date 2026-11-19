@@ -1,7 +1,59 @@
 // Android runtime: Bionic allocation and logging for the native, host-driven UI.
 // New platform adapter; no assembly reference. Allocation never assumes a page size.
+// The kernel calls plat makes the Linux way (futex, eventfd; docs/ANDROID.md decision 2) go through
+// syscall6 / syscall3 / poll with the numbers of rt::kernel, as on Linux; threads, allocation and
+// signals stay Bionic's.
 
 use core::{alloc::{GlobalAlloc, Layout}, ffi::{c_int, c_void}, sync::atomic::{AtomicBool, Ordering}};
+
+pub use crate::kernel::*;
+
+/// # Safety
+/// Raw system call: the arguments must be valid for the call.  Only calls Zygote's seccomp filter
+/// lets an app make (docs/ANDROID.md, AN0's table): any other ends the process with SIGSYS.
+#[cfg(target_arch = "x86_64")]
+#[inline]
+pub unsafe fn syscall6(n: usize, a: usize, b: usize, c: usize, d: usize, e: usize, f: usize) -> isize {
+    let r: isize;
+    unsafe {
+        core::arch::asm!("syscall", inlateout("rax") n as isize => r, in("rdi") a, in("rsi") b, in("rdx") c,
+                         in("r10") d, in("r8") e, in("r9") f, lateout("rcx") _, lateout("r11") _, options(nostack));
+    }
+    r
+}
+
+/// # Safety
+/// As above.  ARM64: the number in x8, the result in x0; the kernel keeps every other register.
+#[cfg(target_arch = "aarch64")]
+#[inline]
+pub unsafe fn syscall6(n: usize, a: usize, b: usize, c: usize, d: usize, e: usize, f: usize) -> isize {
+    let r: isize;
+    unsafe {
+        core::arch::asm!("svc 0", in("x8") n, inlateout("x0") a as isize => r, in("x1") b, in("x2") c,
+                         in("x3") d, in("x4") e, in("x5") f, options(nostack));
+    }
+    r
+}
+
+/// # Safety
+/// See syscall6.
+#[inline]
+pub unsafe fn syscall3(n: usize, a: usize, b: usize, c: usize) -> isize {
+    unsafe { syscall6(n, a, b, c, 0, 0, 0) }
+}
+
+/// poll with the timeout in milliseconds (negative: none), by ppoll (ARM64 has no poll)
+///
+/// # Safety
+/// fds must point to n struct pollfd.
+#[inline]
+pub unsafe fn poll(fds: usize, n: usize, ms: i32) -> isize {
+    // ppoll writes the time left back
+    let mut ts = [(ms / 1000) as i64, (ms % 1000) as i64 * 1_000_000];
+    let timeout = if ms < 0 { 0 } else { ts.as_mut_ptr() as usize };
+    // SAFETY: fds as the caller promises, ts lives during the call; no signal mask.
+    unsafe { syscall6(SYS_PPOLL, fds, n, timeout, 0, 8, 0) }
+}
 
 #[link(name = "c")]
 unsafe extern "C" {

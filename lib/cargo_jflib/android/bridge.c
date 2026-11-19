@@ -3,14 +3,19 @@
  * Rust asks Java synchronously through jfgui_host_call (GalleryHost.call: the ContentResolver,
  * the clipboard, the secret store; lib/plat/android_host.rs) and starts the system's picker through
  * jfgui_host_request (GalleryHost.request), whose answer comes back in GalleryHost.nativeResult.
+ * The app's other threads wake the UI thread through an eventfd (jfgui_wake_fd, lib/plat/android_thread.rs)
+ * that the UI thread's looper watches: its callback asks GalleryActivity for a frame, whose tick
+ * delivers the wake-up (docs/ANDROID.md, decision 4).
  */
 #include <jni.h>
 #include <android/bitmap.h>
+#include <android/looper.h>
 #include <android/native_window_jni.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 extern uintptr_t jfgui_buffer(uint32_t length);
 extern int32_t jfgui_start(int32_t width, int32_t height, int32_t dpi, uint32_t args_len);
@@ -38,6 +43,7 @@ extern uint32_t jfgui_gpu_surface(uintptr_t window);
 extern uint64_t jfgui_present_frames(void);
 extern uint32_t jfgui_gpu_test(uint32_t op);
 extern uintptr_t jfgui_response(void);
+extern int32_t jfgui_wake_fd(void);
 
 static JNIEnv *target_env;
 static jobject target_bitmap;
@@ -49,12 +55,25 @@ static uint64_t epoch_ms;
 static JavaVM *java_vm;
 static jclass host_class;
 static jmethodID host_call, host_request;
+/* GalleryActivity.frameNow(): a frame from the Choreographer (the wake-up's callback) */
+static jclass activity_class;
+static jmethodID activity_frame;
 
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     (void)reserved;
     JNIEnv *env;
     java_vm = vm;
     if ((*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6) != JNI_OK) return JNI_ERR;
+    jclass activity = (*env)->FindClass(env, "org/jflib/gallery/GalleryActivity");
+    if (activity) {
+        activity_frame = (*env)->GetStaticMethodID(env, activity, "frameNow", "()V");
+        if (activity_frame) activity_class = (jclass)(*env)->NewGlobalRef(env, activity);
+        (*env)->DeleteLocalRef(env, activity);
+    }
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionClear(env);
+        activity_class = NULL;
+    }
     /* FindClass in JNI_OnLoad sees the app's classes (the loader of System.loadLibrary's caller) */
     jclass found = (*env)->FindClass(env, "org/jflib/gallery/GalleryHost");
     if (!found) {
@@ -103,6 +122,27 @@ int32_t jfgui_host_call(uint32_t kind, const uint8_t *bytes, size_t length) {
     (*env)->DeleteLocalRef(env, out);
     if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionClear(env); return -1; }
     return (int32_t)n;
+}
+
+/* The looper of the UI thread saw the wake-up's eventfd readable: empty it and ask for a frame (its tick
+ * turns the wake-up into E_WAKE).  Nothing read: a tick took it already.  1 = keep watching. */
+static int wake_ready(int fd, int events, void *data) {
+    (void)data;
+    uint64_t count;
+    if (read(fd, &count, sizeof count) == (ssize_t)sizeof count && activity_class) {
+        JNIEnv *env;
+        if (java_vm && (*java_vm)->GetEnv(java_vm, (void **)&env, JNI_VERSION_1_6) == JNI_OK) {
+            (*env)->CallStaticVoidMethod(env, activity_class, activity_frame);
+            if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+        }
+    }
+    return (events & (ALOOPER_EVENT_ERROR | ALOOPER_EVENT_HANGUP)) ? 0 : 1;
+}
+/* once, on the UI thread after the start: its looper watches the wake-up */
+static void wake_watch(void) {
+    ALooper *looper = ALooper_forThread();
+    int fd = jfgui_wake_fd();
+    if (looper && fd >= 0) (void)ALooper_addFd(looper, fd, ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT, wake_ready, NULL);
 }
 
 double jfgui_host_time_us(void) {
@@ -194,6 +234,7 @@ JNIEXPORT jint JNICALL Java_org_jflib_gallery_GalleryActivity_nativeRender(
         (void)jfgui_buffer(0);
         result = jfgui_start((int32_t)target_info.width, (int32_t)target_info.height, dpi, 0);
         started = result == 0;
+        if (started) wake_watch();
         if (started && a11y_wanted >= 0) (void)jfgui_a11y((uint32_t)a11y_wanted);
     } else {
         if (last_dpi != dpi) jfgui_event(9, 0, 0, 0, 0, 0, (uint32_t)dpi);

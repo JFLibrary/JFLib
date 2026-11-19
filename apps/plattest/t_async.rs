@@ -90,7 +90,6 @@ fn returns_within(ms: u64, f: impl FnOnce() -> bool + Send + 'static) -> Option<
 }
 
 // a value that holds a sender of the channel it travels in
-#[cfg(not(target_os = "android"))]
 struct Carried(#[allow(dead_code)] plat::sync::Sender<Carried>);
 
 // cancels its token when dropped
@@ -124,12 +123,6 @@ fn noop_waker() -> core::task::Waker {
     core::task::Waker::from(Arc::new(Noop))
 }
 
-#[cfg(target_os = "android")]
-fn drops(t: &mut T) {
-    t.later("async: drops (plat::sync's channels)");
-}
-
-#[cfg(not(target_os = "android"))]
 fn drops(t: &mut T) {
     // the receiver goes while a sender of the same channel waits in its queue: the queued value
     // (and the sender in it) is dropped after the lock is released

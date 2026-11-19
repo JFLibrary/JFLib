@@ -38,7 +38,7 @@
 // E_WAKE.  Timers live in one list with the thread that registered them; each executor fires
 // its own.  Blocking jobs run on up to BLOCKING_MAX threads of their own (not the compute pool:
 // a job waiting for a disk must not starve parallel_for); where no thread can start (the
-// browser without shared memory, Android) the executors run them inline, one per run.  A panic
+// browser without shared memory) the executors run them inline, one per run.  A panic
 // in a task or job ends the process like any panic (rt's handler: crash hook, exit code 3), with
 // jflib's feature unwind too unless the task's own code catches it (rt::abort_on_unwind).
 
@@ -64,13 +64,13 @@ pub const BLOCKING_MAX: u32 = 8;
 pub const PROGRESS_WAKE_MS: u64 = 30;
 const BLOCKING_STACK: usize = 512 * 1024;
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 fn tid() -> u64 {
     crate::plat_tid()
 }
 
 // no thread ids: every wake-up counts as local, and the owner is told (the browser's workers)
-#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android")))]
 fn tid() -> u64 {
     0
 }
@@ -702,6 +702,9 @@ fn submit(job: BJob) {
 }
 
 fn blocking_worker(sem: Arc<crate::Sem>) {
+    // Android: below the UI thread (docs/ANDROID.md AN1), as the pool's workers
+    #[cfg(target_os = "android")]
+    crate::thread_background();
     loop {
         let job = {
             let mut g = BPOOL.lock();
