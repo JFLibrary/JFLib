@@ -81,3 +81,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   - the same sources give the same bytes; no panic, bounded counts, no recursion
 
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+
+### Changed
+
+- (JD11) New documents are themed: a style "Theme" (ID 5) with THEMEVAL() cells, "Normal" based on it, "Connector" on the connector scheme's style 1, "Text Only" with the dark font style 1 and Visio's text contrast rule; the page shows the design NetLab, variant 1 (its theme part now carries Visio's extensions); the root style holds the NetLab look without a design
+

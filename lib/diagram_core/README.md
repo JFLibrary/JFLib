@@ -39,6 +39,10 @@ viewer draws are there; glue, connector routing and layout follow.
   recalculation that follows the cells a formula really read. Inherited formulas run in the
   inheriting shape; results go into the same transaction as the edit that caused them. Opening
   a file computes nothing, and a formula the engine cannot compute keeps its stored value.
+- **Designs** (`design`): a theme as typed data -- the DrawingML theme with Visio's extensions
+  (variants, connector scheme, line ends, font styles) -- written as a theme part, JFLib's own
+  designs (NetLab, Contour, Contrast, four variants each), and applying a design or variant to a
+  page or the document in one undoable step; themed cells follow by recalculation.
 
 ```rust
 use jflib::diagram_core::{CellAddr, Document, SheetRef, Unit};

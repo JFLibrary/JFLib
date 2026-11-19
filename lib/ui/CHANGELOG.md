@@ -63,6 +63,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - (JD7) `DgPaint::damage(from, to)`: the world rectangle an edit changed between two content versions; ui.diagram then paints only that part of its backing store again (one shape edited in a large drawing). `DiagramState::grid_lines`: false keeps the grid for snapping without drawing it (Visio's hidden grid)
 - `Mi::List` rows take the state of their id like a command: `cmd_state(base + k, CF_CHECKED | CF_DISABLED)` shows row k checked or disabled (in the window's menus and in macOS' system menu), e.g. the open stencils in JFDiagrammer's "Weitere Shapes"; before, list rows were always plain
 - `SE_PLACE`, a tool of `ui.shape_edit` for placing what the app holds (a shape from a stencil, click + click): a click anywhere, on a shape too, reports `SeEv::Draw { tool: SE_PLACE, a, b: a }` at the snapped point; no handles, a drag places nothing
+- (JD11) `ui.color_menu(id, &ColorMenu)` -> `Option<(ColorPick, rgb)>`: the swatches of an Office colour menu (design colours with five shades each, variant colours, fixed colours, last used; the current one marked) and `color_shades(rgb)`; `ui.ribbon_image_tile(id, label, &surface, ver)`: a gallery tile with a picture the app made
 
 ### Changed
 
