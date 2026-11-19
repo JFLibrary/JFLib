@@ -53,3 +53,17 @@ expect button:"NetLab" unchecked
 expect button:"Variante 1" disabled
 key ctrl+z
 expect button:"Kontrast" checked
+# Design auf neue Shapes anwenden off: a box drawn now keeps no design (the plain look of the
+# root style beside the Kontrast box)
+click button:"Alle Designs"
+expect "Design auf neue Shapes anwenden" checked
+click "Design auf neue Shapes anwenden"
+move 700,600
+cmd 4404
+drag 700,330 840,420
+cmd 4400
+click 900,600
+expect same apps/JFDiagrammer/tests/golden/design_new_shapes.png 470 300 400 150
+click button:"Alle Designs"
+expect "Design auf neue Shapes anwenden" unchecked
+click "Design auf neue Shapes anwenden"

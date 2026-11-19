@@ -395,6 +395,7 @@ static HANDLERS: &[(u32, Handler)] = &[
     (TEXT_RIGHT, |a, ui| crate::format_menus::halign(a, ui, 2)),
     (TEXT_JUSTIFY, |a, ui| crate::format_menus::halign(a, ui, 3)),
     (FORMAT_PAINTER, crate::format_menus::painter),
+    (THEME_NEW_SHAPES, crate::design_gallery::toggle_new_shapes),
 ];
 
 // toggles: whether the command is on
@@ -436,6 +437,7 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (TEXT_RIGHT, |a| a.format.halign_now == Some(2)),
     (TEXT_JUSTIFY, |a| a.format.halign_now == Some(3)),
     (FORMAT_PAINTER, |a| a.format.painter.is_some()),
+    (THEME_NEW_SHAPES, crate::design_gallery::new_shapes),
 ];
 
 /// the handler of a command (None: not available yet)

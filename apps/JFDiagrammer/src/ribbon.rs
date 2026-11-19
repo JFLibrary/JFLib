@@ -136,7 +136,8 @@ static CONTAINER_MENU: [It; 0] = [];
 static TEXTBOX_MENU: [It; 2] = [C(TEXT_BOX_H), C(TEXT_BOX_V)];
 static ORIENT_MENU: [It; 2] = [C(PORTRAIT), C(LANDSCAPE)];
 static SIZE_MENU: [It; 3] = [C(FIT_DRAWING), Sep, C(MORE_SIZES)];
-static THEME_MENU: [It; 1] = [C(THEME_NEW_SHAPES)];
+// (JD11) the variants' own menus (TH-05: new colours, effects, connectors, fonts, embellishment) are P2
+static THEME_MENU: [It; 0] = [];
 static CONN_MENU: [It; 6] = [C(CONN_RIGHT_ANGLE), C(CONN_STRAIGHT), C(CONN_CURVED), Sep, C(LINE_JUMPS), C(REROUTE)];
 static PANES_MENU: [It; 5] = [C(PANE_SHAPES), C(PANE_DATA), C(PANE_SIZEPOS), C(PANE_PANZOOM), C(PANE_FORMAT)];
 static MARGIN_MENU: [It; 0] = [];

@@ -260,7 +260,7 @@ pub(crate) fn no_design(app: &mut Diagrammer, ui: &mut Ui, all: bool) {
 // a tile's events: the live preview while it is under the pointer, applied on a click, its
 // menu on a right click; -> whether it was clicked
 fn tile_events(app: &mut Diagrammer, ui: &mut Ui, tile: u32, ev: u32, e: &Entry, variant: Option<u32>) {
-    if ev & EV_HOVER != 0 && ui.popup_count() == 0 {
+    if ev & EV_HOVER != 0 && ui.popup_count() == 0 && app.opts.get(&crate::options::LIVE) {
         app.designs.hovered = true;
         if app.designs.preview != Some(tile) {
             if app.designs.preview.is_none() {
@@ -362,6 +362,12 @@ fn all_designs(app: &mut Diagrammer, ui: &mut Ui, list: &[Entry], cur: Option<u3
         no_design(app, ui, true);
         ui.popup_close();
     }
+    ui.next_flags(if new_shapes(app) { ST_CHECKED } else { 0 });
+    if ui.menu_item(ID_ALL + 0x103, crate::commands::label(crate::commands::THEME_NEW_SHAPES)) & EV_ACT != 0 {
+        toggle_new_shapes(app, ui);
+        ui.popup_close();
+    }
+    ui.menu_sep();
     ui.next_flags(if app.opened.is_some() && cur.is_some() { 0 } else { ST_DISABLED });
     if ui.menu_item(ID_ALL + 0x101, t("Aktuelles Design speichern ...")) & EV_ACT != 0 {
         crate::design_store::ask_save(app, ui);
@@ -440,8 +446,48 @@ fn file_entry(app: &Diagrammer, id: u32) -> Option<Entry> {
     Some(Entry { id, name: String::new(), part: Rc::new(data), kind: Kind::File })
 }
 
+// ---------------------------------------------------------------- Design auf neue Shapes anwenden
+
+/// the option (an application setting, as Visio's ApplyThemesOnShapeAdd): new shapes get the
+/// page's design
+pub(crate) fn new_shapes(app: &Diagrammer) -> bool {
+    app.opts.ini().get("design", "new_shapes") != Some("0")
+}
+
+/// the command: the option on or off
+pub(crate) fn toggle_new_shapes(app: &mut Diagrammer, _ui: &mut Ui) {
+    let v = if new_shapes(app) { "0" } else { "1" };
+    app.opts.ini_mut().set("design", "new_shapes", v);
+    app.opts.save();
+}
+
+/// every shape of the pages (to see which an edit adds)
+pub(crate) fn shapes_now(doc: &Document) -> Vec<ShapeRef> {
+    doc.pages().flat_map(|p| doc.all_shapes(Owner::Page(p)).collect::<Vec<_>>()).collect()
+}
+
+/// the shapes an edit added (not in `before`) get no design: their theme index cells 0
+pub(crate) fn unthemed_new(tx: &mut Transaction, eng: &mut Engine, before: &[ShapeRef]) -> Result<(), diagram_core::EditError> {
+    let added: Vec<ShapeRef> = shapes_now(tx.doc()).into_iter().filter(|s| !before.contains(s)).collect();
+    if added.is_empty() {
+        return Ok(());
+    }
+    for &s in &added {
+        for n in apply::INDEX_CELLS {
+            set_num(tx, SheetRef::Shape(s), n, 0.0)?;
+        }
+    }
+    let sheets: Vec<SheetRef> = added.into_iter().map(SheetRef::Shape).collect();
+    eng.recalc(tx, &sheets)?;
+    Ok(())
+}
+
 /// after the ribbon, every pass: a preview whose tile is no longer under the pointer goes
 pub(crate) fn after(app: &mut Diagrammer, ui: &mut Ui) {
+    let on = new_shapes(app);
+    if let Some(o) = app.opened.as_mut() {
+        o.ed.theme_new_shapes = on;
+    }
     if !app.designs.hovered && app.designs.preview.take().is_some() {
         if let Some(o) = app.opened.as_mut() {
             crate::edit_doc::cancel(o);

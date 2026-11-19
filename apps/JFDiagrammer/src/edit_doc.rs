@@ -72,6 +72,8 @@ pub(crate) struct EditState {
     pub changed: Vec<SheetRef>,
     /// the page views must be built anew (shapes added, removed, reordered; undo)
     pub rebuild: bool,
+    /// (JD11) Design auf neue Shapes anwenden: off, shapes an edit adds get no design
+    pub theme_new_shapes: bool,
 }
 
 impl EditState {
@@ -88,6 +90,7 @@ impl EditState {
             rev: 0,
             changed: Vec::new(),
             rebuild: false,
+            theme_new_shapes: true,
         }
     }
 
@@ -102,8 +105,14 @@ impl EditState {
 pub(crate) fn edit<T>(o: &mut Opened, label: &str, done: bool, f: impl FnOnce(&mut Transaction, &mut Engine) -> Result<T, EditError>) -> Result<T, EditError> {
     take_back(o);
     let ed = &mut o.ed;
+    let before = if ed.theme_new_shapes { Vec::new() } else { crate::design_gallery::shapes_now(&o.doc) };
     let mut tx = o.doc.transaction(label);
-    let r = f(&mut tx, &mut ed.eng);
+    let r = f(&mut tx, &mut ed.eng).and_then(|v| {
+        if !ed.theme_new_shapes {
+            crate::design_gallery::unthemed_new(&mut tx, &mut ed.eng, &before)?;
+        }
+        Ok(v)
+    });
     match r {
         Ok(v) => {
             if let Some(c) = tx.commit() {
