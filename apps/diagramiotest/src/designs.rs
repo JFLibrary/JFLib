@@ -230,3 +230,196 @@ pub(crate) fn probe(dir: &str) -> i32 {
     out(&format!("wrote {path}\n"));
     0
 }
+
+// ---------------------------------------------------------------- group "designs"
+
+const GOLDEN_W: u32 = 800;
+const INDEX: [&str; 5] = ["ThemeIndex", "ColorSchemeIndex", "EffectSchemeIndex", "ConnectorSchemeIndex", "FontSchemeIndex"];
+
+fn read_back(doc: &Document) -> Option<Document> {
+    let bytes = vsdx::write(doc, &WriteOptions::DEFAULT).ok()?;
+    vsdx::read(&bytes, &vsdx::Limits::VSDX).ok().map(|l| l.doc)
+}
+
+fn page_num(doc: &Document, name: &str) -> Option<f64> {
+    let page = doc.pages().next()?;
+    let c = doc.sym(name)?;
+    doc.resolve(SheetRef::Page(page), &CellAddr::single(c)).num()
+}
+
+fn formula_text(doc: &Document, s: ShapeRef, cell: &str) -> String {
+    let Some(c) = doc.sym(cell) else { return String::new() };
+    match doc.sheet(SheetRef::Shape(s)).and_then(|sh| sh.cells.iter().find(|x| x.name == c)).map(|x| x.formula) {
+        Some(diagram_core::Formula::Expr(f)) => String::from(doc.str(f)),
+        Some(_) => String::from("(value)"),
+        None => String::from("(inherited)"),
+    }
+}
+
+// the theme value the engine gives a cell of a shape
+fn themed_color(doc: &Document, s: ShapeRef, sec: Option<&str>, cell: &str) -> Option<u32> {
+    use diagram_core::formula::{Color, Outcome, Val};
+    let mut eng = Engine::new();
+    let c = doc.sym(cell)?;
+    let a = match sec {
+        Some(n) => CellAddr::row(SecKey::one(doc.sym(n)?), RowKey::Index(0), c),
+        None => CellAddr::single(c),
+    };
+    let mut v = match eng.evaluate(doc, SheetRef::Shape(s), &a) {
+        Outcome::Value(v) => v,
+        _ => return None,
+    };
+    while let Val::Themed(inner) = v {
+        v = (*inner).clone();
+    }
+    match v {
+        Val::Color(Color::Rgb(r, g, b)) => Some(((r as u32) << 16) | ((g as u32) << 8) | b as u32),
+        _ => None,
+    }
+}
+
+/// group "designs": the own designs' parts, applying with undo, foreign parts, the golden images
+pub(crate) fn check(h: &mut crate::H) {
+    let golden = crate::render::find_up("apps/diagramiotest/tests/golden");
+    for d in catalog::all() {
+        let name = design_name(&d).to_lowercase();
+        let part = d.theme_xml();
+        h.check(&format!("designs/{name}/part"), apply::part_id(&part) == Some(d.id) && d.id >= diagram_core::design::FIRST_ID, format!("id {}", d.id));
+        let Ok(doc) = sample(&d, 0, &format!("{} · Variante 1", design_name(&d))) else {
+            h.check(&format!("designs/{name}/sample"), false, String::from("the sample builds"));
+            continue;
+        };
+        // the part and the page's cells survive writing and reading
+        let back = read_back(&doc);
+        let ok = back.as_ref().is_some_and(|b| b.themes.iter().any(|t| t.data == part) && INDEX.iter().all(|n| page_num(b, n) == Some(d.id as f64)));
+        h.check(&format!("designs/{name}/roundtrip"), ok, format!("{} parts", back.map_or(0, |b| b.themes.len())));
+        // the golden image of variant 1
+        let Some(img) = render(&doc, GOLDEN_W) else { continue };
+        let Some(dir) = &golden else { continue };
+        let path = format!("{dir}/design-{name}.png");
+        let want = plat::read_file(&path).and_then(|b| img_png::decode_pargb(&b));
+        let what = match want.as_ref().and_then(|g| crate::render::diff(&img, g)) {
+            Some((far, max)) => {
+                let limit = (img.w as f64 * img.h as f64 * crate::render::PER_MILLE / 1000.0) as u64;
+                (far <= limit, format!("{far} pixels off by more than {} (at most {limit}), largest {max}", crate::render::FAR))
+            }
+            None => (false, format!("{path}: missing or another size (write it with --write-design-golden)")),
+        };
+        h.check(&format!("designs/{name}/golden"), what.0, what.1);
+    }
+    behaviour(h);
+}
+
+// applying: undo, foreign parts kept, mixed scheme numbers, THEMEGUARD and locks, text boxes
+fn behaviour(h: &mut crate::H) {
+    let mut doc = vsdx::new_document(DocKind::Drawing, Measure::Metric);
+    let Some(page) = doc.pages().next() else { return };
+    let owner = Owner::Page(page);
+    let mut eng = Engine::new();
+    let netlab = catalog::netlab();
+    let contrast = catalog::contrast();
+    h.check("designs/new-document", apply::page_design(&doc, page) == Some((netlab.id, 0)), format!("{:?}", apply::page_design(&doc, page)));
+    // a foreign part (another number, as a design read from a Visio file) with mixed numbers:
+    // the colour scheme 41, everything else 37
+    let own = String::from_utf8_lossy(&netlab.theme_xml()).into_owned();
+    let foreign = own
+        .replace(&format!("schemeEnum=\"{}\"", netlab.id), "schemeEnum=\"37\"")
+        .replacen("schemeEnum=\"37\"", "schemeEnum=\"41\"", 1)
+        .replace("name=\"NetLab\"", "name=\"Fremd\"");
+    let mut tx = doc.transaction("fremd");
+    let fp = tx.intern("/visio/theme/theme9.xml");
+    let mut themes = tx.doc().themes.clone();
+    themes.push(diagram_core::Theme { part: fp, data: foreign.clone().into_bytes() });
+    let _ = tx.set_themes(themes);
+    let _ = tx.commit();
+    let foreign_id = apply::part_id(foreign.as_bytes());
+    // shapes: plain red line (a design resets it), THEMEGUARD red (kept), locked colours (kept),
+    // a text box
+    let mut tx = doc.transaction("Shapes");
+    let mut made = Vec::new();
+    for (k, f) in ["RGB(255,0,0)", "THEMEGUARD(RGB(255,0,0))", "RGB(255,0,0)"].iter().enumerate() {
+        let x = 1.0 + k as f64 * 2.0;
+        if let Ok(s) = ops::new_shape(&mut tx, &mut eng, owner, Basic::Rectangle, [x, 1.0], [x + 1.5, 2.0]) {
+            let a = tx.single("LineColor");
+            let _ = tx.set_formula(SheetRef::Shape(s), &a, f);
+            if k == 2 {
+                let l = tx.single("LockThemeColors");
+                let _ = tx.set_constant(SheetRef::Shape(s), &l, Value::Num(1.0), None);
+            }
+            made.push(s);
+        }
+    }
+    let tb = labelled(&mut tx, &mut eng, owner, Basic::TextBox, [1.0, 4.0], [4.0, 4.5], "Titel").ok();
+    let _ = tx.commit();
+    let (Some(tb), true) = (tb, made.len() == 3) else {
+        h.check("designs/apply/shapes", false, String::from("shapes made"));
+        return;
+    };
+    let before = doc.themes.clone();
+    let mut tx = doc.transaction("Kontrast");
+    let r = apply::apply(&mut tx, &mut eng, contrast.id, &contrast.theme_xml(), Scope::All, 0);
+    let change = tx.commit();
+    h.check("designs/apply/ok", r.is_ok(), format!("{r:?}"));
+    h.check("designs/apply/page", apply::page_design(&doc, page) == Some((contrast.id, 0)), format!("{:?}", apply::page_design(&doc, page)));
+    let kept_foreign = doc.themes.iter().any(|t| t.data == foreign.as_bytes());
+    let has_netlab = apply::find_part(&doc, netlab.id).is_some();
+    h.check(
+        "designs/apply/parts",
+        kept_foreign && !has_netlab && apply::find_part(&doc, contrast.id).is_some(),
+        format!("foreign kept {kept_foreign}, NetLab dropped {}", !has_netlab),
+    );
+    let f = [formula_text(&doc, made[0], "LineColor"), formula_text(&doc, made[1], "LineColor"), formula_text(&doc, made[2], "LineColor")];
+    h.check("designs/apply/guard-and-locks", f[0] == "(inherited)" && f[1] == "THEMEGUARD(RGB(255,0,0))" && f[2] == "RGB(255,0,0)", format!("{f:?}"));
+    // the text box keeps dark text on Contrast's solid style (font style 1, Text Only)
+    let tbc = themed_color(&doc, tb, Some("Character"), "Color");
+    h.check("designs/apply/text-box-dark", tbc == Some(0x1D2228), format!("{tbc:?}"));
+    // a box shows Contrast's solid fill
+    let fill = themed_color(&doc, made[0], None, "FillForegnd");
+    h.check("designs/apply/solid-fill", fill == Some(contrast.variants[0].colors[0]), format!("{fill:?}"));
+    // a variant, then undo of both restores the parts and the cells
+    let mut tx = doc.transaction("Variante");
+    let r = apply::set_variant(&mut tx, &mut eng, Scope::Page(page), 2);
+    let change2 = tx.commit();
+    h.check("designs/variant", r.is_ok() && apply::page_design(&doc, page) == Some((contrast.id, 2)), format!("{:?}", apply::page_design(&doc, page)));
+    let undone = change2.is_some_and(|mut c| c.undo(&mut doc)) && change.is_some_and(|mut c| c.undo(&mut doc));
+    h.check(
+        "designs/undo",
+        undone && doc.themes == before && apply::page_design(&doc, page) == Some((netlab.id, 0)) && formula_text(&doc, made[0], "LineColor") == "RGB(255,0,0)",
+        format!("{:?}", apply::page_design(&doc, page)),
+    );
+    // the foreign part applied: each component by its own number
+    let Some(fid) = foreign_id else {
+        h.check("designs/foreign/id", false, String::from("the foreign part has a number"));
+        return;
+    };
+    let mut tx = doc.transaction("Fremd");
+    let r = apply::apply(&mut tx, &mut eng, fid, foreign.as_bytes(), Scope::All, 1);
+    let _ = tx.commit();
+    let nums: Vec<Option<f64>> = INDEX.iter().map(|n| page_num(&doc, n)).collect();
+    h.check("designs/foreign/mixed-numbers", r.is_ok() && nums == [Some(37.0), Some(41.0), Some(37.0), Some(37.0), Some(37.0)], format!("{nums:?}"));
+    let back = read_back(&doc);
+    h.check("designs/foreign/kept", back.is_some_and(|b| b.themes.iter().any(|t| t.data == foreign.as_bytes())), String::from("written back unchanged"));
+    let mut tx = doc.transaction("Kein Design");
+    let r = apply::remove(&mut tx, &mut eng, Scope::All);
+    let _ = tx.commit();
+    h.check(
+        "designs/none",
+        r.is_ok() && apply::page_design(&doc, page).is_none() && doc.themes.iter().any(|t| t.data == foreign.as_bytes()),
+        format!("{:?}", apply::page_design(&doc, page)),
+    );
+}
+
+/// --write-design-golden DIR
+pub(crate) fn write_golden(dir: &str) -> i32 {
+    for d in catalog::all() {
+        let name = design_name(&d).to_lowercase();
+        let Ok(doc) = sample(&d, 0, &format!("{} · Variante 1", design_name(&d))) else { return 1 };
+        let Some(img) = render(&doc, GOLDEN_W) else { return 1 };
+        let path = format!("{dir}/design-{name}.png");
+        if !plat::write_file(&path, &crate::render::png(&img)) {
+            return 1;
+        }
+        out(&format!("wrote {path}\n"));
+    }
+    0
+}

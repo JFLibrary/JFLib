@@ -25,7 +25,7 @@ click button:"Shape formatieren: Formenarten"
 expect tab:"Shape formatieren" selected
 expect tab:"Füllung und Linie" selected
 click tab:"Effekte"
-expect button:"Schatten" disabled
+expect button:"Spiegelung" disabled
 # Größe und Position through the measures in the status bar
 click button:"Breite: –  Höhe: –  Winkel: –"
 expect tab:"Größe und Position" selected

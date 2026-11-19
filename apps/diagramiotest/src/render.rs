@@ -32,8 +32,8 @@ use crate::drawings;
 use crate::{out, H};
 
 const WIDTH: u32 = 640;
-const FAR: u32 = 16;
-const PER_MILLE: f64 = 1.0;
+pub(crate) const FAR: u32 = 16;
+pub(crate) const PER_MILLE: f64 = 1.0;
 
 static INTER: &[u8] = include_bytes!("../../../styles/netlab/assets/Inter-Regular.ttf");
 static INTER_BOLD: &[u8] = include_bytes!("../../../styles/netlab/assets/Inter-SemiBold.ttf");
@@ -88,7 +88,7 @@ pub fn png(sf: &Surface) -> Vec<u8> {
 }
 
 /// (pixels differing by more than FAR in a channel, the largest difference)
-fn diff(a: &Surface, b: &Surface) -> Option<(u64, u32)> {
+pub(crate) fn diff(a: &Surface, b: &Surface) -> Option<(u64, u32)> {
     if a.w != b.w || a.h != b.h {
         return None;
     }

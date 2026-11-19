@@ -540,3 +540,66 @@ Die Auswahl (ohne Auswahl die aktuelle Seite) als Bild (PNG) in die Zwischenabla
 Die Auswahl (ohne Auswahl die aktuelle Seite) als SVG-Text in die Zwischenablage kopieren (für Grafikprogramme und Webseiten)	Copy the selection (without a selection, the current page) to the clipboard as SVG text (for graphics programs and web pages)	Copiar la selección (sin selección, la página actual) en el Portapapeles como texto SVG (para programas de gráficos y páginas web)	Copiare la selezione (senza selezione, la pagina corrente) negli Appunti come testo SVG (per programmi di grafica e pagine web)	Copier la sélection (sans sélection, la page active) dans le Presse-papiers en tant que texte SVG (pour les logiciels de dessin et les pages web)
 Die Auswahl ist als Bild in der Zwischenablage.	The selection is on the clipboard as a picture.	La selección está en el Portapapeles como imagen.	La selezione è negli Appunti come immagine.	La sélection est dans le Presse-papiers en tant qu'image.
 Die Auswahl ist als SVG in der Zwischenablage.	The selection is on the clipboard as SVG.	La selección está en el Portapapeles como SVG.	La selezione è negli Appunti come SVG.	La sélection est dans le Presse-papiers en tant que SVG.
+(eigenes)	(custom)	(personalizado)	(personalizzato)	(personnalisé)
+Abrundung	Rounding	Redondeo	Arrotondamento	Arrondi
+Abschlusstyp	Cap type	Tipo de remate	Tipo estremità	Type d'extrémité
+Abstand X	Offset X	Desplazamiento X	Distanza X	Décalage X
+Abstand Y	Offset Y	Desplazamiento Y	Distanza Y	Décalage Y
+Aktuelles Design speichern	Save Current Theme	Guardar tema actual	Salva tema corrente	Enregistrer le thème actuel
+Aktuelles Design speichern ...	Save Current Theme...	Guardar tema actual...	Salva tema corrente...	Enregistrer le thème actuel...
+Akzent 1	Accent 1	Énfasis 1	Colore 1	Accentuation 1
+Akzent 2	Accent 2	Énfasis 2	Colore 2	Accentuation 2
+Akzent 3	Accent 3	Énfasis 3	Colore 3	Accentuation 3
+Akzent 4	Accent 4	Énfasis 4	Colore 4	Accentuation 4
+Akzent 5	Accent 5	Énfasis 5	Colore 5	Accentuation 5
+Akzent 6	Accent 6	Énfasis 6	Colore 6	Accentuation 6
+Alle Designs	All Themes	Todos los temas	Tutti i temi	Tous les thèmes
+Anfangsgröße	Begin size	Tamaño inicial	Dimensione iniziale	Taille de début
+Anfangspfeil	Begin arrow type	Tipo de flecha inicial	Tipo freccia iniziale	Type de flèche de début
+Auf aktuelle Seite anwenden	Apply to Current Page	Aplicar a la página actual	Applica alla pagina corrente	Appliquer à la page active
+Auf alle Seiten anwenden	Apply to All Pages	Aplicar a todas las páginas	Applica a tutte le pagine	Appliquer à toutes les pages
+Das Design der angezeigten Seite wird unter diesem Namen gespeichert und erscheint im Katalog unter „Gespeichert“.	The theme of the page shown is saved under this name and appears in the gallery under “Saved”.	El tema de la página mostrada se guarda con este nombre y aparece en la galería en «Guardados».	Il tema della pagina visualizzata viene salvato con questo nome e compare nella raccolta in «Salvati».	Le thème de la page affichée est enregistré sous ce nom et apparaît dans la galerie sous « Enregistrés ».
+Design	Theme	Tema	Tema	Thème
+Design anwenden	Apply Theme	Aplicar tema	Applica tema	Appliquer le thème
+Designfarben	Theme Colors	Colores del tema	Colori tema	Couleurs du thème
+Durchgezogene Linie	Solid line	Línea sólida	Linea continua	Trait plein
+Einfarbige Füllung	Solid fill	Relleno sólido	Riempimento a tinta unita	Remplissage uni
+Endgröße	End size	Tamaño final	Dimensione finale	Taille de fin
+Endpfeil	End arrow type	Tipo de flecha final	Tipo freccia finale	Type de flèche de fin
+Extra groß	Extra Large	Extra grande	Molto grande	Très grande
+Flach	Flat	Plano	Piatto	Plat
+Füllfarbe	Fill Color	Color de relleno	Colore riempimento	Couleur de remplissage
+gespeichert	saved	guardado	salvato	enregistré
+Gespeichert	Saved	Guardados	Salvati	Enregistrés
+Gespeicherte Designs löschen	Delete Saved Themes	Eliminar temas guardados	Elimina temi salvati	Supprimer les thèmes enregistrés
+Groß	Large	Grande	Grande	Grande
+in dieser Datei	in this file	en este archivo	in questo file	dans ce fichier
+In dieser Datei	In This File	En este archivo	In questo file	Dans ce fichier
+JFDiagrammer	JFDiagrammer	JFDiagrammer	JFDiagrammer	JFDiagrammer
+Kein Design	No Theme	Sin tema	Nessun tema	Aucun thème
+Kein Schatten	No shadow	Sin sombra	Nessuna ombreggiatura	Aucune ombre
+Klein	Small	Pequeño	Piccola	Petite
+Kolossal	Colossal	Colosal	Colossale	Colossale
+Kontrast|Design	Contrast	Contraste	Contrasto	Contraste
+Kontur|Design	Contour	Contorno	Contorno	Contour
+Linienfarbe	Line Color	Color de línea	Colore linea	Couleur du trait
+Linienstärke	Line Weight	Grosor de línea	Spessore linea	Épaisseur du trait
+Mittel	Medium	Mediano	Media	Moyenne
+Ohne	None	Ninguna	Nessuna	Aucune
+Quadratisch	Square	Cuadrado	Quadrato	Carré
+Riesig	Jumbo	Enorme	Enorme	Énorme
+Rund	Round	Redondo	Arrotondato	Rond
+Schatten außen	Outer shadow	Sombra exterior	Ombreggiatura esterna	Ombre externe
+Schattenfarbe	Shadow Color	Color de sombra	Colore ombreggiatura	Couleur de l'ombre
+Schwarz	Black	Negro	Nero	Noir
+Sehr klein	Very Small	Muy pequeño	Molto piccola	Très petite
+Standardfarben	Standard Colors	Colores estándar	Colori standard	Couleurs standard
+Strichtyp	Dash type	Tipo de guion	Tipo tratteggio	Type de tiret
+Transparenz	Transparency	Transparencia	Trasparenza	Transparence
+Transparenz der Füllung	Fill transparency	Transparencia del relleno	Trasparenza riempimento	Transparence du remplissage
+Transparenz der Linie	Line transparency	Transparencia de la línea	Trasparenza linea	Transparence du trait
+Transparenz des Schattens	Shadow transparency	Transparencia de la sombra	Trasparenza ombreggiatura	Transparence de l'ombre
+Variante	Variant	Variante	Variante	Variante
+Variante anwenden	Apply Variant	Aplicar variante	Applica variante	Appliquer la variante
+Variantenfarben	Variant Colors	Colores de variante	Colori variante	Couleurs de la variante
+Weiß	White	Blanco	Bianco	Blanc

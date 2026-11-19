@@ -1,0 +1,62 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD11: formatting the selection (AB-05, RS-04 .. RS-11, RS-20, RS-21, FM-01 ..
+# FM-04 simple, FM-08).  Shape formatieren shows the design's values of a new rectangle (solid
+# fill, solid line); no fill and back by undo; Start › Linie › Stärke 3 pt and a dash; the
+# colour menu of Füllung (a design colour's shade) and Weitere Farben; a shadow in Effekte;
+# bold and right-aligned text through Start.  Golden image: the formatted rectangle.
+# New references: "shot FILE X Y W H" in place of "expect same" (look first)
+theme light
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+click 570,370
+expect button:"Fett" enabled
+click button:"Shape formatieren: Formenarten"
+expect tab:"Shape formatieren" selected
+expect tab:"Füllung und Linie" selected
+expect radio:"Einfarbige Füllung" checked
+expect radio:"Durchgezogene Linie" checked
+click radio:"Keine Füllung"
+expect radio:"Keine Füllung" checked
+key ctrl+z
+expect radio:"Einfarbige Füllung" checked
+# Start › Linie: the weight and a dash
+click tab:"Start"
+click button:"Linie"
+click "Stärke"
+wait 100
+click "3 pt"
+click button:"Linie"
+click "Striche"
+wait 100
+click "– – – – –"
+# Füllung: the colour menu (accent 2, lighter 60 %: second column of accents, third row)
+click button:"Füllung"
+expect text:"Designfarben" exists
+expect text:"Variantenfarben" exists
+expect text:"Standardfarben" exists
+click 902,155
+expect text:"Zuletzt verwendet" missing
+# Weitere Farben: the dialog with the picker, taken as it is
+click button:"Linie"
+click "Weitere Farben"
+expect text:"Weitere Farben" exists
+click button:"OK"
+expect text:"Weitere Farben" missing
+# a shadow
+click tab:"Effekte"
+expect radio:"Kein Schatten" checked
+click radio:"Schatten außen"
+expect radio:"Schatten außen" checked
+# text: type, bold, right
+click listitem:"Sheet.4"
+key F2
+type "Box"
+key esc
+click listitem:"Box"
+click button:"Fett"
+expect button:"Fett" checked
+click button:"Rechtsbündig"
+expect button:"Rechtsbündig" checked
+click 600,660
+expect same apps/JFDiagrammer/tests/golden/format_shape.png 300 280 260 200

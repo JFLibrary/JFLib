@@ -148,7 +148,13 @@ fn line(app: &mut Diagrammer, ui: &mut Ui) {
 
 fn shadow(app: &mut Diagrammer, ui: &mut Ui) {
     heading(ui, t("Schatten"));
+    let was = fc::num(app, F::Cell("ShdwPattern")).unwrap_or(0.0) != 0.0;
     let on = on_off(app, ui, ID + 0x50, "ShdwPattern", t("Kein Schatten"), t("Schatten außen"), t("Schatten"));
+    if on && !was {
+        // a soft shadow at first (the design's effect styles mostly have none): the simple
+        // kind, 60 % transparent, as one more step of the same undo history
+        fc::set(app, ui, t("Schatten"), &[(F::Cell("ShapeShdwType"), String::from("THEMEGUARD(1)")), (F::Cell("ShdwForegndTrans"), String::from("THEMEGUARD(60%)"))]);
+    }
     if !on {
         return;
     }

@@ -31,8 +31,8 @@ click button:"jd7-save.vsdx"
 expect text:"jd7-save – JFDiagrammer" exists
 expect listitem:"Sheet.4" exists
 expect listitem:"Sheet.5" rect 827 475 126 100
-expect listitem:"Sheet.6" rect 651 374 239 101
+expect listitem:"Sheet.6" rect 651 374 242 101
 # the connector is still glued: it follows the next move
 drag 900,500 900,449
 expect listitem:"Sheet.5" rect 827 424 126 101
-expect listitem:"Sheet.6" rect 651 374 239 50
+expect listitem:"Sheet.6" rect 651 374 242 50

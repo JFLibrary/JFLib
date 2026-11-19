@@ -414,22 +414,30 @@ pub const THEME: &str = "<a:theme xmlns:a='http://schemas.openxmlformats.org/dra
 <a:ext uri='{2}'><vt:bkgnd xmlns:vt='http://schemas.microsoft.com/office/visio/2012/theme'><a:srgbClr val='FFFFE0'/></vt:bkgnd></a:ext>\
 <a:ext uri='{3}'><vt:variationClrSchemeLst xmlns:vt='http://schemas.microsoft.com/office/visio/2012/theme'><vt:variationClrScheme>\
 <vt:varColor1><a:srgbClr val='008080'/></vt:varColor1></vt:variationClrScheme></vt:variationClrSchemeLst></a:ext></a:extLst></a:clrScheme>\
-<a:fontScheme name='Probe'><a:majorFont><a:latin typeface='Georgia'/></a:majorFont><a:minorFont><a:latin typeface='Consolas'/></a:minorFont></a:fontScheme>\
-<a:fmtScheme name='Probe'><a:lnStyleLst><a:ln w='38100'/><a:ln w='19050'/></a:lnStyleLst></a:fmtScheme></a:themeElements>\
-<a:extLst><a:ext uri='{4}'><vt:themeScheme xmlns:vt='http://schemas.microsoft.com/office/visio/2012/theme'><vt:schemeID schemeEnum='77'/></vt:themeScheme></a:ext></a:extLst></a:theme>";
+<a:fontScheme name='Probe'><a:majorFont><a:latin typeface='Georgia'/></a:majorFont><a:minorFont><a:latin typeface='Consolas'/></a:minorFont>\
+<a:extLst><a:ext uri='{5}'><vt:schemeID xmlns:vt='http://schemas.microsoft.com/office/visio/2012/theme' schemeEnum='77'/></a:ext></a:extLst></a:fontScheme>\
+<a:fmtScheme name='Probe'><a:lnStyleLst><a:ln w='38100'/><a:ln w='19050'/></a:lnStyleLst></a:fmtScheme>\
+<a:extLst><a:ext uri='{4}'><vt:themeScheme xmlns:vt='http://schemas.microsoft.com/office/visio/2012/theme'><vt:schemeID schemeEnum='77'/></vt:themeScheme></a:ext>\
+<a:ext uri='{6}'><vt:fmtSchemeEx xmlns:vt='http://schemas.microsoft.com/office/visio/2012/theme'><vt:schemeID schemeEnum='77'/></vt:fmtSchemeEx></a:ext>\
+<a:ext uri='{7}'><vt:fmtConnectorSchemeEx xmlns:vt='http://schemas.microsoft.com/office/visio/2012/theme'><vt:schemeID schemeEnum='77'/></vt:fmtConnectorSchemeEx></a:ext></a:extLst></a:themeElements></a:theme>";
+
+// the theme index cells of a page or shape
+const INDEX: [&str; 5] = ["ThemeIndex", "ColorSchemeIndex", "EffectSchemeIndex", "ConnectorSchemeIndex", "FontSchemeIndex"];
 
 fn pages() -> Pkg {
     let mut d = Doc::new();
     d.theme = Some(String::from(THEME));
     // page 1: themed values, on a background page
     let mut s = String::new();
-    s += &shape(1, (2.0, 2.0), (2.0, 1.2), &format!("{}{}{}{}{}",
+    s += &shape(1, (2.0, 2.0), (2.0, 1.2), &(format!("{}{}{}{}{}",
         "<Cell N='FillForegnd' V='Themed' F='THEMEVAL()'/>", "<Cell N='LineColor' V='Themed' F='THEMEVAL()'/>", "<Cell N='LineWeight' V='Themed' F='THEMEVAL()'/>",
-        c("QuickStyleFillColor", 2), c("QuickStyleLineColor", 100)),
+        c("QuickStyleFillColor", 2), c("QuickStyleLineColor", 100)) + &c("QuickStyleLineMatrix", 1)
+            // (JD11) the theme context as Visio has it: the shape follows the page's five index cells
+            + &INDEX.iter().map(|n| c(n, 65534)).collect::<String>()),
         &format!("{}<Section N='Character'><Row IX='0'><Cell N='Font' V='Themed' F='THEMEVAL()'/><Cell N='Color' V='Themed' F='THEMEVAL()'/></Row></Section>", rect(2.0, 1.2)),
         "Design\n");
     s += &shape(2, (4.6, 2.0), (1.6, 1.2), &c("FillForegnd", "#9dc3e6"), &rect(1.6, 1.2), "Vordergrund\n");
-    let i = d.page("Seite-1", 6.0, 4.0, &format!("{}", c("ThemeIndex", 77)), s);
+    let i = d.page("Seite-1", 6.0, 4.0, &INDEX.iter().map(|n| c(n, 77)).collect::<String>(), s);
     d.pages[i].back_page = Some(2);
     // page 2: drawn at 1:10 (shapes in drawing units ten times larger, lines and text as on paper)
     let mut s2 = String::new();

@@ -50,6 +50,8 @@ pub(crate) enum Target {
 pub(crate) struct Painter {
     pub cells: Vec<(F, String)>,
     pub sticky: bool,
+    // made sticky by a double click in this pass: the click's queued command passes by
+    fresh: bool,
     sel: alloc::collections::BTreeSet<u64>,
     started: u64,
 }
@@ -66,11 +68,15 @@ pub(crate) struct FormatState {
     pub style_now: u32,
     pub valign_now: Option<u32>,
     pub halign_now: Option<u32>,
+    /// the ribbon saw a double click on Format übertragen
+    pub double: bool,
+    /// the line menu's choices to open next (Stärke, Striche, Pfeile)
+    pub line_sub: Option<u32>,
 }
 
 impl Default for FormatState {
     fn default() -> FormatState {
-        FormatState { recent: Vec::new(), painter: None, more: Shared::new(0), more_argb: 0xFF1F_5FA8, more_for: Target::Fill, style_now: 0, valign_now: None, halign_now: None }
+        FormatState { recent: Vec::new(), painter: None, more: Shared::new(0), more_argb: 0xFF1F_5FA8, more_for: Target::Fill, style_now: 0, valign_now: None, halign_now: None, double: false, line_sub: None }
     }
 }
 
@@ -104,19 +110,19 @@ pub(crate) fn set_color(app: &mut Diagrammer, ui: &mut Ui, target: Target, formu
 
 const WEIGHTS: [(f64, &str); 9] = [(0.25, "¼ pt"), (0.5, "½ pt"), (0.75, "¾ pt"), (1.0, "1 pt"), (1.5, "1½ pt"), (2.25, "2¼ pt"), (3.0, "3 pt"), (4.5, "4½ pt"), (6.0, "6 pt")];
 /// Visio's line patterns with a picture in text: (pattern, picture)
-pub(crate) const DASHES: [(u32, &str); 8] = [(1, "———————"), (2, "– – – – –"), (3, "· · · · · · ·"), (4, "— · — · —"), (5, "— · · — · ·"), (9, "—— —— ——"), (10, "- - - - - - -"), (16, "─ ─ ─ ─ ─")];
+pub(crate) const DASHES: [(u32, &str); 8] = [(1, "———————"), (2, "– – – – –"), (3, "· · · · · · ·"), (4, "— · — · —"), (5, "— · · — · ·"), (9, "——  ——  ——"), (10, "- - - - - - -"), (16, "—   —   —   —")];
 /// line ends offered at once: (begin, end, picture)
 pub(crate) const ARROWS: [(u32, u32, &str); 10] = [
     (0, 0, "————"),
-    (0, 13, "———▶"),
-    (13, 0, "◀———"),
-    (13, 13, "◀——▶"),
-    (0, 4, "———►"),
-    (4, 4, "◄——►"),
-    (0, 1, "——— >"),
-    (1, 1, "< ——— >"),
-    (0, 20, "———●"),
-    (20, 20, "●——●"),
+    (0, 13, "———→"),
+    (13, 0, "←———"),
+    (13, 13, "←——→"),
+    (0, 4, "———→  4"),
+    (4, 4, "←——→  4"),
+    (0, 1, "———>  1"),
+    (1, 1, "<——>  1"),
+    (0, 20, "———•"),
+    (20, 20, "•——•"),
 ];
 
 /// a flyout of the ribbon this module fills -> handled
@@ -127,6 +133,9 @@ pub(crate) fn flyout(app: &mut Diagrammer, ui: &mut Ui, pid: u32) -> bool {
         x if x == FONT_COLOR | SPLIT => Target::Font,
         _ => return false,
     };
+    if target == Target::Line {
+        line_choices(app, ui);
+    }
     if ui.flyout_begin(pid, 0) {
         let (c, _) = cells_of(target);
         let current = fc::color(app, c);
@@ -145,9 +154,13 @@ pub(crate) fn flyout(app: &mut Diagrammer, ui: &mut Ui, pid: u32) -> bool {
         }
         if target == Target::Line {
             ui.menu_sep();
-            sub(app, ui, ID_WEIGHTS, LINE_WEIGHT);
-            sub(app, ui, ID_DASHES, LINE_DASH);
-            sub(app, ui, ID_ARROWS, LINE_ARROWS);
+            for (sub, cmd) in [(ID_WEIGHTS, LINE_WEIGHT), (ID_DASHES, LINE_DASH), (ID_ARROWS, LINE_ARROWS)] {
+                ui.next_icon(IC_CHEV_RIGHT);
+                if ui.menu_item(sub + 0xFF, crate::commands::label(cmd)) & EV_ACT != 0 {
+                    app.format.line_sub = Some(sub);
+                    ui.repass();
+                }
+            }
             ui.menu_sep();
             item(app, ui, LINE_OPTIONS);
         }
@@ -167,12 +180,19 @@ fn item(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
     }
 }
 
-// a menu item with its own flyout of choices (Stärke, Striche, Pfeile)
-fn sub(app: &mut Diagrammer, ui: &mut Ui, pid: u32, cmd: u32) {
-    ui.next_icon(IC_CHEV_RIGHT);
-    if ui.menu_item(pid + 0xFF, crate::commands::label(cmd)) & (EV_ACT | EV_HOVER) != 0 && ui.popup_count() < 3 {
-        ui.popup_open(pid);
+// the choices of the line menu (Stärke, Striche, Pfeile): each a flyout of its own at the
+// Linie button, opened after the line menu closed (a flyout inside the menu would lie under
+// its other rows)
+fn line_choices(app: &mut Diagrammer, ui: &mut Ui) {
+    if let Some(p) = app.format.line_sub.take() {
+        ui.popup_open(p);
     }
+    for pid in [ID_WEIGHTS, ID_DASHES, ID_ARROWS] {
+        choices(app, ui, pid);
+    }
+}
+
+fn choices(app: &mut Diagrammer, ui: &mut Ui, pid: u32) {
     if ui.flyout_begin(pid, 0) {
         match pid {
             ID_WEIGHTS => {
@@ -480,6 +500,10 @@ pub(crate) fn format_of(doc: &diagram_core::Document, s: ShapeRef) -> Vec<(F, St
 pub(crate) fn painter(app: &mut Diagrammer, ui: &mut Ui) {
     let now = plat::time_us();
     if let Some(p) = app.format.painter.as_mut() {
+        if core::mem::take(&mut p.fresh) {
+            // the second click of a double click (after() kept it on)
+            return;
+        }
         if now.wrapping_sub(p.started) < 500_000 {
             p.sticky = true;
         } else {
@@ -491,7 +515,7 @@ pub(crate) fn painter(app: &mut Diagrammer, ui: &mut Ui) {
     let sel = fc::selection(app);
     let (Some(&s), Some(o)) = (sel.first(), app.opened.as_ref()) else { return };
     let cells = format_of(&o.doc, s);
-    app.format.painter = Some(Painter { cells, sticky: false, sel: app.se.sel.clone(), started: now });
+    app.format.painter = Some(Painter { cells, sticky: false, fresh: false, sel: app.se.sel.clone(), started: now });
     ui.repass();
 }
 
@@ -504,6 +528,17 @@ pub(crate) fn after(app: &mut Diagrammer, ui: &mut Ui) {
     app.format.valign_now = if sel { fc::num(app, F::Cell("VerticalAlign")).map(|v| v as u32) } else { None };
     app.format.halign_now = if sel { fc::num(app, F::Para("HorzAlign")).map(|v| v as u32) } else { None };
     more_dialog(app, ui);
+    // (EV_DOUBLE comes with the second press, its EV_ACT with the release a pass later: the
+    // mark stays until that click's command has passed by)
+    if core::mem::take(&mut app.format.double) {
+        if app.format.painter.is_none() {
+            painter(app, ui);
+        }
+        if let Some(p) = app.format.painter.as_mut() {
+            p.sticky = true;
+            p.fresh = true;
+        }
+    }
     let Some(p) = app.format.painter.as_ref() else { return };
     if ui.key_first() == VK_ESCAPE || app.tool != POINTER {
         if ui.key_first() == VK_ESCAPE {
@@ -513,11 +548,21 @@ pub(crate) fn after(app: &mut Diagrammer, ui: &mut Ui) {
         ui.repass();
         return;
     }
-    if app.se.sel.is_empty() || app.se.sel == p.sel {
+    // Esc (the canvas takes it first and clears the selection) or a click on the empty page
+    // ends it, as in Visio
+    if app.se.sel.is_empty() {
+        app.format.painter = None;
+        ui.repass();
+        return;
+    }
+    if app.se.sel == p.sel {
         return;
     }
     let cells = p.cells.clone();
     let sticky = p.sticky;
+    if let Some(p) = app.format.painter.as_mut() {
+        p.fresh = false;
+    }
     let shapes = fc::selection(app);
     fc::set_on(app, ui, t("Format übertragen"), &shapes, &cells);
     match app.format.painter.as_mut() {

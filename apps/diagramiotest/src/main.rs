@@ -15,6 +15,7 @@
 //   diagramiotest --write-exports DIR [--corpus DIR]   (JD12) the self-built drawings and the local
 //                                         files as PDF, SVG and PNG (to compare with Visio)
 //   diagramiotest --write-stencils DIR   (JD9) the start set's stencils as .vssx (stencils.rs)
+//   diagramiotest --write-design-golden DIR   (JD11) the designs' golden images anew
 //   diagramiotest --design-probe DIR     (JD11) the own designs on the sample drawing as PNG, and
 //                                         one .vsdx a design for the Visio counter-check (designs.rs)
 //
@@ -38,6 +39,9 @@
 //             compared with the stored value (--show N prints N misses, locally)
 //   editview  (JD7, edit_view.rs) PageView::update against a page built anew, Metrics' text
 //             sizes against the drawn text, the time an edit of one of 1000 shapes takes
+//   designs   (JD11, designs.rs) the own designs: their theme parts, the sample drawing written
+//             and read back, golden images (tests/golden/design-*.png), applying with undo,
+//             foreign parts kept, Visio's mixed scheme numbers, THEMEGUARD and locks
 //   edit      (JD7, gegenprobe.rs) static and dynamic glue through ops and glue, moved, written
 //             and read back: the Connect entries and glue formulas stay, ends follow again
 //   stencils  (JD9, stencils.rs) the stencil build tool: the start set, the SVG import, faults
@@ -145,6 +149,9 @@ fn run() -> i32 {
     if let Some(dir) = arg(&args, "--write-gegenprobe") {
         return gegenprobe::write(&dir);
     }
+    if let Some(dir) = arg(&args, "--write-design-golden") {
+        return designs::write_golden(&dir);
+    }
     if let Some(dir) = arg(&args, "--design-probe") {
         return designs::probe(&dir);
     }
@@ -175,6 +182,9 @@ fn run() -> i32 {
         }
         if h.on("edit") {
             gegenprobe::check(&mut h);
+        }
+        if h.on("designs") {
+            designs::check(&mut h);
         }
         roundtrip::run(&mut h, corpus_dir.as_deref());
         if h.on("stencils") {

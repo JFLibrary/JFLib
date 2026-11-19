@@ -429,7 +429,12 @@ fn small(app: &mut Diagrammer, ui: &mut Ui, s: &Sm, compact: bool) {
     match s {
         Sm::Btn(id) => {
             ui.next_size(-1, SMALL_H);
-            if ui.ribbon_button(*id, commands::label(*id), icon(*id), only | cflags(app, *id)) & EV_ACT != 0 {
+            let ev = ui.ribbon_button(*id, commands::label(*id), icon(*id), only | cflags(app, *id));
+            // (JD11) a double click keeps Format übertragen on
+            if ev & EV_DOUBLE != 0 && *id == FORMAT_PAINTER {
+                app.format.double = true;
+            }
+            if ev & EV_ACT != 0 {
                 ui.cmd_run(*id, 0);
             }
             ui.tooltip(&commands::tip(ui, *id));
