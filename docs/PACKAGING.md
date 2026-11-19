@@ -514,7 +514,9 @@ own repositories and bundles.
 | no PERMISSIONS | `--share=network --filesystem=host --talk-name=org.freedesktop.secrets --socket=pulseaudio` (the app may do everything; noted) |
 
 `flatpak_args=` adds more, for example `--talk-name=org.kde.StatusNotifierWatcher` for the tray
-(`plat::tray`) or `--talk-name=org.freedesktop.Notifications`.  Without `recent` in
+(`plat::tray`), `--talk-name=org.freedesktop.Notifications`, or `--device=input` for a game that reads
+game pads (`plat::pad_watch`, `ui.gamepads`: the evdev nodes below `/dev/input`, which a Flatpak sees
+only with it; Flatpak 1.15.6 and newer, an older one finds no pad).  Without `recent` in
 `PERMISSIONS` the list of recent files stays in the sandbox's own data folder.  The exported
 `.desktop` file's `Exec` gets flatpak's file forwarding (`@@u %U @@`): opened files come as
 `file:///run/user/<uid>/doc/...` URIs that `plat` turns into paths and grants (`fs.user`).

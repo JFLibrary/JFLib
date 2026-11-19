@@ -38,6 +38,7 @@ input.set_lock(ui.pointer_lock_state());            // its end is the game's pau
 input.key(key_event.code, key_event.down);
 input.motion(ui.pointer_motion().0, ui.pointer_motion().1);
 if input.take_lock_request() { ui.pointer_lock(true); }   // the click that locks fires nothing
+input.pad_frame(ui.gamepads(), dt);                  // game pads: the one used last drives
 let mut camera = FirstPerson::new(Vec3::new(0.0, 1.7, 0.0));
 camera.look(input.motion_of(look_x), 0.0);
 ```
@@ -55,7 +56,10 @@ camera.look(input.motion_of(look_x), 0.0);
 - **Input actions**: buttons, axes and motion bound to keys by their place on the keyboard, mouse
   buttons, the wheel and the raw motion of the locked pointer; sensitivity, inversion and a factor
   per platform that evens out the different units of raw motion; the click that locks the pointer
-  fires nothing, the end of the lock pauses. Bindings and settings go into a settings file.
+  fires nothing, the end of the lock pauses. Game pads too: their buttons, sticks with a radial dead
+  zone as analog axes, looking with a stick at a turn rate with a response curve; the pad used last
+  drives a player's input, and a pad plays without the pointer lock (`Input::pad_frame` with
+  `ui.gamepads()`). Bindings and settings go into a settings file.
 - **Cameras**: first person, an orbit that follows a target and comes in front of walls (through
   [jflib-physics](https://crates.io/crates/jflib-physics)), and free flight, all in `f64`.
 - **Netcode** (`game::net`, over [jflib-netchan](https://crates.io/crates/jflib-netchan): UDP and

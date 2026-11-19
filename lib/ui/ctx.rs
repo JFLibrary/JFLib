@@ -1065,6 +1065,7 @@ impl Ui {
 
     /// ui_input_clear_edges: after the first pass of a batch the edges are consumed
     pub(crate) fn input_clear_edges(&mut self) {
+        self.pads_clear_edges(); // (G7a) the pads' downs and ups of the batch
         let c = &mut self.wp.ctx;
         c.motion = [0.0; 2];
         c.pressed = 0;
