@@ -1226,6 +1226,39 @@ fn copy_a_subshape_takes_its_groups_transform() {
     assert_eq!(formula(d, new[0], "PinX"), "");
 }
 
+// (JD8 rest, LY-03) copied to another page, the shapes' layers come along by name
+#[test]
+fn paste_on_another_page_brings_the_layers() {
+    let mut f = fx();
+    let a = add_box(&mut f, None, 1, [2.0, 2.0], [1.0, 1.0], 0.0, (false, false));
+    let mut tx = f.doc.transaction("Ebenen");
+    let p2 = tx.add_page("Seite-2", "Page-2", false, None).unwrap();
+    tx.add_layer(f.page, "Erste", "First").unwrap();
+    let net = tx.add_layer(f.page, "Netz", "Net").unwrap();
+    let lock = tx.single("Lock");
+    tx.set_constant(SheetRef::Page(f.page), &CellAddr::row(SecKey::one(names::LAYER), RowKey::Index(net), lock.cell), Value::Num(1.0), None).unwrap();
+    tx.add_layer(p2, "Andere", "Other").unwrap();
+    tx.set_layers(a, &[net]).unwrap();
+    tx.commit().unwrap();
+    let mut eng = Engine::new();
+    let clip = copy(&f.doc, &[a]);
+    // the same page: the same layer
+    let owner = f.owner;
+    let same = gesture(&mut f, &mut eng, "Einfügen", |tx, eng| paste(tx, eng, owner, &clip, [1.0, 0.0]));
+    assert_eq!(f.doc.layer_members(same[0]), alloc::vec![net]);
+    // another page: "Netz" added there (locked as it was), the copy on it
+    let other = gesture(&mut f, &mut eng, "Einfügen", |tx, eng| paste(tx, eng, Owner::Page(p2), &clip, [0.0, 0.0]));
+    let layers = f.doc.layers(p2);
+    assert_eq!(layers.len(), 2);
+    assert_eq!(layers[1].text("Name"), Some("Netz"));
+    assert!(layers[1].flag("Lock"));
+    assert_eq!(f.doc.layer_members(other[0]), alloc::vec![1]);
+    // once more: no second layer
+    let again = gesture(&mut f, &mut eng, "Einfügen", |tx, eng| paste(tx, eng, Owner::Page(p2), &clip, [0.0, 0.0]));
+    assert_eq!(f.doc.layers(p2).len(), 2);
+    assert_eq!(f.doc.layer_members(again[0]), alloc::vec![1]);
+}
+
 // ---- speed: a small selection in a large drawing (timed from outside: no clock without std)
 
 #[test]

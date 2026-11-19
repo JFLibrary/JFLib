@@ -473,10 +473,13 @@ fn small(app: &mut Diagrammer, ui: &mut Ui, s: &Sm, compact: bool) {
             ui.box_begin(0, BOX_H | BOX_FIXED, 0);
             let label = commands::label(*id);
             ui.next_size(-1, SMALL_H);
-            if ui.ribbon_button(*id, label, icon(*id), only | cflags(app, *id)) & EV_ACT != 0 {
+            // (JD8 rest) Zeichentools shows the drawing tool it repeats (cmds_draw.rs)
+            let ic = if *id == DRAW_TOOLS { crate::cmds_draw::split_icon(app) } else { icon(*id) };
+            if ui.ribbon_button(*id, label, ic, only | cflags(app, *id)) & EV_ACT != 0 {
                 ui.cmd_run(*id, 0);
             }
-            ui.tooltip(&commands::tip(ui, *id));
+            let tip = if *id == DRAW_TOOLS { crate::cmds_draw::split_tip(app, ui) } else { commands::tip(ui, *id) };
+            ui.tooltip(&tip);
             ui.next_size(16, SMALL_H);
             let more = alloc::format!("{}: {}", label, t("Weitere Optionen"));
             ui.next_flags(ST_SUBTLE | ST_COMPACT | ST_ICON_ONLY | (mflags(app, *id, items) & ST_DISABLED));

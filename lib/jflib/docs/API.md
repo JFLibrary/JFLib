@@ -105,7 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -7803,7 +7803,8 @@ shapes to SeShape frames (diagram_core for JFDiagrammer).
                                   while it shows ("Element einfügen", value = its tag): scripts
                                   click and drag them, screen readers name them (a screen
                                   reader's click on an arrow or a mark reports it as a click)
-  tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT, SE_PLACE
+  tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT, SE_PLACE, SE_FREEFORM,
+        SE_ARC
 
 Model (SeModel, borrowed per call; world units are the canvas's, y down):
   SeShape { key, parent, bx, ends, pin, bbox, flags, points }
@@ -7828,7 +7829,12 @@ Esc during one sends SeEv::Cancel.  So the app takes its preview back and applie
 total each step, and keeps the last one as the undo step.  The frames of the selection follow
 the model (the app's preview), the gesture keeps what it had at the start.  The connector and
 line tools and the drawing tools draw a rubber band and report Connect / Draw when released;
-a click with them selects like the pointer.
+a click with them selects like the pointer.  With Shift the rectangle and the ellipse tool draw
+a square and a circle (KB-09).  The freeform tool records the pointer's way (a point every 2 px)
+and reports SeEv::Stroke when released; the arc tool shows a quarter ellipse from the press to
+the pointer, bowing the way the drag started (horizontally or vertically, decided once the
+pointer left the drag threshold), and reports SeEv::Arc; both start and end glued to
+connection points like the line tool (CN-12).
 
 Input (pointer tool): a press on a handle of the selection starts its drag; on a shape it
 selects it (Shift adds, Ctrl toggles) and a drag moves the selection (grid, dynamic grid,
@@ -7891,6 +7897,11 @@ SE_TEXT: u32 = 5
 /// shape too, reports Draw { tool: SE_PLACE, a, b: a } at the snapped point; no handles, a
 /// drag places nothing
 SE_PLACE: u32 = 6
+/// draw freehand: the pointer's way, reported as SeEv::Stroke (its ends glue like a line's)
+SE_FREEFORM: u32 = 7
+/// draw a quarter ellipse from the press to the release, reported as SeEv::Arc (its ends glue
+/// like a line's)
+SE_ARC: u32 = 8
 /// shape flags (SeShape::flags)
 SEF_1D: u32 = 1  // the two ends instead of the eight handles
 SEF_GROUP: u32 = 2  // a group: a second click selects the child under the pointer
@@ -7910,6 +7921,7 @@ SEF_END_GLUED: u32 = 0x4000
 SEF_END_DYN: u32 = 0x8000
 SEF_LOCK_PIN: u32 = 0x1_0000  // no rotation pin handle
 SEF_NOARROWS: u32 = 0x2_0000  // no connection arrows around it (see the file header)
+SEF_NOSNAP: u32 = 0x4_0000  // moves do not snap to it (the dynamic grid leaves it out)
 /// kinds of SePoint
 SP_CONTROL: u8 = 0
 SP_CONN: u8 = 1
@@ -8001,6 +8013,10 @@ SPF_GLUE: u32 = 1  // a control point that glues to connection points (SP-04)
   - `Cancel` -- Esc during a live gesture: take the preview back
   - `Connect { tool: u32, a: [f32; 2], ga: SeGlue, b: [f32; 2], gb: SeGlue }` -- the connector or line tool drew from a to b
   - `Draw { tool: u32, a: [f32; 2], b: [f32; 2] }` -- a drawing tool drew the box from a to b (a == b: a click)
+  - `Stroke { pts: Vec<[f32; 2]>, ga: SeGlue, gb: SeGlue }` -- the freeform tool drew this way (world points, at least two); its begin glued to `ga`,
+    its end to `gb` (connection points only)
+  - `Arc { a: [f32; 2], ga: SeGlue, b: [f32; 2], gb: SeGlue, horizontal: bool }` -- the arc tool drew a quarter ellipse from a to b that leaves a horizontally
+    (horizontal) or vertically; glued like a line's ends
   - `Text { key: u64, ch: Option<char> }` -- edit the text of a shape (double click, F2, Enter, or a typed character)
   - `Context { key: u64, at: [i32; 2] }` -- right click, Shift+F10 or the menu key on a shape (0: the page); at = window px
   - `Delete` -- Del with a selection
@@ -55165,7 +55181,9 @@ a Del="1" mark; restore_row and restore_section remove it again.
   put a shape on these layers (LayerMember; empty: on none)
 - **`fn delete_layer(&mut self, page: PageRef, ix: u32) -> Result<(), EditError>`**
   delete a layer of a page; shapes on it leave it (their own LayerMember cells), the
-  shapes themselves stay (LY-04 asks the user first and deletes them before)
+  shapes themselves stay (LY-04 asks the user first and deletes them before).  The layers
+  after it move one down (IX - 1, as Visio keeps a page's layers numbered without gaps) and
+  the shapes' own LayerMember cells follow
 - **`fn add_shape(&mut self, owner: Owner, parent: Option<ShapeRef>, kind: ShapeKind) -> Result<ShapeRef, EditError>`**
   add an empty shape on a page or in a master, on top of its siblings -> its handle; a
   parent that is not a group becomes one
@@ -55204,6 +55222,12 @@ a Del="1" mark; restore_row and restore_section remove it again.
   set a shape's attributes as a whole (kind, names, references)
 - **`fn set_text(&mut self, shape: ShapeRef, text: Option<Text>) -> Result<(), EditError>`**
   set a shape's own text (None: inherited from the master shape again)
+- **`fn add_part(&mut self, name: &str, content_type: &str, rel_type: &str, data: Vec<u8>) -> Result<usize, EditError>`**
+  add a part the model keeps as bytes (a picture's media part) at the end of
+  Document::parts -> its index; a name some part has already (ASCII case ignored, a
+  leading '/' too) is refused (Exists)
+- **`fn remove_part(&mut self, index: usize) -> Result<(), EditError>`**
+  remove the part at `index` of Document::parts (shapes that name it show no picture)
 - **`fn set_foreign(&mut self, shape: ShapeRef, foreign: Option<ForeignData>) -> Result<(), EditError>`**
   set the picture data of a Foreign shape
 - **`fn add_connect(&mut self, owner: Owner, connect: Connect) -> Result<(), EditError>`**
@@ -56370,7 +56394,13 @@ instance of it dropped on a page, the texts of masters and stencils in five lang
   place(&mut tx, page, master, x, y, lang) -> ShapeRef   an instance at (x, y) inches on the
                                      page (y up): Name in language lang, NameU the master's
                                      (LG-04; "Rechteck.7" when the page has one already), its
-                                     text and translated cells in that language
+                                     text and translated cells in that language; (JD8 rest,
+                                     LY-03) the master's layers come along: the page gets the
+                                     ones it lacks (matched by NameUniv, else Name, with the
+                                     master's Visible, Print, Lock, Snap, Glue, Color and
+                                     ColorTrans) and every shape of the instance its own
+                                     LayerMember with the page's indices (the master's name
+                                     the rows of its own Layer section)
 
 The JFD_ cells are JFDiagrammer's own (apps/JFDiagrammer/stencils/README.md); diagram_io's
 stencil builder writes them, the Shapes panel reads them.  Visio keeps them as ordinary User
@@ -56453,6 +56483,12 @@ JFD_TR: &str = "JFD_Tr"
   `lang` (an index into LANGS), NameU the master's, unique on the page with ".ID" like Visio;
   the text and translated cells in that language where they differ from the master's
 
+- **`fn bring_layers(tx: &mut Transaction, page: PageRef, master: MasterRef, shape: ShapeRef) -> Result<(), EditError>`**
+  (LY-03) the layers of `master` that the shapes of its instance `shape` are on: the page gets
+  the ones it lacks (matched by NameUniv, else Name), each shape of the instance its own
+  LayerMember with the page's indices (Visio's: a master's shapes name the rows of the
+  master's Layer section, an instance on a page names the page's)
+
 - **`fn base64(data: &[u8]) -> String`**
   base64 (RFC 4648, with padding)
 
@@ -56522,6 +56558,10 @@ groups, z-order, new shapes, text, copy and paste (JD7: SP-03..07, TX-01, TX-03,
   new_shape(tx, eng, owner, Basic::Rectangle | Ellipse | TextBox, a, b)
   set_text(tx, eng, shape, text) / text_frame / set_text_frame   (TX-01, TX-03)
   copy(doc, shapes) -> Clip / paste(tx, eng, owner, &clip, offset)
+  new_freeform / new_arc / simplify / Spline / quarter_arc   (JD8 rest) the freeform and arc
+                                      tools: 1-D shapes like a line (ops/draw.rs, RS-16)
+  new_picture / probe_picture / PictureInfo   (JD8 rest) a picture file as a Foreign shape
+                                      with its bytes as a package part (ops/picture.rs, RE-02)
 
 Every position is on the page in drawing units (PinX of a top-level shape as the file has
 it), y up; local coordinates have their origin at the bottom left of the shape's box.  A
@@ -56729,7 +56769,10 @@ Pasted shapes get new IDs; the formulas of the pasted shapes that name a copied 
 Sheet.N (or by a NameU that ends in .N) name its copy, Names and NameUs that end in .<old ID>
 end in the new one, UniqueIDs are dropped, the Connect entries between copied shapes come
 along with the new IDs.  Glue to a shape outside the copy is let go: the glued cells keep
-their values as constants, the Connect entry stays behind.  A Clip holds the document's
+their values as constants, the Connect entry stays behind.  (JD8 rest, LY-03) The layers of
+the page the shapes were copied from come along by name: on another page the missing ones are
+added (with their Visible, Print, Lock, Snap, Glue, Color, ColorTrans) and the copies' own
+LayerMember cells name the target page's indices.  A Clip holds the document's
 string handles and refers to its masters and styles by ID: it pastes into the document it
 was copied from (an app with several documents copies across them through a file format).
 ```
@@ -56754,6 +56797,164 @@ was copied from (an app with several documents copies across them through a file
 - **`fn paste(tx: &mut Transaction, eng: &mut Engine, owner: Owner, clip: &Clip, offset: [f64; 2]) -> Result<Vec<ShapeRef>, EditError>`**
   paste copied shapes on a page or in a master (into the document they were copied from),
   on top of its shapes and moved by `offset` (page) -> the new top-level shapes
+
+### `diagram_core/src/ops/draw.rs`
+
+Source: [`lib/diagram_core/src/ops/draw.rs`](../lib/diagram_core/src/ops/draw.rs)
+
+```text
+ops::draw -- the freeform and arc tools (RS-16, KB-09): a stroke smoothed into a NURBS curve,
+a quarter of an ellipse between two points.  Both are 1-D shapes like a line (glue::new_line):
+their ends glue to connection points (CN-12) and their geometry follows Width, so they keep
+their form when an end moves.
+
+  simplify(pts, tol) -> corners       Ramer-Douglas-Peucker: the points of a stroke that keep
+                                      every other point within tol of the polyline
+  Spline::of(points) -> Spline        a clamped B-spline (degree 3, fewer for 2 or 3 points)
+                                      with the points as its control polygon and evenly spaced
+                                      knots 0, 1, 2 ...; the curve starts and ends at the
+                                      first and last point and runs smoothly along the rest
+  quarter_arc(a, b, horizontal) -> Arc   the quarter ellipse from a to b with page-parallel
+                                      axes: horizontal = it leaves a horizontally (and meets b
+                                      vertically), else the other way round
+  new_freeform(tx, eng, owner, stroke, tol, close, begin, end) -> ShapeRef
+  new_arc(tx, eng, owner, begin, end, horizontal) -> ShapeRef
+
+How Visio keeps them (MS-VSDX, Geometry section rows; geometry.rs reads them the same way):
+* The freeform: MoveTo at the begin, then one NURBSTo whose X, Y is the end, A the knot of
+  the last control point, B its weight, C the knot of the first one (the current point), D
+  its weight, and E = NURBS(knotLast, degree, xType, yType, x1, y1, knot1, weight1, ...) the
+  control points between (type 0: a fraction of Width / Height, 1: local inches).  Visio's
+  own freeform tool writes NURBSTo too; its smoothing is its own (not documented), so the
+  curve here is a choice: the corners of the stroke as control points.  A 1-D shape has
+  Height 0 (its chord is the local x axis, as a line's), so the y values are local inches
+  written as Width*k inside the NURBS formula: the whole curve scales with Width when an
+  end moves, as a line's rows do (Annahme: Visio's 1-D freeforms keep y as constants of
+  their own; the formula keeps the form instead, and Visio evaluates NURBS() with
+  expressions like any function).
+* A stroke that ends where it began (within `close`) is a closed 2-D shape (Visio's freeform
+  tool closes a shape there and fills it): its box around the control points, the rows in
+  fractions of Width and Height (xType = yType = 0), filled.
+* The arc: MoveTo at the begin, an EllipticalArcTo to the end through the control point A, B
+  (the middle of the quarter: 45 degrees of the ellipse's parameter), C the angle of the
+  ellipse's major axis in the shape's local coordinates (the page's x axis, so -Angle at
+  the start), D the ratio of that axis to the other.  A and B are Width*k as well.  Visio's
+  arc tool draws a quarter ellipse whose bow follows the direction the drag starts in
+  (Annahme from its help: "drag in the direction you want the arc to bow"; the start's
+  axis decides here).
+The 1-D cells are those of new_line: PinX/Y in the middle, Width the chord, Angle its
+direction, LocPinX Width*0.5, Begin and End constants until glued.
+```
+
+- **`fn simplify(pts: &[[f64; 2]], tol: f64) -> Vec<[f64; 2]>`**
+  the corners of a stroke: every point of `pts` lies within `tol` of the polyline through the
+  result, which starts and ends with the stroke's first and last point (repeated points go)
+
+- **`struct Spline`**
+  a clamped, uniform B-spline through its first and last control point
+  - `degree: usize`
+  - `points: Vec<[f64; 2]>`
+  - `knots: Vec<f64>` -- the full knot vector: points + degree + 1 knots
+
+**`impl Spline`**
+
+- **`fn of(points: &[[f64; 2]]) -> Option<Spline>`**
+  the spline with these control points: degree 3 (2 for three points, 1 for two), knots
+  0 .. 0, 1, 2 .. n - degree + 1 .. (None: fewer than two points)
+- **`fn at(&self, t: f64) -> [f64; 2]`**
+  the point at parameter t in 0 ..= 1 of the knot range (de Boor)
+
+- **`struct Arc`**
+  a quarter of an ellipse with axes parallel to the page's
+  - `centre: [f64; 2]`
+  - `rx: f64` -- the half axes along x and y
+  - `ry: f64`
+  - `mid: [f64; 2]` -- the point halfway (45 degrees of the parameter)
+
+- **`fn quarter_arc(a: [f64; 2], b: [f64; 2], horizontal: bool) -> Arc`**
+  the quarter ellipse from `a` to `b`: leaving `a` horizontally (horizontal) or vertically
+
+- **`fn new_freeform(tx: &mut Transaction, eng: &mut Engine, owner: Owner, stroke: &[[f64; 2]], tol: f64, close: f64, begin: Target, end: Target) -> Result<ShapeRef, EditError>`**
+  a freeform shape from a stroke (page points in drawing units): its corners within `tol`
+  (simplify) smoothed into a NURBS curve; a stroke whose end lies within `close` of its start
+  (and that has a few corners) is a closed, filled 2-D shape, else a 1-D shape whose ends glue
+  like a line's (Target::Shape is refused, as for lines) -> its handle.  A stroke without
+  length is refused (Invalid)
+
+- **`fn new_arc(tx: &mut Transaction, eng: &mut Engine, owner: Owner, begin: ([f64; 2], Target), end: ([f64; 2], Target), horizontal: bool) -> Result<ShapeRef, EditError>`**
+  a quarter-ellipse arc from `begin` to `end` (page points with their glue targets; lines
+  glue statically, Target::Shape is refused), leaving the begin horizontally or vertically
+  (quarter_arc) -> its handle.  Begin and end in one place are refused (Invalid)
+
+### `diagram_core/src/ops/picture.rs`
+
+Source: [`lib/diagram_core/src/ops/picture.rs`](../lib/diagram_core/src/ops/picture.rs)
+
+```text
+ops::picture -- a picture file as a shape (RE-02 "Bild aus Datei", SP-09): its format, size
+and resolution read from its header, its bytes as a media part of the package, a Foreign
+shape that shows it
+
+  probe_picture(bytes) -> Option<PictureInfo>   PNG (IHDR, pHYs), JPEG (SOFn, JFIF density),
+                                      GIF (logical screen), BMP (DIB header, pixels per metre):
+                                      format, pixels, dots per inch (0: the file does not say)
+  info.size(per_inch, max) -> [w, h]  the size Visio gives it: pixels / dpi (96 when the file
+                                      does not say) in paper inches, times the drawing units
+                                      per paper inch, scaled down (proportionally) into `max`
+  new_picture(tx, eng, owner, bytes, format, centre, size) -> ShapeRef
+
+How Visio keeps a picture ([MS-VSDX] ForeignData, Foreign shapes): a shape of Type
+"Foreign" with a ForeignData element (ForeignType="Bitmap", CompressionType "PNG", "JPEG",
+"GIF" ...) whose Rel names a part of the package by an image relationship
+(/visio/media/imageN.ext; diagram_io::vsdx::write makes the relationship and the content type
+from Document::parts, the shape refers to the part by its name).  The picture fills the box
+ImgOffsetX/Y, ImgWidth/ImgHeight inside the shape, cut at the shape's box; Visio writes them
+as ImgOffsetX = ImgWidth*0, ImgOffsetY = ImgHeight*0, ImgWidth = Width*1, ImgHeight =
+Height*1, so the picture stretches with the shape.  The shape here also has a rectangle in
+Geometry (no fill) and LinePattern 0, so a border can be given later (Line format) without a
+line at first; Annahme: Visio's inserted pictures carry such a section too, their border is
+off until set.  A BMP is best converted to PNG by the caller (CompressionType "BMP" is
+written for it here, Annahme from [MS-VSDX]'s list of compression types).
+```
+
+- **`enum PictureFormat`**
+  the formats of picture files
+  - `Png`
+  - `Jpeg`
+  - `Gif`
+  - `Bmp`
+
+**`impl PictureFormat`**
+
+- **`fn extension(self) -> &'static str`**
+  the part name's extension
+- **`fn content_type(self) -> &'static str`**
+  the part's content type
+- **`fn compression(self) -> &'static str`**
+  ForeignData's CompressionType
+
+- **`struct PictureInfo`**
+  what a picture file's header says
+  - `format: PictureFormat`
+  - `w: u32` -- pixels
+  - `h: u32`
+  - `dpi: [f64; 2]` -- dots per inch across and down (0: the file does not say)
+
+**`impl PictureInfo`**
+
+- **`fn size(&self, per_inch: f64, max: [f64; 2]) -> [f64; 2]`**
+  the size of the picture's shape: its pixels at its resolution (96 dpi when the file does
+  not say) in paper inches times `per_inch` (drawing units per paper inch), scaled down
+  into `max` (width, height; 0: no bound) keeping its proportions
+
+- **`fn probe_picture(b: &[u8]) -> Option<PictureInfo>`**
+  the format, pixels and resolution of a picture file (None: no PNG, JPEG, GIF or BMP, or a
+  header that ends too soon or names no pixels)
+
+- **`fn new_picture(tx: &mut Transaction, eng: &mut Engine, owner: Owner, bytes: &[u8], format: PictureFormat, centre: [f64; 2], size: [f64; 2]) -> Result<ShapeRef, EditError>`**
+  a picture of `format` with these bytes as a Foreign shape of `size` (drawing units) around
+  `centre` on top of the owner's shapes; the bytes become a new media part -> the shape (an
+  empty size or no bytes: Invalid)
 
 ### `diagram_core/src/ops/points.rs`
 
@@ -56992,6 +57193,8 @@ inches (geometry times PageScale / DrawingScale).
   what build draws
   - `background: bool` -- draw the page's background pages under it
   - `hidden_layers: bool` -- draw shapes on hidden layers too
+  - `print: bool` -- (JD8 rest) the page as printed and exported: shapes on layers that do not print (Layer
+    row Print 0, LY-02) and shapes with NonPrinting set are left out
 
 - **`struct Drawing`**
   a page as items to draw
@@ -60325,8 +60528,9 @@ Source: [`lib/diagram_view/src/image.rs`](../lib/diagram_view/src/image.rs)
 image -- the pictures of Foreign shapes: bytes from the package or inline base64, decoded
 
   bytes(doc, &ImageSource) -> Option<Vec<u8>>   a part's bytes, or the inline data decoded
-  decode(bytes) -> Picture                      PNG and JPEG as pixels (straight ARGB rows);
-                                                EMF, WMF and anything else: a placeholder
+  decode(bytes) -> Picture                      PNG, JPEG, (JD8 rest) GIF (its first frame)
+                                                and BMP as pixels (straight ARGB rows); EMF,
+                                                WMF and anything else: a placeholder
   base64(text)                                  RFC 4648 with padding and line breaks
 
 The format is told by the bytes (the signatures), not by the file's attributes.  A picture

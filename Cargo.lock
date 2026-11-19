@@ -770,6 +770,8 @@ version = "0.2.1"
 dependencies = [
  "jflib-diagram-core",
  "jflib-gfx",
+ "jflib-img-bmp",
+ "jflib-img-gif",
  "jflib-img-jpeg",
  "jflib-img-png",
  "jflib-pdf",

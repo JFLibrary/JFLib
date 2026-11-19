@@ -46,6 +46,11 @@
 //                     Format, Shapes verbinden, the Verbindungspfeile
 //   src/structures_cff.rs   (JD10) the register Funktionsübergreifendes Flussdiagramm
 //   src/layout_ui.rs  (JD10) Layout-Verhalten per shape, Seite einrichten › Layout und Routing
+//   src/cmds_draw.rs  (JD8 rest) Zeichentools: the split button, the freeform and arc tools
+//   src/cmds_picture.rs  (JD8 rest) Einfügen › Bilder › Bild aus Datei
+//   src/cmds_paste.rs (JD8 rest) Inhalte einfügen, Als Link einfügen, Strg+V from the system
+//   src/layers.rs     (JD8 rest) Ebene zuweisen, Ebeneneigenschaften, the layers on the canvas
+//   src/select_type.rs  (JD8 rest) Markieren › Nach Typ auswählen
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too)
@@ -66,7 +71,8 @@
 // a drawing on the command line opens at start (JD4); --no-system-fonts draws with the style's
 // fonts only (the same on every machine); --write-stencils DIR writes the built-in stencils
 // (.vssx, metric and US) into DIR and ends (JD9: the user's check in Visio); --export-dir DIR
-// puts DIR in front of the name the export's save dialog proposes (JD12).
+// puts DIR in front of the name the export's save dialog proposes (JD12); --picture-dir DIR is
+// where Bild aus Datei's dialog starts (JD8 rest).
 //
 //   python build_rs.py run JFDiagrammer
 //   python build_rs.py test JFDiagrammer          tests/*.uis
@@ -80,6 +86,9 @@
 extern crate alloc;
 
 mod backstage;
+mod cmds_draw;
+mod cmds_paste;
+mod cmds_picture;
 mod commands;
 mod design_gallery;
 mod design_store;
@@ -94,12 +103,14 @@ mod format_pane;
 mod format_quick;
 mod icons;
 mod lang;
+mod layers;
 mod layout_ui;
 mod options;
 mod panes;
 mod print_layout;
 mod print_ui;
 mod ribbon;
+mod select_type;
 mod shell;
 mod stencils;
 mod stencils_drop;
@@ -204,6 +215,12 @@ pub(crate) struct Diagrammer {
     /// dialog and register
     pub structs: structures::Structs,
     pub layout: layout_ui::LayoutState,
+    /// (JD8 rest) Zeichentools, Bild aus Datei, Inhalte einfügen, Ebenen, Nach Typ auswählen
+    pub draw: cmds_draw::DrawState,
+    pub pictures: cmds_picture::PictureState,
+    pub paste: cmds_paste::PasteState,
+    pub layers: layers::LayerState,
+    pub select: select_type::SelectState,
 }
 
 impl Diagrammer {
@@ -253,6 +270,11 @@ impl Diagrammer {
             quick: format_quick::QuickTiles::default(),
             structs: structures::Structs::default(),
             layout: layout_ui::LayoutState::default(),
+            draw: cmds_draw::DrawState::default(),
+            pictures: cmds_picture::PictureState::default(),
+            paste: cmds_paste::PasteState::default(),
+            layers: layers::LayerState::default(),
+            select: select_type::SelectState::default(),
         }
     }
 
@@ -382,6 +404,8 @@ impl App for Diagrammer {
         if let Some((key, ch, fresh)) = self.text_req.take() {
             edit_text::begin_with(self, ui, key, ch, fresh);
         }
+        // (JD8 rest) what the system's clipboard offers (Einfügen, Inhalte einfügen)
+        cmds_paste::poll(self, ui);
         commands::states(self, ui);
         stencils_panel::states(self, ui);
         shell::frame(self, ui);
@@ -391,6 +415,12 @@ impl App for Diagrammer {
         export_ui::dialogs(self, ui);
         print_ui::dialogs(self, ui);
         layout_ui::dialog(self, ui);
+        // (JD8 rest) the dialogs of pictures, pasting, layers, select by type
+        cmds_picture::dialog(self, ui);
+        cmds_paste::dialog(self, ui);
+        layers::assign_dialog(self, ui);
+        layers::props_dialog(self, ui);
+        select_type::dialog(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

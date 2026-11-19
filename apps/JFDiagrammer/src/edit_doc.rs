@@ -106,10 +106,15 @@ pub(crate) fn edit<T>(o: &mut Opened, label: &str, done: bool, f: impl FnOnce(&m
     take_back(o);
     let ed = &mut o.ed;
     let before = if ed.theme_new_shapes { Vec::new() } else { crate::design_gallery::shapes_now(&o.doc) };
+    // (JD8 rest) pages with active layers: new shapes go onto them (layers.rs)
+    let active = crate::layers::active_before(&o.doc);
     let mut tx = o.doc.transaction(label);
     let r = f(&mut tx, &mut ed.eng).and_then(|v| {
         if !ed.theme_new_shapes {
             crate::design_gallery::unthemed_new(&mut tx, &mut ed.eng, &before)?;
+        }
+        if !active.is_empty() {
+            crate::layers::assign_new(&mut tx, &active)?;
         }
         Ok(v)
     });

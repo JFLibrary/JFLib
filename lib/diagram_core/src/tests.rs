@@ -676,8 +676,60 @@ fn layers() {
     assert!(f.doc.layer_members(f.plain).is_empty());
     assert!(del.undo(&mut f.doc));
     assert_eq!(f.doc.layer_members(f.plain), vec![1]);
+    // (JD8 rest) the first one goes: the second becomes 0, the shapes follow
+    let mut tx = f.doc.transaction("Ebene löschen");
+    tx.delete_layer(f.page, 0).unwrap();
+    let mut first = tx.commit().unwrap();
+    let rest = f.doc.layers(f.page);
+    assert_eq!((rest.len(), rest[0].key(), rest[0].text("Name")), (1, RowKey::Index(0), Some("Geräte")));
+    assert_eq!(f.doc.layer_members(f.inst), vec![0]);
+    assert_eq!(f.doc.layer_members(f.plain), vec![0]);
+    assert!(first.undo(&mut f.doc));
+    assert_eq!(f.doc.layer_members(f.inst), vec![0, 1]);
     assert!(ch.undo(&mut f.doc));
     assert!(f.doc.layers(f.page).is_empty());
+}
+
+// (JD8 rest) a layer that does not print, a hidden layer, NonPrinting: what the screen and the
+// printout draw (render::Options::print)
+#[test]
+fn layers_print_and_show() {
+    let mut doc = Document::new(DocKind::Drawing);
+    let page = doc.insert_page(Page::new(PageHeader { id: 0, ..PageHeader::default() })).unwrap();
+    let owner = Owner::Page(page);
+    let mut eng = formula::Engine::new();
+    let mut tx = doc.transaction("Ebenen");
+    let mut shapes = Vec::new();
+    for k in 0..4 {
+        let x = k as f64 * 2.0;
+        shapes.push(ops::new_shape(&mut tx, &mut eng, owner, ops::Basic::Rectangle, [x, 0.0], [x + 1.0, 1.0]).unwrap());
+    }
+    let quiet = tx.add_layer(page, "Notizen", "Notes").unwrap();
+    let hidden = tx.add_layer(page, "Verborgen", "Hidden").unwrap();
+    let print = tx.single("Print");
+    let visible = tx.single("Visible");
+    let sec = SecKey::one(names::LAYER);
+    tx.set_constant(SheetRef::Page(page), &CellAddr::row(sec, RowKey::Index(quiet), print.cell), Value::Num(0.0), None).unwrap();
+    tx.set_constant(SheetRef::Page(page), &CellAddr::row(sec, RowKey::Index(hidden), visible.cell), Value::Num(0.0), None).unwrap();
+    // 0: no layer, 1: on the quiet layer, 2: on the hidden one, 3: NonPrinting
+    tx.set_layers(shapes[1], &[quiet]).unwrap();
+    tx.set_layers(shapes[2], &[hidden]).unwrap();
+    let np = tx.single("NonPrinting");
+    tx.set_constant(SheetRef::Shape(shapes[3]), &np, Value::Num(1.0), None).unwrap();
+    tx.commit().unwrap();
+    let drawn = |doc: &Document, print: bool| -> Vec<bool> {
+        let opts = render::Options { print, ..render::Options::default() };
+        let d = render::build(doc, page, &mut render::ApproxMeasure, &opts);
+        shapes.iter().map(|s| d.items.iter().any(|i| i.top == *s)).collect()
+    };
+    assert_eq!(drawn(&doc, false), vec![true, true, false, true]);
+    assert_eq!(drawn(&doc, true), vec![true, false, false, false]);
+    // on a printing layer as well: printed
+    let mut tx = doc.transaction("Ebene zuweisen");
+    let both = tx.add_layer(page, "Alles", "All").unwrap();
+    tx.set_layers(shapes[1], &[quiet, both]).unwrap();
+    tx.commit().unwrap();
+    assert_eq!(drawn(&doc, true), vec![true, true, false, false]);
 }
 
 #[test]

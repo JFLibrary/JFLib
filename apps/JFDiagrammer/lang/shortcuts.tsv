@@ -18,6 +18,9 @@
 #   it   Grassetto Ctrl+G, Sottolineato Ctrl+S: Salva goes to Shift+F12, Raggruppa to
 #        Ctrl+Shift+G
 #   fr   Gras Ctrl+G: Grouper goes to Ctrl+Shift+G
+# Inhalte einfügen is Office's Ctrl+Alt+V in every language (JD8 rest); the drawing tools keep
+# Visio's Ctrl+4 .. Ctrl+9 (KB-09), the Zeichentools split button repeats the last one and has
+# no key of its own.
 # Flip horizontal moves from Visio's Ctrl+H to Ctrl+Shift+H in every language (Ctrl+H is
 # Replace in Office; KB-02).  The es / it / fr cells for the file commands are Office's as far
 # as known here and are still to be checked against an Office of that language.
@@ -33,6 +36,7 @@ REDO	Ctrl+Y	Ctrl+Y	Ctrl+Y	Ctrl+Y	Ctrl+Y
 CUT	Ctrl+X	Ctrl+X	Ctrl+X	Ctrl+X	Ctrl+X
 COPY	Ctrl+C	Ctrl+C	Ctrl+C	Ctrl+C	Ctrl+C
 PASTE	Ctrl+V	Ctrl+V	Ctrl+V	Ctrl+V	Ctrl+V
+PASTE_SPECIAL	Ctrl+Alt+V	Ctrl+Alt+V	Ctrl+Alt+V	Ctrl+Alt+V	Ctrl+Alt+V
 DUPLICATE	Ctrl+D	Ctrl+D	Ctrl+D	Ctrl+D	Ctrl+D
 FORMAT_PAINTER	Ctrl+Shift+P	Ctrl+Shift+P	Ctrl+Shift+P	Ctrl+Shift+P	Ctrl+Shift+P
 SELECT_ALL	Ctrl+A	Ctrl+A	Ctrl+E	Ctrl+A	Ctrl+A

@@ -139,7 +139,7 @@ fn view_index(app: &mut Diagrammer, page: PageRef) -> Option<usize> {
     if app.print.views.len() > 8 {
         app.print.views.remove(0);
     }
-    let view = PageView::new(&o.doc, page, &mut app.fonts, &Options { background: bg, hidden_layers: false });
+    let view = PageView::new(&o.doc, page, &mut app.fonts, &Options { background: bg, hidden_layers: false, print: true });
     app.print.views.push((ver, page, bg, view));
     Some(app.print.views.len() - 1)
 }

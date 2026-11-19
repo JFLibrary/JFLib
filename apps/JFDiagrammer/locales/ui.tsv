@@ -654,3 +654,40 @@ Containerformatvorlage	Container style	Estilo de contenedor	Stile contenitore	St
 Container einfügen	Insert Container	Insertar contenedor	Inserisci contenitore	Insérer un conteneur
 Beschriftung einfügen	Insert Callout	Insertar llamada	Inserisci richiamo	Insérer une bulle d'annotation
 Verbindungspfeil	Connect arrow	Flecha de conexión	Freccia di collegamento	Flèche de liaison
+Als:	As:	Como:	Come:	En tant que :
+Bild (PNG oder BMP)	Picture (PNG or BMP)	Imagen (PNG o BMP)	Immagine (PNG o BMP)	Image (PNG ou BMP)
+Shapes (JFDiagrammer)	Shapes (JFDiagrammer)	Formas (JFDiagrammer)	Forme (JFDiagrammer)	Formes (JFDiagrammer)
+Unformatierter Text (als Textfeld)	Unformatted text (as a text box)	Texto sin formato (como cuadro de texto)	Testo non formattato (come casella di testo)	Texte sans mise en forme (en tant que zone de texte)
+Die Zwischenablage ist leer.	The clipboard is empty.	El Portapapeles está vacío.	Gli Appunti sono vuoti.	Le Presse-papiers est vide.
+Als Hyperlink lässt sich eine Adresse (https://…) oder ein Pfad einfügen, oder Shapes aus dieser Zeichnung.	An address (https://…) or a path can be pasted as a hyperlink, or shapes from this drawing.	Como hipervínculo se puede pegar una dirección (https://…) o una ruta, o formas de este dibujo.	Come collegamento ipertestuale si può incollare un indirizzo (https://…) o un percorso, oppure forme di questo disegno.	Une adresse (https://…) ou un chemin peut être collé en tant que lien hypertexte, ou des formes de ce dessin.
+Kein Hyperlink in der Zwischenablage	No hyperlink on the clipboard	No hay ningún hipervínculo en el Portapapeles	Nessun collegamento ipertestuale negli Appunti	Aucun lien hypertexte dans le Presse-papiers
+png;jpg;jpeg;gif;bmp=Bilder	png;jpg;jpeg;gif;bmp=Pictures	png;jpg;jpeg;gif;bmp=Imágenes	png;jpg;jpeg;gif;bmp=Immagini	png;jpg;jpeg;gif;bmp=Images
+„{}“ kann nicht eingefügt werden.	“{}” cannot be inserted.	No se puede insertar «{}».	Impossibile inserire «{}».	Impossible d'insérer « {} ».
+Das Bild hat kein bekanntes Format (PNG, JPEG, GIF, BMP).	The picture is in no known format (PNG, JPEG, GIF, BMP).	La imagen no tiene un formato conocido (PNG, JPEG, GIF, BMP).	L'immagine non ha un formato noto (PNG, JPEG, GIF, BMP).	L'image n'a pas de format connu (PNG, JPEG, GIF, BMP).
+Bild einfügen	Insert Picture	Insertar imagen	Inserisci immagine	Insérer une image
+Rot	Red	Rojo	Rosso	Rouge
+Grün	Green	Verde	Verde	Vert
+Blau	Blue	Azul	Blu	Bleu
+Gelb	Yellow	Amarillo	Giallo	Jaune
+Magenta	Magenta	Magenta	Magenta	Magenta
+Cyan	Cyan	Cian	Ciano	Cyan
+Aktiv	Active	Activa	Attivo	Actif
+Einrasten	Snap	Ajustar	Aggancia	Magnétisme
+Kleben	Glue	Pegar	Incolla	Collage
+Sichtbar	Visible	Visible	Visibile	Visible
+Sperren	Lock	Bloquear	Blocca	Verrouiller
+Auf Ebene(n):	On layer(s):	En capa(s):	Sui livelli:	Sur le(s) calque(s) :
+Diese Seite hat keine Ebenen.	This page has no layers.	Esta página no tiene capas.	Questa pagina non ha livelli.	Cette page n'a pas de calques.
+Alle	All	Todas	Tutti	Tous
+Name der neuen Ebene	Name of the new layer	Nombre de la nueva capa	Nome del nuovo livello	Nom du nouveau calque
+Neu…	New…	Nueva…	Nuovo…	Nouveau…
+Anzahl	Count	Número	Numero	Nombre
+Farbe der Ebene	Layer color	Color de la capa	Colore del livello	Couleur du calque
+Umbenennen	Rename	Cambiar nombre	Rinomina	Renommer
+„{}“ löschen? {} Shapes, die auf keiner anderen Ebene liegen, werden mit gelöscht.	Delete “{}”? {} shapes that are on no other layer are deleted with the layer.	¿Eliminar «{}»? {} formas que no están en ninguna otra capa se eliminarán con la capa.	Eliminare «{}»? {} forme che non si trovano su nessun altro livello verranno eliminate con il livello.	Supprimer « {} » ? {} formes qui ne sont sur aucun autre calque seront supprimées avec le calque.
+Ebene löschen	Delete Layer	Eliminar capa	Elimina livello	Supprimer le calque
+Behalten	Keep	Conservar	Mantieni	Conserver
+Gruppen	Groups	Grupos	Gruppi	Groupes
+Auswahl nach	Select by	Seleccionar por	Seleziona per	Sélectionner par
+Shapetyp	Shape type	Tipo de forma	Tipo di forma	Type de forme
+Keine Ebene	No layer	Ninguna capa	Nessun livello	Aucun calque

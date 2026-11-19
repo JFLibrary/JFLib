@@ -324,7 +324,7 @@ pub(crate) fn export(app: &mut Diagrammer, path: &str) -> Result<String, String>
     let name = app.drawing_name();
     let st = &app.export;
     let f = st.format.clamp(0, FORMATS.len() as i32 - 1) as usize;
-    let opts = Options { background: st.background != 0, hidden_layers: false };
+    let opts = Options { background: st.background != 0, hidden_layers: false, print: true };
     let (links, bookmarks, props, paper, shape_data) = (st.links != 0, st.bookmarks != 0, st.props != 0, st.paper != 0, st.shape_data != 0);
     let (dpi, transparent, quality) = (st.dpi(), st.transparent != 0, st.quality);
     let Some(o) = app.opened.as_ref() else { return Err(String::from(t("Es ist keine Zeichnung geöffnet."))) };
@@ -384,7 +384,7 @@ pub(crate) fn copy_page(app: &mut Diagrammer, ui: &mut Ui, as_svg: bool) {
     let Some(o) = app.opened.as_ref() else { return };
     let is_sel = sel.is_some();
     let doc = sel.as_ref().unwrap_or(&o.doc);
-    let opts = Options { background: !is_sel, hidden_layers: false };
+    let opts = Options { background: !is_sel, hidden_layers: false, print: true };
     let mut view = PageView::new(doc, page, &mut app.fonts, &opts);
     // a selection: its box and two pixels around it
     let pad = 2.0 / 150.0;

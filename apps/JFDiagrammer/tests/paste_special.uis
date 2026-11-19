@@ -1,0 +1,90 @@
+#!args --no-system-fonts --save-dir build
+# JFDiagrammer, JD8 rest: Start › Zwischenablage (RS-01) -- Inhalte einfügen and Als Link
+# einfügen, and Einfügen (Strg+V) with an empty app clipboard (the headless clipboard of the
+# script, never the system's)
+# nothing on any clipboard: Einfügen and its menu are off
+expect button:"Einfügen" disabled
+expect button:"Einfügen: Weitere Optionen" disabled
+# text from another program: Strg+V makes a text box of it (one undo step)
+clip text "Hallo Welt"
+expect button:"Einfügen" enabled
+key ctrl+v
+expect listitem:"Hallo Welt" selected
+key ctrl+z
+expect listitem:"Hallo Welt" missing
+key ctrl+y
+expect listitem:"Hallo Welt" exists
+# a picture from another program: Strg+V makes a picture shape of it
+clip file apps/JFDiagrammer/tests/pic_blue.png
+key ctrl+v
+expect listitem:"Sheet.5" selected
+expect button:"Breite: 51 mm  Höhe: 25 mm  Winkel: 0°" exists
+drag 773,462 573,662
+# a shape with a text, copied inside the app: Strg+V takes the app's shapes first
+cmd 4404
+drag 500,280 650,355
+cmd 4400
+type "Server"
+click 1000,700
+click 575,317
+key ctrl+c
+clip text "https://example.org/netz"
+key ctrl+v
+expect listitem:"https://example.org/netz" missing
+# (the copy goes again, so the record "Server" is one)
+key ctrl+z
+# Inhalte einfügen (Strg+Alt+V): the formats there are now, the text as a text box
+key ctrl+alt+v
+expect dialog:"Inhalte einfügen" exists
+expect radio:"Shapes (JFDiagrammer)" checked
+expect radio:"Unformatierter Text (als Textfeld)" exists
+expect radio:"Bild (PNG oder BMP)" missing
+click radio:"Unformatierter Text (als Textfeld)"
+click button:"OK"
+expect dialog:"Inhalte einfügen" missing
+expect listitem:"https://example.org/netz" selected
+# Als Link einfügen: the shape copied from this drawing -> a text box linking to it
+click 1000,700
+cmd 4354
+expect listitem:"Server (Seite-1)" selected
+shot build/JFDiagrammer-paste.png
+# an address on the clipboard: a text box with that hyperlink (the app's shapes now come from
+# another drawing, the one saved here)
+key ctrl+s
+click #28940
+key ctrl+a
+type "jd8-paste-1.vsdx"
+click button:"Speichern"
+cmd 4097
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+clip text "www.example.org"
+cmd 4354
+expect listitem:"www.example.org" selected
+# a text that is no address: a notice
+clip text "kein Link"
+cmd 4354
+expect "Kein Hyperlink in der Zwischenablage" exists
+click 1000,700
+# a picture: Inhalte einfügen offers it beside the app's shapes
+clip file apps/JFDiagrammer/tests/pic_check.bmp
+key ctrl+alt+v
+expect radio:"Bild (PNG oder BMP)" exists
+expect radio:"Unformatierter Text (als Textfeld)" missing
+click radio:"Bild (PNG oder BMP)"
+click button:"OK"
+expect button:"Breite: 25 mm  Höhe: 13 mm  Winkel: 0°" exists
+# saved and opened again: the hyperlinks' text boxes are there
+key ctrl+s
+click #28940
+key ctrl+a
+type "jd8-paste-2.vsdx"
+click button:"Speichern"
+cmd 4098
+click button:"jd8-paste-1.vsdx"
+expect listitem:"Server (Seite-1)" exists
+expect listitem:"https://example.org/netz" exists
+cmd 4098
+click button:"jd8-paste-2.vsdx"
+expect listitem:"www.example.org" exists
+expect listitem:"Sheet.5" exists

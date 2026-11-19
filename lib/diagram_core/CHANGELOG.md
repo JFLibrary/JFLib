@@ -51,9 +51,28 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - (JD10) `diagram_core::structure`: containers, lists and callouts as Visio stores them, in the Relationships cell of both shapes (`structure::rel`: DEPENDSON types 1/4 container and member, 2/5 list and item in list order, 3/6 target and callout, the others kept): `kind`, `container` (margin, automatic size, lock, styles, heading from a Heading subshape or the own `JFD_HeadingEdge`/`JFD_HeadingSize`, required and excluded categories), `list` (direction, spacing, alignment), `members`, `items`, `containers_of`, `list_of`, `callouts_of`, `target_of`, `categories`, `has_category`; `drop_targets` (every enclosing container that takes a shape, a list by its middle), `carried` (members, nested ones and callouts move, copy and go along), `add_members`, `remove_members`, `set_target`, `settle` after a gesture (membership by place, list order, lists laid out, containers sized deepest first, callouts aimed), `fit`, `layout_list`, `list_index_at`, `insert_marks`, `move_in_list`, `forget`, `disband`, `repair` (one-sided relationships), `set_anchor`, `aim_callouts` (the `Controls.Association` point on the target); `structure::cff`: the cross-functional flowchart (pool, lane list, phase list, lanes and phases laid out horizontally or vertically)
 - (JD10) Formulas: the structure functions CONTAINERCOUNT, CONTAINERSHEETREF (also with a sheet first), CONTAINERMEMBERCOUNT, LISTMEMBERCOUNT, LISTORDER, LISTSHEETREF, CALLOUTCOUNT, CALLOUTTARGETREF, HASCATEGORY (FX-12), IFERROR, and a cell of the sheet a function gives (`CONTAINERSHEETREF(1,"Swimlane")!User.visHeadingText`, `SheetName::Call`)
 - (JD11) Designs: `diagram_core::design`, a typed DrawingML theme with Visio's extensions (`Design`, `Scheme`, `Fill`, `Line`, `Effect`, `FontStyle`, `Variant`, `VarStyle`, `Clr`, `Slot`, `Mod`; `Design::theme_xml`); only Visio's identifiers are taken over (the extension URIs in `design::uri`, the namespace `NS_VT`, element and attribute names), every value is JFLib's own. `design::catalog`: the own designs NetLab, Contour and Contrast with four variants each (scheme numbers from `FIRST_ID` 60001). `design::apply`: `apply`, `set_variant` and `remove` on a page or every page in one transaction (the theme part installed or replaced, each index cell by the part's own component number, the shapes' formatting of themed cells reset unless THEMEGUARD/GUARD or a LockTheme* cell keeps it, unused own parts dropped), `page_design`, `part_id`, `find_part`. `Transaction::set_themes` (undoable), `formula::Theme::scheme_ids`, `Engine::themes_changed`; the engine also notices changed theme parts by itself
+- (JD8 rest) `ops::new_freeform` (a stroke's corners, `ops::simplify`, as the control polygon of a
+  clamped cubic NURBS curve in a NURBSTo row; 1-D like a line, its y values Width-relative so it keeps
+  its form when an end moves; a stroke that ends at its start is a closed, filled 2-D shape),
+  `ops::new_arc` (a quarter ellipse from begin to end as EllipticalArcTo, bowing as the drag
+  started: `ops::quarter_arc`), both gluing their ends to connection points like `glue::new_line`;
+  `ops::Spline`, `ops::Arc`
+- (JD8 rest) Pictures: `ops::probe_picture` (format, pixels and resolution of PNG, JPEG, GIF and BMP
+  headers: `PictureInfo`, `PictureInfo::size` in drawing units bounded to a box), `ops::new_picture`
+  (a Foreign shape, ForeignType Bitmap with its CompressionType, ImgWidth/ImgHeight following the
+  shape, the bytes as a new media part `/visio/media/imageN.ext`); `Transaction::add_part` and
+  `remove_part` (package parts kept as bytes, undoable)
+- (JD8 rest) Layers: `render::Options::print` leaves out shapes on layers that do not print and
+  shapes with NonPrinting (print, export); `instance::place` brings the master's layers onto the
+  page (matched by name, missing ones added with their properties) and gives the instance's shapes
+  the page's layer indices (`instance::bring_layers`, LY-03); `ops::paste` on another page brings the
+  copied shapes' layers along by name
 
 ### Changed
 
+- (JD8 rest) `Transaction::delete_layer` keeps the page's layers numbered without gaps: the layers
+  after the deleted one move one down and the shapes' own LayerMember cells follow (as Visio numbers
+  them); `render::Options` has the new field `print`
 - (JD10) The router of `glue` leaves shapes with ObjType 4 ("do not lay out and route around", CN-17) and containers out of its obstacles
 - The theme cells (ThemeIndex, ColorSchemeIndex, EffectSchemeIndex, ConnectorSchemeIndex, FontSchemeIndex, the variation and embellishment indices) and the quick style cells inherit from the styles: the line and font ones with line and text, the others with fill (`Category::of`); shapes took them only from master shapes and so never got the document's theme
 - (JD11) The display list works out cells stored as "Themed" through the formula engine (THEMEVAL with the style lists, colour transforms, variants, line ends, fill patterns), so a design applied shows at once; `ThemeInfo` reads the format scheme's number from `vt:fmtSchemeEx` as Visio writes it; the text tool's box uses the style "Text Only" for its text too

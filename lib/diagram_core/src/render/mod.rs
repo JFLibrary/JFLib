@@ -72,11 +72,14 @@ pub struct Options {
     pub background: bool,
     /// draw shapes on hidden layers too
     pub hidden_layers: bool,
+    /// (JD8 rest) the page as printed and exported: shapes on layers that do not print (Layer
+    /// row Print 0, LY-02) and shapes with NonPrinting set are left out
+    pub print: bool,
 }
 
 impl Default for Options {
     fn default() -> Options {
-        Options { background: true, hidden_layers: false }
+        Options { background: true, hidden_layers: false, print: false }
     }
 }
 
@@ -383,6 +386,7 @@ fn page_scale(doc: &Document, ps: SheetRef) -> f64 {
 
 struct Layer {
     visible: bool,
+    print: bool,
     color: Option<u32>,
 }
 
@@ -592,13 +596,14 @@ impl<'d, 'm> Builder<'d, 'm> {
             .filter_map(|l| {
                 let RowKey::Index(ix) = l.key() else { return None };
                 let visible = l.num("Visible").is_none_or(|v| v != 0.0);
+                let print = l.num("Print").is_none_or(|v| v != 0.0);
                 let color = match l.get("Color").value() {
                     Value::Num(n) if n >= 0.0 && n != 255.0 => Some(self.palette(n as u32)),
                     Value::Text(s) => parse_color(doc.str(s)),
                     _ => None,
                 }
                 .map(|c| with_alpha(c, l.num("ColorTrans").unwrap_or(0.0)));
-                Some((ix, Layer { visible, color }))
+                Some((ix, Layer { visible, print, color }))
             })
             .collect();
     }
@@ -626,13 +631,20 @@ impl<'d, 'm> Builder<'d, 'm> {
         Some(t)
     }
 
-    /// whether a shape is shown by its layers, and the colour a layer gives it
+    /// whether a shape is shown by its layers, and the colour a layer gives it; printing
+    /// (Options::print), shapes with NonPrinting and shapes only on layers that do not print
+    /// are left out (a shape on several layers prints when one of them prints, as it shows
+    /// when one of them is visible)
     fn layer_state(&self, r: ShapeRef) -> (bool, Option<u32>) {
+        if self.opts.print && self.num(SheetRef::Shape(r), "NonPrinting").is_some_and(|v| v != 0.0) {
+            return (false, None);
+        }
         let members = self.doc.layer_members(r);
         if members.is_empty() || self.layers.is_empty() {
             return (true, None);
         }
         let mut visible = false;
+        let mut printed = false;
         let mut known = false;
         let mut color = None;
         for m in members {
@@ -640,12 +652,19 @@ impl<'d, 'm> Builder<'d, 'm> {
                 Some((_, l)) => {
                     known = true;
                     visible |= l.visible;
+                    printed |= l.print;
                     if color.is_none() {
                         color = l.color;
                     }
                 }
-                None => visible = true,
+                None => {
+                    visible = true;
+                    printed = true;
+                }
             }
+        }
+        if self.opts.print && known && !printed {
+            return (false, color);
         }
         (visible || !known || self.opts.hidden_layers, color)
     }

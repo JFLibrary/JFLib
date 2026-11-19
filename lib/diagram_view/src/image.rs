@@ -1,8 +1,9 @@
 // image -- the pictures of Foreign shapes: bytes from the package or inline base64, decoded
 //
 //   bytes(doc, &ImageSource) -> Option<Vec<u8>>   a part's bytes, or the inline data decoded
-//   decode(bytes) -> Picture                      PNG and JPEG as pixels (straight ARGB rows);
-//                                                 EMF, WMF and anything else: a placeholder
+//   decode(bytes) -> Picture                      PNG, JPEG, (JD8 rest) GIF (its first frame)
+//                                                 and BMP as pixels (straight ARGB rows); EMF,
+//                                                 WMF and anything else: a placeholder
 //   base64(text)                                  RFC 4648 with padding and line breaks
 //
 // The format is told by the bytes (the signatures), not by the file's attributes.  A picture
@@ -65,11 +66,20 @@ pub fn decode(data: &[u8]) -> Decoded {
     if data.starts_with(&[0xD7, 0xCD, 0xC6, 0x9A]) || data.starts_with(&[0x01, 0x00, 0x09, 0x00]) {
         return Decoded::Placeholder("WMF");
     }
-    if data.starts_with(b"GIF8") {
-        return Decoded::Placeholder("GIF");
-    }
-    if data.starts_with(b"BM") {
-        return Decoded::Placeholder("BMP");
+    // (JD8 rest) GIF and BMP, their size from the header first (diagram_core::ops::probe_picture)
+    if data.starts_with(b"GIF8") || data.starts_with(b"BM") {
+        let gif = data.starts_with(b"GIF8");
+        let name = if gif { "GIF" } else { "BMP" };
+        let Some(info) = diagram_core::ops::probe_picture(data) else { return Decoded::Placeholder(name) };
+        if info.w > MAX_SIDE || info.h > MAX_SIDE {
+            return Decoded::Placeholder(name);
+        }
+        let mut sf = Surface::default();
+        let r = if gif { img_gif::decode(data, &mut sf) } else { img_bmp::decode(data, &mut sf) };
+        return match (r, sf.w as u32 <= MAX_SIDE && sf.h as u32 <= MAX_SIDE) {
+            (0, true) => from_surface(&sf).map_or(Decoded::Placeholder(name), Decoded::Picture),
+            _ => Decoded::Placeholder(name),
+        };
     }
     Decoded::Placeholder("?")
 }
