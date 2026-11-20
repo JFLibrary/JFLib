@@ -167,9 +167,9 @@ Verbinder|Layout	Connectors	Conectores	Connettori	Connecteurs
 Rechtwinklig	Right-Angle	En ángulo recto	Ad angolo retto	Angle droit
 Gerade	Straight	Recto	Diritto	Droit
 Gebogen	Curved	Curvo	Curvo	Courbe
-Linienübergänge anzeigen	Show Line Jumps	Mostrar saltos de línea	Mostra salti di linea	Afficher les sauts de ligne
+Linienübergänge anzeigen	Show Line Jumps	Mostrar saltos en los cruces	Mostra salti agli incroci	Afficher les sauts aux croisements
 Verbinder neu routen	Reroute Connectors	Volver a enrutar conectores	Reindirizza connettori	Réacheminer les connecteurs
-Layout und Routing	Layout and Routing	Diseño y enrutamiento	Layout e routing	Disposition et routage
+Layout und Routing	Layout and Routing	Disposición y enrutamiento	Layout e routing	Disposition et routage
 Seitenumbrüche	Page Breaks	Saltos de página	Interruzioni di pagina	Sauts de page
 Gitternetz	Grid	Cuadrícula	Griglia	Grille
 Dynamisches Gitter	Dynamic Grid	Cuadrícula dinámica	Griglia dinamica	Grille dynamique
@@ -285,7 +285,6 @@ Kein Shape ausgewählt.	No shape selected.	No hay ninguna forma seleccionada.	Ne
 Breite	Width	Ancho	Larghezza	Largeur
 Höhe	Height	Alto	Altezza	Hauteur
 Winkel	Angle	Ángulo	Angolo	Angle
-Drehpunkt	Rotation point	Punto de giro	Punto di rotazione	Point de rotation
 Mitte	Center	Centro	Centro	Centre
 Keine Shape-Daten	No shape data	No hay datos de forma	Nessun dato forma	Aucune donnée de forme
 Wählen Sie ein Shape aus, um seine Daten zu sehen.	Select a shape to see its data.	Seleccione una forma para ver sus datos.	Selezionare una forma per visualizzarne i dati.	Sélectionnez une forme pour afficher ses données.
@@ -297,7 +296,7 @@ Textwerkzeuge	Text Tools	Herramientas de texto	Strumenti testo	Outils de texte
 Text|Register	Text	Texto	Testo	Texte
 Shapes drehen	Rotate Shapes	Girar formas	Ruota forme	Faire pivoter les formes
 Formenarten	Shape Styles	Estilos de forma	Stili forma	Styles de forme
-Layout	Layout	Diseño	Layout	Disposition
+Layout	Layout	Disposición	Layout	Disposition
 Visuelle Unterstützung	Visual Aids	Ayudas visuales	Supporti visivi	Aides visuelles
 Mitgliedschaft	Membership	Pertenencia	Appartenenza	Appartenance
 Vorschauen folgen mit den Designs	Previews will come with the themes	Las vistas previas llegarán con los temas	Le anteprime arriveranno con i temi	Les aperçus arriveront avec les thèmes
@@ -649,3 +648,180 @@ Containerformatvorlage	Container style	Estilo de contenedor	Stile contenitore	St
 Container einfügen	Insert Container	Insertar contenedor	Inserisci contenitore	Insérer un conteneur
 Beschriftung einfügen	Insert Callout	Insertar llamada	Inserisci richiamo	Insérer une bulle d'annotation
 Verbindungspfeil	Connect arrow	Flecha de conexión	Freccia di collegamento	Flèche de liaison
+Shape	Shape	Forma	Forma	Forme
+Zoom auf	Zoom to	Zoom a	Zoom a	Zoom à
+Ganze Seite	Whole page	Página completa	Pagina intera	Page entière
+Prozent:	Percent:	Porcentaje:	Percentuale:	Pourcentage :
+Boolesch	Boolean	Booleano	Booleano	Booléen
+Datum	Date	Fecha	Data	Date
+Dauer	Duration	Duración	Durata	Durée
+Feste Liste	Fixed list	Lista fija	Elenco fisso	Liste fixe
+Variable Liste	Variable list	Lista variable	Elenco variabile	Liste variable
+Währung	Currency	Moneda	Valuta	Devise
+Zahl	Number	Número	Numero	Nombre
+Zeichenfolge	String	Cadena	Stringa	Chaîne
+Das Shape hat keine Shape-Daten.	The shape has no shape data.	La forma no tiene datos de forma.	La forma non ha dati forma.	La forme n'a pas de données de forme.
+Felder	Fields	Campos	Campi	Champs
+Eingabeaufforderung	Prompt	Indicación	Messaggio di richiesta	Invite
+Sortierschlüssel	Sort key	Clave de ordenación	Chiave di ordinamento	Clé de tri
+Beim Ablegen fragen	Ask when dropped	Preguntar al colocar	Chiedi al rilascio	Demander lors du dépôt
+Ausgeblendet	Hidden	Oculto	Nascosto	Masqué
+Listen: die Einträge im Format durch Semikolon getrennt.	Lists: the entries in Format, separated by semicolons.	Listas: las entradas en Formato, separadas por punto y coma.	Elenchi: le voci in Formato, separate da punto e virgola.	Listes : les entrées dans Format, séparées par des points-virgules.
+Ziehen verschiebt die Ansicht, ein Rechteck zoomt dorthin.	Drag to move the view; draw a rectangle to zoom there.	Arrastre para mover la vista; dibuje un rectángulo para acercarse a esa zona.	Trascina per spostare la vista; disegna un rettangolo per ingrandire quella zona.	Faites glisser pour déplacer la vue ; tracez un rectangle pour zoomer sur cette zone.
+Oben links	Top left	Arriba a la izquierda	In alto a sinistra	En haut à gauche
+Oben Mitte	Top center	Arriba en el centro	In alto al centro	En haut au centre
+Oben rechts	Top right	Arriba a la derecha	In alto a destra	En haut à droite
+Mitte links	Middle left	Centro a la izquierda	Al centro a sinistra	Au milieu à gauche
+Mitte rechts	Middle right	Centro a la derecha	Al centro a destra	Au milieu à droite
+Unten links	Bottom left	Abajo a la izquierda	In basso a sinistra	En bas à gauche
+Unten Mitte	Bottom center	Abajo en el centro	In basso al centro	En bas au centre
+Unten rechts	Bottom right	Abajo a la derecha	In basso a destra	En bas à droite
+Mehrere Shapes ausgewählt.	Several shapes selected.	Varias formas seleccionadas.	Più forme selezionate.	Plusieurs formes sélectionnées.
+Drehpunktposition	Rotation point	Posición del punto de giro	Posizione del punto di rotazione	Position du point de rotation
+Anfang X	Begin X	Inicio X	Inizio X	Début X
+Anfang Y	Begin Y	Inicio Y	Inizio Y	Début Y
+Ende X	End X	Fin X	Fine X	Fin X
+Ende Y	End Y	Fin Y	Fine Y	Fin Y
+Länge	Length	Longitud	Lunghezza	Longueur
+Befehle	Commands	Comandos	Comandi	Commandes
+Hinzufügen	Add	Agregar	Aggiungi	Ajouter
+Entfernen	Remove	Quitar	Rimuovi	Supprimer
+Nach oben	Move up	Subir	Sposta su	Monter
+Nach unten	Move down	Bajar	Sposta giù	Descendre
+Symbolleiste für den Schnellzugriff	Quick access toolbar	Barra de herramientas de acceso rápido	Barra di accesso rapido	Barre d'outils Accès rapide
+Hintergrund-{}	Background-{}	Fondo-{}	Sfondo-{}	Arrière-plan-{}
+Der Name darf nicht leer sein.	The name cannot be empty.	El nombre no puede estar vacío.	Il nome non può essere vuoto.	Le nom ne peut pas être vide.
+Eine andere Seite hat diesen Namen schon.	Another page already has this name.	Otra página ya tiene este nombre.	Un'altra pagina ha già questo nome.	Une autre page porte déjà ce nom.
+Die Seite gibt es nicht mehr.	The page no longer exists.	La página ya no existe.	La pagina non esiste più.	La page n'existe plus.
+Name der Seite	Page name	Nombre de la página	Nome della pagina	Nom de la page
+Letter	Letter	Letter	Letter	Letter
+Legal	Legal	Legal	Legal	Legal
+Tabloid	Tabloid	Tabloid	Tabloid	Tabloid
+Executive	Executive	Executive	Executive	Executive
+A5	A5	A5	A5	A5
+A4	A4	A4	A4	A4
+A3	A3	A3	A3	A3
+B5 (JIS)	B5 (JIS)	B5 (JIS)	B5 (JIS)	B5 (JIS)
+B4 (JIS)	B4 (JIS)	B4 (JIS)	B4 (JIS)	B4 (JIS)
+Als:	As:	Como:	Come:	En tant que :
+Bild (PNG oder BMP)	Picture (PNG or BMP)	Imagen (PNG o BMP)	Immagine (PNG o BMP)	Image (PNG ou BMP)
+Shapes (JFDiagrammer)	Shapes (JFDiagrammer)	Formas (JFDiagrammer)	Forme (JFDiagrammer)	Formes (JFDiagrammer)
+Unformatierter Text (als Textfeld)	Unformatted text (as a text box)	Texto sin formato (como cuadro de texto)	Testo non formattato (come casella di testo)	Texte sans mise en forme (en tant que zone de texte)
+Die Zwischenablage ist leer.	The clipboard is empty.	El Portapapeles está vacío.	Gli Appunti sono vuoti.	Le Presse-papiers est vide.
+Als Hyperlink lässt sich eine Adresse (https://…) oder ein Pfad einfügen, oder Shapes aus dieser Zeichnung.	An address (https://…) or a path can be pasted as a hyperlink, or shapes from this drawing.	Como hipervínculo se puede pegar una dirección (https://…) o una ruta, o formas de este dibujo.	Come collegamento ipertestuale si può incollare un indirizzo (https://…) o un percorso, oppure forme di questo disegno.	Une adresse (https://…) ou un chemin peut être collé en tant que lien hypertexte, ou des formes de ce dessin.
+Kein Hyperlink in der Zwischenablage	No hyperlink on the clipboard	No hay ningún hipervínculo en el Portapapeles	Nessun collegamento ipertestuale negli Appunti	Aucun lien hypertexte dans le Presse-papiers
+png;jpg;jpeg;gif;bmp=Bilder	png;jpg;jpeg;gif;bmp=Pictures	png;jpg;jpeg;gif;bmp=Imágenes	png;jpg;jpeg;gif;bmp=Immagini	png;jpg;jpeg;gif;bmp=Images
+„{}“ kann nicht eingefügt werden.	“{}” cannot be inserted.	No se puede insertar «{}».	Impossibile inserire «{}».	Impossible d'insérer « {} ».
+Das Bild hat kein bekanntes Format (PNG, JPEG, GIF, BMP).	The picture is in no known format (PNG, JPEG, GIF, BMP).	La imagen no tiene un formato conocido (PNG, JPEG, GIF, BMP).	L'immagine non ha un formato noto (PNG, JPEG, GIF, BMP).	L'image n'a pas de format connu (PNG, JPEG, GIF, BMP).
+Bild einfügen	Insert Picture	Insertar imagen	Inserisci immagine	Insérer une image
+Rot	Red	Rojo	Rosso	Rouge
+Grün	Green	Verde	Verde	Vert
+Blau	Blue	Azul	Blu	Bleu
+Gelb	Yellow	Amarillo	Giallo	Jaune
+Magenta	Magenta	Magenta	Magenta	Magenta
+Cyan	Cyan	Cian	Ciano	Cyan
+Aktiv	Active	Activa	Attivo	Actif
+Einrasten	Snap	Ajustar	Aggancia	Magnétisme
+Kleben	Glue	Pegar	Incolla	Collage
+Sichtbar	Visible	Visible	Visibile	Visible
+Sperren	Lock	Bloquear	Blocca	Verrouiller
+Auf Ebene(n):	On layer(s):	En capa(s):	Sui livelli:	Sur le(s) calque(s) :
+Diese Seite hat keine Ebenen.	This page has no layers.	Esta página no tiene capas.	Questa pagina non ha livelli.	Cette page n'a pas de calques.
+Alle	All	Todas	Tutti	Tous
+Name der neuen Ebene	Name of the new layer	Nombre de la nueva capa	Nome del nuovo livello	Nom du nouveau calque
+Neu…	New…	Nueva…	Nuovo…	Nouveau…
+Anzahl	Count	Número	Numero	Nombre
+Farbe der Ebene	Layer color	Color de la capa	Colore del livello	Couleur du calque
+Umbenennen	Rename	Cambiar nombre	Rinomina	Renommer
+„{}“ löschen? {} Shapes, die auf keiner anderen Ebene liegen, werden mit gelöscht.	Delete “{}”? {} shapes that are on no other layer are deleted with the layer.	¿Eliminar «{}»? {} formas que no están en ninguna otra capa se eliminarán con la capa.	Eliminare «{}»? {} forme che non si trovano su nessun altro livello verranno eliminate con il livello.	Supprimer « {} » ? {} formes qui ne sont sur aucun autre calque seront supprimées avec le calque.
+Ebene löschen	Delete Layer	Eliminar capa	Elimina livello	Supprimer le calque
+Behalten	Keep	Conservar	Mantieni	Conserver
+Gruppen	Groups	Grupos	Gruppi	Groupes
+Auswahl nach	Select by	Seleccionar por	Seleziona per	Sélectionner par
+Shapetyp	Shape type	Tipo de forma	Tipo di forma	Type de forme
+Keine Ebene	No layer	Ninguna capa	Nessun livello	Aucun calque
+Sonntag	Sunday	domingo	domenica	dimanche
+Montag	Monday	lunes	lunedì	lundi
+Dienstag	Tuesday	martes	martedì	mardi
+Mittwoch	Wednesday	miércoles	mercoledì	mercredi
+Donnerstag	Thursday	jueves	giovedì	jeudi
+Freitag	Friday	viernes	venerdì	vendredi
+Samstag	Saturday	sábado	sabato	samedi
+Datum/Uhrzeit	Date/Time	Fecha/Hora	Data/Ora	Date/Heure
+Dokumentinfo	Document Info	Información del documento	Informazioni documento	Informations sur le document
+Seiteninfo	Page Info	Información de página	Informazioni pagina	Informations sur la page
+Geometrie	Geometry	Geometría	Geometria	Géométrie
+Objektinfo	Object Info	Información del objeto	Informazioni oggetto	Informations sur l'objet
+Benutzerdefinierte Zellen	User-defined Cells	Celdas definidas por el usuario	Celle definite dall'utente	Cellules définies par l'utilisateur
+Eigene Formel	Custom Formula	Fórmula personalizada	Formula personalizzata	Formule personnalisée
+Erstellungsdatum/-uhrzeit	Creation Date/Time	Fecha/hora de creación	Data/ora di creazione	Date/heure de création
+Aktuelles Datum/aktuelle Uhrzeit	Current Date/Time	Fecha/hora actual	Data/ora corrente	Date/heure actuelle
+Letzte Bearbeitung	Last Edit Date/Time	Última edición	Ultima modifica	Dernière modification
+Druckdatum/-uhrzeit	Print Date/Time	Fecha/hora de impresión	Data/ora di stampa	Date/heure d'impression
+Ersteller	Creator	Autor	Autore	Auteur
+Beschreibung	Description	Descripción	Descrizione	Description
+Verzeichnis	Directory	Carpeta	Cartella	Dossier
+Dateiname	File Name	Nombre de archivo	Nome file	Nom du fichier
+Stichwörter	Keywords	Palabras clave	Parole chiave	Mots clés
+Betreff	Subject	Asunto	Oggetto	Objet
+Titel	Title	Título	Titolo	Titre
+Manager	Manager	Administrador	Responsabile	Responsable
+Firma	Company	Organización	Società	Société
+Kategorie	Category	Categoría	Categoria	Catégorie
+Hyperlinkbasis	Hyperlink Base	Base del vínculo	Base collegamento	Base de lien
+Seitenzahl	Page Number	Número de página	Numero di pagina	Numéro de page
+Seitenanzahl	Number of Pages	Número de páginas	Numero di pagine	Nombre de pages
+ID	ID	Id.	ID	ID
+Master-Shape	Master shape	Forma maestra	Forma master	Forme maître
+Daten 1	Data 1	Datos 1	Dati 1	Données 1
+Daten 2	Data 2	Datos 2	Dati 2	Données 2
+Daten 3	Data 3	Datos 3	Dati 3	Données 3
+Normal	Normal	Normal	Normale	Normal
+Großbuchstaben	Uppercase	Mayúsculas	Maiuscole	Majuscules
+Kleinbuchstaben	Lowercase	Minúsculas	Minuscole	Minuscules
+Formel	Formula	Fórmula	Formula	Formule
+z. B. Width*2	e.g. Width*2	p. ej. Width*2	ad es. Width*2	p. ex. Width*2
+Die Formel lässt sich nicht lesen.	The formula cannot be read.	No se puede leer la fórmula.	Impossibile leggere la formula.	La formule est illisible.
+Feldname	Field name	Nombre del campo	Nome campo	Nom du champ
+Das Shape hat keine Einträge dieser Art.	The shape has no entries of this kind.	La forma no tiene entradas de este tipo.	La forma non ha voci di questo tipo.	La forme n'a aucune entrée de ce type.
+Feld einfügen	Insert Field	Insertar campo	Inserisci campo	Insérer un champ
+Shape-Name	Shape name	Nombre de la forma	Nome forma	Nom de la forme
+Gefunden: {} ({})	Found: {} ({})	Encontrado: {} ({})	Trovato: {} ({})	Trouvé : {} ({})
+Die Suche hat wieder am Anfang begonnen.	The search started again from the beginning.	La búsqueda ha vuelto a empezar desde el principio.	La ricerca è ripartita dall'inizio.	La recherche a repris depuis le début.
+„{}“ wurde nicht gefunden.	"{}" was not found.	No se encontró "{}".	"{}" non trovato.	« {} » introuvable.
+Suchen nach	Find what	Buscar	Trova	Rechercher
+Ersetzen durch	Replace with	Reemplazar con	Sostituisci con	Remplacer par
+Suchen in	Search in	Buscar en	Cerca in	Rechercher dans
+Auswahl	Selection	Selección	Selezione	Sélection
+Seite|Bereich	Page	Página	Pagina	Page
+Auch in	Also in	También en	Anche in	Aussi dans
+Shape-Namen	Shape names	Nombres de forma	Nomi forma	Noms de forme
+Namen der Master-Shapes	Master shape names	Nombres de formas maestras	Nomi delle forme master	Noms des formes maîtres
+Groß-/Kleinschreibung beachten	Match case	Coincidir mayúsculas y minúsculas	Maiuscole/minuscole	Respecter la casse
+Nur ganzes Wort	Whole words only	Solo palabras completas	Solo parole intere	Mot entier uniquement
+Weitersuchen	Find Next	Buscar siguiente	Trova successivo	Suivant
+1 Stelle ersetzt.	1 occurrence replaced.	Se reemplazó 1 aparición.	Sostituita 1 occorrenza.	1 occurrence remplacée.
+{} Stellen ersetzt.	{} occurrences replaced.	Se reemplazaron {} apariciones.	Sostituite {} occorrenze.	{} occurrences remplacées.
+(neuer Link)	(new link)	(nuevo vínculo)	(nuovo collegamento)	(nouveau lien)
+Hyperlinks	Links	Vínculos	Collegamenti	Liens
+Adresse	Address	Dirección	Indirizzo	Adresse
+https://…, mailto:…, Datei	https://…, mailto:…, file	https://…, mailto:…, archivo	https://…, mailto:…, file	https://…, mailto:…, fichier
+Unteradresse	Sub-address	Subdirección	Sottoindirizzo	Sous-adresse
+(keine)	(none)	(ninguna)	(nessuno)	(aucune)
+Shape (optional)	Shape (optional)	Forma (opcional)	Forma (facoltativa)	Forme (facultatif)
+Links des Shapes	Links of the shape	Vínculos de la forma	Collegamenti della forma	Liens de la forme
+Als Standard	Set as default	Predeterminado	Imposta come predefinito	Par défaut
+Strg+Klicken, um dem Link zu folgen	Ctrl+click to follow the link	Ctrl+clic para seguir el vínculo	Ctrl+clic per seguire il collegamento	Ctrl+clic pour suivre le lien
+Der Link lässt sich nicht öffnen.	The link cannot be opened.	No se puede abrir el vínculo.	Impossibile aprire il collegamento.	Impossible d'ouvrir le lien.
+Die Seite „{}“ gibt es nicht.	There is no page "{}".	No existe la página "{}".	La pagina "{}" non esiste.	La page « {} » n'existe pas.
+Links der Art „{}:“ öffnet JFDiagrammer nicht.	JFDiagrammer does not open links of the kind "{}:".	JFDiagrammer no abre vínculos del tipo "{}:".	JFDiagrammer non apre collegamenti del tipo "{}:".	JFDiagrammer n'ouvre pas les liens du type « {}: ».
+Ein relativer Link braucht eine gespeicherte Zeichnung.	A relative link needs a saved drawing.	Un vínculo relativo necesita un dibujo guardado.	Un collegamento relativo richiede un disegno salvato.	Un lien relatif nécessite un dessin enregistré.
+Erste Zeile	First line	Primera línea	Prima riga	Première ligne
+Abstand	Spacing	Espaciado	Spaziatura	Espacement
+Vor	Before	Antes	Prima	Avant
+Nach	After	Después	Dopo	Après
+Zeilenabstand	Line spacing	Interlineado	Interlinea	Interligne
+Vertikale Ausrichtung	Vertical alignment	Alineación vertical	Allineamento verticale	Alignement vertical
+Texthintergrund	Text background	Fondo del texto	Sfondo del testo	Arrière-plan du texte
+Keiner	None	Ninguno	Nessuno	Aucun
+Hintergrundfarbe	Background color	Color de fondo	Colore di sfondo	Couleur d'arrière-plan

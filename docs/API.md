@@ -105,7 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -2743,7 +2743,9 @@ list -- scroll views, scroll bars, lists, tabs and expanders (WinUI 3 style)
        the asm keeps a pointer to the app's variable in between; list_sel() reads it in
        the rows)
   tabs(id, &mut sel, names) -> EV        text tab header row, tab i has the id
-                                         `id + 1 + i`; EV_ACT when sel changed; placed
+                                         `id + 1 + i`; EV_ACT when sel changed (a click
+                                         or a right click on a tab), EV_DOUBLE when a
+                                         tab was double-clicked; placed
                                          narrower than the tabs, the widest ones give
                                          way (labels cut with "…")
   expander_begin(id, header, &mut open) -> open   (emit the content when 1)
@@ -2804,7 +2806,8 @@ Widget ids used internally: (id << 3 | k) | 0x80000000 for sub parts (k = 1..7),
   and resized viewports reveal the selected tab. Internal IDs follow the
   usual `(id * 8 + part) | 0x80000000` convention (parts 1, 2, 3 and 7).
 - **`fn tabs(&mut self, id: u32, sel: &mut i32, names: &[&str]) -> u32`**
-  ui_tabs(id, &mut sel, names) -> EV_\* (EV_ACT when sel changed)
+  ui_tabs(id, &mut sel, names) -> EV_\* (EV_ACT when sel changed: a click or a right click
+  on a tab selects it; EV_DOUBLE when a tab was double-clicked: it is the selected one then)
 - **`fn expander_begin(&mut self, id: u32, header: &str, open: &mut i32) -> i32`**
   ui_expander_begin(id, header, &mut open) -> open: a card-like header (48 DIP) with a
   chevron; when open the content follows in a padded card below it (BOX_V, PAD_16, gap
@@ -7803,7 +7806,8 @@ shapes to SeShape frames (diagram_core for JFDiagrammer).
                                   while it shows ("Element einfügen", value = its tag): scripts
                                   click and drag them, screen readers name them (a screen
                                   reader's click on an arrow or a mark reports it as a click)
-  tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT, SE_PLACE
+  tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT, SE_PLACE, SE_FREEFORM,
+        SE_ARC
 
 Model (SeModel, borrowed per call; world units are the canvas's, y down):
   SeShape { key, parent, bx, ends, pin, bbox, flags, points }
@@ -7828,7 +7832,12 @@ Esc during one sends SeEv::Cancel.  So the app takes its preview back and applie
 total each step, and keeps the last one as the undo step.  The frames of the selection follow
 the model (the app's preview), the gesture keeps what it had at the start.  The connector and
 line tools and the drawing tools draw a rubber band and report Connect / Draw when released;
-a click with them selects like the pointer.
+a click with them selects like the pointer.  With Shift the rectangle and the ellipse tool draw
+a square and a circle, and a move with Shift keeps to one axis (KB-09).  The freeform tool
+records the pointer's way (a point every 2 px) and reports SeEv::Stroke when released; the arc
+tool shows a quarter ellipse from the press to the pointer, bowing the way the drag started
+(horizontally or vertically, decided once the pointer left the drag threshold), and reports
+SeEv::Arc; both start and end glued to connection points like the line tool (CN-12).
 
 Input (pointer tool): a press on a handle of the selection starts its drag; on a shape it
 selects it (Shift adds, Ctrl toggles) and a drag moves the selection (grid, dynamic grid,
@@ -7862,7 +7871,8 @@ the screen, nor right after a gesture or a click until the pointer moves again. 
 that would cover a rotation handle of the selection (the single shape's, or the one of the
 box around several) moves out along its direction until it clears the handle by a few DIP
 (Visio puts its top arrow beyond the rotation handle too); the strip that keeps the arrows
-grows with it.  Handles and control points stay on top and are hit first.  A click on an
+grows with it.  Handles and control points of that shape (or of a selection box around it)
+stay on top and are hit first; another selected shape's handle under a hot arrow is not.  A click on an
 arrow reports SeEv::Arrow { key, dir } and leaves the selection alone (the app selects what
 it made); a drag from an arrow is the connector tool from that shape: a rubber band from
 the middle of the box's side, glue and the target's highlight as SE_CONNECT, released
@@ -7891,6 +7901,11 @@ SE_TEXT: u32 = 5
 /// shape too, reports Draw { tool: SE_PLACE, a, b: a } at the snapped point; no handles, a
 /// drag places nothing
 SE_PLACE: u32 = 6
+/// draw freehand: the pointer's way, reported as SeEv::Stroke (its ends glue like a line's)
+SE_FREEFORM: u32 = 7
+/// draw a quarter ellipse from the press to the release, reported as SeEv::Arc (its ends glue
+/// like a line's)
+SE_ARC: u32 = 8
 /// shape flags (SeShape::flags)
 SEF_1D: u32 = 1  // the two ends instead of the eight handles
 SEF_GROUP: u32 = 2  // a group: a second click selects the child under the pointer
@@ -7910,6 +7925,7 @@ SEF_END_GLUED: u32 = 0x4000
 SEF_END_DYN: u32 = 0x8000
 SEF_LOCK_PIN: u32 = 0x1_0000  // no rotation pin handle
 SEF_NOARROWS: u32 = 0x2_0000  // no connection arrows around it (see the file header)
+SEF_NOSNAP: u32 = 0x4_0000  // moves do not snap to it (the dynamic grid leaves it out)
 /// kinds of SePoint
 SP_CONTROL: u8 = 0
 SP_CONN: u8 = 1
@@ -8001,6 +8017,10 @@ SPF_GLUE: u32 = 1  // a control point that glues to connection points (SP-04)
   - `Cancel` -- Esc during a live gesture: take the preview back
   - `Connect { tool: u32, a: [f32; 2], ga: SeGlue, b: [f32; 2], gb: SeGlue }` -- the connector or line tool drew from a to b
   - `Draw { tool: u32, a: [f32; 2], b: [f32; 2] }` -- a drawing tool drew the box from a to b (a == b: a click)
+  - `Stroke { pts: Vec<[f32; 2]>, ga: SeGlue, gb: SeGlue }` -- the freeform tool drew this way (world points, at least two); its begin glued to `ga`,
+    its end to `gb` (connection points only)
+  - `Arc { a: [f32; 2], ga: SeGlue, b: [f32; 2], gb: SeGlue, horizontal: bool }` -- the arc tool drew a quarter ellipse from a to b that leaves a horizontally
+    (horizontal) or vertically; glued like a line's ends
   - `Text { key: u64, ch: Option<char> }` -- edit the text of a shape (double click, F2, Enter, or a typed character)
   - `Context { key: u64, at: [i32; 2] }` -- right click, Shift+F10 or the menu key on a shape (0: the page); at = window px
   - `Delete` -- Del with a selection
@@ -54251,6 +54271,13 @@ a file loses nothing, and the behaviour Visio files carry works without translat
 
   structure::*                  (JD10) containers, lists, callouts: membership in the
                                 Relationships cell, automatic size, list order and layout
+  pagesetup::*                  (JD8) a page's size against its drawing and its paper:
+                                orientation, sizes, fit to the drawing, automatic size in
+                                tiles of the printed sheet; Transaction::add_page_like and
+                                duplicate_page insert pages with settings or content
+  field::*                      (JD8) text fields: a Field row's value in its format picture,
+                                new fields, the text with its fields, the document's
+                                properties (Document::fields: the app's locale and clock)
 
 What is to come here, by stage of the plan: page layout (CN-13, P2)
 
@@ -54862,6 +54889,8 @@ instance "<master's NameU>.<ID>"; without Name it shows its NameU.
   - `colors_extras: Extras` -- unknown items of the Colors element (a ColorEntry with more than IX and RGB too)
   - `faces_extras: Extras` -- unknown items of the FaceNames element (a FaceName with children too)
   - `styles_extras: Extras` -- unknown items of the StyleSheets element
+  - `fields: crate::field::Env` -- what text fields show that the file does not hold: the app's locale and clock, the
+    file's path (field::Env; never written)
 
 **`impl Document`**
 
@@ -55118,6 +55147,9 @@ a Del="1" mark; restore_row and restore_section remove it again.
   end the transaction -> the change to keep for undo (None: nothing changed)
 - **`fn rollback(self)`**
   take every edit of the transaction back
+- **`fn sheets(&self) -> Vec<SheetRef>`**
+  the sheets the edits so far touch, as Change::sheets names them once committed (an app
+  that follows a gesture with more work in the same step asks which pages it changed)
 - **`fn set_formula(&mut self, sheet: SheetRef, addr: &CellAddr, formula: &str) -> Result<(), EditError>`**
   give the cell a formula of its own; its value stays until the engine computes the new
   one (the cell is stale until then)
@@ -55165,7 +55197,9 @@ a Del="1" mark; restore_row and restore_section remove it again.
   put a shape on these layers (LayerMember; empty: on none)
 - **`fn delete_layer(&mut self, page: PageRef, ix: u32) -> Result<(), EditError>`**
   delete a layer of a page; shapes on it leave it (their own LayerMember cells), the
-  shapes themselves stay (LY-04 asks the user first and deletes them before)
+  shapes themselves stay (LY-04 asks the user first and deletes them before).  The layers
+  after it move one down (IX - 1, as Visio keeps a page's layers numbered without gaps) and
+  the shapes' own LayerMember cells follow
 - **`fn add_shape(&mut self, owner: Owner, parent: Option<ShapeRef>, kind: ShapeKind) -> Result<ShapeRef, EditError>`**
   add an empty shape on a page or in a master, on top of its siblings -> its handle; a
   parent that is not a group becomes one
@@ -55204,6 +55238,12 @@ a Del="1" mark; restore_row and restore_section remove it again.
   set a shape's attributes as a whole (kind, names, references)
 - **`fn set_text(&mut self, shape: ShapeRef, text: Option<Text>) -> Result<(), EditError>`**
   set a shape's own text (None: inherited from the master shape again)
+- **`fn add_part(&mut self, name: &str, content_type: &str, rel_type: &str, data: Vec<u8>) -> Result<usize, EditError>`**
+  add a part the model keeps as bytes (a picture's media part) at the end of
+  Document::parts -> its index; a name some part has already (ASCII case ignored, a
+  leading '/' too) is refused (Exists)
+- **`fn remove_part(&mut self, index: usize) -> Result<(), EditError>`**
+  remove the part at `index` of Document::parts (shapes that name it show no picture)
 - **`fn set_foreign(&mut self, shape: ShapeRef, foreign: Option<ForeignData>) -> Result<(), EditError>`**
   set the picture data of a Foreign shape
 - **`fn add_connect(&mut self, owner: Owner, connect: Connect) -> Result<(), EditError>`**
@@ -55227,6 +55267,21 @@ a Del="1" mark; restore_row and restore_section remove it again.
   and the chain of backgrounds must not lead back to the page
 - **`fn set_page_theme(&mut self, page: PageRef, theme: Option<u32>) -> Result<(), EditError>`**
   set the theme of a page (an index into Document::themes, None: none)
+- **`fn add_page_like(&mut self, like: PageRef, name: &str, name_u: &str, background: bool, pos: Option<usize>) -> Result<PageRef, EditError>`**
+  add an empty page with the settings of page `like` (PG-03: Visio gives a new page the
+  properties of the active page -- size, scale, units, print setup, layout and routing,
+  background page, design): its page sheet without the Layer section (layers belong to a
+  page's shapes), the styles of its PageSheet element, its theme; a foreground page keeps
+  `like`'s background page, a background page gets none.  At `pos` in document order (None:
+  the end) with the next free page ID -> its handle
+- **`fn duplicate_page(&mut self, page: PageRef, name: &str, name_u: &str, pos: Option<usize>) -> Result<PageRef, EditError>`**
+  a copy of a page with its shapes, glue records and settings (PG-03 Duplizieren) at `pos`
+  in document order (None: right after the original, as Visio's Page.Duplicate puts it)
+  -> its handle.  The shapes keep their IDs (IDs count per page), so formulas that name
+  Sheet.N, the Connect entries and the Relationships of containers and lists stay inside
+  the copy; UniqueIDs are dropped (each names one shape of the document), the copy gets the
+  next free page ID, the names given (not marked as custom names) and a part of its own
+  when it is written.  Pages that use the original as their background keep it
 - **`fn add_master(&mut self, name: &str, name_u: &str) -> Result<MasterRef, EditError>`**
   add an empty master with the next free master ID -> its handle (add shapes with
   add_shape(Owner::Master(..)))
@@ -55265,6 +55320,178 @@ a Del="1" mark; restore_row and restore_section remove it again.
 - **`fn set_row_kind(&mut self, sheet: SheetRef, sk: SecKey, key: RowKey, kind: &str) -> Result<(), EditError>`**
   change the type (T) of a row the sheet has (Geometry: "MoveTo", "LineTo" ...); an
   inherited row gets an entry of the sheet's own that names the type
+
+### `diagram_core/src/field.rs`
+
+Source: [`lib/diagram_core/src/field.rs`](../lib/diagram_core/src/field.rs)
+
+```text
+field -- text fields (TX-06): a <fld IX='n'/> mark in a shape's text shows Field row n of the
+shape, the value of its Value cell in the format picture of its Format cell
+
+  Env                        what fields show that the file does not hold (Document::fields,
+                             set by the app): the decimal sign and the digit groups, month and
+                             day names, the date picture of the general format, the clock
+                             (NOW), when the drawing was made, saved and edited (when the
+                             document's properties do not say), the file's path (DIRECTORY,
+                             FILENAME), the zone's offset (the properties' times are UTC)
+  Shown / format(&v, picture, &env) -> String   a value in a picture of Visio's FORMAT
+  shown(doc, sheet, ix) -> String           the text Field row ix of a sheet shows
+  cached(xml) -> Option<String>             the text a field kept as XML (Visio's own
+                                             <fld IX='n'>text</fld>) has cached
+  Seg / segments(doc, shape)                the shape's text as runs of characters and fields,
+                                             each field with the text it shows (editing in
+                                             place, Find and Replace)
+  plain(doc, shape) -> String                the text as it shows, fields included
+  Kind / Spec / insert(tx, eng, shape, at, &spec) -> ix   a new field: its Field row (Value
+                                             formula, Format, Type) and its mark in the text,
+                                             computed at once
+  Props / props(doc)                         the document's properties (docProps/core.xml and
+                                             app.xml): title, creator, keywords, dates ...
+  ole_days(y, m, d, h, min, s) / civil(days) dates as Visio keeps them: days since 30 December
+                                             1899, the time of day as the fraction
+
+The Field section (Visio's Text Fields section, [MS-VSDX] Field_Type): Value holds the
+formula (Width, PAGENAME(), NOW(), Prop.Cost, a formula of the user's) and its result in the
+unit the field shows (U="MM" for a length in millimetres, U="DATE" for a date, U="STR" for a
+text); Format holds the format picture as a string.  Type: 0 text, 2 number, 5 date or time,
+6 duration, 7 currency (Annahme: the numbering of the shape data's Type cell, which the Text
+Fields section shares as far as known here).  The cells UICat, UICod and UIFmt, which only
+Visio's own dialog reads, are not written; Visio's dialog then opens a field of ours as a
+custom formula (Annahme).  A field the file wrote with its text inside
+(<fld IX='0'>19.11.2026</fld>, Visio's way) stays as the reader kept it (TextItem::Other) and
+shows that text (JD4); a field without text inside (ours, TextItem::Field) shows its value,
+which the formula engine computes when what it reads changes.
+
+Format pictures (Visio's FORMAT; Annahmen as far as Visio's own documentation was not at hand):
+  numbers   0 a digit or 0, # a digit or nothing, . the decimal sign, , groups of three in the
+            integer part, % times 100, u / U the unit's abbreviation (uu / UU the same), "..."
+            and \c literal text, anything else literal; "a;b;c": a for positive, b for
+            negative (without its sign), c for zero; a length, angle or duration shows in the
+            unit of its cell (25.4 mm for an inch in a cell with U="MM")
+  dates     {{ ... }} around date and time parts: d dd day, ddd dddd its name, M MM month,
+            MMM MMMM its name, yy yyyy year, H HH hours (24), h hh hours (12), m mm minutes,
+            s ss seconds, t tt AM / PM; '...' literal inside, text outside the braces literal
+  texts     @ the text, @+ in capitals, @- in small letters
+  empty     the general format: a number with up to four decimals (a length with its unit),
+            a date in Env::date, a text as it is
+```
+
+- **`struct Env`**
+  what fields show that the file does not hold (see the file header)
+  - `decimal: char` -- the decimal sign ('.' in English, ',' in German)
+  - `group: char` -- the sign between groups of three digits
+  - `months: [&'static str; 12]` -- January .. December
+  - `days: [&'static str; 7]` -- Sunday .. Saturday
+  - `am_pm: [&'static str; 2]` -- the marks of the morning and the afternoon (t, tt)
+  - `date: &'static str` -- the date picture of the general format (without the braces): "M/d/yyyy", "dd.MM.yyyy"
+  - `now: f64` -- now in local time (days since 30 Dec 1899; NaN: unknown, NOW() keeps its stored value)
+  - `created: f64` -- when the drawing was made (local time; NaN: unknown) when its properties do not say
+  - `saved: f64` -- when it was saved last (the same)
+  - `edited: f64` -- when it was edited last (NaN: when it was saved)
+  - `path: String` -- the file's path ("": not saved yet)
+  - `utc_offset: f64` -- local time minus UTC, in days (the properties' times are UTC)
+
+```rust
+/// English month names
+MONTHS_EN: [&str; 12] = ["January", "February", "March", "April", "May", "June", ...
+/// English day names, Sunday first
+DAYS_EN: [&str; 7] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", ...
+```
+
+- **`enum Shown<'a>`**
+  a value to show
+  - `Num(f64, Option<Unit>)` -- a number in internal units and the unit of its cell
+  - `Text(&'a str)` -- a text
+  - `Nothing` -- nothing (no value)
+
+- **`fn format(v: &Shown, picture: &str, env: &Env) -> String`**
+  a value in a format picture (see the file header)
+
+- **`fn unit_abbr(u: Unit) -> &'static str`**
+  the abbreviation a picture's u shows for a unit
+
+- **`fn ole_days(year: i64, month: u32, day: u32, hour: u32, min: u32, sec: u32) -> f64`**
+  the days since 30 December 1899 of a date and time (Visio's date values)
+
+- **`fn civil(days: f64) -> (i64, u32, u32, u32, u32, u32, u32)`**
+  a date value as (year, month, day, hour, minute, second, weekday with Sunday 0)
+
+- **`fn shown(doc: &Document, sheet: SheetRef, ix: u32) -> String`**
+  the text Field row ix of a sheet shows: its value in its format ("" for an error)
+
+- **`fn picture(doc: &Document, sheet: SheetRef, ix: u32) -> &str`**
+  the format picture of Field row ix ("" for none)
+
+- **`fn cached(xml: &str) -> Option<String>`**
+  the text inside a &lt;fld ...>text&lt;/fld> element (a field as Visio writes it, kept as XML)
+
+- **`enum Seg`**
+  a run of a shape's text
+  - `Text(String)` -- characters (the marks between them left out)
+  - `Field { item: usize, text: String, }` -- a field: its item in Text::items and the text it shows
+
+**`impl Seg`**
+
+- **`fn text(&self) -> &str`**
+  the text the run shows
+
+- **`fn segments_of(doc: &Document, sheet: SheetRef, text: &Text) -> Vec<Seg>`**
+  the runs of a text (`sheet`: the shape's, for the values of its fields)
+
+- **`fn segments(doc: &Document, shape: ShapeRef) -> Vec<Seg>`**
+  the runs of a shape's text (its master's when it has none of its own)
+
+- **`fn plain(doc: &Document, shape: ShapeRef) -> String`**
+  the text of a shape as it shows, fields included
+
+- **`enum Kind`**
+  what a field holds (its Type cell)
+  - `Text` -- a text (Type 0)
+  - `Number` -- a number, also a length or an angle (Type 2)
+  - `Date` -- a date or a time (Type 5)
+  - `Duration` -- a duration (Type 6)
+  - `Currency` -- an amount of money (Type 7)
+
+**`impl Kind`**
+
+- **`fn code(self) -> f64`**
+  the Type cell's value
+
+- **`struct Spec<'a>`**
+  a new field
+  - `formula: &'a str` -- the Value cell's formula (Width, PAGENAME(), NOW(), Prop.Cost ...)
+  - `format: &'a str` -- the format picture ("" the general format)
+  - `unit: Option<Unit>` -- the unit the value shows in (MM, DEG, DATE ...; None: a plain number; a text: STR)
+  - `kind: Kind` -- what it holds
+
+- **`fn insert_item(doc: &Document, sheet: SheetRef, text: &Text, at: Option<usize>, item: TextItem) -> Text`**
+  a text with `item` put in at a shown position (fields count with the text they show; a
+  position inside a field goes behind it; None: at the end, in front of the last line break)
+
+- **`fn insert(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, at: Option<usize>, spec: &Spec) -> Result<u32, EditError>`**
+  a new field in a shape's text at the shown position `at` (None: at its end, on a line of
+  its own when the text has words): a Field row with the formula, the format and the type,
+  computed at once, and its mark in the text -> the row's IX
+
+- **`struct Props`**
+  the document's properties (docProps/core.xml, docProps/app.xml); dates as days since
+  30 Dec 1899 in local time (Env::utc_offset), None when the part does not say
+  - `title: String`
+  - `subject: String`
+  - `creator: String`
+  - `keywords: String`
+  - `description: String`
+  - `category: String`
+  - `manager: String`
+  - `company: String`
+  - `hyperlink_base: String`
+  - `created: Option<f64>`
+  - `modified: Option<f64>`
+  - `printed: Option<f64>`
+
+- **`fn props(doc: &Document) -> Props`**
+  the document's properties (see Props)
 
 ### `diagram_core/src/formula/color.rs`
 
@@ -56370,7 +56597,13 @@ instance of it dropped on a page, the texts of masters and stencils in five lang
   place(&mut tx, page, master, x, y, lang) -> ShapeRef   an instance at (x, y) inches on the
                                      page (y up): Name in language lang, NameU the master's
                                      (LG-04; "Rechteck.7" when the page has one already), its
-                                     text and translated cells in that language
+                                     text and translated cells in that language; (JD8 rest,
+                                     LY-03) the master's layers come along: the page gets the
+                                     ones it lacks (matched by NameUniv, else Name, with the
+                                     master's Visible, Print, Lock, Snap, Glue, Color and
+                                     ColorTrans) and every shape of the instance its own
+                                     LayerMember with the page's indices (the master's name
+                                     the rows of its own Layer section)
 
 The JFD_ cells are JFDiagrammer's own (apps/JFDiagrammer/stencils/README.md); diagram_io's
 stencil builder writes them, the Shapes panel reads them.  Visio keeps them as ordinary User
@@ -56453,6 +56686,12 @@ JFD_TR: &str = "JFD_Tr"
   `lang` (an index into LANGS), NameU the master's, unique on the page with ".ID" like Visio;
   the text and translated cells in that language where they differ from the master's
 
+- **`fn bring_layers(tx: &mut Transaction, page: PageRef, master: MasterRef, shape: ShapeRef) -> Result<(), EditError>`**
+  (LY-03) the layers of `master` that the shapes of its instance `shape` are on: the page gets
+  the ones it lacks (matched by NameUniv, else Name), each shape of the instance its own
+  LayerMember with the page's indices (Visio's: a master's shapes name the rows of the
+  master's Layer section, an instance on a page names the page's)
+
 - **`fn base64(data: &[u8]) -> String`**
   base64 (RFC 4648, with padding)
 
@@ -56511,6 +56750,8 @@ groups, z-order, new shapes, text, copy and paste (JD7: SP-03..07, TX-01, TX-03,
   bounds(doc, shapes)                 the box of a selection on the page
   locks(eng, doc, shape) -> Locks     the protection cells that are set (Locks::MOVE_X ...)
   move_shapes(tx, eng, shapes, d)     2D: the pin; 1D: BeginX/Y, EndX/Y of the free ends
+  shift_all(tx, eng, owner, d)        every top-level shape, locks or not (the page's origin
+                                      moves: pagesetup::grow, fit_to_drawing)
   set_frame(tx, eng, shape, &frame)   size and place, same turn (the eight grips)
   scale_shapes(tx, eng, shapes, from, to)   a selection from one box into another
   rotate_shapes(tx, eng, shapes, centre, angle) / flip_shapes(tx, eng, shapes, horizontal)
@@ -56522,6 +56763,10 @@ groups, z-order, new shapes, text, copy and paste (JD7: SP-03..07, TX-01, TX-03,
   new_shape(tx, eng, owner, Basic::Rectangle | Ellipse | TextBox, a, b)
   set_text(tx, eng, shape, text) / text_frame / set_text_frame   (TX-01, TX-03)
   copy(doc, shapes) -> Clip / paste(tx, eng, owner, &clip, offset)
+  new_freeform / new_arc / simplify / Spline / quarter_arc   (JD8 rest) the freeform and arc
+                                      tools: 1-D shapes like a line (ops/draw.rs, RS-16)
+  new_picture / probe_picture / PictureInfo   (JD8 rest) a picture file as a Foreign shape
+                                      with its bytes as a package part (ops/picture.rs, RE-02)
 
 Every position is on the page in drawing units (PinX of a top-level shape as the file has
 it), y up; local coordinates have their origin at the bottom left of the shape's box.  A
@@ -56628,6 +56873,11 @@ vertical flip toggles FlipY and makes it 2φ - a.
   glue::update); a shape inside another one of the list moves with it; LockMoveX/LockMoveY
   keep that part of the move away
 
+- **`fn shift_all(tx: &mut Transaction, eng: &mut Engine, owner: Owner, d: [f64; 2]) -> Result<(), EditError>`**
+  move every top-level shape of a page or master by `d`, whatever their locks say: the page's
+  origin moves under the drawing (a page that grows to the left or down, a page fitted to
+  its drawing; pagesetup.rs).  Free 1D ends move, glued ones follow their formulas
+
 - **`fn set_frame(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, to: &Frame) -> Result<(), EditError>`**
   give a shape another size and place with the same turn and flips (`to` from Frame::drag
   of frame(doc, shape)): Width and Height first, then the pin where the frame puts the local
@@ -56729,7 +56979,10 @@ Pasted shapes get new IDs; the formulas of the pasted shapes that name a copied 
 Sheet.N (or by a NameU that ends in .N) name its copy, Names and NameUs that end in .<old ID>
 end in the new one, UniqueIDs are dropped, the Connect entries between copied shapes come
 along with the new IDs.  Glue to a shape outside the copy is let go: the glued cells keep
-their values as constants, the Connect entry stays behind.  A Clip holds the document's
+their values as constants, the Connect entry stays behind.  (JD8 rest, LY-03) The layers of
+the page the shapes were copied from come along by name: on another page the missing ones are
+added (with their Visible, Print, Lock, Snap, Glue, Color, ColorTrans) and the copies' own
+LayerMember cells name the target page's indices.  A Clip holds the document's
 string handles and refers to its masters and styles by ID: it pastes into the document it
 was copied from (an app with several documents copies across them through a file format).
 ```
@@ -56754,6 +57007,164 @@ was copied from (an app with several documents copies across them through a file
 - **`fn paste(tx: &mut Transaction, eng: &mut Engine, owner: Owner, clip: &Clip, offset: [f64; 2]) -> Result<Vec<ShapeRef>, EditError>`**
   paste copied shapes on a page or in a master (into the document they were copied from),
   on top of its shapes and moved by `offset` (page) -> the new top-level shapes
+
+### `diagram_core/src/ops/draw.rs`
+
+Source: [`lib/diagram_core/src/ops/draw.rs`](../lib/diagram_core/src/ops/draw.rs)
+
+```text
+ops::draw -- the freeform and arc tools (RS-16, KB-09): a stroke smoothed into a NURBS curve,
+a quarter of an ellipse between two points.  Both are 1-D shapes like a line (glue::new_line):
+their ends glue to connection points (CN-12) and their geometry follows Width, so they keep
+their form when an end moves.
+
+  simplify(pts, tol) -> corners       Ramer-Douglas-Peucker: the points of a stroke that keep
+                                      every other point within tol of the polyline
+  Spline::of(points) -> Spline        a clamped B-spline (degree 3, fewer for 2 or 3 points)
+                                      with the points as its control polygon and evenly spaced
+                                      knots 0, 1, 2 ...; the curve starts and ends at the
+                                      first and last point and runs smoothly along the rest
+  quarter_arc(a, b, horizontal) -> Arc   the quarter ellipse from a to b with page-parallel
+                                      axes: horizontal = it leaves a horizontally (and meets b
+                                      vertically), else the other way round
+  new_freeform(tx, eng, owner, stroke, tol, close, begin, end) -> ShapeRef
+  new_arc(tx, eng, owner, begin, end, horizontal) -> ShapeRef
+
+How Visio keeps them (MS-VSDX, Geometry section rows; geometry.rs reads them the same way):
+* The freeform: MoveTo at the begin, then one NURBSTo whose X, Y is the end, A the knot of
+  the last control point, B its weight, C the knot of the first one (the current point), D
+  its weight, and E = NURBS(knotLast, degree, xType, yType, x1, y1, knot1, weight1, ...) the
+  control points between (type 0: a fraction of Width / Height, 1: local inches).  Visio's
+  own freeform tool writes NURBSTo too; its smoothing is its own (not documented), so the
+  curve here is a choice: the corners of the stroke as control points.  A 1-D shape has
+  Height 0 (its chord is the local x axis, as a line's), so the y values are local inches
+  written as Width*k inside the NURBS formula: the whole curve scales with Width when an
+  end moves, as a line's rows do (Annahme: Visio's 1-D freeforms keep y as constants of
+  their own; the formula keeps the form instead, and Visio evaluates NURBS() with
+  expressions like any function).
+* A stroke that ends where it began (within `close`) is a closed 2-D shape (Visio's freeform
+  tool closes a shape there and fills it): its box around the control points, the rows in
+  fractions of Width and Height (xType = yType = 0), filled.
+* The arc: MoveTo at the begin, an EllipticalArcTo to the end through the control point A, B
+  (the middle of the quarter: 45 degrees of the ellipse's parameter), C the angle of the
+  ellipse's major axis in the shape's local coordinates (the page's x axis, so -Angle at
+  the start), D the ratio of that axis to the other.  A and B are Width*k as well.  Visio's
+  arc tool draws a quarter ellipse whose bow follows the direction the drag starts in
+  (Annahme from its help: "drag in the direction you want the arc to bow"; the start's
+  axis decides here).
+The 1-D cells are those of new_line: PinX/Y in the middle, Width the chord, Angle its
+direction, LocPinX Width*0.5, Begin and End constants until glued.
+```
+
+- **`fn simplify(pts: &[[f64; 2]], tol: f64) -> Vec<[f64; 2]>`**
+  the corners of a stroke: every point of `pts` lies within `tol` of the polyline through the
+  result, which starts and ends with the stroke's first and last point (repeated points go)
+
+- **`struct Spline`**
+  a clamped, uniform B-spline through its first and last control point
+  - `degree: usize`
+  - `points: Vec<[f64; 2]>`
+  - `knots: Vec<f64>` -- the full knot vector: points + degree + 1 knots
+
+**`impl Spline`**
+
+- **`fn of(points: &[[f64; 2]]) -> Option<Spline>`**
+  the spline with these control points: degree 3 (2 for three points, 1 for two), knots
+  0 .. 0, 1, 2 .. n - degree + 1 .. (None: fewer than two points)
+- **`fn at(&self, t: f64) -> [f64; 2]`**
+  the point at parameter t in 0 ..= 1 of the knot range (de Boor)
+
+- **`struct Arc`**
+  a quarter of an ellipse with axes parallel to the page's
+  - `centre: [f64; 2]`
+  - `rx: f64` -- the half axes along x and y
+  - `ry: f64`
+  - `mid: [f64; 2]` -- the point halfway (45 degrees of the parameter)
+
+- **`fn quarter_arc(a: [f64; 2], b: [f64; 2], horizontal: bool) -> Arc`**
+  the quarter ellipse from `a` to `b`: leaving `a` horizontally (horizontal) or vertically
+
+- **`fn new_freeform(tx: &mut Transaction, eng: &mut Engine, owner: Owner, stroke: &[[f64; 2]], tol: f64, close: f64, begin: Target, end: Target) -> Result<ShapeRef, EditError>`**
+  a freeform shape from a stroke (page points in drawing units): its corners within `tol`
+  (simplify) smoothed into a NURBS curve; a stroke whose end lies within `close` of its start
+  (and that has a few corners) is a closed, filled 2-D shape, else a 1-D shape whose ends glue
+  like a line's (Target::Shape is refused, as for lines) -> its handle.  A stroke without
+  length is refused (Invalid)
+
+- **`fn new_arc(tx: &mut Transaction, eng: &mut Engine, owner: Owner, begin: ([f64; 2], Target), end: ([f64; 2], Target), horizontal: bool) -> Result<ShapeRef, EditError>`**
+  a quarter-ellipse arc from `begin` to `end` (page points with their glue targets; lines
+  glue statically, Target::Shape is refused), leaving the begin horizontally or vertically
+  (quarter_arc) -> its handle.  Begin and end in one place are refused (Invalid)
+
+### `diagram_core/src/ops/picture.rs`
+
+Source: [`lib/diagram_core/src/ops/picture.rs`](../lib/diagram_core/src/ops/picture.rs)
+
+```text
+ops::picture -- a picture file as a shape (RE-02 "Bild aus Datei", SP-09): its format, size
+and resolution read from its header, its bytes as a media part of the package, a Foreign
+shape that shows it
+
+  probe_picture(bytes) -> Option<PictureInfo>   PNG (IHDR, pHYs), JPEG (SOFn, JFIF density),
+                                      GIF (logical screen), BMP (DIB header, pixels per metre):
+                                      format, pixels, dots per inch (0: the file does not say)
+  info.size(per_inch, max) -> [w, h]  the size Visio gives it: pixels / dpi (96 when the file
+                                      does not say) in paper inches, times the drawing units
+                                      per paper inch, scaled down (proportionally) into `max`
+  new_picture(tx, eng, owner, bytes, format, centre, size) -> ShapeRef
+
+How Visio keeps a picture ([MS-VSDX] ForeignData, Foreign shapes): a shape of Type
+"Foreign" with a ForeignData element (ForeignType="Bitmap", CompressionType "PNG", "JPEG",
+"GIF" ...) whose Rel names a part of the package by an image relationship
+(/visio/media/imageN.ext; diagram_io::vsdx::write makes the relationship and the content type
+from Document::parts, the shape refers to the part by its name).  The picture fills the box
+ImgOffsetX/Y, ImgWidth/ImgHeight inside the shape, cut at the shape's box; Visio writes them
+as ImgOffsetX = ImgWidth*0, ImgOffsetY = ImgHeight*0, ImgWidth = Width*1, ImgHeight =
+Height*1, so the picture stretches with the shape.  The shape here also has a rectangle in
+Geometry (no fill) and LinePattern 0, so a border can be given later (Line format) without a
+line at first; Annahme: Visio's inserted pictures carry such a section too, their border is
+off until set.  A BMP is best converted to PNG by the caller (CompressionType "BMP" is
+written for it here, Annahme from [MS-VSDX]'s list of compression types).
+```
+
+- **`enum PictureFormat`**
+  the formats of picture files
+  - `Png`
+  - `Jpeg`
+  - `Gif`
+  - `Bmp`
+
+**`impl PictureFormat`**
+
+- **`fn extension(self) -> &'static str`**
+  the part name's extension
+- **`fn content_type(self) -> &'static str`**
+  the part's content type
+- **`fn compression(self) -> &'static str`**
+  ForeignData's CompressionType
+
+- **`struct PictureInfo`**
+  what a picture file's header says
+  - `format: PictureFormat`
+  - `w: u32` -- pixels
+  - `h: u32`
+  - `dpi: [f64; 2]` -- dots per inch across and down (0: the file does not say)
+
+**`impl PictureInfo`**
+
+- **`fn size(&self, per_inch: f64, max: [f64; 2]) -> [f64; 2]`**
+  the size of the picture's shape: its pixels at its resolution (96 dpi when the file does
+  not say) in paper inches times `per_inch` (drawing units per paper inch), scaled down
+  into `max` (width, height; 0: no bound) keeping its proportions
+
+- **`fn probe_picture(b: &[u8]) -> Option<PictureInfo>`**
+  the format, pixels and resolution of a picture file (None: no PNG, JPEG, GIF or BMP, or a
+  header that ends too soon or names no pixels)
+
+- **`fn new_picture(tx: &mut Transaction, eng: &mut Engine, owner: Owner, bytes: &[u8], format: PictureFormat, centre: [f64; 2], size: [f64; 2]) -> Result<ShapeRef, EditError>`**
+  a picture of `format` with these bytes as a Foreign shape of `size` (drawing units) around
+  `centre` on top of the owner's shapes; the bytes become a new media part -> the shape (an
+  empty size or no bytes: Invalid)
 
 ### `diagram_core/src/ops/points.rs`
 
@@ -56941,6 +57352,104 @@ the sheets are shape IDs of the same page or master.
   - `sheet: Sheet` -- its cells
   - `extras: Extras` -- unknown items of the StyleSheet element
 
+### `diagram_core/src/pagesetup.rs`
+
+Source: [`lib/diagram_core/src/pagesetup.rs`](../lib/diagram_core/src/pagesetup.rs)
+
+```text
+pagesetup -- a page's size against its drawing and its printer paper (PG-04, PG-05, RW-01 ..
+RW-03): orientation, a size of the menu, the page fitted to its drawing, automatic size in
+tiles of the printed sheet
+
+  size(doc, page) -> [w, h]              PageWidth, PageHeight (drawing units, inches)
+  scale(doc, page)                       paper inches per drawing inch (PageScale / DrawingScale)
+  landscape(doc, page)                   the page is wider than high
+  set_orientation(tx, eng, page, landscape)   Hochformat / Querformat: width and height
+                                         swapped when the page lies the other way,
+                                         PrintPageOrientation 1 / 2
+  set_paper_size(tx, eng, page, [w, h])  the page to w x h paper inches in its orientation
+  auto_size(doc, page) / set_auto_size(tx, page, on)   Automatisch anpassen
+  content(doc, page) -> Option<[x0, y0, x1, y1]>   the box of the page's top-level shapes
+  fit_to_drawing(tx, eng, page, margins) the page around its drawing, the shapes moved in
+  Tiles::new(paper, margins, zoom); grow(tx, eng, page, &tiles)   automatic size after a
+                                         gesture: whole tiles added or taken away
+
+The cells (Visio's ShapeSheet reference, Page Properties and Print Properties sections):
+* DrawingSizeType: 0 same as printer (visPrintSetup), 1 fit page to drawing contents
+  (visTight), 2 standard (visStandard), 3 custom page size (visCustom), 4 custom scaled, 5
+  metric (ISO), 6 ANSI engineering, 7 ANSI architectural.
+* DrawingResizeType: 0 the page resizes automatically when DrawingSizeType is 0, else not;
+  1 the page resizes automatically; 2 it does not.  set_auto_size writes 1 or 2.
+* PrintPageOrientation: 0 same as printer, 1 portrait, 2 landscape.
+A size chosen from the menu or fitted to the drawing turns the automatic size off: the Page
+Size register of Visio's Page Setup offers "let Visio expand the page" and a fixed size as
+alternatives (Visio 2016 Step by Step, chapter 3).  Assumption, not checked in Visio: fitting
+to the drawing turns it off as well (DrawingResizeType 2), so the next gesture does not cut
+the fitted page back into tiles.
+
+Automatic size (Step by Step, chapter 3: "Auto Size works both horizontally and vertically",
+the extended page goes again when its last shape leaves it): a tile is the printed sheet,
+the first one the whole paper, each further one the paper less the margins left and right
+(top and bottom) -- a page of the local corpus agrees: A4 landscape with 0.25 in margins and
+two by two tiles is 2 x 11.69 - 0.5 = 22.89 in wide and 2 x 8.27 - 0.5 = 16.04 in high.  After a
+gesture the page gains a tile on each side where a shape juts out and loses an empty tile at
+an edge, never below the first one; a page that grows to the left or down moves its drawing
+(the origin stays at the bottom left corner, as every coordinate of the file says).  Nothing
+happens on opening a file (PLAN.md, "Fallen"): only the app's gesture asks.
+```
+
+- **`fn size(doc: &Document, page: PageRef) -> [f64; 2]`**
+  PageWidth and PageHeight in drawing units (inches; Visio's 8.5 x 11 in when missing)
+
+- **`fn scale(doc: &Document, page: PageRef) -> f64`**
+  paper inches per drawing inch: PageScale / DrawingScale (1 without a scale)
+
+- **`fn landscape(doc: &Document, page: PageRef) -> bool`**
+  whether the page lies landscape (wider than high)
+
+- **`fn set_orientation(tx: &mut Transaction, eng: &mut Engine, page: PageRef, landscape: bool) -> Result<bool, EditError>`**
+  Hochformat (landscape = false) / Querformat: width and height swapped when the page lies
+  the other way, PrintPageOrientation 1 or 2, then what depends on the page computed again
+  -> whether anything changed
+
+- **`fn set_paper_size(tx: &mut Transaction, eng: &mut Engine, page: PageRef, paper: [f64; 2]) -> Result<bool, EditError>`**
+  a size of the menu (paper inches, portrait or landscape alike): the page gets it in its
+  own orientation (DrawingSizeType 2, standard; the automatic size goes off) -> changed
+
+- **`fn auto_size(doc: &Document, page: PageRef) -> bool`**
+  whether the page grows and shrinks with its drawing (Automatisch anpassen): DrawingResizeType
+  1, or 0 with DrawingSizeType 0
+
+- **`fn set_auto_size(tx: &mut Transaction, page: PageRef, on: bool) -> Result<bool, EditError>`**
+  turn the automatic size on (DrawingResizeType 1) or off (2) -> changed
+
+- **`fn content(doc: &Document, page: PageRef) -> Option<[f64; 4]>`**
+  the box of the page's top-level shapes on the page (drawing units, y up; guides and deleted
+  shapes left out); None for a page without shapes
+
+- **`fn fit_to_drawing(tx: &mut Transaction, eng: &mut Engine, page: PageRef, margins: [f64; 4]) -> Result<bool, EditError>`**
+  the page around its drawing (Größe an Zeichnung anpassen): the box of its shapes and
+  `margins` (left, top, right, bottom; paper inches) around it, the shapes moved so that the
+  box starts at the left and bottom margin; DrawingSizeType 1 (fit page to drawing contents),
+  the automatic size off -> changed (false for a page without shapes)
+
+- **`struct Tiles`**
+  the tiles of the automatic size on paper (inches): the first tile, each further one
+  - `base: [f64; 2]` -- the first tile: the paper (over the print zoom)
+  - `step: [f64; 2]` -- each further tile: the paper less the margins (over the print zoom)
+
+**`impl Tiles`**
+
+- **`fn new(paper: [f64; 2], margins: [f64; 4], zoom: f64) -> Tiles`**
+  the tiles of a sheet of `paper` (width, height; inches, in the page's print
+  orientation) with `margins` (left, top, right, bottom) printed at `zoom` (1 = 100 %)
+
+- **`fn grow(tx: &mut Transaction, eng: &mut Engine, page: PageRef, tiles: &Tiles) -> Result<Option<[f64; 2]>, EditError>`**
+  the automatic size after a gesture (see the file header): the page gains or loses whole
+  tiles where its drawing juts out or left empty space, the drawing moves by what the page
+  grew or shrank at its left and bottom edge -> that move (drawing units) when the page
+  changed, None when it stays (the automatic size is off, it fits, a step is too small)
+
 ### `diagram_core/src/render/mod.rs`
 
 Source: [`lib/diagram_core/src/render/mod.rs`](../lib/diagram_core/src/render/mod.rs)
@@ -56992,6 +57501,8 @@ inches (geometry times PageScale / DrawingScale).
   what build draws
   - `background: bool` -- draw the page's background pages under it
   - `hidden_layers: bool` -- draw shapes on hidden layers too
+  - `print: bool` -- (JD8 rest) the page as printed and exported: shapes on layers that do not print (Layer
+    row Print 0, LY-02) and shapes with NonPrinting set are left out
 
 - **`struct Drawing`**
   a page as items to draw
@@ -57251,7 +57762,8 @@ wrapping, alignment, the text block's transform and margins
 
 The text comes as the file keeps it (Text: characters between cp, pp, tp and fld marks,
 JD3): a cp mark selects the Character row for what follows, a pp mark the Paragraph row; a
-field shows the text Visio cached in it (no formula is evaluated); LF ends a paragraph,
+field Visio wrote with its text inside shows that text, one without text inside (a field of
+JFDiagrammer) its Field row's value in its format (field.rs); LF ends a paragraph,
 U+2028 breaks a line inside one, the last LF of a text is Visio's end mark and makes no empty
 paragraph.  Character cells: Font, Size, Color, ColorTrans, Style (1 bold, 2 italic,
 4 underline, 8 small caps), Case (1 all caps, 2 initial caps), Pos (1 superscript,
@@ -60534,8 +61046,9 @@ Source: [`lib/diagram_view/src/image.rs`](../lib/diagram_view/src/image.rs)
 image -- the pictures of Foreign shapes: bytes from the package or inline base64, decoded
 
   bytes(doc, &ImageSource) -> Option<Vec<u8>>   a part's bytes, or the inline data decoded
-  decode(bytes) -> Picture                      PNG and JPEG as pixels (straight ARGB rows);
-                                                EMF, WMF and anything else: a placeholder
+  decode(bytes) -> Picture                      PNG, JPEG, (JD8 rest) GIF (its first frame)
+                                                and BMP as pixels (straight ARGB rows); EMF,
+                                                WMF and anything else: a placeholder
   base64(text)                                  RFC 4648 with padding and line breaks
 
 The format is told by the bytes (the signatures), not by the file's attributes.  A picture

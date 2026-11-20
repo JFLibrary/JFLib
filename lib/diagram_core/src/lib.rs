@@ -41,6 +41,13 @@
 //
 //   structure::*                  (JD10) containers, lists, callouts: membership in the
 //                                 Relationships cell, automatic size, list order and layout
+//   pagesetup::*                  (JD8) a page's size against its drawing and its paper:
+//                                 orientation, sizes, fit to the drawing, automatic size in
+//                                 tiles of the printed sheet; Transaction::add_page_like and
+//                                 duplicate_page insert pages with settings or content
+//   field::*                      (JD8) text fields: a Field row's value in its format picture,
+//                                 new fields, the text with its fields, the document's
+//                                 properties (Document::fields: the app's locale and clock)
 //
 // What is to come here, by stage of the plan: page layout (CN-13, P2)
 //
@@ -56,6 +63,7 @@ mod cell;
 pub mod design;
 mod document;
 mod edit;
+pub mod field;
 pub mod formula;
 pub mod geometry;
 pub mod glue;
@@ -65,6 +73,7 @@ pub mod instance;
 mod names;
 pub mod ops;
 mod page;
+pub mod pagesetup;
 pub mod render;
 pub mod route;
 mod shape;

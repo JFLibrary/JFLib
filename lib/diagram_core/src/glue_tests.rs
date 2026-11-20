@@ -903,3 +903,86 @@ fn update_bench() {
     }
     assert!(path(&f.doc, c).len() >= 2);
 }
+
+// (JD8 rest) the freeform and arc tools: 1-D shapes that glue like a line and keep their form
+#[test]
+fn freeform_glues_and_keeps_its_form() {
+    let mut f = fx();
+    let a = f.rect(None, 1, [2.0, 2.0], [1.0, 1.0], 0.0);
+    let b = f.rect(None, 2, [6.0, 2.0], [1.0, 1.0], 0.0);
+    // a wave from A's right side to B's left side
+    let mut stroke = Vec::new();
+    for i in 0..=60 {
+        let t = i as f64 / 60.0;
+        stroke.push([2.5 + 3.0 * t, 2.0 + 0.6 * crate::formula::math::sincos(t * PI * 2.0).0]);
+    }
+    let mut tx = f.doc.transaction("Freihandform");
+    let s = crate::ops::new_freeform(&mut tx, &mut f.eng, f.owner, &stroke, 0.01, 0.05, Target::Point { shape: a, row: 1 }, Target::Point { shape: b, row: 0 }).unwrap();
+    // a Shape target is refused, as for lines
+    assert!(crate::ops::new_freeform(&mut tx, &mut f.eng, f.owner, &stroke, 0.01, 0.05, Target::Shape(a), Target::None).is_err());
+    tx.commit().unwrap();
+    assert!(is_one_d(&f.doc, s) && !is_connector(&f.doc, s));
+    assert_eq!(f.formula(s, "BeginX"), "PAR(PNT(Sheet.1!Connections.X2,Sheet.1!Connections.Y2))");
+    assert_eq!(f.connects().len(), 2);
+    // the curve runs from end to end near the stroke, through the NURBS row the engine computed
+    let p = path(&f.doc, s);
+    assert!(p.len() > 8);
+    assert!(near(p[0], [2.5, 2.0]) && near(*p.last().unwrap(), [5.5, 2.0]), "{:?} {:?}", p[0], p.last());
+    let top = p.iter().fold(f64::MIN, |m, q| m.max(q[1]));
+    assert!(top > 2.3 && top < 2.6, "{top}");
+    let sec = SecKey::one(names::GEOMETRY);
+    let e = f.doc.resolve(SheetRef::Shape(s), &CellAddr::row(sec, RowKey::Index(2), names::E));
+    let ef = e.formula().expr().map(|x| String::from(f.doc.str(x))).unwrap();
+    assert!(ef.starts_with("NURBS(") && ef.contains("Width*"), "{ef}");
+    // B moves: the curve follows end to end, scaled and turned with its chord
+    f.move_to(b, [6.0, 5.0]).unwrap();
+    let p = path(&f.doc, s);
+    assert!(near(p[0], [2.5, 2.0]) && near(*p.last().unwrap(), [5.5, 5.0]), "{:?} {:?}", p[0], p.last());
+    // a closed stroke: a filled 2-D shape
+    let ring: Vec<[f64; 2]> = (0..=40).map(|i| {
+        let (s, c) = crate::formula::math::sincos(i as f64 / 40.0 * PI * 2.0);
+        [8.0 + c, 8.0 + s]
+    }).collect();
+    let mut tx = f.doc.transaction("Freihandform");
+    let r = crate::ops::new_freeform(&mut tx, &mut f.eng, f.owner, &ring, 0.01, 0.05, Target::None, Target::None).unwrap();
+    tx.commit().unwrap();
+    assert!(!is_one_d(&f.doc, r));
+    let g = f.doc.geometry_paths(SheetRef::Shape(r), f.value(r, "Width"), f.value(r, "Height"));
+    assert!(!g[0].no_fill && g[0].path.subs[0].segs.len() > 4);
+    let w = f.value(r, "Width");
+    assert!(w > 1.9 && w < 2.01, "{w}");
+}
+
+#[test]
+fn arc_is_a_quarter_ellipse_that_glues() {
+    let mut f = fx();
+    let a = f.rect(None, 1, [2.0, 4.0], [1.0, 1.0], 0.0);
+    // from A's bottom (2, 3.5) to (5, 1.5), leaving vertically: the centre at (5, 3.5)
+    let mut tx = f.doc.transaction("Bogen");
+    let s = crate::ops::new_arc(&mut tx, &mut f.eng, f.owner, ([2.0, 3.5], Target::Point { shape: a, row: 2 }), ([5.0, 1.5], Target::None), false).unwrap();
+    tx.commit().unwrap();
+    assert!(is_one_d(&f.doc, s));
+    assert_eq!(f.formula(s, "BeginX"), "PAR(PNT(Sheet.1!Connections.X3,Sheet.1!Connections.Y3))");
+    let p = path(&f.doc, s);
+    assert!(near(p[0], [2.0, 3.5]) && near(*p.last().unwrap(), [5.0, 1.5]));
+    // every point on the ellipse around (5, 3.5) with half axes 3 and 2
+    for q in &p {
+        let (u, v) = ((q[0] - 5.0) / 3.0, (q[1] - 3.5) / 2.0);
+        assert!((u * u + v * v - 1.0).abs() < 1e-3, "{q:?}");
+    }
+    // leaving horizontally: the other quarter, around (2, 1.5)
+    let mut tx = f.doc.transaction("Bogen");
+    let t = crate::ops::new_arc(&mut tx, &mut f.eng, f.owner, ([2.0, 3.5], Target::None), ([5.0, 1.5], Target::None), true).unwrap();
+    tx.commit().unwrap();
+    for q in &path(&f.doc, t) {
+        let (u, v) = ((q[0] - 2.0) / 3.0, (q[1] - 1.5) / 2.0);
+        assert!((u * u + v * v - 1.0).abs() < 1e-3, "{q:?}");
+    }
+    // A moves: the arc follows from its begin, its other end stays
+    f.move_to(a, [1.0, 4.0]).unwrap();
+    let p = path(&f.doc, s);
+    assert!(near(p[0], [1.0, 3.5]) && near(*p.last().unwrap(), [5.0, 1.5]));
+    // begin = end is refused
+    let mut tx = f.doc.transaction("Bogen");
+    assert_eq!(crate::ops::new_arc(&mut tx, &mut f.eng, f.owner, ([1.0, 1.0], Target::None), ([1.0, 1.0], Target::None), true), Err(EditError::Invalid));
+}

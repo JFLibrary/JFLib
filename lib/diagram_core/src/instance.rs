@@ -22,7 +22,13 @@
 //   place(&mut tx, page, master, x, y, lang) -> ShapeRef   an instance at (x, y) inches on the
 //                                      page (y up): Name in language lang, NameU the master's
 //                                      (LG-04; "Rechteck.7" when the page has one already), its
-//                                      text and translated cells in that language
+//                                      text and translated cells in that language; (JD8 rest,
+//                                      LY-03) the master's layers come along: the page gets the
+//                                      ones it lacks (matched by NameUniv, else Name, with the
+//                                      master's Visible, Print, Lock, Snap, Glue, Color and
+//                                      ColorTrans) and every shape of the instance its own
+//                                      LayerMember with the page's indices (the master's name
+//                                      the rows of its own Layer section)
 //
 // The JFD_ cells are JFDiagrammer's own (apps/JFDiagrammer/stencils/README.md); diagram_io's
 // stencil builder writes them, the Shapes panel reads them.  Visio keeps them as ordinary User
@@ -572,6 +578,8 @@ pub fn place(tx: &mut Transaction, page: PageRef, master: MasterRef, x: f64, y: 
                 tx.set_text(shape, Some(Text::plain(text)))?;
             }
         }
+        // (LY-03) the master's layers onto the page
+        bring_layers(tx, page, master, shape)?;
         // translated cells (Controls.Row_1.Tip ...) in this language
         let ms = tx.doc().master(master).and_then(|m| m.master_shape()).map(|slot| SheetRef::Shape(ShapeRef { owner: Owner::Master(master), slot }));
         for (cell, values) in &texts.translated {
@@ -626,6 +634,79 @@ fn one_d_ends(tx: &mut Transaction, master: MasterRef, shape: ShapeRef, x: f64, 
     for name in ["PinX", "PinY"] {
         let a = tx.single(name);
         tx.inherit_cell(sheet, &a)?;
+    }
+    Ok(())
+}
+
+// the layer cells a page's layer takes over from the master's (not Active: the page's own)
+pub(crate) const LAYER_CELLS: [&str; 7] = ["Visible", "Print", "Lock", "Snap", "Glue", "Color", "ColorTrans"];
+
+/// (LY-03) the layers of `master` that the shapes of its instance `shape` are on: the page gets
+/// the ones it lacks (matched by NameUniv, else Name), each shape of the instance its own
+/// LayerMember with the page's indices (Visio's: a master's shapes name the rows of the
+/// master's Layer section, an instance on a page names the page's)
+pub fn bring_layers(tx: &mut Transaction, page: PageRef, master: MasterRef, shape: ShapeRef) -> Result<(), EditError> {
+    let sec = SecKey::one(crate::names::LAYER);
+    // the master's layers: index -> (Name, NameUniv, the cells to take over)
+    let theirs: Vec<(u32, String, String, Vec<(&str, Value)>)> = {
+        let doc = tx.doc();
+        doc.section_rows(SheetRef::Master(master), sec)
+            .into_iter()
+            .filter_map(|l| {
+                let RowKey::Index(ix) = l.key() else { return None };
+                let name = String::from(l.text("Name").or_else(|| l.text("NameUniv"))?);
+                let univ = String::from(l.text("NameUniv").unwrap_or(&name));
+                let cells = LAYER_CELLS.iter().filter_map(|c| match l.get(c).value() {
+                    Value::Absent => None,
+                    v => Some((*c, v)),
+                }).collect();
+                Some((ix, name, univ, cells))
+            })
+            .collect()
+    };
+    if theirs.is_empty() {
+        return Ok(());
+    }
+    // the instance and its subshapes
+    let mut all = alloc::vec![shape];
+    let mut k = 0;
+    while k < all.len() {
+        let kids: Vec<ShapeRef> = tx.doc().shape(all[k]).map(|s| s.children().collect()).unwrap_or_default();
+        all.extend(kids);
+        k += 1;
+    }
+    let mut map: BTreeMap<u32, u32> = BTreeMap::new();
+    for s in all {
+        let members = tx.doc().layer_members(s);
+        if members.is_empty() {
+            continue;
+        }
+        let mut mine = Vec::new();
+        for m in members {
+            let Some((_, name, univ, cells)) = theirs.iter().find(|l| l.0 == m) else { continue };
+            let ix = match map.get(&m) {
+                Some(&ix) => ix,
+                None => {
+                    let ix = match tx.doc().layer_by_name(page, univ).or_else(|| tx.doc().layer_by_name(page, name)) {
+                        Some(ix) => ix,
+                        None => {
+                            let ix = tx.add_layer(page, name, univ)?;
+                            for (c, v) in cells {
+                                let c = tx.intern(c);
+                                tx.set_constant(SheetRef::Page(page), &CellAddr::row(sec, RowKey::Index(ix), c), *v, None)?;
+                            }
+                            ix
+                        }
+                    };
+                    map.insert(m, ix);
+                    ix
+                }
+            };
+            if !mine.contains(&ix) {
+                mine.push(ix);
+            }
+        }
+        tx.set_layers(s, &mine)?;
     }
     Ok(())
 }
@@ -799,6 +880,46 @@ mod tests {
         assert!(change.undo(&mut dst));
         assert_eq!(dst.masters().count(), 0);
         assert_eq!(dst.top_shapes(Owner::Page(page)).count(), 0);
+    }
+
+    // (LY-03) a master on the layer "Connector" brings it to the page, once
+    #[test]
+    fn place_brings_the_masters_layers() {
+        let src = stencil();
+        let box_m = src.masters().next().unwrap();
+        let mut dst = Document::new(DocKind::Drawing);
+        let mut tx = dst.transaction("page");
+        let page = tx.add_page("Seite-1", "Page-1", false, None).unwrap();
+        tx.add_layer(page, "Andere", "Other").unwrap();
+        tx.commit();
+        let mut tx = dst.transaction("drop");
+        let m = import_master(&mut tx, &src, box_m).unwrap();
+        // the master's page sheet: layers 0 "Verbinder" (not printed) and 1 "Geräte"; its shape on 1
+        let sec = SecKey::one(crate::names::LAYER);
+        let ms = SheetRef::Master(m);
+        for (name, univ, print) in [("Verbinder", "Connector", 0.0), ("Geräte", "Devices", 1.0)] {
+            let r = tx.add_row(ms, sec, None, None).unwrap();
+            let (n, u) = (tx.intern(name), tx.intern(univ));
+            for (c, v) in [("Name", Value::Text(n)), ("NameUniv", Value::Text(u)), ("Print", Value::Num(print))] {
+                let c = tx.intern(c);
+                tx.set_constant(ms, &CellAddr::row(sec, r, c), v, None).unwrap();
+            }
+        }
+        let shape = ShapeRef { owner: Owner::Master(m), slot: tx.doc().master(m).unwrap().master_shape().unwrap() };
+        tx.set_layers(shape, &[1, 0]).unwrap();
+        let a = place(&mut tx, page, m, 1.0, 1.0, 0).unwrap();
+        let b = place(&mut tx, page, m, 3.0, 1.0, 0).unwrap();
+        let mut change = tx.commit().unwrap();
+        let layers = dst.layers(page);
+        assert_eq!(layers.len(), 3);
+        assert_eq!(dst.layer_by_name(page, "Devices"), Some(1));
+        assert_eq!(dst.layer_by_name(page, "Connector"), Some(2));
+        assert!(!layers[2].flag("Print") && layers[1].flag("Print"));
+        assert_eq!(layers[1].text("Name"), Some("Geräte"));
+        assert_eq!(dst.layer_members(a), alloc::vec![1, 2]);
+        assert_eq!(dst.layer_members(b), alloc::vec![1, 2]);
+        assert!(change.undo(&mut dst));
+        assert_eq!(dst.layers(page).len(), 1);
     }
 
     #[test]

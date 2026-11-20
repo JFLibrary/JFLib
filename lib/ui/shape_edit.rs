@@ -22,7 +22,8 @@
 //                                   while it shows ("Element einfügen", value = its tag): scripts
 //                                   click and drag them, screen readers name them (a screen
 //                                   reader's click on an arrow or a mark reports it as a click)
-//   tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT, SE_PLACE
+//   tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT, SE_PLACE, SE_FREEFORM,
+//         SE_ARC
 //
 // Model (SeModel, borrowed per call; world units are the canvas's, y down):
 //   SeShape { key, parent, bx, ends, pin, bbox, flags, points }
@@ -47,7 +48,12 @@
 // total each step, and keeps the last one as the undo step.  The frames of the selection follow
 // the model (the app's preview), the gesture keeps what it had at the start.  The connector and
 // line tools and the drawing tools draw a rubber band and report Connect / Draw when released;
-// a click with them selects like the pointer.
+// a click with them selects like the pointer.  With Shift the rectangle and the ellipse tool draw
+// a square and a circle, and a move with Shift keeps to one axis (KB-09).  The freeform tool
+// records the pointer's way (a point every 2 px) and reports SeEv::Stroke when released; the arc
+// tool shows a quarter ellipse from the press to the pointer, bowing the way the drag started
+// (horizontally or vertically, decided once the pointer left the drag threshold), and reports
+// SeEv::Arc; both start and end glued to connection points like the line tool (CN-12).
 //
 // Input (pointer tool): a press on a handle of the selection starts its drag; on a shape it
 // selects it (Shift adds, Ctrl toggles) and a drag moves the selection (grid, dynamic grid,
@@ -81,7 +87,8 @@
 // that would cover a rotation handle of the selection (the single shape's, or the one of the
 // box around several) moves out along its direction until it clears the handle by a few DIP
 // (Visio puts its top arrow beyond the rotation handle too); the strip that keeps the arrows
-// grows with it.  Handles and control points stay on top and are hit first.  A click on an
+// grows with it.  Handles and control points of that shape (or of a selection box around it)
+// stay on top and are hit first; another selected shape's handle under a hot arrow is not.  A click on an
 // arrow reports SeEv::Arrow { key, dir } and leaves the selection alone (the app selects what
 // it made); a drag from an arrow is the connector tool from that shape: a rubber band from
 // the middle of the box's side, glue and the target's highlight as SE_CONNECT, released
@@ -122,6 +129,11 @@ pub const SE_TEXT: u32 = 5;
 /// shape too, reports Draw { tool: SE_PLACE, a, b: a } at the snapped point; no handles, a
 /// drag places nothing
 pub const SE_PLACE: u32 = 6;
+/// draw freehand: the pointer's way, reported as SeEv::Stroke (its ends glue like a line's)
+pub const SE_FREEFORM: u32 = 7;
+/// draw a quarter ellipse from the press to the release, reported as SeEv::Arc (its ends glue
+/// like a line's)
+pub const SE_ARC: u32 = 8;
 
 /// shape flags (SeShape::flags)
 pub const SEF_1D: u32 = 1; // the two ends instead of the eight handles
@@ -142,6 +154,7 @@ pub const SEF_END_GLUED: u32 = 0x4000;
 pub const SEF_END_DYN: u32 = 0x8000;
 pub const SEF_LOCK_PIN: u32 = 0x1_0000; // no rotation pin handle
 pub const SEF_NOARROWS: u32 = 0x2_0000; // no connection arrows around it (see the file header)
+pub const SEF_NOSNAP: u32 = 0x4_0000; // moves do not snap to it (the dynamic grid leaves it out)
 
 /// kinds of SePoint
 pub const SP_CONTROL: u8 = 0;
@@ -303,6 +316,12 @@ pub enum SeEv {
     Connect { tool: u32, a: [f32; 2], ga: SeGlue, b: [f32; 2], gb: SeGlue },
     /// a drawing tool drew the box from a to b (a == b: a click)
     Draw { tool: u32, a: [f32; 2], b: [f32; 2] },
+    /// the freeform tool drew this way (world points, at least two); its begin glued to `ga`,
+    /// its end to `gb` (connection points only)
+    Stroke { pts: Vec<[f32; 2]>, ga: SeGlue, gb: SeGlue },
+    /// the arc tool drew a quarter ellipse from a to b that leaves a horizontally
+    /// (horizontal) or vertically; glued like a line's ends
+    Arc { a: [f32; 2], ga: SeGlue, b: [f32; 2], gb: SeGlue, horizontal: bool },
     /// edit the text of a shape (double click, F2, Enter, or a typed character)
     Text { key: u64, ch: Option<char> },
     /// right click, Shift+F10 or the menu key on a shape (0: the page); at = window px
@@ -492,6 +511,10 @@ enum G {
     Zoom { start: [f32; 2], cur: [f32; 2] },
     Connect { tool: u32, a: [f32; 2], ga: SeGlue, b: [f32; 2] },
     Draw { tool: u32, a: [f32; 2], b: [f32; 2] },
+    /// the freeform tool: the way so far, the begin's glue
+    Stroke { pts: Vec<[f32; 2]>, ga: SeGlue },
+    /// the arc tool: from a to b, the direction it leaves a (None: not decided yet)
+    Arc { a: [f32; 2], ga: SeGlue, b: [f32; 2], h: Option<bool> },
 }
 
 // an alignment line of the dynamic grid: from a to b (world)
@@ -865,6 +888,23 @@ fn in_polygon(pts: &[[f32; 2]], p: [f32; 2]) -> bool {
     inside
 }
 
+// the quarter ellipse from a to b with axes along x and y, leaving a horizontally or vertically
+// (the arc tool's rubber band; diagram_core::ops::quarter_arc makes the shape)
+fn arc_points(a: [f32; 2], b: [f32; 2], horizontal: bool) -> Vec<[f32; 2]> {
+    let n = 24;
+    (0..=n)
+        .map(|k| {
+            let (sn, cs) = rt::x87::sincos(k as f64 * core::f64::consts::FRAC_PI_2 / n as f64);
+            let (sn, cs) = (sn as f32, cs as f32);
+            if horizontal {
+                [a[0] + (b[0] - a[0]) * sn, b[1] + (a[1] - b[1]) * cs]
+            } else {
+                [b[0] + (a[0] - b[0]) * cs, a[1] + (b[1] - a[1]) * sn]
+            }
+        })
+        .collect()
+}
+
 fn snap_angle(a: f32, step_deg: f32) -> f32 {
     let s = step_deg.to_radians();
     fl(a / s + 0.5) as f32 * s
@@ -962,7 +1002,7 @@ impl Ui {
         }
         // the cursor for the next call of ui.diagram
         dg.ext_cursor = self.se_cursor(st, m, tool);
-        dg.ext_moving = st.live() || matches!(st.g, G::Marquee { .. } | G::Lasso { .. } | G::Connect { .. } | G::Draw { .. } | G::Zoom { .. });
+        dg.ext_moving = st.live() || matches!(st.g, G::Marquee { .. } | G::Lasso { .. } | G::Connect { .. } | G::Draw { .. } | G::Zoom { .. } | G::Stroke { .. } | G::Arc { .. });
         // (pointer moves bring the frames of a gesture: no pass is asked for while one runs)
         if !out.is_empty() {
             self.repass();
@@ -987,7 +1027,7 @@ impl Ui {
         let hr = w(HANDLE_DIP + 2);
         // the drawing tools keep the handles of the shape just drawn (Visio's)
         let frame_tool = matches!(tool, SE_POINTER | SE_RECT | SE_ELLIPSE | SE_TEXT);
-        if frame_tool || tool == SE_LINE {
+        if frame_tool || matches!(tool, SE_LINE | SE_FREEFORM | SE_ARC) {
             if let Some(sh) = st.single(m) {
                 // points first (they lie on the frame), then ends, rotation, pin, handles
                 let mut best: Option<(f32, u32)> = None;
@@ -1157,8 +1197,16 @@ impl Ui {
                 }
             }
         }
-        // the hover: handles first (they lie on top), then a mark, then an arrow
-        let handle = matches!(st.hover, SHit::Handle(..) | SHit::SelHandle(_) | SHit::Rotate(_) | SHit::SelRotate | SHit::Pin(_) | SHit::End(..) | SHit::Point(..));
+        // the hover: handles first (they lie on top), then a mark, then an arrow.  Only the
+        // handles of the shape whose arrows show (or of a selection box around it) beat its arrow:
+        // a selected neighbour's handle under the arrow (the shape a first arrow click just made
+        // lies the page's spacing away, its side handle under the arrow) is not what the pointer,
+        // coming from the arrows' shape, is on -- the arrow shows hot and takes the click
+        let handle = match st.hover {
+            SHit::Handle(k, _) | SHit::Rotate(k) | SHit::Pin(k) | SHit::End(k, _) | SHit::Point(k, _) => hot == 255 || k == key,
+            SHit::SelHandle(_) | SHit::SelRotate => hot == 255 || st.sel.contains(&key),
+            _ => false,
+        };
         if handle {
             st.arrow_hot = 255;
             st.mark_hot = None;
@@ -1219,7 +1267,7 @@ impl Ui {
         match st.g {
             G::Move { .. } => return CUR_MOVE,
             G::Resize { h, ref to, .. } => return size_cursor([to.at(HANDLES[h as usize][0], HANDLES[h as usize][1])[0] - to.at(0.5, 0.5)[0], to.at(HANDLES[h as usize][0], HANDLES[h as usize][1])[1] - to.at(0.5, 0.5)[1]]),
-            G::Rotate { .. } | G::Pin { .. } | G::End { .. } | G::Point { .. } | G::Connect { .. } | G::Draw { .. } | G::Zoom { .. } => return CUR_CROSS,
+            G::Rotate { .. } | G::Pin { .. } | G::End { .. } | G::Point { .. } | G::Connect { .. } | G::Draw { .. } | G::Zoom { .. } | G::Stroke { .. } | G::Arc { .. } => return CUR_CROSS,
             _ => {}
         }
         let frame_cursor = |b: &SeBox, h: u8| {
@@ -1378,6 +1426,16 @@ impl Ui {
             let a = self.se_snap_pt(dg, at, mods);
             return G::Draw { tool, a, b: a };
         }
+        // the freeform and the arc tool start glued like a line (CN-12); the stroke starts where
+        // the press was, the arc on the grid
+        if matches!(tool, SE_FREEFORM | SE_ARC) && !matches!(hit, SHit::Point(..) | SHit::End(..)) {
+            let (ga, a) = self.se_glue(st, dg, m, at, 0, false);
+            if tool == SE_FREEFORM {
+                return G::Stroke { pts: alloc::vec![a], ga };
+            }
+            let a = if ga == SeGlue::None { self.se_snap_pt(dg, a, mods) } else { a };
+            return G::Arc { a, ga, b: a, h: None };
+        }
         if tool == SE_CONNECT || (tool == SE_LINE && !matches!(hit, SHit::Point(..) | SHit::End(..))) {
             let dynamic = tool == SE_CONNECT;
             let (ga, a) = self.se_glue(st, dg, m, at, 0, dynamic);
@@ -1474,6 +1532,8 @@ impl Ui {
             }
             G::Move { keys, start, bb, total } => {
                 let raw = [i.p[0] - start[0], i.p[1] - start[1]];
+                // Shift: along one axis, the one the pointer went farther on (KB-09)
+                let raw = if i.mods & MOD_SHIFT != 0 { if raw[0].abs() >= raw[1].abs() { [raw[0], 0.0] } else { [0.0, raw[1]] } } else { raw };
                 let t = self.se_snap_move(st, dg, m, &keys, bb, raw, i.mods);
                 if t != total || done {
                     out.push(SeEv::Move { keys: keys.clone(), total: t, done });
@@ -1626,11 +1686,55 @@ impl Ui {
             }
             G::Draw { tool, a, .. } => {
                 let b = self.se_snap_pt(dg, i.p, i.mods);
+                // Shift: a square, a circle (KB-09)
+                let b = if i.mods & MOD_SHIFT != 0 && matches!(tool, SE_RECT | SE_ELLIPSE) {
+                    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+                    let d = dx.abs().max(dy.abs());
+                    [a[0] + if dx < 0.0 { -d } else { d }, a[1] + if dy < 0.0 { -d } else { d }]
+                } else {
+                    b
+                };
                 if done {
                     out.push(SeEv::Draw { tool, a, b });
                     G::Idle
                 } else {
                     G::Draw { tool, a, b }
+                }
+            }
+            G::Stroke { mut pts, ga } => {
+                if pts.last().is_none_or(|q| dist(*q, i.p) * s >= 2.0) && pts.len() < 8192 {
+                    pts.push(i.p);
+                }
+                let (gb, p) = self.se_glue(st, dg, m, i.p, 0, false);
+                st.glue_now = gb;
+                if done {
+                    st.glue_now = SeGlue::None;
+                    if gb != SeGlue::None {
+                        pts.push(p);
+                    }
+                    let first = pts[0];
+                    if pts.len() >= 2 && pts.iter().any(|q| dist(first, *q) * s > i.lim as f32) {
+                        out.push(SeEv::Stroke { pts, ga, gb });
+                    }
+                    G::Idle
+                } else {
+                    G::Stroke { pts, ga }
+                }
+            }
+            G::Arc { a, ga, h, .. } => {
+                let (gb, p) = self.se_glue(st, dg, m, i.p, 0, false);
+                let b = if gb == SeGlue::None { self.se_snap_pt(dg, p, i.mods) } else { p };
+                // the bow: the axis the pointer left the threshold along
+                let raw = [(i.p[0] - a[0]) * s, (i.p[1] - a[1]) * s];
+                let h = h.or_else(|| (raw[0].abs().max(raw[1].abs()) > i.lim as f32).then_some(raw[0].abs() >= raw[1].abs()));
+                st.glue_now = gb;
+                if done {
+                    if dist(a, b) * s > i.lim as f32 {
+                        out.push(SeEv::Arc { a, ga, b, gb, horizontal: h.unwrap_or(true) });
+                    }
+                    G::Idle
+                } else {
+                    G::Arc { a, ga, b, h }
                 }
             }
             g => g,
@@ -1669,7 +1773,7 @@ impl Ui {
             }
             if st.dyn_grid {
                 for sh in m.shapes {
-                    if sh.parent != 0 || keys.contains(&sh.key) || sh.flags & SEF_1D != 0 || !overlaps(sh.bbox, page) {
+                    if sh.parent != 0 || keys.contains(&sh.key) || sh.flags & (SEF_1D | SEF_NOSNAP) != 0 || !overlaps(sh.bbox, page) {
                         continue;
                     }
                     let b = align_box(sh);
@@ -1951,7 +2055,7 @@ impl Ui {
             }
         }
         // connection points: while connecting or moving an end, with the connector tool, or always
-        let connecting = matches!(st.g, G::Connect { .. } | G::End { .. }) || matches!(st.g, G::Point { glues: true, .. }) || tool == SE_CONNECT || tool == SE_LINE || st.show_points;
+        let connecting = matches!(st.g, G::Connect { .. } | G::End { .. } | G::Stroke { .. } | G::Arc { .. }) || matches!(st.g, G::Point { glues: true, .. }) || matches!(tool, SE_CONNECT | SE_LINE | SE_FREEFORM | SE_ARC) || st.show_points;
         if connecting && st.glue {
             let mut keys: Vec<u64> = Vec::new();
             if st.hover_shape != 0 {
@@ -2019,6 +2123,13 @@ impl Ui {
                     way.push(first);
                 }
                 self.dg_poly(&vp, &way, hairf, band);
+            }
+            G::Stroke { ref pts, .. } => {
+                self.dg_poly(&vp, pts, (hairf * 1.5).max(1.5), band);
+            }
+            G::Arc { a, b, h, .. } => {
+                let pts = arc_points(a, b, h.unwrap_or(true));
+                self.dg_poly(&vp, &pts, (hairf * 1.5).max(1.5), band);
             }
             G::Draw { tool, a, b } => {
                 let r = [a[0].min(b[0]), a[1].min(b[1]), a[0].max(b[0]), a[1].max(b[1])];

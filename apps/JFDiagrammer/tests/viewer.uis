@@ -27,8 +27,8 @@ click "Massstab"
 expect tab:"Massstab" selected
 # zoom and fit (the 6 x 4 in page fits at 100 %)
 click tab:"Seite-1"
-expect text:"100 %" exists
+expect button:"100 %" exists
 click button:"Vergrößern"
-expect text:"125 %" exists
+expect button:"125 %" exists
 key ctrl+shift+w
-expect text:"100 %" exists
+expect button:"100 %" exists

@@ -1,0 +1,131 @@
+#!args --no-system-fonts --save-dir build
+# JFDiagrammer, JD8 rest: Start › Bearbeiten › Ebenen (RS-30, LY-01..04) -- Ebeneneigenschaften
+# makes layers, Ebene zuweisen puts the selection on them; a hidden layer's shapes go from the
+# canvas, a locked layer's cannot be selected, an active layer takes new shapes, a layer's colour
+# overrides its shapes', a deleted layer takes the shapes that are on no other layer (asked
+# first); every change is one undo step; saved and opened again the layers are there
+cmd 4404
+drag 450,250 550,300
+drag 600,250 700,300
+drag 450,450 550,500
+cmd 4400
+# no layers yet: two new ones
+cmd 4469
+expect dialog:"Ebeneneigenschaften" exists
+expect text:"Diese Seite hat keine Ebenen." exists
+click #34821
+type "Netz"
+click button:"Neu…"
+click #34821
+type "Notizen"
+click button:"Neu…"
+expect radio:"Netz" exists
+expect radio:"Notizen" checked
+expect button:"Netz: Sichtbar" checked
+expect button:"Netz: Aktiv" unchecked
+click button:"OK"
+expect dialog:"Ebeneneigenschaften" missing
+# the first two rectangles onto "Netz", the third onto "Notizen"
+click 500,275
+click 650,275 shift
+cmd 4468
+expect dialog:"Ebene zuweisen" exists
+expect checkbox:"Netz" unchecked
+click checkbox:"Netz"
+click button:"OK"
+click 500,475
+cmd 4468
+click checkbox:"Notizen"
+click button:"OK"
+# the dialog counts them; "Notizen" hidden: its rectangle goes from the canvas
+cmd 4469
+expect text:"2" exists
+click button:"Notizen: Sichtbar"
+expect button:"Notizen: Sichtbar" unchecked
+click button:"OK"
+expect listitem:"Sheet.6" missing
+expect listitem:"Sheet.4" exists
+key ctrl+z
+expect listitem:"Sheet.6" exists
+# "Netz" locked: its rectangles cannot be selected (no records of selectable shapes, a click
+# on one selects nothing), Strg+A takes only the third
+cmd 4469
+click button:"Netz: Sperren"
+click button:"OK"
+expect listitem:"Sheet.4" missing
+click 500,275
+expect listitem:"Sheet.6" unselected
+key ctrl+a
+expect listitem:"Sheet.6" selected
+key ctrl+z
+expect listitem:"Sheet.4" exists
+click 1000,700
+# "Notizen" active: a new rectangle lands on it (it goes when "Notizen" is hidden)
+cmd 4469
+click button:"Notizen: Aktiv"
+click button:"OK"
+cmd 4404
+drag 600,450 700,500
+cmd 4400
+expect listitem:"Sheet.7" exists
+cmd 4469
+click button:"Notizen: Sichtbar"
+click button:"OK"
+expect listitem:"Sheet.7" missing
+expect listitem:"Sheet.6" missing
+key ctrl+z
+# "Netz" coloured red: its rectangles are drawn red
+cmd 4469
+click radio:"Netz"
+click button:"Netz: Farbe"
+click button:"OK"
+click 1000,700
+expect pixel 500 275 #FF0000
+expect pixel 650 275 #FF0000
+shot build/JFDiagrammer-layers.png
+# saved and opened again: the layers with their values
+key ctrl+s
+click #28940
+key ctrl+a
+type "jd8-layers.vsdx"
+click button:"Speichern"
+cmd 4097
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+cmd 4098
+click button:"jd8-layers.vsdx"
+expect pixel 500 275 #FF0000
+cmd 4469
+expect radio:"Netz" exists
+expect button:"Netz: Farbe" checked
+expect button:"Notizen: Aktiv" checked
+# LY-04: "Netz" deleted -- asked first, its two rectangles go with it, the others stay
+click radio:"Netz"
+click button:"Löschen"
+expect text:"„Netz“ löschen? 2 Shapes, die auf keiner anderen Ebene liegen, werden mit gelöscht." exists
+click button:"Behalten"
+expect radio:"Netz" exists
+click button:"Löschen"
+click button:"Ebene löschen"
+expect radio:"Netz" missing
+click button:"OK"
+expect listitem:"Sheet.4" missing
+expect listitem:"Sheet.5" missing
+expect listitem:"Sheet.6" exists
+cmd 4469
+expect radio:"Netz" missing
+expect radio:"Notizen" exists
+click button:"Abbrechen"
+key ctrl+z
+expect listitem:"Sheet.4" exists
+expect pixel 500 275 #FF0000
+# "Notizen" does not print: the print preview leaves its rectangles out, the canvas keeps them
+cmd 4469
+click button:"Notizen: Drucken"
+click button:"OK"
+expect listitem:"Sheet.6" exists
+key ctrl+p
+expect text:"Blatt 1 von 1" exists
+expect pixel 610 233 #FF0000
+expect pixel 610 318 #FFFFFF
+shot build/JFDiagrammer-layers-print.png

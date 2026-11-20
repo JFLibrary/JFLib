@@ -1,0 +1,102 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD8 rest (Entwurf › Seite einrichten, FEATURES RW-01 .. RW-03, PG-04, PG-05,
+# PR-07): the new drawing's A4 landscape page with Automatisch anpassen on -- a shape dragged over
+# the right edge adds a tile of the printed sheet (A4 less the margins: 297 + 284 mm), undo takes
+# both back, dragged back the tile goes again, over the left edge the page grows to the left and
+# the shape stays where it was dropped; off, the page stays; Ausrichtung (the check at the
+# current one), Größe (the sizes with their measures, the check, A3), Größe an Zeichnung anpassen
+# (the shape and 6.35 mm print margins), Weitere Seitenformate and Zeichnungsmaßstab open Seite
+# einrichten on their registers
+click tab:"Entwurf"
+expect button:"Automatisch anpassen" checked
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+expect listitem:"Sheet.4" rect 500 324 151 100
+# over the right edge: one more tile
+drag 570,375 1170,375
+cmd 4871
+click tab:"Seitengröße"
+expect text:"Neue Seitengröße: 581 × 210 mm" exists
+click button:"Abbrechen"
+shot build/JFDiagrammer-page-auto.png
+key ctrl+z
+cmd 4871
+click tab:"Seitengröße"
+expect text:"Neue Seitengröße: 297 × 210 mm" exists
+click button:"Abbrechen"
+key ctrl+y
+# dragged back: the empty tile goes
+drag 1170,375 570,375
+cmd 4871
+click tab:"Seitengröße"
+expect text:"Neue Seitengröße: 297 × 210 mm" exists
+click button:"Abbrechen"
+# over the left edge: the page grows to the left, the shape stays where it was dropped
+drag 570,375 420,375
+expect listitem:"Sheet.4" rect 349 324 151 100
+cmd 4871
+click tab:"Seitengröße"
+expect text:"Neue Seitengröße: 581 × 210 mm" exists
+click button:"Abbrechen"
+key ctrl+z
+# off: the page stays whatever juts out
+click button:"Automatisch anpassen"
+expect button:"Automatisch anpassen" unchecked
+drag 570,375 1170,375
+cmd 4871
+click tab:"Seitengröße"
+expect text:"Neue Seitengröße: 297 × 210 mm" exists
+click button:"Abbrechen"
+key ctrl+z
+# Ausrichtung: Querformat checked, Hochformat swaps the page
+click button:"Ausrichtung"
+expect menuitem:"Querformat" checked
+expect menuitem:"Hochformat" unchecked
+click menuitem:"Hochformat"
+expect button:"47 %" exists
+cmd 4871
+expect radio:"Hochformat" checked
+click tab:"Seitengröße"
+expect text:"Neue Seitengröße: 210 × 297 mm" exists
+click button:"Abbrechen"
+click button:"Ausrichtung"
+expect menuitem:"Hochformat" checked
+key esc
+# Größe: the sizes in centimetres, A4 checked; A3 keeps the orientation
+click button:"Größe"
+expect menuitem:"A4" checked
+expect menuitem:"Letter" unchecked
+shot build/JFDiagrammer-page-sizes.png
+click menuitem:"A3"
+cmd 4871
+click tab:"Seitengröße"
+expect text:"Neue Seitengröße: 297 × 420 mm" exists
+click button:"Abbrechen"
+click button:"Größe"
+expect menuitem:"A3" checked
+key esc
+# Größe an Zeichnung anpassen: 60 x 40 mm and the margins
+click button:"Größe"
+click menuitem:"Größe an Zeichnung anpassen"
+cmd 4871
+click tab:"Seitengröße"
+expect text:"Neue Seitengröße: 73 × 53 mm" exists
+click button:"Abbrechen"
+key ctrl+z
+cmd 4871
+click tab:"Seitengröße"
+expect text:"Neue Seitengröße: 297 × 420 mm" exists
+click button:"Abbrechen"
+# Weitere Seitenformate: Seite einrichten on Seitengröße
+click button:"Größe"
+click menuitem:"Weitere Seitenformate"
+expect dialog:"Seite einrichten" exists
+expect tab:"Seitengröße" selected
+click button:"Abbrechen"
+# Zeichnungsmaßstab from the page tab's menu
+rclick tab:"Seite-1"
+click "Zeichnungsmaßstab"
+expect dialog:"Seite einrichten" exists
+expect tab:"Zeichnungsmaßstab" selected
+click button:"Abbrechen"

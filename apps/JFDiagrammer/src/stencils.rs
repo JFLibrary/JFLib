@@ -108,7 +108,7 @@ impl Loaded {
         }
     }
 
-    fn rebuild_entries(&mut self) {
+    pub(crate) fn rebuild_entries(&mut self) {
         let doc = &self.doc;
         let hidden = doc.sym("Hidden");
         self.entries = doc

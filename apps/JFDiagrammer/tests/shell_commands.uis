@@ -1,0 +1,66 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD8 rest: the commands of menu buttons open their menus (here from cmd, as a
+# shortcut or the quick access toolbar would), Stärke opens its choices at Linie, Schriftart
+# takes the keyboard, Schnellformatvorlagen opens Shape formatieren with the quick styles, Zoom
+# its dialog (also from the zoom value of the status bar), Automatisch ausrichten lines connected
+# shapes up (RS-24, RA-05, SB-04)
+expect button:"Ausrichten" disabled
+cmd 4404
+drag 500,430 640,520
+cmd 4404
+drag 760,470 900,560
+cmd 4400
+click 570,470
+click 830,520 shift
+# Shapes verbinden, then both selected again
+cmd 5421
+click 570,470
+click 830,520 shift
+expect listitem:"Sheet.5" rect 752 475 150 75
+# Automatisch ausrichten: the second shape's middle to the first one's, the connector straight
+cmd 4433
+expect listitem:"Sheet.5" rect 752 437 150 75
+expect listitem:"Sheet.6" rect 651 472 101 6
+key ctrl+z
+expect listitem:"Sheet.5" rect 752 475 150 75
+key ctrl+y
+# Ausrichten opens its menu
+cmd 4432
+expect "Links ausrichten" exists
+key esc
+expect "Links ausrichten" missing
+# Anordnen › Positionieren
+cmd 4440
+expect "Horizontal verteilen" exists
+key esc
+# Stärke: the weights at Linie
+cmd 4421
+expect "¼ pt" exists
+click "3 pt"
+cmd 4421
+expect "3 pt" checked
+key esc
+# Schriftart takes the keyboard
+cmd 4368
+expect #4368 focused
+key esc
+# Schnellformatvorlagen
+cmd 4427
+expect tab:"Shape formatieren" selected
+expect button:"Dunkel, Stärke 1" exists
+key esc
+# Zoom: the dialog, then the zoom value of the status bar
+cmd 5125
+expect dialog:"Zoom" exists
+click "200 %"
+click "OK"
+expect button:"200 %" exists
+click button:"200 %"
+expect dialog:"Zoom" exists
+click "Ganze Seite"
+click "OK"
+expect button:"200 %" missing
+# Ansicht › Aufgabenbereiche
+cmd 5124
+expect "Verschieben und Zoomen" exists
+key esc

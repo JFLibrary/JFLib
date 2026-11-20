@@ -1,0 +1,97 @@
+#!args --no-system-fonts --save-dir build
+# JFDiagrammer, JD8 rest: hyperlinks (HL-01, RE-09, ZF-12, ZF-15, KB-13) -- Ctrl+K opens the
+# dialog Hyperlinks for the selected shape: an address, a page and a shape of the drawing, a
+# description; several links with one as the default; Ctrl+click follows the default link (the
+# shape on the page is selected), the shape's menu lists its links; the QuickInfo over the shape
+# names the link; Löschen removes one; saved and opened again the links are there
+cmd 4404
+drag 500,330 640,420
+drag 760,330 900,420
+cmd 4400
+click 570,375
+key ctrl+k
+expect dialog:"Hyperlinks" exists
+click #2016411658
+type "https://example.org/netz"
+click #2016411661
+type "Netzplan"
+click button:"Neu"
+click #2016411659
+click "Seite-1"
+click #2016411660
+type "Sheet.5"
+click #2016411661
+type "Zum Server"
+click button:"Als Standard"
+expect listitem:"Zum Server  (Standard)" exists
+expect listitem:"Netzplan" exists
+click button:"OK"
+expect dialog:"Hyperlinks" missing
+# Ctrl+click follows the default link: the shape it names is selected
+click 900,650
+keydown ctrl
+click listitem:"Sheet.4"
+keyup ctrl
+expect listitem:"Sheet.5" selected
+# the shape's menu lists its links
+rclick listitem:"Sheet.4"
+expect menuitem:"Netzplan" exists
+click menuitem:"Zum Server"
+expect listitem:"Sheet.5" selected
+rclick listitem:"Sheet.4"
+click menuitem:"Netzplan"
+expect box:"Der Link lässt sich nicht öffnen." missing
+# a link of a kind the app does not open: a notice
+click listitem:"Sheet.4"
+cmd 5633
+expect dialog:"Hyperlinks" exists
+click button:"Neu"
+click #2016411658
+type "ftp://example.org/x"
+click button:"Als Standard"
+click button:"OK"
+click 900,650
+keydown ctrl
+click listitem:"Sheet.4"
+keyup ctrl
+expect box:"Der Link lässt sich nicht öffnen." exists
+# Löschen: the ftp link goes, the page link is the default again
+click listitem:"Sheet.4"
+cmd 5633
+click listitem:"ftp://example.org/x  (Standard)"
+click button:"Löschen"
+click listitem:"Zum Server"
+click button:"Als Standard"
+click button:"OK"
+rclick listitem:"Sheet.4"
+expect menuitem:"ftp://example.org/x" missing
+expect menuitem:"Zum Server" exists
+key esc
+# undo takes the change back
+key ctrl+z
+rclick listitem:"Sheet.4"
+expect menuitem:"ftp://example.org/x" exists
+key esc
+key ctrl+y
+# saved and opened again
+key ctrl+s
+click #28940
+key ctrl+a
+type "jd8-links.vsdx"
+click button:"Speichern"
+expect text:"jd8-links – JFDiagrammer" exists
+cmd 4097
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+cmd 4098
+click button:"jd8-links.vsdx"
+expect text:"jd8-links – JFDiagrammer" exists
+rclick listitem:"Sheet.4"
+expect menuitem:"Netzplan" exists
+expect menuitem:"Zum Server" exists
+key esc
+click 900,650
+keydown ctrl
+click listitem:"Sheet.4"
+keyup ctrl
+expect listitem:"Sheet.5" selected

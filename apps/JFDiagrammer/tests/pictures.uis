@@ -1,0 +1,70 @@
+#!args --no-system-fonts --save-dir build --picture-dir apps/JFDiagrammer/tests
+# JFDiagrammer, JD8 rest: Einfügen › Bilder › Bild aus Datei (RE-02, SP-09) -- a PNG, a BMP and
+# a GIF (own test pictures, made by a script: 192 x 96 px and 96 x 48 px at 96 dpi, the GIF
+# without resolution) become picture shapes (Type Foreign): their size from pixels and dpi
+# (2 x 1 in, 1 x 0.5 in), in the middle of the view, selected, drawn by diagram_view; one undo
+# step each; saved (media parts of the .vsdx) and opened again they look the same
+cmd 4613
+expect dialog:"Öffnen" exists
+expect text:"pic_blue.png" exists
+expect text:"pic_check.bmp" exists
+expect text:"pic_green.gif" exists
+click #32780
+key ctrl+a
+type "pic_blue.png"
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+expect listitem:"Sheet.4" selected
+expect listitem:"Sheet.4" rect 709 430 128 64
+expect button:"Breite: 51 mm  Höhe: 25 mm  Winkel: 0°" exists
+# out of the way, the BMP (stored as PNG) and the GIF in the middle of the view
+drag 773,462 573,312
+expect listitem:"Sheet.4" rect 500 273 128 64
+cmd 4613
+click #32780
+key ctrl+a
+type "pic_check.bmp"
+click button:"Öffnen"
+expect listitem:"Sheet.5" selected
+expect button:"Breite: 25 mm  Höhe: 13 mm  Winkel: 0°" exists
+drag 773,462 573,612
+expect listitem:"Sheet.5" rect 550 600 64 32
+cmd 4613
+click #32780
+key ctrl+a
+type "pic_green.gif"
+click button:"Öffnen"
+expect listitem:"Sheet.6" selected
+expect listitem:"Sheet.6" rect 741 446 64 32
+click 1000,700
+# the pictures as diagram_view draws them
+expect pixel 510 325 #2F6FC8
+expect pixel 554 604 #F08C28
+expect pixel 746 462 #2E9E44
+shot build/JFDiagrammer-pictures.png
+# one undo step takes the GIF back, redo brings it
+key ctrl+z
+expect listitem:"Sheet.6" missing
+key ctrl+y
+expect listitem:"Sheet.6" rect 741 446 64 32
+# saved and opened again
+key ctrl+s
+expect dialog:"Speichern unter" exists
+click #28940
+key ctrl+a
+type "jd8-pictures.vsdx"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+cmd 4097
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+expect listitem:"Sheet.4" missing
+cmd 4098
+click button:"jd8-pictures.vsdx"
+expect text:"jd8-pictures – JFDiagrammer" exists
+expect listitem:"Sheet.4" rect 500 273 128 64
+expect listitem:"Sheet.5" rect 550 600 64 32
+expect listitem:"Sheet.6" rect 741 446 64 32
+expect pixel 510 325 #2F6FC8
+expect pixel 554 604 #F08C28
+expect pixel 746 462 #2E9E44

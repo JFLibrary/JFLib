@@ -22,6 +22,8 @@ use crate::format_menus::{self as fm, Target};
 use crate::Diagrammer;
 
 const ID: u32 = 0x5E80_0000;
+/// (JD8 rest) the flyout of the quick styles (Start's command Schnellformatvorlagen opens it)
+pub(crate) const QUICK_POPUP: u32 = ID + 0x71;
 
 fn heading(ui: &mut Ui, s: &str) {
     ui.spacer(6);
@@ -179,9 +181,9 @@ pub(crate) fn pane(app: &mut Diagrammer, ui: &mut Ui, id_pane: u32) {
         ui.next_size(-1, 28);
         ui.next_icon(crate::icons::JD_QUICK_STYLES_L);
         if ui.dropdown_button(ID + 0x70, crate::commands::label(crate::commands::QUICK_STYLES)) & EV_ACT != 0 {
-            ui.popup_open(ID + 0x71);
+            ui.popup_open(QUICK_POPUP);
         }
-        if ui.flyout_begin(ID + 0x71, 0) {
+        if ui.flyout_begin(QUICK_POPUP, 0) {
             crate::format_quick::flyout(app, ui);
         }
         ui.flyout_end();

@@ -38,13 +38,14 @@ expect button:"Weitere Shapes" enabled
 expect canvas:"Zeichenfläche" exists
 expect tab:"Seite-1" selected
 expect button:"Seite 1 von 1" exists
-expect text:"67 %" exists
+expect button:"67 %" exists
 shot build/JFDiagrammer.png
 # the registers switch the ribbon
 click tab:"Einfügen"
 expect tab:"Einfügen" selected
 expect text:"Illustrationen" exists
-expect button:"Bilder" disabled
+# (JD8 rest) Bilder › Bild aus Datei works
+expect button:"Bilder" enabled
 expect text:"Zwischenablage" missing
 click tab:"Entwurf"
 expect text:"Seite einrichten" exists

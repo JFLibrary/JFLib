@@ -52,12 +52,34 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - (JD10) Formulas: the structure functions CONTAINERCOUNT, CONTAINERSHEETREF (also with a sheet first), CONTAINERMEMBERCOUNT, LISTMEMBERCOUNT, LISTORDER, LISTSHEETREF, CALLOUTCOUNT, CALLOUTTARGETREF, HASCATEGORY (FX-12), IFERROR, and a cell of the sheet a function gives (`CONTAINERSHEETREF(1,"Swimlane")!User.visHeadingText`, `SheetName::Call`)
 - (JD11) Designs: `diagram_core::design`, a typed DrawingML theme with Visio's extensions (`Design`, `Scheme`, `Fill`, `Line`, `Effect`, `FontStyle`, `Variant`, `VarStyle`, `Clr`, `Slot`, `Mod`; `Design::theme_xml`); only Visio's identifiers are taken over (the extension URIs in `design::uri`, the namespace `NS_VT`, element and attribute names), every value is JFLib's own. `design::catalog`: the own designs NetLab, Contour and Contrast with four variants each (scheme numbers from `FIRST_ID` 60001). `design::apply`: `apply`, `set_variant` and `remove` on a page or every page in one transaction (the theme part installed or replaced, each index cell by the part's own component number, the shapes' formatting of themed cells reset unless THEMEGUARD/GUARD or a LockTheme* cell keeps it, unused own parts dropped), `page_design`, `part_id`, `find_part`. `Transaction::set_themes` (undoable), `formula::Theme::scheme_ids`, `Engine::themes_changed`; the engine also notices changed theme parts by itself
 - (JD13) `structure::cff::create` and `create_with`: a cross-functional flowchart (pool, lane list, phase list, lanes and phases laid out) as JFDiagrammer builds it, for the template build tool; `instance::place` of a 1-D master moves its ends to the drop point and lets PinX / PinY inherit the master's formulas again
+- (JD8) Pages: `Transaction::add_page_like` (an empty page with the settings of another one: its page sheet without the Layer section, the styles of its PageSheet element, its theme, its background page for a foreground page) and `Transaction::duplicate_page` (a page with its shapes, Connect entries and settings right after the original; shape IDs kept, so formulas, glue and structures stay inside the copy; UniqueIDs dropped, a part of its own); `Transaction::sheets` names the sheets a transaction touched so far. `diagram_core::pagesetup`: `size`, `scale`, `landscape`, `set_orientation` (width and height swapped, PrintPageOrientation), `set_paper_size` (a size in the page's orientation, DrawingSizeType 2, automatic size off), `auto_size` and `set_auto_size` (DrawingResizeType with Visio's meanings), `content`, `fit_to_drawing` (the page around its shapes with margins, the shapes moved, DrawingSizeType 1), `Tiles` and `grow` (the automatic size after a gesture: whole tiles of the printed sheet added or taken away on every side, the drawing moved when the page grows to the left or down). `ops::shift_all` moves every top-level shape of a page, whatever their locks
+- (JD8 rest) `ops::new_freeform` (a stroke's corners, `ops::simplify`, as the control polygon of a
+  clamped cubic NURBS curve in a NURBSTo row; 1-D like a line, its y values Width-relative so it keeps
+  its form when an end moves; a stroke that ends at its start is a closed, filled 2-D shape),
+  `ops::new_arc` (a quarter ellipse from begin to end as EllipticalArcTo, bowing as the drag
+  started: `ops::quarter_arc`), both gluing their ends to connection points like `glue::new_line`;
+  `ops::Spline`, `ops::Arc`
+- (JD8 rest) Pictures: `ops::probe_picture` (format, pixels and resolution of PNG, JPEG, GIF and BMP
+  headers: `PictureInfo`, `PictureInfo::size` in drawing units bounded to a box), `ops::new_picture`
+  (a Foreign shape, ForeignType Bitmap with its CompressionType, ImgWidth/ImgHeight following the
+  shape, the bytes as a new media part `/visio/media/imageN.ext`); `Transaction::add_part` and
+  `remove_part` (package parts kept as bytes, undoable)
+- (JD8 rest) Layers: `render::Options::print` leaves out shapes on layers that do not print and
+  shapes with NonPrinting (print, export); `instance::place` brings the master's layers onto the
+  page (matched by name, missing ones added with their properties) and gives the instance's shapes
+  the page's layer indices (`instance::bring_layers`, LY-03); `ops::paste` on another page brings the
+  copied shapes' layers along by name
+- (JD8) Text fields (TX-06), `diagram_core::field`: `shown` gives the text of a Field row -- its Value in the format picture of its Format cell (`format`: numbers with digits, decimals, digit groups, sections, percent and the unit of the cell, dates and times in `{{ }}`, texts with `@`, `@+`, `@-`, the general format), `insert` puts a new field (Value formula, Format, Type) into a shape's text at a shown position or at its end and computes it, `segments`/`plain` give a text with its fields as they show, `props` reads the document's properties (docProps core and app parts), `ole_days`/`civil` convert Visio's date values; `Document::fields` (`field::Env`) carries what fields show that the file does not hold: the app's decimal sign, digit groups, month and day names, date picture, clock, file path and zone offset. Formulas: NOW, DOCCREATION, DOCLASTSAVE, DOCLASTPRINT, DOCLASTEDIT, CREATOR, DESCRIPTION, DIRECTORY, FILENAME, KEYWORDS, SUBJECT, TITLE, MANAGER, COMPANY, CATEGORY, HYPERLINKBASE (what the engine cannot know here keeps the stored value)
 
 ### Changed
 
+- (JD8 rest) `Transaction::delete_layer` keeps the page's layers numbered without gaps: the layers
+  after the deleted one move one down and the shapes' own LayerMember cells follow (as Visio numbers
+  them); `render::Options` has the new field `print`
 - (JD10) The router of `glue` leaves shapes with ObjType 4 ("do not lay out and route around", CN-17) and containers out of its obstacles
 - The theme cells (ThemeIndex, ColorSchemeIndex, EffectSchemeIndex, ConnectorSchemeIndex, FontSchemeIndex, the variation and embellishment indices) and the quick style cells inherit from the styles: the line and font ones with line and text, the others with fill (`Category::of`); shapes took them only from master shapes and so never got the document's theme
 - (JD11) The display list works out cells stored as "Themed" through the formula engine (THEMEVAL with the style lists, colour transforms, variants, line ends, fill patterns), so a design applied shows at once; `ThemeInfo` reads the format scheme's number from `vt:fmtSchemeEx` as Visio writes it; the text tool's box uses the style "Text Only" for its text too
+- (JD8) A field without cached text (a mark `<fld IX='n'/>`) shows its Field row's value in its format instead of the raw number; SHAPETEXT, TEXTWIDTH and TEXTHEIGHT count the text of a shape's fields (their Value cells are read as dependencies)
 
 ### Fixed
 

@@ -49,6 +49,29 @@
 //   src/templates.rs  (JD13) the templates: built-in (build.rs builds them from templates/ into
 //                     .vstx), the own ones, a new drawing from one, Speichern als Vorlage
 //   src/templates_ui.rs  (JD13) Datei › Neu: the catalogue with rendered previews
+//   src/cmds_arrange.rs  (JD8 rest) Automatisch ausrichten
+//   src/cmds_later.rs    (JD8 rest) the commands left for later with their reasons, the check
+//   src/cmds_myshapes.rs (JD8 rest) Zu meinen Shapes hinzufügen (shapes of the page into Favoriten)
+//   src/pane_sizepos.rs, pane_data.rs, pane_panzoom.rs  (JD8 rest) the task panes Größe und
+//                     Position, Shape-Daten, Verschieben und Zoomen; Shape-Daten definieren
+//   src/qat.rs        (JD8 rest) the quick access toolbar and its customization
+//   src/cmds_shell.rs (JD8 rest) menu buttons' commands open their menus; Schrift, Linie,
+//                     Schnellformatvorlagen, the dialog Zoom
+//   src/pages.rs      (JD8 rest) the page tabs kept in step with the pages, Neue Seite,
+//                     Hintergrundseite, duplicate, delete, rename, reorder (dialogs)
+//   src/page_size.rs  (JD8 rest) Entwurf › Ausrichtung, Größe, Automatisch anpassen, the
+//                     automatic size after a gesture (diagram_core::pagesetup)
+//   src/cmds_draw.rs  (JD8 rest) Zeichentools: the split button, the freeform and arc tools
+//   src/cmds_picture.rs  (JD8 rest) Einfügen › Bilder › Bild aus Datei
+//   src/cmds_paste.rs (JD8 rest) Inhalte einfügen, Als Link einfügen, Strg+V from the system
+//   src/layers.rs     (JD8 rest) Ebene zuweisen, Ebeneneigenschaften, the layers on the canvas
+//   src/select_type.rs  (JD8 rest) Markieren › Nach Typ auswählen
+//   src/cmds_text.rs  (JD8 rest) the text, field, link and search commands: state, target, the
+//                     fields' locale and clock, the vertical text box, a shape into view
+//   src/dlg_text.rs   (JD8 rest) the dialog Text (font, paragraph, text block)
+//   src/dlg_field.rs  (JD8 rest) the dialog Feld (fields in the text, TX-06)
+//   src/dlg_link.rs   (JD8 rest) the dialog Hyperlinks, following links, the link pointer
+//   src/dlg_find.rs   (JD8 rest) the dialog Suchen und Ersetzen
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too); templates/ (JD13) the
@@ -72,7 +95,9 @@
 // (.vssx, metric and US) into DIR and ends (JD9: the user's check in Visio); --export-dir DIR
 // puts DIR in front of the name the export's save dialog proposes (JD12); --write-templates DIR
 // writes the built-in templates (.vstx) into DIR and ends, --template-dir DIR is the folder of
-// the own templates (JD13).
+// the own templates (JD13); --picture-dir DIR is where Bild aus Datei's dialog starts (JD8 rest);
+// --check-commands shows which commands still lack a function as the notice (JD8 rest,
+// cmds_later.rs).
 //
 //   python build_rs.py run JFDiagrammer
 //   python build_rs.py test JFDiagrammer          tests/*.uis
@@ -86,9 +111,21 @@
 extern crate alloc;
 
 mod backstage;
+mod cmds_arrange;
+mod cmds_later;
+mod cmds_myshapes;
+mod cmds_shell;
+mod cmds_draw;
+mod cmds_paste;
+mod cmds_picture;
+mod cmds_text;
 mod commands;
 mod design_gallery;
 mod design_store;
+mod dlg_field;
+mod dlg_find;
+mod dlg_link;
+mod dlg_text;
 mod edit_canvas;
 mod edit_cmds;
 mod edit_doc;
@@ -100,12 +137,20 @@ mod format_pane;
 mod format_quick;
 mod icons;
 mod lang;
+mod layers;
 mod layout_ui;
 mod options;
+mod pane_data;
+mod pane_panzoom;
+mod pane_sizepos;
+mod page_size;
+mod pages;
 mod panes;
 mod print_layout;
 mod print_ui;
+mod qat;
 mod ribbon;
+mod select_type;
 mod shell;
 mod stencils;
 mod stencils_drop;
@@ -214,6 +259,25 @@ pub(crate) struct Diagrammer {
     /// dialog and register
     pub structs: structures::Structs,
     pub layout: layout_ui::LayoutState,
+    /// (JD8 rest) the dialog Zoom
+    pub shell: cmds_shell::ShellState,
+    /// (JD8 rest) Größe und Position, Shape-Daten (the field being typed into, the dialog)
+    pub sizepos: pane_sizepos::SizePos,
+    pub data: pane_data::DataState,
+    /// (JD8 rest) Verschieben und Zoomen: the overview's picture, the drag
+    pub panzoom: pane_panzoom::PanZoom,
+    /// (JD8 rest) the quick access toolbar's dialog
+    pub qat: qat::QatState,
+    /// (JD8 rest) the dialogs Seite umbenennen, Seiten neu anordnen
+    pub pages: pages::PagesState,
+    /// (JD8 rest) Zeichentools, Bild aus Datei, Inhalte einfügen, Ebenen, Nach Typ auswählen
+    pub draw: cmds_draw::DrawState,
+    pub pictures: cmds_picture::PictureState,
+    pub paste: cmds_paste::PasteState,
+    pub layers: layers::LayerState,
+    pub select: select_type::SelectState,
+    /// (JD8 rest) the text, field, link and search commands (cmds_text.rs)
+    pub txt: cmds_text::TextCmds,
 }
 
 impl Diagrammer {
@@ -264,6 +328,18 @@ impl Diagrammer {
             quick: format_quick::QuickTiles::default(),
             structs: structures::Structs::default(),
             layout: layout_ui::LayoutState::default(),
+            shell: cmds_shell::ShellState::default(),
+            sizepos: pane_sizepos::SizePos::default(),
+            data: pane_data::DataState::default(),
+            panzoom: pane_panzoom::PanZoom::default(),
+            qat: qat::QatState::default(),
+            pages: pages::PagesState::default(),
+            draw: cmds_draw::DrawState::default(),
+            pictures: cmds_picture::PictureState::default(),
+            paste: cmds_paste::PasteState::default(),
+            layers: layers::LayerState::default(),
+            select: select_type::SelectState::default(),
+            txt: cmds_text::TextCmds::default(),
         }
     }
 
@@ -379,6 +455,10 @@ impl App for Diagrammer {
         if !opened && self.preview == ribbon::SEL_NONE {
             edit_doc::new_drawing(self, ui, false);
         }
+        // (JD8 rest) --check-commands: which commands still lack a function (cmds_later.rs)
+        if plat::args().iter().any(|a| a == "--check-commands") {
+            self.error = Some((alloc::format!("Befehlsprüfung: {}", cmds_later::report_text()), alloc::string::String::new()));
+        }
         true
     }
 
@@ -389,6 +469,10 @@ impl App for Diagrammer {
         if let Some((key, ch, fresh)) = self.text_req.take() {
             edit_text::begin_with(self, ui, key, ch, fresh);
         }
+        // (JD8 rest) the page tabs follow the pages (also after undo and redo)
+        pages::sync(self);
+        // (JD8 rest) what the system's clipboard offers (Einfügen, Inhalte einfügen)
+        cmds_paste::poll(self, ui);
         commands::states(self, ui);
         stencils_panel::states(self, ui);
         shell::frame(self, ui);
@@ -398,10 +482,21 @@ impl App for Diagrammer {
         export_ui::dialogs(self, ui);
         print_ui::dialogs(self, ui);
         layout_ui::dialog(self, ui);
+        cmds_shell::zoom_dialog(self, ui);
+        pane_data::define_dialog(self, ui);
+        qat::dialog(self, ui);
+        pages::dialogs(self, ui);
+        // (JD8 rest) the dialogs of pictures, pasting, layers, select by type
+        cmds_picture::dialog(self, ui);
+        cmds_paste::dialog(self, ui);
+        layers::assign_dialog(self, ui);
+        layers::props_dialog(self, ui);
+        select_type::dialog(self, ui);
+        cmds_text::frame(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
-        stencils::command(self, ui, id) || commands::run(self, ui, id)
+        cmds_text::command(self, ui, id) || stencils::command(self, ui, id) || commands::run(self, ui, id)
     }
 }
 

@@ -1,0 +1,45 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD8 rest: the vertical text box (TX-05, RE-10) -- Einfügen › Textfeld ›
+# Vertikales Textfeld: a click makes an upright text box (TextDirection 1) ready for text, the
+# text runs downwards and the box's width follows it; editing it again uses a box across the
+# shape; a dragged box keeps its height; undo takes it back
+cmd 4620
+click 700,450
+expect #23552 exists
+type "Senkrecht"
+cmd 4400
+click 1000,680
+expect listitem:"Senkrecht" exists
+click listitem:"Senkrecht"
+expect "Breite: 7 mm  Höhe: 25 mm  Winkel: 0°" exists
+click 1000,680
+# edited again: the editor lies across the shape
+click listitem:"Senkrecht"
+key f2
+expect #23552 rect 641 431 120 36
+key end
+type "er Text in zwei Zeilen"
+click 1000,680
+expect listitem:"Senkrechter Text in zwei Zeilen" exists
+click listitem:"Senkrechter Text in zwei Zeilen"
+expect "Breite: 16 mm  Höhe: 25 mm  Winkel: 0°" exists
+click 1000,680
+shot build/JFDiagrammer-text-vertical.png
+# a dragged box: its height stays, its width follows the text
+cmd 4620
+drag 800,300 820,500
+type "Gezogen"
+cmd 4400
+click 1000,680
+click listitem:"Gezogen"
+expect "Breite: 7 mm  Höhe: 80 mm  Winkel: 0°" exists
+# undo: the text box, the second text, the first box (with its text)
+click 1000,680
+key ctrl+z
+key ctrl+z
+expect listitem:"Gezogen" missing
+key ctrl+z
+expect listitem:"Senkrecht" exists
+key ctrl+z
+key ctrl+z
+expect listitem:"Senkrecht" missing
