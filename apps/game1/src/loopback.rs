@@ -38,7 +38,7 @@ pub fn run(secs: u64) -> i32 {
         }
     };
     let opts = HostOptions { room: MatchConfig { bots: 4, ..MatchConfig::default() }, ..HostOptions::default() };
-    let mut host = Host::new(chan, ws.port, opts, map.clone(), plat::random_u64());
+    let mut host = Host::new(chan, ws.port, opts, map.clone());
     out(&format!("loopback: UDP {}, WebSocket ws://{}{}\n", udp, ws, WS_PATH));
     let ccfg = ClientConfig { protocol: PROTOCOL, ..ClientConfig::default() };
     let mut links: Vec<NetLink<Mover>> = Vec::new();

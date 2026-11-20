@@ -404,7 +404,7 @@ impl Game1 {
         }
         let mut y = pad + s(10.0);
         for l in &hud.feed {
-            let line = if l.killer.is_empty() { format!("{} ist abgestürzt", l.victim) } else if l.head { format!("{}  ⊗ Kopf  {}", l.killer, l.victim) } else { format!("{}  ⊗  {}", l.killer, l.victim) };
+            let line = if !l.note.is_empty() { l.note.clone() } else if l.killer.is_empty() { format!("{} ist abgestürzt", l.victim) } else if l.head { format!("{}  ⊗ Kopf  {}", l.killer, l.victim) } else { format!("{}  ⊗  {}", l.killer, l.victim) };
             let px = s(16.0);
             let tw = text_w(&line, px);
             ui.draw_color(if l.mine { 0x90A0_3010 } else { 0x7010_1418 });

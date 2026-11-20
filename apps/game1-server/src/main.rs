@@ -114,7 +114,7 @@ fn serve(addr: SocketAddr, bots: usize, web: Option<&str>, secs: Option<u64>) ->
     };
     let map = game1_core::map::werft();
     let opts = HostOptions { room: MatchConfig { bots, seed: plat::random_u64(), ..MatchConfig::default() }, ..HostOptions::default() };
-    let mut host = Host::new(chan, ws_port, opts, map, plat::random_u64());
+    let mut host = Host::new(chan, ws_port, opts, map);
     out(&format!("game1-server {}: {} auf UDP {} und ws://{}:{}{}{}\n", APP_VERSION, GAME_NAME, udp, udp.ip, ws_port, WS_PATH, if web.is_some() { format!(", die Seite auf http://{}:{}/", udp.ip, ws_port) } else { String::new() }));
     let t0 = plat::time_us();
     let mut last_report = t0;
@@ -162,7 +162,7 @@ fn check() -> i32 {
     match bind(lo, None) {
         Ok((chan, _, udp, ws)) => {
             let opts = HostOptions { room: MatchConfig { bots: 3, ..MatchConfig::default() }, ..HostOptions::default() };
-            let mut host = Host::new(chan, ws, opts, map.clone(), 99);
+            let mut host = Host::new(chan, ws, opts, map.clone());
             let nc = NetClient::new(ClientOptions { name: String::from("Prüfer"), ..ClientOptions::default() }, Mover::default(), schema(), Match::empty_baseline());
             match NetLink::connect(Endpoint::Udp(udp), ClientConfig { protocol: PROTOCOL, ..ClientConfig::default() }, nc, WS_PATH) {
                 Ok(mut link) => {

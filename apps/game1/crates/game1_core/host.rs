@@ -1,6 +1,8 @@
 // host -- game 1's server on real sockets (Windows, Linux, Apple): a netchan::Server (UDP and the WebSocket path,
 // which the caller binds: game1-server, the client's loopback test) under game::net's NetServer with a Match per
-// room; one thread, every room on it (part 1: one room per server is the use)
+// room.  The loop is one thread; the rooms of a tick run side by side on plat's worker pool (one room per core,
+// NetServer::set_parallel: the same messages as on one thread).  Room codes and tickets come from the system's
+// cryptographic random numbers (NetServer::secure)
 //
 //   Host::new(chan, ws_port, opts)   the server's state; rooms make their Match from the shared map
 //   Host::round(now_ns)              one round of the loop: netchan's events in, the ticks due, the messages out
@@ -23,11 +25,13 @@ pub struct HostOptions {
     pub room: MatchConfig,
     /// the netcode's
     pub server: ServerOptions,
+    /// rooms side by side on the worker pool
+    pub parallel: bool,
 }
 
 impl Default for HostOptions {
     fn default() -> Self {
-        HostOptions { room: MatchConfig::default(), server: ServerOptions { max_players: crate::rules::MAX_FIGURES, ..ServerOptions::default() } }
+        HostOptions { room: MatchConfig::default(), server: ServerOptions { max_players: crate::rules::MAX_FIGURES, ..ServerOptions::default() }, parallel: true }
     }
 }
 
@@ -39,7 +43,7 @@ pub struct Host {
 
 impl Host {
     /// a host on a bound netchan server (ws_port: its WebSocket's port, 0: none)
-    pub fn new(chan: netchan::Server, ws_port: u16, opts: HostOptions, map: Arc<Map>, seed: u64) -> Host {
+    pub fn new(chan: netchan::Server, ws_port: u16, opts: HostOptions, map: Arc<Map>) -> Host {
         let room = opts.room;
         let mut n = 0u64;
         let factory: game::net::server::RoomFactory<Match> = Box::new(move |_code| {
@@ -47,7 +51,9 @@ impl Host {
             Match::new(MatchConfig { seed: room.seed.wrapping_add(n), ..room }, map.clone())
         });
         let server = ServerOptions { ws_port, rate: RATE, max_rewind_ms: room.max_rewind * 1000 / RATE, ..opts.server };
-        Host { chan, game: NetServer::new(server, seed, factory) }
+        let mut game = NetServer::secure(server, factory);
+        game.set_parallel(opts.parallel);
+        Host { chan, game }
     }
 
     /// one round of the loop -> the ticks run
