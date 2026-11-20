@@ -94,6 +94,10 @@
 //                                          through AppKit's accessibility entry points (a window),
 //                                          iOS through UIAccessibility under UIKit (simapp);
 //                                          a11y-show: the demo by hand, for a screen reader
+//   plattest --test ipad                   (t_ipad.rs, iOS on an iPad under UIKit: tools/apple.py simapp
+//                                          in an iPad simulator) the window's sizes (Split View, Slide
+//                                          Over, Stage Manager), the keyboard, turning, the form factor,
+//                                          the menus in iPadOS's menu bar, hover, wheel and pinch
 //   plattest --test settings / settings-bus / settings-bus-files   (t_settings.rs) the system
 //                                          settings: the jfgui_* overrides, the title bar's
 //                                          layout, the wheel's lines; Linux: GTK's / KDE's files,
@@ -107,6 +111,12 @@
 //                                          USB HID usages), raw motion decoding (RAWINPUT, XI 2 raw
 //                                          events, Wayland fixed point), the pointer lock's shared
 //                                          state; Linux: Wayland and X11 with synthetic events
+//   plattest --test pad                    (t_pad.rs, G7a part 2) game pads: the shared state
+//                                          (events, edges, the axes' threshold), XInput records,
+//                                          the evdev parser (Xbox, Sony, simple HID pads), the
+//                                          browser's record; the backend of the platform through
+//                                          a test hook (Windows XINPUT_STATE records, Linux a pipe
+//                                          as a pad's node, macOS controllerWithExtendedGamepad)
 //   plattest --test a11y-rich / uia-rich / a11y-rich-bus   (t_a11y_rich.rs) a web page's
 //                                          accessibility tree (apps/a11ytest's page): headless
 //                                          model, requests, live regions, the rich update format;
@@ -219,6 +229,8 @@ use base::{Args, Ini, f64_format, f64_parse};
 
 // the accessibility tree (screen readers)
 mod t_a11y;
+// the iPad's host: window sizes, iPadOS's menu bar, the pointer (docs/APPLE.md AP9)
+mod t_ipad;
 // a web page's accessibility tree (apps/a11ytest's page)
 mod t_a11y_rich;
 // what that tree costs per frame
@@ -342,6 +354,8 @@ mod t_settings;
 mod t_keychar;
 // (G7a) where keys sit, raw motion, the pointer lock
 mod t_input;
+// (G7a part 2) game pads: the shared state, the decoders, each platform's backend through a test hook
+mod t_pad;
 mod t_tray;
 // the desktop integration: keeping awake, autostart, the taskbar button
 #[cfg(not(target_os = "android"))]
@@ -564,6 +578,7 @@ fn plattest() -> i32 {
         Some("settings") => t_settings::t_settings,    // the system settings: overrides, defaults
         Some("keychar") => t_keychar::t_keychar,       // the layout's character of a key event
         Some("input") => t_input::t_input,             // (G7a) key positions, raw motion, the pointer lock
+        Some("pad") => t_pad::t_pad,                   // (G7a part 2) game pads without real input
         Some("settings-bus") => t_settings::t_settings_bus, // Linux: against tools/platshared/settings_bus.py
         Some("settings-bus-files") => t_settings::t_settings_bus_files, // Linux: the same, a portal without appearance keys
         Some("a11y-rich") => t_a11y_rich::t_a11y_rich, // a web page's accessibility tree, headless
@@ -578,6 +593,7 @@ fn plattest() -> i32 {
         Some("a11y-mac") => t_a11y::t_a11y_mac,        // macOS, a real window: NSAccessibility (VoiceOver)
         Some("a11y-show") => t_a11y::t_a11y_show,      // by hand: the demo for a screen reader
         Some("a11y-ios") => t_a11y::t_a11y_ios,        // iOS under UIKit (simapp): UIAccessibility (VoiceOver)
+        Some("ipad") => t_ipad::t_ipad,                // iOS on an iPad under UIKit (simapp): sizes, menu bar, pointer (AP9)
         Some("secret") => t_secret::t_secret,          // the system's secret store (not in "all")
         Some("secret-bus") => t_secret::t_secret_bus,  // Linux: against tools/platshared/secret_bus.py
         Some("power") => t_power::t_power,             // plat::inhibit (Windows: real power requests)

@@ -1,0 +1,39 @@
+[package]
+name = "game1"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "game1"
+path = "src/main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+base.workspace = true
+physics.workspace = true
+game.workspace = true
+netchan.workspace = true
+# the game's logic without a GPU, shared with apps/game1-server
+game1_core = { path = "crates/game1_core" }
+# drawing: render3d in a ui.gpu_view (lib/game_render3d for the camera), gltf for the bake (src/bake.rs)
+game_render3d.workspace = true
+render3d.workspace = true
+gpu.workspace = true
+gltf.workspace = true
+ui.workspace = true
+style = { package = "jflib-style-winui", path = "../../styles/winui" }
+
+[build-dependencies]
+jflib-build.workspace = true

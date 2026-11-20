@@ -32,6 +32,9 @@ pub const E_DRAG_END: u8 = 24; // our outgoing drag (drag_start) ended: data = D
 pub const E_RAW_MOTION: u8 = 25;
 /// (G7a) the pointer lock of the window changed (win_pointer_lock_state): data 1 locked now, 0 not
 pub const E_POINTER_LOCK: u8 = 26;
+/// (G7a) a game pad came, went or changed (pad.rs): data = the pad's index | PADEV_* << 8; the
+/// pads belong to the app (win 0); a state change is one event until plat::pads() is called
+pub const E_GAMEPAD: u8 = 27;
 
 // E_SETTINGS: what changed
 pub const SET_THEME: u32 = 1; // light / dark, accent colour

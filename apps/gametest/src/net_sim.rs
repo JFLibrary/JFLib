@@ -89,7 +89,8 @@ fn wrap(c: &mut Ctx) {
     c.check(crossed && n > 100 && diff == 0 && ok_clients, || format!("tick wrap: crossed {} (tick {}), {} of {} differ; {}", crossed, s.server.tick(), diff, n, s.describe(0)));
 }
 
-/// the full state of a join with 300 props: fetched over a WebSocket (`fetch`) or filled in by priority
+/// the full state of a join with 300 props: fetched over a WebSocket (`fetch`, the option ServerOptions::fetch_full) or
+/// filled in by priority (the default since 2026-11-19, with the WebSocket's port there but unused)
 fn fetch(c: &mut Ctx, fetch: bool) {
     let name = if fetch { "fetch" } else { "fill" };
     let mut cfg = base_cfg(6, 4, Weather::TYPICAL);
@@ -97,9 +98,7 @@ fn fetch(c: &mut Ctx, fetch: bool) {
     cfg.arena.moving = 30;
     cfg.arena.displaced = 150;
     cfg.join_after_ms = 1000;
-    if !fetch {
-        cfg.server.ws_port = 0;
-    }
+    cfg.server.fetch_full = fetch;
     let mut s = Session::new(cfg);
     // when is a client's state complete (its newest snapshot equal to the server's world of that tick)?
     let mut complete_at: Vec<Option<f64>> = alloc::vec![None; s.clients.len()];
@@ -218,7 +217,7 @@ pub fn measure_rewind(name: &str, seed: u64, players: usize, w: Weather, props: 
     let mut cfg = base_cfg(seed, players, w);
     cfg.arena = ArenaConfig { props, moving, displaced, fire, max_rewind: rewind_ms * 60 / 1000, ..ArenaConfig::default() };
     cfg.fire = fire;
-    cfg.server = ServerOptions { snapshot_every: every, ws_port: 7777, max_rewind_ms: rewind_ms, ..ServerOptions::default() };
+    cfg.server = ServerOptions { snapshot_every: every, ws_port: 7777, fetch_full: true, max_rewind_ms: rewind_ms, ..ServerOptions::default() };
     cfg.time_ticks = true;
     cfg.join_gap_ms = 20;
     let mut s = Session::new(cfg);

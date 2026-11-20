@@ -113,6 +113,7 @@ DOCS = [
     ("docs/GEOM.md", "Modelling", "Reference", "de", "Models described in JFScript: meshes from primitives and profiles, checks, pictures, glTF"),
     ("docs/TRANSPORT.md", "Transport for games", "Reference", "de", "WebSocket, the browser's network and a message channel over UDP and WebSocket with sequence numbers and acks"),
     ("docs/NETCODE.md", "Netcode", "Reference", "de", "Multiplayer for games: a server that decides, prediction, delta snapshots, lag compensation, rooms"),
+    ("docs/GAME1.md", "Game 1", "Reference", "de", "The first game on the engine: a cartoon multiplayer shooter, its crates, map, rules, tests and measurements"),
     ("docs/SHADER.md", "Shaders (SPIR-V)", "Reference", "de", "Writing, reading and validating SPIR-V"),
     ("docs/WGSL.md", "WGSL compiler", "Reference", "de", "From WGSL text to a checked, typed module and on to SPIR-V"),
     ("apps/Kritzel/README.md", "Kritzel", "Apps", "en", "A small drawing and image-editing app"),

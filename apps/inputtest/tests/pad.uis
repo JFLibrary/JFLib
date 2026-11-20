@@ -1,0 +1,36 @@
+# inputtest: (G7a part 2) game pads as a script plays them (`pad ...`: plat's shared state as a
+# backend reports it): ui.gamepads lists them with their buttons and sticks, a tap between two
+# frames counts, UIC_GAMEPAD says which came and went
+expect text:"Pad-Drücke: –" exists
+pad connect 0 xbox Testpad
+expect text:"Pad 0: Testpad · Xbox" exists
+expect text:"Pad-Ereignisse: +0" exists
+expect text:"Pad 0 Knöpfe: –" exists
+pad press 0 a
+expect text:"Pad 0 Knöpfe: A" exists
+pad press 0 rt 0.8
+expect text:"Pad 0 Knöpfe: A RT 0.80" exists
+pad axis 0 lx 0.5
+pad axis 0 ly -0.25
+expect text:"Pad 0 Sticks: L 0.50 -0.25 · R 0.00 0.00" exists
+pad release 0 a
+pad release 0 rt
+expect text:"Pad 0 Knöpfe: –" exists
+expect text:"Pad-Drücke: A RT" exists
+# a trigger below the press point: its value shows, no press
+pad press 0 lt 0.1
+expect text:"Pad 0 Knöpfe: LT 0.10" exists
+expect text:"Pad-Drücke: A RT" exists
+pad release 0 lt
+# a second pad, then the first goes
+pad connect 3 playstation DualSense
+expect text:"Pad 3: DualSense · PlayStation" exists
+pad press 3 y
+expect text:"Pad 3 Knöpfe: Y" exists
+expect text:"Pad-Drücke: A RT 3:Y" exists
+pad disconnect 0
+expect text:"Pad 0: Testpad · Xbox" missing
+expect text:"Pad-Ereignisse: +0 +3 -0" exists
+pad disconnect 3
+expect text:"Pads: keine (Knopf drücken; im Browser erst nach einem Druck auf dem Pad)" exists
+shot build/inputtest_pad.png

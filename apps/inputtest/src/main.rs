@@ -1,5 +1,5 @@
-// inputtest -- (G7a) the pointer lock, the raw relative motion and where keys sit: what a game
-// needs of the input, to try by hand (docs/GAME.md, the check list of the stage)
+// inputtest -- (G7a) the pointer lock, the raw relative motion, where keys sit and game pads: what a
+// game needs of the input, to try by hand (docs/GAME.md, the check list of the stage)
 //
 //   "Zeiger fangen"      ui.pointer_lock(true): the pointer is hidden and stays put, its raw
 //                        motion adds up in "Summe" (ui.pointer_motion of every pass) and moves the
@@ -13,13 +13,19 @@
 //                        layout's character, what the layout prints on the key: plat::key_label)
 //   "WASD"               the keys at the places of W, A, S and D whatever the layout prints on
 //                        them (Z, Q, S, D on a French keyboard), held or not (ui.key_code_down)
+//   "Gamepads"           (G7a part 2) the pads connected now (ui.gamepads): per pad its name and
+//                        style, the buttons held (triggers with their value), both sticks as
+//                        numbers and as dots in two circles; "Pad-Drücke" the buttons pressed in
+//                        order (from the edges: a tap between two frames too), "Pad-Ereignisse"
+//                        the pads that came (+N) and went (-N: UIC_GAMEPAD)
 //
 //   python build_rs.py run inputtest                    (Linux: --target linux; the browser:
 //   python build_rs.py test inputtest                    build with --target web)
 //   build/win/inputtest.exe --script apps/inputtest/tests/lock.uis
 //
 // A headless run (scripts) plays the lock: Locked at once, Esc lets it go, `motion DX DY` moves
-// the pointer, `keydown w code 26` presses the key at W's place.
+// the pointer, `keydown w code 26` presses the key at W's place, `pad connect 0 xbox NAME`,
+// `pad press 0 a`, `pad axis 0 lx 0.5` play a pad.
 //
 //   inputtest --lock [--auto-close MS]   asks for the lock in the first frame and writes every
 //                                        state of it to stdout ("lock: gefangen"), with the motion
@@ -34,7 +40,7 @@ extern crate alloc;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
-use plat::{KC_A, KC_D, KC_S, KC_W, key_code_name, key_label};
+use plat::{Gamepad, KC_A, KC_D, KC_S, KC_W, PAD_BUTTONS, PAD_LT, PAD_RT, PADEV_CONNECT, PadStyle, key_code_name, key_label, pad_button_name};
 use ui::*;
 
 /// the app's own version: version= of apps/inputtest/PACKAGE (the library's is ui::VERSION)
@@ -44,6 +50,8 @@ const ID_LOCK: u32 = 100;
 const ID_FREE: u32 = 101;
 const ID_FIELD: u32 = 102;
 const ID_CLEAR: u32 = 103;
+/// the sticks' canvas of pad N: ID_STICKS + N
+const ID_STICKS: u32 = 110;
 
 const CMD_QUIT: u32 = 1;
 
@@ -55,7 +63,7 @@ const DESC: AppDesc = AppDesc {
     title: "Eingabetest",
     flags: AF_RESIZABLE,
     w: 720,
-    h: 560,
+    h: 720,
     min_w: 420,
     min_h: 380,
     cmds: &CMDS,
@@ -65,6 +73,8 @@ const DESC: AppDesc = AppDesc {
 
 /// keys the list keeps
 const KEYS_MAX: usize = 12;
+/// pad presses and events the lists keep
+const PAD_LIST_MAX: usize = 16;
 
 #[derive(Default)]
 struct Inputtest {
@@ -78,6 +88,10 @@ struct Inputtest {
     detail: String,
     /// --lock: asked in the first frame, the states written to stdout
     report: Option<bool>,
+    /// (G7a part 2) the pad buttons pressed in order ("A", "RT", "1:B" for pad 1), the pads that came
+    /// and went ("+0", "-0")
+    pad_presses: Vec<String>,
+    pad_events: Vec<String>,
 }
 
 fn state_name(s: PointerLock) -> &'static str {
@@ -88,6 +102,37 @@ fn state_name(s: PointerLock) -> &'static str {
         PointerLock::Unsupported => "nicht möglich",
         PointerLock::Refused => "abgelehnt",
         _ => "?",
+    }
+}
+
+fn style_name(s: PadStyle) -> &'static str {
+    match s {
+        PadStyle::Xbox => "Xbox",
+        PadStyle::PlayStation => "PlayStation",
+        PadStyle::Nintendo => "Nintendo",
+        _ => "andere",
+    }
+}
+
+/// the buttons held: their names, a trigger with its value ("A LB RT 0.75"; "–" for none)
+fn held_text(p: &Gamepad) -> String {
+    let mut v: Vec<String> = Vec::new();
+    for b in 0..PAD_BUTTONS {
+        if b == PAD_LT || b == PAD_RT {
+            if p.buttons[b] > 0.0 {
+                v.push(format!("{} {:.2}", pad_button_name(b), p.buttons[b]));
+            }
+        } else if p.held(b) {
+            v.push(String::from(pad_button_name(b)));
+        }
+    }
+    if v.is_empty() { String::from("–") } else { v.join(" ") }
+}
+
+fn push_capped(list: &mut Vec<String>, s: String) {
+    list.push(s);
+    if list.len() > PAD_LIST_MAX {
+        list.remove(0);
     }
 }
 
@@ -143,6 +188,8 @@ impl App for Inputtest {
         if ui.button(ID_CLEAR, "Liste leeren") & EV_ACT != 0 {
             self.keys.clear();
             self.detail.clear();
+            self.pad_presses.clear();
+            self.pad_events.clear();
         }
         ui.box_end();
         ui.text(TS_BODY, &format!("Zeiger: {}", state_name(st)));
@@ -196,15 +243,60 @@ impl App for Inputtest {
         }
         ui.text(TS_BODY, &format!("WASD gehalten: {}", if held.is_empty() { "–" } else { &held }));
         ui.text(TS_BODY | TX_SECONDARY, &format!("Beschriftung der Lagen:{labels}"));
+
+        // (G7a part 2) the game pads
+        let pads: Vec<Gamepad> = ui.gamepads().to_vec();
+        for p in &pads {
+            for b in 0..PAD_BUTTONS {
+                if p.went_down(b) {
+                    let n = pad_button_name(b);
+                    push_capped(&mut self.pad_presses, if pads.len() > 1 || p.index != 0 { format!("{}:{n}", p.index) } else { String::from(n) });
+                }
+            }
+        }
+        ui.text(TS_SUBTITLE, "Gamepads");
+        if pads.is_empty() {
+            let why = if ui.gamepads_watching() { "Pads: keine (Knopf drücken; im Browser erst nach einem Druck auf dem Pad)" } else { "Pads: nicht möglich auf diesem System" };
+            ui.text(TS_BODY, why);
+        }
+        for p in &pads {
+            let layout = if p.mapped { "" } else { " · eigene Belegung" };
+            ui.text(TS_BODY, &format!("Pad {}: {} · {}{layout}", p.index, p.name, style_name(p.style)));
+            ui.text(TS_BODY, &format!("Pad {} Knöpfe: {}", p.index, held_text(p)));
+            ui.text(TS_BODY | TX_SECONDARY, &format!("Pad {} Sticks: L {:.2} {:.2} · R {:.2} {:.2}", p.index, p.axes[0], p.axes[1], p.axes[2], p.axes[3]));
+            // both sticks as dots in their circles
+            ui.next_size(0, 64);
+            ui.canvas_label("Sticks");
+            let inp = ui.canvas(ID_STICKS + p.index as u32, None, 0, 0).clone();
+            let [x, y, _, h] = inp.rect;
+            let r = (h / 2 - 2).max(4);
+            let stroke = ui.color(T_CARD_STROKE);
+            for (k, cx) in [(0usize, x + r + 2), (1, x + 3 * r + 12)] {
+                let cy = y + h / 2;
+                ui.draw_color(stroke);
+                ui.draw_circle(cx << 8, cy << 8, r << 8, 1 << 8);
+                let st = p.stick(k);
+                let (dx, dy) = ((st[0] * r as f32) as i32, (st[1] * r as f32) as i32);
+                ui.draw_color(ui.color(T_ACCENT));
+                ui.draw_circle((cx + dx) << 8, (cy + dy) << 8, (r / 5).max(2) << 8, 0);
+            }
+        }
+        ui.text(TS_BODY, &format!("Pad-Drücke: {}", if self.pad_presses.is_empty() { String::from("–") } else { self.pad_presses.join(" ") }));
+        ui.text(TS_BODY | TX_SECONDARY, &format!("Pad-Ereignisse: {}", if self.pad_events.is_empty() { String::from("–") } else { self.pad_events.join(" ") }));
         ui.box_end();
         ui.statusbar_begin();
         ui.text(TS_CAPTION, &format!("Eingabetest {} · JFLib {}", APP_VERSION, ui::VERSION));
         ui.statusbar_end();
     }
 
-    fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
+    fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
         match id {
             CMD_QUIT => ui.quit(),
+            UIC_GAMEPAD => {
+                let sign = if arg >> 8 == PADEV_CONNECT { '+' } else { '-' };
+                push_capped(&mut self.pad_events, format!("{sign}{}", arg & 0xFF));
+                ui.repass();
+            }
             _ => return false,
         }
         true

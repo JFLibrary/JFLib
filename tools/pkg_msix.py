@@ -18,7 +18,9 @@ Publisher).
   capabilities(perms)        the capabilities of a PERMISSIONS manifest (+ notes)
   find_makeappx()            MakeAppx.exe: jfgui_MAKEAPPX, PATH, the newest Windows Kit
   make_msix(job, signing)    <dist>/<App>-<version>-x64.msix (+ <App>.appinstaller) -> its path
-                             or None
+                             or None; for ARM64 (job.arch aarch64, package.py --arch) the same as
+                             <App>-<version>-arm64.msix and <App>-arm64.appinstaller
+  msix_name(job) / appinstaller_name(job)   those file names
 """
 import os
 import re
@@ -28,7 +30,7 @@ import zipfile
 from pathlib import Path
 from xml.sax.saxutils import escape, quoteattr
 
-from pkgmeta import app_id, browser, filetypes, icon, lf, logo, schemes
+from pkgmeta import app_id, arch_name, browser, filetypes, icon, lf, logo, schemes
 
 ROOT = Path(__file__).resolve().parent.parent
 # the StartupTask's id: lib/plat/win_autostart.rs asks StartupTask.GetAsync for it
@@ -176,7 +178,7 @@ def appx_manifest(job, style):
             '         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"\n'
             '         IgnorableNamespaces="uap uap3 desktop rescap">\n'
             f"  <Identity Name={quoteattr(identity_name(meta, app))} Publisher={quoteattr(publisher(meta))}\n"
-            f'            Version="{msix_version(meta.get("version", "0.1.0"))}" ProcessorArchitecture="x64"/>\n'
+            f'            Version="{msix_version(meta.get("version", "0.1.0"))}" ProcessorArchitecture="{arch_name(job.arch, "msix")}"/>\n'
             "  <Properties>\n"
             f"    <DisplayName>{display}</DisplayName>\n"
             f"    <PublisherDisplayName>{escape(meta.get('publisher', 'JFLib'))}</PublisherDisplayName>\n"
@@ -234,7 +236,7 @@ def make_msix(job, signing):
     if tool is None:
         return job.skip("msix", "MakeAppx.exe nicht gefunden (Windows SDK oder jfgui_MAKEAPPX); "
                         f"nur {d.relative_to(job.root).as_posix()} geschrieben")
-    out = job.dist / f"{job.app}-{job.version}-x64.msix"
+    out = job.dist / msix_name(job)
     r = subprocess.run([str(tool), "pack", "/o", "/d", str(d), "/p", str(out)], capture_output=True, text=True,
                        encoding="utf-8", errors="replace")
     if r.returncode:
@@ -247,6 +249,17 @@ def make_msix(job, signing):
     job.made("msix", out)
     write_appinstaller(job, out)
     return out
+
+
+def msix_name(job):
+    """<App>-<version>-x64.msix, on ARM64 -arm64.msix (one package per processor, docs/ARM64.md)"""
+    return f"{job.app}-{job.version}-{arch_name(job.arch, 'msix')}.msix"
+
+
+def appinstaller_name(job):
+    """<App>.appinstaller, on ARM64 <App>-arm64.appinstaller: each names the package of its processor, an
+    installation looks for updates at the address of the file it came from"""
+    return f"{job.app}.appinstaller" if job.arch == "x86_64" else f"{job.app}-{arch_name(job.arch, 'msix')}.appinstaller"
 
 
 def appinstaller_hours(meta):
@@ -267,12 +280,12 @@ def appinstaller(job, msix):
     if not re.fullmatch(r"https?://[^\s\"<>]+", base):
         raise SystemExit(f"PACKAGE appinstaller_url {base!r}: an http(s) address of a folder")
     version = msix_version(meta.get("version", "0.1.0"))
-    name = f"{job.app}.appinstaller"
+    name = appinstaller_name(job)
     return ('<?xml version="1.0" encoding="utf-8"?>\n'
             f"<!-- written by tools/package.py from apps/{job.app}/PACKAGE (docs/PACKAGING.md \"MSIX\") -->\n"
             f'<AppInstaller xmlns="{APPINSTALLER_NS}" Version="{version}" Uri={quoteattr(base + "/" + name)}>\n'
             f"  <MainPackage Name={quoteattr(identity_name(meta, job.app))} Publisher={quoteattr(publisher(meta))}\n"
-            f'               Version="{version}" ProcessorArchitecture="x64" Uri={quoteattr(base + "/" + Path(msix).name)}/>\n'
+            f'               Version="{version}" ProcessorArchitecture="{arch_name(job.arch, "msix")}" Uri={quoteattr(base + "/" + Path(msix).name)}/>\n'
             "  <UpdateSettings>\n"
             f'    <OnLaunch HoursBetweenUpdateChecks="{appinstaller_hours(meta)}" ShowPrompt="true" UpdateBlocksActivation="false"/>\n'
             "    <AutomaticBackgroundTask/>\n"
@@ -286,7 +299,7 @@ def write_appinstaller(job, msix):
         job.note("msix", "PACKAGE appinstaller_url= fehlt: keine .appinstaller-Datei (Updates über App Installer); "
                          "lib/update meldet das Paket als von außen aktualisiert")
         return None
-    out = job.dist / f"{job.app}.appinstaller"
+    out = job.dist / appinstaller_name(job)
     out.write_bytes(lf(appinstaller(job, msix)))
     job.made("msix", out)
     return out

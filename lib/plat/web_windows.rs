@@ -165,9 +165,10 @@ pub fn win_create(
         title: String::from(title),
         shown: false,
         enabled: true,
-        // Android's main surface fills its Activity (iOS's: its scene); desktop caption controls and resize
-        // grips belong only to floating library windows, not to the phone viewport.
-        state: if id == 0 && cfg!(any(target_os = "android", target_os = "ios")) { WST_MAXIMIZED } else { WST_CSD },
+        // the main surface fills its host: the browser page's canvas, Android's Activity, iOS's scene.
+        // A title bar, caption controls and resize grips belong only to floating library windows, not
+        // to the page or the phone viewport (the browser tab shows the title: REQUEST_TITLE).
+        state: if id == 0 { WST_MAXIMIZED } else { WST_CSD },
         pixels: Vec::new(),
         width: 0,
         height: 0,
@@ -222,8 +223,12 @@ pub fn win_enable(id: i32, enabled: bool) {
         window.enabled = enabled;
     }
 }
-/// Change a library surface rectangle, preserving fields equal to PW_KEEP.
+/// Change a library surface rectangle, preserving fields equal to PW_KEEP.  Window zero is the
+/// host's viewport: its place and size follow the host alone (E_RESIZE), not a saved placement.
 pub fn win_set_rect(id: i32, x: i32, y: i32, width: i32, height: i32) {
+    if id == 0 {
+        return;
+    }
     let mut display = DISPLAY.lock();
     if let Some(window) = window_mut(&mut display, id) {
         let before = window.rect;
@@ -316,12 +321,13 @@ pub fn win_cmd(id: i32, command: u32) {
     let mut display = DISPLAY.lock();
     let size = (display.width, display.height);
     if let Some(window) = window_mut(&mut display, id) {
+        // (window zero always fills the host: maximize and restore leave it)
         match command {
-            WCMD_MAXIMIZE => {
+            WCMD_MAXIMIZE if id != 0 => {
                 window.rect = [0, 0, size.0, size.1];
                 window.state |= WST_MAXIMIZED;
             }
-            WCMD_RESTORE => {
+            WCMD_RESTORE if id != 0 => {
                 window.state &= !(WST_MAXIMIZED | WST_MINIMIZED);
                 window.shown = true;
             }

@@ -354,12 +354,19 @@ try {
           await page.setViewportSize({width:980,height:700});
           const resized=await until(()=>pixels(page),v=>v.width===980 && v.height===662,'host resize to software framebuffer');
           await page.screenshot({path:resolve(artifact,`${engine}-${app}.png`)});
+          // the agent badge sits in a title bar of the app's own (AF_CUSTOM_TITLEBAR: jfWord, Kritzel);
+          // the browser draws none for the main window, the host bar's button is the control there
           const badge=(await state(page)).widgets.find(w=>w.id===0xffff7440);
-          assert.ok(badge,'shared titlebar shows enabled agent control');
+          const ownTitlebar=app==='jfWord'||app==='Kritzel';
+          assert.equal(Boolean(badge),ownTitlebar,ownTitlebar?'own titlebar shows enabled agent control':'no library titlebar in the browser');
           await page.evaluate(()=>{window.__oldAgent=window.jfguiAgent;});
-          const canvas=await page.locator('#screen').boundingBox();
-          await page.mouse.click(canvas.x+badge.rect[0]+badge.rect[2]/2,canvas.y+badge.rect[1]+badge.rect[3]/2);
-          await until(()=>page.evaluate(()=>typeof window.jfguiAgent),v=>v==='undefined','in-app agent revocation removes browser API');
+          if(badge) {
+            const canvas=await page.locator('#screen').boundingBox();
+            await page.mouse.click(canvas.x+badge.rect[0]+badge.rect[2]/2,canvas.y+badge.rect[1]+badge.rect[3]/2);
+          } else {
+            await page.locator('#control').click();
+          }
+          await until(()=>page.evaluate(()=>typeof window.jfguiAgent),v=>v==='undefined','agent revocation removes browser API');
           assert.equal(await page.evaluate(()=>window.__oldAgent.request({jsonrpc:'2.0',id:1,method:'agent/info'}).then(()=>false,()=>true)),true,'retained API handle is revoked');
           await page.locator('#control').click();
           await until(()=>raw(page,'agent/info'),v=>v?.result?.controlEnabled===true,'explicit reactivation after in-app revocation');

@@ -167,6 +167,9 @@ members = [
     "apps/gamedemo",
     "apps/modeltool",
     "apps/nettest",
+    "apps/game1",
+    "apps/game1/crates/game1_core",
+    "apps/game1-server",
 ]
 
 # The one version of the library (rt::VERSION; `build_rs.py release` writes it, docs/VERSIONING.md)

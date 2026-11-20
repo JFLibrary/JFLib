@@ -19,6 +19,7 @@ const imports = { jfgui: {
     frames++;
   },
   request() {},
+  gpu_call() { return 0; }, // no GPU here (web/worker.js without navigator.gpu): the software output
 } };
 instance = await WebAssembly.instantiate(module, imports);
 const api = instance.exports;
@@ -30,9 +31,9 @@ if (api.jfgui_start(390, 1100, 96, args.length) !== 0) throw Error('App startup 
 api.jfgui_tick(1);
 if (!frames || !pixels || new Set(pixels).size < 32) throw Error('No rendered UI');
 const first = createHash('sha256').update(pixels).digest('hex');
-// Browser has a 32 DIP library caption above the same gallery layout.
+// The same gallery layout as on Android: the main window has no title bar in the browser either.
 for (const type of [1, 2, 3]) {
-  api.jfgui_event(type, 1, 0, 0, 100, 334, 0);
+  api.jfgui_event(type, 1, 0, 0, 100, 302, 0);
   api.jfgui_input(10 + type);
 }
 api.jfgui_tick(20);

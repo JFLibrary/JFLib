@@ -6,7 +6,10 @@ grün, seit ARM4 auch Plugins und das Modul `jxlenc`. Seit ARM5 laufen `coretest
 `windows-11-arm` (bis auf `screen.uis`, das der Bildschirm des Runners verhindert). Seit ARM7 ist das Speichermodell auf echter
 Hardware geprüft: A56, Mac mini (M2), `ubuntu-24.04-arm` und `windows-11-arm`, jeweils mit LSE und mit LL/SC. Seit ARM8 laufen alle Skripte von
 `gallery` und `jfWord`, die Fenster-Tests von `plattest` und `gputest` und `uigputest` in der VM unter Wayland und X11, auf `ubuntu-24.04-arm` und
-auf `windows-11-arm`, dazu mit lavapipe; ein echtes Gerät mit GPU fehlt noch. Für den Rest gilt: Die Zahlen sind
+auf `windows-11-arm`, dazu mit lavapipe; ein echtes Gerät mit GPU fehlt noch. Seit ARM9 (2026-11-19, auf `main` 3d251d39) gibt
+es jedes Paketformat als eigene ARM64-Datei (`tools/package.py --arch aarch64`), ein Update-Kanal dient beiden Prozessoren, und ein
+Update über `lib/update` lief auf ARM64 komplett durch (VM, `windows-11-arm`, `ubuntu-24.04-arm`); `.github/workflows/arm64.yml`
+installiert jedes Format auf den Runnern, startet es und entfernt es wieder. Für den Rest gilt: Die Zahlen sind
 aus dem Code gezählt, die Aufwände
 geschätzt. Syscalls, Flags und `struct stat` sind mit ARM1 gegen die Kernel-Header geprüft (`tools/kernel_table_check.py`),
 die Relocations mit ARM3 an einem Test-Plugin. Der Eintrag in der Roadmap steht in
@@ -943,6 +946,67 @@ Clippy), `gendoc --check --api`; auf x86-64 `build_rs.py test gputest` 42/42, `t
 **Fertig, wenn:** `pkg_check.py` grün ist, ein Update auf ARM durchläuft und die Website nur beschreibt,
 was getestet ist.
 
+**Umgesetzt** (2026-11-19). Nach Entscheidung 5 eine Datei pro Architektur, die x86-64-Pakete bleiben, wie sie waren:
+
+- **`tools/package.py --arch aarch64`** baut die ARM64-Programme (`build_rs.py --arch aarch64`, auf dem PC wie bisher) und packt sie
+  in eigene Dateien: `<App>_Setup_arm64.exe` (der Setup-Stub selbst für ARM64), `<deb>_<ver>_arm64.deb`,
+  `<App>-<ver>-<style>-aarch64.AppImage` hinter `apps/appimagert` für ARM64, `rpm-aarch64/` mit `ExclusiveArch: aarch64` und
+  `rpmbuild --target aarch64`, `flatpak-aarch64/` (dasselbe Manifest, `flatpak-builder --arch=aarch64`, dasselbe Repository
+  `flatpak/repo`, Bundle `<app id>-aarch64.flatpak`), `<App>-<ver>-arm64.msix` mit `ProcessorArchitecture="arm64"` und
+  `<App>-arm64.appinstaller`. Die Arbeitsdateien liegen in `<out>/<App>-arm64/`. Die Namen stehen an einer Stelle
+  (`pkgmeta.arch_name`, `setup_name`), `linux_task.py` kennt `--arch`. [PACKAGING.md](PACKAGING.md) „ARM64“ beschreibt es.
+- **Vorschaubilder des Setups:** Ein ARM64-Programm startet auf dem x86-PC nicht; das Bild kommt vom x86-64-Programm desselben
+  Stils, das `package.py` dafür mitbaut (es sieht gleich aus).
+- **Update-Kanäle:** `--update DIR` schreibt `windows-aarch64` (Programm `<App>-<ver>-<style>-arm64.exe`) und `linux-aarch64` in
+  den Kanal, den der x86-64-Lauf derselben Version dort geschrieben hat, und behält dessen Einträge
+  (`update_manifest.other_targets`, nur wenn die Dateien wie gelistet daliegen); umgekehrt ebenso. Ein `update.json` dient also
+  beiden Prozessoren, eine neue Version beginnt frisch. `lib/update/manifest.rs` kannte die Namen schon.
+- **Agent-Ordner (BackupCraft, `cross_bins=`):** Die ARM64-Pakete tragen die Agenten des anderen Systems für beide Prozessoren,
+  `agents/linux-x86_64/` und `agents/linux-aarch64/` im Setup, `agents/windows-*/` im `.deb`; die x86-64-Pakete bleiben bei
+  `x86_64`. BackupCraft selbst ist unverändert: `ssh_push.rs` schiebt `agents/linux-x86_64/bc-agent` (auch von einem
+  ARM64-Server), einen ARM64-Agenten für einen ARM64-Host wählt es noch nicht; `bcctl release manifest` ordnet nur `*.exe` und
+  `*_amd64.deb` zu.
+- **Prüfungen:** `pkg_check.py --quick` (in jeder Suite) prüft die ARM64-Namen jedes Formats neben den unveränderten, `.spec`
+  und AppxManifest beider Prozessoren (sie unterscheiden sich nur in `ExclusiveArch` und `ProcessorArchitecture`), die
+  `.appinstaller`, die Agenten pro Prozessor, eine fehlende aarch64-Runtime und QEMU ohne Flag F (Flatpak übersprungen mit
+  Grund) und einen Kanal aus einem x86-64- und einem ARM64-Lauf. Ohne `--quick` prüft `--arch aarch64` die gebauten Pakete
+  (Prozessor der Programme in AppImage, `.rpm`-Tarball, Flatpak-Dateien und MSIX), auf einem ARM64-Rechner laufen AppImage und
+  entpacktes `.deb` mit den Skripten der App. `--install-packages` installiert dort die Pakete kurz (Setup im Testmodus, MSIX,
+  `apt`, `dnf` in einem Fedora-Container, Flatpak), startet sie mit den Skripten und entfernt sie wieder.
+  `winarm_check.py --only update` lässt `updatetest --test update` und `--test apply` laufen; `updatetest` nennt jetzt am Ende
+  `update::target()`.
+- **CI:** `.github/workflows/arm64.yml` ersetzt `arm64-windows.yml` und behält dessen Prüfungen (ARM5, ARM8). Neu: `template`s
+  Pakete für ARM64, Setup und MSIX auf `windows-latest` (mit einem im Lauf erzeugten Testzertifikat signiert), `.deb`, AppImage,
+  `.rpm` und das Flatpak-Manifest auf `ubuntu-latest`; auf `windows-11-arm` und `ubuntu-24.04-arm` installiert, gestartet und
+  entfernt, dazu `lib/update`. Start per Hand (`workflow_dispatch`, `parts`: `all`, `checks` = ARM5 und ARM8, `packages` = ARM9)
+  oder durch einen Push auf `arm64-test/…` (offene Frage 3), dort wählt `[arm64 parts=packages]` oder `[arm64 parts=checks]` in der
+  Commit-Nachricht die Teile (die Nachricht sucht der Workflow ganz ab: nur die gewünschte Markierung hineinschreiben; ein Commit, der
+  beide zitierte, ließ in Lauf 44564502467 den Linux-Paketjob aus); `arm64-atomics.yml` und `arm64-emulation.yml` bleiben eigene Läufe.
+
+**x86-64 unverändert:** `package.py template --formats all --update` mit der Basis `3d251d39` und mit diesem Stand nacheinander in
+denselben Ordner (`SOURCE_DATE_EPOCH` fest, der Bau aus dem Cache): Setup Byte für Byte gleich, MSIX mit denselben Einträgen
+(MakeAppx schreibt Zeiten), `.deb`, AppImage und RPM-Tarball inhaltsgleich (Dateien, Rechte, Besitzer, Links; anders sind nur Zeiten:
+`SOURCE_DATE_EPOCH` erreicht WSL nicht, `tar_gz` schreibt die Uhrzeit in den gzip-Kopf, beides schon vorher), `.spec`,
+Flatpak-Manifest und -Dateien gleich, der Kanal gleich bis auf `date`. Die Namen der x86-64-Dateien sind dieselben.
+
+**Getestet**, mit `template` (ein Stil) als App:
+
+| Wo | Was | Ergebnis |
+| --- | --- | --- |
+| PC (x86-64) | `package.py template --arch aarch64 --formats all --update` in denselben Ordner wie die x86-64-Pakete | Setup (Stub und Programm ARM64, Vorschau vom x86-64-Programm), MSIX, `.deb`, AppImage gebaut; `.rpm` nur Spec und Tarball (kein `rpmbuild`), Flatpak nur Manifest (keine aarch64-Runtime, WSLs QEMU ohne Flag F, beides mit Grund gemeldet); der Kanal listet danach `windows-x86_64`, `linux-x86_64`, `windows-aarch64`, `linux-aarch64` |
+| PC | `package.py BackupCraft --arch aarch64 --formats setup,deb` (Agent-Ordner) | `BackupCraft_Setup_arm64.exe`: Stub, Programm, `bc-server.exe`, `bc-agent.exe`, `bcctl.exe` ARM64, dazu `agents/linux-x86_64/bc-agent` (x86-64) und `agents/linux-aarch64/bc-agent` (ARM64); `backupcraft_0.1.0_arm64.deb`: Programm und die drei Programme ARM64, `agents/windows-x86_64/` und `agents/windows-aarch64/bc-agent.exe`; gelesen aus Payload und Tarball (`arm9-files/bc_agents.py` der Übergabenotizen), nicht gestartet |
+| PC | `pkg_check.py --no-build --arch aarch64` | grün: die Programme in AppImage, RPM-Tarball, Flatpak-Dateien und MSIX sind ARM64, `ExclusiveArch`, `ProcessorArchitecture`, MSIX entpackt (MakeAppx) und mit einem Testzertifikat signiert; Starten SKIP (WSL ist x86-64). Die x86-64-Pakete ebenso grün, ihr `.deb` jetzt auch entpackt mit `smoke.uis` |
+| VM, 64-KB-Kernel (`6.8.0-149-generic-64k`) | `pkg_check.py --no-build --arch aarch64 --runtime appimagert`, nichts installiert | grün: `appimagert` für ARM64 gegen Abbilder von mksquashfs (zstd mit 4-KB-Blöcken, lz4, Links, Cache, ein abgeschnittenes Abbild, `--appimage-mount` abgelehnt), die AppImage (`--appimage-extract`, `unsquashfs` am Versatz, `smoke.uis` durch die AppImage), das `.deb` (`Architecture: arm64`, entpackt läuft `smoke.uis`) |
+| VM, 64-KB-Kernel | `winarm_check.py --target linux --only update` | `updatetest --test update` 175 PASS, `--test apply` 27 PASS, 0 SKIP, Ziel `linux-aarch64`: Prüfen, Laden mit Abbruch und Range, Signatur, Staging, Einsetzen, Neustart, Rollback, auch als echte AppImage mit `appimagert` |
+| `windows-11-arm` (`arm64.yml`, Lauf 44558068236 auf `8dbb4b58`) | `pkg_check.py --no-build --arch aarch64 --install-packages` mit Setup und MSIX vom Job `build` (auf `windows-latest` gebaut, mit einem im Lauf erzeugten Testzertifikat `CN=JFLib` signiert, das nur dieser Runner vertraut) | grün, in Lauf 44564502467 (`873878b3`) mit jeder Zeile im Log: das Setup im Testmodus installiert, Setup und installiertes `template.exe` ARM64, `smoke.uis` mit dem installierten Programm, `uninstall.exe` entfernt es; die MSIX mit `Add-AppxPackage` installiert (`Arm64`, in `WindowsApps\org.jflib.Template_0.1.0.0_arm64__…`), über `shell:AppsFolder` gestartet (`template.exe` läuft aus dem Paket), mit `Remove-AppxPackage` entfernt; dazu die MSIX entpackt und testweise signiert (MakeAppx und signtool des Runners, ein Zertifikat eines anderen Antragstellers abgelehnt) |
+| `windows-11-arm`, beide Läufe | `winarm_check.py --only update` | `updatetest --test update` 132 PASS, `--test apply` 18 PASS, 0 SKIP, Ziel `windows-aarch64` |
+| `ubuntu-latest` (x86-64), Lauf 44573711000 (`7dde3d5e`, Inhalt `873878b3`) | `package.py template --arch aarch64 --no-win --formats deb,appimage,rpm,flatpak` auf einem Linux-Rechner, dann `pkg_check.py --no-build --arch aarch64` | grün: `.deb`, AppImage, `jfgui-template-0.1.0-1.aarch64.rpm` (`rpmbuild --target aarch64` auf x86-64), Flatpak-Manifest; `build_rs.py` baut dafür auf dem Linux-Rechner selbst nach ARM64 |
+| `ubuntu-24.04-arm`, Lauf 44573711000 | `pkg_check.py --no-build --arch aarch64 --install-packages --runtime appimagert` mit den Paketen von `ubuntu-latest` | grün: Runtime wie in der VM, AppImage mit `smoke.uis`, `.deb` entpackt mit `smoke.uis`; das `.deb` mit `apt-get` installiert (`arm64 install ok installed`, `/usr/bin/jfgui-template` → `/usr/lib/jfgui-template/template-winui` über `update-alternatives`), `smoke.uis` mit dem installierten Programm, `apt-get remove --purge` lässt nichts zurück; das `.rpm` mit `dnf` in `fedora:latest` (aarch64) installiert, `/usr/bin/jfgui-template` über `alternatives`, `smoke.uis` im Container, `dnf remove`; Flatpak übersprungen (eine fehlerhafte Abfrage der Runtime, behoben in `98502977`) |
+| `ubuntu-24.04-arm`, Läufe 44581549632 und 44584637295 | dasselbe, jetzt mit Flatpak (Runtime und SDK 26.08 für aarch64 von Flathub) | `.deb`, `.rpm`, AppImage und `lib/update` wieder grün. Flatpak: `flatpak-builder --arch=aarch64` baut nativ aus dem Manifest, die Build-Befehle laufen in der aarch64-SDK, dann bricht es beim Strippen ab: `eu-strip` fehlt (`elfutils` ist bei Ubuntu nur eine Empfehlung von `flatpak-builder`, der Workflow installiert ohne Empfehlungen; lokal ist es da). Der Workflow installiert jetzt `elfutils` |
+| beide Runner, Lauf 44588727142 (`3091f0fe`, Baum des Endstands `837f1981`, nur Paketteil) | alles oben noch einmal | alles grün: Windows Setup und MSIX installiert, gestartet, entfernt, `updatetest` 132/18; Linux `.deb`, `.rpm`, AppImage wie oben, dazu das Flatpak: Bundle für aarch64 nativ aus dem Manifest gebaut, `flatpak install --user --bundle`, installiert für `aarch64`, `flatpak run org.jflib.Template` mit `smoke.uis`, `flatpak uninstall`; `updatetest` 175/27 |
+| `ubuntu-24.04-arm`, Läufe 44558068236 und 44573711000 | `winarm_check.py --target linux --only update` | `updatetest --test update` 175 PASS, `--test apply` 27 PASS, 0 SKIP, Ziel `linux-aarch64`, auf echter Hardware (Neoverse N2, 4-KB-Seiten) |
+| beide Runner, derselbe Lauf | die Prüfungen von ARM5 und ARM8 im zusammengeführten Workflow | wie bei ARM8: Windows Runde A 208 von 209 (`screen.uis`), B 55 von 55, C 52 von 55 und 33 von 34 (lavapipe ohne Bildtakt, `viewsize`); Linux 199 von 201 (`textures`, `validate` mit lavapipe 25.2) und 80 von 81 (`screen.uis` unter Xvfb) |
+
 ## Reihenfolge
 
 ```text
@@ -1008,12 +1072,13 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
 |---|---|---|
 | `coretest`, `portabletest`, Logik | `qemu-aarch64` in WSL: `build_rs.py test NAME --target linux --arch aarch64` | kein echtes Speichermodell, nur statische Programme; `-cpu cortex-a53` prüft ARMv8.0 ohne LSE |
 | Signale, Sandbox, Crash, glibc, Fenster, Plugins | `qemu-system-aarch64` in WSL: Ubuntu 24.04 arm64, Kernel mit 4- und 64-KB-Seiten (ARM3; Skripte in den Übergabenotizen von ARM3, ARM4 und ARM8), lavapipe installiert (ARM8) | TCG, etwa so schnell wie `qemu-aarch64`, Start 5 Minuten; kein echtes Speichermodell, kein Befehlscache; Weston und Xvfb ohne volles RandR und ohne dma-bufs (die UI-Ausgabe bleibt auf dem CPU-Weg); Zeitgrenzen unter Last |
-| Echte ARM-CPU unter Linux | `ubuntu-24.04-arm` (seit ARM8 auch mit Weston, Xvfb und lavapipe: `arm64-windows.yml`, Job `linux`, `tools/winarm_check.py --target linux`), statische Programme per `adb` auf dem A56 | keine dma-bufs im Display; das Telefon steckt nur auf Zuruf |
+| Echte ARM-CPU unter Linux | `ubuntu-24.04-arm` (seit ARM8 auch mit Weston, Xvfb und lavapipe: `arm64.yml`, Job `linux`, `tools/winarm_check.py --target linux`), statische Programme per `adb` auf dem A56 | keine dma-bufs im Display; das Telefon steckt nur auf Zuruf |
 | Speichermodell (ARM7) | `plattest --test atomics --secs N` auf A56, Mac mini (M2) und den Runnern: `.github/workflows/arm64-atomics.yml` (beide Wege: `jfgui_ARM_LLSC=1`, `JFLIB_EXTRA_RUSTFLAGS`) | nicht unter QEMU (siehe Fallen); ein Lauf beweist keine Freiheit von Fehlern |
 | Plugins | JFPainters Test-Plugins (`plugins/` in dessen Repository) für jede Architektur gebaut, `plattest --test lib --dir DIR`; für ARM64 bis zum Patch in JFPainter eine portierte Kopie (Notizen von ARM4) | JFLib lässt `--test lib` in keinem Skript laufen |
-| Windows ARM64 | `windows-11-arm`: `.github/workflows/arm64-windows.yml` mit `tools/winarm_check.py` (ARM5; seit ARM8 alle Skripte von `gallery`, `jfWord`, `gputest`, `uigputest`, dazu Loader und lavapipe für ARM64); lokal nur bauen und `tools/winarm_imports.py --libs` | Fenster-Skripte laufen, die Windows-Einrichtung verdeckt aber den Bildschirm (ARM0), 1024 × 768; eine `vulkan-1.dll` ohne Treiber; lokal kein Start möglich |
+| Windows ARM64 | `windows-11-arm`: `.github/workflows/arm64.yml` (bis ARM9 `arm64-windows.yml`) mit `tools/winarm_check.py` (ARM5; seit ARM8 alle Skripte von `gallery`, `jfWord`, `gputest`, `uigputest`, dazu Loader und lavapipe für ARM64; seit ARM9 Pakete und Updates); lokal nur bauen und `tools/winarm_imports.py --libs` | Fenster-Skripte laufen, die Windows-Einrichtung verdeckt aber den Bildschirm (ARM0), 1024 × 768; eine `vulkan-1.dll` ohne Treiber; lokal kein Start möglich |
 | Android und NEON | A56, Emulator | Emulator ist x86-64 |
 | Echte GPU auf ARM | noch kein Gerät (Paket für das Surface bereit, ARM8) | Vulkan sonst nur mit lavapipe (VM, beide Runner); lavapipe 25.2 rechnet den Texturfilter auf ARM64 ungenauer (ARM8) |
+| Pakete und Updates (ARM9) | lokal `tools/package.py APP --arch aarch64` und `tools/pkg_check.py --no-build --arch aarch64` (Namen, Felder, Prozessor der Programme; `--quick` prüft die Namen und den gemeinsamen Kanal in jeder Suite); VM: `arm9-files/vm/vm9.sh` der Übergabenotizen (AppImage, entpacktes `.deb`, Runtime, `winarm_check.py --target linux --only update`); Runner: `arm64.yml` mit `pkg_check.py --install-packages` und `winarm_check.py --only update` | installiert wird nur auf den Runnern (in der VM wäre es eine Installation); Flatpak und `.rpm` für aarch64 lokal nur als Manifest und Spec (Runtime, QEMU mit Flag F und `rpmbuild` fehlen) |
 
 Die Regel gegen Fenster-Fluten gilt auch hier: dieselben Fenster-Tests nicht wiederholt laufen lassen,
 höchstens drei Runden pro Variante. Die Runner von GitHub sind für öffentliche Repositories kostenlos.
@@ -1025,7 +1090,11 @@ höchstens drei Runden pro Variante. Die Runner von GitHub sind für öffentlich
 2. **Echtes ARM-Gerät für Linux:** Ein Raspberry Pi 5 oder Ähnliches wird spätestens für ARM8 nötig. Das
    kann bis dahin warten.
 3. **CI:** Sollen die ARM-Läufe später auch automatisch bei jedem Push laufen? Vorschlag: nur bei Releases
-   und per Hand.
+   und per Hand. Bis zur Entscheidung startet `arm64.yml` (ARM9) nur per Hand (`workflow_dispatch`, mit `parts`: alles, nur
+   ARM5/ARM8 oder nur die Pakete) oder durch einen Push auf einen Testzweig `arm64-test/…`; ein Lauf bei Releases ist nicht
+   eingerichtet.
 4. **64-KB-Seiten:** Nur für manche Server-Kernel relevant, nach Entscheidung 7 zunächst nicht unterstützt. Seit ARM3
    laufen `rt` und `plat` dort (VM mit Ubuntus Kernel `generic-64k`), seit ARM4 auch Module und Plugins (gelinkt mit
-   `-z max-page-size=65536`); offen ist, ob die Pakete das zusagen sollen.
+   `-z max-page-size=65536`), seit ARM9 die ARM64-Pakete von `template` (AppImage samt Runtime, entpacktes `.deb`) und
+   `lib/update` in derselben VM; offen ist, ob die Pakete das zusagen sollen. Bis dahin sagen PACKAGING.md und README nichts
+   dazu.

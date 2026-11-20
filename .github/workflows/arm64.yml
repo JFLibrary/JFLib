@@ -1,0 +1,406 @@
+# ARM5, ARM8 and ARM9 (docs/ARM64.md): the programs and packages for ARM64, built on x86-64 runners as on the PC
+# (build_rs.py --arch aarch64, tools/package.py --arch aarch64) and checked on windows-11-arm (Cobalt 100) and
+# ubuntu-24.04-arm (Neoverse N2), real ARM64 machines. (Until ARM9 this file was arm64-windows.yml.)
+# ARM5: every script of coretest and plattest, the crash handler (plattest --test crash, guardcrash, panic) and the
+# module jxlenc against the linked writer; the x64 build of the module comes along, the ARM64 program must refuse
+# it (LIBE_ARCH). ARM8: every script of gallery, jfWord, gputest and uigputest in three rounds of the GPU: (a) the
+# runner as it is (a vulkan-1.dll in System32 but no driver), (b) the Khronos loader of a known version built here
+# for ARM64 in its place, still no driver, (c) lavapipe for ARM64 (Mesa, mmozeiko/build-mesa) as the driver; on
+# Linux under Weston headless and Xvfb with Ubuntu's lavapipe.
+# ARM9: the packages of apps/template for ARM64 -- on windows-latest the setup and the MSIX (signed with a test
+# certificate made in the run, trusted only on the ARM64 runner), on ubuntu-latest the .deb, the AppImage (with the
+# runtime apps/appimagert for ARM64), the .rpm (rpmbuild --target aarch64) and the Flatpak manifest -- installed,
+# started with the app's script and removed again on the ARM64 runners (tools/pkg_check.py --install-packages: the
+# setup in test mode, Add-AppxPackage, apt, dnf in a Fedora container, a Flatpak built there with the aarch64
+# runtime from Flathub); and lib/update on both (tools/winarm_check.py --only update: updatetest --test update and
+# --test apply, on Linux also as a real AppImage).
+# Downloads only on the runners: the Rust toolchain, apt packages, the Khronos loader's sources, lavapipe, the
+# Flatpak runtime and SDK for aarch64, the Fedora image.
+# Started by hand (workflow_dispatch; parts: all, checks = ARM5 and ARM8, packages = ARM9), or by a push to a branch
+# arm64-test/... (workflow_dispatch needs the file on main); there the pushed commit's message picks the parts with
+# "[arm64 parts=packages]" or "[arm64 parts=checks]" (else all; the text is searched anywhere in the message, so a
+# message names only the one it wants). Not on every push (docs/ARM64.md, open question 3).
+name: ARM64
+
+on:
+  workflow_dispatch:
+    inputs:
+      parts:
+        description: "all; checks (ARM5, ARM8: scripts, crash handler, module, GPU rounds); packages (ARM9: packages, lib/update)"
+        type: choice
+        default: all
+        options: [all, checks, packages]
+  push:
+    branches: ["arm64-test/**"]
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: 1
+  PARTS: ${{ inputs.parts || (contains(github.event.head_commit.message, '[arm64 parts=packages]') && 'packages') || (contains(github.event.head_commit.message, '[arm64 parts=checks]') && 'checks') || 'all' }}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust and LLD
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --no-self-update --target aarch64-pc-windows-msvc,aarch64-unknown-linux-gnu
+          rustup default 1.98.1
+          rustc --version
+          "/c/Program Files/LLVM/bin/lld-link.exe" --version
+          "/c/Program Files/LLVM/bin/ld.lld.exe" --version
+      - name: Build for ARM64
+        if: env.PARTS != 'packages'
+        run: |
+          for a in coretest plattest gallery codectest jfWord gputest uigputest; do
+            python -u build_rs.py app $a --target win --arch aarch64
+          done
+      - name: Build for Linux ARM64
+        if: env.PARTS != 'packages'
+        run: |
+          for a in plattest gallery jfWord gputest uigputest; do
+            python -u build_rs.py app $a --target linux --arch aarch64
+          done
+      - name: The module for x64 (the ARM64 programs must refuse it)
+        if: env.PARTS != 'packages'
+        run: python -u build_rs.py app codectest --target win
+      - name: "ARM9: lib/update's test program for ARM64, the AppImage runtime beside the Linux one"
+        if: env.PARTS != 'checks'
+        run: |
+          python -u build_rs.py app updatetest --target both --arch aarch64
+          python -u build_rs.py app appimagert --target linux --arch aarch64
+      - name: "ARM9: a test certificate for the packages (subject = the MSIX publisher of template, CN=JFLib)"
+        if: env.PARTS != 'checks'
+        shell: pwsh
+        run: |
+          $pw = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(18))
+          "::add-mask::$pw"
+          "jfgui_SIGN_PFX_PASS=$pw" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "jfgui_SIGN_PFX=$PWD\build\cert\test.pfx" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          New-Item -ItemType Directory -Force build\cert | Out-Null
+          $c = New-SelfSignedCertificate -Type Custom -Subject "CN=JFLib" -KeyUsage DigitalSignature -FriendlyName "JFLib ARM64 CI test" `
+               -CertStoreLocation Cert:\CurrentUser\My -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+          Export-PfxCertificate -Cert $c -FilePath build\cert\test.pfx -Password (ConvertTo-SecureString $pw -AsPlainText -Force) | Out-Null
+          Export-Certificate -Cert $c -FilePath build\cert\test.cer | Out-Null
+          "certificate $($c.Thumbprint), $($c.Subject), until $($c.NotAfter)"
+      - name: "ARM9: the Windows packages of template for ARM64 (setup, MSIX), signed with it"
+        if: env.PARTS != 'checks'
+        run: |
+          python -u tools/package.py template --arch aarch64 --formats setup,msix --out build/pkg 2>&1 | tee build/package_win.txt
+          exit ${PIPESTATUS[0]}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arm64-programs
+          retention-days: 7
+          if-no-files-found: ignore
+          path: |
+            build/win-arm64/**
+            build/linux-arm64/**
+            build/win/jxlenc.dll
+            !build/win-arm64/inc/**
+            !build/win-arm64/**/*.rlib
+            !build/win-arm64/**/*.rmeta
+            !build/linux-arm64/inc/**
+            !build/linux-arm64/**/*.rlib
+            !build/linux-arm64/**/*.rmeta
+      - uses: actions/upload-artifact@v4
+        if: env.PARTS != 'checks'
+        with:
+          name: arm64-packages-win
+          retention-days: 7
+          path: |
+            build/pkg/*.exe
+            build/pkg/*.msix
+            build/cert/test.cer
+            build/package_win.txt
+
+  linux-packages:
+    if: ${{ inputs.parts != 'checks' && !contains(github.event.head_commit.message, '[arm64 parts=checks]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools (LLD, the package tools, the validators)
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends lld squashfs-tools rpm desktop-file-utils appstream > /dev/null
+          ld.lld --version; rpmbuild --version; mksquashfs -version | head -1
+      - name: Rust
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --no-self-update --target aarch64-unknown-linux-gnu
+          rustup default 1.98.1
+          rustc --version
+      - name: "ARM9: the Linux packages of template for ARM64 (.deb, AppImage, .rpm; the Flatpak's manifest)"
+        run: |
+          mkdir -p build
+          python3 -u tools/package.py template --arch aarch64 --no-win --formats deb,appimage,rpm,flatpak --out build/pkg 2>&1 | tee build/package_linux.txt
+          exit ${PIPESTATUS[0]}
+      - name: "ARM9: their checks here (names, fields, the processor of the programs; nothing starts on x86-64)"
+        run: |
+          python3 -u tools/pkg_check.py --no-build --out build/pkg --arch aarch64 --summary 2>&1 | tee build/pkg_check_x64.txt
+          exit ${PIPESTATUS[0]}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arm64-packages-linux
+          retention-days: 7
+          path: |
+            build/pkg/*.deb
+            build/pkg/*.AppImage
+            build/pkg/*.rpm
+            build/pkg/rpm-aarch64/**
+            build/pkg/flatpak-aarch64/**
+            build/package_linux.txt
+            build/pkg_check_x64.txt
+
+  check:
+    needs: build
+    runs-on: windows-11-arm
+    timeout-minutes: 200
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          architecture: arm64
+      - uses: actions/download-artifact@v4
+        with:
+          name: arm64-programs
+          path: build
+      - uses: actions/download-artifact@v4
+        if: env.PARTS != 'checks'
+        with:
+          name: arm64-packages-win
+          path: build
+      - name: The machine (processor, display adapters, Vulkan, D3D12)
+        run: |
+          Get-CimInstance Win32_Processor | Format-List Name, Architecture, NumberOfLogicalProcessors
+          Get-CimInstance Win32_VideoController | Format-List Name, AdapterCompatibility, DriverVersion, PNPDeviceID, CurrentHorizontalResolution, CurrentVerticalResolution
+          python -c "import platform; print('python', platform.machine(), platform.python_version())"
+          "vulkan-1.dll in System32: $(Test-Path C:\Windows\System32\vulkan-1.dll)"
+          Get-ChildItem C:\Windows\System32 -Filter "vulkan*" -ErrorAction SilentlyContinue | Format-Table Name, Length
+          foreach ($k in "HKLM:\SOFTWARE\Khronos\Vulkan\Drivers", "HKLM:\SOFTWARE\Khronos\Vulkan\ImplicitLayers") {
+            "${k}:"; Get-ItemProperty $k -ErrorAction SilentlyContinue | Format-List
+          }
+          "d3d12.dll: $(Test-Path C:\Windows\System32\d3d12.dll), WARP (d3d10warp.dll): $(Test-Path C:\Windows\System32\d3d10warp.dll)"
+      - name: The desktop before the checks
+        continue-on-error: true
+        run: |
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $s = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          "screen $($s.Width) x $($s.Height), $([System.Drawing.Graphics]::FromHwnd([IntPtr]::Zero).DpiX) dpi"
+          $b = New-Object System.Drawing.Bitmap $s.Width, $s.Height
+          [System.Drawing.Graphics]::FromImage($b).CopyFromScreen($s.Location, [System.Drawing.Point]::Empty, $s.Size)
+          $b.Save("$PWD\build\desktop.png")
+      - name: Every import of the programs exists here (else Windows refuses to start them silently)
+        run: python -u tools/winarm_imports.py build/win-arm64
+      - name: "ARM9: the packages installed, started and removed (the setup in test mode; the MSIX, its test certificate trusted on this runner only)"
+        id: pkgs
+        if: env.PARTS != 'checks'
+        continue-on-error: true
+        run: |
+          Import-Certificate -FilePath build\cert\test.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+          Import-Certificate -FilePath build\cert\test.cer -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
+          python -u tools/pkg_check.py --no-build --out build/pkg --arch aarch64 --install-packages *>&1 | Tee-Object build/packages_win.txt
+          exit $LASTEXITCODE
+      - name: "ARM9: lib/update on Windows ARM64 (updatetest --test update and --test apply)"
+        id: upd
+        if: env.PARTS != 'checks'
+        continue-on-error: true
+        run: |
+          python -u tools/winarm_check.py --only update *>&1 | Tee-Object build/update_win.txt
+          exit $LASTEXITCODE
+      - name: jfWord's check.py (its own checks; it also writes the fixtures two of its scripts open)
+        id: jfwcheck
+        if: env.PARTS != 'packages'
+        continue-on-error: true
+        run: |
+          New-Item -ItemType Directory -Force build\a64\win | Out-Null
+          Copy-Item build\win-arm64\jfWord.exe build\a64\win\
+          python -u apps/jfWord/tests/check.py --target win --build-dir build/a64 *>&1 | Tee-Object build/jfword_check.txt
+          exit $LASTEXITCODE
+      - name: Round A, the runner as it is (a loader, no driver) -- ARM5's checks, gallery, jfWord, gputest, uigputest
+        id: a
+        if: env.PARTS != 'packages'
+        continue-on-error: true
+        run: |
+          python -u tools/winarm_check.py --other-module build/win/jxlenc.dll --scripts coretest,plattest,gallery,jfWord,gputest,uigputest *>&1 | Tee-Object build/round_a.txt
+          exit $LASTEXITCODE
+      - name: The Vulkan loader for ARM64 (Khronos, vulkan-sdk-1.4.363.0, built here) into System32
+        id: loader
+        if: env.PARTS != 'packages'
+        continue-on-error: true
+        run: |
+          $src = "$env:RUNNER_TEMP\vkloader"
+          git clone --depth 1 --branch vulkan-sdk-1.4.363.0 https://github.com/KhronosGroup/Vulkan-Loader.git $src
+          cmake -S $src -B "$src\build" -A ARM64 -D UPDATE_DEPS=ON -D BUILD_TESTS=OFF
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --build "$src\build" --config Release --parallel
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $dll = (Get-ChildItem -Recurse "$src\build" -Filter vulkan-1.dll | Select-Object -First 1).FullName
+          "loader: $dll"
+          Copy-Item $dll C:\Windows\System32\vulkan-1.dll
+          python -c "import sys; sys.path.insert(0, '.'); from tools import host_exec; print('vulkan-1.dll for', host_exec.exe_arch(r'C:\Windows\System32\vulkan-1.dll'))"
+      - name: Round B, the loader without a driver -- gputest, uigputest, the gallery's GPU scripts
+        id: b
+        if: env.PARTS != 'packages' && steps.loader.outcome == 'success'
+        continue-on-error: true
+        run: |
+          $bad = 0
+          python -u tools/winarm_check.py --only gpu *>&1 | Tee-Object build/round_b_gpu.txt
+          $bad += [int]($LASTEXITCODE -ne 0)
+          python -u tools/winarm_check.py --only scripts --scripts gputest,uigputest,gallery/gpu_output.uis,gallery/gpu_layers.uis,gallery/gpu_layers_rtl.uis *>&1 | Tee-Object build/round_b.txt
+          $bad += [int]($LASTEXITCODE -ne 0)
+          exit $bad
+      - name: lavapipe for ARM64 (Mesa 26.3.0 of mmozeiko/build-mesa) as the Vulkan driver
+        id: lvp
+        if: env.PARTS != 'packages' && steps.loader.outcome == 'success'
+        continue-on-error: true
+        run: |
+          $f = "$env:RUNNER_TEMP\lvp.7z"
+          Invoke-WebRequest https://github.com/mmozeiko/build-mesa/releases/download/26.3.0/mesa-lavapipe-arm64-26.3.0.7z -OutFile $f
+          "sha256 $((Get-FileHash $f -Algorithm SHA256).Hash), $((Get-Item $f).Length) bytes"
+          if (Get-Command 7z -ErrorAction SilentlyContinue) { 7z x -y -o"$env:RUNNER_TEMP\lvp" $f | Out-Null } else { New-Item -ItemType Directory "$env:RUNNER_TEMP\lvp" | Out-Null; tar -xf $f -C "$env:RUNNER_TEMP\lvp" }
+          Get-ChildItem -Recurse "$env:RUNNER_TEMP\lvp" -File | Format-Table FullName, Length
+          $json = (Get-ChildItem -Recurse "$env:RUNNER_TEMP\lvp" -Filter "*.json" | Select-Object -First 1).FullName
+          "driver: $json"; Get-Content $json
+          if (-not (Test-Path HKLM:\SOFTWARE\Khronos\Vulkan\Drivers)) { New-Item -Force HKLM:\SOFTWARE\Khronos\Vulkan\Drivers | Out-Null }
+          New-ItemProperty -Force -Path HKLM:\SOFTWARE\Khronos\Vulkan\Drivers -Name $json -PropertyType DWord -Value 0 | Out-Null
+      - name: Round C, lavapipe -- gputest, uigputest (as chosen, and with jfgui_GPU_ADAPTER=llvmpipe), the gallery's GPU scripts
+        id: c
+        if: env.PARTS != 'packages' && steps.lvp.outcome == 'success'
+        continue-on-error: true
+        run: |
+          $bad = 0
+          python -u tools/winarm_check.py --only gpu *>&1 | Tee-Object build/round_c_gpu.txt
+          $bad += [int]($LASTEXITCODE -ne 0)
+          python -u tools/winarm_check.py --only scripts --scripts gputest,uigputest,gallery/gpu_output.uis,gallery/gpu_layers.uis,gallery/gpu_layers_rtl.uis *>&1 | Tee-Object build/round_c.txt
+          $bad += [int]($LASTEXITCODE -ne 0)
+          $env:jfgui_GPU_ADAPTER = "llvmpipe"
+          python -u tools/winarm_check.py --only gpu *>&1 | Tee-Object build/round_c_lvp_gpu.txt
+          $bad += [int]($LASTEXITCODE -ne 0)
+          python -u tools/winarm_check.py --only scripts --scripts uigputest,gallery/gpu_output.uis,gallery/gpu_layers.uis,gallery/gpu_layers_rtl.uis *>&1 | Tee-Object build/round_c_lvp.txt
+          $bad += [int]($LASTEXITCODE -ne 0)
+          "parts of round C that failed: $bad of 4"
+          exit $bad
+      - name: The rounds
+        if: always()
+        run: |
+          $r = [ordered]@{ "packages" = "${{ steps.pkgs.outcome }}"; "lib/update" = "${{ steps.upd.outcome }}"; "jfWord check.py" = "${{ steps.jfwcheck.outcome }}"; "round A" = "${{ steps.a.outcome }}"; "loader" = "${{ steps.loader.outcome }}"; "round B" = "${{ steps.b.outcome }}"; "lavapipe" = "${{ steps.lvp.outcome }}"; "round C" = "${{ steps.c.outcome }}" }
+          $r.GetEnumerator() | ForEach-Object { "$($_.Key): $($_.Value)" }
+          if ($r.Values -contains "failure") { exit 1 }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arm64-results
+          retention-days: 7
+          path: |
+            build/*.png
+            build/*.txt
+
+  linux:
+    needs: [build, linux-packages]
+    if: ${{ always() && needs.build.result == 'success' }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: arm64-programs
+          path: build
+      - uses: actions/download-artifact@v4
+        if: env.PARTS != 'checks' && needs.linux-packages.result == 'success'
+        with:
+          name: arm64-packages-linux
+          path: build
+      - name: The machine; Weston, Xvfb and Mesa's Vulkan drivers (lavapipe) of Ubuntu
+        run: |
+          lscpu | head -16; uname -a; getconf PAGESIZE
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends weston xvfb libvulkan1 mesa-vulkan-drivers dbus-x11 > /dev/null
+          dpkg -l weston xvfb mesa-vulkan-drivers | tail -3
+          for p in plattest gallery jfWord gputest uigputest updatetest appimagert; do
+            [ -f build/linux-arm64/$p ] && chmod +x build/linux-arm64/$p
+          done
+          chmod +x build/pkg/*.AppImage 2>/dev/null || true
+          docker --version || echo "no docker"
+      - name: "ARM9: tools for the packages and lib/update (squashfs-tools, validators, flatpak, flatpak-builder)"
+        id: tools
+        if: env.PARTS != 'checks'
+        continue-on-error: true
+        run: |
+          # elfutils: flatpak-builder strips the programs with eu-strip (only a Recommends of flatpak-builder)
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends squashfs-tools desktop-file-utils appstream flatpak flatpak-builder elfutils gnupg > /dev/null
+          mksquashfs -version | head -1; flatpak --version; flatpak-builder --version; eu-strip --version | head -1
+          # Ubuntu 24.04 may refuse unprivileged user namespaces to bwrap (flatpak-builder, flatpak run): allowed on this runner
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          if bwrap --unshare-user --ro-bind / / true; then echo "bwrap: user namespaces work"; else echo "bwrap: no user namespaces"; fi
+      - name: "ARM9: the Flatpak runtime and SDK for aarch64 (Flathub, org.freedesktop 26.08)"
+        id: fpruntime
+        if: env.PARTS != 'checks' && steps.tools.outcome == 'success'
+        continue-on-error: true
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y --noninteractive flathub org.freedesktop.Platform//26.08 org.freedesktop.Sdk//26.08
+          flatpak list --runtime --columns=application,arch,branch
+      - name: "ARM9: the packages checked, installed, started and removed (.deb with apt, .rpm in a Fedora container, AppImage, Flatpak)"
+        id: pkgs
+        if: env.PARTS != 'checks' && needs.linux-packages.result == 'success'
+        continue-on-error: true
+        run: |
+          python3 -u tools/pkg_check.py --no-build --out build/pkg --arch aarch64 --install-packages --runtime build/linux-arm64/appimagert 2>&1 | tee build/packages_linux.txt
+          exit ${PIPESTATUS[0]}
+      - name: "ARM9: lib/update on Linux ARM64 (updatetest --test update and --test apply, also as a real AppImage)"
+        id: upd
+        if: env.PARTS != 'checks'
+        continue-on-error: true
+        run: |
+          python3 -u tools/winarm_check.py --target linux --only update 2>&1 | tee build/update_linux.txt
+          exit ${PIPESTATUS[0]}
+      - name: jfWord's check.py (its own checks; it also writes the fixtures two of its scripts open)
+        id: jfwcheck
+        if: env.PARTS != 'packages'
+        continue-on-error: true
+        run: |
+          mkdir -p build/a64/linux && cp build/linux-arm64/jfWord build/a64/linux/
+          python3 -u apps/jfWord/tests/check.py --target linux --build-dir build/a64 2>&1 | tee build/jfword_check_linux.txt
+          exit ${PIPESTATUS[0]}
+      - name: Round L1, Wayland (Weston headless) with lavapipe -- plattest, gallery, jfWord, gputest, uigputest
+        id: wl
+        if: env.PARTS != 'packages'
+        continue-on-error: true
+        run: |
+          export XDG_RUNTIME_DIR=$RUNNER_TEMP/xdg && mkdir -p -m 700 $XDG_RUNTIME_DIR
+          weston --backend=headless --socket=wayland-1 --width=1920 --height=1080 > $RUNNER_TEMP/weston.log 2>&1 &
+          sleep 3
+          WAYLAND_DISPLAY=wayland-1 dbus-run-session -- python3 -u tools/winarm_check.py --target linux --scripts plattest,gallery,jfWord,gputest,uigputest 2>&1 | tee build/round_linux_wl.txt
+          exit ${PIPESTATUS[0]}
+      - name: Round L2, X11 (Xvfb) with lavapipe -- plattest, uigputest, the gallery's GPU scripts
+        id: x11
+        if: env.PARTS != 'packages'
+        continue-on-error: true
+        run: |
+          Xvfb :1 -screen 0 1920x1080x24 -nolisten tcp > $RUNNER_TEMP/xvfb.log 2>&1 &
+          sleep 3
+          DISPLAY=:1 dbus-run-session -- python3 -u tools/winarm_check.py --target linux --only scripts --scripts plattest,uigputest,gallery/gpu_output.uis,gallery/gpu_layers.uis,gallery/gpu_layers_rtl.uis 2>&1 | tee build/round_linux_x11.txt
+          exit ${PIPESTATUS[0]}
+      - name: The rounds
+        if: always()
+        run: |
+          echo "packages: ${{ steps.pkgs.outcome }}, lib/update: ${{ steps.upd.outcome }}, jfWord check.py: ${{ steps.jfwcheck.outcome }}, round L1: ${{ steps.wl.outcome }}, round L2: ${{ steps.x11.outcome }}"
+          for o in "${{ steps.pkgs.outcome }}" "${{ steps.upd.outcome }}" "${{ steps.jfwcheck.outcome }}" "${{ steps.wl.outcome }}" "${{ steps.x11.outcome }}"; do
+            [ "$o" != failure ] || exit 1
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arm64-results-linux
+          retention-days: 7
+          path: build/*.txt

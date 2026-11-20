@@ -1,15 +1,17 @@
 // input_t -- the group "input": names and bindings, the map, the settings file (base::Ini and
 // base::Settings), the pointer lock's click and end, frames against ticks, the wheel, capture, plat's
-// events, the factor per platform; every case against the rule of docs/GAMECORE.md written out
+// events, the factor per platform; (G7a part 2) game pads: their sources, the radial dead zone, analog
+// axes, looking at a turn rate with a curve, pad play without the lock, which pad drives the input, the
+// pad settings in the file; every case against the rule of docs/GAMECORE.md written out
 
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
 use base::{Ini, Schema, Settings};
-use game::input::{self, MOUSE_LEFT, MOUSE_RIGHT, MOUSE_X2, platform_motion_factor};
-use game::{ActionId, ActionKind, ActionMap, Bind, Input, MouseSettings, Source};
-use plat::{KC_A, KC_D, KC_DOWN, KC_Q, KC_S, KC_SPACE, KC_UP, KC_W, PointerLock};
+use game::input::{self, MOUSE_LEFT, MOUSE_RIGHT, MOUSE_X2, PAD_DIR_PRESS, PAD_DIR_RELEASE, TURN_RATE, platform_motion_factor};
+use game::{ActionId, ActionKind, ActionMap, Bind, Device, Input, MouseSettings, PadSettings, Source};
+use plat::{Gamepad, KC_A, KC_D, KC_DOWN, KC_Q, KC_S, KC_SPACE, KC_UP, KC_W, PAD_A, PAD_B, PAD_HOME, PAD_LX, PAD_LY, PAD_RT, PAD_RX, PAD_RY, PAD_X, PadStyle, PointerLock};
 
 use crate::Ctx;
 
@@ -22,6 +24,12 @@ pub fn run(c: &mut Ctx) {
     wheel_buttons_capture(c);
     plat_events(c);
     factor(c);
+    pad_names(c);
+    pad_sticks(c);
+    pad_play(c);
+    pad_axes_and_look(c);
+    pad_which(c);
+    pad_settings(c);
 }
 
 /// the actions of the tests
@@ -389,4 +397,359 @@ fn factor(c: &mut Ctx) {
     c.check((deg - 22.0).abs() < 1e-12, || format!("1000 counts: {deg} degrees"));
     let v: Vec<f64> = [input::FACTOR_WINDOWS, input::FACTOR_LINUX, input::FACTOR_MACOS, input::FACTOR_BROWSER, input::FACTOR_OTHER].to_vec();
     c.check(v.iter().all(|f| *f > 0.0), || "factors positive".into());
+}
+
+// ------------------------------------------------------------------ game pads (G7a part 2)
+
+/// a connected pad: buttons held (their value 1), the edges since the last frame, the axes
+fn gp(i: u8, pressed: u32, down: u32, up: u32, axes: [f32; 4]) -> Gamepad {
+    let mut g = Gamepad::empty(i);
+    g.connected = true;
+    g.pressed = pressed;
+    g.down = down;
+    g.up = up;
+    g.axes = axes;
+    for b in 0..plat::PAD_BUTTONS {
+        if pressed & (1 << b) != 0 {
+            g.buttons[b] = 1.0;
+        }
+    }
+    g
+}
+
+const A: u32 = 1 << PAD_A;
+const B: u32 = 1 << PAD_B;
+const RT: u32 = 1 << PAD_RT;
+const REST: [f32; 4] = [0.0; 4];
+
+fn close(a: f64, b: f64) -> bool {
+    (a - b).abs() <= 1e-12 * (1.0 + b.abs())
+}
+
+/// a pad's value as the input sees it: the f32 of the snapshot
+fn f(v: f32) -> f64 {
+    v as f64
+}
+
+/// a stick's part beyond the default dead zone of 0.15, scaled to 0 ..= 1
+fn beyond(v: f32) -> f64 {
+    (f(v) - 0.15) / 0.85
+}
+
+fn pad_names(c: &mut Ctx) {
+    let mut bad = Vec::new();
+    for b in 0..plat::PAD_BUTTONS as u8 {
+        let s = Source::PadButton(b);
+        if s.name() != format!("Pad{}", plat::pad_button_name(b as usize)) || Source::parse(&s.name()) != Some(s) || !s.is_pad() || s.is_motion() {
+            bad.push(s.name());
+        }
+    }
+    for a in 0..4u8 {
+        for s in [Source::PadAxis(a), Source::PadDir(a, true), Source::PadDir(a, false)] {
+            if Source::parse(&s.name()) != Some(s) || !s.is_pad() || s.is_motion() {
+                bad.push(s.name());
+            }
+        }
+    }
+    c.check(bad.is_empty(), || format!("pad sources by name: {bad:?}"));
+    c.check(Source::PadButton(PAD_A as u8).name() == "PadA" && Source::PadButton(PAD_HOME as u8).name() == "PadHome" && Source::PadAxis(PAD_RY as u8).name() == "PadRightY"
+            && Source::PadDir(PAD_LX as u8, false).name() == "PadLeftX-" && Source::PadDir(PAD_LY as u8, true).name() == "PadLeftY+", || "pad names".into());
+    c.check(["Pad", "PadZ", "PadLeftX*", "PadLeftXx", "PadLeftZ", "Pada", "PadLeftX+-"].iter().all(|n| Source::parse(n).is_none()), || "unknown pad names".into());
+    for (b, t) in [(Bind::scaled(Source::PadAxis(PAD_LY as u8), -1.0), "-PadLeftY"), (Bind::scaled(Source::PadButton(PAD_RT as u8), 0.5), "PadRT*0.5"),
+                   (Bind::new(Source::PadDir(PAD_LX as u8, false)), "PadLeftX-"), (Bind::scaled(Source::PadDir(PAD_RX as u8, false), -1.0), "-PadRightX-")] {
+        c.check(b.text() == t && Bind::parse(t) == Some(b), || format!("{t}: {} / {:?}", b.text(), Bind::parse(t)));
+    }
+    let a = Source::PadButton(PAD_A as u8);
+    c.check(a.label() == "A" && a.label_for(PadStyle::PlayStation) == "Kreuz" && a.label_for(PadStyle::Nintendo) == "B" && a.label_for(PadStyle::Other) == "A",
+            || "the bottom button by style".into());
+    c.check(Source::PadButton(PAD_X as u8).label_for(PadStyle::Nintendo) == "Y" && Source::PadButton(PAD_RT as u8).label_for(PadStyle::PlayStation) == "R2"
+            && Source::PadAxis(PAD_LX as u8).label() == "Linker Stick waagrecht" && Source::PadDir(PAD_RY as u8, false).label() == "Rechter Stick hoch",
+            || "pad labels".into());
+    c.check(Source::Key(KC_W).label_for(PadStyle::PlayStation) == Source::Key(KC_W).label(), || "keys: label_for as label".into());
+    // which kind takes what
+    let (bt, ax, dir) = (Source::PadButton(0), Source::PadAxis(0), Source::PadDir(0, true));
+    c.check(ActionKind::Button.takes(bt) && ActionKind::Button.takes(dir) && !ActionKind::Button.takes(ax), || "a Button: pad buttons and directions, no axis".into());
+    c.check(ActionKind::Axis.takes(bt) && ActionKind::Axis.takes(dir) && ActionKind::Axis.takes(ax), || "an Axis: all three".into());
+    c.check(ActionKind::Motion.takes(ax) && !ActionKind::Motion.takes(bt) && !ActionKind::Motion.takes(dir) && ActionKind::Motion.takes(Source::MouseX), || "a Motion: the axis".into());
+}
+
+fn pad_sticks(c: &mut Ctx) {
+    let s = PadSettings::DEFAULT;
+    c.check(s.dead_zone == 0.15 && s.curve == 2.0 && s.sensitivity == 1.0 && !s.invert_x && !s.invert_y, || "the pad's defaults".into());
+    c.check(s.stick(0.1, 0.1) == (0.0, 0.0) && s.stick(0.15, 0.0) == (0.0, 0.0) && s.stick(0.0, 0.0) == (0.0, 0.0), || "inside the dead zone: rest".into());
+    // radial: (0.1, 0.1) is 0.141 from the middle, inside; (0.12, 0.12) 0.170, outside, in both axes
+    let (x, y) = s.stick(0.12, 0.12);
+    c.check(x > 0.0 && x == y, || format!("radial: both axes come together {x} {y}"));
+    let (x, y) = s.stick(0.575, 0.0);
+    c.check(close(x, 0.5) && y == 0.0, || format!("0.575 with a dead zone of 0.15: 0.5 ({x})"));
+    let (x, y) = s.stick(0.6, -0.8);
+    c.check(close(x, 0.6) && close(y, -0.8), || format!("at the edge (length 1): unchanged {x} {y}"));
+    let (x, y) = s.stick(1.0, 1.0);
+    c.check(close(x * x + y * y, 1.0) && close(x, y), || format!("a square stick's corner: length 1 {x} {y}"));
+    c.check(s.stick(f64::NAN, 0.5) == (0.0, 0.0) && s.stick(0.5, f64::INFINITY) == (0.0, 0.0), || "NaN and infinity: rest".into());
+    let z = PadSettings { dead_zone: 0.0, ..s };
+    c.check(z.stick(0.3, -0.4) == (0.3, -0.4), || "no dead zone: as it is".into());
+    // looking: full deflection turns TURN_RATE degrees a second; the curve; sensitivity; inversion
+    let rad = TURN_RATE * core::f64::consts::PI / 180.0;
+    let (lx, ly) = s.look(1.0, 0.0);
+    c.check(close(lx, rad) && ly == 0.0, || format!("full right: {lx} rad/s"));
+    let (lx, _) = s.look(0.575, 0.0);
+    c.check(close(lx, 0.25 * rad), || format!("half way after the dead zone, curve 2: a quarter ({lx})"));
+    let (lx, _) = PadSettings { curve: 1.0, ..s }.look(0.575, 0.0);
+    c.check(close(lx, 0.5 * rad), || format!("curve 1: half ({lx})"));
+    let (lx, _) = PadSettings { curve: 3.0, ..s }.look(0.575, 0.0);
+    c.check(close(lx, 0.125 * rad), || format!("curve 3: an eighth ({lx})"));
+    let (lx, ly) = PadSettings { sensitivity: 2.0, invert_x: true, invert_y: true, ..s }.look(0.0, 1.0);
+    c.check(lx == 0.0 && close(ly, -2.0 * rad), || format!("sensitivity 2, inverted: {lx} {ly}"));
+    c.check(s.look(0.1, 0.0) == (0.0, 0.0), || "looking inside the dead zone: nothing".into());
+}
+
+/// the actions of the pad tests
+struct P {
+    mx: ActionId,
+    my: ActionId,
+    jump: ActionId,
+    fire: ActionId,
+    throttle: ActionId,
+    look_x: ActionId,
+    look_y: ActionId,
+    up: ActionId,
+}
+
+fn pad_actions() -> (Input, P) {
+    let mut m = ActionMap::new();
+    let p = P {
+        mx: m.add("move_x", ActionKind::Axis, &[Bind::key(KC_D), Bind::scaled(Source::Key(KC_A), -1.0), Bind::new(Source::PadAxis(PAD_LX as u8))]),
+        my: m.add("move_y", ActionKind::Axis, &[Bind::key(KC_S), Bind::scaled(Source::Key(KC_W), -1.0), Bind::new(Source::PadAxis(PAD_LY as u8))]),
+        jump: m.add("jump", ActionKind::Button, &[Bind::key(KC_SPACE), Bind::new(Source::PadButton(PAD_A as u8))]),
+        fire: m.add("fire", ActionKind::Button, &[Bind::new(Source::Mouse(MOUSE_LEFT)), Bind::new(Source::PadButton(PAD_RT as u8))]),
+        throttle: m.add("throttle", ActionKind::Axis, &[Bind::new(Source::PadButton(PAD_RT as u8))]),
+        look_x: m.add("look_x", ActionKind::Motion, &[Bind::new(Source::MouseX), Bind::new(Source::PadAxis(PAD_RX as u8))]),
+        look_y: m.add("look_y", ActionKind::Motion, &[Bind::new(Source::MouseY), Bind::new(Source::PadAxis(PAD_RY as u8))]),
+        up: m.add("menu_up", ActionKind::Button, &[Bind::new(Source::PadDir(PAD_LY as u8, false))]),
+    };
+    (Input::new(m), p)
+}
+
+/// pad play: a pad button starts playing without the lock and fires nothing; taps; the lock and the mouse
+fn pad_play(c: &mut Ctx) {
+    let (mut i, p) = pad_actions();
+    i.pad_frame(&[gp(0, 0, 0, 0, REST)], 0.016);
+    c.check(i.active_pad().is_none() && !i.playing() && i.device() == Device::KeyboardMouse, || "a pad at rest: not active, not playing".into());
+    // a stick while not playing: nothing starts, the axis says 0
+    i.pad_frame(&[gp(0, 0, 0, 0, [0.9, 0.0, 0.0, 0.0])], 0.016);
+    c.check(!i.playing() && i.axis(p.mx) == 0.0 && i.active_pad() == Some(0) && i.device() == Device::Pad, || "a stick: the pad is active, the game does not play".into());
+    i.pad_frame(&[gp(0, 0, 0, 0, REST)], 0.016);
+    // the press that starts playing
+    i.pad_frame(&[gp(0, A, A, 0, REST)], 0.016);
+    c.check(i.playing() && i.pad_playing() && !i.pressed(p.jump) && !i.down(p.jump) && !i.take_lock_request() && !i.pad_held(PAD_A), || "a pad press starts pad play, fires nothing".into());
+    i.pad_frame(&[gp(0, A, 0, 0, REST)], 0.016);
+    c.check(!i.down(p.jump), || "still held: nothing".into());
+    i.pad_frame(&[gp(0, 0, 0, A, REST)], 0.016);
+    c.check(!i.released(p.jump) && !i.down(p.jump), || "its release is swallowed too".into());
+    let t = i.tick();
+    c.check(!t.pressed(p.jump) && !t.released(p.jump), || "the tick saw nothing of it".into());
+    i.end_frame();
+    // playing: a press and a release
+    i.pad_frame(&[gp(0, A, A, 0, REST)], 0.016);
+    c.check(i.pressed(p.jump) && i.down(p.jump) && i.pad_held(PAD_A), || "a press fires".into());
+    i.end_frame();
+    i.pad_frame(&[gp(0, 0, 0, A, REST)], 0.016);
+    c.check(i.released(p.jump) && !i.down(p.jump), || "its release".into());
+    i.tick();
+    i.end_frame();
+    // a tap between two frames: pressed and released in one frame, one tick with down, pressed, released
+    i.pad_frame(&[gp(0, 0, A, A, REST)], 0.016);
+    c.check(i.pressed(p.jump) && i.released(p.jump) && !i.down(p.jump), || "a tap: pressed and released".into());
+    let t = i.tick();
+    c.check(t.down(p.jump) && t.pressed(p.jump) && t.released(p.jump), || format!("the tick of a tap: {:?}", t.get(p.jump)));
+    i.end_frame();
+    // held, let go and pressed again between two frames: released and pressed
+    i.pad_frame(&[gp(0, A, A, 0, REST)], 0.016);
+    i.end_frame();
+    i.pad_frame(&[gp(0, A, A, A, REST)], 0.016);
+    c.check(i.pressed(p.jump) && i.released(p.jump) && i.down(p.jump), || "up and down again: both, still held".into());
+    i.end_frame();
+    i.pad_frame(&[gp(0, 0, 0, A, REST)], 0.016);
+    i.end_frame();
+    // the mouse during pad play asks for the lock, its press is the lock's
+    i.button(MOUSE_LEFT, true);
+    c.check(i.take_lock_request() && !i.pressed(p.fire) && i.playing() && i.device() == Device::KeyboardMouse, || "a click in pad play asks for the lock, fires nothing".into());
+    i.set_lock(PointerLock::Locked);
+    i.button(MOUSE_LEFT, false);
+    c.check(i.playing() && !i.pad_playing() && !i.take_pause() && !i.released(p.fire), || "the lock taken ends pad play without a pause".into());
+    // a pad button held when the lock ends: let go, and it counts only after its release
+    i.pad_frame(&[gp(0, A, A, 0, REST)], 0.016);
+    c.check(i.down(p.jump) && i.device() == Device::Pad, || "locked: the pad presses".into());
+    i.end_frame();
+    i.set_lock(PointerLock::Off);
+    c.check(!i.playing() && i.take_pause() && i.released(p.jump) && !i.down(p.jump), || "the lock's end: the pause lets the pad's button go".into());
+    i.end_frame();
+    i.set_lock(PointerLock::Locked);
+    i.pad_frame(&[gp(0, A, 0, 0, REST)], 0.016);
+    c.check(i.playing() && !i.down(p.jump) && !i.pressed(p.jump), || "back: the button held through the pause waits for its release".into());
+    i.pad_frame(&[gp(0, 0, 0, A, REST)], 0.016);
+    i.pad_frame(&[gp(0, A, A, 0, REST)], 0.016);
+    c.check(i.pressed(p.jump) && i.down(p.jump), || "released and pressed again: it counts".into());
+    i.end_frame();
+    // keys still drive in pad play; Esc reaches the game (no lock)
+    let (mut k, pk) = pad_actions();
+    k.pad_frame(&[gp(1, B, B, 0, REST)], 0.016);
+    k.key(KC_SPACE, true);
+    c.check(k.pad_playing() && k.pressed(pk.jump) && k.device() == Device::KeyboardMouse, || "a key in pad play".into());
+    // the pad gone during pad play: the pause
+    k.end_frame();
+    k.pad_frame(&[], 0.016);
+    c.check(!k.playing() && k.take_pause() && k.pauses() == 1 && k.active_pad().is_none() && k.released(pk.jump), || "the pad gone in pad play: the pause".into());
+    // capture: a pad's button and a stick's direction answer a settings page
+    let (mut cap, pc) = pad_actions();
+    cap.set_require_lock(false);
+    cap.start_capture();
+    cap.pad_frame(&[gp(0, 1 << PAD_X, 1 << PAD_X, 0, REST)], 0.016);
+    c.check(cap.take_capture() == Some(Source::PadButton(PAD_X as u8)) && !cap.pad_held(PAD_X), || "captured a pad button".into());
+    cap.start_capture();
+    cap.pad_frame(&[gp(0, 1 << PAD_X, 0, 0, [0.9, 0.0, 0.0, 0.0])], 0.016);
+    c.check(cap.take_capture() == Some(Source::PadDir(PAD_LX as u8, true)), || "captured a stick's direction".into());
+    cap.start_capture();
+    cap.pad_frame(&[gp(0, A, A, 0, [0.9, 0.0, 0.0, 0.0])], 0.016);
+    c.check(cap.take_capture() == Some(Source::PadButton(PAD_A as u8)) && !cap.pressed(pc.jump) && !cap.down(pc.jump), || "a captured press drives nothing".into());
+    // plat's event for a game with its own window
+    c.check(cap.plat_event(&ev(plat::E_GAMEPAD, 0, 0, 0)), || "E_GAMEPAD is the input's (pads come with pad_frame)".into());
+}
+
+/// analog axes, triggers, stick directions, looking
+fn pad_axes_and_look(c: &mut Ctx) {
+    let (mut i, p) = pad_actions();
+    i.set_require_lock(false);
+    i.pad_frame(&[gp(0, 0, 0, 0, [0.575, -1.0, 0.0, 0.0])], 0.016);
+    // (0.575, -1) has a length above 1: the direction kept, length 1
+    let n = physics::math::sqrt(f(0.575) * f(0.575) + 1.0);
+    c.check(close(i.axis(p.mx), f(0.575) / n) && close(i.axis(p.my), -1.0 / n) && i.down(p.mx), || format!("the left stick in two axes {} {}", i.axis(p.mx), i.axis(p.my)));
+    i.pad_frame(&[gp(0, 0, 0, 0, [0.575, 0.0, 0.0, 0.0])], 0.016);
+    c.check(close(i.axis(p.mx), beyond(0.575)) && (i.axis(p.mx) - 0.5).abs() < 1e-7 && i.axis(p.my) == 0.0, || format!("0.575 right: 0.5 ({})", i.axis(p.mx)));
+    i.key(KC_D, true);
+    c.check(i.axis(p.mx) == 1.0, || "D and the stick: kept at 1".into());
+    i.key(KC_D, false);
+    i.key(KC_A, true);
+    c.check(close(i.axis(p.mx), beyond(0.575) - 1.0), || format!("A (-1) and the stick (0.5): -0.5 ({})", i.axis(p.mx)));
+    i.key(KC_A, false);
+    i.pad_frame(&[gp(0, 0, 0, 0, [0.1, 0.1, 0.0, 0.0])], 0.016);
+    c.check(i.axis(p.mx) == 0.0 && !i.down(p.mx), || "inside the dead zone: 0, not held".into());
+    // a trigger: analog in an Axis, a press above the threshold
+    let mut g = gp(0, 0, 0, 0, REST);
+    g.buttons[PAD_RT] = 0.1;
+    i.pad_frame(&[g], 0.016);
+    c.check(close(i.axis(p.throttle), 0.1f32 as f64) && !i.down(p.fire), || format!("RT 0.1: throttle 0.1, no fire ({})", i.axis(p.throttle)));
+    let mut g = gp(0, RT, RT, 0, REST);
+    g.buttons[PAD_RT] = 0.8;
+    i.pad_frame(&[g], 0.016);
+    c.check(close(i.axis(p.throttle), 0.8f32 as f64) && i.pressed(p.fire) && i.down(p.fire), || "RT 0.8: throttle and fire".into());
+    i.end_frame();
+    i.pad_frame(&[gp(0, 0, 0, RT, REST)], 0.016);
+    c.check(i.released(p.fire) && i.axis(p.throttle) == 0.0, || "RT let go".into());
+    i.end_frame();
+    // a stick's direction as a button, with its hysteresis
+    let up = |v: f32| gp(0, 0, 0, 0, [0.0, v, 0.0, 0.0]);
+    i.pad_frame(&[up(-0.5)], 0.016); // (0.5 - 0.15) / 0.85 = 0.41: not yet
+    c.check(!i.down(p.up), || "up 0.41: not yet pressed".into());
+    i.pad_frame(&[up(-0.7)], 0.016); // 0.65
+    c.check(i.pressed(p.up) && i.down(p.up), || "up 0.65: pressed".into());
+    i.pad_frame(&[up(-0.5)], 0.016); // 0.41: held still
+    c.check(i.down(p.up), || format!("up 0.41: still held (let go below {PAD_DIR_RELEASE}, pressed from {PAD_DIR_PRESS})"));
+    i.pad_frame(&[up(-0.45)], 0.016); // 0.35
+    c.check(!i.down(p.up) && i.released(p.up), || "up 0.35: let go".into());
+    i.end_frame();
+    i.tick();
+    // looking: the right stick at full deflection for 0.25 s turns 45 degrees at TURN_RATE 180
+    let rad = TURN_RATE * core::f64::consts::PI / 180.0;
+    i.pad_frame(&[gp(0, 0, 0, 0, [0.0, 0.0, 1.0, 0.0])], 0.25);
+    c.check(close(i.motion_of(p.look_x), 0.25 * rad) && i.motion_of(p.look_y) == 0.0, || format!("full right 0.25 s: {} rad", i.motion_of(p.look_x)));
+    i.end_frame();
+    let half = beyond(0.575) * beyond(0.575) * rad; // (half way after the dead zone, curve 2: a quarter of the rate)
+    i.pad_frame(&[gp(0, 0, 0, 0, [0.0, 0.0, 0.575, 0.0])], 0.125);
+    c.check(close(i.motion_of(p.look_x), half * 0.125) && (half / rad - 0.25).abs() < 1e-7, || format!("half way (curve 2) 0.125 s: {}", i.motion_of(p.look_x)));
+    let t = i.tick();
+    c.check(close(t.value(p.look_x), 0.25 * rad + half * 0.125), || format!("the tick: both frames {}", t.value(p.look_x)));
+    i.end_frame();
+    // the mouse and the stick in one Motion add up; the frame's time is kept at 0.25 s
+    i.motion(100.0, 0.0);
+    i.pad_frame(&[gp(0, 0, 0, 0, [0.0, 0.0, 0.0, 1.0])], 10.0);
+    c.check(close(i.motion_of(p.look_y), 0.25 * rad) && close(i.motion_of(p.look_x), 100.0 * k(1.0)), || "a long frame turns at most 0.25 s; the mouse beside".into());
+    i.end_frame();
+    i.set_pad_settings(PadSettings { invert_y: true, sensitivity: 0.5, ..PadSettings::DEFAULT });
+    i.pad_frame(&[gp(0, 0, 0, 0, [0.0, 0.0, 0.0, 1.0])], 0.1);
+    c.check(close(i.motion_of(p.look_y), -0.5 * rad * 0.1), || format!("inverted, sensitivity 0.5: {}", i.motion_of(p.look_y)));
+    i.end_frame();
+    i.pad_frame(&[gp(0, 0, 0, 0, [0.0, 0.0, 0.0, 1.0])], f64::NAN);
+    c.check(i.motion_of(p.look_y) == 0.0, || "a frame's time NaN: no turn".into());
+    // not playing: a stick drives nothing
+    let (mut np, pn) = pad_actions();
+    np.pad_frame(&[gp(0, 0, 0, 0, [1.0, 0.0, 1.0, 0.0])], 0.1);
+    c.check(np.axis(pn.mx) == 0.0 && np.motion_of(pn.look_x) == 0.0 && !np.playing(), || "not playing: no axis, no turn".into());
+}
+
+/// which pad drives the input: the one used last, or the pinned one
+fn pad_which(c: &mut Ctx) {
+    let (mut i, p) = pad_actions();
+    i.set_require_lock(false);
+    i.pad_frame(&[gp(0, A, A, 0, REST), gp(1, 0, 0, 0, REST)], 0.016);
+    c.check(i.active_pad() == Some(0) && i.down(p.jump), || "pad 0 pressed: it drives".into());
+    i.end_frame();
+    // pad 1's stick drifting out of its dead zone does not take over
+    i.pad_frame(&[gp(0, A, 0, 0, REST), gp(1, 0, 0, 0, [0.0, 0.3, 0.0, 0.0])], 0.016);
+    c.check(i.active_pad() == Some(0) && i.axis(p.my) == 0.0, || "pad 1's stick does not take over".into());
+    // pad 1's button does: pad 0's A goes, pad 1's own press counts
+    i.pad_frame(&[gp(0, A, 0, 0, REST), gp(1, B, B, 0, [0.0, 0.3, 0.0, 0.0])], 0.016);
+    c.check(i.active_pad() == Some(1) && i.released(p.jump) && !i.down(p.jump) && close(i.axis(p.my), beyond(0.3)), || format!("pad 1 pressed B: it drives now ({:?}, {})", i.active_pad(), i.axis(p.my)));
+    i.end_frame();
+    // a button held on pad 0 when it takes over again waits for its release; its new press counts
+    i.pad_frame(&[gp(0, A | RT, RT, 0, REST), gp(1, 0, 0, B, REST)], 0.016);
+    c.check(i.active_pad() == Some(0) && i.down(p.fire) && !i.down(p.jump), || "back to pad 0: RT pressed counts, A held before waits".into());
+    i.end_frame();
+    // pinned: only pad 1, whatever pad 0 does
+    i.pin_pad(Some(1));
+    i.pad_frame(&[gp(0, 0, 0, A | RT, REST), gp(1, 0, 0, 0, REST)], 0.016);
+    i.pad_frame(&[gp(0, A, A, 0, REST), gp(1, 0, 0, 0, REST)], 0.016);
+    c.check(i.active_pad() == Some(1) && i.pinned_pad() == Some(1) && !i.down(p.jump), || "pinned to pad 1: pad 0 drives nothing".into());
+    i.pad_frame(&[gp(0, A, 0, 0, REST)], 0.016);
+    c.check(i.active_pad().is_none(), || "the pinned pad gone: none drives".into());
+    i.pin_pad(None);
+    i.pad_frame(&[gp(0, 0, 0, A, REST)], 0.016);
+    i.pad_frame(&[gp(0, A, A, 0, REST)], 0.016);
+    c.check(i.active_pad() == Some(0) && i.down(p.jump), || "unpinned: the one used".into());
+}
+
+fn pad_settings(c: &mut Ctx) {
+    let mut ini = Ini::new();
+    PadSettings::DEFAULT.store(&mut ini, "input");
+    c.check(ini.section("input").is_empty() && PadSettings::load(&ini, "input") == PadSettings::DEFAULT, || "default pad settings store nothing".into());
+    let s = PadSettings { sensitivity: 1.75, dead_zone: 0.2, curve: 1.5, invert_x: true, invert_y: false };
+    s.store(&mut ini, "input");
+    c.check(ini.get("input", "pad_sensitivity") == Some("1.75") && ini.get("input", "pad_dead_zone") == Some("0.2") && ini.get("input", "pad_curve") == Some("1.5")
+            && ini.get("input", "pad_invert_x") == Some("true") && ini.get("input", "pad_invert_y").is_none(), || format!("stored: {:?}", ini.section("input")));
+    let back = Ini::parse(&ini.to_bytes());
+    c.check(PadSettings::load(&back, "input") == s, || "through the file's text and back".into());
+    c.check(MouseSettings::load(&back, "input") == MouseSettings::DEFAULT, || "the pad's lines leave the mouse at its defaults".into());
+    ini.set("input", "pad_dead_zone", "5");
+    ini.set("input", "pad_curve", "0");
+    ini.set("input", "pad_sensitivity", "x");
+    let l = PadSettings::load(&ini, "input");
+    c.check(l.dead_zone == 0.9 && l.curve == 1.0 && l.sensitivity == 1.0 && l.invert_x, || format!("clamped, unreadable: {l:?}"));
+    // the input stores and loads them beside its bindings and the mouse
+    let (mut i, p) = pad_actions();
+    i.set_pad_settings(PadSettings { dead_zone: 0.25, ..PadSettings::DEFAULT });
+    i.set_mouse(MouseSettings { sensitivity: 3.0, ..MouseSettings::DEFAULT });
+    i.edit_map(|m| m.set_binds(p.jump, &[Bind::new(Source::PadButton(PAD_B as u8))]));
+    let mut ini = Ini::new();
+    i.store(&mut ini, "input");
+    c.check(ini.get("input", "bind.jump") == Some("PadB") && ini.get("input", "pad_dead_zone") == Some("0.25") && ini.get("input", "sensitivity") == Some("3"),
+            || format!("the input's section: {:?}", ini.section("input")));
+    let (mut j, _) = pad_actions();
+    let bad = j.load(&Ini::parse(&ini.to_bytes()), "input");
+    c.check(bad == 0 && j.pad_settings().dead_zone == 0.25 && j.mouse().sensitivity == 3.0 && same_binds(i.map(), j.map()), || "loaded beside the bindings and the mouse".into());
+    // a pad source a kind does not take is left out and counted
+    ini.set("input", "bind.jump", "PadLeftX PadA");
+    let (mut j, pj) = pad_actions();
+    let bad = j.load(&ini, "input");
+    c.check(bad == 1 && j.map().binds(pj.jump) == [Bind::new(Source::PadButton(PAD_A as u8))], || format!("a Button refuses a stick's axis: {bad}"));
 }

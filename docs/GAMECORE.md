@@ -9,7 +9,8 @@ Systeme ohne Fenster, unter Linux statisch ohne libc. Wie die Physik rechnet der
 
 Stand: G7b Teil 1 (dieser Lauf): Weltmodell, Takt, Eingabe, Kameras, Brücke, `apps/gametest`, die Demo `apps/gamedemo`. Teil 2
 fehlt noch ([Für Teil 2](#für-teil-2)): die Messung der beiden Wege des Spielfensters, Vollbild, Bildrate-Begrenzer und
-Present-Modus, Assets über das VFS im Hintergrund, Raumklang, die Demo auf allen Zielen.
+Present-Modus, Assets über das VFS im Hintergrund, Raumklang, die Demo auf allen Zielen. Seit G7a Teil 2 nimmt die Eingabe
+auch Gamepads ([Gamepads](#gamepads)).
 
 | Teil | Wo |
 | --- | --- |
@@ -17,7 +18,7 @@ Present-Modus, Assets über das VFS im Hintergrund, Raumklang, die Demo auf alle
 | Spalten (Sparse-Sets), Versionen | [`sparse.rs`](../lib/game/src/sparse.rs) |
 | `Transform`, `Pose`, Interpolation | [`pose.rs`](../lib/game/src/pose.rs) |
 | Takt, Systeme, `Game` | [`tick.rs`](../lib/game/src/tick.rs) |
-| Eingabe-Aktionen, Maus-Einstellungen, Pointer-Lock | [`input.rs`](../lib/game/src/input.rs) |
+| Eingabe-Aktionen, Maus- und Pad-Einstellungen, Pointer-Lock, Gamepads | [`input.rs`](../lib/game/src/input.rs) |
 | Kameras | [`camera.rs`](../lib/game/src/camera.rs) |
 | Brücke zu render3d | [`lib/game_render3d/src/lib.rs`](../lib/game_render3d/src/lib.rs) |
 | Tests | [`apps/gametest`](../apps/gametest/README.md): [`world_t.rs`](../apps/gametest/src/world_t.rs), [`tick_t.rs`](../apps/gametest/src/tick_t.rs), [`input_t.rs`](../apps/gametest/src/input_t.rs), [`camera_t.rs`](../apps/gametest/src/camera_t.rs), [`bridge.rs`](../apps/gametest/src/bridge.rs), [`checksum.rs`](../apps/gametest/src/checksum.rs), das Fenster der Skripte [`probe.rs`](../apps/gametest/src/probe.rs) |
@@ -81,16 +82,20 @@ bridge.sync(&spiel.world, &mut scene, spiel.alpha())?;   // nur Geändertes, bei
   `System<R>` (`fn(&mut World, &mut R, &Step)`), `Systems<R>` (`add`, `add_before`, `remove`, `run`, `names`), `Game<R> { world,
   res, systems, clock }` (`new`, `frame(now_ns)`, `step`, `alpha`).
 - **Eingabe** (`game::input`, die Typen auch an der Wurzel): `Source::{Key(KC_*), Mouse(b), WheelUp, WheelDown, MouseX, MouseY,
-  Wheel}` (`#[non_exhaustive]`; `name`, `parse`, `label`, `is_motion`), `MOUSE_LEFT` bis `MOUSE_X2`, `Bind { source, scale }`
+  Wheel, PadButton(plat::PAD_*), PadAxis(a), PadDir(a, positiv)}` (`#[non_exhaustive]`; `name`, `parse`, `label`, `label_for(PadStyle)`,
+  `is_motion`, `is_pad`), `MOUSE_LEFT` bis `MOUSE_X2`, `Bind { source, scale }`
   (`new`, `scaled`, `key`, `text`, `parse`), `ActionKind::{Button, Axis, Motion}` (`takes`), `ActionId` (`index`), `ActionMap`
   (`add(name, kind, defaults)`, `find`, `name`, `kind`, `binds`, `defaults`, `bind`, `unbind`, `set_binds`, `reset`,
   `reset_all`, `users`, `ids`, `store`, `load`), `MouseSettings { sensitivity, invert_x, invert_y, factor }` (`DEFAULT`,
   `motion_factor`, `radians_per_unit`, `store`, `load`), `DEGREES_PER_COUNT` (0,022), `platform_motion_factor()`,
-  `FACTOR_WINDOWS`, `FACTOR_LINUX`, `FACTOR_MACOS`, `FACTOR_BROWSER`, `FACTOR_OTHER`. `Input`: hinein `key`, `button`, `buttons`
-  (die Masken von `UiInput`), `motion`, `wheel`, `set_lock`, `plat_event`, `release_all`; je Bild `down`, `pressed`, `released`,
+  `FACTOR_WINDOWS`, `FACTOR_LINUX`, `FACTOR_MACOS`, `FACTOR_BROWSER`, `FACTOR_OTHER`, `PadSettings { sensitivity, dead_zone, curve,
+  invert_x, invert_y }` (`DEFAULT`, `stick`, `look`, `store`, `load`), `TURN_RATE` (180°/s), `PAD_DIR_PRESS` (0,5),
+  `PAD_DIR_RELEASE` (0,4), `Device::{KeyboardMouse, Pad}`. `Input`: hinein `key`, `button`, `buttons`
+  (die Masken von `UiInput`), `motion`, `wheel`, `set_lock`, `plat_event`, `release_all`, `pad_frame(pads, dt)`; je Bild `down`, `pressed`, `released`,
   `axis`, `motion_of`, `end_frame`; je Takt `tick() -> TickInput` (`get`, `down`, `pressed`, `released`, `value`, `states`;
   `ActionState { down, pressed, released, value }`); der Lock `playing`, `lock`, `take_lock_request`, `take_pause`, `pauses`,
-  `set_require_lock`; `start_capture`, `take_capture`, `capturing`; `edit_map`, `map`, `mouse`, `set_mouse`, `key_held`,
+  `set_require_lock`; das Pad `active_pad`, `pin_pad`, `pinned_pad`, `pad_playing`, `device`, `pad_held`, `pad_stick`,
+  `pad_settings`, `set_pad_settings`; `start_capture`, `take_capture`, `capturing`; `edit_map`, `map`, `mouse`, `set_mouse`, `key_held`,
   `button_held`; `store`, `load`.
 - **Kameras** (`game::camera`): `View { eye, forward, up }` (`look_at`, `right`), `FirstPerson { eye, yaw, pitch, pitch_limit }`
   (`look`, `forward`, `rotation`, `walk_dir`, `view`), `Follow { target, yaw, pitch, distance, min_distance, max_distance,
@@ -185,13 +190,49 @@ Bericht dieses Laufs).
   Bewegung zweimal: fürs Bild (`end_frame` leert, die Kamera dreht je Bild) und für den Takt (`tick()` nimmt). Ein Druck zwischen
   zwei Takten erreicht den nächsten, auch wenn das Bild keinen hatte; ein Tippen zwischen zwei Takten ergibt einen Takt mit
   gehalten, gedrückt und losgelassen. Eine Achse liest die Tasten, die im Moment der Frage gehalten sind.
-- **Platz für Gamepads** (G7a Teil 2): `Source` ist `#[non_exhaustive]`, Knöpfe und Sticks kommen als weitere Quellen; eine
-  Achse nimmt analoge Werte wie die Skalen der Tasten; ein Pad bekommt eigene Einstellungen neben `MouseSettings`.
+- **Gamepads**: siehe [Gamepads](#gamepads).
 - **Gespeichert** in einer Einstellungsdatei der Bibliothek: `Input::store(ini, "input")` und `load` schreiben in einen
   Abschnitt einer `base::Ini`, mit `base::Settings` in deren freien Teil (`settings.ini_mut()`, was auch `apps/prefstest`
   benutzt). Wie dort steht nur, was von der Vorgabe abweicht: `bind.NAME=KeyD -KeyA` (Name der Quelle wie `KeyboardEvent.code`,
-  `-` für die Skala −1, `*0.5` für andere, `none` für keine), `sensitivity`, `invert_x`, `invert_y`, `motion_factor`. Eine neue
-  Vorgabe erreicht so jeden, der sie nie geändert hat; Unlesbares wird ausgelassen und gezählt.
+  `-` für die Skala −1, `*0.5` für andere, `none` für keine; Pads `PadA`, `PadRT`, `PadLeftX`, `PadLeftY-`), `sensitivity`,
+  `invert_x`, `invert_y`, `motion_factor`, für das Pad `pad_sensitivity`, `pad_dead_zone`, `pad_curve`, `pad_invert_x`,
+  `pad_invert_y`. Eine neue Vorgabe erreicht so jeden, der sie nie geändert hat; Unlesbares wird ausgelassen und gezählt.
+
+### Gamepads
+
+G7a Teil 2. `plat` liefert die Pads in einer Belegung, der „standard“-Belegung der W3C-Gamepad-API ([GUIDE.md §39](GUIDE.md)): 17
+Knöpfe mit analogen Werten (die Trigger `PAD_LT` / `PAD_RT`), zwei Sticks von −1 bis 1, rechts und unten positiv, ohne tote Zone,
+dazu die Knöpfe, die seit dem letzten Lesen herunter- und hochgingen. `Input::pad_frame(ui.gamepads(), dt)` nimmt sie einmal je
+Bild (ein Spiel mit eigenem Fenster: `plat::pads()`), `dt` ist die Zeit seit dem Bild davor in Sekunden.
+
+- **Quellen**: `PadButton(b)` (gedrückt und losgelassen wie eine Taste; in einer Achse sein analoger Wert mal die Skala, ein Trigger
+  als Gas), `PadAxis(a)` (die Achse eines Sticks nach der toten Zone: in einer `Axis` ihr Wert −1 bis 1, in einer `Motion` dreht
+  sie), `PadDir(a, positiv)` (eine Richtung eines Sticks als Knopf: gedrückt ab 0,5, losgelassen unter 0,4, damit sie an der
+  Schwelle nicht flattert). Ein `Button` nimmt Knöpfe und Richtungen, eine `Axis` alle drei, eine `Motion` die Achsen. Menüs zeigen
+  `label_for(pad.style)`: Xbox A B X Y, LB RB LT RT, Ansicht, Menü (auch für Pads ohne bekannten Stil), PlayStation Kreuz, Kreis,
+  Quadrat, Dreieck, L1 R1 L2 R2, Create, Options, Nintendo nach der Lage B A Y X, L R ZL ZR, Minus, Plus.
+- **Tote Zone, radial**: Beide Achsen eines Sticks zusammen, nicht jede für sich (sonst rastet ein schräger Stick auf die Achsen
+  ein): bis `dead_zone` (Vorgabe 0,15) vom Mittelpunkt ist der Stick in Ruhe, der Rest des Wegs wird auf 0 bis 1 gestreckt, in
+  derselben Richtung; über 1 (die Ecken eines eckigen Sticks) bleibt er bei 1.
+- **Blicken mit dem Stick**: eine `Motion` dreht um `TURN_RATE` (180°/s) × `sensitivity` bei vollem Ausschlag, der Ausschlag nach
+  der toten Zone hoch `curve` (Vorgabe 2: langsam nahe der Mitte zum Zielen, schnell am Rand; 1 linear, bis 4), mal `dt` des Bilds
+  (höchstens 0,25 s, ein hängendes Bild dreht nicht weit). Das Ergebnis ist in Radiant wie die Maus, beide zählen in derselben
+  Aktion zusammen; `invert_x` / `invert_y` drehen das Vorzeichen. Laufen mit dem Stick bleibt linear.
+- **Welches Pad**: Ein Pad treibt die Eingabe eines Spielers: das zuletzt benutzte. Ein Knopfdruck macht ein Pad zum aktiven (auch
+  ein anderes als das bisherige; dessen gehaltene Knöpfe werden losgelassen, die gehaltenen des neuen zählen erst nach dem
+  Loslassen), ein Stick außerhalb der toten Zone nur, wenn noch keins aktiv ist: Ein driftender Stick auf dem Tisch stiehlt nichts.
+  Für geteilten Bildschirm hält `pin_pad(Some(i))` eine `Input` auf Pad i. `device()` sagt, was zuletzt benutzt wurde (Tastatur
+  und Maus oder Pad), für die Hinweise im Spiel.
+- **Spielen ohne Pointer-Lock** (Vorschlag dieses Laufs, siehe Fragen an den Nutzer): Ein Pad braucht keinen Lock. Drückt man einen
+  Pad-Knopf, während das Spiel nicht spielt, spielt es mit dem Pad (`pad_playing`); dieser Druck löst wie der Klick des Locks
+  nichts aus, sein Loslassen auch nicht. Die Maus fragt mit ihrem ersten Druck weiter nach dem Lock (verschluckt); kommt der Lock,
+  endet das Spielen mit dem Pad, sein Ende pausiert wie bisher. Tasten wirken beim Spielen mit dem Pad (Esc kommt dann beim Spiel
+  an, weil kein Lock es nimmt). Geht das aktive Pad beim Spielen mit dem Pad weg, ist das die Pause. Nach einer Pause zählt ein
+  gehaltener Pad-Knopf erst wieder, wenn er losgelassen wurde.
+- **Bild und Takt**: Die Knöpfe zählen Drücken und Loslassen wie Tasten; ein Tippen zwischen zwei Bildern (der Schnappschuss hat
+  es in `down` und `up`, aber nicht in `pressed`) ist ein Drücken und ein Loslassen im selben Bild; die Drehung des Sticks geht
+  in die Bewegung des Bilds und des Takts.
+- **Fokus**: `plat` meldet nichts gedrückt, solange kein Fenster der App aktiv ist; die Aktionen lassen dann los.
 
 ### Einheiten der rohen Bewegung und die Faktoren je Plattform
 
@@ -269,7 +310,7 @@ Abgleich).
 | --- | --- | --- |
 | `world` | Entitäten: die ersten Ids, LIFO der freien Plätze, die Generation zählt je Platz, eine alte Id wird überall verweigert (`insert`, `get`, `get_mut`, `remove`, `despawn`) und trifft nie die neue Entität, `to_bits`/`from_bits`, `Entity::NONE`, ein Platz 100 000-mal neu vergeben, `despawn` leert jede Spalte, `spawn_with`. Spalten: anhängen, Lücke mit dem letzten füllen, Versionen (Lesen durch `Mut` stempelt nicht, Schreiben schon, `iter_mut` stempelt nur Beschriebenes, `untracked`, `touch`, `clear`, `removals`), `pair_mut` in beiden Reihenfolgen, der Index in Seiten (eine Entität bei Index 999 999: unter 32 KB), `sort`. 200 000 Zufallsschritte (`spawn`, `despawn`, `insert` zweier Typen, `remove`, Schreiben durch `get_mut`, Nachschlagen; sieben von zehn auf einer der 256 neuesten Ids, sonst irgendeiner je vergebenen, oft toten) gegen das Modell: jede Antwort, alle 997 Schritte beide Spalten ganz (Entitäten, Werte, Versionen, Version, Entfernungen) und die lebenden Entitäten; dieselben Schritte in einer zweiten Welt iterieren gleich. 1 000 000 Entitäten mit `Pose`, ein Viertel mit einer zweiten Komponente: Summe, Verbund, ein Drittel weg, neu (Generation 1, die alten Ids bleiben tot). Zwei Geschichten, nach `sort_columns` dieselbe Reihenfolge | 649 Prüfungen, 0 falsch; am Ende 19 508 lebend auf 19 512 Plätzen, 8190 und 6406 Werte |
 | `tick` | 625 Bilder zu 16 ms: 600 Takte, das Alpha nach jedem Bild der exakte Bruch; je 100 000 zufällige Bilder von 0 bis 50 ms bei 1, 24, 30, 60, 120 und 144 Hz: die Summe der Takte ⌊t · Rate / 10⁹⌋ und das Alpha exakt nach jedem Bild; eine Stunde in Schritten von 1 ms bei 60 und 10 000 Hz; die Kappe (1,008 s: 8 Takte, 866 666 666 ns verworfen, Alpha 0,48, danach weiter), der erste Aufruf, eine Uhr rückwärts, `reset`; Systeme in ihrer Reihenfolge (`add_before`, `remove`), `Game::frame`; 10 000 Posen, 10 davon bewegt: Interpolation in Achteln exakt, nur die 10 neuer als `pose_mark`, nach einem Takt ohne Bewegung `prev = now`, `teleport`, die Enden von `lerp`, `nlerp` halb zu 90° ist 45° (10⁻¹⁵), der kurze Weg für −q | 33 Prüfungen, 0 falsch |
-| `input` | Namen aller Tasten aus plats Tabelle hin und zurück, Maus, Bewegung, unbekannte Namen; Bindungstexte mit Skalen; die Karte (was verweigert wird, `users`, `reset`); der Abschnitt einer `Ini` (nur Abweichungen, `none`, Unlesbares gezählt, durch den Text der Datei und zurück), Maus-Einstellungen (Grenzen, unlesbarer Faktor), dasselbe durch `base::Settings` in `mem://` und zurück; der Lock: Tasten vorher treiben nichts, der Klick, der fragt, löst nichts aus und sein Loslassen auch nicht, gehaltenes W zählt danach ohne „gedrückt“, ein Klick im Lock feuert, die Bewegung ist Zählwerte × Faktor × 0,022°, das Ende des Locks pausiert einmal und lässt alles los, in der Pause keine Bewegung und keine Aktion, `Pending` verschluckt weiter, `Refused`, `Unsupported` spielt ohne Lock, `set_require_lock(false)`; Bild gegen Takt (ein Tippen ergibt einen Takt mit gehalten, gedrückt und losgelassen, gehalten über drei Takte, Wiederholung ändert nichts, Bewegung zweier Bilder in einem Takt), Achsen (Gegenrichtungen, Skala 0,5, Grenze 1), eine Bindung, die im Halten geht, Empfindlichkeit 2 und Invertieren; Mausrad (eine Raste, zwei halbe, nach unten), die Masken von `UiInput`, das Abfangen für eine Einstellungsseite; `plat_event` (Tasten über den Scancode dieser Plattform, Knöpfe, Rad, Lock 1 und 0, Fokusverlust); der Faktor dieser Plattform, ein eigener, 1 000 Zählwerte = 22° | 106 Prüfungen, 0 falsch |
+| `input` | (G7a Teil 2, 84 Prüfungen dazu) Pad-Quellen: Namen hin und zurück, Bindungstexte, Beschriftungen je Stil, welche Art welche Quelle nimmt; die radiale tote Zone (innen Ruhe, beide Achsen zusammen, 0,575 → 0,5, Länge 1 an der Ecke, NaN), das Blicken (voller Ausschlag `TURN_RATE`, Kurve 1, 2, 3, Empfindlichkeit, Invertieren); Spielen mit dem Pad ohne Lock (der Druck, der beginnt, und sein Loslassen lösen nichts aus), Tippen zwischen zwei Bildern, hoch und wieder herunter, der Klick der Maus fragt beim Spielen mit dem Pad nach dem Lock, der Lock beendet es ohne Pause, ein gehaltener Knopf nach der Pause wartet aufs Loslassen, Tasten beim Spielen mit dem Pad, das Pad weg ist die Pause, Abfangen von Knopf und Stickrichtung; analoge Achsen mit Tasten zusammen, Trigger als Gas unter und über der Schwelle, Stickrichtung mit Hysterese, Blicken über zwei Bilder und im Takt, Maus und Stick in einer Aktion, `dt` begrenzt und NaN, ohne Spielen nichts; welches Pad (gedrückt, driftender Stick stiehlt nicht, Knopf übernimmt, zurück, angeheftet, weg); Pad-Einstellungen in der `Ini` (nur Abweichungen, durch den Text zurück, Grenzen, neben Bindungen und Maus). Dazu wie bisher: Namen aller Tasten aus plats Tabelle hin und zurück, Maus, Bewegung, unbekannte Namen; Bindungstexte mit Skalen; die Karte (was verweigert wird, `users`, `reset`); der Abschnitt einer `Ini` (nur Abweichungen, `none`, Unlesbares gezählt, durch den Text der Datei und zurück), Maus-Einstellungen (Grenzen, unlesbarer Faktor), dasselbe durch `base::Settings` in `mem://` und zurück; der Lock: Tasten vorher treiben nichts, der Klick, der fragt, löst nichts aus und sein Loslassen auch nicht, gehaltenes W zählt danach ohne „gedrückt“, ein Klick im Lock feuert, die Bewegung ist Zählwerte × Faktor × 0,022°, das Ende des Locks pausiert einmal und lässt alles los, in der Pause keine Bewegung und keine Aktion, `Pending` verschluckt weiter, `Refused`, `Unsupported` spielt ohne Lock, `set_require_lock(false)`; Bild gegen Takt (ein Tippen ergibt einen Takt mit gehalten, gedrückt und losgelassen, gehalten über drei Takte, Wiederholung ändert nichts, Bewegung zweier Bilder in einem Takt), Achsen (Gegenrichtungen, Skala 0,5, Grenze 1), eine Bindung, die im Halten geht, Empfindlichkeit 2 und Invertieren; Mausrad (eine Raste, zwei halbe, nach unten), die Masken von `UiInput`, das Abfangen für eine Einstellungsseite; `plat_event` (Tasten über den Scancode dieser Plattform, Knöpfe, Rad, Lock 1 und 0, Fokusverlust); der Faktor dieser Plattform, ein eigener, 1 000 Zählwerte = 22° | 190 Prüfungen, 0 falsch |
 | `camera` | 20 000 zufällige Gier- und Nickwinkel: die Basis gegen `Quat::from_yaw_pitch` (höchstens 10⁻¹⁵), orthonormal, rechtshändig, die Winkel zurück; Grenzen, `wrap_angle`, `look_at`; `FirstPerson` (rechts dreht nach +X, unten blickt nach unten, ±89°, NaN wird übergangen), `walk_dir`; `Follow` über 2000 Drehungen (Abstand auf 10⁻¹², blickt aufs Ziel), Zoom und seine Grenzen, vor einer Wand (das Auge bei z 2,68 vor der Fläche bei 2,9 mit einer Kugel von 0,2, die Kugel berührt nichts), frei ohne Wand; `FreeFly` | 34 Prüfungen, 0 falsch |
 | `bridge` | auf Voll und auf einem Gerät auf Basis begrenzt: der erste Abgleich (301 Instanzen, auch eine Entität ohne Pose), ein Abgleich ohne Änderung schreibt nichts und das Bild lädt 0 Instanzen hoch; ein Takt bewegt fünf (5 geschrieben, 5 hochgeladen), bei Alpha 0,25, dasselbe Alpha noch einmal (nichts geschrieben), der Takt danach (einmal `now`, dann nichts); entfernt (`despawn`, `MeshRef` weg; eine entfernte Pose lässt die Instanz stehen), Meshes und Materialien gewechselt, ein Platz zwischen zwei Abgleichen neu vergeben; `retire_mesh`/`collect` (bleibt, solange benutzt, geht danach: `mesh_info` leer, die Zahl der Meshes kleiner); `reset` mit einer neuen Szene, `clear`; der Ursprung (Schritte, Runden, eine Weite unter 1 verweigert) und dieselbe Welt bei 10⁷ gegen 0; 60 Zufallsbilder (Entitäten kommen, gehen, bewegen sich, wechseln das Material; nach jedem Abgleich jede Transformation gegen die interpolierte der Welt, alle 15 Bilder das Bild); 100 000 Entitäten für die Kosten | 0 Pixel anders in jedem Vergleich mit der neu gebauten Szene (je Gerät 8 und 4 in den Zufallsbildern), bei 10⁷ mit folgendem Ursprung 0 Pixel anders, ohne über 1000; Zufallsbilder: 3370 Posen, 1390 Transformationen geschrieben, 5096 Posen angesehen; 79 Prüfungen, 0 falsch |
 | Skript `input.uis` | der Weg durch `ui`: vor dem Lock „Pause“, der Klick fängt den Zeiger und zählt nicht, Tasten einer französischen Tastatur nach Lage (Z Q S D), 1000 und −500 Zählwerte sind 22° und −11°, ein Klick im Lock zählt, die rechte Taste springt, Esc pausiert (Space losgelassen, die Taste kommt nicht an), in der Pause nichts, ein Klick spielt weiter und zählt nicht | alle Erwartungen erfüllt |
@@ -281,6 +322,10 @@ Abgleich).
 | Windows x86-64 (Ryzen 5 3600), Rust 1.100 | 901 von 901 | `input`, `tick`, `shot` bestanden | RTX 2070 SUPER, Voll und Basis |
 | Linux x86-64 (glibc) in WSL Ubuntu 24.04 | 901 von 901 | `input`, `tick`, `shot` bestanden (das Bild über llvmpipe) | llvmpipe (LLVM 20.1.2), Voll und Basis |
 | macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | 901 von 901 | `input`, `tick`, `shot` bestanden (das Bild über Metal) | Apple M2, Voll und Basis |
+
+Die Zahlen sind die von G7b Teil 1. Seit G7a Teil 2 hat die Gruppe `input` 190 Prüfungen (84 für die Pads); sie bestehen auf
+Windows (Rust 1.100), Linux in WSL, macOS (M2) und als WebAssembly in Node (`tests/web.mjs`), die Skripte `input.uis` und
+`tick.uis` ebenso, die Prüfsumme ist überall unverändert.
 
 Die Zahlen der Prüfungen zählen Fälle grob: eine Schleife über 200 000 Schritte ist eine Prüfung „0 Antworten anders“. Gemessen
 im Entwicklungs-Build (Ryzen 5 3600 / M2): eine Million Entitäten mit Komponenten anlegen 211 / 54 ms, Summe und Verbund 11 /
@@ -313,6 +358,8 @@ Im Browser (WebAssembly in Node 22.17, einfach, SIMD und Threads, `apps/gametest
 - **Echte Fenster und echte Eingabe**: Die Demo lief nur ohne Fenster (Windows, Linux in WSL, macOS); ob sich Lock, Klick,
   Esc und die Empfindlichkeit von Hand richtig anfühlen, prüft der Nutzer in Teil 2 auf Windows, Linux (Wayland, X11), macOS und
   im Browser.
+- **Gamepads**: `Input` nur mit Schnappschüssen aus den Tests; echte Pads auf Windows, Linux, macOS und im Browser prüft der Nutzer
+  von Hand (`apps/inputtest`); `plat`s Wege dorthin sind mit eingespeisten Werten geprüft (`plattest --test pad`).
 - **Die Faktoren**: nur gerechnet. Der Wert für macOS (2,5) ist geschätzt, der Browser ohne `unadjustedMovement` und ein
   `devicePixelRatio` ≠ 1 sind nicht ausgeglichen.
 - **Browser und Android**: `lib/game` und `lib/game_render3d` bauen für `wasm32-unknown-unknown` und `aarch64-linux-android`
@@ -340,7 +387,8 @@ Im Browser (WebAssembly in Node 22.17, einfach, SIMD und Threads, `apps/gametest
   Kinder), Ressourcen in der Welt: was davon nötig ist, zeigt Spiel 1.
 - Die Brücke nimmt keine Lichter, keine Detailstufen und keine Materialwechsel je Instanz außerhalb von `MeshRef`; eine Entität
   ohne `Pose` steht am Ursprung, eine entfernte `Pose` lässt die Instanz, wo sie war.
-- Gamepads (G7a Teil 2), Touch-Steuerung (später), Tastenkombinationen als Bindung (Umschalt+W).
+- Touch-Steuerung (später), Tastenkombinationen als Bindung (Umschalt+W), Rumpeln der Pads (G7a Teil 2: auf macOS nur über Core
+  Haptics, nicht billig; offen), eine Belegung je Pad-Modell über die Standard-Belegung hinaus.
 
 ## Für Teil 2
 

@@ -162,8 +162,8 @@ The following table describes the build paths available in the current repositor
 
 | Platform | Output / build target | Status |
 | --- | --- | --- |
-| **Windows** | Native x86-64 app, `--target win` | Win32 windows and desktop integration |
-| **Linux** | Native x86-64 app, `--target linux` | Wayland and X11; the backend is selected at startup |
+| **Windows** | Native x86-64 and ARM64 app, `--target win` (`--arch aarch64`) | Win32 windows and desktop integration; ARM64 checked on GitHub's `windows-11-arm` runner, not yet on a device of its own ([ARM64 plan](docs/ARM64.md)) |
+| **Linux** | Native x86-64 and ARM64 app, `--target linux` (`--arch aarch64`) | Wayland and X11; the backend is selected at startup; ARM64 checked on GitHub's `ubuntu-24.04-arm` runner and in an ARM64 VM, GPU there only with lavapipe |
 | **Android** | Native APK, `--target android` | `androidGallery`, ARM64 and x86-64 emulator; Android 8 / API 26 or later |
 | **macOS** | Native ARM64 app, `--target mac` (built on a Mac) | AppKit windows, menus, Dock, notifications and services; GPU through Metal; `NAME.app` and `.dmg`, updates of the whole bundle; Apple silicon, macOS 13 or later |
 | **iOS** | Native ARM64 app, `--target ios` (built on a Mac; `--sim` for the simulator) | `androidGallery` as an iPhone app: UIKit host, touch, Apple Pencil, keyboards, sensors, files, clipboard, GPU through Metal; iOS 16 or later |
@@ -335,6 +335,7 @@ python build_rs.py lib --target win
 | `--target win` / `linux` / `web` / `android` | Build one target; the app must support it |
 | `--target both` | Windows and Linux; the default for `app`, `lib`, and `all` |
 | `--target all` | Windows, Linux, and Web where supported; Android is built separately |
+| `--arch aarch64` | Windows and Linux for ARM64, into `build/win-arm64/` and `build/linux-arm64/` (below) |
 | `--style kde` | Select a style; otherwise, use `apps/NAME/STYLE`, falling back to `winui` |
 | `--style winui,classic,macos,kde,jfoffice` | Build several style variants in one invocation |
 | `--release` | Optimized build with LTO; output defaults to `build/release/` |
@@ -348,6 +349,26 @@ When building multiple styles, the path also includes the style, for example
 `build/win/classic/gallery.exe`. Selecting a single explicit style does not add this
 subdirectory. Builds are incremental, and warnings are treated as build errors.
 An app's loadable modules, such as codectest's `jxlenc.dll` or `jxlenc.so`, are built automatically.
+
+### Windows and Linux on ARM64
+
+```sh
+rustup target add aarch64-pc-windows-msvc aarch64-unknown-linux-gnu
+python build_rs.py app gallery --target both --arch aarch64    # build/win-arm64/, build/linux-arm64/
+python build_rs.py test coretest --target linux --arch aarch64 # static Linux programs under qemu-aarch64 in WSL
+python tools/package.py Kritzel --arch aarch64                 # Kritzel_Setup_arm64.exe, kritzel_0.1.0_arm64.deb
+```
+
+The ARM64 programs are built on the x86-64 PC like the others; the x86-64 programs and packages do
+not change. Each package format has an ARM64 file of its own (setup, MSIX, .deb, RPM, AppImage,
+Flatpak; [packaging guide](docs/PACKAGING.md) "ARM64"), and one update channel lists both processors.
+Plugins and modules are built per processor; one of the other processor is refused with a message.
+How it is tested -- GitHub's `windows-11-arm` and `ubuntu-24.04-arm` runners, an ARM64 VM with 4 and
+64 KB pages, the memory model also on an Apple M2 and an Android phone -- and what is not tested yet
+(a Windows on ARM device with its own display, an ARM64 Linux device with a GPU: Vulkan on ARM64 only
+with lavapipe) is in the [ARM64 plan](docs/ARM64.md). Numbers read from and written as text are the
+same bits as on x86-64; `exp2`, `log2`, `pow`, `sin`, `cos` and `atan2` are not bit for bit those of
+x86-64's x87 (mostly the same bits, otherwise usually 1 ulp apart; measured in the plan, ARM2).
 
 ### Browser builds
 
@@ -656,7 +677,7 @@ rust-analyzer reads the Cargo workspace in the root `Cargo.toml` directly.
 | [Changelog](CHANGELOG.md) | What changed in each release of the library |
 | [Roadmap](docs/ROADMAP.md) | What the library still lacks, with priorities (German) |
 | [Linux test plan](docs/LINUX_TESTPLAN.md) | What is checked on real Linux desktops and what is still to check on KDE, GNOME and X11 (German) |
-| [ARM64 plan](docs/ARM64.md) | The planned port to ARM64 on Windows and Linux: milestones, traps, how it is tested (German) |
+| [ARM64 plan](docs/ARM64.md) | The port to ARM64 on Windows and Linux: milestones, results, traps, how it is tested (German) |
 | [Android plan](docs/ANDROID.md) | Bringing Android up to Windows, Linux and Apple: threads, network, file system, printing, system fonts; milestones, traps, tests (German) |
 | [Game engine plan](docs/GAME.md) | A game engine on render3d: decisions, crates, stages G7a to G7p from a first multiplayer game to procedural cities, tests (German) |
 | [Physics](docs/PHYSICS.md) | Collision for games: shapes, broad phase, rays, swept shapes, contacts; f64, the same bits on every target; tests and measurements (German) |
@@ -664,6 +685,7 @@ rust-analyzer reads the Cargo workspace in the root `Cargo.toml` directly.
 | [Modelling](docs/GEOM.md) | Models described in JFScript: lib/geom (meshes from primitives, profiles and operations, checks), apps/modeltool (pictures, report, glTF), what JFScript needs (German) |
 | [Transport](docs/TRANSPORT.md) | The network of games: WebSocket in netio, the browser's WebSocket, lib/netchan's channel over UDP and WebSocket; wire format, limits, tests, measurements (German) |
 | [Netcode](docs/NETCODE.md) | Multiplayer in lib/game: a server-authoritative tick, prediction and reconciliation, delta snapshots under 1200 bytes, lag compensation, rooms, bots; tests and measurements with 16 bots (German) |
+| [Game 1](docs/GAME1.md) | The first game on the engine (working name game1): a cartoon multiplayer shooter for the browser and the desktop; crates, map from JFScript, rules, tests, checksums, measurements (German) |
 | [Android Gallery](apps/androidGallery/README.md) | APKs, Android prerequisites, input, and port status |
 | [Web and agent control](docs/AGENT_WEB.md) | Browser host and explicit CLI/JSON/MCP interfaces |
 | [jfWord](apps/jfWord/README.md) | Document editing and current feature coverage |

@@ -1065,6 +1065,7 @@ impl Ui {
 
     /// ui_input_clear_edges: after the first pass of a batch the edges are consumed
     pub(crate) fn input_clear_edges(&mut self) {
+        self.pads_clear_edges(); // (G7a) the pads' downs and ups of the batch
         let c = &mut self.wp.ctx;
         c.motion = [0.0; 2];
         c.pressed = 0;
@@ -1634,6 +1635,7 @@ impl Ui {
     /// ui_frame_end -> another pass is needed before the frame is final
     pub(crate) fn frame_end(&mut self) -> bool {
         self.building = false;
+        self.sysmenu_frame_end(); // (popup.rs) no menubar(None) this pass: the system's bar empties
         self.uiw_frame_end();
         #[cfg(target_os = "android")]
         self.ime_frame_end();

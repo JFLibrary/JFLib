@@ -1,0 +1,2 @@
+# the baked map and figure are read byte for byte (their checksums are part of the tests): never convert them
+content/*.g1m -text binary

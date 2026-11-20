@@ -514,7 +514,9 @@ own repositories and bundles.
 | no PERMISSIONS | `--share=network --filesystem=host --talk-name=org.freedesktop.secrets --socket=pulseaudio` (the app may do everything; noted) |
 
 `flatpak_args=` adds more, for example `--talk-name=org.kde.StatusNotifierWatcher` for the tray
-(`plat::tray`) or `--talk-name=org.freedesktop.Notifications`.  Without `recent` in
+(`plat::tray`), `--talk-name=org.freedesktop.Notifications`, or `--device=input` for a game that reads
+game pads (`plat::pad_watch`, `ui.gamepads`: the evdev nodes below `/dev/input`, which a Flatpak sees
+only with it; Flatpak 1.15.6 and newer, an older one finds no pad).  Without `recent` in
 `PERMISSIONS` the list of recent files stays in the sandbox's own data folder.  The exported
 `.desktop` file's `Exec` gets flatpak's file forwarding (`@@u %U @@`): opened files come as
 `file:///run/user/<uid>/doc/...` URIs that `plat` turns into paths and grants (`fs.user`).
@@ -606,6 +608,61 @@ bundletool is not part of the Android SDK; it is a JAR on GitHub (google/bundlet
 not on this machine, so the AAB is not built (no download without the user's consent).
 `tools/pkg_check.py` reports what is there (SDK, build-tools, aapt2, Java, bundletool).
 
+## ARM64: one package per processor (`--arch aarch64`)
+
+```
+python tools/package.py Kritzel --arch aarch64                  # build/dist/Kritzel_Setup_arm64.exe
+                                                                # build/dist/kritzel_0.1.0_arm64.deb
+python tools/package.py template --arch aarch64 --formats all   # every format for ARM64
+```
+
+`--arch aarch64` packages the ARM64 programs of Windows and Linux ([ARM64.md](ARM64.md); built on the
+x86-64 PC like the others, `build_rs.py --arch aarch64`) into files of their own, one per processor
+([ARM64.md](ARM64.md) decision 5: no setup for both). The x86-64 packages keep their names and their
+contents; a run without `--arch` is the same as before (checked byte for byte, or by content where a
+format stores times). The work files go to `<out>/<App>-arm64/`, the programs to
+`<out>/rs_<profile>/win-arm64` and `linux-arm64`.
+
+| Format | x86-64 (as before) | ARM64 |
+| --- | --- | --- |
+| setup | `<App>_Setup.exe` | `<App>_Setup_arm64.exe`: the ARM64 stub and the ARM64 programs |
+| .deb | `<deb>_<ver>_amd64.deb` | `<deb>_<ver>_arm64.deb` (`Architecture: arm64`) |
+| AppImage | `<App>-<ver>-<style>-x86_64.AppImage` | `<App>-<ver>-<style>-aarch64.AppImage`, behind `apps/appimagert` built for ARM64 |
+| RPM | `rpm/`, `<deb>-<ver>-1.x86_64.rpm` | `rpm-aarch64/` (`ExclusiveArch: aarch64`), `rpmbuild --target aarch64`: `<deb>-<ver>-1.aarch64.rpm` |
+| Flatpak | `flatpak/<app id>.json`, `<app id>.flatpak` | `flatpak-aarch64/<app id>.json` (the same manifest), `flatpak-builder --arch=aarch64`, `<app id>-aarch64.flatpak`; the same repository `flatpak/repo` |
+| MSIX | `<App>-<ver>-x64.msix`, `<App>.appinstaller` | `<App>-<ver>-arm64.msix` (`ProcessorArchitecture="arm64"`), `<App>-arm64.appinstaller` |
+| update channel (`--update`) | `windows-x86_64`, `linux-x86_64` | `windows-aarch64` (the program named `<App>-<ver>-<style>-arm64.exe`), `linux-aarch64` -- in the same `update.json` |
+
+* **One update channel for both processors:** a run with `--update DIR` into a channel of the same
+  app and version keeps the other processor's entries (their files must still be there as listed) and
+  signs the whole manifest again, so `update.json` lists all four targets after one run of each; a
+  new version starts afresh. `lib/update` picks the entry of `update::target()`.
+* **The setup's previews** come from the program of the same style running on the PC; on an x86-64
+  PC that is the x86-64 program, which `package.py` builds as well (it looks the same).
+* **`cross_bins=`** (BackupCraft's agents): the ARM64 packages carry the other system's agents of
+  both processors, `agents/<os>-x86_64/` and `agents/<os>-aarch64/`; the x86-64 packages stay with
+  `agents/<os>-x86_64/`. BackupCraft's server pushes `agents/linux-x86_64/bc-agent` to Linux hosts
+  (also from an ARM64 server); choosing the ARM64 agent for an ARM64 host is not built yet.
+* **Flatpak:** flatpak-builder runs the build commands in the SDK of the target, so on an x86-64 PC an
+  ARM64 bundle needs the `aarch64` runtime and SDK (`flatpak install --user --arch=aarch64 flathub
+  org.freedesktop.Platform//26.08 org.freedesktop.Sdk//26.08`) and QEMU's binfmt entry with flag F
+  (`qemu-user-static`; WSL's `qemu-user-binfmt` has P and O only). Neither is installed here: the run
+  writes the manifest and says so. On an ARM64 machine the bundle builds natively from that manifest.
+  flatpak-builder strips the programs with `eu-strip`: `elfutils` must be installed (Ubuntu only
+  recommends it with `flatpak-builder`).
+* **RPM** needs `rpmbuild` (missing here: only the `.spec` and its tarball); `--target aarch64` lets
+  an x86-64 `rpmbuild` make the ARM64 package, nothing in it runs on the build machine.
+* macOS (`.dmg`) is one program for both Mac processors anyway; `--arch` is for Windows and Linux.
+* **Tested** with `template` ([ARM64.md](ARM64.md) ARM9, `.github/workflows/arm64.yml`): built on the
+  x86-64 PC and on an x86-64 Linux runner (there with `rpmbuild`); installed, started with the app's
+  script and removed on real ARM64 machines -- the setup (test mode) and the MSIX (`Add-AppxPackage`,
+  a test certificate trusted on that machine) on `windows-11-arm`, the `.deb` (`apt`) and the `.rpm`
+  (`dnf` in a Fedora container) and the Flatpak (built there from the manifest with the `aarch64`
+  runtime, `flatpak install --user`) on `ubuntu-24.04-arm`; the AppImage and the unpacked `.deb` there and
+  in an ARM64 VM with 64 KB pages. `lib/update` ran through on all three (`updatetest`), targets
+  `windows-aarch64` and `linux-aarch64`. Not tested: a Windows on ARM device of its own, an ARM64
+  Flatpak built on an x86-64 PC (QEMU), packages signed with a real certificate on ARM64.
+
 ## Checks
 
 [`tools/pkg_check.py`](../tools/pkg_check.py): `--quick` runs in `build_rs.py test` (a few
@@ -649,6 +706,22 @@ private session bus with `flatpak-portal --poll-timeout=2`: the portal reports t
 installed through the portal and 2.0.0 is started by it; the update permission is granted in
 that bus's permission store first, so no dialog appears) and as an MSIX package (registered in
 developer mode, when it is already on; else SKIP), then everything is removed.
+
+ARM64 ([ARM64.md](ARM64.md) ARM9): `--quick` also checks the ARM64 names of every format beside the
+unchanged x86-64 ones, the `.spec` and the AppxManifest of both processors (they differ only in
+`ExclusiveArch` and `ProcessorArchitecture`), each processor's `.appinstaller`, the agents of
+`cross_bins=` per processor, a missing `aarch64` Flatpak runtime and QEMU without flag F (skipped with
+the reason), and one update channel written by an x86-64 and an ARM64 run (all four entries, signed; a
+second run keeps the other's entries, a new version drops them). Without `--quick`, `--arch aarch64`
+checks the ARM64 packages (`--no-build`: the ones in `--out`): the programs inside are ARM64, and on an
+ARM64 machine the AppImage and the unpacked `.deb` run the app's scripts (elsewhere SKIP). The
+`.deb` is unpacked for this on x86-64 as well (`dpkg-deb -x`, nothing installed). `--install-packages`
+(on a machine of the packages' processor, meant for the CI runners of `.github/workflows/arm64.yml`)
+installs the app's own packages for a moment, runs its scripts with the installed program and removes
+them again: the setup in test mode, the MSIX with `Add-AppxPackage` (its certificate must be trusted
+beforehand) and a start through `shell:AppsFolder`, the `.deb` with `apt-get` (only with `sudo` that asks
+for no password), the `.rpm` with `dnf` in a Fedora container (docker), the Flatpak built from its
+manifest on that machine and installed with `flatpak --user`.
 
 ## Third-party notices
 

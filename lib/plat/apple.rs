@@ -37,6 +37,10 @@ pub(crate) mod ios;
 // (tests) VoiceOver's view of the elements (apple_ios_a11y.rs)
 #[cfg(target_os = "ios")]
 pub use ios::{IosAxAct, IosAxElem, IosAxText, ios_ax_act, ios_ax_escape, ios_ax_events, ios_ax_listen, ios_ax_select, ios_ax_text, ios_ax_tree, ios_ax_type};
+// (tests) the iPad's window sizes, menus and pointer (apple_ios_pad.rs, AP9)
+#[cfg(target_os = "ios")]
+pub use ios::{IosMenuRow, IosPadMenus, IosPadPointer, IosPadView, ios_pad_keyboard, ios_pad_menu_build, ios_pad_menu_choose, ios_pad_menus, ios_pad_pointer, ios_pad_rotate,
+              ios_pad_view, ios_pad_window};
 // macOS's windows: AppKit (AP4)
 #[cfg(target_os = "macos")]
 #[path = "apple_mac.rs"]

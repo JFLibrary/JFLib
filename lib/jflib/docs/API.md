@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_pad.rs (Windows)](#platwin_padrs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_pad.rs (Linux)](#platlinux_padrs-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_pad.rs (Apple)](#platapple_mac_padrs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [pad.rs](#platpadrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -216,6 +216,8 @@ Re-exports: `plat::{Preedit, IP_EMAIL, IP_NUMBER, IP_PASSWORD, IP_PHONE, IP_SEAR
 Re-exports: `plat::BrowserStatus`
 
 Re-exports: `plat::PointerLock`
+
+Re-exports: `plat::{Gamepad, PadStyle}`
 
 Re-exports: `rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH}`
 
@@ -4536,6 +4538,11 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   location searching|denied|off|none   the host's answer (off: the system's switch; none: no
                       location service, as at the start)
   location expect off|searching|fix|paused|denied|disabled|unavailable
+  pad connect N [xbox|playstation|nintendo|other] [NAME]   (G7a part 2, pads.rs) game pad N comes
+                      (plat's shared state, as a backend reports it); pad disconnect N: it goes
+  pad press N BUTTON [VALUE] | pad release N BUTTON   a button of the standard layout (a b x y lb
+                      rb lt rt back start ls rs up down left right home; VALUE 0..1, default 1)
+  pad axis N lx|ly|rx|ry VALUE   a stick's axis, -1..1 (right and down positive)
   expect wm none|move|menu|minimize|maximize|restore|close|lower|resize EDGE   what the title
                       bar or the resize band asked the window manager for since the last check
                       (EDGE n, s, w, e, nw, ne, sw, se: physical edges)
@@ -5920,6 +5927,7 @@ UIC_SCREENSHOT: u32 = 0x7FFF_0018  // arg 1: the picture is there (screenshot_ta
 UIC_RECENT: u32 = 0x7FFF_0019  // arg 1: the file of recent_open is readable now (recent_reopened), 0: refused or gone
 UIC_SENSOR: u32 = 0x7FFF_001B  // arg = plat::sensors::SENSOR_* bits: new readings or another state (plat::sensors::read, state)
 UIC_LOCATION: u32 = 0x7FFF_001C  // arg = plat::sensors::LocationState: a new fix or another state (location_fix)
+UIC_GAMEPAD: u32 = 0x7FFF_001E  // arg = index | plat::PADEV_CONNECT / PADEV_DISCONNECT << 8: a game pad came or went (ui.gamepads)
 UIC_A11Y: u32 = 0x7FFF_001D  // arg 1: a screen reader (an accessibility client) came, 0: it left (ui.a11y_active), also while the app is idle
 TRAY_ACTIVATE: u32 = 1  // UIC_TRAY: the symbol was clicked
 TRAY_SECONDARY: u32 = 2  // UIC_TRAY: double click (Windows) / middle click (Linux)
@@ -9076,7 +9084,9 @@ FF_DESKTOP however small a window is dragged (a narrow desktop window keeps the 
 behaviour); Android and iOS are FF_TABLET, and FF_PHONE where the main window's shorter side is
 below 600 DIP (Android's own line between a phone and a tablet, `sw600dp`; a tablet's app in a
 narrow split screen is laid out like a phone's then).  The shorter side keeps a phone a phone
-when it is turned.
+when it is turned.  An iPad stays FF_TABLET in every window that is not that narrow, also a
+large one in Stage Manager or iPadOS 26's windows (the user's decision of 2026-11-19: iPadOS owns
+the window and draws its controls, the finger stays the main way; docs/APPLE.md AP9).
 
 jfgui_FORM=desktop|tablet|phone decides instead (any platform: tests, and a look at the phone's
 layout on the desktop; scripts: `system env jfgui_FORM phone`).
@@ -11100,6 +11110,43 @@ Unavailable.
   the picture of the last screenshot, once
 - **`fn screen_error(&self) -> Option<ScreenError>`**
   why the last pick or picture failed (None: it worked or was not asked for)
+
+#### `ui/pads.rs`
+
+Source: [`lib/ui/pads.rs`](../lib/ui/pads.rs)
+
+```text
+pads -- (G7a part 2) the game pads for the app and the test scripts (plat::pads)
+
+  ui.gamepads()            the pads connected now with the edges of their buttons in this batch;
+                           the first call starts watching (plat::pad_watch; a headless run: the
+                           script's pads only)
+  ui.gamepads_watching()   pads are being watched (false where the platform has none)
+  pads_event(data)         (E_GAMEPAD) the pads anew, the edges added up until the batch's first
+                           pass took them (pads_clear_edges); App::command(UIC_GAMEPAD, data) for a
+                           pad that came or went
+  sc_pad                   the script command `pad ...` (auto.rs)
+
+Pads belong to the app, not to a window: E_GAMEPAD comes for window 0 and every window's pass sees
+the same list.  plat reports pads as nothing held while no window of the app is active.
+```
+
+**`impl Ui`**
+
+- **`fn gamepads(&mut self) -> &[Gamepad]`**
+  (G7a) the game pads connected now (plat::Gamepad: index, name, style, the W3C standard layout's
+  buttons with analog values, the sticks in -1 ..= 1 right and down positive, the triggers as
+  buttons PAD_LT / PAD_RT), each with the buttons that went down and up since the last batch
+  (`down`, `up`: a tap between two frames is in both).  The first call starts watching for pads
+  (plat::pad_watch): they appear in later frames, each change gives a pass, a pad that comes or
+  goes gives App::command(UIC_GAMEPAD, index | PADEV_\* &lt;&lt; 8).  While none of the app's windows
+  has the focus every pad reports nothing held.  Windows: XInput (Xbox-compatible pads); Linux:
+  evdev; macOS: GameController; the browser: the Gamepad API (a pad appears after one of its
+  buttons was pressed in the page); Android and iOS: none.  A headless run has the pads of its
+  script (`pad ...`)
+- **`fn gamepads_watching(&self) -> bool`**
+  (G7a) pads are being watched: ui.gamepads was called and the platform has pads (false on
+  Android and iOS, on Windows without XInput); a headless run: after ui.gamepads
 
 #### `ui/scrollcopy.rs`
 
@@ -28187,7 +28234,9 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
            wait ..., popups, clipboard, drops, pen, cursors; consts.rs, evq.rs, pwin0.rs)
   input:   (G7a) win_pointer_lock / win_pointer_lock_state / win_raw_motion_take: the pointer
            locked to a window, hidden, its raw relative motion (plock.rs); KC_* key_code /
-           key_label: where a key sits as a USB HID usage on every platform (keycode.rs)
+           key_label: where a key sits as a USB HID usage on every platform (keycode.rs);
+           (G7a part 2) pad_watch / pads / pad, E_GAMEPAD: game pads in the W3C standard
+           layout (pad.rs)
   dnd:     drag and drop between programs: DragData (files, text, URLs, HTML, image),
            the drop target hook, the pending drop, drag_start (dragging out)    (dnd.rs)
   (plat-shared) print(job) + page layout / PDF writer (print.rs; win_print.rs,
@@ -30647,19 +30696,25 @@ Source: [`lib/plat/sysmenu.rs`](../lib/plat/sysmenu.rs)
 
 ```text
 sysmenu -- the app's menus in the system's own menu bar (macOS: between the app menu and the Window
-menu, as every Mac app has them; docs/APPLE.md "Menüs in der Menüleiste")
+menu, as every Mac app has them; iPadOS: between the application menu and Window as well;
+docs/APPLE.md "Menüs in der Menüleiste" and AP9)
 
   sysmenu_supported() -> bool        whether this system shows an app's menus in its own bar (macOS
-                                     with a window of the app; elsewhere false: the app draws its menu
-                                     bar in the window)
+                                     with a window of the app, an iPad under UIKit; elsewhere false:
+                                     the app draws its menu bar in the window)
+  sysmenu_window_row() -> bool       whether the window keeps its own menu row as well (iPadOS: its
+                                     bar hides until a swipe down from the top or the pointer there
+                                     reveals it, the row stays the way for the finger; macOS: false)
   sysmenu_set(&[SysMenuItem])        the app's menus: the top level are the menus of the bar, their
-                                     `sub` the rows; the same list again changes nothing
+                                     `sub` the rows; the same list again changes nothing; an empty
+                                     list takes them out again
   sysmenu_take() -> Vec<u32>         the ids of the rows chosen since the last call (each choice calls
                                      wake())
 
 A row's key equivalent is a character ("s", or a function key's: "\u{F704}" = F1) with MOD_* bits;
 MOD_CTRL is the Mac's Command key, MOD_ALT its Option key.  A disabled row cannot be chosen, its key
-then reaches the window as a normal key press.
+then reaches the window as a normal key press.  On the iPad the rows with a key also show while
+Command is held; Insert has no key there.
 ```
 
 - **`struct SysMenuItem`**
@@ -30676,6 +30731,10 @@ then reaches the window as a normal key press.
 
 - **`fn sysmenu_supported() -> bool`**
   whether the app's menus go into the system's menu bar here
+
+- **`fn sysmenu_window_row() -> bool`**
+  whether the window keeps drawing its own menu row besides the system's bar (iPadOS; false where
+  the system's bar is the only place, macOS, and where sysmenu_supported is false)
 
 - **`fn sysmenu_set(menus: &[SysMenuItem])`**
   put the app's menus into the system's menu bar (an unchanged list does nothing)
@@ -33784,7 +33843,8 @@ callbacks (refresh, hit hook) never hold a reference across a Win32 call.
 
 - **`fn wait(deadline_us: u64) -> u32`**
   pump the OS until an event is queued or the deadline (plat::time_us; 0 = poll without
-  blocking, u64::MAX = forever) passes -> events queued (wake() makes it return at once)
+  blocking, u64::MAX = forever) passes -> events queued (wake() makes it return at once).  (G7a)
+  While pads are watched, XInput is polled when its time comes (pad.rs pad_wait)
 
 - **`fn win_present(w: i32, f: &Frame, rects: Option<&[[i32; 4]]>)`**
   show the frame's dirty rectangles (x, y, w, h; None = the whole frame); the window keeps a
@@ -34911,6 +34971,38 @@ handler (win_crash.rs).
 - **`fn lib_sym(h: &Lib, name: &str) -> usize`**
   the address of the export name, 0 when missing / forwarded  [plat_lib_sym]
 
+### `plat/win_pad.rs` (Windows)
+
+Source: [`lib/plat/win_pad.rs`](../lib/plat/win_pad.rs)
+
+```text
+win_pad -- (G7a part 2) game pads on Windows: XInput (the shared part: pad.rs)
+
+  start() -> bool             load XInput (xinput1_4.dll, else xinput9_1_0.dll, from System32),
+                              look at all four slots
+  stop()                      every pad goes
+  poll(now, focused, full) -> next   the connected slots' states (pad_update when their packet
+                              number moved or the focus changed), one empty slot every 250 ms
+                              (XInputGetState is slow on an empty one), all with full
+  xinput_test_feed(slot, rec) / xinput_test_end()   (tests) XINPUT_STATE records instead of the
+                              DLL's
+
+XInput knows Xbox-compatible pads only (Xbox 360, One, Series and the pads that act as one; other
+HID pads come later), at most four; the index of a pad is its XInput slot.  XInputGetStateEx
+(ordinal 100 of xinput1_4.dll) also reports the guide button (PAD_HOME); xinput9_1_0.dll has no
+such ordinal, there XInputGetState without it.  XInput reads the pads whoever has the focus: the
+state is neutral while the app is not active (pad.rs).
+```
+
+- **`fn xinput_test_feed(slot: usize, rec: Option<[u8; 16]>)`**
+  (test aid, plattest --test pad) slot `slot` reports this XINPUT_STATE record (16 bytes: packet
+  number, buttons, triggers, thumbs) from now on instead of the DLL's (None: not connected); the
+  other slots of the first call are empty.  The backend polls as it would the DLL
+  (plat::pad_poll_test, or the window loop)
+
+- **`fn xinput_test_end()`**
+  (test aid) the DLL again (pad_watch(false) first: the slots' state is forgotten)
+
 ### `plat/win_clr.rs` (Windows)
 
 Source: [`lib/plat/win_clr.rs`](../lib/plat/win_clr.rs)
@@ -35111,7 +35203,8 @@ BK_X11: u32 = 2
 - **`fn wait(deadline_us: u64) -> u32`**
   pump the display until an event is queued or the deadline passes (0 = poll, u64::MAX =
   forever); without a display (headless) sleep until the deadline or a wake()
-  [lx_wait_nodisp]
+  [lx_wait_nodisp].  (G7a) While pads are watched, their nodes are read when their time comes
+  (pad.rs pad_wait)
 
 - **`fn popup(slot: u32, owner: i32, rect: Option<[i32; 4]>, f: Option<&Frame>)`**
   show / move / present popup slot `slot` over window `owner` (rect None hides it)  [lx_popup.s]
@@ -35631,6 +35724,45 @@ a bus and without inotify the thread ends quietly; jfgui_LIFE=0 turns it off.
 
 - **`fn life_poll()`**
   (wait) a SIGTERM since the last call -> E_SESSION_END queued
+
+### `plat/linux_pad.rs` (Linux)
+
+Source: [`lib/plat/linux_pad.rs`](../lib/plat/linux_pad.rs)
+
+```text
+linux_pad -- (G7a part 2) game pads on Linux: evdev (the shared part and the parser: pad.rs)
+
+  start() -> bool             an inotify watch on /dev/input, then every event node looked at
+  stop()                      every pad goes, the nodes and the watch are closed
+  poll(now, focused, full) -> next   read what the pads' nodes have (EvdevPad::feed, pad_update),
+                              every 250 ms what inotify reported (new nodes, nodes whose rights
+                              changed: udev sets them after the node appears); a node that says
+                              ENODEV or ends is a pad that went
+  evdev_test_attach(..)       (tests) a pad whose node is a pipe the test writes into
+
+A node is a pad when evdev_is_pad says so of its bitmaps (EVIOCGBIT): keys with BTN_SOUTH,
+absolute axes with ABS_X and ABS_Y.  udev's uaccess rule gives the user of the seat its game
+controllers (ID_INPUT_JOYSTICK), never keyboards or mice: what cannot be opened is no pad of
+ours, and is not opened again until inotify reports it anew.  Nodes are opened read-only and
+without blocking; their events are read whenever the pads are polled (4 ms), not from the window
+loop's poll().  Inside a Flatpak /dev/input exists only with --device=input (Flatpak 1.15.6 and
+newer); without it no pad is found.
+```
+
+- **`struct EvdevTestNode(usize)`**
+  (test aid, plattest --test pad) the writing end of a pipe whose reading end is a pad's node
+  (evdev_test_attach): what is written reaches the pad when the pads are polled; dropping it is
+  the pad's unplugging
+
+**`impl EvdevTestNode`**
+
+- **`fn write(&self, data: &[u8]) -> bool`**
+  input_event records (EVDEV_EVENT_SIZE bytes each) into the node -> all written
+
+- **`fn evdev_test_attach(name: &str, vendor: u16, keys: &[u8], abs: &[AbsInfo]) -> Option<(usize, EvdevTestNode)>`**
+  (test aid) a pad with these keys and axes (EvdevPad::new) whose node is a pipe of the test's: it
+  connects at once -> (its slot, the pipe's writing end); None: not watching, no slot free or no
+  pipe
 
 ### `plat/linux_sys.rs` (Linux)
 
@@ -36348,6 +36480,119 @@ semantic groups with their names.
 - **`fn ios_ax_type(t: &str) -> bool`**
   (tests, any thread) the keyboard's view types text (UIKeyInput / UITextInput of JFView)
 
+### `plat/apple_ios_pad.rs` (Apple)
+
+Source: [`lib/plat/apple_ios_pad.rs`](../lib/plat/apple_ios_pad.rs)
+
+```text
+apple_ios_pad -- the iPad's parts of iOS's host (docs/APPLE.md AP9): the app's menus in the menu bar
+of iPadOS, the pointer of a trackpad or mouse without a button, its wheel and pinch, and the test
+aids of plattest --test ipad
+
+  is_pad() -> bool                 the device is an iPad (UIUserInterfaceIdiomPad)
+  sysmenu_supported() / sysmenu_window_row() / sysmenu_set()   plat::sysmenu on the iPad
+  app_methods() / view_methods()   (apple_ios.rs register) the app delegate's menu methods, JFView's
+                                   actions of the recognizers
+  add_recognizers(view)            (apple_ios.rs vc_load_view) hover, wheel and pinch on JFView
+  ios_pad_*                        (tests, any thread) window sizes, the keyboard, turning, the menus
+                                   built with a stand-in for UIKit's builder, the pointer's paths
+                                   without a pointer; on the main thread
+
+The menus: UIKit asks the app delegate (a UIResponder) for the main menu (buildMenuWithBuilder:).
+With menus of the app the system's File, Edit, Format and View menus go and the app's follow the
+application menu, before Window, as on the Mac (apple_mac_app.rs).  Every row is a UICommand, with
+a key equivalent a UIKeyCommand, whose action jfSysMenu: goes up the responder chain to the app
+delegate; its propertyList is the row's id.  Separators become inline groups (UIMenu has none).
+sysmenu_set asks for a rebuild; iPadOS builds when it needs the menu (the bar revealed, Command
+held), never without input.  iPadOS 26 shows the menus in its menu bar (a swipe down from the top
+edge or the pointer there reveals it), every iPadOS shows the rows with a key while Command is
+held.  The window keeps its own menu row (sysmenu_window_row, the user's decision of 2026-11-19):
+the bar of iPadOS hides until it is revealed, the row stays the way for the finger.  The iPhone
+has no menu bar: unsupported there.
+
+The pointer: a UIHoverGestureRecognizer moves the mouse without a button (the Apple Pencil's hover
+on the iPads that have it: a pen without pressure), a UIPanGestureRecognizer that takes no touches,
+only scroll events, turns a trackpad's two fingers and a mouse wheel into E_WHEEL (WHEEL_PIXELS,
+as the Mac's trackpad), a UIPinchGestureRecognizer for the indirect pointer alone turns a
+trackpad's pinch into Ctrl + wheel (as macOS).  None of them takes or delays a finger.
+```
+
+- **`struct IosMenuRow`**
+  one row as UIKit holds it (tests)
+  - `label: String`
+  - `id: u32` -- the id of its command (0: a submenu or a row without action)
+  - `disabled: bool`
+  - `checked: bool`
+  - `key: String` -- the key equivalent's input (UIKit's names for special keys) and its UIKeyModifierFlags
+  - `key_flags: isize`
+  - `sub: usize` -- the rows of a submenu (0: none)
+  - `sep_before: bool` -- a separator (an inline group's border) comes before it
+
+- **`struct IosPadView`**
+  what the host shows (ios_pad_view): sizes in points unless named px
+  - `pad: bool` -- the device is an iPad
+  - `scene: (f64, f64)` -- the window scene's bounds (the window iPadOS gave the app), the window's, JFView's
+  - `window: (f64, f64)`
+  - `view: (f64, f64)`
+  - `safe: (f64, f64, f64, f64)` -- the safe area's insets of the root view: top, left, bottom, right
+  - `canvas: (i32, i32)` -- the canvas in px as last sent (E_RESIZE) and its px per point
+  - `scale: f64`
+  - `screen_scale: f64` -- the screen's own scale
+  - `orientation: isize` -- the interface orientation of the scene (UIInterfaceOrientation: 1 portrait .. 4 landscape)
+  - `window_row: bool` -- the app's menus in the window row stay (sysmenu_window_row)
+  - `shown: (i32, i32)` -- the size of the last picture shown (px)
+  - `keyboard: bool` -- the on-screen keyboard is asked for (JFView first responder)
+  - `last_wheel: (u8, u8, u32)` -- the last E_WHEEL the wheel or the pinch sent: btn, mods, data
+
+- **`fn ios_pad_view() -> Option<IosPadView>`**
+  (tests, any thread) the host's sizes now; None without UIKit's host
+
+- **`fn ios_pad_window(w: f64, h: f64) -> bool`**
+  (tests, any thread) the window's frame inside its scene in points, as Split View, Slide Over or
+  Stage Manager would give it (w or h 0: the scene's whole bounds again) -> false without the host
+
+- **`fn ios_pad_rotate(landscape: bool) -> bool`**
+  (tests, any thread) the scene turned to landscape (true) or portrait, as the user turning the
+  iPad would (requestGeometryUpdateWithPreferences:) -> false without the host
+
+- **`fn ios_pad_keyboard(show: bool) -> bool`**
+  (tests, any thread) the on-screen keyboard as a tap into a text box brings it (JFView first
+  responder) or "Done" hides it -> false without the host
+
+- **`fn ios_pad_menu_build() -> Option<Vec<String>>`**
+  (tests, any thread) the main menu built as UIKit would, with a stand-in for its UIMenuBuilder
+  (iPadOS builds its own only when the menu is needed: the bar revealed, Command held, a key of a
+  hardware keyboard -- none of which a test without input can bring): it starts with the system's
+  menus (application, File, Edit, Format, View, Window, Help) and answers what the build asks; the
+  app's menus, rows and commands are UIKit's own objects -> the identifiers of the top level after
+  the build (ios_pad_menus reads the rows), None without the host
+
+- **`struct IosPadMenus`**
+  the main menu after the last build (ios_pad_menus)
+  - `builds: u32` -- builds so far (UIKit's and ios_pad_menu_build's), rebuilds sysmenu_set asked UIKit for
+  - `rebuilds: u32`
+  - `system_gone: bool` -- the system's File, Edit, Format and View menus went
+  - `menus: Vec<(String, Vec<IosMenuRow>)>` -- the app's menus with their rows as the builder holds them
+
+- **`fn ios_pad_menus() -> IosPadMenus`**
+  (tests, any thread) the main menu after the last build
+
+- **`fn ios_pad_menu_choose(menu: usize, row: usize) -> bool`**
+  (tests, any thread) choose row `row` of the app's menu `menu` as the menu bar does: its action
+  goes up the responder chain from the first responder -> false: no such row, or no one took it
+
+- **`enum IosPadPointer`**
+  what the tests feed in where a pointer would (ios_pad_pointer)
+  - `Hover { x: f64, y: f64, pen: Option<(i32, i32)> }` -- the pointer (pen: the pencil's hover with this tilt) over the view without a button at (x, y)
+    points; Leave: it left the view
+  - `Leave`
+  - `Scroll { dx: f64, dy: f64, x: f64, y: f64 }` -- two fingers on the trackpad move the content by (dx, dy) points at (x, y)
+  - `Pinch { m: f64, x: f64, y: f64 }` -- a trackpad's pinch: the scale changed by m (0.1 = 10 % larger)
+
+- **`fn ios_pad_pointer(p: IosPadPointer) -> bool`**
+  (tests, any thread) the recognizers' paths with the values a pointer would give (the simulator
+  has no pointer of its own to drive) -> false without the host
+
 ### `plat/apple_mac.rs` (Apple)
 
 Source: [`lib/plat/apple_mac.rs`](../lib/plat/apple_mac.rs)
@@ -36664,6 +36909,41 @@ tool windows as panels, the print dialog
 
 - **`fn print_dialog_autoclose(ms: u32)`**
   (test aid) the next print panel is cancelled after ms
+
+### `plat/apple_mac_pad.rs` (Apple)
+
+Source: [`lib/plat/apple_mac_pad.rs`](../lib/plat/apple_mac_pad.rs)
+
+```text
+apple_mac_pad -- (G7a part 2) game pads on macOS: GameController (the shared part: pad.rs)
+
+  start() -> bool             an observer of GCControllerDidConnectNotification and
+                              ...DidDisconnectNotification, then the controllers there already
+  stop()                      every pad goes, the observer is removed
+  poll(now, focused, full) -> next   the pads' extendedGamepad values (pad_update), once a second
+                              (and with full) GCController.controllers against the slots: a
+                              notification that never came still connects or disconnects
+  gc_test_pad(state) / gc_test_disconnect(slot)   (tests) a controller of GameController's own
+                              (controllerWithExtendedGamepad) with these values, through the
+                              same paths as a real one
+
+Only controllers with the extended gamepad profile count (Xbox, PlayStation, Switch Pro, MFi
+pads); a Siri remote or a single Joy-Con (micro gamepad) does not.  GameController names the
+buttons by their places as the standard layout does (buttonA the bottom one); its sticks have up
+positive (the layout: down).  It hands input to the frontmost app only (shouldMonitorBackgroundEvents
+stays off), as pad.rs wants it anyway.  Everything on the main thread: the notifications come on
+the main queue, inside the window loop's run loop, which a wake-up (wake_app) lets return.
+```
+
+- **`fn gc_test_pad(st: &PadState) -> Option<(PadState, usize)>`**
+  (test aid, plattest --test pad) a controller of GameController's own
+  (+[GCController controllerWithExtendedGamepad], macOS 10.15) with the buttons and sticks of
+  `st` set on its elements (setValue:, setValueForXAxis:yAxis:), read back through the backend's
+  mapping and connected through its path (watching or not) -> (what the mapping read, the slot);
+  None: no such controller here
+
+- **`fn gc_test_disconnect(slot: usize)`**
+  (test aid) the test controller of `slot` goes through the backend's path (pad_disconnect)
 
 ### `plat/apple_mac_gpu.rs` (Apple)
 
@@ -37410,7 +37690,8 @@ comes through jfgui_motion.  Android and iOS: Unsupported.
   Enable or disable window input, including modality established by the UI runtime.
 
 - **`fn win_set_rect(id: i32, x: i32, y: i32, width: i32, height: i32)`**
-  Change a library surface rectangle, preserving fields equal to PW_KEEP.
+  Change a library surface rectangle, preserving fields equal to PW_KEEP.  Window zero is the
+  host's viewport: its place and size follow the host alone (E_RESIZE), not a saved placement.
 
 - **`fn win_get_rect(id: i32) -> Option<[i32; 4]>`**
   Current canvas-relative client rectangle.
@@ -38396,6 +38677,9 @@ E_DRAG_END: u8 = 24  // our outgoing drag (drag_start) ended: data = DE_* effect
 E_RAW_MOTION: u8 = 25
 /// (G7a) the pointer lock of the window changed (win_pointer_lock_state): data 1 locked now, 0 not
 E_POINTER_LOCK: u8 = 26
+/// (G7a) a game pad came, went or changed (pad.rs): data = the pad's index | PADEV_* << 8; the
+/// pads belong to the app (win 0); a state change is one event until plat::pads() is called
+E_GAMEPAD: u8 = 27
 // E_SETTINGS: what changed
 SET_THEME: u32 = 1  // light / dark, accent colour
 SET_LOCALE: u32 = 2  // language, regional format
@@ -39058,6 +39342,302 @@ asking for another lets the first go.
 
 - **`fn wl_fixed(v: i32) -> f64`**
   (G7a) Wayland's fixed-point value (24.8) as a number
+
+### `plat/pad.rs`
+
+Source: [`lib/plat/pad.rs`](../lib/plat/pad.rs)
+
+```text
+pad -- (G7a part 2) game pads: one snapshot per pad in the W3C standard layout and their connect
+and disconnect events, the part every platform shares
+
+  pad_watch(on) -> bool      start (on) or stop watching for pads -> false: this platform has none
+                             (Android, iOS: a later stage with touch controls) or the system lacks
+                             the means (Windows without an XInput DLL); nothing runs before
+  pad_watching() -> bool     watching now
+  pads() -> Vec<Gamepad>     the connected pads by index, with the buttons that went down and up
+                             since the last call; takes the E_GAMEPAD that waits
+  pad(i) -> Gamepad          slot i as it stands (connected or not), edges left in place
+  E_GAMEPAD                  data = index | PADEV_* << 8: PADEV_STATE (a pad's state changed: one
+                             event until pads() is called, whichever pads change meanwhile),
+                             PADEV_CONNECT, PADEV_DISCONNECT (each its own event)
+
+The layout is the W3C Gamepad API's "standard" mapping, the same on every platform: buttons
+PAD_A (bottom face button: Xbox A, PlayStation cross, Nintendo B) .. PAD_HOME with analog values
+0 ..= 1 (the triggers PAD_LT / PAD_RT analog, the others 0 or 1 on most pads) and a bit each in
+Gamepad::pressed (a trigger counts as pressed above PAD_TRIGGER_PRESS, XInput's threshold); two
+sticks PAD_LX, PAD_LY, PAD_RX, PAD_RY in -1 ..= 1, right and down positive, raw: no dead zone
+(lib/game applies a radial one).  Gamepad::style says whose labels the buttons carry.
+
+Per platform:
+  Windows  XInput (Xbox-compatible pads, at most four, index = XInput's slot): xinput1_4.dll,
+           else xinput9_1_0.dll, loaded at the first pad_watch(true); its ordinal 100
+           (XInputGetStateEx) where it has it, for the guide button (win_pad.rs)
+  Linux    evdev: the /dev/input/event* nodes the user may read (udev gives the user of the
+           seat game controllers, not keyboards) with the buttons of a game pad (BTN_SOUTH) and
+           two axes; the kernel's gamepad codes mapped to the layout, Sony's and Nintendo's
+           north / west buttons the other way round than xpad's; hotplug through inotify on
+           /dev/input (linux_pad.rs).  Inside a Flatpak only with --device=input
+  macOS    GameController: GCController's extendedGamepad, connect and disconnect
+           notifications (apple_mac_pad.rs)
+  browser  the Gamepad API's pads with the "standard" mapping (others pass their first buttons
+           and axes as the browser numbers them, mapped false): the page polls
+           navigator.getGamepads() every animation frame while the app watches and hands each
+           change to the worker (jfgui_pad; loader.js).  The browser shows a pad only after a
+           button of it was pressed in the page
+  Android, iOS  Unsupported: pad_watch says false
+
+The native backends are polled from the window loop's wait (pad_wait): every 4 ms while a pad is
+connected, new pads every 250 ms (Windows: one empty slot each time, XInput is slow for empty
+ones; Linux: what inotify reported; macOS: its notifications, once a second a look at the list).
+A change of a button wakes the app at once, an axis only when it moved by 1/256 or more since
+the last event (a stick at rest jitters); the snapshot always has the latest values.  Pads speak
+only to the app that has the focus, as the keyboard does: while none of its windows is active
+they report nothing held and their sticks at rest (still connected).
+```
+
+```rust
+/// slots of pads (Gamepad::index is below this)
+PAD_MAX: usize = 8
+/// buttons of the standard layout (Gamepad::buttons)
+PAD_BUTTONS: usize = 17
+/// axes of the standard layout (Gamepad::axes)
+PAD_AXES: usize = 4
+/// the bottom face button (Xbox A, PlayStation cross, Nintendo B)
+PAD_A: usize = 0
+/// the right face button (Xbox B, PlayStation circle, Nintendo A)
+PAD_B: usize = 1
+/// the left face button (Xbox X, PlayStation square, Nintendo Y)
+PAD_X: usize = 2
+/// the top face button (Xbox Y, PlayStation triangle, Nintendo X)
+PAD_Y: usize = 3
+/// the left shoulder button (LB, L1, L)
+PAD_LB: usize = 4
+/// the right shoulder button (RB, R1, R)
+PAD_RB: usize = 5
+/// the left trigger, analog (LT, L2, ZL)
+PAD_LT: usize = 6
+/// the right trigger, analog (RT, R2, ZR)
+PAD_RT: usize = 7
+/// the left middle button (View / Back, Share / Create, minus)
+PAD_BACK: usize = 8
+/// the right middle button (Menu / Start, Options, plus)
+PAD_START: usize = 9
+/// the left stick pressed (LS, L3)
+PAD_LS: usize = 10
+/// the right stick pressed (RS, R3)
+PAD_RS: usize = 11
+/// the directional pad up
+PAD_UP: usize = 12
+/// the directional pad down
+PAD_DOWN: usize = 13
+/// the directional pad left
+PAD_LEFT: usize = 14
+/// the directional pad right
+PAD_RIGHT: usize = 15
+/// the middle button of the system (Xbox, PS, Home)
+PAD_HOME: usize = 16
+/// the left stick to the right (Gamepad::axes)
+PAD_LX: usize = 0
+/// the left stick down
+PAD_LY: usize = 1
+/// the right stick to the right
+PAD_RX: usize = 2
+/// the right stick down
+PAD_RY: usize = 3
+/// E_GAMEPAD's kind (data >> 8): a pad's state changed (one event until pads() is called)
+PADEV_STATE: u32 = 0
+/// E_GAMEPAD's kind: pad data & 0xFF came
+PADEV_CONNECT: u32 = 1
+/// E_GAMEPAD's kind: pad data & 0xFF went
+PADEV_DISCONNECT: u32 = 2
+/// the value above which a trigger counts as pressed (XInput's XINPUT_GAMEPAD_TRIGGER_THRESHOLD)
+PAD_TRIGGER_PRESS: f32 = 30.0 / 255.0
+```
+
+- **`enum PadStyle`**
+  whose labels a pad's buttons carry (the layout is the same for all)
+  - `Other` -- not known
+  - `Xbox` -- Xbox and XInput pads: A B X Y, LB RB LT RT, View, Menu
+  - `PlayStation` -- PlayStation: cross, circle, square, triangle, L1 R1 L2 R2, Share / Create, Options
+  - `Nintendo` -- Nintendo: B A Y X by their places (the bottom button is B), L R ZL ZR, minus, plus
+
+- **`struct PadState`**
+  one pad's state at a moment, in the standard layout
+  - `buttons: [f32; PAD_BUTTONS]` -- the buttons, 0 ..= 1 (PAD_A ..= PAD_HOME)
+  - `pressed: u32` -- the buttons held (bit PAD_\*)
+  - `axes: [f32; PAD_AXES]` -- PAD_LX, PAD_LY, PAD_RX, PAD_RY: -1 ..= 1, right and down positive
+
+**`impl PadState`**
+
+- **`const NEUTRAL: PadState = PadState { buttons: [0.0; PAD_BUTTONS], pressed: 0, axes: ...`**
+  nothing held, the sticks at rest
+- **`fn held(&self, b: usize) -> bool`**
+  button b (PAD_\*) is held
+
+- **`struct Gamepad`**
+  a pad as plat::pads reports it
+  - `index: u8` -- its slot, the same while it stays connected (0 .. PAD_MAX; Windows: XInput's slot, the
+    browser: the Gamepad API's index)
+  - `connected: bool` -- connected (pads() lists only connected ones; pad(i) of an empty slot: false)
+  - `name: String` -- the system's name for it ("Xbox Controller (XInput)", "Sony Interactive Entertainment
+    Wireless Controller", the browser's id)
+  - `style: PadStyle` -- whose labels its buttons carry
+  - `mapped: bool` -- its buttons and axes are the standard layout (false: a browser pad without the "standard"
+    mapping: its first buttons and axes as the browser numbers them)
+  - `buttons: [f32; PAD_BUTTONS]` -- the standard layout's buttons, 0 ..= 1 (PAD_A ..= PAD_HOME; the triggers analog)
+  - `pressed: u32` -- the buttons held now (bit PAD_\*)
+  - `down: u32` -- the buttons that went down since the last plat::pads (a tap between two reads is in down
+    and up, but not in pressed)
+  - `up: u32` -- the buttons that went up since the last plat::pads
+  - `axes: [f32; PAD_AXES]` -- PAD_LX, PAD_LY, PAD_RX, PAD_RY: -1 ..= 1, right and down positive, raw (no dead zone)
+
+**`impl Gamepad`**
+
+- **`const fn empty(i: u8) -> Gamepad`**
+  slot i, empty: not connected, nothing held
+- **`fn held(&self, b: usize) -> bool`**
+  button b (PAD_\*) is held
+- **`fn went_down(&self, b: usize) -> bool`**
+  button b went down since the last read
+- **`fn went_up(&self, b: usize) -> bool`**
+  button b went up since the last read
+- **`fn value(&self, b: usize) -> f32`**
+  button b's value, 0 ..= 1 (0 for another index)
+- **`fn axis(&self, a: usize) -> f32`**
+  axis a's value (PAD_LX ..), -1 ..= 1
+- **`fn stick(&self, s: usize) -> [f32; 2]`**
+  stick s (0 left, 1 right): [x, y], right and down positive
+- **`fn trigger(&self, t: usize) -> f32`**
+  trigger t (0 left, 1 right), 0 ..= 1
+- **`fn state(&self) -> PadState`**
+  the state alone
+
+- **`fn pad_button_name(b: usize) -> &'static str`**
+  the short English name of button b of the standard layout ("A", "LB", "Up", "Home"; "" for
+  another index): what a test or a log shows (lib/game has the labels for menus)
+
+- **`fn pad_style(vendor: u16, name: &str) -> PadStyle`**
+  whose labels a pad has, from its USB vendor (0: not known) and its name
+
+- **`fn pad_vendor_of_id(id: &str) -> u16`**
+  the USB vendor in a browser's id of a pad: Chrome's "... (STANDARD GAMEPAD Vendor: 054c Product:
+  0ce6)", Firefox's "054c-0ce6-DualSense Wireless Controller" (0: none)
+
+- **`fn pad_watch(on: bool) -> bool`**
+  start (on) or stop watching for game pads -> false: this platform has no pads (Android, iOS) or
+  the system lacks the means (Windows without an XInput DLL).  While watching, pads come and go
+  with E_GAMEPAD events and plat::pads has them; stopping lets every pad go (PADEV_DISCONNECT).
+  The browser shows a pad only after one of its buttons was pressed in the page
+
+- **`fn pad_watching() -> bool`**
+  pads are being watched (pad_watch)
+
+- **`fn pads() -> Vec<Gamepad>`**
+  the connected pads by index, each with the buttons that went down and up since the last call
+  (which go then), and the E_GAMEPAD that waits (the next change sends a new one).  Read it once
+  per frame (ui does: ui.gamepads)
+
+- **`fn pad(i: usize) -> Gamepad`**
+  slot i as it stands (Gamepad::connected false when empty), its edges left for pads()
+
+*the browser*
+
+```rust
+/// (browser) ask the page to watch the pads (one byte, 1 on / 0 off): it polls
+/// navigator.getGamepads() every animation frame while one is connected and hands changes over
+/// with jfgui_pad
+REQUEST_GAMEPAD: u32 = 33
+```
+
+- **`fn web_pad_decode(rec: &[u8]) -> Option<(usize, bool, bool, PadState, String)>`**
+  (G7a) the record of a pad the page hands over (jfgui_pad): u32 index, u32 flags (bit 0
+  connected, bit 1 the "standard" mapping), u32 the buttons pressed, f32 x 17 buttons, f32 x 4
+  axes, then the browser's id in UTF-8 -> (index, connected, mapped, state, id); None for a
+  short record or an index beyond PAD_MAX
+
+- **`extern "C" fn jfgui_pad(len: u32) -> u32`**
+  (browser) a pad's state from the page (web_pad_decode's record in the inbox) -> 1 taken
+
+- **`fn xinput_map(buttons: u16, lt: u8, rt: u8, lx: i16, ly: i16, rx: i16, ry: i16) -> PadState`**
+  (G7a) an XINPUT_GAMEPAD in the standard layout: wButtons, the triggers 0..255 (pressed above
+  30, XINPUT_GAMEPAD_TRIGGER_THRESHOLD), the thumbs -32768..32767 with up positive (the layout
+  has down positive: y turned round)
+
+- **`fn xinput_decode(rec: &[u8]) -> Option<(u32, PadState)>`**
+  (G7a) an XINPUT_STATE as XInputGetState fills it (16 bytes: dwPacketNumber, then
+  XINPUT_GAMEPAD) -> (packet number, the state in the layout); None for a short record
+
+```rust
+/// struct input_event on 64-bit Linux: struct timeval (16 bytes), type, code, value
+EVDEV_EVENT_SIZE: usize = 24
+/// the key codes a pad's bitmap covers (KEY_MAX + 1)
+EVDEV_KEYS: usize = 0x300
+/// the absolute axes (ABS_MAX + 1)
+EVDEV_ABS: usize = 0x40
+/// the absolute axes a pad may map (ABS_X ..= ABS_HAT0Y)
+EVDEV_ABS_MAPPED: usize = 18
+```
+
+- **`fn evdev_is_pad(types: &[u8], keys: &[u8], abs: &[u8]) -> bool`**
+  (G7a) an evdev node is a game pad: its event types (EVIOCGBIT(0)), keys (EVIOCGBIT(EV_KEY)) and
+  absolute axes (EVIOCGBIT(EV_ABS)) as the kernel's bitmaps -> it has keys, absolute axes, the
+  gamepad's first button (BTN_SOUTH, alias BTN_GAMEPAD) and a stick (ABS_X, ABS_Y).  A pad's
+  touchpad and motion sensors (their own nodes) have no BTN_SOUTH
+
+- **`struct AbsInfo`**
+  an absolute axis as the kernel describes it (EVIOCGABS: value, minimum, maximum)
+  - `code: u16` -- ABS_\*
+  - `value: i32` -- its value now
+  - `min: i32`
+  - `max: i32`
+
+- **`struct EvdevPad`**
+  (G7a) one evdev game pad: its codes mapped to the standard layout, the events of the node in,
+  its state out.  The kernel's gamepad codes (Documentation/input/gamepad.rst): BTN_SOUTH and
+  BTN_EAST are A and B; xpad (Xbox pads and most others) reports X as BTN_NORTH (= BTN_X) and Y
+  as BTN_WEST (= BTN_Y), Sony's and Nintendo's drivers by the places (north the top button): the
+  vendor decides.  Sticks ABS_X / ABS_Y and ABS_RX / ABS_RY; triggers ABS_Z / ABS_RZ (without
+  ABS_RX / ABS_RY those are the right stick, as on simple HID pads), else ABS_BRAKE / ABS_GAS,
+  else BTN_TL2 / BTN_TR2 digital; the directional pad ABS_HAT0X / ABS_HAT0Y or BTN_DPAD_\*
+
+**`impl EvdevPad`**
+
+- **`fn new(vendor: u16, keys: &[u8], abs: &[AbsInfo]) -> EvdevPad`**
+  a pad with these keys (EVIOCGBIT(EV_KEY)'s bitmap) and absolute axes (EVIOCGABS of each
+  one it has) of this USB vendor (0x054C Sony, 0x057E Nintendo: north / west by place)
+- **`fn state(&self) -> PadState`**
+  the state of the last complete report (SYN_REPORT)
+- **`fn feed(&mut self, data: &[u8]) -> bool`**
+  the events of the node (whole input_event records, EVDEV_EVENT_SIZE bytes each) -> a
+  SYN_REPORT changed the state.  After a SYN_DROPPED the events up to the next SYN_REPORT go
+  and needs_resync says to read the device's state anew
+- **`fn needs_resync(&mut self) -> bool`**
+  events were dropped (SYN_DROPPED): the caller reads the keys (EVIOCGKEY) and the axes
+  (EVIOCGABS) and hands them to resync (once true, then false until the next drop)
+- **`fn resync(&mut self, keys: &[u8], abs: &[AbsInfo]) -> bool`**
+  the device's state read anew: the keys held (EVIOCGKEY's bitmap), the axes' values -> it
+  changed
+
+- **`fn pad_test_connect(i: usize, name: &str, style: PadStyle)`**
+  (test aid) the shared state without a platform: pad i came (as a backend says it)
+
+- **`fn pad_test_state(i: usize, st: &PadState)`**
+  (test aid) pad i's state now (as a backend reports it)
+
+- **`fn pad_test_disconnect(i: usize)`**
+  (test aid) pad i went
+
+- **`fn pad_test_reset()`**
+  (test aid) every slot empty, no event waiting, not watching (a backend that watched is stopped
+  first: its PADEV_DISCONNECT events are queued)
+
+- **`fn pad_test_focus(f: Option<bool>)`**
+  (test aid) the focus the backends see: Some(true) focused, Some(false) not, None the windows'
+
+- **`fn pad_poll_test() -> bool`**
+  (test aid) poll the native backend now, every slot (Windows: also the empty ones), as the window
+  loop does when the time comes -> false: no native backend (the browser, Android, iOS)
 
 ### `plat/ime.rs`
 
@@ -62854,22 +63434,29 @@ PITCH_LIMIT: f64 = 89.0 * core::f64::consts::PI / 180.0
 Source: [`lib/game/src/input.rs`](../lib/game/src/input.rs)
 
 ```text
-input -- named actions bound to keys by where they sit, mouse buttons, the wheel and the raw motion of
-the locked pointer; sensitivity, inversion and a factor per platform for the motion; the pointer
-lock's click and its end; bindings and settings in a settings file
+input -- named actions bound to keys by where they sit, mouse buttons, the wheel, the raw motion of
+the locked pointer and game pads; sensitivity, inversion and a factor per platform for the motion; the
+pointer lock's click and its end; the pad's dead zone, turn rate and curve; bindings and settings in a
+settings file
 
   Source            where an input comes from: Key(KC_*: the key's place, KeyEvent::code, never its
                     character), Mouse(MOUSE_*), WheelUp / WheelDown (a notch as a press), MouseX /
-                    MouseY (raw motion), Wheel (the turn in notches); name / parse for the file,
-                    label for a menu (plat::key_label: what the layout prints on the key)
+                    MouseY (raw motion), Wheel (the turn in notches), PadButton(plat::PAD_*), PadAxis
+                    (a stick's axis), PadDir (a stick's direction as a button); name / parse for the
+                    file, label for a menu (plat::key_label: what the layout prints on the key;
+                    label_for: a pad's labels by its style)
   ActionMap         actions (name, ActionKind, bindings and their defaults); store / load in an Ini
-  ActionKind        Button (down, pressed, released), Axis (keys with a scale each, -1 ..= 1),
-                    Motion (raw motion: an angle in radians, the wheel in notches)
+  ActionKind        Button (down, pressed, released), Axis (keys with a scale each, a pad's analog
+                    values, -1 ..= 1), Motion (raw motion: an angle in radians, the wheel in notches,
+                    a stick turning at a rate)
   MouseSettings     sensitivity, invert_x, invert_y, factor (None: the platform's,
                     platform_motion_factor); store / load in an Ini
+  PadSettings       sensitivity (of TURN_RATE), dead_zone (radial), curve, invert_x, invert_y; store /
+                    load in the same section
   Input             takes the events (key, button, buttons, motion, wheel, set_lock, plat_event) and
-                    answers per frame (down, pressed, released, axis, motion; end_frame) and per tick
-                    (tick() -> TickInput); the lock: take_lock_request, playing, take_pause
+                    the pads' snapshots (pad_frame) and answers per frame (down, pressed, released,
+                    axis, motion; end_frame) and per tick (tick() -> TickInput); the lock:
+                    take_lock_request, playing, take_pause; the pad: active_pad, pin_pad, device
 
 The pointer lock (docs/GAME.md, the user's decisions of 2026-11-18).  While the game needs the lock
 (require_lock, the default) and does not hold it, no action fires: a mouse press asks for the lock
@@ -62895,9 +63482,20 @@ turns per frame) and for the tick (tick() takes them: a press between two ticks 
 even when the frame had none, a press and a release between two ticks make one tick with down,
 pressed and released).  An Axis reads the keys held at the moment it is asked.
 
-Room for gamepads (G7a part 2): Source is #[non_exhaustive] (pad buttons and sticks come as more
-sources), an Axis takes analog values the same way as the scales of keys, a pad gets settings of its
-own beside MouseSettings.
+Game pads (G7a part 2).  pad_frame takes the pads of a frame (ui.gamepads(), plat::pads()) and the
+time since the frame before.  One pad drives a single player's input: the one used last (a button
+pressed or a stick out of its dead zone; the first such pad, and any other that is used, takes over),
+or the one pin_pad names (a split screen: an Input per pad).  Its buttons press and release like keys
+(a tap between two frames is a press and a release: the snapshots carry their edges); its sticks go
+through a radial dead zone (PadSettings::dead_zone: nearer the middle is rest, the rest of the way
+scales to 0 ..= 1); an Axis adds a stick's value (or a trigger's) times the binding's scale to its
+keys', a Motion turns by TURN_RATE x sensitivity degrees a second at full deflection, the deflection
+raised to PadSettings::curve (fine aim near the middle), times the frame's time.  A pad plays without
+the pointer lock: a pad button pressed while the game does not play starts playing (pad play) and is
+swallowed with its release, as the lock's click; the mouse still asks for the lock with its first
+press, the lock taken ends pad play, its end pauses as before.  The active pad going away during pad
+play pauses.  After a pause a pad button held counts only once it was let go.  device() says what was
+used last (prompts for keys or for a pad).
 ```
 
 ```rust
@@ -62929,6 +63527,12 @@ FACTOR_MACOS: f64 = 2.5
 FACTOR_BROWSER: f64 = 1.0
 /// the factor where the pointer cannot be locked (Android, iOS): no motion comes
 FACTOR_OTHER: f64 = 1.0
+/// the degrees per second a stick turns at full deflection and pad sensitivity 1 (PadSettings)
+TURN_RATE: f64 = 180.0
+/// a stick's direction (Source::PadDir) is held from this far on and let go below PAD_DIR_RELEASE
+PAD_DIR_PRESS: f64 = 0.5
+/// below this a held stick direction is let go
+PAD_DIR_RELEASE: f64 = 0.4
 ```
 
 - **`const fn platform_motion_factor() -> f64`**
@@ -62944,21 +63548,37 @@ FACTOR_OTHER: f64 = 1.0
   - `MouseX` -- the raw motion of the locked pointer to the right
   - `MouseY` -- the raw motion of the locked pointer downwards
   - `Wheel` -- the wheel's turn in notches, up positive
+  - `PadButton(u8)` -- a pad's button of the standard layout (plat::PAD_A ..= plat::PAD_HOME): pressed and released; in
+    an Axis its analog value (a trigger's 0 ..= 1) times the scale
+  - `PadAxis(u8)` -- a pad's stick axis (plat::PAD_LX, PAD_LY, PAD_RX, PAD_RY: right and down positive) after the radial
+    dead zone: in an Axis its value -1 ..= 1 times the scale, in a Motion it turns (looking: TURN_RATE,
+    PadSettings)
+  - `PadDir(u8, bool)` -- one direction of a stick axis as a button (true: right / down), held from PAD_DIR_PRESS on; in an
+    Axis its value 0 ..= 1
 
 **`impl Source`**
 
 - **`fn is_motion(self) -> bool`**
   a motion (MouseX, MouseY, Wheel): for Motion actions; the others are pressed and released
+- **`fn is_pad(self) -> bool`**
+  a pad's (PadButton, PadAxis, PadDir)
 - **`fn name(self) -> String`**
   the name in a settings file, the same on every platform: a key's KeyboardEvent.code name ("KeyW",
   "ShiftLeft"; "Code0x99" without one), "Mouse1" .. "Mouse7", "WheelUp", "WheelDown", "MouseX",
-  "MouseY", "Wheel"
+  "MouseY", "Wheel"; a pad's "PadA" .. "PadHome" (plat::pad_button_name), "PadLeftX", "PadLeftY",
+  "PadRightX", "PadRightY", a direction "PadLeftX+" (right / down) or "PadLeftX-"
 - **`fn parse(s: &str) -> Option<Source>`**
   the source of a name (Source::name); None: unknown
 - **`fn label(self) -> String`**
   what a menu shows: for a key what the current layout prints on it (plat::key_label: "Z" for KC_W on
   a French keyboard), where the platform does not say (the browser, phones) the name without "Key" /
-  "Digit"; for the mouse German texts an app translates with its catalogue (ui::i18n::t)
+  "Digit"; for the mouse and the pads German texts an app translates with its catalogue
+  (ui::i18n::t); a pad's buttons as on an Xbox pad (label_for: by the pad's style)
+- **`fn label_for(self, style: PadStyle) -> String`**
+  label, a pad's buttons as a pad of that style prints them (plat::Gamepad::style): Xbox (also for
+  pads of no known style) A B X Y, LB RB LT RT, Ansicht, Menü; PlayStation Kreuz, Kreis, Quadrat,
+  Dreieck, L1 R1 L2 R2, Create, Options, L3 R3; Nintendo by the places B A Y X, L R ZL ZR, Minus,
+  Plus
 
 - **`struct Bind`**
   a binding: a source and its scale (an Axis: +1 / -1 for the two directions; a Motion: a multiplier,
@@ -62984,13 +63604,16 @@ FACTOR_OTHER: f64 = 1.0
   what an action reports
   - `Button` -- pressed and released (fire, jump, use): sources that press (keys, mouse buttons, wheel notches)
   - `Axis` -- a value in -1 ..= 1 from the sources held, each with its scale (walking forward and back from W
-    and S); pads' sticks later
-  - `Motion` -- raw motion summed (looking around): MouseX, MouseY (radians), Wheel (notches)
+    and S), a pad's sticks and triggers with their analog values times the scale
+  - `Motion` -- raw motion summed (looking around): MouseX, MouseY (radians), Wheel (notches), a stick's axis
+    (PadAxis: radians, turning at a rate)
 
 **`impl ActionKind`**
 
 - **`fn takes(self, s: Source) -> bool`**
-  a source this kind takes
+  a source this kind takes: a Button what presses (keys, mouse buttons, wheel notches, pad buttons and
+  stick directions), an Axis those and a stick's axis, a Motion the mouse's motion, the wheel and a
+  stick's axis
 
 - **`struct ActionId(u16)`**
   an action of an ActionMap (its index)
@@ -63071,6 +63694,38 @@ FACTOR_OTHER: f64 = 1.0
   from section `section` of a settings file (Self::store): what is missing or unreadable is the
   default, the sensitivity is kept in 0.001 ..= 100, a factor in 0.001 ..= 1000
 
+- **`struct PadSettings`**
+  how a pad's sticks turn into values and angles (the sticks of every pad of the input)
+  - `sensitivity: f64` -- the multiplier of TURN_RATE (1: 180 degrees a second at full deflection)
+  - `dead_zone: f64` -- the radial dead zone of both sticks, 0 ..= 0.9: nearer the middle a stick is at rest, the rest of
+    its way scales to 0 ..= 1 (beyond 1, a square stick's corners: 1)
+  - `curve: f64` -- the response curve of looking, 1 ..= 4: the deflection after the dead zone to this power (1
+    linear; 2, the default, turns slowly near the middle for fine aim and fast at the end)
+  - `invert_x: bool` -- right turns left
+  - `invert_y: bool` -- down looks up
+
+**`impl PadSettings`**
+
+- **`const DEFAULT: PadSettings = PadSettings { sensitivity: 1.0, dead_zone: 0.15, curve: 2 ...`**
+  sensitivity 1, dead zone 0.15, curve 2, nothing inverted
+- **`fn stick(&self, x: f64, y: f64) -> (f64, f64)`**
+  a stick (x, y as the pad reports it, -1 ..= 1) after the radial dead zone: (0, 0) up to dead_zone
+  from the middle, beyond it the way that is left scaled to 0 ..= 1 in the same direction
+- **`fn look(&self, x: f64, y: f64) -> (f64, f64)`**
+  a stick's turn in radians per second (x right, y down): the dead zone, the curve on the
+  deflection, TURN_RATE x sensitivity at full deflection, the inversion's signs
+- **`fn store(&self, ini: &mut Ini, section: &str)`**
+  into section `section` of a settings file: "pad_sensitivity", "pad_dead_zone", "pad_curve",
+  "pad_invert_x", "pad_invert_y", each only when it differs from the default (else its line goes)
+- **`fn load(ini: &Ini, section: &str) -> PadSettings`**
+  from section `section` (Self::store): what is missing or unreadable is the default; the
+  sensitivity kept in 0.001 ..= 100, the dead zone in 0 ..= 0.9, the curve in 1 ..= 4
+
+- **`enum Device`**
+  what the player used last (Input::device): a game shows its prompts for that
+  - `KeyboardMouse` -- the keyboard or the mouse (also before anything was used)
+  - `Pad` -- a game pad (Input::active_pad)
+
 - **`struct ActionState`**
   an action in a tick (TickInput) or a frame
   - `down: bool` -- held at the tick, or pressed since the tick before (a tap between two ticks counts once)
@@ -63119,7 +63774,11 @@ FACTOR_OTHER: f64 = 1.0
 - **`fn require_lock(&self) -> bool`**
   the lock is required (set_require_lock)
 - **`fn playing(&self) -> bool`**
-  the actions fire: the lock is held, or not required, or the platform has none (Unsupported)
+  the actions fire: the lock is held, or not required, or the platform has none (Unsupported), or the
+  player plays with a pad (pad_playing)
+- **`fn pad_playing(&self) -> bool`**
+  playing with a pad without the pointer lock: a pad button pressed while the game did not play
+  started it (that press fired nothing); the lock taken or the pad gone ends it
 - **`fn lock(&self) -> PointerLock`**
   the state of the lock as the input knows it (set_lock)
 - **`fn set_lock(&mut self, state: PointerLock)`**
@@ -63134,7 +63793,8 @@ FACTOR_OTHER: f64 = 1.0
 - **`fn pauses(&self) -> u32`**
   how often the lock has ended so far
 - **`fn release_all(&mut self)`**
-  every held key and button is let go (the actions report their release); motion not yet taken goes
+  every held key and button is let go (the actions report their release); motion not yet taken goes;
+  a pad button held counts again only after it was let go
 - **`fn key(&mut self, code: u32, down: bool)`**
   the key at usage `code` (plat::KC_\*, KeyEvent::code) went down or up; a down while held (the
   system's repeat) changes nothing
@@ -63183,11 +63843,38 @@ FACTOR_OTHER: f64 = 1.0
   window), its motion (E_RAW_MOTION: plat::win_raw_motion_take of the window), E_FOCUS_OUT lets
   everything go -> the event was one of these
 - **`fn store(&self, ini: &mut Ini, section: &str)`**
-  the bindings and the mouse settings into section `section` of a settings file (ActionMap::store,
-  MouseSettings::store): with base::Settings, `input.store(settings.ini_mut(), "input")`
+  the bindings, the mouse and the pad settings into section `section` of a settings file
+  (ActionMap::store, MouseSettings::store, PadSettings::store): with base::Settings,
+  `input.store(settings.ini_mut(), "input")`
 - **`fn load(&mut self, ini: &Ini, section: &str) -> usize`**
-  the bindings and the mouse settings from section `section` (Self::store) -> the bindings that
-  could not be read
+  the bindings, the mouse and the pad settings from section `section` (Self::store) -> the bindings
+  that could not be read
+- **`fn pad_settings(&self) -> &PadSettings`**
+  the pad settings
+- **`fn set_pad_settings(&mut self, s: PadSettings)`**
+  other pad settings (from the next pad_frame on)
+- **`fn active_pad(&self) -> Option<u8>`**
+  the pad that drives the actions (plat::Gamepad::index): the one used last, or the pinned one;
+  None before any pad was used
+- **`fn pin_pad(&mut self, index: Option<u8>)`**
+  only this pad drives the input from now on (an Input per player in a split screen); None: the
+  one used last again
+- **`fn pinned_pad(&self) -> Option<u8>`**
+  the pad pinned (pin_pad)
+- **`fn device(&self) -> Device`**
+  what the player used last: a key or the mouse, or a pad
+- **`fn pad_held(&self, b: usize) -> bool`**
+  the active pad's button b (plat::PAD_\*) is held as the input counts it (not one that waits for its
+  release after a pause, not the press that started pad play)
+- **`fn pad_stick(&self, a: usize) -> f64`**
+  the active pad's stick axis a (plat::PAD_LX ..) after the dead zone
+- **`fn pad_frame(&mut self, pads: &[Gamepad], dt: f64)`**
+  the pads of this frame (ui.gamepads(), plat::pads(): the connected ones with the edges of their
+  buttons) and the seconds since the frame before (a stick's turn is its rate times that; kept in
+  0 ..= 0.25).  The pad used last drives the actions (or the pinned one); a pad button pressed while
+  the game does not play starts pad play and fires nothing, nor does its release; the active pad gone
+  during pad play pauses.  Call it once a frame, before reading the actions, also without pads (an
+  empty slice lets the active pad go)
 
 ### `game/src/net/arena.rs`
 
@@ -64169,10 +64856,12 @@ until the entity is sent -- and cut to the budget (1200 bytes unless set: netcha
 What was sent is remembered per client exactly as the client will hold it.
 
 Joining: HELLO -> WELCOME.  The full state goes with the first snapshot when it fits (a WebSocket always:
-up to stream_budget); a UDP client whose full state does not fit a datagram gets a ticket and fetches it
-over a WebSocket of its own (FETCH -> FULL at the next snapshot tick), the user's decision of 18.11.2026.
-Until the FULL arrives the client's snapshots are cut by priority, so it sees its own figure and the
-most important things at once.
+up to stream_budget).  A UDP client whose full state does not fit a datagram gets it filled in: its
+snapshots are cut by priority, so it sees its own figure and the most important things at once and the
+rest in the next snapshots (about 200 ms for 300 props, as fast as the fetch; the user's decision of
+19.11.2026).  With ServerOptions::fetch_full it gets a ticket instead and fetches the full state over a
+WebSocket of its own (FETCH -> FULL at the next snapshot tick; the user's first decision of 18.11.2026),
+filled in by priority until the FULL arrives.
 ```
 
 - **`trait RoomSim`**
@@ -64204,6 +64893,9 @@ most important things at once.
   - `max_rewind_ms: u32` -- how far back hits are rewound at most (ms; 300 unless set: the 100 ms of the interpolation buffer and
     200 ms beyond them, the user's decision of 2026-11-19)
   - `ws_port: u16` -- the WebSocket's port (WELCOME tells UDP clients where to fetch a full state; 0: none)
+  - `fetch_full: bool` -- a UDP client whose full state does not fit a datagram fetches it over a WebSocket of its own (ws_port, a
+    ticket); false unless set: its snapshots fill it in by priority, as fast and without a second connection
+    (the user's decision of 2026-11-19)
   - `hello_ms: u32` -- a connection must send HELLO within this long (ms)
   - `ticket_ms: u32` -- a ticket stays good this long (ms)
   - `empty_room_ms: u32` -- a room without players closes after this long (ms)

@@ -114,7 +114,10 @@ Two files at the channel's address, written by `tools/update_manifest.py` (or
 
 * `update.json.sig` -- the Ed25519 signature over the exact bytes of `update.json`, Base64.
 
-`target` is `windows-x86_64`, `linux-x86_64`, `linux-aarch64`, `macos-aarch64`, ... (`update::target()`).
+`target` is `windows-x86_64`, `windows-aarch64`, `linux-x86_64`, `linux-aarch64`, `macos-aarch64`, ...
+(`update::target()`). `tools/package.py --arch aarch64 --update DIR` writes the ARM64 files into the
+channel of the x86-64 run of the same version (its entries stay), so one `update.json` lists both
+processors ([PACKAGING.md](PACKAGING.md) "ARM64").
 `kind`:
 
 | kind | Put in place by the updater | Use |

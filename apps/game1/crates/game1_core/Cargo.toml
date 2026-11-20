@@ -1,0 +1,22 @@
+[package]
+name = "game1_core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "game1_core"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+physics.workspace = true
+game.workspace = true
+netchan.workspace = true

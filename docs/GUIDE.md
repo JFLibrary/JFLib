@@ -980,8 +980,12 @@ ui.menubar(None);                        // the menu bar of the AppDesc
 * On a Mac the menus of the `AppDesc` go into the menu bar of macOS, between the app menu and
   the Window menu, as every Mac app has them: `ui.menubar(None)` of the main window draws no row
   then, a row chosen up there runs as from the window's bar, `MOD_CTRL` is the Command key.
-  Headless runs (scripts) keep the row in the window, `jfgui_SYSMENU=0` too
-  (`plat::sysmenu`).
+  On an iPad they go into the menu bar of iPadOS as well (between the application menu and
+  Window; the rows with a key also show while Command is held), and the window keeps its row:
+  iPadOS shows its bar only after a swipe down from the top or with the pointer at the top edge,
+  the row stays the way for the finger. A pass that draws no `menubar(None)` takes the menus out
+  of the system's bar again (a page without the bar). Headless runs (scripts) keep the row in
+  the window, `jfgui_SYSMENU=0` too (`plat::sysmenu`).
 * `cmd_state(cmd, CF_DISABLED | CF_CHECKED | CF_HIDDEN)` is persistent; set it every frame from
   your model. Accelerators fire only when no widget consumed the key first (`ui.key(VK_*)`).
   `accel_text(cmd)` gives the shortcut as shown in menus ("Strg+S").
@@ -2187,6 +2191,7 @@ in DIP):
 | `key CHORD...` | `key ctrl+s`, `key tab shift+tab enter esc left f4`, also `[ ] , . - + /`, `num0`..`num9`, `numadd` ... (every key a pass of its own, as the platform delivers them; with the US layout's character, `KeyEvent::ch`) |
 | `keydown CHORD [scan N\|code N] [left\|right\|numpad] [char "c"\|none] [dead]`, `keyup CHORD ...` | a key down and held (shift / ctrl / alt stay held for the following events; down again: an auto-repeat) and up again, with a scancode (`code N`: the key at USB HID usage N, `KeyEvent::code`), location and character for `ui.key_event_take` (the US layout's character for the key and its Shift; `char "c"` another layout's, `char none` none, `dead` a dead key) |
 | `motion DX DY` | raw motion of the pointer while the window holds the pointer lock a headless run plays (`ui.pointer_lock`, `ui.pointer_motion`; section 39); nothing without the lock |
+| `pad connect N [xbox\|playstation\|nintendo\|other] [NAME]`, `pad disconnect N`, `pad press N BUTTON [VALUE]`, `pad release N BUTTON`, `pad axis N lx\|ly\|rx\|ry VALUE` | game pad N comes or goes, a button of the standard layout (`a b x y lb rb lt rt back start ls rs up down left right home`; VALUE 0 to 1, default 1) goes down or up, a stick's axis moves (-1 to 1, right and down positive): `ui.gamepads`, `UIC_GAMEPAD` (section 39) |
 | `keys [N] CHORD...` | the chords N times over, queued for ONE pass of the window with the keyboard (more keys than frames, as a tool window hands them on) |
 | `type "text"` | typed text (`"\n"` presses Enter), a character per event; the whole quoted string, as long as a script line (16 KiB) |
 | `commit "text" [N]` | an input method commits the text (N times over: one long commit, as the platform queues it); the text as long as a script line |
@@ -3314,6 +3319,10 @@ ui::main!({
   the Store or snapd update it ([UPDATES.md](UPDATES.md), "Packages").  On macOS a program in an
   app bundle takes the channel's `app` entry: the whole `NAME.app` is replaced in one step after
   its signature checked against the installed one ([UPDATES.md](UPDATES.md), "macOS app bundles").
+* Windows and Linux on ARM64 ([ARM64.md](ARM64.md)) are targets of their own in the channel,
+  `windows-aarch64` and `linux-aarch64` (`update::target()`): `tools/package.py APP --arch aarch64
+  --update DIR` adds their files to the channel the x86-64 run wrote for the same version, so one
+  `update.json` serves both processors and each program takes its own entry.
 
 ## 19. Accessibility (screen readers)
 
@@ -5864,7 +5873,9 @@ phone or a tablet ([`lib/ui/form.rs`](../lib/ui/form.rs)). The platform decides,
 Windows, Linux, macOS and the browser are `FF_DESKTOP` however small a window is dragged, so a narrow
 desktop window keeps the desktop's behaviour. Android and iOS are `FF_TABLET`, and `FF_PHONE` where the
 main window's shorter side is below 600 DIP (Android's line, `sw600dp`; a turned phone stays a phone, a
-tablet's app in a narrow split screen is laid out like a phone's). `jfgui_FORM=desktop|tablet|phone`
+tablet's app in a narrow split screen is laid out like a phone's). An iPad stays `FF_TABLET` in Split
+View, Slide Over and Stage Manager as long as the window is not that narrow, also in a large window
+(iPadOS owns the window and draws its controls; docs/APPLE.md AP9). `jfgui_FORM=desktop|tablet|phone`
 decides instead, on any platform: for tests and for a look at the phone's layout on the desktop.
 
 What the library does by itself on a phone or a tablet, and only there:
@@ -5890,10 +5901,12 @@ the desktop's row as it was), which hints speak of a mouse.
 Test it on the desktop: `system env jfgui_FORM phone` in a script (`apps/gallery/tests/form_factor.uis`,
 `apps/androidGallery/tests/touch_phone.uis`), or a program started with `jfgui_FORM=phone` in a window
 of a phone's size. On Android a tablet comes from the emulator's `pixel_tablet` profile, a phone from the
-same emulator with `adb shell wm size 1080x2400` and `wm density 420`.
+same emulator with `adb shell wm size 1080x2400` and `wm density 420`. On an iPad simulator
+`jfgui_IOS_WINDOW=320x1376` starts the app in a window of that size inside its scene (Slide Over's
+width; Split View's and Stage Manager's sizes likewise), `plattest --test ipad` goes through them.
 
 
-## 39. Games: pointer lock, raw mouse motion, key positions
+## 39. Games: pointer lock, raw mouse motion, key positions, game pads
 
 A game that turns its camera with the mouse locks the pointer to its window: the pointer is hidden,
 stays where it is, and its motion comes raw, without the system's acceleration where the platform
@@ -5954,8 +5967,45 @@ the key for a settings page ("Z" for `KC_W` on a French keyboard; Windows, Linux
 the browser and on phones), `plat::key_code_name(code)` the browser's `KeyboardEvent.code` name
 ("KeyW"), `plat::key_code_from_name` the other way. Android's keys carry no place yet (`code` 0).
 
+**Game pads.** `ui.gamepads()` lists the pads connected now as `plat::Gamepad`s, in one layout on
+every platform, the W3C Gamepad API's "standard" mapping: `buttons[PAD_A ..= PAD_HOME]` with analog
+values 0 to 1 (the triggers `PAD_LT` / `PAD_RT` analog, a bit each in `pressed` above
+`PAD_TRIGGER_PRESS`), `axes[PAD_LX, PAD_LY, PAD_RX, PAD_RY]` in -1 to 1 with right and down positive
+and no dead zone, `down` and `up` for the buttons that went down and up since the last batch (a tap
+between two frames is in both), `index` (the same while the pad stays connected), `name` and `style`
+(whose labels the buttons carry: Xbox, PlayStation, Nintendo). The first call starts watching; pads
+appear in later frames, every change gives a pass, and a pad that comes or goes gives
+`App::command(UIC_GAMEPAD, index | PADEV_CONNECT << 8)` (or `PADEV_DISCONNECT`):
+
+```rust
+for p in ui.gamepads() {
+    if p.went_down(plat::PAD_A) {
+        self.jump();
+    }
+    let [x, y] = p.stick(0); // the left stick, raw: apply a dead zone (lib/game does it radially)
+    self.walk(x, y);
+}
+```
+
+| Platform | How | Which pads |
+| --- | --- | --- |
+| Windows | XInput (`xinput1_4.dll`, else `xinput9_1_0.dll`; the guide button through `XInputGetStateEx`), polled every 4 ms while a pad is connected, an empty slot every 250 ms | Xbox-compatible pads, at most four (`index` = XInput's slot) |
+| Linux | evdev: the `/dev/input/event*` nodes with a game pad's buttons the user may read, inotify for new ones; inside a Flatpak with `--device=input` | Xbox (xpad), PlayStation (hid-playstation, hid-sony), Nintendo, simple HID pads |
+| macOS | GameController: `GCController`'s `extendedGamepad`, its connect and disconnect notifications | Xbox, PlayStation, Switch Pro, MFi pads |
+| Browser | the Gamepad API, polled by the page every animation frame; a pad appears only after one of its buttons was pressed in the page | pads with the "standard" mapping; others come with `mapped` false, their buttons as the browser numbers them |
+| Android, iOS | none yet (touch controls come later): `ui.gamepads_watching()` says false | – |
+
+Pads speak only to the app that has the focus, as the keyboard does: while none of its windows is
+active every pad reports nothing held. They need no line in `PERMISSIONS`. Rumble is not built. A game
+without `ui` has the same at the platform's level: `plat::pad_watch(true)`, `plat::pads()` once a
+frame (it takes the edges) and the event `E_GAMEPAD`. `lib/game`'s input actions take pads as sources
+with a radial dead zone, looking at a turn rate with a curve, and pad play without the pointer lock
+([GAMECORE.md](GAMECORE.md)).
+
 Scripts play the lock in a headless run: `ui.pointer_lock(true)` locks at once, `motion DX DY` moves
 the locked pointer, `key esc` lets it go; `keydown CHORD code N` presses the key at usage N (this
-platform's scan code for it). `apps/inputtest` shows the lock, the summed motion and the keys by
-place; its `README.md` has the check list for trying it by hand on each platform, and
-`plattest --test input` checks the tables and the decoding of the raw records without real input.
+platform's scan code for it); `pad connect N xbox NAME`, `pad press N a`, `pad axis N lx 0.5` and
+`pad disconnect N` play a pad. `apps/inputtest` shows the lock, the summed motion, the keys by place
+and the pads; its `README.md` has the check list for trying it by hand on each platform, and
+`plattest --test input` and `--test pad` check the tables, the decoding of the raw records and each
+platform's pad backend without real input.

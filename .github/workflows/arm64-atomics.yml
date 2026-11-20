@@ -4,7 +4,7 @@
 # (the LL/SC loops); on windows-11-arm the Windows program as built (inline LL/SC, ARMv8.0) and one built
 # with -C target-feature=+lse (inline LSE). Built on an x64 runner as on the PC (build_rs.py --arch aarch64).
 # Started by hand, or by a push to a branch arm64-test/atomics... (workflow_dispatch needs the file on main; the
-# other test branches arm64-test/... run arm64-windows.yml alone, without these 4 x 15 minutes).
+# other test branches arm64-test/... run arm64.yml alone, without these 4 x 15 minutes).
 name: ARM64 atomics
 
 on:

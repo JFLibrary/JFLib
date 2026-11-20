@@ -215,6 +215,8 @@ pub(crate) struct S {
     pub(crate) list_empty: Vec<(u32, String)>,
     /// (form.rs) the one-menu bars of compact menu bars, by the address of the bar
     compact: Vec<((usize, usize), &'static [Mi])>,
+    /// (plat::sysmenu) the pass whose main window gave the system's menu bar its menus
+    pub(crate) sysmenu_frame: u32,
 }
 
 /// per-window state (ui_popup_wb0 .. ui_popup_wb1: popup stack, flyouts, menu bar, tooltip)
@@ -1621,14 +1623,27 @@ impl Ui {
         }
     }
 
-    // (macOS) the rows chosen in the system's menu bar run as from the window's bar; the bar's
-    // menus with the commands' labels, states and keys go to the system (unchanged: nothing)
+    // (macOS, iPadOS) the rows chosen in the system's menu bar run as from the window's bar; the
+    // bar's menus with the commands' labels, states and keys go to the system (unchanged: nothing)
     fn sysmenu_publish(&mut self, mb: &'static [Mi]) {
+        self.m.popup.sysmenu_frame = self.frame;
         for id in plat::sysmenu::sysmenu_take() {
             self.cmd_run(id, 0);
         }
         let items = self.sysmenu_items(mb);
         plat::sysmenu::sysmenu_set(&items);
+    }
+
+    /// (ctx.rs frame_end) a pass whose main window drew no menubar(None): its menus leave the
+    /// system's bar (a page without the bar); a row chosen just before still runs
+    pub(crate) fn sysmenu_frame_end(&mut self) {
+        if self.headless || self.m.popup.sysmenu_frame == self.frame || !plat::sysmenu::sysmenu_supported() {
+            return;
+        }
+        for id in plat::sysmenu::sysmenu_take() {
+            self.cmd_run(id, 0);
+        }
+        plat::sysmenu::sysmenu_set(&[]);
     }
 
     // menu records -> the system's menu rows (MI_LIST: the rows of menu_list, else its placeholder)
@@ -1687,10 +1702,13 @@ impl Ui {
             return 0;
         }
         // (macOS, a window of the app) the app's menus live in the system's menu bar, as on every
-        // Mac: they go there (plat::sysmenu) and the window draws no bar of its own
+        // Mac: they go there (plat::sysmenu) and the window draws no bar of its own.  (iPadOS) they
+        // go to its menu bar too, the window keeps its row (the system's bar hides until revealed)
         if menubar.is_none() && !self.headless && self.uiw_cur == 0 && plat::sysmenu::sysmenu_supported() {
             self.sysmenu_publish(mb);
-            return 0;
+            if !plat::sysmenu::sysmenu_window_row() {
+                return 0;
+            }
         }
         let a = (mb.as_ptr() as usize as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
         let base = ((a >> 36) as u32 & 0x0FFF_FF00) | 0xC000_0000;

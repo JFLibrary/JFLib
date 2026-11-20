@@ -1,0 +1,5 @@
+#!args --test pad
+# (G7a part 2) game pads without real input: the shared state (events, edges, the axes' threshold),
+# the decoders (XInput records, the evdev parser with Xbox, Sony and simple HID pads, the browser's
+# record), and the backend of the platform through a test hook: Windows XINPUT_STATE records instead
+# of the DLL's, Linux a pipe as a pad's node, macOS a controller of GameController's own

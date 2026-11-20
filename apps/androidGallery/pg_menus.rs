@@ -2,7 +2,7 @@
 // submenus and a list of recent files, combo box, date picker, drop-down, split and command
 // buttons, a flat tool drop-down with checked rows, tooltips, a context menu (long press, the
 // right button) and the same menu from a button.  Commands without shortcuts: they work with the
-// finger.
+// finger.  On an iPad the menu bar's menus are in iPadOS's menu bar too (docs/APPLE.md AP9).
 
 use alloc::format;
 use alloc::string::String;
@@ -63,7 +63,7 @@ pub static CMDS: [Command; 16] = [
     Command::new(CMD_RECENT_CLEAR, "Liste &leeren", IC_DELETE, 0, 0, 0),
 ];
 
-static MENUBAR: [Mi; 3] = [Mi::Menu("&Datei", &M_FILE), Mi::Menu("&Bearbeiten", &M_EDIT), Mi::Menu("&Ansicht", &M_VIEW)];
+pub static MENUBAR: [Mi; 3] = [Mi::Menu("&Datei", &M_FILE), Mi::Menu("&Bearbeiten", &M_EDIT), Mi::Menu("&Ansicht", &M_VIEW)];
 static M_FILE: [Mi; 7] = [
     Mi::Cmd(CMD_NEW),
     Mi::Cmd(CMD_OPEN),
@@ -120,7 +120,9 @@ impl Menus {
         ui.cmd_state(CMD_DARK, if dark { CF_CHECKED } else { 0 });
         ui.cmd_state(CMD_ZOOM100, if self.zoom == 100 { CF_DISABLED } else { 0 });
         ui.menu_list(CMD_RECENT0, &self.recent);
-        ui.menubar(Some(i18n::menu(&MENUBAR)));
+        // the bar of the app record (AppDesc::menubar): on an iPad its menus go to iPadOS's menu bar
+        // as well while this page shows (plat::sysmenu), the row stays for the finger
+        ui.menubar(None);
     }
 
     pub fn page(&mut self, ui: &mut Ui) {

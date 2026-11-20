@@ -1,6 +1,7 @@
 // net_loop -- the netcode on real sockets (--loopback): a netchan::Server on 127.0.0.1 with UDP and a
 // WebSocket path, the arena with 300 props, 150 of them away from the map's places (so the UDP
-// clients fetch their full state over a WebSocket of their own), bots as NetLinks over UDP and over WebSocket, all in one thread for a few real seconds
+// clients fetch their full state over a WebSocket of their own: the option ServerOptions::fetch_full, on here
+// to run it over real sockets; the default, the priority fill, has no socket of its own to test), bots as NetLinks over UDP and over WebSocket, all in one thread for a few real seconds
 // (the server's wait() sleeps until a packet comes); then the counts
 
 use alloc::format;
@@ -46,7 +47,7 @@ pub fn run(secs: u64, udp: usize, ws: usize) -> i32 {
         }
     };
     let acfg = ArenaConfig { props: 300, moving: 30, displaced: 150, fire: true, ..ArenaConfig::default() };
-    let opts = ServerOptions { ws_port: ws_addr.port, ..ServerOptions::default() };
+    let opts = ServerOptions { ws_port: ws_addr.port, fetch_full: true, ..ServerOptions::default() };
     let mut game = NetServer::new(opts, plat::random_u64(), alloc::boxed::Box::new(move |_| Arena::new(acfg)));
     out(&format!("loopback: UDP {}, WebSocket ws://{}/game\n", udp_addr, ws_addr));
     let map = arena::map(&acfg);

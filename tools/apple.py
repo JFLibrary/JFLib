@@ -48,8 +48,10 @@ keychain is locked: codesign with a certificate and notarytool run in the logged
 
     jfgui_MAC_IDENTITY=NAME   sign with this certificate ("Developer ID Application: NAME (TEAM)")
     jfgui_MAC_NOTARY=PROFILE  notarize .dmg files with this notarytool profile (needs the identity)
-    jfgui_SIM_DEVICE=UDID     the simulator to use (default: the first available iPhone)
+    jfgui_SIM_DEVICE=UDID     the simulator to use (default: the first available iPhone; an iPad's
+                              for plattest --test ipad, docs/APPLE.md AP9)
     jfgui_SIM_KEEP=1          leave a simulator running that this tool booted
+    jfgui_SIM_SECONDS=N       how long simapp lets the program run before it ends it (default 60)
     jfgui_IOS_DEVICE=UDID     the iPhone (default: the only connected one)
 """
 from pathlib import Path
@@ -137,6 +139,10 @@ def bundle(exe, sim=False):
         "CFBundleVersion": "1", "CFBundleSupportedPlatforms": ["iPhoneSimulator" if sim else "iPhoneOS"],
         "DTPlatformName": "iphonesimulator" if sim else "iphoneos", "MinimumOSVersion": IOS_MIN,
         "LSRequiresIPhoneOS": True, "UIDeviceFamily": [1, 2], "UILaunchScreen": {},
+        # an iPad's trackpad and mouse as a pointer (clicks as UITouchTypeIndirectPointer: the mouse),
+        # scroll and pinch as their gestures (lib/plat/apple_ios_pad.rs, docs/APPLE.md AP9); without the
+        # key UIKit turns them into fingers
+        "UIApplicationSupportsIndirectInputEvents": True,
         # one scene, its delegate the UIKit host's (lib/plat/apple_ios.rs, docs/APPLE.md AP5)
         "UIApplicationSceneManifest": {
             "UIApplicationSupportsMultipleScenes": False,
@@ -680,7 +686,7 @@ def main():
             mac_notarize(path)
             return 0
         if cmd in ("sim", "simapp", "gui"):
-            r = sim_run(path, rest) if cmd == "sim" else sim_app(path, rest) if cmd == "simapp" else gui_run(path, rest)
+            r = sim_run(path, rest) if cmd == "sim" else sim_app(path, rest, int(os.environ.get("jfgui_SIM_SECONDS", "60"))) if cmd == "simapp" else gui_run(path, rest)
             sys.stdout.write(r.stdout)
             sys.stderr.write(r.stderr)
             return r.returncode

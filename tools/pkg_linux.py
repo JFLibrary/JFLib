@@ -2,7 +2,8 @@
 appimage,rpm,flatpak; docs/PACKAGING.md "AppImage", "RPM", "Flatpak").  The Linux tools run in
 Linux or WSL (tools/linux_task.py); a missing tool skips that step and says what is missing.
 
-  make_appimage(job, style)    <dist>/<App>-<version>-<style>-x86_64.AppImage: the AppDir
+  make_appimage(job, style)    <dist>/<App>-<version>-<style>-x86_64.AppImage (ARM64, job.arch
+                               aarch64: -aarch64.AppImage, the runtime built for it): the AppDir
                                (AppRun, .desktop, icon, metainfo, the program with its modules,
                                further programs and notices) as SquashFS (mksquashfs -comp zstd)
                                behind the runtime apps/appimagert (or another runtime file:
@@ -10,14 +11,18 @@ Linux or WSL (tools/linux_task.py); a missing tool skips that step and says what
                                PATH makes the image instead (with the same runtime); signed
                                (sign_appimage) when jfgui_GPG_KEY is set
   make_rpm(job)                <dist>/rpm/<pkg>.spec + SOURCES/<pkg>-<version>-root.tar.gz, and
-                               the .rpm by rpmbuild when it is installed
+                               the .rpm by rpmbuild when it is installed (ARM64: <dist>/rpm-aarch64/,
+                               ExclusiveArch aarch64, rpmbuild --target aarch64)
   make_flatpak(job)            <dist>/flatpak/<app id>.json + files/: the manifest, finish-args
                                from apps/NAME/PERMISSIONS; <dist>/<app id>.flatpak (a bundle)
                                by flatpak-builder when it and the runtime are installed, exported
                                into the repository <dist>/flatpak/repo (each run adds a commit);
                                with jfgui_GPG_KEY the repository and the bundle are GPG-signed
                                and the bundle carries the key (and PACKAGE flatpak_repo_url=:
-                               the remote its installation updates from)
+                               the remote its installation updates from); ARM64: the manifest in
+                               <dist>/flatpak-aarch64/, flatpak-builder --arch=aarch64 (the
+                               runtime for aarch64, and on an x86-64 machine QEMU's binfmt with
+                               flag F), the same repository, <dist>/<app id>-aarch64.flatpak
   finish_args(perms, extra)    the sandbox holes of a PERMISSIONS manifest -> (args, notes)
   runtime_image(elf, info)     a runtime file made an AppImage runtime: the magic "AI\\x02" at
                                byte 8, the sections .upd_info (1024 bytes) with info,
@@ -37,6 +42,7 @@ import re
 import shlex
 import shutil
 import struct
+import subprocess
 import sys
 import tarfile
 import time
@@ -65,7 +71,11 @@ def probe():
     runtimes (application/branch) -- asked once per run"""
     global _probe
     if _probe is None:
-        r = run_linux(["python3", linux_path(ROOT / "tools" / "linux_task.py"), "probe"])
+        try:
+            r = run_linux(["python3", linux_path(ROOT / "tools" / "linux_task.py"), "probe"])
+        except (OSError, subprocess.SubprocessError) as e:   # no wsl.exe (a Windows runner)
+            _probe = {"error": f"Linux / WSL nicht erreichbar ({e})"}
+            return _probe
         try:
             _probe = json.loads(r.stdout) if r.returncode == 0 else {}
         except ValueError:
@@ -75,8 +85,11 @@ def probe():
     return _probe
 
 
-def linux_task(*args, timeout=1800):
-    r = run_linux(["python3", linux_path(ROOT / "tools" / "linux_task.py"), *map(str, args)], timeout=timeout)
+def linux_task(*args, timeout=1800, arch="x86_64"):
+    """tools/linux_task.py ACTION ARGS in Linux / WSL; arch: the packages' processor (only another than x86_64
+    is passed on, as --arch)"""
+    head = ["--arch", arch] if arch != "x86_64" else []
+    r = run_linux(["python3", linux_path(ROOT / "tools" / "linux_task.py"), *head, *map(str, args)], timeout=timeout)
     if r.returncode:
         raise RuntimeError((r.stdout + r.stderr).strip())
     return r.stdout
@@ -295,10 +308,10 @@ def make_appimage(job, style):
         return job.skip("appimage", f"mksquashfs fehlt (Paket squashfs-tools) und kein appimagetool; {where}")
     rt = work / "runtime"
     rt.write_bytes(runtime_image(appimage_runtime(job).read_bytes(), job.meta.get("appimage_update", "")))
-    out = job.dist / f"{job.app}-{job.version}-{style}-x86_64.AppImage"
+    out = job.dist / f"{job.app}-{job.version}-{style}-{pkgmeta.arch_name(job.arch, 'appimage')}.AppImage"
     print(f"[linux] AppImage {style}")
     linux_task("appimage", linux_path(work / "AppDir"), linux_path(rt), linux_path(out),
-               *[f"{k}={v}" for k, v in links.items()])
+               *[f"{k}={v}" for k, v in links.items()], arch=job.arch)
     appimage_signature(job, out)
     job.made("appimage", out)
     return out
@@ -400,7 +413,7 @@ def rpm_spec(job, tarball, files):
         f"License:        {meta.get('license', 'LicenseRef-proprietary')}\n"
         + (f"URL:            {homepage}\n" if homepage else "")
         + f"Source0:        {tarball}\n"
-        "ExclusiveArch:  x86_64\n"
+        f"ExclusiveArch:  {pkgmeta.arch_name(job.arch, 'rpm')}\n"
         "AutoReqProv:    no\n"
         + ("Requires:       glibc\nRecommends:     vulkan-loader, mesa-vulkan-drivers\n" if job.glibc else "") +
         f"Requires(post): {alt}\n"
@@ -426,12 +439,18 @@ def rpm_spec(job, tarball, files):
         f"- Paket aus apps/{app}/PACKAGE gebaut\n")
 
 
+def rpm_top(job):
+    """the folder of the .spec and its tarball: <dist>/rpm, for ARM64 <dist>/rpm-aarch64 (the tarball holds
+    the programs of one processor)"""
+    return job.dist / ("rpm" if job.arch == "x86_64" else f"rpm-{pkgmeta.arch_name(job.arch, 'rpm')}")
+
+
 def make_rpm(job):
     """the .spec and its source tarball; the .rpm when rpmbuild is installed -> its path or None"""
     files = rpm_tree(job)
     ver = rpm_version(job.version)
     tarball = f"{job.pkg}-{ver}-root.tar.gz"
-    top = job.dist / "rpm"
+    top = rpm_top(job)
     (top / "SPECS").mkdir(parents=True, exist_ok=True)
     (top / "SOURCES").mkdir(parents=True, exist_ok=True)
     mtime = int(os.environ.get("SOURCE_DATE_EPOCH", time.time()))
@@ -443,7 +462,7 @@ def make_rpm(job):
     if p.get("error") or not p.get("rpmbuild"):
         why = "Linux / WSL nicht erreichbar" if p.get("error") else "rpmbuild fehlt (Paket rpm-build bzw. rpm)"
         return job.skip("rpm", f"{why}; nur {spec.relative_to(job.root).as_posix()} und SOURCES/{tarball} geschrieben")
-    out = linux_task("rpm", linux_path(spec), linux_path(top / "SOURCES" / tarball), linux_path(job.dist)).strip()
+    out = linux_task("rpm", linux_path(spec), linux_path(top / "SOURCES" / tarball), linux_path(job.dist), arch=job.arch).strip()
     rpm = job.dist / Path(out.splitlines()[-1]).name if out else None
     if rpm is None or not rpm.exists():
         raise RuntimeError(f"rpmbuild: kein Paket ({out})")
@@ -603,11 +622,35 @@ def flatpak_manifest(job, files):
     return man, notes
 
 
+def flatpak_dir(job):
+    """the folder of the manifest and its files/: <dist>/flatpak, for ARM64 <dist>/flatpak-aarch64 (the
+    repository stays <dist>/flatpak/repo: one remote for every processor)"""
+    return job.dist / ("flatpak" if job.arch == "x86_64" else f"flatpak-{pkgmeta.arch_name(job.arch, 'flatpak')}")
+
+
+def flatpak_bundle_name(job, aid):
+    """<app id>.flatpak, for ARM64 <app id>-aarch64.flatpak"""
+    return f"{aid}.flatpak" if job.arch == "x86_64" else f"{aid}-{pkgmeta.arch_name(job.arch, 'flatpak')}.flatpak"
+
+
+def flatpak_foreign(p, arch):
+    """why flatpak-builder cannot run the build commands of another processor's SDK here, or "" (an x86-64
+    machine needs QEMU's binfmt handler with flag F: the sandbox does not see the host's interpreter)"""
+    if arch == p.get("machine", "x86_64"):
+        return ""
+    flags = p.get("binfmt_" + arch)
+    if flags is None:
+        return f"QEMU für {arch} fehlt (binfmt_misc, Paket qemu-user-static)"
+    if "F" not in flags:
+        return f"QEMUs binfmt-Eintrag für {arch} hat kein Flag F (Paket qemu-user-static statt qemu-user-binfmt)"
+    return ""
+
+
 def make_flatpak(job):
     """the manifest + files/; the .flatpak bundle when flatpak-builder and the runtime are
     there -> its path or None"""
     aid = app_id(job.meta, job.app)
-    d = job.dist / "flatpak"
+    d = flatpak_dir(job)
     files = flatpak_files(job)
     write_tree(files, d / "files")
     man, notes = flatpak_manifest(job, files)
@@ -621,19 +664,31 @@ def make_flatpak(job):
     if p.get("error") or not p.get("flatpak-builder"):
         why = "Linux / WSL nicht erreichbar" if p.get("error") else "flatpak-builder fehlt"
         return job.skip("flatpak", f"{why}; nur das Manifest {mf.relative_to(job.root).as_posix()} geschrieben")
-    refs = p.get("flatpak_refs", [])
     need = [f"{man['runtime']}/{man['runtime-version']}", f"{man['sdk']}/{man['runtime-version']}"]
-    missing = [r for r in need if r not in refs]
-    if missing:
-        return job.skip("flatpak", "Runtime fehlt: " + ", ".join(missing).replace("/", "//")
-                        + f" (flatpak install --user flathub …: Download); nur das Manifest geschrieben")
-    out = job.dist / f"{aid}.flatpak"
-    repo = d / "repo"
+    if job.arch == "x86_64":
+        missing = [r for r in need if r not in p.get("flatpak_refs", [])]
+        if missing:
+            return job.skip("flatpak", "Runtime fehlt: " + ", ".join(missing).replace("/", "//")
+                            + f" (flatpak install --user flathub …: Download); nur das Manifest geschrieben")
+    else:                               # "name/arch/branch" (linux_task.py probe)
+        fa = pkgmeta.arch_name(job.arch, "flatpak")
+        have = p.get("flatpak_refs_arch", [])
+        missing = [r for r in need if "/".join([r.split("/")[0], fa, r.split("/")[1]]) not in have]
+        if missing:
+            return job.skip("flatpak", f"Runtime für {fa} fehlt: " + ", ".join(missing).replace("/", "//")
+                            + f" (flatpak install --user --arch={fa} flathub …: Download); nur das Manifest "
+                            f"{mf.relative_to(job.root).as_posix()} geschrieben")
+    foreign = flatpak_foreign(p, pkgmeta.arch_name(job.arch, "flatpak"))
+    if foreign:
+        return job.skip("flatpak", f"{foreign}; nur das Manifest {mf.relative_to(job.root).as_posix()} geschrieben")
+    out = job.dist / flatpak_bundle_name(job, aid)
+    repo = job.dist / "flatpak" / "repo"
     key = os.environ.get("jfgui_GPG_KEY", "")
     url = job.meta.get("flatpak_repo_url", "")
     import codesign
     # "-" for an empty value: wsl.exe would drop an empty argument
-    r = codesign.run_gpg_task(["flatpak", linux_path(d), aid, linux_path(out), linux_path(repo), key or "-", url or "-"])
+    arch = [] if job.arch == "x86_64" else ["--arch", pkgmeta.arch_name(job.arch, "flatpak")]
+    r = codesign.run_gpg_task([*arch, "flatpak", linux_path(d), aid, linux_path(out), linux_path(repo), key or "-", url or "-"])
     if r.returncode:
         raise RuntimeError(f"flatpak: {(r.stdout + r.stderr).strip()[-3000:]}")
     if key:

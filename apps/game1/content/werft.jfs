@@ -1,0 +1,103 @@
+// Werft: die Karte von Spiel 1, Teil 1 -- ein Werfthof 56 x 40 m zwischen Ziegelmauern: in der Mitte eine Plattform
+// mit zwei Rampen, im Norden ein Steg auf 3 m mit Treppen an beiden Enden, Container, Kisten, Fässer, niedrige
+// Deckungsmauern.  Gebaut mit modeltool (apps/game1/tools/content.py backt daraus werft.g1m):
+//   modeltool apps/game1/content/werft.jfs --out build/game1-content/werft
+// Namen der Teile (apps/game1/src/bake.rs): "@spawn GRAD" ein Startplatz (Blick GRAD links von -Z), "@weg" ein
+// Wegpunkt der Bots; "#rand" Randlicht (Requisiten), "#deko" ohne Kollision.  Meter, Y oben, der Boden bei y = 0.
+
+model.name("Werft")
+model.material("asphalt", {color: "#5d6473", roughness: 0.9})
+model.material("markierung", {color: "#f2c230", roughness: 0.6})
+model.material("mauer", {color: "#b65a42", roughness: 0.9})
+model.material("mauerkopf", {color: "#d9c7a5", roughness: 0.9})
+model.material("beton", {color: "#a3a8ad", roughness: 0.9})
+model.material("rampe", {color: "#e0a526", roughness: 0.7})
+model.material("steg", {color: "#4f7ca8", roughness: 0.6})
+model.material("gelaender", {color: "#f0efe8", roughness: 0.5})
+model.material("container_rot", {color: "#c8412f", roughness: 0.7})
+model.material("container_blau", {color: "#2f6db3", roughness: 0.7})
+model.material("container_gruen", {color: "#3d9150", roughness: 0.7})
+model.material("container_orange", {color: "#e57a25", roughness: 0.7})
+model.material("kiste", {color: "#b98546", roughness: 0.8})
+model.material("fass", {color: "#d23c3c", roughness: 0.6})
+
+let L = 56.0          // Hof entlang x
+let W = 40.0          // Hof entlang z
+let H = 4.5           // Mauerhöhe
+let D = 0.8           // Mauerstärke
+
+// Boden und Mauern
+model.add(geom.box(L + 2 * D, 0.5, W + 2 * D).move(0, -0.5, 0), "asphalt", "boden")
+let nord = geom.box(L + 2 * D, H, D).move(0, 0, -W / 2 - D / 2)
+let ost = geom.box(D, H, W).move(L / 2 + D / 2, 0, 0)
+model.add(geom.merge(nord, nord.mirror("z"), ost, ost.mirror("x")), "mauer", "mauern")
+let kopf_n = geom.box(L + 2 * D + 0.2, 0.25, D + 0.2).move(0, H, -W / 2 - D / 2)
+let kopf_o = geom.box(D + 0.2, 0.25, W).move(L / 2 + D / 2, H, 0)
+model.add(geom.merge(kopf_n, kopf_n.mirror("z"), kopf_o, kopf_o.mirror("x")), "mauerkopf", "mauerkopf")
+
+// die Plattform in der Mitte (1,6 m) mit Rampen nach Norden und Süden, oben eine niedrige Deckung
+let ph = 1.6
+let pb = 10.0
+model.add(geom.box(pb, ph, pb), "beton", "plattform")
+model.add(geom.box(3.0, 1.0, 0.4).move(0, ph, 0), "beton", "plattform deckung")
+let rl = 4.5          // Länge einer Rampe
+let keil = geom.extrude([[0, 0], [rl, 0], [0, ph]], 3.6)
+model.add(geom.merge(keil.rotate_y(-90).move(0, 0, pb / 2), keil.rotate_y(90).move(0, 0, -pb / 2)), "rampe", "rampen")
+
+// gelbe Linien um die Plattform (nur Farbe)
+let linie_x = geom.box(pb + 4, 0.02, 0.15)
+let linie_z = geom.box(0.15, 0.02, pb + 4)
+model.add(geom.merge(linie_x.move(0, 0, pb / 2 + 2), linie_x.move(0, 0, -pb / 2 - 2), linie_z.move(pb / 2 + 2, 0, 0), linie_z.move(-pb / 2 - 2, 0, 0)), "markierung", "linien #deko")
+
+// der Steg im Norden auf 3 m: Deck, Geländer, Pfeiler, Treppen an beiden Enden
+let sz = -14.0        // Mitte des Stegs in z
+let sh = 3.0          // Höhe des Decks oben
+let sl = 16.0         // Länge des Decks
+model.add(geom.box(sl, 0.3, 2.4).move(0, sh - 0.3, sz), "steg", "steg")
+let gel = geom.box(sl, 1.0, 0.1)
+model.add(geom.merge(gel.move(0, sh, sz - 1.15), gel.move(0, sh, sz + 1.15)), "gelaender", "geländer")
+model.add(geom.cylinder(0.3, sh - 0.3, 16).array(3, 4.0, 0, 0).move(-4.0, 0, sz), "beton", "pfeiler")
+let tt = 4.5          // Tiefe einer Treppe
+let treppe = geom.stairs(2.0, sh, tt, 15)
+model.add(geom.merge(treppe.rotate_y(-90).move(-sl / 2 - tt / 2, 0, sz), treppe.rotate_y(90).move(sl / 2 + tt / 2, 0, sz)), "steg", "treppen")
+
+// Container: 6 x 2,6 x 2,4, einer auf einem anderen
+let cont = geom.box(6.0, 2.6, 2.4)
+model.add(cont.move(-14, 0, -6), "container_rot", "container rot")
+model.add(cont.move(-14.5, 2.6, -6), "container_blau", "container blau oben")
+model.add(cont.rotate_y(90).move(-17, 0, 10), "container_blau", "container blau")
+model.add(cont.move(14, 0, 12), "container_gruen", "container grün")
+model.add(cont.rotate_y(90).move(17, 0, -6), "container_orange", "container orange")
+
+// niedrige Deckungsmauern (1,2 m)
+let deck = geom.box(3.0, 1.2, 0.6)
+model.add(geom.merge(deck.move(8, 0, 6), deck.move(-8, 0, 6), deck.move(0, 0, 14), deck.rotate_y(90).move(-23, 0, 0), deck.rotate_y(90).move(23, 0, 0), deck.move(8, 0, -8), deck.move(-8, 0, -8)), "beton", "deckung")
+
+// Kisten (1,2 m) und Fässer: Requisiten mit Randlicht
+let k = geom.box(1.2, 1.2, 1.2)
+model.add(geom.merge(k.move(-11, 0, -2.5), k.move(-11, 1.2, -2.5), k.move(-9.7, 0, -2.5), k.move(10, 0, 9), k.move(11.3, 0, 9), k.move(10.6, 1.2, 9),
+                     k.move(-20, 0, 15), k.move(20, 0, -15), k.move(6.8, 0, -2), k.move(-6.8, 0, 2), k.move(19, 0, 4), k.rotate_y(30).move(-4, 0, 17)), "kiste", "kisten #rand")
+let f = geom.cylinder(0.4, 1.0, 20)
+model.add(geom.merge(f.move(25, 0, 17), f.move(25.9, 0, 17.4), f.move(25.3, 0, 18.3), f.move(-25, 0, -17), f.move(-25.8, 0, -17.6), f.move(4, 0, -18.5), f.move(-3, 0, 9.5)), "fass", "fässer #rand")
+
+// Startplätze: zwölf am Rand, jeder blickt zur Mitte
+let mk = geom.box(0.4, 0.1, 0.4)
+let starts = [[-24, -16, -123.7], [-25.5, 4, -99], [-24, 16, -56.3], [24, -16, 123.7], [25.5, -4, 81], [24, 16, 56.3],
+              [-8, -18, -156], [8, -18, 156], [-8, 18, -24], [8, 18, 24], [0, 18, 0], [0, -18, 180]]
+for s in starts {
+  model.add(mk.move(s[0], 0, s[1]), "markierung", "@spawn ${s[2]}")
+}
+
+// Wegpunkte der Bots: ein Ring am Rand, ein innerer Ring, die Plattform, der Steg mit seinen Treppen
+let wege = [[-22, 0, -14], [-22, 0, 0], [-22, 0, 14], [-10, 0, 17], [0, 0, 17], [10, 0, 17], [22, 0, 14], [22, 0, 0], [22, 0, -14],
+            [10, 0, -17.5], [0, 0, -17.5], [-10, 0, -17.5],
+            [-9, 0, -1], [9, 0, -1], [-6, 0, 10], [6, 0, 10], [-5, 0, -10], [5, 0, -10], [0, 0, 11], [0, 0, -11],
+            [0, ph, 2.5], [0, ph, -2.5], [-3.5, ph, 0], [3.5, ph, 0],
+            [-13.5, 0, sz], [13.5, 0, sz], [-8.5, sh, sz], [8.5, sh, sz], [0, sh, sz],
+            [-17, 0, -10], [19, 0, 8], [-14, 0, 2], [14, 0, 6]]
+for w in wege {
+  model.add(mk.move(w[0], w[1], w[2]), "markierung", "@weg")
+}
+
+model.budget(6000)
+model.expect_size(L + 2 * D + 0.2, nil, W + 2 * D + 0.2, 0.001)

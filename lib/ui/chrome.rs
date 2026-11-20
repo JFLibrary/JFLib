@@ -716,8 +716,10 @@ impl Ui {
     // (plat::TB_BTN_*, 0 ends): the system's layout, else the style's (SM_CAP_LEFT: close,
     // minimize, maximize at the left; else minimize, maximize, close at the right)
     fn tb_side(&self, right: bool) -> [u8; 3] {
-        if self.mobile() && self.uiw_cur == 0 {
-            return [0; 3]; // a phone's or a tablet's system owns the app's window (form.rs)
+        // a phone's or a tablet's system owns the app's window (form.rs), in the browser the page
+        // does (web_windows.rs: it fills the canvas, nothing to minimize, maximize or close)
+        if (self.mobile() || cfg!(target_arch = "wasm32")) && self.uiw_cur == 0 {
+            return [0; 3];
         }
         if let Some((l, r)) = self.tb_sys.buttons {
             return if right { r } else { l };

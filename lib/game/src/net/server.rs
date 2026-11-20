@@ -17,10 +17,12 @@
 // What was sent is remembered per client exactly as the client will hold it.
 //
 // Joining: HELLO -> WELCOME.  The full state goes with the first snapshot when it fits (a WebSocket always:
-// up to stream_budget); a UDP client whose full state does not fit a datagram gets a ticket and fetches it
-// over a WebSocket of its own (FETCH -> FULL at the next snapshot tick), the user's decision of 18.11.2026.
-// Until the FULL arrives the client's snapshots are cut by priority, so it sees its own figure and the
-// most important things at once.
+// up to stream_budget).  A UDP client whose full state does not fit a datagram gets it filled in: its
+// snapshots are cut by priority, so it sees its own figure and the most important things at once and the
+// rest in the next snapshots (about 200 ms for 300 props, as fast as the fetch; the user's decision of
+// 19.11.2026).  With ServerOptions::fetch_full it gets a ticket instead and fetches the full state over a
+// WebSocket of its own (FETCH -> FULL at the next snapshot tick; the user's first decision of 18.11.2026),
+// filled in by priority until the FULL arrives.
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, VecDeque};
@@ -79,6 +81,10 @@ pub struct ServerOptions {
     pub max_rewind_ms: u32,
     /// the WebSocket's port (WELCOME tells UDP clients where to fetch a full state; 0: none)
     pub ws_port: u16,
+    /// a UDP client whose full state does not fit a datagram fetches it over a WebSocket of its own (ws_port, a
+    /// ticket); false unless set: its snapshots fill it in by priority, as fast and without a second connection
+    /// (the user's decision of 2026-11-19)
+    pub fetch_full: bool,
     /// a connection must send HELLO within this long (ms)
     pub hello_ms: u32,
     /// a ticket stays good this long (ms)
@@ -103,6 +109,7 @@ impl Default for ServerOptions {
             margin: 2,
             max_rewind_ms: 300,
             ws_port: 0,
+            fetch_full: false,
             hello_ms: 5000,
             ticket_ms: 10_000,
             empty_room_ms: 30_000,
@@ -429,7 +436,7 @@ impl<S: RoomSim> NetServer<S> {
         room.sim.snapshot(tick.wrapping_sub(1), &mut world);
         let bits = snapshot::full_bits(room.sim.schema(), Some(room.sim.baseline()), &world, Some(room.sim.baseline()));
         let full_bytes = 16 + bits.div_ceil(8);
-        let fetch = !reliable && full_bytes > self.opts.budget && self.opts.ws_port != 0;
+        let fetch = !reliable && full_bytes > self.opts.budget && self.opts.fetch_full && self.opts.ws_port != 0;
         let ticket = if fetch { self.random() } else { 0 };
         if fetch {
             let until = tick.wrapping_add(self.ms_ticks(self.opts.ticket_ms));
