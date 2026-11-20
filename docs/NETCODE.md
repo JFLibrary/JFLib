@@ -620,6 +620,7 @@ typisches Wetter), 10 s, die Zeit von `NetServer::step`:
 | Rechner | nacheinander: Mittel / p50 / p99 | nebeneinander: Mittel / p50 / p99 | schneller |
 | --- | --- | --- | ---: |
 | Ryzen 5 3600 (6 Kerne, 12 Threads), Windows, geteilt mit anderen Sitzungen | 1643 / 2617 / 3820 µs | 488 / 555 / 1442 µs | 3,4 × |
+| Apple M2 (4 + 4 Kerne), macOS 27.2.1, zwei Läufe | 873–882 / 1527–1534 / 1689–1733 µs | 286–287 / 430–431 / 517 µs | 3,1 × |
 
 Der p50 liegt bei den Ticks mit Schnappschüssen. Ein Raum mit 16 Spielern braucht rund 200 µs je Tick (1,2 % eines Kerns bei
 60 Hz); acht Räume nacheinander 10 %, nebeneinander 3 % der Zeit eines Ticks. Ein Kern trägt also viele Räume; die Threads
