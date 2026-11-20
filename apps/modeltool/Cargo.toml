@@ -32,5 +32,10 @@ agent_core.workspace = true
 # Cargo.toml takes its jflib-agent-core from this workspace ([patch.crates-io])
 script = { package = "jfscript", git = "https://github.com/JFLibrary/JFScript" }
 
+# the observation mode's window (--watch); the browser's build has none
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ui.workspace = true
+style = { package = "jflib-style-winui", path = "../../styles/winui" }
+
 [build-dependencies]
 jflib-build.workspace = true

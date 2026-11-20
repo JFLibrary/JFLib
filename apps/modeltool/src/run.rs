@@ -153,6 +153,25 @@ pub fn import_allowed(dir: &str, path: &str) -> Result<(), String> {
     }
 }
 
+/// A module in the script's folder or below (paths come normalised and relative to the working directory; run.rs
+/// has refused any outside the folder): no link on the way from the folder to the file, so a link inside it
+/// cannot lead out.
+pub fn file_loader(dir: &str, path: &str) -> Result<String, String> {
+    let rest = path.strip_prefix(dir).unwrap_or(path);
+    let mut at = String::from(dir);
+    for part in rest.split('/') {
+        at.push_str(part);
+        if plat::fs::lstat(&at).is_some_and(|m| m.is_symlink()) {
+            return Err(format!("{} ist eine Verknüpfung; import folgt keinen Verknüpfungen (sie könnten aus dem Ordner des Skripts führen)", at));
+        }
+        at.push('/');
+    }
+    match plat::read_file(path) {
+        Some(b) => String::from_utf8(b).map_err(|_| String::from("die Datei ist kein UTF-8")),
+        None => Err(String::from("die Datei gibt es nicht")),
+    }
+}
+
 /// Compile and run the script `src` (named `file` in messages) with its parameters; `loader` reads a module
 /// for import(path) (the path relative to the script).  A module outside the script's folder is refused
 /// before the loader sees it (import_allowed).

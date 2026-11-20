@@ -13,7 +13,7 @@ use crate::refs;
 use crate::{examples, out, run};
 
 /// the groups in the order --check runs them
-pub const ALL: &[&str] = &["prims", "ops", "normals", "checks", "poly", "csg", "bevel", "gltf", "script", "examples"];
+pub const ALL: &[&str] = &["prims", "ops", "normals", "checks", "poly", "csg", "bevel", "gltf", "script", "watch", "examples"];
 
 /// xorshift64*: the same numbers on every target
 pub struct Rng(pub u64);
@@ -90,6 +90,7 @@ pub fn run(names: &[&str], quick: bool) -> i32 {
             "bevel" => crate::selftest_csg::bevel(&mut c),
             "gltf" => gltf_tests(&mut c),
             "script" => script(&mut c),
+            "watch" => watch_tests(&mut c),
             _ => examples_tests(&mut c),
         }
         let ms = (plat::time_us() - t0) / 1000;
@@ -791,6 +792,69 @@ fn script(c: &mut Ctx) {
     // the cache key: the same for CRLF and LF, another for another parameter
     let k1 = run::cache_key("a\nb\n", &[], &[]);
     c.check(k1 == run::cache_key("a\r\nb\r\n", &[], &[]) && k1 != run::cache_key("a\nb\n", &[(String::from("x"), String::from("1"))], &[]) && k1.len() == 32, || "cache key".into());
+}
+
+// ---------------------------------------------------------------- the observation mode
+
+/// The core of --watch with real files in a temporary folder: built when the script or a module changed, the old
+/// model kept while the script has an error, a module that goes missing, an import outside the folder.  (The
+/// browser has no files: nothing to check there.)
+fn watch_tests(c: &mut Ctx) {
+    if cfg!(target_arch = "wasm32") {
+        return;
+    }
+    let tmp = plat::temp_dir().unwrap_or_else(|| String::from(".")).replace('\\', "/");
+    let base = format!("{}/modeltool-watch-{}", tmp.trim_end_matches('/'), plat::random_u64() % 1_000_000_000);
+    if !c.check(plat::mkdir(&format!("{base}/sub")), || format!("mkdir {base}")) {
+        return;
+    }
+    let write = |name: &str, text: &str| plat::write_file(&format!("{base}/{name}"), text.as_bytes());
+    let a = format!("{base}/a.jfs");
+    write("a.jfs", "model.name(\"A\")\nmodel.add(geom.box(1, 1, 1))\n");
+    let mut w = crate::watch::Watched::new(&a, &[]);
+    c.check(w.changed(), || "before the first build: changed".into());
+    w.build();
+    let st = &w.state;
+    c.check(st.ok == Some(true) && st.title == "A" && st.summary == "1 Teile, 12 Dreiecke, 1 x 1 x 1 m" && st.builds == 1, || format!("first build: {:?} {} {}", st.ok, st.title, st.summary));
+    c.check(!w.changed(), || "nothing changed, but changed".into());
+    // saved with another size
+    write("a.jfs", "model.name(\"A\")\nmodel.add(geom.box(1, 2, 1))\n");
+    c.check(w.changed(), || "saved: not changed".into());
+    w.build();
+    c.check(w.state.summary == "1 Teile, 12 Dreiecke, 1 x 2 x 1 m", || format!("second build: {}", w.state.summary));
+    // an error: its place, the old model stays
+    write("a.jfs", "model.name(\"A\")\nmodel.add(geom.box(1, 0, 1))\n");
+    w.build();
+    let st = &w.state;
+    let place = format!("{a}:2:");
+    c.check(st.ok.is_none() && st.errors.first().is_some_and(|e| e[0].starts_with(&place) && e[0].contains("die Höhe")) && st.model.is_some(), || format!("error: {:?}", st.errors));
+    c.check(!w.changed(), || "after the failed build: changed".into());
+    // a module: watched too
+    write("m.jfs", "fn teil() { return geom.box(2, 1, 1) }\n");
+    write("a.jfs", "let m = import(\"m.jfs\")\nmodel.add(m.teil())\n");
+    c.check(w.changed(), || "script with a module: not changed".into());
+    w.build();
+    c.check(w.state.ok == Some(true) && w.state.summary.ends_with("2 x 1 x 1 m") && w.files().iter().any(|f| f.ends_with("/m.jfs")), || format!("module: {:?} {} {:?}", w.state.errors, w.state.summary, w.files()));
+    write("m.jfs", "fn teil() { return geom.box(3, 1, 1) }\n");
+    c.check(w.changed(), || "module saved: not changed".into());
+    w.build();
+    c.check(w.state.summary.ends_with("3 x 1 x 1 m"), || format!("module saved: {}", w.state.summary));
+    plat::delete(&format!("{base}/m.jfs"));
+    c.check(w.changed(), || "module deleted: not changed".into());
+    w.build();
+    c.check(w.state.errors.first().is_some_and(|e| e[0].contains("m.jfs: die Datei gibt es nicht")), || format!("module deleted: {:?}", w.state.errors));
+    // a script in a folder below may not import from the one above
+    write("sub/b.jfs", "let a = import(\"../a.jfs\")\nmodel.add(geom.box(1, 1, 1))\n");
+    let mut wb = crate::watch::Watched::new(&format!("{base}/sub/b.jfs"), &[]);
+    wb.build();
+    c.check(wb.state.errors.first().is_some_and(|e| e[0].contains("liegt außerhalb des Ordners des Skripts")), || format!("outside: {:?}", wb.state.errors));
+    // a script that is gone
+    let mut wg = crate::watch::Watched::new(&format!("{base}/fehlt.jfs"), &[]);
+    wg.build();
+    c.check(wg.state.errors.first().is_some_and(|e| e[0].contains("lässt sich nicht lesen")) && !wg.changed(), || format!("missing: {:?}", wg.state.errors));
+    for f in ["a.jfs", "sub/b.jfs", "sub", ""] {
+        plat::delete(&format!("{base}/{f}").trim_end_matches('/').to_string());
+    }
 }
 
 // ---------------------------------------------------------------- examples
