@@ -57,10 +57,19 @@ pub(crate) fn steps(own: bool) -> Vec<(Hud, Phase)> {
             "readback" => Hud::Readback,
             _ => continue,
         };
-        v.push((h, Phase::Latency));
+        // (the browser: no thread posts keys, nothing reads the screen; the frames the app draws only)
+        if !web_bench() {
+            v.push((h, Phase::Latency));
+        }
         v.push((h, Phase::Pacing));
     }
     v
+}
+
+/// (the browser) the measurement runs from the page's address: ?gpu=1&gpuenv=jfgui_GPU_GAMEBENCH=SECS (the page passes
+/// only jfgui_GPU_ variables), the pacing steps of path (a), SECS seconds each
+pub(crate) fn web_bench() -> bool {
+    cfg!(target_arch = "wasm32") && plat::env("jfgui_GPU_GAMEBENCH").is_some()
 }
 
 /// the run's steps one after the other: settle, measure, report
@@ -89,7 +98,7 @@ pub(crate) enum Next {
 impl Plan {
     pub(crate) fn new(own: bool, label: String) -> Plan {
         let n = arg("--n").and_then(|v| v.parse().ok()).unwrap_or(150);
-        let secs = arg("--secs").and_then(|v| v.parse().ok()).unwrap_or(3.0);
+        let secs = arg("--secs").or_else(|| plat::env("jfgui_GPU_GAMEBENCH")).and_then(|v| v.parse().ok()).unwrap_or(3.0);
         Plan { probe: Rc::new(Probe::start()), steps: steps(own), at: 0, since: 0, measuring: false, n, secs, reports: Vec::new(), label }
     }
 
@@ -104,6 +113,8 @@ impl Plan {
             let settle = if self.at == 0 { 2_500_000 } else { 600_000 };
             if now >= self.since + settle {
                 self.measuring = true;
+                // (the phase's time counts from here, not from the step's start)
+                self.since = now;
                 self.probe.begin(phase, presses);
             }
             return Next::Wait(hud);
@@ -265,6 +276,10 @@ pub(crate) fn view() -> i32 {
         started: false,
     };
     let d = AppDesc { title: "Spiel-Demo: Messung", w: 1280, h: 800, ..DESC };
+    // (the browser: the page drives the frames, the app is handed over)
+    if cfg!(target_arch = "wasm32") {
+        return ui::launch(&d, app, &style::STYLE);
+    }
     let code = ui::run_window(&d, &mut app, &style::STYLE);
     app.plan.probe.stop();
     code

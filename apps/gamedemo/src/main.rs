@@ -589,6 +589,7 @@ fn start() -> i32 {
             plat::write_stderr(format!("gamedemo: --bench view|own, not {other}\n").as_bytes());
             return 2;
         }
+        None if bench::web_bench() => return bench::view(),
         None => {}
     }
     // script runs: the beacon decoded in the first frame (the same frames every run), no sound
