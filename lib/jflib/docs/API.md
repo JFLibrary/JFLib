@@ -119,7 +119,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [physics](#physics) -- Collision shapes, broad phase and deterministic queries for games
   <br>[src/bvh.rs](#physicssrcbvhrs) · [src/character.rs](#physicssrccharacterrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
 - [game](#game) -- The game core: a world of entities and components, a fixed tick, input actions, cameras
-  <br>[lib.rs](#game-crate-root) · [src/camera.rs](#gamesrccamerars) · [src/input.rs](#gamesrcinputrs) · [src/net/arena.rs](#gamesrcnetarenars) · [src/net/bits.rs](#gamesrcnetbitsrs) · [src/net/bot.rs](#gamesrcnetbotrs) · [src/net/client.rs](#gamesrcnetclientrs) · [src/net/clock.rs](#gamesrcnetclockrs) · [src/net/input.rs](#gamesrcnetinputrs) · [src/net/lagcomp.rs](#gamesrcnetlagcomprs) · [src/net/link.rs](#gamesrcnetlinkrs) · [src/net/predict.rs](#gamesrcnetpredictrs) · [src/net/proto.rs](#gamesrcnetprotors) · [src/net/quant.rs](#gamesrcnetquantrs) · [src/net/room.rs](#gamesrcnetroomrs) · [src/net/server.rs](#gamesrcnetserverrs) · [src/net/sim.rs](#gamesrcnetsimrs) · [src/net/snapshot.rs](#gamesrcnetsnapshotrs) · [src/net/walker.rs](#gamesrcnetwalkerrs) · [src/pose.rs](#gamesrcposers) · [src/sparse.rs](#gamesrcsparsers) · [src/tick.rs](#gamesrctickrs) · [src/world.rs](#gamesrcworldrs)
+  <br>[lib.rs](#game-crate-root) · [src/camera.rs](#gamesrccamerars) · [src/input.rs](#gamesrcinputrs) · [src/net/arena.rs](#gamesrcnetarenars) · [src/net/bits.rs](#gamesrcnetbitsrs) · [src/net/bot.rs](#gamesrcnetbotrs) · [src/net/client.rs](#gamesrcnetclientrs) · [src/net/clock.rs](#gamesrcnetclockrs) · [src/net/event.rs](#gamesrcneteventrs) · [src/net/input.rs](#gamesrcnetinputrs) · [src/net/lagcomp.rs](#gamesrcnetlagcomprs) · [src/net/link.rs](#gamesrcnetlinkrs) · [src/net/predict.rs](#gamesrcnetpredictrs) · [src/net/proto.rs](#gamesrcnetprotors) · [src/net/quant.rs](#gamesrcnetquantrs) · [src/net/room.rs](#gamesrcnetroomrs) · [src/net/server.rs](#gamesrcnetserverrs) · [src/net/sim.rs](#gamesrcnetsimrs) · [src/net/snapshot.rs](#gamesrcnetsnapshotrs) · [src/net/walker.rs](#gamesrcnetwalkerrs) · [src/pose.rs](#gamesrcposers) · [src/sparse.rs](#gamesrcsparsers) · [src/tick.rs](#gamesrctickrs) · [src/world.rs](#gamesrcworldrs)
 - [game_render3d](#game_render3d) -- The bridge from the game core to render3d: entities with a mesh as scene instances
   <br>[lib.rs](#game_render3d-crate-root)
 - [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
@@ -63378,10 +63378,17 @@ client -- the client side of the netcode, without I/O: netchan's events in, mess
   fetch          a UDP client whose full state does not fit a datagram is told so in WELCOME:
                  fetch_request() names the server's WebSocket port and a ticket, the app opens a second
                  netchan connection there and feeds its events to on_fetch_event (FETCH -> FULL)
+  events         send_event (to the room's RoomSim) and take_event (the room's): reliable, in order, each
+                 delivered once (event.rs); they ride in the INPUTs and SNAPSHOTs
+  smoothing      a correction of the own figure becomes an offset of the drawn position that decays in
+                 smooth_ms (predict::Smoother; above `snap` metres it jumps): drawn() is what a frame
+                 shows, predicted() stays the exact state
+  leave          LEAVE goes out, the server removes the figure at once (NetLink::leave also ends netchan)
 
 Per frame: on_event for every netchan event (main channel), advance(now) -> n, then n times step(map,
-input) with the input of that tick; take_out what to send.  The figure is predicted() (and
-predicted_prev() with alpha() for a frame between two ticks); the others are remotes().
+input) with the input of that tick; take_out what to send.  The figure is drawn() (or predicted() and
+predicted_prev() with alpha() for a frame between two ticks); the others are remotes(); events come from
+take_event().
 ```
 
 - **`struct ClientOptions`**
@@ -63389,9 +63396,14 @@ predicted_prev() with alpha() for a frame between two ticks); the others are rem
   - `name: String` -- the player's name
   - `room: Option<RoomCode>` -- the room to join (None: make one)
   - `interp_ms: u32` -- how far behind the newest snapshot the others are shown (ms)
-  - `margin: Option<f64>` -- the margin the inputs aim for (None: the server's)
+  - `margin: Option<f64>` -- the margin the inputs aim for (None: the server's, over a WebSocket plus stream_margin)
+  - `stream_margin: f64` -- ticks the margin gets over a WebSocket (set_reliable) on top of the server's: TCP delivers what follows a
+    lost segment only after its retransmission (1: over WLAN 2.7 instead of 12 corrections a minute)
   - `ring: usize` -- snapshots kept as bases and for interpolation
   - `min_redundancy: usize` -- inputs every packet repeats at least (the newest and the ones before it)
+  - `smooth_ms: u32` -- the time constant in which a correction of the drawn own figure decays (ms; 0: no smoothing)
+  - `snap: f64` -- a correction larger than this is not smoothed: the picture jumps (m)
+  - `event_budget: usize` -- the bytes of the events an INPUT carries at most
 
 - **`enum Phase`**
   where a client stands
@@ -63400,6 +63412,7 @@ predicted_prev() with alpha() for a frame between two ticks); the others are rem
   - `Playing` -- in a room
   - `Refused(u8)` -- the server refused (proto::REFUSE_\*)
   - `Closed` -- the channel ended
+  - `Left` -- the client left (leave)
 
 - **`struct ClientStats`**
   what a client counted
@@ -63457,6 +63470,31 @@ predicted_prev() with alpha() for a frame between two ticks); the others are rem
   the interpolation clock
 - **`fn last_outcome(&self) -> Option<Outcome>`**
   what the last reconciliation found
+- **`fn set_reliable(&mut self, on: bool)`**
+  the channel is reliable (a WebSocket): its events go once instead of until acknowledged, its margin is
+  stream_margin more (call it before WELCOME).  NetLink and the simulated network's users set it; without it a
+  client resends over a WebSocket too (harmless: duplicates are dropped)
+- **`fn send_event(&mut self, channel: u8, data: &[u8]) -> bool`**
+  queue an event for the room's RoomSim (reliable, in order) -> false when refused: not in a room, a channel
+  over 15, more than event::MAX_EVENT bytes, event::MAX_PENDING not yet acknowledged
+- **`fn take_event(&mut self) -> Option<NetEvent>`**
+  the next event of the room (each once, in the order the room sent them)
+- **`fn events_out(&self) -> OutboxStats`**
+  what the outbox of the client's events counted
+- **`fn events_in(&self) -> InboxStats`**
+  what the inbox of the room's events counted
+- **`fn events_pending(&self) -> usize`**
+  events of the client not yet acknowledged by the server
+- **`fn leave(&mut self)`**
+  leave the room: LEAVE goes out (take_out), the server removes the figure at once; the phase is Left and
+  nothing more is sent.  (NetLink::leave sends it and ends netchan's connection too.)
+- **`fn smoothing(&self) -> Vec3`**
+  what a frame adds to the predicted position of the own figure: the rest of the corrections, decaying
+- **`fn smoother(&self) -> &Smoother`**
+  the smoothing's counts: (corrections, of those snapped)
+- **`fn drawn(&self) -> Option<Vec3>`**
+  where a frame draws the own figure: the predicted position between the last two ticks (alpha) plus the
+  decaying rest of the corrections (None before the first snapshot)
 - **`fn on_event(&mut self, map: &physics::World, e: &ClientEvent, now_ns: u64)`**
   one of netchan's client events of the main channel at time now_ns
 - **`fn fetch_request(&mut self) -> Option<(u16, u64)>`**
@@ -63551,6 +63589,125 @@ the own figure); docs/NETCODE.md, "Zeit".
   the render time: a tick and the fraction towards the next (None before the first snapshot)
 - **`fn behind(&self) -> f64`**
   how far the render time is behind the newest snapshot, in ticks
+
+### `game/src/net/event.rs`
+
+Source: [`lib/game/src/net/event.rs`](../lib/game/src/net/event.rs)
+
+```text
+event -- reliable events over the netcode's own packets: each delivered once and in order, over UDP and over a
+WebSocket (docs/NETCODE.md, "Ereignisse")
+
+  NetEvent   a tick, a channel (0 ..= 15: the game's kinds, such as the kill feed, hit confirmations, chat) and
+             up to MAX_EVENT bytes
+  Outbox     the sender's side: every event gets the next number of one sequence per direction (u16, wrapping)
+             and stays until the peer acknowledges it; every packet carries the oldest ones up to a byte budget.
+             Over a WebSocket (reliable and ordered) each goes once and is forgotten
+  Inbox      the receiver's side: the number it expects next.  A packet's run of events starts at or before it
+             (the sender forgets only what was acknowledged): the ones before are duplicates, the rest are
+             delivered in order; the acknowledgement rides in the next packets of the other direction
+  write_section / read_section   a run of events in a bit stream (after a message's header, proto.rs)
+
+Server -> client the events ride in SNAPSHOTs, client -> server in INPUTs, and each side acknowledges in its own
+packets what it got (proto.rs: the event part after the header, flagged in byte 0).  This is the rule of Quake 3's
+reliable commands: whatever the network loses, duplicates or reorders, a packet that arrives holds a run without a
+gap from what the receiver expects, so nothing waits for anything (no reordering buffer, no timer, no extra
+packet).  Delivered in one order per direction, so in order per channel as well.  The price: an event rides in
+every packet until its acknowledgement comes back -- at 30 snapshots a second and a round trip of 100 ms four or
+five times; a kill-feed line of a few bytes costs little.  Why here and not in netchan: see NETCODE.md.
+```
+
+```rust
+/// the bytes of one event at most
+MAX_EVENT: usize = 255
+/// channels (0 ..= 15)
+CHANNELS: u8 = 16
+/// events an outbox holds at most (more: the peer does not acknowledge; a server drops such a client)
+MAX_PENDING: usize = 512
+/// events one packet's run holds at most
+MAX_RUN: usize = 256
+/// packets of the other direction that carry the acknowledgement after events came (a duplicate starts it again)
+ACK_PACKETS: u32 = 32
+```
+
+- **`struct NetEvent`**
+  one event (see the module header)
+  - `tick: u32` -- the sender's tick when it happened (the server's tick; a client's predicted tick)
+  - `channel: u8` -- the channel: the game's kind of event (0 ..= 15)
+  - `data: Vec<u8>` -- the game's bytes (at most MAX_EVENT)
+
+**`impl NetEvent`**
+
+- **`fn new(tick: u32, channel: u8, data: &[u8]) -> NetEvent`**
+  an event of `channel` at `tick` with these bytes
+- **`fn valid(&self) -> bool`**
+  within the limits (channel, size)
+- **`fn bits(&self, base_tick: u32) -> usize`**
+  its bits in a run whose ticks count from `base_tick`
+
+- **`fn seq_diff(a: u16, b: u16) -> i32`**
+  a - b of two event numbers (they wrap)
+
+- **`fn write_section(w: &mut BitWriter, first: u16, events: &[NetEvent], base_tick: u32)`**
+  write a run: the number of its first event, the count, then each event (channel, tick against `base_tick`, length,
+  bytes)
+
+- **`fn read_section(r: &mut BitReader, base_tick: u32) -> Option<(u16, Vec<NetEvent>)>`**
+  read a run (None when malformed: a count or length out of range, the stream too short)
+
+- **`struct OutboxStats`**
+  what an outbox counted
+  - `queued: u64` -- events queued
+  - `refused: u64` -- events refused (too long, a bad channel, the outbox full)
+  - `sent: u64` -- events put into a packet for the first time
+  - `resent: u64` -- ... and again (UDP: until acknowledged)
+  - `done: u64` -- events acknowledged (or, over a WebSocket, sent)
+  - `bits: u64` -- the bits of the runs written
+
+- **`struct Outbox`**
+  the sender's side (see the module header)
+
+**`impl Outbox`**
+
+- **`fn new(reliable: bool, budget: usize) -> Outbox`**
+  an empty outbox; `reliable`: the transport delivers (a WebSocket), each event goes once; `budget`: the bytes
+  of the events a packet carries at most (it always carries at least one)
+- **`fn push(&mut self, e: NetEvent) -> bool`**
+  queue an event -> false when refused (too long, a bad channel, MAX_PENDING waiting)
+- **`fn pending(&self) -> usize`**
+  events waiting (not yet acknowledged; over a WebSocket: not yet sent)
+- **`fn stats(&self) -> OutboxStats`**
+  what it counted
+- **`fn take_run(&mut self, base_tick: u32) -> Option<(u16, Vec<NetEvent>)>`**
+  the run the next packet carries (the number of its first event and the events), None when nothing waits;
+  ticks of the bit count against `base_tick` (the packet's tick)
+- **`fn ack(&mut self, seq: u16)`**
+  the peer has every event up to `seq` (an acknowledgement of a number never sent is ignored)
+
+- **`struct InboxStats`**
+  what an inbox counted
+  - `delivered: u64` -- events delivered (once each)
+  - `duplicates: u64` -- events that came again (dropped)
+  - `gaps: u64` -- runs that started after the next expected number (an honest sender never sends one; dropped)
+  - `overflow: u64` -- events dropped because the app did not take them (MAX_PENDING waiting)
+
+- **`struct Inbox`**
+  the receiver's side (see the module header)
+
+**`impl Inbox`**
+
+- **`fn new(acks: bool) -> Inbox`**
+  an empty inbox expecting event 0; `acks`: acknowledge (false over a WebSocket, whose sender does not wait)
+- **`fn receive(&mut self, first: u16, events: Vec<NetEvent>)`**
+  a packet's run: the new events in order into the queue, duplicates dropped
+- **`fn take(&mut self) -> Option<NetEvent>`**
+  the next event delivered (in order)
+- **`fn waiting(&self) -> usize`**
+  events delivered and not yet taken
+- **`fn ack_for_packet(&mut self) -> Option<u16>`**
+  the acknowledgement the next packet carries (every event up to it came), None when nothing came lately
+- **`fn stats(&self) -> InboxStats`**
+  what it counted
 
 ### `game/src/net/input.rs`
 
@@ -63689,7 +63846,8 @@ link -- the netcode on real sockets: netchan's Server and Client under NetServer
                                 Linux, Apple: netchan::Server needs netio)
   NetLink<M>                    a client's channel and, when WELCOME asks for it, the fetch's WebSocket
                                 (ws://host:port/path of the server's UDP address); pump(map, now) reads
-                                both, flush() sends what the game queued
+                                both, flush() sends what the game queued, leave() ends it cleanly (LEAVE,
+                                then netchan's DISCONNECT: the server removes the figure at once)
 
 A server's loop: serve(..) then server.wait(ms to the next tick) (never plat::sleep_ms(1) on Windows:
 docs/TRANSPORT.md).  A client's frame: link.pump(map, now), n = link.game.advance(now), n times
@@ -63712,6 +63870,9 @@ link.game.step(map, input), link.flush().
   read the channels, feed the game, open the fetch when asked
 - **`fn flush(&mut self)`**
   send what the game queued
+- **`fn leave(&mut self)`**
+  leave the room: LEAVE (the server removes the figure at once), then netchan's DISCONNECT (over UDP three
+  times) and the end of a fetch's WebSocket.  Dropping a NetLink only does the last two
 - **`fn channel(&self) -> &Client`**
   the main channel (its state, stats, round-trip time)
 - **`fn fetching(&self) -> bool`**
@@ -63735,6 +63896,8 @@ applies its inputs since then again (reconciliation)
                 walker::Walker; G7h's character controller takes its place
   Predictor     the inputs and predicted states since the newest confirmed tick; step, reconcile, the
                 current and previous state (a frame blends the two by the tick's alpha)
+  Smoother      what a frame draws after a correction: the jump of the predicted position becomes an offset
+                that decays in a short time (and snaps above a distance); the predicted state stays exact
 
 A prediction is exact when the server used the client's own inputs: reconcile then finds the same
 state and only drops history.  It differs after a missed input (the server repeated the last one), a
@@ -63802,6 +63965,30 @@ the server's state and the client's later inputs lead.
 - **`fn clear(&mut self)`**
   forget everything (a new figure, a new room)
 
+- **`struct Smoother`**
+  the drawn position of the own figure after corrections (see the module header).  A correction moves the
+  predicted position by a jump; the offset takes the jump back, so the picture does not move at that moment, and
+  decays like exp(-t / decay) (a rational approximation, the same for any frame rate within a few percent).  Above
+  `snap` metres (a teleport, a return after death) the offset is dropped: the picture jumps with the state.  The
+  prediction itself never sees the offset: it stays bit for bit the server's.
+  - `decay_ms: f64` -- the time constant of the decay (ms; 0: no smoothing)
+  - `snap: f64` -- a correction (with what is still left) larger than this is not smoothed (m)
+  - `corrections: u64` -- corrections taken in, and of those dropped by snap
+  - `snaps: u64` -- see corrections
+
+**`impl Smoother`**
+
+- **`fn new(decay_ms: f64, snap: f64) -> Smoother`**
+  an offset of 0 decaying with `decay_ms`, snapping above `snap` metres
+- **`fn correct(&mut self, jump: Vec3)`**
+  the predicted position jumped by `jump` (new minus old): the offset takes it back
+- **`fn reset(&mut self)`**
+  forget the offset (a new figure, a reset of the prediction)
+- **`fn advance(&mut self, dt: f64)`**
+  `dt` seconds passed
+- **`fn offset(&self) -> Vec3`**
+  what a frame adds to the predicted position (blended by alpha) of the own figure
+
 ### `game/src/net/proto.rs`
 
 Source: [`lib/game/src/net/proto.rs`](../lib/game/src/net/proto.rs)
@@ -63823,13 +64010,19 @@ rest a bit stream of bits.rs)
                                 inputs, then the entities (snapshot.rs)
   FETCH      client -> server   (on a WebSocket of its own) the ticket of WELCOME
   FULL       server -> client   (on that WebSocket) a SNAPSHOT against the baseline without a budget
+  LEAVE      client -> server   the player leaves: the server removes the figure at once
+
+The event part (event.rs): bit 7 of byte 0 (EXT) says that an INPUT or SNAPSHOT carries an acknowledgement of
+the other side's events and / or a run of its own events: after a SNAPSHOT's header (before the entities, so the
+budget counts it), after an INPUT's inputs.  Without events the bytes are those of version 1.
 
 Every reader returns None for anything malformed or too large (bytes from the network never panic).
 ```
 
 ```rust
-/// the netcode's own version (HELLO); a game's version goes into netchan's protocol id
-VERSION: u16 = 1
+/// the netcode's own version (HELLO); a game's version goes into netchan's protocol id.  2 since G7e part 2 (the
+/// event part, LEAVE)
+VERSION: u16 = 2
 /// message types (byte 0)
 MSG_HELLO: u8 = 1
 /// see the module header
@@ -63844,6 +64037,10 @@ MSG_SNAPSHOT: u8 = 5
 MSG_FETCH: u8 = 6
 /// see the module header
 MSG_FULL: u8 = 7
+/// see the module header
+MSG_LEAVE: u8 = 8
+/// bit 7 of byte 0: an event part follows (see the module header)
+EXT: u8 = 0x80
 /// REFUSE: another version of the netcode
 REFUSE_VERSION: u8 = 1
 /// REFUSE: the room has its players
@@ -63893,6 +64090,13 @@ REFUSE_PROTOCOL: u8 = 7
   - `player: u16` -- the net id of the receiver's figure (0: none)
   - `have: u32` -- the receiver's inputs are complete up to this tick
   - `margin: Option<i8>` -- the smallest margin of its inputs since the last snapshot (None: none came)
+  - `ev_ack: Option<u16>` -- the event part: the server has every event of the client up to this one
+  - `events: bool` -- the event part: a run of the server's events follows the header (event::read_section, ticks against `tick`)
+
+**`impl SnapHeader`**
+
+- **`fn new(tick: u32, base: Base, player: u16, have: u32, margin: Option<i8>) -> SnapHeader`**
+  a header without an event part
 
 - **`struct InputMsg`**
   an INPUT
@@ -63900,9 +64104,19 @@ REFUSE_PROTOCOL: u8 = 7
   - `inputs: Vec<NetInput>` -- the inputs, the newest first
   - `ack: Option<u32>` -- the newest snapshot the client decoded
   - `full: Option<u32>` -- the FULL it fetched (repeated until the server bases on it)
+  - `ev_ack: Option<u16>` -- the event part: the client has every event of the server up to this one
+  - `events: Option<(u16, Vec<NetEvent>)>` -- the event part: a run of the client's events (the number of the first and the events; ticks against `newest`)
+
+**`impl InputMsg`**
+
+- **`fn new(newest: u32, inputs: Vec<NetInput>, ack: Option<u32>, full: Option<u32>) -> InputMsg`**
+  an INPUT without an event part
 
 - **`fn msg_type(b: &[u8]) -> Option<u8>`**
-  the type of a message (None: empty)
+  the type of a message without the EXT flag (None: empty)
+
+- **`fn has_ext(b: &[u8]) -> bool`**
+  whether a message has an event part (EXT)
 
 - **`fn write_hello(h: &Hello) -> Vec<u8>`**
   HELLO as bytes
@@ -63940,6 +64154,12 @@ REFUSE_PROTOCOL: u8 = 7
 
 - **`fn read_fetch(b: &[u8]) -> Option<u64>`**
   FETCH's ticket
+
+- **`fn write_leave() -> Vec<u8>`**
+  LEAVE as bytes
+
+- **`fn is_leave(b: &[u8]) -> bool`**
+  whether the bytes are a LEAVE
 
 ### `game/src/net/quant.rs`
 
@@ -64073,7 +64293,8 @@ Source: [`lib/game/src/net/server.rs`](../lib/game/src/net/server.rs)
 server -- the server-authoritative side of the netcode, without I/O: netchan's events in, messages out
 
   RoomSim        what a game puts into a room: its schema, the map's baseline, join and leave, one tick
-                 with the players' inputs, the replicated world, the priority of an entity for a viewer
+                 with the players' inputs, the replicated world, the priority of an entity for a viewer,
+                 and the reliable events both ways (on_event, take_events)
   NetServer      rooms by code, connections by netchan id; on_event takes netchan's ServerEvents (of a
                  netchan::Server with sockets or of an endpoint::ServerCore on a simulated network),
                  advance(now) runs the ticks due at the fixed rate, take_out / take_close say what to send
@@ -64086,7 +64307,14 @@ a snapshot.  A snapshot is a delta against a base the client holds: over a WebSo
 is better, the newest complete one it confirmed (the FULL it fetched), else the map's baseline.  Its
 changes are ordered -- the client's own figure, what is gone, then by a priority added up per snapshot
 until the entity is sent -- and cut to the budget (1200 bytes unless set: netchan does not fragment).
-What was sent is remembered per client exactly as the client will hold it.
+What was sent is remembered per client exactly as the client will hold it.  The events of the room
+(RoomSim::take_events) ride in every snapshot until the client acknowledges them (event.rs); the client's
+events come with its INPUTs and reach the RoomSim at the start of the next tick.
+
+Rooms are independent: a room's tick (its inputs, its step, its events, its snapshots) touches nothing of
+another room.  With set_parallel the rooms of a tick run side by side on plat's worker pool (one room per
+item: one room per core with enough cores); their messages are merged in the order of the room codes, so
+the server sends bit for bit what it sends on one thread.
 
 Joining: HELLO -> WELCOME.  The full state goes with the first snapshot when it fits (a WebSocket always:
 up to stream_budget).  A UDP client whose full state does not fit a datagram gets it filled in: its
@@ -64094,8 +64322,30 @@ snapshots are cut by priority, so it sees its own figure and the most important 
 rest in the next snapshots (about 200 ms for 300 props, as fast as the fetch; the user's decision of
 19.11.2026).  With ServerOptions::fetch_full it gets a ticket instead and fetches the full state over a
 WebSocket of its own (FETCH -> FULL at the next snapshot tick; the user's first decision of 18.11.2026),
-filled in by priority until the FULL arrives.
+filled in by priority until the FULL arrives.  Leaving: LEAVE (or netchan's DISCONNECT) removes the
+figure at once; a client that goes silent is removed when netchan's timeout ends its connection.
+
+Room codes and tickets come from the server's generator: a seeded one (new: tests, the simulated network,
+a practice mode in the browser) or the system's cryptographic random numbers (secure, with_random): a
+ticket is sent to its client, and a seeded xorshift gives its state away with one output.
 ```
+
+- **`enum To`**
+  who gets an event of a room
+  - `All` -- every player of the room
+  - `Player(u16)` -- the player with this figure
+  - `AllBut(u16)` -- every player but this one
+
+**`impl To`**
+
+- **`fn includes(&self, id: u16) -> bool`**
+  whether the player with figure `id` gets it
+
+- **`struct RoomEvent`**
+  an event a room sends to its players (RoomSim::take_events): reliable, in order, each delivered once
+  - `to: To` -- who gets it
+  - `channel: u8` -- the game's channel (0 ..= 15)
+  - `data: Vec<u8>` -- the game's bytes (at most event::MAX_EVENT)
 
 - **`trait RoomSim`**
   what a game puts into a room (see the module header)
@@ -64106,13 +64356,18 @@ filled in by priority until the FULL arrives.
   - `fn join(&mut self, name: &str) -> Option<u16>`
     a player joins with this (cleaned, unique) name -> the net id of its figure (None: no place)
   - `fn leave(&mut self, player: u16)`
-    the player's figure goes
+    the player's figure goes (it left, or its connection ended)
   - `fn step(&mut self, tick: u32, dt: f64, inputs: &[(u16, NetInput, bool)])`
     one tick: every player's input (net id, input, false when it is the last one repeated)
   - `fn snapshot(&self, tick: u32, out: &mut Snapshot)`
     the replicated world after the tick (tick set, entities sorted by id)
   - `fn priority(&self, viewer: u16, e: &Ent) -> u32`
     how much `e` matters to the player `viewer` now (added up every snapshot until it is sent)
+  - `fn on_event(&mut self, player: u16, e: &NetEvent)`
+    an event of the player with figure `player` (reliable, in order): at the start of the tick after it came,
+    before step, by the figures' ids and in the order they came
+  - `fn take_events(&mut self, out: &mut Vec<RoomEvent>)`
+    the events of the last step for the players (asked after every step; their tick is the step's)
 
 - **`struct ServerOptions`**
   a server's settings
@@ -64122,6 +64377,7 @@ filled in by priority until the FULL arrives.
   - `max_rooms: usize` -- rooms at once
   - `budget: usize` -- the bytes of a snapshot (UDP's limit; netchan's max_payload)
   - `stream_budget: usize` -- the bytes of a join's state over a WebSocket and of a FULL (below netchan's max_stream_payload)
+  - `event_budget: usize` -- the bytes of the events a snapshot carries at most (out of `budget`; it always carries one)
   - `margin: u8` -- the margin the clients' inputs should arrive with (ticks)
   - `max_rewind_ms: u32` -- how far back hits are rewound at most (ms; 300 unless set: the 100 ms of the interpolation buffer and
     200 ms beyond them, the user's decision of 2026-11-19)
@@ -64146,6 +64402,10 @@ filled in by priority until the FULL arrives.
   - `full_bytes: u64` -- the bytes of the FULLs
   - `joins: u64` -- players who joined, refusals
   - `refused: u64` -- HELLOs refused
+  - `left: u64` -- players who left with LEAVE
+  - `events_out: u64` -- events of the rooms queued for players
+  - `events_in: u64` -- events of players handed to their rooms
+  - `event_overflow: u64` -- players dropped because they did not acknowledge their events (event::MAX_PENDING waiting)
   - `sizes: Vec<u16>` -- the payload size of every snapshot (the first 200 000, for percentiles)
 
 - **`struct LinkStats`**
@@ -64155,6 +64415,8 @@ filled in by priority until the FULL arrives.
   - `partial: u64` -- cut by the budget
   - `from_map: u64` -- based on the map's baseline
   - `inputs: InputStats` -- the inputs
+  - `events: OutboxStats` -- the events to the client
+  - `events_in: InboxStats` -- the events of the client
 
 - **`type RoomFactory<S> = Box<dyn FnMut(&RoomCode) -> S + Send>`**
   the factory of a room's simulation
@@ -64165,14 +64427,23 @@ filled in by priority until the FULL arrives.
 **`impl<S: RoomSim> NetServer<S>`**
 
 - **`fn new(opts: ServerOptions, seed: u64, factory: RoomFactory<S>) -> NetServer<S>`**
-  a server with these settings; `seed` drives room codes and tickets (random in a real server),
-  `factory` makes a room's simulation
+  a server with these settings whose room codes and tickets come from a generator seeded with `seed` (the
+  same codes every run: tests, the simulated network, a practice mode); `factory` makes a room's simulation.
+  A server on the network takes secure() or with_random()
+- **`fn with_random(opts: ServerOptions, random: fn() -> u64, factory: RoomFactory<S>) -> NetServer<S>`**
+  a server whose room codes and tickets come from `random` (a cryptographic source, such as
+  plat::random_u64; secure() takes that one)
+- **`fn secure(opts: ServerOptions, factory: RoomFactory<S>) -> NetServer<S>`**
+  a server whose room codes and tickets come from the system's cryptographic random numbers
+  (plat::random_u64: Windows, Linux, Apple, Android)
 - **`fn options(&self) -> &ServerOptions`**
   the settings
 - **`fn tick(&self) -> u32`**
   the next tick to run
 - **`fn stats(&self) -> &ServerStats`**
   what it counted
+- **`fn parallel(&self) -> bool`**
+  whether the rooms run side by side (set_parallel)
 - **`fn link_stats(&self, conn: u32) -> Option<LinkStats>`**
   a client's counts (None: no player on that connection)
 - **`fn rooms(&self) -> Vec<RoomCode>`**
@@ -64182,9 +64453,12 @@ filled in by priority until the FULL arrives.
 - **`fn room_mut(&mut self, code: &RoomCode) -> Option<&mut S>`**
   a room's simulation for changing it
 - **`fn players(&self, code: &RoomCode) -> Vec<(u32, u16, String)>`**
-  a room's players: (connection, figure id, name)
+  a room's players: (connection, figure id, name), in the order they joined
 - **`fn player_of(&self, conn: u32) -> Option<(RoomCode, u16)>`**
   the room and figure of a connection
+- **`fn send_event(&mut self, conn: u32, channel: u8, data: &[u8]) -> bool`**
+  queue an event for the player on connection `conn` (besides those of its room) -> false when refused (no
+  player there, too long, a bad channel, its outbox full)
 - **`fn create_room(&mut self) -> Option<RoomCode>`**
   make an empty room (a lobby could hand its code out) -> its code; None when the server has its rooms
 - **`fn take_out(&mut self) -> Option<(u32, Vec<u8>)>`**
@@ -64199,6 +64473,14 @@ filled in by priority until the FULL arrives.
   the clock stands at now_ns (any monotonic clock): the ticks due run -> how many
 - **`fn step(&mut self)`**
   one tick now
+
+**`impl<S: RoomSim + Send> NetServer<S>`**
+
+- **`fn set_parallel(&mut self, on: bool)`**
+  run the rooms of a tick side by side on plat's worker pool (plat::parallel_for, one room per item; the pool
+  has a thread per core unless `--threads N`), or one after another (false, the default).  Every room is
+  deterministic as on one thread and the results are merged in the order of the room codes: the messages are
+  the same bit for bit.  Without threads (the browser without shared memory) the pool runs the rooms in turn.
 
 ### `game/src/net/sim.rs`
 
