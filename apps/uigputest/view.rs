@@ -12,7 +12,8 @@
 //   viewlose   Device::test_lose while the view moves: the CPU path with the last frame, the content detached, a new
 //              device: attached again, its renderer built anew, the same picture
 //   viewplain  without reading every presented image back: during an animation the framebuffer lacks the view,
-//              Ui::gpu_settle gives it, at rest it holds it by itself; a popup over it reads every frame back
+//              Ui::gpu_settle gives it, at rest it holds it by itself; (G7b) something of the base over it: veils, no
+//              frame read back while it turns, the screen = the CPU's picture; a popup over it reads every frame back
 //   viewcpu    jfgui_GPU_OUTPUT=0: the windows on the CPU path, the views on a device of their own (Voll), every
 //              frame read back; the window's DC shows it
 //   viewoff    jfgui_GPU=0: no device, the content paints
@@ -227,6 +228,26 @@ impl GpuContent for View3d {
     fn paint(&self, g: &mut Gfx, r: [i32; 4]) {
         g.dc.set_color(PAINT);
         g.dc.fill(g.sf, r[0], r[1], r[2], r[3]);
+    }
+}
+
+/// (G7b) what the screen shows of window 0's client rectangle r (Windows: the composed screen; X11: the window's image;
+/// None: no way to read it, as on Wayland), rows of B, G, R, x
+fn shown_rect(r: [i32; 4]) -> Option<Vec<u8>> {
+    if cfg!(windows) {
+        let w = plat::win_get_rect(0)?;
+        plat::win_test_screen(w[0] + r[0], w[1] + r[1], r[2], r[3])
+    } else {
+        let (w, h, px) = plat::win_test_image(0)?;
+        if r[0] < 0 || r[1] < 0 || r[0] + r[2] > w || r[1] + r[3] > h {
+            return None;
+        }
+        let mut v = Vec::with_capacity((r[2] * r[3] * 4) as usize);
+        for y in r[1]..r[1] + r[3] {
+            let at = (y * w + r[0]) as usize * 4;
+            v.extend_from_slice(&px[at..at + r[2] as usize * 4]);
+        }
+        Some(v)
     }
 }
 
@@ -826,10 +847,76 @@ impl Test {
                     let i = self.view_info(ui, 0, VIEW_ID);
                     self.ok(i.reads == self.mark[0] + 1, &format!("at rest again: {} read-back", i.reads - self.mark[0]));
                     self.view_check(ui, &c, r, false, true, "at rest again, nobody asked");
+                    // (G7b) something of the base over it next: veils
+                    self.sc.views.hud = true;
+                    let o = ui.gpu_output(0);
+                    self.mark[0] = i.reads;
+                    self.mark[1] = i.frames;
+                    self.mark[2] = o.veil_draws;
+                    self.mark[3] = o.veil_settles;
+                    self.pc = 20;
+                    self.since = plat::time_us();
+                    self.since_pass = self.passes;
+                }
+            }
+            20 => {
+                // (G7b) it turns with something of the base over it: those cells are veils, no frame is read back, the
+                // cells are drawn twice once (not for every frame)
+                if self.view_turn(30) {
+                    let (i, o) = (self.view_info(ui, 0, VIEW_ID), ui.gpu_output(0));
+                    let (n, f, draws) = (i.reads - self.mark[0], i.frames - self.mark[1], o.veil_draws - self.mark[2]);
+                    self.ok(n == 0 && f >= 10, &format!("something over it while it turns: {n} read-backs for {f} frames (before G7b: one per frame)"));
+                    self.ok(o.veil_cells > 0 && o.veil_rects > 0, &format!("veils: {} cells in {} rectangles", o.veil_cells, o.veil_rects));
+                    self.ok(draws > 0 && draws <= 2 * o.veil_cells as u64, &format!("{draws} cells drawn twice for them in {f} frames ({} veils)", o.veil_cells));
+                    self.next();
+                }
+            }
+            21 => {
+                // the screen (the output's pass: K + T · frame) against the CPU's picture of the same frame (settled now:
+                // what lies over the view drawn over the frame read back)
+                if self.after(70) {
+                    let shot = shown_rect(r);
+                    let i = self.view_info(ui, 0, VIEW_ID);
+                    self.ok(i.reads == self.mark[0], &format!("not settled yet: {} read-backs", i.reads - self.mark[0]));
+                    ui.gpu_settle();
+                    let want = fb_rect(ui.fb(), r);
+                    let (cx, cy) = (r[0] + 120, r[1] + 30);
+                    match shot {
+                        None => out("note: veils on the screen: no way to read a rectangle of it here (no result)"),
+                        Some(_) if plat::win_test(plat::WT_FROM_POINT, 0, [cx, cy, 0, 0]) != 1 => {
+                            out("note: veils on the screen: another window lies on top of ours (no result)")
+                        }
+                        Some(got) => {
+                            let (n, m) = rgb_diff(&got, &want);
+                            self.ok(m <= 1, &format!("veils on the screen against the CPU's picture ({} x {}): {n} pixels differ (largest {m})", r[2], r[3]));
+                        }
+                    }
+                    let (i, o) = (self.view_info(ui, 0, VIEW_ID), ui.gpu_output(0));
+                    self.ok(i.reads == self.mark[0] + 1 && o.veil_settles > self.mark[3] && o.veil_cells == 0,
+                            &format!("Ui::gpu_settle: {} read-back, the veils settled ({} veils left)", i.reads - self.mark[0], o.veil_cells));
+                    self.mark[0] = i.reads;
+                    self.next();
+                }
+            }
+            22 => {
+                if self.view_turn(10) {
+                    self.next();
+                }
+            }
+            23 => {
+                // at rest the veils settle by themselves: the framebuffer holds what lies over the view over its frame
+                if self.after(500) {
+                    let c = self.one();
+                    let (i, o) = (self.view_info(ui, 0, VIEW_ID), ui.gpu_output(0));
+                    self.ok(i.reads == self.mark[0] + 1 && o.veil_cells == 0, &format!("at rest with the veils: {} read-back, {} veils left", i.reads - self.mark[0], o.veil_cells));
+                    self.view_check_rows(ui, &c, r, 60, false, false, "below what lies over it, at rest");
+                    self.sc.views.hud = false;
                     self.sc.mask = 2;
                     self.mark[0] = i.reads;
                     self.mark[1] = i.frames;
-                    self.next();
+                    self.pc = 5;
+                    self.since = plat::time_us();
+                    self.since_pass = self.passes;
                 }
             }
             5 => {
