@@ -1,0 +1,63 @@
+# Off-Page-Referenz: ein Fünfeck, das nach unten zeigt (ein Quadrat mit einer Spitze), für die
+# Fortsetzung auf einer anderen Seite -- in ISO 5807 nicht eigens genormt, daher in der üblichen
+# Form.  15 x 15 mm (US 0.625 in).  Row_1 an der linken Ecke über der Spitze ändert deren Höhe
+# (nur senkrecht, als Abstand von unten, höchstens die halbe Höhe).  Der Text steht im Quadrat,
+# der untere Verbindungspunkt in der Spitze.
+master: Off-page reference
+name.de: Off-Page-Referenz
+name.en: Off-page reference
+name.es: Referencia a otra página
+name.it: Riferimento ad altra pagina
+name.fr: Renvoi vers une autre page
+prompt.de: Verweis darauf, dass der Ablauf auf einer anderen Seite weitergeht. Mit dem gelben Steuerpunkt ändern Sie die Höhe der Spitze.
+prompt.en: Shows that the flow continues on another page. Drag the yellow control handle to change the height of the point.
+prompt.es: Indica que el flujo continúa en otra página. Arrastre el controlador amarillo para cambiar la altura de la punta.
+prompt.it: Indica che il flusso prosegue in un'altra pagina. Trascina la maniglia di controllo gialla per cambiare l'altezza della punta.
+prompt.fr: Indique que le flux continue sur une autre page. Faites glisser la poignée de contrôle jaune pour modifier la hauteur de la pointe.
+keywords.de: Referenz, Seitenverweis, andere Seite, Fortsetzung, Fünfeck, Sprung, Flussdiagramm
+keywords.en: reference, off-page, other page, continuation, pentagon, jump, flowchart
+keywords.es: referencia, otra página, continuación, pentágono, salto, diagrama de flujo
+keywords.it: riferimento, altra pagina, continuazione, pentagono, salto, diagramma di flusso
+keywords.fr: renvoi, autre page, suite, pentagone, saut, diagramme de flux
+
+[Shape]
+Width = 15 mm
+Width.us = 0.625 in
+Height = 15 mm
+Height.us = 0.625 in
+TxtWidth = Width
+TxtHeight = Height-User.P
+TxtPinX = Width*0.5
+TxtPinY = (Height+User.P)*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+msvShapeCategories:  Value = "Flowchart"
+# die Höhe der Spitze
+P:  Value = MIN(MAX(Controls.Row_1.Y, 0), Height*0.5)
+
+[Geometry]
+MoveTo  X = Width*0.5; Y = 0
+LineTo  X = Width; Y = User.P
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = User.P
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = 0; Y = 5 mm
+        Y.us = 0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 2; CanGlue = FALSE
+        Tip.de = "Höhe der Spitze ändern"
+        Tip.en = "Change the height of the point"
+        Tip.es = "Cambiar la altura de la punta"
+        Tip.it = "Cambia l'altezza della punta"
+        Tip.fr = "Modifier la hauteur de la pointe"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

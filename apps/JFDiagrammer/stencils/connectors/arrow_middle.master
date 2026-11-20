@@ -1,0 +1,75 @@
+# Pfeil - Mitte: eine gerade Linie ohne Linienenden (BeginArrow/EndArrow 0) mit einer Spitze in
+# der Mitte, die zum Ende zeigt.  Die Spitze in der Mitte ist ein geschlossener Abschnitt, gefüllt
+# mit der Linienfarbe (FillForegnd = LineColor, FillPattern 1: keine feste Farbe, sie folgt dem
+# Design); die Linie selbst sind zwei Hälften ohne Füllung, damit der erste Teilpfad am Anfang
+# beginnt und der letzte am Ende endet (dort zeichnet die App die Linienenden).  Liegt auf der
+# Linie vom Anfang zum Ende und dreht sich mit ihr (PinX, Width, Angle aus den Enden); die Enden
+# kleben an Shapes, mit GlueType 2 auch an das ganze Shape.
+master: Arrow - middle
+name.de: Pfeil - Mitte
+name.en: Arrow - middle
+name.es: Flecha - centro
+name.it: Freccia - centro
+name.fr: Flèche - milieu
+prompt.de: Gerade Linie mit einer Pfeilspitze in der Mitte, die die Richtung zeigt. Ziehen Sie die Enden auf Shapes.
+prompt.en: Straight line with an arrowhead in the middle that shows the direction. Drag the ends onto shapes.
+prompt.es: Línea recta con una punta de flecha en el centro que indica la dirección. Arrastre los extremos sobre las formas.
+prompt.it: Linea retta con una punta di freccia al centro che indica la direzione. Trascina le estremità sulle forme.
+prompt.fr: Ligne droite avec une pointe de flèche au milieu qui indique la direction. Faites glisser les extrémités sur les formes.
+keywords.de: Pfeil, Mitte, Richtung, Fluss, Linie, Verbinder
+keywords.en: arrow, middle, direction, flow, line, connector
+keywords.es: flecha, centro, dirección, flujo, línea, conector
+keywords.it: freccia, centro, direzione, flusso, linea, connettore
+keywords.fr: flèche, milieu, direction, flux, ligne, connecteur
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 2.5 mm
+BeginY.us = 0.1 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 2.5 mm
+EndY.us = 0.1 in
+Height = 0 mm
+Height.us = 0 in
+GlueType = 2
+BeginArrow = 0
+EndArrow = 0
+FillPattern = 1
+FillForegnd = LineColor
+FillBkgnd = LineColor
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5-5 mm
+TxtPinY.us = Height*0.5-0.2 in
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Länge und die halbe Breite der Spitze in der Mitte
+Al:  Value = 3 mm
+     Value.us = 0.125 in
+Aw:  Value = 1.25 mm
+     Value.us = 0.05 in
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width*0.5; Y = Height*0.5
+
+# 2 die Spitze in der Mitte, mit der Linienfarbe gefüllt
+[Geometry]
+MoveTo  X = Width*0.5+User.Al*0.5; Y = Height*0.5
+LineTo  X = Width*0.5-User.Al*0.5; Y = Height*0.5+User.Aw
+LineTo  X = Width*0.5-User.Al*0.5; Y = Height*0.5-User.Aw
+LineTo  X = Geometry2.X1; Y = Geometry2.Y1
+
+# 3 die zweite Hälfte: der letzte Teilpfad endet am Ende
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5; Y = Height*0.5
+LineTo  X = Width; Y = Height*0.5

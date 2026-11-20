@@ -1,5 +1,8 @@
-# Standard-Shapes: der Startsatz von JD9 (PLAN.md), die einfachen Grundformen im NetLab-Stil.
-# Die vollständigen Sätze kommen mit JD13 und Phase 3.
+# Standard-Shapes (SH-006): die Grundformen im NetLab-Stil.  Die ersten sieben sind der Startsatz
+# von JD9 (Rechteck, Abgerundetes Rechteck, Ellipse, Dreieck als Schnell-Shapes, dazu Raute, Pfeil
+# und Textfeld); mit JD13 folgen alle übrigen Formen aus FEATURES.md in der Reihenfolge der Liste:
+# Quadrat und Kreis (festes Seitenverhältnis), Vielecke, Dose, Vierecke, Kreuz, Chevron, Würfel,
+# Sterne, Rechtecke mit abgeschnittenen und abgerundeten Ecken, Rahmen, Ringe und Klammern.
 stencil: Basic Shapes
 file: standard
 name.de: Standard-Shapes
@@ -8,5 +11,5 @@ name.es: Formas básicas
 name.it: Forme di base
 name.fr: Formes de base
 category: general
-masters: rectangle, rounded_rectangle, ellipse, triangle, diamond, arrow, textbox
+masters: rectangle, rounded_rectangle, ellipse, triangle, diamond, arrow, textbox, square, circle, right_triangle, pentagon, hexagon, heptagon, octagon, decagon, can, parallelogram, trapezoid, cross, chevron, cube, star_4, star_5, star_6, star_7, star_16, star_24, star_32, rect_snip_1, rect_snip_same, rect_snip_diagonal, rect_round_1, rect_round_same, rect_round_diagonal, rect_snip_round, rect_snip_corners, rect_snip_3, rect_round_3, frame, frame_corner, l_shape, diagonal_stripe, plaque, donut, no_symbol, circle_from_center, parenthesis_left, parenthesis_right, brace_left, brace_right
 quick: 4

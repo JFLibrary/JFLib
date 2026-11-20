@@ -1,5 +1,5 @@
 # Startdiagramm „Beispiel: Bestellung“: ein kleiner Ablauf mit Entscheidung und Tipp.  Start und
-# Ende sind Ellipsen der Grundformen, bis die Schablone flowchart ein Start/Ende-Shape hat.
+# Ende sind Grenzstellen (Master Start/End der Schablone flowchart, Stadionform nach ISO 5807).
 starter: sample
 name.de: Beispiel: Bestellung
 name.en: Sample: Order
@@ -13,7 +13,7 @@ description.it: Un piccolo flusso con inizio, passi, una decisione e una fine, d
 description.fr: Un petit flux avec un début, des étapes, une décision et une fin, à adapter.
 
 [Shapes]
-start:  Stencil = "standard"; Master = "Ellipse"
+start:  Stencil = "flowchart"; Master = "Start/End"
         PinX = 80 mm; PinY = 180 mm; PinX.us = 3.2 in; PinY.us = 7.2 in
         Text.de = "Start"; Text.en = "Start"; Text.es = "Inicio"; Text.it = "Inizio"; Text.fr = "Début"
 step:   Stencil = "flowchart"; Master = "Process"
@@ -28,7 +28,7 @@ ask:    Stencil = "flowchart"; Master = "Process"
         PinX = 150 mm; PinY = 102 mm; PinX.us = 6 in; PinY.us = 4.1 in
         Text.de = "Rückfrage stellen"; Text.en = "Ask the customer"; Text.es = "Consultar al cliente"
         Text.it = "Chiedere al cliente"; Text.fr = "Contacter le client"
-end:    Stencil = "standard"; Master = "Ellipse"
+end:    Stencil = "flowchart"; Master = "Start/End"
         PinX = 80 mm; PinY = 55 mm; PinX.us = 3.2 in; PinY.us = 2.3 in
         Text.de = "Ende"; Text.en = "End"; Text.es = "Fin"; Text.it = "Fine"; Text.fr = "Fin"
 c1:     From = "start"; To = "step"

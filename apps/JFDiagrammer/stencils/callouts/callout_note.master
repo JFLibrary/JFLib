@@ -1,0 +1,86 @@
+# Anmerkung: eine Notiz mit Eselsohr rechts oben (Umriss mit abgeschnittener Ecke, die Faltkante
+# als eigener Abschnitt ohne Füllung) und gerader Leitlinie vom nächsten Punkt des Kastens zur
+# Spitze, dort ein Punkt.  Liegt die Spitze im Körper, sind Leitlinie und Punkt aus (NoShow).
+master: Callout note
+name.de: Anmerkung
+name.en: Note
+name.es: Nota
+name.it: Nota
+name.fr: Note
+prompt.de: Notiz mit Eselsohr und Leitlinie, etwa ein Kommentar zu einem Shape. Ziehen Sie den gelben Steuerpunkt auf das Ziel.
+prompt.en: Note with a folded corner and a leader line, such as a comment on a shape. Drag the yellow control handle onto the target.
+prompt.es: Nota con una esquina doblada y línea guía, por ejemplo un comentario sobre una forma. Arrastre el controlador amarillo hasta el destino.
+prompt.it: Nota con un angolo piegato e linea guida, ad esempio un commento su una forma. Trascina la maniglia di controllo gialla sulla destinazione.
+prompt.fr: Note avec un coin plié et une ligne de repère, par exemple un commentaire sur une forme. Faites glisser la poignée de contrôle jaune sur la cible.
+keywords.de: Beschriftung, Hinweis, Kommentar, Zeiger, Anmerkung, Notiz, Eselsohr
+keywords.en: callout, note, comment, pointer, annotation, note, folded corner
+keywords.es: llamada, nota, comentario, puntero, anotación, nota, esquina doblada
+keywords.it: richiamo, nota, commento, puntatore, annotazione, nota, angolo piegato
+keywords.fr: bulle d'annotation, note, commentaire, pointeur, annotation, note, coin plié
+text.de: Text
+text.en: Text
+text.es: Texto
+text.it: Testo
+text.fr: Texte
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+msvStructureType:         Value = "Callout"
+msvShapeCategories:       Value = "Callout"
+msvSDCalloutNoHighlight:  Value = FALSE
+# die Spitze des Zeigers
+Ax:                       Value = Controls.Association
+Ay:                       Value = Controls.Association.Y
+Out:                      Value = OR(User.Ax<0,User.Ax>Width,User.Ay<0,User.Ay>Height)
+# der nächste Punkt des Kastens
+Px:                       Value = MIN(MAX(User.Ax,0),Width)
+Py:                       Value = MIN(MAX(User.Ay,0),Height)
+# die Größe des Eselsohrs
+Fold:                     Value = MIN(4 mm,Width*0.3,Height*0.4)
+                          Value.us = MIN(0.16 in,Width*0.3,Height*0.4)
+Dot:                      Value = 0.8 mm
+                          Value.us = 0.03 in
+
+# die Notiz
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height-User.Fold
+LineTo  X = Width-User.Fold; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# die Faltkante
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width-User.Fold; Y = Height
+LineTo  X = Width-User.Fold; Y = Height-User.Fold
+LineTo  X = Width; Y = Height-User.Fold
+
+# die Leitlinie
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(User.Out)
+MoveTo  X = User.Px; Y = User.Py
+LineTo  X = User.Ax; Y = User.Ay
+
+# der Punkt an der Spitze
+[Geometry]
+NoShow = NOT(User.Out)
+Ellipse  X = User.Ax; Y = User.Ay; A = User.Ax+User.Dot; B = User.Ay; C = User.Ax; D = User.Ay+User.Dot
+
+[Controls]
+Association:  X = -12 mm; Y = -10 mm
+              X.us = -0.5 in; Y.us = -0.4 in
+              XDyn = User.Px; YDyn = User.Py
+              XCon = 2; YCon = 2; CanGlue = FALSE
+              Tip.de = "Zeiger auf das Ziel ziehen"
+              Tip.en = "Drag the pointer onto the target"
+              Tip.es = "Arrastre el puntero hasta el destino"
+              Tip.it = "Trascina il puntatore sulla destinazione"
+              Tip.fr = "Faites glisser le pointeur sur la cible"

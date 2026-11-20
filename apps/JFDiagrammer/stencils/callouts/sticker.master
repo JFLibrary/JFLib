@@ -1,0 +1,52 @@
+# Eine Fläche ohne Zeiger (kein msvStructureType): ein rechteckiger Aufkleber, die Innenlinie als
+# eigener Abschnitt ohne Füllung, um Inset eingerückt.
+master: Sticker
+name.de: Aufkleber eckig
+name.en: Sticker
+name.es: Adhesivo
+name.it: Adesivo
+name.fr: Autocollant
+prompt.de: Rechteckiger Aufkleber mit einer Innenlinie, etwa für „Neu“ oder einen Hinweis.
+prompt.en: Rectangular sticker with an inner line, for example for "New" or a hint.
+prompt.es: Adhesivo rectangular con una línea interior, por ejemplo para «Nuevo» o una indicación.
+prompt.it: Adesivo rettangolare con una linea interna, ad esempio per «Nuovo» o un avviso.
+prompt.fr: Autocollant rectangulaire avec un trait intérieur, par exemple pour « Nouveau » ou un avis.
+keywords.de: Aufkleber, Sticker, Etikett, Abzeichen, Hervorhebung, neu
+keywords.en: sticker, label, badge, highlight, new, seal
+keywords.es: adhesivo, pegatina, etiqueta, insignia, destacar, nuevo
+keywords.it: adesivo, etichetta, distintivo, evidenziare, nuovo, bollino
+keywords.fr: autocollant, étiquette, badge, mise en avant, nouveau, pastille
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 16 mm
+Height.us = 0.6 in
+
+[User]
+# der Abstand der Innenlinie vom Rand
+Inset:  Value = MIN(1.5 mm,Width*0.1,Height*0.1)
+        Value.us = MIN(0.06 in,Width*0.1,Height*0.1)
+
+# der Aufkleber
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# die Innenlinie
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.Inset; Y = User.Inset
+LineTo  X = Width-User.Inset; Y = User.Inset
+LineTo  X = Width-User.Inset; Y = Height-User.Inset
+LineTo  X = User.Inset; Y = Height-User.Inset
+LineTo  X = Geometry2.X1; Y = Geometry2.Y1
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

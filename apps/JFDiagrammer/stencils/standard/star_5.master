@@ -1,0 +1,60 @@
+# Stern mit 5 Zacken: die äußeren Spitzen auf einem Kreis (eine oben), die inneren Ecken auf einem
+# Kreis mit dem Radius User.R (Anteil des äußeren); der Kasten ist so breit und hoch wie die
+# Spitzen.  Row_1 sitzt auf der inneren Ecke rechts der oberen Spitze und ändert R (nur senkrecht,
+# anteilig; ihr X folgt der Ecke).  R bleibt zwischen 0,2 und cos(180°/5), wo der Stern zum
+# Vieleck wird.
+master: 5-point star
+name.de: Stern mit 5 Zacken
+name.en: 5-point star
+name.es: Estrella de 5 puntas
+name.it: Stella a 5 punte
+name.fr: Étoile à 5 branches
+prompt.de: Stern mit 5 Zacken, eine davon oben. Mit dem gelben Steuerpunkt ändern Sie die Zackentiefe.
+prompt.en: Star with 5 points, one of them at the top. Drag the yellow control handle to change the depth of the points.
+prompt.es: Estrella de 5 puntas, una de ellas arriba. Arrastre el controlador amarillo para cambiar la profundidad de las puntas.
+prompt.it: Stella a 5 punte, una delle quali in alto. Trascina la maniglia di controllo gialla per cambiare la profondità delle punte.
+prompt.fr: Étoile à 5 branches, dont une en haut. Faites glisser la poignée de contrôle jaune pour modifier la profondeur des branches.
+keywords.de: Stern, Zacken, Bewertung, Favorit, fünf, Auszeichnung
+keywords.en: star, points, rating, favorite, five, highlight
+keywords.es: estrella, puntas, valoración, favorito, cinco, destacar
+keywords.it: stella, punte, valutazione, preferito, cinque, evidenziare
+keywords.fr: étoile, branches, évaluation, favori, cinq, mise en avant
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 28.5 mm
+Height.us = 1.19 in
+
+[User]
+# der Radius der inneren Ecken als Anteil des äußeren
+R:  Value = MIN(MAX((Controls.Row_1.Y/Height-0.447214)/0.447214,0.2),0.809017)
+
+[Geometry]
+MoveTo  X = Width*0.5; Y = Height
+LineTo  X = Width*(0.5-0.309017*User.R); Y = Height*(0.447214+0.447214*User.R)
+LineTo  X = 0; Y = Height*0.618034
+LineTo  X = Width*(0.5-0.5*User.R); Y = Height*(0.447214-0.17082*User.R)
+LineTo  X = Width*0.190983; Y = 0
+LineTo  X = Width*0.5; Y = Height*(0.447214-0.552786*User.R)
+LineTo  X = Width*0.809017; Y = 0
+LineTo  X = Width*(0.5+0.5*User.R); Y = Height*(0.447214-0.17082*User.R)
+LineTo  X = Width; Y = Height*0.618034
+LineTo  X = Width*(0.5+0.309017*User.R); Y = Height*(0.447214+0.447214*User.R)
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*(0.5+0.309017*User.R); Y = Height*0.626099
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Zackentiefe ändern"
+        Tip.en = "Change the depth of the points"
+        Tip.es = "Cambiar la profundidad de las puntas"
+        Tip.it = "Cambia la profondità delle punte"
+        Tip.fr = "Modifier la profondeur des branches"
+
+[Connection]
+Row  X = Width*0.5; Y = Height*(0.447214-0.552786*User.R); DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.618034; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.618034; DirX = 1; DirY = 0

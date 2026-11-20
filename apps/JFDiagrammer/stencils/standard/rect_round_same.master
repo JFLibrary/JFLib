@@ -1,0 +1,56 @@
+# Rechteck, beide oberen Ecken abgerundet.  Row_1 an der oberen Kante ändert den Radius (nur
+# waagrecht, Abstand von rechts).
+master: Round same side corner rectangle
+name.de: Rechteck, gleiche Seite abgerundet
+name.en: Round same side corner rectangle
+name.es: Rectángulo, esquinas del mismo lado redondeadas
+name.it: Rettangolo, angoli sullo stesso lato arrotondati
+name.fr: Rectangle, coins du même côté arrondis
+prompt.de: Rechteck mit beiden oberen Ecken rund. Mit dem gelben Steuerpunkt ändern Sie den Radius.
+prompt.en: Rectangle with both top corners round. Drag the yellow control handle to change the radius.
+prompt.es: Rectángulo con las dos esquinas superiores redondeadas. Arrastre el controlador amarillo para cambiar el radio.
+prompt.it: Rettangolo con i due angoli superiori arrotondati. Trascina la maniglia di controllo gialla per cambiare il raggio.
+prompt.fr: Rectangle dont les deux coins supérieurs sont arrondis. Faites glisser la poignée de contrôle jaune pour modifier le rayon.
+keywords.de: Rechteck, Ecke, Kasten, Schaltfläche, abgerundet, Radius, rund, zwei Ecken, oben, Registerkarte
+keywords.en: rectangle, corner, box, button, rounded, radius, round, two corners, top, tab
+keywords.es: rectángulo, esquina, caja, botón, redondeado, radio, redondo, dos esquinas, arriba, pestaña
+keywords.it: rettangolo, angolo, riquadro, pulsante, arrotondato, raggio, rotondo, due angoli, sopra, scheda
+keywords.fr: rectangle, coin, boîte, bouton, arrondi, rayon, rond, deux coins, haut, onglet
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# der Radius der runden Ecken
+R:    Value = MIN(MAX(Width-Controls.Row_1,0),Width*0.5,Height)
+# der Stich eines Viertelkreises mit dem Radius R (ArcTo A)
+Bow:  Value = User.R*0.292893
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height-User.R
+ArcTo   X = Width-User.R; Y = Height; A = User.Bow
+LineTo  X = User.R; Y = Height
+ArcTo   X = 0; Y = Height-User.R; A = User.Bow
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width-5 mm; Y = Height
+        X.us = Width-0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Eckenradius ändern"
+        Tip.en = "Change the corner radius"
+        Tip.es = "Cambiar el radio de las esquinas"
+        Tip.it = "Cambia il raggio degli angoli"
+        Tip.fr = "Modifier le rayon des coins"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

@@ -1,0 +1,54 @@
+# Chevron: Spitze rechts, Kerbe links gleich tief.  Row_1 an der oberen Ecke der Spitze ändert die
+# Tiefe (nur waagrecht, Abstand von rechts: die Tiefe bleibt beim Verbreitern).
+master: Chevron
+name.de: Chevron
+name.en: Chevron
+name.es: Cheurón
+name.it: Gallone
+name.fr: Chevron
+prompt.de: Winkelpfeil mit Spitze rechts und Kerbe links, zum Aneinanderreihen. Mit dem gelben Steuerpunkt ändern Sie die Tiefe der Spitze.
+prompt.en: Angled arrow with a point on the right and a notch on the left, for chaining. Drag the yellow control handle to change the depth of the point.
+prompt.es: Flecha angular con punta a la derecha y muesca a la izquierda, para encadenar. Arrastre el controlador amarillo para cambiar la profundidad de la punta.
+prompt.it: Freccia angolare con punta a destra e tacca a sinistra, da concatenare. Trascina la maniglia di controllo gialla per cambiare la profondità della punta.
+prompt.fr: Flèche en angle avec une pointe à droite et une encoche à gauche, à enchaîner. Faites glisser la poignée de contrôle jaune pour modifier la profondeur de la pointe.
+keywords.de: Chevron, Winkel, Pfeil, Schritt, Phase, Prozess, Ablauf
+keywords.en: chevron, angle, arrow, step, phase, process, sequence
+keywords.es: cheurón, ángulo, flecha, paso, fase, proceso, secuencia
+keywords.it: gallone, angolo, freccia, passo, fase, processo, sequenza
+keywords.fr: chevron, angle, flèche, étape, phase, processus, séquence
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# die Tiefe der Spitze und der Kerbe
+P:  Value = MIN(MAX(Width-Controls.Row_1,0),Width*0.9)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width-User.P; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.P; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = User.P; Y = Height*0.5
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width-10 mm; Y = Height
+        X.us = Width-0.375 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Tiefe der Spitze ändern"
+        Tip.en = "Change the depth of the point"
+        Tip.es = "Cambiar la profundidad de la punta"
+        Tip.it = "Cambia la profondità della punta"
+        Tip.fr = "Modifier la profondeur de la pointe"
+
+[Connection]
+Row  X = (Width-User.P)*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = (Width-User.P)*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = User.P; Y = Height*0.5; DirX = 1; DirY = 0

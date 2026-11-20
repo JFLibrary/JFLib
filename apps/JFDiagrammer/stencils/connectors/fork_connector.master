@@ -1,0 +1,68 @@
+# Gegabelter Verbinder: ein Stiel vom Anfang bis zur Gabel, dort eine Querstrebe und zwei Zinken
+# bis zum Ende; das Ende liegt mitten zwischen den Zinken, die Gabel ist so breit wie das Shape
+# dick (Height).  Liegt auf der Linie vom Anfang zum Ende und dreht sich mit ihr (PinX, Width,
+# Angle aus den Enden); die Enden kleben an Shapes, mit GlueType 2 auch an das ganze Shape.  Row_1
+# an der oberen Ecke der Gabel ändert ihre Länge (Abstand vom Ende).  Ohne Pfeilspitzen.
+master: Fork connector
+name.de: Gegabelter Verbinder
+name.en: Fork connector
+name.es: Conector en horquilla
+name.it: Connettore a forcella
+name.fr: Connecteur en fourche
+prompt.de: Verbinder, der in einer Gabel endet, die das Ziel umfasst. Mit dem gelben Steuerpunkt ändern Sie die Länge der Gabel.
+prompt.en: Connector that ends in a fork around the target. Drag the yellow control handle to change the length of the fork.
+prompt.es: Conector que termina en una horquilla que rodea el destino. Arrastre el controlador amarillo para cambiar la longitud de la horquilla.
+prompt.it: Connettore che termina con una forcella attorno alla destinazione. Trascina la maniglia di controllo gialla per cambiare la lunghezza della forcella.
+prompt.fr: Connecteur qui se termine par une fourche autour de la cible. Faites glisser la poignée de contrôle jaune pour modifier la longueur de la fourche.
+keywords.de: Gabel, gegabelt, umfassen, Zinken, Linie, Verbinder
+keywords.en: fork, forked, enclose, prongs, line, connector
+keywords.es: horquilla, bifurcado, rodear, dientes, línea, conector
+keywords.it: forcella, biforcato, abbracciare, rebbi, linea, connettore
+keywords.fr: fourche, fourchu, entourer, dents, ligne, connecteur
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 4 mm
+BeginY.us = 0.15 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 4 mm
+EndY.us = 0.15 in
+Height = 8 mm
+Height.us = 0.3 in
+GlueType = 2
+BeginArrow = 0
+EndArrow = 0
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = User.Fork*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# wo die Gabel beginnt
+Fork:  Value = MIN(MAX(Controls.Row_1, 0), Width)
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = User.Fork; Y = Height*0.5
+MoveTo  X = Width; Y = 0
+LineTo  X = User.Fork; Y = 0
+LineTo  X = User.Fork; Y = Height
+LineTo  X = Width; Y = Height
+
+[Controls]
+Row_1:  X = Width-12 mm; Y = Height
+        X.us = Width-0.5 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Länge der Gabel ändern"
+        Tip.en = "Change the length of the fork"
+        Tip.es = "Cambiar la longitud de la horquilla"
+        Tip.it = "Cambia la lunghezza della forcella"
+        Tip.fr = "Modifier la longueur de la fourche"

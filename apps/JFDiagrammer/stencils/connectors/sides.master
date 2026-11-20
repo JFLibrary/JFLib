@@ -1,0 +1,73 @@
+# Seiten: beide Enden an Seitenflächen; gezeichnet ein Bügel, der rechts aus dem einen und rechts
+# in das andere Shape führt.  Dynamischer Verbinder (ObjType 2 verlegbar, GlueType 2): die App
+# verlegt ihn selbst und ersetzt die gezeichnete Geometrie durch ihren Weg; der Kasten bleibt
+# aufrecht (Width = EndX-BeginX ..., Angle 0).  Route-Zellen mit Visios Namen und Werten:
+# ShapeRouteStyle 6 (Flussdiagramm links nach rechts), ConLineRouteExt 1, ConFixedCode 0.  Der
+# Text folgt Controls.TextPosition, das die App in die Mitte des Wegs setzt (ohne Text verborgen).
+master: Sides
+name.de: Seiten
+name.en: Sides
+name.es: Lados
+name.it: Lati
+name.fr: Côtés
+prompt.de: Dynamischer Verbinder, der an den Seiten der Shapes anschließt. Ziehen Sie die Enden auf Shapes.
+prompt.en: Dynamic connector that joins the shapes at their sides. Drag the ends onto shapes.
+prompt.es: Conector dinámico que se une a las formas por sus lados. Arrastre los extremos sobre las formas.
+prompt.it: Connettore dinamico che si collega alle forme sui lati. Trascina le estremità sulle forme.
+prompt.fr: Connecteur dynamique qui rejoint les formes par leurs côtés. Faites glisser les extrémités sur les formes.
+keywords.de: Verbinder, dynamisch, verbinden, Seiten, seitlich, Bügel
+keywords.en: connector, dynamic, connect, sides, sideways, bracket
+keywords.es: conector, dinámico, conectar, lados, lateral, corchete
+keywords.it: connettore, dinamico, collegare, lati, laterale, staffa
+keywords.fr: connecteur, dynamique, relier, côtés, latéral, crochet
+style: Connector
+
+[Shape]
+BeginX = 10 mm
+BeginX.us = 0.4 in
+BeginY = 5 mm
+BeginY.us = 0.2 in
+EndX = 15 mm
+EndX.us = 0.6 in
+EndY = 20 mm
+EndY.us = 0.8 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+ObjType = 2
+GlueType = 2
+ShapeRouteStyle = 6
+ConLineRouteExt = 1
+ConFixedCode = 0
+NoAlignBox = TRUE
+DynFeedback = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Controls.TextPosition
+TxtPinY = Controls.TextPosition.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# der Abstand, mit dem der gezeichnete Verlauf um die Shapes herumführt
+Gap:  Value = 6 mm
+      Value.us = 0.25 in
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = MAX(Width,0)+User.Gap; Y = 0
+LineTo  X = MAX(Width,0)+User.Gap; Y = Height
+LineTo  X = Width; Y = Height
+
+[Controls]
+TextPosition:  X = MAX(Width,0)+User.Gap; Y = Height*0.5
+        XDyn = Controls.TextPosition; YDyn = Controls.TextPosition.Y
+        XCon = IF(OR(STRSAME(SHAPETEXT(TheText),""),HideText),5,0); YCon = 0; CanGlue = FALSE
+        Tip.de = "Text verschieben"
+        Tip.en = "Move the text"
+        Tip.es = "Mover el texto"
+        Tip.it = "Sposta il testo"
+        Tip.fr = "Déplacer le texte"

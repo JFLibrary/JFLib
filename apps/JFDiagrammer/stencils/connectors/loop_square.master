@@ -1,0 +1,74 @@
+# Schleife (eckig): rechtwinklig; gezeichnet von der rechten Seite eines Shapes hinaus, darüber
+# und von oben in seine Oberkante.  Dynamischer Verbinder (ObjType 2 verlegbar, GlueType 2): die
+# App verlegt ihn selbst und ersetzt die gezeichnete Geometrie durch ihren Weg; der Kasten bleibt
+# aufrecht (Width = EndX-BeginX ..., Angle 0).  Route-Zellen mit Visios Namen und Werten:
+# ShapeRouteStyle 1 (rechtwinklig), ConLineRouteExt 1, ConFixedCode 0.  Der Text folgt
+# Controls.TextPosition, das die App in die Mitte des Wegs setzt (ohne Text verborgen).
+master: Loop (square)
+name.de: Schleife (eckig)
+name.en: Loop (square)
+name.es: Bucle (en ángulo recto)
+name.it: Anello (ad angolo retto)
+name.fr: Boucle (à angle droit)
+prompt.de: Dynamischer Verbinder, der eckig zum selben Shape zurückführt, etwa für eine Wiederholung. Ziehen Sie die Enden auf Shapes.
+prompt.en: Dynamic connector that returns to the same shape at right angles, for example for a repetition. Drag the ends onto shapes.
+prompt.es: Conector dinámico que vuelve a la misma forma en ángulo recto, por ejemplo para una repetición. Arrastre los extremos sobre las formas.
+prompt.it: Connettore dinamico che ritorna alla stessa forma ad angolo retto, ad esempio per una ripetizione. Trascina le estremità sulle forme.
+prompt.fr: Connecteur dynamique qui revient à la même forme à angle droit, par exemple pour une répétition. Faites glisser les extrémités sur les formes.
+keywords.de: Verbinder, dynamisch, verbinden, Schleife, Wiederholung, zurück, eckig
+keywords.en: connector, dynamic, connect, loop, repetition, back, square
+keywords.es: conector, dinámico, conectar, bucle, repetición, volver, ángulo recto
+keywords.it: connettore, dinamico, collegare, anello, ripetizione, ritorno, angolo retto
+keywords.fr: connecteur, dynamique, relier, boucle, répétition, retour, angle droit
+style: Connector
+
+[Shape]
+BeginX = 25 mm
+BeginX.us = 1 in
+BeginY = 6 mm
+BeginY.us = 0.25 in
+EndX = 10 mm
+EndX.us = 0.4 in
+EndY = 14 mm
+EndY.us = 0.55 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+ObjType = 2
+GlueType = 2
+ShapeRouteStyle = 1
+ConLineRouteExt = 1
+ConFixedCode = 0
+NoAlignBox = TRUE
+DynFeedback = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Controls.TextPosition
+TxtPinY = Controls.TextPosition.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# der Abstand, mit dem der gezeichnete Verlauf um die Shapes herumführt
+Gap:  Value = 6 mm
+      Value.us = 0.25 in
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = User.Gap; Y = 0
+LineTo  X = User.Gap; Y = Height+User.Gap
+LineTo  X = Width; Y = Height+User.Gap
+LineTo  X = Width; Y = Height
+
+[Controls]
+TextPosition:  X = Width*0.5; Y = Height+User.Gap
+        XDyn = Controls.TextPosition; YDyn = Controls.TextPosition.Y
+        XCon = IF(OR(STRSAME(SHAPETEXT(TheText),""),HideText),5,0); YCon = 0; CanGlue = FALSE
+        Tip.de = "Text verschieben"
+        Tip.en = "Move the text"
+        Tip.es = "Mover el texto"
+        Tip.it = "Sposta il testo"
+        Tip.fr = "Déplacer le texte"

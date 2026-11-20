@@ -31,7 +31,8 @@ TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight*0.5
 
 [User]
-msvShapeCategories:  Value = "Flowchart"
+# die Kategorie Decision zusätzlich: die Regeln der Vorlage finden Entscheidungen daran
+msvShapeCategories:  Value = "Flowchart;Decision"
 
 [Geometry]
 MoveTo  X = Width*0.5; Y = 0

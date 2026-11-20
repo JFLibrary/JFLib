@@ -1,0 +1,62 @@
+# Daten (ISO 5807: Daten, Ein- und Ausgabe): ein Parallelogramm, die Oberkante nach rechts
+# versetzt.  Row_1 an der linken oberen Ecke ändert den Versatz (nur waagrecht, als Abstand von
+# links: die Neigung bleibt beim Verbreitern gleich).  Verbindungspunkte oben und unten in der
+# Mitte (dort fluchten sie mit den anderen Symbolen), seitlich auf halber Höhe der schrägen
+# Kanten.
+master: Data
+name.de: Daten
+name.en: Data
+name.es: Datos
+name.it: Dati
+name.fr: Données
+prompt.de: Daten im Ablauf, zum Beispiel eine Eingabe oder Ausgabe (ISO 5807). Mit dem gelben Steuerpunkt ändern Sie die Neigung.
+prompt.en: Data in the flow, for example an input or an output (ISO 5807). Drag the yellow control handle to change the slant.
+prompt.es: Datos en el flujo, por ejemplo una entrada o una salida (ISO 5807). Arrastre el controlador amarillo para cambiar la inclinación.
+prompt.it: Dati nel flusso, ad esempio un input o un output (ISO 5807). Trascina la maniglia di controllo gialla per cambiare l'inclinazione.
+prompt.fr: Données dans le flux, par exemple une entrée ou une sortie (ISO 5807). Faites glisser la poignée de contrôle jaune pour modifier l'inclinaison.
+keywords.de: Daten, Eingabe, Ausgabe, Ein-/Ausgabe, Parallelogramm, Information, Flussdiagramm
+keywords.en: data, input, output, input/output, parallelogram, information, flowchart
+keywords.es: datos, entrada, salida, entrada/salida, paralelogramo, información, diagrama de flujo
+keywords.it: dati, input, output, ingresso/uscita, parallelogramma, informazione, diagramma di flusso
+keywords.fr: données, entrée, sortie, entrée/sortie, parallélogramme, information, diagramme de flux
+
+[Shape]
+Width = 36 mm
+Width.us = 1.5 in
+Height = 24 mm
+Height.us = 1 in
+TxtWidth = Width-User.Slant
+TxtHeight = Height
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+msvShapeCategories:  Value = "Flowchart"
+# der Versatz der Oberkante
+Slant:  Value = MIN(MAX(Controls.Row_1, 0), Width*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width-User.Slant; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = User.Slant; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = 6 mm; Y = Height
+        X.us = 0.25 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Neigung ändern"
+        Tip.en = "Change the slant"
+        Tip.es = "Cambiar la inclinación"
+        Tip.it = "Cambia l'inclinazione"
+        Tip.fr = "Modifier l'inclinaison"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width-User.Slant*0.5; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = User.Slant*0.5; Y = Height*0.5; DirX = 1; DirY = 0

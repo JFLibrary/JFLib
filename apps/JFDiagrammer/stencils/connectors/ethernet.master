@@ -1,0 +1,120 @@
+# Ethernet: ein Kabelstrang als Doppellinie (Height 3 mm) mit einem Abschluss (Querstrich) an
+# jedem Ende und vier Abzweigen wie beim Bus (Row_1 .. Row_4, CanGlue).  Liegt auf der Linie vom
+# Anfang zum Ende und dreht sich mit ihr (PinX, Width, Angle aus den Enden); die Enden kleben an
+# Shapes, mit GlueType 2 auch an das ganze Shape.  Vereinfacht: feste Zahl von vier Abzweigen.
+# Formatvorlage "Connector" ohne Pfeilspitzen (BeginArrow/EndArrow 0).
+master: Ethernet
+name.de: Ethernet
+name.en: Ethernet
+name.es: Ethernet
+name.it: Ethernet
+name.fr: Ethernet
+prompt.de: Ethernet-Strang als Doppellinie mit Abschlüssen und vier Abzweigen. Die gelben Punkte sind die Abzweige: verschieben Sie sie oder ziehen Sie sie auf Shapes.
+prompt.en: Ethernet segment as a double line with terminators and four taps. The yellow handles are the taps: move them or drag them onto shapes.
+prompt.es: Segmento Ethernet como línea doble con terminadores y cuatro derivaciones. Los controladores amarillos son las derivaciones: muévalos o arrástrelos sobre las formas.
+prompt.it: Segmento Ethernet come linea doppia con terminatori e quattro derivazioni. Le maniglie gialle sono le derivazioni: spostale o trascinale sulle forme.
+prompt.fr: Segment Ethernet en double ligne avec terminaisons et quatre dérivations. Les poignées jaunes sont les dérivations : déplacez-les ou faites-les glisser sur les formes.
+keywords.de: Ethernet, LAN, Kabel, Abzweig, Strang, Netzwerk, verbinden
+keywords.en: Ethernet, LAN, cable, tap, segment, network, connect
+keywords.es: Ethernet, LAN, cable, derivación, segmento, red, conectar
+keywords.it: Ethernet, LAN, cavo, derivazione, segmento, rete, collegare
+keywords.fr: Ethernet, LAN, câble, dérivation, segment, réseau, relier
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 1.5 mm
+BeginY.us = 0.0625 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 1.5 mm
+EndY.us = 0.0625 in
+Height = 3 mm
+Height.us = 0.125 in
+GlueType = 2
+BeginArrow = 0
+EndArrow = 0
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = -TxtHeight*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# wie weit die Abschlüsse über die Doppellinie hinausragen
+T:  Value = 1.5 mm
+    Value.us = 0.06 in
+
+# 1 die Doppellinie und die Abschlüsse
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+MoveTo  X = 0; Y = Height
+LineTo  X = Width; Y = Height
+MoveTo  X = 0; Y = -User.T
+LineTo  X = 0; Y = Height+User.T
+MoveTo  X = Width; Y = -User.T
+LineTo  X = Width; Y = Height+User.T
+
+# 2 .. 5 die Abzweige
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Controls.Row_1; Y = IF(Controls.Row_1.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_1; Y = Controls.Row_1.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Controls.Row_2; Y = IF(Controls.Row_2.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_2; Y = Controls.Row_2.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Controls.Row_3; Y = IF(Controls.Row_3.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_3; Y = Controls.Row_3.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Controls.Row_4; Y = IF(Controls.Row_4.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_4; Y = Controls.Row_4.Y
+
+[Controls]
+Row_1:  X = Width*0.2; Y = Height+10 mm
+        Y.us = Height+0.4 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 2; CanGlue = TRUE
+        Tip.de = "Abzweig verschieben; auf ein Shape ziehen"
+        Tip.en = "Move the tap; drag it onto a shape"
+        Tip.es = "Mover la derivación; arrástrela sobre una forma"
+        Tip.it = "Sposta la derivazione; trascinala su una forma"
+        Tip.fr = "Déplacer la dérivation ; faites-la glisser sur une forme"
+Row_2:  X = Width*0.4; Y = Height+10 mm
+        Y.us = Height+0.4 in
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 2; CanGlue = TRUE
+        Tip.de = "Abzweig verschieben; auf ein Shape ziehen"
+        Tip.en = "Move the tap; drag it onto a shape"
+        Tip.es = "Mover la derivación; arrástrela sobre una forma"
+        Tip.it = "Sposta la derivazione; trascinala su una forma"
+        Tip.fr = "Déplacer la dérivation ; faites-la glisser sur une forme"
+Row_3:  X = Width*0.6; Y = Height+10 mm
+        Y.us = Height+0.4 in
+        XDyn = Controls.Row_3; YDyn = Controls.Row_3.Y
+        XCon = 0; YCon = 2; CanGlue = TRUE
+        Tip.de = "Abzweig verschieben; auf ein Shape ziehen"
+        Tip.en = "Move the tap; drag it onto a shape"
+        Tip.es = "Mover la derivación; arrástrela sobre una forma"
+        Tip.it = "Sposta la derivazione; trascinala su una forma"
+        Tip.fr = "Déplacer la dérivation ; faites-la glisser sur une forme"
+Row_4:  X = Width*0.8; Y = Height+10 mm
+        Y.us = Height+0.4 in
+        XDyn = Controls.Row_4; YDyn = Controls.Row_4.Y
+        XCon = 0; YCon = 2; CanGlue = TRUE
+        Tip.de = "Abzweig verschieben; auf ein Shape ziehen"
+        Tip.en = "Move the tap; drag it onto a shape"
+        Tip.es = "Mover la derivación; arrástrela sobre una forma"
+        Tip.it = "Sposta la derivazione; trascinala su una forma"
+        Tip.fr = "Déplacer la dérivation ; faites-la glisser sur une forme"

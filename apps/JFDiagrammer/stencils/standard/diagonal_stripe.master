@@ -1,0 +1,55 @@
+# Diagonaler Streifen: ein Band entlang der Diagonale von links unten nach rechts oben, seine
+# Kanten parallel zur Diagonale.  Row_1 an der unteren Kante ändert die Breite (nur waagrecht,
+# anteilig: der Streifen skaliert mit).
+master: Diagonal stripe
+name.de: Diagonaler Streifen
+name.en: Diagonal stripe
+name.es: Franja diagonal
+name.it: Striscia diagonale
+name.fr: Bande diagonale
+prompt.de: Schräges Band von links unten nach rechts oben. Mit dem gelben Steuerpunkt ändern Sie die Breite des Streifens.
+prompt.en: Slanted band from the bottom left to the top right. Drag the yellow control handle to change the width of the stripe.
+prompt.es: Banda inclinada de abajo a la izquierda a arriba a la derecha. Arrastre el controlador amarillo para cambiar el ancho de la franja.
+prompt.it: Banda inclinata dal basso a sinistra all'alto a destra. Trascina la maniglia di controllo gialla per cambiare la larghezza della striscia.
+prompt.fr: Bande inclinée d'en bas à gauche vers le haut à droite. Faites glisser la poignée de contrôle jaune pour modifier la largeur de la bande.
+keywords.de: Streifen, diagonal, schräg, Band, Schärpe, Strich
+keywords.en: stripe, diagonal, slanted, band, sash, slash
+keywords.es: franja, diagonal, inclinada, banda, faja, barra
+keywords.it: striscia, diagonale, inclinata, banda, fascia, barra
+keywords.fr: bande, diagonale, inclinée, ruban, écharpe, barre
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+
+[User]
+# die Breite des Streifens an der Unterkante und an der linken Kante
+T:   Value = MIN(MAX(Controls.Row_1,Width*0.05),Width*0.95)
+Ty:  Value = User.T*Height/Width
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = User.T; Y = 0
+LineTo  X = Width; Y = Height-User.Ty
+LineTo  X = Width; Y = Height
+LineTo  X = Width-User.T; Y = Height
+LineTo  X = 0; Y = User.Ty
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.3; Y = 0
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Breite des Streifens ändern"
+        Tip.en = "Change the width of the stripe"
+        Tip.es = "Cambiar el ancho de la franja"
+        Tip.it = "Cambia la larghezza della striscia"
+        Tip.fr = "Modifier la largeur de la bande"
+
+[Connection]
+Row  X = User.T*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height-User.Ty*0.5; DirX = -1; DirY = 0
+Row  X = Width-User.T*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.Ty*0.5; DirX = 1; DirY = 0

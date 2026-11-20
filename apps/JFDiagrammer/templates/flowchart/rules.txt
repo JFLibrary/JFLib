@@ -1,6 +1,6 @@
 # Regelsatz „Flussdiagramm“ (VL-20, DA-10): eigene Regeln mit Visios Prüffunktionen.  Die
-# Flussdiagramm-Shapes tragen die Kategorie Flowchart, Entscheidungen zusätzlich Decision
-# (User.msvShapeCategories).
+# Flussdiagramm-Shapes tragen die Kategorie Flowchart, Entscheidungen zusätzlich Decision, Start/Ende
+# zusätzlich Terminator (User.msvShapeCategories, Schablone flowchart).
 ruleset: Flowchart
 name.de: Flussdiagramm
 name.en: Flowchart
@@ -14,8 +14,13 @@ description.it: Verifica che il diagramma di flusso sia completamente collegato 
 description.fr: Vérifie que l'organigramme est entièrement connecté et légendé.
 
 [Rules]
+# Verbinder sind bei Visio die 1D-Shapes (ein Shape mit BeginX, ohne eigenes Kennzeichen);
+# ObjType 2 („verlegbar“) macht einen davon zum dynamischen Verbinder.  Die Schablone „Verbinder“
+# hat beides: dynamische Verbinder und feste Verbinder (Linien, Kurven-, Winkel-, Hohlverbinder,
+# ohne ObjType 2).  IS1D() erfasst alle; ROLE()=1 ist nur für Verbinder dokumentiert, ohne zu
+# sagen, ob feste 1D-Shapes dazugehören.
 UngluedConnector: Target = 0
-    Filter = "ROLE()=1"
+    Filter = "IS1D()"
     Test = "AND(AGGCOUNT(GLUEDSHAPES(4))=1,AGGCOUNT(GLUEDSHAPES(5))=1)"
     Category.de = "Verbindungen"; Category.en = "Connectivity"; Category.es = "Conectividad"
     Category.it = "Connettività"; Category.fr = "Connectivité"

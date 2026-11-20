@@ -1,0 +1,54 @@
+# L-Form: Ecke links unten, beide Schenkel gleich breit.  Row_1 am oberen Ende des senkrechten
+# Schenkels ändert die Breite (nur waagrecht, Abstand von links).
+master: L-shape
+name.de: L-Form
+name.en: L-shape
+name.es: Forma de L
+name.it: Forma a L
+name.fr: Forme en L
+prompt.de: L-Profil mit der Ecke links unten, beide Schenkel gleich breit. Mit dem gelben Steuerpunkt ändern Sie die Schenkelbreite.
+prompt.en: L profile with the corner at the bottom left, both legs equally wide. Drag the yellow control handle to change the width of the legs.
+prompt.es: Perfil en L con la esquina abajo a la izquierda, los dos brazos del mismo ancho. Arrastre el controlador amarillo para cambiar el ancho de los brazos.
+prompt.it: Profilo a L con l'angolo in basso a sinistra, i due bracci della stessa larghezza. Trascina la maniglia di controllo gialla per cambiare la larghezza dei bracci.
+prompt.fr: Profilé en L avec le coin en bas à gauche, les deux branches de même largeur. Faites glisser la poignée de contrôle jaune pour modifier la largeur des branches.
+keywords.de: L-Form, L, Winkel, Profil, Ecke, Schenkel
+keywords.en: L-shape, L, angle, profile, corner, legs
+keywords.es: forma de L, L, ángulo, perfil, esquina, brazos
+keywords.it: forma a L, L, angolare, profilo, angolo, bracci
+keywords.fr: forme en L, L, équerre, profilé, coin, branches
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+
+[User]
+# die Schenkelbreite
+T:  Value = MIN(MAX(Controls.Row_1,MIN(Width,Height)*0.02),MIN(Width,Height)*0.9)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = User.T
+LineTo  X = User.T; Y = User.T
+LineTo  X = User.T; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = 10 mm; Y = Height
+        X.us = 0.4 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Schenkelbreite ändern"
+        Tip.en = "Change the width of the legs"
+        Tip.es = "Cambiar el ancho de los brazos"
+        Tip.it = "Cambia la larghezza dei bracci"
+        Tip.fr = "Modifier la largeur des branches"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = User.T*0.5; DirX = -1; DirY = 0
+Row  X = User.T*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

@@ -1,0 +1,52 @@
+# Eine Fläche ohne Zeiger (kein msvStructureType): ein quadratischer Notizzettel, die Ecke rechts
+# unten umgeknickt (Umriss mit abgeschnittener Ecke, die Kanten der Lasche als eigener Abschnitt
+# ohne Füllung).  Farbe aus dem Design wie alle Master (kein festes Gelb, SH-G01).
+master: Sticky note
+name.de: Notizzettel
+name.en: Sticky note
+name.es: Nota adhesiva
+name.it: Foglietto adesivo
+name.fr: Pense-bête
+prompt.de: Quadratischer Notizzettel mit umgeknickter Ecke rechts unten.
+prompt.en: Square sticky note with the bottom right corner folded over.
+prompt.es: Nota adhesiva cuadrada con la esquina inferior derecha doblada.
+prompt.it: Foglietto adesivo quadrato con l'angolo in basso a destra piegato.
+prompt.fr: Pense-bête carré avec le coin inférieur droit replié.
+keywords.de: Notizzettel, Haftnotiz, Notiz, Zettel, Merkzettel, Erinnerung
+keywords.en: sticky note, note, memo, reminder, post-it, paper
+keywords.es: nota adhesiva, nota, recordatorio, papel, memo
+keywords.it: foglietto adesivo, nota, promemoria, foglio, appunto
+keywords.fr: pense-bête, note, mémo, rappel, papillon
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+
+[User]
+# die Größe der umgeknickten Ecke
+Fold:  Value = MIN(6 mm,Width*0.3,Height*0.3)
+       Value.us = MIN(0.25 in,Width*0.3,Height*0.3)
+
+# der Zettel
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width-User.Fold; Y = 0
+LineTo  X = Width; Y = User.Fold
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# die Lasche
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width-User.Fold; Y = 0
+LineTo  X = Width-User.Fold; Y = User.Fold
+LineTo  X = Width; Y = User.Fold
+
+[Connection]
+Row  X = (Width-User.Fold)*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = (Height+User.Fold)*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

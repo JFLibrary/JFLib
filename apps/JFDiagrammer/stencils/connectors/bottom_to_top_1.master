@@ -1,0 +1,66 @@
+# Von unten nach oben 1: von der Unterkante zur Oberkante eines tieferen Shapes, gezeichnet ein Z.
+# Dynamischer Verbinder (ObjType 2 verlegbar, GlueType 2): die App verlegt ihn selbst und ersetzt
+# die gezeichnete Geometrie durch ihren Weg; der Kasten bleibt aufrecht (Width = EndX-BeginX ...,
+# Angle 0).  Route-Zellen mit Visios Namen und Werten: ShapeRouteStyle 17 (einfach oben nach
+# unten), ConLineRouteExt 1, ConFixedCode 0.  Der Text folgt Controls.TextPosition, das die App in
+# die Mitte des Wegs setzt (ohne Text verborgen).
+master: Bottom to top 1
+name.de: Von unten nach oben 1
+name.en: Bottom to top 1
+name.es: De abajo arriba 1
+name.it: Dal basso in alto 1
+name.fr: De bas en haut 1
+prompt.de: Dynamischer Verbinder von der Unterkante des einen zur Oberkante des anderen Shapes. Ziehen Sie die Enden auf Shapes.
+prompt.en: Dynamic connector from the bottom edge of one shape to the top edge of the other. Drag the ends onto shapes.
+prompt.es: Conector dinámico del borde inferior de una forma al borde superior de la otra. Arrastre los extremos sobre las formas.
+prompt.it: Connettore dinamico dal bordo inferiore di una forma al bordo superiore dell'altra. Trascina le estremità sulle forme.
+prompt.fr: Connecteur dynamique du bord inférieur d'une forme au bord supérieur de l'autre. Faites glisser les extrémités sur les formes.
+keywords.de: Verbinder, dynamisch, verbinden, unten, oben, Unterkante, Oberkante
+keywords.en: connector, dynamic, connect, bottom, top, bottom edge, top edge
+keywords.es: conector, dinámico, conectar, abajo, arriba, borde inferior, borde superior
+keywords.it: connettore, dinamico, collegare, basso, alto, bordo inferiore, bordo superiore
+keywords.fr: connecteur, dynamique, relier, bas, haut, bord inférieur, bord supérieur
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 20 mm
+BeginY.us = 0.75 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 0 mm
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+ObjType = 2
+GlueType = 2
+ShapeRouteStyle = 17
+ConLineRouteExt = 1
+ConFixedCode = 0
+NoAlignBox = TRUE
+DynFeedback = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Controls.TextPosition
+TxtPinY = Controls.TextPosition.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+RelMoveTo  X = 0; Y = 0
+RelLineTo  X = 0; Y = 0.5
+RelLineTo  X = 1; Y = 0.5
+RelLineTo  X = 1; Y = 1
+
+[Controls]
+TextPosition:  X = Width*0.5; Y = Height*0.5
+        XDyn = Controls.TextPosition; YDyn = Controls.TextPosition.Y
+        XCon = IF(OR(STRSAME(SHAPETEXT(TheText),""),HideText),5,0); YCon = 0; CanGlue = FALSE
+        Tip.de = "Text verschieben"
+        Tip.en = "Move the text"
+        Tip.es = "Mover el texto"
+        Tip.it = "Sposta il testo"
+        Tip.fr = "Déplacer le texte"

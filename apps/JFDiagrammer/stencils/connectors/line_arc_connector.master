@@ -1,0 +1,77 @@
+# Verbinder: Linie/Bogen: gerade von Mitte zu Mitte; die Shape-Daten „Als Bogen“ (Prop.Arc)
+# schalten ConLineRouteExt auf 2 (gebogen).  Dynamischer Verbinder (ObjType 2 verlegbar, GlueType
+# 2): die App verlegt ihn selbst und ersetzt die gezeichnete Geometrie durch ihren Weg; der Kasten
+# bleibt aufrecht (Width = EndX-BeginX ..., Angle 0).  Route-Zellen mit Visios Namen und Werten:
+# ShapeRouteStyle und ConLineRouteExt als Formeln aus den Shape-Daten (oben), ConFixedCode 0.  Der
+# Text folgt Controls.TextPosition, das die App in die Mitte des Wegs setzt (ohne Text verborgen).
+master: Line-arc connector
+name.de: Verbinder: Linie/Bogen
+name.en: Line-arc connector
+name.es: Conector de línea o arco
+name.it: Connettore linea/arco
+name.fr: Connecteur ligne/arc
+prompt.de: Dynamischer Verbinder als gerade Linie; mit „Als Bogen“ in den Shape-Daten wird er gebogen. Ziehen Sie die Enden auf Shapes.
+prompt.en: Dynamic connector as a straight line; “As an arc” in the shape data curves it. Drag the ends onto shapes.
+prompt.es: Conector dinámico como línea recta; «Como arco» en los datos de forma lo curva. Arrastre los extremos sobre las formas.
+prompt.it: Connettore dinamico come linea retta; «Come arco» nei dati della forma lo curva. Trascina le estremità sulle forme.
+prompt.fr: Connecteur dynamique en ligne droite ; « En arc » dans les données de forme le courbe. Faites glisser les extrémités sur les formes.
+keywords.de: Verbinder, dynamisch, verbinden, gerade, Bogen, gebogen, Linie
+keywords.en: connector, dynamic, connect, straight, arc, curved, line
+keywords.es: conector, dinámico, conectar, recto, arco, curvo, línea
+keywords.it: connettore, dinamico, collegare, diritto, arco, curvo, linea
+keywords.fr: connecteur, dynamique, relier, droit, arc, courbe, ligne
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 0 mm
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 20 mm
+EndY.us = 0.75 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+ObjType = 2
+GlueType = 2
+ShapeRouteStyle = 16
+ConLineRouteExt = IF(Prop.Arc,2,1)
+ConFixedCode = 0
+NoAlignBox = TRUE
+DynFeedback = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Controls.TextPosition
+TxtPinY = Controls.TextPosition.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+RelMoveTo  X = 0; Y = 0
+RelLineTo  X = 1; Y = 1
+
+[Controls]
+TextPosition:  X = Width*0.5; Y = Height*0.5
+        XDyn = Controls.TextPosition; YDyn = Controls.TextPosition.Y
+        XCon = IF(OR(STRSAME(SHAPETEXT(TheText),""),HideText),5,0); YCon = 0; CanGlue = FALSE
+        Tip.de = "Text verschieben"
+        Tip.en = "Move the text"
+        Tip.es = "Mover el texto"
+        Tip.it = "Sposta il testo"
+        Tip.fr = "Déplacer le texte"
+
+[Property]
+Arc:    Type = 3; Value = FALSE
+        Label.de = "Als Bogen"
+        Label.en = "As an arc"
+        Label.es = "Como arco"
+        Label.it = "Come arco"
+        Label.fr = "En arc"
+        Prompt.de = "Den Verbinder gebogen statt gerade zeichnen"
+        Prompt.en = "Draw the connector curved instead of straight"
+        Prompt.es = "Dibujar el conector curvo en lugar de recto"
+        Prompt.it = "Disegnare il connettore curvo invece che diritto"
+        Prompt.fr = "Dessiner le connecteur courbe au lieu de droit"

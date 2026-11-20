@@ -1,0 +1,62 @@
+# Externe Daten (ISO 5807: gespeicherte Daten): oben und unten gerade, beide Seiten nach links
+# gewölbt -- links nach außen, rechts nach innen (zwei Kreisbögen, ArcTo mit derselben Bogenhöhe).
+# Row_1 an der linken oberen Ecke ändert die Wölbung (nur waagrecht, als Abstand von links: sie
+# bleibt beim Verbreitern gleich).  Verbindungspunkte in der Mitte jeder Seite, rechts auf dem
+# Scheitel des inneren Bogens.
+master: External data
+name.de: Externe Daten
+name.en: External data
+name.es: Datos externos
+name.it: Dati esterni
+name.fr: Données externes
+prompt.de: Gespeicherte Daten außerhalb des Ablaufs, ohne Angabe des Datenträgers (ISO 5807). Mit dem gelben Steuerpunkt ändern Sie die Wölbung der Seiten.
+prompt.en: Stored data outside the flow, whatever the medium (ISO 5807). Drag the yellow control handle to change the curve of the sides.
+prompt.es: Datos almacenados fuera del flujo, sea cual sea el soporte (ISO 5807). Arrastre el controlador amarillo para cambiar la curvatura de los lados.
+prompt.it: Dati memorizzati al di fuori del flusso, su qualsiasi supporto (ISO 5807). Trascina la maniglia di controllo gialla per cambiare la curvatura dei lati.
+prompt.fr: Données stockées hors du flux, quel que soit le support (ISO 5807). Faites glisser la poignée de contrôle jaune pour modifier la courbure des côtés.
+keywords.de: externe Daten, gespeicherte Daten, Speicher, Datei, Quelle, Archiv, Flussdiagramm
+keywords.en: external data, stored data, storage, file, source, archive, flowchart
+keywords.es: datos externos, datos almacenados, almacenamiento, archivo, fuente, diagrama de flujo
+keywords.it: dati esterni, dati memorizzati, archiviazione, file, sorgente, archivio, diagramma di flusso
+keywords.fr: données externes, données stockées, stockage, fichier, source, archive, diagramme de flux
+
+[Shape]
+Width = 36 mm
+Width.us = 1.5 in
+Height = 24 mm
+Height.us = 1 in
+TxtWidth = Width-User.D*2
+TxtHeight = Height
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+msvShapeCategories:  Value = "Flowchart"
+# die Bogenhöhe der beiden Seiten
+D:  Value = MIN(MAX(Controls.Row_1, 0), Height*0.5, Width*0.25)
+
+[Geometry]
+MoveTo  X = User.D; Y = Height
+ArcTo   X = User.D; Y = 0; A = User.D
+LineTo  X = Width; Y = 0
+ArcTo   X = Width; Y = Height; A = -User.D
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = 4 mm; Y = Height
+        X.us = 0.15 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Wölbung der Seiten ändern"
+        Tip.en = "Change the curve of the sides"
+        Tip.es = "Cambiar la curvatura de los lados"
+        Tip.it = "Cambia la curvatura dei lati"
+        Tip.fr = "Modifier la courbure des côtés"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width-User.D; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

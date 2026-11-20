@@ -1,0 +1,85 @@
+# Knickbeschriftung: Text ohne Rahmen; der Zeiger geht von der Mitte der Seite, die der Spitze
+# zugewandt ist, ein festes Stück (Knee) waagrecht hinaus und von dort gerade zur Spitze, dort ein
+# Punkt.  Liegt die Spitze im Körper, sind Zeiger und Punkt aus (NoShow).
+master: Callout knee
+name.de: Knickbeschriftung
+name.en: Bent callout
+name.es: Llamada acodada
+name.it: Richiamo piegato
+name.fr: Annotation coudée
+prompt.de: Text ohne Rahmen, der Zeiger geht ein kurzes Stück waagrecht aus der Seite und knickt dann zum Ziel. Ziehen Sie den gelben Steuerpunkt auf das Ziel.
+prompt.en: Text without a frame; the pointer leaves the side horizontally for a short way and then bends to the target. Drag the yellow control handle onto the target.
+prompt.es: Texto sin marco; el puntero sale del lateral un tramo corto en horizontal y luego se dobla hacia el destino. Arrastre el controlador amarillo hasta el destino.
+prompt.it: Testo senza cornice; il puntatore esce dal lato in orizzontale per un breve tratto e poi piega verso la destinazione. Trascina la maniglia di controllo gialla sulla destinazione.
+prompt.fr: Texte sans cadre ; le pointeur sort du côté à l'horizontale sur une courte distance puis se coude vers la cible. Faites glisser la poignée de contrôle jaune sur la cible.
+keywords.de: Beschriftung, Hinweis, Kommentar, Zeiger, Knick, Text, ohne Rahmen
+keywords.en: callout, note, comment, pointer, bend, knee, text
+keywords.es: llamada, nota, comentario, puntero, codo, texto, sin marco
+keywords.it: richiamo, nota, commento, puntatore, piega, testo, senza cornice
+keywords.fr: bulle d'annotation, note, commentaire, pointeur, coude, texte, sans cadre
+text.de: Text
+text.en: Text
+text.es: Texto
+text.it: Testo
+text.fr: Texte
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 16 mm
+Height.us = 0.6 in
+
+[User]
+msvStructureType:         Value = "Callout"
+msvShapeCategories:       Value = "Callout"
+msvSDCalloutNoHighlight:  Value = FALSE
+# die Spitze des Zeigers
+Ax:                       Value = Controls.Association
+Ay:                       Value = Controls.Association.Y
+Out:                      Value = OR(User.Ax<0,User.Ax>Width,User.Ay<0,User.Ay>Height)
+# die Spitze rechts der Mitte: der Zeiger beginnt an der rechten Seite
+Right:                    Value = User.Ax>Width*0.5
+Sx:                       Value = IF(User.Right,Width,0)
+# das waagrechte Stück bis zum Knick
+Knee:                     Value = 4 mm
+                          Value.us = 0.15 in
+Kx:                       Value = IF(User.Right,Width+User.Knee,-User.Knee)
+Dot:                      Value = 0.8 mm
+                          Value.us = 0.03 in
+
+# der Körper: unsichtbar, nur zum Anfassen
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# der Zeiger mit dem Knick
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(User.Out)
+MoveTo  X = User.Sx; Y = Height*0.5
+LineTo  X = User.Kx; Y = Height*0.5
+LineTo  X = User.Ax; Y = User.Ay
+
+# der Punkt an der Spitze
+[Geometry]
+NoShow = NOT(User.Out)
+Ellipse  X = User.Ax; Y = User.Ay; A = User.Ax+User.Dot; B = User.Ay; C = User.Ax; D = User.Ay+User.Dot
+
+[Paragraph]
+Row  HorzAlign = IF(User.Right,2,0)
+
+[Controls]
+Association:  X = -12 mm; Y = -10 mm
+              X.us = -0.5 in; Y.us = -0.4 in
+              XDyn = User.Sx; YDyn = Height*0.5
+              XCon = 2; YCon = 2; CanGlue = FALSE
+              Tip.de = "Zeiger auf das Ziel ziehen"
+              Tip.en = "Drag the pointer onto the target"
+              Tip.es = "Arrastre el puntero hasta el destino"
+              Tip.it = "Trascina il puntatore sulla destinazione"
+              Tip.fr = "Faites glisser le pointeur sur la cible"

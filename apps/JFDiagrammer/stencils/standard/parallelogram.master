@@ -1,0 +1,52 @@
+# Parallelogramm: Row_1 an der linken oberen Ecke ändert die Neigung (nur waagrecht, Abstand von
+# links: die Neigung bleibt beim Verbreitern gleich).
+master: Parallelogram
+name.de: Parallelogramm
+name.en: Parallelogram
+name.es: Paralelogramo
+name.it: Parallelogramma
+name.fr: Parallélogramme
+prompt.de: Viereck mit parallelen, schrägen Seiten. Mit dem gelben Steuerpunkt ändern Sie die Neigung.
+prompt.en: Quadrilateral with parallel slanted sides. Drag the yellow control handle to change the slant.
+prompt.es: Cuadrilátero con lados inclinados paralelos. Arrastre el controlador amarillo para cambiar la inclinación.
+prompt.it: Quadrilatero con lati inclinati paralleli. Trascina la maniglia di controllo gialla per cambiare l'inclinazione.
+prompt.fr: Quadrilatère aux côtés inclinés parallèles. Faites glisser la poignée de contrôle jaune pour modifier l'inclinaison.
+keywords.de: Parallelogramm, schräg, Viereck, Neigung, Eingabe, Ausgabe, Daten
+keywords.en: parallelogram, slanted, quadrilateral, slant, input, output, data
+keywords.es: paralelogramo, inclinado, cuadrilátero, inclinación, entrada, salida, datos
+keywords.it: parallelogramma, inclinato, quadrilatero, inclinazione, input, output, dati
+keywords.fr: parallélogramme, incliné, quadrilatère, inclinaison, entrée, sortie, données
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# der waagrechte Versatz der Oberkante
+S:  Value = MIN(MAX(Controls.Row_1,0),Width*0.9)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width-User.S; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = User.S; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = 10 mm; Y = Height
+        X.us = 0.375 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Neigung ändern"
+        Tip.en = "Change the slant"
+        Tip.es = "Cambiar la inclinación"
+        Tip.it = "Cambia l'inclinazione"
+        Tip.fr = "Modifier l'inclinaison"
+
+[Connection]
+Row  X = (Width-User.S)*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width-User.S*0.5; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = (Width+User.S)*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = User.S*0.5; Y = Height*0.5; DirX = 1; DirY = 0

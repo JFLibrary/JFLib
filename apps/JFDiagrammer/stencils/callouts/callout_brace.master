@@ -1,0 +1,90 @@
+# Beschriftung geschweifte Klammer: eine waagrechte Klammer an der Unter- oder Oberkante, je
+# nachdem, wo die Spitze liegt (gespiegelt über By0 und Sg), der Text auf der anderen Seite; der
+# Zeiger geht von der Spitze der Klammer zur Spitze des Zeigers, dort ein Punkt.  Liegt die Spitze
+# im Körper, sind Zeiger und Punkt aus (NoShow), die Klammer bleibt.
+master: Callout brace
+name.de: Beschriftung geschweifte Klammer
+name.en: Callout brace
+name.es: Llamada llave
+name.it: Richiamo parentesi graffa
+name.fr: Bulle d'annotation accolade
+prompt.de: Text über oder unter einer waagrechten geschweiften Klammer, der Zeiger geht von ihrer Spitze aus. Ziehen Sie den gelben Steuerpunkt auf das Ziel.
+prompt.en: Text above or below a horizontal brace; the pointer starts at its point. Drag the yellow control handle onto the target.
+prompt.es: Texto encima o debajo de una llave horizontal; el puntero sale de su punta. Arrastre el controlador amarillo hasta el destino.
+prompt.it: Testo sopra o sotto una parentesi graffa orizzontale; il puntatore parte dalla sua punta. Trascina la maniglia di controllo gialla sulla destinazione.
+prompt.fr: Texte au-dessus ou au-dessous d'une accolade horizontale ; le pointeur part de sa pointe. Faites glisser la poignée de contrôle jaune sur la cible.
+keywords.de: Beschriftung, Hinweis, Kommentar, Zeiger, geschweifte Klammer, Klammer, Gruppe, waagrecht, Bereich
+keywords.en: callout, note, comment, pointer, brace, curly bracket, group, horizontal, range
+keywords.es: llamada, nota, comentario, puntero, llave, grupo, agrupar, horizontal, rango
+keywords.it: richiamo, nota, commento, puntatore, parentesi graffa, graffa, gruppo, orizzontale, intervallo
+keywords.fr: bulle d'annotation, note, commentaire, pointeur, accolade, groupe, regrouper, horizontale, plage
+text.de: Text
+text.en: Text
+text.es: Texto
+text.it: Testo
+text.fr: Texte
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+TopMargin = 4 mm
+TopMargin.us = 0.16 in
+BottomMargin = 4 mm
+BottomMargin.us = 0.16 in
+
+[User]
+msvStructureType:         Value = "Callout"
+msvShapeCategories:       Value = "Callout"
+msvSDCalloutNoHighlight:  Value = FALSE
+# die Spitze des Zeigers
+Ax:                       Value = Controls.Association
+Ay:                       Value = Controls.Association.Y
+Out:                      Value = OR(User.Ax<0,User.Ax>Width,User.Ay<0,User.Ay>Height)
+# die Spitze unter der Mitte: die Klammer unten, ihre Spitze bei By0, nach innen Sg
+Below:                    Value = User.Ay<Height*0.5
+By0:                      Value = IF(User.Below,0,Height)
+Sg:                       Value = IF(User.Below,1,-1)
+# die Tiefe der Klammer, ihre halbe Tiefe, die Breite der Bögen
+Bw:                       Value = MIN(3 mm,Height*0.2)
+                          Value.us = MIN(0.12 in,Height*0.2)
+Bh:                       Value = User.Bw*0.5
+R:                        Value = MAX(MIN(2.5 mm,Width*0.25),0.1 mm)
+                          Value.us = MAX(MIN(0.1 in,Width*0.25),0.004 in)
+Dot:                      Value = 0.8 mm
+                          Value.us = 0.03 in
+
+# die Klammer
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width; Y = User.By0+User.Sg*User.Bw
+EllipticalArcTo  X = Width-User.R; Y = User.By0+User.Sg*User.Bh; A = Width-User.R+User.R*0.707107; B = User.By0+User.Sg*(User.Bw-User.Bh*0.707107); C = 0 deg; D = User.R/User.Bh
+LineTo  X = Width*0.5+User.R; Y = User.By0+User.Sg*User.Bh
+EllipticalArcTo  X = Width*0.5; Y = User.By0; A = Width*0.5+User.R-User.R*0.707107; B = User.By0+User.Sg*User.Bh*0.707107; C = 0 deg; D = User.R/User.Bh
+EllipticalArcTo  X = Width*0.5-User.R; Y = User.By0+User.Sg*User.Bh; A = Width*0.5-User.R+User.R*0.707107; B = User.By0+User.Sg*User.Bh*0.707107; C = 0 deg; D = User.R/User.Bh
+LineTo  X = User.R; Y = User.By0+User.Sg*User.Bh
+EllipticalArcTo  X = 0; Y = User.By0+User.Sg*User.Bw; A = User.R-User.R*0.707107; B = User.By0+User.Sg*(User.Bw-User.Bh*0.707107); C = 0 deg; D = User.R/User.Bh
+
+# der Zeiger
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(User.Out)
+MoveTo  X = Width*0.5; Y = User.By0
+LineTo  X = User.Ax; Y = User.Ay
+
+# der Punkt an der Spitze
+[Geometry]
+NoShow = NOT(User.Out)
+Ellipse  X = User.Ax; Y = User.Ay; A = User.Ax+User.Dot; B = User.Ay; C = User.Ax; D = User.Ay+User.Dot
+
+[Controls]
+Association:  X = -12 mm; Y = -10 mm
+              X.us = -0.5 in; Y.us = -0.4 in
+              XDyn = Width*0.5; YDyn = User.By0
+              XCon = 2; YCon = 2; CanGlue = FALSE
+              Tip.de = "Zeiger auf das Ziel ziehen"
+              Tip.en = "Drag the pointer onto the target"
+              Tip.es = "Arrastre el puntero hasta el destino"
+              Tip.it = "Trascina il puntatore sulla destinazione"
+              Tip.fr = "Faites glisser le pointeur sur la cible"

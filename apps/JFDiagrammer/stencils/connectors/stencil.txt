@@ -1,9 +1,16 @@
-# Verbinder (SH-277, JD13): 1D-Shapes mit festem Verlauf (README: 1D-Shapes) -- ihre Enden
-# kleben an Shapes, der Verlauf folgt per Formel den Enden; sie werden nicht neu verlegt (kein
-# ObjType "verlegbar", das ist der dynamische Verbinder der App).  Linienverbinder und Verbinder
-# aus Umrissen ohne Füllung tragen die Formatvorlage "Connector" (Linie und Pfeilspitze aus dem
-# Design, Text mit Hintergrund; Umrisse ohne Pfeilspitzen), gefüllte flächige die Formatvorlage
-# "Normal".  Probeblatt mit vier Mastern; die übrigen folgen im selben Stil.
+# Verbinder (SH-277, JD13): eigene Fassungen aller 69 Verbinder (README: 1D-Shapes), in Gruppen:
+#
+# - dynamische Verbinder (ObjType 2 verlegbar): die App verlegt sie selbst und ersetzt ihre
+#   gezeichnete Geometrie durch den Weg; der feste Verlauf steht in Visios Route-Zellen
+#   (ShapeRouteStyle, ConLineRouteExt, ConFixedCode mit Visios Werten), die Zeichnung im Master
+#   zeigt ihn für Symbol und Seitenleiste;
+# - feste Verbinder: 1D-Shapes, deren Verlauf per Formel den Enden folgt (Kurven, Linien mit
+#   Linienenden, Verzweigungen, Wellen, Sprung, Blitz);
+# - flächige Pfeile, hohle und parallele Linien, Bus, Ethernet und Stern.
+#
+# Linienverbinder und Verbinder aus Umrissen ohne Füllung tragen die Formatvorlage "Connector"
+# (Linie und Pfeilspitze aus dem Design, Text mit Hintergrund; Umrisse ohne Pfeilspitzen),
+# gefüllte flächige die Formatvorlage "Normal".  Die ersten sechs sind Schnell-Shapes.
 stencil: Connectors
 file: connectors
 name.de: Verbinder
@@ -12,5 +19,5 @@ name.es: Conectores
 name.it: Connettori
 name.fr: Connecteurs
 category: extras
-masters: curved_connector, elbow_connector, hollow_connector, line_arrow
-quick: 2
+masters: dynamic_connector, line_arrow, elbow_connector, curved_connector, line_arc_connector, two_branches_square, universal_connector, layout_connector, line_connector, side_to_side_1, side_to_side_2, side_to_side_fixed_1, side_to_side_fixed_2, side_to_side, sides, bottom_to_top_1, bottom_to_top_2, bottom_to_top, top_to_bottom_1, top_to_bottom_2, top_or_bottom, top_bottom_to_side, top_bottom_side, bottom_to_side_1, bottom_to_side_2, bottom_to_side_3, side_to_top_bottom, side_top_bottom, side_to_top, loop_square, curved_connector_2, curved_connector_3, line_curve_connector, curved_arrow, wavy_connector_1, wavy_connector_2, jump, comm_link_1, line_arrow_2, single_arrowhead, double_arrowhead, dotted_line, arrow_middle, dot_arrow, arrow_dot_1, arrow_dot_2, arrow_endpoints, pass_control, square_branches, two_branches_angled, angled_branches, fork_connector, arrow_1d, double_arrow_1d, arrow_1d_open_end, flexible_arrow, arrow_90_1, arrow_90_2, comm_link_2, hollow_connector, hollow_connector_2, hollow_connector_3, two_lines, four_lines, two_elbow_lines, four_elbow_lines, bus, ethernet, star
+quick: 6

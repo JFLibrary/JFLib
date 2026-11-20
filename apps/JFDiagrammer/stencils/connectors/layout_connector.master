@@ -1,0 +1,67 @@
+# Layoutverbinder: Verlauf (ShapeRouteStyle 0) und Linienform (ConLineRouteExt 0) kommen aus der
+# Seite, wie beim dynamischen Verbinder; gezeichnet von oben nach unten (ein senkrechtes Z), wie
+# ihn ein Layout von oben nach unten anschließt.  Dynamischer Verbinder (ObjType 2 verlegbar,
+# GlueType 2): die App verlegt ihn selbst und ersetzt die gezeichnete Geometrie durch ihren Weg;
+# der Kasten bleibt aufrecht (Width = EndX-BeginX ..., Angle 0).  Route-Zellen mit Visios Namen
+# und Werten: ShapeRouteStyle 0 (Standard der Seite), ConLineRouteExt 0, ConFixedCode 0.  Der Text
+# folgt Controls.TextPosition, das die App in die Mitte des Wegs setzt (ohne Text verborgen).
+master: Layout connector
+name.de: Layoutverbinder
+name.en: Layout connector
+name.es: Conector de diseño
+name.it: Connettore di layout
+name.fr: Connecteur de disposition
+prompt.de: Dynamischer Verbinder, der Verlauf und Linienform aus den Layout-Einstellungen der Seite übernimmt. Ziehen Sie die Enden auf Shapes.
+prompt.en: Dynamic connector that takes its route and line form from the page's layout settings. Drag the ends onto shapes.
+prompt.es: Conector dinámico que toma el trazado y la forma de línea de la configuración de diseño de la página. Arrastre los extremos sobre las formas.
+prompt.it: Connettore dinamico che prende percorso e forma della linea dalle impostazioni di layout della pagina. Trascina le estremità sulle forme.
+prompt.fr: Connecteur dynamique qui reprend le tracé et la forme de ligne des paramètres de disposition de la page. Faites glisser les extrémités sur les formes.
+keywords.de: Verbinder, dynamisch, verbinden, Layout, Seite, Einstellungen, verlegen
+keywords.en: connector, dynamic, connect, layout, page, settings, route
+keywords.es: conector, dinámico, conectar, diseño, página, configuración, trazar
+keywords.it: connettore, dinamico, collegare, layout, pagina, impostazioni, instradare
+keywords.fr: connecteur, dynamique, relier, disposition, page, paramètres, tracer
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 20 mm
+BeginY.us = 0.75 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 0 mm
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+ObjType = 2
+GlueType = 2
+ShapeRouteStyle = 0
+ConLineRouteExt = 0
+ConFixedCode = 0
+NoAlignBox = TRUE
+DynFeedback = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Controls.TextPosition
+TxtPinY = Controls.TextPosition.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+RelMoveTo  X = 0; Y = 0
+RelLineTo  X = 0; Y = 0.5
+RelLineTo  X = 1; Y = 0.5
+RelLineTo  X = 1; Y = 1
+
+[Controls]
+TextPosition:  X = Width*0.5; Y = Height*0.5
+        XDyn = Controls.TextPosition; YDyn = Controls.TextPosition.Y
+        XCon = IF(OR(STRSAME(SHAPETEXT(TheText),""),HideText),5,0); YCon = 0; CanGlue = FALSE
+        Tip.de = "Text verschieben"
+        Tip.en = "Move the text"
+        Tip.es = "Mover el texto"
+        Tip.it = "Sposta il testo"
+        Tip.fr = "Déplacer le texte"

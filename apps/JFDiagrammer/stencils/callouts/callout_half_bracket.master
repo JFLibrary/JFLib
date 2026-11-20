@@ -1,0 +1,89 @@
+# Text mit Teilklammer: eine Klammer mit nur einem Arm an der Seite zur Spitze hin (links oder
+# rechts); der Arm sitzt an dem Ende, das von der Spitze weg liegt (oben oder unten), der Zeiger
+# setzt das andere, offene Ende fort, dort ein Punkt.  Liegt die Spitze im Körper, sind Zeiger und
+# Punkt aus (NoShow).
+master: Callout half bracket
+name.de: Text mit Teilklammer
+name.en: Text with half bracket
+name.es: Texto con medio corchete
+name.it: Testo con mezza parentesi
+name.fr: Texte avec demi-crochet
+prompt.de: Text mit einer halben Klammer zum Ziel hin, der Zeiger setzt ihr offenes Ende fort. Ziehen Sie den gelben Steuerpunkt auf das Ziel.
+prompt.en: Text with a half bracket facing the target; the pointer continues its open end. Drag the yellow control handle onto the target.
+prompt.es: Texto con un medio corchete hacia el destino; el puntero continúa su extremo abierto. Arrastre el controlador amarillo hasta el destino.
+prompt.it: Testo con una mezza parentesi verso la destinazione; il puntatore prosegue la sua estremità aperta. Trascina la maniglia di controllo gialla sulla destinazione.
+prompt.fr: Texte avec un demi-crochet tourné vers la cible ; le pointeur prolonge son extrémité ouverte. Faites glisser la poignée de contrôle jaune sur la cible.
+keywords.de: Beschriftung, Hinweis, Kommentar, Zeiger, eckige Klammer, Klammer, Randnotiz, halbe Klammer, Haken
+keywords.en: callout, note, comment, pointer, bracket, square bracket, side note, half bracket, hook
+keywords.es: llamada, nota, comentario, puntero, corchete, nota al margen, grupo, medio corchete, gancho
+keywords.it: richiamo, nota, commento, puntatore, parentesi quadra, parentesi, nota a margine, mezza parentesi, gancio
+keywords.fr: bulle d'annotation, note, commentaire, pointeur, crochet, note en marge, groupe, demi-crochet, crochet simple
+text.de: Text
+text.en: Text
+text.es: Texto
+text.it: Testo
+text.fr: Texte
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 16 mm
+Height.us = 0.6 in
+LeftMargin = 3 mm
+LeftMargin.us = 0.12 in
+RightMargin = 3 mm
+RightMargin.us = 0.12 in
+
+[User]
+msvStructureType:         Value = "Callout"
+msvShapeCategories:       Value = "Callout"
+msvSDCalloutNoHighlight:  Value = FALSE
+# die Spitze des Zeigers
+Ax:                       Value = Controls.Association
+Ay:                       Value = Controls.Association.Y
+Out:                      Value = OR(User.Ax<0,User.Ax>Width,User.Ay<0,User.Ay>Height)
+# die Seite (rechts der Mitte: rechts) und das offene Ende (unter der Mitte: unten)
+Right:                    Value = User.Ax>Width*0.5
+Bx:                       Value = IF(User.Right,Width,0)
+Below:                    Value = User.Ay<Height*0.5
+Oy:                       Value = IF(User.Below,0,Height)
+Ay2:                      Value = IF(User.Below,Height,0)
+# das Ende des Arms
+Arm:                      Value = MIN(2.5 mm,Width*0.2)
+                          Value.us = MIN(0.1 in,Width*0.2)
+Bk:                       Value = IF(User.Right,Width-User.Arm,User.Arm)
+Dot:                      Value = 0.8 mm
+                          Value.us = 0.03 in
+
+# die halbe Klammer
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.Bk; Y = User.Ay2
+LineTo  X = User.Bx; Y = User.Ay2
+LineTo  X = User.Bx; Y = User.Oy
+
+# der Zeiger
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(User.Out)
+MoveTo  X = User.Bx; Y = User.Oy
+LineTo  X = User.Ax; Y = User.Ay
+
+# der Punkt an der Spitze
+[Geometry]
+NoShow = NOT(User.Out)
+Ellipse  X = User.Ax; Y = User.Ay; A = User.Ax+User.Dot; B = User.Ay; C = User.Ax; D = User.Ay+User.Dot
+
+[Paragraph]
+Row  HorzAlign = IF(User.Right,2,0)
+
+[Controls]
+Association:  X = -12 mm; Y = -10 mm
+              X.us = -0.5 in; Y.us = -0.4 in
+              XDyn = User.Bx; YDyn = User.Oy
+              XCon = 2; YCon = 2; CanGlue = FALSE
+              Tip.de = "Zeiger auf das Ziel ziehen"
+              Tip.en = "Drag the pointer onto the target"
+              Tip.es = "Arrastre el puntero hasta el destino"
+              Tip.it = "Trascina il puntatore sulla destinazione"
+              Tip.fr = "Faites glisser le pointeur sur la cible"

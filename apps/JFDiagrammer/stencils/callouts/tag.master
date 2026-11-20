@@ -1,0 +1,68 @@
+# Eine Fläche ohne Zeiger (kein msvStructureType): ein Anhänger mit Spitze links und einem Loch
+# (Kreis als eigener Abschnitt, Gerade-Ungerade-Regel).  Row_1 an der oberen Ecke der Spitze
+# ändert ihre Länge (nur waagrecht, Abstand von links).  Der Text steht rechts vom Loch.
+master: Tag
+name.de: Etikett
+name.en: Tag
+name.es: Etiqueta colgante
+name.it: Cartellino
+name.fr: Étiquette
+prompt.de: Anhänger mit Spitze links und Loch für die Schnur. Mit dem gelben Steuerpunkt ändern Sie die Länge der Spitze.
+prompt.en: Hanging tag with a point on the left and a hole for the string. Drag the yellow control handle to change the length of the point.
+prompt.es: Etiqueta colgante con punta a la izquierda y agujero para el cordel. Arrastre el controlador amarillo para cambiar la longitud de la punta.
+prompt.it: Cartellino con punta a sinistra e foro per lo spago. Trascina la maniglia di controllo gialla per cambiare la lunghezza della punta.
+prompt.fr: Étiquette à suspendre avec une pointe à gauche et un trou pour la ficelle. Faites glisser la poignée de contrôle jaune pour modifier la longueur de la pointe.
+keywords.de: Etikett, Anhänger, Tag, Preisschild, Schild, Label
+keywords.en: tag, label, price tag, hang tag, sign, ticket
+keywords.es: etiqueta, colgante, precio, rótulo, marbete
+keywords.it: cartellino, etichetta, prezzo, targhetta, tag
+keywords.fr: étiquette, prix, marque, tag, ticket
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+TxtWidth = MAX(Width-User.Hx-User.Hr*2,0)
+TxtHeight = Height
+TxtPinX = Width-TxtWidth*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Länge der Spitze, Radius und Mitte des Lochs
+P:   Value = MIN(MAX(Controls.Row_1,0),Width*0.5)
+Hr:  Value = MIN(1.5 mm,Height*0.15)
+     Value.us = MIN(0.06 in,Height*0.15)
+Hx:  Value = MAX(User.P,User.Hr*3)
+
+# 1 der Anhänger
+[Geometry]
+MoveTo  X = User.P; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = User.P; Y = Height
+LineTo  X = 0; Y = Height*0.5
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# 2 das Loch
+[Geometry]
+Ellipse  X = User.Hx; Y = Height*0.5; A = User.Hx+User.Hr; B = Height*0.5; C = User.Hx; D = Height*0.5+User.Hr
+
+[Controls]
+Row_1:  X = 8 mm; Y = Height
+        X.us = 0.3 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Länge der Spitze ändern"
+        Tip.en = "Change the length of the point"
+        Tip.es = "Cambiar la longitud de la punta"
+        Tip.it = "Cambia la lunghezza della punta"
+        Tip.fr = "Modifier la longueur de la pointe"
+
+[Connection]
+Row  X = (Width+User.P)*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = (Width+User.P)*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

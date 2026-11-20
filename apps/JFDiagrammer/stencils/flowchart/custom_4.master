@@ -1,0 +1,63 @@
+# Benutzerdefiniert 4: eine frei belegbare Form, ein langgezogenes Sechseck mit Spitzen links und
+# rechts (in ISO 5807 sähe so die Vorbereitung aus).  Row_1 an der linken oberen Ecke ändert die
+# Tiefe der Spitzen (nur waagrecht, als Abstand von links), die rechte folgt gespiegelt.
+# Verbindungspunkte in der Mitte jeder Seite, seitlich in den Spitzen.
+master: Custom 4
+name.de: Benutzerdefiniert 4
+name.en: Custom 4
+name.es: Personalizado 4
+name.it: Personalizzato 4
+name.fr: Personnalisé 4
+prompt.de: Eine frei belegbare Form: ein Sechseck. Mit dem gelben Steuerpunkt ändern Sie die Tiefe der Spitzen.
+prompt.en: A shape for your own meaning: a hexagon. Drag the yellow control handle to change the depth of the points.
+prompt.es: Una forma para el significado que usted elija: un hexágono. Arrastre el controlador amarillo para cambiar la profundidad de las puntas.
+prompt.it: Una forma dal significato libero: un esagono. Trascina la maniglia di controllo gialla per cambiare la profondità delle punte.
+prompt.fr: Une forme à la signification libre : un hexagone. Faites glisser la poignée de contrôle jaune pour modifier la profondeur des pointes.
+keywords.de: benutzerdefiniert, Sechseck, Vorbereitung, frei, eigene Bedeutung, Form, Flussdiagramm
+keywords.en: custom, hexagon, preparation, free, own meaning, shape, flowchart
+keywords.es: personalizado, hexágono, preparación, libre, significado propio, forma, diagrama de flujo
+keywords.it: personalizzato, esagono, preparazione, libero, significato proprio, forma, diagramma di flusso
+keywords.fr: personnalisé, hexagone, préparation, libre, signification propre, forme, diagramme de flux
+
+[Shape]
+Width = 36 mm
+Width.us = 1.5 in
+Height = 24 mm
+Height.us = 1 in
+TxtWidth = Width-User.Point
+TxtHeight = Height
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+msvShapeCategories:  Value = "Flowchart"
+# die Tiefe der Spitzen
+Point:  Value = MIN(MAX(Controls.Row_1, 0), Width*0.5)
+
+[Geometry]
+MoveTo  X = User.Point; Y = 0
+LineTo  X = Width-User.Point; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.Point; Y = Height
+LineTo  X = User.Point; Y = Height
+LineTo  X = 0; Y = Height*0.5
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = 6 mm; Y = Height
+        X.us = 0.25 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Tiefe der Spitzen ändern"
+        Tip.en = "Change the depth of the points"
+        Tip.es = "Cambiar la profundidad de las puntas"
+        Tip.it = "Cambia la profondità delle punte"
+        Tip.fr = "Modifier la profondeur des pointes"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

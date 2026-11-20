@@ -1,0 +1,52 @@
+# Trapez: oben schmaler; Row_1 an der linken oberen Ecke rückt beide oberen Ecken ein (nur
+# waagrecht, Abstand von links).
+master: Trapezoid
+name.de: Trapez
+name.en: Trapezoid
+name.es: Trapecio
+name.it: Trapezio
+name.fr: Trapèze
+prompt.de: Viereck, oben schmaler als unten. Mit dem gelben Steuerpunkt ändern Sie die Breite der Oberseite.
+prompt.en: Quadrilateral, narrower at the top than at the bottom. Drag the yellow control handle to change the width of the top.
+prompt.es: Cuadrilátero, más estrecho arriba que abajo. Arrastre el controlador amarillo para cambiar el ancho del lado superior.
+prompt.it: Quadrilatero, più stretto in alto che in basso. Trascina la maniglia di controllo gialla per cambiare la larghezza del lato superiore.
+prompt.fr: Quadrilatère, plus étroit en haut qu'en bas. Faites glisser la poignée de contrôle jaune pour modifier la largeur du côté supérieur.
+keywords.de: Trapez, Viereck, schräg, Rampe, manuelle Bearbeitung
+keywords.en: trapezoid, trapezium, quadrilateral, slanted, manual operation
+keywords.es: trapecio, cuadrilátero, inclinado, rampa, operación manual
+keywords.it: trapezio, quadrilatero, inclinato, rampa, operazione manuale
+keywords.fr: trapèze, quadrilatère, incliné, rampe, opération manuelle
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# wie weit die oberen Ecken eingerückt sind
+S:  Value = MIN(MAX(Controls.Row_1,0),Width*0.45)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width-User.S; Y = Height
+LineTo  X = User.S; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = 10 mm; Y = Height
+        X.us = 0.375 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Breite der Oberseite ändern"
+        Tip.en = "Change the width of the top"
+        Tip.es = "Cambiar el ancho del lado superior"
+        Tip.it = "Cambia la larghezza del lato superiore"
+        Tip.fr = "Modifier la largeur du côté supérieur"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width-User.S*0.5; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = User.S*0.5; Y = Height*0.5; DirX = 1; DirY = 0

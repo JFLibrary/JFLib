@@ -1,0 +1,58 @@
+# Gebogener Pfeil: ein Kreisbogen vom Anfang zum Ende (ArcTo), der Scheitel 5 mm über der Linie
+# (Row_1 in der Mitte, nur quer zur Linie).  Liegt auf der Linie vom Anfang zum Ende und dreht
+# sich mit ihr (PinX, Width, Angle aus den Enden); die Enden kleben an Shapes, mit GlueType 2 auch
+# an das ganze Shape.  Die Pfeilspitze am Ende kommt aus der Formatvorlage "Connector", der Text
+# steht am Scheitel.
+master: Curved arrow
+name.de: Gebogener Pfeil
+name.en: Curved arrow
+name.es: Flecha curva
+name.it: Freccia curva
+name.fr: Flèche courbe
+prompt.de: Gebogene Linie mit Pfeilspitze am Ende. Mit dem gelben Steuerpunkt ändern Sie die Biegung. Ziehen Sie die Enden auf Shapes.
+prompt.en: Curved line with an arrowhead at the end. Drag the yellow control handle to change the bend. Drag the ends onto shapes.
+prompt.es: Línea curva con punta de flecha al final. Arrastre el controlador amarillo para cambiar la curvatura. Arrastre los extremos sobre las formas.
+prompt.it: Linea curva con punta di freccia alla fine. Trascina la maniglia di controllo gialla per cambiare la curvatura. Trascina le estremità sulle forme.
+prompt.fr: Ligne courbe avec une pointe de flèche à la fin. Faites glisser la poignée de contrôle jaune pour modifier la courbure. Faites glisser les extrémités sur les formes.
+keywords.de: gebogen, Bogen, Pfeil, Kurve, Linie, Verbinder
+keywords.en: curved, arc, arrow, curve, line, connector
+keywords.es: curva, arco, flecha, curvo, línea, conector
+keywords.it: curva, arco, freccia, curvo, linea, connettore
+keywords.fr: courbe, arc, flèche, courbé, ligne, connecteur
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 6 mm
+BeginY.us = 0.25 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 6 mm
+EndY.us = 0.25 in
+Height = 0 mm
+Height.us = 0 in
+GlueType = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Controls.Row_1.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+ArcTo   X = Width; Y = Height*0.5; A = Height*0.5-Controls.Row_1.Y
+
+[Controls]
+Row_1:  X = Width*0.5; Y = 5 mm
+        Y.us = 0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 2; CanGlue = FALSE
+        Tip.de = "Linie biegen"
+        Tip.en = "Bend the line"
+        Tip.es = "Curvar la línea"
+        Tip.it = "Curva la linea"
+        Tip.fr = "Courber la ligne"

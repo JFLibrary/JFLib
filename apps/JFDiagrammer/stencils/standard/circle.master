@@ -1,0 +1,33 @@
+# Kreis: eine Ellipse-Zeile mit festem Seitenverhältnis (LockAspect)
+master: Circle
+name.de: Kreis
+name.en: Circle
+name.es: Círculo
+name.it: Cerchio
+name.fr: Cercle
+prompt.de: Kreis, der beim Vergrößern rund bleibt.
+prompt.en: Circle that stays round when you resize it.
+prompt.es: Círculo que sigue redondo al cambiar su tamaño.
+prompt.it: Cerchio che resta rotondo quando lo ridimensioni.
+prompt.fr: Cercle qui reste rond quand vous le redimensionnez.
+keywords.de: Kreis, rund, Scheibe, Punkt, Ring, Seitenverhältnis
+keywords.en: circle, round, disc, dot, ring, aspect ratio
+keywords.es: círculo, redondo, disco, punto, anillo, proporción
+keywords.it: cerchio, rotondo, disco, punto, anello, proporzioni
+keywords.fr: cercle, rond, disque, point, anneau, proportions
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+LockAspect = TRUE
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
