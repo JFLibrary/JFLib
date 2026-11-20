@@ -36,7 +36,7 @@ use alloc::vec::Vec;
 
 use archive::opc::{self, Package, Rules};
 use archive::Method;
-use diagram_core::{DocKind, Document, ForeignPayload, MasterRef, ShapeTree, Sym};
+use diagram_core::{DocKind, Document, ForeignPayload, MasterRef, Owner, ShapeTree, Sym};
 
 use crate::blank;
 use crate::vsdx::{self, Format, WriteError, WriteOptions, CT_MASTER, CT_MASTERS, CT_PAGE, CT_PAGES, CT_THEME, CT_WINDOWS};
@@ -574,15 +574,15 @@ pub(crate) fn write(doc: &Document, options: &WriteOptions) -> Result<Vec<u8>, W
     // the parts the model owns
     let main_key = key(&plan.main).unwrap_or_default();
     pkg.set_part(&plan.main, format.content_type(), xml_part(&plan.main, write::document(doc))?).map_err(WriteError::Package)?;
-    let pages: Vec<_> = doc.pages().filter_map(|p| doc.page(p)).collect();
+    let pages: Vec<_> = doc.pages().filter_map(|p| doc.page(p).map(|x| (p, x))).collect();
     if let Some(list) = plan.pages.clone() {
         let lk = key(&list).unwrap_or_default();
         let ids: Vec<Option<String>> = plan.page_parts.iter().map(|p| p.as_deref().and_then(key).and_then(|k| plan.id_of(&lk, &k, Some("page")))).collect();
         pkg.set_part(&list, CT_PAGES, xml_part(&list, write::pages(doc, &ids))?).map_err(WriteError::Package)?;
-        for (i, pg) in pages.iter().enumerate() {
+        for (i, (pref, pg)) in pages.iter().enumerate() {
             let Some(name) = plan.page_parts.get(i).cloned().flatten() else { continue };
             let pics = plan.pictures(&key(&name).unwrap_or_default(), &pg.shapes);
-            let text = write::contents(doc, "PageContents", &pg.shapes, &pg.connects, &pg.contents_extras, &pics);
+            let text = write::contents(doc, Some(Owner::Page(*pref)), "PageContents", &pg.shapes, &pg.connects, &pg.contents_extras, &pics);
             pkg.set_part(&name, CT_PAGE, xml_part(&name, text)?).map_err(WriteError::Package)?;
         }
     }
@@ -591,11 +591,11 @@ pub(crate) fn write(doc: &Document, options: &WriteOptions) -> Result<Vec<u8>, W
         let lk = key(&list).unwrap_or_default();
         let ids: Vec<Option<String>> = plan.master_parts.iter().map(|p| p.as_deref().and_then(key).and_then(|k| plan.id_of(&lk, &k, Some("master")))).collect();
         pkg.set_part(&list, CT_MASTERS, xml_part(&list, write::masters(doc, &ids))?).map_err(WriteError::Package)?;
-        let masters: Vec<_> = doc.masters().filter_map(|m| doc.master(m)).collect();
-        for (i, m) in masters.iter().enumerate() {
+        let masters: Vec<_> = doc.masters().filter_map(|m| doc.master(m).map(|x| (m, x))).collect();
+        for (i, (mref, m)) in masters.iter().enumerate() {
             let Some(name) = plan.master_parts.get(i).cloned().flatten() else { continue };
             let pics = plan.pictures(&key(&name).unwrap_or_default(), &m.shapes);
-            let text = write::contents(doc, "MasterContents", &m.shapes, &m.connects, &m.contents_extras, &pics);
+            let text = write::contents(doc, Some(Owner::Master(*mref)), "MasterContents", &m.shapes, &m.connects, &m.contents_extras, &pics);
             pkg.set_part(&name, CT_MASTER, xml_part(&name, text)?).map_err(WriteError::Package)?;
         }
     }

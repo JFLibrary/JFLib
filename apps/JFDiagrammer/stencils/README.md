@@ -20,7 +20,10 @@ stencils/
     server.svg            Grafik für gestaltete Shapes (optional)
 ```
 
-Ausgabe: `<file>_m.vssx` (metrisch, mm, A4) und `<file>_u.vssx` (US, Zoll, Letter). Beim Bauen
+Ausgabe: `jfd_<file>_m.vssx` (metrisch, mm, A4) und `jfd_<file>_u.vssx` (US, Zoll, Letter). Das Präfix
+`jfd_` hält unsere Dateinamen von Visios eigenen fern (Visio hat etwa ein `ARROWS_M.VSSX`): eine
+Vorlage nennt ihre Schablonen beim Dateinamen, und Visio öffnet eine eigene Schablone gleichen
+Namens, wenn es eine hat (`diagram_io::stencil::file_name`, `parse_file_name`). Beim Bauen
 der App landen sie in `OUT_DIR`; zum Ansehen in Visio schreibt
 `JFDiagrammer --write-stencils ORDNER` sie in einen Ordner (die Startschablone auch
 `diagramiotest --write-stencils ORDNER`, dazu eine Testschablone aus SVG-Grafiken).
@@ -49,7 +52,7 @@ der App landen sie in `OUT_DIR`; zum Ansehen in Visio schreibt
 | Schlüssel | Pflicht | Bedeutung |
 |---|---|---|
 | `stencil` | ja | universeller Name der Schablone (NameU-artiger Schlüssel), z. B. `Basic Shapes` |
-| `file` | ja | Dateistamm der Ausgabe, z. B. `standard` → `standard_m.vssx`, `standard_u.vssx` |
+| `file` | ja | Dateistamm der Ausgabe, z. B. `standard` → `jfd_standard_m.vssx`, `jfd_standard_u.vssx` |
 | `name.<sprache>` | ja, alle fünf | Titel in der Seitenleiste und im Menü „Weitere Shapes“ |
 | `category` | ja | Kategorie in „Weitere Shapes“: `general`, `flowchart`, `business`, `engineering`, `network`, `maps`, `software`, `schedule`, `extras` |
 | `masters` | ja | die Master-Dateien (ohne `.master`), durch Komma getrennt, in Anzeigereihenfolge |

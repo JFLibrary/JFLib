@@ -215,7 +215,7 @@ fn builds_every_form() {
     let v = doc.resolve(SheetRef::Style(normal), &CellAddr::row(SecKey::one(ch), RowKey::Index(0), size)).num();
     assert_eq!(v, Some(8.0 / 72.0));
     // stencil windows and the rule set
-    assert_eq!(stencil_windows(doc), [StencilWindow { document: String::from("t_m.vssx"), active: true }]);
+    assert_eq!(stencil_windows(doc), [StencilWindow { document: String::from("jfd_t_m.vssx"), active: true }]);
     let v = part_text(doc, CT_VALIDATION).expect("the rule set's part");
     assert!(v.contains("NameU='Tests' Name='Prüfung' Description='d &amp; &lt;x&gt;'"), "{v}");
     assert!(v.contains("<RuleFilter>ROLE()=1</RuleFilter>"), "{v}");
@@ -267,7 +267,7 @@ fn same_sources_same_bytes_and_round_trip() {
         if m == Measure::Us {
             let p1 = page_named(&a[0].0.doc, "Page-1");
             assert_eq!(num(&a[0].0.doc, SheetRef::Page(p1), "PageWidth"), Some(8.5));
-            assert_eq!(stencil_windows(&a[0].0.doc)[0].document, "t_u.vssx");
+            assert_eq!(stencil_windows(&a[0].0.doc)[0].document, "jfd_t_u.vssx");
         }
     }
 }

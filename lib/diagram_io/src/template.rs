@@ -51,7 +51,7 @@
 //
 // The windows part (visio/windows.xml), as Visio writes it: a drawing window (WindowType
 // 'Drawing') and per stencil a Window with WindowType 'Stencil', Document (the file name of a
-// built-in stencil, "standard_m.vssx"; a path for others), ParentWindow (the drawing window),
+// built-in stencil, "jfd_standard_m.vssx" (stencil::file_name); a path for others), ParentWindow (the drawing window),
 // WindowState 1025 (visWSDockedLeft | visWSAnchorMerged) or 67109889 (| visWSActive: the
 // unfolded one) and the children StencilGroup 10 and StencilGroupPos 1, 2 ... in the Shapes
 // panel's order.  set_stencil_windows keeps the part's other windows (the drawing window,
@@ -877,7 +877,7 @@ impl Stencils<'_> {
 }
 
 fn stencil_file(stem: &str, m: Measure) -> String {
-    format!("{stem}_{}.vssx", if m == Measure::Us { "u" } else { "m" })
+    crate::stencil::file_name(stem, m)
 }
 
 // the template every form starts from (step 2 of the module comment)

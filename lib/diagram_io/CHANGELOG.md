@@ -81,6 +81,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   - the same sources give the same bytes; no panic, bounded counts, no recursion
 - (JD10) The stencil build tool takes `hidden: true` in a master's header (the master's `Hidden="1"`: in the file, not in the Shapes panel; JFDiagrammer's flowchart frame and lists)
 - (JD13) The stencil build tool builds 1-D masters: a master whose `[Shape]` sets `BeginX`, `BeginY`, `EndX`, `EndY` (lengths from 0) gets Visio's 1-D formulas where it writes none (`PinX = GUARD((BeginX+EndX)/2)`, `Width = GUARD(SQRT(...))`, `Angle = GUARD(ATAN2(...))`, `LocPin = GUARD(...)`), its master page is `BeginX+EndX` by `BeginY+EndY`, `Height` may be 0 or a formula; 2-D masters are written as before
+- (JD13) `stencil::file_name` / `parse_file_name` and `FILE_PREFIX`: JFDiagrammer's own stencils are named `jfd_<stem>_m.vssx` / `_u.vssx` (`Built::vssx_name`, the stencil windows of templates), so that Visio never opens one of its own stencils of the same name (ARROWS_M.VSSX) for ours and Visio's names are never taken for ours
 - (JD13) The template build tool `template` (apps/JFDiagrammer/templates/README.md): `build(&files, Measure, &stencils)` and `build_vstx` compile `template.txt`, `*.starter` and `rules.txt` into the forms of a template (`BuiltTemplate`: the blank one and one per starter diagram) and `.vstx` bytes, with the stencil windows in `windows.xml` as Visio writes them, the rule set in `visio/validation.xml` and the catalogue's JFD_ cells; `stencil_windows`, `set_stencil_windows`, `info`, `registers` and `to_drawing` for templates at run time; unit tests in the crate (`cargo test -p jflib-diagram-io --lib`)
 
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
@@ -95,3 +96,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - The stencil tool rendered each master's icon after a recalculation of the whole stencil: a stencil of 150 masters took minutes; the icon instance now inherits the values computed for the master
 
+
+### Fixed
+
+- (JD13) Rows of a shape's Geometry and Connection sections are written with their type `T`, as Visio writes them: a row that overrides an inherited one (a resized instance of a master) gets the inherited row's type, a Connection row without one `T='Connection'`. Without it Office's previewer (`VPREVIEW.EXE`, the preview pane of Windows Explorer) hung, and Explorer with it, and desktop Visio passed over the rows and drew such shapes with the master's geometry
