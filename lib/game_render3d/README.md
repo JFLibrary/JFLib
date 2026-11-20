@@ -29,6 +29,11 @@ between two ticks: a pose that moved in the latest tick is written every frame, 
 `retire_mesh` and `collect` remove meshes and materials from the renderer once no instance uses them
 (when a map is left). `reset` starts over on a new scene after the GPU device was lost.
 
+glTF models and images are assets of the game core (`Model`, `Image`, loaded in the background through
+`game::assets`): `Models` puts a model on the renderer once it is ready and takes it off when it is
+unloaded, and an entity with a `ModelRef` gets an instance per part of the model as soon as it is up
+(`Bridge::sync_models`).
+
 ## Why a crate of its own
 
 A game's server is built from the same workspace as its client. Cargo unifies a crate's features
