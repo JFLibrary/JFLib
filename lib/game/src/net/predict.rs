@@ -11,6 +11,8 @@
 //                 walker::Walker; G7h's character controller takes its place
 //   Predictor     the inputs and predicted states since the newest confirmed tick; step, reconcile, the
 //                 current and previous state (a frame blends the two by the tick's alpha)
+//   Smoother      what a frame draws after a correction: the jump of the predicted position becomes an offset
+//                 that decays in a short time (and snaps above a distance); the predicted state stays exact
 //
 // A prediction is exact when the server used the client's own inputs: reconcile then finds the same
 // state and only drops history.  It differs after a missed input (the server repeated the last one), a
@@ -212,5 +214,75 @@ impl<M: Movement> Predictor<M> {
     pub fn clear(&mut self) {
         self.hist.clear();
         self.base = None;
+    }
+}
+
+/// the drawn position of the own figure after corrections (see the module header).  A correction moves the
+/// predicted position by a jump; the offset takes the jump back, so the picture does not move at that moment, and
+/// decays like exp(-t / decay) (a rational approximation, the same for any frame rate within a few percent).  Above
+/// `snap` metres (a teleport, a return after death) the offset is dropped: the picture jumps with the state.  The
+/// prediction itself never sees the offset: it stays bit for bit the server's.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Smoother {
+    offset: Vec3,
+    /// the time constant of the decay (ms; 0: no smoothing)
+    pub decay_ms: f64,
+    /// a correction (with what is still left) larger than this is not smoothed (m)
+    pub snap: f64,
+    /// corrections taken in, and of those dropped by snap
+    pub corrections: u64,
+    /// see corrections
+    pub snaps: u64,
+}
+
+impl Smoother {
+    /// an offset of 0 decaying with `decay_ms`, snapping above `snap` metres
+    pub fn new(decay_ms: f64, snap: f64) -> Smoother {
+        Smoother { offset: Vec3::ZERO, decay_ms, snap, corrections: 0, snaps: 0 }
+    }
+
+    /// the predicted position jumped by `jump` (new minus old): the offset takes it back
+    pub fn correct(&mut self, jump: Vec3) {
+        self.corrections += 1;
+        let o = self.offset - jump;
+        if self.decay_ms <= 0.0 || !(o.length() <= self.snap) {
+            self.offset = Vec3::ZERO;
+            self.snaps += 1;
+        } else {
+            self.offset = o;
+        }
+    }
+
+    /// forget the offset (a new figure, a reset of the prediction)
+    pub fn reset(&mut self) {
+        self.offset = Vec3::ZERO;
+    }
+
+    /// `dt` seconds passed
+    pub fn advance(&mut self, dt: f64) {
+        if self.offset == Vec3::ZERO || !(dt > 0.0) {
+            return;
+        }
+        if self.decay_ms <= 0.0 {
+            self.offset = Vec3::ZERO;
+            return;
+        }
+        // exp(-x) as 1 / (1 + y + y^2/2 + y^3/6) to the n-th power with y = x/n <= 1/2: within 0.1 % per step,
+        // the same for any frame rate
+        let x = dt * 1000.0 / self.decay_ms;
+        let n = (x * 2.0) as u32 + 1;
+        let y = x / n as f64;
+        let k = 1.0 / (1.0 + y * (1.0 + y * (0.5 + y / 6.0)));
+        for _ in 0..n.min(64) {
+            self.offset = self.offset * k;
+        }
+        if self.offset.length() < 1e-4 {
+            self.offset = Vec3::ZERO;
+        }
+    }
+
+    /// what a frame adds to the predicted position (blended by alpha) of the own figure
+    pub fn offset(&self) -> Vec3 {
+        self.offset
     }
 }

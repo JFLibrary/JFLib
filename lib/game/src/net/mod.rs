@@ -3,9 +3,11 @@
 //
 //   server     NetServer and the trait RoomSim: rooms by code, the fixed tick, inputs per tick, snapshots
 //              as deltas against what each client holds, cut to the budget by priority, the full state of
-//              a join over a WebSocket when it does not fit a datagram
+//              a join over a WebSocket when it does not fit a datagram; rooms side by side on threads
 //   client     NetClient: joins, runs ahead of the server (clock::SteeredClock), predicts and reconciles
-//              (predict), decodes snapshots and shows the others behind the newest (clock::InterpClock)
+//              (predict), smooths the drawn corrections, decodes snapshots and shows the others behind the
+//              newest (clock::InterpClock), leaves
+//   event      reliable events both ways: once each, in order, over UDP and WebSocket
 //   snapshot   NetState, Snapshot, Schema; diff, select, encode, decode
 //   input      NetInput, the redundant input packets, the server's InputBuffer
 //   lagcomp    HitHistory, view_time, hitscan
@@ -19,7 +21,8 @@
 //
 // Everything a client predicts runs the same bits as the server: the movement state is integers on a
 // grid, the movement uses + - * /, sqrt and lib/physics' sin, cos and atan2, nothing iterates a hash map,
-// nothing reads a clock (time comes from outside).
+// nothing reads a clock (time comes from outside).  Rooms on threads (NetServer::set_parallel) merge their
+// results in a fixed order: the same messages as on one thread.
 
 /// the arena: the reference game of the netcode's tests
 pub mod arena;
@@ -31,6 +34,8 @@ pub mod bot;
 pub mod client;
 /// the client's clocks
 pub mod clock;
+/// reliable events: delivered once, in order
+pub mod event;
 /// inputs and their redundancy, the server's input buffer
 pub mod input;
 /// lag compensation and hitscan
@@ -55,8 +60,9 @@ pub mod snapshot;
 pub mod walker;
 
 pub use client::{ClientOptions, ClientStats, NetClient, Phase, Remote};
+pub use event::NetEvent;
 pub use input::NetInput;
-pub use predict::{Movement, Outcome, Predictor};
+pub use predict::{Movement, Outcome, Predictor, Smoother};
 pub use room::RoomCode;
-pub use server::{LinkStats, NetServer, RoomSim, ServerOptions, ServerStats};
+pub use server::{LinkStats, NetServer, RoomEvent, RoomSim, ServerOptions, ServerStats, To};
 pub use snapshot::{tick_diff, Ent, NetState, Schema, Snapshot};

@@ -2,6 +2,7 @@
 //
 //   gametest --check [--quick]   every test group (tests/check.uis); exit code 1 when a check fails
 //   gametest --test NAME         one group: world tick input camera bridge netcodec lagcomp room netsim bots
+//                                events leave smooth threads
 //   gametest --checksum          the determinism harness: one line "gametest checksum=HEX" over the bits
 //                                of a fixed run (world, systems, poses, input replayed, cameras); the same on
 //                                every target
@@ -29,6 +30,7 @@ mod camera_t;
 mod checksum;
 mod input_t;
 mod net_codec;
+mod net_event;
 mod net_lag;
 // (real sockets: not in the browser, where only the console paths run in Node: tests/web.mjs)
 #[cfg(not(target_arch = "wasm32"))]
@@ -116,7 +118,7 @@ impl Ctx {
     }
 }
 
-pub const ALL: &[&str] = &["world", "tick", "input", "camera", "bridge", "netcodec", "lagcomp", "room", "netsim", "bots"];
+pub const ALL: &[&str] = &["world", "tick", "input", "camera", "bridge", "netcodec", "lagcomp", "room", "netsim", "bots", "events", "leave", "smooth", "threads"];
 
 fn run_groups(names: &[&str], quick: bool) -> i32 {
     let (mut checks, mut failed) = (0u64, 0u64);
@@ -137,6 +139,10 @@ fn run_groups(names: &[&str], quick: bool) -> i32 {
             "room" => net_room::run(&mut c),
             "netsim" => net_sim::run(&mut c),
             "bots" => net_sim::bots(&mut c),
+            "events" => net_event::events(&mut c),
+            "leave" => net_event::leave(&mut c),
+            "smooth" => net_event::smooth(&mut c),
+            "threads" => net_event::threads(&mut c),
             _ => bridge::run(&mut c),
         }
         let ms = (plat::time_us() - t0) / 1000;

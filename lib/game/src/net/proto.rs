@@ -14,6 +14,11 @@
 //                                 inputs, then the entities (snapshot.rs)
 //   FETCH      client -> server   (on a WebSocket of its own) the ticket of WELCOME
 //   FULL       server -> client   (on that WebSocket) a SNAPSHOT against the baseline without a budget
+//   LEAVE      client -> server   the player leaves: the server removes the figure at once
+//
+// The event part (event.rs): bit 7 of byte 0 (EXT) says that an INPUT or SNAPSHOT carries an acknowledgement of
+// the other side's events and / or a run of its own events: after a SNAPSHOT's header (before the entities, so the
+// budget counts it), after an INPUT's inputs.  Without events the bytes are those of version 1.
 //
 // Every reader returns None for anything malformed or too large (bytes from the network never panic).
 
@@ -21,11 +26,13 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use super::bits::{BitReader, BitWriter};
+use super::event::{read_section, write_section, NetEvent};
 use super::input::{read_inputs, write_inputs, NetInput};
 use super::room::RoomCode;
 
-/// the netcode's own version (HELLO); a game's version goes into netchan's protocol id
-pub const VERSION: u16 = 1;
+/// the netcode's own version (HELLO); a game's version goes into netchan's protocol id.  2 since G7e part 2 (the
+/// event part, LEAVE)
+pub const VERSION: u16 = 2;
 
 /// message types (byte 0)
 pub const MSG_HELLO: u8 = 1;
@@ -41,6 +48,10 @@ pub const MSG_SNAPSHOT: u8 = 5;
 pub const MSG_FETCH: u8 = 6;
 /// see the module header
 pub const MSG_FULL: u8 = 7;
+/// see the module header
+pub const MSG_LEAVE: u8 = 8;
+/// bit 7 of byte 0: an event part follows (see the module header)
+pub const EXT: u8 = 0x80;
 
 /// REFUSE: another version of the netcode
 pub const REFUSE_VERSION: u8 = 1;
@@ -119,6 +130,17 @@ pub struct SnapHeader {
     pub have: u32,
     /// the smallest margin of its inputs since the last snapshot (None: none came)
     pub margin: Option<i8>,
+    /// the event part: the server has every event of the client up to this one
+    pub ev_ack: Option<u16>,
+    /// the event part: a run of the server's events follows the header (event::read_section, ticks against `tick`)
+    pub events: bool,
+}
+
+impl SnapHeader {
+    /// a header without an event part
+    pub fn new(tick: u32, base: Base, player: u16, have: u32, margin: Option<i8>) -> SnapHeader {
+        SnapHeader { tick, base, player, have, margin, ev_ack: None, events: false }
+    }
 }
 
 /// an INPUT
@@ -132,11 +154,41 @@ pub struct InputMsg {
     pub ack: Option<u32>,
     /// the FULL it fetched (repeated until the server bases on it)
     pub full: Option<u32>,
+    /// the event part: the client has every event of the server up to this one
+    pub ev_ack: Option<u16>,
+    /// the event part: a run of the client's events (the number of the first and the events; ticks against `newest`)
+    pub events: Option<(u16, Vec<NetEvent>)>,
 }
 
-/// the type of a message (None: empty)
+impl InputMsg {
+    /// an INPUT without an event part
+    pub fn new(newest: u32, inputs: Vec<NetInput>, ack: Option<u32>, full: Option<u32>) -> InputMsg {
+        InputMsg { newest, inputs, ack, full, ev_ack: None, events: None }
+    }
+}
+
+/// the type of a message without the EXT flag (None: empty)
 pub fn msg_type(b: &[u8]) -> Option<u8> {
-    b.first().copied()
+    b.first().map(|t| t & !EXT)
+}
+
+/// whether a message has an event part (EXT)
+pub fn has_ext(b: &[u8]) -> bool {
+    b.first().is_some_and(|t| t & EXT != 0)
+}
+
+// the event part: the acknowledgement, then whether a run follows
+fn write_ext(w: &mut BitWriter, ack: Option<u16>, run: bool) {
+    w.bool(ack.is_some());
+    if let Some(a) = ack {
+        w.u16(a);
+    }
+    w.bool(run);
+}
+
+fn read_ext(r: &mut BitReader) -> (Option<u16>, bool) {
+    let ack = if r.bool() { Some(r.u16()) } else { None };
+    (ack, r.bool())
 }
 
 /// HELLO as bytes
@@ -256,7 +308,9 @@ pub fn read_refuse(b: &[u8]) -> Option<u8> {
 
 /// INPUT as bytes
 pub fn write_input(m: &InputMsg) -> Vec<u8> {
-    let mut w = BitWriter::with_prefix(&[MSG_INPUT]);
+    let run = m.events.as_ref().is_some_and(|e| !e.1.is_empty());
+    let ext = m.ev_ack.is_some() || run;
+    let mut w = BitWriter::with_prefix(&[MSG_INPUT | if ext { EXT } else { 0 }]);
     w.bool(m.ack.is_some());
     if let Some(a) = m.ack {
         w.u32(a);
@@ -266,6 +320,12 @@ pub fn write_input(m: &InputMsg) -> Vec<u8> {
         w.u32(f);
     }
     write_inputs(&mut w, m.newest, &m.inputs);
+    if ext {
+        write_ext(&mut w, m.ev_ack, run);
+        if let Some((first, ev)) = m.events.as_ref().filter(|_| run) {
+            write_section(&mut w, *first, ev, m.newest);
+        }
+    }
     w.finish()
 }
 
@@ -278,13 +338,22 @@ pub fn read_input(b: &[u8]) -> Option<InputMsg> {
     let ack = if r.bool() { Some(r.u32()) } else { None };
     let full = if r.bool() { Some(r.u32()) } else { None };
     let (newest, inputs) = read_inputs(&mut r)?;
-    r.ok().then_some(InputMsg { newest, inputs, ack, full })
+    let (mut ev_ack, mut events) = (None, None);
+    if has_ext(b) {
+        let (a, run) = read_ext(&mut r);
+        ev_ack = a;
+        if run {
+            events = Some(read_section(&mut r, newest)?);
+        }
+    }
+    r.ok().then_some(InputMsg { newest, inputs, ack, full, ev_ack, events })
 }
 
 /// the header of a SNAPSHOT (`kind` MSG_SNAPSHOT) or FULL (MSG_FULL); the entities follow in the same
 /// writer (snapshot::encode)
 pub fn write_snap_header(kind: u8, h: &SnapHeader) -> BitWriter {
-    let mut w = BitWriter::with_prefix(&[kind]);
+    let ext = h.ev_ack.is_some() || h.events;
+    let mut w = BitWriter::with_prefix(&[kind | if ext { EXT } else { 0 }]);
     w.u32(h.tick);
     match h.base {
         Base::None => w.bits(0, 2),
@@ -299,6 +368,9 @@ pub fn write_snap_header(kind: u8, h: &SnapHeader) -> BitWriter {
     w.bool(h.margin.is_some());
     if let Some(m) = h.margin {
         w.u8(m as u8);
+    }
+    if ext {
+        write_ext(&mut w, h.ev_ack, h.events);
     }
     w
 }
@@ -323,7 +395,8 @@ pub fn read_snap_header(b: &[u8]) -> Option<(u8, SnapHeader, BitReader<'_>)> {
     let player = r.u16();
     let have = tick.wrapping_add(r.svar() as u32);
     let margin = if r.bool() { Some(r.u8() as i8) } else { None };
-    r.ok().then_some((kind, SnapHeader { tick, base, player, have, margin }, r))
+    let (ev_ack, events) = if has_ext(b) { read_ext(&mut r) } else { (None, false) };
+    r.ok().then_some((kind, SnapHeader { tick, base, player, have, margin, ev_ack, events }, r))
 }
 
 /// FETCH as bytes
@@ -336,4 +409,14 @@ pub fn write_fetch(ticket: u64) -> Vec<u8> {
 /// FETCH's ticket
 pub fn read_fetch(b: &[u8]) -> Option<u64> {
     (b.len() == 9 && b[0] == MSG_FETCH).then(|| u64::from_le_bytes([b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8]]))
+}
+
+/// LEAVE as bytes
+pub fn write_leave() -> Vec<u8> {
+    alloc::vec![MSG_LEAVE]
+}
+
+/// whether the bytes are a LEAVE
+pub fn is_leave(b: &[u8]) -> bool {
+    b == [MSG_LEAVE]
 }
