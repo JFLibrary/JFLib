@@ -331,10 +331,14 @@ pub fn analyse(model: &Model) -> Analysis {
     }
 }
 
-/// a German one-line summary of what failed, for the console and the report
+/// a German one-line summary of what failed, for the console and the report; the first finding about the surface
+/// says where it lies first and in which part
 pub fn findings(model: &Model, a: &Analysis) -> Vec<String> {
     let mut out = Vec::new();
     let w = &a.whole;
+    let place = a.parts.iter().enumerate().find_map(|(i, r)| r.problem_at.map(|p| (i, p))).map(|(i, p)| {
+        format!(", zuerst bei ({}, {}, {}) in Teil \"{}\"", geom::fnum(p.x), geom::fnum(p.y), geom::fnum(p.z), model.parts[i].name)
+    });
     if w.open_edges > 0 {
         out.push(format!("nicht geschlossen: {} offene Kanten", w.open_edges));
     }
@@ -355,6 +359,9 @@ pub fn findings(model: &Model, a: &Analysis) -> Vec<String> {
     }
     if w.bad_normals > 0 {
         out.push(format!("{} Normalen falsch (nicht Länge 1 oder gegen die Fläche)", w.bad_normals));
+    }
+    if let (Some(first), Some(p)) = (out.first_mut(), place) {
+        first.push_str(&p);
     }
     for (i, p) in a.parts.iter().enumerate() {
         if !p.ok() && w.ok() {

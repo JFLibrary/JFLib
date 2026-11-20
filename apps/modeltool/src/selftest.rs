@@ -486,6 +486,9 @@ fn topo(c: &mut Ctx) {
     hole.indices.truncate(hole.indices.len() - 3);
     let r = hole.check();
     c.check(!r.closed() && r.open_edges == 3 && r.inverted_components == 0, || format!("hole: open edges {}", r.open_edges));
+    // where the first problem lies: on an edge of the hole (the missing triangle's edges lie at x = 0.5, the -X face
+    // of the box is the last one: its corners are at x = -0.5); none for the good cube
+    c.check(cube.check().problem_at.is_none() && r.problem_at.is_some_and(|p| p.x == -0.5), || format!("hole: problem at {:?}", r.problem_at));
     // one triangle turned
     let mut turned = cube.clone();
     turned.indices.swap(1, 2);
@@ -505,6 +508,8 @@ fn topo(c: &mut Ctx) {
     sliver.indices.extend_from_slice(&[base, base + 1, base + 2, base, base, base + 1]);
     let r = sliver.check();
     c.check(r.degenerate == 2, || format!("sliver: degenerate {}", r.degenerate));
+    // (its triangles are alone: their open edges come before the degenerate ones)
+    c.check(r.problem_at.is_some_and(|p| p.x == 5.5 && p.z == 0.0), || format!("sliver: problem at {:?}", r.problem_at));
     // an edge of four triangles: two cubes welded along an edge
     let two = Mesh::merge(&[&cube, &cube.translated(Vec3::new(1.0, 1.0, 0.0))]).unwrap().weld(0.0);
     let r = two.check();
@@ -753,6 +758,14 @@ fn script(c: &mut Ctx) {
     for (src, msg) in bad {
         let (r, text) = script_run(src, &[]);
         c.check(!r.ok() && text.contains("test.jfs:") && text.contains(msg), || format!("{:?}: wanted {msg}, got: {text}", src));
+    }
+    // a finding about the surface says where it lies first and in which part: two boxes joined that touch only along
+    // an edge (four faces meet there)
+    let (r, text) = script_run("model.add(geom.box(1, 1, 1))\nmodel.add(geom.union(geom.box(1, 1, 1), geom.box(1, 1, 1).move(1, 1, 0)).move(3, 0, 0), \"grau\", \"kante\")\n", &[]);
+    if c.check(r.ok(), || format!("edge contact: {text}")) {
+        let a = run::analyse(&r.model);
+        let f = run::findings(&r.model, &a);
+        c.check(f.first().is_some_and(|s| s.contains("Kanten mit mehr als zwei Dreiecken, zuerst bei (3.5, 1, ") && s.ends_with("in Teil \"kante\"")), || format!("located finding: {:?}", f));
     }
     // imports only from the script's folder and below
     for (dir, path, ok) in [
