@@ -1,0 +1,63 @@
+{
+  "tool": "modeltool 0.1.0",
+  "script": "turm.jfs",
+  "key": "fd4723780e9a55ff455f24d4a0afe6c0",
+  "ok": true,
+  "errors": [],
+  "findings": [],
+  "params": {},
+  "model": {
+    "name": "Turm",
+    "parts": 2,
+    "materials": 2,
+    "vertices": 2720,
+    "triangles": 3680,
+    "budget": 6000,
+    "within_budget": true,
+    "min": [-2, 0, -2],
+    "max": [2, 7.3, 2],
+    "size": [4, 7.3, 4],
+    "center": [0, 3.65, 0],
+    "area": 162.408647464,
+    "volume": 29.836087788,
+    "uv_scale": 1
+  },
+  "checks": {
+    "ok": true,
+    "closed": true,
+    "outward": true,
+    "vertices": 2720,
+    "triangles": 3680,
+    "min": [-2, 0, -2],
+    "max": [2, 7.3, 2],
+    "size": [4, 7.3, 4],
+    "area": 162.408647464,
+    "volume": 29.836087788,
+    "components": 2,
+    "euler": -4,
+    "open_edges": 0,
+    "nonmanifold_edges": 0,
+    "flipped_edges": 0,
+    "nonmanifold_points": 0,
+    "inverted_components": 0,
+    "degenerate": 0,
+    "bad_normals": 0
+  },
+  "parts": [
+    {"name": "sockel", "material": "beton", "ok": true, "closed": true, "outward": true, "triangles": 156, "vertices": 129, "min": [-2, 0, -2], "size": [4, 0.5, 4], "area": 38.145294869, "volume": 7.879066508, "degenerate": 0},
+    {"name": "turm", "material": "stein", "ok": true, "closed": true, "outward": true, "triangles": 3524, "vertices": 2591, "min": [-1.6, 0.5, -1.6], "size": [3.2, 6.8, 3.2], "area": 124.263352595, "volume": 21.95702128, "degenerate": 0}
+  ],
+  "expect": [
+    {"rule": "size", "expected": [4, 7.3, 4], "actual": [4, 7.3, 4], "tolerance": 0.001, "ok": true}
+  ],
+  "materials": [
+    {"name": "beton", "color": "#a8a8a3", "roughness": 0.9, "metallic": 0},
+    {"name": "stein", "color": "#8f8a80", "roughness": 0.9, "metallic": 0}
+  ],
+  "fingerprint": "3120c9cb5805efd4",
+  "output": "",
+  "imports": [],
+  "files": {"report": "report.json", "glb": "model.glb", "sheet": "sheet.png", "front": "front.png", "side": "side.png", "top": "top.png", "iso": "iso.png"},
+  "views": {"images": true, "size": 512, "grid_on": true, "grid": 1, "sheet": "front | side over top | iso", "cameras": "front: from +Z; side: from +X; top: from +Y, front at the bottom; the three at one scale; iso: from front right above", "adapter": "NVIDIA GeForce RTX 2070 SUPER"},
+  "timing": {"script_ms": 1.598, "geometry_ms": 310.67, "checks_ms": 3.354, "render_ms": 257.482, "export_ms": 0.237, "total_ms": 607.198, "fuel": 9485}
+}

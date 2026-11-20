@@ -19,6 +19,7 @@ pub const ALL: &[Example] = &[
     Example { name: "tuer", source: include_str!("../examples/tuer.jfs"), report: include_str!("../examples/out/tuer/report.json") },
     Example { name: "haus", source: include_str!("../examples/haus.jfs"), report: include_str!("../examples/out/haus/report.json") },
     Example { name: "saeule", source: include_str!("../examples/saeule.jfs"), report: include_str!("../examples/out/saeule/report.json") },
+    Example { name: "turm", source: include_str!("../examples/turm.jfs"), report: include_str!("../examples/out/turm/report.json") },
 ];
 
 /// the modules the examples import
