@@ -25,4 +25,5 @@ First release on crates.io.
 ### Changed
 
 - A client over a WebSocket aims for one tick more input margin (`ClientOptions::stream_margin`, set by `NetClient::set_reliable`, which NetLink calls): measured over WLAN, 2.7 instead of 12 corrections a minute
+- (G7b part 2) Assets: `game::assets` -- `Assets<T>` loads files through the VFS and decodes them in the background (`Loading::Background` on plat's blocking pool, `Loading::Frames { budget_us }` within a budget per update: the browser without threads, deterministic tests), behind `Handle<T>` with a state (`Loading`, `Ready`, `Failed`), counted references and unloading (`update() -> Vec<Change>`, `set_linger`, `reload`, `insert`, `wait_idle`); kinds are types (`Asset::decode`, `Bytes`). Spatial audio: `game::audio` -- `SpatialAudio` over plat::audio's mixer with a listener (the camera's `View`), `Emitter` components and sounds at points (`play_at`), `Attenuation` (linear, OpenAL's inverse distance clamped) and an equal-power pan; `Mixer`: `Speakers` or plat's `MixTest`. docs/GAMECORE.md
 

@@ -10,7 +10,9 @@
 //   s.start() / s.pause() / s.stop() (empties the ring) / s.finish() (ends once all is played)
 //   s.set_volume(0 ..= 1), s.state() -> State, s.latency_ms(), s.played(), s.underruns(),
 //   s.device(), s.device_changes()
-//   play(&Sound) -> Result<Voice, AudioError>    a short sound through the shared mixer
+//   play(&Sound) -> Result<Voice, AudioError>    a short sound through the shared mixer; voice.set_volume(v),
+//                           (G7b) set_gains(left, right) (lib/game's spatial audio pans with it), stop(), playing();
+//                           play_gains(&Sound, left, right): with those gains from its first sample on
 //   play_file(path)         a WAV or Ogg Vorbis file through the VFS (app://, data://, ..)
 //   Sound::wav(bytes) / ogg / decode / load(path) / tone(freq, ms)
 //   sound(SOUND_*) -> bool  the system's own sound for an event (dialog_sounds(): whether the
@@ -672,11 +674,22 @@ impl core::fmt::Debug for Sound {
     }
 }
 
-// a playing sound's controls, shared with the mixer
+// a playing sound's controls, shared with the mixer: the gains of the left and the right channel
 struct VoiceCtl {
     stop: AtomicBool,
     done: AtomicBool,
     vol: AtomicU32,
+    vol_r: AtomicU32,
+}
+
+impl VoiceCtl {
+    fn new() -> VoiceCtl {
+        VoiceCtl { stop: AtomicBool::new(false), done: AtomicBool::new(false), vol: AtomicU32::new(1.0f32.to_bits()), vol_r: AtomicU32::new(1.0f32.to_bits()) }
+    }
+}
+
+fn gain(v: f32) -> u32 {
+    if v.is_nan() { 0.0f32 } else { v.clamp(0.0, 1.0) }.to_bits()
 }
 
 /// a sound play() started; dropping the handle lets it play on
@@ -697,7 +710,15 @@ impl Voice {
 
     /// 0 ..= 1
     pub fn set_volume(&self, v: f32) {
-        self.ctl.vol.store(if v.is_nan() { 0.0f32 } else { v.clamp(0.0, 1.0) }.to_bits(), Ordering::Relaxed);
+        self.set_gains(v, v);
+    }
+
+    /// (G7b) the gains of the left and the right channel, 0 ..= 1 each (a mono sound goes to both, a stereo sound
+    /// keeps its channels): what lib/game's spatial audio pans with.  From the mixer's next buffer on, as
+    /// set_volume, which sets both
+    pub fn set_gains(&self, left: f32, right: f32) {
+        self.ctl.vol.store(gain(left), Ordering::Relaxed);
+        self.ctl.vol_r.store(gain(right), Ordering::Relaxed);
     }
 }
 
@@ -737,13 +758,71 @@ impl Playing {
             Some(rs) => rs.process(tmp, &mut take),
             None => take(tmp),
         };
-        let g = f32::from_bits(self.ctl.vol.load(Ordering::Relaxed));
+        let gl = f32::from_bits(self.ctl.vol.load(Ordering::Relaxed));
+        let gr = f32::from_bits(self.ctl.vol_r.load(Ordering::Relaxed));
         for (o, f) in out.chunks_exact_mut(2).zip(self.tmp.chunks_exact(vch)) {
             let (l, r) = if vch == 1 { (f[0], f[0]) } else { (f[0], f[1]) };
-            o[0] += l * g;
-            o[1] += r * g;
+            o[0] += l * gl;
+            o[1] += r * gr;
         }
         real > 0 || self.pos < total
+    }
+}
+
+// one buffer of the mixer: every voice added (those that ended go), the sum clamped to -1 ..= 1
+fn mix_voices(voices: &mut Vec<Playing>, out: &mut [f32]) {
+    voices.retain_mut(|v| {
+        let more = v.mix(out);
+        if !more {
+            v.ctl.done.store(true, Ordering::Release);
+        }
+        more
+    });
+    for x in out.iter_mut() {
+        *x = x.clamp(-1.0, 1.0);
+    }
+}
+
+fn playing(s: &Sound, ctl: &Arc<VoiceCtl>) -> Playing {
+    let rs = (s.rate != MIX_RATE).then(|| Resampler::new(s.rate, MIX_RATE, s.channels as usize));
+    Playing { sound: s.clone(), pos: 0, rs, ctl: ctl.clone(), tmp: Vec::new() }
+}
+
+/// (tests, G7b) the mixer of play() without a device: the same code, buffer by buffer, 48 kHz stereo (what
+/// lib/game's spatial audio is checked against, sample for sample).  Needs no `audio.output`: nothing is played
+#[doc(hidden)]
+#[derive(Default)]
+pub struct MixTest {
+    voices: Vec<Playing>,
+}
+
+impl MixTest {
+    pub fn new() -> MixTest {
+        MixTest { voices: Vec::new() }
+    }
+
+    /// a voice as play() starts one: it is mixed from the next render on
+    pub fn play(&mut self, s: &Sound) -> Voice {
+        let ctl = Arc::new(VoiceCtl::new());
+        self.voices.push(playing(s, &ctl));
+        Voice { ctl }
+    }
+
+    /// the next `frames` frames (stereo, interleaved) as the device's next buffer
+    pub fn render(&mut self, frames: usize) -> Vec<f32> {
+        let mut out = alloc::vec![0.0f32; frames * 2];
+        mix_voices(&mut self.voices, &mut out);
+        out
+    }
+
+    /// voices still in the mixer
+    pub fn voices(&self) -> usize {
+        self.voices.len()
+    }
+
+    /// the mixer's rate
+    pub fn rate(&self) -> u32 {
+        MIX_RATE
     }
 }
 
@@ -772,16 +851,7 @@ fn mix_fill(shared: Arc<MixShared>) -> impl FnMut(&mut [f32]) -> bool + Send {
                 return false;
             }
         }
-        voices.retain_mut(|v| {
-            let more = v.mix(out);
-            if !more {
-                v.ctl.done.store(true, Ordering::Release);
-            }
-            more
-        });
-        for x in out.iter_mut() {
-            *x = x.clamp(-1.0, 1.0);
-        }
+        mix_voices(&mut voices, out);
         idle = if voices.is_empty() { idle + out.len() / 2 } else { 0 };
         true
     }
@@ -790,12 +860,19 @@ fn mix_fill(shared: Arc<MixShared>) -> impl FnMut(&mut [f32]) -> bool + Send {
 /// play a sound once, mixed with the other sounds of play() (dropping the Voice lets it play
 /// on) -> Err(Unavailable) without an output, Err(Denied) without `audio.output`
 pub fn play(s: &Sound) -> Result<Voice, AudioError> {
+    play_gains(s, 1.0, 1.0)
+}
+
+/// (G7b) play() with the gains of the left and the right channel from its first sample on (Voice::set_gains;
+/// lib/game's spatial audio starts a far sound quiet, not at full volume for a buffer)
+pub fn play_gains(s: &Sound, left: f32, right: f32) -> Result<Voice, AudioError> {
     if !crate::policy::audio_allowed() {
         return Err(AudioError::Denied); // also while the mixer of an earlier sound plays on
     }
-    let ctl = Arc::new(VoiceCtl { stop: AtomicBool::new(false), done: AtomicBool::new(false), vol: AtomicU32::new(1.0f32.to_bits()) });
-    let rs = (s.rate != MIX_RATE).then(|| Resampler::new(s.rate, MIX_RATE, s.channels as usize));
-    let mut p = Some(Playing { sound: s.clone(), pos: 0, rs, ctl: ctl.clone(), tmp: Vec::new() });
+    let ctl = Arc::new(VoiceCtl::new());
+    ctl.vol.store(gain(left), Ordering::Relaxed);
+    ctl.vol_r.store(gain(right), Ordering::Relaxed);
+    let mut p = Some(playing(s, &ctl));
     let mut m = MIXER.lock();
     if let Some(mx) = &*m {
         if mx.stream.state() == State::Lost {

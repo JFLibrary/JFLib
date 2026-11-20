@@ -131,10 +131,27 @@
 // swapchain with a frame not shown yet (Win::pending), a new ver waits; gp_views_wake asks for a render once the
 // window's frame has been shown, at the latest VIEW_HOLD_US after the first frame waited (a display that never
 // answers does not stop the view).  Without this a view drawn as fast as the app can starved the compositor on the
-// same GPU (Intel under Linux: no frame presented at all).  AF_GPU_3D makes the device at level Voll on the fastest
+// same GPU (Intel under Linux: no frame presented at all).  (G7b) Cells of the base with something over a view (a game's
+// HUD, a menu) are veils (below), not read back.  AF_GPU_3D makes the device at level Voll on the fastest
 // adapter; without the flag views work on the Basis device of the frugal adapter.  Without an output in this run (not
 // wanted, never possible) views make a device of their own (gp_view_device).  A lost device detaches every content
 // (gp_views_gone) and attaches it to the next one.
+//
+// Veils (G7b, docs/GAMECORE.md "Spielfenster").  Before, a cell of the base layer with anything over a view apart (a
+// HUD's text, a menu's panel) was drawn by the CPU over the view's frame, and its Draw read every new frame back: a copy
+// of the whole target and a wait for the GPU in each frame, 1.3 ms at 1200 x 700 on the RTX 2070 SUPER, and the CPU drew
+// and uploaded those cells again although nothing in them changed but the view.  Now such a cell (the view the only one
+// in it, no layer above it) is a veil: the CPU draws what lies over the view twice, once over a black view and once over
+// a white one (Cpu::veil: the view's Draw paints the colour, reads nothing), and keeps K, the cell over black, in the
+// base texture and T = white − black, per channel the share of the view that shows through, in the veil's texture.
+// The output's pass draws the cell as K + T · view (fs_veil), which is the CPU's "over" exactly: every blend of gfx is
+// dst = src + dst · (255 − a) / 255, with K = src and T = 255 − a, and the shader rounds once (the CPU rounds the
+// product to the nearest level too).  Text in veils is greyscale (subpixel text blends in linear light, which is not of
+// that form; as in layers and images, text/lcd.rs).  A new frame of the view costs a veil nothing: K and T change only
+// when what lies over the view changes, then the cell is drawn twice and goes up.  The framebuffer lacks the true pixels
+// of a veil (like owed cells): gp_settle draws them over the frame read back (once, at rest), puts them into the base
+// texture and ends the veil, the next frame of the view makes it again.  jfgui_GPU_VEIL=0 (Ui::gpu_test_veil): the
+// way before, every frame read back.
 //
 // A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 // frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
@@ -152,7 +169,8 @@
 // tiles, whatever the widget chose), jfgui_GPU_CANVAS_MB=n (the tiles' budget),
 // jfgui_GPU_CANVAS_SETTLE_MS=n (the time until the CPU's picture follows a move), jfgui_GPU_OUTPUT=0 (the
 // windows through the CPU path, the GPU stays for views, which read every frame back), jfgui_GPU_VIEWS=0 (no view
-// is drawn by the output's render pass: every frame read back into the framebuffer);
+// is drawn by the output's render pass: every frame read back into the framebuffer), jfgui_GPU_VEIL=0 (no veils:
+// cells with something over a view read its frame back);
 // lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 //
 // Script command `gpu` (headless runs stay on the CPU path without it; on other targets (a static
@@ -337,6 +355,8 @@ pub const GPU_OUT_FS: &[u32] = spv::FS;
 pub const GPU_OUT_FS_IMAGE: &[u32] = spv::FS_IMAGE;
 #[cfg(not(target_arch = "wasm32"))]
 pub const GPU_OUT_FS_TILE: &[u32] = spv::FS_TILE;
+#[cfg(not(target_arch = "wasm32"))]
+pub const GPU_OUT_FS_VEIL: &[u32] = spv::FS_VEIL;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Stage {
@@ -510,8 +530,9 @@ struct TileDraw {
 enum QuadSrc {
     Image { tex: Rc<ImageTex>, src: Rc<Surface>, w: i32, h: i32, step: [u32; 2] },
     Canvas { f: DrawRef, w: i32, h: i32, vis: [i32; 4], tiles: Vec<TileDraw>, copy: bool, loose: bool },
-    /// (G5e1) a view's frame: its target, one to one at the quad's place; its Draw reads the frame back
-    View { tex: Rc<ViewTex>, f: DrawRef, w: i32, h: i32, vis: [i32; 4] },
+    /// (G5e1) a view's frame: its target, one to one at the quad's place; its Draw reads the frame back.  (G7b) id: the
+    /// view's (ui.gpu_view); veil: the rectangles of its veils, K + T · frame (the module's header)
+    View { tex: Rc<ViewTex>, f: DrawRef, w: i32, h: i32, vis: [i32; 4], id: u32, veil: Vec<[i32; 4]> },
 }
 
 /// an image or a canvas drawn by the GPU in a window's frame: its place, the rectangles of its cells
@@ -555,6 +576,16 @@ struct Split {
     part: Vec<bool>,
     redraw: Vec<bool>,
     moved: bool,
+    // ---- (G7b) veils (the module's header).  Per cell: the view (its id + 1) whose veil the base texture and the veil
+    // texture hold there (0: none; the framebuffer lacks the true pixels, gp_settle draws them); the view quad (+ 1)
+    // the output draws as a veil in this frame (gp_plan_views)
+    veil_of: Vec<u32>,
+    veil_now: Vec<u8>,
+    any_veil: bool,
+    /// T of the veils, the window's rectangle it holds (as a layer's texture)
+    veil_tex: Option<LayerTex>,
+    /// K while T is made (gp_split_draw)
+    veil_k: Vec<u8>,
 }
 
 impl Split {
@@ -625,6 +656,8 @@ struct Core {
     pipe: RenderPipeline,
     pipe_image: RenderPipeline,
     pipe_tile: RenderPipeline,
+    /// (G7b) veils: the window's texture, the view's frame, the veil's texture (three groups of bgl)
+    pipe_veil: RenderPipeline,
     format: Format,
     name: String,
 }
@@ -706,6 +739,11 @@ pub(crate) struct S {
     /// (views) the output's render pass may draw them (jfgui_GPU_VIEWS); the app shows them (AF_GPU_3D)
     views_on: bool,
     want3d: bool,
+    /// (G7b) cells with something over a view are veils (jfgui_GPU_VEIL, Ui::gpu_test_veil); cells drawn twice for
+    /// veils, veils settled
+    veil_on: bool,
+    veil_draws: u64,
+    veil_settles: u64,
     #[cfg(target_arch = "wasm32")]
     web_inst: Option<Instance>, // adapter and device asked for, on their way
     #[cfg(target_arch = "wasm32")]
@@ -765,6 +803,9 @@ impl Default for S {
             dev_gen: 0,
             views_on: true,
             want3d: false,
+            veil_on: true,
+            veil_draws: 0,
+            veil_settles: 0,
             #[cfg(target_arch = "wasm32")]
             web_inst: None,
             #[cfg(target_arch = "wasm32")]
@@ -818,6 +859,7 @@ impl S {
             self.canvas_settle_us = ms * 1000;
         }
         self.views_on = self.layers_on && !off("jfgui_GPU_VIEWS");
+        self.veil_on = !off("jfgui_GPU_VEIL");
     }
 
     /// how this canvas may use the GPU (the variables say what the widget's choice is not)
@@ -1185,18 +1227,20 @@ fn build_device(prepared: Option<Instance>, nw: plat::NativeWindow, pw: i32, dis
     let t4 = plat::time_us();
     let format = built.sc.format();
     #[cfg(not(target_arch = "wasm32"))]
-    let (vs, fs, fs_image, fs_tile) = (ShaderModule::from_spirv(&dev, spv::VS)?, ShaderModule::from_spirv(&dev, spv::FS)?,
-                                       ShaderModule::from_spirv(&dev, spv::FS_IMAGE)?, ShaderModule::from_spirv(&dev, spv::FS_TILE)?);
+    let (vs, fs, fs_image, fs_tile, fs_veil) = (ShaderModule::from_spirv(&dev, spv::VS)?, ShaderModule::from_spirv(&dev, spv::FS)?,
+                                                ShaderModule::from_spirv(&dev, spv::FS_IMAGE)?, ShaderModule::from_spirv(&dev, spv::FS_TILE)?,
+                                                ShaderModule::from_spirv(&dev, spv::FS_VEIL)?);
     // (the browser takes the WGSL as it is)
     #[cfg(target_arch = "wasm32")]
-    let (vs, fs, fs_image, fs_tile) = {
+    let (vs, fs, fs_image, fs_tile, fs_veil) = {
         let m = ShaderModule::from_wgsl(&dev, GPU_OUT_WGSL)?;
-        (m.clone(), m.clone(), m.clone(), m)
+        (m.clone(), m.clone(), m.clone(), m.clone(), m)
     };
     let layout = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&bgl], push_constants: 16 })?;
-    let pipeline = |fragment: &'_ ShaderModule, entry: &'static str| {
+    let layout_veil = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&bgl, &bgl, &bgl], push_constants: 16 })?;
+    let pipeline = |fragment: &'_ ShaderModule, entry: &'static str, layout: &gpu::PipelineLayout| {
         dev.create_render_pipeline(&RenderPipelineDesc {
-            layout: &layout,
+            layout,
             vertex: ShaderStage::new(&vs, "vs"),
             fragment: Some(ShaderStage::new(fragment, entry)),
             buffers: &[],
@@ -1207,9 +1251,10 @@ fn build_device(prepared: Option<Instance>, nw: plat::NativeWindow, pw: i32, dis
             depth: None,
         })
     };
-    let pipe = pipeline(&fs, "fs")?;
-    let pipe_image = pipeline(&fs_image, "fs_image")?;
-    let pipe_tile = pipeline(&fs_tile, "fs_tile")?;
+    let pipe = pipeline(&fs, "fs", &layout)?;
+    let pipe_image = pipeline(&fs_image, "fs_image", &layout)?;
+    let pipe_tile = pipeline(&fs_tile, "fs_tile", &layout)?;
+    let pipe_veil = pipeline(&fs_veil, "fs_veil", &layout_veil)?;
     let t5 = plat::time_us();
     if trace {
         plat::write_stderr(format!(
@@ -1217,7 +1262,7 @@ fn build_device(prepared: Option<Instance>, nw: plat::NativeWindow, pw: i32, dis
             ms(t0, t1), ms(t1, t2), ms(t2, t3), ms(t3, t4), ms(t4, t5), adapter.info().name).as_bytes());
     }
     let name = adapter.info().name.clone();
-    Ok((Core { inst, dev, bgl, pipe, pipe_image, pipe_tile, format, name }, built))
+    Ok((Core { inst, dev, bgl, pipe, pipe_image, pipe_tile, pipe_veil, format, name }, built))
 }
 
 // ------------------------------------------------------------------ one frame
@@ -1300,15 +1345,27 @@ fn show(w: &mut Win, core: &Core, fb: &Surface) -> gpu::Result<Shown> {
                         e.draw(3, 1, 0, 0);
                     }
                 }
-                QuadSrc::View { tex, .. } => {
+                QuadSrc::View { tex: vt, veil, .. } => {
                     // (its frame ended in Layout::Sampled; the content's pass made it visible to the shaders)
-                    let Some(group) = &tex.group else { continue };
+                    let Some(group) = &vt.group else { continue };
                     e.set_render_pipeline(&core.pipe);
                     e.set_bind_group(0, group);
                     e.push_constants(0, &[q.x, q.y, 0, 0]);
                     for r in &q.rects {
                         scissor(&mut e, r);
                         e.draw(3, 1, 0, 0);
+                    }
+                    // (G7b) its veils: what lies over it, K from the window's texture, T from the veil's
+                    if let (false, Some(t)) = (veil.is_empty(), &w.sp.veil_tex) {
+                        e.set_render_pipeline(&core.pipe_veil);
+                        e.set_bind_group(0, &tex.group);
+                        e.set_bind_group(1, group);
+                        e.set_bind_group(2, &t.group);
+                        e.push_constants(0, &[q.x, q.y, t.ox, t.oy]);
+                        for r in veil {
+                            scissor(&mut e, r);
+                            e.draw(3, 1, 0, 0);
+                        }
                     }
                 }
                 QuadSrc::Canvas { tiles, copy, .. } => {
@@ -1591,6 +1648,14 @@ fn quad_blit(fb: &mut Surface, q: &Quad, b: [i32; 4], text: &mut Text) {
             dc.clip_pop();
             dc.clip_pop();
         }
+    }
+}
+
+/// (G7b) the view (its id + 1) of the quad tag + 1 (0: none)
+fn veil_quad_key(quads: &[Quad], tag: u8) -> u32 {
+    match quads.get((tag as usize).wrapping_sub(1)) {
+        Some(Quad { src: QuadSrc::View { id, .. }, .. }) => id.wrapping_add(1),
+        _ => 0,
     }
 }
 
@@ -2489,6 +2554,8 @@ impl Ui {
             }
             o.image_quads = w.sp.quads.iter().filter(|q| matches!(q.src, QuadSrc::Image { .. })).count() as u32;
             o.view_quads = w.sp.quads.iter().filter(|q| matches!(q.src, QuadSrc::View { .. })).count() as u32;
+            o.veil_cells = w.sp.veil_now.iter().filter(|&&v| v != 0).count() as u32;
+            o.veil_rects = w.sp.quads.iter().map(|q| if let QuadSrc::View { veil, .. } = &q.src { veil.len() as u32 } else { 0 }).sum();
             o.canvas_quads = w.sp.quads.len() as u32 - o.image_quads - o.view_quads;
             o
         });
@@ -2505,6 +2572,8 @@ impl Ui {
         o.canvas_fill_us = s.tile_fill_us;
         o.canvas_evicted = s.tile_evicted;
         o.canvas_settles = s.canvas_settles;
+        o.veil_draws = s.veil_draws;
+        o.veil_settles = s.veil_settles;
         match &s.dev {
             Dev::Ready(core) => {
                 o.adapter = core.name.clone();
@@ -2539,6 +2608,15 @@ impl Ui {
     pub fn gpu_test_hold(&mut self, win: u32, on: bool) {
         if let Some(w) = self.m.gout.win(win as usize) {
             w.test_hold = on;
+        }
+    }
+
+    /// (test aid, G7b) cells of the base with something over a view are veils (the default; jfgui_GPU_VEIL=0 turns them
+    /// off), or off: those cells read the view's frame back, the way before.  For measurements
+    pub fn gpu_test_veil(&mut self, on: bool) {
+        if self.m.gout.veil_on != on {
+            self.m.gout.veil_on = on;
+            self.invalidate();
         }
     }
 
@@ -2617,11 +2695,15 @@ impl Ui {
             sp.stale = vec![false; total];
             sp.part = vec![false; total];
             sp.redraw = vec![false; total];
+            sp.veil_of = vec![0; total];
+            sp.veil_now = vec![0; total];
             sp.any_owed = false;
             sp.any_stale = false;
+            sp.any_veil = false;
         }
         sp.hole.fill(0);
         sp.part.fill(false);
+        sp.veil_now.fill(0);
         let mut quads = core::mem::take(&mut sp.quads);
         quads.clear();
         // an image gone or drawn in another version takes its texture along
@@ -3303,14 +3385,33 @@ impl Ui {
         let Mods { gout: s, gview, .. } = m;
         let d = &wp.dirty;
         let (cols, rows) = (d.cols as usize, d.rows as usize);
+        let veil_on = s.veil_on;
         let Some(Some(w)) = s.wins.get_mut(i) else { return false };
         let sp = &mut w.sp;
-        if sp.hole.len() != cols * rows {
+        if sp.hole.len() != cols * rows || sp.veil_of.len() != cols * rows {
             return false; // (gp_plan_images sizes them where a window can be drawn apart)
         }
         let mut quads = core::mem::take(&mut sp.quads);
         let span = |a: i32, b: i32, n: usize| ((a.max(0) >> 5) as usize, (((b + CELL - 1).max(0) >> 5) as usize).min(n));
         let mut any = false;
+        // (G7b) veils: per cell the views that reach it (more than one: no veil), and whether a layer above the base
+        // touches it (its texture holds what lies below: no veil)
+        let mut reach: Vec<u8> = Vec::new();
+        let (base, all) = (d.through(false, 0), d.cells.as_deref().unwrap_or(&[]));
+        if veil_on {
+            reach.resize(cols * rows, 0);
+            for rec in wp.canv.views.iter() {
+                let Some(Cmd::Custom { x, y, w: cw, h: ch, .. }) = wp.cmd.layers[rec.layer as usize].get(rec.index as usize) else { continue };
+                let (c0, c1) = span(*x, x + cw, cols);
+                let (r0, r1) = span(*y, y + ch, rows);
+                for r in r0..r1 {
+                    for c in c0..c1 {
+                        let k = r * cols + c;
+                        reach[k] = reach[k].saturating_add(1);
+                    }
+                }
+            }
+        }
         for rec in wp.canv.views.iter().filter(|v| v.apart) {
             let Some(e) = gview.views.iter().find(|e| e.win == i && e.id == rec.id) else { continue };
             let Some(tex) = e.tex.clone() else { continue };
@@ -3333,6 +3434,8 @@ impl Ui {
             let (tag, vis) = (tag0 as u8 + 1, d.imgs[tag0].vis);
             let (c0, c1) = span(vis[0], vis[2], cols);
             let (r0, r1) = span(vis[1], vis[3], rows);
+            let key = rec.id.wrapping_add(1);
+            let mut veils = false;
             for r in r0..r1 {
                 for c in c0..c1 {
                     let k = r * cols + c;
@@ -3344,6 +3447,18 @@ impl Ui {
                             sp.owed[k] = true;
                             sp.stale[k] = true;
                         }
+                    } else if veil_on && key != 0 && sp.hole[k] == 0 && reach.get(k) == Some(&1) && base.get(k) == all.get(k) {
+                        // (G7b) something of the base over the view here: a veil.  One whose K and T are there costs
+                        // nothing; a new frame makes the others (gp_split_draw draws them twice); without one the cell
+                        // goes the CPU's way as before (at rest, after gp_settle: its pixels are true)
+                        if sp.veil_of[k] == key || moved {
+                            sp.veil_now[k] = q;
+                            veils = true;
+                            if sp.veil_of[k] != key {
+                                sp.redraw[k] = true;
+                            }
+                        }
+                        continue;
                     }
                     if moved {
                         sp.redraw[k] = true;
@@ -3360,9 +3475,27 @@ impl Ui {
                 *r = [x0, y0, x1 - x0, y1 - y0];
             }
             rects.retain(|r| r[2] > 0 && r[3] > 0);
-            if !rects.is_empty() {
-                quads.push(Quad { x: *x, y: *y, src: QuadSrc::View { tex, f: e.draw.clone(), w: *cw, h: *ch, vis }, rects });
+            // (G7b) the veils, inside what shows of the view (outside it a veil's T is 0 and K the true pixels, which the
+            // window's texture draws)
+            let mut veil = Vec::new();
+            if veils {
+                let now = &sp.veil_now;
+                cell_rects(&mut veil, cols, rows, fw, fh, |k| now[k] == q);
+                for r in veil.iter_mut() {
+                    let (x0, y0) = (r[0].max(vis[0]), r[1].max(vis[1]));
+                    let (x1, y1) = ((r[0] + r[2]).min(vis[2]), (r[1] + r[3]).min(vis[3]));
+                    *r = [x0, y0, x1 - x0, y1 - y0];
+                }
+                veil.retain(|r| r[2] > 0 && r[3] > 0);
+            }
+            if !rects.is_empty() || !veil.is_empty() {
+                quads.push(Quad { x: *x, y: *y, src: QuadSrc::View { tex, f: e.draw.clone(), w: *cw, h: *ch, vis, id: rec.id, veil }, rects });
                 any = true;
+            } else if veils {
+                // (no quad for it after all: its cells go the CPU's way)
+                for v in sp.veil_now.iter_mut().filter(|v| **v == q) {
+                    *v = 0;
+                }
             }
         }
         w.sp.quads = quads;
@@ -3489,7 +3622,9 @@ impl Ui {
             return false;
         }
         let stale = sp.any_stale && sp.stale.iter().zip(sp.hole.iter()).any(|(&a, &h)| a && h == 0);
-        if n == 0 && !stale && !sp.moved {
+        // (G7b) a veil that is none in this frame: its cell holds K, which must give way to the true pixels
+        let unveiled = sp.any_veil && sp.veil_of.iter().zip(sp.veil_now.iter()).any(|(&o, &v)| o != 0 && v == 0);
+        if n == 0 && !stale && !sp.moved && !unveiled {
             return false; // nothing changed
         }
         if self.wp.rt.present_n == 0 {
@@ -3505,8 +3640,8 @@ impl Ui {
         let icon_style = (self.style, self.color(T_ACCENT), self.theme_dark, self.color(T_TEXT_DISABLED), self.wp.rt.dpi as u32);
         let i = self.uiw_cur as usize;
         let Ui { m, wp, dc, text, icon_hook, drects, .. } = self;
-        let s = &mut m.gout;
-        let S { dev, wins, trim_at, .. } = s;
+        let Mods { gout: s, gview, .. } = m;
+        let S { dev, wins, trim_at, veil_draws, .. } = s;
         let (Dev::Ready(core), Some(Some(w))) = (&*dev, wins.get_mut(i)) else {
             for l in wp.cmd.layers.iter() {
                 render_layer(l, 0, dc, &mut wp.rt.fb, text, icon_hook, icon_style);
@@ -3519,15 +3654,18 @@ impl Ui {
         let fb = &mut wp.rt.fb;
         let (fw, fh) = (fb.w, fb.h);
         let Win { sp, tex: base, out, pending, .. } = w;
-        if sp.hole.len() != total {
+        if sp.hole.len() != total || sp.veil_of.len() != total {
             (sp.cols, sp.rows) = (cols, rows);
             sp.hole = vec![0; total];
             sp.owed = vec![false; total];
             sp.stale = vec![false; total];
             sp.part = vec![false; total];
             sp.redraw = vec![false; total];
+            sp.veil_of = vec![0; total];
+            sp.veil_now = vec![0; total];
+            sp.any_veil = false;
         }
-        let Split { upper, m: lowest, nr, rects, hole, owed, stale, quads, linger_at, part, redraw, .. } = sp;
+        let Split { upper, m: lowest, nr, rects, hole, owed, stale, quads, linger_at, part, redraw, veil_of, veil_now, veil_tex, veil_k, .. } = sp;
         // ---- per cell: what changed, which layers touch it
         lowest.clear();
         lowest.resize(total, L_COUNT as u8);
@@ -3561,6 +3699,11 @@ impl Ui {
             if redraw[k] && (hole[k] == 0 || nr[k] != 0) {
                 low = 0;
             }
+            // (G7b) a veil made in this frame, or one that ends: its cell from the base up
+            let key = veil_quad_key(quads, veil_now[k]);
+            if (veil_now[k] != 0 && veil_of[k] != key) || (veil_of[k] != 0 && veil_now[k] == 0) {
+                low = 0;
+            }
             lowest[k] = low as u8;
         }
         // explicit damage: its cells from the base up
@@ -3575,6 +3718,32 @@ impl Ui {
         }
         // ---- the layers' textures: a new one takes all of its cells
         let mut err = None;
+        // (G7b) the veils' texture, as a layer's: a new one takes every veil of this frame
+        {
+            let mut bb = [i32::MAX, i32::MAX, i32::MIN, i32::MIN];
+            for k in (0..total).filter(|&k| veil_now[k] != 0) {
+                let b = cell_box(k, cols, fw, fh);
+                bb = [bb[0].min(b[0]), bb[1].min(b[1]), bb[2].max(b[2]), bb[3].max(b[3])];
+            }
+            if bb[0] < bb[2] {
+                // (too large: more than LAYER_SHRINK times what layer_texture would make for it now)
+                let size = |n: i32, lim: i32| ((n + LAYER_SPARE + LAYER_STEP - 1) / LAYER_STEP * LAYER_STEP).min(lim) as i64;
+                let want = size(bb[2] - bb[0], fw) * size(bb[3] - bb[1], fh);
+                let fits = veil_tex.as_ref().is_some_and(|t| {
+                    bb[0] >= t.ox && bb[1] >= t.oy && bb[2] <= t.ox + t.w && bb[3] <= t.oy + t.h && (t.w as i64 * t.h as i64) <= want * LAYER_SHRINK
+                });
+                if !fits {
+                    *veil_tex = None;
+                    match layer_texture(core, bb, fw, fh) {
+                        Ok(t) => *veil_tex = Some(t),
+                        Err(e) => err = Some(e),
+                    }
+                    for k in (0..total).filter(|&k| veil_now[k] != 0) {
+                        lowest[k] = 0;
+                    }
+                }
+            }
+        }
         for (u, l) in upper.iter_mut().zip(1..) {
             let bit = 1u8 << l;
             let mut bb = [i32::MAX, i32::MAX, i32::MIN, i32::MIN];
@@ -3641,11 +3810,88 @@ impl Ui {
                 }
             }
             let is_base = l == 0;
-            cell_rects(rects, cols, rows, fw, fh, |k| (lowest[k] as usize) <= l && (if is_base { hole[k] == 0 || part[k] } else { nr[k] & bit != 0 }));
+            cell_rects(rects, cols, rows, fw, fh, |k| (lowest[k] as usize) <= l && (if is_base { (hole[k] == 0 || part[k]) && veil_now[k] == 0 } else { nr[k] & bit != 0 }));
             for r in rects.iter() {
                 dc.clip_push(r[0], r[1], r[2], r[3]);
                 render_layer(&wp.cmd.layers[l], 0, dc, fb, text, icon_hook, icon_style);
                 dc.clip_pop();
+            }
+            // (G7b) the veils of this frame that changed: what lies over the view drawn over black (K, it stays in the
+            // framebuffer and goes up with the rest) and over white; T = white − black goes to the veil's texture
+            if is_base {
+                let mut vr = Vec::new();
+                cell_rects(&mut vr, cols, rows, fw, fh, |k| lowest[k] == 0 && veil_now[k] != 0);
+                if !vr.is_empty() {
+                    let sub = text.subpixel();
+                    text.set_subpixel(0);
+                    let mut pass = |colour: u32, fb: &mut Surface| {
+                        for e in gview.views.iter().filter(|e| e.win == i) {
+                            e.sh.c.borrow_mut().veil = Some(colour);
+                        }
+                        for r in vr.iter() {
+                            dc.clip_push(r[0], r[1], r[2], r[3]);
+                            render_layer(&wp.cmd.layers[0], 0, dc, fb, text, icon_hook, icon_style);
+                            dc.clip_pop();
+                        }
+                    };
+                    pass(0xFF00_0000, fb);
+                    veil_k.clear();
+                    for r in vr.iter() {
+                        for y in r[1]..r[1] + r[3] {
+                            let at = y as usize * stride + r[0] as usize * 4;
+                            veil_k.extend_from_slice(&fb.px[at..at + r[2] as usize * 4]);
+                        }
+                    }
+                    pass(0xFFFF_FFFF, fb);
+                    for e in gview.views.iter().filter(|e| e.win == i) {
+                        e.sh.c.borrow_mut().veil = None;
+                    }
+                    text.set_subpixel(sub);
+                    let mut o = 0;
+                    for r in vr.iter() {
+                        for y in r[1]..r[1] + r[3] {
+                            let at = y as usize * stride + r[0] as usize * 4;
+                            for (t, k) in fb.px[at..at + r[2] as usize * 4].chunks_exact_mut(4).zip(veil_k[o..].chunks_exact(4)) {
+                                t[0] = t[0].saturating_sub(k[0]);
+                                t[1] = t[1].saturating_sub(k[1]);
+                                t[2] = t[2].saturating_sub(k[2]);
+                                t[3] = 255;
+                            }
+                            o += r[2] as usize * 4;
+                        }
+                    }
+                    if err.is_none() {
+                        if let Some(t) = veil_tex.as_mut() {
+                            let before = if t.fresh { Layout::Undefined } else { Layout::Sampled };
+                            match core.dev.queue().write_texture_rects_at(&t.t, &vr, (t.ox, t.oy), &fb.px, stride as u32, before, Layout::Sampled) {
+                                Ok(()) => t.fresh = false,
+                                Err(e) => err = Some(e),
+                            }
+                        }
+                    }
+                    let mut o = 0;
+                    for r in vr.iter() {
+                        for y in r[1]..r[1] + r[3] {
+                            let at = y as usize * stride + r[0] as usize * 4;
+                            let n = r[2] as usize * 4;
+                            fb.px[at..at + n].copy_from_slice(&veil_k[o..o + n]);
+                            o += n;
+                        }
+                    }
+                    for k in (0..total).filter(|&k| lowest[k] == 0 && veil_now[k] != 0) {
+                        veil_of[k] = veil_quad_key(quads, veil_now[k]);
+                        *veil_draws += 1;
+                    }
+                    let tb: u64 = vr.iter().map(|r| r[2] as u64 * r[3] as u64 * 4).sum();
+                    out.upload_bytes += tb;
+                    rects.extend_from_slice(&vr);
+                }
+                // (cells drawn the CPU's way are no veils)
+                for k in 0..total {
+                    if lowest[k] == 0 && veil_now[k] == 0 {
+                        veil_of[k] = 0;
+                    }
+                }
             }
             let bytes: u64 = rects.iter().map(|r| r[2] as u64 * r[3] as u64 * 4).sum();
             if is_base {
@@ -3701,6 +3947,7 @@ impl Ui {
         }
         sp.any_owed = sp.owed.iter().any(|&v| v);
         sp.any_stale = sp.stale.iter().any(|&v| v);
+        sp.any_veil = sp.veil_of.iter().any(|&v| v != 0);
         sp.redraw.fill(false);
         sp.moved = false;
         sp.active = sp.upper.iter().any(|u| !u.rects.is_empty());
@@ -3729,8 +3976,10 @@ impl Ui {
         }
     }
 
-    /// the images the GPU draws of window i into its framebuffer, where it lacks them
+    /// the images the GPU draws of window i into its framebuffer, where it lacks them; (G7b) its veils' true pixels, also
+    /// into the window's texture (the veils end)
     fn gp_settle(&mut self, i: usize) {
+        self.gp_settle_veils(i);
         let Some(Some(w)) = self.m.gout.wins.get_mut(i) else { return };
         if !w.sp.any_owed {
             return;
@@ -3759,6 +4008,62 @@ impl Ui {
         owed.fill(false);
         let Some(Some(w)) = self.m.gout.wins.get_mut(i) else { return };
         (w.sp.owed, w.sp.hole, w.sp.quads) = (owed, hole, quads);
+    }
+
+    /// (G7b) window i's veils: what lies over the view drawn the CPU's way over its frame (read back), in the framebuffer
+    /// and the window's texture; they are no veils any more (the next frame of the view makes them again)
+    fn gp_settle_veils(&mut self, i: usize) {
+        let Some(Some(w)) = self.m.gout.wins.get(i) else { return };
+        if !w.sp.any_veil {
+            return;
+        }
+        let cur = self.uiw_cur as usize;
+        let dpi = if i == cur { self.wp.rt.dpi } else { self.m.win.recs[i & (WIN_MAX - 1)].save.as_deref().map_or(self.wp.rt.dpi, |p| p.rt.dpi) };
+        let icon_style = (self.style, self.color(T_ACCENT), self.theme_dark, self.color(T_TEXT_DISABLED), dpi as u32);
+        let font = self.text.get_font();
+        let sub = self.text.subpixel();
+        let Ui { wp, m, text, icon_hook, .. } = self;
+        let Mods { gout: s, win, .. } = m;
+        let S { dev, wins, veil_settles, .. } = s;
+        let Some(Some(w)) = wins.get_mut(i) else { return };
+        let sp = &mut w.sp;
+        let parts = if i == cur { Some(wp) } else { win.recs[i & (WIN_MAX - 1)].save.as_deref_mut() };
+        let mut rects = Vec::new();
+        // (a framebuffer of another size since: the next frame draws it whole anyway)
+        let fits = |fw: i32, fh: i32| sp.veil_of.len() == sp.cols * sp.rows && sp.cols == ((fw + CELL - 1) / CELL) as usize && sp.rows == ((fh + CELL - 1) / CELL) as usize;
+        if let Some(p) = parts.filter(|p| fits(p.rt.fb.w, p.rt.fb.h)) {
+            let fb = &mut p.rt.fb;
+            let (fw, fh) = (fb.w, fb.h);
+            let of = &sp.veil_of;
+            cell_rects(&mut rects, sp.cols, sp.rows, fw, fh, |k| of.get(k).is_some_and(|&v| v != 0));
+            text.set_subpixel(0);
+            let mut dc = Dc::new(fw, fh);
+            for r in &rects {
+                dc.clip_push(r[0], r[1], r[2], r[3]);
+                render_layer(&p.cmd.layers[0], 0, &mut dc, fb, text, icon_hook, icon_style);
+                dc.clip_pop();
+            }
+            text.set_subpixel(sub);
+            if let (Dev::Ready(core), Some(t)) = (&*dev, w.tex.as_ref().filter(|t| (t.w, t.h) == (fw, fh))) {
+                if let Err(e) = core.dev.queue().write_texture_rects(&t.t, &rects, &fb.px, fb.stride as u32, Layout::Sampled, Layout::Sampled) {
+                    sp.err = Some(e);
+                }
+            }
+            let bytes: u64 = rects.iter().map(|r| r[2] as u64 * r[3] as u64 * 4).sum();
+            w.out.upload_bytes += bytes;
+            w.out.upload_base += bytes;
+            w.pending = true;
+        }
+        sp.veil_of.fill(0);
+        sp.veil_now.fill(0);
+        sp.any_veil = false;
+        for q in sp.quads.iter_mut() {
+            if let QuadSrc::View { veil, .. } = &mut q.src {
+                veil.clear();
+            }
+        }
+        *veil_settles += 1;
+        self.text.set_font(font.0, font.1);
     }
 
     /// every window's framebuffer holds its whole frame

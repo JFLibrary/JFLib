@@ -26,7 +26,11 @@ game.workspace = true
 game_render3d.workspace = true
 render3d.workspace = true
 gpu.workspace = true
+gfx.workspace = true
 ui.workspace = true
+# (G7b part 2) the HUD's shader of the own-swapchain path (own.rs), compiled where the program starts
+shader.workspace = true
+wgsl.workspace = true
 style = { package = "jflib-style-winui", path = "../../styles/winui" }
 
 [build-dependencies]

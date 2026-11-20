@@ -2,7 +2,7 @@
 //
 //   gametest --check [--quick]   every test group (tests/check.uis); exit code 1 when a check fails
 //   gametest --test NAME         one group: world tick input camera bridge netcodec lagcomp room netsim bots
-//                                events leave smooth threads
+//                                events leave smooth threads assets audio
 //   gametest --checksum          the determinism harness: one line "gametest checksum=HEX" over the bits
 //                                of a fixed run (world, systems, poses, input replayed, cameras); the same on
 //                                every target
@@ -26,6 +26,9 @@
 
 extern crate alloc;
 
+// (G7b part 2) assets (lib/game's Assets, game_render3d's models and images) and spatial audio
+mod asset_t;
+mod audio_t;
 mod bridge;
 mod camera_t;
 mod checksum;
@@ -119,7 +122,7 @@ impl Ctx {
     }
 }
 
-pub const ALL: &[&str] = &["world", "tick", "input", "camera", "bridge", "netcodec", "lagcomp", "room", "netsim", "bots", "events", "leave", "smooth", "threads"];
+pub const ALL: &[&str] = &["world", "tick", "input", "camera", "bridge", "netcodec", "lagcomp", "room", "netsim", "bots", "events", "leave", "smooth", "threads", "assets", "audio"];
 
 fn run_groups(names: &[&str], quick: bool) -> i32 {
     let (mut checks, mut failed) = (0u64, 0u64);
@@ -144,6 +147,8 @@ fn run_groups(names: &[&str], quick: bool) -> i32 {
             "leave" => net_event::leave(&mut c),
             "smooth" => net_event::smooth(&mut c),
             "threads" => net_event::threads(&mut c),
+            "assets" => asset_t::run(&mut c),
+            "audio" => audio_t::run(&mut c),
             _ => bridge::run(&mut c),
         }
         let ms = (plat::time_us() - t0) / 1000;

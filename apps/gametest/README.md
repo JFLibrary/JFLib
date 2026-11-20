@@ -13,7 +13,8 @@ bridge).
 ```sh
 python build_rs.py test gametest                     # tests/*.uis on Windows and Linux
 python build_rs.py run gametest -- --test input      # one group (world tick input camera bridge netcodec lagcomp
-                                                     # room netsim bots events leave smooth threads), --quick: a tenth
+                                                     # room netsim bots events leave smooth threads assets audio),
+                                                     # --quick: a tenth
 python build_rs.py run gametest -- --checksum        # the determinism checksum of the core
 python build_rs.py run gametest -- --netsum          # the netcode's: a recorded session on the simulated link
 python build_rs.py run gametest -- --loopback        # the netcode on real sockets (--secs, --udp, --ws)
@@ -38,6 +39,8 @@ node apps/gametest/tests/web.mjs build                         # WebAssembly in 
 | `src/main.rs` | the arguments, the counters of a test group, the random numbers (xorshift64*) |
 | `src/world_t.rs` | entities, generations, columns and their order, versions, 200 000 random steps against a model, a million entities, the canonical order |
 | `src/tick_t.rs` | the fixed rate against floor(t x rate / 10^9), the cap, the alpha, systems in order, poses settled and interpolated |
+| `src/asset_t.rs` | (G7b part 2) Assets step by step (Frames) and on threads (Background), the glTF and PNG kinds, models on the GPU (Models, sync_models) against a scene built from the documents' matrices |
+| `src/audio_t.rs` | (G7b part 2) spatial audio: attenuation and pan against closed forms, sample for sample through plat's mixer without a device (MixTest) |
 | `src/input_t.rs` | names, bindings, the map, the settings file, the pointer lock's click and end, frames against ticks, the wheel, capture, plat's events, the factor per platform |
 | `src/camera_t.rs` | the camera basis against `Quat::from_yaw_pitch`, the limits, walking, the follow camera against a wall, free flight |
 | `src/bridge.rs` | the bridge against a render3d scene built anew, offscreen: 0 pixels different, only changes written, the origin at 10^7, retire and collect, reset, 60 random frames |
