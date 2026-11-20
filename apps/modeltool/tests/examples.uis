@@ -1,4 +1,5 @@
-#!args --test gltf,script,examples
+#!args --test gltf,script,watch,examples
 # The glTF round trip of the examples, the script host's messages (file, line, column, the source line), its
-# parameters and modules, and the examples' reports against examples/out/NAME/report.json.  The determinism
+# parameters, modules (only from the script's folder), the observation mode's core with real files, and the
+# examples' reports against examples/out/NAME/report.json.  The determinism
 # checksum (--checksum) is compared across the targets by hand (docs/GEOM.md, "Prüfsummen").

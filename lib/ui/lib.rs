@@ -163,7 +163,7 @@ mod gpu_out;
 #[path = "gpu_out_off.rs"]
 mod gpu_out;
 #[cfg(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple"))]
-pub use gpu_out::{GPU_OUT_FS, GPU_OUT_FS_IMAGE, GPU_OUT_FS_TILE, GPU_OUT_VS, GPU_OUT_WGSL};
+pub use gpu_out::{GPU_OUT_FS, GPU_OUT_FS_IMAGE, GPU_OUT_FS_TILE, GPU_OUT_FS_VEIL, GPU_OUT_VS, GPU_OUT_WGSL};
 // a canvas whose zoom and pan go through GPU textures (canvas.rs); on every target
 mod canvas;
 pub use canvas::{CanvasContent, CanvasDesc, CanvasGpu, CanvasView};
@@ -697,6 +697,12 @@ pub struct GpuOutput {
     /// jfgui_GPU_VERIFY: images read back and compared, those that differed
     pub verified: u64,
     pub verify_bad: u64,
+    /// (G7b) veils (gpu_out.rs "Veils": cells with something over a view, composed on the GPU): the cells and
+    /// rectangles drawn so in the window's last frame; of all windows: cells drawn twice for them, settles
+    pub veil_cells: u32,
+    pub veil_rects: u32,
+    pub veil_draws: u64,
+    pub veil_settles: u64,
 }
 
 /// the UI context: everything ASMLIB keeps in g_* variables

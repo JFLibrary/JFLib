@@ -1,14 +1,19 @@
 // rules -- the numbers of game 1 in one place: the tick, the buttons of NetInput, the weapon, health and
-// respawn, the replicated entities (their kinds and fields), the netchan protocol id, the bots' names.
+// respawn, the replicated entities (their kinds and fields), the events (kill feed, hit marker, players coming
+// and going: game::net's reliable events), the netchan protocol id, the bots' names.
 // The feel of the movement is physics::CharacterParams (movement.rs); everything here is a start value the
 // user tunes by hand (docs/GAME1.md lists them).
+
+use alloc::string::String;
+use alloc::vec::Vec;
 
 use game::net::snapshot::Schema;
 
 /// the working name of the game in the UI (the user picks the real one later: GAME_NAME is the one place)
 pub const GAME_NAME: &str = "Spiel 1";
-/// netchan's protocol id of game 1 ("G1", version 1): a client of another game or version is refused
-pub const PROTOCOL: u32 = 0x4731_0001;
+/// netchan's protocol id of game 1 ("G1", version 2 since the events of G7e part 2): a client of another game or
+/// version is refused
+pub const PROTOCOL: u32 = 0x4731_0002;
 /// the WebSocket path of the server (and of the browser's client: the page's own server)
 pub const WS_PATH: &str = "/game1";
 /// the server's port unless set (UDP and the WebSocket's TCP)
@@ -73,15 +78,13 @@ pub const F_HEALTH: usize = 10;
 pub const F_KILLS: usize = 11;
 /// how often it was ended
 pub const F_DEATHS: usize = 12;
-/// bits 0-7: its hits (a counter: the hit marker), 8-15: who ended it last, 16: that was a head shot, 17: it cannot
-/// be hurt now (just came back), 24-31: its head shots (a counter)
+/// bit 17: it cannot be hurt now (just came back), bits 18-23: the spawn point's direction (hits, kills and who
+/// ended whom are events since G7e part 2: EV_KILL, EV_HIT)
 pub const F_INFO: usize = 13;
 /// a tag's net id: TAG_BASE + the figure's id (figures have 1 ..= 255)
 pub const TAG_BASE: u16 = 512;
 
-/// the info field's parts
-pub const INFO_HEAD: i32 = 1 << 16;
-/// see INFO_HEAD
+/// the info field: it cannot be hurt now
 pub const INFO_PROTECTED: i32 = 1 << 17;
 /// bits 18-23 of the info field: the yaw of the spawn point it came back at, in 64ths of a turn (the client turns
 /// its camera that way once per life)
@@ -106,19 +109,56 @@ pub fn schema() -> Schema {
     Schema::new().with(KIND_FIG, FIG_FIELDS).with(KIND_TAG, TAG_FIELDS)
 }
 
-/// the hits counter of an info field
-pub fn info_hits(info: i32) -> u8 {
-    (info & 0xff) as u8
+/// the channel of an event: a figure was ended (to everybody in the room)
+pub const EV_KILL: u8 = 1;
+/// the channel of an event: your shot hit (to the shooter: the hit marker)
+pub const EV_HIT: u8 = 2;
+/// the channel of an event: a player came or went (to everybody)
+pub const EV_ROOM: u8 = 3;
+
+/// game 1's events (game::net::event: each delivered once, in order)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GameEvent {
+    /// `killer` ended `victim` (killer == victim: it fell out of the map)
+    Kill { killer: u16, victim: u16, head: bool },
+    /// the receiver's shot hit `victim` (on the head; and ended it)
+    Hit { victim: u16, head: bool, kill: bool },
+    /// a figure came into the room
+    Joined { id: u16, name: String },
+    /// a figure left the room (or its connection ended)
+    Left { id: u16, name: String },
 }
 
-/// who ended the figure last (a figure's id; 0: nobody yet)
-pub fn info_killer(info: i32) -> u16 {
-    ((info >> 8) & 0xff) as u16
-}
+impl GameEvent {
+    /// the channel and the bytes
+    pub fn encode(&self) -> (u8, Vec<u8>) {
+        match self {
+            GameEvent::Kill { killer, victim, head } => (EV_KILL, alloc::vec![*killer as u8, *victim as u8, *head as u8]),
+            GameEvent::Hit { victim, head, kill } => (EV_HIT, alloc::vec![*victim as u8, *head as u8 | (*kill as u8) << 1]),
+            GameEvent::Joined { id, name } | GameEvent::Left { id, name } => {
+                let mut v = alloc::vec![matches!(self, GameEvent::Left { .. }) as u8, *id as u8];
+                let mut cut = name.len().min(60);
+                while !name.is_char_boundary(cut) {
+                    cut -= 1;
+                }
+                v.extend_from_slice(&name.as_bytes()[..cut]);
+                (EV_ROOM, v)
+            }
+        }
+    }
 
-/// the head shots counter of an info field
-pub fn info_heads(info: i32) -> u8 {
-    ((info >> 24) & 0xff) as u8
+    /// from a channel and bytes (None: not one of game 1's)
+    pub fn decode(channel: u8, d: &[u8]) -> Option<GameEvent> {
+        match (channel, d) {
+            (EV_KILL, [k, v, h]) => Some(GameEvent::Kill { killer: *k as u16, victim: *v as u16, head: *h != 0 }),
+            (EV_HIT, [v, f]) => Some(GameEvent::Hit { victim: *v as u16, head: f & 1 != 0, kill: f & 2 != 0 }),
+            (EV_ROOM, [kind, id, name @ ..]) if *kind <= 1 => {
+                let name = String::from_utf8_lossy(name).into_owned();
+                Some(if *kind == 0 { GameEvent::Joined { id: *id as u16, name } } else { GameEvent::Left { id: *id as u16, name } })
+            }
+            _ => None,
+        }
+    }
 }
 
 /// the bots' names: made up, nobody's

@@ -284,7 +284,7 @@ impl Game1 {
 
 /// the server's address -> an endpoint: "host:port" or "host" (DEFAULT_PORT); UDP on the desktop, the WebSocket of
 /// the page's own server in the browser
-fn endpoint(server: &str) -> Result<netchan::Endpoint, String> {
+pub fn endpoint(server: &str) -> Result<netchan::Endpoint, String> {
     let s = server.trim();
     if cfg!(target_arch = "wasm32") {
         return Ok(netchan::Endpoint::WebSocket(if s.is_empty() { String::from(WS_PATH) } else { format!("ws://{}{}", s, WS_PATH) }));
@@ -404,7 +404,7 @@ impl Game1 {
         }
         let mut y = pad + s(10.0);
         for l in &hud.feed {
-            let line = if l.killer.is_empty() { format!("{} ist abgestürzt", l.victim) } else if l.head { format!("{}  ⊗ Kopf  {}", l.killer, l.victim) } else { format!("{}  ⊗  {}", l.killer, l.victim) };
+            let line = if !l.note.is_empty() { l.note.clone() } else if l.killer.is_empty() { format!("{} ist abgestürzt", l.victim) } else if l.head { format!("{}  ⊗ Kopf  {}", l.killer, l.victim) } else { format!("{}  ⊗  {}", l.killer, l.victim) };
             let px = s(16.0);
             let tw = text_w(&line, px);
             ui.draw_color(if l.mine { 0x90A0_3010 } else { 0x7010_1418 });

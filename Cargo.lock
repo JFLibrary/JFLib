@@ -528,13 +528,16 @@ dependencies = [
  "jflib-build",
  "jflib-game",
  "jflib-game-render3d",
+ "jflib-gfx",
  "jflib-gpu",
  "jflib-physics",
  "jflib-plat",
  "jflib-render3d",
  "jflib-rt",
+ "jflib-shader",
  "jflib-style-winui",
  "jflib-ui",
+ "jflib-wgsl",
 ]
 
 [[package]]
@@ -545,7 +548,9 @@ dependencies = [
  "jflib-build",
  "jflib-game",
  "jflib-game-render3d",
+ "jflib-gltf",
  "jflib-gpu",
+ "jflib-img-png",
  "jflib-netchan",
  "jflib-physics",
  "jflib-plat",
@@ -904,7 +909,11 @@ name = "jflib-game-render3d"
 version = "0.2.1"
 dependencies = [
  "jflib-game",
+ "jflib-gltf",
  "jflib-gpu",
+ "jflib-img-core",
+ "jflib-img-jpeg",
+ "jflib-img-png",
  "jflib-render3d",
 ]
 
@@ -1485,6 +1494,8 @@ dependencies = [
  "jflib-plat",
  "jflib-render3d",
  "jflib-rt",
+ "jflib-style-winui",
+ "jflib-ui",
  "jfscript",
 ]
 

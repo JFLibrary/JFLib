@@ -26,7 +26,7 @@ pub(crate) fn face_normals(m: &Mesh) -> Vec<Option<Vec3>> {
 
 /// the corners (point, normal, uv) of every triangle as an indexed mesh: corners of one point with the same
 /// normal and UV become one vertex; points numbered again in the order of their first corner
-fn from_corners(m: &Mesh, normal: &[Vec3], uv: &[[f64; 2]]) -> Mesh {
+pub(crate) fn from_corners(m: &Mesh, normal: &[Vec3], uv: &[[f64; 2]]) -> Mesh {
     let n = m.indices.len();
     let mut keys: Vec<[u64; 6]> = Vec::with_capacity(n);
     for c in 0..n {

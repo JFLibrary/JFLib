@@ -119,11 +119,11 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [physics](#physics) -- Collision shapes, broad phase and deterministic queries for games
   <br>[src/bvh.rs](#physicssrcbvhrs) · [src/character.rs](#physicssrccharacterrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
 - [game](#game) -- The game core: a world of entities and components, a fixed tick, input actions, cameras
-  <br>[lib.rs](#game-crate-root) · [src/camera.rs](#gamesrccamerars) · [src/input.rs](#gamesrcinputrs) · [src/net/arena.rs](#gamesrcnetarenars) · [src/net/bits.rs](#gamesrcnetbitsrs) · [src/net/bot.rs](#gamesrcnetbotrs) · [src/net/client.rs](#gamesrcnetclientrs) · [src/net/clock.rs](#gamesrcnetclockrs) · [src/net/input.rs](#gamesrcnetinputrs) · [src/net/lagcomp.rs](#gamesrcnetlagcomprs) · [src/net/link.rs](#gamesrcnetlinkrs) · [src/net/predict.rs](#gamesrcnetpredictrs) · [src/net/proto.rs](#gamesrcnetprotors) · [src/net/quant.rs](#gamesrcnetquantrs) · [src/net/room.rs](#gamesrcnetroomrs) · [src/net/server.rs](#gamesrcnetserverrs) · [src/net/sim.rs](#gamesrcnetsimrs) · [src/net/snapshot.rs](#gamesrcnetsnapshotrs) · [src/net/walker.rs](#gamesrcnetwalkerrs) · [src/pose.rs](#gamesrcposers) · [src/sparse.rs](#gamesrcsparsers) · [src/tick.rs](#gamesrctickrs) · [src/world.rs](#gamesrcworldrs)
+  <br>[lib.rs](#game-crate-root) · [src/assets.rs](#gamesrcassetsrs) · [src/audio.rs](#gamesrcaudiors) · [src/camera.rs](#gamesrccamerars) · [src/input.rs](#gamesrcinputrs) · [src/net/arena.rs](#gamesrcnetarenars) · [src/net/bits.rs](#gamesrcnetbitsrs) · [src/net/bot.rs](#gamesrcnetbotrs) · [src/net/client.rs](#gamesrcnetclientrs) · [src/net/clock.rs](#gamesrcnetclockrs) · [src/net/event.rs](#gamesrcneteventrs) · [src/net/input.rs](#gamesrcnetinputrs) · [src/net/lagcomp.rs](#gamesrcnetlagcomprs) · [src/net/link.rs](#gamesrcnetlinkrs) · [src/net/predict.rs](#gamesrcnetpredictrs) · [src/net/proto.rs](#gamesrcnetprotors) · [src/net/quant.rs](#gamesrcnetquantrs) · [src/net/room.rs](#gamesrcnetroomrs) · [src/net/server.rs](#gamesrcnetserverrs) · [src/net/sim.rs](#gamesrcnetsimrs) · [src/net/snapshot.rs](#gamesrcnetsnapshotrs) · [src/net/walker.rs](#gamesrcnetwalkerrs) · [src/pose.rs](#gamesrcposers) · [src/sparse.rs](#gamesrcsparsers) · [src/tick.rs](#gamesrctickrs) · [src/world.rs](#gamesrcworldrs)
 - [game_render3d](#game_render3d) -- The bridge from the game core to render3d: entities with a mesh as scene instances
-  <br>[lib.rs](#game_render3d-crate-root)
+  <br>[lib.rs](#game_render3d-crate-root) · [src/models.rs](#game_render3dsrcmodelsrs)
 - [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
-  <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
+  <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/csg.rs](#geomsrccsgrs) · [src/exact.rs](#geomsrcexactrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
 - [netchan](#netchan) -- Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network
   <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 
@@ -381,6 +381,11 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   - `leaves: u32`
   - `verified: u64` -- jfgui_GPU_VERIFY: images read back and compared, those that differed
   - `verify_bad: u64`
+  - `veil_cells: u32` -- (G7b) veils (gpu_out.rs "Veils": cells with something over a view, composed on the GPU): the cells and
+    rectangles drawn so in the window's last frame; of all windows: cells drawn twice for them, settles
+  - `veil_rects: u32`
+  - `veil_draws: u64`
+  - `veil_settles: u64`
 
 - **`struct Ui`**
   the UI context: everything ASMLIB keeps in g_\* variables
@@ -9956,10 +9961,27 @@ it back.  A view's frame is bound to the display (G5e3, docs/GPU.md "3D-Ansicht"
 swapchain with a frame not shown yet (Win::pending), a new ver waits; gp_views_wake asks for a render once the
 window's frame has been shown, at the latest VIEW_HOLD_US after the first frame waited (a display that never
 answers does not stop the view).  Without this a view drawn as fast as the app can starved the compositor on the
-same GPU (Intel under Linux: no frame presented at all).  AF_GPU_3D makes the device at level Voll on the fastest
+same GPU (Intel under Linux: no frame presented at all).  (G7b) Cells of the base with something over a view (a game's
+HUD, a menu) are veils (below), not read back.  AF_GPU_3D makes the device at level Voll on the fastest
 adapter; without the flag views work on the Basis device of the frugal adapter.  Without an output in this run (not
 wanted, never possible) views make a device of their own (gp_view_device).  A lost device detaches every content
 (gp_views_gone) and attaches it to the next one.
+
+Veils (G7b, docs/GAMECORE.md "Spielfenster").  Before, a cell of the base layer with anything over a view apart (a
+HUD's text, a menu's panel) was drawn by the CPU over the view's frame, and its Draw read every new frame back: a copy
+of the whole target and a wait for the GPU in each frame, 1.3 ms at 1200 x 700 on the RTX 2070 SUPER, and the CPU drew
+and uploaded those cells again although nothing in them changed but the view.  Now such a cell (the view the only one
+in it, no layer above it) is a veil: the CPU draws what lies over the view twice, once over a black view and once over
+a white one (Cpu::veil: the view's Draw paints the colour, reads nothing), and keeps K, the cell over black, in the
+base texture and T = white − black, per channel the share of the view that shows through, in the veil's texture.
+The output's pass draws the cell as K + T · view (fs_veil), which is the CPU's "over" exactly: every blend of gfx is
+dst = src + dst · (255 − a) / 255, with K = src and T = 255 − a, and the shader rounds once (the CPU rounds the
+product to the nearest level too).  Text in veils is greyscale (subpixel text blends in linear light, which is not of
+that form; as in layers and images, text/lcd.rs).  A new frame of the view costs a veil nothing: K and T change only
+when what lies over the view changes, then the cell is drawn twice and goes up.  The framebuffer lacks the true pixels
+of a veil (like owed cells): gp_settle draws them over the frame read back (once, at rest), puts them into the base
+texture and ends the veil, the next frame of the view makes it again.  jfgui_GPU_VEIL=0 (Ui::gpu_test_veil): the
+way before, every frame read back.
 
 A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
@@ -9977,7 +9999,8 @@ jfgui_GPU_CANVAS_PAN=a,b (they only pan from tiles), jfgui_GPU_CANVAS_ZOOM=a,b (
 tiles, whatever the widget chose), jfgui_GPU_CANVAS_MB=n (the tiles' budget),
 jfgui_GPU_CANVAS_SETTLE_MS=n (the time until the CPU's picture follows a move), jfgui_GPU_OUTPUT=0 (the
 windows through the CPU path, the GPU stays for views, which read every frame back), jfgui_GPU_VIEWS=0 (no view
-is drawn by the output's render pass: every frame read back into the framebuffer);
+is drawn by the output's render pass: every frame read back into the framebuffer), jfgui_GPU_VEIL=0 (no veils:
+cells with something over a view read its frame back);
 lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 
 Script command `gpu` (headless runs stay on the CPU path without it; on other targets (a static
@@ -10025,6 +10048,7 @@ GPU_OUT_VS: &[u32] = spv::VS
 GPU_OUT_FS: &[u32] = spv::FS
 GPU_OUT_FS_IMAGE: &[u32] = spv::FS_IMAGE
 GPU_OUT_FS_TILE: &[u32] = spv::FS_TILE
+GPU_OUT_FS_VEIL: &[u32] = spv::FS_VEIL
 ```
 
 **`impl Ui`**
@@ -10037,6 +10061,9 @@ GPU_OUT_FS_TILE: &[u32] = spv::FS_TILE
 - **`fn gpu_test_hold(&mut self, win: u32, on: bool)`**
   (test aid, G5e3) window `win`'s frames are not shown while on (as if the display did not answer): they stay in
   its texture, its views' new frames wait for them; off: the next look shows the newest
+- **`fn gpu_test_veil(&mut self, on: bool)`**
+  (test aid, G7b) cells of the base with something over a view are veils (the default; jfgui_GPU_VEIL=0 turns them
+  off), or off: those cells read the view's frame back, the way before.  For measurements
 - **`fn gpu_test_image_budget(&mut self, bytes: u64)`**
   (test aid) the bytes image textures may take
 - **`fn gpu_test_canvas_budget(&mut self, bytes: u64)`**
@@ -10067,6 +10094,8 @@ against glibc, Android, the browser): every frame takes the platform's path, no 
   where the GPU shows windows: the pixels of the GPU's images into the framebuffer
 - **`fn gpu_test_hold(&mut self, _win: u32, _on: bool)`**
   (test aid, G5e3) where the GPU shows windows: window `win`'s frames are not shown while on
+- **`fn gpu_test_veil(&mut self, _on: bool)`**
+  (test aid, G7b) where the GPU shows windows: cells with something over a view are veils, or read its frame back
 - **`fn gpu_test_image_budget(&mut self, _bytes: u64)`**
   (test aid) where the GPU shows windows: the bytes image textures may take
 - **`fn gpu_test_canvas_budget(&mut self, _bytes: u64)`**
@@ -31605,7 +31634,9 @@ system's own sounds
   s.start() / s.pause() / s.stop() (empties the ring) / s.finish() (ends once all is played)
   s.set_volume(0 ..= 1), s.state() -> State, s.latency_ms(), s.played(), s.underruns(),
   s.device(), s.device_changes()
-  play(&Sound) -> Result<Voice, AudioError>    a short sound through the shared mixer
+  play(&Sound) -> Result<Voice, AudioError>    a short sound through the shared mixer; voice.set_volume(v),
+                          (G7b) set_gains(left, right) (lib/game's spatial audio pans with it), stop(), playing();
+                          play_gains(&Sound, left, right): with those gains from its first sample on
   play_file(path)         a WAV or Ogg Vorbis file through the VFS (app://, data://, ..)
   Sound::wav(bytes) / ogg / decode / load(path) / tone(freq, ms)
   sound(SOUND_*) -> bool  the system's own sound for an event (dialog_sounds(): whether the
@@ -31789,10 +31820,34 @@ SOUND_NOTIFY: u32 = 5
   still playing (or waiting for the device)
 - **`fn set_volume(&self, v: f32)`**
   0 ..= 1
+- **`fn set_gains(&self, left: f32, right: f32)`**
+  (G7b) the gains of the left and the right channel, 0 ..= 1 each (a mono sound goes to both, a stereo sound
+  keeps its channels): what lib/game's spatial audio pans with.  From the mixer's next buffer on, as
+  set_volume, which sets both
+
+- **`struct MixTest`**
+  (tests, G7b) the mixer of play() without a device: the same code, buffer by buffer, 48 kHz stereo (what
+  lib/game's spatial audio is checked against, sample for sample).  Needs no `audio.output`: nothing is played
+
+**`impl MixTest`**
+
+- **`fn new() -> MixTest`**
+- **`fn play(&mut self, s: &Sound) -> Voice`**
+  a voice as play() starts one: it is mixed from the next render on
+- **`fn render(&mut self, frames: usize) -> Vec<f32>`**
+  the next `frames` frames (stereo, interleaved) as the device's next buffer
+- **`fn voices(&self) -> usize`**
+  voices still in the mixer
+- **`fn rate(&self) -> u32`**
+  the mixer's rate
 
 - **`fn play(s: &Sound) -> Result<Voice, AudioError>`**
   play a sound once, mixed with the other sounds of play() (dropping the Voice lets it play
   on) -> Err(Unavailable) without an output, Err(Denied) without `audio.output`
+
+- **`fn play_gains(s: &Sound, left: f32, right: f32) -> Result<Voice, AudioError>`**
+  (G7b) play() with the gains of the left and the right channel from its first sample on (Voice::set_gains;
+  lib/game's spatial audio starts a far sound quiet, not at full volume for a buffer)
 
 - **`fn play_file(path: &str) -> Result<Voice, AudioError>`**
   play a WAV or Ogg Vorbis file once (see play; without `audio.output` the file is not read)
@@ -63310,17 +63365,284 @@ tick, input actions, camera controllers; without a GPU, so a game's server runs 
                  platform), the pointer lock's click and end; store / load in a settings file (base::Ini)
   camera         FirstPerson, Follow (an orbit, pulled in front of walls through lib/physics), FreeFly;
                  View (eye, forward, up)
+  assets         (G7b part 2) Assets<T>: files through the VFS decoded in the background (plat's blocking
+                 pool, or a budget per frame), Handle<T> with a state (Loading, Ready, Failed), counted
+                 references, unloading; the kinds are types (Asset::decode; glTF and images in game_render3d)
+  audio          (G7b part 2) SpatialAudio over plat::audio's mixer: a listener (the camera's View), Emitter
+                 components and sounds at points, the gain by distance (Attenuation), the pan by direction
 
 render3d is not a dependency: the bridge that puts entities with a mesh into a render3d scene is the
 crate game_render3d.  Everything here is deterministic: no unordered containers, no threads, no clock
 of its own (time comes from outside), floats only through + - * / and lib/physics' math (its correctly
-rounded square root, rt's portable sin and cos).  docs/GAMECORE.md describes the design and the tests
-(apps/gametest).
+rounded square root, rt's portable sin and cos).  The one exception is assets: with Loading::Background
+an asset becomes Ready when its thread is done (what a frame shows, never what the simulation computes).
+docs/GAMECORE.md describes the design and the tests (apps/gametest).
 ```
 
 ### `game` crate root
 
 Re-exports: `physics::{Quat, Vec3}`
+
+### `game/src/assets.rs`
+
+Source: [`lib/game/src/assets.rs`](../lib/game/src/assets.rs)
+
+```text
+assets -- (G7b part 2) files through the VFS, decoded in the background, behind handles with states, reference
+counts and unloading (docs/GAMECORE.md "Assets")
+
+  impl Asset for T               decode(bytes, files) -> Result<T, String>: a file's bytes into the value; files
+                                 reads the files beside it by relative name (a .gltf's buffers and images).  It
+                                 runs on a worker thread (Send); lib/game_render3d has glTF models and images
+  Assets::<T>::new(Loading)      a store of one kind: Background (plat::task::spawn_blocking: threads where the
+                                 target has them), Frames { budget_us } (decoded in update(), one after the other
+                                 until the budget is spent, at least one per update: the browser without
+                                 threads, deterministic tests)
+  assets.load(path) -> Handle<T> the asset of path (app://, data://, mem://, a file ...): the same entry for the
+                                 same path while it lives (another handle), else a new one, Loading
+  assets.insert(name, value)     an asset made in code, Ready at once
+  assets.state(&h) / get(&h) / error(&h) / path(&h) / refs(&h) / id()
+  assets.update() -> Vec<Change> finished decodes become Ready or Failed; assets nobody holds a handle of (for
+                                 `linger` updates) are unloaded: their value goes, their path is forgotten;
+                                 what happened, for those who keep something per asset (the GPU's copies)
+  Handle<T>                      a reference: Clone counts one more, Drop one less; AssetId (index, generation)
+                                 names the entry, also after it is gone (a stale id finds nothing)
+
+The simulation does not depend on assets (they are what a frame shows and plays): with threads the moment an
+asset becomes Ready depends on the machine.  Everything else in lib/game stays deterministic; a test that needs
+the same frames on every target loads with Loading::Frames.
+```
+
+- **`trait Asset: Sized + Send + 'static`**
+  a kind of asset: how a file's bytes become its value (on a worker thread)
+  - `fn decode(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>) -> Result<Self, String>`
+    decode `bytes` (the file at the handle's path); `files` reads a file beside it by a relative name (None: none)
+
+- **`struct Bytes(pub Vec<u8>)`**
+  the raw bytes of a file (an Asset for anything a game decodes itself)
+
+- **`enum Loading`**
+  how decoding runs
+  - `Background` -- on the blocking pool of plat::task (threads; where none can start, the executor runs the jobs between
+    frames, one per run: lib/ui does)
+  - `Frames { budget_us: u64 }` -- in update(), one asset after the other until budget_us is spent (at least one per update)
+
+**`impl Loading`**
+
+- **`fn default_for_target() -> Loading`**
+  Background on targets with threads, Frames { 4 ms } in the browser (a bundle without shared memory has none)
+
+- **`enum State`**
+  where an asset is
+  - `Loading` -- being read and decoded
+  - `Ready` -- decoded: get() gives it
+  - `Failed` -- not read or not decoded: error() says why
+
+- **`struct AssetId`**
+  an asset's entry: its index and generation (a reused index has a new one)
+  - `index: u32`
+  - `generation: u32`
+
+- **`enum Change`**
+  what update() did to an asset
+  - `Ready(AssetId)`
+  - `Failed(AssetId)`
+  - `Unloaded(AssetId)` -- gone: nobody held a handle (its id finds nothing from now on)
+
+- **`struct Handle<T>`**
+  a reference to an asset of kind T: while one lives the asset stays (Clone: one more, Drop: one less)
+
+**`impl<T> Handle<T>`**
+
+- **`fn id(&self) -> AssetId`**
+  the entry it refers to
+
+- **`struct AssetStats`**
+  what a store holds now
+  - `loading: u32`
+  - `ready: u32`
+  - `failed: u32`
+  - `decoded: u64` -- decodes finished, unloads so far
+  - `unloaded: u64`
+
+- **`struct Assets<T: Asset>`**
+  the assets of one kind (see the module header)
+
+- **`fn sibling(path: &str, rel: &str) -> Option<String>`**
+  path's folder (with its slash) joined with a relative name; None for one that leaves the folder or names a scheme
+
+**`impl<T: Asset> Assets<T>`**
+
+- **`fn new(mode: Loading) -> Assets<T>`**
+  an empty store that decodes as `mode` says
+- **`fn mode(&self) -> Loading`**
+  how it decodes
+- **`fn set_linger(&mut self, updates: u32)`**
+  an asset nobody holds stays this many updates before it is unloaded (0, the default: the next update
+  unloads it; a load of its path before then takes it again, without reading it anew)
+- **`fn load(&mut self, path: &str) -> Handle<T>`**
+  the asset of `path`: another handle of its entry while it lives, else a new entry that starts loading
+- **`fn insert(&mut self, name: &str, value: T) -> Handle<T>`**
+  an asset made in code (no file): Ready at once; `name` is its path for path() (it is not looked up by load)
+- **`fn state(&self, h: &Handle<T>) -> State`**
+  where the asset is (None: a handle of another store, which cannot happen through the API)
+- **`fn state_of(&self, id: AssetId) -> Option<State>`**
+  the state of an entry by its id (None: gone)
+- **`fn get(&self, h: &Handle<T>) -> Option<&T>`**
+  the value once Ready
+- **`fn get_id(&self, id: AssetId) -> Option<&T>`**
+  the value of an entry by its id (None: not ready, failed or gone)
+- **`fn error(&self, h: &Handle<T>) -> Option<&str>`**
+  why it failed
+- **`fn path(&self, h: &Handle<T>) -> &str`**
+  the path it was loaded from (an inserted one: its name)
+- **`fn refs(&self, h: &Handle<T>) -> u32`**
+  handles of the asset that live now
+- **`fn refs_of(&self, id: AssetId) -> u32`**
+  handles of an entry that live now (0: gone, or held by nobody)
+- **`fn len(&self) -> usize`**
+  entries (every state)
+- **`fn is_empty(&self) -> bool`**
+- **`fn stats(&self) -> AssetStats`**
+  what the store holds
+- **`fn ids(&self) -> Vec<AssetId>`**
+  the ids of every entry that lives, in index order
+- **`fn reload(&mut self, h: &Handle<T>)`**
+  read and decode the asset again (a file that changed): Loading until then; its value stays until the new
+  one has come (a failed reload keeps the old value and reports Failed only when there was none)
+- **`fn update(&mut self) -> Vec<Change>`**
+  once a frame: decodes that finished (Frames: decoded now, within the budget) become Ready or Failed; assets
+  nobody holds are unloaded -> what happened
+- **`fn wait_idle(&mut self, timeout_us: u64, changes: &mut Vec<Change>) -> bool`**
+  Background: wait until nothing is loading (at most timeout_us; tests, a loading screen) -> nothing is
+
+### `game/src/audio.rs`
+
+Source: [`lib/game/src/audio.rs`](../lib/game/src/audio.rs)
+
+```text
+audio -- (G7b part 2) spatial audio over plat::audio's mixer: a listener (the camera), sounds on entities and at
+points, the volume by distance (near, far, a rolloff), the pan by direction (docs/GAMECORE.md "Raumklang")
+
+  Attenuation { near, far, rolloff }   the gain by distance: 1 up to near; Linear falls to 0 at far, Inverse
+                                 (OpenAL's inverse distance, clamped) near / (near + rolloff (d - near)) up to far
+                                 and stays there beyond it
+  gains(&View, at, volume, &att) -> Gains   left and right gain of a sound at `at` for a listener: equal power
+                                 (left = cos, right = sin of (pan + 1) pi / 4, so -3 dB each in the middle), pan
+                                 the sine of the direction's angle to the right (front and back sound the same:
+                                 stereo), drawn to the middle within PAN_RADIUS of the listener
+  Emitter (a component)          a sound on an entity, played at its Pose (interpolated at the frame's alpha)
+  SpatialAudio                   set_listener(&View), update(&mut World, alpha, &mut dyn Mixer) once a frame:
+                                 starts the emitters' voices, sets every voice's gains; play_at(sound, at, ..):
+                                 a sound at a point (a shot, a hit) until it ends
+  Mixer                          where voices play: Speakers (plat::audio's shared mixer, play_gains), or
+                                 plat::audio::MixTest (the same mixer without a device: tests, sample by sample)
+
+No Doppler: plat's mixer plays a voice at its rate (a pitch per voice would need its resampler steered).  A voice's
+gains change at the mixer's next buffer (about 20 ms), without a ramp.  Like the rest of lib/game the gains are the
+same bits on every target: + - x / and lib/physics' math (its square root, rt's portable sine and cosine).
+```
+
+Re-exports: `plat::audio::{AudioError, Sound, Voice}`
+
+```rust
+/// a source this close to the listener drifts to the middle (metres): no jump from left to right through the head
+PAN_RADIUS: f64 = 0.5
+```
+
+- **`enum Rolloff`**
+  how the gain falls beyond near
+  - `Linear` -- to 0 at far
+  - `Inverse(f64)` -- near / (near + rolloff (d - near)), d clamped to far (OpenAL's AL_INVERSE_DISTANCE_CLAMPED)
+
+- **`struct Attenuation`**
+  the gain by distance (metres)
+  - `near: f64`
+  - `far: f64`
+  - `rolloff: Rolloff`
+
+**`impl Attenuation`**
+
+- **`const DEFAULT: Attenuation = Attenuation { near: 1.0, far: 50.0, rolloff: Rolloff::Inv ...`**
+  near 1 m, far 50 m, inverse with rolloff 1 (half the gain at 2 m, a fiftieth at 50 m and beyond)
+- **`const fn linear(near: f64, far: f64) -> Attenuation`**
+  linear from near to far
+- **`fn gain(&self, d: f64) -> f64`**
+  the gain at distance d (0 ..= 1)
+
+- **`struct Gains`**
+  what a listener hears of a source
+  - `left: f32`
+  - `right: f32`
+  - `distance: f64` -- the distance (metres), the pan (-1 left .. 1 right), the gain before the pan (volume x attenuation)
+  - `pan: f64`
+  - `gain: f64`
+
+- **`fn gains(listener: &View, at: Vec3, volume: f64, att: &Attenuation) -> Gains`**
+  the gains of a sound at `at` with `volume` (0 ..= 1) for the listener (see the module header)
+
+- **`trait Mixer`**
+  where voices play
+  - `fn play(&mut self, sound: &Sound, left: f32, right: f32) -> Result<Voice, AudioError>`
+    start `sound` with these gains (they hold from its first sample on)
+
+- **`struct Speakers`**
+  plat::audio's shared mixer (the speakers; an app with a manifest needs `audio.output`)
+
+- **`struct Emitter`**
+  a sound on an entity (a component): it plays at the entity's Pose (the origin without one) from the next
+  SpatialAudio::update on; looping: started again when it ends
+  - `sound: Sound`
+  - `volume: f32`
+  - `att: Attenuation`
+  - `looping: bool`
+
+**`impl Emitter`**
+
+- **`fn new(sound: Sound) -> Emitter`**
+  once, at volume 1, with the default attenuation
+- **`fn with_volume(mut self, v: f32) -> Emitter`**
+- **`fn with_attenuation(mut self, a: Attenuation) -> Emitter`**
+- **`fn looping(mut self) -> Emitter`**
+- **`fn playing(&self) -> bool`**
+  its voice plays now
+- **`fn finished(&self) -> bool`**
+  it has ended (or was stopped, or the mixer refused it)
+- **`fn restart(&mut self)`**
+  play it again from the start at the next update
+- **`fn stop(&mut self)`**
+  end it now
+- **`fn gains(&self) -> Option<Gains>`**
+  what the last update set
+
+- **`struct AudioStats`**
+  what an update did
+  - `emitters: u32` -- emitters looked at, voices started, voices that ended, sounds at points still playing, voices with a gain
+    above 0, starts the mixer refused
+  - `started: u32`
+  - `ended: u32`
+  - `shots: u32`
+  - `audible: u32`
+  - `refused: u32`
+
+- **`struct SpatialAudio`**
+  the listener and the voices of a game's sounds (see the module header)
+  - `master: f32` -- every gain times this (0 ..= 1)
+
+**`impl SpatialAudio`**
+
+- **`fn new() -> SpatialAudio`**
+  a listener at the origin looking down -Z
+- **`fn set_listener(&mut self, v: &View)`**
+  where the listener is and looks (the camera's View)
+- **`fn listener(&self) -> &View`**
+- **`fn play_at(&mut self, sound: &Sound, at: Vec3, volume: f32, att: Attenuation, mixer: &mut dyn Mixer) -> Result<(), AudioError>`**
+  a sound at a point, once (a shot, a hit): its gains follow the listener until it ends
+- **`fn update(&mut self, world: &mut World, alpha: f64, mixer: &mut dyn Mixer) -> AudioStats`**
+  once a frame, after the listener is set: the emitters of `world` (their voices started, their gains at the
+  poses interpolated at `alpha`), the sounds at points -> what it did
+- **`fn stop_all(&mut self)`**
+  every sound at a point ends now (the emitters keep theirs: Emitter::stop)
 
 ### `game/src/camera.rs`
 
@@ -64164,10 +64486,17 @@ client -- the client side of the netcode, without I/O: netchan's events in, mess
   fetch          a UDP client whose full state does not fit a datagram is told so in WELCOME:
                  fetch_request() names the server's WebSocket port and a ticket, the app opens a second
                  netchan connection there and feeds its events to on_fetch_event (FETCH -> FULL)
+  events         send_event (to the room's RoomSim) and take_event (the room's): reliable, in order, each
+                 delivered once (event.rs); they ride in the INPUTs and SNAPSHOTs
+  smoothing      a correction of the own figure becomes an offset of the drawn position that decays in
+                 smooth_ms (predict::Smoother; above `snap` metres it jumps): drawn() is what a frame
+                 shows, predicted() stays the exact state
+  leave          LEAVE goes out, the server removes the figure at once (NetLink::leave also ends netchan)
 
 Per frame: on_event for every netchan event (main channel), advance(now) -> n, then n times step(map,
-input) with the input of that tick; take_out what to send.  The figure is predicted() (and
-predicted_prev() with alpha() for a frame between two ticks); the others are remotes().
+input) with the input of that tick; take_out what to send.  The figure is drawn() (or predicted() and
+predicted_prev() with alpha() for a frame between two ticks); the others are remotes(); events come from
+take_event().
 ```
 
 - **`struct ClientOptions`**
@@ -64175,9 +64504,14 @@ predicted_prev() with alpha() for a frame between two ticks); the others are rem
   - `name: String` -- the player's name
   - `room: Option<RoomCode>` -- the room to join (None: make one)
   - `interp_ms: u32` -- how far behind the newest snapshot the others are shown (ms)
-  - `margin: Option<f64>` -- the margin the inputs aim for (None: the server's)
+  - `margin: Option<f64>` -- the margin the inputs aim for (None: the server's, over a WebSocket plus stream_margin)
+  - `stream_margin: f64` -- ticks the margin gets over a WebSocket (set_reliable) on top of the server's: TCP delivers what follows a
+    lost segment only after its retransmission (1: over WLAN 2.7 instead of 12 corrections a minute)
   - `ring: usize` -- snapshots kept as bases and for interpolation
   - `min_redundancy: usize` -- inputs every packet repeats at least (the newest and the ones before it)
+  - `smooth_ms: u32` -- the time constant in which a correction of the drawn own figure decays (ms; 0: no smoothing)
+  - `snap: f64` -- a correction larger than this is not smoothed: the picture jumps (m)
+  - `event_budget: usize` -- the bytes of the events an INPUT carries at most
 
 - **`enum Phase`**
   where a client stands
@@ -64186,6 +64520,7 @@ predicted_prev() with alpha() for a frame between two ticks); the others are rem
   - `Playing` -- in a room
   - `Refused(u8)` -- the server refused (proto::REFUSE_\*)
   - `Closed` -- the channel ended
+  - `Left` -- the client left (leave)
 
 - **`struct ClientStats`**
   what a client counted
@@ -64243,6 +64578,31 @@ predicted_prev() with alpha() for a frame between two ticks); the others are rem
   the interpolation clock
 - **`fn last_outcome(&self) -> Option<Outcome>`**
   what the last reconciliation found
+- **`fn set_reliable(&mut self, on: bool)`**
+  the channel is reliable (a WebSocket): its events go once instead of until acknowledged, its margin is
+  stream_margin more (call it before WELCOME).  NetLink and the simulated network's users set it; without it a
+  client resends over a WebSocket too (harmless: duplicates are dropped)
+- **`fn send_event(&mut self, channel: u8, data: &[u8]) -> bool`**
+  queue an event for the room's RoomSim (reliable, in order) -> false when refused: not in a room, a channel
+  over 15, more than event::MAX_EVENT bytes, event::MAX_PENDING not yet acknowledged
+- **`fn take_event(&mut self) -> Option<NetEvent>`**
+  the next event of the room (each once, in the order the room sent them)
+- **`fn events_out(&self) -> OutboxStats`**
+  what the outbox of the client's events counted
+- **`fn events_in(&self) -> InboxStats`**
+  what the inbox of the room's events counted
+- **`fn events_pending(&self) -> usize`**
+  events of the client not yet acknowledged by the server
+- **`fn leave(&mut self)`**
+  leave the room: LEAVE goes out (take_out), the server removes the figure at once; the phase is Left and
+  nothing more is sent.  (NetLink::leave sends it and ends netchan's connection too.)
+- **`fn smoothing(&self) -> Vec3`**
+  what a frame adds to the predicted position of the own figure: the rest of the corrections, decaying
+- **`fn smoother(&self) -> &Smoother`**
+  the smoothing's counts: (corrections, of those snapped)
+- **`fn drawn(&self) -> Option<Vec3>`**
+  where a frame draws the own figure: the predicted position between the last two ticks (alpha) plus the
+  decaying rest of the corrections (None before the first snapshot)
 - **`fn on_event(&mut self, map: &physics::World, e: &ClientEvent, now_ns: u64)`**
   one of netchan's client events of the main channel at time now_ns
 - **`fn fetch_request(&mut self) -> Option<(u16, u64)>`**
@@ -64337,6 +64697,125 @@ the own figure); docs/NETCODE.md, "Zeit".
   the render time: a tick and the fraction towards the next (None before the first snapshot)
 - **`fn behind(&self) -> f64`**
   how far the render time is behind the newest snapshot, in ticks
+
+### `game/src/net/event.rs`
+
+Source: [`lib/game/src/net/event.rs`](../lib/game/src/net/event.rs)
+
+```text
+event -- reliable events over the netcode's own packets: each delivered once and in order, over UDP and over a
+WebSocket (docs/NETCODE.md, "Ereignisse")
+
+  NetEvent   a tick, a channel (0 ..= 15: the game's kinds, such as the kill feed, hit confirmations, chat) and
+             up to MAX_EVENT bytes
+  Outbox     the sender's side: every event gets the next number of one sequence per direction (u16, wrapping)
+             and stays until the peer acknowledges it; every packet carries the oldest ones up to a byte budget.
+             Over a WebSocket (reliable and ordered) each goes once and is forgotten
+  Inbox      the receiver's side: the number it expects next.  A packet's run of events starts at or before it
+             (the sender forgets only what was acknowledged): the ones before are duplicates, the rest are
+             delivered in order; the acknowledgement rides in the next packets of the other direction
+  write_section / read_section   a run of events in a bit stream (after a message's header, proto.rs)
+
+Server -> client the events ride in SNAPSHOTs, client -> server in INPUTs, and each side acknowledges in its own
+packets what it got (proto.rs: the event part after the header, flagged in byte 0).  This is the rule of Quake 3's
+reliable commands: whatever the network loses, duplicates or reorders, a packet that arrives holds a run without a
+gap from what the receiver expects, so nothing waits for anything (no reordering buffer, no timer, no extra
+packet).  Delivered in one order per direction, so in order per channel as well.  The price: an event rides in
+every packet until its acknowledgement comes back -- at 30 snapshots a second and a round trip of 100 ms four or
+five times; a kill-feed line of a few bytes costs little.  Why here and not in netchan: see NETCODE.md.
+```
+
+```rust
+/// the bytes of one event at most
+MAX_EVENT: usize = 255
+/// channels (0 ..= 15)
+CHANNELS: u8 = 16
+/// events an outbox holds at most (more: the peer does not acknowledge; a server drops such a client)
+MAX_PENDING: usize = 512
+/// events one packet's run holds at most
+MAX_RUN: usize = 256
+/// packets of the other direction that carry the acknowledgement after events came (a duplicate starts it again)
+ACK_PACKETS: u32 = 32
+```
+
+- **`struct NetEvent`**
+  one event (see the module header)
+  - `tick: u32` -- the sender's tick when it happened (the server's tick; a client's predicted tick)
+  - `channel: u8` -- the channel: the game's kind of event (0 ..= 15)
+  - `data: Vec<u8>` -- the game's bytes (at most MAX_EVENT)
+
+**`impl NetEvent`**
+
+- **`fn new(tick: u32, channel: u8, data: &[u8]) -> NetEvent`**
+  an event of `channel` at `tick` with these bytes
+- **`fn valid(&self) -> bool`**
+  within the limits (channel, size)
+- **`fn bits(&self, base_tick: u32) -> usize`**
+  its bits in a run whose ticks count from `base_tick`
+
+- **`fn seq_diff(a: u16, b: u16) -> i32`**
+  a - b of two event numbers (they wrap)
+
+- **`fn write_section(w: &mut BitWriter, first: u16, events: &[NetEvent], base_tick: u32)`**
+  write a run: the number of its first event, the count, then each event (channel, tick against `base_tick`, length,
+  bytes)
+
+- **`fn read_section(r: &mut BitReader, base_tick: u32) -> Option<(u16, Vec<NetEvent>)>`**
+  read a run (None when malformed: a count or length out of range, the stream too short)
+
+- **`struct OutboxStats`**
+  what an outbox counted
+  - `queued: u64` -- events queued
+  - `refused: u64` -- events refused (too long, a bad channel, the outbox full)
+  - `sent: u64` -- events put into a packet for the first time
+  - `resent: u64` -- ... and again (UDP: until acknowledged)
+  - `done: u64` -- events acknowledged (or, over a WebSocket, sent)
+  - `bits: u64` -- the bits of the runs written
+
+- **`struct Outbox`**
+  the sender's side (see the module header)
+
+**`impl Outbox`**
+
+- **`fn new(reliable: bool, budget: usize) -> Outbox`**
+  an empty outbox; `reliable`: the transport delivers (a WebSocket), each event goes once; `budget`: the bytes
+  of the events a packet carries at most (it always carries at least one)
+- **`fn push(&mut self, e: NetEvent) -> bool`**
+  queue an event -> false when refused (too long, a bad channel, MAX_PENDING waiting)
+- **`fn pending(&self) -> usize`**
+  events waiting (not yet acknowledged; over a WebSocket: not yet sent)
+- **`fn stats(&self) -> OutboxStats`**
+  what it counted
+- **`fn take_run(&mut self, base_tick: u32) -> Option<(u16, Vec<NetEvent>)>`**
+  the run the next packet carries (the number of its first event and the events), None when nothing waits;
+  ticks of the bit count against `base_tick` (the packet's tick)
+- **`fn ack(&mut self, seq: u16)`**
+  the peer has every event up to `seq` (an acknowledgement of a number never sent is ignored)
+
+- **`struct InboxStats`**
+  what an inbox counted
+  - `delivered: u64` -- events delivered (once each)
+  - `duplicates: u64` -- events that came again (dropped)
+  - `gaps: u64` -- runs that started after the next expected number (an honest sender never sends one; dropped)
+  - `overflow: u64` -- events dropped because the app did not take them (MAX_PENDING waiting)
+
+- **`struct Inbox`**
+  the receiver's side (see the module header)
+
+**`impl Inbox`**
+
+- **`fn new(acks: bool) -> Inbox`**
+  an empty inbox expecting event 0; `acks`: acknowledge (false over a WebSocket, whose sender does not wait)
+- **`fn receive(&mut self, first: u16, events: Vec<NetEvent>)`**
+  a packet's run: the new events in order into the queue, duplicates dropped
+- **`fn take(&mut self) -> Option<NetEvent>`**
+  the next event delivered (in order)
+- **`fn waiting(&self) -> usize`**
+  events delivered and not yet taken
+- **`fn ack_for_packet(&mut self) -> Option<u16>`**
+  the acknowledgement the next packet carries (every event up to it came), None when nothing came lately
+- **`fn stats(&self) -> InboxStats`**
+  what it counted
 
 ### `game/src/net/input.rs`
 
@@ -64475,7 +64954,8 @@ link -- the netcode on real sockets: netchan's Server and Client under NetServer
                                 Linux, Apple: netchan::Server needs netio)
   NetLink<M>                    a client's channel and, when WELCOME asks for it, the fetch's WebSocket
                                 (ws://host:port/path of the server's UDP address); pump(map, now) reads
-                                both, flush() sends what the game queued
+                                both, flush() sends what the game queued, leave() ends it cleanly (LEAVE,
+                                then netchan's DISCONNECT: the server removes the figure at once)
 
 A server's loop: serve(..) then server.wait(ms to the next tick) (never plat::sleep_ms(1) on Windows:
 docs/TRANSPORT.md).  A client's frame: link.pump(map, now), n = link.game.advance(now), n times
@@ -64498,6 +64978,9 @@ link.game.step(map, input), link.flush().
   read the channels, feed the game, open the fetch when asked
 - **`fn flush(&mut self)`**
   send what the game queued
+- **`fn leave(&mut self)`**
+  leave the room: LEAVE (the server removes the figure at once), then netchan's DISCONNECT (over UDP three
+  times) and the end of a fetch's WebSocket.  Dropping a NetLink only does the last two
 - **`fn channel(&self) -> &Client`**
   the main channel (its state, stats, round-trip time)
 - **`fn fetching(&self) -> bool`**
@@ -64521,6 +65004,8 @@ applies its inputs since then again (reconciliation)
                 walker::Walker; G7h's character controller takes its place
   Predictor     the inputs and predicted states since the newest confirmed tick; step, reconcile, the
                 current and previous state (a frame blends the two by the tick's alpha)
+  Smoother      what a frame draws after a correction: the jump of the predicted position becomes an offset
+                that decays in a short time (and snaps above a distance); the predicted state stays exact
 
 A prediction is exact when the server used the client's own inputs: reconcile then finds the same
 state and only drops history.  It differs after a missed input (the server repeated the last one), a
@@ -64588,6 +65073,30 @@ the server's state and the client's later inputs lead.
 - **`fn clear(&mut self)`**
   forget everything (a new figure, a new room)
 
+- **`struct Smoother`**
+  the drawn position of the own figure after corrections (see the module header).  A correction moves the
+  predicted position by a jump; the offset takes the jump back, so the picture does not move at that moment, and
+  decays like exp(-t / decay) (a rational approximation, the same for any frame rate within a few percent).  Above
+  `snap` metres (a teleport, a return after death) the offset is dropped: the picture jumps with the state.  The
+  prediction itself never sees the offset: it stays bit for bit the server's.
+  - `decay_ms: f64` -- the time constant of the decay (ms; 0: no smoothing)
+  - `snap: f64` -- a correction (with what is still left) larger than this is not smoothed (m)
+  - `corrections: u64` -- corrections taken in, and of those dropped by snap
+  - `snaps: u64` -- see corrections
+
+**`impl Smoother`**
+
+- **`fn new(decay_ms: f64, snap: f64) -> Smoother`**
+  an offset of 0 decaying with `decay_ms`, snapping above `snap` metres
+- **`fn correct(&mut self, jump: Vec3)`**
+  the predicted position jumped by `jump` (new minus old): the offset takes it back
+- **`fn reset(&mut self)`**
+  forget the offset (a new figure, a reset of the prediction)
+- **`fn advance(&mut self, dt: f64)`**
+  `dt` seconds passed
+- **`fn offset(&self) -> Vec3`**
+  what a frame adds to the predicted position (blended by alpha) of the own figure
+
 ### `game/src/net/proto.rs`
 
 Source: [`lib/game/src/net/proto.rs`](../lib/game/src/net/proto.rs)
@@ -64609,13 +65118,19 @@ rest a bit stream of bits.rs)
                                 inputs, then the entities (snapshot.rs)
   FETCH      client -> server   (on a WebSocket of its own) the ticket of WELCOME
   FULL       server -> client   (on that WebSocket) a SNAPSHOT against the baseline without a budget
+  LEAVE      client -> server   the player leaves: the server removes the figure at once
+
+The event part (event.rs): bit 7 of byte 0 (EXT) says that an INPUT or SNAPSHOT carries an acknowledgement of
+the other side's events and / or a run of its own events: after a SNAPSHOT's header (before the entities, so the
+budget counts it), after an INPUT's inputs.  Without events the bytes are those of version 1.
 
 Every reader returns None for anything malformed or too large (bytes from the network never panic).
 ```
 
 ```rust
-/// the netcode's own version (HELLO); a game's version goes into netchan's protocol id
-VERSION: u16 = 1
+/// the netcode's own version (HELLO); a game's version goes into netchan's protocol id.  2 since G7e part 2 (the
+/// event part, LEAVE)
+VERSION: u16 = 2
 /// message types (byte 0)
 MSG_HELLO: u8 = 1
 /// see the module header
@@ -64630,6 +65145,10 @@ MSG_SNAPSHOT: u8 = 5
 MSG_FETCH: u8 = 6
 /// see the module header
 MSG_FULL: u8 = 7
+/// see the module header
+MSG_LEAVE: u8 = 8
+/// bit 7 of byte 0: an event part follows (see the module header)
+EXT: u8 = 0x80
 /// REFUSE: another version of the netcode
 REFUSE_VERSION: u8 = 1
 /// REFUSE: the room has its players
@@ -64679,6 +65198,13 @@ REFUSE_PROTOCOL: u8 = 7
   - `player: u16` -- the net id of the receiver's figure (0: none)
   - `have: u32` -- the receiver's inputs are complete up to this tick
   - `margin: Option<i8>` -- the smallest margin of its inputs since the last snapshot (None: none came)
+  - `ev_ack: Option<u16>` -- the event part: the server has every event of the client up to this one
+  - `events: bool` -- the event part: a run of the server's events follows the header (event::read_section, ticks against `tick`)
+
+**`impl SnapHeader`**
+
+- **`fn new(tick: u32, base: Base, player: u16, have: u32, margin: Option<i8>) -> SnapHeader`**
+  a header without an event part
 
 - **`struct InputMsg`**
   an INPUT
@@ -64686,9 +65212,19 @@ REFUSE_PROTOCOL: u8 = 7
   - `inputs: Vec<NetInput>` -- the inputs, the newest first
   - `ack: Option<u32>` -- the newest snapshot the client decoded
   - `full: Option<u32>` -- the FULL it fetched (repeated until the server bases on it)
+  - `ev_ack: Option<u16>` -- the event part: the client has every event of the server up to this one
+  - `events: Option<(u16, Vec<NetEvent>)>` -- the event part: a run of the client's events (the number of the first and the events; ticks against `newest`)
+
+**`impl InputMsg`**
+
+- **`fn new(newest: u32, inputs: Vec<NetInput>, ack: Option<u32>, full: Option<u32>) -> InputMsg`**
+  an INPUT without an event part
 
 - **`fn msg_type(b: &[u8]) -> Option<u8>`**
-  the type of a message (None: empty)
+  the type of a message without the EXT flag (None: empty)
+
+- **`fn has_ext(b: &[u8]) -> bool`**
+  whether a message has an event part (EXT)
 
 - **`fn write_hello(h: &Hello) -> Vec<u8>`**
   HELLO as bytes
@@ -64726,6 +65262,12 @@ REFUSE_PROTOCOL: u8 = 7
 
 - **`fn read_fetch(b: &[u8]) -> Option<u64>`**
   FETCH's ticket
+
+- **`fn write_leave() -> Vec<u8>`**
+  LEAVE as bytes
+
+- **`fn is_leave(b: &[u8]) -> bool`**
+  whether the bytes are a LEAVE
 
 ### `game/src/net/quant.rs`
 
@@ -64859,7 +65401,8 @@ Source: [`lib/game/src/net/server.rs`](../lib/game/src/net/server.rs)
 server -- the server-authoritative side of the netcode, without I/O: netchan's events in, messages out
 
   RoomSim        what a game puts into a room: its schema, the map's baseline, join and leave, one tick
-                 with the players' inputs, the replicated world, the priority of an entity for a viewer
+                 with the players' inputs, the replicated world, the priority of an entity for a viewer,
+                 and the reliable events both ways (on_event, take_events)
   NetServer      rooms by code, connections by netchan id; on_event takes netchan's ServerEvents (of a
                  netchan::Server with sockets or of an endpoint::ServerCore on a simulated network),
                  advance(now) runs the ticks due at the fixed rate, take_out / take_close say what to send
@@ -64872,7 +65415,14 @@ a snapshot.  A snapshot is a delta against a base the client holds: over a WebSo
 is better, the newest complete one it confirmed (the FULL it fetched), else the map's baseline.  Its
 changes are ordered -- the client's own figure, what is gone, then by a priority added up per snapshot
 until the entity is sent -- and cut to the budget (1200 bytes unless set: netchan does not fragment).
-What was sent is remembered per client exactly as the client will hold it.
+What was sent is remembered per client exactly as the client will hold it.  The events of the room
+(RoomSim::take_events) ride in every snapshot until the client acknowledges them (event.rs); the client's
+events come with its INPUTs and reach the RoomSim at the start of the next tick.
+
+Rooms are independent: a room's tick (its inputs, its step, its events, its snapshots) touches nothing of
+another room.  With set_parallel the rooms of a tick run side by side on plat's worker pool (one room per
+item: one room per core with enough cores); their messages are merged in the order of the room codes, so
+the server sends bit for bit what it sends on one thread.
 
 Joining: HELLO -> WELCOME.  The full state goes with the first snapshot when it fits (a WebSocket always:
 up to stream_budget).  A UDP client whose full state does not fit a datagram gets it filled in: its
@@ -64880,8 +65430,30 @@ snapshots are cut by priority, so it sees its own figure and the most important 
 rest in the next snapshots (about 200 ms for 300 props, as fast as the fetch; the user's decision of
 19.11.2026).  With ServerOptions::fetch_full it gets a ticket instead and fetches the full state over a
 WebSocket of its own (FETCH -> FULL at the next snapshot tick; the user's first decision of 18.11.2026),
-filled in by priority until the FULL arrives.
+filled in by priority until the FULL arrives.  Leaving: LEAVE (or netchan's DISCONNECT) removes the
+figure at once; a client that goes silent is removed when netchan's timeout ends its connection.
+
+Room codes and tickets come from the server's generator: a seeded one (new: tests, the simulated network,
+a practice mode in the browser) or the system's cryptographic random numbers (secure, with_random): a
+ticket is sent to its client, and a seeded xorshift gives its state away with one output.
 ```
+
+- **`enum To`**
+  who gets an event of a room
+  - `All` -- every player of the room
+  - `Player(u16)` -- the player with this figure
+  - `AllBut(u16)` -- every player but this one
+
+**`impl To`**
+
+- **`fn includes(&self, id: u16) -> bool`**
+  whether the player with figure `id` gets it
+
+- **`struct RoomEvent`**
+  an event a room sends to its players (RoomSim::take_events): reliable, in order, each delivered once
+  - `to: To` -- who gets it
+  - `channel: u8` -- the game's channel (0 ..= 15)
+  - `data: Vec<u8>` -- the game's bytes (at most event::MAX_EVENT)
 
 - **`trait RoomSim`**
   what a game puts into a room (see the module header)
@@ -64892,13 +65464,18 @@ filled in by priority until the FULL arrives.
   - `fn join(&mut self, name: &str) -> Option<u16>`
     a player joins with this (cleaned, unique) name -> the net id of its figure (None: no place)
   - `fn leave(&mut self, player: u16)`
-    the player's figure goes
+    the player's figure goes (it left, or its connection ended)
   - `fn step(&mut self, tick: u32, dt: f64, inputs: &[(u16, NetInput, bool)])`
     one tick: every player's input (net id, input, false when it is the last one repeated)
   - `fn snapshot(&self, tick: u32, out: &mut Snapshot)`
     the replicated world after the tick (tick set, entities sorted by id)
   - `fn priority(&self, viewer: u16, e: &Ent) -> u32`
     how much `e` matters to the player `viewer` now (added up every snapshot until it is sent)
+  - `fn on_event(&mut self, player: u16, e: &NetEvent)`
+    an event of the player with figure `player` (reliable, in order): at the start of the tick after it came,
+    before step, by the figures' ids and in the order they came
+  - `fn take_events(&mut self, out: &mut Vec<RoomEvent>)`
+    the events of the last step for the players (asked after every step; their tick is the step's)
 
 - **`struct ServerOptions`**
   a server's settings
@@ -64908,6 +65485,7 @@ filled in by priority until the FULL arrives.
   - `max_rooms: usize` -- rooms at once
   - `budget: usize` -- the bytes of a snapshot (UDP's limit; netchan's max_payload)
   - `stream_budget: usize` -- the bytes of a join's state over a WebSocket and of a FULL (below netchan's max_stream_payload)
+  - `event_budget: usize` -- the bytes of the events a snapshot carries at most (out of `budget`; it always carries one)
   - `margin: u8` -- the margin the clients' inputs should arrive with (ticks)
   - `max_rewind_ms: u32` -- how far back hits are rewound at most (ms; 300 unless set: the 100 ms of the interpolation buffer and
     200 ms beyond them, the user's decision of 2026-11-19)
@@ -64932,6 +65510,10 @@ filled in by priority until the FULL arrives.
   - `full_bytes: u64` -- the bytes of the FULLs
   - `joins: u64` -- players who joined, refusals
   - `refused: u64` -- HELLOs refused
+  - `left: u64` -- players who left with LEAVE
+  - `events_out: u64` -- events of the rooms queued for players
+  - `events_in: u64` -- events of players handed to their rooms
+  - `event_overflow: u64` -- players dropped because they did not acknowledge their events (event::MAX_PENDING waiting)
   - `sizes: Vec<u16>` -- the payload size of every snapshot (the first 200 000, for percentiles)
 
 - **`struct LinkStats`**
@@ -64941,6 +65523,8 @@ filled in by priority until the FULL arrives.
   - `partial: u64` -- cut by the budget
   - `from_map: u64` -- based on the map's baseline
   - `inputs: InputStats` -- the inputs
+  - `events: OutboxStats` -- the events to the client
+  - `events_in: InboxStats` -- the events of the client
 
 - **`type RoomFactory<S> = Box<dyn FnMut(&RoomCode) -> S + Send>`**
   the factory of a room's simulation
@@ -64951,14 +65535,23 @@ filled in by priority until the FULL arrives.
 **`impl<S: RoomSim> NetServer<S>`**
 
 - **`fn new(opts: ServerOptions, seed: u64, factory: RoomFactory<S>) -> NetServer<S>`**
-  a server with these settings; `seed` drives room codes and tickets (random in a real server),
-  `factory` makes a room's simulation
+  a server with these settings whose room codes and tickets come from a generator seeded with `seed` (the
+  same codes every run: tests, the simulated network, a practice mode); `factory` makes a room's simulation.
+  A server on the network takes secure() or with_random()
+- **`fn with_random(opts: ServerOptions, random: fn() -> u64, factory: RoomFactory<S>) -> NetServer<S>`**
+  a server whose room codes and tickets come from `random` (a cryptographic source, such as
+  plat::random_u64; secure() takes that one)
+- **`fn secure(opts: ServerOptions, factory: RoomFactory<S>) -> NetServer<S>`**
+  a server whose room codes and tickets come from the system's cryptographic random numbers
+  (plat::random_u64: Windows, Linux, Apple, Android)
 - **`fn options(&self) -> &ServerOptions`**
   the settings
 - **`fn tick(&self) -> u32`**
   the next tick to run
 - **`fn stats(&self) -> &ServerStats`**
   what it counted
+- **`fn parallel(&self) -> bool`**
+  whether the rooms run side by side (set_parallel)
 - **`fn link_stats(&self, conn: u32) -> Option<LinkStats>`**
   a client's counts (None: no player on that connection)
 - **`fn rooms(&self) -> Vec<RoomCode>`**
@@ -64968,9 +65561,12 @@ filled in by priority until the FULL arrives.
 - **`fn room_mut(&mut self, code: &RoomCode) -> Option<&mut S>`**
   a room's simulation for changing it
 - **`fn players(&self, code: &RoomCode) -> Vec<(u32, u16, String)>`**
-  a room's players: (connection, figure id, name)
+  a room's players: (connection, figure id, name), in the order they joined
 - **`fn player_of(&self, conn: u32) -> Option<(RoomCode, u16)>`**
   the room and figure of a connection
+- **`fn send_event(&mut self, conn: u32, channel: u8, data: &[u8]) -> bool`**
+  queue an event for the player on connection `conn` (besides those of its room) -> false when refused (no
+  player there, too long, a bad channel, its outbox full)
 - **`fn create_room(&mut self) -> Option<RoomCode>`**
   make an empty room (a lobby could hand its code out) -> its code; None when the server has its rooms
 - **`fn take_out(&mut self) -> Option<(u32, Vec<u8>)>`**
@@ -64985,6 +65581,14 @@ filled in by priority until the FULL arrives.
   the clock stands at now_ns (any monotonic clock): the ticks due run -> how many
 - **`fn step(&mut self)`**
   one tick now
+
+**`impl<S: RoomSim + Send> NetServer<S>`**
+
+- **`fn set_parallel(&mut self, on: bool)`**
+  run the rooms of a tick side by side on plat's worker pool (plat::parallel_for, one room per item; the pool
+  has a thread per core unless `--threads N`), or one after another (false, the default).  Every room is
+  deterministic as on one thread and the results are merged in the order of the room codes: the messages are
+  the same bit for bit.  Without threads (the browser without shared memory) the pool runs the rooms in turn.
 
 ### `game/src/net/sim.rs`
 
@@ -65705,6 +66309,10 @@ instances of a render3d scene, only what changed is written, the scene's origin 
   Bridge::retire_* / collect   meshes and materials the game is done with go from the renderer
                      (Renderer::remove_mesh / remove_material) once no instance of the bridge uses them
   camera, transform  a game View as render3d::Camera, a game Transform as render3d::Transform
+  (G7b part 2) Model, Image   glTF models and images as lib/game assets (Assets<Model>, loaded in the background);
+                     Models / Textures put them on a renderer once Ready and take them off when unloaded;
+                     ModelRef (a component) and Bridge::sync_models: an entity gets its meshes when its model is
+                     up (models.rs)
 
 Why a crate of its own and not a module of lib/game behind a feature: a game's server is built from the
 same workspace as its client, and Cargo unifies a crate's features over everything one `cargo build`
@@ -65795,6 +66403,113 @@ ORIGIN_STEP: f64 = 512.0
   axis, the origin moves to the eye rounded to the step (Scene::set_origin uploads every instance
   once) -> it moved
 
+### `game_render3d/src/models.rs`
+
+Source: [`lib/game_render3d/src/models.rs`](../lib/game_render3d/src/models.rs)
+
+```text
+models -- (G7b part 2) assets for render3d: glTF models and images through lib/game's Assets, on the GPU once
+ready, and entities that draw a model (docs/GAMECORE.md "Assets")
+
+  Model (an Asset)           a .glb / .gltf as lib/gltf reads it (its buffers and images through the VFS beside
+                             it), decoded on the loader's thread
+  Image (an Asset)           a PNG or JPEG as straight rgba rows
+  ModelRef (a component)     an entity draws the model of its handle at its Pose, every instance of the model's
+                             scene (Bridge::sync_models); nothing while the model loads or failed
+  Models                     the models on a Renderer: update(&assets, &changes, &mut renderer) puts what became
+                             Ready on the GPU (meshes, textures, materials) and takes off what was unloaded
+                             (Renderer::remove_mesh / remove_material / remove_texture); parts(id)
+  Textures                   the same for images: texture(id) -> TextureId once it is up
+  Bridge::sync_models        entities with a ModelRef as instances: they appear when their model is up, follow
+                             their poses (only what changed), go with the entity, the component or the model
+
+A model's lights and cameras are not placed (render3d::gltf::upload does that for a whole scene); a node's shear
+is dropped as there.  An entity's transform and a part's compose as translation, rotation and per-axis scale
+(exact for uniform scales; a non-uniform scale under a rotated part would need shear).
+```
+
+- **`struct Model`**
+  a glTF model (an Asset): lib/gltf's Document
+  - `doc: ::gltf::Document`
+
+- **`struct Image`**
+  an image (an Asset): straight rgba rows
+  - `width: u32`
+  - `height: u32`
+  - `rgba: Vec<u8>`
+
+```rust
+/// the largest image an Image asset takes (pixels)
+IMAGE_PIXELS: u64 = 1 << 26
+```
+
+- **`struct ModelRef`**
+  what an entity looks like: the model of a handle (all instances of its default scene), at its Pose
+  - `model: Handle<Model>`
+
+- **`struct Part`**
+  a part of a model on the GPU: one instance of its scene
+  - `mesh: MeshId`
+  - `material: MaterialId`
+  - `local: render3d::Transform` -- where the scene puts it (model space)
+
+- **`struct ModelStats`**
+  what an update of Models did
+  - `uploaded: u32`
+  - `removed: u32`
+  - `models: u32` -- models on the GPU now, their parts
+  - `parts: u32`
+
+- **`struct Models`**
+  the models of an Assets&lt;Model> on one renderer (see the module header)
+
+**`impl Models`**
+
+- **`fn new() -> Models`**
+- **`fn update(&mut self, assets: &Assets<Model>, changes: &[Change], r: &mut Renderer) -> Result<ModelStats>`**
+  once a frame, after Assets::update (its changes) and before the bridge: what became Ready goes up, what was
+  unloaded comes off.  The first update on a renderer (and the first after reset) puts every Ready model up.
+  A model the renderer refuses counts as not up (its entities show nothing); the first error is returned after
+  everything else was done
+- **`fn parts(&self, id: AssetId) -> Option<&[Part]>`**
+  the parts of a model that is up
+- **`fn serial(&self, id: AssetId) -> Option<u64>`**
+  which upload a model that is up came from (another one after a reload or a new renderer)
+- **`fn made(&self, id: AssetId) -> Option<(&[MeshId], &[MaterialId], &[TextureId])>`**
+  the meshes, materials and textures a model made on the renderer
+- **`fn version(&self) -> u64`**
+  counts every change of what is up
+- **`fn len(&self) -> usize`**
+  models up now
+- **`fn is_empty(&self) -> bool`**
+- **`fn reset(&mut self)`**
+  the renderer went with its device: forget what was up (the next update puts every Ready model up again)
+
+- **`struct Textures`**
+  the images of an Assets&lt;Image> on one renderer (sRGB colour textures unless set otherwise)
+  - `linear: bool` -- the images are data, not colour (normal maps, masks): linear
+  - `nearest: bool`
+
+**`impl Textures`**
+
+- **`fn new() -> Textures`**
+- **`fn update(&mut self, assets: &Assets<Image>, changes: &[Change], r: &mut Renderer) -> Result<u32>`**
+  once a frame after Assets::update: Ready images up, unloaded ones off -> textures put up now
+- **`fn texture(&self, id: AssetId) -> Option<TextureId>`**
+  the texture of an image once it is up
+- **`fn reset(&mut self)`**
+  the renderer went: forget every texture (the next update puts them up again)
+
+**`impl Bridge`**
+
+- **`fn sync_models(&mut self, world: &World, scene: &mut Scene, alpha: f64, models: &Models) -> Result<SyncStats>`**
+  the entities with a ModelRef into the scene for a frame at `alpha` (see the module header): an entity whose
+  model is up (Models) gets an instance per part, at its Pose composed with the part's place; a model that is
+  not up shows nothing; a pose that changed moves every part.  Instances it adds are the bridge's (clear,
+  reset); the counts as sync's
+- **`fn model_entities(&self) -> u32`**
+  entities drawn through sync_models now
+
 ## geom
 
 *Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks* -- crate root [`lib/geom/src/lib.rs`](../lib/geom/src/lib.rs)
@@ -65812,6 +66527,11 @@ built from primitives, profiles and operations, checked, the same bits on every 
                  the origin), extrude (front-view profile along Z), prism (floor plan up along Y), sweep
                  (profile along a path, mitred corners, rotation-minimising frames), lathe (profile about Y)
   poly           2D profiles: area, cleaning, triangulation (ear clipping), rect, circle, arc, rounded_rect
+  Solid          convex cells as brushes: from_convex, union, difference, intersection (exact decisions:
+                 points are where three planes meet, sides are signs of determinants), to_mesh (closed,
+                 corners rounded once at the end), bevel (chamfer or round edges and corners)
+  exact          expansions (Shewchuk), orient2d, the side of a plane at a meeting of three planes,
+                 the correctly rounded quotient
   Report         closed, manifold, outward, degenerate triangles, normals, bounds, area, volume, Euler
                  characteristic, components; json()
   math           Vec3, Aabb, Affine in f64; sqrt correctly rounded, sin / cos / atan2 from rt's portable
@@ -65955,6 +66675,9 @@ NORMAL_TOLERANCE: f64 = 1e-6
   - `inverted_components: usize` -- closed components with a negative volume: inside out
   - `degenerate: usize` -- triangles without area (see [`DEGENERATE_RATIO`])
   - `bad_normals: usize` -- vertex normals that are not unit length or point away from their face (see [`NORMAL_TOLERANCE`])
+  - `problem_at: Option<Vec3>` -- where the first problem lies, for a message: the middle of the first open, non-manifold or flipped edge,
+    else a pinched point, else the middle of the first degenerate triangle, else a vertex with a wrong
+    normal; None when there is none of these
 
 **`impl Report`**
 
@@ -65976,6 +66699,189 @@ NORMAL_TOLERANCE: f64 = 1e-6
 
 - **`fn check(&self) -> Report`**
   Measure the mesh: counts, bounds, area, volume and the topology checks of [`Report`].
+
+### `geom/src/csg.rs`
+
+Source: [`lib/geom/src/csg.rs`](../lib/geom/src/csg.rs)
+
+```text
+csg -- Boolean operations on convex solids, as brushes in a map editor (docs/GEOM.md, "Boolesche
+Operationen"): a Solid is a set of convex cells that do not overlap, each the intersection of half-spaces
+whose planes it shares with the other cells; union, difference and intersection split cells by planes and
+give such a set again, so results can be combined further.  to_mesh gives the boundary: the faces of the
+cells less where two cells touch, as one closed mesh.
+
+Exact where it decides: a point is where three planes meet, never rounded while the operation runs, and
+which side of a plane it lies on is the sign of a 4 x 4 determinant of plane coefficients (exact.rs: f64
+with an error bound, exact expansions near 0).  So splitting a cell, cutting a face and finding where
+faces of neighbouring cells meet always agree with each other, also for points exactly on a plane (the
+usual case: a window flush with a wall, boxes touching).  Only the output is rounded: every corner to the
+f64 nearest the exact point (equal points, equal bits), the faces triangulated with exact orientation
+tests on those coordinates.  The planes themselves come from the input meshes in f64; planes closer than
+WELD_RATIO of the extent count as one (also between the operands), so faces that are meant to lie in one
+plane do, and features smaller than that (where several planes almost meet in one point: the tip of a
+cone, the rings of a sphere) fall together into one point of the output.
+```
+
+```rust
+/// Planes closer than this fraction of the extent count as one, output points closer than it fall together.
+WELD_RATIO: f64 = 1e-9
+/// the most cells a solid may have (a limit against runaway splitting)
+MAX_CELLS: usize = 20_000
+```
+
+- **`struct Plane`**
+  A plane n . x + w = 0, n a unit vector pointing out of the solid: inside is n . x + w &lt; 0.
+  - `n: Vec3` -- the outward normal, unit length
+  - `w: f64` -- the offset: n . x + w = 0 on the plane
+
+**`impl Plane`**
+
+- **`fn eval(&self, p: Vec3) -> f64`**
+  the signed distance of `p` (positive outside)
+- **`fn flipped(&self) -> Plane`**
+  the same plane facing the other way
+- **`fn transformed(&self, a: &Affine) -> Plane`**
+  the plane mapped by `a` (normal by the normal matrix, kept pointing outward)
+
+- **`struct Solid`**
+  A solid as convex cells that do not overlap (brushes): each cell is a list of planes whose inside it is.
+  Made from a convex mesh ([`Solid::from_convex`]) or by union, difference and intersection; [`Solid::to_mesh`]
+  gives its surface.
+
+**`impl Solid`**
+
+- **`fn from_convex(m: &Mesh) -> Result<Solid, Error>`**
+  The solid of a convex closed mesh: one cell whose planes are the mesh's faces (triangles in one plane
+  within [`WELD_RATIO`] of the extent are one face).  Err when the mesh is not closed, inside out, flat
+  or not convex (a corner in front of a face by more than the tolerance).
+- **`fn cell_count(&self) -> usize`**
+  the number of cells (convex pieces)
+- **`fn plane_count(&self) -> usize`**
+  the number of planes the cells use
+- **`fn is_empty(&self) -> bool`**
+  whether it has no cell (nothing left)
+- **`fn cells(&self) -> Vec<Vec<Plane>>`**
+  the planes of each cell (each pointing out of its cell)
+- **`fn bounds(&self) -> Aabb`**
+  the box around the operands it came from (at least the solid's own)
+- **`fn transformed(&self, a: &Affine) -> Solid`**
+  the solid mapped by `a` (planes and bounds; cells that shared a plane still do)
+- **`fn union(&self, o: &Solid) -> Result<Solid, Error>`**
+  Everything in this solid or in `o`.
+- **`fn difference(&self, o: &Solid) -> Result<Solid, Error>`**
+  What is in this solid but not in `o`.
+- **`fn intersection(&self, o: &Solid) -> Result<Solid, Error>`**
+  What is in both.
+- **`fn to_mesh(&self, smooth_deg: f64) -> Result<Mesh, Error>`**
+  The surface as one closed mesh with normals smooth up to `smooth_deg` degrees (0: flat) and box UV in
+  metres.  Err for an empty solid.
+
+**`impl Solid`**
+
+- **`fn bevel(&self, radius: f64, segments: usize, only: Option<Axis>) -> Result<(Solid, Mesh), Error>`**
+  The solid with its edges and corners bevelled, and its surface ([`bevel`]): `segments` 1 chamfers (a
+  flat face along each edge, a triangle at each corner of three faces), more round them with that many
+  faces per quarter turn (an edge turning by another angle gets proportionally many, at least one), the
+  faces cut back by `radius` at right angles.  `only`: just the edges along that axis, the corners stay.
+  Only for one convex cell.
+
+- **`fn union(meshes: &[&Mesh]) -> Result<Mesh, Error>`**
+  The union of convex closed meshes as one mesh, normals smooth up to 30 degrees.
+
+- **`fn difference(a: &Mesh, minus: &[&Mesh]) -> Result<Mesh, Error>`**
+  The convex closed mesh `a` less each of `minus`, as one mesh, normals smooth up to 30 degrees.
+
+- **`fn intersection(meshes: &[&Mesh]) -> Result<Mesh, Error>`**
+  The intersection of convex closed meshes as one mesh, normals smooth up to 30 degrees.
+
+- **`fn bevel(m: &Mesh, radius: f64, segments: usize, only: Option<Axis>) -> Result<Mesh, Error>`**
+  A convex closed mesh with its edges and corners bevelled ([`Solid::bevel`]); the flat faces keep flat
+  normals, the rounded ones get normals across the arcs (where an arc meets a face, the face's normal: no
+  seam, no shading across the face).
+
+### `geom/src/exact.rs`
+
+Source: [`lib/geom/src/exact.rs`](../lib/geom/src/exact.rs)
+
+```text
+exact -- arithmetic without rounding error for the decisions of the Boolean operations (docs/GEOM.md,
+"Boolesche Operationen"): expansions after Shewchuk (a number as a sum of f64 components that do not overlap,
+smallest first; sums and products of them are exact), the orientation of three points in the plane, the
+side of a plane at the point where three other planes meet, and the f64 nearest to a quotient of two
+expansions.  Only + - * on f64 (never a fused multiply-add: Rust does not contract a * b + c), so the same
+bits and the same answers on every target.  Each predicate first computes in f64 and decides there when the
+result is farther from 0 than its error bound; only near 0 (and exactly at 0) it computes exactly.
+```
+
+- **`struct Exp(pub Vec<f64>)`**
+  An exact number: f64 components that do not overlap, smallest magnitude first, no zeros (an empty list is 0).
+
+**`impl Exp`**
+
+- **`fn zero() -> Exp`**
+  0
+- **`fn of(a: f64) -> Exp`**
+  one f64
+- **`fn product(a: f64, b: f64) -> Exp`**
+  a \* b, exact
+- **`fn diff(a: f64, b: f64) -> Exp`**
+  a - b, exact
+- **`fn sign(&self) -> i32`**
+  -1, 0 or 1: the sign of the largest component
+- **`fn estimate(&self) -> f64`**
+  the components summed in f64, smallest first: close to the value (after compress within an ulp)
+- **`fn add_f64(&self, b: f64) -> Exp`**
+  self + b, exact (Shewchuk's Grow-Expansion with zero elimination)
+- **`fn add(&self, o: &Exp) -> Exp`**
+  self + o, exact: o's components grown in one by one (correct for any two expansions that do not overlap)
+- **`fn neg(&self) -> Exp`**
+  -self
+- **`fn sub(&self, o: &Exp) -> Exp`**
+  self - o, exact
+- **`fn scale(&self, b: f64) -> Exp`**
+  self \* b, exact (Shewchuk's Scale-Expansion with zero elimination)
+- **`fn mul(&self, o: &Exp) -> Exp`**
+  self \* o, exact: the sum of self scaled by each component of o
+- **`fn compress(&self) -> Exp`**
+  the same value in as few components as possible (Shewchuk's Compress): the largest component is then
+  the value rounded to within an ulp
+
+- **`fn orient2d(a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> i32`**
+  The orientation of a, b, c in the plane: 1 counter-clockwise (c left of a -> b), -1 clockwise, 0 on one
+  line -- exact: the f64 determinant decides when it is clearly away from 0, else the exact one.
+
+- **`fn orient2d_exact(a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> i32`**
+  orient2d without the f64 shortcut
+
+- **`type Pl = [f64; 4]`**
+  a plane n . x + w = 0 as [nx, ny, nz, w]; its inside is where n . x + w &lt; 0
+
+- **`struct Meet`**
+  The point where three planes meet, as the cofactors x~ of the 3 x 4 matrix of their rows: for any plane
+  p, det[p1; p2; p3; p] = p . x~, and x~ = det3(normals) \* (x, y, z, 1).  Exact (expansions) on request,
+  always in f64 with error bounds for the shortcut.
+  - `approx: [f64; 4]` -- the cofactors in f64
+  - `perm: [f64; 4]` -- the permanents (the same sums of products, every term positive): the scale of each cofactor's error
+  - `exact: Option<[Exp; 4]>` -- the exact cofactors, compressed (computed the first time a decision needs them)
+
+**`impl Meet`**
+
+- **`fn new(p: &Pl, q: &Pl, r: &Pl) -> Meet`**
+  where planes p, q, r meet (x~ in f64; exact later on request)
+- **`fn exact(&mut self, p: &Pl, q: &Pl, r: &Pl) -> &[Exp; 4]`**
+  the exact cofactors (computed once)
+- **`fn w_sign(&mut self, p: &Pl, q: &Pl, r: &Pl) -> i32`**
+  the sign of x~\_w = det3 of the three normals: 0 when the planes do not meet in one point
+- **`fn dot_sign(&mut self, s: &Pl, p: &Pl, q: &Pl, r: &Pl) -> i32`**
+  The sign of p . x~ (det[p1; p2; p3; s]): with w_sign, the side of plane s at the point (exact).
+- **`fn point(&mut self, p: &Pl, q: &Pl, r: &Pl) -> [f64; 3]`**
+  the point's coordinates, each the f64 nearest to the exact quotient (ties to even): equal points give
+  equal bits however their planes were chosen
+
+- **`fn div_round(n: &Exp, d: &Exp) -> f64`**
+  The f64 nearest to n / d (ties to even), d not 0: an estimate, moved by ulps until n / d lies between two
+  neighbours, then the side of their midpoint decides (2n against (lo + hi) d, exact).
 
 ### `geom/src/math.rs`
 

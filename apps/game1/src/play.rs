@@ -2,7 +2,9 @@
 // UDP or WebSocket), the controls, the ticks (game::Input's tick -> NetInput -> NetClient::step: prediction), what
 // the frame shows (the own figure predicted and blended by the clock's alpha, the others interpolated) and what the
 // HUD needs (health, ammo, the hit marker, the kill feed, the scores); effects for the scene (muzzle flashes, tracers,
-// impacts, puffs) from the own predicted shots and the others' shot counters
+// impacts, puffs) from the own predicted shots and the others' shot counters.  The kill feed and the hit marker come
+// from the room's events (game::net's reliable events: each once); the own figure is drawn with the decaying rest of
+// a correction (NetClient::smoothing); leaving sends LEAVE (the server lets the figure go at once)
 //
 //   Controls        the actions (ActionMap) and their defaults: WASD by place, Space, Ctrl, Shift, the mouse, R, Tab
 //   Conn            Local (practice: a server with bots on the simulated network) or Online (NetLink)
@@ -93,6 +95,8 @@ pub struct FeedLine {
     pub victim: String,
     pub head: bool,
     pub mine: bool,
+    /// a line that is no kill (a player came or went): shown as it is
+    pub note: String,
 }
 
 /// a row of the scoreboard
@@ -142,7 +146,6 @@ pub struct Play {
     deaths: BTreeMap<u16, i32>,
     healths: BTreeMap<u16, i32>,
     phases: BTreeMap<u16, (f64, Vec3)>,
-    last_hits: Option<(u8, u8, i32)>,
     last_health: i32,
     feed: VecDeque<FeedLine>,
     vm: VmState,
@@ -189,7 +192,6 @@ impl Play {
             deaths: BTreeMap::new(),
             healths: BTreeMap::new(),
             phases: BTreeMap::new(),
-            last_hits: None,
             last_health: HEALTH,
             feed: VecDeque::new(),
             vm: VmState::default(),
@@ -210,15 +212,22 @@ impl Play {
         }
     }
 
+    fn client_mut(&mut self) -> &mut NetClient<Mover> {
+        match &mut self.conn {
+            Conn::Local(l) => &mut l.clients[0].client,
+            Conn::Online(l) => &mut l.game,
+        }
+    }
+
     /// the room's code (once in a room)
     pub fn room(&self) -> Option<RoomCode> {
         self.client().welcome().map(|w| w.room)
     }
 
-    /// leave: close the connection
+    /// leave: LEAVE and the end of the connection (the server lets the figure go at once)
     pub fn close(&mut self) {
-        if let Conn::Online(_) = &self.conn {
-            // (dropping the link ends the channel; the server lets the figure go)
+        if let Conn::Online(link) = &mut self.conn {
+            link.leave();
         }
     }
 
@@ -325,14 +334,11 @@ impl Play {
                 self.shot_fx(muzzle, eye, dir);
             }
             self.shots.insert(r.id, shots);
-            // deaths: the counter went up -> a puff, a line in the feed
+            // deaths: the counter went up -> a puff where the figure is seen (the feed's line is the event's)
             let deaths = near.fields[F_DEATHS];
             let last = *self.deaths.entry(r.id).or_insert(deaths);
             if deaths > last {
-                let killer = info_killer(near.fields[F_INFO]);
-                let head = near.fields[F_INFO] & INFO_HEAD != 0;
                 self.fx.push(Fx::Poof { at: feet + Vec3::new(0.0, 0.9, 0.0), color: PALETTE[r.id as usize % PALETTE.len()] });
-                self.push_feed(killer, r.id, head, own_id);
             }
             self.deaths.insert(r.id, deaths);
             // a hit: the health went down
@@ -346,39 +352,44 @@ impl Play {
             }
         }
         self.rem = rem;
-        // the own figure
+        // the room's events: the kill feed, the hit marker, players coming and going
+        while let Some(e) = self.client_mut().take_event() {
+            match GameEvent::decode(e.channel, &e.data) {
+                Some(GameEvent::Kill { killer, victim, head }) => {
+                    self.push_feed(killer, victim, head, own_id);
+                    if victim == own_id {
+                        self.hud.killer = if killer == victim { String::new() } else { self.name_of(killer) };
+                    }
+                }
+                Some(GameEvent::Hit { head, kill, .. }) => {
+                    self.hud.hit = 0.25;
+                    self.hud.hit_head = head;
+                    self.hud.hit_kill = kill;
+                }
+                Some(GameEvent::Joined { id, name }) => {
+                    self.push_note(alloc::format!("{} ist dabei", name));
+                    self.names.insert(id, name);
+                }
+                Some(GameEvent::Left { name, .. }) => self.push_note(alloc::format!("{} hat den Raum verlassen", name)),
+                None => {}
+            }
+        }
+        // the own figure: between the last two ticks, with the decaying rest of a correction
         let newest = self.client().newest().and_then(|s| s.get(own_id)).map(|e| e.state);
         let (prev, cur, alpha) = self.own().unwrap_or_default();
         let a = prev.feet();
         let b = cur.feet();
-        let feet = a + (b - a) * alpha;
+        let feet = a + (b - a) * alpha + self.client().smoothing();
         let eye_h = mover.height(cur.crouched()) - EYE_BELOW_TOP;
         let prev_h = mover.height(prev.crouched()) - EYE_BELOW_TOP;
         let eye = feet + Vec3::new(0.0, prev_h + (eye_h - prev_h) * alpha, 0.0);
         if let Some(st) = newest {
             let f = &st.fields;
             self.hud.health = f[F_HEALTH];
-            let (hits, heads, kills) = (info_hits(f[F_INFO]), info_heads(f[F_INFO]), f[F_KILLS]);
-            if let Some((h0, hd0, k0)) = self.last_hits {
-                if hits != h0 {
-                    self.hud.hit = 0.25;
-                    self.hud.hit_head = heads != hd0;
-                    self.hud.hit_kill = kills > k0;
-                }
-            }
-            self.last_hits = Some((hits, heads, kills));
             if f[F_HEALTH] < self.last_health && f[F_HEALTH] > 0 {
                 self.hud.hurt = 0.35;
             }
-            // the own death: a line in the feed
             let deaths = f[F_DEATHS];
-            let last = *self.deaths.entry(own_id).or_insert(deaths);
-            if deaths > last {
-                let killer = info_killer(f[F_INFO]);
-                self.push_feed(killer, own_id, f[F_INFO] & INFO_HEAD != 0, own_id);
-                self.hud.killer = self.name_of(killer);
-            }
-            self.deaths.insert(own_id, deaths);
             self.last_health = f[F_HEALTH];
             self.hud.protected = f[F_INFO] & INFO_PROTECTED != 0;
             // came back: look the way the spawn point looks (once per life)
@@ -436,7 +447,15 @@ impl Play {
     }
 
     fn push_feed(&mut self, killer: u16, victim: u16, head: bool, own: u16) {
-        let line = FeedLine { at: self.time, killer: if killer == victim { String::new() } else { self.name_of(killer) }, victim: self.name_of(victim), head, mine: killer == own || victim == own };
+        let line = FeedLine { at: self.time, killer: if killer == victim { String::new() } else { self.name_of(killer) }, victim: self.name_of(victim), head, mine: killer == own || victim == own, note: String::new() };
+        self.push_line(line);
+    }
+
+    fn push_note(&mut self, note: String) {
+        self.push_line(FeedLine { at: self.time, killer: String::new(), victim: String::new(), head: false, mine: false, note });
+    }
+
+    fn push_line(&mut self, line: FeedLine) {
         self.feed.push_back(line);
         while self.feed.len() > 5 {
             self.feed.pop_front();

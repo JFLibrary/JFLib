@@ -9,14 +9,18 @@ die der Schütze sah, höchstens 300 ms (die 100 ms der Interpolation und 200 ms
 am 19.11.2026). Räume gibt es per Code oder Link, Spieler haben einen Namen, kein Konto; Bots spielen
 in den Tests. Der Transport ist [`lib/netchan`](TRANSPORT.md) (UDP und WebSocket); `lib/game` bleibt ohne GPU und ohne
 Betriebssystem (`#![no_std]`, `#![forbid(unsafe_code)]`, keine fremden Crates), der Server läuft unter Linux statisch.
+Seit Teil 2: zuverlässige Ereignisse in beide Richtungen (einmal, in Reihenfolge, über UDP und WebSocket), ein sauberes
+Verlassen (LEAVE), geglättete Korrekturen der eigenen Figur, Räume nebeneinander auf Threads, Raumcodes und Tickets aus
+dem kryptographischen Zufall des Systems; gemessen auf einem echten Netz zwischen zwei Rechnern und im Browser.
 
-Stand: G7e Teil 1 (dieser Lauf). Was fehlt, steht unter [Was nicht gebaut ist](#was-nicht-gebaut-ist) und
-[Für Teil 2 und G7h](#für-teil-2-und-g7h).
+Stand: G7e Teil 2 (dieser Lauf). Was fehlt, steht unter [Was nicht gebaut ist](#was-nicht-gebaut-ist) und
+[Offen](#offen).
 
 | Teil | Wo |
 | --- | --- |
-| Server: Räume, Takt, Eingaben, Schnappschüsse je Client | [`server.rs`](../lib/game/src/net/server.rs) |
-| Client: Beitritt, Uhr, Vorhersage, Schnappschüsse, Interpolation | [`client.rs`](../lib/game/src/net/client.rs), [`clock.rs`](../lib/game/src/net/clock.rs), [`predict.rs`](../lib/game/src/net/predict.rs) |
+| Server: Räume, Takt, Eingaben, Schnappschüsse je Client, Räume auf Threads | [`server.rs`](../lib/game/src/net/server.rs) |
+| Client: Beitritt, Uhr, Vorhersage, Glätten, Schnappschüsse, Interpolation, Verlassen | [`client.rs`](../lib/game/src/net/client.rs), [`clock.rs`](../lib/game/src/net/clock.rs), [`predict.rs`](../lib/game/src/net/predict.rs) |
+| Zuverlässige Ereignisse | [`event.rs`](../lib/game/src/net/event.rs) |
 | Schnappschüsse und ihr Delta | [`snapshot.rs`](../lib/game/src/net/snapshot.rs), Bitstrom [`bits.rs`](../lib/game/src/net/bits.rs), Raster [`quant.rs`](../lib/game/src/net/quant.rs) |
 | Eingaben, ihre Wiederholung, der Puffer des Servers | [`input.rs`](../lib/game/src/net/input.rs) |
 | Nachrichten | [`proto.rs`](../lib/game/src/net/proto.rs) |
@@ -25,7 +29,8 @@ Stand: G7e Teil 1 (dieser Lauf). Was fehlt, steht unter [Was nicht gebaut ist](#
 | Simulierte Leitung | [`sim.rs`](../lib/game/src/net/sim.rs) |
 | Echte Sockets | [`link.rs`](../lib/game/src/net/link.rs) |
 | Bezugsspiel: Bewegung, Arena, Bots | [`walker.rs`](../lib/game/src/net/walker.rs), [`arena.rs`](../lib/game/src/net/arena.rs), [`bot.rs`](../lib/game/src/net/bot.rs) |
-| Tests, Messungen, Prüfsumme | [`apps/gametest`](../apps/gametest/README.md): [`net_codec.rs`](../apps/gametest/src/net_codec.rs), [`net_lag.rs`](../apps/gametest/src/net_lag.rs), [`net_room.rs`](../apps/gametest/src/net_room.rs), [`net_sim.rs`](../apps/gametest/src/net_sim.rs), [`net_session.rs`](../apps/gametest/src/net_session.rs), [`net_loop.rs`](../apps/gametest/src/net_loop.rs) |
+| Tests, Messungen, Prüfsumme | [`apps/gametest`](../apps/gametest/README.md): [`net_codec.rs`](../apps/gametest/src/net_codec.rs), [`net_lag.rs`](../apps/gametest/src/net_lag.rs), [`net_room.rs`](../apps/gametest/src/net_room.rs), [`net_sim.rs`](../apps/gametest/src/net_sim.rs), [`net_session.rs`](../apps/gametest/src/net_session.rs), [`net_loop.rs`](../apps/gametest/src/net_loop.rs), [`net_event.rs`](../apps/gametest/src/net_event.rs) |
+| Echtes Netz, Browser als Client | [`apps/game1`](GAME1.md): `game1 --client` ([`client.rs`](../apps/game1/src/client.rs)), [`tests/browser.mjs`](../apps/game1/tests/browser.mjs), `game1-server --log` |
 
 ## Ein Beispiel
 
@@ -41,7 +46,9 @@ let mut chan = Server::new(ServerConfig { protocol: SPIEL1, ..Default::default()
 let udp = chan.bind_udp(&adresse)?;
 let ws = chan.listen_ws(&adresse, "/spiel")?;
 let opts = ServerOptions { ws_port: ws.port, ..Default::default() };
-let mut spiel = NetServer::new(opts, plat::random_u64(), Box::new(|_code| Arena::new(ArenaConfig::default())));
+// Codes und Tickets aus dem Zufall des Systems; die Räume eines Ticks nebeneinander auf dem Pool
+let mut spiel = NetServer::secure(opts, Box::new(|_code| Arena::new(ArenaConfig::default())));
+spiel.set_parallel(true);
 loop {
     serve(&mut chan, &mut spiel, plat::time_us() * 1000);    // Ereignisse, fällige Ticks, Nachrichten
     chan.wait(2);                                            // nie plat::sleep_ms(1) unter Windows
@@ -60,26 +67,40 @@ for _ in 0..link.game.advance(jetzt) {
     link.game.step(&karte, eingabe);                        // vorhersagen, senden
 }
 link.flush();
-let ich = link.game.predicted();                            // die eigene Figur (mit alpha() zwischen zwei Ticks)
+let ich = link.game.drawn();                                // die eigene Figur: zwischen zwei Ticks, Korrekturen geglättet
 link.game.remotes(&mut andere);                             // die anderen, interpoliert
+while let Some(e) = link.game.take_event() { /* Abschüsse, Treffer: je einmal, in Reihenfolge */ }
+link.game.send_event(KANAL_CHAT, b"gg");                    // an den RoomSim des Raums
+// beim Verlassen:
+link.leave();                                               // LEAVE: der Server nimmt die Figur sofort heraus
 ```
 
 ## API-Überblick
 
 - **Server** (`net::server`): `RoomSim` (`schema`, `baseline`, `join(name) -> Option<u16>`, `leave`, `step(tick, dt, &[(id,
-  NetInput, eigen)])`, `snapshot(tick, &mut Snapshot)`, `priority(betrachter, &Ent) -> u32`), `NetServer::new(ServerOptions,
-  seed, RoomFactory)`, `on_event(&ServerEvent)`, `advance(now_ns)`, `step`, `take_out`, `take_close`, `create_room`, `rooms`,
-  `room`, `room_mut`, `players`, `player_of`, `stats` (`ServerStats`), `link_stats` (`LinkStats`), `max_rewind_ticks`, `tick`.
-  `ServerOptions { rate, snapshot_every, max_players, max_rooms, budget, stream_budget, margin, max_rewind_ms, ws_port, fetch_full,
-  hello_ms, ticket_ms, empty_room_ms, start_tick, history }`.
-- **Client** (`net::client`): `NetClient::new(ClientOptions, Movement, Schema, Grundlinie)`, `on_event`, `fetch_request`,
-  `on_fetch_event`, `take_out`, `take_fetch_out`, `advance(now_ns)`, `step(map, NetInput) -> tick`, `predicted`,
-  `predicted_prev`, `alpha`, `remotes(&mut Vec<Remote>)`, `render_time`, `newest`, `phase` (`Phase`), `welcome`, `own_id`,
-  `stats` (`ClientStats`), `predictor`, `clock`, `interp`, `last_outcome`; `lerp_field`, `lerp_angle_field`.
-  `ClientOptions { name, room, interp_ms, margin, ring, min_redundancy }`.
+  NetInput, eigen)])`, `snapshot(tick, &mut Snapshot)`, `priority(betrachter, &Ent) -> u32`, `on_event(spieler, &NetEvent)`,
+  `take_events(&mut Vec<RoomEvent>)`), `RoomEvent { to: To::{All, Player, AllBut}, channel, data }`,
+  `NetServer::new(ServerOptions, seed, RoomFactory)` (Codes aus einem Seed), `secure(ServerOptions, RoomFactory)` (aus
+  `plat::random_u64`), `with_random(ServerOptions, fn() -> u64, RoomFactory)`, `set_parallel(bool)` (die Räume auf dem Pool;
+  `RoomSim: Send`), `parallel`, `on_event(&ServerEvent)`, `advance(now_ns)`, `step`, `take_out`, `take_close`, `send_event(conn,
+  kanal, bytes)`, `create_room`, `rooms`, `room`, `room_mut`, `players`, `player_of`, `stats` (`ServerStats`, neu `left`,
+  `events_out`, `events_in`, `event_overflow`), `link_stats` (`LinkStats`, neu `events`, `events_in`), `max_rewind_ticks`, `tick`.
+  `ServerOptions { rate, snapshot_every, max_players, max_rooms, budget, stream_budget, event_budget, margin, max_rewind_ms,
+  ws_port, fetch_full, hello_ms, ticket_ms, empty_room_ms, start_tick, history }`.
+- **Client** (`net::client`): `NetClient::new(ClientOptions, Movement, Schema, Grundlinie)`, `set_reliable`, `on_event`,
+  `fetch_request`, `on_fetch_event`, `take_out`, `take_fetch_out`, `advance(now_ns)`, `step(map, NetInput) -> tick`, `drawn`,
+  `smoothing`, `smoother`, `predicted`, `predicted_prev`, `alpha`, `remotes(&mut Vec<Remote>)`, `render_time`, `newest`,
+  `send_event(kanal, bytes) -> bool`, `take_event`, `events_out`, `events_in`, `events_pending`, `leave`, `phase` (`Phase`,
+  neu `Left`), `welcome`, `own_id`, `stats` (`ClientStats`), `predictor`, `clock`, `interp`, `last_outcome`; `lerp_field`,
+  `lerp_angle_field`. `ClientOptions { name, room, interp_ms, margin, stream_margin, ring, min_redundancy, smooth_ms, snap,
+  event_budget }`.
+- **Ereignisse** (`net::event`): `NetEvent { tick, channel, data }`, `Outbox` (`push`, `take_run`, `ack`, `pending`,
+  `stats`), `Inbox` (`receive`, `take`, `ack_for_packet`, `stats`), `write_section`, `read_section`, `seq_diff`;
+  `MAX_EVENT` (255 Bytes), `CHANNELS` (16), `MAX_PENDING` (512), `ACK_PACKETS` (32).
 - **Vorhersage** (`net::predict`): `Movement` (`State`, `FIELDS`, `step(map, &State, &NetInput, dt)`, `to_fields`,
   `from_fields`, `position`), `Predictor` (`step`, `reconcile -> Outcome::{Stale, Match, Corrected { error, shift }, Reset}`,
-  `current`, `previous`, `at`, `confirmed`, `pending`, `stats` (`PredictStats`), `clear`).
+  `current`, `previous`, `at`, `confirmed`, `pending`, `stats` (`PredictStats`), `clear`), `Smoother` (`correct`, `advance`,
+  `offset`, `reset`; `decay_ms`, `snap`, `corrections`, `snaps`).
 - **Uhren** (`net::clock`): `SteeredClock` (`set_tick`, `advance`, `next_tick`, `tick`, `alpha`, `on_margin`, `speed_ppm`,
   `margin`, `jumps`), `InterpClock` (`on_snapshot`, `advance`, `time`, `behind`).
 - **Schnappschüsse** (`net::snapshot`): `NetState { kind, fields }`, `Ent { id, generation, state }`, `Snapshot { tick, ents }`
@@ -91,12 +112,13 @@ link.game.remotes(&mut andere);                             // die anderen, inte
   World}`.
 - **Räume** (`net::room`): `RoomCode` (`from_random`, `parse`, `as_str`, `valid`), `room_link`, `room_from_link`,
   `clean_name`, `unique_name`, `CODE_ALPHABET`, `MAX_NAME`.
-- **Nachrichten** (`net::proto`), **Raster** (`net::quant`: `pos_q`, `pos_f`, `angle_q`, `angle_f`, `pitch_q`, `axis_q`,
+- **Nachrichten** (`net::proto`: neu `MSG_LEAVE`, `EXT`, `has_ext`, `write_leave`, `is_leave`, `SnapHeader::new`,
+  `InputMsg::new`; `VERSION` 2), **Raster** (`net::quant`: `pos_q`, `pos_f`, `angle_q`, `angle_f`, `pitch_q`, `axis_q`,
   `rot_q`, `rot_f`, `round_i64`), **Bitstrom** (`net::bits`: `BitWriter`, `BitReader`, `uvar`, `svar`).
 - **Simulierte Leitung** (`net::sim`): `Weather` (`CLEAR`, `TYPICAL`, `ROUGH`, `STORM`), `SimNet` (`add_udp`, `add_ws`,
   `open_fetch`, `step`, `server_events`, `link_events`, `server_send`, `link_send`, `link_close`, `set_weather`), `PeerStats`.
 - **Echte Sockets** (`net::link`): `serve(&mut netchan::Server, &mut NetServer, now_ns)` (Windows, Linux, Apple), `NetLink`
-  (`connect`, `pump`, `flush`, `channel`, `fetching`).
+  (`connect`, `pump`, `flush`, `leave`, `channel`, `fetching`).
 - **Bezugsspiel**: `walker::Walker` (`WalkState`, `BTN_JUMP`, `BTN_RUN`, `BTN_FIRE`), `arena::{Arena, ArenaConfig, schema,
   map, baseline, spawn_point}`, `bot::{Bot, BotConfig, remote_feet}`.
 
@@ -157,8 +179,91 @@ Geschichte weg; verschieden, dann setzt er den Zustand des Servers und wendet di
 error, shift }`: die Abweichung beim Tick des Servers und wie weit der jetzige Zustand springt). Ein älterer Schnappschuss
 (umgeordnet) ändert nichts. Vor dem ersten Schnappschuss kennt der Client seine Figur nicht; er schickt trotzdem Eingaben, und
 der erste Abgleich rechnet sie vom Zustand des Servers aus nach (`Reset`). Ein Teleport, Schaden oder ein Wiedereinstieg nach
-dem Tod sind für den Client Abweichungen wie jede andere. Sichtbare Sprünge glättet Teil 1 nicht; das Bild kann zwischen
-`predicted_prev` und `predicted` mit `alpha` blenden (wie `Pose` in [GAMECORE.md](GAMECORE.md)).
+dem Tod sind für den Client Abweichungen wie jede andere. Das Bild blendet zwischen `predicted_prev` und `predicted` mit
+`alpha` (wie `Pose` in [GAMECORE.md](GAMECORE.md)) und glättet Korrekturen (unten).
+
+### Korrekturen glätten (Teil 2)
+
+Die Vorhersage bleibt Bit für Bit beim Zustand des Servers; geglättet wird nur, was ein Bild zeigt (`NetClient::drawn`):
+die vorhergesagte Lage zwischen den letzten zwei Ticks plus ein Versatz (`predict::Smoother`). Springt die gezeigte Lage bei
+einem Abgleich um `d`, nimmt der Versatz `-d` auf: In diesem Augenblick bewegt sich das Bild nicht (geprüft: höchstens
+1e-9 m). Danach klingt der Versatz ab wie exp(−t / 60 ms) (eine rationale Näherung in Teilschritten von höchstens einer
+halben Zeitkonstante, für jede Bildrate auf 0,1 % gleich; nach rund 0,5 s unter 0,1 mm). Was über 1 m hinausgeht (ein
+Neustart nach dem Tod, ein Teleport, auch wenn sich mehrere Korrekturen dahin aufaddieren), wird nicht geglättet: Das
+Bild springt mit dem Zustand. `ClientOptions::smooth_ms` (60; 0: aus) und `snap` (1 m); Source glättet ähnlich
+(`cl_smoothtime` 0,1 s). Die Kamera der eigenen Figur folgt dem gezeichneten Punkt, also auch dem Glätten.
+
+### Zuverlässige Ereignisse (Teil 2)
+
+Abschüsse, Trefferbestätigungen, Nachrichten wie in einem Chat: Sie müssen genau einmal ankommen, in Reihenfolge, über UDP
+wie über WebSocket. In Teil 1 standen sie als Zähler in den Feldern der Figuren (zwei Ereignisse zwischen zwei
+Schnappschüssen fielen zusammen, ein Name oder ein Text passte nicht hinein).
+
+- **Wie** (`net::event`): Jede Richtung hat eine Folge von Nummern (u16, umlaufend). Der Sender hält jedes Ereignis, bis
+  der Empfänger es bestätigt, und jedes Paket trägt die ältesten unbestätigten, bis zu einem Budget (400 Bytes, eines
+  immer). Der Empfänger kennt die Nummer, die er als nächste erwartet: Was davor liegt, ist doppelt, der Rest wird in
+  Reihenfolge geliefert; seine Bestätigung (die letzte Nummer ohne Lücke) reitet auf seinen nächsten 32 Paketen. Das ist
+  die Regel der „reliable commands“ von Quake 3: Weil der Sender nur Bestätigtes vergisst, beginnt jeder Lauf, der ankommt,
+  bei oder vor der erwarteten Nummer. Es gibt also nie eine Lücke, nichts wartet, kein Puffer zum Umordnen, kein Timer, kein
+  eigenes Paket. Über einen WebSocket geht jedes Ereignis einmal (der Transport liefert). Ereignisse eines Raums reiten in
+  den SNAPSHOTs, die eines Clients in den INPUTs; Bit 7 von Byte 0 (`EXT`) sagt, dass ein Teil mit Bestätigung und Lauf
+  folgt: Ohne Ereignisse sind die Bytes die von Version 1 (die Prüfsumme `--netsum` blieb gleich).
+- **Der Preis**: Ein Ereignis fährt in jedem Paket mit, bis seine Bestätigung zurück ist: bei 30 Schnappschüssen je Sekunde
+  und 40 ms Umlauf (klares Wetter der Tests) zweimal, bei 100 ms vier- bis fünfmal. Eine Zeile der Abschussliste sind 3
+  Bytes; ein Text von 200 Bytes kostet einige Pakete lang Platz im Budget von 1200 Bytes (das Budget der Entitäten wird
+  danach gerechnet).
+- **API**: `RoomSim::take_events` (nach jedem Tick: `RoomEvent` an alle, einen Spieler oder alle außer einem),
+  `RoomSim::on_event` (die Ereignisse eines Spielers am Anfang des nächsten Ticks, nach Figur und Ankunft: deterministisch),
+  `NetServer::send_event`, `NetClient::send_event` / `take_event`. Kanäle 0 bis 15 sind des Spiels; ein Ereignis hat bis zu
+  255 Bytes und den Tick, in dem es geschah.
+- **Grenzen**: Ein Client, der 512 Ereignisse nicht bestätigt, wird getrennt (`ServerStats::event_overflow`): Er ist weg oder
+  kaputt, und genau einmal ginge sonst nicht. Ein Client verweigert `send_event`, wenn 512 warten.
+- **Warum in `game::net` und nicht in `netchan`**: Netchan stückelt nicht und hat keine Zuverlässigkeit über UDP
+  (Entscheidung vom 18.11.2026: ein schlanker Kanal); ein zuverlässiger Teilkanal dort bräuchte eigene Pakete, eigene Timer
+  für Wiederholungen und Acks je Nachricht. Der Netcode schickt ohnehin in jedem Tick ein INPUT und alle zwei Ticks einen
+  Schnappschuss, und er bestätigt schon, was er dekodierte: Die Ereignisse fahren umsonst mit, ihr Platz zählt im Budget
+  des Schnappschusses, sie tragen den Tick der Simulation, und die Prüfsummen der Sitzungen umfassen sie. Ein anderes Spiel
+  über netchan, das keinen Takt hat, müsste es selbst bauen; dann wäre es Zeit für netchan.
+
+### Verlassen (Teil 2)
+
+`NetClient::leave` schickt LEAVE (eine Nachricht von einem Byte) und steht danach auf `Phase::Left`; `NetLink::leave` schickt es
+und beendet netchans Verbindung (DISCONNECT, über UDP dreimal). Der Server nimmt die Figur heraus, sobald eines von beiden
+ankommt (`RoomSim::leave`), die anderen sehen sie im nächsten Schnappschuss gehen. Gemessen auf der simulierten Leitung mit 20
+ms je Richtung: nach 21 ms beim Server, nach 55 ms bei den anderen, auch wenn LEAVE verloren geht. Ein Client, der stumm
+wird (Absturz, Kabel), geht wie bisher nach netchans 5 s. Ein `NetLink`, das fallen gelassen wird, schickte schon in Teil 1
+DISCONNECT; neu ist, dass der Client es selbst sagen kann (auch ohne Sockets, etwa im Üben von Spiel 1) und der Server ein
+Verlassen von einem Abbruch unterscheidet (`ServerStats::left`).
+
+### Räume auf Threads (Teil 2)
+
+Ein Raum berührt in seinem Tick nichts eines anderen: seine Eingaben, sein `step`, seine Ereignisse, seine Schnappschüsse
+(der Zustand je Spieler liegt seit Teil 2 im Raum). `NetServer::set_parallel(true)` lässt die Räume eines Ticks nebeneinander
+auf dem Pool von `plat` laufen (`plat::parallel_for`, ein Raum je Element: bei genug Kernen ein Raum je Kern; die Zahl der
+Threads mit `--threads N`). Ihre Nachrichten und Zähler werden in der Reihenfolge der Raumcodes zusammengeführt: Der Server
+schickt Bit für Bit dasselbe wie auf einem Thread (Gruppe `threads`). Netchans Ereignisse, die Uhr, Beitritte und Codes
+bleiben auf dem Thread der Schleife. Ziele ohne Threads (der Browser ohne gemeinsamen Speicher) rechnen die Räume
+nacheinander; dort läuft ohnehin nur das Üben. Gegenweg: ein `NetServer` je Thread mit eigener Uhr; das spart das Warten
+auf den langsamsten Raum, braucht aber ein Verteilen der Verbindungen nach Raumcode und gäbe keine Gleichheit mit einem
+Thread. Gemessen [unten](#räume-nebeneinander).
+
+### Raumcodes und Tickets aus dem Zufall des Systems (Teil 2)
+
+`NetServer::new(opts, seed, …)` zieht Codes und Tickets aus einem xorshift64* mit Seed: gut für Tests, die simulierte Leitung
+und das Üben im Browser, aber ein Ticket geht an seinen Client, und xorshift64* verrät seinen Zustand mit einer einzigen
+Ausgabe (die Multiplikation ist umkehrbar). Wer ein Ticket sah, kennt alle folgenden Codes und Tickets. `NetServer::secure`
+nimmt deshalb `plat::random_u64` (BCryptGenRandom, getrandom, getentropy, arc4random) für jeden Code und jedes Ticket;
+`with_random` nimmt eine andere Quelle. `game1-server` nimmt `secure`. Im Browser hat `plat` keinen Zufall des Systems;
+dort gibt es nur das Üben ohne Netz, das den Seed nimmt.
+
+### Die Marge über WebSocket (Teil 2, nach der Messung)
+
+Über UDP hielt die Marge von 2 Ticks auch über WLAN (0 bis 1,3 Korrekturen je Minute, im Mittel 3 mm, [unten](#echtes-netz)).
+Über einen WebSocket waren es 12 je Minute: TCP liefert, was einem verlorenen Segment folgt, erst nach dessen Wiederholung,
+und dann kommen Eingaben zu spät. Mit 3 Ticks 2,7 je Minute. Ein Client über einen WebSocket (`set_reliable`, das `NetLink`
+für `Endpoint::WebSocket` setzt) zielt deshalb auf die Marge des Servers plus `ClientOptions::stream_margin` (1 Tick, 16,7
+ms mehr Weg für seine Eingaben; die eigene Figur reagiert weiter sofort). Die Interpolation von 100 ms lief über WLAN nie
+leer (mit 50 ms in 0,04 % der Runden); sie bleibt.
 
 ### Schnappschüsse: Delta, Raster, Budget
 
@@ -278,7 +383,7 @@ nächsten anderen in 25 m.
 
 ## Tests
 
-`python build_rs.py test gametest` führt `apps/gametest/tests/check.uis` (`--check`: auch die fünf Gruppen des Netcodes) und
+`python build_rs.py test gametest` führt `apps/gametest/tests/check.uis` (`--check`: auch die neun Gruppen des Netcodes) und
 `tests/loopback.uis` (`--loopback --secs 5`) aus. Die Referenzen teilen keinen Code mit `game::net`: eine einfache volle
 Kodierung in ganzen Bytes für die Schnappschüsse, Listen jedes aufgezeichneten Ticks für das Zurückstellen, ein eigener Schnitt
 von Strahl und Kapsel und ein Slab-Test für den Hitscan, eine eigene Bewegung aus ganzen Zahlen für den Abgleich; für die
@@ -291,6 +396,10 @@ Vorhersage ist die Referenz der Server selbst (sein Zustand jeder Figur in jedem
 | `room` | 20 000 Codes (gültig, zurückgelesen, jede Schreibweise), verweigerte Codes, Links (Fragment, Abfrage, Pfad, nackt), acht Namen und ihre Säuberung, eindeutige Namen; der Server mit netchan-Ereignissen von Hand: HELLO macht einen Raum, zwei treten bei (Namen „Anna“, „anna 2“), voller Raum, unbekannter Raum, andere Version, leerer Name, der erste Schnappschuss eines WebSockets gegen die Grundlinie, Verlassen, der freie Platz mit Generation 1, eine stumme Verbindung nach 500 ms zu, ein leerer Raum nach 1 s zu, `max_rooms`; 300 bewegte Requisiten: Ticket für UDP, keines für WebSocket, ein falsches Ticket, FULL beim nächsten Schnappschuss-Tick und kein UDP-Schnappschuss in diesem Tick | 47 Prüfungen, 0 falsch; FULL 3146 Bytes |
 | `netsim` | Sitzungen mit Bots (ein Viertel über WebSocket, 40 Requisiten, 8 fahren): klar 6 s mit 8, typisch 10 s mit 8, rau 10 s mit 6, Sturm 10 s mit 4, dann klar; nach der Heilung (2 s) 3 s lang jede erste Vorhersage gegen den Zustand des Servers Bit für Bit, kein Abgleich mit Unterschied, jeder Client im Raum, keine fehlende Basis, kein kaputter Schnappschuss, keiner über 1200 Bytes. Der Umlauf der Ticks (Start 240 vor `u32::MAX`, rau). Der volle Stand mit 300 Requisiten (30 fahren, 150 stehen nicht am Platz der Karte): geholt über den WebSocket und ohne WebSocket nur nach Priorität aufgefüllt, danach ist der neueste Stand jedes Clients der Welt des Servers gleich. Verlassen (die anderen sehen die Figur gehen) und neu beitreten (dieselbe Id, Generation 1). 70 000 Schnappschüsse an einen Client über den Umlauf der Folgenummern (5 % Verlust), danach bitgleich | 51 Prüfungen, 0 falsch; siehe unten |
 | `bots` | 16 Bots, typisches Wetter, 300 Requisiten, Schießen: alle spielen, keiner getrennt, kein Schnappschuss über 1200 Bytes, aufwärts unter 300 Paketen und 256 KiB je Sekunde | 4 Prüfungen, 0 falsch |
+| `events` (Teil 2) | Outbox und Inbox über eine Modell-Leitung des Tests (300 Läufe, bis 50 % Verlust, doppelt, verspätet, Bestätigungen verloren, Budgets von 16 bis 415 Bytes; danach klar, bis alles durch ist): jedes Ereignis genau einmal und in Reihenfolge, nichts bleibt liegen; dasselbe zuverlässig (WebSocket); 70 000 Ereignisse über den Umlauf der Nummern. Sitzungen auf der simulierten Leitung mit einer Arena, deren Raum an alle, einen und alle außer einem sendet (auch 200 Bytes) und die Ereignisse der Clients zurückschickt, klar, rau und Sturm, 6 Clients (2 über WebSocket), die selbst senden: jeder bekommt genau die Ereignisse für ihn seit seinem Beitritt, einmal und in Reihenfolge (gegen das Buch des Raums), der Raum die jedes Clients einmal und in Reihenfolge, das Echo kommt zurück, keine Lücke, nichts offen, kein Schnappschuss über 1200 Bytes. Ein Client, der nie bestätigt, wird nach 512 offenen getrennt | 83 Prüfungen, 0 falsch; Modell: 395 114 Ereignisse, je 4,2 Pakete (UDP) bzw. 1,0; Sitzungen: 8428 / 8131 / 6464 Ereignisse an die Clients, 6406 / 6155 / 4801 von ihnen |
+| `leave` (Teil 2) | LEAVE über UDP, LEAVE verloren (nur DISCONNECT), über WebSocket: die Figur beim Server weg, die anderen sehen sie gehen, `Phase::Left`, `ServerStats::left`; ein stummer Client erst nach netchans Zeitlimit | 10 Prüfungen, 0 falsch; 21 ms beim Server, 55 ms bei den anderen (20 ms je Richtung), stumm 5006 ms |
+| `smooth` (Teil 2) | Der Versatz nimmt den Sprung auf, fällt stetig, nach 0,4 bis 0,8 s unter 0,1 mm; nach 100 ms in Schritten von 1, 7, 16, 33, 50 und 100 ms auf 1 % gleich und auf 0,5 % bei exp; über 1 m (auch aufaddiert) kein Glätten; 20 000 zufällige Korrekturen: nie über 1 m, nie gewachsen ohne Korrektur; `smooth_ms` 0 ist aus. Rau, 6 Clients, 10 s: bei jeder geglätteten Korrektur bewegt sich das gezeichnete Bild nicht (gemessen Ereignis für Ereignis), danach klar: kein Versatz, keine Korrektur mehr | 10 Prüfungen, 0 falsch; 18 Korrekturen geglättet, das Bild bewegte sich dabei um 0,0 m |
+| `threads` (Teil 2) | 6 Räume mit je 3 Bots (Schießen, 40 Requisiten), rau, dann klar: einmal nacheinander, einmal nebeneinander auf dem Pool, alle Nachrichten des Servers Bit für Bit gleich. Codes: mit Seed zweimal gleich, aus einer gegebenen Quelle genau `from_random` ihrer Zahl, `secure` 60 verschiedene gültige Codes, zwei Tickets verschieden und nicht 0 | 6 Prüfungen, 0 falsch; 4518 Nachrichten (442 452 Bytes) gleich, auf 12 (Windows) und 8 (M2) Threads; ihre Prüfsumme `21edeb35d6a7aa94` ist auf beiden gleich |
 | Skript `loopback.uis` | echte Sockets: siehe [unten](#echte-sockets) | bestanden |
 
 Die Läufe der Gruppe `netsim` (dieselben auf allen Zielen):
@@ -309,11 +418,11 @@ sind 1853 Bytes, passt also nicht in ein Datagramm. Vollständig (der neueste St
 rund 200 ms über UDP mit FULL über den WebSocket, ebenso schnell ohne WebSocket nur nach Priorität aufgefüllt (9 geschnittene
 Schnappschüsse), 50 ms für den Browser-Client über WebSocket (gemessen in Schritten von 100 ms).
 
-| Ziel | `--test netcodec,lagcomp,room,netsim,bots` | `--loopback` |
+| Ziel | die neun Gruppen des Netcodes (Teil 1: die ersten fünf) | `--loopback` |
 | --- | --- | --- |
-| Windows x86-64 (Ryzen 5 3600), Rust 1.100, Entwicklung | 177 von 177 | bestanden (8 Clients, 8 s) |
-| Linux x86-64 (glibc) in WSL Ubuntu 24.04, Entwicklung | 176 von 176 (`--quick`) | bestanden (8 Clients, 6 s) |
-| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1, Entwicklung | 177 von 177 | bestanden (8 Clients, 6 s) |
+| Windows x86-64 (Ryzen 5 3600), Rust 1.100, Entwicklung | 407 von 407 (Teil 1: 177 von 177) | bestanden (8 Clients, 5 s) |
+| Linux x86-64 (glibc) in WSL Ubuntu 24.04, Entwicklung | `check.uis` bestanden (Teil 1: 176 von 176 mit `--quick`) | bestanden (8 Clients, 5 s) |
+| macOS ARM64 (Mac mini M2, macOS 27.2.1), Rust 1.98.1, Entwicklung | 407 von 407 (Teil 1: 177 von 177) | Teil 1 bestanden (8 Clients, 6 s) |
 
 ### Echte Sockets
 
@@ -339,11 +448,16 @@ die Folgenummern und die Acks.
 | --- | --- | --- | --- |
 | Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung und Release | `4118995e45c0c067` (177 246 Werte) | `8edfe993e4ffcb65` |
 | Linux x86-64 (glibc) in WSL Ubuntu 24.04 | Entwicklung | `4118995e45c0c067` | `8edfe993e4ffcb65` |
-| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung und Release | `52c4613d8ffdd103` mit der alten Grenze von 200 ms (wie die anderen damals); mit 300 ms nicht neu gerechnet | `8edfe993e4ffcb65` |
+| macOS ARM64 (Mac mini M2, macOS 27.2.1), Rust 1.98.1 | Entwicklung | `4118995e45c0c067` (Teil 2; in Teil 1 nur `52c4613d8ffdd103` mit der alten Grenze von 200 ms gerechnet) | `8edfe993e4ffcb65` |
 | WebAssembly in Node 22.17 (V8): einfach, SIMD, Threads (`tests/web.mjs`) | Entwicklung | `4118995e45c0c067` (alle drei) | `8edfe993e4ffcb65` (alle drei; für den Kern neu) |
 
 Die Grenze des Lag-Ausgleichs ging am 19.11.2026 von 200 auf 300 ms; damit treffen andere Schüsse, und die Prüfsumme der
 Sitzung wechselte von `52c4613d8ffdd103` (177 304 Werte, auf allen vier Zielen gleich) zu `4118995e45c0c067`.
+
+**Teil 2 änderte sie nicht**: Die Sitzung hat keine Ereignisse und kein Verlassen, und ohne sie sind die Nachrichten die von
+Version 1 (`EXT` nicht gesetzt); der Umbau des Servers (der Zustand je Spieler im Raum, die Räume auf Threads) ergibt Bit für
+Bit dieselben Nachrichten. `4118995e45c0c067` (177 246 Werte) nach Teil 2 auf Windows, Linux (WSL), macOS (M2) und in Node
+(siehe GAME1.md für die Prüfsummen von Spiel 1, die sich änderten).
 
 Die Messungen von `--netbench` ergeben auf Windows und dem M2 dieselben Zahlen bis auf die Zeiten (siehe unten).
 
@@ -456,56 +570,99 @@ braucht also auf dem M2 rund 0,7 % eines Kerns (110 µs je Tick bei 60 Hz), auf 
 Planungslücken, nicht der Netcode. Wo die Zeit geht: das Delta je Client (zwei Basen verglichen, jede Entität Feld für Feld) und
 die Kopie des gesendeten Stands je Client; geschnittene Schnappschüsse kosten das Sortieren nach Priorität.
 
+### Echtes Netz
+
+Teil 2, am 20.11.2026: `game1-server` auf dem Mac mini (M2, macOS 27.2.1, über WLAN angebunden, `--bind` auf seine
+Adresse, nur der Testport, danach beendet), Clients auf dem Windows-Rechner (Ryzen 5 3600, über Kabel) mit `game1 --client`
+(Spiel 1, der Character-Controller, die Clients vom Verstand der Bots gespielt). Der Fedora-Rechner und das ThinkPad waren an
+diesem Tag nicht erreichbar; Fedora als Server und der Mac als Client bleiben offen. Der Ping (ICMP) zum Mac: Median 3 ms,
+p90 57 ms, höchstens 122 ms (das WLAN des Mac spart Strom: Spitzen, wenn eine Weile nichts kam). „Umlauf“ ist netchans
+geglätteter Wert aus dem neuesten Ack; ein Ack reitet auf dem nächsten Paket der Gegenseite, also stecken darin bis zu 17 ms
+Warten. „Schwankung“: die mittlere Änderung der Laufzeit eines Schnappschusses von einem zum nächsten (|D| nach RFC 3550)
+und die Spanne ihres p1 bis p99. „Korrekturen“: Abgleiche mit Unterschied ab der zweiten Sekunde nach dem Beitritt.
+
+| Lauf | Clients | Umlauf Mittel / p99 | Schwankung, Spanne | Verlust ab / auf | Korrekturen je Minute (Fehler Mittel) | Marge |
+| --- | --- | --- | --- | --- | --- | --- |
+| UDP, ohne Bots, 60 s | 3 | 17,3 / 34,4 ms | 3,0 ms, 28 ms | 0 / 0 % | 0 (jede der 5501 Vorhersagen exakt) | 2,00 Ticks |
+| UDP, ohne Bots, 45 s | 2 | 16,8 / 39,4 ms | 2,7 ms, 28 ms | 0 / 0 % | 0,0 und 1,3 (3 mm) | 1,9 |
+| WebSocket, Marge 2, 45 s | 2 | 18,1 / 58,6 ms | 2,7 ms, 33 ms | 0 / 0 % | 12,0 (4 und 16 mm) | 2,00 |
+| WebSocket, Marge 3, 45 s | 2 | 19,9 / 69 ms | 3,3 ms, 42 ms | 0 / 0 % | 2,7 (5 mm) | 3,5 |
+| WebSocket, Marge 3 als Vorgabe (`stream_margin`), 45 s | 2 | 16,3 / 38,6 ms | 2,3 ms, 27 ms | 0 / 0 % | 2,7 (1 und 28 mm) | 3,00 |
+| UDP, 4 Bots auf dem Server, Schießen, 60 s | 3 | 18,6 / 51 ms | 3,6 ms, 34 ms | 0 / 0 % | 17–22 (Tode und Rückkehr: 8–9 gesprungen) | 2,3–2,5 |
+| WebSocket, 4 Bots, Schießen, 40 s (Marge 2) | 2 | 28,3 / 84 ms | 7,1 ms, 45 ms | 0 / 0 % | 24 und 40 | 1,4 |
+
+Die Interpolation von 100 ms lief in keinem Lauf leer; mit `--interp 50` in 0,04 % der Runden. Beim Server (`--log`):
+außer den 4 Ticks vor der ersten Eingabe kein fehlender Tick über UDP; über den WebSocket mit der Marge von 2 Ticks 21–24
+fehlende in 40 s (TCP: was einem verlorenen Segment folgt, wartet auf dessen Wiederholung). Daraus die Marge von 3 Ticks über
+WebSocket ([oben](#die-marge-über-websocket-teil-2-nach-der-messung)). Mit Schießen kamen alle 63 Abschüsse bei jedem der drei
+Clients an (Ereignisse), jeder Client verließ den Raum mit LEAVE (`3 left` beim Server).
+
+Dabei gefunden: `game1-server` beantwortete UDP-Clients aus dem LAN nicht. `plat` prüft `UdpSocket::send_to` gegen
+`net.connect`, und die PERMISSIONS des Servers erlaubten nur `localhost` (PERMDENY im Log); jetzt `net.connect *:*`.
+
+### Der Browser als Client
+
+`node apps/game1/tests/browser.mjs` (Playwright, headless): `game1-server --web` liefert auf 127.0.0.1 eine Kopie der
+Web-Ausgabe, deren Loader `--client /game1` übergibt (der Loader von `web/` nimmt keine Argumente aus der Adresse); die Seite
+spielt dann ohne Fenster zwei Clients mit dem Verstand der Bots über den WebSocket der Seite und vergleicht jede Vorhersage
+mit dem Zustand des Servers (Abgleich). Chrome 157 und Firefox 153, je 12 s, ohne Bots: beide Clients im Raum, 330 bis 390
+Schnappschüsse, keiner kaputt, keine fehlende Basis, jede Vorhersage exakt (0 Korrekturen), Umlauf 22–24 ms (der Takt des
+Browsers), Schwankung 7 ms (Chrome) und 3 ms (Firefox); mit Bots und Schießen ebenso bestanden. Firefox trat zuerst erst nach
+5,7 s bei: Die HTTP-Arbeiter des Servers (4) hingen an den offenen Verbindungen, mit denen die Seite geladen wurde (30 s
+Keep-alive); jetzt 16 Arbeiter und 2 s. In einem Lauf hielt Firefox' Worker einmal rund 400 ms an (der Umlauf p99 400 ms, der
+Rechner war belastet); der Netcode fing es auf.
+
+### Räume nebeneinander
+
+`gametest --netbench` (Release), zuletzt: 8 Räume mit je 16 Bots über die simulierte Leitung (300 Requisiten, Schießen,
+typisches Wetter), 10 s, die Zeit von `NetServer::step`:
+
+| Rechner | nacheinander: Mittel / p50 / p99 | nebeneinander: Mittel / p50 / p99 | schneller |
+| --- | --- | --- | ---: |
+| Ryzen 5 3600 (6 Kerne, 12 Threads), Windows, geteilt mit anderen Sitzungen | 1643 / 2617 / 3820 µs | 488 / 555 / 1442 µs | 3,4 × |
+| Apple M2 (4 + 4 Kerne), macOS 27.2.1, zwei Läufe | 873–882 / 1527–1534 / 1689–1733 µs | 286–287 / 430–431 / 517 µs | 3,1 × |
+
+Der p50 liegt bei den Ticks mit Schnappschüssen. Ein Raum mit 16 Spielern braucht rund 200 µs je Tick (1,2 % eines Kerns bei
+60 Hz); acht Räume nacheinander 10 %, nebeneinander 3 % der Zeit eines Ticks. Ein Kern trägt also viele Räume; die Threads
+nehmen dem einen Thread der Schleife die Arbeit ab, wenn es viele werden. `gametest --roomsbench` misst nur diesen Teil.
+
 ## Was nicht getestet ist
 
-- **Ein echtes Netz zwischen Rechnern**: alles lief auf der simulierten Leitung oder auf 127.0.0.1. Wie sich echte Schwankung
-  (WLAN, Mobilfunk) auf die Marge auswirkt, misst Teil 2.
-- **Der Browser als Client**: Der WebSocket-Weg des Clients ist derselbe Code wie auf dem Desktop (`netchan::Client` mit
-  `Endpoint::WebSocket`), gelaufen ist er im Browser nicht; die Prüfsumme lief in Node (in drei Varianten, auch die Gruppen netcodec bis bots mit `--quick`: 176 von 176).
-- **Android, iOS, statisches Linux**: `lib/game` mit `game::net` baut für `aarch64-linux-android`, `aarch64-apple-ios` (auf dem
-  Mac geprüft, auch netchan) und `wasm32-unknown-unknown`, mit und ohne `std`; gelaufen ist dort nichts. Ein statischer
-  Linux-Server mit dem Netcode ist noch nicht gebaut (gametest braucht glibc für die Brücke).
-- **Mehr als 16 Spieler, mehrere Räume unter Last, viele Server-Threads**: gemessen ist ein Raum mit 16 Bots; Räume laufen
-  nacheinander auf einem Thread.
+- **Fedora als Server, der Mac als Client, Mobilfunk**: Das echte Netz lief zwischen dem Windows-Rechner (Kabel) und dem
+  Mac (WLAN, Server). Fedora und das ThinkPad waren nicht erreichbar.
+- **Android, iOS**: `lib/game` mit `game::net` baut für `aarch64-linux-android`, `aarch64-apple-ios` und
+  `wasm32-unknown-unknown`; gelaufen ist dort nichts. Der statische Linux-Server von Spiel 1 läuft (WSL).
+- **Mehr als 16 Spieler je Raum**, viele Räume unter echter Last mit echten Clients (die Räume auf Threads sind auf der
+  simulierten Leitung gemessen).
 - **Böswillige Clients über die Fuzz-Tests hinaus**: ein Client, der Eingaben weit in der Zukunft schickt, wird begrenzt (64
-  Ticks), einer, der falsche Acks meldet, schadet nur sich (der Server nimmt nur Stände, die er gesendet hat); Geschwindigkeit
-  und Ziele prüft der Server, weil er rechnet. Schummeln mit Zielhilfen ist nicht Thema (GAME.md, „Bewusst nicht“).
-- **Das Gefühl**: Ob 100 ms Interpolation, eine Marge von 2 Ticks und Korrekturen ohne Glätten sich gut spielen, zeigt erst
-  Spiel 1 mit Menschen.
+  Ticks), einer, der falsche Acks meldet, schadet nur sich (der Server nimmt nur Stände, die er gesendet hat), einer, der
+  Ereignisse nicht bestätigt, wird nach 512 getrennt, einer, der Ereignisse flutet, ist durch netchans Rate begrenzt;
+  Geschwindigkeit und Ziele prüft der Server, weil er rechnet. Schummeln mit Zielhilfen ist nicht Thema (GAME.md, „Bewusst
+  nicht“).
+- **Das Gefühl**: Ob 100 ms Interpolation, die Marge und das Glätten in 60 ms sich gut spielen, zeigt erst Spiel 1 mit
+  Menschen.
 
 ## Was nicht gebaut ist
 
 - Verschlüsselung über UDP (später, Entscheidung vom 18.11.2026); das Ticket für FETCH ist nur so geheim wie der Verkehr.
-- Glätten sichtbarer Korrekturen der eigenen Figur (ein abklingender Versatz im Bild), Extrapolation der anderen, wenn
-  Schnappschüsse fehlen (sie halten).
-- Geschosse mit Flugzeit, Treffer auf Teile der Figur (Kopf), Figuren, die einander stoßen oder blockieren (die Vorhersage
-  kennt die anderen nicht), Requisiten, die die Figuren aufhalten.
+- Extrapolation der anderen, wenn Schnappschüsse fehlen (sie halten).
+- Geschosse mit Flugzeit, Treffer auf Teile der Figur (Kopf: das Spiel), Figuren, die einander stoßen oder blockieren (die
+  Vorhersage kennt die anderen nicht), Requisiten, die die Figuren aufhalten.
 - Deltas gegen eine Vorhersage (Position + Geschwindigkeit × Zeit) statt gegen den Stand: spart bei laufenden Figuren
   vielleicht ein Drittel.
-- Ein Raum je Kern: Alle Räume eines Servers rechnen auf einem Thread nacheinander.
 - Zuschauer, Wiedereinstieg nach einem Verbindungsabbruch mit derselben Figur, Teams, Runden: das ist Spiel 1 (G7h).
-- Eingaben, die das Spiel selbst definiert (`NetInput` ist fest); Ereignisse mit Zuverlässigkeit über UDP (Treffermarken und
-  Abschüsse stehen in den Feldern der Figuren).
+- Eingaben, die das Spiel selbst definiert (`NetInput` ist fest).
+- Ein `NetServer` je Thread mit eigener Uhr (die Räume eines Ticks warten auf den langsamsten; bei Räumen gleicher Größe
+  unwichtig).
 
-## Für Teil 2 und G7h
+## Offen
 
-- **Den Controller einsetzen**: `walker::Walker` durch den Character-Controller von G7c Teil 2 ersetzen, hinter
-  `predict::Movement`: seinen Zustand als ganze Zahlen auf dem Raster halten (alles, was der nächste Schritt braucht, auch
-  Knöpfe des Ticks davor, Bodenkontakt, Ducken), `FIELDS` und `to_fields`/`from_fields` verlustfrei; die Karte des Spiels als
-  `physics::World` auf Server und Client gleich. Die Prüfung, dass nach der Heilung jede erste Vorhersage exakt ist
-  (`net_sim.rs`, `weather`), mit dem Controller wiederholen; ebenso `--netsum` auf allen Zielen.
-- **Ein RoomSim für Spiel 1**: die Arena zeigt, wie: die Figuren und ihre Zustände, Requisiten mit festen Netz-Ids aus der Karte
-  (die Grundlinie), `priority` nach Entfernung und Sichtbarkeit, Treffer mit `HitHistory` und `hitscan`. Teams, Runden,
-  Punktetafel, Waffen, Geschosse mit Flugzeit sind des Spiels. Ein Spiel mit `World` und `Pose` baut den Schnappschuss aus den
-  Spalten (eine Hilfe dafür gibt es noch nicht).
-- **Die Grenze des Lag-Ausgleichs**: 300 ms (entschieden am 19.11.2026); ein RoomSim für Spiel 1 nimmt dieselbe Zahl wie
-  `ServerOptions::max_rewind_ms` (in Ticks, wie `ArenaConfig::max_rewind`).
-- **Korrekturen glätten**: ein abklingender Versatz im Bild der eigenen Figur nach `Outcome::Corrected` (die Physik bleibt beim
-  korrigierten Zustand).
-- **Treffermarken und Abschüsse** zuverlässig melden: heute stehen sie als Felder in den Figuren (das letzte Schuss-Tick, Leben,
-  Abschüsse); ein Ereigniskanal mit Wiederholung bis zur Bestätigung wäre der nächste Schritt.
-- **Der Browser-Client**: `NetLink` mit `Endpoint::WebSocket("/pfad")` im Web-Build; der Server mit `ws_endpoint` neben den
-  Dateien der Seite (wie `nettest --serve`).
-- **Teil 2 des Netcodes**: echtes Netz zwischen Rechnern (Windows, Fedora, ThinkPad, Mac, WLAN), die Marge und die
-  Interpolationszeit danach einstellen; die Verschlüsselung über UDP (netchan, entschieden); Deltas gegen eine Vorhersage;
-  mehrere Räume auf mehreren Threads.
+- **Fedora als Server, Clients auf dem Windows-Rechner und dem Mac** (der Rechner war am 20.11.2026 nicht erreichbar),
+  WLAN beider Enden, ein Mobilfunk-Hotspot.
+- **Die Verschlüsselung über UDP** (netchan, entschieden: ChaCha20-Poly1305 aus `crypto`).
+- **Deltas gegen eine Vorhersage**.
+- **Die Grenze des Lag-Ausgleichs**: 300 ms (entschieden am 19.11.2026; ob sie auf 400 ms geht, ist eine Frage an den Nutzer
+  aus GAME1.md).
+- **Ein UDP-Server und `net.connect`**: Ein Server, der UDP-Clients antwortet, braucht in seinen PERMISSIONS `net.connect *:*`,
+  weil `plat` jedes `send_to` gegen diese Regel prüft. Ob Antworten an eine Adresse, die vorher an einen erlaubten
+  lauschenden Socket schickte, ohne Regel durchgehen sollen, ist eine Frage für `plat` (docs/PERMISSIONS.md).

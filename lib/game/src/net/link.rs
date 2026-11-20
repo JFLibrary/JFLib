@@ -5,7 +5,8 @@
 //                                 Linux, Apple: netchan::Server needs netio)
 //   NetLink<M>                    a client's channel and, when WELCOME asks for it, the fetch's WebSocket
 //                                 (ws://host:port/path of the server's UDP address); pump(map, now) reads
-//                                 both, flush() sends what the game queued
+//                                 both, flush() sends what the game queued, leave() ends it cleanly (LEAVE,
+//                                 then netchan's DISCONNECT: the server removes the figure at once)
 //
 // A server's loop: serve(..) then server.wait(ms to the next tick) (never plat::sleep_ms(1) on Windows:
 // docs/TRANSPORT.md).  A client's frame: link.pump(map, now), n = link.game.advance(now), n times
@@ -51,6 +52,8 @@ pub struct NetLink<M: Movement> {
 impl<M: Movement> NetLink<M> {
     /// connect to `ep`; `path` is the server's WebSocket path (for a fetch of a UDP client)
     pub fn connect(ep: Endpoint, cfg: ClientConfig, game: NetClient<M>, path: &str) -> Result<NetLink<M>, netchan::Error> {
+        let mut game = game;
+        game.set_reliable(matches!(ep, Endpoint::WebSocket(_)));
         let host = match &ep {
             Endpoint::Udp(a) => Some(match a.ip {
                 plat::net::IpAddr::V4(b) => format!("{}.{}.{}.{}", b[0], b[1], b[2], b[3]),
@@ -104,6 +107,18 @@ impl<M: Movement> NetLink<M> {
                 None => self.send_errors += 1,
             }
         }
+    }
+
+    /// leave the room: LEAVE (the server removes the figure at once), then netchan's DISCONNECT (over UDP three
+    /// times) and the end of a fetch's WebSocket.  Dropping a NetLink only does the last two
+    pub fn leave(&mut self) {
+        self.game.leave();
+        self.flush();
+        self.chan.disconnect();
+        if let Some(f) = &mut self.fetch {
+            f.disconnect();
+        }
+        self.fetch = None;
     }
 
     /// the main channel (its state, stats, round-trip time)

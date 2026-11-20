@@ -332,11 +332,27 @@ Unter Linux in WSL2 (Ubuntu 24.04 auf demselben Ryzen, eine virtuelle Maschine, 
 
 Die p99 um 16 ms sind Planungslücken der virtuellen Maschine; Linux auf echter Hardware (Fedora, ThinkPad) misst Teil 2.
 
+### Zwischen zwei Rechnern (gemessen mit G7e Teil 2)
+
+Der Kanal unter dem Netcode von Spiel 1 (`game1 --client`, NETCODE.md „Echtes Netz“): der Server auf dem Mac mini (WLAN),
+die Clients auf dem Windows-Rechner (Kabel), je 40 bis 60 s mit 60 Paketen je Sekunde hinauf und 30 herunter. Über UDP:
+netchans Umlauf im Mittel 17 ms, p99 34 bis 51 ms (darin bis 17 ms, bis der Ack mitfährt; ICMP-Ping: Median 3 ms, p90 57 ms,
+Spitzen 122 ms, weil das WLAN des Mac Strom spart), kein verlorenes Paket in keiner Richtung, keine Umordnung, die
+Schwankung der Ankunft 3 ms. Über WebSocket: Umlauf 16 bis 28 ms, p99 39 bis 89 ms; was einem verlorenen Segment folgt,
+wartet auf dessen Wiederholung, und dann kommen Eingaben in Schüben (der Netcode hält deshalb über WebSocket einen Tick mehr
+Vorlauf). Fedora als Server und weitere Rechner waren nicht erreichbar.
+
+Dabei gefunden: Ein Server mit UDP braucht in seinen PERMISSIONS `net.connect` für die Adressen seiner Clients, weil `plat`
+jedes `UdpSocket::send_to` gegen diese Regel prüft; `game1-server` hatte nur `localhost` und schickte Clients im LAN keine
+CHALLENGE (PERMDENY). Ob Antworten an eine Adresse, die vorher an einen erlaubten lauschenden Socket schickte, ohne eigene
+Regel durchgehen sollen, ist offen.
+
 ## Was nicht getestet ist
 
 - `wss:` (TLS darunter): verdrahtet (Server über `start_with`, Client über `ClientConfig::connector`), nicht geprüft
   (Teil 2).
-- Ein echtes Netz und zwei Rechner: alle Messungen sind auf Loopback (Teil 2).
+- Ein echtes Netz: die Messungen oben sind auf Loopback; zwischen zwei Rechnern lief der Kanal nur unter dem Netcode (G7e
+  Teil 2: Windows ↔ Mac über WLAN, oben), nicht mit `nettest --bench`.
 - Safari und der Build mit Threads im Browser (die Sockets gehören dem Thread der App; aus einem Rechen-Worker gerufen
   bleiben sie stumm).
 - Viele Clients mit echter Last: 24 gleichzeitig im Test, 32 am rohen WebSocket; 16 Spieler je Raum misst G7e.
@@ -347,7 +363,8 @@ Die p99 um 16 ms sind Planungslücken der virtuellen Maschine; Linux auf echter 
 - Verschlüsselung und Authentifizierung über UDP (das Token hält nur blinde Absender fern).
 - Nachrichten über 1400 Bytes über UDP (keine Fragmentierung): Große, seltene Daten (die Karte, der volle Stand beim
   Beitritt) braucht der Netcode in Stücken oder über einen WebSocket daneben.
-- Ein zuverlässiger, geordneter Teilkanal über UDP.
+- Ein zuverlässiger, geordneter Teilkanal über UDP: Der Netcode baut seine zuverlässigen Ereignisse selbst auf seinen eigenen
+  Paketen (G7e Teil 2, NETCODE.md „Zuverlässige Ereignisse“); netchan bleibt ohne.
 - Android (`plat` hat dort noch keine Sockets: `Error::Unsupported`, [ANDROID.md](ANDROID.md)).
 - WebTransport (E8: erst mit QUIC in `netio`), `permessage-deflate`.
 - Ein `wait` für den Client (Spiele fragen jedes Bild ab).
@@ -373,6 +390,7 @@ Die p99 um 16 ms sind Planungslücken der virtuellen Maschine; Linux auf echter 
 
 - `wss:` mit dem TLS von `netio` prüfen (Server mit eigener CA, Client mit `trust::connector`; im Browser gegen ein
   Zertifikat, dem der Browser traut).
-- Messen zwischen Rechnern (Windows ↔ Fedora, ThinkPad, Mac mini) und über WLAN; Verlust und Schwankung echter Netze.
+- Messen zwischen Rechnern (Windows ↔ Fedora, ThinkPad, Mac mini) und über WLAN; Verlust und Schwankung echter Netze (für
+  den Netcode zwischen Windows und dem Mac mit G7e Teil 2 geschehen, oben).
 - Die Grenzen nach diesen Messungen einstellen; prüfen, ob 1200 Bytes und 300 Pakete je Sekunde zu Spiel 1 passen.
 - `bufferedAmount` des Browsers an Rust melden, wenn der Netcode im Browser Gegendruck braucht.

@@ -13,6 +13,8 @@
 //   modeltool --checksum                         FNV-1a over the bits of every example's meshes and a fixed set of
 //                                                operations: the same on every target
 //   modeltool --examples DIR [--size PX]         the built-in examples with pictures into DIR/NAME/
+//   modeltool --watch FILE.jfs [--param ...]     the observation mode: a window with the model, built again when
+//                                                the script or a module is saved (watch.rs, watch_ui.rs)
 //   modeltool --version | --help
 #![no_std]
 #![no_main]
@@ -30,6 +32,12 @@ mod refs;
 mod render;
 mod run;
 mod selftest;
+mod selftest_csg;
+// the observation mode (no files and no window in the browser)
+#[cfg(not(target_arch = "wasm32"))]
+mod watch;
+#[cfg(not(target_arch = "wasm32"))]
+mod watch_ui;
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -58,7 +66,7 @@ pub struct Options {
 fn usage() -> i32 {
     out("Aufruf: modeltool DATEI.jfs [--out ORDNER] [--param NAME=WERT ...] [--size PX] [--no-grid] [--no-images] [--force]\n");
     out("        modeltool --report DATEI.jfs [--param ...] | --api | --check [--quick] | --test NAME | --checksum\n");
-    out("        modeltool --examples ORDNER [--size PX] | --version | --help\n");
+    out("        modeltool --examples ORDNER [--size PX] | --watch DATEI.jfs [--param ...] | --version | --help\n");
     out("Schreibt ORDNER/report.json, model.glb, front.png, side.png, top.png, iso.png und sheet.png (vorn | rechts über oben | schräg).\n");
     out("Exit-Code 0: gebaut und alle Prüfungen bestanden; 1: Fehler im Skript; 3: gebaut, aber eine Prüfung fehlgeschlagen; 2: Aufruf.\n");
     0
@@ -252,14 +260,6 @@ fn pictures(_: &host::Model, _: &Options) -> (Option<(Vec<(&'static str, Vec<u8>
     (None, Some(String::from("im Browser zeichnet modeltool nicht")))
 }
 
-/// a module next to the script (paths come normalised and relative to the working directory)
-fn file_loader(path: &str) -> Result<String, String> {
-    match plat::read_file(path) {
-        Some(b) => String::from_utf8(b).map_err(|_| String::from("die Datei ist kein UTF-8")),
-        None => Err(String::from("die Datei gibt es nicht")),
-    }
-}
-
 fn run_main() -> i32 {
     let args: Vec<String> = plat::args().into_iter().skip(1).collect();
     let has = |n: &str| args.iter().any(|a| a == n);
@@ -325,12 +325,27 @@ fn run_main() -> i32 {
             i += 2;
             continue;
         }
-        if a == "--out" || a == "--size" {
+        if a == "--out" || a == "--size" || a == "--script" {
+            i += 2;
+            continue;
+        }
+        if a == "--watch" {
+            match args.get(i + 1) {
+                Some(f) if file.is_none() => file = Some(f.clone()),
+                Some(f) => {
+                    err(&format!("modeltool: zwei Skripte ({} und {}); eins je Aufruf\n", file.as_deref().unwrap_or(""), f));
+                    return 2;
+                }
+                None => {
+                    err("modeltool: --watch braucht eine Datei\n");
+                    return 2;
+                }
+            }
             i += 2;
             continue;
         }
         if a.starts_with("--") {
-            if !matches!(a.as_str(), "--no-grid" | "--no-images" | "--force" | "--report") {
+            if !matches!(a.as_str(), "--no-grid" | "--no-images" | "--force" | "--report" | "--verify-dirty") {
                 err(&format!("modeltool: unbekannte Option {}\n", a));
                 return 2;
             }
@@ -346,6 +361,15 @@ fn run_main() -> i32 {
         return usage();
     };
     let file = file.replace('\\', "/");
+    if has("--watch") {
+        #[cfg(not(target_arch = "wasm32"))]
+        return watch_ui::run(&file, &params);
+        #[cfg(target_arch = "wasm32")]
+        {
+            err("modeltool: im Browser gibt es den Beobachtungsmodus nicht\n");
+            return 2;
+        }
+    }
     let Some(bytes) = plat::read_file(&file) else {
         err(&format!("modeltool: kann {} nicht lesen\n", file));
         return 2;
@@ -354,7 +378,8 @@ fn run_main() -> i32 {
         err(&format!("modeltool: {} ist kein UTF-8\n", file));
         return 2;
     };
-    let mut loader = file_loader;
+    let dir = run::script_dir(&file);
+    let mut loader = |p: &str| run::file_loader(&dir, p);
     if has("--report") {
         let r = run::run_script(&file, &src, &params, &mut loader);
         if !r.ok() {
@@ -386,4 +411,8 @@ fn run_main() -> i32 {
     build(&file, &src, &dir, &params, &o, &mut loader)
 }
 
+// a window for --watch: ui's start (its languages, the app's identity) everywhere but in the browser
+#[cfg(not(target_arch = "wasm32"))]
+ui::main!(run_main());
+#[cfg(target_arch = "wasm32")]
 rt::main!(run_main());

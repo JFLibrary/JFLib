@@ -13,17 +13,27 @@
 //                  platform), the pointer lock's click and end; store / load in a settings file (base::Ini)
 //   camera         FirstPerson, Follow (an orbit, pulled in front of walls through lib/physics), FreeFly;
 //                  View (eye, forward, up)
+//   assets         (G7b part 2) Assets<T>: files through the VFS decoded in the background (plat's blocking
+//                  pool, or a budget per frame), Handle<T> with a state (Loading, Ready, Failed), counted
+//                  references, unloading; the kinds are types (Asset::decode; glTF and images in game_render3d)
+//   audio          (G7b part 2) SpatialAudio over plat::audio's mixer: a listener (the camera's View), Emitter
+//                  components and sounds at points, the gain by distance (Attenuation), the pan by direction
 //
 // render3d is not a dependency: the bridge that puts entities with a mesh into a render3d scene is the
 // crate game_render3d.  Everything here is deterministic: no unordered containers, no threads, no clock
 // of its own (time comes from outside), floats only through + - * / and lib/physics' math (its correctly
-// rounded square root, rt's portable sin and cos).  docs/GAMECORE.md describes the design and the tests
-// (apps/gametest).
+// rounded square root, rt's portable sin and cos).  The one exception is assets: with Loading::Background
+// an asset becomes Ready when its thread is done (what a frame shows, never what the simulation computes).
+// docs/GAMECORE.md describes the design and the tests (apps/gametest).
 #![no_std]
 #![forbid(unsafe_code)]
 
 extern crate alloc;
 
+/// (G7b part 2) files decoded in the background behind handles: states, references, unloading
+pub mod assets;
+/// (G7b part 2) spatial audio: a listener, emitters, attenuation by distance, pan by direction
+pub mod audio;
 /// camera controllers: first person, follow, free fly
 pub mod camera;
 /// actions, bindings, mouse settings, the pointer lock's click and end
@@ -35,6 +45,8 @@ mod sparse;
 mod tick;
 mod world;
 
+pub use assets::{Asset, AssetId, Assets, Handle, Loading};
+pub use audio::{Attenuation, Emitter, SpatialAudio};
 pub use camera::{FirstPerson, Follow, FreeFly, View};
 pub use input::{ActionId, ActionKind, ActionMap, ActionState, Bind, Device, Input, MouseSettings, PadSettings, Source, TickInput};
 pub use pose::{Pose, Transform, nlerp};

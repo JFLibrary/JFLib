@@ -95,6 +95,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   shows no caption buttons, and there are no resize grips; the browser tab shows the title.
   Before, it looked like a window inside the page. Tool windows keep their title bar, also with
   `WF_SYSFRAME` (the browser draws no frame).
+- (G7b) Veils: a cell of the base layer with something over a GPU view (`ui.gpu_view`; a game's HUD, a menu's panel) is composed on the GPU instead of reading the view's frame back in every frame. The CPU draws what lies over the view once over a black and once over a white view; the output's pass draws the cell as K + T x frame (`fs_veil`), the CPU's "over" to one level; a new frame of the view costs those cells nothing (before: the whole frame read back and waited for, 1.3 ms at 1200 x 700 on an RTX 2070 SUPER, and the cells drawn and uploaded again). Text in veils is greyscale; at rest the framebuffer gets the true pixels once (`gp_settle`). `jfgui_GPU_VEIL=0` and `Ui::gpu_test_veil(false)` give the way before; `GpuOutput::veil_cells`, `veil_rects`, `veil_draws`, `veil_settles`; `GPU_OUT_FS_VEIL`. uigputest `--test viewplain`: no frame read back while the view turns under something, the screen against the CPU's picture
 
 ### Fixed
 

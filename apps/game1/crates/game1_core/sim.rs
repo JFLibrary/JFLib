@@ -6,6 +6,8 @@
 //   Figure        a figure's state on the server: movement (movement::MoveState), view, health, kills, deaths,
 //                 the hits counter, who ended it, when it comes back, how long it cannot be hurt, a bot's mind
 //   Event         what happened in a tick (shots, kills, spawns): for tests and measurements
+//   events        what the players learn reliably (game::net's events, rules::GameEvent): every kill to everybody
+//                 (the kill feed), every hit to its shooter (the hit marker), players coming and going
 //
 // A tick (step): figures whose time has come are back at a spawn point; every bot thinks (from the state at the
 // start of the tick); every figure moves with its input in id order (Mover::step: body and weapon); the hit volumes
@@ -27,7 +29,7 @@ use game::net::input::NetInput;
 use game::net::lagcomp::{hitscan, view_time, Hit, HitHistory};
 use game::net::predict::Movement;
 use game::net::quant::{angle_f, angle_q, pitch_f};
-use game::net::server::RoomSim;
+use game::net::server::{RoomEvent, RoomSim, To};
 use game::net::snapshot::{Ent, NetState, Schema, Snapshot};
 
 use crate::bot::{Brain, Seen, Skill};
@@ -137,6 +139,8 @@ pub struct Match {
     record: bool,
     scratch: Vec<(u16, Vec3)>,
     seen: Vec<Seen>,
+    /// the players' events until the server takes them (take_events)
+    net: Vec<RoomEvent>,
 }
 
 impl Match {
@@ -161,6 +165,7 @@ impl Match {
             record: false,
             scratch: Vec::new(),
             seen: Vec::new(),
+            net: Vec::new(),
         };
         m.fill_bots();
         m
@@ -203,6 +208,11 @@ impl Match {
         self.events.clear();
     }
 
+    /// whether it keeps the events (set_record)
+    pub fn recording(&self) -> bool {
+        self.record
+    }
+
     pub fn take_events(&mut self) -> Vec<Event> {
         core::mem::take(&mut self.events)
     }
@@ -210,6 +220,15 @@ impl Match {
     /// the tick of the last step
     pub fn tick(&self) -> u32 {
         self.tick
+    }
+
+    // an event for the players (kept until the server takes it; a room without a server keeps the last 1024)
+    fn tell(&mut self, to: To, e: GameEvent) {
+        let (channel, data) = e.encode();
+        if self.net.len() >= 1024 {
+            self.net.remove(0);
+        }
+        self.net.push(RoomEvent { to, channel, data });
     }
 
     fn free_id(&self) -> Option<u16> {
@@ -337,6 +356,7 @@ impl Match {
         } else {
             self.stats.falls += 1;
         }
+        self.tell(To::All, GameEvent::Kill { killer, victim, head });
         if self.record {
             self.events.push(Event::Kill { tick, killer, victim, head });
         }
@@ -398,6 +418,7 @@ impl Match {
                     }
                     None => false,
                 };
+                self.tell(To::Player(shooter), GameEvent::Hit { victim, head, kill: dead });
                 if dead {
                     self.kill(victim, shooter, head);
                 }
@@ -418,10 +439,7 @@ impl Match {
         fields[F_HEALTH] = f.health;
         fields[F_KILLS] = f.kills;
         fields[F_DEATHS] = f.deaths;
-        let mut info = f.hits as i32 | (f.killer as i32 & 0xff) << 8 | (f.spawn_dir & 63) << INFO_SPAWN_SHIFT | (f.heads as i32) << 24;
-        if f.killed_by_head {
-            info |= INFO_HEAD;
-        }
+        let mut info = (f.spawn_dir & 63) << INFO_SPAWN_SHIFT;
         if (self.tick.wrapping_sub(f.safe_until) as i32) < 0 {
             info |= INFO_PROTECTED;
         }
@@ -443,12 +461,20 @@ impl RoomSim for Match {
         if self.figs.len() >= self.cfg.max_figures && !self.drop_bot() {
             return None;
         }
-        self.add_figure(String::from(name), None)
+        let id = self.add_figure(String::from(name), None)?;
+        self.tell(To::AllBut(id), GameEvent::Joined { id, name: String::from(name) });
+        Some(id)
     }
 
     fn leave(&mut self, player: u16) {
-        self.figs.remove(&player);
+        if let Some(f) = self.figs.remove(&player) {
+            self.tell(To::All, GameEvent::Left { id: player, name: f.name });
+        }
         self.fill_bots();
+    }
+
+    fn take_events(&mut self, out: &mut Vec<RoomEvent>) {
+        out.append(&mut self.net);
     }
 
     fn step(&mut self, tick: u32, dt: f64, inputs: &[(u16, NetInput, bool)]) {

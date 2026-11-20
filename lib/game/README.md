@@ -69,6 +69,13 @@ camera.look(input.motion_of(look_x), 0.0);
   holds, quantised and cut by priority to fit one 1200-byte datagram; a join's full state that does not
   fit comes over a WebSocket. Hits are lag-compensated (the others rewound to what the shooter saw).
   Rooms by a code or a link, a name, no account; bots and a simulated network for tests.
+- **Assets** (`game::assets`): files through JFLib's virtual file system, decoded in the background on
+  threads (or within a budget per frame where there are none), behind handles with a state (loading,
+  ready, failed), counted references and unloading; the kinds are types (glTF models and images are in
+  the bridge crate).
+- **Spatial audio** (`game::audio`): a listener (the camera), sounds on entities and at points, the
+  volume by distance (near, far, a rolloff) and the pan by direction, over the shared mixer of
+  JFLib's sound output.
 
 The bridge that draws entities through JFLib's 3D renderer is the crate
 [jflib-game-render3d](https://crates.io/crates/jflib-game-render3d): a server never links a renderer.

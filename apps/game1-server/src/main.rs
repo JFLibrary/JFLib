@@ -1,8 +1,9 @@
 // game1-server -- the server of Spiel 1 (working name; docs/GAME1.md): rooms by code, free for all, server-side bots,
-// the clients over UDP (desktop) and WebSocket (browser and desktop); one thread, a static Linux program without libc,
-// also Windows.  The game's logic is game1_core (apps/game1/crates/game1_core), the same the client predicts with.
+// the clients over UDP (desktop) and WebSocket (browser and desktop); one loop, the rooms of a tick side by side on the
+// worker pool (one room per core; `--threads N`), a static Linux program without libc, also Windows.  Room codes and
+// tickets from the system's random numbers.  The game's logic is game1_core (apps/game1/crates/game1_core), the same the client predicts with.
 //
-//   game1-server [--bind ADDR] [--port P] [--bots N] [--web DIR] [--secs S]
+//   game1-server [--bind ADDR] [--port P] [--bots N] [--web DIR] [--secs S] [--log]
 //       --bind      the address to listen on (127.0.0.1 unless set: only this computer; 0.0.0.0 for a LAN, which
 //                   the system's firewall may ask about)
 //       --port      UDP and TCP port (27960)
@@ -10,6 +11,9 @@
 //       --web DIR   also serve the files of the browser build (build/web/game1) on the same port: a browser opens
 //                   http://ADDR:PORT/ and plays over the WebSocket /game1 of the page's own server
 //       --secs S    stop after S seconds (tests)
+//       --log       every connection that comes and goes (netchan's reason), and every 10 s and at the end each
+//                   player's counts as the server sees them (snapshots, inputs that came late or not at all: the
+//                   loss upwards, events) and the time of the loop's rounds with ticks (the measurements, NETCODE.md)
 //   game1-server --check     the self-check of tests/check.uis: a room with 16 bots for a minute of ticks, then the
 //                            server on 127.0.0.1 with a client over UDP that joins a room and gets snapshots
 //   game1-server --version | --help
@@ -44,7 +48,7 @@ fn out(s: &str) {
 }
 
 fn usage() -> i32 {
-    out("Aufruf: game1-server [--bind ADRESSE] [--port P] [--bots N] [--web ORDNER] [--secs S] | --check | --version | --help\n");
+    out("Aufruf: game1-server [--bind ADRESSE] [--port P] [--bots N] [--web ORDNER] [--secs S] [--log] | --check | --version | --help\n");
     0
 }
 
@@ -81,6 +85,8 @@ fn bind(addr: SocketAddr, web: Option<&str>) -> Result<(netchan::Server, Option<
         Some(dir) => {
             let ep = chan.ws_endpoint();
             let dir = String::from(dir);
+            // (a browser keeps up to six connections to the page's server open after loading it; with few workers and
+            // a long keep-alive the WebSocket's upgrade waited for one of them: Firefox joined after 5.7 s)
             let handler: netio::server::Handler = Arc::new(move |req: &Request| {
                 if req.path() == WS_PATH {
                     return ep.accept(req);
@@ -90,7 +96,7 @@ fn bind(addr: SocketAddr, web: Option<&str>) -> Result<(netchan::Server, Option<
                     None => Response::new(404),
                 }
             });
-            let http = netio::Server::start(&addr, HttpConfig { threads: 4, read_ms: 10_000, ..HttpConfig::default() }, handler).map_err(|e| format!("HTTP auf {}: {}", addr, e))?;
+            let http = netio::Server::start(&addr, HttpConfig { threads: 16, idle_ms: 2_000, read_ms: 10_000, ..HttpConfig::default() }, handler).map_err(|e| format!("HTTP auf {}: {}", addr, e))?;
             let port = http.local_addr().port;
             let udp = chan.bind_udp(&SocketAddr::new(addr.ip, port)).map_err(|e| format!("UDP auf Port {}: {}", port, e))?;
             Ok((chan, Some(http), udp, port))
@@ -104,7 +110,7 @@ fn bind(addr: SocketAddr, web: Option<&str>) -> Result<(netchan::Server, Option<
 }
 
 /// the server's loop -> exit code
-fn serve(addr: SocketAddr, bots: usize, web: Option<&str>, secs: Option<u64>) -> i32 {
+fn serve(addr: SocketAddr, bots: usize, web: Option<&str>, secs: Option<u64>, log: bool) -> i32 {
     let (chan, http, udp, ws_port) = match bind(addr, web) {
         Ok(x) => x,
         Err(e) => {
@@ -114,13 +120,23 @@ fn serve(addr: SocketAddr, bots: usize, web: Option<&str>, secs: Option<u64>) ->
     };
     let map = game1_core::map::werft();
     let opts = HostOptions { room: MatchConfig { bots, seed: plat::random_u64(), ..MatchConfig::default() }, ..HostOptions::default() };
-    let mut host = Host::new(chan, ws_port, opts, map, plat::random_u64());
+    let mut host = Host::new(chan, ws_port, opts, map);
+    host.log = log;
     out(&format!("game1-server {}: {} auf UDP {} und ws://{}:{}{}{}\n", APP_VERSION, GAME_NAME, udp, udp.ip, ws_port, WS_PATH, if web.is_some() { format!(", die Seite auf http://{}:{}/", udp.ip, ws_port) } else { String::new() }));
     let t0 = plat::time_us();
     let mut last_report = t0;
+    let mut last_log = t0;
+    let mut rounds: Vec<u32> = Vec::new();
     loop {
         let now = plat::time_us();
-        host.round(now * 1000);
+        let n = host.round(now * 1000);
+        if log && n > 0 {
+            rounds.push((plat::time_us() - now).min(u32::MAX as u64) as u32);
+        }
+        if log && now - last_log > 10_000_000 {
+            last_log = now;
+            report(&host, &mut rounds);
+        }
         if now - last_report > 30_000_000 {
             last_report = now;
             let rooms = host.game.rooms();
@@ -133,10 +149,47 @@ fn serve(addr: SocketAddr, bots: usize, web: Option<&str>, secs: Option<u64>) ->
         // (a sleep would cost a timer tick on Windows: the channel's wait wakes on a packet)
         host.wait(1000 / RATE / 2);
     }
+    if log {
+        report(&host, &mut rounds);
+    }
     if let Some(h) = http {
         h.stop();
     }
     0
+}
+
+/// --log: each player's counts and the loop's round times since the last report
+fn report(host: &Host, rounds: &mut Vec<u32>) {
+    let st = host.game.stats();
+    rounds.sort_unstable();
+    let p = |q: usize| rounds.get((rounds.len() * q / 100).min(rounds.len().saturating_sub(1))).copied().unwrap_or(0);
+    out(&format!(
+        "game1-server: {} ticks, {} joins, {} left, {} snapshots ({} bytes, max {}), events {} out {} in; rounds with ticks: {} p50 {} p99 {} max {} us\n",
+        st.ticks,
+        st.joins,
+        st.left,
+        st.snapshots,
+        st.snapshot_bytes,
+        st.max_snapshot,
+        st.events_out,
+        st.events_in,
+        rounds.len(),
+        p(50),
+        p(99),
+        rounds.last().copied().unwrap_or(0)
+    ));
+    rounds.clear();
+    for code in host.game.rooms() {
+        for (conn, id, name) in host.game.players(&code) {
+            if let Some(l) = host.game.link_stats(conn) {
+                let i = l.inputs;
+                out(&format!(
+                    "game1-server:   {} {} ({}): {} snapshots, inputs {} taken, {} missed, {} late, {} repeated, events {} sent {} resent {} acknowledged, {} in\n",
+                    code, id, name, l.snapshots, i.received, i.missed, i.late, i.repeated, l.events.sent, l.events.resent, l.events.done, l.events_in.delivered
+                ));
+            }
+        }
+    }
 }
 
 /// the self-check (see the module header) -> exit code
@@ -162,7 +215,7 @@ fn check() -> i32 {
     match bind(lo, None) {
         Ok((chan, _, udp, ws)) => {
             let opts = HostOptions { room: MatchConfig { bots: 3, ..MatchConfig::default() }, ..HostOptions::default() };
-            let mut host = Host::new(chan, ws, opts, map.clone(), 99);
+            let mut host = Host::new(chan, ws, opts, map.clone());
             let nc = NetClient::new(ClientOptions { name: String::from("Prüfer"), ..ClientOptions::default() }, Mover::default(), schema(), Match::empty_baseline());
             match NetLink::connect(Endpoint::Udp(udp), ClientConfig { protocol: PROTOCOL, ..ClientConfig::default() }, nc, WS_PATH) {
                 Ok(mut link) => {
@@ -217,7 +270,8 @@ fn run() -> i32 {
     let bots = value("--bots").and_then(|b| b.parse::<usize>().ok()).unwrap_or(0).min(game1_core::rules::MAX_FIGURES);
     let secs = value("--secs").and_then(|s| s.parse::<u64>().ok());
     let web = value("--web");
-    serve(SocketAddr::new(ip, port), bots, web.as_deref(), secs)
+    let log = args.iter().any(|a| a == "--log");
+    serve(SocketAddr::new(ip, port), bots, web.as_deref(), secs, log)
 }
 
 rt::main!(run());

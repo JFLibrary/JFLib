@@ -9,6 +9,7 @@ use alloc::vec::Vec;
 
 use game::net::bits::{svar_bits, uvar_bits, BitReader, BitWriter};
 use game::net::clock::{InterpClock, SteeredClock};
+use game::net::event::NetEvent;
 use game::net::input::{read_inputs, write_inputs, InputBuffer, NetInput};
 use game::net::predict::{Movement, Outcome, Predictor};
 use game::net::proto::{self, Base, Hello, InputMsg, SnapHeader, Welcome};
@@ -466,15 +467,29 @@ fn messages(c: &mut Ctx) {
     let w = Welcome { room: code, player: 7, rate: 60, snapshot_every: 2, tick: u32::MAX - 3, margin: 2, max_rewind: 12, fetch: true, ticket: 0x1234_5678_9abc_def0, ws_port: 8080, full_bytes: 5000 };
     c.check(proto::read_welcome(&proto::write_welcome(&w)) == Some(w.clone()), || String::from("WELCOME round trip"));
     c.check(proto::read_refuse(&proto::write_refuse(proto::REFUSE_ROOM_FULL)) == Some(proto::REFUSE_ROOM_FULL), || String::from("REFUSE"));
-    let m = InputMsg { newest: 17, inputs: alloc::vec![NetInput { buttons: 5, ..NetInput::default() }; 3], ack: Some(u32::MAX), full: None };
-    c.check(proto::read_input(&proto::write_input(&m)) == Some(m.clone()), || String::from("INPUT round trip"));
+    let m = InputMsg::new(17, alloc::vec![NetInput { buttons: 5, ..NetInput::default() }; 3], Some(u32::MAX), None);
+    let plain = proto::write_input(&m);
+    c.check(proto::read_input(&plain) == Some(m.clone()), || String::from("INPUT round trip"));
+    c.check(plain[0] == proto::MSG_INPUT, || String::from("an INPUT without events has no EXT flag"));
+    // the event part: an acknowledgement, a run, both (ticks against the newest input, across the wrap)
+    let ev = alloc::vec![NetEvent::new(15, 3, b"kill"), NetEvent::new(u32::MAX, 15, &[]), NetEvent::new(18, 0, &[7u8; 255])];
+    for (ack, run) in [(Some(65535u16), None), (None, Some((65534u16, ev.clone()))), (Some(0), Some((9, ev.clone())))] {
+        let m2 = InputMsg { ev_ack: ack, events: run, ..m.clone() };
+        let b = proto::write_input(&m2);
+        c.check(b[0] == proto::MSG_INPUT | proto::EXT && proto::msg_type(&b) == Some(proto::MSG_INPUT), || String::from("an INPUT with events has the EXT flag"));
+        c.check(proto::read_input(&b) == Some(m2.clone()), || format!("INPUT with an event part: {:?}", m2.ev_ack));
+    }
     c.check(proto::read_fetch(&proto::write_fetch(99)) == Some(99), || String::from("FETCH"));
+    c.check(proto::is_leave(&proto::write_leave()) && proto::msg_type(&proto::write_leave()) == Some(proto::MSG_LEAVE), || String::from("LEAVE"));
     for base in [Base::None, Base::Map, Base::Back(1), Base::Back(255)] {
         for margin in [None, Some(-128i8), Some(0), Some(127)] {
-            let h = SnapHeader { tick: 0xffff_fff0, base, player: 3, have: 0xffff_ffee, margin };
-            let b = proto::write_snap_header(proto::MSG_SNAPSHOT, &h).finish();
-            let got = proto::read_snap_header(&b).map(|x| (x.0, x.1));
-            c.check(got == Some((proto::MSG_SNAPSHOT, h)), || format!("snapshot header {:?}: {:?}", h, got));
+            for (ev_ack, events) in [(None, false), (Some(3u16), false), (None, true), (Some(65535), true)] {
+                let h = SnapHeader { tick: 0xffff_fff0, base, player: 3, have: 0xffff_ffee, margin, ev_ack, events };
+                let b = proto::write_snap_header(proto::MSG_SNAPSHOT, &h).finish();
+                let got = proto::read_snap_header(&b).map(|x| (x.0, x.1));
+                c.check(got == Some((proto::MSG_SNAPSHOT, h)), || format!("snapshot header {:?}: {:?}", h, got));
+                c.check((b[0] & proto::EXT != 0) == (ev_ack.is_some() || events), || String::from("EXT exactly with an event part"));
+            }
         }
     }
 }
