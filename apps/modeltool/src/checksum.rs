@@ -1,6 +1,7 @@
 // checksum -- the determinism harness: every example built from its script (JFScript's soft floats, the host
 // functions, lib/geom), every part's mesh bits and the numbers of its checks, then a fixed set of geom
-// operations of every kind, folded bit for bit into one FNV-1a hash.  The same number on Windows, Linux,
+// operations of every kind (since G7g part 2 also Boolean operations and bevels, and the example turm.jfs), folded
+// bit for bit into one FNV-1a hash.  The same number on Windows, Linux,
 // macOS and the browser means the same script gives the same model there (docs/GEOM.md, "Prüfsummen").
 
 use alloc::format;
@@ -94,6 +95,23 @@ fn operations() -> Vec<Mesh> {
     v.push(base.smooth(12.0));
     v.push(base.flat().uv_box(0.37));
     v.push(Mesh::merge(&[&base, &base.translated(Vec3::new(2.0, 0.0, 0.0))]).unwrap().weld(1e-9));
+    // (G7g part 2) Boolean operations and bevels: a slab less a turned prism and a box flush with its face, turned
+    // boxes joined, a sphere cut by a box, a solid turned and cut again, bevels of a box, a cylinder and a frustum
+    let solid = |m: &Mesh| geom::Solid::from_convex(m).unwrap();
+    let slab = geom::cuboid(3.0, 2.0, 0.3).unwrap();
+    let prism = geom::cylinder(0.4, 1.0, 13).unwrap().rotated(Axis::X, 90.0).translated(Vec3::new(-0.6, 1.0, -0.5));
+    let notch = geom::cuboid(0.8, 0.5, 0.3).unwrap().translated(Vec3::new(0.9, 1.5, 0.0));
+    v.push(geom::difference(&slab, &[&prism, &notch]).unwrap());
+    let turned: Vec<Mesh> = (0..4).map(|k| geom::cuboid(1.0, 0.7, 1.3).unwrap().rotated(Axis::Y, 23.0 * k as f64).translated(Vec3::new(0.45 * k as f64, 0.1 * k as f64, 0.0))).collect();
+    v.push(geom::union(&turned.iter().collect::<Vec<_>>()).unwrap());
+    v.push(geom::intersection(&[&geom::sphere(1.0, 19, 11).unwrap(), &geom::cuboid(1.5, 1.2, 1.5).unwrap().translated(Vec3::new(0.3, 0.2, -0.1))]).unwrap());
+    let cut = solid(&slab).difference(&solid(&prism)).unwrap();
+    let turn = geom::Affine::rotation_about(Vec3::new(0.2, 1.0, -0.3), 31.0).unwrap();
+    v.push(cut.transformed(&turn).difference(&solid(&geom::cuboid(0.5, 3.0, 0.5).unwrap().translated(Vec3::new(0.7, -0.5, 0.0)))).unwrap().to_mesh(30.0).unwrap());
+    v.push(geom::bevel(&geom::cuboid(1.2, 0.8, 0.6).unwrap(), 0.1, 3, None).unwrap());
+    v.push(geom::bevel(&geom::cylinder(0.5, 1.0, 24).unwrap(), 0.08, 2, None).unwrap());
+    v.push(geom::bevel(&geom::cone(0.7, 1.2, 12, 0.3).unwrap(), 0.05, 1, None).unwrap());
+    v.push(geom::bevel(&geom::cuboid(1.0, 2.0, 0.5).unwrap(), 0.15, 4, Some(Axis::Y)).unwrap());
     v
 }
 

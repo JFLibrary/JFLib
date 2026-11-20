@@ -1,0 +1,31 @@
+#!args --watch apps/modeltool/examples/kiste.jfs
+# The observation mode headless (watch_ui.rs): the crate example in the window, the four fixed views, the free view
+# by dragging and the wheel, the grid off, building again by the button and F5.  That the window builds again when
+# the file changes is the console's group "watch" (real files in a temporary folder); this script never writes one.
+expect text:"Kiste: ok" exists
+expect text:"28 Teile, 444 Dreiecke, 0.8 x 0.8 x 0.8 m" exists
+expect text:"Ansicht: vorn" exists
+expect text:"Bau 1" exists
+shot build/modeltool-watch-vorn.png
+click "Rechts"
+expect text:"Ansicht: rechts" exists
+click "Oben"
+expect text:"Ansicht: oben" exists
+click "Schräg"
+expect text:"Ansicht: schräg" exists
+shot build/modeltool-watch-schraeg.png
+# 50 DIP right and 20 down from the middle: from the three-quarter view (35, 28) by 0.4 degrees per DIP
+drag canvas:"Modell" 600,400
+expect text:"Ansicht: frei (Gier 15°, Nick 36°, Abstand 1)" exists
+wheel canvas:"Modell" 120
+expect text:"Ansicht: frei (Gier 15°, Nick 36°, Abstand 0.9)" exists
+shot build/modeltool-watch-frei.png
+click "Vorn"
+expect text:"Ansicht: vorn" exists
+click "Gitter"
+expect "Gitter" unchecked
+click "Neu bauen"
+expect text:"Bau 2" exists
+key f5
+expect text:"Bau 3" exists
+expect text:"Kiste: ok" exists

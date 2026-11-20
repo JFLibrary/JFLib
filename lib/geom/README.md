@@ -5,9 +5,12 @@ primitives, profiles and operations, and the checks a model must pass, with the 
 platform. Boxes, cylinders, cones, spheres, tori, stairs and arches; profiles extruded, raised from a
 floor plan, swept along a path or turned about an axis; moves, rotations, scales, mirrors, arrays,
 merging and welding; flat or smooth normals with an angle threshold; texture coordinates by box
-projection in metres. The checks say whether a model is closed and manifold, whether its faces point
-outward, whether it has degenerate triangles, how large it is, its area and volume. It is plain Rust,
-without the standard library and without a line of `unsafe` code.
+projection in metres. Union, difference and intersection of convex solids, as brushes in a map editor,
+decided with exact arithmetic (results closed, faces outward, ready for the next operation), and
+chamfered or rounded edges. The checks say whether a model is closed and manifold, whether its faces
+point outward, whether it has degenerate triangles and where the first problem lies, how large it is,
+its area and volume. It is plain Rust, without the standard library and without a line of `unsafe`
+code.
 
 ## How it is used
 
@@ -25,6 +28,12 @@ let table = Mesh::merge(&[&top, &legs])?.uv_box(1.0);
 let profile = [[-0.07, -0.07], [0.0, -0.07], [0.0, 0.02], [0.015, 0.02], [0.015, 0.07], [-0.07, 0.07]];
 let edge = [Vec3::new(-0.44, 0.0, 0.0), Vec3::new(-0.44, 2.0, 0.0), Vec3::new(0.44, 2.0, 0.0), Vec3::new(0.44, 0.0, 0.0)];
 let frame = geom::sweep(&profile, &edge, false, 0.0)?;
+
+// a wall with a window: a difference of convex solids, the sill with rounded edges
+let wall = geom::cuboid(3.0, 2.5, 0.3)?;
+let window = geom::cuboid(1.2, 1.3, 1.0)?.translated(Vec3::new(0.0, 0.9, 0.0));
+let wall = geom::difference(&wall, &[&window])?;
+let sill = geom::bevel(&geom::cuboid(1.4, 0.05, 0.35)?, 0.01, 3, None)?;
 
 let report = table.check();
 assert!(report.closed() && report.outward() && report.degenerate == 0);

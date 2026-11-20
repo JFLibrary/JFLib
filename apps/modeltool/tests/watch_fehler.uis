@@ -1,0 +1,10 @@
+#!args --watch apps/modeltool/tests/kaputt.jfs
+# The observation mode with a script that fails (tests/kaputt.jfs, line 4): the bar above the view, the place and the
+# message as modeltool prints them, the source line and the calls; no model yet.
+expect "Fehler im Skript" exists
+expect text:"apps/modeltool/tests/kaputt.jfs:4:14: Fehler: geom.box: die Höhe muss eine Zahl größer 0 sein, nicht -1" exists
+expect text:"  4 | let b = geom.box(1, -1, 1)" exists
+expect text:"kaputt.jfs: Fehler" exists
+click "Neu bauen"
+expect text:"Bau 2" exists
+expect text:"kaputt.jfs: Fehler" exists

@@ -31,6 +31,9 @@ agent_core.workspace = true
 # JFScript lives in its own repository and comes by git, as for editortest (docs/GAME.md, E7); the root
 # Cargo.toml takes its jflib-agent-core from this workspace ([patch.crates-io])
 script = { package = "jfscript", git = "https://github.com/JFLibrary/JFScript" }
+# the observation mode's window (--watch; the browser's build does not use them)
+ui.workspace = true
+style = { package = "jflib-style-winui", path = "../../styles/winui" }
 
 [build-dependencies]
 jflib-build.workspace = true

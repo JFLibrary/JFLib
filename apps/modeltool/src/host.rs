@@ -3,14 +3,17 @@
 // {mesh: id, tris: n} (JFScript has no host objects yet: docs/GEOM.md, "Was JFScript braucht"), whose
 // methods reach the host as "map.move" and so on; meshes never change, every operation makes a new one.
 // Wrong arguments throw a German message that names the function and the parameter; the VM adds the line
-// and column of the call.
+// and column of the call.  A mesh made by a Boolean operation keeps its convex cells (geom::Solid) beside it,
+// moved, turned, scaled and mirrored with it, so it can go into the next Boolean operation; any other mesh
+// goes in as one convex solid.
 
 use alloc::format;
+use alloc::rc::Rc;
 use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 
-use geom::{Axis, Mesh, Vec3};
+use geom::{Affine, Axis, Mesh, Solid, Vec3};
 use script::{Cx, Fail, Host, Value};
 
 /// the names the host answers (compile_with: any other unknown name is an error before the run)
@@ -39,7 +42,10 @@ pub const API: &[ApiEntry] = &[
     ApiEntry { name: "geom.prism", params: "grundriss, h", doc: "Grundriss [[x, z], ...] (Ansicht von oben) von y = 0 um h nach oben" },
     ApiEntry { name: "geom.sweep", params: "profil, pfad, geschlossen = false, glatt = 30", doc: "Profil [[x, y], ...] entlang eines Pfads [[x, y, z], ...]; Ecken auf Gehrung" },
     ApiEntry { name: "geom.lathe", params: "profil, segmente = 32, glatt = 30", doc: "Drehkörper: Profil [[radius, y], ...] um die Y-Achse" },
-    ApiEntry { name: "geom.merge", params: "m1, m2, ... | [m1, m2, ...]", doc: "Meshes zu einem zusammenfügen" },
+    ApiEntry { name: "geom.merge", params: "m1, m2, ... | [m1, m2, ...]", doc: "Meshes zu einem zusammenfügen (Teile bleiben getrennt, auch wenn sie sich durchdringen)" },
+    ApiEntry { name: "geom.union", params: "m1, m2, ... | [m1, m2, ...]", doc: "Vereinigung zu einem geschlossenen Körper (konvexe Körper oder Ergebnisse Boolescher Operationen)" },
+    ApiEntry { name: "geom.difference", params: "m, abzug1, abzug2, ... | [m, abzug1, ...]", doc: "m ohne die Abzüge (ein Fenster aus einer Wand, ein Loch durch eine Platte)" },
+    ApiEntry { name: "geom.intersection", params: "m1, m2, ... | [m1, m2, ...]", doc: "was in allen liegt" },
     ApiEntry { name: "m.move", params: "x, y, z | [x, y, z]", doc: "verschoben" },
     ApiEntry { name: "m.place", params: "x, y, z | [x, y, z]", doc: "so verschoben, dass die Mitte der Unterseite der Box bei (x, y, z) liegt" },
     ApiEntry { name: "m.center", params: "", doc: "so verschoben, dass die Mitte der Box im Ursprung liegt" },
@@ -53,6 +59,7 @@ pub const API: &[ApiEntry] = &[
     ApiEntry { name: "m.radial", params: "anzahl, schritt = 360 / anzahl", doc: "anzahl Kopien um die Y-Achse, Kopie i um i * schritt Grad gedreht" },
     ApiEntry { name: "m.flat", params: "", doc: "flache Normalen (harte Kanten)" },
     ApiEntry { name: "m.smooth", params: "grad = 30", doc: "glatte Normalen über Kanten flacher als grad" },
+    ApiEntry { name: "m.bevel", params: "breite, segmente = 1, achse = nil", doc: "Kanten und Ecken abgeschrägt (segmente 1) oder gerundet (Flächen je Viertelkreis), breite = Radius; achse \"x\" | \"y\" | \"z\": nur die Kanten entlang dieser Achse; nur konvexe Körper" },
     ApiEntry { name: "m.bounds", params: "", doc: "{min, max, size, center} in Metern" },
     ApiEntry { name: "m.area", params: "", doc: "Oberfläche in m²" },
     ApiEntry { name: "m.volume", params: "", doc: "Volumen in m³ (bei geschlossenen Meshes)" },
@@ -141,6 +148,8 @@ pub struct Model {
 /// the host of one run
 pub struct ModelHost<'a> {
     meshes: Vec<Mesh>,
+    /// the convex cells of a mesh made by a Boolean operation (moved with it), by mesh id
+    solids: Vec<Option<Rc<Solid>>>,
     arena: usize,
     defined: Vec<MaterialDef>,
     pub model: Model,
@@ -155,6 +164,7 @@ impl<'a> ModelHost<'a> {
     pub fn new(loader: &'a mut dyn FnMut(&str) -> Result<String, String>) -> ModelHost<'a> {
         ModelHost {
             meshes: Vec::new(),
+            solids: Vec::new(),
             arena: 0,
             defined: Vec::new(),
             model: Model { uv_scale: 1.0, ..Model::default() },
@@ -354,6 +364,7 @@ impl ModelHost<'_> {
                     self.construct(cx, name, f, args)
                 }
                 "merge" => self.merge(cx, name, args),
+                "union" | "difference" | "intersection" => self.boolean(cx, name, f, args),
                 _ => {
                     // geom.move(m, ...) and the other methods as functions
                     if self.mesh_id(cx, arg(args, 0)).is_some() {
@@ -395,6 +406,11 @@ impl ModelHost<'_> {
 
     /// keep a mesh and give the script its handle
     fn handle(&mut self, cx: &mut Cx, f: &str, m: Mesh) -> Result<Value, Fail> {
+        self.handle_with(cx, f, m, None)
+    }
+
+    /// keep a mesh with its convex cells
+    fn handle_with(&mut self, cx: &mut Cx, f: &str, m: Mesh, solid: Option<Rc<Solid>>) -> Result<Value, Fail> {
         let tris = m.triangle_count();
         if self.arena + tris > ARENA_TRIANGLES {
             return Err(throw(cx, f, &format!(
@@ -405,6 +421,7 @@ impl ModelHost<'_> {
         cx.spend(1 + tris as u64 / 64)?;
         self.arena += tris;
         self.meshes.push(m);
+        self.solids.push(solid);
         let id = Value::Int(self.meshes.len() as i64 - 1);
         map_of(cx, &[("mesh", id), ("tris", Value::Int(tris as i64))])
     }
@@ -505,6 +522,61 @@ impl ModelHost<'_> {
         }
     }
 
+    /// the solid of mesh `id`: its cells when a Boolean operation made it, else the mesh as one convex solid
+    fn solid_of(&self, cx: &mut Cx, f: &str, id: usize, what: &str) -> Result<Rc<Solid>, Fail> {
+        if let Some(s) = &self.solids[id] {
+            return Ok(s.clone());
+        }
+        cx.spend(1 + self.meshes[id].triangle_count() as u64 / 16)?;
+        match Solid::from_convex(&self.meshes[id]) {
+            Ok(s) => Ok(Rc::new(s)),
+            Err(e) => Err(throw(cx, f, &format!("{}: {}", what, e.message()))),
+        }
+    }
+
+    /// geom.union / difference / intersection of meshes (or one list of them)
+    fn boolean(&mut self, cx: &mut Cx, name: &str, f: &str, args: &[Value]) -> Result<Value, Fail> {
+        let items: Vec<Value> = match (args.len(), cx.list(arg(args, 0)).map(|l| l.to_vec())) {
+            (1, Some(l)) => l,
+            _ => args.to_vec(),
+        };
+        let least = if f == "difference" { 2 } else { 1 };
+        if items.len() < least {
+            return Err(throw(cx, name, &format!("braucht mindestens {} Meshes", least)));
+        }
+        let mut ids = Vec::with_capacity(items.len());
+        for (k, &v) in items.iter().enumerate() {
+            match self.mesh_id(cx, v) {
+                Some(id) => ids.push(id),
+                None => {
+                    let s = shown(cx, v);
+                    return Err(throw(cx, name, &format!("Teil {} muss ein Mesh sein, nicht {}", k + 1, s)));
+                }
+            }
+        }
+        let mut acc = (*self.solid_of(cx, name, ids[0], "Teil 1")?).clone();
+        for (k, &id) in ids.iter().enumerate().skip(1) {
+            let o = self.solid_of(cx, name, id, &format!("Teil {}", k + 1))?;
+            let r = match f {
+                "union" => acc.union(&o),
+                "difference" => acc.difference(&o),
+                _ => acc.intersection(&o),
+            };
+            acc = match r {
+                Ok(s) => s,
+                Err(e) => return Err(throw(cx, name, e.message())),
+            };
+            cx.spend(1 + acc.cell_count() as u64 * 4)?;
+        }
+        if acc.is_empty() {
+            return Err(throw(cx, name, "das Ergebnis ist leer (nichts übrig)"));
+        }
+        match acc.to_mesh(geom::DEFAULT_SMOOTH_DEG) {
+            Ok(m) => self.handle_with(cx, name, m, Some(Rc::new(acc))),
+            Err(e) => Err(throw(cx, name, e.message())),
+        }
+    }
+
     /// a method of a mesh (args[0] is the mesh)
     fn method(&mut self, cx: &mut Cx, f: &str, args: &[Value]) -> Result<Value, Fail> {
         let name = format!("{}()", f);
@@ -512,20 +584,18 @@ impl ModelHost<'_> {
         let id = self.mesh_arg(cx, name, args, 0, "das Objekt")?;
         let rest = &args[1..];
         let m = &self.meshes[id];
-        let out = match f {
-            "move" => {
-                let v = vec3(cx, name, rest, 0, "die Verschiebung")?;
-                m.translated(v)
-            }
+        // the maps of move, place, center, rotations, scale and mirror (the solid goes along)
+        let map: Option<Affine> = match f {
+            "move" => Some(Affine::translation(vec3(cx, name, rest, 0, "die Verschiebung")?)),
             "place" => {
                 let v = vec3(cx, name, rest, 0, "der Punkt")?;
                 let Some(b) = m.bounds() else { return Err(throw(cx, name, "das Mesh ist leer")) };
                 let c = b.center();
-                m.translated(Vec3::new(v.x - c.x, v.y - b.min.y, v.z - c.z))
+                Some(Affine::translation(Vec3::new(v.x - c.x, v.y - b.min.y, v.z - c.z)))
             }
             "center" => {
                 let Some(b) = m.bounds() else { return Err(throw(cx, name, "das Mesh ist leer")) };
-                m.translated(-b.center())
+                Some(Affine::translation(-b.center()))
             }
             "rotate_x" | "rotate_y" | "rotate_z" => {
                 let deg = num(cx, name, rest, 0, "grad")?;
@@ -534,13 +604,13 @@ impl ModelHost<'_> {
                     "rotate_y" => Axis::Y,
                     _ => Axis::Z,
                 };
-                m.rotated(axis, deg)
+                Some(Affine::rotation(axis, deg))
             }
             "rotate" => {
                 let deg = num(cx, name, rest, 0, "grad")?;
                 let axis = vec3(cx, name, rest, 1, "die Achse")?;
-                match geom::Affine::rotation_about(axis, deg) {
-                    Some(a) => m.transformed(&a),
+                match Affine::rotation_about(axis, deg) {
+                    Some(a) => Some(a),
                     None => return Err(throw(cx, name, "die Achse darf nicht (0, 0, 0) sein")),
                 }
             }
@@ -554,7 +624,7 @@ impl ModelHost<'_> {
                 if s.x == 0.0 || s.y == 0.0 || s.z == 0.0 {
                     return Err(throw(cx, name, "ein Faktor 0 macht das Mesh flach"));
                 }
-                m.scaled(s)
+                Some(Affine::scale(s))
             }
             "mirror" => {
                 let axis = match cx.str(arg(rest, 0)) {
@@ -566,8 +636,19 @@ impl ModelHost<'_> {
                         return Err(throw(cx, name, &format!("die Achse muss \"x\", \"y\" oder \"z\" sein, nicht {}", s)));
                     }
                 };
-                m.mirrored(axis)
+                Some(Affine::mirror(axis))
             }
+            _ => None,
+        };
+        if let Some(a) = map {
+            let out = self.meshes[id].transformed(&a);
+            let solid = self.solids[id].as_ref().map(|s| Rc::new(s.transformed(&a)));
+            return self.handle_with(cx, name, out, solid);
+        }
+        let m = &self.meshes[id];
+        // the same geometry (normals only): the cells stay
+        let keep = matches!(f, "flat" | "smooth" | "weld");
+        let out = match f {
             "flip" => m.flipped(),
             "weld" => {
                 let tol = num_or(cx, name, rest, 0, 0.0, "toleranz")?;
@@ -597,6 +678,28 @@ impl ModelHost<'_> {
                 let deg = num_or(cx, name, rest, 0, geom::DEFAULT_SMOOTH_DEG, "grad")?;
                 self.meshes[id].smooth(deg)
             }
+            "bevel" => {
+                let r = num(cx, name, rest, 0, "breite")?;
+                let k = count_or(cx, name, rest, 1, Some(1), "segmente")?;
+                let only = match arg(rest, 2) {
+                    Value::Nil => None,
+                    v => match cx.str(v) {
+                        Some("x") | Some("X") => Some(Axis::X),
+                        Some("y") | Some("Y") => Some(Axis::Y),
+                        Some("z") | Some("Z") => Some(Axis::Z),
+                        _ => {
+                            let s = shown(cx, v);
+                            return Err(throw(cx, name, &format!("achse muss \"x\", \"y\", \"z\" oder nil sein, nicht {}", s)));
+                        }
+                    },
+                };
+                let solid = self.solid_of(cx, name, id, "das Mesh")?;
+                cx.spend(1 + (k * k) as u64 * solid.plane_count() as u64 / 4)?;
+                return match solid.bevel(r, k, only) {
+                    Ok((s, m)) => self.handle_with(cx, name, m, Some(Rc::new(s))),
+                    Err(e) => Err(throw(cx, name, e.message())),
+                };
+            }
             "bounds" => {
                 let Some(b) = m.bounds() else { return Ok(Value::Nil) };
                 let (lo, hi, size, c) = (vec_value(cx, b.min)?, vec_value(cx, b.max)?, vec_value(cx, b.size())?, vec_value(cx, b.center())?);
@@ -622,7 +725,8 @@ impl ModelHost<'_> {
                 return Err(cx.error(&format!("Ein Mesh hat keine Methode {} (es gibt: {})", f, known.join(", "))));
             }
         };
-        self.handle(cx, name, out)
+        let solid = if keep { self.solids[id].clone() } else { None };
+        self.handle_with(cx, name, out, solid)
     }
 
     fn profile(&mut self, cx: &mut Cx, name: &str, f: &str, args: &[Value]) -> Result<Value, Fail> {

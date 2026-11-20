@@ -1480,6 +1480,8 @@ dependencies = [
  "jflib-plat",
  "jflib-render3d",
  "jflib-rt",
+ "jflib-style-winui",
+ "jflib-ui",
  "jfscript",
 ]
 
