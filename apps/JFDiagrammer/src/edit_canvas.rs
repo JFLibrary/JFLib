@@ -186,7 +186,10 @@ pub(crate) fn model(app: &mut Diagrammer) {
     let mut open: Vec<ShapeRef> = Vec::new();
     for &sk in &sel {
         let r = shape_of(page, sk);
-        if doc.shape(r).is_some_and(|s| s.header().kind == ShapeKind::Group) {
+        // (JD13) not a group with SelectMode 0 ("group only", Visio's cell; the network symbols:
+        // their subshapes are the drawing's colours)
+        let group_only = || doc.sym("SelectMode").and_then(|c| doc.resolve(SheetRef::Shape(r), &diagram_core::CellAddr::single(c)).num()) == Some(0.0);
+        if doc.shape(r).is_some_and(|s| s.header().kind == ShapeKind::Group) && !group_only() {
             open.push(r);
         }
         let mut cur = doc.shape(r).and_then(|s| s.parent());

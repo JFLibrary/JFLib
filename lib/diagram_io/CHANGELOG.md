@@ -82,8 +82,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - (JD10) The stencil build tool takes `hidden: true` in a master's header (the master's `Hidden="1"`: in the file, not in the Shapes panel; JFDiagrammer's flowchart frame and lists)
 
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+- Stencil sources (stage JD13): the master keys `include:` (sections shared by many masters from .inc files, merged under the master's own cells, errors name the included file), `scale: 1:N` (a master page drawn to scale, line weights on paper) and `size:` (the size of a master whose Width or Height is a formula); apps/JFDiagrammer/stencils/README.md
 
 ### Changed
 
 - (JD11) New documents are themed: a style "Theme" (ID 5) with THEMEVAL() cells, "Normal" based on it, "Connector" on the connector scheme's style 1, "Text Only" with the dark font style 1 and Visio's text contrast rule; the page shows the design NetLab, variant 1 (its theme part now carries Visio's extensions); the root style holds the NetLab look without a design
+- The stencil tool's SVG import keeps the document's order as JFNetworker's tools/vsym.py does: consecutive elements of one format share a subshape, a format that comes back later is a subshape of its own (before, every format was one layer where it first appeared and later parts vanished under the body); overlapping filled parts of one format get subshapes of their own (no holes from the even-odd rule); sub-paths of one kind share a Geometry section; an SVG group gets SelectMode 0; SVG masters get new UniqueIDs
+
+### Fixed
+
+- The stencil tool rendered each master's icon after a recalculation of the whole stencil: a stencil of 150 masters took minutes; the icon instance now inherits the values computed for the master
 

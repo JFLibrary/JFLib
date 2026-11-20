@@ -105,7 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -54251,6 +54251,8 @@ a file loses nothing, and the behaviour Visio files carry works without translat
 
   structure::*                  (JD10) containers, lists, callouts: membership in the
                                 Relationships cell, automatic size, list order and layout
+  dock::*                       (JD13) 2-D shapes that snap with an outward connection point
+                                onto an inward one (equipment into racks)
 
 What is to come here, by stage of the plan: page layout (CN-13, P2)
 
@@ -54720,6 +54722,52 @@ CONTRAST: u32 = FIRST_ID + 2
 
 - **`fn by_id(id: u32) -> Option<Design>`**
   the own design with this scheme number
+
+### `diagram_core/src/dock.rs`
+
+Source: [`lib/diagram_core/src/dock.rs`](../lib/diagram_core/src/dock.rs)
+
+```text
+dock -- 2-D shapes that snap onto connection points (JD13; SP-12, CN-04 "Andocken und
+Einrasten": equipment into racks, later doors into walls, valves into pipes)
+
+  snap(doc, owner, shapes, reach) -> Option<Snap>   the move that puts an outward point of
+                                   one of `shapes` on an inward point of another shape
+  dock(tx, eng, owner, shapes, reach) -> Option<Snap>   ... and do it (ops::move_shapes of the
+                                   shapes and what they carry; connectors follow in the app)
+  reach(doc, owner, paper)         a distance on paper in the page's drawing units
+
+Visio's point-to-point glue of 2-D shapes: a connection point of Type 1 ("outward") on the
+shape that moves meets one of Type 0 or 2 ("inward", "both") on another shape.  The nearest
+pair within `reach` (page units) wins.  A container that would take the shape (its
+categories, structure::accepts) and holds the middle of the shape's box is reached from
+anywhere inside it: a server dropped anywhere over a rack goes onto the nearest unit of its
+rail.  The shapes themselves, what they carry (members, callouts) and 1-D shapes are no
+targets; only top-level shapes of the owner dock and are docked on.
+
+Nothing here records glue: membership in the container (structure::settle after the move)
+keeps a device with its rack, in JFDiagrammer as in Visio.
+```
+
+- **`struct Snap`**
+  a move that docks a shape
+  - `d: [f64; 2]` -- the move (page units)
+  - `shape: ShapeRef` -- the shape whose outward point docks, and the IX of that point's row
+  - `point: u32`
+  - `target: ShapeRef` -- the shape it docks on, and the IX of the inward point's row
+  - `target_point: u32`
+
+- **`fn snap(doc: &Document, owner: Owner, shapes: &[ShapeRef], reach: f64) -> Option<Snap>`**
+  the move that docks one of `shapes` (2-D shapes with an outward point) on the nearest inward
+  point of another top-level shape of `owner` within `reach`, or anywhere inside a container
+  that takes it; None: nothing to dock on
+
+- **`fn reach(doc: &Document, owner: Owner, paper: f64) -> f64`**
+  `paper` inches on the paper of `owner`'s page in its drawing units (the page's scale; a
+  master or a page without scale: 1:1) -- the reach of a gesture that ends on the page
+
+- **`fn dock(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[ShapeRef], reach: f64) -> Result<Option<Snap>, EditError>`**
+  dock `shapes` (see snap) and move them with what they carry; None: nothing moved
 
 ### `diagram_core/src/document.rs`
 
@@ -56323,9 +56371,6 @@ is at most 64 sheets long (a cycle of styles or masters in a broken file ends th
 - **`fn value_of(&self, sheet: SheetRef, cell: &str) -> Value`**
   the value of a single cell (PinX, Width ...) for `sheet`, with inheritance
 - **`fn rows(&self, sheet: SheetRef, sec: SecKey) -> Vec<EffRow>`**
-  the rows section `sec` really has for `sheet`: inherited, overridden and own rows
-  without the deleted ones; indexed rows by rising index, named rows in the order the
-  master shape or style has them, then the own ones
 - **`fn has_row(&self, sheet: SheetRef, sec: SecKey, key: RowKey) -> bool`**
   whether section `sec` has row `key` for `sheet` (inherited or own, not deleted)
 - **`fn section_indices(&self, sheet: SheetRef, name: Sym) -> Vec<u32>`**

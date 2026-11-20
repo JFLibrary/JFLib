@@ -475,6 +475,17 @@ fn prop_text(tx: &mut Transaction, s: ShapeRef, row: &str, v: &str) {
     let _ = tx.set_constant(SheetRef::Shape(s), &CellAddr::row(sk, rk, c), Value::Text(sym), Some(Unit::Str));
 }
 
+// the page as PNG at `dpi` beside the drawing (how JFDiagrammer shows it, for the comparison in Visio)
+fn write_png(doc: &mut Document, page: PageRef, path: &str, dpi: f64) -> bool {
+    let mut fonts = crate::render::fonts();
+    let mut v = PageView::new(doc, page, &mut fonts, &Options::default());
+    let ro = raster::RasterOptions { dpi, ..Default::default() };
+    let Some(img) = raster::render(&mut v, &ro) else { return false };
+    let ok = plat::write_file(path, &crate::render::png(&img));
+    out(&format!("{} {path} ({} x {})\n", if ok { "wrote" } else { "error: cannot write" }, img.w, img.h));
+    ok
+}
+
 fn write_vsdx(doc: &Document, path: &str) -> bool {
     match vsdx::write(doc, &vsdx::WriteOptions::DEFAULT) {
         Ok(b) => {
@@ -555,7 +566,7 @@ pub fn gegenprobe(dir: &str) -> i32 {
         if let Some(l) = put(&mut tx, set("peripherals"), page, "Legend", (380.0, 240.0), 0) {
             let text = "Legende\n1 × Cloud\n1 × Dateiserver\n1 × Datenbankserver\n1 × Drucker\n1 × Firewall\n1 × Gebäude\n1 × Laptop\n1 × Lastverteiler\n1 × PC\n1 × Router\n1 × Smartphone\n1 × Switch\n1 × WLAN-Zugangspunkt\n1 × Webserver";
             let _ = tx.set_text(l, Some(Text::plain(text)));
-            set_single(&mut tx, SheetRef::Shape(l), "Height", 81.0 * MM, Some(Unit::Millimeters));
+            set_single(&mut tx, SheetRef::Shape(l), "Height", (4.5 + 3.387 * 15.0) * MM, Some(Unit::Millimeters));
         }
         let links = [(0, 1), (1, 2), (2, 3), (4, 1), (3, 5), (3, 6), (3, 7), (3, 8), (3, 9), (3, 10), (1, 13)];
         for (a, b) in links {
@@ -572,6 +583,7 @@ pub fn gegenprobe(dir: &str) -> i32 {
         }
         let _ = tx.commit();
         ok &= write_vsdx(&doc, &format!("{dir}/JD13-Netzwerk.vsdx"));
+        ok &= write_png(&mut doc, page, &format!("{dir}/JD13-Netzwerk-JFDiagrammer.png"), 150.0);
     }
     // ---- an empty page at 1:20 (A4 landscape): the fixture of JFDiagrammer's tests/network_rack.uis
     {
@@ -638,6 +650,7 @@ pub fn gegenprobe(dir: &str) -> i32 {
         out(&format!("rack members {mr} (want 9), cabinet members {mc} (want 5)\n"));
         ok &= mr == 9 && mc == 5;
         ok &= write_vsdx(&doc, &format!("{dir}/JD13-Rack.vsdx"));
+        ok &= write_png(&mut doc, page, &format!("{dir}/JD13-Rack-JFDiagrammer.png"), 300.0);
     }
     if ok { 0 } else { 1 }
 }

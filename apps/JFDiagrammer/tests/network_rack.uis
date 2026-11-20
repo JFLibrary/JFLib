@@ -1,0 +1,27 @@
+#!args apps/JFDiagrammer/tests/rack_page.vsdx --no-system-fonts
+# JFDiagrammer, JD13: a rack (SH-146, VL-52) -- rack_page.vsdx is an empty A4 page at 1:20
+# (diagramiotest --write-network-gegenprobe); Weitere Shapes › Netzwerk › Gestellmontierte Geräte;
+# a rack dropped, a server dropped over it snaps with its lower left corner onto the nearest unit
+# of the rail and joins the rack; moved by a little more than one unit it snaps again; a 1 U
+# switch below it; moving the rack moves both
+click button:"Weitere Shapes"
+click "Netzwerk"
+click "Gestellmontierte Geräte"
+drag button:"Gestell" 400,400
+a11y expect announced "„Gestell“ abgelegt"
+expect listitem:"Gestell" rect 365 276 70 248
+drag button:"Server" 405,380
+a11y expect announced "„Server“ abgelegt"
+expect listitem:"Server" rect 370 376 60 11
+# about five units up (a unit is some 6 px here): it snaps onto a unit again
+drag 405,380 409,350
+expect listitem:"Server" rect 370 349 60 11
+drag button:"Switch" 403,420
+a11y expect announced "„Switch“ abgelegt"
+expect listitem:"Switch" rect 370 416 60 5
+shot build/JFDiagrammer-network-rack.png
+# the rack by its left post: both devices come along
+drag 367,470 467,470
+expect listitem:"Gestell" rect 465 273 71 248
+expect listitem:"Server" rect 470 346 61 11
+expect listitem:"Switch" rect 470 413 61 5

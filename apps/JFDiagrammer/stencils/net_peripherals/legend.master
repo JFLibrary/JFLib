@@ -41,9 +41,14 @@ RightMargin = 3 mm
 RightMargin.us = 0.12 in
 TopMargin = 2 mm
 TopMargin.us = 0.08 in
+BottomMargin = 2 mm
+BottomMargin.us = 0.08 in
 
 [User]
 JFD_Legend: Value = TRUE
+
+[Character]
+Row  Size = 8 pt
 
 [Paragraph]
 Row  HorzAlign = 0
@@ -54,8 +59,3 @@ LineTo  X = Width; Y = 0
 LineTo  X = Width; Y = Height
 LineTo  X = 0; Y = Height
 LineTo  X = 0; Y = 0
-
-[Geometry]
-NoFill = TRUE
-MoveTo  X = 0; Y = Height-8 mm
-LineTo  X = Width; Y = Height-8 mm

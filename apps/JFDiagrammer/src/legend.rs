@@ -62,9 +62,10 @@ pub(crate) fn refresh(tx: &mut Transaction, eng: &mut Engine, owner: Owner) -> R
         if now.trim_end_matches('\n') != text {
             tx.set_text(l, Some(Text::plain(&text)))?;
         }
-        // the heading band is 8 mm on paper, each line about 5 mm, 3 mm below
+        // on paper: the margins 2 mm above and below, a line of the master's 8 pt text 1.2 x 8 pt
         // (the top edge stays)
-        let h = dock::reach(tx.doc(), owner, (8.0 + 5.0 * counts.len() as f64 + 3.0) / 25.4);
+        let line = 8.0 * 1.2 / 72.0 * 25.4;
+        let h = dock::reach(tx.doc(), owner, (4.0 + line * (counts.len() + 1) as f64 + 0.5) / 25.4);
         let num = |tx: &mut Transaction, n: &str| {
             let a = CellAddr::single(tx.intern(n));
             (a, tx.doc().resolve(SheetRef::Shape(l), &a).num().unwrap_or(0.0))

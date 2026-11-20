@@ -14,7 +14,8 @@
 //                       instance::place in French, Engine::recalc): Name, NameU, "Name.ID" for
 //                       the second drop, the arrow's translated tip, the text box's text
 //   stencils/svg        tests/stencil_server.svg (two formats: a group of two subshapes) and
-//                       tests/stencil_cloud.svg (one format: the master shape's own geometry)
+//                       tests/stencil_cloud.svg (one format; since JD13 two subshapes, as the
+//                       open line's fill lies on the cloud's)
 //   stencils/errors     faults with file and line: a missing language, an unknown section, an
 //                       unknown function, a missing Width, a missing master file, NameU twice,
 //                       a reference into nothing, a cell text without all languages
@@ -509,33 +510,47 @@ fn svg(h: &mut H) {
             let wf = w.and_then(|c| c.formula.expr()).map(|f| String::from(doc.str(f))).unwrap_or_default();
             let wv = w.and_then(|c| c.value.num()).unwrap_or(-1.0);
             let fill = cell(&doc, SheetRef::Shape(sub), None, None, "FillForegnd").map(|c| sym_text(&doc, c.value)).unwrap_or_default();
-            let want = if k == 0 { (1, 4, "#2E3A46") } else { (7, 4 * 2 + 5, "#6FA3E0") };
+            // (JD13) the seven details are sub-paths of one Geometry section (each starts with MoveTo)
+            let want = if k == 0 { (1, 4, "#2E3A46") } else { (1, 4 * 2 + 5, "#6FA3E0") };
             ok &= sections == want.0 && nurbs >= want.1 && nok && wf.starts_with("Sheet.") && wf.ends_with("!Width") && (wv - gw).abs() < 1e-12 && fill == want.2;
             what.push(format!("sub {k}: {sections} sections, {nurbs} NURBSTo, Width {wf} = {wv}, fill {fill}"));
         }
         h.check("stencils/svg/server", ok, format!("{kind:?}, {}", what.join("; ")));
     }
-    // cloud: one format, the master shape's own geometry; the open line as fill + line
+    // cloud: one format; the open line as fill + line.  (JD13) The line's filled part lies on the
+    // cloud's fill: a subshape of its own after the cloud's (in one shape the even-odd rule would cut
+    // it out of the cloud), so a group of two
     if let Some(&cloud) = ms.get(1) {
-        let Some(sheet) = master_shape(&doc, cloud) else { return };
-        let (sections, nurbs, nok) = nurbs_of(sheet);
-        let flags: Vec<(bool, bool)> = doc
-            .geometry(sheet)
-            .iter()
-            .map(|g| {
+        let Some(top) = master_shape(&doc, cloud) else { return };
+        let parts: Vec<SheetRef> = match top {
+            SheetRef::Shape(r) => match doc.shape(r) {
+                Some(s) if s.header().kind == ShapeKind::Group => s.children().map(SheetRef::Shape).collect(),
+                _ => alloc::vec![top],
+            },
+            _ => alloc::vec![top],
+        };
+        let (mut sections, mut nurbs, mut nok) = (0, 0, true);
+        let mut flags: Vec<(bool, bool)> = Vec::new();
+        for &sheet in &parts {
+            let (s, n, k) = nurbs_of(sheet);
+            sections += s;
+            nurbs += n;
+            nok &= k;
+            flags.extend(doc.geometry(sheet).iter().map(|g| {
                 let f = |n: &str| cell(&doc, sheet, Some(("Geometry", g.index)), None, n).is_some_and(|c| c.value == Value::Num(1.0));
                 (f("NoFill"), f("NoLine"))
-            })
-            .collect();
+            }));
+        }
+        let sheet = parts[0];
         let lw = cell(&doc, sheet, None, None, "LineWeight");
         // stroke-width 2 in viewBox units, the viewBox 64 x 40 on 32 x 20 mm
         let want_lw = 2.0 * diagram_core::formula::math::sqrt((32.0 / 25.4 / 64.0) * (20.0 / 25.4 / 40.0));
         let lw_ok = lw.is_some_and(|c| c.unit == Some(Unit::Points) && matches!(c.value, Value::Num(x) if (x - want_lw).abs() < 1e-9));
-        let kind = match sheet {
+        let kind = match top {
             SheetRef::Shape(r) => doc.shape(r).map(|s| s.header().kind),
             _ => None,
         };
-        h.check("stencils/svg/cloud", kind == Some(ShapeKind::Shape) && sections == 3 && nurbs >= 6 && nok && flags == [(false, false), (false, true), (true, false)] && lw_ok,
+        h.check("stencils/svg/cloud", kind == Some(ShapeKind::Group) && parts.len() == 2 && sections == 3 && nurbs >= 6 && nok && flags == [(false, false), (false, true), (true, false)] && lw_ok,
             format!("{kind:?}, {sections} sections, {nurbs} NURBSTo, NoFill/NoLine {flags:?}, LineWeight {:?}", lw.map(|c| c.value)));
     }
     // the icons of the SVG masters are drawn
