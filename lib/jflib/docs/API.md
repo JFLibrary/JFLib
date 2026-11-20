@@ -119,9 +119,9 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [physics](#physics) -- Collision shapes, broad phase and deterministic queries for games
   <br>[src/bvh.rs](#physicssrcbvhrs) · [src/character.rs](#physicssrccharacterrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
 - [game](#game) -- The game core: a world of entities and components, a fixed tick, input actions, cameras
-  <br>[lib.rs](#game-crate-root) · [src/camera.rs](#gamesrccamerars) · [src/input.rs](#gamesrcinputrs) · [src/net/arena.rs](#gamesrcnetarenars) · [src/net/bits.rs](#gamesrcnetbitsrs) · [src/net/bot.rs](#gamesrcnetbotrs) · [src/net/client.rs](#gamesrcnetclientrs) · [src/net/clock.rs](#gamesrcnetclockrs) · [src/net/event.rs](#gamesrcneteventrs) · [src/net/input.rs](#gamesrcnetinputrs) · [src/net/lagcomp.rs](#gamesrcnetlagcomprs) · [src/net/link.rs](#gamesrcnetlinkrs) · [src/net/predict.rs](#gamesrcnetpredictrs) · [src/net/proto.rs](#gamesrcnetprotors) · [src/net/quant.rs](#gamesrcnetquantrs) · [src/net/room.rs](#gamesrcnetroomrs) · [src/net/server.rs](#gamesrcnetserverrs) · [src/net/sim.rs](#gamesrcnetsimrs) · [src/net/snapshot.rs](#gamesrcnetsnapshotrs) · [src/net/walker.rs](#gamesrcnetwalkerrs) · [src/pose.rs](#gamesrcposers) · [src/sparse.rs](#gamesrcsparsers) · [src/tick.rs](#gamesrctickrs) · [src/world.rs](#gamesrcworldrs)
+  <br>[lib.rs](#game-crate-root) · [src/assets.rs](#gamesrcassetsrs) · [src/audio.rs](#gamesrcaudiors) · [src/camera.rs](#gamesrccamerars) · [src/input.rs](#gamesrcinputrs) · [src/net/arena.rs](#gamesrcnetarenars) · [src/net/bits.rs](#gamesrcnetbitsrs) · [src/net/bot.rs](#gamesrcnetbotrs) · [src/net/client.rs](#gamesrcnetclientrs) · [src/net/clock.rs](#gamesrcnetclockrs) · [src/net/event.rs](#gamesrcneteventrs) · [src/net/input.rs](#gamesrcnetinputrs) · [src/net/lagcomp.rs](#gamesrcnetlagcomprs) · [src/net/link.rs](#gamesrcnetlinkrs) · [src/net/predict.rs](#gamesrcnetpredictrs) · [src/net/proto.rs](#gamesrcnetprotors) · [src/net/quant.rs](#gamesrcnetquantrs) · [src/net/room.rs](#gamesrcnetroomrs) · [src/net/server.rs](#gamesrcnetserverrs) · [src/net/sim.rs](#gamesrcnetsimrs) · [src/net/snapshot.rs](#gamesrcnetsnapshotrs) · [src/net/walker.rs](#gamesrcnetwalkerrs) · [src/pose.rs](#gamesrcposers) · [src/sparse.rs](#gamesrcsparsers) · [src/tick.rs](#gamesrctickrs) · [src/world.rs](#gamesrcworldrs)
 - [game_render3d](#game_render3d) -- The bridge from the game core to render3d: entities with a mesh as scene instances
-  <br>[lib.rs](#game_render3d-crate-root)
+  <br>[lib.rs](#game_render3d-crate-root) · [src/models.rs](#game_render3dsrcmodelsrs)
 - [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
   <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/csg.rs](#geomsrccsgrs) · [src/exact.rs](#geomsrcexactrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
 - [netchan](#netchan) -- Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network
@@ -381,6 +381,11 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   - `leaves: u32`
   - `verified: u64` -- jfgui_GPU_VERIFY: images read back and compared, those that differed
   - `verify_bad: u64`
+  - `veil_cells: u32` -- (G7b) veils (gpu_out.rs "Veils": cells with something over a view, composed on the GPU): the cells and
+    rectangles drawn so in the window's last frame; of all windows: cells drawn twice for them, settles
+  - `veil_rects: u32`
+  - `veil_draws: u64`
+  - `veil_settles: u64`
 
 - **`struct Ui`**
   the UI context: everything ASMLIB keeps in g_\* variables
@@ -9936,10 +9941,27 @@ it back.  A view's frame is bound to the display (G5e3, docs/GPU.md "3D-Ansicht"
 swapchain with a frame not shown yet (Win::pending), a new ver waits; gp_views_wake asks for a render once the
 window's frame has been shown, at the latest VIEW_HOLD_US after the first frame waited (a display that never
 answers does not stop the view).  Without this a view drawn as fast as the app can starved the compositor on the
-same GPU (Intel under Linux: no frame presented at all).  AF_GPU_3D makes the device at level Voll on the fastest
+same GPU (Intel under Linux: no frame presented at all).  (G7b) Cells of the base with something over a view (a game's
+HUD, a menu) are veils (below), not read back.  AF_GPU_3D makes the device at level Voll on the fastest
 adapter; without the flag views work on the Basis device of the frugal adapter.  Without an output in this run (not
 wanted, never possible) views make a device of their own (gp_view_device).  A lost device detaches every content
 (gp_views_gone) and attaches it to the next one.
+
+Veils (G7b, docs/GAMECORE.md "Spielfenster").  Before, a cell of the base layer with anything over a view apart (a
+HUD's text, a menu's panel) was drawn by the CPU over the view's frame, and its Draw read every new frame back: a copy
+of the whole target and a wait for the GPU in each frame, 1.3 ms at 1200 x 700 on the RTX 2070 SUPER, and the CPU drew
+and uploaded those cells again although nothing in them changed but the view.  Now such a cell (the view the only one
+in it, no layer above it) is a veil: the CPU draws what lies over the view twice, once over a black view and once over
+a white one (Cpu::veil: the view's Draw paints the colour, reads nothing), and keeps K, the cell over black, in the
+base texture and T = white − black, per channel the share of the view that shows through, in the veil's texture.
+The output's pass draws the cell as K + T · view (fs_veil), which is the CPU's "over" exactly: every blend of gfx is
+dst = src + dst · (255 − a) / 255, with K = src and T = 255 − a, and the shader rounds once (the CPU rounds the
+product to the nearest level too).  Text in veils is greyscale (subpixel text blends in linear light, which is not of
+that form; as in layers and images, text/lcd.rs).  A new frame of the view costs a veil nothing: K and T change only
+when what lies over the view changes, then the cell is drawn twice and goes up.  The framebuffer lacks the true pixels
+of a veil (like owed cells): gp_settle draws them over the frame read back (once, at rest), puts them into the base
+texture and ends the veil, the next frame of the view makes it again.  jfgui_GPU_VEIL=0 (Ui::gpu_test_veil): the
+way before, every frame read back.
 
 A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
@@ -9957,7 +9979,8 @@ jfgui_GPU_CANVAS_PAN=a,b (they only pan from tiles), jfgui_GPU_CANVAS_ZOOM=a,b (
 tiles, whatever the widget chose), jfgui_GPU_CANVAS_MB=n (the tiles' budget),
 jfgui_GPU_CANVAS_SETTLE_MS=n (the time until the CPU's picture follows a move), jfgui_GPU_OUTPUT=0 (the
 windows through the CPU path, the GPU stays for views, which read every frame back), jfgui_GPU_VIEWS=0 (no view
-is drawn by the output's render pass: every frame read back into the framebuffer);
+is drawn by the output's render pass: every frame read back into the framebuffer), jfgui_GPU_VEIL=0 (no veils:
+cells with something over a view read its frame back);
 lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 
 Script command `gpu` (headless runs stay on the CPU path without it; on other targets (a static
@@ -10005,6 +10028,7 @@ GPU_OUT_VS: &[u32] = spv::VS
 GPU_OUT_FS: &[u32] = spv::FS
 GPU_OUT_FS_IMAGE: &[u32] = spv::FS_IMAGE
 GPU_OUT_FS_TILE: &[u32] = spv::FS_TILE
+GPU_OUT_FS_VEIL: &[u32] = spv::FS_VEIL
 ```
 
 **`impl Ui`**
@@ -10017,6 +10041,9 @@ GPU_OUT_FS_TILE: &[u32] = spv::FS_TILE
 - **`fn gpu_test_hold(&mut self, win: u32, on: bool)`**
   (test aid, G5e3) window `win`'s frames are not shown while on (as if the display did not answer): they stay in
   its texture, its views' new frames wait for them; off: the next look shows the newest
+- **`fn gpu_test_veil(&mut self, on: bool)`**
+  (test aid, G7b) cells of the base with something over a view are veils (the default; jfgui_GPU_VEIL=0 turns them
+  off), or off: those cells read the view's frame back, the way before.  For measurements
 - **`fn gpu_test_image_budget(&mut self, bytes: u64)`**
   (test aid) the bytes image textures may take
 - **`fn gpu_test_canvas_budget(&mut self, bytes: u64)`**
@@ -10047,6 +10074,8 @@ against glibc, Android, the browser): every frame takes the platform's path, no 
   where the GPU shows windows: the pixels of the GPU's images into the framebuffer
 - **`fn gpu_test_hold(&mut self, _win: u32, _on: bool)`**
   (test aid, G5e3) where the GPU shows windows: window `win`'s frames are not shown while on
+- **`fn gpu_test_veil(&mut self, _on: bool)`**
+  (test aid, G7b) where the GPU shows windows: cells with something over a view are veils, or read its frame back
 - **`fn gpu_test_image_budget(&mut self, _bytes: u64)`**
   (test aid) where the GPU shows windows: the bytes image textures may take
 - **`fn gpu_test_canvas_budget(&mut self, _bytes: u64)`**
@@ -31585,7 +31614,9 @@ system's own sounds
   s.start() / s.pause() / s.stop() (empties the ring) / s.finish() (ends once all is played)
   s.set_volume(0 ..= 1), s.state() -> State, s.latency_ms(), s.played(), s.underruns(),
   s.device(), s.device_changes()
-  play(&Sound) -> Result<Voice, AudioError>    a short sound through the shared mixer
+  play(&Sound) -> Result<Voice, AudioError>    a short sound through the shared mixer; voice.set_volume(v),
+                          (G7b) set_gains(left, right) (lib/game's spatial audio pans with it), stop(), playing();
+                          play_gains(&Sound, left, right): with those gains from its first sample on
   play_file(path)         a WAV or Ogg Vorbis file through the VFS (app://, data://, ..)
   Sound::wav(bytes) / ogg / decode / load(path) / tone(freq, ms)
   sound(SOUND_*) -> bool  the system's own sound for an event (dialog_sounds(): whether the
@@ -31769,10 +31800,34 @@ SOUND_NOTIFY: u32 = 5
   still playing (or waiting for the device)
 - **`fn set_volume(&self, v: f32)`**
   0 ..= 1
+- **`fn set_gains(&self, left: f32, right: f32)`**
+  (G7b) the gains of the left and the right channel, 0 ..= 1 each (a mono sound goes to both, a stereo sound
+  keeps its channels): what lib/game's spatial audio pans with.  From the mixer's next buffer on, as
+  set_volume, which sets both
+
+- **`struct MixTest`**
+  (tests, G7b) the mixer of play() without a device: the same code, buffer by buffer, 48 kHz stereo (what
+  lib/game's spatial audio is checked against, sample for sample).  Needs no `audio.output`: nothing is played
+
+**`impl MixTest`**
+
+- **`fn new() -> MixTest`**
+- **`fn play(&mut self, s: &Sound) -> Voice`**
+  a voice as play() starts one: it is mixed from the next render on
+- **`fn render(&mut self, frames: usize) -> Vec<f32>`**
+  the next `frames` frames (stereo, interleaved) as the device's next buffer
+- **`fn voices(&self) -> usize`**
+  voices still in the mixer
+- **`fn rate(&self) -> u32`**
+  the mixer's rate
 
 - **`fn play(s: &Sound) -> Result<Voice, AudioError>`**
   play a sound once, mixed with the other sounds of play() (dropping the Voice lets it play
   on) -> Err(Unavailable) without an output, Err(Denied) without `audio.output`
+
+- **`fn play_gains(s: &Sound, left: f32, right: f32) -> Result<Voice, AudioError>`**
+  (G7b) play() with the gains of the left and the right channel from its first sample on (Voice::set_gains;
+  lib/game's spatial audio starts a far sound quiet, not at full volume for a buffer)
 
 - **`fn play_file(path: &str) -> Result<Voice, AudioError>`**
   play a WAV or Ogg Vorbis file once (see play; without `audio.output` the file is not read)
@@ -62524,17 +62579,284 @@ tick, input actions, camera controllers; without a GPU, so a game's server runs 
                  platform), the pointer lock's click and end; store / load in a settings file (base::Ini)
   camera         FirstPerson, Follow (an orbit, pulled in front of walls through lib/physics), FreeFly;
                  View (eye, forward, up)
+  assets         (G7b part 2) Assets<T>: files through the VFS decoded in the background (plat's blocking
+                 pool, or a budget per frame), Handle<T> with a state (Loading, Ready, Failed), counted
+                 references, unloading; the kinds are types (Asset::decode; glTF and images in game_render3d)
+  audio          (G7b part 2) SpatialAudio over plat::audio's mixer: a listener (the camera's View), Emitter
+                 components and sounds at points, the gain by distance (Attenuation), the pan by direction
 
 render3d is not a dependency: the bridge that puts entities with a mesh into a render3d scene is the
 crate game_render3d.  Everything here is deterministic: no unordered containers, no threads, no clock
 of its own (time comes from outside), floats only through + - * / and lib/physics' math (its correctly
-rounded square root, rt's portable sin and cos).  docs/GAMECORE.md describes the design and the tests
-(apps/gametest).
+rounded square root, rt's portable sin and cos).  The one exception is assets: with Loading::Background
+an asset becomes Ready when its thread is done (what a frame shows, never what the simulation computes).
+docs/GAMECORE.md describes the design and the tests (apps/gametest).
 ```
 
 ### `game` crate root
 
 Re-exports: `physics::{Quat, Vec3}`
+
+### `game/src/assets.rs`
+
+Source: [`lib/game/src/assets.rs`](../lib/game/src/assets.rs)
+
+```text
+assets -- (G7b part 2) files through the VFS, decoded in the background, behind handles with states, reference
+counts and unloading (docs/GAMECORE.md "Assets")
+
+  impl Asset for T               decode(bytes, files) -> Result<T, String>: a file's bytes into the value; files
+                                 reads the files beside it by relative name (a .gltf's buffers and images).  It
+                                 runs on a worker thread (Send); lib/game_render3d has glTF models and images
+  Assets::<T>::new(Loading)      a store of one kind: Background (plat::task::spawn_blocking: threads where the
+                                 target has them), Frames { budget_us } (decoded in update(), one after the other
+                                 until the budget is spent, at least one per update: the browser without
+                                 threads, deterministic tests)
+  assets.load(path) -> Handle<T> the asset of path (app://, data://, mem://, a file ...): the same entry for the
+                                 same path while it lives (another handle), else a new one, Loading
+  assets.insert(name, value)     an asset made in code, Ready at once
+  assets.state(&h) / get(&h) / error(&h) / path(&h) / refs(&h) / id()
+  assets.update() -> Vec<Change> finished decodes become Ready or Failed; assets nobody holds a handle of (for
+                                 `linger` updates) are unloaded: their value goes, their path is forgotten;
+                                 what happened, for those who keep something per asset (the GPU's copies)
+  Handle<T>                      a reference: Clone counts one more, Drop one less; AssetId (index, generation)
+                                 names the entry, also after it is gone (a stale id finds nothing)
+
+The simulation does not depend on assets (they are what a frame shows and plays): with threads the moment an
+asset becomes Ready depends on the machine.  Everything else in lib/game stays deterministic; a test that needs
+the same frames on every target loads with Loading::Frames.
+```
+
+- **`trait Asset: Sized + Send + 'static`**
+  a kind of asset: how a file's bytes become its value (on a worker thread)
+  - `fn decode(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>) -> Result<Self, String>`
+    decode `bytes` (the file at the handle's path); `files` reads a file beside it by a relative name (None: none)
+
+- **`struct Bytes(pub Vec<u8>)`**
+  the raw bytes of a file (an Asset for anything a game decodes itself)
+
+- **`enum Loading`**
+  how decoding runs
+  - `Background` -- on the blocking pool of plat::task (threads; where none can start, the executor runs the jobs between
+    frames, one per run: lib/ui does)
+  - `Frames { budget_us: u64 }` -- in update(), one asset after the other until budget_us is spent (at least one per update)
+
+**`impl Loading`**
+
+- **`fn default_for_target() -> Loading`**
+  Background on targets with threads, Frames { 4 ms } in the browser (a bundle without shared memory has none)
+
+- **`enum State`**
+  where an asset is
+  - `Loading` -- being read and decoded
+  - `Ready` -- decoded: get() gives it
+  - `Failed` -- not read or not decoded: error() says why
+
+- **`struct AssetId`**
+  an asset's entry: its index and generation (a reused index has a new one)
+  - `index: u32`
+  - `generation: u32`
+
+- **`enum Change`**
+  what update() did to an asset
+  - `Ready(AssetId)`
+  - `Failed(AssetId)`
+  - `Unloaded(AssetId)` -- gone: nobody held a handle (its id finds nothing from now on)
+
+- **`struct Handle<T>`**
+  a reference to an asset of kind T: while one lives the asset stays (Clone: one more, Drop: one less)
+
+**`impl<T> Handle<T>`**
+
+- **`fn id(&self) -> AssetId`**
+  the entry it refers to
+
+- **`struct AssetStats`**
+  what a store holds now
+  - `loading: u32`
+  - `ready: u32`
+  - `failed: u32`
+  - `decoded: u64` -- decodes finished, unloads so far
+  - `unloaded: u64`
+
+- **`struct Assets<T: Asset>`**
+  the assets of one kind (see the module header)
+
+- **`fn sibling(path: &str, rel: &str) -> Option<String>`**
+  path's folder (with its slash) joined with a relative name; None for one that leaves the folder or names a scheme
+
+**`impl<T: Asset> Assets<T>`**
+
+- **`fn new(mode: Loading) -> Assets<T>`**
+  an empty store that decodes as `mode` says
+- **`fn mode(&self) -> Loading`**
+  how it decodes
+- **`fn set_linger(&mut self, updates: u32)`**
+  an asset nobody holds stays this many updates before it is unloaded (0, the default: the next update
+  unloads it; a load of its path before then takes it again, without reading it anew)
+- **`fn load(&mut self, path: &str) -> Handle<T>`**
+  the asset of `path`: another handle of its entry while it lives, else a new entry that starts loading
+- **`fn insert(&mut self, name: &str, value: T) -> Handle<T>`**
+  an asset made in code (no file): Ready at once; `name` is its path for path() (it is not looked up by load)
+- **`fn state(&self, h: &Handle<T>) -> State`**
+  where the asset is (None: a handle of another store, which cannot happen through the API)
+- **`fn state_of(&self, id: AssetId) -> Option<State>`**
+  the state of an entry by its id (None: gone)
+- **`fn get(&self, h: &Handle<T>) -> Option<&T>`**
+  the value once Ready
+- **`fn get_id(&self, id: AssetId) -> Option<&T>`**
+  the value of an entry by its id (None: not ready, failed or gone)
+- **`fn error(&self, h: &Handle<T>) -> Option<&str>`**
+  why it failed
+- **`fn path(&self, h: &Handle<T>) -> &str`**
+  the path it was loaded from (an inserted one: its name)
+- **`fn refs(&self, h: &Handle<T>) -> u32`**
+  handles of the asset that live now
+- **`fn refs_of(&self, id: AssetId) -> u32`**
+  handles of an entry that live now (0: gone, or held by nobody)
+- **`fn len(&self) -> usize`**
+  entries (every state)
+- **`fn is_empty(&self) -> bool`**
+- **`fn stats(&self) -> AssetStats`**
+  what the store holds
+- **`fn ids(&self) -> Vec<AssetId>`**
+  the ids of every entry that lives, in index order
+- **`fn reload(&mut self, h: &Handle<T>)`**
+  read and decode the asset again (a file that changed): Loading until then; its value stays until the new
+  one has come (a failed reload keeps the old value and reports Failed only when there was none)
+- **`fn update(&mut self) -> Vec<Change>`**
+  once a frame: decodes that finished (Frames: decoded now, within the budget) become Ready or Failed; assets
+  nobody holds are unloaded -> what happened
+- **`fn wait_idle(&mut self, timeout_us: u64, changes: &mut Vec<Change>) -> bool`**
+  Background: wait until nothing is loading (at most timeout_us; tests, a loading screen) -> nothing is
+
+### `game/src/audio.rs`
+
+Source: [`lib/game/src/audio.rs`](../lib/game/src/audio.rs)
+
+```text
+audio -- (G7b part 2) spatial audio over plat::audio's mixer: a listener (the camera), sounds on entities and at
+points, the volume by distance (near, far, a rolloff), the pan by direction (docs/GAMECORE.md "Raumklang")
+
+  Attenuation { near, far, rolloff }   the gain by distance: 1 up to near; Linear falls to 0 at far, Inverse
+                                 (OpenAL's inverse distance, clamped) near / (near + rolloff (d - near)) up to far
+                                 and stays there beyond it
+  gains(&View, at, volume, &att) -> Gains   left and right gain of a sound at `at` for a listener: equal power
+                                 (left = cos, right = sin of (pan + 1) pi / 4, so -3 dB each in the middle), pan
+                                 the sine of the direction's angle to the right (front and back sound the same:
+                                 stereo), drawn to the middle within PAN_RADIUS of the listener
+  Emitter (a component)          a sound on an entity, played at its Pose (interpolated at the frame's alpha)
+  SpatialAudio                   set_listener(&View), update(&mut World, alpha, &mut dyn Mixer) once a frame:
+                                 starts the emitters' voices, sets every voice's gains; play_at(sound, at, ..):
+                                 a sound at a point (a shot, a hit) until it ends
+  Mixer                          where voices play: Speakers (plat::audio's shared mixer, play_gains), or
+                                 plat::audio::MixTest (the same mixer without a device: tests, sample by sample)
+
+No Doppler: plat's mixer plays a voice at its rate (a pitch per voice would need its resampler steered).  A voice's
+gains change at the mixer's next buffer (about 20 ms), without a ramp.  Like the rest of lib/game the gains are the
+same bits on every target: + - x / and lib/physics' math (its square root, rt's portable sine and cosine).
+```
+
+Re-exports: `plat::audio::{AudioError, Sound, Voice}`
+
+```rust
+/// a source this close to the listener drifts to the middle (metres): no jump from left to right through the head
+PAN_RADIUS: f64 = 0.5
+```
+
+- **`enum Rolloff`**
+  how the gain falls beyond near
+  - `Linear` -- to 0 at far
+  - `Inverse(f64)` -- near / (near + rolloff (d - near)), d clamped to far (OpenAL's AL_INVERSE_DISTANCE_CLAMPED)
+
+- **`struct Attenuation`**
+  the gain by distance (metres)
+  - `near: f64`
+  - `far: f64`
+  - `rolloff: Rolloff`
+
+**`impl Attenuation`**
+
+- **`const DEFAULT: Attenuation = Attenuation { near: 1.0, far: 50.0, rolloff: Rolloff::Inv ...`**
+  near 1 m, far 50 m, inverse with rolloff 1 (half the gain at 2 m, a fiftieth at 50 m and beyond)
+- **`const fn linear(near: f64, far: f64) -> Attenuation`**
+  linear from near to far
+- **`fn gain(&self, d: f64) -> f64`**
+  the gain at distance d (0 ..= 1)
+
+- **`struct Gains`**
+  what a listener hears of a source
+  - `left: f32`
+  - `right: f32`
+  - `distance: f64` -- the distance (metres), the pan (-1 left .. 1 right), the gain before the pan (volume x attenuation)
+  - `pan: f64`
+  - `gain: f64`
+
+- **`fn gains(listener: &View, at: Vec3, volume: f64, att: &Attenuation) -> Gains`**
+  the gains of a sound at `at` with `volume` (0 ..= 1) for the listener (see the module header)
+
+- **`trait Mixer`**
+  where voices play
+  - `fn play(&mut self, sound: &Sound, left: f32, right: f32) -> Result<Voice, AudioError>`
+    start `sound` with these gains (they hold from its first sample on)
+
+- **`struct Speakers`**
+  plat::audio's shared mixer (the speakers; an app with a manifest needs `audio.output`)
+
+- **`struct Emitter`**
+  a sound on an entity (a component): it plays at the entity's Pose (the origin without one) from the next
+  SpatialAudio::update on; looping: started again when it ends
+  - `sound: Sound`
+  - `volume: f32`
+  - `att: Attenuation`
+  - `looping: bool`
+
+**`impl Emitter`**
+
+- **`fn new(sound: Sound) -> Emitter`**
+  once, at volume 1, with the default attenuation
+- **`fn with_volume(mut self, v: f32) -> Emitter`**
+- **`fn with_attenuation(mut self, a: Attenuation) -> Emitter`**
+- **`fn looping(mut self) -> Emitter`**
+- **`fn playing(&self) -> bool`**
+  its voice plays now
+- **`fn finished(&self) -> bool`**
+  it has ended (or was stopped, or the mixer refused it)
+- **`fn restart(&mut self)`**
+  play it again from the start at the next update
+- **`fn stop(&mut self)`**
+  end it now
+- **`fn gains(&self) -> Option<Gains>`**
+  what the last update set
+
+- **`struct AudioStats`**
+  what an update did
+  - `emitters: u32` -- emitters looked at, voices started, voices that ended, sounds at points still playing, voices with a gain
+    above 0, starts the mixer refused
+  - `started: u32`
+  - `ended: u32`
+  - `shots: u32`
+  - `audible: u32`
+  - `refused: u32`
+
+- **`struct SpatialAudio`**
+  the listener and the voices of a game's sounds (see the module header)
+  - `master: f32` -- every gain times this (0 ..= 1)
+
+**`impl SpatialAudio`**
+
+- **`fn new() -> SpatialAudio`**
+  a listener at the origin looking down -Z
+- **`fn set_listener(&mut self, v: &View)`**
+  where the listener is and looks (the camera's View)
+- **`fn listener(&self) -> &View`**
+- **`fn play_at(&mut self, sound: &Sound, at: Vec3, volume: f32, att: Attenuation, mixer: &mut dyn Mixer) -> Result<(), AudioError>`**
+  a sound at a point, once (a shot, a hit): its gains follow the listener until it ends
+- **`fn update(&mut self, world: &mut World, alpha: f64, mixer: &mut dyn Mixer) -> AudioStats`**
+  once a frame, after the listener is set: the emitters of `world` (their voices started, their gains at the
+  poses interpolated at `alpha`), the sounds at points -> what it did
+- **`fn stop_all(&mut self)`**
+  every sound at a point ends now (the emitters keep theirs: Emitter::stop)
 
 ### `game/src/camera.rs`
 
@@ -65201,6 +65523,10 @@ instances of a render3d scene, only what changed is written, the scene's origin 
   Bridge::retire_* / collect   meshes and materials the game is done with go from the renderer
                      (Renderer::remove_mesh / remove_material) once no instance of the bridge uses them
   camera, transform  a game View as render3d::Camera, a game Transform as render3d::Transform
+  (G7b part 2) Model, Image   glTF models and images as lib/game assets (Assets<Model>, loaded in the background);
+                     Models / Textures put them on a renderer once Ready and take them off when unloaded;
+                     ModelRef (a component) and Bridge::sync_models: an entity gets its meshes when its model is
+                     up (models.rs)
 
 Why a crate of its own and not a module of lib/game behind a feature: a game's server is built from the
 same workspace as its client, and Cargo unifies a crate's features over everything one `cargo build`
@@ -65290,6 +65616,113 @@ ORIGIN_STEP: f64 = 512.0
   the scene's origin follows the eye: once the eye is more than one step from the origin on an
   axis, the origin moves to the eye rounded to the step (Scene::set_origin uploads every instance
   once) -> it moved
+
+### `game_render3d/src/models.rs`
+
+Source: [`lib/game_render3d/src/models.rs`](../lib/game_render3d/src/models.rs)
+
+```text
+models -- (G7b part 2) assets for render3d: glTF models and images through lib/game's Assets, on the GPU once
+ready, and entities that draw a model (docs/GAMECORE.md "Assets")
+
+  Model (an Asset)           a .glb / .gltf as lib/gltf reads it (its buffers and images through the VFS beside
+                             it), decoded on the loader's thread
+  Image (an Asset)           a PNG or JPEG as straight rgba rows
+  ModelRef (a component)     an entity draws the model of its handle at its Pose, every instance of the model's
+                             scene (Bridge::sync_models); nothing while the model loads or failed
+  Models                     the models on a Renderer: update(&assets, &changes, &mut renderer) puts what became
+                             Ready on the GPU (meshes, textures, materials) and takes off what was unloaded
+                             (Renderer::remove_mesh / remove_material / remove_texture); parts(id)
+  Textures                   the same for images: texture(id) -> TextureId once it is up
+  Bridge::sync_models        entities with a ModelRef as instances: they appear when their model is up, follow
+                             their poses (only what changed), go with the entity, the component or the model
+
+A model's lights and cameras are not placed (render3d::gltf::upload does that for a whole scene); a node's shear
+is dropped as there.  An entity's transform and a part's compose as translation, rotation and per-axis scale
+(exact for uniform scales; a non-uniform scale under a rotated part would need shear).
+```
+
+- **`struct Model`**
+  a glTF model (an Asset): lib/gltf's Document
+  - `doc: ::gltf::Document`
+
+- **`struct Image`**
+  an image (an Asset): straight rgba rows
+  - `width: u32`
+  - `height: u32`
+  - `rgba: Vec<u8>`
+
+```rust
+/// the largest image an Image asset takes (pixels)
+IMAGE_PIXELS: u64 = 1 << 26
+```
+
+- **`struct ModelRef`**
+  what an entity looks like: the model of a handle (all instances of its default scene), at its Pose
+  - `model: Handle<Model>`
+
+- **`struct Part`**
+  a part of a model on the GPU: one instance of its scene
+  - `mesh: MeshId`
+  - `material: MaterialId`
+  - `local: render3d::Transform` -- where the scene puts it (model space)
+
+- **`struct ModelStats`**
+  what an update of Models did
+  - `uploaded: u32`
+  - `removed: u32`
+  - `models: u32` -- models on the GPU now, their parts
+  - `parts: u32`
+
+- **`struct Models`**
+  the models of an Assets&lt;Model> on one renderer (see the module header)
+
+**`impl Models`**
+
+- **`fn new() -> Models`**
+- **`fn update(&mut self, assets: &Assets<Model>, changes: &[Change], r: &mut Renderer) -> Result<ModelStats>`**
+  once a frame, after Assets::update (its changes) and before the bridge: what became Ready goes up, what was
+  unloaded comes off.  The first update on a renderer (and the first after reset) puts every Ready model up.
+  A model the renderer refuses counts as not up (its entities show nothing); the first error is returned after
+  everything else was done
+- **`fn parts(&self, id: AssetId) -> Option<&[Part]>`**
+  the parts of a model that is up
+- **`fn serial(&self, id: AssetId) -> Option<u64>`**
+  which upload a model that is up came from (another one after a reload or a new renderer)
+- **`fn made(&self, id: AssetId) -> Option<(&[MeshId], &[MaterialId], &[TextureId])>`**
+  the meshes, materials and textures a model made on the renderer
+- **`fn version(&self) -> u64`**
+  counts every change of what is up
+- **`fn len(&self) -> usize`**
+  models up now
+- **`fn is_empty(&self) -> bool`**
+- **`fn reset(&mut self)`**
+  the renderer went with its device: forget what was up (the next update puts every Ready model up again)
+
+- **`struct Textures`**
+  the images of an Assets&lt;Image> on one renderer (sRGB colour textures unless set otherwise)
+  - `linear: bool` -- the images are data, not colour (normal maps, masks): linear
+  - `nearest: bool`
+
+**`impl Textures`**
+
+- **`fn new() -> Textures`**
+- **`fn update(&mut self, assets: &Assets<Image>, changes: &[Change], r: &mut Renderer) -> Result<u32>`**
+  once a frame after Assets::update: Ready images up, unloaded ones off -> textures put up now
+- **`fn texture(&self, id: AssetId) -> Option<TextureId>`**
+  the texture of an image once it is up
+- **`fn reset(&mut self)`**
+  the renderer went: forget every texture (the next update puts them up again)
+
+**`impl Bridge`**
+
+- **`fn sync_models(&mut self, world: &World, scene: &mut Scene, alpha: f64, models: &Models) -> Result<SyncStats>`**
+  the entities with a ModelRef into the scene for a frame at `alpha` (see the module header): an entity whose
+  model is up (Models) gets an instance per part, at its Pose composed with the part's place; a model that is
+  not up shows nothing; a pose that changed moves every part.  Instances it adds are the bridge's (clear,
+  reset); the counts as sync's
+- **`fn model_entities(&self) -> u32`**
+  entities drawn through sync_models now
 
 ## geom
 
