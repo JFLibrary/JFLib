@@ -10,6 +10,11 @@
 //                  the origin), extrude (front-view profile along Z), prism (floor plan up along Y), sweep
 //                  (profile along a path, mitred corners, rotation-minimising frames), lathe (profile about Y)
 //   poly           2D profiles: area, cleaning, triangulation (ear clipping), rect, circle, arc, rounded_rect
+//   Solid          convex cells as brushes: from_convex, union, difference, intersection (exact decisions:
+//                  points are where three planes meet, sides are signs of determinants), to_mesh (closed,
+//                  corners rounded once at the end), bevelled / bevel (chamfer or round edges and corners)
+//   exact          expansions (Shewchuk), orient2d, the side of a plane at a meeting of three planes,
+//                  the correctly rounded quotient
 //   Report         closed, manifold, outward, degenerate triangles, normals, bounds, area, volume, Euler
 //                  characteristic, components; json()
 //   math           Vec3, Aabb, Affine in f64; sqrt correctly rounded, sin / cos / atan2 from rt's portable
@@ -29,6 +34,9 @@ extern crate alloc;
 /// the generators: primitives, extrude, prism, sweep, lathe
 pub mod build;
 mod check;
+mod csg;
+/// exact arithmetic: expansions, orientation, planes meeting in a point, correctly rounded quotients
+pub mod exact;
 /// Vec3, Aabb, Affine in f64 and the scalar functions, the same bits on every target
 pub mod math;
 mod mesh;
@@ -38,6 +46,7 @@ pub mod poly;
 
 pub use build::{DEFAULT_SMOOTH_DEG, arch, cone, cuboid, cylinder, extrude, lathe, prism, sphere, stairs, sweep, torus};
 pub use check::{DEGENERATE_RATIO, NORMAL_TOLERANCE, Report, fnum};
+pub use csg::{MAX_CELLS, Plane, Solid, WELD_RATIO, bevel, difference, intersection, union};
 pub use math::{Aabb, Affine, Axis, Vec3};
 pub use mesh::{Fnv, Mesh};
 

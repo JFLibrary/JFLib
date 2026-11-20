@@ -13,7 +13,7 @@ use crate::refs;
 use crate::{examples, out, run};
 
 /// the groups in the order --check runs them
-pub const ALL: &[&str] = &["prims", "ops", "normals", "checks", "poly", "gltf", "script", "examples"];
+pub const ALL: &[&str] = &["prims", "ops", "normals", "checks", "poly", "csg", "bevel", "gltf", "script", "examples"];
 
 /// xorshift64*: the same numbers on every target
 pub struct Rng(pub u64);
@@ -86,6 +86,8 @@ pub fn run(names: &[&str], quick: bool) -> i32 {
             "normals" => normals(&mut c),
             "checks" => topo(&mut c),
             "poly" => poly(&mut c),
+            "csg" => crate::selftest_csg::csg(&mut c),
+            "bevel" => crate::selftest_csg::bevel(&mut c),
             "gltf" => gltf_tests(&mut c),
             "script" => script(&mut c),
             _ => examples_tests(&mut c),

@@ -30,6 +30,7 @@ mod refs;
 mod render;
 mod run;
 mod selftest;
+mod selftest_csg;
 
 use alloc::format;
 use alloc::string::{String, ToString};
