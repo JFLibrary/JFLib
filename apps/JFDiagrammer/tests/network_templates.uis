@@ -1,0 +1,38 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD13: the network templates in Datei › Neu (VL-50, VL-51, VL-52) -- the category
+# Netzwerk shows Standardnetzwerk, Detailliertes Netzwerk and Rack-Diagramm; the office network
+# from its starter diagram opens with its stencils; the rack diagram from its starter: a page at
+# 1:20 with an empty rack, the stencils of rack equipment, a server dragged over the rack snaps
+# onto a height unit
+click tab:"Datei"
+expect button:"Neu" selected
+click button:"Netzwerk"
+expect button:"Netzwerk" checked
+expect button:"Standardnetzwerk" exists
+expect button:"Detailliertes Netzwerk" exists
+expect button:"Rack-Diagramm" exists
+expect button:"Standardflussdiagramm" missing
+click button:"Standardnetzwerk"
+click button:"Beispiel: Büronetz"
+expect button:"Beispiel: Büronetz" checked
+click button:"Erstellen"
+expect tab:"Start" selected
+expect listitem:"Internetzugang" exists
+expect tab:"Netzwerk und Peripheriegeräte" selected
+expect tab:"Computer und Monitore" exists
+shot build/JFDiagrammer-network-template.png
+click tab:"Datei"
+click button:"Neu"
+click button:"Netzwerk"
+click button:"Rack-Diagramm"
+click button:"Leeres Gestell"
+click button:"Erstellen"
+expect listitem:"Gestell A1" exists
+expect tab:"Gestellmontierte Geräte" selected
+expect tab:"Gestellmontierte Server" exists
+expect tab:"Freistehende Geräte" exists
+expect listitem:"Gestell A1" rect 616 338 70 248
+drag button:"Server" 655,450
+a11y expect announced "„Server“ abgelegt"
+expect listitem:"Server" rect 621 444 60 11
+shot build/JFDiagrammer-rack-template.png

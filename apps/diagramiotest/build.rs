@@ -11,13 +11,14 @@ fn main() {
     jfd_sources();
 }
 
-// (kind, folder, file name, include_str!) for the .txt, .master, .starter and .svg files of
-// ../JFDiagrammer/stencils/<folder> and ../JFDiagrammer/templates/<folder>
+// (kind, folder, file name, include_str!) for the .txt, .master, .starter, .svg and .inc files of
+// ../JFDiagrammer/stencils/<folder> and ../JFDiagrammer/templates/<folder>, (JD13) and the shared
+// network symbols ../JFDiagrammer/symbols/<folder>/*.svg (kind "symbols")
 fn jfd_sources() {
     let out = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));
     let app = Path::new(&env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR")).join("../JFDiagrammer");
     let mut table = String::from("// built by build.rs from ../JFDiagrammer/stencils and templates\n&[\n");
-    for kind in ["stencils", "templates"] {
+    for kind in ["stencils", "templates", "symbols"] {
         let root = app.join(kind);
         println!("cargo:rerun-if-changed={}", root.display());
         let mut dirs: Vec<PathBuf> = fs::read_dir(&root).map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.is_dir()).collect()).unwrap_or_default();
@@ -28,7 +29,7 @@ fn jfd_sources() {
                 .map(|rd| {
                     rd.filter_map(|e| e.ok())
                         .map(|e| e.path())
-                        .filter(|p| p.is_file() && p.extension().and_then(|x| x.to_str()).is_some_and(|x| matches!(x, "txt" | "master" | "starter" | "svg")))
+                        .filter(|p| p.is_file() && p.extension().and_then(|x| x.to_str()).is_some_and(|x| matches!(x, "txt" | "master" | "starter" | "svg" | "inc")))
                         .collect()
                 })
                 .unwrap_or_default();

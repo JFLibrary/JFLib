@@ -45,7 +45,20 @@ fn folders(kind: &str) -> Vec<&'static str> {
 }
 
 pub(crate) fn files_of(kind: &'static str, folder: &'static str) -> impl Fn(&str) -> Option<String> {
-    move |name: &str| SOURCES.iter().find(|s| s.0 == kind && s.1 == folder && s.2 == name).map(|s| String::from(s.3))
+    move |name: &str| {
+        // (JD13) the names a master gives relative to its folder: "../net_common/asset.inc" (another
+        // folder of the same kind), "../../symbols/network/router.svg" (the shared symbols)
+        let (k, f, n) = if let Some(rest) = name.strip_prefix("../../symbols/") {
+            let (f, n) = rest.split_once('/')?;
+            ("symbols", f, n)
+        } else if let Some(rest) = name.strip_prefix("../") {
+            let (f, n) = rest.split_once('/')?;
+            (kind, f, n)
+        } else {
+            (kind, folder, name)
+        };
+        SOURCES.iter().find(|s| s.0 == k && s.1 == f && s.2 == n).map(|s| String::from(s.3))
+    }
 }
 
 /// every stencil of apps/JFDiagrammer/stencils built for measure m
@@ -153,9 +166,12 @@ fn check_forms(h: &mut H, folder: &'static str, m: Measure, forms: &[(BuiltTempl
             let unit = doc.sym("PageWidth").and_then(|c| doc.page(p).and_then(|pg| pg.sheet.cell(c)).and_then(|c| c.unit));
             let (want_w, want_h, want_u) = if m == Measure::Us { (11.0, 8.5, Unit::Inches) } else { (297.0 / 25.4, 210.0 / 25.4, Unit::Millimeters) };
             let orient = num(&doc, ps, "PrintPageOrientation");
+            // (JD13) on paper: a page drawn to scale (the rack, 1:20) is A4 or Letter there
+            let paper = num(&doc, ps, "PageScale").zip(num(&doc, ps, "DrawingScale")).filter(|(a, d)| *a > 0.0 && *d > 0.0).map_or(1.0, |(a, d)| a / d);
+            let (w, hh) = (w * paper, hh * paper);
             let ok = (w - want_w).abs() < 1e-9 && (hh - want_h).abs() < 1e-9 && unit == Some(want_u) && orient == Some(2.0);
             let pname = doc.page(p).and_then(|pg| pg.header.name).map(|n| String::from(doc.str(n))).unwrap_or_default();
-            h.check("templates/page", ok, format!("{name}: „{pname}“ {:.1} x {:.1} mm, unit {unit:?}, orientation {orient:?}", w * 25.4, hh * 25.4));
+            h.check("templates/page", ok, format!("{name}: „{pname}“ {:.1} x {:.1} mm on paper (1:{}), unit {unit:?}, orientation {orient:?}", w * 25.4, hh * 25.4, 1.0 / paper));
             let page_names = user(&doc, ps, "JFD_Name").is_some_and(|t| t.split('|').count() == 5);
             h.check("templates/page", page_names, format!("{name}: the page's name in five languages (JFD_Name)"));
         }

@@ -382,8 +382,11 @@ Neun Schablonen der Kategorie `network`: `net_computers` (SH-140), `net_detailed
   JFDiagrammer (`diagram_core::dock`, App `rack.rs`) und in Visio auf den HE einrasten.
 - **Besondere Master:** `ethernet` und `ring_network` (acht Steuerpunkte, deren Leitungen zu den
   Geräten führen; in Visio kleben sie), `legend` (JFDiagrammer schreibt die Zählung, App
-  `legend.rs`). Wählverbindung und Bemaßungen sind 1D-Shapes und folgen mit der
-  1D-Unterstützung des Bauwerkzeugs.
+  `legend.rs`), `dialup` (Wählverbindung, ein 1D-Shape mit Blitz). Die Bemaßungen der
+  Rack-Schablone fehlen noch: Sie zeigen ihre Länge in einem Textfeld, das das Bauwerkzeug
+  nicht schreibt.
+- Vorlagen: `templates/network` (VL-50), `templates/network_detailed` (VL-51), `templates/rack`
+  (VL-52, Seite 1:20).
 - Prüfen: `diagramiotest --check --only stencils/network`, Ansicht
   `diagramiotest --write-network-previews DIR`, Visio-Gegenprobe
   `diagramiotest --write-network-gegenprobe DIR`.

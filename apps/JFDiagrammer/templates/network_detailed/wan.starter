@@ -22,6 +22,11 @@ cloud:  Stencil = "netloc"; Master = "Cloud"
         Text.fr = "Internet"
 dc:     Stencil = "netloc"; Master = "Data center"
         PinX = 50 mm; PinY = 150 mm; PinX.us = 1.85 in; PinY.us = 6.07 in
+        Text.de = "Rechenzentrum"
+        Text.en = "Data centre"
+        Text.es = "Centro de datos"
+        Text.it = "Data center"
+        Text.fr = "Centre de données"
 office: Stencil = "netloc"; Master = "Building"
         PinX = 246 mm; PinY = 150 mm; PinX.us = 9.11 in; PinY.us = 6.07 in
         Text.de = "Zentrale"

@@ -29,66 +29,35 @@ use diagram_io::vsdx::{self, Measure};
 use diagram_view::export::raster;
 use diagram_view::PageView;
 
-use crate::stencils::{build_set, read_back};
+use crate::stencils::read_back;
 use crate::{out, H};
 
 const MM: f64 = 1.0 / 25.4;
 
-macro_rules! src {
-    ($dir:literal, $($name:literal),* $(,)?) => {
-        &[$(($name, include_str!(concat!("../../JFDiagrammer/stencils/", $dir, "/", $name))),)*]
-    };
-}
-
-// the files every network set may include, by the name the masters give
-const COMMON: &[(&str, &str)] = &[
-    ("../net_common/symbol.inc", include_str!("../../JFDiagrammer/stencils/net_common/symbol.inc")),
-    ("../net_common/asset.inc", include_str!("../../JFDiagrammer/stencils/net_common/asset.inc")),
-    ("../net_common/network.inc", include_str!("../../JFDiagrammer/stencils/net_common/network.inc")),
-    ("../net_common/computer.inc", include_str!("../../JFDiagrammer/stencils/net_common/computer.inc")),
-    ("../net_common/location.inc", include_str!("../../JFDiagrammer/stencils/net_common/location.inc")),
-    ("../net_common/rackdev.inc", include_str!("../../JFDiagrammer/stencils/net_common/rackdev.inc")),
+/// the sets: name, folder in apps/JFDiagrammer/stencils, the number of masters
+pub(crate) const SETS: &[(&str, &str, usize)] = &[
+    ("computers", "net_computers", 11),
+    ("detailed", "net_detailed", 15),
+    ("peripherals", "net_peripherals", 31),
+    ("locations", "net_locations", 8),
+    ("symbols", "net_symbols", 24),
+    ("servers", "net_servers", 17),
+    ("rack_equipment", "rack_equipment", 17),
+    ("rack_freestanding", "rack_freestanding", 9),
+    ("rack_servers", "rack_servers", 17),
 ];
 
-// the shared symbols (apps/JFDiagrammer/symbols) by the name the masters give
-macro_rules! sym {
-    ($($path:literal),* $(,)?) => {
-        &[$((concat!("../../symbols/", $path), include_str!(concat!("../../JFDiagrammer/symbols/", $path))),)*]
-    };
-}
-// BEGIN generated (gen_table.py): every source of the network and rack stencils
-const NET_COMPUTERS: &[(&str, &str)] = src!("net_computers", "stencil.txt", "pc.master", "laptop.master", "tablet.master", "monitor_lcd.master", "pc_virtual.master", "terminal.master", "tablet_pen.master", "pda.master", "monitor_crt.master", "wdm.master", "data_pipeline.master");
-const NET_DETAILED: &[(&str, &str)] = src!("net_detailed", "stencil.txt", "patch_panel.master", "repeater.master", "voip_phone.master", "pbx.master", "ab_switch.master", "diagnostic.master", "smartcard_reader.master", "radio_tower.master", "biometric_reader.master", "external_hdd.master", "web_service.master", "fiber_optic.master", "satellite_dish.master", "satellite.master", "mpls.master");
-const NET_PERIPHERALS: &[(&str, &str)] = src!("net_peripherals", "stencil.txt", "server.master", "router.master", "switch.master", "firewall.master", "wireless_ap.master", "printer.master", "ethernet.master", "ring_network.master", "server_virtual.master", "mainframe.master", "supercomputer.master", "bridge.master", "hub.master", "modem.master", "plotter.master", "scanner.master", "copier.master", "fax.master", "mfp.master", "projector.master", "projection_screen.master", "phone.master", "mobile_phone.master", "smartphone.master", "video_phone.master", "camera.master", "video_camera.master", "external_drive.master", "user.master", "legend.master");
-const NET_LOCATIONS: &[(&str, &str)] = src!("net_locations", "stencil.txt", "building.master", "data_center.master", "cloud.master", "house.master", "government.master", "town.master", "university.master", "city.master");
-const NET_SYMBOLS: &[(&str, &str)] = src!("net_symbols", "stencil.txt", "router.master", "database.master", "gateway.master", "wan.master", "communications_server.master", "terminal_server.master", "host.master", "key.master", "lock.master", "lock_key.master", "workgroup_switch.master", "atm_switch.master", "atm_fast_switch.master", "isdn_switch.master", "atm_router.master", "probe.master", "fddi_concentrator.master", "hub_100baset.master", "small_hub.master", "dsu_csu.master", "bridge.master", "olap_database.master", "data.master", "load_balancer.master");
-const NET_SERVERS: &[(&str, &str)] = src!("net_servers", "stencil.txt", "server_web.master", "server_file.master", "server_application.master", "server_certificate.master", "server_ecommerce.master", "server_mobile.master", "server_ftp.master", "server_cms.master", "server_directory.master", "server_print.master", "server_email.master", "server_management.master", "server_realtime.master", "server_public.master", "server_database.master", "server_proxy.master", "server_streaming.master");
-const RACK_EQUIPMENT: &[(&str, &str)] = src!("rack_equipment", "stencil.txt", "rack.master", "cabinet.master", "server.master", "switch.master", "patch_panel.master", "raid_array.master", "router_1.master", "router_2.master", "bridge.master", "nas.master", "tape_drive.master", "lcd_monitor.master", "power_supply.master", "power_strip.master", "keyboard_tray.master", "shelf.master", "cable_management.master");
-const RACK_FREESTANDING: &[(&str, &str)] = src!("rack_freestanding", "stencil.txt", "server.master", "monitor.master", "laptop.master", "printer.master", "ab_switch_box.master", "modem.master", "hard_drive.master", "optical_drive.master", "hub.master");
-const RACK_SERVERS: &[(&str, &str)] = src!("rack_servers", "stencil.txt", "server_web.master", "server_file.master", "server_application.master", "server_certificate.master", "server_ecommerce.master", "server_mobile.master", "server_ftp.master", "server_cms.master", "server_directory.master", "server_print.master", "server_email.master", "server_management.master", "server_realtime.master", "server_public.master", "server_database.master", "server_proxy.master", "server_streaming.master");
-const SYMBOLS: &[(&str, &str)] = sym!("network/ab_switch.svg", "network/ap_wifi6e.svg", "network/biometric_reader.svg", "network/bridge.svg", "network/building.svg", "network/camera.svg", "network/city.svg", "network/cloud_internet.svg", "network/copier.svg", "network/data.svg", "network/data_center.svg", "network/data_pipeline.svg", "network/database.svg", "network/db_olap.svg", "network/diagnostic.svg", "network/dsu_csu.svg", "network/external_drive.svg", "network/external_hdd.svg", "network/fax.svg", "network/fddi_concentrator.svg", "network/fiber_optic.svg", "network/firewall_ngfw.svg", "network/gateway.svg", "network/government.svg", "network/host.svg", "network/house.svg", "network/hub.svg", "network/hub_100base.svg", "network/ip_phone.svg", "network/key.svg", "network/laptop.svg", "network/load_balancer.svg", "network/lock.svg", "network/lock_key.svg", "network/mainframe.svg", "network/mfp.svg", "network/mobile_phone.svg", "network/modem_ont.svg", "network/monitor_crt.svg", "network/monitor_lcd.svg", "network/mpls_cloud.svg", "network/patch_panel.svg", "network/pbx.svg", "network/pc.svg", "network/pc_virtual.svg", "network/pda.svg", "network/phone.svg", "network/plotter.svg", "network/printer.svg", "network/probe.svg", "network/projection_screen.svg", "network/projector.svg", "network/radio_tower.svg", "network/repeater.svg", "network/router.svg", "network/router_atm.svg", "network/satellite.svg", "network/satellite_dish.svg", "network/scanner.svg", "network/server_application.svg", "network/server_certificate.svg", "network/server_cms.svg", "network/server_comm.svg", "network/server_database.svg", "network/server_directory.svg", "network/server_ecommerce.svg", "network/server_email.svg", "network/server_file.svg", "network/server_ftp.svg", "network/server_management.svg", "network/server_mobile.svg", "network/server_print.svg", "network/server_proxy.svg", "network/server_public.svg", "network/server_realtime.svg", "network/server_streaming.svg", "network/server_terminal.svg", "network/server_tower.svg", "network/server_virtual.svg", "network/server_web.svg", "network/smartcard_reader.svg", "network/smartphone.svg", "network/supercomputer.svg", "network/switch_atm.svg", "network/switch_atm_fast.svg", "network/switch_desk.svg", "network/switch_isdn.svg", "network/switch_l2.svg", "network/tablet.svg", "network/tablet_pen.svg", "network/terminal.svg", "network/town.svg", "network/university.svg", "network/user.svg", "network/video_camera.svg", "network/video_phone.svg", "network/wan.svg", "network/wdm.svg", "network/web_service.svg", "rack/bridge_1u.svg", "rack/cable_manager_1u.svg", "rack/front_ab_switch.svg", "rack/front_hdd.svg", "rack/front_hub.svg", "rack/front_laptop.svg", "rack/front_modem.svg", "rack/front_monitor.svg", "rack/front_optical.svg", "rack/front_printer.svg", "rack/front_server_tower.svg", "rack/keyboard_tray_1u.svg", "rack/kvm_1u.svg", "rack/nas_2u.svg", "rack/patch_panel_1u.svg", "rack/pdu_1u.svg", "rack/raid_3u.svg", "rack/router_1u.svg", "rack/router_2u.svg", "rack/server_2u.svg", "rack/server_application.svg", "rack/server_certificate.svg", "rack/server_cms.svg", "rack/server_database.svg", "rack/server_directory.svg", "rack/server_ecommerce.svg", "rack/server_email.svg", "rack/server_file.svg", "rack/server_ftp.svg", "rack/server_management.svg", "rack/server_mobile.svg", "rack/server_print.svg", "rack/server_proxy.svg", "rack/server_public.svg", "rack/server_realtime.svg", "rack/server_streaming.svg", "rack/server_web.svg", "rack/shelf_1u.svg", "rack/switch_1u.svg", "rack/tape_2u.svg", "rack/ups_2u.svg");
-/// the sets: name, files, the number of masters
-pub(crate) const SETS: &[(&str, &[(&str, &str)], usize)] = &[
-    ("computers", NET_COMPUTERS, 11),
-    ("detailed", NET_DETAILED, 15),
-    ("peripherals", NET_PERIPHERALS, 30),
-    ("locations", NET_LOCATIONS, 8),
-    ("symbols", NET_SYMBOLS, 24),
-    ("servers", NET_SERVERS, 17),
-    ("rack_equipment", RACK_EQUIPMENT, 17),
-    ("rack_freestanding", RACK_FREESTANDING, 9),
-    ("rack_servers", RACK_SERVERS, 17),
-];
-// END generated
-
-// a set's files and the common ones
-fn files<'a>(set: &'a [(&'a str, &'a str)]) -> Vec<(&'a str, &'a str)> {
-    set.iter().chain(COMMON.iter()).chain(SYMBOLS.iter()).copied().collect()
+// a set's sources (build.rs embeds every file of apps/JFDiagrammer/stencils and symbols)
+fn files(folder: &'static str) -> impl Fn(&str) -> Option<String> {
+    crate::templates::files_of("stencils", folder)
 }
 
-fn built(set: &[(&str, &str)], m: Measure) -> Result<Document, String> {
-    let f = files(set);
-    build_set(&f, m).map(|(b, _)| b.doc).map_err(|e| format!("{e}"))
+fn build_set(folder: &'static str, m: Measure) -> Result<(diagram_io::stencil::Built, Vec<u8>), diagram_io::stencil::SourceError> {
+    diagram_io::stencil::build_vssx(&files(folder), m)
+}
+
+fn built(folder: &'static str, m: Measure) -> Result<Document, String> {
+    build_set(folder, m).map(|(b, _)| b.doc).map_err(|e| format!("{e}"))
 }
 
 /// the group "stencils/network"
@@ -98,14 +67,13 @@ pub fn run(h: &mut H) {
     for &(name, set, count) in SETS {
         for m in [Measure::Metric, Measure::Us] {
             let tag = format!("stencils/network/{name}/{}", if m == Measure::Us { "us" } else { "metric" });
-            let f = files(set);
             let t0 = plat::time_us();
-            match build_set(&f, m) {
+            match build_set(set, m) {
                 Err(e) => h.check(&tag, false, format!("{e}")),
                 Ok((b, bytes)) => {
                     let n = b.doc.masters().count();
                     h.check(&tag, n == count && b.category == "network", format!("{n} masters (want {count}), category {}, {} bytes, built in {} ms", b.category, bytes.len(), plat::time_us().wrapping_sub(t0) / 1000));
-                    let again = build_set(&f, m).map(|(_, x)| x).unwrap_or_default();
+                    let again = build_set(set, m).map(|(_, x)| x).unwrap_or_default();
                     h.check(&format!("{tag}/deterministic"), again == bytes, format!("same bytes: {}", again == bytes));
                     let back = read_back(h, &format!("{tag}/roundtrip"), &bytes);
                     if m == Measure::Metric {
@@ -507,7 +475,7 @@ fn write_vsdx(doc: &Document, path: &str) -> bool {
 pub fn gegenprobe(dir: &str) -> i32 {
     let mut docs: Vec<(&str, Document)> = Vec::new();
     for &(name, set, _) in SETS {
-        match build_set(&files(set), Measure::Metric) {
+        match build_set(set, Measure::Metric) {
             Ok((b, bytes)) => {
                 let _ = plat::write_file(&format!("{dir}/{}", b.vssx_name()), &bytes);
                 docs.push((name, b.doc));
