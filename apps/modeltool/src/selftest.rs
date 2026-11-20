@@ -725,6 +725,69 @@ fn script(c: &mut Ctx) {
         &[],
     );
     c.check(r.ok(), || format!("queries: {text}"));
+    // Boolean operations and bevels from a script: a wall with a window (a ring: Euler 0), the result turned and
+    // cut again (its cells go along), a rounded block
+    let (r, text) = script_run(
+        "let w = geom.difference(geom.box(4, 2.6, 0.3), geom.box(1, 1, 1).move(0, 1, 0))\nmodel.add(w, \"ziegel\", \"wand\")\nlet w2 = geom.difference(w.rotate_y(90).move(3, 0, 0), geom.box(0.5, 0.5, 1).move(3, 1.2, 1.2))\nmodel.add(w2)\nmodel.add(geom.box(1, 1, 1).bevel(0.1, 3).move(0, 3, 0))\nmodel.add(geom.union([geom.box(1, 1, 1), geom.cylinder(0.3, 2, 16)]).move(-3, 0, 0))\nmodel.add(geom.intersection(geom.box(1, 1, 1), geom.sphere(0.6, 12).move(0.3, 0, 0)).move(0, 0, 3))\n",
+        &[],
+    );
+    if c.check(r.ok(), || format!("booleans: {text}")) {
+        let a = run::analyse(&r.model);
+        c.check(a.ok(), || format!("booleans: {:?}", run::findings(&r.model, &a)));
+        let wall = &a.parts[0];
+        c.check(wall.euler == 0 && rel(wall.volume, 4.0 * 2.6 * 0.3 - 0.3, 1e-12), || format!("wall: euler {} volume {}", wall.euler, wall.volume));
+        let turned = &a.parts[1];
+        c.check(turned.euler == -2 && rel(turned.volume, 4.0 * 2.6 * 0.3 - 0.3 - 0.3 * 0.5 * 1.0, 1e-12), || format!("turned wall: euler {} volume {}", turned.euler, turned.volume));
+        c.check(rel(a.parts[2].volume, refs::bevel_box_volume(1.0, 1.0, 1.0, 0.1, 3), 1e-12), || format!("bevel: volume {}", a.parts[2].volume));
+    }
+    // their messages: not convex, two parts, nothing left, a bevel too wide, a wrong axis
+    let bad: [(&str, &str); 6] = [
+        ("model.add(geom.union(geom.stairs(1, 1, 1, 3), geom.box(1, 1, 1)))\n", "geom.union: Teil 1: das Mesh ist nicht konvex"),
+        ("let b = geom.box(1, 1, 1)\nmodel.add(geom.difference(geom.merge(b, b.move(3, 0, 0)), b))\n", "geom.difference: Teil 1: das Mesh besteht aus 2 Teilen"),
+        ("model.add(geom.intersection(geom.box(1, 1, 1), geom.box(1, 1, 1).move(5, 0, 0)))\n", "geom.intersection: das Ergebnis ist leer"),
+        ("model.add(geom.difference(geom.box(1, 1, 1)))\n", "geom.difference: braucht mindestens 2 Meshes"),
+        ("model.add(geom.box(1, 1, 1).bevel(0.6, 2))\n", "bevel(): die Breite 0.6 ist zu groß"),
+        ("model.add(geom.box(1, 1, 1).bevel(0.1, 2, \"w\"))\n", "bevel(): achse muss"),
+    ];
+    for (src, msg) in bad {
+        let (r, text) = script_run(src, &[]);
+        c.check(!r.ok() && text.contains("test.jfs:") && text.contains(msg), || format!("{:?}: wanted {msg}, got: {text}", src));
+    }
+    // imports only from the script's folder and below
+    for (dir, path, ok) in [
+        ("", "teil.jfs", true),
+        ("", "lib/teil.jfs", true),
+        ("", "../teil.jfs", false),
+        ("", "/etc/passwd", false),
+        ("", "C:/Windows/win.ini", false),
+        ("apps/x/", "apps/x/lib/teil.jfs", true),
+        ("apps/x/", "apps/y.jfs", false),
+        ("apps/x/", "apps/xy/teil.jfs", false),
+        ("apps/x/", "apps/x", false),
+        ("C:/m/", "C:/m/a.jfs", true),
+        ("C:/m/", "c:/m/a.jfs", false),
+        ("C:/m/", "C:/n/a.jfs", false),
+    ] {
+        let r = run::import_allowed(dir, path);
+        c.check(r.is_ok() == ok, || format!("import {path} from {dir:?}: {:?}", r));
+    }
+    c.check(run::script_dir("apps/x/haus.jfs") == "apps/x/" && run::script_dir("haus.jfs").is_empty() && run::script_dir("./a/../b/c.jfs") == "b/", || "script_dir".into());
+    for (src, msg) in [
+        ("let t = import(\"../geheim.jfs\")\n", "Modul ../geheim.jfs: liegt außerhalb des Ordners des Skripts"),
+        ("let t = import(\"lib/../../geheim.jfs\")\n", "liegt außerhalb des Ordners des Skripts"),
+        ("let t = import(\"/geheim.jfs\")\n", "liegt außerhalb des Ordners des Skripts"),
+    ] {
+        let (r, text) = script_run(src, &[]);
+        c.check(!r.ok() && text.contains(msg), || format!("{:?}: wanted {msg}, got: {text}", src));
+    }
+    // a script in a folder imports relative to it, and not beside the folder
+    let mut seen = Vec::new();
+    let mut loader = |p: &str| -> Result<String, String> {
+        seen.push(String::from(p));
+        Ok(String::from("fn f() { return 1 }\n"))
+    };
+    let r = run::run_script("sub/test.jfs", "let a = import(\"teil.jfs\")\nlet b = import(\"../daneben.jfs\")\n", &[], &mut loader);
+    c.check(r.problems.first().is_some_and(|p| p.message.contains("außerhalb")) && seen == ["sub/teil.jfs"], || format!("sub folder: {:?} loaded {:?}", r.problems.first().map(|p| &p.message), seen));
     // the cache key: the same for CRLF and LF, another for another parameter
     let k1 = run::cache_key("a\nb\n", &[], &[]);
     c.check(k1 == run::cache_key("a\r\nb\r\n", &[], &[]) && k1 != run::cache_key("a\nb\n", &[(String::from("x"), String::from("1"))], &[]) && k1.len() == 32, || "cache key".into());

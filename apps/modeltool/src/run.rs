@@ -95,8 +95,67 @@ pub fn cache_key(src: &str, params: &[(String, String)], imports: &[(String, Str
     h[..16].iter().map(|b| format!("{:02x}", b)).collect()
 }
 
+/// `p` without "." and "..", "/" between the parts, the root ("/", "C:/") kept: the way JFScript normalises the
+/// path of an import (its module.rs), so the two compare
+pub fn normalize(p: &str) -> String {
+    let p = p.replace('\\', "/");
+    let b = p.as_bytes();
+    let (root, rest) = if p.starts_with('/') {
+        ("/", &p[1..])
+    } else if b.len() >= 2 && b[1] == b':' && b[0].is_ascii_alphabetic() {
+        if b.get(2) == Some(&b'/') { (&p[..3], &p[3..]) } else { (&p[..2], &p[2..]) }
+    } else {
+        ("", &p[..])
+    };
+    let mut parts: Vec<&str> = Vec::new();
+    for c in rest.split('/') {
+        match c {
+            "" | "." => {}
+            ".." => match parts.last() {
+                Some(&l) if l != ".." => {
+                    parts.pop();
+                }
+                _ if !root.is_empty() => {}
+                _ => parts.push(".."),
+            },
+            c => parts.push(c),
+        }
+    }
+    format!("{}{}", root, parts.join("/"))
+}
+
+/// the folder of a script, normalised ("" for a script in the working directory)
+pub fn script_dir(file: &str) -> String {
+    let f = normalize(file);
+    match f.rfind('/') {
+        Some(i) => String::from(&f[..i + 1]),
+        None => String::new(),
+    }
+}
+
+/// Whether a script in folder `dir` (script_dir) may import `path` (normalised by JFScript, relative to the
+/// working directory): only files in its folder and below.  Err with the reason for the message.
+pub fn import_allowed(dir: &str, path: &str) -> Result<(), String> {
+    let p = normalize(path);
+    let inside = if dir.is_empty() {
+        let b = p.as_bytes();
+        !(p.starts_with('/') || (b.len() >= 2 && b[1] == b':') || p == ".." || p.starts_with("../"))
+    } else {
+        p.len() > dir.len() && p.starts_with(dir)
+    };
+    if inside && !p.split('/').any(|c| c == "..") {
+        Ok(())
+    } else {
+        Err(format!(
+            "liegt außerhalb des Ordners des Skripts ({}); import liest nur Dateien in diesem Ordner und darunter",
+            if dir.is_empty() { "." } else { dir.trim_end_matches('/') }
+        ))
+    }
+}
+
 /// Compile and run the script `src` (named `file` in messages) with its parameters; `loader` reads a module
-/// for import(path) (the path relative to the script).
+/// for import(path) (the path relative to the script).  A module outside the script's folder is refused
+/// before the loader sees it (import_allowed).
 pub fn run_script(file: &str, src: &str, params: &[(String, String)], loader: &mut dyn FnMut(&str) -> Result<String, String>) -> Run {
     let t0 = plat::time_us();
     let mut run = Run {
@@ -132,7 +191,12 @@ pub fn run_script(file: &str, src: &str, params: &[(String, String)], loader: &m
         }
         vm.set_global("params", m);
     }
-    let mut host = ModelHost::new(loader);
+    let dir = script_dir(file);
+    let mut guarded = |path: &str| -> Result<String, String> {
+        import_allowed(&dir, path)?;
+        loader(path)
+    };
+    let mut host = ModelHost::new(&mut guarded);
     loop {
         match vm.run(&mut host, 10_000_000) {
             Status::Done(_) => break,

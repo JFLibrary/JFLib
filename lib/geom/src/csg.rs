@@ -1181,13 +1181,16 @@ impl Solid {
         Ok(BevelPlanes { solid, original, segments, ctx: bctx, poly: p })
     }
 
-    /// The solid with its edges and corners bevelled: `segments` 1 chamfers (a flat face along each edge, a
-    /// triangle at each corner of three faces), more round them with that many faces per edge, the faces cut
-    /// back by `radius` at right angles.  `only`: just the edges along that axis, corners stay.  Only for one
-    /// convex cell.
-    pub fn bevelled(&self, radius: f64, segments: usize, only: Option<Axis>) -> Result<Solid, Error> {
+    /// The solid with its edges and corners bevelled, and its surface ([`bevel`]): `segments` 1 chamfers (a
+    /// flat face along each edge, a triangle at each corner of three faces), more round them with that many
+    /// faces per quarter turn (an edge turning by another angle gets proportionally many, at least one), the
+    /// faces cut back by `radius` at right angles.  `only`: just the edges along that axis, the corners stay.
+    /// Only for one convex cell.
+    pub fn bevel(&self, radius: f64, segments: usize, only: Option<Axis>) -> Result<(Solid, Mesh), Error> {
         check_bevel(radius, segments)?;
-        Ok(self.bevel_planes(radius, segments, only)?.solid.pruned())
+        let b = self.bevel_planes(radius, segments, only)?;
+        let solid = b.solid.clone().pruned();
+        Ok((solid, bevel_mesh(b)?))
     }
 }
 
@@ -1244,14 +1247,6 @@ pub fn bevel(m: &Mesh, radius: f64, segments: usize, only: Option<Axis>) -> Resu
     let s = solid_of(m, "abschrägen")?;
     let b = s.bevel_planes(radius, segments, only)?;
     bevel_mesh(b)
-}
-
-impl Solid {
-    /// [`bevel`] of this solid (one convex cell) as a mesh with the bevel's normals
-    pub fn bevel_mesh(&self, radius: f64, segments: usize, only: Option<Axis>) -> Result<Mesh, Error> {
-        check_bevel(radius, segments)?;
-        bevel_mesh(self.bevel_planes(radius, segments, only)?)
-    }
 }
 
 /// The surface of a bevel with its normals: a corner of a face of the original solid gets the face's normal.

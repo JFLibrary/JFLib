@@ -253,8 +253,19 @@ fn pictures(_: &host::Model, _: &Options) -> (Option<(Vec<(&'static str, Vec<u8>
     (None, Some(String::from("im Browser zeichnet modeltool nicht")))
 }
 
-/// a module next to the script (paths come normalised and relative to the working directory)
-fn file_loader(path: &str) -> Result<String, String> {
+/// A module in the script's folder or below (paths come normalised and relative to the working directory; run.rs
+/// has refused any outside the folder): no link on the way from the folder to the file, so a link inside it
+/// cannot lead out.
+fn file_loader(dir: &str, path: &str) -> Result<String, String> {
+    let rest = path.strip_prefix(dir).unwrap_or(path);
+    let mut at = String::from(dir);
+    for part in rest.split('/') {
+        at.push_str(part);
+        if plat::fs::lstat(&at).is_some_and(|m| m.is_symlink()) {
+            return Err(format!("{} ist eine Verknüpfung; import folgt keinen Verknüpfungen (sie könnten aus dem Ordner des Skripts führen)", at));
+        }
+        at.push('/');
+    }
     match plat::read_file(path) {
         Some(b) => String::from_utf8(b).map_err(|_| String::from("die Datei ist kein UTF-8")),
         None => Err(String::from("die Datei gibt es nicht")),
@@ -355,7 +366,8 @@ fn run_main() -> i32 {
         err(&format!("modeltool: {} ist kein UTF-8\n", file));
         return 2;
     };
-    let mut loader = file_loader;
+    let dir = run::script_dir(&file);
+    let mut loader = |p: &str| file_loader(&dir, p);
     if has("--report") {
         let r = run::run_script(&file, &src, &params, &mut loader);
         if !r.ok() {
