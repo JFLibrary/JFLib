@@ -1,0 +1,11 @@
+# game1: what the program may do (docs/PERMISSIONS.md).  Without this file an app may do
+# everything; with it, everything that is not listed is refused (in the library, plugins,
+# scripts and agent actions too).  The app's own folders (config://, data://, cache://,
+# logs://) and app:// need no line.  The build checks the syntax; the packages follow the file
+# (Flatpak finish-args, MSIX capabilities: docs/PACKAGING.md).
+# the server the player types in (UDP and WebSocket); in the browser the page's own server needs no rule
+net.connect *:*
+# --loopback (tests/loopback.uis): a server on the loopback address only
+net.listen localhost:*
+# --bake IN OUT (apps/game1/tools/content.py): the files named on the command line
+fs.user

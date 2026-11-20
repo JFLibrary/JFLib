@@ -1,0 +1,20 @@
+# apps/game1/PACKAGE: the app's identity and packages (docs/PACKAGING.md)
+#   python tools/package.py game1 --formats all
+# version= is the app's own version (MAJOR.MINOR.PATCH, docs/VERSIONING.md); the program reads it
+# as rt::app_version!(), the packages and lib/update use it.  The library has its own (Cargo.toml).
+# "Spiel 1" and game1 are working names: the user picks the real name later (rules::GAME_NAME, this file, app_id,
+# the folder names; docs/GAME1.md, "Name").
+display=Spiel 1
+version=0.1.0
+publisher=JFLib
+summary=Ein schneller Cartoon-Shooter, jeder gegen jeden, im Browser und auf dem Desktop
+description=Spiel 1: ein schneller Mehrspieler-Shooter in Cartoon-Grafik. Räume per Code, Bots zum Üben, eine Karte, eine Waffe; Teil 1 von G7h.
+generic=Spiel
+categories=Game;ActionGame;
+deb_name=game1
+# Flatpak, AppStream and the MSIX identity: the user's own apps are org.jfreund.* (a working id until the name)
+app_id=org.jfreund.game1
+homepage=https://github.com/JFLibrary/JFLib
+default_win=winui
+default_linux=winui
+styles=winui

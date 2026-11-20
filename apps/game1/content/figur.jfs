@@ -1,0 +1,48 @@
+// Figur: eine Figur von Spiel 1 aus starren Teilen (ohne Skelett) -- Beine, Rumpf, Kopf mit Mütze und Augen, Arme,
+// Hände und die Waffe, ein Funkenwerfer.  1,8 m hoch wie die Kapsel des Controllers, die Füße im Ursprung, Blick
+// nach vorn (+Z).  Das Spiel bewegt die Teile einzeln: die Beine um die Hüfte (Gehen), Arme, Hände und Waffe um die
+// Schulter (Blick nach oben und unten); "jacke" bekommt je Spieler eine eigene Farbe.  Die Waffe und die Hände
+// zeichnet es auch vor der Kamera.  Gebaut mit modeltool, gebacken von apps/game1/tools/content.py:
+//   modeltool apps/game1/content/figur.jfs --out build/game1-content/figur
+// "@muendung" markiert die Mündung (Mündungsfeuer, Leuchtspur).
+
+model.name("Figur")
+model.material("hose", {color: "#3b4356", roughness: 0.8})
+model.material("jacke", {color: "#e0802c", roughness: 0.7})
+model.material("haut", {color: "#f1c39a", roughness: 0.8})
+model.material("muetze", {color: "#2b2f3a", roughness: 0.7})
+model.material("schwarz", {color: "#1d1d22", roughness: 0.5})
+model.material("waffe", {color: "#525866", roughness: 0.5})
+model.material("akzent", {color: "#3fd0e8", roughness: 0.4})
+
+// Beine (Hüfte bei 0,82 m)
+let bein = geom.box(0.26, 0.82, 0.3)
+model.add(bein.move(-0.17, 0, 0), "hose", "bein_l")
+model.add(bein.move(0.17, 0, 0), "hose", "bein_r")
+
+// Rumpf: breit und kurz, darüber der Kopf mit Mütze und zwei Augen
+model.add(geom.box(0.66, 0.62, 0.4).move(0, 0.8, 0), "jacke", "rumpf")
+model.add(geom.sphere(0.2, 24).move(0, 1.42, 0), "haut", "kopf")
+let schirm = geom.box(0.3, 0.03, 0.16).move(0, 1.69, 0.2)
+model.add(geom.merge(geom.cylinder(0.205, 0.15, 24).move(0, 1.68, 0), schirm), "muetze", "muetze")
+let auge = geom.sphere(0.035, 12)
+model.add(geom.merge(auge.move(-0.075, 1.6, 0.17), auge.move(0.075, 1.6, 0.17)), "schwarz", "augen")
+
+// Arme: von der Schulter (y 1,3) nach vorn zur Waffe; die Figur hält sie rechts (bei -x, sie blickt nach +Z)
+let arm = geom.box(0.14, 0.14, 0.5).move(0, -0.07, 0.25)
+let arm_lang = geom.box(0.14, 0.14, 0.6).move(0, -0.07, 0.3)
+model.add(arm.rotate_y(15).move(-0.36, 1.3, 0), "jacke", "arm_r")
+model.add(arm_lang.rotate_y(-40).move(0.36, 1.3, 0), "jacke", "arm_l")
+let hand = geom.box(0.11, 0.11, 0.11)
+model.add(geom.merge(hand.move(-0.17, 1.04, 0.42), hand.move(-0.07, 1.13, 0.6)), "haut", "haende")
+
+// die Waffe: Gehäuse, Griff, Lauf, ein leuchtender Tank oben
+let wx = -0.12
+let gehaeuse = geom.box(0.12, 0.16, 0.42).move(wx, 1.15, 0.5)
+let griff = geom.box(0.08, 0.14, 0.08).move(wx, 1.01, 0.4)
+let lauf = geom.cylinder(0.035, 0.25, 16).rotate_x(90).move(wx, 1.23, 0.71)
+model.add(geom.merge(gehaeuse, griff, lauf), "waffe", "waffe")
+model.add(geom.cylinder(0.05, 0.22, 16).rotate_x(90).move(wx, 1.36, 0.36), "akzent", "tank")
+model.add(geom.box(0.02, 0.02, 0.02).move(wx, 1.22, 0.96), "akzent", "@muendung")
+
+model.budget(4000)

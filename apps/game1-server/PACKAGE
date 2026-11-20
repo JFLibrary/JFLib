@@ -1,0 +1,20 @@
+# apps/game1-server/PACKAGE: the app's identity and packages (docs/PACKAGING.md)
+#   python tools/package.py game1-server --formats all
+# version= is the app's own version (MAJOR.MINOR.PATCH, docs/VERSIONING.md); the program reads it
+# as rt::app_version!(), the packages and lib/update use it.  The library has its own (Cargo.toml).
+# A program without a window: tools/package.py makes desktop packages for window apps; here
+# version= (rt::app_version!()) and app_id= matter.  "Spiel 1" is a working name (docs/GAME1.md, "Name").
+display=Spiel 1 Server
+version=0.1.0
+publisher=JFLib
+summary=Der Server von Spiel 1: Räume per Code, Bots, UDP und WebSocket
+description=Spiel 1 Server: Räume per Code, jeder gegen jeden, Bots auf dem Server; Clients über UDP (Desktop) und WebSocket (Browser), auf Wunsch mit den Dateien der Browser-Ausgabe.
+generic=Spielserver
+categories=Game;ConsoleOnly;
+deb_name=game1-server
+# Flatpak, AppStream and the MSIX identity: the user's own apps are org.jfreund.* (a working id until the name)
+app_id=org.jfreund.game1_server
+homepage=https://github.com/JFLibrary/JFLib
+default_win=winui
+default_linux=winui
+styles=winui

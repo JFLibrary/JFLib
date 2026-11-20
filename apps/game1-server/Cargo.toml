@@ -1,0 +1,31 @@
+[package]
+name = "game1-server"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "game1-server"
+path = "src/main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+game.workspace = true
+netchan.workspace = true
+netio.workspace = true
+# the game's logic without a GPU, shared with the client apps/game1 (never render3d or gpu here)
+game1_core = { path = "../game1/crates/game1_core" }
+
+[build-dependencies]
+jflib-build.workspace = true
