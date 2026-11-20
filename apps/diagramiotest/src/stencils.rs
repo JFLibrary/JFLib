@@ -19,8 +19,8 @@
 //                       unknown function, a missing Width, a missing master file, NameU twice,
 //                       a reference into nothing, a cell text without all languages
 //
-//   diagramiotest --write-stencils DIR   standard_m.vssx, standard_u.vssx, the SVG test
-//                       stencil svgtest_m.vssx and standard_dropped.vsdx (every master dropped
+//   diagramiotest --write-stencils DIR   jfd_standard_m.vssx, jfd_standard_u.vssx, the SVG test
+//                       stencil jfd_svgtest_m.vssx and standard_dropped.vsdx (every master dropped
 //                       on a drawing the way JFDiagrammer does it), for a look in Visio
 
 use alloc::format;
@@ -329,7 +329,7 @@ pub fn run(h: &mut H) {
                 docs.push(None);
             }
             Ok((built, bytes)) => {
-                h.check(&format!("stencils/build/{tag}"), built.doc.masters().count() == WANT.len() && built.vssx_name() == format!("standard_{}.vssx", &tag[..1]), format!("{} masters, {} bytes, {}", built.doc.masters().count(), bytes.len(), built.vssx_name()));
+                h.check(&format!("stencils/build/{tag}"), built.doc.masters().count() == WANT.len() && built.vssx_name() == format!("jfd_standard_{}.vssx", &tag[..1]), format!("{} masters, {} bytes, {}", built.doc.masters().count(), bytes.len(), built.vssx_name()));
                 let again = build_set(STANDARD, m).map(|(_, b)| b).unwrap_or_default();
                 h.check(&format!("stencils/build/{tag}/deterministic"), again == bytes, format!("second build {} bytes, same: {}", again.len(), again == bytes));
                 let back = read_back(h, &format!("stencils/build/{tag}/roundtrip"), &bytes);

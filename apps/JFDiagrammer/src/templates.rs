@@ -23,16 +23,17 @@
 // masters, styles, design, stencil windows and rule set; to_drawing puts the page names and the
 // texts into the language of the user and drops the catalogue's cells.  The stencils it names
 // open in the Shapes panel in its order, the active one unfolded: built-in stencils by their
-// file name ("flowchart_m.vssx", the US form "_u"), other names as paths.
+// file name ("jfd_flowchart_m.vssx", the US form "_u"; diagram_io::stencil::file_name), other
+// names as paths.
 
 use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use diagram_core::{CellAddr, DocKind, Document, SheetRef, Unit};
+use diagram_core::{CellAddr, DocKind, Document, SheetRef};
 use diagram_io::template::{self, StencilWindow};
-use diagram_io::vsdx::{self, Format, Measure};
+use diagram_io::vsdx::{self, Format};
 use gfx::Surface;
 use ui::i18n::{t, tf};
 use ui::*;
@@ -326,17 +327,6 @@ fn page_size(doc: &Document) -> (f64, f64) {
     (num("PageWidth"), num("PageHeight"))
 }
 
-/// the measuring system of a document: the unit its first page shows its width in
-fn measure_of(doc: &Document) -> Measure {
-    let Some(p) = doc.pages().next() else { return Measure::Metric };
-    let Some(sym) = doc.sym("PageWidth") else { return Measure::Metric };
-    let r = doc.resolve(SheetRef::Page(p), &CellAddr::single(sym));
-    match r.cell.and_then(|c| c.unit) {
-        Some(Unit::Inches | Unit::InchesFrac | Unit::Feet | Unit::FeetInches | Unit::Yards | Unit::Miles | Unit::MilesFrac) => Measure::Us,
-        _ => Measure::Metric,
-    }
-}
-
 // ------------------------------------------------------------------ a new drawing
 
 /// Erstellen: a new drawing from form `f` of entry `k` in the units chosen
@@ -363,17 +353,16 @@ pub(crate) fn create(app: &mut Diagrammer, ui: &mut Ui, k: usize, f: usize) -> b
 /// stencils it names by a bare file name are looked for too
 pub(crate) fn create_from(app: &mut Diagrammer, ui: &mut Ui, mut doc: Document, dir: Option<&str>) {
     let windows = template::stencil_windows(&doc);
-    let measure = measure_of(&doc);
     template::to_drawing(&mut doc, stencils::lang());
     let name = crate::edit_doc::next_name();
     let format = Format { kind: DocKind::Drawing, macros: false };
     crate::edit_doc::install(app, ui, doc, name, None, format, None);
-    open_stencils(app, ui, &windows, measure, dir);
+    open_stencils(app, ui, &windows, dir);
 }
 
 // the stencils of a template into the Shapes panel, in its order, the active one unfolded; the
 // stencils open before are closed (the panel belongs to the drawing, as Visio's window does)
-fn open_stencils(app: &mut Diagrammer, ui: &mut Ui, list: &[StencilWindow], measure: Measure, dir: Option<&str>) {
+fn open_stencils(app: &mut Diagrammer, ui: &mut Ui, list: &[StencilWindow], dir: Option<&str>) {
     for key in app.stencils.open.clone() {
         stencils::close(app, ui, key);
     }
@@ -381,20 +370,11 @@ fn open_stencils(app: &mut Diagrammer, ui: &mut Ui, list: &[StencilWindow], meas
     let mut missing: Vec<String> = Vec::new();
     for w in list {
         let name = String::from(w.document.rsplit(['/', '\\']).next().unwrap_or(&w.document));
-        let lower = name.to_ascii_lowercase();
-        // a built-in stencil by its file name; its measure from the name, else the drawing's
-        let builtin = stencils::BUILTIN.iter().position(|b| {
-            let f = b.file.to_ascii_lowercase();
-            lower == format!("{f}_m.vssx") || lower == format!("{f}_u.vssx") || lower == format!("{f}.vssx")
-        });
-        let key = if let Some(b) = builtin {
-            let m = if lower.ends_with("_u.vssx") {
-                Measure::Us
-            } else if lower.ends_with("_m.vssx") {
-                Measure::Metric
-            } else {
-                measure
-            };
+        // a built-in stencil by its file name ("jfd_flowchart_u.vssx"), in the measure the name
+        // says; Visio's own stencils (BASIC_M.VSSX ...) are none of ours
+        let builtin = diagram_io::stencil::parse_file_name(&name)
+            .and_then(|(stem, m)| stencils::BUILTIN.iter().position(|b| b.file.eq_ignore_ascii_case(&stem)).map(|k| (k, m)));
+        let key = if let Some((b, m)) = builtin {
             stencils::open_builtin_in(app, ui, b, m)
         } else {
             let mut tries: Vec<String> = alloc::vec![w.document.clone()];
@@ -429,7 +409,7 @@ fn open_stencils(app: &mut Diagrammer, ui: &mut Ui, list: &[StencilWindow], meas
 /// the open stencils as stencil windows of a template: built-in ones by their file name, files
 /// by their path; new stencils not saved yet and the favourites are left out
 pub(crate) fn windows_of_panel(app: &Diagrammer) -> Vec<StencilWindow> {
-    let suffix = if stencils::measure(app) == Measure::Us { "u" } else { "m" };
+    let region = stencils::measure(app);
     let active = app.stencils.panel.active;
     app.stencils
         .open
@@ -437,7 +417,7 @@ pub(crate) fn windows_of_panel(app: &Diagrammer) -> Vec<StencilWindow> {
         .filter_map(|&key| {
             let l = app.stencils.get(key)?;
             let document = match &l.origin {
-                Origin::Builtin(k) => format!("{}_{suffix}.vssx", stencils::BUILTIN.get(*k)?.file),
+                Origin::Builtin(k) => diagram_io::stencil::file_name(stencils::BUILTIN.get(*k)?.file, region),
                 Origin::File(p) | Origin::New(Some(p)) => p.clone(),
                 Origin::Favorites | Origin::New(None) => return None,
             };

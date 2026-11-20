@@ -109,3 +109,17 @@ fn inherited_rows_written_with_their_type() {
     let again = vsdx::write(&back.doc, &vsdx::WriteOptions::DEFAULT).expect("write again");
     assert_eq!(bytes, again);
 }
+
+// (JD13) the file names of the own stencils carry the prefix "jfd_" and read back; Visio's own
+// stencil names are none of ours
+#[test]
+fn stencil_file_names() {
+    use crate::stencil::{file_name, parse_file_name};
+    assert_eq!(file_name("arrows", Measure::Metric), "jfd_arrows_m.vssx");
+    assert_eq!(file_name("arrows", Measure::Us), "jfd_arrows_u.vssx");
+    assert_eq!(parse_file_name("jfd_arrows_u.vssx"), Some((alloc::string::String::from("arrows"), Measure::Us)));
+    assert_eq!(parse_file_name("C:/x/JFD_Flowchart_M.VSSX"), Some((alloc::string::String::from("flowchart"), Measure::Metric)));
+    for other in ["ARROWS_M.VSSX", "arrows_m.vssx", "jfd__m.vssx", "jfd_arrows.vssx", "jfd_arrows_m.vsdx"] {
+        assert_eq!(parse_file_name(other), None, "{other}");
+    }
+}

@@ -265,7 +265,7 @@ pub(crate) fn open_builtin(app: &mut Diagrammer, ui: &mut Ui, k: usize) {
 
 /// (JD13) open built-in stencil k in measure `m` (a template's units): the region's variant is the
 /// stencil every other place uses; the other one is read as a stencil of its own, named like
-/// its file ("flowchart_u.vssx") -> its key
+/// its file ("jfd_flowchart_u.vssx") -> its key
 pub(crate) fn open_builtin_in(app: &mut Diagrammer, ui: &mut Ui, k: usize, m: Measure) -> Option<u32> {
     if m == measure(app) {
         let key = load_builtin(app, k)?;
@@ -274,7 +274,7 @@ pub(crate) fn open_builtin_in(app: &mut Diagrammer, ui: &mut Ui, k: usize, m: Me
         return Some(key);
     }
     let b = BUILTIN.get(k)?;
-    let name = format!("{}_{}.vssx", b.file, if m == Measure::Us { "u" } else { "m" });
+    let name = diagram_io::stencil::file_name(b.file, m);
     let origin = Origin::File(name);
     let key = match app.stencils.find(&origin) {
         Some(key) => key,
@@ -684,8 +684,8 @@ fn toggle(app: &mut Diagrammer, ui: &mut Ui, key: u32) {
 pub(crate) fn write_builtin(dir: &str) -> Vec<String> {
     let mut out = Vec::new();
     for b in BUILTIN {
-        for (suffix, bytes) in [("m", b.metric), ("u", b.us)] {
-            let p = format!("{dir}/{}_{suffix}.vssx", b.file);
+        for (m, bytes) in [(Measure::Metric, b.metric), (Measure::Us, b.us)] {
+            let p = format!("{dir}/{}", diagram_io::stencil::file_name(b.file, m));
             if plat::write_file(&p, bytes) {
                 out.push(p);
             }

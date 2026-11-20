@@ -5,7 +5,10 @@
 //   stencil::build_vssx(&files, Measure::Us) -> Result<(Built, Vec<u8>), SourceError>
 //   Built { doc, stencil, file, category, measure }   the stencil document (DocKind::Stencil),
 //                                   its universal name, the output stem, the category
-//   built.vssx_name()               "standard_m.vssx" / "standard_u.vssx"
+//   built.vssx_name()               "jfd_standard_m.vssx" / "jfd_standard_u.vssx"
+//   file_name(stem, Measure) / parse_file_name(name)   (JD13) the file names of JFDiagrammer's
+//                                   own stencils: the prefix "jfd_" keeps them apart from
+//                                   Visio's (its ARROWS_M.VSSX is not our arrows_m)
 //   SourceError { file, line, message }   shown as "rectangle.master:12: unbekannter
 //                                   Abschnitt [Geometrie]" (line 0: the whole file)
 //
@@ -93,10 +96,35 @@ pub struct Built {
 }
 
 impl Built {
-    /// the file name of the .vssx: `<file>_m.vssx` (metric) or `<file>_u.vssx` (US)
+    /// the file name of the .vssx: `jfd_<file>_m.vssx` (metric) or `jfd_<file>_u.vssx` (US)
     pub fn vssx_name(&self) -> String {
-        format!("{}_{}.vssx", self.file, if self.measure == Measure::Us { "u" } else { "m" })
+        file_name(&self.file, self.measure)
     }
+}
+
+/// the prefix of the file names of JFDiagrammer's own stencils (JD13, the user's choice): a
+/// template names its stencils by file name (windows.xml), and Visio opens a stencil of its own
+/// of that name if it has one, so ours never share a name with Visio's (ARROWS_M.VSSX)
+pub const FILE_PREFIX: &str = "jfd_";
+
+/// the file name of the built stencil with stem `stem` (stencil.txt `file`) in measure `m`:
+/// "jfd_standard_m.vssx", "jfd_standard_u.vssx"
+pub fn file_name(stem: &str, m: Measure) -> String {
+    format!("{FILE_PREFIX}{stem}_{}.vssx", if m == Measure::Us { "u" } else { "m" })
+}
+
+/// the stem and measure of a file name file_name gives (a path before it and ASCII case do not
+/// count: "C:/x/JFD_Standard_U.VSSX" -> ("standard", Us)); None for every other name, also for
+/// Visio's own stencils
+pub fn parse_file_name(name: &str) -> Option<(String, Measure)> {
+    let base = name.rsplit(['/', '\\']).next().unwrap_or(name).to_ascii_lowercase();
+    let rest = base.strip_prefix(FILE_PREFIX)?.strip_suffix(".vssx")?;
+    let (stem, m) = if let Some(s) = rest.strip_suffix("_m") {
+        (s, Measure::Metric)
+    } else {
+        (rest.strip_suffix("_u")?, Measure::Us)
+    };
+    (!stem.is_empty()).then(|| (String::from(stem), m))
 }
 
 /// why a stencil did not build: the source file, the line (from 1; 0: the whole file) and why

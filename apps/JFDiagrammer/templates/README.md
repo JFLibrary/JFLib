@@ -174,12 +174,14 @@ Die Formeln nutzen Visios Prüffunktionen (`ROLE()`, `HASCATEGORY()`, `AGGCOUNT(
   Dokument.
 - **Schablonen (VL-02):** im Fensterteil `visio/windows.xml`, so wie Visio ihn schreibt: ein
   Zeichenfenster (`WindowType='Drawing'`, `ID='0'`) und je Schablone ein Element
-  `Window WindowType='Stencil'` mit `Document='<file>_m.vssx'` (bzw. `_u`), `ParentWindow='0'`,
+  `Window WindowType='Stencil'` mit `Document='jfd_<file>_m.vssx'` (bzw. `_u`; das Präfix hält
+  sie von Visios eigenen Schablonen fern, `diagram_io::stencil::file_name`), `ParentWindow='0'`,
   `WindowState='1025'` (angedockt, `visWSDockedLeft | visWSAnchorMerged`) oder `'67109889'` für die
   aufgeklappte (`| visWSActive`) und den Kindern `StencilGroup` 10 und `StencilGroupPos` 1, 2 …
   in der Reihenfolge der Seitenleiste. JFDiagrammer erkennt seine eingebauten Schablonen am
-  Dateinamen; andere Namen sind Pfade (eigene Vorlagen). Visio findet unsere Schablonen nicht und
-  öffnet die Vorlage ohne sie. Das eigene Zeichenfenster ist minimal
+  Dateinamen (nur am Präfix, nie an Visios Namen wie BASIC_M.VSSX); andere Namen sind Pfade, die
+  es öffnet, wenn es sie gibt (eigene Vorlagen). Visio findet unsere Schablonen in seinen Ordnern nicht und öffnet die Vorlage
+  ohne sie. Das eigene Zeichenfenster ist minimal
   (`<Window ID='0' WindowType='Drawing' WindowState='1073741824' ContainerType='Page' Page='0'/>`,
   maximiert, erste Seite); `set_stencil_windows` behält in einem gelesenen Fensterteil alle
   anderen Fenster wörtlich und gibt neuen Fenstern IDs hinter allen, die der Teil hatte.

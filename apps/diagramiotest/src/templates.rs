@@ -7,7 +7,7 @@
 //                        starter diagrams; the same sources give the same bytes
 //   templates/roundtrip  read -> write -> read: the same model and the same bytes, no warning
 //   templates/windows    the stencil windows: the template's stencils in order, the first
-//                        unfolded, "<stem>_m.vssx" / "_u.vssx"; ParentWindow names the drawing window
+//                        unfolded, "jfd_<stem>_m.vssx" / "_u.vssx"; ParentWindow names the drawing window
 //   templates/cells      the JFD_ cells: template, names, description, category, order, starter,
 //                        default (exactly one form a template), registers
 //   templates/page       page size, orientation and unit: A4 landscape in mm, Letter landscape in in
@@ -126,7 +126,7 @@ fn check_forms(h: &mut H, folder: &'static str, m: Measure, forms: &[(BuiltTempl
         let want: Vec<StencilWindow> = names
             .iter()
             .enumerate()
-            .map(|(k, s)| StencilWindow { document: format!("{s}{}", if m == Measure::Us { "_u.vssx" } else { "_m.vssx" }), active: active.as_ref().map_or(k == 0, |a| a == s) })
+            .map(|(k, s)| StencilWindow { document: stencil::file_name(s, m), active: active.as_ref().map_or(k == 0, |a| a == s) })
             .collect();
         h.check("templates/windows", wins == want, format!("{name}: {:?}", wins.iter().map(|w| format!("{}{}", w.document, if w.active { " (aufgeklappt)" } else { "" })).collect::<Vec<_>>()));
         let wxml = part(&doc, "application/vnd.ms-visio.windows+xml").map(|d| String::from_utf8_lossy(d).into_owned()).unwrap_or_default();
