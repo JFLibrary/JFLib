@@ -1,0 +1,14 @@
+# Pfeil-Shapes (SH-019, JD13): flächige Pfeile im NetLab-Stil -- gerade Kanten, Bögen nur wo der
+# Name sie verlangt; Schaft und Spitze per Steuerpunkt.  Linie, Füllung und Text kommen aus der
+# Formatvorlage "Normal" (die Linienpfeile "Connector").  Reihenfolge wie FEATURES.md SH-019;
+# die ersten fünf sind Schnell-Shapes.
+stencil: Arrow Shapes
+file: arrows
+name.de: Pfeil-Shapes
+name.en: Arrow Shapes
+name.es: Formas de flecha
+name.it: Forme a freccia
+name.fr: Formes de flèche
+category: flowchart
+masters: simple_arrow, double_arrow, modern_arrow, flexible_arrow, bent_arrow, u_turn_arrow, right_angle_arrow, curved_right_arrow, curved_left_arrow, polyline_arrow, zigzag_arrow, zigzag_arrow_2d, striped_arrow, notched_arrow, pentagon_arrow, circular_arrow, quad_arrow, left_right_up_arrow, left_right_arrow_block, quad_arrow_block
+quick: 5

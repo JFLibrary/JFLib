@@ -1,0 +1,78 @@
+# Feld mit Pfeil: ein Kasten mit angesetztem Blockpfeil nach unten, ein Umriss.  Row_1 an der
+# linken unteren Ecke des Kastens ändert die Länge des Pfeils (nur senkrecht), Row_2 an der
+# linken Ecke der Spitze ihre Breite (waagrecht; der Schaft ist halb so breit) und ihre Länge
+# (senkrecht).  Der Text steht im Kasten.
+master: Box with arrow
+name.de: Feld mit Pfeil
+name.en: Box with arrow
+name.es: Cuadro con flecha
+name.it: Riquadro con freccia
+name.fr: Bloc avec flèche
+prompt.de: Block mit einem Pfeil nach unten. Pfeil und Spitze ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Block with an arrow pointing down. Drag the yellow control handles to change the arrow and its head.
+prompt.es: Bloque con una flecha hacia abajo. Arrastre los controladores amarillos para cambiar la flecha y su punta.
+prompt.it: Blocco con una freccia verso il basso. Trascina le maniglie di controllo gialle per cambiare la freccia e la punta.
+prompt.fr: Bloc avec une flèche vers le bas. Faites glisser les poignées de contrôle jaunes pour modifier la flèche et sa pointe.
+keywords.de: Block, Feld, Kasten, Pfeil, unten, Schritt, Ablauf, Blockdiagramm
+keywords.en: block, box, arrow, down, step, flow, block diagram
+keywords.es: bloque, cuadro, flecha, abajo, paso, flujo, diagrama de bloques
+keywords.it: blocco, riquadro, freccia, giù, passo, flusso, diagramma a blocchi
+keywords.fr: bloc, boîte, flèche, bas, étape, flux, diagramme de blocs
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 30 mm
+Height.us = 1.125 in
+TxtWidth = Width
+TxtHeight = Height-User.Body
+TxtPinX = Width*0.5
+TxtPinY = (Height+User.Body)*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Unterkante des Kastens (= Länge des Pfeils), die halbe Breite und die Länge der Spitze,
+# der halbe Schaft
+Body:   Value = MIN(MAX(Controls.Row_1.Y, Height*0.1), Height*0.9)
+Hw:     Value = MIN(MAX(Width*0.5-Controls.Row_2, 0), Width*0.5)
+Hl:     Value = MIN(MAX(Controls.Row_2.Y, 0), User.Body)
+Shaft:  Value = User.Hw*0.5
+
+[Geometry]
+MoveTo  X = 0; Y = User.Body
+LineTo  X = Width*0.5-User.Shaft; Y = User.Body
+LineTo  X = Width*0.5-User.Shaft; Y = User.Hl
+LineTo  X = Width*0.5-User.Hw; Y = User.Hl
+LineTo  X = Width*0.5; Y = 0
+LineTo  X = Width*0.5+User.Hw; Y = User.Hl
+LineTo  X = Width*0.5+User.Shaft; Y = User.Hl
+LineTo  X = Width*0.5+User.Shaft; Y = User.Body
+LineTo  X = Width; Y = User.Body
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = 0; Y = Height*0.4
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Länge des Pfeils ändern"
+        Tip.en = "Change the length of the arrow"
+        Tip.es = "Cambiar la longitud de la flecha"
+        Tip.it = "Cambia la lunghezza della freccia"
+        Tip.fr = "Modifier la longueur de la flèche"
+Row_2:  X = Width*0.3; Y = Height*0.25
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Breite und Länge der Spitze ändern"
+        Tip.en = "Change the width and length of the head"
+        Tip.es = "Cambiar el ancho y la longitud de la punta"
+        Tip.it = "Cambia la larghezza e la lunghezza della punta"
+        Tip.fr = "Modifier la largeur et la longueur de la pointe"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = (Height+User.Body)*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = (Height+User.Body)*0.5; DirX = 1; DirY = 0

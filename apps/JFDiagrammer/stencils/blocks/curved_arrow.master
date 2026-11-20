@@ -1,0 +1,58 @@
+# Gebogener Pfeil: eine Bogenlinie als 1D-Shape (Height 0) mit der Pfeilspitze des Designs am Ende;
+# sie liegt auf der Linie vom Anfang zum Ende und dreht sich mit ihr, die Enden kleben
+# (GlueType 2 auch an das ganze Shape).  Eine ArcTo-Zeile, der Bogen wölbt sich links der
+# Laufrichtung.  Row_1 über der Mitte ändert den Stich (nur senkrecht, als Abstand; anfangs ein
+# Viertel der Länge, bis man ihn zieht).  Formatvorlage "Connector"; der Text steht auf dem
+# Scheitel des Bogens.
+master: Curved arrow
+name.de: Gebogener Pfeil
+name.en: Curved arrow
+name.es: Flecha curva
+name.it: Freccia curva
+name.fr: Flèche courbe
+style: Connector
+prompt.de: Bogenlinie mit Pfeilspitze, deren Enden an Shapes kleben. Den Bogen ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Arc line with an arrowhead whose ends glue to shapes. Drag the yellow control handle to change the arc.
+prompt.es: Línea en arco con punta de flecha cuyos extremos se pegan a las formas. Arrastre el controlador amarillo para cambiar el arco.
+prompt.it: Linea ad arco con punta di freccia le cui estremità si incollano alle forme. Trascina la maniglia di controllo gialla per cambiare l'arco.
+prompt.fr: Ligne en arc avec pointe de flèche dont les extrémités se collent aux formes. Faites glisser la poignée de contrôle jaune pour modifier l'arc.
+keywords.de: Pfeil, Bogen, gebogen, Linie, Kurve, Rückführung, Verbindung
+keywords.en: arrow, arc, curved, line, curve, feedback, connection
+keywords.es: flecha, arco, curva, línea, curvada, retorno, conexión
+keywords.it: freccia, arco, curva, linea, curvata, ritorno, collegamento
+keywords.fr: flèche, arc, courbe, ligne, incurvée, retour, connexion
+
+[Shape]
+BeginX = 0 mm
+BeginY = 2.5 mm
+BeginY.us = 0.1 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 2.5 mm
+EndY.us = 0.1 in
+Height = 0 mm
+Height.us = 0 in
+GlueType = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Controls.Row_1.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+ArcTo   X = Width; Y = Height*0.5; A = Height*0.5-Controls.Row_1.Y
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.5+Width*0.25
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 2; CanGlue = FALSE
+        Tip.de = "Bogen ändern"
+        Tip.en = "Change the arc"
+        Tip.es = "Cambiar el arco"
+        Tip.it = "Cambia l'arco"
+        Tip.fr = "Modifier l'arc"

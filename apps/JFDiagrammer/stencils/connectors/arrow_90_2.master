@@ -1,0 +1,61 @@
+# 90-Grad 2: ein flächiger Winkelpfeil als 1D-Shape, erst senkrecht vom Anfang, dann waagrecht zum
+# Ende; die Spitze sitzt am Ende.  1D-Shape mit aufrechtem Kasten wie der Kurvenverbinder (Width =
+# EndX-BeginX, Height = EndY-BeginY, Angle 0); die Enden kleben an Shapes, mit GlueType 2 auch an
+# das ganze Shape.  Der Umriss folgt den Vorzeichen von Width und Height (User.Sx, User.Sy),
+# stimmt also in jeder Lage.  Schaft 5 mm, Spitze 10 x 8 mm (README: 1D-Flächenpfeile), ohne
+# Steuerpunkte.  Formatvorlage "Normal".
+master: 90 degree 2
+name.de: 90-Grad 2
+name.en: 90 degree 2
+name.es: 90 grados 2
+name.it: 90 gradi 2
+name.fr: 90 degrés 2
+prompt.de: Flächiger Pfeil mit einem rechtwinkligen Knick, dessen Enden an Shapes kleben. Ziehen Sie die Enden auf Shapes.
+prompt.en: Flat arrow with one right-angle bend whose ends glue to shapes. Drag the ends onto shapes.
+prompt.es: Flecha plana con un codo en ángulo recto cuyos extremos se pegan a las formas. Arrastre los extremos sobre las formas.
+prompt.it: Freccia piatta con una piega ad angolo retto le cui estremità si incollano alle forme. Trascina le estremità sulle forme.
+prompt.fr: Flèche pleine avec un coude à angle droit dont les extrémités se collent aux formes. Faites glisser les extrémités sur les formes.
+keywords.de: 90 Grad, Winkel, rechtwinklig, Knick, Pfeil, Blockpfeil, kleben
+keywords.en: 90 degree, angle, right angle, bend, arrow, block arrow, glue
+keywords.es: 90 grados, ángulo, ángulo recto, codo, flecha, flecha de bloque, pegar
+keywords.it: 90 gradi, angolo, angolo retto, piega, freccia, freccia a blocco, incollare
+keywords.fr: 90 degrés, angle, angle droit, coude, flèche, flèche pleine, coller
+
+[Shape]
+BeginX = 5 mm
+BeginX.us = 0.2 in
+BeginY = 30 mm
+BeginY.us = 1.2 in
+EndX = 35 mm
+EndX.us = 1.4 in
+EndY = 10 mm
+EndY.us = 0.4 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+GlueType = 2
+
+
+[User]
+# die Richtung des Kastens (Width und Height dürfen negativ sein)
+Sx:  Value = IF(Width<0,-1,1)
+Sy:  Value = IF(Height<0,-1,1)
+# der halbe Schaft, die halbe Breite und die Länge der Spitze
+S:   Value = 2.5 mm
+     Value.us = 0.1 in
+Hw:  Value = 5 mm
+     Value.us = 0.1875 in
+Hl:  Value = 8 mm
+     Value.us = 0.3 in
+
+[Geometry]
+MoveTo  X = -User.Sx*User.S; Y = 0
+LineTo  X = -User.Sx*User.S; Y = Height+User.Sy*User.S
+LineTo  X = Width-User.Sx*User.Hl; Y = Height+User.Sy*User.S
+LineTo  X = Width-User.Sx*User.Hl; Y = Height+User.Sy*User.Hw
+LineTo  X = Width; Y = Height
+LineTo  X = Width-User.Sx*User.Hl; Y = Height-User.Sy*User.Hw
+LineTo  X = Width-User.Sx*User.Hl; Y = Height-User.Sy*User.S
+LineTo  X = User.Sx*User.S; Y = Height-User.Sy*User.S
+LineTo  X = User.Sx*User.S; Y = 0
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1

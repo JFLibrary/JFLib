@@ -6,15 +6,15 @@ expect button:"Neu" selected
 expect tab:"Start" missing
 expect text:"Vorlagen" exists
 expect button:"Leere Zeichnung" exists
-expect button:"Rack-Diagramm" exists
 shot build/JFDiagrammer-backstage.png
-# a template's preview: description, units, Erstellen (only the blank drawing works yet)
+# a template's preview: description, units, Erstellen (JD13: the catalogue, templates.uis)
 click button:"Standardflussdiagramm"
-expect text:"Prozessschritte, Entscheidungen und Verbinder nach ISO 5807." exists
+expect text:"Abläufe, Prozesse und Entscheidungen als Flussdiagramm, mit Regeln zur Diagrammprüfung." exists
 expect radio:"Metrische Einheiten" checked
-expect button:"Erstellen" disabled
+expect button:"Erstellen" enabled
 click radio:"US-Einheiten"
 expect radio:"US-Einheiten" checked
+click radio:"Metrische Einheiten"
 click button:"Zurück zu den Vorlagen"
 expect text:"Vorlagen" exists
 # the other pages

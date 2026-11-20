@@ -1,0 +1,67 @@
+# Seitenweise, fest 2: wie Seitenweise 2, aber nie neu verlegt (ConFixedCode 2): die App behält
+# die Ecken des Wegs und bewegt nur das erste und das letzte Stück mit den Enden.  Dynamischer
+# Verbinder (ObjType 2 verlegbar, GlueType 2): die App verlegt ihn selbst und ersetzt die
+# gezeichnete Geometrie durch ihren Weg; der Kasten bleibt aufrecht (Width = EndX-BeginX ...,
+# Angle 0).  Route-Zellen mit Visios Namen und Werten: ShapeRouteStyle 20 (einfach rechts nach
+# links), ConLineRouteExt 1, ConFixedCode 2.  Der Text folgt Controls.TextPosition, das die App in
+# die Mitte des Wegs setzt (ohne Text verborgen).
+master: Side to side, fixed 2
+name.de: Seitenweise, fest 2
+name.en: Side to side, fixed 2
+name.es: De lado a lado, fijo 2
+name.it: Da lato a lato, fisso 2
+name.fr: De côté à côté, fixe 2
+prompt.de: Dynamischer Verbinder von der linken zur rechten Seite. Sein Verlauf bleibt, wenn Shapes verschoben werden; nur das erste und das letzte Stück passen sich an. Ziehen Sie die Enden auf Shapes.
+prompt.en: Dynamic connector from the left side to the right side. Its route is kept when shapes move; only the first and the last piece adapt. Drag the ends onto shapes.
+prompt.es: Conector dinámico del lado izquierdo al lado derecho. Su trazado se mantiene al mover las formas; solo se adaptan el primer y el último tramo. Arrastre los extremos sobre las formas.
+prompt.it: Connettore dinamico dal lato sinistro al lato destro. Il suo percorso resta quando si spostano le forme; si adattano solo il primo e l'ultimo tratto. Trascina le estremità sulle forme.
+prompt.fr: Connecteur dynamique du côté gauche au côté droit. Son tracé est conservé quand les formes bougent ; seuls le premier et le dernier segment s’adaptent. Faites glisser les extrémités sur les formes.
+keywords.de: Verbinder, dynamisch, verbinden, seitlich, fest, Verlauf bleibt
+keywords.en: connector, dynamic, connect, side, fixed, route kept
+keywords.es: conector, dinámico, conectar, lado, fijo, trazado fijo
+keywords.it: connettore, dinamico, collegare, lato, fisso, percorso fisso
+keywords.fr: connecteur, dynamique, relier, côté, fixe, tracé conservé
+style: Connector
+
+[Shape]
+BeginX = 40 mm
+BeginX.us = 1.5 in
+BeginY = 0 mm
+EndX = 0 mm
+EndY = 20 mm
+EndY.us = 0.75 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+ObjType = 2
+GlueType = 2
+ShapeRouteStyle = 20
+ConLineRouteExt = 1
+ConFixedCode = 2
+NoAlignBox = TRUE
+DynFeedback = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Controls.TextPosition
+TxtPinY = Controls.TextPosition.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+RelMoveTo  X = 0; Y = 0
+RelLineTo  X = 0.5; Y = 0
+RelLineTo  X = 0.5; Y = 1
+RelLineTo  X = 1; Y = 1
+
+[Controls]
+TextPosition:  X = Width*0.5; Y = Height*0.5
+        XDyn = Controls.TextPosition; YDyn = Controls.TextPosition.Y
+        XCon = IF(OR(STRSAME(SHAPETEXT(TheText),""),HideText),5,0); YCon = 0; CanGlue = FALSE
+        Tip.de = "Text verschieben"
+        Tip.en = "Move the text"
+        Tip.es = "Mover el texto"
+        Tip.it = "Sposta il testo"
+        Tip.fr = "Déplacer le texte"

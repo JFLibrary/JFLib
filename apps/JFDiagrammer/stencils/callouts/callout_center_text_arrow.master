@@ -1,0 +1,89 @@
+# Textbeschriftung Mitte mit Pfeil: Text ohne Rahmen.  Der Zeiger geht gerade von der Mitte der
+# Kante, die der Spitze zugewandt ist (unten oder oben) zur Spitze und endet in einer Pfeilspitze
+# (eine Fläche, deren Fuß in Zeigerrichtung liegt). Liegt die Spitze im Körper, sind Zeiger und
+# Pfeilspitze aus (NoShow).
+master: Callout text center arrow
+name.de: Textbeschriftung Mitte mit Pfeil
+name.en: Text callout, center, with arrow
+name.es: Llamada de texto central con flecha
+name.it: Richiamo di testo centrale con freccia
+name.fr: Annotation de texte centrale avec flèche
+prompt.de: Text ohne Rahmen, der Zeiger mit Pfeilspitze geht von der Mitte der Unter- oder Oberkante zum Ziel. Ziehen Sie den gelben Steuerpunkt auf das Ziel.
+prompt.en: Text without a frame, the pointer with an arrowhead runs from the middle of the bottom or top edge to the target. Drag the yellow control handle onto the target.
+prompt.es: Texto sin marco, el puntero con punta de flecha va del centro del borde inferior o superior al destino. Arrastre el controlador amarillo hasta el destino.
+prompt.it: Testo senza cornice, il puntatore con punta di freccia va dal centro del bordo inferiore o superiore alla destinazione. Trascina la maniglia di controllo gialla sulla destinazione.
+prompt.fr: Texte sans cadre, le pointeur avec une pointe de flèche va du milieu du bord inférieur ou supérieur à la cible. Faites glisser la poignée de contrôle jaune sur la cible.
+keywords.de: Beschriftung, Hinweis, Kommentar, Zeiger, Text, ohne Rahmen, Mitte, Pfeil, Pfeilspitze
+keywords.en: callout, note, comment, pointer, text, frameless, center, arrow, arrowhead
+keywords.es: llamada, nota, comentario, puntero, texto, sin marco, centro, flecha, punta de flecha
+keywords.it: richiamo, nota, commento, puntatore, testo, senza cornice, centro, freccia, punta di freccia
+keywords.fr: bulle d'annotation, note, commentaire, pointeur, texte, sans cadre, centre, flèche, pointe de flèche
+text.de: Text
+text.en: Text
+text.es: Texto
+text.it: Testo
+text.fr: Texte
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 16 mm
+Height.us = 0.6 in
+VerticalAlign = IF(User.Below,2,0)
+
+[User]
+msvStructureType:         Value = "Callout"
+msvShapeCategories:       Value = "Callout"
+msvSDCalloutNoHighlight:  Value = FALSE
+# die Spitze des Zeigers
+Ax:                       Value = Controls.Association
+Ay:                       Value = Controls.Association.Y
+Out:                      Value = OR(User.Ax<0,User.Ax>Width,User.Ay<0,User.Ay>Height)
+# die Spitze unter der Mitte: der Zeiger beginnt an der Unterkante
+Below:                    Value = User.Ay<Height*0.5
+Sy:                       Value = IF(User.Below,0,Height)
+# die Richtung des Zeigers, Länge und halbe Breite der Spitze, die Mitte ihres Fußes
+Len:                      Value = MAX(SQRT(POW(User.Ax-Width*0.5,2)+POW(User.Ay-User.Sy,2)),0.001)
+Ux:                       Value = (User.Ax-Width*0.5)/User.Len
+Uy:                       Value = (User.Ay-User.Sy)/User.Len
+Hl:                       Value = MIN(3 mm,User.Len)
+                          Value.us = MIN(0.12 in,User.Len)
+Hw:                       Value = User.Hl*0.4
+Bx:                       Value = User.Ax-User.Ux*User.Hl
+By:                       Value = User.Ay-User.Uy*User.Hl
+
+# der Körper: unsichtbar, nur zum Anfassen
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# der Zeiger
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(User.Out)
+MoveTo  X = Width*0.5; Y = User.Sy
+LineTo  X = User.Bx; Y = User.By
+
+# die Pfeilspitze
+[Geometry]
+NoShow = NOT(User.Out)
+MoveTo  X = User.Ax; Y = User.Ay
+LineTo  X = User.Bx-User.Uy*User.Hw; Y = User.By+User.Ux*User.Hw
+LineTo  X = User.Bx+User.Uy*User.Hw; Y = User.By-User.Ux*User.Hw
+LineTo  X = Geometry3.X1; Y = Geometry3.Y1
+
+[Controls]
+Association:  X = -12 mm; Y = -10 mm
+              X.us = -0.5 in; Y.us = -0.4 in
+              XDyn = Width*0.5; YDyn = User.Sy
+              XCon = 2; YCon = 2; CanGlue = FALSE
+              Tip.de = "Zeiger auf das Ziel ziehen"
+              Tip.en = "Drag the pointer onto the target"
+              Tip.es = "Arrastre el puntero hasta el destino"
+              Tip.it = "Trascina il puntatore sulla destinazione"
+              Tip.fr = "Faites glisser le pointeur sur la cible"

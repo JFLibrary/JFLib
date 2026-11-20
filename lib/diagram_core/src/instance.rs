@@ -565,6 +565,7 @@ pub fn place(tx: &mut Transaction, page: PageRef, master: MasterRef, x: f64, y: 
     tx.atomic(|tx| {
         let texts = MasterTexts::of(tx.doc(), master);
         let shape = tx.add_instance(Owner::Page(page), master, x, y)?;
+        one_d_ends(tx, master, shape, x, y)?;
         let id = tx.doc().shape(shape).map_or(0, |s| s.id());
         let base = texts.name(lang).to_string();
         let base_u = if texts.name_u.is_empty() { base.clone() } else { texts.name_u.clone() };
@@ -602,6 +603,42 @@ pub fn place(tx: &mut Transaction, page: PageRef, master: MasterRef, x: f64, y: 
         }
         Ok(shape)
     })
+}
+
+// (JD13) a 1-D master (its shape sets BeginX, BeginY, EndX, EndY): the instance's ends are the
+// master's moved so that its pin lands on (x, y), and PinX / PinY inherit the master's formulas
+// again (GUARD((BeginX+EndX)/2) ...), so pin, width and angle follow the ends as in Visio;
+// add_instance alone would put the pin there and leave the ends where the master page has them
+fn one_d_ends(tx: &mut Transaction, master: MasterRef, shape: ShapeRef, x: f64, y: f64) -> Result<(), EditError> {
+    let Some(slot) = tx.doc().master(master).and_then(|m| m.master_shape()) else { return Ok(()) };
+    let ms = SheetRef::Shape(ShapeRef { owner: Owner::Master(master), slot });
+    let local = |tx: &Transaction, name: &str| -> Option<(f64, Option<Unit>)> {
+        let sym = tx.doc().sym(name)?;
+        let sheet = tx.doc().sheet(ms)?;
+        match sheet.find(&CellAddr::single(sym)) {
+            crate::sheet::Local::Cell(c) => c.value.num().map(|v| (v, c.unit)),
+            _ => None,
+        }
+    };
+    let ends: Vec<Option<(f64, Option<Unit>)>> = ["BeginX", "BeginY", "EndX", "EndY"].iter().map(|n| local(tx, n)).collect();
+    let [Some(bx), Some(by), Some(ex), Some(ey)] = [ends[0], ends[1], ends[2], ends[3]] else { return Ok(()) };
+    let pin = |tx: &Transaction, name: &str, fallback: f64| -> f64 {
+        let Some(sym) = tx.doc().sym(name) else { return fallback };
+        let r = tx.doc().resolve(ms, &CellAddr::single(sym));
+        r.cached.or(r.cell).and_then(|c| c.value.num()).filter(|v| v.is_finite()).unwrap_or(fallback)
+    };
+    let (px, py) = (pin(tx, "PinX", (bx.0 + ex.0) * 0.5), pin(tx, "PinY", (by.0 + ey.0) * 0.5));
+    let (dx, dy) = (x - px, y - py);
+    let sheet = SheetRef::Shape(shape);
+    for (name, (v, unit), d) in [("BeginX", bx, dx), ("BeginY", by, dy), ("EndX", ex, dx), ("EndY", ey, dy)] {
+        let a = tx.single(name);
+        tx.set_constant(sheet, &a, Value::Num(v + d), unit)?;
+    }
+    for name in ["PinX", "PinY"] {
+        let a = tx.single(name);
+        tx.inherit_cell(sheet, &a)?;
+    }
+    Ok(())
 }
 
 // "Section.Row.Cell" (Row a name, or a number for indexed rows) or "Cell" -> its address

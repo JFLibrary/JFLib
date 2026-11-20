@@ -1,0 +1,93 @@
+# Schaltfläche: ein erhabener Block in Knopfoptik -- die Außenkante, eine innere Fläche und die
+# Fasen dazwischen, durch Kanten gezeichnet (keine eigene Schattierung, damit die Designs
+# wirken).  Abschnitte: 1 der Umriss mit der Füllung, 2 die Kante der inneren Fläche, 3 bis 6
+# die Fasenkanten an den Ecken (Innenkanten ohne Füllung).  Row_1 an der linken oberen Ecke der
+# inneren Fläche ändert die Breite der Fase (nur waagrecht, als Abstand vom Rand: sie bleibt
+# beim Vergrößern).  Der Text steht auf der inneren Fläche.
+master: Button
+name.de: Schaltfläche
+name.en: Button
+name.es: Botón
+name.it: Pulsante
+name.fr: Bouton
+prompt.de: Erhabener Block in Knopfoptik. Die Breite der Fase ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Raised block that looks like a button. Drag the yellow control handle to change the width of the bevel.
+prompt.es: Bloque en relieve con aspecto de botón. Arrastre el controlador amarillo para cambiar el ancho del bisel.
+prompt.it: Blocco in rilievo con l'aspetto di un pulsante. Trascina la maniglia di controllo gialla per cambiare la larghezza della smussatura.
+prompt.fr: Bloc en relief en forme de bouton. Faites glisser la poignée de contrôle jaune pour modifier la largeur du biseau.
+keywords.de: Schaltfläche, Knopf, Taste, Button, erhaben, Fase, Bedienelement
+keywords.en: button, key, raised, bevel, control, user interface
+keywords.es: botón, tecla, relieve, bisel, control, interfaz
+keywords.it: pulsante, tasto, bottone, rilievo, smussatura, controllo, interfaccia
+keywords.fr: bouton, touche, relief, biseau, commande, interface
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+TxtWidth = Width-User.B*2
+TxtHeight = Height-User.B*2
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Breite der Fase
+B:  Value = MIN(MAX(Controls.Row_1, 0), Width*0.25, Height*0.25)
+
+# 1 der Umriss
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# 2 die Kante der inneren Fläche
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.B; Y = User.B
+LineTo  X = Width-User.B; Y = User.B
+LineTo  X = Width-User.B; Y = Height-User.B
+LineTo  X = User.B; Y = Height-User.B
+LineTo  X = Geometry2.X1; Y = Geometry2.Y1
+
+# 3 bis 6 die Fasenkanten an den Ecken
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = User.B; Y = User.B
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width; Y = 0
+LineTo  X = Width-User.B; Y = User.B
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width; Y = Height
+LineTo  X = Width-User.B; Y = Height-User.B
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height
+LineTo  X = User.B; Y = Height-User.B
+
+[Controls]
+Row_1:  X = 2.5 mm; Y = Height-User.B
+        X.us = 0.1 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Breite der Fase ändern"
+        Tip.en = "Change the width of the bevel"
+        Tip.es = "Cambiar el ancho del bisel"
+        Tip.it = "Cambia la larghezza della smussatura"
+        Tip.fr = "Modifier la largeur du biseau"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

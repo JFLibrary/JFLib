@@ -1,0 +1,66 @@
+# Seitenweise 2: von der linken Seite zur rechten Seite, gezeichnet ein Z nach links.  Dynamischer
+# Verbinder (ObjType 2 verlegbar, GlueType 2): die App verlegt ihn selbst und ersetzt die
+# gezeichnete Geometrie durch ihren Weg; der Kasten bleibt aufrecht (Width = EndX-BeginX ...,
+# Angle 0).  Route-Zellen mit Visios Namen und Werten: ShapeRouteStyle 20 (einfach rechts nach
+# links), ConLineRouteExt 1, ConFixedCode 0.  Der Text folgt Controls.TextPosition, das die App in
+# die Mitte des Wegs setzt (ohne Text verborgen).
+master: Side to side 2
+name.de: Seitenweise 2
+name.en: Side to side 2
+name.es: De lado a lado 2
+name.it: Da lato a lato 2
+name.fr: De côté à côté 2
+prompt.de: Dynamischer Verbinder, der links aus dem einen Shape kommt und rechts in das andere führt. Ziehen Sie die Enden auf Shapes.
+prompt.en: Dynamic connector that leaves one shape on the left and enters the other on the right. Drag the ends onto shapes.
+prompt.es: Conector dinámico que sale de una forma por la izquierda y entra en la otra por la derecha. Arrastre los extremos sobre las formas.
+prompt.it: Connettore dinamico che esce da una forma a sinistra ed entra nell'altra a destra. Trascina le estremità sulle forme.
+prompt.fr: Connecteur dynamique qui sort d'une forme par la gauche et entre dans l'autre par la droite. Faites glisser les extrémités sur les formes.
+keywords.de: Verbinder, dynamisch, verbinden, seitlich, Seite, rechts nach links
+keywords.en: connector, dynamic, connect, side, sideways, right to left
+keywords.es: conector, dinámico, conectar, lado, lateral, de derecha a izquierda
+keywords.it: connettore, dinamico, collegare, lato, laterale, da destra a sinistra
+keywords.fr: connecteur, dynamique, relier, côté, latéral, de droite à gauche
+style: Connector
+
+[Shape]
+BeginX = 40 mm
+BeginX.us = 1.5 in
+BeginY = 0 mm
+EndX = 0 mm
+EndY = 20 mm
+EndY.us = 0.75 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+ObjType = 2
+GlueType = 2
+ShapeRouteStyle = 20
+ConLineRouteExt = 1
+ConFixedCode = 0
+NoAlignBox = TRUE
+DynFeedback = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Controls.TextPosition
+TxtPinY = Controls.TextPosition.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+RelMoveTo  X = 0; Y = 0
+RelLineTo  X = 0.5; Y = 0
+RelLineTo  X = 0.5; Y = 1
+RelLineTo  X = 1; Y = 1
+
+[Controls]
+TextPosition:  X = Width*0.5; Y = Height*0.5
+        XDyn = Controls.TextPosition; YDyn = Controls.TextPosition.Y
+        XCon = IF(OR(STRSAME(SHAPETEXT(TheText),""),HideText),5,0); YCon = 0; CanGlue = FALSE
+        Tip.de = "Text verschieben"
+        Tip.en = "Move the text"
+        Tip.es = "Mover el texto"
+        Tip.it = "Sposta il testo"
+        Tip.fr = "Déplacer le texte"

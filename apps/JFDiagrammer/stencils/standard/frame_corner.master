@@ -1,0 +1,73 @@
+# Rahmenecke: ein L mit der Ecke links oben und einer Gehrungslinie von der äußeren zur inneren
+# Ecke (eigener Abschnitt ohne Füllung).  Row_1 am unteren Ende des senkrechten Schenkels ändert
+# seine Breite (nur waagrecht, Abstand von links), Row_2 am rechten Ende des waagrechten Schenkels
+# dessen Breite (nur senkrecht, Abstand von oben).
+master: Frame corner
+name.de: Rahmenecke
+name.en: Frame corner
+name.es: Esquina de marco
+name.it: Angolo di cornice
+name.fr: Coin de cadre
+prompt.de: L-förmiges Eckstück eines Rahmens mit Gehrungslinie, die Ecke links oben. Mit den gelben Steuerpunkten ändern Sie die Breite der Schenkel.
+prompt.en: L-shaped corner piece of a frame with a mitre line, the corner at the top left. Drag the yellow control handles to change the width of the arms.
+prompt.es: Pieza de esquina en forma de L de un marco con línea de inglete, la esquina arriba a la izquierda. Arrastre los controladores amarillos para cambiar el ancho de los brazos.
+prompt.it: Angolare a L di una cornice con linea di giunzione a 45°, l'angolo in alto a sinistra. Trascina le maniglie di controllo gialle per cambiare la larghezza dei bracci.
+prompt.fr: Pièce d'angle en L d'un cadre avec ligne d'onglet, le coin en haut à gauche. Faites glisser les poignées de contrôle jaunes pour modifier la largeur des branches.
+keywords.de: Rahmenecke, Ecke, Winkel, Rahmen, Gehrung, Halbrahmen
+keywords.en: frame corner, corner, angle, frame, mitre, half frame
+keywords.es: esquina de marco, esquina, ángulo, marco, inglete, medio marco
+keywords.it: angolo di cornice, angolo, squadra, cornice, giunzione, mezza cornice
+keywords.fr: coin de cadre, coin, équerre, cadre, onglet, demi-cadre
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+
+[User]
+# die Breite des senkrechten und des waagrechten Schenkels
+Tx:  Value = MIN(MAX(Controls.Row_1,Width*0.02),Width*0.9)
+Ty:  Value = MIN(MAX(Height-Controls.Row_2.Y,Height*0.02),Height*0.9)
+
+# 1 das L
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = User.Tx; Y = 0
+LineTo  X = User.Tx; Y = Height-User.Ty
+LineTo  X = Width; Y = Height-User.Ty
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# 2 die Gehrungslinie
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height
+LineTo  X = User.Tx; Y = Height-User.Ty
+
+[Controls]
+Row_1:  X = 5 mm; Y = 0
+        X.us = 0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Breite des senkrechten Schenkels ändern"
+        Tip.en = "Change the width of the vertical arm"
+        Tip.es = "Cambiar el ancho del brazo vertical"
+        Tip.it = "Cambia la larghezza del braccio verticale"
+        Tip.fr = "Modifier la largeur de la branche verticale"
+Row_2:  X = Width; Y = Height-5 mm
+        Y.us = Height-0.2 in
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 1; YCon = 4; CanGlue = FALSE
+        Tip.de = "Breite des waagrechten Schenkels ändern"
+        Tip.en = "Change the width of the horizontal arm"
+        Tip.es = "Cambiar el ancho del brazo horizontal"
+        Tip.it = "Cambia la larghezza del braccio orizzontale"
+        Tip.fr = "Modifier la largeur de la branche horizontale"
+
+[Connection]
+Row  X = User.Tx*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height-User.Ty*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

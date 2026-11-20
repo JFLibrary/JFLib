@@ -1,0 +1,70 @@
+# Datenbank (ISO 5807: Speicher mit direktem Zugriff): ein liegender Zylinder.  Der Umriss sind
+# zwei halbe Ellipsen an den Enden und die beiden geraden Kanten; ein zweiter Abschnitt ohne
+# Füllung zeichnet die sichtbare Stirnfläche rechts.  Row_1 am linken Punkt der Stirnfläche
+# ändert die Tiefe der Ellipsen (nur waagrecht, als Abstand von rechts: sie bleibt beim
+# Verlängern gleich).  Der Text steht zwischen linkem Ende und Stirnfläche.
+master: Database
+name.de: Datenbank
+name.en: Database
+name.es: Base de datos
+name.it: Database
+name.fr: Base de données
+prompt.de: Gespeicherte Daten mit direktem Zugriff, zum Beispiel eine Datenbank (ISO 5807).
+prompt.en: Stored data with direct access, for example a database (ISO 5807).
+prompt.es: Datos almacenados con acceso directo, por ejemplo una base de datos (ISO 5807).
+prompt.it: Dati memorizzati con accesso diretto, ad esempio un database (ISO 5807).
+prompt.fr: Données stockées à accès direct, par exemple une base de données (ISO 5807).
+keywords.de: Datenbank, Speicher, gespeicherte Daten, Zylinder, Festplatte, Tabelle, Flussdiagramm
+keywords.en: database, storage, stored data, cylinder, disk, table, flowchart
+keywords.es: base de datos, almacenamiento, datos almacenados, cilindro, disco, tabla, diagrama de flujo
+keywords.it: database, archivio, dati memorizzati, cilindro, disco, tabella, diagramma di flusso
+keywords.fr: base de données, stockage, données stockées, cylindre, disque, table, diagramme de flux
+
+[Shape]
+Width = 36 mm
+Width.us = 1.5 in
+Height = 24 mm
+Height.us = 1 in
+TxtWidth = Width-User.R*3
+TxtHeight = Height
+TxtPinX = (Width-User.R)*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+msvShapeCategories:  Value = "Flowchart"
+# die waagrechte Halbachse der Ellipsen an den Enden und ihr Verhältnis zur senkrechten
+R:      Value = MIN(MAX((Width-Controls.Row_1)*0.5, 0), Width*0.25)
+Ratio:  Value = User.R*2/Height
+
+# 1 der Zylinder
+[Geometry]
+MoveTo           X = User.R; Y = 0
+LineTo           X = Width-User.R; Y = 0
+EllipticalArcTo  X = Width-User.R; Y = Height; A = Width; B = Height*0.5; C = 0 deg; D = User.Ratio
+LineTo           X = User.R; Y = Height
+EllipticalArcTo  X = User.R; Y = 0; A = 0; B = Height*0.5; C = 0 deg; D = User.Ratio
+
+# 2 der Rand der Stirnfläche
+[Geometry]
+NoFill = TRUE
+MoveTo           X = Width-User.R; Y = Height
+EllipticalArcTo  X = Width-User.R; Y = 0; A = Width-User.R*2; B = Height*0.5; C = 0 deg; D = User.Ratio
+
+[Controls]
+Row_1:  X = Width-8 mm; Y = Height*0.5
+        X.us = Width-0.3 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Tiefe der Enden ändern"
+        Tip.en = "Change the depth of the ends"
+        Tip.es = "Cambiar la profundidad de los extremos"
+        Tip.it = "Cambia la profondità delle estremità"
+        Tip.fr = "Modifier la profondeur des extrémités"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

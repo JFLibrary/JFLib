@@ -50,7 +50,7 @@ const CFF: &[(&str, &str)] = &[
     ("phase_list.master", include_str!("../../JFDiagrammer/stencils/cff/phase_list.master")),
 ];
 
-const CALLOUTS: &[(&str, &str)] = &[
+pub(crate) const CALLOUTS: &[(&str, &str)] = &[
     ("stencil.txt", include_str!("../../JFDiagrammer/stencils/callouts/stencil.txt")),
     ("callout_box.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_box.master")),
     ("callout_rounded.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_rounded.master")),
@@ -58,6 +58,37 @@ const CALLOUTS: &[(&str, &str)] = &[
     ("callout_line.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_line.master")),
     ("callout_bracket.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_bracket.master")),
     ("callout_circle.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_circle.master")),
+    // (JD13) the rest of SH-272
+    ("callout_side_box.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_side_box.master")),
+    ("callout_side_line.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_side_line.master")),
+    ("callout_side_text.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_side_text.master")),
+    ("callout_center_box.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_center_box.master")),
+    ("callout_center_line.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_center_line.master")),
+    ("callout_center_text.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_center_text.master")),
+    ("callout_center_text_arrow.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_center_text_arrow.master")),
+    ("callout_side_box_90.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_side_box_90.master")),
+    ("callout_center_box_90.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_center_box_90.master")),
+    ("callout_side_line_90.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_side_line_90.master")),
+    ("callout_center_line_90.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_center_line_90.master")),
+    ("callout_side_text_90.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_side_text_90.master")),
+    ("callout_center_text_90.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_center_text_90.master")),
+    ("callout_note.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_note.master")),
+    ("callout_knee.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_knee.master")),
+    ("callout_side_brace.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_side_brace.master")),
+    ("callout_brace.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_brace.master")),
+    ("callout_bracket_text.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_bracket_text.master")),
+    ("callout_half_bracket.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_half_bracket.master")),
+    ("callout_brackets.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_brackets.master")),
+    ("folder.master", include_str!("../../JFDiagrammer/stencils/callouts/folder.master")),
+    ("sticky_note.master", include_str!("../../JFDiagrammer/stencils/callouts/sticky_note.master")),
+    ("tag.master", include_str!("../../JFDiagrammer/stencils/callouts/tag.master")),
+    ("callout_bubble_horizontal.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_bubble_horizontal.master")),
+    ("callout_bubble_vertical.master", include_str!("../../JFDiagrammer/stencils/callouts/callout_bubble_vertical.master")),
+    ("sticker.master", include_str!("../../JFDiagrammer/stencils/callouts/sticker.master")),
+    ("sticker_rounded.master", include_str!("../../JFDiagrammer/stencils/callouts/sticker_rounded.master")),
+    ("jagged_star_1.master", include_str!("../../JFDiagrammer/stencils/callouts/jagged_star_1.master")),
+    ("jagged_star_2.master", include_str!("../../JFDiagrammer/stencils/callouts/jagged_star_2.master")),
+    ("tip.master", include_str!("../../JFDiagrammer/stencils/callouts/tip.master")),
 ];
 
 type Want = (&'static str, &'static str, bool);
@@ -88,6 +119,38 @@ const SETS: [(&str, &[(&str, &str)], &[Want]); 3] = [
             ("Callout line", "Callout", false),
             ("Callout bracket", "Callout", false),
             ("Callout circle", "Callout", false),
+            // (JD13) the rest of SH-272; the areas without a pointer are no callouts
+            ("Callout box side", "Callout", false),
+            ("Callout side line", "Callout", false),
+            ("Callout text side", "Callout", false),
+            ("Callout box center", "Callout", false),
+            ("Callout center line", "Callout", false),
+            ("Callout text center", "Callout", false),
+            ("Callout text center arrow", "Callout", false),
+            ("Callout box side 90", "Callout", false),
+            ("Callout box center 90", "Callout", false),
+            ("Callout side line 90", "Callout", false),
+            ("Callout center line 90", "Callout", false),
+            ("Callout text side 90", "Callout", false),
+            ("Callout text center 90", "Callout", false),
+            ("Callout note", "Callout", false),
+            ("Callout knee", "Callout", false),
+            ("Callout side brace", "Callout", false),
+            ("Callout brace", "Callout", false),
+            ("Callout bracket text right", "Callout", false),
+            ("Callout half bracket", "Callout", false),
+            ("Callout brackets", "Callout", false),
+            ("Folder", "", false),
+            ("Sticky note", "", false),
+            ("Tag", "", false),
+            ("Callout bubble horizontal", "Callout", false),
+            ("Callout bubble vertical", "Callout", false),
+            ("Sticker", "", false),
+            ("Rounded sticker", "", false),
+            ("Jagged star 1", "", false),
+            ("Jagged star 2", "", false),
+            // (JD13) the hidden note box of the templates' start drawings: no callout
+            ("Tip", "", true),
         ],
     ),
 ];
@@ -123,11 +186,11 @@ fn geo_flag(doc: &Document, s: SheetRef, ix: u32, n: &str) -> bool {
     num(doc, s, Some(("Geometry", ix)), None, n) != 0.0
 }
 
-fn set_user(tx: &mut Transaction, s: ShapeRef, n: &str, v: f64, u: Option<Unit>) {
+pub(crate) fn set_user(tx: &mut Transaction, s: ShapeRef, n: &str, v: f64, u: Option<Unit>) {
     let _ = tx.set_user(SheetRef::Shape(s), n, Value::Num(v), u);
 }
 
-fn set_single(tx: &mut Transaction, s: SheetRef, n: &str, v: f64, u: Option<Unit>) {
+pub(crate) fn set_single(tx: &mut Transaction, s: SheetRef, n: &str, v: f64, u: Option<Unit>) {
     let a = CellAddr::single(tx.intern(n));
     let _ = tx.set_constant(s, &a, Value::Num(v), u);
 }
@@ -293,6 +356,10 @@ fn callouts(h: &mut H, mut doc: Document, shapes: &[(String, ShapeRef)]) {
     for (nu, s) in shapes {
         let s = *s;
         let ss = SheetRef::Shape(s);
+        // (JD13) the Tip has no pointer
+        if user_text(&doc, ss, "msvStructureType") != "Callout" {
+            continue;
+        }
         let geo = doc.geometry(ss);
         // the sections with a NoShow formula: the pointer and its dot
         let has_noshow = |d: &Document, g: SecKey| d.sym("NoShow").is_some_and(|n| d.resolve(ss, &CellAddr::section(g, n)).exists());
@@ -303,7 +370,7 @@ fn callouts(h: &mut H, mut doc: Document, shapes: &[(String, ShapeRef)]) {
         let bad = edit(&mut doc, s, |tx| set_tip(tx, s, w * 0.5, hh * 0.5));
         let in_count = shown(&doc);
         let side = user_num(&doc, ss, "Side");
-        let wedge = nu == "Callout rounded" || nu == "Callout bubble";
+        let wedge = matches!(nu.as_str(), "Callout rounded" | "Callout bubble" | "Callout bubble horizontal" | "Callout bubble vertical");
         let ok = bad == 0 && if wedge { side == 0.0 } else { !pointer.is_empty() && out_count == pointer.len() && in_count == 0 };
         h.check(
             &format!("stencils/structure/callouts/{nu}"),
@@ -316,7 +383,7 @@ fn callouts(h: &mut H, mut doc: Document, shapes: &[(String, ShapeRef)]) {
 // ---------------------------------------------------------------- previews
 
 // a drawing page of w x h mm for the previews
-fn sheet_doc(w: f64, hh: f64) -> Option<(Document, PageRef)> {
+pub(crate) fn sheet_doc(w: f64, hh: f64) -> Option<(Document, PageRef)> {
     let mut doc = vsdx::new_document(DocKind::Drawing, Measure::Metric);
     let page = doc.pages().next()?;
     let mut tx = doc.transaction("page");
@@ -329,7 +396,7 @@ fn sheet_doc(w: f64, hh: f64) -> Option<(Document, PageRef)> {
 // one instance of master NameU `nu` of `src` with its centre at (x, y) mm, w x h mm (0: the
 // master's size), the text `text` (None: the master's)
 #[allow(clippy::too_many_arguments)]
-fn put(tx: &mut Transaction, src: &Document, page: PageRef, nu: &str, at: (f64, f64), size: (f64, f64), text: Option<&str>, more: &dyn Fn(&mut Transaction, ShapeRef)) -> Option<ShapeRef> {
+pub(crate) fn put(tx: &mut Transaction, src: &Document, page: PageRef, nu: &str, at: (f64, f64), size: (f64, f64), text: Option<&str>, more: &dyn Fn(&mut Transaction, ShapeRef)) -> Option<ShapeRef> {
     let m = src.masters().find(|&m| MasterTexts::of(src, m).name_u == nu)?;
     let local = instance::import_master(tx, src, m).ok()?;
     let s = instance::place(tx, page, local, at.0 * MM, at.1 * MM, 0).ok()?;
@@ -344,9 +411,14 @@ fn put(tx: &mut Transaction, src: &Document, page: PageRef, nu: &str, at: (f64, 
     Some(s)
 }
 
-fn none(_: &mut Transaction, _: ShapeRef) {}
+pub(crate) fn none(_: &mut Transaction, _: ShapeRef) {}
 
 fn render_page(doc: &mut Document, page: PageRef, path: &str) -> bool {
+    render_page_at(doc, page, path, 110.0)
+}
+
+/// recalculate the page's shapes and write the page as PNG at `dpi`
+pub(crate) fn render_page_at(doc: &mut Document, page: PageRef, path: &str, dpi: f64) -> bool {
     {
         let mut tx = doc.transaction("recalc");
         let sheets: Vec<SheetRef> = tx.doc().all_shapes(diagram_core::Owner::Page(page)).map(SheetRef::Shape).collect();
@@ -355,7 +427,7 @@ fn render_page(doc: &mut Document, page: PageRef, path: &str) -> bool {
     }
     let mut fonts = crate::render::fonts();
     let mut v = PageView::new(doc, page, &mut fonts, &Options::default());
-    let ro = raster::RasterOptions { dpi: 110.0, ..Default::default() };
+    let ro = raster::RasterOptions { dpi, ..Default::default() };
     let Some(img) = raster::render(&mut v, &ro) else { return false };
     let ok = plat::write_file(path, &crate::render::png(&img));
     out(&format!("{} {path} ({} x {})\n", if ok { "wrote" } else { "error: cannot write" }, img.w, img.h));
@@ -446,12 +518,18 @@ pub fn previews(dir: &str) -> i32 {
     }
     // callouts: one row per master, the tip in five places, then a wider one
     {
-        let names = ["Callout box", "Callout rounded", "Callout bubble", "Callout line", "Callout bracket", "Callout circle"];
-        let Some((mut doc, page)) = sheet_doc(520.0, 6.0 * 55.0 + 20.0) else { return 1 };
+        // (JD13) every master with a pointer; NameU starts with "Callout "
+        let names: Vec<String> = co.masters().map(|m| MasterTexts::of(&co, m).name_u).filter(|n| n.starts_with("Callout ")).collect();
+        let sheet_h = names.len() as f64 * 55.0 + 20.0;
+        let Some((mut doc, page)) = sheet_doc(520.0, sheet_h) else { return 1 };
         let mut tx = doc.transaction("previews");
         for (row, nu) in names.iter().enumerate() {
-            let y = 6.0 * 55.0 + 20.0 - 40.0 - row as f64 * 55.0;
-            let (w, hh) = if *nu == "Callout circle" { (20.0, 20.0) } else { (40.0, 16.0) };
+            let y = sheet_h - 40.0 - row as f64 * 55.0;
+            let (w, hh) = match nu.as_str() {
+                "Callout circle" => (20.0, 20.0),
+                "Callout note" | "Callout brace" => (40.0, 20.0),
+                _ => (40.0, 16.0),
+            };
             // tip relative to the body's lower left corner (mm); None: the master's
             let tips: [Option<(f64, f64)>; 6] = [None, Some((w + 18.0, hh + 12.0)), Some((w * 0.5, hh * 0.5)), Some((-30.0, hh * 0.5)), Some((w * 0.6, -18.0)), Some((w + 25.0, -6.0))];
             for (col, tip) in tips.iter().enumerate() {

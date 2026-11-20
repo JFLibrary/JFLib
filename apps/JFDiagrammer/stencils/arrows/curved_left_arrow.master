@@ -1,0 +1,74 @@
+# Nach links gekrümmter Pfeil: das Spiegelbild des nach rechts gekrümmten -- er setzt unten
+# rechts nach oben an und schwenkt im Viertelbogen nach links; die Spitze zeigt nach links und
+# reicht bis zur Oberkante und zur linken Kante.  Außen- und Innenkante sind Ellipsenbögen um
+# dieselbe Mitte (unten auf der Basis der Spitze) durch ihren 45°-Punkt.  Die Spitze ist doppelt
+# so breit wie der Schaft.  Row_1 an der oberen Ecke der Spitze ändert ihre Länge, Row_2 an der
+# inneren Ecke des Schaftendes die Dicke des Schafts (beide anteilig, nur waagrecht).
+# Verbindungspunkte am Schaftende und an der Spitze.
+master: Curved left arrow
+name.de: Nach links gekrümmter Pfeil
+name.en: Curved left arrow
+name.es: Flecha curvada a la izquierda
+name.it: Freccia curva a sinistra
+name.fr: Flèche courbée vers la gauche
+prompt.de: Bogenpfeil, der von unten nach links schwenkt. Spitze und Schaft ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Arc arrow that swings from the bottom to the left. Drag the yellow control handles to change the head and the shaft.
+prompt.es: Flecha en arco que gira de abajo hacia la izquierda. Arrastre los controladores amarillos para cambiar la punta y el cuerpo.
+prompt.it: Freccia ad arco che piega dal basso verso sinistra. Trascina le maniglie di controllo gialle per cambiare la punta e il corpo.
+prompt.fr: Flèche en arc qui tourne du bas vers la gauche. Faites glisser les poignées de contrôle jaunes pour modifier la pointe et le corps.
+keywords.de: Pfeil, gekrümmt, Bogen, links, abbiegen, Kurve, Richtungswechsel
+keywords.en: arrow, curved, arc, left, turn, curve, change of direction
+keywords.es: flecha, curvada, arco, izquierda, giro, curva, cambio de dirección
+keywords.it: freccia, curva, arco, sinistra, svolta, curvatura, cambio di direzione
+keywords.fr: flèche, courbée, arc, gauche, virage, courbe, changement de direction
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 30 mm
+Height.us = 1.125 in
+
+[User]
+# die Länge der Spitze (= ihre Basis, die Mitte der Bögen liegt unten auf ihr), die Dicke des
+# Schafts (höchstens ein Viertel der Höhe), die halbe Breite der Spitze, ihre Achse und die
+# Halbachsen des Außenbogens
+Hl:    Value = MIN(MAX(Controls.Row_1, 0), Width*0.6)
+T:     Value = MIN(MAX(Width-Controls.Row_2, Width*0.02), Height*0.25, (Width-User.Hl)*0.5)
+Hw:    Value = User.T
+Axis:  Value = Height-User.Hw
+Ax:    Value = Width-User.Hl
+Ay:    Value = User.Axis+User.T*0.5
+
+[Geometry]
+MoveTo           X = Width; Y = 0
+EllipticalArcTo  X = User.Hl; Y = User.Ay; A = User.Hl+User.Ax*0.70710678; B = User.Ay*0.70710678
+                 C = 0 deg; D = User.Ax/User.Ay
+LineTo           X = User.Hl; Y = Height
+LineTo           X = 0; Y = User.Axis
+LineTo           X = User.Hl; Y = User.Axis-User.Hw
+LineTo           X = User.Hl; Y = User.Ay-User.T
+EllipticalArcTo  X = Width-User.T; Y = 0; A = User.Hl+(User.Ax-User.T)*0.70710678; B = (User.Ay-User.T)*0.70710678
+                 C = 0 deg; D = (User.Ax-User.T)/(User.Ay-User.T)
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.25; Y = Height
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Länge der Spitze ändern"
+        Tip.en = "Change the length of the head"
+        Tip.es = "Cambiar la longitud de la punta"
+        Tip.it = "Cambia la lunghezza della punta"
+        Tip.fr = "Modifier la longueur de la pointe"
+Row_2:  X = Width*0.85; Y = 0
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Dicke des Schafts ändern"
+        Tip.en = "Change the thickness of the shaft"
+        Tip.es = "Cambiar el grosor del cuerpo"
+        Tip.it = "Cambia lo spessore del corpo"
+        Tip.fr = "Modifier l'épaisseur du corps"
+
+[Connection]
+Row  X = Width-User.T*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = 0; Y = User.Axis; DirX = 1; DirY = 0

@@ -1,0 +1,66 @@
+# 2 Winkellinien: 2 parallele Linien, erst waagrecht vom Anfang, dann senkrecht zum Ende, mit
+# gleichem Abstand auch um die Ecke (die äußere Linie biegt außen ab).  1D-Shape mit aufrechtem
+# Kasten wie der Kurvenverbinder (Width = EndX-BeginX, Height = EndY-BeginY, Angle 0); die Enden
+# kleben an Shapes, mit GlueType 2 auch an das ganze Shape.  Abstand der Linien 4 mm; die
+# Vorzeichen von Width und Height (User.Sx, User.Sy) halten den Knick in jeder Lage richtig.  Ohne
+# Pfeilspitzen.
+master: 2 elbow lines
+name.de: 2 Winkellinien
+name.en: 2 elbow lines
+name.es: 2 líneas en ángulo
+name.it: 2 linee ad angolo
+name.fr: 2 lignes coudées
+prompt.de: 2 parallele Linien mit einem rechtwinkligen Knick. Ziehen Sie die Enden auf Shapes.
+prompt.en: 2 parallel lines with one right-angle bend. Drag the ends onto shapes.
+prompt.es: 2 líneas paralelas con un codo en ángulo recto. Arrastre los extremos sobre las formas.
+prompt.it: 2 linee parallele con una piega ad angolo retto. Trascina le estremità sulle forme.
+prompt.fr: 2 lignes parallèles avec un coude à angle droit. Faites glisser les extrémités sur les formes.
+keywords.de: Winkel, Knick, parallel, Leitungen, Kabel, Bündel, Linie, Verbinder
+keywords.en: elbow, bend, parallel, lines, cables, bundle, line, connector
+keywords.es: ángulo, codo, paralelas, líneas, cables, haz, línea, conector
+keywords.it: angolo, piega, parallele, linee, cavi, fascio, linea, connettore
+keywords.fr: coude, angle, parallèles, lignes, câbles, faisceau, ligne, connecteur
+style: Connector
+
+[Shape]
+BeginX = 3 mm
+BeginX.us = 0.1 in
+BeginY = 22 mm
+BeginY.us = 0.85 in
+EndX = 30 mm
+EndX.us = 1.2 in
+EndY = 3 mm
+EndY.us = 0.1 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+GlueType = 2
+BeginArrow = 0
+EndArrow = 0
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Richtung des Kastens (Width und Height dürfen negativ sein)
+Sx:  Value = IF(Width<0,-1,1)
+Sy:  Value = IF(Height<0,-1,1)
+# die Abstände der Linien von der Mitte
+O1:  Value = 2 mm
+     Value.us = 0.075 in
+O2:  Value = -2 mm
+     Value.us = -0.075 in
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = -User.Sy*User.O1
+LineTo  X = Width+User.Sx*User.O1; Y = -User.Sy*User.O1
+LineTo  X = Width+User.Sx*User.O1; Y = Height
+MoveTo  X = 0; Y = -User.Sy*User.O2
+LineTo  X = Width+User.Sx*User.O2; Y = -User.Sy*User.O2
+LineTo  X = Width+User.Sx*User.O2; Y = Height

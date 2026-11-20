@@ -1,0 +1,82 @@
+# Gebogener Pfeil: der Schaft kommt von unten, biegt im Viertelkreis nach rechts ab und endet in
+# der Spitze an der rechten Kante.  Die Spitze ist halb so hoch wie das Shape und reicht bis zur
+# Oberkante; der Bogen hat außen den anderthalbfachen Schaft als Radius (ArcTo, beide Bögen um
+# dieselbe Mitte).  Row_1 an der oberen Ecke der Spitze ändert ihre Länge (nur waagrecht), Row_2
+# an der unteren Schaftkante vor der Spitze die Dicke des Schafts (nur senkrecht).
+master: Bent arrow
+name.de: Gebogener Pfeil
+name.en: Bent arrow
+name.es: Flecha doblada
+name.it: Freccia piegata
+name.fr: Flèche coudée
+prompt.de: Pfeil mit einem 90-Grad-Bogen. Spitze und Schaft ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Arrow with a 90-degree bend. Drag the yellow control handles to change the head and the shaft.
+prompt.es: Flecha con una curva de 90 grados. Arrastre los controladores amarillos para cambiar la punta y el cuerpo.
+prompt.it: Freccia con una curva a 90 gradi. Trascina le maniglie di controllo gialle per cambiare la punta e il corpo.
+prompt.fr: Flèche avec un virage à 90 degrés. Faites glisser les poignées de contrôle jaunes pour modifier la pointe et le corps.
+keywords.de: Pfeil, gebogen, Bogen, abbiegen, Kurve, 90 Grad, Richtung
+keywords.en: arrow, bent, bend, turn, curve, 90 degrees, direction
+keywords.es: flecha, doblada, curva, giro, 90 grados, dirección
+keywords.it: freccia, piegata, curva, svolta, 90 gradi, direzione
+keywords.fr: flèche, coudée, virage, courbe, tourner, 90 degrés, direction
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 30 mm
+Height.us = 1.125 in
+TxtWidth = MAX(Width-User.Hl-User.Ro, 0)
+TxtHeight = User.T
+TxtPinX = (User.Ro+Width-User.Hl)*0.5
+TxtPinY = User.Axis
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die halbe Breite der Spitze, die Achse des waagrechten Arms, die Dicke des Schafts, die Länge
+# der Spitze
+Hw:    Value = Height*0.25
+Axis:  Value = Height-User.Hw
+T:     Value = MIN(MAX((User.Axis-Controls.Row_2.Y)*2, 0), User.Hw*2)
+Hl:    Value = MIN(MAX(Width-Controls.Row_1, 0), Width*0.5)
+# die Oberkante des Arms, der Außenradius des Bogens, die Höhe seiner Mitte, der Innenradius
+Yt:    Value = User.Axis+User.T*0.5
+Ro:    Value = MAX(MIN(User.T*1.5, User.Yt, Width-User.Hl), User.T)
+Yc:    Value = User.Yt-User.Ro
+Ri:    Value = User.Ro-User.T
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = 0; Y = User.Yc
+ArcTo   X = User.Ro; Y = User.Yt; A = -User.Ro*0.29289322
+LineTo  X = Width-User.Hl; Y = User.Yt
+LineTo  X = Width-User.Hl; Y = Height
+LineTo  X = Width; Y = User.Axis
+LineTo  X = Width-User.Hl; Y = User.Axis-User.Hw
+LineTo  X = Width-User.Hl; Y = User.Yt-User.T
+LineTo  X = User.Ro; Y = User.Yt-User.T
+ArcTo   X = User.T; Y = User.Yc; A = User.Ri*0.29289322
+LineTo  X = User.T; Y = 0
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.75; Y = Height
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Länge der Spitze ändern"
+        Tip.en = "Change the length of the head"
+        Tip.es = "Cambiar la longitud de la punta"
+        Tip.it = "Cambia la lunghezza della punta"
+        Tip.fr = "Modifier la longueur de la pointe"
+Row_2:  X = Width-User.Hl; Y = Height*0.625
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Dicke des Schafts ändern"
+        Tip.en = "Change the thickness of the shaft"
+        Tip.es = "Cambiar el grosor del cuerpo"
+        Tip.it = "Cambia lo spessore del corpo"
+        Tip.fr = "Modifier l'épaisseur du corps"
+
+[Connection]
+Row  X = User.T*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = User.Axis; DirX = -1; DirY = 0

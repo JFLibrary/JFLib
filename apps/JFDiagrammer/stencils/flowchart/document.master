@@ -1,0 +1,52 @@
+# Dokument (ISO 5807): ein Blatt mit gewellter Unterkante.  Die Welle sind zwei Kreisbögen
+# (ArcTo), die sich in der Mitte tangential treffen: rechts nach oben, links nach unten, je um
+# ein Zehntel der Höhe; ihre Mittellinie liegt ein Zehntel über der Unterkante, das linke Tal
+# berührt sie.  Der Text steht über der Welle, der untere Verbindungspunkt auf ihr; die seitlichen
+# liegen auf halber Höhe wie bei den anderen Symbolen, damit Linien im Ablauf gerade bleiben.
+master: Document
+name.de: Dokument
+name.en: Document
+name.es: Documento
+name.it: Documento
+name.fr: Document
+prompt.de: Daten auf Papier oder ein Bericht (ISO 5807).
+prompt.en: Data on paper or a report (ISO 5807).
+prompt.es: Datos en papel o un informe (ISO 5807).
+prompt.it: Dati su carta o un rapporto (ISO 5807).
+prompt.fr: Données sur papier ou un rapport (ISO 5807).
+keywords.de: Dokument, Bericht, Ausdruck, Papier, Beleg, Datei, Flussdiagramm
+keywords.en: document, report, printout, paper, form, file, flowchart
+keywords.es: documento, informe, impresión, papel, formulario, archivo, diagrama de flujo
+keywords.it: documento, rapporto, stampa, carta, modulo, file, diagramma di flusso
+keywords.fr: document, rapport, impression, papier, formulaire, fichier, diagramme de flux
+
+[Shape]
+Width = 36 mm
+Width.us = 1.5 in
+Height = 24 mm
+Height.us = 1 in
+TxtWidth = Width
+TxtHeight = Height-User.Wave*2
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5+User.Wave
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+msvShapeCategories:  Value = "Flowchart"
+# die Höhe der Mittellinie der Welle und die Auslenkung beider Bögen
+Wave:  Value = Height*0.1
+
+[Geometry]
+MoveTo  X = 0; Y = User.Wave
+LineTo  X = 0; Y = Height
+LineTo  X = Width; Y = Height
+LineTo  X = Width; Y = User.Wave
+ArcTo   X = Width*0.5; Y = User.Wave; A = User.Wave
+ArcTo   X = 0; Y = User.Wave; A = -User.Wave
+
+[Connection]
+Row  X = Width*0.5; Y = User.Wave; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

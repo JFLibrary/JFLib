@@ -1,0 +1,75 @@
+# 180-Grad-Pfeil: U-förmiger Wendepfeil -- links hinauf, oben ein halber Ellipsenbogen, rechts
+# hinunter in die Spitze, die nach unten zeigt und an die rechte Kante reicht.  Die Spitze ist
+# doppelt so breit wie der Schaft.  Der Bogen beginnt bei 45 % der Höhe (die Mitte beider
+# Bögen); der Innenbogen hat die um den Schaft kleineren Halbachsen.  Row_1 an der inneren
+# unteren Ecke des linken Schenkels ändert die Dicke des Schafts (nur waagrecht), Row_2 an der
+# linken Ecke der Spitze ihre Länge (nur senkrecht).
+master: U-turn arrow
+name.de: 180-Grad-Pfeil
+name.en: U-turn arrow
+name.es: Flecha de 180 grados
+name.it: Freccia a 180 gradi
+name.fr: Flèche demi-tour
+prompt.de: U-förmiger Wendepfeil. Schaft und Spitze ändern Sie mit den gelben Steuerpunkten.
+prompt.en: U-shaped turnaround arrow. Drag the yellow control handles to change the shaft and the head.
+prompt.es: Flecha de retorno en forma de U. Arrastre los controladores amarillos para cambiar el cuerpo y la punta.
+prompt.it: Freccia di inversione a forma di U. Trascina le maniglie di controllo gialle per cambiare il corpo e la punta.
+prompt.fr: Flèche de demi-tour en forme de U. Faites glisser les poignées de contrôle jaunes pour modifier le corps et la pointe.
+keywords.de: Pfeil, Wende, Kehrtwende, zurück, U, 180 Grad, Schleife
+keywords.en: arrow, U-turn, turnaround, back, return, 180 degrees, loop
+keywords.es: flecha, cambio de sentido, retorno, volver, U, 180 grados, bucle
+keywords.it: freccia, inversione, ritorno, indietro, U, 180 gradi, ciclo
+keywords.fr: flèche, demi-tour, retour, arrière, U, 180 degrés, boucle
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 30 mm
+Height.us = 1.125 in
+
+[User]
+# die Dicke des Schafts, die halbe Breite der Spitze, ihre Achse, die Halbachsen und die Mitte
+# des Außenbogens, die Länge der Spitze
+T:     Value = MIN(MAX(Controls.Row_1, 0), Width*0.3, Height*0.45)
+Hw:    Value = User.T
+Xr:    Value = Width-User.Hw
+Rx:    Value = (User.Xr+User.T*0.5)*0.5
+Yc:    Value = Height*0.45
+Ry:    Value = Height-User.Yc
+Hl:    Value = MIN(MAX(Controls.Row_2.Y, 0), User.Yc)
+
+[Geometry]
+MoveTo           X = 0; Y = 0
+LineTo           X = 0; Y = User.Yc
+EllipticalArcTo  X = User.Xr+User.T*0.5; Y = User.Yc; A = User.Rx; B = Height; C = 0 deg; D = User.Rx/User.Ry
+LineTo           X = User.Xr+User.T*0.5; Y = User.Hl
+LineTo           X = User.Xr+User.Hw; Y = User.Hl
+LineTo           X = User.Xr; Y = 0
+LineTo           X = User.Xr-User.Hw; Y = User.Hl
+LineTo           X = User.Xr-User.T*0.5; Y = User.Hl
+LineTo           X = User.Xr-User.T*0.5; Y = User.Yc
+EllipticalArcTo  X = User.T; Y = User.Yc; A = User.Rx; B = Height-User.T; C = 0 deg; D = (User.Rx-User.T)/(User.Ry-User.T)
+LineTo           X = User.T; Y = 0
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.175; Y = 0
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Dicke des Schafts ändern"
+        Tip.en = "Change the thickness of the shaft"
+        Tip.es = "Cambiar el grosor del cuerpo"
+        Tip.it = "Cambia lo spessore del corpo"
+        Tip.fr = "Modifier l'épaisseur du corps"
+Row_2:  X = User.Xr-User.Hw; Y = Height*0.3
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Länge der Spitze ändern"
+        Tip.en = "Change the length of the head"
+        Tip.es = "Cambiar la longitud de la punta"
+        Tip.it = "Cambia la lunghezza della punta"
+        Tip.fr = "Modifier la longueur de la pointe"
+
+[Connection]
+Row  X = User.T*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = User.Xr; Y = 0; DirX = 0; DirY = 1

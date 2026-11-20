@@ -1,0 +1,56 @@
+# DFÜ-Verbinder 1: eine Linie mit einem Blitz (Zickzack) in der Mitte; der Blitz ist 8 mm lang und
+# so hoch wie das Shape dick (Height), er streckt sich nicht mit der Länge.  Liegt auf der Linie
+# vom Anfang zum Ende und dreht sich mit ihr (PinX, Width, Angle aus den Enden); die Enden kleben
+# an Shapes, mit GlueType 2 auch an das ganze Shape.  Pfeilspitze am Ende aus der Formatvorlage
+# "Connector".
+master: Comm-link 1
+name.de: DFÜ-Verbinder 1
+name.en: Comm-link 1
+name.es: Enlace de comunicación 1
+name.it: Collegamento di comunicazione 1
+name.fr: Liaison de communication 1
+prompt.de: Linie mit einem Blitz in der Mitte für eine Datenfernübertragung, zum Beispiel per Funk. Ziehen Sie die Enden auf Shapes.
+prompt.en: Line with a lightning bolt in the middle for a communication link, for example by radio. Drag the ends onto shapes.
+prompt.es: Línea con un rayo en el centro para un enlace de comunicación, por ejemplo por radio. Arrastre los extremos sobre las formas.
+prompt.it: Linea con un fulmine al centro per un collegamento di comunicazione, ad esempio via radio. Trascina le estremità sulle forme.
+prompt.fr: Ligne avec un éclair au milieu pour une liaison de communication, par exemple par radio. Faites glisser les extrémités sur les formes.
+keywords.de: DFÜ, Blitz, Funk, Kommunikation, Datenübertragung, Linie, Verbinder
+keywords.en: comm link, lightning, radio, communication, data transmission, line, connector
+keywords.es: comunicación, rayo, radio, enlace, transmisión de datos, línea, conector
+keywords.it: comunicazione, fulmine, radio, collegamento, trasmissione dati, linea, connettore
+keywords.fr: communication, éclair, radio, liaison, transmission de données, ligne, connecteur
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 3 mm
+BeginY.us = 0.125 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 3 mm
+EndY.us = 0.125 in
+Height = 6 mm
+Height.us = 0.25 in
+GlueType = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = -TxtHeight*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die halbe Länge des Blitzes
+B:  Value = 4 mm
+    Value.us = 0.15 in
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width*0.5-User.B; Y = Height*0.5
+LineTo  X = Width*0.5+User.B*0.4; Y = Height
+LineTo  X = Width*0.5-User.B*0.4; Y = 0
+LineTo  X = Width*0.5+User.B; Y = Height*0.5
+LineTo  X = Width; Y = Height*0.5

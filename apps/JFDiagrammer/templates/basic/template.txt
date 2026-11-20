@@ -1,0 +1,18 @@
+# Standarddiagramm (VL-11): Grundformen, Blöcke, Pfeile und Beschriftungen auf einer Seite A4
+# bzw. Letter quer.  Quellformat: ../README.md
+template: Basic Diagram
+file: basic
+name.de: Standarddiagramm
+name.en: Basic Diagram
+name.es: Diagrama básico
+name.it: Diagramma di base
+name.fr: Diagramme de base
+description.de: Grundformen, Blöcke, Pfeile und Beschriftungen für Diagramme aller Art.
+description.en: Basic shapes, blocks, arrows and callouts for all kinds of diagrams.
+description.es: Formas básicas, bloques, flechas y llamadas para todo tipo de diagramas.
+description.it: Forme di base, blocchi, frecce e richiami per diagrammi di ogni tipo.
+description.fr: Formes de base, blocs, flèches et bulles d'annotation pour toutes sortes de diagrammes.
+category: general
+order: 20
+stencils: standard, blocks, arrows, callouts
+starters: sample

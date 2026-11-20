@@ -1,0 +1,39 @@
+# Siebeneck: regelmäßig, eine Ecke oben
+master: Heptagon
+name.de: Siebeneck
+name.en: Heptagon
+name.es: Heptágono
+name.it: Ettagono
+name.fr: Heptagone
+prompt.de: Regelmäßiges Siebeneck mit einer Spitze oben.
+prompt.en: Regular heptagon with a point at the top.
+prompt.es: Heptágono regular con un vértice arriba.
+prompt.it: Ettagono regolare con un vertice in alto.
+prompt.fr: Heptagone régulier avec une pointe en haut.
+keywords.de: Siebeneck, sieben, Heptagon, Vieleck, Polygon, regelmäßig, Ecken
+keywords.en: heptagon, seven, seven-sided, polygon, regular, corners
+keywords.es: heptágono, siete, siete lados, polígono, regular, esquinas
+keywords.it: ettagono, sette, sette lati, poligono, regolare, angoli
+keywords.fr: heptagone, sept, sept côtés, polygone, régulier, coins
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 29.25 mm
+Height.us = 1.22 in
+
+[Geometry]
+MoveTo  X = Width*0.5; Y = Height
+LineTo  X = Width*0.099031; Y = Height*0.801938
+LineTo  X = 0; Y = Height*0.356896
+LineTo  X = Width*0.277479; Y = 0
+LineTo  X = Width*0.722521; Y = 0
+LineTo  X = Width; Y = Height*0.356896
+LineTo  X = Width*0.900969; Y = Height*0.801938
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.356896; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.356896; DirX = 1; DirY = 0

@@ -1,0 +1,47 @@
+# Winkelverbinder: ein 1D-Shape mit aufrechtem Kasten wie der Kurvenverbinder, der Verlauf hat
+# genau einen Knick -- erst waagrecht vom Anfang, dann senkrecht zum Ende (RelLineTo in Anteilen
+# des Kastens): er verbindet eine Seite mit einer Ober- oder Unterkante.  Die Enden kleben, mit
+# GlueType 2 auch an das ganze Shape.  Der Text steht auf dem waagrechten Stück.
+master: Elbow connector
+name.de: Winkelverbinder
+name.en: Elbow connector
+name.es: Conector angular
+name.it: Connettore ad angolo
+name.fr: Connecteur en angle
+prompt.de: Verbinder mit einem rechtwinkligen Knick. Ziehen Sie seine Enden auf Shapes.
+prompt.en: Connector with one right-angle bend. Drag its ends onto shapes.
+prompt.es: Conector con un codo en ángulo recto. Arrastre sus extremos sobre las formas.
+prompt.it: Connettore con una piega ad angolo retto. Trascina le sue estremità sulle forme.
+prompt.fr: Connecteur avec un coude à angle droit. Faites glisser ses extrémités sur les formes.
+keywords.de: Verbinder, Winkel, Knick, rechtwinklig, Linie, Pfeil, verbinden
+keywords.en: connector, elbow, bend, right angle, line, arrow, connect
+keywords.es: conector, codo, ángulo, ángulo recto, línea, flecha, conectar
+keywords.it: connettore, gomito, angolo, angolo retto, linea, freccia, collegare
+keywords.fr: connecteur, coude, angle, angle droit, ligne, flèche, connecter, relier
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 20 mm
+BeginY.us = 0.75 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 0 mm
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+GlueType = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = 0
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+RelMoveTo  X = 0; Y = 0
+RelLineTo  X = 1; Y = 0
+RelLineTo  X = 1; Y = 1

@@ -1,0 +1,57 @@
+# Verbinder: Linie/Kurve: zunächst gerade; Row_1 in der Mitte (nur quer zur Linie, Abstand von der
+# Linie) biegt sie zu einem Kreisbogen durch den Steuerpunkt (ArcTo, die Bogenhöhe ist der
+# Abstand).  Liegt auf der Linie vom Anfang zum Ende und dreht sich mit ihr (PinX, Width, Angle
+# aus den Enden); die Enden kleben an Shapes, mit GlueType 2 auch an das ganze Shape.  Die
+# Pfeilspitze am Ende kommt aus der Formatvorlage "Connector", der Text steht am Scheitel.
+master: Line-curve connector
+name.de: Verbinder: Linie/Kurve
+name.en: Line-curve connector
+name.es: Conector de línea o curva
+name.it: Connettore linea/curva
+name.fr: Connecteur ligne/courbe
+prompt.de: Gerade Linie, die sich zum Bogen biegen lässt. Mit dem gelben Steuerpunkt in der Mitte biegen Sie sie. Ziehen Sie die Enden auf Shapes.
+prompt.en: Straight line that can be bent into an arc. Drag the yellow control handle in the middle to bend it. Drag the ends onto shapes.
+prompt.es: Línea recta que se puede curvar en arco. Arrastre el controlador amarillo del centro para curvarla. Arrastre los extremos sobre las formas.
+prompt.it: Linea retta che si può curvare ad arco. Trascina la maniglia di controllo gialla al centro per curvarla. Trascina le estremità sulle forme.
+prompt.fr: Ligne droite que l’on peut courber en arc. Faites glisser la poignée de contrôle jaune au milieu pour la courber. Faites glisser les extrémités sur les formes.
+keywords.de: gerade, Kurve, Bogen, biegen, Linie, Verbinder
+keywords.en: straight, curve, arc, bend, line, connector
+keywords.es: recta, curva, arco, curvar, línea, conector
+keywords.it: diritta, curva, arco, curvare, linea, connettore
+keywords.fr: droite, courbe, arc, courber, ligne, connecteur
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 2.5 mm
+BeginY.us = 0.1 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 2.5 mm
+EndY.us = 0.1 in
+Height = 0 mm
+Height.us = 0 in
+GlueType = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Controls.Row_1.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+ArcTo   X = Width; Y = Height*0.5; A = Height*0.5-Controls.Row_1.Y
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.5
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 2; CanGlue = FALSE
+        Tip.de = "Linie biegen"
+        Tip.en = "Bend the line"
+        Tip.es = "Curvar la línea"
+        Tip.it = "Curva la linea"
+        Tip.fr = "Courber la ligne"

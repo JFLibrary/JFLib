@@ -1,0 +1,38 @@
+# Sechseck: regelmäßig, waagrechte Kanten oben und unten, Ecken links und rechts
+master: Hexagon
+name.de: Sechseck
+name.en: Hexagon
+name.es: Hexágono
+name.it: Esagono
+name.fr: Hexagone
+prompt.de: Regelmäßiges Sechseck mit waagrechten Kanten oben und unten.
+prompt.en: Regular hexagon with horizontal edges at the top and bottom.
+prompt.es: Hexágono regular con lados horizontales arriba y abajo.
+prompt.it: Esagono regolare con lati orizzontali in alto e in basso.
+prompt.fr: Hexagone régulier avec des côtés horizontaux en haut et en bas.
+keywords.de: Sechseck, sechs, Hexagon, Wabe, Vieleck, Polygon, regelmäßig, Ecken
+keywords.en: hexagon, six, six-sided, honeycomb, polygon, regular, corners
+keywords.es: hexágono, seis, seis lados, panal, polígono, regular, esquinas
+keywords.it: esagono, sei, sei lati, nido d'ape, poligono, regolare, angoli
+keywords.fr: hexagone, six, six côtés, alvéole, polygone, régulier, coins
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 26 mm
+Height.us = 1.08 in
+
+[Geometry]
+MoveTo  X = Width; Y = Height*0.5
+LineTo  X = Width*0.75; Y = Height
+LineTo  X = Width*0.25; Y = Height
+LineTo  X = 0; Y = Height*0.5
+LineTo  X = Width*0.25; Y = 0
+LineTo  X = Width*0.75; Y = 0
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

@@ -1,0 +1,79 @@
+# Flexibler Pfeil: der 1D-Pfeil mit gebogenem Schaft -- beide Schaftkanten sind Kreisbögen mit
+# derselben Bogenhöhe (ArcTo; vereinfacht: nicht genau gleich weit voneinander, die Spitze bleibt
+# gerade auf der Linie).  Liegt auf der Linie vom Anfang zum Ende und dreht sich mit ihr (PinX,
+# Width, Angle aus den Enden); die Enden kleben an Shapes, mit GlueType 2 auch an das ganze Shape.
+# Row_1 ändert die Länge der Spitze (Abstand vom Ende), Row_2 die Dicke des Schafts, Row_3 in der
+# Mitte des Schafts (nur quer zur Linie) die Biegung.  Formatvorlage "Normal".
+master: Flexible arrow
+name.de: Flexibler Pfeil
+name.en: Flexible arrow
+name.es: Flecha flexible
+name.it: Freccia flessibile
+name.fr: Flèche flexible
+prompt.de: Flächiger Pfeil mit biegbarem Schaft, dessen Enden an Shapes kleben. Mit den gelben Steuerpunkten ändern Sie Spitze, Schaft und Biegung.
+prompt.en: Flat arrow with a bendable shaft whose ends glue to shapes. Drag the yellow control handles to change the head, the shaft and the bend.
+prompt.es: Flecha plana con cuerpo flexible cuyos extremos se pegan a las formas. Arrastre los controladores amarillos para cambiar la punta, el cuerpo y la curvatura.
+prompt.it: Freccia piatta con corpo pieghevole le cui estremità si incollano alle forme. Trascina le maniglie di controllo gialle per cambiare la punta, il corpo e la curvatura.
+prompt.fr: Flèche pleine au corps flexible dont les extrémités se collent aux formes. Faites glisser les poignées de contrôle jaunes pour modifier la pointe, le corps et la courbure.
+keywords.de: flexibel, biegbar, gebogen, Kurve, Pfeil, Blockpfeil, kleben
+keywords.en: flexible, bendable, curved, curve, arrow, block arrow, glue
+keywords.es: flexible, curvable, curva, curvo, flecha, flecha de bloque, pegar
+keywords.it: flessibile, pieghevole, curvo, curva, freccia, freccia a blocco, incollare
+keywords.fr: flexible, courbable, courbe, arc, flèche, flèche pleine, coller
+
+[Shape]
+BeginX = 0 mm
+BeginY = 5 mm
+BeginY.us = 0.1875 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 5 mm
+EndY.us = 0.1875 in
+Height = 10 mm
+Height.us = 0.375 in
+GlueType = 2
+
+[User]
+# die Länge der Spitze und der halbe Schaft
+Hl:     Value = MIN(MAX(Width-Controls.Row_1, 0), Width)
+Shaft:  Value = MIN(MAX(Controls.Row_2.Y-Height*0.5, 0), Height*0.5)
+# die Biegung: wie weit der Schaft in der Mitte von der Linie abweicht
+Bow:    Value = Controls.Row_3.Y-Height*0.5
+
+[Geometry]
+MoveTo  X = 0; Y = Height*0.5-User.Shaft
+ArcTo   X = Width-User.Hl; Y = Height*0.5-User.Shaft; A = -User.Bow
+LineTo  X = Width-User.Hl; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.Hl; Y = Height
+LineTo  X = Width-User.Hl; Y = Height*0.5+User.Shaft
+ArcTo   X = 0; Y = Height*0.5+User.Shaft; A = User.Bow
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width-8 mm; Y = Height
+        X.us = Width-0.3 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Länge der Spitze ändern"
+        Tip.en = "Change the length of the head"
+        Tip.es = "Cambiar la longitud de la punta"
+        Tip.it = "Cambia la lunghezza della punta"
+        Tip.fr = "Modifier la longueur de la pointe"
+Row_2:  X = 0; Y = Height*0.75
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Dicke des Schafts ändern"
+        Tip.en = "Change the thickness of the shaft"
+        Tip.es = "Cambiar el grosor del cuerpo"
+        Tip.it = "Cambia lo spessore del corpo"
+        Tip.fr = "Modifier l'épaisseur du corps"
+Row_3:  X = (Width-User.Hl)*0.5; Y = Height*0.5+4 mm
+        Y.us = Height*0.5+0.15 in
+        XDyn = Controls.Row_3; YDyn = Controls.Row_3.Y
+        XCon = 1; YCon = 2; CanGlue = FALSE
+        Tip.de = "Biegung ändern"
+        Tip.en = "Change the bend"
+        Tip.es = "Cambiar la curvatura"
+        Tip.it = "Cambia la curvatura"
+        Tip.fr = "Modifier la courbure"

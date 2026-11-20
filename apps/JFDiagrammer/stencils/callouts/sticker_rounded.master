@@ -1,0 +1,65 @@
+# Eine Fläche ohne Zeiger (kein msvStructureType): ein Aufkleber mit runden Ecken (ArcTo), die
+# Innenlinie um Inset eingerückt mit dem kleineren Radius R-Inset.
+master: Rounded sticker
+name.de: Abgerundeter Aufkleber
+name.en: Rounded sticker
+name.es: Adhesivo redondeado
+name.it: Adesivo arrotondato
+name.fr: Autocollant arrondi
+prompt.de: Aufkleber mit runden Ecken und einer Innenlinie, etwa für „Neu“ oder einen Hinweis.
+prompt.en: Sticker with round corners and an inner line, for example for "New" or a hint.
+prompt.es: Adhesivo con esquinas redondeadas y una línea interior, por ejemplo para «Nuevo» o una indicación.
+prompt.it: Adesivo con angoli arrotondati e una linea interna, ad esempio per «Nuovo» o un avviso.
+prompt.fr: Autocollant aux coins arrondis avec un trait intérieur, par exemple pour « Nouveau » ou un avis.
+keywords.de: Aufkleber, Sticker, Etikett, Abzeichen, Hervorhebung, neu, abgerundet
+keywords.en: sticker, label, badge, highlight, new, seal, rounded
+keywords.es: adhesivo, pegatina, etiqueta, insignia, destacar, nuevo, redondeado
+keywords.it: adesivo, etichetta, distintivo, evidenziare, nuovo, bollino, arrotondato
+keywords.fr: autocollant, étiquette, badge, mise en avant, nouveau, pastille, arrondi
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 16 mm
+Height.us = 0.6 in
+
+[User]
+# der Radius außen, der Abstand der Innenlinie, der Radius innen, die Stiche der Viertelkreise (ArcTo A)
+R:      Value = MIN(4 mm,Width*0.25,Height*0.25)
+        Value.us = MIN(0.16 in,Width*0.25,Height*0.25)
+Inset:  Value = MIN(1.5 mm,Width*0.1,Height*0.1)
+        Value.us = MIN(0.06 in,Width*0.1,Height*0.1)
+Ri:     Value = MAX(User.R-User.Inset,0)
+Bow:    Value = User.R*0.292893
+Bowi:   Value = User.Ri*0.292893
+
+# der Aufkleber
+[Geometry]
+MoveTo  X = User.R; Y = 0
+LineTo  X = Width-User.R; Y = 0
+ArcTo   X = Width; Y = User.R; A = User.Bow
+LineTo  X = Width; Y = Height-User.R
+ArcTo   X = Width-User.R; Y = Height; A = User.Bow
+LineTo  X = User.R; Y = Height
+ArcTo   X = 0; Y = Height-User.R; A = User.Bow
+LineTo  X = 0; Y = User.R
+ArcTo   X = Geometry1.X1; Y = Geometry1.Y1; A = User.Bow
+
+# die Innenlinie
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.Inset+User.Ri; Y = User.Inset
+LineTo  X = Width-User.Inset-User.Ri; Y = User.Inset
+ArcTo   X = Width-User.Inset; Y = User.Inset+User.Ri; A = User.Bowi
+LineTo  X = Width-User.Inset; Y = Height-User.Inset-User.Ri
+ArcTo   X = Width-User.Inset-User.Ri; Y = Height-User.Inset; A = User.Bowi
+LineTo  X = User.Inset+User.Ri; Y = Height-User.Inset
+ArcTo   X = User.Inset; Y = Height-User.Inset-User.Ri; A = User.Bowi
+LineTo  X = User.Inset; Y = User.Inset+User.Ri
+ArcTo   X = Geometry2.X1; Y = Geometry2.Y1; A = User.Bowi
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

@@ -146,8 +146,12 @@ Fehlt die Zelle im Master, setzt das Werkzeug:
 - `LocPinX = Width*0.5`, `LocPinY = Height*0.5`
 - Masterseite: `PageWidth`, `PageHeight` = Shape-Größe, Maßstab 1:1 in mm bzw. Zoll
 
-`Width` und `Height` sind Pflicht, und zwar als Längen (Konstanten wie `40 mm`, keine Formeln):
-aus ihnen entstehen Pin und Masterseite.  Eine Formel geht nur zusammen mit `size:` im Kopf.
+`Width` und `Height` sind Pflicht. Meist sind es Längen (Konstanten wie `40 mm`); eine Formel ist
+erlaubt, außer zusammen mit `svg:` (JD13, z. B. die Felder mit Auto-Höhe:
+`GUARD(MAX(10 mm, TEXTHEIGHT(TheText,Width)))` mit `LockHeight`). Pin und Masterseite entstehen
+aus dem berechneten Wert. Mit `svg:` geht eine Formel nur zusammen mit `size:` im Kopf, das dann
+Pin und Masterseite bestimmt (JD13, die Rack-Einschübe: Höhe aus den Höheneinheiten). Ausnahme
+sind 1D-Master (Abschnitt „1D-Shapes“).
 
 ### Eingebundene Dateien (`include:`, JD13)
 
@@ -162,6 +166,83 @@ Masters gemischt:
   fällt weg, eine benannte Zeile gleichen Namens bekommt nur die eingebundenen Zellen, die der
   Master nicht selbst setzt (`RackUnits: Value = 2` übernimmt Bezeichnung und Typ aus der Datei).
 - Fehler nennen die eingebundene Datei und ihre Zeile; ihr Text gehört zur `UniqueID`.
+
+## 1D-Shapes (Verbinder, Linienpfeile)
+
+Ein Master ist ein 1D-Shape, wenn `[Shape]` die Enden `BeginX`, `BeginY`, `EndX` und `EndY`
+setzt (eine davon genügt für die Erkennung, dann sind alle vier Pflicht). Das ist Visios eigene
+Speicherform: Es gibt kein eigenes Kennzeichen, ein Shape mit `BeginX` ist eindimensional; die
+App (`diagram_core::glue::is_one_d`) liest es genauso.
+
+- `BeginX` … `EndY` sind Längen ab 0 (Konstanten wie `40 mm`, keine Formeln): die Enden auf der
+  Masterseite. Die Masterseite ist `BeginX+EndX` breit und `BeginY+EndY` hoch, die Enden haben
+  also zum Rand so viel Abstand wie zum anderen Rand; eine waagrechte Linie braucht deshalb
+  `BeginY = EndY = 2.5 mm` o. ä. statt 0. Fallen die Enden zusammen oder wäre die Seite leer, ist
+  das ein Baufehler.
+- `Height` ist Pflicht: die Dicke (Länge ab 0, eine Linie hat `0 mm`) oder eine Formel.
+- Fehlt die Zelle, setzt das Werkzeug Visios 1D-Formeln, so dass der Kasten den Enden folgt:
+
+  | Zelle | Formel |
+  |---|---|
+  | `PinX`, `PinY` | `GUARD((BeginX+EndX)/2)`, `GUARD((BeginY+EndY)/2)` |
+  | `Width` | `GUARD(SQRT((EndX-BeginX)^2+(EndY-BeginY)^2))` (die Länge) |
+  | `Angle` | `GUARD(ATAN2(EndY-BeginY,EndX-BeginX))` (der Kasten liegt auf der Linie) |
+  | `LocPinX`, `LocPinY` | `GUARD(Width*0.5)`, `GUARD(Height*0.5)` |
+
+  Die Geometrie zeichnet dann im gedrehten Kasten: x von 0 (Anfang) bis `Width` (Ende), die
+  Linie selbst auf `Height*0.5`.
+- **Aufrechter Kasten** (wie der dynamische Verbinder der App, für Verläufe von Seite zu Seite):
+  der Master schreibt `Width = GUARD(EndX-BeginX)`, `Height = GUARD(EndY-BeginY)`,
+  `Angle = GUARD(0DA)`; beide Maße dürfen negativ sein, lokal (0, 0) ist der Anfang und
+  (`Width`, `Height`) das Ende. Geometrie in Anteilen des Kastens (`RelMoveTo`, `RelLineTo`,
+  `RelCubBezTo`) bleibt so bei jeder Lage richtig.
+- **Kleben:** Die Enden kleben an Verbindungspunkte (statisch, `PAR(PNT(…))`, schreibt die App
+  beim Kleben selbst). `GlueType = 2` erlaubt auch das Kleben an das ganze Shape (das Ende sucht
+  sich den Rand). Trigger (`BegTrigger`, `EndTrigger`) braucht der Master nicht.
+- **Kein `ObjType = 2`** für Shapes mit eigener Geometrie: Das Kennzeichen „verlegbar“ macht ein
+  1D-Shape zum dynamischen Verbinder; die App verlegt ihn dann selbst und ersetzt seine
+  Geometrie. Formatvorlage: Linienverbinder `Connector` (Linie, Pfeilspitze und Text mit
+  Hintergrund aus dem Design), gefüllte flächige Pfeile `Normal`. Ein Verbinder nur aus Umrissen
+  (ohne Füllung) nimmt ebenfalls `Connector`, mit `BeginArrow = 0` und `EndArrow = 0`: mit
+  `Normal` verschwände er in Designs ohne Shape-Linien (Kontrast).
+- Text eines Linienverbinders: ein fester Textblock (z. B. `TxtWidth = 30 mm`) mitten auf dem
+  Verlauf; der Hintergrund aus `Connector` erscheint nur hinter vorhandenem Text.
+
+Die App legt einen 1D-Master heute wie ein 2D-Shape ab (`instance::place` setzt `PinX`/`PinY`
+als Konstanten, die Enden bleiben auf den Werten der Masterseite); siehe Prüfung
+`diagramiotest --check --only stencils/shapes/drop`.
+
+## Stilregeln (SH-G01, vom Nutzer mit dem JD13-Probeblatt abgenommen)
+
+Verbindlich für alle mitgelieferten Master; das Probeblatt (`diagramiotest
+--write-stencil-previews DIR`, `probeblatt.png`) zeigt sie, `<ordner>-alle.png` zeigt je
+Schablone alle Master.
+
+- **Formatvorlage:** 2D-Master ohne `style:` (also `Normal`), Linien- und Umrissverbinder
+  `style: Connector`. Keine Farben, Linienstärken oder Schriftfarben im Master, damit die
+  Designs (JD11) wirken. Ausnahmen nur begründet im Kopfkommentar (Tipp: `LineWeight 3 pt`,
+  `LineCap 1`; 3D-Feld: `Rounding 0`; Hohler Verbinder: `BeginArrow`/`EndArrow 0`).
+- **Form:** ein Umriss je Fläche, eckig mit geraden Kanten. Bögen nur, wo Name oder Norm sie
+  verlangen (`ArcTo`, `EllipticalArcTo`; Ellipsenbögen durch den 45°-Punkt). Mehrere Flächen
+  nur nebeneinander (Visio füllt nach der Gerade-Ungerade-Regel); Innenkanten als eigener
+  Abschnitt mit `NoFill TRUE`. Keine Rundung im Master, `Rounding` kommt aus dem Design.
+- **Genormte Symbole** (ISO 5807 …) sehen normgerecht aus; Flussdiagramm-Shapes 36 × 24 mm (3:2).
+- **Maße:** 5-mm-Raster (40 × 20, 40 × 30, 40 × 25, 30 × 30 mm), US-Fassung in runden Zoll
+  (1.5 × 0.75, 1.5 × 1.125, 1.25 × 1.25, 1.5 × 1). Pfeile: Spitze etwa 0,4 × Länge, Schaft halb
+  so dick wie die Spitze, Bogen außen 1,5 × Schaft. 1D-Flächenpfeile: Dicke 10 mm, Spitze 8 mm.
+- **Steuerpunkte:** ein gelber Punkt je Formparameter auf der Ecke, die er bewegt; unnötige
+  Richtung gesperrt (`XCon`/`YCon` 1); anteilig (0) für Formen, die mitskalieren, Abstand vom
+  Rand (2 oder 4) für Maße, die beim Strecken bleiben (Tiefe, Spitze eines 1D-Pfeils,
+  Zylinderenden). Werte in `User`-Zellen mit `MIN`/`MAX` begrenzt; `Tip` in fünf Sprachen.
+- **Verbindungspunkte:** Mitte jeder Seite in der Reihenfolge unten, rechts, oben, links,
+  `DirX`/`DirY` nach innen. Pfeile: Schaftende und Spitze(n); Raute: an den Ecken; Dokument:
+  unten auf der Welle. 1D-Shapes haben keine, dort kleben die Enden.
+- **Text:** Textblock auf der Hauptfläche (Kasten, Vorderseite, über der Welle, Bandmitte),
+  `TxtLocPin` die halbe Größe; Linienverbinder: Block 30 × 8 mm mittig auf dem Verlauf.
+- **Sprachen:** Name, ein Prompt-Satz (was es ist, dazu einer zu den Steuerpunkten) und 5–8
+  Stichworte je Sprache; NameU ist der naheliegende englische Begriff.
+- **Kategorien für Regeln:** Flussdiagramm-Shapes tragen `User.msvShapeCategories`
+  (`"Flowchart"`, die Entscheidung `"Flowchart;Decision"`, Start/Ende `"Flowchart;Terminator"`).
 
 ## SVG-Grafik (`svg:`)
 

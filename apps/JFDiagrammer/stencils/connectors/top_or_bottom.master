@@ -1,0 +1,73 @@
+# Oben oder unten: beide Enden an Ober- oder Unterkanten; gezeichnet ein Bügel unter zwei
+# nebeneinanderliegenden Shapes.  Dynamischer Verbinder (ObjType 2 verlegbar, GlueType 2): die App
+# verlegt ihn selbst und ersetzt die gezeichnete Geometrie durch ihren Weg; der Kasten bleibt
+# aufrecht (Width = EndX-BeginX ..., Angle 0).  Route-Zellen mit Visios Namen und Werten:
+# ShapeRouteStyle 5 (Flussdiagramm oben nach unten), ConLineRouteExt 1, ConFixedCode 0.  Der Text
+# folgt Controls.TextPosition, das die App in die Mitte des Wegs setzt (ohne Text verborgen).
+master: Top or bottom
+name.de: Oben oder unten
+name.en: Top or bottom
+name.es: Arriba o abajo
+name.it: In alto o in basso
+name.fr: Haut ou bas
+prompt.de: Dynamischer Verbinder, der oben oder unten an den Shapes anschließt. Ziehen Sie die Enden auf Shapes.
+prompt.en: Dynamic connector that joins the shapes at the top or at the bottom. Drag the ends onto shapes.
+prompt.es: Conector dinámico que se une a las formas por arriba o por abajo. Arrastre los extremos sobre las formas.
+prompt.it: Connettore dinamico che si collega alle forme in alto o in basso. Trascina le estremità sulle forme.
+prompt.fr: Connecteur dynamique qui rejoint les formes par le haut ou par le bas. Faites glisser les extrémités sur les formes.
+keywords.de: Verbinder, dynamisch, verbinden, oben, unten, senkrecht, Bügel
+keywords.en: connector, dynamic, connect, top, bottom, vertical, bracket
+keywords.es: conector, dinámico, conectar, arriba, abajo, vertical, corchete
+keywords.it: connettore, dinamico, collegare, alto, basso, verticale, staffa
+keywords.fr: connecteur, dynamique, relier, haut, bas, vertical, crochet
+style: Connector
+
+[Shape]
+BeginX = 5 mm
+BeginX.us = 0.2 in
+BeginY = 10 mm
+BeginY.us = 0.4 in
+EndX = 35 mm
+EndX.us = 1.4 in
+EndY = 10 mm
+EndY.us = 0.4 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+ObjType = 2
+GlueType = 2
+ShapeRouteStyle = 5
+ConLineRouteExt = 1
+ConFixedCode = 0
+NoAlignBox = TRUE
+DynFeedback = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Controls.TextPosition
+TxtPinY = Controls.TextPosition.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# der Abstand, mit dem der gezeichnete Verlauf um die Shapes herumführt
+Gap:  Value = 6 mm
+      Value.us = 0.25 in
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = 0; Y = MIN(Height,0)-User.Gap
+LineTo  X = Width; Y = MIN(Height,0)-User.Gap
+LineTo  X = Width; Y = Height
+
+[Controls]
+TextPosition:  X = Width*0.5; Y = MIN(Height,0)-User.Gap
+        XDyn = Controls.TextPosition; YDyn = Controls.TextPosition.Y
+        XCon = IF(OR(STRSAME(SHAPETEXT(TheText),""),HideText),5,0); YCon = 0; CanGlue = FALSE
+        Tip.de = "Text verschieben"
+        Tip.en = "Move the text"
+        Tip.es = "Mover el texto"
+        Tip.it = "Sposta il testo"
+        Tip.fr = "Déplacer le texte"

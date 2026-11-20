@@ -1,0 +1,49 @@
+# Doppelspitze: eine gerade Linie als 1D-Shape (Height 0) mit Pfeilspitzen an beiden Enden; der
+# Anfang trägt dieselbe Spitze wie das Ende (BeginArrow = EndArrow, BeginArrowSize =
+# EndArrowSize, beide aus der Formatvorlage "Connector", also aus dem Design).  Sie liegt auf der
+# Linie vom Anfang zum Ende und dreht sich mit ihr, die Enden kleben (GlueType 2 auch an das
+# ganze Shape).  Der Text steht in der Mitte der Linie.
+master: Double arrowhead
+name.de: Doppelspitze
+name.en: Double arrowhead
+name.es: Punta doble
+name.it: Punta doppia
+name.fr: Double pointe
+style: Connector
+prompt.de: Linie mit Pfeilspitzen an beiden Enden, deren Enden an Shapes kleben.
+prompt.en: Line with arrowheads at both ends whose ends glue to shapes.
+prompt.es: Línea con puntas de flecha en ambos extremos cuyos extremos se pegan a las formas.
+prompt.it: Linea con punte di freccia a entrambe le estremità le cui estremità si incollano alle forme.
+prompt.fr: Ligne avec des pointes de flèche aux deux extrémités dont les extrémités se collent aux formes.
+keywords.de: Linie, Doppelpfeil, beide Richtungen, Pfeilspitzen, Wechselwirkung, Verbindung
+keywords.en: line, double arrow, both ways, arrowheads, interaction, connection
+keywords.es: línea, flecha doble, ambos sentidos, puntas de flecha, interacción, conexión
+keywords.it: linea, freccia doppia, due direzioni, punte di freccia, interazione, collegamento
+keywords.fr: ligne, double flèche, deux sens, pointes de flèche, interaction, connexion
+
+[Shape]
+BeginX = 0 mm
+BeginY = 2.5 mm
+BeginY.us = 0.1 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 2.5 mm
+EndY.us = 0.1 in
+Height = 0 mm
+Height.us = 0 in
+GlueType = 2
+BeginArrow = EndArrow
+BeginArrowSize = EndArrowSize
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width; Y = Height*0.5

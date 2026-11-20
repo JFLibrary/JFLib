@@ -1,0 +1,38 @@
+# Fünfeck: regelmäßig, eine Ecke oben; die Ecken als Anteile des Kastens, der genau so breit und
+# hoch ist wie das Fünfeck
+master: Pentagon
+name.de: Fünfeck
+name.en: Pentagon
+name.es: Pentágono
+name.it: Pentagono
+name.fr: Pentagone
+prompt.de: Regelmäßiges Fünfeck mit einer Spitze oben.
+prompt.en: Regular pentagon with a point at the top.
+prompt.es: Pentágono regular con un vértice arriba.
+prompt.it: Pentagono regolare con un vertice in alto.
+prompt.fr: Pentagone régulier avec une pointe en haut.
+keywords.de: Fünfeck, fünf, Pentagon, Vieleck, Polygon, regelmäßig, Ecken
+keywords.en: pentagon, five, five-sided, polygon, regular, corners
+keywords.es: pentágono, cinco, cinco lados, polígono, regular, esquinas
+keywords.it: pentagono, cinque, cinque lati, poligono, regolare, angoli
+keywords.fr: pentagone, cinq, cinq côtés, polygone, régulier, coins
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 28.5 mm
+Height.us = 1.19 in
+
+[Geometry]
+MoveTo  X = Width*0.5; Y = Height
+LineTo  X = 0; Y = Height*0.618034
+LineTo  X = Width*0.190983; Y = 0
+LineTo  X = Width*0.809017; Y = 0
+LineTo  X = Width; Y = Height*0.618034
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.618034; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.618034; DirX = 1; DirY = 0

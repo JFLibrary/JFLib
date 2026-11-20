@@ -1,0 +1,58 @@
+# Einfacher Doppelpfeil: Blockpfeil mit Spitzen nach links und rechts.  Ein Steuerpunkt an der
+# inneren Ecke zwischen Schaft und rechter Spitze: waagrecht der Beginn der Spitzen (beide gleich
+# lang), senkrecht die Dicke des Schafts (beide anteilig, der Pfeil skaliert mit).
+# Verbindungspunkte an beiden Spitzen.
+master: Simple double arrow
+name.de: Einfacher Doppelpfeil
+name.en: Simple double arrow
+name.es: Flecha doble simple
+name.it: Freccia doppia semplice
+name.fr: Flèche double simple
+prompt.de: Blockpfeil mit Spitzen an beiden Enden. Spitzen und Schaft ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Block arrow with heads at both ends. Drag the yellow control handle to change the heads and the shaft.
+prompt.es: Flecha de bloque con puntas en ambos extremos. Arrastre el controlador amarillo para cambiar las puntas y el cuerpo.
+prompt.it: Freccia a blocco con punte a entrambe le estremità. Trascina la maniglia di controllo gialla per cambiare le punte e il corpo.
+prompt.fr: Flèche pleine avec des pointes aux deux extrémités. Faites glisser la poignée de contrôle jaune pour modifier les pointes et le corps.
+keywords.de: Doppelpfeil, Pfeil, beide Richtungen, links, rechts, Austausch, Wechselwirkung
+keywords.en: double arrow, arrow, both ways, left, right, exchange, interaction
+keywords.es: flecha doble, flecha, ambos sentidos, izquierda, derecha, intercambio, interacción
+keywords.it: freccia doppia, freccia, due direzioni, sinistra, destra, scambio, interazione
+keywords.fr: double flèche, flèche, deux sens, gauche, droite, échange, interaction
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# die Länge der Spitzen, der halbe Schaft
+Hl:     Value = MIN(MAX(Width-Controls.Row_1, 0), Width*0.5)
+Shaft:  Value = MIN(MAX(Controls.Row_1.Y-Height*0.5, 0), Height*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = User.Hl; Y = 0
+LineTo  X = User.Hl; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.Hl; Y = Height
+LineTo  X = Width-User.Hl; Y = Height*0.5+User.Shaft
+LineTo  X = User.Hl; Y = Height*0.5+User.Shaft
+LineTo  X = User.Hl; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.7; Y = Height*0.75
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Spitzen und Schaft ändern"
+        Tip.en = "Change the heads and the shaft"
+        Tip.es = "Cambiar las puntas y el cuerpo"
+        Tip.it = "Cambia le punte e il corpo"
+        Tip.fr = "Modifier les pointes et le corps"
+
+[Connection]
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0

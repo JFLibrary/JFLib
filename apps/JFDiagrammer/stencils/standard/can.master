@@ -1,0 +1,67 @@
+# Dose: ein stehender Zylinder, Ellipsenbögen durch die Mitte wie bei der Datenbank.  Row_1 am
+# unteren Punkt des Deckels ändert seine Höhe (nur senkrecht, Abstand von oben: der Deckel bleibt
+# beim Strecken gleich hoch).  Der Text steht unter dem Deckel.
+master: Can
+name.de: Dose
+name.en: Can
+name.es: Lata
+name.it: Barattolo
+name.fr: Boîte cylindrique
+prompt.de: Stehender Zylinder mit Deckel. Mit dem gelben Steuerpunkt ändern Sie die Höhe des Deckels.
+prompt.en: Upright cylinder with a lid. Drag the yellow control handle to change the height of the lid.
+prompt.es: Cilindro vertical con tapa. Arrastre el controlador amarillo para cambiar la altura de la tapa.
+prompt.it: Cilindro verticale con coperchio. Trascina la maniglia di controllo gialla per cambiare l'altezza del coperchio.
+prompt.fr: Cylindre debout avec un couvercle. Faites glisser la poignée de contrôle jaune pour modifier la hauteur du couvercle.
+keywords.de: Dose, Zylinder, Tonne, Speicher, Behälter, Datenbank, Walze
+keywords.en: can, cylinder, drum, storage, container, database, tank
+keywords.es: lata, cilindro, bidón, almacenamiento, contenedor, base de datos
+keywords.it: barattolo, cilindro, fusto, archivio, contenitore, database
+keywords.fr: boîte, cylindre, fût, stockage, conteneur, base de données
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 40 mm
+Height.us = 1.5 in
+TxtWidth = Width
+TxtHeight = Height-User.Ry*2
+TxtPinX = Width*0.5
+TxtPinY = (Height-User.Ry*2)*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die senkrechte Halbachse des Deckels und das Verhältnis der Halbachsen
+Ry:     Value = MIN(MAX((Height-Controls.Row_1.Y)*0.5,Height*0.02),Height*0.25)
+Ratio:  Value = Width*0.5/User.Ry
+
+# 1 der Zylinder
+[Geometry]
+MoveTo  X = 0; Y = Height-User.Ry
+LineTo  X = 0; Y = User.Ry
+EllipticalArcTo  X = Width; Y = User.Ry; A = Width*0.5; B = 0; C = 0 deg; D = User.Ratio
+LineTo  X = Width; Y = Height-User.Ry
+EllipticalArcTo  X = 0; Y = Height-User.Ry; A = Width*0.5; B = Height; C = 0 deg; D = User.Ratio
+
+# 2 der vordere Rand des Deckels
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height-User.Ry
+EllipticalArcTo  X = Width; Y = Height-User.Ry; A = Width*0.5; B = Height-User.Ry*2; C = 0 deg; D = User.Ratio
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height-8 mm
+        Y.us = Height-0.3 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 4; CanGlue = FALSE
+        Tip.de = "Höhe des Deckels ändern"
+        Tip.en = "Change the height of the lid"
+        Tip.es = "Cambiar la altura de la tapa"
+        Tip.it = "Cambia l'altezza del coperchio"
+        Tip.fr = "Modifier la hauteur du couvercle"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

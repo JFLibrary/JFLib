@@ -1,0 +1,41 @@
+# Kreis vom Mittelpunkt: ein 1D-Shape (README: 1D-Shapes) vom Mittelpunkt zum Rand, Visios
+# 1D-Formeln aus dem Werkzeug; Width ist also der Radius, der Kasten dreht sich mit dem Ende. Die
+# Ellipse-Zeile zeichnet den Kreis um den Anfang.  Der Text steht in der Mitte, aufrecht (TxtAngle
+# gleicht Angle aus).  Keine Verbindungspunkte (1D), die Enden kleben.
+master: Circle from center
+name.de: Kreis vom Mittelpunkt
+name.en: Circle from center
+name.es: Círculo desde el centro
+name.it: Cerchio dal centro
+name.fr: Cercle à partir du centre
+prompt.de: Kreis, der vom Mittelpunkt aus aufgezogen wird: der Anfang ist die Mitte, das Ende liegt auf dem Rand.
+prompt.en: Circle drawn out from its center: the begin point is the center, the end point lies on the rim.
+prompt.es: Círculo que se traza desde el centro: el punto inicial es el centro y el final está en el borde.
+prompt.it: Cerchio tracciato dal centro: il punto iniziale è il centro, quello finale sta sul bordo.
+prompt.fr: Cercle tracé à partir du centre : le point de début est le centre, le point de fin est sur le bord.
+keywords.de: Kreis, Mittelpunkt, Radius, Zirkel, Umkreis, Reichweite
+keywords.en: circle, center, radius, compass, range, reach
+keywords.es: círculo, centro, radio, compás, alcance, perímetro
+keywords.it: cerchio, centro, raggio, compasso, portata, raggio d'azione
+keywords.fr: cercle, centre, rayon, compas, portée, périmètre
+
+[Shape]
+BeginX = 15 mm
+BeginX.us = 0.625 in
+BeginY = 15 mm
+BeginY.us = 0.625 in
+EndX = 30 mm
+EndX.us = 1.25 in
+EndY = 15 mm
+EndY.us = 0.625 in
+Height = 0 mm
+TxtPinX = 0
+TxtPinY = Height*0.5
+TxtWidth = Width*1.4
+TxtHeight = Width*1.4
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = -Angle
+
+[Geometry]
+Ellipse  X = 0; Y = Height*0.5; A = Width; B = Height*0.5; C = 0; D = Height*0.5+Width

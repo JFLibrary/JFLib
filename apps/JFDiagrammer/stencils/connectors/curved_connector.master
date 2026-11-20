@@ -1,0 +1,47 @@
+# Kurvenverbinder: ein 1D-Shape, dessen Kasten aufrecht bleibt wie beim dynamischen Verbinder
+# (Width = EndX-BeginX, Height = EndY-BeginY, beide dürfen negativ sein, Angle 0).  Die Kurve
+# ist ein kubisches Bézierstück vom Anfang zum Ende mit waagrechten Tangenten an beiden Enden
+# (RelCubBezTo in Anteilen des Kastens): er verbindet Seite mit Seite.  Die Enden kleben, mit
+# GlueType 2 auch an das ganze Shape.  Der Text steht in der Mitte der Kurve.
+master: Curved connector
+name.de: Kurvenverbinder
+name.en: Curved connector
+name.es: Conector curvo
+name.it: Connettore curvo
+name.fr: Connecteur courbe
+prompt.de: Geschwungener Verbinder von Seite zu Seite. Ziehen Sie seine Enden auf Shapes.
+prompt.en: Curved connector from side to side. Drag its ends onto shapes.
+prompt.es: Conector curvo de lado a lado. Arrastre sus extremos sobre las formas.
+prompt.it: Connettore curvo da lato a lato. Trascina le sue estremità sulle forme.
+prompt.fr: Connecteur courbe d'un côté à l'autre. Faites glisser ses extrémités sur les formes.
+keywords.de: Verbinder, Kurve, geschwungen, Bogen, Linie, Pfeil, verbinden
+keywords.en: connector, curve, curved, arc, line, arrow, connect
+keywords.es: conector, curva, curvo, arco, línea, flecha, conectar
+keywords.it: connettore, curva, curvo, arco, linea, freccia, collegare
+keywords.fr: connecteur, courbe, arc, ligne, flèche, connecter, relier
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 0 mm
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 20 mm
+EndY.us = 0.75 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+GlueType = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+RelMoveTo    X = 0; Y = 0
+RelCubBezTo  X = 1; Y = 1; A = 0.5; B = 0; C = 0.5; D = 1

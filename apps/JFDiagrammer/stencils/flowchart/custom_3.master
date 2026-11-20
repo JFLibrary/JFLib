@@ -1,0 +1,62 @@
+# Benutzerdefiniert 3: eine frei belegbare Form, eine Fahne -- ein Rechteck mit einer dreieckigen
+# Kerbe in der rechten Seite.  Row_1 in der Spitze der Kerbe ändert ihre Tiefe (nur waagrecht, als
+# Abstand von rechts: sie bleibt beim Verbreitern gleich).  Der rechte Verbindungspunkt liegt in
+# der Spitze der Kerbe.
+master: Custom 3
+name.de: Benutzerdefiniert 3
+name.en: Custom 3
+name.es: Personalizado 3
+name.it: Personalizzato 3
+name.fr: Personnalisé 3
+prompt.de: Eine frei belegbare Form: eine Fahne mit Kerbe. Mit dem gelben Steuerpunkt ändern Sie die Tiefe der Kerbe.
+prompt.en: A shape for your own meaning: a flag with a notch. Drag the yellow control handle to change the depth of the notch.
+prompt.es: Una forma para el significado que usted elija: una bandera con muesca. Arrastre el controlador amarillo para cambiar la profundidad de la muesca.
+prompt.it: Una forma dal significato libero: una bandiera con tacca. Trascina la maniglia di controllo gialla per cambiare la profondità della tacca.
+prompt.fr: Une forme à la signification libre : un drapeau avec une encoche. Faites glisser la poignée de contrôle jaune pour modifier la profondeur de l'encoche.
+keywords.de: benutzerdefiniert, Fahne, Wimpel, Kerbe, frei, eigene Bedeutung, Flussdiagramm
+keywords.en: custom, flag, pennant, notch, free, own meaning, flowchart
+keywords.es: personalizado, bandera, banderín, muesca, libre, significado propio, diagrama de flujo
+keywords.it: personalizzato, bandiera, gagliardetto, tacca, libero, significato proprio, diagramma di flusso
+keywords.fr: personnalisé, drapeau, fanion, encoche, libre, signification propre, diagramme de flux
+
+[Shape]
+Width = 36 mm
+Width.us = 1.5 in
+Height = 24 mm
+Height.us = 1 in
+TxtWidth = Width-User.Notch
+TxtHeight = Height
+TxtPinX = (Width-User.Notch)*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+msvShapeCategories:  Value = "Flowchart"
+# die Tiefe der Kerbe
+Notch:  Value = MIN(MAX(Width-Controls.Row_1, 0), Width*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width-User.Notch; Y = Height*0.5
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width-6 mm; Y = Height*0.5
+        X.us = Width-0.25 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Tiefe der Kerbe ändern"
+        Tip.en = "Change the depth of the notch"
+        Tip.es = "Cambiar la profundidad de la muesca"
+        Tip.it = "Cambia la profondità della tacca"
+        Tip.fr = "Modifier la profondeur de l'encoche"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width-User.Notch; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

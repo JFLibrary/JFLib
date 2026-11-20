@@ -1,0 +1,67 @@
+# Geschweifte Klammer links: eine offene Linie ohne Füllung aus vier Viertelellipsenbögen durch
+# den 45°-Punkt (Halbachsen halbe Breite und R) und zwei geraden Stücken, die Spitze in der Mitte.
+# Row_1 am unteren Ende des unteren geraden Stücks ändert R (nur senkrecht, Abstand von unten).
+# Der Textblock liegt rechts neben der Klammer.
+master: Left brace
+name.de: Geschweifte Klammer links
+name.en: Left brace
+name.es: Llave izquierda
+name.it: Parentesi graffa sinistra
+name.fr: Accolade gauche
+prompt.de: Geschweifte Klammer als Linie, der Text rechts daneben. Mit dem gelben Steuerpunkt ändern Sie die Rundung der Bögen.
+prompt.en: Brace drawn as a line, the text beside it on the right. Drag the yellow control handle to change the curve of the bends.
+prompt.es: Llave dibujada como línea, con el texto al lado a la derecha. Arrastre el controlador amarillo para cambiar la curvatura de los arcos.
+prompt.it: Parentesi graffa disegnata come linea, con il testo accanto a destra. Trascina la maniglia di controllo gialla per cambiare la curvatura degli archi.
+prompt.fr: Accolade dessinée comme un trait, le texte à côté à droite. Faites glisser la poignée de contrôle jaune pour modifier la courbure des arcs.
+keywords.de: Klammer, geschweifte Klammer, links, Gruppe, zusammenfassen, Bereich
+keywords.en: brace, curly bracket, left, group, enclose, range
+keywords.es: llave, izquierda, grupo, agrupar, encerrar, rango
+keywords.it: parentesi graffa, graffa, sinistra, gruppo, racchiudere, intervallo
+keywords.fr: accolade, gauche, groupe, regrouper, encadrer, plage
+
+[Shape]
+Width = 5 mm
+Width.us = 0.2 in
+Height = 30 mm
+Height.us = 1.25 in
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = Height
+TxtPinX = Width
+TxtPinY = Height*0.5
+TxtLocPinX = 0
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Höhe der Bögen und das Verhältnis ihrer Halbachsen
+R:      Value = MIN(MAX(Controls.Row_1.Y,Height*0.02),Height*0.25)
+Ratio:  Value = Width*0.5/User.R
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width; Y = Height
+EllipticalArcTo  X = Width*0.5; Y = Height-User.R; A = Width*0.646447; B = Height-User.R*0.292893; C = 0 deg; D = User.Ratio
+LineTo  X = Width*0.5; Y = Height*0.5+User.R
+EllipticalArcTo  X = 0; Y = Height*0.5; A = Width*0.353553; B = Height*0.5+User.R*0.292893; C = 0 deg; D = User.Ratio
+EllipticalArcTo  X = Width*0.5; Y = Height*0.5-User.R; A = Width*0.353553; B = Height*0.5-User.R*0.292893; C = 0 deg; D = User.Ratio
+LineTo  X = Width*0.5; Y = User.R
+EllipticalArcTo  X = Width; Y = 0; A = Width*0.646447; B = User.R*0.292893; C = 0 deg; D = User.Ratio
+
+[Paragraph]
+Row  HorzAlign = 0
+
+[Controls]
+Row_1:  X = Width*0.5; Y = 4 mm
+        Y.us = 0.15 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 2; CanGlue = FALSE
+        Tip.de = "Rundung der Enden ändern"
+        Tip.en = "Change the curve of the ends"
+        Tip.es = "Cambiar la curvatura de los extremos"
+        Tip.it = "Cambia la curvatura delle estremità"
+        Tip.fr = "Modifier la courbure des extrémités"
+
+[Connection]
+Row  X = Width; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

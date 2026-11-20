@@ -1,0 +1,104 @@
+# Pfeilblock in vier Richtungen: ein Block in der Mitte mit je einem Pfeil nach rechts, oben,
+# links und unten, ein Umriss.  Row_1 an der rechten oberen Ecke des Blocks ändert seine Größe
+# (symmetrisch, anteilig), Row_2 an der oberen Ecke der rechten Spitze Länge (waagrecht) und
+# Breite (senkrecht) aller Spitzen; der Schaft ist halb so dick wie die Spitze und nie dicker als
+# der Block.  Die Spitzen stoßen nie aneinander.  Der Text steht im Block; Verbindungspunkte an
+# den vier Spitzen.
+master: Quad arrow block
+name.de: Pfeilblock in vier Richtungen
+name.en: Quad arrow block
+name.es: Bloque con flechas en cuatro direcciones
+name.it: Blocco con frecce in quattro direzioni
+name.fr: Bloc à flèches dans quatre directions
+prompt.de: Block mit Pfeilen in alle vier Richtungen. Block und Pfeile ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Block with arrows pointing in all four directions. Drag the yellow control handles to change the block and the arrows.
+prompt.es: Bloque con flechas en las cuatro direcciones. Arrastre los controladores amarillos para cambiar el bloque y las flechas.
+prompt.it: Blocco con frecce in tutte e quattro le direzioni. Trascina le maniglie di controllo gialle per cambiare il blocco e le frecce.
+prompt.fr: Bloc avec des flèches dans les quatre directions. Faites glisser les poignées de contrôle jaunes pour modifier le bloc et les flèches.
+keywords.de: Pfeilblock, Block, vier Richtungen, Zentrale, Verteiler, Mitte
+keywords.en: arrow block, block, four-way, hub, distributor, centre
+keywords.es: bloque de flechas, bloque, cuatro direcciones, centro, distribuidor
+keywords.it: blocco con frecce, blocco, quattro direzioni, centro, distributore
+keywords.fr: bloc fléché, bloc, quatre directions, centre, répartiteur
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 40 mm
+Height.us = 1.5 in
+TxtWidth = User.Bx*2
+TxtHeight = User.By*2
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Mitte, die halbe Breite und Höhe des Blocks, die Länge und die halbe Breite der Spitzen,
+# der halbe Schaft
+Cx:  Value = Width*0.5
+Cy:  Value = Height*0.5
+Bx:  Value = MIN(MAX(Controls.Row_1-User.Cx, Width*0.1), Width*0.4)
+By:  Value = MIN(MAX(Controls.Row_1.Y-User.Cy, Height*0.1), Height*0.4)
+Hl:  Value = MIN(MAX(Width-Controls.Row_2, 0), Width*0.5-User.Bx, Height*0.5-User.By)
+Hw:  Value = MIN(MAX(Controls.Row_2.Y-User.Cy, 0), Width*0.5-User.Hl, Height*0.5-User.Hl)
+S:   Value = MIN(User.Hw*0.5, User.Bx, User.By)
+
+[Geometry]
+MoveTo  X = Width; Y = User.Cy
+LineTo  X = Width-User.Hl; Y = User.Cy+User.Hw
+LineTo  X = Width-User.Hl; Y = User.Cy+User.S
+LineTo  X = User.Cx+User.Bx; Y = User.Cy+User.S
+LineTo  X = User.Cx+User.Bx; Y = User.Cy+User.By
+LineTo  X = User.Cx+User.S; Y = User.Cy+User.By
+LineTo  X = User.Cx+User.S; Y = Height-User.Hl
+LineTo  X = User.Cx+User.Hw; Y = Height-User.Hl
+LineTo  X = User.Cx; Y = Height
+LineTo  X = User.Cx-User.Hw; Y = Height-User.Hl
+LineTo  X = User.Cx-User.S; Y = Height-User.Hl
+LineTo  X = User.Cx-User.S; Y = User.Cy+User.By
+LineTo  X = User.Cx-User.Bx; Y = User.Cy+User.By
+LineTo  X = User.Cx-User.Bx; Y = User.Cy+User.S
+LineTo  X = User.Hl; Y = User.Cy+User.S
+LineTo  X = User.Hl; Y = User.Cy+User.Hw
+LineTo  X = 0; Y = User.Cy
+LineTo  X = User.Hl; Y = User.Cy-User.Hw
+LineTo  X = User.Hl; Y = User.Cy-User.S
+LineTo  X = User.Cx-User.Bx; Y = User.Cy-User.S
+LineTo  X = User.Cx-User.Bx; Y = User.Cy-User.By
+LineTo  X = User.Cx-User.S; Y = User.Cy-User.By
+LineTo  X = User.Cx-User.S; Y = User.Hl
+LineTo  X = User.Cx-User.Hw; Y = User.Hl
+LineTo  X = User.Cx; Y = 0
+LineTo  X = User.Cx+User.Hw; Y = User.Hl
+LineTo  X = User.Cx+User.S; Y = User.Hl
+LineTo  X = User.Cx+User.S; Y = User.Cy-User.By
+LineTo  X = User.Cx+User.Bx; Y = User.Cy-User.By
+LineTo  X = User.Cx+User.Bx; Y = User.Cy-User.S
+LineTo  X = Width-User.Hl; Y = User.Cy-User.S
+LineTo  X = Width-User.Hl; Y = User.Cy-User.Hw
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.75; Y = Height*0.75
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Größe des Blocks ändern"
+        Tip.en = "Change the size of the block"
+        Tip.es = "Cambiar el tamaño del bloque"
+        Tip.it = "Cambia la dimensione del blocco"
+        Tip.fr = "Modifier la taille du bloc"
+Row_2:  X = Width*0.85; Y = Height*0.625
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Länge und Breite der Spitzen ändern"
+        Tip.en = "Change the length and width of the heads"
+        Tip.es = "Cambiar la longitud y el ancho de las puntas"
+        Tip.it = "Cambia la lunghezza e la larghezza delle punte"
+        Tip.fr = "Modifier la longueur et la largeur des pointes"
+
+[Connection]
+Row  X = User.Cx; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = User.Cy; DirX = -1; DirY = 0
+Row  X = User.Cx; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.Cy; DirX = 1; DirY = 0

@@ -49,20 +49,15 @@ Weitere Shapes	More Shapes	Más formas	Altre forme	Plus de formes
 Zeichenfläche	Drawing canvas	Lienzo de dibujo	Area di disegno	Zone de dessin
 Seite {} von {}	Page {} of {}	Página {} de {}	Pagina {} di {}	Page {} sur {}
 {} %	{}%	{} %	{}%	{} %
-Eine leere Seite ohne Schablonen.	A blank page without stencils.	Una página en blanco sin ninguna colección de formas.	Una pagina vuota senza alcuna raccolta di forme.	Une page vierge sans bibliothèque de formes.
-Leere Zeichnung	Blank Drawing	Dibujo en blanco	Disegno vuoto	Dessin vierge
-Einfache Formen, Pfeile und Beschriftungen für allgemeine Diagramme.	Basic shapes, arrows and callouts for general diagrams.	Formas básicas, flechas y llamadas para diagramas generales.	Forme di base, frecce e richiami per diagrammi generici.	Formes simples, flèches et bulles d'annotation pour les diagrammes courants.
-Standarddiagramm	Basic Diagram	Diagrama básico	Diagramma di base	Diagramme de base
-Prozessschritte, Entscheidungen und Verbinder nach ISO 5807.	Process steps, decisions and connectors following ISO 5807.	Pasos de proceso, decisiones y conectores según ISO 5807.	Fasi di processo, decisioni e connettori secondo ISO 5807.	Étapes de processus, décisions et connecteurs selon la norme ISO 5807.
-Standardflussdiagramm	Basic Flowchart	Diagrama de flujo básico	Diagramma di flusso di base	Diagramme de flux de base
-Ein Ablauf in Bahnen je Abteilung oder Rolle.	A process in lanes by department or role.	Un proceso en calles por departamento o función.	Un processo in corsie per reparto o ruolo.	Un processus en couloirs par service ou rôle.
+Alle Vorlagen	All Templates	Todas las plantillas	Tutti i modelli	Tous les modèles
+Meine Vorlagen	My Templates	Mis plantillas	I miei modelli	Mes modèles
+Leer	Blank	En blanco	Vuoto	Vierge
+Hier erscheinen Ihre eigenen Vorlagen. Speichern Sie eine Zeichnung unter Datei › Speichern unter › Als Vorlage, oder legen Sie Vorlagen (.vstx) in diesen Ordner: {}	Your own templates appear here. Save a drawing with File › Save As › As Template, or put templates (.vstx) into this folder: {}	Aquí aparecen sus propias plantillas. Guarde un dibujo con Archivo › Guardar como › Como plantilla o coloque plantillas (.vstx) en esta carpeta: {}	Qui vengono visualizzati i modelli personali. Salvare un disegno con File › Salva con nome › Come modello oppure inserire modelli (.vstx) in questa cartella: {}	Vos propres modèles apparaissent ici. Enregistrez un dessin avec Fichier › Enregistrer sous › Comme modèle ou placez des modèles (.vstx) dans ce dossier : {}
+Als Vorlage	As Template	Como plantilla	Come modello	Comme modèle
+Die Zeichnung als Vorlage (.vstx) im Ordner Ihrer Vorlagen speichern; die offenen Schablonen gehen mit	Save the drawing as a template (.vstx) in your templates folder; the open stencils go with it	Guardar el dibujo como plantilla (.vstx) en la carpeta de sus plantillas; las colecciones de formas abiertas se guardan con ella	Salvare il disegno come modello (.vstx) nella cartella dei modelli personali; le raccolte di forme aperte vengono salvate con esso	Enregistrer le dessin comme modèle (.vstx) dans le dossier de vos modèles ; les bibliothèques de formes ouvertes sont enregistrées avec lui
+Hinweise zur Vorlage	Notes on the template	Notas sobre la plantilla	Note sul modello	Remarques sur le modèle
+Diese Schablonen der Vorlage wurden nicht gefunden: {}	These stencils of the template were not found: {}	No se encontraron estas colecciones de formas de la plantilla: {}	Non sono state trovate queste raccolte di forme del modello: {}	Ces bibliothèques de formes du modèle sont introuvables : {}
 Funktionsübergreifendes Flussdiagramm	Cross-Functional Flowchart	Diagrama de flujo multifuncional	Diagramma di flusso multifunzione	Diagramme de flux interfonctionnel
-Rechner, Server und Netzwerkgeräte mit Verbindungen.	Computers, servers and network devices with their connections.	Equipos, servidores y dispositivos de red con sus conexiones.	Computer, server e dispositivi di rete con i relativi collegamenti.	Ordinateurs, serveurs et périphériques réseau avec leurs connexions.
-Standardnetzwerk	Basic Network	Red básica	Rete di base	Réseau de base
-Detailliertes Netzwerk	Detailed Network	Red detallada	Rete dettagliata	Réseau détaillé
-Netzwerkpläne mit Geräten, Racks und Verkabelung im Detail.	Detailed network plans with devices, racks and cabling.	Planos de red detallados con dispositivos, racks y cableado.	Schemi di rete dettagliati con dispositivi, rack e cablaggio.	Plans réseau détaillés avec appareils, racks et câblage.
-Geräte in Racks nach Höheneinheiten.	Devices in racks by rack unit.	Dispositivos en racks por unidades de altura.	Dispositivi in rack per unità di altezza.	Appareils en rack par unités de hauteur.
-Rack-Diagramm	Rack Diagram	Diagrama de rack	Diagramma rack	Diagramme de rack
 Neu	New	Nuevo	Nuovo	Nouveau
 Exportieren	Export	Exportar	Esporta	Exporter
 Info	Info	Información	Informazioni	Informations

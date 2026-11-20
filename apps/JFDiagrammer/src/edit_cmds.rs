@@ -346,9 +346,3 @@ pub(crate) fn edit_text(app: &mut Diagrammer, ui: &mut Ui) {
         crate::edit_text::begin(app, ui, k, None);
     }
 }
-
-/// Neu › Leere Zeichnung
-pub(crate) fn new_drawing(app: &mut Diagrammer, ui: &mut Ui) {
-    let us = app.units_us == 1;
-    edit_doc::new_drawing(app, ui, us);
-}

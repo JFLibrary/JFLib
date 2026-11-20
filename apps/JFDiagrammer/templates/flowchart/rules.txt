@@ -1,0 +1,61 @@
+# Regelsatz „Flussdiagramm“ (VL-20, DA-10): eigene Regeln mit Visios Prüffunktionen.  Die
+# Flussdiagramm-Shapes tragen die Kategorie Flowchart, Entscheidungen zusätzlich Decision, Start/Ende
+# zusätzlich Terminator (User.msvShapeCategories, Schablone flowchart).
+ruleset: Flowchart
+name.de: Flussdiagramm
+name.en: Flowchart
+name.es: Diagrama de flujo
+name.it: Diagramma di flusso
+name.fr: Organigramme
+description.de: Prüft, ob das Flussdiagramm vollständig verbunden und beschriftet ist.
+description.en: Checks that the flowchart is fully connected and labelled.
+description.es: Comprueba que el diagrama de flujo esté totalmente conectado y rotulado.
+description.it: Verifica che il diagramma di flusso sia completamente collegato ed etichettato.
+description.fr: Vérifie que l'organigramme est entièrement connecté et légendé.
+
+[Rules]
+# Verbinder sind bei Visio die 1D-Shapes (ein Shape mit BeginX, ohne eigenes Kennzeichen);
+# ObjType 2 („verlegbar“) macht einen davon zum dynamischen Verbinder.  Die Schablone „Verbinder“
+# hat beides: dynamische Verbinder und feste Verbinder (Linien, Kurven-, Winkel-, Hohlverbinder,
+# ohne ObjType 2).  IS1D() erfasst alle; ROLE()=1 ist nur für Verbinder dokumentiert, ohne zu
+# sagen, ob feste 1D-Shapes dazugehören.
+UngluedConnector: Target = 0
+    Filter = "IS1D()"
+    Test = "AND(AGGCOUNT(GLUEDSHAPES(4))=1,AGGCOUNT(GLUEDSHAPES(5))=1)"
+    Category.de = "Verbindungen"; Category.en = "Connectivity"; Category.es = "Conectividad"
+    Category.it = "Connettività"; Category.fr = "Connectivité"
+    Description.de = "Der Verbinder ist nicht an beiden Enden mit einem Shape verbunden."
+    Description.en = "The connector is not glued to a shape at both ends."
+    Description.es = "El conector no está pegado a una forma en ambos extremos."
+    Description.it = "Il connettore non è incollato a una forma a entrambe le estremità."
+    Description.fr = "Le connecteur n'est pas collé à une forme à ses deux extrémités."
+UnconnectedShape: Target = 0
+    Filter = "HASCATEGORY(""Flowchart"")"
+    Test = "AGGCOUNT(GLUEDSHAPES(0))>0"
+    Category.de = "Verbindungen"; Category.en = "Connectivity"; Category.es = "Conectividad"
+    Category.it = "Connettività"; Category.fr = "Connectivité"
+    Description.de = "Das Flussdiagramm-Shape ist mit keinem anderen Shape verbunden."
+    Description.en = "The flowchart shape is not connected to any other shape."
+    Description.es = "La forma del diagrama de flujo no está conectada a ninguna otra forma."
+    Description.it = "La forma del diagramma di flusso non è collegata a nessun'altra forma."
+    Description.fr = "La forme de l'organigramme n'est connectée à aucune autre forme."
+DecisionBranches: Target = 0
+    Filter = "HASCATEGORY(""Decision"")"
+    Test = "AGGCOUNT(GLUEDSHAPES(2))>=2"
+    Category.de = "Verbindungen"; Category.en = "Connectivity"; Category.es = "Conectividad"
+    Category.it = "Connettività"; Category.fr = "Connectivité"
+    Description.de = "Die Entscheidung hat weniger als zwei ausgehende Verbinder."
+    Description.en = "The decision has fewer than two outgoing connectors."
+    Description.es = "La decisión tiene menos de dos conectores de salida."
+    Description.it = "La decisione ha meno di due connettori in uscita."
+    Description.fr = "La décision a moins de deux connecteurs sortants."
+ShapeWithoutText: Target = 0
+    Filter = "HASCATEGORY(""Flowchart"")"
+    Test = "LEN(SHAPETEXT(TheText))>0"
+    Category.de = "Beschriftung"; Category.en = "Text"; Category.es = "Texto"
+    Category.it = "Testo"; Category.fr = "Texte"
+    Description.de = "Das Flussdiagramm-Shape hat keinen Text."
+    Description.en = "The flowchart shape has no text."
+    Description.es = "La forma del diagrama de flujo no tiene texto."
+    Description.it = "La forma del diagramma di flusso non ha testo."
+    Description.fr = "La forme de l'organigramme n'a pas de texte."

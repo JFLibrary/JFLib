@@ -18,9 +18,10 @@
 // How a stencil is built, in this order:
 // 1. stencil.txt and every master file are parsed and checked for the chosen measure: header
 //    keys, sections, row heads, cell names (each section's own list), the five languages of
-//    every language-suffixed key or cell, Width and Height as lengths, formulas that parse and
-//    call only functions the engine knows.  A ".metric" / ".us" line replaces the line
-//    without suffix.
+//    every language-suffixed key or cell, Width and Height as lengths or formulas (a box that
+//    fits its text: TEXTHEIGHT ...; not with svg:) (a 1-D master: BeginX, BeginY, EndX, EndY as
+//    lengths and Height), formulas that parse and call only functions the engine knows.  A
+//    ".metric" / ".us" line replaces the line without suffix.
 // 2. A new stencil (vsdx::new_document: the own styles and the NetLab theme) gets the masters in
 //    one transaction: the Master attributes (Name and Prompt in the build language,
 //    IsCustomName(U), IconSize 1, AlignName 2, MatchByName 0, IconUpdate 1, PatternFlags 0,
@@ -29,12 +30,17 @@
 //    the shape's size, scale 1:1 in mm or in, ShapeKeywords, the JFD_ User cells), the master
 //    shape with its cells, sections, text and the SVG geometry.  Constants are written as values
 //    with their unit (lengths in inches with U = MM, IN ...), everything else as a formula; the
-//    tool adds PinX / PinY (half the size), LocPinX = Width*0.5, LocPinY = Height*0.5.
+//    tool adds PinX / PinY (half the size), LocPinX = Width*0.5, LocPinY = Height*0.5.  A 1-D
+//    master (one that sets BeginX ...) gets Visio's 1-D formulas instead: PinX =
+//    GUARD((BeginX+EndX)/2), Width = GUARD(SQRT(...)), Angle = GUARD(ATAN2(EndY-BeginY,
+//    EndX-BeginX)), LocPin = GUARD(Width*0.5) ...; its master page is BeginX+EndX wide and
+//    BeginY+EndY high.
 // 3. Every reference of every formula must name something that is there (a cell of the sheet
 //    or of its styles, a single cell of the ShapeSheet's own list, Sheet.N of the master).  The
 //    formula engine computes every formula and its values are stored: a cell the engine keeps
 //    (unknown function, unknown section, cycle) or that comes out as an error is a build error
-//    naming the source line.  No stale value goes into the file.
+//    naming the source line.  No stale value goes into the file.  A master whose Width or
+//    Height is a formula gets its master page and pin from the computed size afterwards.
 // 4. Each master's icon is rendered from an instance on the stencil's page (stencil_icon.rs);
 //    the instance goes again, the page stays empty.
 //
@@ -62,8 +68,8 @@ use core::fmt;
 use diagram_core::formula::{self, CellPart, Engine, Keep, Outcome, SheetName, LOCKS};
 use diagram_core::instance::{self, join_fields, LANGS};
 use diagram_core::{
-    CellAddr, DocKind, Document, EditError, MasterRef, Owner, RowKey, SecKey, ShapeKind, SheetRef, StyleRefs, Text, Transaction,
-    Unit, Value,
+    CellAddr, DocKind, Document, EditError, MasterRef, Owner, RowKey, SecKey, ShapeKind, ShapeRef, SheetRef, StyleRefs, Text,
+    Transaction, Unit, Value,
 };
 
 use crate::stencil_icon;
@@ -169,7 +175,7 @@ const EFFECT_FAMILIES: &[&str] = &["Bevel", "Glow", "Reflection", "Sketch", "Rot
 const PAGE_CELLS: &[&str] = &["PageWidth", "PageHeight", "PageScale", "DrawingScale", "DrawingSizeType", "DrawingScaleType", "ShdwOffsetX", "ShdwOffsetY"];
 
 // a cell [Shape] may set
-fn shape_cell_known(name: &str) -> bool {
+pub(crate) fn shape_cell_known(name: &str) -> bool {
     SINGLE_CELLS.contains(&name) || LOCKS.contains(&name) || EFFECT_FAMILIES.iter().any(|p| name.starts_with(p) && name.len() > p.len())
 }
 
@@ -182,7 +188,7 @@ const GEO_SECTION_CELLS: &[&str] = &["NoFill", "NoLine", "NoShow", "NoSnap", "No
 const GEO_ROW_CELLS: &[&str] = &["X", "Y", "A", "B", "C", "D", "E"];
 
 // the cells of a row of a section (by its VSDX name)
-fn row_cells(model: &str) -> &'static [&'static str] {
+pub(crate) fn row_cells(model: &str) -> &'static [&'static str] {
     match model {
         "Connection" => &["X", "Y", "DirX", "DirY", "Type", "AutoGen", "Prompt", "A", "B", "C", "D"],
         "Control" => &["X", "Y", "XDyn", "YDyn", "XCon", "YCon", "CanGlue", "Tip"],
@@ -267,8 +273,13 @@ struct MasterInfo {
     hidden: bool,
     // (JD13) `scale: 1:N`: drawing units per page unit of the master page (1: no scale)
     scale: f64,
-    width: f64,
-    height: f64,
+    // the size of the master page: the shape's Width x Height (2-D), BeginX+EndX x BeginY+EndY
+    // (1-D), `size:` for a formula (JD13); None: Width or Height is a formula, the page takes the
+    // size the engine computes
+    width: Option<f64>,
+    height: Option<f64>,
+    // (1-D) the master sets BeginX, BeginY, EndX, EndY: PinX, Width, Angle ... follow the ends
+    one_d: bool,
     shape: Vec<Cell0>,
     sections: Vec<Sec0>,
     // the content for the UniqueID
@@ -276,7 +287,7 @@ struct MasterInfo {
 }
 
 // the values of a key in five languages (`required`: an error when there is none)
-fn five(file: &str, es: &[&Entry], key: &str, required: bool, line: u32) -> Result<Option<[String; 5]>, SourceError> {
+pub(crate) fn five(file: &str, es: &[&Entry], key: &str, required: bool, line: u32) -> Result<Option<[String; 5]>, SourceError> {
     let mut out: [Option<String>; 5] = Default::default();
     let mut first = None;
     for e in es.iter().filter(|e| e.name == key) {
@@ -296,14 +307,14 @@ fn five(file: &str, es: &[&Entry], key: &str, required: bool, line: u32) -> Resu
 }
 
 // the one entry of a key without language
-fn single<'e>(file: &str, es: &[&'e Entry], key: &str) -> Result<Option<&'e Entry>, SourceError> {
+pub(crate) fn single<'e>(file: &str, es: &[&'e Entry], key: &str) -> Result<Option<&'e Entry>, SourceError> {
     match es.iter().find(|e| e.name == key) {
         Some(e) if e.lang.is_some() => Err(err(file, e.line, format!("{key} hat keine Sprachendung"))),
         found => Ok(found.copied()),
     }
 }
 
-fn keys_known(file: &str, es: &[&Entry], known: &[&str]) -> Result<(), SourceError> {
+pub(crate) fn keys_known(file: &str, es: &[&Entry], known: &[&str]) -> Result<(), SourceError> {
     match es.iter().find(|e| !known.contains(&e.name.as_str())) {
         Some(e) => Err(err(file, e.line, format!("unbekannter Schlüssel {} (bekannt: {})", e.name, known.join(", ")))),
         None => Ok(()),
@@ -530,22 +541,77 @@ fn master_info(file: &str, text: &str, m: Measure, files: &dyn Fn(&str) -> Optio
         }
     }
     canon_cells(&mut canon, &shape);
-    // (JD13) `size: 482.6 mm x 88.9 mm`: the size of a master whose Width or Height is a formula
-    // (the rack: height from its height units); it sizes the master page and the pin
+    // (JD13) `size: 482.6 mm x 88.9 mm`: the size of a master whose Width or Height is a formula,
+    // also one drawn from an SVG (the rack: height from its height units); it sizes the master page
+    // and the pin
     let size = match single(file, &es, "size")? {
         None => None,
         Some(e) => Some(parse_size(&e.value).ok_or_else(|| err(file, e.line, format!("size: „{}“ ist keine Größe Breite x Höhe (z. B. 482.6 mm x 88.9 mm)", e.value)))?),
     };
-    let length = |n: &str, ix: usize| -> Result<f64, SourceError> {
-        match shape.iter().find(|c| c.name == n) {
-            None => Err(err(file, line, format!("{n} fehlt ([Shape] {n} = …, z. B. 40 mm)"))),
-            Some(Cell0 { val: CellVal::Plain(Value0::Num(x, u)), .. }) if *x > 0.0 && u.is_none_or(|u| u.dimension() == diagram_core::Dimension::Length) => Ok(*x),
-            Some(Cell0 { val: CellVal::Plain(Value0::Formula(_)), .. }) if size.is_some() => Ok(size.map_or(0.0, |s: [f64; 2]| s[ix])),
-            Some(c) => Err(err(file, c.line, format!("{n} muss eine positive Länge sein (z. B. 40 mm), eine Formel nur mit size: im Kopf"))),
-        }
+    let one_d = shape.iter().any(|c| ENDS.contains(&c.name.as_str()));
+    let (width, height) = if one_d {
+        let (w, h) = one_d_page(file, line, &shape)?;
+        (Some(w), Some(h))
+    } else {
+        let dim = |n: &str, ix: usize| -> Result<Option<f64>, SourceError> {
+            let formula = shape.iter().any(|c| c.name == n && matches!(c.val, CellVal::Plain(Value0::Formula(_))));
+            match size {
+                Some(s) if formula => Ok(Some(s[ix])),
+                _ => length(file, line, &shape, n, svg.is_none()),
+            }
+        };
+        (dim("Width", 0)?, dim("Height", 1)?)
     };
-    let (width, height) = (length("Width", 0)?, length("Height", 1)?);
-    Ok(MasterInfo { file: String::from(file), line, name_u, names, prompts, keywords, text, styles, svg, hidden, scale, width, height, shape, sections, canon })
+    Ok(MasterInfo { file: String::from(file), line, name_u, names, prompts, keywords, text, styles, svg, hidden, scale, width, height, one_d, shape, sections, canon })
+}
+
+// the cells that make a master 1-D (README: 1D-Shapes)
+const ENDS: [&str; 4] = ["BeginX", "BeginY", "EndX", "EndY"];
+
+// a length constant of [Shape]: Some(value) when the cell is one (no unit: inches), None when it
+// is something else; Err when it is missing
+fn length_const(file: &str, line: u32, shape: &[Cell0], n: &str, example: &str) -> Result<(Option<f64>, u32), SourceError> {
+    match shape.iter().find(|c| c.name == n) {
+        None => Err(err(file, line, format!("{n} fehlt ([Shape] {n} = …, z. B. {example})"))),
+        Some(Cell0 { val: CellVal::Plain(Value0::Num(x, u)), line, .. }) if u.is_none_or(|u| u.dimension() == diagram_core::Dimension::Length) => Ok((Some(*x), *line)),
+        Some(c) => Ok((None, c.line)),
+    }
+}
+
+// Width or Height of a 2-D master: a positive length constant, or (`formula`: the master has no
+// SVG drawing) a formula such as GUARD(MAX(10 mm, TEXTHEIGHT(TheText,Width))) -> None
+fn length(file: &str, line: u32, shape: &[Cell0], n: &str, formula: bool) -> Result<Option<f64>, SourceError> {
+    let is_formula = shape.iter().any(|c| c.name == n && matches!(c.val, CellVal::Plain(Value0::Formula(_))));
+    match length_const(file, line, shape, n, "40 mm")? {
+        (Some(x), _) if x > 0.0 => Ok(Some(x)),
+        (None, _) if formula && is_formula => Ok(None),
+        (_, at) => Err(err(file, at, format!("{n} muss eine positive Länge sein (z. B. 40 mm) oder eine Formel (nicht mit svg:)"))),
+    }
+}
+
+// a 1-D master: BeginX, BeginY, EndX, EndY are length constants from 0 (the ends on the master
+// page), Height is given (a length from 0, or a formula); the master page is BeginX+EndX wide
+// and BeginY+EndY high (the ends lie as far from its edges as from the other end's edges)
+fn one_d_page(file: &str, line: u32, shape: &[Cell0]) -> Result<(f64, f64), SourceError> {
+    let mut e = [0.0; 4];
+    for (i, n) in ENDS.iter().enumerate() {
+        e[i] = match length_const(file, line, shape, n, "0 mm; ein 1D-Master braucht BeginX, BeginY, EndX und EndY")? {
+            (Some(x), _) if x >= 0.0 => x,
+            (_, at) => return Err(err(file, at, format!("{n} muss eine Länge ab 0 sein (eine Konstante wie 40 mm): das Ende auf der Masterseite"))),
+        };
+    }
+    match length_const(file, line, shape, "Height", "10 mm, 0 mm für eine Linie, oder eine Formel wie GUARD(EndY-BeginY)")? {
+        (Some(x), at) if x < 0.0 => return Err(err(file, at, "Height muss eine Länge ab 0 oder eine Formel sein")),
+        _ => {}
+    }
+    if (e[0] - e[2]).abs() < 1e-12 && (e[1] - e[3]).abs() < 1e-12 {
+        return Err(err(file, line, "BeginX/BeginY und EndX/EndY liegen aufeinander"));
+    }
+    let (w, h) = (e[0] + e[2], e[1] + e[3]);
+    if w <= 0.0 || h <= 0.0 {
+        return Err(err(file, line, "die Masterseite (BeginX+EndX mal BeginY+EndY) wäre leer: die Enden brauchen Abstand zum Rand (z. B. BeginY = EndY = 5 mm)"));
+    }
+    Ok((w, h))
 }
 
 // "482.6 mm x 88.9 mm" -> both lengths (internal units)
@@ -773,7 +839,8 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
     // the master page: its size and scale, the keywords
     let (len_unit, one) = if measure == Measure::Us { (Unit::Inches, 1.0) } else { (Unit::Millimeters, 1.0 / 25.4) };
     let ps = SheetRef::Master(mref);
-    let (w, h) = (mi.width, mi.height);
+    // a size from a formula: 0 until fit_sizes() writes the computed one
+    let (w, h) = (mi.width.unwrap_or(0.0), mi.height.unwrap_or(0.0));
     // a scaled master (JD13, `scale:`): Visio's scale types 4 (metric) and 3 (custom)
     let scale_type = if mi.scale == 1.0 { 0.0 } else if measure == Measure::Us { 3.0 } else { 4.0 };
     for (name, v, u) in [
@@ -802,11 +869,27 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
     };
     tx.set_shape_styles(shape, refs).map_err(|e| sink.fail(line, "die Formatvorlagen", e))?;
     let sheet = SheetRef::Shape(shape);
-    const FIRST: [&str; 6] = ["PinX", "PinY", "Width", "Height", "LocPinX", "LocPinY"];
-    for name in FIRST {
+    // the transform first, in Visio's order; a 1-D master's box follows its ends (Visio's own
+    // formulas for a 1-D shape, README: 1D-Shapes) unless the master writes a cell itself
+    const FIRST: &[&str] = &["PinX", "PinY", "Width", "Height", "LocPinX", "LocPinY"];
+    const FIRST_1D: &[&str] = &["PinX", "PinY", "Width", "Height", "LocPinX", "LocPinY", "Angle", "BeginX", "BeginY", "EndX", "EndY"];
+    let first = if mi.one_d { FIRST_1D } else { FIRST };
+    for &name in first {
         let a = single_addr(tx, name);
         match mi.shape.iter().find(|c| c.name == name) {
             Some(c) => sink.put(tx, sheet, &a, c, Some(String::from(name)))?,
+            None if mi.one_d => {
+                let f = match name {
+                    "PinX" => "GUARD((BeginX+EndX)/2)",
+                    "PinY" => "GUARD((BeginY+EndY)/2)",
+                    "Width" => "GUARD(SQRT((EndX-BeginX)^2+(EndY-BeginY)^2))",
+                    "LocPinX" => "GUARD(Width*0.5)",
+                    "LocPinY" => "GUARD(Height*0.5)",
+                    "Angle" => "GUARD(ATAN2(EndY-BeginY,EndX-BeginX))",
+                    _ => continue,
+                };
+                sink.formula(tx, sheet, &a, f, line)?;
+            }
             None => match name {
                 "PinX" => sink.constant(tx, sheet, &a, Value::Num(w / 2.0), Some(len_unit), line)?,
                 "PinY" => sink.constant(tx, sheet, &a, Value::Num(h / 2.0), Some(len_unit), line)?,
@@ -822,7 +905,7 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
         let a = single_addr(tx, "SelectMode");
         sink.constant(tx, sheet, &a, Value::Num(0.0), None, line)?;
     }
-    for c in mi.shape.iter().filter(|c| !FIRST.contains(&c.name.as_str())) {
+    for c in mi.shape.iter().filter(|c| !first.contains(&c.name.as_str())) {
         let a = single_addr(tx, &c.name);
         sink.put(tx, sheet, &a, c, Some(c.name.clone()))?;
     }
@@ -1142,6 +1225,31 @@ fn compute(doc: &mut Document, infos: &[MasterInfo], mrefs: &[MasterRef], formul
     Ok(())
 }
 
+// a 2-D master whose Width or Height is a formula: the master page gets the computed size and
+// the master shape the pin in its middle (constants, as for the other masters)
+fn fit_sizes(doc: &mut Document, infos: &[MasterInfo], mrefs: &[MasterRef], measure: Measure) -> Result<(), SourceError> {
+    let unit = if measure == Measure::Us { Unit::Inches } else { Unit::Millimeters };
+    let mut tx = doc.transaction("Größen");
+    for (mi, &m) in infos.iter().zip(mrefs) {
+        if mi.width.is_some() && mi.height.is_some() {
+            continue;
+        }
+        let Some(slot) = tx.doc().master(m).and_then(|x| x.master_shape()) else { continue };
+        let sheet = SheetRef::Shape(ShapeRef { owner: Owner::Master(m), slot });
+        let num = |doc: &Document, n: &str| doc.sym(n).and_then(|s| doc.resolve(sheet, &CellAddr::single(s)).num()).unwrap_or(0.0);
+        let (w, h) = (num(tx.doc(), "Width"), num(tx.doc(), "Height"));
+        if !(w > 0.0 && h > 0.0 && w.is_finite() && h.is_finite()) {
+            return Err(err(&mi.file, mi.line, format!("Width und Height ergeben beim Bauen keine positive Größe ({w} x {h} in)")));
+        }
+        for (s, name, v) in [(SheetRef::Master(m), "PageWidth", w), (SheetRef::Master(m), "PageHeight", h), (sheet, "PinX", w * 0.5), (sheet, "PinY", h * 0.5)] {
+            let a = single_addr(&mut tx, name);
+            tx.set_constant(s, &a, Value::Num(v), Some(unit)).map_err(|e| err(&mi.file, mi.line, format!("{name} lässt sich nicht schreiben ({e:?})")))?;
+        }
+    }
+    let _ = tx.commit();
+    Ok(())
+}
+
 // ---------------------------------------------------------------- the API
 
 /// build the stencil of one folder for one measure (see the module comment)
@@ -1181,6 +1289,7 @@ pub fn build(files: &dyn Fn(&str) -> Option<String>, measure: Measure) -> Result
         check_refs(&doc, f).map_err(|m| err(f.file.as_deref().unwrap_or(&infos[f.master].file), f.line, format!("{m} in „{}“", f.text)))?;
     }
     compute(&mut doc, &infos, &mrefs, &formulas)?;
+    fit_sizes(&mut doc, &infos, &mrefs, measure)?;
     for (mi, &m) in infos.iter().zip(&mrefs) {
         let ico = stencil_icon::master_icon(&mut doc, m).map_err(|e| err(&mi.file, mi.line, format!("das Symbol lässt sich nicht rendern ({e:?})")))?;
         let sym = doc.intern(&instance::base64(&ico));

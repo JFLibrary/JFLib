@@ -1,0 +1,38 @@
+# On-Page-Referenz (ISO 5807: Verbindungsstelle): ein Kreis, 15 mm Durchmesser (US 0.625 in), für
+# einen Sprung zu einer anderen Stelle derselben Seite; beide Stellen tragen dieselbe Marke
+# (Buchstabe oder Zahl).  Verbindungspunkte in der Mitte jeder Seite des Kastens, also auf dem
+# Kreis.
+master: On-page reference
+name.de: On-Page-Referenz
+name.en: On-page reference
+name.es: Referencia en la página
+name.it: Riferimento nella pagina
+name.fr: Renvoi dans la page
+prompt.de: Verbindungsstelle zu einer anderen Stelle derselben Seite; beschriften Sie beide Stellen gleich (ISO 5807).
+prompt.en: Connector to another place on the same page; give both places the same label (ISO 5807).
+prompt.es: Conector a otro lugar de la misma página; rotule ambos lugares igual (ISO 5807).
+prompt.it: Connettore verso un altro punto della stessa pagina; etichetta i due punti allo stesso modo (ISO 5807).
+prompt.fr: Renvoi vers un autre endroit de la même page ; donnez la même étiquette aux deux endroits (ISO 5807).
+keywords.de: Referenz, Verbindungsstelle, Konnektor, Sprung, Kreis, Marke, Seite, Flussdiagramm
+keywords.en: reference, connector, jump, circle, label, page, on-page, flowchart
+keywords.es: referencia, conector, salto, círculo, etiqueta, página, diagrama de flujo
+keywords.it: riferimento, connettore, salto, cerchio, etichetta, pagina, diagramma di flusso
+keywords.fr: renvoi, connecteur, saut, cercle, étiquette, page, diagramme de flux
+
+[Shape]
+Width = 15 mm
+Width.us = 0.625 in
+Height = 15 mm
+Height.us = 0.625 in
+
+[User]
+msvShapeCategories:  Value = "Flowchart"
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

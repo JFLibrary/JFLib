@@ -204,10 +204,15 @@ pub(crate) fn new_drawing(app: &mut Diagrammer, ui: &mut Ui, us: bool) {
             pg.header.name = Some(n);
         }
     }
-    let n = NEW_COUNT.fetch_add(1, core::sync::atomic::Ordering::Relaxed) + 1;
-    let name = tf("Zeichnung{}", &[&format!("{n}")]);
+    let name = next_name();
     let format = Format { kind: DocKind::Drawing, macros: false };
     install(app, ui, doc, name, None, format, None);
+}
+
+/// the name of the next new drawing: "Zeichnung1", "Zeichnung2" ... (also from a template, JD13)
+pub(crate) fn next_name() -> String {
+    let n = NEW_COUNT.fetch_add(1, core::sync::atomic::Ordering::Relaxed) + 1;
+    tf("Zeichnung{}", &[&format!("{n}")])
 }
 
 /// make `doc` the open drawing (opened from a file, or new)
@@ -269,13 +274,18 @@ pub(crate) fn save(app: &mut Diagrammer, ui: &mut Ui, as_new: bool) {
 
 /// write the drawing to `path` (its format from the extension; unknown: .vsdx appended)
 pub(crate) fn save_to(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
-    let Some(o) = app.opened.as_mut() else { return false };
-    take_back(o);
     let ext = path.rsplit_once('.').map(|x| x.1).unwrap_or("");
     let (path, format) = match Format::from_extension(ext) {
         Some(f) => (String::from(path), f),
         None => (format!("{path}.vsdx"), Format { kind: DocKind::Drawing, macros: false }),
     };
+    // (JD13) a template keeps the open stencils (EX-11, VL-02)
+    let windows = (format.kind == DocKind::Template).then(|| crate::templates::windows_of_panel(app));
+    let Some(o) = app.opened.as_mut() else { return false };
+    take_back(o);
+    if let Some(w) = windows {
+        diagram_io::template::set_stencil_windows(&mut o.doc, &w);
+    }
     let name = String::from(plat::display_name(&path));
     let opts = WriteOptions { format: Some(format), ..WriteOptions::DEFAULT };
     let bytes = match vsdx::write(&o.doc, &opts) {

@@ -1,0 +1,89 @@
+# Balken offen/geschlossen: ein flacher Balken, dessen Enden offen (nur die beiden Längskanten)
+# oder geschlossen (ganzer Umriss) gezeichnet sind.  Umgeschaltet wird über die Shape-Daten
+# (Prop.Closed, ja/nein) oder den Kontextmenüeintrag „Enden geschlossen“ (Actions.Closed mit
+# Häkchen).  Abschnitte: 1 die Fläche ohne Linie, 2 der geschlossene Umriss, 3 und 4 die
+# Längskanten; NoShow schaltet 2 bzw. 3 und 4 ab.  Keine Steuerpunkte; die Verbindungspunkte
+# liegen in der Mitte jeder Seite.
+master: Open/closed bar
+name.de: Balken offen/geschlossen
+name.en: Open/closed bar
+name.es: Barra abierta/cerrada
+name.it: Barra aperta/chiusa
+name.fr: Barre ouverte/fermée
+prompt.de: Balken mit offenen oder geschlossenen Enden. Die Enden schalten Sie über die Shape-Daten oder das Kontextmenü um.
+prompt.en: Bar with open or closed ends. Switch the ends in the shape data or on the shortcut menu.
+prompt.es: Barra con extremos abiertos o cerrados. Cambie los extremos en los datos de forma o en el menú contextual.
+prompt.it: Barra con estremità aperte o chiuse. Cambia le estremità nei dati forma o nel menu di scelta rapida.
+prompt.fr: Barre aux extrémités ouvertes ou fermées. Changez les extrémités dans les données de forme ou dans le menu contextuel.
+keywords.de: Balken, offen, geschlossen, Band, Leiste, Ebene, Schicht, Blockdiagramm
+keywords.en: bar, open, closed, band, strip, layer, tier, block diagram
+keywords.es: barra, abierta, cerrada, banda, franja, capa, nivel, diagrama de bloques
+keywords.it: barra, aperta, chiusa, banda, striscia, livello, strato, diagramma a blocchi
+keywords.fr: barre, ouverte, fermée, bande, bandeau, couche, niveau, diagramme de blocs
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 10 mm
+Height.us = 0.375 in
+
+[Property]
+Closed:  Type = 3; Value = FALSE
+         Label.de = "Enden geschlossen"
+         Label.en = "Closed ends"
+         Label.es = "Extremos cerrados"
+         Label.it = "Estremità chiuse"
+         Label.fr = "Extrémités fermées"
+         Prompt.de = "Die Enden des Balkens mit einer Kante schließen"
+         Prompt.en = "Close the ends of the bar with an edge"
+         Prompt.es = "Cerrar los extremos de la barra con un borde"
+         Prompt.it = "Chiudi le estremità della barra con un bordo"
+         Prompt.fr = "Fermer les extrémités de la barre par un bord"
+
+[Actions]
+Closed:  Action = SETF(GETREF(Prop.Closed),NOT(Prop.Closed))
+         Checked = Prop.Closed
+         Menu.de = "Enden geschlossen"
+         Menu.en = "Closed ends"
+         Menu.es = "Extremos cerrados"
+         Menu.it = "Estremità chiuse"
+         Menu.fr = "Extrémités fermées"
+
+# 1 die Fläche
+[Geometry]
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# 2 der geschlossene Umriss
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(Prop.Closed)
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry2.X1; Y = Geometry2.Y1
+
+# 3 die untere Längskante
+[Geometry]
+NoFill = TRUE
+NoShow = Prop.Closed
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+
+# 4 die obere Längskante
+[Geometry]
+NoFill = TRUE
+NoShow = Prop.Closed
+MoveTo  X = 0; Y = Height
+LineTo  X = Width; Y = Height
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

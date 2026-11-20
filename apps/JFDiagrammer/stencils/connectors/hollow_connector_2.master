@@ -1,0 +1,64 @@
+# Hohler Verbinder 2: der Umriss eines Winkelpfeils, erst senkrecht vom Anfang, dann waagrecht zum
+# Ende, ohne Füllung und am Schaftende offen wie beim Hohlen Verbinder.  1D-Shape mit aufrechtem
+# Kasten wie der Kurvenverbinder (Width = EndX-BeginX, Height = EndY-BeginY, Angle 0); die Enden
+# kleben an Shapes, mit GlueType 2 auch an das ganze Shape.  Der Umriss folgt den Vorzeichen von
+# Width und Height.  Schaft 5 mm, Spitze 10 x 8 mm, ohne Steuerpunkte.  Formatvorlage "Connector"
+# ohne deren Pfeilspitzen (BeginArrow/EndArrow 0): die Spitze ist der Umriss selbst.
+master: Hollow connector 2
+name.de: Hohler Verbinder 2
+name.en: Hollow connector 2
+name.es: Conector hueco 2
+name.it: Connettore cavo 2
+name.fr: Connecteur creux 2
+prompt.de: Hohlpfeil mit einem rechtwinkligen Knick als Verbinder; seine Enden kleben an Shapes. Ziehen Sie die Enden auf Shapes.
+prompt.en: Hollow arrow with one right-angle bend as a connector whose ends glue to shapes. Drag the ends onto shapes.
+prompt.es: Flecha hueca con un codo en ángulo recto como conector cuyos extremos se pegan a las formas. Arrastre los extremos sobre las formas.
+prompt.it: Freccia cava con una piega ad angolo retto come connettore con estremità che si incollano alle forme. Trascina le estremità sulle forme.
+prompt.fr: Flèche creuse avec un coude à angle droit servant de connecteur, dont les extrémités se collent aux formes. Faites glisser les extrémités sur les formes.
+keywords.de: Hohlpfeil, hohl, Umriss, Winkel, Knick, Verbinder, verbinden
+keywords.en: hollow arrow, hollow, outline, angle, bend, connector, connect
+keywords.es: flecha hueca, hueco, contorno, ángulo, codo, conector, conectar
+keywords.it: freccia cava, cavo, contorno, angolo, piega, connettore, collegare
+keywords.fr: flèche creuse, creux, contour, angle, coude, connecteur, relier
+style: Connector
+
+[Shape]
+BeginX = 5 mm
+BeginX.us = 0.2 in
+BeginY = 30 mm
+BeginY.us = 1.2 in
+EndX = 35 mm
+EndX.us = 1.4 in
+EndY = 10 mm
+EndY.us = 0.4 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+GlueType = 2
+BeginArrow = 0
+EndArrow = 0
+
+
+[User]
+# die Richtung des Kastens (Width und Height dürfen negativ sein)
+Sx:  Value = IF(Width<0,-1,1)
+Sy:  Value = IF(Height<0,-1,1)
+# der halbe Schaft, die halbe Breite und die Länge der Spitze
+S:   Value = 2.5 mm
+     Value.us = 0.1 in
+Hw:  Value = 5 mm
+     Value.us = 0.1875 in
+Hl:  Value = 8 mm
+     Value.us = 0.3 in
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = -User.Sx*User.S; Y = 0
+LineTo  X = -User.Sx*User.S; Y = Height+User.Sy*User.S
+LineTo  X = Width-User.Sx*User.Hl; Y = Height+User.Sy*User.S
+LineTo  X = Width-User.Sx*User.Hl; Y = Height+User.Sy*User.Hw
+LineTo  X = Width; Y = Height
+LineTo  X = Width-User.Sx*User.Hl; Y = Height-User.Sy*User.Hw
+LineTo  X = Width-User.Sx*User.Hl; Y = Height-User.Sy*User.S
+LineTo  X = User.Sx*User.S; Y = Height-User.Sy*User.S
+LineTo  X = User.Sx*User.S; Y = 0

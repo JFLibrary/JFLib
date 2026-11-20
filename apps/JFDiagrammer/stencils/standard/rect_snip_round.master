@@ -1,0 +1,66 @@
+# Rechteck, je eine Ecke abgerundet (links oben) und abgeschnitten (rechts oben).  Row_1 an der
+# oberen Kante ändert den Radius (Abstand von links), Row_2 die abgeschnittene Ecke (Abstand von
+# rechts); beide höchstens halb so breit wie das Shape.
+master: Snip and round single corner rectangle
+name.de: Rechteck, Ecke abgerundet und abgeschnitten
+name.en: Snip and round single corner rectangle
+name.es: Rectángulo, esquina redondeada y cortada
+name.it: Rettangolo, angolo arrotondato e tagliato
+name.fr: Rectangle, coin arrondi et coin coupé
+prompt.de: Rechteck mit runder Ecke links oben und abgeschnittener Ecke rechts oben. Mit den gelben Steuerpunkten ändern Sie den Radius und die abgeschnittene Ecke.
+prompt.en: Rectangle with a round top left corner and a snipped top right corner. Drag the yellow control handles to change the radius and the snipped corner.
+prompt.es: Rectángulo con la esquina superior izquierda redondeada y la superior derecha cortada. Arrastre los controladores amarillos para cambiar el radio y la esquina cortada.
+prompt.it: Rettangolo con l'angolo in alto a sinistra arrotondato e quello in alto a destra tagliato. Trascina le maniglie di controllo gialle per cambiare il raggio e l'angolo tagliato.
+prompt.fr: Rectangle avec le coin supérieur gauche arrondi et le coin supérieur droit coupé. Faites glisser les poignées de contrôle jaunes pour modifier le rayon et le coin coupé.
+keywords.de: Rechteck, Ecke, Kasten, Schaltfläche, abgerundet, abgeschnitten, Registerkarte, Etikett
+keywords.en: rectangle, corner, box, button, rounded, snipped, tab, label
+keywords.es: rectángulo, esquina, caja, botón, redondeado, cortado, pestaña, etiqueta
+keywords.it: rettangolo, angolo, riquadro, pulsante, arrotondato, tagliato, scheda, etichetta
+keywords.fr: rectangle, coin, boîte, bouton, arrondi, coupé, onglet, étiquette
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# der Radius links oben, sein Stich (ArcTo A), die abgeschnittene Ecke rechts oben
+R:    Value = MIN(MAX(Controls.Row_1,0),Width*0.5,Height)
+Bow:  Value = User.R*0.292893
+D:    Value = MIN(MAX(Width-Controls.Row_2,0),Width*0.5,Height)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height-User.D
+LineTo  X = Width-User.D; Y = Height
+LineTo  X = User.R; Y = Height
+ArcTo   X = 0; Y = Height-User.R; A = User.Bow
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = 5 mm; Y = Height
+        X.us = 0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Radius der Ecke ändern"
+        Tip.en = "Change the radius of the corner"
+        Tip.es = "Cambiar el radio de la esquina"
+        Tip.it = "Cambia il raggio dell'angolo"
+        Tip.fr = "Modifier le rayon du coin"
+Row_2:  X = Width-5 mm; Y = Height
+        X.us = Width-0.2 in
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Größe der Ecke ändern"
+        Tip.en = "Change the size of the corner"
+        Tip.es = "Cambiar el tamaño de la esquina"
+        Tip.it = "Cambia la dimensione dell'angolo"
+        Tip.fr = "Modifier la taille du coin"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

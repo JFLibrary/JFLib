@@ -1,0 +1,75 @@
+# Pfeil mit Endpunkten: eine gerade Linie mit gefüllten Punkten an beiden Enden (BeginArrow und
+# EndArrow 10, der Sinn dieses Shapes) und einer Spitze in der Mitte.  Die Spitze in der Mitte ist
+# ein geschlossener Abschnitt, gefüllt mit der Linienfarbe (FillForegnd = LineColor, FillPattern
+# 1: keine feste Farbe, sie folgt dem Design); die Linie selbst sind zwei Hälften ohne Füllung,
+# damit der erste Teilpfad am Anfang beginnt und der letzte am Ende endet (dort zeichnet die App
+# die Linienenden).  Liegt auf der Linie vom Anfang zum Ende und dreht sich mit ihr (PinX, Width,
+# Angle aus den Enden); die Enden kleben an Shapes, mit GlueType 2 auch an das ganze Shape.
+master: Arrow with endpoints
+name.de: Pfeil mit Endpunkten
+name.en: Arrow with endpoints
+name.es: Flecha con extremos
+name.it: Freccia con estremi
+name.fr: Flèche avec extrémités
+prompt.de: Gerade Linie mit Punkten an beiden Enden und einer Pfeilspitze in der Mitte. Ziehen Sie die Enden auf Shapes.
+prompt.en: Straight line with dots at both ends and an arrowhead in the middle. Drag the ends onto shapes.
+prompt.es: Línea recta con puntos en ambos extremos y una punta de flecha en el centro. Arrastre los extremos sobre las formas.
+prompt.it: Linea retta con punti a entrambe le estremità e una punta di freccia al centro. Trascina le estremità sulle forme.
+prompt.fr: Ligne droite avec des points aux deux extrémités et une pointe de flèche au milieu. Faites glisser les extrémités sur les formes.
+keywords.de: Endpunkte, Punkte, Pfeil, Mitte, Linie, Verbinder
+keywords.en: endpoints, dots, arrow, middle, line, connector
+keywords.es: extremos, puntos, flecha, centro, línea, conector
+keywords.it: estremi, punti, freccia, centro, linea, connettore
+keywords.fr: extrémités, points, flèche, milieu, ligne, connecteur
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 2.5 mm
+BeginY.us = 0.1 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 2.5 mm
+EndY.us = 0.1 in
+Height = 0 mm
+Height.us = 0 in
+GlueType = 2
+BeginArrow = 10
+EndArrow = 10
+FillPattern = 1
+FillForegnd = LineColor
+FillBkgnd = LineColor
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5-5 mm
+TxtPinY.us = Height*0.5-0.2 in
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Länge und die halbe Breite der Spitze in der Mitte
+Al:  Value = 3 mm
+     Value.us = 0.125 in
+Aw:  Value = 1.25 mm
+     Value.us = 0.05 in
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width*0.5; Y = Height*0.5
+
+# 2 die Spitze in der Mitte, mit der Linienfarbe gefüllt
+[Geometry]
+MoveTo  X = Width*0.5+User.Al*0.5; Y = Height*0.5
+LineTo  X = Width*0.5-User.Al*0.5; Y = Height*0.5+User.Aw
+LineTo  X = Width*0.5-User.Al*0.5; Y = Height*0.5-User.Aw
+LineTo  X = Geometry2.X1; Y = Geometry2.Y1
+
+# 3 die zweite Hälfte: der letzte Teilpfad endet am Ende
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5; Y = Height*0.5
+LineTo  X = Width; Y = Height*0.5

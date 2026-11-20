@@ -1,0 +1,91 @@
+# Universeller Verbinder: die Shape-Daten „Verlauf“ (Prop.Route, feste Liste) wählen rechtwinklig
+# (ShapeRouteStyle 1, ConLineRouteExt 1), gerade (16, 1) oder gebogen (1, 2) -- dieselben Werte,
+# die der Befehl „Verbinder“ der App schreibt; die Liste und ihr Wert reisen in fünf Sprachen mit.
+# Dynamischer Verbinder (ObjType 2 verlegbar, GlueType 2): die App verlegt ihn selbst und ersetzt
+# die gezeichnete Geometrie durch ihren Weg; der Kasten bleibt aufrecht (Width = EndX-BeginX ...,
+# Angle 0).  Route-Zellen mit Visios Namen und Werten: ShapeRouteStyle und ConLineRouteExt als
+# Formeln aus den Shape-Daten (oben), ConFixedCode 0.  Der Text folgt Controls.TextPosition, das
+# die App in die Mitte des Wegs setzt (ohne Text verborgen).
+master: Universal connector
+name.de: Universeller Verbinder
+name.en: Universal connector
+name.es: Conector universal
+name.it: Connettore universale
+name.fr: Connecteur universel
+prompt.de: Dynamischer Verbinder, dessen Verlauf Sie in den Shape-Daten wählen: rechtwinklig, gerade oder gebogen. Ziehen Sie die Enden auf Shapes.
+prompt.en: Dynamic connector whose route you choose in the shape data: right angle, straight or curved. Drag the ends onto shapes.
+prompt.es: Conector dinámico cuyo trazado se elige en los datos de forma: en ángulo recto, recto o curvo. Arrastre los extremos sobre las formas.
+prompt.it: Connettore dinamico il cui percorso si sceglie nei dati della forma: ad angolo retto, diritto o curvo. Trascina le estremità sulle forme.
+prompt.fr: Connecteur dynamique dont le tracé se choisit dans les données de forme : à angle droit, droit ou courbe. Faites glisser les extrémités sur les formes.
+keywords.de: Verbinder, dynamisch, verbinden, universell, Verlauf, rechtwinklig, gerade, gebogen
+keywords.en: connector, dynamic, connect, universal, route, right angle, straight, curved
+keywords.es: conector, dinámico, conectar, universal, trazado, ángulo recto, recto, curvo
+keywords.it: connettore, dinamico, collegare, universale, percorso, angolo retto, diritto, curvo
+keywords.fr: connecteur, dynamique, relier, universel, tracé, angle droit, droit, courbe
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 0 mm
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 20 mm
+EndY.us = 0.75 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+ObjType = 2
+GlueType = 2
+ShapeRouteStyle = IF(LOOKUP(Prop.Route,Prop.Route.Format)=1,16,1)
+ConLineRouteExt = IF(LOOKUP(Prop.Route,Prop.Route.Format)=2,2,1)
+ConFixedCode = 0
+NoAlignBox = TRUE
+DynFeedback = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Controls.TextPosition
+TxtPinY = Controls.TextPosition.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+RelMoveTo  X = 0; Y = 0
+RelLineTo  X = 0.5; Y = 0
+RelLineTo  X = 0.5; Y = 1
+RelLineTo  X = 1; Y = 1
+
+[Controls]
+TextPosition:  X = Width*0.5; Y = Height*0.5
+        XDyn = Controls.TextPosition; YDyn = Controls.TextPosition.Y
+        XCon = IF(OR(STRSAME(SHAPETEXT(TheText),""),HideText),5,0); YCon = 0; CanGlue = FALSE
+        Tip.de = "Text verschieben"
+        Tip.en = "Move the text"
+        Tip.es = "Mover el texto"
+        Tip.it = "Sposta il testo"
+        Tip.fr = "Déplacer le texte"
+
+[Property]
+Route:  Type = 1
+        Label.de = "Verlauf"
+        Label.en = "Route"
+        Label.es = "Trazado"
+        Label.it = "Percorso"
+        Label.fr = "Tracé"
+        Prompt.de = "Wie der Verbinder verläuft"
+        Prompt.en = "How the connector runs"
+        Prompt.es = "Cómo discurre el conector"
+        Prompt.it = "Come corre il connettore"
+        Prompt.fr = "Comment le connecteur est tracé"
+        Format.de = "Rechtwinklig;Gerade;Gebogen"
+        Format.en = "Right angle;Straight;Curved"
+        Format.es = "En ángulo recto;Recto;Curvo"
+        Format.it = "Ad angolo retto;Diritto;Curvo"
+        Format.fr = "À angle droit;Droit;Courbe"
+        Value.de = "Rechtwinklig"
+        Value.en = "Right angle"
+        Value.es = "En ángulo recto"
+        Value.it = "Ad angolo retto"
+        Value.fr = "À angle droit"

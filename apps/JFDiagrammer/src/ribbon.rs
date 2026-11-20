@@ -63,7 +63,8 @@ const L_CFF: &str = "Funktionsübergreifendes Flussdiagramm";
 /// the registers shown now (the File register first)
 pub(crate) fn tabs(app: &Diagrammer) -> Vec<Reg> {
     let mut v = alloc::vec![Reg::File, Reg::Start, Reg::Insert, Reg::Design, Reg::View];
-    if crate::structures::has_cff(app) {
+    // (JD13, VL-04) also when the drawing's template brought the register
+    if crate::structures::has_cff(app) || crate::templates::has_register(app, "cff") {
         v.push(Reg::Cff);
     }
     match app.selection_kind() {
