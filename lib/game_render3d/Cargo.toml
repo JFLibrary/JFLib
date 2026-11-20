@@ -1,6 +1,6 @@
 [package]
 name = "jflib-game-render3d"
-description = "The bridge from the game core to render3d: entities with a mesh as scene instances"
+description = "The bridge from the game core to render3d: entities with a mesh or a model as scene instances, glTF and image assets"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -22,6 +22,11 @@ workspace = true
 gpu.workspace = true
 render3d.workspace = true
 game.workspace = true
+# (G7b part 2) the assets of models.rs: glTF models (gltf) and PNG / JPEG images
+gltf.workspace = true
+img_core.workspace = true
+img_png.workspace = true
+img_jpeg.workspace = true
 
 # docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
 # of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)
