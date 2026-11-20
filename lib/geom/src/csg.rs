@@ -1239,7 +1239,7 @@ pub fn intersection(meshes: &[&Mesh]) -> Result<Mesh, Error> {
     s.to_mesh(crate::DEFAULT_SMOOTH_DEG)
 }
 
-/// A convex closed mesh with its edges and corners bevelled ([`Solid::bevelled`]); the flat faces keep flat
+/// A convex closed mesh with its edges and corners bevelled ([`Solid::bevel`]); the flat faces keep flat
 /// normals, the rounded ones get normals across the arcs (where an arc meets a face, the face's normal: no
 /// seam, no shading across the face).
 pub fn bevel(m: &Mesh, radius: f64, segments: usize, only: Option<Axis>) -> Result<Mesh, Error> {

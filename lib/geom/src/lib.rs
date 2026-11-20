@@ -12,7 +12,7 @@
 //   poly           2D profiles: area, cleaning, triangulation (ear clipping), rect, circle, arc, rounded_rect
 //   Solid          convex cells as brushes: from_convex, union, difference, intersection (exact decisions:
 //                  points are where three planes meet, sides are signs of determinants), to_mesh (closed,
-//                  corners rounded once at the end), bevelled / bevel (chamfer or round edges and corners)
+//                  corners rounded once at the end), bevel (chamfer or round edges and corners)
 //   exact          expansions (Shewchuk), orient2d, the side of a plane at a meeting of three planes,
 //                  the correctly rounded quotient
 //   Report         closed, manifold, outward, degenerate triangles, normals, bounds, area, volume, Euler
