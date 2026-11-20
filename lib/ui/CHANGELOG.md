@@ -10,6 +10,13 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
+- (JD8 rest) `ui.shape_edit`: the freeform tool `SE_FREEFORM` (the pointer's way, reported as
+  `SeEv::Stroke` with the glue of both ends) and the arc tool `SE_ARC` (a quarter ellipse as the
+  rubber band, bowing the way the drag started, reported as `SeEv::Arc`); both glue to connection
+  points like the line tool; Shift with the rectangle and ellipse tools draws a square and a circle, Shift while moving keeps
+  to one axis;
+  `SEF_NOSNAP`: moves do not snap to such a shape (the dynamic grid leaves it out)
+
 - The Shapes window of a diagram editor, modelled on Visio's but knowing nothing about diagrams:
   `ui.stencil_panel(id, &mut StencilState, &StencilPanel) -> Vec<StencilEvent>`. The app hands in
   stencils (`StencilDef`, `SD_EDITABLE` for favourites) of tiles (`StencilTile`: a name, a
@@ -64,6 +71,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - `Mi::List` rows take the state of their id like a command: `cmd_state(base + k, CF_CHECKED | CF_DISABLED)` shows row k checked or disabled (in the window's menus and in macOS' system menu), e.g. the open stencils in JFDiagrammer's "Weitere Shapes"; before, list rows were always plain
 - `SE_PLACE`, a tool of `ui.shape_edit` for placing what the app holds (a shape from a stencil, click + click): a click anywhere, on a shape too, reports `SeEv::Draw { tool: SE_PLACE, a, b: a }` at the snapped point; no handles, a drag places nothing
 - (JD10) Connection arrows and insertion marks in `ui.shape_edit`: with the pointer tool a top-level shape under the pointer shows four arrows around its box (`SeState::arrows`, on by default; `SEF_NOARROWS` leaves a shape out); a click on one reports `SeEv::Arrow { key, dir }`, a drag from one draws a connector from that shape (`SeEv::Connect` with `ga: SeGlue::Shape(key)`), `SeEv::ArrowHover` and `SeState::arrow_hover()` tell the arrow under the pointer; the app's insertion marks (`SeModel::marks`, `SeMark`) show near the pointer and report `SeEv::Mark { tag }`; `ui.shape_edit_sems` names both for scripts and screen readers
+- (JD8) `ui.tabs` and `ui.tabs_scrolling` report `EV_DOUBLE` when a tab is double-clicked (it is the selected one then); a double click on the strip beside the tabs no longer does. A right click on a tab selects it as a click does, so a context menu on the strip belongs to the tab under the pointer
 - (JD11) `ui.color_menu(id, &ColorMenu)` -> `Option<(ColorPick, rgb)>`: the swatches of an Office colour menu (design colours with five shades each, variant colours, fixed colours, last used; the current one marked) and `color_shades(rgb)`; `ui.ribbon_image_tile(id, label, &surface, ver)`: a gallery tile with a picture the app made
 
 ### Changed
@@ -83,6 +91,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Fixed
 
+- `ui.shape_edit`: a click on a connection arrow did nothing when a handle of another selected
+  shape lay under it (the shape a first arrow click had just made, its side handle under the
+  arrow); a drag from it resized that shape. The arrow shown hot now takes the click and the drag;
+  only the handles of the arrows' own shape, or of a selection box around it, still come first.
 - GPU canvases: a tile evicted for a new one hands its texture over when no frame draws it any
   more; a zoom over many levels made a new texture for every tile while the evicted ones lived on
   until the GPU had finished the frame.

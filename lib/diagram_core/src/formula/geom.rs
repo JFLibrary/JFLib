@@ -320,7 +320,35 @@ pub(crate) fn shape_text(ev: &mut Ev, i: u32) -> Result<String, CellError> {
     }
     // the end of the last paragraph is no character of the text (a file writes "Vertrieb\n",
     // the text is "Vertrieb": the lane title the flowchart's formulas read, JD10)
-    let mut t = ev.doc.shape(r).and_then(|s| s.text()).map(|t| t.chars()).unwrap_or_default();
+    // (TX-06) fields count with the text they show: their Value cells as computed in this run
+    // (recorded as dependencies), in the format of their Format cells
+    let doc = ev.doc;
+    let mut t = String::new();
+    if let Some(text) = doc.shape(r).and_then(|s| s.text()) {
+        let sheet = SheetRef::Shape(r);
+        for item in &text.items {
+            match item {
+                crate::shape::TextItem::Chars(c) => t.push_str(c),
+                crate::shape::TextItem::Field(ix) => {
+                    let a = CellAddr::row(SecKey::one(crate::names::FIELD), RowKey::Index(*ix), crate::names::VALUE);
+                    let unit = doc.resolve(sheet, &a).unit();
+                    let v = cell_value(doc, ev.run, sheet, &a);
+                    let shown = match v.plain() {
+                        Val::Num(x) => crate::field::Shown::Num(*x, unit),
+                        Val::Str(s) | Val::Font(s) => crate::field::Shown::Text(s),
+                        _ => crate::field::Shown::Nothing,
+                    };
+                    t.push_str(&crate::field::format(&shown, crate::field::picture(doc, sheet, *ix), &doc.fields));
+                }
+                crate::shape::TextItem::Other(x) => {
+                    if let Some(c) = crate::field::cached(doc.str(*x)) {
+                        t.push_str(&c);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
     for end in ["\r\n", "\n", "\u{2029}"] {
         if t.ends_with(end) {
             t.truncate(t.len() - end.len());

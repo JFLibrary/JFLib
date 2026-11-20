@@ -33,6 +33,8 @@ text.workspace = true
 gfx.workspace = true
 pdf.workspace = true
 style = { package = "jflib-style-netlab", path = "../../styles/netlab" }
+# (JD8 rest) the local time of fields (NOW, the document's dates in local time)
+datetime.workspace = true
 
 [build-dependencies]
 jflib-build.workspace = true

@@ -16,12 +16,9 @@
 use alloc::format;
 use ui::*;
 
-use crate::commands::{self, REDO, SAVE, UNDO};
-use crate::icons::JD_QAT_CUSTOMIZE;
 use crate::{backstage, panes, ribbon, Diagrammer};
 
-const ID_TABS: u32 = 100;
-const ID_QAT_MORE: u32 = 120;
+pub(crate) const ID_TABS: u32 = 100;
 const ID_NOTICE: u32 = 130;
 const ID_OPEN_DLG: u32 = 0x7000;
 const ID_SAVE_DLG: u32 = 0x7100;
@@ -34,7 +31,7 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
     }
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V, 0);
-    titlebar(ui, &title);
+    titlebar(app, ui, &title);
     open_dialog(app, ui);
     save_dialog(app, ui);
     if app.backstage.is_some() {
@@ -112,21 +109,12 @@ fn save_dialog(app: &mut Diagrammer, ui: &mut Ui) {
     }
 }
 
-// the title bar: the quick access toolbar (Speichern, Rückgängig, Wiederholen, its menu) and
-// the drawing's name
-fn titlebar(ui: &mut Ui, title: &str) {
+// the title bar: the quick access toolbar (JD8 rest: qat.rs, its commands and menu) and the
+// drawing's name
+fn titlebar(app: &mut Diagrammer, ui: &mut Ui, title: &str) {
     ui.titlebar_begin_opt(None, 0);
-    for (k, id) in [SAVE, UNDO, REDO].into_iter().enumerate() {
-        ui.next_size(28, 26);
-        ui.cmd_button(id, ST_SUBTLE | ST_ICON_ONLY | ST_COMPACT);
-        ui.tooltip(&commands::tip(ui, id));
-        ui.keytip_keys(1, ["1", "2", "3"][k]);
-    }
-    ui.next_size(22, 26);
-    ui.next_flags(ST_SUBTLE | ST_ICON_ONLY | ST_COMPACT | ST_DISABLED);
-    ui.next_icon(JD_QAT_CUSTOMIZE);
-    ui.button(ID_QAT_MORE, commands::label(commands::QAT_CUSTOMIZE));
-    ui.tooltip(&commands::tip(ui, commands::QAT_CUSTOMIZE));
+    crate::qat::buttons(app, ui);
+    crate::qat::more(app, ui);
     ui.spacer(-1);
     ui.text(TS_BODY | TX_ELLIPSIS, title);
     ui.titlebar_end();

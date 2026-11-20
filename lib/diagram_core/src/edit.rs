@@ -55,7 +55,7 @@ use alloc::vec::Vec;
 use core::mem;
 
 use crate::cell::{Cell, CellError, Formula, Value};
-use crate::document::{DocSettings, Document, MasterRef, Owner, PageRef, ShapeRef, SheetRef, StyleRef, Theme};
+use crate::document::{DocSettings, Document, MasterRef, Owner, Part, PageRef, ShapeRef, SheetRef, StyleRef, Theme};
 use crate::names::{self, Category};
 use crate::page::{Connect, Master, MasterHeader, Page, PageHeader, Style, StyleHeader};
 use crate::shape::{ForeignData, Node, ShapeData, ShapeHeader, ShapeKind, StyleRefs, Text};
@@ -139,6 +139,8 @@ pub(crate) enum Op {
     ConnectRemove { owner: Owner, pos: u32 },
     Settings { settings: Box<DocSettings> },
     Themes { themes: Box<Vec<Theme>> },
+    PartInsert { pos: u32, part: Box<Part> },
+    PartRemove { pos: u32 },
 }
 
 fn cells_mut(doc: &mut Document, sheet: SheetRef, scope: Scope) -> Option<&mut Vec<Cell>> {
@@ -367,6 +369,17 @@ impl Op {
             },
             Op::Settings { settings } => Op::Settings { settings: Box::new(mem::replace(&mut doc.settings, *settings)) },
             Op::Themes { themes } => Op::Themes { themes: Box::new(mem::replace(&mut doc.themes, *themes)) },
+            Op::PartInsert { pos, part } => {
+                if pos as usize > doc.parts.len() {
+                    fail!(Op::PartInsert { pos, part })
+                }
+                doc.parts.insert(pos as usize, *part);
+                Op::PartRemove { pos }
+            }
+            Op::PartRemove { pos } => match remove_at(&mut doc.parts, pos) {
+                Some(part) => Op::PartInsert { pos, part: Box::new(part) },
+                None => fail!(Op::PartRemove { pos }),
+            },
         })
     }
 
@@ -415,7 +428,7 @@ impl Op {
             Op::StyleHeader { style, .. } => {
                 out.insert(SheetRef::Style(*style));
             }
-            Op::Settings { .. } | Op::Themes { .. } => {
+            Op::Settings { .. } | Op::Themes { .. } | Op::PartInsert { .. } | Op::PartRemove { .. } => {
                 out.insert(SheetRef::Document);
             }
         }
@@ -647,6 +660,16 @@ impl<'d> Transaction<'d> {
 
     /// take every edit of the transaction back
     pub fn rollback(self) {}
+
+    /// the sheets the edits so far touch, as Change::sheets names them once committed (an app
+    /// that follows a gesture with more work in the same step asks which pages it changed)
+    pub fn sheets(&self) -> Vec<SheetRef> {
+        let mut set = BTreeSet::new();
+        for op in &self.ops {
+            op.sheets(&mut set);
+        }
+        set.into_iter().collect()
+    }
 
     pub(crate) fn run(&mut self, op: Op) -> Result<(), EditError> {
         match op.exec(self.doc) {
@@ -1013,7 +1036,9 @@ impl<'d> Transaction<'d> {
     }
 
     /// delete a layer of a page; shapes on it leave it (their own LayerMember cells), the
-    /// shapes themselves stay (LY-04 asks the user first and deletes them before)
+    /// shapes themselves stay (LY-04 asks the user first and deletes them before).  The layers
+    /// after it move one down (IX - 1, as Visio keeps a page's layers numbered without gaps) and
+    /// the shapes' own LayerMember cells follow
     pub fn delete_layer(&mut self, page: PageRef, ix: u32) -> Result<(), EditError> {
         self.doc.page(page).ok_or(EditError::NoPage)?;
         let owner = Owner::Page(page);
@@ -1027,11 +1052,12 @@ impl<'d> Transaction<'d> {
                     Value::Num(x) if x >= 0.0 => alloc::vec![x as u32],
                     _ => return None,
                 };
-                list.contains(&ix).then(|| (s, list.into_iter().filter(|&l| l != ix).collect()))
+                let new: Vec<u32> = list.iter().filter(|&&l| l != ix).map(|&l| if l > ix { l - 1 } else { l }).collect();
+                (new != list).then_some((s, new))
             })
             .collect();
         self.atomic(|tx| {
-            tx.delete_row(SheetRef::Page(page), SecKey::one(names::LAYER), RowKey::Index(ix))?;
+            tx.remove_row(SheetRef::Page(page), SecKey::one(names::LAYER), RowKey::Index(ix))?;
             for (s, list) in &members {
                 tx.set_layers(*s, list)?;
             }
@@ -1366,6 +1392,26 @@ impl<'d> Transaction<'d> {
         self.run(Op::ShapeText { shape, text: text.map(Box::new) })
     }
 
+    /// add a part the model keeps as bytes (a picture's media part) at the end of
+    /// Document::parts -> its index; a name some part has already (ASCII case ignored, a
+    /// leading '/' too) is refused (Exists)
+    pub fn add_part(&mut self, name: &str, content_type: &str, rel_type: &str, data: Vec<u8>) -> Result<usize, EditError> {
+        let bare = |n: &str| -> String { n.trim_start_matches('/').to_ascii_lowercase() };
+        let want = bare(name);
+        if want.is_empty() || self.doc.parts.iter().any(|p| bare(self.doc.str(p.name)) == want) {
+            return Err(EditError::Exists);
+        }
+        let part = Part { name: self.intern(name), content_type: self.intern(content_type), rel_type: self.intern(rel_type), data };
+        let pos = self.doc.parts.len();
+        self.run(Op::PartInsert { pos: pos as u32, part: Box::new(part) })?;
+        Ok(pos)
+    }
+
+    /// remove the part at `index` of Document::parts (shapes that name it show no picture)
+    pub fn remove_part(&mut self, index: usize) -> Result<(), EditError> {
+        self.run(Op::PartRemove { pos: index as u32 }).map_err(|_| EditError::Invalid)
+    }
+
     /// set the picture data of a Foreign shape
     pub fn set_foreign(&mut self, shape: ShapeRef, foreign: Option<ForeignData>) -> Result<(), EditError> {
         self.doc.shape(shape).ok_or(EditError::NoShape)?;
@@ -1483,6 +1529,58 @@ impl<'d> Transaction<'d> {
             return Err(EditError::Invalid);
         }
         self.run(Op::PageTheme { page, theme })
+    }
+
+    /// add an empty page with the settings of page `like` (PG-03: Visio gives a new page the
+    /// properties of the active page -- size, scale, units, print setup, layout and routing,
+    /// background page, design): its page sheet without the Layer section (layers belong to a
+    /// page's shapes), the styles of its PageSheet element, its theme; a foreground page keeps
+    /// `like`'s background page, a background page gets none.  At `pos` in document order (None:
+    /// the end) with the next free page ID -> its handle
+    pub fn add_page_like(&mut self, like: PageRef, name: &str, name_u: &str, background: bool, pos: Option<usize>) -> Result<PageRef, EditError> {
+        let src = self.doc.page(like).ok_or(EditError::NoPage)?;
+        let mut sheet = src.sheet.clone();
+        sheet.sections.retain(|s| s.name != names::LAYER);
+        let back_page = if background { None } else { src.header.back_page.filter(|&id| self.doc.page_by_id(id).is_some()) };
+        let (sheet_styles, theme) = (src.header.sheet_styles, src.theme);
+        let (n, nu) = (self.intern(name), self.intern(name_u));
+        let len = self.doc.pages.len();
+        let (slot, id) = self.doc.pages.alloc().ok_or(EditError::NoIds)?;
+        let header = PageHeader { id, name: Some(n), name_u: Some(nu), background, back_page, sheet_styles, ..PageHeader::default() };
+        let page = Page { sheet, theme, ..Page::new(header) };
+        let pos = pos.unwrap_or(len).min(len) as u32;
+        self.run(Op::PageInsert { slot, pos, page: Box::new(page) })?;
+        Ok(PageRef(slot))
+    }
+
+    /// a copy of a page with its shapes, glue records and settings (PG-03 Duplizieren) at `pos`
+    /// in document order (None: right after the original, as Visio's Page.Duplicate puts it)
+    /// -> its handle.  The shapes keep their IDs (IDs count per page), so formulas that name
+    /// Sheet.N, the Connect entries and the Relationships of containers and lists stay inside
+    /// the copy; UniqueIDs are dropped (each names one shape of the document), the copy gets the
+    /// next free page ID, the names given (not marked as custom names) and a part of its own
+    /// when it is written.  Pages that use the original as their background keep it
+    pub fn duplicate_page(&mut self, page: PageRef, name: &str, name_u: &str, pos: Option<usize>) -> Result<PageRef, EditError> {
+        let mut copy = self.doc.page(page).ok_or(EditError::NoPage)?.clone();
+        let at = self.doc.page_position(page).ok_or(EditError::NoPage)? + 1;
+        let slots: Vec<u32> = copy.shapes.iter().collect();
+        for s in slots {
+            if let Some(d) = copy.shapes.data_mut(s) {
+                d.header.unique_id = None;
+            }
+        }
+        copy.part = None;
+        let (n, nu) = (self.intern(name), self.intern(name_u));
+        let len = self.doc.pages.len();
+        let (slot, id) = self.doc.pages.alloc().ok_or(EditError::NoIds)?;
+        copy.header.id = id;
+        copy.header.name = Some(n);
+        copy.header.name_u = Some(nu);
+        copy.header.is_custom_name = None;
+        copy.header.is_custom_name_u = None;
+        let pos = pos.unwrap_or(at).min(len) as u32;
+        self.run(Op::PageInsert { slot, pos, page: Box::new(copy) })?;
+        Ok(PageRef(slot))
     }
 
     // ---- masters

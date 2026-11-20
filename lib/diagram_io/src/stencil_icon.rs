@@ -41,7 +41,7 @@ pub(crate) fn master_icon(doc: &mut Document, m: MasterRef) -> Result<Vec<u8>, E
     let mut tx = doc.transaction("icon");
     let shape = tx.add_instance(Owner::Page(page), m, 0.0, 0.0)?;
     let d = tx.doc();
-    let drawing = render::build(d, page, &mut ApproxMeasure, &Options { background: false, hidden_layers: true });
+    let drawing = render::build(d, page, &mut ApproxMeasure, &Options { background: false, hidden_layers: true, print: false });
     let num = |name: Sym| d.resolve(SheetRef::Shape(shape), &CellAddr::single(name)).num().unwrap_or(0.0);
     let (w, h) = match (d.sym("Width"), d.sym("Height")) {
         (Some(ws), Some(hs)) => (num(ws), num(hs)),

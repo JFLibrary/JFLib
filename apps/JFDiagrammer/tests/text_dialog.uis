@@ -1,0 +1,66 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD8 rest: the dialog Text (RS-09, KB-10) -- F11 opens it for the selected
+# shape: font size, bold, alignment, the text block's vertical alignment and background; OK
+# writes what changed in one undo step, the dialog shows the values when it opens again; the
+# launcher of Start › Absatz and Formatieren › Text formatieren open it too
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+key f2
+type "Hallo Welt"
+click 900,650
+click 570,375
+key f11
+expect dialog:"Text" exists
+expect checkbox:"Fett" unchecked
+click checkbox:"Fett"
+click checkbox:"Unterstrichen"
+click #2014314507
+key ctrl+a
+type "18"
+key tab
+click tab:"Absatz"
+click #2014314516
+click "Rechtsbündig"
+click #2014314517
+key ctrl+a
+type "5"
+key tab
+click #2014314522
+key ctrl+a
+type "150"
+key tab
+click tab:"Textblock"
+click #2014314526
+click "Oben"
+click radio:"Farbe"
+click button:"OK"
+expect dialog:"Text" missing
+expect button:"Fett" checked
+expect button:"Rechtsbündig" checked
+expect button:"Oben ausrichten" checked
+shot build/JFDiagrammer-text-dialog.png
+# opened again (Formatieren › Text formatieren): the values
+cmd 5634
+expect dialog:"Text" exists
+expect tab:"Textblock" selected
+click tab:"Schriftart"
+expect checkbox:"Fett" checked
+expect checkbox:"Unterstrichen" checked
+expect checkbox:"Kursiv" unchecked
+click tab:"Absatz"
+expect #2014314516 value 2
+expect #2014314517 text "5,00"
+expect #2014314522 text "150"
+click tab:"Textblock"
+expect radio:"Farbe" checked
+click button:"Abbrechen"
+# one undo step
+key ctrl+z
+expect button:"Fett" unchecked
+expect button:"Linksbündig" unchecked
+key f11
+click tab:"Schriftart"
+expect checkbox:"Fett" unchecked
+click button:"Abbrechen"
+expect dialog:"Text" missing

@@ -1,0 +1,110 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD8 rest (pages, FEATURES RE-01, PG-03, ZF-13, ZF-14): the page tab's menu (the
+# last foreground page cannot go), Einfügen › Neue Seite (after the page shown, shown), the split
+# button's Hintergrundseite, Alle Seiten with the background page, Diese Seite duplizieren (the
+# content comes along), Seite umbenennen by double click (a name another page has is refused),
+# Seiten neu anordnen, Seite löschen, undo and redo of each step; the tabs follow the pages
+expect tab:"Seite-1" selected
+expect button:"Seite 1 von 1" exists
+# the page tab's menu: one foreground page cannot be deleted
+rclick tab:"Seite-1"
+expect "Seite löschen" disabled
+expect "Seite einfügen" enabled
+expect "Seite umbenennen" enabled
+expect "Diese Seite duplizieren" enabled
+expect "Seiten neu anordnen" enabled
+expect "Zeichnungsmaßstab" enabled
+key esc
+# a rectangle on Seite-1 (the copy takes it along)
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+expect listitem:"Sheet.4" exists
+# Einfügen › Neue Seite: Seite-2 after the page shown, shown, empty
+click tab:"Einfügen"
+click button:"Neue Seite"
+expect tab:"Seite-2" selected
+expect button:"Seite 2 von 2" exists
+expect listitem:"Sheet.4" missing
+# the split button's menu: a background page, at the end, shown
+click "Neue Seite: Weitere Optionen"
+click "Hintergrundseite"
+expect tab:"Hintergrund-1" selected
+expect button:"Seite 3 von 3" exists
+# Alle Seiten lists the background page too
+click button:"Alle Seiten"
+expect menuitem:"Hintergrund-1" checked
+expect menuitem:"Seite-1" exists
+key esc
+# a right click on a tab shows its page first: Seite-1 duplicated from its menu, right after it,
+# shown, with the rectangle
+rclick tab:"Seite-1"
+expect tab:"Seite-1" selected
+expect "Seite löschen" enabled
+click "Diese Seite duplizieren"
+expect tab:"Seite-3" selected
+expect button:"Seite 2 von 4" exists
+expect listitem:"Sheet.4" exists
+shot build/JFDiagrammer-pages.png
+# a double click on a tab renames its page
+dblclick tab:"Seite-3"
+expect dialog:"Seite umbenennen" exists
+expect #1598029825 focused
+type "Kopie"
+click button:"OK"
+expect dialog:"Seite umbenennen" missing
+expect tab:"Kopie" selected
+# a name another page has is refused, the dialog stays
+cmd 5157
+type "seite-1"
+expect text:"Eine andere Seite hat diesen Namen schon." exists
+click button:"OK"
+expect dialog:"Seite umbenennen" exists
+click button:"Abbrechen"
+expect tab:"Kopie" selected
+# Seiten neu anordnen: Kopie after Seite-2 (foreground pages only)
+rclick tab:"Kopie"
+click "Seiten neu anordnen"
+expect dialog:"Seiten neu anordnen" exists
+expect listitem:"Kopie" selected
+expect listitem:"Hintergrund-1" missing
+expect button:"Nach oben" enabled
+click button:"Nach unten"
+expect button:"Nach unten" disabled
+click button:"OK"
+expect tab:"Kopie" selected
+expect button:"Seite 3 von 4" exists
+# Seite löschen: the page before it is shown; undo brings it back and shows it
+rclick tab:"Kopie"
+click "Seite löschen"
+expect tab:"Kopie" missing
+expect tab:"Seite-2" selected
+expect button:"Seite 2 von 3" exists
+key ctrl+z
+expect tab:"Kopie" selected
+expect listitem:"Sheet.4" exists
+# undo the order, the name, the copy, the background page and the new page
+key ctrl+z
+expect button:"Seite 2 von 4" exists
+key ctrl+z
+expect tab:"Seite-3" selected
+key ctrl+z
+expect tab:"Seite-3" missing
+expect tab:"Seite-1" selected
+key ctrl+z
+expect tab:"Hintergrund-1" missing
+key ctrl+z
+expect tab:"Seite-2" missing
+expect button:"Seite 1 von 1" exists
+# and redo the first two
+key ctrl+y
+expect tab:"Seite-2" selected
+key ctrl+y
+expect tab:"Hintergrund-1" selected
+# Seite einfügen from the plus button; a deleted background page
+click button:"Seite einfügen"
+expect tab:"Seite-3" selected
+click tab:"Hintergrund-1"
+cmd 5156
+expect tab:"Hintergrund-1" missing
+expect tab:"Seite-3" selected

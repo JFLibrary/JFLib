@@ -20,12 +20,12 @@ drag 890,350 890,357 alt
 expect listitem:"Sheet.5" rect 827 331 126 50
 key ctrl+z
 # the magnifier: 66.7 %, 75 %, back
-expect text:"67 %" exists
+expect button:"67 %" exists
 click 700,500 ctrl shift
 click 700,500 ctrl shift
-expect text:"75 %" exists
+expect button:"75 %" exists
 click 700,500 r ctrl shift
-expect text:"67 %" exists
+expect button:"67 %" exists
 # the rulers off and on again
 cmd 5120
 expect #23296 missing

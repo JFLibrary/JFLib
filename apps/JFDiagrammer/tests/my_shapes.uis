@@ -1,0 +1,24 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD8 rest: Zu meinen Shapes hinzufügen in the shape's menu (SL-07, ZF-12) -- the
+# selected shape becomes a master of Favoriten (named after its text), the Shapes panel shows it,
+# and dragged back onto the page it comes out as large as it was; the drawing does not change
+cmd 4404
+drag 500,430 640,520
+cmd 4400
+click 570,470
+type "Kasse"
+click 900,650
+rclick 570,470
+expect "Zu meinen Shapes hinzufügen" enabled
+click "Zu meinen Shapes hinzufügen"
+expect tab:"Favoriten" selected
+expect button:"Kasse" exists
+expect button:"Rückgängig" enabled
+drag button:"Kasse" 800,300
+# the new shape is selected: the size of the original (the list of shapes names both "Kasse")
+expect button:"Breite: 60 mm  Höhe: 40 mm  Winkel: 0°" exists
+# nothing selected: the page's menu, without the command
+click 900,650
+rclick 900,650
+expect "Zu meinen Shapes hinzufügen" missing
+key esc

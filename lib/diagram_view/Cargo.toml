@@ -28,6 +28,9 @@ rt.workspace = true
 # the pictures of Foreign shapes
 img_png.workspace = true
 img_jpeg.workspace = true
+# (JD8 rest) GIF and BMP pictures (Einfügen › Bild aus Datei, Visio files)
+img_gif.workspace = true
+img_bmp.workspace = true
 # (JD12) the PDF export
 pdf.workspace = true
 

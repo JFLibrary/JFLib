@@ -1,0 +1,33 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD8 rest: a Verbindungspfeil over another shape's handle still takes the click.
+# A click on the right arrow puts a copy to the right at the page's spacing and selects it; its
+# left side handle then lies under the first shape's right arrow.  Coming back from the first
+# shape, that arrow shows hot and a second click connects the two again (the nearest shape in
+# that direction) instead of hitting the copy's handle; a drag from it draws a connector and
+# leaves the copy's size alone
+cmd 4404
+drag 500,430 640,520
+cmd 4400
+move 570,470
+click button:"Verbindungspfeil rechts"
+expect listitem:"Sheet.5" selected
+expect listitem:"Sheet.5" rect 670 424 151 101
+expect listitem:"Sheet.6" exists
+# the second click in the same direction, the copy's handle under the arrow
+move 570,470
+expect button:"Verbindungspfeil rechts" exists
+click button:"Verbindungspfeil rechts"
+expect listitem:"Sheet.7" exists
+expect listitem:"Sheet.5" rect 670 424 151 101
+# the selection stays (nothing new was made)
+expect listitem:"Sheet.5" selected
+# a drag from the arrow: a connector from the first shape, the copy keeps its size
+move 570,470
+drag button:"Verbindungspfeil rechts" 760,640
+expect listitem:"Sheet.8" exists
+expect listitem:"Sheet.5" rect 670 424 151 101
+key ctrl+z
+expect listitem:"Sheet.8" missing
+key ctrl+z
+expect listitem:"Sheet.7" missing
+expect listitem:"Sheet.6" exists

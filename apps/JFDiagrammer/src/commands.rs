@@ -307,6 +307,16 @@ commands! {
     STENCIL_OPEN = 0x170A, "Schablone öffnen...", 0, 0;
     STENCIL_NEW_METRIC = 0x170B, "Neue Schablone (metrisch)", 0, 0;
     STENCIL_NEW_US = 0x170C, "Neue Schablone (US-Einheiten)", 0, 0;
+    // (JD8 rest: pages) Entwurf › Größe: the paper sizes (page_size.rs)
+    SIZE_LETTER = 0x1800, "Letter", 0, 0;
+    SIZE_LEGAL = 0x1801, "Legal", 0, 0;
+    SIZE_TABLOID = 0x1802, "Tabloid", 0, 0;
+    SIZE_EXECUTIVE = 0x1803, "Executive", 0, 0;
+    SIZE_A5 = 0x1804, "A5", 0, 0;
+    SIZE_A4 = 0x1805, "A4", 0, 0;
+    SIZE_A3 = 0x1806, "A3", 0, 0;
+    SIZE_B5 = 0x1807, "B5 (JIS)", 0, 0;
+    SIZE_B4 = 0x1808, "B4 (JIS)", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -441,6 +451,82 @@ static HANDLERS: &[(u32, Handler)] = &[
     (TEXT_JUSTIFY, |a, ui| crate::format_menus::halign(a, ui, 3)),
     (FORMAT_PAINTER, crate::format_menus::painter),
     (THEME_NEW_SHAPES, crate::design_gallery::toggle_new_shapes),
+    // (JD8 rest: shell) a menu button's own command opens its menu; Schrift, Stärke/Striche/Pfeile,
+    // Schnellformatvorlagen, Linie/Füllung formatieren, Zoom (cmds_shell.rs)
+    (FILL, |a, ui| crate::cmds_shell::open_menu(a, ui, FILL)),
+    (LINE_FORMAT, |a, ui| crate::cmds_shell::open_menu(a, ui, LINE_FORMAT)),
+    (ALIGN, |a, ui| crate::cmds_shell::open_menu(a, ui, ALIGN)),
+    (POSITION, |a, ui| crate::cmds_shell::open_menu(a, ui, POSITION)),
+    (GROUP_MENU, |a, ui| crate::cmds_shell::open_menu(a, ui, GROUP_MENU)),
+    (FIND_MENU, |a, ui| crate::cmds_shell::open_menu(a, ui, FIND_MENU)),
+    (LAYERS, |a, ui| crate::cmds_shell::open_menu(a, ui, LAYERS)),
+    (SELECT_MENU, |a, ui| crate::cmds_shell::open_menu(a, ui, SELECT_MENU)),
+    (PICTURES, |a, ui| crate::cmds_shell::open_menu(a, ui, PICTURES)),
+    (ORIENTATION, |a, ui| crate::cmds_shell::open_menu(a, ui, ORIENTATION)),
+    (PAGE_SIZE, |a, ui| crate::cmds_shell::open_menu(a, ui, PAGE_SIZE)),
+    (TASK_PANES, |a, ui| crate::cmds_shell::open_menu(a, ui, TASK_PANES)),
+    (CONNECTORS, |a, ui| crate::cmds_shell::open_menu(a, ui, CONNECTORS)),
+    (CT_MARGINS, |a, ui| crate::cmds_shell::open_menu(a, ui, CT_MARGINS)),
+    (CT_AUTOSIZE, |a, ui| crate::cmds_shell::open_menu(a, ui, CT_AUTOSIZE)),
+    (CT_STYLES, |a, ui| crate::cmds_shell::open_menu(a, ui, CT_STYLES)),
+    (CT_HEADING, |a, ui| crate::cmds_shell::open_menu(a, ui, CT_HEADING)),
+    (THEMES, |a, ui| crate::cmds_shell::open_menu(a, ui, THEMES)),
+    (FONT, |a, ui| crate::cmds_shell::font_focus(a, ui, FONT)),
+    (FONT_SIZE, |a, ui| crate::cmds_shell::font_focus(a, ui, FONT_SIZE)),
+    (LINE_WEIGHT, |a, ui| crate::cmds_shell::line_choice(a, ui, LINE_WEIGHT)),
+    (LINE_DASH, |a, ui| crate::cmds_shell::line_choice(a, ui, LINE_DASH)),
+    (LINE_ARROWS, |a, ui| crate::cmds_shell::line_choice(a, ui, LINE_ARROWS)),
+    (QUICK_STYLES, crate::cmds_shell::quick_styles),
+    (FORMAT_LINE, |a, _| crate::format_menus::pane(a, 0)),
+    (FORMAT_FILL, |a, _| crate::format_menus::pane(a, 0)),
+    (ZOOM, crate::cmds_shell::zoom_open),
+    (AUTO_ALIGN, crate::cmds_arrange::auto_align),
+    (SHAPE_DATA_DEFINE, crate::pane_data::define_open),
+    (QAT_CUSTOMIZE, crate::qat::open_menu),
+    (ADD_TO_MY_SHAPES, crate::cmds_myshapes::add),
+    // (JD8 rest: pages) pages and Seite einrichten (pages.rs, page_size.rs)
+    (NEW_PAGE, |a, ui| crate::pages::new_page(a, ui, NEW_PAGE)),
+    (PAGE_BLANK, |a, ui| crate::pages::new_page(a, ui, PAGE_BLANK)),
+    (PAGE_INSERT, |a, ui| crate::pages::new_page(a, ui, PAGE_INSERT)),
+    (PAGE_BACKGROUND, crate::pages::background_page),
+    (PAGE_DUPLICATE, crate::pages::duplicate),
+    (PAGE_DELETE, crate::pages::delete),
+    (PAGE_RENAME, crate::pages::open_rename),
+    (PAGE_REORDER, crate::pages::open_reorder),
+    (PORTRAIT, |a, ui| crate::page_size::orientation(a, ui, false)),
+    (LANDSCAPE, |a, ui| crate::page_size::orientation(a, ui, true)),
+    (FIT_DRAWING, crate::page_size::fit_drawing),
+    (MORE_SIZES, |a, ui| crate::print_ui::open_setup(a, ui, 1)),
+    (AUTO_SIZE, crate::page_size::auto_size),
+    (DRAWING_SCALE, |a, ui| crate::print_ui::open_setup(a, ui, 2)),
+    (SIZE_LETTER, |a, ui| crate::page_size::size(a, ui, SIZE_LETTER)),
+    (SIZE_LEGAL, |a, ui| crate::page_size::size(a, ui, SIZE_LEGAL)),
+    (SIZE_TABLOID, |a, ui| crate::page_size::size(a, ui, SIZE_TABLOID)),
+    (SIZE_EXECUTIVE, |a, ui| crate::page_size::size(a, ui, SIZE_EXECUTIVE)),
+    (SIZE_A5, |a, ui| crate::page_size::size(a, ui, SIZE_A5)),
+    (SIZE_A4, |a, ui| crate::page_size::size(a, ui, SIZE_A4)),
+    (SIZE_A3, |a, ui| crate::page_size::size(a, ui, SIZE_A3)),
+    (SIZE_B5, |a, ui| crate::page_size::size(a, ui, SIZE_B5)),
+    (SIZE_B4, |a, ui| crate::page_size::size(a, ui, SIZE_B4)),
+    // (JD8 rest: Zeichentools, Bilder, Inhalte einfügen, Ebenen, Nach Typ auswählen)
+    (DRAW_TOOLS, crate::cmds_draw::draw_tools),
+    (FREEFORM, |a, _| crate::edit_cmds::tool(a, FREEFORM)),
+    (ARC, |a, _| crate::edit_cmds::tool(a, ARC)),
+    (PICTURE_FILE, crate::cmds_picture::open),
+    (PASTE_SPECIAL, crate::cmds_paste::special),
+    (PASTE_LINK, crate::cmds_paste::link),
+    (LAYER_ASSIGN, crate::layers::open_assign),
+    (LAYER_PROPERTIES, crate::layers::open_props),
+    (SELECT_BY_TYPE, crate::select_type::open),
+    // (JD8 rest: Text, Felder, Links, Suchen -- cmds_text.rs, dlg_*.rs)
+    (TEXT_DIALOG, crate::dlg_text::open),
+    (FORMAT_TEXT, crate::dlg_text::open),
+    (TEXT_BOX_V, |a, _| crate::edit_cmds::tool(a, TEXT_BOX_V)),
+    (FIELD, crate::dlg_field::open),
+    (LINK, crate::dlg_link::open),
+    (HYPERLINK, crate::dlg_link::open),
+    (FIND, |a, ui| crate::dlg_find::open(a, ui, false)),
+    (REPLACE, |a, ui| crate::dlg_find::open(a, ui, true)),
 ];
 
 // toggles: whether the command is on
@@ -483,6 +569,25 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (TEXT_JUSTIFY, |a| a.format.halign_now == Some(3)),
     (FORMAT_PAINTER, |a| a.format.painter.is_some()),
     (THEME_NEW_SHAPES, crate::design_gallery::new_shapes),
+    // (JD8 rest: pages) the orientation, the size and the automatic size of the page shown
+    (PORTRAIT, |a| crate::page_size::checked(a, PORTRAIT)),
+    (LANDSCAPE, |a| crate::page_size::checked(a, LANDSCAPE)),
+    (AUTO_SIZE, |a| crate::page_size::checked(a, AUTO_SIZE)),
+    (SIZE_LETTER, |a| crate::page_size::checked(a, SIZE_LETTER)),
+    (SIZE_LEGAL, |a| crate::page_size::checked(a, SIZE_LEGAL)),
+    (SIZE_TABLOID, |a| crate::page_size::checked(a, SIZE_TABLOID)),
+    (SIZE_EXECUTIVE, |a| crate::page_size::checked(a, SIZE_EXECUTIVE)),
+    (SIZE_A5, |a| crate::page_size::checked(a, SIZE_A5)),
+    (SIZE_A4, |a| crate::page_size::checked(a, SIZE_A4)),
+    (SIZE_A3, |a| crate::page_size::checked(a, SIZE_A3)),
+    (SIZE_B5, |a| crate::page_size::checked(a, SIZE_B5)),
+    (SIZE_B4, |a| crate::page_size::checked(a, SIZE_B4)),
+    // (JD8 rest: Zeichentools)
+    (DRAW_TOOLS, crate::cmds_draw::any_tool),
+    (FREEFORM, |a| a.tool == FREEFORM),
+    (ARC, |a| a.tool == ARC),
+    // (JD8 rest: Text, Felder, Links, Suchen)
+    (TEXT_BOX_V, |a| a.tool == TEXT_BOX_V),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -497,7 +602,16 @@ pub(crate) fn enabled(id: u32) -> bool {
 
 /// (JD7) the command exists and can run now (a selection, something to undo ...)
 pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
-    enabled(id) && crate::edit_cmds::available(app, id) && crate::format_menus::available(app, id)
+    enabled(id)
+        && crate::edit_cmds::available(app, id)
+        && crate::format_menus::available(app, id)
+        // (JD8 rest) menu buttons, panes, pages, pasting, layers, text
+        && crate::cmds_shell::available(app, id)
+        && crate::pages::available(app, id)
+        && crate::page_size::available(app, id)
+        && crate::cmds_paste::available(app, id)
+        && crate::layers::available(app, id)
+        && crate::cmds_text::available(app, id)
 }
 
 /// the toggle is on

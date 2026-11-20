@@ -15,7 +15,8 @@
 //
 // The text comes as the file keeps it (Text: characters between cp, pp, tp and fld marks,
 // JD3): a cp mark selects the Character row for what follows, a pp mark the Paragraph row; a
-// field shows the text Visio cached in it (no formula is evaluated); LF ends a paragraph,
+// field Visio wrote with its text inside shows that text, one without text inside (a field of
+// JFDiagrammer) its Field row's value in its format (field.rs); LF ends a paragraph,
 // U+2028 breaks a line inside one, the last LF of a text is Visio's end mark and makes no empty
 // paragraph.  Character cells: Font, Size, Color, ColorTrans, Style (1 bold, 2 italic,
 // 4 underline, 8 small caps), Case (1 all caps, 2 initial caps), Pos (1 superscript,
@@ -197,7 +198,7 @@ impl Builder<'_, '_> {
                     push_text(&mut cur, &mut paras, cp, &mut pp, &v);
                 }
                 Mark::Other(xml) => {
-                    if let Some(v) = cached_field(doc.str(*xml)) {
+                    if let Some(v) = crate::field::cached(doc.str(*xml)) {
                         push_text(&mut cur, &mut paras, cp, &mut pp, &v);
                     }
                 }
@@ -486,14 +487,10 @@ impl Builder<'_, '_> {
         }
     }
 
-    /// the cached text of the field in Field row ix (fld elements without cached text)
+    /// the text of the field in Field row ix (fld elements without cached text): its value in
+    /// its format picture (field.rs)
     fn field_text(&self, sheet: SheetRef, ix: u32) -> String {
-        let sec = SecKey::one(names::FIELD);
-        match self.row_val(sheet, sec, RowKey::Index(ix), "Value") {
-            Value::Text(s) => String::from(self.doc.str(s)),
-            Value::Num(x) => fmt_num(x),
-            Value::Absent => String::new(),
-        }
+        crate::field::shown(self.doc, sheet, ix)
     }
 
     fn text_background(&self, sheet: SheetRef) -> Option<u32> {
@@ -722,31 +719,6 @@ fn split_words(s: &str) -> Vec<String> {
     out
 }
 
-/// the text inside a <fld ...>text</fld> element as JD3 keeps it
-fn cached_field(xml: &str) -> Option<String> {
-    let t = xml.trim_start();
-    if !(t.starts_with("<fld") || t.contains(":fld")) {
-        return None;
-    }
-    let open_end = t.find('>')?;
-    if t[..open_end].ends_with('/') {
-        return Some(String::new());
-    }
-    let close = t.rfind("</")?;
-    if close < open_end {
-        return None;
-    }
-    Some(super::theme::unescape(&t[open_end + 1..close]))
-}
-
-fn fmt_num(x: f64) -> String {
-    if x == (x as i64) as f64 && x.abs() < 1e15 {
-        alloc::format!("{}", x as i64)
-    } else {
-        alloc::format!("{x}")
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -754,12 +726,5 @@ mod tests {
     #[test]
     fn words_split() {
         assert_eq!(split_words("ab  cd-ef\u{2028}g"), alloc::vec!["ab", "  ", "cd-", "ef", "\u{2028}", "g"]);
-    }
-
-    #[test]
-    fn fields_keep_their_text() {
-        assert_eq!(cached_field("<fld IX='0'>12.11.2026 &amp; mehr</fld>").as_deref(), Some("12.11.2026 & mehr"));
-        assert_eq!(cached_field("<fld IX='1'/>").as_deref(), Some(""));
-        assert_eq!(cached_field("<x/>"), None);
     }
 }

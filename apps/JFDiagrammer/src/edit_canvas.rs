@@ -112,10 +112,13 @@ pub(crate) fn tool_of(app: &Diagrammer) -> u32 {
     }
     match app.tool {
         CONNECTOR_TOOL => SE_CONNECT,
-        LINE_TOOL | FREEFORM | ARC | PENCIL => SE_LINE,
+        LINE_TOOL | PENCIL => SE_LINE,
+        // (JD8 rest) the freeform and the arc tool (cmds_draw.rs)
+        FREEFORM => SE_FREEFORM,
+        ARC => SE_ARC,
         RECTANGLE => SE_RECT,
         ELLIPSE => SE_ELLIPSE,
-        TEXT_TOOL => SE_TEXT,
+        TEXT_TOOL | TEXT_BOX_V => SE_TEXT,
         _ => SE_POINTER,
     }
 }
@@ -198,11 +201,20 @@ pub(crate) fn model(app: &mut Diagrammer) {
             cur = doc.shape(p).and_then(|s| s.parent());
         }
     }
+    // (JD8 rest) the page's layers: hidden shapes are left out, locked ones not selectable
+    let layer_flags = crate::layers::Flags::of(doc, page);
     let add = |r: ShapeRef, parent: u64, m: &mut Model, eng: &mut diagram_core::formula::Engine| {
         let Some(s) = doc.shape(r) else { return };
         if s.is_deleted() {
             return;
         }
+        let layered = match &layer_flags {
+            Some(lf) => match lf.flags(doc, r) {
+                Some(f) => f,
+                None => return,
+            },
+            None => 0,
+        };
         let sheet = SheetRef::Shape(r);
         // guides: lines for the edit layer, no frame
         if s.header().kind == ShapeKind::Guide {
@@ -238,6 +250,7 @@ pub(crate) fn model(app: &mut Diagrammer) {
             flags |= SEF_GROUP;
         }
         flags |= lock_flags(&ops::locks(eng, doc, r));
+        flags |= layered;
         // (JD10) no Verbindungspfeile on containers, lists, callouts
         if crate::structures_cmds::no_arrows(doc, r) {
             flags |= SEF_NOARROWS;
@@ -360,10 +373,24 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
     let paint = crate::viewer::paint(app, k);
     let nodes: Vec<DNode> = crate::viewer::sheet_node(app, k).into_iter().collect();
     let ver = app.opened.as_ref().map_or(0, |o| crate::viewer::canvas_ver(o.serial, k, o.ed.rev));
-    let dm = DModel { nodes: &nodes, ports: &[], edges: &[], wps: &[], ver: app.opened.as_ref().map_or(0, |o| o.serial.wrapping_mul(4096).wrapping_add(k as u32 + 1)) };
+    // (JD8 rest: pages) the page's size in the version: ui.diagram fits and scrolls by the node's
+    // box, which it takes anew only when the version changes (orientation, size, automatic size)
+    let size_key = nodes.first().map_or(0, |n| (n.rect[2].to_bits() ^ n.rect[3].to_bits().rotate_left(13)).wrapping_mul(0x9E37_79B9));
+    let dm = DModel { nodes: &nodes, ports: &[], edges: &[], wps: &[], ver: app.opened.as_ref().map_or(0, |o| o.serial.wrapping_mul(4096).wrapping_add(k as u32 + 1)) ^ size_key };
     let paint: Option<Rc<dyn DgPaint>> = paint.map(|p| p as Rc<dyn DgPaint>);
+    // (JD8 rest) a shape with a hyperlink under the pointer: the link pointer and its QuickInfo;
+    // Ctrl+click follows the link, and the edit layer does not see that press (dlg_link.rs)
+    let link = link_hover(app, ui, k);
+    if link.is_some() {
+        let cur = crate::dlg_link::cursor(app, ui);
+        ui.cursor_next(cur);
+    }
     ui.next_size(-1, -1);
     ui.diagram(id, &mut app.canvas, &dm, DG_EDIT, paint, ver);
+    let follow = link.as_ref().filter(|_| ui.pressed() & (1 << BTN_LEFT) != 0 && ui.mods() & (MOD_CTRL | MOD_SHIFT | MOD_ALT) == MOD_CTRL && ui.last_state() & SS_HOVER as u32 != 0).map(|l| l.0);
+    if let Some((key, tip)) = &link {
+        ui.tooltip_part(tip, *key);
+    }
     // (JD9) the canvas takes the Shapes panel's tiles (its rectangle is the last one)
     crate::stencils_drop::drop_target(app, ui, id);
     // the edit layer; (JD10) the insert triangles of the lists
@@ -383,10 +410,13 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
             hit_at(doc, view.drawing(), &geo, page, p, tol, within)
         };
         let sm = SeModel { shapes: &m.shapes, points: &m.points, guides: &m.guides, marks: &marks, ver: m.ver, hit: &hitf };
-        ui.shape_edit(id, &mut app.se, &mut app.canvas, &sm, tool)
+        if follow.is_some() { Vec::new() } else { ui.shape_edit(id, &mut app.se, &mut app.canvas, &sm, tool) }
     };
     for ev in evs {
         apply(app, ui, ev);
+    }
+    if let Some(key) = follow {
+        crate::dlg_link::follow_key(app, ui, key);
     }
     // (JD10) the selection's order, the glow of a container under a dragged shape
     crate::structures::sync_order(app);
@@ -428,10 +458,34 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
     }
 }
 
+// (JD8 rest) the top-level shape with a hyperlink under the pointer and its QuickInfo: with the
+// pointer tool, nothing being dragged or edited, no menu open
+fn link_hover(app: &Diagrammer, ui: &Ui, k: usize) -> Option<(u64, String)> {
+    let vp = app.canvas.vp;
+    let (mx, my) = ui.mouse();
+    if tool_of(app) != SE_POINTER || app.se.busy() || app.text.is_some() || ui.popup_count() != 0 {
+        return None;
+    }
+    if mx < vp.rect[0] || my < vp.rect[1] || mx >= vp.rect[0] + vp.rect[2] || my >= vp.rect[1] + vp.rect[3] {
+        return None;
+    }
+    let (Some(o), Some(geo), Some(page)) = (app.opened.as_ref(), app.model.geo, app.model.page) else { return None };
+    let pv = o.paint_of(k)?;
+    let view = pv.view();
+    let scale = vp.scale() as f32;
+    let tol = if scale > 0.0 { ui.dp(3) as f32 / scale } else { 3.0 };
+    let key = hit_at(&o.doc, view.drawing(), &geo, page, vp.to_world(mx as f32 + 0.5, my as f32 + 0.5), tol, 0);
+    if key == 0 {
+        return None;
+    }
+    crate::dlg_link::tip(app, shape_of(page, key)).map(|t| (key, t))
+}
+
 /// a shape's name for scripts and screen readers: its text (the first line), else its name
 pub(crate) fn shape_label(doc: &Document, s: ShapeRef) -> String {
     let Some(sh) = doc.shape(s) else { return String::new() };
-    let text = sh.text().map(|t| t.chars()).unwrap_or_default();
+    // (JD8 rest) fields count with the text they show
+    let text = diagram_core::field::plain(doc, s);
     let line = text.split(['\n', '\u{2028}', '\u{2029}']).find(|l| !l.trim().is_empty()).unwrap_or("").trim();
     if !line.is_empty() {
         return String::from(line);
@@ -690,6 +744,10 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
         crate::stencils_drop::clicked(app, ui, a);
         return;
     }
+    // (JD8 rest) a freeform stroke, an arc (cmds_draw.rs)
+    if crate::cmds_draw::apply(app, ui, &ev) {
+        return;
+    }
     // (JD10) a running move (the glow), the Verbindungspfeile, the insert triangles
     crate::structures::track(app, &ev);
     match ev {
@@ -810,9 +868,15 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
                 SE_TEXT => ops::Basic::TextBox,
                 _ => ops::Basic::Rectangle,
             };
-            // a click with the text tool: a box of the default size around the point
+            // a click with the text tool: a box of the default size around the point; (JD8 rest)
+            // the vertical text box stands upright
+            let vertical = tool == SE_TEXT && app.tool == TEXT_BOX_V;
             if (pa[0] - pb[0]).abs() < 1e-9 && (pa[1] - pb[1]).abs() < 1e-9 {
-                let (w, h) = if tool == SE_TEXT { (1.0 / geo.scale, 0.25 / geo.scale) } else { (0.0, 0.0) };
+                let (w, h) = match (tool == SE_TEXT, vertical) {
+                    (true, false) => (1.0 / geo.scale, 0.25 / geo.scale),
+                    (true, true) => (0.25 / geo.scale, 1.0 / geo.scale),
+                    _ => (0.0, 0.0),
+                };
                 pa = [pa[0] - w * 0.5, pa[1] - h * 0.5];
                 pb = [pb[0] + w * 0.5, pb[1] + h * 0.5];
             }
@@ -826,6 +890,9 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
             } else {
                 match edit_doc::edit(o, label, true, |tx, eng| {
                     let s = ops::new_shape(tx, eng, owner, kind, pa, pb)?;
+                    if vertical {
+                        crate::cmds_text::vertical(tx, eng, s, (pa[1] - pb[1]).abs())?;
+                    }
                     // (JD10) drawn inside a container: a member
                     crate::structures::joined(tx, eng, owner, &[s])?;
                     Ok(s)

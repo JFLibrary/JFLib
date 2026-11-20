@@ -1,0 +1,108 @@
+#!args --no-system-fonts --save-dir build
+# JFDiagrammer, JD8 rest: Start › Tools › Zeichentools (RS-16, KB-09) -- the split button
+# repeats the drawing tool used last (at first the rectangle) and is checked while one of its
+# tools is on; Shift draws a square; the freeform tool turns a stroke into a smoothed 1-D shape
+# (NURBS), the arc tool a quarter ellipse (EllipticalArcTo); both glue their ends to connection
+# points like the line and keep them when the shape moves; each is one undo step; saved and
+# opened again they are the same
+# (the shapes are drawn across the page's edge: Automatisch anpassen, on in a new drawing since
+# the pages came, would let the page grow under them; this script is about the tools)
+cmd 4870
+expect button:"Zeichentools" enabled
+expect button:"Zeichentools" unchecked
+cmd 4403
+expect button:"Zeichentools" checked
+# a square with Shift: the box follows the longer side
+drag 300,250 400,300 shift
+expect listitem:"Sheet.4" rect 299 248 101 101
+# Shift while moving: along one axis (the farther one)
+cmd 4400
+drag 350,300 410,320 shift
+expect listitem:"Sheet.4" rect 349 248 101 101
+key ctrl+z
+# the ellipse tool from its key (Strg+9), then the pointer; Zeichentools repeats the ellipse
+key ctrl+9
+cmd 4400
+expect button:"Zeichentools" unchecked
+cmd 4403
+click button:"Zeichentools: Weitere Optionen"
+expect "Ellipse" checked
+key esc
+# two rectangles with connection points from the stencil to glue to
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+click button:"Rechteck"
+click 750,300
+click button:"Rechteck"
+click 750,550
+cmd 4400
+click 1000,700
+# Freihandform (Strg+5): a wavy stroke from the first rectangle's bottom to the second's top
+key ctrl+5
+expect button:"Zeichentools" checked
+down 751,324
+move 740,340
+move 715,370
+move 700,400
+move 705,430
+move 730,460
+move 760,480
+move 770,500
+up 751,525
+expect listitem:"Sheet.7" selected
+expect listitem:"Sheet.7" rect 704 324 61 201
+expect button:"Anfangspunkt" rect 747 319 10 10
+expect button:"Endpunkt" rect 747 520 10 10
+shot build/JFDiagrammer-draw-tools.png
+# Bogen (Strg+7): from the first rectangle's right side, leaving it horizontally, to a free point
+key ctrl+7
+down 802,298
+move 830,300
+move 900,360
+up 950,450
+expect listitem:"Sheet.8" selected
+expect listitem:"Sheet.8" rect 802 299 151 150
+expect button:"Anfangspunkt" rect 797 294 10 10
+# it bows as the drag started: a click on its middle selects it, a click where the other
+# quarter would run does not
+cmd 4400
+click 846,405
+expect listitem:"Sheet.8" unselected
+click 909,343
+expect listitem:"Sheet.8" selected
+# the first rectangle moves two grid steps right: both glued ends follow
+click 1000,700
+drag 760,290 810,290
+expect listitem:"Rechteck" rect 752 273 100 51
+expect listitem:"Sheet.7" rect 731 324 71 201
+expect listitem:"Sheet.8" rect 852 299 103 150
+# undo: the move, then the arc (one step each); redo both
+key ctrl+z
+expect listitem:"Sheet.7" rect 704 324 61 201
+key ctrl+z
+expect listitem:"Sheet.8" missing
+key ctrl+y
+key ctrl+y
+expect listitem:"Sheet.8" rect 852 299 103 150
+# saved and opened again: the same shapes, still glued
+key ctrl+s
+expect dialog:"Speichern unter" exists
+click #28940
+key ctrl+a
+type "jd8-draw-tools.vsdx"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+cmd 4097
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+expect listitem:"Sheet.7" missing
+cmd 4098
+click button:"jd8-draw-tools.vsdx"
+expect text:"jd8-draw-tools – JFDiagrammer" exists
+expect listitem:"Sheet.7" rect 731 324 71 201
+expect listitem:"Sheet.8" rect 852 299 103 150
+cmd 4400
+drag 800,290 750,290
+expect listitem:"Sheet.7" rect 704 324 61 201
+expect listitem:"Sheet.8" rect 802 299 151 150
