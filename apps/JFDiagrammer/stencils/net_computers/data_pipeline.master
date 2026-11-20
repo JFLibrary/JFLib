@@ -1,0 +1,33 @@
+# Datenleitung (JD13, eigene Grafik im JFNetworker-Stil)
+master: Data pipeline
+name.de: Datenleitung
+name.en: Data pipeline
+name.es: Canalización de datos
+name.it: Pipeline di dati
+name.fr: Pipeline de données
+prompt.de: Datenleitung: Datenleitung oder Datenstrom zwischen Systemen.
+prompt.en: Data pipeline: data line or data flow between systems.
+prompt.es: Canalización de datos: línea o flujo de datos entre sistemas.
+prompt.it: Pipeline di dati: linea o flusso di dati tra sistemi.
+prompt.fr: Pipeline de données : ligne ou flux de données entre systèmes.
+keywords.de: Datenleitung, Daten
+keywords.en: Data pipeline, data
+keywords.es: Canalización de datos, datos
+keywords.it: Pipeline di dati, dati
+keywords.fr: Pipeline de données, données
+svg: ../../symbols/network/data_pipeline.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Daten
+    Value.en = Data
+    Value.es = Datos
+    Value.it = Dati
+    Value.fr = Données
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Datenleitung
+    Value.en = Data pipeline
+    Value.es = Canalización de datos
+    Value.it = Pipeline di dati
+    Value.fr = Pipeline de données

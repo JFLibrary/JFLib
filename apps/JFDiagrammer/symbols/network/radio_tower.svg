@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Radio tower: a lattice mast with an antenna, sending</title>
+  <path class="tint" d="M35.83 7.79A5 5 0 0 1 35.83 14.21M28.17 14.21A5 5 0 0 1 28.17 7.79M39.28 4.89A9.5 9.5 0 0 1 39.28 17.11M24.72 17.11A9.5 9.5 0 0 1 24.72 4.89" stroke="#3E8A86" stroke-width="2.25"/>
+  <rect class="shade" x="19" y="41.5" width="26" height="3" rx="0.8" fill="#DCDFE3"/>
+  <path class="ink" d="M30.75 17L35.42 24M33.25 17L28.58 24M28.58 24L37.9 32M35.42 24L26.1 32M26.1 32L41 42M37.9 32L23 42M28.58 24H35.42M26.1 32H37.9" stroke-width="1"/>
+  <path class="ink" d="M30.75 17L23 42M33.25 17L41 42M30.75 17H33.25M32 17V12.75"/>
+  <circle class="body" cx="32" cy="11" r="1.75" fill="#F7F8FA" stroke-width="1.25"/>
+</svg>

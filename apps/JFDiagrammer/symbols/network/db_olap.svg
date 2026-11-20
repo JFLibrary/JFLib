@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>OLAP database: a data cube in front of a database cylinder</title>
+  <path class="body" d="M28 8V34A13 3.5 0 0 0 54 34V8A13 3.5 0 0 0 28 8Z" fill="#F7F8FA"/>
+  <ellipse class="body" cx="41" cy="8" rx="13" ry="3.5" fill="#F7F8FA"/>
+  <path class="ink" d="M28 17A13 3.5 0 0 0 54 17M28 25.5A13 3.5 0 0 0 54 25.5" stroke-width="1.25"/>
+  <polygon class="shade" points="10,22 16,16 36,16 30,22" fill="#DCDFE3"/>
+  <path class="ink" d="M16.67 22L22.67 16M23.33 22L29.33 16M13 19H33" stroke-width="0.75"/>
+  <rect class="tint" x="10" y="22" width="20" height="20" fill="#8E8540"/>
+  <path class="body" d="M16.67 23V41M23.33 23V41M11 28.67H29M11 35.33H29" stroke="#F7F8FA" stroke-width="1"/>
+</svg>

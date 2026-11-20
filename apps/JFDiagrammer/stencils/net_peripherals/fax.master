@@ -1,0 +1,33 @@
+# Fax (JD13, eigene Grafik im JFNetworker-Stil)
+master: Fax
+name.de: Fax
+name.en: Fax
+name.es: Fax
+name.it: Fax
+name.fr: Télécopieur
+prompt.de: Fax: Faxgerät.
+prompt.en: Fax: fax machine.
+prompt.es: Fax: aparato de fax.
+prompt.it: Fax: apparecchio fax.
+prompt.fr: Télécopieur : télécopieur.
+keywords.de: Fax, Peripherie, Büro
+keywords.en: Fax, peripheral, office
+keywords.es: Fax, periférico, oficina
+keywords.it: Fax, periferica, ufficio
+keywords.fr: Télécopieur, périphérique, bureau
+svg: ../../symbols/network/fax.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Fax
+    Value.en = Fax
+    Value.es = Fax
+    Value.it = Fax
+    Value.fr = Télécopieur

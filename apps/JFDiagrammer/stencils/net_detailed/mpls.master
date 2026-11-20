@@ -1,0 +1,33 @@
+# MPLS-Netz (JD13, eigene Grafik im JFNetworker-Stil)
+master: MPLS
+name.de: MPLS-Netz
+name.en: MPLS network
+name.es: Red MPLS
+name.it: Rete MPLS
+name.fr: Réseau MPLS
+prompt.de: MPLS-Netz: Netz mit Label-Switching beim Anbieter.
+prompt.en: MPLS network: provider network with label switching.
+prompt.es: Red MPLS: red del proveedor con conmutación de etiquetas.
+prompt.it: Rete MPLS: rete del provider con commutazione a etichette.
+prompt.fr: Réseau MPLS : réseau d'opérateur à commutation d'étiquettes.
+keywords.de: MPLS-Netz, Netzwerk
+keywords.en: MPLS network, network
+keywords.es: Red MPLS, red
+keywords.it: Rete MPLS, rete
+keywords.fr: Réseau MPLS, réseau
+svg: ../../symbols/network/mpls_cloud.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = MPLS-Netz
+    Value.en = MPLS network
+    Value.es = Red MPLS
+    Value.it = Rete MPLS
+    Value.fr = Réseau MPLS

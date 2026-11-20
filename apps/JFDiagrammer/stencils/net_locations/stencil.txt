@@ -1,3 +1,4 @@
+# Netzwerkstandorte (SH-153, JD13): eigene Shapes im JFNetworker-Stil, Grafiken aus ../../symbols/
 stencil: Network Locations
 file: netloc
 name.de: Netzwerkstandorte
@@ -6,5 +7,5 @@ name.es: Ubicaciones de red
 name.it: Sedi di rete
 name.fr: Sites réseau
 category: network
-masters: building
-quick: 1
+masters: building, data_center, cloud, house, government, town, university, city
+quick: 4

@@ -1,0 +1,33 @@
+# Multifunktionsgerät (JD13, eigene Grafik im JFNetworker-Stil)
+master: Multifunction device
+name.de: Multifunktionsgerät
+name.en: Multifunction device
+name.es: Dispositivo multifunción
+name.it: Dispositivo multifunzione
+name.fr: Appareil multifonction
+prompt.de: Multifunktionsgerät: druckt, scannt, kopiert und faxt.
+prompt.en: Multifunction device: prints, scans, copies and faxes.
+prompt.es: Dispositivo multifunción: imprime, escanea, copia y envía faxes.
+prompt.it: Dispositivo multifunzione: stampa, scansiona, copia e invia fax.
+prompt.fr: Appareil multifonction : imprime, numérise, copie et faxe.
+keywords.de: Multifunktionsgerät, Peripherie, Büro
+keywords.en: Multifunction device, peripheral, office
+keywords.es: Dispositivo multifunción, periférico, oficina
+keywords.it: Dispositivo multifunzione, periferica, ufficio
+keywords.fr: Appareil multifonction, périphérique, bureau
+svg: ../../symbols/network/mfp.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Multifunktionsgerät
+    Value.en = Multifunction device
+    Value.es = Dispositivo multifunción
+    Value.it = Dispositivo multifunzione
+    Value.fr = Appareil multifonction

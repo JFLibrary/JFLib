@@ -1,0 +1,33 @@
+# Dateiserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: File server
+name.de: Dateiserver
+name.en: File server
+name.es: Servidor de archivos
+name.it: File server
+name.fr: Serveur de fichiers
+prompt.de: Dateiserver: legt Dateien zentral ab.
+prompt.en: File server: stores files centrally.
+prompt.es: Servidor de archivos: almacena archivos de forma central.
+prompt.it: File server: archivia i file in modo centralizzato.
+prompt.fr: Serveur de fichiers : stocke les fichiers de façon centrale.
+keywords.de: Dateiserver, Server, Rolle
+keywords.en: File server, server, role
+keywords.es: Servidor de archivos, servidor, función
+keywords.it: File server, server, ruolo
+keywords.fr: Serveur de fichiers, serveur, rôle
+svg: ../../symbols/network/server_file.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Dateiserver
+    Value.en = File server
+    Value.es = Servidor de archivos
+    Value.it = File server
+    Value.fr = Serveur de fichiers

@@ -1,0 +1,33 @@
+# Lastverteiler (JD13, eigene Grafik im JFNetworker-Stil)
+master: Load balancer
+name.de: Lastverteiler
+name.en: Load balancer
+name.es: Equilibrador de carga
+name.it: Bilanciatore di carico
+name.fr: Répartiteur de charge
+prompt.de: Lastverteiler: verteilt Anfragen auf mehrere Server.
+prompt.en: Load balancer: spreads requests over several servers.
+prompt.es: Equilibrador de carga: reparte las solicitudes entre varios servidores.
+prompt.it: Bilanciatore di carico: distribuisce le richieste su più server.
+prompt.fr: Répartiteur de charge : répartit les requêtes sur plusieurs serveurs.
+keywords.de: Lastverteiler, Netzwerk
+keywords.en: Load balancer, network
+keywords.es: Equilibrador de carga, red
+keywords.it: Bilanciatore di carico, rete
+keywords.fr: Répartiteur de charge, réseau
+svg: ../../symbols/network/load_balancer.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Lastverteiler
+    Value.en = Load balancer
+    Value.es = Equilibrador de carga
+    Value.it = Bilanciatore di carico
+    Value.fr = Répartiteur de charge

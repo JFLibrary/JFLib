@@ -1,3 +1,4 @@
+# Switch (JD13, eigene Grafik im JFNetworker-Stil)
 master: Switch
 name.de: Switch
 name.en: Switch
@@ -9,15 +10,16 @@ prompt.en: Switch: connects devices in the local network.
 prompt.es: Conmutador: conecta dispositivos en la red local.
 prompt.it: Switch: collega i dispositivi nella rete locale.
 prompt.fr: Commutateur : relie les appareils du réseau local.
-keywords.de: Switch, Layer 2, LAN, Ethernet, Netzwerk
-keywords.en: switch, layer 2, LAN, Ethernet, network
-keywords.es: conmutador, switch, capa 2, LAN, Ethernet, red
-keywords.it: switch, livello 2, LAN, Ethernet, rete
-keywords.fr: commutateur, switch, couche 2, LAN, Ethernet, réseau
-svg: switch_l2.svg
+keywords.de: Switch, Netzwerk
+keywords.en: Switch, network
+keywords.es: Conmutador, red
+keywords.it: Switch, rete
+keywords.fr: Commutateur, réseau
+svg: ../../symbols/network/switch_l2.svg
 include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
 
 [Property]
+NumberofPorts: Value = 24
 ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
     Value.de = Netzwerk
     Value.en = Network

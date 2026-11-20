@@ -1,0 +1,45 @@
+# Drucker (JD13, eigene Grafik im JFNetworker-Stil)
+master: Printer
+name.de: Drucker
+name.en: Printer
+name.es: Impresora
+name.it: Stampante
+name.fr: Imprimante
+prompt.de: Drucker: Drucker in Frontansicht.
+prompt.en: Printer: printer in front view.
+prompt.es: Impresora: impresora en vista frontal.
+prompt.it: Stampante: stampante in vista frontale.
+prompt.fr: Imprimante : imprimante en vue de face.
+keywords.de: Drucker, Frontansicht, Regal
+keywords.en: Printer, front view, shelf
+keywords.es: Impresora, vista frontal, estante
+keywords.it: Stampante, vista frontale, ripiano
+keywords.fr: Imprimante, vue de face, étagère
+svg: ../../symbols/rack/front_printer.svg
+scale: 1:20
+include: ../net_common/asset.inc, ../net_common/network.inc
+
+[Shape]
+Width = 100 mm
+Width.us = 3.9370 in
+Height = 50 mm
+Height.us = 1.9685 in
+TxtPinY = 0 mm
+TxtLocPinY = TxtHeight
+TxtHeight = 160 mm
+TxtWidth = Width*2
+VerticalAlign = 0
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Freistehend
+    Value.en = Freestanding
+    Value.es = Independiente
+    Value.it = Autoportante
+    Value.fr = Autonome
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Drucker
+    Value.en = Printer
+    Value.es = Impresora
+    Value.it = Stampante
+    Value.fr = Imprimante

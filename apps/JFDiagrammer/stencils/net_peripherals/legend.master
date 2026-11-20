@@ -1,0 +1,61 @@
+# Legende (JD13, SH-151): zählt die Geräte der Seite.  JFDiagrammer schreibt den Text neu, wenn
+# Shapes abgelegt, eingefügt oder gelöscht werden: die Überschrift, dann je Gerätetyp Anzahl und
+# Name.  Gezählt werden Shapes mit User.visLegendShape (wie bei Visio), getrennt nach ihrem Namen
+# ohne „.ID“.  User.JFD_Legend kennzeichnet das Shape als Legende.
+master: Legend
+name.de: Legende
+name.en: Legend
+name.es: Leyenda
+name.it: Legenda
+name.fr: Légende
+prompt.de: Legende: zählt die Geräte auf der Seite und hält die Liste aktuell.
+prompt.en: Legend: counts the devices on the page and keeps the list up to date.
+prompt.es: Leyenda: cuenta los dispositivos de la página y mantiene la lista actualizada.
+prompt.it: Legenda: conta i dispositivi della pagina e tiene aggiornato l'elenco.
+prompt.fr: Légende : compte les appareils de la page et tient la liste à jour.
+keywords.de: Legende, Anzahl, Zählung, Stückliste, Inventar
+keywords.en: legend, count, tally, bill of materials, inventory
+keywords.es: leyenda, recuento, lista de materiales, inventario
+keywords.it: legenda, conteggio, distinta, inventario
+keywords.fr: légende, comptage, nomenclature, inventaire
+text.de: Legende
+text.en: Legend
+text.es: Leyenda
+text.it: Legenda
+text.fr: Légende
+
+[Shape]
+Width = 60 mm
+Width.us = 2.4 in
+Height = 30 mm
+Height.us = 1.2 in
+LineWeight = 0.75 pt
+LineColor = #2E343B
+FillForegnd = #F7F8FA
+FillBkgnd = #F7F8FA
+FillPattern = 1
+VerticalAlign = 0
+LeftMargin = 3 mm
+LeftMargin.us = 0.12 in
+RightMargin = 3 mm
+RightMargin.us = 0.12 in
+TopMargin = 2 mm
+TopMargin.us = 0.08 in
+
+[User]
+JFD_Legend: Value = TRUE
+
+[Paragraph]
+Row  HorzAlign = 0
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height-8 mm
+LineTo  X = Width; Y = Height-8 mm

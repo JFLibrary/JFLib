@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Host computer: a wide cabinet with drive bays, grille and power button</title>
+  <rect class="port" x="10" y="42.5" width="6" height="2" rx="0.6" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="48" y="42.5" width="6" height="2" rx="0.6" fill="#4F555D" stroke="none"/>
+  <rect class="body" x="5" y="6" width="54" height="37" rx="2" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M7 6H10.5V43H7A2 2 0 0 1 5 41V8A2 2 0 0 1 7 6Z" fill="#6A6390" stroke="none"/>
+  <rect class="ink" x="5" y="6" width="54" height="37" rx="2"/>
+  <g class="shade" fill="#DCDFE3" stroke-width="0.75">
+    <rect x="14" y="10" width="19" height="4" rx="0.5"/><rect x="36" y="10" width="19" height="4" rx="0.5"/>
+    <rect x="14" y="15.5" width="19" height="4" rx="0.5"/><rect x="36" y="15.5" width="19" height="4" rx="0.5"/>
+    <rect x="14" y="21" width="19" height="4" rx="0.5"/><rect x="36" y="21" width="19" height="4" rx="0.5"/>
+  </g>
+  <path class="port" d="M26 12H30.5M48 12H52.5M26 17.5H30.5M48 17.5H52.5M26 23H30.5M48 23H52.5" stroke="#4F555D" stroke-width="0.9"/>
+  <path class="port" d="M14 29.5H43M14 32H43M14 34.5H43M14 37H43" stroke="#4F555D" stroke-width="1"/>
+  <circle class="body" cx="51" cy="32.5" r="2.25" fill="#F7F8FA" stroke-width="1"/>
+  <path class="ink" d="M51 31.25V33" stroke-width="0.9"/>
+  <circle class="ok" cx="51" cy="38" r="0.9" fill="#3C9A5F" stroke="none"/>
+</svg>

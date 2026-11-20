@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>External hard disk: a flat case with a platter mark, LED and cable</title>
+  <rect class="body" x="8" y="10" width="42" height="28" rx="4" fill="#F7F8FA"/>
+  <path class="tint" d="M8.75 33H49.25V34A3.25 3.25 0 0 1 46 37.25H12A3.25 3.25 0 0 1 8.75 34Z" fill="#7A828C" stroke="none"/>
+  <path class="ink" d="M8.75 33H49.25" stroke-width="1"/>
+  <circle class="shade" cx="22" cy="21.5" r="7.5" fill="#DCDFE3" stroke-width="1"/>
+  <circle class="body" cx="22" cy="21.5" r="1.75" fill="#F7F8FA" stroke-width="1"/>
+  <path class="ink" d="M33 14L26.5 21" stroke-width="1.25"/>
+  <circle class="port" cx="33" cy="14" r="1.2" fill="#4F555D" stroke="none"/>
+  <circle class="ok" cx="44" cy="15" r="1.1" fill="#3C9A5F" stroke="none"/>
+  <rect class="port" x="50" y="21" width="3" height="6" rx="0.6" fill="#4F555D" stroke="none"/>
+  <path class="ink" d="M53 24H55A3.5 3.5 0 0 1 58.5 27.5V43.5"/>
+</svg>

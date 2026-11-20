@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Cache: a cylinder with a lightning bolt</title>
+  <path class="body" d="M17 10V37A15 4 0 0 0 47 37V10A15 4 0 0 0 17 10Z" fill="#F7F8FA"/>
+  <ellipse class="hi" cx="32" cy="10" rx="15" ry="4" fill="#FFFFFF"/>
+  <polygon class="tint" points="34.5,16 25.5,28.5 31,28.5 28.5,38.5 38.5,25 33,25 36.75,16" fill="#8E8540" stroke-width="1"/>
+</svg>

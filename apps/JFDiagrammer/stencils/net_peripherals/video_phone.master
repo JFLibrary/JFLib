@@ -1,0 +1,33 @@
+# Bildtelefon (JD13, eigene Grafik im JFNetworker-Stil)
+master: Video phone
+name.de: Bildtelefon
+name.en: Video phone
+name.es: Videoteléfono
+name.it: Videotelefono
+name.fr: Visiophone
+prompt.de: Bildtelefon: Telefon mit Kamera und Bildschirm.
+prompt.en: Video phone: phone with a camera and a display.
+prompt.es: Videoteléfono: teléfono con cámara y pantalla.
+prompt.it: Videotelefono: telefono con videocamera e schermo.
+prompt.fr: Visiophone : téléphone avec caméra et écran.
+keywords.de: Bildtelefon, Peripherie, Büro
+keywords.en: Video phone, peripheral, office
+keywords.es: Videoteléfono, periférico, oficina
+keywords.it: Videotelefono, periferica, ufficio
+keywords.fr: Visiophone, périphérique, bureau
+svg: ../../symbols/network/video_phone.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Bildtelefon
+    Value.en = Video phone
+    Value.es = Videoteléfono
+    Value.it = Videotelefono
+    Value.fr = Visiophone

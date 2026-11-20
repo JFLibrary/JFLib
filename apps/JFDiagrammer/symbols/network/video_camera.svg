@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Camcorder: side view with lens, top handle and fold-out display</title>
+  <path class="ink" d="M13 15V11.5Q13 9.5 15 9.5H33Q35 9.5 35 11.5V15" stroke-width="1.75"/>
+  <rect class="body" x="5" y="14" width="39" height="23" rx="4" fill="#F7F8FA"/>
+  <rect class="shade" x="44" y="17" width="11" height="17" rx="1.5" fill="#DCDFE3" stroke-width="1.25"/>
+  <path class="ink" d="M48.5 17V34" stroke-width="1"/>
+  <ellipse class="screen" cx="55" cy="25.5" rx="1.75" ry="7" fill="#CAD4DF" stroke-width="1.25"/>
+  <rect class="shade" x="27" y="22" width="3" height="8" fill="#DCDFE3" stroke-width="1"/>
+  <rect class="tint" x="8" y="18" width="19.5" height="15.5" rx="1.5" fill="#7A828C"/>
+  <rect class="screen" x="10.25" y="20.25" width="15" height="11" rx="0.5" fill="#CAD4DF" stroke="none"/>
+  <circle class="ok" cx="39.5" cy="18.5" r="0.9" fill="#3C9A5F" stroke="none"/>
+  <path class="port" d="M34 26H40M34 28.5H40M34 31H40" stroke="#4F555D" stroke-width="1"/>
+</svg>

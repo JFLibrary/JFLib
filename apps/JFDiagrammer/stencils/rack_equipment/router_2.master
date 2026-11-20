@@ -1,0 +1,37 @@
+# Router 2 (JD13, eigene Grafik im JFNetworker-Stil)
+master: Router 2
+name.de: Router 2
+name.en: Router 2
+name.es: Enrutador 2
+name.it: Router 2
+name.fr: Routeur 2
+prompt.de: Router 2: modularer Router, 2 HE.
+prompt.en: Router 2: modular router, 2 U.
+prompt.es: Enrutador 2: enrutador modular, 2 U.
+prompt.it: Router 2: router modulare, 2 U.
+prompt.fr: Routeur 2 : routeur modulaire, 2 U.
+keywords.de: Router 2, Rack, 19 Zoll, HE
+keywords.en: Router 2, rack, 19 inch, U
+keywords.es: Enrutador 2, rack, 19 pulgadas, U
+keywords.it: Router 2, rack, 19 pollici, U
+keywords.fr: Routeur 2, baie, 19 pouces, U
+svg: ../../symbols/rack/router_2u.svg
+scale: 1:20
+size: 482.6 mm x 88.9 mm
+size.us: 19 in x 3.5 in
+include: ../net_common/rackdev.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+RackUnits: Value = 2
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Gestellmontiert
+    Value.en = Rack-mounted
+    Value.es = Montaje en rack
+    Value.it = Montaggio a rack
+    Value.fr = Monté en baie
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Router 2
+    Value.en = Router 2
+    Value.es = Enrutador 2
+    Value.it = Router 2
+    Value.fr = Routeur 2

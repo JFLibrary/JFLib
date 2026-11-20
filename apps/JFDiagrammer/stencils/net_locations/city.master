@@ -1,0 +1,33 @@
+# Großstadt (JD13, eigene Grafik im JFNetworker-Stil)
+master: City
+name.de: Großstadt
+name.en: City
+name.es: Gran ciudad
+name.it: Metropoli
+name.fr: Grande ville
+prompt.de: Großstadt: Großstadt mit Hochhäusern.
+prompt.en: City: city with high-rise buildings.
+prompt.es: Gran ciudad: gran ciudad con rascacielos.
+prompt.it: Metropoli: metropoli con grattacieli.
+prompt.fr: Grande ville : grande ville avec des tours.
+keywords.de: Großstadt, Standort, WAN
+keywords.en: City, location, site, WAN
+keywords.es: Gran ciudad, ubicación, WAN
+keywords.it: Metropoli, sede, WAN
+keywords.fr: Grande ville, site, WAN
+svg: ../../symbols/network/city.svg
+include: ../net_common/symbol.inc, ../net_common/location.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Standort
+    Value.en = Location
+    Value.es = Ubicación
+    Value.it = Sede
+    Value.fr = Site
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Großstadt
+    Value.en = City
+    Value.es = Gran ciudad
+    Value.it = Metropoli
+    Value.fr = Grande ville

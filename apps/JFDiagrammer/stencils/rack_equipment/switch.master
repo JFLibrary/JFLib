@@ -1,20 +1,21 @@
+# Switch (JD13, eigene Grafik im JFNetworker-Stil)
 master: Switch
 name.de: Switch
 name.en: Switch
 name.es: Conmutador
 name.it: Switch
 name.fr: Commutateur
-prompt.de: Switch als 19-Zoll-Einschub, 1 HE, 24 Anschlüsse. Rastet im Gestell auf den Höheneinheiten ein.
-prompt.en: 19-inch rack switch, 1 U, 24 ports. Snaps to the rack units in a rack.
-prompt.es: Conmutador de rack de 19 pulgadas, 1 U, 24 puertos. Se ajusta a las unidades del bastidor.
-prompt.it: Switch rack da 19 pollici, 1 U, 24 porte. Si aggancia alle unità del rack.
-prompt.fr: Commutateur 19 pouces, 1 U, 24 ports. S'aligne sur les unités de la baie.
-keywords.de: Switch, Einschub, 19 Zoll, Rack, HE, Ethernet
-keywords.en: switch, 19 inch, rack, U, Ethernet
-keywords.es: conmutador, switch, rack, 19 pulgadas, U, Ethernet
-keywords.it: switch, rack, 19 pollici, U, Ethernet
-keywords.fr: commutateur, switch, baie, 19 pouces, U, Ethernet
-svg: switch_1u.svg
+prompt.de: Switch: Switch als 19-Zoll-Einschub, 24 Anschlüsse.
+prompt.en: Switch: 19-inch rack switch, 24 ports.
+prompt.es: Conmutador: conmutador de rack de 19 pulgadas, 24 puertos.
+prompt.it: Switch: switch rack da 19 pollici, 24 porte.
+prompt.fr: Commutateur : commutateur 19 pouces, 24 ports.
+keywords.de: Switch, Rack, 19 Zoll, HE
+keywords.en: Switch, rack, 19 inch, U
+keywords.es: Conmutador, rack, 19 pulgadas, U
+keywords.it: Switch, rack, 19 pollici, U
+keywords.fr: Commutateur, baie, 19 pouces, U
+svg: ../../symbols/rack/switch_1u.svg
 scale: 1:20
 size: 482.6 mm x 44.45 mm
 size.us: 19 in x 1.75 in

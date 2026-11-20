@@ -1,0 +1,33 @@
+# Repeater (JD13, eigene Grafik im JFNetworker-Stil)
+master: Repeater
+name.de: Repeater
+name.en: Repeater
+name.es: Repetidor
+name.it: Ripetitore
+name.fr: Répéteur
+prompt.de: Repeater: verstärkt und erneuert das Signal.
+prompt.en: Repeater: amplifies and regenerates the signal.
+prompt.es: Repetidor: amplifica y regenera la señal.
+prompt.it: Ripetitore: amplifica e rigenera il segnale.
+prompt.fr: Répéteur : amplifie et régénère le signal.
+keywords.de: Repeater, Netzwerk
+keywords.en: Repeater, network
+keywords.es: Repetidor, red
+keywords.it: Ripetitore, rete
+keywords.fr: Répéteur, réseau
+svg: ../../symbols/network/repeater.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Repeater
+    Value.en = Repeater
+    Value.es = Repetidor
+    Value.it = Ripetitore
+    Value.fr = Répéteur

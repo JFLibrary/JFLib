@@ -1,0 +1,33 @@
+# Diagnosegerät (JD13, eigene Grafik im JFNetworker-Stil)
+master: Diagnostic device
+name.de: Diagnosegerät
+name.en: Diagnostic device
+name.es: Dispositivo de diagnóstico
+name.it: Dispositivo diagnostico
+name.fr: Appareil de diagnostic
+prompt.de: Diagnosegerät: Messgerät für die Netzwerkdiagnose.
+prompt.en: Diagnostic device: tester for network diagnostics.
+prompt.es: Dispositivo de diagnóstico: medidor para diagnóstico de red.
+prompt.it: Dispositivo diagnostico: strumento per la diagnostica di rete.
+prompt.fr: Appareil de diagnostic : testeur pour le diagnostic réseau.
+keywords.de: Diagnosegerät, Netzwerk
+keywords.en: Diagnostic device, network
+keywords.es: Dispositivo de diagnóstico, red
+keywords.it: Dispositivo diagnostico, rete
+keywords.fr: Appareil de diagnostic, réseau
+svg: ../../symbols/network/diagnostic.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Diagnosegerät
+    Value.en = Diagnostic device
+    Value.es = Dispositivo de diagnóstico
+    Value.it = Dispositivo diagnostico
+    Value.fr = Appareil de diagnostic

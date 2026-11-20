@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Fibre optic link: a reel of fibre, its end leaving in a connector with light</title>
+  <circle class="shade" cx="23" cy="24" r="15" fill="#DCDFE3"/>
+  <circle class="tint" cx="23" cy="24" r="11.5" fill="#3E8A86" stroke-width="1"/>
+  <g class="body" stroke="#F7F8FA" stroke-width="0.8"><circle cx="23" cy="24" r="9.25"/><circle cx="23" cy="24" r="7"/></g>
+  <circle class="body" cx="23" cy="24" r="4.25" fill="#F7F8FA" stroke-width="1.25"/>
+  <circle class="port" cx="23" cy="24" r="1.5" fill="#4F555D" stroke="none"/>
+  <path class="tint" d="M23 12.5H31C37 12.5 38 24 44 24" stroke="#3E8A86" stroke-width="1.75"/>
+  <rect class="shade" x="44" y="21" width="7" height="6" rx="1" fill="#DCDFE3" stroke-width="1.25"/>
+  <rect class="body" x="51" y="22.5" width="3.5" height="3" rx="0.5" fill="#F7F8FA" stroke-width="1"/>
+  <path class="tint" d="M57.25 24H60.25M56.75 21L58.75 19M56.75 27L58.75 29" stroke="#3E8A86" stroke-width="1.25"/>
+  <circle class="body tint" cx="55.25" cy="24" r="1.25" fill="#F7F8FA" stroke="#3E8A86" stroke-width="1"/>
+</svg>

@@ -1,0 +1,45 @@
+# Monitor (JD13, eigene Grafik im JFNetworker-Stil)
+master: Monitor
+name.de: Monitor
+name.en: Monitor
+name.es: Monitor
+name.it: Monitor
+name.fr: Moniteur
+prompt.de: Monitor: Bildschirm in Frontansicht.
+prompt.en: Monitor: monitor in front view.
+prompt.es: Monitor: monitor en vista frontal.
+prompt.it: Monitor: monitor in vista frontale.
+prompt.fr: Moniteur : moniteur en vue de face.
+keywords.de: Monitor, Frontansicht, Regal
+keywords.en: Monitor, front view, shelf
+keywords.es: Monitor, vista frontal, estante
+keywords.it: Monitor, vista frontale, ripiano
+keywords.fr: Moniteur, vue de face, étagère
+svg: ../../symbols/rack/front_monitor.svg
+scale: 1:20
+include: ../net_common/asset.inc
+
+[Shape]
+Width = 100 mm
+Width.us = 3.9370 in
+Height = 50 mm
+Height.us = 1.9685 in
+TxtPinY = 0 mm
+TxtLocPinY = TxtHeight
+TxtHeight = 160 mm
+TxtWidth = Width*2
+VerticalAlign = 0
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Freistehend
+    Value.en = Freestanding
+    Value.es = Independiente
+    Value.it = Autoportante
+    Value.fr = Autonome
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Monitor
+    Value.en = Monitor
+    Value.es = Monitor
+    Value.it = Monitor
+    Value.fr = Moniteur

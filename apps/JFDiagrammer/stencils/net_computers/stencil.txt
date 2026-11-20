@@ -1,0 +1,11 @@
+# Computer und Monitore (SH-140, JD13): eigene Shapes im JFNetworker-Stil, Grafiken aus ../../symbols/
+stencil: Computers and Monitors
+file: netcomp
+name.de: Computer und Monitore
+name.en: Computers and Monitors
+name.es: Equipos y monitores
+name.it: Computer e monitor
+name.fr: Ordinateurs et moniteurs
+category: network
+masters: pc, laptop, tablet, monitor_lcd, pc_virtual, terminal, tablet_pen, pda, monitor_crt, wdm, data_pipeline
+quick: 4

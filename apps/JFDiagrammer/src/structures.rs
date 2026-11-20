@@ -211,7 +211,9 @@ pub(crate) fn dropped(tx: &mut Transaction, eng: &mut Engine, m: &Masters, owner
         }
     }
     crate::rack::docked(tx, eng, owner, &[s])?;
-    settle(tx, eng, owner, &[s], true)
+    settle(tx, eng, owner, &[s], true)?;
+    // (JD13) legends count the devices of the page
+    crate::legend::refresh(tx, eng, owner)
 }
 
 /// the topmost shape under page point p that may be a callout's target (not a container's
@@ -284,7 +286,7 @@ pub(crate) fn delete(o: &mut crate::viewer::Opened, owner: Owner, shapes: &[Shap
         if !more.is_empty() {
             edit_canvas::follow(tx, eng, owner, &more)?;
         }
-        Ok(())
+        crate::legend::refresh(tx, eng, owner)
     })
 }
 
@@ -302,7 +304,8 @@ pub(crate) fn pasted(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shape
         let doc = tx.doc();
         shapes.iter().copied().filter(|&s| structure::containers_of(doc, s).is_empty()).collect()
     };
-    settle(tx, eng, owner, &loose, true)
+    settle(tx, eng, owner, &loose, true)?;
+    crate::legend::refresh(tx, eng, owner)
 }
 
 /// whether a click at page point `p` on top-level shape `top` goes through it: inside a

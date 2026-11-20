@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>City: a skyline of high-rise towers</title>
+  <path class="ink" d="M20.5 8V3.5" stroke-width="1.25"/>
+  <rect class="body" x="5" y="22" width="10" height="21" rx="1" fill="#F7F8FA"/>
+  <path class="tint" d="M6 22.75H14A0.25 0.25 0 0 1 14.25 23V25H5.75V23A0.25 0.25 0 0 1 6 22.75Z" fill="#3E8A86" stroke="none"/>
+  <g class="screen" fill="#CAD4DF" stroke-width="0.6">
+    <rect x="7.5" y="27.5" width="2" height="2.5" rx="0.25"/><rect x="10.5" y="27.5" width="2" height="2.5" rx="0.25"/><rect x="7.5" y="31.75" width="2" height="2.5" rx="0.25"/><rect x="10.5" y="31.75" width="2" height="2.5" rx="0.25"/><rect x="7.5" y="36" width="2" height="2.5" rx="0.25"/><rect x="10.5" y="36" width="2" height="2.5" rx="0.25"/>
+  </g>
+  <rect class="body" x="26" y="17" width="10" height="26" rx="1" fill="#F7F8FA"/>
+  <path class="tint" d="M27 17.75H35A0.25 0.25 0 0 1 35.25 18V20H26.75V18A0.25 0.25 0 0 1 27 17.75Z" fill="#3E8A86" stroke="none"/>
+  <g class="screen" fill="#CAD4DF" stroke-width="0.6">
+    <rect x="28.5" y="22.5" width="2" height="2.5" rx="0.25"/><rect x="31.5" y="22.5" width="2" height="2.5" rx="0.25"/><rect x="28.5" y="26.75" width="2" height="2.5" rx="0.25"/><rect x="31.5" y="26.75" width="2" height="2.5" rx="0.25"/><rect x="28.5" y="31" width="2" height="2.5" rx="0.25"/><rect x="31.5" y="31" width="2" height="2.5" rx="0.25"/>
+    <rect x="28.5" y="35.25" width="2" height="2.5" rx="0.25"/><rect x="31.5" y="35.25" width="2" height="2.5" rx="0.25"/>
+  </g>
+  <rect class="body" x="48" y="25" width="11" height="18" rx="1" fill="#F7F8FA"/>
+  <path class="tint" d="M49 25.75H58A0.25 0.25 0 0 1 58.25 26V28H48.75V26A0.25 0.25 0 0 1 49 25.75Z" fill="#3E8A86" stroke="none"/>
+  <g class="screen" fill="#CAD4DF" stroke-width="0.6">
+    <rect x="50.5" y="30.5" width="2" height="2.5" rx="0.25"/><rect x="54.5" y="30.5" width="2" height="2.5" rx="0.25"/><rect x="50.5" y="34.75" width="2" height="2.5" rx="0.25"/><rect x="54.5" y="34.75" width="2" height="2.5" rx="0.25"/>
+  </g>
+  <rect class="body" x="15" y="8" width="11" height="35" rx="1" fill="#F7F8FA"/>
+  <path class="tint" d="M16 8.75H25A0.25 0.25 0 0 1 25.25 9V11H15.75V9A0.25 0.25 0 0 1 16 8.75Z" fill="#3E8A86" stroke="none"/>
+  <g class="screen" fill="#CAD4DF" stroke-width="0.6">
+    <rect x="17.5" y="13.5" width="2" height="2.5" rx="0.25"/><rect x="21.5" y="13.5" width="2" height="2.5" rx="0.25"/><rect x="17.5" y="17.75" width="2" height="2.5" rx="0.25"/><rect x="21.5" y="17.75" width="2" height="2.5" rx="0.25"/><rect x="17.5" y="22" width="2" height="2.5" rx="0.25"/><rect x="21.5" y="22" width="2" height="2.5" rx="0.25"/>
+    <rect x="17.5" y="26.25" width="2" height="2.5" rx="0.25"/><rect x="21.5" y="26.25" width="2" height="2.5" rx="0.25"/><rect x="17.5" y="30.5" width="2" height="2.5" rx="0.25"/><rect x="21.5" y="30.5" width="2" height="2.5" rx="0.25"/><rect x="17.5" y="34.75" width="2" height="2.5" rx="0.25"/><rect x="21.5" y="34.75" width="2" height="2.5" rx="0.25"/>
+  </g>
+  <rect class="body" x="36" y="11" width="12" height="32" rx="1" fill="#F7F8FA"/>
+  <path class="tint" d="M37 11.75H47A0.25 0.25 0 0 1 47.25 12V14H36.75V12A0.25 0.25 0 0 1 37 11.75Z" fill="#3E8A86" stroke="none"/>
+  <g class="screen" fill="#CAD4DF" stroke-width="0.6">
+    <rect x="38.5" y="16.5" width="2" height="2.5" rx="0.25"/><rect x="41" y="16.5" width="2" height="2.5" rx="0.25"/><rect x="43.5" y="16.5" width="2" height="2.5" rx="0.25"/><rect x="38.5" y="20.75" width="2" height="2.5" rx="0.25"/><rect x="41" y="20.75" width="2" height="2.5" rx="0.25"/><rect x="43.5" y="20.75" width="2" height="2.5" rx="0.25"/>
+    <rect x="38.5" y="25" width="2" height="2.5" rx="0.25"/><rect x="41" y="25" width="2" height="2.5" rx="0.25"/><rect x="43.5" y="25" width="2" height="2.5" rx="0.25"/><rect x="38.5" y="29.25" width="2" height="2.5" rx="0.25"/><rect x="41" y="29.25" width="2" height="2.5" rx="0.25"/><rect x="43.5" y="29.25" width="2" height="2.5" rx="0.25"/>
+    <rect x="38.5" y="33.5" width="2" height="2.5" rx="0.25"/><rect x="41" y="33.5" width="2" height="2.5" rx="0.25"/><rect x="43.5" y="33.5" width="2" height="2.5" rx="0.25"/><rect x="38.5" y="37.75" width="2" height="2.5" rx="0.25"/><rect x="41" y="37.75" width="2" height="2.5" rx="0.25"/><rect x="43.5" y="37.75" width="2" height="2.5" rx="0.25"/>
+  </g>
+  <path class="ink" d="M3 43H61"/>
+</svg>

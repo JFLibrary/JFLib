@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Video phone: desk unit with a large screen, camera above it and a handset</title>
+  <rect class="body" x="4" y="11" width="56" height="31" rx="3" fill="#F7F8FA"/>
+  <rect class="shade" x="7" y="7" width="13" height="33" rx="5" fill="#DCDFE3"/>
+  <g class="port" fill="#4F555D" stroke="none">
+    <circle cx="11" cy="12.5" r="0.75"/><circle cx="13.5" cy="12.5" r="0.75"/><circle cx="16" cy="12.5" r="0.75"/>
+    <circle cx="11" cy="34.5" r="0.75"/><circle cx="13.5" cy="34.5" r="0.75"/><circle cx="16" cy="34.5" r="0.75"/>
+    <circle cx="40" cy="13.75" r="1.1"/>
+  </g>
+  <rect class="screen" x="24" y="16.5" width="32" height="19" rx="1" fill="#CAD4DF" stroke-width="1"/>
+  <circle class="body" cx="40" cy="23.5" r="3.25" fill="#F7F8FA" stroke="none"/>
+  <path class="body" d="M32.5 35.5Q32.5 28.5 40 28.5Q47.5 28.5 47.5 35.5Z" fill="#F7F8FA" stroke="none"/>
+  <g class="tint" fill="#7A828C" stroke="none">
+    <rect x="45.5" y="37.75" width="3" height="2" rx="0.6"/><rect x="49.25" y="37.75" width="3" height="2" rx="0.6"/><rect x="53" y="37.75" width="3" height="2" rx="0.6"/>
+  </g>
+  <circle class="ok" cx="25.5" cy="38.75" r="0.8" fill="#3C9A5F" stroke="none"/>
+</svg>

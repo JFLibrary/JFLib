@@ -1,0 +1,33 @@
+# WDM (Wellenlängenmultiplexer) (JD13, eigene Grafik im JFNetworker-Stil)
+master: WDM
+name.de: WDM (Wellenlängenmultiplexer)
+name.en: WDM (wavelength multiplexer)
+name.es: WDM (multiplexor de longitud de onda)
+name.it: WDM (multiplexer a lunghezza d'onda)
+name.fr: WDM (multiplexeur en longueur d'onde)
+prompt.de: WDM (Wellenlängenmultiplexer): bündelt mehrere Wellenlängen auf einer Glasfaser.
+prompt.en: WDM (wavelength multiplexer): combines several wavelengths on one optical fibre.
+prompt.es: WDM (multiplexor de longitud de onda): combina varias longitudes de onda en una fibra.
+prompt.it: WDM (multiplexer a lunghezza d'onda): combina più lunghezze d'onda su una fibra.
+prompt.fr: WDM (multiplexeur en longueur d'onde) : combine plusieurs longueurs d'onde sur une fibre.
+keywords.de: WDM (Wellenlängenmultiplexer), Netzwerk
+keywords.en: WDM (wavelength multiplexer), network
+keywords.es: WDM (multiplexor de longitud de onda), red
+keywords.it: WDM (multiplexer a lunghezza d'onda), rete
+keywords.fr: WDM (multiplexeur en longueur d'onde), réseau
+svg: ../../symbols/network/wdm.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = WDM (Wellenlängenmultiplexer)
+    Value.en = WDM (wavelength multiplexer)
+    Value.es = WDM (multiplexor de longitud de onda)
+    Value.it = WDM (multiplexer a lunghezza d'onda)
+    Value.fr = WDM (multiplexeur en longueur d'onde)

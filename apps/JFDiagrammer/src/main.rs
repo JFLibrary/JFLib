@@ -95,6 +95,8 @@ mod format_quick;
 mod icons;
 mod lang;
 mod layout_ui;
+// (JD13) the legend of a network plan counts its devices
+mod legend;
 mod options;
 mod panes;
 mod print_layout;

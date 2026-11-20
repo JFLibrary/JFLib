@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>XML web service: a document with a code mark and a globe badge</title>
+  <path class="body" d="M13 5H39L47 13V43H13Z" fill="#F7F8FA"/>
+  <polygon class="shade" points="39,5 39,13 47,13" fill="#DCDFE3"/>
+  <path class="ink" d="M22 15.5L17.5 20L22 24.5M29.75 14.5L26.25 25.5M34 15.5L38.5 20L34 24.5" stroke-width="1.75"/>
+  <path class="shade" d="M18 30.5H33M18 35H30M18 39.5H32" stroke="#DCDFE3" stroke-width="2"/>
+  <circle class="tint body" cx="46" cy="35" r="9" fill="#4F7396" stroke="#F7F8FA" stroke-width="1.5"/>
+  <g class="body" stroke="#F7F8FA" stroke-width="1.2">
+    <circle cx="46" cy="35" r="5.5"/>
+    <ellipse cx="46" cy="35" rx="2.25" ry="5.5"/>
+    <path d="M40.5 35H51.5M41.24 32.25H50.76M41.24 37.75H50.76"/>
+  </g>
+</svg>

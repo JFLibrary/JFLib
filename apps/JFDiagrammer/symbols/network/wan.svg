@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>WAN: a cloud with a lightning bolt across it</title>
+  <g transform="translate(-1 1)">
+    <path class="body" d="M16 38A9 9 0 0 1 16 20A11 11 0 0 1 34.92 12.37A9 9 0 0 1 49.94 20A9 9 0 0 1 50 38Z" fill="#F7F8FA"/>
+    <polygon class="tint" points="34.5,16 25.5,28.5 31,28.5 28.5,38.5 38.5,25 33,25 36.75,16" transform="translate(33 28) rotate(-80) scale(1.15) translate(-32 -27.25)" fill="#3E8A86" stroke-width="1"/>
+  </g>
+</svg>

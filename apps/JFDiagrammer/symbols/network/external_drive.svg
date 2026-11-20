@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>External optical drive: flat box with a tray and a disc</title>
+  <circle class="screen" cx="32" cy="18" r="13" fill="#CAD4DF" stroke-width="1.25"/>
+  <circle class="shade" cx="32" cy="18" r="4.25" fill="#DCDFE3" stroke-width="1.25"/>
+  <circle class="body" cx="32" cy="18" r="1.5" fill="#F7F8FA" stroke-width="1"/>
+  <rect class="port" x="10" y="37.5" width="6" height="2" rx="0.75" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="48" y="37.5" width="6" height="2" rx="0.75" fill="#4F555D" stroke="none"/>
+  <rect class="body" x="5" y="24" width="54" height="14" rx="2" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M5 34.5H59V36A2 2 0 0 1 57 38H7A2 2 0 0 1 5 36Z" fill="#7A828C" stroke="none"/>
+  <rect class="ink" x="5" y="24" width="54" height="14" rx="2"/>
+  <rect class="shade" x="9.5" y="27" width="32" height="4" rx="0.6" fill="#DCDFE3" stroke-width="1"/>
+  <rect class="shade" x="46" y="28" width="6" height="2" rx="0.6" fill="#DCDFE3" stroke-width="0.75"/>
+  <circle class="ok" cx="55.5" cy="29" r="0.9" fill="#3C9A5F" stroke="none"/>
+</svg>

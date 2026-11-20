@@ -1,0 +1,33 @@
+# Fühler (JD13, eigene Grafik im JFNetworker-Stil)
+master: Probe
+name.de: Fühler
+name.en: Probe
+name.es: Sonda
+name.it: Sonda
+name.fr: Sonde
+prompt.de: Fühler: Messsonde im Netz.
+prompt.en: Probe: measuring probe in the network.
+prompt.es: Sonda: sonda de medición en la red.
+prompt.it: Sonda: sonda di misura nella rete.
+prompt.fr: Sonde : sonde de mesure dans le réseau.
+keywords.de: Fühler, Netzwerk
+keywords.en: Probe, network
+keywords.es: Sonda, red
+keywords.it: Sonda, rete
+keywords.fr: Sonde, réseau
+svg: ../../symbols/network/probe.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Fühler
+    Value.en = Probe
+    Value.es = Sonda
+    Value.it = Sonda
+    Value.fr = Sonde

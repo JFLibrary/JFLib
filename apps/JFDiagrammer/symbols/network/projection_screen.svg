@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Projection screen: a screen pulled out of its case on a tripod</title>
+  <path class="ink" d="M32 33V45M32 39.5L22 45M32 39.5L42 45"/>
+  <rect class="screen" x="9.5" y="7" width="45" height="25.5" fill="#CAD4DF" stroke-width="1.25"/>
+  <rect class="shade" x="9" y="31.5" width="46" height="2.5" rx="1" fill="#DCDFE3" stroke-width="1"/>
+  <rect class="tint" x="6" y="3.5" width="52" height="4.5" rx="2.25" fill="#7A828C"/>
+</svg>

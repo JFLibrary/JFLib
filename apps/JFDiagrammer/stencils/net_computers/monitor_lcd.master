@@ -1,0 +1,33 @@
+# Flachbildschirm (JD13, eigene Grafik im JFNetworker-Stil)
+master: LCD monitor
+name.de: Flachbildschirm
+name.en: LCD monitor
+name.es: Monitor LCD
+name.it: Monitor LCD
+name.fr: Moniteur LCD
+prompt.de: Flachbildschirm: flacher Bildschirm.
+prompt.en: LCD monitor: flat-panel display.
+prompt.es: Monitor LCD: pantalla plana.
+prompt.it: Monitor LCD: schermo piatto.
+prompt.fr: Moniteur LCD : écran plat.
+keywords.de: Flachbildschirm, Computer, Arbeitsplatz
+keywords.en: LCD monitor, computer, workstation
+keywords.es: Monitor LCD, equipo, puesto de trabajo
+keywords.it: Monitor LCD, computer, postazione
+keywords.fr: Moniteur LCD, ordinateur, poste de travail
+svg: ../../symbols/network/monitor_lcd.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Computer
+    Value.en = Computer
+    Value.es = Equipo
+    Value.it = Computer
+    Value.fr = Ordinateur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Flachbildschirm
+    Value.en = LCD monitor
+    Value.es = Monitor LCD
+    Value.it = Monitor LCD
+    Value.fr = Moniteur LCD

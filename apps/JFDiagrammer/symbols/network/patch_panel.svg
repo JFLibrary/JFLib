@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Patch panel: 1U, 24 jacks in two rows under label strips, nothing active</title>
+  <rect class="body" x="3" y="14" width="58" height="20" rx="1.5" fill="#F7F8FA"/>
+  <path class="shade" d="M4.5 14H7V34H4.5A1.5 1.5 0 0 1 3 32.5V15.5A1.5 1.5 0 0 1 4.5 14ZM57 14H59.5A1.5 1.5 0 0 1 61 15.5V32.5A1.5 1.5 0 0 1 59.5 34H57Z" fill="#DCDFE3" stroke="none"/>
+  <path class="ink" d="M7 14V34M57 14V34" stroke-width="1"/>
+  <rect class="ink" x="3" y="14" width="58" height="20" rx="1.5"/>
+  <rect class="tint" x="9" y="16.75" width="2.5" height="14.5" rx="0.75" fill="#4F7396" stroke="none"/>
+  <g class="shade" fill="#DCDFE3" stroke-width="0.6">
+    <rect x="15.5" y="17" width="18" height="2.25" rx="0.5"/><rect x="35.5" y="17" width="18" height="2.25" rx="0.5"/><rect x="15.5" y="24.5" width="18" height="2.25" rx="0.5"/><rect x="35.5" y="24.5" width="18" height="2.25" rx="0.5"/>
+  </g>
+  <g class="port" fill="#4F555D" stroke="none">
+    <rect x="15.5" y="19.75" width="2.5" height="3.25" rx="0.3"/><rect x="18.6" y="19.75" width="2.5" height="3.25" rx="0.3"/><rect x="21.7" y="19.75" width="2.5" height="3.25" rx="0.3"/><rect x="24.8" y="19.75" width="2.5" height="3.25" rx="0.3"/><rect x="27.9" y="19.75" width="2.5" height="3.25" rx="0.3"/><rect x="31" y="19.75" width="2.5" height="3.25" rx="0.3"/>
+    <rect x="35.5" y="19.75" width="2.5" height="3.25" rx="0.3"/><rect x="38.6" y="19.75" width="2.5" height="3.25" rx="0.3"/><rect x="41.7" y="19.75" width="2.5" height="3.25" rx="0.3"/><rect x="44.8" y="19.75" width="2.5" height="3.25" rx="0.3"/><rect x="47.9" y="19.75" width="2.5" height="3.25" rx="0.3"/><rect x="51" y="19.75" width="2.5" height="3.25" rx="0.3"/>
+    <rect x="15.5" y="27.25" width="2.5" height="3.25" rx="0.3"/><rect x="18.6" y="27.25" width="2.5" height="3.25" rx="0.3"/><rect x="21.7" y="27.25" width="2.5" height="3.25" rx="0.3"/><rect x="24.8" y="27.25" width="2.5" height="3.25" rx="0.3"/><rect x="27.9" y="27.25" width="2.5" height="3.25" rx="0.3"/><rect x="31" y="27.25" width="2.5" height="3.25" rx="0.3"/>
+    <rect x="35.5" y="27.25" width="2.5" height="3.25" rx="0.3"/><rect x="38.6" y="27.25" width="2.5" height="3.25" rx="0.3"/><rect x="41.7" y="27.25" width="2.5" height="3.25" rx="0.3"/><rect x="44.8" y="27.25" width="2.5" height="3.25" rx="0.3"/><rect x="47.9" y="27.25" width="2.5" height="3.25" rx="0.3"/><rect x="51" y="27.25" width="2.5" height="3.25" rx="0.3"/>
+  </g>
+  <g class="port" fill="#4F555D" stroke="none"><circle cx="5" cy="17.5" r="0.8"/><circle cx="5" cy="30.5" r="0.8"/><circle cx="59" cy="17.5" r="0.8"/><circle cx="59" cy="30.5" r="0.8"/></g>
+</svg>

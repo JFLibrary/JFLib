@@ -869,22 +869,17 @@ impl<'d> Transaction<'d> {
     /// the next index (Geometry from 1, other indexed sections from 0); `kind` the row type
     /// (Geometry: "LineTo" ...)
     pub fn add_row(&mut self, sheet: SheetRef, sk: SecKey, key: Option<RowKey>, kind: Option<&str>) -> Result<RowKey, EditError> {
-        let rows = self.doc.rows(sheet, sk);
         let key = match key {
-            Some(k) => k,
-            None => {
-                // past every index the section has, also the sheet's own deleted rows (Del marks)
-                let own = self.doc.sheet(sheet).and_then(|s| s.section(sk)).map_or(&[][..], |s| s.rows.as_slice());
-                let max = rows.iter().map(|r| r.key).chain(own.iter().map(|r| r.key)).filter_map(|k| match k {
-                    RowKey::Index(i) => Some(i),
-                    RowKey::Named(_) => None,
-                }).max();
-                RowKey::Index(max.map_or(if sk.name == names::GEOMETRY { 1 } else { 0 }, |m| m + 1))
+            Some(k) => {
+                if self.doc.rows(sheet, sk).iter().any(|r| r.key == k) {
+                    return Err(EditError::Exists);
+                }
+                k
             }
+            // past every index the section has, also the sheet's own deleted rows (Del marks);
+            // (JD13) without merging the rows, which made a section of thousands quadratic
+            None => RowKey::Index(self.doc.last_row_index(sheet, sk).map_or(if sk.name == names::GEOMETRY { 1 } else { 0 }, |m| m + 1)),
         };
-        if rows.iter().any(|r| r.key == key) {
-            return Err(EditError::Exists);
-        }
         let kind = kind.map(|k| self.intern(k));
         self.atomic(|tx| {
             let sp = tx.ensure_section(sheet, sk, false)?;

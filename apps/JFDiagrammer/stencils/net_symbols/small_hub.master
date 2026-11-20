@@ -1,0 +1,33 @@
+# Kleiner Hub (JD13, eigene Grafik im JFNetworker-Stil)
+master: Small hub
+name.de: Kleiner Hub
+name.en: Small hub
+name.es: Concentrador pequeño
+name.it: Hub piccolo
+name.fr: Petit concentrateur
+prompt.de: Kleiner Hub: Hub mit wenigen Anschlüssen.
+prompt.en: Small hub: hub with a few ports.
+prompt.es: Concentrador pequeño: concentrador con pocos puertos.
+prompt.it: Hub piccolo: hub con poche porte.
+prompt.fr: Petit concentrateur : concentrateur à quelques ports.
+keywords.de: Kleiner Hub, Netzwerk
+keywords.en: Small hub, network
+keywords.es: Concentrador pequeño, red
+keywords.it: Hub piccolo, rete
+keywords.fr: Petit concentrateur, réseau
+svg: ../../symbols/network/hub.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Kleiner Hub
+    Value.en = Small hub
+    Value.es = Concentrador pequeño
+    Value.it = Hub piccolo
+    Value.fr = Petit concentrateur

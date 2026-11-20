@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="400" height="120"
+     fill="none" stroke="#2E343B" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>A/B switch box, front view: rotary knob between two position LEDs (one lit)</title>
+  <rect class="body" x="1.25" y="1.25" width="197.5" height="52" rx="4" fill="#F7F8FA" stroke="none"/>
+  <rect class="tint" x="10" y="9" width="44" height="36.5" rx="3" fill="#7A828C" stroke="none"/>
+  <path class="body" d="M19 27.25L41 18.2" stroke="#F7F8FA" stroke-width="1.8"/>
+  <g class="body body" fill="#F7F8FA" stroke="#F7F8FA" stroke-width="1"><circle cx="19" cy="27.25" r="2.4"/><circle cx="45" cy="17.25" r="2.4"/><circle cx="45" cy="37.25" r="2.4"/></g>
+  <rect class="ink" x="1.25" y="1.25" width="197.5" height="52" rx="4"/>
+  <g class="port" fill="#4F555D" stroke="none"><rect x="14" y="54.5" width="26" height="5.5" rx="1.5"/><rect x="160" y="54.5" width="26" height="5.5" rx="1.5"/></g>
+  <circle class="body" cx="128" cy="27.25" r="15" fill="#F7F8FA" stroke-width="1.8"/>
+  <path class="ink" d="M128 27.25L119 18.25" stroke-width="2.4"/>
+  <path class="ink" d="M107 13.5L104 10.5M149 13.5L152 10.5" stroke-width="1.5"/>
+  <circle class="ok" cx="98" cy="10" r="3" fill="#3C9A5F" stroke="none"/>
+  <circle class="shade" cx="158" cy="10" r="3" fill="#DCDFE3" stroke-width="1.2"/>
+</svg>

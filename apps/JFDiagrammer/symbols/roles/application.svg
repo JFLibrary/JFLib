@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="96" height="96"
+     fill="none" stroke="#F7F8FA" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round">
+  <title>Role pictogram application: a window with an app grid (white, for the role badge; make_roles.py)</title>
+  <rect class="body" x="0.8" y="1.4" width="10.4" height="9.2" rx="1"/>
+  <path class="body" d="M0.8 3.9H11.2"/>
+  <path class="body" d="M3.35 5.4H5.25V6.5H3.35ZM6.75 5.4H8.65V6.5H6.75ZM3.35 8H5.25V9.1H3.35ZM6.75 8H8.65V9.1H6.75Z" fill="#F7F8FA" stroke-width="0.5"/>
+</svg>

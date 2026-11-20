@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Slate computer: a tablet (landscape) with a pen leaning on it</title>
+  <rect class="body" x="3" y="8" width="47" height="33" rx="3.5" fill="#F7F8FA"/>
+  <rect class="screen" x="8.5" y="11.5" width="36" height="26" rx="1" fill="#CAD4DF" stroke="none"/>
+  <circle class="port" cx="5.75" cy="24.5" r="0.75" fill="#4F555D" stroke="none"/>
+  <rect class="tint" x="21.5" y="38.3" width="10" height="1.5" rx="0.75" fill="#7A828C" stroke="none"/>
+  <!-- the pen -->
+  <g transform="translate(57 4) rotate(12)">
+    <path class="shade" d="M-1.75 32H1.75L0 39Z" fill="#DCDFE3" stroke-width="1.25"/>
+    <rect class="tint" x="-1.75" y="0" width="3.5" height="32" rx="1.25" fill="#7A828C" stroke-width="1.25"/>
+    <path class="body" d="M0 4V13" stroke="#F7F8FA" stroke-width="1"/>
+  </g>
+</svg>

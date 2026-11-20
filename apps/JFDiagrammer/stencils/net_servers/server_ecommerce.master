@@ -1,0 +1,33 @@
+# E-Commerce-Server (JD13, eigene Grafik im JFNetworker-Stil)
+master: E-commerce server
+name.de: E-Commerce-Server
+name.en: E-commerce server
+name.es: Servidor de comercio electrónico
+name.it: Server e-commerce
+name.fr: Serveur de commerce électronique
+prompt.de: E-Commerce-Server: betreibt einen Online-Shop.
+prompt.en: E-commerce server: runs an online shop.
+prompt.es: Servidor de comercio electrónico: gestiona una tienda en línea.
+prompt.it: Server e-commerce: gestisce un negozio online.
+prompt.fr: Serveur de commerce électronique : fait fonctionner une boutique en ligne.
+keywords.de: E-Commerce-Server, Server, Rolle
+keywords.en: E-commerce server, server, role
+keywords.es: Servidor de comercio electrónico, servidor, función
+keywords.it: Server e-commerce, server, ruolo
+keywords.fr: Serveur de commerce électronique, serveur, rôle
+svg: ../../symbols/network/server_ecommerce.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = E-Commerce-Server
+    Value.en = E-commerce server
+    Value.es = Servidor de comercio electrónico
+    Value.it = Server e-commerce
+    Value.fr = Serveur de commerce électronique

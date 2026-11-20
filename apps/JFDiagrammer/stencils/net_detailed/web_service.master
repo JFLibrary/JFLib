@@ -1,0 +1,33 @@
+# XML-Webdienst (JD13, eigene Grafik im JFNetworker-Stil)
+master: XML web service
+name.de: XML-Webdienst
+name.en: XML web service
+name.es: Servicio web XML
+name.it: Servizio web XML
+name.fr: Service Web XML
+prompt.de: XML-Webdienst: Dienst, der über das Web Daten austauscht.
+prompt.en: XML web service: service that exchanges data over the web.
+prompt.es: Servicio web XML: servicio que intercambia datos por la web.
+prompt.it: Servizio web XML: servizio che scambia dati sul web.
+prompt.fr: Service Web XML : service qui échange des données via le Web.
+keywords.de: XML-Webdienst, Netzwerk
+keywords.en: XML web service, network
+keywords.es: Servicio web XML, red
+keywords.it: Servizio web XML, rete
+keywords.fr: Service Web XML, réseau
+svg: ../../symbols/network/web_service.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = XML-Webdienst
+    Value.en = XML web service
+    Value.es = Servicio web XML
+    Value.it = Servizio web XML
+    Value.fr = Service Web XML

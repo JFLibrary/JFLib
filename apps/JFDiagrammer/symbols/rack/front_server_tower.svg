@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 440" width="400" height="880"
+     fill="none" stroke="#2E343B" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Tower server, front view: optical drive, four drive bays, grille, power button, LED, USB</title>
+  <rect class="body" x="1.25" y="1.25" width="197.5" height="427" rx="6" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M7.25 1.25H21V428.25H7.25A6 6 0 0 1 1.25 422.25V7.25A6 6 0 0 1 7.25 1.25Z" fill="#6A6390" stroke="none"/>
+  <rect class="ink" x="1.25" y="1.25" width="197.5" height="427" rx="6"/>
+  <g class="port" fill="#4F555D" stroke="none"><rect x="18" y="429.5" width="36" height="10.5" rx="3"/><rect x="146" y="429.5" width="36" height="10.5" rx="3"/></g>
+  <rect class="shade" x="38" y="22" width="144" height="30" rx="2" fill="#DCDFE3" stroke-width="1.8"/>
+  <path class="port" d="M50 37H128" stroke="#4F555D" stroke-width="2.5"/>
+  <rect class="body" x="156" y="33.5" width="16" height="7" rx="1.5" fill="#F7F8FA" stroke-width="1.5"/>
+  <g class="shade" fill="#DCDFE3" stroke-width="1.8"><rect x="38" y="64" width="144" height="32" rx="2"/><rect x="38" y="102" width="144" height="32" rx="2"/><rect x="38" y="140" width="144" height="32" rx="2"/><rect x="38" y="178" width="144" height="32" rx="2"/></g>
+  <path class="port" d="M62 86H170M62 124H170M62 162H170M62 200H170" stroke="#4F555D" stroke-width="2.5"/>
+  <path class="port" d="M62 74H100M62 112H100M62 150H100M62 188H100" stroke="#4F555D" stroke-width="1.5"/>
+  <g class="ok" fill="#3C9A5F" stroke="none"><circle cx="50" cy="74" r="2.4"/><circle cx="50" cy="112" r="2.4"/><circle cx="50" cy="150" r="2.4"/><circle cx="50" cy="188" r="2.4"/><circle cx="144" cy="37" r="2.4"/></g>
+  <path class="port" d="M50 232H170M50 241H170M50 250H170M50 259H170M50 268H170M50 277H170M50 286H170M50 295H170M50 304H170M50 313H170M50 322H170M50 331H170" stroke="#4F555D" stroke-width="2.5"/>
+  <circle class="body" cx="110" cy="382" r="11" fill="#F7F8FA" stroke-width="2"/>
+  <path class="ink" d="M110 376.5V383.87" stroke-width="2"/>
+  <circle class="ok" cx="80" cy="382" r="3" fill="#3C9A5F" stroke="none"/>
+  <g class="port port" fill="#4F555D" stroke="#4F555D" stroke-width="0.4"><rect x="136" y="378" width="14" height="7" rx="1.5"/><rect x="156" y="378" width="14" height="7" rx="1.5"/></g>
+</svg>

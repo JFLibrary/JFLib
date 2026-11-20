@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>House: gable roof, door and window</title>
+  <rect class="shade" x="39" y="11" width="4.5" height="10" fill="#DCDFE3" stroke-width="1.25"/>
+  <rect class="body" x="16" y="24" width="32" height="19" fill="#F7F8FA"/>
+  <polygon class="tint" points="12,25 32,9 52,25" fill="#3E8A86"/>
+  <rect class="shade" x="21" y="31" width="7" height="12" fill="#DCDFE3" stroke-width="1"/>
+  <circle class="port" cx="26.25" cy="37.5" r="0.6" fill="#4F555D" stroke="none"/>
+  <rect class="screen" x="34" y="29" width="9" height="7.5" rx="0.5" fill="#CAD4DF" stroke-width="1"/>
+  <path class="ink" d="M38.5 29V36.5M34 32.75H43" stroke-width="0.75"/>
+  <path class="ink" d="M9 43H55"/>
+</svg>

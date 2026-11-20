@@ -1,0 +1,33 @@
+# PDA (JD13, eigene Grafik im JFNetworker-Stil)
+master: PDA
+name.de: PDA
+name.en: PDA
+name.es: PDA
+name.it: PDA
+name.fr: PDA
+prompt.de: PDA: Taschencomputer.
+prompt.en: PDA: handheld computer.
+prompt.es: PDA: ordenador de bolsillo.
+prompt.it: PDA: computer palmare.
+prompt.fr: PDA : ordinateur de poche.
+keywords.de: PDA, Computer, Arbeitsplatz
+keywords.en: PDA, computer, workstation
+keywords.es: PDA, equipo, puesto de trabajo
+keywords.it: PDA, computer, postazione
+keywords.fr: PDA, ordinateur, poste de travail
+svg: ../../symbols/network/pda.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Computer
+    Value.en = Computer
+    Value.es = Equipo
+    Value.it = Computer
+    Value.fr = Ordinateur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = PDA
+    Value.en = PDA
+    Value.es = PDA
+    Value.it = PDA
+    Value.fr = PDA

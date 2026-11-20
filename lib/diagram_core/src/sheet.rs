@@ -257,11 +257,26 @@ impl Section {
 
     /// the row with this key
     pub fn row(&self, key: RowKey) -> Option<&Row> {
-        self.rows.iter().find(|r| r.key == key)
+        self.row_pos(key).map(|p| &self.rows[p])
     }
 
     /// the position of the row with this key
     pub fn row_pos(&self, key: RowKey) -> Option<usize> {
+        // (JD13) indexed rows stay sorted by index (insert_pos): where the index says (IX 0 or 1
+        // first), else by bisection; a linear search only when that misses (a section that mixes
+        // named rows in).  A shape with thousands of Geometry rows was quadratic to compute and draw
+        if let RowKey::Index(ix) = key {
+            let i = ix as usize;
+            for p in [i, i.wrapping_sub(1)] {
+                if self.rows.get(p).is_some_and(|r| r.key == key) {
+                    return Some(p);
+                }
+            }
+            let p = self.rows.partition_point(|r| matches!(r.key, RowKey::Index(j) if j < ix));
+            if self.rows.get(p).is_some_and(|r| r.key == key) {
+                return Some(p);
+            }
+        }
         self.rows.iter().position(|r| r.key == key)
     }
 
@@ -273,6 +288,8 @@ impl Section {
     /// where a new indexed row with this index belongs (rows stay sorted by index)
     pub fn insert_pos(&self, key: RowKey) -> usize {
         match key {
+            // appending (the usual case) needs no search
+            RowKey::Index(ix) if self.rows.last().is_none_or(|r| matches!(r.key, RowKey::Index(i) if i < ix)) => self.rows.len(),
             RowKey::Index(ix) => self.rows.iter().position(|r| matches!(r.key, RowKey::Index(i) if i > ix)).unwrap_or(self.rows.len()),
             RowKey::Named(_) => self.rows.len(),
         }

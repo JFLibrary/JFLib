@@ -1,0 +1,33 @@
+# Externes Laufwerk (JD13, eigene Grafik im JFNetworker-Stil)
+master: External media drive
+name.de: Externes Laufwerk
+name.en: External media drive
+name.es: Unidad de medios externa
+name.it: Unità multimediale esterna
+name.fr: Lecteur multimédia externe
+prompt.de: Externes Laufwerk: Laufwerk für optische Medien.
+prompt.en: External media drive: drive for optical media.
+prompt.es: Unidad de medios externa: unidad para medios ópticos.
+prompt.it: Unità multimediale esterna: unità per supporti ottici.
+prompt.fr: Lecteur multimédia externe : lecteur de supports optiques.
+keywords.de: Externes Laufwerk, Peripherie, Büro
+keywords.en: External media drive, peripheral, office
+keywords.es: Unidad de medios externa, periférico, oficina
+keywords.it: Unità multimediale esterna, periferica, ufficio
+keywords.fr: Lecteur multimédia externe, périphérique, bureau
+svg: ../../symbols/network/external_drive.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Externes Laufwerk
+    Value.en = External media drive
+    Value.es = Unidad de medios externa
+    Value.it = Unità multimediale esterna
+    Value.fr = Lecteur multimédia externe

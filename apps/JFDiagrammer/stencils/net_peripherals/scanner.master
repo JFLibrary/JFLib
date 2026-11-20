@@ -1,0 +1,33 @@
+# Scanner (JD13, eigene Grafik im JFNetworker-Stil)
+master: Scanner
+name.de: Scanner
+name.en: Scanner
+name.es: Escáner
+name.it: Scanner
+name.fr: Scanner
+prompt.de: Scanner: Flachbettscanner.
+prompt.en: Scanner: flatbed scanner.
+prompt.es: Escáner: escáner plano.
+prompt.it: Scanner: scanner piano.
+prompt.fr: Scanner : scanner à plat.
+keywords.de: Scanner, Peripherie, Büro
+keywords.en: Scanner, peripheral, office
+keywords.es: Escáner, periférico, oficina
+keywords.it: Scanner, periferica, ufficio
+keywords.fr: Scanner, périphérique, bureau
+svg: ../../symbols/network/scanner.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Scanner
+    Value.en = Scanner
+    Value.es = Escáner
+    Value.it = Scanner
+    Value.fr = Scanner

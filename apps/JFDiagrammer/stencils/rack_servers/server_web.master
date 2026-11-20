@@ -1,0 +1,37 @@
+# Webserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: Web server
+name.de: Webserver
+name.en: Web server
+name.es: Servidor web
+name.it: Server web
+name.fr: Serveur Web
+prompt.de: Webserver: stellt Webseiten und Webdienste bereit, 19-Zoll-Einschub.
+prompt.en: Web server: serves web pages and web services, 19-inch rack unit.
+prompt.es: Servidor web: ofrece páginas y servicios web, unidad de rack de 19 pulgadas.
+prompt.it: Server web: fornisce pagine e servizi web, unità rack da 19 pollici.
+prompt.fr: Serveur Web : fournit des pages et des services Web, unité de baie 19 pouces.
+keywords.de: Webserver, Rack, 19 Zoll, HE
+keywords.en: Web server, rack, 19 inch, U
+keywords.es: Servidor web, rack, 19 pulgadas, U
+keywords.it: Server web, rack, 19 pollici, U
+keywords.fr: Serveur Web, baie, 19 pouces, U
+svg: ../../symbols/rack/server_web.svg
+scale: 1:20
+size: 482.6 mm x 44.45 mm
+size.us: 19 in x 1.75 in
+include: ../net_common/rackdev.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+RackUnits: Value = 1
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Gestellmontiert
+    Value.en = Rack-mounted
+    Value.es = Montaje en rack
+    Value.it = Montaggio a rack
+    Value.fr = Monté en baie
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Webserver
+    Value.en = Web server
+    Value.es = Servidor web
+    Value.it = Server web
+    Value.fr = Serveur Web

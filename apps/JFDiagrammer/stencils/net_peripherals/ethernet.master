@@ -1,0 +1,152 @@
+# Ethernet (JD13, SH-151): eine Busleitung mit acht Steuerpunkten.  Zieht man einen Steuerpunkt
+# auf ein Gerät, führt eine Leitung von der Busleitung dorthin (in Visio kleben die Steuerpunkte,
+# CanGlue).  Liegt ein Steuerpunkt auf dem Bus, ist seine Leitung null lang und unsichtbar.
+# Geometrie: 1 Bus, 2-9 die Anschlussleitungen.
+master: Ethernet
+name.de: Ethernet
+name.en: Ethernet
+name.es: Ethernet
+name.it: Ethernet
+name.fr: Ethernet
+prompt.de: Ethernet: Busleitung. Ziehen Sie die gelben Steuerpunkte auf die Geräte, um sie anzuschließen.
+prompt.en: Ethernet: bus line. Drag the yellow control handles onto devices to connect them.
+prompt.es: Ethernet: línea de bus. Arrastre los controladores amarillos sobre los dispositivos para conectarlos.
+prompt.it: Ethernet: linea bus. Trascina le maniglie gialle sui dispositivi per collegarli.
+prompt.fr: Ethernet : ligne de bus. Faites glisser les poignées jaunes sur les appareils pour les raccorder.
+keywords.de: Ethernet, Bus, LAN, Netzwerk, Kabel
+keywords.en: Ethernet, bus, LAN, network, cable
+keywords.es: Ethernet, bus, LAN, red, cable
+keywords.it: Ethernet, bus, LAN, rete, cavo
+keywords.fr: Ethernet, bus, LAN, réseau, câble
+include: ../net_common/network.inc
+
+[Shape]
+Width = 150 mm
+Width.us = 6 in
+Height = 4 mm
+Height.us = 0.16 in
+LineWeight = 1 pt
+LineColor = #2E343B
+FillForegnd = #4F7396
+FillBkgnd = #4F7396
+FillPattern = 1
+TxtWidth = 40 mm
+TxtWidth.us = 1.6 in
+TxtHeight = 6 mm
+TxtHeight.us = 0.24 in
+TxtPinX = 0 mm
+TxtPinY = Height
+TxtLocPinX = 0 mm
+TxtLocPinY = 0 mm
+VerticalAlign = 2
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = MAX(0,MIN(Width,Controls.Row_1)); Y = IF(Controls.Row_1.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_1; Y = Controls.Row_1.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = MAX(0,MIN(Width,Controls.Row_2)); Y = IF(Controls.Row_2.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_2; Y = Controls.Row_2.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = MAX(0,MIN(Width,Controls.Row_3)); Y = IF(Controls.Row_3.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_3; Y = Controls.Row_3.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = MAX(0,MIN(Width,Controls.Row_4)); Y = IF(Controls.Row_4.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_4; Y = Controls.Row_4.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = MAX(0,MIN(Width,Controls.Row_5)); Y = IF(Controls.Row_5.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_5; Y = Controls.Row_5.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = MAX(0,MIN(Width,Controls.Row_6)); Y = IF(Controls.Row_6.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_6; Y = Controls.Row_6.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = MAX(0,MIN(Width,Controls.Row_7)); Y = IF(Controls.Row_7.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_7; Y = Controls.Row_7.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = MAX(0,MIN(Width,Controls.Row_8)); Y = IF(Controls.Row_8.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_8; Y = Controls.Row_8.Y
+
+[Controls]
+Row_1:  X = Width*0.0625; Y = Height*0.5; XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+Row_2:  X = Width*0.1875; Y = Height*0.5; XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+Row_3:  X = Width*0.3125; Y = Height*0.5; XDyn = Controls.Row_3; YDyn = Controls.Row_3.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+Row_4:  X = Width*0.4375; Y = Height*0.5; XDyn = Controls.Row_4; YDyn = Controls.Row_4.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+Row_5:  X = Width*0.5625; Y = Height*0.5; XDyn = Controls.Row_5; YDyn = Controls.Row_5.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+Row_6:  X = Width*0.6875; Y = Height*0.5; XDyn = Controls.Row_6; YDyn = Controls.Row_6.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+Row_7:  X = Width*0.8125; Y = Height*0.5; XDyn = Controls.Row_7; YDyn = Controls.Row_7.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+Row_8:  X = Width*0.9375; Y = Height*0.5; XDyn = Controls.Row_8; YDyn = Controls.Row_8.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Ethernet
+    Value.en = Ethernet
+    Value.es = Ethernet
+    Value.it = Ethernet
+    Value.fr = Ethernet

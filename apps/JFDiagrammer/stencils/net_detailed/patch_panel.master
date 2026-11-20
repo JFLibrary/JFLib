@@ -1,0 +1,34 @@
+# Patchfeld (JD13, eigene Grafik im JFNetworker-Stil)
+master: Patch panel
+name.de: Patchfeld
+name.en: Patch panel
+name.es: Panel de conexiones
+name.it: Pannello di permutazione
+name.fr: Panneau de brassage
+prompt.de: Patchfeld: Anschlussfeld für die feste Verkabelung.
+prompt.en: Patch panel: termination panel for the fixed cabling.
+prompt.es: Panel de conexiones: panel de terminación del cableado fijo.
+prompt.it: Pannello di permutazione: pannello di terminazione del cablaggio fisso.
+prompt.fr: Panneau de brassage : panneau de terminaison du câblage fixe.
+keywords.de: Patchfeld, Netzwerk
+keywords.en: Patch panel, network
+keywords.es: Panel de conexiones, red
+keywords.it: Pannello di permutazione, rete
+keywords.fr: Panneau de brassage, réseau
+svg: ../../symbols/network/patch_panel.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+NumberofPorts: Value = 24
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Patchfeld
+    Value.en = Patch panel
+    Value.es = Panel de conexiones
+    Value.it = Pannello di permutazione
+    Value.fr = Panneau de brassage

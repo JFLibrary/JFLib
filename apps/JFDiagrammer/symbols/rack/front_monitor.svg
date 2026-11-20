@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 400" width="1080" height="800"
+     fill="none" stroke="#2E343B" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Monitor on a stand, front view: screen, chin with LED and power button</title>
+  <rect class="shade" x="244" y="320" width="52" height="66" fill="#DCDFE3"/>
+  <rect class="body" x="160" y="385" width="220" height="13.75" rx="5" fill="#F7F8FA"/>
+  <rect class="body" x="1.25" y="1.25" width="537.5" height="336" rx="6" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M1.25 300H538.75V331.25A6 6 0 0 1 532.75 337.25H7.25A6 6 0 0 1 1.25 331.25Z" fill="#7A828C" stroke="none"/>
+  <rect class="screen" x="16" y="16" width="508" height="270" fill="#CAD4DF" stroke="none"/>
+  <rect class="ink" x="1.25" y="1.25" width="537.5" height="336" rx="6"/>
+  <circle class="body" cx="484" cy="318.6" r="6" fill="#F7F8FA" stroke-width="2"/>
+  <circle class="ok" cx="504" cy="318.6" r="3.5" fill="#3C9A5F" stroke="none"/>
+</svg>

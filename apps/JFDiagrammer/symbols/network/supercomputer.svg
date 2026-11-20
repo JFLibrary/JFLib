@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Supercomputer: a row of four narrow cabinets full of LED rows</title>
+  <rect class="body" x="3" y="4" width="13" height="38" rx="1.5" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M4.5 4H14.5A1.5 1.5 0 0 1 16 5.5V9H3V5.5A1.5 1.5 0 0 1 4.5 4Z" fill="#6A6390" stroke="none"/>
+  <rect class="ink" x="3" y="4" width="13" height="38" rx="1.5"/>
+  <path class="ink" d="M3 9H16" stroke-width="1"/>
+  <rect class="body" x="18" y="4" width="13" height="38" rx="1.5" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M19.5 4H29.5A1.5 1.5 0 0 1 31 5.5V9H18V5.5A1.5 1.5 0 0 1 19.5 4Z" fill="#6A6390" stroke="none"/>
+  <rect class="ink" x="18" y="4" width="13" height="38" rx="1.5"/>
+  <path class="ink" d="M18 9H31" stroke-width="1"/>
+  <rect class="body" x="33" y="4" width="13" height="38" rx="1.5" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M34.5 4H44.5A1.5 1.5 0 0 1 46 5.5V9H33V5.5A1.5 1.5 0 0 1 34.5 4Z" fill="#6A6390" stroke="none"/>
+  <rect class="ink" x="33" y="4" width="13" height="38" rx="1.5"/>
+  <path class="ink" d="M33 9H46" stroke-width="1"/>
+  <rect class="body" x="48" y="4" width="13" height="38" rx="1.5" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M49.5 4H59.5A1.5 1.5 0 0 1 61 5.5V9H48V5.5A1.5 1.5 0 0 1 49.5 4Z" fill="#6A6390" stroke="none"/>
+  <rect class="ink" x="48" y="4" width="13" height="38" rx="1.5"/>
+  <path class="ink" d="M48 9H61" stroke-width="1"/>
+  <rect class="port" x="4.5" y="42.75" width="10" height="1.25" rx="0.6" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="19.5" y="42.75" width="10" height="1.25" rx="0.6" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="34.5" y="42.75" width="10" height="1.25" rx="0.6" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="49.5" y="42.75" width="10" height="1.25" rx="0.6" fill="#4F555D" stroke="none"/>
+  <g class="ok" fill="#3C9A5F" stroke="none">
+    <circle cx="9.5" cy="13" r="0.75"/><circle cx="12.5" cy="13" r="0.75"/><circle cx="6.5" cy="16.25" r="0.75"/><circle cx="9.5" cy="16.25" r="0.75"/><circle cx="12.5" cy="16.25" r="0.75"/><circle cx="6.5" cy="19.5" r="0.75"/><circle cx="12.5" cy="19.5" r="0.75"/><circle cx="6.5" cy="22.75" r="0.75"/>
+    <circle cx="9.5" cy="22.75" r="0.75"/><circle cx="12.5" cy="22.75" r="0.75"/><circle cx="6.5" cy="26" r="0.75"/><circle cx="9.5" cy="26" r="0.75"/><circle cx="9.5" cy="29.25" r="0.75"/><circle cx="12.5" cy="29.25" r="0.75"/><circle cx="6.5" cy="32.5" r="0.75"/><circle cx="9.5" cy="32.5" r="0.75"/>
+    <circle cx="12.5" cy="32.5" r="0.75"/><circle cx="6.5" cy="35.75" r="0.75"/><circle cx="12.5" cy="35.75" r="0.75"/><circle cx="21.5" cy="13" r="0.75"/><circle cx="24.5" cy="13" r="0.75"/><circle cx="24.5" cy="16.25" r="0.75"/><circle cx="27.5" cy="16.25" r="0.75"/><circle cx="21.5" cy="19.5" r="0.75"/>
+    <circle cx="24.5" cy="19.5" r="0.75"/><circle cx="27.5" cy="19.5" r="0.75"/><circle cx="21.5" cy="22.75" r="0.75"/><circle cx="27.5" cy="22.75" r="0.75"/><circle cx="21.5" cy="26" r="0.75"/><circle cx="24.5" cy="26" r="0.75"/><circle cx="27.5" cy="26" r="0.75"/><circle cx="21.5" cy="29.25" r="0.75"/>
+    <circle cx="24.5" cy="29.25" r="0.75"/><circle cx="24.5" cy="32.5" r="0.75"/><circle cx="27.5" cy="32.5" r="0.75"/><circle cx="21.5" cy="35.75" r="0.75"/><circle cx="24.5" cy="35.75" r="0.75"/><circle cx="27.5" cy="35.75" r="0.75"/><circle cx="36.5" cy="13" r="0.75"/><circle cx="39.5" cy="13" r="0.75"/>
+    <circle cx="42.5" cy="13" r="0.75"/><circle cx="36.5" cy="16.25" r="0.75"/><circle cx="39.5" cy="16.25" r="0.75"/><circle cx="39.5" cy="19.5" r="0.75"/><circle cx="42.5" cy="19.5" r="0.75"/><circle cx="36.5" cy="22.75" r="0.75"/><circle cx="39.5" cy="22.75" r="0.75"/><circle cx="42.5" cy="22.75" r="0.75"/>
+    <circle cx="36.5" cy="26" r="0.75"/><circle cx="42.5" cy="26" r="0.75"/><circle cx="36.5" cy="29.25" r="0.75"/><circle cx="39.5" cy="29.25" r="0.75"/><circle cx="42.5" cy="29.25" r="0.75"/><circle cx="36.5" cy="32.5" r="0.75"/><circle cx="39.5" cy="32.5" r="0.75"/><circle cx="39.5" cy="35.75" r="0.75"/>
+    <circle cx="42.5" cy="35.75" r="0.75"/><circle cx="51.5" cy="13" r="0.75"/><circle cx="57.5" cy="13" r="0.75"/><circle cx="51.5" cy="16.25" r="0.75"/><circle cx="54.5" cy="16.25" r="0.75"/><circle cx="57.5" cy="16.25" r="0.75"/><circle cx="51.5" cy="19.5" r="0.75"/><circle cx="54.5" cy="19.5" r="0.75"/>
+    <circle cx="54.5" cy="22.75" r="0.75"/><circle cx="57.5" cy="22.75" r="0.75"/><circle cx="51.5" cy="26" r="0.75"/><circle cx="54.5" cy="26" r="0.75"/><circle cx="57.5" cy="26" r="0.75"/><circle cx="51.5" cy="29.25" r="0.75"/><circle cx="57.5" cy="29.25" r="0.75"/><circle cx="51.5" cy="32.5" r="0.75"/>
+    <circle cx="54.5" cy="32.5" r="0.75"/><circle cx="57.5" cy="32.5" r="0.75"/><circle cx="51.5" cy="35.75" r="0.75"/><circle cx="54.5" cy="35.75" r="0.75"/>
+  </g>
+  <g class="port" fill="#4F555D" stroke="none">
+    <circle cx="6.5" cy="13" r="0.75"/><circle cx="9.5" cy="19.5" r="0.75"/><circle cx="12.5" cy="26" r="0.75"/><circle cx="6.5" cy="29.25" r="0.75"/><circle cx="9.5" cy="35.75" r="0.75"/><circle cx="27.5" cy="13" r="0.75"/><circle cx="21.5" cy="16.25" r="0.75"/><circle cx="24.5" cy="22.75" r="0.75"/>
+    <circle cx="27.5" cy="29.25" r="0.75"/><circle cx="21.5" cy="32.5" r="0.75"/><circle cx="42.5" cy="16.25" r="0.75"/><circle cx="36.5" cy="19.5" r="0.75"/><circle cx="39.5" cy="26" r="0.75"/><circle cx="42.5" cy="32.5" r="0.75"/><circle cx="36.5" cy="35.75" r="0.75"/><circle cx="54.5" cy="13" r="0.75"/>
+    <circle cx="57.5" cy="19.5" r="0.75"/><circle cx="51.5" cy="22.75" r="0.75"/><circle cx="54.5" cy="29.25" r="0.75"/><circle cx="57.5" cy="35.75" r="0.75"/>
+  </g>
+  <path class="port" d="M6 38.5H13M21 38.5H28M36 38.5H43M51 38.5H58" stroke="#4F555D" stroke-width="1"/>
+</svg>

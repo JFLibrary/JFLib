@@ -1,0 +1,33 @@
+# Tablet-PC (JD13, eigene Grafik im JFNetworker-Stil)
+master: Tablet PC
+name.de: Tablet-PC
+name.en: Tablet PC
+name.es: Tablet PC
+name.it: Tablet PC
+name.fr: Tablette PC
+prompt.de: Tablet-PC: Tablet-Computer.
+prompt.en: Tablet PC: tablet computer.
+prompt.es: Tablet PC: ordenador tableta.
+prompt.it: Tablet PC: computer tablet.
+prompt.fr: Tablette PC : ordinateur tablette.
+keywords.de: Tablet-PC, Computer, Arbeitsplatz
+keywords.en: Tablet PC, computer, workstation
+keywords.es: Tablet PC, equipo, puesto de trabajo
+keywords.it: Tablet PC, computer, postazione
+keywords.fr: Tablette PC, ordinateur, poste de travail
+svg: ../../symbols/network/tablet.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Computer
+    Value.en = Computer
+    Value.es = Equipo
+    Value.it = Computer
+    Value.fr = Ordinateur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Tablet-PC
+    Value.en = Tablet PC
+    Value.es = Tablet PC
+    Value.it = Tablet PC
+    Value.fr = Tablette PC

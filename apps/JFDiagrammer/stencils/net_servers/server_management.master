@@ -1,0 +1,33 @@
+# Verwaltungsserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: Management server
+name.de: Verwaltungsserver
+name.en: Management server
+name.es: Servidor de administración
+name.it: Server di gestione
+name.fr: Serveur d'administration
+prompt.de: Verwaltungsserver: überwacht und verwaltet Systeme.
+prompt.en: Management server: monitors and manages systems.
+prompt.es: Servidor de administración: supervisa y administra sistemas.
+prompt.it: Server di gestione: monitora e gestisce i sistemi.
+prompt.fr: Serveur d'administration : surveille et administre les systèmes.
+keywords.de: Verwaltungsserver, Server, Rolle
+keywords.en: Management server, server, role
+keywords.es: Servidor de administración, servidor, función
+keywords.it: Server di gestione, server, ruolo
+keywords.fr: Serveur d'administration, serveur, rôle
+svg: ../../symbols/network/server_management.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Verwaltungsserver
+    Value.en = Management server
+    Value.es = Servidor de administración
+    Value.it = Server di gestione
+    Value.fr = Serveur d'administration

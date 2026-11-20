@@ -91,6 +91,7 @@ mod stencil_structs;
 mod stencils;
 mod structures;
 mod svgdump;
+mod symbol_sheet;
 mod zipkit;
 
 /// a refusal must come within this many microseconds
@@ -160,6 +161,15 @@ fn run() -> i32 {
     }
     if let Some(reps) = arg(&args, "--growth") {
         return formulas::growth_table(reps.parse().unwrap_or(5));
+    }
+    if let Some(dir) = arg(&args, "--symbol-sheet") {
+        // (JD13) every SVG of a folder on one sheet (the shared network symbols)
+        let path = args.iter().position(|a| a == "--symbol-sheet").and_then(|i| args.get(i + 2)).cloned().unwrap_or_else(|| String::from("symbols.png"));
+        return symbol_sheet::write(&dir, &path, arg(&args, "--cols").and_then(|c| c.parse().ok()).unwrap_or(6));
+    }
+    if let Some(dir) = arg(&args, "--write-network-gegenprobe") {
+        // (JD13) a network plan and a rack drawing for a look in Visio
+        return stencil_network::gegenprobe(&dir);
     }
     if let Some(dir) = arg(&args, "--write-network-previews") {
         // (JD13) the network symbols and a rack with devices

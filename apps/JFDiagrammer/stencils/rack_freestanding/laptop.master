@@ -1,0 +1,45 @@
+# Laptop (JD13, eigene Grafik im JFNetworker-Stil)
+master: Laptop
+name.de: Laptop
+name.en: Laptop
+name.es: Portátil
+name.it: Portatile
+name.fr: Ordinateur portable
+prompt.de: Laptop: aufgeklappter Laptop in Frontansicht.
+prompt.en: Laptop: open laptop in front view.
+prompt.es: Portátil: portátil abierto en vista frontal.
+prompt.it: Portatile: portatile aperto in vista frontale.
+prompt.fr: Ordinateur portable : ordinateur portable ouvert en vue de face.
+keywords.de: Laptop, Frontansicht, Regal
+keywords.en: Laptop, front view, shelf
+keywords.es: Portátil, vista frontal, estante
+keywords.it: Portatile, vista frontale, ripiano
+keywords.fr: Ordinateur portable, vue de face, étagère
+svg: ../../symbols/rack/front_laptop.svg
+scale: 1:20
+include: ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Shape]
+Width = 100 mm
+Width.us = 3.9370 in
+Height = 50 mm
+Height.us = 1.9685 in
+TxtPinY = 0 mm
+TxtLocPinY = TxtHeight
+TxtHeight = 160 mm
+TxtWidth = Width*2
+VerticalAlign = 0
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Freistehend
+    Value.en = Freestanding
+    Value.es = Independiente
+    Value.it = Autoportante
+    Value.fr = Autonome
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Laptop
+    Value.en = Laptop
+    Value.es = Portátil
+    Value.it = Portatile
+    Value.fr = Ordinateur portable

@@ -1,5 +1,8 @@
 # Shape-Daten von Standorten (JD13, SH-153): Anschrift, Ansprechpartner, Netz.  Eigene Zeilennamen
 # außer NetworkName und ShapeClass (wie bei Visio).
+[User]
+# Visios Kennung für Shapes, die eine Legende zählt (JD13: die Legende in Netzwerk und Peripheriegeräte)
+visLegendShape: Value = 2
 [Property]
 Address: Type = 0; Value = ""
     Label.de = Adresse

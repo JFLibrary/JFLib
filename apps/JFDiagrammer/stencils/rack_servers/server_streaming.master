@@ -1,0 +1,37 @@
+# Streaming-Server (JD13, eigene Grafik im JFNetworker-Stil)
+master: Streaming media server
+name.de: Streaming-Server
+name.en: Streaming media server
+name.es: Servidor de streaming
+name.it: Server di streaming
+name.fr: Serveur de streaming
+prompt.de: Streaming-Server: überträgt Audio und Video, 19-Zoll-Einschub.
+prompt.en: Streaming media server: streams audio and video, 19-inch rack unit.
+prompt.es: Servidor de streaming: transmite audio y vídeo, unidad de rack de 19 pulgadas.
+prompt.it: Server di streaming: trasmette audio e video, unità rack da 19 pollici.
+prompt.fr: Serveur de streaming : diffuse l'audio et la vidéo, unité de baie 19 pouces.
+keywords.de: Streaming-Server, Rack, 19 Zoll, HE
+keywords.en: Streaming media server, rack, 19 inch, U
+keywords.es: Servidor de streaming, rack, 19 pulgadas, U
+keywords.it: Server di streaming, rack, 19 pollici, U
+keywords.fr: Serveur de streaming, baie, 19 pouces, U
+svg: ../../symbols/rack/server_streaming.svg
+scale: 1:20
+size: 482.6 mm x 44.45 mm
+size.us: 19 in x 1.75 in
+include: ../net_common/rackdev.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+RackUnits: Value = 1
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Gestellmontiert
+    Value.en = Rack-mounted
+    Value.es = Montaje en rack
+    Value.it = Montaggio a rack
+    Value.fr = Monté en baie
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Streaming-Server
+    Value.en = Streaming media server
+    Value.es = Servidor de streaming
+    Value.it = Server di streaming
+    Value.fr = Serveur de streaming

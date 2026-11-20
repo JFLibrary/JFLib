@@ -1,0 +1,145 @@
+# Ringnetz (JD13, SH-151): ein Ring mit acht Steuerpunkten.  Zieht man einen Steuerpunkt auf ein
+# Gerät, führt eine Leitung vom Ring (in Richtung des Steuerpunkts) dorthin; auf dem Ring ist sie
+# null lang.  Geometrie: 1 Ring außen, 2 Ring innen (gerade-ungerade gefüllt), 3-10 Leitungen.
+master: Ring network
+name.de: Ringnetz
+name.en: Ring network
+name.es: Red en anillo
+name.it: Rete ad anello
+name.fr: Réseau en anneau
+prompt.de: Ringnetz: Ringleitung. Ziehen Sie die gelben Steuerpunkte auf die Geräte, um sie anzuschließen.
+prompt.en: Ring network: ring line. Drag the yellow control handles onto devices to connect them.
+prompt.es: Red en anillo: línea en anillo. Arrastre los controladores amarillos sobre los dispositivos para conectarlos.
+prompt.it: Rete ad anello: linea ad anello. Trascina le maniglie gialle sui dispositivi per collegarli.
+prompt.fr: Réseau en anneau : ligne en anneau. Faites glisser les poignées jaunes sur les appareils pour les raccorder.
+keywords.de: Ring, Token Ring, FDDI, Netzwerk
+keywords.en: ring, token ring, FDDI, network
+keywords.es: anillo, token ring, FDDI, red
+keywords.it: anello, token ring, FDDI, rete
+keywords.fr: anneau, token ring, FDDI, réseau
+include: ../net_common/network.inc
+
+[Shape]
+Width = 60 mm
+Width.us = 2.4 in
+Height = 40 mm
+Height.us = 1.6 in
+LineWeight = 1 pt
+LineColor = #2E343B
+FillForegnd = #4F7396
+FillBkgnd = #4F7396
+FillPattern = 1
+
+[User]
+Ring:  Value = 3 mm
+       Value.us = 0.12 in
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width-User.Ring; B = Height*0.5; C = Width*0.5; D = Height-User.Ring
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5+Width*0.5*COS(ATAN2((Controls.Row_1.Y-Height*0.5)/Height,(Controls.Row_1-Width*0.5)/Width)); Y = Height*0.5+Height*0.5*SIN(ATAN2((Controls.Row_1.Y-Height*0.5)/Height,(Controls.Row_1-Width*0.5)/Width))
+LineTo  X = Controls.Row_1; Y = Controls.Row_1.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5+Width*0.5*COS(ATAN2((Controls.Row_2.Y-Height*0.5)/Height,(Controls.Row_2-Width*0.5)/Width)); Y = Height*0.5+Height*0.5*SIN(ATAN2((Controls.Row_2.Y-Height*0.5)/Height,(Controls.Row_2-Width*0.5)/Width))
+LineTo  X = Controls.Row_2; Y = Controls.Row_2.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5+Width*0.5*COS(ATAN2((Controls.Row_3.Y-Height*0.5)/Height,(Controls.Row_3-Width*0.5)/Width)); Y = Height*0.5+Height*0.5*SIN(ATAN2((Controls.Row_3.Y-Height*0.5)/Height,(Controls.Row_3-Width*0.5)/Width))
+LineTo  X = Controls.Row_3; Y = Controls.Row_3.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5+Width*0.5*COS(ATAN2((Controls.Row_4.Y-Height*0.5)/Height,(Controls.Row_4-Width*0.5)/Width)); Y = Height*0.5+Height*0.5*SIN(ATAN2((Controls.Row_4.Y-Height*0.5)/Height,(Controls.Row_4-Width*0.5)/Width))
+LineTo  X = Controls.Row_4; Y = Controls.Row_4.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5+Width*0.5*COS(ATAN2((Controls.Row_5.Y-Height*0.5)/Height,(Controls.Row_5-Width*0.5)/Width)); Y = Height*0.5+Height*0.5*SIN(ATAN2((Controls.Row_5.Y-Height*0.5)/Height,(Controls.Row_5-Width*0.5)/Width))
+LineTo  X = Controls.Row_5; Y = Controls.Row_5.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5+Width*0.5*COS(ATAN2((Controls.Row_6.Y-Height*0.5)/Height,(Controls.Row_6-Width*0.5)/Width)); Y = Height*0.5+Height*0.5*SIN(ATAN2((Controls.Row_6.Y-Height*0.5)/Height,(Controls.Row_6-Width*0.5)/Width))
+LineTo  X = Controls.Row_6; Y = Controls.Row_6.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5+Width*0.5*COS(ATAN2((Controls.Row_7.Y-Height*0.5)/Height,(Controls.Row_7-Width*0.5)/Width)); Y = Height*0.5+Height*0.5*SIN(ATAN2((Controls.Row_7.Y-Height*0.5)/Height,(Controls.Row_7-Width*0.5)/Width))
+LineTo  X = Controls.Row_7; Y = Controls.Row_7.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5+Width*0.5*COS(ATAN2((Controls.Row_8.Y-Height*0.5)/Height,(Controls.Row_8-Width*0.5)/Width)); Y = Height*0.5+Height*0.5*SIN(ATAN2((Controls.Row_8.Y-Height*0.5)/Height,(Controls.Row_8-Width*0.5)/Width))
+LineTo  X = Controls.Row_8; Y = Controls.Row_8.Y
+
+[Controls]
+Row_1:  X = Width*0.96194; Y = Height*0.691342; XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+Row_2:  X = Width*0.691342; Y = Height*0.96194; XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+Row_3:  X = Width*0.308658; Y = Height*0.96194; XDyn = Controls.Row_3; YDyn = Controls.Row_3.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+Row_4:  X = Width*0.0380602; Y = Height*0.691342; XDyn = Controls.Row_4; YDyn = Controls.Row_4.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+Row_5:  X = Width*0.0380602; Y = Height*0.308658; XDyn = Controls.Row_5; YDyn = Controls.Row_5.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+Row_6:  X = Width*0.308658; Y = Height*0.0380602; XDyn = Controls.Row_6; YDyn = Controls.Row_6.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+Row_7:  X = Width*0.691342; Y = Height*0.0380602; XDyn = Controls.Row_7; YDyn = Controls.Row_7.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+Row_8:  X = Width*0.96194; Y = Height*0.308658; XDyn = Controls.Row_8; YDyn = Controls.Row_8.Y; XCon = 0; YCon = 0; CanGlue = TRUE
+        Tip.de = Auf ein Gerät ziehen
+        Tip.en = Drag onto a device
+        Tip.es = Arrastrar sobre un dispositivo
+        Tip.it = Trascina su un dispositivo
+        Tip.fr = Faire glisser sur un appareil
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Ringnetz
+    Value.en = Ring network
+    Value.es = Red en anillo
+    Value.it = Rete ad anello
+    Value.fr = Réseau en anneau

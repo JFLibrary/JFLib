@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Data: a stack of data sheets</title>
+  <rect class="body" x="25" y="4" width="26" height="31" rx="1" fill="#F7F8FA"/>
+  <rect class="body" x="20" y="8" width="26" height="31" rx="1" fill="#F7F8FA"/>
+  <path class="body" d="M15 12H34L41 19V43H15Z" fill="#F7F8FA"/>
+  <polygon class="shade" points="34,12 34,19 41,19" fill="#DCDFE3"/>
+  <rect class="tint" x="19" y="16" width="11.5" height="3.5" rx="0.5" fill="#8E8540" stroke="none"/>
+  <path class="shade" d="M19 25H37M19 29.5H37M19 34H37M19 38.5H31" stroke="#DCDFE3" stroke-width="2"/>
+</svg>

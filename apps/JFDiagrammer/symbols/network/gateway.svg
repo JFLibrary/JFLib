@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Gateway: small box, an arrow passing through a gap between two posts</title>
+  <rect class="body" x="9" y="15" width="46" height="18" rx="3" fill="#F7F8FA"/>
+  <rect class="tint" x="29.5" y="17.75" width="5" height="4.25" rx="0.75" fill="#4F7396" stroke="none"/>
+  <rect class="tint" x="29.5" y="26" width="5" height="4.25" rx="0.75" fill="#4F7396" stroke="none"/>
+  <path class="tint" d="M20.5 24H40.5" stroke="#4F7396" stroke-width="2"/>
+  <polygon class="tint" points="44.5,24 40,20.75 40,27.25" fill="#4F7396" stroke="none"/>
+  <rect class="port" x="12.5" y="21.75" width="5.5" height="4.5" rx="0.4" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="46.5" y="21.75" width="5.5" height="4.5" rx="0.4" fill="#4F555D" stroke="none"/>
+  <circle class="ok" cx="15.25" cy="18.5" r="0.8" fill="#3C9A5F" stroke="none"/>
+  <circle class="ok" cx="49.25" cy="18.5" r="0.8" fill="#3C9A5F" stroke="none"/>
+  <rect class="port" x="16" y="33" width="6" height="2" rx="0.75" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="42" y="33" width="6" height="2" rx="0.75" fill="#4F555D" stroke="none"/>
+</svg>

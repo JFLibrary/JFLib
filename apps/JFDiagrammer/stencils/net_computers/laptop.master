@@ -1,0 +1,33 @@
+# Laptop (JD13, eigene Grafik im JFNetworker-Stil)
+master: Laptop
+name.de: Laptop
+name.en: Laptop
+name.es: Portátil
+name.it: Portatile
+name.fr: Ordinateur portable
+prompt.de: Laptop: tragbarer Rechner.
+prompt.en: Laptop: portable computer.
+prompt.es: Portátil: ordenador portátil.
+prompt.it: Portatile: computer portatile.
+prompt.fr: Ordinateur portable : ordinateur portable.
+keywords.de: Laptop, Computer, Arbeitsplatz
+keywords.en: Laptop, computer, workstation
+keywords.es: Portátil, equipo, puesto de trabajo
+keywords.it: Portatile, computer, postazione
+keywords.fr: Ordinateur portable, ordinateur, poste de travail
+svg: ../../symbols/network/laptop.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Computer
+    Value.en = Computer
+    Value.es = Equipo
+    Value.it = Computer
+    Value.fr = Ordinateur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Laptop
+    Value.en = Laptop
+    Value.es = Portátil
+    Value.it = Portatile
+    Value.fr = Ordinateur portable

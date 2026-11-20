@@ -1,0 +1,33 @@
+# Schloss und Schlüssel (JD13, eigene Grafik im JFNetworker-Stil)
+master: Lock and key
+name.de: Schloss und Schlüssel
+name.en: Lock and key
+name.es: Candado y llave
+name.it: Lucchetto e chiave
+name.fr: Cadenas et clé
+prompt.de: Schloss und Schlüssel: Verschlüsselung.
+prompt.en: Lock and key: encryption.
+prompt.es: Candado y llave: cifrado.
+prompt.it: Lucchetto e chiave: crittografia.
+prompt.fr: Cadenas et clé : chiffrement.
+keywords.de: Schloss und Schlüssel, Sicherheit
+keywords.en: Lock and key, security
+keywords.es: Candado y llave, seguridad
+keywords.it: Lucchetto e chiave, sicurezza
+keywords.fr: Cadenas et clé, sécurité
+svg: ../../symbols/network/lock_key.svg
+include: ../net_common/symbol.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Sicherheit
+    Value.en = Security
+    Value.es = Seguridad
+    Value.it = Sicurezza
+    Value.fr = Sécurité
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Schloss und Schlüssel
+    Value.en = Lock and key
+    Value.es = Candado y llave
+    Value.it = Lucchetto e chiave
+    Value.fr = Cadenas et clé

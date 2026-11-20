@@ -1,3 +1,4 @@
+# Gebäude (JD13, eigene Grafik im JFNetworker-Stil)
 master: Building
 name.de: Gebäude
 name.en: Building
@@ -9,12 +10,12 @@ prompt.en: Building: a site in the network plan, such as an office building.
 prompt.es: Edificio: una ubicación del plano de red, como un edificio de oficinas.
 prompt.it: Edificio: una sede nello schema di rete, ad esempio un edificio per uffici.
 prompt.fr: Bâtiment : un site du plan réseau, par exemple un immeuble de bureaux.
-keywords.de: Gebäude, Büro, Standort, Niederlassung, WAN
-keywords.en: building, office, site, branch, WAN
-keywords.es: edificio, oficina, ubicación, sucursal, WAN
-keywords.it: edificio, ufficio, sede, filiale, WAN
-keywords.fr: bâtiment, bureau, site, agence, WAN
-svg: building.svg
+keywords.de: Gebäude, Standort, WAN
+keywords.en: Building, location, site, WAN
+keywords.es: Edificio, ubicación, WAN
+keywords.it: Edificio, sede, WAN
+keywords.fr: Bâtiment, site, WAN
+svg: ../../symbols/network/building.svg
 include: ../net_common/symbol.inc, ../net_common/location.inc
 
 [Property]

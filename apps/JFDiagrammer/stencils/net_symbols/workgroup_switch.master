@@ -1,0 +1,33 @@
+# Arbeitsgruppen-Switch (JD13, eigene Grafik im JFNetworker-Stil)
+master: Workgroup switch
+name.de: Arbeitsgruppen-Switch
+name.en: Workgroup switch
+name.es: Conmutador de grupo de trabajo
+name.it: Switch di gruppo di lavoro
+name.fr: Commutateur de groupe de travail
+prompt.de: Arbeitsgruppen-Switch: kleiner Switch für einen Arbeitsbereich.
+prompt.en: Workgroup switch: small switch for a work area.
+prompt.es: Conmutador de grupo de trabajo: conmutador pequeño para una zona de trabajo.
+prompt.it: Switch di gruppo di lavoro: piccolo switch per un'area di lavoro.
+prompt.fr: Commutateur de groupe de travail : petit commutateur pour une zone de travail.
+keywords.de: Arbeitsgruppen-Switch, Netzwerk
+keywords.en: Workgroup switch, network
+keywords.es: Conmutador de grupo de trabajo, red
+keywords.it: Switch di gruppo di lavoro, rete
+keywords.fr: Commutateur de groupe de travail, réseau
+svg: ../../symbols/network/switch_desk.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Arbeitsgruppen-Switch
+    Value.en = Workgroup switch
+    Value.es = Conmutador de grupo de trabajo
+    Value.it = Switch di gruppo di lavoro
+    Value.fr = Commutateur de groupe de travail

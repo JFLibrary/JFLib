@@ -1,3 +1,4 @@
+# Webserver (JD13, eigene Grafik im JFNetworker-Stil)
 master: Web server
 name.de: Webserver
 name.en: Web server
@@ -9,12 +10,12 @@ prompt.en: Web server: serves web pages and web services.
 prompt.es: Servidor web: ofrece páginas y servicios web.
 prompt.it: Server web: fornisce pagine e servizi web.
 prompt.fr: Serveur Web : fournit des pages et des services Web.
-keywords.de: Webserver, HTTP, Website, Internet, Server
-keywords.en: web server, HTTP, website, internet, server
-keywords.es: servidor web, HTTP, sitio web, internet, servidor
-keywords.it: server web, HTTP, sito web, internet, server
-keywords.fr: serveur Web, HTTP, site Web, internet, serveur
-svg: web_server.svg
+keywords.de: Webserver, Server, Rolle
+keywords.en: Web server, server, role
+keywords.es: Servidor web, servidor, función
+keywords.it: Server web, server, ruolo
+keywords.fr: Serveur Web, serveur, rôle
+svg: ../../symbols/network/server_web.svg
 include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
 
 [Property]

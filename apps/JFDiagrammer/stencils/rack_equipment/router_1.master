@@ -1,0 +1,37 @@
+# Router 1 (JD13, eigene Grafik im JFNetworker-Stil)
+master: Router 1
+name.de: Router 1
+name.en: Router 1
+name.es: Enrutador 1
+name.it: Router 1
+name.fr: Routeur 1
+prompt.de: Router 1: Router als 19-Zoll-Einschub, 1 HE.
+prompt.en: Router 1: 19-inch rack router, 1 U.
+prompt.es: Enrutador 1: enrutador de rack de 19 pulgadas, 1 U.
+prompt.it: Router 1: router rack da 19 pollici, 1 U.
+prompt.fr: Routeur 1 : routeur 19 pouces, 1 U.
+keywords.de: Router 1, Rack, 19 Zoll, HE
+keywords.en: Router 1, rack, 19 inch, U
+keywords.es: Enrutador 1, rack, 19 pulgadas, U
+keywords.it: Router 1, rack, 19 pollici, U
+keywords.fr: Routeur 1, baie, 19 pouces, U
+svg: ../../symbols/rack/router_1u.svg
+scale: 1:20
+size: 482.6 mm x 44.45 mm
+size.us: 19 in x 1.75 in
+include: ../net_common/rackdev.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+RackUnits: Value = 1
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Gestellmontiert
+    Value.en = Rack-mounted
+    Value.es = Montaje en rack
+    Value.it = Montaggio a rack
+    Value.fr = Monté en baie
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Router 1
+    Value.en = Router 1
+    Value.es = Enrutador 1
+    Value.it = Router 1
+    Value.fr = Routeur 1

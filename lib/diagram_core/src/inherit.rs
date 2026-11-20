@@ -164,6 +164,32 @@ impl Document {
     /// the rows section `sec` really has for `sheet`: inherited, overridden and own rows
     /// without the deleted ones; indexed rows by rising index, named rows in the order the
     /// master shape or style has them, then the own ones
+    /// (JD13) the highest row index of a section along the inheritance (the sheet's own rows,
+    /// also deleted ones, and its parents'), without building the merged rows: a new row goes
+    /// past it (Transaction::add_row)
+    pub(crate) fn last_row_index(&self, sheet: SheetRef, sec: SecKey) -> Option<u32> {
+        let cat = Category::of_section(self.str(sec.name));
+        let mut best: Option<u32> = None;
+        let mut at = Some(sheet);
+        let mut depth = 0;
+        while let Some(s) = at {
+            if depth > MAX_DEPTH {
+                break;
+            }
+            if let Some(section) = self.sheet(s).and_then(|x| x.section(sec)) {
+                // indexed rows are sorted by index: the last one is the highest
+                let own = section.rows.iter().rev().find_map(|r| match r.key {
+                    RowKey::Index(i) => Some(i),
+                    RowKey::Named(_) => None,
+                });
+                best = best.max(own);
+            }
+            at = self.parent_sheet(s, cat);
+            depth += 1;
+        }
+        best
+    }
+
     pub fn rows(&self, sheet: SheetRef, sec: SecKey) -> Vec<EffRow> {
         let mut rows = self.rows_at(sheet, sec, 0);
         if rows.iter().all(|r| matches!(r.key, RowKey::Index(_))) {

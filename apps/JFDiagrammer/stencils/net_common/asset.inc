@@ -2,6 +2,9 @@
 # (Kompatibilität mit Berichten und Legenden), Bezeichnungen und Werte sind eigene.
 # ShapeClass/ShapeType/SubShapeType sind verborgen und ordnen das Gerät für Berichte ein; der
 # Master setzt ShapeType und SubShapeType selbst.
+[User]
+# Visios Kennung für Shapes, die eine Legende zählt (JD13: die Legende in Netzwerk und Peripheriegeräte)
+visLegendShape: Value = 2
 [Property]
 AssetNumber:  Type = 0; Value = ""
               Label.de = Inventarnummer

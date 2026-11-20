@@ -1,0 +1,45 @@
+# Optisches Laufwerk (JD13, eigene Grafik im JFNetworker-Stil)
+master: Optical drive
+name.de: Optisches Laufwerk
+name.en: Optical drive
+name.es: Unidad óptica
+name.it: Unità ottica
+name.fr: Lecteur optique
+prompt.de: Optisches Laufwerk: optisches Laufwerk in Frontansicht.
+prompt.en: Optical drive: optical drive in front view.
+prompt.es: Unidad óptica: unidad óptica en vista frontal.
+prompt.it: Unità ottica: unità ottica in vista frontale.
+prompt.fr: Lecteur optique : lecteur optique en vue de face.
+keywords.de: Optisches Laufwerk, Frontansicht, Regal
+keywords.en: Optical drive, front view, shelf
+keywords.es: Unidad óptica, vista frontal, estante
+keywords.it: Unità ottica, vista frontale, ripiano
+keywords.fr: Lecteur optique, vue de face, étagère
+svg: ../../symbols/rack/front_optical.svg
+scale: 1:20
+include: ../net_common/asset.inc
+
+[Shape]
+Width = 100 mm
+Width.us = 3.9370 in
+Height = 50 mm
+Height.us = 1.9685 in
+TxtPinY = 0 mm
+TxtLocPinY = TxtHeight
+TxtHeight = 160 mm
+TxtWidth = Width*2
+VerticalAlign = 0
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Freistehend
+    Value.en = Freestanding
+    Value.es = Independiente
+    Value.it = Autoportante
+    Value.fr = Autonome
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Optisches Laufwerk
+    Value.en = Optical drive
+    Value.es = Unidad óptica
+    Value.it = Unità ottica
+    Value.fr = Lecteur optique

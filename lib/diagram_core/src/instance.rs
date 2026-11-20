@@ -533,6 +533,17 @@ impl Copier<'_> {
         let (slot, id) = tx.doc.masters.alloc().ok_or(EditError::NoIds)?;
         let mut copy = copy;
         copy.header.id = id;
+        // (JD13) another master with this NameU is there already (the same name in two stencils,
+        // "Router" in Netzwerk und Peripheriegeräte and in Netzwerksymbole): Name and NameU get
+        // ".ID" as Visio names them
+        if let Some(nu) = copy.header.name_u.map(|s| String::from(tx.doc().str(s))) {
+            if tx.doc().masters().any(|r| tx.doc().master(r).and_then(|x| x.header.name_u).is_some_and(|n| tx.doc().str(n) == nu)) {
+                copy.header.name_u = Some(tx.intern(&format!("{nu}.{id}")));
+                if let Some(n) = copy.header.name.map(|s| String::from(tx.doc().str(s))) {
+                    copy.header.name = Some(tx.intern(&format!("{n}.{id}")));
+                }
+            }
+        }
         let old = master.header.id;
         tx.run(Op::MasterInsert { slot, pos, master: Box::new(copy) })?;
         self.masters.insert(old, id);

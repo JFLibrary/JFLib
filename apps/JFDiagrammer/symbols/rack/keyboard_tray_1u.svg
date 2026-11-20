@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 482.6 44.45" width="965" height="89"
+     fill="none" stroke="#2E343B" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Rack keyboard tray 1U: the keyboard's front with its keys, tray lip with a handle</title>
+  <rect class="body" x="17.8" y="0.6" width="447" height="43.25" fill="#F7F8FA" stroke="none"/>
+  <path class="shade" d="M2.6 0.6H17.8V43.85H2.6A2 2 0 0 1 0.6 41.85V2.6A2 2 0 0 1 2.6 0.6ZM464.8 0.6H480A2 2 0 0 1 482 2.6V41.85A2 2 0 0 1 480 43.85H464.8Z" fill="#DCDFE3" stroke="none"/>
+  <path class="ink" d="M17.8 0.6V43.85M464.8 0.6V43.85" stroke-width="1.5"/>
+  <rect class="ink" x="0.6" y="0.6" width="481.4" height="43.25" rx="2"/>
+  <g class="port" fill="#4F555D" stroke="none"><rect x="4.9" y="4.1" width="8" height="4.5" rx="2.25"/><rect x="469.7" y="4.1" width="8" height="4.5" rx="2.25"/><rect x="4.9" y="35.85" width="8" height="4.5" rx="2.25"/><rect x="469.7" y="35.85" width="8" height="4.5" rx="2.25"/></g>
+  <rect class="tint" x="25" y="6" width="22" height="32.45" rx="3" fill="#7A828C" stroke="none"/>
+  <rect class="shade" x="118" y="13.5" width="250" height="7.5" rx="2" fill="#DCDFE3" stroke-width="1.2"/>
+  <g class="body" fill="#F7F8FA" stroke-width="1"><rect x="122" y="7.5" width="12" height="6" rx="1"/><rect x="136.5" y="7.5" width="12" height="6" rx="1"/><rect x="151" y="7.5" width="12" height="6" rx="1"/><rect x="165.5" y="7.5" width="12" height="6" rx="1"/><rect x="180" y="7.5" width="12" height="6" rx="1"/><rect x="194.5" y="7.5" width="12" height="6" rx="1"/><rect x="209" y="7.5" width="70" height="6" rx="1"/><rect x="281.5" y="7.5" width="12" height="6" rx="1"/><rect x="296" y="7.5" width="12" height="6" rx="1"/><rect x="310.5" y="7.5" width="12" height="6" rx="1"/><rect x="325" y="7.5" width="12" height="6" rx="1"/><rect x="339.5" y="7.5" width="12" height="6" rx="1"/><rect x="354" y="7.5" width="12" height="6" rx="1"/></g>
+  <path class="ink" d="M70 24H458" stroke-width="1.2"/>
+  <rect class="shade" x="196" y="29.5" width="90" height="8" rx="4" fill="#DCDFE3" stroke-width="1.2"/>
+  <path class="port" d="M206 33.5H276" stroke="#4F555D" stroke-width="1.6"/>
+</svg>

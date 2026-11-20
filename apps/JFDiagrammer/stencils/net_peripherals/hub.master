@@ -1,0 +1,33 @@
+# Hub (JD13, eigene Grafik im JFNetworker-Stil)
+master: Hub
+name.de: Hub
+name.en: Hub
+name.es: Concentrador
+name.it: Hub
+name.fr: Concentrateur
+prompt.de: Hub: verteilt Signale an alle Anschlüsse.
+prompt.en: Hub: repeats signals to every port.
+prompt.es: Concentrador: repite las señales a todos los puertos.
+prompt.it: Hub: ripete i segnali su tutte le porte.
+prompt.fr: Concentrateur : répète les signaux sur tous les ports.
+keywords.de: Hub, Netzwerk
+keywords.en: Hub, network
+keywords.es: Concentrador, red
+keywords.it: Hub, rete
+keywords.fr: Concentrateur, réseau
+svg: ../../symbols/network/hub.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Hub
+    Value.en = Hub
+    Value.es = Concentrador
+    Value.it = Hub
+    Value.fr = Concentrateur

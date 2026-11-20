@@ -1,0 +1,33 @@
+# Leinwand (JD13, eigene Grafik im JFNetworker-Stil)
+master: Projection screen
+name.de: Leinwand
+name.en: Projection screen
+name.es: Pantalla de proyección
+name.it: Schermo di proiezione
+name.fr: Écran de projection
+prompt.de: Leinwand: Projektionsfläche.
+prompt.en: Projection screen: surface for projection.
+prompt.es: Pantalla de proyección: superficie de proyección.
+prompt.it: Schermo di proiezione: superficie di proiezione.
+prompt.fr: Écran de projection : surface de projection.
+keywords.de: Leinwand, Peripherie, Büro
+keywords.en: Projection screen, peripheral, office
+keywords.es: Pantalla de proyección, periférico, oficina
+keywords.it: Schermo di proiezione, periferica, ufficio
+keywords.fr: Écran de projection, périphérique, bureau
+svg: ../../symbols/network/projection_screen.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Leinwand
+    Value.en = Projection screen
+    Value.es = Pantalla de proyección
+    Value.it = Schermo di proiezione
+    Value.fr = Écran de projection

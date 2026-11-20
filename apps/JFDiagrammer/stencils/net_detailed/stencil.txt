@@ -1,3 +1,4 @@
+# Detailliertes Netzwerkdiagramm (SH-142, JD13): eigene Shapes im JFNetworker-Stil, Grafiken aus ../../symbols/
 stencil: Detailed Network Diagram
 file: netdetail
 name.de: Detailliertes Netzwerkdiagramm
@@ -6,5 +7,5 @@ name.es: Diagrama de red detallado
 name.it: Schema di rete dettagliato
 name.fr: Diagramme réseau détaillé
 category: network
-masters: satellite_dish
-quick: 0
+masters: patch_panel, repeater, voip_phone, pbx, ab_switch, diagnostic, smartcard_reader, radio_tower, biometric_reader, external_hdd, web_service, fiber_optic, satellite_dish, satellite, mpls
+quick: 4

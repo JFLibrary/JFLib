@@ -1,0 +1,33 @@
+# Behördengebäude (JD13, eigene Grafik im JFNetworker-Stil)
+master: Government building
+name.de: Behördengebäude
+name.en: Government building
+name.es: Edificio gubernamental
+name.it: Edificio governativo
+name.fr: Bâtiment administratif
+prompt.de: Behördengebäude: Gebäude einer Behörde.
+prompt.en: Government building: building of a public authority.
+prompt.es: Edificio gubernamental: edificio de una administración pública.
+prompt.it: Edificio governativo: edificio di un ente pubblico.
+prompt.fr: Bâtiment administratif : bâtiment d'une administration.
+keywords.de: Behördengebäude, Standort, WAN
+keywords.en: Government building, location, site, WAN
+keywords.es: Edificio gubernamental, ubicación, WAN
+keywords.it: Edificio governativo, sede, WAN
+keywords.fr: Bâtiment administratif, site, WAN
+svg: ../../symbols/network/government.svg
+include: ../net_common/symbol.inc, ../net_common/location.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Standort
+    Value.en = Location
+    Value.es = Ubicación
+    Value.it = Sede
+    Value.fr = Site
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Behördengebäude
+    Value.en = Government building
+    Value.es = Edificio gubernamental
+    Value.it = Edificio governativo
+    Value.fr = Bâtiment administratif

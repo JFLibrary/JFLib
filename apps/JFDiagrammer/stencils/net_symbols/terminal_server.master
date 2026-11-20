@@ -1,0 +1,33 @@
+# Terminalserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: Terminal server
+name.de: Terminalserver
+name.en: Terminal server
+name.es: Servidor de terminales
+name.it: Server terminal
+name.fr: Serveur de terminaux
+prompt.de: Terminalserver: stellt Sitzungen für Terminals bereit.
+prompt.en: Terminal server: provides sessions for terminals.
+prompt.es: Servidor de terminales: ofrece sesiones para terminales.
+prompt.it: Server terminal: fornisce sessioni ai terminali.
+prompt.fr: Serveur de terminaux : fournit des sessions aux terminaux.
+keywords.de: Terminalserver, Server, Rolle
+keywords.en: Terminal server, server, role
+keywords.es: Servidor de terminales, servidor, función
+keywords.it: Server terminal, server, ruolo
+keywords.fr: Serveur de terminaux, serveur, rôle
+svg: ../../symbols/network/server_terminal.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Terminalserver
+    Value.en = Terminal server
+    Value.es = Servidor de terminales
+    Value.it = Server terminal
+    Value.fr = Serveur de terminaux

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Printer: paper in at the top, out at the front</title>
+  <rect class="hi" x="18" y="4" width="28" height="12" fill="#FFFFFF"/>
+  <path class="shade" d="M22 8H42M22 11.5H36" stroke="#DCDFE3" stroke-width="1.25"/>
+  <rect class="shade" x="8" y="13" width="48" height="6" rx="1.5" fill="#DCDFE3"/>
+  <rect class="body" x="5" y="18" width="54" height="22" rx="2.5" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M5 36.5H59V37.5A2.5 2.5 0 0 1 56.5 40H7.5A2.5 2.5 0 0 1 5 37.5Z" fill="#7A828C" stroke="none"/>
+  <rect class="ink" x="5" y="18" width="54" height="22" rx="2.5"/>
+  <rect class="port" x="13" y="27.5" width="38" height="3.5" rx="1" fill="#4F555D" stroke="none"/>
+  <path class="hi" d="M17 29.5V35H47V29.5Z" fill="#FFFFFF" stroke="none"/>
+  <path class="ink" d="M17 29.5V35H47V29.5" stroke-width="1.25"/>
+  <rect class="screen" x="42" y="20.75" width="10" height="4.5" rx="0.75" fill="#CAD4DF" stroke-width="1"/>
+  <circle class="ok" cx="12" cy="23" r="1.2" fill="#3C9A5F" stroke="none"/>
+  <rect class="port" x="9" y="40" width="6" height="2" rx="0.75" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="49" y="40" width="6" height="2" rx="0.75" fill="#4F555D" stroke="none"/>
+</svg>

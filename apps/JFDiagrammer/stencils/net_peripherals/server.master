@@ -1,0 +1,33 @@
+# Server (JD13, eigene Grafik im JFNetworker-Stil)
+master: Server
+name.de: Server
+name.en: Server
+name.es: Servidor
+name.it: Server
+name.fr: Serveur
+prompt.de: Server: Rechner, der Dienste im Netz bereitstellt.
+prompt.en: Server: computer that provides services on the network.
+prompt.es: Servidor: equipo que ofrece servicios en la red.
+prompt.it: Server: computer che fornisce servizi in rete.
+prompt.fr: Serveur : ordinateur qui fournit des services sur le réseau.
+keywords.de: Server, Server, Rolle
+keywords.en: Server, server, role
+keywords.es: Servidor, servidor, función
+keywords.it: Server, server, ruolo
+keywords.fr: Serveur, serveur, rôle
+svg: ../../symbols/network/server_tower.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="96" height="96"
+     fill="none" stroke="#F7F8FA" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round">
+  <title>Role pictogram streaming: a play sign with waves (white, for the role badge; make_roles.py)</title>
+  <path class="body" d="M1.2 3.4L5.4 6L1.2 8.6Z" fill="#F7F8FA"/>
+  <path class="body" d="M6.48 3.47A3.4 3.4 0 0 1 6.48 8.53M8.51 1.69A6.1 6.1 0 0 1 8.51 10.31"/>
+</svg>

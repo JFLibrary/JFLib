@@ -31,6 +31,8 @@ fn stencils(app: &Path) {
     let out = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));
     let root = app.join("stencils");
     println!("cargo:rerun-if-changed={}", root.display());
+    // (JD13) the shared network symbols the masters name (svg: ../../symbols/...; later a submodule)
+    println!("cargo:rerun-if-changed={}", app.join("symbols").display());
     let mut dirs: Vec<PathBuf> = fs::read_dir(&root)
         .map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.join("stencil.txt").is_file()).collect())
         .unwrap_or_default();

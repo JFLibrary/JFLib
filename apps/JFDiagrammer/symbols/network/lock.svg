@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Padlock: a closed shackle and a body with a keyhole</title>
+  <path class="ink" d="M23.5 23V15.5A8.5 8.5 0 0 1 40.5 15.5V23" stroke-width="5"/>
+  <path class="shade" d="M23.5 23V15.5A8.5 8.5 0 0 1 40.5 15.5V23" stroke="#DCDFE3" stroke-width="2.25"/>
+  <rect class="tint" x="17" y="21" width="30" height="22" rx="3" fill="#A65A4A"/>
+  <path class="body" d="M30.61 31.87A2.75 2.75 0 1 1 33.4 31.87L34.25 36.5H29.75Z" fill="#F7F8FA" stroke="none"/>
+</svg>

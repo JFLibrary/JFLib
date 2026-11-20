@@ -1,0 +1,33 @@
+# Kopierer (JD13, eigene Grafik im JFNetworker-Stil)
+master: Copier
+name.de: Kopierer
+name.en: Copier
+name.es: Fotocopiadora
+name.it: Fotocopiatrice
+name.fr: Photocopieur
+prompt.de: Kopierer: Kopiergerät.
+prompt.en: Copier: copying machine.
+prompt.es: Fotocopiadora: máquina copiadora.
+prompt.it: Fotocopiatrice: macchina fotocopiatrice.
+prompt.fr: Photocopieur : machine à photocopier.
+keywords.de: Kopierer, Peripherie, Büro
+keywords.en: Copier, peripheral, office
+keywords.es: Fotocopiadora, periférico, oficina
+keywords.it: Fotocopiatrice, periferica, ufficio
+keywords.fr: Photocopieur, périphérique, bureau
+svg: ../../symbols/network/copier.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Kopierer
+    Value.en = Copier
+    Value.es = Fotocopiadora
+    Value.it = Fotocopiatrice
+    Value.fr = Photocopieur

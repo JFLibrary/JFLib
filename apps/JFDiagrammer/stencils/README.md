@@ -189,10 +189,10 @@ den Shape-Kasten abgebildet (x nach rechts, y nach oben gedreht).
   `rgb()`, ein paar Namen (`black`, `white`, `red` …).
 - Haben alle Elemente dieselbe Füllung, Linie und Linienbreite, trägt das Master-Shape selbst
   die Geometrie und diese Formate (außer den Zellen, die `[Shape]` selbst setzt). Sonst wird es
-  eine Gruppe mit einem Untershape je Format in der Reihenfolge, in der die Formate zuerst
-  vorkommen; jedes Untershape ist so groß wie die Gruppe (`Width = Sheet.N!Width` …) und
-  zeichnet seine Pfade. Liegen Formate abwechselnd übereinander, stimmt die Stapelfolge daher
-  nur je Format.
+  eine Gruppe mit einem Untershape je Folge gleich formatierter Elemente, in der Reihenfolge der
+  Datei (JD13: wie JFNetworkers `vsym.py`; ein Format, das später wiederkommt, wird ein eigenes
+  Untershape über allem dazwischen). Jedes Untershape ist so groß wie die Gruppe
+  (`Width = Sheet.N!Width` …) und zeichnet seine Pfade.
 - Farben werden als `#RRGGBB` übernommen (`FillForegnd`, `FillBkgnd`, `LineColor`, Deckkraft
   als `…Trans`), die Linienbreite im Verhältnis viewBox zu Shape-Größe (`LineWeight` in pt).
 
@@ -277,3 +277,32 @@ Werte stehen in der festen Reihenfolge `de|en|es|it|fr`, `\|` und `\\` maskieren
 Beim Ablegen schreibt JFDiagrammer den Namen der aktuellen Sprache als `Name` ins Dokument und
 behält `NameU` als Schlüssel (LG-04). Übersetzte Zellen und der Text kommen ebenfalls in der
 aktuellen Sprache auf die Instanz.
+
+## Netzwerk und Rack (JD13)
+
+Neun Schablonen der Kategorie `network`: `net_computers` (SH-140), `net_detailed` (SH-142),
+`net_peripherals` (SH-151), `net_locations` (SH-153), `net_symbols` (SH-156), `net_servers`
+(SH-158), `rack_freestanding` (SH-145), `rack_equipment` (SH-146), `rack_servers` (SH-147).
+
+- **Grafiken:** aus dem gemeinsamen Symbolsatz von JFNetworker und JFDiagrammer
+  (`../symbols/`, F9, SH-G09; später ein eigenes Repository als git-Submodule), angesprochen mit
+  `svg: ../../symbols/network/router.svg`. Der Ordner hat eine eigene README mit Stilregeln.
+- **Gemeinsame Abschnitte** in `net_common/` (kein `stencil.txt`, per `include:`):
+  `symbol.inc` (24 x 18 mm, Name unter dem Symbol), `asset.inc` (Inventar, `ShapeClass`,
+  `User.visLegendShape`), `network.inc` (Adressen), `computer.inc` (Betriebssystem, CPU …),
+  `location.inc` (Standorte), `rackdev.inc` (19-Zoll-Einschübe). Die Zeilennamen der Shape-Daten
+  sind Visios (`AssetNumber`, `IPAddress` …), Bezeichnungen und Werte eigene.
+- **Rack (VL-52):** Masterseiten im Maßstab 1:20 (`scale:`). Gestell und Schrank: Höhe =
+  Sockel + Kopf + HE x 44,45 mm aus `Prop.RackUnits`; beim Ziehen schickt `SETATREF` die
+  gerundete HE-Zahl in die Shape-Daten (`size:` gibt die Anfangsgröße). Sie sind Container für
+  die Kategorie `RackEquipment` und haben auf jeder HE-Grenze der linken Schiene einen
+  Verbindungspunkt „nach innen“. Einschübe (`rackdev.inc`): 482,6 mm breit, Höhe aus
+  `Prop.RackUnits` ebenso, ein Verbindungspunkt „nach außen“ unten links, mit dem sie in
+  JFDiagrammer (`diagram_core::dock`, App `rack.rs`) und in Visio auf den HE einrasten.
+- **Besondere Master:** `ethernet` und `ring_network` (acht Steuerpunkte, deren Leitungen zu den
+  Geräten führen; in Visio kleben sie), `legend` (JFDiagrammer schreibt die Zählung, App
+  `legend.rs`). Wählverbindung und Bemaßungen sind 1D-Shapes und folgen mit der
+  1D-Unterstützung des Bauwerkzeugs.
+- Prüfen: `diagramiotest --check --only stencils/network`, Ansicht
+  `diagramiotest --write-network-previews DIR`, Visio-Gegenprobe
+  `diagramiotest --write-network-gegenprobe DIR`.

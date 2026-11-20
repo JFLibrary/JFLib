@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Home router: three antennas, LED row</title>
+  <rect class="shade" x="11" y="8" width="3.5" height="20" rx="1.75" fill="#DCDFE3"/>
+  <rect class="shade" x="30.25" y="5" width="3.5" height="23" rx="1.75" fill="#DCDFE3"/>
+  <rect class="shade" x="49.5" y="8" width="3.5" height="20" rx="1.75" fill="#DCDFE3"/>
+  <rect class="port" x="10" y="39" width="6" height="2.5" rx="0.75" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="48" y="39" width="6" height="2.5" rx="0.75" fill="#4F555D" stroke="none"/>
+  <rect class="body" x="5" y="25" width="54" height="15" rx="4" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M5 35H59V36A4 4 0 0 1 55 40H9A4 4 0 0 1 5 36Z" fill="#4F7396" stroke="none"/>
+  <rect class="ink" x="5" y="25" width="54" height="15" rx="4"/>
+  <g class="ok" fill="#3C9A5F" stroke="none">
+    <circle cx="23" cy="30" r="1.1"/><circle cx="28" cy="30" r="1.1"/><circle cx="33" cy="30" r="1.1"/><circle cx="38" cy="30" r="1.1"/>
+  </g>
+  <circle class="port" cx="43" cy="30" r="1.1" fill="#4F555D" stroke="none"/>
+</svg>

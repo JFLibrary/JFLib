@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Lock and key: a padlock with a key in front of it</title>
+  <path class="ink" d="M16.5 21V15A7 7 0 0 1 30.5 15V21" stroke-width="4.5"/>
+  <path class="shade" d="M16.5 21V15A7 7 0 0 1 30.5 15V21" stroke="#DCDFE3" stroke-width="2"/>
+  <rect class="tint" x="11" y="19" width="25" height="19" rx="3" fill="#A65A4A"/>
+  <path class="body" d="M22.26 28.05A2.4 2.4 0 1 1 24.74 28.05L25.5 32H21.5Z" fill="#F7F8FA" stroke="none"/>
+  <g transform="translate(39 34) rotate(-28)">
+    <path class="tint" d="M6.3 -1.6H23L24.5 0L23 1.6H21V5H18V1.6H16V4H13V1.6H6.3A6.5 6.5 0 1 1 6.3 -1.6Z" fill="#A65A4A"/>
+    <circle class="body" cx="-2" cy="0" r="2.25" fill="#F7F8FA" stroke-width="1"/>
+  </g>
+</svg>

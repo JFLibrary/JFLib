@@ -1,0 +1,33 @@
+# Kommunikationsserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: Communications server
+name.de: Kommunikationsserver
+name.en: Communications server
+name.es: Servidor de comunicaciones
+name.it: Server di comunicazione
+name.fr: Serveur de communication
+prompt.de: Kommunikationsserver: Server für Telefonie und Nachrichten.
+prompt.en: Communications server: server for telephony and messaging.
+prompt.es: Servidor de comunicaciones: servidor de telefonía y mensajería.
+prompt.it: Server di comunicazione: server per telefonia e messaggistica.
+prompt.fr: Serveur de communication : serveur de téléphonie et de messagerie.
+keywords.de: Kommunikationsserver, Server, Rolle
+keywords.en: Communications server, server, role
+keywords.es: Servidor de comunicaciones, servidor, función
+keywords.it: Server di comunicazione, server, ruolo
+keywords.fr: Serveur de communication, serveur, rôle
+svg: ../../symbols/network/server_comm.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Kommunikationsserver
+    Value.en = Communications server
+    Value.es = Servidor de comunicaciones
+    Value.it = Server di comunicazione
+    Value.fr = Serveur de communication

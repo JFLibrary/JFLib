@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 482.6 88.9" width="965" height="178"
+     fill="none" stroke="#2E343B" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Rack NAS 2U: twelve 3.5-inch drive bays in two rows, small display with buttons, power button, LEDs</title>
+  <rect class="body" x="17.8" y="0.6" width="447" height="87.7" fill="#F7F8FA" stroke="none"/>
+  <path class="shade" d="M2.6 0.6H17.8V88.3H2.6A2 2 0 0 1 0.6 86.3V2.6A2 2 0 0 1 2.6 0.6ZM464.8 0.6H480A2 2 0 0 1 482 2.6V86.3A2 2 0 0 1 480 88.3H464.8Z" fill="#DCDFE3" stroke="none"/>
+  <path class="ink" d="M17.8 0.6V88.3M464.8 0.6V88.3" stroke-width="1.5"/>
+  <rect class="ink" x="0.6" y="0.6" width="481.4" height="87.7" rx="2"/>
+  <g class="port" fill="#4F555D" stroke="none"><rect x="4.9" y="4.1" width="8" height="4.5" rx="2.25"/><rect x="469.7" y="4.1" width="8" height="4.5" rx="2.25"/><rect x="4.9" y="35.85" width="8" height="4.5" rx="2.25"/><rect x="469.7" y="35.85" width="8" height="4.5" rx="2.25"/><rect x="4.9" y="48.55" width="8" height="4.5" rx="2.25"/><rect x="469.7" y="48.55" width="8" height="4.5" rx="2.25"/><rect x="4.9" y="80.3" width="8" height="4.5" rx="2.25"/><rect x="469.7" y="80.3" width="8" height="4.5" rx="2.25"/></g>
+  <rect class="tint" x="25" y="8" width="22" height="72.9" rx="3" fill="#8E8540" stroke="none"/>
+  <g class="shade" fill="#DCDFE3" stroke-width="1.2"><rect x="58" y="9" width="50" height="33" rx="1.5"/><rect x="111" y="9" width="50" height="33" rx="1.5"/><rect x="164" y="9" width="50" height="33" rx="1.5"/><rect x="217" y="9" width="50" height="33" rx="1.5"/><rect x="270" y="9" width="50" height="33" rx="1.5"/><rect x="323" y="9" width="50" height="33" rx="1.5"/><rect x="58" y="46.9" width="50" height="33" rx="1.5"/><rect x="111" y="46.9" width="50" height="33" rx="1.5"/><rect x="164" y="46.9" width="50" height="33" rx="1.5"/><rect x="217" y="46.9" width="50" height="33" rx="1.5"/><rect x="270" y="46.9" width="50" height="33" rx="1.5"/><rect x="323" y="46.9" width="50" height="33" rx="1.5"/></g>
+  <path class="port" d="M66 34H100M119 34H153M172 34H206M225 34H259M278 34H312M331 34H365M66 71.9H100M119 71.9H153M172 71.9H206M225 71.9H259M278 71.9H312M331 71.9H365" stroke="#4F555D" stroke-width="2"/>
+  <path class="port" d="M76 17H100M76 22H100M129 17H153M129 22H153M182 17H206M182 22H206M235 17H259M235 22H259M288 17H312M288 22H312M341 17H365M341 22H365M76 54.9H100M76 59.9H100M129 54.9H153M129 59.9H153M182 54.9H206M182 59.9H206M235 54.9H259M235 59.9H259M288 54.9H312M288 59.9H312M341 54.9H365M341 59.9H365" stroke="#4F555D" stroke-width="1.2"/>
+  <g class="ok" fill="#3C9A5F" stroke="none"><circle cx="67" cy="18" r="1.7"/><circle cx="120" cy="18" r="1.7"/><circle cx="173" cy="18" r="1.7"/><circle cx="226" cy="18" r="1.7"/><circle cx="279" cy="18" r="1.7"/><circle cx="332" cy="18" r="1.7"/><circle cx="67" cy="55.9" r="1.7"/><circle cx="120" cy="55.9" r="1.7"/><circle cx="173" cy="55.9" r="1.7"/><circle cx="226" cy="55.9" r="1.7"/><circle cx="279" cy="55.9" r="1.7"/><circle cx="332" cy="55.9" r="1.7"/></g>
+  <rect class="screen" x="388" y="12" width="64" height="22" rx="1.5" fill="#CAD4DF" stroke-width="1.2"/>
+  <path class="port" d="M394 19H430M394 27H418" stroke="#4F555D" stroke-width="1.6"/>
+  <g class="shade" fill="#DCDFE3" stroke-width="1.2"><rect x="388" y="40" width="10" height="7" rx="1"/><rect x="402" y="40" width="10" height="7" rx="1"/><rect x="416" y="40" width="10" height="7" rx="1"/><rect x="430" y="40" width="10" height="7" rx="1"/></g>
+  <circle class="body" cx="398" cy="66" r="7" fill="#F7F8FA" stroke-width="1.8"/>
+  <path class="ink" d="M398 62.5V67.19" stroke-width="1.8"/>
+  <g class="ok" fill="#3C9A5F" stroke="none"><circle cx="418" cy="66" r="2"/><circle cx="430" cy="66" r="2"/><circle cx="442" cy="66" r="2"/></g>
+</svg>

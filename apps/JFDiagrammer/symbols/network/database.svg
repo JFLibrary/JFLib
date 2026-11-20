@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Database: a cylinder with two ring lines</title>
+  <path class="tint" d="M17 9V39A15 4.5 0 0 0 47 39V9A15 4.5 0 0 0 17 9Z" fill="#8E8540"/>
+  <ellipse class="body" cx="32" cy="9" rx="15" ry="4.5" fill="#F7F8FA"/>
+  <path class="body" d="M17.75 19.75A15 4.5 0 0 0 46.25 19.75M17.75 29.75A15 4.5 0 0 0 46.25 29.75" stroke="#F7F8FA" stroke-width="1.5"/>
+</svg>

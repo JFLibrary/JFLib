@@ -1,0 +1,33 @@
+# ATM-Router (JD13, eigene Grafik im JFNetworker-Stil)
+master: ATM router
+name.de: ATM-Router
+name.en: ATM router
+name.es: Enrutador ATM
+name.it: Router ATM
+name.fr: Routeur ATM
+prompt.de: ATM-Router: Router mit ATM-Anschluss.
+prompt.en: ATM router: router with an ATM interface.
+prompt.es: Enrutador ATM: enrutador con interfaz ATM.
+prompt.it: Router ATM: router con interfaccia ATM.
+prompt.fr: Routeur ATM : routeur avec interface ATM.
+keywords.de: ATM-Router, Netzwerk
+keywords.en: ATM router, network
+keywords.es: Enrutador ATM, red
+keywords.it: Router ATM, rete
+keywords.fr: Routeur ATM, réseau
+svg: ../../symbols/network/router_atm.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = ATM-Router
+    Value.en = ATM router
+    Value.es = Enrutador ATM
+    Value.it = Router ATM
+    Value.fr = Routeur ATM

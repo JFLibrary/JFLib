@@ -1,0 +1,33 @@
+# Modem (JD13, eigene Grafik im JFNetworker-Stil)
+master: Modem
+name.de: Modem
+name.en: Modem
+name.es: Módem
+name.it: Modem
+name.fr: Modem
+prompt.de: Modem: Anschluss an die Leitung des Anbieters.
+prompt.en: Modem: connection to the provider's line.
+prompt.es: Módem: conexión a la línea del proveedor.
+prompt.it: Modem: collegamento alla linea del provider.
+prompt.fr: Modem : raccordement à la ligne de l'opérateur.
+keywords.de: Modem, Netzwerk
+keywords.en: Modem, network
+keywords.es: Módem, red
+keywords.it: Modem, rete
+keywords.fr: Modem, réseau
+svg: ../../symbols/network/modem_ont.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Modem
+    Value.en = Modem
+    Value.es = Módem
+    Value.it = Modem
+    Value.fr = Modem

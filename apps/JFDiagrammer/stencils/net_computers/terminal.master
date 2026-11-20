@@ -1,0 +1,33 @@
+# Terminal (JD13, eigene Grafik im JFNetworker-Stil)
+master: Terminal
+name.de: Terminal
+name.en: Terminal
+name.es: Terminal
+name.it: Terminale
+name.fr: Terminal
+prompt.de: Terminal: Bildschirmarbeitsplatz ohne eigene Rechenleistung.
+prompt.en: Terminal: display workstation without its own processing.
+prompt.es: Terminal: puesto con pantalla sin capacidad de cálculo propia.
+prompt.it: Terminale: postazione video senza capacità di calcolo propria.
+prompt.fr: Terminal : poste d'affichage sans puissance de calcul propre.
+keywords.de: Terminal, Computer, Arbeitsplatz
+keywords.en: Terminal, computer, workstation
+keywords.es: Terminal, equipo, puesto de trabajo
+keywords.it: Terminale, computer, postazione
+keywords.fr: Terminal, ordinateur, poste de travail
+svg: ../../symbols/network/terminal.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Computer
+    Value.en = Computer
+    Value.es = Equipo
+    Value.it = Computer
+    Value.fr = Ordinateur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Terminal
+    Value.en = Terminal
+    Value.es = Terminal
+    Value.it = Terminale
+    Value.fr = Terminal

@@ -1,0 +1,33 @@
+# Firewall (JD13, eigene Grafik im JFNetworker-Stil)
+master: Firewall
+name.de: Firewall
+name.en: Firewall
+name.es: Cortafuegos
+name.it: Firewall
+name.fr: Pare-feu
+prompt.de: Firewall: prüft und filtert den Datenverkehr.
+prompt.en: Firewall: inspects and filters traffic.
+prompt.es: Cortafuegos: inspecciona y filtra el tráfico.
+prompt.it: Firewall: ispeziona e filtra il traffico.
+prompt.fr: Pare-feu : inspecte et filtre le trafic.
+keywords.de: Firewall, Sicherheit
+keywords.en: Firewall, security
+keywords.es: Cortafuegos, seguridad
+keywords.it: Firewall, sicurezza
+keywords.fr: Pare-feu, sécurité
+svg: ../../symbols/network/firewall_ngfw.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Sicherheit
+    Value.en = Security
+    Value.es = Seguridad
+    Value.it = Sicurezza
+    Value.fr = Sécurité
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Firewall
+    Value.en = Firewall
+    Value.es = Cortafuegos
+    Value.it = Firewall
+    Value.fr = Pare-feu

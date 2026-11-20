@@ -1,0 +1,33 @@
+# OLAP-Datenbank (JD13, eigene Grafik im JFNetworker-Stil)
+master: OLAP database
+name.de: OLAP-Datenbank
+name.en: OLAP database
+name.es: Base de datos OLAP
+name.it: Database OLAP
+name.fr: Base de données OLAP
+prompt.de: OLAP-Datenbank: Datenbank für Auswertungen.
+prompt.en: OLAP database: database for analysis.
+prompt.es: Base de datos OLAP: base de datos para análisis.
+prompt.it: Database OLAP: database per le analisi.
+prompt.fr: Base de données OLAP : base de données d'analyse.
+keywords.de: OLAP-Datenbank, Daten
+keywords.en: OLAP database, data
+keywords.es: Base de datos OLAP, datos
+keywords.it: Database OLAP, dati
+keywords.fr: Base de données OLAP, données
+svg: ../../symbols/network/db_olap.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Daten
+    Value.en = Data
+    Value.es = Datos
+    Value.it = Dati
+    Value.fr = Données
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = OLAP-Datenbank
+    Value.en = OLAP database
+    Value.es = Base de datos OLAP
+    Value.it = Database OLAP
+    Value.fr = Base de données OLAP

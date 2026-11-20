@@ -1,0 +1,33 @@
+# Verzeichnisserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: Directory server
+name.de: Verzeichnisserver
+name.en: Directory server
+name.es: Servidor de directorio
+name.it: Server di directory
+name.fr: Serveur d'annuaire
+prompt.de: Verzeichnisserver: verwaltet Benutzer und Geräte.
+prompt.en: Directory server: manages users and devices.
+prompt.es: Servidor de directorio: gestiona usuarios y dispositivos.
+prompt.it: Server di directory: gestisce utenti e dispositivi.
+prompt.fr: Serveur d'annuaire : gère les utilisateurs et les appareils.
+keywords.de: Verzeichnisserver, Server, Rolle
+keywords.en: Directory server, server, role
+keywords.es: Servidor de directorio, servidor, función
+keywords.it: Server di directory, server, ruolo
+keywords.fr: Serveur d'annuaire, serveur, rôle
+svg: ../../symbols/network/server_directory.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Verzeichnisserver
+    Value.en = Directory server
+    Value.es = Servidor de directorio
+    Value.it = Server di directory
+    Value.fr = Serveur d'annuaire

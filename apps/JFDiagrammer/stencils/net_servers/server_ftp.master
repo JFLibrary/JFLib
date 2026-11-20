@@ -1,0 +1,33 @@
+# FTP-Server (JD13, eigene Grafik im JFNetworker-Stil)
+master: FTP server
+name.de: FTP-Server
+name.en: FTP server
+name.es: Servidor FTP
+name.it: Server FTP
+name.fr: Serveur FTP
+prompt.de: FTP-Server: überträgt Dateien.
+prompt.en: FTP server: transfers files.
+prompt.es: Servidor FTP: transfiere archivos.
+prompt.it: Server FTP: trasferisce file.
+prompt.fr: Serveur FTP : transfère des fichiers.
+keywords.de: FTP-Server, Server, Rolle
+keywords.en: FTP server, server, role
+keywords.es: Servidor FTP, servidor, función
+keywords.it: Server FTP, server, ruolo
+keywords.fr: Serveur FTP, serveur, rôle
+svg: ../../symbols/network/server_ftp.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = FTP-Server
+    Value.en = FTP server
+    Value.es = Servidor FTP
+    Value.it = Server FTP
+    Value.fr = Serveur FTP

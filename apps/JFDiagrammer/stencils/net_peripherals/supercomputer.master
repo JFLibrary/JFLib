@@ -1,0 +1,33 @@
+# Supercomputer (JD13, eigene Grafik im JFNetworker-Stil)
+master: Supercomputer
+name.de: Supercomputer
+name.en: Supercomputer
+name.es: Supercomputadora
+name.it: Supercomputer
+name.fr: Superordinateur
+prompt.de: Supercomputer: Höchstleistungsrechner.
+prompt.en: Supercomputer: high-performance computer.
+prompt.es: Supercomputadora: ordenador de alto rendimiento.
+prompt.it: Supercomputer: computer ad alte prestazioni.
+prompt.fr: Superordinateur : ordinateur haute performance.
+keywords.de: Supercomputer, Server, Rolle
+keywords.en: Supercomputer, server, role
+keywords.es: Supercomputadora, servidor, función
+keywords.it: Supercomputer, server, ruolo
+keywords.fr: Superordinateur, serveur, rôle
+svg: ../../symbols/network/supercomputer.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Supercomputer
+    Value.en = Supercomputer
+    Value.es = Supercomputadora
+    Value.it = Supercomputer
+    Value.fr = Superordinateur

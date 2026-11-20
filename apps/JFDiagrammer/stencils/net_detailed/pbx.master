@@ -1,0 +1,33 @@
+# Telefonanlage (JD13, eigene Grafik im JFNetworker-Stil)
+master: PBX
+name.de: Telefonanlage
+name.en: PBX
+name.es: Centralita
+name.it: Centralino
+name.fr: Autocommutateur (PBX)
+prompt.de: Telefonanlage: Nebenstellenanlage für Telefone.
+prompt.en: PBX: private branch exchange for phones.
+prompt.es: Centralita: centralita telefónica privada.
+prompt.it: Centralino: centralino telefonico privato.
+prompt.fr: Autocommutateur (PBX) : autocommutateur téléphonique privé.
+keywords.de: Telefonanlage, Netzwerk
+keywords.en: PBX, network
+keywords.es: Centralita, red
+keywords.it: Centralino, rete
+keywords.fr: Autocommutateur (PBX), réseau
+svg: ../../symbols/network/pbx.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Telefonanlage
+    Value.en = PBX
+    Value.es = Centralita
+    Value.it = Centralino
+    Value.fr = Autocommutateur (PBX)

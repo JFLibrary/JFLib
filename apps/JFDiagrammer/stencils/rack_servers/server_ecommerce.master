@@ -1,0 +1,37 @@
+# E-Commerce-Server (JD13, eigene Grafik im JFNetworker-Stil)
+master: E-commerce server
+name.de: E-Commerce-Server
+name.en: E-commerce server
+name.es: Servidor de comercio electrónico
+name.it: Server e-commerce
+name.fr: Serveur de commerce électronique
+prompt.de: E-Commerce-Server: betreibt einen Online-Shop, 19-Zoll-Einschub.
+prompt.en: E-commerce server: runs an online shop, 19-inch rack unit.
+prompt.es: Servidor de comercio electrónico: gestiona una tienda en línea, unidad de rack de 19 pulgadas.
+prompt.it: Server e-commerce: gestisce un negozio online, unità rack da 19 pollici.
+prompt.fr: Serveur de commerce électronique : fait fonctionner une boutique en ligne, unité de baie 19 pouces.
+keywords.de: E-Commerce-Server, Rack, 19 Zoll, HE
+keywords.en: E-commerce server, rack, 19 inch, U
+keywords.es: Servidor de comercio electrónico, rack, 19 pulgadas, U
+keywords.it: Server e-commerce, rack, 19 pollici, U
+keywords.fr: Serveur de commerce électronique, baie, 19 pouces, U
+svg: ../../symbols/rack/server_ecommerce.svg
+scale: 1:20
+size: 482.6 mm x 44.45 mm
+size.us: 19 in x 1.75 in
+include: ../net_common/rackdev.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+RackUnits: Value = 1
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Gestellmontiert
+    Value.en = Rack-mounted
+    Value.es = Montaje en rack
+    Value.it = Montaggio a rack
+    Value.fr = Monté en baie
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = E-Commerce-Server
+    Value.en = E-commerce server
+    Value.es = Servidor de comercio electrónico
+    Value.it = Server e-commerce
+    Value.fr = Serveur de commerce électronique

@@ -1,0 +1,33 @@
+# VoIP-Telefon (JD13, eigene Grafik im JFNetworker-Stil)
+master: VoIP phone
+name.de: VoIP-Telefon
+name.en: VoIP phone
+name.es: Teléfono VoIP
+name.it: Telefono VoIP
+name.fr: Téléphone VoIP
+prompt.de: VoIP-Telefon: Telefon für Sprache über IP.
+prompt.en: VoIP phone: phone for voice over IP.
+prompt.es: Teléfono VoIP: teléfono de voz sobre IP.
+prompt.it: Telefono VoIP: telefono per voce su IP.
+prompt.fr: Téléphone VoIP : téléphone pour la voix sur IP.
+keywords.de: VoIP-Telefon, Peripherie, Büro
+keywords.en: VoIP phone, peripheral, office
+keywords.es: Teléfono VoIP, periférico, oficina
+keywords.it: Telefono VoIP, periferica, ufficio
+keywords.fr: Téléphone VoIP, périphérique, bureau
+svg: ../../symbols/network/ip_phone.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = VoIP-Telefon
+    Value.en = VoIP phone
+    Value.es = Teléfono VoIP
+    Value.it = Telefono VoIP
+    Value.fr = Téléphone VoIP

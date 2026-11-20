@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="96" height="96"
+     fill="none" stroke="#F7F8FA" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round">
+  <title>Role pictogram public: a person in an open door (white, for the role badge; make_roles.py)</title>
+  <path class="body" d="M4.6 11.2V0.8H10.6V11.2"/>
+  <path class="body" d="M4.6 0.8L1.4 2.4V10.4L4.6 11.2" fill="#F7F8FA"/>
+  <circle class="body" cx="7.6" cy="3.8" r="1.1" fill="#F7F8FA" stroke-width="0.5"/>
+  <path class="body" d="M6 11.2V8.6A1.6 1.6 0 0 1 9.2 8.6V11.2" fill="#F7F8FA"/>
+</svg>

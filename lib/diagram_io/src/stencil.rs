@@ -481,7 +481,8 @@ fn master_info(file: &str, text: &str, m: Measure, files: &dyn Fn(&str) -> Optio
             if art.layers.is_empty() {
                 return Err(err(&e.value, 0, "das SVG zeichnet nichts"));
             }
-            canon.push_str("svg\u{1f}");
+            // (JD13) the layers in document order: a new UniqueID for every SVG master
+            canon.push_str("svg-in-order\u{1f}");
             canon.push_str(&t);
             canon.push('\u{1e}');
             Some((art, e.line))
@@ -939,14 +940,25 @@ fn emit_layer(tx: &mut Transaction, sink: &mut Sink, sheet: SheetRef, layer: &La
         sink.put(tx, sheet, &a, &Cell0 { name: String::from(name), line, val: CellVal::Plain(v), file: None }, None)?;
     }
     let xy = |p: [f64; 2]| (format!("Width*{}", frac(p[0])), format!("Height*{}", frac(p[1])));
+    // (JD13) consecutive sub-paths with the same NoFill / NoLine share one Geometry section, each
+    // starting with its MoveTo (Visio fills a shape's figures together by the even-odd rule
+    // either way); hundreds of sections in one shape made building and drawing slow
+    let mut open: Option<(SecKey, bool, bool)> = None;
     for sec in &layer.sections {
-        let sk = tx.add_section(sheet, "Geometry").map_err(|e| sink.fail(line, "[Geometry]", e))?;
-        for (flag, name) in [(sec.no_fill, "NoFill"), (sec.no_line, "NoLine")] {
-            if flag {
-                let a = CellAddr::section(sk, tx.intern(name));
-                sink.constant(tx, sheet, &a, Value::Num(1.0), Some(Unit::Bool), line)?;
+        let sk = match open {
+            Some((sk, f, l)) if f == sec.no_fill && l == sec.no_line => sk,
+            _ => {
+                let sk = tx.add_section(sheet, "Geometry").map_err(|e| sink.fail(line, "[Geometry]", e))?;
+                for (flag, name) in [(sec.no_fill, "NoFill"), (sec.no_line, "NoLine")] {
+                    if flag {
+                        let a = CellAddr::section(sk, tx.intern(name));
+                        sink.constant(tx, sheet, &a, Value::Num(1.0), Some(Unit::Bool), line)?;
+                    }
+                }
+                open = Some((sk, sec.no_fill, sec.no_line));
+                sk
             }
-        }
+        };
         let (x, y) = xy(sec.start);
         geo_row(tx, sink, (sheet, sk), "MoveTo", &[("X", Value0::Formula(x)), ("Y", Value0::Formula(y))], line)?;
         for s in &sec.segs {

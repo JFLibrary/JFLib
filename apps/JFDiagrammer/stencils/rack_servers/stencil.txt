@@ -1,0 +1,11 @@
+# Gestellmontierte Server (SH-147, JD13): eigene Shapes im JFNetworker-Stil, Grafiken aus ../../symbols/
+stencil: Rack-mounted Servers
+file: racksrv
+name.de: Gestellmontierte Server
+name.en: Rack-mounted Servers
+name.es: Servidores montados en rack
+name.it: Server a rack
+name.fr: Serveurs montés en baie
+category: network
+masters: server_web, server_file, server_application, server_certificate, server_ecommerce, server_mobile, server_ftp, server_cms, server_directory, server_print, server_email, server_management, server_realtime, server_public, server_database, server_proxy, server_streaming
+quick: 4

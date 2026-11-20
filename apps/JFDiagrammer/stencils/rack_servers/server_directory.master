@@ -1,0 +1,37 @@
+# Verzeichnisserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: Directory server
+name.de: Verzeichnisserver
+name.en: Directory server
+name.es: Servidor de directorio
+name.it: Server di directory
+name.fr: Serveur d'annuaire
+prompt.de: Verzeichnisserver: verwaltet Benutzer und Geräte, 19-Zoll-Einschub.
+prompt.en: Directory server: manages users and devices, 19-inch rack unit.
+prompt.es: Servidor de directorio: gestiona usuarios y dispositivos, unidad de rack de 19 pulgadas.
+prompt.it: Server di directory: gestisce utenti e dispositivi, unità rack da 19 pollici.
+prompt.fr: Serveur d'annuaire : gère les utilisateurs et les appareils, unité de baie 19 pouces.
+keywords.de: Verzeichnisserver, Rack, 19 Zoll, HE
+keywords.en: Directory server, rack, 19 inch, U
+keywords.es: Servidor de directorio, rack, 19 pulgadas, U
+keywords.it: Server di directory, rack, 19 pollici, U
+keywords.fr: Serveur d'annuaire, baie, 19 pouces, U
+svg: ../../symbols/rack/server_directory.svg
+scale: 1:20
+size: 482.6 mm x 44.45 mm
+size.us: 19 in x 1.75 in
+include: ../net_common/rackdev.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+RackUnits: Value = 1
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Gestellmontiert
+    Value.en = Rack-mounted
+    Value.es = Montaje en rack
+    Value.it = Montaggio a rack
+    Value.fr = Monté en baie
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Verzeichnisserver
+    Value.en = Directory server
+    Value.es = Servidor de directorio
+    Value.it = Server di directory
+    Value.fr = Serveur d'annuaire

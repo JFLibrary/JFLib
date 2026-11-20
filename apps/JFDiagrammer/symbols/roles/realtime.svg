@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="96" height="96"
+     fill="none" stroke="#F7F8FA" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round">
+  <title>Role pictogram realtime: two speech bubbles (white, for the role badge; make_roles.py)</title>
+  <path class="body" d="M1.6 0.8H6.6A0.8 0.8 0 0 1 7.4 1.6V4.2A0.8 0.8 0 0 1 6.6 5H3.6L1.8 6.5V5H1.6A0.8 0.8 0 0 1 0.8 4.2V1.6A0.8 0.8 0 0 1 1.6 0.8Z" fill="#F7F8FA"/>
+  <path class="body" d="M5.4 6.6H10.4A0.8 0.8 0 0 1 11.2 7.4V9.6A0.8 0.8 0 0 1 10.4 10.4H10.2V11.4L8.8 10.4H5.4A0.8 0.8 0 0 1 4.6 9.6V7.4A0.8 0.8 0 0 1 5.4 6.6Z"/>
+</svg>

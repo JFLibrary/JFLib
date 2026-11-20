@@ -1,0 +1,399 @@
+# Schrank (JD13, SH-146, VL-52): geschlossener 19-Zoll-Schrank (600 mm breit) in Frontansicht ohne
+# Tür, Maßstab 1:20.  Wie das Gestell: Höhe aus den Höheneinheiten (SETATREF), Container für
+# Geräte der Kategorie RackEquipment, Verbindungspunkte 1 bis 53 auf den HE-Grenzen der linken
+# Schiene.  Dazu Türrahmen und Griff.  Geometrie: 1 Rahmen außen, 2 Öffnung, 3 Schienen,
+# 4/5 HE-Striche, 6 Türrahmen, 7 Griff, 8 Sockelfuge.
+master: Cabinet
+name.de: Schrank
+name.en: Cabinet
+name.es: Armario
+name.it: Armadio
+name.fr: Armoire
+prompt.de: Schrank: geschlossener 19-Zoll-Schrank. Die Höhe in Höheneinheiten stellen Sie in den Shape-Daten oder durch Ziehen ein; Geräte rasten auf den Höheneinheiten ein.
+prompt.en: Cabinet: enclosed 19-inch cabinet. Set its height in rack units in the shape data or by dragging; equipment snaps to the rack units.
+prompt.es: Armario: armario cerrado de 19 pulgadas. Ajuste la altura en unidades de rack en los datos de forma o arrastrando; los equipos se ajustan a las unidades.
+prompt.it: Armadio: armadio chiuso da 19 pollici. Imposta l'altezza in unità rack nei dati forma o trascinando; le apparecchiature si agganciano alle unità.
+prompt.fr: Armoire : armoire fermée 19 pouces. Réglez la hauteur en unités dans les données de forme ou en faisant glisser ; les équipements s'alignent sur les unités.
+keywords.de: Schrank, Serverschrank, Netzwerkschrank, 19 Zoll, Höheneinheit, HE, Rechenzentrum
+keywords.en: cabinet, server cabinet, network cabinet, 19 inch, rack unit, U, data centre
+keywords.es: armario, armario de servidores, armario de red, 19 pulgadas, unidad de rack
+keywords.it: armadio, armadio server, armadio di rete, 19 pollici, unità rack
+keywords.fr: armoire, armoire serveur, armoire réseau, 19 pouces, unité
+scale: 1:20
+size: 600 mm x 2036.9 mm
+size.us: 23.6 in x 80.3 in
+include: ../net_common/asset.inc
+
+[Shape]
+Width = 600 mm
+Width.us = 23.6 in
+Height = User.Base+User.Top+SETATREF(Prop.RackUnits,MAX(1,MIN(52,ROUND((SETATREFEXPR()-User.Base-User.Top)/User.U,0))))*User.U
+LineWeight = 0.5 pt
+LineColor = #2E343B
+FillForegnd = #C9CED4
+FillBkgnd = #C9CED4
+FillPattern = 1
+TxtWidth = Width*1.6
+TxtHeight = 160 mm
+TxtHeight.us = 6.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = 0 mm
+VerticalAlign = 2
+
+[User]
+U:            Value = 44.45 mm
+              Value.us = 1.75 in
+Top:          Value = 70 mm
+              Value.us = 2.8 in
+Base:         Value = 100 mm
+              Value.us = 3.9 in
+Post:         Value = 76 mm
+              Value.us = 3 in
+MountX:       Value = Width*0.5-241.3 mm
+              Value.us = Width*0.5-9.5 in
+msvStructureType: Value = "Container"
+msvShapeCategories: Value = "Rack"
+msvSDContainerMargin: Value = 0 mm
+msvSDContainerResize: Value = 0
+msvSDContainerLocked: Value = FALSE
+msvSDContainerNoHighlight: Value = FALSE
+msvSDContainerNoRibbon: Value = TRUE
+msvSDContainerRequiredCategories: Value = "RackEquipment"
+JFD_HeadingEdge: Value = "None"
+JFD_HeadingSize: Value = 0 mm
+
+[Property]
+RackUnits:    Type = 2; Value = 42
+              Label.de = Höheneinheiten (HE)
+              Label.en = Rack units (U)
+              Label.es = Unidades de rack (U)
+              Label.it = Unità rack (U)
+              Label.fr = Unités de baie (U)
+ShapeType:    Type = 0; Invisible = TRUE; Label = "ShapeType"
+              Value.de = Schrank
+              Value.en = Cabinet
+              Value.es = Armario
+              Value.it = Armadio
+              Value.fr = Armoire
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+              Value.de = Schrank
+              Value.en = Cabinet
+              Value.es = Armario
+              Value.it = Armadio
+              Value.fr = Armoire
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Geometry]
+MoveTo  X = User.Post; Y = User.Base
+LineTo  X = Width-User.Post; Y = User.Base
+LineTo  X = Width-User.Post; Y = Height-User.Top
+LineTo  X = User.Post; Y = Height-User.Top
+LineTo  X = User.Post; Y = User.Base
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.MountX; Y = User.Base
+LineTo  X = User.MountX; Y = Height-User.Top
+MoveTo  X = Width-User.MountX; Y = User.Base
+LineTo  X = Width-User.MountX; Y = Height-User.Top
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.MountX; Y = User.Base+MIN(0,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(0,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(1,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(1,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(2,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(2,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(3,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(3,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(4,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(4,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(5,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(5,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(6,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(6,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(7,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(7,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(8,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(8,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(9,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(9,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(10,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(10,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(11,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(11,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(12,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(12,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(13,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(13,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(14,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(14,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(15,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(15,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(16,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(16,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(17,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(17,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(18,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(18,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(19,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(19,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(20,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(20,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(21,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(21,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(22,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(22,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(23,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(23,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(24,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(24,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(25,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(25,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(26,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(26,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(27,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(27,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(28,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(28,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(29,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(29,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(30,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(30,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(31,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(31,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(32,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(32,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(33,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(33,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(34,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(34,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(35,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(35,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(36,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(36,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(37,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(37,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(38,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(38,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(39,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(39,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(40,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(40,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(41,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(41,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(42,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(42,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(43,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(43,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(44,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(44,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(45,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(45,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(46,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(46,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(47,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(47,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(48,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(48,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(49,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(49,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(50,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(50,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(51,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(51,Prop.RackUnits)*User.U
+MoveTo  X = User.MountX; Y = User.Base+MIN(52,Prop.RackUnits)*User.U
+LineTo  X = User.Post; Y = User.Base+MIN(52,Prop.RackUnits)*User.U
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(0,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(0,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(1,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(1,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(2,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(2,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(3,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(3,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(4,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(4,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(5,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(5,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(6,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(6,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(7,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(7,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(8,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(8,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(9,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(9,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(10,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(10,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(11,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(11,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(12,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(12,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(13,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(13,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(14,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(14,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(15,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(15,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(16,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(16,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(17,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(17,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(18,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(18,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(19,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(19,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(20,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(20,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(21,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(21,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(22,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(22,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(23,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(23,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(24,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(24,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(25,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(25,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(26,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(26,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(27,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(27,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(28,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(28,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(29,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(29,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(30,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(30,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(31,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(31,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(32,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(32,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(33,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(33,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(34,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(34,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(35,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(35,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(36,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(36,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(37,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(37,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(38,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(38,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(39,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(39,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(40,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(40,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(41,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(41,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(42,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(42,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(43,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(43,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(44,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(44,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(45,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(45,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(46,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(46,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(47,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(47,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(48,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(48,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(49,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(49,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(50,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(50,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(51,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(51,Prop.RackUnits)*User.U
+MoveTo  X = Width-User.Post; Y = User.Base+MIN(52,Prop.RackUnits)*User.U
+LineTo  X = Width-User.MountX; Y = User.Base+MIN(52,Prop.RackUnits)*User.U
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 18 mm; Y = User.Base-12 mm
+LineTo  X = Width-18 mm; Y = User.Base-12 mm
+LineTo  X = Width-18 mm; Y = Height-User.Top+12 mm
+LineTo  X = 18 mm; Y = Height-User.Top+12 mm
+LineTo  X = 18 mm; Y = User.Base-12 mm
+
+[Geometry]
+MoveTo  X = Width-12 mm; Y = Height*0.5-60 mm
+LineTo  X = Width-6 mm; Y = Height*0.5-60 mm
+LineTo  X = Width-6 mm; Y = Height*0.5+60 mm
+LineTo  X = Width-12 mm; Y = Height*0.5+60 mm
+LineTo  X = Width-12 mm; Y = Height*0.5-60 mm
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0 mm; Y = 30 mm
+LineTo  X = Width; Y = 30 mm
+
+[Connection]
+Row  X = User.MountX; Y = User.Base+MIN(0,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(1,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(2,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(3,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(4,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(5,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(6,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(7,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(8,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(9,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(10,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(11,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(12,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(13,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(14,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(15,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(16,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(17,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(18,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(19,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(20,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(21,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(22,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(23,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(24,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(25,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(26,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(27,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(28,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(29,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(30,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(31,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(32,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(33,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(34,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(35,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(36,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(37,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(38,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(39,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(40,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(41,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(42,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(43,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(44,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(45,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(46,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(47,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(48,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(49,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(50,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(51,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0
+Row  X = User.MountX; Y = User.Base+MIN(52,Prop.RackUnits)*User.U; DirX = 0; DirY = 0; Type = 0

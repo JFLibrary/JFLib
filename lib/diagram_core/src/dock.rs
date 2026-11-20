@@ -115,3 +115,90 @@ pub fn dock(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[Shap
     ops::move_shapes(tx, eng, &along, s.d)?;
     Ok(Some(s))
 }
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec;
+    use alloc::vec::Vec;
+
+    use super::*;
+    use crate::cell::{Cell, Value};
+    use crate::names;
+    use crate::page::{Page, PageHeader};
+    use crate::shape::{ShapeData, ShapeKind};
+    use crate::sheet::{Row, RowKey, SecKey, Section};
+    use crate::{DocKind, PageRef};
+
+    fn num(doc: &mut Document, n: &str, v: f64) -> Cell {
+        Cell::constant(doc.intern(n), Value::Num(v), None)
+    }
+
+    // a w x h shape with its lower left corner at (x, y) and connection points (local x, y, Type)
+    fn shape(doc: &mut Document, page: PageRef, id: u32, at: [f64; 2], size: [f64; 2], points: &[(f64, f64, f64)]) -> ShapeRef {
+        let mut d = ShapeData::new(ShapeKind::Shape);
+        let cells = vec![
+            num(doc, "PinX", at[0] + size[0] * 0.5),
+            num(doc, "PinY", at[1] + size[1] * 0.5),
+            num(doc, "Width", size[0]),
+            num(doc, "Height", size[1]),
+            num(doc, "LocPinX", size[0] * 0.5),
+            num(doc, "LocPinY", size[1] * 0.5),
+        ];
+        d.sheet.cells.extend(cells);
+        let mut con = Section::new(SecKey::one(names::CONNECTION));
+        for (i, &(x, y, t)) in points.iter().enumerate() {
+            let mut r = Row::new(RowKey::Index(i as u32));
+            r.cells = vec![num(doc, "X", x), num(doc, "Y", y), num(doc, "Type", t)];
+            con.rows.push(r);
+        }
+        d.sheet.sections.push(con);
+        let tree = &mut doc.page_mut(page).unwrap().shapes;
+        let slot = tree.insert(None, id, d).unwrap();
+        ShapeRef { owner: Owner::Page(page), slot }
+    }
+
+    fn fixture() -> (Document, PageRef, ShapeRef, ShapeRef) {
+        let mut doc = Document::new(DocKind::Drawing);
+        let page = doc.insert_page(Page::new(PageHeader { id: 0, ..PageHeader::default() })).unwrap();
+        // a "rail": inward points every 0.5 in up its left edge, an outward one (no target)
+        let rail = shape(&mut doc, page, 1, [0.0, 0.0], [1.0, 3.0], &[(0.0, 0.0, 0.0), (0.0, 0.5, 0.0), (0.0, 1.0, 2.0), (0.0, 1.5, 1.0)]);
+        // a "device" with an outward point at its lower left corner
+        let dev = shape(&mut doc, page, 2, [0.1, 0.62], [0.8, 0.4], &[(0.0, 0.0, 1.0)]);
+        (doc, page, rail, dev)
+    }
+
+    #[test]
+    fn docks_on_the_nearest_inward_point_in_reach() {
+        let (doc, page, rail, dev) = fixture();
+        let s = snap(&doc, Owner::Page(page), &[dev], 0.3).expect("a snap");
+        assert_eq!((s.target, s.target_point, s.shape, s.point), (rail, 1, dev, 0));
+        assert!((s.d[0] + 0.1).abs() < 1e-9 && (s.d[1] + 0.12).abs() < 1e-9, "{:?}", s.d);
+        // Type 2 counts as inward, Type 1 (outward) on the target is no target: a device with its
+        // corner at 1.3 goes onto 1.0 (both), not onto 1.5 (outward)
+        let mut doc2 = Document::new(DocKind::Drawing);
+        let p2 = doc2.insert_page(Page::new(PageHeader { id: 0, ..PageHeader::default() })).unwrap();
+        let _ = shape(&mut doc2, p2, 1, [0.0, 0.0], [1.0, 3.0], &[(0.0, 0.0, 0.0), (0.0, 0.5, 0.0), (0.0, 1.0, 2.0), (0.0, 1.5, 1.0)]);
+        let d2 = shape(&mut doc2, p2, 2, [0.0, 1.3], [0.8, 0.4], &[(0.0, 0.0, 1.0)]);
+        let s2 = snap(&doc2, Owner::Page(p2), &[d2], 0.6).expect("a snap");
+        assert_eq!(s2.target_point, 2, "{s2:?}");
+    }
+
+    #[test]
+    fn nothing_out_of_reach_or_without_outward_points() {
+        let (doc, page, rail, dev) = fixture();
+        assert!(snap(&doc, Owner::Page(page), &[dev], 0.05).is_none());
+        // the rail has only one outward point and the device no inward one
+        assert!(snap(&doc, Owner::Page(page), &[rail], 10.0).is_none());
+        let r = reach(&doc, Owner::Page(page), 0.25);
+        assert!((r - 0.25).abs() < 1e-12);
+        let moved: Vec<ShapeRef> = vec![dev];
+        let mut d2 = doc.clone();
+        let mut tx = d2.transaction("dock");
+        let mut eng = Engine::new();
+        let done = dock(&mut tx, &mut eng, Owner::Page(page), &moved, 0.3).unwrap().expect("docked");
+        let _ = tx.commit();
+        let f = ops::frame(&d2, dev);
+        let p = f.at([0.0, 0.0]);
+        assert!(p[0].abs() < 1e-9 && (p[1] - 0.5).abs() < 1e-9, "{p:?} after {done:?}");
+    }
+}
