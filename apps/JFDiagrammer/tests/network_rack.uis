@@ -22,6 +22,6 @@ expect listitem:"Switch" rect 370 416 60 5
 shot build/JFDiagrammer-network-rack.png
 # the rack by its left post: both devices come along
 drag 367,470 467,470
-expect listitem:"Gestell" rect 465 273 71 248
-expect listitem:"Server" rect 470 346 61 11
-expect listitem:"Switch" rect 470 413 61 5
+expect listitem:"Gestell" rect 464 273 71 248
+expect listitem:"Server" rect 469 346 61 11
+expect listitem:"Switch" rect 469 413 61 5
