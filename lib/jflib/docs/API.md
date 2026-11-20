@@ -107,7 +107,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
   <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
-  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
+  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
@@ -57924,6 +57924,11 @@ structure::cff -- the cross-functional flowchart (ST-05): lanes and phases in a 
   layout(tx, eng, &cff)              lanes stacked, phases side by side across every lane,
                                      the lists and the pool around them -> what moved
   lanes(doc, &cff) / phases(doc, &cff)
+  create(tx, eng, &src, page, top_left, horizontal, lanes, phases, lang) -> Cff
+                                     (JD13) a new flowchart from the masters of stencil `src`
+                                     (JFDiagrammer's "cff"): pool, both lists, the lanes and
+                                     phases, laid out from `top_left`; create_with takes a
+                                     lane or phase already on the page along (a dropped one)
 
 Visio's structure, kept so that Visio recognises it (research in jd10-strukturen.md):
 
@@ -57992,6 +57997,29 @@ CAT_PHASE: &str = "Phase"
 - **`fn layout_with(tx: &mut Transaction, eng: &mut Engine, f: &Cff, want: Option<f64>) -> Result<Vec<ShapeRef>, EditError>`**
   layout with the lanes' length given (a pool or lane resized by hand), else the longest
   lane's or what the phases need
+
+```rust
+/// the hidden masters of a flowchart (NameU, as in JFDiagrammer's stencil "cff")
+M_POOL: &str = "CFF Container"
+M_LANE_LIST: &str = "Swimlane List"
+M_PHASE_LIST: &str = "Phase List"
+```
+
+- **`fn lane_master(horizontal: bool) -> &'static str`**
+  the master of a lane: horizontal (lanes one above the other) or vertical
+
+- **`fn phase_master(horizontal: bool) -> &'static str`**
+  the master of a phase (a separator)
+
+- **`fn create(tx: &mut Transaction, eng: &mut Engine, src: &Document, page: PageRef, top_left: [f64; 2], horizontal: bool, lanes: usize, phases: usize, lang: usize) -> Result<Cff, EditError>`**
+  a new flowchart from the masters of stencil `src` on `page`: the pool, the lane list, the
+  phase list, `lanes` lanes (at least one) and `phases` phases, laid out with the pool's top
+  left corner at `top_left`; names and texts in language `lang` (instance::LANGS).  Connectors
+  near it are not rerouted (the caller's glue::update)
+
+- **`fn create_with( tx: &mut Transaction, eng: &mut Engine, src: &Document, page: PageRef, top_left: [f64; 2], horizontal: bool, lane: Option<ShapeRef>, phase: Option<ShapeRef>, lanes: usize, phases: usize, lang: usize, ) -> Result<Cff, EditError>`**
+  create with a lane or a phase already on the page (one dropped outside any flowchart) as the
+  first lane or phase; the others are new
 
 ### `diagram_core/src/structure/rel.rs`
 
@@ -58508,6 +58536,12 @@ format follows the public specification [MS-VSDX]; no code of other implementati
                       drawings; apps/JFDiagrammer/stencils/README.md) into a stencil:
                       masters in five languages, formulas computed, icons rendered from the
                       shapes, name-based GUIDs; stencil::build_vssx gives the .vssx bytes too
+  template::build(&files, Measure::Metric, &stencils) -> Result<Vec<BuiltTemplate>, SourceError>
+                      (JD13) the text sources of a template (template.txt, *.starter,
+                      rules.txt; apps/JFDiagrammer/templates/README.md) into its forms: the
+                      blank template and one per starter diagram, with stencil windows, rule
+                      set and the catalogue's cells; template::stencil_windows,
+                      set_stencil_windows, info, registers and to_drawing for the app
 
 What is to come here, by stage of the plan:
   JD12  exports: SVG, PNG and PDF through the library's writers
@@ -58590,9 +58624,10 @@ icons stencil_icon.rs.
 How a stencil is built, in this order:
 1. stencil.txt and every master file are parsed and checked for the chosen measure: header
    keys, sections, row heads, cell names (each section's own list), the five languages of
-   every language-suffixed key or cell, Width and Height as lengths, formulas that parse and
-   call only functions the engine knows.  A ".metric" / ".us" line replaces the line
-   without suffix.
+   every language-suffixed key or cell, Width and Height as lengths or formulas (a box that
+   fits its text: TEXTHEIGHT ...; not with svg:) (a 1-D master: BeginX, BeginY, EndX, EndY as
+   lengths and Height), formulas that parse and call only functions the engine knows.  A
+   ".metric" / ".us" line replaces the line without suffix.
 2. A new stencil (vsdx::new_document: the own styles and the NetLab theme) gets the masters in
    one transaction: the Master attributes (Name and Prompt in the build language,
    IsCustomName(U), IconSize 1, AlignName 2, MatchByName 0, IconUpdate 1, PatternFlags 0,
@@ -58601,12 +58636,17 @@ How a stencil is built, in this order:
    the shape's size, scale 1:1 in mm or in, ShapeKeywords, the JFD_ User cells), the master
    shape with its cells, sections, text and the SVG geometry.  Constants are written as values
    with their unit (lengths in inches with U = MM, IN ...), everything else as a formula; the
-   tool adds PinX / PinY (half the size), LocPinX = Width*0.5, LocPinY = Height*0.5.
+   tool adds PinX / PinY (half the size), LocPinX = Width*0.5, LocPinY = Height*0.5.  A 1-D
+   master (one that sets BeginX ...) gets Visio's 1-D formulas instead: PinX =
+   GUARD((BeginX+EndX)/2), Width = GUARD(SQRT(...)), Angle = GUARD(ATAN2(EndY-BeginY,
+   EndX-BeginX)), LocPin = GUARD(Width*0.5) ...; its master page is BeginX+EndX wide and
+   BeginY+EndY high.
 3. Every reference of every formula must name something that is there (a cell of the sheet
    or of its styles, a single cell of the ShapeSheet's own list, Sheet.N of the master).  The
    formula engine computes every formula and its values are stored: a cell the engine keeps
    (unknown function, unknown section, cycle) or that comes out as an error is a build error
-   naming the source line.  No stale value goes into the file.
+   naming the source line.  No stale value goes into the file.  A master whose Width or
+   Height is a formula gets its master page and pin from the computed size afterwards.
 4. Each master's icon is rendered from an instance on the stencil's page (stencil_icon.rs);
    the instance goes again, the page stays empty.
 
@@ -58655,6 +58695,175 @@ CATEGORIES: [&str; 9] = ["general", "flowchart", "business", "engineering", "net
 
 - **`fn build_vssx(files: &dyn Fn(&str) -> Option<String>, measure: Measure) -> Result<(Built, Vec<u8>), SourceError>`**
   build the stencil and write it as .vssx bytes (vsdx::write with the default options)
+
+### `diagram_io/src/template.rs`
+
+Source: [`lib/diagram_io/src/template.rs`](../lib/diagram_io/src/template.rs)
+
+```text
+template -- the template build tool (JD13): the text sources of a template into template
+documents and .vstx files; and what the app does with a template, built-in or the user's
+
+  template::build(&files, Measure::Metric, &stencils) -> Result<Vec<BuiltTemplate>, SourceError>
+  template::build_vstx(&files, Measure::Us, &stencils) -> Result<Vec<(BuiltTemplate, Vec<u8>)>, ..>
+  BuiltTemplate { doc, template, file, starter, category, order, measure, listed }
+                                  every form of one template: the blank one first, then the
+                                  starter diagrams in `starters` order (file "flowchart",
+                                  "flowchart-sample"); listed: false for a blank form the
+                                  catalogue does not show (`blank: false`)
+  built.vstx_name()               "flowchart_m.vstx", "cff-vertical_u.vstx"
+
+  stencil_windows(&doc) -> Vec<StencilWindow { document, active }>   the stencils a template
+                                  opens: the Stencil windows of the windows part (Visio's or
+                                  ours) by StencilGroupPos, else in document order; active =
+                                  WindowState bit 0x4000000 (visWSActive: unfolded)
+  set_stencil_windows(&mut doc, &list)   the windows part for these stencils (EX-11)
+  info(&doc) -> Info              the catalogue's cells (the document sheet's JFD_ cells)
+  registers(&doc)                 the context registers a template brought (VL-04)
+  to_drawing(&mut doc, lang)      a new drawing from a template (DF-05, VL-03)
+
+`files(name)` gives the text of "template.txt", of "<name>.starter" and of the rules file, all
+of one template folder (None: there is none); `stencils(stem)` the built stencil of the same
+measure whose output stem is `stem` (stencil.txt `file`; None: there is none, a build error).
+The source format and what goes into the file: apps/JFDiagrammer/templates/README.md.  The
+app's build_steps.rs calls this for each template folder and both measures after the
+stencils.  The parser is template_src.rs (the stencils' common rules, stencil_src.rs).
+
+How a template is built, in this order:
+1. template.txt, the starter files and the rules file are parsed and checked for the measure:
+   header keys, sections, row heads, cell names, the five languages, constants where the
+   format wants them (templates hold no formulas but the rules' Filter and Test, which must
+   parse), the stencils named exist, the starters' shapes name masters and rows that are
+   there.  A ".metric" / ".us" line replaces the line without suffix.
+2. A new template (vsdx::new_document: the own styles and the design NetLab) gets the cells
+   of [Style ...], the first page's name and the cells of [PageSheet] (PrintPageOrientation
+   follows the size when a size is given without it), the pages of [Pages] (their page sheet
+   a copy of the first page's), background pages, the layers of [Layer] on every foreground
+   page, the design and its variant on every page (design::apply::apply), the JFD_ cells of
+   the document sheet and the page sheets, the windows part with the stencils
+   (set_stencil_windows) and the rule set's part.
+3. Each form is a copy of that: the blank form, then per starter diagram its JFD_Starter (and
+   own description) and the shapes of [Shapes] on the first page in file order -- master
+   instances as JFDiagrammer drops them (instance::import_master, instance::place in the
+   build language), dynamic connectors glued to the whole shapes at both ends
+   (glue::new_connector), cross-functional flowcharts (structure::cff::create).  JFD_Default
+   marks the form the catalogue chooses first.
+4. The formula engine computes every formula of each form and the values are stored: no
+   stale value goes into the file.
+The same sources always give the same documents and the same bytes.
+
+The windows part (visio/windows.xml), as Visio writes it: a drawing window (WindowType
+'Drawing') and per stencil a Window with WindowType 'Stencil', Document (the file name of a
+built-in stencil, "standard_m.vssx"; a path for others), ParentWindow (the drawing window),
+WindowState 1025 (visWSDockedLeft | visWSAnchorMerged) or 67109889 (| visWSActive: the
+unfolded one) and the children StencilGroup 10 and StencilGroupPos 1, 2 ... in the Shapes
+panel's order.  set_stencil_windows keeps the part's other windows (the drawing window,
+Visio's panes) as written and replaces its stencil windows; without a drawing window it
+writes a minimal one of its own (maximized, on the first page).
+
+The rule set's part visio/validation.xml (relationship …/visio/2010/relationships/validation
+from the main part, which pack.rs adds for a part of Visio's own kind): Validation >
+ValidationProperties, RuleSets > RuleSet (ID, NameU, Name, Description, RuleSetFlags) > Rule
+(ID, NameU, Category, Description, RuleTarget, RuleFilter, RuleTest), texts in the build
+language; all five in the document sheet's JFD_RuleSetN ("NameU|5 names|5 descriptions") and
+JFD_RuleN ("RuleSet.Rule|5 descriptions|5 categories").
+
+to_drawing: DocKind::Drawing; page names (the page sheet's JFD_Name), layer names
+(JFD_LayerN, row IX N-1), shape texts (the shape's JFD_Text, else its master's text where the
+shape shows one of the master's texts), instance names and translated cells (the master's
+JFD_Name and JFD_TrN where the instance shows one of them, as instance::place sets them) and
+the rule set's names, descriptions and categories in the chosen language; then the cells of
+the catalogue go (JFD_Name, JFD_Description, JFD_Category, JFD_Order, JFD_Starter,
+JFD_Default, JFD_Text, JFD_LayerN), JFD_Template, JFD_Registers, JFD_Tip and the rules'
+translations stay.  The sheets changed are recalculated, nothing else.
+
+The sources are files of the repository, trusted but checked all the same; a template read
+from a file (stencil_windows, info, to_drawing) is untrusted: no panic on any input, counts
+bounded, no recursion.
+```
+
+- **`struct BuiltTemplate`**
+  one form of a template, built
+  - `doc: Document` -- the template (DocKind::Template)
+  - `template: String` -- the template's universal name (template.txt `template`)
+  - `file: String` -- the output stem: `file`, or `file-starter` for a starter diagram
+  - `starter: Option<String>` -- the starter diagram's universal name (None: the blank form)
+  - `category: String` -- the catalogue's category (template.txt `category`)
+  - `order: u32` -- the place in the catalogue, smaller first
+  - `measure: Measure` -- the measure it was built for
+  - `listed: bool` -- whether the catalogue shows this form (false: the blank form of `blank: false`)
+
+**`impl BuiltTemplate`**
+
+- **`fn vstx_name(&self) -> String`**
+  the file name of the .vstx: `<file>_m.vstx` (metric) or `<file>_u.vstx` (US)
+
+- **`struct StencilWindow`**
+  a stencil a template opens: its Document as written (a built-in stencil's file name, else a
+  path) and whether it is the one unfolded
+  - `document: String`
+  - `active: bool`
+
+- **`struct Info`**
+  what the catalogue reads from a template (the document sheet's JFD_ cells; empty or None
+  where a cell is missing, as in templates that were not built here)
+  - `template: String` -- the universal name (JFD_Template)
+  - `name: Option<[String; 5]>` -- the title in five languages (JFD_Name)
+  - `description: Option<[String; 5]>` -- the description (JFD_Description)
+  - `category: String` -- the category (JFD_Category)
+  - `order: u32` -- the place in the catalogue (JFD_Order; 0 without)
+  - `starter: Option<[String; 5]>` -- the starter diagram's name (JFD_Starter; None: the blank form)
+  - `default: bool` -- the form the catalogue chooses first (JFD_Default)
+  - `registers: Vec<String>` -- the context registers (JFD_Registers)
+
+```rust
+/// the universal name of the template (document sheet; stays in drawings)
+JFD_TEMPLATE: &str = "JFD_Template"
+/// the description in the catalogue (document sheet)
+JFD_DESCRIPTION: &str = "JFD_Description"
+/// the place in the catalogue (document sheet)
+JFD_ORDER: &str = "JFD_Order"
+/// the starter diagram's name (document sheet of a starter form)
+JFD_STARTER: &str = "JFD_Starter"
+/// 1 in the form the catalogue chooses first (document sheet)
+JFD_DEFAULT: &str = "JFD_Default"
+/// the context registers, ';'-separated (document sheet; stays in drawings)
+JFD_REGISTERS: &str = "JFD_Registers"
+/// TRUE on the tip shape of a starter diagram
+JFD_TIP: &str = "JFD_Tip"
+/// JFD_RuleSet1 ...: "NameU|5 names|5 descriptions" (document sheet)
+JFD_RULE_SET: &str = "JFD_RuleSet"
+/// JFD_Rule1 ...: "RuleSet.Rule|5 descriptions|5 categories" (document sheet)
+JFD_RULE: &str = "JFD_Rule"
+/// JFD_Layer1 ...: a layer's name in five languages (page sheet; layer IX N-1)
+JFD_LAYER: &str = "JFD_Layer"
+/// the context registers a template may bring (VL-04)
+REGISTERS: [&str; 1] = ["cff"]
+```
+
+- **`fn build(files: &dyn Fn(&str) -> Option<String>, measure: Measure, stencils: &dyn Fn(&str) -> Option<Document>) -> Result<Vec<BuiltTemplate>, SourceError>`**
+  build every form of the template of one folder for one measure (see the module comment)
+
+- **`fn build_vstx(files: &dyn Fn(&str) -> Option<String>, measure: Measure, stencils: &dyn Fn(&str) -> Option<Document>) -> Result<Vec<(BuiltTemplate, Vec<u8>)>, SourceError>`**
+  build every form and write each as .vstx bytes (vsdx::write with the default options)
+
+- **`fn stencil_windows(doc: &Document) -> Vec<StencilWindow>`**
+  the stencils the document's windows part opens, by StencilGroupPos, else in document order
+  (see the module comment); none without a part or a readable one
+
+- **`fn set_stencil_windows(doc: &mut Document, list: &[StencilWindow])`**
+  set the windows part to these stencils, in this order (see the module comment): the part's
+  other windows stay, its stencil windows are replaced; a part of its own when there is none
+
+- **`fn info(doc: &Document) -> Info`**
+  the catalogue's cells of a template (fields of cells it lacks stay empty)
+
+- **`fn registers(doc: &Document) -> Vec<String>`**
+  the context registers a template or a drawing made from one brought (JFD_Registers)
+
+- **`fn to_drawing(doc: &mut Document, lang: usize)`**
+  make a template a new drawing in language `lang` (an index into instance::LANGS; see the
+  module comment)
 
 ### `diagram_io/src/vsdx.rs`
 
