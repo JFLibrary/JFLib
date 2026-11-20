@@ -58611,7 +58611,10 @@ and a .vssx file
   stencil::build_vssx(&files, Measure::Us) -> Result<(Built, Vec<u8>), SourceError>
   Built { doc, stencil, file, category, measure }   the stencil document (DocKind::Stencil),
                                   its universal name, the output stem, the category
-  built.vssx_name()               "standard_m.vssx" / "standard_u.vssx"
+  built.vssx_name()               "jfd_standard_m.vssx" / "jfd_standard_u.vssx"
+  file_name(stem, Measure) / parse_file_name(name)   (JD13) the file names of JFDiagrammer's
+                                  own stencils: the prefix "jfd_" keeps them apart from
+                                  Visio's (its ARROWS_M.VSSX is not our arrows_m)
   SourceError { file, line, message }   shown as "rectangle.master:12: unbekannter
                                   Abschnitt [Geometrie]" (line 0: the whole file)
 
@@ -58677,7 +58680,23 @@ counts bounded, no recursion.
 **`impl Built`**
 
 - **`fn vssx_name(&self) -> String`**
-  the file name of the .vssx: `<file>_m.vssx` (metric) or `<file>_u.vssx` (US)
+  the file name of the .vssx: `jfd_<file>_m.vssx` (metric) or `jfd_<file>_u.vssx` (US)
+
+```rust
+/// the prefix of the file names of JFDiagrammer's own stencils (JD13, the user's choice): a
+/// template names its stencils by file name (windows.xml), and Visio opens a stencil of its own
+/// of that name if it has one, so ours never share a name with Visio's (ARROWS_M.VSSX)
+FILE_PREFIX: &str = "jfd_"
+```
+
+- **`fn file_name(stem: &str, m: Measure) -> String`**
+  the file name of the built stencil with stem `stem` (stencil.txt `file`) in measure `m`:
+  "jfd_standard_m.vssx", "jfd_standard_u.vssx"
+
+- **`fn parse_file_name(name: &str) -> Option<(String, Measure)>`**
+  the stem and measure of a file name file_name gives (a path before it and ASCII case do not
+  count: "C:/x/JFD_Standard_U.VSSX" -> ("standard", Us)); None for every other name, also for
+  Visio's own stencils
 
 - **`struct SourceError`**
   why a stencil did not build: the source file, the line (from 1; 0: the whole file) and why
@@ -58754,7 +58773,7 @@ The same sources always give the same documents and the same bytes.
 
 The windows part (visio/windows.xml), as Visio writes it: a drawing window (WindowType
 'Drawing') and per stencil a Window with WindowType 'Stencil', Document (the file name of a
-built-in stencil, "standard_m.vssx"; a path for others), ParentWindow (the drawing window),
+built-in stencil, "jfd_standard_m.vssx" (stencil::file_name); a path for others), ParentWindow (the drawing window),
 WindowState 1025 (visWSDockedLeft | visWSAnchorMerged) or 67109889 (| visWSActive: the
 unfolded one) and the children StencilGroup 10 and StencilGroupPos 1, 2 ... in the Shapes
 panel's order.  set_stencil_windows keeps the part's other windows (the drawing window,
