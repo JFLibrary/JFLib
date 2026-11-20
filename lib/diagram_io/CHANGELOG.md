@@ -92,4 +92,4 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Fixed
 
-- (JD13) Rows of a shape's Geometry and Connection sections are written with their type `T`, as Visio writes them: a row that overrides an inherited one (a resized instance of a master) gets the inherited row's type, a Connection row without one `T='Connection'`. Desktop Visio read the rows without it, but Office's previewer (`VPREVIEW.EXE`, the preview pane of Windows Explorer) hung on them, and Explorer with it
+- (JD13) Rows of a shape's Geometry and Connection sections are written with their type `T`, as Visio writes them: a row that overrides an inherited one (a resized instance of a master) gets the inherited row's type, a Connection row without one `T='Connection'`. Without it Office's previewer (`VPREVIEW.EXE`, the preview pane of Windows Explorer) hung, and Explorer with it, and desktop Visio passed over the rows and drew such shapes with the master's geometry

@@ -160,7 +160,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ### Fixed
 
-- **diagram_io:** (JD13) Rows of Geometry and Connection sections are written with their type `T` also where a shape inherits it (a resized master instance), as Visio writes them; Office's previewer (`VPREVIEW.EXE`, Explorer's preview pane) hung on every drawing with such shapes and took Windows Explorer with it
+- **diagram_io:** (JD13) Rows of Geometry and Connection sections are written with their type `T` also where a shape inherits it (a resized master instance), as Visio writes them; Office's previewer (`VPREVIEW.EXE`, Explorer's preview pane) hung on every drawing with such shapes and took Windows Explorer with it, and desktop Visio passed over those rows and drew the shapes with their master's geometry (a resized arrow or box at the master's size)
 - **ui:** The code editor's horizontal wheel scrolled the wrong way: tilted right it scrolled left (Shift + the wheel was right)
 - **ui:** An image view whose wheel zooms panned twice as far with the horizontal wheel while the vertical one stood still (and not at all in a right-to-left window)
 - **ui:** The fine steps of a precision touchpad (Windows' wheel deltas below 120) were cut off one by one where whole lines count: the terminal never scrolled with steps below 40, the code completion list scrolled three rows on each of them (and on two notches at once), Ctrl + each of them zoomed a diagram a whole step; they add up now
