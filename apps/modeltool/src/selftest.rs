@@ -812,10 +812,11 @@ fn script(c: &mut Ctx) {
 /// The core of --watch with real files in a temporary folder: built when the script or a module changed, the old
 /// model kept while the script has an error, a module that goes missing, an import outside the folder.  (The
 /// browser has no files: nothing to check there.)
+#[cfg(target_arch = "wasm32")]
+fn watch_tests(_: &mut Ctx) {}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn watch_tests(c: &mut Ctx) {
-    if cfg!(target_arch = "wasm32") {
-        return;
-    }
     let tmp = plat::temp_dir().unwrap_or_else(|| String::from(".")).replace('\\', "/");
     let base = format!("{}/modeltool-watch-{}", tmp.trim_end_matches('/'), plat::random_u64() % 1_000_000_000);
     if !c.check(plat::mkdir(&format!("{base}/sub")), || format!("mkdir {base}")) {

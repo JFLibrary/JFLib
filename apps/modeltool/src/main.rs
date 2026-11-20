@@ -33,6 +33,8 @@ mod render;
 mod run;
 mod selftest;
 mod selftest_csg;
+// the observation mode (no files and no window in the browser)
+#[cfg(not(target_arch = "wasm32"))]
 mod watch;
 #[cfg(not(target_arch = "wasm32"))]
 mod watch_ui;
