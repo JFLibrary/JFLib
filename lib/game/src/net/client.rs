@@ -45,8 +45,11 @@ pub struct ClientOptions {
     pub room: Option<RoomCode>,
     /// how far behind the newest snapshot the others are shown (ms)
     pub interp_ms: u32,
-    /// the margin the inputs aim for (None: the server's)
+    /// the margin the inputs aim for (None: the server's, over a WebSocket plus stream_margin)
     pub margin: Option<f64>,
+    /// ticks the margin gets over a WebSocket (set_reliable) on top of the server's: TCP delivers what follows a
+    /// lost segment only after its retransmission (1: over WLAN 2.7 instead of 12 corrections a minute)
+    pub stream_margin: f64,
     /// snapshots kept as bases and for interpolation
     pub ring: usize,
     /// inputs every packet repeats at least (the newest and the ones before it)
@@ -61,7 +64,7 @@ pub struct ClientOptions {
 
 impl Default for ClientOptions {
     fn default() -> Self {
-        ClientOptions { name: String::from("Spieler"), room: None, interp_ms: 100, margin: None, ring: 64, min_redundancy: 3, smooth_ms: 60, snap: 1.0, event_budget: 400 }
+        ClientOptions { name: String::from("Spieler"), room: None, interp_ms: 100, margin: None, stream_margin: 1.0, ring: 64, min_redundancy: 3, smooth_ms: 60, snap: 1.0, event_budget: 400 }
     }
 }
 
@@ -163,6 +166,7 @@ pub struct NetClient<M: Movement> {
     in_ev: Inbox,
     smooth: Smoother,
     smooth_ns: u64,
+    reliable: bool,
 }
 
 impl<M: Movement> NetClient<M> {
@@ -174,6 +178,7 @@ impl<M: Movement> NetClient<M> {
             in_ev: Inbox::new(true),
             smooth: Smoother::new(opts.smooth_ms as f64, opts.snap),
             smooth_ns: 0,
+            reliable: false,
             opts,
             mover,
             schema,
@@ -250,9 +255,11 @@ impl<M: Movement> NetClient<M> {
         self.last_outcome
     }
 
-    /// the channel is reliable (a WebSocket): its events go once instead of until acknowledged.  NetLink and the
-    /// simulated network set it; without it a client resends over a WebSocket too (harmless: duplicates are dropped)
+    /// the channel is reliable (a WebSocket): its events go once instead of until acknowledged, its margin is
+    /// stream_margin more (call it before WELCOME).  NetLink and the simulated network's users set it; without it a
+    /// client resends over a WebSocket too (harmless: duplicates are dropped)
     pub fn set_reliable(&mut self, on: bool) {
+        self.reliable = on;
         if self.out_ev.pending() == 0 {
             self.out_ev = Outbox::new(on, self.opts.event_budget);
         }
@@ -395,7 +402,9 @@ impl<M: Movement> NetClient<M> {
     fn on_welcome(&mut self, w: Welcome) {
         self.rate = w.rate as u32;
         self.dt = 1.0 / self.rate as f64;
-        let target = self.opts.margin.unwrap_or(w.margin as f64);
+        // (over a WebSocket TCP holds back what follows a lost segment: a tick more, measured over WLAN in G7e part 2)
+        let extra = if self.reliable { self.opts.stream_margin } else { 0.0 };
+        let target = self.opts.margin.unwrap_or(w.margin as f64 + extra);
         self.clock = SteeredClock::new(self.rate, target);
         let delay = self.opts.interp_ms as f64 * self.rate as f64 / 1000.0;
         self.interp = InterpClock::new(self.rate, delay);

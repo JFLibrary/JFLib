@@ -4,11 +4,13 @@
 // minute, the clock's margin, the reliable events (kills, hits).  Also in the browser: the page's own server over
 // the WebSocket (tests/browser.mjs starts it with these arguments)
 //
-//   game1 --client SERVER [--clients N] [--secs S] [--ws] [--room CODE] [--fire] [--leave]
+//   game1 --client SERVER [--clients N] [--secs S] [--ws] [--room CODE] [--fire] [--leave] [--margin T] [--interp MS]
 //       SERVER     host:port (UDP; --ws: ws://host:port/game1), ws://..., or /game1 (the page's own server)
 //       --clients  how many (2); the first makes a room (or joins --room), the others join it 150 ms apart
 //       --fire     the minds shoot (corrections then also count deaths and returns); without it they only walk
 //       --leave    at the end every client leaves with LEAVE (the server lets the figures go at once)
+//       --margin   the input margin the clock aims for (ticks; the server's 2 unless set), --interp the buffer of the
+//                  others (ms; 100): the knobs of the tuning in NETCODE.md
 //
 // The lines: one per client ("game1 client K ..."), then "game1 clients: ..." with the means and the verdict
 // ("bestanden": every client played, decoded every snapshot against a base it had, and without --fire predicted
@@ -56,6 +58,10 @@ struct Probe {
     kills: u64,
     hits: u64,
     left: bool,
+    /// rounds after joining, and of those the ones whose render time of the others had reached the newest snapshot
+    /// (the interpolation buffer ran dry: the others hold)
+    rounds: u64,
+    dry: u64,
 }
 
 /// a run of headless clients (see the module header)
@@ -70,6 +76,8 @@ pub struct Run {
     secs: u64,
     fire: bool,
     leave: bool,
+    margin: Option<f64>,
+    interp_ms: u32,
     started: usize,
     next_at: u64,
     end_at: u64,
@@ -122,6 +130,8 @@ impl Run {
             secs,
             fire,
             leave: args.iter().any(|a| a == "--leave"),
+            margin: arg(args, "--margin").and_then(|v| v.parse::<f64>().ok()),
+            interp_ms: num("--interp", 100) as u32,
             started: 0,
             next_at: t0,
             // (the run ends `secs` after the last client joined, at the latest 30 s later)
@@ -133,7 +143,7 @@ impl Run {
 
     fn start_client(&mut self, k: usize) {
         self.probes[k].started_us = plat::time_us();
-        let opts = ClientOptions { name: format!("Messung {}", k + 1), room: self.room, ..ClientOptions::default() };
+        let opts = ClientOptions { name: format!("Messung {}", k + 1), room: self.room, margin: self.margin, interp_ms: self.interp_ms, ..ClientOptions::default() };
         let nc = NetClient::new(opts, Mover::default(), schema(), Match::empty_baseline());
         let cfg = ClientConfig { protocol: PROTOCOL, ..ClientConfig::default() };
         match NetLink::connect(self.ep.clone(), cfg, nc, WS_PATH) {
@@ -191,6 +201,14 @@ impl Run {
                     }
                 }
                 p.last_snaps = snaps;
+            }
+            if p.mism0.is_some() {
+                if let (Some((rt, frac)), Some(n)) = (l.game.render_time(), l.game.newest().map(|s| s.tick)) {
+                    p.rounds += 1;
+                    if (rt.wrapping_sub(n) as i32) as f64 + frac >= 0.0 {
+                        p.dry += 1;
+                    }
+                }
             }
             if now_us >= p.next_rtt_us && l.game.phase() == Phase::Playing {
                 p.next_rtt_us = now_us + 100_000;
@@ -273,7 +291,7 @@ impl Run {
             let good = g.phase() == Phase::Playing && st.bad == 0 && st.no_base == 0 && got >= (self.secs as f64 * 10.0) && (self.fire || per_min < 60.0);
             ok &= good;
             out(&format!(
-                "game1 client {} ({}) {:?}: rtt mean {:.1} p50 {:.1} p99 {:.1} ms (var {:.1}), jitter {:.2} ms (spread {:.1} ms), loss down {:.2} % up {:.2} %, joined after {} ms, {} snapshots ({} bad, {} no base, {} stale), predictions compared {}, corrections {} ({:.1}/min, error mean {:.3} max {:.3} m, smoothed {} snapped {}), margin {:.2} ticks, clock {} ppm, {} jumps, kills {} hits {}{}\n",
+                "game1 client {} ({}) {:?}: rtt mean {:.1} p50 {:.1} p99 {:.1} ms (var {:.1}), jitter {:.2} ms (spread {:.1} ms), loss down {:.2} % up {:.2} %, joined after {} ms, {} snapshots ({} bad, {} no base, {} stale), predictions compared {}, corrections {} ({:.1}/min, error mean {:.3} max {:.3} m, smoothed {} snapped {}), margin {:.2} ticks, clock {} ppm, {} jumps, buffer dry {:.2} %, kills {} hits {}{}\n",
                 k,
                 if l.channel().reliable() { "WebSocket" } else { "UDP" },
                 (g.phase(), l.channel().state()),
@@ -300,6 +318,7 @@ impl Run {
                 g.clock().margin().unwrap_or(0.0),
                 g.clock().speed_ppm() as i64 - 1_000_000,
                 g.clock().jumps(),
+                p.dry as f64 * 100.0 / p.rounds.max(1) as f64,
                 p.kills,
                 p.hits,
                 if good { "" } else { "  FAIL" }
