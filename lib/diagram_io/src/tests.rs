@@ -64,3 +64,48 @@ fn stencil_size_from_text() {
     assert!(refused(&master("GUARD(MAX(10 mm, TEXTHEIGHT(TheText,Width)))", "svg: a.svg\n")));
     assert!(refused(&master("0 mm", "")));
 }
+
+// (JD13) rows of a shape's Geometry and Connection sections carry their type T in the file, as
+// Visio writes them: an instance resized from its master overrides inherited rows (F='Inh'
+// cells) without a type of its own, and Office's previewer (Explorer's preview pane) hangs on
+// rows without T; a Connection row without any type is written T='Connection'
+#[test]
+fn inherited_rows_written_with_their_type() {
+    use crate::stencil;
+    use diagram_core::formula::Engine;
+    use diagram_core::{instance, SheetRef, Unit, Value};
+
+    const ST: &str = "stencil: Test\nfile: test\nname.de: T\nname.en: T\nname.es: T\nname.it: T\nname.fr: T\ncategory: general\nmasters: box\n";
+    const BOX: &str = "master: Box\nname.de: B\nname.en: B\nname.es: B\nname.it: B\nname.fr: B\nprompt.de: P\nprompt.en: P\nprompt.es: P\nprompt.it: P\nprompt.fr: P\n\n[Shape]\nWidth = 40 mm\nHeight = 20 mm\n\n[Geometry]\nMoveTo  X = 0; Y = 0\nLineTo  X = Width; Y = 0\nLineTo  X = Width; Y = Height\nLineTo  X = 0; Y = Height\nLineTo  X = Geometry1.X1; Y = Geometry1.Y1\n\n[Connection]\nRow  X = Width*0.5; Y = 0; DirX = 0; DirY = 1\nRow  X = Width; Y = Height*0.5; DirX = -1; DirY = 0\n";
+    let files = |f: &str| match f {
+        "stencil.txt" => Some(alloc::string::String::from(ST)),
+        "box.master" => Some(alloc::string::String::from(BOX)),
+        _ => None,
+    };
+    let built = stencil::build(&files, Measure::Metric).expect("the stencil builds");
+    let m = built.doc.masters().next().expect("the master");
+    let mut d = vsdx::new_document(DocKind::Drawing, Measure::Metric);
+    let pg = d.pages().next().expect("a page");
+    {
+        let mut tx = d.transaction("drop");
+        let local = instance::import_master(&mut tx, &built.doc, m).expect("import");
+        let s = instance::place(&mut tx, pg, local, 2.0, 2.0, 0).expect("place");
+        let w = tx.single("Width");
+        tx.set_constant(SheetRef::Shape(s), &w, Value::Num(3.0), Some(Unit::Millimeters)).expect("width");
+        Engine::new().recalc(&mut tx, &[SheetRef::Shape(s)]).expect("recalc");
+        tx.commit();
+    }
+    let bytes = vsdx::write(&d, &vsdx::WriteOptions::DEFAULT).expect("write");
+    let entries = archive::read(&bytes, archive::Limits::default()).expect("zip");
+    let page = entries.iter().find(|e| e.name == "visio/pages/page1.xml").expect("page part");
+    let text = core::str::from_utf8(&page.data).expect("utf-8");
+    let geo = text.find("<Section N='Geometry'").expect("the instance overrides geometry rows");
+    let rows: alloc::vec::Vec<&str> = text[geo..].split("<Row ").skip(1).collect();
+    assert!(!rows.is_empty());
+    assert!(rows.iter().all(|r| r.starts_with("T='")), "rows without T: {text}");
+    assert!(text.contains("<Row T='LineTo' IX='2'>") && text.contains("<Row T='Connection'"), "{text}");
+    // and the file reads back with the types in the model, written the same way again
+    let back = vsdx::read(&bytes, &vsdx::Limits::VSDX).expect("read");
+    let again = vsdx::write(&back.doc, &vsdx::WriteOptions::DEFAULT).expect("write again");
+    assert_eq!(bytes, again);
+}
