@@ -1,7 +1,8 @@
 # Spiel-Engine: Plan für G7
 
 Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1), von G7b, G7d und G7g (Welle 2), von G7e und die
-zweiten Teile von G7c und G7f (Welle 3), siehe dort; Stand 2026-11-19. Die Zahl der Läufe je Stufe ist
+zweiten Teile von G7c und G7f (Welle 3), der zweite Teil von G7a und der erste von G7h (Welle 4), siehe dort; Stand
+2026-11-20. Die Zahl der Läufe je Stufe ist
 geschätzt (ein Lauf ist eine Arbeitsrunde eines Agenten mit Durchsicht, wie bei G5 und G6).
 
 ## Ziel
@@ -131,7 +132,7 @@ anfassen:
 | 1 | G7a, G7c, G7f (je Teil 1) | `plat` (Eingabe), `lib/physics`, `render3d`: keine gemeinsamen Dateien. G7a liegt auf dem längsten Weg (G7a → G7b → G7e → G7h). Fertig und gepusht am 18.11.2026. |
 | 2 | G7b, G7d, G7g (je Teil 1) | G7b braucht G7a; G7d fasst den Browser-Host in `plat` an, den in Welle 1 G7a ändert. Fertig am 18.11.2026. |
 | 3 | G7e (Teil 1), G7c Teil 2, G7f Teil 2 | G7e braucht G7b und G7d; der Controller (`lib/physics`) und `render3d` Teil 2 berühren `lib/game` nicht. Fertig am 19.11.2026. |
-| 4 | G7a Teil 2, G7h | die Gamepads fassen den Browser-Host an wie G7d, deshalb nach Welle 2; Spiel 1 braucht alles davor, Gamepads nur als Zugabe. |
+| 4 | G7a Teil 2, G7h (Teil 1) | die Gamepads fassen den Browser-Host an wie G7d, deshalb nach Welle 2; Spiel 1 braucht alles davor, Gamepads nur als Zugabe. Fertig am 20.11.2026. |
 
 ### Phase 1: Grundlagen und Spiel 1
 
@@ -160,6 +161,19 @@ anfassen:
   endet (ein Spiel zeigt dann sein Pausenmenü); der Zeiger kommt unter Windows und X11 an die alte Stelle zurück wie
   unter macOS und Wayland; der Klick, der den Lock auslöst, kommt bei der App als Klick an und `lib/game` übergeht
   ihn (G7b); die Einheiten der Bewegung gleicht `lib/game` mit einem Faktor je Plattform aus (G7b).
+- **Stand 2026-11-20: Teil 2 fertig** ([GAMECORE.md](GAMECORE.md), `lib/plat/README.md`). Gamepads in der
+  Standard-Belegung des W3C auf allen vier Zielen: Windows über XInput (aus System32, die Guide-Taste über
+  `XInputGetStateEx`), Linux über evdev (Pads nach ihren Fähigkeiten erkannt, Xbox-, Sony-, Nintendo- und einfache
+  HID-Pads belegt, Hotplug über inotify), macOS über GameController, der Browser über die Gamepad API (die Seite
+  fragt nur ab, solange die App zuschaut und ein Pad verbunden ist); Android und iOS noch nicht. `plat::pads()`,
+  `E_GAMEPAD`, in der UI `ui.gamepads()`; abgefragt aus dem Warten der Fensterschleife, ohne Pads kostet das eine
+  Abfrage. In `lib/game` Tasten, Achsen und Richtungen der Sticks als Quellen, eine radiale Totzone (0,15), Schauen
+  mit dem Stick (180°/s bei vollem Ausschlag, Kurve 2), eigene Einstellungen neben denen der Maus; das zuletzt
+  benutzte Pad steuert. Ein Pad spielt ohne Pointer-Lock: der erste Druck startet das Spiel und wird verschluckt wie
+  der Klick, der den Lock holt. Geprüft nur mit eingespeisten Eingaben: `plattest --test pad` auf Windows und Linux
+  je 80, auf macOS 76 Prüfungen, die Eingabe-Aktionen auf allen vier Zielen, der Browser in Chromium und Firefox;
+  die Prüfsumme von `gametest` unverändert. Offen: die Prüfung von Hand mit echten Pads, Vibration, Pads ohne
+  XInput unter Windows (PlayStation nur über Steam Input), im Flatpak `--device=input`.
 
 **G7b Spielkern und Spielfenster** (`lib/game`)
 
@@ -373,6 +387,23 @@ anfassen:
 - Fremde Klänge oder Texturen (etwa CC0) nur mit einem Ja des Nutzers je Download. Der Server auf einem eigenen
   Rechner (etwa bei jfreund.org) nur mit einem Ja des Nutzers.
 - Fertig, wenn: der Nutzer eine Runde mit Mitspielern gespielt hat, Browser und Desktop gemischt.
+- **Stand 2026-11-20: Teil 1 fertig** ([GAME1.md](GAME1.md)). Arbeitsname `game1` („Spiel 1“, App-ID vorläufig
+  `org.jfreund.game1`), bis der Nutzer den Namen wählt. `apps/game1` (Fenster unter Windows, Linux, macOS und im
+  Browser), `apps/game1-server` (ohne Fenster, unter Linux statisch, ohne `--bind` nur auf 127.0.0.1) und die
+  Spiellogik ohne GPU in `apps/game1/crates/game1_core` (Spielcode, keine Engine: bleibt aus `lib/`). Eine Karte
+  („Werft“, 56 × 40 m, 12 Startpunkte) und die Figur aus starren Teilen in JFScript, mit `modeltool` und
+  `game1 --bake` zu eingecheckten `.g1m`-Dateien gebacken (`tools/content.py --check` baut sie Byte für Byte nach);
+  Client und Server kollidieren gegen dieselben Bytes. Die Bewegung ist der Character-Controller hinter `Movement`
+  auf dem Raster von 1/1024 m; eine Hitscan-Waffe mit Lag-Ausgleich, Leben, Munition, Nachladen, Tod und Rückkehr,
+  jeder gegen jeden mit Punktetafel, Bots auf dem Server; Look C, die Waffe vor der Kamera, Partikel, HUD, Start-,
+  Pausen- und Einstellungsmenü; Üben gegen sieben Bots ohne Server, auch im Browser. `lib/` blieb unverändert.
+  20 240 Prüfungen auf Windows und macOS, dieselben Skripte unter Linux, in Node 20 233; fünf Prüfsummen gleich auf
+  Windows, Linux, macOS und in Node. Auf sauberer Leitung keine Korrektur; Treffer auf ein seitlich laufendes Ziel
+  mit Lag-Ausgleich bis 200 ms Umlauf zu 100 %, bei 250 ms zu 23 % (die Sicht des Schützen liegt dann rund 390 ms
+  zurück, über der Grenze von 300 ms). Auf der RTX 2070 SUPER: 1080p mit 16 Figuren 0,7 ms GPU-Zeit je Bild; der
+  Server 140 µs je Tick mit 16 Bots; je Spieler 2,75 KB/s hinauf, 5 KB/s herunter. Offen: Teil 2 (weitere Karten
+  und Waffen, Teams und Runden, Tastenbelegung, Klang), Messungen auf Iris Xe, HD 610 und dem Mac, ein echter
+  Browser gegen den Server, die Runde des Nutzers mit Mitspielern.
 
 ### Phase 2: Bewegung und große Welten
 

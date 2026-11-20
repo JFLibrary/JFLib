@@ -685,6 +685,7 @@ rust-analyzer reads the Cargo workspace in the root `Cargo.toml` directly.
 | [Modelling](docs/GEOM.md) | Models described in JFScript: lib/geom (meshes from primitives, profiles and operations, checks), apps/modeltool (pictures, report, glTF), what JFScript needs (German) |
 | [Transport](docs/TRANSPORT.md) | The network of games: WebSocket in netio, the browser's WebSocket, lib/netchan's channel over UDP and WebSocket; wire format, limits, tests, measurements (German) |
 | [Netcode](docs/NETCODE.md) | Multiplayer in lib/game: a server-authoritative tick, prediction and reconciliation, delta snapshots under 1200 bytes, lag compensation, rooms, bots; tests and measurements with 16 bots (German) |
+| [Game 1](docs/GAME1.md) | The first game on the engine (working name game1): a cartoon multiplayer shooter for the browser and the desktop; crates, map from JFScript, rules, tests, checksums, measurements (German) |
 | [Android Gallery](apps/androidGallery/README.md) | APKs, Android prerequisites, input, and port status |
 | [Web and agent control](docs/AGENT_WEB.md) | Browser host and explicit CLI/JSON/MCP interfaces |
 | [jfWord](apps/jfWord/README.md) | Document editing and current feature coverage |
