@@ -12,6 +12,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 
 use game::net::link::serve;
+use netchan::ServerEvent;
 use game::net::server::{NetServer, ServerOptions};
 
 use crate::map::Map;
@@ -39,6 +40,8 @@ impl Default for HostOptions {
 pub struct Host {
     pub chan: netchan::Server,
     pub game: NetServer<Match>,
+    /// print every connection that comes and goes (with netchan's reason) to stdout
+    pub log: bool,
 }
 
 impl Host {
@@ -53,12 +56,33 @@ impl Host {
         let server = ServerOptions { ws_port, rate: RATE, max_rewind_ms: room.max_rewind * 1000 / RATE, ..opts.server };
         let mut game = NetServer::secure(server, factory);
         game.set_parallel(opts.parallel);
-        Host { chan, game }
+        Host { chan, game, log: false }
     }
 
     /// one round of the loop -> the ticks run
     pub fn round(&mut self, now_ns: u64) -> u32 {
-        serve(&mut self.chan, &mut self.game, now_ns)
+        if !self.log {
+            return serve(&mut self.chan, &mut self.game, now_ns);
+        }
+        while let Some(e) = self.chan.poll() {
+            match &e {
+                ServerEvent::Connected { id, transport, addr } => plat::write_stdout(alloc::format!("game1-server: connection {} over {:?} from {:?}\n", id, transport, addr).as_bytes()),
+                ServerEvent::Disconnected { id, reason } => {
+                    let who = self.game.player_of(*id).map(|(r, p)| alloc::format!(" (room {}, figure {})", r, p)).unwrap_or_default();
+                    plat::write_stdout(alloc::format!("game1-server: connection {} ended: {:?}{}\n", id, reason, who).as_bytes())
+                }
+                _ => {}
+            }
+            self.game.on_event(&e);
+        }
+        let n = self.game.advance(now_ns);
+        while let Some((id, b)) = self.game.take_out() {
+            let _ = self.chan.send(id, &b);
+        }
+        while let Some(id) = self.game.take_close() {
+            self.chan.disconnect(id);
+        }
+        n
     }
 
     /// sleep until a packet comes, at most `ms`

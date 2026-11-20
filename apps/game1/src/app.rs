@@ -284,7 +284,7 @@ impl Game1 {
 
 /// the server's address -> an endpoint: "host:port" or "host" (DEFAULT_PORT); UDP on the desktop, the WebSocket of
 /// the page's own server in the browser
-fn endpoint(server: &str) -> Result<netchan::Endpoint, String> {
+pub fn endpoint(server: &str) -> Result<netchan::Endpoint, String> {
     let s = server.trim();
     if cfg!(target_arch = "wasm32") {
         return Ok(netchan::Endpoint::WebSocket(if s.is_empty() { String::from(WS_PATH) } else { format!("ws://{}{}", s, WS_PATH) }));
