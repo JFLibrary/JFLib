@@ -9,6 +9,7 @@
 //   gametest --netsum            the netcode's: "gametest netsum=HEX" over a recorded networked session (a
 //                                server and six bots on the simulated link, rough then clear, a fixed seed)
 //   gametest --netbench          the netcode's measurements with 16 bots (docs/NETCODE.md; release build)
+//   gametest --roomsbench        its last part alone: 8 rooms of 16 bots, one after another and side by side
 //   gametest --loopback [--secs S] [--udp N] [--ws N]   the netcode on real sockets on 127.0.0.1
 //   gametest [--script S]        the probe window (src/probe.rs): ui's real input path into an Input, for
 //                                the scripts tests/input.uis and tests/tick.uis (headless)
@@ -174,6 +175,10 @@ fn run() -> i32 {
     }
     if args.iter().any(|a| a == "--netbench") {
         return net_sim::bench();
+    }
+    if args.iter().any(|a| a == "--roomsbench") {
+        net_event::rooms_bench();
+        return 0;
     }
     #[cfg(not(target_arch = "wasm32"))]
     if args.iter().any(|a| a == "--loopback") {

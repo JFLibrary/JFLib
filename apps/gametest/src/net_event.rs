@@ -34,7 +34,7 @@ use game::net::predict::Smoother;
 use game::net::proto;
 use game::net::server::{NetServer, RoomEvent, RoomFactory, RoomSim, ServerOptions, To};
 use game::net::sim::{SimNet, Weather, Which};
-use game::net::snapshot::{tick_diff, Ent, Schema, Snapshot};
+use game::net::snapshot::{Ent, Schema, Snapshot};
 use game::net::walker::{WalkState, Walker};
 use game::net::RoomCode;
 use game::Vec3;
@@ -171,6 +171,8 @@ pub struct Rig<S: RoomSim> {
     pub snapped: u64,
     /// drop LEAVE messages of the clients (a LEAVE lost)
     pub lose_leave: bool,
+    /// the time of every server tick (us), when Some
+    pub tick_us: Option<Vec<u32>>,
     pub fire: bool,
     clock: game::FixedTick,
     seed: u64,
@@ -192,6 +194,7 @@ impl<S: RoomSim> Rig<S> {
             at_correction: Vec::new(),
             snapped: 0,
             lose_leave: false,
+            tick_us: None,
             fire: false,
             clock: game::FixedTick::new(rate).with_max_steps(64),
             seed,
@@ -247,7 +250,11 @@ impl<S: RoomSim> Rig<S> {
             self.server.on_event(e);
         }
         for _ in 0..self.clock.advance_to(now_ns) {
+            let t0 = if self.tick_us.is_some() { plat::time_us() } else { 0 };
             self.server.step();
+            if let Some(v) = &mut self.tick_us {
+                v.push((plat::time_us() - t0).min(u32::MAX as u64) as u32);
+            }
         }
         while let Some((id, b)) = self.server.take_out() {
             if let Some(r) = &mut self.record {
@@ -767,6 +774,46 @@ pub fn threads(c: &mut Ctx) {
     codes(c);
 }
 
+/// --netbench: the server's time per tick with 8 rooms of 16 bots (300 props each), the rooms one after another and
+/// side by side on the pool (real time; the messages are the same, the group threads checks that)
+pub fn rooms_bench() {
+    let (rooms, per) = (8, 16);
+    crate::out(&format!("rooms side by side: {} rooms of {} bots, 300 props each, typical weather, 10 s after the joins ({} workers)\n", rooms, per, plat::thr_count()));
+    let mut means = Vec::new();
+    for parallel in [false, true] {
+        let cfg = ArenaConfig { fire: true, props: 300, moving: 30, displaced: 150, ..ArenaConfig::default() };
+        let factory: RoomFactory<Arena> = Box::new(move |_| Arena::new(cfg));
+        let mut server = NetServer::new(ServerOptions::default(), 98, factory);
+        server.set_parallel(parallel);
+        let mut rig = Rig::new(98, server, cfg);
+        rig.fire = true;
+        for r in 0..rooms {
+            let first = rig.add(false, Weather::TYPICAL, None, r as u64 * 10);
+            for k in 1..per {
+                rig.add(k % 4 == 3, Weather::TYPICAL, Some(first), 200 + k as u64 * 10);
+            }
+        }
+        rig.run(2000, &mut |_, _| {});
+        rig.tick_us = Some(Vec::new());
+        rig.run(10_000, &mut |_, _| {});
+        let mut v: Vec<f64> = rig.tick_us.take().unwrap_or_default().iter().map(|x| *x as f64).collect();
+        let (mean, p50, p99, max) = crate::net_session::stats_of(&mut v);
+        means.push(mean);
+        crate::out(&format!(
+            "  {:<14} {} playing: tick mean {:.0} p50 {:.0} p99 {:.0} max {:.0} us\n",
+            if parallel { "side by side" } else { "one thread" },
+            rig.playing(),
+            mean,
+            p50,
+            p99,
+            max
+        ));
+    }
+    if means.len() == 2 && means[1] > 0.0 {
+        crate::out(&format!("  speed-up {:.1}x\n", means[0] / means[1]));
+    }
+}
+
 /// room codes and tickets: seeded (the same every run), from a given source, from the system's random numbers
 fn codes(c: &mut Ctx) {
     let mk = || -> RoomFactory<Arena> { Box::new(|_| Arena::new(ArenaConfig::default())) };
@@ -813,5 +860,4 @@ fn codes(c: &mut Ctx) {
         }
         c.check(tickets.len() == 2 && tickets[0] != tickets[1] && tickets.iter().all(|t| *t != 0), || format!("secure tickets: {:x?}", tickets));
     }
-    let _ = tick_diff(0, 0);
 }

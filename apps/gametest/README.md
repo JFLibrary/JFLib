@@ -13,11 +13,12 @@ bridge).
 ```sh
 python build_rs.py test gametest                     # tests/*.uis on Windows and Linux
 python build_rs.py run gametest -- --test input      # one group (world tick input camera bridge netcodec lagcomp
-                                                     # room netsim bots), --quick: a tenth
+                                                     # room netsim bots events leave smooth threads), --quick: a tenth
 python build_rs.py run gametest -- --checksum        # the determinism checksum of the core
 python build_rs.py run gametest -- --netsum          # the netcode's: a recorded session on the simulated link
 python build_rs.py run gametest -- --loopback        # the netcode on real sockets (--secs, --udp, --ws)
 build/release/win/gametest.exe --netbench            # the netcode's measurements with 16 bots (docs/NETCODE.md)
+build/release/win/gametest.exe --roomsbench          # its last part: 8 rooms of 16 bots, one thread and side by side
 build/win/gametest.exe --script apps/gametest/tests/input.uis
 ```
 
@@ -47,6 +48,7 @@ node apps/gametest/tests/web.mjs build                         # WebAssembly in 
 | `src/net_session.rs` | a networked session: the server with the arena and bots over the simulated link, the server's state per tick and every client's first prediction kept for the checks |
 | `src/net_sim.rs` | the group netsim (clear, typical, rough, storm; the tick wrap, the join's full state fetched and filled in, leaving and joining, 70 000 snapshots past the sequence wrap), the group bots (16 bots against the limits), `--netbench`, `--netsum` |
 | `src/net_loop.rs` | `--loopback`: the netcode on real sockets, UDP and WebSocket clients, a UDP client's fetch over its own WebSocket |
+| `src/net_event.rs` | part 2 of the netcode: the groups events (outbox and inbox against a model channel, sessions whose room talks to all, one and all but one), leave, smooth, threads (rooms side by side against one thread, bit for bit; room codes) and `--roomsbench` |
 | `src/probe.rs` | the window of the scripts: canvas keys, buttons, raw motion and the lock into an Input, ticks on the virtual clock |
 | `tests/check.uis` | `--check` |
 | `tests/input.uis` | the lock's click fires nothing, keys by place (a French keyboard), the motion's angle, Esc pauses, a click plays on |
