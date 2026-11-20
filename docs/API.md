@@ -123,7 +123,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [game_render3d](#game_render3d) -- The bridge from the game core to render3d: entities with a mesh as scene instances
   <br>[lib.rs](#game_render3d-crate-root)
 - [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
-  <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
+  <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/csg.rs](#geomsrccsgrs) · [src/exact.rs](#geomsrcexactrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
 - [netchan](#netchan) -- Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network
   <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 
@@ -65308,6 +65308,11 @@ built from primitives, profiles and operations, checked, the same bits on every 
                  the origin), extrude (front-view profile along Z), prism (floor plan up along Y), sweep
                  (profile along a path, mitred corners, rotation-minimising frames), lathe (profile about Y)
   poly           2D profiles: area, cleaning, triangulation (ear clipping), rect, circle, arc, rounded_rect
+  Solid          convex cells as brushes: from_convex, union, difference, intersection (exact decisions:
+                 points are where three planes meet, sides are signs of determinants), to_mesh (closed,
+                 corners rounded once at the end), bevel (chamfer or round edges and corners)
+  exact          expansions (Shewchuk), orient2d, the side of a plane at a meeting of three planes,
+                 the correctly rounded quotient
   Report         closed, manifold, outward, degenerate triangles, normals, bounds, area, volume, Euler
                  characteristic, components; json()
   math           Vec3, Aabb, Affine in f64; sqrt correctly rounded, sin / cos / atan2 from rt's portable
@@ -65451,6 +65456,9 @@ NORMAL_TOLERANCE: f64 = 1e-6
   - `inverted_components: usize` -- closed components with a negative volume: inside out
   - `degenerate: usize` -- triangles without area (see [`DEGENERATE_RATIO`])
   - `bad_normals: usize` -- vertex normals that are not unit length or point away from their face (see [`NORMAL_TOLERANCE`])
+  - `problem_at: Option<Vec3>` -- where the first problem lies, for a message: the middle of the first open, non-manifold or flipped edge,
+    else a pinched point, else the middle of the first degenerate triangle, else a vertex with a wrong
+    normal; None when there is none of these
 
 **`impl Report`**
 
@@ -65472,6 +65480,189 @@ NORMAL_TOLERANCE: f64 = 1e-6
 
 - **`fn check(&self) -> Report`**
   Measure the mesh: counts, bounds, area, volume and the topology checks of [`Report`].
+
+### `geom/src/csg.rs`
+
+Source: [`lib/geom/src/csg.rs`](../lib/geom/src/csg.rs)
+
+```text
+csg -- Boolean operations on convex solids, as brushes in a map editor (docs/GEOM.md, "Boolesche
+Operationen"): a Solid is a set of convex cells that do not overlap, each the intersection of half-spaces
+whose planes it shares with the other cells; union, difference and intersection split cells by planes and
+give such a set again, so results can be combined further.  to_mesh gives the boundary: the faces of the
+cells less where two cells touch, as one closed mesh.
+
+Exact where it decides: a point is where three planes meet, never rounded while the operation runs, and
+which side of a plane it lies on is the sign of a 4 x 4 determinant of plane coefficients (exact.rs: f64
+with an error bound, exact expansions near 0).  So splitting a cell, cutting a face and finding where
+faces of neighbouring cells meet always agree with each other, also for points exactly on a plane (the
+usual case: a window flush with a wall, boxes touching).  Only the output is rounded: every corner to the
+f64 nearest the exact point (equal points, equal bits), the faces triangulated with exact orientation
+tests on those coordinates.  The planes themselves come from the input meshes in f64; planes closer than
+WELD_RATIO of the extent count as one (also between the operands), so faces that are meant to lie in one
+plane do, and features smaller than that (where several planes almost meet in one point: the tip of a
+cone, the rings of a sphere) fall together into one point of the output.
+```
+
+```rust
+/// Planes closer than this fraction of the extent count as one, output points closer than it fall together.
+WELD_RATIO: f64 = 1e-9
+/// the most cells a solid may have (a limit against runaway splitting)
+MAX_CELLS: usize = 20_000
+```
+
+- **`struct Plane`**
+  A plane n . x + w = 0, n a unit vector pointing out of the solid: inside is n . x + w &lt; 0.
+  - `n: Vec3` -- the outward normal, unit length
+  - `w: f64` -- the offset: n . x + w = 0 on the plane
+
+**`impl Plane`**
+
+- **`fn eval(&self, p: Vec3) -> f64`**
+  the signed distance of `p` (positive outside)
+- **`fn flipped(&self) -> Plane`**
+  the same plane facing the other way
+- **`fn transformed(&self, a: &Affine) -> Plane`**
+  the plane mapped by `a` (normal by the normal matrix, kept pointing outward)
+
+- **`struct Solid`**
+  A solid as convex cells that do not overlap (brushes): each cell is a list of planes whose inside it is.
+  Made from a convex mesh ([`Solid::from_convex`]) or by union, difference and intersection; [`Solid::to_mesh`]
+  gives its surface.
+
+**`impl Solid`**
+
+- **`fn from_convex(m: &Mesh) -> Result<Solid, Error>`**
+  The solid of a convex closed mesh: one cell whose planes are the mesh's faces (triangles in one plane
+  within [`WELD_RATIO`] of the extent are one face).  Err when the mesh is not closed, inside out, flat
+  or not convex (a corner in front of a face by more than the tolerance).
+- **`fn cell_count(&self) -> usize`**
+  the number of cells (convex pieces)
+- **`fn plane_count(&self) -> usize`**
+  the number of planes the cells use
+- **`fn is_empty(&self) -> bool`**
+  whether it has no cell (nothing left)
+- **`fn cells(&self) -> Vec<Vec<Plane>>`**
+  the planes of each cell (each pointing out of its cell)
+- **`fn bounds(&self) -> Aabb`**
+  the box around the operands it came from (at least the solid's own)
+- **`fn transformed(&self, a: &Affine) -> Solid`**
+  the solid mapped by `a` (planes and bounds; cells that shared a plane still do)
+- **`fn union(&self, o: &Solid) -> Result<Solid, Error>`**
+  Everything in this solid or in `o`.
+- **`fn difference(&self, o: &Solid) -> Result<Solid, Error>`**
+  What is in this solid but not in `o`.
+- **`fn intersection(&self, o: &Solid) -> Result<Solid, Error>`**
+  What is in both.
+- **`fn to_mesh(&self, smooth_deg: f64) -> Result<Mesh, Error>`**
+  The surface as one closed mesh with normals smooth up to `smooth_deg` degrees (0: flat) and box UV in
+  metres.  Err for an empty solid.
+
+**`impl Solid`**
+
+- **`fn bevel(&self, radius: f64, segments: usize, only: Option<Axis>) -> Result<(Solid, Mesh), Error>`**
+  The solid with its edges and corners bevelled, and its surface ([`bevel`]): `segments` 1 chamfers (a
+  flat face along each edge, a triangle at each corner of three faces), more round them with that many
+  faces per quarter turn (an edge turning by another angle gets proportionally many, at least one), the
+  faces cut back by `radius` at right angles.  `only`: just the edges along that axis, the corners stay.
+  Only for one convex cell.
+
+- **`fn union(meshes: &[&Mesh]) -> Result<Mesh, Error>`**
+  The union of convex closed meshes as one mesh, normals smooth up to 30 degrees.
+
+- **`fn difference(a: &Mesh, minus: &[&Mesh]) -> Result<Mesh, Error>`**
+  The convex closed mesh `a` less each of `minus`, as one mesh, normals smooth up to 30 degrees.
+
+- **`fn intersection(meshes: &[&Mesh]) -> Result<Mesh, Error>`**
+  The intersection of convex closed meshes as one mesh, normals smooth up to 30 degrees.
+
+- **`fn bevel(m: &Mesh, radius: f64, segments: usize, only: Option<Axis>) -> Result<Mesh, Error>`**
+  A convex closed mesh with its edges and corners bevelled ([`Solid::bevel`]); the flat faces keep flat
+  normals, the rounded ones get normals across the arcs (where an arc meets a face, the face's normal: no
+  seam, no shading across the face).
+
+### `geom/src/exact.rs`
+
+Source: [`lib/geom/src/exact.rs`](../lib/geom/src/exact.rs)
+
+```text
+exact -- arithmetic without rounding error for the decisions of the Boolean operations (docs/GEOM.md,
+"Boolesche Operationen"): expansions after Shewchuk (a number as a sum of f64 components that do not overlap,
+smallest first; sums and products of them are exact), the orientation of three points in the plane, the
+side of a plane at the point where three other planes meet, and the f64 nearest to a quotient of two
+expansions.  Only + - * on f64 (never a fused multiply-add: Rust does not contract a * b + c), so the same
+bits and the same answers on every target.  Each predicate first computes in f64 and decides there when the
+result is farther from 0 than its error bound; only near 0 (and exactly at 0) it computes exactly.
+```
+
+- **`struct Exp(pub Vec<f64>)`**
+  An exact number: f64 components that do not overlap, smallest magnitude first, no zeros (an empty list is 0).
+
+**`impl Exp`**
+
+- **`fn zero() -> Exp`**
+  0
+- **`fn of(a: f64) -> Exp`**
+  one f64
+- **`fn product(a: f64, b: f64) -> Exp`**
+  a \* b, exact
+- **`fn diff(a: f64, b: f64) -> Exp`**
+  a - b, exact
+- **`fn sign(&self) -> i32`**
+  -1, 0 or 1: the sign of the largest component
+- **`fn estimate(&self) -> f64`**
+  the components summed in f64, smallest first: close to the value (after compress within an ulp)
+- **`fn add_f64(&self, b: f64) -> Exp`**
+  self + b, exact (Shewchuk's Grow-Expansion with zero elimination)
+- **`fn add(&self, o: &Exp) -> Exp`**
+  self + o, exact: o's components grown in one by one (correct for any two expansions that do not overlap)
+- **`fn neg(&self) -> Exp`**
+  -self
+- **`fn sub(&self, o: &Exp) -> Exp`**
+  self - o, exact
+- **`fn scale(&self, b: f64) -> Exp`**
+  self \* b, exact (Shewchuk's Scale-Expansion with zero elimination)
+- **`fn mul(&self, o: &Exp) -> Exp`**
+  self \* o, exact: the sum of self scaled by each component of o
+- **`fn compress(&self) -> Exp`**
+  the same value in as few components as possible (Shewchuk's Compress): the largest component is then
+  the value rounded to within an ulp
+
+- **`fn orient2d(a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> i32`**
+  The orientation of a, b, c in the plane: 1 counter-clockwise (c left of a -> b), -1 clockwise, 0 on one
+  line -- exact: the f64 determinant decides when it is clearly away from 0, else the exact one.
+
+- **`fn orient2d_exact(a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> i32`**
+  orient2d without the f64 shortcut
+
+- **`type Pl = [f64; 4]`**
+  a plane n . x + w = 0 as [nx, ny, nz, w]; its inside is where n . x + w &lt; 0
+
+- **`struct Meet`**
+  The point where three planes meet, as the cofactors x~ of the 3 x 4 matrix of their rows: for any plane
+  p, det[p1; p2; p3; p] = p . x~, and x~ = det3(normals) \* (x, y, z, 1).  Exact (expansions) on request,
+  always in f64 with error bounds for the shortcut.
+  - `approx: [f64; 4]` -- the cofactors in f64
+  - `perm: [f64; 4]` -- the permanents (the same sums of products, every term positive): the scale of each cofactor's error
+  - `exact: Option<[Exp; 4]>` -- the exact cofactors, compressed (computed the first time a decision needs them)
+
+**`impl Meet`**
+
+- **`fn new(p: &Pl, q: &Pl, r: &Pl) -> Meet`**
+  where planes p, q, r meet (x~ in f64; exact later on request)
+- **`fn exact(&mut self, p: &Pl, q: &Pl, r: &Pl) -> &[Exp; 4]`**
+  the exact cofactors (computed once)
+- **`fn w_sign(&mut self, p: &Pl, q: &Pl, r: &Pl) -> i32`**
+  the sign of x~\_w = det3 of the three normals: 0 when the planes do not meet in one point
+- **`fn dot_sign(&mut self, s: &Pl, p: &Pl, q: &Pl, r: &Pl) -> i32`**
+  The sign of p . x~ (det[p1; p2; p3; s]): with w_sign, the side of plane s at the point (exact).
+- **`fn point(&mut self, p: &Pl, q: &Pl, r: &Pl) -> [f64; 3]`**
+  the point's coordinates, each the f64 nearest to the exact quotient (ties to even): equal points give
+  equal bits however their planes were chosen
+
+- **`fn div_round(n: &Exp, d: &Exp) -> f64`**
+  The f64 nearest to n / d (ties to even), d not 0: an estimate, moved by ulps until n / d lies between two
+  neighbours, then the side of their midpoint decides (2n against (lo + hi) d, exact).
 
 ### `geom/src/math.rs`
 
