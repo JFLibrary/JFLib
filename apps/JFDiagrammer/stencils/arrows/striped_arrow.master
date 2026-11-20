@@ -1,0 +1,74 @@
+# Gestreifter Pfeil: ein Blockpfeil nach rechts mit zwei Streifen vor dem Schaftende, die wie
+# Schaft-Stücke aussehen (Bewegung, Tempo).  Drei Flächen nebeneinander: 1 und 2 die Streifen
+# (je ein Zwanzigstel der Breite, mit gleichem Abstand), 3 der Pfeil.  Ein Steuerpunkt an der
+# inneren Ecke zwischen Schaft und Spitze wie beim Einfachen Pfeil: waagrecht der Beginn der
+# Spitze, senkrecht die Dicke von Schaft und Streifen (beide anteilig).  Verbindungspunkte am
+# Schaftende und an der Spitze.
+master: Striped arrow
+name.de: Gestreifter Pfeil
+name.en: Striped arrow
+name.es: Flecha rayada
+name.it: Freccia a strisce
+name.fr: Flèche rayée
+prompt.de: Blockpfeil mit zwei Streifen am Schaftende. Spitze und Schaft ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Block arrow with two stripes at the shaft end. Drag the yellow control handle to change the head and the shaft.
+prompt.es: Flecha de bloque con dos franjas en el extremo del cuerpo. Arrastre el controlador amarillo para cambiar la punta y el cuerpo.
+prompt.it: Freccia a blocco con due strisce all'estremità del corpo. Trascina la maniglia di controllo gialla per cambiare la punta e il corpo.
+prompt.fr: Flèche pleine avec deux bandes à l'extrémité du corps. Faites glisser la poignée de contrôle jaune pour modifier la pointe et le corps.
+keywords.de: Pfeil, gestreift, Streifen, Bewegung, Tempo, Fortschritt
+keywords.en: arrow, striped, stripes, motion, speed, progress
+keywords.es: flecha, rayada, franjas, movimiento, velocidad, progreso
+keywords.it: freccia, a strisce, strisce, movimento, velocità, progresso
+keywords.fr: flèche, rayée, bandes, mouvement, vitesse, progression
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# wo die Spitze beginnt (hinter den Streifen), der halbe Schaft, die Breite eines Streifens
+D:      Value = Width*0.05
+Head:   Value = MIN(MAX(Controls.Row_1, User.D*4), Width)
+Shaft:  Value = MIN(MAX(Controls.Row_1.Y-Height*0.5, 0), Height*0.5)
+
+# 1 und 2 die Streifen
+[Geometry]
+MoveTo  X = 0; Y = Height*0.5-User.Shaft
+LineTo  X = User.D; Y = Height*0.5-User.Shaft
+LineTo  X = User.D; Y = Height*0.5+User.Shaft
+LineTo  X = 0; Y = Height*0.5+User.Shaft
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Geometry]
+MoveTo  X = User.D*2; Y = Height*0.5-User.Shaft
+LineTo  X = User.D*3; Y = Height*0.5-User.Shaft
+LineTo  X = User.D*3; Y = Height*0.5+User.Shaft
+LineTo  X = User.D*2; Y = Height*0.5+User.Shaft
+LineTo  X = Geometry2.X1; Y = Geometry2.Y1
+
+# 3 der Pfeil
+[Geometry]
+MoveTo  X = User.D*4; Y = Height*0.5-User.Shaft
+LineTo  X = User.Head; Y = Height*0.5-User.Shaft
+LineTo  X = User.Head; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = User.Head; Y = Height
+LineTo  X = User.Head; Y = Height*0.5+User.Shaft
+LineTo  X = User.D*4; Y = Height*0.5+User.Shaft
+LineTo  X = Geometry3.X1; Y = Geometry3.Y1
+
+[Controls]
+Row_1:  X = Width*0.6; Y = Height*0.75
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Spitze und Schaft ändern"
+        Tip.en = "Change the head and the shaft"
+        Tip.es = "Cambiar la punta y el cuerpo"
+        Tip.it = "Cambia la punta e il corpo"
+        Tip.fr = "Modifier la pointe et le corps"
+
+[Connection]
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0

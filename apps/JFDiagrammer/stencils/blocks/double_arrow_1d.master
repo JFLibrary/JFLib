@@ -1,0 +1,70 @@
+# 1D-Doppelpfeil: ein flächiger Pfeil mit zwei Spitzen als 1D-Shape (README: 1D-Shapes), wie der
+# 1D-Pfeil auf der Linie vom Anfang zum Ende; die Enden kleben an Shapes, mit GlueType 2 auch an
+# das ganze Shape.  Die Dicke ist Height.  Row_1 an der oberen Ecke der rechten Spitze ändert die
+# Länge beider Spitzen (Abstand vom Ende: sie bleiben gleich lang, wenn der Pfeil länger wird),
+# Row_2 an der oberen Schaftkante in der Mitte die Dicke des Schafts.
+master: 1-D double arrow
+name.de: 1D-Doppelpfeil
+name.en: 1-D double arrow
+name.es: Flecha doble 1D
+name.it: Freccia doppia 1D
+name.fr: Flèche double 1D
+prompt.de: Flächiger Pfeil mit zwei Spitzen, dessen Enden an Shapes kleben. Spitzen und Schaft ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Flat arrow with two heads whose ends glue to shapes. Drag the yellow control handles to change the heads and the shaft.
+prompt.es: Flecha plana con dos puntas cuyos extremos se pegan a las formas. Arrastre los controladores amarillos para cambiar las puntas y el cuerpo.
+prompt.it: Freccia piatta con due punte le cui estremità si incollano alle forme. Trascina le maniglie di controllo gialle per cambiare le punte e il corpo.
+prompt.fr: Flèche pleine à deux pointes dont les extrémités se collent aux formes. Faites glisser les poignées de contrôle jaunes pour modifier les pointes et le corps.
+keywords.de: Doppelpfeil, Pfeil, 1D, beide Richtungen, Wechselwirkung, Verbindung, kleben
+keywords.en: double arrow, arrow, 1-D, both ways, two-way, interaction, connection, glue
+keywords.es: flecha doble, flecha, 1D, ambos sentidos, bidireccional, interacción, conexión
+keywords.it: freccia doppia, freccia, 1D, due direzioni, bidirezionale, interazione, collegamento
+keywords.fr: double flèche, flèche, 1D, deux sens, bidirectionnel, interaction, connexion
+
+[Shape]
+BeginX = 0 mm
+BeginY = 5 mm
+BeginY.us = 0.1875 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 5 mm
+EndY.us = 0.1875 in
+Height = 10 mm
+Height.us = 0.375 in
+GlueType = 2
+
+[User]
+# die Länge der Spitzen und der halbe Schaft
+Hl:     Value = MIN(MAX(Width-Controls.Row_1, 0), Width*0.5)
+Shaft:  Value = MIN(MAX(Controls.Row_2.Y-Height*0.5, 0), Height*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = User.Hl; Y = 0
+LineTo  X = User.Hl; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.Hl; Y = Height
+LineTo  X = Width-User.Hl; Y = Height*0.5+User.Shaft
+LineTo  X = User.Hl; Y = Height*0.5+User.Shaft
+LineTo  X = User.Hl; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width-8 mm; Y = Height
+        X.us = Width-0.3 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Länge der Spitzen ändern"
+        Tip.en = "Change the length of the heads"
+        Tip.es = "Cambiar la longitud de las puntas"
+        Tip.it = "Cambia la lunghezza delle punte"
+        Tip.fr = "Modifier la longueur des pointes"
+Row_2:  X = Width*0.5; Y = Height*0.75
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Dicke des Schafts ändern"
+        Tip.en = "Change the thickness of the shaft"
+        Tip.es = "Cambiar el grosor del cuerpo"
+        Tip.it = "Cambia lo spessore del corpo"
+        Tip.fr = "Modifier l'épaisseur du corps"

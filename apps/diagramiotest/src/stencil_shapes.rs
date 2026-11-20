@@ -5,7 +5,8 @@
 //                       (roundtrip); the masters by NameU and German name with names, QuickInfos
 //                       and keywords in five languages; the stencil's title and category; the
 //                       master pages in mm or in; the engine keeps nothing
-//   stencils/shapes/flowchart/<NameU>   User.msvShapeCategories "Flowchart", four connection
+//   stencils/shapes/flowchart/<NameU>   User.msvShapeCategories "Flowchart" (the decision
+//                       "Flowchart;Decision", Start/End "Flowchart;Terminator"), four connection
 //                       points
 //   stencils/shapes/1d/<NameU>   the 1-D masters (connectors, 1-D arrow): BeginX ... on the master
 //                       shape, PinX and Width as GUARD formulas of the ends, the master page from
@@ -45,50 +46,234 @@ use crate::{out, H};
 
 const BLOCKS: &[(&str, &str)] = &[
     ("stencil.txt", include_str!("../../JFDiagrammer/stencils/blocks/stencil.txt")),
+    ("box.master", include_str!("../../JFDiagrammer/stencils/blocks/box.master")),
+    ("circle.master", include_str!("../../JFDiagrammer/stencils/blocks/circle.master")),
+    ("diamond.master", include_str!("../../JFDiagrammer/stencils/blocks/diamond.master")),
     ("box_arrow.master", include_str!("../../JFDiagrammer/stencils/blocks/box_arrow.master")),
-    ("box_3d.master", include_str!("../../JFDiagrammer/stencils/blocks/box_3d.master")),
-    ("partial_layer.master", include_str!("../../JFDiagrammer/stencils/blocks/partial_layer.master")),
     ("arrow_1d.master", include_str!("../../JFDiagrammer/stencils/blocks/arrow_1d.master")),
+    ("double_arrow_1d.master", include_str!("../../JFDiagrammer/stencils/blocks/double_arrow_1d.master")),
+    ("arrow_2d.master", include_str!("../../JFDiagrammer/stencils/blocks/arrow_2d.master")),
+    ("double_arrow_2d.master", include_str!("../../JFDiagrammer/stencils/blocks/double_arrow_2d.master")),
+    ("auto_height_box.master", include_str!("../../JFDiagrammer/stencils/blocks/auto_height_box.master")),
+    ("auto_width_box.master", include_str!("../../JFDiagrammer/stencils/blocks/auto_width_box.master")),
+    ("curved_block_arrow.master", include_str!("../../JFDiagrammer/stencils/blocks/curved_block_arrow.master")),
+    ("arrow_1d_open.master", include_str!("../../JFDiagrammer/stencils/blocks/arrow_1d_open.master")),
+    ("arrow_2d_open.master", include_str!("../../JFDiagrammer/stencils/blocks/arrow_2d_open.master")),
+    ("box_3d.master", include_str!("../../JFDiagrammer/stencils/blocks/box_3d.master")),
+    ("bar.master", include_str!("../../JFDiagrammer/stencils/blocks/bar.master")),
+    ("button.master", include_str!("../../JFDiagrammer/stencils/blocks/button.master")),
+    ("concentric_layer_1.master", include_str!("../../JFDiagrammer/stencils/blocks/concentric_layer_1.master")),
+    ("concentric_layer_2.master", include_str!("../../JFDiagrammer/stencils/blocks/concentric_layer_2.master")),
+    ("concentric_layer_3.master", include_str!("../../JFDiagrammer/stencils/blocks/concentric_layer_3.master")),
+    ("concentric_center.master", include_str!("../../JFDiagrammer/stencils/blocks/concentric_center.master")),
+    ("partial_layer.master", include_str!("../../JFDiagrammer/stencils/blocks/partial_layer.master")),
+    ("partial_layer_2.master", include_str!("../../JFDiagrammer/stencils/blocks/partial_layer_2.master")),
+    ("partial_layer_3.master", include_str!("../../JFDiagrammer/stencils/blocks/partial_layer_3.master")),
+    ("partial_layer_4.master", include_str!("../../JFDiagrammer/stencils/blocks/partial_layer_4.master")),
+    ("branch2_square.master", include_str!("../../JFDiagrammer/stencils/blocks/branch2_square.master")),
+    ("branch2_angled.master", include_str!("../../JFDiagrammer/stencils/blocks/branch2_angled.master")),
+    ("dynamic_connector.master", include_str!("../../JFDiagrammer/stencils/blocks/dynamic_connector.master")),
+    ("branches_angled.master", include_str!("../../JFDiagrammer/stencils/blocks/branches_angled.master")),
+    ("branches_square.master", include_str!("../../JFDiagrammer/stencils/blocks/branches_square.master")),
+    ("line_curve_connector.master", include_str!("../../JFDiagrammer/stencils/blocks/line_curve_connector.master")),
+    ("dotted_line.master", include_str!("../../JFDiagrammer/stencils/blocks/dotted_line.master")),
+    ("middle_arrow.master", include_str!("../../JFDiagrammer/stencils/blocks/middle_arrow.master")),
+    ("curved_arrow.master", include_str!("../../JFDiagrammer/stencils/blocks/curved_arrow.master")),
+    ("dot_arrow.master", include_str!("../../JFDiagrammer/stencils/blocks/dot_arrow.master")),
+    ("arrow_end_points.master", include_str!("../../JFDiagrammer/stencils/blocks/arrow_end_points.master")),
+    ("single_arrowhead.master", include_str!("../../JFDiagrammer/stencils/blocks/single_arrowhead.master")),
+    ("double_arrowhead.master", include_str!("../../JFDiagrammer/stencils/blocks/double_arrowhead.master")),
 ];
 
 const ARROWS: &[(&str, &str)] = &[
     ("stencil.txt", include_str!("../../JFDiagrammer/stencils/arrows/stencil.txt")),
     ("simple_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/simple_arrow.master")),
+    ("double_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/double_arrow.master")),
+    ("modern_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/modern_arrow.master")),
+    ("flexible_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/flexible_arrow.master")),
     ("bent_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/bent_arrow.master")),
     ("u_turn_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/u_turn_arrow.master")),
+    ("right_angle_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/right_angle_arrow.master")),
+    ("curved_right_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/curved_right_arrow.master")),
+    ("curved_left_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/curved_left_arrow.master")),
+    ("polyline_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/polyline_arrow.master")),
+    ("zigzag_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/zigzag_arrow.master")),
+    ("zigzag_arrow_2d.master", include_str!("../../JFDiagrammer/stencils/arrows/zigzag_arrow_2d.master")),
+    ("striped_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/striped_arrow.master")),
+    ("notched_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/notched_arrow.master")),
+    ("pentagon_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/pentagon_arrow.master")),
+    ("circular_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/circular_arrow.master")),
     ("quad_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/quad_arrow.master")),
+    ("left_right_up_arrow.master", include_str!("../../JFDiagrammer/stencils/arrows/left_right_up_arrow.master")),
+    ("left_right_arrow_block.master", include_str!("../../JFDiagrammer/stencils/arrows/left_right_arrow_block.master")),
+    ("quad_arrow_block.master", include_str!("../../JFDiagrammer/stencils/arrows/quad_arrow_block.master")),
 ];
 
 const FLOWCHART: &[(&str, &str)] = &[
     ("stencil.txt", include_str!("../../JFDiagrammer/stencils/flowchart/stencil.txt")),
     ("process.master", include_str!("../../JFDiagrammer/stencils/flowchart/process.master")),
     ("decision.master", include_str!("../../JFDiagrammer/stencils/flowchart/decision.master")),
+    ("subprocess.master", include_str!("../../JFDiagrammer/stencils/flowchart/subprocess.master")),
+    ("start_end.master", include_str!("../../JFDiagrammer/stencils/flowchart/start_end.master")),
     ("document.master", include_str!("../../JFDiagrammer/stencils/flowchart/document.master")),
+    ("data.master", include_str!("../../JFDiagrammer/stencils/flowchart/data.master")),
     ("database.master", include_str!("../../JFDiagrammer/stencils/flowchart/database.master")),
+    ("external_data.master", include_str!("../../JFDiagrammer/stencils/flowchart/external_data.master")),
+    ("custom_1.master", include_str!("../../JFDiagrammer/stencils/flowchart/custom_1.master")),
+    ("custom_2.master", include_str!("../../JFDiagrammer/stencils/flowchart/custom_2.master")),
+    ("custom_3.master", include_str!("../../JFDiagrammer/stencils/flowchart/custom_3.master")),
+    ("custom_4.master", include_str!("../../JFDiagrammer/stencils/flowchart/custom_4.master")),
+    ("on_page_reference.master", include_str!("../../JFDiagrammer/stencils/flowchart/on_page_reference.master")),
+    ("off_page_reference.master", include_str!("../../JFDiagrammer/stencils/flowchart/off_page_reference.master")),
 ];
 
 const CONNECTORS: &[(&str, &str)] = &[
     ("stencil.txt", include_str!("../../JFDiagrammer/stencils/connectors/stencil.txt")),
-    ("curved_connector.master", include_str!("../../JFDiagrammer/stencils/connectors/curved_connector.master")),
-    ("elbow_connector.master", include_str!("../../JFDiagrammer/stencils/connectors/elbow_connector.master")),
-    ("hollow_connector.master", include_str!("../../JFDiagrammer/stencils/connectors/hollow_connector.master")),
+    ("dynamic_connector.master", include_str!("../../JFDiagrammer/stencils/connectors/dynamic_connector.master")),
     ("line_arrow.master", include_str!("../../JFDiagrammer/stencils/connectors/line_arrow.master")),
+    ("elbow_connector.master", include_str!("../../JFDiagrammer/stencils/connectors/elbow_connector.master")),
+    ("curved_connector.master", include_str!("../../JFDiagrammer/stencils/connectors/curved_connector.master")),
+    ("line_arc_connector.master", include_str!("../../JFDiagrammer/stencils/connectors/line_arc_connector.master")),
+    ("two_branches_square.master", include_str!("../../JFDiagrammer/stencils/connectors/two_branches_square.master")),
+    ("universal_connector.master", include_str!("../../JFDiagrammer/stencils/connectors/universal_connector.master")),
+    ("layout_connector.master", include_str!("../../JFDiagrammer/stencils/connectors/layout_connector.master")),
+    ("line_connector.master", include_str!("../../JFDiagrammer/stencils/connectors/line_connector.master")),
+    ("side_to_side_1.master", include_str!("../../JFDiagrammer/stencils/connectors/side_to_side_1.master")),
+    ("side_to_side_2.master", include_str!("../../JFDiagrammer/stencils/connectors/side_to_side_2.master")),
+    ("side_to_side_fixed_1.master", include_str!("../../JFDiagrammer/stencils/connectors/side_to_side_fixed_1.master")),
+    ("side_to_side_fixed_2.master", include_str!("../../JFDiagrammer/stencils/connectors/side_to_side_fixed_2.master")),
+    ("side_to_side.master", include_str!("../../JFDiagrammer/stencils/connectors/side_to_side.master")),
+    ("sides.master", include_str!("../../JFDiagrammer/stencils/connectors/sides.master")),
+    ("bottom_to_top_1.master", include_str!("../../JFDiagrammer/stencils/connectors/bottom_to_top_1.master")),
+    ("bottom_to_top_2.master", include_str!("../../JFDiagrammer/stencils/connectors/bottom_to_top_2.master")),
+    ("bottom_to_top.master", include_str!("../../JFDiagrammer/stencils/connectors/bottom_to_top.master")),
+    ("top_to_bottom_1.master", include_str!("../../JFDiagrammer/stencils/connectors/top_to_bottom_1.master")),
+    ("top_to_bottom_2.master", include_str!("../../JFDiagrammer/stencils/connectors/top_to_bottom_2.master")),
+    ("top_or_bottom.master", include_str!("../../JFDiagrammer/stencils/connectors/top_or_bottom.master")),
+    ("top_bottom_to_side.master", include_str!("../../JFDiagrammer/stencils/connectors/top_bottom_to_side.master")),
+    ("top_bottom_side.master", include_str!("../../JFDiagrammer/stencils/connectors/top_bottom_side.master")),
+    ("bottom_to_side_1.master", include_str!("../../JFDiagrammer/stencils/connectors/bottom_to_side_1.master")),
+    ("bottom_to_side_2.master", include_str!("../../JFDiagrammer/stencils/connectors/bottom_to_side_2.master")),
+    ("bottom_to_side_3.master", include_str!("../../JFDiagrammer/stencils/connectors/bottom_to_side_3.master")),
+    ("side_to_top_bottom.master", include_str!("../../JFDiagrammer/stencils/connectors/side_to_top_bottom.master")),
+    ("side_top_bottom.master", include_str!("../../JFDiagrammer/stencils/connectors/side_top_bottom.master")),
+    ("side_to_top.master", include_str!("../../JFDiagrammer/stencils/connectors/side_to_top.master")),
+    ("loop_square.master", include_str!("../../JFDiagrammer/stencils/connectors/loop_square.master")),
+    ("curved_connector_2.master", include_str!("../../JFDiagrammer/stencils/connectors/curved_connector_2.master")),
+    ("curved_connector_3.master", include_str!("../../JFDiagrammer/stencils/connectors/curved_connector_3.master")),
+    ("line_curve_connector.master", include_str!("../../JFDiagrammer/stencils/connectors/line_curve_connector.master")),
+    ("curved_arrow.master", include_str!("../../JFDiagrammer/stencils/connectors/curved_arrow.master")),
+    ("wavy_connector_1.master", include_str!("../../JFDiagrammer/stencils/connectors/wavy_connector_1.master")),
+    ("wavy_connector_2.master", include_str!("../../JFDiagrammer/stencils/connectors/wavy_connector_2.master")),
+    ("jump.master", include_str!("../../JFDiagrammer/stencils/connectors/jump.master")),
+    ("comm_link_1.master", include_str!("../../JFDiagrammer/stencils/connectors/comm_link_1.master")),
+    ("line_arrow_2.master", include_str!("../../JFDiagrammer/stencils/connectors/line_arrow_2.master")),
+    ("single_arrowhead.master", include_str!("../../JFDiagrammer/stencils/connectors/single_arrowhead.master")),
+    ("double_arrowhead.master", include_str!("../../JFDiagrammer/stencils/connectors/double_arrowhead.master")),
+    ("dotted_line.master", include_str!("../../JFDiagrammer/stencils/connectors/dotted_line.master")),
+    ("arrow_middle.master", include_str!("../../JFDiagrammer/stencils/connectors/arrow_middle.master")),
+    ("dot_arrow.master", include_str!("../../JFDiagrammer/stencils/connectors/dot_arrow.master")),
+    ("arrow_dot_1.master", include_str!("../../JFDiagrammer/stencils/connectors/arrow_dot_1.master")),
+    ("arrow_dot_2.master", include_str!("../../JFDiagrammer/stencils/connectors/arrow_dot_2.master")),
+    ("arrow_endpoints.master", include_str!("../../JFDiagrammer/stencils/connectors/arrow_endpoints.master")),
+    ("pass_control.master", include_str!("../../JFDiagrammer/stencils/connectors/pass_control.master")),
+    ("square_branches.master", include_str!("../../JFDiagrammer/stencils/connectors/square_branches.master")),
+    ("two_branches_angled.master", include_str!("../../JFDiagrammer/stencils/connectors/two_branches_angled.master")),
+    ("angled_branches.master", include_str!("../../JFDiagrammer/stencils/connectors/angled_branches.master")),
+    ("fork_connector.master", include_str!("../../JFDiagrammer/stencils/connectors/fork_connector.master")),
+    ("arrow_1d.master", include_str!("../../JFDiagrammer/stencils/connectors/arrow_1d.master")),
+    ("double_arrow_1d.master", include_str!("../../JFDiagrammer/stencils/connectors/double_arrow_1d.master")),
+    ("arrow_1d_open_end.master", include_str!("../../JFDiagrammer/stencils/connectors/arrow_1d_open_end.master")),
+    ("flexible_arrow.master", include_str!("../../JFDiagrammer/stencils/connectors/flexible_arrow.master")),
+    ("arrow_90_1.master", include_str!("../../JFDiagrammer/stencils/connectors/arrow_90_1.master")),
+    ("arrow_90_2.master", include_str!("../../JFDiagrammer/stencils/connectors/arrow_90_2.master")),
+    ("comm_link_2.master", include_str!("../../JFDiagrammer/stencils/connectors/comm_link_2.master")),
+    ("hollow_connector.master", include_str!("../../JFDiagrammer/stencils/connectors/hollow_connector.master")),
+    ("hollow_connector_2.master", include_str!("../../JFDiagrammer/stencils/connectors/hollow_connector_2.master")),
+    ("hollow_connector_3.master", include_str!("../../JFDiagrammer/stencils/connectors/hollow_connector_3.master")),
+    ("two_lines.master", include_str!("../../JFDiagrammer/stencils/connectors/two_lines.master")),
+    ("four_lines.master", include_str!("../../JFDiagrammer/stencils/connectors/four_lines.master")),
+    ("two_elbow_lines.master", include_str!("../../JFDiagrammer/stencils/connectors/two_elbow_lines.master")),
+    ("four_elbow_lines.master", include_str!("../../JFDiagrammer/stencils/connectors/four_elbow_lines.master")),
+    ("bus.master", include_str!("../../JFDiagrammer/stencils/connectors/bus.master")),
+    ("ethernet.master", include_str!("../../JFDiagrammer/stencils/connectors/ethernet.master")),
+    ("star.master", include_str!("../../JFDiagrammer/stencils/connectors/star.master")),
 ];
 
 type Want = &'static [(&'static str, &'static str)];
 
 /// per stencil: its folder, its sources, its category, its masters (NameU, German name)
 const SETS: [(&str, &[(&str, &str)], &str, Want); 4] = [
-    ("blocks", BLOCKS, "general", &[("Box with arrow", "Feld mit Pfeil"), ("3-D box", "3D-Feld"), ("Partial layer", "Teilebene"), ("1-D arrow", "1D-Pfeil")]),
-    ("arrows", ARROWS, "flowchart", &[("Simple arrow", "Einfacher Pfeil"), ("Bent arrow", "Gebogener Pfeil"), ("U-turn arrow", "180-Grad-Pfeil"), ("Quad arrow", "Pfeil in vier Richtungen")]),
-    ("flowchart", FLOWCHART, "flowchart", &[("Process", "Prozess"), ("Decision", "Entscheidung"), ("Document", "Dokument"), ("Database", "Datenbank")]),
-    ("connectors", CONNECTORS, "extras", &[("Curved connector", "Kurvenverbinder"), ("Elbow connector", "Winkelverbinder"), ("Hollow connector", "Hohler Verbinder"), ("Line with arrow", "Linie mit Pfeil")]),
+    ("blocks", BLOCKS, "general", &[
+        ("Box", "Feld"), ("Circle", "Kreis"), ("Diamond", "Raute"), ("Box with arrow", "Feld mit Pfeil"), ("1-D arrow", "1D-Pfeil"), ("1-D double arrow", "1D-Doppelpfeil"),
+        ("2-D arrow", "2D-Pfeil"), ("2-D double arrow", "2D-Doppelpfeil"), ("Auto-height box", "Feld mit Auto-Höhe"), ("Auto-width box", "Feld mit Auto-Breite"),
+        ("Curved block arrow", "Krummer Pfeil"), ("1-D arrow, open end", "1D-Pfeil, Ende offen"), ("2-D arrow, open end", "2D-Pfeil, Ende offen"), ("3-D box", "3D-Feld"),
+        ("Open/closed bar", "Balken offen/geschlossen"), ("Button", "Schaltfläche"), ("Concentric layer 1", "Konzentrische Ebene 1"), ("Concentric layer 2", "Konzentrische Ebene 2"),
+        ("Concentric layer 3", "Konzentrische Ebene 3"), ("Concentric center", "Konzentrisches Zentrum"), ("Partial layer", "Teilebene 1"), ("Partial layer 2", "Teilebene 2"),
+        ("Partial layer 3", "Teilebene 3"), ("Partial layer 4", "Teilebene 4"), ("2 branches (square)", "2 Zweige (eckig)"), ("2 branches (angled)", "2 Zweige (schräg)"),
+        ("Dynamic connector", "Dynamischer Verbinder"), ("Branches (angled)", "Zweige schräg"), ("Branches (square)", "Zweige eckig"), ("Line-curve connector", "Verbinder: Linie/Kurve"),
+        ("Dotted line", "Gepunktete Linie"), ("Arrow - middle", "Pfeil - Mitte"), ("Curved arrow", "Gebogener Pfeil"), ("Dot and arrow", "Punkt und Pfeil"),
+        ("Arrow with endpoints", "Pfeil mit Endpunkten"), ("Single arrowhead", "Einfache Pfeilspitze"), ("Double arrowhead", "Doppelspitze"),
+    ]),
+    ("arrows", ARROWS, "flowchart", &[
+        ("Simple arrow", "Einfacher Pfeil"), ("Simple double arrow", "Einfacher Doppelpfeil"), ("Modern arrow", "Moderner Pfeil"), ("Flexible arrow", "Flexibler Pfeil"),
+        ("Bent arrow", "Gebogener Pfeil"), ("U-turn arrow", "180-Grad-Pfeil"), ("Right-angle arrow", "Rechtwinkliger Pfeil"), ("Curved right arrow", "Nach rechts gekrümmter Pfeil"),
+        ("Curved left arrow", "Nach links gekrümmter Pfeil"), ("Polyline arrow", "Linienzug mit Pfeil"), ("Zigzag arrow", "Zickzackpfeil"), ("2-D zigzag arrow", "2D-Zickzackpfeil"),
+        ("Striped arrow", "Gestreifter Pfeil"), ("Notched arrow", "Eingekerbter Pfeil"), ("Pentagon arrow", "Blockpfeil"), ("Circular arrow", "Kreispfeil"),
+        ("Quad arrow", "Pfeil in vier Richtungen"), ("Left-right-up arrow", "Pfeil nach links, rechts und oben"), ("Left-right arrow block", "Pfeilblock nach links und rechts"),
+        ("Quad arrow block", "Pfeilblock in vier Richtungen"),
+    ]),
+    ("flowchart", FLOWCHART, "flowchart", &[
+        ("Process", "Prozess"), ("Decision", "Entscheidung"), ("Subprocess", "Teilprozess"), ("Start/End", "Start/Ende"), ("Document", "Dokument"), ("Data", "Daten"),
+        ("Database", "Datenbank"), ("External data", "Externe Daten"), ("Custom 1", "Benutzerdefiniert 1"), ("Custom 2", "Benutzerdefiniert 2"),
+        ("Custom 3", "Benutzerdefiniert 3"), ("Custom 4", "Benutzerdefiniert 4"), ("On-page reference", "On-Page-Referenz"), ("Off-page reference", "Off-Page-Referenz"),
+    ]),
+    ("connectors", CONNECTORS, "extras", &[
+        ("Dynamic connector", "Dynamischer Verbinder"), ("Line with arrow", "Linie mit Pfeil"), ("Elbow connector", "Winkelverbinder"),
+        ("Curved connector", "Kurvenverbinder"), ("Line-arc connector", "Verbinder: Linie/Bogen"), ("2 branches (square)", "2 Zweige (eckig)"),
+        ("Universal connector", "Universeller Verbinder"), ("Layout connector", "Layoutverbinder"), ("Line connector", "Verbinder: Linie"),
+        ("Side to side 1", "Seitenweise 1"), ("Side to side 2", "Seitenweise 2"), ("Side to side, fixed 1", "Seitenweise, fest 1"),
+        ("Side to side, fixed 2", "Seitenweise, fest 2"), ("Side to side", "Seite nach Seite"), ("Sides", "Seiten"),
+        ("Bottom to top 1", "Von unten nach oben 1"), ("Bottom to top 2", "Von unten nach oben 2"), ("Bottom to top", "Unten nach oben"),
+        ("Top to bottom 1", "Von oben nach unten 1"), ("Top to bottom 2", "Von oben nach unten 2"), ("Top or bottom", "Oben oder unten"),
+        ("Top/bottom to side", "Oben/unten nach Seite"), ("Top/bottom - side", "Oben/unten - Seite"), ("Bottom to side 1", "Unten nach Seite 1"),
+        ("Bottom to side 2", "Unten nach Seite 2"), ("Bottom to side 3", "Unten nach Seite 3"), ("Side to top/bottom", "Seite nach oben/unten"),
+        ("Side - top/bottom", "Seite - oben/unten"), ("Side to top", "Seite nach oben"), ("Loop (square)", "Schleife (eckig)"),
+        ("Curved connector 2", "Kurvenverbinder 2"), ("Curved connector 3", "Kurvenverbinder 3"), ("Line-curve connector", "Verbinder: Linie/Kurve"),
+        ("Curved arrow", "Gebogener Pfeil"), ("Wavy connector 1", "Welliger Verbinder 1"), ("Wavy connector 2", "Welliger Verbinder 2"),
+        ("Jump", "Sprung"), ("Comm-link 1", "DFÜ-Verbinder 1"), ("Line with arrow 2", "Linie mit Pfeil 2"),
+        ("Single arrowhead", "Einfache Pfeilspitze"), ("Double arrowhead", "Doppelspitze"), ("Dotted line", "Gepunktete Linie"),
+        ("Arrow - middle", "Pfeil - Mitte"), ("Dot and arrow", "Punkt und Pfeil"), ("Arrow and dot 1", "Pfeil und Punkt 1"),
+        ("Arrow and dot 2", "Pfeil und Punkt 2"), ("Arrow with endpoints", "Pfeil mit Endpunkten"), ("Pass control", "Übergabe der Kontrolle"),
+        ("Branches (square)", "Zweige eckig"), ("2 branches (angled)", "2 Zweige (schräg)"), ("Branches (angled)", "Zweige schräg"),
+        ("Fork connector", "Gegabelter Verbinder"), ("1-D arrow", "1D-Pfeil"), ("1-D double arrow", "1D-Doppelpfeil"),
+        ("1-D arrow, open end", "1D-Pfeil, Ende offen"), ("Flexible arrow", "Flexibler Pfeil"), ("90 degree 1", "90-Grad 1"),
+        ("90 degree 2", "90-Grad 2"), ("Comm-link 2", "DFÜ-Verbinder 2"), ("Hollow connector", "Hohler Verbinder"),
+        ("Hollow connector 2", "Hohler Verbinder 2"), ("Hollow connector 3", "Hohler Verbinder 3"), ("2 lines", "2 Linien"), ("4 lines", "4 Linien"),
+        ("2 elbow lines", "2 Winkellinien"), ("4 elbow lines", "4 Winkellinien"), ("Bus", "Bus"), ("Ethernet", "Ethernet"), ("Star", "Stern"),
+    ]),
 ];
 
 /// the 1-D masters: stencil index in SETS, NameU, whether the box stays upright (Width =
 /// EndX-BeginX, Angle 0) instead of lying along the line
-const ONE_D: [(usize, &str, bool); 5] =
-    [(3, "Curved connector", true), (3, "Elbow connector", true), (3, "Hollow connector", false), (3, "Line with arrow", false), (0, "1-D arrow", false)];
+/// (the first five stay in front: the glue check takes the line and the elbow connector by index;
+/// the dynamic connectors of "connectors" are no 1-D masters of this kind, the app routes them)
+const ONE_D: [(usize, &str, bool); 60] = [
+    (3, "Curved connector", true), (3, "Elbow connector", true), (3, "Hollow connector", false), (3, "Line with arrow", false), (0, "1-D arrow", false),
+    (3, "2 branches (square)", true), (3, "Curved connector 2", true), (3, "Curved connector 3", true), (3, "Line-curve connector", false),
+    (3, "Curved arrow", false), (3, "Wavy connector 1", false), (3, "Wavy connector 2", false), (3, "Jump", false), (3, "Comm-link 1", false),
+    (3, "Line with arrow 2", false), (3, "Single arrowhead", false), (3, "Double arrowhead", false), (3, "Dotted line", false),
+    (3, "Arrow - middle", false), (3, "Dot and arrow", false), (3, "Arrow and dot 1", false), (3, "Arrow and dot 2", false),
+    (3, "Arrow with endpoints", false), (3, "Pass control", false), (3, "Branches (square)", true), (3, "2 branches (angled)", true),
+    (3, "Branches (angled)", true), (3, "Fork connector", false), (3, "1-D arrow", false), (3, "1-D double arrow", false),
+    (3, "1-D arrow, open end", false), (3, "Flexible arrow", false), (3, "90 degree 1", true), (3, "90 degree 2", true), (3, "Comm-link 2", false),
+    (3, "Hollow connector 2", true), (3, "Hollow connector 3", true), (3, "2 lines", false), (3, "4 lines", false), (3, "2 elbow lines", true),
+    (3, "4 elbow lines", true), (3, "Bus", false), (3, "Ethernet", false), (3, "Star", true),
+    (0, "1-D double arrow", false), (0, "Curved block arrow", false), (0, "1-D arrow, open end", false), (0, "2 branches (square)", true),
+    (0, "2 branches (angled)", true), (0, "Branches (angled)", true), (0, "Branches (square)", true), (0, "Line-curve connector", false),
+    (0, "Dotted line", false), (0, "Arrow - middle", false), (0, "Curved arrow", false), (0, "Dot and arrow", false),
+    (0, "Arrow with endpoints", false), (0, "Single arrowhead", false), (0, "Double arrowhead", false), (1, "Flexible arrow", false),
+];
 
 const MM: f64 = 1.0 / 25.4;
 
@@ -220,8 +405,15 @@ fn flowchart(h: &mut H, doc: &Document) {
         let nu = MasterTexts::of(doc, m).name_u;
         let Some(s) = master_shape(doc, m) else { continue };
         let cat = user_text(doc, s, "msvShapeCategories");
+        // the rules of the template flowchart (templates/flowchart/rules.txt) find decisions and
+        // terminators by their second category
+        let want = match nu.as_str() {
+            "Decision" => "Flowchart;Decision",
+            "Start/End" => "Flowchart;Terminator",
+            _ => "Flowchart",
+        };
         let conn = doc.sym("Connection").map_or(0, |c| doc.rows(s, SecKey::one(c)).len());
-        h.check(&format!("stencils/shapes/flowchart/{nu}"), cat == "Flowchart" && conn == 4, format!("msvShapeCategories {cat:?}, {conn} connection points"));
+        h.check(&format!("stencils/shapes/flowchart/{nu}"), cat == want && conn == 4, format!("msvShapeCategories {cat:?} (want {want:?}), {conn} connection points"));
     }
 }
 
@@ -347,10 +539,12 @@ fn drop_all(h: &mut H, docs: &[&Document]) {
             ((px - mx).abs() > 1e-9 || (py - my).abs() > 1e-9).then(|| format!("{nu}: pin ({:.1}, {:.1}) mm, ends' middle ({:.1}, {:.1}) mm", px / MM, py / MM, mx / MM, my / MM))
         })
         .collect();
+    // every master of the sets (JD13: the full stencils), the 1-D ones with their ends at the pin
     let n = shapes.len();
+    let want: usize = docs.iter().map(|d| d.masters().count()).sum();
     h.check(
         "stencils/shapes/drop",
-        fail.is_empty() && n == 16 && kept == 0 && bad.is_empty(),
+        fail.is_empty() && n == want && kept == 0 && bad.is_empty() && off.is_empty(),
         format!("{n} instances, recalc kept {kept}, errors {bad:?}{fail}; 1-D ends apart from the pin after instance::place: {}", if off.is_empty() { String::from("none") } else { off.join("; ") }),
     );
 }

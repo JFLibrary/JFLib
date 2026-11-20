@@ -1,14 +1,15 @@
-# Teilebene: ein Viertelring um die linke untere Ecke, zum Aneinanderlegen mit weiteren Ebenen
-# gleicher Mitte (eine Teilebene von 60 mm mit Innenradius 50 % umschließt eine von 30 mm).
+# Teilebene 1: ein Viertelring um die linke untere Ecke, 30 mm groß mit dem Innenradius 50 %,
+# zum Aneinanderlegen mit weiteren Ebenen gleicher Mitte: Teilebene 2 bis 4 umschließen ihn
+# und einander genau (Ringbreite 15 mm).  NameU bleibt „Partial layer“ (Probeblatt).
 # Außen- und Innenbogen sind Ellipsenbögen durch den 45°-Punkt, das Shape bleibt also auch
 # gestreckt sauber.  Row_1 an der unteren Kante ändert den Innenradius als Anteil des
 # Außenradius (anteilig, nur waagrecht).  Der Text steht in der Mitte des Rings.
 master: Partial layer
-name.de: Teilebene
-name.en: Partial layer
-name.es: Capa parcial
-name.it: Livello parziale
-name.fr: Couche partielle
+name.de: Teilebene 1
+name.en: Partial layer 1
+name.es: Capa parcial 1
+name.it: Livello parziale 1
+name.fr: Couche partielle 1
 prompt.de: Viertelring für Ebenen- und Schichtenmodelle. Die Breite des Rings ändern Sie mit dem gelben Steuerpunkt.
 prompt.en: Quarter ring for layer models. Drag the yellow control handle to change the width of the ring.
 prompt.es: Cuarto de anillo para modelos de capas. Arrastre el controlador amarillo para cambiar el ancho del anillo.

@@ -1,0 +1,67 @@
+# 2D-Doppelpfeil: ein flächiger Pfeil mit Spitzen nach links und rechts als 2D-Shape.  Row_1 an
+# der oberen Ecke der rechten Spitze ändert die Länge beider Spitzen als Abstand von rechts (nur
+# waagrecht: sie bleiben beim Strecken gleich lang), Row_2 an der oberen Schaftkante in der Mitte
+# die Dicke des Schafts (anteilig, nur senkrecht).  Verbindungspunkte an beiden Spitzen.
+master: 2-D double arrow
+name.de: 2D-Doppelpfeil
+name.en: 2-D double arrow
+name.es: Flecha doble 2D
+name.it: Freccia doppia 2D
+name.fr: Flèche double 2D
+prompt.de: Flächiger Pfeil mit zwei Spitzen, den Sie frei skalieren und drehen. Spitzen und Schaft ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Flat arrow with two heads you can scale and rotate freely. Drag the yellow control handles to change the heads and the shaft.
+prompt.es: Flecha plana con dos puntas que se puede escalar y girar libremente. Arrastre los controladores amarillos para cambiar las puntas y el cuerpo.
+prompt.it: Freccia piatta con due punte da ridimensionare e ruotare liberamente. Trascina le maniglie di controllo gialle per cambiare le punte e il corpo.
+prompt.fr: Flèche pleine à deux pointes à redimensionner et à faire pivoter librement. Faites glisser les poignées de contrôle jaunes pour modifier les pointes et le corps.
+keywords.de: Doppelpfeil, Pfeil, 2D, beide Richtungen, links, rechts, Austausch
+keywords.en: double arrow, arrow, 2-D, both ways, left, right, exchange
+keywords.es: flecha doble, flecha, 2D, ambos sentidos, izquierda, derecha, intercambio
+keywords.it: freccia doppia, freccia, 2D, due direzioni, sinistra, destra, scambio
+keywords.fr: double flèche, flèche, 2D, deux sens, gauche, droite, échange
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# die Länge der Spitzen und der halbe Schaft
+Hl:     Value = MIN(MAX(Width-Controls.Row_1, 0), Width*0.5)
+Shaft:  Value = MIN(MAX(Controls.Row_2.Y-Height*0.5, 0), Height*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = User.Hl; Y = 0
+LineTo  X = User.Hl; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.Hl; Y = Height
+LineTo  X = Width-User.Hl; Y = Height*0.5+User.Shaft
+LineTo  X = User.Hl; Y = Height*0.5+User.Shaft
+LineTo  X = User.Hl; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width-12 mm; Y = Height
+        X.us = Width-0.45 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Länge der Spitzen ändern"
+        Tip.en = "Change the length of the heads"
+        Tip.es = "Cambiar la longitud de las puntas"
+        Tip.it = "Cambia la lunghezza delle punte"
+        Tip.fr = "Modifier la longueur des pointes"
+Row_2:  X = Width*0.5; Y = Height*0.75
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Dicke des Schafts ändern"
+        Tip.en = "Change the thickness of the shaft"
+        Tip.es = "Cambiar el grosor del cuerpo"
+        Tip.it = "Cambia lo spessore del corpo"
+        Tip.fr = "Modifier l'épaisseur du corps"
+
+[Connection]
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0

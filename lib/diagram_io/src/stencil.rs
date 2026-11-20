@@ -18,9 +18,10 @@
 // How a stencil is built, in this order:
 // 1. stencil.txt and every master file are parsed and checked for the chosen measure: header
 //    keys, sections, row heads, cell names (each section's own list), the five languages of
-//    every language-suffixed key or cell, Width and Height as lengths (a 1-D master: BeginX,
-//    BeginY, EndX, EndY as lengths and Height), formulas that parse and call only functions the
-//    engine knows.  A ".metric" / ".us" line replaces the line without suffix.
+//    every language-suffixed key or cell, Width and Height as lengths or formulas (a box that
+//    fits its text: TEXTHEIGHT ...; not with svg:) (a 1-D master: BeginX, BeginY, EndX, EndY as
+//    lengths and Height), formulas that parse and call only functions the engine knows.  A
+//    ".metric" / ".us" line replaces the line without suffix.
 // 2. A new stencil (vsdx::new_document: the own styles and the NetLab theme) gets the masters in
 //    one transaction: the Master attributes (Name and Prompt in the build language,
 //    IsCustomName(U), IconSize 1, AlignName 2, MatchByName 0, IconUpdate 1, PatternFlags 0,
@@ -38,7 +39,8 @@
 //    or of its styles, a single cell of the ShapeSheet's own list, Sheet.N of the master).  The
 //    formula engine computes every formula and its values are stored: a cell the engine keeps
 //    (unknown function, unknown section, cycle) or that comes out as an error is a build error
-//    naming the source line.  No stale value goes into the file.
+//    naming the source line.  No stale value goes into the file.  A master whose Width or
+//    Height is a formula gets its master page and pin from the computed size afterwards.
 // 4. Each master's icon is rendered from an instance on the stencil's page (stencil_icon.rs);
 //    the instance goes again, the page stays empty.
 //
@@ -66,8 +68,8 @@ use core::fmt;
 use diagram_core::formula::{self, CellPart, Engine, Keep, Outcome, SheetName, LOCKS};
 use diagram_core::instance::{self, join_fields, LANGS};
 use diagram_core::{
-    CellAddr, DocKind, Document, EditError, MasterRef, Owner, RowKey, SecKey, ShapeKind, SheetRef, StyleRefs, Text, Transaction,
-    Unit, Value,
+    CellAddr, DocKind, Document, EditError, MasterRef, Owner, RowKey, SecKey, ShapeKind, ShapeRef, SheetRef, StyleRefs, Text,
+    Transaction, Unit, Value,
 };
 
 use crate::stencil_icon;
@@ -268,9 +270,9 @@ struct MasterInfo {
     // dropped by code, e.g. the lists of a cross-functional flowchart)
     hidden: bool,
     // the size of the master page: the shape's Width x Height (2-D), BeginX+EndX x BeginY+EndY
-    // (1-D)
-    width: f64,
-    height: f64,
+    // (1-D); None: Width or Height is a formula, the page takes the size the engine computes
+    width: Option<f64>,
+    height: Option<f64>,
     // (1-D) the master sets BeginX, BeginY, EndX, EndY: PinX, Width, Angle ... follow the ends
     one_d: bool,
     shape: Vec<Cell0>,
@@ -507,7 +509,12 @@ fn master_info(file: &str, text: &str, m: Measure, files: &dyn Fn(&str) -> Optio
     }
     canon_cells(&mut canon, &shape);
     let one_d = shape.iter().any(|c| ENDS.contains(&c.name.as_str()));
-    let (width, height) = if one_d { one_d_page(file, line, &shape)? } else { (length(file, line, &shape, "Width")?, length(file, line, &shape, "Height")?) };
+    let (width, height) = if one_d {
+        let (w, h) = one_d_page(file, line, &shape)?;
+        (Some(w), Some(h))
+    } else {
+        (length(file, line, &shape, "Width", svg.is_none())?, length(file, line, &shape, "Height", svg.is_none())?)
+    };
     Ok(MasterInfo { file: String::from(file), line, name_u, names, prompts, keywords, text, styles, svg, hidden, width, height, one_d, shape, sections, canon })
 }
 
@@ -524,11 +531,14 @@ fn length_const(file: &str, line: u32, shape: &[Cell0], n: &str, example: &str) 
     }
 }
 
-// Width or Height of a 2-D master: a positive length constant
-fn length(file: &str, line: u32, shape: &[Cell0], n: &str) -> Result<f64, SourceError> {
+// Width or Height of a 2-D master: a positive length constant, or (`formula`: the master has no
+// SVG drawing) a formula such as GUARD(MAX(10 mm, TEXTHEIGHT(TheText,Width))) -> None
+fn length(file: &str, line: u32, shape: &[Cell0], n: &str, formula: bool) -> Result<Option<f64>, SourceError> {
+    let is_formula = shape.iter().any(|c| c.name == n && matches!(c.val, CellVal::Plain(Value0::Formula(_))));
     match length_const(file, line, shape, n, "40 mm")? {
-        (Some(x), _) if x > 0.0 => Ok(x),
-        (_, at) => Err(err(file, at, format!("{n} muss eine positive Länge sein (z. B. 40 mm)"))),
+        (Some(x), _) if x > 0.0 => Ok(Some(x)),
+        (None, _) if formula && is_formula => Ok(None),
+        (_, at) => Err(err(file, at, format!("{n} muss eine positive Länge sein (z. B. 40 mm) oder eine Formel (nicht mit svg:)"))),
     }
 }
 
@@ -754,7 +764,8 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
     // the master page: its size and scale, the keywords
     let (len_unit, one) = if measure == Measure::Us { (Unit::Inches, 1.0) } else { (Unit::Millimeters, 1.0 / 25.4) };
     let ps = SheetRef::Master(mref);
-    let (w, h) = (mi.width, mi.height);
+    // a size from a formula: 0 until fit_sizes() writes the computed one
+    let (w, h) = (mi.width.unwrap_or(0.0), mi.height.unwrap_or(0.0));
     for (name, v, u) in [
         ("PageWidth", w, Some(len_unit)),
         ("PageHeight", h, Some(len_unit)),
@@ -1119,6 +1130,31 @@ fn compute(doc: &mut Document, infos: &[MasterInfo], mrefs: &[MasterRef], formul
     Ok(())
 }
 
+// a 2-D master whose Width or Height is a formula: the master page gets the computed size and
+// the master shape the pin in its middle (constants, as for the other masters)
+fn fit_sizes(doc: &mut Document, infos: &[MasterInfo], mrefs: &[MasterRef], measure: Measure) -> Result<(), SourceError> {
+    let unit = if measure == Measure::Us { Unit::Inches } else { Unit::Millimeters };
+    let mut tx = doc.transaction("Größen");
+    for (mi, &m) in infos.iter().zip(mrefs) {
+        if mi.width.is_some() && mi.height.is_some() {
+            continue;
+        }
+        let Some(slot) = tx.doc().master(m).and_then(|x| x.master_shape()) else { continue };
+        let sheet = SheetRef::Shape(ShapeRef { owner: Owner::Master(m), slot });
+        let num = |doc: &Document, n: &str| doc.sym(n).and_then(|s| doc.resolve(sheet, &CellAddr::single(s)).num()).unwrap_or(0.0);
+        let (w, h) = (num(tx.doc(), "Width"), num(tx.doc(), "Height"));
+        if !(w > 0.0 && h > 0.0 && w.is_finite() && h.is_finite()) {
+            return Err(err(&mi.file, mi.line, format!("Width und Height ergeben beim Bauen keine positive Größe ({w} x {h} in)")));
+        }
+        for (s, name, v) in [(SheetRef::Master(m), "PageWidth", w), (SheetRef::Master(m), "PageHeight", h), (sheet, "PinX", w * 0.5), (sheet, "PinY", h * 0.5)] {
+            let a = single_addr(&mut tx, name);
+            tx.set_constant(s, &a, Value::Num(v), Some(unit)).map_err(|e| err(&mi.file, mi.line, format!("{name} lässt sich nicht schreiben ({e:?})")))?;
+        }
+    }
+    let _ = tx.commit();
+    Ok(())
+}
+
 // ---------------------------------------------------------------- the API
 
 /// build the stencil of one folder for one measure (see the module comment)
@@ -1158,6 +1194,7 @@ pub fn build(files: &dyn Fn(&str) -> Option<String>, measure: Measure) -> Result
         check_refs(&doc, f).map_err(|m| err(&infos[f.master].file, f.line, format!("{m} in „{}“", f.text)))?;
     }
     compute(&mut doc, &infos, &mrefs, &formulas)?;
+    fit_sizes(&mut doc, &infos, &mrefs, measure)?;
     for (mi, &m) in infos.iter().zip(&mrefs) {
         let ico = stencil_icon::master_icon(&mut doc, m).map_err(|e| err(&mi.file, mi.line, format!("das Symbol lässt sich nicht rendern ({e:?})")))?;
         let sym = doc.intern(&instance::base64(&ico));

@@ -1,0 +1,81 @@
+# Krummer Pfeil: ein flächiger Pfeil auf einem Kreisbogen als 1D-Shape (README: 1D-Shapes);
+# er liegt auf der Linie vom Anfang zum Ende und dreht sich mit ihr, die Enden kleben an Shapes,
+# mit GlueType 2 auch an das ganze Shape.  Die Mittellinie ist ein Kreisbogen vom Anfang zum
+# Ende, der sich links der Laufrichtung wölbt, höchstens zum Halbkreis.  Der Schaft folgt ihm:
+# beide Kanten sind Bögen um dieselbe Mitte (ArcTo).  Die Spitze sitzt auf dem Bogen, ihre Basis
+# 8 mm (entlang des Bogens) vor dem Ende, und steht symmetrisch zur Sehne von dort zum Ende, so
+# dass sie genau im Ende endet; die Schaftkanten enden auf ihrer Basis.  Height ist die Breite
+# der Spitze, der Schaft ist halb so dick.  Row_1 über der Mitte ändert die Krümmung
+# (nur senkrecht, als Abstand: sie bleibt beim Verlängern, bis man sie zieht; anfangs ein
+# Viertel der Länge).
+master: Curved block arrow
+name.de: Krummer Pfeil
+name.en: Curved block arrow
+name.es: Flecha de bloque curva
+name.it: Freccia a blocco curva
+name.fr: Flèche pleine courbe
+prompt.de: Gebogener flächiger Pfeil, dessen Enden an Shapes kleben. Die Krümmung ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Curved flat arrow whose ends glue to shapes. Drag the yellow control handle to change the curve.
+prompt.es: Flecha plana curva cuyos extremos se pegan a las formas. Arrastre el controlador amarillo para cambiar la curvatura.
+prompt.it: Freccia piatta curva le cui estremità si incollano alle forme. Trascina la maniglia di controllo gialla per cambiare la curvatura.
+prompt.fr: Flèche pleine courbe dont les extrémités se collent aux formes. Faites glisser la poignée de contrôle jaune pour modifier la courbure.
+keywords.de: Pfeil, krumm, gekrümmt, Bogen, 1D, Blockpfeil, kleben, Rückkopplung
+keywords.en: arrow, curved, bowed, arc, 1-D, block arrow, glue, feedback
+keywords.es: flecha, curva, curvada, arco, 1D, flecha de bloque, pegar, retroalimentación
+keywords.it: freccia, curva, curvata, arco, 1D, freccia a blocco, incollare, retroazione
+keywords.fr: flèche, courbe, incurvée, arc, 1D, flèche pleine, coller, rétroaction
+
+[Shape]
+BeginX = 0 mm
+BeginY = 5 mm
+BeginY.us = 0.1875 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 5 mm
+EndY.us = 0.1875 in
+Height = 10 mm
+Height.us = 0.375 in
+GlueType = 2
+
+[User]
+# der Stich der Mittellinie (höchstens die halbe Länge: ein Halbkreis), ihr Radius, die Höhe der
+# Kreismitte (sie liegt mittig über der Länge), der halbe Winkel des Bogens
+F:    Value = MAX(MIN(MAX(Controls.Row_1.Y-Height*0.5, Width*0.05), Width*0.5), 0.1 mm)
+R:    Value = (Width*Width*0.25+User.F*User.F)/(2*User.F)
+Cy:   Value = Height*0.5+User.F-User.R
+Al:   Value = ASIN(MIN(Width*0.5/User.R, 1))
+# die Länge der Spitze und ihr Winkel (höchstens der halbe Bogen), die Winkel des Schaftendes
+# und der Basis der Spitze, der halbe Schaft, die halbe Spitze, der Stich je Radius
+Hl:   Value = 8 mm
+      Value.us = 0.3 in
+Be:   Value = MIN(User.Hl/User.R, User.Al)
+Pt:   Value = PI()*0.5+User.Al
+Pb:   Value = PI()*0.5-User.Al+User.Be
+S:    Value = Height*0.25
+Hw:   Value = Height*0.5
+Bow:  Value = 1-COS((User.Pt-User.Pb)*0.5)
+# die Mitte der Basis der Spitze und die Richtung von dort zum Ende (die Basis steht quer dazu)
+Bx:   Value = Width*0.5+User.R*COS(User.Pb)
+By:   Value = User.Cy+User.R*SIN(User.Pb)
+Ux:   Value = (Width-User.Bx)/MAX(SQRT((Width-User.Bx)^2+(Height*0.5-User.By)^2), 0.01 mm)
+Uy:   Value = (Height*0.5-User.By)/MAX(SQRT((Width-User.Bx)^2+(Height*0.5-User.By)^2), 0.01 mm)
+
+[Geometry]
+MoveTo  X = Width*0.5+(User.R-User.S)*COS(User.Pt); Y = User.Cy+(User.R-User.S)*SIN(User.Pt)
+LineTo  X = Width*0.5+(User.R+User.S)*COS(User.Pt); Y = User.Cy+(User.R+User.S)*SIN(User.Pt)
+ArcTo   X = User.Bx-User.S*User.Uy; Y = User.By+User.S*User.Ux; A = -(User.R+User.S)*User.Bow
+LineTo  X = User.Bx-User.Hw*User.Uy; Y = User.By+User.Hw*User.Ux
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = User.Bx+User.Hw*User.Uy; Y = User.By-User.Hw*User.Ux
+LineTo  X = User.Bx+User.S*User.Uy; Y = User.By-User.S*User.Ux
+ArcTo   X = Geometry1.X1; Y = Geometry1.Y1; A = (User.R-User.S)*User.Bow
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.5+Width*0.25
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 2; CanGlue = FALSE
+        Tip.de = "Krümmung ändern"
+        Tip.en = "Change the curve"
+        Tip.es = "Cambiar la curvatura"
+        Tip.it = "Cambia la curvatura"
+        Tip.fr = "Modifier la courbure"

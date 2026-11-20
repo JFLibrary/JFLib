@@ -1,0 +1,121 @@
+# 2 Zweige (eckig): ein Verbinder, der sich rechtwinklig in zwei Äste teilt, als 1D-Shape mit
+# aufrechtem Kasten (Width = EndX-BeginX, Height = EndY-BeginY, beide dürfen negativ sein,
+# Angle 0; lokal (0, 0) ist der Anfang).  Vom Anfang läuft der Stamm waagrecht zur Gabel, dort
+# ein senkrechter Steg, von ihm zwei waagrechte Äste: einer zum Ende, einer zur Spitze von
+# Row_1.  Der Anfang und das Ende kleben (GlueType 2 auch an das ganze Shape), Row_1 darf in
+# Visio ebenfalls kleben (CanGlue).  Row_1 setzt die Spitze des zweiten Asts (frei, als Abstand
+# vom Anfang; anfangs gespiegelt zum Ende), Row_2 auf dem Stamm die Lage der Gabel (anteilig,
+# nur waagrecht).  Formatvorlage "Connector"; die Pfeilspitzen an beiden Ästen zeichnet das
+# Shape selbst (gefüllte Dreiecke in der Linienfarbe, FillForegnd = LineColor), denn die
+# Linienenden des Designs gäbe es nur am Ende des letzten Abschnitts: BeginArrow und EndArrow 0.
+# Der Text steht auf dem Stamm.
+master: 2 branches (square)
+name.de: 2 Zweige (eckig)
+name.en: 2 branches (square)
+name.es: 2 ramas (en ángulo recto)
+name.it: 2 rami (ad angolo retto)
+name.fr: 2 branches (à angle droit)
+style: Connector
+prompt.de: Verbinder, der sich rechtwinklig in zwei Äste teilt. Gabel und zweiten Ast verschieben Sie mit den gelben Steuerpunkten.
+prompt.en: Connector that splits into two branches at right angles. Drag the yellow control handles to move the fork and the second branch.
+prompt.es: Conector que se divide en dos ramas en ángulo recto. Arrastre los controladores amarillos para mover la bifurcación y la segunda rama.
+prompt.it: Connettore che si divide in due rami ad angolo retto. Trascina le maniglie di controllo gialle per spostare la biforcazione e il secondo ramo.
+prompt.fr: Connecteur qui se divise en deux branches à angle droit. Faites glisser les poignées de contrôle jaunes pour déplacer la fourche et la deuxième branche.
+keywords.de: Verbinder, Zweige, Verzweigung, Gabel, aufteilen, rechtwinklig, Baum
+keywords.en: connector, branches, branching, fork, split, right angle, tree
+keywords.es: conector, ramas, ramificación, bifurcación, dividir, ángulo recto, árbol
+keywords.it: connettore, rami, diramazione, biforcazione, dividere, angolo retto, albero
+keywords.fr: connecteur, branches, embranchement, fourche, diviser, angle droit, arbre
+
+[Shape]
+BeginX = 0 mm
+BeginY = 15 mm
+BeginY.us = 0.6 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 25 mm
+EndY.us = 1 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+GlueType = 2
+BeginArrow = 0
+EndArrow = 0
+FillForegnd = LineColor
+FillPattern = 1
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = User.Xj*0.5
+TxtPinY = 0
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Gabel, die Spitze des zweiten Asts, Länge und halbe Breite der Pfeilspitzen, die Richtung
+# beider Äste (1 nach rechts, -1 nach links)
+Xj:  Value = Controls.Row_2
+Xc:  Value = Controls.Row_1
+Yc:  Value = Controls.Row_1.Y
+L:   Value = 3 mm
+     Value.us = 0.12 in
+Aw:  Value = 1.2 mm
+     Value.us = 0.05 in
+Sb:  Value = IF(Width>=User.Xj, 1, -1)
+Sc:  Value = IF(User.Xc>=User.Xj, 1, -1)
+
+# 1 der Stamm
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = User.Xj; Y = 0
+
+# 2 der Steg an der Gabel
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.Xj; Y = MIN(0, Height, User.Yc)
+LineTo  X = User.Xj; Y = MAX(0, Height, User.Yc)
+
+# 3 der Ast zum Ende
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.Xj; Y = Height
+LineTo  X = Width-User.Sb*User.L; Y = Height
+
+# 4 der zweite Ast
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.Xj; Y = User.Yc
+LineTo  X = User.Xc-User.Sc*User.L; Y = User.Yc
+
+# 5 und 6 die Pfeilspitzen
+[Geometry]
+MoveTo  X = Width; Y = Height
+LineTo  X = Width-User.Sb*User.L; Y = Height+User.Aw
+LineTo  X = Width-User.Sb*User.L; Y = Height-User.Aw
+LineTo  X = Geometry5.X1; Y = Geometry5.Y1
+
+[Geometry]
+MoveTo  X = User.Xc; Y = User.Yc
+LineTo  X = User.Xc-User.Sc*User.L; Y = User.Yc+User.Aw
+LineTo  X = User.Xc-User.Sc*User.L; Y = User.Yc-User.Aw
+LineTo  X = Geometry6.X1; Y = Geometry6.Y1
+
+[Controls]
+Row_1:  X = Width; Y = -Height
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 2; CanGlue = TRUE
+        Tip.de = "Zweiten Ast verschieben"
+        Tip.en = "Move the second branch"
+        Tip.es = "Mover la segunda rama"
+        Tip.it = "Sposta il secondo ramo"
+        Tip.fr = "Déplacer la deuxième branche"
+Row_2:  X = Width*0.5; Y = 0
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Gabel verschieben"
+        Tip.en = "Move the fork"
+        Tip.es = "Mover la bifurcación"
+        Tip.it = "Sposta la biforcazione"
+        Tip.fr = "Déplacer la fourche"

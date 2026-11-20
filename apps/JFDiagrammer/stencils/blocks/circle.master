@@ -1,0 +1,34 @@
+# Kreis: ein runder Block, eine Ellipse-Zeile (Mittelpunkt, Punkt auf der waagrechten und auf
+# der senkrechten Achse); gestreckt wird er zur Ellipse.  Keine Steuerpunkte; die
+# Verbindungspunkte liegen unten, rechts, oben und links auf dem Rand.
+master: Circle
+name.de: Kreis
+name.en: Circle
+name.es: Círculo
+name.it: Cerchio
+name.fr: Cercle
+prompt.de: Runder Block mit Text für Blockdiagramme.
+prompt.en: Round block with text for block diagrams.
+prompt.es: Bloque redondo con texto para diagramas de bloques.
+prompt.it: Blocco rotondo con testo per diagrammi a blocchi.
+prompt.fr: Bloc rond avec texte pour les diagrammes de blocs.
+keywords.de: Kreis, rund, Block, Knoten, Ellipse, Blockdiagramm
+keywords.en: circle, round, block, node, ellipse, block diagram
+keywords.es: círculo, redondo, bloque, nodo, elipse, diagrama de bloques
+keywords.it: cerchio, rotondo, blocco, nodo, ellisse, diagramma a blocchi
+keywords.fr: cercle, rond, bloc, nœud, ellipse, diagramme de blocs
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

@@ -1,0 +1,47 @@
+# Startdiagramm „Beispiel: Ablauf“ des Standarddiagramms: drei Schritte mit Blockpfeilen, ein
+# Ergebnis am Verbinder, eine Überschrift und ein Tipp.  Positionen für A4 bzw. Letter quer.
+starter: sample
+name.de: Beispiel: Ablauf
+name.en: Sample: Process
+name.es: Ejemplo: proceso
+name.it: Esempio: processo
+name.fr: Exemple : processus
+description.de: Drei Schritte mit Pfeilen und ein Ergebnis, aus Grundformen und Pfeil-Shapes, zum Abwandeln.
+description.en: Three steps with arrows and a result, made of basic shapes and arrow shapes, to adapt.
+description.es: Tres pasos con flechas y un resultado, con formas básicas y formas de flecha, para adaptar.
+description.it: Tre passi con frecce e un risultato, con forme di base e forme freccia, da adattare.
+description.fr: Trois étapes avec des flèches et un résultat, en formes de base et formes de flèche, à adapter.
+
+[Shapes]
+title:  Stencil = "standard"; Master = "Text box"
+        PinX = 110 mm; PinY = 165 mm; Width = 140 mm; Height = 12 mm
+        PinX.us = 4.2 in; PinY.us = 6.6 in; Width.us = 5.5 in; Height.us = 0.5 in
+        Text.de = "Projektablauf"; Text.en = "Project process"; Text.es = "Proceso del proyecto"
+        Text.it = "Processo del progetto"; Text.fr = "Déroulement du projet"
+plan:   Stencil = "standard"; Master = "Rounded rectangle"
+        PinX = 60 mm; PinY = 125 mm; PinX.us = 2.2 in; PinY.us = 4.9 in
+        Text.de = "Planen"; Text.en = "Plan"; Text.es = "Planificar"; Text.it = "Pianificare"; Text.fr = "Planifier"
+a1:     Stencil = "arrows"; Master = "Simple arrow"
+        PinX = 104 mm; PinY = 125 mm; Width = 24 mm; Height = 14 mm
+        PinX.us = 3.85 in; PinY.us = 4.9 in; Width.us = 0.9 in; Height.us = 0.55 in
+do:     Stencil = "standard"; Master = "Rounded rectangle"
+        PinX = 148 mm; PinY = 125 mm; PinX.us = 5.5 in; PinY.us = 4.9 in
+        Text.de = "Umsetzen"; Text.en = "Do"; Text.es = "Ejecutar"; Text.it = "Realizzare"; Text.fr = "Réaliser"
+a2:     Stencil = "arrows"; Master = "Simple arrow"
+        PinX = 192 mm; PinY = 125 mm; Width = 24 mm; Height = 14 mm
+        PinX.us = 7.15 in; PinY.us = 4.9 in; Width.us = 0.9 in; Height.us = 0.55 in
+check:  Stencil = "standard"; Master = "Rounded rectangle"
+        PinX = 236 mm; PinY = 125 mm; PinX.us = 8.8 in; PinY.us = 4.9 in
+        Text.de = "Prüfen"; Text.en = "Check"; Text.es = "Revisar"; Text.it = "Verificare"; Text.fr = "Vérifier"
+result: Stencil = "standard"; Master = "Ellipse"
+        PinX = 236 mm; PinY = 65 mm; PinX.us = 8.8 in; PinY.us = 2.5 in
+        Text.de = "Ergebnis"; Text.en = "Result"; Text.es = "Resultado"; Text.it = "Risultato"; Text.fr = "Résultat"
+c1:     From = "check"; To = "result"
+tip:    Stencil = "callouts"; Master = "Tip"; Tip = TRUE
+        PinX = 100 mm; PinY = 60 mm; Width = 120 mm; Height = 26 mm
+        PinX.us = 3.4 in; PinY.us = 2.4 in; Width.us = 4.6 in; Height.us = 1 in
+        Text.de = "Tipp: Ziehen Sie Formen aus den Schablonen links auf die Seite. Die gelben Punkte ändern die Form. Diesen Hinweis können Sie löschen."
+        Text.en = "Tip: Drag shapes from the stencils on the left onto the page. The yellow handles change the shape. You can delete this note."
+        Text.es = "Consejo: arrastre formas desde las colecciones de formas de la izquierda a la página. Los controladores amarillos cambian la forma. Puede eliminar esta nota."
+        Text.it = "Suggerimento: trascinare le forme dalle raccolte di forme a sinistra sulla pagina. Le maniglie gialle cambiano la forma. È possibile eliminare questa nota."
+        Text.fr = "Astuce : faites glisser des formes des bibliothèques de formes à gauche sur la page. Les poignées jaunes modifient la forme. Vous pouvez supprimer cette note."

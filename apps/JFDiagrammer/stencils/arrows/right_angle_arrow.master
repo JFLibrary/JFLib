@@ -1,0 +1,77 @@
+# Rechtwinkliger Pfeil: der Schaft kommt von unten und knickt rechtwinklig nach rechts ab, die
+# Spitze an der rechten Kante -- wie der Gebogene Pfeil, nur mit scharfer Ecke statt Bogen.  Die
+# Spitze ist halb so hoch wie das Shape und reicht bis zur Oberkante.  Row_1 an der oberen Ecke
+# der Spitze ändert ihre Länge (anteilig, nur waagrecht), Row_2 an der unteren Schaftkante vor
+# der Spitze die Dicke des Schafts (anteilig, nur senkrecht; höchstens die Breite der Spitze).
+# Der Text steht auf dem waagrechten Arm; Verbindungspunkte am Schaftende und an der Spitze.
+master: Right-angle arrow
+name.de: Rechtwinkliger Pfeil
+name.en: Right-angle arrow
+name.es: Flecha en ángulo recto
+name.it: Freccia ad angolo retto
+name.fr: Flèche à angle droit
+prompt.de: Pfeil, der rechtwinklig abknickt. Spitze und Schaft ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Arrow with a sharp right-angle turn. Drag the yellow control handles to change the head and the shaft.
+prompt.es: Flecha que gira en ángulo recto. Arrastre los controladores amarillos para cambiar la punta y el cuerpo.
+prompt.it: Freccia che svolta ad angolo retto. Trascina le maniglie di controllo gialle per cambiare la punta e il corpo.
+prompt.fr: Flèche qui tourne à angle droit. Faites glisser les poignées de contrôle jaunes pour modifier la pointe et le corps.
+keywords.de: Pfeil, rechtwinklig, Winkel, abknicken, abbiegen, Ecke, 90 Grad
+keywords.en: arrow, right angle, angle, turn, corner, elbow, 90 degrees
+keywords.es: flecha, ángulo recto, ángulo, giro, esquina, codo, 90 grados
+keywords.it: freccia, angolo retto, angolo, svolta, spigolo, gomito, 90 gradi
+keywords.fr: flèche, angle droit, angle, tourner, coin, coude, 90 degrés
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 30 mm
+Height.us = 1.125 in
+TxtWidth = MAX(Width-User.Hl-User.T, 0)
+TxtHeight = User.T
+TxtPinX = (User.T+Width-User.Hl)*0.5
+TxtPinY = User.Axis
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die halbe Breite der Spitze, die Achse des waagrechten Arms, die Dicke des Schafts, die Länge
+# der Spitze, die Oberkante des Arms
+Hw:    Value = Height*0.25
+Axis:  Value = Height-User.Hw
+T:     Value = MIN(MAX((User.Axis-Controls.Row_2.Y)*2, 0), User.Hw*2)
+Hl:    Value = MIN(MAX(Width-Controls.Row_1, 0), Width-User.T)
+Yt:    Value = User.Axis+User.T*0.5
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = 0; Y = User.Yt
+LineTo  X = Width-User.Hl; Y = User.Yt
+LineTo  X = Width-User.Hl; Y = Height
+LineTo  X = Width; Y = User.Axis
+LineTo  X = Width-User.Hl; Y = User.Axis-User.Hw
+LineTo  X = Width-User.Hl; Y = User.Yt-User.T
+LineTo  X = User.T; Y = User.Yt-User.T
+LineTo  X = User.T; Y = 0
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.75; Y = Height
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Länge der Spitze ändern"
+        Tip.en = "Change the length of the head"
+        Tip.es = "Cambiar la longitud de la punta"
+        Tip.it = "Cambia la lunghezza della punta"
+        Tip.fr = "Modifier la longueur de la pointe"
+Row_2:  X = Width-User.Hl; Y = Height*0.625
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Dicke des Schafts ändern"
+        Tip.en = "Change the thickness of the shaft"
+        Tip.es = "Cambiar el grosor del cuerpo"
+        Tip.it = "Cambia lo spessore del corpo"
+        Tip.fr = "Modifier l'épaisseur du corps"
+
+[Connection]
+Row  X = User.T*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = User.Axis; DirX = -1; DirY = 0

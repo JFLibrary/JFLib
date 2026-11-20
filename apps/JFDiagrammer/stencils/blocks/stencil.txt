@@ -1,6 +1,6 @@
 # Blöcke (SH-002, JD13): Bausteine für Blockdiagramme im NetLab-Stil -- eckig und schlicht;
 # Linie, Füllung und Text kommen aus der Formatvorlage "Normal", damit die Designs wirken.
-# Probeblatt mit vier Mastern; die übrigen folgen im selben Stil.
+# Reihenfolge wie FEATURES.md SH-002; die ersten fünf sind Schnell-Shapes.
 stencil: Blocks
 file: blocks
 name.de: Blöcke
@@ -9,5 +9,5 @@ name.es: Bloques
 name.it: Blocchi
 name.fr: Blocs
 category: general
-masters: box_arrow, box_3d, partial_layer, arrow_1d
-quick: 2
+masters: box, circle, diamond, box_arrow, arrow_1d, double_arrow_1d, arrow_2d, double_arrow_2d, auto_height_box, auto_width_box, curved_block_arrow, arrow_1d_open, arrow_2d_open, box_3d, bar, button, concentric_layer_1, concentric_layer_2, concentric_layer_3, concentric_center, partial_layer, partial_layer_2, partial_layer_3, partial_layer_4, branch2_square, branch2_angled, dynamic_connector, branches_angled, branches_square, line_curve_connector, dotted_line, middle_arrow, curved_arrow, dot_arrow, arrow_end_points, single_arrowhead, double_arrowhead
+quick: 5

@@ -1,0 +1,78 @@
+# 2D-Pfeil, Ende offen: der 2D-Pfeil ohne Kante am Schaftende, zum Ansetzen an einen Block.
+# Zwei Abschnitte über denselben Umriss: 1 die Fläche ohne Linie, 2 die Linie ohne Füllung, offen
+# am Schaftende.  Row_1 an der oberen Ecke der Spitze ändert ihre Länge als Abstand von rechts
+# (nur waagrecht), Row_2 an der oberen Schaftkante links die Dicke des Schafts (anteilig, nur
+# senkrecht).  Verbindungspunkte am Schaftende und an der Spitze.
+master: 2-D arrow, open end
+name.de: 2D-Pfeil, Ende offen
+name.en: 2-D arrow, open end
+name.es: Flecha 2D, extremo abierto
+name.it: Freccia 2D, estremità aperta
+name.fr: Flèche 2D, extrémité ouverte
+prompt.de: Flächiger Pfeil ohne Kante am Schaftende, zum Ansetzen an einen Block. Spitze und Schaft ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Flat arrow without an edge at the shaft end, to attach to a block. Drag the yellow control handles to change the head and the shaft.
+prompt.es: Flecha plana sin borde en el extremo del cuerpo, para unir a un bloque. Arrastre los controladores amarillos para cambiar la punta y el cuerpo.
+prompt.it: Freccia piatta senza bordo all'estremità del corpo, da attaccare a un blocco. Trascina le maniglie di controllo gialle per cambiare la punta e il corpo.
+prompt.fr: Flèche pleine sans bord à l'extrémité du corps, à accoler à un bloc. Faites glisser les poignées de contrôle jaunes pour modifier la pointe et le corps.
+keywords.de: Pfeil, 2D, offen, offenes Ende, Blockpfeil, ansetzen, Fortsetzung
+keywords.en: arrow, 2-D, open, open end, block arrow, attach, continuation
+keywords.es: flecha, 2D, abierta, extremo abierto, flecha de bloque, unir, continuación
+keywords.it: freccia, 2D, aperta, estremità aperta, freccia a blocco, attaccare, continuazione
+keywords.fr: flèche, 2D, ouverte, extrémité ouverte, flèche pleine, accoler, continuation
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# die Länge der Spitze und der halbe Schaft
+Hl:     Value = MIN(MAX(Width-Controls.Row_1, 0), Width)
+Shaft:  Value = MIN(MAX(Controls.Row_2.Y-Height*0.5, 0), Height*0.5)
+
+# 1 die Fläche
+[Geometry]
+NoLine = TRUE
+MoveTo  X = 0; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.Hl; Y = Height
+LineTo  X = Width-User.Hl; Y = Height*0.5+User.Shaft
+LineTo  X = 0; Y = Height*0.5+User.Shaft
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# 2 die Linie, offen am Schaftende
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.Hl; Y = Height
+LineTo  X = Width-User.Hl; Y = Height*0.5+User.Shaft
+LineTo  X = 0; Y = Height*0.5+User.Shaft
+
+[Controls]
+Row_1:  X = Width-15 mm; Y = Height
+        X.us = Width-0.6 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Länge der Spitze ändern"
+        Tip.en = "Change the length of the head"
+        Tip.es = "Cambiar la longitud de la punta"
+        Tip.it = "Cambia la lunghezza della punta"
+        Tip.fr = "Modifier la longueur de la pointe"
+Row_2:  X = 0; Y = Height*0.75
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Dicke des Schafts ändern"
+        Tip.en = "Change the thickness of the shaft"
+        Tip.es = "Cambiar el grosor del cuerpo"
+        Tip.it = "Cambia lo spessore del corpo"
+        Tip.fr = "Modifier l'épaisseur du corps"
+
+[Connection]
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0

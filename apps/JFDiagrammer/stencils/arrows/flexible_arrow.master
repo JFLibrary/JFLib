@@ -1,0 +1,84 @@
+# Flexibler Pfeil: ein flächiger Pfeil als 1D-Shape (README: 1D-Shapes), dessen Schaft einmal
+# abknickt -- zwei gerade Stücke vom Anfang zum Knick und vom Knick zur Spitze, die im Ende
+# endet und in Richtung des zweiten Stücks zeigt.  Er liegt auf der Linie vom Anfang zum Ende
+# und dreht sich mit ihr, die Enden kleben (GlueType 2 auch an das ganze Shape).  Die Kanten des
+# Schafts laufen parallel zur Mittellinie und treffen sich am Knick auf Gehrung (für spitze
+# Winkel begrenzt).  Height ist die Breite der Spitze, der Schaft ist halb so dick, die Spitze
+# 8 mm lang (höchstens 60 % des zweiten Stücks).  Row_1 ist der Knick: frei zu ziehen, längs
+# anteilig, quer als Abstand von der Linie (anfangs 8 mm darüber).  Die Schablone Verbinder hat
+# einen Flexiblen Pfeil mit gebogenem Schaft; dieser hier knickt eckig (NetLab-Stil).
+master: Flexible arrow
+name.de: Flexibler Pfeil
+name.en: Flexible arrow
+name.es: Flecha flexible
+name.it: Freccia flessibile
+name.fr: Flèche flexible
+prompt.de: Flächiger Pfeil mit Knick, dessen Enden an Shapes kleben. Den Knick ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Flat arrow with a bend whose ends glue to shapes. Drag the yellow control handle to change the bend.
+prompt.es: Flecha plana con un quiebro cuyos extremos se pegan a las formas. Arrastre el controlador amarillo para cambiar el quiebro.
+prompt.it: Freccia piatta con una piega le cui estremità si incollano alle forme. Trascina la maniglia di controllo gialla per cambiare la piega.
+prompt.fr: Flèche pleine coudée dont les extrémités se collent aux formes. Faites glisser la poignée de contrôle jaune pour modifier le coude.
+keywords.de: Pfeil, flexibel, Knick, biegen, 1D, kleben, Umweg
+keywords.en: arrow, flexible, bend, kink, 1-D, glue, detour
+keywords.es: flecha, flexible, quiebro, doblar, 1D, pegar, desvío
+keywords.it: freccia, flessibile, piega, piegare, 1D, incollare, deviazione
+keywords.fr: flèche, flexible, coude, plier, 1D, coller, détour
+
+[Shape]
+BeginX = 0 mm
+BeginY = 5 mm
+BeginY.us = 0.1875 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 5 mm
+EndY.us = 0.1875 in
+Height = 10 mm
+Height.us = 0.375 in
+GlueType = 2
+
+[User]
+# der Knick, die Höhe der Mittellinie, die Längen der beiden Stücke und ihre Richtungen
+Kx:   Value = MIN(MAX(Controls.Row_1, Width*0.1), Width*0.9)
+Ky:   Value = Controls.Row_1.Y
+C:    Value = Height*0.5
+L1:   Value = MAX(SQRT(User.Kx^2+(User.Ky-User.C)^2), 0.01 mm)
+L2:   Value = MAX(SQRT((Width-User.Kx)^2+(User.C-User.Ky)^2), 0.01 mm)
+U1x:  Value = User.Kx/User.L1
+U1y:  Value = (User.Ky-User.C)/User.L1
+U2x:  Value = (Width-User.Kx)/User.L2
+U2y:  Value = (User.C-User.Ky)/User.L2
+# der halbe Schaft, die halbe Spitze, ihre Länge, die Mitte ihrer Basis
+S:    Value = Height*0.25
+Hw:   Value = Height*0.5
+Hl:   Value = MIN(8 mm, User.L2*0.6)
+      Value.us = MIN(0.3 in, User.L2*0.6)
+Bx:   Value = Width-User.Hl*User.U2x
+By:   Value = User.C-User.Hl*User.U2y
+# die Gehrung am Knick: der Versatz der Schaftkanten (Summe der Normalen durch 1 + cos des
+# Winkels, für spitze Winkel begrenzt)
+D:    Value = MAX(1+User.U1x*User.U2x+User.U1y*User.U2y, 0.2)
+Mx:   Value = -User.S*(User.U1y+User.U2y)/User.D
+My:   Value = User.S*(User.U1x+User.U2x)/User.D
+
+[Geometry]
+MoveTo  X = User.S*User.U1y; Y = User.C-User.S*User.U1x
+LineTo  X = User.Kx-User.Mx; Y = User.Ky-User.My
+LineTo  X = User.Bx+User.S*User.U2y; Y = User.By-User.S*User.U2x
+LineTo  X = User.Bx+User.Hw*User.U2y; Y = User.By-User.Hw*User.U2x
+LineTo  X = Width; Y = User.C
+LineTo  X = User.Bx-User.Hw*User.U2y; Y = User.By+User.Hw*User.U2x
+LineTo  X = User.Bx-User.S*User.U2y; Y = User.By+User.S*User.U2x
+LineTo  X = User.Kx+User.Mx; Y = User.Ky+User.My
+LineTo  X = -User.S*User.U1y; Y = User.C+User.S*User.U1x
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.5+8 mm
+        Y.us = Height*0.5+0.3 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 2; CanGlue = FALSE
+        Tip.de = "Knick verschieben"
+        Tip.en = "Move the bend"
+        Tip.es = "Mover el quiebro"
+        Tip.it = "Sposta la piega"
+        Tip.fr = "Déplacer le coude"

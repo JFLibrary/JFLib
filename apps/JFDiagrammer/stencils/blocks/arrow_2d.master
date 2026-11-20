@@ -1,0 +1,65 @@
+# 2D-Pfeil: ein flächiger Pfeil nach rechts als gewöhnliches 2D-Shape, frei zu skalieren und zu
+# drehen.  Anders als beim Einfachen Pfeil (Pfeil-Shapes) bleibt die Spitze beim Strecken gleich
+# lang: Row_1 an der oberen Ecke der Spitze ändert ihre Länge als Abstand von rechts (nur
+# waagrecht), Row_2 an der oberen Schaftkante links die Dicke des Schafts (anteilig, nur
+# senkrecht).  Verbindungspunkte am Schaftende und an der Spitze.
+master: 2-D arrow
+name.de: 2D-Pfeil
+name.en: 2-D arrow
+name.es: Flecha 2D
+name.it: Freccia 2D
+name.fr: Flèche 2D
+prompt.de: Flächiger Pfeil, den Sie frei skalieren und drehen. Spitze und Schaft ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Flat arrow you can scale and rotate freely. Drag the yellow control handles to change the head and the shaft.
+prompt.es: Flecha plana que se puede escalar y girar libremente. Arrastre los controladores amarillos para cambiar la punta y el cuerpo.
+prompt.it: Freccia piatta da ridimensionare e ruotare liberamente. Trascina le maniglie di controllo gialle per cambiare la punta e il corpo.
+prompt.fr: Flèche pleine à redimensionner et à faire pivoter librement. Faites glisser les poignées de contrôle jaunes pour modifier la pointe et le corps.
+keywords.de: Pfeil, 2D, Blockpfeil, Richtung, rechts, Fluss, Schritt
+keywords.en: arrow, 2-D, block arrow, direction, right, flow, step
+keywords.es: flecha, 2D, flecha de bloque, dirección, derecha, flujo, paso
+keywords.it: freccia, 2D, freccia a blocco, direzione, destra, flusso, passo
+keywords.fr: flèche, 2D, flèche pleine, direction, droite, flux, étape
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# die Länge der Spitze und der halbe Schaft
+Hl:     Value = MIN(MAX(Width-Controls.Row_1, 0), Width)
+Shaft:  Value = MIN(MAX(Controls.Row_2.Y-Height*0.5, 0), Height*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.Hl; Y = Height
+LineTo  X = Width-User.Hl; Y = Height*0.5+User.Shaft
+LineTo  X = 0; Y = Height*0.5+User.Shaft
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width-15 mm; Y = Height
+        X.us = Width-0.6 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Länge der Spitze ändern"
+        Tip.en = "Change the length of the head"
+        Tip.es = "Cambiar la longitud de la punta"
+        Tip.it = "Cambia la lunghezza della punta"
+        Tip.fr = "Modifier la longueur de la pointe"
+Row_2:  X = 0; Y = Height*0.75
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Dicke des Schafts ändern"
+        Tip.en = "Change the thickness of the shaft"
+        Tip.es = "Cambiar el grosor del cuerpo"
+        Tip.it = "Cambia lo spessore del corpo"
+        Tip.fr = "Modifier l'épaisseur du corps"
+
+[Connection]
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0

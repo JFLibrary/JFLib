@@ -1,0 +1,37 @@
+# Feld: der Grundbaustein der Blockdiagramme, ein Rechteck mit Text.  Keine Steuerpunkte; die
+# Verbindungspunkte liegen in der Mitte jeder Seite.
+master: Box
+name.de: Feld
+name.en: Box
+name.es: Cuadro
+name.it: Riquadro
+name.fr: Bloc
+prompt.de: Rechteckiger Block mit Text für Blockdiagramme.
+prompt.en: Rectangular block with text for block diagrams.
+prompt.es: Bloque rectangular con texto para diagramas de bloques.
+prompt.it: Blocco rettangolare con testo per diagrammi a blocchi.
+prompt.fr: Bloc rectangulaire avec texte pour les diagrammes de blocs.
+keywords.de: Feld, Block, Kasten, Rechteck, Baustein, Blockdiagramm, Text
+keywords.en: box, block, rectangle, element, building block, block diagram, text
+keywords.es: cuadro, bloque, rectángulo, elemento, componente, diagrama de bloques, texto
+keywords.it: riquadro, blocco, rettangolo, elemento, componente, diagramma a blocchi, testo
+keywords.fr: bloc, boîte, rectangle, élément, composant, diagramme de blocs, texte
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

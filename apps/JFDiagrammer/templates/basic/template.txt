@@ -15,3 +15,4 @@ description.fr: Formes de base, blocs, flèches et bulles d'annotation pour tout
 category: general
 order: 20
 stencils: standard, blocks, arrows, callouts
+starters: sample

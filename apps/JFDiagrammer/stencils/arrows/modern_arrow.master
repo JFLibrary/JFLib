@@ -1,0 +1,68 @@
+# Moderner Pfeil: ein schlanker Pfeil nach rechts, dessen Spitze nach hinten gezogene Widerhaken
+# hat -- der Schaft setzt erst hinter den Ecken der Spitze an.  Row_1 an der oberen Ecke der
+# Spitze ändert ihre Länge (anteilig, nur waagrecht), Row_2 am Ansatz des Schafts setzt, wie weit
+# die Haken zurückreichen (waagrecht), und die Dicke des Schafts (senkrecht; beide anteilig).
+# Der Ansatz bleibt zwischen den Haken und der Kante der Spitze.  Verbindungspunkte am
+# Schaftende und an der Spitze.
+master: Modern arrow
+name.de: Moderner Pfeil
+name.en: Modern arrow
+name.es: Flecha moderna
+name.it: Freccia moderna
+name.fr: Flèche moderne
+prompt.de: Schlanker Pfeil mit nach hinten gezogener Spitze. Spitze und Schaft ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Slim arrow with a swept-back head. Drag the yellow control handles to change the head and the shaft.
+prompt.es: Flecha estilizada con la punta inclinada hacia atrás. Arrastre los controladores amarillos para cambiar la punta y el cuerpo.
+prompt.it: Freccia sottile con la punta rivolta all'indietro. Trascina le maniglie di controllo gialle per cambiare la punta e il corpo.
+prompt.fr: Flèche fine à pointe effilée vers l'arrière. Faites glisser les poignées de contrôle jaunes pour modifier la pointe et le corps.
+keywords.de: Pfeil, modern, schlank, spitz, Widerhaken, Richtung
+keywords.en: arrow, modern, slim, pointed, barbed, direction
+keywords.es: flecha, moderna, estilizada, puntiaguda, dirección
+keywords.it: freccia, moderna, sottile, appuntita, direzione
+keywords.fr: flèche, moderne, fine, pointue, direction
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# die Lage der Haken, der halbe Schaft, der Ansatz des Schafts (höchstens bis zur Kante der
+# Spitze auf der Höhe der Schaftkante)
+Bk:     Value = MIN(MAX(Controls.Row_1, Width*0.1), Width*0.95)
+S:      Value = MIN(MAX(Controls.Row_2.Y-Height*0.5, 0), Height*0.4)
+Jmax:   Value = Width-(Width-User.Bk)*User.S/(Height*0.5)
+J:      Value = MIN(MAX(Controls.Row_2, User.Bk), User.Jmax)
+
+[Geometry]
+MoveTo  X = 0; Y = Height*0.5-User.S
+LineTo  X = User.J; Y = Height*0.5-User.S
+LineTo  X = User.Bk; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = User.Bk; Y = Height
+LineTo  X = User.J; Y = Height*0.5+User.S
+LineTo  X = 0; Y = Height*0.5+User.S
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.6; Y = Height
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Länge der Spitze ändern"
+        Tip.en = "Change the length of the head"
+        Tip.es = "Cambiar la longitud de la punta"
+        Tip.it = "Cambia la lunghezza della punta"
+        Tip.fr = "Modifier la longueur de la pointe"
+Row_2:  X = Width*0.7; Y = Height*0.65
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Ansatz der Spitze und Dicke des Schafts ändern"
+        Tip.en = "Change where the head starts and the thickness of the shaft"
+        Tip.es = "Cambiar el arranque de la punta y el grosor del cuerpo"
+        Tip.it = "Cambia l'attacco della punta e lo spessore del corpo"
+        Tip.fr = "Modifier la naissance de la pointe et l'épaisseur du corps"
+
+[Connection]
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0

@@ -143,8 +143,10 @@ Fehlt die Zelle im Master, setzt das Werkzeug:
 - `LocPinX = Width*0.5`, `LocPinY = Height*0.5`
 - Masterseite: `PageWidth`, `PageHeight` = Shape-Größe, Maßstab 1:1 in mm bzw. Zoll
 
-`Width` und `Height` sind Pflicht, und zwar als Längen (Konstanten wie `40 mm`, keine Formeln):
-aus ihnen entstehen Pin und Masterseite. Ausnahme sind 1D-Master (nächster Abschnitt).
+`Width` und `Height` sind Pflicht. Meist sind es Längen (Konstanten wie `40 mm`); eine Formel ist
+erlaubt, außer zusammen mit `svg:` (JD13, z. B. die Felder mit Auto-Höhe:
+`GUARD(MAX(10 mm, TEXTHEIGHT(TheText,Width)))` mit `LockHeight`). Pin und Masterseite entstehen
+aus dem berechneten Wert. Ausnahme sind 1D-Master (nächster Abschnitt).
 
 ## 1D-Shapes (Verbinder, Linienpfeile)
 

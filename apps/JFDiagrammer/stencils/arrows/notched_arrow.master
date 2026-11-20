@@ -1,0 +1,66 @@
+# Eingekerbter Pfeil: ein Blockpfeil nach rechts mit einer Kerbe am Schaftende.  Row_1 an der
+# inneren Ecke zwischen Schaft und Spitze wie beim Einfachen Pfeil: waagrecht der Beginn der
+# Spitze, senkrecht die Dicke des Schafts (beide anteilig); Row_2 in der Kerbe ihre Tiefe
+# (anteilig, nur waagrecht; höchstens bis kurz vor die Spitze).  Verbindungspunkte in der Kerbe
+# und an der Spitze.
+master: Notched arrow
+name.de: Eingekerbter Pfeil
+name.en: Notched arrow
+name.es: Flecha con muesca
+name.it: Freccia con tacca
+name.fr: Flèche à encoche
+prompt.de: Blockpfeil mit einer Kerbe am Schaftende. Spitze, Schaft und Kerbe ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Block arrow with a notch at the shaft end. Drag the yellow control handles to change the head, the shaft and the notch.
+prompt.es: Flecha de bloque con una muesca en el extremo del cuerpo. Arrastre los controladores amarillos para cambiar la punta, el cuerpo y la muesca.
+prompt.it: Freccia a blocco con una tacca all'estremità del corpo. Trascina le maniglie di controllo gialle per cambiare la punta, il corpo e la tacca.
+prompt.fr: Flèche pleine avec une encoche à l'extrémité du corps. Faites glisser les poignées de contrôle jaunes pour modifier la pointe, le corps et l'encoche.
+keywords.de: Pfeil, Kerbe, eingekerbt, Prozess, Schritt, weiter
+keywords.en: arrow, notch, notched, process, step, next
+keywords.es: flecha, muesca, entalladura, proceso, paso, siguiente
+keywords.it: freccia, tacca, intaglio, processo, passo, avanti
+keywords.fr: flèche, encoche, entaille, processus, étape, suivant
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# wo die Spitze beginnt, der halbe Schaft, die Tiefe der Kerbe
+Head:   Value = MIN(MAX(Controls.Row_1, 0), Width)
+Shaft:  Value = MIN(MAX(Controls.Row_1.Y-Height*0.5, 0), Height*0.5)
+N:      Value = MIN(MAX(Controls.Row_2, 0), User.Head*0.9)
+
+[Geometry]
+MoveTo  X = 0; Y = Height*0.5-User.Shaft
+LineTo  X = User.Head; Y = Height*0.5-User.Shaft
+LineTo  X = User.Head; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = User.Head; Y = Height
+LineTo  X = User.Head; Y = Height*0.5+User.Shaft
+LineTo  X = 0; Y = Height*0.5+User.Shaft
+LineTo  X = User.N; Y = Height*0.5
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.6; Y = Height*0.75
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Spitze und Schaft ändern"
+        Tip.en = "Change the head and the shaft"
+        Tip.es = "Cambiar la punta y el cuerpo"
+        Tip.it = "Cambia la punta e il corpo"
+        Tip.fr = "Modifier la pointe et le corps"
+Row_2:  X = Width*0.1; Y = Height*0.5
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Tiefe der Kerbe ändern"
+        Tip.en = "Change the depth of the notch"
+        Tip.es = "Cambiar la profundidad de la muesca"
+        Tip.it = "Cambia la profondità della tacca"
+        Tip.fr = "Modifier la profondeur de l'encoche"
+
+[Connection]
+Row  X = User.N; Y = Height*0.5; DirX = 1; DirY = 0
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0

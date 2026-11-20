@@ -3,7 +3,8 @@
 # do not count; the hits show in the current language.  #24577 is the panel's search box
 # (stencils_panel.rs ID_PANEL + 1)
 focus #24577
-type "losange"
+# (JD13: "losange" also finds the Raute of Blöcke; "carreau" is a keyword of Standard-Shapes only)
+type "carreau"
 expect button:"Raute" exists
 expect button:"Rechteck" missing
 key esc
