@@ -10,9 +10,12 @@ crates.io darf nicht an einem git-Stand hängen); `lib/geom` hat eine reine Rust
 `#![forbid(unsafe_code)]`, keine fremden Crates, abhängig nur von `rt`, und rechnet **bitgleich auf allen Zielen**:
 Dasselbe Skript gibt auf Windows, Linux, macOS und im Browser dasselbe Modell, Bit für Bit.
 
-Stand: G7g Teil 1 (dieser Lauf). Nicht in Teil 1: Boolesche Operationen auf konvexen Körpern, Abschrägen, der
-Beobachtungsmodus für Menschen mit einer `gpu_view`, die beim Speichern neu baut, und der Bewertungslauf, in dem ein
-Agent Bezugsobjekte aus Beschreibungen baut ([Für Teil 2](#für-teil-2)).
+Stand: G7g Teil 2 (2026-11-20). Teil 1 brachte den Kern, das Werkzeug und die fünf Beispiele; Teil 2 bringt
+[Boolesche Operationen auf konvexen Körpern](#boolesche-operationen-brushes-exakt-entschieden) mit exakten
+Prädikaten, das [Abschrägen](#abschrägen) von Kanten und Ecken, den [Beobachtungsmodus](#der-beobachtungsmodus)
+(`modeltool --watch`), [Importe nur aus dem Ordner des Skripts](#importe-nur-aus-dem-ordner-des-skripts), Befunde
+mit ihrem Ort und den [Bewertungslauf](#der-bewertungslauf): fünf Bezugsobjekte, die ein Agent aus Beschreibungen
+gebaut hat, mit Bildern und Bericht als einziger Sicht.
 
 | Teil | Wo |
 | --- | --- |
@@ -21,12 +24,15 @@ Agent Bezugsobjekte aus Beschreibungen baut ([Für Teil 2](#für-teil-2)).
 | Normalen (flach, glatt mit Schwellwinkel) und UV per Box-Projektion | [`normals.rs`](../lib/geom/src/normals.rs) |
 | Grundkörper, Extrudieren, Grundriss hochziehen, Sweep, Drehkörper | [`build.rs`](../lib/geom/src/build.rs) |
 | Profile: Fläche, Aufräumen, Zerlegen in Dreiecke, Rechteck, Kreis, Bogen | [`poly.rs`](../lib/geom/src/poly.rs) |
+| Boolesche Operationen auf konvexen Zellen (`Solid`), Abschrägen | [`csg.rs`](../lib/geom/src/csg.rs) |
+| exakte Arithmetik: Erweiterungen nach Shewchuk, `orient2d`, Ebenen und ihre Schnittpunkte | [`exact.rs`](../lib/geom/src/exact.rs) |
 | die Prüfungen und ihr Bericht | [`check.rs`](../lib/geom/src/check.rs) |
 | glTF schreiben | [`lib/gltf/write.rs`](../lib/gltf/write.rs) |
 | die Skript-Funktionen, Materialien, `--api` | [`apps/modeltool/src/host.rs`](../apps/modeltool/src/host.rs) |
 | Skript laufen lassen, Fehler, Messungen, Bericht | [`run.rs`](../apps/modeltool/src/run.rs) |
-| Bilder über render3d | [`render.rs`](../apps/modeltool/src/render.rs) |
-| Tests, Referenzen, Prüfsumme | [`selftest.rs`](../apps/modeltool/src/selftest.rs), [`refs.rs`](../apps/modeltool/src/refs.rs), [`checksum.rs`](../apps/modeltool/src/checksum.rs), im Browser [`tests/web.mjs`](../apps/modeltool/tests/web.mjs) |
+| Bilder über render3d (Kameras, Gitter und Licht teilt der Beobachtungsmodus) | [`render.rs`](../apps/modeltool/src/render.rs) |
+| der Beobachtungsmodus: der Kern ohne Fenster, das Fenster | [`watch.rs`](../apps/modeltool/src/watch.rs), [`watch_ui.rs`](../apps/modeltool/src/watch_ui.rs) |
+| Tests, Referenzen, Prüfsumme | [`selftest.rs`](../apps/modeltool/src/selftest.rs), [`selftest_csg.rs`](../apps/modeltool/src/selftest_csg.rs), [`refs.rs`](../apps/modeltool/src/refs.rs), [`checksum.rs`](../apps/modeltool/src/checksum.rs), im Browser [`tests/web.mjs`](../apps/modeltool/tests/web.mjs) |
 | Beispiele mit ihren Bildern und Berichten | [`apps/modeltool/examples`](../apps/modeltool/examples) |
 
 ## Ein Beispiel
@@ -101,7 +107,10 @@ Mesh ändert sich nie: Jede Operation gibt ein neues. Punkte und Vektoren sind L
 | `geom.prism(grundriss, h)` | Grundriss `[[x, z], ...]` (Ansicht von oben) von y = 0 nach oben |
 | `geom.sweep(profil, pfad, geschlossen = false, glatt = 30)` | Profil entlang eines Pfads `[[x, y, z], ...]`, Ecken auf Gehrung; Profil-x rechts des Pfads, Profil-y oben (bei senkrechtem Pfad: x ist X, y ist Z) |
 | `geom.lathe(profil, segmente = 32, glatt = 30)` | Drehkörper: Profil `[[radius, y], ...]` um die Y-Achse |
-| `geom.merge(m1, m2, ...)` oder `geom.merge([m1, ...])` | zu einem Mesh |
+| `geom.merge(m1, m2, ...)` oder `geom.merge([m1, ...])` | zu einem Mesh (die Teile bleiben getrennt, auch wo sie sich durchdringen) |
+| `geom.union(m1, m2, ...)` oder `geom.union([m1, ...])` | Vereinigung zu einem geschlossenen Körper: überlappende Ecken, Podest und Rampen, Turm und Kranz |
+| `geom.difference(m, abzug1, abzug2, ...)` oder `geom.difference([m, ...])` | `m` ohne die Abzüge: ein Fenster aus einer Wand, eine Vertiefung, Zinnen |
+| `geom.intersection(m1, m2, ...)` | was in allen liegt |
 | `m.move(x, y, z)`, `m.place(x, y, z)`, `m.center()` | verschieben; die Mitte der Unterseite der Box nach (x, y, z); die Mitte der Box in den Ursprung |
 | `m.rotate_x(grad)`, `rotate_y`, `rotate_z`, `m.rotate(grad, [ax, ay, az])` | drehen um eine Achse durch den Ursprung (rechtshändig; Vielfache von 90° exakt) |
 | `m.scale(s)`, `m.scale(sx, sy, sz)` | skalieren um den Ursprung |
@@ -110,6 +119,7 @@ Mesh ändert sich nie: Jede Operation gibt ein neues. Punkte und Vektoren sind L
 | `m.weld(toleranz = 0)` | Ecken an derselben Stelle zu einem Punkt verbinden (eine Hälfte und ihr Spiegelbild zu einer Fläche) |
 | `m.array(anzahl, dx, dy, dz)`, `m.radial(anzahl, schritt = 360 / anzahl)` | Kopien in einer Reihe; um die Y-Achse |
 | `m.flat()`, `m.smooth(grad = 30)` | flache Normalen; glatte über Kanten flacher als `grad` |
+| `m.bevel(breite, segmente = 1, achse = nil)` | Kanten und Ecken abgeschrägt (`segmente` 1) oder gerundet (so viele Flächen je Viertelkreis), `breite` ist der Radius; `achse` `"x"`, `"y"`, `"z"`: nur die Kanten entlang dieser Achse; nur für konvexe Körper |
 | `m.bounds()`, `m.area()`, `m.volume()`, `m.check()`, `m.tris` | `{min, max, size, center}`; m²; m³; `{ok, closed, outward, ...}`; die Zahl der Dreiecke |
 | `profile.rect(b, h)`, `circle(r, n = 32)`, `rounded(b, h, r, n = 4)`, `arc(r, von, bis, n = 16)` | Profile um den Ursprung (`arc`: ein offener Linienzug, beide Enden dabei) |
 | `profile.move(p, dx, dy)`, `scale(p, sx, sy)`, `rotate(p, grad)`, `area(p)` | Profile ändern und messen |
@@ -121,7 +131,24 @@ Mesh ändert sich nie: Jede Operation gibt ein neues. Punkte und Vektoren sind L
 | `params` | die Parameter von `--param NAME=WERT` (Zahlen, `true`/`false`, sonst Text): `params.get("b", 0.8)` |
 
 Eingebaute Materialien: grau, weiss, schwarz, holz, dunkelholz, stein, beton, ziegel, dach, metall, rot, gruen, blau,
-gelb, glas (deckend). `import("datei.jfs")` lädt ein Modul relativ zum Skript ([`haus_teile.jfs`](../apps/modeltool/examples/haus_teile.jfs)).
+gelb, glas (deckend). `import("datei.jfs")` lädt ein Modul relativ zum Skript ([`haus_teile.jfs`](../apps/modeltool/examples/haus_teile.jfs)),
+nur aus dem Ordner des Skripts und darunter.
+
+**Boolesche Operationen** nehmen konvexe geschlossene Körper (Quader, Zylinder, Kegel, Kugeln, Prismen und Extrusionen
+konvexer Profile, auch gedreht und verschoben) oder Ergebnisse früherer Boolescher Operationen: ein solches Ergebnis
+behält seine konvexen Zellen, auch nach `move`, `place`, `center`, `rotate*`, `scale` und `mirror` (`smooth`, `flat`,
+`weld` ändern die Form nicht und behalten sie auch). `merge`, `array`, `radial` und `flip` geben ein Mesh ohne Zellen:
+Es geht nur als konvexer Körper in eine weitere Operation (ein zusammengefügtes ist es nicht, die Meldung schlägt
+`geom.union` vor). Das Ergebnis hat glatte Normalen bis 30 Grad (`.flat()` oder `.smooth(grad)` danach ändern das).
+[`turm.jfs`](../apps/modeltool/examples/turm.jfs) zeigt alle drei Bausteine:
+
+```js
+let ring = geom.difference(geom.cylinder(r, z, 32), geom.cylinder(r - wand, z + 0.2, 32).move(0, -0.1, 0))
+let scharte = geom.box(0.55, 0.45, 2 * r + 1).move(0, z - 0.45, 0)
+let kranz = geom.difference(ring, scharte, scharte.rotate_y(45), scharte.rotate_y(90), scharte.rotate_y(135))
+let schaft = geom.union(geom.cylinder(r, H, 32).move(0, s, 0), kranz.move(0, s + H, 0))
+let sockel = geom.box(4, s, 4).bevel(0.12, 3)
+```
 
 ## Die Ausgabe
 
@@ -137,7 +164,27 @@ in den Ordner (ohne `--out`: der Name des Skripts mit `.out`):
 | `model.glb` | je Teil ein Mesh und ein Knoten mit seinem Material; die Szene heißt wie das Modell |
 
 Exit-Code 0: gebaut und alle Prüfungen bestanden; 1: Fehler im Skript; 3: gebaut, aber eine Prüfung fehlgeschlagen; 2:
-falscher Aufruf. `--report DATEI.jfs` gibt nur den Bericht auf stdout, `--api` die Funktionen.
+falscher Aufruf. `--report DATEI.jfs` gibt nur den Bericht auf stdout, `--api` die Funktionen. Ein Befund über die
+Oberfläche nennt den ersten Ort und das Teil: `1 Kanten mit mehr als zwei Dreiecken, zuerst bei (0, 4.278199262, 0) in
+Teil "dach"` (`Report::problem_at`: die Mitte der ersten offenen, nicht mannigfaltigen oder gedrehten Kante, sonst ein
+eingeklemmter Punkt, die Mitte des ersten entarteten Dreiecks oder eine Ecke mit falscher Normale).
+
+### Der Beobachtungsmodus
+
+`modeltool --watch DATEI.jfs [--param NAME=WERT ...]` öffnet ein Fenster mit dem Modell in einer `gpu_view` und baut es
+neu, sobald das Skript oder eines seiner Module gespeichert wird (alle 300 ms wird verglichen, was in den Dateien
+steht, nicht die Zeitstempel: Editoren ersetzen Dateien oder lassen den Stempel). Kameras, Gitter und Licht sind die
+der Bilder ([`render.rs`](../apps/modeltool/src/render.rs) teilt sie): die Knöpfe „Vorn", „Rechts", „Oben" (ohne
+Perspektive, mit Umrissen, an die Fenstergröße angepasst), „Schräg" und „Frei": Ziehen mit der linken Taste dreht um
+die Mitte des Modells, das Rad bringt die Kamera näher oder weiter (beides wechselt in die freie Ansicht, ausgehend
+von der gewählten). „Gitter" schaltet das Gitter, „Neu bauen" oder F5 baut von Hand, Strg+Q beendet. Ein Fehler im
+Skript steht über der Ansicht (Ort und Meldung wie in der Konsole, die Zeile der Quelle, die Aufrufe); zu sehen
+bleibt das Modell des letzten Baus, der lief. Ein fehlgeschlagener Befund (Maße, Budget, offen) steht als Warnung
+dort. Die Statusleiste: Name und Zustand, Teile, Dreiecke, Maße, die Ansicht, die Nummer des Baus, seine Dauer.
+Der Kern ([`watch.rs`](../apps/modeltool/src/watch.rs)) hat kein Fenster und wird mit echten Dateien geprüft
+(Gruppe `watch`), das Fenster headless mit [`tests/watch.uis`](../apps/modeltool/tests/watch.uis) und
+[`tests/watch_fehler.uis`](../apps/modeltool/tests/watch_fehler.uis). Im Browser gibt es ihn nicht (keine Dateien).
+modeltool startet dafür außerhalb des Browsers über `ui::main!` (ui und der Stil winui sind Abhängigkeiten).
 
 ## API-Überblick (Rust)
 
@@ -153,8 +200,15 @@ falscher Aufruf. `--report DATEI.jfs` gibt nur den Bericht auf stdout, `--api` d
 - **Profile** (`geom::poly`): `signed_area2`, `area`, `clean`, `ccw`, `check_simple`, `triangulate`, `rect`, `circle`,
   `arc`, `rounded_rect`; `MERGE_RATIO`, `MAX_PROFILE_POINTS`.
 - **Prüfen**: `Mesh::check() -> Report { vertices, triangles, points, edges, bounds, area, volume, components, euler,
-  open_edges, nonmanifold_edges, flipped_edges, nonmanifold_points, inverted_components, degenerate, bad_normals }`
-  mit `closed()`, `outward()`, `ok()`, `size()`, `json()`; `DEGENERATE_RATIO`, `NORMAL_TOLERANCE`, `fnum`.
+  open_edges, nonmanifold_edges, flipped_edges, nonmanifold_points, inverted_components, degenerate, bad_normals,
+  problem_at }` mit `closed()`, `outward()`, `ok()`, `size()`, `json()`; `DEGENERATE_RATIO`, `NORMAL_TOLERANCE`, `fnum`.
+- **Boolesche Operationen** (`csg.rs`): `Solid::from_convex(&Mesh)`, `union`, `difference`, `intersection`,
+  `to_mesh(glatt)`, `transformed(&Affine)`, `bevel(breite, segmente, achse) -> (Solid, Mesh)`, `cell_count`,
+  `plane_count`, `cells`, `bounds`, `is_empty`; `Plane { n, w }`; auf Meshes `geom::union(&[&Mesh])`,
+  `difference(&Mesh, &[&Mesh])`, `intersection(&[&Mesh])`, `bevel(&Mesh, breite, segmente, Option<Axis>)`;
+  `WELD_RATIO` (10⁻⁹), `MAX_CELLS` (20 000).
+- **Exakt** (`geom::exact`): `Exp` (Erweiterungen: `add`, `sub`, `scale`, `mul`, `compress`, `sign`, `estimate`),
+  `orient2d`, `Meet` (wo drei Ebenen sich schneiden: `w_sign`, `dot_sign`, `point`), `div_round`.
 - **Mathematik** (`geom::math`, die Typen an der Wurzel): `Vec3`, `Aabb`, `Affine` (`IDENTITY`, `translation`, `scale`,
   `mirror`, `rotation(Axis, grad)`, `rotation_about(achse, grad)`, `then_after`, `apply`, `apply_vector`, `determinant`,
   `normal_matrix`, `is_similarity`), `Axis`; `sqrt`, `sqrt_portable`, `sin`, `cos`, `atan2`, `sin_cos_deg`, `angle_deg`,
@@ -237,6 +291,114 @@ entstand (eine Hälfte und ihr Spiegelbild), verbindet `weld` ausdrücklich, exa
 `modeltool` prüft das ganze Modell und jedes Teil. Teile dürfen sich berühren und durchdringen (für Bilder und Spiele
 in Ordnung); sie zu einem Körper zu vereinen ist Sache der Booleschen Operationen.
 
+### Boolesche Operationen: Brushes, exakt entschieden
+
+Wie Brushes in Karten-Editoren: Ein `Solid` ist eine Menge konvexer Zellen, die sich nicht überlappen; jede Zelle ist
+der Schnitt von Halbräumen, deren Ebenen sie mit den anderen Zellen teilt (eine Tabelle von Ebenen, die Zellen
+verweisen darauf, von vorn oder von hinten). Vereinigung, Differenz und Schnitt zerlegen Zellen an Ebenen und geben
+wieder eine solche Menge; darum lassen sich Ergebnisse weiter verknüpfen (eine Wand, aus der nacheinander drei
+Fenster und eine Tür fallen), und darum ist die Eingabe konvex: Ein konvexer Körper ist eine Zelle.
+
+- **Aus dem Mesh**: je Dreieck die Ebene durch eine seiner Ecken (eine Fläche quer zu einer Achse hat ihre Koordinate
+  dann exakt), Dreiecke, deren Ebenen innerhalb `WELD_RATIO` (10⁻⁹ der Ausdehnung) gleich sind, sind eine Fläche
+  (die Ebene des größten). Geprüft wird: geschlossen, ein Teil, Volumen positiv, keine Ecke mehr als die Toleranz
+  vor einer Fläche (sonst „nicht konvex: die Ecke (…) liegt … m vor der Fläche mit der Normale (…)").
+- **Ebenen verschweißen**: Kommen zwei Körper zusammen, wird jede Ebene des zweiten durch eine des ersten ersetzt,
+  die innerhalb der Toleranz gleich ist (oder gleich und umgekehrt). So liegen bündige Flächen (ein Fenster bündig
+  mit der Wand, Quader, die sich berühren, auch gedreht) wirklich in einer Ebene, und die exakten Entscheidungen
+  behandeln sie als eine.
+- **Exakt**: Ein Punkt ist, wo drei Ebenen sich schneiden; er wird während der Operation nie gerundet. Auf welcher
+  Seite einer vierten Ebene er liegt, ist das Vorzeichen einer 4 × 4-Determinante der Ebenen-Koeffizienten (genauer:
+  der Kofaktoren der drei Ebenen mal der vierten, mal dem Vorzeichen der Determinante der drei Normalen). Erst in f64
+  mit einer Fehlerschranke aus den Permanenten (4 · 10⁻¹⁵ der Summe der Beträge, das Doppelte dessen, was die
+  Rechnung braucht), nur nahe 0 (und genau bei 0) exakt mit Erweiterungen nach Shewchuk
+  ([`exact.rs`](../lib/geom/src/exact.rs): Summen und Produkte von f64 ohne Rundungsfehler, nur `+ − ×`, also auf
+  jedem Ziel dieselben Antworten). Damit stimmen Zerlegen einer Zelle, Schneiden einer Fläche und das Finden von
+  Punkten auf Kanten immer überein, auch für Punkte genau auf einer Ebene (der übliche Fall, nicht die Ausnahme).
+- **Eine Zelle zerlegen**: Die Seiten aller Ecken zur Ebene; liegen alle auf einer Seite, bleibt die Zelle ganz.
+  Sonst wird jede Fläche geschnitten (die Kanten einer Fläche sind die Ebenen ihrer Nachbarn, ein Schnitt setzt die
+  neue Ebene als Kante ein) und die neue Fläche ist ein großes Vieleck auf der Ebene, geschnitten mit den Ebenen der
+  Flächen, die sie berühren. Ein Polytop aus Ebenen ist ein Würfel weit draußen, nacheinander an jeder Ebene zerlegt.
+  Differenz: die Teile außerhalb jeder Ebene des Abzugs, nacheinander; Vereinigung: der erste Körper und die Teile
+  des zweiten außerhalb des ersten; Schnitt: jede Zelle des einen an allen Ebenen jeder Zelle des anderen.
+- **Die Oberfläche**: die Flächen aller Zellen je Ebene, von vorn und von hinten; wo sich zwei Zellen berühren,
+  liegen ihre Flächen auf derselben Ebene in entgegengesetzter Richtung, und was übrig bleibt, wenn man die einen von
+  den anderen abzieht (Abzug konvexer Vielecke in der Ebene), ist außen. Punkte, die genau auf einer Kante eines
+  Nachbarn liegen (exakt geprüft), kommen in diese Kante, so teilt jede Kante genau zwei Dreiecke.
+- **Gerundet wird einmal, am Ende**: jede Koordinate auf das f64, das dem exakten Quotienten am nächsten liegt (bei
+  Gleichstand gerade), über den Rest `n − q·d` als Erweiterung. Gleiche Punkte geben gleiche Bits, wie auch immer ihre
+  Ebenen gewählt wurden; die Topologie ist die der gleichen Bits (wie `weld(0)`).
+- **Zerlegen in Dreiecke ohne Koordinaten**: Jede Fläche ist exakt konvex, ihre Ecken knicken echt, eingefügte Punkte
+  liegen auf ihren Kanten. Drei Einträge liegen also genau dann auf einer Linie, wenn sie eine Kante der Fläche teilen;
+  die Ohren werden nur danach gewählt. Der erste Entwurf zerlegte die gerundeten Punkte mit exaktem `orient2d`: Punkte,
+  die exakt auf einer Kante liegen, stehen nach dem Runden um 10⁻¹⁷ daneben, und es entstanden Splitter mit einer
+  Höhe von 10⁻¹⁷ (der Test fand sie als entartete Dreiecke).
+- **Was unter der Toleranz liegt, fällt zusammen**: Ebenen in f64 treffen sich nicht genau in einem Punkt, wo mehr als
+  drei Flächen zusammenkommen sollten (die Spitze eines Kegels, die Ringe einer Kugel, eine verschweißte Ebene an
+  einer Ecke mit vier Flächen). Das exakte Ergebnis hat dort Kanten von 10⁻¹⁶; Punkte näher als die Toleranz werden
+  ein Punkt (Dreiecke mit einem Punkt doppelt fallen weg, zwei auf denselben Punkten gegeneinander auch), und ein
+  Splitter, dessen Spitze nur um Rundung neben einer langen Kante liegt, wird durch Umklappen dieser Kante entfernt
+  (die Fläche bleibt, wo sie war). Ebenen mit exakten Koeffizienten durch drei Punkte hätten das vermieden, aber
+  Determinanten vom Grad 9 gekostet, und das Verschweißen bündiger Flächen braucht die Toleranz ohnehin.
+- **Grenzen**: Zwei Körper, die sich nur an einer Kante berühren, geben eine Kante mit vier Flächen; das ist richtig
+  und wird gemeldet (im Bewertungslauf genau so passiert: die zwei Hälften eines Dachs). Allgemeine Netze
+  (nicht konvex, ohne Zellen) gehen nicht hinein; `MAX_CELLS` 20 000 Zellen. Die Ergebnisse sind nicht minimal: Eine
+  ebene Fläche aus mehreren Zellen bleibt in Stücken, mit mehr Dreiecken als nötig.
+
+### Abschrägen
+
+`m.bevel(breite, segmente, achse)` (Rust: `geom::bevel`, `Solid::bevel`) auf einem konvexen Körper fügt Ebenen hinzu:
+längs jeder Kante `segmente` Ebenen durch Punkte eines Kreisbogens mit dem Radius `breite`, dessen Achse um den Radius
+in beiden Flächen liegt (eine Kante, die um φ knickt, bekommt `round(segmente · φ / 90°)` davon, mindestens eine:
+die Zahl gilt je Viertelkreis, die Seiten eines 32-eckigen Zylinders werden nicht zerstückelt), an jeder Ecke von drei
+Flächen die Dreiecke eines Kugelflickens mit demselben Radius (bei drei gleichen Kanten das Raster normalize(i n₁ + j n₂
++ (k − i − j) n₃), sonst Reihen von der Fläche gegenüber der Kante mit den wenigsten Segmenten). Der abgeschrägte
+Quader ist die Minkowski-Summe des um den Radius geschrumpften Quaders und des Polytops dieser Richtungen; daraus ist
+die Referenz der Tests gerechnet. `segmente` 1 ist eine Fase (eine Fläche je Kante, ein Dreieck je Ecke); flache
+Normalen. Ab 2 sind die Rundungen glatt: Eine Ecke einer Rundung bekommt die Normale der ursprünglichen Fläche, auf der
+sie liegt, wo der Bogen in sie übergeht (dort ist die Fläche tangential: keine Kante, und die große Fläche bleibt
+gleichmäßig hell), sonst den nach Winkeln gewichteten Mittelwert der Rundungsflächen um sie. `achse`: nur Kanten
+entlang dieser Achse (auf ein Grad), die Ecken bleiben (eine Tischplatte mit runden senkrechten Kanten). Zu breit (die
+nach innen versetzten Flächen schließen kein Volumen mehr ein) ist ein Fehler. Ecken mit mehr als drei Flächen (die
+Spitze eines Kegels) bekommen keinen Flicken; nicht konvexe Körper gehen nicht (abschrägen vor der Booleschen
+Operation: ein abgeschrägter Körper ist konvex).
+
+### Importe nur aus dem Ordner des Skripts
+
+`import()` liest nur Dateien im Ordner des Skripts und darunter: JFScript normalisiert den Pfad (relativ zum Skript,
+„..", „." aufgelöst), [`run.rs`](../apps/modeltool/src/run.rs) prüft ihn, bevor ein Lader ihn sieht (`import_allowed`:
+der Pfad beginnt mit dem Ordner des Skripts und einem „/", kein „.." bleibt; ein Skript im Arbeitsordner darf keinen
+absoluten Pfad und nichts über „.." öffnen; Groß- und Kleinschreibung zählt, `C:/m/` ist nicht `c:/m/`), und der Lader
+für Dateien folgt keiner Verknüpfung auf dem Weg vom Ordner zur Datei (unter Windows auch keiner Junction), damit
+eine Verknüpfung im Ordner nicht hinausführt. Die Meldung: `Modul ../geheim.jfs: liegt außerhalb des Ordners des
+Skripts (apps/x); import liest nur Dateien in diesem Ordner und darunter`. Andere Wege zu Dateien hat ein Skript
+nicht (JFScripts Bibliothek liest keine, `params` sind Text).
+
+### Der Bewertungslauf
+
+Fünf Bezugsobjekte aus kurzen Beschreibungen, die vor dem Modellieren geschrieben wurden (eine Kiste mit Griffmulden,
+eine Treppe mit Geländer, eine Tür mit Kassetten, ein Haus aus Wandmodulen in einer eigenen Datei, eine kleine Arena
+mit Türmen), gebaut vom Agenten in JFScript, mit `sheet.png` und `report.json` als einziger Sicht. Die Beschreibungen,
+jede Runde mit Skript, Bild und Bericht und die Notizen liegen außerhalb des Repositorys in
+`Documents\JFLib-wip-archiv\g7g2-eval` (README.txt dort ist die Übersicht).
+
+| Objekt | Runden | Was geschah |
+| --- | ---: | --- |
+| Kiste | 1 | Bretter einer Seite als `geom.union`, die Griffmulde ein Abzug mit gerundetem Schneider, Leisten mit `bevel` |
+| Treppe | 2 | v1: „Maße 1.2 x beliebig x 2.24 m erwartet, sind … x 2.354 m": der Handlauf ragte vor (der Bericht fand es, nicht das Bild) |
+| Tür | 2 | v0: `?:` gibt es nicht (Meldung mit Pfeil); v1: acht Kassetten als Abzüge mit gefasten Schneidern |
+| Haus aus Modulen | 3 | v1: eine Kerbe am First; v2: das Dach nicht geschlossen (die Hälften berührten sich nur am First, ein echter Fehler im Modell); v3 richtig |
+| Arena | 2 | v1: die Türme ragten aus den 30 m (`expect_size`); v2 bündig in den Ecken |
+
+Was geholfen hat: die Booleschen Operationen (Öffnungen und Vertiefungen als ein Abzug, das Haus-Modul halb so lang
+wie [`haus_teile.jfs`](../apps/modeltool/examples/haus_teile.jfs) aus Teil 1), `geom.union` über überlappende Teile,
+`model.expect_size` (dreimal der erste Hinweis auf einen Fehler), `bevel` als ein Aufruf, die Meldungen mit Ort.
+Was schwer war: Lage-Rechnungen von Hand (die Dachplatte: drehen, dann verschieben, mit sin und cos im Bogenmaß; die
+Linie der Stufenkanten); ein Befund ohne Ort (seitdem nennen die Befunde Ort und Teil); Richtungen in den Bildern
+(vorn liegt in der Seitenansicht links, keine Achsen im Bild); kein Bedingungsausdruck, Listen nur mit `push`; kleine
+Teile sind bei 384 px kaum zu sehen (`--size 1024` hilft). Die Reihenfolge der Wünsche an JFScript steht unter
+[Was JFScript braucht](#was-jfscript-braucht).
+
 ### Die Skriptseite
 
 - **Ein Mesh ist im Skript eine Map** `{mesh: id, tris: n}`, weil JFScript keine Host-Objekte hat. Methoden wie
@@ -270,7 +432,11 @@ in Ordnung); sie zu einem Körper zu vereinen ist Sache der Booleschen Operation
 ## Was JFScript braucht
 
 Was in Teil 1 fehlte und wie `modeltool` sich behilft. Gebaut wird es im Repository von JFScript, nach einem Ja des
-Nutzers (E7).
+Nutzers (E7); JFScript ist in Teil 2 unverändert. Der [Bewertungslauf](#der-bewertungslauf) ordnet die Wünsche so:
+**1. Vektoren mit Operatoren** (die Lage-Rechnungen waren der größte Aufwand: die Dachplatte, die Linie der
+Stufenkanten), **5. mehr Mathematik in Grad** (tan für das Dach), **4. benannte Argumente** (`bevel(breite, segmente,
+achse)`), neu **10. ein Bedingungsausdruck** (`a ? b : c` fehlt; die Meldung hilft, kostet aber eine Runde), dann
+**2./3. Host-Objekte und die Stelle des Aufrufs** (Warnungen mit Zeile, etwa „dieser Abzug trifft nichts").
 
 1. **Vektoren mit Operatoren.** Heute: `let b2 = vec.add(b, vec.mul(richtung, 0.1))`. Gewünscht: `let b2 = b +
    richtung * 0.1` mit `b.x`, `b.y`, `b.z`. Ein Typ `vec` (2 und 3 Komponenten, `f64`, unveränderlich) mit `+ − ×
@@ -300,51 +466,78 @@ Nutzers (E7).
    `f.rahmen` und `p[0]`.
 9. **Beschreibungen der Host-Funktionen für die Sprachdienste.** `script::ls` kennt `HostItem`; `modeltool` hat die
    Liste in `host::API`. Für den Beobachtungsmodus und die IDE (G7o) gehören beide zusammen.
+10. **Ein Bedingungsausdruck** (neu aus dem Bewertungslauf). `"drücker ${seite > 0 ? "vorn" : "hinten"}"` geht nicht;
+    Behelf: eine Variable und `if` davor. Ebenso fehlt ein Ausdruck für eine Liste aus einer Schleife (`[for i in
+    0..n: ...]`); Behelf: `push` in der Schleife, was bei `geom.union(teile)` und `geom.difference(liste)` oft vorkommt.
 
 ## Tests
 
-`python build_rs.py test modeltool` führt `tests/geom.uis` (`--test prims,ops,normals,checks,poly`) und
-`tests/examples.uis` (`--test gltf,script,examples`) aus; `modeltool --check` alle acht Gruppen (`--quick` ein Zehntel).
+`python build_rs.py test modeltool` führt `tests/geom.uis` (`--test prims,ops,normals,checks,poly`), `tests/csg.uis`
+(`--test csg,bevel`), `tests/examples.uis` (`--test gltf,script,watch,examples`) und die beiden Skripte des
+Beobachtungsmodus (`tests/watch.uis`, `tests/watch_fehler.uis`, headless) aus; `modeltool --check` alle elf Gruppen
+(`--quick` ein Zehntel).
 Die Referenzen in `refs.rs` teilen keinen Code mit `lib/geom`: Volumen und Flächen aus geschlossenen Formeln, die aus der
 Geometrie hergeleitet sind. Ein Drehkörper mit n Segmenten ist ein Polyeder aus ebenen Trapezen; der Körper zwischen
 zwei Meridianebenen ist ein lineares Bild des Prismas über dem Profil mit der Jacobi-Determinante ρ sin Δ, also ist sein
 Volumen die diskrete Pappus-Regel V = n sin(2π/n) · ∫∫ρ dA, die Fläche je Profilkante n gleichschenklige Trapeze. Ein
 Sweep mit Gehrung um den Schwerpunkt des Profils hat das Volumen Fläche × Länge der Mittellinie.
 
+Für die Booleschen Operationen: Die Überlappung zweier achsparalleler Quader ist ein Produkt von Intervall-Längen; für
+alle anderen Körper prüfen Punkte, die um beide Eingaben gestreut werden, ob sie auf der richtigen Seite liegen: in
+den Eingaben über die Ebenen ihrer Dreiecke, im Ergebnis über die Parität der Schnitte eines Strahls (beides in
+einfachem f64, Punkte nahe einer Fläche bleiben weg), dazu die Gleichungen V(A ∪ B) + V(A ∩ B) = V(A) + V(B) und
+V(A − B) + V(A ∩ B) = V(A). Für das Abschrägen: Der abgeschrägte Quader ist die Minkowski-Summe des geschrumpften
+Quaders und des Polytops P der Richtungen; sein Volumen ist der geschrumpfte Quader, seine Flächen mal dem Radius,
+seine Kanten mal der Fläche des Umrisses von P quer zu ihnen und das Volumen von P (8 Oktanten, je die Kegel über
+ihren Rasterdreiecken).
+
 | Gruppe | Prüft | Ergebnis |
 | --- | --- | --- |
 | `prims` | je 150 bis 300 Quader, Zylinder, Kegel und Stümpfe, Kugeln, Tori, Treppen, Bögen mit zufälligen Maßen und Segmenten: geschlossen, außen, nichts entartet, Normalen gut, ein Teil, Euler 2 (Torus 0), Volumen und Fläche gegen die Referenz auf 10⁻¹¹, Boxen exakt (bei Vielfachen von 4 Segmenten); was verweigert wird | 12 609 Prüfungen, 0 falsch |
 | `ops` | Drehungen um Vielfache von 90° exakt (Boxen Bit für Bit), 200 Drehungen um beliebige Achsen, Skalieren (auch gespiegelt), Spiegeln an allen Achsen, Umdrehen, Felder, `radial`: Volumen, Fläche, Teile; sich berührende Quader bleiben zwei geschlossene Teile; sechs einzelne Quadratflächen werden erst durch `weld` ein Würfel; 300 Sterne extrudiert und hochgezogen (auch im Uhrzeigersinn); Sweeps entlang eines L und eines geschlossenen Quadrats gegen Fläche × Länge, um eine nicht ebene geschlossene Schleife und eine Schraubenlinie; 300 Drehkörper zufälliger Profile gegen Pappus | 9 920 Prüfungen, 0 falsch |
 | `normals` | flach: jede Ecke mit der Normale ihres Dreiecks; ein Quader bleibt bei 30° flach; Kugelnormalen zeigen von der Mitte weg; Zylinder: Deckel genau ±Y, Seiten waagrecht und radial auf 10⁻¹²; ein Achteck bei 10° flach; UV einer verschobenen Box je Fläche gleich den Koordinaten, in drei Maßstäben | 706 Prüfungen, 0 falsch |
-| `checks` | absichtlich kaputte Netze: ein Loch (3 offene Kanten), ein gedrehtes Dreieck (3 gegenläufige Kanten), innen nach außen, ein Splitter und ein Dreieck mit doppeltem Punkt, eine Kante mit vier Dreiecken, zwei Würfel an einer Ecke, Nullnormalen, Normalen nach innen; Euler eines Torus und zweier Kugeln; das JSON | 13 Prüfungen, 0 falsch |
+| `checks` | absichtlich kaputte Netze: ein Loch (3 offene Kanten), ein gedrehtes Dreieck (3 gegenläufige Kanten), innen nach außen, ein Splitter und ein Dreieck mit doppeltem Punkt, eine Kante mit vier Dreiecken, zwei Würfel an einer Ecke, Nullnormalen, Normalen nach innen; Euler eines Torus und zweier Kugeln; das JSON; der Ort des ersten Problems | 15 Prüfungen, 0 falsch |
 | `poly` | 2000 zufällige Sternvielecke mit 3 bis 80 Punkten zerlegt: n − 2 Dreiecke, alle mit Fläche, die Summe gleich der Fläche, jede Randkante einmal vorwärts, jede innere Kante einmal in jede Richtung; Punkte auf geraden Strecken; was verweigert wird; Rechteck, Kreis, abgerundete Rechtecke | 8 013 Prüfungen, 0 falsch |
-| `gltf` | die fünf Beispiele geschrieben und gelesen: Meshes, Materialien, Knoten, Szenen gleich, keine Notizen; ein Knoten mit Matrix und Kind, ein Material mit allen Faktoren, MASK und doppelseitig; was verweigert wird (Textur, Index außerhalb, NaN) | 36 Prüfungen, 0 falsch |
-| `script` | ein gutes Skript; zwölf kaputte: falsche Werte, falsche Typen, unbekannte Namen, Methoden, Materialien, sich schneidende Profile, nichts hinzugefügt, fehlende und kaputte Module, Endlosschleife, zu viele Dreiecke, falsche Achse: jede Meldung mit Datei, Zeile und Text; Pfeil unter der Spalte; Parameter, Module, Funden statt Fehlern, Abfragen; der Cache-Schlüssel (CRLF = LF) | 21 Prüfungen, 0 falsch |
-| `examples` | die fünf Beispiele: laufen, bestehen alle Prüfungen, ihr Bericht gleich dem in `examples/out` (ohne Dateien, Ansichten, Zeiten) | 20 Prüfungen, 0 falsch |
+| `csg` | 300 Paare achsparalleler Quader (ein Drittel auf einem Raster von 1/64 m bündig, berührend, eins im anderen): Vereinigung, Differenz, Schnitt geschlossen, außen, nichts entartet, ein oder zwei Teile, Euler, Volumen gegen die Überlappung auf 10⁻¹¹, Grenzen exakt; 120 Paare gedrehter Quader, Zylinder, Kegel und Stümpfe, Kugeln und Prismen: die Volumen-Gleichungen auf 10⁻⁹, je 40 gestreute Punkte auf der richtigen Seite; 80 Prismen mit 3 bis 48 Ecken durch Platten (Euler 0, Volumen); 30 Wände mit bis zu vier Öffnungen nacheinander (Euler 2 − 2k); 20 Körper gedreht und weiter geschnitten gegen dasselbe aus gedrehten Eingaben; A ∪ A, A − A, A ∩ A, zwei Hälften, eine Reihe gedrehter Kisten; was verweigert wird (nicht konvex, offen, zwei Teile, leer) | 6 090 Prüfungen, 0 falsch |
+| `bevel` | 120 Quader mit 1 bis 6 Segmenten: geschlossen, Euler 2, Volumen gegen die Minkowski-Summe auf 10⁻¹¹, Grenzen exakt, die flache Fläche flach und so groß wie erwartet, keine Naht am Übergang; 40 nur entlang Y (Querschnitt: Rechteck mit runden Ecken); 60 Zylinder, Stümpfe, gedrehte Quader; ein abgeschrägter Block mit Loch; was verweigert wird | 1 287 Prüfungen, 0 falsch |
+| `gltf` | die sechs Beispiele geschrieben und gelesen: Meshes, Materialien, Knoten, Szenen gleich, keine Notizen; ein Knoten mit Matrix und Kind, ein Material mit allen Faktoren, MASK und doppelseitig; was verweigert wird (Textur, Index außerhalb, NaN) | 42 Prüfungen, 0 falsch |
+| `script` | ein gutes Skript; zwölf kaputte: falsche Werte, falsche Typen, unbekannte Namen, Methoden, Materialien, sich schneidende Profile, nichts hinzugefügt, fehlende und kaputte Module, Endlosschleife, zu viele Dreiecke, falsche Achse: jede Meldung mit Datei, Zeile und Text; Pfeil unter der Spalte; Parameter, Module, Funden statt Fehlern, Abfragen; der Cache-Schlüssel (CRLF = LF); Boolesche Operationen und Abschrägen aus dem Skript (eine Wand mit Fenster: Euler 0, gedreht und weiter geschnitten) und ihre Meldungen; ein Befund mit Ort und Teil; Importe: zwölf Pfade für `import_allowed`, drei Skripte, die hinaus wollen, ein Skript im Unterordner | 51 Prüfungen, 0 falsch |
+| `watch` | der Kern des Beobachtungsmodus mit echten Dateien in einem temporären Ordner: der erste Bau, unverändert, gespeichert, ein Fehler (das alte Modell bleibt), ein Modul geändert und gelöscht, ein Import aus dem Ordner darüber, ein Skript, das fehlt (im Browser: keine Dateien, keine Prüfung) | 16 Prüfungen, 0 falsch |
+| `examples` | die sechs Beispiele: laufen, bestehen alle Prüfungen, ihr Bericht gleich dem in `examples/out` (ohne Dateien, Ansichten, Zeiten) | 24 Prüfungen, 0 falsch |
 
-Zusammen 31 338 Prüfungen in rund 3,8 s (Entwicklungs-Build, Ryzen 5 3600; `script` ist mit der Endlosschleife die
-längste Gruppe).
+Zusammen 38 773 Prüfungen in rund 11 s (Entwicklungs-Build, Ryzen 5 3600, ohne Last; `bevel` und `csg` sind die
+längsten Gruppen). Dazu headless: `watch.uis` (die Kiste im Fenster, die vier Ansichten, ziehen und Rad in der
+freien Ansicht, Gitter aus, Neu bauen und F5) und `watch_fehler.uis` (ein Skript mit Fehler: der Balken, Ort und
+Meldung, die Zeile; kein Modell).
 
 ## Prüfsummen
 
 `modeltool --checksum` baut jedes Beispiel aus seinem Skript und faltet die Bits jedes Teils (Positionen, Normalen,
 UV, Punkte, Indizes über `Mesh::fingerprint`), die Zahlen seiner Prüfung, den Brennstoff des Skripts und den Bericht des
-ganzen Modells in FNV-1a; dazu 20 feste Operationen aller Arten (jeder Grundkörper mit ungeraden Segmenten, ein
+ganzen Modells in FNV-1a; dazu 29 feste Operationen aller Arten (jeder Grundkörper mit ungeraden Segmenten, ein
 Sternprofil extrudiert, ein abgerundeter Grundriss, ein Sweep um eine Schraubenlinie und eine nicht ebene geschlossene
 Schleife, eine Vase, eine beliebige Drehung, ungleiches und gespiegeltes Skalieren, Felder, `radial` mit 7, `smooth`,
-`flat` mit UV, `weld` mit Toleranz).
+`flat` mit UV, `weld` mit Toleranz; seit Teil 2: eine Platte ohne ein gedrehtes Prisma und einen bündigen Quader,
+vier gedrehte Quader vereint, eine Kugel geschnitten mit einem Quader, ein Körper gedreht und weiter geschnitten,
+Abschrägen eines Quaders, eines Zylinders, eines Stumpfs und nur entlang Y).
+
+**Die Zahl hat sich in Teil 2 geändert**, weil sie jetzt mehr faltet: das sechste Beispiel (`turm.jfs`) und die neun
+neuen Operationen. Der alte Teil ist unverändert: `8d93441afd1b79d7` mit 183 303 Werten bis zum Stand a7b4f56b, also
+nach allen Änderungen an `lib/geom` (Booleans, Abschrägen, `problem_at`) und vor dem neuen Beispiel; die alten
+Beispiele geben denselben Bericht wie in `examples/out`.
 
 | Ziel | Build | Prüfsumme | `--check` |
 | --- | --- | --- | --- |
-| Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung und Release (fat LTO) | `8d93441afd1b79d7` | 31 338 bestanden |
-| Linux x86-64 gegen glibc, in WSL Ubuntu 24.04 | Entwicklung | `8d93441afd1b79d7` | 31 338 bestanden |
-| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung | `8d93441afd1b79d7` | 31 338 bestanden |
-| WebAssembly in Node 22 (V8): einfach, SIMD, Threads | Entwicklung | `8d93441afd1b79d7` | 31 338 bestanden (alle drei) |
+| Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung | `0fae175a31a0f15e` | 38 773 bestanden |
+| Linux x86-64 gegen glibc, in WSL Ubuntu 24.04 | Entwicklung | `0fae175a31a0f15e` | 38 773 bestanden |
+| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung | `0fae175a31a0f15e` | 38 773 bestanden, die fünf Skripte auch (Metal) |
+| WebAssembly in Node 22 (V8): einfach, SIMD, Threads | Entwicklung | `0fae175a31a0f15e` | 38 757 bestanden (alle drei; ohne die 16 der Gruppe `watch`) |
 
-Zusammen 183 303 Werte. Auf x86-64 und ARM64 rechnet die Wurzel der Prozessor, im Browser `sqrt_portable`; JFScript
-rechnet überall in Software. `--check` dauert im Entwicklungs-Build rund 3,8 s unter Windows, 5,8 s in WSL, 1,6 s auf
-dem M2 und 10 bis 16 s in Node. Gezeichnet haben die RTX 2070 SUPER (Vulkan), der M2 (Metal) und llvmpipe in WSL; die
-Bilder sahen gleich aus (verglichen mit dem Auge, nicht Pixel für Pixel).
+Zusammen 234 941 Werte. Auf x86-64 und ARM64 rechnet die Wurzel der Prozessor, im Browser `sqrt_portable`; JFScript
+rechnet überall in Software, die exakte Arithmetik der Booleschen Operationen nur mit `+ − ×`. `--check` dauert im
+Entwicklungs-Build rund 11 s unter Windows (unter Last bis 20 s), 11 s in WSL, 6 s auf dem M2 und 19 bis 25 s in
+Node. Gezeichnet haben die RTX 2070 SUPER (Vulkan) und der M2 (Metal); die Release-Builds sind in Teil 2 nicht
+verglichen.
 
 ## Messwerte
 
@@ -357,9 +550,15 @@ Die Beispiele auf dem Entwicklungsrechner (Ryzen 5 3600, RTX 2070 SUPER, Entwick
 | Tür | 7 | 688 | 0,5 | 0,6 | 0,7 | 281 |
 | Haus aus Modulen | 29 | 952 | 1,2 | 1,4 | 1,0 | 282 |
 | Säule | 3 | 3304 | 1,2 | 3,4 | 2,9 | 332 |
+| Turm (Teil 2) | 2 | 3680 | 1,6 | 311 | 3,4 | 257 |
 
-Skript und Geometrie sind gegen die Bilder vernachlässigbar; die Rückmeldeschleife kostet rund 0,3 s je Lauf, davon
-das meiste in render3d (Gerät, Szenen, vier Bilder mit Warten) und im PNG-Kodierer.
+Skript und Geometrie sind gegen die Bilder vernachlässigbar, außer bei Booleschen Operationen mit runden Körpern: Der
+Turm (ein 32-eckiger Schaft, hohl, mit Kranz, Tür und drei Fenstern als Abzüge) braucht 311 ms Geometrie, die Arena
+des Bewertungslaufs 60 bis 160 ms, das Haus aus Modulen 18 ms, die Tür 60 ms. Teuer ist, dass jeder Abzug mit einem
+32-Eck die Zelle in rund 34 Zellen zerlegt und jede Operation die Polytope aller Zellen neu baut (O(Ebenen²) je
+Zelle); ein Vorfilter über Boxen und behaltene Polytope wären der nächste Schritt. Die Rückmeldeschleife kostet sonst
+rund 0,3 s je Lauf, davon das meiste in render3d (Gerät, Szenen, vier Bilder mit Warten) und im PNG-Kodierer; im
+Beobachtungsmodus zeichnet nur die eine Ansicht.
 
 ## Was nicht getestet ist
 
@@ -376,32 +575,35 @@ das meiste in render3d (Gerät, Szenen, vier Bilder mit Warten) und im PNG-Kodie
   Fläche weg zeigen (der Bericht zählt sie als `bad_normals`; `smooth` mit kleinerem Winkel hilft).
 - `--examples` und der Cache mit Modulen, die sich nach dem ersten Lauf ändern, sind nur von Hand probiert; das
   Werkzeug unter einem Pfad mit Leerzeichen oder Nicht-ASCII-Zeichen gar nicht.
+- Der Beobachtungsmodus mit echtem Fenster: eine kurze Probe unter Windows (das Fenster ohne Aktivierung und ohne
+  gespeicherten Fensterzustand, die Datei geändert, während es offen war: Bau 2 mit den neuen Maßen, mit WM_CLOSE
+  beendet); Linux, macOS und das Ziehen mit der Maus nur headless. Verknüpfungen auf dem Weg eines Imports sind nicht
+  automatisch geprüft (Verknüpfungen anlegen braucht unter Windows Rechte).
+- Boolesche Operationen mit sehr vielen Zellen (über einige hundert), sehr feinen Kugeln (über 1000 Ebenen) und
+  Merkmalen nahe der Toleranz (10⁻⁹ der Ausdehnung): Sie fallen zusammen oder bleiben, geprüft ist es nicht.
 
 ## Was nicht gebaut ist
 
-- Boolesche Operationen (Teil 2: zuerst konvexe Körper mit exakten Prädikaten), Abschrägen, Vereinfachen für
-  Detailstufen (G7j), Löcher in Profilen (ein Fenster in einer Wand entsteht aus Stücken um die Öffnung), Teil-Drehkörper
-  (unter 360°), Texturen, Farben je Ecke, Instanzen im glTF (jedes Teil ist ein eigenes Mesh).
-- (Seit G7f Teil 2 erledigt: die Ansichten sind ohne Perspektive und mit Umrissen.)
-- Der Beobachtungsmodus mit `gpu_view` und Neubau beim Speichern, Beschriftungen in den Bildern (Maße, Achsen).
+- Allgemeine Netz-Booleans (nicht konvexe Eingaben ohne Zellen), Abschrägen nicht konvexer Körper und von Ecken mit
+  mehr als drei Flächen, das Zusammenfassen ebener Stücke einer Fläche (weniger Dreiecke), Vereinfachen für
+  Detailstufen (G7j), Löcher in Profilen (ein Fenster entsteht jetzt als Abzug), Teil-Drehkörper (unter 360°),
+  Texturen, Farben je Ecke, Instanzen im glTF (jedes Teil ist ein eigenes Mesh).
+- Beschriftungen in den Bildern und im Beobachtungsmodus (Maße, Achsen, Himmelsrichtungen).
 - Freigeben von Meshes während eines Laufs (wartet auf Host-Objekte in JFScript).
 
-## Für Teil 2
+## Danach
 
-- **Boolesche Operationen auf konvexen Körpern**: `Mesh::points` und die Prüfungen sind dafür da; exakte Prädikate
-  (Orientierung mit adaptiver Genauigkeit wie bei Shewchuk) gehören dann auch in das Ohrenschneiden. Ein Fenster in einer
-  Wand wäre dann ein Abzug statt Stücke um die Öffnung (`haus_teile.jfs` zeigt, wie es heute geht).
-- **Abschrägen** (bevel) der Kanten eines Quaders und eines Profils: Profile lassen sich vorher abrunden
-  (`profile.rounded`), Kanten von Körpern noch nicht.
-- **Beobachtungsmodus**: eine `gpu_view` mit derselben Szene wie `render.rs` (Kameras, Gitter, Sonne), die beim
-  Speichern des Skripts neu baut (die Bauzeit ist gegen das Zeichnen vernachlässigbar, siehe [Messwerte](#messwerte)).
-  `host::API` gehört dann als `HostItem`s in die Sprachdienste.
-- **Bewertungslauf**: ein Agent baut aus Beschreibungen in Text Bezugsobjekte (Kiste, Treppe, Tür, Haus aus Modulen,
-  eine kleine Karte) mit den Bildern und dem Bericht als einziger Sicht; die fünf Beispiele hier sind die Messlatte.
-- **render3d**: die Kamera ohne Perspektive und die Umrisse sind seit G7f Teil 2 da. Beschriftungen (Maße,
-  Achsennamen) im Bild brauchten Text in render3d oder ein Zeichnen danach.
-- **JFScript**: die Liste in [Was JFScript braucht](#was-jfscript-braucht), zuerst Host-Objekte (danach können Meshes
-  freigegeben werden) und die Stelle des Aufrufs für Warnungen.
+- **Spiel 1, Teil 2** (die Inhalte von `apps/game1` sind nicht geändert): `werft.jfs` baut die Deckungsmauern, Kisten
+  und Fässer als getrennte Teile, die sich durchdringen dürfen; mit `geom.union` würden Plattform und Rampen ein
+  Körper (eine Kollisionsform ohne Fuge), mit `geom.difference` die Mauern mit Durchgängen und Toren aus einem Stück,
+  mit `bevel` Kisten und Container mit Fasen (sichtbare Kanten in der Toon-Grafik). Die Arena des Bewertungslaufs
+  zeigt das für eine ganze Karte. `figur.jfs` profitiert wenig (Teile, die sich bewegen, bleiben Teile).
+- **Schneller**: Vorfilter über Boxen beim Zerlegen und behaltene Polytope zwischen Operationen (siehe
+  [Messwerte](#messwerte)); ebene Stücke einer Fläche zusammenfassen.
+- **Bausteine für die Lage-Rechnungen**, die im Bewertungslauf am meisten kosteten: Dächer, Rampen, „an zwei Punkten
+  ausrichten", eine Vertiefung in einer Fläche; dann Beschriftungen in den Bildern (Text in render3d oder danach).
+- **JFScript**: die Liste in [Was JFScript braucht](#was-jfscript-braucht) in der Reihenfolge des Bewertungslaufs,
+  nach dem Ja des Nutzers.
 - **Geteilter Code mit `lib/physics`**: `math::sqrt`/`sqrt_portable` stehen in beiden Crates gleich; ein gemeinsamer
   Ort (etwa `rt`) wäre eine eigene Entscheidung. Ein Mesh von `lib/geom` geht über `positions_f32` und die Indizes in ein
   `physics::TriMesh`.
