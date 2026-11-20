@@ -273,8 +273,8 @@ mitbenutzt, drei Läufe, die Spannen stehen da.
   sich drehen und schießen (Mündungsfeuer, Leuchtspuren, Funken), der Waffe vor der Kamera, Schatten, FXAA: die GPU
   braucht im p50 **0,68–0,72 ms** je Bild (ein Lauf unter Last 3,4 ms); ein Bild für sich, CPU und GPU nacheinander,
   im p50 1,1 ms (unter Last 28 ms); mit zwei Bildern in Arbeit **396 Bilder/s** (unter Last 115–176). Das Ziel „über 144
-  auf der RTX 2070 SUPER“ hält offscreen weit. Im Fenster liest jede Zelle mit HUD das Bild zurück (Was nicht getestet
-  ist).
+  auf der RTX 2070 SUPER“ hält offscreen weit. Im Fenster liest seit G7b Teil 2 keine Zelle mit HUD das Bild mehr
+  zurück (Schleier, GAMECORE.md).
 - **Der Server, ein Raum mit 16 Bots** (niemand verbunden: Bots denken, bewegen, schießen; jeder zweite Tick ein
   Schnappschuss): p50 **139–143 µs** je Tick, Mittel 293–357 µs, p99 556–598 µs (Ausreißer bis 83 ms sind Lücken der
   Planung des geteilten Rechners), also 1,8–2,1 % eines Kerns bei 60 Hz.
@@ -316,17 +316,15 @@ Die Messungen auf der Iris Xe, der HD 610 und dem Mac kommen mit Teil 2.
 - **Ein echtes Netz zwischen Rechnern** (G7e Teil 2): der Server auf dem Mac mini (WLAN), Clients auf dem Windows-Rechner,
   UDP und WebSocket, mit und ohne Bots: über UDP keine Korrektur ohne Schießen, jede Vorhersage exakt (NETCODE.md, „Echtes
   Netz“). Fedora als Server war nicht erreichbar.
-- **Die HUD über der Ansicht kostet**: Jede Zelle mit etwas über der `gpu_view` zeichnet die CPU über das zurückgelesene
-  Bild (gpu_out.rs, „Views“); im Fenster wird damit jedes Bild zurückgelesen. Gemessen ist das Bild offscreen; der
-  Weg des Fensters ist die Messung von G7b Teil 2.
+- **Die HUD über der Ansicht** kostete bis G7b Teil 2 ein Zurücklesen je Bild; seitdem mischt die GPU-Ausgabe von
+  `lib/ui` solche Zellen als „Schleier“ (GAMECORE.md, GPU.md), ohne Änderung an Spiel 1.
 
 ## Für Teil 2
 
 Aus GAME.md (G7h): zwei weitere Karten, drei weitere Waffen (auch Geschosse mit Flugzeit), Teams und Runden, ein Menü
 für die Tasten, Grafik und Lautstärke, Klang; dazu aus diesem Lauf:
 
-- die Messungen auf der Iris Xe, der HD 610 und dem Mac; die HUD ohne Zurücklesen (in die Szene gezeichnet oder eine
-  eigene Swapchain, G7b Teil 2);
+- die Messungen auf der Iris Xe, der HD 610 und dem Mac;
 - Figuren, die einander blockieren (heute laufen sie durcheinander); das Glätten der Korrekturen kam mit G7e Teil 2;
 - Bots, die Rampen und Treppen gezielt nehmen (heute folgen sie den Wegpunkten, wer festhängt, springt), und eine
   Schwierigkeit;
