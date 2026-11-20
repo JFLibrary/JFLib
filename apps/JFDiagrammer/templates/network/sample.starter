@@ -1,0 +1,51 @@
+# Startdiagramm „Beispiel: Büronetz“ (VL-50): Internetzugang, Router, Switch und die Geräte eines
+# kleinen Büros, verbunden, dazu ein Tipp.
+starter: sample
+name.de: Beispiel: Büronetz
+name.en: Sample: Office network
+name.es: Ejemplo: red de oficina
+name.it: Esempio: rete d'ufficio
+name.fr: Exemple : réseau de bureau
+description.de: Ein kleines Büronetz mit Internetzugang, Router, Switch, Server, Rechnern, Drucker und WLAN, zum Abwandeln.
+description.en: A small office network with internet access, router, switch, server, computers, printer and wireless, to adapt.
+description.es: Una pequeña red de oficina con acceso a internet, enrutador, conmutador, servidor, equipos, impresora e inalámbrico, para adaptar.
+description.it: Una piccola rete d'ufficio con accesso a internet, router, switch, server, computer, stampante e wireless, da adattare.
+description.fr: Un petit réseau de bureau avec accès internet, routeur, commutateur, serveur, ordinateurs, imprimante et sans-fil, à adapter.
+
+[Shapes]
+modem:  Stencil = "netperi"; Master = "Modem"
+        PinX = 120 mm; PinY = 180 mm; PinX.us = 4.44 in; PinY.us = 7.29 in
+        Text.de = "Internetzugang"
+        Text.en = "Internet access"
+        Text.es = "Acceso a internet"
+        Text.it = "Accesso a internet"
+        Text.fr = "Accès internet"
+router: Stencil = "netperi"; Master = "Router"
+        PinX = 120 mm; PinY = 140 mm; PinX.us = 4.44 in; PinY.us = 5.67 in
+switch: Stencil = "netperi"; Master = "Switch"
+        PinX = 120 mm; PinY = 100 mm; PinX.us = 4.44 in; PinY.us = 4.05 in
+server: Stencil = "netperi"; Master = "Server"
+        PinX = 40 mm; PinY = 45 mm; PinX.us = 1.48 in; PinY.us = 1.82 in
+pc1:    Stencil = "netcomp"; Master = "PC"
+        PinX = 90 mm; PinY = 45 mm; PinX.us = 3.33 in; PinY.us = 1.82 in
+pc2:    Stencil = "netcomp"; Master = "Laptop"
+        PinX = 140 mm; PinY = 45 mm; PinX.us = 5.19 in; PinY.us = 1.82 in
+printer:Stencil = "netperi"; Master = "Printer"
+        PinX = 190 mm; PinY = 45 mm; PinX.us = 7.04 in; PinY.us = 1.82 in
+ap:     Stencil = "netperi"; Master = "Wireless access point"
+        PinX = 200 mm; PinY = 100 mm; PinX.us = 7.41 in; PinY.us = 4.05 in
+c1:     From = "modem"; To = "router"
+c2:     From = "router"; To = "switch"
+c3:     From = "switch"; To = "server"
+c4:     From = "switch"; To = "pc1"
+c5:     From = "switch"; To = "pc2"
+c6:     From = "switch"; To = "printer"
+c7:     From = "switch"; To = "ap"
+tip:    Stencil = "callouts"; Master = "Tip"; Tip = TRUE
+        PinX = 240 mm; PinY = 170 mm; Width = 90 mm; Height = 34 mm
+        PinX.us = 8.89 in; PinY.us = 6.88 in; Width.us = 3.4 in; Height.us = 1.3 in
+        Text.de = "Tipp: Ziehen Sie Geräte aus der Seitenleiste auf die Seite und verbinden Sie sie mit dem Verbinder. IP-Adresse und andere Angaben stehen in den Shape-Daten. Diesen Hinweis können Sie löschen."
+        Text.en = "Tip: Drag devices from the Shapes panel onto the page and connect them with the connector. The IP address and other details are in the shape data. You can delete this note."
+        Text.es = "Consejo: arrastre dispositivos desde el panel Formas a la página y conéctelos con el conector. La dirección IP y otros datos están en los datos de forma. Puede eliminar esta nota."
+        Text.it = "Suggerimento: trascinare i dispositivi dal riquadro Forme sulla pagina e collegarli con il connettore. L'indirizzo IP e altri dati si trovano nei dati forma. È possibile eliminare questa nota."
+        Text.fr = "Astuce : faites glisser des appareils du volet Formes sur la page et reliez-les avec le connecteur. L'adresse IP et d'autres informations figurent dans les données de forme. Vous pouvez supprimer cette note."

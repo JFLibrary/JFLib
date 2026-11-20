@@ -1,0 +1,58 @@
+# Startdiagramm „Beispiel: Standorte“ (VL-51): Rechenzentrum, Zentrale und Homeoffice am Internet,
+# hinter der Firewall des Rechenzentrums zwei Server, dazu ein Tipp.
+starter: wan
+name.de: Beispiel: Standorte
+name.en: Sample: Sites
+name.es: Ejemplo: ubicaciones
+name.it: Esempio: sedi
+name.fr: Exemple : sites
+description.de: Drei Standorte am Internet und die Server hinter der Firewall des Rechenzentrums, zum Abwandeln.
+description.en: Three sites on the internet and the servers behind the data centre's firewall, to adapt.
+description.es: Tres ubicaciones conectadas a internet y los servidores detrás del cortafuegos del centro de datos, para adaptar.
+description.it: Tre sedi collegate a internet e i server dietro il firewall del data center, da adattare.
+description.fr: Trois sites reliés à internet et les serveurs derrière le pare-feu du centre de données, à adapter.
+
+[Shapes]
+cloud:  Stencil = "netloc"; Master = "Cloud"
+        PinX = 148 mm; PinY = 150 mm; PinX.us = 5.48 in; PinY.us = 6.07 in
+        Text.de = "Internet"
+        Text.en = "Internet"
+        Text.es = "Internet"
+        Text.it = "Internet"
+        Text.fr = "Internet"
+dc:     Stencil = "netloc"; Master = "Data center"
+        PinX = 50 mm; PinY = 150 mm; PinX.us = 1.85 in; PinY.us = 6.07 in
+office: Stencil = "netloc"; Master = "Building"
+        PinX = 246 mm; PinY = 150 mm; PinX.us = 9.11 in; PinY.us = 6.07 in
+        Text.de = "Zentrale"
+        Text.en = "Head office"
+        Text.es = "Sede central"
+        Text.it = "Sede centrale"
+        Text.fr = "Siège"
+home:   Stencil = "netloc"; Master = "House"
+        PinX = 246 mm; PinY = 80 mm; PinX.us = 9.11 in; PinY.us = 3.24 in
+        Text.de = "Homeoffice"
+        Text.en = "Home office"
+        Text.es = "Teletrabajo"
+        Text.it = "Telelavoro"
+        Text.fr = "Télétravail"
+fw:     Stencil = "netperi"; Master = "Firewall"
+        PinX = 50 mm; PinY = 105 mm; PinX.us = 1.85 in; PinY.us = 4.25 in
+web:    Stencil = "servers"; Master = "Web server"
+        PinX = 25 mm; PinY = 55 mm; PinX.us = 0.93 in; PinY.us = 2.23 in
+db:     Stencil = "servers"; Master = "Database server"
+        PinX = 75 mm; PinY = 55 mm; PinX.us = 2.78 in; PinY.us = 2.23 in
+c1:     From = "dc"; To = "cloud"
+c2:     From = "office"; To = "cloud"
+c3:     From = "home"; To = "cloud"
+c4:     From = "dc"; To = "fw"
+c5:     From = "fw"; To = "web"
+c6:     From = "fw"; To = "db"
+tip:    Stencil = "callouts"; Master = "Tip"; Tip = TRUE
+        PinX = 160 mm; PinY = 50 mm; Width = 90 mm; Height = 34 mm
+        PinX.us = 5.93 in; PinY.us = 2.02 in; Width.us = 3.4 in; Height.us = 1.3 in
+        Text.de = "Tipp: Standorte, Serverrollen und Sondergeräte finden Sie in den Schablonen links, die Suche oben findet jedes Gerät. Diesen Hinweis können Sie löschen."
+        Text.en = "Tip: Sites, server roles and special devices are in the stencils on the left; the search above finds every device. You can delete this note."
+        Text.es = "Consejo: las ubicaciones, funciones de servidor y dispositivos especiales están en las galerías de la izquierda; la búsqueda de arriba encuentra cualquier dispositivo. Puede eliminar esta nota."
+        Text.it = "Suggerimento: sedi, ruoli dei server e dispositivi speciali si trovano negli stencil a sinistra; la ricerca in alto trova ogni dispositivo. È possibile eliminare questa nota."
+        Text.fr = "Astuce : les sites, rôles de serveur et appareils spéciaux se trouvent dans les gabarits à gauche ; la recherche en haut trouve chaque appareil. Vous pouvez supprimer cette note."

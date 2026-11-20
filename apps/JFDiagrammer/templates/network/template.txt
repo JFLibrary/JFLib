@@ -1,0 +1,27 @@
+# Standardnetzwerk (VL-50, JD13): Querformat, die Schablonen Netzwerk und Peripheriegeräte und
+# Computer und Monitore (gemeinsamer Symbolsatz SH-G09), Verbinder ohne Pfeilspitzen, ein
+# Startdiagramm.  Quellformat: ../README.md
+template: Basic Network Diagram
+file: network
+name.de: Standardnetzwerk
+name.en: Basic Network Diagram
+name.es: Diagrama de red básico
+name.it: Schema di rete di base
+name.fr: Diagramme réseau de base
+description.de: Netzwerkpläne mit Rechnern, Servern, Routern, Switches und Peripheriegeräten; Geräte-Daten wie die IP-Adresse in den Shape-Daten.
+description.en: Network plans with computers, servers, routers, switches and peripherals; device data such as the IP address in the shape data.
+description.es: Planos de red con equipos, servidores, enrutadores, conmutadores y periféricos; datos de los dispositivos como la dirección IP en los datos de forma.
+description.it: Schemi di rete con computer, server, router, switch e periferiche; i dati dei dispositivi come l'indirizzo IP nei dati forma.
+description.fr: Plans réseau avec ordinateurs, serveurs, routeurs, commutateurs et périphériques ; les données des appareils, comme l'adresse IP, dans les données de forme.
+category: network
+order: 50
+stencils: netperi, netcomp
+active: netperi
+starters: sample
+
+[PageSheet]
+PrintPageOrientation = 2
+
+[Style Connector]
+EndArrow = 0
+BeginArrow = 0

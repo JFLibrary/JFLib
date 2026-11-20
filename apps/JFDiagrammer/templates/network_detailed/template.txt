@@ -1,0 +1,27 @@
+# Detailliertes Netzwerk (VL-51, JD13): Querformat, alle sechs Netzwerk-Schablonen (detailliertes
+# Netzwerk, Peripherie, Computer, Server, Netzwerksymbole, Standorte), Verbinder ohne Pfeilspitzen,
+# ein Startdiagramm.  Quellformat: ../README.md
+template: Detailed Network Diagram
+file: netdetailed
+name.de: Detailliertes Netzwerk
+name.en: Detailed Network Diagram
+name.es: Diagrama de red detallado
+name.it: Schema di rete dettagliato
+name.fr: Diagramme réseau détaillé
+description.de: Ausführliche Netzwerkpläne mit Standorten, Serverrollen, Netzwerksymbolen und Sondergeräten über mehrere Standorte.
+description.en: Detailed network plans with sites, server roles, network symbols and special devices across several sites.
+description.es: Planos de red detallados con ubicaciones, funciones de servidor, símbolos de red y dispositivos especiales en varias ubicaciones.
+description.it: Schemi di rete dettagliati con sedi, ruoli dei server, simboli di rete e dispositivi speciali su più sedi.
+description.fr: Plans réseau détaillés avec sites, rôles de serveur, symboles réseau et appareils spéciaux sur plusieurs sites.
+category: network
+order: 51
+stencils: netdetail, netperi, netcomp, servers, netsym, netloc
+active: netdetail
+starters: wan
+
+[PageSheet]
+PrintPageOrientation = 2
+
+[Style Connector]
+EndArrow = 0
+BeginArrow = 0
