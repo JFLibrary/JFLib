@@ -1063,6 +1063,12 @@ fn reader(t: &mut T) {
     let c = cp("AC1021", "ANSI_1252", "Größe \\U+2300".as_bytes());
     let d = cp("AC1015", "ANSI_932", &[0x41, 0x82, 0xA0]);
     t.ok(a == "Аб" && b == "Eé€" && c == "Größe ⌀" && d == "A\u{FFFD}\u{FFFD}", &format!("code pages: ANSI_1251 {a:?}, ANSI_1252 {b:?}, AC1021 UTF-8 with \\U+ {c:?}, ANSI_932 (no table) {d:?}"));
+    // the DOS pages by their number, KOI8_R by name, an unknown page as Windows-1252
+    let e = cp("AC1015", "DOS850", &[0x82]);
+    let f = cp("AC1015", "DOS737", &[0x80]);
+    let g = cp("AC1015", "KOI8_R", &[0xCD, 0xC9, 0xD2]);
+    let h = cp("AC1015", "ANSI_9999", &[0x80]);
+    t.ok(e == "é" && f == "Α" && g == "мир" && h == "€", &format!("code pages: DOS850 {e:?}, DOS737 {f:?}, KOI8_R {g:?}, ANSI_9999 {h:?}"));
     // TEXT's %% codes, MTEXT's format codes
     let sp = dxf::specials("Wall 45%%d %%uunder%%u %%c%%p%%%%%065");
     t.ok(sp.len() == 3 && sp[0].text == "Wall 45° " && sp[1].underline && sp[1].text == "under" && sp[2].text == " ∅±%A", &format!("TEXT's %% codes: {sp:?}"));

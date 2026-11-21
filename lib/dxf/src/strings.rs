@@ -1,26 +1,45 @@
 // strings -- a DXF's bytes as text: UTF-8 from AutoCAD 2007 (AC1021) on, before that the header's code page
-// ($DWGCODEPAGE; codepages.rs), \U+XXXX in any version; TEXT's %% codes (specials).
+// ($DWGCODEPAGE: formats::encoding's character sets), \U+XXXX in any version; TEXT's %% codes (specials).
 
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use crate::codepages;
+use formats::encoding::Charset;
 
 /// how a file's strings are decoded
 #[derive(Clone, Copy)]
 pub(crate) struct Decoder {
     /// AC1021 and later: UTF-8
     pub utf8: bool,
-    /// the code page's table (None: Windows-1252, also for unknown pages)
-    pub table: Option<&'static [u16; 128]>,
+    /// the code page (windows-1252 also for unknown pages)
+    pub charset: Charset,
     /// a multi-byte page this reader has no table of (bytes above 0x7F become U+FFFD)
     pub multibyte: bool,
 }
 
 impl Default for Decoder {
     fn default() -> Decoder {
-        Decoder { utf8: false, table: codepages::table("ANSI_1252"), multibyte: false }
+        Decoder { utf8: false, charset: Charset::Windows1252, multibyte: false }
     }
+}
+
+/// the character set of a $DWGCODEPAGE name (upper case): ANSI_874 and ANSI_1250 to 1258, DOS437 to
+/// DOS869 by their code page, MACINTOSH, a few ISO-8859 and KOI8-R; None for the multi-byte pages and
+/// unknown names
+fn charset(cp: &str) -> Option<Charset> {
+    if let Some(n) = cp.strip_prefix("ANSI_").or_else(|| cp.strip_prefix("DOS")).and_then(|n| n.parse::<u16>().ok()) {
+        return Charset::from_code_page(n);
+    }
+    Some(match cp {
+        "ISO8859-1" | "ISO8859_1" => Charset::Windows1252,
+        "ISO8859-2" | "ISO8859_2" => Charset::Iso8859_2,
+        "ISO8859-5" | "ISO8859_5" => Charset::Iso8859_5,
+        "ISO8859-7" | "ISO8859_7" => Charset::Iso8859_7,
+        "ISO8859-9" | "ISO8859_9" => Charset::Windows1254,
+        "MACINTOSH" | "MAC_ROMAN" => Charset::Macintosh,
+        "KOI8-R" | "KOI8_R" => Charset::Koi8R,
+        _ => return None,
+    })
 }
 
 impl Decoder {
@@ -29,8 +48,8 @@ impl Decoder {
         let utf8 = version.len() == 6 && version.is_ascii() && version.starts_with("AC") && version[2..].parse::<u32>().is_ok_and(|v| v >= 1021);
         let cp: String = codepage.trim().chars().map(|c| c.to_ascii_uppercase()).collect();
         let multibyte = matches!(cp.as_str(), "ANSI_932" | "ANSI_936" | "ANSI_949" | "ANSI_950" | "ANSI_1361" | "DOS932" | "BIG5" | "GB2312" | "JOHAB");
-        let table = codepages::table(&cp).or_else(|| if multibyte { None } else { codepages::table("ANSI_1252") });
-        Decoder { utf8, table, multibyte }
+        let charset = if multibyte { Charset::Windows1252 } else { charset(&cp).unwrap_or(Charset::Windows1252) };
+        Decoder { utf8, charset, multibyte }
     }
 
     /// bytes as text: valid UTF-8 stays UTF-8 in any version (writers put UTF-8 into older files: GDAL's utf-8.dxf), the
@@ -48,15 +67,11 @@ impl Decoder {
             lossy(b, &mut out);
             return out;
         }
+        if !self.multibyte {
+            return self.charset.decode(b);
+        }
         for &c in b {
-            if c < 0x80 {
-                out.push(c as char);
-            } else if self.multibyte {
-                out.push('\u{FFFD}');
-            } else {
-                let u = self.table.map_or(0xFFFD, |t| t[(c - 0x80) as usize]);
-                out.push(char::from_u32(u as u32).unwrap_or('\u{FFFD}'));
-            }
+            out.push(if c < 0x80 { c as char } else { '\u{FFFD}' });
         }
         out
     }
@@ -66,8 +81,8 @@ impl Decoder {
         if c < 0x80 {
             return c as char;
         }
-        let t = if self.utf8 || self.multibyte { codepages::table("ANSI_1252") } else { self.table };
-        t.and_then(|t| char::from_u32(t[(c - 0x80) as usize] as u32)).unwrap_or('\u{FFFD}')
+        let cs = if self.utf8 || self.multibyte { Charset::Windows1252 } else { self.charset };
+        cs.decode_char(c).unwrap_or('\u{FFFD}')
     }
 }
 

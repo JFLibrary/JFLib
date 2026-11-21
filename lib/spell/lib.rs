@@ -53,7 +53,6 @@
 extern crate alloc;
 
 mod aff;
-mod charsets;
 mod check;
 mod dic;
 mod hyphen;

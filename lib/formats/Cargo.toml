@@ -4,7 +4,7 @@ description = "bounded JSON, typed JSON records, an XML subset and Unicode text 
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
+license = "(MIT OR Apache-2.0) AND BSD-3-Clause"
 repository.workspace = true
 homepage.workspace = true
 

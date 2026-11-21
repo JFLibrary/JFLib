@@ -29,9 +29,17 @@ instead of being read halfway: a DTD, other entities, comments, CDATA sections, 
 instructions and mixed content. `escape` writes text and attribute values that survive the
 reader's newline normalization.
 
-**Encodings** (`formats::encoding`) decode bytes to a `String` and back: UTF-8 with or without a
-byte-order mark and UTF-16 in both byte orders, told apart by the mark. Nothing is replaced or
-guessed: invalid sequences and UTF-32 are errors.
+**Encodings** (`formats::encoding`) decode bytes to a `String` and back. `decode` and `encode` are
+the strict Unicode interchange: UTF-8 with or without a byte-order mark and UTF-16 in both byte
+orders, told apart by the mark; nothing is replaced or guessed, invalid sequences and UTF-32 are
+errors. For text from the web, from mail and from old files there are the single-byte character
+sets (`Charset`): every single-byte encoding of the
+[WHATWG Encoding Standard](https://encoding.spec.whatwg.org/) (windows-1252 and the other Windows
+pages, ISO-8859-2 to -16, KOI8-R and KOI8-U, macintosh, IBM866, x-mac-cyrillic), the DOS code pages
+of old files (IBM437, 737, 775, 850 to 869) and an exact ISO-8859-1. `label` reads the standard's
+labels as browsers do ("latin1" is windows-1252, multi-byte encodings such as Shift_JIS are named
+but not decoded), `Charset::from_code_page` takes Windows code page numbers, and `decode_label`
+is the standard's decode: a byte-order mark wins over the label, malformed input becomes U+FFFD.
 
 Every reader treats its input as untrusted. It checks the size before it reads and the nesting,
 the values or the elements while it reads (`json::Limits`, `xml::Limits`, the `limit` of
@@ -55,6 +63,14 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::formats`. All of JFLib's crates share one
 version and are released together. It runs on every platform JFLib supports.
 
+```rust
+use jflib::formats::encoding::{self, Charset};
+
+let text = encoding::decode_label("iso-8859-2", &bytes, 1 << 20)?;   // a mail's charset=
+let dos = Charset::from_code_page(850).map(|c| c.decode(&name));     // a ZIP or DBF from DOS
+let back = Charset::Windows1252.encode("€100")?;                     // Err: a character it lacks
+```
+
 Until 0.2.1, JSON and the typed records were `agent_core::json` and `agent_core::jmap`, XML and
 the encodings `base::xml` and `base::encoding`. Those paths remain as re-exports of this crate's
 modules, so existing code keeps compiling.
@@ -72,4 +88,7 @@ in `agent_core` and `base` until then. The
 
 ## License
 
-MIT or Apache-2.0, at your choice.
+MIT or Apache-2.0, at your choice. The labels of the WHATWG Encoding Standard and the entries of its
+single-byte indexes in `charsets.rs` are under the standard's BSD 3-Clause License (Copyright ©
+WHATWG: Apple, Google, Mozilla, Microsoft); the text is in the crate's
+[`licenses/`](https://github.com/JFLibrary/JFLib/tree/main/lib/formats/licenses) folder.
