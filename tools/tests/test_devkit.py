@@ -553,6 +553,15 @@ class ChangelogTest(unittest.TestCase):
         self.assertIn("## [0.3.0] - 2027-01-01\n\nFirst release on crates.io.", new)
         self.assertIn(f"[0.3.0]: {changelog.REPO}/compare/v0.2.0...v0.3.0", new)
 
+    def test_new_crate_entries(self):
+        """a new crate's changelog has only [Unreleased]: its entries go before the link reference"""
+        t = changelog.crate_log("jflib-y", "0.2.0")
+        t = changelog.add_entry(t, "One", "added")
+        t = changelog.add_entry(t, "Two", "security")
+        self.assertIn("First release on crates.io.\n\n### Added\n\n- One\n\n### Security\n\n- Two\n\n[Unreleased]: ", t)
+        self.assertTrue(t.endswith("...HEAD\n"))
+        self.assertEqual(changelog.unreleased(t).splitlines()[-1], "- Two")
+
     def test_repository_changelog(self):
         """CHANGELOG.md has [Unreleased] and a section of the library's version"""
         text, _ = changelog.read()
