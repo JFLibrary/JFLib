@@ -7,7 +7,7 @@ use archive::{
     Entry, Limits,
     opc::{self, Package, Rules},
 };
-use base::xml::Node;
+use formats::xml::Node;
 use doc_core::Document;
 
 /// jfWord's conservative OPC profile: no macros, part names and targets as exact strings

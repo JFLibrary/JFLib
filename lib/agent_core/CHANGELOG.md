@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- `agent_core::json`, `agent_core::jmap`, `agent_core::record!` and `agent_core::wire_enum!` are re-exports of jflib-formats (`formats::json`, `formats::jmap` and their macros), where the code lives now; the items and their behaviour are the same, and `agent_core::Value` stays. The crate depends on jflib-formats. api-diff lists the re-exported items as removed (it does not follow re-exports into another crate).
+
 ### Security
 
 - `describe` and `discover` show an `Access::Local` action's name, description and access only: unavailable (forbidden), without its schemas (they revealed what an external call of it does not).

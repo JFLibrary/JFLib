@@ -1261,8 +1261,9 @@ Fensterrand hinaus.
   ([`base/hashring.rs`](../lib/base/hashring.rs)) und eine LRU-Tabelle nach Anzahl und Gewicht
   ([`base/lru.rs`](../lib/base/lru.rs); Gruppen `hashring`, `lru`), im Einsatz im
   Loadbalancer, KV-Speicher und Cache des Labors von JFNetworker. Dazu typisiertes JSON
-  ([`agent_core/src/jmap.rs`](../lib/agent_core/src/jmap.rs): `record!`, `wire_enum!`, aus
-  BackupCraft in die Library gezogen; `bc_proto` nutzt es mit) und eingerücktes JSON für
+  ([`formats/src/jmap.rs`](../lib/formats/src/jmap.rs), bis U2 in `agent_core`: `record!`,
+  `wire_enum!`, aus BackupCraft in die Library gezogen; `bc_proto` nutzt es mit) und eingerücktes
+  JSON für
   Dateien (`json::stringify_pretty`), getestet mit der coretest-Gruppe `jmap`.
   Seit D2 fasst `Window::hist_between` die Slots eines Zeitraums zu einem Histogramm zusammen
   (die Zeitreihen des Labors von JFNetworker: ein Punkt pro Intervall, Perzentile beliebiger
@@ -2501,7 +2502,7 @@ Sicherheit:
   sie lesen UDP-Pakete aus dem Internet.
 - **P1** · *fehlt* · Fuzzing der Datei-Parser. `tools/net_fuzz.py` und `tools/cov_fuzz.py` decken
   nur zstd, LZ4, X.509, DNS, HTTP, TLS, die IP-Reassembly und `netpkt` ab. Es fehlen DEFLATE,
-  zlib und gzip (`img_core`), `archive` (ZIP, OPC), `agent_core::json` (darüber laufen auch
+  zlib, gzip und Brotli (`compress`), `archive` (ZIP, OPC), `formats::json` (darüber laufen auch
   Update-Manifeste, `datastore`, glTF und Agent-Anfragen), die XML-Leser (unten), die
   Bild-Decoder und die Schriften (bisher nur abgeschnittene und gekippte Kopien in den
   Python-Prüfungen, [`tools/imgtest_common.py`](../tools/imgtest_common.py),
@@ -2535,15 +2536,20 @@ Grundbausteine am falschen Ort oder mehrfach:
   Sicherheits-Sitzung); `cargo-jflib` mit `compress` statt seines eigenen Encoders
   ([`cargo_jflib/src/deflate.rs`](../lib/cargo_jflib/src/deflate.rs), heute ohne jede
   Abhängigkeit; die Bytes der Pakete ändern sich dabei).
-- **P1** · *teilweise* · JSON aus `agent_core` lösen: `agent_core::json` und `jmap` nutzen `ui`,
-  `cas`, `gltf`, `datastore`, `update` und `netio`; wer nur JSON braucht, findet es heute in der
-  Crate der Agentenschnittstelle. Ziel: `base` oder eine eigene Crate, `agent_core` re-exportiert.
-- **P2** · *teilweise* · Ein XML-Leser statt sechs: `base::xml`,
+- **P1** · *erledigt* (2026-11-21, U2) · JSON aus `agent_core` gelöst: die neue Blatt-Crate
+  `formats` ([`formats/src/lib.rs`](../lib/formats/src/lib.rs), nur `alloc`) hat `json` und `jmap`
+  aus `agent_core` und `xml` und `encoding` aus `base` übernommen, unverändert; die alten Pfade
+  bleiben als Re-Exporte. `cas`, `datastore`, `gltf` und `update` hängen nicht mehr an
+  `agent_core`, `archive`, `doc_core` und `doc_io` nicht mehr an `base` (`doc_core` damit auch
+  nicht mehr an `plat`). `netio` nutzt noch `agent_core::json` (über die Sicherheits-Sitzung).
+  Der Name `data` ging nicht: `build_rs.py` erkennt Crates an `NAME::`, und die Stile netlab,
+  backupcraft und jfoffice haben ein eigenes Modul `data`.
+- **P2** · *teilweise* · Ein XML-Leser statt sechs: `formats::xml`,
   [`img_svg/xml.rs`](../lib/img_svg/xml.rs), [`diagram_io/src/xml.rs`](../lib/diagram_io/src/xml.rs),
   zwei in `diagram_core` (`design/xml.rs`, `formula/xml.rs`) und der in
   [`text/fontconf.rs`](../lib/text/fontconf.rs), jeder mit eigenen Grenzen. Einer, gefuzzt, mit
   einer nachsichtigen Art für SVG.
-- **P2** · *teilweise* · Alte Textkodierungen in `base::encoding`, das heute nur UTF-8 und
+- **P2** · *teilweise* · Alte Textkodierungen in `formats::encoding`, das heute nur UTF-8 und
   UTF-16 kann. Tabellen gibt es getrennt in [`spell/charsets.rs`](../lib/spell/charsets.rs) und
   [`dxf/src/codepages.rs`](../lib/dxf/src/codepages.rs); [`netpkt/imf.rs`](../lib/netpkt/imf.rs)
   liest außer UTF-8 nur ISO-8859-1. Gebraucht für HTML, Mail, CSV und alte Dateien.
@@ -2569,7 +2575,8 @@ Crates, die einer JF-App folgen:
 - **P3** · *teilweise* · `eapm`: nur EAP-MD5 und EAP-PWD (für den Simulator). WPA-Enterprise
   braucht EAP-TLS, PEAP-MSCHAPv2 oder EAP-TTLS; für MSCHAPv2 fehlen in `crypto` MD4 und DES.
 - **P3** · *teilweise* · `base` mischt Grundbausteine mit Werkzeugen aus dem Labor von
-  JFNetworker (`cmdtree`, `hashring`, `metrics`); beim Umzug von JSON die Gliederung mit ordnen.
+  JFNetworker (`cmdtree`, `hashring`, `metrics`). XML und die Kodierungen sind seit U2 in
+  `formats`; `base::xml` und `base::encoding` sind nur noch Re-Exporte.
 
 Geprüft und ohne Eintrag: `diagram_*` (das Visio-Modell als Fach-Crate), `img_pdn`, `gltf` und
 `dxf` (nur Import, kein binäres DXF), `spell` (ohne Morphologie) und `update`.

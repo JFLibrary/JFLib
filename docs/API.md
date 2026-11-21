@@ -11,7 +11,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [ui](#ui) -- the immediate-mode UI: runtime, layout, widgets, windows, style contract
   <br>[App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks) · [Layout](#layout) · [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics) · [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8) · [Widgets](#widgets) · [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips) · [Text boxes and the clipboard](#text-boxes-and-the-clipboard) · [Rich-text and code editors](#rich-text-and-code-editors) · [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders) · [Data views: grid, tree, badges, meters](#data-views-grid-tree-badges-meters) · [Shell parts: navigation, command bar, splitter, breadcrumb, wizard steps](#shell-parts-navigation-command-bar-splitter-breadcrumb-wizard-steps) · [Docking: panels at the sides, tab groups, floating tool windows](#docking-panels-at-the-sides-tab-groups-floating-tool-windows) · [Charts](#charts) · [Toasts, spinners, progress](#toasts-spinners-progress) · [Date and time input](#date-and-time-input) · [Languages](#languages) · [Vector icons](#vector-icons) · [Values and colours](#values-and-colours) · [Windows](#windows) · [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars) · [File dialog](#file-dialog) · [Drawing commands](#drawing-commands) · [Scripts and the widget dump](#scripts-and-the-widget-dump) · [Theme](#theme) · [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions) · [Style contract](#style-contract) · [Stock painters of the data and shell parts](#stock-painters-of-the-data-and-shell-parts) · [Constants](#constants) · [Key codes](#key-codes) · [other](#other-modules)
 - [agent_core](#agent_core) -- transport-independent actions, schema validation, JSON-RPC, MCP and tasks
-  <br>[src/action.rs](#agent_coresrcactionrs) · [src/jmap.rs](#agent_coresrcjmaprs) · [src/json.rs](#agent_coresrcjsonrs) · [src/rpc.rs](#agent_coresrcrpcrs) · [src/schema.rs](#agent_coresrcschemars) · [src/task.rs](#agent_coresrctaskrs)
+  <br>[lib.rs](#agent_core-crate-root) · [src/action.rs](#agent_coresrcactionrs) · [src/rpc.rs](#agent_coresrcrpcrs) · [src/schema.rs](#agent_coresrcschemars) · [src/task.rs](#agent_coresrctaskrs)
 - [agent_io](#agent_io) -- explicitly enabled stdio and current-user native agent transports
   <br>[lib.rs](#agent_io-crate-root) · [src/ipc.rs](#agent_iosrcipcrs)
 - [gfx](#gfx) -- surfaces, the draw context, blend kernels, paths, strokes, masks, gradients
@@ -75,7 +75,9 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
   <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_pad.rs (Windows)](#platwin_padrs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_pad.rs (Linux)](#platlinux_padrs-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_pad.rs (Apple)](#platapple_mac_padrs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [pad.rs](#platpadrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
-  <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
+  <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
+- [formats](#formats) -- bounded JSON with exact numbers, typed JSON records, an XML subset, Unicode text encodings
+  <br>[src/encoding.rs](#formatssrcencodingrs) · [src/jmap.rs](#formatssrcjmaprs) · [src/json.rs](#formatssrcjsonrs) · [src/xml.rs](#formatssrcxmlrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
   <br>[lib.rs](#datetime-crate-root) · [cron.rs](#datetimecronrs) · [tz.rs](#datetimetzrs)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
@@ -12228,12 +12230,28 @@ The card is one Tab stop; a button of its own (remove from a list) goes beside i
 *transport-independent actions, schema validation, JSON-RPC, MCP and tasks* -- crate root [`lib/agent_core/src/lib.rs`](../lib/agent_core/src/lib.rs)
 
 ```text
-Transport-independent action contracts and bounded JSON. New shared implementation;
-no corresponding module exists in the frozen assembly reference.
+Transport-independent action contracts. New shared implementation; no corresponding module
+exists in the frozen assembly reference.
 
-  json   strict bounded JSON: Value, parse, stringify, stringify_pretty
-  jmap   typed mapping of records and string enums (Field, Json, record!, wire_enum!)
+  action   semantic action dispatch: Dispatcher, ActionSpec, ActionContext, ActionResult /
+           ActionError, batches, pages
+  schema   statically registered input / output schemas (a JSON Schema subset), validation
+  rpc      versioned newline JSON-RPC (Protocol, RpcSession) with MCP adapters; no I/O
+  task     bounded cooperative tasks for long operations
+
+  json, jmap, record!, wire_enum!   re-exports of formats::{json, jmap} (they lived here until
+           0.3.0; new code names formats)
 ```
+
+### `agent_core` crate root
+
+Re-exports: `json::Value`
+
+Re-exports: `formats::json`
+
+Re-exports: `formats::jmap`
+
+Re-exports: `formats::{record, wire_enum}`
 
 ### `agent_core/src/action.rs`
 
@@ -12455,151 +12473,6 @@ New library code, independent of native windows, document types and language mod
 
 - **`fn validate_registry(actions: &[ActionSpec]) -> Result<(), ActionError>`**
   Validate stable identifiers and prevent ambiguous name/command registrations.
-
-### `agent_core/src/jmap.rs`
-
-Source: [`lib/agent_core/src/jmap.rs`](../lib/agent_core/src/jmap.rs)
-
-```text
-jmap -- typed JSON mapping for records and string enums over json::Value: the Field trait
-for member values, the Json trait for records, and the record! / wire_enum! macros that
-declare a type and its mapping in one place.  Missing or mistyped members read as their
-default; unknown members are ignored, so old and new programs read each other's data
-(protocols, project files, settings).
-
-  record! { pub struct P { pub a: String, pub n: u32, pub items: Vec<Item> } }
-  wire_enum! { pub enum Kind { Pc = "pc", Router = "router" } }   // Default = first variant
-  p.to_json() / P::from_json(&v) / Field::put / Field::take
-  list(&[T]) / from_list(&v) / str_of / u64_of / obj([...]) / empty_object()
-
-Field is implemented for String, bool, the integer types, Value (kept as is), Vec<T>,
-Option<T> (null = None) and BTreeMap<String, T> (an object).  Floating point has no exact
-JSON token here: store fixed-point integers instead.
-```
-
-- **`trait Field: Sized + Default`**
-  a value that maps to one JSON member
-  - `fn put(&self) -> Value`
-  - `fn take(v: Option<&Value>) -> Self`
-
-- **`trait Json: Sized`**
-  a record (a JSON object)
-  - `fn to_json(&self) -> Value`
-  - `fn from_json(v: &Value) -> Option<Self>`
-
-- **`fn empty_object() -> Value`**
-  an empty JSON object (used by record!)
-
-- **`record!(...)`**
-  declare a record: the struct (Clone, Debug, Default, PartialEq) and its Json / Field
-  mapping; the JSON member names are the field names
-
-- **`wire_enum!(...)`**
-  declare an enum carried as a string: Default is the first variant, ALL, as_str / parse,
-  Field
-
-- **`fn list<T: Json>(items: &[T]) -> Value`**
-  a list of records as a JSON array
-
-- **`fn from_list<T: Json>(v: &Value) -> Vec<T>`**
-  the records of a JSON array (or of the array under `items` of an object)
-
-- **`fn str_of<'a>(v: &'a Value, k: &str) -> &'a str`**
-  a string member of an object ("" when missing)
-
-- **`fn u64_of(v: &Value, k: &str) -> u64`**
-  an unsigned member of an object (0 when missing)
-
-- **`fn obj<const N: usize>(fields: [(&str, Value); N]) -> Value`**
-  an object built from (name, value) pairs
-
-### `agent_core/src/json.rs`
-
-Source: [`lib/agent_core/src/json.rs`](../lib/agent_core/src/json.rs)
-
-```text
-Strict, bounded UTF-8 JSON for local and browser control channels. New shared code.
-```
-
-- **`struct Number(String)`**
-  Exact JSON number token; construction validates the JSON number grammar.
-
-**`impl Number`**
-
-- **`fn parse(text: &str) -> Option<Self>`**
-  Parse one complete JSON number without rounding it through floating point.
-- **`fn as_str(&self) -> &str`**
-  Original validated JSON representation.
-- **`fn as_i64(&self) -> Option<i64>`**
-  Read an exactly integral JSON number without precision loss, including exponents.
-- **`fn as_u64(&self) -> Option<u64>`**
-  Read an exactly integral, nonnegative JSON number without precision loss.
-
-- **`enum Value`**
-  Owned JSON data. Objects retain member order and parsed objects have unique keys.
-  - `Null` -- JSON null.
-  - `Bool(bool)` -- JSON boolean.
-  - `Number(Number)` -- Exact JSON number.
-  - `String(String)` -- Unicode string.
-  - `Array(Vec<Value>)` -- Ordered values.
-  - `Object(Vec<(String, Value)>)` -- Ordered name/value members.
-
-**`impl Value`**
-
-- **`fn string(value: impl Into<String>) -> Self`**
-  Make a JSON string.
-- **`fn u64(value: u64) -> Self`**
-  Make an unsigned number without converting to floating point.
-- **`fn i64(value: i64) -> Self`**
-  Make a signed number without converting to floating point.
-- **`fn object<const N: usize>(fields: [(&str, Value); N]) -> Self`**
-  Make an object, with later duplicate names replacing earlier values.
-- **`fn insert(&mut self, key: &str, value: Value) -> bool`**
-  Insert or replace an object member; false when this value is not an object.
-- **`fn get(&self, key: &str) -> Option<&Value>`**
-  Look up an object member.
-- **`fn as_object(&self) -> Option<&[(String, Value)]>`**
-  Borrow an object member list.
-- **`fn as_array(&self) -> Option<&[Value]>`**
-  Borrow an array.
-- **`fn as_str(&self) -> Option<&str>`**
-  Borrow a string.
-- **`fn as_bool(&self) -> Option<bool>`**
-  Read a boolean.
-- **`fn as_u64(&self) -> Option<u64>`**
-  Read an unsigned integer token.
-- **`fn as_i64(&self) -> Option<i64>`**
-  Read a signed integer token.
-
-- **`struct Limits`**
-  Bounds applied before and during decoding or encoding.
-  - `bytes: usize` -- Maximum encoded byte count.
-  - `depth: usize` -- Maximum nested arrays/objects; the root value starts at depth zero.
-  - `values: usize` -- Maximum total values, including the root.
-  - `string_bytes: usize` -- Maximum decoded bytes in any string, including member names.
-  - `members: usize` -- Maximum members/elements in any container.
-
-- **`struct Error`**
-  Parse or serialization failure with the byte offset where it was found.
-  - `offset: usize` -- Zero-based byte offset (zero for serialization limits).
-  - `kind: &'static str` -- Stable machine-readable failure category.
-
-- **`fn parse(bytes: &[u8]) -> Result<Value, Error>`**
-  Parse a complete UTF-8 JSON value using default limits.
-
-- **`fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Value, Error>`**
-  Parse a complete UTF-8 JSON value. Duplicate object keys and lone surrogates are errors.
-
-- **`fn stringify(value: &Value) -> Result<String, Error>`**
-  Encode JSON without literal newlines, enforcing the default bounds.
-
-- **`fn stringify_with_limits(value: &Value, limits: Limits) -> Result<String, Error>`**
-  Encode bounded JSON. Invalid duplicate keys in manually built objects are rejected.
-
-- **`fn stringify_pretty(value: &Value, limits: Limits, indent: usize) -> Result<String, Error>`**
-  Encode bounded JSON for people to read: every array element and object member on its own
-  line, indented by `indent` spaces per level, "name": value; empty containers stay "[]" / "{}".
-  The output ends without a newline.
 
 ### `agent_core/src/rpc.rs`
 
@@ -40381,12 +40254,18 @@ base -- portable basics above the runtime and the platform     [src/core/str.s, 
   lru:  Lru -- a map that forgets the least recently used entries (count and weight limits)
   pattern: glob / has_glob -- shell wildcards; Regex -- POSIX basic and extended regular
         expressions without back-references (a Pike VM: no exponential cases)
+  xml, encoding: re-exports of formats::{xml, encoding} (here until 0.3.0; new code names
+        formats)
 
 Strings and formatting are Rust's own (str, String, format!); the thread pool, cpu
 features and files are in plat (they need unsafe).
 ```
 
 ### `base` crate root
+
+Re-exports: `formats::encoding`
+
+Re-exports: `formats::xml`
 
 - **`fn utf8_decode(s: &[u8], i: usize) -> (u32, usize)`**
   UTF-8 decoding: (codepoint, index after it); an invalid / overlong / surrogate / too large
@@ -40488,88 +40367,6 @@ a value are dropped (reading drops them too): get after set gives what a reload 
   the shortest text that reads back to the same double  [ini_set_f64]
 - **`fn remove(&mut self, sec: &str, key: &str) -> bool`**
   false: not there  [ini_remove]
-
-### `base/encoding.rs`
-
-Source: [`lib/base/encoding.rs`](../lib/base/encoding.rs)
-
-```text
-Strict Unicode interchange codecs. New native library functionality (no legacy counterpart).
-```
-
-- **`enum Encoding`**
-  Explicit text encodings; unmarked input is interpreted as UTF-8.
-  - `Utf8`
-  - `Utf8Bom`
-  - `Utf16Le`
-  - `Utf16Be`
-
-- **`enum Error`**
-  Invalid Unicode, unsupported UTF-32, or a caller-specified byte limit.
-  - `Invalid`
-  - `Unsupported`
-  - `Limit`
-
-- **`fn decode(bytes: &[u8], limit: usize) -> Result<(String, Encoding), Error>`**
-  Decode without replacement characters or guessed legacy code pages.
-
-- **`fn encode(text: &str, enc: Encoding) -> Vec<u8>`**
-  Encode Unicode; UTF-16 output always includes its byte-order mark.
-
-### `base/xml.rs`
-
-Source: [`lib/base/xml.rs`](../lib/base/xml.rs)
-
-```text
-Bounded, namespace-aware XML subset for interchange. No DTD, entities, I/O or XInclude.
-New native functionality; deliberately rejects constructs it cannot represent losslessly.
-```
-
-- **`struct Name`**
-  Expanded XML name (prefixes are not identities).
-  - `ns: String`
-  - `local: String`
-
-- **`struct Node`**
-  Element-only or text-only node; mixed content is rejected by this subset reader.
-  - `name: Name`
-  - `attrs: Vec<(Name, String)>`
-  - `text: String`
-  - `children: Vec<Node>`
-
-**`impl Node`**
-
-- **`fn is(&self, ns: &str, local: &str) -> bool`**
-  Test an expanded name.
-- **`fn attr(&self, ns: &str, local: &str) -> Option<&str>`**
-  Attribute lookup; the default namespace never applies to unprefixed attributes.
-
-- **`enum Error`**
-  Syntax error, resource limit, or an intentionally unsupported XML construct.
-  - `Syntax`
-  - `Limit`
-  - `Unsupported`
-
-- **`struct Limits`**
-  What one parse may take: the text's bytes, its elements, their nesting. The default
-  (4 MiB, 30000 elements, 48 levels) is `parse`'s; a reader whose own model bounds its
-  documents otherwise names what that model can expand to (`parse_with`).
-  - `bytes: usize`
-  - `nodes: usize`
-  - `depth: usize`
-
-- **`fn valid_char(c: char) -> bool`**
-  XML 1.0 character validity (also used before emitting document text).
-
-- **`fn escape(s: &str) -> Result<String, Error>`**
-  Escape text/attribute content, including CR so it survives XML newline normalization.
-
-- **`fn parse(s: &str) -> Result<Node, Error>`**
-  Parse a bounded XML subset. DTDs, processing instructions, comments, CDATA and mixed
-  content are explicitly rejected. No resources are ever resolved or fetched.
-
-- **`fn parse_with(s: &str, lim: Limits) -> Result<Node, Error>`**
-  `parse` within other limits than the default ones.
 
 ### `base/num.rs`
 
@@ -41386,6 +41183,262 @@ forms.
   the leftmost match (the longest of those starting there): byte offsets
 - **`fn find_at(&self, s: &str, from: usize) -> Option<(usize, usize)>`**
   as find, starting the search at byte `from` (the edges still see the text before it)
+
+## formats
+
+*bounded JSON with exact numbers, typed JSON records, an XML subset, Unicode text encodings* -- crate root [`lib/formats/src/lib.rs`](../lib/formats/src/lib.rs)
+
+```text
+formats -- data formats as text: JSON, typed JSON records, an XML subset, Unicode encodings
+
+  json   strict bounded JSON (RFC 8259; duplicate member names and lone surrogates are
+         errors): Value, Number (the exact token, no rounding through f64), parse /
+         parse_with_limits, stringify / stringify_with_limits / stringify_pretty, Limits,
+         Error { offset, kind }
+  jmap   typed mapping of records and string enums over json::Value: Field, Json,
+         record! / wire_enum!, list / from_list, str_of / u64_of / obj / empty_object
+  xml    a bounded, namespace-aware XML subset: Node / Name, parse / parse_with(Limits),
+         escape, valid_char; the five predefined entities and character references, and
+         Unsupported for a DTD, other entities, comments, CDATA, processing instructions
+         and mixed content
+  encoding  decode(bytes, limit) -> (String, Encoding) / encode(text, Encoding): UTF-8 with
+         and without BOM, UTF-16 LE / BE; no legacy code pages and no guessing
+
+Every reader takes untrusted input: it checks the size before it reads and the nesting, the
+values or the elements while it reads, and reports a malformed or too large input as an error,
+never a panic.  Only alloc; no I/O.
+
+json and jmap came from agent_core, xml and encoding from base (0.3.0); agent_core::{json,
+jmap, record!, wire_enum!} and base::{xml, encoding} remain as re-exports of these modules.
+```
+
+### `formats/src/encoding.rs`
+
+Source: [`lib/formats/src/encoding.rs`](../lib/formats/src/encoding.rs)
+
+```text
+Strict Unicode interchange codecs. New native library functionality (no legacy counterpart).
+```
+
+- **`enum Encoding`**
+  Explicit text encodings; unmarked input is interpreted as UTF-8.
+  - `Utf8`
+  - `Utf8Bom`
+  - `Utf16Le`
+  - `Utf16Be`
+
+- **`enum Error`**
+  Invalid Unicode, unsupported UTF-32, or a caller-specified byte limit.
+  - `Invalid`
+  - `Unsupported`
+  - `Limit`
+
+- **`fn decode(bytes: &[u8], limit: usize) -> Result<(String, Encoding), Error>`**
+  Decode without replacement characters or guessed legacy code pages.
+
+- **`fn encode(text: &str, enc: Encoding) -> Vec<u8>`**
+  Encode Unicode; UTF-16 output always includes its byte-order mark.
+
+### `formats/src/jmap.rs`
+
+Source: [`lib/formats/src/jmap.rs`](../lib/formats/src/jmap.rs)
+
+```text
+jmap -- typed JSON mapping for records and string enums over json::Value: the Field trait
+for member values, the Json trait for records, and the record! / wire_enum! macros that
+declare a type and its mapping in one place.  Missing or mistyped members read as their
+default; unknown members are ignored, so old and new programs read each other's data
+(protocols, project files, settings).
+
+  record! { pub struct P { pub a: String, pub n: u32, pub items: Vec<Item> } }
+  wire_enum! { pub enum Kind { Pc = "pc", Router = "router" } }   // Default = first variant
+  p.to_json() / P::from_json(&v) / Field::put / Field::take
+  list(&[T]) / from_list(&v) / str_of / u64_of / obj([...]) / empty_object()
+
+Field is implemented for String, bool, the integer types, Value (kept as is), Vec<T>,
+Option<T> (null = None) and BTreeMap<String, T> (an object).  Floating point has no exact
+JSON token here: store fixed-point integers instead.
+```
+
+- **`trait Field: Sized + Default`**
+  a value that maps to one JSON member
+  - `fn put(&self) -> Value`
+  - `fn take(v: Option<&Value>) -> Self`
+
+- **`trait Json: Sized`**
+  a record (a JSON object)
+  - `fn to_json(&self) -> Value`
+  - `fn from_json(v: &Value) -> Option<Self>`
+
+- **`fn empty_object() -> Value`**
+  an empty JSON object (used by record!)
+
+- **`record!(...)`**
+  declare a record: the struct (Clone, Debug, Default, PartialEq) and its Json / Field
+  mapping; the JSON member names are the field names
+
+- **`wire_enum!(...)`**
+  declare an enum carried as a string: Default is the first variant, ALL, as_str / parse,
+  Field
+
+- **`fn list<T: Json>(items: &[T]) -> Value`**
+  a list of records as a JSON array
+
+- **`fn from_list<T: Json>(v: &Value) -> Vec<T>`**
+  the records of a JSON array (or of the array under `items` of an object)
+
+- **`fn str_of<'a>(v: &'a Value, k: &str) -> &'a str`**
+  a string member of an object ("" when missing)
+
+- **`fn u64_of(v: &Value, k: &str) -> u64`**
+  an unsigned member of an object (0 when missing)
+
+- **`fn obj<const N: usize>(fields: [(&str, Value); N]) -> Value`**
+  an object built from (name, value) pairs
+
+### `formats/src/json.rs`
+
+Source: [`lib/formats/src/json.rs`](../lib/formats/src/json.rs)
+
+```text
+Strict, bounded UTF-8 JSON (RFC 8259): settings and project files, manifests, protocols,
+the agent interface's control channels. New shared code (agent_core::json until 0.3.0).
+```
+
+- **`struct Number(String)`**
+  Exact JSON number token; construction validates the JSON number grammar.
+
+**`impl Number`**
+
+- **`fn parse(text: &str) -> Option<Self>`**
+  Parse one complete JSON number without rounding it through floating point.
+- **`fn as_str(&self) -> &str`**
+  Original validated JSON representation.
+- **`fn as_i64(&self) -> Option<i64>`**
+  Read an exactly integral JSON number without precision loss, including exponents.
+- **`fn as_u64(&self) -> Option<u64>`**
+  Read an exactly integral, nonnegative JSON number without precision loss.
+
+- **`enum Value`**
+  Owned JSON data. Objects retain member order and parsed objects have unique keys.
+  - `Null` -- JSON null.
+  - `Bool(bool)` -- JSON boolean.
+  - `Number(Number)` -- Exact JSON number.
+  - `String(String)` -- Unicode string.
+  - `Array(Vec<Value>)` -- Ordered values.
+  - `Object(Vec<(String, Value)>)` -- Ordered name/value members.
+
+**`impl Value`**
+
+- **`fn string(value: impl Into<String>) -> Self`**
+  Make a JSON string.
+- **`fn u64(value: u64) -> Self`**
+  Make an unsigned number without converting to floating point.
+- **`fn i64(value: i64) -> Self`**
+  Make a signed number without converting to floating point.
+- **`fn object<const N: usize>(fields: [(&str, Value); N]) -> Self`**
+  Make an object, with later duplicate names replacing earlier values.
+- **`fn insert(&mut self, key: &str, value: Value) -> bool`**
+  Insert or replace an object member; false when this value is not an object.
+- **`fn get(&self, key: &str) -> Option<&Value>`**
+  Look up an object member.
+- **`fn as_object(&self) -> Option<&[(String, Value)]>`**
+  Borrow an object member list.
+- **`fn as_array(&self) -> Option<&[Value]>`**
+  Borrow an array.
+- **`fn as_str(&self) -> Option<&str>`**
+  Borrow a string.
+- **`fn as_bool(&self) -> Option<bool>`**
+  Read a boolean.
+- **`fn as_u64(&self) -> Option<u64>`**
+  Read an unsigned integer token.
+- **`fn as_i64(&self) -> Option<i64>`**
+  Read a signed integer token.
+
+- **`struct Limits`**
+  Bounds applied before and during decoding or encoding.
+  - `bytes: usize` -- Maximum encoded byte count.
+  - `depth: usize` -- Maximum nested arrays/objects; the root value starts at depth zero.
+  - `values: usize` -- Maximum total values, including the root.
+  - `string_bytes: usize` -- Maximum decoded bytes in any string, including member names.
+  - `members: usize` -- Maximum members/elements in any container.
+
+- **`struct Error`**
+  Parse or serialization failure with the byte offset where it was found.
+  - `offset: usize` -- Zero-based byte offset (zero for serialization limits).
+  - `kind: &'static str` -- Stable machine-readable failure category.
+
+- **`fn parse(bytes: &[u8]) -> Result<Value, Error>`**
+  Parse a complete UTF-8 JSON value using default limits.
+
+- **`fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Value, Error>`**
+  Parse a complete UTF-8 JSON value. Duplicate object keys and lone surrogates are errors.
+
+- **`fn stringify(value: &Value) -> Result<String, Error>`**
+  Encode JSON without literal newlines, enforcing the default bounds.
+
+- **`fn stringify_with_limits(value: &Value, limits: Limits) -> Result<String, Error>`**
+  Encode bounded JSON. Invalid duplicate keys in manually built objects are rejected.
+
+- **`fn stringify_pretty(value: &Value, limits: Limits, indent: usize) -> Result<String, Error>`**
+  Encode bounded JSON for people to read: every array element and object member on its own
+  line, indented by `indent` spaces per level, "name": value; empty containers stay "[]" / "{}".
+  The output ends without a newline.
+
+### `formats/src/xml.rs`
+
+Source: [`lib/formats/src/xml.rs`](../lib/formats/src/xml.rs)
+
+```text
+Bounded, namespace-aware XML subset for interchange. No DTD, entities, I/O or XInclude.
+New native functionality; deliberately rejects constructs it cannot represent losslessly.
+```
+
+- **`struct Name`**
+  Expanded XML name (prefixes are not identities).
+  - `ns: String`
+  - `local: String`
+
+- **`struct Node`**
+  Element-only or text-only node; mixed content is rejected by this subset reader.
+  - `name: Name`
+  - `attrs: Vec<(Name, String)>`
+  - `text: String`
+  - `children: Vec<Node>`
+
+**`impl Node`**
+
+- **`fn is(&self, ns: &str, local: &str) -> bool`**
+  Test an expanded name.
+- **`fn attr(&self, ns: &str, local: &str) -> Option<&str>`**
+  Attribute lookup; the default namespace never applies to unprefixed attributes.
+
+- **`enum Error`**
+  Syntax error, resource limit, or an intentionally unsupported XML construct.
+  - `Syntax`
+  - `Limit`
+  - `Unsupported`
+
+- **`struct Limits`**
+  What one parse may take: the text's bytes, its elements, their nesting. The default
+  (4 MiB, 30000 elements, 48 levels) is `parse`'s; a reader whose own model bounds its
+  documents otherwise names what that model can expand to (`parse_with`).
+  - `bytes: usize`
+  - `nodes: usize`
+  - `depth: usize`
+
+- **`fn valid_char(c: char) -> bool`**
+  XML 1.0 character validity (also used before emitting document text).
+
+- **`fn escape(s: &str) -> Result<String, Error>`**
+  Escape text/attribute content, including CR so it survives XML newline normalization.
+
+- **`fn parse(s: &str) -> Result<Node, Error>`**
+  Parse a bounded XML subset. DTDs, processing instructions, comments, CDATA and mixed
+  content are explicitly rejected. No resources are ever resolved or fetched.
+
+- **`fn parse_with(s: &str, lim: Limits) -> Result<Node, Error>`**
+  `parse` within other limits than the default ones.
 
 ## datetime
 

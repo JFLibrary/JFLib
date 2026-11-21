@@ -10,13 +10,13 @@ without a line of `unsafe` code.
 ## How it is used
 
 A `Store` lives in a folder. Each collection maps an id to a JSON value
-(`agent_core::json::Value` of [`jflib-agent-core`](https://crates.io/crates/jflib-agent-core)),
+(`formats::json::Value` of [`jflib-formats`](https://crates.io/crates/jflib-formats)),
 and reads return copies of the values, so nothing is held across a call. Changes run as
 transactions: the closure of `write` sees the current data and records puts and deletes, which
 then become durable and visible together, or not at all when it returns an error.
 
 ```rust
-use jflib::agent_core::json::Value;
+use jflib::formats::json::Value;
 use jflib::datastore::{Store, StoreError};
 
 let store = Store::open("data://db")?;                      // one process at a time

@@ -10,7 +10,7 @@ use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use agent_core::json::{self, Value};
+use formats::json::{self, Value};
 
 use crate::*;
 

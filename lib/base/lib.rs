@@ -13,6 +13,8 @@
 //   lru:  Lru -- a map that forgets the least recently used entries (count and weight limits)
 //   pattern: glob / has_glob -- shell wildcards; Regex -- POSIX basic and extended regular
 //         expressions without back-references (a Pike VM: no exponential cases)
+//   xml, encoding: re-exports of formats::{xml, encoding} (here until 0.3.0; new code names
+//         formats)
 //
 // Strings and formatting are Rust's own (str, String, format!); the thread pool, cpu
 // features and files are in plat (they need unsafe).
@@ -25,8 +27,10 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 pub mod ini;
-pub mod encoding;
-pub mod xml;
+/// Unicode text encodings: formats::encoding (here until 0.3.0)
+pub use formats::encoding;
+/// the XML subset: formats::xml (here until 0.3.0)
+pub use formats::xml;
 pub mod num;
 pub mod settings;
 pub mod rng;
