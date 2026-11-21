@@ -2827,6 +2827,14 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   (`compress::brotli::decompress`), LZ4 and zstd (`compress::zstd::compress(data, level)` /
   `decompress`; levels 1 to 19, single-segment frames with checksums), CRC-32, Adler-32 and
   xxHash; `Codec` picks LZ4 or zstd by name.
+* `formats` -- data formats as text, without a dependency: `formats::json` (strict bounded JSON,
+  numbers kept as their exact token, `parse_with_limits` / `stringify_pretty`),
+  `formats::jmap` (typed records, below), `formats::xml` (a bounded, namespace-aware XML subset;
+  a DTD, comments and mixed content are refused) and `formats::encoding` (strict UTF-8 and
+  UTF-16 by their byte-order mark; `Charset`, the single-byte sets of the web and of DOS files,
+  `Charset::from_code_page(850)`, `label("iso-8859-2")` and `decode_label` as the WHATWG Encoding
+  Standard reads labels). `agent_core::json` / `jmap` and `base::xml` / `encoding` are the same
+  modules under their names until 0.2.1.
 * `plat::watch::Watcher::new(&roots)` / `take(ms)` -- the changed paths below folders
   (ReadDirectoryChangesW / inotify, recursive; `overflow` when events were lost). Every change
   after `new` returned is seen. A root that is deleted or moved away (Linux: also a folder that
@@ -3279,7 +3287,7 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   `(a|a)*b` against a long text costs linear time instead of exponential; a refused pattern
   says why with `ReErr::text()` in GNU grep's words (JFNetworker's shell, `apps/coretest`
   group `pattern`).
-* `agent_core::jmap` -- typed JSON for protocols and files: `record! { pub struct P { pub a:
+* `formats::jmap` -- typed JSON for protocols and files: `record! { pub struct P { pub a:
   String, pub n: u32 } }` declares the struct with `to_json` / `from_json`, `wire_enum!` an
   enum carried as a string; missing or mistyped members read as their defaults, unknown ones
   are ignored (old and new programs read each other's data). `json::stringify_pretty(&v,

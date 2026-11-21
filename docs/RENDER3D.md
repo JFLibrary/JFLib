@@ -676,7 +676,7 @@ glTF laden (`render3dtest --bench-gltf`; die Datei im Programm geschrieben, nich
 | ein Mesh mit 1 Mio. Ecken und 2 Mio. Dreiecken | 56,0 MB | 167 ms (138–170) | +56 MB | 56,0 MB | 146 ms (105–182) | – | – |
 
 - **Große Meshes lesen schnell** (330 bis 400 MB/s), der Speicher ist das Modell selbst.
-- **Viele Knoten kosten im JSON**: Der Baum aus `agent_core::json` braucht für 17 MB Text vorübergehend rund das Sechsfache; ein Knoten im Modell hält rund 340 Byte (zwei `f64`-Matrizen, Name, Kinder). Für Szenen mit Millionen Knoten wären ein Leser, der den Baum nicht aufbaut, und schlankere Knoten der Weg (nicht gebaut).
+- **Viele Knoten kosten im JSON**: Der Baum aus `formats::json` braucht für 17 MB Text vorübergehend rund das Sechsfache; ein Knoten im Modell hält rund 340 Byte (zwei `f64`-Matrizen, Name, Kinder). Für Szenen mit Millionen Knoten wären ein Leser, der den Baum nicht aufbaut, und schlankere Knoten der Weg (nicht gebaut).
 
 ### Messung der Listen je Alpha-Modus
 

@@ -1261,8 +1261,9 @@ Fensterrand hinaus.
   ([`base/hashring.rs`](../lib/base/hashring.rs)) und eine LRU-Tabelle nach Anzahl und Gewicht
   ([`base/lru.rs`](../lib/base/lru.rs); Gruppen `hashring`, `lru`), im Einsatz im
   Loadbalancer, KV-Speicher und Cache des Labors von JFNetworker. Dazu typisiertes JSON
-  ([`agent_core/src/jmap.rs`](../lib/agent_core/src/jmap.rs): `record!`, `wire_enum!`, aus
-  BackupCraft in die Library gezogen; `bc_proto` nutzt es mit) und eingerücktes JSON für
+  ([`formats/src/jmap.rs`](../lib/formats/src/jmap.rs), bis U2 in `agent_core`: `record!`,
+  `wire_enum!`, aus BackupCraft in die Library gezogen; `bc_proto` nutzt es mit) und eingerücktes
+  JSON für
   Dateien (`json::stringify_pretty`), getestet mit der coretest-Gruppe `jmap`.
   Seit D2 fasst `Window::hist_between` die Slots eines Zeitraums zu einem Histogramm zusammen
   (die Zeitreihen des Labors von JFNetworker: ein Punkt pro Intervall, Perzentile beliebiger
@@ -1806,7 +1807,7 @@ Fensterrand hinaus.
 - **P3** · *fehlt* · G7b: der Weg des Spielfensters (entscheidet der Nutzer); im Browser zeichnet eine Ansicht nur rund 30 Bilder/s (`web/worker.js` meldet sich bei einem Zeitgeber von 1 ms nicht als beschäftigt); für Spiele `MIN_PRESENT_US` und das Halten von G5e3 abstimmen, ein Begrenzer in `lib/game`; auf dem Mac ist die GPU-Ausgabe der UI aus (Ansichten lesen zurück); Messungen auf Iris Xe, HD 610 und in echten Linux-Fenstern; der Test „passt“ in `gp_split_draw` legt bei dünnen Rahmen jedes Bild neu an; von Hand: die Faktoren der Mausbewegung, der Raumklang der Demo.
 - **P3** · *erledigt* (2026-11-20) · G7g Teil 2 ([GEOM.md](GEOM.md)): Boolesche Operationen auf konvexen Körpern mit exakten Prädikaten, Abschrägen, `modeltool --watch`, Importe nur aus dem Ordner des Skripts, der Bewertungslauf (fünf Objekte nur nach Bildern).
 - **P3** · *fehlt* · G7g: die Wünsche an JFScript (GEOM.md), erst nach dem Ja des Nutzers; Tempo der Booleschen Operationen bei runden Körpern, ebene Teilflächen zusammenführen, Abschrägen nichtkonvexer Körper; der Beobachtungsmodus von Hand und in echten Fenstern unter Linux und macOS.
-- **P3** · *fehlt* · G7d Teil 2: `wss:` mit dem TLS von `netio` prüfen (im Browser mit einem Zertifikat, dem er traut), Messungen zwischen Rechnern und über WLAN, Grenzen abstimmen; Verschlüsselung über UDP (AEAD, entschieden 2026-11-18); Android mit Netz (netchan baut seit G7e für iOS).
+- **P3** · *fehlt* · G7d Teil 2: `wss:` mit dem TLS von `netio` prüfen (im Browser mit einem Zertifikat, dem er traut), Messungen zwischen Rechnern und über WLAN, Grenzen abstimmen; Android mit Netz (netchan baut seit G7e für iOS). Die Verschlüsselung über UDP ist seit U3 (2026-11-21) gebaut, Abschnitt 13.
 - **P3** · *erledigt* (2026-11-20) · G7e Teil 2 ([NETCODE.md](NETCODE.md)): zuverlässige Ereignisse, Abmelden, geglättete Korrekturen, Räume auf dem Worker-Pool (bitgleich), Raumcodes aus dem kryptographischen Zufall, echtes Netz (Server auf dem Mac im WLAN), der Browser als Client; Spiel 1 nimmt sie.
 - **P3** · *fehlt* · G7e (entschieden 2026-11-19: Lag-Ausgleich 300 ms, der volle Stand eines UDP-Clients nach Priorität aufgefüllt, der WebSocket-Abruf als Option `fetch_full`): ein Lauf mit Fedora als Server, WLAN an beiden Enden, Telefone; Deltas gegen eine Vorhersage; ob WebSocket-Clients den Tick mehr Marge behalten und ob ein UDP-Server ohne `net.connect`-Regel Absendern antworten darf (Fragen an den Nutzer).
 - **P3** · *fehlt* · Später: D3D12-Rückfall, GPU-Rasterung der Widgets.
@@ -2493,15 +2494,19 @@ später.
 
 Sicherheit:
 
-- **P1** · *fehlt* · `netchan`: Verschlüsselung über UDP (AEAD, entschieden 2026-11-18; unter
-  G7d Teil 2 in Abschnitt 8 noch als P3). Heute schützt nur ein 32-Bit-Token
-  ([`netchan/src/endpoint.rs`](../lib/netchan/src/endpoint.rs), „The token is no encryption“): wer
-  den Verkehr sieht, liest mit, schleust Pakete ein und übernimmt Verbindungen. Dazu `packet` und
-  `endpoint` als Fuzz-Ziele in `tools/net_fuzz/targets.rs`, denn
-  sie lesen UDP-Pakete aus dem Internet.
+- **P1** · *erledigt* (2026-11-21, U3) · `netchan`: Verschlüsselung über UDP. Paketformat Version 2: der Handschlag
+  tauscht flüchtige X25519-Schlüssel (RESPONSE, ACCEPT mit einer Bestätigung der Schlüssel), danach ist jedes DATA und
+  DISCONNECT mit ChaCha20-Poly1305 versiegelt, der Kopf authentisiert, die Nonce die volle Paketnummer
+  ([`netchan/src/seal.rs`](../lib/netchan/src/seal.rs), [TRANSPORT.md](TRANSPORT.md) „Verschlüsselung“). Optional ein
+  statischer Schlüssel des Servers, den der Client kennt (`ClientConfig::server_key`, wie Noise NK): dann kann auch
+  niemand auf dem Weg den Server ersetzen. Vorwärtssicher, Schlüssel werden genullt. Geprüft in `nettest` (Mitlesen,
+  jedes gekippte Byte, Fälschungen, Wiederholungen, der statische Schlüssel, ein Server in der Mitte; Fuzzing der
+  versiegelten Pakete); `gametest --netsum` blieb `4118995e45c0c067`. Kosten: 94 µs Server-Zeit je ACCEPT, die Flut über
+  UDP 199 statt 460 MB/s auf einem i7-1165G7. Die Fuzz-Ziele `packet` und `endpoint` für `tools/net_fuzz` gingen an die
+  Sicherheits-Sitzung.
 - **P1** · *fehlt* · Fuzzing der Datei-Parser. `tools/net_fuzz.py` und `tools/cov_fuzz.py` decken
   nur zstd, LZ4, X.509, DNS, HTTP, TLS, die IP-Reassembly und `netpkt` ab. Es fehlen DEFLATE,
-  zlib und gzip (`img_core`), `archive` (ZIP, OPC), `agent_core::json` (darüber laufen auch
+  zlib, gzip und Brotli (`compress`), `archive` (ZIP, OPC), `formats::json` (darüber laufen auch
   Update-Manifeste, `datastore`, glTF und Agent-Anfragen), die XML-Leser (unten), die
   Bild-Decoder und die Schriften (bisher nur abgeschnittene und gekippte Kopien in den
   Python-Prüfungen, [`tools/imgtest_common.py`](../tools/imgtest_common.py),
@@ -2535,18 +2540,27 @@ Grundbausteine am falschen Ort oder mehrfach:
   Sicherheits-Sitzung); `cargo-jflib` mit `compress` statt seines eigenen Encoders
   ([`cargo_jflib/src/deflate.rs`](../lib/cargo_jflib/src/deflate.rs), heute ohne jede
   Abhängigkeit; die Bytes der Pakete ändern sich dabei).
-- **P1** · *teilweise* · JSON aus `agent_core` lösen: `agent_core::json` und `jmap` nutzen `ui`,
-  `cas`, `gltf`, `datastore`, `update` und `netio`; wer nur JSON braucht, findet es heute in der
-  Crate der Agentenschnittstelle. Ziel: `base` oder eine eigene Crate, `agent_core` re-exportiert.
-- **P2** · *teilweise* · Ein XML-Leser statt sechs: `base::xml`,
+- **P1** · *erledigt* (2026-11-21, U2) · JSON aus `agent_core` gelöst: die neue Blatt-Crate
+  `formats` ([`formats/src/lib.rs`](../lib/formats/src/lib.rs), nur `alloc`) hat `json` und `jmap`
+  aus `agent_core` und `xml` und `encoding` aus `base` übernommen, unverändert; die alten Pfade
+  bleiben als Re-Exporte. `cas`, `datastore`, `gltf` und `update` hängen nicht mehr an
+  `agent_core`, `archive`, `doc_core` und `doc_io` nicht mehr an `base` (`doc_core` damit auch
+  nicht mehr an `plat`). `netio` nutzt noch `agent_core::json` (über die Sicherheits-Sitzung).
+  Der Name `data` ging nicht: `build_rs.py` erkennt Crates an `NAME::`, und die Stile netlab,
+  backupcraft und jfoffice haben ein eigenes Modul `data`.
+- **P2** · *teilweise* · Ein XML-Leser statt sechs: `formats::xml`,
   [`img_svg/xml.rs`](../lib/img_svg/xml.rs), [`diagram_io/src/xml.rs`](../lib/diagram_io/src/xml.rs),
   zwei in `diagram_core` (`design/xml.rs`, `formula/xml.rs`) und der in
   [`text/fontconf.rs`](../lib/text/fontconf.rs), jeder mit eigenen Grenzen. Einer, gefuzzt, mit
   einer nachsichtigen Art für SVG.
-- **P2** · *teilweise* · Alte Textkodierungen in `base::encoding`, das heute nur UTF-8 und
-  UTF-16 kann. Tabellen gibt es getrennt in [`spell/charsets.rs`](../lib/spell/charsets.rs) und
-  [`dxf/src/codepages.rs`](../lib/dxf/src/codepages.rs); [`netpkt/imf.rs`](../lib/netpkt/imf.rs)
-  liest außer UTF-8 nur ISO-8859-1. Gebraucht für HTML, Mail, CSV und alte Dateien.
+- **P2** · *erledigt* (2026-11-21, U4) · Alte Textkodierungen in `formats::encoding`: `Charset` mit allen
+  Einbyte-Kodierungen des WHATWG-Standards, den DOS-Seiten (IBM437, 737, 775, 850 bis 869) und einem genauen
+  ISO-8859-1; `label` mit allen 228 Labels des Standards (mehrbytige benannt, nicht dekodiert), `decode_label`
+  wie das „decode“ des Standards, `Charset::from_code_page`. Eine Tabelle statt zweier:
+  [`tools/gen_encodings.py`](../tools/gen_encodings.py) ersetzt `gen_charsets.py` (spell) und
+  `gen_dxf_codepages.py` (dxf), `--verify` vergleicht mit den Daten des Standards und Nodes `TextDecoder`. Offen:
+  [`netpkt/imf.rs`](../lib/netpkt/imf.rs) (Mail) liest außer UTF-8 nur ISO-8859-1 (über die Sicherheits-Sitzung),
+  die mehrbytigen Kodierungen Ostasiens (Shift_JIS, GBK, gb18030, Big5, EUC-KR, EUC-JP, ISO-2022-JP).
 
 Crates, die einer JF-App folgen:
 
@@ -2569,7 +2583,8 @@ Crates, die einer JF-App folgen:
 - **P3** · *teilweise* · `eapm`: nur EAP-MD5 und EAP-PWD (für den Simulator). WPA-Enterprise
   braucht EAP-TLS, PEAP-MSCHAPv2 oder EAP-TTLS; für MSCHAPv2 fehlen in `crypto` MD4 und DES.
 - **P3** · *teilweise* · `base` mischt Grundbausteine mit Werkzeugen aus dem Labor von
-  JFNetworker (`cmdtree`, `hashring`, `metrics`); beim Umzug von JSON die Gliederung mit ordnen.
+  JFNetworker (`cmdtree`, `hashring`, `metrics`). XML und die Kodierungen sind seit U2 in
+  `formats`; `base::xml` und `base::encoding` sind nur noch Re-Exporte.
 
 Geprüft und ohne Eintrag: `diagram_*` (das Visio-Modell als Fach-Crate), `img_pdn`, `gltf` und
 `dxf` (nur Import, kein binäres DXF), `spell` (ohne Morphologie) und `update`.

@@ -17,6 +17,7 @@
 pub mod guide {}
 
 pub use rt;
+pub use formats;
 pub use agent_core;
 pub use plat;
 pub use base;

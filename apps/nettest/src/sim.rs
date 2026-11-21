@@ -7,7 +7,10 @@
 //   reliable streams deliver everything in order and lose nothing; the handshake survives loss;
 //   timeouts, keep-alives, the connection caps, the protocol id, rate limits, forged cookies and
 //   tokens, unpadded handshakes, answers never larger than their request, a client that starts
-//   again, streams that never send CONNECT
+//   again, streams that never send CONNECT; the seal: no payload readable on the wire, changed,
+//   forged and replayed packets dropped without harm, forged DISCONNECTs ignored, keys without a
+//   shared secret refused, the static key (pinned: connects; wrong or missing: ServerKey; a server
+//   in the middle: refused with it, taken without it)
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -55,7 +58,23 @@ pub struct Sim {
     /// the largest answer the server sent an address without a connection, and the request size
     pub pre_conn: Vec<(usize, usize)>,
     last_in: BTreeMap<SocketAddr, usize>,
+    /// every datagram put on the network, when set (what someone listening sees)
+    pub tap: Option<Vec<Vec<u8>>>,
 }
+
+/// a client's 32 random bytes from one number
+pub fn random32(x: u64) -> [u8; 32] {
+    let mut r = [0u8; 32];
+    r[..8].copy_from_slice(&x.to_le_bytes());
+    r
+}
+
+/// X25519's base point: a public key that gives a shared secret with any key
+pub const BASE_POINT: [u8; 32] = {
+    let mut b = [0u8; 32];
+    b[0] = 9;
+    b
+};
 
 pub fn client_addr(i: usize) -> SocketAddr {
     SocketAddr::new(IpAddr::V4([10, 0, (i / 250) as u8, (i % 250) as u8 + 1]), 40000 + i as u16)
@@ -84,12 +103,13 @@ impl Sim {
             down: false,
             pre_conn: Vec::new(),
             last_in: BTreeMap::new(),
+            tap: None,
         }
     }
 
     /// a client from `addr` that starts its handshake now -> its index
     pub fn add_client(&mut self, addr: SocketAddr, cfg: ClientConfig) -> usize {
-        let mut c = ClientCore::new(cfg, self.rng.next_u64(), false);
+        let mut c = ClientCore::new(cfg, random32(self.rng.next_u64()), false);
         c.start(self.now);
         self.clients.push((addr, c));
         self.flush();
@@ -97,6 +117,9 @@ impl Sim {
     }
 
     fn push(&mut self, d: Dest, b: Vec<u8>) {
+        if let Some(tap) = self.tap.as_mut() {
+            tap.push(b.clone());
+        }
         if self.down || self.rng.chance(self.w.loss) {
             return;
         }
@@ -376,7 +399,7 @@ fn exchange(c: &mut Ctx, name: &str, seed: u64, w: Weather, n: usize, every_us: 
 /// a reliable stream: the client over a lossless ordered queue to the server's stream
 fn stream(c: &mut Ctx, seed: u64, n: usize) {
     let mut server = ServerCore::new(ServerConfig { packets_per_s: 1_000_000, bytes_per_s: 1 << 30, ..server_cfg() }, [3u8; 32], 0);
-    let mut cl = ClientCore::new(ClientConfig { packets_per_s: 1_000_000, bytes_per_s: 1 << 30, ..client_cfg() }, 99, true);
+    let mut cl = ClientCore::new(ClientConfig { packets_per_s: 1_000_000, bytes_per_s: 1 << 30, ..client_cfg() }, [99; 32], true);
     let mut rng = Rng::new(seed);
     let mut now = 1_000_000u64;
     let delay = 5_000u64;
@@ -541,7 +564,7 @@ pub fn run(quick: bool) -> Ctx {
     sim.settle(1000);
     sim.server_events();
     let bad0 = sim.server.server_stats().bad;
-    let forged = Packet::Response { protocol: PROTOCOL, nonce: 5, time: (sim.now / 1_000_000) as u32, mac: [7; 16] }.to_vec(true);
+    let forged = Packet::Response { protocol: PROTOCOL, nonce: 5, time: (sim.now / 1_000_000) as u32, mac: [7; 16], flags: 0, key: BASE_POINT }.to_vec(true);
     sim.inject(client_addr(50), forged);
     let unpadded = Packet::Connect { protocol: PROTOCOL, nonce: 6 }.to_vec(false);
     sim.inject(client_addr(51), unpadded);
@@ -566,7 +589,7 @@ pub fn run(quick: bool) -> Ctx {
         }
     }
     if let Some((time, mac)) = cookie {
-        let resp = Packet::Response { protocol: PROTOCOL, nonce: 77, time, mac }.to_vec(true);
+        let resp = Packet::Response { protocol: PROTOCOL, nonce: 77, time, mac, flags: 0, key: BASE_POINT }.to_vec(true);
         s2.server.datagram(client_addr(61), &resp, t);
         c.check(s2.server.connections() == 0, || String::from("a cookie used from another address"));
         s2.server.datagram(probe, &resp, t + 11_000_000);
@@ -583,7 +606,7 @@ pub fn run(quick: bool) -> Ctx {
     sim.add_client(client_addr(0), client_cfg());
     sim.settle(1000);
     sim.server_events();
-    let mut again = ClientCore::new(client_cfg(), 4242, false);
+    let mut again = ClientCore::new(client_cfg(), random32(4242), false);
     again.start(sim.now);
     sim.clients[0].1 = again;
     sim.flush();
@@ -621,5 +644,175 @@ pub fn run(quick: bool) -> Ctx {
         too_big |= matches!(e, ServerEvent::Disconnected { reason: Reason::Protocol, .. });
     }
     c.check(too_big, || String::from("a stream message over max_stream_payload ends the connection"));
+    seal(&mut c);
     c
+}
+
+// the client's one connection and the server's id for it, after the handshake
+fn connected(seed: u64, scfg: ServerConfig, ccfg: ClientConfig, key: Option<[u8; 32]>) -> (Sim, usize, Option<u32>) {
+    let mut sim = Sim::new(seed, CLEAR, scfg);
+    if let Some(k) = key {
+        sim.server.set_static_key(k);
+    }
+    let i = sim.add_client(client_addr(0), ccfg);
+    sim.settle(1000);
+    let sid = sim.server_events().iter().find_map(|e| if let ServerEvent::Connected { id, .. } = e { Some(*id) } else { None });
+    (sim, i, sid)
+}
+
+// what the server received from its client as messages, and whether it lost it
+fn server_got(sim: &mut Sim) -> (Vec<Vec<u8>>, bool) {
+    let mut got = Vec::new();
+    let mut gone = false;
+    for e in sim.server_events() {
+        match e {
+            ServerEvent::Message { data, .. } => got.push(data),
+            ServerEvent::Disconnected { .. } => gone = true,
+            _ => {}
+        }
+    }
+    (got, gone)
+}
+
+/// the seal over UDP: what listening, changing, forging and replaying get, and the static key
+fn seal(c: &mut Ctx) {
+    // someone listening: no payload in clear, the keys differ per connection
+    let marker = b"nobody on the wire may read this sentence";
+    let (mut sim, i, sid) = connected(20, server_cfg(), client_cfg(), None);
+    sim.tap = Some(Vec::new());
+    let sid = sid.unwrap_or(0);
+    let _ = sim.clients[i].1.send(marker, sim.now);
+    let _ = sim.server.send(sid, marker, sim.now);
+    sim.flush();
+    for _ in 0..50 {
+        sim.step(1000);
+    }
+    let (got, _) = server_got(&mut sim);
+    let down = sim.client_events(i).iter().any(|e| matches!(e, ClientEvent::Message { data, .. } if data == marker));
+    let wire = sim.tap.take().unwrap_or_default();
+    let readable = wire.iter().filter(|b| b.windows(8).any(|w| marker.windows(8).any(|m| m == w))).count();
+    c.check(got.iter().any(|d| d == marker) && down, || format!("seal: the message both ways ({} up, down {})", got.len(), down));
+    c.check(!wire.is_empty() && readable == 0, || format!("seal: {} of {} datagrams carry 8 bytes of the payload in clear", readable, wire.len()));
+    c.check(wire.iter().filter(|b| b.first().is_some_and(|k| k & 0x0f == packet::KIND_DATA)).all(|b| b.len() >= packet::DATA_HEADER + packet::TAG),
+        || String::from("seal: a DATA packet without its tag"));
+
+    // changed, forged and replayed packets: dropped, counted, the connection unharmed
+    let fast = ServerConfig { packets_per_s: 1_000_000, bytes_per_s: 1 << 30, ..server_cfg() };
+    let (mut sim, i, sid) = connected(21, fast, client_cfg(), None);
+    let from = client_addr(0);
+    let _ = sim.clients[i].1.send(b"the genuine message 1", sim.now);
+    let genuine = sim.clients[i].1.take_out().unwrap_or_default();
+    let token = match packet::parse(&genuine) {
+        Some(Packet::Data { token, .. }) => token,
+        _ => 0,
+    };
+    let now = sim.now;
+    let mut flipped = 0u64;
+    for k in 0..genuine.len() {
+        // every byte changed once: header (authenticated), payload (encrypted), tag
+        let mut m = genuine.clone();
+        m[k] ^= 0x40;
+        sim.server.datagram(from, &m, now);
+        flipped += 1;
+    }
+    let forged = Packet::Data { token, seq: 1, ack: 0, bits: 0, payload: &[0x55; 40] }.to_vec(false);
+    sim.server.datagram(from, &forged, now);
+    let bye = Packet::Disconnect { token, seq: 2, reason: packet::BYE_NORMAL, tag: &[0; 16] }.to_vec(false);
+    sim.server.datagram(from, &bye, now);
+    let bye_plain = Packet::Disconnect { token, seq: 2, reason: packet::BYE_NORMAL, tag: &[] }.to_vec(false);
+    sim.server.datagram(from, &bye_plain, now);
+    let (got, gone) = server_got(&mut sim);
+    let forged_n = sid.and_then(|s| sim.server.stats(s)).map_or(0, |s| s.forged);
+    c.check(got.is_empty() && !gone && sim.server.connections() == 1, || format!("seal: changed and forged packets: {} messages, gone {}", got.len(), gone));
+    // (a changed kind or token byte, the first 5, makes no packet of this connection: bad, not forged)
+    let want = flipped - 5 + 3;
+    c.check(forged_n == want, || format!("seal: {} forged counted, {} expected ({} changed, 3 forged)", forged_n, want, flipped));
+    sim.server.datagram(from, &genuine, now);
+    sim.server.datagram(from, &genuine, now + 1000);
+    let (got, _) = server_got(&mut sim);
+    let dups = sid.and_then(|s| sim.server.stats(s)).map_or(0, |s| s.duplicates);
+    c.check(got.len() == 1 && got[0] == b"the genuine message 1" && dups == 1, || format!("seal: the genuine packet after the forgeries: {} messages, {} duplicates", got.len(), dups));
+    // an old packet replayed after more than the window: stale (or its tag fails), never delivered
+    for k in 0..1100u32 {
+        let _ = sim.clients[i].1.send(&k.to_le_bytes(), sim.now);
+    }
+    sim.flush();
+    for _ in 0..50 {
+        sim.step(1000);
+    }
+    server_got(&mut sim);
+    sim.server.datagram(from, &genuine, sim.now);
+    let (got, _) = server_got(&mut sim);
+    c.check(got.is_empty() && sim.server.connections() == 1, || format!("seal: a packet replayed 1100 packets later: {} messages", got.len()));
+    // the client's side: a forged DISCONNECT with the connection's token
+    let fake = Packet::Disconnect { token, seq: 9, reason: packet::BYE_SHUTDOWN, tag: &[1; 16] }.to_vec(false);
+    let t1 = sim.now;
+    sim.clients[i].1.packet(&fake, t1);
+    c.check(sim.clients[i].1.state() == State::Connected, || format!("seal: a forged DISCONNECT to the client: {:?}", sim.clients[i].1.state()));
+
+    // a RESPONSE whose key gives no shared secret (a low-order point): no connection
+    let mut s2 = Sim::new(22, CLEAR, server_cfg());
+    let probe = client_addr(70);
+    let t = s2.now;
+    s2.server.datagram(probe, &Packet::Connect { protocol: PROTOCOL, nonce: 3 }.to_vec(true), t);
+    let mut cookie = None;
+    while let Some(o) = s2.server.take_out() {
+        if let Out::Send(_, b) = o {
+            if let Some(Packet::Challenge { time, mac, .. }) = packet::parse(&b) {
+                cookie = Some((time, mac));
+            }
+        }
+    }
+    let bad0 = s2.server.server_stats().bad;
+    if let Some((time, mac)) = cookie {
+        s2.server.datagram(probe, &Packet::Response { protocol: PROTOCOL, nonce: 3, time, mac, flags: 0, key: [0; 32] }.to_vec(true), t);
+    }
+    c.check(s2.server.connections() == 0 && s2.server.server_stats().bad == bad0 + 1, || String::from("seal: a RESPONSE with an all-zero key"));
+
+    // the static key: pinned, it connects; a wrong one or a server without one: ServerKey
+    let secret = [0x42u8; 32];
+    let mut probe_srv = ServerCore::new(server_cfg(), [1; 32], 0);
+    probe_srv.set_static_key(secret);
+    let public = probe_srv.public_key().unwrap_or([0; 32]);
+    let (mut sim, i, sid) = connected(23, server_cfg(), ClientConfig { server_key: Some(public), ..client_cfg() }, Some(secret));
+    let _ = sim.clients[i].1.send(b"pinned", sim.now);
+    sim.flush();
+    for _ in 0..30 {
+        sim.step(1000);
+    }
+    let (got, _) = server_got(&mut sim);
+    c.check(sid.is_some() && got.len() == 1, || format!("static key pinned: {:?}, {} messages", sim.clients[i].1.state(), got.len()));
+    let (sim, i, _) = connected(24, server_cfg(), ClientConfig { server_key: Some(BASE_POINT), ..client_cfg() }, Some(secret));
+    c.check(sim.clients[i].1.state() == State::Disconnected(Reason::ServerKey) && sim.server.connections() == 1,
+        || format!("a wrong static key: {:?}", sim.clients[i].1.state()));
+    let (sim, i, _) = connected(25, server_cfg(), ClientConfig { server_key: Some(public), ..client_cfg() }, None);
+    c.check(sim.clients[i].1.state() == State::Disconnected(Reason::ServerKey) && sim.server.connections() == 0,
+        || format!("a server without a static key: {:?}", sim.clients[i].1.state()));
+    let (sim, i, _) = connected(26, server_cfg(), client_cfg(), Some(secret));
+    c.check(sim.clients[i].1.state() == State::Connected, || format!("a static key the client does not pin: {:?}", sim.clients[i].1.state()));
+
+    // a server in the middle (someone on the path answers with keys of its own): with the static
+    // key the client refuses it; without, it cannot tell (what ClientConfig::server_key is for)
+    for pinned in [true, false] {
+        let mut mitm = ServerCore::new(server_cfg(), [0x66; 32], 1_000_000_000);
+        mitm.set_static_key([0x67; 32]);
+        let cfg = ClientConfig { server_key: pinned.then_some(public), ..client_cfg() };
+        let mut cl = ClientCore::new(cfg, random32(27), false);
+        let from = client_addr(0);
+        let mut now = 1_000_000_000u64;
+        cl.start(now);
+        for _ in 0..6 {
+            now += 1000;
+            while let Some(b) = cl.take_out() {
+                mitm.datagram(from, &b, now);
+            }
+            while let Some(o) = mitm.take_out() {
+                if let Out::Send(_, b) = o {
+                    cl.packet(&b, now);
+                }
+            }
+        }
+        let want = if pinned { State::Disconnected(Reason::ServerKey) } else { State::Connected };
+        c.check(cl.state() == want, || format!("a server in the middle, pinned {}: {:?}", pinned, cl.state()));
+    }
 }

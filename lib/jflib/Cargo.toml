@@ -38,6 +38,7 @@ unwind = ["std", "rt/unwind", "plat/unwind", "ui/unwind"]
 
 [dependencies]
 rt.workspace = true
+formats.workspace = true
 agent_core.workspace = true
 plat.workspace = true
 base.workspace = true

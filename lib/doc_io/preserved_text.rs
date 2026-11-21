@@ -3,7 +3,7 @@
 use crate::{DocxStory, Error, find, parse, unsupported};
 use alloc::{format, string::String, vec::Vec};
 use archive::{Entry, Limits};
-use base::{
+use formats::{
     encoding::{self, Encoding},
     xml::Node,
 };
@@ -209,7 +209,7 @@ impl TextSession {
                 "Neue Absätze und Tabulatoren benötigen eine vollständige Dokumentbearbeitung",
             ));
         }
-        base::xml::escape(replacement)?;
+        formats::xml::escape(replacement)?;
         if expected == replacement {
             return Ok(());
         }
@@ -256,7 +256,7 @@ impl TextSession {
             }
             out.push_str(&xml[previous..span.start]);
             out.push_str(&span.open);
-            out.push_str(&base::xml::escape(&self.runs[index].text)?);
+            out.push_str(&formats::xml::escape(&self.runs[index].text)?);
             out.push_str(&span.close);
             previous = span.end;
             if out.len() > 4 << 20 {
@@ -374,7 +374,7 @@ fn protected(entries: &[Entry], types: &archive::opc::ContentTypes) -> bool {
         if text.to_ascii_lowercase().contains("digital-signature") {
             return true;
         }
-        let Ok(node) = base::xml::parse(&text) else {
+        let Ok(node) = formats::xml::parse(&text) else {
             return true;
         };
         contains(&node, "documentProtection") || contains(&node, "trackRevisions")

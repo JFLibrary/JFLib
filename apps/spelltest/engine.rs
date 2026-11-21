@@ -200,6 +200,16 @@ fn formats(t: &mut T) {
     t.good(&d, &["łza", "Łza"]);
     let d = Dictionary::from_bytes(b"SET KOI8-R\n", b"1\n\xcd\xc9\xd2\n");
     t.good(&d, &["мир", "Мир", "МИР"]);
+    // Hunspell's own spellings and labels of the WHATWG Encoding Standard: microsoft-cp1251, latin9,
+    // KOI8-U, a label of the standard Hunspell does not use (x-mac-cyrillic)
+    let d = Dictionary::from_bytes(b"SET microsoft-cp1251\n", b"1\n\xec\xe8\xf0\n");
+    t.good(&d, &["мир"]);
+    let d = Dictionary::from_bytes(b"SET latin9\n", b"1\n\xa4uro\n");
+    t.good(&d, &["€uro"]);
+    let d = Dictionary::from_bytes(b"SET KOI8-U\n", b"1\n\xa6\xce\xd4\xc5\xd2\xce\xc5\xd4\n");
+    t.good(&d, &["інтернет"]);
+    let d = Dictionary::from_bytes(b"SET x-mac-cyrillic\n", b"1\n\xEC\xE8\xF0\n");
+    t.good(&d, &["мир"]);
     // a UTF-8 file with a byte order mark
     let d = Dictionary::from_bytes(b"\xef\xbb\xbfSET UTF-8\n", b"\xef\xbb\xbf1\nk\xc3\xa4se\n");
     t.good(&d, &["käse"]);

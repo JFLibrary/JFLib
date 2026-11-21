@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- The values are `formats::json::Value` of jflib-formats; the crate no longer depends on jflib-agent-core. `Value` is the same type as `agent_core::json::Value` (that path is a re-export now), so code that names it keeps compiling.
+
 ### Fixed
 
 - A torn last log frame whose payload holds the bytes `BCW1` is cut like any torn frame: only a whole valid frame behind a damaged one makes it damaged (a bare magic made the store refuse to open).

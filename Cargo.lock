@@ -317,6 +317,7 @@ dependencies = [
  "jflib-datastore",
  "jflib-datetime",
  "jflib-eapm",
+ "jflib-formats",
  "jflib-netio",
  "jflib-netpkt",
  "jflib-plat",
@@ -668,6 +669,7 @@ dependencies = [
  "jflib-doc-view",
  "jflib-dxf",
  "jflib-eapm",
+ "jflib-formats",
  "jflib-fx",
  "jflib-game",
  "jflib-game-render3d",
@@ -724,6 +726,7 @@ dependencies = [
 name = "jflib-agent-core"
 version = "0.2.1"
 dependencies = [
+ "jflib-formats",
  "jflib-rt",
 ]
 
@@ -749,8 +752,8 @@ dependencies = [
 name = "jflib-archive"
 version = "0.2.1"
 dependencies = [
- "jflib-base",
  "jflib-compress",
+ "jflib-formats",
  "jflib-plat",
  "jflib-rt",
 ]
@@ -759,6 +762,7 @@ dependencies = [
 name = "jflib-base"
 version = "0.2.1"
 dependencies = [
+ "jflib-formats",
  "jflib-plat",
  "jflib-rt",
 ]
@@ -774,9 +778,9 @@ dependencies = [
 name = "jflib-cas"
 version = "0.2.1"
 dependencies = [
- "jflib-agent-core",
  "jflib-compress",
  "jflib-crypto",
+ "jflib-formats",
  "jflib-plat",
  "jflib-rt",
 ]
@@ -793,8 +797,8 @@ version = "0.2.1"
 name = "jflib-datastore"
 version = "0.2.1"
 dependencies = [
- "jflib-agent-core",
  "jflib-crypto",
+ "jflib-formats",
  "jflib-plat",
  "jflib-rt",
 ]
@@ -836,7 +840,7 @@ dependencies = [
 name = "jflib-doc-core"
 version = "0.2.1"
 dependencies = [
- "jflib-base",
+ "jflib-formats",
  "jflib-rt",
 ]
 
@@ -845,8 +849,8 @@ name = "jflib-doc-io"
 version = "0.2.1"
 dependencies = [
  "jflib-archive",
- "jflib-base",
  "jflib-doc-core",
+ "jflib-formats",
  "jflib-plat",
  "jflib-rt",
 ]
@@ -874,6 +878,9 @@ dependencies = [
 [[package]]
 name = "jflib-dxf"
 version = "0.2.1"
+dependencies = [
+ "jflib-formats",
+]
 
 [[package]]
 name = "jflib-eapm"
@@ -882,6 +889,10 @@ dependencies = [
  "jflib-crypto",
  "jflib-netpkt",
 ]
+
+[[package]]
+name = "jflib-formats"
+version = "0.2.1"
 
 [[package]]
 name = "jflib-fx"
@@ -938,7 +949,7 @@ dependencies = [
 name = "jflib-gltf"
 version = "0.2.1"
 dependencies = [
- "jflib-agent-core",
+ "jflib-formats",
  "jflib-img-core",
  "jflib-img-jpeg",
  "jflib-img-png",
@@ -1310,6 +1321,7 @@ dependencies = [
 name = "jflib-spell"
 version = "0.2.1"
 dependencies = [
+ "jflib-formats",
  "jflib-plat",
  "jflib-rt",
 ]
@@ -1425,8 +1437,8 @@ dependencies = [
 name = "jflib-update"
 version = "0.2.1"
 dependencies = [
- "jflib-agent-core",
  "jflib-crypto",
+ "jflib-formats",
  "jflib-netio",
  "jflib-plat",
  "jflib-rt",

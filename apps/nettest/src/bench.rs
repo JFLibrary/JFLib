@@ -4,6 +4,9 @@
 //   99th percentile), then a second of messages as fast as they go (1200 bytes over UDP, 16 KiB
 //   over the WebSocket): what the server took per second, and what was lost
 //   netio's WebSocket alone: n round trips of 32 bytes, 64 MiB from the server, 64 MiB echoed
+//   the seal in-process: DATA of 1200 bytes written and opened, sealed and not; the server's time
+//   for a RESPONSE (the X25519 of an ACCEPT), with ephemeral keys and with a static key, and the
+//   client's for its ACCEPT
 //
 // Both ends poll without sleeping (the server on a thread of its own), so the numbers are the
 // transport's, without a game's tick.  They include the hop from the reading thread to poll().
@@ -143,8 +146,81 @@ fn line(name: &str, v: &mut [f64]) {
     out(&format!("{:<34} median {:>7.3} ms   p99 {:>7.3} ms   ({} round trips)\n", name, m, p, v.len()));
 }
 
+// DATA of 1200 bytes through a pair of connections -> MB/s
+fn conn_pass(sealed: bool, n: usize) -> f64 {
+    use netchan::conn::{Conn, Settings};
+    use netchan::seal::Keys;
+    let set = Settings { timeout_ms: 5000, keepalive_ms: 100, packets_per_s: u32::MAX, bytes_per_s: u32::MAX };
+    let (mut a, mut b) = (Conn::new(1, false, set, 0), Conn::new(1, false, set, 0));
+    if sealed {
+        a = a.with_keys(Keys::new([1; 32], [2; 32]));
+        b = b.with_keys(Keys::new([2; 32], [1; 32]));
+    }
+    let payload = alloc::vec![7u8; 1200];
+    let mut wire = Vec::with_capacity(1300);
+    let t0 = plat::time_us();
+    let mut ok = 0usize;
+    for _ in 0..n {
+        wire.clear();
+        let seq = a.write_data(&payload, 0, &mut wire);
+        if let Some(p) = b.open(&wire, netchan::packet::DATA_HEADER, seq) {
+            ok += p.len();
+        }
+    }
+    let us = (plat::time_us() - t0).max(1) as f64;
+    ok as f64 / us
+}
+
+// handshakes in memory -> (the server's µs per RESPONSE, the client's per ACCEPT)
+fn handshakes(stat: bool, n: usize) -> (f64, f64) {
+    use netchan::endpoint::{ClientCore, Out, ServerCore, State};
+    let cfg = ServerConfig { protocol: PROTOCOL, max_connections: n + 1, max_per_ip: n + 1, challenges_per_s: 100_000_000, ..ServerConfig::default() };
+    let mut s = ServerCore::new(cfg, [5; 32], 1_000_000_000);
+    if stat {
+        s.set_static_key([6; 32]);
+    }
+    let ccfg = ClientConfig { protocol: PROTOCOL, server_key: s.public_key(), ..ClientConfig::default() };
+    let (mut t_server, mut t_client, mut done) = (0u64, 0u64, 0usize);
+    let now = 1_000_000_000u64;
+    for k in 0..n {
+        let mut r = [0u8; 32];
+        r[..8].copy_from_slice(&(k as u64).to_le_bytes());
+        let mut cl = ClientCore::new(ccfg, r, false);
+        let from = SocketAddr::new(IpAddr::V4([10, (k >> 16) as u8, (k >> 8) as u8, k as u8]), 5000);
+        cl.start(now);
+        for round in 0..3 {
+            while let Some(b) = cl.take_out() {
+                let t0 = plat::time_us();
+                s.datagram(from, &b, now);
+                if round == 1 {
+                    t_server += plat::time_us() - t0;
+                }
+            }
+            while let Some(o) = s.take_out() {
+                if let Out::Send(_, b) = o {
+                    let t0 = plat::time_us();
+                    cl.packet(&b, now);
+                    if round == 1 {
+                        t_client += plat::time_us() - t0;
+                    }
+                }
+            }
+        }
+        while s.poll_event().is_some() {}
+        done += (cl.state() == State::Connected) as usize;
+    }
+    let d = done.max(1) as f64;
+    (t_server as f64 / d, t_client as f64 / d)
+}
+
 pub fn run(n: usize) -> i32 {
     out(&format!("nettest bench: {} on {} ({} threads)\n", if cfg!(windows) { "Windows" } else if cfg!(target_os = "linux") { "Linux" } else { "macOS" }, plat::cpu_brand(), plat::cpu_count()));
+    let (plain, sealed) = (conn_pass(false, 50_000), conn_pass(true, 50_000));
+    out(&format!("{:<34} {:>8.1} MB/s sealed and opened, {:.1} MB/s without the seal\n", "seal: DATA of 1200 B in memory", sealed, plain));
+    for stat in [false, true] {
+        let (srv, cli) = handshakes(stat, 500);
+        out(&format!("{:<34} {:>8.1} us the server per RESPONSE, {:.1} us the client per ACCEPT\n", if stat { "handshake with the static key" } else { "handshake, ephemeral keys" }, srv, cli));
+    }
     let Some(srv) = chan_server() else {
         out("FAIL bench: no channel server\n");
         return 1;

@@ -142,7 +142,9 @@ python build_rs.py api-diff --snapshot         # write docs/api/<the library's v
 
 It reads the sources with gendoc's parser (no compiler), walks every crate's modules to find
 each item's public paths and keeps the shortest, so moving an item between modules that are
-re-exported changes nothing. It prints four groups: **Breaking** (removed, changed, a new variant
+re-exported changes nothing. A `pub use` into another crate of the library is followed there, so
+neither does moving a module or an item to another crate that the old crate re-exports it from
+(`pub use formats::json;` in agent_core). It prints four groups: **Breaking** (removed, changed, a new variant
 of an exhaustive enum, a new required trait member, ...), **Deprecated**, **Added** and
 **Notes**, then the version the next release needs. The exit code is 1 when there are breaking
 changes and the library's version is lower than that version, so it can guard a release or a CI job;

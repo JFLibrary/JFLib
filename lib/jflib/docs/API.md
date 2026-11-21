@@ -11,7 +11,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [ui](#ui) -- the immediate-mode UI: runtime, layout, widgets, windows, style contract
   <br>[App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks) · [Layout](#layout) · [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics) · [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8) · [Widgets](#widgets) · [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips) · [Text boxes and the clipboard](#text-boxes-and-the-clipboard) · [Rich-text and code editors](#rich-text-and-code-editors) · [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders) · [Data views: grid, tree, badges, meters](#data-views-grid-tree-badges-meters) · [Shell parts: navigation, command bar, splitter, breadcrumb, wizard steps](#shell-parts-navigation-command-bar-splitter-breadcrumb-wizard-steps) · [Docking: panels at the sides, tab groups, floating tool windows](#docking-panels-at-the-sides-tab-groups-floating-tool-windows) · [Charts](#charts) · [Toasts, spinners, progress](#toasts-spinners-progress) · [Date and time input](#date-and-time-input) · [Languages](#languages) · [Vector icons](#vector-icons) · [Values and colours](#values-and-colours) · [Windows](#windows) · [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars) · [File dialog](#file-dialog) · [Drawing commands](#drawing-commands) · [Scripts and the widget dump](#scripts-and-the-widget-dump) · [Theme](#theme) · [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions) · [Style contract](#style-contract) · [Stock painters of the data and shell parts](#stock-painters-of-the-data-and-shell-parts) · [Constants](#constants) · [Key codes](#key-codes) · [other](#other-modules)
 - [agent_core](#agent_core) -- transport-independent actions, schema validation, JSON-RPC, MCP and tasks
-  <br>[src/action.rs](#agent_coresrcactionrs) · [src/jmap.rs](#agent_coresrcjmaprs) · [src/json.rs](#agent_coresrcjsonrs) · [src/rpc.rs](#agent_coresrcrpcrs) · [src/schema.rs](#agent_coresrcschemars) · [src/task.rs](#agent_coresrctaskrs)
+  <br>[lib.rs](#agent_core-crate-root) · [src/action.rs](#agent_coresrcactionrs) · [src/rpc.rs](#agent_coresrcrpcrs) · [src/schema.rs](#agent_coresrcschemars) · [src/task.rs](#agent_coresrctaskrs)
 - [agent_io](#agent_io) -- explicitly enabled stdio and current-user native agent transports
   <br>[lib.rs](#agent_io-crate-root) · [src/ipc.rs](#agent_iosrcipcrs)
 - [gfx](#gfx) -- surfaces, the draw context, blend kernels, paths, strokes, masks, gradients
@@ -75,7 +75,9 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
   <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_pad.rs (Windows)](#platwin_padrs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_pad.rs (Linux)](#platlinux_padrs-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_pad.rs (Apple)](#platapple_mac_padrs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [pad.rs](#platpadrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
-  <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
+  <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
+- [formats](#formats) -- bounded JSON with exact numbers, typed JSON records, an XML subset, Unicode text encodings
+  <br>[src/charsets.rs](#formatssrccharsetsrs) · [src/encoding.rs](#formatssrcencodingrs) · [src/jmap.rs](#formatssrcjmaprs) · [src/json.rs](#formatssrcjsonrs) · [src/xml.rs](#formatssrcxmlrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
   <br>[lib.rs](#datetime-crate-root) · [cron.rs](#datetimecronrs) · [tz.rs](#datetimetzrs)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
@@ -127,7 +129,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
   <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/csg.rs](#geomsrccsgrs) · [src/exact.rs](#geomsrcexactrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
 - [netchan](#netchan) -- Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network
-  <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
+  <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/seal.rs](#netchansrcsealrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 
 ## ui
 
@@ -12230,12 +12232,28 @@ The card is one Tab stop; a button of its own (remove from a list) goes beside i
 *transport-independent actions, schema validation, JSON-RPC, MCP and tasks* -- crate root [`lib/agent_core/src/lib.rs`](../lib/agent_core/src/lib.rs)
 
 ```text
-Transport-independent action contracts and bounded JSON. New shared implementation;
-no corresponding module exists in the frozen assembly reference.
+Transport-independent action contracts. New shared implementation; no corresponding module
+exists in the frozen assembly reference.
 
-  json   strict bounded JSON: Value, parse, stringify, stringify_pretty
-  jmap   typed mapping of records and string enums (Field, Json, record!, wire_enum!)
+  action   semantic action dispatch: Dispatcher, ActionSpec, ActionContext, ActionResult /
+           ActionError, batches, pages
+  schema   statically registered input / output schemas (a JSON Schema subset), validation
+  rpc      versioned newline JSON-RPC (Protocol, RpcSession) with MCP adapters; no I/O
+  task     bounded cooperative tasks for long operations
+
+  json, jmap, record!, wire_enum!   re-exports of formats::{json, jmap} (they lived here until
+           0.3.0; new code names formats)
 ```
+
+### `agent_core` crate root
+
+Re-exports: `json::Value`
+
+Re-exports: `formats::json`
+
+Re-exports: `formats::jmap`
+
+Re-exports: `formats::{record, wire_enum}`
 
 ### `agent_core/src/action.rs`
 
@@ -12457,151 +12475,6 @@ New library code, independent of native windows, document types and language mod
 
 - **`fn validate_registry(actions: &[ActionSpec]) -> Result<(), ActionError>`**
   Validate stable identifiers and prevent ambiguous name/command registrations.
-
-### `agent_core/src/jmap.rs`
-
-Source: [`lib/agent_core/src/jmap.rs`](../lib/agent_core/src/jmap.rs)
-
-```text
-jmap -- typed JSON mapping for records and string enums over json::Value: the Field trait
-for member values, the Json trait for records, and the record! / wire_enum! macros that
-declare a type and its mapping in one place.  Missing or mistyped members read as their
-default; unknown members are ignored, so old and new programs read each other's data
-(protocols, project files, settings).
-
-  record! { pub struct P { pub a: String, pub n: u32, pub items: Vec<Item> } }
-  wire_enum! { pub enum Kind { Pc = "pc", Router = "router" } }   // Default = first variant
-  p.to_json() / P::from_json(&v) / Field::put / Field::take
-  list(&[T]) / from_list(&v) / str_of / u64_of / obj([...]) / empty_object()
-
-Field is implemented for String, bool, the integer types, Value (kept as is), Vec<T>,
-Option<T> (null = None) and BTreeMap<String, T> (an object).  Floating point has no exact
-JSON token here: store fixed-point integers instead.
-```
-
-- **`trait Field: Sized + Default`**
-  a value that maps to one JSON member
-  - `fn put(&self) -> Value`
-  - `fn take(v: Option<&Value>) -> Self`
-
-- **`trait Json: Sized`**
-  a record (a JSON object)
-  - `fn to_json(&self) -> Value`
-  - `fn from_json(v: &Value) -> Option<Self>`
-
-- **`fn empty_object() -> Value`**
-  an empty JSON object (used by record!)
-
-- **`record!(...)`**
-  declare a record: the struct (Clone, Debug, Default, PartialEq) and its Json / Field
-  mapping; the JSON member names are the field names
-
-- **`wire_enum!(...)`**
-  declare an enum carried as a string: Default is the first variant, ALL, as_str / parse,
-  Field
-
-- **`fn list<T: Json>(items: &[T]) -> Value`**
-  a list of records as a JSON array
-
-- **`fn from_list<T: Json>(v: &Value) -> Vec<T>`**
-  the records of a JSON array (or of the array under `items` of an object)
-
-- **`fn str_of<'a>(v: &'a Value, k: &str) -> &'a str`**
-  a string member of an object ("" when missing)
-
-- **`fn u64_of(v: &Value, k: &str) -> u64`**
-  an unsigned member of an object (0 when missing)
-
-- **`fn obj<const N: usize>(fields: [(&str, Value); N]) -> Value`**
-  an object built from (name, value) pairs
-
-### `agent_core/src/json.rs`
-
-Source: [`lib/agent_core/src/json.rs`](../lib/agent_core/src/json.rs)
-
-```text
-Strict, bounded UTF-8 JSON for local and browser control channels. New shared code.
-```
-
-- **`struct Number(String)`**
-  Exact JSON number token; construction validates the JSON number grammar.
-
-**`impl Number`**
-
-- **`fn parse(text: &str) -> Option<Self>`**
-  Parse one complete JSON number without rounding it through floating point.
-- **`fn as_str(&self) -> &str`**
-  Original validated JSON representation.
-- **`fn as_i64(&self) -> Option<i64>`**
-  Read an exactly integral JSON number without precision loss, including exponents.
-- **`fn as_u64(&self) -> Option<u64>`**
-  Read an exactly integral, nonnegative JSON number without precision loss.
-
-- **`enum Value`**
-  Owned JSON data. Objects retain member order and parsed objects have unique keys.
-  - `Null` -- JSON null.
-  - `Bool(bool)` -- JSON boolean.
-  - `Number(Number)` -- Exact JSON number.
-  - `String(String)` -- Unicode string.
-  - `Array(Vec<Value>)` -- Ordered values.
-  - `Object(Vec<(String, Value)>)` -- Ordered name/value members.
-
-**`impl Value`**
-
-- **`fn string(value: impl Into<String>) -> Self`**
-  Make a JSON string.
-- **`fn u64(value: u64) -> Self`**
-  Make an unsigned number without converting to floating point.
-- **`fn i64(value: i64) -> Self`**
-  Make a signed number without converting to floating point.
-- **`fn object<const N: usize>(fields: [(&str, Value); N]) -> Self`**
-  Make an object, with later duplicate names replacing earlier values.
-- **`fn insert(&mut self, key: &str, value: Value) -> bool`**
-  Insert or replace an object member; false when this value is not an object.
-- **`fn get(&self, key: &str) -> Option<&Value>`**
-  Look up an object member.
-- **`fn as_object(&self) -> Option<&[(String, Value)]>`**
-  Borrow an object member list.
-- **`fn as_array(&self) -> Option<&[Value]>`**
-  Borrow an array.
-- **`fn as_str(&self) -> Option<&str>`**
-  Borrow a string.
-- **`fn as_bool(&self) -> Option<bool>`**
-  Read a boolean.
-- **`fn as_u64(&self) -> Option<u64>`**
-  Read an unsigned integer token.
-- **`fn as_i64(&self) -> Option<i64>`**
-  Read a signed integer token.
-
-- **`struct Limits`**
-  Bounds applied before and during decoding or encoding.
-  - `bytes: usize` -- Maximum encoded byte count.
-  - `depth: usize` -- Maximum nested arrays/objects; the root value starts at depth zero.
-  - `values: usize` -- Maximum total values, including the root.
-  - `string_bytes: usize` -- Maximum decoded bytes in any string, including member names.
-  - `members: usize` -- Maximum members/elements in any container.
-
-- **`struct Error`**
-  Parse or serialization failure with the byte offset where it was found.
-  - `offset: usize` -- Zero-based byte offset (zero for serialization limits).
-  - `kind: &'static str` -- Stable machine-readable failure category.
-
-- **`fn parse(bytes: &[u8]) -> Result<Value, Error>`**
-  Parse a complete UTF-8 JSON value using default limits.
-
-- **`fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Value, Error>`**
-  Parse a complete UTF-8 JSON value. Duplicate object keys and lone surrogates are errors.
-
-- **`fn stringify(value: &Value) -> Result<String, Error>`**
-  Encode JSON without literal newlines, enforcing the default bounds.
-
-- **`fn stringify_with_limits(value: &Value, limits: Limits) -> Result<String, Error>`**
-  Encode bounded JSON. Invalid duplicate keys in manually built objects are rejected.
-
-- **`fn stringify_pretty(value: &Value, limits: Limits, indent: usize) -> Result<String, Error>`**
-  Encode bounded JSON for people to read: every array element and object member on its own
-  line, indented by `indent` spaces per level, "name": value; empty containers stay "[]" / "{}".
-  The output ends without a newline.
 
 ### `agent_core/src/rpc.rs`
 
@@ -40383,12 +40256,18 @@ base -- portable basics above the runtime and the platform     [src/core/str.s, 
   lru:  Lru -- a map that forgets the least recently used entries (count and weight limits)
   pattern: glob / has_glob -- shell wildcards; Regex -- POSIX basic and extended regular
         expressions without back-references (a Pike VM: no exponential cases)
+  xml, encoding: re-exports of formats::{xml, encoding} (here until 0.3.0; new code names
+        formats)
 
 Strings and formatting are Rust's own (str, String, format!); the thread pool, cpu
 features and files are in plat (they need unsafe).
 ```
 
 ### `base` crate root
+
+Re-exports: `formats::encoding`
+
+Re-exports: `formats::xml`
 
 - **`fn utf8_decode(s: &[u8], i: usize) -> (u32, usize)`**
   UTF-8 decoding: (codepoint, index after it); an invalid / overlong / surrogate / too large
@@ -40490,88 +40369,6 @@ a value are dropped (reading drops them too): get after set gives what a reload 
   the shortest text that reads back to the same double  [ini_set_f64]
 - **`fn remove(&mut self, sec: &str, key: &str) -> bool`**
   false: not there  [ini_remove]
-
-### `base/encoding.rs`
-
-Source: [`lib/base/encoding.rs`](../lib/base/encoding.rs)
-
-```text
-Strict Unicode interchange codecs. New native library functionality (no legacy counterpart).
-```
-
-- **`enum Encoding`**
-  Explicit text encodings; unmarked input is interpreted as UTF-8.
-  - `Utf8`
-  - `Utf8Bom`
-  - `Utf16Le`
-  - `Utf16Be`
-
-- **`enum Error`**
-  Invalid Unicode, unsupported UTF-32, or a caller-specified byte limit.
-  - `Invalid`
-  - `Unsupported`
-  - `Limit`
-
-- **`fn decode(bytes: &[u8], limit: usize) -> Result<(String, Encoding), Error>`**
-  Decode without replacement characters or guessed legacy code pages.
-
-- **`fn encode(text: &str, enc: Encoding) -> Vec<u8>`**
-  Encode Unicode; UTF-16 output always includes its byte-order mark.
-
-### `base/xml.rs`
-
-Source: [`lib/base/xml.rs`](../lib/base/xml.rs)
-
-```text
-Bounded, namespace-aware XML subset for interchange. No DTD, entities, I/O or XInclude.
-New native functionality; deliberately rejects constructs it cannot represent losslessly.
-```
-
-- **`struct Name`**
-  Expanded XML name (prefixes are not identities).
-  - `ns: String`
-  - `local: String`
-
-- **`struct Node`**
-  Element-only or text-only node; mixed content is rejected by this subset reader.
-  - `name: Name`
-  - `attrs: Vec<(Name, String)>`
-  - `text: String`
-  - `children: Vec<Node>`
-
-**`impl Node`**
-
-- **`fn is(&self, ns: &str, local: &str) -> bool`**
-  Test an expanded name.
-- **`fn attr(&self, ns: &str, local: &str) -> Option<&str>`**
-  Attribute lookup; the default namespace never applies to unprefixed attributes.
-
-- **`enum Error`**
-  Syntax error, resource limit, or an intentionally unsupported XML construct.
-  - `Syntax`
-  - `Limit`
-  - `Unsupported`
-
-- **`struct Limits`**
-  What one parse may take: the text's bytes, its elements, their nesting. The default
-  (4 MiB, 30000 elements, 48 levels) is `parse`'s; a reader whose own model bounds its
-  documents otherwise names what that model can expand to (`parse_with`).
-  - `bytes: usize`
-  - `nodes: usize`
-  - `depth: usize`
-
-- **`fn valid_char(c: char) -> bool`**
-  XML 1.0 character validity (also used before emitting document text).
-
-- **`fn escape(s: &str) -> Result<String, Error>`**
-  Escape text/attribute content, including CR so it survives XML newline normalization.
-
-- **`fn parse(s: &str) -> Result<Node, Error>`**
-  Parse a bounded XML subset. DTDs, processing instructions, comments, CDATA and mixed
-  content are explicitly rejected. No resources are ever resolved or fetched.
-
-- **`fn parse_with(s: &str, lim: Limits) -> Result<Node, Error>`**
-  `parse` within other limits than the default ones.
 
 ### `base/num.rs`
 
@@ -41388,6 +41185,397 @@ forms.
   the leftmost match (the longest of those starting there): byte offsets
 - **`fn find_at(&self, s: &str, from: usize) -> Option<(usize, usize)>`**
   as find, starting the search at byte `from` (the edges still see the text before it)
+
+## formats
+
+*bounded JSON with exact numbers, typed JSON records, an XML subset, Unicode text encodings* -- crate root [`lib/formats/src/lib.rs`](../lib/formats/src/lib.rs)
+
+```text
+formats -- data formats as text: JSON, typed JSON records, an XML subset, Unicode encodings
+
+  json   strict bounded JSON (RFC 8259; duplicate member names and lone surrogates are
+         errors): Value, Number (the exact token, no rounding through f64), parse /
+         parse_with_limits, stringify / stringify_with_limits / stringify_pretty, Limits,
+         Error { offset, kind }
+  jmap   typed mapping of records and string enums over json::Value: Field, Json,
+         record! / wire_enum!, list / from_list, str_of / u64_of / obj / empty_object
+  xml    a bounded, namespace-aware XML subset: Node / Name, parse / parse_with(Limits),
+         escape, valid_char; the five predefined entities and character references, and
+         Unsupported for a DTD, other entities, comments, CDATA, processing instructions
+         and mixed content
+  encoding  decode(bytes, limit) -> (String, Encoding) / encode(text, Encoding): UTF-8 with
+         and without BOM, UTF-16 LE / BE, strict and without guessing; Charset: the single-byte
+         sets of the web (WHATWG: windows-1252, ISO-8859-x, KOI8 ...) and of old files (the DOS
+         code pages); label / decode_label: the WHATWG Encoding Standard's labels and decode
+
+Every reader takes untrusted input: it checks the size before it reads and the nesting, the
+values or the elements while it reads, and reports a malformed or too large input as an error,
+never a panic.  Only alloc; no I/O.
+
+The single-byte tables and the WHATWG labels are generated (charsets.rs, tools/gen_encodings.py).
+
+json and jmap came from agent_core, xml and encoding from base (0.3.0); agent_core::{json,
+jmap, record!, wire_enum!} and base::{xml, encoding} remain as re-exports of these modules.
+```
+
+### `formats/src/charsets.rs`
+
+Source: [`lib/formats/src/charsets.rs`](../lib/formats/src/charsets.rs)
+
+```text
+charsets -- the single-byte character sets of formats::encoding (generated by tools/gen_encodings.py,
+do not edit): the WHATWG Encoding Standard's single-byte encodings and labels, the DOS code pages of old
+files.  Tables: bytes 0x80..0xFF -> Unicode, 0 unassigned (below 0x80 every set is ASCII).  The labels and
+the standard's tables: Copyright © WHATWG (Apple, Google, Mozilla, Microsoft), BSD 3-Clause License
+(licenses/WHATWG-LICENSE.txt).
+```
+
+- **`enum Charset`**
+  a single-byte character set: the bytes below 0x80 are ASCII, the others come from its table.
+  The single-byte encodings of the WHATWG Encoding Standard (what browsers, HTML and mail use; `whatwg()`)
+  and the DOS code pages of old files (by `from_code_page` or by name here; no web label names them)
+  - `Ibm866` -- IBM866: DOS Cyrillic
+  - `Iso8859_2` -- ISO-8859-2: Latin 2, Central European
+  - `Iso8859_3` -- ISO-8859-3: Latin 3, South European
+  - `Iso8859_4` -- ISO-8859-4: Latin 4, North European
+  - `Iso8859_5` -- ISO-8859-5: Cyrillic
+  - `Iso8859_6` -- ISO-8859-6: Arabic
+  - `Iso8859_7` -- ISO-8859-7: Greek
+  - `Iso8859_8` -- ISO-8859-8: Hebrew, visual order
+  - `Iso8859_8I` -- ISO-8859-8-I: Hebrew, logical order (the same bytes as ISO-8859-8)
+  - `Iso8859_10` -- ISO-8859-10: Latin 6, Nordic
+  - `Iso8859_13` -- ISO-8859-13: Latin 7, Baltic
+  - `Iso8859_14` -- ISO-8859-14: Latin 8, Celtic
+  - `Iso8859_15` -- ISO-8859-15: Latin 9, Latin 1 with the euro sign
+  - `Iso8859_16` -- ISO-8859-16: Latin 10, South-Eastern European
+  - `Koi8R` -- KOI8-R: Russian
+  - `Koi8U` -- KOI8-U: Ukrainian and Belarusian (WHATWG's KOI8-RU)
+  - `Macintosh` -- macintosh: Mac OS Roman
+  - `Windows874` -- windows-874: Thai (also TIS-620 and ISO-8859-11)
+  - `Windows1250` -- windows-1250: Windows Central European
+  - `Windows1251` -- windows-1251: Windows Cyrillic
+  - `Windows1252` -- windows-1252: Windows Western (also ISO-8859-1 and ASCII on the web)
+  - `Windows1253` -- windows-1253: Windows Greek
+  - `Windows1254` -- windows-1254: Windows Turkish (also ISO-8859-9)
+  - `Windows1255` -- windows-1255: Windows Hebrew
+  - `Windows1256` -- windows-1256: Windows Arabic
+  - `Windows1257` -- windows-1257: Windows Baltic
+  - `Windows1258` -- windows-1258: Windows Vietnamese
+  - `XMacCyrillic` -- x-mac-cyrillic: Mac OS Cyrillic
+  - `XUserDefined` -- x-user-defined: bytes 0x80..0xFF as U+F780..U+F7FF (WHATWG)
+  - `Latin1` -- ISO-8859-1: ISO-8859-1 exactly: each byte is its code point (the web reads the label as windows-1252) (not WHATWG)
+  - `Ibm437` -- IBM437: DOS United States (also ZIP names without the UTF-8 flag) (not WHATWG)
+  - `Ibm737` -- IBM737: DOS Greek (not WHATWG)
+  - `Ibm775` -- IBM775: DOS Baltic (not WHATWG)
+  - `Ibm850` -- IBM850: DOS Western European (not WHATWG)
+  - `Ibm852` -- IBM852: DOS Central European (not WHATWG)
+  - `Ibm855` -- IBM855: DOS Cyrillic (IBM) (not WHATWG)
+  - `Ibm857` -- IBM857: DOS Turkish (not WHATWG)
+  - `Ibm858` -- IBM00858: DOS Western European with the euro sign (not WHATWG)
+  - `Ibm860` -- IBM860: DOS Portuguese (not WHATWG)
+  - `Ibm861` -- IBM861: DOS Icelandic (not WHATWG)
+  - `Ibm862` -- IBM862: DOS Hebrew (not WHATWG)
+  - `Ibm863` -- IBM863: DOS Canadian French (not WHATWG)
+  - `Ibm864` -- IBM864: DOS Arabic (not WHATWG)
+  - `Ibm865` -- IBM865: DOS Nordic (not WHATWG)
+  - `Ibm869` -- IBM869: DOS Greek 2 (not WHATWG)
+
+**`impl Charset`**
+
+- **`const ALL: &'static [Charset] = &[ Charset::Ibm866, Charset::Iso8859_2, Charset::Iso8859_ ...`**
+  every character set, in declaration order
+- **`const fn name(self) -> &'static str`**
+  its name: the WHATWG Encoding Standard's, else IANA's ("IBM437", "ISO-8859-1")
+- **`const fn whatwg(self) -> bool`**
+  whether it is one of the WHATWG Encoding Standard's encodings (the others have no web label)
+- **`const fn code_page(self) -> Option<u16>`**
+  its Windows code page number (None: ISO-8859-10, -14 and -16 and x-user-defined have none)
+- **`const fn from_code_page(cp: u16) -> Option<Charset>`**
+  the character set of a Windows code page number: 437 to 869 (DOS), 874, 1250 to 1258, 10000 and 10007
+  (Mac), 20866 and 21866 (KOI8), 28591 to 28605 (ISO-8859; 28599, ISO-8859-9, is windows-1254 as on the
+  web), 38598
+
+### `formats/src/encoding.rs`
+
+Source: [`lib/formats/src/encoding.rs`](../lib/formats/src/encoding.rs)
+
+```text
+encoding -- text encodings: strict Unicode interchange, the single-byte character sets of the web and of
+old files, the labels of the WHATWG Encoding Standard.  New native library functionality.
+
+  decode(bytes, limit) -> (String, Encoding)   strict UTF-8 / UTF-16 by the byte-order mark, no guessing
+  encode(text, Encoding) -> bytes
+  Charset: the WHATWG single-byte encodings (windows-1252, ISO-8859-x, KOI8, macintosh, IBM866 ...) and
+           the DOS code pages (IBM437 ... 869), an exact ISO-8859-1; from_label (WHATWG), from_code_page
+           (Windows numbers), name, code_page, decode (U+FFFD for unassigned bytes), decode_char,
+           encode (Unmappable), encode_char
+  label(name) -> Label      what a WHATWG label names: UTF-8, UTF-16, a Charset, the replacement
+                            encoding, or an encoding this crate does not decode (Shift_JIS, GBK ...)
+  decode_label(label, bytes, limit) -> String   the standard's decode: a byte-order mark wins over the
+                            label, then the label's encoding, errors become U+FFFD
+
+The tables and labels are generated (charsets.rs, tools/gen_encodings.py): Python's codecs, made the
+standard's index where it differs (checked against the standard's data with --verify).
+```
+
+- **`enum Encoding`**
+  Explicit text encodings; unmarked input is interpreted as UTF-8.
+  - `Utf8`
+  - `Utf8Bom`
+  - `Utf16Le`
+  - `Utf16Be`
+
+- **`enum Error`**
+  Invalid Unicode, an encoding this crate does not decode (UTF-32, an unknown or multi-byte label), a
+  caller-specified byte limit, or a character the character set cannot encode.
+  - `Invalid`
+  - `Unsupported`
+  - `Limit`
+  - `Unmappable(char)`
+
+- **`fn decode(bytes: &[u8], limit: usize) -> Result<(String, Encoding), Error>`**
+  Decode without replacement characters or guessed legacy code pages.
+
+- **`fn encode(text: &str, enc: Encoding) -> Vec<u8>`**
+  Encode Unicode; UTF-16 output always includes its byte-order mark.
+
+- **`enum Label`**
+  What a label of the WHATWG Encoding Standard names (`label`).
+  - `Utf8` -- UTF-8
+  - `Utf16Le` -- UTF-16 little-endian (also the label "utf-16")
+  - `Utf16Be` -- UTF-16 big-endian
+  - `Single(Charset)` -- a single-byte character set of this crate
+  - `Replacement` -- the standard's replacement encoding (ISO-2022-KR, HZ and other labels it closes): any input
+    is one U+FFFD
+  - `Other(&'static str)` -- an encoding of the standard this crate does not decode, by its name: "Big5", "EUC-JP",
+    "EUC-KR", "gb18030", "GBK", "ISO-2022-JP", "Shift_JIS"
+
+- **`fn label(name: &str) -> Option<Label>`**
+  The encoding a label names, as the WHATWG Encoding Standard reads it ("get an encoding"): leading
+  and trailing ASCII white space ignored, ASCII case ignored, the standard's labels only ("latin1",
+  "iso-8859-1" and "ascii" are windows-1252, "utf-16" is UTF-16LE).  None: no label of the standard.
+
+- **`fn decode_label(label: &str, bytes: &[u8], limit: usize) -> Result<String, Error>`**
+  Decode as the WHATWG Encoding Standard's "decode": a UTF-8 or UTF-16 byte-order mark wins over the
+  label (and is dropped), else the label's encoding; malformed input becomes U+FFFD, never an error.
+  Limit: more than `limit` bytes in or out; Unsupported: no label of the standard, or an encoding this
+  crate does not decode (`Label::Other`).
+
+**`impl Charset`**
+
+- **`fn from_label(name: &str) -> Option<Charset>`**
+  The character set a WHATWG label names (`label`, single-byte sets only): "windows-1252",
+  "latin1", "koi8-r", "cp1251", "iso8859-2" ...  The DOS code pages and the exact ISO-8859-1
+  have no web label: `from_code_page` or the variant.
+- **`fn decode(self, bytes: &[u8]) -> String`**
+  The text of these bytes; an unassigned byte becomes U+FFFD.
+- **`fn decode_char(self, b: u8) -> Option<char>`**
+  The character of one byte (None: unassigned in this set).
+- **`fn encode_char(self, c: char) -> Option<u8>`**
+  The byte of one character (None: not in this set; the first byte where a set has two).
+- **`fn encode(self, text: &str) -> Result<Vec<u8>, Error>`**
+  The bytes of a text; Unmappable: the first character this set does not have.
+
+### `formats/src/jmap.rs`
+
+Source: [`lib/formats/src/jmap.rs`](../lib/formats/src/jmap.rs)
+
+```text
+jmap -- typed JSON mapping for records and string enums over json::Value: the Field trait
+for member values, the Json trait for records, and the record! / wire_enum! macros that
+declare a type and its mapping in one place.  Missing or mistyped members read as their
+default; unknown members are ignored, so old and new programs read each other's data
+(protocols, project files, settings).
+
+  record! { pub struct P { pub a: String, pub n: u32, pub items: Vec<Item> } }
+  wire_enum! { pub enum Kind { Pc = "pc", Router = "router" } }   // Default = first variant
+  p.to_json() / P::from_json(&v) / Field::put / Field::take
+  list(&[T]) / from_list(&v) / str_of / u64_of / obj([...]) / empty_object()
+
+Field is implemented for String, bool, the integer types, Value (kept as is), Vec<T>,
+Option<T> (null = None) and BTreeMap<String, T> (an object).  Floating point has no exact
+JSON token here: store fixed-point integers instead.
+```
+
+- **`trait Field: Sized + Default`**
+  a value that maps to one JSON member
+  - `fn put(&self) -> Value`
+  - `fn take(v: Option<&Value>) -> Self`
+
+- **`trait Json: Sized`**
+  a record (a JSON object)
+  - `fn to_json(&self) -> Value`
+  - `fn from_json(v: &Value) -> Option<Self>`
+
+- **`fn empty_object() -> Value`**
+  an empty JSON object (used by record!)
+
+- **`record!(...)`**
+  declare a record: the struct (Clone, Debug, Default, PartialEq) and its Json / Field
+  mapping; the JSON member names are the field names
+
+- **`wire_enum!(...)`**
+  declare an enum carried as a string: Default is the first variant, ALL, as_str / parse,
+  Field
+
+- **`fn list<T: Json>(items: &[T]) -> Value`**
+  a list of records as a JSON array
+
+- **`fn from_list<T: Json>(v: &Value) -> Vec<T>`**
+  the records of a JSON array (or of the array under `items` of an object)
+
+- **`fn str_of<'a>(v: &'a Value, k: &str) -> &'a str`**
+  a string member of an object ("" when missing)
+
+- **`fn u64_of(v: &Value, k: &str) -> u64`**
+  an unsigned member of an object (0 when missing)
+
+- **`fn obj<const N: usize>(fields: [(&str, Value); N]) -> Value`**
+  an object built from (name, value) pairs
+
+### `formats/src/json.rs`
+
+Source: [`lib/formats/src/json.rs`](../lib/formats/src/json.rs)
+
+```text
+Strict, bounded UTF-8 JSON (RFC 8259): settings and project files, manifests, protocols,
+the agent interface's control channels. New shared code (agent_core::json until 0.3.0).
+```
+
+- **`struct Number(String)`**
+  Exact JSON number token; construction validates the JSON number grammar.
+
+**`impl Number`**
+
+- **`fn parse(text: &str) -> Option<Self>`**
+  Parse one complete JSON number without rounding it through floating point.
+- **`fn as_str(&self) -> &str`**
+  Original validated JSON representation.
+- **`fn as_i64(&self) -> Option<i64>`**
+  Read an exactly integral JSON number without precision loss, including exponents.
+- **`fn as_u64(&self) -> Option<u64>`**
+  Read an exactly integral, nonnegative JSON number without precision loss.
+
+- **`enum Value`**
+  Owned JSON data. Objects retain member order and parsed objects have unique keys.
+  - `Null` -- JSON null.
+  - `Bool(bool)` -- JSON boolean.
+  - `Number(Number)` -- Exact JSON number.
+  - `String(String)` -- Unicode string.
+  - `Array(Vec<Value>)` -- Ordered values.
+  - `Object(Vec<(String, Value)>)` -- Ordered name/value members.
+
+**`impl Value`**
+
+- **`fn string(value: impl Into<String>) -> Self`**
+  Make a JSON string.
+- **`fn u64(value: u64) -> Self`**
+  Make an unsigned number without converting to floating point.
+- **`fn i64(value: i64) -> Self`**
+  Make a signed number without converting to floating point.
+- **`fn object<const N: usize>(fields: [(&str, Value); N]) -> Self`**
+  Make an object, with later duplicate names replacing earlier values.
+- **`fn insert(&mut self, key: &str, value: Value) -> bool`**
+  Insert or replace an object member; false when this value is not an object.
+- **`fn get(&self, key: &str) -> Option<&Value>`**
+  Look up an object member.
+- **`fn as_object(&self) -> Option<&[(String, Value)]>`**
+  Borrow an object member list.
+- **`fn as_array(&self) -> Option<&[Value]>`**
+  Borrow an array.
+- **`fn as_str(&self) -> Option<&str>`**
+  Borrow a string.
+- **`fn as_bool(&self) -> Option<bool>`**
+  Read a boolean.
+- **`fn as_u64(&self) -> Option<u64>`**
+  Read an unsigned integer token.
+- **`fn as_i64(&self) -> Option<i64>`**
+  Read a signed integer token.
+
+- **`struct Limits`**
+  Bounds applied before and during decoding or encoding.
+  - `bytes: usize` -- Maximum encoded byte count.
+  - `depth: usize` -- Maximum nested arrays/objects; the root value starts at depth zero.
+  - `values: usize` -- Maximum total values, including the root.
+  - `string_bytes: usize` -- Maximum decoded bytes in any string, including member names.
+  - `members: usize` -- Maximum members/elements in any container.
+
+- **`struct Error`**
+  Parse or serialization failure with the byte offset where it was found.
+  - `offset: usize` -- Zero-based byte offset (zero for serialization limits).
+  - `kind: &'static str` -- Stable machine-readable failure category.
+
+- **`fn parse(bytes: &[u8]) -> Result<Value, Error>`**
+  Parse a complete UTF-8 JSON value using default limits.
+
+- **`fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Value, Error>`**
+  Parse a complete UTF-8 JSON value. Duplicate object keys and lone surrogates are errors.
+
+- **`fn stringify(value: &Value) -> Result<String, Error>`**
+  Encode JSON without literal newlines, enforcing the default bounds.
+
+- **`fn stringify_with_limits(value: &Value, limits: Limits) -> Result<String, Error>`**
+  Encode bounded JSON. Invalid duplicate keys in manually built objects are rejected.
+
+- **`fn stringify_pretty(value: &Value, limits: Limits, indent: usize) -> Result<String, Error>`**
+  Encode bounded JSON for people to read: every array element and object member on its own
+  line, indented by `indent` spaces per level, "name": value; empty containers stay "[]" / "{}".
+  The output ends without a newline.
+
+### `formats/src/xml.rs`
+
+Source: [`lib/formats/src/xml.rs`](../lib/formats/src/xml.rs)
+
+```text
+Bounded, namespace-aware XML subset for interchange. No DTD, entities, I/O or XInclude.
+New native functionality; deliberately rejects constructs it cannot represent losslessly.
+```
+
+- **`struct Name`**
+  Expanded XML name (prefixes are not identities).
+  - `ns: String`
+  - `local: String`
+
+- **`struct Node`**
+  Element-only or text-only node; mixed content is rejected by this subset reader.
+  - `name: Name`
+  - `attrs: Vec<(Name, String)>`
+  - `text: String`
+  - `children: Vec<Node>`
+
+**`impl Node`**
+
+- **`fn is(&self, ns: &str, local: &str) -> bool`**
+  Test an expanded name.
+- **`fn attr(&self, ns: &str, local: &str) -> Option<&str>`**
+  Attribute lookup; the default namespace never applies to unprefixed attributes.
+
+- **`enum Error`**
+  Syntax error, resource limit, or an intentionally unsupported XML construct.
+  - `Syntax`
+  - `Limit`
+  - `Unsupported`
+
+- **`struct Limits`**
+  What one parse may take: the text's bytes, its elements, their nesting. The default
+  (4 MiB, 30000 elements, 48 levels) is `parse`'s; a reader whose own model bounds its
+  documents otherwise names what that model can expand to (`parse_with`).
+  - `bytes: usize`
+  - `nodes: usize`
+  - `depth: usize`
+
+- **`fn valid_char(c: char) -> bool`**
+  XML 1.0 character validity (also used before emitting document text).
+
+- **`fn escape(s: &str) -> Result<String, Error>`**
+  Escape text/attribute content, including CR so it survives XML newline normalization.
+
+- **`fn parse(s: &str) -> Result<Node, Error>`**
+  Parse a bounded XML subset. DTDs, processing instructions, comments, CDATA and mixed
+  content are explicitly rejected. No resources are ever resolved or fetched.
+
+- **`fn parse_with(s: &str, lim: Limits) -> Result<Node, Error>`**
+  `parse` within other limits than the default ones.
 
 ## datetime
 
@@ -62220,7 +62408,7 @@ dimension styles, blocks with their entities, and the entities of the drawing.  
 Binary DXF is refused (Error::Binary).  Files are untrusted input: every count, length and size is bounded
 (Limits), a malformed value is skipped with a note, a group code that is no number ends the file with an error;
 nothing nests deeper than POLYLINE / VERTEX and INSERT / ATTRIB, so there is no recursion.  Strings before AutoCAD
-2007 are in the header's code page ($DWGCODEPAGE, codepages.rs), from AC1021 on UTF-8; \U+XXXX is decoded
+2007 are in the header's code page ($DWGCODEPAGE, formats::encoding's character sets), from AC1021 on UTF-8; \U+XXXX is decoded
 everywhere, %% codes and MTEXT's codes where the text is drawn (specials, mtext).
 ```
 
@@ -62780,7 +62968,7 @@ Source: [`lib/dxf/src/strings.rs`](../lib/dxf/src/strings.rs)
 
 ```text
 strings -- a DXF's bytes as text: UTF-8 from AutoCAD 2007 (AC1021) on, before that the header's code page
-($DWGCODEPAGE; codepages.rs), \U+XXXX in any version; TEXT's %% codes (specials).
+($DWGCODEPAGE: formats::encoding's character sets), \U+XXXX in any version; TEXT's %% codes (specials).
 ```
 
 - **`fn decode_unicode_escapes(s: &str) -> String`**
@@ -67579,12 +67767,14 @@ netchan -- message channels for games (G7d, docs/TRANSPORT.md)
            poll() -> ServerEvent, send(id, payload) -> seq, disconnect(id), stats(id)
            (Windows, Linux, Apple: it needs netio's HTTP server)
   WebSocket::connect(url): one non-blocking client type for the browser and the desktop
-  packet / conn / endpoint: the wire format, the sequence numbers and acks, the handshake --
-           without I/O, for tests on a simulated network and for other transports
+  packet / conn / endpoint / seal: the wire format, the sequence numbers and acks, the
+           handshake, its keys -- without I/O, for tests on a simulated network and for other
+           transports
 
 The same channel over two transports: unreliable and unordered over UDP (a handshake with a
-stateless cookie, a token in every packet, keep-alives and timeouts), reliable and ordered
-over a WebSocket (the browser's only way, docs/GAME.md E8).  Both carry the same header: a
+stateless cookie and X25519 keys, every packet after it sealed with ChaCha20-Poly1305,
+keep-alives and timeouts; optionally a static server key the client pins), reliable and
+ordered over a WebSocket (the browser's only way, docs/GAME.md E8; wss:// encrypts it).  Both carry the same header: a
 sequence number per packet and acks of the newest 33 received, so the netcode (G7e) learns
 which packets arrived over either.  Limits everywhere: payload sizes, packets and bytes a
 second per connection, connections per server and per address, handshake answers a second.
@@ -67614,6 +67804,8 @@ it at the same time; the transport has no game in it).
   - `RateLimit` -- the peer broke the rate limits (the server ended it)
   - `Closed(u16)` -- the WebSocket under it closed with this code (1006: without a close frame)
   - `Replaced` -- the same address made a new handshake
+  - `ServerKey` -- the server did not prove the static key of ClientConfig::server_key: it has none (DENY),
+    or its ACCEPT did not check (another server, or someone on the path in its place)
 
 - **`enum Error`**
   why a call failed
@@ -67688,6 +67880,9 @@ conn -- one connection's sequence numbers and acks, without I/O (docs/TRANSPORT.
                                                      the caller)
   conn.take_event() -> Message / Delivered / Lost    conn.rate_ok(bytes, now), keepalive_due,
                                                      timed_out, stats, rtt_ms
+  Conn::new(..).with_keys(Keys)                      sealed (UDP): write_data and
+                                                     write_disconnect seal, open(wire, head,
+                                                     seq) checks and decrypts what came
 
 Every DATA packet has its own sequence number (u16, wrapping) and acknowledges the newest
 number received plus the 32 before it as bits.  Unreliable (UDP): packets may come late, twice
@@ -67700,6 +67895,10 @@ pass the bits unacknowledged: after ACK_EVERY packets without one of its own, an
 connection owes an empty DATA packet at once (ack_due).
 The round-trip time comes from the newest ack only (bits name older packets, whose wait would
 count twice), smoothed as TCP does (RFC 6298).
+Sealed (seal.rs): each packet sent takes the next packet number (u64; its low 16 bits are the
+sequence number), the nonce of ChaCha20-Poly1305; open() takes the number nearest the largest
+authenticated one and leaves the state alone when the tag does not check (Stats::forged).  The
+receive window above then drops a replayed packet as a duplicate or stale: only after the tag.
 ```
 
 ```rust
@@ -67725,6 +67924,8 @@ ACK_EVERY: u32 = 16
   - `duplicates: u64` -- packets that came a second time
   - `stale: u64` -- packets older than the window
   - `dropped: u64` -- packets dropped for the rate limits or their size
+  - `forged: u64` -- sealed packets with this connection's token whose tag did not check (forged or damaged;
+    nothing else was done with them)
   - `bytes_sent: u64` -- bytes of DATA packets sent (headers included)
   - `bytes_received: u64` -- bytes of DATA packets taken in (headers included)
   - `rtt_ms: f32` -- the smoothed round-trip time (0 before the first sample)
@@ -67743,14 +67944,28 @@ ACK_EVERY: u32 = 16
 
 - **`fn new(token: u32, reliable: bool, set: Settings, now_us: u64) -> Conn`**
   a connection with the token both sides put into DATA (0 over a WebSocket)
+- **`fn with_keys(mut self, keys: Keys) -> Conn`**
+  the connection sealed with these keys (UDP after the handshake): every packet written is
+  encrypted and authenticated, every packet taken in must pass open()
+- **`fn sealed(&self) -> bool`**
+  whether its packets are sealed
 - **`fn token(&self) -> u32`**
   the token of DATA and DISCONNECT packets
+- **`fn open(&mut self, wire: &[u8], head: usize, seq: u16) -> Option<Vec<u8>>`**
+  check and decrypt a packet that came: `wire` the whole packet, `head` the bytes before its
+  payload (DATA_HEADER, DISCONNECT_HEADER), `seq` its sequence number -> the payload
+  (unsealed connections: the bytes after the header as they are).  None: too short or a
+  wrong tag (counted as forged); the connection's state is not touched then
 - **`fn reliable(&self) -> bool`**
   whether the transport is reliable (a WebSocket)
 - **`fn ack_fields(&self) -> (u16, u32)`**
   the newest number received and the bits of the 32 before it (0xffff, 0 before any)
 - **`fn write_data(&mut self, payload: &[u8], now: u64, out: &mut Vec<u8>) -> u16`**
-  append a DATA packet with `payload` (empty: a keep-alive) -> its sequence number
+  append a DATA packet with `payload` (empty: a keep-alive), sealed if the connection is
+  -> its sequence number
+- **`fn write_disconnect(&mut self, reason: u8, out: &mut Vec<u8>)`**
+  append a DISCONNECT with `reason` (BYE_\*), sealed if the connection is; it takes a
+  sequence number of its own, so its seal never shares a nonce with a DATA packet
 - **`fn rate_ok(&mut self, bytes: usize, now: u64) -> bool`**
   whether a packet of `bytes` from the peer stays within the rate limits (false: drop it,
   or end a reliable connection)
@@ -67788,18 +68003,26 @@ endpoint -- the server's and the client's protocol without I/O (docs/TRANSPORT.m
     .tick(now)                         keep-alives, timeouts, streams that never said CONNECT
     .send(conn, payload, now) -> seq   .disconnect(conn, now)
     .take_out() -> Out (what to send where, streams to close)   .poll_event() -> ServerEvent
-  ClientCore::new(ClientConfig, nonce, stream)
+    .set_static_key(secret) / .public_key()   a long-lived X25519 key clients may pin
+  ClientCore::new(ClientConfig, random [32], stream)
     .start(now) / .packet(bytes, now) / .tick(now) / .send(payload, now) / .disconnect(now)
     .transport_closed(code) / .take_out() -> bytes / .poll_event() -> ClientEvent
 
-Time is the caller's (microseconds), so tests run them on a virtual clock over a simulated
-network (apps/nettest).  The UDP handshake: CONNECT (padded) -> CHALLENGE with a stateless
-cookie, HMAC-SHA256 over the client's address, its nonce and the time -> RESPONSE (padded) with
-the cookie -> ACCEPT with a random token, which every DATA and DISCONNECT then carries.  Nothing
-is kept for an address before its RESPONSE proves it receives there, the answers before that
-are smaller than the requests, and challenges_per_s bounds the work for all of them.  A
-WebSocket sends CONNECT and gets ACCEPT (token 0); TCP has proved the address.  The token is no
-encryption: it keeps senders out that do not see the traffic.
+Time and randomness are the caller's (microseconds; the server's secret, the client's 32 random
+bytes), so tests run them on a virtual clock over a simulated network (apps/nettest), the same
+on every run.  The UDP handshake: CONNECT (padded) -> CHALLENGE with a stateless cookie,
+HMAC-SHA256 over the client's address, its nonce and the time -> RESPONSE (padded) with the
+cookie and the client's ephemeral X25519 key -> ACCEPT with a random token, the server's
+ephemeral key and `confirm`, the proof that it derived the same keys (seal.rs).  From then on
+every DATA and DISCONNECT is sealed with ChaCha20-Poly1305 under keys of this connection alone:
+who listens reads nothing, a changed, forged or replayed packet is dropped.  With
+ClientConfig::server_key the keys also need the server's static secret, so nobody on the path
+can take the server's place; without it they keep out only those who listen.  Nothing is kept
+for an address before its RESPONSE proves it receives there, the answers before that are
+smaller than the requests, and challenges_per_s bounds the work for all of them (an HMAC for a
+CHALLENGE; for an ACCEPT two or three X25519, which a lost ACCEPT does not repeat).  A WebSocket
+sends CONNECT and gets ACCEPT (token 0, no keys); TCP has proved the address, and wss:// is
+its encryption.
 ```
 
 - **`struct ServerConfig`**
@@ -67839,7 +68062,8 @@ encryption: it keeps senders out that do not see the traffic.
   - `challenges: u64` -- CHALLENGE answers sent
   - `accepted: u64` -- connections taken
   - `denied: u64` -- clients refused (full, protocol, address)
-  - `bad: u64` -- packets that were no packet, a wrong kind or a wrong cookie or token
+  - `bad: u64` -- packets that were no packet, a wrong kind, a wrong cookie or token, or a handshake with a
+    key that gives no shared secret (forged DATA of a connection: its Stats::forged)
   - `throttled: u64` -- handshakes over challenges_per_s, left without an answer
   - `unknown: u64` -- DATA from addresses without a connection
 
@@ -67849,10 +68073,16 @@ encryption: it keeps senders out that do not see the traffic.
 **`impl ServerCore`**
 
 - **`fn new(cfg: ServerConfig, secret: [u8; 32], now: u64) -> ServerCore`**
-  a server with these limits; `secret` keys the cookies and tokens (random in a real server,
-  fixed in tests)
+  a server with these limits; `secret` keys the cookies and tokens and seeds the ephemeral
+  keys of the handshakes (random in a real server, fixed in tests)
 - **`fn config(&self) -> &ServerConfig`**
   the limits in force (max_payload clamped)
+- **`fn set_static_key(&mut self, secret: [u8; 32])`**
+  a long-lived X25519 secret: clients that know its public key (ClientConfig::server_key)
+  include it in their keys, so only this server can answer them.  Kept by the app (32 random
+  bytes, made once); clients without the key still connect with ephemeral keys only
+- **`fn public_key(&self) -> Option<[u8; 32]>`**
+  the public key of set_static_key (for the clients' ClientConfig::server_key)
 - **`fn datagram(&mut self, from: SocketAddr, data: &[u8], now: u64)`**
   a UDP datagram from `from`
 - **`fn stream_open(&mut self, stream: u32, addr: Option<SocketAddr>, now: u64)`**
@@ -67897,6 +68127,10 @@ encryption: it keeps senders out that do not see the traffic.
   - `resend_ms: u32` -- UDP: CONNECT / RESPONSE again after this long without an answer
   - `packets_per_s: u32` -- packets a second from the server, on average (more are dropped)
   - `bytes_per_s: u32` -- bytes a second from the server, on average (more are dropped)
+  - `server_key: Option<[u8; 32]>` -- UDP: the server's static public key (ServerCore::set_static_key, Server::set_static_key).
+    Given, the keys need the server's secret, and a server without it is refused
+    (Reason::ServerKey); None: ephemeral keys only, safe from listeners but not from someone
+    on the path who answers in the server's place
 
 - **`enum State`**
   where a client stands
@@ -67917,8 +68151,10 @@ encryption: it keeps senders out that do not see the traffic.
 
 **`impl ClientCore`**
 
-- **`fn new(cfg: ClientConfig, nonce: u64, stream: bool) -> ClientCore`**
-  a client with a random `nonce` (it names this attempt); `stream`: over a WebSocket
+- **`fn new(cfg: ClientConfig, random: [u8; 32], stream: bool) -> ClientCore`**
+  a client; `random`: 32 random bytes of this attempt (its nonce and, over UDP, its
+  ephemeral key come from them: plat::random_bytes in a real client, fixed in tests);
+  `stream`: over a WebSocket
 - **`fn start(&mut self, now: u64)`**
   begin the handshake (CONNECT goes out)
 - **`fn packet(&mut self, data: &[u8], now: u64)`**
@@ -67950,33 +68186,40 @@ encryption: it keeps senders out that do not see the traffic.
 Source: [`lib/netchan/src/packet.rs`](../lib/netchan/src/packet.rs)
 
 ```text
-packet -- the channel's wire format, version 1 (docs/TRANSPORT.md "Paketformat")
+packet -- the channel's wire format, version 2 (docs/TRANSPORT.md "Paketformat")
 
   byte 0: VERSION << 4 | kind; then, little-endian:
-  CONNECT     client -> server  protocol u32, nonce u64              13 bytes (UDP: padded to 64)
+  CONNECT     client -> server  protocol u32, nonce u64              13 bytes (UDP: padded to 96)
   CHALLENGE   server -> client  nonce u64, time u32, mac [16]        29 bytes (UDP only)
-  RESPONSE    client -> server  protocol u32, nonce u64, time u32,   33 bytes (UDP only, padded
-                                mac [16]                                       to 64)
-  ACCEPT      server -> client  nonce u64, token u32, max payload u16   15 bytes
+  RESPONSE    client -> server  protocol u32, nonce u64, time u32,   66 bytes (UDP only, padded
+                                mac [16], flags u8, key [32]                   to 96)
+  ACCEPT      server -> client  nonce u64, token u32, max payload    63 bytes
+                                u16, key [32], confirm [16]
   DENY        server -> client  nonce u64, reason u8                 10 bytes
-  DATA        both              token u32, seq u16, ack u16, ack bits u32, payload   13 + n
-  DISCONNECT  both              token u32, reason u8                  6 bytes
+  DATA        both              token u32, seq u16, ack u16, ack bits u32, payload
+                                                                     13 + n (UDP: + 16)
+  DISCONNECT  both              token u32, seq u16, reason u8          8 bytes (UDP: + 16)
 
-A UDP client pads CONNECT and RESPONSE to HANDSHAKE_SIZE, and every answer of the server before
-a connection is smaller: a forged sender address gets back less than was sent (no
-amplification).  Over a WebSocket the CONNECT is not padded and CHALLENGE / RESPONSE do not
-occur (TCP has proved the address).  parse() reads untrusted bytes: exact sizes, no panics,
-no allocation.
+Over UDP the handshake agrees on keys (RESPONSE: the client's ephemeral X25519 key; ACCEPT: the
+server's and `confirm`, the proof that the server derived the same keys; seal.rs), and every
+DATA and DISCONNECT after it is sealed with ChaCha20-Poly1305: the payload is encrypted, the
+header before it is authenticated with it, and the 16-byte tag follows (DATA's payload as
+parse() returns it is the ciphertext and the tag).  A UDP client pads CONNECT and RESPONSE to
+HANDSHAKE_SIZE, and every answer of the server before a connection is smaller: a forged sender
+address gets back less than was sent (no amplification).  Over a WebSocket the CONNECT is not
+padded, CHALLENGE / RESPONSE do not occur (TCP has proved the address), ACCEPT's key and
+confirm are zeros and nothing is sealed (wss:// is the encryption there).  parse() reads
+untrusted bytes: exact sizes, no panics, no allocation.
 ```
 
 ```rust
 /// the format's version (the high nibble of byte 0)
-VERSION: u8 = 1
+VERSION: u8 = 2
 /// a client asks for a connection
 KIND_CONNECT: u8 = 1
 /// the server's stateless cookie for a UDP client
 KIND_CHALLENGE: u8 = 2
-/// the client returns the cookie
+/// the client returns the cookie with its key
 KIND_RESPONSE: u8 = 3
 /// the server took the client
 KIND_ACCEPT: u8 = 4
@@ -67988,17 +68231,26 @@ KIND_DATA: u8 = 6
 KIND_DISCONNECT: u8 = 7
 /// the bytes of a DATA packet before its payload
 DATA_HEADER: usize = 13
+/// the bytes of a DISCONNECT packet before its tag
+DISCONNECT_HEADER: usize = 8
+/// the tag after a sealed DATA or DISCONNECT (UDP)
+TAG: usize = 16
 /// the size a UDP client pads CONNECT and RESPONSE to (at most the server takes)
-HANDSHAKE_SIZE: usize = 64
-/// the largest payload of a UDP DATA packet that may be configured (1400 + 13 + 8 + 40 bytes
-/// stay below the 1500 of Ethernet also over IPv6)
+HANDSHAKE_SIZE: usize = 96
+/// the largest payload of a UDP DATA packet that may be configured (1400 + 13 + 16 + 8 + 40
+/// bytes stay below the 1500 of Ethernet also over IPv6)
 MAX_UDP_PAYLOAD: usize = 1400
+/// RESPONSE flags: the client knows the server's static key (ClientConfig::server_key), and the
+/// keys include a Diffie-Hellman with it
+FLAG_STATIC_KEY: u8 = 1
 /// DENY: the server has max_connections clients
 DENY_FULL: u8 = 1
 /// DENY: the client speaks another protocol id (another game or version)
 DENY_PROTOCOL: u8 = 2
 /// DENY: the client's address has max_per_ip connections
 DENY_ADDRESS: u8 = 3
+/// DENY: the client expects a static key, and the server has none
+DENY_KEY: u8 = 4
 /// DISCONNECT: an orderly end
 BYE_NORMAL: u8 = 0
 /// DISCONNECT: nothing came for timeout_ms
@@ -68017,25 +68269,111 @@ BYE_SHUTDOWN: u8 = 5
   one packet, borrowed from the bytes it was read from
   - `Connect { protocol: u32, nonce: u64 }` -- a client asks: the app's protocol id, the nonce of this attempt
   - `Challenge { nonce: u64, time: u32, mac: [u8; 16] }` -- the server's cookie for a UDP client: the time (seconds) and the MAC over address, nonce, time
-  - `Response { protocol: u32, nonce: u64, time: u32, mac: [u8; 16] }` -- the client returns the cookie
-  - `Accept { nonce: u64, token: u32, max_payload: u16 }` -- the server took the client: the token of its packets, the largest payload it takes
+  - `Response { protocol: u32, nonce: u64, time: u32, mac: [u8; 16], flags: u8, key: [u8; 32] }` -- the client returns the cookie with FLAG_\* and its ephemeral X25519 public key
+  - `Accept { nonce: u64, token: u32, max_payload: u16, key: [u8; 32], confirm: [u8; 16] }` -- the server took the client: the token of its packets, the largest payload it takes, its
+    ephemeral X25519 public key and the proof of the keys (over a WebSocket: zeros)
   - `Deny { nonce: u64, reason: u8 }` -- the server refused the client (DENY_\*)
-  - `Data { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] }` -- a message (empty: a keep-alive) with its number, the newest number received and the bits of the 32 before
-  - `Disconnect { token: u32, reason: u8 }` -- one side ends the connection (BYE_\*)
+  - `Data { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] }` -- a message (empty: a keep-alive) with its number, the newest number received and the bits
+    of the 32 before; over UDP `payload` is the ciphertext and its tag
+  - `Disconnect { token: u32, seq: u16, reason: u8, tag: &'a [u8] }` -- one side ends the connection (BYE_\*) under the sequence number it took; over UDP `tag`
+    holds the 16 bytes of the seal, over a WebSocket nothing
 
 - **`fn parse(b: &[u8]) -> Option<Packet<'_>>`**
   read one packet: None for anything that is not exactly a packet of this version (handshake
-  packets between their size and HANDSHAKE_SIZE, the fixed-size ones exactly)
+  packets between their size and HANDSHAKE_SIZE, the fixed-size ones exactly, DISCONNECT with
+  or without its tag)
 
 **`impl Packet<'_>`**
 
 - **`fn write(&self, out: &mut Vec<u8>, pad: bool)`**
-  append the packet to `out`; `pad`: CONNECT and RESPONSE filled with zeros to HANDSHAKE_SIZE
+  append the packet to `out`; `pad`: CONNECT and RESPONSE filled with zeros to HANDSHAKE_SIZE.
+  DATA and DISCONNECT are written as given (Conn seals them)
 - **`fn to_vec(&self, pad: bool) -> Vec<u8>`**
   the packet as new bytes
 
 - **`fn seq_newer(a: u16, b: u16) -> bool`**
   whether sequence number `a` is newer than `b` (wrapping: within half the range ahead)
+
+### `netchan/src/seal.rs`
+
+Source: [`lib/netchan/src/seal.rs`](../lib/netchan/src/seal.rs)
+
+```text
+seal -- the keys of the UDP handshake and the sealing of its packets (docs/TRANSPORT.md
+"Verschlüsselung")
+
+  derive(&Handshake, &dh1, dh2) -> Derived { c2s, s2c, confirm }   the keys of a connection
+  confirm_tag(&confirm, accept_bytes) -> [u8; 16]                  ACCEPT's proof of the keys
+  Keys::new(send, recv)        one side's keys (Conn::with_keys)
+  full_pn(largest, seq) -> u64 the packet number a 16-bit sequence number stands for
+  nonce(pn) -> [u8; 12]        ChaCha20-Poly1305's nonce of a packet number
+  Generator::new(seed) / next_secret() -> [u8; 32]   the server's ephemeral secrets (forward secure)
+
+Both sides have an ephemeral X25519 key per connection; the client may also know the server's
+static key (ClientConfig::server_key), as in Noise's NK pattern.  The transcript hash h is
+SHA-256 over a label, the protocol id, the nonce, the flags and the public keys (the client's,
+the server's ephemeral one, the static one if used); the keys are HKDF-SHA256 with salt h over
+dh1 (ephemeral with ephemeral) and dh2 (the client's ephemeral with the static key): 32 bytes
+client to server, 32 bytes server to client, 32 bytes for `confirm`.  Without a static key the
+channel is safe from those who only listen and from blind senders, not from someone on the path
+who answers the handshake in the server's place; with it, only the holder of the static secret
+can make an ACCEPT whose confirm checks.
+
+Every sealed packet takes the next packet number of its direction (u64, from 0), and its 16-bit
+sequence number is that number's low bits.  The receiver takes the number closest to the one
+after the largest it authenticated (as QUIC does with its truncated numbers, RFC 9000 A.3), so
+the nonce never repeats under one key and a replay of an old packet fails its tag or is found
+by the receive window of conn.rs.
+```
+
+- **`struct Keys`**
+  one side's keys of a connection; zeroed when dropped
+
+**`impl Keys`**
+
+- **`fn new(send: [u8; 32], recv: [u8; 32]) -> Keys`**
+  the key this side seals with and the one it opens with
+
+- **`struct Handshake<'a>`**
+  what the transcript hash covers: the handshake as both sides saw it
+  - `protocol: u32`
+  - `nonce: u64`
+  - `client: &'a [u8; 32]` -- the client's ephemeral public key (RESPONSE)
+  - `server: &'a [u8; 32]` -- the server's ephemeral public key (ACCEPT)
+  - `stat: Option<&'a [u8; 32]>` -- the server's static public key, when the client uses it (FLAG_STATIC_KEY)
+
+- **`struct Derived`**
+  the keys of one connection; zeroed when dropped
+  - `c2s: [u8; 32]` -- client to server
+  - `s2c: [u8; 32]` -- server to client
+  - `confirm: [u8; 32]` -- the key of ACCEPT's confirm
+
+- **`fn derive(hs: &Handshake<'_>, dh1: &[u8; 32], dh2: Option<&[u8; 32]>) -> Derived`**
+  the keys of a connection: `dh1` = X25519(ephemeral, ephemeral), `dh2` = X25519(the client's
+  ephemeral, the static key) when hs.stat is set (both must be given together)
+
+- **`fn confirm_tag(key: &[u8; 32], accept: &[u8]) -> [u8; 16]`**
+  ACCEPT's confirm: the first 16 bytes of HMAC-SHA256 under the confirm key over the ACCEPT
+  before it (kind, nonce, token, max payload, the server's key)
+
+- **`fn nonce(pn: u64) -> [u8; 12]`**
+  the nonce of packet number `pn` (the keys differ per direction, so both may count from 0)
+
+- **`fn full_pn(largest: Option<u64>, seq: u16) -> u64`**
+  the packet number that sequence number `seq` stands for: the one closest to the number after
+  `largest`, the largest authenticated so far (None: nothing yet, so the next is 0)
+
+- **`struct Generator`**
+  a forward-secure source of the server's ephemeral secrets: each one comes from the state,
+  which is replaced by a hash of itself, so what leaks later does not give the earlier ones.
+  Seeded once with 32 random bytes (fixed in tests: the same keys on every run)
+
+**`impl Generator`**
+
+- **`fn new(seed: &[u8; 32]) -> Generator`**
+  a generator from 32 secret bytes
+- **`fn next_secret(&mut self) -> [u8; 32]`**
+  the next 32 secret bytes
 
 ### `netchan/src/server.rs`
 
@@ -68053,6 +68391,7 @@ server -- a game server's channels (G7d): UDP and WebSocket clients in one table
   server.poll() -> Option<ServerEvent>   send(id, payload) -> seq   disconnect(id)
   server.wait(ms)                        sleep until something arrives (a loop without a tick)
   connections() / ids() / stats(id) / peer(id) / server_stats() / stop()
+  set_static_key(secret) / public_key()  the key clients may pin (ClientConfig::server_key)
 
 Threads: one reads the UDP socket; each WebSocket has a reading one (netio's thread of the
 upgrade) and a writing one, so neither a full socket buffer nor a slow client holds the
@@ -68107,6 +68446,12 @@ LINK_UNSENT: usize = 1 << 20
   LINK_UNSENT bytes waiting)
 - **`fn disconnect(&mut self, id: u32)`**
   end a client's connection (Disconnected(Local) follows)
+- **`fn set_static_key(&mut self, secret: [u8; 32])`**
+  a long-lived X25519 secret (32 random bytes the app made once and keeps): clients with its
+  public key in ClientConfig::server_key can tell this server from anyone in its place
+  (endpoint::ServerCore::set_static_key)
+- **`fn public_key(&self) -> Option<[u8; 32]>`**
+  the public key of set_static_key, for the clients
 - **`fn connections(&self) -> usize`**
   connections now
 - **`fn ids(&self) -> Vec<u32>`**

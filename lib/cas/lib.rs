@@ -47,7 +47,7 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use agent_core::json::{self, Limits, Value};
+use formats::json::{self, Limits, Value};
 use compress::Codec;
 use crypto::{aead, argon2, b64, ed25519};
 use plat::sync::{Mutex, RwLock};
