@@ -45,7 +45,9 @@ def main():
                     for style in variants:
                         destination = scratch / ('install-' + style)
                         script = scratch / 'install.uis'
-                        script.write_text('click "Weiter"\nclick "Installieren"\nwait 500\nexpect "Fertigstellen" exists\n', encoding='utf-8')
+                        # (one style: no style page, the setup starts on its options page)
+                        first = 'click "Weiter"\n' if len(variants) > 1 else ''
+                        script.write_text(first + 'click "Installieren"\nwait 500\nexpect "Fertigstellen" exists\n', encoding='utf-8')
                         env = dict(os.environ, ASMINST_SHELL_DIR=str(scratch / ('shell-' + style)))
                         result = subprocess.run([str(path), '--script', str(script), '--dir', str(destination),
                             '--style', style, '--verify-dirty'], env=env, cwd=ROOT, capture_output=True, timeout=30)

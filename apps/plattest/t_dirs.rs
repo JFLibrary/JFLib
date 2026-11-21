@@ -1,7 +1,8 @@
 // t_dirs -- plattest --test dirs: the user's folders and the log folder (lib/plat/dirs.rs)
 //
 //   user_dir for every DIR_* (absolute, '/' separators; Windows: the known folders, the same
-//   desktop as the setup's plat::inst::known_folder; Linux: a user-dirs.dirs in a scratch
+//   desktop as the setup's plat::inst::known_folder, and its folders of all users and Program
+//   Files; Linux: a user-dirs.dirs in a scratch
 //   HOME / XDG_CONFIG_HOME -- "$HOME/..", absolute, escapes, the last line, bad values --,
 //   then the fallbacks without it), log_dir and app_dir(APP_LOG) (XDG_STATE_HOME;
 //   Windows: a redirected LOCALAPPDATA), the schemes logs:// and documents:// ..., the
@@ -66,8 +67,19 @@ fn windows(t: &mut T, base: &str) {
     }
     #[cfg(windows)]
     {
-        let setup = plat::inst::known_folder(0).map(|p| p.replace('\\', "/"));
-        t.expect_s(user_dir(DIR_DESKTOP).as_deref(), setup.as_deref(), "dirs: the desktop of the setup (plat::inst::known_folder)");
+        let setup = |w: u32| plat::inst::known_folder(w).map(|p| p.replace('\\', "/"));
+        t.expect_s(user_dir(DIR_DESKTOP).as_deref(), setup(0).as_deref(), "dirs: the desktop of the setup (plat::inst::known_folder)");
+        // the setup for all users: the start menu's programs, the common desktop and programs,
+        // Program Files (the same as the environment's ProgramFiles in a process of the system's
+        // processor)
+        for w in 1..5 {
+            t.check(setup(w).as_deref().is_some_and(well_formed), &format!("dirs: plat::inst::known_folder({w}) is an absolute path"));
+            t.info(&format!("  known_folder({w}): {}\n", setup(w).unwrap_or_default()));
+        }
+        t.check(setup(2) != setup(0) && setup(3) != setup(1), "dirs: all users' desktop and start menu are folders of their own");
+        let pf = plat::env("ProgramFiles").map(|p| p.replace('\\', "/"));
+        t.expect_s(setup(4).as_deref(), pf.as_deref(), "dirs: known_folder(4) is Program Files");
+        t.check(setup(5).is_none(), "dirs: known_folder(5) is none");
     }
     let docs = user_dir(DIR_DOCUMENTS).unwrap_or_default();
     t.check(plat::file_exists(&docs) == 2, "dirs: the documents folder exists");

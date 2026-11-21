@@ -609,10 +609,11 @@ fn query_escape(s: &str) -> String {
     out
 }
 
-/// Settings at the app's page of the default apps; the app must be in RegisteredApplications
+/// Settings at the app's page of the default apps; the app must be in RegisteredApplications,
+/// the user's or the computer's (a setup for all users registers it there)
 pub fn browser_request(pkg: &Package) -> Result<(), AssocError> {
     available()?;
-    if get_sz(HKCU, REGISTERED_APPS, &pkg.app).is_none() {
+    if get_sz(HKCU, REGISTERED_APPS, &pkg.app).is_none() && get_sz(HKLM, REGISTERED_APPS, &pkg.app).is_none() {
         return Err(AssocError::NotRegistered);
     }
     let page = format!("ms-settings:defaultapps?registeredAppUser={}", query_escape(&pkg.app));

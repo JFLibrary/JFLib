@@ -9,11 +9,13 @@
 //   signature(bytes) / stub(st) -- a signed setup (Authenticode): the certificate table follows
 //                     the trailer; the uninstaller is the stub without the setup's signature
 
+use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
 use gfx::Surface;
+use ui::i18n::t;
 
 use crate::{Inst, PATH_CAP, Sty, str_cap};
 
@@ -63,23 +65,22 @@ fn cstr48(b: &[u8]) -> String {
     String::from_utf8_lossy(&f[..n]).into_owned()
 }
 
-const ERR_NOREAD: &str = "Die Setup-Datei konnte nicht gelesen werden.";
-const ERR_BAD: &str = "Das Setup enthält keine gültigen Installationsdaten (beschädigt oder unvollständig).";
-
-/// the payload of the own exe -> Ok, or Err with st.err set  [pl_load]
+/// the payload of the own exe -> Ok, or Err with st.err set (in the language of the pages)
+/// [pl_load]
 pub(crate) fn pl_load(st: &mut Inst) -> Result<(), ()> {
+    let noread = || String::from(t("Die Setup-Datei konnte nicht gelesen werden."));
     let Some(path) = plat::inst::exe_path() else {
-        st.err = String::from(ERR_NOREAD);
+        st.err = noread();
         return Err(());
     };
     st.selfpath = path;
     let Some(data) = plat::read_file(&st.selfpath) else {
-        st.err = String::from(ERR_NOREAD);
+        st.err = noread();
         return Err(());
     };
     st.self_ = data;
     if pl_parse(st).is_err() {
-        st.err = String::from(ERR_BAD);
+        st.err = String::from(t("Das Setup enthält keine gültigen Installationsdaten (beschädigt oder unvollständig)."));
         return Err(());
     }
     Ok(())
@@ -189,7 +190,7 @@ fn pl_parse(st: &mut Inst) -> Result<(), ()> {
             }
             PK_STYLE => {
                 if st.sty.len() < STY_MAX {
-                    st.sty.push(Sty { ent: i, sf: None, desc: String::new() });
+                    st.sty.push(Sty { ent: i, sf: None, label: String::new(), desc: String::new() });
                 }
             }
             PK_PREVIEW => {
@@ -220,10 +221,16 @@ fn pl_parse(st: &mut Inst) -> Result<(), ()> {
     st.schemes = kv_get(&man, "schemes", 512).unwrap_or_default();
     st.browser = kv_get(&man, "browser", 8).is_some_and(|b| b == "1");
     st.appid = kv_get(&man, "app_id", 128).filter(|a| a.bytes().all(|c| c.is_ascii_alphanumeric() || b"._".contains(&c))).unwrap_or_default();
-    // descriptions: desc_<style id>
+    // names and descriptions in the language of the pages: label_<style id>.<lang> and
+    // desc_<style id>.<lang> (styles/S/INFO name.<lang> / desc.<lang>), else the entry's label
+    // and desc_<style id> (INFO lines 1 and 2)
+    let lang = ui::i18n::language_code();
     for k in 0..st.sty.len() {
-        let key = str_cap(&(String::from("desc_") + &st.ents[st.sty[k].ent].name), 64);
-        st.sty[k].desc = kv_get(&man, &key, 192).unwrap_or_default();
+        let e = &st.ents[st.sty[k].ent];
+        let label = kv_get(&man, &format!("label_{}.{lang}", e.name), 128).unwrap_or_else(|| e.label.clone());
+        let desc = kv_get(&man, &format!("desc_{}.{lang}", e.name), 512).or_else(|| kv_get(&man, &format!("desc_{}", e.name), 512));
+        st.sty[k].label = label;
+        st.sty[k].desc = desc.unwrap_or_default();
     }
     st.man = Some(man);
     Ok(())

@@ -1410,7 +1410,7 @@ def t_install_packages(app, out, arch):
     job = pkgmeta.Job(app=app, meta=meta, styles=meta.get("styles", "winui").split(), root=ROOT, dist=dist, work=dist, impl="rs",
                       pkg=pkg, version=ver, perms=None, arch=arch)
     if os.name == "nt":
-        install_setup(app, dist / pkgmeta.setup_name(app, arch), arch, scripts)
+        install_setup(app, dist / pkgmeta.setup_name(app, arch), arch, scripts, job.styles)
         install_msix(app, meta, dist / pkg_msix.msix_name(job), arch)
         return
     deb = dist / f"{pkg}_{ver}_{pkgmeta.arch_name(arch, 'deb')}.deb"
@@ -1436,16 +1436,18 @@ def t_install_packages(app, out, arch):
         run_inside("installflatpak", lp(fdir), aid, fa, *[lp(s) for s in scripts], timeout=2400)
 
 
-def install_setup(app, setup, arch, scripts):
+def install_setup(app, setup, arch, scripts, styles):
     """the setup installed in test mode (ASMINST_SHELL_DIR: no shortcuts, no registry) into build/pkg_check,
-    the installed program (this machine's) runs the scripts, uninstall.exe removes it"""
+    the installed program (this machine's) runs the scripts, uninstall.exe removes it (a setup of one style
+    has no style page: it starts on the options page)"""
     from tools.host_exec import exe_arch
     if not setup.exists():
         return skip("install setup", f"{setup.name} not built")
     d = WORK / "setup-install"
     shutil.rmtree(d, ignore_errors=True)
     (d / "shell").mkdir(parents=True)
-    (d / "inst.uis").write_text('click "Weiter"\nclick "Installieren"\nwait 500\nexpect "Fertigstellen" exists\n', encoding="utf-8")
+    first = 'click "Weiter"\n' if len(styles) > 1 else ""
+    (d / "inst.uis").write_text(first + 'click "Installieren"\nwait 500\nexpect "Fertigstellen" exists\n', encoding="utf-8")
     (d / "un.uis").write_text('click "Deinstallieren"\nwait 500\nexpect "Schließen" exists\n', encoding="utf-8")
     env = dict(os.environ, ASMINST_SHELL_DIR=str(d / "shell"))
     r = subprocess.run([str(setup), "--script", str(d / "inst.uis"), "--dir", str(d / "inst")], env=env, capture_output=True, text=True,
