@@ -702,7 +702,7 @@ repository, that corresponds to the repository root.
 | `lib/doc_*`, `lib/archive` | Document model, layout, rendering, and file formats |
 | `lib/agent_core`, `lib/agent_io` | Contracts and transports for optional app control |
 | `lib/crypto`, `lib/compress`, `lib/datetime` | Cryptography, LZ4, time zones and cron schedules |
-| `lib/netio`, `lib/datastore`, `lib/cas` | HTTP, TLS, SSH, DNS; the journal database; backup repositories |
+| `lib/netio`, `lib/x509`, `lib/datastore`, `lib/cas` | HTTP, TLS, SSH, DNS; X.509 certificates; the journal database; backup repositories |
 | `styles/` | The six bundled styles |
 | `apps/` | Applications, examples, and their tests |
 | `plugins/`, `modules/` | Native extensions and loadable modules |

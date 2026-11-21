@@ -21,6 +21,7 @@ workspace = true
 rt.workspace = true
 plat.workspace = true
 crypto.workspace = true
+x509.workspace = true
 agent_core.workspace = true
 
 # docs.rs: Windows and Linux only (plat has no files and no network in the browser and on Android), not docs.rs's five defaults

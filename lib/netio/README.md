@@ -60,13 +60,20 @@ let server = Server::start(&addr, ServerConfig::default(), handler); // NetResul
 
 Between an app's own servers and clients, `netio::tls` speaks TLS 1.3 on both sides with
 ChaCha20-Poly1305, X25519 and Ed25519 certificates of the app's own certificate authority,
-mutual authentication, HelloRetryRequest and key updates. A client that talks to public servers
-(`Trust::System`) also offers AES-128-GCM, RSA and ECDSA certificates and the P-256 key exchange,
-and falls back to TLS 1.2 with ECDHE and AEAD suites only, the extended master secret and the
-TLS 1.3 downgrade check; connections between an app's own parts never fall back. Not here:
-session resumption, 0-RTT, renegotiation and revocation checks.
+mutual authentication, HelloRetryRequest and key updates. The server also takes AES-128-GCM and
+P-256 key shares, as RFC 8446 requires of every TLS 1.3 implementation; its certificate is
+Ed25519, so browsers, which do not take Ed25519 certificates, cannot use it yet. A client that talks to public servers
+(`Trust::System`, or `Trust::Custom` with a check of the program's own: a PKI of its own, pinning,
+Certificate Transparency) also offers AES-128-GCM, RSA and ECDSA certificates and the P-256 key exchange,
+and falls back to TLS 1.2 with ECDHE and AEAD suites only, the extended master secret (when the
+server has it; without resumption and renegotiation a server without it is safe to take) and
+the TLS 1.3 downgrade check; connections between an app's own parts never fall back. Not here:
+session resumption, 0-RTT, renegotiation and revocation checks. The server is checked against
+tlsfuzzer, the client against TLS-Anvil
+([docs/EXTERNAL_SUITES.md](https://github.com/JFLibrary/JFLib/blob/main/docs/EXTERNAL_SUITES.md)).
 
-`netio::x509` parses certificates strictly, builds and signs those of a private Ed25519 CA, and
+`netio::x509` (the crate [`jflib-x509`](https://docs.rs/jflib-x509), which netpkt shares) parses
+certificates strictly, builds and signs those of a private Ed25519 CA, and
 verifies chains up to a trusted anchor, name constraints included. For https to a server with
 its own CA, `trust::connector` trusts a CA the app knows or one with a pinned fingerprint, or
 learns the CA on the first connection and hands it back for the user to decide, the way SSH

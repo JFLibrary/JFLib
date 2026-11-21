@@ -195,6 +195,26 @@ pub fn run_udp(quick: bool) -> Ctx {
         pump(&mut server, &mut cls, &mut seen, 2000, |s| s[0].end.is_some());
         c.check(seen[0].end == Some(Reason::Protocol), || format!("udp: another protocol id: {:?}", seen[0].end));
     }
+    // a static key: the client that pins it connects and echoes, one with another key is refused
+    let mut keyed = Server::new(scfg());
+    keyed.set_static_key(plat::random_bytes::<32>());
+    let kaddr = keyed.bind_udp(&lo4()).unwrap_or(lo4());
+    let public = keyed.public_key();
+    let pinned = Client::connect(Endpoint::Udp(kaddr), ClientConfig { server_key: public, ..ccfg() });
+    let wrong = Client::connect(Endpoint::Udp(kaddr), ClientConfig { server_key: Some([9; 32]), ..ccfg() });
+    if let (Ok(a), Ok(b)) = (pinned, wrong) {
+        let mut cls = [a, b];
+        let mut seen = [Seen::default(), Seen::default()];
+        pump(&mut keyed, &mut cls, &mut seen, 3000, |s| s[0].connected && s[1].end.is_some());
+        let _ = cls[0].send(b"pinned echo");
+        pump(&mut keyed, &mut cls, &mut seen, 3000, |s| !s[0].msgs.is_empty());
+        let echoed = seen[0].msgs.iter().any(|(_, d)| d == b"pinned echo");
+        c.check(seen[0].connected && echoed, || format!("udp: a client with the server's static key: connected {}, echo {}", seen[0].connected, echoed));
+        c.check(seen[1].end == Some(Reason::ServerKey), || format!("udp: a client with another static key: {:?}", seen[1].end));
+    } else {
+        c.check(false, || String::from("udp: no clients for the static key"));
+    }
+    drop(keyed);
     // nobody listens: ConnectTimeout
     let dead = SocketAddr::new(IpAddr::LOCALHOST_V4, addr.port.wrapping_add(7).max(1024));
     if let Ok(cl) = Client::connect(Endpoint::Udp(dead), ClientConfig { connect_ms: 400, ..ccfg() }) {

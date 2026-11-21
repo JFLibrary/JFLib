@@ -10,7 +10,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Changed
 
-- `base::xml` and `base::encoding` are re-exports of jflib-formats (`formats::xml`, `formats::encoding`), where the code lives now; the items and their behaviour are the same. The crate depends on jflib-formats. api-diff lists the re-exported items as removed (it does not follow re-exports into another crate).
+- `base::xml` and `base::encoding` are re-exports of jflib-formats (`formats::xml`, `formats::encoding`), where the code lives now; the items and their behaviour are the same. The crate depends on jflib-formats.
 
 ### Fixed
 

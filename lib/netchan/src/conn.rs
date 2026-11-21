@@ -6,6 +6,9 @@
 //                                                      the caller)
 //   conn.take_event() -> Message / Delivered / Lost    conn.rate_ok(bytes, now), keepalive_due,
 //                                                      timed_out, stats, rtt_ms
+//   Conn::new(..).with_keys(Keys)                      sealed (UDP): write_data and
+//                                                      write_disconnect seal, open(wire, head,
+//                                                      seq) checks and decrypts what came
 //
 // Every DATA packet has its own sequence number (u16, wrapping) and acknowledges the newest
 // number received plus the 32 before it as bits.  Unreliable (UDP): packets may come late, twice
@@ -18,12 +21,17 @@
 // connection owes an empty DATA packet at once (ack_due).
 // The round-trip time comes from the newest ack only (bits name older packets, whose wait would
 // count twice), smoothed as TCP does (RFC 6298).
+// Sealed (seal.rs): each packet sent takes the next packet number (u64; its low 16 bits are the
+// sequence number), the nonce of ChaCha20-Poly1305; open() takes the number nearest the largest
+// authenticated one and leaves the state alone when the tag does not check (Stats::forged).  The
+// receive window above then drops a replayed packet as a duplicate or stale: only after the tag.
 
 use alloc::collections::VecDeque;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::packet::{seq_newer, Packet};
+use crate::packet::{seq_newer, Packet, DATA_HEADER, DISCONNECT_HEADER, TAG};
+use crate::seal::{self, Keys};
 
 /// how far back sequence numbers are remembered (sent and received)
 pub const WINDOW: usize = 1024;
@@ -60,6 +68,9 @@ pub struct Stats {
     pub stale: u64,
     /// packets dropped for the rate limits or their size
     pub dropped: u64,
+    /// sealed packets with this connection's token whose tag did not check (forged or damaged;
+    /// nothing else was done with them)
+    pub forged: u64,
     /// bytes of DATA packets sent (headers included)
     pub bytes_sent: u64,
     /// bytes of DATA packets taken in (headers included)
@@ -117,6 +128,11 @@ pub struct Conn {
     token: u32,
     reliable: bool,
     set: Settings,
+    keys: Option<Keys>,
+    // the packet number the next sealed packet takes (its low bits: next_seq)
+    sent_pn: u64,
+    // the largest packet number authenticated
+    rx_pn: Option<u64>,
     next_seq: u16,
     sent_seq: Vec<u16>,
     sent_time: Vec<u64>,
@@ -146,6 +162,9 @@ impl Conn {
             token,
             reliable,
             set,
+            keys: None,
+            sent_pn: 0,
+            rx_pn: None,
             next_seq: 0,
             sent_seq: vec![0; WINDOW],
             sent_time: vec![0; WINDOW],
@@ -167,9 +186,63 @@ impl Conn {
         }
     }
 
+    /// the connection sealed with these keys (UDP after the handshake): every packet written is
+    /// encrypted and authenticated, every packet taken in must pass open()
+    pub fn with_keys(mut self, keys: Keys) -> Conn {
+        self.keys = Some(keys);
+        self
+    }
+
+    /// whether its packets are sealed
+    pub fn sealed(&self) -> bool {
+        self.keys.is_some()
+    }
+
     /// the token of DATA and DISCONNECT packets
     pub fn token(&self) -> u32 {
         self.token
+    }
+
+    // the next packet number and its sequence number
+    fn take_pn(&mut self) -> (u64, u16) {
+        let pn = self.sent_pn;
+        self.sent_pn = pn.wrapping_add(1);
+        let seq = self.next_seq;
+        self.next_seq = seq.wrapping_add(1);
+        (pn, seq)
+    }
+
+    // seal out[start..]: the first `head` bytes authenticated, the rest encrypted, the tag after it
+    fn seal_tail(&self, pn: u64, out: &mut Vec<u8>, start: usize, head: usize) {
+        if let Some(k) = &self.keys {
+            let (aad, body) = out[start..].split_at_mut(head);
+            let tag = crypto::aead::seal_in_place(&k.send, &seal::nonce(pn), aad, body);
+            out.extend_from_slice(&tag);
+        }
+    }
+
+    /// check and decrypt a packet that came: `wire` the whole packet, `head` the bytes before its
+    /// payload (DATA_HEADER, DISCONNECT_HEADER), `seq` its sequence number -> the payload
+    /// (unsealed connections: the bytes after the header as they are).  None: too short or a
+    /// wrong tag (counted as forged); the connection's state is not touched then
+    pub fn open(&mut self, wire: &[u8], head: usize, seq: u16) -> Option<Vec<u8>> {
+        let Some(k) = &self.keys else { return wire.get(head..).map(|b| b.to_vec()) };
+        if wire.len() < head + TAG {
+            self.stats.forged += 1;
+            return None;
+        }
+        let pn = seal::full_pn(self.rx_pn, seq);
+        let (body, tag) = wire[head..].split_at(wire.len() - head - TAG);
+        let mut t = [0u8; TAG];
+        t.copy_from_slice(tag);
+        let mut plain = body.to_vec();
+        if !crypto::aead::open_in_place(&k.recv, &seal::nonce(pn), &wire[..head], &mut plain, &t) {
+            self.stats.forged += 1;
+            return None;
+        }
+        // authentic: a newer number moves the reference of the next reconstruction
+        self.rx_pn = Some(self.rx_pn.map_or(pn, |l| l.max(pn)));
+        Some(plain)
     }
 
     /// whether the transport is reliable (a WebSocket)
@@ -193,9 +266,10 @@ impl Conn {
         (self.latest, bits)
     }
 
-    /// append a DATA packet with `payload` (empty: a keep-alive) -> its sequence number
+    /// append a DATA packet with `payload` (empty: a keep-alive), sealed if the connection is
+    /// -> its sequence number
     pub fn write_data(&mut self, payload: &[u8], now: u64, out: &mut Vec<u8>) -> u16 {
-        let seq = self.next_seq;
+        let (pn, seq) = self.take_pn();
         let k = seq as usize % WINDOW;
         if self.sent_state[k] == WAITING {
             // a whole window without an answer: decided now
@@ -212,16 +286,25 @@ impl Conn {
         self.sent_seq[k] = seq;
         self.sent_time[k] = now;
         self.sent_state[k] = WAITING;
-        self.next_seq = seq.wrapping_add(1);
         self.advance_oldest();
         let (ack, bits) = self.ack_fields();
         let before = out.len();
         Packet::Data { token: self.token, seq, ack, bits, payload }.write(out, false);
+        self.seal_tail(pn, out, before, DATA_HEADER);
         self.last_send_us = now;
         self.unacked_rx = 0;
         self.stats.sent += 1;
         self.stats.bytes_sent += (out.len() - before) as u64;
         seq
+    }
+
+    /// append a DISCONNECT with `reason` (BYE_*), sealed if the connection is; it takes a
+    /// sequence number of its own, so its seal never shares a nonce with a DATA packet
+    pub fn write_disconnect(&mut self, reason: u8, out: &mut Vec<u8>) {
+        let (pn, seq) = self.take_pn();
+        let before = out.len();
+        Packet::Disconnect { token: self.token, seq, reason, tag: &[] }.write(out, false);
+        self.seal_tail(pn, out, before, DISCONNECT_HEADER);
     }
 
     /// whether a packet of `bytes` from the peer stays within the rate limits (false: drop it,
@@ -273,7 +356,7 @@ impl Conn {
         self.last_recv_us = now;
         self.unacked_rx = self.unacked_rx.saturating_add(1);
         self.stats.received += 1;
-        self.stats.bytes_received += (crate::packet::DATA_HEADER + payload.len()) as u64;
+        self.stats.bytes_received += (DATA_HEADER + payload.len() + if self.keys.is_some() { TAG } else { 0 }) as u64;
         self.on_ack(ack, bits, now);
         if !payload.is_empty() {
             self.events.push_back(Event::Message { seq, data: payload.to_vec() });

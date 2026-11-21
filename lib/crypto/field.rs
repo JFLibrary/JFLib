@@ -199,7 +199,7 @@ impl Fe {
     /// swap a and b when swap == 1 (0 / 1, constant time)
     #[inline(always)]
     pub fn cswap(a: &mut Fe, b: &mut Fe, swap: u64) {
-        let mask = 0u64.wrapping_sub(swap);
+        let mask = crate::ct_mask(0u64.wrapping_sub(swap));
         for i in 0..5 {
             let t = mask & (a.0[i] ^ b.0[i]);
             a.0[i] ^= t;
@@ -210,7 +210,7 @@ impl Fe {
     /// b when choice == 1, else self (constant time)
     #[inline(always)]
     pub fn select(&self, b: &Fe, choice: u64) -> Fe {
-        let mask = 0u64.wrapping_sub(choice);
+        let mask = crate::ct_mask(0u64.wrapping_sub(choice));
         let mut r = self.0;
         for (i, x) in r.iter_mut().enumerate() {
             *x ^= mask & (*x ^ b.0[i]);

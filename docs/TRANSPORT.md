@@ -12,8 +12,9 @@ Browser und auf dem Desktop, im Browser trägt WebSocket das Netz. Drei Teile:
    Nachrichten mit Folgenummern und Bestätigungen, unzuverlässig und ungeordnet über UDP, zuverlässig über WebSocket,
    dieselbe Kopfzeile auf beiden. Ein Server nimmt UDP- und WebSocket-Clients in eine Tabelle.
 
-Stand: G7d Teil 1 (dieser Lauf). Teil 2: `wss:` über das TLS 1.3 von `netio` geprüft, Messungen zwischen Rechnern und
-über ein echtes Netz, die Grenzen nach diesen Messungen ([Für Teil 2](#für-teil-2)).
+Stand: G7d Teil 1. Teil 2: `wss:` über das TLS 1.3 von `netio` geprüft, Messungen zwischen Rechnern und
+über ein echtes Netz, die Grenzen nach diesen Messungen ([Für Teil 2](#für-teil-2)). Seit dem 21.11.2026 (Paket U3 aus
+Abschnitt 13 der ROADMAP) ist der Kanal über UDP verschlüsselt und authentisiert ([Verschlüsselung](#verschlüsselung)).
 
 | Teil | Wo |
 | --- | --- |
@@ -22,6 +23,7 @@ Stand: G7d Teil 1 (dieser Lauf). Teil 2: `wss:` über das TLS 1.3 von `netio` ge
 | Paketformat | [`lib/netchan/src/packet.rs`](../lib/netchan/src/packet.rs) |
 | Folgenummern, Bestätigungen, Umlaufzeit | [`lib/netchan/src/conn.rs`](../lib/netchan/src/conn.rs) |
 | Handschlag, Server und Client ohne Ein- und Ausgabe | [`lib/netchan/src/endpoint.rs`](../lib/netchan/src/endpoint.rs) |
+| Schlüssel des Handschlags, Siegel der Pakete | [`lib/netchan/src/seal.rs`](../lib/netchan/src/seal.rs) |
 | Server und Client mit Sockets, ein WebSocket-Typ für alle Ziele | [`server.rs`](../lib/netchan/src/server.rs), [`client.rs`](../lib/netchan/src/client.rs), [`ws.rs`](../lib/netchan/src/ws.rs) |
 | Tests, Fuzzing, Messung, Browser-Test | [`apps/nettest`](../apps/nettest/README.md) |
 
@@ -90,10 +92,13 @@ let seq = client.send(&eingaben)?;
 - `Server::new(ServerConfig)`, `bind_udp`, `listen_ws(addr, pfad)`, `ws_endpoint()` (`WsEndpoint::accept(&req)` im eigenen
   Handler, etwa neben den Dateien der Seite), `poll() -> ServerEvent`, `wait(ms)`, `send(id, payload) -> seq`,
   `disconnect(id)`, `connections()`, `ids()`, `stats(id)`, `peer(id)`, `server_stats()`.
+- Der statische Schlüssel: `Server::set_static_key(secret)` und `public_key()` (auch an `ServerCore`), beim Client
+  `ClientConfig::server_key: Option<[u8; 32]>`; ein Server ohne ihn oder mit einem anderen: `Reason::ServerKey`.
 - `WebSocket`: ein Client-Typ für alle Ziele, der nie wartet (im Browser der von `plat`, sonst der von `netio` auf zwei
   Threads); `unsent()`.
-- Ohne Ein- und Ausgabe: `endpoint::ServerCore`, `endpoint::ClientCore` (die Zeit kommt vom Aufrufer), `conn::Conn`,
-  `packet::parse`, `Packet::write`, `seq_newer`.
+- Ohne Ein- und Ausgabe: `endpoint::ServerCore`, `endpoint::ClientCore` (Zeit und Zufall kommen vom Aufrufer:
+  `ClientCore::new(cfg, random: [u8; 32], stream)`), `conn::Conn` (`with_keys`, `open`, `write_disconnect`),
+  `seal` (`derive`, `confirm_tag`, `full_pn`, `Keys`, `Generator`), `packet::parse`, `Packet::write`, `seq_newer`.
 
 ## Entscheidungen
 
@@ -148,41 +153,80 @@ Sockets gehören dem Thread der App: Die Rechen-Worker des Builds mit Threads er
 
 ### Paketformat
 
-Byte 0 ist `VERSION << 4 | Art` (Version 1), danach Little-Endian:
+Byte 0 ist `VERSION << 4 | Art` (Version 2 seit U3; Version 1 ohne Schlüssel liest niemand mehr), danach Little-Endian:
 
 | Art | Richtung | Inhalt | Bytes |
 | --- | --- | --- | ---: |
-| CONNECT | Client → Server | Protokoll-Id u32, Nonce u64 | 13, über UDP auf 64 aufgefüllt |
+| CONNECT | Client → Server | Protokoll-Id u32, Nonce u64 | 13, über UDP auf 96 aufgefüllt |
 | CHALLENGE | Server → Client | Nonce u64, Zeit u32, MAC [16] | 29 (nur UDP) |
-| RESPONSE | Client → Server | Protokoll-Id, Nonce, Zeit, MAC | 33, auf 64 aufgefüllt (nur UDP) |
-| ACCEPT | Server → Client | Nonce, Token u32, größte Nutzlast u16 | 15 |
-| DENY | Server → Client | Nonce, Grund u8 (voll, Protokoll, Adresse) | 10 |
-| DATA | beide | Token u32, Folgenummer u16, Ack u16, Ack-Bits u32, Nutzlast | 13 + n |
-| DISCONNECT | beide | Token u32, Grund u8 | 6 |
+| RESPONSE | Client → Server | Protokoll-Id, Nonce, Zeit, MAC, Flags u8, Schlüssel [32] | 66, auf 96 aufgefüllt (nur UDP) |
+| ACCEPT | Server → Client | Nonce, Token u32, größte Nutzlast u16, Schlüssel [32], Bestätigung [16] | 63 |
+| DENY | Server → Client | Nonce, Grund u8 (voll, Protokoll, Adresse, Schlüssel) | 10 |
+| DATA | beide | Token u32, Folgenummer u16, Ack u16, Ack-Bits u32, Nutzlast | 13 + n, über UDP + 16 |
+| DISCONNECT | beide | Token u32, Folgenummer u16, Grund u8 | 8, über UDP + 16 |
 
-Eine Nachricht ist ein Paket: Der Kopf von DATA kostet 13 Bytes, die Nutzlast ist höchstens 1200 Bytes über UDP
-(einstellbar bis 1400: 1400 + 13 + 8 + 40 bleiben unter den 1500 von Ethernet auch mit IPv6) und 64 KiB über
-WebSocket. Über WebSocket trägt jede binäre Nachricht ein Paket, das Token ist 0. `packet::parse` liest genaue Größen,
-ohne Allokation und ohne Panik.
+Eine Nachricht ist ein Paket: Der Kopf von DATA kostet 13 Bytes, über UDP kommt das Siegel mit 16 Bytes dazu, die
+Nutzlast ist höchstens 1200 Bytes über UDP (einstellbar bis 1400: 1400 + 13 + 16 + 8 + 40 bleiben unter den 1500 von
+Ethernet auch mit IPv6) und 64 KiB über WebSocket. Über WebSocket trägt jede binäre Nachricht ein Paket, das Token ist 0,
+Schlüssel und Bestätigung des ACCEPT sind Nullen, nichts ist versiegelt. `packet::parse` liest genaue Größen, ohne
+Allokation und ohne Panik; über UDP ist die Nutzlast von DATA, wie `parse` sie liefert, der Geheimtext mit dem Siegel.
 
 ### Handschlag über UDP
 
 CONNECT (aufgefüllt) → CHALLENGE mit einem zustandslosen Cookie: die ersten 16 Bytes von HMAC-SHA256 über Adresse und
-Port des Clients, seine Nonce und die Zeit in Sekunden, mit einem Geheimnis des Servers → RESPONSE (aufgefüllt) mit dem
-Cookie → ACCEPT mit einem Token, das jedes DATA und DISCONNECT dann trägt. Für eine Adresse merkt sich der Server nichts,
-bevor ihre RESPONSE beweist, dass sie dort empfängt; ein Cookie gilt 10 Sekunden und nur für seine Adresse. Jede
-Antwort vor dem ACCEPT ist kleiner als die Anfrage, die sie auslöste (29 und 15 Bytes gegen 64): Ein gefälschter Absender
-bekommt weniger zurück, als geschickt wurde. `challenges_per_s` (2000) begrenzt die Arbeit für alle Adressen zusammen
-(eine HMAC je Antwort). Eine neue RESPONSE von einer Adresse mit Verbindung ersetzt die alte (der Client hat neu
-gestartet); eine verlorene ACCEPT wird auf die wiederholte RESPONSE noch einmal geschickt. Der Client wiederholt CONNECT
-oder RESPONSE alle 100 ms bis `connect_ms`.
+Port des Clients, seine Nonce und die Zeit in Sekunden, mit einem Schlüssel des Servers → RESPONSE (aufgefüllt) mit dem
+Cookie und dem flüchtigen X25519-Schlüssel des Clients → ACCEPT mit einem Token, dem flüchtigen Schlüssel des Servers
+und der Bestätigung, dass er dieselben Schlüssel abgeleitet hat ([Verschlüsselung](#verschlüsselung)). Für eine Adresse
+merkt sich der Server nichts, bevor ihre RESPONSE beweist, dass sie dort empfängt; ein Cookie gilt 10 Sekunden und nur
+für seine Adresse. Jede Antwort vor dem ACCEPT und das ACCEPT selbst sind kleiner als die Anfrage, die sie auslöste (29,
+63 und 10 Bytes gegen 96): Ein gefälschter Absender bekommt weniger zurück, als geschickt wurde. `challenges_per_s`
+(2000) begrenzt die Arbeit für alle Adressen zusammen: eine HMAC je CHALLENGE, zwei X25519 je ACCEPT (drei mit
+statischem Schlüssel; gemessen 94 und 132 µs, [Messwerte](#messwerte)). Eine neue RESPONSE von einer Adresse mit
+Verbindung ersetzt die alte (der Client hat neu gestartet); eine verlorene ACCEPT wird auf die wiederholte RESPONSE
+(dieselbe Nonce, derselbe Schlüssel) noch einmal geschickt, als dieselben Bytes und ohne neue Rechnung. Der Client
+wiederholt CONNECT oder RESPONSE alle 100 ms bis `connect_ms`.
 
 Über WebSocket schickt der Client CONNECT, der Server antwortet ACCEPT oder DENY; TCP hat die Adresse bewiesen. Eine
 Verbindung ohne CONNECT schließt der Server nach `handshake_ms`.
 
-Das Token ist keine Verschlüsselung: Es hält Absender fern, die den Verkehr nicht sehen. Wer mitliest, kann Pakete
-fälschen. Verschlüsselung (etwa ChaCha20-Poly1305 aus `crypto` mit Schlüsseln aus einem Austausch im Handschlag) ist
-nicht gebaut.
+### Verschlüsselung
+
+Über UDP ist jedes DATA und DISCONNECT nach dem Handschlag mit ChaCha20-Poly1305 versiegelt (RFC 8439, `crypto::aead`):
+die Nutzlast verschlüsselt, der Kopf davor (Art, Token, Folgenummer, Acks; bei DISCONNECT der Grund) mit ihr
+authentisiert, das Siegel mit 16 Bytes dahinter. Auch Keep-alives sind versiegelt, denn ihre Acks entscheiden
+`Delivered` und `Lost`. Entschieden am 18.11.2026 (immer verschlüsselt, flüchtige Schlüssel) und am 21.11.2026 (dazu ein
+optionaler statischer Schlüssel des Servers).
+
+- **Schlüssel:** Beide Seiten haben für jede Verbindung einen flüchtigen X25519-Schlüssel. Der Hash des Handschlags ist
+  SHA-256 über eine Marke, die Protokoll-Id, die Nonce, die Flags und die öffentlichen Schlüssel (des Clients, der
+  flüchtige des Servers, der statische, falls benutzt). Daraus und aus dh1 (flüchtig mit flüchtig) und dh2 (der
+  flüchtige des Clients mit dem statischen des Servers) leitet HKDF-SHA256 je 32 Bytes ab: Client → Server, Server →
+  Client und den Schlüssel der Bestätigung. Die Bestätigung im ACCEPT sind die ersten 16 Bytes von HMAC-SHA256 darüber
+  über das ACCEPT davor (Nonce, Token, Nutzlast, Schlüssel des Servers); der Client nimmt kein ACCEPT, dessen
+  Bestätigung nicht stimmt.
+- **Statischer Schlüssel (wie Noise NK):** `ClientConfig::server_key` nennt den öffentlichen Schlüssel des Servers
+  (`Server::set_static_key`, `public_key`). Dann setzt der Client `FLAG_STATIC_KEY`, dh2 geht in die Schlüssel ein,
+  und nur wer das Geheimnis hat, kann ein stimmendes ACCEPT schicken: Ein anderer Server oder jemand auf dem Weg an
+  seiner Stelle endet mit `Reason::ServerKey`, ein Server ohne statischen Schlüssel antwortet `DENY_KEY` (ebenso
+  `ServerKey`). Ohne `server_key` schützen die flüchtigen Schlüssel gegen jeden, der nur mitliest, und gegen blinde
+  Absender, aber nicht gegen jemanden auf dem Weg, der den Handschlag selbst beantwortet (in `nettest --test sim`
+  geprüft: mit Schlüssel abgelehnt, ohne angenommen).
+- **Nonce:** Jedes versiegelte Paket nimmt die nächste Paketnummer seiner Richtung (u64 ab 0; DISCONNECT eine eigene),
+  die Folgenummer sind ihre unteren 16 Bit. Der Empfänger nimmt die Nummer, die der nach der größten bisher
+  authentisierten am nächsten liegt (wie QUIC mit gekürzten Nummern, RFC 9000 A.3). So wiederholt sich unter einem
+  Schlüssel keine Nonce, und ein altes Paket, das noch einmal kommt, scheitert am Siegel oder fällt dem Empfangsfenster
+  von `conn.rs` als Duplikat oder zu alt zum Opfer, aber erst nach der Prüfung des Siegels.
+- **Was mit falschen Paketen geschieht:** Ein Paket mit dem Token der Verbindung, dessen Siegel nicht stimmt, wird
+  verworfen und gezählt (`Stats::forged`), sonst ändert sich nichts: keine Nachricht, kein Ack, keine Zeit, kein
+  Trennen. Die Rate wird vorher geprüft, damit falsche Pakete nicht mehr Arbeit kosten als echte.
+- **Vorwärtssicherheit:** Die flüchtigen Geheimnisse des Servers kommen aus einem Generator, dessen Zustand nach jedem
+  Schlüssel durch einen Hash seiner selbst ersetzt wird (`seal::Generator`); das Geheimnis von `ServerCore::new` wird
+  nicht behalten, nur ein Schlüssel für Cookies und Tokens, aus dem sich der Generator nicht ableiten lässt. Was später
+  aus dem Speicher dringt, öffnet also keine früher aufgezeichnete Verbindung; auch der statische Schlüssel nicht (dh1
+  bleibt). Schlüssel, Generator und flüchtige Geheimnisse werden beim Verwerfen genullt.
+- **Was nicht geschützt ist:** Die Clients sind nicht authentisiert (das ist das Login des Spiels); wer auf dem Weg ist,
+  kann Pakete verwerfen oder ein DENY fälschen. Über WebSocket hat der Kanal keine eigene Verschlüsselung; dort ist es
+  `wss://`.
 
 ### Folgenummern und Bestätigungen
 
@@ -217,7 +261,7 @@ davor als Bits. Beide Seiten merken sich 1024 Nummern zurück.
 | Nutzlast UDP / WebSocket | 1200 (höchstens 1400) / 64 KiB | `ServerConfig`, `ClientConfig` |
 | Pakete und Bytes je Sekunde je Client | 300, 256 KiB (UDP: verworfen; WebSocket: getrennt) | `ServerConfig` |
 | Verbindungen je Server, je Adresse | 64, 16 | `ServerConfig` |
-| Antworten auf Handschläge je Sekunde | 2000 | `ServerConfig` |
+| Antworten auf Handschläge je Sekunde | 2000 (ein ACCEPT: zwei oder drei X25519) | `ServerConfig` |
 | Zeitlimit, Keep-alive, CONNECT über WebSocket | 5 s, 100 ms, 5 s | `ServerConfig` |
 | Ungesendetes je WebSocket-Client des Servers | 1 MiB (`send`: `Backlog`; die eigenen Pakete darüber: getrennt) | `server::LINK_UNSENT` |
 | Ungesendetes des Desktop-WebSockets | 4 MiB (`send`: `Backlog`, nichts gesendet) | `WsOptions` |
@@ -235,10 +279,10 @@ braucht rund 70 Pakete je Sekunde je Client, 300 lassen Luft für Stöße.
 | --- | ---: | --- |
 | codec | 162 | Längen an ihren Grenzen (0, 125, 126, 65535, 65536), Masken an jedem Versatz gegen die einfache Schleife, Bytes einzeln, Steuerrahmen zwischen Fragmenten, jeder Close-Code 0 bis 5100, die Grenze des Decoders |
 | ws | 63 | Echo (Text, Binär, leer, 1 MiB in 16 Rahmen), Text in Rahmen von 3 Bytes (UTF-8 über Rahmen geteilt), Server → Client in Rahmen von 1000, Ping und Pong (auch zwischen Fragmenten), Close in beide Richtungen, Unterprotokolle; 14 kaputte Rahmen mit ihrem Close-Code (unmaskiert, RSV, Opcodes, fragmentierter Ping, Fortsetzung ohne Anfang, neue Nachricht mitten in einer, UTF-8, Close-Codes, Close mit einem Byte) und 5 kaputte Köpfe (zu langer Ping, Längen nicht in kürzester Form, oberstes Bit, 4 GiB angekündigt); die Grenzen (Rahmen 1009 vor der Nutzlast, Nachricht 1009, Fragmente 1008, Nachrichten- und Byte-Rate 1008, Leerlauf 1001 nach 300 ms, Ping nach 200 ms); Fehler im Handschlag (ohne Schlüssel, kurzer Schlüssel, POST, ohne Upgrade, fremder und fehlender Origin, Version 8 mit 426, `max_connections` mit 503, Pfad ohne WebSocket) und beim Client (falsches Accept, keine Antwort in `handshake_ms`); Stopp des Servers mit offenen Verbindungen (1001); 32 Clients gleichzeitig mit je 200 Echos; Senden von einem zweiten Thread |
-| sim | 211 | der Kanal auf einem simulierten Netz mit virtueller Uhr (siehe unten) |
-| udp | 18 | Kanal über UDP auf Loopback (IPv4, IPv6): 2000 Echos bis 1200 Bytes, alle geliefert, Grenzen der Nutzlast, Trennen, Stopp des Servers (`BYE_SHUTDOWN`), Clients ohne `poll` laufen ab, `max_connections`, fremde Protokoll-Id, niemand da (`ConnectTimeout`), die Berechtigungen (192.0.2.1 und 0.0.0.0:45678 abgelehnt) |
+| sim | 226 | der Kanal auf einem simulierten Netz mit virtueller Uhr (siehe unten) |
+| udp | 20 | Kanal über UDP auf Loopback (IPv4, IPv6): 2000 Echos bis 1200 Bytes, alle geliefert, Grenzen der Nutzlast, Trennen, Stopp des Servers (`BYE_SHUTDOWN`), Clients ohne `poll` laufen ab, `max_connections`, fremde Protokoll-Id, der statische Schlüssel (der richtige verbindet und hat ein Echo, ein anderer endet mit `ServerKey`), niemand da (`ConnectTimeout`), die Berechtigungen (192.0.2.1 und 0.0.0.0:45678 abgelehnt) |
 | wschan | 17 | Kanal über WebSocket: 2000 Echos bis 8000 Bytes in Reihenfolge, 60 KB am Stück, Trennen; 12 UDP- und 12 WebSocket-Clients an einem Server mit je 200 Echos; falscher Pfad; Berechtigungen; der WebSocket-Typ von `netchan` gegen den Echo-Server von `netio` |
-| fuzz | 4 | 2,12 Mio. Fälle mit festem Seed (siehe unten) |
+| fuzz | 8 | 2,22 Mio. Fälle mit festem Seed (siehe unten) |
 
 Die Simulation (`sim`) ist die unabhängige Referenz für den Kanal: Ein Hauptbuch je Richtung hält fest, was unter
 welcher Nummer gesendet wurde, was ankam und was die Acks behaupteten. Geprüft unter klarem Wetter, rauem Wetter (20 %
@@ -252,13 +296,25 @@ nach `timeout_ms`, die Obergrenzen, die Protokoll-Id, `ConnectTimeout`, die Rate
 Sekunde: rund 200 genommen, 800 verworfen, die Verbindung bleibt), gefälschte Cookies (fremde Adresse, 11 s alt), falsches
 Token, CONNECT ohne Auffüllung, ein neu startender Client, Ströme ohne CONNECT, zu schnell, zu groß.
 
+Das Siegel (seit U3, in derselben Gruppe): Wer mitliest, findet von einer Nachricht in beide Richtungen keine 8 Bytes am
+Stück auf der Leitung, und jedes DATA trägt sein Siegel. Jedes Byte eines echten Pakets einmal gekippt (Kopf, Nutzlast,
+Siegel), ein gefälschtes DATA und zwei gefälschte DISCONNECT mit dem Token der Verbindung: keine Nachricht, keine
+Trennung, genau so viele `forged` wie erwartet (ein gekipptes Byte in Art oder Token ist kein Paket dieser Verbindung);
+das echte Paket danach kommt einmal an, zweimal geschickt ist es ein Duplikat; 1100 Pakete später noch einmal geschickt
+kommt es nicht an. Ein gefälschtes DISCONNECT an den Client trennt nicht. Eine RESPONSE mit einem Schlüssel ohne
+gemeinsames Geheimnis (lauter Nullen) gibt keine Verbindung. Der statische Schlüssel: der richtige verbindet, ein
+falscher und ein Server ohne endet mit `ServerKey`, ein Server mit einem, den der Client nicht nennt, verbindet; ein
+Server in der Mitte mit eigenen Schlüsseln wird mit `server_key` abgelehnt und ohne angenommen.
+
 Fuzzing (`fuzz`, eigener Korpus aus einem festen Seed, keine fremden Fuzzer): 200 000 Byte-Folgen für den Rahmen-Decoder
 (halb zufällig, halb gültige Ströme mit Mutationen, beide Rollen, in zufälligen Stücken gefüttert; kein Puffer über einen
 Rahmen und 64 KiB, keine Nachricht über ihre Grenze, nur die vier erlaubten Close-Codes), 1,5 Mio. für den
 Paket-Parser (zufällig, gültig mit Rundreise `parse` ∘ `write`, mutiert), 300 000 Datagramme und Strom-Nachrichten an
-einen `ServerCore` (zufällige Adressen, nie über `max_connections`), 100 000 Läufe eines `ClientCore` in allen Phasen,
-20 000 Läufe einer Verbindung mit zufälligen Nummern, Acks und Bits (nie mehr entschieden als gesendet). Nichts stürzt
-ab.
+einen `ServerCore` (zufällige Adressen, nie über `max_connections`), 100 000 Läufe eines `ClientCore` in allen Phasen
+(die Hälfte der UDP-Clients nach einem echten Handschlag, mit mutierten Kopien der versiegelten Pakete des Servers),
+20 000 Läufe einer Verbindung mit zufälligen Nummern, Acks und Bits (nie mehr entschieden als gesendet), 50 000
+versiegelte Pakete (DATA und DISCONNECT), von denen jedes echte sich zu dem öffnet, was gesendet wurde, und keines mit
+einem geänderten, fehlenden oder zusätzlichen Byte. Nichts stürzt ab.
 
 Der Browser-Test (`tests/web.mjs`, Playwright über `tools/tests/playwright.mjs`): `nettest --serve` liefert die Seite des
 Web-Builds, einen Echo-WebSocket auf `/ws` und den Kanal auf `/chan` (UDP auf derselben Portnummer, mit Ausweichen auf
@@ -270,7 +326,9 @@ am selben Server, das „Fertig, wenn" von G7d.
 
 Bestanden (18.11.2026): `--check` mit allen 475 Prüfungen auf Windows 11 (Ryzen 5 3600), Linux (WSL2, das statische
 Programm ohne libc; `python build_rs.py test nettest` auf beiden) und macOS 27.2 (M2); der Browser-Test mit 11 Prüfungen
-in Chrome 157 und Firefox 153 (Playwright, headless), danach der Desktop-Client am selben Server.
+in Chrome 157 und Firefox 153 (Playwright, headless), danach der Desktop-Client am selben Server. Mit dem Siegel
+(21.11.2026): `--check` mit 496 Prüfungen und `python build_rs.py test nettest` unter Linux (Ubuntu 26.04, i7-1165G7); Windows,
+macOS und der Browser-Test sind mit Version 2 nicht gelaufen.
 
 ## Messwerte
 
@@ -332,6 +390,20 @@ Unter Linux in WSL2 (Ubuntu 24.04 auf demselben Ryzen, eine virtuelle Maschine, 
 
 Die p99 um 16 ms sind Planungslücken der virtuellen Maschine; Linux auf echter Hardware (Fedora, ThinkPad) misst Teil 2.
 
+Unter Linux auf echter Hardware (Ubuntu 26.04, Intel i7-1165G7, Release, `nettest --bench --n 2000`, drei Läufe), vor und
+nach dem Siegel (U3, 21.11.2026):
+
+| Messung | ohne Siegel | mit Siegel |
+| --- | ---: | ---: |
+| Kanal über UDP, 32 Bytes hin und zurück (Median) | 0,009 bis 0,010 ms | 0,011 bis 0,015 ms |
+| Kanal über UDP, Flut mit 1200 Bytes | 452 bis 471 MB/s, bis 0,5 % verloren | 199 bis 200 MB/s, 0,0 % verloren |
+| DATA mit 1200 Bytes im Speicher, versiegelt und geöffnet | | 198 MB/s |
+| Der Server je RESPONSE (das ACCEPT), flüchtige Schlüssel / mit statischem | | 94 / 132 µs |
+| Der Client je ACCEPT, flüchtige Schlüssel / mit statischem | | 49 / 87 µs |
+
+Das Siegel halbiert, was ein Kern über UDP durchsetzt (das ChaCha20-Poly1305 von `crypto` rechnet skalar); ein Spiel mit
+64 Clients und je 60 Paketen von 1200 Bytes je Sekunde braucht davon unter 3 %. Der WebSocket ist unverändert.
+
 ### Zwischen zwei Rechnern (gemessen mit G7e Teil 2)
 
 Der Kanal unter dem Netcode von Spiel 1 (`game1 --client`, NETCODE.md „Echtes Netz“): der Server auf dem Mac mini (WLAN),
@@ -360,7 +432,10 @@ Regel durchgehen sollen, ist offen.
 
 ## Was nicht gebaut ist
 
-- Verschlüsselung und Authentifizierung über UDP (das Token hält nur blinde Absender fern).
+- Die Authentisierung der Clients (das Login ist Sache des Spiels) und ein Schutz gegen jemanden auf dem Weg, wenn der
+  Client den statischen Schlüssel des Servers nicht kennt ([Verschlüsselung](#verschlüsselung)).
+- Ein Wechsel des statischen Schlüssels, den der Server ankündigt (heute: neuer Schlüssel, neue Konfiguration der
+  Clients).
 - Nachrichten über 1400 Bytes über UDP (keine Fragmentierung): Große, seltene Daten (die Karte, der volle Stand beim
   Beitritt) braucht der Netcode in Stücken oder über einen WebSocket daneben.
 - Ein zuverlässiger, geordneter Teilkanal über UDP: Der Netcode baut seine zuverlässigen Ereignisse selbst auf seinen eigenen

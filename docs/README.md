@@ -27,6 +27,7 @@ and tests); `../legacy`, `../rewrite` and `../booksAndContext` lie next to it.
 | [PERMISSIONS.md](PERMISSIONS.md) | `apps/NAME/PERMISSIONS`: the files, programs, URL schemes, plugins, printing and network addresses an app may use, and how `plat` enforces them |
 | [SECRETS.md](SECRETS.md) | `plat::secret`: passwords, tokens and keys in the Credential Manager (DPAPI files for large values) and the Secret Service, the `secrets` permission, limits |
 | [PLAT_INPUTS.md](PLAT_INPUTS.md) | Other programs' data in `plat`: clipboard, drag and drop, Wayland, X11, D-Bus, the agent interface; how each way is bounded, where its `unsafe` is, what tests it (`plattest --test wirefuzz`), what is open |
+| [EXTERNAL_SUITES.md](EXTERNAL_SUITES.md) | Wycheproof, x509-limbo, tlsfuzzer and TLS-Anvil against `lib/crypto`, `lib/x509` and netio's TLS: the commands, the results, every failure with its cause |
 | [`../README.md`](../README.md) | building and testing the Rust code, the rules (`no_std`, no crates, `unsafe` only in `rt` / `simd` / `plat` / `gpu` and the module runtimes), the crate layout |
 
 ## What is where
@@ -34,7 +35,7 @@ and tests); `../legacy`, `../rewrite` and `../booksAndContext` lie next to it.
 | Path (in `RustLib/`) | Content |
 |---|---|
 | `build_rs.py` | build and test (`lib`, `app NAME [--style S]`, `all`, `run`, `test [--quick]`, `check`, `plugin`, `ide`) |
-| `lib/` | the library crates: `rt`, `simd`, `plat`, `base`, `gfx`, `text`, `img_core` + one crate per codec family + `img_all`, `img_jxl_enc`, `fx`, `ui`, `plugin`; the network and data crates `netio`, `crypto`, `datastore`, `cas`, `update` |
+| `lib/` | the library crates: `rt`, `simd`, `plat`, `base`, `gfx`, `text`, `img_core` + one crate per codec family + `img_all`, `img_jxl_enc`, `fx`, `ui`, `plugin`; the network and data crates `netio`, `x509`, `crypto`, `datastore`, `cas`, `update` |
 | `styles/` | the style crates `winui`, `classic`, `macos`, `kde` (assets and `INFO` included) |
 | `apps/NAME/` | one folder per app: its Rust code (`main.rs` ...), `tests/*.uis` + fixtures, `res/` (icons), `STYLE`, `TARGETS`, `PACKAGE`, `PERMISSIONS`, `assets/` (app://), `parity.txt`; (until 2026-11 `apps/PaintCraft/docs/`, the PaintCraft specification: document, layers, tools, effects, plugins, settings, diagnostics, ...) |
 | `modules/` | loadable modules (`jxlenc`, the JPEG XL writer) and their runtime crates `modrt` / `modplat` |

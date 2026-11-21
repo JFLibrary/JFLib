@@ -7,14 +7,17 @@
 //   established(), peer_cert(), version(), suite()
 //
 // Our own servers and agents (private PKI): TLS 1.3 with TLS_CHACHA20_POLY1305_SHA256, X25519,
-// Ed25519 signatures and certificates, a HelloRetryRequest when the client offered X25519
-// without a key share (or a cookie), mutual authentication.  The server side speaks only that.
+// Ed25519 signatures and certificates, mutual authentication.  The server also takes what RFC
+// 8446 9.1 makes mandatory, TLS_AES_128_GCM_SHA256 and P-256 (secp256r1) key shares, sends a
+// HelloRetryRequest for X25519 or P-256 when the client offered no usable share, and a dummy
+// change_cipher_spec for middleboxes (D.4); its certificate and signatures are Ed25519 only.
 //
 // A client that trusts the system's certificate authorities (Trust::System: mail servers,
 // update servers, web hooks) also offers TLS_AES_128_GCM_SHA256, RSA (PKCS #1 v1.5 / PSS) and
 // ECDSA (P-256 / P-384) signatures and the P-256 key exchange (after a HelloRetryRequest),
 // and falls back to TLS 1.2 with ECDHE (X25519 or P-256) and AEAD suites (AES-128-GCM,
-// ChaCha20-Poly1305), the extended master secret and the TLS 1.3 downgrade check.  Private
+// ChaCha20-Poly1305), the extended master secret when the server has it and the TLS 1.3
+// downgrade check.  Private
 // connections never fall back.
 //
 // No PSK, no 0-RTT, no session tickets (a client ignores them), no renegotiation;
@@ -53,6 +56,11 @@ const EXT_POINT_FORMATS: u16 = 11;
 const EXT_SIG_ALGS: u16 = 13;
 const EXT_EMS: u16 = 23;
 const EXT_COOKIE: u16 = 44;
+const EXT_EARLY_DATA: u16 = 42;
+const EXT_PSK: u16 = 41;
+const EXT_PADDING: u16 = 21;
+/// early data a server skips (it never accepts 0-RTT, RFC 8446 4.2.10): at most this many bytes
+const MAX_EARLY_SKIP: usize = 4 * 16384;
 const EXT_VERSIONS: u16 = 43;
 const EXT_KEY_SHARE: u16 = 51;
 const EXT_RENEGOTIATION_INFO: u16 = 0xff01;
@@ -88,6 +96,7 @@ pub const AL_PROTOCOL_VERSION: u8 = 70;
 pub const AL_INTERNAL_ERROR: u8 = 80;
 pub const AL_NO_RENEGOTIATION: u8 = 100;
 pub const AL_MISSING_EXTENSION: u8 = 109;
+pub const AL_UNSUPPORTED_EXTENSION: u8 = 110;
 pub const AL_CERTIFICATE_REQUIRED: u8 = 116;
 
 /// SHA-256("HelloRetryRequest"): the random of a HelloRetryRequest
@@ -284,6 +293,8 @@ pub struct Conn {
     eph: [u8; 32],
     session_id: Vec<u8>,
     cookie: Vec<u8>,
+    /// client: the extensions of its last ClientHello, the only ones the server may answer
+    sent_exts: Vec<u16>,
     hrr: bool,
     cert_requested: bool,
     peer: Vec<Cert>,
@@ -305,6 +316,15 @@ pub struct Conn {
     pms: Option<[u8; 32]>,
     master12: [u8; 48],
     rd_next: Option<Cipher>,
+    /// counts the changes of the read key (set_rd): handshake data must not cross one
+    rd_epoch: u32,
+    /// the peer's dummy change_cipher_spec of middlebox compatibility came (one is allowed)
+    ccs_seen: bool,
+    /// a server whose client offered early data: the bytes of 0-RTT records it may still skip
+    early_skip: usize,
+    /// a server after its HelloRetryRequest: the first ClientHello without what the second may
+    /// change (RFC 8446 4.1.2)
+    ch1: Option<Vec<u8>>,
     /// the group of our key share (X25519, or P-256 when the server asks for it)
     group: u16,
     eph256: [u8; 32],
@@ -330,6 +350,7 @@ impl Conn {
             eph: plat::random_bytes(),
             session_id: Vec::new(),
             cookie: Vec::new(),
+            sent_exts: Vec::new(),
             hrr: false,
             cert_requested: false,
             peer: Vec::new(),
@@ -346,6 +367,10 @@ impl Conn {
             pms: None,
             master12: [0; 48],
             rd_next: None,
+            rd_epoch: 0,
+            ccs_seen: false,
+            early_skip: 0,
+            ch1: None,
             group: X25519,
             eph256: [0; 32],
         }
@@ -382,7 +407,7 @@ impl Conn {
         let mut c = Conn::new(false);
         c.session_id = Vec::from(&plat::random_bytes::<32>()[..]);
         c.client_random = plat::random_bytes();
-        c.web = matches!(cfg.trust, Trust::System(_));
+        c.web = matches!(cfg.trust, Trust::System(_) | Trust::Custom(_));
         c.ccfg = Some(cfg);
         c.send_client_hello();
         c
@@ -500,6 +525,12 @@ impl Conn {
         Cipher::for_suite(self.suite, &k, &iv, false).ok_or(fail(AL_INTERNAL_ERROR, "suite"))
     }
 
+    /// the new read key (every change counts, see handshake_bytes)
+    fn set_rd(&mut self, c: Option<Cipher>) {
+        self.rd = c;
+        self.rd_epoch = self.rd_epoch.wrapping_add(1);
+    }
+
     /// bytes from the peer
     pub fn feed(&mut self, data: &[u8]) -> Result<(), TlsError> {
         if self.state == State::Closed {
@@ -535,6 +566,11 @@ impl Conn {
             if self.inbuf[1] != 3 {
                 return Err(fail(AL_PROTOCOL_VERSION, "not a TLS record"));
             }
+            // a record that is not protected holds at most 2^14 bytes (RFC 8446 5.1)
+            let protected = self.rd.is_some() && (ty == APPLICATION_DATA || self.v12) && ty != CHANGE_CIPHER_SPEC;
+            if !protected && len > MAX_PLAIN {
+                return Err(fail(AL_RECORD_OVERFLOW, "plaintext record too long"));
+            }
             if self.inbuf.len() < 5 + len {
                 return Ok(());
             }
@@ -544,31 +580,54 @@ impl Conn {
             match ty {
                 CHANGE_CIPHER_SPEC if self.v12 => {
                     // TLS 1.2: the server's records are protected from here on
+                    self.whole_messages()?;
                     if body != [1] || self.state != State::Client12Ccs {
                         return Err(fail(AL_UNEXPECTED_MESSAGE, "change_cipher_spec"));
                     }
-                    self.rd = self.rd_next.take();
+                    let next = self.rd_next.take();
+                    self.set_rd(next);
                     self.state = State::Client12Fin;
                 }
                 CHANGE_CIPHER_SPEC => {
-                    // compatibility mode: one byte 1, only during the handshake
-                    if body != [1] || self.state == State::Established {
+                    // compatibility mode (RFC 8446 D.4): one byte 1, during the handshake; a server
+                    // takes one from its client, not before the first ClientHello (a client stays
+                    // lenient with servers)
+                    self.whole_messages()?;
+                    let again = self.server && (self.ccs_seen || (self.state == State::ServerCh && !self.hrr));
+                    if body != [1] || self.state == State::Established || again {
                         return Err(fail(AL_UNEXPECTED_MESSAGE, "change_cipher_spec"));
                     }
+                    self.ccs_seen = true;
                 }
                 _ if self.v12 && self.rd.is_some() => {
                     let rd = self.rd.as_mut().ok_or(fail(AL_INTERNAL_ERROR, "keys"))?;
-                    let (inner, content) = rd.open(&hdr, &body).ok_or(fail(AL_BAD_RECORD_MAC, "record does not authenticate"))?;
+                    let (inner, content) = rd.open(&hdr, &body).map_err(open_failure)?;
                     match inner {
                         HANDSHAKE => self.handshake_bytes(&content)?,
                         ALERT => self.peer_alert(&content)?,
-                        APPLICATION_DATA if self.state == State::Established => self.plain.extend_from_slice(&content),
+                        APPLICATION_DATA if self.state == State::Established => {
+                            self.whole_messages()?;
+                            self.plain.extend_from_slice(&content)
+                        }
                         _ => return Err(fail(AL_UNEXPECTED_MESSAGE, "record type")),
                     }
                 }
+                // 0-RTT data the server does not take (RFC 8446 4.2.10): before its keys (after a
+                // HelloRetryRequest) every application_data record, after them those that do not
+                // open with the client's handshake key, up to MAX_EARLY_SKIP bytes
+                APPLICATION_DATA if self.skips_early(body.len()) && self.rd.is_none() => {
+                    self.early_skip -= body.len();
+                }
                 APPLICATION_DATA => {
                     let rd = self.rd.as_mut().ok_or(fail(AL_UNEXPECTED_MESSAGE, "data before keys"))?;
-                    let (inner, content) = rd.open(&hdr, &body).ok_or(fail(AL_BAD_RECORD_MAC, "record does not authenticate"))?;
+                    let opened = rd.open(&hdr, &body);
+                    if self.skips_early(body.len()) && opened == Err(record::OpenError::Mac) {
+                        self.early_skip -= body.len();
+                        continue;
+                    }
+                    let (inner, content) = opened.map_err(open_failure)?;
+                    // the first record that opens is the client's second flight: no more skipping
+                    self.early_skip = 0;
                     match inner {
                         HANDSHAKE => self.handshake_bytes(&content)?,
                         ALERT => self.peer_alert(&content)?,
@@ -576,6 +635,7 @@ impl Conn {
                             if self.state != State::Established {
                                 return Err(fail(AL_UNEXPECTED_MESSAGE, "data during the handshake"));
                             }
+                            self.whole_messages()?;
                             self.plain.extend_from_slice(&content);
                         }
                         _ => return Err(fail(AL_UNEXPECTED_MESSAGE, "inner type")),
@@ -585,13 +645,12 @@ impl Conn {
                     if self.rd.is_some() {
                         return Err(fail(AL_UNEXPECTED_MESSAGE, "plaintext handshake after keys"));
                     }
-                    if body.is_empty() {
-                        return Err(fail(AL_DECODE_ERROR, "empty handshake record"));
-                    }
                     self.handshake_bytes(&body)?;
                 }
-                // a peer that fails before it has our keys may still send a plaintext alert
-                ALERT if self.rd.is_none() => self.peer_alert(&body)?,
+                // a peer that fails during the handshake may send its alert in plaintext (it may
+                // not have the keys, or not trust them); it ends the connection either way, as a
+                // TCP reset of an attacker could
+                ALERT if self.rd.is_none() || self.state != State::Established => self.peer_alert(&body)?,
                 _ => return Err(fail(AL_UNEXPECTED_MESSAGE, "record type")),
             }
             if self.state == State::Closed {
@@ -600,12 +659,37 @@ impl Conn {
         }
     }
 
+    /// a record of len bytes is 0-RTT data to skip: the client offered early data, a ClientHello
+    /// came whole (early data follows it), and len fits what is left to skip
+    fn skips_early(&self, len: usize) -> bool {
+        self.server && self.early_skip > 0 && len <= self.early_skip && self.hs.is_empty()
+    }
+
+    /// a handshake message split over records has no other records between its parts (RFC 8446
+    /// 5.1): application data or a change_cipher_spec while one is incomplete (a KeyUpdate whose
+    /// first bytes came) is refused; an alert ends the connection anyway, with the peer's reason
+    fn whole_messages(&self) -> Result<(), TlsError> {
+        if self.hs.is_empty() {
+            Ok(())
+        } else {
+            Err(fail(AL_UNEXPECTED_MESSAGE, "a record inside a fragmented handshake message"))
+        }
+    }
+
     fn peer_alert(&mut self, b: &[u8]) -> Result<(), TlsError> {
+        if b.is_empty() {
+            return Err(fail(AL_UNEXPECTED_MESSAGE, "empty alert record")); // RFC 8446 5.4
+        }
         if b.len() != 2 {
             return Err(fail(AL_DECODE_ERROR, "alert"));
         }
         if b[1] == AL_CLOSE_NOTIFY {
             self.peer_closed = true;
+            // TLS 1.2: the other side answers with its own and closes (RFC 5246 7.2.1); TLS 1.3
+            // leaves the write side open until the program closes it (RFC 8446 6.1)
+            if self.v12 {
+                self.close();
+            }
             return Ok(());
         }
         if b[0] == 1 && self.v12 {
@@ -616,6 +700,10 @@ impl Conn {
     }
 
     fn handshake_bytes(&mut self, b: &[u8]) -> Result<(), TlsError> {
+        // a handshake record holds part of a message (RFC 8446 5.1, RFC 5246 6.2.1), protected or not
+        if b.is_empty() {
+            return Err(fail(AL_UNEXPECTED_MESSAGE, "empty handshake record"));
+        }
         self.hs.extend_from_slice(b);
         loop {
             if self.hs.len() < 4 {
@@ -630,10 +718,11 @@ impl Conn {
             }
             let msg: Vec<u8> = self.hs[..4 + n].to_vec();
             self.hs.drain(..4 + n);
-            let keys_before = self.rd.is_some();
+            let epoch = self.rd_epoch;
             self.message(&msg)?;
-            // a key change must fall on a record boundary
-            if self.rd.is_some() != keys_before && !self.hs.is_empty() {
+            // a key change must fall on a record boundary (RFC 8446 5.1): the first keys, the
+            // application keys after Finished and every KeyUpdate
+            if self.rd_epoch != epoch && !self.hs.is_empty() {
                 return Err(fail(AL_UNEXPECTED_MESSAGE, "handshake data across a key change"));
             }
         }
@@ -647,8 +736,10 @@ impl Conn {
             (State::ClientSh, HS_SERVER_HELLO) => self.client_server_hello(msg, body),
             (State::ClientEe, HS_ENCRYPTED_EXTENSIONS) => {
                 let mut r = R { b: body };
-                extensions(r.v16()?)?;
+                let exts = extensions(r.v16()?)?;
                 r.done()?;
+                // server_name (empty: the server used the name), the server's supported_groups
+                self.server_exts(&exts, &[EXT_SERVER_NAME, EXT_GROUPS])?;
                 self.add(msg);
                 self.state = State::ClientCertOrCr;
                 Ok(())
@@ -707,11 +798,13 @@ impl Conn {
             }
             (State::ServerFinished, HS_FINISHED) => {
                 let want = keysched::finished(&self.c_hs, &self.hash());
+                finished_len(body, want.len())?;
                 if !crypto::ct_eq(&want, body) {
                     return Err(fail(AL_DECRYPT_ERROR, "client Finished"));
                 }
                 self.add(msg);
-                self.rd = Some(self.cipher13(&self.c_ap.clone())?);
+                let c = self.cipher13(&self.c_ap.clone())?;
+                self.set_rd(Some(c));
                 self.state = State::Established;
                 Ok(())
             }
@@ -753,6 +846,7 @@ impl Conn {
             (State::Client12Fin, HS_FINISHED) => {
                 let mut want = [0u8; 12];
                 keysched::prf12(&self.master12, "server finished", &self.hash(), &mut want);
+                finished_len(body, want.len())?;
                 if !crypto::ct_eq(&want, body) {
                     return Err(fail(AL_DECRYPT_ERROR, "server Finished"));
                 }
@@ -779,7 +873,8 @@ impl Conn {
                 let peer_secret = if self.server { &mut self.c_ap } else { &mut self.s_ap };
                 *peer_secret = keysched::update(peer_secret);
                 let ps = *peer_secret;
-                self.rd = Some(self.cipher13(&ps)?);
+                let c = self.cipher13(&ps)?;
+                self.set_rd(Some(c));
                 if requested == 1 {
                     let msg = hs_msg(HS_KEY_UPDATE, &[0]);
                     let rec = self.wr.as_mut().ok_or(TlsError::Closed)?.seal(HANDSHAKE, &msg);
@@ -851,16 +946,36 @@ impl Conn {
             put_v16(&mut c, &self.cookie);
             put_ext(&mut e, EXT_COOKIE, &c);
         }
+        self.sent_exts.clear();
+        let mut i = 0;
+        while i + 4 <= e.len() {
+            self.sent_exts.push(u16::from_be_bytes([e[i], e[i + 1]]));
+            i += 4 + (u16::from_be_bytes([e[i + 2], e[i + 3]]) as usize);
+        }
         put_v16(&mut b, &e);
         let msg = hs_msg(HS_CLIENT_HELLO, &b);
         self.send_hs(&msg);
     }
 
+    /// what a server's message may hold (RFC 8446 4.2, RFC 5246 7.4.1.4): an extension the
+    /// ClientHello did not offer is unsupported_extension (a HelloRetryRequest's cookie is the
+    /// server's own), one it offered outside the messages that answer it illegal_parameter;
+    /// unknown types and GREASE values (RFC 8701 4) are never offered
+    fn server_exts(&self, exts: &[(u16, &[u8])], allowed: &[u16]) -> Result<(), TlsError> {
+        for (t, _) in exts {
+            if !self.sent_exts.contains(t) && *t != EXT_COOKIE {
+                return Err(fail(AL_UNSUPPORTED_EXTENSION, "an extension the client did not offer"));
+            }
+            if !allowed.contains(t) {
+                return Err(fail(AL_ILLEGAL_PARAMETER, "an extension in a message it does not belong in"));
+            }
+        }
+        Ok(())
+    }
+
     fn client_server_hello(&mut self, msg: &[u8], body: &[u8]) -> Result<(), TlsError> {
         let mut r = R { b: body };
-        if r.u16()? != 0x0303 {
-            return Err(fail(AL_PROTOCOL_VERSION, "legacy version"));
-        }
+        let legacy = r.u16()?;
         let random = r.take(32)?;
         let sid = r.v8()?;
         let suite = r.u16()?;
@@ -869,7 +984,12 @@ impl Conn {
         }
         let exts = extensions(if r.b.is_empty() { &[] } else { r.v16()? })?;
         r.done()?;
+        // with supported_versions the client ignores legacy_version (RFC 8446 4.2.1); without
+        // it the ServerHello is TLS 1.2's, the oldest version offered
         let Some(v) = ext(&exts, EXT_VERSIONS) else {
+            if legacy != 0x0303 {
+                return Err(fail(AL_PROTOCOL_VERSION, "a version older than TLS 1.2"));
+            }
             if self.web && !self.hrr && random != HRR_RANDOM {
                 return self.server_hello12(msg, random, suite, &exts);
             }
@@ -877,6 +997,11 @@ impl Conn {
         };
         if sid != self.session_id.as_slice() {
             return Err(fail(AL_ILLEGAL_PARAMETER, "session id not echoed"));
+        }
+        if random == HRR_RANDOM {
+            self.server_exts(&exts, &[EXT_VERSIONS, EXT_KEY_SHARE, EXT_COOKIE])?;
+        } else {
+            self.server_exts(&exts, &[EXT_VERSIONS, EXT_KEY_SHARE])?;
         }
         let offered: &[u16] = if self.web { &SUITES_13 } else { &[SUITE] };
         if !offered.contains(&suite) || (self.hrr && suite != self.suite) {
@@ -921,7 +1046,8 @@ impl Conn {
         let shared = self.ecdhe(self.group, pk)?;
         self.add(msg);
         self.handshake_keys(&shared);
-        self.rd = Some(self.cipher13(&self.s_hs.clone())?);
+        let c = self.cipher13(&self.s_hs.clone())?;
+        self.set_rd(Some(c));
         self.state = State::ClientEe;
         Ok(())
     }
@@ -955,6 +1081,7 @@ impl Conn {
 
     fn client_server_finished(&mut self, msg: &[u8], body: &[u8]) -> Result<(), TlsError> {
         let want = keysched::finished(&self.s_hs, &self.hash());
+        finished_len(body, want.len())?;
         if !crypto::ct_eq(&want, body) {
             return Err(fail(AL_DECRYPT_ERROR, "server Finished"));
         }
@@ -982,7 +1109,8 @@ impl Conn {
         let m = hs_msg(HS_FINISHED, &fin);
         self.send_hs(&m);
         self.wr = Some(self.cipher13(&self.c_ap.clone())?);
-        self.rd = Some(self.cipher13(&self.s_ap.clone())?);
+        let c = self.cipher13(&self.s_ap.clone())?;
+        self.set_rd(Some(c));
         self.state = State::Established;
         Ok(())
     }
@@ -996,15 +1124,16 @@ impl Conn {
         if !SUITES_12.contains(&suite) {
             return Err(fail(AL_ILLEGAL_PARAMETER, "cipher suite"));
         }
+        self.server_exts(exts, &[EXT_SERVER_NAME, EXT_POINT_FORMATS, EXT_EMS, EXT_RENEGOTIATION_INFO])?;
         if ext(exts, EXT_RENEGOTIATION_INFO).is_some_and(|r| r != [0]) {
             return Err(fail(AL_HANDSHAKE_FAILURE, "renegotiation_info"));
         }
         self.v12 = true;
         self.suite = suite;
+        // the extended master secret when the server has it (RFC 7627); a server without it is
+        // taken: the attack it closes (Triple Handshake) needs resumption or renegotiation,
+        // which this client does neither of.  Resumption, once it comes, must require it
         self.ems = ext(exts, EXT_EMS).is_some();
-        if !self.ems {
-            return Err(fail(AL_HANDSHAKE_FAILURE, "extended_master_secret"));
-        }
         self.server_random.copy_from_slice(random);
         self.add(msg);
         self.state = State::Client12Cert;
@@ -1090,9 +1219,22 @@ impl Conn {
 
     // ------------------------------------------------------------------ server
 
+    /// middlebox compatibility (RFC 8446 D.4): to a client that sent a legacy session id, a dummy
+    /// change_cipher_spec right after the first handshake message (ServerHello or
+    /// HelloRetryRequest), so that middleboxes see what looks like a resumed TLS 1.2 session
+    fn compat_ccs(&mut self, sid: &[u8]) {
+        if !sid.is_empty() {
+            self.out.extend_from_slice(&record::plain(CHANGE_CIPHER_SPEC, &[1]));
+        }
+    }
+
     fn server_client_hello(&mut self, msg: &[u8], body: &[u8]) -> Result<(), TlsError> {
         let mut r = R { b: body };
-        let _legacy = r.u16()?;
+        // legacy_version MUST be 0x0303 in a TLS 1.3 ClientHello (RFC 8446 4.1.2); an older one
+        // (SSL 3.0, garbage) is refused
+        if r.u16()? < 0x0303 {
+            return Err(fail(AL_PROTOCOL_VERSION, "legacy_version below TLS 1.2"));
+        }
         r.take(32)?;
         let sid = Vec::from(r.v8()?);
         if sid.len() > 32 {
@@ -1105,41 +1247,87 @@ impl Conn {
         if comp != [0] {
             return Err(fail(AL_ILLEGAL_PARAMETER, "compression"));
         }
+        // pre_shared_key comes last (RFC 8446 4.2.11; the server checks it though it takes no PSK)
+        if exts.iter().rev().skip(1).any(|(t, _)| *t == EXT_PSK) {
+            return Err(fail(AL_ILLEGAL_PARAMETER, "pre_shared_key not the last extension"));
+        }
         let versions = ext(&exts, EXT_VERSIONS).ok_or(fail(AL_PROTOCOL_VERSION, "TLS 1.3 required"))?;
         if !u16_list(R { b: versions }.v8()?)?.contains(&TLS13) {
             return Err(fail(AL_PROTOCOL_VERSION, "TLS 1.3 required"));
         }
-        if !suites.contains(&SUITE) {
-            return Err(fail(AL_HANDSHAKE_FAILURE, "TLS_CHACHA20_POLY1305_SHA256 required"));
+        // ChaCha20-Poly1305 when the client offers it, else AES-128-GCM (RFC 8446 9.1: every
+        // TLS 1.3 implementation has it); both with SHA-256
+        let suite = if suites.contains(&TLS_CHACHA20_POLY1305_SHA256) {
+            TLS_CHACHA20_POLY1305_SHA256
+        } else if suites.contains(&TLS_AES_128_GCM_SHA256) {
+            TLS_AES_128_GCM_SHA256
+        } else {
+            return Err(fail(AL_HANDSHAKE_FAILURE, "no common cipher suite (ChaCha20-Poly1305, AES-128-GCM)"));
+        };
+        if self.hrr && suite != self.suite {
+            return Err(fail(AL_ILLEGAL_PARAMETER, "another cipher suite after HelloRetryRequest"));
         }
+        self.suite = suite;
         let algs = u16_list(R { b: ext(&exts, EXT_SIG_ALGS).ok_or(fail(AL_MISSING_EXTENSION, "signature_algorithms"))? }.v16()?)?;
         if !algs.contains(&ED25519) {
             return Err(fail(AL_HANDSHAKE_FAILURE, "Ed25519 required"));
         }
         let groups = u16_list(R { b: ext(&exts, EXT_GROUPS).ok_or(fail(AL_MISSING_EXTENSION, "supported_groups"))? }.v16()?)?;
-        let mut share = None;
+        // early data is never taken (no tickets, no PSK): its records are skipped; a second
+        // ClientHello must not offer it, and after it the client sends none (RFC 8446 4.2.10):
+        // a record that does not open is an error again
+        if self.hrr {
+            self.early_skip = 0;
+        }
+        if ext(&exts, EXT_EARLY_DATA).is_some() {
+            if self.hrr {
+                return Err(fail(AL_ILLEGAL_PARAMETER, "early_data in the second ClientHello"));
+            }
+            self.early_skip = MAX_EARLY_SKIP;
+        }
+        // supported_groups and key_share come together (RFC 8446 9.2)
+        if ext(&exts, EXT_KEY_SHARE).is_none() {
+            return Err(fail(AL_MISSING_EXTENSION, "key_share"));
+        }
+        // the second ClientHello after a HelloRetryRequest is the first one, except for what
+        // RFC 8446 4.1.2 lets it change (key_share, cookie, early_data, padding, and the binders
+        // and ticket ages of pre_shared_key)
+        let fixed = ch_fixed(&sid, &suites, comp, &exts);
+        if self.hrr && self.ch1.as_ref() != Some(&fixed) {
+            return Err(fail(AL_ILLEGAL_PARAMETER, "the second ClientHello changed"));
+        }
+        // the key shares: each for a group the client lists, at most one per group (RFC 8446
+        // 4.2.8); groups: X25519 and P-256 (secp256r1, which 9.1 makes mandatory)
+        let mut shares: Vec<(u16, &[u8])> = Vec::new();
         if let Some(ks) = ext(&exts, EXT_KEY_SHARE) {
             let mut k = R { b: R { b: ks }.v16()? };
             while !k.b.is_empty() {
                 let g = k.u16()?;
                 let key = k.v16()?;
-                if g == X25519 {
-                    share = Some(key);
+                if !groups.contains(&g) || shares.iter().any(|s| s.0 == g) {
+                    return Err(fail(AL_ILLEGAL_PARAMETER, "key share for a group not listed, or twice"));
                 }
+                shares.push((g, key));
             }
         }
         if self.hrr && ext(&exts, EXT_COOKIE).is_some_and(|c| R { b: c }.v16().map(|v| v != self.cookie.as_slice()).unwrap_or(true)) {
             return Err(fail(AL_ILLEGAL_PARAMETER, "cookie"));
         }
-        let Some(pk) = share else {
-            if !groups.contains(&X25519) {
-                return Err(fail(AL_HANDSHAKE_FAILURE, "X25519 required"));
-            }
+        // the client's order decides: the first group it lists that we have, with its share when
+        // it sent one, else a HelloRetryRequest for that group
+        let ours = |g: &u16| *g == X25519 || *g == SECP256R1;
+        let pick = groups.iter().filter(|g| ours(g)).find_map(|g| shares.iter().find(|s| s.0 == *g)).copied();
+        let Some((group, pk)) = pick else {
+            let Some(&want) = groups.iter().find(|g| ours(g)) else {
+                return Err(fail(AL_HANDSHAKE_FAILURE, "no common group (X25519, P-256)"));
+            };
             if self.hrr {
-                return Err(fail(AL_ILLEGAL_PARAMETER, "no X25519 share after HelloRetryRequest"));
+                return Err(fail(AL_ILLEGAL_PARAMETER, "no share for the asked group after HelloRetryRequest"));
             }
-            // HelloRetryRequest: ask for an X25519 share
+            // HelloRetryRequest: ask for a share of that group
             self.hrr = true;
+            self.ch1 = Some(fixed);
+            self.group = want;
             self.add(msg);
             let h1 = self.hash();
             self.transcript = Sha256::new();
@@ -1149,42 +1337,48 @@ impl Conn {
             put16(&mut b, 0x0303);
             b.extend_from_slice(&HRR_RANDOM);
             put_v8(&mut b, &sid);
-            put16(&mut b, SUITE);
+            put16(&mut b, suite);
             b.push(0);
             let mut e = Vec::new();
             put_ext(&mut e, EXT_VERSIONS, &[0x03, 0x04]);
-            put_ext(&mut e, EXT_KEY_SHARE, &X25519.to_be_bytes());
+            put_ext(&mut e, EXT_KEY_SHARE, &want.to_be_bytes());
             put_v16(&mut b, &e);
             let m = hs_msg(HS_SERVER_HELLO, &b);
             self.send_hs(&m);
+            self.compat_ccs(&sid);
             return Ok(());
         };
-        if pk.len() != 32 {
-            return Err(fail(AL_ILLEGAL_PARAMETER, "key share length"));
+        if self.hrr && (group != self.group || shares.len() != 1) {
+            return Err(fail(AL_ILLEGAL_PARAMETER, "the share after HelloRetryRequest is not the one asked for"));
         }
-        let mut peer = [0u8; 32];
-        peer.copy_from_slice(pk);
-        let shared = x25519::shared(&self.eph, &peer).ok_or(fail(AL_ILLEGAL_PARAMETER, "key share"))?;
+        self.group = group;
+        // our share first: it makes the P-256 secret the shared secret needs
+        let public = self.key_share(group);
+        let shared = self.ecdhe(group, pk)?;
         self.add(msg);
         // ServerHello
         let mut b = Vec::new();
         put16(&mut b, 0x0303);
         b.extend_from_slice(&plat::random_bytes::<32>());
         put_v8(&mut b, &sid);
-        put16(&mut b, SUITE);
+        put16(&mut b, suite);
         b.push(0);
         let mut e = Vec::new();
         put_ext(&mut e, EXT_VERSIONS, &[0x03, 0x04]);
         let mut ks = Vec::new();
-        put16(&mut ks, X25519);
-        put_v16(&mut ks, &x25519::public_key(&self.eph));
+        put16(&mut ks, group);
+        put_v16(&mut ks, &public);
         put_ext(&mut e, EXT_KEY_SHARE, &ks);
         put_v16(&mut b, &e);
         let sh = hs_msg(HS_SERVER_HELLO, &b);
         self.send_hs(&sh);
+        if !self.hrr {
+            self.compat_ccs(&sid);
+        }
         self.handshake_keys(&shared);
         self.wr = Some(self.cipher13(&self.s_hs.clone())?);
-        self.rd = Some(self.cipher13(&self.c_hs.clone())?);
+        let c = self.cipher13(&self.c_hs.clone())?;
+        self.set_rd(Some(c));
         // EncryptedExtensions
         let ee = hs_msg(HS_ENCRYPTED_EXTENSIONS, &[0, 0]);
         self.send_hs(&ee);
@@ -1219,6 +1413,41 @@ impl Conn {
     }
 }
 
+/// what a second ClientHello must repeat of the first: the session id, the cipher suites, the
+/// compression methods and every extension but key_share (51), cookie (44), early_data (42) and
+/// padding (21), in their order (RFC 8446 4.1.2)
+fn ch_fixed(sid: &[u8], suites: &[u16], comp: &[u8], exts: &[(u16, &[u8])]) -> Vec<u8> {
+    let mut out = Vec::new();
+    put_v8(&mut out, sid);
+    for s in suites {
+        put16(&mut out, *s);
+    }
+    put_v8(&mut out, comp);
+    for (t, v) in exts {
+        if ![EXT_KEY_SHARE, EXT_COOKIE, EXT_EARLY_DATA, EXT_PADDING, EXT_PSK].contains(t) {
+            put16(&mut out, *t);
+            out.extend_from_slice(&(v.len() as u32).to_be_bytes());
+            out.extend_from_slice(v);
+        }
+    }
+    out
+}
+
+/// the alert for a protected record that does not open
+fn open_failure(e: record::OpenError) -> TlsError {
+    match e {
+        record::OpenError::Mac => fail(AL_BAD_RECORD_MAC, "record does not authenticate"),
+        record::OpenError::Overflow => fail(AL_RECORD_OVERFLOW, "record too long"),
+        record::OpenError::NoType => fail(AL_UNEXPECTED_MESSAGE, "record without a content type"),
+    }
+}
+
+/// a Finished of another length than the hash (or TLS 1.2's 12 bytes) is malformed, not wrong:
+/// decode_error (RFC 8446 4.4.4, 6.2), while a wrong value of the right length is decrypt_error
+fn finished_len(body: &[u8], want: usize) -> Result<(), TlsError> {
+    if body.len() == want { Ok(()) } else { Err(fail(AL_DECODE_ERROR, "Finished of the wrong length")) }
+}
+
 fn certificate_body(chain: &[Vec<u8>]) -> Vec<u8> {
     let mut list = Vec::new();
     for c in chain {
@@ -1239,16 +1468,32 @@ fn parse_certificates(body: &[u8]) -> Result<Vec<Cert>, TlsError> {
     let mut list = R { b: r.v24()? };
     r.done()?;
     let mut out = Vec::new();
+    let mut n = 0;
     while !list.b.is_empty() {
         let der = list.v24()?;
         list.v16()?;
-        if out.len() >= 10 {
-            return Err(fail(AL_BAD_CERTIFICATE, "chain too long"));
-        }
-        let c = Cert::parse(der).ok_or(fail(AL_BAD_CERTIFICATE, "certificate unreadable"))?;
-        out.push(c);
+        push_cert(&mut out, der, n)?;
+        n += 1;
     }
     Ok(out)
+}
+
+/// the most certificates a Certificate message may hold (the path search has its own limits:
+/// nine certificates deep, 64 signature checks)
+const MAX_CERTS: usize = 20;
+
+/// a certificate of a Certificate message: the first (the peer's own) must be readable, the
+/// others only help to build a path, and one that cannot be read is left out, as browsers do
+fn push_cert(out: &mut Vec<Cert>, der: &[u8], index: usize) -> Result<(), TlsError> {
+    if index >= MAX_CERTS {
+        return Err(fail(AL_BAD_CERTIFICATE, "chain too long"));
+    }
+    match Cert::parse(der) {
+        Some(c) => out.push(c),
+        None if index == 0 => return Err(fail(AL_BAD_CERTIFICATE, "certificate unreadable")),
+        None => {}
+    }
+    Ok(())
 }
 
 /// TLS 1.2: a list of certificates without context or extensions
@@ -1257,12 +1502,11 @@ fn parse_certificates12(body: &[u8]) -> Result<Vec<Cert>, TlsError> {
     let mut list = R { b: r.v24()? };
     r.done()?;
     let mut out = Vec::new();
+    let mut n = 0;
     while !list.b.is_empty() {
         let der = list.v24()?;
-        if out.len() >= 10 {
-            return Err(fail(AL_BAD_CERTIFICATE, "chain too long"));
-        }
-        out.push(Cert::parse(der).ok_or(fail(AL_BAD_CERTIFICATE, "certificate unreadable"))?);
+        push_cert(&mut out, der, n)?;
+        n += 1;
     }
     Ok(out)
 }
@@ -1326,5 +1570,6 @@ fn check_trust(trust: &Trust, chain: &[Cert], name: Option<&String>, usage: Usag
             }
             Err(if !name.is_empty() && !leaf.names(name) { fail(AL_BAD_CERTIFICATE, "certificate for another name") } else { fail(AL_UNKNOWN_CA, "certificate not trusted") })
         }
+        Trust::Custom(check) => check(chain, name.map(|s| s.as_str()).unwrap_or(""), now).map_err(|_| fail(AL_BAD_CERTIFICATE, "certificate refused by the program's check")),
     }
 }
