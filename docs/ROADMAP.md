@@ -2507,7 +2507,7 @@ Sicherheit:
 - **P1** · *fehlt* · Fuzzing der Datei-Parser. `tools/net_fuzz.py` und `tools/cov_fuzz.py` decken
   nur zstd, LZ4, X.509, DNS, HTTP, TLS, die IP-Reassembly und `netpkt` ab. Es fehlen DEFLATE,
   zlib, gzip und Brotli (`compress`), `archive` (ZIP, OPC), `formats::json` (darüber laufen auch
-  Update-Manifeste, `datastore`, glTF und Agent-Anfragen), die XML-Leser (unten), die
+  Update-Manifeste, `datastore`, glTF und Agent-Anfragen), `formats::xml` (`Reader`, `Lenient`; seit U5 der eine XML-Leser), die
   Bild-Decoder und die Schriften (bisher nur abgeschnittene und gekippte Kopien in den
   Python-Prüfungen, [`tools/imgtest_common.py`](../tools/imgtest_common.py),
   `tools/font_check.py --fuzz`), `doc_io` (RTF und HTML aus der Zwischenablage, die jedes andere
@@ -2548,11 +2548,17 @@ Grundbausteine am falschen Ort oder mehrfach:
   nicht mehr an `plat`). `netio` nutzt noch `agent_core::json` (über die Sicherheits-Sitzung).
   Der Name `data` ging nicht: `build_rs.py` erkennt Crates an `NAME::`, und die Stile netlab,
   backupcraft und jfoffice haben ein eigenes Modul `data`.
-- **P2** · *teilweise* · Ein XML-Leser statt sechs: `formats::xml`,
-  [`img_svg/xml.rs`](../lib/img_svg/xml.rs), [`diagram_io/src/xml.rs`](../lib/diagram_io/src/xml.rs),
-  zwei in `diagram_core` (`design/xml.rs`, `formula/xml.rs`) und der in
-  [`text/fontconf.rs`](../lib/text/fontconf.rs), jeder mit eigenen Grenzen. Einer, gefuzzt, mit
-  einer nachsichtigen Art für SVG.
+- **P2** · *erledigt* (2026-11-21, U5) · Ein XML-Leser statt fünf (die Bestandsaufnahme zählte sechs; `design/xml.rs`
+  in `diagram_core` schreibt nur): [`formats/src/xml/`](../lib/formats/src/xml/mod.rs) hat einen Leser in zwei
+  Arten. `Reader` ist streng (wohlgeformtes XML 1.0 mit Namensräumen, ein Pull-Leser mit Positionen und `skip`, ohne
+  Rekursion; aus dem Leser von `diagram_io` verallgemeinert), `Lenient` nachsichtig (die Regeln des SVG-Lesers:
+  Entitäten der DOCTYPE mit Budget, kaputtes Markup so weit lesbar). `diagram_io` läuft auf `Reader`, `img_svg`, die
+  Theme-Teile von `diagram_core` und `text::fontconf` auf `Lenient`, `xml::parse` als Baum auf `Reader`. Gleich
+  geblieben: alle 543 SVG-Dateien des Repositorys und 45 absichtlich kaputte gerendert byte-gleich, der SVG-Baum
+  auf 208 000 Eingaben (mit Mutationen) gleich bis auf einen behobenen Fehler, alle Ausgaben von diagramiotest
+  (Proben, Zeichnungen, Schablonen, Exporte, Renderings) byte-gleich, fontconf auf den 63 fontconfig-Dateien des
+  Systems gleich. Dabei behoben: `<?>` ließ den Leser von `diagram_io` in Panik geraten. Gefuzzt mit festem Seed in
+  der coretest-Gruppe `xml`; ein Fuzz-Ziel für `tools/net_fuzz` geht an die Sicherheits-Sitzung.
 - **P2** · *erledigt* (2026-11-21, U4) · Alte Textkodierungen in `formats::encoding`: `Charset` mit allen
   Einbyte-Kodierungen des WHATWG-Standards, den DOS-Seiten (IBM437, 737, 775, 850 bis 869) und einem genauen
   ISO-8859-1; `label` mit allen 228 Labels des Standards (mehrbytige benannt, nicht dekodiert), `decode_label`

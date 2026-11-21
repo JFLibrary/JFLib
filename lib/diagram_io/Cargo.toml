@@ -18,6 +18,7 @@ doctest = false
 workspace = true
 
 [dependencies]
+formats.workspace = true
 # archive: ZIP and OPC (archive::opc)
 diagram_core.workspace = true
 archive.workspace = true

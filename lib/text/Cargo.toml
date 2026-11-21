@@ -18,6 +18,7 @@ doctest = false
 workspace = true
 
 [dependencies]
+formats.workspace = true
 rt.workspace = true
 plat.workspace = true
 base.workspace = true

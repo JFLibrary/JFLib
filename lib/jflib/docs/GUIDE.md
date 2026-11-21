@@ -2829,8 +2829,9 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   xxHash; `Codec` picks LZ4 or zstd by name.
 * `formats` -- data formats as text, without a dependency: `formats::json` (strict bounded JSON,
   numbers kept as their exact token, `parse_with_limits` / `stringify_pretty`),
-  `formats::jmap` (typed records, below), `formats::xml` (a bounded, namespace-aware XML subset;
-  a DTD, comments and mixed content are refused) and `formats::encoding` (strict UTF-8 and
+  `formats::jmap` (typed records, below), `formats::xml` (`Reader`, the strict pull reader with
+  namespaces and offsets; `Lenient`, the forgiving one for files from editors; `parse`, a bounded
+  tree of a subset that refuses a DTD, comments and mixed content) and `formats::encoding` (strict UTF-8 and
   UTF-16 by their byte-order mark; `Charset`, the single-byte sets of the web and of DOS files,
   `Charset::from_code_page(850)`, `label("iso-8859-2")` and `decode_label` as the WHATWG Encoding
   Standard reads labels). `agent_core::json` / `jmap` and `base::xml` / `encoding` are the same
