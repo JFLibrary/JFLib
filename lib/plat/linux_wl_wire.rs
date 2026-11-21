@@ -771,73 +771,14 @@ impl Wl {
             Some(n) => &ev.sig[n + 1..],
             None => "",
         };
-        let mut a = Args { v: [0; MAXARGS], b: [&[]; MAXARGS] };
-        let mut fds = [0i32; 8];
-        let mut nfd = 0usize;
-        let end = msg.len();
-        let mut c = 8usize;
-        let mut k = 0usize;
-        for ch in sig.bytes() {
-            if ch == b'?' {
-                continue;
-            }
-            if k >= MAXARGS {
-                fatal("malformed event arguments");
-            }
-            if ch == b'h' {
-                let fd = self.w.pop_fd();
-                a.v[k] = fd as u32 as u64;
-                if nfd < 8 {
-                    fds[nfd] = fd;
-                    nfd += 1;
-                }
-                k += 1;
-                continue;
-            }
-            if c + 4 > end {
-                fatal("malformed event arguments");
-            }
-            let v = rd32(msg, c);
-            match ch {
-                b's' => {
-                    c += 4;
-                    if v != 0 {
-                        let n = v as usize;
-                        let next = c + ((n + 3) & !3);
-                        if next > end || msg[c + n - 1] != 0 {
-                            fatal("malformed event arguments");
-                        }
-                        a.v[k] = 1;
-                        a.b[k] = cstr(&msg[c..c + n]);
-                        c = next;
-                    }
-                }
-                b'a' => {
-                    let n = v as usize;
-                    let next = c + 4 + ((n + 3) & !3);
-                    if next > end {
-                        fatal("malformed event arguments");
-                    }
-                    a.v[k] = 1;
-                    a.b[k] = &msg[c + 4..c + 4 + n];
-                    c = next;
-                }
-                b'i' => {
-                    a.v[k] = v as i32 as i64 as u64;
-                    c += 4;
-                }
-                _ => {
-                    a.v[k] = v as u64; // u f o n
-                    c += 4;
-                }
-            }
-            k += 1;
-        }
+        let w = &mut self.w;
+        let Ok((a, fds, nfd)) = decode_args(sig, msg, || Some(w.pop_fd())) else { fatal("malformed event arguments") };
         if self.w.debug {
             self.w.trace(msg, ev.sig, false);
         }
         match ev.h {
             Some(h) if !zombie => h(self, id, &a, udata),
+            // a zombie's (or a handler-less event's) descriptors are ours to close
             _ => {
                 for &fd in &fds[..nfd] {
                     sys_close(fd);
@@ -888,6 +829,76 @@ impl Wl {
         }
         true
     }
+}
+
+/// the arguments of one event message (`msg`: header and body) after the signature `sig`
+/// ("iuo?sa h" letters; '?' marks a nullable argument) -> the arguments, the descriptors they
+/// took (`fd()` gives the next received one) and their count; Err for a message that does not
+/// hold what the signature says (a string without its NUL, an argument past the end, more than
+/// MAXARGS arguments).  Strings and arrays borrow from `msg`.  Pure: the fuzz checks call it
+/// with any bytes (plat::fuzz::wl_args)
+pub(crate) fn decode_args<'m>(sig: &str, msg: &'m [u8], mut fd: impl FnMut() -> Option<i32>) -> Result<(Args<'m>, [i32; MAXARGS], usize), ()> {
+    let mut a = Args { v: [0; MAXARGS], b: [&[]; MAXARGS] };
+    let mut fds = [0i32; MAXARGS];
+    let mut nfd = 0usize;
+    let end = msg.len();
+    let mut c = 8usize;
+    let mut k = 0usize;
+    for ch in sig.bytes() {
+        if ch == b'?' {
+            continue;
+        }
+        if k >= MAXARGS {
+            return Err(());
+        }
+        if ch == b'h' {
+            let f = fd().ok_or(())?;
+            a.v[k] = f as u32 as u64;
+            fds[nfd] = f;
+            nfd += 1;
+            k += 1;
+            continue;
+        }
+        if c + 4 > end {
+            return Err(());
+        }
+        let v = rd32(msg, c);
+        match ch {
+            b's' => {
+                c += 4;
+                if v != 0 {
+                    let n = v as usize;
+                    let next = c.checked_add((n.checked_add(3).ok_or(())?) & !3).ok_or(())?;
+                    if next > end || msg[c + n - 1] != 0 {
+                        return Err(());
+                    }
+                    a.v[k] = 1;
+                    a.b[k] = cstr(&msg[c..c + n]);
+                    c = next;
+                }
+            }
+            b'a' => {
+                let n = v as usize;
+                let next = (c + 4).checked_add((n.checked_add(3).ok_or(())?) & !3).ok_or(())?;
+                if next > end {
+                    return Err(());
+                }
+                a.v[k] = 1;
+                a.b[k] = &msg[c + 4..c + 4 + n];
+                c = next;
+            }
+            b'i' => {
+                a.v[k] = v as i32 as i64 as u64;
+                c += 4;
+            }
+            _ => {
+                a.v[k] = v as u64; // u f o n
+                c += 4;
+            }
+        }
+        k += 1;
+    }
+    Ok((a, fds, nfd))
 }
 
 // ------------------------------------------------------------------ handlers

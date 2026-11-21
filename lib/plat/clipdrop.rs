@@ -327,3 +327,75 @@ pub fn clipimg_split(data: &[u8]) -> Option<(&[u8], &[u8])> {
     }
     Some((parts[0], parts[1]))
 }
+
+/// the paths of a DROPFILES block (CF_HDROP of another program: wide or ANSI), at most `max`;
+/// the empty string ends the list, an offset outside the block gives none.  Windows' drops; on
+/// every OS for the fuzz checks
+pub(crate) fn hdrop_list(b: &[u8], max: usize) -> Vec<alloc::string::String> {
+    const DROPFILES_SIZE: usize = 20;
+    let mut paths = Vec::new();
+    if b.len() < DROPFILES_SIZE {
+        return paths;
+    }
+    let off = u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize;
+    let wide = u32::from_le_bytes([b[16], b[17], b[18], b[19]]) != 0;
+    if off < DROPFILES_SIZE || off > b.len() {
+        return paths;
+    }
+    if wide {
+        let units: Vec<u16> = b[off..].chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+        for p in units.split(|&u| u == 0) {
+            if p.is_empty() || paths.len() >= max {
+                break;
+            }
+            paths.push(alloc::string::String::from_utf16_lossy(p));
+        }
+    } else {
+        for p in b[off..].split(|&c| c == 0) {
+            if p.is_empty() || paths.len() >= max {
+                break;
+            }
+            paths.push(alloc::string::String::from_utf8_lossy(p).into_owned());
+        }
+    }
+    paths
+}
+
+/// CF_UNICODETEXT of another program: UTF-16 up to the NUL (or the end of the block) -> UTF-8,
+/// "\r\n" -> "\n", bad surrogates -> U+FFFD (None: no room for it).  Windows' clipboard; on every OS for
+/// the fuzz checks
+pub(crate) fn clip_wide_text(b: &[u8]) -> Option<Vec<u8>> {
+    let n = b.chunks_exact(2).position(|c| c == [0, 0]).unwrap_or(b.len() / 2);
+    let mut w: Vec<u16> = Vec::new();
+    w.try_reserve_exact(n).ok()?;
+    w.extend(b.chunks_exact(2).take(n).map(|c| u16::from_le_bytes([c[0], c[1]])));
+    let mut out = Vec::new();
+    out.try_reserve(w.len().saturating_mul(3)).ok()?;
+    let mut i = 0;
+    while i < w.len() {
+        let c = w[i] as u32;
+        if c == 13 && i + 1 < w.len() && w[i + 1] == 10 {
+            i += 1; // "\r\n" -> "\n"
+            continue;
+        }
+        let cp;
+        if c & 0xFC00 == 0xD800 {
+            if i + 1 >= w.len() {
+                cp = 0xFFFD; // high surrogate at the very end
+                i += 1;
+            } else if w[i + 1] as u32 & 0xFC00 == 0xDC00 {
+                cp = 0x10000 + ((c - 0xD800) << 10) + (w[i + 1] as u32 - 0xDC00);
+                i += 2;
+            } else {
+                cp = 0xFFFD;
+                i += 1;
+            }
+        } else {
+            cp = if c & 0xFC00 == 0xDC00 { 0xFFFD } else { c };
+            i += 1;
+        }
+        let mut b4 = [0u8; 4];
+        out.extend_from_slice(char::from_u32(cp).unwrap_or('\u{FFFD}').encode_utf8(&mut b4).as_bytes());
+    }
+    Some(out)
+}

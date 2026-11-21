@@ -405,7 +405,7 @@ fn encode(m: &Msg, serial: u32) -> Vec<u8> {
 
 // a message decode does not take
 #[derive(Debug, PartialEq)]
-enum Bad {
+pub(crate) enum Bad {
     /// not D-Bus framing: the connection must close
     Fatal,
     /// framed but too large or not readable here (big-endian, a type or depth this reader does
@@ -415,8 +415,8 @@ enum Bad {
     Skip(usize),
 }
 
-// one message from the start of b -> (message, its length); None: incomplete
-fn decode(b: &[u8]) -> Result<Option<(Msg, usize)>, Bad> {
+// one message from the start of b -> (message, its length); None: incomplete (plat::fuzz::dbus too)
+pub(crate) fn decode(b: &[u8]) -> Result<Option<(Msg, usize)>, Bad> {
     if b.len() < 16 {
         return Ok(None);
     }

@@ -57,6 +57,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   browser, Android, iOS) window 0's place and size follow the host alone: `win_set_rect(0, ..)`,
   `WCMD_MAXIMIZE` and `WCMD_RESTORE` leave it.
 - The PDF streams of `print` are compressed with `compress::zlib` without any hook (the same bytes as with the hook that ui set until now); before, a program without ui wrote uncompressed streams. The hook goes through a lock instead of an `unsafe` transmute.
+- The readers of other programs' data that only Windows used, CF_UNICODETEXT and the DROPFILES block of a drop, are portable code (clipdrop.rs) and run through the fuzz checks on every OS; Windows' clipboard and drops read the same as before. plat::fuzz (hidden, no API) reaches these readers, the D-Bus decoder and the Wayland event decoder with any bytes
 
 ### Deprecated
 
@@ -97,6 +98,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Android: a text longer than 256 KiB goes to the keyboard as a window of 192 KiB around the caret, and its edits are put back into the whole text: such a text gave the keyboard no copy, and its next key replaced the text by an old one.
 - Windows: files and folders made by `fs::write_file_private` and `fs::mkdir_private` grant the user the process runs as by name, besides SYSTEM, the administrators and the owner. Made by a process run as administrator, their owner is the administrators' group, and the same user without administrator rights could no longer open them.
 - iOS: a text box of no width or height no longer panics when UIKit asks for the position at a point (VoiceOver, the space bar's trackpad): clamp got a minimum above its maximum.
+- Wayland: an event for an object that is already gone closed only the first 8 of its file descriptors, the rest stayed open; every one is closed now. The event arguments are decoded by a pure function (decode_args), which the fuzz checks reach; a message that does not hold what its signature says ends the connection as before (ROADMAP section 13, U6)
 
 ### Security
 
