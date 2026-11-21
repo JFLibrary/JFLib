@@ -160,30 +160,46 @@ pub(crate) fn ct_mask(m: u64) -> u64 {
     core::hint::black_box(m)
 }
 
-/// lower-case hex
+/// lower-case hex (without a table: keys are printed this way too)
 pub fn hex(data: &[u8]) -> String {
-    const D: &[u8; 16] = b"0123456789abcdef";
     let mut s = String::with_capacity(data.len() * 2);
-    for b in data {
-        s.push(D[(b >> 4) as usize] as char);
-        s.push(D[(b & 15) as usize] as char);
+    for &b in data {
+        for n in [b >> 4, b & 15] {
+            // '0' + n, and 'a' - '0' - 10 more above 9
+            let above9 = ct_mask(((9i32 - n as i32) >> 31) as u32 as u64) as u8;
+            s.push((b'0' + n + (above9 & (b'a' - b'0' - 10))) as char);
+        }
     }
     s
 }
 
-/// the bytes of a hex string (upper or lower case; None on odd length or other characters)
+/// the bytes of a hex string (upper or lower case; None on odd length or other characters).
+/// Every character is looked at before the answer, without a branch on it
 pub fn unhex(s: &str) -> Option<Vec<u8>> {
     let b = s.as_bytes();
     if b.len() % 2 != 0 {
         return None;
     }
-    let nib = |c: u8| match c {
-        b'0'..=b'9' => Some(c - b'0'),
-        b'a'..=b'f' => Some(c - b'a' + 10),
-        b'A'..=b'F' => Some(c - b'A' + 10),
-        _ => None,
+    // (value, all ones when c is a hex digit)
+    let nib = |c: u8| -> (u8, u8) {
+        let c = c as i32;
+        let range = |lo: i32, hi: i32| ct_mask((((lo - 1 - c) & (c - hi - 1)) >> 31) as u32 as u64) as u8;
+        let (dig, low, up) = (range(48, 57), range(97, 102), range(65, 70));
+        let v = (dig & (c - 48) as u8) | (low & (c - 87) as u8) | (up & (c - 55) as u8);
+        (v, dig | low | up)
     };
-    b.chunks(2).map(|p| Some(nib(p[0])? << 4 | nib(p[1])?)).collect()
+    let mut good = 0xFFu8;
+    let mut out = Vec::with_capacity(b.len() / 2);
+    for p in b.chunks(2) {
+        let ((hi, a), (lo, z)) = (nib(p[0]), nib(p[1]));
+        good &= a & z;
+        out.push(hi << 4 | lo);
+    }
+    if good == 0 {
+        zeroize(&mut out);
+        return None;
+    }
+    Some(out)
 }
 
 #[inline(always)]

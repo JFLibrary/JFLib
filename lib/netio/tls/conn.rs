@@ -305,6 +305,8 @@ pub struct Conn {
     pms: Option<[u8; 32]>,
     master12: [u8; 48],
     rd_next: Option<Cipher>,
+    /// counts the changes of the read key (set_rd): handshake data must not cross one
+    rd_epoch: u32,
     /// the group of our key share (X25519, or P-256 when the server asks for it)
     group: u16,
     eph256: [u8; 32],
@@ -346,6 +348,7 @@ impl Conn {
             pms: None,
             master12: [0; 48],
             rd_next: None,
+            rd_epoch: 0,
             group: X25519,
             eph256: [0; 32],
         }
@@ -500,6 +503,12 @@ impl Conn {
         Cipher::for_suite(self.suite, &k, &iv, false).ok_or(fail(AL_INTERNAL_ERROR, "suite"))
     }
 
+    /// the new read key (every change counts, see handshake_bytes)
+    fn set_rd(&mut self, c: Option<Cipher>) {
+        self.rd = c;
+        self.rd_epoch = self.rd_epoch.wrapping_add(1);
+    }
+
     /// bytes from the peer
     pub fn feed(&mut self, data: &[u8]) -> Result<(), TlsError> {
         if self.state == State::Closed {
@@ -547,7 +556,8 @@ impl Conn {
                     if body != [1] || self.state != State::Client12Ccs {
                         return Err(fail(AL_UNEXPECTED_MESSAGE, "change_cipher_spec"));
                     }
-                    self.rd = self.rd_next.take();
+                    let next = self.rd_next.take();
+                    self.set_rd(next);
                     self.state = State::Client12Fin;
                 }
                 CHANGE_CIPHER_SPEC => {
@@ -630,10 +640,11 @@ impl Conn {
             }
             let msg: Vec<u8> = self.hs[..4 + n].to_vec();
             self.hs.drain(..4 + n);
-            let keys_before = self.rd.is_some();
+            let epoch = self.rd_epoch;
             self.message(&msg)?;
-            // a key change must fall on a record boundary
-            if self.rd.is_some() != keys_before && !self.hs.is_empty() {
+            // a key change must fall on a record boundary (RFC 8446 5.1): the first keys, the
+            // application keys after Finished and every KeyUpdate
+            if self.rd_epoch != epoch && !self.hs.is_empty() {
                 return Err(fail(AL_UNEXPECTED_MESSAGE, "handshake data across a key change"));
             }
         }
@@ -711,7 +722,8 @@ impl Conn {
                     return Err(fail(AL_DECRYPT_ERROR, "client Finished"));
                 }
                 self.add(msg);
-                self.rd = Some(self.cipher13(&self.c_ap.clone())?);
+                let c = self.cipher13(&self.c_ap.clone())?;
+                self.set_rd(Some(c));
                 self.state = State::Established;
                 Ok(())
             }
@@ -779,7 +791,8 @@ impl Conn {
                 let peer_secret = if self.server { &mut self.c_ap } else { &mut self.s_ap };
                 *peer_secret = keysched::update(peer_secret);
                 let ps = *peer_secret;
-                self.rd = Some(self.cipher13(&ps)?);
+                let c = self.cipher13(&ps)?;
+                self.set_rd(Some(c));
                 if requested == 1 {
                     let msg = hs_msg(HS_KEY_UPDATE, &[0]);
                     let rec = self.wr.as_mut().ok_or(TlsError::Closed)?.seal(HANDSHAKE, &msg);
@@ -921,7 +934,8 @@ impl Conn {
         let shared = self.ecdhe(self.group, pk)?;
         self.add(msg);
         self.handshake_keys(&shared);
-        self.rd = Some(self.cipher13(&self.s_hs.clone())?);
+        let c = self.cipher13(&self.s_hs.clone())?;
+        self.set_rd(Some(c));
         self.state = State::ClientEe;
         Ok(())
     }
@@ -982,7 +996,8 @@ impl Conn {
         let m = hs_msg(HS_FINISHED, &fin);
         self.send_hs(&m);
         self.wr = Some(self.cipher13(&self.c_ap.clone())?);
-        self.rd = Some(self.cipher13(&self.s_ap.clone())?);
+        let c = self.cipher13(&self.s_ap.clone())?;
+        self.set_rd(Some(c));
         self.state = State::Established;
         Ok(())
     }
@@ -1184,7 +1199,8 @@ impl Conn {
         self.send_hs(&sh);
         self.handshake_keys(&shared);
         self.wr = Some(self.cipher13(&self.s_hs.clone())?);
-        self.rd = Some(self.cipher13(&self.c_hs.clone())?);
+        let c = self.cipher13(&self.c_hs.clone())?;
+        self.set_rd(Some(c));
         // EncryptedExtensions
         let ee = hs_msg(HS_ENCRYPTED_EXTENSIONS, &[0, 0]);
         self.send_hs(&ee);

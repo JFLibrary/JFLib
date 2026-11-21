@@ -119,6 +119,14 @@ const TARGETS: &[&str] = &[
     "blake2b_keyed",
     "blake3_keyed",
     "argon2id",
+    "b64_encode",
+    "b64_decode",
+    "hex",
+    "unhex",
+    #[cfg(feature = "netio")]
+    "pem_pkcs8_key",
+    #[cfg(feature = "netio")]
+    "ssh_private_key",
 ];
 
 /// the operation of a target with the inputs of one secret, prepared outside the trace
@@ -317,6 +325,43 @@ fn prepare(name: &str, seed: u64) -> Op {
                 let mut out = [0u8; 32];
                 black_box(argon2::argon2id(black_box(&pw), b"saltsaltsalt", &p, &mut out));
                 black_box(out);
+            })
+        }
+        // keys as text: PEM, OpenSSH key files, PHC strings, hex keys (the encoded strings of
+        // different secrets have the same length)
+        "b64_encode" => Box::new(move || {
+            black_box(b64::encode(black_box(&s[..48])));
+        }),
+        "b64_decode" => {
+            let text = b64::encode(&s[..47]);
+            Box::new(move || {
+                black_box(b64::decode(black_box(&text)));
+            })
+        }
+        "hex" => Box::new(move || {
+            black_box(hex(black_box(&k)));
+        }),
+        "unhex" => {
+            let text = hex(&k);
+            Box::new(move || {
+                black_box(unhex(black_box(&text)));
+            })
+        }
+        // a private key from its PEM file (PKCS #8, as BackupCraft's keys)
+        #[cfg(feature = "netio")]
+        "pem_pkcs8_key" => {
+            let text = netio::pem::encode("PRIVATE KEY", &netio::x509::ed25519_pkcs8(&k));
+            Box::new(move || {
+                let der = netio::pem::decode(black_box(&text), "PRIVATE KEY").expect("pem");
+                black_box(netio::x509::ed25519_from_pkcs8(&der));
+            })
+        }
+        // an OpenSSH key file (netio's SSH client logs in with it)
+        #[cfg(feature = "netio")]
+        "ssh_private_key" => {
+            let text = netpkt::ssh::KeyPair::ed25519(&k).private_file("probe");
+            Box::new(move || {
+                black_box(netio::ssh::private_key(black_box(&text)).map(|kp| kp.public));
             })
         }
         _ => {

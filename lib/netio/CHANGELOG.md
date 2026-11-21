@@ -24,6 +24,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - `ssh`: `private_key` overwrites the key file's decoded bytes and text, `auth_password` the message with the password, once used.
 - `x509::Cert::verify` reads an ECDSA signature (certificates, TLS CertificateVerify) strictly as DER: nothing after the SEQUENCE or in it after s, r and s in the shortest form of a non-negative INTEGER. Bytes appended to the signature and zeros put before r or s were accepted, so a CA-signed certificate could be re-encoded into copies with other fingerprints that still validated (no forgery; Wycheproof's InvalidEncoding cases, tools/wycheproof_check.py now without a failure)
+- TLS refuses handshake data that crosses any change of the read key (RFC 8446 5.1): the application keys after Finished and those of a KeyUpdate count too; before, only the first keys did
 
 ## [0.2.1] - 2026-11-16
 

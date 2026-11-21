@@ -2,7 +2,8 @@
     python tools/ct_check.py [--opt release,dev,o3,s,z] [--only T,..] [--seeds N] [--crypto DIR] [--step]
 Builds tools/ct_check/probe.rs against lib/crypto (or the crate in DIR) at each optimization level
 below and lets it run every operation of its list (X25519, Ed25519, P-256, EAP-PWD, the RSA / DH
-exponentiation, the AEADs, AES, MACs, KDFs, Argon2id ...) with SEEDS different secrets under
+exponentiation, the AEADs, AES, MACs, KDFs, Argon2id, Base64 and hex, and with this
+repository's crypto the key files of netio: PEM / PKCS #8 and OpenSSH) with SEEDS different secrets under
 ptrace.  An operation fails when two secrets take different branches or jump-table entries; the
 report names the function and the line where the paths part (addr2line).
   release  opt-level 2, fat LTO, one codegen unit (JFLib's release, Cargo.toml)
@@ -59,10 +60,22 @@ def package_name(crate_dir):
 
 
 def build(level, crate_dir, label):
-    """the probe at one level -> path of the binary"""
+    """the probe at one level -> path of the binary; with this repository's crypto also the
+    targets of netio and netpkt (key files), which link that crypto"""
     d = OUT / f"{label}-{level}"
     d.mkdir(parents=True, exist_ok=True)
     prof = "\n".join(f"{k} = {v}" for k, v in LEVELS[level].items())
+    lib = ROOT / "lib"
+    own = label == "lib"
+    extra = f"""rt = {{ package = "jflib-rt", path = "{(lib / 'rt').as_posix()}", features = ["std"], optional = true }}
+plat = {{ package = "jflib-plat", path = "{(lib / 'plat').as_posix()}", features = ["std"], optional = true }}
+netio = {{ package = "jflib-netio", path = "{(lib / 'netio').as_posix()}", optional = true }}
+netpkt = {{ package = "jflib-netpkt", path = "{(lib / 'netpkt').as_posix()}", optional = true }}
+
+[features]
+default = [{'"netio"' if own else ''}]
+netio = ["dep:rt", "dep:plat", "dep:netio", "dep:netpkt"]
+"""
     (d / "Cargo.toml").write_text(f"""# written by tools/ct_check.py
 [package]
 name = "ct-probe"
@@ -78,7 +91,7 @@ path = "{PROBE.as_posix()}"
 
 [dependencies]
 crypto = {{ package = "{package_name(crate_dir)}", path = "{crate_dir.as_posix()}" }}
-
+{extra}
 [profile.release]
 {prof}
 panic = "abort"
