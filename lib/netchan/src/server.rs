@@ -9,6 +9,7 @@
 //   server.poll() -> Option<ServerEvent>   send(id, payload) -> seq   disconnect(id)
 //   server.wait(ms)                        sleep until something arrives (a loop without a tick)
 //   connections() / ids() / stats(id) / peer(id) / server_stats() / stop()
+//   set_static_key(secret) / public_key()  the key clients may pin (ClientConfig::server_key)
 //
 // Threads: one reads the UDP socket; each WebSocket has a reading one (netio's thread of the
 // upgrade) and a writing one, so neither a full socket buffer nor a slow client holds the
@@ -229,8 +230,10 @@ impl Server {
             ..nws::Limits::default()
         };
         let sh = Arc::new(Shared { tx, links: Mutex::new(BTreeMap::new()), next_stream: AtomicU32::new(1), acceptor: nws::Acceptor::new(lim), stop: AtomicBool::new(false) });
-        let secret = plat::random_bytes::<32>();
-        Server { core: ServerCore::new(cfg, secret, plat::time_us()), sh, rx, udp: None, http: None }
+        let mut secret = plat::random_bytes::<32>();
+        let core = ServerCore::new(cfg, secret, plat::time_us());
+        crypto::zeroize(&mut secret);
+        Server { core, sh, rx, udp: None, http: None }
     }
 
     /// listen for UDP clients on `addr` (port 0: a free one) -> the address it got
@@ -380,6 +383,18 @@ impl Server {
     pub fn disconnect(&mut self, id: u32) {
         self.core.disconnect(id, packet::BYE_NORMAL);
         self.flush();
+    }
+
+    /// a long-lived X25519 secret (32 random bytes the app made once and keeps): clients with its
+    /// public key in ClientConfig::server_key can tell this server from anyone in its place
+    /// (endpoint::ServerCore::set_static_key)
+    pub fn set_static_key(&mut self, secret: [u8; 32]) {
+        self.core.set_static_key(secret);
+    }
+
+    /// the public key of set_static_key, for the clients
+    pub fn public_key(&self) -> Option<[u8; 32]> {
+        self.core.public_key()
     }
 
     /// connections now

@@ -1807,7 +1807,7 @@ Fensterrand hinaus.
 - **P3** · *fehlt* · G7b: der Weg des Spielfensters (entscheidet der Nutzer); im Browser zeichnet eine Ansicht nur rund 30 Bilder/s (`web/worker.js` meldet sich bei einem Zeitgeber von 1 ms nicht als beschäftigt); für Spiele `MIN_PRESENT_US` und das Halten von G5e3 abstimmen, ein Begrenzer in `lib/game`; auf dem Mac ist die GPU-Ausgabe der UI aus (Ansichten lesen zurück); Messungen auf Iris Xe, HD 610 und in echten Linux-Fenstern; der Test „passt“ in `gp_split_draw` legt bei dünnen Rahmen jedes Bild neu an; von Hand: die Faktoren der Mausbewegung, der Raumklang der Demo.
 - **P3** · *erledigt* (2026-11-20) · G7g Teil 2 ([GEOM.md](GEOM.md)): Boolesche Operationen auf konvexen Körpern mit exakten Prädikaten, Abschrägen, `modeltool --watch`, Importe nur aus dem Ordner des Skripts, der Bewertungslauf (fünf Objekte nur nach Bildern).
 - **P3** · *fehlt* · G7g: die Wünsche an JFScript (GEOM.md), erst nach dem Ja des Nutzers; Tempo der Booleschen Operationen bei runden Körpern, ebene Teilflächen zusammenführen, Abschrägen nichtkonvexer Körper; der Beobachtungsmodus von Hand und in echten Fenstern unter Linux und macOS.
-- **P3** · *fehlt* · G7d Teil 2: `wss:` mit dem TLS von `netio` prüfen (im Browser mit einem Zertifikat, dem er traut), Messungen zwischen Rechnern und über WLAN, Grenzen abstimmen; Verschlüsselung über UDP (AEAD, entschieden 2026-11-18); Android mit Netz (netchan baut seit G7e für iOS).
+- **P3** · *fehlt* · G7d Teil 2: `wss:` mit dem TLS von `netio` prüfen (im Browser mit einem Zertifikat, dem er traut), Messungen zwischen Rechnern und über WLAN, Grenzen abstimmen; Android mit Netz (netchan baut seit G7e für iOS). Die Verschlüsselung über UDP ist seit U3 (2026-11-21) gebaut, Abschnitt 13.
 - **P3** · *erledigt* (2026-11-20) · G7e Teil 2 ([NETCODE.md](NETCODE.md)): zuverlässige Ereignisse, Abmelden, geglättete Korrekturen, Räume auf dem Worker-Pool (bitgleich), Raumcodes aus dem kryptographischen Zufall, echtes Netz (Server auf dem Mac im WLAN), der Browser als Client; Spiel 1 nimmt sie.
 - **P3** · *fehlt* · G7e (entschieden 2026-11-19: Lag-Ausgleich 300 ms, der volle Stand eines UDP-Clients nach Priorität aufgefüllt, der WebSocket-Abruf als Option `fetch_full`): ein Lauf mit Fedora als Server, WLAN an beiden Enden, Telefone; Deltas gegen eine Vorhersage; ob WebSocket-Clients den Tick mehr Marge behalten und ob ein UDP-Server ohne `net.connect`-Regel Absendern antworten darf (Fragen an den Nutzer).
 - **P3** · *fehlt* · Später: D3D12-Rückfall, GPU-Rasterung der Widgets.
@@ -2494,12 +2494,16 @@ später.
 
 Sicherheit:
 
-- **P1** · *fehlt* · `netchan`: Verschlüsselung über UDP (AEAD, entschieden 2026-11-18; unter
-  G7d Teil 2 in Abschnitt 8 noch als P3). Heute schützt nur ein 32-Bit-Token
-  ([`netchan/src/endpoint.rs`](../lib/netchan/src/endpoint.rs), „The token is no encryption“): wer
-  den Verkehr sieht, liest mit, schleust Pakete ein und übernimmt Verbindungen. Dazu `packet` und
-  `endpoint` als Fuzz-Ziele in `tools/net_fuzz/targets.rs`, denn
-  sie lesen UDP-Pakete aus dem Internet.
+- **P1** · *erledigt* (2026-11-21, U3) · `netchan`: Verschlüsselung über UDP. Paketformat Version 2: der Handschlag
+  tauscht flüchtige X25519-Schlüssel (RESPONSE, ACCEPT mit einer Bestätigung der Schlüssel), danach ist jedes DATA und
+  DISCONNECT mit ChaCha20-Poly1305 versiegelt, der Kopf authentisiert, die Nonce die volle Paketnummer
+  ([`netchan/src/seal.rs`](../lib/netchan/src/seal.rs), [TRANSPORT.md](TRANSPORT.md) „Verschlüsselung“). Optional ein
+  statischer Schlüssel des Servers, den der Client kennt (`ClientConfig::server_key`, wie Noise NK): dann kann auch
+  niemand auf dem Weg den Server ersetzen. Vorwärtssicher, Schlüssel werden genullt. Geprüft in `nettest` (Mitlesen,
+  jedes gekippte Byte, Fälschungen, Wiederholungen, der statische Schlüssel, ein Server in der Mitte; Fuzzing der
+  versiegelten Pakete); `gametest --netsum` blieb `4118995e45c0c067`. Kosten: 94 µs Server-Zeit je ACCEPT, die Flut über
+  UDP 199 statt 460 MB/s auf einem i7-1165G7. Die Fuzz-Ziele `packet` und `endpoint` für `tools/net_fuzz` gingen an die
+  Sicherheits-Sitzung.
 - **P1** · *fehlt* · Fuzzing der Datei-Parser. `tools/net_fuzz.py` und `tools/cov_fuzz.py` decken
   nur zstd, LZ4, X.509, DNS, HTTP, TLS, die IP-Reassembly und `netpkt` ab. Es fehlen DEFLATE,
   zlib, gzip und Brotli (`compress`), `archive` (ZIP, OPC), `formats::json` (darüber laufen auch

@@ -6,9 +6,11 @@ in one table. Every packet has a sequence number and acknowledges the newest 33 
 received, so the netcode learns which packets arrived over either transport. It is plain Rust,
 without the standard library and without a line of `unsafe` code.
 
-- **UDP** (Windows, Linux, macOS): unreliable and unordered. A connection handshake with a
-  stateless cookie (nothing is kept for an address before it proved that it receives there, and
-  no answer is larger than its request), a random token in every packet, keep-alives and timeouts.
+- **UDP** (Windows, Linux, macOS): unreliable and unordered, and encrypted. A connection
+  handshake with a stateless cookie (nothing is kept for an address before it proved that it
+  receives there, and no answer is larger than its request) agrees on keys of this connection
+  alone (X25519); every packet after it is sealed with ChaCha20-Poly1305. Keep-alives and
+  timeouts.
 - **WebSocket** (everywhere, and the browser's only way): reliable and ordered, over the browser's
   own WebSocket (`plat::net::WebSocket` through the page's host) or netio's on the desktop.
 - **Limits:** the payload of a message (1200 bytes over UDP, 64 KiB over a WebSocket), packets and
@@ -48,9 +50,35 @@ while let Some(event) = server.poll() {
 }
 ```
 
+## Security over UDP
+
+Someone who listens reads nothing, and a packet that was changed, forged or sent again is dropped
+before the game sees it: the payload is encrypted, the header with the sequence number and the
+acks is authenticated with it, and the nonce is the packet's full 64-bit number, so a replay
+fails its tag or is found by the receive window. The keys are new for every connection (ephemeral
+X25519 on both sides), so a key that leaks later does not open what was recorded before.
+
+Ephemeral keys alone do not tell the client who answered: someone on the path could take the
+server's place. Against that the server can have a static key, whose public half the client
+knows (shipped with the game, or from its server list):
+
+```rust
+// once, kept by the server's operator: 32 random bytes
+server.set_static_key(secret);
+let public = server.public_key();       // give this to the clients
+
+// the client: only the holder of the secret can finish the handshake
+let cfg = ClientConfig { protocol: 0x47414d45, server_key: Some(public_key), ..Default::default() };
+```
+
+A client with the wrong key, or a server without one, ends with `Reason::ServerKey`. What stays
+open: clients are not authenticated (that is the game's login), and someone on the path can always
+drop packets. Over a WebSocket the channel has no encryption of its own; `wss://` is it.
+
 `netchan::endpoint` has the protocol of both sides without I/O (`ServerCore`, `ClientCore`, the time
 comes from the caller), for tests on a simulated network and for other transports; `netchan::packet`
-the wire format, `netchan::conn` the sequence numbers and acks.
+the wire format, `netchan::conn` the sequence numbers and acks, `netchan::seal` the keys and the
+seal.
 
 ## Platforms
 

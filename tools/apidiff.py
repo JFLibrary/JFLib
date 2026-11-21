@@ -13,11 +13,24 @@ snapshot's lines of a REPO_ONLY crate (0.1.0 still has plugin's) are left out of
 file walks the modules again to find each item's public paths and keeps the shortest one, so
 moving an item between modules that are glob re-exported (ui's files) changes nothing.
 
+A `pub use` into another crate of CRATES is followed into that crate: the module, item or macro
+it names (`pub use formats::json;`, `pub use compress::{adler32, crc32};`, `pub use
+formats::record;`), also through a name the module imports (`pub use json::Value;` after `pub use
+formats::json;`), gets that crate's lines -- the item's signature, its fields, variants, methods
+and impls, this crate's trait impls for it -- under this crate's path, each item once per crate at
+its shortest path, shown as its own crate shows it (a codec crate's kind decides).  So an item that
+moved to another crate and stays re-exported under its old path is no change.  A re-export
+through which nothing shown is found (a module a codec crate does not show, items a macro writes,
+rt::os of SKIP_FILES) stays a `use` line, and so does one of a crate outside CRATES.  Snapshots up
+to 0.2.1 hold every re-export of another crate as a `use` line: read_snapshot reads such a line
+the same way, as the target's lines of that snapshot (found under the path the use names or,
+where it names an alias such as plat::hotkey::Chord, where the target crate shows the item now).
+
 Snapshot lines (sorted; # starts a comment):  PATH <TAB> KIND <TAB> SIGNATURE <TAB> FLAGS
   KIND   fn, method, const, static, type, macro, struct, union, enum, variant, field, trait,
          trait-fn / trait-const / trait-type (a member of a public trait), impl (a derive or an
          `impl Trait for Type` of a public type; SIGNATURE names the trait), use (a re-export of
-         another crate's item)
+         a crate outside CRATES, or one of a crate of CRATES that shows nothing)
   FLAGS  comma list: windows / linux / apple (the item's cfg), deprecated, provided (a trait member with a
          default), all-pub (a struct whose fields are all public), non-exhaustive
 A line's identity is PATH, KIND, its cfg and, for impl, the trait; signatures compare without
@@ -240,107 +253,227 @@ def impl_head(sig):
     return s
 
 
+def api_crates():
+    """{name: kind}: the crates of the public API (gendoc's CRATES but REPO_ONLY)"""
+    return {name: kind for name, _title, kind in gendoc.CRATES if name not in gendoc.REPO_ONLY}
+
+
+def exported_macros(crate):
+    """[(macro, module)]: a crate's #[macro_export] macros (another crate names them at its root)"""
+    return [(it, m) for m in crate.all_modules() for it in m.items if gendoc.is_exported_macro(it)]
+
+
+def strip_self(segs):
+    """`use a::b::{self}` names a::b"""
+    return segs[:-1] if len(segs) > 1 and segs[-1] == "self" else segs
+
+
 class PathWalk:
-    """the public paths of a crate's items: id(item) -> (item, module, {paths}); external
-    re-exports: [(path, text, module)]"""
+    """the public paths of a crate's items, the items of the other crates of CRATES it re-exports
+    included: id(item) -> (item, module, {paths}, crate); re-exports of crates outside CRATES:
+    external [(path, text, module)]; steps into another crate of CRATES: foreign [(path, text,
+    module, {id(item) found through it})] (its `use` line when none of them is shown)"""
 
     def __init__(self, crate):
         self.c = crate
-        self.skip = gendoc.SKIP_FILES.get(crate.name, set())
+        self.crates = api_crates()
         self.items = {}
         self.external = []
-        self.seen = set()
-        self.export(crate.root, crate.name)
+        self.foreign = []
+        self.seen = {}                  # (id(module), path) -> {id(item)} exported there
+        self.trace = []                 # the id sets that collect what add() adds (seen, foreign)
+        self.export(crate, crate.root, crate.name)
 
-    def skipped(self, mod):
+    @staticmethod
+    def skipped(c, mod):
         """a module of SKIP_FILES (rt::os: the OS calls plat is built on) or inside one"""
+        skip = gendoc.SKIP_FILES.get(c.name, set())
         while mod is not None:
-            if mod.path.name in self.skip:
+            if mod.path.name in skip:
                 return True
             mod = mod.parent
         return False
 
-    def add(self, it, mod, path):
-        self.items.setdefault(id(it), (it, mod, set()))[2].add(path)
+    def add(self, it, mod, path, c):
+        self.items.setdefault(id(it), (it, mod, set(), c))[2].add(path)
+        for ids in self.trace:
+            ids.add(id(it))
 
-    def export(self, mod, path):
-        """mod's public names are visible as path::NAME"""
+    def export(self, c, mod, path):
+        """the public names of mod (a module of crate c) are visible as path::NAME"""
         key = (id(mod), path)
-        if key in self.seen or self.skipped(mod):
+        if key in self.seen:
+            for ids in self.trace:
+                ids |= self.seen[key]
             return
-        self.seen.add(key)
-        for it in mod.items:
-            if gendoc.is_exported_macro(it):
-                self.add(it, mod, f"{self.c.name}::{it.name}")
-            elif it.vis == "pub" and it.kind != "impl" and it.name:
-                self.add(it, mod, f"{path}::{it.name}")
-        for name, variants in mod.children.items():
-            for ch in variants:
-                if ch.vis == "pub":
-                    self.export(ch, f"{path}::{name}")
-        for vis, trees, text in mod.uses:
-            if vis != "pub":
-                continue
-            for segs, alias, glob in trees:
-                for target, rest in self.c.resolve(mod, segs):     # one per cfg variant on the way
-                    if target is None:
-                        name = "*" if glob else (alias or (segs[-1] if segs else ""))
-                        if name and name != "self":
-                            self.external.append((f"{path}::{name}", "::".join(segs) + ("::*" if glob else ""), mod))
-                    elif glob and not rest:
-                        self.export(target, path)
-                    elif not glob and len(rest) == 1:
-                        self.mark(target, rest[0], f"{path}::{alias or rest[0]}")
-                    elif not glob and not rest:
-                        self.export(target, f"{path}::{alias or segs[-1]}")
+        if self.skipped(c, mod):
+            return
+        self.seen[key] = got = set()
+        self.trace.append(got)
+        try:
+            for it in mod.items:
+                if gendoc.is_exported_macro(it):
+                    if c is self.c:                         # another crate's: at that crate's root only
+                        self.add(it, mod, f"{c.name}::{it.name}", c)
+                elif it.vis == "pub" and it.kind != "impl" and it.name:
+                    self.add(it, mod, f"{path}::{it.name}", c)
+            if c is not self.c and mod is c.root:           # pub use dep::*: dep's macros come along
+                for it, m in exported_macros(c):
+                    self.add(it, m, f"{path}::{it.name}", c)
+            for name, variants in mod.children.items():
+                for ch in variants:
+                    if ch.vis == "pub":
+                        self.export(c, ch, f"{path}::{name}")
+            for vis, trees, text in mod.uses:
+                if vis == "pub":
+                    for segs, alias, glob in trees:
+                        self.reexport(c, mod, strip_self(segs), alias, glob, path)
+        finally:
+            self.trace.pop()
 
-    def mark(self, mod, name, path, depth=0):
-        """the item `name` of mod, re-exported as path"""
+    def reexport(self, c, mod, segs, alias, glob, path):
+        """the `pub use segs` of mod (crate c), its names visible as path::NAME"""
+        name = "*" if glob else (alias or (segs[-1] if segs else ""))
+        if not name or name in ("self", "_"):
+            return
+        dest = f"{path}::{name}"
+        for tc, target, rest, via in self.targets(c, mod, segs):     # one per cfg variant on the way
+            if tc is None:
+                self.external.append((dest, "::".join(segs) + ("::*" if glob else ""), mod))
+            elif glob and not rest:
+                self.cross(c, tc, (dest, via, mod, glob), self.export, tc, target, path)
+            elif not glob and len(rest) == 1:
+                self.cross(c, tc, (dest, via, mod, glob), self.mark, tc, target, rest[0], dest)
+            elif not glob and not rest:
+                self.cross(c, tc, (dest, via, mod, glob), self.export, tc, target, dest)
+
+    def cross(self, c, tc, record, fn, *args):
+        """fn(*args); a step from crate c into another one (tc) goes into foreign with what it found
+        (record: (path, the use path where the other crate was entered, module, glob), or None)"""
+        if tc is c:
+            fn(*args)
+            return
+        ids = set()
+        self.trace.append(ids)
+        try:
+            fn(*args)
+        finally:
+            self.trace.pop()
+        if record:
+            path, via, mod, glob = record
+            self.foreign.append((path, "::".join(via) + ("::*" if glob else ""), mod, ids))
+
+    def targets(self, c, mod, segs, depth=0, via=None):
+        """[(crate, module, rest, via)] for a use path of mod in crate c, one per cfg variant of
+        the modules on the way.  A name the module imports is followed (`use formats::json;`
+        then `pub use json::Value;`), and so is the name of another crate of CRATES (via: the
+        use path where it was entered, None while in c); (None, None, segs, None): a crate
+        outside CRATES"""
+        if depth > 8:
+            return [(None, None, segs, None)]
+        res = c.resolve(mod, segs)
+        if res[0][0] is None:                               # segs[0] names no module of mod
+            imp = self.imported(mod, segs[0])
+            if imp:
+                return self.targets(c, mod, imp + segs[1:], depth + 1, via)
+            if segs[0] in self.crates and segs[0] != c.name:
+                dep = gendoc.load_crate(segs[0])
+                return self.targets(dep, dep.root, ["crate"] + segs[1:], depth + 1, via or segs)
+            return [(None, None, segs, None)]
+        out = []
+        for target, rest in res:
+            imp = self.imported(target, rest[0]) if len(rest) > 1 else None
+            if imp:                                         # a::b::C with `pub use x::b;` in a
+                out += self.targets(c, target, imp + rest[1:], depth + 1, via)
+            else:
+                out.append((c, target, rest, via))
+        return out
+
+    @staticmethod
+    def imported(mod, name):
+        """the path a `use` of mod (not a glob) brings in as `name`, or None"""
+        for _vis, trees, _text in mod.uses:
+            for segs, alias, glob in trees:
+                segs = strip_self(segs)
+                if not glob and segs and (alias or segs[-1]) == name and segs != [name]:
+                    return list(segs)
+        return None
+
+    def mark(self, c, mod, name, path, depth=0):
+        """the item `name` of mod (a module of crate c), re-exported as path"""
+        if c is not self.c and self.skipped(c, mod):       # plat's `pub use rt::os::exit`: a use line
+            return
         found = False
         for it in mod.items:
             if it.name == name and it.kind != "impl":
-                self.add(it, mod, path)
+                self.add(it, mod, path, c)
                 found = True
+        if mod is c.root:                                   # pub use dep::some_macro
+            for it, m in exported_macros(c):
+                if it.name == name:
+                    self.add(it, m, path, c)
+                    found = True
         for ch in mod.children.get(name, ()):
-            self.export(ch, path)
+            self.export(c, ch, path)
             found = True
         if found or depth > 8:
             return
         for vis, trees, text in mod.uses:
             for segs, alias, glob in trees:
-                for target, rest in self.c.resolve(mod, segs):
-                    if target is None:
-                        if not glob and (alias or (segs[-1] if segs else "")) == name:
+                segs = strip_self(segs)
+                if not glob and (alias or (segs[-1] if segs else "")) != name:
+                    continue
+                for tc, target, rest, via in self.targets(c, mod, segs):
+                    if tc is None:
+                        if not glob:
                             self.external.append((path, "::".join(segs), mod))
-                        continue
-                    if glob and not rest:
-                        self.mark(target, name, path, depth + 1)
-                    elif not glob and len(rest) == 1 and (alias or rest[0]) == name:
-                        self.mark(target, rest[0], path, depth + 1)
+                    elif glob and not rest:
+                        self.cross(c, tc, None, self.mark, tc, target, name, path, depth + 1)
+                    elif not glob and len(rest) == 1:
+                        self.cross(c, tc, (path, via, mod, False), self.mark, tc, target, rest[0], path, depth + 1)
+                    elif not glob and not rest:
+                        self.cross(c, tc, (path, via, mod, False), self.export, tc, target, path)
 
 
 def best(paths):
     return min(paths, key=lambda p: (p.count("::"), p))
 
 
-def crate_lines(crate, kind="full"):
-    """the snapshot lines of one crate: [(path, kind, sig, flags)]"""
-    walk = PathWalk(crate)
-    extra = gendoc.CODEC_EXTRA.get(crate.name, {})
-    shown = {}                                      # id(item) -> (item, module, path)
-    for it, mod, paths in walk.items.values():
-        if hidden(it):
-            continue
-        if kind == "codec" and not (mod is crate.root or id(it) in crate.rexp
-                                    or extra.get(mod.name) == "*" or it.name in extra.get(mod.name, [])):
-            continue
-        shown[id(it)] = (it, mod, best(paths))
-    types = {}                                      # name -> [(module, path)]
-    for it, mod, path in shown.values():
-        if it.kind in TYPE_KINDS:
-            types.setdefault(it.name, []).append((mod, path))
+def shows(c, it, mod, kind):
+    """whether the public item `it` of crate c (of `kind` in CRATES) is in the snapshot"""
+    if hidden(it):
+        return False
+    if kind != "codec":
+        return True
+    extra = gendoc.CODEC_EXTRA.get(c.name, {})
+    return mod is c.root or id(it) in c.rexp or extra.get(mod.name) == "*" or it.name in extra.get(mod.name, [])
+
+
+def mod_path(mod):
+    """('crate', 'a', 'b') for crate::a::b (the cfg variants of a module share it)"""
     out = []
-    for it, mod, path in shown.values():
+    while mod is not None:
+        out.append(mod.name)
+        mod = mod.parent
+    return tuple(reversed(out))
+
+
+def crate_lines(crate, kind="full"):
+    """the snapshot lines of one crate: [(path, kind, sig, flags)].  An item of another crate of
+    CRATES that this one re-exports is shown as there (its crate's kind decides), under this
+    crate's path; the `use` line stays where none of the items found through it is shown"""
+    walk = PathWalk(crate)
+    kinds = api_crates()
+    shown = {}                                      # id(item) -> (item, module, path, crate)
+    for it, mod, paths, c in walk.items.values():
+        if shows(c, it, mod, kind if c is crate else kinds.get(c.name, "full")):
+            shown[id(it)] = (it, mod, best(paths), c)
+    types = {}                                      # (crate, name) -> [(module, path)]
+    for it, mod, path, c in shown.values():
+        if it.kind in TYPE_KINDS:
+            types.setdefault((c.name, it.name), []).append((mod, path))
+    out = []
+    for it, mod, path, _c in shown.values():
         sig = item_sig(it)
         if it.kind in ("struct", "union"):
             fields = [f for f in it.fields]
@@ -371,28 +504,52 @@ def crate_lines(crate, kind="full"):
             out.append((path, it.kind, sig, flags_of(it)))
         for d in derives(it) if it.kind in ("struct", "union", "enum") else []:
             out.append((path, "impl", f"impl {d}", flags_of(it)))
-    # methods and trait impls of the public types (impl blocks in any module of the crate)
-    for mod in crate.all_modules():
-        if walk.skipped(mod):
-            continue
-        for it in mod.items:
-            if it.kind != "impl":
+    # methods and trait impls of the public types: impl blocks in any module of the type's crate
+    # (and this crate's traits for another crate's types)
+    crates = {crate.name: crate}
+    for _it, _mod, _path, c in shown.values():
+        crates.setdefault(c.name, c)
+    own = {it.name for m in crate.all_modules() for it in m.items if it.kind in TYPE_KINDS}
+    for c in crates.values():
+        homes = {}                                  # type name -> {module path}: same name, other type?
+        if c is not crate:
+            for m in c.all_modules():
+                for it in m.items:
+                    if it.kind in TYPE_KINDS:
+                        homes.setdefault(it.name, set()).add(mod_path(m))
+        for mod in c.all_modules():
+            if walk.skipped(c, mod):
                 continue
-            ty, is_trait = gendoc.impl_type(it.sig)
-            cands = types.get(ty)
-            if not cands:
-                continue
-            tpath = next((p for m, p in cands if m is mod), cands[0][1])
-            if is_trait:
-                trait = re.split(r"\bfor\b", impl_head(it.sig), maxsplit=1)[0]
-                out.append((tpath, "impl", "impl " + trait.strip(), flags_of(it)))
-                continue
-            for m in it.members:
-                if m.vis == "pub" and m.kind in ("fn", "const", "type") and not hidden(m):
-                    out.append((f"{tpath}::{m.name}", "method" if m.kind == "fn" else m.kind,
-                                item_sig(m), flags_of(it) + flags_of(m)))
+            for it in mod.items:
+                if it.kind != "impl":
+                    continue
+                ty, is_trait = gendoc.impl_type(it.sig)
+                cands = types.get((c.name, ty))
+                if not cands and c is crate and is_trait and ty not in own:
+                    cands = [mp for (cn, tn), v in types.items() if tn == ty and cn != c.name for mp in v]
+                if not cands:
+                    continue
+                here = next((p for m, p in cands if m is mod), None)
+                if here is None and c is not crate and len(homes.get(ty, ())) != 1:
+                    continue                        # another crate's type of a name it uses twice
+                tpath = here or cands[0][1]
+                if is_trait:
+                    trait = re.split(r"\bfor\b", impl_head(it.sig), maxsplit=1)[0]
+                    out.append((tpath, "impl", "impl " + trait.strip(), flags_of(it)))
+                    continue
+                for m in it.members:
+                    if m.vis == "pub" and m.kind in ("fn", "const", "type") and not hidden(m):
+                        out.append((f"{tpath}::{m.name}", "method" if m.kind == "fn" else m.kind,
+                                    item_sig(m), flags_of(it) + flags_of(m)))
     for path, text, mod in walk.external:
         out.append((path, "use", text, [cfg_flag(mod.cfg)] if cfg_flag(mod.cfg) else []))
+    found = {}                                      # (path, text, cfg) -> whether an item is shown
+    for path, text, mod, ids in walk.foreign:
+        k = (path, text, cfg_flag(mod.cfg))
+        found[k] = found.get(k, False) or any(i in shown for i in ids)
+    for (path, text, cfg), f in found.items():
+        if not f:                                   # a module a codec crate does not show, items a macro writes
+            out.append((path, "use", text, [cfg] if cfg else []))
     return out
 
 
@@ -426,7 +583,89 @@ def read_snapshot(path):
         if p[0].split("::")[0] in gendoc.REPO_ONLY:
             continue
         out.append(tuple((p + ["", "", "", ""])[:4]))
+    return expand_uses(out)
+
+
+def heads(path):
+    """'a::B.f' -> ['a', 'a::B', 'a::B.f']: the paths a line is found under"""
+    base, dot, _ = path.partition(".")
+    parts = base.split("::")
+    return ["::".join(parts[:k]) for k in range(1, len(parts) + 1)] + ([path] if dot else [])
+
+
+def owner(line):
+    """the path of the item a snapshot line belongs to (a field's, variant's, method's type)"""
+    path, kind = line[0], line[1]
+    if kind == "field":
+        return path.rsplit(".", 1)[0]
+    if kind in ("variant", "method", "trait-fn", "trait-const", "trait-type"):
+        return path.rsplit("::", 1)[0]
+    return path
+
+
+_WALKS = {}
+
+
+def aliases(src, dst):
+    """[(path, path under dst)]: where the target crate shows the items of the use path src now,
+    when src is not that path (ui's `pub use plat::hotkey::Chord`, shown as plat::Chord)"""
+    name = src.split("::")[0]
+    crate = gendoc.load_crate(name)
+    if _WALKS.get(name, (None,))[0] is not crate:
+        _WALKS[name] = (crate, PathWalk(crate))
+    out = []
+    for _it, _mod, paths, _c in _WALKS[name][1].items.values():
+        b = best(paths)
+        for p in paths:
+            if p != b and (p == src or p.startswith(src + "::")):
+                out.append((b, dst + p[len(src):]))
     return out
+
+
+def expand_uses(lines):
+    """a snapshot's `use` lines into another crate of CRATES, read the way crate_lines writes
+    them now (snapshots up to 0.2.1 hold one per such re-export): the target's lines of the same
+    snapshot under the re-exporting path, found under the path the use names or, where that is no
+    path the target crate shows, where it shows the items now; each item once per crate, at its
+    shortest path; the use line stays where no item is found (as crate_lines keeps it)"""
+    crates = api_crates()
+    have = set(lines)
+    for _ in range(8):                              # a use of a use: until nothing changes
+        under = {}
+        for ln in have:
+            for h in heads(ln[0]):
+                under.setdefault(h, []).append(ln)
+        copies = {}                                 # (crate, item in the target) -> {root: [lines]}
+        drop = set()
+        for ln in sorted(have):
+            path, kind, text, _flags = ln
+            if kind != "use" or text.split("::")[0] not in crates:
+                continue
+            glob = text.endswith("::*")
+            if glob != path.endswith("::*"):
+                continue
+            src, dst = (text[:-3], path[:-3]) if glob else (text, path)
+            pairs = [(src, dst, glob)]                  # pub use m::*: what is under m, not m
+            if not any(x[1] != "use" for x in under.get(src, ())):
+                pairs += [(s, d, False) for s, d in aliases(src, dst)]
+            for s, d, inside in pairs:
+                for x in under.get(s, ()):
+                    if x == ln or (inside and x[0] == s):
+                        continue
+                    o = owner(x)
+                    o = o if o == s or o.startswith(s + "::") else s
+                    root = d + o[len(s):]
+                    copies.setdefault((path.split("::")[0], o), {}).setdefault(root, []).append(
+                        (d + x[0][len(s):],) + x[1:])
+                    if x[1] != "use":
+                        drop.add(ln)
+        new = have - drop
+        for roots in copies.values():
+            new.update(roots[best(roots)])
+        if new == have:
+            break
+        have = new
+    return sorted(have)
 
 
 # ---------------------------------------------------------------- the diff

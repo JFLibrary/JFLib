@@ -127,7 +127,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
   <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/csg.rs](#geomsrccsgrs) · [src/exact.rs](#geomsrcexactrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
 - [netchan](#netchan) -- Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network
-  <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
+  <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/seal.rs](#netchansrcsealrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 
 ## ui
 
@@ -67717,12 +67717,14 @@ netchan -- message channels for games (G7d, docs/TRANSPORT.md)
            poll() -> ServerEvent, send(id, payload) -> seq, disconnect(id), stats(id)
            (Windows, Linux, Apple: it needs netio's HTTP server)
   WebSocket::connect(url): one non-blocking client type for the browser and the desktop
-  packet / conn / endpoint: the wire format, the sequence numbers and acks, the handshake --
-           without I/O, for tests on a simulated network and for other transports
+  packet / conn / endpoint / seal: the wire format, the sequence numbers and acks, the
+           handshake, its keys -- without I/O, for tests on a simulated network and for other
+           transports
 
 The same channel over two transports: unreliable and unordered over UDP (a handshake with a
-stateless cookie, a token in every packet, keep-alives and timeouts), reliable and ordered
-over a WebSocket (the browser's only way, docs/GAME.md E8).  Both carry the same header: a
+stateless cookie and X25519 keys, every packet after it sealed with ChaCha20-Poly1305,
+keep-alives and timeouts; optionally a static server key the client pins), reliable and
+ordered over a WebSocket (the browser's only way, docs/GAME.md E8; wss:// encrypts it).  Both carry the same header: a
 sequence number per packet and acks of the newest 33 received, so the netcode (G7e) learns
 which packets arrived over either.  Limits everywhere: payload sizes, packets and bytes a
 second per connection, connections per server and per address, handshake answers a second.
@@ -67752,6 +67754,8 @@ it at the same time; the transport has no game in it).
   - `RateLimit` -- the peer broke the rate limits (the server ended it)
   - `Closed(u16)` -- the WebSocket under it closed with this code (1006: without a close frame)
   - `Replaced` -- the same address made a new handshake
+  - `ServerKey` -- the server did not prove the static key of ClientConfig::server_key: it has none (DENY),
+    or its ACCEPT did not check (another server, or someone on the path in its place)
 
 - **`enum Error`**
   why a call failed
@@ -67826,6 +67830,9 @@ conn -- one connection's sequence numbers and acks, without I/O (docs/TRANSPORT.
                                                      the caller)
   conn.take_event() -> Message / Delivered / Lost    conn.rate_ok(bytes, now), keepalive_due,
                                                      timed_out, stats, rtt_ms
+  Conn::new(..).with_keys(Keys)                      sealed (UDP): write_data and
+                                                     write_disconnect seal, open(wire, head,
+                                                     seq) checks and decrypts what came
 
 Every DATA packet has its own sequence number (u16, wrapping) and acknowledges the newest
 number received plus the 32 before it as bits.  Unreliable (UDP): packets may come late, twice
@@ -67838,6 +67845,10 @@ pass the bits unacknowledged: after ACK_EVERY packets without one of its own, an
 connection owes an empty DATA packet at once (ack_due).
 The round-trip time comes from the newest ack only (bits name older packets, whose wait would
 count twice), smoothed as TCP does (RFC 6298).
+Sealed (seal.rs): each packet sent takes the next packet number (u64; its low 16 bits are the
+sequence number), the nonce of ChaCha20-Poly1305; open() takes the number nearest the largest
+authenticated one and leaves the state alone when the tag does not check (Stats::forged).  The
+receive window above then drops a replayed packet as a duplicate or stale: only after the tag.
 ```
 
 ```rust
@@ -67863,6 +67874,8 @@ ACK_EVERY: u32 = 16
   - `duplicates: u64` -- packets that came a second time
   - `stale: u64` -- packets older than the window
   - `dropped: u64` -- packets dropped for the rate limits or their size
+  - `forged: u64` -- sealed packets with this connection's token whose tag did not check (forged or damaged;
+    nothing else was done with them)
   - `bytes_sent: u64` -- bytes of DATA packets sent (headers included)
   - `bytes_received: u64` -- bytes of DATA packets taken in (headers included)
   - `rtt_ms: f32` -- the smoothed round-trip time (0 before the first sample)
@@ -67881,14 +67894,28 @@ ACK_EVERY: u32 = 16
 
 - **`fn new(token: u32, reliable: bool, set: Settings, now_us: u64) -> Conn`**
   a connection with the token both sides put into DATA (0 over a WebSocket)
+- **`fn with_keys(mut self, keys: Keys) -> Conn`**
+  the connection sealed with these keys (UDP after the handshake): every packet written is
+  encrypted and authenticated, every packet taken in must pass open()
+- **`fn sealed(&self) -> bool`**
+  whether its packets are sealed
 - **`fn token(&self) -> u32`**
   the token of DATA and DISCONNECT packets
+- **`fn open(&mut self, wire: &[u8], head: usize, seq: u16) -> Option<Vec<u8>>`**
+  check and decrypt a packet that came: `wire` the whole packet, `head` the bytes before its
+  payload (DATA_HEADER, DISCONNECT_HEADER), `seq` its sequence number -> the payload
+  (unsealed connections: the bytes after the header as they are).  None: too short or a
+  wrong tag (counted as forged); the connection's state is not touched then
 - **`fn reliable(&self) -> bool`**
   whether the transport is reliable (a WebSocket)
 - **`fn ack_fields(&self) -> (u16, u32)`**
   the newest number received and the bits of the 32 before it (0xffff, 0 before any)
 - **`fn write_data(&mut self, payload: &[u8], now: u64, out: &mut Vec<u8>) -> u16`**
-  append a DATA packet with `payload` (empty: a keep-alive) -> its sequence number
+  append a DATA packet with `payload` (empty: a keep-alive), sealed if the connection is
+  -> its sequence number
+- **`fn write_disconnect(&mut self, reason: u8, out: &mut Vec<u8>)`**
+  append a DISCONNECT with `reason` (BYE_\*), sealed if the connection is; it takes a
+  sequence number of its own, so its seal never shares a nonce with a DATA packet
 - **`fn rate_ok(&mut self, bytes: usize, now: u64) -> bool`**
   whether a packet of `bytes` from the peer stays within the rate limits (false: drop it,
   or end a reliable connection)
@@ -67926,18 +67953,26 @@ endpoint -- the server's and the client's protocol without I/O (docs/TRANSPORT.m
     .tick(now)                         keep-alives, timeouts, streams that never said CONNECT
     .send(conn, payload, now) -> seq   .disconnect(conn, now)
     .take_out() -> Out (what to send where, streams to close)   .poll_event() -> ServerEvent
-  ClientCore::new(ClientConfig, nonce, stream)
+    .set_static_key(secret) / .public_key()   a long-lived X25519 key clients may pin
+  ClientCore::new(ClientConfig, random [32], stream)
     .start(now) / .packet(bytes, now) / .tick(now) / .send(payload, now) / .disconnect(now)
     .transport_closed(code) / .take_out() -> bytes / .poll_event() -> ClientEvent
 
-Time is the caller's (microseconds), so tests run them on a virtual clock over a simulated
-network (apps/nettest).  The UDP handshake: CONNECT (padded) -> CHALLENGE with a stateless
-cookie, HMAC-SHA256 over the client's address, its nonce and the time -> RESPONSE (padded) with
-the cookie -> ACCEPT with a random token, which every DATA and DISCONNECT then carries.  Nothing
-is kept for an address before its RESPONSE proves it receives there, the answers before that
-are smaller than the requests, and challenges_per_s bounds the work for all of them.  A
-WebSocket sends CONNECT and gets ACCEPT (token 0); TCP has proved the address.  The token is no
-encryption: it keeps senders out that do not see the traffic.
+Time and randomness are the caller's (microseconds; the server's secret, the client's 32 random
+bytes), so tests run them on a virtual clock over a simulated network (apps/nettest), the same
+on every run.  The UDP handshake: CONNECT (padded) -> CHALLENGE with a stateless cookie,
+HMAC-SHA256 over the client's address, its nonce and the time -> RESPONSE (padded) with the
+cookie and the client's ephemeral X25519 key -> ACCEPT with a random token, the server's
+ephemeral key and `confirm`, the proof that it derived the same keys (seal.rs).  From then on
+every DATA and DISCONNECT is sealed with ChaCha20-Poly1305 under keys of this connection alone:
+who listens reads nothing, a changed, forged or replayed packet is dropped.  With
+ClientConfig::server_key the keys also need the server's static secret, so nobody on the path
+can take the server's place; without it they keep out only those who listen.  Nothing is kept
+for an address before its RESPONSE proves it receives there, the answers before that are
+smaller than the requests, and challenges_per_s bounds the work for all of them (an HMAC for a
+CHALLENGE; for an ACCEPT two or three X25519, which a lost ACCEPT does not repeat).  A WebSocket
+sends CONNECT and gets ACCEPT (token 0, no keys); TCP has proved the address, and wss:// is
+its encryption.
 ```
 
 - **`struct ServerConfig`**
@@ -67977,7 +68012,8 @@ encryption: it keeps senders out that do not see the traffic.
   - `challenges: u64` -- CHALLENGE answers sent
   - `accepted: u64` -- connections taken
   - `denied: u64` -- clients refused (full, protocol, address)
-  - `bad: u64` -- packets that were no packet, a wrong kind or a wrong cookie or token
+  - `bad: u64` -- packets that were no packet, a wrong kind, a wrong cookie or token, or a handshake with a
+    key that gives no shared secret (forged DATA of a connection: its Stats::forged)
   - `throttled: u64` -- handshakes over challenges_per_s, left without an answer
   - `unknown: u64` -- DATA from addresses without a connection
 
@@ -67987,10 +68023,16 @@ encryption: it keeps senders out that do not see the traffic.
 **`impl ServerCore`**
 
 - **`fn new(cfg: ServerConfig, secret: [u8; 32], now: u64) -> ServerCore`**
-  a server with these limits; `secret` keys the cookies and tokens (random in a real server,
-  fixed in tests)
+  a server with these limits; `secret` keys the cookies and tokens and seeds the ephemeral
+  keys of the handshakes (random in a real server, fixed in tests)
 - **`fn config(&self) -> &ServerConfig`**
   the limits in force (max_payload clamped)
+- **`fn set_static_key(&mut self, secret: [u8; 32])`**
+  a long-lived X25519 secret: clients that know its public key (ClientConfig::server_key)
+  include it in their keys, so only this server can answer them.  Kept by the app (32 random
+  bytes, made once); clients without the key still connect with ephemeral keys only
+- **`fn public_key(&self) -> Option<[u8; 32]>`**
+  the public key of set_static_key (for the clients' ClientConfig::server_key)
 - **`fn datagram(&mut self, from: SocketAddr, data: &[u8], now: u64)`**
   a UDP datagram from `from`
 - **`fn stream_open(&mut self, stream: u32, addr: Option<SocketAddr>, now: u64)`**
@@ -68035,6 +68077,10 @@ encryption: it keeps senders out that do not see the traffic.
   - `resend_ms: u32` -- UDP: CONNECT / RESPONSE again after this long without an answer
   - `packets_per_s: u32` -- packets a second from the server, on average (more are dropped)
   - `bytes_per_s: u32` -- bytes a second from the server, on average (more are dropped)
+  - `server_key: Option<[u8; 32]>` -- UDP: the server's static public key (ServerCore::set_static_key, Server::set_static_key).
+    Given, the keys need the server's secret, and a server without it is refused
+    (Reason::ServerKey); None: ephemeral keys only, safe from listeners but not from someone
+    on the path who answers in the server's place
 
 - **`enum State`**
   where a client stands
@@ -68055,8 +68101,10 @@ encryption: it keeps senders out that do not see the traffic.
 
 **`impl ClientCore`**
 
-- **`fn new(cfg: ClientConfig, nonce: u64, stream: bool) -> ClientCore`**
-  a client with a random `nonce` (it names this attempt); `stream`: over a WebSocket
+- **`fn new(cfg: ClientConfig, random: [u8; 32], stream: bool) -> ClientCore`**
+  a client; `random`: 32 random bytes of this attempt (its nonce and, over UDP, its
+  ephemeral key come from them: plat::random_bytes in a real client, fixed in tests);
+  `stream`: over a WebSocket
 - **`fn start(&mut self, now: u64)`**
   begin the handshake (CONNECT goes out)
 - **`fn packet(&mut self, data: &[u8], now: u64)`**
@@ -68088,33 +68136,40 @@ encryption: it keeps senders out that do not see the traffic.
 Source: [`lib/netchan/src/packet.rs`](../lib/netchan/src/packet.rs)
 
 ```text
-packet -- the channel's wire format, version 1 (docs/TRANSPORT.md "Paketformat")
+packet -- the channel's wire format, version 2 (docs/TRANSPORT.md "Paketformat")
 
   byte 0: VERSION << 4 | kind; then, little-endian:
-  CONNECT     client -> server  protocol u32, nonce u64              13 bytes (UDP: padded to 64)
+  CONNECT     client -> server  protocol u32, nonce u64              13 bytes (UDP: padded to 96)
   CHALLENGE   server -> client  nonce u64, time u32, mac [16]        29 bytes (UDP only)
-  RESPONSE    client -> server  protocol u32, nonce u64, time u32,   33 bytes (UDP only, padded
-                                mac [16]                                       to 64)
-  ACCEPT      server -> client  nonce u64, token u32, max payload u16   15 bytes
+  RESPONSE    client -> server  protocol u32, nonce u64, time u32,   66 bytes (UDP only, padded
+                                mac [16], flags u8, key [32]                   to 96)
+  ACCEPT      server -> client  nonce u64, token u32, max payload    63 bytes
+                                u16, key [32], confirm [16]
   DENY        server -> client  nonce u64, reason u8                 10 bytes
-  DATA        both              token u32, seq u16, ack u16, ack bits u32, payload   13 + n
-  DISCONNECT  both              token u32, reason u8                  6 bytes
+  DATA        both              token u32, seq u16, ack u16, ack bits u32, payload
+                                                                     13 + n (UDP: + 16)
+  DISCONNECT  both              token u32, seq u16, reason u8          8 bytes (UDP: + 16)
 
-A UDP client pads CONNECT and RESPONSE to HANDSHAKE_SIZE, and every answer of the server before
-a connection is smaller: a forged sender address gets back less than was sent (no
-amplification).  Over a WebSocket the CONNECT is not padded and CHALLENGE / RESPONSE do not
-occur (TCP has proved the address).  parse() reads untrusted bytes: exact sizes, no panics,
-no allocation.
+Over UDP the handshake agrees on keys (RESPONSE: the client's ephemeral X25519 key; ACCEPT: the
+server's and `confirm`, the proof that the server derived the same keys; seal.rs), and every
+DATA and DISCONNECT after it is sealed with ChaCha20-Poly1305: the payload is encrypted, the
+header before it is authenticated with it, and the 16-byte tag follows (DATA's payload as
+parse() returns it is the ciphertext and the tag).  A UDP client pads CONNECT and RESPONSE to
+HANDSHAKE_SIZE, and every answer of the server before a connection is smaller: a forged sender
+address gets back less than was sent (no amplification).  Over a WebSocket the CONNECT is not
+padded, CHALLENGE / RESPONSE do not occur (TCP has proved the address), ACCEPT's key and
+confirm are zeros and nothing is sealed (wss:// is the encryption there).  parse() reads
+untrusted bytes: exact sizes, no panics, no allocation.
 ```
 
 ```rust
 /// the format's version (the high nibble of byte 0)
-VERSION: u8 = 1
+VERSION: u8 = 2
 /// a client asks for a connection
 KIND_CONNECT: u8 = 1
 /// the server's stateless cookie for a UDP client
 KIND_CHALLENGE: u8 = 2
-/// the client returns the cookie
+/// the client returns the cookie with its key
 KIND_RESPONSE: u8 = 3
 /// the server took the client
 KIND_ACCEPT: u8 = 4
@@ -68126,17 +68181,26 @@ KIND_DATA: u8 = 6
 KIND_DISCONNECT: u8 = 7
 /// the bytes of a DATA packet before its payload
 DATA_HEADER: usize = 13
+/// the bytes of a DISCONNECT packet before its tag
+DISCONNECT_HEADER: usize = 8
+/// the tag after a sealed DATA or DISCONNECT (UDP)
+TAG: usize = 16
 /// the size a UDP client pads CONNECT and RESPONSE to (at most the server takes)
-HANDSHAKE_SIZE: usize = 64
-/// the largest payload of a UDP DATA packet that may be configured (1400 + 13 + 8 + 40 bytes
-/// stay below the 1500 of Ethernet also over IPv6)
+HANDSHAKE_SIZE: usize = 96
+/// the largest payload of a UDP DATA packet that may be configured (1400 + 13 + 16 + 8 + 40
+/// bytes stay below the 1500 of Ethernet also over IPv6)
 MAX_UDP_PAYLOAD: usize = 1400
+/// RESPONSE flags: the client knows the server's static key (ClientConfig::server_key), and the
+/// keys include a Diffie-Hellman with it
+FLAG_STATIC_KEY: u8 = 1
 /// DENY: the server has max_connections clients
 DENY_FULL: u8 = 1
 /// DENY: the client speaks another protocol id (another game or version)
 DENY_PROTOCOL: u8 = 2
 /// DENY: the client's address has max_per_ip connections
 DENY_ADDRESS: u8 = 3
+/// DENY: the client expects a static key, and the server has none
+DENY_KEY: u8 = 4
 /// DISCONNECT: an orderly end
 BYE_NORMAL: u8 = 0
 /// DISCONNECT: nothing came for timeout_ms
@@ -68155,25 +68219,111 @@ BYE_SHUTDOWN: u8 = 5
   one packet, borrowed from the bytes it was read from
   - `Connect { protocol: u32, nonce: u64 }` -- a client asks: the app's protocol id, the nonce of this attempt
   - `Challenge { nonce: u64, time: u32, mac: [u8; 16] }` -- the server's cookie for a UDP client: the time (seconds) and the MAC over address, nonce, time
-  - `Response { protocol: u32, nonce: u64, time: u32, mac: [u8; 16] }` -- the client returns the cookie
-  - `Accept { nonce: u64, token: u32, max_payload: u16 }` -- the server took the client: the token of its packets, the largest payload it takes
+  - `Response { protocol: u32, nonce: u64, time: u32, mac: [u8; 16], flags: u8, key: [u8; 32] }` -- the client returns the cookie with FLAG_\* and its ephemeral X25519 public key
+  - `Accept { nonce: u64, token: u32, max_payload: u16, key: [u8; 32], confirm: [u8; 16] }` -- the server took the client: the token of its packets, the largest payload it takes, its
+    ephemeral X25519 public key and the proof of the keys (over a WebSocket: zeros)
   - `Deny { nonce: u64, reason: u8 }` -- the server refused the client (DENY_\*)
-  - `Data { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] }` -- a message (empty: a keep-alive) with its number, the newest number received and the bits of the 32 before
-  - `Disconnect { token: u32, reason: u8 }` -- one side ends the connection (BYE_\*)
+  - `Data { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] }` -- a message (empty: a keep-alive) with its number, the newest number received and the bits
+    of the 32 before; over UDP `payload` is the ciphertext and its tag
+  - `Disconnect { token: u32, seq: u16, reason: u8, tag: &'a [u8] }` -- one side ends the connection (BYE_\*) under the sequence number it took; over UDP `tag`
+    holds the 16 bytes of the seal, over a WebSocket nothing
 
 - **`fn parse(b: &[u8]) -> Option<Packet<'_>>`**
   read one packet: None for anything that is not exactly a packet of this version (handshake
-  packets between their size and HANDSHAKE_SIZE, the fixed-size ones exactly)
+  packets between their size and HANDSHAKE_SIZE, the fixed-size ones exactly, DISCONNECT with
+  or without its tag)
 
 **`impl Packet<'_>`**
 
 - **`fn write(&self, out: &mut Vec<u8>, pad: bool)`**
-  append the packet to `out`; `pad`: CONNECT and RESPONSE filled with zeros to HANDSHAKE_SIZE
+  append the packet to `out`; `pad`: CONNECT and RESPONSE filled with zeros to HANDSHAKE_SIZE.
+  DATA and DISCONNECT are written as given (Conn seals them)
 - **`fn to_vec(&self, pad: bool) -> Vec<u8>`**
   the packet as new bytes
 
 - **`fn seq_newer(a: u16, b: u16) -> bool`**
   whether sequence number `a` is newer than `b` (wrapping: within half the range ahead)
+
+### `netchan/src/seal.rs`
+
+Source: [`lib/netchan/src/seal.rs`](../lib/netchan/src/seal.rs)
+
+```text
+seal -- the keys of the UDP handshake and the sealing of its packets (docs/TRANSPORT.md
+"Verschlüsselung")
+
+  derive(&Handshake, &dh1, dh2) -> Derived { c2s, s2c, confirm }   the keys of a connection
+  confirm_tag(&confirm, accept_bytes) -> [u8; 16]                  ACCEPT's proof of the keys
+  Keys::new(send, recv)        one side's keys (Conn::with_keys)
+  full_pn(largest, seq) -> u64 the packet number a 16-bit sequence number stands for
+  nonce(pn) -> [u8; 12]        ChaCha20-Poly1305's nonce of a packet number
+  Generator::new(seed) / next_secret() -> [u8; 32]   the server's ephemeral secrets (forward secure)
+
+Both sides have an ephemeral X25519 key per connection; the client may also know the server's
+static key (ClientConfig::server_key), as in Noise's NK pattern.  The transcript hash h is
+SHA-256 over a label, the protocol id, the nonce, the flags and the public keys (the client's,
+the server's ephemeral one, the static one if used); the keys are HKDF-SHA256 with salt h over
+dh1 (ephemeral with ephemeral) and dh2 (the client's ephemeral with the static key): 32 bytes
+client to server, 32 bytes server to client, 32 bytes for `confirm`.  Without a static key the
+channel is safe from those who only listen and from blind senders, not from someone on the path
+who answers the handshake in the server's place; with it, only the holder of the static secret
+can make an ACCEPT whose confirm checks.
+
+Every sealed packet takes the next packet number of its direction (u64, from 0), and its 16-bit
+sequence number is that number's low bits.  The receiver takes the number closest to the one
+after the largest it authenticated (as QUIC does with its truncated numbers, RFC 9000 A.3), so
+the nonce never repeats under one key and a replay of an old packet fails its tag or is found
+by the receive window of conn.rs.
+```
+
+- **`struct Keys`**
+  one side's keys of a connection; zeroed when dropped
+
+**`impl Keys`**
+
+- **`fn new(send: [u8; 32], recv: [u8; 32]) -> Keys`**
+  the key this side seals with and the one it opens with
+
+- **`struct Handshake<'a>`**
+  what the transcript hash covers: the handshake as both sides saw it
+  - `protocol: u32`
+  - `nonce: u64`
+  - `client: &'a [u8; 32]` -- the client's ephemeral public key (RESPONSE)
+  - `server: &'a [u8; 32]` -- the server's ephemeral public key (ACCEPT)
+  - `stat: Option<&'a [u8; 32]>` -- the server's static public key, when the client uses it (FLAG_STATIC_KEY)
+
+- **`struct Derived`**
+  the keys of one connection; zeroed when dropped
+  - `c2s: [u8; 32]` -- client to server
+  - `s2c: [u8; 32]` -- server to client
+  - `confirm: [u8; 32]` -- the key of ACCEPT's confirm
+
+- **`fn derive(hs: &Handshake<'_>, dh1: &[u8; 32], dh2: Option<&[u8; 32]>) -> Derived`**
+  the keys of a connection: `dh1` = X25519(ephemeral, ephemeral), `dh2` = X25519(the client's
+  ephemeral, the static key) when hs.stat is set (both must be given together)
+
+- **`fn confirm_tag(key: &[u8; 32], accept: &[u8]) -> [u8; 16]`**
+  ACCEPT's confirm: the first 16 bytes of HMAC-SHA256 under the confirm key over the ACCEPT
+  before it (kind, nonce, token, max payload, the server's key)
+
+- **`fn nonce(pn: u64) -> [u8; 12]`**
+  the nonce of packet number `pn` (the keys differ per direction, so both may count from 0)
+
+- **`fn full_pn(largest: Option<u64>, seq: u16) -> u64`**
+  the packet number that sequence number `seq` stands for: the one closest to the number after
+  `largest`, the largest authenticated so far (None: nothing yet, so the next is 0)
+
+- **`struct Generator`**
+  a forward-secure source of the server's ephemeral secrets: each one comes from the state,
+  which is replaced by a hash of itself, so what leaks later does not give the earlier ones.
+  Seeded once with 32 random bytes (fixed in tests: the same keys on every run)
+
+**`impl Generator`**
+
+- **`fn new(seed: &[u8; 32]) -> Generator`**
+  a generator from 32 secret bytes
+- **`fn next_secret(&mut self) -> [u8; 32]`**
+  the next 32 secret bytes
 
 ### `netchan/src/server.rs`
 
@@ -68191,6 +68341,7 @@ server -- a game server's channels (G7d): UDP and WebSocket clients in one table
   server.poll() -> Option<ServerEvent>   send(id, payload) -> seq   disconnect(id)
   server.wait(ms)                        sleep until something arrives (a loop without a tick)
   connections() / ids() / stats(id) / peer(id) / server_stats() / stop()
+  set_static_key(secret) / public_key()  the key clients may pin (ClientConfig::server_key)
 
 Threads: one reads the UDP socket; each WebSocket has a reading one (netio's thread of the
 upgrade) and a writing one, so neither a full socket buffer nor a slow client holds the
@@ -68245,6 +68396,12 @@ LINK_UNSENT: usize = 1 << 20
   LINK_UNSENT bytes waiting)
 - **`fn disconnect(&mut self, id: u32)`**
   end a client's connection (Disconnected(Local) follows)
+- **`fn set_static_key(&mut self, secret: [u8; 32])`**
+  a long-lived X25519 secret (32 random bytes the app made once and keeps): clients with its
+  public key in ClientConfig::server_key can tell this server from anyone in its place
+  (endpoint::ServerCore::set_static_key)
+- **`fn public_key(&self) -> Option<[u8; 32]>`**
+  the public key of set_static_key, for the clients
 - **`fn connections(&self) -> usize`**
   connections now
 - **`fn ids(&self) -> Vec<u32>`**

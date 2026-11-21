@@ -7,12 +7,14 @@
 //            poll() -> ServerEvent, send(id, payload) -> seq, disconnect(id), stats(id)
 //            (Windows, Linux, Apple: it needs netio's HTTP server)
 //   WebSocket::connect(url): one non-blocking client type for the browser and the desktop
-//   packet / conn / endpoint: the wire format, the sequence numbers and acks, the handshake --
-//            without I/O, for tests on a simulated network and for other transports
+//   packet / conn / endpoint / seal: the wire format, the sequence numbers and acks, the
+//            handshake, its keys -- without I/O, for tests on a simulated network and for other
+//            transports
 //
 // The same channel over two transports: unreliable and unordered over UDP (a handshake with a
-// stateless cookie, a token in every packet, keep-alives and timeouts), reliable and ordered
-// over a WebSocket (the browser's only way, docs/GAME.md E8).  Both carry the same header: a
+// stateless cookie and X25519 keys, every packet after it sealed with ChaCha20-Poly1305,
+// keep-alives and timeouts; optionally a static server key the client pins), reliable and
+// ordered over a WebSocket (the browser's only way, docs/GAME.md E8; wss:// encrypts it).  Both carry the same header: a
 // sequence number per packet and acks of the newest 33 received, so the netcode (G7e) learns
 // which packets arrived over either.  Limits everywhere: payload sizes, packets and bytes a
 // second per connection, connections per server and per address, handshake answers a second.
@@ -37,6 +39,8 @@ pub mod conn;
 pub mod endpoint;
 /// the wire format
 pub mod packet;
+/// the handshake's keys and the sealing of UDP packets
+pub mod seal;
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 mod reap;
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
@@ -82,6 +86,9 @@ pub enum Reason {
     Closed(u16),
     /// the same address made a new handshake
     Replaced,
+    /// the server did not prove the static key of ClientConfig::server_key: it has none (DENY),
+    /// or its ACCEPT did not check (another server, or someone on the path in its place)
+    ServerKey,
 }
 
 /// why a call failed

@@ -10,7 +10,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Changed
 
-- `agent_core::json`, `agent_core::jmap`, `agent_core::record!` and `agent_core::wire_enum!` are re-exports of jflib-formats (`formats::json`, `formats::jmap` and their macros), where the code lives now; the items and their behaviour are the same, and `agent_core::Value` stays. The crate depends on jflib-formats. api-diff lists the re-exported items as removed (it does not follow re-exports into another crate).
+- `agent_core::json`, `agent_core::jmap`, `agent_core::record!` and `agent_core::wire_enum!` are re-exports of jflib-formats (`formats::json`, `formats::jmap` and their macros), where the code lives now; the items and their behaviour are the same, and `agent_core::Value` stays. The crate depends on jflib-formats.
 
 ### Security
 
