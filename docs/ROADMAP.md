@@ -2509,13 +2509,15 @@ Sicherheit:
   `tools/font_check.py --fuzz`), `doc_io` (RTF und HTML aus der Zwischenablage, die jedes andere
   Programm füllen kann), `diagram_io`, `dxf`, `gltf`, `img_svg` und `spell` (`.aff`, `.dic`). Mit
   `panic = "abort"` beendet jeder Panic in einem Parser die ganze App.
-- **P2** · *fehlt* · `unsafe` außerhalb von `rt` und `simd` prüfen: `plat` hat rund 3000 Stellen
-  mit `unsafe`, `gpu` rund 300 (`rt` rund 240, `simd` rund 100).
-  [`tools/memory_safety_check.py`](../tools/memory_safety_check.py) prüft Proben für `rt` und
-  `simd`, nicht die Wege in `plat`, auf denen Daten anderer Programme ankommen
-  ([`plat/win_clip.rs`](../lib/plat/win_clip.rs),
-  [`plat/linux_wl_wire.rs`](../lib/plat/linux_wl_wire.rs)). `SECURITY.md` nennt
-  diese Prüfung nicht.
+- **P2** · *teilweise* (2026-11-21, U6) · `unsafe` außerhalb von `rt` und `simd` prüfen: `plat` hat rund 3000
+  Stellen mit `unsafe`, `gpu` rund 300. Durchgesehen sind die Wege, auf denen Daten anderer Programme ankommen
+  ([PLAT_INPUTS.md](PLAT_INPUTS.md): Zwischenablage und Drag and Drop unter Windows und Wayland, das Wayland- und das
+  X11-Protokoll, D-Bus, die Agenten-Schnittstelle): überall kopiert ein kleiner `unsafe`-Block begrenzt in einen
+  eigenen Puffer, gelesen wird in sicherem Rust. Behoben: Wayland schloss von den Deskriptoren eines Ereignisses an
+  ein gelöschtes Objekt nur die ersten 8. Alle diese Leser gehen durch `plattest --test wirefuzz` (`plat::fuzz`,
+  fester Seed, in der Suite); die zwei, die nur Windows brauchte, laufen dafür seit U6 auf jedem System. Offen: UI
+  Automation (`win_uia*.rs`, rund 370 Stellen; braucht Windows mit Narrator und NVDA), macOS und iOS, `gpu`; dass
+  `SECURITY.md` PLAT_INPUTS.md nennt (die Datei bearbeitet die Sicherheits-Sitzung).
 - **P2** · *fehlt* · `crypto`, sofern nicht schon Teil der laufenden Überarbeitung: die
   RSA-Schlüsselerzeugung zeitkonstant machen oder deutlich abgrenzen (heute laut README „meant
   for simulators and tests“); `tools/ct_check.py` auch für ARM64.

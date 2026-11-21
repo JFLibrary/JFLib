@@ -364,6 +364,9 @@ pub mod web;
 pub use web::*;
 
 mod clipdrop;
+/// the decoders of other programs' data for fuzz checks (plattest --test wirefuzz); not API
+#[doc(hidden)]
+pub mod fuzz;
 // drag and drop between programs (the shared part; win_dnd.rs, linux_x11_dnd.rs, linux_wl_clip.rs)
 #[cfg_attr(target_os = "ios", allow(dead_code))] // no drags between programs on iOS yet
 mod dnd;

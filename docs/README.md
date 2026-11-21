@@ -26,6 +26,7 @@ and tests); `../legacy`, `../rewrite` and `../booksAndContext` lie next to it.
 | [VFS.md](VFS.md) | one file namespace: `app://` (bundled `apps/NAME/assets`), `config://`, `data://`, `cache://`, `mem://`, your own mounts (folders, overlays, ZIP) |
 | [PERMISSIONS.md](PERMISSIONS.md) | `apps/NAME/PERMISSIONS`: the files, programs, URL schemes, plugins, printing and network addresses an app may use, and how `plat` enforces them |
 | [SECRETS.md](SECRETS.md) | `plat::secret`: passwords, tokens and keys in the Credential Manager (DPAPI files for large values) and the Secret Service, the `secrets` permission, limits |
+| [PLAT_INPUTS.md](PLAT_INPUTS.md) | Other programs' data in `plat`: clipboard, drag and drop, Wayland, X11, D-Bus, the agent interface; how each way is bounded, where its `unsafe` is, what tests it (`plattest --test wirefuzz`), what is open |
 | [`../README.md`](../README.md) | building and testing the Rust code, the rules (`no_std`, no crates, `unsafe` only in `rt` / `simd` / `plat` / `gpu` and the module runtimes), the crate layout |
 
 ## What is where

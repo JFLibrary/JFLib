@@ -308,6 +308,7 @@ mod t_kernel;
 mod t_life;
 #[cfg(not(target_vendor = "apple"))]
 mod t_lib;
+mod t_wire;
 #[cfg(target_vendor = "apple")]
 mod t_lib {
     pub fn t_lib(t: &mut crate::T) {
@@ -548,6 +549,7 @@ fn plattest() -> i32 {
         Some("guardlimit") => t_guard::t_guardlimit,   // plat-shared
         Some("lib") => t_lib::t_lib,                   // plat-shared
         Some("libfuzz") => t_lib::t_libfuzz,           // plat-shared
+        Some("wirefuzz") => t_wire::t_wirefuzz,        // plat-shared: the decoders of other programs' data (plat::fuzz)
         Some("portal") => t_portal::t_portal,          // plat-shared
         Some("icc") => t_icc::t_icc,                   // plat-shared
         Some("iccx11") => t_icc::t_iccx11,             // plat-shared
