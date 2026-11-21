@@ -41,7 +41,10 @@ let opened = crypto::aead::x_open(&key, &nonce, b"header", &sealed);   // None i
 
 Work on secrets avoids branches and table lookups that depend on them: field arithmetic in fixed
 limbs with masked swaps and selects, and an AES that is bitsliced instead of looking up tables, in
-both directions. Ed25519 verifies strictly (canonical points, no cofactor), so a signature is
+both directions. The masks pass an optimization barrier, so the compiler cannot turn a select back
+into a branch, and [`tools/ct_check.py`](https://github.com/JFLibrary/JFLib/blob/main/tools/ct_check.py)
+runs each of these operations with different secrets and checks that the machine code takes the
+same branches for all of them, at five optimization levels (x86-64). Ed25519 verifies strictly (canonical points, no cofactor), so a signature is
 valid or not the same way everywhere. Operations on public data, such as RSA and ECDSA
 verification, are allowed to take variable time; RSA signing uses a constant-time exponentiation.
 RSA key generation is variable time and meant for simulators and tests.

@@ -14,7 +14,9 @@
 // interface of this computer is left out.
 //
 // Queries: A and AAAA over UDP (2 s per server and attempt, two rounds), over TCP when the answer
-// is truncated; an answer must come from the server asked and carry the query's id and question.
+// is truncated; an answer must come from the server asked and carry the query's id and question,
+// and only addresses of the asked name count, or of the name its CNAME chain in the answer leads
+// to (at most 8 steps): records for other names in an answer are ignored.
 // IPv4 addresses come first.  Not here: DNSSEC validation, mDNS, caching.
 //
 // The app's permissions: a name its net.connect rules do not cover fails with
@@ -128,25 +130,6 @@ pub fn query(id: u16, name: &str, qtype: u16) -> Option<Vec<u8>> {
     Some(q)
 }
 
-/// skip a (possibly compressed) name
-fn skip_name(m: &[u8], mut p: usize) -> Option<usize> {
-    for _ in 0..128 {
-        let l = *m.get(p)? as usize;
-        if l == 0 {
-            return Some(p + 1);
-        }
-        if l & 0xC0 == 0xC0 {
-            m.get(p + 1)?;
-            return Some(p + 2);
-        }
-        if l & 0xC0 != 0 {
-            return None;
-        }
-        p += 1 + l;
-    }
-    None
-}
-
 /// what an answer says
 #[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -159,6 +142,39 @@ pub enum Answer {
     Truncated,
     /// a server failure or an answer that does not fit the question
     Bad,
+}
+
+const TYPE_CNAME: u16 = 5;
+
+/// a (possibly compressed) name at p, in lower case with dots, and where it ends in the message
+fn read_name(m: &[u8], mut p: usize) -> Option<(String, usize)> {
+    let mut out = String::new();
+    let mut end = None;
+    // 128 steps: no name has more labels, and a loop of pointers ends here
+    for _ in 0..128 {
+        let l = *m.get(p)? as usize;
+        if l == 0 {
+            return Some((out, end.unwrap_or(p + 1)));
+        }
+        if l & 0xC0 == 0xC0 {
+            end.get_or_insert(p + 2);
+            p = (l & 0x3F) << 8 | *m.get(p + 1)? as usize;
+            continue;
+        }
+        if l & 0xC0 != 0 {
+            return None;
+        }
+        let label = m.get(p + 1..p + 1 + l)?;
+        if !out.is_empty() {
+            out.push('.');
+        }
+        out.push_str(&String::from_utf8_lossy(label).to_ascii_lowercase());
+        if out.len() > 255 {
+            return None;
+        }
+        p += 1 + l;
+    }
+    None
 }
 
 /// read an answer to `q` (the query it answers)
@@ -182,25 +198,44 @@ pub fn parse_answer(m: &[u8], q: &[u8], qtype: u16) -> Answer {
     if qd != 1 || m.get(12..q.len()).is_none_or(|qq| !qq.eq_ignore_ascii_case(&q[12..])) {
         return Answer::Bad;
     }
+    let Some((asked, _)) = read_name(q, 12) else { return Answer::Bad };
+    // the records of the answer section: (owner, type, class, where the data begins, its length)
     let mut p = q.len();
-    let mut out = Vec::new();
+    let mut rrs = Vec::new();
     for _ in 0..an {
-        let Some(np) = skip_name(m, p) else { return Answer::Bad };
+        let Some((owner, np)) = read_name(m, p) else { return Answer::Bad };
         let Some(h) = m.get(np..np + 10) else { return Answer::Bad };
         let (t, class, len) = (u16::from_be_bytes([h[0], h[1]]), u16::from_be_bytes([h[2], h[3]]), u16::from_be_bytes([h[8], h[9]]) as usize);
-        let Some(data) = m.get(np + 10..np + 10 + len) else { return Answer::Bad };
-        if class == 1 && t == qtype {
-            match (t, len) {
-                (TYPE_A, 4) => out.push(IpAddr::V4([data[0], data[1], data[2], data[3]])),
-                (TYPE_AAAA, 16) => {
-                    let mut a = [0u8; 16];
-                    a.copy_from_slice(data);
-                    out.push(IpAddr::V6(a));
-                }
-                _ => {}
-            }
+        if m.get(np + 10..np + 10 + len).is_none() {
+            return Answer::Bad;
         }
+        rrs.push((owner, t, class, np + 10, len));
         p = np + 10 + len;
+    }
+    // follow the CNAME chain from the asked name, then take that name's addresses only
+    let mut name = asked;
+    for _ in 0..8 {
+        let next = rrs.iter().find(|r| r.0 == name && r.1 == TYPE_CNAME && r.2 == 1).and_then(|r| read_name(m, r.3));
+        match next {
+            Some((target, _)) if qtype != TYPE_CNAME => name = target,
+            _ => break,
+        }
+    }
+    let mut out = Vec::new();
+    for (owner, t, class, at, len) in &rrs {
+        if *owner != name || *class != 1 || *t != qtype {
+            continue;
+        }
+        let data = &m[*at..*at + *len];
+        match (*t, *len) {
+            (TYPE_A, 4) => out.push(IpAddr::V4([data[0], data[1], data[2], data[3]])),
+            (TYPE_AAAA, 16) => {
+                let mut a = [0u8; 16];
+                a.copy_from_slice(data);
+                out.push(IpAddr::V6(a));
+            }
+            _ => {}
+        }
     }
     Answer::Found(out)
 }

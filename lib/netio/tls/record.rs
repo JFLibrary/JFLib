@@ -164,11 +164,14 @@ impl Cipher {
     }
 
     /// open a protected record body (header given) -> (type, content)
-    pub fn open(&mut self, hdr: &[u8; 5], body: &[u8]) -> Option<(u8, Vec<u8>)> {
+    pub fn open(&mut self, hdr: &[u8; 5], body: &[u8]) -> Result<(u8, Vec<u8>), OpenError> {
         if self.v12 {
             let ex = if self.explicit { 8 } else { 0 };
-            if body.len() < ex + 16 || body.len() > MAX_RECORD {
-                return None;
+            if body.len() < ex + 16 {
+                return Err(OpenError::Mac);
+            }
+            if body.len() > MAX_PLAIN + 2048 {
+                return Err(OpenError::Overflow);
             }
             let mut nonce = self.nonce();
             if self.explicit {
@@ -179,33 +182,49 @@ impl Cipher {
             tag.copy_from_slice(&body[n..]);
             let mut plain = Vec::from(&body[ex..n]);
             let aad = self.aad12(hdr[0], plain.len());
-            if !self.open_raw(&nonce, &aad, &mut plain, &tag) || plain.len() > MAX_PLAIN {
-                return None;
+            if !self.open_raw(&nonce, &aad, &mut plain, &tag) {
+                return Err(OpenError::Mac);
+            }
+            if plain.len() > MAX_PLAIN {
+                return Err(OpenError::Overflow);
             }
             self.seq += 1;
-            return Some((hdr[0], plain));
+            return Ok((hdr[0], plain));
         }
-        if body.len() < 17 || body.len() > MAX_RECORD {
-            return None;
+        if body.len() < 17 {
+            return Err(OpenError::Mac);
+        }
+        // TLSInnerPlaintext (content, type, padding) at most 2^14 + 1 bytes (RFC 8446 5.2)
+        if body.len() > MAX_PLAIN + 1 + 16 {
+            return Err(OpenError::Overflow);
         }
         let n = body.len() - 16;
         let mut tag = [0u8; 16];
         tag.copy_from_slice(&body[n..]);
         let mut plain = Vec::from(&body[..n]);
         if !self.open_raw(&self.nonce(), hdr, &mut plain, &tag) {
-            return None;
+            return Err(OpenError::Mac);
         }
         self.seq += 1;
-        // strip the zero padding; the last non-zero byte is the real type
+        // strip the zero padding; the last non-zero byte is the real type (none: RFC 8446 5.4
+        // wants unexpected_message)
         while plain.last() == Some(&0) {
             plain.pop();
         }
-        let ty = plain.pop()?;
-        if plain.len() > MAX_PLAIN {
-            return None;
-        }
-        Some((ty, plain))
+        let ty = plain.pop().ok_or(OpenError::NoType)?;
+        Ok((ty, plain))
     }
+}
+
+/// why a protected record did not open
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OpenError {
+    /// it does not authenticate (bad_record_mac)
+    Mac,
+    /// more than a record may hold (record_overflow)
+    Overflow,
+    /// only padding, no content type (unexpected_message)
+    NoType,
 }
 
 /// a plaintext record

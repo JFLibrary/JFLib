@@ -554,6 +554,10 @@ pub fn vectors(path: &str) -> i32 {
                 s.copy_from_slice(arg(2));
                 Some(alloc::vec![ed25519::verify(&k32(0), arg(1), &s) as u8])
             }
+            // the operations of tools/wycheproof_check.py and tools/limbo_check.py
+            #[cfg(not(target_os = "android"))]
+            _ => crate::suitevec::op(alg, &args),
+            #[cfg(target_os = "android")]
             _ => None,
         };
         out.push_str(&r.map_or(String::from("-"), |v| hex(&v)));

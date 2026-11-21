@@ -7,26 +7,37 @@
 //     .tick(now)                         keep-alives, timeouts, streams that never said CONNECT
 //     .send(conn, payload, now) -> seq   .disconnect(conn, now)
 //     .take_out() -> Out (what to send where, streams to close)   .poll_event() -> ServerEvent
-//   ClientCore::new(ClientConfig, nonce, stream)
+//     .set_static_key(secret) / .public_key()   a long-lived X25519 key clients may pin
+//   ClientCore::new(ClientConfig, random [32], stream)
 //     .start(now) / .packet(bytes, now) / .tick(now) / .send(payload, now) / .disconnect(now)
 //     .transport_closed(code) / .take_out() -> bytes / .poll_event() -> ClientEvent
 //
-// Time is the caller's (microseconds), so tests run them on a virtual clock over a simulated
-// network (apps/nettest).  The UDP handshake: CONNECT (padded) -> CHALLENGE with a stateless
-// cookie, HMAC-SHA256 over the client's address, its nonce and the time -> RESPONSE (padded) with
-// the cookie -> ACCEPT with a random token, which every DATA and DISCONNECT then carries.  Nothing
-// is kept for an address before its RESPONSE proves it receives there, the answers before that
-// are smaller than the requests, and challenges_per_s bounds the work for all of them.  A
-// WebSocket sends CONNECT and gets ACCEPT (token 0); TCP has proved the address.  The token is no
-// encryption: it keeps senders out that do not see the traffic.
+// Time and randomness are the caller's (microseconds; the server's secret, the client's 32 random
+// bytes), so tests run them on a virtual clock over a simulated network (apps/nettest), the same
+// on every run.  The UDP handshake: CONNECT (padded) -> CHALLENGE with a stateless cookie,
+// HMAC-SHA256 over the client's address, its nonce and the time -> RESPONSE (padded) with the
+// cookie and the client's ephemeral X25519 key -> ACCEPT with a random token, the server's
+// ephemeral key and `confirm`, the proof that it derived the same keys (seal.rs).  From then on
+// every DATA and DISCONNECT is sealed with ChaCha20-Poly1305 under keys of this connection alone:
+// who listens reads nothing, a changed, forged or replayed packet is dropped.  With
+// ClientConfig::server_key the keys also need the server's static secret, so nobody on the path
+// can take the server's place; without it they keep out only those who listen.  Nothing is kept
+// for an address before its RESPONSE proves it receives there, the answers before that are
+// smaller than the requests, and challenges_per_s bounds the work for all of them (an HMAC for a
+// CHALLENGE; for an ACCEPT two or three X25519, which a lost ACCEPT does not repeat).  A WebSocket
+// sends CONNECT and gets ACCEPT (token 0, no keys); TCP has proved the address, and wss:// is
+// its encryption.
 
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::vec::Vec;
 
 use plat::net::{IpAddr, SocketAddr};
 
+use crypto::x25519;
+
 use crate::conn::{Bucket, Conn, Event, Settings, Stats};
-use crate::packet::{self, Packet, DATA_HEADER, HANDSHAKE_SIZE, MAX_UDP_PAYLOAD};
+use crate::packet::{self, Packet, DATA_HEADER, DISCONNECT_HEADER, FLAG_STATIC_KEY, HANDSHAKE_SIZE, MAX_UDP_PAYLOAD, TAG};
+use crate::seal::{self, Generator, Handshake, Keys};
 use crate::{Error, Reason, Transport};
 
 /// how long a cookie of a CHALLENGE stays good (seconds)
@@ -121,7 +132,8 @@ pub struct ServerStats {
     pub accepted: u64,
     /// clients refused (full, protocol, address)
     pub denied: u64,
-    /// packets that were no packet, a wrong kind or a wrong cookie or token
+    /// packets that were no packet, a wrong kind, a wrong cookie or token, or a handshake with a
+    /// key that gives no shared secret (forged DATA of a connection: its Stats::forged)
     pub bad: u64,
     /// handshakes over challenges_per_s, left without an answer
     pub throttled: u64,
@@ -134,12 +146,31 @@ struct Peer {
     route: Route,
     nonce: u64,
     addr: Option<SocketAddr>,
+    // UDP: the client's key and the ACCEPT, sent again when its RESPONSE comes again
+    client_key: [u8; 32],
+    accept: Vec<u8>,
+}
+
+/// the server's static X25519 key; zeroed when dropped
+struct StaticKey {
+    secret: [u8; 32],
+    public: [u8; 32],
+}
+
+impl Drop for StaticKey {
+    fn drop(&mut self) {
+        crypto::zeroize(&mut self.secret);
+    }
 }
 
 /// the server's protocol (see the top of this file)
 pub struct ServerCore {
     cfg: ServerConfig,
-    secret: [u8; 32],
+    // the key of the cookies and tokens (from the secret, which is not kept: the generator's seed
+    // cannot be had from this key, so a later leak does not give the past ephemeral keys)
+    mac_key: [u8; 32],
+    keygen: Generator,
+    static_key: Option<StaticKey>,
     tokens: u64,
     peers: BTreeMap<u32, Peer>,
     by_addr: BTreeMap<SocketAddr, u32>,
@@ -153,15 +184,21 @@ pub struct ServerCore {
 }
 
 impl ServerCore {
-    /// a server with these limits; `secret` keys the cookies and tokens (random in a real server,
-    /// fixed in tests)
+    /// a server with these limits; `secret` keys the cookies and tokens and seeds the ephemeral
+    /// keys of the handshakes (random in a real server, fixed in tests)
     pub fn new(cfg: ServerConfig, secret: [u8; 32], now: u64) -> ServerCore {
+        let mut secret = secret;
+        let mac_key = crypto::hmac::hmac_sha256(&secret, b"netchan v2 mac");
+        let keygen = Generator::new(&secret);
+        crypto::zeroize(&mut secret);
         let mut cfg = cfg;
         cfg.max_payload = cfg.max_payload.clamp(1, MAX_UDP_PAYLOAD);
         cfg.max_stream_payload = cfg.max_stream_payload.max(1);
         ServerCore {
             cfg,
-            secret,
+            mac_key,
+            keygen,
+            static_key: None,
             tokens: 0,
             peers: BTreeMap::new(),
             by_addr: BTreeMap::new(),
@@ -180,6 +217,19 @@ impl ServerCore {
         &self.cfg
     }
 
+    /// a long-lived X25519 secret: clients that know its public key (ClientConfig::server_key)
+    /// include it in their keys, so only this server can answer them.  Kept by the app (32 random
+    /// bytes, made once); clients without the key still connect with ephemeral keys only
+    pub fn set_static_key(&mut self, secret: [u8; 32]) {
+        let public = x25519::public_key(&secret);
+        self.static_key = Some(StaticKey { secret, public });
+    }
+
+    /// the public key of set_static_key (for the clients' ClientConfig::server_key)
+    pub fn public_key(&self) -> Option<[u8; 32]> {
+        self.static_key.as_ref().map(|k| k.public)
+    }
+
     fn settings(&self) -> Settings {
         Settings { timeout_ms: self.cfg.timeout_ms, keepalive_ms: self.cfg.keepalive_ms, packets_per_s: self.cfg.packets_per_s, bytes_per_s: self.cfg.bytes_per_s }
     }
@@ -191,7 +241,7 @@ impl ServerCore {
         d[18..26].copy_from_slice(&nonce.to_le_bytes());
         d[26..30].copy_from_slice(&time.to_le_bytes());
         d[30..34].copy_from_slice(b"ck01");
-        let h = crypto::hmac::hmac_sha256(&self.secret, &d);
+        let h = crypto::hmac::hmac_sha256(&self.mac_key, &d);
         let mut m = [0u8; 16];
         m.copy_from_slice(&h[..16]);
         m
@@ -203,7 +253,7 @@ impl ServerCore {
             let mut d = [0u8; 12];
             d[..8].copy_from_slice(&self.tokens.to_le_bytes());
             d[8..].copy_from_slice(b"tk01");
-            let h = crypto::hmac::hmac_sha256(&self.secret, &d);
+            let h = crypto::hmac::hmac_sha256(&self.mac_key, &d);
             let t = u32::from_le_bytes([h[0], h[1], h[2], h[3]]);
             if t != 0 {
                 return t;
@@ -235,20 +285,24 @@ impl ServerCore {
 
     // a peer goes: its bye (UDP several times), its stream closed, the event
     fn remove(&mut self, id: u32, bye: Option<u8>, reason: Reason) {
-        let Some(p) = self.peers.remove(&id) else { return };
+        let Some(mut p) = self.peers.remove(&id) else { return };
+        let mut b = Vec::new();
+        if let Some(r) = bye {
+            p.conn.write_disconnect(r, &mut b);
+        }
         match p.route {
             Route::Udp(a) => {
                 self.by_addr.remove(&a);
-                if let Some(r) = bye {
+                if bye.is_some() {
                     for _ in 0..BYE_COPIES {
-                        self.send_raw(p.route, Packet::Disconnect { token: p.conn.token(), reason: r });
+                        self.out.push_back(Out::Send(p.route, b.clone()));
                     }
                 }
             }
             Route::Stream(s) => {
                 self.by_stream.remove(&s);
-                if let Some(r) = bye {
-                    self.send_raw(p.route, Packet::Disconnect { token: 0, reason: r });
+                if bye.is_some() {
+                    self.out.push_back(Out::Send(p.route, b));
                 }
                 self.out.push_back(Out::Close(s));
             }
@@ -286,16 +340,16 @@ impl ServerCore {
                 self.stats.challenges += 1;
                 self.send_raw(Route::Udp(from), Packet::Challenge { nonce, time, mac });
             }
-            Packet::Response { protocol, nonce, time, mac } => {
-                if data.len() < HANDSHAKE_SIZE || protocol != self.cfg.protocol {
+            Packet::Response { protocol, nonce, time, mac, flags, key } => {
+                if data.len() < HANDSHAKE_SIZE || protocol != self.cfg.protocol || flags & !FLAG_STATIC_KEY != 0 {
                     self.stats.bad += 1;
                     return;
                 }
                 if let Some(&id) = self.by_addr.get(&from) {
-                    if self.peers.get(&id).is_some_and(|p| p.nonce == nonce) {
-                        // the ACCEPT was lost: once more
-                        let (token, max) = (self.peers[&id].conn.token(), self.cfg.max_payload as u16);
-                        self.send_raw(Route::Udp(from), Packet::Accept { nonce, token, max_payload: max });
+                    if let Some(p) = self.peers.get(&id).filter(|p| p.nonce == nonce && p.client_key == key) {
+                        // the ACCEPT was lost: the same bytes once more (no new keys)
+                        let b = p.accept.clone();
+                        self.out.push_back(Out::Send(Route::Udp(from), b));
                         return;
                     }
                 }
@@ -307,6 +361,32 @@ impl ServerCore {
                 if time > now_s || now_s - time > COOKIE_S || !crypto::ct_eq(&mac, &self.cookie(&from, nonce, time)) {
                     self.stats.bad += 1;
                     return;
+                }
+                let stat = flags & FLAG_STATIC_KEY != 0;
+                if stat && self.static_key.is_none() {
+                    self.stats.denied += 1;
+                    self.send_raw(Route::Udp(from), Packet::Deny { nonce, reason: packet::DENY_KEY });
+                    return;
+                }
+                // the keys, before anything changes (a key without a shared secret: nothing happens)
+                let mut eph = self.keygen.next_secret();
+                let server_pub = x25519::public_key(&eph);
+                let dh1 = x25519::shared(&eph, &key);
+                crypto::zeroize(&mut eph);
+                let dh2 = match &self.static_key {
+                    Some(k) if stat => x25519::shared(&k.secret, &key).map(Some),
+                    _ => Some(None),
+                };
+                let (Some(mut dh1), Some(mut dh2)) = (dh1, dh2) else {
+                    self.stats.bad += 1;
+                    return;
+                };
+                let static_pub = self.static_key.as_ref().filter(|_| stat).map(|k| k.public);
+                let hs = Handshake { protocol, nonce, client: &key, server: &server_pub, stat: static_pub.as_ref() };
+                let keys = seal::derive(&hs, &dh1, dh2.as_ref());
+                crypto::zeroize(&mut dh1);
+                if let Some(d) = dh2.as_mut() {
+                    crypto::zeroize(d);
                 }
                 // a new handshake from an address with a connection: the client started again
                 if let Some(&old) = self.by_addr.get(&from) {
@@ -324,12 +404,16 @@ impl ServerCore {
                 }
                 let id = self.new_id();
                 let token = self.new_token();
-                let conn = Conn::new(token, false, self.settings(), now);
-                self.peers.insert(id, Peer { conn, route: Route::Udp(from), nonce, addr: Some(from) });
+                let max = self.cfg.max_payload as u16;
+                let mut accept = Packet::Accept { nonce, token, max_payload: max, key: server_pub, confirm: [0; 16] }.to_vec(false);
+                let at = accept.len() - 16;
+                let confirm = seal::confirm_tag(&keys.confirm, &accept[..at]);
+                accept[at..].copy_from_slice(&confirm);
+                let conn = Conn::new(token, false, self.settings(), now).with_keys(Keys::new(keys.s2c, keys.c2s));
+                self.peers.insert(id, Peer { conn, route: Route::Udp(from), nonce, addr: Some(from), client_key: key, accept: accept.clone() });
                 self.by_addr.insert(from, id);
                 self.stats.accepted += 1;
-                let max = self.cfg.max_payload as u16;
-                self.send_raw(Route::Udp(from), Packet::Accept { nonce, token, max_payload: max });
+                self.out.push_back(Out::Send(Route::Udp(from), accept));
                 self.events.push_back(ServerEvent::Connected { id, transport: Transport::Udp, addr: Some(from) });
             }
             Packet::Data { token, seq, ack, bits, payload } => {
@@ -343,14 +427,15 @@ impl ServerCore {
                     self.stats.bad += 1;
                     return;
                 }
-                if payload.len() > max {
+                if payload.len() > max + TAG {
                     peer.conn.count_dropped();
                     return;
                 }
                 if !peer.conn.rate_ok(data.len(), now) {
                     return;
                 }
-                peer.conn.on_data(seq, ack, bits, payload, now);
+                let Some(plain) = peer.conn.open(data, DATA_HEADER, seq) else { return };
+                peer.conn.on_data(seq, ack, bits, &plain, now);
                 if peer.conn.ack_due() {
                     let mut b = Vec::with_capacity(DATA_HEADER);
                     peer.conn.write_data(&[], now, &mut b);
@@ -358,12 +443,14 @@ impl ServerCore {
                 }
                 self.drain(id);
             }
-            Packet::Disconnect { token, reason } => {
+            Packet::Disconnect { token, seq, reason, .. } => {
                 let Some(&id) = self.by_addr.get(&from) else { return };
-                if self.peers.get(&id).is_some_and(|p| p.conn.token() == token) {
-                    self.remove(id, None, Reason::Peer(reason));
-                } else {
+                let Some(peer) = self.peers.get_mut(&id).filter(|p| p.conn.token() == token) else {
                     self.stats.bad += 1;
+                    return;
+                };
+                if peer.conn.open(data, DISCONNECT_HEADER, seq).is_some() {
+                    self.remove(id, None, Reason::Peer(reason));
                 }
             }
             _ => self.stats.bad += 1,
@@ -424,11 +511,11 @@ impl ServerCore {
         }
         let id = self.new_id();
         let conn = Conn::new(0, true, self.settings(), now);
-        self.peers.insert(id, Peer { conn, route: Route::Stream(stream), nonce, addr });
+        self.peers.insert(id, Peer { conn, route: Route::Stream(stream), nonce, addr, client_key: [0; 32], accept: Vec::new() });
         self.by_stream.insert(stream, id);
         self.stats.accepted += 1;
         let max = self.cfg.max_stream_payload.min(u16::MAX as usize) as u16;
-        self.send_raw(Route::Stream(stream), Packet::Accept { nonce, token: 0, max_payload: max });
+        self.send_raw(Route::Stream(stream), Packet::Accept { nonce, token: 0, max_payload: max, key: [0; 32], confirm: [0; 16] });
         self.events.push_back(ServerEvent::Connected { id, transport: Transport::WebSocket, addr });
     }
 
@@ -536,6 +623,12 @@ impl ServerCore {
     }
 }
 
+impl Drop for ServerCore {
+    fn drop(&mut self) {
+        crypto::zeroize(&mut self.mac_key);
+    }
+}
+
 /// an address as 16 bytes (IPv4 mapped)
 fn ip16(ip: &IpAddr) -> [u8; 16] {
     match ip {
@@ -565,6 +658,11 @@ pub struct ClientConfig {
     pub packets_per_s: u32,
     /// bytes a second from the server, on average (more are dropped)
     pub bytes_per_s: u32,
+    /// UDP: the server's static public key (ServerCore::set_static_key, Server::set_static_key).
+    /// Given, the keys need the server's secret, and a server without it is refused
+    /// (Reason::ServerKey); None: ephemeral keys only, safe from listeners but not from someone
+    /// on the path who answers in the server's place
+    pub server_key: Option<[u8; 32]>,
 }
 
 impl Default for ClientConfig {
@@ -578,6 +676,7 @@ impl Default for ClientConfig {
             resend_ms: 100,
             packets_per_s: 4000,
             bytes_per_s: 16 << 20,
+            server_key: None,
         }
     }
 }
@@ -619,6 +718,9 @@ enum Phase {
 pub struct ClientCore {
     cfg: ClientConfig,
     nonce: u64,
+    // the ephemeral X25519 key of this attempt (UDP; zeroed once the handshake is over)
+    eph: [u8; 32],
+    eph_pub: [u8; 32],
     stream: bool,
     phase: Phase,
     out: VecDeque<Vec<u8>>,
@@ -626,13 +728,45 @@ pub struct ClientCore {
 }
 
 impl ClientCore {
-    /// a client with a random `nonce` (it names this attempt); `stream`: over a WebSocket
-    pub fn new(cfg: ClientConfig, nonce: u64, stream: bool) -> ClientCore {
+    /// a client; `random`: 32 random bytes of this attempt (its nonce and, over UDP, its
+    /// ephemeral key come from them: plat::random_bytes in a real client, fixed in tests);
+    /// `stream`: over a WebSocket
+    pub fn new(cfg: ClientConfig, random: [u8; 32], stream: bool) -> ClientCore {
         let mut cfg = cfg;
         if !stream {
             cfg.max_payload = cfg.max_payload.clamp(1, MAX_UDP_PAYLOAD);
         }
-        ClientCore { cfg, nonce, stream, phase: Phase::Idle, out: VecDeque::new(), events: VecDeque::new() }
+        let n = crypto::hmac::hmac_sha256(&random, b"netchan v2 nonce");
+        let nonce = u64::from_le_bytes([n[0], n[1], n[2], n[3], n[4], n[5], n[6], n[7]]);
+        let (eph, eph_pub) = if stream {
+            ([0; 32], [0; 32])
+        } else {
+            let e = crypto::hmac::hmac_sha256(&random, b"netchan v2 ephemeral");
+            (e, x25519::public_key(&e))
+        };
+        ClientCore { cfg, nonce, eph, eph_pub, stream, phase: Phase::Idle, out: VecDeque::new(), events: VecDeque::new() }
+    }
+
+    fn response(&self, time: u32, mac: [u8; 16]) -> Vec<u8> {
+        let flags = if self.cfg.server_key.is_some() { FLAG_STATIC_KEY } else { 0 };
+        Packet::Response { protocol: self.cfg.protocol, nonce: self.nonce, time, mac, flags, key: self.eph_pub }.to_vec(true)
+    }
+
+    // the keys of an ACCEPT that came: None when its confirm does not check
+    fn accept_keys(&self, accept: &[u8], server_pub: &[u8; 32], confirm: &[u8; 16]) -> Option<Keys> {
+        let mut dh1 = x25519::shared(&self.eph, server_pub)?;
+        let mut dh2 = match &self.cfg.server_key {
+            Some(s) => Some(x25519::shared(&self.eph, s)?),
+            None => None,
+        };
+        let hs = Handshake { protocol: self.cfg.protocol, nonce: self.nonce, client: &self.eph_pub, server: server_pub, stat: self.cfg.server_key.as_ref() };
+        let keys = seal::derive(&hs, &dh1, dh2.as_ref());
+        crypto::zeroize(&mut dh1);
+        if let Some(d) = dh2.as_mut() {
+            crypto::zeroize(d);
+        }
+        let want = seal::confirm_tag(&keys.confirm, &accept[..accept.len() - 16]);
+        crypto::ct_eq(&want, confirm).then(|| Keys::new(keys.c2s, keys.s2c))
     }
 
     fn connect_packet(&self) -> Vec<u8> {
@@ -648,6 +782,7 @@ impl ClientCore {
     }
 
     fn end(&mut self, reason: Reason) {
+        crypto::zeroize(&mut self.eph);
         if !matches!(self.phase, Phase::Done(_)) {
             self.phase = Phase::Done(reason.clone());
             self.events.push_back(ClientEvent::Disconnected(reason));
@@ -673,26 +808,43 @@ impl ClientCore {
             (Phase::Connecting { last, cookie, .. }, Packet::Challenge { nonce: n, time, mac }) if n == nonce && !self.stream => {
                 *cookie = Some((time, mac));
                 *last = now;
-                let r = Packet::Response { protocol: self.cfg.protocol, nonce, time, mac }.to_vec(true);
+                let r = self.response(time, mac);
                 self.out.push_back(r);
             }
-            (Phase::Connecting { .. }, Packet::Accept { nonce: n, token, max_payload }) if n == nonce => {
+            (Phase::Connecting { .. }, Packet::Accept { nonce: n, token, max_payload, key, confirm }) if n == nonce => {
                 let set = Settings { timeout_ms: self.cfg.timeout_ms, keepalive_ms: self.cfg.keepalive_ms, packets_per_s: self.cfg.packets_per_s, bytes_per_s: self.cfg.bytes_per_s };
                 let cap = if self.stream { usize::MAX } else { MAX_UDP_PAYLOAD };
-                self.phase = Phase::Connected { conn: Conn::new(token, self.stream, set, now), max_send: (max_payload as usize).clamp(1, cap) };
+                let mut conn = Conn::new(token, self.stream, set, now);
+                if !self.stream {
+                    match self.accept_keys(data, &key, &confirm) {
+                        Some(k) => conn = conn.with_keys(k),
+                        // a pinned key that does not check: the wrong server (or someone in its
+                        // place); without one, an ACCEPT that is not the server's
+                        None if self.cfg.server_key.is_some() => return self.end(Reason::ServerKey),
+                        None => return,
+                    }
+                    crypto::zeroize(&mut self.eph);
+                }
+                self.phase = Phase::Connected { conn, max_send: (max_payload as usize).clamp(1, cap) };
                 self.events.push_back(ClientEvent::Connected);
             }
             (Phase::Connecting { .. }, Packet::Deny { nonce: n, reason }) if n == nonce => {
-                self.end(if reason == packet::DENY_PROTOCOL { Reason::Protocol } else { Reason::Full });
+                self.end(match reason {
+                    packet::DENY_PROTOCOL => Reason::Protocol,
+                    packet::DENY_KEY => Reason::ServerKey,
+                    _ => Reason::Full,
+                });
             }
             (Phase::Connected { conn, .. }, Packet::Data { token, seq, ack, bits, payload }) if token == conn.token() => {
-                if payload.len() > self.cfg.max_payload || !conn.rate_ok(data.len(), now) {
-                    if payload.len() > self.cfg.max_payload {
+                let tag = if conn.sealed() { TAG } else { 0 };
+                if payload.len() > self.cfg.max_payload + tag || !conn.rate_ok(data.len(), now) {
+                    if payload.len() > self.cfg.max_payload + tag {
                         conn.count_dropped();
                     }
                     return;
                 }
-                conn.on_data(seq, ack, bits, payload, now);
+                let Some(plain) = conn.open(data, DATA_HEADER, seq) else { return };
+                conn.on_data(seq, ack, bits, &plain, now);
                 if conn.ack_due() {
                     let mut b = Vec::with_capacity(DATA_HEADER);
                     conn.write_data(&[], now, &mut b);
@@ -700,7 +852,11 @@ impl ClientCore {
                 }
                 self.drain();
             }
-            (Phase::Connected { conn, .. }, Packet::Disconnect { token, reason }) if token == conn.token() => self.end(Reason::Peer(reason)),
+            (Phase::Connected { conn, .. }, Packet::Disconnect { token, seq, reason, .. }) if token == conn.token() => {
+                if conn.open(data, DISCONNECT_HEADER, seq).is_some() {
+                    self.end(Reason::Peer(reason));
+                }
+            }
             _ => {}
         }
     }
@@ -713,8 +869,9 @@ impl ClientCore {
                     self.end(Reason::ConnectTimeout);
                 } else if !self.stream && now.saturating_sub(*last) >= self.cfg.resend_ms as u64 * 1000 {
                     *last = now;
+                    let cookie = *cookie;
                     let p = match cookie {
-                        Some((time, mac)) => Packet::Response { protocol: self.cfg.protocol, nonce: self.nonce, time: *time, mac: *mac }.to_vec(true),
+                        Some((time, mac)) => self.response(time, mac),
                         None => Packet::Connect { protocol: self.cfg.protocol, nonce: self.nonce }.to_vec(true),
                     };
                     self.out.push_back(p);
@@ -750,8 +907,9 @@ impl ClientCore {
 
     /// end the connection (DISCONNECT goes out; UDP several times)
     pub fn disconnect(&mut self) {
-        if let Phase::Connected { conn, .. } = &self.phase {
-            let b = Packet::Disconnect { token: conn.token(), reason: packet::BYE_NORMAL }.to_vec(false);
+        if let Phase::Connected { conn, .. } = &mut self.phase {
+            let mut b = Vec::new();
+            conn.write_disconnect(packet::BYE_NORMAL, &mut b);
             for _ in 0..if self.stream { 1 } else { BYE_COPIES } {
                 self.out.push_back(b.clone());
             }
@@ -802,5 +960,11 @@ impl ClientCore {
             Phase::Connected { conn, .. } => conn.stats(),
             _ => Stats::default(),
         }
+    }
+}
+
+impl Drop for ClientCore {
+    fn drop(&mut self) {
+        crypto::zeroize(&mut self.eph);
     }
 }

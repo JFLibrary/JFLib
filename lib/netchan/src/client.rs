@@ -100,7 +100,7 @@ impl Client {
                     if !crate::reap::spawn(128 * 1024, move || udp_reader(s, addr, i, st)) {
                         return Err(Error::Net(plat::net::NetError::new(plat::net::NetErrorKind::Other, 0)));
                     }
-                    let mut core = ClientCore::new(cfg, plat::random_u64(), false);
+                    let mut core = ClientCore::new(cfg, plat::random_bytes::<32>(), false);
                     core.start(now());
                     let mut c = Client { core, io: Io::Udp(Udp { sock, server: addr, inbox, stop }) };
                     c.flush();
@@ -115,7 +115,7 @@ impl Client {
             Endpoint::WebSocket(url) => {
                 let o = WsOptions { max_message: cfg.max_payload + DATA_HEADER, connect_ms: cfg.connect_ms, idle_ms: cfg.timeout_ms.saturating_mul(2), ping_ms: 0, ..WsOptions::default() };
                 let ws = WebSocket::connect_with(&url, o)?;
-                Ok(Client { core: ClientCore::new(cfg, nonce(), true), io: Io::Ws { ws, started: false, max_unsent: o.max_unsent } })
+                Ok(Client { core: ClientCore::new(cfg, ws_random(), true), io: Io::Ws { ws, started: false, max_unsent: o.max_unsent } })
             }
         }
     }
@@ -240,15 +240,18 @@ impl Drop for Client {
     }
 }
 
-// the nonce of an attempt: random where the system has a generator (the browser's WebSocket
-// needs none that is secret: TCP proved the address)
-fn nonce() -> u64 {
+// the random bytes of a WebSocket attempt (only its nonce comes from them): random where the
+// system has a generator; the browser's needs none that is secret (TCP proved the address, and a
+// WebSocket has no keys of its own)
+fn ws_random() -> [u8; 32] {
     #[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
     {
-        plat::random_u64()
+        plat::random_bytes::<32>()
     }
     #[cfg(not(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android")))]
     {
-        plat::time_us() ^ 0x9e37_79b9_7f4a_7c15
+        let mut r = [0u8; 32];
+        r[..8].copy_from_slice(&(plat::time_us() ^ 0x9e37_79b9_7f4a_7c15).to_le_bytes());
+        r
     }
 }

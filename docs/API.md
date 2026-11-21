@@ -82,12 +82,14 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#datetime-crate-root) · [cron.rs](#datetimecronrs) · [tz.rs](#datetimetzrs)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
   <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs) · [md5.rs](#cryptomd5rs) · [eappwd.rs](#cryptoeappwdrs)
+- [x509](#x509) -- X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)
+  <br>[lib.rs](#x509-crate-root) · [der.rs](#x509derrs) · [ip.rs](#x509iprs)
 - [compress](#compress) -- DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids
   <br>[lib.rs](#compress-crate-root) · [brotli/mod.rs](#compressbrotlimodrs) · [checksum.rs](#compresschecksumrs) · [deflate/mod.rs](#compressdeflatemodrs) · [deflate/dec.rs](#compressdeflatedecrs) · [deflate/enc.rs](#compressdeflateencrs) · [gzip.rs](#compressgziprs) · [lz4.rs](#compresslz4rs) · [xxh.rs](#compressxxhrs) · [zlib.rs](#compresszlibrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/enc.rs](#compresszstdencrs)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery
   <br>[lib.rs](#datastore-crate-root) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
-  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [der.rs](#netioderrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs) · [x509.rs](#netiox509rs)
+  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng
   <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs) · [uri.rs](#netpkturirs) · [ssh.rs](#netpktsshrs) · [snmpv3.rs](#netpktsnmpv3rs) · [eap.rs](#netpkteaprs) · [imap.rs](#netpktimaprs) · [cookie.rs](#netpktcookiers) · [x509.rs](#netpktx509rs) · [tls.rs](#netpkttlsrs)
 - [eapm](#eapm) -- EAP-MD5 and EAP-PWD as peer and server state machines without I/O
@@ -127,7 +129,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
   <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/csg.rs](#geomsrccsgrs) · [src/exact.rs](#geomsrcexactrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
 - [netchan](#netchan) -- Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network
-  <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
+  <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/seal.rs](#netchansrcsealrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 
 ## ui
 
@@ -42037,7 +42039,8 @@ crypto -- the primitives BackupCraft (and anything else) builds on, in plain Rus
 No randomness here: callers pass random bytes in (plat::fill_random on Windows, Linux, Apple
 and Android; in the browser the page's crypto.getRandomValues), so everything is
 deterministic and testable.  Secret-dependent work avoids branches and table lookups
-(field arithmetic with 51-bit limbs, masked conditional swaps and selects).
+(field arithmetic with 51-bit limbs, masked conditional swaps and selects); every mask made
+from secret data passes ct_mask, so the optimizer cannot turn a select back into a branch.
 ```
 
 ### `crypto` crate root
@@ -42071,10 +42074,11 @@ deterministic and testable.  Secret-dependent work avoids branches and table loo
   overwrite a secret (the write is kept even though nothing reads the buffer afterwards)
 
 - **`fn hex(data: &[u8]) -> String`**
-  lower-case hex
+  lower-case hex (without a table: keys are printed this way too)
 
 - **`fn unhex(s: &str) -> Option<Vec<u8>>`**
-  the bytes of a hex string (upper or lower case; None on odd length or other characters)
+  the bytes of a hex string (upper or lower case; None on odd length or other characters).
+  Every character is looked at before the answer, without a branch on it
 
 ### `crypto/aead.rs`
 
@@ -42539,7 +42543,7 @@ points are x || y (64 bytes, both big endian), scalars 32 bytes big endian
 
   below_p(x)                               x is a coordinate: smaller than p
   y_for_x(x, odd) -> Option<[u8; 32]>      the y of a point with this x and parity (None: no such
-                                           point; variable time, only for public or hashed x)
+                                           point); no branch on x before the answer
   on_curve(point)                          both coordinates in range and the curve equation
   mul_point(k, point) -> Option<point>     k * point (None: not on the curve, or the identity)
   add_points(a, b) -> Option<point>        a + b (None: not on the curve, or the identity)
@@ -42555,7 +42559,7 @@ multiplication by four-bit windows with a table read in full for every window.
 ```
 
 - **`fn secret_from(random: &[u8; 32]) -> Option<[u8; 32]>`**
-  a scalar in [1, n - 1] from random bytes (None: draw again)
+  a scalar in [1, n - 1] from random bytes (None: draw again); only the answer is a branch
 
 - **`fn public_key(secret: &[u8; 32]) -> [u8; 65]`**
   the public key of a secret scalar: 04 || x || y
@@ -42921,6 +42925,289 @@ ROUNDS: u8 = 40
 - **`fn keys(ss: &[u8; 32], confirm_p: &[u8; 32], confirm_s: &[u8; 32], scalar_p: &[u8; 32], scalar_s: &[u8; 32]) -> ([u8; 64], [u8; 64])`**
   MK = H(ss | Confirm_P | Confirm_S), stretched with the session id (the type byte 52 and
   H(ciphersuite | Scalar_P | Scalar_S)) to 128 bytes: the MSK, then the EMSK
+
+## x509
+
+*X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)* -- crate root [`lib/x509/lib.rs`](../lib/x509/lib.rs)
+
+```text
+x509 -- certificates (RFC 5280) for all of JFLib: netio's TLS and https, netpkt's TLS core and
+simulators.  A program's own private PKI (Ed25519, RFC 8410; built and signed here) and the
+public web PKI (RSA and P-256 / P-384 keys; RSA PKCS #1 v1.5 / PSS and ECDSA signatures with
+SHA-256 / 384 / 512), parsed strictly; no I/O, no clock (the caller passes the time)
+
+  der                                     the DER reader and writer certificates need
+  IpAddr                                  addresses in names (octets, parse, RFC 5952 text)
+  Cert::parse(der) -> Option<Cert>        subject / issuer, validity, key, CA flag, names,
+                                          key and extended key usage, name constraints,
+                                          unknown critical extensions noticed
+  cert.fingerprint() -> SHA-256 (hex)     fingerprint_bytes(), fingerprint_text() (colons)
+  cert.signed_by(&issuer) -> bool         self_signed(), names(host), name_list(), bytes()
+  cert.verify(alg, data, sig)             a signature made with the certificate's key
+  verify_chain(&[leaf, ...], &anchors, now, name, usage) -> Result<(), String>   builds a
+                                          path through the given intermediates to an anchor
+  CertBuilder { .. }.sign(&issuer_cert_or_self, &issuer_key) -> DER
+
+Not checked: revocation (CRL / OCSP), certificate policies.  Name constraints are processed
+for DNS names, IP addresses, e-mail addresses (rfc822Name), URIs (their host) and directory
+names (a byte-wise prefix of the subject's RDNs); a CA that constrains another form refuses
+every certificate below it that has a name of that form (RFC 5280 4.2.1.10).  They apply to
+the leaf and to the intermediates below the CA, self-issued ones excepted (6.1.3 (b)).
+```
+
+### `x509` crate root
+
+```rust
+OID_ED25519: &[u64] = &[1, 3, 101, 112]
+/// key usage bits as they appear in the first byte
+KU_DIGITAL_SIGNATURE: u8 = 0x80
+KU_KEY_CERT_SIGN: u8 = 0x04
+KU_CRL_SIGN: u8 = 0x02
+```
+
+- **`enum Usage`**
+  - `Server`
+  - `Client`
+
+- **`enum PubKey`**
+  a public key
+  - `Other` -- a key type this code does not use
+  - `Ed25519([u8; 32])`
+  - `Rsa { n: Vec<u8>, e: Vec<u8> }` -- modulus and exponent, big-endian
+  - `Ec { curve: Curve, point: Vec<u8> }` -- an uncompressed point (04 || x || y)
+
+- **`enum SigAlg`**
+  a signature algorithm (of certificates and of TLS handshakes)
+  - `Unknown`
+  - `Ed25519`
+  - `RsaPkcs1(HashAlg)`
+  - `RsaPss(HashAlg, Option<usize>)` -- salt length None: any (TLS fixes it to the hash length)
+  - `Ecdsa(HashAlg)`
+
+- **`struct NameConstraints`**
+  the name constraints of a CA
+  - `permitted_dns: Vec<String>`
+  - `excluded_dns: Vec<String>`
+  - `permitted_ip: Vec<Vec<u8>>` -- address and mask (4 + 4 or 16 + 16 bytes)
+  - `excluded_ip: Vec<Vec<u8>>`
+  - `permitted_email: Vec<String>` -- rfc822Name subtrees, lower case: a mailbox ("a@example.com"), all mailboxes of a host
+    ("example.com") or of the subdomains of a domain (".example.com")
+  - `excluded_email: Vec<String>`
+  - `permitted_uri: Vec<String>` -- uniformResourceIdentifier subtrees, lower case: the URI's host ("example.com") or the
+    subdomains of a domain (".example.com")
+  - `excluded_uri: Vec<String>`
+  - `permitted_dn: Vec<Vec<u8>>` -- directoryName subtrees (the DER of a Name): the subject begins with its RDNs
+  - `excluded_dn: Vec<Vec<u8>>`
+  - `other_forms: Vec<u8>` -- the GeneralName tags of constrained forms not processed here (otherName 0xa0,
+    x400Address 0xa3, ediPartyName 0xa5, registeredID 0x88)
+
+- **`struct Cert`**
+  - `der: Vec<u8>`
+  - `tbs: Vec<u8>`
+  - `serial: Vec<u8>`
+  - `issuer: Vec<u8>` -- the raw DER of the issuer and subject names (compared byte for byte)
+  - `subject: Vec<u8>`
+  - `subject_cn: String`
+  - `subject_org: String` -- the subject's organization, the issuer's common name and organization (for dialogs)
+  - `issuer_cn: String`
+  - `issuer_org: String`
+  - `not_before: i64`
+  - `not_after: i64`
+  - `public_key: Vec<u8>` -- Ed25519 public key (empty for other key types)
+  - `key: PubKey`
+  - `ed25519_signed: bool`
+  - `sig_alg: SigAlg`
+  - `signature: Vec<u8>`
+  - `version: u8` -- 1 or 3
+  - `name_constraints: Option<NameConstraints>`
+  - `is_ca: bool`
+  - `path_len: Option<u64>`
+  - `key_usage: Option<u8>`
+  - `eku: Vec<Vec<u8>>`
+  - `dns: Vec<String>`
+  - `ips: Vec<IpAddr>`
+  - `emails: Vec<String>` -- rfc822Name entries of the subject alternative name and emailAddress attributes of the
+    subject (lower case): what e-mail name constraints apply to
+  - `uris: Vec<String>` -- uniformResourceIdentifier entries of the subject alternative name
+  - `dirs: Vec<Vec<u8>>` -- directoryName entries of the subject alternative name (the DER of each Name)
+  - `other_names: Vec<u8>` -- the tags of subject alternative names of other forms (otherName 0xa0, x400Address 0xa3,
+    ediPartyName 0xa5, registeredID 0x88)
+  - `ski: Vec<u8>`
+  - `unknown_critical: bool` -- a critical extension this code does not understand (such a certificate is rejected)
+
+**`impl Cert`**
+
+- **`fn parse(bytes: &[u8]) -> Option<Cert>`**
+- **`fn fingerprint_bytes(&self) -> [u8; 32]`**
+  SHA-256 of the certificate
+- **`fn fingerprint_text(&self) -> String`**
+  the fingerprint in hex with colons, as certificate dialogs write it
+- **`fn self_signed(&self) -> bool`**
+  it names itself as issuer and its own key made the signature
+- **`fn ed25519_key(&self) -> Option<[u8; 32]>`**
+  its Ed25519 key (None for another kind)
+- **`fn name_list(&self) -> Vec<String>`**
+  what its names are, for a dialog: the DNS names, then the addresses
+- **`fn bytes(&self) -> usize`**
+  bytes it holds (an estimate for a memory budget)
+- **`fn fingerprint(&self) -> String`**
+  SHA-256 of the certificate (hex)
+- **`fn verify(&self, alg: SigAlg, data: &[u8], sig: &[u8]) -> bool`**
+  whether a signature over `data` was made with this certificate's key
+- **`fn signed_by(&self, issuer: &Cert) -> bool`**
+  whether `issuer` signed this certificate
+- **`fn names(&self, host: &str) -> bool`**
+  whether the certificate names this host (DNS name, case-insensitive; IP address)
+
+- **`fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&str>, usage: Usage) -> Result<(), String>`**
+  check a chain (leaf first) against trusted anchors: a path from the leaf through the other
+  certificates of the chain (in any order) to an anchor
+
+- **`struct CertBuilder`**
+  what a new certificate says
+  - `serial: [u8; 16]`
+  - `cn: String`
+  - `org: String`
+  - `not_before: i64`
+  - `not_after: i64`
+  - `public_key: [u8; 32]`
+  - `is_ca: bool`
+  - `dns: Vec<String>`
+  - `ips: Vec<IpAddr>`
+  - `server_auth: bool`
+  - `client_auth: bool`
+
+- **`fn extension(oid: &[u64], critical: bool, value: &[u8]) -> Vec<u8>`**
+  a DER Extension (oid, the critical flag, the DER value) for CertBuilder::sign_ext
+
+**`impl CertBuilder`**
+
+- **`fn sign(&self, issuer: Option<&Cert>, key: &Keypair) -> Vec<u8>`**
+  the DER certificate, signed by `key`; `issuer`: the issuing certificate (None: self
+  signed with the builder's own name)
+- **`fn sign_ext(&self, issuer: Option<&Cert>, key: &Keypair, extra: &[Vec<u8>]) -> Vec<u8>`**
+  sign with further extensions (each one from `extension`: name constraints, a CA's
+  extended key usage ...); one with the OID of an extension the builder writes itself
+  replaces that one (basic constraints without a path length, other key usages)
+
+- **`fn ed25519_pkcs8(seed: &[u8; 32]) -> Vec<u8>`**
+  the PKCS#8 form of an Ed25519 private key (for interoperable PEM files)
+
+- **`fn ed25519_from_pkcs8(b: &[u8]) -> Option<[u8; 32]>`**
+  the seed of a PKCS#8 Ed25519 private key
+
+### `x509/der.rs`
+
+Source: [`lib/x509/der.rs`](../lib/x509/der.rs)
+
+```text
+der -- the DER subset X.509 needs: a bounded reader (definite lengths, no indefinite
+forms, at most 16 MiB per element) and a writer
+
+  Der::new(bytes).read(tag) -> Option<(content, rest)>, peek_tag, int, oid, ...
+  writer: tlv(tag, content), seq(&[parts]), int_u(bytes), oid(&[arcs]), utf8(s) ...
+```
+
+```rust
+BOOLEAN: u8 = 0x01
+INTEGER: u8 = 0x02
+BIT_STRING: u8 = 0x03
+OCTET_STRING: u8 = 0x04
+NULL: u8 = 0x05
+OID: u8 = 0x06
+UTF8: u8 = 0x0c
+PRINTABLE: u8 = 0x13
+IA5: u8 = 0x16
+UTC_TIME: u8 = 0x17
+GEN_TIME: u8 = 0x18
+SEQUENCE: u8 = 0x30
+SET: u8 = 0x31
+```
+
+- **`struct Der<'a>`**
+  a cursor over DER bytes
+  - `b: &'a [u8]`
+
+**`impl<'a> Der<'a>`**
+
+- **`fn new(b: &'a [u8]) -> Der<'a>`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn peek_tag(&self) -> Option<u8>`**
+- **`fn next(&mut self) -> Option<(u8, &'a [u8], &'a [u8])>`**
+  the next element: (tag, content, the whole element)
+- **`fn read(&mut self, tag: u8) -> Option<&'a [u8]>`**
+  the next element with this tag -> its content
+- **`fn read_raw(&mut self, tag: u8) -> Option<&'a [u8]>`**
+  the next element with this tag -> the whole element (for signatures over it)
+- **`fn optional(&mut self, tag: u8) -> Option<&'a [u8]>`**
+  an optional element with this tag
+- **`fn seq(&mut self) -> Option<Der<'a>>`**
+- **`fn u64(&mut self) -> Option<u64>`**
+  a non-negative INTEGER up to 64 bits
+- **`fn bool(&mut self) -> Option<bool>`**
+- **`fn bits(&mut self) -> Option<&'a [u8]>`**
+  a BIT STRING without unused bits -> its bytes
+
+- **`fn oid_bytes(arcs: &[u64]) -> Vec<u8>`**
+  the encoded OID content of dotted arcs
+
+- **`fn tlv(tag: u8, content: &[u8]) -> Vec<u8>`**
+
+- **`fn seq(parts: &[&[u8]]) -> Vec<u8>`**
+
+- **`fn set(parts: &[&[u8]]) -> Vec<u8>`**
+
+- **`fn int_u(b: &[u8]) -> Vec<u8>`**
+  an INTEGER of unsigned big-endian bytes (leading zeros dropped, a zero byte added when
+  the top bit is set)
+
+- **`fn small_int(v: u64) -> Vec<u8>`**
+
+- **`fn oid(arcs: &[u64]) -> Vec<u8>`**
+
+- **`fn utf8(s: &str) -> Vec<u8>`**
+
+- **`fn octets(b: &[u8]) -> Vec<u8>`**
+
+- **`fn bits(b: &[u8]) -> Vec<u8>`**
+
+- **`fn boolean(v: bool) -> Vec<u8>`**
+
+- **`fn explicit(n: u8, content: &[u8]) -> Vec<u8>`**
+  [n] EXPLICIT
+
+### `x509/ip.rs`
+
+Source: [`lib/x509/ip.rs`](../lib/x509/ip.rs)
+
+```text
+ip -- the IP addresses of certificates (subject alternative names, name constraints), as
+plain octets with a parser and the text form of RFC 5952; the same shape as plat::net::IpAddr
+(this crate needs no platform), so `IpAddr::from_octets` and `octets` convert
+```
+
+- **`enum IpAddr`**
+  - `V4([u8; 4])`
+  - `V6([u8; 16])`
+
+**`impl IpAddr`**
+
+- **`const LOCALHOST_V4: IpAddr = IpAddr::V4([127, 0, 0, 1])`**
+- **`const UNSPECIFIED_V4: IpAddr = IpAddr::V4([0, 0, 0, 0])`**
+- **`const LOCALHOST_V6: IpAddr = IpAddr::V6([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])`**
+- **`fn is_loopback(&self) -> bool`**
+- **`fn is_unspecified(&self) -> bool`**
+- **`fn mapped_v4(&self) -> Option<IpAddr>`**
+  the IPv4 address inside an IPv4-mapped IPv6 address (::ffff:a.b.c.d)
+- **`fn parse(s: &str) -> Option<IpAddr>`**
+  "192.168.1.2" or "fe80::1" (RFC 5952 shortening)
+
+**`impl IpAddr`**
+
+- **`fn from_octets(b: &[u8]) -> Option<IpAddr>`**
+  the address of 4 or 16 octets (None for another length)
+- **`fn octets(&self) -> &[u8]`**
+  its 4 or 16 octets
 
 ## compress
 
@@ -43530,8 +43817,9 @@ netio -- network protocols on top of plat::net
   tls        TLS 1.3 for own deployments (ChaCha20-Poly1305, X25519, Ed25519, mutual auth)
              and a client for public servers (AES-GCM, RSA / ECDSA, TLS 1.2 fallback):
              connect / accept -> TlsStream (a Stream)
-  x509 / der / pem   certificates: Ed25519 of a private CA (parse, build, verify chains) and
-             the RSA / ECDSA certificates of the web PKI
+  x509 / der the crate jflib-x509 (re-exported): certificates of a private Ed25519 CA (parse,
+             build, verify chains) and the RSA / ECDSA certificates of the web PKI
+  pem        PEM blocks
   roots      the system's certificate authorities (Windows: CryptoAPI; Linux: the bundle)
   ssh        SSH-2 client (curve25519, ssh-ed25519, chacha20-poly1305): run commands with
              stdin; the server side of the transport for tests
@@ -43548,6 +43836,10 @@ error answer or a closed connection, never a panic.
 ```
 
 ### `netio` crate root
+
+Re-exports: `x509`
+
+Re-exports: `x509::der`
 
 - **`trait Stream: Send + Sync`**
   a byte stream HTTP runs over (shared between a reader and a writer: &self methods)
@@ -43641,86 +43933,6 @@ an optional connector for https (TLS wraps the TCP connection)
 - **`fn json_headers(token: &str) -> Headers`**
   "Bearer &lt;token>" headers plus JSON content type
 
-### `netio/der.rs`
-
-Source: [`lib/netio/der.rs`](../lib/netio/der.rs)
-
-```text
-der -- the DER subset X.509 needs: a bounded reader (definite lengths, no indefinite
-forms, at most 16 MiB per element) and a writer
-
-  Der::new(bytes).read(tag) -> Option<(content, rest)>, peek_tag, int, oid, ...
-  writer: tlv(tag, content), seq(&[parts]), int_u(bytes), oid(&[arcs]), utf8(s) ...
-```
-
-```rust
-BOOLEAN: u8 = 0x01
-INTEGER: u8 = 0x02
-BIT_STRING: u8 = 0x03
-OCTET_STRING: u8 = 0x04
-NULL: u8 = 0x05
-OID: u8 = 0x06
-UTF8: u8 = 0x0c
-PRINTABLE: u8 = 0x13
-IA5: u8 = 0x16
-UTC_TIME: u8 = 0x17
-GEN_TIME: u8 = 0x18
-SEQUENCE: u8 = 0x30
-SET: u8 = 0x31
-```
-
-- **`struct Der<'a>`**
-  a cursor over DER bytes
-  - `b: &'a [u8]`
-
-**`impl<'a> Der<'a>`**
-
-- **`fn new(b: &'a [u8]) -> Der<'a>`**
-- **`fn is_empty(&self) -> bool`**
-- **`fn peek_tag(&self) -> Option<u8>`**
-- **`fn next(&mut self) -> Option<(u8, &'a [u8], &'a [u8])>`**
-  the next element: (tag, content, the whole element)
-- **`fn read(&mut self, tag: u8) -> Option<&'a [u8]>`**
-  the next element with this tag -> its content
-- **`fn read_raw(&mut self, tag: u8) -> Option<&'a [u8]>`**
-  the next element with this tag -> the whole element (for signatures over it)
-- **`fn optional(&mut self, tag: u8) -> Option<&'a [u8]>`**
-  an optional element with this tag
-- **`fn seq(&mut self) -> Option<Der<'a>>`**
-- **`fn u64(&mut self) -> Option<u64>`**
-  a non-negative INTEGER up to 64 bits
-- **`fn bool(&mut self) -> Option<bool>`**
-- **`fn bits(&mut self) -> Option<&'a [u8]>`**
-  a BIT STRING without unused bits -> its bytes
-
-- **`fn oid_bytes(arcs: &[u64]) -> Vec<u8>`**
-  the encoded OID content of dotted arcs
-
-- **`fn tlv(tag: u8, content: &[u8]) -> Vec<u8>`**
-
-- **`fn seq(parts: &[&[u8]]) -> Vec<u8>`**
-
-- **`fn set(parts: &[&[u8]]) -> Vec<u8>`**
-
-- **`fn int_u(b: &[u8]) -> Vec<u8>`**
-  an INTEGER of unsigned big-endian bytes (leading zeros dropped, a zero byte added when
-  the top bit is set)
-
-- **`fn small_int(v: u64) -> Vec<u8>`**
-
-- **`fn oid(arcs: &[u64]) -> Vec<u8>`**
-
-- **`fn utf8(s: &str) -> Vec<u8>`**
-
-- **`fn octets(b: &[u8]) -> Vec<u8>`**
-
-- **`fn bits(b: &[u8]) -> Vec<u8>`**
-
-- **`fn boolean(v: bool) -> Vec<u8>`**
-
-- **`fn explicit(n: u8, content: &[u8]) -> Vec<u8>`**
-  [n] EXPLICIT
-
 ### `netio/dns.rs`
 
 Source: [`lib/netio/dns.rs`](../lib/netio/dns.rs)
@@ -43742,7 +43954,9 @@ plat::net::ip_scope_parse), the adapter's index on Windows.  A server whose zone
 interface of this computer is left out.
 
 Queries: A and AAAA over UDP (2 s per server and attempt, two rounds), over TCP when the answer
-is truncated; an answer must come from the server asked and carry the query's id and question.
+is truncated; an answer must come from the server asked and carry the query's id and question,
+and only addresses of the asked name count, or of the name its CNAME chain in the answer leads
+to (at most 8 steps): records for other names in an answer are ignored.
 IPv4 addresses come first.  Not here: DNSSEC validation, mDNS, caching.
 
 The app's permissions: a name its net.connect rules do not cover fails with
@@ -43943,14 +44157,16 @@ MAX_HEADERS: usize = 100
 Source: [`lib/netio/pem.rs`](../lib/netio/pem.rs)
 
 ```text
-pem -- "-----BEGIN LABEL-----" blocks (RFC 7468)
+pem -- "-----BEGIN LABEL-----" blocks (RFC 7468): each marker on a line of its own
 ```
 
 - **`fn encode(label: &str, der: &[u8]) -> String`**
   a PEM block of DER bytes
 
 - **`fn decode_all(text: &str, label: &str) -> Vec<Vec<u8>>`**
-  every block with this label, decoded
+  every block with this label, decoded.  Read line by line: the lines of a body (a private key
+  is secret) are only compared with the markers, which no Base64 line equals (none begins with
+  '-'); no substring search runs over them, whose steps would depend on the characters
 
 - **`fn decode(text: &str, label: &str) -> Option<Vec<u8>>`**
   the first block with this label
@@ -44276,6 +44492,14 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   - `Any` -- anything (only to read the fingerprint for a trust decision)
   - `System(Vec<Cert>)` -- the operating system's certificate authorities, and these as well (a company CA);
     allows TLS 1.2 and the public suites (crate::roots)
+  - `Custom(Verifier)` -- a check the program brings (a PKI of its own, keys pinned by their SPKI, Certificate
+    Transparency, the platform's verifier, a test peer); a client offers with it what it
+    offers with System (TLS 1.2, the public suites)
+
+- **`type Verifier = Arc<dyn Fn(&[Cert], &str, i64) -> Result<(), String> + Send + Sync>`**
+  the check of Trust::Custom: the certificates the peer sent that could be read (leaf first),
+  the name the client asked for ("" for a client's certificate) and the time (Unix seconds) ->
+  Ok, or why they are refused (the handshake ends with bad_certificate)
 
 - **`struct ClientConfig`**
   - `trust: Trust`
@@ -44330,14 +44554,17 @@ conn -- the TLS handshake and the record stream, without I/O
   established(), peer_cert(), version(), suite()
 
 Our own servers and agents (private PKI): TLS 1.3 with TLS_CHACHA20_POLY1305_SHA256, X25519,
-Ed25519 signatures and certificates, a HelloRetryRequest when the client offered X25519
-without a key share (or a cookie), mutual authentication.  The server side speaks only that.
+Ed25519 signatures and certificates, mutual authentication.  The server also takes what RFC
+8446 9.1 makes mandatory, TLS_AES_128_GCM_SHA256 and P-256 (secp256r1) key shares, sends a
+HelloRetryRequest for X25519 or P-256 when the client offered no usable share, and a dummy
+change_cipher_spec for middleboxes (D.4); its certificate and signatures are Ed25519 only.
 
 A client that trusts the system's certificate authorities (Trust::System: mail servers,
 update servers, web hooks) also offers TLS_AES_128_GCM_SHA256, RSA (PKCS #1 v1.5 / PSS) and
 ECDSA (P-256 / P-384) signatures and the P-256 key exchange (after a HelloRetryRequest),
 and falls back to TLS 1.2 with ECDHE (X25519 or P-256) and AEAD suites (AES-128-GCM,
-ChaCha20-Poly1305), the extended master secret and the TLS 1.3 downgrade check.  Private
+ChaCha20-Poly1305), the extended master secret when the server has it and the TLS 1.3
+downgrade check.  Private
 connections never fall back.
 
 No PSK, no 0-RTT, no session tickets (a client ignores them), no renegotiation;
@@ -44362,6 +44589,7 @@ AL_PROTOCOL_VERSION: u8 = 70
 AL_INTERNAL_ERROR: u8 = 80
 AL_NO_RENEGOTIATION: u8 = 100
 AL_MISSING_EXTENSION: u8 = 109
+AL_UNSUPPORTED_EXTENSION: u8 = 110
 AL_CERTIFICATE_REQUIRED: u8 = 116
 ```
 
@@ -44489,8 +44717,14 @@ ECDHE_ECDSA_CHACHA20: u16 = 0xCCA9
   the keys of a suite (key and IV of key_iv_len); None for an unknown suite
 - **`fn seal(&mut self, ty: u8, content: &[u8]) -> Vec<u8>`**
   a protected record of `content` of type `ty`
-- **`fn open(&mut self, hdr: &[u8; 5], body: &[u8]) -> Option<(u8, Vec<u8>)>`**
+- **`fn open(&mut self, hdr: &[u8; 5], body: &[u8]) -> Result<(u8, Vec<u8>), OpenError>`**
   open a protected record body (header given) -> (type, content)
+
+- **`enum OpenError`**
+  why a protected record did not open
+  - `Mac` -- it does not authenticate (bad_record_mac)
+  - `Overflow` -- more than a record may hold (record_overflow)
+  - `NoType` -- only padding, no content type (unexpected_message)
 
 - **`fn plain(ty: u8, content: &[u8]) -> Vec<u8>`**
   a plaintext record
@@ -44791,136 +45025,6 @@ CLOSE_INTERNAL: u16 = 1011
   connect to a WebSocket server: TCP (and TLS for wss:// through `cfg.connector`), the upgrade
   request, the server's 101 with the right Sec-WebSocket-Accept, all within handshake_ms
 
-### `netio/x509.rs`
-
-Source: [`lib/netio/x509.rs`](../lib/netio/x509.rs)
-
-```text
-x509 -- certificates (RFC 5280): a program's own private PKI (Ed25519, RFC 8410; built
-and signed here) and the public web PKI (RSA and P-256 / P-384 keys; RSA PKCS #1 v1.5 / PSS
-and ECDSA signatures with SHA-256 / 384 / 512), parsed strictly
-
-  Cert::parse(der) -> Option<Cert>        subject / issuer, validity, key, CA flag, names,
-                                          key and extended key usage, name constraints,
-                                          unknown critical extensions noticed
-  cert.fingerprint() -> SHA-256 (hex)     cert.signed_by(&issuer) -> bool
-  cert.verify(alg, data, sig)             a signature made with the certificate's key
-  verify_chain(&[leaf, ...], &anchors, now, name, usage) -> Result<(), String>   builds a
-                                          path through the given intermediates to an anchor
-  CertBuilder { .. }.sign(&issuer_cert_or_self, &issuer_key) -> DER
-
-Not checked: revocation (CRL / OCSP), certificate policies; name constraints cover DNS
-names and IP addresses (the names a TLS server is reached by).
-```
-
-```rust
-OID_ED25519: &[u64] = &[1, 3, 101, 112]
-/// key usage bits as they appear in the first byte
-KU_DIGITAL_SIGNATURE: u8 = 0x80
-KU_KEY_CERT_SIGN: u8 = 0x04
-KU_CRL_SIGN: u8 = 0x02
-```
-
-- **`enum Usage`**
-  - `Server`
-  - `Client`
-
-- **`enum PubKey`**
-  a public key
-  - `Other` -- a key type this code does not use
-  - `Ed25519([u8; 32])`
-  - `Rsa { n: Vec<u8>, e: Vec<u8> }` -- modulus and exponent, big-endian
-  - `Ec { curve: Curve, point: Vec<u8> }` -- an uncompressed point (04 || x || y)
-
-- **`enum SigAlg`**
-  a signature algorithm (of certificates and of TLS handshakes)
-  - `Unknown`
-  - `Ed25519`
-  - `RsaPkcs1(HashAlg)`
-  - `RsaPss(HashAlg, Option<usize>)` -- salt length None: any (TLS fixes it to the hash length)
-  - `Ecdsa(HashAlg)`
-
-- **`struct NameConstraints`**
-  DNS and IP name constraints of a CA (other forms are recorded as present only)
-  - `permitted_dns: Vec<String>`
-  - `excluded_dns: Vec<String>`
-  - `permitted_ip: Vec<Vec<u8>>` -- address and mask (4 + 4 or 16 + 16 bytes)
-  - `excluded_ip: Vec<Vec<u8>>`
-
-- **`struct Cert`**
-  - `der: Vec<u8>`
-  - `tbs: Vec<u8>`
-  - `serial: Vec<u8>`
-  - `issuer: Vec<u8>` -- the raw DER of the issuer and subject names (compared byte for byte)
-  - `subject: Vec<u8>`
-  - `subject_cn: String`
-  - `not_before: i64`
-  - `not_after: i64`
-  - `public_key: Vec<u8>` -- Ed25519 public key (empty for other key types)
-  - `key: PubKey`
-  - `ed25519_signed: bool`
-  - `sig_alg: SigAlg`
-  - `signature: Vec<u8>`
-  - `version: u8` -- 1 or 3
-  - `name_constraints: Option<NameConstraints>`
-  - `is_ca: bool`
-  - `path_len: Option<u64>`
-  - `key_usage: Option<u8>`
-  - `eku: Vec<Vec<u8>>`
-  - `dns: Vec<String>`
-  - `ips: Vec<IpAddr>`
-  - `ski: Vec<u8>`
-  - `unknown_critical: bool` -- a critical extension this code does not understand (such a certificate is rejected)
-
-**`impl Cert`**
-
-- **`fn parse(bytes: &[u8]) -> Option<Cert>`**
-- **`fn fingerprint(&self) -> String`**
-  SHA-256 of the certificate (hex)
-- **`fn verify(&self, alg: SigAlg, data: &[u8], sig: &[u8]) -> bool`**
-  whether a signature over `data` was made with this certificate's key
-- **`fn signed_by(&self, issuer: &Cert) -> bool`**
-  whether `issuer` signed this certificate
-- **`fn names(&self, host: &str) -> bool`**
-  whether the certificate names this host (DNS name, case-insensitive; IP address)
-
-- **`fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&str>, usage: Usage) -> Result<(), String>`**
-  check a chain (leaf first) against trusted anchors: a path from the leaf through the other
-  certificates of the chain (in any order) to an anchor
-
-- **`struct CertBuilder`**
-  what a new certificate says
-  - `serial: [u8; 16]`
-  - `cn: String`
-  - `org: String`
-  - `not_before: i64`
-  - `not_after: i64`
-  - `public_key: [u8; 32]`
-  - `is_ca: bool`
-  - `dns: Vec<String>`
-  - `ips: Vec<IpAddr>`
-  - `server_auth: bool`
-  - `client_auth: bool`
-
-- **`fn extension(oid: &[u64], critical: bool, value: &[u8]) -> Vec<u8>`**
-  a DER Extension (oid, the critical flag, the DER value) for CertBuilder::sign_ext
-
-**`impl CertBuilder`**
-
-- **`fn sign(&self, issuer: Option<&Cert>, key: &Keypair) -> Vec<u8>`**
-  the DER certificate, signed by `key`; `issuer`: the issuing certificate (None: self
-  signed with the builder's own name)
-- **`fn sign_ext(&self, issuer: Option<&Cert>, key: &Keypair, extra: &[Vec<u8>]) -> Vec<u8>`**
-  sign with further extensions (each one from `extension`: name constraints, a CA's
-  extended key usage ...); one with the OID of an extension the builder writes itself
-  replaces that one (basic constraints without a path length, other key usages)
-
-- **`fn ed25519_pkcs8(seed: &[u8; 32]) -> Vec<u8>`**
-  the PKCS#8 form of an Ed25519 private key (for interoperable PEM files)
-
-- **`fn ed25519_from_pkcs8(b: &[u8]) -> Option<[u8; 32]>`**
-  the seed of a PKCS#8 Ed25519 private key
-
 ## netpkt
 
 *network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng* -- crate root [`lib/netpkt/lib.rs`](../lib/netpkt/lib.rs)
@@ -45021,7 +45125,8 @@ on every target (simulators, packet tools, tests).
   cookie    SetCookie::parse, parse_date, domain_match, path_match, default_path, site_of; Jar:
             store, header, matching, script_text, purge, drop_session; SameSite as far as a small
             browser needs it; the time comes from the caller          (RFC 6265, 6265bis)
-  x509      certificates of a private PKI (Ed25519): CertSpec::sign, Cert::parse, names, fingerprint,
+  x509      certificates: the crate jflib-x509 (netio's as well), CertSpec as its builder's
+            earlier name, check_chain: what is wrong with a chain as fault bits for dialogs
             signed_by, check_chain with F_* faults; no clock; uses crate crypto  (RFC 5280, 8410)
   tls       TLS 1.3 without I/O: Core for a client or a server (push bytes, take_out bytes, read,
             send, take_events), TLS_CHACHA20_POLY1305_SHA256, X25519, Ed25519; the key schedule,
@@ -51742,25 +51847,21 @@ MAX_COOKIES: usize = 500
 Source: [`lib/netpkt/x509.rs`](../lib/netpkt/x509.rs)
 
 ```text
-x509 -- certificates of a small private PKI without I/O and without a clock (RFC 5280; Ed25519,
-RFC 8410): written and read as DER and checked against anchors at a time the caller passes in.
-netio::x509 is the other X.509 of the library, with the web's RSA and ECDSA keys, on a crate that
-needs plat
+x509 -- netpkt's view of JFLib's certificates: the crate jflib-x509, which netio uses as well
+(one parser, one path validation), and what is wrong with a chain as fault bits for the
+dialogs of simulators and packet tools
 
-  CertSpec { serial, cn, org, not_before, not_after, public_key, is_ca, dns, ips }
-  spec.sign(issuer: Option<&Cert>, key) -> DER      issuer None: self-signed with its own name
-  Cert::parse(der) -> Option<Cert>                  subject and issuer (common name, organization),
-                                                    validity, the Ed25519 key, the CA flag, names;
-                                                    other keys parse with key None (they verify nothing)
-  cert.names(host)                                  a DNS name (case-insensitive, one wildcard
-                                                    label) or an address of its alternative names
-  cert.fingerprint() / fingerprint_text()           SHA-256 of the DER; in hex with colons
-  cert.signed_by(&issuer), cert.self_signed()       the signature checks out
-  check_chain(&[leaf, ...], anchors, host, now) -> faults   what is wrong with it: F_* bits, 0 for
-                                                    nothing
-
-Not here: revocation, name constraints, key usage checks beyond the CA flag, certificate policies.
+  Cert, CertBuilder, IpAddr, verify_chain ...   the crate x509, re-exported
+  CertSpec                                      CertBuilder under netpkt's earlier name
+  check_chain(&[leaf, ...], anchors, host, now) -> faults   what is wrong with it: F_* bits, 0
+                                                for nothing (a browser's list, where
+                                                verify_chain gives the first reason)
 ```
+
+Re-exports: `x509::*`
+
+- **`type CertSpec = x509::CertBuilder`**
+  the builder of a certificate (netpkt's earlier name of x509::CertBuilder)
 
 ```rust
 /// the time of a certificate has passed
@@ -51777,61 +51878,9 @@ F_UNKNOWN_ISSUER: u32 = 1 << 4
 F_BAD_SIGNATURE: u32 = 1 << 5
 ```
 
-- **`struct CertSpec`**
-  what a new certificate says
-  - `serial: [u8; 16]`
-  - `cn: String`
-  - `org: String`
-  - `not_before: i64` -- seconds since 1970
-  - `not_after: i64`
-  - `public_key: [u8; 32]`
-  - `is_ca: bool`
-  - `dns: Vec<String>`
-  - `ips: Vec<IpAddr>`
-
-**`impl CertSpec`**
-
-- **`fn sign(&self, issuer: Option<&Cert>, key: &Keypair) -> Vec<u8>`**
-  the DER certificate, signed by `key`; `issuer`: the certificate that issues it (None:
-  self-signed with its own name)
-
-- **`struct Cert`**
-  a certificate as this code reads it
-  - `der: Vec<u8>`
-  - `serial: Vec<u8>`
-  - `subject_cn: String`
-  - `subject_org: String`
-  - `issuer_cn: String`
-  - `issuer_org: String`
-  - `not_before: i64` -- seconds since 1970
-  - `not_after: i64`
-  - `key: Option<[u8; 32]>` -- its Ed25519 key (None: another kind of key)
-  - `is_ca: bool`
-  - `dns: Vec<String>`
-  - `ips: Vec<IpAddr>`
-
-**`impl Cert`**
-
-- **`fn parse(bytes: &[u8]) -> Option<Cert>`**
-  a certificate from DER; None: not one (or trailing bytes, or a version before v3)
-- **`fn fingerprint(&self) -> [u8; 32]`**
-  SHA-256 of the DER
-- **`fn fingerprint_text(&self) -> String`**
-  the fingerprint in hex with colons, as certificate dialogs write it
-- **`fn signed_by(&self, issuer: &Cert) -> bool`**
-  issuer's key made the signature (and the names fit)
-- **`fn self_signed(&self) -> bool`**
-  it says it issued itself, and the signature checks out
-- **`fn names(&self, host: &str) -> bool`**
-  it names this host: a DNS name (one wildcard label at the left), or an address; only its
-  alternative names count (RFC 9110 4.3.4), the common name does not
-- **`fn name_list(&self) -> Vec<String>`**
-  what the names are, for a dialog
-- **`fn bytes(&self) -> usize`**
-  bytes it holds (an estimate for a budget)
-
 - **`fn check_chain(chain: &[Cert], anchors: &[Cert], host: &str, now: i64) -> u32`**
-  what is wrong with a chain (leaf first) for this host at this time: F_\* bits, 0 for nothing
+  what is wrong with a chain (leaf first) for this host at this time: F_\* bits, 0 for nothing.
+  For a private Ed25519 PKI: a leaf with another kind of key counts as F_BAD_SIGNATURE
 
 ### `netpkt/tls.rs`
 
@@ -51913,6 +51962,7 @@ AL_DECRYPT_ERROR: u8 = 51
 AL_PROTOCOL_VERSION: u8 = 70
 AL_INTERNAL_ERROR: u8 = 80
 AL_MISSING_EXTENSION: u8 = 109
+AL_UNSUPPORTED_EXTENSION: u8 = 110
 EXT_SERVER_NAME: u16 = 0
 EXT_GROUPS: u16 = 10
 EXT_SIG_ALGS: u16 = 13
@@ -67894,12 +67944,14 @@ netchan -- message channels for games (G7d, docs/TRANSPORT.md)
            poll() -> ServerEvent, send(id, payload) -> seq, disconnect(id), stats(id)
            (Windows, Linux, Apple: it needs netio's HTTP server)
   WebSocket::connect(url): one non-blocking client type for the browser and the desktop
-  packet / conn / endpoint: the wire format, the sequence numbers and acks, the handshake --
-           without I/O, for tests on a simulated network and for other transports
+  packet / conn / endpoint / seal: the wire format, the sequence numbers and acks, the
+           handshake, its keys -- without I/O, for tests on a simulated network and for other
+           transports
 
 The same channel over two transports: unreliable and unordered over UDP (a handshake with a
-stateless cookie, a token in every packet, keep-alives and timeouts), reliable and ordered
-over a WebSocket (the browser's only way, docs/GAME.md E8).  Both carry the same header: a
+stateless cookie and X25519 keys, every packet after it sealed with ChaCha20-Poly1305,
+keep-alives and timeouts; optionally a static server key the client pins), reliable and
+ordered over a WebSocket (the browser's only way, docs/GAME.md E8; wss:// encrypts it).  Both carry the same header: a
 sequence number per packet and acks of the newest 33 received, so the netcode (G7e) learns
 which packets arrived over either.  Limits everywhere: payload sizes, packets and bytes a
 second per connection, connections per server and per address, handshake answers a second.
@@ -67929,6 +67981,8 @@ it at the same time; the transport has no game in it).
   - `RateLimit` -- the peer broke the rate limits (the server ended it)
   - `Closed(u16)` -- the WebSocket under it closed with this code (1006: without a close frame)
   - `Replaced` -- the same address made a new handshake
+  - `ServerKey` -- the server did not prove the static key of ClientConfig::server_key: it has none (DENY),
+    or its ACCEPT did not check (another server, or someone on the path in its place)
 
 - **`enum Error`**
   why a call failed
@@ -68003,6 +68057,9 @@ conn -- one connection's sequence numbers and acks, without I/O (docs/TRANSPORT.
                                                      the caller)
   conn.take_event() -> Message / Delivered / Lost    conn.rate_ok(bytes, now), keepalive_due,
                                                      timed_out, stats, rtt_ms
+  Conn::new(..).with_keys(Keys)                      sealed (UDP): write_data and
+                                                     write_disconnect seal, open(wire, head,
+                                                     seq) checks and decrypts what came
 
 Every DATA packet has its own sequence number (u16, wrapping) and acknowledges the newest
 number received plus the 32 before it as bits.  Unreliable (UDP): packets may come late, twice
@@ -68015,6 +68072,10 @@ pass the bits unacknowledged: after ACK_EVERY packets without one of its own, an
 connection owes an empty DATA packet at once (ack_due).
 The round-trip time comes from the newest ack only (bits name older packets, whose wait would
 count twice), smoothed as TCP does (RFC 6298).
+Sealed (seal.rs): each packet sent takes the next packet number (u64; its low 16 bits are the
+sequence number), the nonce of ChaCha20-Poly1305; open() takes the number nearest the largest
+authenticated one and leaves the state alone when the tag does not check (Stats::forged).  The
+receive window above then drops a replayed packet as a duplicate or stale: only after the tag.
 ```
 
 ```rust
@@ -68040,6 +68101,8 @@ ACK_EVERY: u32 = 16
   - `duplicates: u64` -- packets that came a second time
   - `stale: u64` -- packets older than the window
   - `dropped: u64` -- packets dropped for the rate limits or their size
+  - `forged: u64` -- sealed packets with this connection's token whose tag did not check (forged or damaged;
+    nothing else was done with them)
   - `bytes_sent: u64` -- bytes of DATA packets sent (headers included)
   - `bytes_received: u64` -- bytes of DATA packets taken in (headers included)
   - `rtt_ms: f32` -- the smoothed round-trip time (0 before the first sample)
@@ -68058,14 +68121,28 @@ ACK_EVERY: u32 = 16
 
 - **`fn new(token: u32, reliable: bool, set: Settings, now_us: u64) -> Conn`**
   a connection with the token both sides put into DATA (0 over a WebSocket)
+- **`fn with_keys(mut self, keys: Keys) -> Conn`**
+  the connection sealed with these keys (UDP after the handshake): every packet written is
+  encrypted and authenticated, every packet taken in must pass open()
+- **`fn sealed(&self) -> bool`**
+  whether its packets are sealed
 - **`fn token(&self) -> u32`**
   the token of DATA and DISCONNECT packets
+- **`fn open(&mut self, wire: &[u8], head: usize, seq: u16) -> Option<Vec<u8>>`**
+  check and decrypt a packet that came: `wire` the whole packet, `head` the bytes before its
+  payload (DATA_HEADER, DISCONNECT_HEADER), `seq` its sequence number -> the payload
+  (unsealed connections: the bytes after the header as they are).  None: too short or a
+  wrong tag (counted as forged); the connection's state is not touched then
 - **`fn reliable(&self) -> bool`**
   whether the transport is reliable (a WebSocket)
 - **`fn ack_fields(&self) -> (u16, u32)`**
   the newest number received and the bits of the 32 before it (0xffff, 0 before any)
 - **`fn write_data(&mut self, payload: &[u8], now: u64, out: &mut Vec<u8>) -> u16`**
-  append a DATA packet with `payload` (empty: a keep-alive) -> its sequence number
+  append a DATA packet with `payload` (empty: a keep-alive), sealed if the connection is
+  -> its sequence number
+- **`fn write_disconnect(&mut self, reason: u8, out: &mut Vec<u8>)`**
+  append a DISCONNECT with `reason` (BYE_\*), sealed if the connection is; it takes a
+  sequence number of its own, so its seal never shares a nonce with a DATA packet
 - **`fn rate_ok(&mut self, bytes: usize, now: u64) -> bool`**
   whether a packet of `bytes` from the peer stays within the rate limits (false: drop it,
   or end a reliable connection)
@@ -68103,18 +68180,26 @@ endpoint -- the server's and the client's protocol without I/O (docs/TRANSPORT.m
     .tick(now)                         keep-alives, timeouts, streams that never said CONNECT
     .send(conn, payload, now) -> seq   .disconnect(conn, now)
     .take_out() -> Out (what to send where, streams to close)   .poll_event() -> ServerEvent
-  ClientCore::new(ClientConfig, nonce, stream)
+    .set_static_key(secret) / .public_key()   a long-lived X25519 key clients may pin
+  ClientCore::new(ClientConfig, random [32], stream)
     .start(now) / .packet(bytes, now) / .tick(now) / .send(payload, now) / .disconnect(now)
     .transport_closed(code) / .take_out() -> bytes / .poll_event() -> ClientEvent
 
-Time is the caller's (microseconds), so tests run them on a virtual clock over a simulated
-network (apps/nettest).  The UDP handshake: CONNECT (padded) -> CHALLENGE with a stateless
-cookie, HMAC-SHA256 over the client's address, its nonce and the time -> RESPONSE (padded) with
-the cookie -> ACCEPT with a random token, which every DATA and DISCONNECT then carries.  Nothing
-is kept for an address before its RESPONSE proves it receives there, the answers before that
-are smaller than the requests, and challenges_per_s bounds the work for all of them.  A
-WebSocket sends CONNECT and gets ACCEPT (token 0); TCP has proved the address.  The token is no
-encryption: it keeps senders out that do not see the traffic.
+Time and randomness are the caller's (microseconds; the server's secret, the client's 32 random
+bytes), so tests run them on a virtual clock over a simulated network (apps/nettest), the same
+on every run.  The UDP handshake: CONNECT (padded) -> CHALLENGE with a stateless cookie,
+HMAC-SHA256 over the client's address, its nonce and the time -> RESPONSE (padded) with the
+cookie and the client's ephemeral X25519 key -> ACCEPT with a random token, the server's
+ephemeral key and `confirm`, the proof that it derived the same keys (seal.rs).  From then on
+every DATA and DISCONNECT is sealed with ChaCha20-Poly1305 under keys of this connection alone:
+who listens reads nothing, a changed, forged or replayed packet is dropped.  With
+ClientConfig::server_key the keys also need the server's static secret, so nobody on the path
+can take the server's place; without it they keep out only those who listen.  Nothing is kept
+for an address before its RESPONSE proves it receives there, the answers before that are
+smaller than the requests, and challenges_per_s bounds the work for all of them (an HMAC for a
+CHALLENGE; for an ACCEPT two or three X25519, which a lost ACCEPT does not repeat).  A WebSocket
+sends CONNECT and gets ACCEPT (token 0, no keys); TCP has proved the address, and wss:// is
+its encryption.
 ```
 
 - **`struct ServerConfig`**
@@ -68154,7 +68239,8 @@ encryption: it keeps senders out that do not see the traffic.
   - `challenges: u64` -- CHALLENGE answers sent
   - `accepted: u64` -- connections taken
   - `denied: u64` -- clients refused (full, protocol, address)
-  - `bad: u64` -- packets that were no packet, a wrong kind or a wrong cookie or token
+  - `bad: u64` -- packets that were no packet, a wrong kind, a wrong cookie or token, or a handshake with a
+    key that gives no shared secret (forged DATA of a connection: its Stats::forged)
   - `throttled: u64` -- handshakes over challenges_per_s, left without an answer
   - `unknown: u64` -- DATA from addresses without a connection
 
@@ -68164,10 +68250,16 @@ encryption: it keeps senders out that do not see the traffic.
 **`impl ServerCore`**
 
 - **`fn new(cfg: ServerConfig, secret: [u8; 32], now: u64) -> ServerCore`**
-  a server with these limits; `secret` keys the cookies and tokens (random in a real server,
-  fixed in tests)
+  a server with these limits; `secret` keys the cookies and tokens and seeds the ephemeral
+  keys of the handshakes (random in a real server, fixed in tests)
 - **`fn config(&self) -> &ServerConfig`**
   the limits in force (max_payload clamped)
+- **`fn set_static_key(&mut self, secret: [u8; 32])`**
+  a long-lived X25519 secret: clients that know its public key (ClientConfig::server_key)
+  include it in their keys, so only this server can answer them.  Kept by the app (32 random
+  bytes, made once); clients without the key still connect with ephemeral keys only
+- **`fn public_key(&self) -> Option<[u8; 32]>`**
+  the public key of set_static_key (for the clients' ClientConfig::server_key)
 - **`fn datagram(&mut self, from: SocketAddr, data: &[u8], now: u64)`**
   a UDP datagram from `from`
 - **`fn stream_open(&mut self, stream: u32, addr: Option<SocketAddr>, now: u64)`**
@@ -68212,6 +68304,10 @@ encryption: it keeps senders out that do not see the traffic.
   - `resend_ms: u32` -- UDP: CONNECT / RESPONSE again after this long without an answer
   - `packets_per_s: u32` -- packets a second from the server, on average (more are dropped)
   - `bytes_per_s: u32` -- bytes a second from the server, on average (more are dropped)
+  - `server_key: Option<[u8; 32]>` -- UDP: the server's static public key (ServerCore::set_static_key, Server::set_static_key).
+    Given, the keys need the server's secret, and a server without it is refused
+    (Reason::ServerKey); None: ephemeral keys only, safe from listeners but not from someone
+    on the path who answers in the server's place
 
 - **`enum State`**
   where a client stands
@@ -68232,8 +68328,10 @@ encryption: it keeps senders out that do not see the traffic.
 
 **`impl ClientCore`**
 
-- **`fn new(cfg: ClientConfig, nonce: u64, stream: bool) -> ClientCore`**
-  a client with a random `nonce` (it names this attempt); `stream`: over a WebSocket
+- **`fn new(cfg: ClientConfig, random: [u8; 32], stream: bool) -> ClientCore`**
+  a client; `random`: 32 random bytes of this attempt (its nonce and, over UDP, its
+  ephemeral key come from them: plat::random_bytes in a real client, fixed in tests);
+  `stream`: over a WebSocket
 - **`fn start(&mut self, now: u64)`**
   begin the handshake (CONNECT goes out)
 - **`fn packet(&mut self, data: &[u8], now: u64)`**
@@ -68265,33 +68363,40 @@ encryption: it keeps senders out that do not see the traffic.
 Source: [`lib/netchan/src/packet.rs`](../lib/netchan/src/packet.rs)
 
 ```text
-packet -- the channel's wire format, version 1 (docs/TRANSPORT.md "Paketformat")
+packet -- the channel's wire format, version 2 (docs/TRANSPORT.md "Paketformat")
 
   byte 0: VERSION << 4 | kind; then, little-endian:
-  CONNECT     client -> server  protocol u32, nonce u64              13 bytes (UDP: padded to 64)
+  CONNECT     client -> server  protocol u32, nonce u64              13 bytes (UDP: padded to 96)
   CHALLENGE   server -> client  nonce u64, time u32, mac [16]        29 bytes (UDP only)
-  RESPONSE    client -> server  protocol u32, nonce u64, time u32,   33 bytes (UDP only, padded
-                                mac [16]                                       to 64)
-  ACCEPT      server -> client  nonce u64, token u32, max payload u16   15 bytes
+  RESPONSE    client -> server  protocol u32, nonce u64, time u32,   66 bytes (UDP only, padded
+                                mac [16], flags u8, key [32]                   to 96)
+  ACCEPT      server -> client  nonce u64, token u32, max payload    63 bytes
+                                u16, key [32], confirm [16]
   DENY        server -> client  nonce u64, reason u8                 10 bytes
-  DATA        both              token u32, seq u16, ack u16, ack bits u32, payload   13 + n
-  DISCONNECT  both              token u32, reason u8                  6 bytes
+  DATA        both              token u32, seq u16, ack u16, ack bits u32, payload
+                                                                     13 + n (UDP: + 16)
+  DISCONNECT  both              token u32, seq u16, reason u8          8 bytes (UDP: + 16)
 
-A UDP client pads CONNECT and RESPONSE to HANDSHAKE_SIZE, and every answer of the server before
-a connection is smaller: a forged sender address gets back less than was sent (no
-amplification).  Over a WebSocket the CONNECT is not padded and CHALLENGE / RESPONSE do not
-occur (TCP has proved the address).  parse() reads untrusted bytes: exact sizes, no panics,
-no allocation.
+Over UDP the handshake agrees on keys (RESPONSE: the client's ephemeral X25519 key; ACCEPT: the
+server's and `confirm`, the proof that the server derived the same keys; seal.rs), and every
+DATA and DISCONNECT after it is sealed with ChaCha20-Poly1305: the payload is encrypted, the
+header before it is authenticated with it, and the 16-byte tag follows (DATA's payload as
+parse() returns it is the ciphertext and the tag).  A UDP client pads CONNECT and RESPONSE to
+HANDSHAKE_SIZE, and every answer of the server before a connection is smaller: a forged sender
+address gets back less than was sent (no amplification).  Over a WebSocket the CONNECT is not
+padded, CHALLENGE / RESPONSE do not occur (TCP has proved the address), ACCEPT's key and
+confirm are zeros and nothing is sealed (wss:// is the encryption there).  parse() reads
+untrusted bytes: exact sizes, no panics, no allocation.
 ```
 
 ```rust
 /// the format's version (the high nibble of byte 0)
-VERSION: u8 = 1
+VERSION: u8 = 2
 /// a client asks for a connection
 KIND_CONNECT: u8 = 1
 /// the server's stateless cookie for a UDP client
 KIND_CHALLENGE: u8 = 2
-/// the client returns the cookie
+/// the client returns the cookie with its key
 KIND_RESPONSE: u8 = 3
 /// the server took the client
 KIND_ACCEPT: u8 = 4
@@ -68303,17 +68408,26 @@ KIND_DATA: u8 = 6
 KIND_DISCONNECT: u8 = 7
 /// the bytes of a DATA packet before its payload
 DATA_HEADER: usize = 13
+/// the bytes of a DISCONNECT packet before its tag
+DISCONNECT_HEADER: usize = 8
+/// the tag after a sealed DATA or DISCONNECT (UDP)
+TAG: usize = 16
 /// the size a UDP client pads CONNECT and RESPONSE to (at most the server takes)
-HANDSHAKE_SIZE: usize = 64
-/// the largest payload of a UDP DATA packet that may be configured (1400 + 13 + 8 + 40 bytes
-/// stay below the 1500 of Ethernet also over IPv6)
+HANDSHAKE_SIZE: usize = 96
+/// the largest payload of a UDP DATA packet that may be configured (1400 + 13 + 16 + 8 + 40
+/// bytes stay below the 1500 of Ethernet also over IPv6)
 MAX_UDP_PAYLOAD: usize = 1400
+/// RESPONSE flags: the client knows the server's static key (ClientConfig::server_key), and the
+/// keys include a Diffie-Hellman with it
+FLAG_STATIC_KEY: u8 = 1
 /// DENY: the server has max_connections clients
 DENY_FULL: u8 = 1
 /// DENY: the client speaks another protocol id (another game or version)
 DENY_PROTOCOL: u8 = 2
 /// DENY: the client's address has max_per_ip connections
 DENY_ADDRESS: u8 = 3
+/// DENY: the client expects a static key, and the server has none
+DENY_KEY: u8 = 4
 /// DISCONNECT: an orderly end
 BYE_NORMAL: u8 = 0
 /// DISCONNECT: nothing came for timeout_ms
@@ -68332,25 +68446,111 @@ BYE_SHUTDOWN: u8 = 5
   one packet, borrowed from the bytes it was read from
   - `Connect { protocol: u32, nonce: u64 }` -- a client asks: the app's protocol id, the nonce of this attempt
   - `Challenge { nonce: u64, time: u32, mac: [u8; 16] }` -- the server's cookie for a UDP client: the time (seconds) and the MAC over address, nonce, time
-  - `Response { protocol: u32, nonce: u64, time: u32, mac: [u8; 16] }` -- the client returns the cookie
-  - `Accept { nonce: u64, token: u32, max_payload: u16 }` -- the server took the client: the token of its packets, the largest payload it takes
+  - `Response { protocol: u32, nonce: u64, time: u32, mac: [u8; 16], flags: u8, key: [u8; 32] }` -- the client returns the cookie with FLAG_\* and its ephemeral X25519 public key
+  - `Accept { nonce: u64, token: u32, max_payload: u16, key: [u8; 32], confirm: [u8; 16] }` -- the server took the client: the token of its packets, the largest payload it takes, its
+    ephemeral X25519 public key and the proof of the keys (over a WebSocket: zeros)
   - `Deny { nonce: u64, reason: u8 }` -- the server refused the client (DENY_\*)
-  - `Data { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] }` -- a message (empty: a keep-alive) with its number, the newest number received and the bits of the 32 before
-  - `Disconnect { token: u32, reason: u8 }` -- one side ends the connection (BYE_\*)
+  - `Data { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] }` -- a message (empty: a keep-alive) with its number, the newest number received and the bits
+    of the 32 before; over UDP `payload` is the ciphertext and its tag
+  - `Disconnect { token: u32, seq: u16, reason: u8, tag: &'a [u8] }` -- one side ends the connection (BYE_\*) under the sequence number it took; over UDP `tag`
+    holds the 16 bytes of the seal, over a WebSocket nothing
 
 - **`fn parse(b: &[u8]) -> Option<Packet<'_>>`**
   read one packet: None for anything that is not exactly a packet of this version (handshake
-  packets between their size and HANDSHAKE_SIZE, the fixed-size ones exactly)
+  packets between their size and HANDSHAKE_SIZE, the fixed-size ones exactly, DISCONNECT with
+  or without its tag)
 
 **`impl Packet<'_>`**
 
 - **`fn write(&self, out: &mut Vec<u8>, pad: bool)`**
-  append the packet to `out`; `pad`: CONNECT and RESPONSE filled with zeros to HANDSHAKE_SIZE
+  append the packet to `out`; `pad`: CONNECT and RESPONSE filled with zeros to HANDSHAKE_SIZE.
+  DATA and DISCONNECT are written as given (Conn seals them)
 - **`fn to_vec(&self, pad: bool) -> Vec<u8>`**
   the packet as new bytes
 
 - **`fn seq_newer(a: u16, b: u16) -> bool`**
   whether sequence number `a` is newer than `b` (wrapping: within half the range ahead)
+
+### `netchan/src/seal.rs`
+
+Source: [`lib/netchan/src/seal.rs`](../lib/netchan/src/seal.rs)
+
+```text
+seal -- the keys of the UDP handshake and the sealing of its packets (docs/TRANSPORT.md
+"Verschlüsselung")
+
+  derive(&Handshake, &dh1, dh2) -> Derived { c2s, s2c, confirm }   the keys of a connection
+  confirm_tag(&confirm, accept_bytes) -> [u8; 16]                  ACCEPT's proof of the keys
+  Keys::new(send, recv)        one side's keys (Conn::with_keys)
+  full_pn(largest, seq) -> u64 the packet number a 16-bit sequence number stands for
+  nonce(pn) -> [u8; 12]        ChaCha20-Poly1305's nonce of a packet number
+  Generator::new(seed) / next_secret() -> [u8; 32]   the server's ephemeral secrets (forward secure)
+
+Both sides have an ephemeral X25519 key per connection; the client may also know the server's
+static key (ClientConfig::server_key), as in Noise's NK pattern.  The transcript hash h is
+SHA-256 over a label, the protocol id, the nonce, the flags and the public keys (the client's,
+the server's ephemeral one, the static one if used); the keys are HKDF-SHA256 with salt h over
+dh1 (ephemeral with ephemeral) and dh2 (the client's ephemeral with the static key): 32 bytes
+client to server, 32 bytes server to client, 32 bytes for `confirm`.  Without a static key the
+channel is safe from those who only listen and from blind senders, not from someone on the path
+who answers the handshake in the server's place; with it, only the holder of the static secret
+can make an ACCEPT whose confirm checks.
+
+Every sealed packet takes the next packet number of its direction (u64, from 0), and its 16-bit
+sequence number is that number's low bits.  The receiver takes the number closest to the one
+after the largest it authenticated (as QUIC does with its truncated numbers, RFC 9000 A.3), so
+the nonce never repeats under one key and a replay of an old packet fails its tag or is found
+by the receive window of conn.rs.
+```
+
+- **`struct Keys`**
+  one side's keys of a connection; zeroed when dropped
+
+**`impl Keys`**
+
+- **`fn new(send: [u8; 32], recv: [u8; 32]) -> Keys`**
+  the key this side seals with and the one it opens with
+
+- **`struct Handshake<'a>`**
+  what the transcript hash covers: the handshake as both sides saw it
+  - `protocol: u32`
+  - `nonce: u64`
+  - `client: &'a [u8; 32]` -- the client's ephemeral public key (RESPONSE)
+  - `server: &'a [u8; 32]` -- the server's ephemeral public key (ACCEPT)
+  - `stat: Option<&'a [u8; 32]>` -- the server's static public key, when the client uses it (FLAG_STATIC_KEY)
+
+- **`struct Derived`**
+  the keys of one connection; zeroed when dropped
+  - `c2s: [u8; 32]` -- client to server
+  - `s2c: [u8; 32]` -- server to client
+  - `confirm: [u8; 32]` -- the key of ACCEPT's confirm
+
+- **`fn derive(hs: &Handshake<'_>, dh1: &[u8; 32], dh2: Option<&[u8; 32]>) -> Derived`**
+  the keys of a connection: `dh1` = X25519(ephemeral, ephemeral), `dh2` = X25519(the client's
+  ephemeral, the static key) when hs.stat is set (both must be given together)
+
+- **`fn confirm_tag(key: &[u8; 32], accept: &[u8]) -> [u8; 16]`**
+  ACCEPT's confirm: the first 16 bytes of HMAC-SHA256 under the confirm key over the ACCEPT
+  before it (kind, nonce, token, max payload, the server's key)
+
+- **`fn nonce(pn: u64) -> [u8; 12]`**
+  the nonce of packet number `pn` (the keys differ per direction, so both may count from 0)
+
+- **`fn full_pn(largest: Option<u64>, seq: u16) -> u64`**
+  the packet number that sequence number `seq` stands for: the one closest to the number after
+  `largest`, the largest authenticated so far (None: nothing yet, so the next is 0)
+
+- **`struct Generator`**
+  a forward-secure source of the server's ephemeral secrets: each one comes from the state,
+  which is replaced by a hash of itself, so what leaks later does not give the earlier ones.
+  Seeded once with 32 random bytes (fixed in tests: the same keys on every run)
+
+**`impl Generator`**
+
+- **`fn new(seed: &[u8; 32]) -> Generator`**
+  a generator from 32 secret bytes
+- **`fn next_secret(&mut self) -> [u8; 32]`**
+  the next 32 secret bytes
 
 ### `netchan/src/server.rs`
 
@@ -68368,6 +68568,7 @@ server -- a game server's channels (G7d): UDP and WebSocket clients in one table
   server.poll() -> Option<ServerEvent>   send(id, payload) -> seq   disconnect(id)
   server.wait(ms)                        sleep until something arrives (a loop without a tick)
   connections() / ids() / stats(id) / peer(id) / server_stats() / stop()
+  set_static_key(secret) / public_key()  the key clients may pin (ClientConfig::server_key)
 
 Threads: one reads the UDP socket; each WebSocket has a reading one (netio's thread of the
 upgrade) and a writing one, so neither a full socket buffer nor a slow client holds the
@@ -68422,6 +68623,12 @@ LINK_UNSENT: usize = 1 << 20
   LINK_UNSENT bytes waiting)
 - **`fn disconnect(&mut self, id: u32)`**
   end a client's connection (Disconnected(Local) follows)
+- **`fn set_static_key(&mut self, secret: [u8; 32])`**
+  a long-lived X25519 secret (32 random bytes the app made once and keeps): clients with its
+  public key in ClientConfig::server_key can tell this server from anyone in its place
+  (endpoint::ServerCore::set_static_key)
+- **`fn public_key(&self) -> Option<[u8; 32]>`**
+  the public key of set_static_key, for the clients
 - **`fn connections(&self) -> usize`**
   connections now
 - **`fn ids(&self) -> Vec<u32>`**

@@ -719,6 +719,7 @@ dependencies = [
  "jflib-ui",
  "jflib-update",
  "jflib-wgsl",
+ "jflib-x509",
 ]
 
 [[package]]
@@ -1248,6 +1249,7 @@ dependencies = [
  "jflib-crypto",
  "jflib-plat",
  "jflib-rt",
+ "jflib-x509",
 ]
 
 [[package]]
@@ -1255,6 +1257,7 @@ name = "jflib-netpkt"
 version = "0.2.1"
 dependencies = [
  "jflib-crypto",
+ "jflib-x509",
 ]
 
 [[package]]
@@ -1452,6 +1455,13 @@ name = "jflib-wgsl"
 version = "0.2.1"
 dependencies = [
  "jflib-shader",
+]
+
+[[package]]
+name = "jflib-x509"
+version = "0.2.1"
+dependencies = [
+ "jflib-crypto",
 ]
 
 [[package]]

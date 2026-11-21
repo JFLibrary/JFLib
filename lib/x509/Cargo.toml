@@ -1,0 +1,27 @@
+[package]
+name = "jflib-x509"
+description = "X.509 certificates in plain Rust for JFLib: strict parsing, path validation, a private CA's builder"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "x509"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# crypto: the signatures (Ed25519, RSA, ECDSA) and the fingerprints
+crypto.workspace = true
+
+# docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
+# of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "wasm32-unknown-unknown", "aarch64-linux-android"]
