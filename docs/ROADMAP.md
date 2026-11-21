@@ -2497,7 +2497,7 @@ Sicherheit:
   G7d Teil 2 in Abschnitt 8 noch als P3). Heute schützt nur ein 32-Bit-Token
   ([`netchan/src/endpoint.rs`](../lib/netchan/src/endpoint.rs), „The token is no encryption“): wer
   den Verkehr sieht, liest mit, schleust Pakete ein und übernimmt Verbindungen. Dazu `packet` und
-  `endpoint` als Fuzz-Ziele in [`tools/net_fuzz/targets.rs`](../tools/net_fuzz/targets.rs), denn
+  `endpoint` als Fuzz-Ziele in `tools/net_fuzz/targets.rs`, denn
   sie lesen UDP-Pakete aus dem Internet.
 - **P1** · *fehlt* · Fuzzing der Datei-Parser. `tools/net_fuzz.py` und `tools/cov_fuzz.py` decken
   nur zstd, LZ4, X.509, DNS, HTTP, TLS, die IP-Reassembly und `netpkt` ab. Es fehlen DEFLATE,
@@ -2513,7 +2513,7 @@ Sicherheit:
   [`tools/memory_safety_check.py`](../tools/memory_safety_check.py) prüft Proben für `rt` und
   `simd`, nicht die Wege in `plat`, auf denen Daten anderer Programme ankommen
   ([`plat/win_clip.rs`](../lib/plat/win_clip.rs),
-  [`plat/linux_wl_wire.rs`](../lib/plat/linux_wl_wire.rs)). [SECURITY.md](../SECURITY.md) nennt
+  [`plat/linux_wl_wire.rs`](../lib/plat/linux_wl_wire.rs)). `SECURITY.md` nennt
   diese Prüfung nicht.
 - **P2** · *fehlt* · `crypto`, sofern nicht schon Teil der laufenden Überarbeitung: die
   RSA-Schlüsselerzeugung zeitkonstant machen oder deutlich abgrenzen (heute laut README „meant
