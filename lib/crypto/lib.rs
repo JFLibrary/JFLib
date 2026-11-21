@@ -33,7 +33,8 @@
 // No randomness here: callers pass random bytes in (plat::fill_random on Windows, Linux, Apple
 // and Android; in the browser the page's crypto.getRandomValues), so everything is
 // deterministic and testable.  Secret-dependent work avoids branches and table lookups
-// (field arithmetic with 51-bit limbs, masked conditional swaps and selects).
+// (field arithmetic with 51-bit limbs, masked conditional swaps and selects); every mask made
+// from secret data passes ct_mask, so the optimizer cannot turn a select back into a branch.
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -145,6 +146,18 @@ pub(crate) fn zeroize_words(buf: &mut [u64]) {
     }
     core::hint::black_box(&buf);
     core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+}
+
+/// a mask made from secret data (0 or all ones), hidden from the optimizer.  Without it LLVM
+/// sees that the value is one of the two and may compile `(a & m) | (b & !m)` back into a
+/// branch, or a select over all entries of a table into a lookup of one.  On x86-64 with Rust
+/// 1.98 it did both: branches for the final subtractions of p256's field arithmetic and of
+/// scalar::reduce_limbs, a jump table for the window of p256::scalar_mul.  black_box is a best
+/// effort, so the machine code of the secret paths is what has to be checked: tools/ct_check.py
+/// runs them with different secrets and compares the branches they take.
+#[inline(always)]
+pub(crate) fn ct_mask(m: u64) -> u64 {
+    core::hint::black_box(m)
 }
 
 /// lower-case hex

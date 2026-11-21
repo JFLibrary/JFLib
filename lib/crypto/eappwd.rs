@@ -87,10 +87,9 @@ pub fn pwe(token: &[u8; 4], peer_id: &[u8], server_id: &[u8], password: &[u8]) -
         let value = kdf(&seed, HUNT, 32);
         let mut x = [0u8; 32];
         x.copy_from_slice(&value);
-        let (ok, y) = match p256::y_for_x(&x, seed[31] & 1 == 1) {
-            Some(y) => (0xFFu8, y),
-            None => (0u8, [0u8; 32]),
-        };
+        // whether this round's x has a point, without a branch on it
+        let (ok, y) = p256::y_for_x_ct(&x, (seed[31] & 1) as u64);
+        let ok = ok as u8;
         // taken only by the first round with a point, without a branch on which one that is
         let take = core::hint::black_box(ok & !found);
         for i in 0..32 {
