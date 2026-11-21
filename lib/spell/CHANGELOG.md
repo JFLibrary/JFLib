@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- A dictionary's SET is decoded with jflib-formats' character sets (`formats::encoding::Charset`) instead of tables of its own: Hunspell's spellings as before (ISO8859-1 stays each byte its code point), and every label of the WHATWG Encoding Standard besides. Changed bytes: in microsoft-cp1251 and -cp1252 an unassigned byte of 0x80..0x9F is the C1 control of the same number instead of U+FFFD; ISO8859-9 / latin5 is windows-1254 and TIS-620 windows-874 (their punctuation in 0x80..0x9F); KOI8-U 0xAE and 0xBE are ў and Ў.
+
 ### Fixed
 
 - `token_errors` tries runs of at most 8 parts of a hyphenated word: a word of 1000 parts took 500 000 checks in the UI thread.

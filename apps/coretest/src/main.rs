@@ -41,6 +41,7 @@ mod dnst;
 mod dt;
 #[cfg(not(target_os = "android"))]
 mod httpt;
+mod charsett;
 mod jmapt;
 mod lz;
 mod metricst;
@@ -166,6 +167,7 @@ fn run() -> i32 {
         ("netpkt", Some(netpktt::run)),
         ("rng", Some(rngt::run)),
         ("jmap", Some(jmapt::run)),
+        ("charsets", Some(charsett::run)),
         ("dhcp", Some(dhcpt::run)),
         ("dnsmsg", Some(dnsmsgt::run)),
         ("ntp", Some(ntpt::run)),

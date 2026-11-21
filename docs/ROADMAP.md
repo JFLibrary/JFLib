@@ -2553,10 +2553,14 @@ Grundbausteine am falschen Ort oder mehrfach:
   zwei in `diagram_core` (`design/xml.rs`, `formula/xml.rs`) und der in
   [`text/fontconf.rs`](../lib/text/fontconf.rs), jeder mit eigenen Grenzen. Einer, gefuzzt, mit
   einer nachsichtigen Art für SVG.
-- **P2** · *teilweise* · Alte Textkodierungen in `formats::encoding`, das heute nur UTF-8 und
-  UTF-16 kann. Tabellen gibt es getrennt in [`spell/charsets.rs`](../lib/spell/charsets.rs) und
-  [`dxf/src/codepages.rs`](../lib/dxf/src/codepages.rs); [`netpkt/imf.rs`](../lib/netpkt/imf.rs)
-  liest außer UTF-8 nur ISO-8859-1. Gebraucht für HTML, Mail, CSV und alte Dateien.
+- **P2** · *erledigt* (2026-11-21, U4) · Alte Textkodierungen in `formats::encoding`: `Charset` mit allen
+  Einbyte-Kodierungen des WHATWG-Standards, den DOS-Seiten (IBM437, 737, 775, 850 bis 869) und einem genauen
+  ISO-8859-1; `label` mit allen 228 Labels des Standards (mehrbytige benannt, nicht dekodiert), `decode_label`
+  wie das „decode“ des Standards, `Charset::from_code_page`. Eine Tabelle statt zweier:
+  [`tools/gen_encodings.py`](../tools/gen_encodings.py) ersetzt `gen_charsets.py` (spell) und
+  `gen_dxf_codepages.py` (dxf), `--verify` vergleicht mit den Daten des Standards und Nodes `TextDecoder`. Offen:
+  [`netpkt/imf.rs`](../lib/netpkt/imf.rs) (Mail) liest außer UTF-8 nur ISO-8859-1 (über die Sicherheits-Sitzung),
+  die mehrbytigen Kodierungen Ostasiens (Shift_JIS, GBK, gb18030, Big5, EUC-KR, EUC-JP, ISO-2022-JP).
 
 Crates, die einer JF-App folgen:
 

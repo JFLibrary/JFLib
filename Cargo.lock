@@ -877,6 +877,9 @@ dependencies = [
 [[package]]
 name = "jflib-dxf"
 version = "0.2.1"
+dependencies = [
+ "jflib-formats",
+]
 
 [[package]]
 name = "jflib-eapm"
@@ -1315,6 +1318,7 @@ dependencies = [
 name = "jflib-spell"
 version = "0.2.1"
 dependencies = [
+ "jflib-formats",
  "jflib-plat",
  "jflib-rt",
 ]
