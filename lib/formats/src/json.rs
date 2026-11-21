@@ -1,4 +1,5 @@
-// Strict, bounded UTF-8 JSON for local and browser control channels. New shared code.
+// Strict, bounded UTF-8 JSON (RFC 8259): settings and project files, manifests, protocols,
+// the agent interface's control channels. New shared code (agent_core::json until 0.3.0).
 
 use alloc::{
     collections::BTreeSet,

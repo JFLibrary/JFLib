@@ -13,6 +13,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - The DOCX reader's package checks (content types, relationships, part names) are jflib-archive's
   `opc` module with `Rules { exact_names: true, .. }`. DOCX files open, are refused and are saved
   exactly as before.
+- DOCX parts, RIS and BibTeX are read through jflib-formats (`formats::xml`, `formats::encoding`); the crate no longer depends on jflib-base. Its API is unchanged.
 
 ## [0.2.1] - 2026-11-16
 

@@ -10,6 +10,7 @@ default-members = ["lib/jflib"]
 # lib/ in this order is build_rs.py's LIBS: a program's crates link in it
 members = [
     "lib/rt",
+    "lib/formats",
     "lib/agent_core",
     "lib/plat",
     "lib/base",
@@ -184,6 +185,7 @@ homepage = "https://jflib.org"
 # Exact versions: only the way through the crate jflib is promised, the crates below it change together.
 [workspace.dependencies]
 rt = { package = "jflib-rt", path = "lib/rt", version = "=0.2.1" }
+formats = { package = "jflib-formats", path = "lib/formats", version = "=0.2.1" }
 agent_core = { package = "jflib-agent-core", path = "lib/agent_core", version = "=0.2.1" }
 plat = { package = "jflib-plat", path = "lib/plat", version = "=0.2.1" }
 base = { package = "jflib-base", path = "lib/base", version = "=0.2.1" }

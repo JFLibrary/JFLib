@@ -54,7 +54,7 @@ let imported = render3d::gltf::upload(&mut renderer, &doc, None)?;
 ## Entscheidungen
 
 - **Eine eigene Bibliothek, nicht ein Modul von `render3d`.** Das Modell braucht keine GPU; ein CAD-Werkzeug, ein Konverter oder ein Test liest Dateien ohne Gerät und ohne `lib/gpu` zu linken. `render3d` hängt an `jflib-gltf` (für `render3d::gltf::upload`), nicht umgekehrt.
-- **JSON über `agent_core::json`** (`parse_with_limits`): streng (doppelte Schlüssel sind ein Fehler), begrenzt, Zahlen als genauer Text, `f64` über `str::parse`. Sein Baum kostet bei vielen Knoten vorübergehend etwa das Sechsfache des Textes (Messung in [RENDER3D.md](RENDER3D.md#g5b-texturen-hochladen-gltf)).
+- **JSON über `formats::json`** (`parse_with_limits`): streng (doppelte Schlüssel sind ein Fehler), begrenzt, Zahlen als genauer Text, `f64` über `str::parse`. Sein Baum kostet bei vielen Knoten vorübergehend etwa das Sechsfache des Textes (Messung in [RENDER3D.md](RENDER3D.md#g5b-texturen-hochladen-gltf)).
 - **Weltmatrizen in `f64`, Zerlegung getrennt.** `Node::world` ist das Produkt der Matrizen; `decompose` gibt T, R (Quaternion), S und ein Maß der Scherung (|cos| des schlechtesten Achsenpaars) zurück. Eine Spiegelung (negative Determinante) wird zu einer negativen x-Skalierung; `render3d` zeichnet sie in eigenen Listen. Scherung (ein ungleich skalierter Elternknoten mit gedrehtem Kind) kann `render3d::Transform` nicht halten: `upload` zeichnet ohne sie und zählt sie (`Imported::sheared`).
 
 ## Tests

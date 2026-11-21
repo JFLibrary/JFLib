@@ -1,5 +1,6 @@
-// jmapt -- checks of agent_core::jmap (record! / wire_enum!, Field for the standard types)
-// and json::stringify_pretty
+// jmapt -- checks of formats::jmap through agent_core's re-export (record! / wire_enum!, Field
+// for the standard types), json::stringify_pretty, and that the old paths of agent_core and base
+// are formats' modules
 
 use alloc::collections::BTreeMap;
 use alloc::string::String;
@@ -70,4 +71,14 @@ pub fn run(t: &mut T) {
     t.eq("pretty parses back", json::stringify_pretty(&v, Limits::default(), 4).ok().and_then(|s| json::parse(s.as_bytes()).ok()), Some(v.clone()));
     let tight = Limits { bytes: 20, ..Limits::default() };
     t.check("pretty keeps the byte limit", json::stringify_pretty(&small, tight, 2).is_err_and(|e| e.kind == "byte_limit"));
+    // agent_core::{json, jmap} and base::{xml, encoding} are re-exports of formats, not copies:
+    // a value of one path is a value of the other (this would not compile otherwise)
+    let new: formats::json::Value = v.clone();
+    let old: agent_core::json::Value = formats::json::parse(formats::json::stringify(&new).unwrap_or_default().as_bytes()).unwrap_or(Value::Null);
+    t.eq("old json path", old, v);
+    let node: Result<formats::xml::Node, base::xml::Error> = base::xml::parse("<a xmlns='urn:x' b='1'/>");
+    t.check("old xml path", node.is_ok_and(|n| n.is("urn:x", "a") && n.attr("", "b") == Some("1")));
+    t.eq("old encoding path", base::encoding::decode(b"\xef\xbb\xbfx", 8), Ok((String::from("x"), formats::encoding::Encoding::Utf8Bom)));
+    let f: fn(&Inner) -> formats::json::Value = <Inner as formats::jmap::Json>::to_json;
+    t.eq("record! of agent_core implements formats::jmap", f(&Inner { n: 2, on: true }), Inner { n: 2, on: true }.to_json());
 }

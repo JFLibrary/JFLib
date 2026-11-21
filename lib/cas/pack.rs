@@ -15,7 +15,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use agent_core::json::{self, Value};
+use formats::json::{self, Value};
 use compress::Codec;
 use crypto::aead;
 

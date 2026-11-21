@@ -15,6 +15,9 @@ python build_rs.py app agenttest --target both --out build/agent-core
 wsl.exe -d Ubuntu-24.04 --cd <repo> -e ./build/agent-core/linux/agenttest
 ```
 
+`python build_rs.py test agenttest` runs the same checks in the suite (`tests/checks.uis`, which
+the program ignores; a failing check exits with code 1).
+
 The default test uses an in-memory counter host and opens no GUI window, pipe, socket or
 standard-input control endpoint. All output is an ordinary test summary; the tested
 protocol adapter itself has no standard-stream access. Stream-framing checks include

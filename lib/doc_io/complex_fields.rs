@@ -2,7 +2,7 @@
 // ECMA-376 17.16.18/19/45; unknown, nested or cross-paragraph fields stay preserved.
 use crate::{Error, W, XML, container, format, read_run, unsupported};
 use alloc::{string::String, vec::Vec};
-use base::xml::{Name, Node};
+use formats::xml::{Name, Node};
 
 struct Field {
     instruction: String,

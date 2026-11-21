@@ -8,7 +8,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use agent_core::json::{self, Number, Value};
+use formats::json::{self, Number, Value};
 
 use crate::{AlphaMode, Document, Error, IDENTITY, Result, write_glb};
 
