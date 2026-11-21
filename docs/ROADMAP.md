@@ -12,6 +12,9 @@ Bekannte Grundgrenzen (Entscheidung „kein libc“): kein GPU-Rendering, kein f
 stehen unten mit in der Liste, damit die Liste vollständig ist. (Die Barrierefreiheit läuft
 inzwischen ohne libc über eigene D-Bus- und COM-Anbindungen, siehe Abschnitt 11.)
 
+Abschnitt 13 (seit 2026-11-21) gilt den Crates außerhalb der GUI: was ihnen für eine universelle
+Library fehlt und wo sie noch Sicherheitsfragen offen haben.
+
 ---
 
 ## 1. Berechtigungen und Sicherheit (wie bei Tauri)
@@ -2478,3 +2481,88 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   `apps/gallery/tests/inspect_source.uis`, `apps/audiotest/tests/inspect_perm.uis` (Manifest
   ohne `process`: abgelehnt), `apps/plattest/tests/launch.uis`, Windows und Linux, auch mit
   `--verify-dirty`.
+
+## 13. Universelle Library: Crates außerhalb der GUI
+
+Bestandsaufnahme vom 2026-11-21 über die Crates unter `lib/`, ohne `ui`, `plat`, `text` und die
+Renderer (Abschnitte 1 bis 12) und ohne `netio`, `netpkt` und `crypto`, deren
+Sicherheitsüberarbeitung läuft. Bewertet nach dem Bedarf von Apps allgemein, nicht nach dem der
+JF-Apps. Die Prioritäten gelten hier so: **P1** = Sicherheitsrisiko oder Grundbaustein, den fast
+jede App braucht · **P2** = wird von einer universellen Library erwartet · **P3** = Fach-Crate,
+später.
+
+Sicherheit:
+
+- **P1** · *fehlt* · `netchan`: Verschlüsselung über UDP (AEAD, entschieden 2026-11-18; unter
+  G7d Teil 2 in Abschnitt 8 noch als P3). Heute schützt nur ein 32-Bit-Token
+  ([`netchan/src/endpoint.rs`](../lib/netchan/src/endpoint.rs), „The token is no encryption“): wer
+  den Verkehr sieht, liest mit, schleust Pakete ein und übernimmt Verbindungen. Dazu `packet` und
+  `endpoint` als Fuzz-Ziele in `tools/net_fuzz/targets.rs`, denn
+  sie lesen UDP-Pakete aus dem Internet.
+- **P1** · *fehlt* · Fuzzing der Datei-Parser. `tools/net_fuzz.py` und `tools/cov_fuzz.py` decken
+  nur zstd, LZ4, X.509, DNS, HTTP, TLS, die IP-Reassembly und `netpkt` ab. Es fehlen DEFLATE,
+  zlib und gzip (`img_core`), `archive` (ZIP, OPC), `agent_core::json` (darüber laufen auch
+  Update-Manifeste, `datastore`, glTF und Agent-Anfragen), die XML-Leser (unten), die
+  Bild-Decoder und die Schriften (bisher nur abgeschnittene und gekippte Kopien in den
+  Python-Prüfungen, [`tools/imgtest_common.py`](../tools/imgtest_common.py),
+  `tools/font_check.py --fuzz`), `doc_io` (RTF und HTML aus der Zwischenablage, die jedes andere
+  Programm füllen kann), `diagram_io`, `dxf`, `gltf`, `img_svg` und `spell` (`.aff`, `.dic`). Mit
+  `panic = "abort"` beendet jeder Panic in einem Parser die ganze App.
+- **P2** · *fehlt* · `unsafe` außerhalb von `rt` und `simd` prüfen: `plat` hat rund 3000 Stellen
+  mit `unsafe`, `gpu` rund 300 (`rt` rund 240, `simd` rund 100).
+  [`tools/memory_safety_check.py`](../tools/memory_safety_check.py) prüft Proben für `rt` und
+  `simd`, nicht die Wege in `plat`, auf denen Daten anderer Programme ankommen
+  ([`plat/win_clip.rs`](../lib/plat/win_clip.rs),
+  [`plat/linux_wl_wire.rs`](../lib/plat/linux_wl_wire.rs)). `SECURITY.md` nennt
+  diese Prüfung nicht.
+- **P2** · *fehlt* · `crypto`, sofern nicht schon Teil der laufenden Überarbeitung: die
+  RSA-Schlüsselerzeugung zeitkonstant machen oder deutlich abgrenzen (heute laut README „meant
+  for simulators and tests“); `tools/ct_check.py` auch für ARM64.
+- **P3** · *fehlt* · `spell`: prüfen, ob ein präpariertes Wörterbuch (`config://hunspell`) die
+  Vorschläge hängen lassen kann; die Crate hat keine Zeitgrenzen.
+
+Grundbausteine am falschen Ort oder mehrfach:
+
+- **P1** · *teilweise* · `compress` hat nur LZ4 und Zstandard. DEFLATE, zlib und gzip liegen in
+  `img_core` ([`inflate.rs`](../lib/img_core/inflate.rs), `deflate.rs`, `gzip.rs`), ein zweiter
+  Encoder in [`cargo_jflib/src/deflate.rs`](../lib/cargo_jflib/src/deflate.rs), Brotli nur intern
+  in `img_jxl`. Gehört alles nach `compress`, dazu eine Streaming-API (heute alles im Speicher)
+  und zstd-Wörterbücher.
+- **P1** · *teilweise* · JSON aus `agent_core` lösen: `agent_core::json` und `jmap` nutzen `ui`,
+  `cas`, `gltf`, `datastore`, `update` und `netio`; wer nur JSON braucht, findet es heute in der
+  Crate der Agentenschnittstelle. Ziel: `base` oder eine eigene Crate, `agent_core` re-exportiert.
+- **P2** · *teilweise* · Ein XML-Leser statt sechs: `base::xml`,
+  [`img_svg/xml.rs`](../lib/img_svg/xml.rs), [`diagram_io/src/xml.rs`](../lib/diagram_io/src/xml.rs),
+  zwei in `diagram_core` (`design/xml.rs`, `formula/xml.rs`) und der in
+  [`text/fontconf.rs`](../lib/text/fontconf.rs), jeder mit eigenen Grenzen. Einer, gefuzzt, mit
+  einer nachsichtigen Art für SVG.
+- **P2** · *teilweise* · Alte Textkodierungen in `base::encoding`, das heute nur UTF-8 und
+  UTF-16 kann. Tabellen gibt es getrennt in [`spell/charsets.rs`](../lib/spell/charsets.rs) und
+  [`dxf/src/codepages.rs`](../lib/dxf/src/codepages.rs); [`netpkt/imf.rs`](../lib/netpkt/imf.rs)
+  liest außer UTF-8 nur ISO-8859-1. Gebraucht für HTML, Mail, CSV und alte Dateien.
+
+Crates, die einer JF-App folgen:
+
+- **P2** · *fehlt* · `pdf` schreibt nur (der Export von JFDiagrammer und jfWord). Es fehlen
+  Lesen und Anzeigen, Formulare, Verschlüsselung, PDF/A und Signaturen.
+- **P2** · *fehlt* · `physics` hat Kollisionen und einen Charakter-Controller nach Quake 3, was
+  Spiel 1 braucht; es fehlen Starrkörper-Dynamik, Gelenke und ein Solver.
+- **P2** · *teilweise* · `installer`: Seiten nur auf Deutsch (außer der Browser-Option), nur für
+  den aktuellen Benutzer, keine unbeaufsichtigte Installation (nur `--dir`, `--style`,
+  `--uninstall`); die Wahl des Stils ist ein JF-Konzept und sollte sich abschalten lassen.
+- **P2** · *teilweise* · `netchan` außer der Sicherheit: Nutzlast höchstens 1200 Byte ohne
+  Fragmentierung, über UDP nur unzuverlässig, kein NAT-Traversal, kein Android (dieses steht
+  schon unter G7d Teil 2).
+- **P2** · *teilweise* · `cas` (BackupCraft): speichert nur in einem Ordner über `plat::fs`, ohne
+  Schnittstelle für entfernte Speicher (S3, SFTP, WebDAV); ein Prozess je Repository.
+- **P2** · *teilweise* · `datastore`: alles im RAM und als JSON, keine Indizes (nur `filter`),
+  keine Verschlüsselung der Daten auf der Platte, nicht auf Android und im Web.
+- **P3** · *teilweise* · `doc_*` (jfWord): DOCX nur im eigenen Profil vollständig, andere
+  Dateien nur als Textstücke; kein ODT, XLSX oder PPTX; RTF und HTML nur für die Zwischenablage.
+- **P3** · *teilweise* · `eapm`: nur EAP-MD5 und EAP-PWD (für den Simulator). WPA-Enterprise
+  braucht EAP-TLS, PEAP-MSCHAPv2 oder EAP-TTLS; für MSCHAPv2 fehlen in `crypto` MD4 und DES.
+- **P3** · *teilweise* · `base` mischt Grundbausteine mit Werkzeugen aus dem Labor von
+  JFNetworker (`cmdtree`, `hashring`, `metrics`); beim Umzug von JSON die Gliederung mit ordnen.
+
+Geprüft und ohne Eintrag: `diagram_*` (das Visio-Modell als Fach-Crate), `img_pdn`, `gltf` und
+`dxf` (nur Import, kein binäres DXF), `spell` (ohne Morphologie) und `update`.
