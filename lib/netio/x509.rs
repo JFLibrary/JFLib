@@ -344,10 +344,16 @@ fn cn_of(name: &[u8]) -> String {
     String::new()
 }
 
-/// DER INTEGER content -> unsigned big-endian bytes
-fn unsigned(b: &[u8]) -> &[u8] {
-    let i = b.iter().position(|&x| x != 0).unwrap_or(b.len());
-    &b[i..]
+/// the content of a non-negative DER INTEGER -> its big-endian bytes without the sign byte;
+/// None when it is empty, negative or not in the shortest form (a 00 before a byte below 0x80)
+fn der_unsigned(b: &[u8]) -> Option<&[u8]> {
+    match b {
+        [] => None,
+        [0, next, ..] if next & 0x80 == 0 => None,
+        [0, rest @ ..] if !rest.is_empty() => Some(rest),
+        [first, ..] if first & 0x80 != 0 => None,
+        _ => Some(b),
+    }
 }
 
 impl Cert {
@@ -481,14 +487,17 @@ impl Cert {
             (PubKey::Rsa { n, e }, SigAlg::RsaPkcs1(h)) => crypto::rsa::PublicKey::new(n, e).is_some_and(|k| k.verify_pkcs1(h, &h.digest(data), sig)),
             (PubKey::Rsa { n, e }, SigAlg::RsaPss(h, salt)) => crypto::rsa::PublicKey::new(n, e).is_some_and(|k| k.verify_pss(h, &h.digest(data), sig, salt)),
             (PubKey::Ec { curve, point }, SigAlg::Ecdsa(h)) => {
-                // Ecdsa-Sig-Value ::= SEQUENCE { r INTEGER, s INTEGER }
+                // Ecdsa-Sig-Value ::= SEQUENCE { r INTEGER, s INTEGER }, strictly DER: nothing
+                // after the SEQUENCE or in it after s, both integers in their shortest form, so a
+                // signature has one encoding (Wycheproof's InvalidEncoding cases)
                 let rs = || -> Option<(&[u8], &[u8])> {
-                    let mut d = Der::new(sig).seq()?;
-                    let r = d.read(der::INTEGER)?;
-                    let s = d.read(der::INTEGER)?;
-                    (d.is_empty() && r.first().is_some_and(|b| b & 0x80 == 0) && s.first().is_some_and(|b| b & 0x80 == 0)).then_some((r, s))
+                    let mut outer = Der::new(sig);
+                    let mut d = outer.seq()?;
+                    let r = der_unsigned(d.read(der::INTEGER)?)?;
+                    let s = der_unsigned(d.read(der::INTEGER)?)?;
+                    (outer.is_empty() && d.is_empty()).then_some((r, s))
                 };
-                rs().is_some_and(|(r, s)| crypto::ecdsa::verify(*curve, point, &h.digest(data), unsigned(r), unsigned(s)))
+                rs().is_some_and(|(r, s)| crypto::ecdsa::verify(*curve, point, &h.digest(data), r, s))
             }
             _ => false,
         }

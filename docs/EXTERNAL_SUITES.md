@@ -19,15 +19,15 @@ filter, `--acceptable` (Wycheproof), `--list` and `--show ID` (limbo), `--target
 
 | Suite | Cases | Pass | Fail | Skipped | Time |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Wycheproof | 10 942 | 10 474 | 15 | 453 | 14 s |
+| Wycheproof | 10 942 | 10 489 | 0 | 453 | 14 s |
 | x509-limbo | 9 807 | 9 690 | 51 (+16 optional) | 50 | 10 s |
 
-Not one primitive in `lib/crypto` failed. All 15 Wycheproof failures are in netio's DER
-decoding of ECDSA signatures. Most of the limbo failures are RFC 5280 / CA/B profile checks
+Not one primitive in `lib/crypto` failed. The 15 Wycheproof failures of the first run were all
+in netio's DER decoding of ECDSA signatures and are fixed (below). Most of the limbo failures are RFC 5280 / CA/B profile checks
 that netio does not do; a short list changes what netio accepts (below, "would change the
 answer").
 
-Negative control: with every expected result inverted, all non-acceptable cases flip (Wycheproof
+Negative control (first run): with every expected result inverted, all non-acceptable cases flip (Wycheproof
 10 133 fail, limbo 9 690 fail), so the harnesses do detect differences.
 
 ## Wycheproof
@@ -46,11 +46,13 @@ Each case goes through the API JFLib's programs call:
 | RSA-PSS | `x509::Cert::verify` -> `verify_pss` with the group's salt length |
 | HKDF, HMAC (SHA-1 / 256 / 384 / 512) | `hmac::hkdf_extract` / `hkdf_expand`, `Hmac<H>` |
 
-### Failures (15): ECDSA DER decoding in netio
+### Fixed: ECDSA DER decoding in netio (the 15 failures of the first run)
 
-`netio::x509::Cert::verify` (`lib/netio/x509.rs:483-491`) decodes the signature of
-certificates and of TLS CertificateVerify. It accepts two non-DER encodings of a valid
-signature, in all five DER files:
+`netio::x509::Cert::verify` decodes the signature of certificates and of TLS
+CertificateVerify. It accepted two non-DER encodings of a valid signature, in all five DER
+files; it now refuses bytes after the SEQUENCE and in it after s, and takes r and s only in the
+shortest form of a non-negative INTEGER (`der_unsigned` in `lib/netio/x509.rs`). The first
+run's lines:
 
 | Wycheproof comment | tcId | Responsible |
 | --- | --- | --- |
@@ -58,10 +60,10 @@ signature, in all five DER files:
 | prepending 0's to r | 84 (P-384/SHA-512: 85) | `x509.rs:489` checks only the sign bit of r and s; a non-minimal INTEGER (`00` before a byte < 0x80) passes, and `unsigned()` (`x509.rs:348`) strips any number of zeros |
 | prepending 0's to s | 128 (P-384/SHA-256: 127) | the same |
 
-What this means: a signature can be changed without the key (malleability), but nothing can be
-forged. A certificate's signature value is not covered by its signature, so anyone can re-encode
-a CA-signed certificate into copies that still validate but have other fingerprints. Pinning by
-fingerprint then fails closed. `crypto::ecdsa::verify` itself is correct: the P1363 files fed
+What this meant: a signature could be changed without the key (malleability), but nothing could be
+forged. A certificate's signature value is not covered by its signature, so anyone could re-encode
+a CA-signed certificate into copies that still validated but had other fingerprints. Pinning by
+fingerprint then failed closed. `crypto::ecdsa::verify` itself is correct: the P1363 files fed
 straight into it pass.
 
 ### Acceptable cases (either answer passes)

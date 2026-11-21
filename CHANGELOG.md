@@ -294,6 +294,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **diagram_core:** Sections with thousands of rows were quadratic to build, compute and draw: `Section::row` / `row_pos` find an indexed row by its index (rows stay sorted), `insert_pos` appends without a search, `Transaction::add_row` takes the next index without merging every inherited row
 - **diagram_io:** The stencil tool rendered each master's icon after a recalculation of the whole stencil: a stencil of 150 masters took minutes; the icon instance now inherits the values computed for the master
 - **Tests:** pkg_check.py without --quick: the finish-args of an app against glibc include --device=dri, as package.py writes them (the check failed for template); pkg_linux.probe() reports a Windows without WSL instead of failing
+- **Tests:** `tools/tls_web_check.py` expects TLS 1.2 without the extended master secret to be refused, as netio's client has done since the review of 2026-10-23; the check expected a connection
 
 ### Security
 
@@ -326,6 +327,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** A text a screen reader sets for a password box is taken as the box's dots with the user's change (the kept dots stand for the hidden characters): a Backspace of TalkBack (browser, Android) set the password to the dots
 - **crypto:** The masks of secret-dependent selects pass an optimization barrier (`ct_mask`). On x86-64 with Rust 1.98 LLVM had compiled the masked final subtractions of the P-256 field arithmetic and of the Ed25519 scalar reduction into branches, the select over all 16 entries of P-256's window table into a jump table indexed by the secret nibble, and at opt-level 2 with LTO (JFLib's release) the window select of `bn::Mont::pow_ct` into a branch: the time and the memory accesses of `p256::public_key`, `shared` and `mul_point` (EAP-PWD too), of Ed25519 signing and of `pow_ct` (RSA signing, the Diffie-Hellman of plat's Secret Service client on Linux) depended on the secret. Results are unchanged; P-256 is about 24 % slower
 - **crypto:** EAP-PWD's hunting and pecking no longer branches on whether a round's x has a point: `p256::y_for_x` (variable time before) has no branch on x up to its answer, and `eappwd::pwe` uses its branch-free core, so which rounds find a point no longer shows in the way the program takes (the partitioning of Dragonblood, CVE-2019-9494, and the cache attacks after it). `p256::scalar_add` (the Scalar rand + mask of a commit), `p256::secret_from` and the subkeys of AES-CMAC select without branches as well; `tools/ct_check.py` found them
+- **netio:** `x509::Cert::verify` reads an ECDSA signature (certificates, TLS CertificateVerify) strictly as DER: nothing after the SEQUENCE or in it after s, r and s in the shortest form of a non-negative INTEGER. Bytes appended to the signature and zeros put before r or s were accepted, so a CA-signed certificate could be re-encoded into copies with other fingerprints that still validated (no forgery; Wycheproof's InvalidEncoding cases, tools/wycheproof_check.py now without a failure)
 
 ## [0.2.1] - 2026-11-16
 
