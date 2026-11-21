@@ -809,6 +809,9 @@ version = "0.2.1"
 [[package]]
 name = "jflib-diagram-core"
 version = "0.2.1"
+dependencies = [
+ "jflib-formats",
+]
 
 [[package]]
 name = "jflib-diagram-io"
@@ -816,6 +819,7 @@ version = "0.2.1"
 dependencies = [
  "jflib-archive",
  "jflib-diagram-core",
+ "jflib-formats",
  "jflib-plat",
  "jflib-rt",
 ]
@@ -1155,6 +1159,7 @@ dependencies = [
 name = "jflib-img-svg"
 version = "0.2.1"
 dependencies = [
+ "jflib-formats",
  "jflib-gfx",
  "jflib-img-core",
  "jflib-rt",
@@ -1391,6 +1396,7 @@ name = "jflib-text"
 version = "0.2.1"
 dependencies = [
  "jflib-base",
+ "jflib-formats",
  "jflib-gfx",
  "jflib-img-core",
  "jflib-img-png",

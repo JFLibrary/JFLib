@@ -39,6 +39,8 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use formats::xml::{Lenient, Token};
+
 /// add_lang modes (fontconfig's edit modes)
 pub const LR_PREPEND: u8 = 0;
 pub const LR_PREPEND_FIRST: u8 = 1;
@@ -608,8 +610,9 @@ fn builtin() -> Vec<Rule> {
     out
 }
 
-// ---- a tolerant reader of fontconfig's XML: elements, attributes, text; comments, the
-// declaration, DOCTYPE and processing instructions are skipped
+// ---- fontconfig's XML: formats::xml::Lenient's tokens (comments, the declaration, the DOCTYPE and
+// processing instructions are skipped, broken markup is read as far as it goes) as a tree of elements,
+// attributes and text
 
 #[derive(Default, Debug)]
 struct Elem {
@@ -628,117 +631,51 @@ impl Elem {
     }
 }
 
-fn unescape(s: &str) -> String {
-    if !s.contains('&') {
-        return String::from(s);
-    }
-    let mut out = String::new();
-    let mut rest = s;
-    while let Some(i) = rest.find('&') {
-        out.push_str(&rest[..i]);
-        let tail = &rest[i..];
-        let Some(j) = tail.find(';').filter(|&j| j <= 10) else {
-            out.push('&');
-            rest = &tail[1..];
-            continue;
-        };
-        let ent = &tail[1..j];
-        let c = match ent {
-            "amp" => Some('&'),
-            "lt" => Some('<'),
-            "gt" => Some('>'),
-            "quot" => Some('"'),
-            "apos" => Some('\''),
-            _ if ent.starts_with("#x") => u32::from_str_radix(&ent[2..], 16).ok().and_then(char::from_u32),
-            _ if ent.starts_with('#') => ent[1..].parse::<u32>().ok().and_then(char::from_u32),
-            _ => None,
-        };
-        match c {
-            Some(c) => out.push(c),
-            None => out.push_str(&tail[..=j]),
-        }
-        rest = &tail[j + 1..];
-    }
-    out.push_str(rest);
-    out
-}
-
-// the document as a tree under a nameless root (unclosed elements end with the text)
+// the document as a tree under a nameless root: an end tag closes up to its element (tolerating a
+// missing end tag; one that closes nothing open is ignored), unclosed elements end with the text, at
+// most 64 levels (a deeper element is dropped, its content goes to the element above)
 fn parse_xml(s: &str) -> Elem {
+    let mut lex = Lenient::new(s);
     let mut stack: Vec<Elem> = alloc::vec![Elem::default()];
-    let mut rest = s;
-    while !rest.is_empty() {
-        let Some(lt) = rest.find('<') else {
-            if let Some(top) = stack.last_mut() {
-                top.text.push_str(&unescape(rest));
+    loop {
+        match lex.next() {
+            Token::Text(raw) => {
+                if let Some(top) = stack.last_mut() {
+                    lex.decode(raw, &mut top.text);
+                }
             }
-            break;
-        };
-        if lt > 0 {
-            if let Some(top) = stack.last_mut() {
-                top.text.push_str(&unescape(&rest[..lt]));
+            Token::CData(raw) => {
+                if let Some(top) = stack.last_mut() {
+                    top.text.push_str(raw);
+                }
             }
-        }
-        rest = &rest[lt..];
-        // comments, declarations, processing instructions
-        let skip_to = |r: &str, end: &str| r.find(end).map(|i| i + end.len()).unwrap_or(r.len());
-        if rest.starts_with("<!--") {
-            rest = &rest[skip_to(rest, "-->")..];
-            continue;
-        }
-        if rest.starts_with("<?") {
-            rest = &rest[skip_to(rest, "?>")..];
-            continue;
-        }
-        if rest.starts_with("<![CDATA[") {
-            let end = rest.find("]]>").unwrap_or(rest.len());
-            if let Some(top) = stack.last_mut() {
-                top.text.push_str(&rest[9.min(end)..end]);
-            }
-            rest = &rest[(end + 3).min(rest.len())..];
-            continue;
-        }
-        if rest.starts_with("<!") {
-            rest = &rest[skip_to(rest, ">")..];
-            continue;
-        }
-        let Some(gt) = rest.find('>') else { break };
-        let tag = &rest[1..gt];
-        rest = &rest[gt + 1..];
-        if let Some(name) = tag.strip_prefix('/') {
-            let name = name.trim();
-            // close up to the matching element (tolerating a missing end tag)
-            if let Some(k) = stack.iter().rposition(|e| e.name == name).filter(|&k| k > 0) {
-                while stack.len() > k {
-                    let e = stack.pop().unwrap_or_default();
-                    if let Some(parent) = stack.last_mut() {
-                        parent.kids.push(e);
+            Token::End { name } => {
+                if let Some(k) = stack.iter().rposition(|e| e.name == name).filter(|&k| k > 0) {
+                    while stack.len() > k {
+                        let e = stack.pop().unwrap_or_default();
+                        if let Some(parent) = stack.last_mut() {
+                            parent.kids.push(e);
+                        }
                     }
                 }
             }
-            continue;
-        }
-        let empty = tag.ends_with('/');
-        let tag = tag.trim_end_matches('/');
-        let name_end = tag.find(|c: char| c.is_ascii_whitespace()).unwrap_or(tag.len());
-        let mut e = Elem { name: String::from(&tag[..name_end]), ..Elem::default() };
-        let mut a = &tag[name_end..];
-        loop {
-            a = a.trim_start();
-            let Some(eq) = a.find('=') else { break };
-            let key = a[..eq].trim();
-            let v = a[eq + 1..].trim_start();
-            let Some(q) = v.chars().next().filter(|c| *c == '"' || *c == '\'') else { break };
-            let Some(close) = v[1..].find(q) else { break };
-            e.attrs.push((String::from(key), unescape(&v[1..1 + close])));
-            a = &v[close + 2..];
-        }
-        if empty {
-            if let Some(top) = stack.last_mut() {
-                top.kids.push(e);
+            Token::Start { name, attrs, empty } => {
+                let mut e = Elem { name: String::from(name), ..Elem::default() };
+                for (k, v) in attrs {
+                    let mut value = String::new();
+                    lex.decode(v, &mut value);
+                    e.attrs.push((String::from(k), value));
+                }
+                if empty {
+                    if let Some(top) = stack.last_mut() {
+                        top.kids.push(e);
+                    }
+                } else if stack.len() < 64 {
+                    stack.push(e);
+                }
             }
-        } else if stack.len() < 64 {
-            stack.push(e);
+            Token::Eof => break,
+            _ => {}
         }
     }
     while stack.len() > 1 {

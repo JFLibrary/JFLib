@@ -77,7 +77,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [formats](#formats) -- bounded JSON with exact numbers, typed JSON records, an XML subset, Unicode text encodings
-  <br>[src/charsets.rs](#formatssrccharsetsrs) · [src/encoding.rs](#formatssrcencodingrs) · [src/jmap.rs](#formatssrcjmaprs) · [src/json.rs](#formatssrcjsonrs) · [src/xml.rs](#formatssrcxmlrs)
+  <br>[src/charsets.rs](#formatssrccharsetsrs) · [src/encoding.rs](#formatssrcencodingrs) · [src/jmap.rs](#formatssrcjmaprs) · [src/json.rs](#formatssrcjsonrs) · [src/xml/mod.rs](#formatssrcxmlmodrs) · [src/xml/lenient.rs](#formatssrcxmllenientrs) · [src/xml/reader.rs](#formatssrcxmlreaderrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
   <br>[lib.rs](#datetime-crate-root) · [cron.rs](#datetimecronrs) · [tz.rs](#datetimetzrs)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
@@ -41197,10 +41197,11 @@ formats -- data formats as text: JSON, typed JSON records, an XML subset, Unicod
          Error { offset, kind }
   jmap   typed mapping of records and string enums over json::Value: Field, Json,
          record! / wire_enum!, list / from_list, str_of / u64_of / obj / empty_object
-  xml    a bounded, namespace-aware XML subset: Node / Name, parse / parse_with(Limits),
-         escape, valid_char; the five predefined entities and character references, and
-         Unsupported for a DTD, other entities, comments, CDATA, processing instructions
-         and mixed content
+  xml    Reader: the strict pull reader (well-formed XML 1.0 with namespaces, events, offsets,
+         skip; DOCTYPE refused); Lenient: the forgiving reader of files from editors (tokens,
+         a DOCTYPE's entities within a budget); parse / parse_with(Limits) -> Node: a bounded
+         tree of the strict subset (Unsupported for comments, CDATA, processing instructions
+         and mixed content); escape, valid_char
   encoding  decode(bytes, limit) -> (String, Encoding) / encode(text, Encoding): UTF-8 with
          and without BOM, UTF-16 LE / BE, strict and without guessing; Charset: the single-byte
          sets of the web (WHATWG: windows-1252, ISO-8859-x, KOI8 ...) and of old files (the DOS
@@ -41520,13 +41521,26 @@ the agent interface's control channels. New shared code (agent_core::json until 
   line, indented by `indent` spaces per level, "name": value; empty containers stay "[]" / "{}".
   The output ends without a newline.
 
-### `formats/src/xml.rs`
+### `formats/src/xml/mod.rs`
 
-Source: [`lib/formats/src/xml.rs`](../lib/formats/src/xml.rs)
+Source: [`lib/formats/src/xml/mod.rs`](../lib/formats/src/xml/mod.rs)
 
 ```text
-Bounded, namespace-aware XML subset for interchange. No DTD, entities, I/O or XInclude.
-New native functionality; deliberately rejects constructs it cannot represent losslessly.
+xml -- XML for JFLib, one reader in two kinds, and a bounded tree on top. New native functionality;
+no DTD, no I/O, no XInclude, nothing is ever fetched.
+
+  Reader (reader.rs)     the strict pull reader: well-formed XML 1.0 with namespaces; events,
+                         positions, the raw text of an element (skip); DOCTYPE refused
+  Lenient (lenient.rs)   the forgiving reader of files from editors (SVG, fontconfig, theme parts):
+                         tokens, nothing is an error, a DOCTYPE's internal entities with a budget
+  parse(text) -> Node    a tree of the strict subset for interchange formats: element-only or
+                         text-only nodes, names expanded to their namespaces; comments, processing
+                         instructions, CDATA and mixed content refused (Unsupported); bounded
+                         (Limits: bytes, elements, nesting; the names it keeps)
+  escape(text), valid_char(c)   for writers
+
+Every reader of the library is one of these two (img_svg, diagram_io, diagram_core's theme parts,
+text's fontconfig files): one place to fuzz, one set of limits per caller.
 ```
 
 - **`struct Name`**
@@ -41550,9 +41564,14 @@ New native functionality; deliberately rejects constructs it cannot represent lo
 
 - **`enum Error`**
   Syntax error, resource limit, or an intentionally unsupported XML construct.
-  - `Syntax`
-  - `Limit`
-  - `Unsupported`
+  - `Syntax` -- not well-formed (or, for the tree, a name it cannot keep)
+  - `Limit` -- a limit of the tree: bytes, elements, nesting, attributes, the names it keeps
+  - `Unsupported` -- a construct the reader does not take: a DOCTYPE or other declaration, an encoding other
+    than UTF-8 and UTF-16, XML other than 1.0; for the tree also comments, processing
+    instructions, CDATA and mixed content
+  - `Depth` -- (Reader) more open elements than its depth
+  - `Attributes` -- (Reader) more attributes on one element than allowed, or more than 64 namespace bindings
+    in scope
 
 - **`struct Limits`**
   What one parse may take: the text's bytes, its elements, their nesting. The default
@@ -41569,11 +41588,171 @@ New native functionality; deliberately rejects constructs it cannot represent lo
   Escape text/attribute content, including CR so it survives XML newline normalization.
 
 - **`fn parse(s: &str) -> Result<Node, Error>`**
-  Parse a bounded XML subset. DTDs, processing instructions, comments, CDATA and mixed
-  content are explicitly rejected. No resources are ever resolved or fetched.
+  Parse a bounded XML subset into a tree. DTDs, processing instructions, comments, CDATA and
+  mixed content are explicitly rejected (Unsupported). No resources are ever resolved or fetched.
 
 - **`fn parse_with(s: &str, lim: Limits) -> Result<Node, Error>`**
-  `parse` within other limits than the default ones.
+  `parse` within other limits than the default ones. The tree is built from the strict Reader
+  without recursion; a limit of the reader (nesting, attributes, bindings) is Limit here.
+
+### `formats/src/xml/lenient.rs`
+
+Source: [`lib/formats/src/xml/lenient.rs`](../lib/formats/src/xml/lenient.rs)
+
+```text
+lenient -- the forgiving reader of formats::xml: what a browser or an editor would still show
+
+  Lenient::new(text) / with_limits(text, attrs, entities, expand)
+  l.next() -> Token          Start { name, attrs (raw values), empty }, End { name }, Text (raw), CData, Eof
+  l.decode(raw, &mut out)    a raw text or attribute value with its references replaced
+  l.truncated()              the input ended inside a tag, or the entities' budget was spent
+
+For files from editors, which are often sloppy (SVG, fontconfig, theme parts): nothing is an error.
+Tokens: a start tag (its name as written, at most `attrs` attributes: a repeated one counts, the first
+stays; a value in ' or ", unquoted to the next blank or '>', none for a bare name; a stray quote, '=' or
+'/' is skipped; '<' ends a broken tag), an end tag (its name; the rest up to '>' is skipped), text up to
+the next '<' (a lone '<' that starts no tag is text), CDATA as written.  Skipped: the XML declaration and
+processing instructions, comments, every `<!...>` declaration; a DOCTYPE's internal subset gives the
+entities: its `<!ENTITY name "value">` declarations (general ones; parameter and external entities are
+skipped; the first declaration of a name stays; at most `entities`, values of at most 64 KiB, with
+character references and the five predefined entities replaced, other references kept as written so no
+entity grows exponentially).  An unterminated construct ends the document there.
+
+References (decode): the five predefined entities, character references (decimal, x or X; a number that
+is no character, or 0, gives U+FFFD), the DOCTYPE's entities while `expand` bytes of their values have
+not been used up (beyond: the reference is dropped and truncated() set); an unknown entity stays as
+written, and so does an '&' that has no ';' within 63 bytes before the next '&'.  Nesting, a second
+root, mismatched end tags and limits on elements are the caller's: it builds the tree it needs.
+```
+
+```rust
+/// the default limit of attributes per start tag
+ATTRS: usize = 512
+/// the default limit of entity declarations in a DOCTYPE
+ENTITIES: usize = 256
+/// the default budget of bytes that entity references may produce in all
+EXPAND: usize = 32 << 20
+```
+
+- **`enum Token<'a>`**
+  what the lenient reader found next
+  - `Start { name: &'a str, attrs: Vec<(&'a str, &'a str)>, empty: bool }` -- a start tag: its name as written and its attributes with their raw values ("" for none)
+  - `End { name: &'a str }` -- an end tag
+  - `Text(&'a str)` -- character data as written (decode replaces the references)
+  - `CData(&'a str)` -- a CDATA section's content as written
+  - `Eof` -- the end of the text
+
+- **`struct Lenient<'a>`**
+  the forgiving reader (see the top of this file)
+
+**`impl<'a> Lenient<'a>`**
+
+- **`fn new(s: &'a str) -> Self`**
+  a reader of `s` with the default limits (ATTRS, ENTITIES, EXPAND)
+- **`fn with_limits(s: &'a str, attrs: usize, entities: usize, expand: usize) -> Self`**
+  a reader with at most `attrs` attributes per start tag, `entities` entity declarations and `expand`
+  bytes of entity values in all
+- **`fn truncated(&self) -> bool`**
+  whether the input ended inside a tag or the entities' budget was spent
+- **`fn pos(&self) -> usize`**
+  the offset the reader is at
+- **`fn decode(&mut self, raw: &str, out: &mut String)`**
+  a raw text or attribute value (from a token) with its references replaced, appended to `out`
+- **`fn next(&mut self) -> Token<'a>`**
+  the next token (Eof at the end, and from then on)
+
+### `formats/src/xml/reader.rs`
+
+Source: [`lib/formats/src/xml/reader.rs`](../lib/formats/src/xml/reader.rs)
+
+```text
+reader -- the strict pull reader of formats::xml: well-formed XML 1.0 with namespaces, without a DTD
+
+  Reader::new(text, depth, attrs)   at most `depth` open elements and `attrs` attributes per element
+  r.next() -> Event                 Start, End, Text, CData, Comment, Pi, Eof; an empty element <a/> gives
+                                    Start (empty: true) and then End
+  r.skip(at) -> &str                the rest of the element whose start tag began at `at`, as written
+  r.pos() / r.src()
+
+Read: elements, attributes in ' or ", the five predefined entities and character references, CDATA,
+comments and processing instructions (as events), the XML declaration (version 1.0; encoding UTF-8 or
+UTF-16, the text is decoded already; standalone; in this order, values as written), a leading U+FEFF, and
+namespaces: every name comes with the URI its prefix is bound to (Namespaces in XML 1.0; xmlns attributes
+are in NS_XMLNS).  Refused: a DOCTYPE and every other declaration (Unsupported: no entities, nothing
+external), an undefined entity, a character XML does not allow, mismatched or unclosed tags, text or a
+second element outside the root, an unbound prefix, a name that is no QName, a duplicate attribute (also
+two prefixes of one namespace), more nesting than `depth` (Depth), more attributes on one element than
+`attrs` or more than 64 namespace bindings in scope (Attributes).  Line ends are normalised as XML says:
+CR LF and CR become LF in text; in attribute values a literal tab, line end or CR becomes a space
+(character references stay).  Nothing recurses: the stack is the reader's own Vec, bounded by `depth`.
+Text is borrowed from the input unless a reference or a CR had to be replaced.
+```
+
+```rust
+/// the namespace of the xml prefix (xml:lang, xml:space)
+NS_XML: &str = "http://www.w3.org/XML/1998/namespace"
+/// the namespace of namespace declarations (xmlns, xmlns:p)
+NS_XMLNS: &str = "http://www.w3.org/2000/xmlns/"
+```
+
+- **`struct Attr<'a>`**
+  one attribute of a start tag
+  - `qname: &'a str` -- the name as written (with its prefix)
+  - `local: &'a str` -- the name without prefix (for a declaration: the prefix it binds, "" for xmlns)
+  - `ns: Cow<'a, str>` -- the namespace URI ("" for an unprefixed attribute; NS_XMLNS for a declaration)
+  - `value: Cow<'a, str>` -- the value with references replaced and white space normalised
+
+- **`struct Start<'a>`**
+  a start tag
+  - `qname: &'a str` -- the name as written (with its prefix)
+  - `local: &'a str` -- the name without prefix
+  - `ns: Cow<'a, str>` -- the namespace URI ("" for none)
+  - `attrs: Vec<Attr<'a>>` -- the attributes in their order, namespace declarations included
+  - `empty: bool` -- &lt;a/>: an End follows right away
+  - `at: usize` -- the offset of '&lt;'
+  - `end: usize` -- the offset after '>'
+
+**`impl Start<'_>`**
+
+- **`fn is(&self, ns: &str, local: &str) -> bool`**
+  whether this is the element `local` of the namespace `ns`
+- **`fn attr(&self, ns: &str, local: &str) -> Option<&str>`**
+  the value of the attribute `local` of the namespace `ns` ("" for an unprefixed one)
+
+- **`enum Event<'a>`**
+  what the reader found next
+  - `Start(Start<'a>)` -- a start tag
+  - `End { end: usize }` -- an end tag: the offset after its '>' (the start tag's end for an empty element)
+  - `Text(Cow<'a, str>)` -- character data with references replaced
+  - `CData(Cow<'a, str>)` -- a CDATA section's content (line ends normalised)
+  - `Comment(&'a str)` -- a comment's content
+  - `Pi { target: &'a str, data: &'a str }` -- a processing instruction
+  - `Eof` -- the end of a well-formed document
+
+- **`struct ReadError`**
+  an error and the byte offset it was found at
+  - `error: Error`
+  - `at: usize`
+
+- **`struct Reader<'a>`**
+  the strict pull reader (see the top of this file)
+
+**`impl<'a> Reader<'a>`**
+
+- **`fn new(s: &'a str, depth: usize, attrs: usize) -> Self`**
+  a reader of `s` with at most `depth` open elements and `attrs` attributes per element; a leading
+  U+FEFF is skipped
+- **`fn pos(&self) -> usize`**
+  the offset the reader is at
+- **`fn src(&self) -> &'a str`**
+  the source text
+- **`fn depth(&self) -> usize`**
+  the elements open now
+- **`fn next(&mut self) -> Result<Event<'a>, ReadError>`**
+  the next event; after an error the reader is not meant to go on
+- **`fn skip(&mut self, at: usize) -> Result<&'a str, ReadError>`**
+  the rest of the element whose start tag began at `at` (just returned by next), as the file
+  wrote it
 
 ## datetime
 
@@ -57204,9 +57383,11 @@ Source: [`lib/diagram_core/src/formula/xml.rs`](../lib/diagram_core/src/formula/
 xml -- a small element tree of a theme part (DrawingML with Visio's extensions)
 
 Theme parts are a few dozen kilobytes of attributes; the engine reads colours, fonts and
-style lists from them.  This reader keeps elements (local names, attributes, children) and
-drops text, comments, processing instructions and the DOCTYPE; it refuses nothing: what it
-cannot read ends the tree there.  Limits: 200 000 elements, depth 256.
+style lists from them.  The reading is formats::xml::Lenient's (nothing is an error: a broken
+tag or reference is read as far as it goes); this tree keeps elements (local names, attributes
+without the xmlns declarations, children) and drops text, comments, processing instructions and
+the DOCTYPE; an end tag closes the element open last.  Limits: 200 000 elements, depth 256; a
+second root element or a limit ends the tree there.
 ```
 
 - **`struct Elem`**
@@ -60703,7 +60884,7 @@ never stack.
 Source: [`lib/diagram_io/src/xml.rs`](../lib/diagram_io/src/xml.rs)
 
 ```text
-xml -- a bounded pull reader for the XML parts of the VSDX family
+xml -- the XML parts of the VSDX family: formats::xml's strict pull reader with the namespaces it knows
 
   Reader::new(text, depth, attrs)    a part's text (UTF-8 or UTF-16 decoded by text_of)
   r.next() -> Event                  Start, End, Text, Eof; an empty element <a/> gives Start
@@ -60711,18 +60892,14 @@ xml -- a bounded pull reader for the XML parts of the VSDX family
   r.skip(&start) -> &str             the rest of an element, returned as the file wrote it
                                      (an unknown element kept for DF-03)
 
-Why not base::xml: shape text is mixed content (<Text>ab<cp IX='0'/>cd</Text>), and unknown
-elements must come back as written; base::xml builds trees of element-only or text-only nodes.
-
-What it reads: elements, attributes in ' or ", the five predefined entities and character
-references, CDATA, comments and processing instructions (both skipped), namespaces (each name
-is resolved to the few namespaces the reader knows, Ns).  Refused: a DOCTYPE (no entities,
-no external anything), an undefined entity, a character XML does not allow, an encoding other
-than UTF-8 / UTF-16 in the declaration, mismatched or unclosed tags, an unbound prefix, a
-duplicate attribute, more nesting than `depth` and more attributes on one element than
-`attrs`.  Line ends are normalised as XML says: CR LF and CR become LF in text; in attribute
-values a literal tab, line end or CR becomes a space (character references stay).  Nothing
-recurses: a reader's stack is its own Vec, bounded by `depth`.
+The reader is formats::xml::Reader (strict: well-formed XML 1.0 with namespaces; mixed content,
+which shape text is: <Text>ab<cp IX='0'/>cd</Text>; positions for the raw text of unknown
+elements).  This file maps its namespace URIs to the few the VSDX reader knows (Ns), its errors to
+XmlError, and skips comments and processing instructions; CDATA is text.  Refused, as there: a
+DOCTYPE (no entities, no external anything), an undefined entity, a character XML does not allow,
+an encoding other than UTF-8 / UTF-16 in the declaration, mismatched or unclosed tags, an unbound
+prefix, a duplicate attribute, more nesting than `depth` and more attributes on one element than
+`attrs`.  Nothing recurses.
 ```
 
 - **`enum XmlError`**

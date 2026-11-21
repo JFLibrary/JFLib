@@ -8,9 +8,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- SVG files are read with jflib-formats' forgiving `formats::xml::Lenient` instead of a reader of the crate's own; the tree, its limits and what is kept are the crate's as before. Every SVG of the repository and 45 deliberately broken ones render byte for byte as before, and the tree is the same on 208 000 inputs with mutations (but for the fix below).
+
 ### Fixed
 
 - XML reader: a repeated attribute is found by sorting an element's attributes once (the first one counts, as before; with more than `MAX_ATTRS` attributes a repeated one now counts towards the limit), and entity references are looked up by binary search. Both walked up to 512 and 256 entries for every attribute and every reference of the file.
+- An element whose name holds a byte that is no UTF-8 was never closed by its end tag (the end tag's raw bytes were compared with the start tag's name as Latin-1).
 
 ## [0.2.1] - 2026-11-16
 

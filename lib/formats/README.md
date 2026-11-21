@@ -21,13 +21,23 @@ macro. `record!` declares a struct together with its mapping, `wire_enum!` an en
 string. A missing or mistyped member reads as its default and unknown members are ignored, so an
 old and a new program read each other's data.
 
-**XML** (`formats::xml`) is a namespace-aware subset for interchange formats such as OPC
-packages, DOCX parts and manifests: `parse` builds a tree of elements that hold either elements
-or text, with names expanded to their namespaces. References are the five predefined entities and
-character references. What the subset cannot represent losslessly is refused as `Unsupported`
-instead of being read halfway: a DTD, other entities, comments, CDATA sections, processing
-instructions and mixed content. `escape` writes text and attribute values that survive the
-reader's newline normalization.
+**XML** (`formats::xml`) has one reader in two kinds, and every XML reader of JFLib is one of them:
+
+- `Reader` is strict: well-formed XML 1.0 with namespaces, as a pull reader of events (start
+  and end tags, text, CDATA, comments, processing instructions), each name with the URI its
+  prefix is bound to, errors with their byte offset, and `skip` for the raw text of an element a
+  program keeps as written. A DOCTYPE is refused, so are entities other than the five predefined
+  ones; nesting, attributes per element and namespace bindings are bounded, and nothing recurses.
+  The VSDX reader of `jflib-diagram-io` runs on it.
+- `Lenient` is forgiving, for files from editors (SVG, fontconfig, theme parts): nothing is an
+  error, a broken tag or reference is read as far as it goes, and a DOCTYPE's internal entities
+  are expanded within a budget of bytes, so no "billion laughs" can grow. It gives tokens, and
+  the program builds the tree it needs (`jflib-img-svg`, `jflib-text`, `jflib-diagram-core`).
+- `parse` builds a tree on the strict reader for interchange formats such as OPC packages, DOCX
+  parts and manifests: elements that hold either elements or text, names expanded to their
+  namespaces. What the subset cannot represent losslessly is refused as `Unsupported` instead of
+  being read halfway: a DTD, comments, CDATA sections, processing instructions and mixed content.
+  `escape` writes text and attribute values that survive the reader's newline normalization.
 
 **Encodings** (`formats::encoding`) decode bytes to a `String` and back. `decode` and `encode` are
 the strict Unicode interchange: UTF-8 with or without a byte-order mark and UTF-16 in both byte

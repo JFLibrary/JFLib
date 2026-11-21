@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- fontconfig files are read with jflib-formats' forgiving `formats::xml::Lenient` instead of a reader of the crate's own (`fontconf`): a '>' inside a quoted attribute value no longer ends the tag, an unquoted value no longer ends the attributes; the system's 63 fontconfig files give the same rules as before.
+
 ### Fixed
 
 - `segment::wrap_end` / `wrap_end_hyph` read the break opportunities in a window that grows while its text fits, and measure the rest of the paragraph only that far; every line scanned and measured the whole rest (quadratic over a long paragraph). A line start inside a character counts from that character's start (it panicked); words longer than about 256 characters are no longer hyphenated (they were found and hyphenated whole for every line).

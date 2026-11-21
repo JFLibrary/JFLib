@@ -43,6 +43,7 @@ mod dt;
 mod httpt;
 mod charsett;
 mod jmapt;
+mod xmlt;
 mod lz;
 mod metricst;
 mod netpktt;
@@ -168,6 +169,7 @@ fn run() -> i32 {
         ("rng", Some(rngt::run)),
         ("jmap", Some(jmapt::run)),
         ("charsets", Some(charsett::run)),
+        ("xml", Some(xmlt::run)),
         ("dhcp", Some(dhcpt::run)),
         ("dnsmsg", Some(dnsmsgt::run)),
         ("ntp", Some(ntpt::run)),
