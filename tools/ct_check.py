@@ -14,8 +14,15 @@ The source says nothing about this: LLVM may turn a masked select back into a br
 lookup (it did, docs: crypto's CHANGELOG), so the machine code is what is checked, for the
 compiler that runs here (cargo; RUSTUP_TOOLCHAIN picks another).  The probe's target
 selftest_leak branches on its secret on purpose: it has to fail, else the tracer sees nothing and
-the run fails as a whole.  Not seen: memory addresses that depend on a secret without a branch,
-instructions whose time depends on their operands, other processors (aarch64, wasm).
+the run fails as a whole.
+With valgrind installed (--no-memcheck turns it off) every operation also runs once under
+memcheck with its secret bytes marked undefined, as BoringSSL's constant-time check does:
+memcheck reports a branch on anything made from them and an address made from them (a table
+lookup at a secret index, which the trace cannot see; selftest_lookup must be reported).  Places
+where a secret becomes public on purpose (an AEAD's verdict, Base64's padding, Argon2id's
+data-dependent addressing) are in DECLASSIFIED, each with its reason, matched by the text of the
+source line.  Not seen by either: instructions whose time depends on their operands (division,
+some multipliers), other processors (aarch64, wasm).
 Linux on x86-64 (from Windows: runs itself again in WSL); needs cargo, binutils (addr2line, objdump)
 and util-linux' setarch (runs without address randomization; without it results may vary).
 Exit code 1 on any difference."""
@@ -24,6 +31,7 @@ import concurrent.futures
 import os
 import platform
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -41,6 +49,47 @@ LEVELS = {
     "z": {"opt-level": '"z"', "lto": '"fat"', "codegen-units": "1"},
 }
 SELFTEST = "selftest_leak"
+# a deliberate table lookup at a secret index: the same branches every time (the trace does not see
+# it), memcheck must report it
+SELFTEST_LOOKUP = "selftest_lookup"
+VALGRIND = shutil.which("valgrind")
+
+# Where a secret becomes public on purpose, memcheck reports the branch on it as well: (file,
+# a pattern of that source line, why the value is public).  Matched by the text of the line, so
+# edits elsewhere in a file do not move the entries.
+DECLASSIFIED = [
+    # verdicts: whether a tag, an unwrapped key's check value or a shared secret passes is the
+    # public answer of the operation
+    ("crypto/aead.rs", r"ct_eq\(&want, t\)|\.then_some\(buf\)", "the AEAD's verdict (authentic or not) is its public answer"),
+    ("crypto/gcm.rs", r"ct_eq\(&self\.tag", "the AEAD's verdict (authentic or not) is its public answer"),
+    ("crypto/keywrap.rs", r"ct_eq\(&a, &IV\)", "the unwrap's verdict (the check value matches or not) is its public answer"),
+    ("crypto/x25519.rs", r"ct_eq\(&s, &\[0u8; 32\]\)", "an all-zero shared secret is refused: that the peer sent a low-order point is public"),
+    ("crypto/b64.rs", r"if good == 0", "the decoder's verdict (valid Base64 or not) is its public answer"),
+    ("crypto/lib.rs", r"if good == 0", "the decoder's verdict (valid hex or not) is its public answer"),
+    ("crypto/p256.rs", r"ct_mask\(br & nonzero\) == 1", "secret_from: whether random bytes make a scalar is public (they are drawn again)"),
+    ("crypto/p256.rs", r"p\.z == \[0; 4\]", "the point at infinity ends the operation (None): reaching it is public"),
+    ("crypto/p256.rs", r"\(found != 0\)\.then_some", "y_for_x: the answer whether there is a point (EAP-PWD calls the branch-free core)"),
+    # EAP-PWD: rand and mask are drawn again when they make no valid scalar; Scalar is sent
+    ("crypto/eappwd.rs", r"scalar_ok\(rand\)|scalar_ok\(&scalar\)", "rand / mask that make no valid scalar are drawn again; Scalar itself is sent to the peer"),
+    ("crypto/eappwd.rs", r"rounds < ROUNDS as u32 \|\| found == 0", "after the 40 rounds RFC 5931 asks for, a password without a point (2^-40) goes on"),
+    # Argon2id addresses its memory by the password after the first half of the first pass
+    ("crypto/argon2.rs", r"same|ref_index|ref_lane|mem\[", "Argon2id's data-dependent addressing (RFC 9106 3.4), by design"),
+    # text formats: the positions of padding, delimiters and line ends are the public layout,
+    # and Base64 or hex characters are never one of them; std's UTF-8 handling looks at the high
+    # bit of characters that are ASCII by construction
+    ("crypto/b64.rs", r"s\.push\(char_of", "the characters are ASCII by construction (std's String::push looks at the high bit)"),
+    ("crypto/lib.rs", r"s\.push\(\(b'0' \+ n", "the characters are ASCII by construction (std's String::push looks at the high bit)"),
+    ("x509/lib.rs", r"\(seed\.len\(\) == 32\)\.then", "the PKCS #8 structure around the key is public"),
+    ("ct_check/probe.rs", r"\.map\(\|kp\| kp\.public\)", "the probe takes the loader's answer (Some or None is its public verdict)"),
+    ("crypto/b64.rs", r"trim_end_matches|pad > 2|b\.len\(\) % 4|b\.chunks\(4\)|out\.push|with_capacity|c\.iter\(\)\.enumerate|for i in 0\.\.bytes|if bytes < 3", "padding and length are the public layout of the text (memcheck sees the length come from comparing the last characters with '=')"),
+    ("x509/der.rs", r".", "DER's tags and lengths are the public structure of a key file"),
+    ("x509/lib.rs", r"fn ed25519_from_pkcs8|d\.u64\(\)\? != 0|is_ed25519_alg|read\(der::OCTET_STRING\)", "the PKCS #8 structure around the key is public"),
+    ("crypto/lib.rs", r"for b in buf\.iter_mut\(\)|\*b = 0", "zeroize's length is the buffer's, which is public"),
+    ("netio/pem.rs", r".", "PEM's layout (markers, line ends) is public; Base64 characters are none of them"),
+    ("netio/ssh.rs", r".", "the OpenSSH key file's layout and fields other than the key are public"),
+]
+# own frames whose declassification holds only for errors raised inside std's text handling
+TEXT_FILES = ("crypto/b64.rs", "netio/pem.rs", "netio/ssh.rs")
 # operations whose way may depend on the secret by design, from this fraction of it on
 KNOWN = {
     "argon2id": (0.5, "Argon2id addresses its memory by the password after the first half of the "
@@ -99,6 +148,9 @@ debug = "line-tables-only"
 """, encoding="utf-8")
     env = dict(os.environ, CARGO_TARGET_DIR=str(d / "target"))
     env.pop("RUSTFLAGS", None)
+    # DWARF 4 line tables: valgrind 3.26 puts lines of a binary of many codegen units in the wrong
+    # files when they are DWARF 5 (memcheck's reports need the right line); code is the same
+    env["CARGO_ENCODED_RUSTFLAGS"] = "-Cdwarf-version=4"
     p = subprocess.run(["cargo", "build", "--release", "--quiet", "--manifest-path", str(d / "Cargo.toml")],
                        env=env, capture_output=True, text=True)
     if p.returncode != 0:
@@ -228,6 +280,166 @@ def check(level, exe, targets, seeds, step):
     return bad
 
 
+def vg_errors(log):
+    """memcheck's errors of a log: [(kind, [(function, file, line)])], innermost frame first"""
+    out = []
+    cur = None
+    for ln in log.splitlines():
+        m = re.match(r"==\d+== (Conditional jump or move depends on uninitialised|Use of uninitialised value|Syscall param .* uninitialised|Invalid read|Invalid write)", ln)
+        if m:
+            kind = "branch" if m.group(1).startswith("Conditional") else ("address" if m.group(1).startswith("Use of") else "other")
+            cur = (kind, [])
+            out.append(cur)
+            continue
+        f = re.match(r"==\d+==    (at|by) 0x([0-9A-F]+): (.*?) \((.*)\)$", ln)
+        if f and cur is not None:
+            where = re.match(r"(.*):(\d+)$", f.group(4))
+            path, line = (where.group(1), int(where.group(2))) if where else (f.group(4).removeprefix("in "), 0)
+            # (function, file, line, address, return address?)
+            cur[1].append((f.group(3), path, line, int(f.group(2), 16), f.group(1) == "by"))
+        elif re.match(r"==\d+== $", ln):
+            cur = None
+    return out
+
+
+def resymbolize(exe, errors):
+    """valgrind 3.26 puts lines of a binary of many codegen units into the wrong files; its
+    function names are right.  The frames inside the probe get their (inlined) functions and
+    lines from addr2line instead, at the load address under which addr2line names the same
+    functions as valgrind"""
+    addrs = sorted({fr[3] - (1 if fr[4] else 0) for _, frames in errors for fr in frames if fr[3] >= 0x1000000})
+    if not addrs:
+        return errors
+
+    def lookup(base, some):
+        # each address asked twice: binutils' addr2line answers the first one of a unit without a line
+        args = [hex(a - base) for a in some for _ in (0, 1)]
+        out = subprocess.run(["addr2line", "-a", "-f", "-C", "-i", "-e", str(exe)] + args, capture_output=True, text=True).stdout
+        blocks = re.split(r"^0x([0-9a-f]+)$", out, flags=re.M)[1:]
+        res = {}
+        for i in range(0, len(blocks), 4):
+            off = int(blocks[i + 2], 16) if i + 2 < len(blocks) else None
+            lines = blocks[i + 3].strip("\n").split("\n") if i + 3 < len(blocks) else []
+            if off is None:
+                continue
+            fr = []
+            for fn, at in zip(lines[0::2], lines[1::2]):
+                m = re.match(r"(.*):(\d+)", at)
+                fr.append((fn, m.group(1) if m else at, int(m.group(2)) if m else 0))
+            res[off + base] = fr
+        return res
+
+    names = {fr[3] - (1 if fr[4] else 0): fr[0] for _, frames in errors for fr in frames}
+    best, base = -1, None
+    for b in (0x4000000, 0x108000, 0x400000, 0):
+        got = lookup(b, addrs[:20])
+        score = sum(1 for a, fr in got.items() if fr and any(f[0].split("::")[-1][:20] in names.get(a, "") or names.get(a, "").split("::")[-1][:20] in f[0] for f in fr))
+        if score > best:
+            best, base = score, b
+    table = lookup(base, addrs)
+    out = []
+    for kind, frames in errors:
+        new = []
+        for fr in frames:
+            chain = table.get(fr[3] - (1 if fr[4] else 0))
+            if chain and any(c[2] > 0 for c in chain):
+                new.extend(chain)
+            else:
+                new.append(fr[:3])
+        out.append((kind, new))
+    return out
+
+
+def own_frame(frames):
+    """the innermost frame in this repository's sources with a line (or the innermost one)"""
+    for fr in frames:
+        if fr[2] > 0 and (fr[1].startswith(tuple(p for p in PREFIXES)) or "/lib/" in fr[1]):
+            return fr
+    return frames[0] if frames else ("?", "?", 0)
+
+
+def declassified(fr, frames):
+    fn, path, line = fr
+    try:
+        text = Path(path).read_text(encoding="utf-8").splitlines()[line - 1]
+    except (OSError, IndexError):
+        return None
+    for file, pattern, why in DECLASSIFIED:
+        if not path.endswith(file) or not re.search(pattern, text):
+            continue
+        # a text file's entry covers std's text handling under it, and its own lines when the
+        # pattern names them; netio's parsers of the decoded structure are public layout too
+        if file in TEXT_FILES and file != "crypto/b64.rs" and frames and frames[0][1] == path and "ssh.rs" not in file:
+            continue
+        return why
+    return None
+
+
+def memcheck_one(exe, target):
+    log = exe.parent.parent.parent / f"memcheck-{target}.log"
+    cmd = [VALGRIND, "--tool=memcheck", "-q", "--error-exitcode=99", "--track-origins=yes", "--num-callers=40",
+           "--fullpath-after=", f"--log-file={log}", str(exe), "--memcheck", target, "1"]
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+    return target, p.returncode, resymbolize(exe, vg_errors(text)), (p.stdout + p.stderr)[-500:]
+
+
+def memcheck(level, exe, targets):
+    """valgrind's memcheck with the secret marked undefined -> number of problems at this level"""
+    jobs = max(1, (os.cpu_count() or 2) - 1)
+    with concurrent.futures.ThreadPoolExecutor(jobs) as pool:
+        results = list(pool.map(lambda t: memcheck_one(exe, t), targets))
+    bad, clean, seen_branch, seen_lookup = 0, 0, False, False
+    lines = []
+    for target, rc, errors, tail in results:
+        if rc not in (0, 99):
+            bad += 1
+            lines.append(f"  {target:<24} ERROR exit {rc}: {tail.strip()[-200:]}")
+            continue
+        found = {}
+        for kind, frames in errors:
+            fr = own_frame(frames)
+            if declassified(fr, frames):
+                continue
+            # allocation sizes come from lengths, which are public (std's capacity checks and
+            # frees of a buffer whose length memcheck follows from a text's padding)
+            if frames and all("/alloc/src/raw_vec/" in f[1] or "/alloc/src/vec/" in f[1] or "/core/src/alloc/layout" in f[1]
+                              or "/core/src/intrinsics/" in f[1] or "/core/src/num/uint_macros" in f[1] for f in frames[:3]):
+                continue
+            # String::push of a Base64 or hex character (ASCII by construction) where the line
+            # of the caller is lost
+            if any(f[1].endswith("alloc/src/string.rs") for f in frames[:6]) and any(f[1].split(":")[0].endswith(("crypto/b64.rs", "crypto/lib.rs")) for f in frames[:8]):
+                continue
+            # the probe dropping the operation's answer: Some or None is its public verdict
+            if any(f[0].startswith(("drop_glue", "core::ptr::drop_in_place")) for f in frames[:8]) and fr[1].endswith("probe.rs"):
+                continue
+            found.setdefault((kind, fr), frames)
+        if target == SELFTEST:
+            seen_branch = any(k == "branch" and f[1].endswith("probe.rs") for k, f in found)
+            continue
+        if target == SELFTEST_LOOKUP:
+            seen_lookup = any(k == "address" and f[1].endswith("probe.rs") for k, f in found)
+            continue
+        if not found:
+            clean += 1
+            continue
+        bad += 1
+        lines.append(f"  {target:<24} {len(found)} place(s) that depend on the secret")
+        for (kind, fr), frames in list(found.items())[:6]:
+            chain = " < ".join(f"{f[0].split('<')[0].split('(')[0]} ({f[1].split('/lib/')[-1]}:{f[2]})" for f in frames[:3])
+            lines.append(f"      {kind:<8} {chain}")
+    checked = len([t for t in targets if t not in (SELFTEST, SELFTEST_LOOKUP)])
+    for ok, what in ((seen_branch, "the branch of " + SELFTEST), (seen_lookup, "the table lookup of " + SELFTEST_LOOKUP)):
+        if not ok:
+            bad += 1
+            lines.append(f"  FAIL: memcheck did not see {what} (is the secret marked?)")
+    print(f"[{level}] memcheck: {clean} of {checked} operations neither branch on the secret nor use it as an address"
+          + (", both self-tests seen" if seen_branch and seen_lookup else ""))
+    for ln in lines:
+        print(ln)
+    return bad
+
+
 def main():
     if os.name == "nt":
         wsl = "/mnt/" + str(ROOT)[0].lower() + str(ROOT)[2:].replace("\\", "/")
@@ -241,6 +453,7 @@ def main():
     ap.add_argument("--seeds", type=int, default=3, help="secrets per target (at least 2)")
     ap.add_argument("--crypto", default=str(ROOT / "lib" / "crypto"), help="the crate to check (another version of it)")
     ap.add_argument("--step", action="store_true", help="every instruction instead of every taken branch")
+    ap.add_argument("--no-memcheck", action="store_true", help="only the trace, not valgrind's memcheck")
     a = ap.parse_args()
     levels = [x for x in a.opt.split(",") if x]
     for lv in levels:
@@ -253,11 +466,15 @@ def main():
     for lv in levels:
         exe = build(lv, crate_dir, label)
         listed = subprocess.run([str(exe), "--list"], capture_output=True, text=True).stdout.split()
-        targets = [t for t in listed if not a.only or t in a.only.split(",") or t == SELFTEST]
+        targets = [t for t in listed if not a.only or t in a.only.split(",") or t in (SELFTEST, SELFTEST_LOOKUP)]
         unknown = [t for t in a.only.split(",") if t and t not in listed]
         if unknown:
             sys.exit(f"ct_check: unknown targets {', '.join(unknown)}")
-        bad += check(lv, exe, targets, max(2, a.seeds), a.step)
+        bad += check(lv, exe, [t for t in targets if t != SELFTEST_LOOKUP], max(2, a.seeds), a.step)
+        # overflow checks put a never-taken branch on every addition of secrets, which memcheck
+        # cannot tell from a leak (the trace shows they never change the way): not under dev
+        if VALGRIND and not a.no_memcheck and LEVELS[lv].get("overflow-checks") != "true":
+            bad += memcheck(lv, exe, targets)
     print("ct_check: " + ("no difference" if bad == 0 else f"{bad} problem(s)"))
     return 1 if bad else 0
 

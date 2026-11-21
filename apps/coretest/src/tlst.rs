@@ -54,7 +54,7 @@ pub fn pki(seed: u8) -> Pki {
             not_after: NOW + 365 * 86_400,
             public_key: key.public,
             dns: if server { alloc::vec![String::from("localhost")] } else { Vec::new() },
-            ips: if server { alloc::vec![IpAddr::LOCALHOST_V4] } else { Vec::new() },
+            ips: if server { alloc::vec![netio::x509::IpAddr::LOCALHOST_V4] } else { Vec::new() },
             server_auth: server,
             client_auth: !server,
             ..CertBuilder::default()
@@ -71,6 +71,8 @@ pub fn run(t: &mut T) {
     restricted_cas(t);
     loopback(t);
     empty_records(t);
+    server_records(t);
+    client_extensions(t);
     https(t);
 }
 
@@ -191,6 +193,125 @@ fn empty_records(t: &mut T) {
         Err(e) => t.check(&format!("empty records: handshake: {}", e), false),
     }
     th.join();
+}
+
+/// netio's server fed hand-made records around a real ClientHello (RFC 8446, what tlsfuzzer
+/// checks): records between the parts of a handshake message, pre_shared_key's place
+fn server_records(t: &mut T) {
+    let p = pki(51);
+    let ccfg = ClientConfig { trust: Trust::Anchors(alloc::vec![p.ca.clone()]), identity: None, server_name: String::from("localhost") };
+    let ch_rec = tls::Conn::client(ccfg).take_out();
+    let ch = ch_rec[5..].to_vec();
+    let record = |ty: u8, b: &[u8]| {
+        let mut r = alloc::vec![ty, 3, 1, (b.len() >> 8) as u8, b.len() as u8];
+        r.extend_from_slice(b);
+        r
+    };
+    let feed = |bytes: &[u8]| {
+        let mut s = tls::Conn::server(ServerConfig { identity: p.server.clone(), client_auth: None, client_auth_optional: false });
+        let r = s.feed(bytes);
+        (r, s.take_out())
+    };
+    let alert = |r: &Result<(), TlsError>| match r {
+        Err(TlsError::Alert(a, _)) => Some(*a),
+        _ => None,
+    };
+    let whole = feed(&record(22, &ch));
+    t.check("server records: the ClientHello as it is gets a ServerHello", whole.0.is_ok() && whole.1.first() == Some(&22));
+    let mut split = record(22, &ch[..2]);
+    split.extend(record(22, &ch[2..]));
+    t.check("server records: a ClientHello in two records is taken", feed(&split).0.is_ok());
+    // an empty application_data record between its parts is no 0-RTT data (there is no
+    // ClientHello yet) and is not skipped: unexpected_message (RFC 8446 5.1)
+    let mut between = record(22, &ch[..2]);
+    between.extend(record(23, &[]));
+    between.extend(record(22, &ch[2..]));
+    t.check("server records: an empty application_data record inside the ClientHello is refused", alert(&feed(&between).0) == Some(tls::conn::AL_UNEXPECTED_MESSAGE));
+    // pre_shared_key (an identity, a binder) must be the last extension (RFC 8446 4.2.11)
+    let mut psk = alloc::vec![0, 41, 0, 45, 0, 8, 0, 2, b'i', b'd', 0, 0, 0, 0, 0, 33, 32];
+    psk.extend_from_slice(&[7u8; 32]);
+    let with_psk = |first: bool| {
+        // legacy_version, random, session id, suites, compression, then the extensions
+        let sid = 4 + 2 + 32;
+        let suites = sid + 1 + ch[sid] as usize;
+        let comp = suites + 2 + ((ch[suites] as usize) << 8 | ch[suites + 1] as usize);
+        let exts = comp + 1 + ch[comp] as usize;
+        let mut m = ch[..exts + 2].to_vec();
+        if first {
+            m.extend_from_slice(&psk);
+            m.extend_from_slice(&ch[exts + 2..]);
+        } else {
+            m.extend_from_slice(&ch[exts + 2..]);
+            m.extend_from_slice(&psk);
+        }
+        let ext_len = m.len() - exts - 2;
+        m[exts..exts + 2].copy_from_slice(&(ext_len as u16).to_be_bytes());
+        let body = m.len() - 4;
+        m[1..4].copy_from_slice(&(body as u32).to_be_bytes()[1..]);
+        record(22, &m)
+    };
+    t.check("server records: pre_shared_key as the last extension is taken (and ignored)", feed(&with_psk(false)).0.is_ok());
+    t.check("server records: pre_shared_key before another extension is refused", alert(&feed(&with_psk(true)).0) == Some(tls::conn::AL_ILLEGAL_PARAMETER));
+}
+
+/// a server's first flight with one extension more in its ServerHello (the first record, put
+/// before the others; the lengths of the extensions, the message and the record follow)
+pub fn sh_with_ext(flight: &[u8], extension: &[u8]) -> Vec<u8> {
+    let n = 5 + ((flight[3] as usize) << 8 | flight[4] as usize);
+    let sh = &flight[5..n];
+    // type and length, legacy_version, random, session id, suite, compression, extensions
+    let at = 4 + 2 + 32 + 1 + sh[38] as usize + 2 + 1;
+    let mut m = sh[..at].to_vec();
+    let old = (sh[at] as usize) << 8 | sh[at + 1] as usize;
+    m.extend_from_slice(&((old + extension.len()) as u16).to_be_bytes());
+    m.extend_from_slice(extension);
+    m.extend_from_slice(&sh[at + 2..]);
+    let body = m.len() - 4;
+    m[1..4].copy_from_slice(&(body as u32).to_be_bytes()[1..]);
+    let mut out = alloc::vec![flight[0], flight[1], flight[2]];
+    out.extend_from_slice(&(m.len() as u16).to_be_bytes());
+    out.extend_from_slice(&m);
+    out.extend_from_slice(&flight[n..]);
+    out
+}
+
+/// netio's client takes in a ServerHello only the extensions it offered that belong there (RFC
+/// 8446 4.2): a GREASE value (RFC 8701 4: TLS-Anvil's finding) is unsupported_extension,
+/// server_name (offered, but EncryptedExtensions answers it) illegal_parameter
+fn client_extensions(t: &mut T) {
+    let p = pki(52);
+    let answer = |extension: &[u8]| {
+        let ccfg = ClientConfig { trust: Trust::Anchors(alloc::vec![p.ca.clone()]), identity: None, server_name: String::from("localhost") };
+        let mut c = tls::Conn::client(ccfg);
+        let mut s = tls::Conn::server(ServerConfig { identity: p.server.clone(), client_auth: None, client_auth_optional: false });
+        let _ = s.feed(&c.take_out());
+        let flight = s.take_out();
+        let r = c.feed(&if extension.is_empty() { flight } else { sh_with_ext(&flight, extension) });
+        match r {
+            Ok(()) => Some(0),
+            Err(TlsError::Alert(a, _)) => Some(a),
+            Err(_) => None,
+        }
+    };
+    t.check("client extensions: the server's flight as it is is taken", answer(&[]) == Some(0));
+    t.check("client extensions: a GREASE extension in the ServerHello is refused", answer(&[0x0a, 0x0a, 0, 1, 0]) == Some(tls::conn::AL_UNSUPPORTED_EXTENSION));
+    t.check("client extensions: server_name in the ServerHello is refused", answer(&[0, 0, 0, 0]) == Some(tls::conn::AL_ILLEGAL_PARAMETER));
+    // the ServerHello in records of one byte each (TLS-Scanner's fragmentation probe could not
+    // tell; tlslite-ng's server with records of 1, 50 and 111 bytes was taken)
+    let ccfg = ClientConfig { trust: Trust::Anchors(alloc::vec![p.ca.clone()]), identity: None, server_name: String::from("localhost") };
+    let mut c = tls::Conn::client(ccfg);
+    let mut s = tls::Conn::server(ServerConfig { identity: p.server.clone(), client_auth: None, client_auth_optional: false });
+    let _ = s.feed(&c.take_out());
+    let flight = s.take_out();
+    let n = 5 + ((flight[3] as usize) << 8 | flight[4] as usize);
+    let mut bytes = Vec::new();
+    for b in &flight[5..n] {
+        bytes.extend_from_slice(&[22, 3, 3, 0, 1, *b]);
+    }
+    bytes.extend_from_slice(&flight[n..]);
+    let r = c.feed(&bytes);
+    let _ = s.feed(&c.take_out());
+    t.check("client records: a ServerHello in records of one byte is taken", r.is_ok() && c.established() && s.established());
 }
 
 fn schedule(t: &mut T) {
@@ -413,6 +534,42 @@ pub fn serve(port: u16, mtls: bool) -> i32 {
     }
 }
 
+/// --tls-echo PORT: netio's TLS server sending every line back as it came, in one write (one
+/// record up to 2^14 bytes); tlsfuzzer's test-tls13-lengths expects that of its server (it names
+/// `openssl s_server -rev`, which keeps the length too).  Four threads take the connections
+pub fn echo(port: u16) -> i32 {
+    let p = pki(60);
+    let scfg = ServerConfig { identity: p.server.clone(), client_auth: None, client_auth_optional: false };
+    let Ok(l) = TcpListener::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, port)) else { return 1 };
+    let l = Arc::new(l);
+    let mut threads = Vec::new();
+    for _ in 0..4 {
+        let (l, scfg) = (l.clone(), scfg.clone());
+        threads.extend(plat::thread_spawn(256 * 1024, Box::new(move || loop {
+            let Ok(Some((tcp, _))) = l.accept_timeout(1000) else { continue };
+            tcp.set_read_timeout(Some(10_000));
+            let Ok(s) = tls::accept(Box::new(tcp), scfg.clone()) else { continue };
+            let (mut line, mut b) = (Vec::new(), [0u8; 4096]);
+            while let Ok(n) = s.read(&mut b) {
+                if n == 0 {
+                    break;
+                }
+                for &c in &b[..n] {
+                    line.push(c);
+                    if c == b'\n' {
+                        let _ = s.write_all(&line);
+                        line.clear();
+                    }
+                }
+            }
+        })));
+    }
+    for t in threads {
+        t.join();
+    }
+    1
+}
+
 /// --tls-get HOST PORT [--mtls]: one HTTPS GET against an OpenSSL server -> the body on stdout
 pub fn get(host: &str, port: u16, mtls: bool) -> i32 {
     let p = pki(60);
@@ -435,6 +592,39 @@ pub fn get(host: &str, port: u16, mtls: bool) -> i32 {
         }
         Err(e) => {
             plat::write_stderr(format!("tls: {}\n", e).as_bytes());
+            1
+        }
+    }
+}
+
+/// --tls-anvil-client PORT: one connection of netio's web client (TLS 1.3 and the TLS 1.2
+/// fallback, the public suites) to TLS-Anvil on 127.0.0.1:PORT, the trigger of
+/// tools/tlsanvil_check.py.  TLS-Anvil makes its certificates up for every test, so the check is
+/// a Trust::Custom that takes every chain (in this test program only); TLS-Anvil judges the
+/// client by what it sends.  An HTTP GET, read until the end or 5 s, then close_notify as a
+/// program closes a connection (RFC 8446 6.1); how it ended goes to stderr, one line
+pub fn anvil_client(port: u16) -> i32 {
+    let accept_all: netio::tls::Verifier = Arc::new(|_, _, _| Ok(()));
+    let cfg = ClientConfig { trust: Trust::Custom(accept_all), identity: None, server_name: String::from("localhost") };
+    let Ok(tcp) = TcpStream::connect(&SocketAddr::new(IpAddr::LOCALHOST_V4, port), 3000) else { return 3 };
+    tcp.set_read_timeout(Some(5000));
+    match tls::connect(Box::new(tcp), cfg) {
+        Ok(s) => {
+            let _ = s.write_all(b"GET / HTTP/1.0\r\nHost: localhost\r\n\r\n");
+            let (mut b, mut got) = ([0u8; 4096], 0);
+            let end = loop {
+                match s.read(&mut b) {
+                    Ok(0) => break String::from(if s.end_is_clean() { "close_notify" } else { "end without close_notify" }),
+                    Ok(n) => got += n,
+                    Err(e) => break format!("read: {}", e),
+                }
+            };
+            s.shutdown();
+            plat::write_stderr(format!("{}: {} bytes, {}\n", s.version().0, got, end).as_bytes());
+            0
+        }
+        Err(e) => {
+            plat::write_stderr(format!("handshake: {}\n", e).as_bytes());
             1
         }
     }

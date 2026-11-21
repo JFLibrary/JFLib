@@ -223,8 +223,14 @@ fn server_modes(args: &[String]) -> Option<i32> {
     if let Some(p) = plat::arg_value("--tls-serve").and_then(|p| p.parse().ok()) {
         return Some(tlst::serve(p, args.iter().any(|a| a == "--mtls")));
     }
+    if let Some(p) = plat::arg_value("--tls-echo").and_then(|p| p.parse().ok()) {
+        return Some(tlst::echo(p));
+    }
     if let Some(p) = plat::arg_value("--tls-get").and_then(|p| p.parse().ok()) {
         return Some(tlst::get(&plat::arg_value("--host").unwrap_or_else(|| String::from("localhost")), p, args.iter().any(|a| a == "--mtls")));
+    }
+    if let Some(p) = plat::arg_value("--tls-anvil-client").and_then(|p| p.parse().ok()) {
+        return Some(tlst::anvil_client(p));
     }
     if let Some(u) = plat::arg_value("--tls-web") {
         return Some(tlst::web(&u, plat::arg_value("--ca").as_deref()));

@@ -55,6 +55,7 @@ pub use ui;
 pub use doc_view;
 pub use datetime;
 pub use crypto;
+pub use x509;
 pub use compress;
 pub use shader;
 pub use wgsl;

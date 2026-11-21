@@ -4,15 +4,16 @@
 
 Fetches limbo.json of the pinned commit into build/vectors (tools/suite_fetch.py; nothing in
 git), hands each testcase to `coretest --vectors` (x509chain, apps/coretest/src/suitevec.rs) the
-way the TLS client does it -- leaf and intermediates parsed with Cert::parse (one unreadable: the
-chain is refused, as tls/conn.rs does), anchors that do not parse left out (roots.rs),
+way the TLS client does it -- leaf and intermediates parsed with Cert::parse (an unreadable leaf: the
+chain is refused; an unreadable intermediate is left out, as tls/conn.rs does), anchors that do
+not parse left out (roots.rs),
 verify_chain(chain, anchors, validation time, expected peer name, server / client usage), which
 checks the name with Cert::names -- and holds the answer against expected_result.  A chain of
-more than 10 certificates is judged by verify_chain and marked: tls/conn.rs refuses a
+more than 20 certificates is judged by verify_chain and marked: tls/conn.rs refuses a
 Certificate message that long.
 
-Skipped, with the reason: testcases whose features netio states it lacks (x509.rs, header:
-revocation / CRLs, certificate policies, name constraints other than DNS / IP; also ML-DSA keys,
+Skipped, with the reason: testcases whose features netio states it lacks (lib/x509/lib.rs,
+header: revocation / CRLs, certificate policies; also ML-DSA keys,
 a caller-chosen chain depth, e-mail peer names, extended key usages other than serverAuth /
 clientAuth).  Optional behaviour (the pedantic-* features, rfc5280-incompatible-with-webpki) is
 run, and its failures are counted apart.  PASS / FAIL / SKIP per testcase id with --list;
@@ -37,14 +38,13 @@ ROOT = Path(__file__).resolve().parent.parent
 REPO = "C2SP/x509-limbo"
 COMMIT = "b12423782a88abead01141fa6582254e3eb49e74"
 
-# features netio does not have (x509.rs: "Not checked: revocation (CRL / OCSP), certificate
-# policies; name constraints cover DNS names and IP addresses")
+# features netio does not have (lib/x509/lib.rs: "Not checked: revocation (CRL / OCSP),
+# certificate policies"); name constraints on directory names it processes
 LACKS = {
-    "has-crl": "revocation (CRL / OCSP) is not checked (x509.rs header)",
-    "has-policy-constraints": "certificate policies are not checked (x509.rs header)",
-    "has-cert-policies": "certificate policies are not checked (x509.rs header)",
-    "no-cert-policies": "certificate policies are not checked (x509.rs header)",
-    "name-constraint-dn": "name constraints cover DNS names and IP addresses only (x509.rs header)",
+    "has-crl": "revocation (CRL / OCSP) is not checked (lib/x509/lib.rs header)",
+    "has-policy-constraints": "certificate policies are not checked (lib/x509/lib.rs header)",
+    "has-cert-policies": "certificate policies are not checked (lib/x509/lib.rs header)",
+    "no-cert-policies": "certificate policies are not checked (lib/x509/lib.rs header)",
     "has-mldsa": "ML-DSA keys: netio knows Ed25519, RSA, P-256 and P-384",
     "max-chain-depth": "no chain depth of the caller's choosing (verify_chain has its own limit)",
 }
@@ -164,9 +164,9 @@ def main():
             continue
         acc, msg = got[t["id"]]
         ok = acc is not None and acc == (t["expected_result"] == "SUCCESS")
-        if 1 + sum(len(pem_ders(x)) for x in t["untrusted_intermediates"]) > 10:
+        if 1 + sum(len(pem_ders(x)) for x in t["untrusted_intermediates"]) > 20:
             # verify_chain takes any number; a TLS Certificate message of more is refused
-            msg = (msg + "; " if msg else "") + "over 10 certificates: tls/conn.rs would refuse the message"
+            msg = (msg + "; " if msg else "") + "over 20 certificates: tls/conn.rs would refuse the message"
         rows.append((t, "PASS" if ok else "FAIL", msg))
 
     if opt.show:

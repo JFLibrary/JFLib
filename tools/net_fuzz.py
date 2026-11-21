@@ -3,12 +3,15 @@
 Builds tools/net_fuzz/fuzz.rs (with panic = "unwind", overflow checks and debug assertions) into
 build/net_fuzz and runs every target on its own thread for N seconds (default 60):
   zstd, lz4                     decompress with an output limit
-  x509, x509_netpkt             netio's and netpkt's certificate parsers (netio's with names,
-                                fingerprint and chain checks); seeds: the system's CA bundle
+  x509, x509_netpkt             the certificate parser (the crate jflib-x509) with names,
+                                fingerprint and verify_chain; netpkt's check_chain over it;
+                                seeds: the system's CA bundle
   dns, dns_netpkt               netio's answer parser and netpkt's message parser
   http_netio, http_netpkt       netio's request reader over a stream in pieces, netpkt's heads
   tls_server                    netio's TLS server fed a mutated ClientHello
   tls_client, tls_webclient     netio's clients (own CA, web PKI) fed a mutated server flight
+  ipv4_reassembly, ipv6_reassembly   netpkt's fragment reassembly fed mutated, reordered,
+                                duplicated and overlapping fragments
   netpkt_decode, netpkt_app     the dissector, and SNMP, RADIUS, BGP, mail, SSH KEXINIT parsers
 The seeds are built by the program itself, plus the system's certificates and frames of the
 reference `zstd` (levels, --long, --ultra) when that tool is there.  No coverage feedback: this
@@ -127,6 +130,9 @@ def main():
             print(f"  {name:<16} {n:>12,} runs  {nseeds:>4} seeds  slowest {slow_us / 1000:7.1f} ms{flag}")
         elif f[0] == "panic" and ln.split(" ")[1] != SELFTEST:
             print(f"      panic: {ln.split(' ', 3)[3]}  ({ln.split(' ')[2]}x)")
+        elif f[0] == "worker-failed":
+            print(f"  WORKER FAILED {ln.split(' ', 1)[1]} (a fault of the fuzzer, or a target without seeds)")
+            bad += 1
         elif f[0] == "hang":
             print(f"  HANG {ln}")
             bad += 1

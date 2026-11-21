@@ -113,7 +113,8 @@ pub fn commit(pwe: &[u8; 64], rand: &[u8; 32], mask: &[u8; 32]) -> Option<([u8; 
     if !p256::scalar_ok(&scalar) || scalar == one {
         return None;
     }
-    Some((scalar, p256::neg_point(&p256::mul_point(mask, pwe)?)))
+    // the PWE is pwe()'s, a point on the curve: not checked again (its coordinates are secret)
+    Some((scalar, p256::neg_point(&p256::mul_point_known(mask, pwe)?)))
 }
 
 /// the x coordinate of k = rand * (peer_scalar * PWE + peer_element); None for a scalar out of
@@ -125,8 +126,10 @@ pub fn shared(pwe: &[u8; 64], rand: &[u8; 32], peer_scalar: &[u8; 32], peer_elem
     if !p256::scalar_ok(peer_scalar) || *peer_scalar == one || !p256::on_curve(peer_element) {
         return None;
     }
-    let sum = p256::add_points(&p256::mul_point(peer_scalar, pwe)?, peer_element)?;
-    let k = p256::mul_point(rand, &sum)?;
+    // the PWE and the points made from it are secret and on the curve: only the peer's element
+    // is checked (above, and in add_points_known)
+    let sum = p256::add_points_known(&p256::mul_point_known(peer_scalar, pwe)?, peer_element)?;
+    let k = p256::mul_point_known(rand, &sum)?;
     let mut ss = [0u8; 32];
     ss.copy_from_slice(&k[..32]);
     Some(ss)

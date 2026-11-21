@@ -135,6 +135,8 @@ CRATES = [
     ("base", "UTF-8, command line, settings files, numbers and text", "full"),
     ("datetime", "timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules", "full"),
     ("crypto", "hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)", "full"),
+    ("x509", "X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's "
+     "builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)", "full"),
     ("compress", "LZ4 block and frame, Zstandard, xxHash32 and xxHash64, codec ids", "full"),
     ("datastore", "an embedded journal database: JSON collections, transactions, snapshots, crash recovery",
      "full"),

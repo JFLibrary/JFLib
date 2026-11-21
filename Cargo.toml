@@ -47,6 +47,7 @@ members = [
     "lib/doc_view",
     "lib/datetime",
     "lib/crypto",
+    "lib/x509",
     "lib/compress",
     "lib/shader",
     "lib/wgsl",
@@ -223,6 +224,7 @@ ui = { package = "jflib-ui", path = "lib/ui", version = "=0.2.1" }
 doc_view = { package = "jflib-doc-view", path = "lib/doc_view", version = "=0.2.1" }
 datetime = { package = "jflib-datetime", path = "lib/datetime", version = "=0.2.1" }
 crypto = { package = "jflib-crypto", path = "lib/crypto", version = "=0.2.1" }
+x509 = { package = "jflib-x509", path = "lib/x509", version = "=0.2.1" }
 compress = { package = "jflib-compress", path = "lib/compress", version = "=0.2.1" }
 shader = { package = "jflib-shader", path = "lib/shader", version = "=0.2.1" }
 wgsl = { package = "jflib-wgsl", path = "lib/wgsl", version = "=0.2.1" }

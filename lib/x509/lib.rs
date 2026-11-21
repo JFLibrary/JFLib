@@ -1,18 +1,35 @@
-// x509 -- certificates (RFC 5280): a program's own private PKI (Ed25519, RFC 8410; built
-// and signed here) and the public web PKI (RSA and P-256 / P-384 keys; RSA PKCS #1 v1.5 / PSS
-// and ECDSA signatures with SHA-256 / 384 / 512), parsed strictly
+// x509 -- certificates (RFC 5280) for all of JFLib: netio's TLS and https, netpkt's TLS core and
+// simulators.  A program's own private PKI (Ed25519, RFC 8410; built and signed here) and the
+// public web PKI (RSA and P-256 / P-384 keys; RSA PKCS #1 v1.5 / PSS and ECDSA signatures with
+// SHA-256 / 384 / 512), parsed strictly; no I/O, no clock (the caller passes the time)
 //
+//   der                                     the DER reader and writer certificates need
+//   IpAddr                                  addresses in names (octets, parse, RFC 5952 text)
 //   Cert::parse(der) -> Option<Cert>        subject / issuer, validity, key, CA flag, names,
 //                                           key and extended key usage, name constraints,
 //                                           unknown critical extensions noticed
-//   cert.fingerprint() -> SHA-256 (hex)     cert.signed_by(&issuer) -> bool
+//   cert.fingerprint() -> SHA-256 (hex)     fingerprint_bytes(), fingerprint_text() (colons)
+//   cert.signed_by(&issuer) -> bool         self_signed(), names(host), name_list(), bytes()
 //   cert.verify(alg, data, sig)             a signature made with the certificate's key
 //   verify_chain(&[leaf, ...], &anchors, now, name, usage) -> Result<(), String>   builds a
 //                                           path through the given intermediates to an anchor
 //   CertBuilder { .. }.sign(&issuer_cert_or_self, &issuer_key) -> DER
 //
-// Not checked: revocation (CRL / OCSP), certificate policies; name constraints cover DNS
-// names and IP addresses (the names a TLS server is reached by).
+// Not checked: revocation (CRL / OCSP), certificate policies.  Name constraints are processed
+// for DNS names, IP addresses, e-mail addresses (rfc822Name), URIs (their host) and directory
+// names (a byte-wise prefix of the subject's RDNs); a CA that constrains another form refuses
+// every certificate below it that has a name of that form (RFC 5280 4.2.1.10).  They apply to
+// the leaf and to the intermediates below the CA, self-issued ones excepted (6.1.3 (b)).
+
+#![no_std]
+#![forbid(unsafe_code)]
+
+extern crate alloc;
+
+pub mod der;
+mod ip;
+
+pub use ip::IpAddr;
 
 use alloc::format;
 use alloc::string::String;
@@ -21,9 +38,8 @@ use alloc::vec::Vec;
 use crypto::ecdsa::Curve;
 use crypto::ed25519::Keypair;
 use crypto::HashAlg;
-use plat::net::IpAddr;
 
-use crate::der::{self, Der};
+use crate::der::Der;
 
 pub const OID_ED25519: &[u64] = &[1, 3, 101, 112];
 const OID_CN: &[u64] = &[2, 5, 4, 3];
@@ -96,7 +112,7 @@ pub enum SigAlg {
     Ecdsa(HashAlg),
 }
 
-/// DNS and IP name constraints of a CA (other forms are recorded as present only)
+/// the name constraints of a CA
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct NameConstraints {
     pub permitted_dns: Vec<String>,
@@ -104,6 +120,20 @@ pub struct NameConstraints {
     /// address and mask (4 + 4 or 16 + 16 bytes)
     pub permitted_ip: Vec<Vec<u8>>,
     pub excluded_ip: Vec<Vec<u8>>,
+    /// rfc822Name subtrees, lower case: a mailbox ("a@example.com"), all mailboxes of a host
+    /// ("example.com") or of the subdomains of a domain (".example.com")
+    pub permitted_email: Vec<String>,
+    pub excluded_email: Vec<String>,
+    /// uniformResourceIdentifier subtrees, lower case: the URI's host ("example.com") or the
+    /// subdomains of a domain (".example.com")
+    pub permitted_uri: Vec<String>,
+    pub excluded_uri: Vec<String>,
+    /// directoryName subtrees (the DER of a Name): the subject begins with its RDNs
+    pub permitted_dn: Vec<Vec<u8>>,
+    pub excluded_dn: Vec<Vec<u8>>,
+    /// the GeneralName tags of constrained forms not processed here (otherName 0xa0,
+    /// x400Address 0xa3, ediPartyName 0xa5, registeredID 0x88)
+    pub other_forms: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -115,6 +145,10 @@ pub struct Cert {
     pub issuer: Vec<u8>,
     pub subject: Vec<u8>,
     pub subject_cn: String,
+    /// the subject's organization, the issuer's common name and organization (for dialogs)
+    pub subject_org: String,
+    pub issuer_cn: String,
+    pub issuer_org: String,
     pub not_before: i64,
     pub not_after: i64,
     /// Ed25519 public key (empty for other key types)
@@ -132,6 +166,16 @@ pub struct Cert {
     pub eku: Vec<Vec<u8>>,
     pub dns: Vec<String>,
     pub ips: Vec<IpAddr>,
+    /// rfc822Name entries of the subject alternative name and emailAddress attributes of the
+    /// subject (lower case): what e-mail name constraints apply to
+    pub emails: Vec<String>,
+    /// uniformResourceIdentifier entries of the subject alternative name
+    pub uris: Vec<String>,
+    /// directoryName entries of the subject alternative name (the DER of each Name)
+    pub dirs: Vec<Vec<u8>>,
+    /// the tags of subject alternative names of other forms (otherName 0xa0, x400Address 0xa3,
+    /// ediPartyName 0xa5, registeredID 0x88)
+    pub other_names: Vec<u8>,
     pub ski: Vec<u8>,
     /// a critical extension this code does not understand (such a certificate is rejected)
     pub unknown_critical: bool,
@@ -311,30 +355,97 @@ fn pub_key(alg: &[u8], key: &[u8]) -> PubKey {
     PubKey::Other
 }
 
-/// GeneralSubtrees: DNS names and IP ranges
-fn subtrees(b: &[u8], dns: &mut Vec<String>, ips: &mut Vec<Vec<u8>>) -> Option<()> {
+/// the subtrees of one kind (permitted or excluded) of a NameConstraints
+#[derive(Default)]
+struct Subtrees {
+    dns: Vec<String>,
+    ips: Vec<Vec<u8>>,
+    email: Vec<String>,
+    uri: Vec<String>,
+    dn: Vec<Vec<u8>>,
+}
+
+/// GeneralSubtrees (SIZE (1..MAX)); minimum and maximum must be absent (RFC 5280 4.2.1.10)
+fn subtrees(b: &[u8], out: &mut Subtrees, other: &mut Vec<u8>) -> Option<()> {
     let mut d = Der::new(b);
+    if d.is_empty() {
+        return None;
+    }
     while !d.is_empty() {
         let mut st = d.seq()?;
         let (tag, v, _) = st.next()?;
+        if !st.is_empty() {
+            return None;
+        }
         match tag {
-            0x82 => dns.push(String::from_utf8_lossy(v).to_ascii_lowercase()),
-            0x87 if v.len() == 8 || v.len() == 32 => ips.push(Vec::from(v)),
-            0x87 => return None,
-            _ => {} // directory names, e-mail addresses, URIs: not names of a TLS server
+            0x81 => out.email.push(ascii(v)?.to_ascii_lowercase()),
+            0x82 => out.dns.push(ascii(v)?.to_ascii_lowercase()),
+            0x86 => out.uri.push(ascii(v)?.to_ascii_lowercase()),
+            0x87 if v.len() == 8 || v.len() == 32 => out.ips.push(Vec::from(v)),
+            0xa4 => out.dn.push(Vec::from(Der::new(v).read_raw(der::SEQUENCE)?)),
+            0xa0 | 0xa3 | 0xa5 | 0x88 => {
+                if !other.contains(&tag) {
+                    other.push(tag);
+                }
+            }
+            _ => return None,
         }
     }
     Some(())
 }
 
-/// the common name of a Name
-fn cn_of(name: &[u8]) -> String {
+/// an IA5String's bytes as text (None for bytes above 0x7f)
+fn ascii(v: &[u8]) -> Option<String> {
+    v.is_ascii().then(|| String::from_utf8_lossy(v).into_owned())
+}
+
+/// a dNSName of a subject alternative name in the preferred name syntax (RFC 5280 4.2.1.6,
+/// RFC 1034 3.5 with RFC 1123 2.1): labels of letters, digits and inner hyphens, at most 63
+/// bytes each and 253 in all; "*" only as the whole first label
+fn dns_name_ok(n: &str) -> bool {
+    let rest = n.strip_prefix("*.").unwrap_or(n);
+    if n.is_empty() || n.len() > 253 || rest.is_empty() {
+        return false;
+    }
+    rest.split('.').all(|l| {
+        let b = l.as_bytes();
+        !b.is_empty() && b.len() <= 63 && b[0] != b'-' && b[b.len() - 1] != b'-' && b.iter().all(|c| c.is_ascii_alphanumeric() || *c == b'-')
+    })
+}
+
+const OID_EMAIL_ATTR: &[u64] = &[1, 2, 840, 113549, 1, 9, 1];
+
+/// the emailAddress attributes of a Name
+fn emails_of(name: &[u8]) -> Vec<String> {
+    let mut out = Vec::new();
     let mut d = Der::new(name);
     while let Some(set) = d.read(der::SET) {
         let mut s = Der::new(set);
         while let Some(atv) = s.seq() {
             let mut a = atv;
-            if a.read(der::OID) == Some(&der::oid_bytes(OID_CN)[..]) {
+            if a.read(der::OID) == Some(&der::oid_bytes(OID_EMAIL_ATTR)[..]) {
+                if let Some((_, v, _)) = a.next() {
+                    out.push(String::from_utf8_lossy(v).to_ascii_lowercase());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// the common name of a Name
+fn cn_of(name: &[u8]) -> String {
+    attr_of(name, OID_CN)
+}
+
+/// the first attribute of a type in a Name (common name, organization, ...)
+fn attr_of(name: &[u8], oid: &[u64]) -> String {
+    let mut d = Der::new(name);
+    while let Some(set) = d.read(der::SET) {
+        let mut s = Der::new(set);
+        while let Some(atv) = s.seq() {
+            let mut a = atv;
+            if a.read(der::OID) == Some(&der::oid_bytes(oid)[..]) {
                 if let Some((_, v, _)) = a.next() {
                     return String::from_utf8_lossy(v).into_owned();
                 }
@@ -342,6 +453,12 @@ fn cn_of(name: &[u8]) -> String {
         }
     }
     String::new()
+}
+
+/// an RSA key of a certificate: at least 2048 bits and a whole number of bytes (the CA/Browser
+/// Forum's floor; crypto::rsa takes 1024 bits and more, for simulators)
+fn rsa_key(n: &[u8], e: &[u8]) -> Option<crypto::rsa::PublicKey> {
+    crypto::rsa::PublicKey::new(n, e).filter(|k| k.bits() >= 2048 && k.bits() % 8 == 0)
 }
 
 /// the content of a non-negative DER INTEGER -> its big-endian bytes without the sign byte;
@@ -392,6 +509,10 @@ impl Cert {
         let subj = t.read_raw(der::SEQUENCE)?;
         c.subject = Vec::from(subj);
         c.subject_cn = cn_of(Der::new(subj).read(der::SEQUENCE)?);
+        c.subject_org = attr_of(Der::new(subj).read(der::SEQUENCE)?, OID_O);
+        c.issuer_cn = cn_of(Der::new(&c.issuer).read(der::SEQUENCE)?);
+        c.issuer_org = attr_of(Der::new(&c.issuer).read(der::SEQUENCE)?, OID_O);
+        c.emails = emails_of(Der::new(subj).read(der::SEQUENCE)?);
         let mut spki = t.seq()?;
         let kalg = spki.read(der::SEQUENCE)?;
         let key = spki.bits()?;
@@ -429,36 +550,78 @@ impl Cert {
                     let bs = k.read(der::BIT_STRING)?;
                     c.key_usage = Some(*bs.get(1).unwrap_or(&0));
                 } else if is(OID_EKU) {
+                    // KeyPurposeId SEQUENCE SIZE (1..MAX): an empty one would allow every purpose
                     let mut k = Der::new(val).seq()?;
                     while let Some(o) = k.read(der::OID) {
                         c.eku.push(Vec::from(o));
                     }
+                    if c.eku.is_empty() || !k.is_empty() {
+                        return None;
+                    }
                 } else if is(OID_SAN) {
+                    // GeneralNames SIZE (1..MAX), every entry well-formed: a name that cannot be
+                    // read could not be held against a name constraint either
                     let mut k = Der::new(val).seq()?;
-                    while let Some((tag, v, _)) = k.next() {
+                    if k.is_empty() {
+                        return None;
+                    }
+                    while !k.is_empty() {
+                        let (tag, v, _) = k.next()?;
                         match tag {
-                            0x82 => c.dns.push(String::from_utf8_lossy(v).to_ascii_lowercase()),
+                            0x82 => {
+                                let n = ascii(v)?.to_ascii_lowercase();
+                                if !dns_name_ok(&n) {
+                                    return None;
+                                }
+                                c.dns.push(n);
+                            }
                             0x87 if v.len() == 4 => c.ips.push(IpAddr::V4([v[0], v[1], v[2], v[3]])),
                             0x87 if v.len() == 16 => {
                                 let mut a = [0u8; 16];
                                 a.copy_from_slice(v);
                                 c.ips.push(IpAddr::V6(a));
                             }
-                            _ => {}
+                            0x81 => c.emails.push(ascii(v)?.to_ascii_lowercase()),
+                            0x86 => c.uris.push(ascii(v)?.to_ascii_lowercase()),
+                            0xa4 => c.dirs.push(Vec::from(Der::new(v).read_raw(der::SEQUENCE)?)),
+                            0xa0 | 0xa3 | 0xa5 | 0x88 => c.other_names.push(tag),
+                            _ => return None,
                         }
                     }
                 } else if is(OID_SKI) {
+                    if critical {
+                        return None; // MUST be non-critical (RFC 5280 4.2.1.2)
+                    }
                     c.ski = Vec::from(Der::new(val).read(der::OCTET_STRING)?);
                 } else if is(OID_NAME_CONSTRAINTS) {
-                    let mut nc = NameConstraints::default();
+                    // permittedSubtrees or excludedSubtrees MUST be present (RFC 5280 4.2.1.10)
                     let mut k = Der::new(val).seq()?;
-                    if let Some(p) = k.optional(0xa0) {
-                        subtrees(p, &mut nc.permitted_dns, &mut nc.permitted_ip)?;
+                    let (p, x) = (k.optional(0xa0), k.optional(0xa1));
+                    if (p.is_none() && x.is_none()) || !k.is_empty() {
+                        return None;
                     }
-                    if let Some(x) = k.optional(0xa1) {
-                        subtrees(x, &mut nc.excluded_dns, &mut nc.excluded_ip)?;
+                    let (mut pt, mut xt, mut other) = (Subtrees::default(), Subtrees::default(), Vec::new());
+                    if let Some(p) = p {
+                        subtrees(p, &mut pt, &mut other)?;
                     }
-                    c.name_constraints = Some(nc);
+                    if let Some(x) = x {
+                        subtrees(x, &mut xt, &mut other)?;
+                    }
+                    c.name_constraints = Some(NameConstraints {
+                        permitted_dns: pt.dns,
+                        excluded_dns: xt.dns,
+                        permitted_ip: pt.ips,
+                        excluded_ip: xt.ips,
+                        permitted_email: pt.email,
+                        excluded_email: xt.email,
+                        permitted_uri: pt.uri,
+                        excluded_uri: xt.uri,
+                        permitted_dn: pt.dn,
+                        excluded_dn: xt.dn,
+                        other_forms: other,
+                    });
+                } else if is(OID_AKI) && critical {
+                    return None; // MUST be non-critical (RFC 5280 4.2.1.1)
                 } else if is(OID_AKI) || is(OID_POLICIES) || is(OID_POLICY_CONSTRAINTS) || is(OID_INHIBIT_ANY) {
                     // known; policies are not enforced
                 } else if critical {
@@ -470,6 +633,44 @@ impl Cert {
             return None;
         }
         Some(c)
+    }
+
+    /// SHA-256 of the certificate
+    pub fn fingerprint_bytes(&self) -> [u8; 32] {
+        crypto::sha256(&self.der)
+    }
+
+    /// the fingerprint in hex with colons, as certificate dialogs write it
+    pub fn fingerprint_text(&self) -> String {
+        let v: Vec<String> = self.fingerprint_bytes().iter().map(|b| format!("{:02X}", b)).collect();
+        v.join(":")
+    }
+
+    /// it names itself as issuer and its own key made the signature
+    pub fn self_signed(&self) -> bool {
+        self.signed_by(self)
+    }
+
+    /// its Ed25519 key (None for another kind)
+    pub fn ed25519_key(&self) -> Option<[u8; 32]> {
+        match &self.key {
+            PubKey::Ed25519(k) => Some(*k),
+            _ => None,
+        }
+    }
+
+    /// what its names are, for a dialog: the DNS names, then the addresses
+    pub fn name_list(&self) -> Vec<String> {
+        let mut v = self.dns.clone();
+        for ip in &self.ips {
+            v.push(format!("{}", ip));
+        }
+        v
+    }
+
+    /// bytes it holds (an estimate for a memory budget)
+    pub fn bytes(&self) -> usize {
+        self.der.len() + self.tbs.len() + self.subject.len() + self.issuer.len() + self.signature.len() + 256
     }
 
     /// SHA-256 of the certificate (hex)
@@ -484,8 +685,8 @@ impl Cert {
                 Ok(s) => crypto::ed25519::verify(pk, data, &s),
                 Err(_) => false,
             },
-            (PubKey::Rsa { n, e }, SigAlg::RsaPkcs1(h)) => crypto::rsa::PublicKey::new(n, e).is_some_and(|k| k.verify_pkcs1(h, &h.digest(data), sig)),
-            (PubKey::Rsa { n, e }, SigAlg::RsaPss(h, salt)) => crypto::rsa::PublicKey::new(n, e).is_some_and(|k| k.verify_pss(h, &h.digest(data), sig, salt)),
+            (PubKey::Rsa { n, e }, SigAlg::RsaPkcs1(h)) => rsa_key(n, e).is_some_and(|k| k.verify_pkcs1(h, &h.digest(data), sig)),
+            (PubKey::Rsa { n, e }, SigAlg::RsaPss(h, salt)) => rsa_key(n, e).is_some_and(|k| k.verify_pss(h, &h.digest(data), sig, salt)),
             (PubKey::Ec { curve, point }, SigAlg::Ecdsa(h)) => {
                 // Ecdsa-Sig-Value ::= SEQUENCE { r INTEGER, s INTEGER }, strictly DER: nothing
                 // after the SEQUENCE or in it after s, both integers in their shortest form, so a
@@ -581,24 +782,101 @@ fn ip_in(ip: &IpAddr, range: &[u8]) -> bool {
     a.len() == half && a.iter().zip(&range[..half]).zip(&range[half..]).all(|((x, net), m)| x & m == net & m)
 }
 
-/// the leaf's names against the name constraints of a CA on its path
-fn constraints_allow(leaf: &Cert, nc: &NameConstraints) -> bool {
-    for d in &leaf.dns {
-        // a wildcard is checked for the names it stands for, not for its base alone
-        let within = |b: &String, every: bool| match d.strip_prefix("*.") {
-            Some(w) => wild_in(w, b, every),
-            None => dns_in(d, b),
-        };
-        if nc.excluded_dns.iter().any(|b| within(b, false)) || (!nc.permitted_dns.is_empty() && !nc.permitted_dns.iter().any(|b| within(b, true))) {
-            return false;
-        }
+/// the RDNs of a Name (the DER of a SEQUENCE of SETs), each as its whole DER
+fn rdns(name: &[u8]) -> Option<Vec<&[u8]>> {
+    let mut d = Der::new(name).seq()?;
+    let mut out = Vec::new();
+    while !d.is_empty() {
+        out.push(d.read_raw(der::SET)?);
     }
-    for ip in &leaf.ips {
-        if nc.excluded_ip.iter().any(|r| ip_in(ip, r)) || (!nc.permitted_ip.is_empty() && !nc.permitted_ip.iter().any(|r| ip_in(ip, r))) {
-            return false;
-        }
+    Some(out)
+}
+
+/// whether a Name lies in a directoryName subtree: it begins with the subtree's RDNs, byte for
+/// byte (no string preparation)
+fn dn_in(name: &[u8], base: &[u8]) -> bool {
+    match (rdns(name), rdns(base)) {
+        (Some(n), Some(b)) => b.len() <= n.len() && n.iter().zip(&b).all(|(x, y)| x == y),
+        _ => false,
     }
-    true
+}
+
+/// whether an e-mail address lies in an rfc822Name subtree: the mailbox itself, every mailbox
+/// of a host ("example.com"), or of the subdomains of a domain (".example.com")
+fn email_in(addr: &str, base: &str) -> bool {
+    if base.contains('@') {
+        return addr == base;
+    }
+    let Some((_, host)) = addr.rsplit_once('@') else { return false };
+    match base.strip_prefix('.') {
+        Some(_) => host.ends_with(base),
+        None => host == base,
+    }
+}
+
+/// the host of a URI ("scheme://[user@]host[:port]/..."); None without an authority or with an
+/// address instead of a name (RFC 5280: such a URI cannot pass a URI constraint)
+fn uri_host(uri: &str) -> Option<&str> {
+    let rest = uri.split_once("://")?.1;
+    let auth = rest.split(['/', '?', '#']).next()?;
+    let host = auth.rsplit_once('@').map_or(auth, |(_, h)| h);
+    if host.starts_with('[') {
+        return None;
+    }
+    let host = host.split(':').next()?;
+    (!host.is_empty() && IpAddr::parse(host).is_none()).then_some(host)
+}
+
+/// whether a URI's host lies in a uniformResourceIdentifier subtree
+fn uri_in(host: &str, base: &str) -> bool {
+    match base.strip_prefix('.') {
+        Some(_) => host.ends_with(base),
+        None => host == base,
+    }
+}
+
+/// a certificate's names against the name constraints of a CA above it on the path
+fn constraints_allow(c: &Cert, nc: &NameConstraints) -> bool {
+    // permitted: every name of a form must lie in one subtree of that form (when there are
+    // any); excluded: none may lie in one
+    fn check<T>(names: &[T], permitted: &[String], excluded: &[String], within: impl Fn(&T, &str, bool) -> bool) -> bool {
+        names.iter().all(|n| !excluded.iter().any(|b| within(n, b, false)) && (permitted.is_empty() || permitted.iter().any(|b| within(n, b, true))))
+    }
+    // a wildcard is checked for the names it stands for, not for its base alone
+    let dns_ok = check(&c.dns, &nc.permitted_dns, &nc.excluded_dns, |d: &String, b: &str, every| match d.strip_prefix("*.") {
+        Some(w) => wild_in(w, b, every),
+        None => dns_in(d, b),
+    });
+    let ip_ok = c.ips.iter().all(|ip| !nc.excluded_ip.iter().any(|r| ip_in(ip, r)) && (nc.permitted_ip.is_empty() || nc.permitted_ip.iter().any(|r| ip_in(ip, r))));
+    let email_ok = check(&c.emails, &nc.permitted_email, &nc.excluded_email, |e: &String, b: &str, _| email_in(e, b));
+    let uri_ok = if nc.permitted_uri.is_empty() && nc.excluded_uri.is_empty() {
+        true
+    } else {
+        c.uris.iter().all(|u| match uri_host(u) {
+            Some(h) => !nc.excluded_uri.iter().any(|b| uri_in(h, b)) && (nc.permitted_uri.is_empty() || nc.permitted_uri.iter().any(|b| uri_in(h, b))),
+            None => false,
+        })
+    };
+    // directory names: the subject (when it has RDNs) and the directoryName alternative names
+    let subject_has_rdns = rdns(&c.subject).is_some_and(|r| !r.is_empty());
+    let dn_ok = (!subject_has_rdns || dn_ok_one(&c.subject, nc)) && c.dirs.iter().all(|n| dn_ok_one(n, nc));
+    // a form constrained here that this code does not process: refused (RFC 5280 4.2.1.10)
+    let other_ok = !c.other_names.iter().any(|t| nc.other_forms.contains(t));
+    dns_ok && ip_ok && email_ok && uri_ok && dn_ok && other_ok
+}
+
+fn dn_ok_one(name: &[u8], nc: &NameConstraints) -> bool {
+    !nc.excluded_dn.iter().any(|b| dn_in(name, b)) && (nc.permitted_dn.is_empty() || nc.permitted_dn.iter().any(|b| dn_in(name, b)))
+}
+
+/// a Name without RDNs (a CA's subject MUST NOT be one, RFC 5280 4.1.2.6)
+fn empty_name(name: &[u8]) -> bool {
+    rdns(name).is_none_or(|r| r.is_empty())
+}
+
+/// a certificate whose issuer and subject are the same name (RFC 5280 6.1: self-issued)
+fn self_issued(c: &Cert) -> bool {
+    c.issuer == c.subject
 }
 
 /// check a chain (leaf first) against trusted anchors: a path from the leaf through the other
@@ -617,6 +895,10 @@ pub fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&st
     if leaf.key_usage.is_some_and(|k| k & KU_DIGITAL_SIGNATURE == 0) {
         return Err(String::from("Zertifikat darf nicht signieren"));
     }
+    // keyCertSign only with cA, name constraints only in CAs (RFC 5280 4.2.1.9, 4.2.1.10)
+    if (leaf.key_usage.is_some_and(|k| k & KU_KEY_CERT_SIGN != 0) && !leaf.is_ca) || (leaf.name_constraints.is_some() && !leaf.is_ca) {
+        return Err(String::from("Zertifikat mit Erweiterungen einer Zertifizierungsstelle"));
+    }
     if let Some(n) = name {
         if !leaf.names(n) {
             return Err(format!("Zertifikat gilt nicht für {}", n));
@@ -624,18 +906,36 @@ pub fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&st
     }
     let mut why = String::from("keine vertrauenswürdige Zertifizierungsstelle");
     let mut used = alloc::vec![false; chain.len()];
+    let mut below = alloc::vec![0usize];
     let mut budget = 64u32;
-    if path(leaf, chain, anchors, now, 0, usage, &mut used, &mut budget, &mut why) { Ok(()) } else { Err(why) }
+    if path(chain, anchors, now, usage, &mut used, &mut below, &mut budget, &mut why) { Ok(()) } else { Err(why) }
 }
 
-/// a path from `cur` upwards (depth: CAs between the leaf and cur)
+/// whether a CA may sign above the certificates of `below` (indices into chain, leaf first):
+/// its path length counts the intermediates that are not self-issued (RFC 5280 6.1.4 (l)), its
+/// name constraints apply to the leaf and to those intermediates (6.1.3 (b))
+fn ca_admits(ca: &Cert, chain: &[Cert], below: &[usize]) -> Result<(), &'static str> {
+    let intermediates = below[1..].iter().filter(|&&i| !self_issued(&chain[i])).count();
+    if ca.path_len.is_some_and(|p| (p as usize) < intermediates) {
+        return Err("die Zertifikatskette ist länger, als die Zertifizierungsstelle erlaubt");
+    }
+    if let Some(nc) = &ca.name_constraints {
+        let named = below.iter().enumerate().filter(|&(k, &i)| k == 0 || !self_issued(&chain[i]));
+        if !named.into_iter().all(|(_, &i)| constraints_allow(&chain[i], nc)) {
+            return Err("der Name ist für diese Zertifizierungsstelle nicht erlaubt");
+        }
+    }
+    Ok(())
+}
+
+/// a path upwards from the last certificate of `below`
 #[allow(clippy::too_many_arguments)]
-fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, usage: Usage, used: &mut [bool], budget: &mut u32, why: &mut String) -> bool {
-    if depth > 8 {
+fn path(chain: &[Cert], anchors: &[Cert], now: i64, usage: Usage, used: &mut [bool], below: &mut Vec<usize>, budget: &mut u32, why: &mut String) -> bool {
+    if below.len() > 9 {
         *why = String::from("Zertifikatskette zu lang");
         return false;
     }
-    let leaf = &chain[0];
+    let cur = &chain[*below.last().unwrap_or(&0)];
     for a in anchors.iter().filter(|a| a.subject == cur.issuer) {
         if !cur.signed_by(a) {
             continue;
@@ -644,12 +944,12 @@ fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, us
             *why = String::from("die Zertifizierungsstelle ist abgelaufen");
             continue;
         }
-        if !(a.is_ca || a.version == 1) || a.key_usage.is_some_and(|k| k & KU_KEY_CERT_SIGN == 0) || a.path_len.is_some_and(|p| (p as usize) < depth) {
+        if !(a.is_ca || a.version == 1) || a.unknown_critical || a.key_usage.is_some_and(|k| k & KU_KEY_CERT_SIGN == 0) || empty_name(&a.subject) {
             *why = String::from("Vertrauensanker ist keine Zertifizierungsstelle");
             continue;
         }
-        if a.name_constraints.as_ref().is_some_and(|nc| !constraints_allow(leaf, nc)) {
-            *why = String::from("der Name ist für diese Zertifizierungsstelle nicht erlaubt");
+        if let Err(e) = ca_admits(a, chain, below) {
+            *why = String::from(e);
             continue;
         }
         if !a.ca_eku_allows(usage) {
@@ -673,14 +973,12 @@ fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, us
         if !cur.signed_by(next) {
             continue;
         }
-        if !next.is_ca || next.unknown_critical || now < next.not_before || now > next.not_after
-            || next.path_len.is_some_and(|p| (p as usize) < depth) || next.key_usage.is_some_and(|k| k & KU_KEY_CERT_SIGN == 0)
-        {
+        if !next.is_ca || next.unknown_critical || now < next.not_before || now > next.not_after || next.key_usage.is_some_and(|k| k & KU_KEY_CERT_SIGN == 0) || empty_name(&next.subject) {
             *why = String::from("ungültige Zwischenzertifizierungsstelle");
             continue;
         }
-        if next.name_constraints.as_ref().is_some_and(|nc| !constraints_allow(leaf, nc)) {
-            *why = String::from("der Name ist für diese Zertifizierungsstelle nicht erlaubt");
+        if let Err(e) = ca_admits(next, chain, below) {
+            *why = String::from(e);
             continue;
         }
         // a CA whose extended key usage names other purposes cannot certify this one
@@ -689,9 +987,11 @@ fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, us
             continue;
         }
         used[i] = true;
-        if path(next, chain, anchors, now, depth + 1, usage, used, budget, why) {
+        below.push(i);
+        if path(chain, anchors, now, usage, used, below, budget, why) {
             return true;
         }
+        below.pop();
         used[i] = false;
     }
     false

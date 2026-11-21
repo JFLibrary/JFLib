@@ -41,10 +41,14 @@ another library. They have **not had an external audit**. What has been done ins
 - Wycheproof and x509-limbo ([docs/EXTERNAL_SUITES.md](docs/EXTERNAL_SUITES.md))
 - interoperability with OpenSSL, curl, Python's `ssl` and OpenSSH (`tools/tls_interop.py`,
   `tools/tls_web_check.py`, `tools/ssh_interop.py`)
-- constant time: the secret-dependent operations of `crypto` take the same branches for every
-  secret at five optimization levels on x86-64 (`tools/ct_check.py`); not checked: memory
-  accesses without a branch, other processors
-- mutation fuzzing of the parsers of untrusted bytes (`tools/net_fuzz.py`, `apps/nettest`)
+- constant time: the secret-dependent operations of `crypto` and netio's key files take the same
+  branches for every secret, and under valgrind's memcheck neither branch on the secret nor use
+  it as an address, at five optimization levels on x86-64 (`tools/ct_check.py`); not checked:
+  other processors, instructions whose time depends on their operands
+- netio's TLS 1.3 server against tlsfuzzer (`tools/tlsfuzzer_check.py`), its client against
+  TLS-Anvil (`tools/tlsanvil_check.py`)
+- mutation fuzzing (`tools/net_fuzz.py`, `apps/nettest`) and coverage-guided fuzzing with
+  libFuzzer and AddressSanitizer (`tools/cov_fuzz.py`) of the parsers of untrusted bytes
 
 Limits that are documented in the crates: no revocation checks for certificates, no DNSSEC
 validation, no TLS session resumption. Each crate's README says what it does and does not do.

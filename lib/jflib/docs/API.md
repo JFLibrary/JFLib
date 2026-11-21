@@ -80,12 +80,14 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#datetime-crate-root) · [cron.rs](#datetimecronrs) · [tz.rs](#datetimetzrs)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
   <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs) · [md5.rs](#cryptomd5rs) · [eappwd.rs](#cryptoeappwdrs)
+- [x509](#x509) -- X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)
+  <br>[lib.rs](#x509-crate-root) · [der.rs](#x509derrs) · [ip.rs](#x509iprs)
 - [compress](#compress) -- LZ4 block and frame, Zstandard, xxHash32 and xxHash64, codec ids
   <br>[lib.rs](#compress-crate-root) · [lz4.rs](#compresslz4rs) · [xxh.rs](#compressxxhrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/enc.rs](#compresszstdencrs)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery
   <br>[lib.rs](#datastore-crate-root) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
-  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [der.rs](#netioderrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs) · [x509.rs](#netiox509rs)
+  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng
   <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs) · [uri.rs](#netpkturirs) · [ssh.rs](#netpktsshrs) · [snmpv3.rs](#netpktsnmpv3rs) · [eap.rs](#netpkteaprs) · [imap.rs](#netpktimaprs) · [cookie.rs](#netpktcookiers) · [x509.rs](#netpktx509rs) · [tls.rs](#netpkttlsrs)
 - [eapm](#eapm) -- EAP-MD5 and EAP-PWD as peer and server state machines without I/O
@@ -41725,7 +41727,8 @@ crypto -- the primitives BackupCraft (and anything else) builds on, in plain Rus
 No randomness here: callers pass random bytes in (plat::fill_random on Windows, Linux, Apple
 and Android; in the browser the page's crypto.getRandomValues), so everything is
 deterministic and testable.  Secret-dependent work avoids branches and table lookups
-(field arithmetic with 51-bit limbs, masked conditional swaps and selects).
+(field arithmetic with 51-bit limbs, masked conditional swaps and selects); every mask made
+from secret data passes ct_mask, so the optimizer cannot turn a select back into a branch.
 ```
 
 ### `crypto` crate root
@@ -41759,10 +41762,11 @@ deterministic and testable.  Secret-dependent work avoids branches and table loo
   overwrite a secret (the write is kept even though nothing reads the buffer afterwards)
 
 - **`fn hex(data: &[u8]) -> String`**
-  lower-case hex
+  lower-case hex (without a table: keys are printed this way too)
 
 - **`fn unhex(s: &str) -> Option<Vec<u8>>`**
-  the bytes of a hex string (upper or lower case; None on odd length or other characters)
+  the bytes of a hex string (upper or lower case; None on odd length or other characters).
+  Every character is looked at before the answer, without a branch on it
 
 ### `crypto/aead.rs`
 
@@ -42227,7 +42231,7 @@ points are x || y (64 bytes, both big endian), scalars 32 bytes big endian
 
   below_p(x)                               x is a coordinate: smaller than p
   y_for_x(x, odd) -> Option<[u8; 32]>      the y of a point with this x and parity (None: no such
-                                           point; variable time, only for public or hashed x)
+                                           point); no branch on x before the answer
   on_curve(point)                          both coordinates in range and the curve equation
   mul_point(k, point) -> Option<point>     k * point (None: not on the curve, or the identity)
   add_points(a, b) -> Option<point>        a + b (None: not on the curve, or the identity)
@@ -42243,7 +42247,7 @@ multiplication by four-bit windows with a table read in full for every window.
 ```
 
 - **`fn secret_from(random: &[u8; 32]) -> Option<[u8; 32]>`**
-  a scalar in [1, n - 1] from random bytes (None: draw again)
+  a scalar in [1, n - 1] from random bytes (None: draw again); only the answer is a branch
 
 - **`fn public_key(secret: &[u8; 32]) -> [u8; 65]`**
   the public key of a secret scalar: 04 || x || y
@@ -42610,6 +42614,289 @@ ROUNDS: u8 = 40
   MK = H(ss | Confirm_P | Confirm_S), stretched with the session id (the type byte 52 and
   H(ciphersuite | Scalar_P | Scalar_S)) to 128 bytes: the MSK, then the EMSK
 
+## x509
+
+*X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)* -- crate root [`lib/x509/lib.rs`](../lib/x509/lib.rs)
+
+```text
+x509 -- certificates (RFC 5280) for all of JFLib: netio's TLS and https, netpkt's TLS core and
+simulators.  A program's own private PKI (Ed25519, RFC 8410; built and signed here) and the
+public web PKI (RSA and P-256 / P-384 keys; RSA PKCS #1 v1.5 / PSS and ECDSA signatures with
+SHA-256 / 384 / 512), parsed strictly; no I/O, no clock (the caller passes the time)
+
+  der                                     the DER reader and writer certificates need
+  IpAddr                                  addresses in names (octets, parse, RFC 5952 text)
+  Cert::parse(der) -> Option<Cert>        subject / issuer, validity, key, CA flag, names,
+                                          key and extended key usage, name constraints,
+                                          unknown critical extensions noticed
+  cert.fingerprint() -> SHA-256 (hex)     fingerprint_bytes(), fingerprint_text() (colons)
+  cert.signed_by(&issuer) -> bool         self_signed(), names(host), name_list(), bytes()
+  cert.verify(alg, data, sig)             a signature made with the certificate's key
+  verify_chain(&[leaf, ...], &anchors, now, name, usage) -> Result<(), String>   builds a
+                                          path through the given intermediates to an anchor
+  CertBuilder { .. }.sign(&issuer_cert_or_self, &issuer_key) -> DER
+
+Not checked: revocation (CRL / OCSP), certificate policies.  Name constraints are processed
+for DNS names, IP addresses, e-mail addresses (rfc822Name), URIs (their host) and directory
+names (a byte-wise prefix of the subject's RDNs); a CA that constrains another form refuses
+every certificate below it that has a name of that form (RFC 5280 4.2.1.10).  They apply to
+the leaf and to the intermediates below the CA, self-issued ones excepted (6.1.3 (b)).
+```
+
+### `x509` crate root
+
+```rust
+OID_ED25519: &[u64] = &[1, 3, 101, 112]
+/// key usage bits as they appear in the first byte
+KU_DIGITAL_SIGNATURE: u8 = 0x80
+KU_KEY_CERT_SIGN: u8 = 0x04
+KU_CRL_SIGN: u8 = 0x02
+```
+
+- **`enum Usage`**
+  - `Server`
+  - `Client`
+
+- **`enum PubKey`**
+  a public key
+  - `Other` -- a key type this code does not use
+  - `Ed25519([u8; 32])`
+  - `Rsa { n: Vec<u8>, e: Vec<u8> }` -- modulus and exponent, big-endian
+  - `Ec { curve: Curve, point: Vec<u8> }` -- an uncompressed point (04 || x || y)
+
+- **`enum SigAlg`**
+  a signature algorithm (of certificates and of TLS handshakes)
+  - `Unknown`
+  - `Ed25519`
+  - `RsaPkcs1(HashAlg)`
+  - `RsaPss(HashAlg, Option<usize>)` -- salt length None: any (TLS fixes it to the hash length)
+  - `Ecdsa(HashAlg)`
+
+- **`struct NameConstraints`**
+  the name constraints of a CA
+  - `permitted_dns: Vec<String>`
+  - `excluded_dns: Vec<String>`
+  - `permitted_ip: Vec<Vec<u8>>` -- address and mask (4 + 4 or 16 + 16 bytes)
+  - `excluded_ip: Vec<Vec<u8>>`
+  - `permitted_email: Vec<String>` -- rfc822Name subtrees, lower case: a mailbox ("a@example.com"), all mailboxes of a host
+    ("example.com") or of the subdomains of a domain (".example.com")
+  - `excluded_email: Vec<String>`
+  - `permitted_uri: Vec<String>` -- uniformResourceIdentifier subtrees, lower case: the URI's host ("example.com") or the
+    subdomains of a domain (".example.com")
+  - `excluded_uri: Vec<String>`
+  - `permitted_dn: Vec<Vec<u8>>` -- directoryName subtrees (the DER of a Name): the subject begins with its RDNs
+  - `excluded_dn: Vec<Vec<u8>>`
+  - `other_forms: Vec<u8>` -- the GeneralName tags of constrained forms not processed here (otherName 0xa0,
+    x400Address 0xa3, ediPartyName 0xa5, registeredID 0x88)
+
+- **`struct Cert`**
+  - `der: Vec<u8>`
+  - `tbs: Vec<u8>`
+  - `serial: Vec<u8>`
+  - `issuer: Vec<u8>` -- the raw DER of the issuer and subject names (compared byte for byte)
+  - `subject: Vec<u8>`
+  - `subject_cn: String`
+  - `subject_org: String` -- the subject's organization, the issuer's common name and organization (for dialogs)
+  - `issuer_cn: String`
+  - `issuer_org: String`
+  - `not_before: i64`
+  - `not_after: i64`
+  - `public_key: Vec<u8>` -- Ed25519 public key (empty for other key types)
+  - `key: PubKey`
+  - `ed25519_signed: bool`
+  - `sig_alg: SigAlg`
+  - `signature: Vec<u8>`
+  - `version: u8` -- 1 or 3
+  - `name_constraints: Option<NameConstraints>`
+  - `is_ca: bool`
+  - `path_len: Option<u64>`
+  - `key_usage: Option<u8>`
+  - `eku: Vec<Vec<u8>>`
+  - `dns: Vec<String>`
+  - `ips: Vec<IpAddr>`
+  - `emails: Vec<String>` -- rfc822Name entries of the subject alternative name and emailAddress attributes of the
+    subject (lower case): what e-mail name constraints apply to
+  - `uris: Vec<String>` -- uniformResourceIdentifier entries of the subject alternative name
+  - `dirs: Vec<Vec<u8>>` -- directoryName entries of the subject alternative name (the DER of each Name)
+  - `other_names: Vec<u8>` -- the tags of subject alternative names of other forms (otherName 0xa0, x400Address 0xa3,
+    ediPartyName 0xa5, registeredID 0x88)
+  - `ski: Vec<u8>`
+  - `unknown_critical: bool` -- a critical extension this code does not understand (such a certificate is rejected)
+
+**`impl Cert`**
+
+- **`fn parse(bytes: &[u8]) -> Option<Cert>`**
+- **`fn fingerprint_bytes(&self) -> [u8; 32]`**
+  SHA-256 of the certificate
+- **`fn fingerprint_text(&self) -> String`**
+  the fingerprint in hex with colons, as certificate dialogs write it
+- **`fn self_signed(&self) -> bool`**
+  it names itself as issuer and its own key made the signature
+- **`fn ed25519_key(&self) -> Option<[u8; 32]>`**
+  its Ed25519 key (None for another kind)
+- **`fn name_list(&self) -> Vec<String>`**
+  what its names are, for a dialog: the DNS names, then the addresses
+- **`fn bytes(&self) -> usize`**
+  bytes it holds (an estimate for a memory budget)
+- **`fn fingerprint(&self) -> String`**
+  SHA-256 of the certificate (hex)
+- **`fn verify(&self, alg: SigAlg, data: &[u8], sig: &[u8]) -> bool`**
+  whether a signature over `data` was made with this certificate's key
+- **`fn signed_by(&self, issuer: &Cert) -> bool`**
+  whether `issuer` signed this certificate
+- **`fn names(&self, host: &str) -> bool`**
+  whether the certificate names this host (DNS name, case-insensitive; IP address)
+
+- **`fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&str>, usage: Usage) -> Result<(), String>`**
+  check a chain (leaf first) against trusted anchors: a path from the leaf through the other
+  certificates of the chain (in any order) to an anchor
+
+- **`struct CertBuilder`**
+  what a new certificate says
+  - `serial: [u8; 16]`
+  - `cn: String`
+  - `org: String`
+  - `not_before: i64`
+  - `not_after: i64`
+  - `public_key: [u8; 32]`
+  - `is_ca: bool`
+  - `dns: Vec<String>`
+  - `ips: Vec<IpAddr>`
+  - `server_auth: bool`
+  - `client_auth: bool`
+
+- **`fn extension(oid: &[u64], critical: bool, value: &[u8]) -> Vec<u8>`**
+  a DER Extension (oid, the critical flag, the DER value) for CertBuilder::sign_ext
+
+**`impl CertBuilder`**
+
+- **`fn sign(&self, issuer: Option<&Cert>, key: &Keypair) -> Vec<u8>`**
+  the DER certificate, signed by `key`; `issuer`: the issuing certificate (None: self
+  signed with the builder's own name)
+- **`fn sign_ext(&self, issuer: Option<&Cert>, key: &Keypair, extra: &[Vec<u8>]) -> Vec<u8>`**
+  sign with further extensions (each one from `extension`: name constraints, a CA's
+  extended key usage ...); one with the OID of an extension the builder writes itself
+  replaces that one (basic constraints without a path length, other key usages)
+
+- **`fn ed25519_pkcs8(seed: &[u8; 32]) -> Vec<u8>`**
+  the PKCS#8 form of an Ed25519 private key (for interoperable PEM files)
+
+- **`fn ed25519_from_pkcs8(b: &[u8]) -> Option<[u8; 32]>`**
+  the seed of a PKCS#8 Ed25519 private key
+
+### `x509/der.rs`
+
+Source: [`lib/x509/der.rs`](../lib/x509/der.rs)
+
+```text
+der -- the DER subset X.509 needs: a bounded reader (definite lengths, no indefinite
+forms, at most 16 MiB per element) and a writer
+
+  Der::new(bytes).read(tag) -> Option<(content, rest)>, peek_tag, int, oid, ...
+  writer: tlv(tag, content), seq(&[parts]), int_u(bytes), oid(&[arcs]), utf8(s) ...
+```
+
+```rust
+BOOLEAN: u8 = 0x01
+INTEGER: u8 = 0x02
+BIT_STRING: u8 = 0x03
+OCTET_STRING: u8 = 0x04
+NULL: u8 = 0x05
+OID: u8 = 0x06
+UTF8: u8 = 0x0c
+PRINTABLE: u8 = 0x13
+IA5: u8 = 0x16
+UTC_TIME: u8 = 0x17
+GEN_TIME: u8 = 0x18
+SEQUENCE: u8 = 0x30
+SET: u8 = 0x31
+```
+
+- **`struct Der<'a>`**
+  a cursor over DER bytes
+  - `b: &'a [u8]`
+
+**`impl<'a> Der<'a>`**
+
+- **`fn new(b: &'a [u8]) -> Der<'a>`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn peek_tag(&self) -> Option<u8>`**
+- **`fn next(&mut self) -> Option<(u8, &'a [u8], &'a [u8])>`**
+  the next element: (tag, content, the whole element)
+- **`fn read(&mut self, tag: u8) -> Option<&'a [u8]>`**
+  the next element with this tag -> its content
+- **`fn read_raw(&mut self, tag: u8) -> Option<&'a [u8]>`**
+  the next element with this tag -> the whole element (for signatures over it)
+- **`fn optional(&mut self, tag: u8) -> Option<&'a [u8]>`**
+  an optional element with this tag
+- **`fn seq(&mut self) -> Option<Der<'a>>`**
+- **`fn u64(&mut self) -> Option<u64>`**
+  a non-negative INTEGER up to 64 bits
+- **`fn bool(&mut self) -> Option<bool>`**
+- **`fn bits(&mut self) -> Option<&'a [u8]>`**
+  a BIT STRING without unused bits -> its bytes
+
+- **`fn oid_bytes(arcs: &[u64]) -> Vec<u8>`**
+  the encoded OID content of dotted arcs
+
+- **`fn tlv(tag: u8, content: &[u8]) -> Vec<u8>`**
+
+- **`fn seq(parts: &[&[u8]]) -> Vec<u8>`**
+
+- **`fn set(parts: &[&[u8]]) -> Vec<u8>`**
+
+- **`fn int_u(b: &[u8]) -> Vec<u8>`**
+  an INTEGER of unsigned big-endian bytes (leading zeros dropped, a zero byte added when
+  the top bit is set)
+
+- **`fn small_int(v: u64) -> Vec<u8>`**
+
+- **`fn oid(arcs: &[u64]) -> Vec<u8>`**
+
+- **`fn utf8(s: &str) -> Vec<u8>`**
+
+- **`fn octets(b: &[u8]) -> Vec<u8>`**
+
+- **`fn bits(b: &[u8]) -> Vec<u8>`**
+
+- **`fn boolean(v: bool) -> Vec<u8>`**
+
+- **`fn explicit(n: u8, content: &[u8]) -> Vec<u8>`**
+  [n] EXPLICIT
+
+### `x509/ip.rs`
+
+Source: [`lib/x509/ip.rs`](../lib/x509/ip.rs)
+
+```text
+ip -- the IP addresses of certificates (subject alternative names, name constraints), as
+plain octets with a parser and the text form of RFC 5952; the same shape as plat::net::IpAddr
+(this crate needs no platform), so `IpAddr::from_octets` and `octets` convert
+```
+
+- **`enum IpAddr`**
+  - `V4([u8; 4])`
+  - `V6([u8; 16])`
+
+**`impl IpAddr`**
+
+- **`const LOCALHOST_V4: IpAddr = IpAddr::V4([127, 0, 0, 1])`**
+- **`const UNSPECIFIED_V4: IpAddr = IpAddr::V4([0, 0, 0, 0])`**
+- **`const LOCALHOST_V6: IpAddr = IpAddr::V6([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])`**
+- **`fn is_loopback(&self) -> bool`**
+- **`fn is_unspecified(&self) -> bool`**
+- **`fn mapped_v4(&self) -> Option<IpAddr>`**
+  the IPv4 address inside an IPv4-mapped IPv6 address (::ffff:a.b.c.d)
+- **`fn parse(s: &str) -> Option<IpAddr>`**
+  "192.168.1.2" or "fe80::1" (RFC 5952 shortening)
+
+**`impl IpAddr`**
+
+- **`fn from_octets(b: &[u8]) -> Option<IpAddr>`**
+  the address of 4 or 16 octets (None for another length)
+- **`fn octets(&self) -> &[u8]`**
+  its 4 or 16 octets
+
 ## compress
 
 *LZ4 block and frame, Zstandard, xxHash32 and xxHash64, codec ids* -- crate root [`lib/compress/lib.rs`](../lib/compress/lib.rs)
@@ -42903,8 +43190,9 @@ netio -- network protocols on top of plat::net
   tls        TLS 1.3 for own deployments (ChaCha20-Poly1305, X25519, Ed25519, mutual auth)
              and a client for public servers (AES-GCM, RSA / ECDSA, TLS 1.2 fallback):
              connect / accept -> TlsStream (a Stream)
-  x509 / der / pem   certificates: Ed25519 of a private CA (parse, build, verify chains) and
-             the RSA / ECDSA certificates of the web PKI
+  x509 / der the crate jflib-x509 (re-exported): certificates of a private Ed25519 CA (parse,
+             build, verify chains) and the RSA / ECDSA certificates of the web PKI
+  pem        PEM blocks
   roots      the system's certificate authorities (Windows: CryptoAPI; Linux: the bundle)
   ssh        SSH-2 client (curve25519, ssh-ed25519, chacha20-poly1305): run commands with
              stdin; the server side of the transport for tests
@@ -42921,6 +43209,10 @@ error answer or a closed connection, never a panic.
 ```
 
 ### `netio` crate root
+
+Re-exports: `x509`
+
+Re-exports: `x509::der`
 
 - **`trait Stream: Send + Sync`**
   a byte stream HTTP runs over (shared between a reader and a writer: &self methods)
@@ -43014,86 +43306,6 @@ an optional connector for https (TLS wraps the TCP connection)
 - **`fn json_headers(token: &str) -> Headers`**
   "Bearer &lt;token>" headers plus JSON content type
 
-### `netio/der.rs`
-
-Source: [`lib/netio/der.rs`](../lib/netio/der.rs)
-
-```text
-der -- the DER subset X.509 needs: a bounded reader (definite lengths, no indefinite
-forms, at most 16 MiB per element) and a writer
-
-  Der::new(bytes).read(tag) -> Option<(content, rest)>, peek_tag, int, oid, ...
-  writer: tlv(tag, content), seq(&[parts]), int_u(bytes), oid(&[arcs]), utf8(s) ...
-```
-
-```rust
-BOOLEAN: u8 = 0x01
-INTEGER: u8 = 0x02
-BIT_STRING: u8 = 0x03
-OCTET_STRING: u8 = 0x04
-NULL: u8 = 0x05
-OID: u8 = 0x06
-UTF8: u8 = 0x0c
-PRINTABLE: u8 = 0x13
-IA5: u8 = 0x16
-UTC_TIME: u8 = 0x17
-GEN_TIME: u8 = 0x18
-SEQUENCE: u8 = 0x30
-SET: u8 = 0x31
-```
-
-- **`struct Der<'a>`**
-  a cursor over DER bytes
-  - `b: &'a [u8]`
-
-**`impl<'a> Der<'a>`**
-
-- **`fn new(b: &'a [u8]) -> Der<'a>`**
-- **`fn is_empty(&self) -> bool`**
-- **`fn peek_tag(&self) -> Option<u8>`**
-- **`fn next(&mut self) -> Option<(u8, &'a [u8], &'a [u8])>`**
-  the next element: (tag, content, the whole element)
-- **`fn read(&mut self, tag: u8) -> Option<&'a [u8]>`**
-  the next element with this tag -> its content
-- **`fn read_raw(&mut self, tag: u8) -> Option<&'a [u8]>`**
-  the next element with this tag -> the whole element (for signatures over it)
-- **`fn optional(&mut self, tag: u8) -> Option<&'a [u8]>`**
-  an optional element with this tag
-- **`fn seq(&mut self) -> Option<Der<'a>>`**
-- **`fn u64(&mut self) -> Option<u64>`**
-  a non-negative INTEGER up to 64 bits
-- **`fn bool(&mut self) -> Option<bool>`**
-- **`fn bits(&mut self) -> Option<&'a [u8]>`**
-  a BIT STRING without unused bits -> its bytes
-
-- **`fn oid_bytes(arcs: &[u64]) -> Vec<u8>`**
-  the encoded OID content of dotted arcs
-
-- **`fn tlv(tag: u8, content: &[u8]) -> Vec<u8>`**
-
-- **`fn seq(parts: &[&[u8]]) -> Vec<u8>`**
-
-- **`fn set(parts: &[&[u8]]) -> Vec<u8>`**
-
-- **`fn int_u(b: &[u8]) -> Vec<u8>`**
-  an INTEGER of unsigned big-endian bytes (leading zeros dropped, a zero byte added when
-  the top bit is set)
-
-- **`fn small_int(v: u64) -> Vec<u8>`**
-
-- **`fn oid(arcs: &[u64]) -> Vec<u8>`**
-
-- **`fn utf8(s: &str) -> Vec<u8>`**
-
-- **`fn octets(b: &[u8]) -> Vec<u8>`**
-
-- **`fn bits(b: &[u8]) -> Vec<u8>`**
-
-- **`fn boolean(v: bool) -> Vec<u8>`**
-
-- **`fn explicit(n: u8, content: &[u8]) -> Vec<u8>`**
-  [n] EXPLICIT
-
 ### `netio/dns.rs`
 
 Source: [`lib/netio/dns.rs`](../lib/netio/dns.rs)
@@ -43115,7 +43327,9 @@ plat::net::ip_scope_parse), the adapter's index on Windows.  A server whose zone
 interface of this computer is left out.
 
 Queries: A and AAAA over UDP (2 s per server and attempt, two rounds), over TCP when the answer
-is truncated; an answer must come from the server asked and carry the query's id and question.
+is truncated; an answer must come from the server asked and carry the query's id and question,
+and only addresses of the asked name count, or of the name its CNAME chain in the answer leads
+to (at most 8 steps): records for other names in an answer are ignored.
 IPv4 addresses come first.  Not here: DNSSEC validation, mDNS, caching.
 
 The app's permissions: a name its net.connect rules do not cover fails with
@@ -43316,14 +43530,16 @@ MAX_HEADERS: usize = 100
 Source: [`lib/netio/pem.rs`](../lib/netio/pem.rs)
 
 ```text
-pem -- "-----BEGIN LABEL-----" blocks (RFC 7468)
+pem -- "-----BEGIN LABEL-----" blocks (RFC 7468): each marker on a line of its own
 ```
 
 - **`fn encode(label: &str, der: &[u8]) -> String`**
   a PEM block of DER bytes
 
 - **`fn decode_all(text: &str, label: &str) -> Vec<Vec<u8>>`**
-  every block with this label, decoded
+  every block with this label, decoded.  Read line by line: the lines of a body (a private key
+  is secret) are only compared with the markers, which no Base64 line equals (none begins with
+  '-'); no substring search runs over them, whose steps would depend on the characters
 
 - **`fn decode(text: &str, label: &str) -> Option<Vec<u8>>`**
   the first block with this label
@@ -43649,6 +43865,14 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   - `Any` -- anything (only to read the fingerprint for a trust decision)
   - `System(Vec<Cert>)` -- the operating system's certificate authorities, and these as well (a company CA);
     allows TLS 1.2 and the public suites (crate::roots)
+  - `Custom(Verifier)` -- a check the program brings (a PKI of its own, keys pinned by their SPKI, Certificate
+    Transparency, the platform's verifier, a test peer); a client offers with it what it
+    offers with System (TLS 1.2, the public suites)
+
+- **`type Verifier = Arc<dyn Fn(&[Cert], &str, i64) -> Result<(), String> + Send + Sync>`**
+  the check of Trust::Custom: the certificates the peer sent that could be read (leaf first),
+  the name the client asked for ("" for a client's certificate) and the time (Unix seconds) ->
+  Ok, or why they are refused (the handshake ends with bad_certificate)
 
 - **`struct ClientConfig`**
   - `trust: Trust`
@@ -43703,14 +43927,17 @@ conn -- the TLS handshake and the record stream, without I/O
   established(), peer_cert(), version(), suite()
 
 Our own servers and agents (private PKI): TLS 1.3 with TLS_CHACHA20_POLY1305_SHA256, X25519,
-Ed25519 signatures and certificates, a HelloRetryRequest when the client offered X25519
-without a key share (or a cookie), mutual authentication.  The server side speaks only that.
+Ed25519 signatures and certificates, mutual authentication.  The server also takes what RFC
+8446 9.1 makes mandatory, TLS_AES_128_GCM_SHA256 and P-256 (secp256r1) key shares, sends a
+HelloRetryRequest for X25519 or P-256 when the client offered no usable share, and a dummy
+change_cipher_spec for middleboxes (D.4); its certificate and signatures are Ed25519 only.
 
 A client that trusts the system's certificate authorities (Trust::System: mail servers,
 update servers, web hooks) also offers TLS_AES_128_GCM_SHA256, RSA (PKCS #1 v1.5 / PSS) and
 ECDSA (P-256 / P-384) signatures and the P-256 key exchange (after a HelloRetryRequest),
 and falls back to TLS 1.2 with ECDHE (X25519 or P-256) and AEAD suites (AES-128-GCM,
-ChaCha20-Poly1305), the extended master secret and the TLS 1.3 downgrade check.  Private
+ChaCha20-Poly1305), the extended master secret when the server has it and the TLS 1.3
+downgrade check.  Private
 connections never fall back.
 
 No PSK, no 0-RTT, no session tickets (a client ignores them), no renegotiation;
@@ -43735,6 +43962,7 @@ AL_PROTOCOL_VERSION: u8 = 70
 AL_INTERNAL_ERROR: u8 = 80
 AL_NO_RENEGOTIATION: u8 = 100
 AL_MISSING_EXTENSION: u8 = 109
+AL_UNSUPPORTED_EXTENSION: u8 = 110
 AL_CERTIFICATE_REQUIRED: u8 = 116
 ```
 
@@ -43862,8 +44090,14 @@ ECDHE_ECDSA_CHACHA20: u16 = 0xCCA9
   the keys of a suite (key and IV of key_iv_len); None for an unknown suite
 - **`fn seal(&mut self, ty: u8, content: &[u8]) -> Vec<u8>`**
   a protected record of `content` of type `ty`
-- **`fn open(&mut self, hdr: &[u8; 5], body: &[u8]) -> Option<(u8, Vec<u8>)>`**
+- **`fn open(&mut self, hdr: &[u8; 5], body: &[u8]) -> Result<(u8, Vec<u8>), OpenError>`**
   open a protected record body (header given) -> (type, content)
+
+- **`enum OpenError`**
+  why a protected record did not open
+  - `Mac` -- it does not authenticate (bad_record_mac)
+  - `Overflow` -- more than a record may hold (record_overflow)
+  - `NoType` -- only padding, no content type (unexpected_message)
 
 - **`fn plain(ty: u8, content: &[u8]) -> Vec<u8>`**
   a plaintext record
@@ -44164,136 +44398,6 @@ CLOSE_INTERNAL: u16 = 1011
   connect to a WebSocket server: TCP (and TLS for wss:// through `cfg.connector`), the upgrade
   request, the server's 101 with the right Sec-WebSocket-Accept, all within handshake_ms
 
-### `netio/x509.rs`
-
-Source: [`lib/netio/x509.rs`](../lib/netio/x509.rs)
-
-```text
-x509 -- certificates (RFC 5280): a program's own private PKI (Ed25519, RFC 8410; built
-and signed here) and the public web PKI (RSA and P-256 / P-384 keys; RSA PKCS #1 v1.5 / PSS
-and ECDSA signatures with SHA-256 / 384 / 512), parsed strictly
-
-  Cert::parse(der) -> Option<Cert>        subject / issuer, validity, key, CA flag, names,
-                                          key and extended key usage, name constraints,
-                                          unknown critical extensions noticed
-  cert.fingerprint() -> SHA-256 (hex)     cert.signed_by(&issuer) -> bool
-  cert.verify(alg, data, sig)             a signature made with the certificate's key
-  verify_chain(&[leaf, ...], &anchors, now, name, usage) -> Result<(), String>   builds a
-                                          path through the given intermediates to an anchor
-  CertBuilder { .. }.sign(&issuer_cert_or_self, &issuer_key) -> DER
-
-Not checked: revocation (CRL / OCSP), certificate policies; name constraints cover DNS
-names and IP addresses (the names a TLS server is reached by).
-```
-
-```rust
-OID_ED25519: &[u64] = &[1, 3, 101, 112]
-/// key usage bits as they appear in the first byte
-KU_DIGITAL_SIGNATURE: u8 = 0x80
-KU_KEY_CERT_SIGN: u8 = 0x04
-KU_CRL_SIGN: u8 = 0x02
-```
-
-- **`enum Usage`**
-  - `Server`
-  - `Client`
-
-- **`enum PubKey`**
-  a public key
-  - `Other` -- a key type this code does not use
-  - `Ed25519([u8; 32])`
-  - `Rsa { n: Vec<u8>, e: Vec<u8> }` -- modulus and exponent, big-endian
-  - `Ec { curve: Curve, point: Vec<u8> }` -- an uncompressed point (04 || x || y)
-
-- **`enum SigAlg`**
-  a signature algorithm (of certificates and of TLS handshakes)
-  - `Unknown`
-  - `Ed25519`
-  - `RsaPkcs1(HashAlg)`
-  - `RsaPss(HashAlg, Option<usize>)` -- salt length None: any (TLS fixes it to the hash length)
-  - `Ecdsa(HashAlg)`
-
-- **`struct NameConstraints`**
-  DNS and IP name constraints of a CA (other forms are recorded as present only)
-  - `permitted_dns: Vec<String>`
-  - `excluded_dns: Vec<String>`
-  - `permitted_ip: Vec<Vec<u8>>` -- address and mask (4 + 4 or 16 + 16 bytes)
-  - `excluded_ip: Vec<Vec<u8>>`
-
-- **`struct Cert`**
-  - `der: Vec<u8>`
-  - `tbs: Vec<u8>`
-  - `serial: Vec<u8>`
-  - `issuer: Vec<u8>` -- the raw DER of the issuer and subject names (compared byte for byte)
-  - `subject: Vec<u8>`
-  - `subject_cn: String`
-  - `not_before: i64`
-  - `not_after: i64`
-  - `public_key: Vec<u8>` -- Ed25519 public key (empty for other key types)
-  - `key: PubKey`
-  - `ed25519_signed: bool`
-  - `sig_alg: SigAlg`
-  - `signature: Vec<u8>`
-  - `version: u8` -- 1 or 3
-  - `name_constraints: Option<NameConstraints>`
-  - `is_ca: bool`
-  - `path_len: Option<u64>`
-  - `key_usage: Option<u8>`
-  - `eku: Vec<Vec<u8>>`
-  - `dns: Vec<String>`
-  - `ips: Vec<IpAddr>`
-  - `ski: Vec<u8>`
-  - `unknown_critical: bool` -- a critical extension this code does not understand (such a certificate is rejected)
-
-**`impl Cert`**
-
-- **`fn parse(bytes: &[u8]) -> Option<Cert>`**
-- **`fn fingerprint(&self) -> String`**
-  SHA-256 of the certificate (hex)
-- **`fn verify(&self, alg: SigAlg, data: &[u8], sig: &[u8]) -> bool`**
-  whether a signature over `data` was made with this certificate's key
-- **`fn signed_by(&self, issuer: &Cert) -> bool`**
-  whether `issuer` signed this certificate
-- **`fn names(&self, host: &str) -> bool`**
-  whether the certificate names this host (DNS name, case-insensitive; IP address)
-
-- **`fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&str>, usage: Usage) -> Result<(), String>`**
-  check a chain (leaf first) against trusted anchors: a path from the leaf through the other
-  certificates of the chain (in any order) to an anchor
-
-- **`struct CertBuilder`**
-  what a new certificate says
-  - `serial: [u8; 16]`
-  - `cn: String`
-  - `org: String`
-  - `not_before: i64`
-  - `not_after: i64`
-  - `public_key: [u8; 32]`
-  - `is_ca: bool`
-  - `dns: Vec<String>`
-  - `ips: Vec<IpAddr>`
-  - `server_auth: bool`
-  - `client_auth: bool`
-
-- **`fn extension(oid: &[u64], critical: bool, value: &[u8]) -> Vec<u8>`**
-  a DER Extension (oid, the critical flag, the DER value) for CertBuilder::sign_ext
-
-**`impl CertBuilder`**
-
-- **`fn sign(&self, issuer: Option<&Cert>, key: &Keypair) -> Vec<u8>`**
-  the DER certificate, signed by `key`; `issuer`: the issuing certificate (None: self
-  signed with the builder's own name)
-- **`fn sign_ext(&self, issuer: Option<&Cert>, key: &Keypair, extra: &[Vec<u8>]) -> Vec<u8>`**
-  sign with further extensions (each one from `extension`: name constraints, a CA's
-  extended key usage ...); one with the OID of an extension the builder writes itself
-  replaces that one (basic constraints without a path length, other key usages)
-
-- **`fn ed25519_pkcs8(seed: &[u8; 32]) -> Vec<u8>`**
-  the PKCS#8 form of an Ed25519 private key (for interoperable PEM files)
-
-- **`fn ed25519_from_pkcs8(b: &[u8]) -> Option<[u8; 32]>`**
-  the seed of a PKCS#8 Ed25519 private key
-
 ## netpkt
 
 *network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng* -- crate root [`lib/netpkt/lib.rs`](../lib/netpkt/lib.rs)
@@ -44394,7 +44498,8 @@ on every target (simulators, packet tools, tests).
   cookie    SetCookie::parse, parse_date, domain_match, path_match, default_path, site_of; Jar:
             store, header, matching, script_text, purge, drop_session; SameSite as far as a small
             browser needs it; the time comes from the caller          (RFC 6265, 6265bis)
-  x509      certificates of a private PKI (Ed25519): CertSpec::sign, Cert::parse, names, fingerprint,
+  x509      certificates: the crate jflib-x509 (netio's as well), CertSpec as its builder's
+            earlier name, check_chain: what is wrong with a chain as fault bits for dialogs
             signed_by, check_chain with F_* faults; no clock; uses crate crypto  (RFC 5280, 8410)
   tls       TLS 1.3 without I/O: Core for a client or a server (push bytes, take_out bytes, read,
             send, take_events), TLS_CHACHA20_POLY1305_SHA256, X25519, Ed25519; the key schedule,
@@ -51115,25 +51220,21 @@ MAX_COOKIES: usize = 500
 Source: [`lib/netpkt/x509.rs`](../lib/netpkt/x509.rs)
 
 ```text
-x509 -- certificates of a small private PKI without I/O and without a clock (RFC 5280; Ed25519,
-RFC 8410): written and read as DER and checked against anchors at a time the caller passes in.
-netio::x509 is the other X.509 of the library, with the web's RSA and ECDSA keys, on a crate that
-needs plat
+x509 -- netpkt's view of JFLib's certificates: the crate jflib-x509, which netio uses as well
+(one parser, one path validation), and what is wrong with a chain as fault bits for the
+dialogs of simulators and packet tools
 
-  CertSpec { serial, cn, org, not_before, not_after, public_key, is_ca, dns, ips }
-  spec.sign(issuer: Option<&Cert>, key) -> DER      issuer None: self-signed with its own name
-  Cert::parse(der) -> Option<Cert>                  subject and issuer (common name, organization),
-                                                    validity, the Ed25519 key, the CA flag, names;
-                                                    other keys parse with key None (they verify nothing)
-  cert.names(host)                                  a DNS name (case-insensitive, one wildcard
-                                                    label) or an address of its alternative names
-  cert.fingerprint() / fingerprint_text()           SHA-256 of the DER; in hex with colons
-  cert.signed_by(&issuer), cert.self_signed()       the signature checks out
-  check_chain(&[leaf, ...], anchors, host, now) -> faults   what is wrong with it: F_* bits, 0 for
-                                                    nothing
-
-Not here: revocation, name constraints, key usage checks beyond the CA flag, certificate policies.
+  Cert, CertBuilder, IpAddr, verify_chain ...   the crate x509, re-exported
+  CertSpec                                      CertBuilder under netpkt's earlier name
+  check_chain(&[leaf, ...], anchors, host, now) -> faults   what is wrong with it: F_* bits, 0
+                                                for nothing (a browser's list, where
+                                                verify_chain gives the first reason)
 ```
+
+Re-exports: `x509::*`
+
+- **`type CertSpec = x509::CertBuilder`**
+  the builder of a certificate (netpkt's earlier name of x509::CertBuilder)
 
 ```rust
 /// the time of a certificate has passed
@@ -51150,61 +51251,9 @@ F_UNKNOWN_ISSUER: u32 = 1 << 4
 F_BAD_SIGNATURE: u32 = 1 << 5
 ```
 
-- **`struct CertSpec`**
-  what a new certificate says
-  - `serial: [u8; 16]`
-  - `cn: String`
-  - `org: String`
-  - `not_before: i64` -- seconds since 1970
-  - `not_after: i64`
-  - `public_key: [u8; 32]`
-  - `is_ca: bool`
-  - `dns: Vec<String>`
-  - `ips: Vec<IpAddr>`
-
-**`impl CertSpec`**
-
-- **`fn sign(&self, issuer: Option<&Cert>, key: &Keypair) -> Vec<u8>`**
-  the DER certificate, signed by `key`; `issuer`: the certificate that issues it (None:
-  self-signed with its own name)
-
-- **`struct Cert`**
-  a certificate as this code reads it
-  - `der: Vec<u8>`
-  - `serial: Vec<u8>`
-  - `subject_cn: String`
-  - `subject_org: String`
-  - `issuer_cn: String`
-  - `issuer_org: String`
-  - `not_before: i64` -- seconds since 1970
-  - `not_after: i64`
-  - `key: Option<[u8; 32]>` -- its Ed25519 key (None: another kind of key)
-  - `is_ca: bool`
-  - `dns: Vec<String>`
-  - `ips: Vec<IpAddr>`
-
-**`impl Cert`**
-
-- **`fn parse(bytes: &[u8]) -> Option<Cert>`**
-  a certificate from DER; None: not one (or trailing bytes, or a version before v3)
-- **`fn fingerprint(&self) -> [u8; 32]`**
-  SHA-256 of the DER
-- **`fn fingerprint_text(&self) -> String`**
-  the fingerprint in hex with colons, as certificate dialogs write it
-- **`fn signed_by(&self, issuer: &Cert) -> bool`**
-  issuer's key made the signature (and the names fit)
-- **`fn self_signed(&self) -> bool`**
-  it says it issued itself, and the signature checks out
-- **`fn names(&self, host: &str) -> bool`**
-  it names this host: a DNS name (one wildcard label at the left), or an address; only its
-  alternative names count (RFC 9110 4.3.4), the common name does not
-- **`fn name_list(&self) -> Vec<String>`**
-  what the names are, for a dialog
-- **`fn bytes(&self) -> usize`**
-  bytes it holds (an estimate for a budget)
-
 - **`fn check_chain(chain: &[Cert], anchors: &[Cert], host: &str, now: i64) -> u32`**
-  what is wrong with a chain (leaf first) for this host at this time: F_\* bits, 0 for nothing
+  what is wrong with a chain (leaf first) for this host at this time: F_\* bits, 0 for nothing.
+  For a private Ed25519 PKI: a leaf with another kind of key counts as F_BAD_SIGNATURE
 
 ### `netpkt/tls.rs`
 
@@ -51286,6 +51335,7 @@ AL_DECRYPT_ERROR: u8 = 51
 AL_PROTOCOL_VERSION: u8 = 70
 AL_INTERNAL_ERROR: u8 = 80
 AL_MISSING_EXTENSION: u8 = 109
+AL_UNSUPPORTED_EXTENSION: u8 = 110
 EXT_SERVER_NAME: u16 = 0
 EXT_GROUPS: u16 = 10
 EXT_SIG_ALGS: u16 = 13

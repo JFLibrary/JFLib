@@ -414,6 +414,24 @@ pub fn on_curve(p: &[u8; 64]) -> bool {
     point_of(p).is_some()
 }
 
+/// x || y as a point this crate computed itself (EAP-PWD's PWE and what is made from it): not
+/// checked, so nothing branches on its secret coordinates
+fn point_known(p: &[u8; 64]) -> Pt {
+    let (x, y) = (from_be(&p[..32]), from_be(&p[32..]));
+    Pt { x: to_mont(&x), y: to_mont(&y), z: to_mont(&[1, 0, 0, 0]) }
+}
+
+/// k * a point this crate computed (point_known)
+pub(crate) fn mul_point_known(k: &[u8; 32], p: &[u8; 64]) -> Option<[u8; 64]> {
+    bytes_of(&scalar_mul(k, &point_known(p), &to_mont(&B)))
+}
+
+/// a (computed here, point_known) + b (from outside: checked)
+pub(crate) fn add_points_known(a: &[u8; 64], b: &[u8; 64]) -> Option<[u8; 64]> {
+    let q = point_of(b)?;
+    bytes_of(&padd(&point_known(a), &q, &to_mont(&B)))
+}
+
 /// k * point (k below n)
 pub fn mul_point(k: &[u8; 32], p: &[u8; 64]) -> Option<[u8; 64]> {
     let q = point_of(p)?;

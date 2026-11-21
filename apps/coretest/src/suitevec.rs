@@ -17,8 +17,8 @@
 //   x509chain usage now name n leaf inter.. anchors..
 //       usage 0 server / 1 client, now: 8 bytes big-endian (seconds), name: 00 = none or 01 + UTF-8,
 //       n: the number of intermediates (2 bytes); then the DER certificates
-//       -> 01 / 00 + verify_chain's reason (UTF-8) / 02 + index (an unreadable leaf or
-//          intermediate: tls/conn.rs refuses the whole Certificate message)
+//       -> 01 / 00 + verify_chain's reason (UTF-8) / 02 + 0 (an unreadable leaf: tls/conn.rs
+//          refuses the Certificate message; an unreadable intermediate is left out, as there)
 
 use alloc::vec::Vec;
 
@@ -123,7 +123,8 @@ pub fn op(alg: &str, args: &[Vec<u8>]) -> Option<Vec<u8>> {
             for i in 0..=n {
                 match Cert::parse(arg(4 + i)) {
                     Some(c) => chain.push(c),
-                    None => return Some(alloc::vec![2, i as u8]),
+                    None if i == 0 => return Some(alloc::vec![2, 0]),
+                    None => {}
                 }
             }
             // anchors that do not parse are left out, as roots::system_anchors does

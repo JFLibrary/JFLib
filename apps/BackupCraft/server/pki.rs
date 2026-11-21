@@ -22,6 +22,14 @@ use plat::net::IpAddr;
 
 use crate::keys::Keys;
 
+/// a platform address as a certificate holds it
+fn cert_ip(ip: &IpAddr) -> netio::x509::IpAddr {
+    match ip {
+        IpAddr::V4(a) => (*a).into(),
+        IpAddr::V6(a) => (*a).into(),
+    }
+}
+
 const YEAR: i64 = 365 * 86_400;
 
 pub struct Pki {
@@ -115,7 +123,7 @@ impl Pki {
         let issue = |name: &str, cn: &str, server: bool, client: bool, dns: &[String], ips: &[IpAddr]| -> Result<Identity, String> {
             let path = plat::fs::join(&dir, &format!("{}.pem", name));
             if let (Some(c), Some(k)) = (read_cert(&path), read_key(keys, &plat::fs::join(&dir, &format!("{}.key", name)), &format!("pki:{}", name))) {
-                let names_ok = dns.iter().all(|d| c.dns.contains(d)) && ips.iter().all(|i| c.ips.contains(i));
+                let names_ok = dns.iter().all(|d| c.dns.contains(d)) && ips.iter().all(|i| c.ips.contains(&cert_ip(i)));
                 if c.public_key == k.public && c.signed_by(&ca) && c.not_after - t > 30 * 86_400 && names_ok {
                     return Ok(Identity { chain: alloc::vec![c.der.clone(), ca.der.clone()], key: k });
                 }
@@ -129,7 +137,7 @@ impl Pki {
                 not_after: t + 2 * YEAR,
                 public_key: k.public,
                 dns: Vec::from(dns),
-                ips: Vec::from(ips),
+                ips: ips.iter().map(cert_ip).collect(),
                 server_auth: server,
                 client_auth: client,
                 ..CertBuilder::default()
@@ -159,7 +167,7 @@ impl Pki {
             not_after: t + YEAR,
             public_key: *public_key,
             dns: Vec::from(dns),
-            ips: Vec::from(ips),
+            ips: ips.iter().map(cert_ip).collect(),
             server_auth: false,
             client_auth: true,
             ..CertBuilder::default()

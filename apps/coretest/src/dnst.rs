@@ -142,6 +142,43 @@ pub fn run(t: &mut T) {
     let qn = dns::query(8, "none.test", 1).unwrap_or_default();
     t.eq("no such name", dns::parse_answer(&answer(&qn, false), &qn, 1), Answer::NoName);
     t.eq("cut answer", dns::parse_answer(&answer(&qf, false)[..30], &qf, 1), Answer::Bad);
+    // only the asked name's records count, or those of the name its CNAME chain leads to
+    let with = |q: &[u8], rrs: &[(&str, u16, Vec<u8>)]| {
+        let mut m = q.to_vec();
+        m[2] = 0x81;
+        m[3] = 0x80;
+        m[7] = rrs.len() as u8;
+        let enc = |n: &str| {
+            let mut v = Vec::new();
+            for l in n.split('.') {
+                v.push(l.len() as u8);
+                v.extend_from_slice(l.as_bytes());
+            }
+            v.push(0);
+            v
+        };
+        for (owner, t, data) in rrs {
+            if *owner == "?" {
+                m.extend_from_slice(&[0xC0, 12]);
+            } else {
+                m.extend_from_slice(&enc(owner));
+            }
+            m.extend_from_slice(&t.to_be_bytes());
+            m.extend_from_slice(&[0, 1, 0, 0, 0, 60]);
+            let data = if *t == 5 { enc(core::str::from_utf8(data).unwrap_or("")) } else { data.clone() };
+            m.extend_from_slice(&(data.len() as u16).to_be_bytes());
+            m.extend_from_slice(&data);
+        }
+        m
+    };
+    let foreign = with(&qf, &[("evil.test", 1, alloc::vec![6, 6, 6, 6]), ("?", 1, alloc::vec![10, 1, 2, 3])]);
+    t.eq("a record for another name is ignored", dns::parse_answer(&foreign, &qf, 1), Answer::Found(alloc::vec![IpAddr::V4([10, 1, 2, 3])]));
+    let chain = with(&qf, &[("?", 5, b"cdn.test".to_vec()), ("cdn.test", 5, b"edge.cdn.test".to_vec()), ("other.test", 1, alloc::vec![6, 6, 6, 6]), ("Edge.CDN.test", 1, alloc::vec![10, 9, 9, 9])]);
+    t.eq("a CNAME chain is followed", dns::parse_answer(&chain, &qf, 1), Answer::Found(alloc::vec![IpAddr::V4([10, 9, 9, 9])]));
+    let skipped = with(&qf, &[("?", 5, b"cdn.test".to_vec()), ("?", 1, alloc::vec![6, 6, 6, 6]), ("cdn.test", 1, alloc::vec![10, 9, 9, 9])]);
+    t.eq("an address beside the CNAME does not count", dns::parse_answer(&skipped, &qf, 1), Answer::Found(alloc::vec![IpAddr::V4([10, 9, 9, 9])]));
+    let looped = with(&qf, &[("?", 5, b"a.test".to_vec()), ("a.test", 5, b"fake.test".to_vec())]);
+    t.eq("a CNAME loop ends", dns::parse_answer(&looped, &qf, 1), Answer::Found(Vec::new()));
 
     // a name server on loopback
     let Some(ns) = server() else {

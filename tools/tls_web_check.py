@@ -8,11 +8,10 @@ time; `coretest --tls-web URL --ca root.pem` must connect with the expected vers
 or refuse with the expected reason:
 
   TLS 1.3  AES-128-GCM / ChaCha20 x RSA / RSA-PSS / P-256 / P-384 (through the intermediate)
-  TLS 1.2  ECDHE-RSA / ECDHE-ECDSA x AES-128-GCM / ChaCha20
+  TLS 1.2  ECDHE-RSA / ECDHE-ECDSA x AES-128-GCM / ChaCha20, without the extended master secret
   both     X25519 and P-256 (TLS 1.3 by HelloRetryRequest), a request for a client certificate
   refused  unknown CA, wrong host name, expired certificate, only P-384 key exchange, TLS 1.1,
-           only AES-256-GCM, a server certificate signed with SHA-1, TLS 1.2 without the
-           extended master secret
+           only AES-256-GCM, a server certificate signed with SHA-1
 
 --internet adds public servers (system trust, Windows build too when run from Windows):
 www.google.com, github.com, and badssl.com's TLS 1.2-only, RSA-2048/4096, P-256/384 hosts (must work)
@@ -145,9 +144,9 @@ def main():
     run("1.2 ECDHE-ECDSA-AES128-GCM (P-256)", "p256", "-tls1_2 -cipher ECDHE-ECDSA-AES128-GCM-SHA256", "TLS 1.2 0xC02B 200")
     run("1.2 ECDHE-ECDSA-CHACHA20 (P-384)", "p384", "-tls1_2 -cipher ECDHE-ECDSA-CHACHA20-POLY1305", "TLS 1.2 0xCCA9 200")
     run("1.2 RSA-PSS certificate", "pss", "-tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256", "TLS 1.2 0xC02F 200")
-    # the client insists on the extended master secret in TLS 1.2 (RFC 7627; since the review of 2026-10-23)
-    run("refused: 1.2 without extended master secret", "rsa", "-tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256",
-        "error extended_master_secret", env={"OPENSSL_CONF": str(conf)})
+    # a TLS 1.2 server without the extended master secret is taken (no resumption, no renegotiation)
+    run("1.2 without extended master secret", "rsa", "-tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256", "TLS 1.2 0xC02F 200",
+        env={"OPENSSL_CONF": str(conf)})
     run("1.2 server asks for a client certificate", "rsa", "-tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256 -verify 1", "TLS 1.2 0xC02F 200")
     run("1.3 server asks for a client certificate", "rsa", f"{v13} TLS_AES_128_GCM_SHA256 -verify 1", "TLS 1.3 0x1301 200")
     run("refused: unknown CA", "rsa", "", "error not trusted", ca=False)

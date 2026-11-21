@@ -10,6 +10,8 @@
 //                                     last addresses before it, newest first, comma-separated; as
 //                                     exe+OFFSET, /LIB+OFFSET or -)
 //   probe --run TARGET SEED           run once without tracing (timing, debugging)
+//   probe --memcheck TARGET SEED      under valgrind --tool=memcheck: the secret marked undefined
+//                                     (see memcheck below)
 //
 // A child process is forked per secret: it prepares the inputs, stops itself (SIGSTOP), runs the
 // operation and stops again; the parent steps it in between and records where it goes.  MODE
@@ -86,6 +88,7 @@ type Op = Box<dyn FnMut()>;
 
 const TARGETS: &[&str] = &[
     "selftest_leak",
+    "selftest_lookup",
     "ct_eq",
     "x25519",
     "x25519_shared",
@@ -131,8 +134,12 @@ const TARGETS: &[&str] = &[
 
 /// the operation of a target with the inputs of one secret, prepared outside the trace
 fn prepare(name: &str, seed: u64) -> Op {
+    prepare_from(name, secret_bytes(seed, 4096))
+}
+
+/// the operation of a target with the inputs made from the secret bytes `s` (4096 of them)
+fn prepare_from(name: &str, s: Vec<u8>) -> Op {
     use crypto::*;
-    let s = secret_bytes(seed, 4096);
     let k = a32(&s);
     let nonce12 = [7u8; 12];
     let nonce24 = [7u8; 24];
@@ -149,6 +156,13 @@ fn prepare(name: &str, seed: u64) -> Op {
             }
             black_box(acc);
         }),
+        // a deliberate table lookup at a secret index (memcheck must see it; the trace does not)
+        "selftest_lookup" => {
+            let table: Vec<u64> = (0..256u64).collect();
+            Box::new(move || {
+                black_box(table[k[3] as usize]);
+            })
+        }
         "ct_eq" => {
             let (a, b) = (s[..32].to_vec(), s[32..64].to_vec());
             Box::new(move || {
@@ -333,7 +347,8 @@ fn prepare(name: &str, seed: u64) -> Op {
             black_box(b64::encode(black_box(&s[..48])));
         }),
         "b64_decode" => {
-            let text = b64::encode(&s[..47]);
+            let mut text = b64::encode(&s[..47]);
+            public_layout(&mut text);
             Box::new(move || {
                 black_box(b64::decode(black_box(&text)));
             })
@@ -342,7 +357,8 @@ fn prepare(name: &str, seed: u64) -> Op {
             black_box(hex(black_box(&k)));
         }),
         "unhex" => {
-            let text = hex(&k);
+            let mut text = hex(&k);
+            public_layout(&mut text);
             Box::new(move || {
                 black_box(unhex(black_box(&text)));
             })
@@ -350,7 +366,8 @@ fn prepare(name: &str, seed: u64) -> Op {
         // a private key from its PEM file (PKCS #8, as BackupCraft's keys)
         #[cfg(feature = "netio")]
         "pem_pkcs8_key" => {
-            let text = netio::pem::encode("PRIVATE KEY", &netio::x509::ed25519_pkcs8(&k));
+            let mut text = netio::pem::encode("PRIVATE KEY", &netio::x509::ed25519_pkcs8(&k));
+            public_layout(&mut text);
             Box::new(move || {
                 let der = netio::pem::decode(black_box(&text), "PRIVATE KEY").expect("pem");
                 black_box(netio::x509::ed25519_from_pkcs8(&der));
@@ -359,7 +376,8 @@ fn prepare(name: &str, seed: u64) -> Op {
         // an OpenSSH key file (netio's SSH client logs in with it)
         #[cfg(feature = "netio")]
         "ssh_private_key" => {
-            let text = netpkt::ssh::KeyPair::ed25519(&k).private_file("probe");
+            let mut text = netpkt::ssh::KeyPair::ed25519(&k).private_file("probe");
+            public_layout(&mut text);
             Box::new(move || {
                 black_box(netio::ssh::private_key(black_box(&text)).map(|kp| kp.public));
             })
@@ -369,6 +387,65 @@ fn prepare(name: &str, seed: u64) -> Op {
             std::process::exit(2);
         }
     }
+}
+
+// ------------------------------------------------------------------ valgrind
+
+/// a valgrind client request (x86-64: the magic preamble, rax -> the arguments, rdx -> the result;
+/// natively a no-op that gives `default`)
+fn vg_request(default: usize, args: [usize; 6]) -> usize {
+    let mut result = default;
+    // SAFETY: the rotations leave rdi as it was (3 + 13 + 61 + 51 = 128), xchg rbx, rbx changes
+    // nothing; valgrind reads the six words at rax and writes the answer into rdx
+    unsafe {
+        core::arch::asm!(
+            "rol rdi, 3", "rol rdi, 13", "rol rdi, 61", "rol rdi, 51", "xchg rbx, rbx",
+            inout("rdx") result,
+            in("rax") args.as_ptr(),
+            inout("rdi") 0usize => _,
+            options(nostack),
+        );
+    }
+    result
+}
+
+const VG_RUNNING_ON_VALGRIND: usize = 0x1001;
+const VG_CHANGE_ERR_DISABLEMENT: usize = 0x1801;
+/// VG_USERREQ_TOOL_BASE('M', 'C') + 1, + 2
+const VG_MAKE_MEM_UNDEFINED: usize = 0x4d43_0001;
+const VG_MAKE_MEM_DEFINED: usize = 0x4d43_0002;
+
+/// --memcheck TARGET SEED (under valgrind's memcheck): the secret bytes are marked undefined, so
+/// memcheck follows everything made from them and reports a branch on them ("Conditional jump")
+/// or an address made from them ("Use of uninitialised value"); reporting is off while the
+/// inputs are prepared and on only for the operation
+fn memcheck(name: &str, seed: u64) -> i32 {
+    if vg_request(0, [VG_RUNNING_ON_VALGRIND, 0, 0, 0, 0, 0]) == 0 {
+        eprintln!("--memcheck runs under valgrind --tool=memcheck only");
+        return 2;
+    }
+    let s = secret_bytes(seed, 4096);
+    vg_request(0, [VG_CHANGE_ERR_DISABLEMENT, 1, 0, 0, 0, 0]);
+    vg_request(0, [VG_MAKE_MEM_UNDEFINED, s.as_ptr() as usize, s.len(), 0, 0, 0]);
+    let mut op = prepare_from(name, s);
+    vg_request(0, [VG_CHANGE_ERR_DISABLEMENT, usize::MAX, 0, 0, 0, 0]); // -1: on again
+    probe_op(&mut op);
+    vg_request(0, [VG_CHANGE_ERR_DISABLEMENT, 1, 0, 0, 0, 0]);
+    0
+}
+
+/// a text made from the secret keeps it in its characters, while its length and capacity are
+/// public (a file's size): under memcheck they are marked defined (String::push adds each
+/// character's UTF-8 length, which memcheck would otherwise follow from the secret)
+fn public_layout(text: &mut String) {
+    let at = text as *mut String as usize;
+    vg_request(0, [VG_MAKE_MEM_DEFINED, at, core::mem::size_of::<String>(), 0, 0, 0]);
+}
+
+/// the operation itself, in a frame of its own (memcheck's reports name it)
+#[inline(never)]
+fn probe_op(op: &mut Op) {
+    op();
 }
 
 // ------------------------------------------------------------------ tracing
@@ -506,6 +583,11 @@ fn main() {
             for t in TARGETS {
                 println!("{}", t);
             }
+        }
+        Some("--memcheck") => {
+            let name = args.get(2).map(String::as_str).unwrap_or("");
+            let seed: u64 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1);
+            std::process::exit(memcheck(name, seed));
         }
         Some("--run") => {
             let name = args.get(2).map(String::as_str).unwrap_or("");
