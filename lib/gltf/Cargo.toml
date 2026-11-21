@@ -18,7 +18,7 @@ doctest = false
 workspace = true
 
 [dependencies]
-agent_core.workspace = true
+formats.workspace = true
 img_core.workspace = true
 img_png.workspace = true
 img_jpeg.workspace = true

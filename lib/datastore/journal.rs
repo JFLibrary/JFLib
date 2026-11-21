@@ -6,7 +6,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use agent_core::json::{self, Value};
+use formats::json::{self, Value};
 use plat::sync::Mutex;
 
 use crate::{record_limits, StoreError, StoreResult};

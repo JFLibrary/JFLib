@@ -31,7 +31,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use agent_core::json::{self, Limits, Value};
+use formats::json::{self, Limits, Value};
 use plat::sync::Mutex;
 
 pub use journal::Journal;

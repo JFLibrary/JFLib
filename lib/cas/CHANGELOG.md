@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- JSON (pack indexes, snapshots, the repository's config) goes through jflib-formats (`formats::json`); the crate no longer depends on jflib-agent-core. Its API is unchanged.
+
 ### Security
 
 - A repo.json without its MAC no longer opens (`Corrupt`). It was sealed again as genuine, so whoever could write it could change signers, retention and keys; every published version writes the MAC.

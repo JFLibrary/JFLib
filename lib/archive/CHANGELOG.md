@@ -33,6 +33,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Changed
 
 - DEFLATE and CRC-32 come from jflib-compress instead of img_core; the crate no longer depends on img_core.
+- `archive::opc` reads and writes its XML through jflib-formats (`formats::xml`, `formats::encoding`); the crate no longer depends on jflib-base. `opc::Rules::xml` and `opc::Error::Xml` take `formats::xml::Limits` and `formats::xml::Error`, the same types as before (base's paths are re-exports of them).
 
 ### Fixed
 

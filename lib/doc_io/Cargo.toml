@@ -19,7 +19,7 @@ workspace = true
 
 [dependencies]
 rt.workspace = true
-base.workspace = true
+formats.workspace = true
 plat.workspace = true
 archive.workspace = true
 doc_core.workspace = true

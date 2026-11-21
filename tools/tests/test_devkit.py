@@ -360,6 +360,20 @@ V2["lib.rs"] = (V1["lib.rs"]
                 .replace("mod inner;\npub use inner::*;", "mod inner2;\npub use inner2::*;"))
 V2["inner2.rs"] = V2.pop("inner.rs")
 
+# a module, a macro and a type that moved from demo to the crate dep and stay re-exported
+# (agent_core's `pub use formats::json; pub use json::Value;`)
+DEP = {
+    "lib.rs": "//! dep\npub mod json;\npub mod hotkey;\npub use hotkey::Chord;\n"
+              "#[macro_export]\nmacro_rules! record { () => {} }\n#[doc(hidden)]\npub fn secret() {}\n",
+    "json.rs": "pub enum Value { Null, Bool(bool) }\nimpl Value { pub fn is_null(&self) -> bool { true } }\n"
+               "pub fn parse(s: &str) -> Option<Value> { None }\n",
+    "hotkey.rs": "#[derive(Clone, Copy)]\npub struct Chord { pub key: u32 }\n",
+}
+DEMO_REST = "pub use dep::hotkey::Chord;\npub use outside::Thing;\npub trait Show {}\nimpl Show for Value {}\n"
+DEMO = {"lib.rs": "//! demo\npub use dep::json;\npub use json::Value;\npub use dep::{record, secret};\n" + DEMO_REST}
+DEMO_BEFORE = {"lib.rs": "//! demo\npub mod json;\npub use json::Value;\n#[macro_export]\nmacro_rules! record { () => {} }\n"
+                         + DEMO_REST, "json.rs": DEP["json.rs"]}
+
 
 class ApiDiffTest(Temp):
     def crate(self, files, name="demo"):
@@ -469,6 +483,58 @@ class ApiDiffTest(Temp):
         d = apidiff.diff(lines, one_arch)                               # a target's signature gone
         self.assertEqual([(what, ln[0], detail) for what, ln, detail in d["breaking"]],
                          [("changed", "demo::kernel::Stat.n", "n: u64")])
+
+    @contextlib.contextmanager
+    def library(self, crates):
+        """crates {name: files} as the library (gendoc's CRATES, all "full") under a scratch lib/"""
+        for name, files in crates.items():
+            d = self.dir / "lib" / name
+            if d.exists():
+                shutil.rmtree(d)
+            for rel, text in files.items():
+                self.write(f"lib/{name}/{rel}", text)
+        with mock.patch.object(gendoc, "LIB", self.dir / "lib"), \
+                mock.patch.object(gendoc, "CRATES", [(n, n, "full") for n in crates]), \
+                mock.patch.dict(gendoc._CRATES, clear=True), mock.patch.dict(apidiff._WALKS, clear=True):
+            yield
+
+    def test_reexport_of_another_crate(self):
+        """a `pub use` into another crate of CRATES shows that crate's items under this crate's
+        path (a module, an item, a macro, through a re-exported module; this crate's trait impls
+        for them), so an item that moved there and stays re-exported is no change; a crate outside
+        CRATES and a target that shows nothing stay `use` lines; an old snapshot's `use` line
+        reads as the target's lines, also where the use names an alias"""
+        with self.library({"dep": DEP, "demo": DEMO}):
+            new = apidiff.current_lines()
+        got = {(p, k, s) for p, k, s, _ in new if p.startswith("demo::")}
+        for want in (("demo::Value", "enum", "enum Value"), ("demo::Value::Null", "variant", "Null"),
+                     ("demo::Value::is_null", "method", "fn is_null(&self) -> bool"), ("demo::Value", "impl", "impl Show"),
+                     ("demo::json::parse", "fn", "fn parse(s: &str) -> Option<Value>"),
+                     ("demo::record", "macro", "macro_rules! record"), ("demo::Chord", "struct", "struct Chord"),
+                     ("demo::Chord.key", "field", "key: u32"), ("demo::Chord", "impl", "impl Copy"),
+                     ("demo::secret", "use", "dep::secret"), ("demo::Thing", "use", "outside::Thing")):
+            self.assertIn(want, got)
+        self.assertEqual({p for p, _, _ in got if p.startswith("demo::json::")}, {"demo::json::parse"})   # Value: demo::Value
+        self.assertEqual({(p, s) for p, k, s in got if k == "use"}, {("demo::secret", "dep::secret"), ("demo::Thing", "outside::Thing")})
+        self.assertEqual(apidiff.expand_uses(new), new)             # a snapshot of now reads back as it is
+
+        with self.library({"dep": {**DEP, "lib.rs": DEP["lib.rs"].replace("macro_rules! record { () => {} }\n", "")},
+                           "demo": DEMO_BEFORE}):
+            before = apidiff.current_lines()
+            # as snapshots up to 0.2.1 hold it: the re-export of another crate's item as one line
+            old = [ln for ln in before if ln[0] != "demo::Chord" and not ln[0].startswith("demo::Chord.")]
+            old.append(("demo::Chord", "use", "dep::hotkey::Chord", ""))
+            snap = apidiff.write_snapshot("0.1.0", sorted(old), self.dir / "api" / "0.1.0.txt")
+        with self.library({"dep": DEP, "demo": DEMO}):
+            old = apidiff.read_snapshot(snap)
+            self.assertIn(("demo::Chord", "struct", "struct Chord", "all-pub"), old)
+            d = apidiff.diff(old, new)
+        self.assertEqual(d["breaking"], [])
+        self.assertEqual({ln[0] for _, ln, _ in d["added"]}, {"dep::record", "demo::secret"})
+        with self.library({"dep": {**DEP, "json.rs": DEP["json.rs"].replace("pub fn parse", "fn parse")}, "demo": DEMO}):
+            d = apidiff.diff(apidiff.read_snapshot(snap), apidiff.current_lines())
+        self.assertEqual({(what, ln[0]) for what, ln, _ in d["breaking"]},     # a real break stays one
+                         {("removed", "demo::json::parse"), ("removed", "dep::json::parse")})
 
     def test_versions(self):
         nv = apidiff.next_version

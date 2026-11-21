@@ -308,8 +308,8 @@ Whitespace getrennte Wörter einschließlich dargestellter Felder.
 
 | Ort | Verantwortung |
 |---|---|
-| `lib/base/encoding.rs` | Striktes UTF-8, BOM, UTF-16 LE/BE; fehlerhafte Sequenzen werden abgelehnt |
-| `lib/base/xml.rs` | Begrenzter XML-Teilparser mit aufgelösten Namensräumen und sicherem Escaping |
+| `lib/formats/src/encoding.rs` | Striktes UTF-8, BOM, UTF-16 LE/BE; fehlerhafte Sequenzen werden abgelehnt |
+| `lib/formats/src/xml.rs` | Begrenzter XML-Teilparser mit aufgelösten Namensräumen und sicherem Escaping |
 | `lib/archive` | ZIP32 lesen/schreiben, gespeicherte und DEFLATE-komprimierte Einträge lesen, CRC, Daten-Deskriptoren und Ressourcenlimits |
 | `lib/doc_core` | Stabile Dokument-/Quellen-/Noten-IDs, Absätze, Zitat-/Literaturfelder, Validierung, atomare Änderungen, Undo/Redo |
 | `lib/doc_core/notes.rs` | Einmalige Haupttextanker, mehrabsätzige Noten, Navigation, Nummerierung und atomare Notenänderungen |

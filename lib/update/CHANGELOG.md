@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- The update manifest is read with jflib-formats (`formats::json`); the crate no longer depends on jflib-agent-core directly.
+
 ### Fixed
 
 - An apply that ended in the middle (a crash between two files, or after the app bundle's exchange) keeps its backup of the old version at the next start and finishes there, also when the new program is the one starting. The second attempt backed up files already replaced as the old ones, and a rollback then kept the new version.
