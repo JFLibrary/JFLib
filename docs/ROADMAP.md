@@ -2523,11 +2523,18 @@ Sicherheit:
 
 Grundbausteine am falschen Ort oder mehrfach:
 
-- **P1** · *teilweise* · `compress` hat nur LZ4 und Zstandard. DEFLATE, zlib und gzip liegen in
-  `img_core` ([`inflate.rs`](../lib/img_core/inflate.rs), `deflate.rs`, `gzip.rs`), ein zweiter
-  Encoder in [`cargo_jflib/src/deflate.rs`](../lib/cargo_jflib/src/deflate.rs), Brotli nur intern
-  in `img_jxl`. Gehört alles nach `compress`, dazu eine Streaming-API (heute alles im Speicher)
-  und zstd-Wörterbücher.
+- **P1** · *erledigt* (2026-11-21, U1) · `compress` hat DEFLATE, zlib, gzip, den Brotli-Decoder,
+  CRC-32 und Adler-32 aus `img_core` und `img_jxl` übernommen
+  ([`compress/deflate/mod.rs`](../lib/compress/deflate/mod.rs), `zlib.rs`, `gzip.rs`,
+  `brotli/mod.rs`), mit `compress`/`decompress(data, max_out)` wie bei LZ4 und zstd; `img_core`
+  und `img_jxl` behalten ihre Aufrufe als dünne Module, `plat::print` braucht keinen
+  `unsafe`-Hook mehr. Byte-gleich mit dem alten Encoder auf allen Stufen; compress hängt weiter
+  an nichts, damit die std-Werkzeuge es nutzen können.
+- **P2** · *fehlt* · `compress`: eine Streaming-API (heute alles im Speicher), zstd-Wörterbücher,
+  ein Brotli-Encoder; Content-Encoding gzip/br im HTTP-Client von `netio` (über die
+  Sicherheits-Sitzung); `cargo-jflib` mit `compress` statt seines eigenen Encoders
+  ([`cargo_jflib/src/deflate.rs`](../lib/cargo_jflib/src/deflate.rs), heute ohne jede
+  Abhängigkeit; die Bytes der Pakete ändern sich dabei).
 - **P1** · *teilweise* · JSON aus `agent_core` lösen: `agent_core::json` und `jmap` nutzen `ui`,
   `cas`, `gltf`, `datastore`, `update` und `netio`; wer nur JSON braucht, findet es heute in der
   Crate der Agentenschnittstelle. Ziel: `base` oder eine eigene Crate, `agent_core` re-exportiert.

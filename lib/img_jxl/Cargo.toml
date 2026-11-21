@@ -4,7 +4,7 @@ description = "JPEG XL reader and writer for JFLib: lossless modular, lossy VarD
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license = "(MIT OR Apache-2.0) AND BSD-3-Clause AND MIT"
+license = "(MIT OR Apache-2.0) AND BSD-3-Clause"
 repository.workspace = true
 homepage.workspace = true
 
@@ -22,6 +22,8 @@ simd.workspace = true
 gfx.workspace = true
 img_core.workspace = true
 img_jpeg.workspace = true
+# Brotli for the JPEG reconstruction data (brotli.rs)
+compress.workspace = true
 
 # inside a loadable module (--cfg jflib_module) the same names are modrt and modplat
 [target.'cfg(not(jflib_module))'.dependencies]

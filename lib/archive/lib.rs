@@ -1,5 +1,5 @@
 // In-memory ZIP interchange (ZIP32, ZIP64 when it is needed). New native library code,
-// independent of document/UI code. Raw DEFLATE, inflate and CRC reuse img_core's safe codec
+// independent of document/UI code. Raw DEFLATE, inflate and CRC come from jflib-compress
 // primitives; no paths are extracted. `opc` builds the Open Packaging Conventions on top.
 // ZipFs shows an archive as a read-only plat::vfs tree:
 //   plat::vfs::mount("pack", Arc::new(archive::ZipFs::new(&bytes, Limits::default())?))
@@ -14,7 +14,7 @@ use alloc::{
     vec,
     vec::Vec,
 };
-use img_core::{checksum::crc32, deflate::deflate_raw, inflate::inflate_raw_ex};
+use compress::{crc32, deflate};
 
 pub mod opc;
 
@@ -347,7 +347,7 @@ fn read_parts(b: &[u8], limits: Limits, escaped: bool) -> Result<(Vec<Entry>, Ve
                 return Err(Error::Limit);
             }
             let mut out = vec![0; size];
-            let (written, used) = inflate_raw_ex(src, &mut out).map_err(|_| Error::Invalid)?;
+            let (written, used) = deflate::decompress_into(None, src, &mut out).map_err(|_| Error::Invalid)?;
             if written != size || used != packed {
                 return Err(Error::Invalid);
             }
@@ -459,7 +459,7 @@ pub(crate) fn write_parts(list: &[(&str, &[u8])], limits: Limits, method: Method
         .iter()
         .map(|e| match method {
             Method::Deflate(level) => {
-                let z = deflate_raw(e.data, level.clamp(1, 9) as i32);
+                let z = deflate::compress(e.data, level.clamp(1, 9) as i32);
                 // (an empty result would be a failed compression, never a smaller part)
                 if !z.is_empty() && z.len() < e.data.len() { (8, Some(z)) } else { (0, None) }
             }

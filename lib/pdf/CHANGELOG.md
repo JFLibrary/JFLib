@@ -38,3 +38,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   which pdfium shows with seams.
 
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
+
+### Changed
+
+- The zlib of the streams comes from jflib-compress instead of img_core; the crate no longer depends on img_core.
+

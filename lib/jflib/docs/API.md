@@ -80,8 +80,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#datetime-crate-root) · [cron.rs](#datetimecronrs) · [tz.rs](#datetimetzrs)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
   <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs) · [md5.rs](#cryptomd5rs) · [eappwd.rs](#cryptoeappwdrs)
-- [compress](#compress) -- LZ4 block and frame, Zstandard, xxHash32 and xxHash64, codec ids
-  <br>[lib.rs](#compress-crate-root) · [lz4.rs](#compresslz4rs) · [xxh.rs](#compressxxhrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/enc.rs](#compresszstdencrs)
+- [compress](#compress) -- DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids
+  <br>[lib.rs](#compress-crate-root) · [brotli/mod.rs](#compressbrotlimodrs) · [checksum.rs](#compresschecksumrs) · [deflate/mod.rs](#compressdeflatemodrs) · [deflate/dec.rs](#compressdeflatedecrs) · [deflate/enc.rs](#compressdeflateencrs) · [gzip.rs](#compressgziprs) · [lz4.rs](#compresslz4rs) · [xxh.rs](#compressxxhrs) · [zlib.rs](#compresszlibrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/enc.rs](#compresszstdencrs)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery
   <br>[lib.rs](#datastore-crate-root) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
@@ -15833,29 +15833,26 @@ zero padding bytes consumed than bits are left.  Values of n: 1..56 (get / peek 
 Source: [`lib/img_core/checksum.rs`](../lib/img_core/checksum.rs)
 
 ```text
-checksum -- CRC-32 (zlib / PNG polynomial) and Adler-32  [src/img/checksum.s]
+checksum -- CRC-32 (zlib / PNG polynomial) and Adler-32
+
+Both live in jflib-compress since 0.3 (compress::crc32, compress::adler32); img_core keeps
+the names of before.
 
   crc32(crc, data) -> u32        start with crc = 0 (like zlib's crc32())
   adler32(adler, data) -> u32    start with adler = 1
-
-CRC: table driven (slice-by-8 here, slice-by-4 in the assembly: the same values).
-Adler-32: blocks of at most 5552 bytes summed exactly in 64 bit, both sums reduced mod
-65521 after every block (as the assembly's SSE2 loop); a call with no data returns the
-start value unchanged.
 ```
 
-- **`fn crc32(crc: u32, data: &[u8]) -> u32`**
-  CRC-32 (zlib / PNG) of data, continuing crc (start with 0)  [crc32]
-
-- **`fn adler32(adler: u32, data: &[u8]) -> u32`**
-  Adler-32 (zlib) of data, continuing adler (start with 1)  [adler32]
+Re-exports: `compress::{adler32, crc32}`
 
 ### `img_core/deflate.rs`
 
 Source: [`lib/img_core/deflate.rs`](../lib/img_core/deflate.rs)
 
 ```text
-deflate -- DEFLATE (RFC 1951) / zlib (RFC 1950) compression  [src/img/deflate.s]
+deflate -- DEFLATE (RFC 1951) / zlib (RFC 1950) compression with img_core's error codes
+
+The encoder lives in jflib-compress since 0.3 (compress::deflate, compress::zlib); these are
+the calls of before, with the same bytes.  New code calls compress directly.
 
   zlib_deflate(src, level) -> Vec          zlib stream (level 0..9, < 0 = 6, > 9 = 9)
   deflate_raw(src, level) -> Vec           raw RFC 1951 data
@@ -15870,26 +15867,9 @@ deflate -- DEFLATE (RFC 1951) / zlib (RFC 1950) compression  [src/img/deflate.s]
                                            a state); overflow when the stream + 8 bytes do
                                            not fit (dst contents undefined then)
   deflate_bound(len) -> len + len / 512 + 128   a cap with which *_to never overflow
-
-The algorithm and every table of the assembly: 3-byte multiplicative hash, head / prev
-chains over "global" positions (input offset + base; every input starts GEN_GAP after
-the previous one, so a reused state matches a fresh one), zlib's levels (greedy 1..3, lazy
-4..9, chain depth / nice / lazy limits), TOO_FAR, 16K-symbol blocks written as the
-cheapest of stored / fixed / dynamic by exact bit count, two-queue Huffman lengths with
-miniz's Kraft repair, RLE-coded code lengths.  Inputs of 4 GiB - 64 KiB and more are
-stored.  The output limit: a block that would end past cap - 8 stops the compressor
-(ERR_OVERFLOW).  Speed (perf-inflate): the LZ77 loops keep their state in locals and
-load the next position's hash head before the current chain walk (the walk is a chain of
-dependent loads; the early load overlaps it) -- the same candidates in the same order.
 ```
 
-- **`struct DeflateState`**
-  a compressor state (DS_\*); reusable, one thread at a time
-
-**`impl DeflateState`**
-
-- **`fn new() -> Box<DeflateState>`**
-  a zeroed state  [deflate_state_new]
+Re-exports: `compress::deflate::DeflateState`
 
 - **`fn deflate_bound(len: usize) -> usize`**
   output capacity with which the \*\_to functions never report ERR_OVERFLOW  [deflate_bound]
@@ -16031,7 +16011,10 @@ TIFR_MAXDEPTH: u32 = 3  // sub-IFD nesting callers must respect
 Source: [`lib/img_core/gzip.rs`](../lib/img_core/gzip.rs)
 
 ```text
-gzip -- gzip (RFC 1952) members on top of inflate_raw / deflate_raw  [src/img/gzip.s]
+gzip -- gzip (RFC 1952) members with img_core's error codes
+
+gzip lives in jflib-compress since 0.3 (compress::gzip); these are the calls of before, with
+the same bytes and codes.  New code calls compress directly.
 
   gzip_decode(src, dst) -> Ok((bytes, consumed)) / Err(ERR_*)   ONE member; consumed =
                                    the member length incl. the trailer
@@ -16042,10 +16025,6 @@ gzip -- gzip (RFC 1952) members on top of inflate_raw / deflate_raw  [src/img/gz
   gzip_encode_to(st, src, level, dst) -> Ok(bytes) / Err(ERR_OVERFLOW)   into dst
                                    (deflate_bound(len) always suffices)
   gzip_isize(src) -> Ok(ISIZE) / Err(ERR_TRUNC)   the last 4 bytes of a single member
-
-Decoding: ID1 ID2, CM 8, FLG (reserved bits 5..7 must be 0), MTIME, XFL, OS, then FEXTRA,
-FNAME, FCOMMENT, FHCRC (low 16 bits of the CRC-32 of the header bytes), the deflate data,
-CRC32 and ISIZE.  Errors: ERR_TRUNC, ERR_HDR, ERR_CHECKSUM and the inflate errors.
 ```
 
 - **`fn gzip_decode(src: &[u8], dst: &mut [u8]) -> Result<(usize, usize), i32>`**
@@ -16225,7 +16204,11 @@ ICC_MON_PRIMARY: i32 = -1  // plat::monitor_icc: the primary monitor
 Source: [`lib/img_core/inflate.rs`](../lib/img_core/inflate.rs)
 
 ```text
-inflate -- DEFLATE (RFC 1951) and zlib (RFC 1950) decompression  [src/img/inflate.s]
+inflate -- DEFLATE (RFC 1951) and zlib (RFC 1950) decompression with img_core's error codes
+
+The decoder lives in jflib-compress since 0.3 (compress::deflate, compress::zlib); these are
+the calls of before, for the codecs and for code written against them.  New code calls
+compress directly.
 
   zlib_inflate(src, dst) -> Ok(bytes written) / Err(ERR_*)
   inflate_raw(src, dst) -> Ok(bytes) / Err(ERR_*)
@@ -16235,50 +16218,12 @@ inflate -- DEFLATE (RFC 1951) and zlib (RFC 1950) decompression  [src/img/inflat
                                     never affects later calls)
   zlib_inflate_st(st, src, dst) / inflate_raw_st(st, src, dst)   the same with a state
                                     (None = a temporary one, like the classic calls)
-  rev16(x)                        16-bit bit reversal (shared with deflate)
-  LBASE / LEXT / DBASE / DEXT / CLORDER   the code tables (shared with deflate)
 
-The output buffer has a fixed capacity: every write is bounds-checked (ERR_OVERFLOW),
-every back reference is checked against the bytes produced so far (ERR_DIST), reading
-past the end of the input gives ERR_TRUNC.  zlib header errors: ERR_HDR; a wrong
-Adler-32: ERR_CHECKSUM.
-
-The bit buffer behaves exactly as the assembly's (the error codes of corrupt input depend
-on it): refilled 8 bytes at a time while 8 input bytes remain (the count becomes
-56 + count % 8), byte by byte near the end with zero bytes counted as padding (more than
-PAD_MAX of them = ERR_TRUNC); Huffman tables as stb_image (10-bit fast table, canonical
-slow path); a code table's sorted-index arrays keep entries of an earlier build (the
-slow path checks the length, as the assembly).
-
-Speed (perf-inflate): the symbol loop runs in codes_fast while 8 input bytes remain at
-every refill and a whole match fits the output: no slow refill, no overflow checks, no
-call on the literal path (the state stays in registers), u32 fast tables (lx / dx) with
-the length / distance base and extra-bit count folded in (one load and two shifts per
-code), wide match moves.  It hands over to the careful loop before the symbol where a
-condition fails; both follow the assembly's loop step by step.
+Errors: ERR_OVERFLOW (the output does not fit), ERR_DIST, ERR_TRUNC, ERR_HDR (zlib header),
+ERR_CHECKSUM (Adler-32), ERR_BLOCK, ERR_CODE -- the same codes for the same input as before.
 ```
 
-- **`static LBASE: [u16; 32]`**
-
-- **`static DBASE: [u16; 32]`**
-
-- **`static LEXT: [u8; 32]`**
-
-- **`static DEXT: [u8; 32]`**
-
-- **`static CLORDER: [u8; 19]`**
-
-- **`const fn rev16(x: u32) -> u32`**
-  16-bit bit reversal  [zl_rev16]
-
-- **`struct InflateState`**
-  a reusable decoder state (IS_\*); only `pad` is reset per call, the fixed tables are built
-  once per state, every other table is rebuilt before it is read
-
-**`impl InflateState`**
-
-- **`fn new() -> Box<InflateState>`**
-  a zeroed state  [inflate_state_new]
+Re-exports: `compress::deflate::InflateState`
 
 - **`fn zlib_inflate(src: &[u8], dst: &mut [u8]) -> Result<usize, i32>`**
   zlib stream src -> dst  [zlib_inflate]
@@ -18092,8 +18037,8 @@ Modules (one per assembly file): bits (jxl_bits.s), hdr (jxl_hdr.s), icc (jxl_ic
 (jxl_rnd.s), epf (jxl_epf.s), blend (jxl_blend.s), noise (jxl_noise.s), tab (jxl_tab.s,
 generated by tools/gen_jxl.py); the writer: ewr (jxl_ewr.s), enc (jxl_enc.s), venc
 (jxl_venc.s).  jxl-plus (no asm): emath (libjxl's fast math), jpeg (JPEG reconstruction) with
-brotli (RFC 7932 decoder; brotli_tab.rs / brotli_dict.bin generated by
-tools/gen_brotli_dict.py), par (the pool helpers).  jxl-tools (no asm): spline (decoder:
+brotli (the call of compress::brotli, the RFC 7932 decoder that lived here until 0.2),
+par (the pool helpers).  jxl-tools (no asm): spline (decoder:
 splines).  jxl-module: writer (the new writer's options, samples and hook).  The new writer
 itself (libjxl 0.11.1's encoder: enew, evdct, emod, ema, eans, efrm, eicc, etx, dctk, eaq,
 eacs, ecfl, epatch, edots, espline, enoise, efeat, ebutter, ebq) is the crate img_jxl_enc
@@ -18240,8 +18185,7 @@ The codec's building blocks (public for the codec test app `codectest`; see thei
 |---|---|
 | [`img_jxl::bits`](../lib/img_jxl/bits.rs) | JPEG XL bit reader and field coding (fields.cc; model: tools/jxl_ref.py Bits) |
 | [`img_jxl::blend`](../lib/img_jxl/blend.rs) | JPEG XL reference frames, frame blending and patches (blending.cc, stage_blending.cc, dec_patch_dictionary.cc; model: tools/jxl_ref.py perform_blending, ... |
-| [`img_jxl::brotli`](../lib/img_jxl/brotli.rs) | Brotli decompression (RFC 7932) of the JPEG reconstruction data (jbrd box) of JPEG transcodes |
-| [`img_jxl::brotli_tab`](../lib/img_jxl/brotli_tab.rs) | Brotli static dictionary layout and the 121 word transforms (RFC 7932 appendices A and B); generated by tools/gen_brotli_dict.py, do not edit |
+| [`img_jxl::brotli`](../lib/img_jxl/brotli.rs) | Brotli decompression (RFC 7932) of the JPEG reconstruction data (jbrd box) of JPEG transcodes, with img_core's error codes |
 | [`img_jxl::dct`](../lib/img_jxl/dct.rs) | JPEG XL VarDCT transforms (dct-inl.h IDCT1DImpl / DCT1DImpl, dec_transforms-inl.h TransformToPixels / LowestFrequenciesFromDC; model: tools/jxl_ref.py ... |
 | [`img_jxl::dec`](../lib/img_jxl/dec.rs) | JPEG XL frame decoding driver (dec_frame.cc, dec_modular.cc; model: tools/jxl_ref.py Frame.decode, decode_global_modular, decode_group, pass_bracket) |
 | [`img_jxl::emath`](../lib/img_jxl/emath.rs) | float helpers of the new encoder (libjxl base/fast_math-inl.h, rational_polynomial-inl.h) |
@@ -40049,11 +39993,10 @@ job as a one-page PDF  [src/plat/print.s, src/img/pdfwrite.s; docs/modules/PRINT
        jfgui_PRINT_PRINTER; elsewhere our PDF into FILE); else ERR_UNSUPPORTED
 
 Deviation (plat-shared): plat must not depend on the image crates, so pdfwrite.s is ported
-here and the one thing it took from img -- zlib_deflate -- comes through a hook.  An app
-sets it to img_core::deflate::zlib_deflate (then the PDF is byte-identical to the
-assembly's); without a hook the streams are zlib "stored" blocks (a valid, uncompressed
-PDF).  The source is a PrintSrc (rows of B, G, R, A bytes; the gfx::Surface fields)
-instead of a SURFACE pointer.
+here.  The one thing it took from img -- zlib_deflate -- is compress::zlib since 0.3, the
+same encoder, so the PDF is byte-identical to the assembly's.  set_print_deflate, the hook
+of before, still replaces it (deprecated).  The source is a PrintSrc (rows of B, G, R, A
+bytes; the gfx::Surface fields) instead of a SURFACE pointer.
 ```
 
 *results (the ERR_\* of jfgui.inc / plugin.inc that plat returns)*
@@ -40195,10 +40138,12 @@ PRW_OPAQUE: u32 = 8  // alpha ignored (XRGB)
   the job laid out on page as a one-page PDF (job.page_w / page_h set)  [print_pdf]
 
 - **`type DeflateFn = fn(&[u8], i32) -> Vec<u8>`**
-  a zlib compressor: (data, level) -> zlib stream (img_core::deflate::zlib_deflate)
+  a zlib compressor: (data, level) -> zlib stream
 
 - **`fn set_print_deflate(f: Option<DeflateFn>)`**
-  the compressor of the PDF streams (None: zlib stored blocks, no compression)
+  another compressor of the PDF streams (None: compress::zlib, the default).  Not needed any
+  more: without a hook the streams are compressed with compress::zlib, the encoder the hook
+  was set to until 0.2.
 
 - **`fn pdf_write_image(src: &PrintSrc, opt: &PdfOpt) -> Result<Vec<u8>, i32>`**
   one image on one PDF 1.4 page: objects 1 Catalog, 2 Pages, 3 Page, 4 Contents, 5 Image
@@ -42612,20 +42557,30 @@ ROUNDS: u8 = 40
 
 ## compress
 
-*LZ4 block and frame, Zstandard, xxHash32 and xxHash64, codec ids* -- crate root [`lib/compress/lib.rs`](../lib/compress/lib.rs)
+*DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids* -- crate root [`lib/compress/lib.rs`](../lib/compress/lib.rs)
 
 ```text
-compress -- lossless compression for backup data
+compress -- lossless compression: DEFLATE, zlib, gzip, Brotli, LZ4 and Zstandard
 
+  deflate::compress(data, level) / decompress(data, max_out)   raw DEFLATE (RFC 1951)
+  zlib::compress / decompress                     zlib streams (RFC 1950)
+  gzip::compress / decompress                     gzip members (RFC 1952; decompress reads
+                                                  all members, as gunzip does)
+  brotli::decompress(data, max_out)               Brotli streams (RFC 7932), decoder only
   lz4::compress(data) -> Vec<u8>                  LZ4 block (greedy, 64 KiB window)
   lz4::decompress(block, max_out) -> Option<Vec>  bounds-checked; None on any corruption
   lz4::frame_compress / frame_decompress          the LZ4 frame format (lz4 / zstd --format=lz4
                                                   interoperable), xxHash32 checksums
   zstd::compress(data, level) / decompress        Zstandard frames (RFC 8878; the zstd tool
                                                   reads ours and we read its)
+  crc32(crc, data), adler32(adler, data)          the checksums of gzip / PNG / ZIP and zlib
   xxh32(data, seed), xxh64(data, seed)
   Codec { None, Lz4, Zstd } with id(): the codec byte that formats on disk store per blob;
   Codec::pack(data, level) / unpack(data, max_out)
+
+Every decoder takes the largest output the caller accepts and treats its input as untrusted:
+truncated or corrupt data, a wrong checksum or more output than allowed give None (or an
+Error from the *_into variants), never a panic and never a read or write outside the buffers.
 ```
 
 ### `compress` crate root
@@ -42646,6 +42601,275 @@ compress -- lossless compression for backup data
   compress with this codec (`level`: zstd only); None stores the data as it is
 - **`fn unpack(self, data: &[u8], max_out: usize) -> Option<Vec<u8>>`**
   the data of pack(); None when it is damaged or longer than max_out
+
+### `compress/brotli/mod.rs`
+
+Source: [`lib/compress/brotli/mod.rs`](../lib/compress/brotli/mod.rs)
+
+```text
+brotli -- Brotli decompression (RFC 7932), the Content-Encoding "br" of the web and the
+compression of WOFF2 fonts and of JPEG XL's JPEG reconstruction data (until 0.2 in
+img_jxl)                                                               [jxl-plus: no asm]
+
+  decompress(data, max_out) -> Option<Vec<u8>>   the stream that fills data completely;
+                                               None for a damaged stream, data after it
+                                               or more than max_out bytes
+  decompress_prefix(data, max_out) -> Ok((bytes, consumed))   the stream at the start of
+                                               data; Error::Corrupt for a damaged stream,
+                                               Error::Limit past max_out bytes
+
+One pass over the whole input: bit reader, prefix codes (simple and complex), block switches,
+context maps (RLE + move to front), insert-and-copy commands, the distance ring buffer and
+the static dictionary with its 121 transforms (tab.rs, dict.bin; tools/gen_brotli_dict.py).
+The output is bounded by max_out before it grows, every distance is checked against the
+output so far.  Large windows (an extension outside RFC 7932) are refused.
+```
+
+- **`enum Error`**
+  why a Brotli stream could not be read
+  - `Corrupt` -- the stream is damaged, truncated or uses something RFC 7932 does not allow
+  - `Limit` -- the output would be larger than the caller allows
+
+- **`fn decompress(data: &[u8], max_out: usize) -> Option<Vec<u8>>`**
+  the data of the Brotli stream that fills `data` completely, at most `max_out` bytes
+
+- **`fn decompress_prefix(data: &[u8], max: usize) -> Result<(Vec<u8>, usize), Error>`**
+  the Brotli stream at the start of `data`: (output, bytes of input used)
+
+### `compress/checksum.rs`
+
+Source: [`lib/compress/checksum.rs`](../lib/compress/checksum.rs)
+
+```text
+checksum -- CRC-32 (zlib / PNG polynomial) and Adler-32 (until 0.2 img_core::checksum)
+                                                                      [src/img/checksum.s]
+
+  crc32(crc, data) -> u32        start with crc = 0 (like zlib's crc32())
+  adler32(adler, data) -> u32    start with adler = 1
+
+CRC: table driven (slice-by-8 here, slice-by-4 in the assembly: the same values).
+Adler-32: blocks of at most 5552 bytes summed exactly in 64 bit, both sums reduced mod
+65521 after every block (as the assembly's SSE2 loop); a call with no data returns the
+start value unchanged.  The 16-byte groups add into 16 column sums, which the
+compiler turns into vector code on every target (the crate depends on nothing, so the
+build tools with std can use it too); the sums are exact, so the value is the same as the
+assembly's psadbw / pmaddwd loop.
+```
+
+- **`fn crc32(crc: u32, data: &[u8]) -> u32`**
+  CRC-32 (zlib / PNG) of data, continuing crc (start with 0)  [crc32]
+
+- **`fn adler32(adler: u32, data: &[u8]) -> u32`**
+  Adler-32 (zlib) of data, continuing adler (start with 1)  [adler32]
+
+### `compress/deflate/mod.rs`
+
+Source: [`lib/compress/deflate/mod.rs`](../lib/compress/deflate/mod.rs)
+
+```text
+deflate -- raw DEFLATE data (RFC 1951), the compressed format inside zlib, gzip, ZIP and PNG
+
+  compress(data, level) -> Vec<u8>         levels 0..=9 (LEVEL_DEFAULT 6; < 0 = 6, > 9 = 9)
+  decompress(data, max_out) -> Option<Vec<u8>>   the whole input must be one DEFLATE stream;
+                                           None on corruption, data after the stream or
+                                           more than max_out bytes
+  compress_with(state, data, level) / compress_into(state, data, level, dst) /
+  compress_padded(state, data, level, head, tail)   with a reusable state (None = a
+                                           temporary one), into the caller's buffer, or with
+                                           free bytes before and room after the data
+  decompress_into(state, data, dst) -> Ok((bytes, consumed))   into the caller's buffer;
+                                           consumed = the input bytes of the stream, so data
+                                           after it is the caller's to judge
+  bound(len)                               an output size with which compress_into never
+                                           fails
+  InflateState / DeflateState              reusable decoder and encoder (~330 KB) states,
+                                           one thread at a time; a reused state gives the
+                                           same bytes and errors as a fresh one
+
+The decoder checks every write against the output buffer and every back reference against
+the bytes produced so far, so a corrupt or hostile stream ends with an Error, never with a
+read or write outside the buffers.  The encoder writes the same bytes on every platform
+(zlib's levels: greedy 1..3, lazy 4..9, blocks as the cheapest of stored, fixed and
+dynamic).  dec.rs and enc.rs are the engines, zlib.rs and gzip.rs the two wrappers.
+```
+
+```rust
+/// the level `compress` uses for a negative level, zlib's default
+LEVEL_DEFAULT: i32 = 6
+/// the strongest level; higher levels count as this one
+LEVEL_MAX: i32 = 9
+```
+
+- **`enum Error`**
+  why a DEFLATE, zlib or gzip stream could not be read or written
+  - `Truncated` -- the input ends before the stream does
+  - `Header` -- a zlib or gzip header that is not valid
+  - `Block` -- a block of an unknown type, or a stored block with a wrong length
+  - `Code` -- a Huffman code that is not valid, or a symbol no code allows
+  - `Distance` -- a back reference to before the start of the output
+  - `Overflow` -- the output does not fit into the buffer
+  - `Checksum` -- a checksum (Adler-32, CRC-32) or a stored size that does not match the data
+
+- **`fn bound(len: usize) -> usize`**
+  an output capacity with which `compress_into` (and the zlib and gzip ones) never fail
+
+- **`fn compress(data: &[u8], level: i32) -> Vec<u8>`**
+  raw DEFLATE data of `data` at `level`
+
+- **`fn compress_with(state: Option<&mut DeflateState>, data: &[u8], level: i32) -> Vec<u8>`**
+  `compress` with a reusable state (None = a temporary one)
+
+- **`fn compress_into(state: Option<&mut DeflateState>, data: &[u8], level: i32, dst: &mut [u8]) -> Result<usize, Error>`**
+  `compress` into `dst`, the number of bytes written; `Error::Overflow` when the stream and 8
+  more bytes do not fit (the contents of `dst` are undefined then)
+
+- **`fn compress_padded(state: Option<&mut DeflateState>, data: &[u8], level: i32, head: usize, tail: usize) -> Vec<u8>`**
+  `compress` after `head` zero bytes, with room for `tail` more bytes behind the data (both
+  at most 64 KiB): a container writes its header and trailer around the stream without
+  copying it.  The vector holds the head and the stream.
+
+- **`fn decompress(data: &[u8], max_out: usize) -> Option<Vec<u8>>`**
+  the data of one DEFLATE stream that fills `data` completely, at most `max_out` bytes
+
+- **`fn decompress_into(state: Option<&mut InflateState>, data: &[u8], dst: &mut [u8]) -> Result<(usize, usize), Error>`**
+  the stream at the start of `data` into `dst`: (bytes written, input bytes of the stream)
+
+### `compress/deflate/dec.rs`
+
+Source: [`lib/compress/deflate/dec.rs`](../lib/compress/deflate/dec.rs)
+
+```text
+deflate::dec -- the DEFLATE (RFC 1951) and zlib (RFC 1950) decoder behind compress::deflate,
+compress::zlib and compress::gzip (until 0.2 img_core::inflate)          [src/img/inflate.s]
+
+  zlib_inflate_ex(st, src, dst) -> Ok((bytes, consumed)) / Err(Error)   consumed = header,
+                                    deflate data and Adler-32
+  inflate_raw_st(st, src, dst) -> Ok((bytes, consumed)) / Err(Error)   consumed = input
+                                    bytes of the deflate data (up to the end of the final
+                                    block)
+  InflateState::new() -> Box      reusable decoder state (one thread at a time; an error
+                                    never affects later calls); st None = a temporary one
+  rev16(x)                        16-bit bit reversal (shared with deflate)
+  LBASE / LEXT / DBASE / DEXT / CLORDER   the code tables (shared with deflate)
+
+The output buffer has a fixed capacity: every write is bounds-checked (Error::Overflow),
+every back reference is checked against the bytes produced so far (Error::Distance), reading
+past the end of the input gives Error::Truncated.  zlib header errors: Error::Header; a wrong
+Adler-32: Error::Checksum.
+
+The bit buffer behaves exactly as the assembly's (the error codes of corrupt input depend
+on it): refilled 8 bytes at a time while 8 input bytes remain (the count becomes
+56 + count % 8), byte by byte near the end with zero bytes counted as padding (more than
+PAD_MAX of them = Error::Truncated); Huffman tables as stb_image (10-bit fast table, canonical
+slow path); a code table's sorted-index arrays keep entries of an earlier build (the
+slow path checks the length, as the assembly).
+
+Speed (perf-inflate): the symbol loop runs in codes_fast while 8 input bytes remain at
+every refill and a whole match fits the output: no slow refill, no overflow checks, no
+call on the literal path (the state stays in registers), u32 fast tables (lx / dx) with
+the length / distance base and extra-bit count folded in (one load and two shifts per
+code), wide match moves.  It hands over to the careful loop before the symbol where a
+condition fails; both follow the assembly's loop step by step.
+```
+
+- **`struct InflateState`**
+  a reusable decoder state (IS_\*); only `pad` is reset per call, the fixed tables are built
+  once per state, every other table is rebuilt before it is read
+
+**`impl InflateState`**
+
+- **`fn new() -> Box<InflateState>`**
+  a zeroed state  [inflate_state_new]
+
+### `compress/deflate/enc.rs`
+
+Source: [`lib/compress/deflate/enc.rs`](../lib/compress/deflate/enc.rs)
+
+```text
+deflate::enc -- the DEFLATE (RFC 1951) / zlib (RFC 1950) encoder behind compress::deflate,
+compress::zlib and compress::gzip (until 0.2 img_core::deflate)          [src/img/deflate.s]
+
+  zlib_deflate(src, level) -> Vec          zlib stream (level 0..9, < 0 = 6, > 9 = 9)
+  deflate_raw(src, level) -> Vec           raw RFC 1951 data
+  deflate_raw_ex(st, src, level, head, tail) -> Vec   head free bytes before the data
+                                           (gzip writes its header there), tail reserved
+                                           after it (not part of the Vec)
+  DeflateState::new() -> Box               a reusable compressor state (~330 KB; one
+                                           thread at a time); the same bytes as fresh calls
+  zlib_deflate_st(st, src, level) / deflate_raw_st(st, src, level) -> Vec
+  zlib_deflate_to(st, src, level, dst) / deflate_raw_to(...) -> Ok(bytes) /
+                                           Err(Error::Overflow): into dst (no allocation with
+                                           a state); overflow when the stream + 8 bytes do
+                                           not fit (dst contents undefined then)
+  deflate_bound(len) -> len + len / 512 + 128   a cap with which *_to never overflow
+
+The algorithm and every table of the assembly: 3-byte multiplicative hash, head / prev
+chains over "global" positions (input offset + base; every input starts GEN_GAP after
+the previous one, so a reused state matches a fresh one), zlib's levels (greedy 1..3, lazy
+4..9, chain depth / nice / lazy limits), TOO_FAR, 16K-symbol blocks written as the
+cheapest of stored / fixed / dynamic by exact bit count, two-queue Huffman lengths with
+miniz's Kraft repair, RLE-coded code lengths.  Inputs of 4 GiB - 64 KiB and more are
+stored.  The output limit: a block that would end past cap - 8 stops the compressor
+(Error::Overflow).  Speed (perf-inflate): the LZ77 loops keep their state in locals and
+load the next position's hash head before the current chain walk (the walk is a chain of
+dependent loads; the early load overlaps it) -- the same candidates in the same order.
+```
+
+- **`struct DeflateState`**
+  a compressor state (DS_\*); reusable, one thread at a time
+
+**`impl DeflateState`**
+
+- **`fn new() -> Box<DeflateState>`**
+  a zeroed state  [deflate_state_new]
+
+### `compress/gzip.rs`
+
+Source: [`lib/compress/gzip.rs`](../lib/compress/gzip.rs)
+
+```text
+gzip -- the gzip format (RFC 1952): members of a header, DEFLATE data, CRC-32 and size
+(until 0.2 img_core::gzip)                                               [src/img/gzip.s]
+
+  compress(data, level) -> Vec<u8>   one member: 1F 8B 08, FLG 0, MTIME 0, XFL (2 for level
+                                     9, 4 for level 1, else 0), OS 255, deflate, CRC32, ISIZE
+  decompress(data, max_out) -> Option<Vec<u8>>   every member of data, one after the other
+                                     as gunzip reads them; None on corruption, a wrong
+                                     CRC-32 or size, bytes that are no member, or more than
+                                     max_out bytes
+  compress_with(state, data, level) / compress_into(state, data, level, dst) -> Ok(bytes) /
+                                     Err(Error::Overflow)   into dst (deflate::bound(len)
+                                     always suffices)
+  decompress_member_into(state, data, dst) -> Ok((bytes, consumed))   ONE member; consumed
+                                     = the member's length including the trailer
+  stored_size(data) -> Option<u32>   ISIZE, the last 4 bytes of a single member (the size
+                                     mod 2^32, as the member claims it)
+
+Decoding: ID1 ID2, CM 8, FLG (reserved bits 5..7 must be 0), MTIME, XFL, OS, then FEXTRA,
+FNAME, FCOMMENT, FHCRC (low 16 bits of the CRC-32 of the header bytes), the deflate data,
+CRC32 and ISIZE.  Errors: Error::Truncated, Error::Header, Error::Checksum and the inflate
+errors.
+```
+
+- **`fn decompress(data: &[u8], max_out: usize) -> Option<Vec<u8>>`**
+  the data of all members that fill `data` completely, at most `max_out` bytes
+
+- **`fn decompress_member_into(st: Option<&mut InflateState>, src: &[u8], dst: &mut [u8]) -> Result<(usize, usize), Error>`**
+  the first member of `data` into `dst` with a reusable state (None = a temporary one):
+  (bytes written, input bytes of the member)  [gzip_decode_st]
+
+- **`fn compress(src: &[u8], level: i32) -> Vec<u8>`**
+  one gzip member of `data` at `level`  [gzip_encode]
+
+- **`fn compress_with(st: Option<&mut DeflateState>, src: &[u8], level: i32) -> Vec<u8>`**
+  `compress` with a reusable state (None = a temporary one)  [gzip_encode_st]
+
+- **`fn compress_into(st: Option<&mut DeflateState>, src: &[u8], level: i32, dst: &mut [u8]) -> Result<usize, Error>`**
+  the member of `compress` into `dst`, the number of bytes written  [gzip_encode_to]
+
+- **`fn stored_size(src: &[u8]) -> Option<u32>`**
+  the ISIZE field (uncompressed size mod 2^32) of a single-member stream; None for fewer than
+  18 bytes  [gzip_isize]
 
 ### `compress/lz4.rs`
 
@@ -42699,6 +42923,42 @@ xxh -- xxHash32 (the checksum of LZ4 frames) and xxHash64 (zstd frames); not cry
 
 - **`fn xxh64(data: &[u8], seed: u64) -> u64`**
   xxHash64 of a byte string (zstd's content checksum is its low 32 bits)
+
+### `compress/zlib.rs`
+
+Source: [`lib/compress/zlib.rs`](../lib/compress/zlib.rs)
+
+```text
+zlib -- the zlib format (RFC 1950): a two-byte header, DEFLATE data and an Adler-32
+
+  compress(data, level) -> Vec<u8>         levels as deflate::compress; the header names the
+                                           level as zlib does (78 01 / 5E / 9C / DA)
+  decompress(data, max_out) -> Option<Vec<u8>>   the whole input must be one zlib stream;
+                                           None on corruption, a wrong Adler-32, data after
+                                           the stream or more than max_out bytes
+  compress_with(state, data, level) / compress_into(state, data, level, dst)
+  decompress_into(state, data, dst) -> Ok((bytes, consumed))   consumed = header, DEFLATE
+                                           data and Adler-32; data after it is not looked at
+
+A preset dictionary (FDICT) is refused as Error::Header.
+```
+
+- **`fn compress(data: &[u8], level: i32) -> Vec<u8>`**
+  a zlib stream of `data` at `level`
+
+- **`fn compress_with(state: Option<&mut DeflateState>, data: &[u8], level: i32) -> Vec<u8>`**
+  `compress` with a reusable state (None = a temporary one)
+
+- **`fn compress_into(state: Option<&mut DeflateState>, data: &[u8], level: i32, dst: &mut [u8]) -> Result<usize, Error>`**
+  `compress` into `dst`, the number of bytes written; `Error::Overflow` when it does not fit
+  with 8 bytes to spare (`deflate::bound` always suffices)
+
+- **`fn decompress(data: &[u8], max_out: usize) -> Option<Vec<u8>>`**
+  the data of the zlib stream that fills `data` completely, at most `max_out` bytes
+
+- **`fn decompress_into(state: Option<&mut InflateState>, data: &[u8], dst: &mut [u8]) -> Result<(usize, usize), Error>`**
+  the zlib stream at the start of `data` into `dst`: (bytes written, input bytes of the
+  stream including its Adler-32)
 
 ### `compress/zstd/mod.rs`
 
@@ -52389,7 +52649,7 @@ MAX_SIG: usize = 4096
 
 ```text
 In-memory ZIP interchange (ZIP32, ZIP64 when it is needed). New native library code,
-independent of document/UI code. Raw DEFLATE, inflate and CRC reuse img_core's safe codec
+independent of document/UI code. Raw DEFLATE, inflate and CRC come from jflib-compress
 primitives; no paths are extracted. `opc` builds the Open Packaging Conventions on top.
 ZipFs shows an archive as a read-only plat::vfs tree:
   plat::vfs::mount("pack", Arc::new(archive::ZipFs::new(&bytes, Limits::default())?))
