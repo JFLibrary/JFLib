@@ -66,11 +66,12 @@ def write(text, crlf, path=FILE):
 
 
 def unreleased_span(text):
-    """(start of the body, end) of the [Unreleased] section"""
+    """(start of the body, end) of the [Unreleased] section: up to the next release, or up to the
+    link references at the end when it is the only section (a new crate's changelog)"""
     m = UNRELEASED.search(text)
     if not m:
         raise ChangelogError("CHANGELOG.md has no '## [Unreleased]' section")
-    nxt = re.search(r"^## \[", text[m.end():], re.M)
+    nxt = re.search(r"^## \[|^\[[^\]\n]+\]: ", text[m.end():], re.M)
     return m.end(), m.end() + nxt.start() if nxt else len(text)
 
 
