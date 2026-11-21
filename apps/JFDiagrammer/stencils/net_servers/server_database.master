@@ -1,0 +1,33 @@
+# Datenbankserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: Database server
+name.de: Datenbankserver
+name.en: Database server
+name.es: Servidor de base de datos
+name.it: Server di database
+name.fr: Serveur de base de données
+prompt.de: Datenbankserver: betreibt Datenbanken.
+prompt.en: Database server: runs databases.
+prompt.es: Servidor de base de datos: ejecuta bases de datos.
+prompt.it: Server di database: gestisce database.
+prompt.fr: Serveur de base de données : fait fonctionner des bases de données.
+keywords.de: Datenbankserver, Server, Rolle
+keywords.en: Database server, server, role
+keywords.es: Servidor de base de datos, servidor, función
+keywords.it: Server di database, server, ruolo
+keywords.fr: Serveur de base de données, serveur, rôle
+svg: ../../symbols/network/server_database.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Datenbankserver
+    Value.en = Database server
+    Value.es = Servidor de base de datos
+    Value.it = Server di database
+    Value.fr = Serveur de base de données

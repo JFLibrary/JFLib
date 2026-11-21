@@ -1,0 +1,37 @@
+# Server (JD13, eigene Grafik im JFNetworker-Stil)
+master: Server
+name.de: Server
+name.en: Server
+name.es: Servidor
+name.it: Server
+name.fr: Serveur
+prompt.de: Server: Server als 19-Zoll-Einschub.
+prompt.en: Server: 19-inch rack server.
+prompt.es: Servidor: servidor de rack de 19 pulgadas.
+prompt.it: Server: server rack da 19 pollici.
+prompt.fr: Serveur : serveur 19 pouces.
+keywords.de: Server, Rack, 19 Zoll, HE
+keywords.en: Server, rack, 19 inch, U
+keywords.es: Servidor, rack, 19 pulgadas, U
+keywords.it: Server, rack, 19 pollici, U
+keywords.fr: Serveur, baie, 19 pouces, U
+svg: ../../symbols/rack/server_2u.svg
+scale: 1:20
+size: 482.6 mm x 88.9 mm
+size.us: 19 in x 3.5 in
+include: ../net_common/rackdev.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+RackUnits: Value = 2
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Gestellmontiert
+    Value.en = Rack-mounted
+    Value.es = Montaje en rack
+    Value.it = Montaggio a rack
+    Value.fr = Monté en baie
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur

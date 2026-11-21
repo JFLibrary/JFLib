@@ -1,0 +1,24 @@
+# Funktionsübergreifendes Flussdiagramm (VL-21): Bahnen und Phasen (Schablone cff), das Register
+# „Funktionsübergreifendes Flussdiagramm“ (VL-04) und zwei Startdiagramme, waagerecht und
+# senkrecht.  Quellformat: ../README.md
+template: Cross-Functional Flowchart
+file: cff
+name.de: Funktionsübergreifendes Flussdiagramm
+name.en: Cross-Functional Flowchart
+name.es: Diagrama de flujo multifuncional
+name.it: Diagramma di flusso multifunzione
+name.fr: Diagramme de flux interfonctionnel
+description.de: Abläufe über Abteilungen oder Rollen hinweg: Bahnen für die Beteiligten, Phasen für die Abschnitte.
+description.en: Processes across departments or roles: lanes for those involved, phases for the stages.
+description.es: Procesos entre departamentos o funciones: calles para los participantes, fases para las etapas.
+description.it: Processi tra reparti o ruoli: corsie per i partecipanti, fasi per le tappe.
+description.fr: Processus entre services ou rôles : couloirs pour les acteurs, phases pour les étapes.
+category: flowchart
+order: 40
+stencils: flowchart, cff
+registers: cff
+starters: horizontal, vertical
+default: horizontal
+
+[Style Normal]
+Char.Size = 8 pt

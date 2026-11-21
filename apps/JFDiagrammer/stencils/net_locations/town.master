@@ -1,0 +1,33 @@
+# Stadt (JD13, eigene Grafik im JFNetworker-Stil)
+master: Town
+name.de: Stadt
+name.en: Town
+name.es: Localidad
+name.it: Cittadina
+name.fr: Petite ville
+prompt.de: Stadt: Ort mit mehreren Standorten.
+prompt.en: Town: town with several sites.
+prompt.es: Localidad: localidad con varias ubicaciones.
+prompt.it: Cittadina: cittadina con più sedi.
+prompt.fr: Petite ville : ville avec plusieurs sites.
+keywords.de: Stadt, Standort, WAN
+keywords.en: Town, location, site, WAN
+keywords.es: Localidad, ubicación, WAN
+keywords.it: Cittadina, sede, WAN
+keywords.fr: Petite ville, site, WAN
+svg: ../../symbols/network/town.svg
+include: ../net_common/symbol.inc, ../net_common/location.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Standort
+    Value.en = Location
+    Value.es = Ubicación
+    Value.it = Sede
+    Value.fr = Site
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Stadt
+    Value.en = Town
+    Value.es = Localidad
+    Value.it = Cittadina
+    Value.fr = Petite ville

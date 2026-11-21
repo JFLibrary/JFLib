@@ -61,8 +61,8 @@ pub(crate) struct Previews {
     boxes: Vec<[f64; 4]>,
     /// per entry: its tile's drawing
     draws: Vec<DrawRef>,
-    /// per entry: the shape draws text only (no fill, no line): it gets a sheet of paper under
-    /// it, else dark text is lost on a dark panel
+    /// per entry: the shape draws text only (no fill, no line) or is a 1-D shape (JD13): it gets
+    /// a sheet of paper under it, else dark text and lines are lost on a dark panel
     paper: Vec<bool>,
 }
 
@@ -83,10 +83,12 @@ impl Previews {
             let mut tx = doc.transaction("previews");
             for e in &l.entries {
                 let (w, h, lx, ly) = master_box(tx.doc(), e.master);
-                let (px, py) = (x + lx, ly);
-                boxes.push([x, 0.0, x + w, h]);
+                // (JD13) an upright 1-D shape drawn to the left or down has a negative width or
+                // height: its box lies on the other side of its pin
+                let (px, py) = (x + lx - w.min(0.0), ly - h.min(0.0));
+                boxes.push([x, 0.0, x + w.abs(), h.abs()]);
                 tops.push(tx.add_instance(Owner::Page(page), e.master, px, py).ok());
-                x += w + 1.0;
+                x += w.abs() + 1.0;
             }
             tx.commit();
         }
@@ -98,6 +100,10 @@ impl Previews {
             .iter()
             .map(|t| {
                 let Some(t) = t else { return false };
+                // (JD13) connectors and lines: dark lines are lost on a dark panel too
+                if diagram_core::glue::is_one_d(&doc, *t) {
+                    return true;
+                }
                 let items = view.drawing().items.iter().filter(|i| i.top == *t);
                 let mut text = false;
                 for i in items {
@@ -135,8 +141,10 @@ fn master_box(doc: &Document, m: diagram_core::MasterRef) -> (f64, f64, f64, f64
             r.cached.or(r.cell).and_then(|c| c.value.num())
         }
     };
-    let w = num("Width").filter(|v| v.is_finite() && *v > 0.0).unwrap_or(1.0);
-    let h = num("Height").filter(|v| v.is_finite() && *v > 0.0).unwrap_or(w.min(1.0));
+    // negative for an upright 1-D shape drawn to the left or down (Width = EndX-BeginX)
+    let w = num("Width").filter(|v| v.is_finite() && v.abs() > 1e-9).unwrap_or(1.0);
+    // 0 for a line (its tile centres it)
+    let h = num("Height").filter(|v| v.is_finite()).unwrap_or(w.abs().min(1.0));
     let lx = num("LocPinX").filter(|v| v.is_finite()).unwrap_or(w * 0.5);
     let ly = num("LocPinY").filter(|v| v.is_finite()).unwrap_or(h * 0.5);
     (w, h, lx, ly)

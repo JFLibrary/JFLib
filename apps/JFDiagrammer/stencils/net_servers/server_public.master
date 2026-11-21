@@ -1,0 +1,33 @@
+# Server für öffentlichen Zugang (JD13, eigene Grafik im JFNetworker-Stil)
+master: Public access server
+name.de: Server für öffentlichen Zugang
+name.en: Public access server
+name.es: Servidor de acceso público
+name.it: Server di accesso pubblico
+name.fr: Serveur d'accès public
+prompt.de: Server für öffentlichen Zugang: bietet Zugang für Besucher.
+prompt.en: Public access server: gives visitors access.
+prompt.es: Servidor de acceso público: da acceso a los visitantes.
+prompt.it: Server di accesso pubblico: dà accesso ai visitatori.
+prompt.fr: Serveur d'accès public : donne accès aux visiteurs.
+keywords.de: Server für öffentlichen Zugang, Server, Rolle
+keywords.en: Public access server, server, role
+keywords.es: Servidor de acceso público, servidor, función
+keywords.it: Server di accesso pubblico, server, ruolo
+keywords.fr: Serveur d'accès public, serveur, rôle
+svg: ../../symbols/network/server_public.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Server für öffentlichen Zugang
+    Value.en = Public access server
+    Value.es = Servidor de acceso público
+    Value.it = Server di accesso pubblico
+    Value.fr = Serveur d'accès public

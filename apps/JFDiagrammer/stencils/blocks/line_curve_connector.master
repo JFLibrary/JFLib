@@ -1,0 +1,82 @@
+# Verbinder: Linie/Kurve: ein Linienverbinder als 1D-Shape (Height 0), der wahlweise gerade oder
+# als Bogen läuft; er liegt auf der Linie vom Anfang zum Ende und dreht sich mit ihr, die Enden
+# kleben (GlueType 2 auch an das ganze Shape).  Umgeschaltet wird über die Shape-Daten
+# (Prop.Curved, ja/nein) oder den Kontextmenüeintrag „Gebogen“ (Actions.Curved mit Häkchen).
+# Eine ArcTo-Zeile: gerade ist ihr Stich 0.  Row_1 über der Mitte ändert den Stich des Bogens
+# (nur senkrecht, als Abstand; anfangs ein Fünftel der Länge) und ist nur beim Bogen sichtbar
+# (XCon/YCon + 5 versteckt ihn).  Formatvorlage "Connector" mit der Pfeilspitze des Designs; der
+# Text steht in der Mitte des Verlaufs.
+master: Line-curve connector
+name.de: Verbinder: Linie/Kurve
+name.en: Line-curve connector
+name.es: Conector de línea o curva
+name.it: Connettore linea/curva
+name.fr: Connecteur ligne/courbe
+style: Connector
+prompt.de: Verbinder, der gerade oder als Bogen verläuft. Die Form schalten Sie über die Shape-Daten oder das Kontextmenü um, den Bogen ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Connector that runs straight or as an arc. Switch the form in the shape data or on the shortcut menu, and drag the yellow control handle to change the arc.
+prompt.es: Conector recto o en arco. Cambie la forma en los datos de forma o en el menú contextual y arrastre el controlador amarillo para cambiar el arco.
+prompt.it: Connettore diritto o ad arco. Cambia la forma nei dati forma o nel menu di scelta rapida e trascina la maniglia di controllo gialla per cambiare l'arco.
+prompt.fr: Connecteur droit ou en arc. Changez la forme dans les données de forme ou dans le menu contextuel, et faites glisser la poignée de contrôle jaune pour modifier l'arc.
+keywords.de: Verbinder, Linie, Kurve, Bogen, gerade, gebogen, umschalten
+keywords.en: connector, line, curve, arc, straight, curved, switch
+keywords.es: conector, línea, curva, arco, recto, curvo, cambiar
+keywords.it: connettore, linea, curva, arco, diritto, curvo, commutare
+keywords.fr: connecteur, ligne, courbe, arc, droit, incurvé, basculer
+
+[Shape]
+BeginX = 0 mm
+BeginY = 2.5 mm
+BeginY.us = 0.1 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 2.5 mm
+EndY.us = 0.1 in
+Height = 0 mm
+Height.us = 0 in
+GlueType = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = IF(Prop.Curved, Controls.Row_1.Y, Height*0.5)
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Property]
+Curved:  Type = 3; Value = FALSE
+         Label.de = "Gebogen"
+         Label.en = "Curved"
+         Label.es = "Curvo"
+         Label.it = "Curvo"
+         Label.fr = "Incurvé"
+         Prompt.de = "Den Verbinder als Bogen statt gerade zeichnen"
+         Prompt.en = "Draw the connector as an arc instead of a straight line"
+         Prompt.es = "Dibujar el conector como arco en lugar de recto"
+         Prompt.it = "Disegna il connettore come arco invece che diritto"
+         Prompt.fr = "Dessiner le connecteur en arc au lieu d'une ligne droite"
+
+[Actions]
+Curved:  Action = SETF(GETREF(Prop.Curved),NOT(Prop.Curved))
+         Checked = Prop.Curved
+         Menu.de = "Gebogen"
+         Menu.en = "Curved"
+         Menu.es = "Curvo"
+         Menu.it = "Curvo"
+         Menu.fr = "Incurvé"
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+ArcTo   X = Width; Y = Height*0.5; A = IF(Prop.Curved, Height*0.5-Controls.Row_1.Y, 0)
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.5+Width*0.2
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = IF(Prop.Curved, 1, 6); YCon = IF(Prop.Curved, 2, 7); CanGlue = FALSE
+        Tip.de = "Bogen ändern"
+        Tip.en = "Change the arc"
+        Tip.es = "Cambiar el arco"
+        Tip.it = "Cambia l'arco"
+        Tip.fr = "Modifier l'arc"

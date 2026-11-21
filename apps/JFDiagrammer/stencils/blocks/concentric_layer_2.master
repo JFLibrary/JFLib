@@ -1,0 +1,64 @@
+# Konzentrische Ebene 2: ein Ring mit 60 mm Außen- und 40 mm Innendurchmesser zum
+# Ineinanderlegen (Ringbreite 10 mm): bei gleicher Mitte umschließt er Ebene 1 genau.  Zwei
+# Ellipse-Zeilen in eigenen Abschnitten, außen und innen; Visio füllt nach der
+# Gerade-Ungerade-Regel, die innere Ellipse ist also das Loch.  Gestreckt wird der Ring zur
+# Ellipse.  Row_1 am rechten Rand des Lochs ändert den Innendurchmesser als Anteil des äußeren
+# (anteilig, nur waagrecht).  Der Text steht oben im Ring; Verbindungspunkte unten, rechts, oben
+# und links auf dem Außenrand.
+master: Concentric layer 2
+name.de: Konzentrische Ebene 2
+name.en: Concentric layer 2
+name.es: Capa concéntrica 2
+name.it: Livello concentrico 2
+name.fr: Couche concentrique 2
+prompt.de: Ring zum Ineinanderlegen mit den anderen konzentrischen Ebenen. Die Breite des Rings ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Ring that nests with the other concentric layers. Drag the yellow control handle to change the width of the ring.
+prompt.es: Anillo que encaja con las demás capas concéntricas. Arrastre el controlador amarillo para cambiar el ancho del anillo.
+prompt.it: Anello che si incastra con gli altri livelli concentrici. Trascina la maniglia di controllo gialla per cambiare la larghezza dell'anello.
+prompt.fr: Anneau qui s'emboîte avec les autres couches concentriques. Faites glisser la poignée de contrôle jaune pour modifier la largeur de l'anneau.
+keywords.de: Ebene, Ring, konzentrisch, Schicht, Schalenmodell, Zwiebelmodell, verschachtelt
+keywords.en: layer, ring, concentric, tier, shell model, onion model, nested
+keywords.es: capa, anillo, concéntrico, nivel, modelo de capas, modelo de cebolla, anidado
+keywords.it: livello, anello, concentrico, strato, modello a strati, modello a cipolla, annidato
+keywords.fr: couche, anneau, concentrique, niveau, modèle en couches, modèle en oignon, imbriqué
+
+[Shape]
+Width = 60 mm
+Width.us = 2.25 in
+Height = 60 mm
+Height.us = 2.25 in
+TxtWidth = Width*SQRT(1-((1+User.K)*0.5)^2)
+TxtHeight = Height*(1-User.K)*0.5
+TxtPinX = Width*0.5
+TxtPinY = Height*(3+User.K)*0.25
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# der Innendurchmesser als Anteil des äußeren
+K:  Value = MIN(MAX((Controls.Row_1-Width*0.5)/(Width*0.5), 0.05), 0.95)
+
+# 1 der Außenrand
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# 2 das Loch
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width*(1+User.K)*0.5; B = Height*0.5
+         C = Width*0.5; D = Height*(1+User.K)*0.5
+
+[Controls]
+Row_1:  X = Width*0.833333333; Y = Height*0.5
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Breite des Rings ändern"
+        Tip.en = "Change the width of the ring"
+        Tip.es = "Cambiar el ancho del anillo"
+        Tip.it = "Cambia la larghezza dell'anello"
+        Tip.fr = "Modifier la largeur de l'anneau"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Multifunction printer: scanner with lid on top, output bay, control panel, paper drawers</title>
+  <rect class="body" x="5" y="4" width="54" height="9" rx="1.5" fill="#F7F8FA" stroke="none"/>
+  <rect class="body" x="5" y="13" width="54" height="28" rx="2.5" fill="#F7F8FA" stroke="none"/>
+  <path class="shade" d="M6.5 4H57.5A1.5 1.5 0 0 1 59 5.5V8H5V5.5A1.5 1.5 0 0 1 6.5 4Z" fill="#DCDFE3" stroke="none"/>
+  <path class="tint" d="M5 37.5H59V38.5A2.5 2.5 0 0 1 56.5 41H7.5A2.5 2.5 0 0 1 5 38.5Z" fill="#7A828C" stroke="none"/>
+  <rect class="ink" x="5" y="4" width="54" height="9" rx="1.5"/>
+  <rect class="ink" x="5" y="13" width="54" height="28" rx="2.5"/>
+  <path class="ink" d="M5 8H59" stroke-width="1"/>
+  <rect class="port" x="9" y="41.75" width="6" height="1.25" rx="0.6" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="49" y="41.75" width="6" height="1.25" rx="0.6" fill="#4F555D" stroke="none"/>
+  <!-- output bay with a printed sheet -->
+  <rect class="port" x="9" y="16" width="34" height="6" rx="0.75" fill="#4F555D" stroke="none"/>
+  <rect class="body" x="12" y="19" width="28" height="3" fill="#F7F8FA" stroke-width="1"/>
+  <!-- control panel -->
+  <rect class="screen" x="46.5" y="16" width="9" height="5" rx="0.75" fill="#CAD4DF" stroke-width="1"/>
+  <circle class="ok" cx="48" cy="23.75" r="0.9" fill="#3C9A5F" stroke="none"/>
+  <rect class="shade" x="50.5" y="22.75" width="5" height="2" rx="0.6" fill="#DCDFE3" stroke="none"/>
+  <!-- paper drawers -->
+  <g class="shade" fill="#DCDFE3" stroke-width="1">
+    <rect x="9" y="26" width="46" height="4.25" rx="0.6"/><rect x="9" y="31.75" width="46" height="4.25" rx="0.6"/>
+  </g>
+  <path class="port" d="M28 28.125H36M28 33.875H36" stroke="#4F555D" stroke-width="1.25"/>
+</svg>

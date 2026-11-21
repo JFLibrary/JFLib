@@ -1,0 +1,35 @@
+# Rechtwinkliges Dreieck: der rechte Winkel links unten; Verbindungspunkte in der Mitte der
+# Grundseite, der Hypotenuse und der linken Seite
+master: Right triangle
+name.de: Rechtwinkliges Dreieck
+name.en: Right triangle
+name.es: Triángulo rectángulo
+name.it: Triangolo rettangolo
+name.fr: Triangle rectangle
+prompt.de: Dreieck mit dem rechten Winkel links unten.
+prompt.en: Triangle with its right angle at the bottom left.
+prompt.es: Triángulo con el ángulo recto abajo a la izquierda.
+prompt.it: Triangolo con l'angolo retto in basso a sinistra.
+prompt.fr: Triangle dont l'angle droit est en bas à gauche.
+keywords.de: Dreieck, rechtwinklig, rechter Winkel, Hypotenuse, Keil, Rampe
+keywords.en: triangle, right angle, right-angled, hypotenuse, wedge, ramp
+keywords.es: triángulo, rectángulo, ángulo recto, hipotenusa, cuña, rampa
+keywords.it: triangolo, rettangolo, angolo retto, ipotenusa, cuneo, rampa
+keywords.fr: triangle, rectangle, angle droit, hypoténuse, coin, rampe
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 25 mm
+Height.us = 1 in
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width*0.5; Y = Height*0.5; DirX = -0.707107; DirY = -0.707107
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

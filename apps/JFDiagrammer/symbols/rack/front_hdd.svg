@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 35" width="240" height="70"
+     fill="none" stroke="#2E343B" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>External hard disk, front view: flat box with grooves and an activity LED</title>
+  <rect class="body" x="1.25" y="1.25" width="117.5" height="30" rx="6" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M7.25 1.25H16V31.25H7.25A6 6 0 0 1 1.25 25.25V7.25A6 6 0 0 1 7.25 1.25Z" fill="#8E8540" stroke="none"/>
+  <rect class="ink" x="1.25" y="1.25" width="117.5" height="30" rx="6"/>
+  <g class="port" fill="#4F555D" stroke="none"><rect x="14" y="32.5" width="16" height="2.5" rx="1"/><rect x="90" y="32.5" width="16" height="2.5" rx="1"/></g>
+  <path class="shade" d="M26 12H92M26 20.5H92" stroke="#DCDFE3" stroke-width="1.8"/>
+  <circle class="ok" cx="104" cy="16.25" r="2.2" fill="#3C9A5F" stroke="none"/>
+</svg>

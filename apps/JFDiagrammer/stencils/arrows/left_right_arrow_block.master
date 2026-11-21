@@ -1,0 +1,88 @@
+# Pfeilblock nach links und rechts: ein Block in der Mitte mit je einem Pfeil nach links und
+# rechts, ein Umriss.  Row_1 an der rechten oberen Ecke des Blocks ändert seine Breite
+# (symmetrisch, anteilig, nur waagrecht), Row_2 an der oberen Ecke der rechten Spitze Länge
+# (waagrecht) und Breite (senkrecht) beider Spitzen; der Schaft ist halb so dick wie die
+# Spitze.  Der Text steht im Block; Verbindungspunkte unten und oben am Block und an beiden
+# Spitzen.
+master: Left-right arrow block
+name.de: Pfeilblock nach links und rechts
+name.en: Left-right arrow block
+name.es: Bloque con flechas a izquierda y derecha
+name.it: Blocco con frecce a sinistra e destra
+name.fr: Bloc à flèches gauche et droite
+prompt.de: Block mit Pfeilen nach links und rechts. Block und Pfeile ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Block with arrows pointing left and right. Drag the yellow control handles to change the block and the arrows.
+prompt.es: Bloque con flechas hacia la izquierda y la derecha. Arrastre los controladores amarillos para cambiar el bloque y las flechas.
+prompt.it: Blocco con frecce a sinistra e a destra. Trascina le maniglie di controllo gialle per cambiare il blocco e le frecce.
+prompt.fr: Bloc avec des flèches vers la gauche et la droite. Faites glisser les poignées de contrôle jaunes pour modifier le bloc et les flèches.
+keywords.de: Pfeilblock, Block, Pfeile, links, rechts, Vermittlung, Schnittstelle
+keywords.en: arrow block, block, arrows, left, right, mediation, interface
+keywords.es: bloque de flechas, bloque, flechas, izquierda, derecha, intermediario, interfaz
+keywords.it: blocco con frecce, blocco, frecce, sinistra, destra, intermediario, interfaccia
+keywords.fr: bloc fléché, bloc, flèches, gauche, droite, intermédiaire, interface
+
+[Shape]
+Width = 50 mm
+Width.us = 2 in
+Height = 20 mm
+Height.us = 0.75 in
+TxtWidth = User.B1-User.B0
+TxtHeight = Height
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die rechte und linke Kante des Blocks, die Länge und die halbe Breite der Spitzen, der halbe
+# Schaft
+B1:  Value = MIN(MAX(Controls.Row_1, Width*0.55), Width)
+B0:  Value = Width-User.B1
+Hl:  Value = MIN(MAX(Width-Controls.Row_2, 0), Width-User.B1)
+Hw:  Value = MIN(MAX(Controls.Row_2.Y-Height*0.5, 0), Height*0.5)
+S:   Value = User.Hw*0.5
+
+[Geometry]
+MoveTo  X = User.B0; Y = 0
+LineTo  X = User.B1; Y = 0
+LineTo  X = User.B1; Y = Height*0.5-User.S
+LineTo  X = Width-User.Hl; Y = Height*0.5-User.S
+LineTo  X = Width-User.Hl; Y = Height*0.5-User.Hw
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.Hl; Y = Height*0.5+User.Hw
+LineTo  X = Width-User.Hl; Y = Height*0.5+User.S
+LineTo  X = User.B1; Y = Height*0.5+User.S
+LineTo  X = User.B1; Y = Height
+LineTo  X = User.B0; Y = Height
+LineTo  X = User.B0; Y = Height*0.5+User.S
+LineTo  X = User.Hl; Y = Height*0.5+User.S
+LineTo  X = User.Hl; Y = Height*0.5+User.Hw
+LineTo  X = 0; Y = Height*0.5
+LineTo  X = User.Hl; Y = Height*0.5-User.Hw
+LineTo  X = User.Hl; Y = Height*0.5-User.S
+LineTo  X = User.B0; Y = Height*0.5-User.S
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.7; Y = Height
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Breite des Blocks ändern"
+        Tip.en = "Change the width of the block"
+        Tip.es = "Cambiar el ancho del bloque"
+        Tip.it = "Cambia la larghezza del blocco"
+        Tip.fr = "Modifier la largeur du bloc"
+Row_2:  X = Width*0.88; Y = Height*0.8
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Länge und Breite der Spitzen ändern"
+        Tip.en = "Change the length and width of the heads"
+        Tip.es = "Cambiar la longitud y el ancho de las puntas"
+        Tip.it = "Cambia la lunghezza e la larghezza delle punte"
+        Tip.fr = "Modifier la longueur et la largeur des pointes"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

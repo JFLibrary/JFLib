@@ -25,6 +25,12 @@
 // last; one whose place its element does not have, or an attribute that would repeat one the
 // writer writes itself, is left out.  Groups at any depth go through a stack of their own: no
 // recursion.
+//
+// (JD13) A row of a shape's Geometry or Connection section always carries its type T, as Visio
+// writes it: a row that overrides an inherited one without a type of its own (the model's
+// `Row::kind` None, "inherited") gets the inherited row's type (Document::rows), a Connection row
+// without any type `T='Connection'`.  Desktop Visio reads rows without T, but Office's previewer
+// (VPREVIEW.EXE, Explorer's preview pane) hangs on them.
 
 use alloc::collections::BTreeMap;
 use alloc::string::String;
@@ -32,8 +38,8 @@ use alloc::vec::Vec;
 use core::fmt::Write as _;
 
 use diagram_core::{
-    Cell, Connect, Document, Extra, ExtraItem, Extras, ForeignData, ForeignPayload, Formula, Place, Row, RowKey, Section,
-    ShapeData, ShapeKind, ShapeTree, Sheet, StyleRefs, Sym, Text, TextItem, Trigger, Value,
+    Cell, Connect, Document, Extra, ExtraItem, Extras, ForeignData, ForeignPayload, Formula, Owner, Place, Row, RowKey, SecKey,
+    Section, ShapeData, ShapeKind, ShapeRef, ShapeTree, Sheet, SheetRef, StyleRefs, Sym, Text, TextItem, Trigger, Value,
 };
 
 use crate::xml::{Event, Reader, NS_REL, NS_REL_STRICT, NS_VISIO};
@@ -62,7 +68,7 @@ fn plain(s: &str, attr: bool) -> bool {
         && !s.contains(['\u{fffe}', '\u{ffff}'])
 }
 
-fn escape(out: &mut String, s: &str, attr: bool) {
+pub(crate) fn escape(out: &mut String, s: &str, attr: bool) {
     if plain(s, attr) {
         out.push_str(s);
         return;
@@ -170,12 +176,25 @@ impl<'e> Placed<'e> {
 
 // ---- the writer
 
+// (JD13) the type a row is written with when it has none of its own
+#[derive(Copy, Clone)]
+enum RowKind {
+    // the inherited row's
+    Sym(Sym),
+    // a Connection row's default
+    Connection,
+}
+
 /// one part being written
 pub(crate) struct Xml<'d> {
     pub(crate) s: String,
     doc: &'d Document,
     // the attribute names of the open start tag (only kept while extras are written into it)
     names: Vec<&'d str>,
+    // (JD13) the page or master whose shapes are written, and the shape whose sheet is being
+    // written (rows inherit their type T from its master shape)
+    owner: Option<Owner>,
+    shape: Option<SheetRef>,
 }
 
 // a shape whose Shapes list is open: what comes after the list
@@ -195,7 +214,7 @@ struct List<'d> {
 
 impl<'d> Xml<'d> {
     pub(crate) fn new(doc: &'d Document) -> Self {
-        Xml { s: String::from(DECL), doc, names: Vec::new() }
+        Xml { s: String::from(DECL), doc, names: Vec::new(), owner: None, shape: None }
     }
 
     fn str(&self, s: Sym) -> &'d str {
@@ -445,10 +464,15 @@ impl<'d> Xml<'d> {
         }
     }
 
-    fn row(&mut self, r: &Row, position: u32) {
+    // `kind`: the row's type when it has none of its own (JD13, see the file's head)
+    fn row(&mut self, r: &Row, position: u32, kind: Option<RowKind>) {
         let mut p = Placed::new(&[&r.extras]);
         self.open("Row");
-        self.opt_sym("T", r.kind);
+        match (r.kind, kind) {
+            (Some(k), _) | (None, Some(RowKind::Sym(k))) => self.opt_sym("T", Some(k)),
+            (None, Some(RowKind::Connection)) => self.attr("T", "Connection"),
+            (None, None) => {}
+        }
         let known: &[&str] = match r.key {
             RowKey::Index(i) => {
                 if r.ix_written || i != position {
@@ -500,9 +524,26 @@ impl<'d> Xml<'d> {
         let mark = self.gt();
         let mut known = 0;
         self.cells(&s.cells, &s.triggers, &mut p, &mut known);
+        // (JD13) the types of the rows a shape inherits for Geometry and Connection
+        let typed = name == "Geometry" || name == "Connection";
+        let inherited: Vec<(RowKey, Option<Sym>)> = match self.shape {
+            Some(sh) if typed && s.rows.iter().any(|r| r.kind.is_none() && !r.del) => {
+                self.doc.rows(sh, SecKey { name: s.name, index: s.index }).into_iter().map(|e| (e.key, e.kind)).collect()
+            }
+            _ => Vec::new(),
+        };
         for (i, r) in s.rows.iter().enumerate() {
             self.before(&mut p.after, known);
-            self.row(r, i as u32);
+            let kind = if !typed || r.kind.is_some() || r.del {
+                None
+            } else {
+                match inherited.iter().find(|x| x.0 == r.key).and_then(|x| x.1) {
+                    Some(k) => Some(RowKind::Sym(k)),
+                    None if name == "Connection" => Some(RowKind::Connection),
+                    None => None,
+                }
+            };
+            self.row(r, i as u32, kind);
             known += 1;
         }
         let rest = p.after.rest();
@@ -642,7 +683,9 @@ impl<'d> Xml<'d> {
         );
         self.s.push('>');
         let mut known = 0;
+        self.shape = self.owner.map(|owner| SheetRef::Shape(ShapeRef { owner, slot }));
         self.sheet(&d.sheet, &mut p, &mut known);
+        self.shape = None;
         if let Some(t) = &d.text {
             self.before(&mut p.after, known);
             self.shape_text(t);
@@ -998,9 +1041,11 @@ pub(crate) fn masters(doc: &Document, rels: &[Option<String>]) -> String {
 }
 
 /// a page or master part (`root`: PageContents or MasterContents): the shapes, the Connect
-/// entries, the unknown items; `pictures`: the r:id of each picture part its shapes name
-pub(crate) fn contents(doc: &Document, root: &str, tree: &ShapeTree, connects: &[Connect], extras: &Extras, pictures: &BTreeMap<Sym, String>) -> String {
+/// entries, the unknown items; `pictures`: the r:id of each picture part its shapes name;
+/// `owner`: the page or master of the tree (the rows' inherited types, JD13)
+pub(crate) fn contents(doc: &Document, owner: Option<Owner>, root: &str, tree: &ShapeTree, connects: &[Connect], extras: &Extras, pictures: &BTreeMap<Sym, String>) -> String {
     let mut x = Xml::new(doc);
+    x.owner = owner;
     let attrs = x.root_pairs(extras);
     x.root(root, &attrs);
     let mut p = Placed::new(&[extras]);

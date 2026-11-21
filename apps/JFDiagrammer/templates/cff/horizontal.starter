@@ -1,0 +1,24 @@
+# Startdiagramm „Horizontal“: zwei waagerechte Bahnen und eine Phase, dazu ein Tipp
+starter: horizontal
+name.de: Horizontal
+name.en: Horizontal
+name.es: Horizontal
+name.it: Orizzontale
+name.fr: Horizontal
+description.de: Waagerechte Bahnen untereinander, die Phasen von links nach rechts.
+description.en: Horizontal lanes one below the other, phases from left to right.
+description.es: Calles horizontales una debajo de otra, fases de izquierda a derecha.
+description.it: Corsie orizzontali una sotto l'altra, fasi da sinistra a destra.
+description.fr: Couloirs horizontaux les uns sous les autres, phases de gauche à droite.
+
+[Shapes]
+flow:   Cff = "horizontal"; Lanes = 2; Phases = 1
+        PinX = 20 mm; PinY = 190 mm; PinX.us = 0.7 in; PinY.us = 7.8 in
+tip:    Stencil = "callouts"; Master = "Tip"; Tip = TRUE
+        PinX = 255 mm; PinY = 170 mm; Width = 60 mm; Height = 40 mm
+        PinX.us = 9.8 in; PinY.us = 7 in; Width.us = 2 in; Height.us = 1.8 in
+        Text.de = "Tipp: Legen Sie Prozess-Shapes in die Bahnen. Bahnen und Phasen fügen Sie im Register „Funktionsübergreifendes Flussdiagramm“ hinzu. Diesen Hinweis können Sie löschen."
+        Text.en = "Tip: Place process shapes in the lanes. Add lanes and phases on the Cross-Functional Flowchart tab. You can delete this note."
+        Text.es = "Consejo: coloque formas de proceso en las calles. Agregue calles y fases en la pestaña Diagrama de flujo multifuncional. Puede eliminar esta nota."
+        Text.it = "Suggerimento: inserire le forme di processo nelle corsie. Aggiungere corsie e fasi nella scheda Diagramma di flusso multifunzione. È possibile eliminare questa nota."
+        Text.fr = "Astuce : placez des formes de processus dans les couloirs. Ajoutez des couloirs et des phases dans l'onglet Diagramme de flux interfonctionnel. Vous pouvez supprimer cette note."

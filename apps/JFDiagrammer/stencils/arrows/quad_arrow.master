@@ -1,0 +1,85 @@
+# Pfeil in vier Richtungen: ein Kreuz mit vier gleichen Spitzen, ein Umriss.  Row_1 an der
+# oberen Ecke der rechten Spitze ändert Länge (waagrecht) und Breite (senkrecht) aller Spitzen,
+# Row_2 an der inneren Ecke oben rechts die Dicke der Schäfte (nur waagrecht).  Die Werte sind
+# Längen und gelten für alle vier Arme; die Spitzen stoßen nie aneinander.
+master: Quad arrow
+name.de: Pfeil in vier Richtungen
+name.en: Quad arrow
+name.es: Flecha de cuatro puntas
+name.it: Freccia a quattro punte
+name.fr: Flèche à quatre pointes
+prompt.de: Kreuz mit vier Pfeilspitzen. Spitzen und Schäfte ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Cross with four arrowheads. Drag the yellow control handles to change the heads and the shafts.
+prompt.es: Cruz con cuatro puntas de flecha. Arrastre los controladores amarillos para cambiar las puntas y los cuerpos.
+prompt.it: Croce con quattro punte di freccia. Trascina le maniglie di controllo gialle per cambiare le punte e i corpi.
+prompt.fr: Croix avec quatre pointes de flèche. Faites glisser les poignées de contrôle jaunes pour modifier les pointes et les corps.
+keywords.de: Pfeil, vier Richtungen, Kreuz, alle Richtungen, verteilen, Mitte
+keywords.en: arrow, four-way, quad, cross, all directions, spread, centre
+keywords.es: flecha, cuatro direcciones, cruz, todas las direcciones, distribuir, centro
+keywords.it: freccia, quattro direzioni, croce, tutte le direzioni, distribuire, centro
+keywords.fr: flèche, quatre directions, croix, toutes directions, répartir, centre
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+
+[User]
+# der halbe Schaft, die Länge und die halbe Breite der Spitzen
+S:   Value = MIN(MAX(Controls.Row_2-Width*0.5, 0), Width*0.25, Height*0.25)
+Hl:  Value = MIN(MAX(Width-Controls.Row_1, 0), Width*0.5-User.S, Height*0.5-User.S)
+Hw:  Value = MIN(MAX(Controls.Row_1.Y-Height*0.5, User.S), Width*0.5-User.Hl, Height*0.5-User.Hl)
+Cx:  Value = Width*0.5
+Cy:  Value = Height*0.5
+
+[Geometry]
+MoveTo  X = Width; Y = User.Cy
+LineTo  X = Width-User.Hl; Y = User.Cy+User.Hw
+LineTo  X = Width-User.Hl; Y = User.Cy+User.S
+LineTo  X = User.Cx+User.S; Y = User.Cy+User.S
+LineTo  X = User.Cx+User.S; Y = Height-User.Hl
+LineTo  X = User.Cx+User.Hw; Y = Height-User.Hl
+LineTo  X = User.Cx; Y = Height
+LineTo  X = User.Cx-User.Hw; Y = Height-User.Hl
+LineTo  X = User.Cx-User.S; Y = Height-User.Hl
+LineTo  X = User.Cx-User.S; Y = User.Cy+User.S
+LineTo  X = User.Hl; Y = User.Cy+User.S
+LineTo  X = User.Hl; Y = User.Cy+User.Hw
+LineTo  X = 0; Y = User.Cy
+LineTo  X = User.Hl; Y = User.Cy-User.Hw
+LineTo  X = User.Hl; Y = User.Cy-User.S
+LineTo  X = User.Cx-User.S; Y = User.Cy-User.S
+LineTo  X = User.Cx-User.S; Y = User.Hl
+LineTo  X = User.Cx-User.Hw; Y = User.Hl
+LineTo  X = User.Cx; Y = 0
+LineTo  X = User.Cx+User.Hw; Y = User.Hl
+LineTo  X = User.Cx+User.S; Y = User.Hl
+LineTo  X = User.Cx+User.S; Y = User.Cy-User.S
+LineTo  X = Width-User.Hl; Y = User.Cy-User.S
+LineTo  X = Width-User.Hl; Y = User.Cy-User.Hw
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.75; Y = Height*0.7
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Länge und Breite der Spitzen ändern"
+        Tip.en = "Change the length and width of the heads"
+        Tip.es = "Cambiar la longitud y el ancho de las puntas"
+        Tip.it = "Cambia la lunghezza e la larghezza delle punte"
+        Tip.fr = "Modifier la longueur et la largeur des pointes"
+Row_2:  X = Width*0.6; Y = Height*0.5+User.S
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Dicke der Schäfte ändern"
+        Tip.en = "Change the thickness of the shafts"
+        Tip.es = "Cambiar el grosor de los cuerpos"
+        Tip.it = "Cambia lo spessore dei corpi"
+        Tip.fr = "Modifier l'épaisseur des corps"
+
+[Connection]
+Row  X = User.Cx; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = User.Cy; DirX = -1; DirY = 0
+Row  X = User.Cx; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.Cy; DirX = 1; DirY = 0

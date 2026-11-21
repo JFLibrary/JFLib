@@ -1,0 +1,33 @@
+# Videokamera (JD13, eigene Grafik im JFNetworker-Stil)
+master: Video camera
+name.de: Videokamera
+name.en: Video camera
+name.es: Videocámara
+name.it: Videocamera
+name.fr: Caméscope
+prompt.de: Videokamera: Camcorder.
+prompt.en: Video camera: camcorder.
+prompt.es: Videocámara: videocámara.
+prompt.it: Videocamera: videocamera.
+prompt.fr: Caméscope : caméscope.
+keywords.de: Videokamera, Peripherie, Büro
+keywords.en: Video camera, peripheral, office
+keywords.es: Videocámara, periférico, oficina
+keywords.it: Videocamera, periferica, ufficio
+keywords.fr: Caméscope, périphérique, bureau
+svg: ../../symbols/network/video_camera.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Videokamera
+    Value.en = Video camera
+    Value.es = Videocámara
+    Value.it = Videocamera
+    Value.fr = Caméscope

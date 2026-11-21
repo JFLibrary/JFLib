@@ -1,0 +1,123 @@
+# Stern: der Anfang ist der Mittelpunkt (ein gefüllter Kreis, 3 mm), das Ende das Ende des ersten
+# Strahls; fünf weitere Strahlen führen zu Steuerpunkten (Row_1 .. Row_5, CanGlue, als Abstand vom
+# Mittelpunkt: sie bleiben stehen, wenn das Ende wandert).  1D-Shape mit aufrechtem Kasten wie der
+# Kurvenverbinder (Width = EndX-BeginX, Height = EndY-BeginY, Angle 0); die Enden kleben an
+# Shapes, mit GlueType 2 auch an das ganze Shape.  Der Mittelpunkt ist mit der Linienfarbe gefüllt
+# (FillForegnd = LineColor, FillPattern 1: keine feste Farbe).  Ohne Pfeilspitzen.
+master: Star
+name.de: Stern
+name.en: Star
+name.es: Estrella
+name.it: Stella
+name.fr: Étoile
+prompt.de: Sternverteiler: Strahlen von einem Mittelpunkt zu bis zu sechs Shapes. Ziehen Sie das Ende und die gelben Punkte auf Shapes.
+prompt.en: Star distributor: rays from a centre to up to six shapes. Drag the end and the yellow handles onto shapes.
+prompt.es: Distribuidor en estrella: radios desde un centro hasta seis formas. Arrastre el extremo y los controladores amarillos sobre las formas.
+prompt.it: Distributore a stella: raggi da un centro fino a sei forme. Trascina l'estremità e le maniglie gialle sulle forme.
+prompt.fr: Répartiteur en étoile : des rayons d'un centre vers jusqu'à six formes. Faites glisser l'extrémité et les poignées jaunes sur les formes.
+keywords.de: Stern, Sternverteiler, Strahlen, Hub, Mittelpunkt, Netzwerk, verbinden
+keywords.en: star, star distributor, rays, hub, centre, network, connect
+keywords.es: estrella, distribuidor, radios, hub, centro, red, conectar
+keywords.it: stella, distributore, raggi, hub, centro, rete, collegare
+keywords.fr: étoile, répartiteur, rayons, concentrateur, centre, réseau, relier
+style: Connector
+
+[Shape]
+BeginX = 25 mm
+BeginX.us = 1 in
+BeginY = 20 mm
+BeginY.us = 0.8 in
+EndX = 45 mm
+EndX.us = 1.8 in
+EndY = 20 mm
+EndY.us = 0.8 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+GlueType = 2
+BeginArrow = 0
+EndArrow = 0
+FillPattern = 1
+FillForegnd = LineColor
+FillBkgnd = LineColor
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = 0
+TxtPinY = -6 mm
+TxtPinY.us = -0.25 in
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# der Radius des Mittelpunkts
+R:  Value = 1.5 mm
+    Value.us = 0.06 in
+
+# 1 die Strahlen, der erste zum Ende
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = Height
+MoveTo  X = 0; Y = 0
+LineTo  X = Controls.Row_1; Y = Controls.Row_1.Y
+MoveTo  X = 0; Y = 0
+LineTo  X = Controls.Row_2; Y = Controls.Row_2.Y
+MoveTo  X = 0; Y = 0
+LineTo  X = Controls.Row_3; Y = Controls.Row_3.Y
+MoveTo  X = 0; Y = 0
+LineTo  X = Controls.Row_4; Y = Controls.Row_4.Y
+MoveTo  X = 0; Y = 0
+LineTo  X = Controls.Row_5; Y = Controls.Row_5.Y
+
+# 2 der Mittelpunkt
+[Geometry]
+Ellipse  X = 0; Y = 0; A = User.R; B = 0; C = 0; D = User.R
+
+[Controls]
+Row_1:  X = 10 mm; Y = 17.32 mm
+        X.us = 0.4 in; Y.us = 0.69 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 2; CanGlue = TRUE
+        Tip.de = "Ende von Strahl 2; auf ein Shape ziehen"
+        Tip.en = "End of ray 2; drag it onto a shape"
+        Tip.es = "Extremo del radio 2; arrástrelo sobre una forma"
+        Tip.it = "Estremità del raggio 2; trascinala su una forma"
+        Tip.fr = "Extrémité du rayon 2 ; faites-la glisser sur une forme"
+Row_2:  X = -10 mm; Y = 17.32 mm
+        X.us = -0.4 in; Y.us = 0.69 in
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 2; YCon = 2; CanGlue = TRUE
+        Tip.de = "Ende von Strahl 3; auf ein Shape ziehen"
+        Tip.en = "End of ray 3; drag it onto a shape"
+        Tip.es = "Extremo del radio 3; arrástrelo sobre una forma"
+        Tip.it = "Estremità del raggio 3; trascinala su una forma"
+        Tip.fr = "Extrémité du rayon 3 ; faites-la glisser sur une forme"
+Row_3:  X = -20 mm; Y = 0 mm
+        X.us = -0.8 in; Y.us = 0 in
+        XDyn = Controls.Row_3; YDyn = Controls.Row_3.Y
+        XCon = 2; YCon = 2; CanGlue = TRUE
+        Tip.de = "Ende von Strahl 4; auf ein Shape ziehen"
+        Tip.en = "End of ray 4; drag it onto a shape"
+        Tip.es = "Extremo del radio 4; arrástrelo sobre una forma"
+        Tip.it = "Estremità del raggio 4; trascinala su una forma"
+        Tip.fr = "Extrémité du rayon 4 ; faites-la glisser sur une forme"
+Row_4:  X = -10 mm; Y = -17.32 mm
+        X.us = -0.4 in; Y.us = -0.69 in
+        XDyn = Controls.Row_4; YDyn = Controls.Row_4.Y
+        XCon = 2; YCon = 2; CanGlue = TRUE
+        Tip.de = "Ende von Strahl 5; auf ein Shape ziehen"
+        Tip.en = "End of ray 5; drag it onto a shape"
+        Tip.es = "Extremo del radio 5; arrástrelo sobre una forma"
+        Tip.it = "Estremità del raggio 5; trascinala su una forma"
+        Tip.fr = "Extrémité du rayon 5 ; faites-la glisser sur une forme"
+Row_5:  X = 10 mm; Y = -17.32 mm
+        X.us = 0.4 in; Y.us = -0.69 in
+        XDyn = Controls.Row_5; YDyn = Controls.Row_5.Y
+        XCon = 2; YCon = 2; CanGlue = TRUE
+        Tip.de = "Ende von Strahl 6; auf ein Shape ziehen"
+        Tip.en = "End of ray 6; drag it onto a shape"
+        Tip.es = "Extremo del radio 6; arrástrelo sobre una forma"
+        Tip.it = "Estremità del raggio 6; trascinala su una forma"
+        Tip.fr = "Extrémité du rayon 6 ; faites-la glisser sur une forme"

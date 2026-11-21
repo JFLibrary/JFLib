@@ -1,0 +1,33 @@
+# Virtueller PC (JD13, eigene Grafik im JFNetworker-Stil)
+master: Virtual PC
+name.de: Virtueller PC
+name.en: Virtual PC
+name.es: PC virtual
+name.it: PC virtuale
+name.fr: PC virtuel
+prompt.de: Virtueller PC: virtuelle Maschine als Arbeitsplatz.
+prompt.en: Virtual PC: virtual machine used as a workstation.
+prompt.es: PC virtual: máquina virtual usada como puesto de trabajo.
+prompt.it: PC virtuale: macchina virtuale usata come postazione.
+prompt.fr: PC virtuel : machine virtuelle utilisée comme poste de travail.
+keywords.de: Virtueller PC, Computer, Arbeitsplatz
+keywords.en: Virtual PC, computer, workstation
+keywords.es: PC virtual, equipo, puesto de trabajo
+keywords.it: PC virtuale, computer, postazione
+keywords.fr: PC virtuel, ordinateur, poste de travail
+svg: ../../symbols/network/pc_virtual.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Computer
+    Value.en = Computer
+    Value.es = Equipo
+    Value.it = Computer
+    Value.fr = Ordinateur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Virtueller PC
+    Value.en = Virtual PC
+    Value.es = PC virtual
+    Value.it = PC virtuale
+    Value.fr = PC virtuel

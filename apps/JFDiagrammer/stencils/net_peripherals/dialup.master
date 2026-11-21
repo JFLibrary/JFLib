@@ -1,0 +1,66 @@
+# Wählverbindung (JD13, SH-151): eine 1D-Linie mit einem Blitz in der Mitte für Verbindungen über
+# die Telefonleitung.  Die Enden kleben an Verbindungspunkte oder (GlueType 2) an das ganze Shape;
+# der Kasten folgt den Enden mit Visios 1D-Formeln (das Bauwerkzeug setzt sie), der Blitz liegt im
+# gedrehten Kasten.  Formatvorlage Connector ohne Pfeilspitzen (README: Stilregeln).
+master: Dial-up connection
+name.de: Wählverbindung
+name.en: Dial-up connection
+name.es: Conexión de acceso telefónico
+name.it: Connessione remota
+name.fr: Connexion d'accès à distance
+prompt.de: Wählverbindung: Verbindung über die Telefonleitung. Ziehen Sie die Enden auf zwei Geräte.
+prompt.en: Dial-up connection: a link over the telephone line. Drag its ends onto two devices.
+prompt.es: Conexión de acceso telefónico: enlace por la línea telefónica. Arrastre los extremos sobre dos dispositivos.
+prompt.it: Connessione remota: collegamento tramite la linea telefonica. Trascina le estremità su due dispositivi.
+prompt.fr: Connexion d'accès à distance : liaison par la ligne téléphonique. Faites glisser les extrémités sur deux appareils.
+keywords.de: Wählverbindung, DFÜ, Modem, Telefonleitung, Blitz, Verbindung
+keywords.en: dial-up connection, modem, telephone line, lightning, link
+keywords.es: acceso telefónico, módem, línea telefónica, rayo, enlace
+keywords.it: connessione remota, modem, linea telefonica, fulmine, collegamento
+keywords.fr: accès à distance, modem, ligne téléphonique, éclair, liaison
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 4 mm
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 4 mm
+BeginY.us = 0.16 in
+EndY.us = 0.16 in
+Height = 6 mm
+Height.us = 0.24 in
+GlueType = 2
+BeginArrow = 0
+EndArrow = 0
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = 0 mm
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width*0.5-Height*0.4; Y = Height*0.5
+LineTo  X = Width*0.5+Height*0.25; Y = Height
+LineTo  X = Width*0.5-Height*0.25; Y = 0
+LineTo  X = Width*0.5+Height*0.4; Y = Height*0.5
+LineTo  X = Width; Y = Height*0.5
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Wählverbindung
+    Value.en = Dial-up connection
+    Value.es = Conexión de acceso telefónico
+    Value.it = Connessione remota
+    Value.fr = Connexion d'accès à distance

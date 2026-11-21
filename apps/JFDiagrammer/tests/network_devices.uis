@@ -1,0 +1,35 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD13: network devices (SH-151, SH-G09, VL-50) -- Weitere Shapes › Netzwerk ›
+# Netzwerk und Peripheriegeräte opens the stencil of the shared network symbols; a router and a
+# switch dragged onto the page, the connector tool joins them (glued to both shapes); a legend
+# found by the search and dropped counts the devices (its height follows its lines), a third
+# device dropped later makes it longer, deleting it shorter again.  #24577 is the panel's search box
+click button:"Weitere Shapes"
+click "Netzwerk"
+click "Netzwerk und Peripheriegeräte"
+drag button:"Router" 500,330
+a11y expect announced "„Router“ abgelegt"
+drag button:"Switch" 800,330
+a11y expect announced "„Switch“ abgelegt"
+# Start › Tools › Verbinder
+cmd 4401
+drag 500,330 800,330
+expect button:"Anfangspunkt" exists
+expect button:"Endpunkt" exists
+cmd 4400
+focus #24577
+type "Legende"
+drag button:"Legende" 650,560
+a11y expect announced "„Legende“ abgelegt"
+expect listitem:"Legende" rect 575 522 150 37
+focus #24577
+key esc
+drag button:"Firewall" 650,440
+a11y expect announced "„Firewall“ abgelegt"
+expect listitem:"Legende" rect 575 522 150 46
+shot build/JFDiagrammer-network-devices.png
+click 650,440
+expect listitem:"Firewall" selected
+key delete
+expect listitem:"Firewall" missing
+expect listitem:"Legende" rect 575 522 150 37

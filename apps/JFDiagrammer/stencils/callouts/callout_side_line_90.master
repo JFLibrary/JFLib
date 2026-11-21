@@ -1,0 +1,87 @@
+# Text mit Linie, 90° Seite: Text mit einem Strich an dieser Kante (er wechselt mit).  Der Zeiger
+# geht von der Mitte der Seite, die der Spitze zugewandt ist (links oder rechts) senkrecht zur
+# Kante hinaus (mindestens Stub weit) und knickt dann im rechten Winkel zur Spitze. Liegt die
+# Spitze im Körper, sind Zeiger und Punkt aus (NoShow).
+master: Callout side line 90
+name.de: Text mit Linie, 90° Seite
+name.en: Callout with side line, 90°
+name.es: Llamada con línea lateral, 90°
+name.it: Richiamo con linea laterale, 90°
+name.fr: Bulle d'annotation à trait latéral, 90°
+prompt.de: Text mit einem Strich an der Seite, der Zeiger knickt im rechten Winkel von der Seite zum Ziel. Ziehen Sie den gelben Steuerpunkt auf das Ziel.
+prompt.en: Text with a line along its side, the pointer turns at a right angle from the side to the target. Drag the yellow control handle onto the target.
+prompt.es: Texto con una línea en el lateral, el puntero gira en ángulo recto del lateral al destino. Arrastre el controlador amarillo hasta el destino.
+prompt.it: Testo con una linea sul lato, il puntatore piega ad angolo retto dal lato alla destinazione. Trascina la maniglia di controllo gialla sulla destinazione.
+prompt.fr: Texte avec un trait sur le côté, le pointeur tourne à angle droit du côté à la cible. Faites glisser la poignée de contrôle jaune sur la cible.
+keywords.de: Beschriftung, Hinweis, Kommentar, Zeiger, Linie, Strich, seitlich, 90°, Winkel
+keywords.en: callout, note, comment, pointer, line, rule, side, 90°, elbow
+keywords.es: llamada, nota, comentario, puntero, línea, trazo, lateral, 90°, codo
+keywords.it: richiamo, nota, commento, puntatore, linea, tratto, laterale, 90°, gomito
+keywords.fr: bulle d'annotation, note, commentaire, pointeur, trait, ligne, latéral, 90°, coude
+text.de: Text
+text.en: Text
+text.es: Texto
+text.it: Testo
+text.fr: Texte
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 16 mm
+Height.us = 0.6 in
+LeftMargin = 2 mm
+LeftMargin.us = 0.08 in
+RightMargin = 2 mm
+RightMargin.us = 0.08 in
+
+[User]
+msvStructureType:         Value = "Callout"
+msvShapeCategories:       Value = "Callout"
+msvSDCalloutNoHighlight:  Value = FALSE
+# die Spitze des Zeigers
+Ax:                       Value = Controls.Association
+Ay:                       Value = Controls.Association.Y
+Out:                      Value = OR(User.Ax<0,User.Ax>Width,User.Ay<0,User.Ay>Height)
+# die Spitze rechts der Mitte: der Zeiger beginnt an der rechten Seite
+Right:                    Value = User.Ax>Width*0.5
+Sx:                       Value = IF(User.Right,Width,0)
+# der erste Arm geht mindestens Stub weit hinaus, dann im rechten Winkel weiter
+Stub:                     Value = 4 mm
+                          Value.us = 0.15 in
+Ex:                       Value = IF(User.Right,MAX(User.Ax,Width+User.Stub),MIN(User.Ax,-User.Stub))
+Dot:                      Value = 0.8 mm
+                          Value.us = 0.03 in
+
+# der Strich an der Seite zur Spitze hin
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.Sx; Y = 0
+LineTo  X = User.Sx; Y = Height
+
+# der Zeiger
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(User.Out)
+MoveTo  X = User.Sx; Y = Height*0.5
+LineTo  X = User.Ex; Y = Height*0.5
+LineTo  X = User.Ex; Y = User.Ay
+LineTo  X = User.Ax; Y = User.Ay
+
+# der Punkt an der Spitze
+[Geometry]
+NoShow = NOT(User.Out)
+Ellipse  X = User.Ax; Y = User.Ay; A = User.Ax+User.Dot; B = User.Ay; C = User.Ax; D = User.Ay+User.Dot
+
+[Paragraph]
+Row  HorzAlign = IF(User.Right,2,0)
+
+[Controls]
+Association:  X = -12 mm; Y = -10 mm
+              X.us = -0.5 in; Y.us = -0.4 in
+              XDyn = User.Sx; YDyn = Height*0.5
+              XCon = 2; YCon = 2; CanGlue = FALSE
+              Tip.de = "Zeiger auf das Ziel ziehen"
+              Tip.en = "Drag the pointer onto the target"
+              Tip.es = "Arrastre el puntero hasta el destino"
+              Tip.it = "Trascina il puntatore sulla destinazione"
+              Tip.fr = "Faites glisser le pointeur sur la cible"

@@ -1,0 +1,25 @@
+# Standardflussdiagramm (VL-20): Querformat, Text 8 pt, ein Regelsatz zur Diagrammprüfung und
+# ein Startdiagramm.  Quellformat: ../README.md
+template: Basic Flowchart
+file: flowchart
+name.de: Standardflussdiagramm
+name.en: Basic Flowchart
+name.es: Diagrama de flujo básico
+name.it: Diagramma di flusso di base
+name.fr: Diagramme de flux de base
+description.de: Abläufe, Prozesse und Entscheidungen als Flussdiagramm, mit Regeln zur Diagrammprüfung.
+description.en: Workflows, processes and decisions as a flowchart, with rules for checking the diagram.
+description.es: Flujos de trabajo, procesos y decisiones como diagrama de flujo, con reglas para comprobar el diagrama.
+description.it: Flussi di lavoro, processi e decisioni come diagramma di flusso, con regole per verificare il diagramma.
+description.fr: Flux de travail, processus et décisions sous forme d'organigramme, avec des règles de vérification du diagramme.
+category: flowchart
+order: 30
+stencils: flowchart, arrows, connectors
+rules: rules.txt
+starters: sample
+
+[PageSheet]
+PrintPageOrientation = 2
+
+[Style Normal]
+Char.Size = 8 pt

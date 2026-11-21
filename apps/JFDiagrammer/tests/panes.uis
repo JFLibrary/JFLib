@@ -29,19 +29,19 @@ expect button:"Spiegelung" disabled
 # Größe und Position through the measures in the status bar
 click button:"Breite: –  Höhe: –  Winkel: –"
 expect tab:"Größe und Position" selected
-expect text:"Drehpunkt" exists
+expect text:"Winkel" exists
 expect text:"Kein Shape ausgewählt." exists
 # the zoom in the status bar (JD7: the new drawing's A4 page fits at 67 %, the next steps are
 # 66.7 % and 75 %)
-expect text:"67 %" exists
+expect button:"67 %" exists
 click button:"Vergrößern"
 click button:"Vergrößern"
-expect text:"75 %" exists
+expect button:"75 %" exists
 click button:"Verkleinern"
 click button:"Verkleinern"
-expect text:"50 %" exists
+expect button:"50 %" exists
 key alt+f6
-expect text:"67 %" exists
+expect button:"67 %" exists
 # the grid of the canvas
 click tab:"Ansicht"
 expect checkbox:"Gitternetz" unchecked
@@ -62,7 +62,7 @@ expect tab:"Drucken einrichten" selected
 key esc
 expect dialog:"Seite einrichten" missing
 rclick tab:"Seite-1"
-expect "Seite umbenennen" disabled
+expect "Seite umbenennen" enabled
 key esc
 # (JD9) the stencil's menu on its title: closing works, saving only for own stencils
 click button:"Weitere Shapes"

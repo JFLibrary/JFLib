@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 482.6 88.9" width="965" height="178"
+     fill="none" stroke="#2E343B" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Rack UPS 2U: ventilation slots, display, buttons, a row of LEDs, power button</title>
+  <rect class="body" x="17.8" y="0.6" width="447" height="87.7" fill="#F7F8FA" stroke="none"/>
+  <path class="shade" d="M2.6 0.6H17.8V88.3H2.6A2 2 0 0 1 0.6 86.3V2.6A2 2 0 0 1 2.6 0.6ZM464.8 0.6H480A2 2 0 0 1 482 2.6V86.3A2 2 0 0 1 480 88.3H464.8Z" fill="#DCDFE3" stroke="none"/>
+  <path class="ink" d="M17.8 0.6V88.3M464.8 0.6V88.3" stroke-width="1.5"/>
+  <rect class="ink" x="0.6" y="0.6" width="481.4" height="87.7" rx="2"/>
+  <g class="port" fill="#4F555D" stroke="none"><rect x="4.9" y="4.1" width="8" height="4.5" rx="2.25"/><rect x="469.7" y="4.1" width="8" height="4.5" rx="2.25"/><rect x="4.9" y="35.85" width="8" height="4.5" rx="2.25"/><rect x="469.7" y="35.85" width="8" height="4.5" rx="2.25"/><rect x="4.9" y="48.55" width="8" height="4.5" rx="2.25"/><rect x="469.7" y="48.55" width="8" height="4.5" rx="2.25"/><rect x="4.9" y="80.3" width="8" height="4.5" rx="2.25"/><rect x="469.7" y="80.3" width="8" height="4.5" rx="2.25"/></g>
+  <rect class="tint" x="25" y="8" width="22" height="72.9" rx="3" fill="#7A828C" stroke="none"/>
+  <g class="body" stroke="#F7F8FA" stroke-width="2"><rect x="30" y="30" width="12" height="26" rx="1.5"/><path d="M33.5 26.5H38.5"/></g>
+  <path class="body" d="M37.3 34L33.6 43.6H38.4L34.7 52" stroke="#F7F8FA" stroke-width="1.6"/>
+  <path class="port" d="M62 14H92M62 22.6H92M62 31.2H92M62 39.8H92M62 48.4H92M62 57H92M62 65.6H92M62 74.2H92M102 14H132M102 22.6H132M102 31.2H132M102 39.8H132M102 48.4H132M102 57H132M102 65.6H132M102 74.2H132M142 14H172M142 22.6H172M142 31.2H172M142 39.8H172M142 48.4H172M142 57H172M142 65.6H172M142 74.2H172M182 14H212M182 22.6H212M182 31.2H212M182 39.8H212M182 48.4H212M182 57H212M182 65.6H212M182 74.2H212M222 14H252M222 22.6H252M222 31.2H252M222 39.8H252M222 48.4H252M222 57H252M222 65.6H252M222 74.2H252M262 14H292M262 22.6H292M262 31.2H292M262 39.8H292M262 48.4H292M262 57H292M262 65.6H292M262 74.2H292" stroke="#4F555D" stroke-width="2.4"/>
+  <rect class="screen" x="312" y="14" width="74" height="28" rx="2" fill="#CAD4DF" stroke-width="1.2"/>
+  <path class="port" d="M319 22H352M319 30H344M362 22V36M369 26V36M376 30V36" stroke="#4F555D" stroke-width="1.6"/>
+  <g class="shade" fill="#DCDFE3" stroke-width="1.2"><rect x="312" y="48" width="11" height="7" rx="1"/><rect x="328.5" y="48" width="11" height="7" rx="1"/><rect x="345" y="48" width="11" height="7" rx="1"/><rect x="361.5" y="48" width="11" height="7" rx="1"/></g>
+  <g class="ok" fill="#3C9A5F" stroke="none"><circle cx="316" cy="68" r="2"/><circle cx="332.5" cy="68" r="2"/><circle cx="349" cy="68" r="2"/><circle cx="365.5" cy="68" r="2"/><circle cx="382" cy="68" r="2"/></g>
+  <circle class="body" cx="432" cy="30" r="9" fill="#F7F8FA" stroke-width="2"/>
+  <path class="ink" d="M432 25.5V31.53" stroke-width="2"/>
+  <circle class="ok" cx="432" cy="52" r="2" fill="#3C9A5F" stroke="none"/>
+</svg>

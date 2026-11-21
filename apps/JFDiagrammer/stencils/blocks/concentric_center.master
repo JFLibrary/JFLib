@@ -1,0 +1,35 @@
+# Konzentrisches Zentrum: die Mittelscheibe der konzentrischen Ebenen, ein Kreis von 20 mm, der
+# genau in das Loch der Konzentrischen Ebene 1 passt (gleiche Mitte).  Eine Ellipse-Zeile;
+# keine Steuerpunkte.  Der Text steht in der Mitte; Verbindungspunkte unten, rechts, oben und
+# links auf dem Rand.
+master: Concentric center
+name.de: Konzentrisches Zentrum
+name.en: Concentric center
+name.es: Centro concéntrico
+name.it: Centro concentrico
+name.fr: Centre concentrique
+prompt.de: Mittelscheibe für die konzentrischen Ebenen.
+prompt.en: Center disc for the concentric layers.
+prompt.es: Disco central para las capas concéntricas.
+prompt.it: Disco centrale per i livelli concentrici.
+prompt.fr: Disque central pour les couches concentriques.
+keywords.de: Zentrum, Mitte, Kern, Scheibe, konzentrisch, Ebene, Zwiebelmodell
+keywords.en: center, centre, core, disc, concentric, layer, onion model
+keywords.es: centro, núcleo, disco, concéntrico, capa, modelo de cebolla
+keywords.it: centro, nucleo, disco, concentrico, livello, modello a cipolla
+keywords.fr: centre, noyau, disque, concentrique, couche, modèle en oignon
+
+[Shape]
+Width = 20 mm
+Width.us = 0.75 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

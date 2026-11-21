@@ -8,20 +8,29 @@
 //   fetch          a UDP client whose full state does not fit a datagram is told so in WELCOME:
 //                  fetch_request() names the server's WebSocket port and a ticket, the app opens a second
 //                  netchan connection there and feeds its events to on_fetch_event (FETCH -> FULL)
+//   events         send_event (to the room's RoomSim) and take_event (the room's): reliable, in order, each
+//                  delivered once (event.rs); they ride in the INPUTs and SNAPSHOTs
+//   smoothing      a correction of the own figure becomes an offset of the drawn position that decays in
+//                  smooth_ms (predict::Smoother; above `snap` metres it jumps): drawn() is what a frame
+//                  shows, predicted() stays the exact state
+//   leave          LEAVE goes out, the server removes the figure at once (NetLink::leave also ends netchan)
 //
 // Per frame: on_event for every netchan event (main channel), advance(now) -> n, then n times step(map,
-// input) with the input of that tick; take_out what to send.  The figure is predicted() (and
-// predicted_prev() with alpha() for a frame between two ticks); the others are remotes().
+// input) with the input of that tick; take_out what to send.  The figure is drawn() (or predicted() and
+// predicted_prev() with alpha() for a frame between two ticks); the others are remotes(); events come from
+// take_event().
 
 use alloc::collections::VecDeque;
 use alloc::string::String;
 use alloc::vec::Vec;
 
 use netchan::endpoint::ClientEvent;
+use physics::Vec3;
 
 use super::clock::{InterpClock, SteeredClock};
+use super::event::{self, Inbox, InboxStats, NetEvent, Outbox, OutboxStats};
 use super::input::{NetInput, MAX_REDUNDANT};
-use super::predict::{Movement, Outcome, Predictor};
+use super::predict::{Movement, Outcome, Predictor, Smoother};
 use super::proto::{self, Base, InputMsg, Welcome};
 use super::quant::round_i64;
 use super::room::RoomCode;
@@ -36,17 +45,26 @@ pub struct ClientOptions {
     pub room: Option<RoomCode>,
     /// how far behind the newest snapshot the others are shown (ms)
     pub interp_ms: u32,
-    /// the margin the inputs aim for (None: the server's)
+    /// the margin the inputs aim for (None: the server's, over a WebSocket plus stream_margin)
     pub margin: Option<f64>,
+    /// ticks the margin gets over a WebSocket (set_reliable) on top of the server's: TCP delivers what follows a
+    /// lost segment only after its retransmission (1: over WLAN 2.7 instead of 12 corrections a minute)
+    pub stream_margin: f64,
     /// snapshots kept as bases and for interpolation
     pub ring: usize,
     /// inputs every packet repeats at least (the newest and the ones before it)
     pub min_redundancy: usize,
+    /// the time constant in which a correction of the drawn own figure decays (ms; 0: no smoothing)
+    pub smooth_ms: u32,
+    /// a correction larger than this is not smoothed: the picture jumps (m)
+    pub snap: f64,
+    /// the bytes of the events an INPUT carries at most
+    pub event_budget: usize,
 }
 
 impl Default for ClientOptions {
     fn default() -> Self {
-        ClientOptions { name: String::from("Spieler"), room: None, interp_ms: 100, margin: None, ring: 64, min_redundancy: 3 }
+        ClientOptions { name: String::from("Spieler"), room: None, interp_ms: 100, margin: None, stream_margin: 1.0, ring: 64, min_redundancy: 3, smooth_ms: 60, snap: 1.0, event_budget: 400 }
     }
 }
 
@@ -63,6 +81,8 @@ pub enum Phase {
     Refused(u8),
     /// the channel ended
     Closed,
+    /// the client left (leave)
+    Left,
 }
 
 /// what a client counted
@@ -142,6 +162,11 @@ pub struct NetClient<M: Movement> {
     fetch_req: Option<(u16, u64)>,
     stats: ClientStats,
     last_outcome: Option<Outcome>,
+    out_ev: Outbox,
+    in_ev: Inbox,
+    smooth: Smoother,
+    smooth_ns: u64,
+    reliable: bool,
 }
 
 impl<M: Movement> NetClient<M> {
@@ -149,6 +174,11 @@ impl<M: Movement> NetClient<M> {
     /// `mover`
     pub fn new(opts: ClientOptions, mover: M, schema: Schema, baseline: Snapshot) -> NetClient<M> {
         NetClient {
+            out_ev: Outbox::new(false, opts.event_budget),
+            in_ev: Inbox::new(true),
+            smooth: Smoother::new(opts.smooth_ms as f64, opts.snap),
+            smooth_ns: 0,
+            reliable: false,
             opts,
             mover,
             schema,
@@ -225,6 +255,77 @@ impl<M: Movement> NetClient<M> {
         self.last_outcome
     }
 
+    /// the channel is reliable (a WebSocket): its events go once instead of until acknowledged, its margin is
+    /// stream_margin more (call it before WELCOME).  NetLink and the simulated network's users set it; without it a
+    /// client resends over a WebSocket too (harmless: duplicates are dropped)
+    pub fn set_reliable(&mut self, on: bool) {
+        self.reliable = on;
+        if self.out_ev.pending() == 0 {
+            self.out_ev = Outbox::new(on, self.opts.event_budget);
+        }
+    }
+
+    /// queue an event for the room's RoomSim (reliable, in order) -> false when refused: not in a room, a channel
+    /// over 15, more than event::MAX_EVENT bytes, event::MAX_PENDING not yet acknowledged
+    pub fn send_event(&mut self, channel: u8, data: &[u8]) -> bool {
+        if self.phase != Phase::Playing {
+            return false;
+        }
+        self.out_ev.push(NetEvent::new(self.clock.tick(), channel, data))
+    }
+
+    /// the next event of the room (each once, in the order the room sent them)
+    pub fn take_event(&mut self) -> Option<NetEvent> {
+        self.in_ev.take()
+    }
+
+    /// what the outbox of the client's events counted
+    pub fn events_out(&self) -> OutboxStats {
+        self.out_ev.stats()
+    }
+
+    /// what the inbox of the room's events counted
+    pub fn events_in(&self) -> InboxStats {
+        self.in_ev.stats()
+    }
+
+    /// events of the client not yet acknowledged by the server
+    pub fn events_pending(&self) -> usize {
+        self.out_ev.pending()
+    }
+
+    /// leave the room: LEAVE goes out (take_out), the server removes the figure at once; the phase is Left and
+    /// nothing more is sent.  (NetLink::leave sends it and ends netchan's connection too.)
+    pub fn leave(&mut self) {
+        if matches!(self.phase, Phase::Joining | Phase::Playing) {
+            self.out.push_back(proto::write_leave());
+        }
+        self.phase = Phase::Left;
+    }
+
+    /// what a frame adds to the predicted position of the own figure: the rest of the corrections, decaying
+    pub fn smoothing(&self) -> Vec3 {
+        self.smooth.offset()
+    }
+
+    /// the smoothing's counts: (corrections, of those snapped)
+    pub fn smoother(&self) -> &Smoother {
+        &self.smooth
+    }
+
+    /// where a frame draws the own figure: the predicted position between the last two ticks (alpha) plus the
+    /// decaying rest of the corrections (None before the first snapshot)
+    pub fn drawn(&self) -> Option<Vec3> {
+        Some(self.blended()? + self.smooth.offset())
+    }
+
+    // the predicted position between the last two ticks (alpha)
+    fn blended(&self) -> Option<Vec3> {
+        let cur = M::position(&self.pred.current()?);
+        let prev = self.pred.previous().map(|s| M::position(&s)).unwrap_or(cur);
+        Some(prev + (cur - prev) * self.clock.alpha())
+    }
+
     /// one of netchan's client events of the main channel at time now_ns
     pub fn on_event(&mut self, map: &physics::World, e: &ClientEvent, now_ns: u64) {
         self.now_ns = now_ns;
@@ -235,7 +336,7 @@ impl<M: Movement> NetClient<M> {
             }
             ClientEvent::Message { data, .. } => self.on_message(map, data, false),
             ClientEvent::Disconnected(_) => {
-                if !matches!(self.phase, Phase::Refused(_)) {
+                if !matches!(self.phase, Phase::Refused(_) | Phase::Left) {
                     self.phase = Phase::Closed;
                 }
             }
@@ -301,7 +402,9 @@ impl<M: Movement> NetClient<M> {
     fn on_welcome(&mut self, w: Welcome) {
         self.rate = w.rate as u32;
         self.dt = 1.0 / self.rate as f64;
-        let target = self.opts.margin.unwrap_or(w.margin as f64);
+        // (over a WebSocket TCP holds back what follows a lost segment: a tick more, measured over WLAN in G7e part 2)
+        let extra = if self.reliable { self.opts.stream_margin } else { 0.0 };
+        let target = self.opts.margin.unwrap_or(w.margin as f64 + extra);
         self.clock = SteeredClock::new(self.rate, target);
         let delay = self.opts.interp_ms as f64 * self.rate as f64 / 1000.0;
         self.interp = InterpClock::new(self.rate, delay);
@@ -320,6 +423,7 @@ impl<M: Movement> NetClient<M> {
         self.ring.clear();
         self.newest = None;
         self.have = None;
+        self.smooth.reset();
     }
 
     fn ring_get(&self, tick: u32) -> Option<&Snapshot> {
@@ -331,6 +435,20 @@ impl<M: Movement> NetClient<M> {
             self.stats.bad += 1;
             return;
         };
+        // the event part (whatever the base: the events do not depend on it, and a late snapshot's run is either
+        // known already or the continuation)
+        if let Some(a) = h.ev_ack {
+            self.out_ev.ack(a);
+        }
+        if h.events {
+            match event::read_section(&mut r, h.tick) {
+                Some((first, ev)) => self.in_ev.receive(first, ev),
+                None => {
+                    self.stats.bad += 1;
+                    return;
+                }
+            }
+        }
         let base: Option<&Snapshot> = match h.base {
             Base::None => None,
             Base::Map => Some(&self.baseline),
@@ -381,7 +499,15 @@ impl<M: Movement> NetClient<M> {
             let st = self.ring_get(h.tick).and_then(|s| s.get(own)).map(|e| e.state);
             if let Some(st) = st {
                 let server = M::from_fields(&st.fields[..M::FIELDS.min(st.fields.len())]);
+                // (the jump of what a frame shows now: the drawn position stays where it is)
+                let before = self.blended();
                 let o = self.pred.reconcile(&self.mover, map, h.tick, server, self.dt);
+                let after = self.blended();
+                match (o, before, after) {
+                    (Outcome::Corrected { .. }, Some(b), Some(a)) => self.smooth.correct(a - b),
+                    (Outcome::Reset, _, _) => self.smooth.reset(),
+                    _ => {}
+                }
                 self.last_outcome = Some(o);
             }
         }
@@ -391,6 +517,10 @@ impl<M: Movement> NetClient<M> {
     pub fn advance(&mut self, now_ns: u64) -> u32 {
         self.now_ns = now_ns;
         self.interp.advance(now_ns);
+        if self.smooth_ns != 0 && now_ns > self.smooth_ns {
+            self.smooth.advance((now_ns - self.smooth_ns) as f64 * 1e-9);
+        }
+        self.smooth_ns = now_ns;
         // (UDP) HELLO or WELCOME lost: HELLO again every 250 ms
         if self.phase == Phase::Joining && now_ns.saturating_sub(self.hello_ns) >= 250_000_000 {
             self.send_hello(now_ns);
@@ -440,7 +570,7 @@ impl<M: Movement> NetClient<M> {
             }
             _ => None,
         };
-        let m = InputMsg { newest: t, inputs, ack: self.newest, full };
+        let m = InputMsg { newest: t, inputs, ack: self.newest, full, ev_ack: self.in_ev.ack_for_packet(), events: self.out_ev.take_run(t) };
         let b = proto::write_input(&m);
         self.stats.inputs_sent += 1;
         self.stats.bytes_out += b.len() as u64;

@@ -1,0 +1,33 @@
+# ISDN-Switch (JD13, eigene Grafik im JFNetworker-Stil)
+master: ISDN switch
+name.de: ISDN-Switch
+name.en: ISDN switch
+name.es: Conmutador RDSI
+name.it: Switch ISDN
+name.fr: Commutateur RNIS
+prompt.de: ISDN-Switch: Vermittlung für ISDN-Leitungen.
+prompt.en: ISDN switch: switch for ISDN lines.
+prompt.es: Conmutador RDSI: conmutador de líneas RDSI.
+prompt.it: Switch ISDN: commutatore per linee ISDN.
+prompt.fr: Commutateur RNIS : commutateur de lignes RNIS.
+keywords.de: ISDN-Switch, Netzwerk
+keywords.en: ISDN switch, network
+keywords.es: Conmutador RDSI, red
+keywords.it: Switch ISDN, rete
+keywords.fr: Commutateur RNIS, réseau
+svg: ../../symbols/network/switch_isdn.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = ISDN-Switch
+    Value.en = ISDN switch
+    Value.es = Conmutador RDSI
+    Value.it = Switch ISDN
+    Value.fr = Commutateur RNIS

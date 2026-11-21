@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="96" height="96"
+     fill="none" stroke="#F7F8FA" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round">
+  <title>Role pictogram comm: a handset with waves (white, for the role badge; make_roles.py)</title>
+  <path class="body" d="M2.7 2.3Q1.2 10.5 9.6 9.3" stroke-width="1.7"/>
+  <path class="body" d="M3.63 1.96L3.3 3.73M8.19 8.64L9.97 8.39" stroke-width="2.3"/>
+  <path class="body" d="M5.89 3.57A3.3 3.3 0 0 1 8.43 6.11M6.34 1.42A5.5 5.5 0 0 1 10.58 5.66"/>
+</svg>

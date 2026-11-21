@@ -82,8 +82,8 @@ pub use ruler::{RulerEv, RulerSpec};
 pub use shape_edit::{
     SeBox, SeEv, SeGlue, SeGuide, SeMark, SeModel, SePoint, SeShape, SeState, SEF_1D, SEF_BEGIN_DYN, SEF_BEGIN_GLUED, SEF_DYNAMIC, SEF_END_DYN,
     SEF_END_GLUED, SEF_GROUP, SEF_LOCK_ASPECT, SEF_LOCK_BEGIN, SEF_LOCK_END, SEF_LOCK_H, SEF_LOCK_MOVE, SEF_LOCK_PIN, SEF_LOCK_ROTATE,
-    SEF_LOCK_W, SEF_NOARROWS, SEF_NOGLUE, SEF_NOSELECT, SE_CONNECT, SE_ELLIPSE, SE_LINE, SE_PLACE, SE_POINTER, SE_RECT, SE_TEXT, SPF_GLUE, SP_CONN, SP_CONTROL,
-    SP_VERTEX,
+    SEF_LOCK_W, SEF_NOARROWS, SEF_NOGLUE, SEF_NOSELECT, SEF_NOSNAP, SE_ARC, SE_CONNECT, SE_ELLIPSE, SE_FREEFORM, SE_LINE, SE_PLACE, SE_POINTER, SE_RECT,
+    SE_TEXT, SPF_GLUE, SP_CONN, SP_CONTROL, SP_VERTEX,
 };
 mod dirty;
 mod dnd;
@@ -163,7 +163,7 @@ mod gpu_out;
 #[path = "gpu_out_off.rs"]
 mod gpu_out;
 #[cfg(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple"))]
-pub use gpu_out::{GPU_OUT_FS, GPU_OUT_FS_IMAGE, GPU_OUT_FS_TILE, GPU_OUT_VS, GPU_OUT_WGSL};
+pub use gpu_out::{GPU_OUT_FS, GPU_OUT_FS_IMAGE, GPU_OUT_FS_TILE, GPU_OUT_FS_VEIL, GPU_OUT_VS, GPU_OUT_WGSL};
 // a canvas whose zoom and pan go through GPU textures (canvas.rs); on every target
 mod canvas;
 pub use canvas::{CanvasContent, CanvasDesc, CanvasGpu, CanvasView};
@@ -697,6 +697,12 @@ pub struct GpuOutput {
     /// jfgui_GPU_VERIFY: images read back and compared, those that differed
     pub verified: u64,
     pub verify_bad: u64,
+    /// (G7b) veils (gpu_out.rs "Veils": cells with something over a view, composed on the GPU): the cells and
+    /// rectangles drawn so in the window's last frame; of all windows: cells drawn twice for them, settles
+    pub veil_cells: u32,
+    pub veil_rects: u32,
+    pub veil_draws: u64,
+    pub veil_settles: u64,
 }
 
 /// the UI context: everything ASMLIB keeps in g_* variables

@@ -1,0 +1,65 @@
+# Unten nach Seite 1: senkrecht aus der Unterkante, waagrecht in die Seite; gezeichnet nach unten
+# und rechts.  Dynamischer Verbinder (ObjType 2 verlegbar, GlueType 2): die App verlegt ihn selbst
+# und ersetzt die gezeichnete Geometrie durch ihren Weg; der Kasten bleibt aufrecht (Width =
+# EndX-BeginX ..., Angle 0).  Route-Zellen mit Visios Namen und Werten: ShapeRouteStyle 22
+# (einfach senkrecht-waagrecht), ConLineRouteExt 1, ConFixedCode 0.  Der Text folgt
+# Controls.TextPosition, das die App in die Mitte des Wegs setzt (ohne Text verborgen).
+master: Bottom to side 1
+name.de: Unten nach Seite 1
+name.en: Bottom to side 1
+name.es: De abajo al lado 1
+name.it: Dal basso al lato 1
+name.fr: Du bas vers le côté 1
+prompt.de: Dynamischer Verbinder mit einem Knick von der Unterkante des einen Shapes zur Seite eines anderen rechts darunter. Ziehen Sie die Enden auf Shapes.
+prompt.en: Dynamic connector with one bend from the bottom edge of one shape to the side of another below on the right. Drag the ends onto shapes.
+prompt.es: Conector dinámico con un codo del borde inferior de una forma al lado de otra situada abajo a la derecha. Arrastre los extremos sobre las formas.
+prompt.it: Connettore dinamico con una piega dal bordo inferiore di una forma al lato di un'altra in basso a destra. Trascina le estremità sulle forme.
+prompt.fr: Connecteur dynamique avec un coude du bord inférieur d'une forme au côté d'une autre en bas à droite. Faites glisser les extrémités sur les formes.
+keywords.de: Verbinder, dynamisch, verbinden, oben, unten, Seite, Knick
+keywords.en: connector, dynamic, connect, top, bottom, side, bend
+keywords.es: conector, dinámico, conectar, arriba, abajo, lado, codo
+keywords.it: connettore, dinamico, collegare, alto, basso, lato, piega
+keywords.fr: connecteur, dynamique, relier, haut, bas, côté, coude
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 20 mm
+BeginY.us = 0.75 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 0 mm
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+ObjType = 2
+GlueType = 2
+ShapeRouteStyle = 22
+ConLineRouteExt = 1
+ConFixedCode = 0
+NoAlignBox = TRUE
+DynFeedback = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Controls.TextPosition
+TxtPinY = Controls.TextPosition.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+RelMoveTo  X = 0; Y = 0
+RelLineTo  X = 0; Y = 1
+RelLineTo  X = 1; Y = 1
+
+[Controls]
+TextPosition:  X = Width*0.25; Y = Height
+        XDyn = Controls.TextPosition; YDyn = Controls.TextPosition.Y
+        XCon = IF(OR(STRSAME(SHAPETEXT(TheText),""),HideText),5,0); YCon = 0; CanGlue = FALSE
+        Tip.de = "Text verschieben"
+        Tip.en = "Move the text"
+        Tip.es = "Mover el texto"
+        Tip.it = "Sposta il testo"
+        Tip.fr = "Déplacer le texte"

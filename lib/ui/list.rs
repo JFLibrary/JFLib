@@ -47,7 +47,9 @@
 //        the asm keeps a pointer to the app's variable in between; list_sel() reads it in
 //        the rows)
 //   tabs(id, &mut sel, names) -> EV        text tab header row, tab i has the id
-//                                          `id + 1 + i`; EV_ACT when sel changed; placed
+//                                          `id + 1 + i`; EV_ACT when sel changed (a click
+//                                          or a right click on a tab), EV_DOUBLE when a
+//                                          tab was double-clicked; placed
 //                                          narrower than the tabs, the widest ones give
 //                                          way (labels cut with "…")
 //   expander_begin(id, header, &mut open) -> open   (emit the content when 1)
@@ -1347,7 +1349,8 @@ impl Ui {
         ev
     }
 
-    /// ui_tabs(id, &mut sel, names) -> EV_* (EV_ACT when sel changed)
+    /// ui_tabs(id, &mut sel, names) -> EV_* (EV_ACT when sel changed: a click or a right click
+    /// on a tab selects it; EV_DOUBLE when a tab was double-clicked: it is the selected one then)
     #[cfg_attr(jfgui_dev, track_caller)]
     pub fn tabs(&mut self, id: u32, sel: &mut i32, names: &[&str]) -> u32 {
         let _src = self.src_scope();
@@ -1402,12 +1405,15 @@ impl Ui {
         }
         // the tabs
         let mut x = strip[0];
+        let mut dbl = false;
         for i in 0..n {
             let label = super::basic::cstr(names[i]);
             self.wp.ctx.last_rect = [x, strip[1], widths[i], h];
             let tid = id.wrapping_add(i as u32).wrapping_add(1);
             let tev = self.behave(tid, disabled);
-            if tev & EV_ACT != 0 {
+            dbl |= tev & EV_DOUBLE != 0;
+            // a right click selects the tab too: a context menu on the strip is the tab's
+            if tev & (EV_ACT | EV_RCLICK) != 0 {
                 self.wp.ctx.focus = id;
                 self.wp.ctx.focus_visible = false;
                 if *sel != i as i32 {
@@ -1486,9 +1492,12 @@ impl Ui {
         self.wp.ctx.last_rect = strip;
         self.wp.ctx.last_state = state;
         self.sem(K_BOX, id, None, *sel).max = count;
-        let mut r = ev & !EV_ACT;
+        let mut r = ev & !(EV_ACT | EV_DOUBLE);
         if *sel != old {
             r |= EV_ACT;
+        }
+        if dbl {
+            r |= EV_DOUBLE;
         }
         r
     }

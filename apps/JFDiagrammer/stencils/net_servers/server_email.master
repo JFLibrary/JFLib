@@ -1,0 +1,33 @@
+# E-Mail-Server (JD13, eigene Grafik im JFNetworker-Stil)
+master: Email server
+name.de: E-Mail-Server
+name.en: Email server
+name.es: Servidor de correo
+name.it: Server di posta
+name.fr: Serveur de messagerie
+prompt.de: E-Mail-Server: stellt E-Mails zu.
+prompt.en: Email server: delivers email.
+prompt.es: Servidor de correo: entrega el correo.
+prompt.it: Server di posta: recapita la posta.
+prompt.fr: Serveur de messagerie : distribue le courrier électronique.
+keywords.de: E-Mail-Server, Server, Rolle
+keywords.en: Email server, server, role
+keywords.es: Servidor de correo, servidor, función
+keywords.it: Server di posta, server, ruolo
+keywords.fr: Serveur de messagerie, serveur, rôle
+svg: ../../symbols/network/server_email.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = E-Mail-Server
+    Value.en = Email server
+    Value.es = Servidor de correo
+    Value.it = Server di posta
+    Value.fr = Serveur de messagerie

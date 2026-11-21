@@ -1,0 +1,90 @@
+# Eingeklammerter Text: links und rechts je eine eckige Klammer; der Zeiger geht von der Mitte der
+# Klammer, die der Spitze zugewandt ist, zur Spitze, dort ein Punkt.  Liegt die Spitze im Körper,
+# sind Zeiger und Punkt aus (NoShow).
+master: Callout brackets
+name.de: Eingeklammerter Text
+name.en: Bracketed text
+name.es: Texto entre corchetes
+name.it: Testo tra parentesi
+name.fr: Texte entre crochets
+prompt.de: Text zwischen zwei eckigen Klammern, der Zeiger geht von der Klammer zum Ziel hin aus. Ziehen Sie den gelben Steuerpunkt auf das Ziel.
+prompt.en: Text between two square brackets; the pointer starts at the bracket facing the target. Drag the yellow control handle onto the target.
+prompt.es: Texto entre dos corchetes; el puntero sale del corchete que mira al destino. Arrastre el controlador amarillo hasta el destino.
+prompt.it: Testo tra due parentesi quadre; il puntatore parte dalla parentesi rivolta verso la destinazione. Trascina la maniglia di controllo gialla sulla destinazione.
+prompt.fr: Texte entre deux crochets ; le pointeur part du crochet tourné vers la cible. Faites glisser la poignée de contrôle jaune sur la cible.
+keywords.de: Beschriftung, Hinweis, Kommentar, Zeiger, eckige Klammer, Klammer, Randnotiz, eingeklammert, beidseitig
+keywords.en: callout, note, comment, pointer, bracket, square bracket, side note, bracketed, both sides
+keywords.es: llamada, nota, comentario, puntero, corchete, nota al margen, grupo, entre corchetes, ambos lados
+keywords.it: richiamo, nota, commento, puntatore, parentesi quadra, parentesi, nota a margine, tra parentesi, entrambi i lati
+keywords.fr: bulle d'annotation, note, commentaire, pointeur, crochet, note en marge, groupe, entre crochets, deux côtés
+text.de: Text
+text.en: Text
+text.es: Texto
+text.it: Testo
+text.fr: Texte
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 16 mm
+Height.us = 0.6 in
+LeftMargin = 3 mm
+LeftMargin.us = 0.12 in
+RightMargin = 3 mm
+RightMargin.us = 0.12 in
+
+[User]
+msvStructureType:         Value = "Callout"
+msvShapeCategories:       Value = "Callout"
+msvSDCalloutNoHighlight:  Value = FALSE
+# die Spitze des Zeigers
+Ax:                       Value = Controls.Association
+Ay:                       Value = Controls.Association.Y
+Out:                      Value = OR(User.Ax<0,User.Ax>Width,User.Ay<0,User.Ay>Height)
+# die Spitze rechts der Mitte: der Zeiger beginnt an der rechten Klammer
+Right:                    Value = User.Ax>Width*0.5
+Sx:                       Value = IF(User.Right,Width,0)
+# die Länge der Arme
+Arm:                      Value = MIN(2.5 mm,Width*0.2)
+                          Value.us = MIN(0.1 in,Width*0.2)
+Dot:                      Value = 0.8 mm
+                          Value.us = 0.03 in
+
+# die linke Klammer
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.Arm; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+LineTo  X = User.Arm; Y = 0
+
+# die rechte Klammer
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width-User.Arm; Y = Height
+LineTo  X = Width; Y = Height
+LineTo  X = Width; Y = 0
+LineTo  X = Width-User.Arm; Y = 0
+
+# der Zeiger
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(User.Out)
+MoveTo  X = User.Sx; Y = Height*0.5
+LineTo  X = User.Ax; Y = User.Ay
+
+# der Punkt an der Spitze
+[Geometry]
+NoShow = NOT(User.Out)
+Ellipse  X = User.Ax; Y = User.Ay; A = User.Ax+User.Dot; B = User.Ay; C = User.Ax; D = User.Ay+User.Dot
+
+[Controls]
+Association:  X = -12 mm; Y = -10 mm
+              X.us = -0.5 in; Y.us = -0.4 in
+              XDyn = User.Sx; YDyn = Height*0.5
+              XCon = 2; YCon = 2; CanGlue = FALSE
+              Tip.de = "Zeiger auf das Ziel ziehen"
+              Tip.en = "Drag the pointer onto the target"
+              Tip.es = "Arrastre el puntero hasta el destino"
+              Tip.it = "Trascina il puntatore sulla destinazione"
+              Tip.fr = "Faites glisser le pointeur sur la cible"

@@ -11,9 +11,9 @@ expect button:"Zone de texte" exists
 expect tab:"Formes principales" exists
 drag button:"Losange" canvas:"Zone de dessin"
 a11y expect announced "« Losange » déposée"
-# a German name finds the French tile
+# a German name finds the French tile (JD13: "Raute" is in Blöcke too, so the triangle)
 focus #24577
-type "raute"
-expect button:"Losange" exists
+type "dreieck"
+expect button:"Triangle" exists
 key esc
 shot build/JFDiagrammer-stencils-fr.png

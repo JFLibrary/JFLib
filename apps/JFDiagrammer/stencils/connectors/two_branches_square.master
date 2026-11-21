@@ -1,0 +1,84 @@
+# 2 Zweige (eckig): ein Stamm vom Anfang bis zur Verzweigung (Steuerpunkt Fork, nur waagrecht),
+# dort rechtwinklig zum Ende und zum Ende des zweiten Zweigs (Row_1).  1D-Shape mit aufrechtem
+# Kasten wie der Kurvenverbinder (Width = EndX-BeginX, Height = EndY-BeginY, Angle 0); die Enden
+# kleben an Shapes, mit GlueType 2 auch an das ganze Shape.  Die Enden der weiteren Zweige sind
+# Steuerpunkte mit CanGlue (in Visio kleben sie an Shapes); ihre Wege stehen vor dem Hauptweg,
+# damit der Hauptweg der letzte Teilpfad ist.  Ohne Pfeilspitzen (BeginArrow/EndArrow 0): eine
+# Spitze säße nur am Ende des Hauptwegs.
+master: 2 branches (square)
+name.de: 2 Zweige (eckig)
+name.en: 2 branches (square)
+name.es: 2 ramas (en ángulo recto)
+name.it: 2 rami (ad angolo retto)
+name.fr: 2 branches (à angle droit)
+prompt.de: Verbinder, der sich rechtwinklig in zwei Zweige teilt. Ziehen Sie die Enden und die gelben Punkte auf Shapes.
+prompt.en: Connector that splits into two branches at right angles. Drag the ends and the yellow handles onto shapes.
+prompt.es: Conector que se divide en dos ramas en ángulo recto. Arrastre los extremos y los controladores amarillos sobre las formas.
+prompt.it: Connettore che si divide in due rami ad angolo retto. Trascina le estremità e le maniglie gialle sulle forme.
+prompt.fr: Connecteur qui se divise en deux branches à angle droit. Faites glisser les extrémités et les poignées jaunes sur les formes.
+keywords.de: zwei, eckig, rechtwinklig, Verbinder, Verzweigung, Zweige, Baum
+keywords.en: two, square, right angle, connector, branch, branches, tree
+keywords.es: dos, ángulo recto, cuadrado, conector, bifurcación, ramas, árbol
+keywords.it: due, ad angolo retto, squadrato, connettore, diramazione, rami, albero
+keywords.fr: deux, angle droit, carré, connecteur, bifurcation, branches, arbre
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 10 mm
+BeginY.us = 0.4 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 18 mm
+EndY.us = 0.7 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+GlueType = 2
+BeginArrow = 0
+EndArrow = 0
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = User.Fork*0.5
+TxtPinY = 0
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# wo sich der Verbinder teilt
+Fork:  Value = Controls.Fork
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.Fork; Y = 0
+LineTo  X = User.Fork; Y = Controls.Row_1.Y
+LineTo  X = Controls.Row_1; Y = Controls.Row_1.Y
+
+# der Hauptweg zum Ende, der letzte Teilpfad
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = User.Fork; Y = 0
+LineTo  X = User.Fork; Y = Height
+LineTo  X = Width; Y = Height
+
+[Controls]
+Row_1:  X = Width; Y = -8 mm
+        Y.us = -0.3 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 2; CanGlue = TRUE
+        Tip.de = "Ende von Zweig 2; auf ein Shape ziehen"
+        Tip.en = "End of branch 2; drag it onto a shape"
+        Tip.es = "Extremo de la rama 2; arrástrelo sobre una forma"
+        Tip.it = "Estremità del ramo 2; trascinala su una forma"
+        Tip.fr = "Extrémité de la branche 2 ; faites-la glisser sur une forme"
+Fork:  X = Width*0.4; Y = 0
+        XDyn = Controls.Fork; YDyn = Controls.Fork.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Verzweigung verschieben"
+        Tip.en = "Move the fork"
+        Tip.es = "Mover la bifurcación"
+        Tip.it = "Sposta la diramazione"
+        Tip.fr = "Déplacer la bifurcation"

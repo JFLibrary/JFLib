@@ -55,6 +55,10 @@ pub struct Report {
     pub degenerate: usize,
     /// vertex normals that are not unit length or point away from their face (see [`NORMAL_TOLERANCE`])
     pub bad_normals: usize,
+    /// where the first problem lies, for a message: the middle of the first open, non-manifold or flipped edge,
+    /// else a pinched point, else the middle of the first degenerate triangle, else a vertex with a wrong
+    /// normal; None when there is none of these
+    pub problem_at: Option<Vec3>,
 }
 
 impl Report {
@@ -128,19 +132,22 @@ impl Mesh {
         let points = self.point_count();
         // degenerate triangles: a repeated point or (almost) no height
         let mut degenerate = 0;
+        let mut degenerate_at: Option<Vec3> = None;
         for t in 0..tris {
             let tri = self.triangle(t);
             let p = [pid[tri[0] as usize], pid[tri[1] as usize], pid[tri[2] as usize]];
+            let [a, b, c] = self.corners(t);
             if p[0] == p[1] || p[1] == p[2] || p[0] == p[2] {
                 degenerate += 1;
+                degenerate_at = degenerate_at.or(Some((a + b + c) / 3.0));
                 continue;
             }
-            let [a, b, c] = self.corners(t);
             let e2 = (b - a).length_sq().max((c - b).length_sq()).max((a - c).length_sq());
             let twice = (b - a).cross(c - a).length();
             // height = twice / longest edge; degenerate when height < ratio * longest edge
             if !(twice > DEGENERATE_RATIO * e2) {
                 degenerate += 1;
+                degenerate_at = degenerate_at.or(Some((a + b + c) / 3.0));
             }
         }
         // edges
@@ -148,6 +155,13 @@ impl Mesh {
         let mut comp = Groups::new(tris);
         let mut corner_fans = Groups::new(3 * tris);
         let (mut edges, mut open, mut nonmanifold, mut flipped) = (0, 0, 0, 0);
+        // the middle of the first bad edge
+        let edge_mid = |u: &crate::mesh::EdgeUse| -> Vec3 {
+            let tri = self.triangle(u.tri as usize);
+            let (a, b) = (self.positions[tri[u.corner as usize] as usize], self.positions[tri[(u.corner as usize + 1) % 3] as usize]);
+            (a + b) * 0.5
+        };
+        let mut bad_edge: Option<Vec3> = None;
         let mut i = 0;
         while i < uses.len() {
             let mut j = i + 1;
@@ -155,6 +169,10 @@ impl Mesh {
                 j += 1;
             }
             edges += 1;
+            let bad = j - i != 2 || uses[i].forward == uses[i + 1].forward;
+            if bad && bad_edge.is_none() {
+                bad_edge = Some(edge_mid(&uses[i]));
+            }
             match j - i {
                 1 => open += 1,
                 2 => {
@@ -193,6 +211,11 @@ impl Mesh {
             fan_count[p as usize] += 1;
         }
         let nonmanifold_points = if open == 0 && nonmanifold == 0 && flipped == 0 { fan_count.iter().filter(|&&c| c > 1).count() } else { 0 };
+        let pinched_at = if nonmanifold_points > 0 {
+            fan_count.iter().position(|&c| c > 1).and_then(|p| pid.iter().position(|&q| q as usize == p)).map(|v| self.positions[v])
+        } else {
+            None
+        };
         // components: points, edges, triangles and signed volume each
         let mut root_of = vec![0u32; tris];
         for (t, r) in root_of.iter_mut().enumerate() {
@@ -248,6 +271,7 @@ impl Mesh {
         // stored normals against the faces
         let fnorm = crate::normals::face_normals(self);
         let mut bad_normals = 0;
+        let mut normal_at: Option<Vec3> = None;
         for c in 0..self.indices.len() {
             let n = self.normals[self.indices[c] as usize];
             let len = n.length();
@@ -255,6 +279,7 @@ impl Mesh {
             let against = fnorm[c / 3].is_some_and(|f| !(f.dot(n) > 0.0));
             if wrong_len || against {
                 bad_normals += 1;
+                normal_at = normal_at.or(Some(self.positions[self.indices[c] as usize]));
             }
         }
         Report {
@@ -274,6 +299,7 @@ impl Mesh {
             inverted_components: inverted,
             degenerate,
             bad_normals,
+            problem_at: bad_edge.or(pinched_at).or(degenerate_at).or(normal_at),
         }
     }
 }

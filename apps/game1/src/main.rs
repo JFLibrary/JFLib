@@ -10,6 +10,8 @@
 //   game1 --bench                  the measurements: frame time offscreen at 1080p with 16 figures, the server's time
 //                                  per tick with 16 bots, the bandwidth per player (release build)
 //   game1 --loopback [--secs S]    a server on 127.0.0.1 (UDP and WebSocket) and clients over real sockets
+//   game1 --client SERVER [..]     headless clients played by the bots' minds against a server: round trip, jitter,
+//                                  loss, corrections (src/client.rs; also in the browser: tests/browser.mjs)
 //   game1 --bake IN.glb OUT.g1m    modeltool's glTF into the game's format (tools/content.py runs it)
 //
 // The parts: game1_core (crates/game1_core: rules, map, movement, the room, bots, the server's loop; no GPU), the
@@ -24,6 +26,7 @@ extern crate alloc;
 mod app;
 mod bake;
 mod bench;
+mod client;
 mod local;
 #[cfg(not(target_arch = "wasm32"))]
 mod loopback;
@@ -188,6 +191,12 @@ fn run() -> i32 {
     }
     if args.iter().any(|a| a == "--bench") {
         return bench::run(quick);
+    }
+    if args.iter().any(|a| a == "--client") {
+        #[cfg(not(target_arch = "wasm32"))]
+        return client::run(&args);
+        #[cfg(target_arch = "wasm32")]
+        return client::start(&args);
     }
     #[cfg(not(target_arch = "wasm32"))]
     if args.iter().any(|a| a == "--loopback") {

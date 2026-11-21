@@ -1,0 +1,62 @@
+# Rahmen: Außen- und Innenrechteck als zwei Abschnitte (Visio füllt nach der
+# Gerade-Ungerade-Regel, innen bleibt frei).  Row_1 an der inneren linken oberen Ecke ändert die
+# Rahmenbreite (nur waagrecht, Abstand von links; Y folgt der Ecke).
+master: Frame
+name.de: Rahmen
+name.en: Frame
+name.es: Marco
+name.it: Cornice
+name.fr: Cadre
+prompt.de: Rechteckiger Rahmen mit Öffnung in der Mitte. Mit dem gelben Steuerpunkt ändern Sie die Rahmenbreite.
+prompt.en: Rectangular frame with an opening in the middle. Drag the yellow control handle to change the frame width.
+prompt.es: Marco rectangular con una abertura en el centro. Arrastre el controlador amarillo para cambiar el ancho del marco.
+prompt.it: Cornice rettangolare con un'apertura al centro. Trascina la maniglia di controllo gialla per cambiare la larghezza della cornice.
+prompt.fr: Cadre rectangulaire avec une ouverture au milieu. Faites glisser la poignée de contrôle jaune pour modifier la largeur du cadre.
+keywords.de: Rahmen, Umrandung, Bilderrahmen, Rand, Fenster, hohl
+keywords.en: frame, border, picture frame, edge, window, hollow
+keywords.es: marco, borde, portarretratos, contorno, ventana, hueco
+keywords.it: cornice, bordo, portafoto, contorno, finestra, cavo
+keywords.fr: cadre, bordure, cadre photo, bord, fenêtre, creux
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 30 mm
+Height.us = 1.125 in
+
+[User]
+# die Rahmenbreite
+T:  Value = MIN(MAX(Controls.Row_1,MIN(Width,Height)*0.02),MIN(Width,Height)*0.45)
+
+# 1 außen
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# 2 innen (die Öffnung)
+[Geometry]
+MoveTo  X = User.T; Y = User.T
+LineTo  X = Width-User.T; Y = User.T
+LineTo  X = Width-User.T; Y = Height-User.T
+LineTo  X = User.T; Y = Height-User.T
+LineTo  X = Geometry2.X1; Y = Geometry2.Y1
+
+[Controls]
+Row_1:  X = 5 mm; Y = Height-User.T
+        X.us = 0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Rahmenbreite ändern"
+        Tip.en = "Change the frame width"
+        Tip.es = "Cambiar el ancho del marco"
+        Tip.it = "Cambia la larghezza della cornice"
+        Tip.fr = "Modifier la largeur du cadre"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

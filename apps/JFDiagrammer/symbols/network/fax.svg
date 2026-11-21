@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Fax machine: handset, paper feed at the top, keypad, display and output slot</title>
+  <rect class="body" x="33" y="5" width="20" height="15" fill="#F7F8FA" stroke-width="1.25"/>
+  <path class="shade" d="M36.5 9H49.5M36.5 12H46" stroke="#DCDFE3" stroke-width="1.25"/>
+  <rect class="body" x="5" y="17.5" width="54" height="23.5" rx="2.5" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M5 37.5H59V38.5A2.5 2.5 0 0 1 56.5 41H7.5A2.5 2.5 0 0 1 5 38.5Z" fill="#7A828C" stroke="none"/>
+  <rect class="ink" x="5" y="17.5" width="54" height="23.5" rx="2.5"/>
+  <rect class="port" x="9" y="41.75" width="6" height="1.25" rx="0.6" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="49" y="41.75" width="6" height="1.25" rx="0.6" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="31" y="17.75" width="24" height="1.75" rx="0.6" fill="#4F555D" stroke="none"/>
+  <path class="shade" d="M9 19.5Q6 19.5 6 16.5V13Q6 10 9.5 10H24.5Q28 10 28 13V16.5Q28 19.5 25 19.5H24Q22 19.5 21.75 17.5L21.5 14.5H12.5L12.25 17.5Q12 19.5 10 19.5Z" fill="#DCDFE3"/>
+  <g class="shade" fill="#DCDFE3" stroke="none">
+    <rect x="9" y="24" width="4.5" height="2.5" rx="0.75"/><rect x="15" y="24" width="4.5" height="2.5" rx="0.75"/><rect x="21" y="24" width="4.5" height="2.5" rx="0.75"/>
+    <rect x="9" y="28" width="4.5" height="2.5" rx="0.75"/><rect x="15" y="28" width="4.5" height="2.5" rx="0.75"/><rect x="21" y="28" width="4.5" height="2.5" rx="0.75"/>
+    <rect x="9" y="32" width="4.5" height="2.5" rx="0.75"/><rect x="15" y="32" width="4.5" height="2.5" rx="0.75"/><rect x="21" y="32" width="4.5" height="2.5" rx="0.75"/>
+  </g>
+  <rect class="screen" x="31" y="22.5" width="17" height="5" rx="0.75" fill="#CAD4DF" stroke-width="1"/>
+  <circle class="ok" cx="53" cy="25" r="1" fill="#3C9A5F" stroke="none"/>
+  <rect class="port" x="31" y="31" width="24" height="2.5" rx="0.75" fill="#4F555D" stroke="none"/>
+</svg>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>A/B switch: a small box with a selector knob, two ports and a fork pictogram</title>
+  <rect class="body" x="10" y="13" width="44" height="21" rx="3" fill="#F7F8FA"/>
+  <rect class="tint" x="13.5" y="16.5" width="13" height="14" rx="1" fill="#4F7396" stroke="none"/>
+  <path class="body" d="M15.5 23.5H18C20.5 23.5 20.5 19.5 23 19.5H24.5M18 23.5C20.5 23.5 20.5 27.5 23 27.5H24.5" stroke="#F7F8FA" stroke-width="1.3"/>
+  <circle class="body" cx="15.5" cy="23.5" r="1" fill="#F7F8FA" stroke="none"/>
+  <circle class="shade" cx="35" cy="24" r="5" fill="#DCDFE3" stroke-width="1"/>
+  <path class="ink" d="M35 24L31.9 20.9" stroke-width="1.4"/>
+  <circle class="ink" cx="35" cy="24" r="1" fill="#2E343B" stroke="none"/>
+  <path class="ink" d="M29.6 18.6L28.6 17.6M40.4 18.6L41.4 17.6" stroke-width="1"/>
+  <rect class="port" x="43" y="17.5" width="6" height="4.5" rx="0.4" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="43" y="25.5" width="6" height="4.5" rx="0.4" fill="#4F555D" stroke="none"/>
+  <circle class="ok" cx="51.25" cy="19.75" r="0.8" fill="#3C9A5F" stroke="none"/>
+  <circle class="port" cx="51.25" cy="27.75" r="0.8" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="15" y="34" width="6" height="2" rx="0.75" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="43" y="34" width="6" height="2" rx="0.75" fill="#4F555D" stroke="none"/>
+</svg>

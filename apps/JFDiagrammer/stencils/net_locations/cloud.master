@@ -1,0 +1,33 @@
+# Cloud (JD13, eigene Grafik im JFNetworker-Stil)
+master: Cloud
+name.de: Cloud
+name.en: Cloud
+name.es: Nube
+name.it: Cloud
+name.fr: Nuage
+prompt.de: Cloud: Internet oder ein Cloud-Dienst.
+prompt.en: Cloud: the internet or a cloud service.
+prompt.es: Nube: internet o un servicio en la nube.
+prompt.it: Cloud: internet o un servizio cloud.
+prompt.fr: Nuage : internet ou un service cloud.
+keywords.de: Cloud, Standort, WAN
+keywords.en: Cloud, location, site, WAN
+keywords.es: Nube, ubicación, WAN
+keywords.it: Cloud, sede, WAN
+keywords.fr: Nuage, site, WAN
+svg: ../../symbols/network/cloud_internet.svg
+include: ../net_common/symbol.inc, ../net_common/location.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Standort
+    Value.en = Location
+    Value.es = Ubicación
+    Value.it = Sede
+    Value.fr = Site
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Cloud
+    Value.en = Cloud
+    Value.es = Nube
+    Value.it = Cloud
+    Value.fr = Nuage

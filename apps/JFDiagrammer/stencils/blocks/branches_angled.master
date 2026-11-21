@@ -1,0 +1,134 @@
+# Zweige schräg: ein Verbinder, der sich in drei schräge Äste teilt, als 1D-Shape mit
+# aufrechtem Kasten wie 2 Zweige (eckig) (lokal (0, 0) ist der Anfang).  Vom Anfang läuft der
+# Stamm waagrecht zur Gabel, von dort gehen drei gerade Äste ab: zum Ende und zu den Spitzen von
+# Row_1 und Row_2.  Der Anfang und das Ende kleben (GlueType 2 auch an das ganze Shape), Row_1
+# und Row_2 dürfen in Visio ebenfalls kleben (CanGlue).  Row_1 und Row_2 setzen die Spitzen der
+# beiden anderen Äste (frei, als Abstand vom Anfang; anfangs auf der Höhe des Anfangs und
+# gespiegelt zum Ende), Row_3 auf dem Stamm die Lage der Gabel (anteilig, nur waagrecht).
+# Formatvorlage "Connector"; die Pfeilspitzen zeichnet das Shape selbst in Richtung der Äste
+# (gefüllte Dreiecke in der Linienfarbe), BeginArrow und EndArrow 0.  Der Text steht auf dem
+# Stamm.
+master: Branches (angled)
+name.de: Zweige schräg
+name.en: Branches (angled)
+name.es: Ramas oblicuas
+name.it: Rami obliqui
+name.fr: Branches obliques
+style: Connector
+prompt.de: Verbinder, der sich in drei schräge Äste teilt. Gabel und Äste verschieben Sie mit den gelben Steuerpunkten.
+prompt.en: Connector that splits into three angled branches. Drag the yellow control handles to move the fork and the branches.
+prompt.es: Conector que se divide en tres ramas oblicuas. Arrastre los controladores amarillos para mover la bifurcación y las ramas.
+prompt.it: Connettore che si divide in tre rami obliqui. Trascina le maniglie di controllo gialle per spostare la biforcazione e i rami.
+prompt.fr: Connecteur qui se divise en trois branches obliques. Faites glisser les poignées de contrôle jaunes pour déplacer la fourche et les branches.
+keywords.de: Verbinder, Zweige, Verzweigung, Gabel, aufteilen, schräg, verteilen, Fächer
+keywords.en: connector, branches, branching, fork, split, angled, distribute, fan
+keywords.es: conector, ramas, ramificación, bifurcación, dividir, oblicuo, distribuir, abanico
+keywords.it: connettore, rami, diramazione, biforcazione, dividere, obliquo, distribuire, ventaglio
+keywords.fr: connecteur, branches, embranchement, fourche, diviser, oblique, répartir, éventail
+
+[Shape]
+BeginX = 0 mm
+BeginY = 15 mm
+BeginY.us = 0.6 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 25 mm
+EndY.us = 1 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+GlueType = 2
+BeginArrow = 0
+EndArrow = 0
+FillForegnd = LineColor
+FillPattern = 1
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = User.Xj*0.5
+TxtPinY = 0
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Gabel, die Spitzen der beiden anderen Äste, Länge und halbe Breite der Pfeilspitzen
+Xj:   Value = Controls.Row_3
+X1:   Value = Controls.Row_1
+Y1:   Value = Controls.Row_1.Y
+X2:   Value = Controls.Row_2
+Y2:   Value = Controls.Row_2.Y
+L:    Value = 3 mm
+      Value.us = 0.12 in
+Aw:   Value = 1.2 mm
+      Value.us = 0.05 in
+# die Richtungen der Äste von der Gabel zu ihrer Spitze (Einheitsvektoren)
+U0x:  Value = (Width-User.Xj)/MAX(SQRT((Width-User.Xj)^2+Height^2), 0.01 mm)
+U0y:  Value = Height/MAX(SQRT((Width-User.Xj)^2+Height^2), 0.01 mm)
+U1x:  Value = (User.X1-User.Xj)/MAX(SQRT((User.X1-User.Xj)^2+User.Y1^2), 0.01 mm)
+U1y:  Value = User.Y1/MAX(SQRT((User.X1-User.Xj)^2+User.Y1^2), 0.01 mm)
+U2x:  Value = (User.X2-User.Xj)/MAX(SQRT((User.X2-User.Xj)^2+User.Y2^2), 0.01 mm)
+U2y:  Value = User.Y2/MAX(SQRT((User.X2-User.Xj)^2+User.Y2^2), 0.01 mm)
+
+# 1 der Stamm und der Ast zum Ende
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = User.Xj; Y = 0
+LineTo  X = Width-User.L*User.U0x; Y = Height-User.L*User.U0y
+
+# 2 und 3 die beiden anderen Äste
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.Xj; Y = 0
+LineTo  X = User.X1-User.L*User.U1x; Y = User.Y1-User.L*User.U1y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.Xj; Y = 0
+LineTo  X = User.X2-User.L*User.U2x; Y = User.Y2-User.L*User.U2y
+
+# 4 bis 6 die Pfeilspitzen
+[Geometry]
+MoveTo  X = Width; Y = Height
+LineTo  X = Width-User.L*User.U0x-User.Aw*User.U0y; Y = Height-User.L*User.U0y+User.Aw*User.U0x
+LineTo  X = Width-User.L*User.U0x+User.Aw*User.U0y; Y = Height-User.L*User.U0y-User.Aw*User.U0x
+LineTo  X = Geometry4.X1; Y = Geometry4.Y1
+
+[Geometry]
+MoveTo  X = User.X1; Y = User.Y1
+LineTo  X = User.X1-User.L*User.U1x-User.Aw*User.U1y; Y = User.Y1-User.L*User.U1y+User.Aw*User.U1x
+LineTo  X = User.X1-User.L*User.U1x+User.Aw*User.U1y; Y = User.Y1-User.L*User.U1y-User.Aw*User.U1x
+LineTo  X = Geometry5.X1; Y = Geometry5.Y1
+
+[Geometry]
+MoveTo  X = User.X2; Y = User.Y2
+LineTo  X = User.X2-User.L*User.U2x-User.Aw*User.U2y; Y = User.Y2-User.L*User.U2y+User.Aw*User.U2x
+LineTo  X = User.X2-User.L*User.U2x+User.Aw*User.U2y; Y = User.Y2-User.L*User.U2y-User.Aw*User.U2x
+LineTo  X = Geometry6.X1; Y = Geometry6.Y1
+
+[Controls]
+Row_1:  X = Width; Y = 0
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 2; CanGlue = TRUE
+        Tip.de = "Zweiten Ast verschieben"
+        Tip.en = "Move the second branch"
+        Tip.es = "Mover la segunda rama"
+        Tip.it = "Sposta il secondo ramo"
+        Tip.fr = "Déplacer la deuxième branche"
+Row_2:  X = Width; Y = -Height
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 2; YCon = 2; CanGlue = TRUE
+        Tip.de = "Dritten Ast verschieben"
+        Tip.en = "Move the third branch"
+        Tip.es = "Mover la tercera rama"
+        Tip.it = "Sposta il terzo ramo"
+        Tip.fr = "Déplacer la troisième branche"
+Row_3:  X = Width*0.5; Y = 0
+        XDyn = Controls.Row_3; YDyn = Controls.Row_3.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Gabel verschieben"
+        Tip.en = "Move the fork"
+        Tip.es = "Mover la bifurcación"
+        Tip.it = "Sposta la biforcazione"
+        Tip.fr = "Déplacer la fourche"

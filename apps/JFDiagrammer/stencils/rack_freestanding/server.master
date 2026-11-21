@@ -1,0 +1,45 @@
+# Server (JD13, eigene Grafik im JFNetworker-Stil)
+master: Server
+name.de: Server
+name.en: Server
+name.es: Servidor
+name.it: Server
+name.fr: Serveur
+prompt.de: Server: Tower-Server in Frontansicht.
+prompt.en: Server: tower server in front view.
+prompt.es: Servidor: servidor torre en vista frontal.
+prompt.it: Server: server tower in vista frontale.
+prompt.fr: Serveur : serveur tour en vue de face.
+keywords.de: Server, Frontansicht, Regal
+keywords.en: Server, front view, shelf
+keywords.es: Servidor, vista frontal, estante
+keywords.it: Server, vista frontale, ripiano
+keywords.fr: Serveur, vue de face, étagère
+svg: ../../symbols/rack/front_server_tower.svg
+scale: 1:20
+include: ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Shape]
+Width = 100 mm
+Width.us = 3.9370 in
+Height = 50 mm
+Height.us = 1.9685 in
+TxtPinY = 0 mm
+TxtLocPinY = TxtHeight
+TxtHeight = 160 mm
+TxtWidth = Width*2
+VerticalAlign = 0
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Freistehend
+    Value.en = Freestanding
+    Value.es = Independiente
+    Value.it = Autoportante
+    Value.fr = Autonome
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur

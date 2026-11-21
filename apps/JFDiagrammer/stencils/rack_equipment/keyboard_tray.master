@@ -1,0 +1,37 @@
+# Tastaturablage (JD13, eigene Grafik im JFNetworker-Stil)
+master: Keyboard tray
+name.de: Tastaturablage
+name.en: Keyboard tray
+name.es: Bandeja de teclado
+name.it: Ripiano tastiera
+name.fr: Tablette clavier
+prompt.de: Tastaturablage: ausziehbare Tastaturablage.
+prompt.en: Keyboard tray: pull-out keyboard tray.
+prompt.es: Bandeja de teclado: bandeja extraíble para teclado.
+prompt.it: Ripiano tastiera: ripiano estraibile per tastiera.
+prompt.fr: Tablette clavier : tablette coulissante pour clavier.
+keywords.de: Tastaturablage, Rack, 19 Zoll, HE
+keywords.en: Keyboard tray, rack, 19 inch, U
+keywords.es: Bandeja de teclado, rack, 19 pulgadas, U
+keywords.it: Ripiano tastiera, rack, 19 pollici, U
+keywords.fr: Tablette clavier, baie, 19 pouces, U
+svg: ../../symbols/rack/keyboard_tray_1u.svg
+scale: 1:20
+size: 482.6 mm x 44.45 mm
+size.us: 19 in x 1.75 in
+include: ../net_common/rackdev.inc, ../net_common/asset.inc
+
+[Property]
+RackUnits: Value = 1
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Gestellmontiert
+    Value.en = Rack-mounted
+    Value.es = Montaje en rack
+    Value.it = Montaggio a rack
+    Value.fr = Monté en baie
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Tastaturablage
+    Value.en = Keyboard tray
+    Value.es = Bandeja de teclado
+    Value.it = Ripiano tastiera
+    Value.fr = Tablette clavier

@@ -1,0 +1,11 @@
+# Server (SH-158, JD13): eigene Shapes im JFNetworker-Stil, Grafiken aus ../../symbols/
+stencil: Servers
+file: servers
+name.de: Server
+name.en: Servers
+name.es: Servidores
+name.it: Server
+name.fr: Serveurs
+category: network
+masters: server_web, server_file, server_application, server_certificate, server_ecommerce, server_mobile, server_ftp, server_cms, server_directory, server_print, server_email, server_management, server_realtime, server_public, server_database, server_proxy, server_streaming
+quick: 4

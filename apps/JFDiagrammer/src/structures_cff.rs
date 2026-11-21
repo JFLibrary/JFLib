@@ -14,9 +14,8 @@
 // vertical forms and the hidden CFF Container, Swimlane List, Phase List.  The structure and
 // the layout are diagram_core::structure::cff's.
 
-use alloc::vec::Vec;
-
 use diagram_core::formula::Engine;
+use diagram_core::structure::cff::{lane_master, phase_master};
 use diagram_core::structure::{self, cff};
 use diagram_core::{Document, EditError, Owner, PageRef, ShapeRef, SheetRef, Transaction, Unit, Value};
 use ui::i18n::t;
@@ -82,15 +81,6 @@ pub(crate) fn run(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
     ui.repass();
 }
 
-// the masters of one orientation
-fn lane_master(horizontal: bool) -> &'static str {
-    if horizontal { "Swimlane" } else { "Swimlane (vertical)" }
-}
-
-fn phase_master(horizontal: bool) -> &'static str {
-    if horizontal { "Separator" } else { "Separator (vertical)" }
-}
-
 /// the flowchart around a dropped lane (`lane`) or phase `s` that joined none: pool, both
 /// lists and the other part (a phase for a lane, a lane for a phase), laid out from the
 /// dropped shape's top left corner
@@ -102,37 +92,18 @@ pub(crate) fn around(tx: &mut Transaction, eng: &mut Engine, src: &Document, pag
     build(tx, eng, src, page, [b[0], b[3]], horizontal, if lane { Some(s) } else { None }, if lane { None } else { Some(s) }, 1)
 }
 
-// a flowchart from top left corner `at`: the given lane (else `lanes` new ones) and phase
+// a flowchart from top left corner `at`: the given lane (else `lanes` new ones) and phase (else
+// a new one), built by diagram_core (cff::create_with, JD13: the template build tool makes its
+// flowcharts the same way); connectors glued to its parts follow
+#[allow(clippy::too_many_arguments)]
 fn build(tx: &mut Transaction, eng: &mut Engine, src: &Document, page: PageRef, at: [f64; 2], horizontal: bool, lane: Option<ShapeRef>, phase: Option<ShapeRef>, lanes: usize) -> Result<(), EditError> {
-    let owner = Owner::Page(page);
-    let pool = place_master(tx, eng, src, "CFF Container", page, at)?;
-    let ll = place_master(tx, eng, src, "Swimlane List", page, at)?;
-    let pl = place_master(tx, eng, src, "Phase List", page, at)?;
-    // the directions of the lists: lanes across the flow, phases along it
-    for (l, d) in [(ll, if horizontal { 2.0 } else { 0.0 }), (pl, if horizontal { 0.0 } else { 2.0 })] {
-        tx.set_user(SheetRef::Shape(l), "msvSDListDirection", Value::Num(d), None)?;
+    let f = cff::create_with(tx, eng, src, page, at, horizontal, lane, phase, lanes, 1, crate::stencils::lang())?;
+    let mut parts = alloc::vec![f.pool];
+    for l in [f.lane_list, f.phase_list].into_iter().flatten() {
+        parts.push(l);
+        parts.extend(structure::items(tx.doc(), l));
     }
-    let mut ls: Vec<ShapeRef> = lane.into_iter().collect();
-    while ls.len() < lanes.max(1) {
-        ls.push(place_master(tx, eng, src, lane_master(horizontal), page, at)?);
-    }
-    let ps: Vec<ShapeRef> = match phase {
-        Some(p) => alloc::vec![p],
-        None => alloc::vec![place_master(tx, eng, src, phase_master(horizontal), page, at)?],
-    };
-    // the pool's top left corner at `at`
-    let pb = structure::shape_box(tx.doc(), pool);
-    diagram_core::ops::move_shapes(tx, eng, &[pool], [at[0] - pb[0], at[1] - pb[3]])?;
-    // the frame behind everything: pool, lists, phases, lanes
-    for &s in ls.iter().chain(ps.iter()).chain([pl, ll, pool].iter()) {
-        diagram_core::ops::reorder(tx, &[s], diagram_core::ops::Z::Back)?;
-    }
-    structure::add_members(tx, eng, pool, &[ll, pl], None)?;
-    structure::add_members(tx, eng, ll, &ls, None)?;
-    structure::add_members(tx, eng, pl, &ps, None)?;
-    let f = cff::of_pool(tx.doc(), pool).ok_or(EditError::Invalid)?;
-    let moved = cff::layout(tx, eng, &f)?;
-    edit_canvas::follow(tx, eng, owner, &moved)
+    edit_canvas::follow(tx, eng, Owner::Page(page), &parts)
 }
 
 // Swimlane / Trennlinie: after the selected one, else at the end; without a flowchart a new one

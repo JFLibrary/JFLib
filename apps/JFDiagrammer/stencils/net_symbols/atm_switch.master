@@ -1,0 +1,33 @@
+# ATM-Switch (JD13, eigene Grafik im JFNetworker-Stil)
+master: ATM switch
+name.de: ATM-Switch
+name.en: ATM switch
+name.es: Conmutador ATM
+name.it: Switch ATM
+name.fr: Commutateur ATM
+prompt.de: ATM-Switch: Switch für ATM-Zellen.
+prompt.en: ATM switch: switch for ATM cells.
+prompt.es: Conmutador ATM: conmutador de celdas ATM.
+prompt.it: Switch ATM: switch per celle ATM.
+prompt.fr: Commutateur ATM : commutateur de cellules ATM.
+keywords.de: ATM-Switch, Netzwerk
+keywords.en: ATM switch, network
+keywords.es: Conmutador ATM, red
+keywords.it: Switch ATM, rete
+keywords.fr: Commutateur ATM, réseau
+svg: ../../symbols/network/switch_atm.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = ATM-Switch
+    Value.en = ATM switch
+    Value.es = Conmutador ATM
+    Value.it = Switch ATM
+    Value.fr = Commutateur ATM

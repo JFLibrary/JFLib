@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Flat-panel monitor on a stand</title>
+  <rect class="shade" x="29" y="35" width="6" height="6" fill="#DCDFE3"/>
+  <rect class="body" x="20" y="40.5" width="24" height="3.5" rx="1.5" fill="#F7F8FA"/>
+  <rect class="body" x="4" y="5" width="56" height="31" rx="2" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M4 31H60V34A2 2 0 0 1 58 36H6A2 2 0 0 1 4 34Z" fill="#7A828C" stroke="none"/>
+  <rect class="screen" x="7" y="8" width="50" height="20.5" fill="#CAD4DF" stroke="none"/>
+  <rect class="ink" x="4" y="5" width="56" height="31" rx="2"/>
+</svg>

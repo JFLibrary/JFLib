@@ -1,0 +1,71 @@
+# Teilprozess (ISO 5807: vordefinierter Prozess): ein Rechteck 3:2 mit je einer senkrechten
+# Innenlinie nahe der linken und der rechten Seite (zweiter Abschnitt ohne Füllung).  Row_1 oben
+# an der linken Innenlinie ändert ihren Abstand zum Rand (nur waagrecht, als Abstand von links: er
+# bleibt beim Verbreitern gleich), die rechte folgt gespiegelt.  Der Text steht zwischen den
+# Linien, die Verbindungspunkte in der Mitte jeder Seite.
+master: Subprocess
+name.de: Teilprozess
+name.en: Subprocess
+name.es: Subproceso
+name.it: Sottoprocesso
+name.fr: Sous-processus
+prompt.de: Ein vordefinierter Prozess, der an anderer Stelle beschrieben ist (ISO 5807). Mit dem gelben Steuerpunkt ändern Sie den Abstand der Innenlinien.
+prompt.en: A predefined process that is described elsewhere (ISO 5807). Drag the yellow control handle to change the distance of the inner lines.
+prompt.es: Un proceso predefinido que se describe en otro lugar (ISO 5807). Arrastre el controlador amarillo para cambiar la distancia de las líneas interiores.
+prompt.it: Un processo predefinito descritto altrove (ISO 5807). Trascina la maniglia di controllo gialla per cambiare la distanza delle linee interne.
+prompt.fr: Un processus prédéfini décrit ailleurs (ISO 5807). Faites glisser la poignée de contrôle jaune pour modifier la distance des lignes intérieures.
+keywords.de: Teilprozess, vordefinierter Prozess, Unterprogramm, Prozedur, Funktion, Modul, Flussdiagramm
+keywords.en: subprocess, predefined process, subroutine, procedure, function, module, flowchart
+keywords.es: subproceso, proceso predefinido, subrutina, procedimiento, función, módulo, diagrama de flujo
+keywords.it: sottoprocesso, processo predefinito, subroutine, procedura, funzione, modulo, diagramma di flusso
+keywords.fr: sous-processus, processus prédéfini, sous-programme, procédure, fonction, module, diagramme de flux
+
+[Shape]
+Width = 36 mm
+Width.us = 1.5 in
+Height = 24 mm
+Height.us = 1 in
+TxtWidth = Width-User.Inset*2
+TxtHeight = Height
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+msvShapeCategories:  Value = "Flowchart"
+# der Abstand der Innenlinien vom Rand
+Inset:  Value = MIN(MAX(Controls.Row_1, 0), Width*0.25)
+
+# 1 das Rechteck
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# 2 die Innenlinien
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.Inset; Y = 0
+LineTo  X = User.Inset; Y = Height
+MoveTo  X = Width-User.Inset; Y = Height
+LineTo  X = Width-User.Inset; Y = 0
+
+[Controls]
+Row_1:  X = 4 mm; Y = Height
+        X.us = 0.15 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Abstand der Innenlinien ändern"
+        Tip.en = "Change the distance of the inner lines"
+        Tip.es = "Cambiar la distancia de las líneas interiores"
+        Tip.it = "Cambia la distanza delle linee interne"
+        Tip.fr = "Modifier la distance des lignes intérieures"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

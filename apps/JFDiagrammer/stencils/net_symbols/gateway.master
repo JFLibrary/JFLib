@@ -1,0 +1,33 @@
+# Gateway (JD13, eigene Grafik im JFNetworker-Stil)
+master: Gateway
+name.de: Gateway
+name.en: Gateway
+name.es: Puerta de enlace
+name.it: Gateway
+name.fr: Passerelle
+prompt.de: Gateway: Übergang zwischen verschiedenen Netzen.
+prompt.en: Gateway: crossing between different networks.
+prompt.es: Puerta de enlace: paso entre redes diferentes.
+prompt.it: Gateway: passaggio tra reti diverse.
+prompt.fr: Passerelle : passage entre réseaux différents.
+keywords.de: Gateway, Netzwerk
+keywords.en: Gateway, network
+keywords.es: Puerta de enlace, red
+keywords.it: Gateway, rete
+keywords.fr: Passerelle, réseau
+svg: ../../symbols/network/gateway.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Gateway
+    Value.en = Gateway
+    Value.es = Puerta de enlace
+    Value.it = Gateway
+    Value.fr = Passerelle

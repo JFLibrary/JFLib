@@ -1,0 +1,91 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD8 rest: Start › Bearbeiten › Markieren › Nach Typ auswählen (RS-31) -- the
+# top-level shapes of the page by kind (shapes, groups, pictures, connectors), by layer and by
+# style
+# two rectangles grouped, a third one, a line, a picture, a text box
+cmd 4404
+drag 400,250 500,300
+drag 550,250 650,300
+drag 400,450 500,500
+cmd 4400
+click 450,275
+click 600,275 shift
+key ctrl+g
+cmd 4406
+drag 700,300 900,400
+cmd 4400
+clip file apps/JFDiagrammer/tests/pic_check.bmp
+key ctrl+v
+drag 773,462 773,612
+clip text "Notiz"
+key ctrl+v
+drag 773,462 973,612
+click 1000,700
+# by kind: the group only
+cmd 4472
+expect dialog:"Nach Typ auswählen" exists
+expect radio:"Shapetyp" checked
+expect checkbox:"Shapes" checked
+expect checkbox:"Führungslinien" disabled
+click checkbox:"Shapes"
+click checkbox:"Bilder"
+click checkbox:"Verbinder"
+click button:"OK"
+expect listitem:"Sheet.7" selected
+expect listitem:"Sheet.6" unselected
+expect listitem:"Sheet.8" unselected
+# the pictures only, the connectors (1-D shapes) only, the shapes
+cmd 4472
+click checkbox:"Gruppen"
+click checkbox:"Bilder"
+click button:"OK"
+expect listitem:"Sheet.9" selected
+expect listitem:"Sheet.7" unselected
+cmd 4472
+click checkbox:"Bilder"
+click checkbox:"Verbinder"
+click button:"OK"
+expect listitem:"Sheet.8" selected
+expect listitem:"Sheet.9" unselected
+cmd 4472
+click checkbox:"Verbinder"
+click checkbox:"Shapes"
+click button:"OK"
+expect listitem:"Sheet.6" selected
+expect listitem:"Notiz" selected
+expect listitem:"Sheet.7" unselected
+expect listitem:"Sheet.8" unselected
+# by style: the text box has "Text Only"
+cmd 4472
+click radio:"Formatvorlage"
+click checkbox:"Text Only"
+click button:"OK"
+expect listitem:"Notiz" selected
+expect listitem:"Sheet.6" unselected
+# by layer: the line on a layer of its own, then the shapes on no layer
+cmd 4469
+click #34821
+type "Linien"
+click button:"Neu…"
+click button:"OK"
+click 800,350
+expect listitem:"Sheet.8" selected
+cmd 4468
+click checkbox:"Linien"
+click button:"OK"
+click 1000,700
+cmd 4472
+click radio:"Ebene"
+click checkbox:"Linien"
+click button:"OK"
+expect listitem:"Sheet.8" selected
+expect listitem:"Sheet.9" unselected
+cmd 4472
+click checkbox:"Linien"
+click checkbox:"Keine Ebene"
+click button:"OK"
+expect listitem:"Sheet.8" unselected
+expect listitem:"Sheet.9" selected
+expect listitem:"Sheet.7" selected
+expect listitem:"Notiz" selected
+shot build/JFDiagrammer-select.png

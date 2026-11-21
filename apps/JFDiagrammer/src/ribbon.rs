@@ -63,7 +63,8 @@ const L_CFF: &str = "Funktionsübergreifendes Flussdiagramm";
 /// the registers shown now (the File register first)
 pub(crate) fn tabs(app: &Diagrammer) -> Vec<Reg> {
     let mut v = alloc::vec![Reg::File, Reg::Start, Reg::Insert, Reg::Design, Reg::View];
-    if crate::structures::has_cff(app) {
+    // (JD13, VL-04) also when the drawing's template brought the register
+    if crate::structures::has_cff(app) || crate::templates::has_register(app, "cff") {
         v.push(Reg::Cff);
     }
     match app.selection_kind() {
@@ -148,7 +149,11 @@ static CT_AUTOSIZE_MENU: [It; 3] = [C(CT_RESIZE_0), C(CT_RESIZE_1), C(CT_RESIZE_
 static CFF_ORIENT_MENU: [It; 2] = [C(CFF_HORIZONTAL), C(CFF_VERTICAL)];
 static TEXTBOX_MENU: [It; 2] = [C(TEXT_BOX_H), C(TEXT_BOX_V)];
 static ORIENT_MENU: [It; 2] = [C(PORTRAIT), C(LANDSCAPE)];
-static SIZE_MENU: [It; 3] = [C(FIT_DRAWING), Sep, C(MORE_SIZES)];
+// (JD8 rest: pages) the paper sizes with their measures (page_size.rs)
+static SIZE_MENU: [It; 12] = [
+    C(SIZE_LETTER), C(SIZE_LEGAL), C(SIZE_TABLOID), C(SIZE_EXECUTIVE), C(SIZE_A5), C(SIZE_A4), C(SIZE_A3), C(SIZE_B5), C(SIZE_B4),
+    Sep, C(FIT_DRAWING), C(MORE_SIZES),
+];
 // (JD11) the variants' own menus (TH-05: new colours, effects, connectors, fonts, embellishment) are P2
 static THEME_MENU: [It; 0] = [];
 static CONN_MENU: [It; 8] = [C(CONN_RIGHT_ANGLE), C(CONN_STRAIGHT), C(CONN_CURVED), Sep, C(LINE_JUMPS), C(REROUTE), Sep, C(CONNECT_SHAPES)];
@@ -257,6 +262,54 @@ fn groups(reg: Reg) -> &'static [Group] {
         Reg::Text => &TEXT_TOOLS,
         _ => &START,
     }
+}
+
+// (JD8 rest) the registers with their own ribbon, in the row's order
+const RIBBONS: [Reg; 7] = [Reg::Start, Reg::Insert, Reg::Design, Reg::View, Reg::Cff, Reg::Container, Reg::Text];
+
+// the menu of the button whose command is `id`: its register, its popup id, its rows
+fn menu_of(id: u32) -> Option<(Reg, u32, &'static [It])> {
+    for reg in RIBBONS {
+        for g in groups(reg) {
+            for col in g.2 {
+                match col {
+                    Col::BigMenu(c, items) if *c == id => return Some((reg, id, items)),
+                    Col::BigSplit(c, items) if *c == id => return Some((reg, id | SPLIT, items)),
+                    Col::Small(sms) => {
+                        for s in *sms {
+                            match s {
+                                Sm::Menu(c, items) if *c == id => return Some((reg, id, items)),
+                                Sm::Split(c, items) if *c == id => return Some((reg, id | SPLIT, items)),
+                                _ => {}
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    None
+}
+
+/// (JD8 rest) where the menu of the button whose command is `id` opens: its register and the
+/// popup's id (Designs: the gallery's list of all designs)
+pub(crate) fn menu_place(id: u32) -> Option<(Reg, u32)> {
+    if id == THEMES {
+        return Some((Reg::Design, crate::design_gallery::ID_ALL));
+    }
+    menu_of(id).map(|(reg, pid, _)| (reg, pid))
+}
+
+/// (JD8 rest) a menu button's own command: usable while one of its rows is (None: `id` opens
+/// no menu of the ribbon)
+pub(crate) fn menu_usable(app: &Diagrammer, id: u32) -> Option<bool> {
+    let (_, _, items) = menu_of(id)?;
+    // a split button's action is a command of its own (Neue Seite, Zeichentools)
+    if matches!(id, NEW_PAGE | DRAW_TOOLS | PASTE | TEXT_BOX | BRING_FRONT | SEND_BACK | FONT_COLOR) {
+        return None;
+    }
+    Some(any_enabled(app, items))
 }
 
 // the flags of a command's control: disabled without a handler, checked when on
@@ -473,10 +526,13 @@ fn small(app: &mut Diagrammer, ui: &mut Ui, s: &Sm, compact: bool) {
             ui.box_begin(0, BOX_H | BOX_FIXED, 0);
             let label = commands::label(*id);
             ui.next_size(-1, SMALL_H);
-            if ui.ribbon_button(*id, label, icon(*id), only | cflags(app, *id)) & EV_ACT != 0 {
+            // (JD8 rest) Zeichentools shows the drawing tool it repeats (cmds_draw.rs)
+            let ic = if *id == DRAW_TOOLS { crate::cmds_draw::split_icon(app) } else { icon(*id) };
+            if ui.ribbon_button(*id, label, ic, only | cflags(app, *id)) & EV_ACT != 0 {
                 ui.cmd_run(*id, 0);
             }
-            ui.tooltip(&commands::tip(ui, *id));
+            let tip = if *id == DRAW_TOOLS { crate::cmds_draw::split_tip(app, ui) } else { commands::tip(ui, *id) };
+            ui.tooltip(&tip);
             ui.next_size(16, SMALL_H);
             let more = alloc::format!("{}: {}", label, t("Weitere Optionen"));
             ui.next_flags(ST_SUBTLE | ST_COMPACT | ST_ICON_ONLY | (mflags(app, *id, items) & ST_DISABLED));
@@ -531,7 +587,9 @@ fn rows(app: &mut Diagrammer, ui: &mut Ui, items: &[It]) {
                     ui.next_icon(ic);
                 }
                 ui.next_flags(cflags(app, *id));
-                if ui.menu_item_keys(*id, commands::label(*id), &shortcut(ui, *id)) & EV_ACT != 0 {
+                // (JD8 rest: pages) a paper size shows its measures where shortcuts stand
+                let keys = crate::page_size::size_note(*id).unwrap_or_else(|| shortcut(ui, *id));
+                if ui.menu_item_keys(*id, commands::label(*id), &keys) & EV_ACT != 0 {
                     ui.cmd_run(*id, 0);
                 }
             }

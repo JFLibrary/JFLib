@@ -5,7 +5,10 @@
 //   stencil::build_vssx(&files, Measure::Us) -> Result<(Built, Vec<u8>), SourceError>
 //   Built { doc, stencil, file, category, measure }   the stencil document (DocKind::Stencil),
 //                                   its universal name, the output stem, the category
-//   built.vssx_name()               "standard_m.vssx" / "standard_u.vssx"
+//   built.vssx_name()               "jfd_standard_m.vssx" / "jfd_standard_u.vssx"
+//   file_name(stem, Measure) / parse_file_name(name)   (JD13) the file names of JFDiagrammer's
+//                                   own stencils: the prefix "jfd_" keeps them apart from
+//                                   Visio's (its ARROWS_M.VSSX is not our arrows_m)
 //   SourceError { file, line, message }   shown as "rectangle.master:12: unbekannter
 //                                   Abschnitt [Geometrie]" (line 0: the whole file)
 //
@@ -18,9 +21,10 @@
 // How a stencil is built, in this order:
 // 1. stencil.txt and every master file are parsed and checked for the chosen measure: header
 //    keys, sections, row heads, cell names (each section's own list), the five languages of
-//    every language-suffixed key or cell, Width and Height as lengths, formulas that parse and
-//    call only functions the engine knows.  A ".metric" / ".us" line replaces the line
-//    without suffix.
+//    every language-suffixed key or cell, Width and Height as lengths or formulas (a box that
+//    fits its text: TEXTHEIGHT ...; not with svg:) (a 1-D master: BeginX, BeginY, EndX, EndY as
+//    lengths and Height), formulas that parse and call only functions the engine knows.  A
+//    ".metric" / ".us" line replaces the line without suffix.
 // 2. A new stencil (vsdx::new_document: the own styles and the NetLab theme) gets the masters in
 //    one transaction: the Master attributes (Name and Prompt in the build language,
 //    IsCustomName(U), IconSize 1, AlignName 2, MatchByName 0, IconUpdate 1, PatternFlags 0,
@@ -29,12 +33,17 @@
 //    the shape's size, scale 1:1 in mm or in, ShapeKeywords, the JFD_ User cells), the master
 //    shape with its cells, sections, text and the SVG geometry.  Constants are written as values
 //    with their unit (lengths in inches with U = MM, IN ...), everything else as a formula; the
-//    tool adds PinX / PinY (half the size), LocPinX = Width*0.5, LocPinY = Height*0.5.
+//    tool adds PinX / PinY (half the size), LocPinX = Width*0.5, LocPinY = Height*0.5.  A 1-D
+//    master (one that sets BeginX ...) gets Visio's 1-D formulas instead: PinX =
+//    GUARD((BeginX+EndX)/2), Width = GUARD(SQRT(...)), Angle = GUARD(ATAN2(EndY-BeginY,
+//    EndX-BeginX)), LocPin = GUARD(Width*0.5) ...; its master page is BeginX+EndX wide and
+//    BeginY+EndY high.
 // 3. Every reference of every formula must name something that is there (a cell of the sheet
 //    or of its styles, a single cell of the ShapeSheet's own list, Sheet.N of the master).  The
 //    formula engine computes every formula and its values are stored: a cell the engine keeps
 //    (unknown function, unknown section, cycle) or that comes out as an error is a build error
-//    naming the source line.  No stale value goes into the file.
+//    naming the source line.  No stale value goes into the file.  A master whose Width or
+//    Height is a formula gets its master page and pin from the computed size afterwards.
 // 4. Each master's icon is rendered from an instance on the stencil's page (stencil_icon.rs);
 //    the instance goes again, the page stays empty.
 //
@@ -62,8 +71,8 @@ use core::fmt;
 use diagram_core::formula::{self, CellPart, Engine, Keep, Outcome, SheetName, LOCKS};
 use diagram_core::instance::{self, join_fields, LANGS};
 use diagram_core::{
-    CellAddr, DocKind, Document, EditError, MasterRef, Owner, RowKey, SecKey, ShapeKind, SheetRef, StyleRefs, Text, Transaction,
-    Unit, Value,
+    CellAddr, DocKind, Document, EditError, MasterRef, Owner, RowKey, SecKey, ShapeKind, ShapeRef, SheetRef, StyleRefs, Text,
+    Transaction, Unit, Value,
 };
 
 use crate::stencil_icon;
@@ -87,10 +96,35 @@ pub struct Built {
 }
 
 impl Built {
-    /// the file name of the .vssx: `<file>_m.vssx` (metric) or `<file>_u.vssx` (US)
+    /// the file name of the .vssx: `jfd_<file>_m.vssx` (metric) or `jfd_<file>_u.vssx` (US)
     pub fn vssx_name(&self) -> String {
-        format!("{}_{}.vssx", self.file, if self.measure == Measure::Us { "u" } else { "m" })
+        file_name(&self.file, self.measure)
     }
+}
+
+/// the prefix of the file names of JFDiagrammer's own stencils (JD13, the user's choice): a
+/// template names its stencils by file name (windows.xml), and Visio opens a stencil of its own
+/// of that name if it has one, so ours never share a name with Visio's (ARROWS_M.VSSX)
+pub const FILE_PREFIX: &str = "jfd_";
+
+/// the file name of the built stencil with stem `stem` (stencil.txt `file`) in measure `m`:
+/// "jfd_standard_m.vssx", "jfd_standard_u.vssx"
+pub fn file_name(stem: &str, m: Measure) -> String {
+    format!("{FILE_PREFIX}{stem}_{}.vssx", if m == Measure::Us { "u" } else { "m" })
+}
+
+/// the stem and measure of a file name file_name gives (a path before it and ASCII case do not
+/// count: "C:/x/JFD_Standard_U.VSSX" -> ("standard", Us)); None for every other name, also for
+/// Visio's own stencils
+pub fn parse_file_name(name: &str) -> Option<(String, Measure)> {
+    let base = name.rsplit(['/', '\\']).next().unwrap_or(name).to_ascii_lowercase();
+    let rest = base.strip_prefix(FILE_PREFIX)?.strip_suffix(".vssx")?;
+    let (stem, m) = if let Some(s) = rest.strip_suffix("_m") {
+        (s, Measure::Metric)
+    } else {
+        (rest.strip_suffix("_u")?, Measure::Us)
+    };
+    (!stem.is_empty()).then(|| (String::from(stem), m))
 }
 
 /// why a stencil did not build: the source file, the line (from 1; 0: the whole file) and why
@@ -169,7 +203,7 @@ const EFFECT_FAMILIES: &[&str] = &["Bevel", "Glow", "Reflection", "Sketch", "Rot
 const PAGE_CELLS: &[&str] = &["PageWidth", "PageHeight", "PageScale", "DrawingScale", "DrawingSizeType", "DrawingScaleType", "ShdwOffsetX", "ShdwOffsetY"];
 
 // a cell [Shape] may set
-fn shape_cell_known(name: &str) -> bool {
+pub(crate) fn shape_cell_known(name: &str) -> bool {
     SINGLE_CELLS.contains(&name) || LOCKS.contains(&name) || EFFECT_FAMILIES.iter().any(|p| name.starts_with(p) && name.len() > p.len())
 }
 
@@ -182,7 +216,7 @@ const GEO_SECTION_CELLS: &[&str] = &["NoFill", "NoLine", "NoShow", "NoSnap", "No
 const GEO_ROW_CELLS: &[&str] = &["X", "Y", "A", "B", "C", "D", "E"];
 
 // the cells of a row of a section (by its VSDX name)
-fn row_cells(model: &str) -> &'static [&'static str] {
+pub(crate) fn row_cells(model: &str) -> &'static [&'static str] {
     match model {
         "Connection" => &["X", "Y", "DirX", "DirY", "Type", "AutoGen", "Prompt", "A", "B", "C", "D"],
         "Control" => &["X", "Y", "XDyn", "YDyn", "XCon", "YCon", "CanGlue", "Tip"],
@@ -219,6 +253,8 @@ struct Cell0 {
     name: String,
     line: u32,
     val: CellVal,
+    // the included file it comes from (`include:`), else the master's
+    file: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -263,8 +299,15 @@ struct MasterInfo {
     // `hidden: true`: the master is in the file but not shown in the Shapes panel (Hidden="1";
     // dropped by code, e.g. the lists of a cross-functional flowchart)
     hidden: bool,
-    width: f64,
-    height: f64,
+    // (JD13) `scale: 1:N`: drawing units per page unit of the master page (1: no scale)
+    scale: f64,
+    // the size of the master page: the shape's Width x Height (2-D), BeginX+EndX x BeginY+EndY
+    // (1-D), `size:` for a formula (JD13); None: Width or Height is a formula, the page takes the
+    // size the engine computes
+    width: Option<f64>,
+    height: Option<f64>,
+    // (1-D) the master sets BeginX, BeginY, EndX, EndY: PinX, Width, Angle ... follow the ends
+    one_d: bool,
     shape: Vec<Cell0>,
     sections: Vec<Sec0>,
     // the content for the UniqueID
@@ -272,7 +315,7 @@ struct MasterInfo {
 }
 
 // the values of a key in five languages (`required`: an error when there is none)
-fn five(file: &str, es: &[&Entry], key: &str, required: bool, line: u32) -> Result<Option<[String; 5]>, SourceError> {
+pub(crate) fn five(file: &str, es: &[&Entry], key: &str, required: bool, line: u32) -> Result<Option<[String; 5]>, SourceError> {
     let mut out: [Option<String>; 5] = Default::default();
     let mut first = None;
     for e in es.iter().filter(|e| e.name == key) {
@@ -292,14 +335,14 @@ fn five(file: &str, es: &[&Entry], key: &str, required: bool, line: u32) -> Resu
 }
 
 // the one entry of a key without language
-fn single<'e>(file: &str, es: &[&'e Entry], key: &str) -> Result<Option<&'e Entry>, SourceError> {
+pub(crate) fn single<'e>(file: &str, es: &[&'e Entry], key: &str) -> Result<Option<&'e Entry>, SourceError> {
     match es.iter().find(|e| e.name == key) {
         Some(e) if e.lang.is_some() => Err(err(file, e.line, format!("{key} hat keine Sprachendung"))),
         found => Ok(found.copied()),
     }
 }
 
-fn keys_known(file: &str, es: &[&Entry], known: &[&str]) -> Result<(), SourceError> {
+pub(crate) fn keys_known(file: &str, es: &[&Entry], known: &[&str]) -> Result<(), SourceError> {
     match es.iter().find(|e| !known.contains(&e.name.as_str())) {
         Some(e) => Err(err(file, e.line, format!("unbekannter Schlüssel {} (bekannt: {})", e.name, known.join(", ")))),
         None => Ok(()),
@@ -362,7 +405,10 @@ fn cells_of(file: &str, entries: &[Entry], m: Measure, allowed: &dyn Fn(&str) ->
     let resolved = stencil_src::resolve(file, entries, m)?;
     let mut out: Vec<(Cell0, u8)> = Vec::new();
     let mut at: BTreeMap<&str, usize> = BTreeMap::new();
+    let master = file;
     for e in resolved {
+        // an included entry names its own file (JD13, `include:`)
+        let file = e.file.as_deref().unwrap_or(master);
         if !allowed(&e.name) {
             return Err(err(file, e.line, format!("unbekannte Zelle {} in {place}", e.name)));
         }
@@ -381,21 +427,21 @@ fn cells_of(file: &str, entries: &[Entry], m: Measure, allowed: &dyn Fn(&str) ->
                 }
                 let mut t: [String; 5] = Default::default();
                 t[l] = stencil_src::unquote(&e.value);
-                out.push((Cell0 { name: e.name.clone(), line: e.line, val: CellVal::Text(t) }, 1 << l));
+                out.push((Cell0 { name: e.name.clone(), line: e.line, val: CellVal::Text(t), file: e.file.clone() }, 1 << l));
             }
             (None, None) => {
                 let v = stencil_src::classify(&e.value);
                 if let Value0::Formula(f) = &v {
                     check_syntax(file, e.line, &e.name, f)?;
                 }
-                out.push((Cell0 { name: e.name.clone(), line: e.line, val: CellVal::Plain(v) }, 0));
+                out.push((Cell0 { name: e.name.clone(), line: e.line, val: CellVal::Plain(v), file: e.file.clone() }, 0));
             }
         }
     }
     for (c, have) in &out {
         if matches!(c.val, CellVal::Text(_)) && *have != 0b1_1111 {
             let missing = (0..5).find(|i| have & (1 << i) == 0).unwrap_or(0);
-            return Err(err(file, c.line, format!("{}: Sprache {} fehlt", c.name, LANGS[missing])));
+            return Err(err(c.file.as_deref().unwrap_or(file), c.line, format!("{}: Sprache {} fehlt", c.name, LANGS[missing])));
         }
     }
     Ok(out.into_iter().map(|(c, _)| c).collect())
@@ -413,14 +459,37 @@ fn check_syntax(file: &str, line: u32, cell: &str, f: &str) -> Result<(), Source
 }
 
 fn master_info(file: &str, text: &str, m: Measure, files: &dyn Fn(&str) -> Option<String>) -> Result<MasterInfo, SourceError> {
-    let src = stencil_src::parse(file, text, true)?;
+    let mut src = stencil_src::parse(file, text, true)?;
     let first = src.header.first().ok_or_else(|| err(file, 1, "die erste Kopfzeile muss master: NameU sein"))?;
     if first.name != "master" || first.lang.is_some() || first.variant.is_some() {
         return Err(err(file, first.line, "die erste Kopfzeile muss master: NameU sein"));
     }
     let line = first.line;
+    // (JD13) `include: a.inc, b.inc`: sections shared by many masters, from other files of the
+    // stencil folder (README); their text is part of the UniqueID
+    let include = {
+        let es = stencil_src::resolve(file, &src.header, m)?;
+        single(file, &es, "include")?.map(|e| (e.value.clone(), e.line))
+    };
+    let mut included = String::new();
+    if let Some((list, at)) = include {
+        for name in list.split(',').map(str::trim) {
+            if name.is_empty() {
+                return Err(err(file, at, "include: leerer Dateiname"));
+            }
+            let t = files(name).ok_or_else(|| err(file, at, format!("die eingebundene Datei {name} fehlt")))?;
+            let inc = stencil_src::parse(name, &t, true)?;
+            stencil_src::merge_include(&mut src, name, inc)?;
+            included.push_str(&format!("include\u{1f}{name}\u{1f}{t}\u{1e}"));
+        }
+    }
     let es = stencil_src::resolve(file, &src.header, m)?;
-    keys_known(file, &es, &["master", "name", "prompt", "keywords", "text", "style", "line_style", "fill_style", "text_style", "svg", "hidden"])?;
+    keys_known(file, &es, &["master", "name", "prompt", "keywords", "text", "style", "line_style", "fill_style", "text_style", "svg", "hidden", "include", "scale", "size"])?;
+    // (JD13) `scale: 1:20`: the master page's drawing scale (shapes drawn to scale, the rack)
+    let scale = match single(file, &es, "scale")? {
+        None => 1.0,
+        Some(e) => parse_scale(&e.value).ok_or_else(|| err(file, e.line, format!("scale: „{}“ ist kein Maßstab 1:N (z. B. 1:20)", e.value)))?,
+    };
     let name_u = single(file, &es, "master")?.map(|e| e.value.clone()).unwrap_or_default();
     if name_u.is_empty() {
         return Err(err(file, line, "master: NameU fehlt"));
@@ -442,6 +511,7 @@ fn master_info(file: &str, text: &str, m: Measure, files: &dyn Fn(&str) -> Optio
     for e in &es {
         canon.push_str(&format!("{}\u{1f}{}\u{1f}{}\u{1e}", e.name, e.lang.map_or("", |l| LANGS[l]), e.value));
     }
+    canon.push_str(&included);
     let svg = match single(file, &es, "svg")? {
         None => None,
         Some(e) => {
@@ -450,7 +520,8 @@ fn master_info(file: &str, text: &str, m: Measure, files: &dyn Fn(&str) -> Optio
             if art.layers.is_empty() {
                 return Err(err(&e.value, 0, "das SVG zeichnet nichts"));
             }
-            canon.push_str("svg\u{1f}");
+            // (JD13) the layers in document order: a new UniqueID for every SVG master
+            canon.push_str("svg-in-order\u{1f}");
             canon.push_str(&t);
             canon.push('\u{1e}');
             Some((art, e.line))
@@ -498,15 +569,94 @@ fn master_info(file: &str, text: &str, m: Measure, files: &dyn Fn(&str) -> Optio
         }
     }
     canon_cells(&mut canon, &shape);
-    let length = |n: &str| -> Result<f64, SourceError> {
-        match shape.iter().find(|c| c.name == n) {
-            None => Err(err(file, line, format!("{n} fehlt ([Shape] {n} = …, z. B. 40 mm)"))),
-            Some(Cell0 { val: CellVal::Plain(Value0::Num(x, u)), .. }) if *x > 0.0 && u.is_none_or(|u| u.dimension() == diagram_core::Dimension::Length) => Ok(*x),
-            Some(c) => Err(err(file, c.line, format!("{n} muss eine positive Länge sein (z. B. 40 mm)"))),
-        }
+    // (JD13) `size: 482.6 mm x 88.9 mm`: the size of a master whose Width or Height is a formula,
+    // also one drawn from an SVG (the rack: height from its height units); it sizes the master page
+    // and the pin
+    let size = match single(file, &es, "size")? {
+        None => None,
+        Some(e) => Some(parse_size(&e.value).ok_or_else(|| err(file, e.line, format!("size: „{}“ ist keine Größe Breite x Höhe (z. B. 482.6 mm x 88.9 mm)", e.value)))?),
     };
-    let (width, height) = (length("Width")?, length("Height")?);
-    Ok(MasterInfo { file: String::from(file), line, name_u, names, prompts, keywords, text, styles, svg, hidden, width, height, shape, sections, canon })
+    let one_d = shape.iter().any(|c| ENDS.contains(&c.name.as_str()));
+    let (width, height) = if one_d {
+        let (w, h) = one_d_page(file, line, &shape)?;
+        (Some(w), Some(h))
+    } else {
+        let dim = |n: &str, ix: usize| -> Result<Option<f64>, SourceError> {
+            let formula = shape.iter().any(|c| c.name == n && matches!(c.val, CellVal::Plain(Value0::Formula(_))));
+            match size {
+                Some(s) if formula => Ok(Some(s[ix])),
+                _ => length(file, line, &shape, n, svg.is_none()),
+            }
+        };
+        (dim("Width", 0)?, dim("Height", 1)?)
+    };
+    Ok(MasterInfo { file: String::from(file), line, name_u, names, prompts, keywords, text, styles, svg, hidden, scale, width, height, one_d, shape, sections, canon })
+}
+
+// the cells that make a master 1-D (README: 1D-Shapes)
+const ENDS: [&str; 4] = ["BeginX", "BeginY", "EndX", "EndY"];
+
+// a length constant of [Shape]: Some(value) when the cell is one (no unit: inches), None when it
+// is something else; Err when it is missing
+fn length_const(file: &str, line: u32, shape: &[Cell0], n: &str, example: &str) -> Result<(Option<f64>, u32), SourceError> {
+    match shape.iter().find(|c| c.name == n) {
+        None => Err(err(file, line, format!("{n} fehlt ([Shape] {n} = …, z. B. {example})"))),
+        Some(Cell0 { val: CellVal::Plain(Value0::Num(x, u)), line, .. }) if u.is_none_or(|u| u.dimension() == diagram_core::Dimension::Length) => Ok((Some(*x), *line)),
+        Some(c) => Ok((None, c.line)),
+    }
+}
+
+// Width or Height of a 2-D master: a positive length constant, or (`formula`: the master has no
+// SVG drawing) a formula such as GUARD(MAX(10 mm, TEXTHEIGHT(TheText,Width))) -> None
+fn length(file: &str, line: u32, shape: &[Cell0], n: &str, formula: bool) -> Result<Option<f64>, SourceError> {
+    let is_formula = shape.iter().any(|c| c.name == n && matches!(c.val, CellVal::Plain(Value0::Formula(_))));
+    match length_const(file, line, shape, n, "40 mm")? {
+        (Some(x), _) if x > 0.0 => Ok(Some(x)),
+        (None, _) if formula && is_formula => Ok(None),
+        (_, at) => Err(err(file, at, format!("{n} muss eine positive Länge sein (z. B. 40 mm) oder eine Formel (nicht mit svg:)"))),
+    }
+}
+
+// a 1-D master: BeginX, BeginY, EndX, EndY are length constants from 0 (the ends on the master
+// page), Height is given (a length from 0, or a formula); the master page is BeginX+EndX wide
+// and BeginY+EndY high (the ends lie as far from its edges as from the other end's edges)
+fn one_d_page(file: &str, line: u32, shape: &[Cell0]) -> Result<(f64, f64), SourceError> {
+    let mut e = [0.0; 4];
+    for (i, n) in ENDS.iter().enumerate() {
+        e[i] = match length_const(file, line, shape, n, "0 mm; ein 1D-Master braucht BeginX, BeginY, EndX und EndY")? {
+            (Some(x), _) if x >= 0.0 => x,
+            (_, at) => return Err(err(file, at, format!("{n} muss eine Länge ab 0 sein (eine Konstante wie 40 mm): das Ende auf der Masterseite"))),
+        };
+    }
+    match length_const(file, line, shape, "Height", "10 mm, 0 mm für eine Linie, oder eine Formel wie GUARD(EndY-BeginY)")? {
+        (Some(x), at) if x < 0.0 => return Err(err(file, at, "Height muss eine Länge ab 0 oder eine Formel sein")),
+        _ => {}
+    }
+    if (e[0] - e[2]).abs() < 1e-12 && (e[1] - e[3]).abs() < 1e-12 {
+        return Err(err(file, line, "BeginX/BeginY und EndX/EndY liegen aufeinander"));
+    }
+    let (w, h) = (e[0] + e[2], e[1] + e[3]);
+    if w <= 0.0 || h <= 0.0 {
+        return Err(err(file, line, "die Masterseite (BeginX+EndX mal BeginY+EndY) wäre leer: die Enden brauchen Abstand zum Rand (z. B. BeginY = EndY = 5 mm)"));
+    }
+    Ok((w, h))
+}
+
+// "482.6 mm x 88.9 mm" -> both lengths (internal units)
+fn parse_size(s: &str) -> Option<[f64; 2]> {
+    let (a, b) = s.split_once(['x', '×'])?;
+    let len = |t: &str| match stencil_src::classify(t) {
+        Value0::Num(x, Some(u)) if x > 0.0 && u.dimension() == diagram_core::Dimension::Length => Some(x),
+        _ => None,
+    };
+    Some([len(a)?, len(b)?])
+}
+
+// "1:20" -> 20 (drawing units per page unit); "2:1" -> 0.5
+fn parse_scale(s: &str) -> Option<f64> {
+    let (a, b) = s.split_once(':')?;
+    let (a, b): (f64, f64) = (a.trim().parse().ok()?, b.trim().parse().ok()?);
+    (a > 0.0 && b > 0.0 && a.is_finite() && b.is_finite()).then_some(b / a)
 }
 
 fn canon_cells(canon: &mut String, cells: &[Cell0]) {
@@ -603,6 +753,8 @@ struct FormulaAt {
     master: usize,
     line: u32,
     text: String,
+    // the included file of its line (`include:`), else the master's
+    file: Option<String>,
 }
 
 // what writing a master collects
@@ -613,11 +765,13 @@ struct Sink<'a> {
     formulas: &'a mut Vec<FormulaAt>,
     // translated cells: "Section.Row.Cell" and the five texts
     tr: Vec<(String, [String; 5])>,
+    // the included file of the cell being written (`include:`), else None
+    cur: Option<String>,
 }
 
 impl Sink<'_> {
     fn fail(&self, line: u32, what: &str, e: EditError) -> SourceError {
-        err(self.file, line, format!("{what} lässt sich nicht schreiben ({e:?})"))
+        err(self.cur.as_deref().unwrap_or(self.file), line, format!("{what} lässt sich nicht schreiben ({e:?})"))
     }
 
     fn constant(&mut self, tx: &mut Transaction, sheet: SheetRef, addr: &CellAddr, v: Value, unit: Option<Unit>, line: u32) -> Result<(), SourceError> {
@@ -631,12 +785,19 @@ impl Sink<'_> {
 
     fn formula(&mut self, tx: &mut Transaction, sheet: SheetRef, addr: &CellAddr, f: &str, line: u32) -> Result<(), SourceError> {
         tx.set_formula(sheet, addr, f).map_err(|e| self.fail(line, tx.doc().str(addr.cell), e))?;
-        self.formulas.push(FormulaAt { sheet, addr: *addr, master: self.master, line, text: String::from(f) });
+        self.formulas.push(FormulaAt { sheet, addr: *addr, master: self.master, line, text: String::from(f), file: self.cur.clone() });
         Ok(())
     }
 
     // a source cell; `tr`: its "Section.Row.Cell" when it may be translated
     fn put(&mut self, tx: &mut Transaction, sheet: SheetRef, addr: &CellAddr, c: &Cell0, tr: Option<String>) -> Result<(), SourceError> {
+        self.cur.clone_from(&c.file);
+        let r = self.put_cell(tx, sheet, addr, c, tr);
+        self.cur = None;
+        r
+    }
+
+    fn put_cell(&mut self, tx: &mut Transaction, sheet: SheetRef, addr: &CellAddr, c: &Cell0, tr: Option<String>) -> Result<(), SourceError> {
         match &c.val {
             CellVal::Text(t) => {
                 self.text(tx, sheet, addr, &t[self.lang], Some(Unit::Str), c.line)?;
@@ -679,7 +840,7 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
     let lang = st.lang;
     let file = mi.file.as_str();
     let line = mi.line;
-    let mut sink = Sink { file, master: ix, lang, formulas, tr: Vec::new() };
+    let mut sink = Sink { file, master: ix, lang, formulas, tr: Vec::new(), cur: None };
     let quick = ix < st.quick;
     // the master and its attributes
     let mref = tx.add_master(&mi.names[lang], &mi.name_u).map_err(|e| sink.fail(line, "der Master", e))?;
@@ -706,14 +867,17 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
     // the master page: its size and scale, the keywords
     let (len_unit, one) = if measure == Measure::Us { (Unit::Inches, 1.0) } else { (Unit::Millimeters, 1.0 / 25.4) };
     let ps = SheetRef::Master(mref);
-    let (w, h) = (mi.width, mi.height);
+    // a size from a formula: 0 until fit_sizes() writes the computed one
+    let (w, h) = (mi.width.unwrap_or(0.0), mi.height.unwrap_or(0.0));
+    // a scaled master (JD13, `scale:`): Visio's scale types 4 (metric) and 3 (custom)
+    let scale_type = if mi.scale == 1.0 { 0.0 } else if measure == Measure::Us { 3.0 } else { 4.0 };
     for (name, v, u) in [
         ("PageWidth", w, Some(len_unit)),
         ("PageHeight", h, Some(len_unit)),
         ("PageScale", one, Some(len_unit)),
-        ("DrawingScale", one, Some(len_unit)),
+        ("DrawingScale", one * mi.scale, Some(len_unit)),
         ("DrawingSizeType", 1.0, None),
-        ("DrawingScaleType", 0.0, None),
+        ("DrawingScaleType", scale_type, None),
     ] {
         let a = single_addr(tx, name);
         sink.constant(tx, ps, &a, Value::Num(v), u, line)?;
@@ -733,11 +897,27 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
     };
     tx.set_shape_styles(shape, refs).map_err(|e| sink.fail(line, "die Formatvorlagen", e))?;
     let sheet = SheetRef::Shape(shape);
-    const FIRST: [&str; 6] = ["PinX", "PinY", "Width", "Height", "LocPinX", "LocPinY"];
-    for name in FIRST {
+    // the transform first, in Visio's order; a 1-D master's box follows its ends (Visio's own
+    // formulas for a 1-D shape, README: 1D-Shapes) unless the master writes a cell itself
+    const FIRST: &[&str] = &["PinX", "PinY", "Width", "Height", "LocPinX", "LocPinY"];
+    const FIRST_1D: &[&str] = &["PinX", "PinY", "Width", "Height", "LocPinX", "LocPinY", "Angle", "BeginX", "BeginY", "EndX", "EndY"];
+    let first = if mi.one_d { FIRST_1D } else { FIRST };
+    for &name in first {
         let a = single_addr(tx, name);
         match mi.shape.iter().find(|c| c.name == name) {
             Some(c) => sink.put(tx, sheet, &a, c, Some(String::from(name)))?,
+            None if mi.one_d => {
+                let f = match name {
+                    "PinX" => "GUARD((BeginX+EndX)/2)",
+                    "PinY" => "GUARD((BeginY+EndY)/2)",
+                    "Width" => "GUARD(SQRT((EndX-BeginX)^2+(EndY-BeginY)^2))",
+                    "LocPinX" => "GUARD(Width*0.5)",
+                    "LocPinY" => "GUARD(Height*0.5)",
+                    "Angle" => "GUARD(ATAN2(EndY-BeginY,EndX-BeginX))",
+                    _ => continue,
+                };
+                sink.formula(tx, sheet, &a, f, line)?;
+            }
             None => match name {
                 "PinX" => sink.constant(tx, sheet, &a, Value::Num(w / 2.0), Some(len_unit), line)?,
                 "PinY" => sink.constant(tx, sheet, &a, Value::Num(h / 2.0), Some(len_unit), line)?,
@@ -747,7 +927,13 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
             },
         }
     }
-    for c in mi.shape.iter().filter(|c| !FIRST.contains(&c.name.as_str())) {
+    // (JD13) an SVG group's subshapes are its formats, no parts of their own: a click selects the
+    // group only (SelectMode 0, as Visio names it), never one colour of it
+    if kind == ShapeKind::Group && !mi.shape.iter().any(|c| c.name == "SelectMode") {
+        let a = single_addr(tx, "SelectMode");
+        sink.constant(tx, sheet, &a, Value::Num(0.0), None, line)?;
+    }
+    for c in mi.shape.iter().filter(|c| !first.contains(&c.name.as_str())) {
         let a = single_addr(tx, &c.name);
         sink.put(tx, sheet, &a, c, Some(c.name.clone()))?;
     }
@@ -789,7 +975,8 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
     }
     // the SVG geometry: on the master shape, or one subshape per format
     if let Some((art, svg_line)) = &mi.svg {
-        let lw = formula::math::sqrt((w / art.vb[2]) * (h / art.vb[3]));
+        // line weights are on paper: a scaled master's drawing units shrink by its scale
+        let lw = formula::math::sqrt((w / art.vb[2]) * (h / art.vb[3])) / mi.scale;
         if layers.len() == 1 {
             let own: Vec<&str> = mi.shape.iter().map(|c| c.name.as_str()).collect();
             emit_layer(tx, &mut sink, sheet, &layers[0], lw, &own, *svg_line)?;
@@ -867,17 +1054,28 @@ fn emit_layer(tx: &mut Transaction, sink: &mut Sink, sheet: SheetRef, layer: &La
             continue;
         }
         let a = single_addr(tx, name);
-        sink.put(tx, sheet, &a, &Cell0 { name: String::from(name), line, val: CellVal::Plain(v) }, None)?;
+        sink.put(tx, sheet, &a, &Cell0 { name: String::from(name), line, val: CellVal::Plain(v), file: None }, None)?;
     }
     let xy = |p: [f64; 2]| (format!("Width*{}", frac(p[0])), format!("Height*{}", frac(p[1])));
+    // (JD13) consecutive sub-paths with the same NoFill / NoLine share one Geometry section, each
+    // starting with its MoveTo (Visio fills a shape's figures together by the even-odd rule
+    // either way); hundreds of sections in one shape made building and drawing slow
+    let mut open: Option<(SecKey, bool, bool)> = None;
     for sec in &layer.sections {
-        let sk = tx.add_section(sheet, "Geometry").map_err(|e| sink.fail(line, "[Geometry]", e))?;
-        for (flag, name) in [(sec.no_fill, "NoFill"), (sec.no_line, "NoLine")] {
-            if flag {
-                let a = CellAddr::section(sk, tx.intern(name));
-                sink.constant(tx, sheet, &a, Value::Num(1.0), Some(Unit::Bool), line)?;
+        let sk = match open {
+            Some((sk, f, l)) if f == sec.no_fill && l == sec.no_line => sk,
+            _ => {
+                let sk = tx.add_section(sheet, "Geometry").map_err(|e| sink.fail(line, "[Geometry]", e))?;
+                for (flag, name) in [(sec.no_fill, "NoFill"), (sec.no_line, "NoLine")] {
+                    if flag {
+                        let a = CellAddr::section(sk, tx.intern(name));
+                        sink.constant(tx, sheet, &a, Value::Num(1.0), Some(Unit::Bool), line)?;
+                    }
+                }
+                open = Some((sk, sec.no_fill, sec.no_line));
+                sk
             }
-        }
+        };
         let (x, y) = xy(sec.start);
         geo_row(tx, sink, (sheet, sk), "MoveTo", &[("X", Value0::Formula(x)), ("Y", Value0::Formula(y))], line)?;
         for s in &sec.segs {
@@ -1019,13 +1217,13 @@ fn keep_message(k: &Keep) -> String {
 // the formula engine computes every formula; a kept cell or an error value is a build error
 fn compute(doc: &mut Document, infos: &[MasterInfo], mrefs: &[MasterRef], formulas: &[FormulaAt]) -> Result<(), SourceError> {
     let res = Engine::new().calculate(doc);
-    let mut worst: Option<(usize, u32, String)> = None;
+    let mut worst: Option<(usize, u32, String, Option<String>)> = None;
     let mut note = |s: SheetRef, a: &CellAddr, msg: String| {
-        let found = formulas.iter().find(|f| f.sheet == s && f.addr == *a).map(|f| (f.master, f.line, format!("{msg} in „{}“", f.text)));
+        let found = formulas.iter().find(|f| f.sheet == s && f.addr == *a).map(|f| (f.master, f.line, format!("{msg} in „{}“", f.text), f.file.clone()));
         let at = found.or_else(|| {
             let m = master_of(s)?;
             let ix = mrefs.iter().position(|&x| x == m)?;
-            Some((ix, infos[ix].line, format!("{msg} ({})", doc.str(a.cell))))
+            Some((ix, infos[ix].line, format!("{msg} ({})", doc.str(a.cell)), None))
         });
         if let Some(at) = at {
             if worst.as_ref().is_none_or(|w| (at.0, at.1) < (w.0, w.1)) {
@@ -1046,11 +1244,36 @@ fn compute(doc: &mut Document, infos: &[MasterInfo], mrefs: &[MasterRef], formul
     for (s, a) in &res.cycles {
         note(*s, a, String::from("Zirkelbezug"));
     }
-    if let Some((m, line, msg)) = worst {
-        return Err(err(&infos[m].file, line, msg));
+    if let Some((m, line, msg, file)) = worst {
+        return Err(err(file.as_deref().unwrap_or(&infos[m].file), line, msg));
     }
     let mut tx = doc.transaction("Formeln");
     res.write(&mut tx).map_err(|e| err("stencil.txt", 0, format!("Formelergebnisse lassen sich nicht schreiben ({e:?})")))?;
+    let _ = tx.commit();
+    Ok(())
+}
+
+// a 2-D master whose Width or Height is a formula: the master page gets the computed size and
+// the master shape the pin in its middle (constants, as for the other masters)
+fn fit_sizes(doc: &mut Document, infos: &[MasterInfo], mrefs: &[MasterRef], measure: Measure) -> Result<(), SourceError> {
+    let unit = if measure == Measure::Us { Unit::Inches } else { Unit::Millimeters };
+    let mut tx = doc.transaction("Größen");
+    for (mi, &m) in infos.iter().zip(mrefs) {
+        if mi.width.is_some() && mi.height.is_some() {
+            continue;
+        }
+        let Some(slot) = tx.doc().master(m).and_then(|x| x.master_shape()) else { continue };
+        let sheet = SheetRef::Shape(ShapeRef { owner: Owner::Master(m), slot });
+        let num = |doc: &Document, n: &str| doc.sym(n).and_then(|s| doc.resolve(sheet, &CellAddr::single(s)).num()).unwrap_or(0.0);
+        let (w, h) = (num(tx.doc(), "Width"), num(tx.doc(), "Height"));
+        if !(w > 0.0 && h > 0.0 && w.is_finite() && h.is_finite()) {
+            return Err(err(&mi.file, mi.line, format!("Width und Height ergeben beim Bauen keine positive Größe ({w} x {h} in)")));
+        }
+        for (s, name, v) in [(SheetRef::Master(m), "PageWidth", w), (SheetRef::Master(m), "PageHeight", h), (sheet, "PinX", w * 0.5), (sheet, "PinY", h * 0.5)] {
+            let a = single_addr(&mut tx, name);
+            tx.set_constant(s, &a, Value::Num(v), Some(unit)).map_err(|e| err(&mi.file, mi.line, format!("{name} lässt sich nicht schreiben ({e:?})")))?;
+        }
+    }
     let _ = tx.commit();
     Ok(())
 }
@@ -1091,9 +1314,10 @@ pub fn build(files: &dyn Fn(&str) -> Option<String>, measure: Measure) -> Result
         let _ = tx.commit();
     }
     for f in &formulas {
-        check_refs(&doc, f).map_err(|m| err(&infos[f.master].file, f.line, format!("{m} in „{}“", f.text)))?;
+        check_refs(&doc, f).map_err(|m| err(f.file.as_deref().unwrap_or(&infos[f.master].file), f.line, format!("{m} in „{}“", f.text)))?;
     }
     compute(&mut doc, &infos, &mrefs, &formulas)?;
+    fit_sizes(&mut doc, &infos, &mrefs, measure)?;
     for (mi, &m) in infos.iter().zip(&mrefs) {
         let ico = stencil_icon::master_icon(&mut doc, m).map_err(|e| err(&mi.file, mi.line, format!("das Symbol lässt sich nicht rendern ({e:?})")))?;
         let sym = doc.intern(&instance::base64(&ico));

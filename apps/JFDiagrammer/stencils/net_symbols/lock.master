@@ -1,0 +1,33 @@
+# Schloss (JD13, eigene Grafik im JFNetworker-Stil)
+master: Lock
+name.de: Schloss
+name.en: Lock
+name.es: Candado
+name.it: Lucchetto
+name.fr: Cadenas
+prompt.de: Schloss: gesicherter Zugang.
+prompt.en: Lock: secured access.
+prompt.es: Candado: acceso protegido.
+prompt.it: Lucchetto: accesso protetto.
+prompt.fr: Cadenas : accès sécurisé.
+keywords.de: Schloss, Sicherheit
+keywords.en: Lock, security
+keywords.es: Candado, seguridad
+keywords.it: Lucchetto, sicurezza
+keywords.fr: Cadenas, sécurité
+svg: ../../symbols/network/lock.svg
+include: ../net_common/symbol.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Sicherheit
+    Value.en = Security
+    Value.es = Seguridad
+    Value.it = Sicurezza
+    Value.fr = Sécurité
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Schloss
+    Value.en = Lock
+    Value.es = Candado
+    Value.it = Lucchetto
+    Value.fr = Cadenas

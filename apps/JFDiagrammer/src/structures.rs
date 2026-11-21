@@ -108,6 +108,8 @@ pub(crate) fn move_shapes(tx: &mut Transaction, eng: &mut Engine, owner: Owner, 
     ops::move_shapes(tx, eng, &along, d)?;
     edit_canvas::follow(tx, eng, owner, &along)?;
     if done {
+        // (JD13) equipment snaps onto the units of a rack before it joins it
+        crate::rack::docked(tx, eng, owner, shapes)?;
         settle(tx, eng, owner, shapes, true)?;
     }
     Ok(())
@@ -139,6 +141,7 @@ pub(crate) fn callout_point(tx: &mut Transaction, eng: &mut Engine, owner: Owner
 
 /// after a resize or a turn of `shapes`: lists, flowcharts and sizes (no membership)
 pub(crate) fn changed(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[ShapeRef]) -> Result<(), EditError> {
+    crate::rack::resized(tx, eng, owner, shapes)?;
     settle(tx, eng, owner, shapes, false)
 }
 
@@ -207,7 +210,10 @@ pub(crate) fn dropped(tx: &mut Transaction, eng: &mut Engine, m: &Masters, owner
             }
         }
     }
-    settle(tx, eng, owner, &[s], true)
+    crate::rack::docked(tx, eng, owner, &[s])?;
+    settle(tx, eng, owner, &[s], true)?;
+    // (JD13) legends count the devices of the page
+    crate::legend::refresh(tx, eng, owner)
 }
 
 /// the topmost shape under page point p that may be a callout's target (not a container's
@@ -280,7 +286,7 @@ pub(crate) fn delete(o: &mut crate::viewer::Opened, owner: Owner, shapes: &[Shap
         if !more.is_empty() {
             edit_canvas::follow(tx, eng, owner, &more)?;
         }
-        Ok(())
+        crate::legend::refresh(tx, eng, owner)
     })
 }
 
@@ -298,7 +304,8 @@ pub(crate) fn pasted(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shape
         let doc = tx.doc();
         shapes.iter().copied().filter(|&s| structure::containers_of(doc, s).is_empty()).collect()
     };
-    settle(tx, eng, owner, &loose, true)
+    settle(tx, eng, owner, &loose, true)?;
+    crate::legend::refresh(tx, eng, owner)
 }
 
 /// whether a click at page point `p` on top-level shape `top` goes through it: inside a

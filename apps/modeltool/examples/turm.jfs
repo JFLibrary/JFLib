@@ -1,0 +1,40 @@
+// Turm: ein runder, hohler Turm auf einem Sockel mit gerundeten Kanten, oben ein Kranz aus acht Zinnen, unten eine
+// Tür mit Rundbogen, darüber drei schmale Fenster -- Öffnungen und Zinnen als Abzüge (geom.difference), Kranz und
+// Schaft vereint (geom.union), der Sockel abgeschrägt (bevel)
+//   modeltool turm.jfs [--param hoehe=6]
+// Der Turm steht mittig über dem Ursprung, die Tür vorn (+Z).
+
+model.name("Turm")
+
+let H = params.get("hoehe", 6.0)     // der Schaft über dem Sockel, ohne die Zinnen
+let r = 1.6                          // außen
+let wand = 0.4
+let s = 0.5                          // Sockelhöhe
+let z = 0.8                          // Höhe des Zinnenkranzes
+
+let sockel = geom.box(4, s, 4).bevel(0.12, 3)
+
+// der Kranz: ein Ring mit acht Scharten (vier Quader durch die Mitte nehmen je zwei weg)
+let ring = geom.difference(geom.cylinder(r, z, 32), geom.cylinder(r - wand, z + 0.2, 32).move(0, -0.1, 0))
+let scharte = geom.box(0.55, 0.45, 2 * r + 1).move(0, z - 0.45, 0)
+let kranz = geom.difference(ring, scharte, scharte.rotate_y(45), scharte.rotate_y(90), scharte.rotate_y(135))
+
+// der Schaft, innen hohl bis auf den Sockel (oben offen, der Sockel ist der Boden), mit dem Kranz zu einem Körper
+let schaft = geom.union(geom.cylinder(r, H, 32).move(0, s, 0), kranz.move(0, s + H, 0))
+let innen = geom.cylinder(r - wand, H + z + 0.2, 32).move(0, s - 0.1, 0)
+
+// die Tür: ein Rechteck mit einem Halbkreis darüber, durch die Wand vorn
+let tuer = geom.union(geom.box(1.0, 1.7, 1.0).move(0, s, r - 0.2), geom.cylinder(0.5, 1.0, 24).rotate_x(90).move(0, s + 1.7, r - 0.7))
+
+// drei schmale Fenster in verschiedenen Höhen, rundherum versetzt
+let fenster = geom.box(0.18, 0.8, 1.0).move(0, 0, r - 0.2)
+let abzug = [schaft, innen, tuer]
+for i in 0..3 {
+  abzug.push(fenster.move(0, s + 2.4 + i * 1.1, 0).rotate_y(100 + i * 110))
+}
+
+model.add(sockel, "beton", "sockel")
+model.add(geom.difference(abzug), "stein", "turm")
+
+model.budget(6000)
+model.expect_size(4, s + H + z, 4)

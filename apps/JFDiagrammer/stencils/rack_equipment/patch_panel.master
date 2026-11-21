@@ -1,0 +1,38 @@
+# Patchfeld (JD13, eigene Grafik im JFNetworker-Stil)
+master: Patch panel
+name.de: Patchfeld
+name.en: Patch panel
+name.es: Panel de conexiones
+name.it: Pannello di permutazione
+name.fr: Panneau de brassage
+prompt.de: Patchfeld: Patchfeld mit 24 Buchsen.
+prompt.en: Patch panel: patch panel with 24 jacks.
+prompt.es: Panel de conexiones: panel de conexiones con 24 tomas.
+prompt.it: Pannello di permutazione: pannello di permutazione con 24 prese.
+prompt.fr: Panneau de brassage : panneau de brassage à 24 prises.
+keywords.de: Patchfeld, Rack, 19 Zoll, HE
+keywords.en: Patch panel, rack, 19 inch, U
+keywords.es: Panel de conexiones, rack, 19 pulgadas, U
+keywords.it: Pannello di permutazione, rack, 19 pollici, U
+keywords.fr: Panneau de brassage, baie, 19 pouces, U
+svg: ../../symbols/rack/patch_panel_1u.svg
+scale: 1:20
+size: 482.6 mm x 44.45 mm
+size.us: 19 in x 1.75 in
+include: ../net_common/rackdev.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+RackUnits: Value = 1
+NumberofPorts: Value = 24
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Gestellmontiert
+    Value.en = Rack-mounted
+    Value.es = Montaje en rack
+    Value.it = Montaggio a rack
+    Value.fr = Monté en baie
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Patchfeld
+    Value.en = Patch panel
+    Value.es = Panel de conexiones
+    Value.it = Pannello di permutazione
+    Value.fr = Panneau de brassage

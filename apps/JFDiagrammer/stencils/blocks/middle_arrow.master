@@ -1,0 +1,67 @@
+# Pfeil - Mitte: eine gerade Linie als 1D-Shape (Height 0) mit einer Pfeilspitze in der
+# Mitte statt am Ende; sie liegt auf der Linie vom Anfang zum Ende und dreht sich mit ihr, die
+# Enden kleben (GlueType 2 auch an das ganze Shape).  Abschnitte: 1 die Linie, 2 die Spitze als
+# gefülltes Dreieck in der Linienfarbe (FillForegnd = LineColor, FillPattern 1: die Füllung
+# folgt dem Design), 3 mm lang.  Formatvorlage "Connector" ohne deren Linienenden (BeginArrow und
+# EndArrow 0).  Der Text steht in der Mitte der Linie.
+master: Arrow - middle
+name.de: Pfeil - Mitte
+name.en: Arrow - middle
+name.es: Flecha - centro
+name.it: Freccia - centro
+name.fr: Flèche - milieu
+style: Connector
+prompt.de: Linie mit einer Pfeilspitze in der Mitte, deren Enden an Shapes kleben.
+prompt.en: Line with an arrowhead in the middle whose ends glue to shapes.
+prompt.es: Línea con una punta de flecha en el centro cuyos extremos se pegan a las formas.
+prompt.it: Linea con una punta di freccia al centro le cui estremità si incollano alle forme.
+prompt.fr: Ligne avec une pointe de flèche au milieu dont les extrémités se collent aux formes.
+keywords.de: Linie, Pfeil, Mitte, Richtung, Fluss, Verbindung, Signal
+keywords.en: line, arrow, middle, direction, flow, connection, signal
+keywords.es: línea, flecha, centro, dirección, flujo, conexión, señal
+keywords.it: linea, freccia, centro, direzione, flusso, collegamento, segnale
+keywords.fr: ligne, flèche, milieu, direction, flux, connexion, signal
+
+[Shape]
+BeginX = 0 mm
+BeginY = 2.5 mm
+BeginY.us = 0.1 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 2.5 mm
+EndY.us = 0.1 in
+Height = 0 mm
+Height.us = 0 in
+GlueType = 2
+BeginArrow = 0
+EndArrow = 0
+FillForegnd = LineColor
+FillPattern = 1
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# Länge und halbe Breite der Pfeilspitze in der Mitte
+L:   Value = 3 mm
+     Value.us = 0.12 in
+Aw:  Value = 1.2 mm
+     Value.us = 0.05 in
+
+# 1 die Linie
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width; Y = Height*0.5
+
+# 2 die Pfeilspitze
+[Geometry]
+MoveTo  X = Width*0.5+User.L*0.5; Y = Height*0.5
+LineTo  X = Width*0.5-User.L*0.5; Y = Height*0.5+User.Aw
+LineTo  X = Width*0.5-User.L*0.5; Y = Height*0.5-User.Aw
+LineTo  X = Geometry2.X1; Y = Geometry2.Y1

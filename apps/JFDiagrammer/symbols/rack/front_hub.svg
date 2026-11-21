@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 40" width="500" height="80"
+     fill="none" stroke="#2E343B" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Desktop hub, front view: fan-out sign, eight RJ45 with link LEDs, power LED</title>
+  <rect class="body" x="1.25" y="1.25" width="247.5" height="33" rx="4" fill="#F7F8FA" stroke="none"/>
+  <rect class="tint" x="8" y="7.5" width="36" height="21" rx="2.5" fill="#4F7396" stroke="none"/>
+  <path class="body" d="M14 18L34 11.5M14 18H34M14 18L34 24.5" stroke="#F7F8FA" stroke-width="1.6"/>
+  <g class="body body" fill="#F7F8FA" stroke="#F7F8FA" stroke-width="0.8"><circle cx="14" cy="18" r="2"/><circle cx="36" cy="11" r="1.7"/><circle cx="36" cy="18" r="1.7"/><circle cx="36" cy="25" r="1.7"/></g>
+  <rect class="ink" x="1.25" y="1.25" width="247.5" height="33" rx="4"/>
+  <g class="port" fill="#4F555D" stroke="none"><rect x="16" y="35.5" width="26" height="4.5" rx="1.5"/><rect x="208" y="35.5" width="26" height="4.5" rx="1.5"/></g>
+  <g class="port" fill="#4F555D" stroke="none"><path d="M56 16H70V24.74H66.08V27.5H59.92V24.74H56Z"/><path d="M75 16H89V24.74H85.08V27.5H78.92V24.74H75Z"/><path d="M94 16H108V24.74H104.08V27.5H97.92V24.74H94Z"/><path d="M113 16H127V24.74H123.08V27.5H116.92V24.74H113Z"/><path d="M132 16H146V24.74H142.08V27.5H135.92V24.74H132Z"/><path d="M151 16H165V24.74H161.08V27.5H154.92V24.74H151Z"/><path d="M170 16H184V24.74H180.08V27.5H173.92V24.74H170Z"/><path d="M189 16H203V24.74H199.08V27.5H192.92V24.74H189Z"/></g>
+  <g class="ok" fill="#3C9A5F" stroke="none"><circle cx="63" cy="10" r="1.7"/><circle cx="82" cy="10" r="1.7"/><circle cx="101" cy="10" r="1.7"/><circle cx="120" cy="10" r="1.7"/><circle cx="139" cy="10" r="1.7"/></g>
+  <g class="shade" fill="#DCDFE3" stroke-width="1"><circle cx="158" cy="10" r="1.7"/><circle cx="177" cy="10" r="1.7"/><circle cx="196" cy="10" r="1.7"/></g>
+  <circle class="ok" cx="228" cy="17.5" r="2.2" fill="#3C9A5F" stroke="none"/>
+</svg>

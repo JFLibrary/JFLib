@@ -1,0 +1,33 @@
+# Benutzer (JD13, eigene Grafik im JFNetworker-Stil)
+master: User
+name.de: Benutzer
+name.en: User
+name.es: Usuario
+name.it: Utente
+name.fr: Utilisateur
+prompt.de: Benutzer: Person im Netzwerkplan.
+prompt.en: User: person in the network plan.
+prompt.es: Usuario: persona del plano de red.
+prompt.it: Utente: persona nello schema di rete.
+prompt.fr: Utilisateur : personne dans le plan réseau.
+keywords.de: Benutzer, Peripherie, Büro
+keywords.en: User, peripheral, office
+keywords.es: Usuario, periférico, oficina
+keywords.it: Utente, periferica, ufficio
+keywords.fr: Utilisateur, périphérique, bureau
+svg: ../../symbols/network/user.svg
+include: ../net_common/symbol.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Benutzer
+    Value.en = User
+    Value.es = Usuario
+    Value.it = Utente
+    Value.fr = Utilisateur

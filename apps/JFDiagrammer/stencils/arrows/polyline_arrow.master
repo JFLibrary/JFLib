@@ -1,0 +1,65 @@
+# Linienzug mit Pfeil: ein Linienzug aus drei Strecken von der linken unteren zur rechten oberen
+# Ecke mit der Pfeilspitze des Designs am Ende, als 2D-Shape (frei zu skalieren).  Row_1 und
+# Row_2 sind die beiden Knickpunkte (frei, anteilig).  Formatvorlage "Connector" wie die
+# Linienverbinder (Linie und Pfeilspitze aus dem Design; mit "Normal" fehlte die Spitze).  Der
+# Text steht in der Mitte; Verbindungspunkte an Anfang und Spitze.
+master: Polyline arrow
+name.de: Linienzug mit Pfeil
+name.en: Polyline arrow
+name.es: Flecha de polilínea
+name.it: Freccia a spezzata
+name.fr: Flèche en ligne brisée
+style: Connector
+prompt.de: Linienzug aus drei Strecken mit Pfeilspitze. Die Knickpunkte ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Polyline of three segments with an arrowhead. Drag the yellow control handles to change the vertices.
+prompt.es: Polilínea de tres segmentos con punta de flecha. Arrastre los controladores amarillos para cambiar los vértices.
+prompt.it: Spezzata di tre segmenti con punta di freccia. Trascina le maniglie di controllo gialle per cambiare i vertici.
+prompt.fr: Ligne brisée de trois segments avec pointe de flèche. Faites glisser les poignées de contrôle jaunes pour modifier les sommets.
+keywords.de: Pfeil, Linienzug, Linie, mehrteilig, Knick, Weg, Polylinie
+keywords.en: arrow, polyline, line, multi-segment, bend, path
+keywords.es: flecha, polilínea, línea, segmentos, quiebro, recorrido
+keywords.it: freccia, spezzata, polilinea, linea, segmenti, percorso
+keywords.fr: flèche, ligne brisée, polyligne, ligne, segments, chemin
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Controls.Row_1; Y = Controls.Row_1.Y
+LineTo  X = Controls.Row_2; Y = Controls.Row_2.Y
+LineTo  X = Width; Y = Height
+
+[Controls]
+Row_1:  X = Width*0.4; Y = 0
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Ersten Knickpunkt verschieben"
+        Tip.en = "Move the first vertex"
+        Tip.es = "Mover el primer vértice"
+        Tip.it = "Sposta il primo vertice"
+        Tip.fr = "Déplacer le premier sommet"
+Row_2:  X = Width*0.6; Y = Height
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Zweiten Knickpunkt verschieben"
+        Tip.en = "Move the second vertex"
+        Tip.es = "Mover el segundo vértice"
+        Tip.it = "Sposta il secondo vertice"
+        Tip.fr = "Déplacer le deuxième sommet"
+
+[Connection]
+Row  X = 0; Y = 0; DirX = 1; DirY = 0
+Row  X = Width; Y = Height; DirX = -1; DirY = 0

@@ -1,0 +1,30 @@
+# Startdiagramm „Leeres Gestell“ (VL-52): ein Gestell mit 42 HE und ein Tipp.  Maße wirklich
+# (Maßstab 1:20): das Gestell 560 x 1966,9 mm, der Tipp 1800 x 680 mm (90 x 34 mm auf dem Papier).
+starter: sample
+name.de: Leeres Gestell
+name.en: Empty rack
+name.es: Bastidor vacío
+name.it: Rack vuoto
+name.fr: Baie vide
+description.de: Ein Gestell mit 42 Höheneinheiten, in das Sie Geräte aus der Seitenleiste ziehen.
+description.en: A rack with 42 rack units to drag equipment into from the Shapes panel.
+description.es: Un bastidor de 42 unidades al que arrastrar equipos desde el panel Formas.
+description.it: Un rack da 42 unità in cui trascinare le apparecchiature dal riquadro Forme.
+description.fr: Une baie de 42 unités dans laquelle faire glisser des équipements depuis le volet Formes.
+
+[Shapes]
+rack:   Stencil = "rackeq"; Master = "Rack"
+        PinX = 2000 mm; PinY = 2100 mm; PinX.us = 74 in; PinY.us = 85 in
+        Text.de = "Gestell A1"
+        Text.en = "Rack A1"
+        Text.es = "Bastidor A1"
+        Text.it = "Rack A1"
+        Text.fr = "Baie A1"
+tip:    Stencil = "callouts"; Master = "Tip"; Tip = TRUE
+        PinX = 4300 mm; PinY = 2900 mm; Width = 1800 mm; Height = 680 mm
+        PinX.us = 160 in; PinY.us = 117 in; Width.us = 68 in; Height.us = 26 in
+        Text.de = "Tipp: Ziehen Sie Geräte aus „Gestellmontierte Geräte“ oder „Gestellmontierte Server“ auf das Gestell; sie rasten auf den Höheneinheiten ein und wandern mit dem Gestell. Die Höhe stellen Sie in den Shape-Daten ein. Diesen Hinweis können Sie löschen."
+        Text.en = "Tip: Drag equipment from Rack-mounted Equipment or Rack-mounted Servers onto the rack; it snaps to the rack units and moves with the rack. Set the height in the shape data. You can delete this note."
+        Text.es = "Consejo: arrastre equipos desde Equipos montados en rack o Servidores montados en rack al bastidor; se ajustan a las unidades y se mueven con el bastidor. Ajuste la altura en los datos de forma. Puede eliminar esta nota."
+        Text.it = "Suggerimento: trascinare le apparecchiature da Apparecchiature a rack o Server a rack sul rack; si agganciano alle unità e si spostano con il rack. Impostare l'altezza nei dati forma. È possibile eliminare questa nota."
+        Text.fr = "Astuce : faites glisser des équipements depuis Équipements montés en baie ou Serveurs montés en baie sur la baie ; ils s'alignent sur les unités et suivent la baie. Réglez la hauteur dans les données de forme. Vous pouvez supprimer cette note."

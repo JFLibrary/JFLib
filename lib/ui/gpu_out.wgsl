@@ -4,6 +4,9 @@
 // wgsl::compile makes of this file (shader::BASIS, no robustness: only pixels of the texture are
 // reached, the scissor keeps the draws inside), uigputest --gen-shaders writes gpu_out_spv.rs again.
 @group(0) @binding(0) var frame: texture_2d<f32>;
+// (G7b, fs_veil) a view's frame and a veil: what shows of the view through what lies over it
+@group(1) @binding(0) var under: texture_2d<f32>;
+@group(2) @binding(0) var veil: texture_2d<f32>;
 
 // where the texture's first pixel lies in the window; an image's steps (16.16 source pixels per
 // window pixel: Dc::blit_scaled).  A scaled tile: x, y in 24.8, its steps the same way
@@ -51,4 +54,17 @@ fn fs_tile(@builtin(position) p: vec4f) -> @location(0) vec4f {
     let top = mix(textureLoad(frame, a, 0).rgb, textureLoad(frame, a + vec2i(1, 0), 0).rgb, w.x);
     let bottom = mix(textureLoad(frame, a + vec2i(0, 1), 0).rgb, textureLoad(frame, a + vec2i(1, 1), 0).rgb, w.x);
     return vec4f(mix(top, bottom, w.y), 1.0);
+}
+
+// (G7b) a veil: what lies over a view, composed on the GPU (lib/ui/gpu_out.rs "Veils").  The window's texture
+// holds it drawn over black (k), the veil the share of each channel that lets the view through (t: drawn over
+// white less drawn over black); the view's frame (v) lies at place.x, place.y, the veil's texture at step_x,
+// step_y.  k + t * v is what the CPU's "over" makes of it (dst = src + dst * (255 - a) / 255), rounded once
+@fragment
+fn fs_veil(@builtin(position) p: vec4f) -> @location(0) vec4f {
+    let q = vec2i(p.xy);
+    let k = textureLoad(frame, q, 0).rgb;
+    let v = textureLoad(under, q - vec2i(place.x, place.y), 0).rgb;
+    let t = textureLoad(veil, q - vec2i(i32(place.step_x), i32(place.step_y)), 0).rgb;
+    return vec4f(k + t * v, 1.0);
 }

@@ -38,7 +38,9 @@ pub(crate) fn available(app: &Diagrammer, id: u32) -> bool {
         DISTRIBUTE_H | DISTRIBUTE_V => app.se.sel.len() > 2,
         UNGROUP => sel && group_selected(app),
         EDIT_TEXT => app.se.sel.len() == 1,
-        PASTE => open && app.clip.is_some(),
+        // (JD8 rest) an empty app clipboard: the system's text or picture (cmds_paste.rs)
+        PASTE => open && (app.clip.is_some() || crate::cmds_paste::system_has(app)),
+        SELECT_BY_TYPE => open,
         CONN_RIGHT_ANGLE | CONN_STRAIGHT | CONN_CURVED | CONN_RESET => sel,
         SAVE | SAVE_AS | SELECT_ALL => open,
         _ => true,
@@ -79,6 +81,8 @@ pub(crate) fn copy(app: &mut Diagrammer, _ui: &mut Ui) {
         // (JD10) members and callouts come along
         app.clip = Some(ops::copy(&o.doc, &crate::structures::carried(&o.doc, &shapes)));
         app.clip_offset = 1;
+        // (JD8 rest) Als Link einfügen links to them
+        crate::cmds_paste::copied(app, &shapes);
     }
 }
 
@@ -98,6 +102,11 @@ pub(crate) fn cut(app: &mut Diagrammer, ui: &mut Ui) {
 /// Einfügen: the clipboard's shapes, a grid step further each time
 pub(crate) fn paste(app: &mut Diagrammer, ui: &mut Ui) {
     let (Some(ow), Some(geo)) = (owner(app), app.model.geo) else { return };
+    // (JD8 rest) nothing copied in the app: the system's text or picture
+    if app.clip.is_none() {
+        crate::cmds_paste::paste_system(app, ui);
+        return;
+    }
     let Some(clip) = app.clip.take() else { return };
     let step = if app.canvas.grid > 0.0 { app.canvas.grid } else { 16.0 };
     let n = app.clip_offset as f32;
@@ -139,6 +148,8 @@ pub(crate) fn select_all(app: &mut Diagrammer, ui: &mut Ui) {
 /// a tool: the pointer, the connector, a drawing tool (stays until another is chosen)
 pub(crate) fn tool(app: &mut Diagrammer, id: u32) {
     app.tool = id;
+    // (JD8 rest) the Zeichentools split button keeps the drawing tool used last
+    crate::cmds_draw::chosen(app, id);
 }
 
 fn change(app: &mut Diagrammer, ui: &mut Ui, label: &str, f: impl FnOnce(&mut diagram_core::Transaction, &mut diagram_core::formula::Engine, Owner, &[ShapeRef]) -> Result<(), diagram_core::EditError>) {
@@ -345,10 +356,4 @@ pub(crate) fn edit_text(app: &mut Diagrammer, ui: &mut Ui) {
     if let (1, Some(&k)) = (app.se.sel.len(), app.se.sel.iter().next()) {
         crate::edit_text::begin(app, ui, k, None);
     }
-}
-
-/// Neu › Leere Zeichnung
-pub(crate) fn new_drawing(app: &mut Diagrammer, ui: &mut Ui) {
-    let us = app.units_us == 1;
-    edit_doc::new_drawing(app, ui, us);
 }

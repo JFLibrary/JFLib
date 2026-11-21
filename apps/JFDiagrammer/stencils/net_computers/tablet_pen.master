@@ -1,0 +1,33 @@
+# Slate-Computer (JD13, eigene Grafik im JFNetworker-Stil)
+master: Slate computer
+name.de: Slate-Computer
+name.en: Slate computer
+name.es: Equipo pizarra
+name.it: Computer slate
+name.fr: Ordinateur ardoise
+prompt.de: Slate-Computer: Tablet mit Stift.
+prompt.en: Slate computer: tablet with a pen.
+prompt.es: Equipo pizarra: tableta con lápiz.
+prompt.it: Computer slate: tablet con penna.
+prompt.fr: Ordinateur ardoise : tablette avec stylet.
+keywords.de: Slate-Computer, Computer, Arbeitsplatz
+keywords.en: Slate computer, computer, workstation
+keywords.es: Equipo pizarra, equipo, puesto de trabajo
+keywords.it: Computer slate, computer, postazione
+keywords.fr: Ordinateur ardoise, ordinateur, poste de travail
+svg: ../../symbols/network/tablet_pen.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Computer
+    Value.en = Computer
+    Value.es = Equipo
+    Value.it = Computer
+    Value.fr = Ordinateur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Slate-Computer
+    Value.en = Slate computer
+    Value.es = Equipo pizarra
+    Value.it = Computer slate
+    Value.fr = Ordinateur ardoise

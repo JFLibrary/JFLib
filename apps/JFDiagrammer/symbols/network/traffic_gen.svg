@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Traffic generator: an instrument with a pulse train, sending</title>
+  <rect class="body" x="3" y="9" width="44" height="30" rx="2" fill="#F7F8FA"/>
+  <rect class="screen" x="7" y="13" width="25.5" height="18" rx="0.75" fill="#CAD4DF" stroke-width="1"/>
+  <polyline class="tint" points="9,27 12,27 12,17 16.5,17 16.5,27 20.5,27 20.5,17 25,17 25,27 30.5,27" stroke="#8E8540" stroke-width="1.5"/>
+  <circle class="shade" cx="40" cy="18.5" r="3.5" fill="#DCDFE3" stroke-width="1"/>
+  <path class="ink" d="M40 18.5L41.8 15.6" stroke-width="1"/>
+  <rect class="port" x="36.25" y="25.5" width="3" height="2.25" rx="0.5" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="40.75" y="25.5" width="3" height="2.25" rx="0.5" fill="#4F555D" stroke="none"/>
+  <circle class="ok" cx="37.75" cy="33.5" r="1" fill="#3C9A5F" stroke="none"/>
+  <path class="shade" d="M8 35H31" stroke="#DCDFE3" stroke-width="1.5"/>
+  <polyline class="ink" points="50,18 55,24 50,30" stroke-width="2"/>
+  <polyline class="ink" points="55.5,18 60.5,24 55.5,30" stroke-width="2"/>
+</svg>

@@ -10,6 +10,13 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
+- (JD8 rest) `ui.shape_edit`: the freeform tool `SE_FREEFORM` (the pointer's way, reported as
+  `SeEv::Stroke` with the glue of both ends) and the arc tool `SE_ARC` (a quarter ellipse as the
+  rubber band, bowing the way the drag started, reported as `SeEv::Arc`); both glue to connection
+  points like the line tool; Shift with the rectangle and ellipse tools draws a square and a circle, Shift while moving keeps
+  to one axis;
+  `SEF_NOSNAP`: moves do not snap to such a shape (the dynamic grid leaves it out)
+
 - The Shapes window of a diagram editor, modelled on Visio's but knowing nothing about diagrams:
   `ui.stencil_panel(id, &mut StencilState, &StencilPanel) -> Vec<StencilEvent>`. The app hands in
   stencils (`StencilDef`, `SD_EDITABLE` for favourites) of tiles (`StencilTile`: a name, a
@@ -64,6 +71,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - `Mi::List` rows take the state of their id like a command: `cmd_state(base + k, CF_CHECKED | CF_DISABLED)` shows row k checked or disabled (in the window's menus and in macOS' system menu), e.g. the open stencils in JFDiagrammer's "Weitere Shapes"; before, list rows were always plain
 - `SE_PLACE`, a tool of `ui.shape_edit` for placing what the app holds (a shape from a stencil, click + click): a click anywhere, on a shape too, reports `SeEv::Draw { tool: SE_PLACE, a, b: a }` at the snapped point; no handles, a drag places nothing
 - (JD10) Connection arrows and insertion marks in `ui.shape_edit`: with the pointer tool a top-level shape under the pointer shows four arrows around its box (`SeState::arrows`, on by default; `SEF_NOARROWS` leaves a shape out); a click on one reports `SeEv::Arrow { key, dir }`, a drag from one draws a connector from that shape (`SeEv::Connect` with `ga: SeGlue::Shape(key)`), `SeEv::ArrowHover` and `SeState::arrow_hover()` tell the arrow under the pointer; the app's insertion marks (`SeModel::marks`, `SeMark`) show near the pointer and report `SeEv::Mark { tag }`; `ui.shape_edit_sems` names both for scripts and screen readers
+- (JD8) `ui.tabs` and `ui.tabs_scrolling` report `EV_DOUBLE` when a tab is double-clicked (it is the selected one then); a double click on the strip beside the tabs no longer does. A right click on a tab selects it as a click does, so a context menu on the strip belongs to the tab under the pointer
 - (JD11) `ui.color_menu(id, &ColorMenu)` -> `Option<(ColorPick, rgb)>`: the swatches of an Office colour menu (design colours with five shades each, variant colours, fixed colours, last used; the current one marked) and `color_shades(rgb)`; `ui.ribbon_image_tile(id, label, &surface, ver)`: a gallery tile with a picture the app made
 - (G7a part 2) `ui.gamepads()`: the game pads connected now (`ui::Gamepad`, the same as `plat::Gamepad`) with the edges of their buttons in this batch; the first call starts watching (`plat::pad_watch`), every change gives a frame, a pad that comes or goes gives `App::command(UIC_GAMEPAD, index | PADEV_* << 8)`; `ui.gamepads_watching()`; `ui::PadStyle`. Scripts: `pad connect N [xbox|playstation|nintendo|other] [NAME]`, `pad disconnect N`, `pad press N BUTTON [VALUE]`, `pad release N BUTTON`, `pad axis N lx|ly|rx|ry VALUE`. docs/GUIDE.md sections 12 and 39
 
@@ -87,9 +95,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   shows no caption buttons, and there are no resize grips; the browser tab shows the title.
   Before, it looked like a window inside the page. Tool windows keep their title bar, also with
   `WF_SYSFRAME` (the browser draws no frame).
+- (G7b) Veils: a cell of the base layer with something over a GPU view (`ui.gpu_view`; a game's HUD, a menu's panel) is composed on the GPU instead of reading the view's frame back in every frame. The CPU draws what lies over the view once over a black and once over a white view; the output's pass draws the cell as K + T x frame (`fs_veil`), the CPU's "over" to one level; a new frame of the view costs those cells nothing (before: the whole frame read back and waited for, 1.3 ms at 1200 x 700 on an RTX 2070 SUPER, and the cells drawn and uploaded again). Text in veils is greyscale; at rest the framebuffer gets the true pixels once (`gp_settle`). `jfgui_GPU_VEIL=0` and `Ui::gpu_test_veil(false)` give the way before; `GpuOutput::veil_cells`, `veil_rects`, `veil_draws`, `veil_settles`; `GPU_OUT_FS_VEIL`. uigputest `--test viewplain`: no frame read back while the view turns under something, the screen against the CPU's picture
 
 ### Fixed
 
+- `ui.shape_edit`: a click on a connection arrow did nothing when a handle of another selected
+  shape lay under it (the shape a first arrow click had just made, its side handle under the
+  arrow); a drag from it resized that shape. The arrow shown hot now takes the click and the drag;
+  only the handles of the arrows' own shape, or of a selection box around it, still come first.
 - GPU canvases: a tile evicted for a new one hands its texture over when no frame draws it any
   more; a zoom over many levels made a new texture for every tile while the evicted ones lived on
   until the GPU had finished the frame.

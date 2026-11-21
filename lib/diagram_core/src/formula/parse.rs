@@ -139,6 +139,12 @@ funcs! {
     Data1 = "DATA1", Data2 = "DATA2", Data3 = "DATA3", Is1D = "IS1D", UserUi = "USERUI", Ref = "REF",
     Arg = "ARG", Na = "NA", IsErr = "ISERR", IsError = "ISERROR", IsErrNa = "ISERRNA", IsErrValue = "ISERRVALUE",
     DefaultEvent = "DEFAULTEVENT",
+    // document information of text fields (TX-06, field.rs): the clock, the file, the
+    // document's properties
+    Now = "NOW", DocCreation = "DOCCREATION", DocLastSave = "DOCLASTSAVE", DocLastPrint = "DOCLASTPRINT",
+    DocLastEdit = "DOCLASTEDIT", Creator = "CREATOR", Description = "DESCRIPTION", Directory = "DIRECTORY",
+    FileName = "FILENAME", Keywords = "KEYWORDS", Subject = "SUBJECT", Title = "TITLE", Manager = "MANAGER",
+    Company = "COMPANY", Category = "CATEGORY", HyperlinkBase = "HYPERLINKBASE",
     // protection and side effects (FX-04)
     Guard = "GUARD", SetF = "SETF", SetAtRef = "SETATREF", SetAtRefExpr = "SETATREFEXPR",
     SetAtRefEval = "SETATREFEVAL", DependsOn = "DEPENDSON", GetRef = "GETREF", SheetRef = "SHEETREF",

@@ -17,7 +17,8 @@
 // Console program; exit code 1 when a check fails.
 //
 //   python build_rs.py app coretest
-//   build/win/coretest.exe [--only NAME] [--bench] [--vectors FILE]  (FILE: tools/crypto_check.py)
+//   build/win/coretest.exe [--only NAME] [--bench] [--vectors FILE]  (FILE: tools/crypto_check.py,
+//                                     tools/wycheproof_check.py, tools/limbo_check.py)
 //   (build_rs.py test runs it through tests/all.uis; --script is ignored)
 //   Android (docs/ANDROID.md, AN0): a program without a UI, python tools/android_console.py coretest;
 //   the groups and parts that need what plat lacks there so far (fs, net: AN2, AN3) say "not on
@@ -54,6 +55,8 @@ mod sshd;
 mod store;
 #[cfg(not(target_os = "android"))]
 mod tlst;
+#[cfg(not(target_os = "android"))]
+mod suitevec;
 mod sshcoret;
 mod cookiet;
 #[cfg(not(target_os = "android"))]

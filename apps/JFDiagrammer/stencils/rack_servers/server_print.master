@@ -1,0 +1,37 @@
+# Druckserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: Print server
+name.de: Druckserver
+name.en: Print server
+name.es: Servidor de impresión
+name.it: Server di stampa
+name.fr: Serveur d'impression
+prompt.de: Druckserver: verwaltet Drucker und Druckaufträge, 19-Zoll-Einschub.
+prompt.en: Print server: manages printers and print jobs, 19-inch rack unit.
+prompt.es: Servidor de impresión: gestiona impresoras y trabajos de impresión, unidad de rack de 19 pulgadas.
+prompt.it: Server di stampa: gestisce stampanti e lavori di stampa, unità rack da 19 pollici.
+prompt.fr: Serveur d'impression : gère les imprimantes et les travaux d'impression, unité de baie 19 pouces.
+keywords.de: Druckserver, Rack, 19 Zoll, HE
+keywords.en: Print server, rack, 19 inch, U
+keywords.es: Servidor de impresión, rack, 19 pulgadas, U
+keywords.it: Server di stampa, rack, 19 pollici, U
+keywords.fr: Serveur d'impression, baie, 19 pouces, U
+svg: ../../symbols/rack/server_print.svg
+scale: 1:20
+size: 482.6 mm x 44.45 mm
+size.us: 19 in x 1.75 in
+include: ../net_common/rackdev.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+RackUnits: Value = 1
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Gestellmontiert
+    Value.en = Rack-mounted
+    Value.es = Montaje en rack
+    Value.it = Montaggio a rack
+    Value.fr = Monté en baie
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Druckserver
+    Value.en = Print server
+    Value.es = Servidor de impresión
+    Value.it = Server di stampa
+    Value.fr = Serveur d'impression

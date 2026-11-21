@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 482.6 44.45" width="965" height="89"
+     fill="none" stroke="#2E343B" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Rack bridge 1U: two RJ45 on each side, console, grille, LEDs</title>
+  <rect class="body" x="17.8" y="0.6" width="447" height="43.25" fill="#F7F8FA" stroke="none"/>
+  <path class="shade" d="M2.6 0.6H17.8V43.85H2.6A2 2 0 0 1 0.6 41.85V2.6A2 2 0 0 1 2.6 0.6ZM464.8 0.6H480A2 2 0 0 1 482 2.6V41.85A2 2 0 0 1 480 43.85H464.8Z" fill="#DCDFE3" stroke="none"/>
+  <path class="ink" d="M17.8 0.6V43.85M464.8 0.6V43.85" stroke-width="1.5"/>
+  <rect class="ink" x="0.6" y="0.6" width="481.4" height="43.25" rx="2"/>
+  <g class="port" fill="#4F555D" stroke="none"><rect x="4.9" y="4.1" width="8" height="4.5" rx="2.25"/><rect x="469.7" y="4.1" width="8" height="4.5" rx="2.25"/><rect x="4.9" y="35.85" width="8" height="4.5" rx="2.25"/><rect x="469.7" y="35.85" width="8" height="4.5" rx="2.25"/></g>
+  <rect class="tint" x="25" y="6" width="38" height="32.45" rx="3" fill="#4F7396" stroke="none"/>
+  <path class="body" d="M29 16.29H59M32.12 16.29V28.16M55.88 16.29V28.16M32.12 28.16A11.88 9.38 0 0 1 55.88 28.16" stroke="#F7F8FA" stroke-width="2.6"/>
+  <g class="port" fill="#4F555D" stroke="none"><path d="M82 8H93V15.98H89.92V18.5H85.08V15.98H82Z"/><path d="M82 24H93V31.98H89.92V34.5H85.08V31.98H82Z"/><path d="M140 8H151V15.98H147.92V18.5H143.08V15.98H140Z"/><path d="M140 24H151V31.98H147.92V34.5H143.08V31.98H140Z"/></g>
+  <g class="ok" fill="#3C9A5F" stroke="none"><circle cx="100" cy="12.5" r="1.6"/><circle cx="100" cy="28.5" r="1.6"/><circle cx="158" cy="12.5" r="1.6"/><circle cx="158" cy="28.5" r="1.6"/></g>
+  <path class="ink" d="M120 9V36" stroke-width="1.2"/>
+  <rect class="screen" x="190" y="16.7" width="13" height="11" rx="1" fill="#CAD4DF" stroke-width="1.2"/>
+  <path class="port" d="M240 11H360M240 16.5H360M240 22H360M240 27.5H360M240 33H360" stroke="#4F555D" stroke-width="1.6"/>
+  <g class="ok" fill="#3C9A5F" stroke="none"><circle cx="392" cy="15" r="1.8"/><circle cx="404" cy="15" r="1.8"/><circle cx="416" cy="15" r="1.8"/></g>
+  <circle class="body" cx="440" cy="22.23" r="6" fill="#F7F8FA" stroke-width="1.8"/>
+  <path class="ink" d="M440 19.23V23.25" stroke-width="1.8"/>
+</svg>

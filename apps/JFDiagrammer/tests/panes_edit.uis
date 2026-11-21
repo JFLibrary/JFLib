@@ -1,0 +1,88 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD8 rest: the task panes change the drawing -- Größe und Position (AB-04): width,
+# angle, the pin's place, a connector's end; Shape-Daten (AB-03) with Shape-Daten definieren
+# (DA-02): a number field and a fixed list, changed in the pane; Verschieben und Zoomen (AB-06):
+# dragging the frame moves the view
+cmd 4404
+drag 500,430 640,520
+cmd 4400
+click 570,470
+cmd 5138
+expect tab:"Größe und Position" selected
+expect #20515 text "60 mm"
+click #20515
+key ctrl+a
+type "80"
+key enter
+expect #20515 text "80 mm"
+expect listitem:"Sheet.4" rect 332 424 201 101
+key ctrl+z
+expect #20515 text "60 mm"
+# the angle, then back
+click #20517
+key ctrl+a
+type "90"
+key enter
+expect #20517 text "90°"
+key ctrl+z
+# the pin to the bottom left: the shape stays, X and Y follow
+click #20528
+click "Unten links"
+expect #20513 text "40 mm"
+expect #20514 text "80 mm"
+expect listitem:"Sheet.4" rect 357 424 151 101
+key ctrl+z
+# a value that is no length changes nothing
+click #20515
+key ctrl+a
+type "breit"
+key enter
+expect #20515 text "60 mm"
+# Shape-Daten definieren: a number field and a fixed list
+cmd 5632
+expect dialog:"Shape-Daten definieren" exists
+click "Neu"
+click #1544552464
+key ctrl+a
+type "Kosten"
+click #1544552466
+click "Zahl"
+click #1544552468
+type "12,5"
+click "Neu"
+click #1544552464
+key ctrl+a
+type "Status"
+click #1544552466
+click "Feste Liste"
+click #1544552467
+type "Neu;Aktiv;Erledigt"
+click #1544552468
+type "Aktiv"
+click "OK"
+cmd 5139
+expect tab:"Shape-Daten" selected
+expect text:"Kosten" exists
+expect #20784 text "12,5"
+expect text:"Status" exists
+# the list in the pane
+click #20788
+click "Erledigt"
+expect #20788 text "Erledigt"
+key ctrl+z
+expect #20788 text "Aktiv"
+# the number in the pane
+click #20784
+key ctrl+a
+type "99"
+key enter
+expect #20784 text "99"
+# Verschieben und Zoomen: dragging the frame moves the view
+cmd 5140
+expect tab:"Verschieben und Zoomen" selected
+cmd 5125
+click "200 %"
+click "OK"
+expect button:"200 %" exists
+drag 1100,300 1180,360
+expect button:"200 %" exists

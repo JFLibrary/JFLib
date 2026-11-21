@@ -1,0 +1,33 @@
+# Echtzeitkommunikationsserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: Real-time communications server
+name.de: Echtzeitkommunikationsserver
+name.en: Real-time communications server
+name.es: Servidor de comunicaciones en tiempo real
+name.it: Server di comunicazione in tempo reale
+name.fr: Serveur de communications en temps réel
+prompt.de: Echtzeitkommunikationsserver: vermittelt Chat, Sprache und Video.
+prompt.en: Real-time communications server: handles chat, voice and video.
+prompt.es: Servidor de comunicaciones en tiempo real: gestiona chat, voz y vídeo.
+prompt.it: Server di comunicazione in tempo reale: gestisce chat, voce e video.
+prompt.fr: Serveur de communications en temps réel : gère le chat, la voix et la vidéo.
+keywords.de: Echtzeitkommunikationsserver, Server, Rolle
+keywords.en: Real-time communications server, server, role
+keywords.es: Servidor de comunicaciones en tiempo real, servidor, función
+keywords.it: Server di comunicazione in tempo reale, server, ruolo
+keywords.fr: Serveur de communications en temps réel, serveur, rôle
+svg: ../../symbols/network/server_realtime.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Echtzeitkommunikationsserver
+    Value.en = Real-time communications server
+    Value.es = Servidor de comunicaciones en tiempo real
+    Value.it = Server di comunicazione in tempo reale
+    Value.fr = Serveur de communications en temps réel

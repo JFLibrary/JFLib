@@ -1,0 +1,48 @@
+# Sprung: eine gerade Linie mit einem Halbkreis in der Mitte (ArcTo, Radius Height/2: der Sprung
+# ist so hoch wie das Shape dick).  Liegt auf der Linie vom Anfang zum Ende und dreht sich mit ihr
+# (PinX, Width, Angle aus den Enden); die Enden kleben an Shapes, mit GlueType 2 auch an das ganze
+# Shape.  Pfeilspitze am Ende aus der Formatvorlage "Connector".
+master: Jump
+name.de: Sprung
+name.en: Jump
+name.es: Salto
+name.it: Salto
+name.fr: Saut
+prompt.de: Gerade Linie mit einem Sprungbogen in der Mitte, wo sie eine andere Linie kreuzt. Ziehen Sie die Enden auf Shapes.
+prompt.en: Straight line with a jump in the middle where it crosses another line. Drag the ends onto shapes.
+prompt.es: Línea recta con un salto en el centro donde cruza otra línea. Arrastre los extremos sobre las formas.
+prompt.it: Linea retta con un salto al centro dove incrocia un'altra linea. Trascina le estremità sulle forme.
+prompt.fr: Ligne droite avec un saut au milieu là où elle croise une autre ligne. Faites glisser les extrémités sur les formes.
+keywords.de: Sprung, Kreuzung, Brücke, Bogen, Linie, Verbinder
+keywords.en: jump, crossing, bridge, hop, line, connector
+keywords.es: salto, cruce, puente, arco, línea, conector
+keywords.it: salto, incrocio, ponte, arco, linea, connettore
+keywords.fr: saut, croisement, pont, arc, ligne, connecteur
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 2.5 mm
+BeginY.us = 0.0938 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 2.5 mm
+EndY.us = 0.0938 in
+Height = 5 mm
+Height.us = 0.1875 in
+GlueType = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = -TxtHeight*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width*0.5-Height*0.5; Y = Height*0.5
+ArcTo   X = Width*0.5+Height*0.5; Y = Height*0.5; A = -Height*0.5
+LineTo  X = Width; Y = Height*0.5

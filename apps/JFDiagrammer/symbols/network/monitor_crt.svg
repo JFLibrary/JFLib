@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>CRT monitor: deep boxy housing, curved screen, swivel foot</title>
+  <rect class="shade" x="25" y="36" width="14" height="5" fill="#DCDFE3"/>
+  <rect class="body" x="17" y="40" width="30" height="4" rx="2" fill="#F7F8FA"/>
+  <rect class="body" x="10" y="3" width="44" height="34" rx="3" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M10 31H54V34A3 3 0 0 1 51 37H13A3 3 0 0 1 10 34Z" fill="#7A828C" stroke="none"/>
+  <rect class="shade" x="13" y="5.5" width="38" height="23.5" rx="4.5" fill="#DCDFE3" stroke-width="1"/>
+  <rect class="screen" x="15.5" y="7.5" width="33" height="19.5" rx="4.5" fill="#CAD4DF" stroke-width="1"/>
+  <path class="body" d="M19 15A5.5 5.5 0 0 1 23.5 10.5" stroke="#F7F8FA" stroke-width="1.25"/>
+  <rect class="ink" x="10" y="3" width="44" height="34" rx="3"/>
+  <circle class="ok" cx="48.5" cy="34" r="0.9" fill="#3C9A5F" stroke="none"/>
+</svg>

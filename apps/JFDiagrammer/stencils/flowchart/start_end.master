@@ -1,0 +1,51 @@
+# Start/Ende (ISO 5807: Grenzstelle): ein Rechteck mit Halbkreisen an beiden Enden (Stadionform).
+# Der Radius ist die halbe Höhe, bei schmalen Formen die halbe Breite; die Bögen sind ArcTo mit
+# der Bogenhöhe des Radius.  Kategorie "Flowchart;Terminator" für die Regeln der Vorlage.  Der
+# Text steht im geraden Teil und reicht ein Stück in die Bögen, die Verbindungspunkte in der Mitte
+# jeder Seite (links und rechts auf dem Scheitel der Bögen).
+master: Start/End
+name.de: Start/Ende
+name.en: Start/End
+name.es: Inicio/Fin
+name.it: Inizio/Fine
+name.fr: Début/Fin
+prompt.de: Beginn oder Ende eines Ablaufs (ISO 5807).
+prompt.en: The start or the end of a flow (ISO 5807).
+prompt.es: El inicio o el final de un flujo (ISO 5807).
+prompt.it: L'inizio o la fine di un flusso (ISO 5807).
+prompt.fr: Le début ou la fin d'un flux (ISO 5807).
+keywords.de: Start, Ende, Beginn, Grenzstelle, Terminator, Stadion, abgerundet, Flussdiagramm
+keywords.en: start, end, begin, terminator, stadium, rounded, stop, flowchart
+keywords.es: inicio, fin, comienzo, terminador, estadio, redondeado, diagrama de flujo
+keywords.it: inizio, fine, avvio, terminatore, stadio, arrotondato, diagramma di flusso
+keywords.fr: début, fin, départ, terminaison, stade, arrondi, diagramme de flux
+
+[Shape]
+Width = 36 mm
+Width.us = 1.5 in
+Height = 24 mm
+Height.us = 1 in
+TxtWidth = Width-User.R
+TxtHeight = Height
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+msvShapeCategories:  Value = "Flowchart;Terminator"
+# der Radius der Enden
+R:  Value = MIN(Height*0.5, Width*0.5)
+
+[Geometry]
+MoveTo  X = User.R; Y = 0
+LineTo  X = Width-User.R; Y = 0
+ArcTo   X = Width-User.R; Y = Height; A = User.R
+LineTo  X = User.R; Y = Height
+ArcTo   X = User.R; Y = 0; A = User.R
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

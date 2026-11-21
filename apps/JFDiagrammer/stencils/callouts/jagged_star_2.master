@@ -1,0 +1,63 @@
+# Eine Fläche ohne Zeiger (kein msvStructureType): ein Explosionsstern mit zwölf spitzeren,
+# unregelmäßigen Zacken; der Text steht in der Mitte.
+master: Jagged star 2
+name.de: Gezackter Stern 2
+name.en: Jagged star 2
+name.es: Estrella dentada 2
+name.it: Stella frastagliata 2
+name.fr: Étoile dentelée 2
+prompt.de: Explosionsstern mit zwölf spitzen, unregelmäßigen Zacken, zum Hervorheben.
+prompt.en: Burst star with twelve sharp, irregular points, for highlighting.
+prompt.es: Estrella de explosión con doce puntas afiladas e irregulares, para destacar.
+prompt.it: Stella esplosione con dodici punte aguzze e irregolari, per evidenziare.
+prompt.fr: Étoile explosion à douze branches pointues et irrégulières, pour mettre en avant.
+keywords.de: Stern, gezackt, Explosion, Knall, Hervorhebung, Achtung, neu
+keywords.en: star, jagged, explosion, burst, highlight, attention, new
+keywords.es: estrella, dentada, explosión, estallido, destacar, atención, nuevo
+keywords.it: stella, frastagliata, esplosione, scoppio, evidenziare, attenzione, nuovo
+keywords.fr: étoile, dentelée, explosion, éclat, mise en avant, attention, nouveau
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 30 mm
+Height.us = 1.125 in
+TxtWidth = Width*0.55
+TxtHeight = Height*0.45
+TxtPinX = Width*0.485295
+TxtPinY = Height*0.501221
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+MoveTo  X = Width*0.546641; Y = Height
+LineTo  X = Width*0.444455; Y = Height*0.749544
+LineTo  X = Width*0.299101; Y = Height*0.858591
+LineTo  X = Width*0.297405; Y = Height*0.706729
+LineTo  X = Width*0.008471; Y = Height*0.776062
+LineTo  X = Width*0.220576; Y = Height*0.583556
+LineTo  X = Width*0.063762; Y = Height*0.52641
+LineTo  X = Width*0.196307; Y = Height*0.457676
+LineTo  X = 0; Y = Height*0.298955
+LineTo  X = Width*0.284668; Y = Height*0.346851
+LineTo  X = Width*0.250538; Y = Height*0.153753
+LineTo  X = Width*0.414304; Y = Height*0.257906
+LineTo  X = Width*0.505777; Y = 0
+LineTo  X = Width*0.570533; Y = Height*0.27704
+LineTo  X = Width*0.728152; Y = Height*0.193541
+LineTo  X = Width*0.703367; Y = Height*0.333428
+LineTo  X = Width; Y = Height*0.305391
+LineTo  X = Width*0.751163; Y = Height*0.46116
+LineTo  X = Width*0.940562; Y = Height*0.542112
+LineTo  X = Width*0.761043; Y = Height*0.586987
+LineTo  X = Width*0.912619; Y = Height*0.766532
+LineTo  X = Width*0.655118; Y = Height*0.686969
+LineTo  X = Width*0.652392; Y = Height*0.821938
+LineTo  X = Width*0.561244; Y = Height*0.74344
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Connection]
+Row  X = Width*0.485295; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.501221; DirX = -1; DirY = 0
+Row  X = Width*0.485295; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.501221; DirX = 1; DirY = 0

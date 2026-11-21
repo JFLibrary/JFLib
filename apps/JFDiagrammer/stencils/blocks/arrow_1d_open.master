@@ -1,0 +1,80 @@
+# 1D-Pfeil, Ende offen: der 1D-Pfeil ohne Kante am Schaftende, als käme er aus dem Shape, an
+# dem sein Anfang klebt (README: 1D-Shapes; Enden wie beim 1D-Pfeil, mit GlueType 2 auch an das
+# ganze Shape).  Zwei Abschnitte über denselben Umriss: 1 die Fläche ohne Linie, 2 die Linie ohne
+# Füllung, offen am Schaftende.  Row_1 an der oberen Ecke der Spitze ändert ihre Länge (Abstand
+# vom Ende), Row_2 an der Schaftkante die Dicke des Schafts.
+master: 1-D arrow, open end
+name.de: 1D-Pfeil, Ende offen
+name.en: 1-D arrow, open end
+name.es: Flecha 1D, extremo abierto
+name.it: Freccia 1D, estremità aperta
+name.fr: Flèche 1D, extrémité ouverte
+prompt.de: Flächiger Pfeil ohne Kante am Schaftende, dessen Enden an Shapes kleben. Spitze und Schaft ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Flat arrow without an edge at the shaft end whose ends glue to shapes. Drag the yellow control handles to change the head and the shaft.
+prompt.es: Flecha plana sin borde en el extremo del cuerpo cuyos extremos se pegan a las formas. Arrastre los controladores amarillos para cambiar la punta y el cuerpo.
+prompt.it: Freccia piatta senza bordo all'estremità del corpo le cui estremità si incollano alle forme. Trascina le maniglie di controllo gialle per cambiare la punta e il corpo.
+prompt.fr: Flèche pleine sans bord à l'extrémité du corps dont les extrémités se collent aux formes. Faites glisser les poignées de contrôle jaunes pour modifier la pointe et le corps.
+keywords.de: Pfeil, 1D, offen, offenes Ende, Blockpfeil, kleben, herausführen
+keywords.en: arrow, 1-D, open, open end, block arrow, glue, outgoing
+keywords.es: flecha, 1D, abierta, extremo abierto, flecha de bloque, pegar, saliente
+keywords.it: freccia, 1D, aperta, estremità aperta, freccia a blocco, incollare, uscente
+keywords.fr: flèche, 1D, ouverte, extrémité ouverte, flèche pleine, coller, sortante
+
+[Shape]
+BeginX = 0 mm
+BeginY = 5 mm
+BeginY.us = 0.1875 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 5 mm
+EndY.us = 0.1875 in
+Height = 10 mm
+Height.us = 0.375 in
+GlueType = 2
+
+[User]
+# die Länge der Spitze und der halbe Schaft
+Hl:     Value = MIN(MAX(Width-Controls.Row_1, 0), Width)
+Shaft:  Value = MIN(MAX(Controls.Row_2.Y-Height*0.5, 0), Height*0.5)
+
+# 1 die Fläche
+[Geometry]
+NoLine = TRUE
+MoveTo  X = 0; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.Hl; Y = Height
+LineTo  X = Width-User.Hl; Y = Height*0.5+User.Shaft
+LineTo  X = 0; Y = Height*0.5+User.Shaft
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# 2 die Linie, offen am Schaftende
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = Height*0.5-User.Shaft
+LineTo  X = Width-User.Hl; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.Hl; Y = Height
+LineTo  X = Width-User.Hl; Y = Height*0.5+User.Shaft
+LineTo  X = 0; Y = Height*0.5+User.Shaft
+
+[Controls]
+Row_1:  X = Width-8 mm; Y = Height
+        X.us = Width-0.3 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Länge der Spitze ändern"
+        Tip.en = "Change the length of the head"
+        Tip.es = "Cambiar la longitud de la punta"
+        Tip.it = "Cambia la lunghezza della punta"
+        Tip.fr = "Modifier la longueur de la pointe"
+Row_2:  X = 0; Y = Height*0.75
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Dicke des Schafts ändern"
+        Tip.en = "Change the thickness of the shaft"
+        Tip.es = "Cambiar el grosor del cuerpo"
+        Tip.it = "Cambia lo spessore del corpo"
+        Tip.fr = "Modifier l'épaisseur du corps"

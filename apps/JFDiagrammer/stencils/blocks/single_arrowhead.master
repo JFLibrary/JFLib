@@ -1,0 +1,46 @@
+# Einfache Pfeilspitze: eine gerade Linie als 1D-Shape (Height 0) mit einer Pfeilspitze am Ende; die
+# Spitze kommt aus der Formatvorlage "Connector" (jedes Design hat eine).  Sie liegt auf der
+# Linie vom Anfang zum Ende und dreht sich mit ihr, die Enden kleben (GlueType 2 auch an das
+# ganze Shape).  Der Text steht in der Mitte der Linie.
+master: Single arrowhead
+name.de: Einfache Pfeilspitze
+name.en: Single arrowhead
+name.es: Punta simple
+name.it: Punta singola
+name.fr: Pointe simple
+style: Connector
+prompt.de: Linie mit einer Pfeilspitze, deren Enden an Shapes kleben.
+prompt.en: Line with one arrowhead whose ends glue to shapes.
+prompt.es: Línea con una punta de flecha cuyos extremos se pegan a las formas.
+prompt.it: Linea con una punta di freccia le cui estremità si incollano alle forme.
+prompt.fr: Ligne avec une pointe de flèche dont les extrémités se collent aux formes.
+keywords.de: Linie, Pfeil, Pfeilspitze, Richtung, Verbindung, Fluss
+keywords.en: line, arrow, arrowhead, direction, connection, flow
+keywords.es: línea, flecha, punta de flecha, dirección, conexión, flujo
+keywords.it: linea, freccia, punta di freccia, direzione, collegamento, flusso
+keywords.fr: ligne, flèche, pointe de flèche, direction, connexion, flux
+
+[Shape]
+BeginX = 0 mm
+BeginY = 2.5 mm
+BeginY.us = 0.1 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 2.5 mm
+EndY.us = 0.1 in
+Height = 0 mm
+Height.us = 0 in
+GlueType = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width; Y = Height*0.5

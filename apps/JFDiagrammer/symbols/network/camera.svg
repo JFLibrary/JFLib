@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Digital camera: front view with a large lens, flash and shutter button</title>
+  <rect class="shade" x="45" y="8.5" width="8" height="5" rx="1" fill="#DCDFE3" stroke-width="1.25"/>
+  <rect class="body" x="21" y="7" width="16" height="7" rx="1.5" fill="#F7F8FA"/>
+  <rect class="body" x="5" y="12" width="54" height="29" rx="3" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M8 12H13V41H8A3 3 0 0 1 5 38V15A3 3 0 0 1 8 12Z" fill="#7A828C" stroke="none"/>
+  <rect class="ink" x="5" y="12" width="54" height="29" rx="3"/>
+  <rect class="screen" x="46" y="15.5" width="8" height="4.5" rx="0.75" fill="#CAD4DF" stroke-width="1"/>
+  <circle class="shade" cx="32" cy="26.5" r="10.5" fill="#DCDFE3"/>
+  <circle class="port" cx="32" cy="26.5" r="7" fill="#4F555D" stroke="none"/>
+  <circle class="screen" cx="32" cy="26.5" r="3.25" fill="#CAD4DF" stroke="none"/>
+  <path class="body" d="M27.08 25.63A5 5 0 0 1 30.29 21.8" stroke="#F7F8FA" stroke-width="1.25"/>
+  <circle class="ok" cx="51" cy="36" r="0.9" fill="#3C9A5F" stroke="none"/>
+</svg>

@@ -1,0 +1,33 @@
+# Glasfaser (JD13, eigene Grafik im JFNetworker-Stil)
+master: Fiber optic
+name.de: Glasfaser
+name.en: Fibre optic
+name.es: Fibra óptica
+name.it: Fibra ottica
+name.fr: Fibre optique
+prompt.de: Glasfaser: Glasfaserstrecke.
+prompt.en: Fibre optic: optical fibre link.
+prompt.es: Fibra óptica: enlace de fibra óptica.
+prompt.it: Fibra ottica: collegamento in fibra ottica.
+prompt.fr: Fibre optique : liaison en fibre optique.
+keywords.de: Glasfaser, Netzwerk
+keywords.en: Fibre optic, network
+keywords.es: Fibra óptica, red
+keywords.it: Fibra ottica, rete
+keywords.fr: Fibre optique, réseau
+svg: ../../symbols/network/fiber_optic.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Glasfaser
+    Value.en = Fibre optic
+    Value.es = Fibra óptica
+    Value.it = Fibra ottica
+    Value.fr = Fibre optique

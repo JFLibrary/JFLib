@@ -1,0 +1,34 @@
+# Switch (JD13, eigene Grafik im JFNetworker-Stil)
+master: Switch
+name.de: Switch
+name.en: Switch
+name.es: Conmutador
+name.it: Switch
+name.fr: Commutateur
+prompt.de: Switch: verbindet Geräte im lokalen Netz.
+prompt.en: Switch: connects devices in the local network.
+prompt.es: Conmutador: conecta dispositivos en la red local.
+prompt.it: Switch: collega i dispositivi nella rete locale.
+prompt.fr: Commutateur : relie les appareils du réseau local.
+keywords.de: Switch, Netzwerk
+keywords.en: Switch, network
+keywords.es: Conmutador, red
+keywords.it: Switch, rete
+keywords.fr: Commutateur, réseau
+svg: ../../symbols/network/switch_l2.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+NumberofPorts: Value = 24
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Switch
+    Value.en = Switch
+    Value.es = Conmutador
+    Value.it = Switch
+    Value.fr = Commutateur

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="96" height="96"
+     fill="none" stroke="#F7F8FA" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round">
+  <title>Role pictogram web: a globe (white, for the role badge; make_roles.py)</title>
+  <circle class="body" cx="6" cy="6" r="5.5"/>
+  <ellipse class="body" cx="6" cy="6" rx="2.3" ry="5.5"/>
+  <path class="body" d="M0.5 6H11.5M1.33 3.25H10.67M1.33 8.75H10.67"/>
+</svg>

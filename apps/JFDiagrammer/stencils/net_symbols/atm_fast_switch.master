@@ -1,0 +1,33 @@
+# ATM-/Fast-Gigabit-Switch (JD13, eigene Grafik im JFNetworker-Stil)
+master: ATM/FastGB Etherswitch
+name.de: ATM-/Fast-Gigabit-Switch
+name.en: ATM/Fast Gigabit switch
+name.es: Conmutador ATM/Fast Gigabit
+name.it: Switch ATM/Fast Gigabit
+name.fr: Commutateur ATM/Fast Gigabit
+prompt.de: ATM-/Fast-Gigabit-Switch: Switch für ATM und schnelles Ethernet.
+prompt.en: ATM/Fast Gigabit switch: switch for ATM and fast Ethernet.
+prompt.es: Conmutador ATM/Fast Gigabit: conmutador para ATM y Ethernet rápido.
+prompt.it: Switch ATM/Fast Gigabit: switch per ATM ed Ethernet veloce.
+prompt.fr: Commutateur ATM/Fast Gigabit : commutateur pour ATM et Ethernet rapide.
+keywords.de: ATM-/Fast-Gigabit-Switch, Netzwerk
+keywords.en: ATM/Fast Gigabit switch, network
+keywords.es: Conmutador ATM/Fast Gigabit, red
+keywords.it: Switch ATM/Fast Gigabit, rete
+keywords.fr: Commutateur ATM/Fast Gigabit, réseau
+svg: ../../symbols/network/switch_atm_fast.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = ATM-/Fast-Gigabit-Switch
+    Value.en = ATM/Fast Gigabit switch
+    Value.es = Conmutador ATM/Fast Gigabit
+    Value.it = Switch ATM/Fast Gigabit
+    Value.fr = Commutateur ATM/Fast Gigabit

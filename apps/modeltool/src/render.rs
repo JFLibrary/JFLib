@@ -24,18 +24,118 @@ use crate::host::Model;
 const SUPER: u32 = 2;
 
 /// the background, linear rgb (an sRGB target would encode it; Rgba8Unorm takes it as it is)
-const CLEAR: [f32; 4] = [0.78, 0.81, 0.86, 1.0];
+pub const CLEAR: [f32; 4] = [0.78, 0.81, 0.86, 1.0];
 
-/// the plan views' lines: a pixel of the picture wide (two of the picture drawn at twice the size), dark, on depth jumps
-/// and on creases from a slope change of 3
-fn plan_outline() -> Outline {
-    let mut o = Outline::new(SUPER, [0.03, 0.035, 0.05, 1.0]);
+/// the plan views' lines, `width` pixels wide (the pictures: two, drawn at twice the size; the window: one), dark, on
+/// depth jumps and on creases from a slope change of 3
+pub fn plan_outline(width: u32) -> Outline {
+    let mut o = Outline::new(width, [0.03, 0.035, 0.05, 1.0]);
     o.crease = 3.0;
     o
 }
 
 /// the field of view of the three-quarter view
-const ISO_FOV: f64 = 20.0;
+pub const ISO_FOV: f64 = 20.0;
+
+/// the light of every view: a sun from the right above the front, ambient 0.32
+pub const SUN: Sun = Sun { direction: [0.45, 0.75, 0.6], color: [0.7 * core::f32::consts::PI; 3], ambient: [0.32; 3] };
+
+/// the colours of the grid: plate, lines, the lines through the origin (sRGB)
+pub const GRID_COLORS: [[f64; 3]; 3] = [[0.86, 0.87, 0.89], [0.55, 0.57, 0.62], [0.20, 0.27, 0.45]];
+
+/// where a view looks from
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Look {
+    /// one of the plan views (VIEWS 0 front, 1 side, 2 top): orthographic, with outlines
+    Plan(usize),
+    /// the three-quarter view of the pictures
+    Iso,
+    /// around the model's middle: yaw degrees from the front towards the right, pitch up, zoom (1: the model fills
+    /// the view as in the three-quarter view)
+    Orbit { yaw: f64, pitch: f64, zoom: f64 },
+}
+
+/// a view's camera, whether it is a plan view, its grid (plate, lines, axis lines) and the grid's spacing
+pub struct Setup {
+    pub cam: Camera,
+    pub plan: bool,
+    pub grid: (Mesh, Mesh, Mesh),
+    pub step: f64,
+}
+
+/// the box around every part of the model (a point at the origin for none)
+pub fn bounds_of(model: &Model) -> geom::Aabb {
+    let mut b: Option<geom::Aabb> = None;
+    for p in &model.parts {
+        if let Some(pb) = p.mesh.bounds() {
+            b = Some(match b {
+                Some(x) => x.union(pb),
+                None => pb,
+            });
+        }
+    }
+    b.unwrap_or(geom::Aabb::point(Vec3::ZERO))
+}
+
+/// The camera and grid of a view of a model with bounds `b`, `px` pixels high, `aspect` wide for each high: the
+/// plan views at one scale (the largest extent), the plate behind the model; the three-quarter and the orbit view
+/// in perspective over a ground grid.
+pub fn setup(b: geom::Aabb, look: &Look, px: u32, aspect: f64) -> Setup {
+    let (c, s) = (b.center(), b.size());
+    let diag = s.length().max(1e-3);
+    // one grid spacing for all views: the largest extent
+    let extent = s.x.max(s.y).max(s.z).max(1e-3) * 1.25;
+    let step = grid_spacing(extent);
+    let gap = diag * 0.02;
+    let aspect = if aspect > 0.0 && aspect.is_finite() { aspect } else { 1.0 };
+    match *look {
+        Look::Plan(i) => {
+            let (_, dir, up) = VIEWS[i.min(2)];
+            let (n, up) = (Vec3::from(dir), Vec3::from(up));
+            // u right, v up on the screen, n towards the camera
+            let u = n.cross(up) * -1.0;
+            let v = up;
+            // one scale for the three plan views: the largest extent of the model, orthographic (2 half high; a
+            // view narrower than high grows so the width holds it)
+            let half = s.x.max(s.y).max(s.z).max(1e-3) * 0.5 * 1.15;
+            let h = 2.0 * half * if aspect < 1.0 { 1.0 / aspect } else { 1.0 };
+            // the plate behind the model (the far side along n), larger than the view
+            let back = b.min.dot(n).min(b.max.dot(n)) - gap;
+            let back = if i == 2 { back.min(-gap) } else { back };
+            let reach = half * 1.6 * aspect.max(1.0 / aspect);
+            let line = h / px.max(1) as f64 * 2.5;
+            let grid = grid(c, u, v, n, back, reach, step, line);
+            let eye = c + n * diag;
+            let dist = (eye - c).length();
+            // (from the eye's plane, a diagonal before the model's middle, to beyond the plate behind it)
+            let cam = Camera::ortho_at(eye.into(), c.into(), up.into(), h, aspect, 0.0, dist + diag * 2.0 + gap * 4.0);
+            Setup { cam, plan: true, grid, step }
+        }
+        Look::Iso | Look::Orbit { .. } => {
+            let (yaw, pitch, zoom) = match *look {
+                Look::Orbit { yaw, pitch, zoom } => (yaw, pitch.clamp(-89.0, 89.0), zoom),
+                _ => (35.0, 28.0, 1.0),
+            };
+            let (sa, ca) = geom::math::sin_cos_deg(yaw);
+            let (se, ce) = geom::math::sin_cos_deg(pitch);
+            let d = Vec3::new(sa * ce, se, ca * ce);
+            let radius = diag * 0.5 * 1.08;
+            // the narrower of the two fields of view holds the model
+            let half_fov = geom::math::sin_cos_deg(ISO_FOV * 0.5);
+            let tan_y = half_fov.0 / half_fov.1;
+            let tan_min = if aspect < 1.0 { tan_y * aspect } else { tan_y };
+            let sin_min = if aspect < 1.0 { tan_min / geom::math::sqrt(1.0 + tan_min * tan_min) } else { half_fov.0 };
+            let dist = radius / sin_min * if zoom > 0.0 && zoom.is_finite() { zoom } else { 1.0 };
+            // the ground under the model
+            let ground = b.min.y.min(0.0) - gap;
+            let grid = grid(Vec3::new(c.x, 0.0, c.z), Vec3::X, -Vec3::Z, Vec3::Y, ground, diag * 6.0 * zoom.max(1.0), step, diag / (px.max(1) as f64) * 2.5);
+            let eye = c + d * dist;
+            let near = (dist - diag * 2.0).max(dist * 1e-3);
+            let cam = Camera::look_at(eye.into(), c.into(), [0.0, 1.0, 0.0], ISO_FOV * core::f64::consts::PI / 180.0, aspect, near, f64::INFINITY);
+            Setup { cam, plan: false, grid, step }
+        }
+    }
+}
 
 /// the four views: name, direction from the model to the camera, the screen's up
 pub const VIEWS: [(&str, [f64; 3], [f64; 3]); 4] =
@@ -162,7 +262,7 @@ fn grid(c: Vec3, u: Vec3, v: Vec3, n: Vec3, w: f64, half: f64, step: f64, line: 
     (plate, merge(&lines), merge(&axes))
 }
 
-fn upload(r: &mut Renderer, m: &Mesh) -> Result<Option<MeshId>> {
+pub fn upload(r: &mut Renderer, m: &Mesh) -> Result<Option<MeshId>> {
     if m.triangle_count() == 0 {
         return Ok(None);
     }
@@ -170,7 +270,7 @@ fn upload(r: &mut Renderer, m: &Mesh) -> Result<Option<MeshId>> {
     Ok(Some(r.add_mesh(&MeshData { positions: &p, normals: &n, uvs: &uv, indices: &m.indices })?))
 }
 
-fn material(r: &mut Renderer, c: [f64; 3], roughness: f64, metallic: f64) -> Result<MaterialId> {
+pub fn material(r: &mut Renderer, c: [f64; 3], roughness: f64, metallic: f64) -> Result<MaterialId> {
     let mut m = Material::color(srgb_to_linear(c[0]) as f32, srgb_to_linear(c[1]) as f32, srgb_to_linear(c[2]) as f32);
     m.roughness = roughness as f32;
     m.metallic = metallic as f32;
@@ -229,74 +329,35 @@ fn draw(dev: &Device, model: &Model, size: u32, no_grid: bool) -> Result<(Vec<(&
             parts.push((id, mats[p.material]));
         }
     }
-    let plate_mat = material(&mut r, [0.86, 0.87, 0.89], 0.95, 0.0)?;
-    let line_mat = material(&mut r, [0.55, 0.57, 0.62], 0.95, 0.0)?;
-    let axis_mat = material(&mut r, [0.20, 0.27, 0.45], 0.95, 0.0)?;
-    let refs: Vec<&Mesh> = model.parts.iter().map(|p| &p.mesh).collect();
-    let b = Mesh::merge(&refs).unwrap_or_default().bounds().unwrap_or(geom::Aabb::point(Vec3::ZERO));
-    let (c, s) = (b.center(), b.size());
-    let diag = s.length().max(1e-3);
-    // one grid spacing for all views: the largest extent
-    let extent = s.x.max(s.y).max(s.z).max(1e-3) * 1.25;
-    let step = grid_spacing(extent);
-    let sun = Sun { direction: [0.45, 0.75, 0.6], color: [0.7 * core::f32::consts::PI; 3], ambient: [0.32; 3] };
+    let plate_mat = material(&mut r, GRID_COLORS[0], 0.95, 0.0)?;
+    let line_mat = material(&mut r, GRID_COLORS[1], 0.95, 0.0)?;
+    let axis_mat = material(&mut r, GRID_COLORS[2], 0.95, 0.0)?;
+    let b = bounds_of(model);
+    let sun = SUN;
     let mut views = Vec::new();
-    for (vname, dir, up) in VIEWS {
-        let (d, up) = (Vec3::from(dir), Vec3::from(up));
+    for (i, (vname, _, _)) in VIEWS.iter().enumerate() {
         let mut scene = Scene::new(&r)?;
         for &(m, mat) in &parts {
             scene.add(Instance { mesh: m, material: mat, transform: Transform::at([0.0; 3]) })?;
         }
-        let gap = diag * 0.02;
-        let (eye, ortho, grid_parts) = if vname == "iso" {
-            let (sa, ca) = geom::math::sin_cos_deg(35.0);
-            let (se, ce) = geom::math::sin_cos_deg(28.0);
-            let d = Vec3::new(sa * ce, se, ca * ce);
-            let radius = diag * 0.5 * 1.08;
-            let dist = radius / geom::math::sin_cos_deg(ISO_FOV * 0.5).0;
-            // the ground under the model
-            let ground = b.min.y.min(0.0) - gap;
-            let gp = grid(Vec3::new(c.x, 0.0, c.z), Vec3::X, -Vec3::Z, Vec3::Y, ground, diag * 6.0, step, diag / (px as f64) * 2.5);
-            (c + d * dist, None, gp)
-        } else {
-            // u right, v up on the screen, n towards the camera
-            let n = d;
-            let u = n.cross(up) * -1.0;
-            let v = up;
-            // one scale for the three plan views: the largest extent of the model, orthographic (2 half high)
-            let half = s.x.max(s.y).max(s.z).max(1e-3) * 0.5 * 1.15;
-            // the plate behind the model (the far side along n), larger than the view
-            let back = b.min.dot(n).min(b.max.dot(n)) - gap;
-            let back = if vname == "top" { back.min(-gap) } else { back };
-            let reach = half * 1.6;
-            let line = 2.0 * half / px as f64 * 2.5;
-            let gp = grid(c, u, v, n, back, reach, step, line);
-            (c + n * diag, Some(2.0 * half), gp)
-        };
+        let look = if i < 3 { Look::Plan(i) } else { Look::Iso };
+        let st = setup(b, &look, px, 1.0);
         if !no_grid {
-            for (m, mat) in [(&grid_parts.0, plate_mat), (&grid_parts.1, line_mat), (&grid_parts.2, axis_mat)] {
+            for (m, mat) in [(&st.grid.0, plate_mat), (&st.grid.1, line_mat), (&st.grid.2, axis_mat)] {
                 if let Some(id) = upload(&mut r, m)? {
                     scene.add(Instance { mesh: id, material: mat, transform: Transform::at([0.0; 3]) })?;
                 }
             }
         }
-        let dist = (eye - c).length();
-        let cam = match ortho {
-            // (from the eye's plane, a diagonal before the model's middle, to beyond the plate behind it)
-            Some(h) => {
-                scene.set_outline(Some(&plan_outline()))?;
-                Camera::ortho_at(eye.into(), c.into(), up.into(), h, 1.0, 0.0, dist + diag * 2.0 + gap * 4.0)
-            }
-            None => {
-                let near = (dist - diag * 2.0).max(dist * 1e-3);
-                Camera::look_at(eye.into(), c.into(), up.into(), ISO_FOV * core::f64::consts::PI / 180.0, 1.0, near, f64::INFINITY)
-            }
-        };
-        scene.set_camera(&cam);
+        if st.plan {
+            scene.set_outline(Some(&plan_outline(SUPER)))?;
+        }
+        scene.set_camera(&st.cam);
         scene.set_sun(&sun);
         let big = off.shot(&mut r, &mut scene)?;
-        views.push((vname, downsample(&big, px, px)));
+        views.push((*vname, downsample(&big, px, px)));
     }
+    let step = setup(b, &Look::Iso, px, 1.0).step;
     // the sheet: front | side over top | iso, a 4-pixel seam
     let seam = 4u32;
     let sw = size * 2 + seam;

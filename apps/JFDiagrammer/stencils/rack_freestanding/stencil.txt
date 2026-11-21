@@ -1,0 +1,11 @@
+# Freistehende Geräte (SH-145, JD13): eigene Shapes im JFNetworker-Stil, Grafiken aus ../../symbols/
+stencil: Freestanding Rack Equipment
+file: rackfree
+name.de: Freistehende Geräte
+name.en: Freestanding Rack Equipment
+name.es: Equipos independientes
+name.it: Apparecchiature autoportanti
+name.fr: Équipements autonomes
+category: network
+masters: server, monitor, laptop, printer, ab_switch_box, modem, hard_drive, optical_drive, hub
+quick: 4

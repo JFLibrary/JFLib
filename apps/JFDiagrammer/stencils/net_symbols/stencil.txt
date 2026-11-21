@@ -1,0 +1,11 @@
+# Netzwerksymbole (SH-156, JD13): eigene Shapes im JFNetworker-Stil, Grafiken aus ../../symbols/
+stencil: Network Symbols
+file: netsym
+name.de: Netzwerksymbole
+name.en: Network Symbols
+name.es: Símbolos de red
+name.it: Simboli di rete
+name.fr: Symboles réseau
+category: network
+masters: router, database, gateway, wan, communications_server, terminal_server, host, key, lock, lock_key, workgroup_switch, atm_switch, atm_fast_switch, isdn_switch, atm_router, probe, fddi_concentrator, hub_100baset, small_hub, dsu_csu, bridge, olap_database, data, load_balancer
+quick: 4

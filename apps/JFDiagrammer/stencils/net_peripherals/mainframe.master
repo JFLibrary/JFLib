@@ -1,0 +1,33 @@
+# Großrechner (JD13, eigene Grafik im JFNetworker-Stil)
+master: Mainframe
+name.de: Großrechner
+name.en: Mainframe
+name.es: Mainframe
+name.it: Mainframe
+name.fr: Ordinateur central
+prompt.de: Großrechner: zentraler Großrechner.
+prompt.en: Mainframe: central large-scale computer.
+prompt.es: Mainframe: gran ordenador central.
+prompt.it: Mainframe: grande elaboratore centrale.
+prompt.fr: Ordinateur central : grand ordinateur central.
+keywords.de: Großrechner, Server, Rolle
+keywords.en: Mainframe, server, role
+keywords.es: Mainframe, servidor, función
+keywords.it: Mainframe, server, ruolo
+keywords.fr: Ordinateur central, serveur, rôle
+svg: ../../symbols/network/mainframe.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Großrechner
+    Value.en = Mainframe
+    Value.es = Mainframe
+    Value.it = Mainframe
+    Value.fr = Ordinateur central

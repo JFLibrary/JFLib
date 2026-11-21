@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 482.6 44.45" width="965" height="89"
+     fill="none" stroke="#2E343B" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Rack console drawer 1U (KVM): folded LCD lid over the keyboard drawer, grip recess, latches, LED</title>
+  <rect class="body" x="17.8" y="0.6" width="447" height="43.25" fill="#F7F8FA" stroke="none"/>
+  <path class="shade" d="M2.6 0.6H17.8V43.85H2.6A2 2 0 0 1 0.6 41.85V2.6A2 2 0 0 1 2.6 0.6ZM464.8 0.6H480A2 2 0 0 1 482 2.6V41.85A2 2 0 0 1 480 43.85H464.8Z" fill="#DCDFE3" stroke="none"/>
+  <path class="ink" d="M17.8 0.6V43.85M464.8 0.6V43.85" stroke-width="1.5"/>
+  <rect class="ink" x="0.6" y="0.6" width="481.4" height="43.25" rx="2"/>
+  <g class="port" fill="#4F555D" stroke="none"><rect x="4.9" y="4.1" width="8" height="4.5" rx="2.25"/><rect x="469.7" y="4.1" width="8" height="4.5" rx="2.25"/><rect x="4.9" y="35.85" width="8" height="4.5" rx="2.25"/><rect x="469.7" y="35.85" width="8" height="4.5" rx="2.25"/></g>
+  <rect class="tint" x="25" y="6" width="38" height="32.45" rx="3" fill="#7A828C" stroke="none"/>
+  <g class="body" stroke="#F7F8FA" stroke-width="2.2"><rect x="33" y="10.5" width="22" height="14" rx="1.5"/><path d="M44 24.5V28.5"/><rect x="30.5" y="29.5" width="27" height="4.5" rx="1"/></g>
+  <path class="ink" d="M70 19H458" stroke-width="1.2"/>
+  <rect class="shade" x="196" y="24" width="90" height="14" rx="7" fill="#DCDFE3" stroke-width="1.2"/>
+  <path class="port" d="M206 28.5H276" stroke="#4F555D" stroke-width="2"/>
+  <g class="shade" fill="#DCDFE3" stroke-width="1.2"><rect x="74" y="24.5" width="16" height="11" rx="2"/><rect x="440" y="24.5" width="16" height="11" rx="2"/></g>
+  <path class="port" d="M78 30H86M444 30H452" stroke="#4F555D" stroke-width="1.6"/>
+  <circle class="ok" cx="420" cy="12.5" r="1.6" fill="#3C9A5F" stroke="none"/>
+  <path class="port" d="M200 12.5H282" stroke="#4F555D" stroke-width="1.2"/>
+</svg>

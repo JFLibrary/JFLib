@@ -1,0 +1,33 @@
+# A/B-Umschalter (JD13, eigene Grafik im JFNetworker-Stil)
+master: A/B switch
+name.de: A/B-Umschalter
+name.en: A/B switch
+name.es: Conmutador A/B
+name.it: Commutatore A/B
+name.fr: Commutateur A/B
+prompt.de: A/B-Umschalter: schaltet zwischen zwei Geräten um.
+prompt.en: A/B switch: switches between two devices.
+prompt.es: Conmutador A/B: conmuta entre dos dispositivos.
+prompt.it: Commutatore A/B: commuta tra due dispositivi.
+prompt.fr: Commutateur A/B : bascule entre deux appareils.
+keywords.de: A/B-Umschalter, Netzwerk
+keywords.en: A/B switch, network
+keywords.es: Conmutador A/B, red
+keywords.it: Commutatore A/B, rete
+keywords.fr: Commutateur A/B, réseau
+svg: ../../symbols/network/ab_switch.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = A/B-Umschalter
+    Value.en = A/B switch
+    Value.es = Conmutador A/B
+    Value.it = Commutatore A/B
+    Value.fr = Commutateur A/B

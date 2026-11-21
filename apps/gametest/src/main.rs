@@ -2,12 +2,14 @@
 //
 //   gametest --check [--quick]   every test group (tests/check.uis); exit code 1 when a check fails
 //   gametest --test NAME         one group: world tick input camera bridge netcodec lagcomp room netsim bots
+//                                events leave smooth threads assets audio
 //   gametest --checksum          the determinism harness: one line "gametest checksum=HEX" over the bits
 //                                of a fixed run (world, systems, poses, input replayed, cameras); the same on
 //                                every target
 //   gametest --netsum            the netcode's: "gametest netsum=HEX" over a recorded networked session (a
 //                                server and six bots on the simulated link, rough then clear, a fixed seed)
 //   gametest --netbench          the netcode's measurements with 16 bots (docs/NETCODE.md; release build)
+//   gametest --roomsbench        its last part alone: 8 rooms of 16 bots, one after another and side by side
 //   gametest --loopback [--secs S] [--udp N] [--ws N]   the netcode on real sockets on 127.0.0.1
 //   gametest [--script S]        the probe window (src/probe.rs): ui's real input path into an Input, for
 //                                the scripts tests/input.uis and tests/tick.uis (headless)
@@ -24,11 +26,15 @@
 
 extern crate alloc;
 
+// (G7b part 2) assets (lib/game's Assets, game_render3d's models and images) and spatial audio
+mod asset_t;
+mod audio_t;
 mod bridge;
 mod camera_t;
 mod checksum;
 mod input_t;
 mod net_codec;
+mod net_event;
 mod net_lag;
 // (real sockets: not in the browser, where only the console paths run in Node: tests/web.mjs)
 #[cfg(not(target_arch = "wasm32"))]
@@ -116,7 +122,7 @@ impl Ctx {
     }
 }
 
-pub const ALL: &[&str] = &["world", "tick", "input", "camera", "bridge", "netcodec", "lagcomp", "room", "netsim", "bots"];
+pub const ALL: &[&str] = &["world", "tick", "input", "camera", "bridge", "netcodec", "lagcomp", "room", "netsim", "bots", "events", "leave", "smooth", "threads", "assets", "audio"];
 
 fn run_groups(names: &[&str], quick: bool) -> i32 {
     let (mut checks, mut failed) = (0u64, 0u64);
@@ -137,6 +143,12 @@ fn run_groups(names: &[&str], quick: bool) -> i32 {
             "room" => net_room::run(&mut c),
             "netsim" => net_sim::run(&mut c),
             "bots" => net_sim::bots(&mut c),
+            "events" => net_event::events(&mut c),
+            "leave" => net_event::leave(&mut c),
+            "smooth" => net_event::smooth(&mut c),
+            "threads" => net_event::threads(&mut c),
+            "assets" => asset_t::run(&mut c),
+            "audio" => audio_t::run(&mut c),
             _ => bridge::run(&mut c),
         }
         let ms = (plat::time_us() - t0) / 1000;
@@ -168,6 +180,10 @@ fn run() -> i32 {
     }
     if args.iter().any(|a| a == "--netbench") {
         return net_sim::bench();
+    }
+    if args.iter().any(|a| a == "--roomsbench") {
+        net_event::rooms_bench();
+        return 0;
     }
     #[cfg(not(target_arch = "wasm32"))]
     if args.iter().any(|a| a == "--loopback") {

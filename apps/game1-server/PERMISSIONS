@@ -5,7 +5,9 @@
 # (Flatpak finish-args, MSIX capabilities: docs/PACKAGING.md).
 # the server: UDP and the WebSocket on the address of --bind (127.0.0.1 unless set)
 net.listen *:*
+# the UDP server's answers go to every client's address (plat checks send_to against net.connect: with only
+# localhost here a client on the LAN got no CHALLENGE, seen in G7e part 2's first run between two machines);
 # --check: a client of its own on the loopback address
-net.connect localhost:*
+net.connect *:*
 # --web DIR: the files of the browser build named on the command line
 fs.user

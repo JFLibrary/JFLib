@@ -1,0 +1,24 @@
+# Startdiagramm „Vertikal“: zwei senkrechte Bahnen und eine Phase, dazu ein Tipp
+starter: vertical
+name.de: Vertikal
+name.en: Vertical
+name.es: Vertical
+name.it: Verticale
+name.fr: Vertical
+description.de: Senkrechte Bahnen nebeneinander, die Phasen von oben nach unten.
+description.en: Vertical lanes side by side, phases from top to bottom.
+description.es: Calles verticales una junto a otra, fases de arriba abajo.
+description.it: Corsie verticali una accanto all'altra, fasi dall'alto in basso.
+description.fr: Couloirs verticaux côte à côte, phases de haut en bas.
+
+[Shapes]
+flow:   Cff = "vertical"; Lanes = 2; Phases = 1
+        PinX = 20 mm; PinY = 195 mm; PinX.us = 0.7 in; PinY.us = 8 in
+tip:    Stencil = "callouts"; Master = "Tip"; Tip = TRUE
+        PinX = 220 mm; PinY = 170 mm; Width = 80 mm; Height = 40 mm
+        PinX.us = 8.4 in; PinY.us = 7 in; Width.us = 3 in; Height.us = 1.6 in
+        Text.de = "Tipp: Legen Sie Prozess-Shapes in die Bahnen. Bahnen und Phasen fügen Sie im Register „Funktionsübergreifendes Flussdiagramm“ hinzu. Diesen Hinweis können Sie löschen."
+        Text.en = "Tip: Place process shapes in the lanes. Add lanes and phases on the Cross-Functional Flowchart tab. You can delete this note."
+        Text.es = "Consejo: coloque formas de proceso en las calles. Agregue calles y fases en la pestaña Diagrama de flujo multifuncional. Puede eliminar esta nota."
+        Text.it = "Suggerimento: inserire le forme di processo nelle corsie. Aggiungere corsie e fasi nella scheda Diagramma di flusso multifunzione. È possibile eliminare questa nota."
+        Text.fr = "Astuce : placez des formes de processus dans les couloirs. Ajoutez des couloirs et des phases dans l'onglet Diagramme de flux interfonctionnel. Vous pouvez supprimer cette note."

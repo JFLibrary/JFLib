@@ -1,0 +1,70 @@
+# Verbotszeichen: die äußere Ellipse und zwei Kreisabschnitte als Löcher (Gerade-Ungerade-Regel),
+# dazwischen bleibt der Schrägbalken stehen.  Jeder Abschnitt: eine Sehne parallel zur Diagonale
+# und ein Ellipsenbogen durch den 45°-Punkt des inneren Rands.  Ring und Balken sind gleich breit
+# (Anteil T des Radius, höchstens die Hälfte).  Row_1 auf dem oberen Punkt des inneren Rands
+# ändert T (nur senkrecht, anteilig).
+master: No symbol
+name.de: Verbotszeichen
+name.en: No symbol
+name.es: Señal de prohibición
+name.it: Segnale di divieto
+name.fr: Panneau d'interdiction
+prompt.de: Kreisring mit Schrägbalken von links oben nach rechts unten. Mit dem gelben Steuerpunkt ändern Sie die Breite von Ring und Balken.
+prompt.en: Ring with a slanted bar from the top left to the bottom right. Drag the yellow control handle to change the width of the ring and the bar.
+prompt.es: Anillo con una barra inclinada de arriba a la izquierda a abajo a la derecha. Arrastre el controlador amarillo para cambiar el ancho del anillo y de la barra.
+prompt.it: Anello con una barra inclinata dall'alto a sinistra al basso a destra. Trascina la maniglia di controllo gialla per cambiare la larghezza dell'anello e della barra.
+prompt.fr: Anneau avec une barre inclinée d'en haut à gauche vers le bas à droite. Faites glisser la poignée de contrôle jaune pour modifier la largeur de l'anneau et de la barre.
+keywords.de: Verbot, verboten, nicht erlaubt, Stopp, Verbotszeichen, Kreis, durchgestrichen
+keywords.en: no, prohibited, forbidden, not allowed, stop, ban, circle
+keywords.es: prohibido, prohibición, no permitido, stop, círculo, tachado
+keywords.it: divieto, vietato, non consentito, stop, cerchio, barrato
+keywords.fr: interdit, interdiction, non autorisé, stop, cercle, barré
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+
+[User]
+# Ring- und Balkenbreite als Anteil des Radius, der innere Radius, die halbe Balkenbreite
+T:  Value = MIN(MAX(2-Controls.Row_1.Y*2/Height,0.04),0.5)
+K:  Value = 1-User.T
+B:  Value = User.T*0.5
+# die Enden der Sehnen auf dem inneren Rand (Einheitskreis, Mitte 0) und der 45°-Punkt
+S:  Value = SQRT(User.K*User.K-User.B*User.B)
+P:  Value = (User.B+User.S)*0.707107
+Q:  Value = (User.B-User.S)*0.707107
+M:  Value = User.K*0.707107
+
+# 1 außen
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# 2 das Loch rechts oben
+[Geometry]
+MoveTo  X = Width*0.5*(1+User.P); Y = Height*0.5*(1+User.Q)
+LineTo  X = Width*0.5*(1+User.Q); Y = Height*0.5*(1+User.P)
+EllipticalArcTo  X = Width*0.5*(1+User.P); Y = Height*0.5*(1+User.Q); A = Width*0.5*(1+User.M); B = Height*0.5*(1+User.M); C = 0 deg; D = Width/Height
+
+# 3 das Loch links unten
+[Geometry]
+MoveTo  X = Width*0.5*(1-User.P); Y = Height*0.5*(1-User.Q)
+LineTo  X = Width*0.5*(1-User.Q); Y = Height*0.5*(1-User.P)
+EllipticalArcTo  X = Width*0.5*(1-User.P); Y = Height*0.5*(1-User.Q); A = Width*0.5*(1-User.M); B = Height*0.5*(1-User.M); C = 0 deg; D = Width/Height
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.9
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Breite von Ring und Balken ändern"
+        Tip.en = "Change the width of the ring and the bar"
+        Tip.es = "Cambiar el ancho del anillo y de la barra"
+        Tip.it = "Cambia la larghezza dell'anello e della barra"
+        Tip.fr = "Modifier la largeur de l'anneau et de la barre"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

@@ -26,6 +26,7 @@ and tests); `../legacy`, `../rewrite` and `../booksAndContext` lie next to it.
 | [VFS.md](VFS.md) | one file namespace: `app://` (bundled `apps/NAME/assets`), `config://`, `data://`, `cache://`, `mem://`, your own mounts (folders, overlays, ZIP) |
 | [PERMISSIONS.md](PERMISSIONS.md) | `apps/NAME/PERMISSIONS`: the files, programs, URL schemes, plugins, printing and network addresses an app may use, and how `plat` enforces them |
 | [SECRETS.md](SECRETS.md) | `plat::secret`: passwords, tokens and keys in the Credential Manager (DPAPI files for large values) and the Secret Service, the `secrets` permission, limits |
+| [EXTERNAL_SUITES.md](EXTERNAL_SUITES.md) | Wycheproof and x509-limbo against `lib/crypto` and `netio::x509`: the two commands, the results, every failure with the line responsible |
 | [`../README.md`](../README.md) | building and testing the Rust code, the rules (`no_std`, no crates, `unsafe` only in `rt` / `simd` / `plat` / `gpu` and the module runtimes), the crate layout |
 
 ## What is where

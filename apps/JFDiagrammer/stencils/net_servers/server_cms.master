@@ -1,0 +1,33 @@
+# CMS-Server (JD13, eigene Grafik im JFNetworker-Stil)
+master: CMS server
+name.de: CMS-Server
+name.en: CMS server
+name.es: Servidor CMS
+name.it: Server CMS
+name.fr: Serveur CMS
+prompt.de: CMS-Server: verwaltet Inhalte von Webseiten.
+prompt.en: CMS server: manages website content.
+prompt.es: Servidor CMS: gestiona el contenido de sitios web.
+prompt.it: Server CMS: gestisce i contenuti dei siti web.
+prompt.fr: Serveur CMS : gère le contenu des sites Web.
+keywords.de: CMS-Server, Server, Rolle
+keywords.en: CMS server, server, role
+keywords.es: Servidor CMS, servidor, función
+keywords.it: Server CMS, server, ruolo
+keywords.fr: Serveur CMS, serveur, rôle
+svg: ../../symbols/network/server_cms.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = CMS-Server
+    Value.en = CMS server
+    Value.es = Servidor CMS
+    Value.it = Server CMS
+    Value.fr = Serveur CMS

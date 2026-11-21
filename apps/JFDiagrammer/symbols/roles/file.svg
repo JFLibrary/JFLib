@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="96" height="96"
+     fill="none" stroke="#F7F8FA" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round">
+  <title>Role pictogram file: a folder (white, for the role badge; make_roles.py)</title>
+  <path class="body" d="M0.8 9.6V2.6A0.8 0.8 0 0 1 1.6 1.8H4.4L5.6 3.2H10.4A0.8 0.8 0 0 1 11.2 4V9.6A0.8 0.8 0 0 1 10.4 10.4H1.6A0.8 0.8 0 0 1 0.8 9.6Z"/>
+  <path class="body" d="M0.8 5.2H11.2"/>
+</svg>

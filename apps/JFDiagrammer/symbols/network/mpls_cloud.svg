@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>MPLS network: a cloud with three labelled paths</title>
+  <g transform="translate(-1 1)">
+    <path class="body" d="M16 38A9 9 0 0 1 16 20A11 11 0 0 1 34.92 12.37A9 9 0 0 1 49.94 20A9 9 0 0 1 50 38Z" fill="#F7F8FA"/>
+    <polygon class="tint" points="19.5,20.5 24.5,20.5 26.5,22.5 24.5,24.5 19.5,24.5" fill="#4F7396" stroke="none"/>
+    <circle class="body" cx="21.25" cy="22.5" r="0.7" fill="#F7F8FA" stroke="none"/>
+    <polygon class="tint" points="19.5,25.5 24.5,25.5 26.5,27.5 24.5,29.5 19.5,29.5" fill="#4F7396" stroke="none"/>
+    <circle class="body" cx="21.25" cy="27.5" r="0.7" fill="#F7F8FA" stroke="none"/>
+    <polygon class="tint" points="19.5,30.5 24.5,30.5 26.5,32.5 24.5,34.5 19.5,34.5" fill="#4F7396" stroke="none"/>
+    <circle class="body" cx="21.25" cy="32.5" r="0.7" fill="#F7F8FA" stroke="none"/>
+    <path class="tint" d="M28 22.5H45M42.5 20L45 22.5L42.5 25M28 27.5H45M42.5 25L45 27.5L42.5 30M28 32.5H45M42.5 30L45 32.5L42.5 35" stroke="#4F7396" stroke-width="1.5"/>
+  </g>
+</svg>

@@ -1,0 +1,33 @@
+# Smartphone (JD13, eigene Grafik im JFNetworker-Stil)
+master: Smartphone
+name.de: Smartphone
+name.en: Smartphone
+name.es: Smartphone
+name.it: Smartphone
+name.fr: Smartphone
+prompt.de: Smartphone: Mobiltelefon mit Touchscreen.
+prompt.en: Smartphone: mobile phone with a touch screen.
+prompt.es: Smartphone: teléfono móvil con pantalla táctil.
+prompt.it: Smartphone: telefono con touch screen.
+prompt.fr: Smartphone : téléphone mobile à écran tactile.
+keywords.de: Smartphone, Peripherie, Büro
+keywords.en: Smartphone, peripheral, office
+keywords.es: Smartphone, periférico, oficina
+keywords.it: Smartphone, periferica, ufficio
+keywords.fr: Smartphone, périphérique, bureau
+svg: ../../symbols/network/smartphone.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Smartphone
+    Value.en = Smartphone
+    Value.es = Smartphone
+    Value.it = Smartphone
+    Value.fr = Smartphone

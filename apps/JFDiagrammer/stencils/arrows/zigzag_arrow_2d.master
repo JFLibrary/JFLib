@@ -1,0 +1,69 @@
+# 2D-Zickzackpfeil: ein flächiger Pfeil nach rechts, dessen Schaft im Zickzack auf und ab läuft
+# (hinauf, hinunter, hinauf, die Knicke bei einem Viertel und drei Vierteln des Schafts) und an
+# der Spitze in die Mitte zurückkommt.  Die Kanten des Schafts sind die Mittellinie, um die halbe
+# Dicke nach oben und unten verschoben (vereinfacht: in den Schrägen wirkt der Schaft dadurch
+# etwas dünner); der Zacken reicht bis an Ober- und Unterkante.  Der Schaft ist halb so dick wie
+# die Spitze.  Row_1 an der oberen Ecke der Spitze ändert ihre Länge (waagrecht) und Breite
+# (senkrecht; beide anteilig).  Verbindungspunkte am Schaftende und an der Spitze.
+master: 2-D zigzag arrow
+name.de: 2D-Zickzackpfeil
+name.en: 2-D zigzag arrow
+name.es: Flecha en zigzag 2D
+name.it: Freccia a zigzag 2D
+name.fr: Flèche en zigzag 2D
+prompt.de: Flächiger Pfeil in Zickzackform. Länge und Breite der Spitze ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Flat zigzag arrow. Drag the yellow control handle to change the length and width of the head.
+prompt.es: Flecha plana en zigzag. Arrastre el controlador amarillo para cambiar la longitud y el ancho de la punta.
+prompt.it: Freccia piatta a zigzag. Trascina la maniglia di controllo gialla per cambiare la lunghezza e la larghezza della punta.
+prompt.fr: Flèche pleine en zigzag. Faites glisser la poignée de contrôle jaune pour modifier la longueur et la largeur de la pointe.
+keywords.de: Pfeil, Zickzack, 2D, Blitz, Blockpfeil, Störung, Umweg
+keywords.en: arrow, zigzag, 2-D, lightning, block arrow, fault, detour
+keywords.es: flecha, zigzag, 2D, rayo, flecha de bloque, avería, desvío
+keywords.it: freccia, zigzag, 2D, fulmine, freccia a blocco, guasto, deviazione
+keywords.fr: flèche, zigzag, 2D, éclair, flèche pleine, panne, détour
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# die Länge und die halbe Breite der Spitze, die Dicke des Schafts, die Mitte, der Zacken, die
+# Basis der Spitze und die beiden Knicke
+Hl:   Value = MIN(MAX(Width-Controls.Row_1, 0), Width*0.6)
+Hw:   Value = MIN(MAX(Controls.Row_1.Y-Height*0.5, Height*0.1), Height*0.5)
+T:    Value = User.Hw
+C:    Value = Height*0.5
+Z:    Value = MAX(Height*0.5-User.T*0.5, 0)
+Xe:   Value = Width-User.Hl
+X1:   Value = User.Xe*0.25
+X2:   Value = User.Xe*0.75
+
+[Geometry]
+MoveTo  X = 0; Y = User.C+User.T*0.5
+LineTo  X = User.X1; Y = User.C+User.Z+User.T*0.5
+LineTo  X = User.X2; Y = User.C-User.Z+User.T*0.5
+LineTo  X = User.Xe; Y = User.C+User.T*0.5
+LineTo  X = User.Xe; Y = User.C+User.Hw
+LineTo  X = Width; Y = User.C
+LineTo  X = User.Xe; Y = User.C-User.Hw
+LineTo  X = User.Xe; Y = User.C-User.T*0.5
+LineTo  X = User.X2; Y = User.C-User.Z-User.T*0.5
+LineTo  X = User.X1; Y = User.C+User.Z-User.T*0.5
+LineTo  X = 0; Y = User.C-User.T*0.5
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.7; Y = Height*0.8
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Länge und Breite der Spitze ändern"
+        Tip.en = "Change the length and width of the head"
+        Tip.es = "Cambiar la longitud y el ancho de la punta"
+        Tip.it = "Cambia la lunghezza e la larghezza della punta"
+        Tip.fr = "Modifier la longueur et la largeur de la pointe"
+
+[Connection]
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0

@@ -1,0 +1,33 @@
+# WLAN-Zugangspunkt (JD13, eigene Grafik im JFNetworker-Stil)
+master: Wireless access point
+name.de: WLAN-Zugangspunkt
+name.en: Wireless access point
+name.es: Punto de acceso inalámbrico
+name.it: Access point wireless
+name.fr: Point d'accès sans fil
+prompt.de: WLAN-Zugangspunkt: verbindet Funkgeräte mit dem Netz.
+prompt.en: Wireless access point: connects wireless devices to the network.
+prompt.es: Punto de acceso inalámbrico: conecta dispositivos inalámbricos a la red.
+prompt.it: Access point wireless: collega i dispositivi wireless alla rete.
+prompt.fr: Point d'accès sans fil : relie les appareils sans fil au réseau.
+keywords.de: WLAN-Zugangspunkt, Netzwerk
+keywords.en: Wireless access point, network
+keywords.es: Punto de acceso inalámbrico, red
+keywords.it: Access point wireless, rete
+keywords.fr: Point d'accès sans fil, réseau
+svg: ../../symbols/network/ap_wifi6e.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = WLAN-Zugangspunkt
+    Value.en = Wireless access point
+    Value.es = Punto de acceso inalámbrico
+    Value.it = Access point wireless
+    Value.fr = Point d'accès sans fil

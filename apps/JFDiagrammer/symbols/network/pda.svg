@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>PDA: a small handheld, display at the top, keypad below</title>
+  <rect class="body" x="20" y="4" width="24" height="40" rx="3" fill="#F7F8FA"/>
+  <rect class="screen" x="23" y="7" width="18" height="21" rx="1" fill="#CAD4DF" stroke-width="1"/>
+  <circle class="tint" cx="32" cy="32.5" r="2.25" fill="#7A828C" stroke-width="0.75"/>
+  <g class="port" fill="#4F555D" stroke="none">
+    <circle cx="24.75" cy="32.5" r="1"/><circle cx="27.75" cy="32.5" r="1"/><circle cx="36.25" cy="32.5" r="1"/><circle cx="39.25" cy="32.5" r="1"/>
+    <circle cx="24.75" cy="36.5" r="1"/><circle cx="29.58" cy="36.5" r="1"/><circle cx="34.42" cy="36.5" r="1"/><circle cx="39.25" cy="36.5" r="1"/>
+    <circle cx="24.75" cy="40.25" r="1"/><circle cx="29.58" cy="40.25" r="1"/><circle cx="34.42" cy="40.25" r="1"/><circle cx="39.25" cy="40.25" r="1"/>
+  </g>
+</svg>

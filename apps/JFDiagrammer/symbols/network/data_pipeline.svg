@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Data pipeline: a pipe section with arrows in the direction of flow</title>
+  <rect class="body" x="9" y="16" width="46" height="16" fill="#F7F8FA"/>
+  <rect class="shade" x="4" y="13" width="7" height="22" rx="1.5" fill="#DCDFE3"/>
+  <rect class="shade" x="53" y="13" width="7" height="22" rx="1.5" fill="#DCDFE3"/>
+  <g class="port" fill="#4F555D" stroke="none"><circle cx="7.5" cy="16" r="0.8"/><circle cx="7.5" cy="32" r="0.8"/><circle cx="56.5" cy="16" r="0.8"/><circle cx="56.5" cy="32" r="0.8"/></g>
+  <path class="tint" d="M19.75 18.5L25.25 24L19.75 29.5M29.25 18.5L34.75 24L29.25 29.5M38.75 18.5L44.25 24L38.75 29.5" stroke="#4F7396" stroke-width="2.25"/>
+</svg>

@@ -1,0 +1,33 @@
+# Drucker (JD13, eigene Grafik im JFNetworker-Stil)
+master: Printer
+name.de: Drucker
+name.en: Printer
+name.es: Impresora
+name.it: Stampante
+name.fr: Imprimante
+prompt.de: Drucker: Netzwerkdrucker.
+prompt.en: Printer: network printer.
+prompt.es: Impresora: impresora de red.
+prompt.it: Stampante: stampante di rete.
+prompt.fr: Imprimante : imprimante réseau.
+keywords.de: Drucker, Peripherie, Büro
+keywords.en: Printer, peripheral, office
+keywords.es: Impresora, periférico, oficina
+keywords.it: Stampante, periferica, ufficio
+keywords.fr: Imprimante, périphérique, bureau
+svg: ../../symbols/network/printer.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Drucker
+    Value.en = Printer
+    Value.es = Impresora
+    Value.it = Stampante
+    Value.fr = Imprimante

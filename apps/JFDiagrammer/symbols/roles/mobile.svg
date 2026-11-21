@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="96" height="96"
+     fill="none" stroke="#F7F8FA" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round">
+  <title>Role pictogram mobile: a smartphone (white, for the role badge; make_roles.py)</title>
+  <rect class="body" x="3.1" y="0.6" width="5.8" height="10.8" rx="1.1"/>
+  <path class="body" d="M5.2 9.2H6.8"/>
+</svg>

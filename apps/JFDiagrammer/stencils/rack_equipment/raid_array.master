@@ -1,0 +1,37 @@
+# RAID-Array (JD13, eigene Grafik im JFNetworker-Stil)
+master: RAID array
+name.de: RAID-Array
+name.en: RAID array
+name.es: Matriz RAID
+name.it: Array RAID
+name.fr: Baie RAID
+prompt.de: RAID-Array: Plattensystem mit 16 Schächten.
+prompt.en: RAID array: disk array with 16 bays.
+prompt.es: Matriz RAID: sistema de discos con 16 bahías.
+prompt.it: Array RAID: sistema di dischi con 16 alloggiamenti.
+prompt.fr: Baie RAID : baie de disques à 16 emplacements.
+keywords.de: RAID-Array, Rack, 19 Zoll, HE
+keywords.en: RAID array, rack, 19 inch, U
+keywords.es: Matriz RAID, rack, 19 pulgadas, U
+keywords.it: Array RAID, rack, 19 pollici, U
+keywords.fr: Baie RAID, baie, 19 pouces, U
+svg: ../../symbols/rack/raid_3u.svg
+scale: 1:20
+size: 482.6 mm x 133.35 mm
+size.us: 19 in x 5.25 in
+include: ../net_common/rackdev.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+RackUnits: Value = 3
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Gestellmontiert
+    Value.en = Rack-mounted
+    Value.es = Montaje en rack
+    Value.it = Montaggio a rack
+    Value.fr = Monté en baie
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = RAID-Array
+    Value.en = RAID array
+    Value.es = Matriz RAID
+    Value.it = Array RAID
+    Value.fr = Baie RAID

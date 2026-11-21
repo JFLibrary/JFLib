@@ -1,0 +1,47 @@
+# Punkt und Pfeil: eine gerade Linie als 1D-Shape (Height 0) mit einem Punkt am Anfang
+# (BeginArrow 10, gefüllter Kreis) und der Pfeilspitze des Designs am Ende; sie liegt auf der
+# Linie vom Anfang zum Ende und dreht sich mit ihr, die Enden kleben (GlueType 2 auch an das
+# ganze Shape).  Formatvorlage "Connector"; der Text steht in der Mitte der Linie.
+master: Dot and arrow
+name.de: Punkt und Pfeil
+name.en: Dot and arrow
+name.es: Punto y flecha
+name.it: Punto e freccia
+name.fr: Point et flèche
+style: Connector
+prompt.de: Linie mit einem Punkt am Anfang und einer Pfeilspitze am Ende, deren Enden an Shapes kleben.
+prompt.en: Line with a dot at the start and an arrowhead at the end whose ends glue to shapes.
+prompt.es: Línea con un punto al inicio y una punta de flecha al final cuyos extremos se pegan a las formas.
+prompt.it: Linea con un punto all'inizio e una punta di freccia alla fine le cui estremità si incollano alle forme.
+prompt.fr: Ligne avec un point au début et une pointe de flèche à la fin dont les extrémités se collent aux formes.
+keywords.de: Linie, Punkt, Pfeil, Ursprung, Richtung, Verbindung, Zuordnung
+keywords.en: line, dot, arrow, origin, direction, connection, assignment
+keywords.es: línea, punto, flecha, origen, dirección, conexión, asignación
+keywords.it: linea, punto, freccia, origine, direzione, collegamento, assegnazione
+keywords.fr: ligne, point, flèche, origine, direction, connexion, affectation
+
+[Shape]
+BeginX = 0 mm
+BeginY = 2.5 mm
+BeginY.us = 0.1 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 2.5 mm
+EndY.us = 0.1 in
+Height = 0 mm
+Height.us = 0 in
+GlueType = 2
+BeginArrow = 10
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width; Y = Height*0.5

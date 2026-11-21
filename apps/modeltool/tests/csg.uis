@@ -1,0 +1,5 @@
+#!args --test csg,bevel
+# The Boolean operations and the bevel of lib/geom against independent references (refs.rs): overlaps of boxes,
+# the side of sampled points by ray parity and the input planes, the Minkowski sum of a bevelled box; closed,
+# outward, nothing degenerate, the Euler characteristic of holes; what must be refused.  Exit code 1 when a check
+# fails.

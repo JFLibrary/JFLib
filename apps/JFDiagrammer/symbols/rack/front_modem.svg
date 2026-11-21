@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 40" width="360" height="80"
+     fill="none" stroke="#2E343B" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Modem, front view: low box with a wave sign and a row of link LEDs</title>
+  <rect class="body" x="1.25" y="1.25" width="177.5" height="33" rx="4" fill="#F7F8FA" stroke="none"/>
+  <rect class="tint" x="8" y="7.5" width="34" height="21" rx="2.5" fill="#3E8A86" stroke="none"/>
+  <path class="body" d="M13 18C15.5 11 18 11 20.5 18S25.5 25 28 18S33 11 35.5 18" stroke="#F7F8FA" stroke-width="1.8"/>
+  <rect class="ink" x="1.25" y="1.25" width="177.5" height="33" rx="4"/>
+  <g class="port" fill="#4F555D" stroke="none"><rect x="12" y="35.5" width="22" height="4.5" rx="1.5"/><rect x="146" y="35.5" width="22" height="4.5" rx="1.5"/></g>
+  <g class="ok" fill="#3C9A5F" stroke="none"><circle cx="60" cy="13.5" r="2.2"/><circle cx="82" cy="13.5" r="2.2"/><circle cx="104" cy="13.5" r="2.2"/><circle cx="126" cy="13.5" r="2.2"/><circle cx="148" cy="13.5" r="2.2"/></g>
+  <path class="shade" d="M54 23H66M76 23H88M98 23H110M120 23H132M142 23H154" stroke="#DCDFE3" stroke-width="1.8"/>
+</svg>

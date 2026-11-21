@@ -1,0 +1,56 @@
+# Rechteck, alle vier Ecken abgeschnitten (Variante 1).  Row_1 an der oberen Kante ändert die
+# Größe der Ecken (nur waagrecht, Abstand von links).
+master: Snip corners rectangle
+name.de: Rechteck, abgeschnittene Ecken
+name.en: Snip corners rectangle
+name.es: Rectángulo, esquinas cortadas
+name.it: Rettangolo, angoli tagliati
+name.fr: Rectangle, coins coupés
+prompt.de: Rechteck mit allen vier Ecken abgeschnitten. Mit dem gelben Steuerpunkt ändern Sie die Größe der Ecken.
+prompt.en: Rectangle with all four corners snipped. Drag the yellow control handle to change the size of the corners.
+prompt.es: Rectángulo con las cuatro esquinas cortadas. Arrastre el controlador amarillo para cambiar el tamaño de las esquinas.
+prompt.it: Rettangolo con tutti e quattro gli angoli tagliati. Trascina la maniglia di controllo gialla per cambiare la dimensione degli angoli.
+prompt.fr: Rectangle dont les quatre coins sont coupés. Faites glisser la poignée de contrôle jaune pour modifier la taille des coins.
+keywords.de: Rechteck, Ecke, Kasten, Schaltfläche, abgeschnitten, abgeschrägt, Fase, vier Ecken, Achteck, Plakette
+keywords.en: rectangle, corner, box, button, snipped, cut, bevel, four corners, octagon, plate
+keywords.es: rectángulo, esquina, caja, botón, cortado, biselado, chaflán, cuatro esquinas, octágono, placa
+keywords.it: rettangolo, angolo, riquadro, pulsante, tagliato, smussato, smusso, quattro angoli, ottagono, targhetta
+keywords.fr: rectangle, coin, boîte, bouton, coupé, biseauté, chanfrein, quatre coins, octogone, plaque
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# die Größe der abgeschnittenen Ecken
+D:  Value = MIN(MAX(Controls.Row_1,0),MIN(Width,Height)*0.5)
+
+[Geometry]
+MoveTo  X = User.D; Y = 0
+LineTo  X = Width-User.D; Y = 0
+LineTo  X = Width; Y = User.D
+LineTo  X = Width; Y = Height-User.D
+LineTo  X = Width-User.D; Y = Height
+LineTo  X = User.D; Y = Height
+LineTo  X = 0; Y = Height-User.D
+LineTo  X = 0; Y = User.D
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = 5 mm; Y = Height
+        X.us = 0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Größe der Ecken ändern"
+        Tip.en = "Change the size of the corners"
+        Tip.es = "Cambiar el tamaño de las esquinas"
+        Tip.it = "Cambia la dimensione degli angoli"
+        Tip.fr = "Modifier la taille des coins"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

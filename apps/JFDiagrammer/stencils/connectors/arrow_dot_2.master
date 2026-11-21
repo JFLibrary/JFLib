@@ -1,0 +1,47 @@
+# Pfeil und Punkt 2: eine gerade Linie mit offenem Kreis am Anfang (BeginArrow 16, der Sinn dieses
+# Shapes) und der Pfeilspitze des Designs am Ende (Formatvorlage "Connector").  Liegt auf der
+# Linie vom Anfang zum Ende und dreht sich mit ihr (PinX, Width, Angle aus den Enden); die Enden
+# kleben an Shapes, mit GlueType 2 auch an das ganze Shape.
+master: Arrow and dot 2
+name.de: Pfeil und Punkt 2
+name.en: Arrow and dot 2
+name.es: Flecha y punto 2
+name.it: Freccia e punto 2
+name.fr: Flèche et point 2
+prompt.de: Gerade Linie mit einem offenen Kreis am Anfang und einer Pfeilspitze am Ende. Ziehen Sie die Enden auf Shapes.
+prompt.en: Straight line with an open circle at the beginning and an arrowhead at the end. Drag the ends onto shapes.
+prompt.es: Línea recta con un círculo abierto al principio y una punta de flecha al final. Arrastre los extremos sobre las formas.
+prompt.it: Linea retta con un cerchio vuoto all'inizio e una punta di freccia alla fine. Trascina le estremità sulle forme.
+prompt.fr: Ligne droite avec un cercle vide au début et une pointe de flèche à la fin. Faites glisser les extrémités sur les formes.
+keywords.de: Pfeil, Kreis, offen, Anfang, Linie, Verbinder
+keywords.en: arrow, circle, open, beginning, line, connector
+keywords.es: flecha, círculo, abierto, principio, línea, conector
+keywords.it: freccia, cerchio, vuoto, inizio, linea, connettore
+keywords.fr: flèche, cercle, vide, début, ligne, connecteur
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 2.5 mm
+BeginY.us = 0.1 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 2.5 mm
+EndY.us = 0.1 in
+Height = 0 mm
+Height.us = 0 in
+GlueType = 2
+BeginArrow = 16
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width; Y = Height*0.5

@@ -20,7 +20,10 @@ stencils/
     server.svg            Grafik für gestaltete Shapes (optional)
 ```
 
-Ausgabe: `<file>_m.vssx` (metrisch, mm, A4) und `<file>_u.vssx` (US, Zoll, Letter). Beim Bauen
+Ausgabe: `jfd_<file>_m.vssx` (metrisch, mm, A4) und `jfd_<file>_u.vssx` (US, Zoll, Letter). Das Präfix
+`jfd_` hält unsere Dateinamen von Visios eigenen fern (Visio hat etwa ein `ARROWS_M.VSSX`): eine
+Vorlage nennt ihre Schablonen beim Dateinamen, und Visio öffnet eine eigene Schablone gleichen
+Namens, wenn es eine hat (`diagram_io::stencil::file_name`, `parse_file_name`). Beim Bauen
 der App landen sie in `OUT_DIR`; zum Ansehen in Visio schreibt
 `JFDiagrammer --write-stencils ORDNER` sie in einen Ordner (die Startschablone auch
 `diagramiotest --write-stencils ORDNER`, dazu eine Testschablone aus SVG-Grafiken).
@@ -49,7 +52,7 @@ der App landen sie in `OUT_DIR`; zum Ansehen in Visio schreibt
 | Schlüssel | Pflicht | Bedeutung |
 |---|---|---|
 | `stencil` | ja | universeller Name der Schablone (NameU-artiger Schlüssel), z. B. `Basic Shapes` |
-| `file` | ja | Dateistamm der Ausgabe, z. B. `standard` → `standard_m.vssx`, `standard_u.vssx` |
+| `file` | ja | Dateistamm der Ausgabe, z. B. `standard` → `jfd_standard_m.vssx`, `jfd_standard_u.vssx` |
 | `name.<sprache>` | ja, alle fünf | Titel in der Seitenleiste und im Menü „Weitere Shapes“ |
 | `category` | ja | Kategorie in „Weitere Shapes“: `general`, `flowchart`, `business`, `engineering`, `network`, `maps`, `software`, `schedule`, `extras` |
 | `masters` | ja | die Master-Dateien (ohne `.master`), durch Komma getrennt, in Anzeigereihenfolge |
@@ -71,6 +74,9 @@ der App landen sie in `OUT_DIR`; zum Ansehen in Visio schreibt
 | `line_style`, `fill_style`, `text_style` | nein | einzeln statt `style` |
 | `svg` | nein | Grafikdatei im selben Ordner: ihre Pfade werden zu Geometrie (siehe unten) |
 | `hidden` | nein | `true`: verborgener Master (`Hidden="1"`), steht in der `.vssx`, erscheint aber nicht in der Seitenleiste; die App legt ihn per Code ab (z. B. die Listen des funktionsübergreifenden Flussdiagramms). Standard `false` |
+| `include` | nein | (JD13) Dateien mit Abschnitten, die viele Master teilen, durch Komma getrennt, relativ zum Schablonenordner (`../net_common/asset.inc`); siehe „Eingebundene Dateien“ |
+| `scale` | nein | (JD13) Maßstab der Masterseite `1:N` für maßstäbliche Shapes (Rack `1:20`): `DrawingScale` = N, `DrawingScaleType` 4 (metrisch) bzw. 3 (US); die Linienbreiten aus dem SVG gelten auf dem Papier. Standard ohne Maßstab |
+| `size` | nein | (JD13) `Breite x Höhe` (`482.6 mm x 88.9 mm`, mit `.us`-Fassung): nötig, wenn `Width` oder `Height` eine Formel ist (Höhe aus Höheneinheiten); daraus entstehen Pin und Masterseite |
 
 ### Abschnitte
 
@@ -143,8 +149,103 @@ Fehlt die Zelle im Master, setzt das Werkzeug:
 - `LocPinX = Width*0.5`, `LocPinY = Height*0.5`
 - Masterseite: `PageWidth`, `PageHeight` = Shape-Größe, Maßstab 1:1 in mm bzw. Zoll
 
-`Width` und `Height` sind Pflicht, und zwar als Längen (Konstanten wie `40 mm`, keine Formeln):
-aus ihnen entstehen Pin und Masterseite.
+`Width` und `Height` sind Pflicht. Meist sind es Längen (Konstanten wie `40 mm`); eine Formel ist
+erlaubt, außer zusammen mit `svg:` (JD13, z. B. die Felder mit Auto-Höhe:
+`GUARD(MAX(10 mm, TEXTHEIGHT(TheText,Width)))` mit `LockHeight`). Pin und Masterseite entstehen
+aus dem berechneten Wert. Mit `svg:` geht eine Formel nur zusammen mit `size:` im Kopf, das dann
+Pin und Masterseite bestimmt (JD13, die Rack-Einschübe: Höhe aus den Höheneinheiten). Ausnahme
+sind 1D-Master (Abschnitt „1D-Shapes“).
+
+### Eingebundene Dateien (`include:`, JD13)
+
+Eine eingebundene Datei (Endung `.inc`, in einem Ordner ohne `stencil.txt`, z. B.
+`stencils/net_common/`) hat nur Abschnitte, keine Kopfzeilen. Ihre Abschnitte werden in die des
+Masters gemischt:
+
+- Einen Abschnitt, den der Master nicht hat, bekommt er; `[Geometry]`-Abschnitte kommen immer
+  hinzu, nach den eigenen.
+- In einem Abschnitt, den der Master auch hat, stehen die eingebundenen Zellen und Zeilen vorn;
+  die des Masters gewinnen: Eine Zelle gleichen Namens (mit gleicher Sprach- und Fassungsendung)
+  fällt weg, eine benannte Zeile gleichen Namens bekommt nur die eingebundenen Zellen, die der
+  Master nicht selbst setzt (`RackUnits: Value = 2` übernimmt Bezeichnung und Typ aus der Datei).
+- Fehler nennen die eingebundene Datei und ihre Zeile; ihr Text gehört zur `UniqueID`.
+
+## 1D-Shapes (Verbinder, Linienpfeile)
+
+Ein Master ist ein 1D-Shape, wenn `[Shape]` die Enden `BeginX`, `BeginY`, `EndX` und `EndY`
+setzt (eine davon genügt für die Erkennung, dann sind alle vier Pflicht). Das ist Visios eigene
+Speicherform: Es gibt kein eigenes Kennzeichen, ein Shape mit `BeginX` ist eindimensional; die
+App (`diagram_core::glue::is_one_d`) liest es genauso.
+
+- `BeginX` … `EndY` sind Längen ab 0 (Konstanten wie `40 mm`, keine Formeln): die Enden auf der
+  Masterseite. Die Masterseite ist `BeginX+EndX` breit und `BeginY+EndY` hoch, die Enden haben
+  also zum Rand so viel Abstand wie zum anderen Rand; eine waagrechte Linie braucht deshalb
+  `BeginY = EndY = 2.5 mm` o. ä. statt 0. Fallen die Enden zusammen oder wäre die Seite leer, ist
+  das ein Baufehler.
+- `Height` ist Pflicht: die Dicke (Länge ab 0, eine Linie hat `0 mm`) oder eine Formel.
+- Fehlt die Zelle, setzt das Werkzeug Visios 1D-Formeln, so dass der Kasten den Enden folgt:
+
+  | Zelle | Formel |
+  |---|---|
+  | `PinX`, `PinY` | `GUARD((BeginX+EndX)/2)`, `GUARD((BeginY+EndY)/2)` |
+  | `Width` | `GUARD(SQRT((EndX-BeginX)^2+(EndY-BeginY)^2))` (die Länge) |
+  | `Angle` | `GUARD(ATAN2(EndY-BeginY,EndX-BeginX))` (der Kasten liegt auf der Linie) |
+  | `LocPinX`, `LocPinY` | `GUARD(Width*0.5)`, `GUARD(Height*0.5)` |
+
+  Die Geometrie zeichnet dann im gedrehten Kasten: x von 0 (Anfang) bis `Width` (Ende), die
+  Linie selbst auf `Height*0.5`.
+- **Aufrechter Kasten** (wie der dynamische Verbinder der App, für Verläufe von Seite zu Seite):
+  der Master schreibt `Width = GUARD(EndX-BeginX)`, `Height = GUARD(EndY-BeginY)`,
+  `Angle = GUARD(0DA)`; beide Maße dürfen negativ sein, lokal (0, 0) ist der Anfang und
+  (`Width`, `Height`) das Ende. Geometrie in Anteilen des Kastens (`RelMoveTo`, `RelLineTo`,
+  `RelCubBezTo`) bleibt so bei jeder Lage richtig.
+- **Kleben:** Die Enden kleben an Verbindungspunkte (statisch, `PAR(PNT(…))`, schreibt die App
+  beim Kleben selbst). `GlueType = 2` erlaubt auch das Kleben an das ganze Shape (das Ende sucht
+  sich den Rand). Trigger (`BegTrigger`, `EndTrigger`) braucht der Master nicht.
+- **Kein `ObjType = 2`** für Shapes mit eigener Geometrie: Das Kennzeichen „verlegbar“ macht ein
+  1D-Shape zum dynamischen Verbinder; die App verlegt ihn dann selbst und ersetzt seine
+  Geometrie. Formatvorlage: Linienverbinder `Connector` (Linie, Pfeilspitze und Text mit
+  Hintergrund aus dem Design), gefüllte flächige Pfeile `Normal`. Ein Verbinder nur aus Umrissen
+  (ohne Füllung) nimmt ebenfalls `Connector`, mit `BeginArrow = 0` und `EndArrow = 0`: mit
+  `Normal` verschwände er in Designs ohne Shape-Linien (Kontrast).
+- Text eines Linienverbinders: ein fester Textblock (z. B. `TxtWidth = 30 mm`) mitten auf dem
+  Verlauf; der Hintergrund aus `Connector` erscheint nur hinter vorhandenem Text.
+
+Die App legt einen 1D-Master heute wie ein 2D-Shape ab (`instance::place` setzt `PinX`/`PinY`
+als Konstanten, die Enden bleiben auf den Werten der Masterseite); siehe Prüfung
+`diagramiotest --check --only stencils/shapes/drop`.
+
+## Stilregeln (SH-G01, vom Nutzer mit dem JD13-Probeblatt abgenommen)
+
+Verbindlich für alle mitgelieferten Master; das Probeblatt (`diagramiotest
+--write-stencil-previews DIR`, `probeblatt.png`) zeigt sie, `<ordner>-alle.png` zeigt je
+Schablone alle Master.
+
+- **Formatvorlage:** 2D-Master ohne `style:` (also `Normal`), Linien- und Umrissverbinder
+  `style: Connector`. Keine Farben, Linienstärken oder Schriftfarben im Master, damit die
+  Designs (JD11) wirken. Ausnahmen nur begründet im Kopfkommentar (Tipp: `LineWeight 3 pt`,
+  `LineCap 1`; 3D-Feld: `Rounding 0`; Hohler Verbinder: `BeginArrow`/`EndArrow 0`).
+- **Form:** ein Umriss je Fläche, eckig mit geraden Kanten. Bögen nur, wo Name oder Norm sie
+  verlangen (`ArcTo`, `EllipticalArcTo`; Ellipsenbögen durch den 45°-Punkt). Mehrere Flächen
+  nur nebeneinander (Visio füllt nach der Gerade-Ungerade-Regel); Innenkanten als eigener
+  Abschnitt mit `NoFill TRUE`. Keine Rundung im Master, `Rounding` kommt aus dem Design.
+- **Genormte Symbole** (ISO 5807 …) sehen normgerecht aus; Flussdiagramm-Shapes 36 × 24 mm (3:2).
+- **Maße:** 5-mm-Raster (40 × 20, 40 × 30, 40 × 25, 30 × 30 mm), US-Fassung in runden Zoll
+  (1.5 × 0.75, 1.5 × 1.125, 1.25 × 1.25, 1.5 × 1). Pfeile: Spitze etwa 0,4 × Länge, Schaft halb
+  so dick wie die Spitze, Bogen außen 1,5 × Schaft. 1D-Flächenpfeile: Dicke 10 mm, Spitze 8 mm.
+- **Steuerpunkte:** ein gelber Punkt je Formparameter auf der Ecke, die er bewegt; unnötige
+  Richtung gesperrt (`XCon`/`YCon` 1); anteilig (0) für Formen, die mitskalieren, Abstand vom
+  Rand (2 oder 4) für Maße, die beim Strecken bleiben (Tiefe, Spitze eines 1D-Pfeils,
+  Zylinderenden). Werte in `User`-Zellen mit `MIN`/`MAX` begrenzt; `Tip` in fünf Sprachen.
+- **Verbindungspunkte:** Mitte jeder Seite in der Reihenfolge unten, rechts, oben, links,
+  `DirX`/`DirY` nach innen. Pfeile: Schaftende und Spitze(n); Raute: an den Ecken; Dokument:
+  unten auf der Welle. 1D-Shapes haben keine, dort kleben die Enden.
+- **Text:** Textblock auf der Hauptfläche (Kasten, Vorderseite, über der Welle, Bandmitte),
+  `TxtLocPin` die halbe Größe; Linienverbinder: Block 30 × 8 mm mittig auf dem Verlauf.
+- **Sprachen:** Name, ein Prompt-Satz (was es ist, dazu einer zu den Steuerpunkten) und 5–8
+  Stichworte je Sprache; NameU ist der naheliegende englische Begriff.
+- **Kategorien für Regeln:** Flussdiagramm-Shapes tragen `User.msvShapeCategories`
+  (`"Flowchart"`, die Entscheidung `"Flowchart;Decision"`, Start/Ende `"Flowchart;Terminator"`).
 
 ## SVG-Grafik (`svg:`)
 
@@ -172,10 +273,10 @@ den Shape-Kasten abgebildet (x nach rechts, y nach oben gedreht).
   `rgb()`, ein paar Namen (`black`, `white`, `red` …).
 - Haben alle Elemente dieselbe Füllung, Linie und Linienbreite, trägt das Master-Shape selbst
   die Geometrie und diese Formate (außer den Zellen, die `[Shape]` selbst setzt). Sonst wird es
-  eine Gruppe mit einem Untershape je Format in der Reihenfolge, in der die Formate zuerst
-  vorkommen; jedes Untershape ist so groß wie die Gruppe (`Width = Sheet.N!Width` …) und
-  zeichnet seine Pfade. Liegen Formate abwechselnd übereinander, stimmt die Stapelfolge daher
-  nur je Format.
+  eine Gruppe mit einem Untershape je Folge gleich formatierter Elemente, in der Reihenfolge der
+  Datei (JD13: wie JFNetworkers `vsym.py`; ein Format, das später wiederkommt, wird ein eigenes
+  Untershape über allem dazwischen). Jedes Untershape ist so groß wie die Gruppe
+  (`Width = Sheet.N!Width` …) und zeichnet seine Pfade.
 - Farben werden als `#RRGGBB` übernommen (`FillForegnd`, `FillBkgnd`, `LineColor`, Deckkraft
   als `…Trans`), die Linienbreite im Verhältnis viewBox zu Shape-Größe (`LineWeight` in pt).
 
@@ -260,3 +361,35 @@ Werte stehen in der festen Reihenfolge `de|en|es|it|fr`, `\|` und `\\` maskieren
 Beim Ablegen schreibt JFDiagrammer den Namen der aktuellen Sprache als `Name` ins Dokument und
 behält `NameU` als Schlüssel (LG-04). Übersetzte Zellen und der Text kommen ebenfalls in der
 aktuellen Sprache auf die Instanz.
+
+## Netzwerk und Rack (JD13)
+
+Neun Schablonen der Kategorie `network`: `net_computers` (SH-140), `net_detailed` (SH-142),
+`net_peripherals` (SH-151), `net_locations` (SH-153), `net_symbols` (SH-156), `net_servers`
+(SH-158), `rack_freestanding` (SH-145), `rack_equipment` (SH-146), `rack_servers` (SH-147).
+
+- **Grafiken:** aus dem gemeinsamen Symbolsatz von JFNetworker und JFDiagrammer
+  (`../symbols/`, F9, SH-G09; später ein eigenes Repository als git-Submodule), angesprochen mit
+  `svg: ../../symbols/network/router.svg`. Der Ordner hat eine eigene README mit Stilregeln.
+- **Gemeinsame Abschnitte** in `net_common/` (kein `stencil.txt`, per `include:`):
+  `symbol.inc` (24 x 18 mm, Name unter dem Symbol), `asset.inc` (Inventar, `ShapeClass`,
+  `User.visLegendShape`), `network.inc` (Adressen), `computer.inc` (Betriebssystem, CPU …),
+  `location.inc` (Standorte), `rackdev.inc` (19-Zoll-Einschübe). Die Zeilennamen der Shape-Daten
+  sind Visios (`AssetNumber`, `IPAddress` …), Bezeichnungen und Werte eigene.
+- **Rack (VL-52):** Masterseiten im Maßstab 1:20 (`scale:`). Gestell und Schrank: Höhe =
+  Sockel + Kopf + HE x 44,45 mm aus `Prop.RackUnits`; beim Ziehen schickt `SETATREF` die
+  gerundete HE-Zahl in die Shape-Daten (`size:` gibt die Anfangsgröße). Sie sind Container für
+  die Kategorie `RackEquipment` und haben auf jeder HE-Grenze der linken Schiene einen
+  Verbindungspunkt „nach innen“. Einschübe (`rackdev.inc`): 482,6 mm breit, Höhe aus
+  `Prop.RackUnits` ebenso, ein Verbindungspunkt „nach außen“ unten links, mit dem sie in
+  JFDiagrammer (`diagram_core::dock`, App `rack.rs`) und in Visio auf den HE einrasten.
+- **Besondere Master:** `ethernet` und `ring_network` (acht Steuerpunkte, deren Leitungen zu den
+  Geräten führen; in Visio kleben sie), `legend` (JFDiagrammer schreibt die Zählung, App
+  `legend.rs`), `dialup` (Wählverbindung, ein 1D-Shape mit Blitz). Die Bemaßungen der
+  Rack-Schablone fehlen noch: Sie zeigen ihre Länge in einem Textfeld, das das Bauwerkzeug
+  nicht schreibt.
+- Vorlagen: `templates/network` (VL-50), `templates/network_detailed` (VL-51), `templates/rack`
+  (VL-52, Seite 1:20).
+- Prüfen: `diagramiotest --check --only stencils/network`, Ansicht
+  `diagramiotest --write-network-previews DIR`, Visio-Gegenprobe
+  `diagramiotest --write-network-gegenprobe DIR`.

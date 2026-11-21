@@ -20,7 +20,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use diagram_core::{DocKind, Document, ForeignPayload, Owner};
+use diagram_core::{ops, DocKind, Document, ForeignPayload, Owner};
 use diagram_io::vsdx::{self, Format, Limits, Loaded, Measure, WriteOptions};
 
 use crate::build;
@@ -180,6 +180,47 @@ fn new_docs(h: &mut H) {
                 && from_page.iter().any(|k| k.ends_with("/image")),
             format!("{shapes} shapes, {connects} connects, page part rels {from_page:?}"),
         );
+    }
+    // (JD8 rest) pictures inserted as JFDiagrammer does (ops::new_picture): PNG, JPEG and GIF
+    // as media parts with their content types, written and read back, the shapes naming them
+    {
+        let mut doc = vsdx::new_document(DocKind::Drawing, Measure::Metric);
+        let page = doc.pages().next().expect("a page");
+        let mut eng = diagram_core::formula::Engine::new();
+        let png = build::png();
+        let jpeg: Vec<u8> = [0xFFu8, 0xD8, 0xFF, 0xD9].to_vec();
+        let gif: Vec<u8> = [0x47u8, 0x49, 0x46, 0x38, 0x39, 0x61, 1, 0, 1, 0, 0, 0, 0, 0x3B].to_vec();
+        let mut tx = doc.transaction("Bild");
+        let mut ok = true;
+        for (k, (bytes, format)) in [(&png, ops::PictureFormat::Png), (&jpeg, ops::PictureFormat::Jpeg), (&gif, ops::PictureFormat::Gif)].into_iter().enumerate() {
+            ok &= ops::new_picture(&mut tx, &mut eng, Owner::Page(page), bytes, format, [1.0 + k as f64 * 2.0, 1.0], [1.5, 1.0]).is_ok();
+        }
+        tx.commit();
+        h.check("roundtrip/new pictures inserted", ok, String::from("three pictures"));
+        if let Some(l) = new_round(h, "roundtrip/new pictures", &doc, &WriteOptions::DEFAULT) {
+            let d = &l.doc;
+            let page = d.pages().next();
+            let pics: Vec<String> = page
+                .and_then(|p| d.page(p))
+                .map(|p| {
+                    let t = &p.shapes;
+                    t.iter().filter_map(|x| t.get(x)).filter_map(|x| match x.foreign.as_ref().map(|f| &f.payload) {
+                        Some(ForeignPayload::Part(p)) => Some(String::from(s(d, *p))),
+                        _ => None,
+                    }).collect()
+                })
+                .unwrap_or_default();
+            let part = |n: &str| d.parts.iter().find(|p| s(d, p.name) == n).map(|p| (String::from(s(d, p.content_type)), p.data.clone()));
+            h.check(
+                "roundtrip/new pictures content",
+                l.warnings.is_empty()
+                    && pics == ["/visio/media/image1.png", "/visio/media/image1.jpeg", "/visio/media/image1.gif"]
+                    && part("/visio/media/image1.png") == Some((String::from("image/png"), png.clone()))
+                    && part("/visio/media/image1.jpeg") == Some((String::from("image/jpeg"), jpeg.clone()))
+                    && part("/visio/media/image1.gif") == Some((String::from("image/gif"), gif.clone())),
+                format!("{pics:?}, {} parts", d.parts.len()),
+            );
+        }
     }
     let doc = build::stencil(Measure::Metric);
     if let Some(l) = new_round(h, "roundtrip/new stencil masters", &doc, &WriteOptions::DEFAULT) {

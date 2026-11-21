@@ -34,7 +34,18 @@ funktionsübergreifendem Flussdiagramm, Beschriftungen, Verbindungspfeile, Layou
 Mitgliedschaft über `Relationships`/`DEPENDSON`) und JD11 Designs und Format (eigene Designs NetLab, Kontur und
 Kontrast mit je vier Varianten, vom Nutzer abgenommen; Galerie mit Live-Vorschau, Shape formatieren, Farbwähler,
 Format übertragen, Schnellformatvorlagen). Offen: Klick auf einen Verbindungspfeil über einem vorhandenen Shape
-wirkt nicht; Visio-Gegenprobe von JD10. Nächste Welle: G.
+wirkt nicht (in Welle G behoben); Visio-Gegenprobe von JD10.
+
+**Erledigt** (2026-11-20, Welle G, Meilenstein M3 P1 komplett): JD13 Vorlagen und Startsatz (Katalog unter
+Datei › Neu mit gerenderten Vorschauen; Vorlagen als `.vstx`, gebaut aus Textquellen in `templates/`: leere
+Zeichnung, Standarddiagramm, Standardflussdiagramm, funktionsübergreifendes Flussdiagramm, Standard- und
+detailliertes Netzwerk, Rack-Diagramm; eigene Vorlagen; Schablonen Blöcke, Pfeile, ISO 5807, Verbinder, sechs
+Netzwerk- und drei Rack-Schablonen mit Einrasten auf Höheneinheiten; der gemeinsame Symbolsatz mit JFNetworker
+liegt in `symbols/` und wird später ein eigenes Repository, das beide Apps als Submodule einbinden) und der Rest
+von JD8 (223 von 235 Befehlen mit Funktion, die 12 übrigen sind P2 und stehen mit Begründung in
+`src/cmds_later.rs`; Aufgabenbereiche, Schnellzugriff, Ebenen, Seitenbefehle; Klickfehler bei den
+Verbindungspfeilen behoben). Offen: Visio-Gegenproben von JD10 und JD13, Bemaßung der Rack-Schablone (das
+Bauwerkzeug schreibt noch keine Textfelder), Vektordruck unter Windows. Weiter mit Phase 2b und Phase 3.
 
 ## Ziel
 

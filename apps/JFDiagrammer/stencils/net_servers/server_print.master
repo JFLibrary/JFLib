@@ -1,0 +1,33 @@
+# Druckserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: Print server
+name.de: Druckserver
+name.en: Print server
+name.es: Servidor de impresión
+name.it: Server di stampa
+name.fr: Serveur d'impression
+prompt.de: Druckserver: verwaltet Drucker und Druckaufträge.
+prompt.en: Print server: manages printers and print jobs.
+prompt.es: Servidor de impresión: gestiona impresoras y trabajos de impresión.
+prompt.it: Server di stampa: gestisce stampanti e lavori di stampa.
+prompt.fr: Serveur d'impression : gère les imprimantes et les travaux d'impression.
+keywords.de: Druckserver, Server, Rolle
+keywords.en: Print server, server, role
+keywords.es: Servidor de impresión, servidor, función
+keywords.it: Server di stampa, server, ruolo
+keywords.fr: Serveur d'impression, serveur, rôle
+svg: ../../symbols/network/server_print.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Druckserver
+    Value.en = Print server
+    Value.es = Servidor de impresión
+    Value.it = Server di stampa
+    Value.fr = Serveur d'impression

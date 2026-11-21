@@ -1,0 +1,33 @@
+# Hochschule (JD13, eigene Grafik im JFNetworker-Stil)
+master: University
+name.de: Hochschule
+name.en: University
+name.es: Universidad
+name.it: Università
+name.fr: Université
+prompt.de: Hochschule: Hochschulgebäude.
+prompt.en: University: university building.
+prompt.es: Universidad: edificio universitario.
+prompt.it: Università: edificio universitario.
+prompt.fr: Université : bâtiment universitaire.
+keywords.de: Hochschule, Standort, WAN
+keywords.en: University, location, site, WAN
+keywords.es: Universidad, ubicación, WAN
+keywords.it: Università, sede, WAN
+keywords.fr: Université, site, WAN
+svg: ../../symbols/network/university.svg
+include: ../net_common/symbol.inc, ../net_common/location.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Standort
+    Value.en = Location
+    Value.es = Ubicación
+    Value.it = Sede
+    Value.fr = Site
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Hochschule
+    Value.en = University
+    Value.es = Universidad
+    Value.it = Università
+    Value.fr = Université

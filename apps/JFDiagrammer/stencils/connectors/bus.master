@@ -1,0 +1,110 @@
+# Bus: ein Balken (Rechteck über die Dicke, Height 2,5 mm) mit vier Abzweigen.  Liegt auf der
+# Linie vom Anfang zum Ende und dreht sich mit ihr (PinX, Width, Angle aus den Enden); die Enden
+# kleben an Shapes, mit GlueType 2 auch an das ganze Shape.  Jeder Abzweig ist eine Linie
+# senkrecht vom Balken zu seinem Steuerpunkt (Row_1 .. Row_4, CanGlue: in Visio kleben sie an
+# Shapes): der Punkt verschiebt den Abzweig längs des Balkens (anteilig) und bestimmt seine Länge,
+# auch nach unten.  Vereinfacht: feste Zahl von vier Abzweigen.  Formatvorlage "Normal" (Balken
+# gefüllt).
+master: Bus
+name.de: Bus
+name.en: Bus
+name.es: Bus
+name.it: Bus
+name.fr: Bus
+prompt.de: Bus als Balken mit vier Abzweigen. Die gelben Punkte sind die Abzweige: verschieben Sie sie oder ziehen Sie sie auf Shapes.
+prompt.en: Bus as a bar with four taps. The yellow handles are the taps: move them or drag them onto shapes.
+prompt.es: Bus como barra con cuatro derivaciones. Los controladores amarillos son las derivaciones: muévalos o arrástrelos sobre las formas.
+prompt.it: Bus come barra con quattro derivazioni. Le maniglie gialle sono le derivazioni: spostale o trascinale sulle forme.
+prompt.fr: Bus sous forme de barre avec quatre dérivations. Les poignées jaunes sont les dérivations : déplacez-les ou faites-les glisser sur les formes.
+keywords.de: Bus, Sammelleitung, Abzweig, Schiene, Netzwerk, verbinden
+keywords.en: bus, backbone, tap, rail, network, connect
+keywords.es: bus, línea troncal, derivación, barra, red, conectar
+keywords.it: bus, dorsale, derivazione, barra, rete, collegare
+keywords.fr: bus, dorsale, dérivation, barre, réseau, relier
+
+[Shape]
+BeginX = 0 mm
+BeginY = 1.25 mm
+BeginY.us = 0.05 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 1.25 mm
+EndY.us = 0.05 in
+Height = 2.5 mm
+Height.us = 0.1 in
+GlueType = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = -TxtHeight*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+# 1 der Balken
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# 2 .. 5 die Abzweige
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Controls.Row_1; Y = IF(Controls.Row_1.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_1; Y = Controls.Row_1.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Controls.Row_2; Y = IF(Controls.Row_2.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_2; Y = Controls.Row_2.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Controls.Row_3; Y = IF(Controls.Row_3.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_3; Y = Controls.Row_3.Y
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Controls.Row_4; Y = IF(Controls.Row_4.Y<Height*0.5,0,Height)
+LineTo  X = Controls.Row_4; Y = Controls.Row_4.Y
+
+[Controls]
+Row_1:  X = Width*0.2; Y = Height+10 mm
+        Y.us = Height+0.4 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 2; CanGlue = TRUE
+        Tip.de = "Abzweig verschieben; auf ein Shape ziehen"
+        Tip.en = "Move the tap; drag it onto a shape"
+        Tip.es = "Mover la derivación; arrástrela sobre una forma"
+        Tip.it = "Sposta la derivazione; trascinala su una forma"
+        Tip.fr = "Déplacer la dérivation ; faites-la glisser sur une forme"
+Row_2:  X = Width*0.4; Y = Height+10 mm
+        Y.us = Height+0.4 in
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 2; CanGlue = TRUE
+        Tip.de = "Abzweig verschieben; auf ein Shape ziehen"
+        Tip.en = "Move the tap; drag it onto a shape"
+        Tip.es = "Mover la derivación; arrástrela sobre una forma"
+        Tip.it = "Sposta la derivazione; trascinala su una forma"
+        Tip.fr = "Déplacer la dérivation ; faites-la glisser sur une forme"
+Row_3:  X = Width*0.6; Y = Height+10 mm
+        Y.us = Height+0.4 in
+        XDyn = Controls.Row_3; YDyn = Controls.Row_3.Y
+        XCon = 0; YCon = 2; CanGlue = TRUE
+        Tip.de = "Abzweig verschieben; auf ein Shape ziehen"
+        Tip.en = "Move the tap; drag it onto a shape"
+        Tip.es = "Mover la derivación; arrástrela sobre una forma"
+        Tip.it = "Sposta la derivazione; trascinala su una forma"
+        Tip.fr = "Déplacer la dérivation ; faites-la glisser sur une forme"
+Row_4:  X = Width*0.8; Y = Height+10 mm
+        Y.us = Height+0.4 in
+        XDyn = Controls.Row_4; YDyn = Controls.Row_4.Y
+        XCon = 0; YCon = 2; CanGlue = TRUE
+        Tip.de = "Abzweig verschieben; auf ein Shape ziehen"
+        Tip.en = "Move the tap; drag it onto a shape"
+        Tip.es = "Mover la derivación; arrástrela sobre una forma"
+        Tip.it = "Sposta la derivazione; trascinala su una forma"
+        Tip.fr = "Déplacer la dérivation ; faites-la glisser sur une forme"

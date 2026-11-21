@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 240" width="680" height="480"
+     fill="none" stroke="#2E343B" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Laptop, opened, front view: lid with screen, base edge with thumb notch and LED</title>
+  <rect class="body" x="14" y="1.25" width="312" height="218" rx="6" fill="#F7F8FA" stroke="none"/>
+  <rect class="tint" x="14" y="196" width="312" height="23.25" fill="#7A828C" stroke="none"/>
+  <rect class="screen" x="25" y="13" width="290" height="176" fill="#CAD4DF" stroke="none"/>
+  <rect class="ink" x="14" y="1.25" width="312" height="218" rx="6"/>
+  <circle class="port" cx="170" cy="7.2" r="1.8" fill="#4F555D" stroke="none"/>
+  <path class="body" d="M1.25 214H338.75V230.75A8 8 0 0 1 330.75 238.75H9.25A8 8 0 0 1 1.25 230.75Z" fill="#F7F8FA"/>
+  <rect class="shade" x="140" y="215.5" width="60" height="6" rx="3" fill="#DCDFE3" stroke="none"/>
+  <circle class="ok" cx="318" cy="226.5" r="2.5" fill="#3C9A5F" stroke="none"/>
+</svg>

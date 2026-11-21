@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Satellite dish: a dish on a mast with its feed, sending</title>
+  <path class="tint" d="M41.5 10.5A5 5 0 0 1 45.5 14.5M42.5 5.5A10 10 0 0 1 50.5 13.5" stroke="#3E8A86" stroke-width="2"/>
+  <rect class="shade" x="17" y="41.5" width="16" height="3" rx="0.8" fill="#DCDFE3"/>
+  <path class="ink" d="M24 31L25 41.5"/>
+  <path class="body" d="M13 16Q13 37 34 37Z" fill="#F7F8FA"/>
+  <path class="shade" d="M16.5 19.5Q17.5 32.5 30.5 33.5" stroke="#DCDFE3" stroke-width="1.25"/>
+  <path class="ink" d="M23.5 26.5L36.5 16.5" stroke-width="1.25"/>
+  <circle class="port" cx="37.5" cy="15.5" r="2.3" fill="#4F555D" stroke="none"/>
+</svg>

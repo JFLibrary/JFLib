@@ -1,0 +1,62 @@
+# Blockpfeil: ein fünfeckiger Pfeil in Hausform nach rechts, für Schritte und Phasen
+# nebeneinander.  Row_1 an der oberen Ecke vor der Spitze ändert die Länge der Spitze als
+# Abstand von rechts (nur waagrecht: sie bleibt beim Strecken gleich, anfangs 10 mm = halbe
+# Höhe, also 45°).  Der Text steht im Rechteck vor der Spitze; Verbindungspunkte unten, an der
+# Spitze, oben und links.
+master: Pentagon arrow
+name.de: Blockpfeil
+name.en: Pentagon arrow
+name.es: Flecha pentágono
+name.it: Freccia pentagono
+name.fr: Flèche pentagone
+prompt.de: Fünfeckiger Pfeil in Hausform, etwa für Schritte und Phasen. Die Länge der Spitze ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Five-sided arrow, for example for steps and phases. Drag the yellow control handle to change the length of the point.
+prompt.es: Flecha de cinco lados, por ejemplo para pasos y fases. Arrastre el controlador amarillo para cambiar la longitud de la punta.
+prompt.it: Freccia a cinque lati, ad esempio per passi e fasi. Trascina la maniglia di controllo gialla per cambiare la lunghezza della punta.
+prompt.fr: Flèche à cinq côtés, par exemple pour des étapes et des phases. Faites glisser la poignée de contrôle jaune pour modifier la longueur de la pointe.
+keywords.de: Blockpfeil, Fünfeck, Hausform, Schritt, Phase, Prozess, Zeitstrahl
+keywords.en: block arrow, pentagon, home plate, step, phase, process, timeline
+keywords.es: flecha de bloque, pentágono, paso, fase, proceso, cronología
+keywords.it: freccia a blocco, pentagono, passo, fase, processo, sequenza temporale
+keywords.fr: flèche pleine, pentagone, étape, phase, processus, frise chronologique
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+TxtWidth = Width-User.P
+TxtHeight = Height
+TxtPinX = (Width-User.P)*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Länge der Spitze
+P:  Value = MIN(MAX(Width-Controls.Row_1, 0), Width)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width-User.P; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.P; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width-10 mm; Y = Height
+        X.us = Width-0.375 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Länge der Spitze ändern"
+        Tip.en = "Change the length of the point"
+        Tip.es = "Cambiar la longitud de la punta"
+        Tip.it = "Cambia la lunghezza della punta"
+        Tip.fr = "Modifier la longueur de la pointe"
+
+[Connection]
+Row  X = (Width-User.P)*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = (Width-User.P)*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

@@ -1,0 +1,33 @@
+# Mobiltelefon (JD13, eigene Grafik im JFNetworker-Stil)
+master: Mobile phone
+name.de: Mobiltelefon
+name.en: Mobile phone
+name.es: Teléfono móvil
+name.it: Telefono cellulare
+name.fr: Téléphone mobile
+prompt.de: Mobiltelefon: Handy.
+prompt.en: Mobile phone: cell phone.
+prompt.es: Teléfono móvil: móvil.
+prompt.it: Telefono cellulare: cellulare.
+prompt.fr: Téléphone mobile : portable.
+keywords.de: Mobiltelefon, Peripherie, Büro
+keywords.en: Mobile phone, peripheral, office
+keywords.es: Teléfono móvil, periférico, oficina
+keywords.it: Telefono cellulare, periferica, ufficio
+keywords.fr: Téléphone mobile, périphérique, bureau
+svg: ../../symbols/network/mobile_phone.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Mobiltelefon
+    Value.en = Mobile phone
+    Value.es = Teléfono móvil
+    Value.it = Telefono cellulare
+    Value.fr = Téléphone mobile

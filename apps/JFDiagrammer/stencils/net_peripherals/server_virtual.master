@@ -1,0 +1,33 @@
+# Virtueller Server (JD13, eigene Grafik im JFNetworker-Stil)
+master: Virtual server
+name.de: Virtueller Server
+name.en: Virtual server
+name.es: Servidor virtual
+name.it: Server virtuale
+name.fr: Serveur virtuel
+prompt.de: Virtueller Server: Server als virtuelle Maschine.
+prompt.en: Virtual server: server running as a virtual machine.
+prompt.es: Servidor virtual: servidor como máquina virtual.
+prompt.it: Server virtuale: server come macchina virtuale.
+prompt.fr: Serveur virtuel : serveur sous forme de machine virtuelle.
+keywords.de: Virtueller Server, Server, Rolle
+keywords.en: Virtual server, server, role
+keywords.es: Servidor virtual, servidor, función
+keywords.it: Server virtuale, server, ruolo
+keywords.fr: Serveur virtuel, serveur, rôle
+svg: ../../symbols/network/server_virtual.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Virtueller Server
+    Value.en = Virtual server
+    Value.es = Servidor virtual
+    Value.it = Server virtuale
+    Value.fr = Serveur virtuel

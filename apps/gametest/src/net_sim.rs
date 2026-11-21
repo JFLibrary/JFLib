@@ -363,6 +363,7 @@ pub fn bench() -> i32 {
         let none_no_bl = game::net::snapshot::full_bits(&schema, None, &w, None).div_ceil(8) + 16;
         crate::out(&format!("  {:>3} props ({:>2} moving, half moved): against the map's baseline {:>5} B, against nothing {:>5} B (adds from the baseline), without a baseline {:>5} B\n", props, props / 10, vs_map, vs_none, none_no_bl));
     }
+    crate::net_event::rooms_bench();
     0
 }
 

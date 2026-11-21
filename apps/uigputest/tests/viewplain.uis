@@ -1,3 +1,4 @@
 #!args --test viewplain
 # (G5e1) a view without reading every presented image back: while it moves the framebuffer lacks it, Ui::gpu_settle
-# gives it, at rest it holds it by itself; a popup over it reads every frame back
+# gives it, at rest it holds it by itself; (G7b) something of the base over it: veils, no frame read back while it
+# turns, the screen against the CPU's picture; a popup over it reads every frame back

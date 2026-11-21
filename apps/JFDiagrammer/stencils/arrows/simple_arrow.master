@@ -1,0 +1,54 @@
+# Einfacher Pfeil: Blockpfeil nach rechts.  Ein Steuerpunkt an der inneren Ecke zwischen Schaft
+# und Spitze: waagrecht der Beginn der Spitze, senkrecht die Dicke des Schafts (beide anteilig,
+# der Pfeil skaliert mit).
+master: Simple arrow
+name.de: Einfacher Pfeil
+name.en: Simple arrow
+name.es: Flecha simple
+name.it: Freccia semplice
+name.fr: Flèche simple
+prompt.de: Blockpfeil in eine Richtung. Spitze und Schaft ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Block arrow pointing one way. Drag the yellow control handle to change the head and the shaft.
+prompt.es: Flecha de bloque en una dirección. Arrastre el controlador amarillo para cambiar la punta y el cuerpo.
+prompt.it: Freccia a blocco in una direzione. Trascina la maniglia di controllo gialla per cambiare la punta e il corpo.
+prompt.fr: Flèche pleine dans une direction. Faites glisser la poignée de contrôle jaune pour modifier la pointe et le corps.
+keywords.de: Pfeil, Blockpfeil, Richtung, rechts, weiter, Schritt, Prozess
+keywords.en: arrow, block arrow, direction, right, next, step, process
+keywords.es: flecha, flecha de bloque, dirección, derecha, siguiente, paso, proceso
+keywords.it: freccia, freccia a blocco, direzione, destra, avanti, passo, processo
+keywords.fr: flèche, flèche pleine, direction, droite, suivant, étape, processus
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# wo die Spitze beginnt, der halbe Schaft
+Head:   Value = MIN(MAX(Controls.Row_1, 0), Width)
+Shaft:  Value = MIN(MAX(Controls.Row_1.Y-Height*0.5, 0), Height*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = Height*0.5-User.Shaft
+LineTo  X = User.Head; Y = Height*0.5-User.Shaft
+LineTo  X = User.Head; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = User.Head; Y = Height
+LineTo  X = User.Head; Y = Height*0.5+User.Shaft
+LineTo  X = 0; Y = Height*0.5+User.Shaft
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.6; Y = Height*0.75
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Spitze und Schaft ändern"
+        Tip.en = "Change the head and the shaft"
+        Tip.es = "Cambiar la punta y el cuerpo"
+        Tip.it = "Cambia la punta e il corpo"
+        Tip.fr = "Modifier la pointe et le corps"
+
+[Connection]
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0

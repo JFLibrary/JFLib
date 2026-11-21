@@ -1,0 +1,42 @@
+# Zehneck: regelmäßig, waagrechte Kanten oben und unten, Ecken links und rechts
+master: Decagon
+name.de: Zehneck
+name.en: Decagon
+name.es: Decágono
+name.it: Decagono
+name.fr: Décagone
+prompt.de: Regelmäßiges Zehneck mit waagrechten Kanten oben und unten.
+prompt.en: Regular decagon with horizontal edges at the top and bottom.
+prompt.es: Decágono regular con lados horizontales arriba y abajo.
+prompt.it: Decagono regolare con lati orizzontali in alto e in basso.
+prompt.fr: Décagone régulier avec des côtés horizontaux en haut et en bas.
+keywords.de: Zehneck, zehn, Dekagon, Vieleck, Polygon, regelmäßig, Ecken
+keywords.en: decagon, ten, ten-sided, polygon, regular, corners
+keywords.es: decágono, diez, diez lados, polígono, regular, esquinas
+keywords.it: decagono, dieci, dieci lati, poligono, regolare, angoli
+keywords.fr: décagone, dix, dix côtés, polygone, régulier, coins
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 28.5 mm
+Height.us = 1.19 in
+
+[Geometry]
+MoveTo  X = Width; Y = Height*0.5
+LineTo  X = Width*0.904508; Y = Height*0.809017
+LineTo  X = Width*0.654508; Y = Height
+LineTo  X = Width*0.345492; Y = Height
+LineTo  X = Width*0.095492; Y = Height*0.809017
+LineTo  X = 0; Y = Height*0.5
+LineTo  X = Width*0.095492; Y = Height*0.190983
+LineTo  X = Width*0.345492; Y = 0
+LineTo  X = Width*0.654508; Y = 0
+LineTo  X = Width*0.904508; Y = Height*0.190983
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

@@ -1,0 +1,84 @@
+# Klammer mit Text rechts: die eckige Klammer steht fest links (anders als „Beschriftung Klammer“,
+# die die Seite wechselt), der Text linksbündig rechts daneben; der Zeiger geht von der Mitte der
+# Klammer zur Spitze, dort ein Punkt.  Liegt die Spitze rechts der Klammer, beginnt er an ihrem
+# oberen oder unteren Ende (zur Spitze hin) und läuft so über oder unter dem Text vorbei. Liegt
+# die Spitze im Körper, sind Zeiger und Punkt aus (NoShow).
+master: Callout bracket text right
+name.de: Klammer mit Text rechts
+name.en: Bracket with text on the right
+name.es: Corchete con texto a la derecha
+name.it: Parentesi con testo a destra
+name.fr: Crochet avec texte à droite
+prompt.de: Eckige Klammer immer links, der Text rechts daneben, der Zeiger geht von der Klammer aus. Ziehen Sie den gelben Steuerpunkt auf das Ziel.
+prompt.en: Square bracket always on the left with the text to its right; the pointer starts at the bracket. Drag the yellow control handle onto the target.
+prompt.es: Corchete siempre a la izquierda con el texto a su derecha; el puntero sale del corchete. Arrastre el controlador amarillo hasta el destino.
+prompt.it: Parentesi quadra sempre a sinistra con il testo a destra; il puntatore parte dalla parentesi. Trascina la maniglia di controllo gialla sulla destinazione.
+prompt.fr: Crochet toujours à gauche avec le texte à sa droite ; le pointeur part du crochet. Faites glisser la poignée de contrôle jaune sur la cible.
+keywords.de: Beschriftung, Hinweis, Kommentar, Zeiger, eckige Klammer, Klammer, Randnotiz, links, Text rechts
+keywords.en: callout, note, comment, pointer, bracket, square bracket, side note, left, text right
+keywords.es: llamada, nota, comentario, puntero, corchete, nota al margen, grupo, izquierda, texto a la derecha
+keywords.it: richiamo, nota, commento, puntatore, parentesi quadra, parentesi, nota a margine, sinistra, testo a destra
+keywords.fr: bulle d'annotation, note, commentaire, pointeur, crochet, note en marge, groupe, gauche, texte à droite
+text.de: Text
+text.en: Text
+text.es: Texto
+text.it: Testo
+text.fr: Texte
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 16 mm
+Height.us = 0.6 in
+LeftMargin = 3 mm
+LeftMargin.us = 0.12 in
+
+[User]
+msvStructureType:         Value = "Callout"
+msvShapeCategories:       Value = "Callout"
+msvSDCalloutNoHighlight:  Value = FALSE
+# die Spitze des Zeigers
+Ax:                       Value = Controls.Association
+Ay:                       Value = Controls.Association.Y
+Out:                      Value = OR(User.Ax<0,User.Ax>Width,User.Ay<0,User.Ay>Height)
+# die Länge der Arme
+Arm:                      Value = MIN(2.5 mm,Width*0.2)
+                          Value.us = MIN(0.1 in,Width*0.2)
+# wo der Zeiger an der Klammer beginnt: Mitte, rechts davon oberes oder unteres Ende
+Sy:                       Value = IF(User.Ax<=0,Height*0.5,IF(User.Ay>Height*0.5,Height,0))
+Dot:                      Value = 0.8 mm
+                          Value.us = 0.03 in
+
+# die Klammer
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.Arm; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+LineTo  X = User.Arm; Y = 0
+
+# der Zeiger
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(User.Out)
+MoveTo  X = 0; Y = User.Sy
+LineTo  X = User.Ax; Y = User.Ay
+
+# der Punkt an der Spitze
+[Geometry]
+NoShow = NOT(User.Out)
+Ellipse  X = User.Ax; Y = User.Ay; A = User.Ax+User.Dot; B = User.Ay; C = User.Ax; D = User.Ay+User.Dot
+
+[Paragraph]
+Row  HorzAlign = 0
+
+[Controls]
+Association:  X = -12 mm; Y = -10 mm
+              X.us = -0.5 in; Y.us = -0.4 in
+              XDyn = 0; YDyn = User.Sy
+              XCon = 2; YCon = 2; CanGlue = FALSE
+              Tip.de = "Zeiger auf das Ziel ziehen"
+              Tip.en = "Drag the pointer onto the target"
+              Tip.es = "Arrastre el puntero hasta el destino"
+              Tip.it = "Trascina il puntatore sulla destinazione"
+              Tip.fr = "Faites glisser le pointeur sur la cible"

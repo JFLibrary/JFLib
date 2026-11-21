@@ -33,7 +33,7 @@ use diagram_io::vsdx::{self, Format, Measure, WriteOptions};
 use ui::i18n::{t, tf};
 use ui::*;
 
-use crate::viewer::{Opened, PageTab};
+use crate::viewer::Opened;
 use crate::Diagrammer;
 
 /// one undo step: a committed transaction
@@ -74,6 +74,9 @@ pub(crate) struct EditState {
     pub rebuild: bool,
     /// (JD11) Design auf neue Shapes anwenden: off, shapes an edit adds get no design
     pub theme_new_shapes: bool,
+    /// (JD8 rest: pages) pages the last gesture grew or shrank (Automatisch anpassen) and how far
+    /// their drawing moved in world units (pages::sync moves the view along)
+    pub grown: Vec<(diagram_core::PageRef, [f32; 2])>,
 }
 
 impl EditState {
@@ -91,6 +94,7 @@ impl EditState {
             changed: Vec::new(),
             rebuild: false,
             theme_new_shapes: true,
+            grown: Vec::new(),
         }
     }
 
@@ -106,10 +110,21 @@ pub(crate) fn edit<T>(o: &mut Opened, label: &str, done: bool, f: impl FnOnce(&m
     take_back(o);
     let ed = &mut o.ed;
     let before = if ed.theme_new_shapes { Vec::new() } else { crate::design_gallery::shapes_now(&o.doc) };
+    // (JD8 rest) pages with active layers: new shapes go onto them (layers.rs)
+    let active = crate::layers::active_before(&o.doc);
     let mut tx = o.doc.transaction(label);
     let r = f(&mut tx, &mut ed.eng).and_then(|v| {
         if !ed.theme_new_shapes {
             crate::design_gallery::unthemed_new(&mut tx, &mut ed.eng, &before)?;
+        }
+        if !active.is_empty() {
+            crate::layers::assign_new(&mut tx, &active)?;
+        }
+        // (JD8 rest: pages) Automatisch anpassen: the pages a finished gesture changed grow or
+        // shrink in tiles of their printed sheet, in the same undo step
+        if done {
+            let grown = crate::page_size::after_gesture(&mut tx, &mut ed.eng)?;
+            ed.grown.extend(grown);
         }
         Ok(v)
     });
@@ -204,25 +219,21 @@ pub(crate) fn new_drawing(app: &mut Diagrammer, ui: &mut Ui, us: bool) {
             pg.header.name = Some(n);
         }
     }
-    let n = NEW_COUNT.fetch_add(1, core::sync::atomic::Ordering::Relaxed) + 1;
-    let name = tf("Zeichnung{}", &[&format!("{n}")]);
+    let name = next_name();
     let format = Format { kind: DocKind::Drawing, macros: false };
     install(app, ui, doc, name, None, format, None);
 }
 
+/// the name of the next new drawing: "Zeichnung1", "Zeichnung2" ... (also from a template, JD13)
+pub(crate) fn next_name() -> String {
+    let n = NEW_COUNT.fetch_add(1, core::sync::atomic::Ordering::Relaxed) + 1;
+    tf("Zeichnung{}", &[&format!("{n}")])
+}
+
 /// make `doc` the open drawing (opened from a file, or new)
 pub(crate) fn install(app: &mut Diagrammer, ui: &mut Ui, doc: Document, name: String, path: Option<String>, format: Format, notice: Option<(String, String)>) {
-    let mut tabs: Vec<PageTab> = Vec::new();
-    for bg in [false, true] {
-        for p in doc.pages() {
-            let Some(pg) = doc.page(p) else { continue };
-            if pg.header.background != bg {
-                continue;
-            }
-            let n = pg.header.name.or(pg.header.name_u).map(|s| String::from(doc.str(s))).unwrap_or_else(|| tf("Seite-{}", &[&format!("{}", tabs.len() + 1)]));
-            tabs.push(PageTab { page: p, name: n });
-        }
-    }
+    // (JD8 rest: pages) foreground pages first, then the background pages
+    let tabs = crate::pages::tabs_of(&doc);
     let serial = app.opened.as_ref().map_or(1, |o| o.serial.wrapping_add(1));
     let metrics = Some(crate::viewer::metrics(app));
     let ed = EditState::new(path, format, metrics);
@@ -269,13 +280,18 @@ pub(crate) fn save(app: &mut Diagrammer, ui: &mut Ui, as_new: bool) {
 
 /// write the drawing to `path` (its format from the extension; unknown: .vsdx appended)
 pub(crate) fn save_to(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
-    let Some(o) = app.opened.as_mut() else { return false };
-    take_back(o);
     let ext = path.rsplit_once('.').map(|x| x.1).unwrap_or("");
     let (path, format) = match Format::from_extension(ext) {
         Some(f) => (String::from(path), f),
         None => (format!("{path}.vsdx"), Format { kind: DocKind::Drawing, macros: false }),
     };
+    // (JD13) a template keeps the open stencils (EX-11, VL-02)
+    let windows = (format.kind == DocKind::Template).then(|| crate::templates::windows_of_panel(app));
+    let Some(o) = app.opened.as_mut() else { return false };
+    take_back(o);
+    if let Some(w) = windows {
+        diagram_io::template::set_stencil_windows(&mut o.doc, &w);
+    }
     let name = String::from(plat::display_name(&path));
     let opts = WriteOptions { format: Some(format), ..WriteOptions::DEFAULT };
     let bytes = match vsdx::write(&o.doc, &opts) {

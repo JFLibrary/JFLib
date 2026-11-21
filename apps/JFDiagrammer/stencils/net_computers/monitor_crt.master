@@ -1,0 +1,33 @@
+# Röhrenmonitor (JD13, eigene Grafik im JFNetworker-Stil)
+master: CRT monitor
+name.de: Röhrenmonitor
+name.en: CRT monitor
+name.es: Monitor CRT
+name.it: Monitor CRT
+name.fr: Moniteur CRT
+prompt.de: Röhrenmonitor: Bildschirm mit Bildröhre.
+prompt.en: CRT monitor: monitor with a picture tube.
+prompt.es: Monitor CRT: monitor de tubo.
+prompt.it: Monitor CRT: monitor a tubo catodico.
+prompt.fr: Moniteur CRT : écran à tube cathodique.
+keywords.de: Röhrenmonitor, Computer, Arbeitsplatz
+keywords.en: CRT monitor, computer, workstation
+keywords.es: Monitor CRT, equipo, puesto de trabajo
+keywords.it: Monitor CRT, computer, postazione
+keywords.fr: Moniteur CRT, ordinateur, poste de travail
+svg: ../../symbols/network/monitor_crt.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Computer
+    Value.en = Computer
+    Value.es = Equipo
+    Value.it = Computer
+    Value.fr = Ordinateur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Röhrenmonitor
+    Value.en = CRT monitor
+    Value.es = Monitor CRT
+    Value.it = Monitor CRT
+    Value.fr = Moniteur CRT

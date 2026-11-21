@@ -1,0 +1,33 @@
+# Anwendungsserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: Application server
+name.de: Anwendungsserver
+name.en: Application server
+name.es: Servidor de aplicaciones
+name.it: Server applicativo
+name.fr: Serveur d'applications
+prompt.de: Anwendungsserver: führt Geschäftsanwendungen aus.
+prompt.en: Application server: runs business applications.
+prompt.es: Servidor de aplicaciones: ejecuta aplicaciones de negocio.
+prompt.it: Server applicativo: esegue applicazioni aziendali.
+prompt.fr: Serveur d'applications : exécute des applications métier.
+keywords.de: Anwendungsserver, Server, Rolle
+keywords.en: Application server, server, role
+keywords.es: Servidor de aplicaciones, servidor, función
+keywords.it: Server applicativo, server, ruolo
+keywords.fr: Serveur d'applications, serveur, rôle
+svg: ../../symbols/network/server_application.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Anwendungsserver
+    Value.en = Application server
+    Value.es = Servidor de aplicaciones
+    Value.it = Server applicativo
+    Value.fr = Serveur d'applications

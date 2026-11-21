@@ -1,0 +1,106 @@
+#!args --no-system-fonts --save-dir build
+# JFDiagrammer, JD8 rest: fields in the text (TX-06, RE-13) -- Einfügen › Feld puts a field at
+# the end of the selected shape's text; it shows its value in the format chosen and follows the
+# cell it reads; while the text is edited the field goes to the caret (the register
+# Textwerkzeuge › Text) and the editing goes on behind it; a field in the editor stays a field;
+# saved and opened again the fields still follow; undo takes a field back
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+cmd 4621
+expect dialog:"Feld" exists
+click listitem:"Geometrie"
+click listitem:"Breite"
+click button:"OK"
+expect dialog:"Feld" missing
+expect listitem:"60 mm" exists
+# the shape gets wider: the field follows
+drag 651,373 711,373
+expect listitem:"60 mm" missing
+expect listitem:"80 mm" exists
+# undo: the width, then the field
+key ctrl+z
+expect listitem:"60 mm" exists
+key ctrl+z
+expect listitem:"Sheet.4" exists
+key ctrl+y
+expect listitem:"60 mm" exists
+# a second field on a line of its own, with one decimal (the formats show the value now)
+cmd 4621
+click listitem:"Geometrie"
+click listitem:"Höhe"
+click #2015363092
+click "40,0 mm"
+click button:"OK"
+expect listitem:"60 mm" exists
+# while editing: the field at the caret, the editing goes on behind it
+cmd 4404
+drag 760,330 900,420
+cmd 4400
+key f2
+type "Seite "
+click tab:"Text"
+click button:"Feld"
+expect dialog:"Feld" exists
+click listitem:"Seiteninfo"
+click listitem:"Seitenzahl"
+click button:"OK"
+expect dialog:"Feld" missing
+type " von "
+click button:"Feld"
+click listitem:"Seiteninfo"
+click listitem:"Seitenanzahl"
+click button:"OK"
+click 900,650
+expect listitem:"Seite 1 von 1" exists
+# editing the text again keeps its fields
+click 830,375
+key f2
+key end
+type "!"
+click 900,650
+expect listitem:"Seite 1 von 1!" exists
+# a custom formula, in capitals
+cmd 4404
+drag 500,470 640,560
+cmd 4400
+cmd 4621
+click listitem:"Eigene Formel"
+click #2015363082
+type "PAGENAME()&\" / \"&ID()"
+click #2015363092
+click "SEITE-1 / 6"
+click button:"OK"
+expect listitem:"SEITE-1 / 6" exists
+# a formula that does not parse: the dialog stays
+cmd 4621
+click listitem:"Eigene Formel"
+click #2015363082
+key ctrl+a
+type "Width*("
+click button:"OK"
+expect dialog:"Feld" exists
+expect text:"Die Formel lässt sich nicht lesen." exists
+click button:"Abbrechen"
+expect dialog:"Feld" missing
+shot build/JFDiagrammer-fields.png
+# saved and opened again: the fields are there and still follow
+key ctrl+s
+click #28940
+key ctrl+a
+type "jd8-fields.vsdx"
+click button:"Speichern"
+expect text:"jd8-fields – JFDiagrammer" exists
+cmd 4097
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+expect listitem:"Seite 1 von 1!" missing
+cmd 4098
+click button:"jd8-fields.vsdx"
+expect text:"jd8-fields – JFDiagrammer" exists
+expect listitem:"Seite 1 von 1!" exists
+expect listitem:"SEITE-1 / 6" exists
+expect listitem:"60 mm" exists
+click 570,375
+drag 651,373 711,373
+expect listitem:"80 mm" exists

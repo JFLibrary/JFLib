@@ -1,0 +1,33 @@
+# Sendemast (JD13, eigene Grafik im JFNetworker-Stil)
+master: Radio tower
+name.de: Sendemast
+name.en: Radio tower
+name.es: Torre de radio
+name.it: Torre radio
+name.fr: Pylône radio
+prompt.de: Sendemast: Funkmast für Richtfunk und Mobilfunk.
+prompt.en: Radio tower: mast for microwave and mobile radio.
+prompt.es: Torre de radio: mástil para radioenlaces y telefonía móvil.
+prompt.it: Torre radio: traliccio per ponti radio e telefonia mobile.
+prompt.fr: Pylône radio : mât pour faisceaux hertziens et téléphonie mobile.
+keywords.de: Sendemast, Netzwerk
+keywords.en: Radio tower, network
+keywords.es: Torre de radio, red
+keywords.it: Torre radio, rete
+keywords.fr: Pylône radio, réseau
+svg: ../../symbols/network/radio_tower.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Sendemast
+    Value.en = Radio tower
+    Value.es = Torre de radio
+    Value.it = Torre radio
+    Value.fr = Pylône radio

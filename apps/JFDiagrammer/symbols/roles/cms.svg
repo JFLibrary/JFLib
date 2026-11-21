@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="96" height="96"
+     fill="none" stroke="#F7F8FA" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round">
+  <title>Role pictogram cms: a page with lines and a pen (white, for the role badge; make_roles.py)</title>
+  <path class="body" d="M3.6 11.2H1.6A0.8 0.8 0 0 1 0.8 10.4V1.6A0.8 0.8 0 0 1 1.6 0.8H7.4A0.8 0.8 0 0 1 8.2 1.6V3.6"/>
+  <path class="body" d="M2.6 3.2H6.4M2.6 5.4H5.6M2.6 7.6H4.2"/>
+  <path class="body" d="M4.7 10.9L6.64 10.44L11.24 5.84L9.76 4.36L5.16 8.96Z" fill="#F7F8FA" stroke-width="0.6"/>
+</svg>

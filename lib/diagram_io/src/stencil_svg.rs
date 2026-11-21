@@ -2,8 +2,9 @@
 //
 //   import(file, text) -> Art { vb, layers }   every drawn element as sub-paths of lines and
 //                                 cubic Bézier curves in fractions of the shape's box (x right,
-//                                 y up), grouped by format (fill, line, line width) in the
-//                                 order the formats first appear
+//                                 y up), in layers of one format (fill, line, line width):
+//                                 consecutive elements of the same format share one, so the
+//                                 layers keep the document's order
 //
 // What it takes: path (M L H V C S Q T A Z, both cases), rect (rx, ry), circle, ellipse, line,
 // polyline, polygon, g; transform on any of them (translate, scale, matrix, rotate, skewX,
@@ -832,7 +833,7 @@ fn fmt_of(st: &St) -> Fmt {
     }
 }
 
-// an element's sub-paths into the layer of its format
+// an element's sub-paths into the last layer when it has its format, else into a new one
 fn add(layers: &mut Vec<Layer>, st: &St, raws: &[Raw], vb: [f64; 4]) {
     let fmt = fmt_of(st);
     if fmt.fill.is_none() && fmt.stroke.is_none() {
@@ -878,8 +879,39 @@ fn add(layers: &mut Vec<Layer>, st: &St, raws: &[Raw], vb: [f64; 4]) {
     if secs.is_empty() {
         return;
     }
-    match layers.iter_mut().find(|l| l.fmt == fmt) {
+    // (JD13) in document order like JFNetworker's symbols (tools/vsym.py): an element joins the
+    // last layer only when it has the same format; a format that comes back later is a layer of
+    // its own above what lies between
+    // A filled element that overlaps a filled section of that layer gets a layer of its own too:
+    // Visio fills a shape's sections together by the even-odd rule, the overlap would be a hole
+    // (JFNetworker fills every element by itself)
+    let filled = |x: &Sec| !x.no_fill;
+    let overlaps = |l: &Layer| secs.iter().filter(|x| filled(x)).any(|n| l.sections.iter().filter(|x| filled(x)).any(|o| boxes_meet(bbox(n), bbox(o))));
+    match layers.last_mut().filter(|l| l.fmt == fmt && !overlaps(l)) {
         Some(l) => l.sections.extend(secs),
         None => layers.push(Layer { fmt, sections: secs }),
     }
+}
+
+// a section's box from its points and control points (x0, y0, x1, y1), a little generous
+fn bbox(s: &Sec) -> [f64; 4] {
+    let mut b = [s.start[0], s.start[1], s.start[0], s.start[1]];
+    let mut add = |p: [f64; 2]| b = [b[0].min(p[0]), b[1].min(p[1]), b[2].max(p[0]), b[3].max(p[1])];
+    for g in &s.segs {
+        match *g {
+            Seg::Line(p) => add(p),
+            Seg::Cubic(c1, c2, p) => {
+                add(c1);
+                add(c2);
+                add(p);
+            }
+        }
+    }
+    b
+}
+
+// whether two boxes share more than an edge
+fn boxes_meet(a: [f64; 4], b: [f64; 4]) -> bool {
+    const E: f64 = 1e-9;
+    a[0] < b[2] - E && b[0] < a[2] - E && a[1] < b[3] - E && b[1] < a[3] - E
 }

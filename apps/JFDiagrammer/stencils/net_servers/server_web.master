@@ -1,0 +1,33 @@
+# Webserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: Web server
+name.de: Webserver
+name.en: Web server
+name.es: Servidor web
+name.it: Server web
+name.fr: Serveur Web
+prompt.de: Webserver: stellt Webseiten und Webdienste bereit.
+prompt.en: Web server: serves web pages and web services.
+prompt.es: Servidor web: ofrece páginas y servicios web.
+prompt.it: Server web: fornisce pagine e servizi web.
+prompt.fr: Serveur Web : fournit des pages et des services Web.
+keywords.de: Webserver, Server, Rolle
+keywords.en: Web server, server, role
+keywords.es: Servidor web, servidor, función
+keywords.it: Server web, server, ruolo
+keywords.fr: Serveur Web, serveur, rôle
+svg: ../../symbols/network/server_web.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Webserver
+    Value.en = Web server
+    Value.es = Servidor web
+    Value.it = Server web
+    Value.fr = Serveur Web

@@ -1,0 +1,63 @@
+# Kreuz: zwei gleich breite Balken als ein Umriss.  Row_1 an der rechten oberen Ecke des
+# senkrechten Balkens ändert die Breite beider Balken (nur waagrecht, Abstand von der Mitte: die
+# Balken bleiben beim Vergrößern gleich breit).
+master: Cross
+name.de: Kreuz
+name.en: Cross
+name.es: Cruz
+name.it: Croce
+name.fr: Croix
+prompt.de: Pluskreuz aus zwei gleich breiten Balken. Mit dem gelben Steuerpunkt ändern Sie die Balkenbreite.
+prompt.en: Plus sign made of two bars of equal width. Drag the yellow control handle to change the bar width.
+prompt.es: Signo más formado por dos barras del mismo ancho. Arrastre el controlador amarillo para cambiar el ancho de las barras.
+prompt.it: Segno più formato da due barre della stessa larghezza. Trascina la maniglia di controllo gialla per cambiare la larghezza delle barre.
+prompt.fr: Signe plus formé de deux barres de même largeur. Faites glisser la poignée de contrôle jaune pour modifier la largeur des barres.
+keywords.de: Kreuz, Plus, Pluszeichen, hinzufügen, Erste Hilfe, Balken
+keywords.en: cross, plus, plus sign, add, first aid, bars
+keywords.es: cruz, más, signo más, añadir, primeros auxilios, barras
+keywords.it: croce, più, segno più, aggiungere, pronto soccorso, barre
+keywords.fr: croix, plus, signe plus, ajouter, premiers secours, barres
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+
+[User]
+# die halbe Balkenbreite, die Mitte
+T:   Value = MIN(MAX(Controls.Row_1-Width*0.5,MIN(Width,Height)*0.025),MIN(Width,Height)*0.45)
+Cx:  Value = Width*0.5
+Cy:  Value = Height*0.5
+
+[Geometry]
+MoveTo  X = User.Cx-User.T; Y = 0
+LineTo  X = User.Cx+User.T; Y = 0
+LineTo  X = User.Cx+User.T; Y = User.Cy-User.T
+LineTo  X = Width; Y = User.Cy-User.T
+LineTo  X = Width; Y = User.Cy+User.T
+LineTo  X = User.Cx+User.T; Y = User.Cy+User.T
+LineTo  X = User.Cx+User.T; Y = Height
+LineTo  X = User.Cx-User.T; Y = Height
+LineTo  X = User.Cx-User.T; Y = User.Cy+User.T
+LineTo  X = 0; Y = User.Cy+User.T
+LineTo  X = 0; Y = User.Cy-User.T
+LineTo  X = User.Cx-User.T; Y = User.Cy-User.T
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.5+5 mm; Y = Height
+        X.us = Width*0.5+0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 3; YCon = 1; CanGlue = FALSE
+        Tip.de = "Balkenbreite ändern"
+        Tip.en = "Change the bar width"
+        Tip.es = "Cambiar el ancho de las barras"
+        Tip.it = "Cambia la larghezza delle barre"
+        Tip.fr = "Modifier la largeur des barres"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

@@ -1,0 +1,57 @@
+# Zickzackpfeil: ein Linienpfeil in Zickzackform von links oben nach rechts unten -- zwei
+# Schrägen mit einem Rücksprung dazwischen, die Pfeilspitze des Designs am Ende; als 2D-Shape.
+# Row_1 am ersten Knick ändert den Zacken (frei, anteilig); der zweite Knick liegt
+# punktsymmetrisch dazu.  Formatvorlage "Connector" wie die Linienverbinder.  Verbindungspunkte an
+# Anfang und Spitze.
+master: Zigzag arrow
+name.de: Zickzackpfeil
+name.en: Zigzag arrow
+name.es: Flecha en zigzag
+name.it: Freccia a zigzag
+name.fr: Flèche en zigzag
+style: Connector
+prompt.de: Linienpfeil in Zickzackform, etwa für einen Blitz oder eine Störung. Den Zacken ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Zigzag line arrow, for example for a flash or a fault. Drag the yellow control handle to change the zigzag.
+prompt.es: Flecha de línea en zigzag, por ejemplo para un rayo o una avería. Arrastre el controlador amarillo para cambiar el zigzag.
+prompt.it: Freccia lineare a zigzag, ad esempio per un fulmine o un guasto. Trascina la maniglia di controllo gialla per cambiare lo zigzag.
+prompt.fr: Flèche linéaire en zigzag, par exemple pour un éclair ou une panne. Faites glisser la poignée de contrôle jaune pour modifier le zigzag.
+keywords.de: Pfeil, Zickzack, Blitz, Störung, Linie, Sprung
+keywords.en: arrow, zigzag, lightning, fault, line, jump
+keywords.es: flecha, zigzag, rayo, avería, línea, salto
+keywords.it: freccia, zigzag, fulmine, guasto, linea, salto
+keywords.fr: flèche, zigzag, éclair, panne, ligne, saut
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 30 mm
+Height.us = 1.125 in
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height
+LineTo  X = Controls.Row_1; Y = Controls.Row_1.Y
+LineTo  X = Width-Controls.Row_1; Y = Height-Controls.Row_1.Y
+LineTo  X = Width; Y = 0
+
+[Controls]
+Row_1:  X = Width*0.6; Y = Height*0.55
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Zacken ändern"
+        Tip.en = "Change the zigzag"
+        Tip.es = "Cambiar el zigzag"
+        Tip.it = "Cambia lo zigzag"
+        Tip.fr = "Modifier le zigzag"
+
+[Connection]
+Row  X = 0; Y = Height; DirX = 1; DirY = 0
+Row  X = Width; Y = 0; DirX = -1; DirY = 0

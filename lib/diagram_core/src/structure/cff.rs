@@ -6,6 +6,11 @@
 //   layout(tx, eng, &cff)              lanes stacked, phases side by side across every lane,
 //                                      the lists and the pool around them -> what moved
 //   lanes(doc, &cff) / phases(doc, &cff)
+//   create(tx, eng, &src, page, top_left, horizontal, lanes, phases, lang) -> Cff
+//                                      (JD13) a new flowchart from the masters of stencil `src`
+//                                      (JFDiagrammer's "cff"): pool, both lists, the lanes and
+//                                      phases, laid out from `top_left`; create_with takes a
+//                                      lane or phase already on the page along (a dropped one)
 //
 // Visio's structure, kept so that Visio recognises it (research in jd10-strukturen.md):
 //
@@ -37,6 +42,8 @@
 use alloc::vec::Vec;
 
 use super::*;
+use crate::document::PageRef;
+use crate::instance;
 
 /// a cross-functional flowchart
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -258,4 +265,96 @@ pub fn layout_with(tx: &mut Transaction, eng: &mut Engine, f: &Cff, want: Option
     moved.sort();
     moved.dedup();
     Ok(moved)
+}
+
+/// the hidden masters of a flowchart (NameU, as in JFDiagrammer's stencil "cff")
+pub const M_POOL: &str = "CFF Container";
+pub const M_LANE_LIST: &str = "Swimlane List";
+pub const M_PHASE_LIST: &str = "Phase List";
+
+/// the master of a lane: horizontal (lanes one above the other) or vertical
+pub fn lane_master(horizontal: bool) -> &'static str {
+    if horizontal { "Swimlane" } else { "Swimlane (vertical)" }
+}
+
+/// the master of a phase (a separator)
+pub fn phase_master(horizontal: bool) -> &'static str {
+    if horizontal { "Separator" } else { "Separator (vertical)" }
+}
+
+// an instance of master `name_u` of `src` with its pin at `at` (computed, its subshapes too)
+fn put(tx: &mut Transaction, eng: &mut Engine, src: &Document, name_u: &str, page: PageRef, at: [f64; 2], lang: usize) -> Result<ShapeRef, EditError> {
+    let m = src
+        .masters()
+        .find(|&m| src.master(m).and_then(|x| x.header.name_u).is_some_and(|n| src.str(n).eq_ignore_ascii_case(name_u)))
+        .ok_or(EditError::NoMaster)?;
+    let m = instance::import_master(tx, src, m)?;
+    let s = instance::place(tx, page, m, at[0], at[1], lang)?;
+    let mut sheets = Vec::new();
+    let mut stack = alloc::vec![s];
+    while let Some(c) = stack.pop() {
+        sheets.push(SheetRef::Shape(c));
+        if let Some(sh) = tx.doc().shape(c) {
+            stack.extend(sh.children());
+        }
+    }
+    eng.recalc(tx, &sheets)?;
+    Ok(s)
+}
+
+/// a new flowchart from the masters of stencil `src` on `page`: the pool, the lane list, the
+/// phase list, `lanes` lanes (at least one) and `phases` phases, laid out with the pool's top
+/// left corner at `top_left`; names and texts in language `lang` (instance::LANGS).  Connectors
+/// near it are not rerouted (the caller's glue::update)
+pub fn create(tx: &mut Transaction, eng: &mut Engine, src: &Document, page: PageRef, top_left: [f64; 2], horizontal: bool, lanes: usize, phases: usize, lang: usize) -> Result<Cff, EditError> {
+    create_with(tx, eng, src, page, top_left, horizontal, None, None, lanes, phases, lang)
+}
+
+/// create with a lane or a phase already on the page (one dropped outside any flowchart) as the
+/// first lane or phase; the others are new
+#[allow(clippy::too_many_arguments)]
+pub fn create_with(
+    tx: &mut Transaction,
+    eng: &mut Engine,
+    src: &Document,
+    page: PageRef,
+    top_left: [f64; 2],
+    horizontal: bool,
+    lane: Option<ShapeRef>,
+    phase: Option<ShapeRef>,
+    lanes: usize,
+    phases: usize,
+    lang: usize,
+) -> Result<Cff, EditError> {
+    let at = top_left;
+    let pool = put(tx, eng, src, M_POOL, page, at, lang)?;
+    let ll = put(tx, eng, src, M_LANE_LIST, page, at, lang)?;
+    let pl = put(tx, eng, src, M_PHASE_LIST, page, at, lang)?;
+    // the directions of the lists: lanes across the flow, phases along it
+    for (l, d) in [(ll, if horizontal { 2.0 } else { 0.0 }), (pl, if horizontal { 0.0 } else { 2.0 })] {
+        tx.set_user(SheetRef::Shape(l), "msvSDListDirection", Value::Num(d), None)?;
+    }
+    let mut ls: Vec<ShapeRef> = lane.into_iter().collect();
+    while ls.len() < lanes.max(1) {
+        ls.push(put(tx, eng, src, lane_master(horizontal), page, at, lang)?);
+    }
+    let mut ps: Vec<ShapeRef> = phase.into_iter().collect();
+    while ps.len() < phases {
+        ps.push(put(tx, eng, src, phase_master(horizontal), page, at, lang)?);
+    }
+    // the pool's top left corner at `at`
+    let pb = shape_box(tx.doc(), pool);
+    ops::move_shapes(tx, eng, &[pool], [at[0] - pb[0], at[1] - pb[3]])?;
+    // the frame behind everything: pool, lists, phases, lanes
+    for &s in ls.iter().chain(ps.iter()).chain([pl, ll, pool].iter()) {
+        ops::reorder(tx, &[s], ops::Z::Back)?;
+    }
+    add_members(tx, eng, pool, &[ll, pl], None)?;
+    add_members(tx, eng, ll, &ls, None)?;
+    if !ps.is_empty() {
+        add_members(tx, eng, pl, &ps, None)?;
+    }
+    let f = of_pool(tx.doc(), pool).ok_or(EditError::Invalid)?;
+    layout(tx, eng, &f)?;
+    Ok(f)
 }

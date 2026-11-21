@@ -1,0 +1,33 @@
+# Satellitenschüssel (JD13, eigene Grafik im JFNetworker-Stil)
+master: Satellite dish
+name.de: Satellitenschüssel
+name.en: Satellite dish
+name.es: Antena parabólica
+name.it: Antenna parabolica
+name.fr: Antenne parabolique
+prompt.de: Satellitenschüssel: Funkstrecke über einen Satelliten.
+prompt.en: Satellite dish: radio link via a satellite.
+prompt.es: Antena parabólica: enlace de radio por satélite.
+prompt.it: Antenna parabolica: collegamento radio via satellite.
+prompt.fr: Antenne parabolique : liaison radio par satellite.
+keywords.de: Satellitenschüssel, Netzwerk
+keywords.en: Satellite dish, network
+keywords.es: Antena parabólica, red
+keywords.it: Antenna parabolica, rete
+keywords.fr: Antenne parabolique, réseau
+svg: ../../symbols/network/satellite_dish.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Satellitenschüssel
+    Value.en = Satellite dish
+    Value.es = Antena parabólica
+    Value.it = Antenna parabolica
+    Value.fr = Antenne parabolique

@@ -1,0 +1,33 @@
+# Host (JD13, eigene Grafik im JFNetworker-Stil)
+master: Host
+name.de: Host
+name.en: Host
+name.es: Host
+name.it: Host
+name.fr: Hôte
+prompt.de: Host: Host-Rechner.
+prompt.en: Host: host computer.
+prompt.es: Host: equipo host.
+prompt.it: Host: computer host.
+prompt.fr: Hôte : ordinateur hôte.
+keywords.de: Host, Server, Rolle
+keywords.en: Host, server, role
+keywords.es: Host, servidor, función
+keywords.it: Host, server, ruolo
+keywords.fr: Hôte, serveur, rôle
+svg: ../../symbols/network/host.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Host
+    Value.en = Host
+    Value.es = Host
+    Value.it = Host
+    Value.fr = Hôte

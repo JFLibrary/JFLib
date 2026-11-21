@@ -1,8 +1,8 @@
 # Spiel-Engine: Plan für G7
 
 Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1), von G7b, G7d und G7g (Welle 2), von G7e und die
-zweiten Teile von G7c und G7f (Welle 3), der zweite Teil von G7a und der erste von G7h (Welle 4), siehe dort; Stand
-2026-11-20. Die Zahl der Läufe je Stufe ist
+zweiten Teile von G7c und G7f (Welle 3), der zweite Teil von G7a und der erste von G7h (Welle 4), die zweiten Teile
+von G7b, G7e und G7g (Welle 5), siehe dort; Stand 2026-11-20. Die Zahl der Läufe je Stufe ist
 geschätzt (ein Lauf ist eine Arbeitsrunde eines Agenten mit Durchsicht, wie bei G5 und G6).
 
 ## Ziel
@@ -133,6 +133,7 @@ anfassen:
 | 2 | G7b, G7d, G7g (je Teil 1) | G7b braucht G7a; G7d fasst den Browser-Host in `plat` an, den in Welle 1 G7a ändert. Fertig am 18.11.2026. |
 | 3 | G7e (Teil 1), G7c Teil 2, G7f Teil 2 | G7e braucht G7b und G7d; der Controller (`lib/physics`) und `render3d` Teil 2 berühren `lib/game` nicht. Fertig am 19.11.2026. |
 | 4 | G7a Teil 2, G7h (Teil 1) | die Gamepads fassen den Browser-Host an wie G7d, deshalb nach Welle 2; Spiel 1 braucht alles davor, Gamepads nur als Zugabe. Fertig am 20.11.2026. |
+| 5 | G7b Teil 2, G7e Teil 2, G7g Teil 2 | G7b nimmt neue Module in `lib/game` und die GPU-Ausgabe von `lib/ui`, G7e den Netzcode und das Netz von Spiel 1, G7g `lib/geom` und `modeltool`: keine gemeinsamen Dateien außer Registrierungen. Fertig am 20.11.2026. |
 
 ### Phase 1: Grundlagen und Spiel 1
 
@@ -205,6 +206,24 @@ anfassen:
   aber nur ohne Fenster. Offen: Teil 2 (Spielfenster messen, Assets, Raumklang), die Prüfung von Hand.
 - Vom Nutzer bestätigt am 18.11.2026: die Brücke bleibt das eigene Crate `lib/game_render3d` (statt eines Moduls
   in `lib/game`), damit ein Server ohne GPU sie nie mitbaut.
+- **Stand 2026-11-20: Teil 2 fertig** ([GAMECORE.md](GAMECORE.md), [GPU.md](GPU.md)). Das Zurücklesen unter einer
+  HUD war vermeidbar: Zellen, in denen über einer Ansicht nur UI liegt, werden jetzt als „Schleier“ auf der GPU
+  gemischt (die UI einmal über Schwarz und einmal über Weiß gezeichnet, der Shader rechnet K + T × Bild); ein neues
+  Bild der Ansicht kostet sie nichts mehr. Im Schleier ist Text in Graustufen, in Ruhe kommen die echten Pixel;
+  `jfgui_GPU_VEIL=0` schaltet zurück. Gemessen auf der RTX 2070 SUPER bei 165 Hz (Fenster 1280 × 800): Weg a
+  (eine `gpu_view` mit der UI darüber, MAILBOX) von der Taste bis zum Bildschirm rund 10 ms, Bildabstand p95 6,4 ms
+  (vorher mit Zurücklesen 15–24 ms); Weg b (eigene Swapchain) mit MAILBOX 20 ms, mit IMMEDIATE 6 ms bei Zerreißen,
+  FIFO ohne Begrenzer auf beiden Wegen rund 37 ms. Der Vorsprung von b kommt nur daher, dass Weg a eine Ansicht
+  höchstens alle 4 bis 5 ms zeichnet (eine Einstellung von `lib/ui`). Vorschlag: Spiele nehmen Weg a (dieselbe
+  Latenz, ganz `lib/ui` über dem Spiel, ein Weg auf allen Zielen); entscheidet der Nutzer. Im Browser zeichnet die
+  Ansicht nur rund 30 Bilder/s (der Worker meldet sich bei einem Zeitgeber von 1 ms nicht als beschäftigt; eine Zeile
+  in `web/worker.js` brächte die Bildrate des Bildschirms, nicht eingebaut). Assets mit Handles (`game::assets`:
+  im Hintergrund oder über Bilder verteilt geladen, Zustände, Zählung, Entladen) und `Models` / `Textures` in
+  `lib/game_render3d`; Raumklang (`game::audio`: Hörer, Quellen an Entitäten, Abfall mit Nah- und Fernbereich,
+  Panorama mit gleicher Leistung) über den Mischer von `plat::audio`, der dafür je Stimme zwei Kanäle bekam
+  (`Voice::set_gains`). Prüfungen: `assets` 75, `audio` 44 (Probe für Probe), `uigputest` 62; die Prüfsummen von
+  `gametest` unverändert. Nicht gemessen: Iris Xe, HD 610, der Mac (dort ist die GPU-Ausgabe der UI aus, Ansichten
+  lesen jedes Bild zurück), echte Fenster unter Linux.
 
 **G7c Physik 1** (`lib/physics`)
 
@@ -302,6 +321,20 @@ anfassen:
   für iOS. Die Grenze des Lag-Ausgleichs ist 300 ms (200 ms griffen schon ab etwa 50 ms Umlauf, weil Puffer und Marge
   mitzählen; vom Nutzer entschieden am 19.11.2026). Offen: Teil 2
   (echtes Netz, Browser als Client, Korrekturen glätten, Ereignisse zuverlässig, Räume auf Threads).
+- **Stand 2026-11-20: Teil 2 fertig** ([NETCODE.md](NETCODE.md)). Zuverlässige Ereignisse (`game::net::event`):
+  jedes genau einmal und in Reihenfolge, nach der Regel der zuverlässigen Befehle von Quake 3 in den Paketen, die
+  ohnehin gehen (INPUT, SNAPSHOT), ohne Zeitgeber und ohne eigene Pakete; in `game::net` statt in `netchan`, weil
+  der Netzcode schon jeden Tick sendet und bestätigt. Abmelden (`LEAVE`, Netzcode-Version 2): die Figur geht sofort.
+  Geglättete Korrekturen (die Vorhersage bleibt bitgleich, nur das gezeichnete Bild klingt in 60 ms ab, über 1 m
+  springt es). Mehrere Räume auf dem Worker-Pool, bitgleich zu einem Thread (8 Räume mit 16 Bots: 3,4-mal schneller
+  auf dem Ryzen, 3,1-mal auf dem M2). Raumcodes und Tickets aus dem kryptographischen Zufall des Systems. Echtes
+  Netz: Fedora und das ThinkPad waren nicht erreichbar, der Server lief auf dem Mac mini im WLAN, die Clients auf dem
+  PC: Umlauf rund 17 ms, kein Verlust, über UDP keine Korrektur ohne Schießen; ein WebSocket-Client hält einen Tick
+  mehr Marge (`stream_margin`, Korrekturen über WLAN von 12 auf 2,7 je Minute). Der Browser als Client (Chrome und
+  Firefox ohne Fenster): jede Vorhersage stimmte. Spiel 1 nimmt Ereignisse (Abschussmeldungen, Treffermarke),
+  Abmelden und Glätten; dabei behoben: der Server antwortete UDP-Clients im LAN nicht (PERMISSIONS), Firefox wartete
+  5,7 s auf freie HTTP-Worker. Die Grenze des Lag-Ausgleichs bleibt 300 ms. Offen: ein Lauf mit Fedora als Server,
+  WLAN an beiden Enden, Telefone, Verschlüsselung über UDP (G7d Teil 2), Deltas gegen eine Vorhersage.
 
 **G7f `render3d` für Spiel 1**
 
@@ -375,6 +408,21 @@ anfassen:
   Offen: Teil 2 (konvexe Booleans mit exakten Prädikaten, Abschrägen, Beobachtungsmodus, der Lauf, in dem ein
   Agent nur mit den Bildern modelliert); die Liste der Wünsche an JFScript in GEOM.md (Vektoren mit Operatoren,
   Host-Objekte, Position des Aufrufs, benannte Argumente, mehr Mathematik), gebaut erst nach dem Ja des Nutzers.
+- **Stand 2026-11-20: Teil 2 fertig** ([GEOM.md](GEOM.md)). Boolesche Operationen auf konvexen Körpern
+  (`geom::union`, `difference`, `intersection`; ein Körper ist eine Menge konvexer Zellen wie die Brushes eines
+  Karten-Editors, Ergebnisse lassen sich weiter verknüpfen): Ebenen in `f64`, auf 1e-9 der Ausdehnung verschweißt,
+  Ecken als Schnitt dreier Ebenen, die Seite eines Punkts exakt (gefilterte Determinante, nahe null mit exakter
+  Arithmetik), Flächen ohne Koordinaten trianguliert; Abschrägen und Runden (`bevel`); Befunde nennen ihren Ort.
+  `modeltool --watch` baut beim Speichern neu (Fenster mit den festen und einer freien Ansicht, Fehler mit Zeile).
+  Ein Skript liest nur noch Module in seinem Ordner und darunter, keinen Verknüpfungen nach. Der Bewertungslauf:
+  Kiste, Treppe, Tür, Haus aus Modulen und eine kleine Karte nur nach den Bildern gebaut, 10 Runden, alle Prüfungen
+  bestanden (`Documents\JFLib-wip-archiv\g7g2-eval`); geholfen haben die Booleschen Schnitte und `expect_size`,
+  schwer waren Positionen von Hand, fehlende Achsen in den Bildern, kein bedingter Ausdruck in JFScript. 38 773
+  Prüfungen, Prüfsumme `0fae175a31a0f15e` gleich auf Windows, Linux, macOS und in Node (ohne das neue Beispiel und
+  die neuen Operationen weiter `8d93441afd1b79d7`). JFScript blieb unverändert. Offen: die Prüfung des
+  Beobachtungsmodus von Hand, Tempo bei runden Körpern (ein Turm 311 ms), ebene Teilflächen zusammenführen, Abschrägen
+  nichtkonvexer Körper; welche Wünsche an JFScript gebaut werden (Rangfolge des Laufs: Vektoren mit Operatoren,
+  Mathematik in Grad, benannte Argumente, bedingter Ausdruck, Position des Aufrufs).
 
 **G7h Spiel 1**
 
@@ -448,7 +496,8 @@ PaintCraft zu JFPainter. `render3d` bleibt (E2); für `physics`, `anim` und `geo
 
 ## Offen
 
-Später zu entscheiden: der Weg des Spielfensters (nach der Messung in G7b), der Faktor der Mausbewegung unter macOS
+Später zu entscheiden: der Weg des Spielfensters (gemessen in G7b Teil 2, Vorschlag: Weg a, die `gpu_view` mit der
+UI darüber), der Faktor der Mausbewegung unter macOS
 (G7b Teil 2, von Hand), Name und Server von Spiel 1 (G7h), Kartendaten aus OpenStreetMap für G7n (Lizenz ODbL), welche Crates beim
 Auszug in JFLib bleiben (G7p).
 

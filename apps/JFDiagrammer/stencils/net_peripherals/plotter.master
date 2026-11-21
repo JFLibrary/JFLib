@@ -1,0 +1,33 @@
+# Plotter (JD13, eigene Grafik im JFNetworker-Stil)
+master: Plotter
+name.de: Plotter
+name.en: Plotter
+name.es: Trazador
+name.it: Plotter
+name.fr: Traceur
+prompt.de: Plotter: Großformatdrucker.
+prompt.en: Plotter: wide-format printer.
+prompt.es: Trazador: impresora de gran formato.
+prompt.it: Plotter: stampante di grande formato.
+prompt.fr: Traceur : imprimante grand format.
+keywords.de: Plotter, Peripherie, Büro
+keywords.en: Plotter, peripheral, office
+keywords.es: Trazador, periférico, oficina
+keywords.it: Plotter, periferica, ufficio
+keywords.fr: Traceur, périphérique, bureau
+svg: ../../symbols/network/plotter.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Plotter
+    Value.en = Plotter
+    Value.es = Trazador
+    Value.it = Plotter
+    Value.fr = Traceur

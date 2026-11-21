@@ -7,7 +7,12 @@
 //                       others join it once its code is known
 //   step_ms(input)      one millisecond: the network delivers, the server takes its events and runs its ticks, every
 //                       client takes its events, runs its ticks (input(k, client) makes each tick's input) and sends
+//   leave(k)            client k leaves: LEAVE, then the end of its link
 //   tick_log            when set, the server's movement state of every figure per tick (the tests' reference)
+//   at_correction       how far a client's drawn figure moved at each correction it smoothed (the tests' check)
+//
+// The clients' events (the kill feed, the hit marker) stay in their NetClients for take_event (Play), unless `got` is
+// set: then every millisecond takes them into it (the tests).
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -39,6 +44,7 @@ pub struct LocalClient {
     started: bool,
     start_us: u64,
     weather: Weather,
+    leaving: bool,
 }
 
 /// a server and clients on the simulated network (see the module header)
@@ -53,6 +59,11 @@ pub struct Local {
     pub tick_log: Option<BTreeMap<(u16, u32), MoveState>>,
     /// when Some, the time of every server tick (us; the measurement)
     pub tick_us: Option<Vec<u32>>,
+    /// how far a client's drawn figure moved at each correction it smoothed (m), and the corrections it snapped
+    pub at_correction: Vec<f64>,
+    pub snapped: u64,
+    /// when Some, every client's events in the order they came (index = client)
+    pub got: Option<Vec<Vec<game::net::NetEvent>>>,
     clock: game::FixedTick,
     sev: Vec<ServerEvent>,
     cev: Vec<ClientEvent>,
@@ -76,6 +87,9 @@ impl Local {
             room: None,
             tick_log: None,
             tick_us: None,
+            at_correction: Vec::new(),
+            snapped: 0,
+            got: None,
             clock: game::FixedTick::new(RATE).with_max_steps(64),
             sev: Vec::new(),
             cev: Vec::new(),
@@ -90,8 +104,16 @@ impl Local {
     pub fn add_client(&mut self, name: &str, ws: bool, weather: Weather, after_ms: u64) -> usize {
         let opts = ClientOptions { name: String::from(name), room: None, ..ClientOptions::default() };
         let client = NetClient::new(opts, Mover::default(), schema(), Match::empty_baseline());
-        self.clients.push(LocalClient { client, peer: usize::MAX, ws, name: String::from(name), started: false, start_us: self.net.now_us + after_ms * 1000, weather });
+        self.clients.push(LocalClient { client, peer: usize::MAX, ws, name: String::from(name), started: false, start_us: self.net.now_us + after_ms * 1000, weather, leaving: false });
         self.clients.len() - 1
+    }
+
+    /// client k leaves: LEAVE goes out with the next millisecond, then its link ends
+    pub fn leave(&mut self, k: usize) {
+        if let Some(c) = self.clients.get_mut(k) {
+            c.client.leave();
+            c.leaving = true;
+        }
     }
 
     /// the network of one client from now on
@@ -118,7 +140,8 @@ impl Local {
             }
             let name = c.name.clone();
             let opts = ClientOptions { name, room: if k > 0 { self.room } else { None }, ..ClientOptions::default() };
-            let client = NetClient::new(opts, Mover::default(), schema(), Match::empty_baseline());
+            let mut client = NetClient::new(opts, Mover::default(), schema(), Match::empty_baseline());
+            client.set_reliable(c.ws);
             let w = c.weather;
             let peer = if c.ws { self.net.add_ws(ccfg, w) } else { self.net.add_udp(ccfg, w) };
             let c = &mut self.clients[k];
@@ -170,7 +193,16 @@ impl Local {
             let peer = self.clients[k].peer;
             self.net.link_events(peer, Which::Main, &mut self.cev);
             for e in &self.cev {
-                self.clients[k].client.on_event(&map.world, e, now_ns);
+                let c = &mut self.clients[k].client;
+                let (b, m0, s0) = (c.drawn(), c.predictor().stats().mismatches, c.smoother().snaps);
+                c.on_event(&map.world, e, now_ns);
+                if c.predictor().stats().mismatches > m0 {
+                    if c.smoother().snaps > s0 {
+                        self.snapped += 1;
+                    } else if let (Some(b), Some(a)) = (b, c.drawn()) {
+                        self.at_correction.push((a - b).length());
+                    }
+                }
             }
             if self.room.is_none() && self.clients[k].client.phase() == Phase::Playing {
                 self.room = self.clients[k].client.welcome().map(|w| w.room);
@@ -181,8 +213,20 @@ impl Local {
                 let t = c.client.step(&map.world, i);
                 stepped.push((k, t));
             }
+            if let Some(got) = &mut self.got {
+                while got.len() <= k {
+                    got.push(Vec::new());
+                }
+                while let Some(e) = self.clients[k].client.take_event() {
+                    got[k].push(e);
+                }
+            }
             while let Some(b) = self.clients[k].client.take_out() {
                 let _ = self.net.link_send(peer, Which::Main, &b);
+            }
+            if self.clients[k].leaving {
+                self.clients[k].leaving = false;
+                self.net.link_close(peer, Which::Main);
             }
         }
         stepped

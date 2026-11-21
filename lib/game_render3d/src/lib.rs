@@ -12,6 +12,10 @@
 //   Bridge::retire_* / collect   meshes and materials the game is done with go from the renderer
 //                      (Renderer::remove_mesh / remove_material) once no instance of the bridge uses them
 //   camera, transform  a game View as render3d::Camera, a game Transform as render3d::Transform
+//   (G7b part 2) Model, Image   glTF models and images as lib/game assets (Assets<Model>, loaded in the background);
+//                      Models / Textures put them on a renderer once Ready and take them off when unloaded;
+//                      ModelRef (a component) and Bridge::sync_models: an entity gets its meshes when its model is
+//                      up (models.rs)
 //
 // Why a crate of its own and not a module of lib/game behind a feature: a game's server is built from the
 // same workspace as its client, and Cargo unifies a crate's features over everything one `cargo build`
@@ -37,6 +41,9 @@ use alloc::vec::Vec;
 use game::{Entity, Pose, View, World};
 use gpu::{GpuError, Result};
 use render3d::{Camera, Instance, InstanceId, MaterialId, MeshId, Renderer, Scene};
+
+mod models;
+pub use models::{Image, Model, ModelRef, ModelStats, Models, Part, Textures, IMAGE_PIXELS};
 
 /// what an entity looks like: a mesh and a material of the renderer the scene belongs to
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -92,6 +99,13 @@ pub struct Bridge {
     retired_meshes: Vec<MeshId>,
     retired_materials: Vec<MaterialId>,
     origin_step: f64,
+    /// (G7b part 2) entities with a ModelRef (sync_models): by entity index; the column's version and removals, the
+    /// Pose column's version, Models' version at the last sync_models
+    models: Vec<Option<models::ModelSlot>>,
+    model_seen: u64,
+    model_removals: u64,
+    model_pose_seen: u64,
+    models_version: u64,
 }
 
 impl Default for Bridge {
@@ -137,6 +151,11 @@ impl Bridge {
             retired_meshes: Vec::new(),
             retired_materials: Vec::new(),
             origin_step: ORIGIN_STEP,
+            models: Vec::new(),
+            model_seen: 0,
+            model_removals: 0,
+            model_pose_seen: 0,
+            models_version: 0,
         }
     }
 
@@ -283,6 +302,9 @@ impl Bridge {
     pub fn clear(&mut self, scene: &mut Scene) -> Result<()> {
         for i in 0..self.slots.len() {
             self.drop_slot(i, scene)?;
+        }
+        for i in 0..self.models.len() {
+            self.drop_model(i, scene)?;
         }
         let step = self.origin_step;
         let (rm, rt) = (core::mem::take(&mut self.retired_meshes), core::mem::take(&mut self.retired_materials));

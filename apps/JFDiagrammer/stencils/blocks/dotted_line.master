@@ -1,0 +1,49 @@
+# Gepunktete Linie: eine gerade Linie als 1D-Shape (Height 0) mit punktiertem Muster
+# (LinePattern 3) -- etwa für eine lose oder geplante Verbindung; die Pfeilspitze am Ende kommt
+# aus dem Design (wie in der Schablone Verbinder).  Sie liegt auf der Linie vom Anfang zum Ende
+# und dreht sich mit ihr, die Enden kleben (GlueType 2 auch an das ganze Shape).  Formatvorlage
+# "Connector" (Farbe und Stärke aus dem Design); das Muster ist die begründete Ausnahme im Master,
+# es ist der Zweck des Shapes.  Der Text steht in der Mitte der Linie.
+master: Dotted line
+name.de: Gepunktete Linie
+name.en: Dotted line
+name.es: Línea de puntos
+name.it: Linea punteggiata
+name.fr: Ligne pointillée
+style: Connector
+prompt.de: Punktierte Linie mit Pfeilspitze, deren Enden an Shapes kleben.
+prompt.en: Dotted line with an arrowhead whose ends glue to shapes.
+prompt.es: Línea de puntos con punta de flecha cuyos extremos se pegan a las formas.
+prompt.it: Linea punteggiata con punta di freccia le cui estremità si incollano alle forme.
+prompt.fr: Ligne pointillée avec pointe de flèche dont les extrémités se collent aux formes.
+keywords.de: Linie, gepunktet, punktiert, Verbindung, lose, optional, geplant
+keywords.en: line, dotted, dots, connection, loose, optional, planned
+keywords.es: línea, punteada, puntos, conexión, opcional, prevista
+keywords.it: linea, punteggiata, punti, collegamento, opzionale, prevista
+keywords.fr: ligne, pointillée, points, connexion, facultative, prévue
+
+[Shape]
+BeginX = 0 mm
+BeginY = 2.5 mm
+BeginY.us = 0.1 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 2.5 mm
+EndY.us = 0.1 in
+Height = 0 mm
+Height.us = 0 in
+GlueType = 2
+LinePattern = 3
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width; Y = Height*0.5

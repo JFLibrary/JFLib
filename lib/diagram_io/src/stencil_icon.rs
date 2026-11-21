@@ -10,9 +10,9 @@
 // colour and the mask bitmap, 1 plane, 4 bits), the palette (16 x BGRA), the colour bitmap (32
 // rows of 16 bytes) and the mask (32 rows of 4 bytes), rows bottom up: 766 bytes.
 //
-// How: an instance of the master goes onto the stencil's page inside a transaction, the formula
-// engine computes it, render::build makes its display list, and the transaction is dropped, so
-// the page stays empty.  The list is drawn with 4 x 4 samples a pixel: fills even-odd, lines at
+// How: an instance of the master goes onto the stencil's page inside a transaction (it inherits
+// the values the build computed for the master), render::build makes its display list, and the
+// transaction is dropped, so the page stays empty.  The list is drawn with 4 x 4 samples a pixel: fills even-odd, lines at
 // least one pixel wide with round ends, text as a block per character (no fonts here),
 // fitted into the 32 x 32 square with a margin of 2 pixels and centred (a shape that draws
 // only text, like a text box, is fitted to its text).  Pixels at least a
@@ -22,7 +22,7 @@
 
 use alloc::vec::Vec;
 
-use diagram_core::formula::{math, Engine};
+use diagram_core::formula::math;
 use diagram_core::geometry::{Path, Seg};
 use diagram_core::render::{self, ApproxMeasure, Drawing, ItemKind, Options, Paint};
 use diagram_core::{CellAddr, Document, EditError, MasterRef, Owner, SheetRef, Sym};
@@ -33,14 +33,15 @@ const G: usize = N * SS;
 const MARGIN: f64 = 2.0;
 
 /// the icon of master `m` (see the module comment); the document is unchanged afterwards
+// (JD13) nothing is recomputed: the instance inherits the values the build computed for the
+// master (only its pin is its own); a recalculation per icon made a stencil of 150 masters take
+// minutes, the engine's incremental path growing with the document
 pub(crate) fn master_icon(doc: &mut Document, m: MasterRef) -> Result<Vec<u8>, EditError> {
     let page = doc.pages().next().ok_or(EditError::NoPage)?;
     let mut tx = doc.transaction("icon");
     let shape = tx.add_instance(Owner::Page(page), m, 0.0, 0.0)?;
-    let sheets: Vec<SheetRef> = tx.doc().all_shapes(Owner::Page(page)).map(SheetRef::Shape).collect();
-    Engine::new().recalc(&mut tx, &sheets)?;
     let d = tx.doc();
-    let drawing = render::build(d, page, &mut ApproxMeasure, &Options { background: false, hidden_layers: true });
+    let drawing = render::build(d, page, &mut ApproxMeasure, &Options { background: false, hidden_layers: true, print: false });
     let num = |name: Sym| d.resolve(SheetRef::Shape(shape), &CellAddr::single(name)).num().unwrap_or(0.0);
     let (w, h) = match (d.sym("Width"), d.sym("Height")) {
         (Some(ws), Some(hs)) => (num(ws), num(hs)),

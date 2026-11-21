@@ -1,0 +1,67 @@
+# Dynamischer Verbinder: wie der Verbinder des Werkzeugs „Verbinder“; Verlauf und Linienform
+# kommen aus der Seite (Layout und Verlegung).  Gezeichnet ist ein Z von Seite zu Seite.
+# Dynamischer Verbinder (ObjType 2 verlegbar, GlueType 2): die App verlegt ihn selbst und ersetzt
+# die gezeichnete Geometrie durch ihren Weg; der Kasten bleibt aufrecht (Width = EndX-BeginX ...,
+# Angle 0).  Route-Zellen mit Visios Namen und Werten: ShapeRouteStyle 0 (Standard der Seite),
+# ConLineRouteExt 0, ConFixedCode 0.  Der Text folgt Controls.TextPosition, das die App in die
+# Mitte des Wegs setzt (ohne Text verborgen).
+master: Dynamic connector
+name.de: Dynamischer Verbinder
+name.en: Dynamic connector
+name.es: Conector dinámico
+name.it: Connettore dinamico
+name.fr: Connecteur dynamique
+prompt.de: Verbinder, der sich selbst um Shapes herum verlegt. Ziehen Sie die Enden auf Shapes.
+prompt.en: Connector that routes itself around shapes. Drag the ends onto shapes.
+prompt.es: Conector que se traza solo alrededor de las formas. Arrastre los extremos sobre las formas.
+prompt.it: Connettore che si instrada da solo attorno alle forme. Trascina le estremità sulle forme.
+prompt.fr: Connecteur qui se trace tout seul autour des formes. Faites glisser les extrémités sur les formes.
+keywords.de: Verbinder, dynamisch, verbinden, rechtwinklig, verlegen, Linie, Pfeil
+keywords.en: connector, dynamic, connect, right angle, route, line, arrow
+keywords.es: conector, dinámico, conectar, ángulo recto, trazar, línea, flecha
+keywords.it: connettore, dinamico, collegare, angolo retto, instradare, linea, freccia
+keywords.fr: connecteur, dynamique, relier, angle droit, tracer, ligne, flèche
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 0 mm
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 20 mm
+EndY.us = 0.75 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+ObjType = 2
+GlueType = 2
+ShapeRouteStyle = 0
+ConLineRouteExt = 0
+ConFixedCode = 0
+NoAlignBox = TRUE
+DynFeedback = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Controls.TextPosition
+TxtPinY = Controls.TextPosition.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+RelMoveTo  X = 0; Y = 0
+RelLineTo  X = 0.5; Y = 0
+RelLineTo  X = 0.5; Y = 1
+RelLineTo  X = 1; Y = 1
+
+[Controls]
+TextPosition:  X = Width*0.5; Y = Height*0.5
+        XDyn = Controls.TextPosition; YDyn = Controls.TextPosition.Y
+        XCon = IF(OR(STRSAME(SHAPETEXT(TheText),""),HideText),5,0); YCon = 0; CanGlue = FALSE
+        Tip.de = "Text verschieben"
+        Tip.en = "Move the text"
+        Tip.es = "Mover el texto"
+        Tip.it = "Sposta il testo"
+        Tip.fr = "Déplacer le texte"

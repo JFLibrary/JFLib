@@ -1,0 +1,76 @@
+# Von oben nach unten 2: von der Oberkante zur Unterkante eines tieferen Shapes; gezeichnet der
+# Weg außen herum (erst nach oben, dann hinab und von unten hinein).  Dynamischer Verbinder
+# (ObjType 2 verlegbar, GlueType 2): die App verlegt ihn selbst und ersetzt die gezeichnete
+# Geometrie durch ihren Weg; der Kasten bleibt aufrecht (Width = EndX-BeginX ..., Angle 0).
+# Route-Zellen mit Visios Namen und Werten: ShapeRouteStyle 19 (einfach unten nach oben),
+# ConLineRouteExt 1, ConFixedCode 0.  Der Text folgt Controls.TextPosition, das die App in die
+# Mitte des Wegs setzt (ohne Text verborgen).
+master: Top to bottom 2
+name.de: Von oben nach unten 2
+name.en: Top to bottom 2
+name.es: De arriba abajo 2
+name.it: Dall'alto in basso 2
+name.fr: De haut en bas 2
+prompt.de: Dynamischer Verbinder von der Oberkante des einen zur Unterkante des anderen Shapes, außen herum, wenn das Ziel tiefer liegt. Ziehen Sie die Enden auf Shapes.
+prompt.en: Dynamic connector from the top edge of one shape to the bottom edge of the other, around the outside when the target lies lower. Drag the ends onto shapes.
+prompt.es: Conector dinámico del borde superior de una forma al borde inferior de la otra, rodeándola cuando el destino está más bajo. Arrastre los extremos sobre las formas.
+prompt.it: Connettore dinamico dal bordo superiore di una forma al bordo inferiore dell'altra, girando attorno quando la destinazione è più in basso. Trascina le estremità sulle forme.
+prompt.fr: Connecteur dynamique du bord supérieur d'une forme au bord inférieur de l'autre, en contournant quand la cible est plus bas. Faites glisser les extrémités sur les formes.
+keywords.de: Verbinder, dynamisch, verbinden, oben, unten, herum, Rückführung
+keywords.en: connector, dynamic, connect, top, bottom, around, return
+keywords.es: conector, dinámico, conectar, arriba, abajo, alrededor, retorno
+keywords.it: connettore, dinamico, collegare, alto, basso, attorno, ritorno
+keywords.fr: connecteur, dynamique, relier, haut, bas, autour, retour
+style: Connector
+
+[Shape]
+BeginX = 5 mm
+BeginX.us = 0.2 in
+BeginY = 20 mm
+BeginY.us = 0.8 in
+EndX = 35 mm
+EndX.us = 1.4 in
+EndY = 8 mm
+EndY.us = 0.3 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+ObjType = 2
+GlueType = 2
+ShapeRouteStyle = 19
+ConLineRouteExt = 1
+ConFixedCode = 0
+NoAlignBox = TRUE
+DynFeedback = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Controls.TextPosition
+TxtPinY = Controls.TextPosition.Y
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# der Abstand, mit dem der gezeichnete Verlauf um die Shapes herumführt
+Gap:  Value = 6 mm
+      Value.us = 0.25 in
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = 0; Y = User.Gap
+LineTo  X = Width*0.5; Y = User.Gap
+LineTo  X = Width*0.5; Y = Height-User.Gap
+LineTo  X = Width; Y = Height-User.Gap
+LineTo  X = Width; Y = Height
+
+[Controls]
+TextPosition:  X = Width*0.5; Y = Height*0.5
+        XDyn = Controls.TextPosition; YDyn = Controls.TextPosition.Y
+        XCon = IF(OR(STRSAME(SHAPETEXT(TheText),""),HideText),5,0); YCon = 0; CanGlue = FALSE
+        Tip.de = "Text verschieben"
+        Tip.en = "Move the text"
+        Tip.es = "Mover el texto"
+        Tip.it = "Sposta il testo"
+        Tip.fr = "Déplacer le texte"

@@ -1,0 +1,48 @@
+# Startdiagramm „Beispiel: Bestellung“: ein kleiner Ablauf mit Entscheidung und Tipp.  Start und
+# Ende sind Grenzstellen (Master Start/End der Schablone flowchart, Stadionform nach ISO 5807).
+starter: sample
+name.de: Beispiel: Bestellung
+name.en: Sample: Order
+name.es: Ejemplo: pedido
+name.it: Esempio: ordine
+name.fr: Exemple : commande
+description.de: Ein kleiner Ablauf mit Start, Schritten, einer Entscheidung und dem Ende, zum Abwandeln.
+description.en: A small workflow with a start, steps, a decision and an end, to adapt.
+description.es: Un pequeño flujo con inicio, pasos, una decisión y un final, para adaptar.
+description.it: Un piccolo flusso con inizio, passi, una decisione e una fine, da adattare.
+description.fr: Un petit flux avec un début, des étapes, une décision et une fin, à adapter.
+
+[Shapes]
+start:  Stencil = "flowchart"; Master = "Start/End"
+        PinX = 80 mm; PinY = 180 mm; PinX.us = 3.2 in; PinY.us = 7.2 in
+        Text.de = "Start"; Text.en = "Start"; Text.es = "Inicio"; Text.it = "Inizio"; Text.fr = "Début"
+step:   Stencil = "flowchart"; Master = "Process"
+        PinX = 80 mm; PinY = 145 mm; PinX.us = 3.2 in; PinY.us = 5.8 in
+        Text.de = "Bestellung prüfen"; Text.en = "Check order"; Text.es = "Revisar pedido"
+        Text.it = "Verificare l'ordine"; Text.fr = "Vérifier la commande"
+check:  Stencil = "flowchart"; Master = "Decision"
+        PinX = 80 mm; PinY = 102 mm; PinX.us = 3.2 in; PinY.us = 4.1 in
+        Text.de = "Vollständig?"; Text.en = "Complete?"; Text.es = "¿Completo?"; Text.it = "Completo?"
+        Text.fr = "Complète ?"
+ask:    Stencil = "flowchart"; Master = "Process"
+        PinX = 150 mm; PinY = 102 mm; PinX.us = 6 in; PinY.us = 4.1 in
+        Text.de = "Rückfrage stellen"; Text.en = "Ask the customer"; Text.es = "Consultar al cliente"
+        Text.it = "Chiedere al cliente"; Text.fr = "Contacter le client"
+end:    Stencil = "flowchart"; Master = "Start/End"
+        PinX = 80 mm; PinY = 55 mm; PinX.us = 3.2 in; PinY.us = 2.3 in
+        Text.de = "Ende"; Text.en = "End"; Text.es = "Fin"; Text.it = "Fine"; Text.fr = "Fin"
+c1:     From = "start"; To = "step"
+c2:     From = "step"; To = "check"
+c3:     From = "check"; To = "end"
+        Text.de = "Ja"; Text.en = "Yes"; Text.es = "Sí"; Text.it = "Sì"; Text.fr = "Oui"
+c4:     From = "check"; To = "ask"
+        Text.de = "Nein"; Text.en = "No"; Text.es = "No"; Text.it = "No"; Text.fr = "Non"
+c5:     From = "ask"; To = "step"
+tip:    Stencil = "callouts"; Master = "Tip"; Tip = TRUE
+        PinX = 235 mm; PinY = 175 mm; Width = 90 mm; Height = 30 mm
+        PinX.us = 9.1 in; PinY.us = 7 in; Width.us = 3.4 in; Height.us = 1.2 in
+        Text.de = "Tipp: Ziehen Sie Shapes aus der Seitenleiste auf die Seite und verbinden Sie sie. Diesen Hinweis können Sie löschen."
+        Text.en = "Tip: Drag shapes from the Shapes panel onto the page and connect them. You can delete this note."
+        Text.es = "Consejo: arrastre formas desde el panel Formas a la página y conéctelas. Puede eliminar esta nota."
+        Text.it = "Suggerimento: trascinare le forme dal riquadro Forme sulla pagina e collegarle. È possibile eliminare questa nota."
+        Text.fr = "Astuce : faites glisser des formes du volet Formes sur la page et reliez-les. Vous pouvez supprimer cette note."

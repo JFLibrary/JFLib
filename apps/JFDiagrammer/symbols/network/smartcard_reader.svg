@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Smart card reader: a reader with a card half inserted, chip showing</title>
+  <rect class="tint" x="19" y="5" width="26" height="20" rx="1.5" fill="#A65A4A"/>
+  <rect class="shade" x="23" y="8.5" width="7" height="5.5" rx="1" fill="#DCDFE3" stroke-width="0.75"/>
+  <path class="ink" d="M26.5 8.5V14M23 10.35H30M23 12.15H30" stroke-width="0.6"/>
+  <path class="body" d="M23 18H38" stroke="#F7F8FA" stroke-width="1.25"/>
+  <rect class="body" x="11" y="22" width="42" height="19" rx="3" fill="#F7F8FA"/>
+  <path class="shade" d="M11.75 36H52.25V38A2.25 2.25 0 0 1 50 40.25H14A2.25 2.25 0 0 1 11.75 38Z" fill="#DCDFE3" stroke="none"/>
+  <rect class="port" x="16" y="21.25" width="32" height="1.5" rx="0.75" fill="#4F555D" stroke="none"/>
+  <circle class="ok" cx="46.5" cy="29" r="1.1" fill="#3C9A5F" stroke="none"/>
+  <circle class="port" cx="42.5" cy="29" r="1.1" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="15" y="41" width="6" height="2" rx="0.75" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="43" y="41" width="6" height="2" rx="0.75" fill="#4F555D" stroke="none"/>
+</svg>

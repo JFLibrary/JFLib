@@ -1,0 +1,33 @@
+# Haus (JD13, eigene Grafik im JFNetworker-Stil)
+master: House
+name.de: Haus
+name.en: House
+name.es: Casa
+name.it: Casa
+name.fr: Maison
+prompt.de: Haus: Wohnhaus, etwa ein Heimarbeitsplatz.
+prompt.en: House: home, such as a remote workplace.
+prompt.es: Casa: vivienda, como un puesto de teletrabajo.
+prompt.it: Casa: abitazione, ad esempio una postazione remota.
+prompt.fr: Maison : habitation, par exemple un poste en télétravail.
+keywords.de: Haus, Standort, WAN
+keywords.en: House, location, site, WAN
+keywords.es: Casa, ubicación, WAN
+keywords.it: Casa, sede, WAN
+keywords.fr: Maison, site, WAN
+svg: ../../symbols/network/house.svg
+include: ../net_common/symbol.inc, ../net_common/location.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Standort
+    Value.en = Location
+    Value.es = Ubicación
+    Value.it = Sede
+    Value.fr = Site
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Haus
+    Value.en = House
+    Value.es = Casa
+    Value.it = Casa
+    Value.fr = Maison

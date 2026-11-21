@@ -1,0 +1,33 @@
+# Proxyserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: Proxy server
+name.de: Proxyserver
+name.en: Proxy server
+name.es: Servidor proxy
+name.it: Server proxy
+name.fr: Serveur proxy
+prompt.de: Proxyserver: vermittelt Anfragen stellvertretend.
+prompt.en: Proxy server: forwards requests on behalf of clients.
+prompt.es: Servidor proxy: reenvía solicitudes en nombre de los clientes.
+prompt.it: Server proxy: inoltra richieste per conto dei client.
+prompt.fr: Serveur proxy : relaie les requêtes pour le compte des clients.
+keywords.de: Proxyserver, Server, Rolle
+keywords.en: Proxy server, server, role
+keywords.es: Servidor proxy, servidor, función
+keywords.it: Server proxy, server, ruolo
+keywords.fr: Serveur proxy, serveur, rôle
+svg: ../../symbols/network/server_proxy.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Proxyserver
+    Value.en = Proxy server
+    Value.es = Servidor proxy
+    Value.it = Server proxy
+    Value.fr = Serveur proxy

@@ -1,0 +1,33 @@
+# DSU/CSU (JD13, eigene Grafik im JFNetworker-Stil)
+master: DSU/CSU
+name.de: DSU/CSU
+name.en: DSU/CSU
+name.es: DSU/CSU
+name.it: DSU/CSU
+name.fr: DSU/CSU
+prompt.de: DSU/CSU: Leitungsabschluss für Mietleitungen.
+prompt.en: DSU/CSU: termination for leased lines.
+prompt.es: DSU/CSU: terminación de líneas dedicadas.
+prompt.it: DSU/CSU: terminazione per linee dedicate.
+prompt.fr: DSU/CSU : terminaison de lignes louées.
+keywords.de: DSU/CSU, Netzwerk
+keywords.en: DSU/CSU, network
+keywords.es: DSU/CSU, red
+keywords.it: DSU/CSU, rete
+keywords.fr: DSU/CSU, réseau
+svg: ../../symbols/network/dsu_csu.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = DSU/CSU
+    Value.en = DSU/CSU
+    Value.es = DSU/CSU
+    Value.it = DSU/CSU
+    Value.fr = DSU/CSU

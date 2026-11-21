@@ -1,0 +1,33 @@
+# Biometrisches Lesegerät (JD13, eigene Grafik im JFNetworker-Stil)
+master: Biometric reader
+name.de: Biometrisches Lesegerät
+name.en: Biometric reader
+name.es: Lector biométrico
+name.it: Lettore biometrico
+name.fr: Lecteur biométrique
+prompt.de: Biometrisches Lesegerät: Fingerabdruckleser für die Zugangskontrolle.
+prompt.en: Biometric reader: fingerprint reader for access control.
+prompt.es: Lector biométrico: lector de huellas para control de acceso.
+prompt.it: Lettore biometrico: lettore di impronte per il controllo accessi.
+prompt.fr: Lecteur biométrique : lecteur d'empreintes pour le contrôle d'accès.
+keywords.de: Biometrisches Lesegerät, Sicherheit
+keywords.en: Biometric reader, security
+keywords.es: Lector biométrico, seguridad
+keywords.it: Lettore biometrico, sicurezza
+keywords.fr: Lecteur biométrique, sécurité
+svg: ../../symbols/network/biometric_reader.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Sicherheit
+    Value.en = Security
+    Value.es = Seguridad
+    Value.it = Sicurezza
+    Value.fr = Sécurité
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Biometrisches Lesegerät
+    Value.en = Biometric reader
+    Value.es = Lector biométrico
+    Value.it = Lettore biometrico
+    Value.fr = Lecteur biométrique

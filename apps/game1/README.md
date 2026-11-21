@@ -17,6 +17,9 @@ python build_rs.py test game1                      # tests/check.uis, loopback.u
 build/win/game1.exe --sums                         # the determinism checksums (the same on every target)
 build/win/game1.exe --bench                        # the measurements (release build)
 node apps/game1/tests/web.mjs -- --sums            # the checksums in the browser's engine (Node)
+build/win/game1.exe --client HOST:PORT --clients 3 --secs 60   # headless clients against a server: round trip, jitter,
+                                                   #   loss, corrections (--ws, --fire, --leave, --margin, --interp)
+node apps/game1/tests/browser.mjs                  # Chrome and Firefox (Playwright) as clients of game1-server --web
 python apps/game1/tools/content.py [--check]       # the map and the figure from JFScript again (byte for byte)
 ```
 
@@ -36,4 +39,5 @@ the scoreboard, Esc pauses (the pointer lock ends).
 | `src/scene.rs`, `src/look.rs` | render3d in a `ui.gpu_view`: the toon look C, figures from rigid parts, the weapon in front of the camera, particles |
 | `src/bake.rs` | modeltool's `.glb` into `.g1m` |
 | `src/t_*.rs`, `src/bench.rs`, `src/loopback.rs` | the test groups, the measurements, real sockets on 127.0.0.1 |
-| `tests/` | the scripts `build_rs.py test game1` runs; `web.mjs` runs the console paths in Node |
+| `src/client.rs` | `--client`: headless clients played by the bots' minds against a server, on the desktop and in the browser (the measurements of docs/NETCODE.md "Echtes Netz") |
+| `tests/` | the scripts `build_rs.py test game1` runs; `web.mjs` runs the console paths in Node; `browser.mjs` the browser as a client of game1-server |

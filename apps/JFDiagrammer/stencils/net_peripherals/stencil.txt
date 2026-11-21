@@ -1,0 +1,11 @@
+# Netzwerk und Peripheriegeräte (SH-151, JD13): eigene Shapes im JFNetworker-Stil, Grafiken aus ../../symbols/
+stencil: Network and Peripherals
+file: netperi
+name.de: Netzwerk und Peripheriegeräte
+name.en: Network and Peripherals
+name.es: Red y periféricos
+name.it: Rete e periferiche
+name.fr: Réseau et périphériques
+category: network
+masters: server, router, switch, firewall, wireless_ap, printer, ethernet, ring_network, dialup, server_virtual, mainframe, supercomputer, bridge, hub, modem, plotter, scanner, copier, fax, mfp, projector, projection_screen, phone, mobile_phone, smartphone, video_phone, camera, video_camera, external_drive, user, legend
+quick: 6

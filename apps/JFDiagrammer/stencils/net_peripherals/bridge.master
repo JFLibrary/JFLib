@@ -1,0 +1,33 @@
+# Bridge (JD13, eigene Grafik im JFNetworker-Stil)
+master: Bridge
+name.de: Bridge
+name.en: Bridge
+name.es: Puente
+name.it: Bridge
+name.fr: Pont
+prompt.de: Bridge: verbindet zwei Netzsegmente.
+prompt.en: Bridge: joins two network segments.
+prompt.es: Puente: une dos segmentos de red.
+prompt.it: Bridge: unisce due segmenti di rete.
+prompt.fr: Pont : relie deux segments de réseau.
+keywords.de: Bridge, Netzwerk
+keywords.en: Bridge, network
+keywords.es: Puente, red
+keywords.it: Bridge, rete
+keywords.fr: Pont, réseau
+svg: ../../symbols/network/bridge.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Bridge
+    Value.en = Bridge
+    Value.es = Puente
+    Value.it = Bridge
+    Value.fr = Pont

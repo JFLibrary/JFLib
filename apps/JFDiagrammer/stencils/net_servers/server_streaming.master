@@ -1,0 +1,33 @@
+# Streaming-Server (JD13, eigene Grafik im JFNetworker-Stil)
+master: Streaming media server
+name.de: Streaming-Server
+name.en: Streaming media server
+name.es: Servidor de streaming
+name.it: Server di streaming
+name.fr: Serveur de streaming
+prompt.de: Streaming-Server: überträgt Audio und Video.
+prompt.en: Streaming media server: streams audio and video.
+prompt.es: Servidor de streaming: transmite audio y vídeo.
+prompt.it: Server di streaming: trasmette audio e video.
+prompt.fr: Serveur de streaming : diffuse l'audio et la vidéo.
+keywords.de: Streaming-Server, Server, Rolle
+keywords.en: Streaming media server, server, role
+keywords.es: Servidor de streaming, servidor, función
+keywords.it: Server di streaming, server, ruolo
+keywords.fr: Serveur de streaming, serveur, rôle
+svg: ../../symbols/network/server_streaming.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Streaming-Server
+    Value.en = Streaming media server
+    Value.es = Servidor de streaming
+    Value.it = Server di streaming
+    Value.fr = Serveur de streaming

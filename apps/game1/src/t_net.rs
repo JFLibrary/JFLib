@@ -6,7 +6,9 @@
 //             correction; typical weather (30 ms +- 5, 1 % loss) for 10 s, then clear: after 2 s every prediction exact
 //             again, the corrections in the bad weather bounded; a match with shooting (four bots on the server, four
 //             clients, one over WebSocket): everybody plays, every snapshot decodes against a base it has, none over
-//             1200 bytes, figures are ended and come back
+//             1200 bytes, figures are ended and come back; every kill reaches every client once and in order (the kill
+//             feed: game::net's events), every hit its shooter (the hit marker); a client that leaves is gone on the
+//             server in the tick after its LEAVE, and the others hear it; at a correction the drawn figure stays put
 //   lagcomp   a client shoots at another that strafes at full speed, aiming at where it sees it, at round trips of
 //             50 to 250 ms: with the lag compensation (300 ms) nearly every shot hits, without it most miss
 //   session_sum   the checksum of a recorded session for --sums
@@ -20,6 +22,7 @@ use game::net::input::NetInput;
 use game::net::quant::{angle_q, pitch_q, POS_STEPS};
 use game::net::server::ServerOptions;
 use game::net::sim::Weather;
+use game::net::NetEvent;
 use game1_core::bot::{Brain, Seen, Skill};
 use game1_core::map::{fnv, Map, FNV0};
 use game1_core::movement::{MoveState, Mover, F_CROUCH, F_DEAD};
@@ -115,6 +118,7 @@ fn ticks_now(l: &Local) -> BTreeMap<usize, u32> {
 fn session(map: &alloc::sync::Arc<Map>, seed: u64, players: usize, bots: usize, w: Weather) -> Local {
     let mut l = Local::new(seed, ServerOptions::default(), MatchConfig { bots, seed, ..MatchConfig::default() }, map.clone());
     l.tick_log = Some(BTreeMap::new());
+    l.got = Some(Vec::new());
     for k in 0..players {
         l.add_client(&format!("Test {}", k + 1), k % 4 == 3, w, k as u64 * 100);
     }
@@ -125,7 +129,20 @@ fn run_for(l: &mut Local, d: &mut Drivers, map: &Map, ms: u64, first: &mut BTree
     for _ in 0..ms {
         let st = l.step_ms(&mut |k, c| d.input(map, k, c));
         record_first(l, &st, first);
+        // (the room records its events from the moment it exists: before the first kill can happen)
+        if let Some(m) = l.room_match_mut() {
+            if !m.recording() {
+                m.set_record(true);
+            }
+        }
     }
+}
+
+/// a client's events of one kind as game events
+fn game_events(l: &Local, k: usize) -> Vec<(u32, GameEvent)> {
+    let none = Vec::new();
+    let got: &Vec<NetEvent> = l.got.as_ref().and_then(|g| g.get(k)).unwrap_or(&none);
+    got.iter().filter_map(|e| GameEvent::decode(e.channel, &e.data).map(|g| (e.tick, g))).collect()
 }
 
 pub fn netsim(c: &mut Ctx) {
@@ -171,6 +188,26 @@ pub fn netsim(c: &mut Ctx) {
     for k in 0..4 {
         c.check(l.clients[k].client.stats().no_base == 0 && l.clients[k].client.stats().bad == 0, || l.describe(k));
     }
+    // the corrections of the typical weather: the drawn figure did not move at any of them
+    let worst = l.at_correction.iter().fold(0.0f64, |a, b| a.max(*b));
+    c.check(!l.at_correction.is_empty() && worst < 1e-9, || format!("smoothing: {} corrections, the drawn figure moved up to {:.2e} m at one", l.at_correction.len(), worst));
+    c.note(&format!("smoothing: {} corrections smoothed (the drawn figure moved {:.1e} m at most at one), {} snapped", l.at_correction.len(), worst, l.snapped));
+    // client 3 leaves: gone on the server in the tick after its LEAVE, the others hear it once
+    let gone_id = l.clients[3].client.own_id();
+    l.leave(3);
+    let t0 = l.net.now_us;
+    let mut gone_ms = None;
+    for _ in 0..400 {
+        let st = l.step_ms(&mut |k, cl| d.input(&map, k, cl));
+        record_first(&l, &st, &mut first);
+        if gone_ms.is_none() && l.room_match().is_some_and(|m| !m.figures().contains_key(&gone_id)) {
+            gone_ms = Some((l.net.now_us - t0) / 1000);
+        }
+    }
+    let heard: Vec<usize> = (0..3).map(|k| game_events(&l, k).iter().filter(|e| matches!(&e.1, GameEvent::Left { id, .. } if *id == gone_id)).count()).collect();
+    c.check(gone_ms.is_some_and(|ms| ms <= 25) && heard == [1, 1, 1], || format!("leave: gone after {:?} ms, the others heard it {:?} times", gone_ms, heard));
+    c.check(l.clients[3].client.phase() == game::net::client::Phase::Left, || format!("leave: phase {:?}", l.clients[3].client.phase()));
+    c.note(&format!("leave: the figure gone on the server {} ms after the LEAVE was sent (20 ms each way)", gone_ms.unwrap_or(0)));
     // shooting: four bots on the server, four clients
     let mut l = session(&map, 33, 4, 4, Weather::TYPICAL);
     let mut d = Drivers::new(4, 33, true);
@@ -191,6 +228,29 @@ pub fn netsim(c: &mut Ctx) {
         "shooting {} s, typical: {} shots, {} hits, {} kills; snapshots up to {} bytes; {} corrections over 4 clients (deaths and returns count)",
         secs, st.shots, st.hits, st.kills, ss.max_snapshot, corr
     ));
+    // the events: let the weather clear so every acknowledgement comes back, then compare with the room's record
+    for k in 0..4 {
+        l.set_weather(k, Weather::CLEAR);
+    }
+    run_for(&mut l, &mut d, &map, 1500, &mut first);
+    let rec = l.room_match_mut().map(|m| m.take_events()).unwrap_or_default();
+    let (mut kills_seen, mut hits_seen) = (0, 0);
+    for k in 0..4 {
+        let since = l.clients[k].client.welcome().map_or(0, |w| w.tick);
+        let own = l.clients[k].client.own_id();
+        let after = |t: u32| (t.wrapping_sub(since) as i32) >= 0;
+        let want_kills: Vec<(u32, u16, u16, bool)> = rec.iter().filter_map(|e| if let Event::Kill { tick, killer, victim, head } = e { after(*tick).then_some((*tick, *killer, *victim, *head)) } else { None }).collect();
+        let want_hits: Vec<(u32, u16, bool)> = rec.iter().filter_map(|e| if let Event::Shot { tick, shooter, hit: Some((v, head)), .. } = e { (*shooter == own && after(*tick)).then_some((*tick, *v, *head)) } else { None }).collect();
+        let ev = game_events(&l, k);
+        let got_kills: Vec<(u32, u16, u16, bool)> = ev.iter().filter_map(|(t, g)| if let GameEvent::Kill { killer, victim, head } = g { Some((*t, *killer, *victim, *head)) } else { None }).collect();
+        let got_hits: Vec<(u32, u16, bool)> = ev.iter().filter_map(|(t, g)| if let GameEvent::Hit { victim, head, .. } = g { Some((*t, *victim, *head)) } else { None }).collect();
+        c.check(!want_kills.is_empty() && got_kills == want_kills, || format!("kill feed: client {} got {} kills, the room had {} since it joined", k, got_kills.len(), want_kills.len()));
+        c.check(got_hits == want_hits, || format!("hit marker: client {} got {} hits, it scored {}", k, got_hits.len(), want_hits.len()));
+        c.check(l.clients[k].client.events_in().gaps == 0, || format!("events: client {} {:?}", k, l.clients[k].client.events_in()));
+        kills_seen += got_kills.len();
+        hits_seen += got_hits.len();
+    }
+    c.note(&format!("events: {} kills and {} hits delivered over 4 clients, each once and in order", kills_seen, hits_seen));
 }
 
 /// one lag compensation run: a shooter and a target that strafes, `rtt_ms` round trip -> (shots, hits, the mean view
@@ -295,6 +355,7 @@ pub fn lagcomp(c: &mut Ctx) {
 pub fn session_sum(map: &alloc::sync::Arc<Map>, quick: bool) -> (u64, u64) {
     let mut l = Local::new(77, ServerOptions::default(), MatchConfig { bots: 4, seed: 77, ..MatchConfig::default() }, map.clone());
     l.tick_log = Some(BTreeMap::new());
+    l.got = Some(Vec::new());
     for k in 0..3 {
         l.add_client(&format!("Summe {}", k + 1), k == 2, Weather::ROUGH, k as u64 * 120);
     }
@@ -327,6 +388,18 @@ pub fn session_sum(map: &alloc::sync::Arc<Map>, quick: bool) -> (u64, u64) {
         for v in [st.snapshots, st.bytes_in, st.inputs_sent, st.bytes_out, c.client.predictor().stats().mismatches] {
             h = fnv(h, &v.to_le_bytes());
             n += 1;
+        }
+    }
+    // the events every client got (the kill feed, the hit marker)
+    if let Some(got) = &l.got {
+        for (k, evs) in got.iter().enumerate() {
+            for e in evs {
+                h = fnv(h, &(k as u32).to_le_bytes());
+                h = fnv(h, &e.tick.to_le_bytes());
+                h = fnv(h, &[e.channel]);
+                h = fnv(h, &e.data);
+                n += 1;
+            }
         }
     }
     (h, n)

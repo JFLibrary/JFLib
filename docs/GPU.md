@@ -1272,6 +1272,27 @@ Was das heißt:
 
 **Nicht getestet (G5e3):** ein Bildschirm, der wirklich nie antwortet (gespielt mit `Ui::gpu_test_hold`); ein verdecktes Fenster unter Wayland; der Browser mit der Bindung über die Messung hinaus (dort ändert sich nach dem Code nichts, ein Bild je Runde); auf dem Telefon nur der Selbsttest und die Messung (oben unter G5e2: unverändert, es hält bei 120 Hz mit), kein Telefon, das nicht mithält; die T500 unter Linux; MAILBOX gegen FIFO unter Windows (ob „angekommen“ dort besser die Bildwiederholung hieße: `VK_KHR_present_wait` fehlt in `lib/gpu`).
 
+**G7b: Schleier — etwas der Grundebene über einer Ansicht ohne Zurücklesen.** Gefunden beim Messen des Spielfensters
+([GAMECORE.md](GAMECORE.md#spielfenster-zwei-wege-gemessen)): Lag etwas der Grundebene über einer Ansicht, die die Ausgabe zeichnet
+(eine HUD, das Feld eines Menüs), zeichnete die CPU diese Zellen über dem Bild der Ansicht, und ihr `Draw` las dafür jedes neue
+Bild zurück (die ganze Textur, gewartet), dazu wurden die Zellen neu gezeichnet und hochgeladen, obwohl sich in ihnen nur die
+Ansicht geändert hatte (Spiel 1: jedes Bild mit HUD; GAME1.md, „Was nicht getestet ist“). Jetzt ist eine solche Zelle ein
+**Schleier**, wenn die Ansicht die einzige in ihr ist und keine höhere Ebene sie berührt: Die CPU zeichnet, was über der Ansicht
+liegt, einmal über einer schwarzen und einmal über einer weißen Ansicht (das `Draw` malt dafür die Farbe, `Cpu::veil`), die
+Grundtextur hält K (über Schwarz), eine Textur des Schleiers T = Weiß − Schwarz, je Kanal den Anteil der Ansicht, der
+durchscheint, und der Durchgang der Ausgabe zeichnet die Zelle als K + T · Ansicht (`fs_veil`, drei Bindungsgruppen derselben
+Belegung). Jede Mischung von gfx ist dst = src + dst · (255 − a) / 255; mit K = src und T = 255 − a ist das genau das „over“ der CPU,
+gerundet einmal wie dort (eine Stufe Abweichung, wo zwei durchscheinende Dinge übereinander liegen, die die CPU nacheinander rundet).
+Text in Schleiern ist grau geglättet (Subpixel-Text mischt in linearem Licht, das ist nicht von dieser Form; wie in Ebenen und
+Bildern). Ein neues Bild der Ansicht kostet einen Schleier nichts; nur wenn sich ändert, was darüber liegt, wird die Zelle zweimal
+gezeichnet und geht hoch. Dem Framebuffer fehlen die wahren Pixel eines Schleiers (wie `owed`): `gp_settle` zeichnet sie über dem
+zurückgelesenen Bild (in Ruhe einmal), legt sie in die Grundtextur und beendet den Schleier; das nächste Bild der Ansicht macht ihn
+neu. `jfgui_GPU_VERIFY` setzt vor jedem Darstellen fest, prüft also den alten Weg; `uigputest --test viewplain` prüft die Schleier:
+30 Durchgänge Drehung mit etwas darüber, 0 Rücklesungen (vorher eine je Bild), die 25 Zellen einmal zweifach gezeichnet, nicht je
+Bild; der Bildschirm gegen das Bild der CPU nach dem Festsetzen: 236 von 190 400 Pixeln eine Stufe anders, keins mehr; in Ruhe
+von selbst festgesetzt. `jfgui_GPU_VEIL=0` und `Ui::gpu_test_veil(false)` geben den Weg davor (für Messungen). Was die Schleier in
+Zahlen bringen, steht in [GAMECORE.md](GAMECORE.md#spielfenster-zwei-wege-gemessen).
+
 ### Was fehlt
 
 - Kacheln entstehen auf dem UI-Thread, in dem Bild, das sie braucht, ohne Vorrat um die Ansicht: das erste Bild einer Geste bleibt teuer. Ein Hilfsthread ginge nur für Inhalte, deren `draw_view` keine `Rc`-Welt braucht.
@@ -1321,6 +1342,7 @@ Was das heißt:
 | `jfgui_GPU_CANVAS_SETTLE_MS=n` | wann das Bild der CPU der letzten Bewegung folgt (Vorgabe 180) |
 | `jfgui_GPU_OUTPUT=0` (oder `off`) | (G5e1) die Fenster über den CPU-Pfad, die GPU bleibt für 3D-Ansichten: sie zeichnen auf einem eigenen Gerät und lesen jedes Bild zurück ([3D-Ansicht](#3d-ansicht-g5e1)) |
 | `jfgui_GPU_VIEWS=0` | (G5e1) kein Render-Durchgang der Ausgabe zeichnet eine 3D-Ansicht: jedes ihrer Bilder wird in den Framebuffer zurückgelesen |
+| `jfgui_GPU_VEIL=0` | (G7b) keine Schleier: Zellen der Grundebene mit etwas über einer Ansicht zeichnet die CPU über dem Bild, das jedes Mal zurückgelesen wird (der Weg davor; `Ui::gpu_test_veil`) |
 | `jfgui_GPU_RETRY_MS=n` | Wartezeit bis zum ersten neuen Gerät nach einem Fehler (Vorgabe 2000, dann doppelt so lang, bis 5 min) |
 | `jfgui_GPU_DLL=name` | anderer Loader statt `vulkan-1.dll` (Name: nur aus System32; Pfad: aus seinem Ordner) bzw. `libvulkan.so.1` (wie `ld.so` sucht) |
 | `jfgui_GPU_ADAPTER=n` / `=name` | Adapter n von `adapters()` oder der erste, dessen Name das Wort enthält |

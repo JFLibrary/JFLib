@@ -1,0 +1,33 @@
+# Chipkartenleser (JD13, eigene Grafik im JFNetworker-Stil)
+master: Smart card reader
+name.de: Chipkartenleser
+name.en: Smart card reader
+name.es: Lector de tarjetas inteligentes
+name.it: Lettore di smart card
+name.fr: Lecteur de carte à puce
+prompt.de: Chipkartenleser: liest Chipkarten zur Anmeldung.
+prompt.en: Smart card reader: reads smart cards for sign-in.
+prompt.es: Lector de tarjetas inteligentes: lee tarjetas inteligentes para iniciar sesión.
+prompt.it: Lettore di smart card: legge smart card per l'accesso.
+prompt.fr: Lecteur de carte à puce : lit des cartes à puce pour la connexion.
+keywords.de: Chipkartenleser, Sicherheit
+keywords.en: Smart card reader, security
+keywords.es: Lector de tarjetas inteligentes, seguridad
+keywords.it: Lettore di smart card, sicurezza
+keywords.fr: Lecteur de carte à puce, sécurité
+svg: ../../symbols/network/smartcard_reader.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Sicherheit
+    Value.en = Security
+    Value.es = Seguridad
+    Value.it = Sicurezza
+    Value.fr = Sécurité
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Chipkartenleser
+    Value.en = Smart card reader
+    Value.es = Lector de tarjetas inteligentes
+    Value.it = Lettore di smart card
+    Value.fr = Lecteur de carte à puce

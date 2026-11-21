@@ -32,7 +32,8 @@ macro_rules! files {
 
 const CONTAINERS: &[(&str, &str)] = files!("containers": "stencil.txt", "container.master", "list.master", "list_item.master");
 const CFF: &[(&str, &str)] = files!("cff": "stencil.txt", "swimlane.master", "separator.master", "swimlane_vertical.master", "separator_vertical.master", "cff_container.master", "swimlane_list.master", "phase_list.master");
-const CALLOUTS: &[(&str, &str)] = files!("callouts": "stencil.txt", "callout_box.master", "callout_rounded.master", "callout_bubble.master", "callout_line.master", "callout_bracket.master", "callout_circle.master");
+// (JD13) the whole stencil, as stencil_structs.rs lists it
+const CALLOUTS: &[(&str, &str)] = crate::stencil_structs::CALLOUTS;
 
 fn build_stencil(table: &[(&str, &str)]) -> Result<Document, String> {
     let f = |name: &str| table.iter().find(|(n, _)| *n == name).map(|(_, t)| String::from(*t));

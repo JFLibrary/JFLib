@@ -42,6 +42,8 @@ pub(crate) struct Entry {
     pub value: String,
     /// the line (from 1)
     pub line: u32,
+    /// the file it comes from when that is not the master's own (`include:`)
+    pub file: Option<String>,
 }
 
 /// how a section's rows are headed
@@ -86,6 +88,8 @@ pub(crate) struct SrcRow {
     pub head: String,
     pub line: u32,
     pub cells: Vec<Entry>,
+    /// the file it comes from when that is not the master's own (`include:`)
+    pub file: Option<String>,
 }
 
 /// a section as written
@@ -124,7 +128,7 @@ fn split_ident(s: &str) -> (&str, &str) {
 }
 
 /// a name with its suffixes -> (name, language, variant)
-fn suffixes(file: &str, line: u32, full: &str) -> Result<(String, Option<usize>, Option<Measure>), SourceError> {
+pub(crate) fn suffixes(file: &str, line: u32, full: &str) -> Result<(String, Option<usize>, Option<Measure>), SourceError> {
     let mut parts = full.split('.');
     let base = parts.next().unwrap_or("");
     if base.is_empty() || !base.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') {
@@ -149,7 +153,7 @@ fn suffixes(file: &str, line: u32, full: &str) -> Result<(String, Option<usize>,
 }
 
 // split at ';' outside double quotes (a doubled "" stays inside the string)
-fn split_cells(s: &str) -> Option<Vec<&str>> {
+pub(crate) fn split_cells(s: &str) -> Option<Vec<&str>> {
     let mut out = Vec::new();
     let mut quoted = false;
     let mut start = 0;
@@ -193,7 +197,7 @@ fn parse_cells(file: &str, line: u32, s: &str, out: &mut Vec<Entry>) -> Result<(
         if out.len() >= MAX_ITEMS {
             return Err(err(file, line, "zu viele Zellen"));
         }
-        out.push(Entry { name: n, lang, variant, value: String::from(value), line });
+        out.push(Entry { name: n, lang, variant, value: String::from(value), line, file: None });
     }
     Ok(())
 }
@@ -250,7 +254,7 @@ pub(crate) fn parse(file: &str, text: &str, sections: bool) -> Result<Source, So
             if src.header.len() >= MAX_ITEMS {
                 return Err(err(file, line_no, "zu viele Kopfzeilen"));
             }
-            src.header.push(Entry { name, lang, variant, value: String::from(value.trim()), line: line_no });
+            src.header.push(Entry { name, lang, variant, value: String::from(value.trim()), line: line_no, file: None });
             continue;
         };
         if sec.kind == SecKind::Shape {
@@ -300,11 +304,63 @@ pub(crate) fn parse(file: &str, text: &str, sections: bool) -> Result<Source, So
         if sec.rows.len() >= MAX_ITEMS {
             return Err(err(file, line_no, "zu viele Zeilen im Abschnitt"));
         }
-        let mut row = SrcRow { head: String::from(head), line: line_no, cells: Vec::new() };
+        let mut row = SrcRow { head: String::from(head), line: line_no, cells: Vec::new(), file: None };
         parse_cells(file, line_no, cells, &mut row.cells)?;
         sec.rows.push(row);
     }
     Ok(src)
+}
+
+/// (JD13) merge the sections of a file a master names with `include:` into the master's: a
+/// section the master lacks is added (Geometry sections always, after the master's own); in a
+/// section the master has, the included cells and rows come first and the master's own win (a
+/// cell of the same name, language and variant is left out; a named row the master has too
+/// gets the included cells it does not set itself).  Every included entry and row remembers its
+/// file for the error messages.
+pub(crate) fn merge_include(src: &mut Source, name: &str, inc: Source) -> Result<(), SourceError> {
+    if let Some(e) = inc.header.first() {
+        return Err(err(name, e.line, format!("eine eingebundene Datei hat nur Abschnitte, keine Kopfzeilen ({}: …)", e.name)));
+    }
+    let mark = |es: &mut Vec<Entry>| es.iter_mut().for_each(|e| e.file = Some(String::from(name)));
+    for mut s in inc.sections {
+        mark(&mut s.cells);
+        for r in &mut s.rows {
+            r.file = Some(String::from(name));
+            mark(&mut r.cells);
+        }
+        let kind = s.kind;
+        let own = if kind == SecKind::Geometry { None } else { src.sections.iter_mut().find(|o| o.kind == kind && o.model == s.model) };
+        let Some(o) = own else {
+            if src.sections.len() >= MAX_SECTIONS {
+                return Err(err(name, s.line, "zu viele Abschnitte"));
+            }
+            src.sections.push(s);
+            continue;
+        };
+        let same = |a: &Entry, b: &Entry| a.name == b.name && a.lang == b.lang && a.variant == b.variant;
+        let mut cells: Vec<Entry> = s.cells.into_iter().filter(|c| !o.cells.iter().any(|m| same(m, c))).collect();
+        cells.append(&mut o.cells);
+        o.cells = cells;
+        // a named row the master has too: its included cells join the master's row (the master's
+        // own cells win)
+        let mut rows: Vec<SrcRow> = Vec::new();
+        for r in s.rows {
+            match o.rows.iter_mut().find(|m| kind == SecKind::Named && m.head == r.head) {
+                Some(m) => {
+                    let mut cells: Vec<Entry> = r.cells.into_iter().filter(|c| !m.cells.iter().any(|x| same(x, c))).collect();
+                    cells.append(&mut m.cells);
+                    m.cells = cells;
+                }
+                None => rows.push(r),
+            }
+        }
+        rows.append(&mut o.rows);
+        if rows.len() > MAX_ITEMS {
+            return Err(err(name, s.line, "zu viele Zeilen im Abschnitt"));
+        }
+        o.rows = rows;
+    }
+    Ok(())
 }
 
 /// the entries that hold for variant `m`: per name and language the entry with m's suffix,

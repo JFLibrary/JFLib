@@ -169,6 +169,10 @@ pub(crate) struct Cpu {
     pub(crate) error: Option<String>,
     #[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple", target_arch = "wasm32")), allow(dead_code))]
     raw: Vec<u8>,
+    /// (G7b) while gpu_out.rs draws a veil (what lies over the view, gpu_out.rs "Veils"): the Draw paints this colour
+    /// instead of the frame (opaque black, then white), and reads nothing back
+    #[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple", target_arch = "wasm32")), allow(dead_code))]
+    pub(crate) veil: Option<u32>,
 }
 
 impl Cpu {
@@ -184,6 +188,7 @@ impl Cpu {
             read_us: 0,
             error: None,
             raw: Vec::new(),
+            veil: None,
         }
     }
 
@@ -278,6 +283,12 @@ impl Draw for ViewDraw {
     fn draw(&self, g: &mut Gfx, r: [i32; 4]) {
         #[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple", target_arch = "wasm32")), allow(unused_mut))]
         let mut c = self.0.c.borrow_mut();
+        // (a veil's pass: the view as one colour, nothing read back)
+        if let Some(colour) = c.veil {
+            g.dc.set_color(colour);
+            g.dc.fill(g.sf, r[0], r[1], r[2], r[3]);
+            return;
+        }
         #[cfg(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple", target_arch = "wasm32"))]
         c.read();
         let content = c.content.upgrade();

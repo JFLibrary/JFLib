@@ -1,0 +1,33 @@
+# Router (JD13, eigene Grafik im JFNetworker-Stil)
+master: Router
+name.de: Router
+name.en: Router
+name.es: Enrutador
+name.it: Router
+name.fr: Routeur
+prompt.de: Router: verbindet Netze und leitet Pakete zwischen ihnen weiter.
+prompt.en: Router: connects networks and forwards packets between them.
+prompt.es: Enrutador: conecta redes y reenvía paquetes entre ellas.
+prompt.it: Router: collega reti e inoltra i pacchetti tra di esse.
+prompt.fr: Routeur : relie des réseaux et achemine les paquets entre eux.
+keywords.de: Router, Netzwerk
+keywords.en: Router, network
+keywords.es: Enrutador, red
+keywords.it: Router, rete
+keywords.fr: Routeur, réseau
+svg: ../../symbols/network/router.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Router
+    Value.en = Router
+    Value.es = Enrutador
+    Value.it = Router
+    Value.fr = Routeur

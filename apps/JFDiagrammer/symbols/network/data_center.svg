@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Data centre: a low wide hall with server rows and cooling units on the roof</title>
+  <rect class="shade" x="11" y="14" width="15" height="7" rx="0.75" fill="#DCDFE3" stroke-width="1"/>
+  <rect class="shade" x="38" y="14" width="15" height="7" rx="0.75" fill="#DCDFE3" stroke-width="1"/>
+  <g class="body" fill="#F7F8FA" stroke-width="0.75"><circle cx="15" cy="17.25" r="2.25"/><circle cx="22" cy="17.25" r="2.25"/><circle cx="42" cy="17.25" r="2.25"/><circle cx="49" cy="17.25" r="2.25"/></g>
+  <g class="port" fill="#4F555D" stroke="none"><circle cx="15" cy="17.25" r="0.7"/><circle cx="22" cy="17.25" r="0.7"/><circle cx="42" cy="17.25" r="0.7"/><circle cx="49" cy="17.25" r="0.7"/></g>
+  <rect class="body" x="5" y="20" width="54" height="23" rx="1.5" fill="#F7F8FA"/>
+  <path class="tint" d="M6.5 20.75H57.5A0.75 0.75 0 0 1 58.25 21.5V24.5H5.75V21.5A0.75 0.75 0 0 1 6.5 20.75Z" fill="#3E8A86" stroke="none"/>
+  <path class="ink" d="M5 24.5H59" stroke-width="1"/>
+  <g class="screen" fill="#CAD4DF" stroke-width="0.75">
+    <rect class="screen" x="9" y="28" width="3.5" height="11.5" rx="0.4"/><rect class="screen" x="13.75" y="28" width="3.5" height="11.5" rx="0.4"/><rect class="screen" x="18.5" y="28" width="3.5" height="11.5" rx="0.4"/><rect class="screen" x="23.25" y="28" width="3.5" height="11.5" rx="0.4"/>
+    <rect class="screen" x="28" y="28" width="3.5" height="11.5" rx="0.4"/><rect class="screen" x="32.75" y="28" width="3.5" height="11.5" rx="0.4"/><rect class="screen" x="37.5" y="28" width="3.5" height="11.5" rx="0.4"/>
+  </g>
+  <path class="port" d="M9.9 30.75H11.6M9.9 33.25H11.6M9.9 35.75H11.6M14.65 30.75H16.35M14.65 33.25H16.35M14.65 35.75H16.35M19.4 30.75H21.1M19.4 33.25H21.1M19.4 35.75H21.1M24.15 30.75H25.85M24.15 33.25H25.85M24.15 35.75H25.85M28.9 30.75H30.6M28.9 33.25H30.6M28.9 35.75H30.6M33.65 30.75H35.35M33.65 33.25H35.35M33.65 35.75H35.35M38.4 30.75H40.1M38.4 33.25H40.1M38.4 35.75H40.1" stroke="#4F555D" stroke-width="0.75"/>
+  <rect class="shade" x="46" y="31" width="9" height="12" fill="#DCDFE3" stroke-width="0.75"/>
+  <path class="ink" d="M50.5 31V43" stroke-width="0.75"/>
+  <path class="ink" d="M3 43H61"/>
+</svg>

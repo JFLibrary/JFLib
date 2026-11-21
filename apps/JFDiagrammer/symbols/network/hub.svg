@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Hub: small desktop box, 5 RJ45 in a row, star pictogram</title>
+  <rect class="body" x="12" y="16" width="40" height="16" rx="3" fill="#F7F8FA" stroke="none"/>
+  <rect class="tint" x="15" y="19" width="10.5" height="10" rx="1" fill="#4F7396" stroke="none"/>
+  <path class="body" d="M20.25 24H23.55M20.25 24L21.9 26.86M20.25 24L18.6 26.86M20.25 24H16.95M20.25 24L18.6 21.14M20.25 24L21.9 21.14" stroke="#F7F8FA" stroke-width="1.1"/>
+  <g class="body body" fill="#F7F8FA" stroke="#F7F8FA" stroke-width="0.5">
+    <circle cx="20.25" cy="24" r="1.25"/>
+    <circle cx="23.55" cy="24" r="0.6"/><circle cx="21.9" cy="26.86" r="0.6"/><circle cx="18.6" cy="26.86" r="0.6"/><circle cx="16.95" cy="24" r="0.6"/><circle cx="18.6" cy="21.14" r="0.6"/><circle cx="21.9" cy="21.14" r="0.6"/>
+  </g>
+  <rect class="ink" x="12" y="16" width="40" height="16" rx="3"/>
+  <rect class="port" x="16" y="32.75" width="5" height="1.25" rx="0.6" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="43" y="32.75" width="5" height="1.25" rx="0.6" fill="#4F555D" stroke="none"/>
+  <g class="port" fill="#4F555D" stroke="none">
+    <rect x="29.25" y="19.5" width="2.6" height="3.5" rx="0.3"/><rect x="32.85" y="19.5" width="2.6" height="3.5" rx="0.3"/><rect x="36.45" y="19.5" width="2.6" height="3.5" rx="0.3"/><rect x="40.05" y="19.5" width="2.6" height="3.5" rx="0.3"/><rect x="43.65" y="19.5" width="2.6" height="3.5" rx="0.3"/>
+  </g>
+  <circle class="ok" cx="30.55" cy="27" r="0.8" fill="#3C9A5F" stroke="none"/>
+  <circle class="ok" cx="34.15" cy="27" r="0.8" fill="#3C9A5F" stroke="none"/>
+  <circle class="ok" cx="37.75" cy="27" r="0.8" fill="#3C9A5F" stroke="none"/>
+</svg>

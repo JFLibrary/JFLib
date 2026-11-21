@@ -1,0 +1,50 @@
+# DFÜ-Verbinder 2: ein flächiger Blitz als 1D-Shape -- Schwanz am Anfang, Spitze am Ende, in der
+# Mitte zweimal versetzt; er streckt sich mit der Länge, seine Breite ist die Dicke (Height).
+# Liegt auf der Linie vom Anfang zum Ende und dreht sich mit ihr (PinX, Width, Angle aus den
+# Enden); die Enden kleben an Shapes, mit GlueType 2 auch an das ganze Shape.  Formatvorlage
+# "Normal" wie die gefüllten flächigen Pfeile.
+master: Comm-link 2
+name.de: DFÜ-Verbinder 2
+name.en: Comm-link 2
+name.es: Enlace de comunicación 2
+name.it: Collegamento di comunicazione 2
+name.fr: Liaison de communication 2
+prompt.de: Flächiger Blitz vom Anfang zum Ende für eine Datenfernübertragung. Ziehen Sie die Enden auf Shapes.
+prompt.en: Filled lightning bolt from the beginning to the end for a communication link. Drag the ends onto shapes.
+prompt.es: Rayo relleno del principio al final para un enlace de comunicación. Arrastre los extremos sobre las formas.
+prompt.it: Fulmine pieno dall'inizio alla fine per un collegamento di comunicazione. Trascina le estremità sulle forme.
+prompt.fr: Éclair plein du début à la fin pour une liaison de communication. Faites glisser les extrémités sur les formes.
+keywords.de: DFÜ, Blitz, Funk, Kommunikation, flächig, Linie, Verbinder
+keywords.en: comm link, lightning bolt, radio, communication, filled, line, connector
+keywords.es: comunicación, rayo, radio, enlace, relleno, línea, conector
+keywords.it: comunicazione, fulmine, radio, collegamento, pieno, linea, connettore
+keywords.fr: communication, éclair, radio, liaison, plein, ligne, connecteur
+
+[Shape]
+BeginX = 0 mm
+BeginY = 4 mm
+BeginY.us = 0.15 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 4 mm
+EndY.us = 0.15 in
+Height = 8 mm
+Height.us = 0.3 in
+GlueType = 2
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width*0.58; Y = Height
+LineTo  X = Width*0.52; Y = Height*0.6
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width*0.42; Y = 0
+LineTo  X = Width*0.48; Y = Height*0.4
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1

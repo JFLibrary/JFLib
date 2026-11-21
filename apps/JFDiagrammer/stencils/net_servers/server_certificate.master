@@ -1,0 +1,33 @@
+# Zertifikatsserver (JD13, eigene Grafik im JFNetworker-Stil)
+master: Certificate server
+name.de: Zertifikatsserver
+name.en: Certificate server
+name.es: Servidor de certificados
+name.it: Server di certificati
+name.fr: Serveur de certificats
+prompt.de: Zertifikatsserver: stellt Zertifikate aus.
+prompt.en: Certificate server: issues certificates.
+prompt.es: Servidor de certificados: emite certificados.
+prompt.it: Server di certificati: rilascia certificati.
+prompt.fr: Serveur de certificats : délivre des certificats.
+keywords.de: Zertifikatsserver, Server, Rolle
+keywords.en: Certificate server, server, role
+keywords.es: Servidor de certificados, servidor, función
+keywords.it: Server di certificati, server, ruolo
+keywords.fr: Serveur de certificats, serveur, rôle
+svg: ../../symbols/network/server_certificate.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Zertifikatsserver
+    Value.en = Certificate server
+    Value.es = Servidor de certificados
+    Value.it = Server di certificati
+    Value.fr = Serveur de certificats

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="96" height="96"
+     fill="none" stroke="#F7F8FA" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round">
+  <title>Role pictogram proxy: two arrows around a point (white, for the role badge; make_roles.py)</title>
+  <path class="body" d="M1.92 4.1A4.5 4.5 0 0 1 10.08 4.1M8.45 3.34L10.08 4.1L10.54 2.36M10.08 7.9A4.5 4.5 0 0 1 1.92 7.9M3.55 8.66L1.92 7.9L1.46 9.64"/>
+  <circle class="body" cx="6" cy="6" r="1" fill="#F7F8FA" stroke-width="0.5"/>
+</svg>

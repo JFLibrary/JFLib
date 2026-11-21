@@ -1,0 +1,43 @@
+# JFDiagrammer, JD8 rest: the quick access toolbar (UI-30) and its customization -- the ▾ menu ticks
+# common commands on and off, Weitere Befehle adds any command with an icon and orders them,
+# Zurücksetzen brings back Speichern, Rückgängig, Wiederholen; Rückgängig names its step
+expect button:"Neu" missing
+click button:"Symbolleiste für den Schnellzugriff anpassen"
+expect "Neu" unchecked
+expect "Speichern" checked
+click "Neu"
+expect button:"Neu" exists
+# the command opens the same menu
+cmd 4114
+expect "Neu" checked
+click "Neu"
+expect button:"Neu" missing
+# Weitere Befehle: Alles markieren added and moved to the front
+click button:"Symbolleiste für den Schnellzugriff anpassen"
+click "Weitere Befehle…"
+expect dialog:"Symbolleiste für den Schnellzugriff anpassen" exists
+click listitem:"Alles markieren"
+click "Hinzufügen"
+click "Nach oben"
+click "Nach oben"
+click "Nach oben"
+expect "Nach oben" disabled
+click "OK"
+expect button:"Alles markieren" exists
+cmd 4404
+drag 500,430 640,520
+cmd 4400
+click 900,650
+expect listitem:"Sheet.4" unselected
+click button:"Alles markieren"
+expect listitem:"Sheet.4" selected
+# Zurücksetzen
+click button:"Symbolleiste für den Schnellzugriff anpassen"
+click "Weitere Befehle…"
+click "Zurücksetzen"
+click "OK"
+expect button:"Alles markieren" missing
+expect button:"Speichern" exists
+# Rückgängig names its step
+key ctrl+z
+expect button:"Wiederholen" enabled

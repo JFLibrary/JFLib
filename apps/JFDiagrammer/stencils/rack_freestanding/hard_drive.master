@@ -1,0 +1,45 @@
+# Festplatte (JD13, eigene Grafik im JFNetworker-Stil)
+master: Hard drive
+name.de: Festplatte
+name.en: Hard drive
+name.es: Disco duro
+name.it: Disco rigido
+name.fr: Disque dur
+prompt.de: Festplatte: externe Festplatte in Frontansicht.
+prompt.en: Hard drive: external hard drive in front view.
+prompt.es: Disco duro: disco duro externo en vista frontal.
+prompt.it: Disco rigido: disco rigido esterno in vista frontale.
+prompt.fr: Disque dur : disque dur externe en vue de face.
+keywords.de: Festplatte, Frontansicht, Regal
+keywords.en: Hard drive, front view, shelf
+keywords.es: Disco duro, vista frontal, estante
+keywords.it: Disco rigido, vista frontale, ripiano
+keywords.fr: Disque dur, vue de face, étagère
+svg: ../../symbols/rack/front_hdd.svg
+scale: 1:20
+include: ../net_common/asset.inc
+
+[Shape]
+Width = 100 mm
+Width.us = 3.9370 in
+Height = 50 mm
+Height.us = 1.9685 in
+TxtPinY = 0 mm
+TxtLocPinY = TxtHeight
+TxtHeight = 160 mm
+TxtWidth = Width*2
+VerticalAlign = 0
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Freistehend
+    Value.en = Freestanding
+    Value.es = Independiente
+    Value.it = Autoportante
+    Value.fr = Autonome
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Festplatte
+    Value.en = Hard drive
+    Value.es = Disco duro
+    Value.it = Disco rigido
+    Value.fr = Disque dur

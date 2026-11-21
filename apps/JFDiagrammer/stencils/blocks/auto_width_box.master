@@ -1,0 +1,40 @@
+# Feld mit Auto-Breite: ein Feld, dessen Breite dem Text folgt.  Width ist eine Formel aus der
+# Breite des Texts ohne Umbruch (TEXTWIDTH samt Textrand), mindestens 20 mm; GUARD und LockWidth
+# halten sie fest, die Höhe ändert der Nutzer.  Keine Steuerpunkte; die Verbindungspunkte liegen
+# in der Mitte jeder Seite.
+master: Auto-width box
+name.de: Feld mit Auto-Breite
+name.en: Auto-width box
+name.es: Cuadro con ancho automático
+name.it: Riquadro a larghezza automatica
+name.fr: Bloc à largeur automatique
+prompt.de: Block, dessen Breite sich dem Text anpasst.
+prompt.en: Block whose width adjusts to its text.
+prompt.es: Bloque cuyo ancho se ajusta al texto.
+prompt.it: Blocco la cui larghezza si adatta al testo.
+prompt.fr: Bloc dont la largeur s'adapte au texte.
+keywords.de: Feld, Block, Auto-Breite, automatische Breite, Text, anpassen, Beschriftung
+keywords.en: box, block, auto width, automatic width, text, fit, label
+keywords.es: cuadro, bloque, ancho automático, texto, ajustar, etiqueta
+keywords.it: riquadro, blocco, larghezza automatica, testo, adattare, etichetta
+keywords.fr: bloc, boîte, largeur automatique, texte, ajuster, étiquette
+
+[Shape]
+Width = GUARD(MAX(20 mm, TEXTWIDTH(TheText)))
+Width.us = GUARD(MAX(0.75 in, TEXTWIDTH(TheText)))
+Height = 10 mm
+Height.us = 0.375 in
+LockWidth = TRUE
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

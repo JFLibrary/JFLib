@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Telephone: classic desk phone with the handset in its cradle and a keypad</title>
+  <path class="body" d="M12.5 42Q9.6 42 10.2 39.2L15.2 18.6Q15.8 16 18.5 16H45.5Q48.2 16 48.8 18.6L53.8 39.2Q54.4 42 51.5 42Z" fill="#F7F8FA"/>
+  <path class="tint" d="M11.5 19Q8 19 8 15.5V11Q8 7 12.5 7H51.5Q56 7 56 11V15.5Q56 19 52.5 19H50Q47.5 19 47 16.5L46.5 13H17.5L17 16.5Q16.5 19 14 19Z" fill="#7A828C"/>
+  <g class="shade" fill="#DCDFE3" stroke-width="0.75">
+    <circle cx="26.5" cy="23" r="1.4"/><circle cx="32" cy="23" r="1.4"/><circle cx="37.5" cy="23" r="1.4"/>
+    <circle cx="26.5" cy="27.5" r="1.4"/><circle cx="32" cy="27.5" r="1.4"/><circle cx="37.5" cy="27.5" r="1.4"/>
+    <circle cx="26.5" cy="32" r="1.4"/><circle cx="32" cy="32" r="1.4"/><circle cx="37.5" cy="32" r="1.4"/>
+    <circle cx="26.5" cy="36.5" r="1.4"/><circle cx="32" cy="36.5" r="1.4"/><circle cx="37.5" cy="36.5" r="1.4"/>
+  </g>
+</svg>

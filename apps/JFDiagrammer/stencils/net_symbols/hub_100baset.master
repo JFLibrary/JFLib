@@ -1,0 +1,33 @@
+# 100BaseT-Hub (JD13, eigene Grafik im JFNetworker-Stil)
+master: 100BaseT hub
+name.de: 100BaseT-Hub
+name.en: 100BaseT hub
+name.es: Concentrador 100BaseT
+name.it: Hub 100BaseT
+name.fr: Concentrateur 100BaseT
+prompt.de: 100BaseT-Hub: Hub für Fast Ethernet.
+prompt.en: 100BaseT hub: hub for Fast Ethernet.
+prompt.es: Concentrador 100BaseT: concentrador para Fast Ethernet.
+prompt.it: Hub 100BaseT: hub per Fast Ethernet.
+prompt.fr: Concentrateur 100BaseT : concentrateur pour Fast Ethernet.
+keywords.de: 100BaseT-Hub, Netzwerk
+keywords.en: 100BaseT hub, network
+keywords.es: Concentrador 100BaseT, red
+keywords.it: Hub 100BaseT, rete
+keywords.fr: Concentrateur 100BaseT, réseau
+svg: ../../symbols/network/hub_100base.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = 100BaseT-Hub
+    Value.en = 100BaseT hub
+    Value.es = Concentrador 100BaseT
+    Value.it = Hub 100BaseT
+    Value.fr = Concentrateur 100BaseT

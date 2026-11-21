@@ -1,0 +1,54 @@
+# 4 Linien: 4 parallele Linien über die ganze Dicke (Height 6 mm), gleich weit voneinander.  Liegt
+# auf der Linie vom Anfang zum Ende und dreht sich mit ihr (PinX, Width, Angle aus den Enden); die
+# Enden kleben an Shapes, mit GlueType 2 auch an das ganze Shape.  Ohne Pfeilspitzen
+# (BeginArrow/EndArrow 0: sonst säße je eine an der ersten und der letzten Linie).
+master: 4 lines
+name.de: 4 Linien
+name.en: 4 lines
+name.es: 4 líneas
+name.it: 4 linee
+name.fr: 4 lignes
+prompt.de: 4 parallele Linien, etwa für Leitungen nebeneinander. Ziehen Sie die Enden auf Shapes.
+prompt.en: 4 parallel lines, for example for lines side by side. Drag the ends onto shapes.
+prompt.es: 4 líneas paralelas, por ejemplo para conducciones una junto a otra. Arrastre los extremos sobre las formas.
+prompt.it: 4 linee parallele, ad esempio per condutture affiancate. Trascina le estremità sulle forme.
+prompt.fr: 4 lignes parallèles, par exemple pour des conduites côte à côte. Faites glisser les extrémités sur les formes.
+keywords.de: parallel, Leitungen, Kabel, Bündel, Linie, Verbinder
+keywords.en: parallel, lines, cables, bundle, line, connector
+keywords.es: paralelas, líneas, cables, haz, línea, conector
+keywords.it: parallele, linee, cavi, fascio, linea, connettore
+keywords.fr: parallèles, lignes, câbles, faisceau, ligne, connecteur
+style: Connector
+
+[Shape]
+BeginX = 0 mm
+BeginY = 3 mm
+BeginY.us = 0.125 in
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 3 mm
+EndY.us = 0.125 in
+Height = 6 mm
+Height.us = 0.25 in
+GlueType = 2
+BeginArrow = 0
+EndArrow = 0
+TxtWidth = 30 mm
+TxtWidth.us = 1.25 in
+TxtHeight = 8 mm
+TxtHeight.us = 0.3 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+MoveTo  X = 0; Y = Height*0.3333
+LineTo  X = Width; Y = Height*0.3333
+MoveTo  X = 0; Y = Height*0.6667
+LineTo  X = Width; Y = Height*0.6667
+MoveTo  X = 0; Y = Height
+LineTo  X = Width; Y = Height

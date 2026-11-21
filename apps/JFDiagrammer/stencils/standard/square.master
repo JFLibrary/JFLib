@@ -1,0 +1,38 @@
+# Quadrat: ein Rechteck mit festem Seitenverhältnis (LockAspect), Verbindungspunkte in der Mitte
+# jeder Seite
+master: Square
+name.de: Quadrat
+name.en: Square
+name.es: Cuadrado
+name.it: Quadrato
+name.fr: Carré
+prompt.de: Quadrat: ein Rechteck, das beim Vergrößern seine Seitenverhältnisse behält.
+prompt.en: Square: a rectangle that keeps its proportions when you resize it.
+prompt.es: Cuadrado: un rectángulo que conserva sus proporciones al cambiar su tamaño.
+prompt.it: Quadrato: un rettangolo che mantiene le proporzioni quando lo ridimensioni.
+prompt.fr: Carré : un rectangle qui garde ses proportions quand vous le redimensionnez.
+keywords.de: Quadrat, Viereck, Kasten, Block, gleichseitig, Seitenverhältnis
+keywords.en: square, box, block, quadrilateral, equal sides, aspect ratio
+keywords.es: cuadrado, caja, bloque, cuadrilátero, lados iguales, proporción
+keywords.it: quadrato, riquadro, blocco, quadrilatero, lati uguali, proporzioni
+keywords.fr: carré, boîte, bloc, quadrilatère, côtés égaux, proportions
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+LockAspect = TRUE
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

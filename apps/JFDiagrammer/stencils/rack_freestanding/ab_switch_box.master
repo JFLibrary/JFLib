@@ -1,0 +1,45 @@
+# A-B-Umschaltkasten (JD13, eigene Grafik im JFNetworker-Stil)
+master: A-B switch box
+name.de: A-B-Umschaltkasten
+name.en: A-B switch box
+name.es: Caja de conmutación A-B
+name.it: Box commutatore A-B
+name.fr: Boîtier de commutation A-B
+prompt.de: A-B-Umschaltkasten: Umschaltkasten in Frontansicht.
+prompt.en: A-B switch box: switch box in front view.
+prompt.es: Caja de conmutación A-B: caja de conmutación en vista frontal.
+prompt.it: Box commutatore A-B: box commutatore in vista frontale.
+prompt.fr: Boîtier de commutation A-B : boîtier de commutation en vue de face.
+keywords.de: A-B-Umschaltkasten, Frontansicht, Regal
+keywords.en: A-B switch box, front view, shelf
+keywords.es: Caja de conmutación A-B, vista frontal, estante
+keywords.it: Box commutatore A-B, vista frontale, ripiano
+keywords.fr: Boîtier de commutation A-B, vue de face, étagère
+svg: ../../symbols/rack/front_ab_switch.svg
+scale: 1:20
+include: ../net_common/asset.inc
+
+[Shape]
+Width = 100 mm
+Width.us = 3.9370 in
+Height = 50 mm
+Height.us = 1.9685 in
+TxtPinY = 0 mm
+TxtLocPinY = TxtHeight
+TxtHeight = 160 mm
+TxtWidth = Width*2
+VerticalAlign = 0
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Freistehend
+    Value.en = Freestanding
+    Value.es = Independiente
+    Value.it = Autoportante
+    Value.fr = Autonome
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = A-B-Umschaltkasten
+    Value.en = A-B switch box
+    Value.es = Caja de conmutación A-B
+    Value.it = Box commutatore A-B
+    Value.fr = Boîtier de commutation A-B

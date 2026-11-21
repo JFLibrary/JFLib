@@ -1,0 +1,33 @@
+# Server für mobile Geräte (JD13, eigene Grafik im JFNetworker-Stil)
+master: Mobile information server
+name.de: Server für mobile Geräte
+name.en: Mobile information server
+name.es: Servidor de información móvil
+name.it: Server informazioni mobili
+name.fr: Serveur d'informations mobiles
+prompt.de: Server für mobile Geräte: versorgt mobile Geräte mit Daten.
+prompt.en: Mobile information server: serves data to mobile devices.
+prompt.es: Servidor de información móvil: sirve datos a dispositivos móviles.
+prompt.it: Server informazioni mobili: fornisce dati ai dispositivi mobili.
+prompt.fr: Serveur d'informations mobiles : fournit des données aux appareils mobiles.
+keywords.de: Server für mobile Geräte, Server, Rolle
+keywords.en: Mobile information server, server, role
+keywords.es: Servidor de información móvil, servidor, función
+keywords.it: Server informazioni mobili, server, ruolo
+keywords.fr: Serveur d'informations mobiles, serveur, rôle
+svg: ../../symbols/network/server_mobile.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Server
+    Value.en = Server
+    Value.es = Servidor
+    Value.it = Server
+    Value.fr = Serveur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Server für mobile Geräte
+    Value.en = Mobile information server
+    Value.es = Servidor de información móvil
+    Value.it = Server informazioni mobili
+    Value.fr = Serveur d'informations mobiles

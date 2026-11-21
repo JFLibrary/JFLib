@@ -1,0 +1,81 @@
+# Pfeil nach links, rechts und oben: ein T aus drei Armen mit gleichen Spitzen, ein Umriss; der
+# waagrechte Arm liegt unten (seine Spitzen reichen bis zur Unterkante), der senkrechte führt in
+# der Mitte nach oben.  Row_1 an der oberen Ecke der rechten Spitze ändert Länge (waagrecht) und
+# Breite (senkrecht) aller Spitzen, Row_2 an der inneren Ecke rechts die Dicke der Schäfte (nur
+# waagrecht).  Die Werte sind Längen und gelten für alle drei Arme; die Spitzen stoßen nie
+# aneinander.  Verbindungspunkte an den drei Spitzen und unten in der Mitte.
+master: Left-right-up arrow
+name.de: Pfeil nach links, rechts und oben
+name.en: Left-right-up arrow
+name.es: Flecha izquierda, derecha y arriba
+name.it: Freccia sinistra, destra e su
+name.fr: Flèche gauche, droite et haut
+prompt.de: T-förmiger Pfeil mit Spitzen nach links, rechts und oben. Spitzen und Schäfte ändern Sie mit den gelben Steuerpunkten.
+prompt.en: T-shaped arrow with heads pointing left, right and up. Drag the yellow control handles to change the heads and the shafts.
+prompt.es: Flecha en forma de T con puntas hacia la izquierda, la derecha y arriba. Arrastre los controladores amarillos para cambiar las puntas y los cuerpos.
+prompt.it: Freccia a T con punte a sinistra, a destra e in alto. Trascina le maniglie di controllo gialle per cambiare le punte e i corpi.
+prompt.fr: Flèche en T avec des pointes vers la gauche, la droite et le haut. Faites glisser les poignées de contrôle jaunes pour modifier les pointes et les corps.
+keywords.de: Pfeil, drei Richtungen, T, links, rechts, oben, verteilen
+keywords.en: arrow, three-way, T, left, right, up, distribute
+keywords.es: flecha, tres direcciones, T, izquierda, derecha, arriba, distribuir
+keywords.it: freccia, tre direzioni, T, sinistra, destra, su, distribuire
+keywords.fr: flèche, trois directions, T, gauche, droite, haut, répartir
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 30 mm
+Height.us = 1.125 in
+
+[User]
+# die Mitte, der halbe Schaft, die halbe Breite der Spitzen (= Höhe der Achse des waagrechten
+# Arms: Row_1 liegt auf ihrer doppelten Höhe), ihre Länge
+Cx:  Value = Width*0.5
+S:   Value = MIN(MAX(Controls.Row_2-User.Cx, 0), Width*0.2, Height*0.2)
+Hw:  Value = MIN(MAX(Controls.Row_1.Y*0.5, User.S), Height*0.4, Width*0.25)
+Cy:  Value = User.Hw
+Hl:  Value = MIN(MAX(Width-Controls.Row_1, 0), Width*0.5-User.Hw, Height-User.Hw*2)
+
+[Geometry]
+MoveTo  X = Width; Y = User.Cy
+LineTo  X = Width-User.Hl; Y = User.Cy+User.Hw
+LineTo  X = Width-User.Hl; Y = User.Cy+User.S
+LineTo  X = User.Cx+User.S; Y = User.Cy+User.S
+LineTo  X = User.Cx+User.S; Y = Height-User.Hl
+LineTo  X = User.Cx+User.Hw; Y = Height-User.Hl
+LineTo  X = User.Cx; Y = Height
+LineTo  X = User.Cx-User.Hw; Y = Height-User.Hl
+LineTo  X = User.Cx-User.S; Y = Height-User.Hl
+LineTo  X = User.Cx-User.S; Y = User.Cy+User.S
+LineTo  X = User.Hl; Y = User.Cy+User.S
+LineTo  X = User.Hl; Y = User.Cy+User.Hw
+LineTo  X = 0; Y = User.Cy
+LineTo  X = User.Hl; Y = User.Cy-User.Hw
+LineTo  X = User.Hl; Y = User.Cy-User.S
+LineTo  X = Width-User.Hl; Y = User.Cy-User.S
+LineTo  X = Width-User.Hl; Y = User.Cy-User.Hw
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.8; Y = Height*0.5
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Länge und Breite der Spitzen ändern"
+        Tip.en = "Change the length and width of the heads"
+        Tip.es = "Cambiar la longitud y el ancho de las puntas"
+        Tip.it = "Cambia la lunghezza e la larghezza delle punte"
+        Tip.fr = "Modifier la longueur et la largeur des pointes"
+Row_2:  X = Width*0.6; Y = User.Cy+User.S
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Dicke der Schäfte ändern"
+        Tip.en = "Change the thickness of the shafts"
+        Tip.es = "Cambiar el grosor de los cuerpos"
+        Tip.it = "Cambia lo spessore dei corpi"
+        Tip.fr = "Modifier l'épaisseur des corps"
+
+[Connection]
+Row  X = User.Cx; Y = User.Cy-User.S; DirX = 0; DirY = 1
+Row  X = Width; Y = User.Cy; DirX = -1; DirY = 0
+Row  X = User.Cx; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.Cy; DirX = 1; DirY = 0

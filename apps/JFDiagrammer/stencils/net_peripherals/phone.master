@@ -1,0 +1,33 @@
+# Telefon (JD13, eigene Grafik im JFNetworker-Stil)
+master: Telephone
+name.de: Telefon
+name.en: Telephone
+name.es: Teléfono
+name.it: Telefono
+name.fr: Téléphone
+prompt.de: Telefon: Tischtelefon.
+prompt.en: Telephone: desk telephone.
+prompt.es: Teléfono: teléfono de sobremesa.
+prompt.it: Telefono: telefono da tavolo.
+prompt.fr: Téléphone : téléphone de bureau.
+keywords.de: Telefon, Peripherie, Büro
+keywords.en: Telephone, peripheral, office
+keywords.es: Teléfono, periférico, oficina
+keywords.it: Telefono, periferica, ufficio
+keywords.fr: Téléphone, périphérique, bureau
+svg: ../../symbols/network/phone.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Peripherie
+    Value.en = Peripheral
+    Value.es = Periférico
+    Value.it = Periferica
+    Value.fr = Périphérique
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Telefon
+    Value.en = Telephone
+    Value.es = Teléfono
+    Value.it = Telefono
+    Value.fr = Téléphone

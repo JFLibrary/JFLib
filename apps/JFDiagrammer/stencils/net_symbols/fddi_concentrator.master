@@ -1,0 +1,33 @@
+# CDDI/FDDI-Konzentrator (JD13, eigene Grafik im JFNetworker-Stil)
+master: CDDI/FDDI concentrator
+name.de: CDDI/FDDI-Konzentrator
+name.en: CDDI/FDDI concentrator
+name.es: Concentrador CDDI/FDDI
+name.it: Concentratore CDDI/FDDI
+name.fr: Concentrateur CDDI/FDDI
+prompt.de: CDDI/FDDI-Konzentrator: Konzentrator für einen Doppelring.
+prompt.en: CDDI/FDDI concentrator: concentrator for a dual ring.
+prompt.es: Concentrador CDDI/FDDI: concentrador para un anillo doble.
+prompt.it: Concentratore CDDI/FDDI: concentratore per un doppio anello.
+prompt.fr: Concentrateur CDDI/FDDI : concentrateur pour un double anneau.
+keywords.de: CDDI/FDDI-Konzentrator, Netzwerk
+keywords.en: CDDI/FDDI concentrator, network
+keywords.es: Concentrador CDDI/FDDI, red
+keywords.it: Concentratore CDDI/FDDI, rete
+keywords.fr: Concentrateur CDDI/FDDI, réseau
+svg: ../../symbols/network/fddi_concentrator.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Netzwerk
+    Value.en = Network
+    Value.es = Red
+    Value.it = Rete
+    Value.fr = Réseau
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = CDDI/FDDI-Konzentrator
+    Value.en = CDDI/FDDI concentrator
+    Value.es = Concentrador CDDI/FDDI
+    Value.it = Concentratore CDDI/FDDI
+    Value.fr = Concentrateur CDDI/FDDI

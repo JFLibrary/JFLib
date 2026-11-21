@@ -1,0 +1,85 @@
+# Kreispfeil: ein flächiger Pfeil auf drei Vierteln eines Kreises (gestreckt einer Ellipse) für
+# Kreisläufe -- er beginnt unten, läuft gegen den Uhrzeigersinn über rechts und oben nach links
+# und endet dort in einer Spitze, die nach unten zeigt.  Außen- und Innenkante sind Ellipsenbögen
+# um die Mitte des Shapes (je ein Halbbogen über rechts und ein Viertelbogen durch den
+# 45°-Punkt); die Spitze ist doppelt so breit wie der Schaft und reicht bis an die linke Kante.
+# Row_1 an der Innenkante unten ändert die Dicke des Schafts, Row_2 an der Spitze ihre Länge
+# (beide anteilig, nur senkrecht).  Der Text steht in der Mitte; Verbindungspunkte am
+# Schaftende und an der Spitze.  (FEATURES „Gebogener Pfeil.18“: zweite Bogenpfeil-Variante.)
+master: Circular arrow
+name.de: Kreispfeil
+name.en: Circular arrow
+name.es: Flecha circular
+name.it: Freccia circolare
+name.fr: Flèche circulaire
+prompt.de: Pfeil auf drei Vierteln eines Kreises, etwa für einen Kreislauf. Schaft und Spitze ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Arrow along three quarters of a circle, for example for a cycle. Drag the yellow control handles to change the shaft and the head.
+prompt.es: Flecha a lo largo de tres cuartos de círculo, por ejemplo para un ciclo. Arrastre los controladores amarillos para cambiar el cuerpo y la punta.
+prompt.it: Freccia lungo tre quarti di cerchio, ad esempio per un ciclo. Trascina le maniglie di controllo gialle per cambiare il corpo e la punta.
+prompt.fr: Flèche sur trois quarts de cercle, par exemple pour un cycle. Faites glisser les poignées de contrôle jaunes pour modifier le corps et la pointe.
+keywords.de: Pfeil, Kreis, Kreislauf, Zyklus, Wiederholung, Drehung, Bogen
+keywords.en: arrow, circle, circular, cycle, repeat, rotation, arc
+keywords.es: flecha, círculo, circular, ciclo, repetición, rotación, arco
+keywords.it: freccia, cerchio, circolare, ciclo, ripetizione, rotazione, arco
+keywords.fr: flèche, cercle, circulaire, cycle, répétition, rotation, arc
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+TxtWidth = User.Axi*1.4
+TxtHeight = User.Ayi*1.4
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Dicke des Schafts (die Innenkante unten liegt auf 1,5 Dicken), die Länge der Spitze, die
+# Mitte, die Halbachsen außen, innen und auf der Mittellinie
+T:    Value = MIN(MAX(Controls.Row_1.Y/1.5, Height*0.02), Width*0.2, Height*0.2)
+Hl:   Value = MIN(MAX(Height*0.5-Controls.Row_2.Y, 0), Height*0.45)
+Cx:   Value = Width*0.5
+Cy:   Value = Height*0.5
+Axo:  Value = Width*0.5-User.T*0.5
+Ayo:  Value = Height*0.5-User.T*0.5
+Axi:  Value = User.Axo-User.T
+Ayi:  Value = User.Ayo-User.T
+Axm:  Value = User.Axo-User.T*0.5
+
+[Geometry]
+MoveTo           X = User.Cx; Y = User.Cy-User.Ayi
+LineTo           X = User.Cx; Y = User.Cy-User.Ayo
+EllipticalArcTo  X = User.Cx; Y = User.Cy+User.Ayo; A = User.Cx+User.Axo; B = User.Cy; C = 0 deg; D = User.Axo/User.Ayo
+EllipticalArcTo  X = User.Cx-User.Axo; Y = User.Cy; A = User.Cx-User.Axo*0.70710678; B = User.Cy+User.Ayo*0.70710678
+                 C = 0 deg; D = User.Axo/User.Ayo
+LineTo           X = User.Cx-User.Axm-User.T; Y = User.Cy
+LineTo           X = User.Cx-User.Axm; Y = User.Cy-User.Hl
+LineTo           X = User.Cx-User.Axm+User.T; Y = User.Cy
+LineTo           X = User.Cx-User.Axi; Y = User.Cy
+EllipticalArcTo  X = User.Cx; Y = User.Cy+User.Ayi; A = User.Cx-User.Axi*0.70710678; B = User.Cy+User.Ayi*0.70710678
+                 C = 0 deg; D = User.Axi/User.Ayi
+EllipticalArcTo  X = Geometry1.X1; Y = Geometry1.Y1; A = User.Cx+User.Axi; B = User.Cy; C = 0 deg; D = User.Axi/User.Ayi
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.225
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Dicke des Schafts ändern"
+        Tip.en = "Change the thickness of the shaft"
+        Tip.es = "Cambiar el grosor del cuerpo"
+        Tip.it = "Cambia lo spessore del corpo"
+        Tip.fr = "Modifier l'épaisseur du corps"
+Row_2:  X = User.Cx-User.Axm; Y = Height*0.2
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Länge der Spitze ändern"
+        Tip.en = "Change the length of the head"
+        Tip.es = "Cambiar la longitud de la punta"
+        Tip.it = "Cambia la lunghezza della punta"
+        Tip.fr = "Modifier la longueur de la pointe"
+
+[Connection]
+Row  X = User.Cx; Y = User.Cy-User.Ayo+User.T*0.5; DirX = 1; DirY = 0
+Row  X = User.Cx-User.Axm; Y = User.Cy-User.Hl; DirX = 0; DirY = 1

@@ -31,6 +31,9 @@ game_render3d.workspace = true
 render3d.workspace = true
 gpu.workspace = true
 ui.workspace = true
+# (G7b part 2) the asset tests make their glTF and PNG files (src/asset_t.rs)
+gltf.workspace = true
+img_png.workspace = true
 style = { package = "jflib-style-winui", path = "../../styles/winui" }
 
 [build-dependencies]

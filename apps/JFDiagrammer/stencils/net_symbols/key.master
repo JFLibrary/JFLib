@@ -1,0 +1,33 @@
+# Schlüssel (JD13, eigene Grafik im JFNetworker-Stil)
+master: Key
+name.de: Schlüssel
+name.en: Key
+name.es: Llave
+name.it: Chiave
+name.fr: Clé
+prompt.de: Schlüssel: Schlüssel, etwa für Verschlüsselung.
+prompt.en: Key: key, for example for encryption.
+prompt.es: Llave: llave, por ejemplo para el cifrado.
+prompt.it: Chiave: chiave, ad esempio per la crittografia.
+prompt.fr: Clé : clé, par exemple pour le chiffrement.
+keywords.de: Schlüssel, Sicherheit
+keywords.en: Key, security
+keywords.es: Llave, seguridad
+keywords.it: Chiave, sicurezza
+keywords.fr: Clé, sécurité
+svg: ../../symbols/network/key.svg
+include: ../net_common/symbol.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Sicherheit
+    Value.en = Security
+    Value.es = Seguridad
+    Value.it = Sicurezza
+    Value.fr = Sécurité
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = Schlüssel
+    Value.en = Key
+    Value.es = Llave
+    Value.it = Chiave
+    Value.fr = Clé

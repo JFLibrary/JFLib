@@ -1,0 +1,33 @@
+# PC (JD13, eigene Grafik im JFNetworker-Stil)
+master: PC
+name.de: PC
+name.en: PC
+name.es: PC
+name.it: PC
+name.fr: PC
+prompt.de: PC: Arbeitsplatzrechner mit Bildschirm.
+prompt.en: PC: desktop computer with a monitor.
+prompt.es: PC: ordenador de sobremesa con monitor.
+prompt.it: PC: computer desktop con monitor.
+prompt.fr: PC : ordinateur de bureau avec écran.
+keywords.de: PC, Computer, Arbeitsplatz
+keywords.en: PC, computer, workstation
+keywords.es: PC, equipo, puesto de trabajo
+keywords.it: PC, computer, postazione
+keywords.fr: PC, ordinateur, poste de travail
+svg: ../../symbols/network/pc.svg
+include: ../net_common/symbol.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
+
+[Property]
+ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
+    Value.de = Computer
+    Value.en = Computer
+    Value.es = Equipo
+    Value.it = Computer
+    Value.fr = Ordinateur
+SubShapeType: Type = 0; Invisible = TRUE; Label = "SubShapeType"
+    Value.de = PC
+    Value.en = PC
+    Value.es = PC
+    Value.it = PC
+    Value.fr = PC

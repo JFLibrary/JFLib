@@ -180,6 +180,17 @@ fn item(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
     }
 }
 
+/// (JD8 rest) the commands Stärke, Striche, Pfeile: their flyout opens at the Linie button the
+/// next time the Start register is drawn
+pub(crate) fn open_line_choice(app: &mut Diagrammer, cmd: u32) {
+    app.format.line_sub = match cmd {
+        LINE_WEIGHT => Some(ID_WEIGHTS),
+        LINE_DASH => Some(ID_DASHES),
+        LINE_ARROWS => Some(ID_ARROWS),
+        _ => None,
+    };
+}
+
 // the choices of the line menu (Stärke, Striche, Pfeile): each a flyout of its own at the
 // Linie button, opened after the line menu closed (a flyout inside the menu would lie under
 // its other rows)

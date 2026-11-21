@@ -22,7 +22,12 @@
 //   diagramiotest --design-probe DIR     (JD11) the own designs on the sample drawing as PNG, and
 //                                         one .vsdx a design for the Visio counter-check (designs.rs)
 //   diagramiotest --write-stencil-previews DIR   (JD10) the structure stencils' masters as PNG
-//                                         (containers, cff, callouts; stencil_structs.rs)
+//                                         (containers, cff, callouts; stencil_structs.rs), (JD13)
+//                                         probeblatt.png: the shape stencils (stencil_shapes.rs),
+//                                         <folder>-alle.png: every master of each stencil
+//                                         (stencil_overview.rs)
+//   diagramiotest --write-templates DIR  (JD13) every form of JFDiagrammer's templates as .vstx,
+//                                         metric and US (templates.rs)
 //
 // Groups:
 //   samples   self-built files of all six formats: what lands where in the model (fields,
@@ -51,9 +56,14 @@
 //             and read back: the Connect entries and glue formulas stay, ends follow again
 //   stencils  (JD9, stencils.rs) the stencil build tool: the start set, the SVG import, faults
 //             (JD10, stencil_structs.rs) the structure stencils: containers, lists, lanes, callouts
+//             (JD13, stencil_shapes.rs) the shape stencils: blocks, arrows, flowchart, connectors
+//             (1-D masters, glue)
 //   structures  (JD10, structures.rs) a container, a list, a cross-functional flowchart and a
 //             callout built as JFDiagrammer builds them: relationships on both sides, written and
 //             read back unchanged, members, steps and callouts carried after reading
+//   templates (JD13, templates.rs) JFDiagrammer's templates built from their sources in both
+//             measures: round trip, stencil windows, JFD_ cells, pages, the rule set, the
+//             starters (cross-functional flowcharts, connectors, tips), to_drawing
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -86,10 +96,15 @@ mod pdfreader;
 mod render;
 mod roundtrip;
 mod samples;
+mod stencil_network;
+mod stencil_overview;
+mod stencil_shapes;
 mod stencil_structs;
 mod stencils;
 mod structures;
 mod svgdump;
+mod symbol_sheet;
+mod templates;
 mod zipkit;
 
 /// a refusal must come within this many microseconds
@@ -160,8 +175,21 @@ fn run() -> i32 {
     if let Some(reps) = arg(&args, "--growth") {
         return formulas::growth_table(reps.parse().unwrap_or(5));
     }
+    if let Some(dir) = arg(&args, "--symbol-sheet") {
+        // (JD13) every SVG of a folder on one sheet (the shared network symbols)
+        let path = args.iter().position(|a| a == "--symbol-sheet").and_then(|i| args.get(i + 2)).cloned().unwrap_or_else(|| String::from("symbols.png"));
+        return symbol_sheet::write(&dir, &path, arg(&args, "--cols").and_then(|c| c.parse().ok()).unwrap_or(6));
+    }
+    if let Some(dir) = arg(&args, "--write-network-gegenprobe") {
+        // (JD13) a network plan and a rack drawing for a look in Visio
+        return stencil_network::gegenprobe(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-network-previews") {
+        // (JD13) the network symbols and a rack with devices
+        return stencil_network::previews(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-stencil-previews") {
-        return stencil_structs::previews(&dir);
+        return stencil_structs::previews(&dir).max(stencil_shapes::previews(&dir)).max(stencil_overview::write_all(&dir));
     }
     if let Some(dir) = arg(&args, "--write-gegenprobe") {
         // (JD7) the glue drawing, (JD10) the structures drawing
@@ -172,6 +200,9 @@ fn run() -> i32 {
     }
     if let Some(dir) = arg(&args, "--design-probe") {
         return designs::probe(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-templates") {
+        return templates::write(&dir);
     }
     if let Some(dir) = arg(&args, "--write-probe") {
         return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
@@ -208,9 +239,17 @@ fn run() -> i32 {
         if h.on("stencils") {
             stencils::run(&mut h);
             stencil_structs::run(&mut h);
+            stencil_shapes::run(&mut h);
         }
         if h.on("structures") {
             structures::check(&mut h);
+        }
+        // (JD13) the network and rack stencils
+        if h.on("stencils/network") {
+            stencil_network::run(&mut h);
+        }
+        if h.on("templates") {
+            templates::run(&mut h);
         }
     }
     if h.on("corpus") {
