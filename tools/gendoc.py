@@ -137,7 +137,7 @@ CRATES = [
     ("crypto", "hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)", "full"),
     ("x509", "X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's "
      "builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)", "full"),
-    ("compress", "LZ4 block and frame, Zstandard, xxHash32 and xxHash64, codec ids", "full"),
+    ("compress", "DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids", "full"),
     ("datastore", "an embedded journal database: JSON collections, transactions, snapshots, crash recovery",
      "full"),
     ("netio", "HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS", "full"),

@@ -56,6 +56,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   iOS: the main window fills the page's canvas and needs no title bar. On every canvas host (the
   browser, Android, iOS) window 0's place and size follow the host alone: `win_set_rect(0, ..)`,
   `WCMD_MAXIMIZE` and `WCMD_RESTORE` leave it.
+- The PDF streams of `print` are compressed with `compress::zlib` without any hook (the same bytes as with the hook that ui set until now); before, a program without ui wrote uncompressed streams. The hook goes through a lock instead of an `unsafe` transmute.
+
+### Deprecated
+
+- `set_print_deflate`: compress::zlib is the default; the hook still replaces it.
 
 ### Fixed
 

@@ -19,7 +19,7 @@ workspace = true
 
 [dependencies]
 gfx.workspace = true
-img_core.workspace = true
+compress.workspace = true
 text_shape.workspace = true
 
 # docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none

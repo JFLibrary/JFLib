@@ -1,14 +1,24 @@
-// compress -- lossless compression for backup data
+// compress -- lossless compression: DEFLATE, zlib, gzip, Brotli, LZ4 and Zstandard
 //
+//   deflate::compress(data, level) / decompress(data, max_out)   raw DEFLATE (RFC 1951)
+//   zlib::compress / decompress                     zlib streams (RFC 1950)
+//   gzip::compress / decompress                     gzip members (RFC 1952; decompress reads
+//                                                   all members, as gunzip does)
+//   brotli::decompress(data, max_out)               Brotli streams (RFC 7932), decoder only
 //   lz4::compress(data) -> Vec<u8>                  LZ4 block (greedy, 64 KiB window)
 //   lz4::decompress(block, max_out) -> Option<Vec>  bounds-checked; None on any corruption
 //   lz4::frame_compress / frame_decompress          the LZ4 frame format (lz4 / zstd --format=lz4
 //                                                   interoperable), xxHash32 checksums
 //   zstd::compress(data, level) / decompress        Zstandard frames (RFC 8878; the zstd tool
 //                                                   reads ours and we read its)
+//   crc32(crc, data), adler32(adler, data)          the checksums of gzip / PNG / ZIP and zlib
 //   xxh32(data, seed), xxh64(data, seed)
 //   Codec { None, Lz4, Zstd } with id(): the codec byte that formats on disk store per blob;
 //   Codec::pack(data, level) / unpack(data, max_out)
+//
+// Every decoder takes the largest output the caller accepts and treats its input as untrusted:
+// truncated or corrupt data, a wrong checksum or more output than allowed give None (or an
+// Error from the *_into variants), never a panic and never a read or write outside the buffers.
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -16,10 +26,16 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 
+pub mod brotli;
+mod checksum;
+pub mod deflate;
+pub mod gzip;
 pub mod lz4;
 mod xxh;
+pub mod zlib;
 pub mod zstd;
 
+pub use checksum::{adler32, crc32};
 pub use xxh::{xxh32, xxh64};
 
 /// the compression of a stored blob (the byte on disk)
