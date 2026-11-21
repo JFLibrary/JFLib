@@ -18,6 +18,7 @@ pub mod keysched;
 pub mod record;
 
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -50,7 +51,16 @@ pub enum Trust {
     /// the operating system's certificate authorities, and these as well (a company CA);
     /// allows TLS 1.2 and the public suites (crate::roots)
     System(Vec<Cert>),
+    /// a check the program brings (a PKI of its own, keys pinned by their SPKI, Certificate
+    /// Transparency, the platform's verifier, a test peer); a client offers with it what it
+    /// offers with System (TLS 1.2, the public suites)
+    Custom(Verifier),
 }
+
+/// the check of Trust::Custom: the certificates the peer sent that could be read (leaf first),
+/// the name the client asked for ("" for a client's certificate) and the time (Unix seconds) ->
+/// Ok, or why they are refused (the handshake ends with bad_certificate)
+pub type Verifier = Arc<dyn Fn(&[Cert], &str, i64) -> Result<(), String> + Send + Sync>;
 
 #[derive(Clone)]
 pub struct ClientConfig {

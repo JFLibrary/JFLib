@@ -20,6 +20,8 @@ workspace = true
 [dependencies]
 # crypto: ssh, the constant-time compares of radius
 crypto.workspace = true
+# x509: certificates (the TLS core, simulators)
+x509.workspace = true
 
 # docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
 # of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)

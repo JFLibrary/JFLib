@@ -144,6 +144,7 @@ def main():
     run("1.2 ECDHE-ECDSA-AES128-GCM (P-256)", "p256", "-tls1_2 -cipher ECDHE-ECDSA-AES128-GCM-SHA256", "TLS 1.2 0xC02B 200")
     run("1.2 ECDHE-ECDSA-CHACHA20 (P-384)", "p384", "-tls1_2 -cipher ECDHE-ECDSA-CHACHA20-POLY1305", "TLS 1.2 0xCCA9 200")
     run("1.2 RSA-PSS certificate", "pss", "-tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256", "TLS 1.2 0xC02F 200")
+    # a TLS 1.2 server without the extended master secret is taken (no resumption, no renegotiation)
     run("1.2 without extended master secret", "rsa", "-tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256", "TLS 1.2 0xC02F 200",
         env={"OPENSSL_CONF": str(conf)})
     run("1.2 server asks for a client certificate", "rsa", "-tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256 -verify 1", "TLS 1.2 0xC02F 200")

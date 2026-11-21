@@ -13,9 +13,8 @@ fn dbl(b: &[u8; 16]) -> [u8; 16] {
         o[i] = (b[i] << 1) | carry;
         carry = b[i] >> 7;
     }
-    if carry != 0 {
-        o[15] ^= 0x87;
-    }
+    // the subkeys come from the key: a mask, not a branch
+    o[15] ^= 0x87 & crate::ct_mask(0u64.wrapping_sub(carry as u64)) as u8;
     o
 }
 

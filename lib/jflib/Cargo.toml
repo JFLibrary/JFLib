@@ -75,6 +75,7 @@ ui.workspace = true
 doc_view.workspace = true
 datetime.workspace = true
 crypto.workspace = true
+x509.workspace = true
 compress.workspace = true
 shader.workspace = true
 wgsl.workspace = true
