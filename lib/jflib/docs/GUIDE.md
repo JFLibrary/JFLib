@@ -2822,8 +2822,11 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   `aes_unwrap`, which checks the integrity value) and AES-CMAC of RFC 4493 (`cmac_aes`).
   For protocols defined with MD5 (RADIUS): MD5 (`md5`, `Md5`, `md5_parts`) and HMAC-MD5
   (`hmac_md5`); broken for collisions, so new designs take SHA-256 (RFC 1321, 2104).
-* `compress` -- LZ4 and zstd (`compress::zstd::compress(data, level)` / `decompress`; levels
-  1 to 19, single-segment frames with checksums); `Codec` picks one by name.
+* `compress` -- DEFLATE, zlib and gzip in both directions (`compress::gzip::compress(data,
+  level)` / `decompress(data, max_out)`; levels 0 to 9), the Brotli decoder
+  (`compress::brotli::decompress`), LZ4 and zstd (`compress::zstd::compress(data, level)` /
+  `decompress`; levels 1 to 19, single-segment frames with checksums), CRC-32, Adler-32 and
+  xxHash; `Codec` picks LZ4 or zstd by name.
 * `plat::watch::Watcher::new(&roots)` / `take(ms)` -- the changed paths below folders
   (ReadDirectoryChangesW / inotify, recursive; `overflow` when events were lost). Every change
   after `new` returned is seen. A root that is deleted or moved away (Linux: also a folder that

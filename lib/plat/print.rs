@@ -31,16 +31,15 @@
 //        jfgui_PRINT_PRINTER; elsewhere our PDF into FILE); else ERR_UNSUPPORTED
 //
 // Deviation (plat-shared): plat must not depend on the image crates, so pdfwrite.s is ported
-// here and the one thing it took from img -- zlib_deflate -- comes through a hook.  An app
-// sets it to img_core::deflate::zlib_deflate (then the PDF is byte-identical to the
-// assembly's); without a hook the streams are zlib "stored" blocks (a valid, uncompressed
-// PDF).  The source is a PrintSrc (rows of B, G, R, A bytes; the gfx::Surface fields)
-// instead of a SURFACE pointer.
+// here.  The one thing it took from img -- zlib_deflate -- is compress::zlib since 0.3, the
+// same encoder, so the PDF is byte-identical to the assembly's.  set_print_deflate, the hook
+// of before, still replaces it (deprecated).  The source is a PrintSrc (rows of B, G, R, A
+// bytes; the gfx::Surface fields) instead of a SURFACE pointer.
 
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt::Write;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use rt::sync::SpinLock;
 
 use rt::fx::{cvtd64, maxsd, minsd};
 
@@ -287,45 +286,27 @@ pub fn print_pdf(job: &mut PrintJob, page: &PPage) -> Result<Vec<u8>, i32> {
     pdf_write_image(&src, &opt)
 }
 
-// ---------------------------------------------------------------- the zlib hook
+// ---------------------------------------------------------------- the zlib compressor
 
-/// a zlib compressor: (data, level) -> zlib stream (img_core::deflate::zlib_deflate)
+/// a zlib compressor: (data, level) -> zlib stream
 pub type DeflateFn = fn(&[u8], i32) -> Vec<u8>;
 
-static DEFLATE: AtomicUsize = AtomicUsize::new(0);
+static DEFLATE: SpinLock<Option<DeflateFn>> = SpinLock::new(None);
 
-/// the compressor of the PDF streams (None: zlib stored blocks, no compression)
+/// another compressor of the PDF streams (None: compress::zlib, the default).  Not needed any
+/// more: without a hook the streams are compressed with compress::zlib, the encoder the hook
+/// was set to until 0.2.
+#[deprecated(since = "0.3.0", note = "the PDF streams are compressed with compress::zlib without a hook")]
 pub fn set_print_deflate(f: Option<DeflateFn>) {
-    DEFLATE.store(f.map_or(0, |f| f as usize), Ordering::SeqCst);
+    *DEFLATE.lock() = f;
 }
 
 fn deflate(data: &[u8], level: i32) -> Vec<u8> {
-    let p = DEFLATE.load(Ordering::SeqCst);
-    if p != 0 {
-        // SAFETY: only set_print_deflate stores here, always a DeflateFn.
-        let f: DeflateFn = unsafe { core::mem::transmute::<usize, DeflateFn>(p) };
-        return f(data, level);
+    let hook = *DEFLATE.lock();
+    match hook {
+        Some(f) => f(data, level),
+        None => compress::zlib::compress(data, level),
     }
-    // zlib with stored blocks: header 78 01, blocks of at most 65535 bytes, Adler-32
-    let mut out = Vec::with_capacity(data.len() + data.len() / 65535 * 5 + 16);
-    out.extend_from_slice(&[0x78, 0x01]);
-    let mut chunks = data.chunks(65535).peekable();
-    if chunks.peek().is_none() {
-        out.extend_from_slice(&[1, 0, 0, 0xFF, 0xFF]);
-    }
-    while let Some(c) = chunks.next() {
-        out.push(chunks.peek().is_none() as u8);
-        out.extend_from_slice(&(c.len() as u16).to_le_bytes());
-        out.extend_from_slice(&(!(c.len() as u16)).to_le_bytes());
-        out.extend_from_slice(c);
-    }
-    let (mut a, mut b) = (1u32, 0u32);
-    for &x in data {
-        a = (a + x as u32) % 65521;
-        b = (b + a) % 65521;
-    }
-    out.extend_from_slice(&(b << 16 | a).to_be_bytes());
-    out
 }
 
 // ---------------------------------------------------------------- the PDF writer  [pdfwrite.s]

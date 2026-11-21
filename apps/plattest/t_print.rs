@@ -1,7 +1,7 @@
 // t_print -- (plat-shared) printing without a dialog and without paper
 //   plattest --test print     paper sizes, print_dpi, row_white against the exact rounding
-//        for every (colour, alpha), the PDF writer's errors and its stored-zlib fallback
-//        (inflated again), the headless guard (no jfgui_PRINT_TO: ERR_UNSUPPORTED, no
+//        for every (colour, alpha), the PDF writer's errors, its zlib streams and the deprecated
+//        compressor hook (inflated again), the headless guard (no jfgui_PRINT_TO: ERR_UNSUPPORTED, no
 //        dialog, no bus), a job without pixels (ERR_DIMS)
 //   plattest --test printlayout   layout() for a grid of jobs / pages, one line each (bit
 //        patterns) -- tools/platshared/print_rs_check.py replays print_check.py's layout
@@ -122,7 +122,6 @@ pub fn t_print(t: &mut T) {
     let a8 = PrintSrc { px: &px, w: IMG_W, h: IMG_H, stride: IMG_W * 4, fmt: 2 };
     t.check(pdf_write_image(&empty, &opt).err() == Some(ERR_DIMS), "print: pdf_write_image of an empty image -> ERR_DIMS");
     t.check(pdf_write_image(&a8, &opt).err() == Some(ERR_UNSUPPORTED), "print: pdf_write_image of A8 -> ERR_UNSUPPORTED");
-    plat::set_print_deflate(None);
     let xrgb = PrintSrc { px: &px, w: IMG_W, h: IMG_H, stride: IMG_W * 4, fmt: PRINT_XRGB };
     let pdf = pdf_write_image(&xrgb, &opt).unwrap_or_default();
     let stream = pdf_stream(&pdf, b"5 0 obj");
@@ -133,13 +132,22 @@ pub fn t_print(t: &mut T) {
         Some(out)
     });
     let want: Vec<u8> = px.chunks(4).flat_map(|p| [p[2], p[1], p[0]]).collect();
+    let n1 = stream.map_or(0, |s| s.len());
     t.check(pdf.starts_with(b"%PDF-1.4\n") && pdf.ends_with(b"%%EOF\n") && raw.as_deref() == Some(&want[..]),
-            "print: without a zlib hook the image is stored (and inflates to the pixels)");
-    plat::set_print_deflate(Some(img_core::deflate::zlib_deflate));
+            "print: the image stream inflates to the pixels");
+    t.check(n1 > 0 && n1 < want.len(), "print: the stream is compressed without a hook (zlib of jflib-compress)");
+    // the deprecated hook still replaces the compressor: level 0 stores the pixels
+    fn stored(data: &[u8], _level: i32) -> Vec<u8> {
+        img_core::deflate::zlib_deflate(data, 0)
+    }
+    #[allow(deprecated)]
+    plat::set_print_deflate(Some(stored));
     let parg = PrintSrc { px: &px, w: IMG_W, h: IMG_H, stride: IMG_W * 4, fmt: PRINT_PARGB };
     let pdf2 = pdf_write_image(&parg, &opt).unwrap_or_default();
     let n2 = pdf_stream(&pdf2, b"5 0 obj").map_or(0, |s| s.len());
-    t.check(n2 > 0 && n2 < stream.map_or(0, |s| s.len()), "print: with img_core's deflate the stream is compressed");
+    #[allow(deprecated)]
+    plat::set_print_deflate(None);
+    t.check(n2 > want.len() && n1 < n2, "print: set_print_deflate still replaces the compressor");
     // ---- headless: no test variable -> unsupported, never a dialog / bus
     let mut job = job_of(&px, 0);
     job.copies = 9;
@@ -208,7 +216,6 @@ pub fn t_printlayout(_t: &mut T) {
 pub fn t_printjob(t: &mut T) {
     let c = plat::arg_value("--case").and_then(|v| v.parse::<usize>().ok()).unwrap_or(0).min(CASES.len() - 1);
     let expect = plat::arg_value("--expect").and_then(|v| v.parse::<i32>().ok()).unwrap_or(0);
-    plat::set_print_deflate(Some(img_core::deflate::zlib_deflate));
     let px = make_pixels();
     let mut job = job_of(&px, c);
     let r = plat::print(&mut job);
@@ -221,7 +228,6 @@ pub fn t_printjob(t: &mut T) {
 /// a page's pixels inflated again), add_pdf as it is, the refusals; Windows: the same pages
 /// through GDI into "Microsoft Print to PDF" (skipped without that printer)
 pub fn t_printdoc(t: &mut T) {
-    plat::set_print_deflate(Some(img_core::deflate::zlib_deflate));
     let px = make_pixels();
     let big: Vec<u8> = (0..60 * 40).flat_map(|i| [(i % 251) as u8, (i % 7 * 30) as u8, 200, 255]).collect();
     let srcs = [

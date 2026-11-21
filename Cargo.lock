@@ -749,7 +749,7 @@ name = "jflib-archive"
 version = "0.2.1"
 dependencies = [
  "jflib-base",
- "jflib-img-core",
+ "jflib-compress",
  "jflib-plat",
  "jflib-rt",
 ]
@@ -1014,6 +1014,7 @@ dependencies = [
 name = "jflib-img-core"
 version = "0.2.1"
 dependencies = [
+ "jflib-compress",
  "jflib-gfx",
  "jflib-modrt",
  "jflib-rt",
@@ -1080,6 +1081,7 @@ dependencies = [
 name = "jflib-img-jxl"
 version = "0.2.1"
 dependencies = [
+ "jflib-compress",
  "jflib-gfx",
  "jflib-img-core",
  "jflib-img-jpeg",
@@ -1243,8 +1245,8 @@ dependencies = [
 name = "jflib-pdf"
 version = "0.2.1"
 dependencies = [
+ "jflib-compress",
  "jflib-gfx",
- "jflib-img-core",
  "jflib-text-shape",
 ]
 

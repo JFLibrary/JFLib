@@ -92,6 +92,7 @@ make it read from the start again without an error. Everything is in the
 
 MIT or Apache-2.0, at your choice. The decoder was written after libjxl 0.11.1's, and some parts
 are ported from libjxl (the splines, the fast math, the JPEG reconstruction); libjxl is under the
-BSD 3-Clause License with Google's patent grant. Brotli's static dictionary, which the metadata
-boxes and the JPEG reconstruction need, is under the MIT License. The texts are in the crate's
-[`licenses/`](https://github.com/JFLibrary/JFLib/tree/main/lib/img_jxl/licenses) folder.
+BSD 3-Clause License with Google's patent grant; the texts are in the crate's
+[`licenses/`](https://github.com/JFLibrary/JFLib/tree/main/lib/img_jxl/licenses) folder. The
+Brotli decoder, which the metadata boxes and the JPEG reconstruction need, is
+[`jflib-compress`](https://crates.io/crates/jflib-compress)'s.

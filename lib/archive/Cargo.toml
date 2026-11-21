@@ -18,9 +18,9 @@ doctest = false
 workspace = true
 
 [dependencies]
-# plat: ZipFs (vfs); base: XML of the OPC packages (opc)
+# plat: ZipFs (vfs); base: XML of the OPC packages (opc); compress: DEFLATE and CRC-32
 rt.workspace = true
-img_core.workspace = true
+compress.workspace = true
 plat.workspace = true
 base.workspace = true
 

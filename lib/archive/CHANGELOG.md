@@ -30,6 +30,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   names compared ASCII case-insensitive and percent-escape aware), `rels_name`, `rels_source`,
   `parse_relationships` and `relationships_xml`.
 
+### Changed
+
+- DEFLATE and CRC-32 come from jflib-compress instead of img_core; the crate no longer depends on img_core.
+
 ### Fixed
 
 - Archives with many parts: the checks for duplicate names and overlapping records take
