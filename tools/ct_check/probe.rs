@@ -600,6 +600,35 @@ impl Exec {
     }
 }
 
+/// this process without address randomization (what setarch -R does; started again so when it
+/// is not yet): the children trace starts then have its layout, whose /proc/self/maps names
+/// their addresses, and the same in every one.  Without it every child would have a layout of
+/// its own, and the traces, absolute addresses, would part where no secret decides; so no
+/// tracing then (an error) -- unless the system randomizes nothing anyway (randomize_va_space 0)
+fn unrandomized() -> Result<(), String> {
+    // SAFETY: personality as its manual page describes (0xffffffff only asks)
+    let p = unsafe { personality(0xffff_ffff) };
+    if p == -1 {
+        return Err("personality(2) does not answer: address randomization unknown".into());
+    }
+    let off = std::fs::read_to_string("/proc/sys/kernel/randomize_va_space").is_ok_and(|s| s.trim() == "0");
+    if p & ADDR_NO_RANDOMIZE != 0 || off {
+        return Ok(());
+    }
+    // SAFETY: as above, the persona with one flag more
+    if unsafe { personality((p | ADDR_NO_RANDOMIZE) as u64) } == -1 {
+        return Err("address randomization cannot be turned off (personality(2) refuses ADDR_NO_RANDOMIZE)".into());
+    }
+    let why = match Exec::new(std::env::args_os().map(|a| a.into_encoded_bytes())) {
+        Ok(e) => {
+            e.run();
+            String::from("execv failed")
+        }
+        Err(e) => e,
+    };
+    Err(format!("the probe could not start again without address randomization: {}", why))
+}
+
 /// the addresses the operation of `name` reaches with the secret of `seed`: the target of every
 /// taken branch (PTRACE_SINGLEBLOCK) or every instruction (PTRACE_SINGLESTEP); with `fine_from`,
 /// after that many entries every instruction, at most FINE_MAX more
@@ -736,19 +765,9 @@ fn main() {
             }
         }
         Some(name) => {
-            // without address randomization (what setarch -R does), started again so: the children
-            // then have the layout of this process, whose /proc/self/maps names their addresses,
-            // and the same in every one
-            // SAFETY: personality as its manual page describes
-            unsafe {
-                let p = personality(0xffff_ffff);
-                if p != -1 && p & ADDR_NO_RANDOMIZE == 0 && personality((p | ADDR_NO_RANDOMIZE) as u64) != -1 {
-                    if let Ok(e) = Exec::new(std::env::args_os().map(|a| a.into_encoded_bytes())) {
-                        e.run();
-                    }
-                    // no new start: the children as randomized as this process
-                    personality(p as u64);
-                }
+            if let Err(e) = unrandomized() {
+                println!("error {}", e);
+                std::process::exit(3);
             }
             let seeds: u64 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(3).max(2);
             let mut step = if std::env::var("CT_STEP").as_deref() == Ok("step") || cfg!(target_arch = "aarch64") { PTRACE_SINGLESTEP } else { PTRACE_SINGLEBLOCK };
