@@ -2816,7 +2816,10 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
 * `cas::Repo` -- content-addressed, deduplicated, encrypted repositories with signed snapshots:
   only trusted keys (`CreateOptions::signer`, `trust_signer`) save and load them
   (`CasError::UntrustedSigner`); the list is protected by the repository key, so it does not
-  keep out someone who can open the repository.
+  keep out someone who can open the repository. A repository lives in a folder (`cas::Folder`,
+  `Repo::open(path, ..)`) or in any `cas::Store`, which keeps its objects by kind and name the
+  way S3, SFTP or WebDAV do (`Repo::create_in` / `open_in`; writes atomic and durable, reads of
+  chunks in ranges, one holder through `Store::lock`).
 * `crypto` -- hashes (SHA-2 incl. SHA-384, BLAKE2b, BLAKE3), MACs, KDFs, Argon2id, AEAD
   (ChaCha20-Poly1305, XChaCha, AES-GCM), X25519, P-256 key exchange, Ed25519, RSA (PKCS#1 v1.5,
   PSS) and ECDSA P-256 / P-384 verification (randomness comes from the caller:
