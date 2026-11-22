@@ -530,7 +530,9 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
 ## 4. Text und Schrift
 
 Vorhanden: [`text/fontdb.rs`](../lib/text/fontdb.rs) (durchsucht die Font-Ordner selbst),
-HarfRust-Shaping, Bidi beim Shaping, IME unter Wayland (text-input-v3), Windows und Android.
+HarfRust-Shaping, Bidi beim Shaping (seit 2026-11-22 auch ohne: Zeilen mit Zeichen von rechts
+nach links, [`text/bidi.rs`](../lib/text/bidi.rs)), IME unter Wayland (text-input-v3), Windows und
+Android.
 Seit 2026-10-17 auch Glyph-Fallback und IME unter X11.
 
 - **P1** · *erledigt* · Glyph-Fallback ([`text/fallback.rs`](../lib/text/fallback.rs)): Fehlt
@@ -755,11 +757,20 @@ Sortierung nach Sprache und Groß- / Kleinschreibung.
   LTR-Inseln (`ltr_begin` / `ltr_end`). Skripte, Agent, Popup-Fenster, WM_NCHITTEST,
   Fenstergriffe und IME sehen physische Koordinaten. Getestet mit `gallery/tests/rtl.uis`.
   Bibliothekstexte gibt es auch auf Arabisch und Hebräisch (`datagallery/tests/lang_ar.uis`).
-  Es fehlen noch: rechtsbündige Eingabe mit Bidi-Cursor für RTL-Text in Textfeldern, der
-  native Fensterrahmen (Titelleiste des Systems). Texte der Steuerelemente werden ohne
-  Bidi-Umordnung gezeichnet (das Shaping ist dort aus): hebräische und arabische Wörter stehen in
-  umgekehrter Buchstabenfolge, z. B. „מחיקה“ als „הקיחמ“ (gesehen 2026-11-21 in
-  `datagallery --lang he` und im Setup, U7).
+  Seit 2026-11-22 stehen die Texte der Steuerelemente (Beschriftungen, Schaltflächen,
+  Checkboxen, Optionsfelder, Überschriften, Listen) in der richtigen Reihenfolge; zuvor standen
+  hebräische und arabische Wörter rückwärts, z. B. „מחיקה“ als „הקיחמ“ (gesehen 2026-11-21 in
+  `datagallery --lang he` und im Setup, U7), weil das Shaping dort aus ist. Eine Zeile mit
+  Zeichen von rechts nach links ordnet [`text/bidi.rs`](../lib/text/bidi.rs) jetzt auch ohne
+  Shaping nach dem Unicode-Bidi-Algorithmus (`Text::set_bidi`, an): RTL-Läufe aus einer
+  TrueType-Ersatzschrift formt HarfRust (arabische Verbindungen, Zeichen), die übrigen stehen
+  Cluster für Cluster von rechts nach links, Klammern gespiegelt. Zeilen ohne solche Zeichen
+  behalten Maße und Pixel. Textfelder zeichnen, setzen den Cursor und markieren in derselben
+  Reihenfolge. Getestet mit `lib/text/tests.rs` (`cargo test --lib`) und Bildern von
+  `datagallery --lang he` / `lang_ar.uis` mit `jfgui_FONT_FALLBACK=1`.
+  Es fehlen noch: rechtsbündige Eingabe für RTL-Text in Textfeldern, Pfeiltasten in visueller
+  Richtung (der Cursor geht logisch), Bidi im Rich-Text- und Code-Editor (Abschnitt 6), der
+  native Fensterrahmen (Titelleiste des Systems).
 - **P1** · *erledigt* · Pluralregeln (CLDR) und Platzhalter mit Namen bzw. Index
   ([`ui/i18n_msg.rs`](../lib/ui/i18n_msg.rs)): `i18n::msg` versteht `{name}`, `{0}`, `{}`,
   `plural` (Kategorien `zero` … `other`, `=N`, `#`, `offset`), `select`, `number` (gruppiert,
@@ -954,8 +965,9 @@ Fensterrand hinaus.
     Snippet-Einfügen mit Platzhaltern, keine Minikarte der Faltungen.
   * Getestet mit `apps/editortest` (13 Skripte mit `--verify-dirty`, Windows und Linux, und
     `--test model`: 168 Prüfungen der Modelle und Grammatiken).
-  * Offen: kein bidirektionaler Text innerhalb eines Absatzes (wie bei den Textfeldern bleibt
-    die Reihenfolge LTR); Android-IME (Komposition über `android_ime_*`) nicht angebunden –
+  * Offen: kein bidirektionaler Text innerhalb eines Absatzes (die Reihenfolge bleibt logisch:
+    seit 2026-11-22 zeichnen beide Editoren Zeichen von rechts nach links einzeln, damit sie zu
+    Cursor und Auswahl passen; einfache Textfelder ordnen um, Abschnitt 5); Android-IME (Komposition über `android_ime_*`) nicht angebunden –
     auf Android kommt nur getippter Text an; keine Rechtschreibprüfung, kein Kontextmenü, kein
     Ziehen von Text, keine Bilder / Tabellen im Rich-Text; RTF-Export fehlt (nur HTML / Text /
     JSON); Code-Editor ohne Zeilenumbruch, Mehrfach-Cursor und Regex-Suche (Faltung seit SK6);
@@ -2587,12 +2599,19 @@ Crates, die einer JF-App folgen:
   und macht danach weiter, der Uninstaller ebenso. `--quiet` installiert und entfernt ohne
   Fenster (Optionen für alles auf den Seiten, `--log`, Exit-Codes 0 / 1 / 2 / 740,
   `QuietUninstallString`). Mit einem Stil im Paket entfällt die Stilseite. Geprüft mit
-  `tools/setup_check.py` (Windows oder Wine). Offen: Arabisch und Hebräisch werden wie alle
-  Texte der Steuerelemente ohne Bidi-Umordnung gezeichnet, also rückwärts (Abschnitt 4,
-  RTL-Layout); die Fragen der .deb (debconf) sind deutsch.
-- **P2** · *teilweise* · `netchan` außer der Sicherheit: Nutzlast höchstens 1200 Byte ohne
-  Fragmentierung, über UDP nur unzuverlässig, kein NAT-Traversal, kein Android (dieses steht
-  schon unter G7d Teil 2).
+  `tools/setup_check.py` (Windows oder Wine). Arabisch und Hebräisch stehen seit 2026-11-22 in
+  der richtigen Reihenfolge (Abschnitt 5, RTL-Layout; gesehen mit `setup_check.py --shots` unter
+  Wine). Offen: die Fragen der .deb (debconf) sind deutsch.
+- **P2** · *teilweise* (2026-11-22, U10) · `netchan` außer der Sicherheit: Neben den Paketen ein zuverlässiger,
+  geordneter Teilkanal über UDP und WebSocket ([`netchan/src/reliable.rs`](../lib/netchan/src/reliable.rs),
+  [TRANSPORT.md](TRANSPORT.md) „Zuverlässige Nachrichten“): `send_reliable` nimmt Nachrichten bis 1 MiB, in Stücken von
+  einer Nutzlast (die neue Paketart RELIABLE mit den Folgenummern und Acks von DATA), wiederholt nach `Lost` oder einer
+  Zeitgrenze wie der Probe-Zeitgrenze von QUIC, gesendet mit festem Tempo unter den Grenzen des Servers; der Empfänger
+  setzt zusammen und liefert genau einmal in Reihenfolge, Gegenüber, die das Protokoll brechen, werden getrennt. DATA
+  blieb gleich (`gametest --netsum` blieb `4118995e45c0c067`). Geprüft in `nettest --test reliable` (ein Hauptbuch
+  gegen Verlust, Duplikate, Umordnung, den Umlauf der Nummern, das Tempo, die Grenzen, feindliche Gegenüber) und über
+  echte Sockets (`udp`, `wschan`). Offen: unzuverlässige Nachrichten über einer Nutzlast (der Netcode teilt seine
+  Schnappschüsse selbst), eine Staukontrolle nach dem Netz, NAT-Traversal, Android (steht unter G7d Teil 2).
 - **P2** · *teilweise* (2026-11-22, U8) · `cas` (BackupCraft): Der Speicher ist eine Schnittstelle,
   `cas::Store` ([`cas/store.rs`](../lib/cas/store.rs)): Objekte nach Art und Name, wie S3, SFTP oder WebDAV sie
   halten (`get`, `get_range`, `put`, `delete`, `list`, `init`, `lock`). Ein `put` ist atomar und dauerhaft;
@@ -2603,8 +2622,23 @@ Crates, die einer JF-App folgen:
   dazu ein Speicher, der Fehler macht), mit BackupCraft `http_smoke.py` und `tools/bc_crash.py`. Offen: Speicher
   für S3, SFTP und WebDAV in der Bibliothek; weiterhin ein Halter je Repository (mehrere Prozesse, die zugleich
   sichern, bräuchten geteilte Sperren und einen Index, der nachgeladen wird).
-- **P2** · *teilweise* · `datastore`: alles im RAM und als JSON, keine Indizes (nur `filter`),
-  keine Verschlüsselung der Daten auf der Platte, nicht auf Android und im Web.
+- **P2** · *teilweise* (2026-11-22, U9) · `datastore`: Indizes und Verschlüsselung auf der Platte sind da.
+  Indizes ([`datastore/index.rs`](../lib/datastore/index.rs)) liegen im RAM neben den Daten, jeder Commit hält sie
+  aktuell: auf einem Feld (`Index::field("owner.id")`, ein Array gibt je Element einen Schlüssel) oder einer
+  Funktion des Datensatzes (`Index::by`), auf Wunsch eindeutig (`unique()`: eine Transaktion, die das bräche, wird
+  vor dem Schreiben abgelehnt, `StoreError::Conflict`); `find`, `find_one`, `range` in beide Richtungen mit
+  Grenze, `count_key`. Schlüssel sind Strings, Wahrheitswerte und ganze Zahlen, genau. Verschlüsselung
+  ([`datastore/seal.rs`](../lib/datastore/seal.rs)): `Store::open_encrypted` und `Journal::open_encrypted` mit einem
+  32-Byte-Schlüssel versiegeln Snapshots, jeden Rahmen des Logs und jede Zeile eines Journals
+  (XChaCha20-Poly1305); eine Schlüssel-ID im Snapshot unterscheidet einen falschen Schlüssel von Schaden
+  (`StoreError::Key`, nie „repariert“). `rekey` verschlüsselt einen Speicher, wechselt den Schlüssel oder
+  entschlüsselt, über einen Snapshot und ohne Zwischenzustand; `Journal::rekey` schreibt die Monate neu und ist
+  nach einer Unterbrechung wiederholbar. Behoben: Unter Windows schlug ein zweites `compact()` ohne Transaktion
+  dazwischen fehl (das Log wurde ein zweites Mal geöffnet). Geprüft in `coretest --only datastore` (95, auch unter
+  Wine; ein Zufallsmodell gegen `filter`), mit BackupCraft `http_smoke.py` und `tools/bc_crash.py`. Offen: weiter
+  alles im RAM und als JSON; Indizes werden nicht gespeichert (nach jedem Öffnen neu angelegt); Löschen und
+  Zurückspielen ganzer Dateien durch jemanden, der den Ordner schreiben kann, findet die Verschlüsselung nicht;
+  nicht auf Android und im Web.
 - **P3** · *teilweise* · `doc_*` (jfWord): DOCX nur im eigenen Profil vollständig, andere
   Dateien nur als Textstücke; kein ODT, XLSX oder PPTX; RTF und HTML nur für die Zwischenablage.
 - **P3** · *teilweise* · `eapm`: nur EAP-MD5 und EAP-PWD (für den Simulator). WPA-Enterprise

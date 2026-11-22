@@ -2740,6 +2740,11 @@ text fields, canvas, colour pads, pan and angle controls do it already -- go bet
 `ui.ltr_begin(x, w)` and `ui.ltr_end()`, and read the pointer with `ui.ltr_x(mx)`; an app
 that lays out text itself for `textbox_surface` wraps it that way. Rectangles that leave the
 UI (scripts' `expect rect`, the agent, popup windows, the platform's hit tests) are physical.
+A line of text with right-to-left characters is drawn in its visual order (the Unicode bidi
+algorithm, `text::Text::set_bidi`; Arabic joined by its fallback font), in mirrored windows and
+others alike: labels, buttons, check boxes, headings, lists, and text fields with their caret and
+selection. The rich-text and code editors keep such letters in logical order for now (their
+carets are logical).
 
 ## 16. Several programs per app, app-local crates
 
@@ -2807,7 +2812,11 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   `if_index` and `local_addrs` (the computer's own addresses) are the pieces; `SocketAddr::parse`
   and `Display` know `[fe80::1%2]:53`.
 * `datastore::Store` -- JSON collections in a crash-safe journal database with transactions;
-  `Journal` for append-only logs.
+  `Journal` for append-only logs. Secondary indexes in memory (`add_index` with `Index::field`
+  or `Index::by`, `unique()` refusing what breaks it with `StoreError::Conflict`; `find`,
+  `find_one`, `range`), and encryption at rest (`Store::open_encrypted`,
+  `Journal::open_encrypted` with a 32-byte key, for example from `plat::secret::secret_get`;
+  `rekey` encrypts, changes the key or decrypts).
 * `cas::Repo` -- content-addressed, deduplicated, encrypted repositories with signed snapshots:
   only trusted keys (`CreateOptions::signer`, `trust_signer`) save and load them
   (`CasError::UntrustedSigner`); the list is protected by the repository key, so it does not

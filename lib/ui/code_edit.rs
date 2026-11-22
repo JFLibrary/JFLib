@@ -1530,9 +1530,12 @@ impl Ui {
     fn ce_cells(&mut self, m: &Metrics, x: i32, y: i32, s: &[u8], c: u32, bold: bool, italic: bool) {
         let font = if italic { m.italic } else { m.font };
         let passes = if bold { 2 } else { 1 };
+        // right-to-left letters cell by cell too: the editor's columns stay in logical order
+        // (a run with them would be drawn in its visual order: text::has_rtl)
+        let cells = m.per_cell || text::has_rtl(s);
         for p in 0..passes {
             let dx = p * ((m.size >> 8) / 16 + 1);
-            if m.per_cell {
+            if cells {
                 let mut i = 0;
                 let mut k = 0;
                 while i < s.len() {

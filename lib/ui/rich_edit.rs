@@ -987,7 +987,17 @@ impl Ui {
                         tcol
                     };
                     let base = ry + row.base;
-                    self.cmd_text(x, base, &p.text().as_bytes()[pc.a..pc.b], pc.font, pc.size, col, 0);
+                    let pt = p.text().as_bytes();
+                    if text::has_rtl(&pt[pc.a..pc.b]) {
+                        // right-to-left letters cluster by cluster at the caret stops: the
+                        // editor's carets and selection are in logical order (a run with them
+                        // would be drawn in its visual order)
+                        for w in row.stops.windows(2).filter(|w| w[0].0 >= pc.a && w[0].0 < pc.b) {
+                            self.cmd_text(tx + w[0].1, base, &pt[w[0].0..w[1].0.min(pc.b)], pc.font, pc.size, col, 0);
+                        }
+                    } else {
+                        self.cmd_text(x, base, &pt[pc.a..pc.b], pc.font, pc.size, col, 0);
+                    }
                     let px = pc.size >> 8;
                     let th_line = (px / 14).max(1);
                     if pc.flags & RF_UNDER != 0 || pc.link {

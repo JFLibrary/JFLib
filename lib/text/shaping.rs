@@ -1,35 +1,53 @@
-//! Opt-in complex text layout. UI controls keep their existing metrics unless enabled.
+//! Opt-in complex text layout. UI controls keep their existing metrics unless enabled; lines
+//! with right-to-left characters get the bidi layout of bidi.rs without it.
 use alloc::{vec::Vec, string::String};
 use crate::{Text, registry::Face};
 
 #[derive(Default)]
 pub(crate) struct Cache {
-    pub enabled: bool, serial: u64, font: u32, size: i32,
-    engine: Option<text_shape::Engine>, text: String, glyphs: Vec<Placed>, carets: Vec<(usize,i32)>, width: i32,
+    pub enabled: bool, serial: u64,
+    engine: Option<text_shape::Engine>,
     fallbacks: Vec<(u32, text_shape::Engine)>,
-    segments: Vec<(usize, usize, i32, i32)>,
+    /// the line laid out last: draw, carets, hits and selections read it
+    pub(crate) line: Line,
+    /// (bidi.rs) set_bidi(false); earlier bidi layouts, oldest first; the engines of their fonts
+    pub(crate) bidi_off: bool,
+    pub(crate) lines: Vec<Line>,
+    pub(crate) engines: Vec<(u32, u64, text_shape::Engine)>,
 }
+/// one laid out line: its glyphs, caret positions and the visual span of every character (24.8)
+#[derive(Default)]
+pub(crate) struct Line {
+    /// LINE_SHAPED (set_shaping), LINE_BIDI (bidi.rs) or 0: nothing
+    pub kind: u8, pub text: String, pub font: u32, pub size: i32,
+    /// LINE_BIDI: the registry's serial after the layout (fonts loaded since: laid out again)
+    pub reg: u64,
+    pub glyphs: Vec<Placed>, pub carets: Vec<(usize,i32)>, pub width: i32,
+    pub segments: Vec<(usize, usize, i32, i32)>,
+}
+pub(crate) const LINE_SHAPED: u8 = 1;
+pub(crate) const LINE_BIDI: u8 = 2;
 #[derive(Clone, Copy)]
 pub(crate) struct Placed { pub font: u32, pub id: u32, pub x: i32, pub y: i32 }
 impl Text {
     /// Enable OpenType shaping for measure, draw, hit testing and carets. Returns
     /// the previous state so callers can scope this to a document's text tool.
     pub fn set_shaping(&mut self, enabled: bool) -> bool { core::mem::replace(&mut self.shaping.enabled,enabled) }
-    // (fallback.rs) the line shaped last is shaped again: the fonts for its missing characters changed
-    pub(crate) fn shaping_forget(&mut self) { self.shaping.size=0; }
+    // (fallback.rs) the lines laid out are laid out again: the fonts for their missing characters changed
+    pub(crate) fn shaping_forget(&mut self) { self.shaping.line.kind=0; self.shaping.lines.clear(); }
     pub fn set_fallback_fonts(&mut self, fonts: &[u32]) {
         if self.fb.app != fonts { self.fallback_app(fonts); }
         let ids:Vec<_>=self.shaping.fallbacks.iter().map(|v|v.0).collect();
         if ids==fonts { return; }
         self.shaping.fallbacks=fonts.iter().take(16).filter_map(|&id| self.shape_engine(id).map(|e|(id,e))).collect();
-        self.shaping.size=0;
+        self.shaping_forget();
     }
-    fn shape_face(&self, mut font: u32) -> Option<&crate::ttf::TtFont> {
+    pub(crate) fn shape_face(&self, mut font: u32) -> Option<&crate::ttf::TtFont> {
         for _ in 0..16 { match self.face(font)? { Face::Tt(tt) => return Some(tt), Face::Syn(s) => font=s.base, Face::Var(v) => font=v.base, _ => return None } }
         None
     }
     pub(crate) fn shape_line(&mut self, bytes: &[u8], limit: Option<usize>) -> bool {
-        if !self.shaping.enabled { return false; }
+        if !self.shaping.enabled { return self.bidi_line(bytes, limit); }
         let n=limit.unwrap_or(bytes.len()).min(bytes.len());
         let n=bytes[..n].iter().position(|b| *b==0 || *b==b'\n').unwrap_or(n);
         let Ok(text)=core::str::from_utf8(&bytes[..n]) else { return false; };
@@ -38,10 +56,11 @@ impl Text {
         let serial=self.shape_serial(render_font); // an instance of a variable font: its own engine
         if self.shaping.serial!=serial || self.shaping.engine.is_none() {
             let engine=self.shape_engine(render_font);
-            self.shaping.engine=engine; self.shaping.serial=serial; self.shaping.text.clear(); self.shaping.size=0;
+            self.shaping.engine=engine; self.shaping.serial=serial; self.shaping.line.kind=0;
         }
         if self.shaping.engine.is_none() { return false; }
-        if self.shaping.font==self.font && self.shaping.size==self.size && self.shaping.text==text { return true; }
+        let l=&self.shaping.line;
+        if l.kind==LINE_SHAPED && l.font==self.font && l.size==self.size && l.text==text { return true; }
         if self.system_fallback() { self.shape_system_fallbacks(text, render_font); }
         let fallback_engines:Vec<_>=self.shaping.fallbacks.iter().map(|v|&v.1).collect();
         let Some(glyphs)=self.shaping.engine.as_ref().and_then(|e| e.shape_with_fallback(text,&fallback_engines)) else { return false; };
@@ -73,8 +92,8 @@ impl Text {
         }
         if carets.is_empty() { carets.push((0,0)); }
         carets.sort_by_key(|c| c.0); carets.dedup_by_key(|c| c.0);
-        self.shaping.text=String::from(text); self.shaping.font=self.font; self.shaping.size=self.size;
-        self.shaping.glyphs=placed; self.shaping.carets=carets; self.shaping.width=pen; self.shaping.segments=segments;
+        self.line_set(Line { kind:LINE_SHAPED, text:String::from(text), font:self.font, size:self.size, reg:0,
+            glyphs:placed, carets, width:pen, segments });
         true
     }
     // system fonts for the characters neither the font nor the fallback engines have
@@ -90,25 +109,25 @@ impl Text {
         for id in need {
             if self.shaping.fallbacks.len() >= 16 { break; }
             let engine = self.shape_engine(id);
-            if let Some(e) = engine { self.shaping.fallbacks.push((id, e)); self.shaping.size = 0; }
+            if let Some(e) = engine { self.shaping.fallbacks.push((id, e)); self.shaping.line.kind = 0; }
         }
     }
     pub(crate) fn shaped_draw(&mut self, pen0: i32, mut target: Option<(&mut gfx::Dc,&mut gfx::Surface)>) -> i32 {
         let baseline=self.run_y;
-        for i in 0..self.shaping.glyphs.len() {
-            let g=self.shaping.glyphs[i];
+        for i in 0..self.shaping.line.glyphs.len() {
+            let g=self.shaping.line.glyphs[i];
             if let Some((dc,sf))=&mut target {
                 self.run_y=baseline-(g.y.saturating_add(128)>>8);
                 if !self.color_glyph(dc,sf,g.font,g.id,pen0.saturating_add(g.x)) { self.glyph_draw(dc,sf,g.font,g.id,pen0.saturating_add(g.x),true); }
             }
         }
-        self.run_y=baseline; self.shaping.width
+        self.run_y=baseline; self.shaping.line.width
     }
     pub(crate) fn shaped_caret(&self, index: usize) -> i32 {
-        self.shaping.carets.iter().min_by_key(|c| c.0.abs_diff(index)).map_or(0,|c| c.1.saturating_add(128)>>8)
+        self.shaping.line.carets.iter().min_by_key(|c| c.0.abs_diff(index)).map_or(0,|c| c.1.saturating_add(128)>>8)
     }
     pub(crate) fn shaped_hit(&self, x: i32) -> usize {
-        self.shaping.carets.iter().min_by_key(|c| ((c.1 as i64)-(x as i64*256)).abs()).map_or(0,|c| c.0)
+        self.shaping.line.carets.iter().min_by_key(|c| ((c.1 as i64)-(x as i64*256)).abs()).map_or(0,|c| c.0)
     }
     /// Visual spans for a logical UTF-8 selection. Mixed bidi text may require
     /// disjoint rectangles; the two endpoint carets alone are not sufficient.
@@ -118,7 +137,7 @@ impl Text {
             let a=self.caret_x(text,start); let b=self.caret_x(text,end);
             return alloc::vec![(a.min(b),a.max(b))];
         }
-        let mut spans:Vec<_>=self.shaping.segments.iter().filter(|s|s.0<end && s.1>start)
+        let mut spans:Vec<_>=self.shaping.line.segments.iter().filter(|s|s.0<end && s.1>start)
             .map(|s|((s.2+128)>>8,(s.3+128)>>8)).collect();
         spans.sort_unstable();
         let mut merged:Vec<(i32,i32)>=Vec::new();

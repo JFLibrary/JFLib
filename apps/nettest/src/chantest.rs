@@ -1,6 +1,7 @@
 // chantest -- lib/netchan on real loopback sockets: the UDP channel and the channel over a
 // WebSocket, one server for both, echoes, acks, disconnects, timeouts, caps, the protocol id, the
-// app's permissions; netchan's own WebSocket client type against netio's echo server
+// app's permissions; the reliable channel there and back (large messages in chunks, in order);
+// netchan's own WebSocket client type against netio's echo server
 
 use alloc::format;
 use alloc::string::String;
@@ -56,6 +57,7 @@ pub fn pump(server: &mut Server, clients: &mut [Client], seen: &mut [Seen], ms: 
                     ClientEvent::Delivered(_) => s.delivered += 1,
                     ClientEvent::Lost(_) => s.lost += 1,
                     ClientEvent::Disconnected(r) => s.end = Some(r),
+                    _ => {}
                 }
             }
         }
@@ -129,6 +131,35 @@ fn echo_run(c: &mut Ctx, name: &str, server: &mut Server, ep: Endpoint, n: usize
     Some(cl)
 }
 
+/// messages on the reliable channel, sent back by the server: whole and in the order they went
+fn reliable_echo(c: &mut Ctx, name: &str, server: &mut Server, cl: &mut Client) {
+    let sizes = [100_000usize, 17, 1500, 30_000];
+    let msgs: Vec<Vec<u8>> = (0..12).map(|i| (0..sizes[i % 4]).map(|k| (k * 7 + i * 13) as u8).collect()).collect();
+    for m in &msgs {
+        if let Err(e) = cl.send_reliable(m) {
+            c.check(false, || format!("{}: send_reliable: {}", name, e));
+            return;
+        }
+    }
+    let mut back: Vec<Vec<u8>> = Vec::new();
+    let end = plat::time_us() + 20_000_000;
+    while back.len() < msgs.len() && plat::time_us() < end {
+        while let Some(e) = server.poll() {
+            if let ServerEvent::Reliable { id, data } = e {
+                let _ = server.send_reliable(id, &data);
+            }
+        }
+        while let Some(e) = cl.poll() {
+            if let ClientEvent::Reliable(d) = e {
+                back.push(d);
+            }
+        }
+        plat::sleep_ms(1);
+    }
+    let bytes: usize = msgs.iter().map(|m| m.len()).sum();
+    c.check(back == msgs, || format!("{}: reliable: {} of {} messages ({} bytes) back whole and in order", name, back.len(), msgs.len(), bytes));
+}
+
 pub fn run_udp(quick: bool) -> Ctx {
     let mut c = Ctx::new("udp", quick);
     let n = c.n(2000).max(100);
@@ -147,6 +178,7 @@ pub fn run_udp(quick: bool) -> Ctx {
         c.check(cl.rtt_ms() > 0.0 && cl.rtt_ms() < 250.0, || format!("udp: rtt {} ms on loopback", cl.rtt_ms()));
         let id = server.ids().first().copied().unwrap_or(0);
         c.check(server.peer(id).is_some_and(|p| p.0 == Transport::Udp), || String::from("udp: the server's peer is UDP"));
+        reliable_echo(&mut c, "udp", &mut server, &mut cl);
         cl.disconnect();
         let mut none: [Client; 0] = [];
         let ev = pump(&mut server, &mut none, &mut [], 1000, |_| false);
@@ -250,6 +282,7 @@ pub fn run_ws(quick: bool) -> Ctx {
         c.check(cl.reliable(), || String::from("ws: reliable"));
         let big = alloc::vec![7u8; 60_000];
         c.check(cl.send(&big).is_ok(), || String::from("ws: 60 KB in one message"));
+        reliable_echo(&mut c, "ws", &mut server, &mut cl);
         cl.disconnect();
         let mut none: [Client; 0] = [];
         let ev = pump(&mut server, &mut none, &mut [], 1000, |_| false);

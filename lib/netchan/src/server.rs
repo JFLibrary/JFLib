@@ -7,6 +7,7 @@
 //                                        endpoint.accept(&req) in the app's own handler (with
 //                                        its page's files beside it, say)
 //   server.poll() -> Option<ServerEvent>   send(id, payload) -> seq   disconnect(id)
+//   server.send_reliable(id, message)      the reliable channel (ClientEvent::Reliable at the client)
 //   server.wait(ms)                        sleep until something arrives (a loop without a tick)
 //   connections() / ids() / stats(id) / peer(id) / server_stats() / stop()
 //   set_static_key(secret) / public_key()  the key clients may pin (ClientConfig::server_key)
@@ -377,6 +378,15 @@ impl Server {
         let seq = self.core.send(id, payload, plat::time_us())?;
         self.flush();
         Ok(seq)
+    }
+
+    /// send a message on a client's reliable channel: any size up to ServerConfig::max_message,
+    /// in order, over UDP sent again until the client has it (endpoint::ServerCore::send_reliable).
+    /// It goes out at reliable_bytes_per_s, the rest with the next polls
+    pub fn send_reliable(&mut self, id: u32, payload: &[u8]) -> Result<(), Error> {
+        self.core.send_reliable(id, payload, plat::time_us())?;
+        self.flush();
+        Ok(())
     }
 
     /// end a client's connection (Disconnected(Local) follows)
