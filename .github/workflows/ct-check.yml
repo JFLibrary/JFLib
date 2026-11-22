@@ -55,9 +55,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # 1.98.1: the rust-version of the root Cargo.toml
-          - { os: ubuntu-latest, toolchain: "1.98.1", minutes: 90 }
-          - { os: ubuntu-latest, toolchain: stable, minutes: 90 }
+          # 1.98.1: the rust-version of the root Cargo.toml. x86-64 takes 80 to 110 minutes (a level 15 to
+          # 30, z the longest); 90 cut both off in z on 2026-11-22
+          - { os: ubuntu-latest, toolchain: "1.98.1", minutes: 150 }
+          - { os: ubuntu-latest, toolchain: stable, minutes: 150 }
           - { os: ubuntu-24.04-arm, toolchain: stable, minutes: 180 }
     steps:
       - uses: actions/checkout@v6
