@@ -2,7 +2,10 @@
 // format "bcrepo-1")
 //
 //   Repo::create(path, &CreateOptions) / Repo::open(path, Unlock::{Master, Passphrase,
-//        Recovery})                       one process holds a repository at a time (LOCK)
+//        Recovery})                       a repository in a folder (store::Folder)
+//   Repo::create_in(store, ..) / open_in(store, ..)   in any Store (store.rs: objects by kind
+//                                         and name, the way S3, SFTP or WebDAV keep them);
+//                                         one holder at a time (Store::lock)
 //   repo.writer() -> Writer               put(kind, bytes) / put_stream(reader) -> chunk ids,
 //                                         finish() (packs and indexes are durable);
 //                                         finish_unsaved() -> (stats, Unsaved): the same, and
@@ -22,16 +25,19 @@
 // and mistakes, not someone who holds the repository key (who could call trust_signer).  A
 // repo.json without a MAC (taken away) does not open (Corrupt).
 //
-// Layout:  repo.json  data/<xx>/<pack>.pack  index/<pack>.idx  snapshots/<id>.snap  LOCK
+// Objects: the config "repo" (repo.json), packs, their indexes, snapshots; a Folder keeps them
+//          as repo.json  data/<xx>/<pack>.pack  index/<pack>.idx  snapshots/<id>.snap  LOCK
 // Keys:    one random repository key, wrapped in repo.json for the server's master key, for
 //          passphrases (Argon2id) and for the recovery kit (sealed box); per purpose keys are
 //          derived from it with BLAKE3 derive_key (chunk ids, data, index, snapshots, gear).
 // Chunks:  id = BLAKE3-keyed(id key, plain) -> identical data is stored once, the ids reveal
-//          nothing without the key.  Commit order of a backup: packs (fsync) -> indexes
-//          (fsync) -> snapshot (atomic rename, directory sync); a crash leaves at most
-//          unreferenced packs, which gc removes.  Until its snapshot is there a backup's chunks
-//          are such packs too: gc waits for open writers and for an Unsaved, and a snapshot
-//          saved the plain way after a gc took chunks of it is refused (save_snapshot).
+//          nothing without the key.  Commit order of a backup: packs -> indexes -> snapshot,
+//          each put atomic and durable (Store's rule; Folder: synced, renamed, the folder
+//          synced); a crash leaves at most unreferenced packs, which gc removes.  A listing
+//          that fails stops gc (it is no empty repository).  Until its snapshot is there a
+//          backup's chunks are such packs too: gc waits for open writers and for an Unsaved,
+//          and a snapshot saved the plain way after a gc took chunks of it is refused
+//          (save_snapshot).
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -40,11 +46,12 @@ extern crate alloc;
 pub mod chunker;
 pub mod pack;
 pub mod snapshot;
+pub mod store;
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
 use alloc::string::String;
-use alloc::sync::Arc;
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 use formats::json::{self, Limits, Value};
@@ -55,6 +62,8 @@ use plat::sync::{Mutex, RwLock};
 use crate::chunker::Chunker;
 use crate::pack::{Loc, PackBuf, PackId};
 pub use crate::snapshot::{Node, NodeKind, SnapStats, Snapshot, Tree};
+use crate::store::{Kind, StoreLock};
+pub use crate::store::{Folder, Store};
 
 pub const FORMAT: &str = "bcrepo-1";
 pub type ChunkId = [u8; 32];
@@ -120,9 +129,8 @@ pub fn parse_id(s: &str) -> Option<ChunkId> {
     })
 }
 
-fn io(what: &str, path: &str) -> CasError {
-    CasError::Io(format!("{} {}", what, path))
-}
+/// the name of the config object
+const CONFIG: &str = "repo";
 
 /// the per-purpose keys of a repository
 pub struct Keys {
@@ -224,10 +232,6 @@ fn str_of<'a>(v: &'a Value, k: &str) -> &'a str {
     v.get(k).and_then(|x| x.as_str()).unwrap_or("")
 }
 
-fn join(a: &str, b: &str) -> String {
-    plat::fs::join(a, b)
-}
-
 /// statistics of a writer
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct WriteStats {
@@ -270,7 +274,8 @@ pub struct GcReport {
 pub type Progress<'a> = &'a mut dyn FnMut(u64, u64) -> bool;
 
 pub struct Repo {
-    path: String,
+    store: Box<dyn Store>,
+    location: String,
     cfg: Mutex<Value>,
     keys: Keys,
     chunker: Chunker,
@@ -280,26 +285,20 @@ pub struct Repo {
     gc_lock: RwLock<()>,
     /// a gc of this process has removed chunks: save_snapshot looks its chunks up
     swept: Mutex<bool>,
-    files: Mutex<Vec<(PackId, Arc<plat::File>)>>,
-    _lock: plat::FileLock,
+    _lock: StoreLock,
 }
 
 impl Repo {
-    fn cfg_path(path: &str) -> String {
-        join(path, "repo.json")
-    }
-
     /// create a repository in an empty (or new) folder
     pub fn create(path: &str, o: &CreateOptions) -> CasResult<Repo> {
-        if plat::fs::read_dir(path).is_some_and(|l| !l.is_empty()) {
-            return Err(CasError::NotEmpty);
-        }
-        for d in ["", "data", "index", "snapshots"] {
-            let p = if d.is_empty() { String::from(path) } else { join(path, d) };
-            if !plat::fs::mkdir_private(&p) {
-                return Err(io("cannot create", &p));
-            }
-        }
+        Repo::create_in(Folder::new(path), o)
+    }
+
+    /// create a repository in a store that holds nothing yet (NotEmpty)
+    pub fn create_in(store: impl Store + 'static, o: &CreateOptions) -> CasResult<Repo> {
+        let store: Box<dyn Store> = Box::new(store);
+        store.init()?;
+        let lock = store.lock()?;
         let repo_key: [u8; 32] = plat::random_bytes();
         let (n, w) = wrap(&o.master, AAD_MASTER, &repo_key);
         let mut keys = alloc::vec![Value::object([("kind", Value::string("master")), ("nonce", Value::string(n)), ("wrapped", Value::string(w))])];
@@ -320,14 +319,23 @@ impl Repo {
         ]);
         let mut rk = repo_key;
         let mut cfg = cfg;
-        let r = write_cfg(path, &mut cfg, &Keys::derive(&rk)).and_then(|_| Repo::open_with_key(path, &rk, cfg));
+        let r = write_cfg(&*store, &mut cfg, &Keys::derive(&rk)).and_then(|_| Repo::open_with_key(store, lock, &rk, cfg));
         crypto::zeroize(&mut rk);
         r
     }
 
-    /// open a repository
+    /// open the repository in a folder
     pub fn open(path: &str, unlock: Unlock) -> CasResult<Repo> {
-        let cfg = read_cfg(path)?;
+        Repo::open_in(Folder::new(path), unlock)
+    }
+
+    /// open the repository in a store
+    pub fn open_in(store: impl Store + 'static, unlock: Unlock) -> CasResult<Repo> {
+        let store: Box<dyn Store> = Box::new(store);
+        read_cfg(&*store)?; // (no lock taken where no repository is)
+        let lock = store.lock()?;
+        // read again under the lock: the holder before may have changed it
+        let cfg = read_cfg(&*store)?;
         let entries = cfg.get("keys").and_then(|k| k.as_array()).unwrap_or(&[]);
         let mut key = None;
         for e in entries {
@@ -361,13 +369,12 @@ impl Repo {
             }
         }
         let Some(mut k) = key else { return Err(CasError::Locked) };
-        let r = Repo::open_with_key(path, &k, cfg);
+        let r = Repo::open_with_key(store, lock, &k, cfg);
         crypto::zeroize(&mut k);
         r
     }
 
-    fn open_with_key(path: &str, repo_key: &[u8; 32], cfg: Value) -> CasResult<Repo> {
-        let lock = plat::FileLock::acquire(&join(path, "LOCK")).ok_or(CasError::InUse)?;
+    fn open_with_key(store: Box<dyn Store>, lock: StoreLock, repo_key: &[u8; 32], cfg: Value) -> CasResult<Repo> {
         let keys = Keys::derive(repo_key);
         // every published version writes the MAC; one taken away is not sealed again (whoever
         // could write repo.json could otherwise change signers, retention and keys and have them
@@ -380,18 +387,18 @@ impl Repo {
         let avg = cfg.get("chunk_avg").and_then(|x| x.as_u64()).unwrap_or(1 << 20).clamp(MIN_CHUNK_AVG as u64, MAX_CHUNK_AVG as u64) as usize;
         let codec = Codec::from_name(str_of(&cfg, "compression")).unwrap_or(Codec::Lz4);
         let chunker = Chunker::new(&keys.gear, avg);
-        let repo = Repo { path: String::from(path), cfg: Mutex::new(cfg), keys, chunker, codec, index: Mutex::new(BTreeMap::new()), gc_lock: RwLock::new(()), swept: Mutex::new(false), files: Mutex::new(Vec::new()), _lock: lock };
+        let location = store.location();
+        let repo = Repo { store, location, cfg: Mutex::new(cfg), keys, chunker, codec, index: Mutex::new(BTreeMap::new()), gc_lock: RwLock::new(()), swept: Mutex::new(false), _lock: lock };
         repo.load_index()?;
         Ok(repo)
     }
 
     fn load_index(&self) -> CasResult<()> {
-        let dir = join(&self.path, "index");
         let mut map = BTreeMap::new();
-        for e in plat::fs::read_dir(&dir).unwrap_or_default() {
-            let Some(pid) = e.name.strip_suffix(".idx").and_then(pack::parse_pack) else { continue };
-            let p = join(&dir, &e.name);
-            let b = plat::read_file(&p).ok_or_else(|| io("cannot read", &p))?;
+        for (name, _) in self.store.list(Kind::Index)? {
+            let Some(pid) = pack::parse_pack(&name) else { continue };
+            // (gone since the listing: nothing to load)
+            let Some(b) = self.store.get(Kind::Index, &name)? else { continue };
             for (id, loc) in pack::open_index(&self.keys, &pid, &b)? {
                 map.entry(id).or_insert(loc);
             }
@@ -400,8 +407,14 @@ impl Repo {
         Ok(())
     }
 
+    /// where the repository is: its folder (Repo::open), else the store's location
     pub fn path(&self) -> &str {
-        &self.path
+        &self.location
+    }
+
+    /// the store the repository lives in
+    pub fn store(&self) -> &dyn Store {
+        &*self.store
     }
 
     pub fn id(&self) -> String {
@@ -429,24 +442,16 @@ impl Repo {
         self.index.lock().contains_key(id)
     }
 
-    /// bytes of all pack files
+    /// bytes of all pack files (0 when the store cannot list them)
     pub fn stored_bytes(&self) -> u64 {
-        let data = join(&self.path, "data");
-        let mut sum = 0;
-        for d in plat::fs::read_dir(&data).unwrap_or_default() {
-            let sub = join(&data, &d.name);
-            for f in plat::fs::read_dir(&sub).unwrap_or_default() {
-                sum += plat::fs::stat(&join(&sub, &f.name)).map_or(0, |m| m.size);
-            }
-        }
-        sum
+        self.pack_files().map_or(0, |l| l.iter().fold(0u64, |s, (_, n)| s.saturating_add(*n)))
     }
 
     fn update_cfg(&self, f: impl FnOnce(&mut Value)) -> CasResult<()> {
         let mut cfg = self.cfg.lock();
         let mut v = cfg.clone();
         f(&mut v);
-        write_cfg(&self.path, &mut v, &self.keys)?;
+        write_cfg(&*self.store, &mut v, &self.keys)?;
         *cfg = v;
         Ok(())
     }
@@ -544,30 +549,12 @@ impl Repo {
         Writer { repo: self, _g: self.gc_lock.read(), pack: PackBuf::new(), pending: BTreeMap::new(), stats: WriteStats::default(), codec: self.codec, level: compress::zstd::LEVEL_DEFAULT }
     }
 
-    fn pack_path(&self, p: &PackId) -> String {
-        let h = pack::pack_hex(p);
-        join(&join(&join(&self.path, "data"), &h[..2]), &format!("{}.pack", h))
-    }
-
-    fn index_path(&self, p: &PackId) -> String {
-        join(&join(&self.path, "index"), &format!("{}.idx", pack::pack_hex(p)))
-    }
-
     /// write a full pack and its index durably
     fn store_pack(&self, buf: &mut PackBuf) -> CasResult<u64> {
         let bytes = buf.finish(&self.keys);
-        let pp = self.pack_path(&buf.id);
-        let dir = String::from(plat::fs::parent(&pp));
-        if !plat::fs::mkdir_private(&dir) {
-            return Err(io("cannot create", &dir));
-        }
-        if !plat::fs::write_file_private(&pp, &bytes) {
-            return Err(io("cannot write", &pp));
-        }
-        let ip = self.index_path(&buf.id);
-        if !plat::fs::write_file_private(&ip, &pack::seal_index(&self.keys, &buf.id, &buf.entries)) {
-            return Err(io("cannot write", &ip));
-        }
+        let name = pack::pack_hex(&buf.id);
+        self.store.put(Kind::Pack, &name, &bytes)?;
+        self.store.put(Kind::Index, &name, &pack::seal_index(&self.keys, &buf.id, &buf.entries))?;
         let mut idx = self.index.lock();
         for (id, loc) in &buf.entries {
             idx.entry(*id).or_insert(*loc);
@@ -577,32 +564,14 @@ impl Repo {
 
     // ------------------------------------------------------------------ reading
 
-    fn pack_file(&self, p: &PackId) -> CasResult<Arc<plat::File>> {
-        let mut files = self.files.lock();
-        if let Some(i) = files.iter().position(|(id, _)| id == p) {
-            let e = files.remove(i);
-            let f = e.1.clone();
-            files.push(e);
-            return Ok(f);
-        }
-        let path = self.pack_path(p);
-        let f = Arc::new(plat::File::open(&plat::fs::long_path(&path), plat::FO_READ).ok_or_else(|| io("cannot open", &path))?);
-        if files.len() >= 32 {
-            files.remove(0);
-        }
-        files.push((*p, f.clone()));
-        Ok(f)
-    }
-
     fn read_blob(&self, loc: &Loc) -> CasResult<Vec<u8>> {
-        let f = self.pack_file(&loc.pack)?;
-        let mut buf = alloc::vec![0u8; loc.len as usize];
-        let mut done = 0;
-        while done < buf.len() {
-            match f.read_at(loc.off as u64 + done as u64, &mut buf[done..]) {
-                Some(0) | None => return Err(CasError::Corrupt(format!("pack {} truncated", pack::pack_hex(&loc.pack)))),
-                Some(n) => done += n,
-            }
+        let name = pack::pack_hex(&loc.pack);
+        let buf = match self.store.get_range(Kind::Pack, &name, loc.off as u64, loc.len as usize) {
+            Err(CasError::NotFound(_)) => return Err(CasError::Corrupt(format!("pack {} missing", name))),
+            r => r?,
+        };
+        if buf.len() != loc.len as usize {
+            return Err(CasError::Corrupt(format!("pack {} truncated", name)));
         }
         Ok(buf)
     }
@@ -619,10 +588,6 @@ impl Repo {
     }
 
     // ------------------------------------------------------------------ snapshots
-
-    fn snap_path(&self, id: &str) -> String {
-        join(&join(&self.path, "snapshots"), &format!("{}.snap", id))
-    }
 
     /// store a snapshot (after its writer finished); signed by `signer`, a key the repository
     /// trusts (CreateOptions::signer or one given to trust_signer), else UntrustedSigner.
@@ -658,22 +623,21 @@ impl Repo {
             return Err(CasError::NotFound(snap.id.clone()));
         }
         let b = snapshot::seal(&self.keys.snapshot, signer, snap)?;
-        let p = self.snap_path(&snap.id);
-        if !plat::fs::write_file_private(&p, &b) {
-            return Err(io("cannot write", &p));
-        }
-        Ok(())
+        self.store.put(Kind::Snapshot, &snap.id, &b)
     }
 
+    /// the ids of the snapshots, sorted (none when the store cannot list them)
     pub fn snapshot_ids(&self) -> Vec<String> {
-        let mut v: Vec<String> = plat::fs::read_dir(&join(&self.path, "snapshots"))
-            .unwrap_or_default()
-            .into_iter()
-            .filter_map(|e| e.name.strip_suffix(".snap").map(String::from))
-            .filter(|n| !n.contains(".tmp"))
-            .collect();
+        self.snapshot_list().unwrap_or_default()
+    }
+
+    // (gc and check: an error, not an empty list -- gc would take every chunk)
+    fn snapshot_list(&self) -> CasResult<Vec<String>> {
+        // a name save_snapshot cannot have written is no snapshot
+        let mut v: Vec<String> = self.store.list(Kind::Snapshot)?.into_iter().map(|(n, _)| n).filter(|n| !bad_snap_id(n)).collect();
         v.sort();
-        v
+        v.dedup();
+        Ok(v)
     }
 
     /// a snapshot, checked (signature by a trusted key, authentic encryption)
@@ -681,8 +645,7 @@ impl Repo {
         if bad_snap_id(id) {
             return Err(CasError::NotFound(String::from(id)));
         }
-        let p = self.snap_path(id);
-        let b = plat::read_file(&p).ok_or_else(|| CasError::NotFound(String::from(id)))?;
+        let b = self.store.get(Kind::Snapshot, id)?.ok_or_else(|| CasError::NotFound(String::from(id)))?;
         let (snap, signer) = snapshot::open(&self.keys.snapshot, id, &b)?;
         if !self.trusted(&signer) {
             return Err(CasError::Corrupt(format!("snapshot {} signed by an unknown key", id)));
@@ -698,11 +661,7 @@ impl Repo {
         if until > now {
             return Err(CasError::Immutable(until));
         }
-        if !plat::delete(&self.snap_path(id)) {
-            return Err(io("cannot delete", &self.snap_path(id)));
-        }
-        plat::fs::sync_dir(&join(&self.path, "snapshots"));
-        Ok(())
+        self.store.delete(Kind::Snapshot, id)
     }
 
     /// every chunk a snapshot references (trees and data)
@@ -732,18 +691,15 @@ impl Repo {
 
     // ------------------------------------------------------------------ maintenance
 
-    fn pack_files(&self) -> Vec<(PackId, String)> {
-        let data = join(&self.path, "data");
-        let mut out = Vec::new();
-        for d in plat::fs::read_dir(&data).unwrap_or_default() {
-            let sub = join(&data, &d.name);
-            for f in plat::fs::read_dir(&sub).unwrap_or_default() {
-                if let Some(p) = f.name.strip_suffix(".pack").and_then(pack::parse_pack) {
-                    out.push((p, join(&sub, &f.name)));
-                }
+    /// the packs of the store and their sizes (the names that are pack ids, each once)
+    fn pack_files(&self) -> CasResult<Vec<(PackId, u64)>> {
+        let mut m = BTreeMap::new();
+        for (name, size) in self.store.list(Kind::Pack)? {
+            if let Some(p) = pack::parse_pack(&name) {
+                m.insert(p, size);
             }
         }
-        out
+        Ok(m.into_iter().collect())
     }
 
     /// check the repository: every snapshot opens and verifies, every referenced chunk is
@@ -752,7 +708,7 @@ impl Repo {
         let _g = self.gc_lock.read();
         let mut rep = CheckReport::default();
         let mut referenced = BTreeSet::new();
-        let ids = self.snapshot_ids();
+        let ids = self.snapshot_list()?;
         rep.snapshots = ids.len() as u64;
         for id in &ids {
             match self.load_snapshot(id).and_then(|s| self.referenced(&s, &mut referenced)) {
@@ -763,7 +719,7 @@ impl Repo {
         rep.chunks_referenced = referenced.len() as u64;
         let idx = self.index.lock().clone();
         rep.missing = referenced.iter().filter(|c| !idx.contains_key(*c)).count() as u64;
-        let packs = self.pack_files();
+        let packs = self.pack_files()?;
         rep.packs = packs.len() as u64;
         let indexed: BTreeSet<PackId> = idx.values().map(|l| l.pack).collect();
         rep.orphan_packs = packs.iter().filter(|(p, _)| !indexed.contains(p)).count() as u64;
@@ -794,8 +750,9 @@ impl Repo {
         // it would go as one nobody uses, with the chunks of its snapshots
         let (_, unindexed) = self.repair_missing()?;
         let mut live = BTreeSet::new();
-        for id in self.snapshot_ids() {
-            // a snapshot that does not open stops gc: its chunks must not be lost
+        // a listing that failed stops gc, as a snapshot that does not open: their chunks
+        // must not be lost
+        for id in self.snapshot_list()? {
             let s = self.load_snapshot(&id)?;
             self.referenced(&s, &mut live)?;
         }
@@ -807,7 +764,7 @@ impl Repo {
             }
         }
         let mut rep = GcReport::default();
-        let packs = self.pack_files();
+        let packs = self.pack_files()?;
         let total = packs.len() as u64;
         let mut by_pack: BTreeMap<PackId, Vec<(ChunkId, Loc)>> = BTreeMap::new();
         for (id, loc) in self.index.lock().iter() {
@@ -815,22 +772,22 @@ impl Repo {
         }
         let mut out = PackBuf::new();
         let mut moved: Vec<(ChunkId, Loc)> = Vec::new();
-        let mut to_delete: Vec<(PackId, String, u64)> = Vec::new();
-        for (k, (pid, path)) in packs.iter().enumerate() {
+        let mut to_delete: Vec<(PackId, u64)> = Vec::new();
+        for (k, &(pid, size)) in packs.iter().enumerate() {
             if !progress(k as u64, total) {
                 return Err(CasError::Cancelled);
             }
-            let size = plat::fs::stat(path).map_or(0, |m| m.size);
             // the entries of this pack that are the index's copy and still referenced
-            let entries: Vec<(ChunkId, Loc)> = by_pack.remove(pid).unwrap_or_default();
+            let entries: Vec<(ChunkId, Loc)> = by_pack.remove(&pid).unwrap_or_default();
             let used: Vec<&(ChunkId, Loc)> = entries.iter().filter(|(i, _)| live.contains(i)).collect();
             let used_bytes: u64 = used.iter().map(|(_, l)| l.len as u64).sum();
             if used.is_empty() {
-                to_delete.push((*pid, path.clone(), size));
+                to_delete.push((pid, size));
                 rep.chunks_removed += entries.len() as u64;
                 continue;
             }
-            if used_bytes * 10 >= size * 6 {
+            // (the size is the store's word: a wrong one only changes whether it is rewritten)
+            if used_bytes.saturating_mul(10) >= size.saturating_mul(6) {
                 continue; // dense enough
             }
             for (id, loc) in &used {
@@ -846,7 +803,7 @@ impl Repo {
                 }
             }
             rep.chunks_removed += (entries.len() - used.len()) as u64;
-            to_delete.push((*pid, path.clone(), size));
+            to_delete.push((pid, size));
             rep.packs_repacked += 1;
         }
         if !out.is_empty() {
@@ -861,18 +818,19 @@ impl Repo {
             for (id, loc) in &moved {
                 idx.insert(*id, *loc);
             }
-            let dead: BTreeSet<PackId> = to_delete.iter().map(|(p, _, _)| *p).collect();
+            let dead: BTreeSet<PackId> = to_delete.iter().map(|(p, _)| *p).collect();
             idx.retain(|_, l| !dead.contains(&l.pack));
         }
-        self.files.lock().clear();
-        for (pid, path, size) in to_delete {
-            plat::delete(&self.index_path(&pid));
-            if plat::delete(&path) {
-                rep.bytes_freed += size;
+        for (pid, size) in to_delete {
+            let name = pack::pack_hex(&pid);
+            // the index first: one left behind by a pack that is gone would name chunks that
+            // are not there (and could win over their moved copy on the next open).  Where it
+            // cannot go, the pack stays too, for the next gc
+            if self.store.delete(Kind::Index, &name).is_ok() && self.store.delete(Kind::Pack, &name).is_ok() {
+                rep.bytes_freed = rep.bytes_freed.saturating_add(size);
                 rep.packs_deleted += 1;
             }
         }
-        plat::fs::sync_dir(&join(&self.path, "index"));
         Ok(rep)
     }
 
@@ -899,18 +857,16 @@ impl Repo {
     fn repair_missing(&self) -> CasResult<(u64, u64)> {
         let mut fixed = 0;
         let mut left = 0;
-        for (pid, path) in self.pack_files() {
-            if plat::file_exists(&self.index_path(&pid)) == 1 {
+        let have: BTreeSet<PackId> = self.store.list(Kind::Index)?.iter().filter_map(|(n, _)| pack::parse_pack(n)).collect();
+        for (pid, size) in self.pack_files()? {
+            if have.contains(&pid) {
                 continue;
             }
-            let b = plat::read_file(&path).ok_or_else(|| io("cannot read", &path))?;
-            let Ok(entries) = pack::trailer_index(&self.keys, &pid, &b) else {
+            let Some(entries) = self.read_trailer(&pid, size)? else {
                 left += 1;
                 continue; // no trailer: an interrupted write, gc removes it
             };
-            if !plat::fs::write_file_private(&self.index_path(&pid), &pack::seal_index(&self.keys, &pid, &entries)) {
-                return Err(io("cannot write", &self.index_path(&pid)));
-            }
+            self.store.put(Kind::Index, &pack::pack_hex(&pid), &pack::seal_index(&self.keys, &pid, &entries))?;
             let mut idx = self.index.lock();
             for (id, loc) in entries {
                 idx.entry(id).or_insert(loc);
@@ -919,10 +875,32 @@ impl Repo {
         }
         Ok((fixed, left))
     }
+
+    // the index in a pack's trailer, read from its end (two ranges, not the whole pack: a
+    // store far away) -> None where there is no readable one
+    fn read_trailer(&self, pid: &PackId, size: u64) -> CasResult<Option<Vec<(ChunkId, Loc)>>> {
+        let name = pack::pack_hex(pid);
+        let Some(tail_at) = size.checked_sub(8) else { return Ok(None) };
+        let tail = match self.store.get_range(Kind::Pack, &name, tail_at, 8) {
+            Err(CasError::NotFound(_)) => return Ok(None), // (gone since the listing)
+            r => r?,
+        };
+        if tail.len() != 8 || &tail[4..] != pack::PACK_TRAILER {
+            return Ok(None);
+        }
+        let n = u32::from_le_bytes([tail[0], tail[1], tail[2], tail[3]]) as u64;
+        // (the blobs start after the 4 bytes of PACK_MAGIC)
+        let Some(at) = tail_at.checked_sub(n).filter(|&a| a >= 4) else { return Ok(None) };
+        let idx = self.store.get_range(Kind::Pack, &name, at, n as usize)?;
+        if idx.len() as u64 != n {
+            return Ok(None);
+        }
+        Ok(pack::open_index(&self.keys, pid, &idx).ok())
+    }
 }
 
-fn read_cfg(path: &str) -> CasResult<Value> {
-    let b = plat::read_file(&Repo::cfg_path(path)).ok_or(CasError::NotARepository)?;
+fn read_cfg(store: &dyn Store) -> CasResult<Value> {
+    let b = store.get(Kind::Config, CONFIG)?.ok_or(CasError::NotARepository)?;
     let v = json::parse_with_limits(&b, big_limits()).map_err(|_| CasError::NotARepository)?;
     if str_of(&v, "format") != FORMAT {
         return Err(CasError::NotARepository);
@@ -938,25 +916,27 @@ fn cfg_mac(keys: &Keys, v: &Value) -> CasResult<String> {
     Ok(crypto::hex(&crypto::blake3::keyed_hash(&keys.cfg, text.as_bytes())))
 }
 
-fn write_cfg(path: &str, v: &mut Value, keys: &Keys) -> CasResult<()> {
+fn write_cfg(store: &dyn Store, v: &mut Value, keys: &Keys) -> CasResult<()> {
     let mac = cfg_mac(keys, v)?;
     v.insert("mac", Value::string(mac));
     let text = json::stringify_with_limits(v, big_limits()).map_err(|_| CasError::TooLarge)?;
-    let p = Repo::cfg_path(path);
-    if !plat::fs::write_file_private(&p, text.as_bytes()) {
-        return Err(io("cannot write", &p));
-    }
-    Ok(())
+    store.put(Kind::Config, CONFIG, text.as_bytes())
 }
 
 /// the id of a repository folder without opening it
 pub fn peek_id(path: &str) -> CasResult<String> {
-    Ok(String::from(str_of(&read_cfg(path)?, "id")))
+    peek_id_in(&Folder::new(path))
 }
 
-/// an id that would leave the snapshots folder or name a stream or a temp file
+/// the id of the repository in a store without opening it
+pub fn peek_id_in(store: &dyn Store) -> CasResult<String> {
+    Ok(String::from(str_of(&read_cfg(store)?, "id")))
+}
+
+/// an id that would leave the snapshots folder or name a stream or a temp file (a name no
+/// store may be asked for: store::name_ok)
 fn bad_snap_id(id: &str) -> bool {
-    id.is_empty() || id.contains(['/', '\\', '.', ':'])
+    !store::name_ok(id)
 }
 
 /// writes new chunks into packs
