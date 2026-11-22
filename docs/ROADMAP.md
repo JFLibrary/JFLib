@@ -2593,8 +2593,16 @@ Crates, die einer JF-App folgen:
 - **P2** · *teilweise* · `netchan` außer der Sicherheit: Nutzlast höchstens 1200 Byte ohne
   Fragmentierung, über UDP nur unzuverlässig, kein NAT-Traversal, kein Android (dieses steht
   schon unter G7d Teil 2).
-- **P2** · *teilweise* · `cas` (BackupCraft): speichert nur in einem Ordner über `plat::fs`, ohne
-  Schnittstelle für entfernte Speicher (S3, SFTP, WebDAV); ein Prozess je Repository.
+- **P2** · *teilweise* (2026-11-22, U8) · `cas` (BackupCraft): Der Speicher ist eine Schnittstelle,
+  `cas::Store` ([`cas/store.rs`](../lib/cas/store.rs)): Objekte nach Art und Name, wie S3, SFTP oder WebDAV sie
+  halten (`get`, `get_range`, `put`, `delete`, `list`, `init`, `lock`). Ein `put` ist atomar und dauerhaft;
+  Chunks und die Reparatur eines verlorenen Index lesen nur Bereiche. Der Ordner ist die erste Umsetzung
+  (`cas::Folder`, auch auf Mounts wie `mem://`), `Repo::create_in` / `open_in` nehmen jede andere. Behoben: Ließ
+  sich der Ordner der Snapshots nicht lesen, nahm gc das für „keine Snapshots“ und löschte jedes Paket; jetzt
+  bricht es ab. Geprüft in `coretest --only cas` (der ganze Ablauf im Ordner und in einem Speicher des Tests,
+  dazu ein Speicher, der Fehler macht), mit BackupCraft `http_smoke.py` und `tools/bc_crash.py`. Offen: Speicher
+  für S3, SFTP und WebDAV in der Bibliothek; weiterhin ein Halter je Repository (mehrere Prozesse, die zugleich
+  sichern, bräuchten geteilte Sperren und einen Index, der nachgeladen wird).
 - **P2** · *teilweise* (2026-11-22, U9) · `datastore`: Indizes und Verschlüsselung auf der Platte sind da.
   Indizes ([`datastore/index.rs`](../lib/datastore/index.rs)) liegen im RAM neben den Daten, jeder Commit hält sie
   aktuell: auf einem Feld (`Index::field("owner.id")`, ein Array gibt je Element einen Schlüssel) oder einer
