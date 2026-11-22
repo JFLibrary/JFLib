@@ -2807,7 +2807,11 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   `if_index` and `local_addrs` (the computer's own addresses) are the pieces; `SocketAddr::parse`
   and `Display` know `[fe80::1%2]:53`.
 * `datastore::Store` -- JSON collections in a crash-safe journal database with transactions;
-  `Journal` for append-only logs.
+  `Journal` for append-only logs. Secondary indexes in memory (`add_index` with `Index::field`
+  or `Index::by`, `unique()` refusing what breaks it with `StoreError::Conflict`; `find`,
+  `find_one`, `range`), and encryption at rest (`Store::open_encrypted`,
+  `Journal::open_encrypted` with a 32-byte key, for example from `plat::secret::secret_get`;
+  `rekey` encrypts, changes the key or decrypts).
 * `cas::Repo` -- content-addressed, deduplicated, encrypted repositories with signed snapshots:
   only trusted keys (`CreateOptions::signer`, `trust_signer`) save and load them
   (`CasError::UntrustedSigner`); the list is protected by the repository key, so it does not
