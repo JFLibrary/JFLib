@@ -15,6 +15,8 @@ Browser und auf dem Desktop, im Browser trägt WebSocket das Netz. Drei Teile:
 Stand: G7d Teil 1. Teil 2: `wss:` über das TLS 1.3 von `netio` geprüft, Messungen zwischen Rechnern und
 über ein echtes Netz, die Grenzen nach diesen Messungen ([Für Teil 2](#für-teil-2)). Seit dem 21.11.2026 (Paket U3 aus
 Abschnitt 13 der ROADMAP) ist der Kanal über UDP verschlüsselt und authentisiert ([Verschlüsselung](#verschlüsselung)).
+Seit dem 22.11.2026 (U10) hat er neben den Paketen einen zuverlässigen, geordneten Teilkanal für Nachrichten jeder Größe
+bis 1 MiB, in Stücken über UDP ([Zuverlässige Nachrichten](#zuverlässige-nachrichten)).
 
 | Teil | Wo |
 | --- | --- |
@@ -24,6 +26,7 @@ Abschnitt 13 der ROADMAP) ist der Kanal über UDP verschlüsselt und authentisie
 | Folgenummern, Bestätigungen, Umlaufzeit | [`lib/netchan/src/conn.rs`](../lib/netchan/src/conn.rs) |
 | Handschlag, Server und Client ohne Ein- und Ausgabe | [`lib/netchan/src/endpoint.rs`](../lib/netchan/src/endpoint.rs) |
 | Schlüssel des Handschlags, Siegel der Pakete | [`lib/netchan/src/seal.rs`](../lib/netchan/src/seal.rs) |
+| Zuverlässige Nachrichten: Stücke, Wiederholung, Zusammensetzen | [`lib/netchan/src/reliable.rs`](../lib/netchan/src/reliable.rs) |
 | Server und Client mit Sockets, ein WebSocket-Typ für alle Ziele | [`server.rs`](../lib/netchan/src/server.rs), [`client.rs`](../lib/netchan/src/client.rs), [`ws.rs`](../lib/netchan/src/ws.rs) |
 | Tests, Fuzzing, Messung, Browser-Test | [`apps/nettest`](../apps/nettest/README.md) |
 
@@ -89,6 +92,9 @@ let seq = client.send(&eingaben)?;
 
 - `Client::connect(Endpoint::Udp(addr) | Endpoint::WebSocket(url), ClientConfig)`, `poll() -> ClientEvent`,
   `send(payload) -> seq`, `state()`, `reliable()`, `max_payload()`, `stats()`, `rtt_ms()`, `disconnect()`.
+- Der zuverlässige Teilkanal: `Client::send_reliable(message)`, `Server::send_reliable(id, message)` (auch an den
+  Kernen), beim Empfänger `ClientEvent::Reliable(data)` und `ServerEvent::Reliable { id, data }`; die Grenzen
+  `max_message`, `max_reliable_queued`, `reliable_bytes_per_s` in `ServerConfig` und `ClientConfig`.
 - `Server::new(ServerConfig)`, `bind_udp`, `listen_ws(addr, pfad)`, `ws_endpoint()` (`WsEndpoint::accept(&req)` im eigenen
   Handler, etwa neben den Dateien der Seite), `poll() -> ServerEvent`, `wait(ms)`, `send(id, payload) -> seq`,
   `disconnect(id)`, `connections()`, `ids()`, `stats(id)`, `peer(id)`, `server_stats()`.
@@ -163,6 +169,7 @@ Byte 0 ist `VERSION << 4 | Art` (Version 2 seit U3; Version 1 ohne Schlüssel li
 | ACCEPT | Server → Client | Nonce, Token u32, größte Nutzlast u16, Schlüssel [32], Bestätigung [16] | 63 |
 | DENY | Server → Client | Nonce, Grund u8 (voll, Protokoll, Adresse, Schlüssel) | 10 |
 | DATA | beide | Token u32, Folgenummer u16, Ack u16, Ack-Bits u32, Nutzlast | 13 + n, über UDP + 16 |
+| RELIABLE | beide | wie DATA; die Nutzlast: Stücke des zuverlässigen Teilkanals (Id u16, Flags u8, Länge u16, Bytes) | 13 + n, über UDP + 16 |
 | DISCONNECT | beide | Token u32, Folgenummer u16, Grund u8 | 8, über UDP + 16 |
 
 Eine Nachricht ist ein Paket: Der Kopf von DATA kostet 13 Bytes, über UDP kommt das Siegel mit 16 Bytes dazu, die
@@ -170,6 +177,8 @@ Nutzlast ist höchstens 1200 Bytes über UDP (einstellbar bis 1400: 1400 + 13 + 
 Ethernet auch mit IPv6) und 64 KiB über WebSocket. Über WebSocket trägt jede binäre Nachricht ein Paket, das Token ist 0,
 Schlüssel und Bestätigung des ACCEPT sind Nullen, nichts ist versiegelt. `packet::parse` liest genaue Größen, ohne
 Allokation und ohne Panik; über UDP ist die Nutzlast von DATA, wie `parse` sie liefert, der Geheimtext mit dem Siegel.
+RELIABLE (seit U10) teilt Folgenummern, Acks und Siegel mit DATA; DATA selbst blieb gleich, ein Kanal ohne zuverlässige
+Nachrichten schreibt dieselben Bytes wie vorher (`gametest --netsum` blieb gleich).
 
 ### Handschlag über UDP
 
@@ -250,6 +259,35 @@ davor als Bits. Beide Seiten merken sich 1024 Nummern zurück.
 - **Keep-alive:** ein leeres DATA nach `keepalive_ms` (100) ohne Senden; es trägt die Acks. Nichts empfangen seit
   `timeout_ms` (5000) beendet die Verbindung.
 
+### Zuverlässige Nachrichten
+
+Neben den Paketen, die der Netcode selbst bestätigt bekommt (`send`, `Delivered`, `Lost`), trägt der Kanal einen
+zuverlässigen, geordneten Teilkanal ([`reliable.rs`](../lib/netchan/src/reliable.rs)): für große, seltene Daten (die
+Karte, der volle Stand beim Beitritt), Chat, Ereignisse, die ankommen müssen. `send_reliable(message)` nimmt jede Größe
+bis `max_message` (1 MiB); beim Empfänger kommt jede Nachricht genau einmal, ganz und in der Reihenfolge des Sendens
+(`Reliable`), über UDP wie über WebSocket.
+
+- **Stücke:** Eine Nachricht wird in Stücke von höchstens einer Nutzlast geschnitten, jedes mit einer eigenen Nummer (u16,
+  umlaufend) und dem Flag „es folgt mehr“. Ein RELIABLE-Paket trägt eines oder mehrere; der Empfänger hält Stücke, die
+  zu früh kommen (höchstens 512 KiB), und gibt ganze Nachrichten in Reihenfolge heraus.
+- **Bestätigt:** über die Acks der Pakete. Ein Stück ist fertig, wenn ein Paket, das es trug, `Delivered` ist. Über UDP
+  geht es wieder, wenn dieses Paket `Lost` ist oder bis zur Zeitgrenze kein Ack kam: Umlaufzeit, vierfache Schwankung
+  (mindestens 10 ms) und die Ack-Verzögerung des Gegenübers wie die Probe-Zeitgrenze von QUIC, je Wiederholung
+  verdoppelt, höchstens 1 s. Über WebSocket nie: Der Transport verliert nichts.
+- **Acks kommen schneller:** Wer RELIABLE-Pakete empfängt, bestätigt nach zwei Stück oder spätestens nach 10 ms
+  (`ACK_DELAY_US`), wie TCPs verzögertes Ack. Mit nur den Keep-alives (100 ms) lief die Zeitgrenze vor den Acks ab: Ein
+  MiB ging ohne jeden Verlust 528 Stücke doppelt und brauchte 10,9 statt 6 s.
+- **Tempo:** Die Stücke gehen aus einem Token-Eimer mit `reliable_bytes_per_s` (128 KiB/s, Stöße von zwei Sekunden),
+  unter den 256 KiB/s, die der Server in der Vorgabe von einem Client nimmt. Höchstens 256 Stücke nach dem ältesten
+  offenen sind unterwegs. Ein MiB braucht so 6 s, ohne dass der Server ein Paket verwirft.
+- **Grenzen:** `send_reliable` sagt `Size` (leer oder über `max_message`) und `Backlog` (mehr als
+  `max_reliable_queued`, 4 MiB, warteten). Ein Gegenüber, das das Protokoll bricht (ein Stück, das nicht stimmt, eine
+  Nachricht über `max_message`, zu viele Stücke vor ihrer Zeit), wird getrennt (`Reason::Protocol`). `max_message` muss
+  auf beiden Seiten passen.
+- **Was der Netcode davon sieht:** RELIABLE-Pakete haben Folgenummern wie Keep-alives; ihre `Delivered` und `Lost`
+  kommen als Ereignisse wie deren. Unzuverlässige Nachrichten über einer Nutzlast gibt es weiter nicht: Der Netcode
+  teilt seine Schnappschüsse selbst, er weiß, was davon fehlen darf.
+
 ### Grenzen
 
 | Grenze | Vorgabe | wo |
@@ -259,6 +297,8 @@ davor als Bits. Beide Seiten merken sich 1024 Nummern zurück.
 | Leerlauf, Ping, Handschlag, Schreiben | 60 s, 20 s, 10 s, 10 s | `ws::Limits` |
 | Verbindungen je Acceptor | 1024 | `ws::Limits` |
 | Nutzlast UDP / WebSocket | 1200 (höchstens 1400) / 64 KiB | `ServerConfig`, `ClientConfig` |
+| Zuverlässige Nachricht, Wartendes, Tempo | 1 MiB, 4 MiB, 128 KiB/s | `ServerConfig`, `ClientConfig` (`max_message`, `max_reliable_queued`, `reliable_bytes_per_s`) |
+| Stücke unterwegs, früh gekommene beim Empfänger | 256, 512 KiB | `reliable::WINDOW`, `reliable::EARLY_MAX` |
 | Pakete und Bytes je Sekunde je Client | 300, 256 KiB (UDP: verworfen; WebSocket: getrennt) | `ServerConfig` |
 | Verbindungen je Server, je Adresse | 64, 16 | `ServerConfig` |
 | Antworten auf Handschläge je Sekunde | 2000 (ein ACCEPT: zwei oder drei X25519) | `ServerConfig` |
@@ -280,8 +320,9 @@ braucht rund 70 Pakete je Sekunde je Client, 300 lassen Luft für Stöße.
 | codec | 162 | Längen an ihren Grenzen (0, 125, 126, 65535, 65536), Masken an jedem Versatz gegen die einfache Schleife, Bytes einzeln, Steuerrahmen zwischen Fragmenten, jeder Close-Code 0 bis 5100, die Grenze des Decoders |
 | ws | 63 | Echo (Text, Binär, leer, 1 MiB in 16 Rahmen), Text in Rahmen von 3 Bytes (UTF-8 über Rahmen geteilt), Server → Client in Rahmen von 1000, Ping und Pong (auch zwischen Fragmenten), Close in beide Richtungen, Unterprotokolle; 14 kaputte Rahmen mit ihrem Close-Code (unmaskiert, RSV, Opcodes, fragmentierter Ping, Fortsetzung ohne Anfang, neue Nachricht mitten in einer, UTF-8, Close-Codes, Close mit einem Byte) und 5 kaputte Köpfe (zu langer Ping, Längen nicht in kürzester Form, oberstes Bit, 4 GiB angekündigt); die Grenzen (Rahmen 1009 vor der Nutzlast, Nachricht 1009, Fragmente 1008, Nachrichten- und Byte-Rate 1008, Leerlauf 1001 nach 300 ms, Ping nach 200 ms); Fehler im Handschlag (ohne Schlüssel, kurzer Schlüssel, POST, ohne Upgrade, fremder und fehlender Origin, Version 8 mit 426, `max_connections` mit 503, Pfad ohne WebSocket) und beim Client (falsches Accept, keine Antwort in `handshake_ms`); Stopp des Servers mit offenen Verbindungen (1001); 32 Clients gleichzeitig mit je 200 Echos; Senden von einem zweiten Thread |
 | sim | 226 | der Kanal auf einem simulierten Netz mit virtueller Uhr (siehe unten) |
-| udp | 20 | Kanal über UDP auf Loopback (IPv4, IPv6): 2000 Echos bis 1200 Bytes, alle geliefert, Grenzen der Nutzlast, Trennen, Stopp des Servers (`BYE_SHUTDOWN`), Clients ohne `poll` laufen ab, `max_connections`, fremde Protokoll-Id, der statische Schlüssel (der richtige verbindet und hat ein Echo, ein anderer endet mit `ServerKey`), niemand da (`ConnectTimeout`), die Berechtigungen (192.0.2.1 und 0.0.0.0:45678 abgelehnt) |
-| wschan | 17 | Kanal über WebSocket: 2000 Echos bis 8000 Bytes in Reihenfolge, 60 KB am Stück, Trennen; 12 UDP- und 12 WebSocket-Clients an einem Server mit je 200 Echos; falscher Pfad; Berechtigungen; der WebSocket-Typ von `netchan` gegen den Echo-Server von `netio` |
+| reliable | 45 | der zuverlässige Teilkanal auf demselben simulierten Netz (seit U10, siehe unten) |
+| udp | 21 | Kanal über UDP auf Loopback (IPv4, IPv6): 2000 Echos bis 1200 Bytes, alle geliefert, Grenzen der Nutzlast, 12 zuverlässige Nachrichten bis 100 KB hin und zurück, Trennen, Stopp des Servers (`BYE_SHUTDOWN`), Clients ohne `poll` laufen ab, `max_connections`, fremde Protokoll-Id, der statische Schlüssel (der richtige verbindet und hat ein Echo, ein anderer endet mit `ServerKey`), niemand da (`ConnectTimeout`), die Berechtigungen (192.0.2.1 und 0.0.0.0:45678 abgelehnt) |
+| wschan | 18 | Kanal über WebSocket: 2000 Echos bis 8000 Bytes in Reihenfolge, 60 KB am Stück, 12 zuverlässige Nachrichten hin und zurück, Trennen; 12 UDP- und 12 WebSocket-Clients an einem Server mit je 200 Echos; falscher Pfad; Berechtigungen; der WebSocket-Typ von `netchan` gegen den Echo-Server von `netio` |
 | fuzz | 8 | 2,22 Mio. Fälle mit festem Seed (siehe unten) |
 
 Die Simulation (`sim`) ist die unabhängige Referenz für den Kanal: Ein Hauptbuch je Richtung hält fest, was unter
@@ -296,7 +337,18 @@ nach `timeout_ms`, die Obergrenzen, die Protokoll-Id, `ConnectTimeout`, die Rate
 Sekunde: rund 200 genommen, 800 verworfen, die Verbindung bleibt), gefälschte Cookies (fremde Adresse, 11 s alt), falsches
 Token, CONNECT ohne Auffüllung, ein neu startender Client, Ströme ohne CONNECT, zu schnell, zu groß.
 
-Das Siegel (seit U3, in derselben Gruppe): Wer mitliest, findet von einer Nachricht in beide Richtungen keine 8 Bytes am
+Der zuverlässige Teilkanal (`reliable`, seit U10): Ein eigenes Hauptbuch je Richtung hält fest, was `send_reliable`
+in welcher Reihenfolge nahm; dagegen steht, was beim anderen herauskam. Unter klarem Wetter, rauem Wetter (drei Seeds),
+Sturm und nur Duplikaten je 600 Nachrichten in beide Richtungen (1 Byte bis 200 KB, auch genau an den Grenzen der
+Stücke), unzuverlässiger Verkehr daneben: jede genau einmal, ganz, in Reihenfolge, auch 10 s danach keine doppelt;
+Wiederholungen nur, wo Pakete verloren gingen; danach nichts mehr wartend. Das Tempo: ein MiB mit den Grenzen der
+Vorgabe in 6,05 s, kein Stück doppelt, kein Paket vom Server verworfen. `Size`, `Backlog`, `NotConnected`; über einen
+Strom in Reihenfolge, nie wiederholt, kein Paket über `max_stream_payload`; feindliche Gegenüber über einen Strom (ein
+abgeschnittenes Stück, ein unbekanntes Flag, ein leeres Stück, eine Nachricht über `max_message`, Stücke vor ihrer Zeit
+über 512 KiB: getrennt; ein Stück jenseits des Fensters: verworfen); 70 000 Nachrichten über den Umlauf der Nummern bei
+5 % Verlust.
+
+Das Siegel (seit U3, in derselben Gruppe wie `sim`): Wer mitliest, findet von einer Nachricht in beide Richtungen keine 8 Bytes am
 Stück auf der Leitung, und jedes DATA trägt sein Siegel. Jedes Byte eines echten Pakets einmal gekippt (Kopf, Nutzlast,
 Siegel), ein gefälschtes DATA und zwei gefälschte DISCONNECT mit dem Token der Verbindung: keine Nachricht, keine
 Trennung, genau so viele `forged` wie erwartet (ein gekipptes Byte in Art oder Token ist kein Paket dieser Verbindung);
@@ -436,10 +488,12 @@ Regel durchgehen sollen, ist offen.
   Client den statischen Schlüssel des Servers nicht kennt ([Verschlüsselung](#verschlüsselung)).
 - Ein Wechsel des statischen Schlüssels, den der Server ankündigt (heute: neuer Schlüssel, neue Konfiguration der
   Clients).
-- Nachrichten über 1400 Bytes über UDP (keine Fragmentierung): Große, seltene Daten (die Karte, der volle Stand beim
-  Beitritt) braucht der Netcode in Stücken oder über einen WebSocket daneben.
-- Ein zuverlässiger, geordneter Teilkanal über UDP: Der Netcode baut seine zuverlässigen Ereignisse selbst auf seinen eigenen
-  Paketen (G7e Teil 2, NETCODE.md „Zuverlässige Ereignisse“); netchan bleibt ohne.
+- Unzuverlässige Nachrichten über 1400 Bytes über UDP: Große Daten gehen über den zuverlässigen Teilkanal (seit U10, in
+  Stücken), Schnappschüsse teilt der Netcode selbst. Der Netcode baut seine zuverlässigen Ereignisse weiter selbst auf
+  seinen Paketen (G7e Teil 2, NETCODE.md „Zuverlässige Ereignisse“); der Teilkanal ist für Apps daneben.
+- Eine Staukontrolle, die sich nach dem Netz richtet: Der zuverlässige Teilkanal sendet mit festem Tempo
+  (`reliable_bytes_per_s`) und einem Fenster von 256 Stücken.
+- NAT-Traversal (Spieler hinter zwei NATs brauchen einen Server, der weiterleitet).
 - Android (`plat` hat dort noch keine Sockets: `Error::Unsupported`, [ANDROID.md](ANDROID.md)).
 - WebTransport (E8: erst mit QUIC in `netio`), `permessage-deflate`.
 - Ein `wait` für den Client (Spiele fragen jedes Bild ab).

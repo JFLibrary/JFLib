@@ -2616,9 +2616,16 @@ Crates, die einer JF-App folgen:
   `tools/setup_check.py` (Windows oder Wine). Arabisch und Hebräisch stehen seit 2026-11-22 in
   der richtigen Reihenfolge (Abschnitt 5, RTL-Layout; gesehen mit `setup_check.py --shots` unter
   Wine). Offen: die Fragen der .deb (debconf) sind deutsch.
-- **P2** · *teilweise* · `netchan` außer der Sicherheit: Nutzlast höchstens 1200 Byte ohne
-  Fragmentierung, über UDP nur unzuverlässig, kein NAT-Traversal, kein Android (dieses steht
-  schon unter G7d Teil 2).
+- **P2** · *teilweise* (2026-11-22, U10) · `netchan` außer der Sicherheit: Neben den Paketen ein zuverlässiger,
+  geordneter Teilkanal über UDP und WebSocket ([`netchan/src/reliable.rs`](../lib/netchan/src/reliable.rs),
+  [TRANSPORT.md](TRANSPORT.md) „Zuverlässige Nachrichten“): `send_reliable` nimmt Nachrichten bis 1 MiB, in Stücken von
+  einer Nutzlast (die neue Paketart RELIABLE mit den Folgenummern und Acks von DATA), wiederholt nach `Lost` oder einer
+  Zeitgrenze wie der Probe-Zeitgrenze von QUIC, gesendet mit festem Tempo unter den Grenzen des Servers; der Empfänger
+  setzt zusammen und liefert genau einmal in Reihenfolge, Gegenüber, die das Protokoll brechen, werden getrennt. DATA
+  blieb gleich (`gametest --netsum` blieb `4118995e45c0c067`). Geprüft in `nettest --test reliable` (ein Hauptbuch
+  gegen Verlust, Duplikate, Umordnung, den Umlauf der Nummern, das Tempo, die Grenzen, feindliche Gegenüber) und über
+  echte Sockets (`udp`, `wschan`). Offen: unzuverlässige Nachrichten über einer Nutzlast (der Netcode teilt seine
+  Schnappschüsse selbst), eine Staukontrolle nach dem Netz, NAT-Traversal, Android (steht unter G7d Teil 2).
 - **P2** · *teilweise* (2026-11-22, U8) · `cas` (BackupCraft): Der Speicher ist eine Schnittstelle,
   `cas::Store` ([`cas/store.rs`](../lib/cas/store.rs)): Objekte nach Art und Name, wie S3, SFTP oder WebDAV sie
   halten (`get`, `get_range`, `put`, `delete`, `list`, `init`, `lock`). Ein `put` ist atomar und dauerhaft;

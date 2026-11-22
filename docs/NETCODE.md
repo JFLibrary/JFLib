@@ -444,7 +444,8 @@ Vorhersage jedes Clients, die Zahl der Abweichungen und ihre Fehler, die interpo
 Tode. Die Sitzung läuft über netchans Kerne auf der simulierten Leitung: Die Prüfsumme umfasst also auch den Handschlag (HMAC,
 seit U3 auch X25519 und die Siegel), die Folgenummern und die Acks. Mit dem Siegel über UDP (21.11.2026) blieb sie unter Linux
 (Ubuntu 26.04, Entwicklung) `4118995e45c0c067` mit 177 246 Werten: Der Netcode sieht dieselben Nachrichten in derselben
-Folge; auf Windows, macOS und in Node ist sie mit dem Siegel nicht neu gerechnet.
+Folge; auf Windows, macOS und in Node ist sie mit dem Siegel nicht neu gerechnet. Mit dem zuverlässigen Teilkanal (U10,
+22.11.2026) blieb sie unter Linux ebenso: Der Netcode nutzt ihn nicht, DATA blieb byte-gleich.
 
 | Ziel | Build | `--netsum` | `--checksum` (der Kern, G7b) |
 | --- | --- | --- | --- |

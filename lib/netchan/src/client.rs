@@ -3,6 +3,8 @@
 //   Client::connect(Endpoint, ClientConfig) -> Result<Client, Error>    Connecting at once
 //   client.poll() -> Option<ClientEvent>    every frame until None: reads, keep-alives, timeouts
 //   client.send(payload) -> Result<u16, Error>    the message's sequence number
+//   client.send_reliable(message) -> Result<(), Error>    the reliable channel (ClientEvent::Reliable
+//                                           on the other side); poll() sends what is due
 //   client.state() / reliable() / max_payload() / stats() / rtt_ms() / disconnect()
 //
 // Nothing blocks.  UDP (Windows, Linux, Apple): a thread of its own reads the socket, keeps only
@@ -189,6 +191,15 @@ impl Client {
         let seq = self.core.send(payload, now())?;
         self.flush();
         Ok(seq)
+    }
+
+    /// send a message on the reliable channel: any size up to ClientConfig::max_message, in
+    /// order, over UDP sent again until the server has it (endpoint::ClientCore::send_reliable).
+    /// It goes out at reliable_bytes_per_s, the rest with the next polls
+    pub fn send_reliable(&mut self, payload: &[u8]) -> Result<(), Error> {
+        self.core.send_reliable(payload, now())?;
+        self.flush();
+        Ok(())
     }
 
     /// where it stands
