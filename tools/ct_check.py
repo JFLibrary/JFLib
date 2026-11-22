@@ -313,14 +313,17 @@ def vg_errors(log):
     return out
 
 
-def resymbolize(exe, errors):
+def resymbolize(exe, errors, span=None):
     """valgrind 3.26 puts lines of a binary of many codegen units into the wrong files; its
     function names are right.  The frames inside the probe get their (inlined) functions and
     lines from addr2line instead, at the load address under which addr2line names the same
-    functions as valgrind"""
-    addrs = sorted({fr[3] - (1 if fr[4] else 0) for _, frames in errors for fr in frames if fr[3] >= 0x1000000})
+    functions as valgrind.  `span` is where the probe says it was loaded (valgrind's choice:
+    0x4000000 on x86-64, lower on ARM64); without it, x86-64's.  Every frame comes back as
+    (function, file, line)"""
+    lo, hi = span if span else (0x1000000, 1 << 64)
+    addrs = sorted({fr[3] - (1 if fr[4] else 0) for _, frames in errors for fr in frames if lo <= fr[3] < hi})
     if not addrs:
-        return errors
+        return [(kind, [fr[:3] for fr in frames]) for kind, frames in errors]
 
     def lookup(base, some):
         # each address asked twice: binutils' addr2line answers the first one of a unit without a line
@@ -342,7 +345,7 @@ def resymbolize(exe, errors):
 
     names = {fr[3] - (1 if fr[4] else 0): fr[0] for _, frames in errors for fr in frames}
     best, base = -1, None
-    for b in (0x4000000, 0x108000, 0x400000, 0):
+    for b in dict.fromkeys(([span[0]] if span else []) + [0x4000000, 0x108000, 0x400000, 0]):
         got = lookup(b, addrs[:20])
         score = sum(1 for a, fr in got.items() if fr and any(f[0].split("::")[-1][:20] in names.get(a, "") or names.get(a, "").split("::")[-1][:20] in f[0] for f in fr))
         if score > best:
@@ -392,7 +395,9 @@ def memcheck_one(exe, target):
            "--fullpath-after=", f"--log-file={log}", str(exe), "--memcheck", target, "1"]
     p = subprocess.run(cmd, capture_output=True, text=True)
     text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
-    return target, p.returncode, resymbolize(exe, vg_errors(text)), (p.stdout + p.stderr)[-500:]
+    m = re.search(r"^exe 0x([0-9a-f]+) 0x([0-9a-f]+)$", p.stdout, re.M)
+    span = (int(m.group(1), 16), int(m.group(2), 16)) if m else None
+    return target, p.returncode, resymbolize(exe, vg_errors(text), span), (p.stdout + p.stderr)[-500:]
 
 
 def memcheck(level, exe, targets):

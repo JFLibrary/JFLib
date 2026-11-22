@@ -487,6 +487,13 @@ fn memcheck(name: &str, seed: u64) -> i32 {
         eprintln!("--memcheck runs under valgrind --tool=memcheck only");
         return 2;
     }
+    // where valgrind loaded this program (its own choice, which differs between architectures):
+    // ct_check.py looks the frames of memcheck's reports up with addr2line from there
+    let maps = Maps::read();
+    let own: Vec<&(u64, u64, String)> = maps.ranges.iter().filter(|r| std::path::Path::new(&r.2) == maps.exe).collect();
+    if let (Some(lo), Some(hi)) = (own.iter().map(|r| r.0).min(), own.iter().map(|r| r.1).max()) {
+        println!("exe {:#x} {:#x}", lo, hi);
+    }
     let s = secret_bytes(seed, 4096);
     vg_request(0, [VG_CHANGE_ERR_DISABLEMENT, 1, 0, 0, 0, 0]);
     vg_request(0, [VG_MAKE_MEM_UNDEFINED, s.as_ptr() as usize, s.len(), 0, 0, 0]);
