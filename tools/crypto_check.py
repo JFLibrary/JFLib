@@ -3,9 +3,12 @@
     python tools/crypto_check.py [--target win|linux] [-n CASES]
 
 Writes random cases, lets coretest --vectors answer them and compares with Python's hashlib /
-hmac and, when installed, the `cryptography` package (ChaCha20-Poly1305, AES-GCM, X25519,
-Ed25519, HKDF; RSA PKCS #1 v1.5 / PSS and ECDSA P-256 / P-384 signatures of random keys, also
-forged ones that must fail).  Under Windows without `cryptography` the script runs itself again inside WSL (the
+hmac (SHA-2 with SHA-224, SHA-3, SHAKE) and, when installed, the `cryptography` package
+(ChaCha20-Poly1305, AES-GCM with 128-, 192- and 256-bit keys, X25519, Ed25519, HKDF; RSA PKCS #1
+v1.5 / PSS and ECDSA P-256 / P-384 signatures of random keys, also forged ones that must fail;
+P-384 keys and Diffie-Hellman; ECDSA signing, deterministic (OpenSSL's RFC 6979 gives the same
+bytes) and hedged (OpenSSL verifies), with SHA-2 and SHA-3; RSA-PSS signing, verified by OpenSSL
+and with an empty salt the same bytes).  Under Windows without `cryptography` the script runs itself again inside WSL (the
 Linux build of coretest).  Exit code 1 on any difference."""
 import argparse
 import hashlib
@@ -39,6 +42,12 @@ def cases(n, rnd):
         out.append(("hmac256", [b(rnd.randint(0, 150)), b(size)]))
         out.append(("hmac512", [b(rnd.randint(0, 200)), b(size)]))
         out.append(("blake2b", [b(rnd.randint(0, 64)), b(size), bytes([rnd.randint(1, 64)])]))
+        out.append(("sha224", [b(size)]))
+        for n3 in (224, 256, 384, 512):
+            out.append((f"sha3_{n3}", [b(size)]))
+        ln = rnd.choice([0, 1, 32, 135, 136, 137, 167, 168, 169, 500])
+        out.append(("shake128", [b(size), ln.to_bytes(2, "big")]))
+        out.append(("shake256", [b(size), ln.to_bytes(2, "big")]))
         out.append(("hkdf256", [b(rnd.randint(0, 40)), b(rnd.randint(1, 60)), b(rnd.randint(0, 30)), bytes([rnd.randint(1, 255)])]))
         if have_cryptography():
             out.append(("aead", [b(32), b(12), b(rnd.randint(0, 40)), b(size)]))
@@ -46,13 +55,83 @@ def cases(n, rnd):
             seed = b(32)
             out.append(("ed25519pub", [seed]))
             out.append(("ed25519sign", [seed, b(size)]))
-            klen = rnd.choice([16, 32])
+            klen = rnd.choice([16, 24, 32])
             out.append(("aesgcm", [b(klen), b(12), b(rnd.randint(0, 40)), b(size)]))
             out.append(("aesgcmopen", [b(klen), b(12), b(rnd.randint(0, 40)), b(size)]))
     if have_cryptography():
         out += signature_cases(max(4, n // 4), rnd)
     if have_cryptography():
         out += p256_cases(max(4, n // 2), rnd)
+        out += phase2a_cases(max(4, n // 4), rnd)
+    return out
+
+
+def phase2a_cases(n, rnd):
+    """P-384, ECDSA signing and RSA-PSS signing against OpenSSL (cases of four: alg, args, None and
+    a check of the answer, where a random salt or nonce leaves only verification)"""
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa, utils
+    hs = {1: hashes.SHA256(), 2: hashes.SHA384(), 3: hashes.SHA512(), 4: hashes.SHA224(),
+          5: hashes.SHA3_224(), 6: hashes.SHA3_256(), 7: hashes.SHA3_384(), 8: hashes.SHA3_512()}
+    names = {1: "sha256", 2: "sha384", 3: "sha512", 4: "sha224", 5: "sha3_224", 6: "sha3_256", 7: "sha3_384", 8: "sha3_512"}
+    order384 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC7634D81F4372DDF581A0DB248B0A77AECEC196ACCC52973
+    out = []
+
+    def point(k, nb):
+        pn = k.public_key().public_numbers()
+        return b"\x04" + pn.x.to_bytes(nb, "big") + pn.y.to_bytes(nb, "big")
+
+    def verifies(pub, digest, h, nb):
+        def check(got):
+            if got == "-":
+                return False
+            sig = bytes.fromhex(got)
+            try:
+                pub.verify(utils.encode_dss_signature(int.from_bytes(sig[:nb], "big"), int.from_bytes(sig[nb:], "big")), digest, ec.ECDSA(utils.Prehashed(h)))
+                return len(sig) == 2 * nb
+            except InvalidSignature:
+                return False
+        return check
+
+    for i in range(n):
+        # P-384: public keys (edge scalars too), Diffie-Hellman, a point off the curve
+        k = rnd.randrange(1, order384) if i % 5 else rnd.choice([1, 2, order384 - 1, order384 - 2])
+        kb = k.to_bytes(48, "big")
+        priv = ec.derive_private_key(k, ec.SECP384R1())
+        out.append(("p384pub", [kb], point(priv, 48)))
+        peer = ec.generate_private_key(ec.SECP384R1())
+        pt = point(peer, 48)
+        out.append(("p384ecdh", [kb, pt], priv.exchange(ec.ECDH(), peer.public_key())))
+        out.append(("p384ecdh", [kb, pt[:60] + bytes([pt[60] ^ 1]) + pt[61:]], None))
+        # ECDSA signing on both curves with any of the eight hashes
+        cid, curve, nb = rnd.choice([(1, ec.SECP256R1(), 32), (2, ec.SECP384R1(), 48)])
+        key = ec.generate_private_key(curve)
+        d = key.private_numbers().private_value.to_bytes(nb, "big")
+        out.append(("ecdsapub", [bytes([cid]), d], point(key, nb)))
+        hid = rnd.choice(list(hs))
+        dg = hashlib.new(names[hid], rnd.randbytes(rnd.randint(0, 200))).digest()
+        r, s_ = utils.decode_dss_signature(key.sign(dg, ec.ECDSA(utils.Prehashed(hs[hid]), deterministic_signing=True)))
+        out.append(("ecdsasign", [bytes([cid]), bytes([hid]), d, dg, b""], r.to_bytes(nb, "big") + s_.to_bytes(nb, "big")))
+        out.append(("ecdsasign", [bytes([cid]), bytes([hid]), d, dg, rnd.randbytes(32)], None, verifies(key.public_key(), dg, hs[hid], nb)))
+        # RSA-PSS signing: a random salt (OpenSSL verifies), an empty one (the same bytes)
+        bits = rnd.choice([2048, 3072])
+        if bits not in _RSA_KEYS:
+            _RSA_KEYS[bits] = rsa.generate_private_key(65537, bits)
+        rk = _RSA_KEYS[bits]
+        pn = rk.private_numbers()
+        be = lambda x: x.to_bytes((x.bit_length() + 7) // 8, "big")  # noqa: E731
+        parts = [be(pn.public_numbers.n), be(pn.public_numbers.e), be(pn.d), be(pn.p), be(pn.q)]
+        salt = rnd.randbytes(hs[hid].digest_size)
+
+        def pss_ok(got, rk=rk, dg=dg, h=hs[hid], n=len(salt)):
+            try:
+                rk.public_key().verify(bytes.fromhex(got), dg, padding.PSS(padding.MGF1(h), n), utils.Prehashed(h))
+                return True
+            except (InvalidSignature, ValueError):
+                return False
+        out.append(("rsapsssign", [bytes([hid])] + parts + [dg, salt], None, pss_ok))
+        out.append(("rsapsssign", [bytes([hid])] + parts + [dg, b""], rk.sign(dg, padding.PSS(padding.MGF1(hs[hid]), 0), utils.Prehashed(hs[hid]))))
     return out
 
 
@@ -120,6 +199,10 @@ def expect(alg, a):
         return hashlib.sha256(a[0]).digest()
     if alg == "sha512":
         return hashlib.sha512(a[0]).digest()
+    if alg == "sha224" or alg.startswith("sha3_"):
+        return hashlib.new(alg, a[0]).digest()
+    if alg in ("shake128", "shake256"):
+        return hashlib.new(alg.replace("shake", "shake_"), a[0]).digest(int.from_bytes(a[1], "big"))
     if alg == "hmac256":
         return hmac.new(a[0], a[1], hashlib.sha256).digest()
     if alg == "hmac512":
@@ -201,6 +284,12 @@ def main():
     got += [""] * max(0, len(cs) - len(got))           # a missing answer is a difference
     for c, g in zip(cs, got):
         alg, a = c[0], c[1]
+        if len(c) == 4:
+            if not c[3](g):
+                bad += 1
+                if bad <= 10:
+                    print(f"DIFF {alg} {[x.hex()[:32] for x in a]}\n  got  {g[:80]}\n  (does not verify)")
+            continue
         if len(c) == 3:
             want = c[2] if isinstance(c[2], bytes) or c[2] is None else bytes([int(c[2])])
         else:

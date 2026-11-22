@@ -11,6 +11,12 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Added
 
 - `argon2::VERIFY_WORK`: the most work `verify` does for a PHC string.
+- SHA-224 (sha2::Sha224, sha224) and SHA-3 / SHAKE (FIPS 202, lib/crypto/sha3.rs): Sha3_224, Sha3_256, Sha3_384, Sha3_512 and sha3_224 .. sha3_512, Shake128 / Shake256 with finalize_xof and ShakeReader::read for any output length, shake128 / shake256; all of them crypto::Hash (HMAC, HKDF, PBKDF2 over them; Hash::BLOCK may now be up to 168, SHA3-224's rate is 144). HashAlg has Sha224 and Sha3_224 .. Sha3_512 (signatures over them, MGF1 with them), and HashAlg::hmac(key, data)
+- AES-192: aes::Aes::new, gcm::AesGcm::new, aes_wrap / aes_unwrap and cmac_aes take 24-byte keys
+- p384: Diffie-Hellman on P-384 in constant time (public_key, shared, secret_from, as p256's), on a new core for the NIST curves of any size (nist.rs: Montgomery arithmetic whose constants are worked out at compile time, the complete formulas of Renes, Costello and Batina, four-bit windows that read the whole table)
+- ECDSA signing on P-256 and P-384 in constant time: ecdsa::sign(curve, secret, hash, digest, extra) with deterministic nonces (RFC 6979, the digest's hash for HMAC_DRBG); extra bytes, when given, go into the nonce as RFC 6979 3.6's additional data and hedge it against faults and a poor random source. ecdsa::public_key and secret_from; verify_p1363 for r || s signatures (IEEE P1363: JOSE, COSE, WebCrypto), der_from_p1363 and p1363_from_der (strict DER) to convert. The same signatures as OpenSSL's deterministic ECDSA, byte for byte
+- RSA-PSS signing: rsa::PrivateKey::sign_pss(hash, digest, salt) (EMSA-PSS with MGF1 of the same hash, the caller's salt; an empty salt gives the same signature each time), with the constant-time exponentiation of sign_pkcs1
+- ML-KEM (FIPS 203, lib/crypto/mlkem.rs): mlkem::keygen(params, seed) from d || z, encaps(params, ek, m) with the encapsulation key's modulus check, decaps(params, dk, ct) with the decapsulation key's hash check and implicit rejection (a changed ciphertext gives J(z || c)); Params::MlKem512, MlKem768, MlKem1024 and their ek_len, dk_len, ct_len. No branch or table lookup on secrets, and no division: reductions and Compress are Barrett's with masked corrections (KyberSlash)
 
 ### Security
 

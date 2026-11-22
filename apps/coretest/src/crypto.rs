@@ -37,6 +37,158 @@ pub fn run(t: &mut T) {
     web_pki(t);
     wpa(t);
     md5(t);
+    phase2a(t);
+}
+
+/// SHA-224, SHA-3 and SHAKE, AES-192, P-384, ECDSA signing (RFC 6979), P1363 and DER, RSA-PSS
+/// signing, ML-KEM: known answers of independent implementations (hashlib, OpenSSL through
+/// Python's cryptography, FIPS 197, RFC 6979's keys, Wycheproof's ML-KEM seeds) and the
+/// properties around them; tools/wycheproof_check.py and tools/acvp_check.py run the full suites
+fn phase2a(t: &mut T) {
+    use crypto::ecdsa::{self, Curve};
+    use crypto::mlkem::{self, Params};
+    use crypto::HashAlg;
+    // hashes
+    t.eq("sha224 abc", hex(&crypto::sha224(b"abc")), String::from("23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7"));
+    t.eq("sha3-224 abc", hex(&crypto::sha3_224(b"abc")), String::from("e642824c3f8cf24ad09234ee7d3c766fc9a3a5168d0c94ad73b46fdf"));
+    t.eq("sha3-256 abc", hex(&crypto::sha3_256(b"abc")), String::from("3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532"));
+    t.eq("sha3-384 abc", hex(&crypto::sha3_384(b"abc")), String::from("ec01498288516fc926459f58e2c6ad8df9b473cb0fc08c2596da7cf0e49be4b298d88cea927ac7f539f1edf228376d25"));
+    t.eq("sha3-512 empty", hex(&crypto::sha3_512(b"")), String::from("a69f73cca23a9ac5c8b567dc185a756e97c982164fe25859e0d1dcc1475c80a615b2123af1f5f94c11e3e9402c3ac558f500199d95b6d3e301758586281dcd26"));
+    let mut o = [0u8; 32];
+    crypto::shake128(b"", &mut o);
+    t.eq("shake128 empty, 32 bytes", hex(&o), String::from("7f9c2ba4e88f827d616045507605853ed73b8093f6efbc88eb1a6eacfa66ef26"));
+    let mut o = [0u8; 64];
+    crypto::shake256(b"abc", &mut o);
+    t.eq("shake256 abc, 64 bytes", hex(&o), String::from("483366601360a8771c6863080cc4114d8db44530f8f1e1ee4f94ea37e78b5739d5a15bef186a5386c75744c0527e1faa9f8726e462a12a4feb06bd8801e751e4"));
+    t.eq("hmac-sha3-256", hex(&HashAlg::Sha3_256.hmac(b"key", b"The quick brown fox jumps over the lazy dog")),
+         String::from("8c6e0683409427f8931711b10ca92a506eb1fafa48fadd66d76126f47ac2c333"));
+    // streaming: pieces across the rates (136, 168) equal one shot; output read in pieces too
+    let data: Vec<u8> = (0..700u32).map(|i| (i * 7 + 3) as u8).collect();
+    let mut same = true;
+    for n in [0usize, 1, 135, 136, 137, 167, 168, 169, 700] {
+        let mut h = crypto::Sha3_256::new();
+        for c in data[..n].chunks(13) {
+            h.update(c);
+        }
+        same &= h.finalize() == crypto::sha3_256(&data[..n]);
+        let mut x = crypto::Shake128::new();
+        x.update(&data[..n]);
+        let mut r = x.finalize_xof();
+        let mut a = alloc::vec![0u8; 400];
+        for c in a.chunks_mut(41) {
+            r.read(c);
+        }
+        let mut b = alloc::vec![0u8; 400];
+        crypto::shake128(&data[..n], &mut b);
+        same &= a == b;
+    }
+    t.check("sha3 / shake: pieces in and out equal one shot", same);
+    // AES-192 (FIPS 197 C.2) both ways
+    let a = crypto::aes::Aes::new(&h("000102030405060708090a0b0c0d0e0f1011121314151617")).expect("aes-192");
+    let mut b: [u8; 16] = h("00112233445566778899aabbccddeeff").try_into().unwrap();
+    a.encrypt(&mut b);
+    t.eq("aes-192 fips197 c.2", hex(&b), String::from("dda97ca4864cdfe06eaf70a0ec0d7191"));
+    a.decrypt(&mut b);
+    t.eq("aes-192 decrypt", hex(&b), String::from("00112233445566778899aabbccddeeff"));
+    t.check("aes: keys of 15, 23, 33 bytes refused", [15usize, 23, 33].iter().all(|&n| crypto::aes::Aes::new(&alloc::vec![0; n]).is_none()));
+    // ECDSA with RFC 6979's keys (A.2.5, A.2.6) and the message "sample"
+    let x256 = h("c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721");
+    let x384 = h("6b9d3dad2e1b8c1c05b19875b6659f4de23c3b667bf297ba9aa47740787137d896d5724e4c70a825f872c9ea60d2edf5");
+    let pub256 = ecdsa::public_key(Curve::P256, &x256).unwrap_or_default();
+    t.eq("ecdsa p-256 public key (rfc 6979 a.2.5)", hex(&pub256), String::from("0460fed4ba255a9d31c961eb74c6356d68c049b8923b61fa6ce669622e60f29fb67903fe1008b8bc99a41ae9e95628bc64f2f1b20c2d7e9f5177a3c294d4462299"));
+    t.eq("ecdsa p-256 public key = p256::public_key", hex(&pub256), hex(&crypto::p256::public_key(&x256.clone().try_into().unwrap())));
+    let sig = ecdsa::sign(Curve::P256, &x256, HashAlg::Sha256, &crypto::sha256(b"sample"), b"").unwrap_or_default();
+    t.eq("ecdsa p-256 sha-256 sample (rfc 6979)", hex(&sig), String::from("efd48b2aacb6a8fd1140dd9cd45e81d69d2c877b56aaf991c34d0ea84eaf3716f7cb1c942d657c41d436c7a1b6e29f65f3e900dbb9aff4064dc4ab2f843acda8"));
+    let pub384 = ecdsa::public_key(Curve::P384, &x384).unwrap_or_default();
+    t.eq("ecdsa p-384 public key (rfc 6979 a.2.6)", hex(&pub384), String::from("04ec3a4e415b4e19a4568618029f427fa5da9a8bc4ae92e02e06aae5286b300c64def8f0ea9055866064a254515480bc138015d9b72d7d57244ea8ef9ac0c621896708a59367f9dfb9f54ca84b3f1c9db1288b231c3ae0d4fe7344fd2533264720"));
+    let sig384 = ecdsa::sign(Curve::P384, &x384, HashAlg::Sha384, &crypto::sha384(b"sample"), b"").unwrap_or_default();
+    t.eq("ecdsa p-384 sha-384 sample (rfc 6979)", hex(&sig384), String::from("94edbb92a5ecb8aad4736e56c691916b3f88140666ce9fa73d64c4ea95ad133c81a648152e44acf96e36dd1e80fabe4699ef4aeb15f178cea1fe40db2603138f130e740a19624526203b6351d0a3a94fa329c145786e679e7b82c71a38628ac8"));
+    t.check("ecdsa: the signatures verify (verify_p1363)", ecdsa::verify_p1363(Curve::P256, &pub256, &crypto::sha256(b"sample"), &sig)
+        && ecdsa::verify_p1363(Curve::P384, &pub384, &crypto::sha384(b"sample"), &sig384));
+    let hedged = ecdsa::sign(Curve::P256, &x256, HashAlg::Sha256, &crypto::sha256(b"sample"), &[7; 32]).unwrap_or_default();
+    t.check("ecdsa: a hedged signature differs and verifies", hedged != sig && ecdsa::verify_p1363(Curve::P256, &pub256, &crypto::sha256(b"sample"), &hedged));
+    t.check("ecdsa: a digest of the wrong length, a secret of 0 or n refused",
+        ecdsa::sign(Curve::P256, &x256, HashAlg::Sha384, &crypto::sha256(b"sample"), b"").is_none()
+            && ecdsa::sign(Curve::P256, &[0; 32], HashAlg::Sha256, &crypto::sha256(b"x"), b"").is_none()
+            && ecdsa::sign(Curve::P256, &h("ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551"), HashAlg::Sha256, &crypto::sha256(b"x"), b"").is_none());
+    // P1363 <-> DER
+    let der = ecdsa::der_from_p1363(&sig).unwrap_or_default();
+    t.check("ecdsa: r || s -> DER -> r || s", ecdsa::p1363_from_der(Curve::P256, &der).as_deref() == Some(&sig[..]));
+    let mut small = alloc::vec![0u8; 64];
+    small[31] = 1;
+    small[63] = 0x80;
+    t.eq("ecdsa: DER of small r and s (a zero byte before a high bit)", hex(&ecdsa::der_from_p1363(&small).unwrap_or_default()), String::from("3007020101020200 80".replace(' ', "")));
+    t.check("ecdsa: non-minimal, negative and trailing DER refused",
+        ecdsa::p1363_from_der(Curve::P256, &h("300802020001020200 80".replace(' ', "").as_str())).is_none()
+            && ecdsa::p1363_from_der(Curve::P256, &h("3006020181020101")).is_none()
+            && ecdsa::p1363_from_der(Curve::P256, &h("300602010102010100")).is_none()
+            && ecdsa::p1363_from_der(Curve::P256, &h("30810602010102010 1".replace(' ', "").as_str())).is_none());
+    // P-384 Diffie-Hellman: both sides, and OpenSSL's answer for x * (0x1234567 G)
+    let mut other = [0u8; 48];
+    other[44..].copy_from_slice(&[0x01, 0x23, 0x45, 0x67]);
+    let x: [u8; 48] = x384.clone().try_into().unwrap();
+    let s1 = crypto::p384::shared(&x, &crypto::p384::public_key(&other));
+    t.eq("p384 shared (openssl)", hex(&s1.map(|v| v.to_vec()).unwrap_or_default()), String::from("685517cf1f3ca90069b65fa4ea4ef9d02b0aa4bc9a26924ec3c0bb76fcdc8c9f9214a21fec6f6bf10ac0b995af9b2b51"));
+    t.check("p384: both sides agree", s1 == crypto::p384::shared(&other, &crypto::p384::public_key(&x)));
+    let mut bad = crypto::p384::public_key(&other);
+    bad[96] ^= 1;
+    t.check("p384: a point off the curve refused", crypto::p384::shared(&x, &bad).is_none());
+    // RSA-PSS signing: verifies, an empty salt is deterministic, a changed digest fails
+    let mut st = 0x1234_5678_9abc_def0u64;
+    let mut rand = |b: &mut [u8]| {
+        for x in b.iter_mut() {
+            st ^= st << 13;
+            st ^= st >> 7;
+            st ^= st << 17;
+            *x = st as u8;
+        }
+    };
+    if let Some(k) = crypto::rsa::PrivateKey::generate(2048, &mut rand) {
+        let pk = k.public().expect("public");
+        let d = crypto::sha256(b"pss");
+        let s1 = k.sign_pss(HashAlg::Sha256, &d, &[9; 32]).unwrap_or_default();
+        let s0 = k.sign_pss(HashAlg::Sha256, &d, b"").unwrap_or_default();
+        t.check("rsa-pss: signatures verify (salt 32 and 0)", pk.verify_pss(HashAlg::Sha256, &d, &s1, Some(32)) && pk.verify_pss(HashAlg::Sha256, &d, &s0, Some(0)));
+        t.check("rsa-pss: an empty salt gives the same signature again", k.sign_pss(HashAlg::Sha256, &d, b"").unwrap_or_default() == s0);
+        t.check("rsa-pss: another digest does not verify", !pk.verify_pss(HashAlg::Sha256, &crypto::sha256(b"other"), &s1, Some(32)));
+        t.check("rsa-pss: sha3-512 with a 64-byte salt", k.sign_pss(HashAlg::Sha3_512, &crypto::sha3_512(b"x"), &[1; 64]).is_some_and(|s| pk.verify_pss(HashAlg::Sha3_512, &crypto::sha3_512(b"x"), &s, Some(64))));
+    } else {
+        t.check("rsa-pss: a 2048-bit key", false);
+    }
+    // ML-KEM: Wycheproof's first keygen seed (keygen_seed tcId 1), then the round trip
+    let seed: [u8; 64] = h("7c9935a0b07694aa0c6d10e4db6b1add2fd81a25ccb148032dcd739936737f2d8626ed79d451140800e03b59b956f8210e556067407d13dc90fa9e8b872bfb8f").try_into().unwrap();
+    for (p, ek_hash, dk_hash) in [
+        (Params::MlKem512, "50c8dd152a4531aab560d2fc7ca9a40ad8af25ad1dd08c6d79afe4dd4d1eee5a", "2e08d2c82a07f5f67878b54e06848c924ee7a0929cb6440d06fffd9622687b48"),
+        (Params::MlKem768, "f57262661358cde8d3ebf990e5fd1d5b896c992ccfaadb5256b68bbf5943b132", "7deef44965b03d76de543ad6ef9e74a2772fa5a9fa0e761120dac767cf0152ef"),
+        (Params::MlKem1024, "ebbe41cd4dea489dedd00e76ae0bcf54aa8550202920eb64d5892ad02b13f2e5", "ecfa369ec7e834204291fccb4d59c3fd1557b0ec3ab2ed7d50c98c01f292612e"),
+    ] {
+        let (ek, dk) = mlkem::keygen(p, &seed);
+        t.eq(&alloc::format!("{:?}: keygen (wycheproof seed 1), sha3-256 of ek", p), hex(&crypto::sha3_256(&ek)), String::from(ek_hash));
+        t.eq(&alloc::format!("{:?}: keygen, sha3-256 of dk", p), hex(&crypto::sha3_256(&dk)), String::from(dk_hash));
+        t.check(&alloc::format!("{:?}: the lengths", p), ek.len() == p.ek_len() && dk.len() == p.dk_len());
+        let (ct, key) = mlkem::encaps(p, &ek, &[0x5a; 32]).expect("encaps");
+        t.check(&alloc::format!("{:?}: decaps gives encaps's key", p), ct.len() == p.ct_len() && mlkem::decaps(p, &dk, &ct) == Some(key));
+        // a changed ciphertext: the implicit-rejection key J(z || c)
+        let mut forged = ct.clone();
+        forged[5] ^= 0x10;
+        let mut j = crypto::Shake256::new();
+        j.update(&dk[dk.len() - 32..]);
+        j.update(&forged);
+        let mut want = [0u8; 32];
+        j.finalize_xof().read(&mut want);
+        t.check(&alloc::format!("{:?}: a changed ciphertext gives J(z || c)", p), mlkem::decaps(p, &dk, &forged) == Some(want));
+        // FIPS 203 7.2: a coefficient of q or more in ek; 7.3: dk's hash of ek
+        let mut big = ek.clone();
+        big[0] = 0xff;
+        big[1] |= 0x0f;
+        t.check(&alloc::format!("{:?}: encaps refuses a coefficient >= q", p), mlkem::encaps(p, &big, &[1; 32]).is_none());
+        let mut dk2 = dk.clone();
+        let at = dk2.len() - 64;
+        dk2[at] ^= 1;
+        t.check(&alloc::format!("{:?}: decaps refuses a dk whose hash of ek is wrong", p), mlkem::decaps(p, &dk2, &ct).is_none());
+        t.check(&alloc::format!("{:?}: wrong lengths refused", p), mlkem::encaps(p, &ek[1..], &[1; 32]).is_none()
+            && mlkem::decaps(p, &dk[1..], &ct).is_none() && mlkem::decaps(p, &dk, &ct[1..]).is_none());
+    }
 }
 
 /// the inverse cipher: FIPS 197 C.1 / C.3 backwards, then random blocks and keys both ways
@@ -54,8 +206,8 @@ fn aes_decrypt(t: &mut T) {
         (g >> 33) as u8
     };
     let mut ok = true;
-    for round in 0..64 {
-        let key: Vec<u8> = (0..if round % 2 == 0 { 16 } else { 32 }).map(|_| next()).collect();
+    for round in 0..96 {
+        let key: Vec<u8> = (0..[16, 24, 32][round % 3]).map(|_| next()).collect();
         let aes = crypto::aes::Aes::new(&key).expect("key");
         let mut blocks = [[0u8; 16]; 4];
         for blk in blocks.iter_mut() {
@@ -68,7 +220,7 @@ fn aes_decrypt(t: &mut T) {
         aes.decrypt4(&mut blocks);
         ok &= blocks == plain && one == plain[1];
     }
-    t.check("aes decrypt(encrypt(x)) == x (64 random keys, AES-128 and AES-256)", ok);
+    t.check("aes decrypt(encrypt(x)) == x (96 random keys, AES-128, AES-192 and AES-256)", ok);
 }
 
 /// pow_ct against pow and the Diffie-Hellman of the Secret Service's 1024-bit MODP group
@@ -466,6 +618,170 @@ pub fn bench() {
 
 /// answer the cases of a vector file (tools/crypto_check.py): one case per line,
 /// "alg hex hex ..." -> one line "hex" per case ("-" for None)
+/// hash ids of the vector lines: 1 SHA-256, 2 SHA-384, 3 SHA-512, 4 SHA-224, 5..8 SHA3-224 / 256 /
+/// 384 / 512
+pub fn hash_of(id: Option<&u8>) -> Option<crypto::HashAlg> {
+    use crypto::HashAlg::*;
+    Some(match id? {
+        1 => Sha256,
+        2 => Sha384,
+        3 => Sha512,
+        4 => Sha224,
+        5 => Sha3_224,
+        6 => Sha3_256,
+        7 => Sha3_384,
+        8 => Sha3_512,
+        _ => return None,
+    })
+}
+
+/// the vector operations of SHA-224, SHA-3, SHAKE, P-384 and ECDSA signing (None: not one of
+/// these, or refused)
+fn more(alg: &str, args: &[Vec<u8>]) -> Option<Vec<u8>> {
+    let arg = |i: usize| args.get(i).map(|v| v.as_slice()).unwrap_or(&[]);
+    match alg {
+        "sha224" => Some(crypto::sha224(arg(0)).to_vec()),
+        "sha3_224" => Some(crypto::sha3_224(arg(0)).to_vec()),
+        "sha3_256" => Some(crypto::sha3_256(arg(0)).to_vec()),
+        "sha3_384" => Some(crypto::sha3_384(arg(0)).to_vec()),
+        "sha3_512" => Some(crypto::sha3_512(arg(0)).to_vec()),
+        "shake128" | "shake256" => {
+            // data, output length (2 bytes big-endian)
+            let mut o = alloc::vec![0u8; u16::from_be_bytes(arg(1).try_into().ok()?) as usize];
+            if alg == "shake128" { crypto::shake128(arg(0), &mut o) } else { crypto::shake256(arg(0), &mut o) }
+            Some(o)
+        }
+        "rsapsssign" => {
+            // hash n e d p q digest salt -> RSASSA-PSS signature
+            let k = crypto::rsa::PrivateKey::from_parts(arg(1), arg(2), arg(3), arg(4), arg(5))?;
+            k.sign_pss(hash_of(arg(0).first())?, arg(6), arg(7))
+        }
+        "mlkemkeygen" | "mlkemseed" | "mlkemencaps" | "mlkemdecaps" => {
+            // params (1 ML-KEM-512, 2 768, 3 1024), then seed (64) -> ek || dk; ek m -> ct || key;
+            // dk ct -> key
+            use crypto::mlkem::{self, Params};
+            let p = match arg(0).first()? {
+                1 => Params::MlKem512,
+                2 => Params::MlKem768,
+                3 => Params::MlKem1024,
+                _ => return None,
+            };
+            match alg {
+                "mlkemkeygen" => {
+                    let (mut ek, dk) = mlkem::keygen(p, &arg(1).try_into().ok()?);
+                    ek.extend_from_slice(&dk);
+                    Some(ek)
+                }
+                "mlkemseed" => {
+                    // seed ct -> ek || the key decaps gives with the dk of the seed
+                    let (mut ek, dk) = mlkem::keygen(p, &arg(1).try_into().ok()?);
+                    ek.extend_from_slice(&mlkem::decaps(p, &dk, arg(2))?);
+                    Some(ek)
+                }
+                "mlkemencaps" => mlkem::encaps(p, arg(1), &arg(2).try_into().ok()?).map(|(mut ct, k)| {
+                    ct.extend_from_slice(&k);
+                    ct
+                }),
+                _ => mlkem::decaps(p, arg(1), arg(2)).map(|k| k.to_vec()),
+            }
+        }
+        "aesecb" => {
+            // dir (0 encrypt, 1 decrypt) key blocks -> the blocks through AES
+            let a = crypto::aes::Aes::new(arg(1))?;
+            let mut out = arg(2).to_vec();
+            if out.len() % 16 != 0 {
+                return None;
+            }
+            for b in out.chunks_exact_mut(16) {
+                let mut x = [0u8; 16];
+                x.copy_from_slice(b);
+                if arg(0).first() == Some(&1) { a.decrypt(&mut x) } else { a.encrypt(&mut x) }
+                b.copy_from_slice(&x);
+            }
+            Some(out)
+        }
+        "aesecbmct" => {
+            // dir key block -> 100 x (key || input || output): AESAVS 6.4.1, the Monte Carlo test
+            let dec = arg(0).first() == Some(&1);
+            let mut key = arg(1).to_vec();
+            let mut input: [u8; 16] = arg(2).try_into().ok()?;
+            let mut out = Vec::new();
+            for _ in 0..100 {
+                let a = crypto::aes::Aes::new(&key)?;
+                out.extend_from_slice(&key);
+                out.extend_from_slice(&input);
+                let (mut prev, mut last) = ([0u8; 16], input);
+                for _ in 0..1000 {
+                    prev = last;
+                    if dec { a.decrypt(&mut last) } else { a.encrypt(&mut last) }
+                }
+                out.extend_from_slice(&last);
+                let mut tail = Vec::from(&prev[..]);
+                tail.extend_from_slice(&last);
+                let off = tail.len() - key.len();
+                for (k, t) in key.iter_mut().zip(&tail[off..]) {
+                    *k ^= t;
+                }
+                input = last;
+            }
+            Some(out)
+        }
+        "hashmct" => {
+            // kind (2 SHA-2, 3 SHA-3) hash seed -> the 100 checkpoints of ACVP's standard Monte
+            // Carlo test
+            let h = hash_of(arg(1).first())?;
+            let mut seed = arg(2).to_vec();
+            let mut out = Vec::new();
+            for _ in 0..100 {
+                if arg(0).first() == Some(&3) {
+                    for _ in 0..1000 {
+                        seed = h.digest(&seed);
+                    }
+                } else {
+                    let (mut a, mut b, mut c) = (seed.clone(), seed.clone(), seed.clone());
+                    for _ in 3..1003 {
+                        let mut m = a;
+                        m.extend_from_slice(&b);
+                        m.extend_from_slice(&c);
+                        (a, b, c) = (b, c, h.digest(&m));
+                    }
+                    seed = c;
+                }
+                out.extend_from_slice(&seed);
+            }
+            Some(out)
+        }
+        "p384pub" => Some(crypto::p384::public_key(&arg(0).try_into().ok()?).to_vec()),
+        "p384ecdh" => crypto::p384::shared(&arg(0).try_into().ok()?, arg(1)).map(|v| v.to_vec()),
+        "ecdsapub" => crypto::ecdsa::public_key(curve_of(arg(0))?, arg(1)),
+        // curve point digest r||s -> 01 / 00 (ecdsa::verify_p1363)
+        "ecdsap1363" => Some(alloc::vec![crypto::ecdsa::verify_p1363(curve_of(arg(0))?, arg(1), arg(2), arg(3)) as u8]),
+        // curve der -> r || s (ecdsa::p1363_from_der); r||s -> der (der_from_p1363)
+        "ecdsader" => crypto::ecdsa::p1363_from_der(curve_of(arg(0))?, arg(1)),
+        "ecdsatoder" => crypto::ecdsa::der_from_p1363(arg(0)),
+        // curve point digest der -> 01 / 00: p1363_from_der, then verify_p1363
+        "ecdsaderverify" => {
+            let c = curve_of(arg(0))?;
+            let ok = crypto::ecdsa::p1363_from_der(c, arg(3)).is_some_and(|sig| crypto::ecdsa::verify_p1363(c, arg(1), arg(2), &sig));
+            Some(alloc::vec![ok as u8])
+        }
+        "ecdsasign" => {
+            // curve hash(suitevec's ids) secret digest extra -> r || s
+            crypto::ecdsa::sign(curve_of(arg(0))?, arg(2), hash_of(arg(1).first())?, arg(3), arg(4))
+        }
+        _ => None,
+    }
+}
+
+/// 1 P-256, 2 P-384
+fn curve_of(id: &[u8]) -> Option<crypto::ecdsa::Curve> {
+    match id.first()? {
+        1 => Some(crypto::ecdsa::Curve::P256),
+        2 => Some(crypto::ecdsa::Curve::P384),
+        _ => None,
+    }
+}
+
 pub fn vectors(path: &str) -> i32 {
     let Some(text) = plat::read_file(path) else {
         plat::write_stderr(b"coretest: cannot read the vector file\n");
@@ -556,9 +872,9 @@ pub fn vectors(path: &str) -> i32 {
             }
             // the operations of tools/wycheproof_check.py and tools/limbo_check.py
             #[cfg(not(target_os = "android"))]
-            _ => crate::suitevec::op(alg, &args),
+            _ => more(alg, &args).or_else(|| crate::suitevec::op(alg, &args)),
             #[cfg(target_os = "android")]
-            _ => None,
+            _ => more(alg, &args),
         };
         out.push_str(&r.map_or(String::from("-"), |v| hex(&v)));
         out.push('\n');

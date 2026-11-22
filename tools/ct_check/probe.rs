@@ -123,6 +123,17 @@ fn p256_scalar(b: &[u8]) -> [u8; 32] {
     b.chunks_exact(32).find_map(|c| crypto::p256::secret_from(&a32(c))).expect("a scalar")
 }
 
+/// a P-384 scalar in [1, n - 1] from the secret's bytes
+fn p384_scalar(b: &[u8]) -> [u8; 48] {
+    b.chunks_exact(48).find_map(|c| crypto::p384::secret_from(&c.try_into().unwrap())).expect("a scalar")
+}
+
+/// what is public although the probe made it from the secret (an encapsulation key, a
+/// ciphertext): under memcheck marked defined, so only the secret parts are followed
+fn public_bytes(b: &[u8]) {
+    vg_request(0, [VG_MAKE_MEM_DEFINED, b.as_ptr() as usize, b.len(), 0, 0, 0]);
+}
+
 const MSG: &[u8] = b"a message of fixed length that is signed, sealed and hashed by the probe ..";
 
 #[inline(never)]
@@ -145,6 +156,14 @@ const TARGETS: &[&str] = &[
     "p256_public_key",
     "p256_shared",
     "p256_mul_point",
+    "p384_public_key",
+    "p384_shared",
+    "ecdsa_sign_p256",
+    "ecdsa_sign_p384",
+    "mlkem768_keygen",
+    "mlkem768_encaps",
+    "mlkem768_decaps",
+    "mlkem768_decaps_foreign",
     "eappwd_pwe",
     "eappwd_commit",
     "eappwd_shared",
@@ -155,6 +174,7 @@ const TARGETS: &[&str] = &[
     "xchacha20poly1305_open",
     "aes128gcm_seal",
     "aes256gcm_open",
+    "aes192gcm_seal",
     "aes_keywrap",
     "aes_cmac",
     "poly1305",
@@ -167,6 +187,9 @@ const TARGETS: &[&str] = &[
     "hmac_md5",
     "sha256",
     "sha512",
+    "sha3_256",
+    "shake256",
+    "hmac_sha3_256",
     "blake2b_keyed",
     "blake3_keyed",
     "argon2id",
@@ -256,6 +279,77 @@ fn prepare_from(name: &str, s: Vec<u8>) -> Op {
                 black_box(p256::mul_point(black_box(&sc), black_box(&pt)));
             })
         }
+        "p384_public_key" => {
+            let sc = p384_scalar(&s);
+            Box::new(move || {
+                black_box(p384::public_key(black_box(&sc)));
+            })
+        }
+        "p384_shared" => {
+            let sc = p384_scalar(&s);
+            let peer = p384::public_key(&p384_scalar(&[0x42; 96]));
+            Box::new(move || {
+                black_box(p384::shared(black_box(&sc), black_box(&peer)));
+            })
+        }
+        // the key is the secret, and with RFC 6979 the nonce made from it
+        "ecdsa_sign_p256" => {
+            let key = p256_scalar(&s);
+            let digest = sha256(MSG);
+            Box::new(move || {
+                black_box(ecdsa::sign(ecdsa::Curve::P256, black_box(&key), HashAlg::Sha256, black_box(&digest), b""));
+            })
+        }
+        "ecdsa_sign_p384" => {
+            let key = p384_scalar(&s);
+            let digest = sha384(MSG);
+            Box::new(move || {
+                black_box(ecdsa::sign(ecdsa::Curve::P384, black_box(&key), HashAlg::Sha384, black_box(&digest), b""));
+            })
+        }
+        // the seed is the secret; the matrix comes from rho, which ek publishes (ct_check.py KNOWN)
+        "mlkem768_keygen" => {
+            let seed: [u8; 64] = s[..64].try_into().unwrap();
+            Box::new(move || {
+                black_box(mlkem::keygen(mlkem::Params::MlKem768, black_box(&seed)));
+            })
+        }
+        // the message is the secret, the key a public one
+        "mlkem768_encaps" => {
+            let (ek, _) = mlkem::keygen(mlkem::Params::MlKem768, &[0x42; 64]);
+            let m: [u8; 32] = a32(&s);
+            Box::new(move || {
+                black_box(mlkem::encaps(mlkem::Params::MlKem768, black_box(&ek), black_box(&m)));
+            })
+        }
+        // one key; the ciphertext of a secret message, changed in one byte where the secret's
+        // byte 40 is odd (of the three default secrets the third): implicit rejection must take
+        // the same way as a good ciphertext
+        "mlkem768_decaps" => {
+            let (ek, dk) = mlkem::keygen(mlkem::Params::MlKem768, &[0x42; 64]);
+            let (mut ct, _) = mlkem::encaps(mlkem::Params::MlKem768, &ek, &a32(&s)).expect("encaps");
+            if s[40] & 1 == 1 {
+                ct[s[41] as usize] ^= 1;
+            }
+            Box::new(move || {
+                black_box(mlkem::decaps(mlkem::Params::MlKem768, black_box(&dk), black_box(&ct)));
+            })
+        }
+        // the secret part of a decapsulation key (s, z) beside a public encapsulation key that
+        // belongs to another: every ciphertext is rejected, through the secret s
+        "mlkem768_decaps_foreign" => {
+            let (ek, _) = mlkem::keygen(mlkem::Params::MlKem768, &[0x42; 64]);
+            let (_, mine) = mlkem::keygen(mlkem::Params::MlKem768, &s[..64].try_into().unwrap());
+            let mut dk = mine[..1152].to_vec();
+            dk.extend_from_slice(&ek);
+            dk.extend_from_slice(&sha3_256(&ek));
+            dk.extend_from_slice(&mine[mine.len() - 32..]);
+            public_bytes(&dk[1152..dk.len() - 32]);
+            let (ct, _) = mlkem::encaps(mlkem::Params::MlKem768, &ek, &[0x43; 32]).expect("encaps");
+            Box::new(move || {
+                black_box(mlkem::decaps(mlkem::Params::MlKem768, black_box(&dk), black_box(&ct)));
+            })
+        }
         // the password is the secret (always 16 bytes: its length is public)
         "eappwd_pwe" => {
             let pw = s[..16].to_vec();
@@ -325,6 +419,12 @@ fn prepare_from(name: &str, s: Vec<u8>) -> Op {
                 black_box(buf);
             })
         }
+        "aes192gcm_seal" => Box::new(move || {
+            let g = gcm::AesGcm::new(black_box(&k[..24])).expect("key");
+            let mut buf = plain.clone();
+            black_box(g.seal_in_place(&nonce12, b"aad", black_box(&mut buf)));
+            black_box(buf);
+        }),
         "aes_keywrap" => {
             let wrapped = aes_wrap(&k[..16], &s[32..64]).expect("wrap");
             Box::new(move || {
@@ -370,6 +470,17 @@ fn prepare_from(name: &str, s: Vec<u8>) -> Op {
         }),
         "sha512" => Box::new(move || {
             black_box(sha512(black_box(&plain)));
+        }),
+        "sha3_256" => Box::new(move || {
+            black_box(sha3_256(black_box(&plain)));
+        }),
+        "shake256" => Box::new(move || {
+            let mut out = [0u8; 200];
+            shake256(black_box(&plain), &mut out);
+            black_box(out);
+        }),
+        "hmac_sha3_256" => Box::new(move || {
+            black_box(HashAlg::Sha3_256.hmac(black_box(&k), black_box(&plain)));
         }),
         "blake2b_keyed" => Box::new(move || {
             let mut out = [0u8; 32];

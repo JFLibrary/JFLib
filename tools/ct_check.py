@@ -1,8 +1,9 @@
 """ct_check.py -- lib/crypto's secret-dependent operations take the same way for every secret.
     python tools/ct_check.py [--opt release,dev,o3,s,z] [--only T,..] [--seeds N] [--crypto DIR] [--step] [--wasm]
 Builds tools/ct_check/probe.rs against lib/crypto (or the crate in DIR) at each optimization level
-below and lets it run every operation of its list (X25519, Ed25519, P-256, EAP-PWD, the RSA / DH
-exponentiation, the AEADs, AES, MACs, KDFs, Argon2id, Base64 and hex, and with this
+below and lets it run every operation of its list (X25519, Ed25519, P-256, P-384, ECDSA signing,
+ML-KEM, EAP-PWD, the RSA / DH exponentiation, the AEADs, AES, MACs, SHA-3 and SHAKE, KDFs,
+Argon2id, Base64 and hex, and with this
 repository's crypto the key files of netio: PEM / PKCS #8 and OpenSSH) with SEEDS different secrets under
 ptrace.  An operation fails when two secrets take different branches or jump-table entries; the
 report names the function and the line where the paths part (addr2line).
@@ -86,6 +87,16 @@ DECLASSIFIED = [
     # ARM64 makes secret_from's answer without a branch (the Option's tag from the mask), and
     # public_key's assert branches on it: the same answer, where it is used
     ("crypto/p256.rs", r"assert!\(secret_from\(secret\)\.is_some\(\)", "public_key's assert takes secret_from's answer: whether the scalar is in [1, n - 1] is public"),
+    ("crypto/p384.rs", r"assert!\(secret_from\(secret\)\.is_some\(\)|\.then_some\(\*random\)", "public_key's assert takes secret_from's answer: whether the scalar is in [1, n - 1] is public"),
+    ("crypto/p384.rs", r"if finite == 0", "the point at infinity ends the operation (None): reaching it is public"),
+    # ECDSA signing: refused keys and nonces, and the signature itself
+    ("crypto/ecdsa.rs", r"in_range_mask\(&d\) == 0", "a secret key outside [1, n - 1] is refused: the API's public answer"),
+    ("crypto/ecdsa.rs", r"in_range_mask\(&kk\) != 0|if let Some\(sig\) = found",
+     "a nonce outside [1, n - 1] is drawn again (RFC 6979 3.2 h.3, about 2^-32 on P-256): that one was refused shows nothing of the one taken"),
+    ("crypto/ecdsa.rs", r"r\.iter\(\)\.all\(\|&w\| w == 0\) \|\| s\.iter", "r and s are the signature, which is published"),
+    # ML-KEM: the matrix comes from rho, which the encapsulation key carries
+    ("crypto/mlkem.rs", r"if d1 < Q && n < N|if d2 < Q && n < N|while n < N|f\[n\] = d",
+     "SampleNTT's rejection sampling (FIPS 203 algorithm 7) reads rho, which the encapsulation key publishes"),
     # EAP-PWD: rand and mask are drawn again when they make no valid scalar; Scalar is sent
     ("crypto/eappwd.rs", r"scalar_ok\(rand\)|scalar_ok\(&scalar\)", "rand / mask that make no valid scalar are drawn again; Scalar itself is sent to the peer"),
     ("crypto/eappwd.rs", r"rounds < ROUNDS as u32 \|\| found == 0", "after the 40 rounds RFC 5931 asks for, a password without a point (2^-40) goes on"),
@@ -114,11 +125,50 @@ DECLASSIFIED = [
 # own frames whose declassification holds only for errors raised inside std's text handling
 TEXT_FILES = ("crypto/b64.rs", "netio/pem.rs", "netio/ssh.rs")
 # operations whose way may depend on the secret by design, from this fraction of it on
-# (a share of the first secret's trace: a parting of any secret before it is a difference)
+# (a share of the first secret's trace: a parting of any secret before it is a difference), and
+# with a third entry only where the paths part there: in one of these functions (a frame at the
+# branch; in wasm, a call; inlined code is named after the function it went into) or, natively,
+# on a source line of this file that matches the pattern
 KNOWN = {
     "argon2id": (0.5, "Argon2id addresses its memory by the password after the first half of the "
                       "first pass (RFC 9106 3.4), and memcpy's path follows the addresses"),
+    "mlkem768_keygen": (0.15, "ML-KEM's keygen samples s and e first and the matrix after them, from "
+                              "rho, which the encapsulation key publishes: its rejection sampling "
+                              "(FIPS 203 algorithm 7) follows rho",
+                        {"functions": ("mlkem::sample_ntt", "mlkem::matrix"),
+                         "line": ("crypto/mlkem.rs", r"if d1 < Q && n < N|if d2 < Q && n < N|while n < N|r\.read\(&mut c\)")}),
 }
+
+
+def source_line(at):
+    """the text of file:line as a report gives it (relative to one of PREFIXES), or None"""
+    path, _, line = at.rpartition(":")
+    if not line.isdigit():
+        return None
+    for pre in [""] + PREFIXES + [str(ROOT / "lib") + "/"]:
+        f = Path(pre + path)
+        if f.is_file():
+            try:
+                return f.read_text(encoding="utf-8").splitlines()[int(line) - 1]
+            except (OSError, IndexError):
+                return None
+    return None
+
+
+def known_parting(t, pos, total, functions, locations=()):
+    """the reason when target t may part at pos of total, else None; functions: the names of the
+    frames (or calls) at the parting, locations: their file:line, innermost first"""
+    k = KNOWN.get(t)
+    if not k or pos < k[0] * total:
+        return None
+    if len(k) > 2:
+        spec = k[2]
+        by_name = any(want in fn for want in spec["functions"] for fn in functions)
+        file, pattern = spec["line"]
+        text = source_line(locations[0]) if locations and locations[0].startswith(file) else None
+        if not by_name and not (text is not None and re.search(pattern, text)):
+            return None
+    return k[1]
 # folders cut from the paths in reports (the checked crate's parent is added by main)
 PREFIXES = [str(ROOT) + "/"]
 
@@ -311,12 +361,20 @@ def check(level, exe, targets, seeds, step):
                 continue
             i, na, nb, branch, a, b, caller = r[1:8]
             unit = "branches" if mode == "block" else "instructions"
-            known = KNOWN.get(t)
             # one threshold for every secret, of the first secret's trace (the reference the
             # parting is counted in): so the earliest parting the probe reports decides for all
-            if known and int(i) >= known[0] * int(na):
+            fr = []
+            if branch.startswith("exe+"):
+                # where the branch's own line is missing, the instructions just before it (as where)
+                off = int(branch[4:], 16)
+                fr = frames(exe, off)
+                k = 1
+                while not has_line(fr) and k < 48:
+                    fr, k = frames(exe, off - k), k + 1
+            why = known_parting(t, int(i), int(na), [fn for fn, _ in fr], [at for _, at in fr])
+            if why:
                 same += 1
-                lines.append(f"  {t:<24} differs after {i} of {na} {unit}, as expected: {known[1]}")
+                lines.append(f"  {t:<24} differs after {i} of {na} {unit}, as expected: {why}")
                 continue
             bad += 1
             lines.append(f"  {t:<24} DIFF after {i} of {na} / {nb} {unit}")
@@ -689,12 +747,12 @@ def check_wasm(level, wasm, targets, seeds):
             seen.add(t)
             continue
         pos = where[0] if where else 0
-        known = KNOWN.get(t)
         # one threshold for every secret, of the first secret's run (the reference the parting is
         # counted in): so the earliest parting, the one wasm_diff returns, decides for all
-        if known and pos >= known[0] * na:
+        why = known_parting(t, pos, na, where[3] if where else [])
+        if why:
             same += 1
-            lines.append(f"  {t:<24} differs after {pos} of {na} wasm instructions, as expected: {known[1]}")
+            lines.append(f"  {t:<24} differs after {pos} of {na} wasm instructions, as expected: {why}")
             continue
         bad += 1
         lines.append(f"  {t:<24} DIFF after {pos} of {na} / {nb} wasm instructions")

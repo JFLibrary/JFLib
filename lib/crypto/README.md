@@ -6,17 +6,21 @@ repositories and its updater build on them, and any program can use them directl
 
 ## What's in it
 
-- **Hashes:** SHA-256, SHA-384 and SHA-512, BLAKE2b (also keyed), BLAKE3 (hash, keyed hash, key
-  derivation, any output length).
-- **Authentication and key derivation:** HMAC, HKDF and PBKDF2 over the SHA-2 hashes (or any
-  type that implements `crypto::Hash`), Poly1305.
+- **Hashes:** SHA-224, SHA-256, SHA-384 and SHA-512, SHA-3 (224 to 512) and SHAKE128 / SHAKE256
+  with any output length, BLAKE2b (also keyed), BLAKE3 (hash, keyed hash, key derivation, any
+  output length).
+- **Authentication and key derivation:** HMAC, HKDF and PBKDF2 over the SHA-2 and SHA-3 hashes (or
+  any type that implements `crypto::Hash`), Poly1305.
 - **Passwords:** Argon2id, with PHC strings to store and `argon2::verify` to check them.
-- **Encryption:** ChaCha20-Poly1305 and XChaCha20-Poly1305, AES-128 and AES-256 with AES-GCM,
-  and sealed boxes (`sealbox`): anyone with a recipient's X25519 public key can seal, only the
-  secret key opens.
-- **Key exchange and signatures:** X25519, Ed25519, Diffie-Hellman on P-256, RSA signatures
-  (PKCS #1 v1.5 and PSS verification, PKCS #1 v1.5 signing, key generation) and ECDSA
-  verification on P-256 and P-384.
+- **Encryption:** ChaCha20-Poly1305 and XChaCha20-Poly1305, AES-128, AES-192 and AES-256 with
+  AES-GCM, and sealed boxes (`sealbox`): anyone with a recipient's X25519 public key can seal,
+  only the secret key opens.
+- **Key exchange and signatures:** X25519, Ed25519, Diffie-Hellman on P-256 and P-384, RSA
+  signatures (PKCS #1 v1.5 and PSS, verification and signing, key generation) and ECDSA on P-256
+  and P-384: verification, and signing with deterministic nonces (RFC 6979) that random bytes can
+  hedge; signatures as r || s (IEEE P1363: JOSE, COSE, WebCrypto) or in DER.
+- **Post-quantum key encapsulation:** ML-KEM-512, ML-KEM-768 and ML-KEM-1024 (FIPS 203), with the
+  input checks of FIPS 203 and implicit rejection.
 - **For protocols that are defined with them:** SHA-1, MD5 and their HMACs, the AES key wrap of
   RFC 3394, AES-CMAC and the computations of EAP-PWD. SHA-1 and MD5 are broken for collisions and
   belong in nothing new.
@@ -44,10 +48,15 @@ limbs with masked swaps and selects, and an AES that is bitsliced instead of loo
 both directions. The masks pass an optimization barrier, so the compiler cannot turn a select back
 into a branch, and [`tools/ct_check.py`](https://github.com/JFLibrary/JFLib/blob/main/tools/ct_check.py)
 runs each of these operations with different secrets and checks that the machine code takes the
-same branches for all of them, at five optimization levels (x86-64). Ed25519 verifies strictly (canonical points, no cofactor), so a signature is
-valid or not the same way everywhere. Operations on public data, such as RSA and ECDSA
-verification, are allowed to take variable time; RSA signing uses a constant-time exponentiation.
-RSA key generation is variable time and meant for simulators and tests.
+same branches for all of them and, under valgrind's memcheck, neither branches on a secret nor
+makes an address of it, at five optimization levels on x86-64 and ARM64, and for the wasm the
+compiler makes. ML-KEM reduces and compresses without dividing (KyberSlash). Ed25519 verifies
+strictly (canonical points, no cofactor), so a signature is valid or not the same way everywhere.
+Operations on public data, such as RSA and ECDSA verification, are allowed to take variable time;
+RSA signing uses a constant-time exponentiation. RSA key generation is variable time and meant
+for simulators and tests. What Project Wycheproof and NIST's ACVP have test vectors for (the
+hashes, HMAC and HKDF, the AEADs, AES, X25519, Ed25519, ECDH, ECDSA, RSA and ML-KEM) passes them
+([docs/EXTERNAL_SUITES.md](https://github.com/JFLibrary/JFLib/blob/main/docs/EXTERNAL_SUITES.md)).
 
 ## How to get it
 
