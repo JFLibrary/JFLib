@@ -149,11 +149,17 @@ impl AddIndex {
     // the index of the rules (i, rule)
     fn build<'r>(rules: impl Iterator<Item = (usize, &'r Affix)>) -> AddIndex {
         let mut map: BTreeMap<(u64, String), Vec<Group>> = BTreeMap::new();
+        // (add, strip) -> its group's place: the groups keep the order of the file, found
+        // without a search through them (a file with thousands of strips for one text)
+        let mut at: BTreeMap<(String, String), usize> = BTreeMap::new();
         for (i, r) in rules {
             let gs = map.entry((add_key(&r.add), r.add.clone())).or_default();
-            match gs.iter_mut().find(|g| g.strip == r.strip) {
-                Some(g) => g.rules.push(i as u32),
-                None => gs.push(Group { strip: r.strip.clone(), rules: alloc::vec![i as u32] }),
+            match at.get(&(r.add.clone(), r.strip.clone())) {
+                Some(&k) => gs[k].rules.push(i as u32),
+                None => {
+                    at.insert((r.add.clone(), r.strip.clone()), gs.len());
+                    gs.push(Group { strip: r.strip.clone(), rules: alloc::vec![i as u32] });
+                }
             }
         }
         let mut x = AddIndex::default();
@@ -657,7 +663,10 @@ pub(crate) fn parse(text: &str, encoding: &str) -> Aff {
     a.sfx_by_add = AddIndex::build(a.sfx.iter().enumerate());
     a.pfx_max = a.pfx.iter().map(|r| r.add.chars().count()).max().unwrap_or(0);
     a.sfx_max = a.sfx.iter().map(|r| r.add.chars().count()).max().unwrap_or(0);
-    let mut outer: Vec<Flag> = a.sfx.iter().map(|r| r.flag).filter(|&f| a.sfx.iter().any(|r| r.has(f))).collect();
+    // the suffix flags some suffix's continuation names (one pass: a file with many rules
+    // costs no square)
+    let conts: alloc::collections::BTreeSet<Flag> = a.sfx.iter().flat_map(|r| r.cont.iter().copied()).collect();
+    let mut outer: Vec<Flag> = a.sfx.iter().map(|r| r.flag).filter(|f| conts.contains(f)).collect();
     outer.sort_unstable();
     outer.dedup();
     a.sfx_outer = outer;
