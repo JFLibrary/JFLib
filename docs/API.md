@@ -85,7 +85,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [x509](#x509) -- X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)
   <br>[lib.rs](#x509-crate-root) · [der.rs](#x509derrs) · [ip.rs](#x509iprs)
 - [compress](#compress) -- DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids
-  <br>[lib.rs](#compress-crate-root) · [brotli/mod.rs](#compressbrotlimodrs) · [checksum.rs](#compresschecksumrs) · [deflate/mod.rs](#compressdeflatemodrs) · [deflate/dec.rs](#compressdeflatedecrs) · [deflate/enc.rs](#compressdeflateencrs) · [gzip.rs](#compressgziprs) · [lz4.rs](#compresslz4rs) · [xxh.rs](#compressxxhrs) · [zlib.rs](#compresszlibrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/enc.rs](#compresszstdencrs)
+  <br>[lib.rs](#compress-crate-root) · [brotli/mod.rs](#compressbrotlimodrs) · [brotli/sdec.rs](#compressbrotlisdecrs) · [checksum.rs](#compresschecksumrs) · [deflate/mod.rs](#compressdeflatemodrs) · [deflate/dec.rs](#compressdeflatedecrs) · [deflate/enc.rs](#compressdeflateencrs) · [deflate/sdec.rs](#compressdeflatesdecrs) · [gzip.rs](#compressgziprs) · [lz4.rs](#compresslz4rs) · [stream.rs](#compressstreamrs) · [xxh.rs](#compressxxhrs) · [zlib.rs](#compresszlibrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/enc.rs](#compresszstdencrs) · [zstd/sdec.rs](#compresszstdsdecrs) · [zstd/senc.rs](#compresszstdsencrs)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery, secondary indexes, encryption at rest
   <br>[lib.rs](#datastore-crate-root) · [index.rs](#datastoreindexrs) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
@@ -43344,13 +43344,21 @@ compress -- lossless compression: DEFLATE, zlib, gzip, Brotli, LZ4 and Zstandard
   zstd::compress(data, level) / decompress        Zstandard frames (RFC 8878; the zstd tool
                                                   reads ours and we read its)
   crc32(crc, data), adler32(adler, data)          the checksums of gzip / PNG / ZIP and zlib
-  xxh32(data, seed), xxh64(data, seed)
+  xxh32(data, seed), xxh64(data, seed); Xxh32, Xxh64   the same over data in pieces
+  stream::{Decode, Encode}                        every format in pieces, with bounded memory:
+                                                  deflate::, zlib::, gzip::, zstd::Decoder /
+                                                  Encoder, lz4::FrameDecoder / FrameEncoder,
+                                                  brotli::Decoder; decode(input, out) /
+                                                  encode(input, out, flush) -> Step; the
+                                                  pumps stream::decode_all / encode_all
   Codec { None, Lz4, Zstd } with id(): the codec byte that formats on disk store per blob;
   Codec::pack(data, level) / unpack(data, max_out)
 
 Every decoder takes the largest output the caller accepts and treats its input as untrusted:
 truncated or corrupt data, a wrong checksum or more output than allowed give None (or an
 Error from the *_into variants), never a panic and never a read or write outside the buffers.
+The stream decoders write at most the caller's buffer per call and keep no more than their
+format's window (stream.rs).
 ```
 
 ### `compress` crate root
@@ -43387,6 +43395,7 @@ img_jxl)                                                               [jxl-plus
   decompress_prefix(data, max_out) -> Ok((bytes, consumed))   the stream at the start of
                                                data; Error::Corrupt for a damaged stream,
                                                Error::Limit past max_out bytes
+  Decoder                                      in pieces (stream::Decode; sdec.rs)
 
 One pass over the whole input: bit reader, prefix codes (simple and complex), block switches,
 context maps (RLE + move to front), insert-and-copy commands, the distance ring buffer and
@@ -43405,6 +43414,37 @@ output so far.  Large windows (an extension outside RFC 7932) are refused.
 
 - **`fn decompress_prefix(data: &[u8], max: usize) -> Result<(Vec<u8>, usize), Error>`**
   the Brotli stream at the start of `data`: (output, bytes of input used)
+
+### `compress/brotli/sdec.rs`
+
+Source: [`lib/compress/brotli/sdec.rs`](../lib/compress/brotli/sdec.rs)
+
+```text
+brotli::sdec -- brotli::Decoder, a Brotli stream in pieces
+
+The decoder of mod.rs as a machine of small steps, each of which starts again when the
+input runs out (stream::drive keeps the bytes of the step that ran out): the window bits,
+a meta-block header, each of the three block-switch descriptions, the context modes, the
+prefix code of a context map and then each of its entries, each prefix code of the
+literals, commands and distances, and then per command: the insert-and-copy code with its
+extra bits, each literal, the distance.  The largest step is a prefix code of 704 symbols,
+well under a kilobyte.  Copies and uncompressed meta-blocks go out in pieces as the
+caller takes them.
+
+The output goes into a window of the stream's size ((1 << WBITS) - 16, at most 16 MiB):
+it keeps that much of the output, as far as a distance may reach, and moves when it holds
+more than twice that.  Distances beyond it are static dictionary words, as in mod.rs.
+```
+
+- **`struct Decoder`**
+  a Brotli decoder that takes its input in pieces (stream::Decode): one stream of RFC 7932,
+  its window (at most 16 MiB, as the stream says) twice and 64 KiB of output
+
+**`impl Decoder`**
+
+- **`fn new() -> Decoder`**
+- **`fn reset(&mut self)`**
+  start a new stream
 
 ### `compress/checksum.rs`
 
@@ -43455,6 +43495,8 @@ deflate -- raw DEFLATE data (RFC 1951), the compressed format inside zlib, gzip,
   InflateState / DeflateState              reusable decoder and encoder (~330 KB) states,
                                            one thread at a time; a reused state gives the
                                            same bytes and errors as a fresh one
+  Decoder / Encoder                        the same in pieces (stream::Decode / Encode):
+                                           sdec.rs, senc.rs (zlib and gzip wrap them)
 
 The decoder checks every write against the output buffer and every back reference against
 the bytes produced so far, so a corrupt or hostile stream ends with an Error, never with a
@@ -43503,6 +43545,18 @@ LEVEL_MAX: i32 = 9
 
 - **`fn decompress_into(state: Option<&mut InflateState>, data: &[u8], dst: &mut [u8]) -> Result<(usize, usize), Error>`**
   the stream at the start of `data` into `dst`: (bytes written, input bytes of the stream)
+
+- **`struct Encoder`**
+  a raw DEFLATE encoder that takes its input in pieces (stream::Encode), about 900 KB of
+  state: pieces of 256 KiB with the 32 KiB before each as their window; the same bytes as
+  compress() for a stream of at most 256 KiB
+
+**`impl Encoder`**
+
+- **`fn new(level: i32) -> Encoder`**
+  an encoder at `level` (as compress: 0..=9, &lt; 0 = 6)
+- **`fn reset(&mut self)`**
+  start a new stream at the same level (the memory stays)
 
 ### `compress/deflate/dec.rs`
 
@@ -43593,6 +43647,38 @@ dependent loads; the early load overlaps it) -- the same candidates in the same 
 - **`fn new() -> Box<DeflateState>`**
   a zeroed state  [deflate_state_new]
 
+### `compress/deflate/sdec.rs`
+
+Source: [`lib/compress/deflate/sdec.rs`](../lib/compress/deflate/sdec.rs)
+
+```text
+deflate::sdec -- deflate::Decoder, raw DEFLATE data in pieces (zlib::Decoder and
+gzip::Decoder wrap it)
+
+The decoder of dec.rs in steps that start again when the input runs out: a block header
+(at most 563 bytes: 17 bits, 19 code length codes, 316 lengths of up to 14 bits), one
+symbol (a literal, the end of a block, or a length and a distance: at most 48 bits), or a
+piece of a stored block.  A step that runs out leaves the bit position at its start; the
+bytes from there wait in the stage (stream::drive).  While a step finds 8 input bytes and
+room for a whole match, codes_fast of dec.rs runs the symbols as for a whole input.
+
+The output goes into a window of 128 KiB: the last 32 KiB of output (the reach of a
+distance) and room for new bytes.  When the caller has taken everything, the window
+keeps the last 32 KiB and moves them to its start.  A distance is checked against the
+bytes in the window, which hold every byte of the output while there are fewer than 32 KiB
+and the last 32 KiB afterwards: the same checks as for a whole input.
+```
+
+- **`struct Decoder`**
+  a decoder of raw DEFLATE data (RFC 1951) that takes its input in pieces (stream::Decode):
+  about 150 KB of state, of which 128 KiB are the window
+
+**`impl Decoder`**
+
+- **`fn new() -> Decoder`**
+- **`fn reset(&mut self)`**
+  start a new stream (the memory stays)
+
 ### `compress/gzip.rs`
 
 Source: [`lib/compress/gzip.rs`](../lib/compress/gzip.rs)
@@ -43614,6 +43700,8 @@ gzip -- the gzip format (RFC 1952): members of a header, DEFLATE data, CRC-32 an
                                      = the member's length including the trailer
   stored_size(data) -> Option<u32>   ISIZE, the last 4 bytes of a single member (the size
                                      mod 2^32, as the member claims it)
+  Decoder / Encoder                  in pieces (stream::Decode / Encode); Decoder reads every
+                                     member, Decoder::single() the first
 
 Decoding: ID1 ID2, CM 8, FLG (reserved bits 5..7 must be 0), MTIME, XFL, OS, then FEXTRA,
 FNAME, FCOMMENT, FHCRC (low 16 bits of the CRC-32 of the header bytes), the deflate data,
@@ -43641,6 +43729,35 @@ errors.
   the ISIZE field (uncompressed size mod 2^32) of a single-member stream; None for fewer than
   18 bytes  [gzip_isize]
 
+- **`struct Decoder`**
+  a gzip decoder that takes its input in pieces (stream::Decode): every member, one after
+  the other as gunzip reads them (`single()`: only the first, and the input after it is not
+  taken); the header with its optional fields, the DEFLATE data through deflate::Decoder,
+  the CRC-32 and the size of each member
+
+**`impl Decoder`**
+
+- **`fn new() -> Decoder`**
+  a decoder of all members
+- **`fn single() -> Decoder`**
+  a decoder of one member: Status::End after it, input behind it is not taken
+- **`fn reset(&mut self)`**
+  start anew (the memory stays)
+- **`fn members(&self) -> u64`**
+  the members ended so far
+
+- **`struct Encoder`**
+  a gzip encoder that takes its input in pieces (stream::Encode): one member with the header of
+  compress(), DEFLATE data as deflate::Encoder writes it, the CRC-32 and size; the same bytes as
+  compress() for a stream of at most 256 KiB
+
+**`impl Encoder`**
+
+- **`fn new(level: i32) -> Encoder`**
+  an encoder at `level` (as compress: 0..=9, &lt; 0 = 6)
+- **`fn reset(&mut self)`**
+  start a new stream at the same level (the memory stays)
+
 ### `compress/lz4.rs`
 
 Source: [`lib/compress/lz4.rs`](../lib/compress/lz4.rs)
@@ -43655,6 +43772,7 @@ lz4 -- the LZ4 block and frame formats
   decompress_into(block, &mut out, limit) appends (back references may reach into the
                                          earlier contents of out: linked frame blocks)
   frame_compress(data) / frame_decompress(frame, max_out)
+  FrameDecoder / FrameEncoder           LZ4 frames in pieces (stream::Decode / Encode)
 
 Block rules kept by the compressor: the last 5 bytes are literals, no match starts in the
 last 12 bytes, offsets 1..=65535.
@@ -43680,12 +43798,135 @@ last 12 bytes, offsets 1..=65535.
   max_out bytes in total; None on corruption, an unsupported feature (dictionary ids), a
   checksum mismatch, or too much output
 
+- **`struct FrameDecoder`**
+  an LZ4 frame decoder that takes its input in pieces (stream::Decode): frames one after
+  the other, skippable frames skipped (`single()`: only the first frame).  It holds one
+  block (at most 4 MiB, as the frame's descriptor allows) and the last 64 KiB of output,
+  which linked blocks may reach.
+
+**`impl FrameDecoder`**
+
+- **`fn new() -> FrameDecoder`**
+  a decoder of all frames
+- **`fn single() -> FrameDecoder`**
+  a decoder of one frame: Status::End after it, input behind it is not taken
+- **`fn reset(&mut self)`**
+  start anew (single() stays)
+- **`fn frames(&self) -> u64`**
+  the frames ended so far (skippable ones not counted)
+
+- **`struct FrameEncoder`**
+  an LZ4 frame encoder that takes its input in pieces (stream::Encode): independent blocks
+  of 4 MiB and the content checksum, as frame_compress writes them; the content size only
+  when it is given (with_size), and then the same bytes as frame_compress.  Flush::Sync ends
+  a block early.  It holds one block of input and its output.
+
+**`impl FrameEncoder`**
+
+- **`fn new() -> FrameEncoder`**
+- **`fn with_size(mut self, bytes: u64) -> FrameEncoder`**
+  state the content size in the frame (the input must have exactly this length, else
+  Error::Size)
+
+### `compress/stream.rs`
+
+Source: [`lib/compress/stream.rs`](../lib/compress/stream.rs)
+
+```text
+stream -- compression and decompression in pieces, with bounded memory
+
+  Decode::decode(input, out) -> Ok(Step)   take input, write into the caller's buffer
+  Decode::finish()                          Ok when the input so far ended a whole stream
+  Encode::encode(input, out, flush) -> Ok(Step)
+  Step { read, written, status }            Status::Input (all input taken, give more),
+                                            Output (out is full, call again), End
+  Flush::None / Sync / Finish               encoders: buffer, make all input so far
+                                            decodable, or end the stream
+  decode_all(dec, read, write, limit)       pump a whole stream from a reader to a writer
+  encode_all(enc, read, write)
+
+The decoders and encoders are deflate::, zlib::, gzip::, zstd::, lz4:: (FrameDecoder,
+FrameEncoder) and brotli::Decoder.  Each keeps only what its format needs to go on: the
+window a back reference may reach (32 KiB for DEFLATE, the frame's for zstd and Brotli, 64
+KiB for LZ4), the bytes of one block where the format sizes its blocks (zstd, LZ4) and at
+most a kilobyte of input otherwise.  Every call writes at most out.len() bytes, so the
+caller decides how much output a piece of input may produce.
+
+The rules for a decoder:
+  - Status::Input: every byte of input was taken (read == input.len()); call again with
+    more.  If there is no more, the stream is truncated (finish() says so).
+  - Status::Output: out is full; call again with the input from `read` on.
+  - Status::End: a whole stream ends at input[read]; every byte of it has been written.
+    DEFLATE, zlib and Brotli hold one stream, so input after it is not taken.  gzip, zstd
+    and LZ4 files may hold several in a row: more input goes on with the next member or
+    frame, as their tools read them (Decoder::single() stops after the first).
+  - An error is final; the decoder must not be used again (reset() starts it anew).
+Decoders take untrusted input: damaged data gives an Error, never a panic, a read outside
+the input or memory beyond the format's window.
+```
+
+- **`struct Step`**
+  how far one call got
+  - `read: usize` -- bytes of input taken
+  - `written: usize` -- bytes written to the output buffer
+  - `status: Status`
+
+- **`enum Status`**
+  why a call returned
+  - `Input` -- all input was taken: give more, or end (finish / Flush::Finish)
+  - `Output` -- the output buffer is full: call again with room, and the input from `read` on
+  - `End` -- the stream is complete: everything of it is written (decoders: `read` stops at its end)
+
+- **`enum Flush`**
+  what an encoder does with the input it has
+  - `None` -- collect input as the format compresses best (output comes in blocks)
+  - `Sync` -- compress everything so far so that a decoder can give all of it back (the stream goes
+    on: DEFLATE ends it with an empty stored block, zstd and LZ4 with a whole block)
+  - `Finish` -- compress the rest and end the stream (call again while it returns Status::Output)
+
+- **`enum Error`**
+  why a stream could not be read or written
+  - `Truncated` -- the input ended inside a stream
+  - `Corrupt` -- the data is damaged, or is no stream of the format
+  - `Checksum` -- a checksum or a stored size does not match the data
+  - `Unsupported` -- the stream needs something this crate does not read: a zstd or LZ4 dictionary, a
+    Brotli large window
+  - `Limit` -- more memory or output than allowed: a zstd window above the decoder's limit, more
+    output than a pump's limit
+  - `Size` -- the encoder got more or less input than the size it was given
+  - `Io` -- a pump's reader or writer failed
+
+- **`trait Decode`**
+  a decoder that takes its input in pieces
+  - `fn decode(&mut self, input: &[u8], out: &mut [u8]) -> Result<Step, Error>`
+    decode from `input` into `out` (see the module's rules for the Step)
+  - `fn finish(&self) -> Result<(), Error>`
+    Ok when the input so far ended a whole stream (and everything is written), else
+    Error::Truncated
+
+- **`trait Encode`**
+  an encoder that takes its input in pieces
+  - `fn encode(&mut self, input: &[u8], out: &mut [u8], flush: Flush) -> Result<Step, Error>`
+    take `input` (fewer bytes when out fills up), write compressed bytes into `out`.
+    Status::Input: all input taken and, for Sync and Finish, all output of it written;
+    Output: call again (with the same flush); End: Finish is done.
+
+- **`fn decode_all<D: Decode + ?Sized>( dec: &mut D, mut read: impl FnMut(&mut [u8]) -> Option<usize>, mut write: impl FnMut(&[u8]) -> bool, limit: u64, ) -> Result<u64, Error>`**
+  decode a whole stream: `read(buf)` gives input (Some(0) at its end, None on an error),
+  `write(bytes)` takes output (false on an error); at most `limit` bytes are written.  The
+  input must be complete streams and nothing else -> the number of bytes written.
+
+- **`fn encode_all<E: Encode + ?Sized>( enc: &mut E, mut read: impl FnMut(&mut [u8]) -> Option<usize>, mut write: impl FnMut(&[u8]) -> bool, ) -> Result<u64, Error>`**
+  compress everything `read(buf)` gives (Some(0) at the end, None on an error) into
+  `write(bytes)` (false on an error) and end the stream -> the number of bytes written
+
 ### `compress/xxh.rs`
 
 Source: [`lib/compress/xxh.rs`](../lib/compress/xxh.rs)
 
 ```text
-xxh -- xxHash32 (the checksum of LZ4 frames) and xxHash64 (zstd frames); not cryptographic
+xxh -- xxHash32 (the checksum of LZ4 frames) and xxHash64 (zstd frames); not cryptographic.
+Xxh32 / Xxh64 give the same values for data that comes in pieces (the streams use them).
 ```
 
 - **`fn xxh32(data: &[u8], seed: u32) -> u32`**
@@ -43693,6 +43934,27 @@ xxh -- xxHash32 (the checksum of LZ4 frames) and xxHash64 (zstd frames); not cry
 
 - **`fn xxh64(data: &[u8], seed: u64) -> u64`**
   xxHash64 of a byte string (zstd's content checksum is its low 32 bits)
+
+- **`struct Xxh32`**
+  xxHash32 over data that comes in pieces: `update` as often as needed, then `digest`
+  (the same value as `xxh32` of all pieces in a row)
+
+**`impl Xxh32`**
+
+- **`fn new(seed: u32) -> Xxh32`**
+- **`fn update(&mut self, mut data: &[u8])`**
+- **`fn digest(&self) -> u32`**
+  the hash of everything so far (the state stays usable)
+
+- **`struct Xxh64`**
+  xxHash64 over data that comes in pieces (the same value as `xxh64` of all pieces in a row)
+
+**`impl Xxh64`**
+
+- **`fn new(seed: u64) -> Xxh64`**
+- **`fn update(&mut self, mut data: &[u8])`**
+- **`fn digest(&self) -> u64`**
+  the hash of everything so far (the state stays usable)
 
 ### `compress/zlib.rs`
 
@@ -43709,6 +43971,7 @@ zlib -- the zlib format (RFC 1950): a two-byte header, DEFLATE data and an Adler
   compress_with(state, data, level) / compress_into(state, data, level, dst)
   decompress_into(state, data, dst) -> Ok((bytes, consumed))   consumed = header, DEFLATE
                                            data and Adler-32; data after it is not looked at
+  Decoder / Encoder                        in pieces (stream::Decode / Encode)
 
 A preset dictionary (FDICT) is refused as Error::Header.
 ```
@@ -43730,6 +43993,28 @@ A preset dictionary (FDICT) is refused as Error::Header.
   the zlib stream at the start of `data` into `dst`: (bytes written, input bytes of the
   stream including its Adler-32)
 
+- **`struct Decoder`**
+  a zlib decoder that takes its input in pieces (stream::Decode): the header, the DEFLATE
+  data through deflate::Decoder, the Adler-32 of the output
+
+**`impl Decoder`**
+
+- **`fn new() -> Decoder`**
+- **`fn reset(&mut self)`**
+  start a new stream (the memory stays)
+
+- **`struct Encoder`**
+  a zlib encoder that takes its input in pieces (stream::Encode): the header, DEFLATE data as
+  deflate::Encoder writes it, the Adler-32; the same bytes as compress() for a stream of at
+  most 256 KiB
+
+**`impl Encoder`**
+
+- **`fn new(level: i32) -> Encoder`**
+  an encoder at `level` (as compress: 0..=9, &lt; 0 = 6)
+- **`fn reset(&mut self)`**
+  start a new stream at the same level (the memory stays)
+
 ### `compress/zstd/mod.rs`
 
 Source: [`lib/compress/zstd/mod.rs`](../lib/compress/zstd/mod.rs)
@@ -43744,6 +44029,9 @@ zstd -- the Zstandard format (RFC 8878), interoperable with the zstd tool both w
                                         corruption, a checksum mismatch or > max_out bytes
   content_size(frame)                   the size a frame header declares
   bound(n)                              the largest frame compress() makes from n bytes
+  Decoder / Encoder                     in pieces (stream::Decode / Encode; sdec.rs, senc.rs):
+                                        windows up to 128 MiB (with_window_max), with_size
+                                        for the bytes of compress()
 ```
 
 ```rust
@@ -43789,6 +44077,71 @@ block.  The decoder's repeat offsets do not move on raw blocks, so the encoder r
 
 - **`fn compress(src: &[u8], level: i32) -> Vec<u8>`**
   one zstd frame
+
+### `compress/zstd/sdec.rs`
+
+Source: [`lib/compress/zstd/sdec.rs`](../lib/compress/zstd/sdec.rs)
+
+```text
+zstd::sdec -- zstd::Decoder, Zstandard frames in pieces
+
+A frame is a header, blocks of at most 128 KiB whose sizes stand in their 3-byte headers,
+and a checksum: each part is collected whole (at most one block's bytes wait) and decoded
+with dec.rs.  The output goes into a window that holds what the frame's matches may reach:
+its Window_Size (the content size when it is smaller), refused above the decoder's limit
+(128 MiB by default, as the zstd tool's).  A match farther back than the window is an
+error, as in the zstd tool's streaming decoder (dec.rs's one-shot decompress allows any
+distance inside the frame).  The next block is decoded once the caller has taken the
+output of the last one; the window moves when it holds more than twice its size.
+```
+
+- **`struct Decoder`**
+  a Zstandard decoder that takes its input in pieces (stream::Decode): frames one after the
+  other as `zstd -d` reads them, skippable frames skipped (`single()`: only the first frame).
+  Its memory is about twice a frame's window and one block.
+
+**`impl Decoder`**
+
+- **`fn new() -> Decoder`**
+  a decoder of all frames, windows up to 128 MiB
+- **`fn single() -> Decoder`**
+  a decoder of one frame: Status::End after it, input behind it is not taken
+- **`fn with_window_max(mut self, bytes: usize) -> Decoder`**
+  refuse frames whose window is larger than `bytes` (Error::Limit)
+- **`fn reset(&mut self)`**
+  start anew (the limit and single() stay)
+- **`fn frames(&self) -> u64`**
+  the frames ended so far (skippable ones not counted)
+
+### `compress/zstd/senc.rs`
+
+Source: [`lib/compress/zstd/senc.rs`](../lib/compress/zstd/senc.rs)
+
+```text
+zstd::senc -- zstd::Encoder, one Zstandard frame in pieces
+
+The input collects in a buffer that keeps the frame's window (8 MiB, or the content when
+a smaller size is given) before the bytes not yet compressed; a block of 128 KiB is
+compressed once 8 more bytes are there (the match finder looks that far ahead), with the
+same finder, tables and block choices as compress().  So a frame whose size is given
+(with_size) is the same bytes as compress() of the whole input; without a size the
+frame header states none, the window is 8 MiB and the tables have their full size.
+Flush::Sync ends a block early.  The buffer moves by 4 MiB once it holds more than the
+window and 4 MiB; the tables move with it.
+```
+
+- **`struct Encoder`**
+  a Zstandard encoder that takes its input in pieces (stream::Encode): one frame with a
+  checksum, the content size when it is given; memory up to about 12 MiB plus the tables
+  of the level
+
+**`impl Encoder`**
+
+- **`fn new(level: i32) -> Encoder`**
+  an encoder at `level` (1..=19 as compress)
+- **`fn with_size(mut self, bytes: u64) -> Encoder`**
+  state the content size in the frame (the input must have exactly this length, else
+  Error::Size); the frame is then the same bytes as compress()
 
 ## datastore
 

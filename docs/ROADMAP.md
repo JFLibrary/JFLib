@@ -2566,11 +2566,26 @@ Grundbausteine am falschen Ort oder mehrfach:
   und `img_jxl` behalten ihre Aufrufe als dünne Module, `plat::print` braucht keinen
   `unsafe`-Hook mehr. Byte-gleich mit dem alten Encoder auf allen Stufen; compress hängt weiter
   an nichts, damit die std-Werkzeuge es nutzen können.
-- **P2** · *fehlt* · `compress`: eine Streaming-API (heute alles im Speicher), zstd-Wörterbücher,
-  ein Brotli-Encoder; Content-Encoding gzip/br im HTTP-Client von `netio` (über die
-  Sicherheits-Sitzung); `cargo-jflib` mit `compress` statt seines eigenen Encoders
-  ([`cargo_jflib/src/deflate.rs`](../lib/cargo_jflib/src/deflate.rs), heute ohne jede
-  Abhängigkeit; die Bytes der Pakete ändern sich dabei).
+- **P2** · *teilweise* (2026-11-22, U12) · `compress`: Die Streaming-API ist da
+  ([`compress/stream.rs`](../lib/compress/stream.rs)): `Decode::decode(input, out)` und
+  `Encode::encode(input, out, flush)` nehmen die Eingabe in Stücken und schreiben in den Puffer
+  des Aufrufers, für jedes Format (`deflate`, `zlib`, `gzip`, `zstd` als Decoder und Encoder,
+  `lz4::FrameDecoder` / `FrameEncoder`, `brotli::Decoder`), dazu die Pumpen `decode_all` /
+  `encode_all` und `Xxh32` / `Xxh64` in Stücken. Der Speicher ist das Fenster des Formats: 32 KiB
+  bei DEFLATE (dessen Decoder in Schritten liest, die neu anfangen, wenn die Eingabe ausgeht;
+  höchstens 1 KiB wartet), das Fenster des Frames bei zstd (Grenze 128 MiB wie beim zstd-Werkzeug)
+  und Brotli, 64 KiB und ein Block bei LZ4. Die Encoder schreiben bis 256 KiB (DEFLATE, zlib,
+  gzip) dieselben Bytes wie `compress()`, zstd und LZ4 mit bekannter Größe (`with_size`) bei
+  jeder Größe; `Flush::Sync` macht alles bisher lesbar. Geprüft in `coretest --only stream` (534:
+  Stücke von 1 Byte bis zur ganzen Eingabe, Puffer ab 1 Byte, die Bytes von `compress()`, die
+  Sync-Punkte, beschädigte Ströme scheitern genau dort, wo die einmaligen Decoder scheitern) und
+  mit `tools/stream_check.py` gegen `gzip`, Pythons zlib, `zstd` (auch `--long=27`, `-T4`, aus
+  einer Pipe) und die Brotli-Ströme der WOFF2-Schriften des Systems. In Stücken entpackt gzip mit
+  317 statt 213 MB/s (der einmalige Decoder fängt mit größerem Puffer neu an). Offen:
+  zstd-Wörterbücher, ein Brotli-Encoder; Content-Encoding gzip/br im HTTP-Client von `netio` (über
+  die Sicherheits-Sitzung, jetzt mit den Stream-Decodern); `cargo-jflib` mit `compress` statt
+  seines eigenen Encoders ([`cargo_jflib/src/deflate.rs`](../lib/cargo_jflib/src/deflate.rs),
+  heute ohne jede Abhängigkeit; die Bytes der Pakete ändern sich dabei).
 - **P1** · *erledigt* (2026-11-21, U2) · JSON aus `agent_core` gelöst: die neue Blatt-Crate
   `formats` ([`formats/src/lib.rs`](../lib/formats/src/lib.rs), nur `alloc`) hat `json` und `jmap`
   aus `agent_core` und `xml` und `encoding` aus `base` übernommen, unverändert; die alten Pfade

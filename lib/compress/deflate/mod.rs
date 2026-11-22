@@ -16,6 +16,8 @@
 //   InflateState / DeflateState              reusable decoder and encoder (~330 KB) states,
 //                                            one thread at a time; a reused state gives the
 //                                            same bytes and errors as a fresh one
+//   Decoder / Encoder                        the same in pieces (stream::Decode / Encode):
+//                                            sdec.rs, senc.rs (zlib and gzip wrap them)
 //
 // The decoder checks every write against the output buffer and every back reference against
 // the bytes produced so far, so a corrupt or hostile stream ends with an Error, never with a
@@ -26,11 +28,16 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
+use crate::stream::{Encode, Error as SError, Flush, Step};
+
 pub(crate) mod dec;
 pub(crate) mod enc;
+mod sdec;
+pub(crate) mod senc;
 
 pub use dec::InflateState;
 pub use enc::DeflateState;
+pub use sdec::Decoder;
 
 /// the level `compress` uses for a negative level, zlib's default
 pub const LEVEL_DEFAULT: i32 = 6;
@@ -129,5 +136,30 @@ pub(crate) fn grow(input: usize, max_out: usize, mut run: impl FnMut(&mut [u8]) 
             Err(Error::Overflow) if cap < max_out => cap = cap.saturating_mul(2).min(max_out),
             Err(_) => return None,
         }
+    }
+}
+
+/// a raw DEFLATE encoder that takes its input in pieces (stream::Encode), about 900 KB of
+/// state: pieces of 256 KiB with the 32 KiB before each as their window; the same bytes as
+/// compress() for a stream of at most 256 KiB
+pub struct Encoder {
+    core: senc::Core,
+}
+
+impl Encoder {
+    /// an encoder at `level` (as compress: 0..=9, < 0 = 6)
+    pub fn new(level: i32) -> Encoder {
+        Encoder { core: senc::Core::new(level, senc::Wrap::Raw) }
+    }
+
+    /// start a new stream at the same level (the memory stays)
+    pub fn reset(&mut self) {
+        self.core.reset();
+    }
+}
+
+impl Encode for Encoder {
+    fn encode(&mut self, input: &[u8], out: &mut [u8], flush: Flush) -> Result<Step, SError> {
+        self.core.encode(input, out, flush)
     }
 }

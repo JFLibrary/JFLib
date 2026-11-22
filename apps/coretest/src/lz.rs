@@ -21,7 +21,7 @@ impl Rng {
     }
 }
 
-fn samples() -> Vec<(&'static str, Vec<u8>)> {
+pub(crate) fn samples() -> Vec<(&'static str, Vec<u8>)> {
     let mut r = Rng(0x9E37_79B9_7F4A_7C15);
     let text: Vec<u8> = b"Ein Backup ist erst dann ein Backup, wenn die Wiederherstellung funktioniert. ".iter().copied().cycle().take(200_000).collect();
     let random: Vec<u8> = (0..300_000).map(|_| r.next() as u8).collect();
@@ -247,7 +247,7 @@ fn flate_run(t: &mut T) {
 }
 
 // streams of libbrotlienc 1.2 (BrotliEncoderCompress: quality, lgwin 22, mode generic or text)
-static BROTLI: &[(&str, &[u8])] = &[
+pub(crate) static BROTLI: &[(&str, &[u8])] = &[
     ("empty", &[0x06]),
     ("hello", &[0x0b, 0x02, 0x80, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x03]),
     ("text q1", &[
@@ -275,7 +275,7 @@ static BROTLI: &[(&str, &[u8])] = &[
     ]),
 ];
 
-fn brotli_plain(name: &str) -> Vec<u8> {
+pub(crate) fn brotli_plain(name: &str) -> Vec<u8> {
     let text = b"Ein Backup ist erst dann ein Backup, wenn die Wiederherstellung funktioniert. ";
     match name {
         "empty" => Vec::new(),

@@ -16,7 +16,7 @@ pub const MAGIC: u32 = 0xFD2F_B528;
 pub const BLOCK_MAX: usize = 128 << 10;
 
 /// what carries over from block to block inside a frame
-struct State {
+pub(super) struct State {
     huf: Option<huf::Table>,
     ll: Option<DTable>,
     of: Option<DTable>,
@@ -25,7 +25,13 @@ struct State {
     lits: Vec<u8>,
 }
 
-fn rd_le(b: &[u8]) -> u64 {
+impl State {
+    pub(super) fn new() -> State {
+        State { huf: None, ll: None, of: None, ml: None, rep: [1, 4, 8], lits: Vec::new() }
+    }
+}
+
+pub(super) fn rd_le(b: &[u8]) -> u64 {
     b.iter().rev().fold(0u64, |a, &x| a << 8 | x as u64)
 }
 
@@ -108,7 +114,7 @@ fn frame(src: &[u8], out: &mut Vec<u8>, max_out: usize) -> Option<usize> {
     if let Some(n) = fcs {
         out.reserve((n as usize).min(64 << 20));
     }
-    let mut st = State { huf: None, ll: None, of: None, ml: None, rep: [1, 4, 8], lits: Vec::new() };
+    let mut st = State::new();
     loop {
         let h = rd_le(src.get(p..p + 3)?) as usize;
         p += 3;
@@ -136,7 +142,7 @@ fn frame(src: &[u8], out: &mut Vec<u8>, max_out: usize) -> Option<usize> {
             }
             2 => {
                 let b = src.get(p..p + size)?;
-                block(&mut st, b, out, start, max_out)?;
+                block(&mut st, b, out, start, max_out, usize::MAX)?;
                 p += size;
             }
             _ => return None,
@@ -251,7 +257,9 @@ fn table(mode: u8, src: &[u8], prev: &mut Option<DTable>, def: &[i16], def_log: 
 }
 
 /// a compressed block, appended to out (`start`: where the frame's output begins)
-fn block(st: &mut State, src: &[u8], out: &mut Vec<u8>, start: usize, max_out: usize) -> Option<()> {
+/// one compressed block appended to out (out[start..]: the frame's output so far; a match
+/// reaches at most `window` back)
+pub(super) fn block(st: &mut State, src: &[u8], out: &mut Vec<u8>, start: usize, max_out: usize, window: usize) -> Option<()> {
     let mut p = literals(st, src)?;
     let limit = max_out.min(out.len() + BLOCK_MAX);
     let b0 = *src.get(p)? as usize;
@@ -329,7 +337,7 @@ fn block(st: &mut State, src: &[u8], out: &mut Vec<u8>, start: usize, max_out: u
         out.extend_from_slice(&lits[lp..lp + ll]);
         lp += ll;
         let off = off as usize;
-        if off > out.len() - start {
+        if off > out.len() - start || off > window {
             return None;
         }
         let from = out.len() - off;

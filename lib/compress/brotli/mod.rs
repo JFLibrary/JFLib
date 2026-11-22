@@ -8,6 +8,7 @@
 //   decompress_prefix(data, max_out) -> Ok((bytes, consumed))   the stream at the start of
 //                                                data; Error::Corrupt for a damaged stream,
 //                                                Error::Limit past max_out bytes
+//   Decoder                                      in pieces (stream::Decode; sdec.rs)
 //
 // One pass over the whole input: bit reader, prefix codes (simple and complex), block switches,
 // context maps (RLE + move to front), insert-and-copy commands, the distance ring buffer and
@@ -18,8 +19,11 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
+mod sdec;
 mod tab;
 use tab as T;
+
+pub use sdec::Decoder;
 
 /// why a Brotli stream could not be read
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -77,7 +81,8 @@ static CL_VAL: [u8; 16] = [0, 4, 3, 2, 0, 4, 3, 1, 0, 4, 3, 2, 0, 4, 3, 5];
 /// LSB-first bit reader
 struct Br<'a> {
     d: &'a [u8],
-    pos: usize, // bits
+    pos: usize,  // bits
+    short: bool, // a read went past the end (the streaming decoder waits for more input)
 }
 
 impl Br<'_> {
@@ -87,6 +92,7 @@ impl Br<'_> {
             return Ok(0);
         }
         if self.pos + n as usize > self.d.len() * 8 {
+            self.short = true;
             return Err(Error::Corrupt);
         }
         let mut v = 0u32;
@@ -110,7 +116,11 @@ impl Br<'_> {
     }
     fn skip(&mut self, n: u32) -> Result<(), Error> {
         self.pos += n as usize;
-        if self.pos > self.d.len() * 8 { Err(Error::Corrupt) } else { Ok(()) }
+        if self.pos > self.d.len() * 8 {
+            self.short = true;
+            return Err(Error::Corrupt);
+        }
+        Ok(())
     }
     /// to the byte boundary; the padding bits must be zero
     fn align(&mut self) -> Result<(), Error> {
@@ -449,7 +459,7 @@ pub fn decompress(data: &[u8], max_out: usize) -> Option<Vec<u8>> {
 
 /// the Brotli stream at the start of `data`: (output, bytes of input used)
 pub fn decompress_prefix(data: &[u8], max: usize) -> Result<(Vec<u8>, usize), Error> {
-    let mut br = Br { d: data, pos: 0 };
+    let mut br = Br { d: data, pos: 0, short: false };
     // window size
     let wbits = if br.bits(1)? == 0 {
         16

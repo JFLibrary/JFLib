@@ -2838,7 +2838,11 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   level)` / `decompress(data, max_out)`; levels 0 to 9), the Brotli decoder
   (`compress::brotli::decompress`), LZ4 and zstd (`compress::zstd::compress(data, level)` /
   `decompress`; levels 1 to 19, single-segment frames with checksums), CRC-32, Adler-32 and
-  xxHash; `Codec` picks LZ4 or zstd by name.
+  xxHash; `Codec` picks LZ4 or zstd by name. Each format also in pieces (`compress::stream`):
+  `gzip::Decoder::new().decode(input, out)` takes input as it comes and writes at most `out`,
+  with a window of the format's size as its only memory; `gzip::Encoder`, `zstd::Encoder` and
+  the others with `Flush::Sync` for live data; `stream::decode_all(dec, read, write, limit)`
+  pumps a whole file.
 * `formats` -- data formats as text, without a dependency: `formats::json` (strict bounded JSON,
   numbers kept as their exact token, `parse_with_limits` / `stringify_pretty`),
   `formats::jmap` (typed records, below), `formats::xml` (`Reader`, the strict pull reader with

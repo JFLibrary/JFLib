@@ -4,7 +4,8 @@ Lossless compression for [JFLib](https://jflib.org): DEFLATE, zlib, gzip, Brotli
 Zstandard in plain Rust, without the standard library, without a line of `unsafe` code and
 without a dependency. All formats are the real ones: what is written here opens with `gzip`,
 `zlib`, `lz4` and `zstd`, and what those tools write opens here (Zstandard as long as it needs no
-dictionary).
+dictionary). Each also comes in pieces, with bounded memory, for data that is too large to hold
+or that arrives over time.
 
 ## What it does
 
@@ -50,6 +51,41 @@ let again = Codec::from_id(id).and_then(|c| c.unpack(&blob, 64 << 20));
 
 For formats that store blobs with their compression, `Codec` (`None`, `Lz4`, `Zstd`) has a byte
 to store beside each blob and a name for configuration files.
+
+**Streams** are for data too large to hold, or that arrives in pieces: a download, a file of
+gigabytes, a socket. Every format has a decoder and, except Brotli, an encoder that takes its
+input in pieces and writes into a buffer of the caller (`compress::stream`): `deflate::Decoder`
+and `Encoder`, the same for `zlib` and `gzip`, `zstd::Decoder` and `Encoder`,
+`lz4::FrameDecoder` and `FrameEncoder`, and `brotli::Decoder`. A call returns how much input it
+took, how much it wrote, and whether it wants more input, more room or is at the end. The memory
+stays bounded by the format: 32 KiB of window for DEFLATE, the frame's window for zstd and
+Brotli, 64 KiB and one block for LZ4. A small piece of input never makes more output than the
+buffer holds, so a compression bomb is the caller's to stop, not a large allocation. Encoders
+can flush (`Flush::Sync`) so that a reader can decode everything so far, as for a log or a live
+connection. Up to 256 KiB, the DEFLATE, zlib and gzip encoders write the same bytes as
+`compress()`; the zstd and LZ4 encoders do for any size once they are told it (`with_size`).
+`stream::decode_all` and `encode_all` pump a whole stream between a reader and a writer.
+
+```rust
+use jflib::compress::{gzip, stream, zstd};
+use jflib::plat;
+
+// a file of any size, gunzipped in pieces of 64 KiB, at most 10 GiB of output
+let src = plat::File::open("server.log.gz", plat::FO_READ).unwrap();
+let dst = plat::File::open("server.log", plat::FO_WRITE).unwrap();
+let (mut at, mut to) = (0u64, 0u64);
+let n = stream::decode_all(
+    &mut gzip::Decoder::new(),
+    |buf| src.read_at(at, buf).inspect(|&k| at += k as u64),
+    |bytes| dst.write_at(to, bytes).inspect(|&k| to += k as u64) == Some(bytes.len()),
+    10 << 30,
+);
+
+// or piece by piece, as the data comes in
+let mut dec = zstd::Decoder::new();
+let mut buf = [0u8; 16 << 10];
+let step = dec.decode(&chunk, &mut buf)?;   // step.read, step.written, step.status
+```
 
 The checksums of the formats are there on their own as well: `crc32` (gzip, PNG, ZIP), `adler32`
 (zlib), `xxh32` and `xxh64`. They find accidental damage and are not cryptographic.
