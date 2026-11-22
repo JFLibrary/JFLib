@@ -2615,8 +2615,23 @@ Crates, die einer JF-App folgen:
   dazu ein Speicher, der Fehler macht), mit BackupCraft `http_smoke.py` und `tools/bc_crash.py`. Offen: Speicher
   für S3, SFTP und WebDAV in der Bibliothek; weiterhin ein Halter je Repository (mehrere Prozesse, die zugleich
   sichern, bräuchten geteilte Sperren und einen Index, der nachgeladen wird).
-- **P2** · *teilweise* · `datastore`: alles im RAM und als JSON, keine Indizes (nur `filter`),
-  keine Verschlüsselung der Daten auf der Platte, nicht auf Android und im Web.
+- **P2** · *teilweise* (2026-11-22, U9) · `datastore`: Indizes und Verschlüsselung auf der Platte sind da.
+  Indizes ([`datastore/index.rs`](../lib/datastore/index.rs)) liegen im RAM neben den Daten, jeder Commit hält sie
+  aktuell: auf einem Feld (`Index::field("owner.id")`, ein Array gibt je Element einen Schlüssel) oder einer
+  Funktion des Datensatzes (`Index::by`), auf Wunsch eindeutig (`unique()`: eine Transaktion, die das bräche, wird
+  vor dem Schreiben abgelehnt, `StoreError::Conflict`); `find`, `find_one`, `range` in beide Richtungen mit
+  Grenze, `count_key`. Schlüssel sind Strings, Wahrheitswerte und ganze Zahlen, genau. Verschlüsselung
+  ([`datastore/seal.rs`](../lib/datastore/seal.rs)): `Store::open_encrypted` und `Journal::open_encrypted` mit einem
+  32-Byte-Schlüssel versiegeln Snapshots, jeden Rahmen des Logs und jede Zeile eines Journals
+  (XChaCha20-Poly1305); eine Schlüssel-ID im Snapshot unterscheidet einen falschen Schlüssel von Schaden
+  (`StoreError::Key`, nie „repariert“). `rekey` verschlüsselt einen Speicher, wechselt den Schlüssel oder
+  entschlüsselt, über einen Snapshot und ohne Zwischenzustand; `Journal::rekey` schreibt die Monate neu und ist
+  nach einer Unterbrechung wiederholbar. Behoben: Unter Windows schlug ein zweites `compact()` ohne Transaktion
+  dazwischen fehl (das Log wurde ein zweites Mal geöffnet). Geprüft in `coretest --only datastore` (95, auch unter
+  Wine; ein Zufallsmodell gegen `filter`), mit BackupCraft `http_smoke.py` und `tools/bc_crash.py`. Offen: weiter
+  alles im RAM und als JSON; Indizes werden nicht gespeichert (nach jedem Öffnen neu angelegt); Löschen und
+  Zurückspielen ganzer Dateien durch jemanden, der den Ordner schreiben kann, findet die Verschlüsselung nicht;
+  nicht auf Android und im Web.
 - **P3** · *teilweise* · `doc_*` (jfWord): DOCX nur im eigenen Profil vollständig, andere
   Dateien nur als Textstücke; kein ODT, XLSX oder PPTX; RTF und HTML nur für die Zwischenablage.
 - **P3** · *teilweise* · `eapm`: nur EAP-MD5 und EAP-PWD (für den Simulator). WPA-Enterprise

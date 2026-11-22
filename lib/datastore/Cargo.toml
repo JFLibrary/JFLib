@@ -1,6 +1,6 @@
 [package]
 name = "jflib-datastore"
-description = "An embedded, crash-safe store of JSON records with a write-ahead log and snapshots"
+description = "An embedded, crash-safe store of JSON records with a write-ahead log, snapshots, secondary indexes and encryption at rest"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
