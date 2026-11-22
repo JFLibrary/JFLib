@@ -1,8 +1,10 @@
 """cov_fuzz.py -- coverage-guided fuzzing (libFuzzer through cargo-fuzz) of the parsers of untrusted bytes.
     python tools/cov_fuzz.py [--seconds N] [--only T,..] [--jobs J]
-The targets are tools/net_fuzz/targets.rs, the same as tools/net_fuzz.py's: zstd, LZ4, X.509
-(with netio's verify_chain and netpkt's check_chain), both DNS and HTTP parsers, netio's TLS
-server and clients, IPv4 / IPv6 reassembly, netpkt's dissector and application-layer parsers.
+The targets are tools/net_fuzz/targets.rs, the same as tools/net_fuzz.py's: zstd, LZ4, DEFLATE,
+zlib, gzip, Brotli, JSON, XML, the charsets, X.509 (with netio's verify_chain and netpkt's
+check_chain), both DNS and HTTP parsers, netio's TLS server and clients, IPv4 / IPv6 reassembly,
+netpkt's dissector and application-layer parsers, netchan's packets, handshake cores and sealing,
+plat's decoders of other programs' data (clipboard, drops; on Linux D-Bus and Wayland).
 Writes a cargo-fuzz project into build/cov_fuzz (one fuzz target
 per name, each including targets.rs), starts every target's corpus from the seeds of net_fuzz
 (build/cov_fuzz/corpus/NAME, kept between runs so coverage adds up) and runs J targets at a time
@@ -26,8 +28,10 @@ OUT = ROOT / "build" / "cov_fuzz"
 sys.path.insert(0, str(ROOT / "tools"))
 import net_fuzz  # noqa: E402
 
-NAMES = ["zstd", "lz4", "x509", "x509_netpkt", "dns", "dns_netpkt", "http_netio", "http_netpkt", "tls_server",
-         "tls_client", "tls_webclient", "ipv4_reassembly", "ipv6_reassembly", "netpkt_decode", "netpkt_app"]
+NAMES = ["zstd", "lz4", "deflate", "zlib", "gzip", "brotli", "json", "xml", "charsets", "x509", "x509_netpkt", "dns",
+         "dns_netpkt", "http_netio", "http_netpkt", "tls_server", "tls_client", "tls_webclient", "ipv4_reassembly",
+         "ipv6_reassembly", "netpkt_decode", "netpkt_app", "netchan_packet", "netchan_server", "netchan_client",
+         "netchan_open", "plat_clipboard"] + (["plat_dbus", "plat_wayland"] if sys.platform.startswith("linux") else [])
 
 
 def project():
@@ -46,7 +50,9 @@ def project():
         dep("crypto", "jflib-crypto"),
         dep("compress", "jflib-compress"),
         dep("netpkt", "jflib-netpkt"),
-        dep("netio", "jflib-netio"), "",
+        dep("netio", "jflib-netio"),
+        dep("formats", "jflib-formats"),
+        dep("netchan", "jflib-netchan"), "",
         bins,
     ]), encoding="utf-8")
     (OUT / "fuzz_targets").mkdir(parents=True, exist_ok=True)

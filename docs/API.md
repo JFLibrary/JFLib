@@ -43975,8 +43975,11 @@ Source: [`lib/netio/dns.rs`](../lib/netio/dns.rs)
 dns -- host names to addresses
 
   resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses and "localhost"
-                    directly; Windows: the system resolver (plat); Linux: /etc/hosts, then
-                    the name servers of /etc/resolv.conf (search domains, ndots)
+                    directly; Windows, macOS and iOS: the system resolver (plat::net::resolve,
+                    getaddrinfo on Apple: VPNs with name servers of their own, .local over
+                    mDNS, iOS's profiles and the app sandbox, none of which /etc/resolv.conf
+                    shows); Linux: /etc/hosts, then the name servers of /etc/resolv.conf
+                    (search domains, ndots)
   resolve_with(host, port, &Config)   the same with a given configuration (tests)
   Config::system()                    /etc/hosts + /etc/resolv.conf; Windows: the hosts file
                                       of %SystemRoot% and the DNS servers of the adapters
@@ -43991,7 +43994,8 @@ Queries: A and AAAA over UDP (2 s per server and attempt, two rounds), over TCP 
 is truncated; an answer must come from the server asked and carry the query's id and question,
 and only addresses of the asked name count, or of the name its CNAME chain in the answer leads
 to (at most 8 steps): records for other names in an answer are ignored.
-IPv4 addresses come first.  Not here: DNSSEC validation, mDNS, caching.
+IPv4 addresses come first (the system resolver keeps its own order, RFC 6724's).  Not here
+(Linux): DNSSEC validation, mDNS, caching.
 
 The app's permissions: a name its net.connect rules do not cover fails with
 NetErrorKind::Denied before any query; the addresses of a covered name are registered

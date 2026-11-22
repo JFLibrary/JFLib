@@ -1,0 +1,94 @@
+# Constant time (tools/ct_check.py, SECURITY.md): lib/crypto's secret-dependent operations and netio's key
+# files take the same way for every secret, traced under ptrace and run under valgrind's memcheck with the
+# secret marked undefined, at the five optimization levels of JFLib's builds -- on x86-64 and on a real
+# ARM64 machine (ubuntu-24.04-arm, Neoverse N2), where ptrace has no branch trap and the trace follows every
+# instruction (about ten minutes a level; also on an x86-64 runner whose virtual machine has no branch trap,
+# the probe then switches by itself). The machine code is what is checked, and it changes with the
+# compiler: hence Mondays as well, and x86-64 with both the rust-version and the newest stable Rust.
+# A third job checks the wasm the compiler makes for the browser (ct_check.py --wasm, WABT's wasm-interp).
+# On a push to main or a pull request that touches the crypto, the key files or the tool; by hand.
+name: Constant time
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - lib/crypto/**
+      - lib/x509/**
+      - lib/netio/pem.rs
+      - lib/netio/ssh.rs
+      - tools/ct_check.py
+      - tools/ct_check/**
+      - .github/workflows/ct-check.yml
+  pull_request:
+    paths:
+      - lib/crypto/**
+      - lib/x509/**
+      - lib/netio/pem.rs
+      - lib/netio/ssh.rs
+      - tools/ct_check.py
+      - tools/ct_check/**
+      - .github/workflows/ct-check.yml
+  schedule:
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ct-check-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  PYTHONUTF8: 1
+
+jobs:
+  ct_check:
+    name: ct_check ${{ matrix.os }} (${{ matrix.toolchain }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ matrix.minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 1.98.1: the rust-version of the root Cargo.toml
+          - { os: ubuntu-latest, toolchain: "1.98.1", minutes: 90 }
+          - { os: ubuntu-latest, toolchain: stable, minutes: 90 }
+          - { os: ubuntu-24.04-arm, toolchain: stable, minutes: 180 }
+    steps:
+      - uses: actions/checkout@v6
+      - name: valgrind, binutils, setarch
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends valgrind binutils util-linux > /dev/null
+          valgrind --version; addr2line --version | head -1
+      - name: Rust
+        run: |
+          rustup toolchain install ${{ matrix.toolchain }} --profile minimal --no-self-update
+          rustup default ${{ matrix.toolchain }}
+          rustc --version
+      - name: ct_check (trace and memcheck, all levels)
+        run: python3 tools/ct_check.py
+
+  wasm:
+    # the wasm the compiler makes for the browser (wasm32-unknown-unknown) in WABT's wasm-interp: the
+    # executed instructions and the addresses of the memory accesses (ct_check.py --wasm)
+    name: ct_check --wasm (stable)
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v6
+      - name: WABT
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends wabt binutils > /dev/null
+          wasm-interp --version
+      - name: Rust
+        run: |
+          rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown --no-self-update
+          rustup default stable
+          rustc --version
+      - name: ct_check --wasm (all levels)
+        run: python3 tools/ct_check.py --wasm

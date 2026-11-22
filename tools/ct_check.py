@@ -1,5 +1,5 @@
 """ct_check.py -- lib/crypto's secret-dependent operations take the same way for every secret.
-    python tools/ct_check.py [--opt release,dev,o3,s,z] [--only T,..] [--seeds N] [--crypto DIR] [--step]
+    python tools/ct_check.py [--opt release,dev,o3,s,z] [--only T,..] [--seeds N] [--crypto DIR] [--step] [--wasm]
 Builds tools/ct_check/probe.rs against lib/crypto (or the crate in DIR) at each optimization level
 below and lets it run every operation of its list (X25519, Ed25519, P-256, EAP-PWD, the RSA / DH
 exponentiation, the AEADs, AES, MACs, KDFs, Argon2id, Base64 and hex, and with this
@@ -22,12 +22,23 @@ lookup at a secret index, which the trace cannot see; selftest_lookup must be re
 where a secret becomes public on purpose (an AEAD's verdict, Base64's padding, Argon2id's
 data-dependent addressing) are in DECLASSIFIED, each with its reason, matched by the text of the
 source line.  Not seen by either: instructions whose time depends on their operands (division,
-some multipliers), other processors (aarch64, wasm).
-Linux on x86-64 (from Windows: runs itself again in WSL); needs cargo, binutils (addr2line, objdump)
-and util-linux' setarch (runs without address randomization; without it results may vary).
+some multipliers).
+--wasm checks the probe compiled for wasm32-unknown-unknown instead, at the same levels: WABT's
+wasm-interp runs each operation with --trace, and between two calls of ct_mark the sequence of the
+executed wasm instructions and the addresses of every load, store, memory.copy and memory.fill
+(not the values) must be the same for every secret; one comparison sees what the trace and
+memcheck see on a processor, for the wasm the compiler made.  A browser's JIT turns it into
+machine code of its own, which no tool here sees.  Needs wasm-interp and wasm-objdump (WABT) and
+the target (rustup target add wasm32-unknown-unknown); runs anywhere those do.
+Linux on x86-64 or ARM64 (from Windows: runs itself again in WSL); needs cargo, binutils (addr2line,
+objdump) and util-linux' setarch (runs without address randomization; without it results may
+vary).  ARM64 has no branch trap for ptrace, so there the trace follows every instruction (as
+--step does on x86-64): some minutes per level instead of seconds.  The workflow
+.github/workflows/ct-check.yml runs it on both, on x86-64 and on an ARM64 runner.
 Exit code 1 on any difference."""
 import argparse
 import concurrent.futures
+import hashlib
 import os
 import platform
 import re
@@ -440,13 +451,224 @@ def memcheck(level, exe, targets):
     return bad
 
 
+
+# ---------------------------------------------------------------- wasm (--wasm)
+WASM_TARGET = "wasm32-unknown-unknown"
+
+
+def build_wasm(level, crate_dir, label):
+    """the probe as a wasm cdylib at one level -> its .wasm (crypto alone: netio is not built for
+    the browser, so the key-file targets are left out)"""
+    d = OUT / f"wasm-{label}-{level}"
+    d.mkdir(parents=True, exist_ok=True)
+    prof = "\n".join(f"{k} = {v}" for k, v in LEVELS[level].items())
+    (d / "Cargo.toml").write_text(f"""# written by tools/ct_check.py --wasm
+[package]
+name = "ct-probe"
+version = "0.0.0"
+edition = "2024"
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+path = "{PROBE.as_posix()}"
+
+[dependencies]
+crypto = {{ package = "{package_name(crate_dir)}", path = "{crate_dir.as_posix()}" }}
+
+[features]
+netio = []
+
+[profile.release]
+{prof}
+panic = "abort"
+strip = false
+""", encoding="utf-8")
+    env = dict(os.environ, CARGO_TARGET_DIR=str(d / "target"))
+    env.pop("RUSTFLAGS", None)
+    p = subprocess.run(["cargo", "build", "--release", "--quiet", "--target", WASM_TARGET, "--manifest-path", str(d / "Cargo.toml")],
+                       env=env, capture_output=True, text=True)
+    if p.returncode != 0:
+        sys.stderr.write(p.stdout + p.stderr)
+        sys.exit(f"ct_check: the wasm probe did not build at level {level} (rustup target add {WASM_TARGET})")
+    return d / "target" / WASM_TARGET / "release" / "ct_probe.wasm"
+
+
+def wasm_functions(wasm):
+    """{function index: name} from the name section (demangled with c++filt when it is there)"""
+    out = subprocess.run(["wasm-objdump", "-x", "-j", "Function", str(wasm)], capture_output=True, text=True).stdout
+    names = {int(m.group(1)): m.group(2) for m in re.finditer(r"func\[(\d+)\] sig=\d+ <(.+?)>", out)}
+    if shutil.which("c++filt") and names:
+        keys = list(names)
+        dem = subprocess.run(["c++filt"], input="\n".join(names[k] for k in keys), capture_output=True, text=True).stdout.split("\n")
+        if len(dem) >= len(keys):
+            names = {k: re.sub(r"::h[0-9a-f]{16}$", "", dem[i]) for i, k in enumerate(keys)}
+    return names
+
+
+def wasm_key(line):
+    """what of a trace line must not depend on the secret: its place (frame depth, instruction,
+    value stack depth) and, for memory operations, the addresses and lengths, not the values"""
+    i = line.find(b"|")
+    left, rest = line[:i], line[i + 2:].rstrip()
+    sp = rest.find(b" ")
+    op = rest[:sp] if sp > 0 else rest
+    if b".load" in op or b".store" in op:
+        return left + op + rest[sp:].split(b",", 1)[0]
+    if op == b"memory.copy":
+        return left + op + b",".join(rest[sp:].split(b",")[2:5])
+    if op == b"memory.fill":
+        a = rest[sp:].split(b",")
+        return left + op + a[1] + b"," + a[-1]
+    return left
+
+
+def wasm_cmd(wasm, index, seed):
+    return ["wasm-interp", str(wasm), "-r", "ct_run", "-a", f"i32:{index}", "-a", f"i64:{seed}", "--trace"]
+
+
+def wasm_digest(wasm, mark, index, seed):
+    """-> (instructions between the marks, a digest of their keys, marks seen)"""
+    h = hashlib.blake2b(digest_size=16)
+    n = marks = 0
+    with subprocess.Popen(wasm_cmd(wasm, index, seed), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as p:
+        for line in p.stdout:
+            if line.endswith(mark):
+                marks += 1
+                if marks == 2:
+                    break
+            elif marks == 1:
+                h.update(wasm_key(line) + b"\n")
+                n += 1
+        p.kill()
+    return n, h.hexdigest(), marks
+
+
+def wasm_parting(wasm, mark, names, index, seed):
+    """both traces side by side up to where they part -> (position, line of seed 1, line of the
+    other, the functions at that place, outermost first)"""
+    a = subprocess.Popen(wasm_cmd(wasm, index, 1), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    b = subprocess.Popen(wasm_cmd(wasm, index, seed), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    stack = {}
+    marks, n, found = 0, 0, None
+    try:
+        for la, lb in zip(a.stdout, b.stdout):
+            if la.endswith(mark):
+                marks += 1
+                if marks == 2:
+                    break
+                continue
+            if marks != 1:
+                continue
+            depth = int(la[1:la.find(b".")])
+            if wasm_key(la) != wasm_key(lb):
+                chain = [names.get(stack.get(d), "?") for d in range(1, depth + 1)]
+                found = (n, la.decode(errors="replace").strip(), lb.decode(errors="replace").strip(), chain)
+                break
+            rest = la[la.find(b"|") + 2:]
+            if rest.startswith(b"call $"):
+                stack[depth + 1] = int(rest[6:].strip())
+            elif rest.startswith(b"call_indirect"):
+                stack[depth + 1] = None
+            n += 1
+    finally:
+        for p in (a, b):
+            p.kill()
+            p.wait()
+    return found
+
+
+def wasm_diff(wasm, mark, names, index, digests):
+    """the digests of one target's secrets (1, 2, ...) -> None, ("diff", where, count A, count B)
+    or ("error", text)"""
+    first = digests[0]
+    if first[2] < 2:
+        return ("error", f"the marks were not reached ({first[2]}): did wasm-interp run it?")
+    for s, other in enumerate(digests[1:], start=2):
+        if other[1] != first[1]:
+            return ("diff", wasm_parting(wasm, mark, names, index, s), first[0], other[0])
+    return None
+
+
+def check_wasm(level, wasm, targets, seeds):
+    """-> number of problems at this level (the targets in the probe's order, their index is ct_run's)"""
+    names = wasm_functions(wasm)
+    marks = [k for k, v in names.items() if v == "ct_mark"]
+    if not marks:
+        sys.exit("ct_check: ct_mark is not in the wasm probe's name section")
+    mark = f"| call ${marks[0]}\n".encode()
+    jobs = max(1, (os.cpu_count() or 2) - 1)
+    # every (target, secret) on its own, in processes (the lines are read in Python, one GIL
+    # would make them one core): the long ones (EAP-PWD, RSA) side by side
+    runs = [(i, t, s) for i, t in targets for s in range(1, seeds + 1)]
+    with concurrent.futures.ProcessPoolExecutor(jobs) as pool:
+        digests = dict(zip([(t, s) for _, t, s in runs], pool.map(wasm_digest, *zip(*[(wasm, mark, i, s) for i, _, s in runs]))))
+        results = dict(zip([t for _, t in targets], pool.map(
+            wasm_diff, *zip(*[(wasm, mark, names, i, [digests[(t, s)] for s in range(1, seeds + 1)]) for i, t in targets]))))
+    bad, same, seen = 0, 0, set()
+    lines = []
+    for _, t in targets:
+        r = results[t]
+        if r is None:
+            if t in (SELFTEST, SELFTEST_LOOKUP):
+                bad += 1
+                lines.append(f"  {t:<24} FAIL: the self-test's leak was not seen (is the trace working?)")
+            else:
+                same += 1
+            continue
+        if r[0] == "error":
+            bad += 1
+            lines.append(f"  {t:<24} ERROR {r[1]}")
+            continue
+        _, where, na, nb = r
+        if t in (SELFTEST, SELFTEST_LOOKUP):
+            seen.add(t)
+            continue
+        pos = where[0] if where else 0
+        known = KNOWN.get(t)
+        if known and pos >= known[0] * min(na, nb):
+            same += 1
+            lines.append(f"  {t:<24} differs after {pos} of {na} wasm instructions, as expected: {known[1]}")
+            continue
+        bad += 1
+        lines.append(f"  {t:<24} DIFF after {pos} of {na} / {nb} wasm instructions")
+        if where:
+            lines.append(f"      in      {' < '.join(reversed(where[3])) or '?'}")
+            lines.append(f"      secret 1  {where[1]}")
+            lines.append(f"      another   {where[2]}")
+    checked = len([1 for _, t in targets if t not in (SELFTEST, SELFTEST_LOOKUP)])
+    both = SELFTEST in seen and SELFTEST_LOOKUP in seen
+    print(f"[wasm {level}] {same} of {checked} operations take one way with the same addresses for {seeds} secrets"
+          + (", both self-tests seen" if both else ""))
+    for ln in lines:
+        print(ln)
+    return bad
+
+
+def main_wasm(a, levels, crate_dir, label):
+    for tool in ("wasm-interp", "wasm-objdump"):
+        if shutil.which(tool) is None:
+            sys.exit(f"ct_check: --wasm needs {tool} (WABT: apt install wabt, brew install wabt)")
+    bad = 0
+    for lv in levels:
+        wasm = build_wasm(lv, crate_dir, label)
+        # the probe's list in wasm: TARGETS without the key files (netio), in the same order
+        listed = [ln for ln in PROBE.read_text(encoding="utf-8").split("const TARGETS: &[&str] = &[", 1)[1].split("];", 1)[0].splitlines()
+                  if ln.strip().startswith('"')]
+        order = [ln.strip().strip('",') for ln in listed]
+        wasm_targets = [t for t in order if t not in ("pem_pkcs8_key", "ssh_private_key")]
+        targets = [(i, t) for i, t in enumerate(wasm_targets) if not a.only or t in a.only.split(",") or t in (SELFTEST, SELFTEST_LOOKUP)]
+        bad += check_wasm(lv, wasm, targets, max(2, a.seeds))
+    print("ct_check: " + ("no difference" if bad == 0 else f"{bad} problem(s)"))
+    return 1 if bad else 0
+
+
 def main():
     if os.name == "nt":
         wsl = "/mnt/" + str(ROOT)[0].lower() + str(ROOT)[2:].replace("\\", "/")
         rest = " ".join("'" + a.replace("'", "'\\''") + "'" for a in sys.argv[1:])
         return subprocess.run(["wsl.exe", "-d", "Ubuntu-24.04", "-e", "sh", "-c", f"cd '{wsl}' && python3 tools/ct_check.py {rest}"]).returncode
-    if sys.platform != "linux" or platform.machine() not in ("x86_64", "AMD64"):
-        sys.exit("ct_check: Linux on x86-64 only (ptrace of rip)")
     ap = argparse.ArgumentParser(description="secret-independent control flow of lib/crypto")
     ap.add_argument("--opt", default=",".join(LEVELS), help="levels, comma-separated: " + ", ".join(LEVELS))
     ap.add_argument("--only", default="", help="targets, comma-separated (default: all of probe --list)")
@@ -454,6 +676,7 @@ def main():
     ap.add_argument("--crypto", default=str(ROOT / "lib" / "crypto"), help="the crate to check (another version of it)")
     ap.add_argument("--step", action="store_true", help="every instruction instead of every taken branch")
     ap.add_argument("--no-memcheck", action="store_true", help="only the trace, not valgrind's memcheck")
+    ap.add_argument("--wasm", action="store_true", help="the probe for wasm32 in WABT's wasm-interp instead")
     a = ap.parse_args()
     levels = [x for x in a.opt.split(",") if x]
     for lv in levels:
@@ -461,6 +684,10 @@ def main():
             sys.exit(f"ct_check: unknown level {lv} ({', '.join(LEVELS)})")
     crate_dir = Path(a.crypto).resolve()
     label = "lib" if crate_dir == (ROOT / "lib" / "crypto").resolve() else "other"
+    if a.wasm:
+        return main_wasm(a, levels, crate_dir, label)
+    if sys.platform != "linux" or platform.machine() not in ("x86_64", "AMD64", "aarch64", "arm64"):
+        sys.exit("ct_check: Linux on x86-64 or ARM64 only (ptrace of the program counter; --wasm runs elsewhere)")
     PREFIXES.insert(0, str(crate_dir.parent) + "/")
     bad = 0
     for lv in levels:

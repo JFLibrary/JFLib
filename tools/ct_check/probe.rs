@@ -12,18 +12,24 @@
 //   probe --run TARGET SEED           run once without tracing (timing, debugging)
 //   probe --memcheck TARGET SEED      under valgrind --tool=memcheck: the secret marked undefined
 //                                     (see memcheck below)
+//   wasm32 (a cdylib): ct_run(INDEX, SEED) prepares TARGETS[INDEX] and runs it between two
+//                                     calls of ct_mark; ct_check.py --wasm traces it in WABT's
+//                                     wasm-interp and compares the wasm instructions and memory
+//                                     addresses between the marks
 //
 // A child process is forked per secret: it prepares the inputs, stops itself (SIGSTOP), runs the
 // operation and stops again; the parent steps it in between and records where it goes.  MODE
-// block (PTRACE_SINGLEBLOCK, the processor's branch trap): the target of every taken branch;
-// step (PTRACE_SINGLESTEP, CT_STEP=step, or where the branch trap is missing, as in some virtual
-// machines): every instruction, some thousand times slower.  Equal sequences for all secrets mean
+// block (PTRACE_SINGLEBLOCK, the processor's branch trap; x86-64): the target of every taken
+// branch; step (PTRACE_SINGLESTEP, CT_STEP=step, on ARM64, or where the branch trap is missing, as
+// in some virtual machines): every instruction, some thousand times slower.  Equal sequences for all secrets mean
 // control flow without secret-dependent branches or jump tables.  Not seen: memory addresses that
 // depend on a secret without a branch, and instructions whose time depends on their operands
 // (division, some multipliers).
 //
-// Linux on x86-64 only (PTRACE_PEEKUSER of rip).  The operations' inputs are valid, so the checks
-// at their end (an AEAD's tag, a point at infinity) take the same way for every secret.
+// Linux on x86-64 (the program counter through PTRACE_PEEKUSER of rip) and ARM64 (through
+// PTRACE_GETREGSET of NT_PRSTATUS; no branch trap there, so step).  The operations' inputs are
+// valid, so the checks at their end (an AEAD's tag, a point at infinity) take the same way for
+// every secret.
 
 use std::hint::black_box;
 
@@ -37,15 +43,45 @@ unsafe extern "C" {
 }
 
 const PTRACE_TRACEME: i32 = 0;
-const PTRACE_PEEKUSER: i32 = 3;
 const PTRACE_SINGLESTEP: i32 = 9;
-/// stop after the next taken branch (x86: the processor's branch trap flag)
+/// stop after the next taken branch (x86: the processor's branch trap flag; ARM64 has none)
 const PTRACE_SINGLEBLOCK: i32 = 33;
 const SIGKILL: i32 = 9;
 const SIGTRAP: i32 = 5;
 const SIGSTOP: i32 = 19;
-/// offsetof(struct user_regs_struct, rip) on x86-64
-const RIP: usize = 16 * 8;
+
+/// the traced child's program counter
+#[cfg(target_arch = "x86_64")]
+unsafe fn pc_of(pid: i32) -> u64 {
+    const PTRACE_PEEKUSER: i32 = 3;
+    /// offsetof(struct user_regs_struct, rip)
+    const RIP: usize = 16 * 8;
+    // SAFETY: PEEKUSER reads one word of the stopped child's registers
+    unsafe { ptrace(PTRACE_PEEKUSER, pid, RIP, 0usize) as u64 }
+}
+
+/// no tracer on other processors (wasm32: ct_run below instead)
+#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+unsafe fn pc_of(_pid: i32) -> u64 {
+    0
+}
+
+/// the traced child's program counter: struct user_pt_regs { regs[31], sp, pc, pstate }
+#[cfg(target_arch = "aarch64")]
+unsafe fn pc_of(pid: i32) -> u64 {
+    const PTRACE_GETREGSET: i32 = 0x4204;
+    const NT_PRSTATUS: usize = 1;
+    #[repr(C)]
+    struct Iovec {
+        base: *mut u64,
+        len: usize,
+    }
+    let mut regs = [0u64; 34];
+    let mut iov = Iovec { base: regs.as_mut_ptr(), len: core::mem::size_of_val(&regs) };
+    // SAFETY: GETREGSET writes at most iov.len bytes of the stopped child's registers into regs
+    unsafe { ptrace(PTRACE_GETREGSET, pid, NT_PRSTATUS, &mut iov as *mut Iovec) };
+    regs[32]
+}
 /// the most instructions one operation may take
 const MAX_STEPS: usize = 200_000_000;
 /// the most instructions followed one by one in the block where two runs part
@@ -393,6 +429,7 @@ fn prepare_from(name: &str, s: Vec<u8>) -> Op {
 
 /// a valgrind client request (x86-64: the magic preamble, rax -> the arguments, rdx -> the result;
 /// natively a no-op that gives `default`)
+#[cfg(target_arch = "x86_64")]
 fn vg_request(default: usize, args: [usize; 6]) -> usize {
     let mut result = default;
     // SAFETY: the rotations leave rdi as it was (3 + 13 + 61 + 51 = 128), xchg rbx, rbx changes
@@ -407,6 +444,32 @@ fn vg_request(default: usize, args: [usize; 6]) -> usize {
         );
     }
     result
+}
+
+/// a valgrind client request (ARM64, valgrind.h: the preamble rotates x12 by 128 bits, x4 -> the
+/// arguments, x3 -> the default and the result, orr x10, x10, x10 marks the request; natively a
+/// no-op that gives `default`)
+#[cfg(target_arch = "aarch64")]
+fn vg_request(default: usize, args: [usize; 6]) -> usize {
+    let mut result = default;
+    // SAFETY: the rotations leave x12 as it was (3 + 13 + 51 + 61 = 128), orr x10, x10, x10
+    // changes nothing; valgrind reads the six words at x4 and writes the answer into x3
+    unsafe {
+        core::arch::asm!(
+            "ror x12, x12, #3", "ror x12, x12, #13", "ror x12, x12, #51", "ror x12, x12, #61", "orr x10, x10, x10",
+            inout("x3") result,
+            in("x4") args.as_ptr(),
+            inout("x12") 0usize => _,
+            options(nostack),
+        );
+    }
+    result
+}
+
+/// no valgrind on other processors
+#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+fn vg_request(default: usize, _args: [usize; 6]) -> usize {
+    default
 }
 
 const VG_RUNNING_ON_VALGRIND: usize = 0x1001;
@@ -530,7 +593,7 @@ fn trace(name: &str, seed: u64, step: i32, fine_from: usize) -> Result<Vec<u64>,
                 return Err(format!("the child ended during the operation (status {:#x})", st));
             }
             match (st >> 8) & 0xff {
-                SIGTRAP => out.push(ptrace(PTRACE_PEEKUSER, pid, RIP, 0usize) as u64),
+                SIGTRAP => out.push(pc_of(pid)),
                 SIGSTOP => break,
                 sig => {
                     end(pid, &mut st);
@@ -599,7 +662,7 @@ fn main() {
         }
         Some(name) => {
             let seeds: u64 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(3).max(2);
-            let mut step = if std::env::var("CT_STEP").as_deref() == Ok("step") { PTRACE_SINGLESTEP } else { PTRACE_SINGLEBLOCK };
+            let mut step = if std::env::var("CT_STEP").as_deref() == Ok("step") || cfg!(target_arch = "aarch64") { PTRACE_SINGLESTEP } else { PTRACE_SINGLEBLOCK };
             let mut first = trace(name, 1, step, usize::MAX);
             if step == PTRACE_SINGLEBLOCK && first.as_ref().is_err_and(|e| e == "no-block") {
                 // a processor or virtual machine without the branch trap: every instruction
@@ -643,4 +706,27 @@ fn main() {
             std::process::exit(2);
         }
     }
+}
+
+// ------------------------------------------------------------------ wasm32
+
+/// the marks around the operation: a call the trace shows (ct_check.py --wasm looks for it)
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+#[inline(never)]
+pub extern "C" fn ct_mark() {
+    black_box(());
+}
+
+/// TARGETS[index] with the inputs of secret `seed`, prepared before the first mark, run between
+/// the marks -> 0, or 1 for an index past the list
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+pub extern "C" fn ct_run(index: u32, seed: u64) -> u32 {
+    let Some(name) = TARGETS.get(index as usize) else { return 1 };
+    let mut op = prepare(name, seed);
+    ct_mark();
+    op();
+    ct_mark();
+    0
 }
