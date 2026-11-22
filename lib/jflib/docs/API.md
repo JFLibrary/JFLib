@@ -95,7 +95,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [eapm](#eapm) -- EAP-MD5 and EAP-PWD as peer and server state machines without I/O
   <br>[lib.rs](#eapm-crate-root)
 - [cas](#cas) -- content-addressed backup repositories: chunking, packs, signed encrypted snapshots, GC
-  <br>[lib.rs](#cas-crate-root) · [chunker.rs](#caschunkerrs) · [pack.rs](#caspackrs) · [snapshot.rs](#cassnapshotrs)
+  <br>[lib.rs](#cas-crate-root) · [chunker.rs](#caschunkerrs) · [pack.rs](#caspackrs) · [snapshot.rs](#cassnapshotrs) · [store.rs](#casstorers)
 - [update](#update) -- signed app updates: check, download, apply at the next start, health marker, rollback
   <br>[lib.rs](#update-crate-root) · [appimage.rs](#updateappimagers) · [apply.rs](#updateapplyrs) · [fetch.rs](#updatefetchrs) · [manifest.rs](#updatemanifestrs)
 - [archive](#archive) -- bounded ZIP32 containers (stored and DEFLATE)
@@ -52262,7 +52262,10 @@ cas -- a content-addressed, deduplicating, encrypted chunk store (BackupCraft's 
 format "bcrepo-1")
 
   Repo::create(path, &CreateOptions) / Repo::open(path, Unlock::{Master, Passphrase,
-       Recovery})                       one process holds a repository at a time (LOCK)
+       Recovery})                       a repository in a folder (store::Folder)
+  Repo::create_in(store, ..) / open_in(store, ..)   in any Store (store.rs: objects by kind
+                                        and name, the way S3, SFTP or WebDAV keep them);
+                                        one holder at a time (Store::lock)
   repo.writer() -> Writer               put(kind, bytes) / put_stream(reader) -> chunk ids,
                                         finish() (packs and indexes are durable);
                                         finish_unsaved() -> (stats, Unsaved): the same, and
@@ -52282,16 +52285,19 @@ The list sits in repo.json under the MAC of the repository key, so it keeps out 
 and mistakes, not someone who holds the repository key (who could call trust_signer).  A
 repo.json without a MAC (taken away) does not open (Corrupt).
 
-Layout:  repo.json  data/<xx>/<pack>.pack  index/<pack>.idx  snapshots/<id>.snap  LOCK
+Objects: the config "repo" (repo.json), packs, their indexes, snapshots; a Folder keeps them
+         as repo.json  data/<xx>/<pack>.pack  index/<pack>.idx  snapshots/<id>.snap  LOCK
 Keys:    one random repository key, wrapped in repo.json for the server's master key, for
          passphrases (Argon2id) and for the recovery kit (sealed box); per purpose keys are
          derived from it with BLAKE3 derive_key (chunk ids, data, index, snapshots, gear).
 Chunks:  id = BLAKE3-keyed(id key, plain) -> identical data is stored once, the ids reveal
-         nothing without the key.  Commit order of a backup: packs (fsync) -> indexes
-         (fsync) -> snapshot (atomic rename, directory sync); a crash leaves at most
-         unreferenced packs, which gc removes.  Until its snapshot is there a backup's chunks
-         are such packs too: gc waits for open writers and for an Unsaved, and a snapshot
-         saved the plain way after a gc took chunks of it is refused (save_snapshot).
+         nothing without the key.  Commit order of a backup: packs -> indexes -> snapshot,
+         each put atomic and durable (Store's rule; Folder: synced, renamed, the folder
+         synced); a crash leaves at most unreferenced packs, which gc removes.  A listing
+         that fails stops gc (it is no empty repository).  Until its snapshot is there a
+         backup's chunks are such packs too: gc waits for open writers and for an Unsaved,
+         and a snapshot saved the plain way after a gc took chunks of it is refused
+         (save_snapshot).
 ```
 
 ### `cas` crate root
@@ -52392,9 +52398,16 @@ KIND_TREE: u8 = 1
 
 - **`fn create(path: &str, o: &CreateOptions) -> CasResult<Repo>`**
   create a repository in an empty (or new) folder
+- **`fn create_in(store: impl Store + 'static, o: &CreateOptions) -> CasResult<Repo>`**
+  create a repository in a store that holds nothing yet (NotEmpty)
 - **`fn open(path: &str, unlock: Unlock) -> CasResult<Repo>`**
-  open a repository
+  open the repository in a folder
+- **`fn open_in(store: impl Store + 'static, unlock: Unlock) -> CasResult<Repo>`**
+  open the repository in a store
 - **`fn path(&self) -> &str`**
+  where the repository is: its folder (Repo::open), else the store's location
+- **`fn store(&self) -> &dyn Store`**
+  the store the repository lives in
 - **`fn id(&self) -> String`**
 - **`fn immutable_days(&self) -> u32`**
 - **`fn chunker(&self) -> &Chunker`**
@@ -52403,7 +52416,7 @@ KIND_TREE: u8 = 1
   chunks in the index
 - **`fn has_chunk(&self, id: &ChunkId) -> bool`**
 - **`fn stored_bytes(&self) -> u64`**
-  bytes of all pack files
+  bytes of all pack files (0 when the store cannot list them)
 - **`fn add_passphrase(&self, pass: &str, label: &str, repo_key_from: Unlock) -> CasResult<()>`**
   let a passphrase open the repository (Argon2id, 64 MiB)
 - **`fn has_passphrase(&self, label: &str) -> bool`**
@@ -52434,6 +52447,7 @@ KIND_TREE: u8 = 1
   of it are gone -- looked up once a gc of this process has removed anything.  It waits
   for a running gc: not to be called while the same thread holds a Writer or an Unsaved.
 - **`fn snapshot_ids(&self) -> Vec<String>`**
+  the ids of the snapshots, sorted (none when the store cannot list them)
 - **`fn load_snapshot(&self, id: &str) -> CasResult<Snapshot>`**
   a snapshot, checked (signature by a trusted key, authentic encryption)
 - **`fn delete_snapshot(&self, id: &str, now: i64) -> CasResult<()>`**
@@ -52455,6 +52469,9 @@ KIND_TREE: u8 = 1
 
 - **`fn peek_id(path: &str) -> CasResult<String>`**
   the id of a repository folder without opening it
+
+- **`fn peek_id_in(store: &dyn Store) -> CasResult<String>`**
+  the id of the repository in a store without opening it
 
 - **`struct Writer<'a>`**
   writes new chunks into packs
@@ -52687,6 +52704,83 @@ SNAP_MAGIC: &[u8; 4] = b"BCN1"
 - **`fn open(key: &[u8; 32], id: &str, b: &[u8]) -> Result<(Snapshot, [u8; 32]), CasError>`**
   open a snapshot file: the snapshot and its signer (the signature is checked; whether the
   signer is trusted is the caller's decision)
+
+### `cas/store.rs`
+
+Source: [`lib/cas/store.rs`](../lib/cas/store.rs)
+
+```text
+store -- where a repository keeps its objects: the Store trait and Folder, a folder of the
+file system (plat::fs, so also a vfs mount such as mem://)
+
+  Store                 init, lock, get, get_range, put, delete, list, location: objects by
+                        kind and name, the way S3, SFTP or WebDAV keep them
+  Kind                  Config ("repo"), Pack, Index, Snapshot
+  Folder::new(path)     repo.json  data/<xx>/<pack>.pack  index/<pack>.idx
+                        snapshots/<id>.snap  LOCK
+
+What the repository asks of a store (Repo::create_in / open_in):
+  - put is atomic and durable: once it returns Ok, get and list see the whole object, also
+    after a crash, and a put that failed leaves the old object or none (the commit order of a
+    backup -- packs, indexes, snapshot -- rests on it)
+  - a delete that returned Ok stays done; deleting what is not there is Ok
+  - get and list see every put that returned before them (read after write)
+  - lock keeps a second holder out, also one of another process or host, until the guard
+    is dropped
+Nothing that comes back from a store is trusted: packs, indexes and snapshots are sealed and
+repo.json carries a MAC, so a store that changes, swaps or replays objects is found out (a
+rollback to older objects of the same repository is not); names and sizes of a listing are
+checked before use.  A store sees the names, the sizes and when objects come and go: pack
+and index names are random, snapshot names are the ids given to save_snapshot.
+```
+
+- **`enum Kind`**
+  what an object of a repository is
+  - `Config` -- the repository's settings and wrapped keys; the repository uses one, named "repo"
+  - `Pack` -- a pack of sealed chunks (written once, read in ranges, deleted by gc)
+  - `Index` -- the sealed index of the pack of the same name
+  - `Snapshot` -- a sealed and signed snapshot, named by its id
+
+- **`type StoreLock = Box<dyn Any + Send + Sync>`**
+  what [`Store::lock`] hands out: the repository is held until it is dropped
+
+- **`trait Store: Send + Sync`**
+  Where a repository keeps its objects.  A name is not empty and has none of '/', '\\\\', '.',
+  ':' (pack and index names are hex, snapshot names the ids given to save_snapshot).  The
+  rules a store keeps are those in the header of this module: put atomic and durable, read
+  after write, a lock that keeps every other holder out.
+  - `fn location(&self) -> String`
+    where it is, for messages and Repo::path ("D:/Backups/repo", "s3://bucket/prefix")
+  - `fn init(&self) -> CasResult<()>`
+    make the place of a new repository: NotEmpty when it already holds anything
+  - `fn lock(&self) -> CasResult<StoreLock>`
+    hold the repository (InUse while another holder has it)
+  - `fn get(&self, kind: Kind, name: &str) -> CasResult<Option<Vec<u8>>>`
+    the whole object; Ok(None) when there is none
+  - `fn get_range(&self, kind: Kind, name: &str, off: u64, len: usize) -> CasResult<Vec<u8>>`
+    `len` bytes from `off` on, fewer only where the object ends (NotFound when there is
+    none).  The default reads the whole object: a store with ranged reads does better
+  - `fn put(&self, kind: Kind, name: &str, data: &[u8]) -> CasResult<()>`
+    store an object (replacing one of the same name), atomic and durable
+  - `fn delete(&self, kind: Kind, name: &str) -> CasResult<()>`
+    remove an object; one that is not there is fine
+  - `fn list(&self, kind: Kind) -> CasResult<Vec<(String, u64)>>`
+    the names and sizes of the objects of a kind, in any order
+
+- **`fn name_ok(name: &str) -> bool`**
+  whether a store may be asked for this name (Store's rule)
+
+- **`struct Folder`**
+  A repository in a folder of the file system: repo.json, data/&lt;xx>/&lt;pack>.pack (the first
+  two hex digits), index/&lt;pack>.idx, snapshots/&lt;id>.snap and LOCK (plat::FileLock: one
+  holder at a time on this machine).  Files and folders are the owner's only
+  (write_file_private, mkdir_private); a write goes to a temporary sibling that is synced
+  and renamed into place.  The path can be a vfs name too (mem://, a mount).
+
+**`impl Folder`**
+
+- **`fn new(path: &str) -> Folder`**
+- **`fn path(&self) -> &str`**
 
 ## update
 
