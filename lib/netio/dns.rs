@@ -1,11 +1,12 @@
 // dns -- host names to addresses
 //
 //   resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses, "localhost" and
-//                     names under .localhost (the loopback addresses, RFC 6761) directly, on
-//                     every system; Windows, macOS and iOS: the system resolver (plat::net::resolve,
-//                     getaddrinfo on Apple: VPNs with name servers of their own, .local over
-//                     mDNS, iOS's profiles and the app sandbox, none of which /etc/resolv.conf
-//                     shows); Linux: /etc/hosts, then the name servers of /etc/resolv.conf
+//                     names under .localhost, with a final dot as well (the loopback addresses,
+//                     RFC 6761) directly, on every system; Windows, macOS and iOS: the system
+//                     resolver (plat::net::resolve, getaddrinfo on Apple: VPNs with name
+//                     servers of their own, .local over mDNS, iOS's profiles and the app
+//                     sandbox, none of which /etc/resolv.conf shows); Linux: /etc/hosts, then
+//                     the name servers of /etc/resolv.conf
 //                     (search domains, ndots)
 //   resolve_with(host, port, &Config)   the same with a given configuration (tests)
 //   Config::system()                    /etc/hosts + /etc/resolv.conf; Windows: the hosts file
@@ -28,7 +29,9 @@
 //
 // The app's permissions: a name its net.connect rules do not cover fails with
 // NetErrorKind::Denied before any query; the addresses of a covered name are registered
-// (plat::policy::net_resolved), so connections to them follow that name's ports.
+// (plat::policy::net_resolved), so connections to them follow that name's ports.  Names under
+// .localhost need no rule, since nothing is asked for them, but their loopback addresses are
+// registered too: a rule for app.localhost:8080 covers them.
 
 use alloc::format;
 use alloc::string::String;
@@ -320,13 +323,22 @@ fn not_found() -> NetError {
     NetError::new(NetErrorKind::NotFound, 0)
 }
 
+/// "localhost" and the names under .localhost (RFC 6761 6.3), the absolute form (app.localhost.)
+/// too, as the rules compare names
+fn loopback_name(h: &str) -> bool {
+    let bare = h.trim_end_matches('.');
+    bare.eq_ignore_ascii_case("localhost") || bare.to_ascii_lowercase().ends_with(".localhost")
+}
+
 pub fn resolve_with(host: &str, port: u16, cfg: &Config) -> NetResult<Vec<SocketAddr>> {
     let h = host.trim_start_matches('[').trim_end_matches(']');
     if let Some((ip, scope)) = plat::net::ip_scope_parse(h) {
         return Ok(alloc::vec![SocketAddr::with_scope(ip, port, scope)]);
     }
-    if h.eq_ignore_ascii_case("localhost") || h.to_ascii_lowercase().ends_with(".localhost") {
-        return Ok(alloc::vec![SocketAddr::new(IpAddr::LOCALHOST_V4, port), SocketAddr::new(IpAddr::LOCALHOST_V6, port)]);
+    if loopback_name(h) {
+        let addrs = alloc::vec![SocketAddr::new(IpAddr::LOCALHOST_V4, port), SocketAddr::new(IpAddr::LOCALHOST_V6, port)];
+        plat::policy::net_resolved(h, &addrs); // a rule for the name covers them
+        return Ok(addrs);
     }
     if h.is_empty() || h.len() > 253 || !h.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'.' || b == b'_') {
         return Err(not_found());
@@ -385,7 +397,7 @@ pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
     }
     // numbers and localhost need no system files (an app's rules may not grant them)
     let h = host.trim_start_matches('[').trim_end_matches(']');
-    if plat::net::ip_scope_parse(h).is_some() || h.eq_ignore_ascii_case("localhost") {
+    if plat::net::ip_scope_parse(h).is_some() || loopback_name(h) {
         return resolve_with(host, port, &Config::default());
     }
     resolve_with(host, port, &Config::system())

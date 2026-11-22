@@ -21,8 +21,9 @@
 //             -> UnixStream (the stream calls of TcpStream; addresses and nodelay do not apply)
 //             Linux, and Windows 10 1803 and later (AF_UNIX)
 //   resolve(host, port): numeric addresses, "localhost" and names under .localhost (the loopback
-//             addresses, RFC 6761); Windows, macOS and iOS also the system resolver
-//             (GetAddrInfoW, getaddrinfo).  Linux names go through netio::dns (no libc here).
+//             addresses, RFC 6761; with a final dot as well); Windows, macOS and iOS also the
+//             system resolver (GetAddrInfoW, getaddrinfo).  Linux: other names NotFound, since
+//             there is no libc here: netio::dns resolves them (/etc/hosts, the name servers).
 //   NetError: the kinds callers act on, with the OS code
 //
 // (G7d) Everywhere: the addresses, NetError and host_port.  The sockets, names and interfaces are
@@ -1694,17 +1695,25 @@ pub fn connect_unix(path: &str, timeout_ms: u32) -> NetResult<UnixStream> {
 
 // ------------------------------------------------------------------ names
 
-/// the addresses of a host: numeric forms, "localhost" and names under .localhost (both loopback
-/// addresses, RFC 6761 6.3, as netio::dns answers them) everywhere; on Windows, macOS and iOS
-/// other names through the system resolver (Linux: netio::dns)
+/// the addresses of a host: numeric forms, "localhost" and names under .localhost, with a final
+/// dot as well (both loopback addresses, RFC 6761 6.3, as netio::dns answers them) everywhere;
+/// on Windows, macOS and iOS other names through the system resolver, on Linux NotFound for them
+/// (no libc here: netio::dns::resolve reads /etc/hosts and asks the name servers).  The
+/// addresses of a name are registered with the app's rules (policy::net_resolved), so a rule
+/// for the name (app.localhost:8080) covers connections to them
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
     let h = host.trim_start_matches('[').trim_end_matches(']');
     if let Some((ip, scope)) = ip_scope_parse(h) {
         return Ok(alloc::vec![SocketAddr::with_scope(ip, port, scope)]);
     }
-    if h.eq_ignore_ascii_case("localhost") || h.to_ascii_lowercase().ends_with(".localhost") {
-        return Ok(alloc::vec![SocketAddr::new(IpAddr::LOCALHOST_V4, port), SocketAddr::new(IpAddr::LOCALHOST_V6, port)]);
+    // the absolute form too (app.localhost.), as the rules compare names
+    let bare = h.trim_end_matches('.');
+    if bare.eq_ignore_ascii_case("localhost") || bare.to_ascii_lowercase().ends_with(".localhost") {
+        let addrs = alloc::vec![SocketAddr::new(IpAddr::LOCALHOST_V4, port), SocketAddr::new(IpAddr::LOCALHOST_V6, port)];
+        // no lookup to permit (nothing is asked), but a rule for the name covers its addresses
+        crate::policy::net_resolved(h, &addrs);
+        return Ok(addrs);
     }
     #[cfg(any(windows, target_vendor = "apple"))]
     {

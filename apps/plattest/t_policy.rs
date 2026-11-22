@@ -136,7 +136,7 @@ fn installed(t: &mut T) {
     let manifest = format!(
         "# plattest --test policy\nfs.read {base}/ro/**\nfs.write {base}/rw/**   # writes imply reads\nfs.write {base}/one.txt\nfs.user\n\
          process plattest-no-such-program {here}/plattest-tool\nurl https MailTo\n\
-         net.connect 127.0.0.1:{port} *.example.test:443 printer.lan:631-632\nnet.listen 127.0.0.1:0\n"
+         net.connect 127.0.0.1:{port} *.example.test:443 printer.lan:631-632 app.localhost:8080\nnet.listen 127.0.0.1:0\n"
     );
     let key = match policy::install(&manifest) {
         Ok(k) => k,
@@ -276,6 +276,14 @@ fn installed(t: &mut T) {
     policy::net_resolved("printer.lan", &[SocketAddr::new(IpAddr::V4([192, 168, 7, 7]), 631)]);
     t.check(policy::net_connect_allowed(&SocketAddr::new(IpAddr::V4([192, 168, 7, 7]), 632)), "policy: a port range of a name");
     t.check(policy::net_connect_allowed(&SocketAddr::new(IpAddr::V4([8, 8, 8, 8]), 53)), "policy: DNS (port 53) with name rules");
+    // a name under .localhost is answered without a lookup (RFC 6761 6.3), the absolute form too,
+    // and its rule covers the loopback addresses of the answer
+    let v6 = SocketAddr::new(IpAddr::LOCALHOST_V6, 8080);
+    t.check(!policy::net_connect_allowed(&v6), "policy: [::1]:8080 before app.localhost was resolved");
+    let r = plat::net::resolve("App.Localhost.", 8080);
+    t.check(r.is_ok_and(|v| v.contains(&v6)) && policy::net_connect_allowed(&v6)
+        && !policy::net_connect_allowed(&SocketAddr::new(IpAddr::LOCALHOST_V6, 8081)),
+        "policy: a name under .localhost resolved, with its rule's port");
     if cfg!(windows) {
         t.check(denied(plat::net::resolve("evil.org", 80).map(|_| ()).map_err(|e| e.kind)), "policy: resolve of a refused name is Denied");
     }

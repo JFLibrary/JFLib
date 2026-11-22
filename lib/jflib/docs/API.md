@@ -28555,8 +28555,9 @@ net -- TCP, UDP and Unix domain sockets (IPv4 and IPv6) with timeouts
             -> UnixStream (the stream calls of TcpStream; addresses and nodelay do not apply)
             Linux, and Windows 10 1803 and later (AF_UNIX)
   resolve(host, port): numeric addresses, "localhost" and names under .localhost (the loopback
-            addresses, RFC 6761); Windows, macOS and iOS also the system resolver
-            (GetAddrInfoW, getaddrinfo).  Linux names go through netio::dns (no libc here).
+            addresses, RFC 6761; with a final dot as well); Windows, macOS and iOS also the
+            system resolver (GetAddrInfoW, getaddrinfo).  Linux: other names NotFound, since
+            there is no libc here: netio::dns resolves them (/etc/hosts, the name servers).
   NetError: the kinds callers act on, with the OS code
 
 (G7d) Everywhere: the addresses, NetError and host_port.  The sockets, names and interfaces are
@@ -28719,9 +28720,12 @@ one thread may read while another writes (Arc<TcpStream>).
   connect to a socket file within `timeout_ms` (0: block)
 
 - **`fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>>`**
-  the addresses of a host: numeric forms, "localhost" and names under .localhost (both loopback
-  addresses, RFC 6761 6.3, as netio::dns answers them) everywhere; on Windows, macOS and iOS
-  other names through the system resolver (Linux: netio::dns)
+  the addresses of a host: numeric forms, "localhost" and names under .localhost, with a final
+  dot as well (both loopback addresses, RFC 6761 6.3, as netio::dns answers them) everywhere;
+  on Windows, macOS and iOS other names through the system resolver, on Linux NotFound for them
+  (no libc here: netio::dns::resolve reads /etc/hosts and asks the name servers).  The
+  addresses of a name are registered with the app's rules (policy::net_resolved), so a rule
+  for the name (app.localhost:8080) covers connections to them
 
 - **`fn hostname() -> String`**
   the host name of this computer
@@ -44164,11 +44168,12 @@ Source: [`lib/netio/dns.rs`](../lib/netio/dns.rs)
 dns -- host names to addresses
 
   resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses, "localhost" and
-                    names under .localhost (the loopback addresses, RFC 6761) directly, on
-                    every system; Windows, macOS and iOS: the system resolver (plat::net::resolve,
-                    getaddrinfo on Apple: VPNs with name servers of their own, .local over
-                    mDNS, iOS's profiles and the app sandbox, none of which /etc/resolv.conf
-                    shows); Linux: /etc/hosts, then the name servers of /etc/resolv.conf
+                    names under .localhost, with a final dot as well (the loopback addresses,
+                    RFC 6761) directly, on every system; Windows, macOS and iOS: the system
+                    resolver (plat::net::resolve, getaddrinfo on Apple: VPNs with name
+                    servers of their own, .local over mDNS, iOS's profiles and the app
+                    sandbox, none of which /etc/resolv.conf shows); Linux: /etc/hosts, then
+                    the name servers of /etc/resolv.conf
                     (search domains, ndots)
   resolve_with(host, port, &Config)   the same with a given configuration (tests)
   Config::system()                    /etc/hosts + /etc/resolv.conf; Windows: the hosts file
@@ -44191,7 +44196,9 @@ link-local address's zone).  Not here: DNSSEC validation, mDNS, caching.
 
 The app's permissions: a name its net.connect rules do not cover fails with
 NetErrorKind::Denied before any query; the addresses of a covered name are registered
-(plat::policy::net_resolved), so connections to them follow that name's ports.
+(plat::policy::net_resolved), so connections to them follow that name's ports.  Names under
+.localhost need no rule, since nothing is asked for them, but their loopback addresses are
+registered too: a rule for app.localhost:8080 covers them.
 ```
 
 - **`struct Config`**

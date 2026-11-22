@@ -213,6 +213,10 @@ pub fn run(t: &mut T) {
     let both_loopback = |r: plat::net::NetResult<Vec<SocketAddr>>| r.is_ok_and(|v| v.len() == 2 && v.iter().all(|a| a.ip.is_loopback() && a.port == 80));
     t.check("a name under .localhost (netio)", both_loopback(dns::resolve("App.Localhost", 80)));
     t.check("a name under .localhost (plat)", both_loopback(plat::net::resolve("app.localhost", 80)));
+    // the absolute forms as well: no query to /etc/hosts or a name server (the silent one here)
+    t.check("an absolute name under .localhost (netio)",
+        both_loopback(dns::resolve_with("app.localhost.", 80, &silent)) && both_loopback(dns::resolve_with("LOCALHOST.", 80, &silent)));
+    t.check("an absolute name under .localhost (plat)", both_loopback(plat::net::resolve("app.localhost.", 80)));
     let sys = Config::system();
     t.check("Config::system: name servers (link-local ones with their zone)",
         !sys.nameservers.is_empty() && sys.nameservers.iter().all(|a| !link_local(&a.ip) || a.scope != 0));
