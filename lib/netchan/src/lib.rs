@@ -1,23 +1,28 @@
 // netchan -- message channels for games (G7d, docs/TRANSPORT.md)
 //
 //   Client::connect(Endpoint::Udp(addr) | Endpoint::WebSocket(url), ClientConfig)
-//            poll() -> ClientEvent (Connected, Message { seq, data }, Delivered(seq), Lost(seq),
-//            Disconnected(reason)), send(payload) -> seq, state, reliable, max_payload, stats
+//            poll() -> ClientEvent (Connected, Message { seq, data }, Reliable(data),
+//            Delivered(seq), Lost(seq), Disconnected(reason)), send(payload) -> seq,
+//            send_reliable(message), state, reliable, max_payload, stats
 //   Server::new(ServerConfig) [.bind_udp(addr)] [.listen_ws(addr, path) | .ws_endpoint()]
-//            poll() -> ServerEvent, send(id, payload) -> seq, disconnect(id), stats(id)
+//            poll() -> ServerEvent, send(id, payload) -> seq, send_reliable(id, message),
+//            disconnect(id), stats(id)
 //            (Windows, Linux, Apple: it needs netio's HTTP server)
 //   WebSocket::connect(url): one non-blocking client type for the browser and the desktop
-//   packet / conn / endpoint / seal: the wire format, the sequence numbers and acks, the
-//            handshake, its keys -- without I/O, for tests on a simulated network and for other
-//            transports
+//   packet / conn / endpoint / seal / reliable: the wire format, the sequence numbers and acks,
+//            the handshake, its keys, the reliable channel -- without I/O, for tests on a
+//            simulated network and for other transports
 //
 // The same channel over two transports: unreliable and unordered over UDP (a handshake with a
 // stateless cookie and X25519 keys, every packet after it sealed with ChaCha20-Poly1305,
 // keep-alives and timeouts; optionally a static server key the client pins), reliable and
 // ordered over a WebSocket (the browser's only way, docs/GAME.md E8; wss:// encrypts it).  Both carry the same header: a
 // sequence number per packet and acks of the newest 33 received, so the netcode (G7e) learns
-// which packets arrived over either.  Limits everywhere: payload sizes, packets and bytes a
-// second per connection, connections per server and per address, handshake answers a second.
+// which packets arrived over either.  Beside the packets, a reliable, ordered channel on both
+// (send_reliable, reliable.rs): messages up to max_message (1 MiB), over UDP in chunks of a
+// packet, resent until acknowledged, sent at a fixed pace.  Limits everywhere: payload sizes,
+// packets and bytes a second per connection, connections per server and per address, handshake
+// answers a second, the reliable channel's message size, queue and pace.
 //
 // Why a crate of its own and not netio: netio is not built for the browser and Android (plat had
 // no sockets there), and the client side must run in the browser; the WebSocket client type
@@ -39,6 +44,8 @@ pub mod conn;
 pub mod endpoint;
 /// the wire format
 pub mod packet;
+/// the reliable, ordered channel beside the packets: chunks, their resends, the reassembly
+pub mod reliable;
 /// the handshake's keys and the sealing of UDP packets
 pub mod seal;
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]

@@ -10,13 +10,17 @@
 //   DENY        server -> client  nonce u64, reason u8                 10 bytes
 //   DATA        both              token u32, seq u16, ack u16, ack bits u32, payload
 //                                                                      13 + n (UDP: + 16)
+//   RELIABLE    both              as DATA; the payload: chunk records of the reliable channel
+//                                 (reliable.rs: id u16, flags u8, len u16, bytes)
 //   DISCONNECT  both              token u32, seq u16, reason u8          8 bytes (UDP: + 16)
 //
 // Over UDP the handshake agrees on keys (RESPONSE: the client's ephemeral X25519 key; ACCEPT: the
 // server's and `confirm`, the proof that the server derived the same keys; seal.rs), and every
 // DATA and DISCONNECT after it is sealed with ChaCha20-Poly1305: the payload is encrypted, the
 // header before it is authenticated with it, and the 16-byte tag follows (DATA's payload as
-// parse() returns it is the ciphertext and the tag).  A UDP client pads CONNECT and RESPONSE to
+// parse() returns it is the ciphertext and the tag).  RELIABLE is sealed as DATA and shares its
+// sequence numbers and acks; DATA itself stays as it was, so a channel that sends nothing
+// reliably writes the same bytes as before.  A UDP client pads CONNECT and RESPONSE to
 // HANDSHAKE_SIZE, and every answer of the server before a connection is smaller: a forged sender
 // address gets back less than was sent (no amplification).  Over a WebSocket the CONNECT is not
 // padded, CHALLENGE / RESPONSE do not occur (TCP has proved the address), ACCEPT's key and
@@ -41,6 +45,8 @@ pub const KIND_DENY: u8 = 5;
 pub const KIND_DATA: u8 = 6;
 /// one side ends the connection
 pub const KIND_DISCONNECT: u8 = 7;
+/// chunks of the reliable channel, with sequence number and acks as DATA
+pub const KIND_RELIABLE: u8 = 8;
 
 /// the bytes of a DATA packet before its payload
 pub const DATA_HEADER: usize = 13;
@@ -82,6 +88,7 @@ pub const BYE_SHUTDOWN: u8 = 5;
 
 /// one packet, borrowed from the bytes it was read from
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Packet<'a> {
     /// a client asks: the app's protocol id, the nonce of this attempt
     Connect { protocol: u32, nonce: u64 },
@@ -97,6 +104,9 @@ pub enum Packet<'a> {
     /// a message (empty: a keep-alive) with its number, the newest number received and the bits
     /// of the 32 before; over UDP `payload` is the ciphertext and its tag
     Data { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] },
+    /// chunks of the reliable channel (reliable.rs), numbered and acknowledged as DATA; over UDP
+    /// `payload` is the ciphertext and its tag
+    Reliable { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] },
     /// one side ends the connection (BYE_*) under the sequence number it took; over UDP `tag`
     /// holds the 16 bytes of the seal, over a WebSocket nothing
     Disconnect { token: u32, seq: u16, reason: u8, tag: &'a [u8] },
@@ -148,6 +158,9 @@ pub fn parse(b: &[u8]) -> Option<Packet<'_>> {
         KIND_DATA if n >= DATA_HEADER => {
             Some(Packet::Data { token: u32_at(b, 1), seq: u16_at(b, 5), ack: u16_at(b, 7), bits: u32_at(b, 9), payload: &b[DATA_HEADER..] })
         }
+        KIND_RELIABLE if n >= DATA_HEADER => {
+            Some(Packet::Reliable { token: u32_at(b, 1), seq: u16_at(b, 5), ack: u16_at(b, 7), bits: u32_at(b, 9), payload: &b[DATA_HEADER..] })
+        }
         KIND_DISCONNECT if n == DISCONNECT_HEADER || n == DISCONNECT_HEADER + TAG => {
             Some(Packet::Disconnect { token: u32_at(b, 1), seq: u16_at(b, 5), reason: b[7], tag: &b[DISCONNECT_HEADER..] })
         }
@@ -194,8 +207,8 @@ impl Packet<'_> {
                 out.extend_from_slice(&nonce.to_le_bytes());
                 out.push(reason);
             }
-            Packet::Data { token, seq, ack, bits, payload } => {
-                out.push(VERSION << 4 | KIND_DATA);
+            Packet::Data { token, seq, ack, bits, payload } | Packet::Reliable { token, seq, ack, bits, payload } => {
+                out.push(VERSION << 4 | if matches!(self, Packet::Data { .. }) { KIND_DATA } else { KIND_RELIABLE });
                 out.extend_from_slice(&token.to_le_bytes());
                 out.extend_from_slice(&seq.to_le_bytes());
                 out.extend_from_slice(&ack.to_le_bytes());
@@ -218,7 +231,7 @@ impl Packet<'_> {
     /// the packet as new bytes
     pub fn to_vec(&self, pad: bool) -> Vec<u8> {
         let mut v = Vec::with_capacity(match self {
-            Packet::Data { payload, .. } => DATA_HEADER + payload.len() + TAG,
+            Packet::Data { payload, .. } | Packet::Reliable { payload, .. } => DATA_HEADER + payload.len() + TAG,
             _ => HANDSHAKE_SIZE,
         });
         self.write(&mut v, pad);

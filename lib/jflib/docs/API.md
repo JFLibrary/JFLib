@@ -129,7 +129,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
   <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/csg.rs](#geomsrccsgrs) · [src/exact.rs](#geomsrcexactrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
 - [netchan](#netchan) -- Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network
-  <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/seal.rs](#netchansrcsealrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
+  <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/reliable.rs](#netchansrcreliablers) · [src/seal.rs](#netchansrcsealrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 
 ## ui
 
@@ -68101,23 +68101,28 @@ MERGE_RATIO: f64 = 1e-9
 netchan -- message channels for games (G7d, docs/TRANSPORT.md)
 
   Client::connect(Endpoint::Udp(addr) | Endpoint::WebSocket(url), ClientConfig)
-           poll() -> ClientEvent (Connected, Message { seq, data }, Delivered(seq), Lost(seq),
-           Disconnected(reason)), send(payload) -> seq, state, reliable, max_payload, stats
+           poll() -> ClientEvent (Connected, Message { seq, data }, Reliable(data),
+           Delivered(seq), Lost(seq), Disconnected(reason)), send(payload) -> seq,
+           send_reliable(message), state, reliable, max_payload, stats
   Server::new(ServerConfig) [.bind_udp(addr)] [.listen_ws(addr, path) | .ws_endpoint()]
-           poll() -> ServerEvent, send(id, payload) -> seq, disconnect(id), stats(id)
+           poll() -> ServerEvent, send(id, payload) -> seq, send_reliable(id, message),
+           disconnect(id), stats(id)
            (Windows, Linux, Apple: it needs netio's HTTP server)
   WebSocket::connect(url): one non-blocking client type for the browser and the desktop
-  packet / conn / endpoint / seal: the wire format, the sequence numbers and acks, the
-           handshake, its keys -- without I/O, for tests on a simulated network and for other
-           transports
+  packet / conn / endpoint / seal / reliable: the wire format, the sequence numbers and acks,
+           the handshake, its keys, the reliable channel -- without I/O, for tests on a
+           simulated network and for other transports
 
 The same channel over two transports: unreliable and unordered over UDP (a handshake with a
 stateless cookie and X25519 keys, every packet after it sealed with ChaCha20-Poly1305,
 keep-alives and timeouts; optionally a static server key the client pins), reliable and
 ordered over a WebSocket (the browser's only way, docs/GAME.md E8; wss:// encrypts it).  Both carry the same header: a
 sequence number per packet and acks of the newest 33 received, so the netcode (G7e) learns
-which packets arrived over either.  Limits everywhere: payload sizes, packets and bytes a
-second per connection, connections per server and per address, handshake answers a second.
+which packets arrived over either.  Beside the packets, a reliable, ordered channel on both
+(send_reliable, reliable.rs): messages up to max_message (1 MiB), over UDP in chunks of a
+packet, resent until acknowledged, sent at a fixed pace.  Limits everywhere: payload sizes,
+packets and bytes a second per connection, connections per server and per address, handshake
+answers a second, the reliable channel's message size, queue and pace.
 
 Why a crate of its own and not netio: netio is not built for the browser and Android (plat had
 no sockets there), and the client side must run in the browser; the WebSocket client type
@@ -68167,6 +68172,8 @@ client -- a game client's channel to its server (G7d)
   Client::connect(Endpoint, ClientConfig) -> Result<Client, Error>    Connecting at once
   client.poll() -> Option<ClientEvent>    every frame until None: reads, keep-alives, timeouts
   client.send(payload) -> Result<u16, Error>    the message's sequence number
+  client.send_reliable(message) -> Result<(), Error>    the reliable channel (ClientEvent::Reliable
+                                          on the other side); poll() sends what is due
   client.state() / reliable() / max_payload() / stats() / rtt_ms() / disconnect()
 
 Nothing blocks.  UDP (Windows, Linux, Apple): a thread of its own reads the socket, keeps only
@@ -68194,6 +68201,10 @@ Endpoint::WebSocket exists; on Android nothing yet (Unsupported).
 - **`fn send(&mut self, payload: &[u8]) -> Result<u16, Error>`**
   send a message -> its sequence number (Delivered / Lost name it later; Backlog: the
   WebSocket has WsOptions::max_unsent bytes waiting, nothing was sent)
+- **`fn send_reliable(&mut self, payload: &[u8]) -> Result<(), Error>`**
+  send a message on the reliable channel: any size up to ClientConfig::max_message, in
+  order, over UDP sent again until the server has it (endpoint::ClientCore::send_reliable).
+  It goes out at reliable_bytes_per_s, the rest with the next polls
 - **`fn state(&self) -> State`**
   where it stands
 - **`fn reliable(&self) -> bool`**
@@ -68223,6 +68234,10 @@ conn -- one connection's sequence numbers and acks, without I/O (docs/TRANSPORT.
   Conn::new(..).with_keys(Keys)                      sealed (UDP): write_data and
                                                      write_disconnect seal, open(wire, head,
                                                      seq) checks and decrypts what came
+  conn.send_reliable(message, chunk_max)             the reliable channel (reliable.rs):
+  conn.write_reliable(now, room, &mut out) -> seq    RELIABLE packets of the chunks due,
+  conn.on_reliable(seq, ack, bits, payload, now)     what came (Event::Reliable: whole
+                                                     messages in order); with_reliable(Limits)
 
 Every DATA packet has its own sequence number (u16, wrapping) and acknowledges the newest
 number received plus the 32 before it as bits.  Unreliable (UDP): packets may come late, twice
@@ -68232,13 +68247,17 @@ it, Lost when the acks have moved more than 32 past it without naming it.  Relia
 the transport keeps order and loses nothing, so an ack of n delivers everything up to n.
 A peer that only receives (or sends less than one packet per 32 received) would let packets
 pass the bits unacknowledged: after ACK_EVERY packets without one of its own, an unreliable
-connection owes an empty DATA packet at once (ack_due).
+connection owes an empty DATA packet at once (ack_due).  RELIABLE packets are acknowledged
+sooner, after two or within ACK_DELAY_US: their sender times its resends by the acks.
 The round-trip time comes from the newest ack only (bits name older packets, whose wait would
 count twice), smoothed as TCP does (RFC 6298).
 Sealed (seal.rs): each packet sent takes the next packet number (u64; its low 16 bits are the
 sequence number), the nonce of ChaCha20-Poly1305; open() takes the number nearest the largest
 authenticated one and leaves the state alone when the tag does not check (Stats::forged).  The
 receive window above then drops a replayed packet as a duplicate or stale: only after the tag.
+RELIABLE packets take numbers and acks from the same sequence as DATA; their Delivered and
+Lost come as events like those of keep-alives, and tell the reliable sender which chunks the
+peer has.
 ```
 
 ```rust
@@ -68246,6 +68265,11 @@ receive window above then drops a replayed packet as a duplicate or stale: only 
 WINDOW: usize = 1024
 /// (unreliable) packets received without sending one, after which an ack is due (half the bits)
 ACK_EVERY: u32 = 16
+/// (unreliable) RELIABLE packets received without sending one, after which an ack is due: the
+/// peer waits for it to free its window and to send nothing twice (as TCP's delayed ack)
+ACK_EVERY_RELIABLE: u32 = 2
+/// (unreliable) the longest a RELIABLE packet waits for its ack (keepalive_due then holds)
+ACK_DELAY_US: u64 = 10_000
 ```
 
 - **`struct Settings`**
@@ -68268,12 +68292,15 @@ ACK_EVERY: u32 = 16
     nothing else was done with them)
   - `bytes_sent: u64` -- bytes of DATA packets sent (headers included)
   - `bytes_received: u64` -- bytes of DATA packets taken in (headers included)
+  - `resent: u64` -- chunks of the reliable channel sent again (UDP: lost, or no ack within the timeout)
+  - `reliable_queued: u64` -- bytes of reliable messages the peer does not have yet
   - `rtt_ms: f32` -- the smoothed round-trip time (0 before the first sample)
   - `rtt_var_ms: f32` -- its variation
 
 - **`enum Event`**
   what a connection reports
   - `Message { seq: u16, data: Vec<u8> }` -- a message of the peer with its sequence number
+  - `Reliable(Vec<u8>)` -- a message of the peer's reliable channel, whole and in order
   - `Delivered(u16)` -- the peer has a packet this side sent
   - `Lost(u16)` -- the peer's acks passed this packet by
 
@@ -68284,6 +68311,8 @@ ACK_EVERY: u32 = 16
 
 - **`fn new(token: u32, reliable: bool, set: Settings, now_us: u64) -> Conn`**
   a connection with the token both sides put into DATA (0 over a WebSocket)
+- **`fn with_reliable(mut self, limits: Limits) -> Conn`**
+  the reliable channel with these limits (instead of Limits::default())
 - **`fn with_keys(mut self, keys: Keys) -> Conn`**
   the connection sealed with these keys (UDP after the handshake): every packet written is
   encrypted and authenticated, every packet taken in must pass open()
@@ -68311,15 +68340,30 @@ ACK_EVERY: u32 = 16
   or end a reliable connection)
 - **`fn count_dropped(&mut self)`**
   count a packet dropped by the caller (its size)
+- **`fn send_reliable(&mut self, msg: &[u8], chunk_max: usize) -> Result<(), Error>`**
+  queue a message on the reliable channel, cut into chunks of at most `chunk_max` bytes
+  (the room of a packet less reliable::CHUNK_HEAD); Size: empty or over Limits::max_message,
+  Backlog: more than Limits::max_queued would wait
+- **`fn write_reliable(&mut self, now: u64, room: usize, out: &mut Vec<u8>) -> Option<u16>`**
+  append a RELIABLE packet with the chunks that are due (new ones, and over UDP those whose
+  packet was lost or went unacknowledged past the timeout), at most `room` bytes of
+  payload -> its sequence number; None: nothing due now (or the rate of the channel spent)
+- **`fn reliable_pending(&self) -> bool`**
+  whether the reliable channel has chunks the peer does not have yet
 - **`fn on_data(&mut self, seq: u16, ack: u16, bits: u32, payload: &[u8], now: u64)`**
   a DATA packet of the peer (its token already checked)
+- **`fn on_reliable(&mut self, seq: u16, ack: u16, bits: u32, payload: &[u8], now: u64) -> bool`**
+  a RELIABLE packet of the peer (its token checked, opened) -> false when its chunks break
+  the protocol (malformed, a message over max_message): the caller ends the connection
 - **`fn take_event(&mut self) -> Option<Event>`**
   the next event (messages, deliveries, losses in the order they happened)
 - **`fn ack_due(&self) -> bool`**
   (unreliable) whether an empty DATA packet is due at once: ACK_EVERY packets came without
-  one of this side's, so the older ones would pass the bits unacknowledged
+  one of this side's, so the older ones would pass the bits unacknowledged (or
+  ACK_EVERY_RELIABLE RELIABLE packets, whose sender waits for the acks)
 - **`fn keepalive_due(&self, now: u64) -> bool`**
-  whether a keep-alive is due (nothing sent for keepalive_ms)
+  whether a keep-alive is due (nothing sent for keepalive_ms; unreliable: or a RELIABLE
+  packet waited ACK_DELAY_US for its ack)
 - **`fn timed_out(&self, now: u64) -> bool`**
   whether nothing came for timeout_ms
 - **`fn stats(&self) -> Stats`**
@@ -68342,10 +68386,13 @@ endpoint -- the server's and the client's protocol without I/O (docs/TRANSPORT.m
                                        a WebSocket (or any reliable message stream)
     .tick(now)                         keep-alives, timeouts, streams that never said CONNECT
     .send(conn, payload, now) -> seq   .disconnect(conn, now)
+    .send_reliable(conn, message, now) the reliable channel: any size up to max_message, in
+                                       order, resent until it arrives (reliable.rs)
     .take_out() -> Out (what to send where, streams to close)   .poll_event() -> ServerEvent
     .set_static_key(secret) / .public_key()   a long-lived X25519 key clients may pin
   ClientCore::new(ClientConfig, random [32], stream)
     .start(now) / .packet(bytes, now) / .tick(now) / .send(payload, now) / .disconnect(now)
+    .send_reliable(message, now)
     .transport_closed(code) / .take_out() -> bytes / .poll_event() -> ClientEvent
 
 Time and randomness are the caller's (microseconds; the server's secret, the client's 32 random
@@ -68378,6 +68425,10 @@ its encryption.
   - `bytes_per_s: u32` -- bytes a second from one client (as packets_per_s)
   - `challenges_per_s: u32` -- answers to handshakes a second, for all addresses together
   - `handshake_ms: u32` -- a WebSocket must send its CONNECT within this long
+  - `max_message: usize` -- the largest message of the reliable channel, both ways (a client's larger one ends its
+    connection)
+  - `max_reliable_queued: usize` -- bytes of reliable messages queued for one client before send_reliable says Backlog
+  - `reliable_bytes_per_s: u32` -- bytes a second of reliable chunks to one client (below what its bytes_per_s takes)
 
 - **`enum Route`**
   where a packet goes
@@ -68393,6 +68444,7 @@ its encryption.
   what happened on the server
   - `Connected { id: u32, transport: Transport, addr: Option<SocketAddr> }` -- a client came (`addr`: its address, if the transport knows it)
   - `Message { id: u32, seq: u16, data: Vec<u8> }` -- a message of a client
+  - `Reliable { id: u32, data: Vec<u8> }` -- a message of a client's reliable channel, whole and in order
   - `Delivered { id: u32, seq: u16 }` -- a client has a packet the server sent
   - `Lost { id: u32, seq: u16 }` -- a packet the server sent did not reach the client (UDP)
   - `Disconnected { id: u32, reason: Reason }` -- a client is gone
@@ -68436,6 +68488,11 @@ its encryption.
 - **`fn send(&mut self, id: u32, payload: &[u8], now: u64) -> Result<u16, Error>`**
   send a message to a client -> its sequence number (Size: empty or over the limit of its
   transport; NotConnected: no such client)
+- **`fn send_reliable(&mut self, id: u32, payload: &[u8], now: u64) -> Result<(), Error>`**
+  send a message on a client's reliable channel: any size up to max_message, cut into
+  chunks of a packet each, in order, over UDP sent again until the client has it; it goes
+  out at reliable_bytes_per_s, so a large one takes a while (Size: empty or over
+  max_message; Backlog: more than max_reliable_queued would wait; NotConnected)
 - **`fn disconnect(&mut self, id: u32, reason: u8)`**
   end a client's connection (DISCONNECT goes out, Disconnected(Local) follows)
 - **`fn disconnect_all(&mut self)`**
@@ -68471,6 +68528,10 @@ its encryption.
     Given, the keys need the server's secret, and a server without it is refused
     (Reason::ServerKey); None: ephemeral keys only, safe from listeners but not from someone
     on the path who answers in the server's place
+  - `max_message: usize` -- the largest message of the reliable channel, both ways (the server's larger one ends the
+    connection)
+  - `max_reliable_queued: usize` -- bytes of reliable messages queued before send_reliable says Backlog
+  - `reliable_bytes_per_s: u32` -- bytes a second of reliable chunks to the server (below its bytes_per_s)
 
 - **`enum State`**
   where a client stands
@@ -68482,6 +68543,7 @@ its encryption.
   what happened on the client
   - `Connected` -- the server took the connection
   - `Message { seq: u16, data: Vec<u8> }` -- a message of the server
+  - `Reliable(Vec<u8>)` -- a message of the server's reliable channel, whole and in order
   - `Delivered(u16)` -- the server has a packet this side sent
   - `Lost(u16)` -- a packet this side sent did not reach the server (UDP)
   - `Disconnected(Reason)` -- the connection ended
@@ -68504,6 +68566,11 @@ its encryption.
 - **`fn send(&mut self, payload: &[u8], now: u64) -> Result<u16, Error>`**
   send a message -> its sequence number (Size: empty or over the server's limit;
   NotConnected before Connected and after the end)
+- **`fn send_reliable(&mut self, payload: &[u8], now: u64) -> Result<(), Error>`**
+  send a message on the reliable channel: any size up to max_message, cut into chunks of
+  a packet each, in order, over UDP sent again until the server has it; it goes out at
+  reliable_bytes_per_s (Size: empty or over max_message; Backlog: more than
+  max_reliable_queued would wait; NotConnected before Connected and after the end)
 - **`fn disconnect(&mut self)`**
   end the connection (DISCONNECT goes out; UDP several times)
 - **`fn transport_closed(&mut self, code: u16)`**
@@ -68538,13 +68605,17 @@ packet -- the channel's wire format, version 2 (docs/TRANSPORT.md "Paketformat")
   DENY        server -> client  nonce u64, reason u8                 10 bytes
   DATA        both              token u32, seq u16, ack u16, ack bits u32, payload
                                                                      13 + n (UDP: + 16)
+  RELIABLE    both              as DATA; the payload: chunk records of the reliable channel
+                                (reliable.rs: id u16, flags u8, len u16, bytes)
   DISCONNECT  both              token u32, seq u16, reason u8          8 bytes (UDP: + 16)
 
 Over UDP the handshake agrees on keys (RESPONSE: the client's ephemeral X25519 key; ACCEPT: the
 server's and `confirm`, the proof that the server derived the same keys; seal.rs), and every
 DATA and DISCONNECT after it is sealed with ChaCha20-Poly1305: the payload is encrypted, the
 header before it is authenticated with it, and the 16-byte tag follows (DATA's payload as
-parse() returns it is the ciphertext and the tag).  A UDP client pads CONNECT and RESPONSE to
+parse() returns it is the ciphertext and the tag).  RELIABLE is sealed as DATA and shares its
+sequence numbers and acks; DATA itself stays as it was, so a channel that sends nothing
+reliably writes the same bytes as before.  A UDP client pads CONNECT and RESPONSE to
 HANDSHAKE_SIZE, and every answer of the server before a connection is smaller: a forged sender
 address gets back less than was sent (no amplification).  Over a WebSocket the CONNECT is not
 padded, CHALLENGE / RESPONSE do not occur (TCP has proved the address), ACCEPT's key and
@@ -68569,6 +68640,8 @@ KIND_DENY: u8 = 5
 KIND_DATA: u8 = 6
 /// one side ends the connection
 KIND_DISCONNECT: u8 = 7
+/// chunks of the reliable channel, with sequence number and acks as DATA
+KIND_RELIABLE: u8 = 8
 /// the bytes of a DATA packet before its payload
 DATA_HEADER: usize = 13
 /// the bytes of a DISCONNECT packet before its tag
@@ -68615,6 +68688,8 @@ BYE_SHUTDOWN: u8 = 5
   - `Deny { nonce: u64, reason: u8 }` -- the server refused the client (DENY_\*)
   - `Data { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] }` -- a message (empty: a keep-alive) with its number, the newest number received and the bits
     of the 32 before; over UDP `payload` is the ciphertext and its tag
+  - `Reliable { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] }` -- chunks of the reliable channel (reliable.rs), numbered and acknowledged as DATA; over UDP
+    `payload` is the ciphertext and its tag
   - `Disconnect { token: u32, seq: u16, reason: u8, tag: &'a [u8] }` -- one side ends the connection (BYE_\*) under the sequence number it took; over UDP `tag`
     holds the 16 bytes of the seal, over a WebSocket nothing
 
@@ -68633,6 +68708,97 @@ BYE_SHUTDOWN: u8 = 5
 
 - **`fn seq_newer(a: u16, b: u16) -> bool`**
   whether sequence number `a` is newer than `b` (wrapping: within half the range ahead)
+
+### `netchan/src/reliable.rs`
+
+Source: [`lib/netchan/src/reliable.rs`](../lib/netchan/src/reliable.rs)
+
+```text
+reliable -- the reliable, ordered channel beside the packets (docs/TRANSPORT.md "Zuverlässige
+Nachrichten"), without I/O
+
+  Sender::push(message, chunk_max) -> Size / Backlog     a message cut into chunks
+  Sender::fill(now, rto, resend, room, bucket, out) -> ids   the chunks a RELIABLE packet carries
+  Sender::sent(seq, ids) / delivered(seq) / lost(seq)     the fate of the packets that carried them
+  Receiver::take(payload) -> Err(protocol) / Ok             the chunks of a packet that came
+  Receiver::message() -> Option<Vec<u8>>                  the next whole message, in order
+
+A message is cut into chunks of at most `chunk_max` bytes, each with a number of its own (u16,
+wrapping) and a flag "more chunks of this message follow".  A RELIABLE packet carries one or
+more chunk records:  id u16 | flags u8 (1: more) | len u16 | len bytes.  The packet is
+acknowledged as every packet (conn.rs); a chunk is done when a packet that carried it is
+Delivered.  Over UDP a chunk goes again when a packet that carried it is Lost, or when no ack
+came within the retransmission timeout (the round-trip time, four times its variation and the
+peer's ack delay, doubled for every retry up to a second); over a WebSocket never, since the transport loses
+nothing.  The receiver keeps the chunks that came early and hands out whole messages in the
+order they were sent.
+
+Limits: at most WINDOW chunks after the oldest open one are in flight (the receiver drops what
+lies further ahead, which a sender that keeps the window never sends); the sender's queue holds
+at most `max_queued` bytes (push: Backlog); a message has at most `max_message` bytes on both
+sides (the receiver ends the connection on more), the chunks kept before their turn at most
+EARLY_MAX bytes (more: the connection ends too); the bytes a second of reliable chunks come
+from a token bucket (`reliable_bytes_per_s` of the configs), so a large message does not run
+into the peer's rate limits.
+```
+
+```rust
+/// chunks in flight after the oldest open one
+WINDOW: u16 = 256
+/// the bytes of a chunk record before its data
+CHUNK_HEAD: usize = 5
+/// the bytes of chunks a receiver keeps before their turn (a sender within the window over UDP
+/// has at most WINDOW * MAX_UDP_PAYLOAD in flight; over a WebSocket chunks come in order)
+EARLY_MAX: usize = 512 * 1024
+```
+
+- **`struct Limits`**
+  the limits of the reliable channel of a connection
+  - `max_message: usize` -- the largest message, sent or taken
+  - `max_queued: usize` -- bytes this side keeps queued until the peer has them (push: Backlog beyond)
+  - `bytes_per_s: u32` -- bytes a second of reliable chunks this side sends
+
+- **`fn rto_us(srtt_us: f64, rttvar_us: f64) -> u64`**
+  the retransmission timeout from the smoothed round-trip time and its variation (µs): as
+  QUIC's probe timeout, the round trip, four times the variation (at least 10 ms) and the
+  longest the peer may hold an ack back (conn::ACK_DELAY_US)
+
+- **`struct Sender`**
+  what a connection sends reliably
+  - `resent: u64` -- chunks sent again
+
+**`impl Sender`**
+
+- **`fn new(limits: Limits, now: u64) -> Sender`**
+- **`fn push(&mut self, msg: &[u8], chunk_max: usize) -> Result<(), Error>`**
+  queue a message, cut into chunks of at most `chunk_max` bytes (Size: empty or over
+  max_message; Backlog: more than max_queued would wait)
+- **`fn queued(&self) -> usize`**
+  bytes queued that the peer does not have yet
+- **`fn pending(&self) -> bool`**
+  whether a chunk is waiting to go out (now or after a timeout)
+- **`fn fill(&mut self, now: u64, rto: u64, resend: bool, room: usize, out: &mut Vec<u8>) -> Vec<u16>`**
+  append the records of the chunks that are due to `out`, at most `room` bytes of them ->
+  their ids (empty: nothing due, or the bucket is empty).  `resend`: chunks whose packet
+  went unacknowledged for `rto` µs go again (UDP; a WebSocket loses nothing)
+- **`fn sent(&mut self, seq: u16, ids: Vec<u16>)`**
+  the packet `seq` carried these chunks
+- **`fn delivered(&mut self, seq: u16)`**
+  the peer has packet `seq`: its chunks are done
+- **`fn lost(&mut self, seq: u16)`**
+  packet `seq` did not reach the peer: its chunks are due again (UDP)
+
+- **`struct Receiver`**
+  what a connection takes in reliably
+
+**`impl Receiver`**
+
+- **`fn new(max_message: usize) -> Receiver`**
+- **`fn take(&mut self, mut b: &[u8]) -> Result<(), ()>`**
+  the chunk records of a RELIABLE packet that came (authentic, not a duplicate) -> Err when
+  they are malformed or a message grows past max_message (the peer breaks the protocol)
+- **`fn message(&mut self) -> Option<Vec<u8>>`**
+  the next whole message, in the order they were sent
 
 ### `netchan/src/seal.rs`
 
@@ -68729,6 +68895,7 @@ server -- a game server's channels (G7d): UDP and WebSocket clients in one table
                                        endpoint.accept(&req) in the app's own handler (with
                                        its page's files beside it, say)
   server.poll() -> Option<ServerEvent>   send(id, payload) -> seq   disconnect(id)
+  server.send_reliable(id, message)      the reliable channel (ClientEvent::Reliable at the client)
   server.wait(ms)                        sleep until something arrives (a loop without a tick)
   connections() / ids() / stats(id) / peer(id) / server_stats() / stop()
   set_static_key(secret) / public_key()  the key clients may pin (ClientConfig::server_key)
@@ -68784,6 +68951,10 @@ LINK_UNSENT: usize = 1 << 20
 - **`fn send(&mut self, id: u32, payload: &[u8]) -> Result<u16, Error>`**
   send a message to a client -> its sequence number (Backlog: a WebSocket client has
   LINK_UNSENT bytes waiting)
+- **`fn send_reliable(&mut self, id: u32, payload: &[u8]) -> Result<(), Error>`**
+  send a message on a client's reliable channel: any size up to ServerConfig::max_message,
+  in order, over UDP sent again until the client has it (endpoint::ServerCore::send_reliable).
+  It goes out at reliable_bytes_per_s, the rest with the next polls
 - **`fn disconnect(&mut self, id: u32)`**
   end a client's connection (Disconnected(Local) follows)
 - **`fn set_static_key(&mut self, secret: [u8; 32])`**

@@ -689,7 +689,8 @@ impl<S: RoomSim> NetServer<S> {
             }
             ServerEvent::Message { id, data, .. } => self.on_message(*id, data),
             ServerEvent::Disconnected { id, .. } => self.drop_conn(*id),
-            ServerEvent::Delivered { .. } | ServerEvent::Lost { .. } => {}
+            // (acks of packets, and the reliable channel, which the netcode does not use)
+            _ => {}
         }
     }
 
