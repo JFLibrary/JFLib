@@ -2740,6 +2740,11 @@ text fields, canvas, colour pads, pan and angle controls do it already -- go bet
 `ui.ltr_begin(x, w)` and `ui.ltr_end()`, and read the pointer with `ui.ltr_x(mx)`; an app
 that lays out text itself for `textbox_surface` wraps it that way. Rectangles that leave the
 UI (scripts' `expect rect`, the agent, popup windows, the platform's hit tests) are physical.
+A line of text with right-to-left characters is drawn in its visual order (the Unicode bidi
+algorithm, `text::Text::set_bidi`; Arabic joined by its fallback font), in mirrored windows and
+others alike: labels, buttons, check boxes, headings, lists, and text fields with their caret and
+selection. The rich-text and code editors keep such letters in logical order for now (their
+carets are logical).
 
 ## 16. Several programs per app, app-local crates
 

@@ -22,6 +22,10 @@
 //                                  on opaque targets (lcd.rs); NONE (default): greyscale
 //   set_fallback_fonts / set_system_fallback / fallback_for   characters the font lacks come
 //                                  from other fonts (fallback.rs; also when shaping)
+//   set_bidi(on) / has_rtl(s)      (default on) lines with right-to-left characters in their
+//                                  visual order, Hebrew and Arabic shaped by their fallback
+//                                  font, also while set_shaping is off (bidi.rs); other lines
+//                                  keep their metrics
 //   record_n / record_icon / glyphs   glyphs placed now, blended later from the glyph cache by
 //                                  any thread (record.rs: GlyphRec, GlyphView)
 //   var_axes / var_instances / var_values / vary / vary_named   variable fonts: their axes,
@@ -42,6 +46,7 @@
 
 extern crate alloc;
 
+mod bidi;
 pub mod cff;
 pub mod colr;
 mod fallback;
@@ -60,6 +65,9 @@ pub mod ttf;
 mod shaping;
 pub mod var;
 
+#[cfg(test)]
+mod tests;
+
 use alloc::vec::Vec;
 
 use gfx::path::Path;
@@ -67,6 +75,7 @@ use gfx::raster::Raster;
 use gfx::{blend, Dc, Surface, FMT_A8};
 use rt::fx::{cvt, div255};
 
+pub use bidi::has_rtl;
 pub use font::*;
 pub use glyphcache::{GcEntry, GcRef};
 pub use lcd::{SUBPIXEL_BGR, SUBPIXEL_NONE, SUBPIXEL_RGB, SUBPIXEL_VBGR, SUBPIXEL_VRGB};
