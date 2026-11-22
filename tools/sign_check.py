@@ -105,7 +105,8 @@ def install(setup, name, stub, style_exe):
     d = WORK / name
     shutil.rmtree(d, ignore_errors=True)
     (d / "shell").mkdir(parents=True)
-    (d / "inst.uis").write_text('click "Weiter"\nclick "Installieren"\nwait 500\nexpect "Fertigstellen" exists\n', encoding="utf-8")
+    # (one style: the setup starts on its options page)
+    (d / "inst.uis").write_text('click "Installieren"\nwait 500\nexpect "Fertigstellen" exists\n', encoding="utf-8")
     (d / "un.uis").write_text('click "Deinstallieren"\nwait 500\nexpect "Schließen" exists\n', encoding="utf-8")
     exe = d / "Signcheck_Setup.exe"
     exe.write_bytes(setup)

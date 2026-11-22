@@ -8,6 +8,20 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- The setup speaks the user's language: German, English, French, Spanish, Italian, Dutch, Polish, Arabic and Hebrew (lib/installer/setup.tsv, an i18n::Catalog), otherwise English; --lang CODE chooses. The styles' names and descriptions follow when the manifest has them (label_<style>.<lang>, desc_<style>.<lang>, from styles/S/INFO). Arabic and Hebrew mirror the window, but their text is drawn without bidi reordering, backwards, as in all of the library's controls (ROADMAP section 13, U7)
+- Installing for all users: the options page asks who the app is for. All users get C:\Program Files\<app>, the common desktop and Start menu and HKLM for the uninstall entry, the file types and a browser's registration (install.ini scope=machine); a setup without administrator rights starts itself again with them (the UAC prompt, quiet, waited for) and carries on, a refused prompt leads back to the options. Its uninstall.exe does the same. When the app is installed in Program Files and not for the user, the setup preselects all users
+- Installing and removing without questions: --quiet (no window) with --all-users / --current-user, --dir, --style, --no-desktop, --no-start-menu, --no-uninstall-entry, --launch and --log FILE; exit codes 0 done, 1 failed, 2 a wrong command line (an unknown option or style), 740 for all users without administrator rights. The uninstall entry carries uninstall.exe --uninstall --quiet as its QuietUninstallString. Without --quiet the options preset the pages
+
+### Changed
+
+- A payload with one style (PACKAGE styles= with one name, the default of cargo jflib package) has no style page: the setup starts on the options page, which has no "Zurück" then. "Start the app" and a browser's "Make it the default browser" moved to the last page, where Fertigstellen does them; scripts that click "Weiter" on a setup of one style click "Installieren" at once
+
+### Fixed
+
+- The uninstaller deletes uninstall.exe and its folder once it has ended, trying once a second for up to five minutes: it tried once after two seconds, and Windows deletes no running program, so both stayed whenever its last page was open longer (not checked on Windows: Wine deletes running programs). The removal page said the files were being installed
+
 ## [0.2.1] - 2026-11-16
 
 ### Security
