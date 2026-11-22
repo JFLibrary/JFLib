@@ -60,6 +60,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - The PDF streams of `print` are compressed with `compress::zlib` without any hook (the same bytes as with the hook that ui set until now); before, a program without ui wrote uncompressed streams. The hook goes through a lock instead of an `unsafe` transmute.
 - The readers of other programs' data that only Windows used, CF_UNICODETEXT and the DROPFILES block of a drop, are portable code (clipdrop.rs) and run through the fuzz checks on every OS; Windows' clipboard and drops read the same as before. plat::fuzz (hidden, no API) reaches these readers, the D-Bus decoder and the Wayland event decoder with any bytes
 - Windows: plat::assoc::browser_request finds a web browser registered for all users (RegisteredApplications below HKLM) as well as one of the user's
+- `net::resolve` answers a name under .localhost (app.localhost) with the loopback addresses, as "localhost" itself and as netio::dns does on Linux (RFC 6761 6.3): on Windows such a name went to the system resolver and needed a net.connect rule of its name, so the same app resolved it differently by system (and since netio::dns asks plat on macOS and iOS, there too)
 
 ### Deprecated
 

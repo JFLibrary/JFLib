@@ -28554,8 +28554,9 @@ net -- TCP, UDP and Unix domain sockets (IPv4 and IPv6) with timeouts
             (bind removes only a socket file nobody listens on; the drop only its own)
             -> UnixStream (the stream calls of TcpStream; addresses and nodelay do not apply)
             Linux, and Windows 10 1803 and later (AF_UNIX)
-  resolve(host, port): numeric addresses, "localhost"; Windows also the system resolver
-            (GetAddrInfoW).  Linux names go through netio::dns (no libc here).
+  resolve(host, port): numeric addresses, "localhost" and names under .localhost (the loopback
+            addresses, RFC 6761); Windows, macOS and iOS also the system resolver
+            (GetAddrInfoW, getaddrinfo).  Linux names go through netio::dns (no libc here).
   NetError: the kinds callers act on, with the OS code
 
 (G7d) Everywhere: the addresses, NetError and host_port.  The sockets, names and interfaces are
@@ -28718,7 +28719,8 @@ one thread may read while another writes (Arc<TcpStream>).
   connect to a socket file within `timeout_ms` (0: block)
 
 - **`fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>>`**
-  the addresses of a host: numeric forms and "localhost" everywhere; on Windows, macOS and iOS
+  the addresses of a host: numeric forms, "localhost" and names under .localhost (both loopback
+  addresses, RFC 6761 6.3, as netio::dns answers them) everywhere; on Windows, macOS and iOS
   other names through the system resolver (Linux: netio::dns)
 
 - **`fn hostname() -> String`**
@@ -44161,8 +44163,9 @@ Source: [`lib/netio/dns.rs`](../lib/netio/dns.rs)
 ```text
 dns -- host names to addresses
 
-  resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses and "localhost"
-                    directly; Windows, macOS and iOS: the system resolver (plat::net::resolve,
+  resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses, "localhost" and
+                    names under .localhost (the loopback addresses, RFC 6761) directly, on
+                    every system; Windows, macOS and iOS: the system resolver (plat::net::resolve,
                     getaddrinfo on Apple: VPNs with name servers of their own, .local over
                     mDNS, iOS's profiles and the app sandbox, none of which /etc/resolv.conf
                     shows); Linux: /etc/hosts, then the name servers of /etc/resolv.conf

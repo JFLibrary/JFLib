@@ -209,6 +209,10 @@ pub fn run(t: &mut T) {
     t.check("within the time limits", plat::time_us() - t0 < 20_000_000);
     // this machine: localhost always; its own name through the system's hosts file (Linux)
     t.check("localhost", dns::resolve("localhost", 80).is_ok_and(|v| v[0].ip.is_loopback()));
+    // a name under .localhost is loopback too (RFC 6761 6.3), in netio and in plat alike
+    let both_loopback = |r: plat::net::NetResult<Vec<SocketAddr>>| r.is_ok_and(|v| v.len() == 2 && v.iter().all(|a| a.ip.is_loopback() && a.port == 80));
+    t.check("a name under .localhost (netio)", both_loopback(dns::resolve("App.Localhost", 80)));
+    t.check("a name under .localhost (plat)", both_loopback(plat::net::resolve("app.localhost", 80)));
     let sys = Config::system();
     t.check("Config::system: name servers (link-local ones with their zone)",
         !sys.nameservers.is_empty() && sys.nameservers.iter().all(|a| !link_local(&a.ip) || a.scope != 0));

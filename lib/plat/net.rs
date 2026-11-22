@@ -20,8 +20,9 @@
 //             (bind removes only a socket file nobody listens on; the drop only its own)
 //             -> UnixStream (the stream calls of TcpStream; addresses and nodelay do not apply)
 //             Linux, and Windows 10 1803 and later (AF_UNIX)
-//   resolve(host, port): numeric addresses, "localhost"; Windows also the system resolver
-//             (GetAddrInfoW).  Linux names go through netio::dns (no libc here).
+//   resolve(host, port): numeric addresses, "localhost" and names under .localhost (the loopback
+//             addresses, RFC 6761); Windows, macOS and iOS also the system resolver
+//             (GetAddrInfoW, getaddrinfo).  Linux names go through netio::dns (no libc here).
 //   NetError: the kinds callers act on, with the OS code
 //
 // (G7d) Everywhere: the addresses, NetError and host_port.  The sockets, names and interfaces are
@@ -1693,7 +1694,8 @@ pub fn connect_unix(path: &str, timeout_ms: u32) -> NetResult<UnixStream> {
 
 // ------------------------------------------------------------------ names
 
-/// the addresses of a host: numeric forms and "localhost" everywhere; on Windows, macOS and iOS
+/// the addresses of a host: numeric forms, "localhost" and names under .localhost (both loopback
+/// addresses, RFC 6761 6.3, as netio::dns answers them) everywhere; on Windows, macOS and iOS
 /// other names through the system resolver (Linux: netio::dns)
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
@@ -1701,7 +1703,7 @@ pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
     if let Some((ip, scope)) = ip_scope_parse(h) {
         return Ok(alloc::vec![SocketAddr::with_scope(ip, port, scope)]);
     }
-    if h.eq_ignore_ascii_case("localhost") {
+    if h.eq_ignore_ascii_case("localhost") || h.to_ascii_lowercase().ends_with(".localhost") {
         return Ok(alloc::vec![SocketAddr::new(IpAddr::LOCALHOST_V4, port), SocketAddr::new(IpAddr::LOCALHOST_V6, port)]);
     }
     #[cfg(any(windows, target_vendor = "apple"))]

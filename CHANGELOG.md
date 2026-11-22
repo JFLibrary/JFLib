@@ -253,6 +253,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **cas:** Repairing a lost index file (repair_index, and gc before it sweeps) reads the index from the pack's end in two ranges instead of the whole pack. A pack the index names but the store does not have is Corrupt ("pack ... missing"), it was Io; a snapshot id with a NUL is refused like the other invalid ids (NotFound), and snapshot_ids leaves out names that cannot be ids. Repo::open reads repo.json again once it holds the lock, and Repo::create takes the lock before it writes repo.json
 - **docs:** SECURITY.md: the crates x509, netchan and formats in scope, compress with DEFLATE, gzip and Brotli, plat with the data of other programs and a pointer to docs/PLAT_INPUTS.md; the fuzzing covers compress, formats, netchan and plat
 - **game:** The netcode's matches over netchan's ClientEvent and ServerEvent take the new events with a _ arm (it does not use the reliable channel)
+- **plat:** `net::resolve` answers a name under .localhost (app.localhost) with the loopback addresses, as "localhost" itself and as netio::dns does on Linux (RFC 6761 6.3): on Windows such a name went to the system resolver and needed a net.connect rule of its name, so the same app resolved it differently by system (and since netio::dns asks plat on macOS and iOS, there too)
 
 ### Deprecated
 

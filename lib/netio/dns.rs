@@ -1,7 +1,8 @@
 // dns -- host names to addresses
 //
-//   resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses and "localhost"
-//                     directly; Windows, macOS and iOS: the system resolver (plat::net::resolve,
+//   resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses, "localhost" and
+//                     names under .localhost (the loopback addresses, RFC 6761) directly, on
+//                     every system; Windows, macOS and iOS: the system resolver (plat::net::resolve,
 //                     getaddrinfo on Apple: VPNs with name servers of their own, .local over
 //                     mDNS, iOS's profiles and the app sandbox, none of which /etc/resolv.conf
 //                     shows); Linux: /etc/hosts, then the name servers of /etc/resolv.conf
