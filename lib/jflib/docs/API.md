@@ -17,7 +17,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [gfx](#gfx) -- surfaces, the draw context, blend kernels, paths, strokes, masks, gradients
   <br>[lib.rs](#gfx-crate-root) · [blend.rs](#gfxblendrs) · [blendmode.rs](#gfxblendmoders) · [dash.rs](#gfxdashrs) · [flood.rs](#gfxfloodrs) · [gradient.rs](#gfxgradientrs) · [path.rs](#gfxpathrs) · [panel.rs](#gfxpanelrs) · [pathdata.rs](#gfxpathdatars) · [raster.rs](#gfxrasterrs) · [shapes.rs](#gfxshapesrs) · [straight.rs](#gfxstraightrs) · [stroke.rs](#gfxstrokers) · [tmask.rs](#gfxtmaskrs) · [xform.rs](#gfxxformrs)
 - [text](#text) -- fonts (SGF1, TrueType, CFF, COLR), glyph cache, text runs
-  <br>[lib.rs](#text-crate-root) · [cff.rs](#textcffrs) · [colr.rs](#textcolrrs) · [fallback.rs](#textfallbackrs) · [font.rs](#textfontrs) · [fontconf.rs](#textfontconfrs) · [fontdb.rs](#textfontdbrs) · [glyphcache.rs](#textglyphcachers) · [lcd.rs](#textlcdrs) · [outline.rs](#textoutliners) · [record.rs](#textrecordrs) · [rendering.rs](#textrenderingrs) · [registry.rs](#textregistryrs) · [segment.rs](#textsegmentrs) · [ttf.rs](#textttfrs) · [shaping.rs](#textshapingrs) · [var.rs](#textvarrs)
+  <br>[lib.rs](#text-crate-root) · [bidi.rs](#textbidirs) · [cff.rs](#textcffrs) · [colr.rs](#textcolrrs) · [fallback.rs](#textfallbackrs) · [font.rs](#textfontrs) · [fontconf.rs](#textfontconfrs) · [fontdb.rs](#textfontdbrs) · [glyphcache.rs](#textglyphcachers) · [lcd.rs](#textlcdrs) · [outline.rs](#textoutliners) · [record.rs](#textrecordrs) · [rendering.rs](#textrenderingrs) · [registry.rs](#textregistryrs) · [segment.rs](#textsegmentrs) · [ttf.rs](#textttfrs) · [shaping.rs](#textshapingrs) · [var.rs](#textvarrs)
 - [spell](#spell) -- spell checking: Hunspell dictionaries, the system's checker, a personal word list
   <br>[lib.rs](#spell-crate-root) · [hyphen.rs](#spellhyphenrs) · [speller.rs](#spellspellerrs) · [token.rs](#spelltokenrs)
 - [img_core](#img_core) -- image I/O dispatch, records, metadata, colour, resampling, image operations
@@ -13630,6 +13630,10 @@ colour glyphs), the glyph cache and text runs                        [src/text/*
                                  on opaque targets (lcd.rs); NONE (default): greyscale
   set_fallback_fonts / set_system_fallback / fallback_for   characters the font lacks come
                                  from other fonts (fallback.rs; also when shaping)
+  set_bidi(on) / has_rtl(s)      (default on) lines with right-to-left characters in their
+                                 visual order, Hebrew and Arabic shaped by their fallback
+                                 font, also while set_shaping is off (bidi.rs); other lines
+                                 keep their metrics
   record_n / record_icon / glyphs   glyphs placed now, blended later from the glyph cache by
                                  any thread (record.rs: GlyphRec, GlyphView)
   var_axes / var_instances / var_values / vary / vary_named   variable fonts: their axes,
@@ -13700,6 +13704,42 @@ FONT_ICON: u32 = 3
   size (filled from x, w px long; y = baseline)
 - **`fn icon_draw(&mut self, dc: &mut Dc, sf: &mut Surface, cp: u32, x: i32, y: i32, size_fx: i32)`**
   icon_draw(cp, x, y, size_fx): the icon's em box has its top-left corner at x, y
+
+### `text/bidi.rs`
+
+Source: [`lib/text/bidi.rs`](../lib/text/bidi.rs)
+
+```text
+bidi -- lines with right-to-left characters in their visual order, also without set_shaping
+
+  has_rtl(s)                       s has right-to-left characters (what set_bidi lays out)
+  set_bidi(on) -> previous         (default on) a line with right-to-left characters (Hebrew,
+                                   Arabic, Syriac, Thaana, N'Ko, ... or the marks RLM, RLE,
+                                   RLO, RLI) is laid out by the Unicode bidi algorithm while
+                                   shaping is off; off: every line in logical order (text
+                                   that is in visual order already)
+
+The line's directional runs come in visual order (text_shape::visual_runs; the line's
+direction is that of its first strong character).  A right-to-left run's characters from a
+TrueType / OpenType font (the fallback font of Hebrew or Arabic, usually) are shaped with
+it (HarfRust: Arabic joining, marks, ligatures, mirrored brackets); the others are drawn
+one grapheme cluster after the other as run draws them, right to left, brackets mirrored.
+Left-to-right runs are drawn as run draws them.  Draw, measure, caret_x, hit and
+selection_spans all read the same layout (shaping.rs: the line laid out last, with the 128
+bidi lines before it).  Lines without right-to-left characters keep run's metrics and
+pixels.
+```
+
+- **`fn has_rtl(s: &[u8]) -> bool`**
+  Whether s has right-to-left characters (Hebrew, Arabic, ... or the marks RLM, RLE, RLO,
+  RLI): a line with them is laid out in its visual order (set_bidi). Views that place their
+  carets by logical prefixes draw such text cluster by cluster to keep the logical order.
+
+**`impl Text`**
+
+- **`fn set_bidi(&mut self, on: bool) -> bool`**
+  Lay out lines with right-to-left characters in their visual order while shaping is off
+  (default on). Returns the previous state.
 
 ### `text/cff.rs`
 
