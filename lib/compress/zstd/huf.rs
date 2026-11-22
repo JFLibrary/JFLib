@@ -5,6 +5,8 @@
 //                                    the last symbol is implied (the code is complete)
 //   decode(table, stream, out, n)    one backward stream of n symbols
 //   Code::build(hist)                length-limited (11 bits) optimal code by package-merge
+//   Code::build_max(hist, bits)      the same with fewer bits (a dictionary's table)
+//   Code::from_weights(w)            the code of a tree description (a dictionary's)
 //   code.write_table / encode        the description and one stream
 //
 // Codes are canonical in zstd's order: lower weights (longer codes) take the lower values.
@@ -31,7 +33,7 @@ pub fn read_table(b: &[u8]) -> Option<(Table, usize)> {
 }
 
 /// the explicit weights of a tree description and its size
-fn read_weights(b: &[u8]) -> Option<(Vec<u8>, usize)> {
+pub(super) fn read_weights(b: &[u8]) -> Option<(Vec<u8>, usize)> {
     let hb = *b.first()? as usize;
     let mut w: Vec<u8> = Vec::new();
     if hb < 128 {
@@ -72,7 +74,8 @@ fn read_weights(b: &[u8]) -> Option<(Vec<u8>, usize)> {
     }
 }
 
-fn from_weights(mut w: Vec<u8>) -> Option<Table> {
+/// the explicit weights and the implied last one -> (all weights, the table's log)
+pub(super) fn full_weights(mut w: Vec<u8>) -> Option<(Vec<u8>, u32)> {
     let mut total = 0u32;
     for &x in &w {
         if x as u32 > MAX_BITS {
@@ -94,6 +97,11 @@ fn from_weights(mut w: Vec<u8>) -> Option<Table> {
         return None;
     }
     w.push((highbit(rest) + 1) as u8);
+    Some((w, log))
+}
+
+pub(super) fn from_weights(w: Vec<u8>) -> Option<Table> {
+    let (w, log) = full_weights(w)?;
     let mut rank = [0u32; 13];
     for &x in &w {
         rank[x as usize] += 1;
@@ -135,6 +143,7 @@ pub fn decode(t: &Table, src: &[u8], out: &mut Vec<u8>, n: usize) -> bool {
 }
 
 /// a code for compression
+#[derive(Clone)]
 pub struct Code {
     pub log: u32,
     pub code: [u16; 256],
@@ -190,11 +199,16 @@ fn lengths(hist: &[u32; 256], syms: &[usize], max_bits: u32) -> [u8; 256] {
 impl Code {
     /// None with fewer than two different symbols
     pub fn build(hist: &[u32; 256]) -> Option<Code> {
+        Code::build_max(hist, MAX_BITS)
+    }
+
+    /// codes of at most max_bits bits (max_bits >= 8 for 256 symbols)
+    pub fn build_max(hist: &[u32; 256], max_bits: u32) -> Option<Code> {
         let syms: Vec<usize> = (0..256).filter(|&s| hist[s] > 0).collect();
-        if syms.len() < 2 {
+        if syms.len() < 2 || syms.len() > 1 << max_bits {
             return None;
         }
-        let len = lengths(hist, &syms, MAX_BITS);
+        let len = lengths(hist, &syms, max_bits);
         let log = *len.iter().max()? as u32;
         let mut rank = [0u32; 13];
         for &s in &syms {
@@ -214,6 +228,50 @@ impl Code {
             start[wt] += 1 << (wt - 1);
         }
         Some(c)
+    }
+
+    /// the code of all weights (the implied last one included), as read_table assigns it
+    pub fn from_weights(w: &[u8]) -> Option<Code> {
+        let mut total = 0u32;
+        for &x in w {
+            if x as u32 > MAX_BITS {
+                return None;
+            }
+            if x > 0 {
+                total += 1 << (x - 1);
+            }
+        }
+        if total == 0 || !total.is_power_of_two() || w.len() > 256 {
+            return None;
+        }
+        let log = highbit(total);
+        let mut rank = [0u32; 13];
+        for &x in w {
+            rank[x as usize] += 1;
+        }
+        let mut start = [0u32; 13];
+        let mut next = 0;
+        for wt in 1..=log as usize {
+            start[wt] = next;
+            next += rank[wt] << (wt - 1);
+        }
+        let mut c = Code { log, code: [0; 256], nb: [0; 256], max_sym: 0 };
+        for (s, &x) in w.iter().enumerate() {
+            if x == 0 {
+                continue;
+            }
+            let wt = x as usize;
+            c.code[s] = (start[wt] >> (wt - 1)) as u16;
+            c.nb[s] = (log + 1 - x as u32) as u8;
+            start[wt] += 1 << (wt - 1);
+            c.max_sym = s;
+        }
+        Some(c)
+    }
+
+    /// whether every symbol of hist has a code
+    pub fn covers(&self, hist: &[u32; 256]) -> bool {
+        hist.iter().zip(self.nb.iter()).all(|(&c, &n)| c == 0 || n > 0)
     }
 
     fn weight(&self, s: usize) -> u8 {

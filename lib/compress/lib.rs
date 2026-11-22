@@ -11,6 +11,8 @@
 //                                                   interoperable), xxHash32 checksums
 //   zstd::compress(data, level) / decompress        Zstandard frames (RFC 8878; the zstd tool
 //                                                   reads ours and we read its)
+//   zstd::Dictionary, compress_with_dict / decompress_with_dict   dictionaries: trained on
+//                                                   samples or raw content, as zstd -D uses them
 //   crc32(crc, data), adler32(adler, data)          the checksums of gzip / PNG / ZIP and zlib
 //   xxh32(data, seed), xxh64(data, seed); Xxh32, Xxh64   the same over data in pieces
 //   stream::{Decode, Encode}                        every format in pieces, with bounded memory:

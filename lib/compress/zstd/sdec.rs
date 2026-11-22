@@ -7,11 +7,14 @@
 // (128 MiB by default, as the zstd tool's).  A match farther back than the window is an
 // error, as in the zstd tool's streaming decoder (dec.rs's one-shot decompress allows any
 // distance inside the frame).  The next block is decoded once the caller has taken the
-// output of the last one; the window moves when it holds more than twice its size.
+// output of the last one; the window moves when it holds more than twice its size.  With a
+// dictionary (with_dictionary), its content goes into the window before the frame's output
+// (not given to the caller) and widens the reach by its length.
 
 use alloc::vec::Vec;
 
-use super::dec::{block, rd_le, State, BLOCK_MAX, MAGIC};
+use super::dec::{block, pick, rd_le, State, BLOCK_MAX, MAGIC};
+use super::dict::Dictionary;
 use crate::stream::{self, gather, Decode, Error, Status, Step};
 use crate::xxh::Xxh64;
 
@@ -36,7 +39,9 @@ pub struct Decoder {
     from: usize,
     fstart: usize,
     window: usize,
+    reach: usize, // how far a match may reach: the window and the dictionary's content
     max_window: usize,
+    dicts: Vec<Dictionary>,
     st: State,
     fcs: Option<u64>,
     made: u64,
@@ -56,7 +61,9 @@ impl Decoder {
             from: 0,
             fstart: 0,
             window: 0,
+            reach: 0,
             max_window: 1 << 27,
+            dicts: Vec::new(),
             st: State::new(),
             fcs: None,
             made: 0,
@@ -75,6 +82,14 @@ impl Decoder {
     /// refuse frames whose window is larger than `bytes` (Error::Limit)
     pub fn with_window_max(mut self, bytes: usize) -> Decoder {
         self.max_window = bytes;
+        self
+    }
+
+    /// a dictionary for the frames that name its ID (several may be given); a frame that
+    /// names none takes the only one given (raw content: Dictionary::raw).  A frame that names
+    /// one not given is Error::Dictionary.
+    pub fn with_dictionary(mut self, dict: Dictionary) -> Decoder {
+        self.dicts.push(dict);
         self
     }
 
@@ -115,12 +130,14 @@ impl Decoder {
             window = base + (base / 8) * (wd & 7) as u64;
         }
         let did = [0, 1, 2, 4][(fhd & 3) as usize];
-        if did > 0 {
-            if rd_le(&h[p..p + did]) != 0 {
-                return Err(Error::Unsupported); // a dictionary
-            }
-            p += did;
-        }
+        let id = rd_le(&h[p..p + did]) as u32;
+        p += did;
+        let dict = match id {
+            0 if self.dicts.len() == 1 => Some(&self.dicts[0]),
+            0 => None,
+            _ => Some(self.dicts.iter().find(|d| d.id == id).ok_or(Error::Dictionary)?),
+        };
+        let dict = pick(id, dict).map_err(|_| Error::Dictionary)?;
         let fcs_size = fcs_size(fhd);
         self.fcs = if fcs_size > 0 { Some(rd_le(&h[p..p + fcs_size]) + if fcs_size == 2 { 256 } else { 0 }) } else { None };
         if single {
@@ -134,9 +151,15 @@ impl Decoder {
         }
         self.window = window as usize;
         self.check = if fhd & 0x04 != 0 { Some(Xxh64::new(0)) } else { None };
-        self.st = State::new();
+        self.st = State::with(dict);
         self.made = 0;
         self.fstart = self.out.len();
+        let extra = dict.map_or(0, |d| d.content.len());
+        if let Some(d) = dict {
+            self.out.extend_from_slice(&d.content);
+            self.from = self.out.len(); // (history, not output)
+        }
+        self.reach = self.window + extra;
         Ok(())
     }
 
@@ -155,7 +178,7 @@ impl Decoder {
 
     // drop output the caller has taken and no match can reach any more
     fn trim(&mut self) {
-        let keep = self.window.max(1);
+        let keep = self.reach.max(1);
         if self.from == self.out.len() && self.out.len() > 2 * keep + BLOCK_MAX {
             let drop = self.out.len() - keep;
             self.out.drain(..drop);
@@ -263,7 +286,7 @@ impl Decode for Decoder {
                     match ty {
                         0 => self.out.extend_from_slice(&self.buf),
                         1 => self.out.resize(from + size, self.buf[0]),
-                        _ => block(&mut self.st, &self.buf, &mut self.out, self.fstart, usize::MAX, self.window).ok_or(Error::Corrupt)?,
+                        _ => block(&mut self.st, &self.buf, &mut self.out, self.fstart, usize::MAX, self.reach).ok_or(Error::Corrupt)?,
                     }
                     self.produced(from)?;
                     self.buf.clear();

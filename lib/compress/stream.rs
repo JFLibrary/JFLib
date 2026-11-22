@@ -72,14 +72,16 @@ pub enum Error {
     Corrupt,
     /// a checksum or a stored size does not match the data
     Checksum,
-    /// the stream needs something this crate does not read: a zstd or LZ4 dictionary, a
-    /// Brotli large window
+    /// the stream needs something this crate does not read: an LZ4 dictionary, a zlib preset
+    /// dictionary, a Brotli large window
     Unsupported,
     /// more memory or output than allowed: a zstd window above the decoder's limit, more
     /// output than a pump's limit
     Limit,
     /// the encoder got more or less input than the size it was given
     Size,
+    /// a zstd frame names a dictionary that was not given
+    Dictionary,
     /// a pump's reader or writer failed
     Io,
 }
@@ -93,6 +95,7 @@ impl core::fmt::Display for Error {
             Error::Unsupported => "the stream uses a feature that is not supported",
             Error::Limit => "the stream needs more than allowed",
             Error::Size => "the input does not have the size given",
+            Error::Dictionary => "the frame needs a dictionary that was not given",
             Error::Io => "reading or writing failed",
         })
     }

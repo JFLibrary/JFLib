@@ -13,6 +13,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use super::dec::BLOCK_MAX;
+use super::dict::Dictionary;
 use super::enc::{block_header, frame_header, params, table_logs, Blocks, Finder, Params, WINDOW_LOG};
 use crate::stream::{self, Encode, Error, Flush, Status, Step};
 use crate::xxh::Xxh64;
@@ -33,6 +34,8 @@ pub struct Encoder {
     cmask: usize,
     next: usize,
     window: usize,
+    dict: Option<Dictionary>,
+    pending: usize, // dictionary positions to enter into the tables with the first block
     blocks: Blocks,
     out: Vec<u8>,
     from: usize,
@@ -57,7 +60,9 @@ impl Encoder {
             cmask: 0,
             next: 0,
             window: 0,
-            blocks: Blocks::new(),
+            dict: None,
+            pending: 0,
+            blocks: Blocks::new(None),
             out: Vec::new(),
             from: 0,
             head: false,
@@ -74,14 +79,29 @@ impl Encoder {
         self
     }
 
+    /// compress with a dictionary (as compress_with_dict; with a size, the same bytes)
+    pub fn with_dictionary(mut self, dict: &Dictionary) -> Encoder {
+        self.dict = Some(dict.clone());
+        self
+    }
+
     fn start(&mut self) {
-        let single = frame_header(&mut self.out, self.size);
-        let (h, c) = table_logs(&self.prm, self.size);
+        let pre = self.dict.as_ref().map_or(0, |d| d.content.len());
+        let single = frame_header(&mut self.out, self.size, self.dict.as_ref().map_or(0, |d| d.id));
+        let (h, c) = table_logs(&self.prm, self.size.map(|n| n + pre as u64));
         self.hash = vec![0; 1 << h];
         self.chain = if self.prm.chain_log == 0 { Vec::new() } else { vec![0; 1 << c] };
         self.hash_log = h;
         self.cmask = (1usize << c) - 1;
-        self.window = if single { self.size.unwrap_or(0) as usize } else { (1 << WINDOW_LOG) - 1 };
+        self.window = if single { self.size.unwrap_or(0) as usize + pre } else { (1 << WINDOW_LOG) - 1 };
+        self.blocks = Blocks::new(self.dict.as_ref());
+        if let Some(d) = &self.dict {
+            // the content first; its positions enter the tables with the first block, once
+            // the bytes after it are there as for compress_with_dict
+            self.buf.extend_from_slice(&d.content);
+            self.bs = pre;
+            self.pending = pre;
+        }
         self.head = true;
     }
 
@@ -110,6 +130,10 @@ impl Encoder {
             sparse: self.prm.sparse,
             next: self.next,
         };
+        if self.pending > 0 {
+            f.enter(self.pending);
+            self.pending = 0;
+        }
         self.blocks.put(&mut f, &self.prm, self.bs, be, last, &mut self.out);
         self.hash = f.hash;
         self.chain = f.chain;
