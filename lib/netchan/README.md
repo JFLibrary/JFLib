@@ -13,9 +13,11 @@ without the standard library and without a line of `unsafe` code.
   timeouts.
 - **WebSocket** (everywhere, and the browser's only way): reliable and ordered, over the browser's
   own WebSocket (`plat::net::WebSocket` through the page's host) or netio's on the desktop.
+- **Reliable messages** on both, beside the packets: any size up to 1 MiB, in order and exactly
+  once, over UDP in chunks that are sent again until they arrive.
 - **Limits:** the payload of a message (1200 bytes over UDP, 64 KiB over a WebSocket), packets and
   bytes a second per connection, connections per server and per address, handshake answers a
-  second.
+  second, the size, queue and pace of reliable messages.
 
 ## How it is used
 
@@ -31,7 +33,9 @@ while let Some(event) = client.poll() {
         ClientEvent::Message { seq, data } => { /* a snapshot of the server */ }
         ClientEvent::Delivered(seq) => { /* the server has our packet seq */ }
         ClientEvent::Lost(seq) => {}
+        ClientEvent::Reliable(data) => { /* a message of the reliable channel */ }
         ClientEvent::Disconnected(reason) => {}
+        _ => {}
     }
 }
 let seq = client.send(&input_bytes)?;
@@ -49,6 +53,32 @@ while let Some(event) = server.poll() {
     }
 }
 ```
+
+## Reliable messages
+
+`send` puts one message into one packet: it may arrive late, twice or not at all, and the
+`Delivered` and `Lost` of its sequence number tell the netcode which. For what must arrive (the
+map, the full state when a player joins, chat, events), `send_reliable(message)` on the client
+and `send_reliable(id, message)` on the server take messages of any size up to `max_message`
+(1 MiB). The other side gets each one exactly once, whole and in the order it was sent, as
+`ClientEvent::Reliable(data)` or `ServerEvent::Reliable { id, data }`.
+
+```rust
+server.send_reliable(id, &map_bytes)?;              // 300 KB: about 250 packets over UDP
+while let Some(event) = client.poll() {
+    if let ClientEvent::Reliable(map) = event { /* the whole map */ }
+}
+```
+
+Over UDP a message is cut into chunks of a packet each, in packets of their own kind that share
+the sequence numbers and acks of the others. A chunk goes again when its packet was lost or no
+ack came within a timeout from the measured round-trip time. The receiver acknowledges these
+packets within 10 ms, and keeps chunks that come early until their turn. The chunks go out at
+`reliable_bytes_per_s` (128 KiB a second), below what a server takes from one client by
+default, so 1 MiB takes about six seconds. `send_reliable` refuses a message over `max_message`
+(`Error::Size`) and one that would make more than `max_reliable_queued` (4 MiB) wait
+(`Error::Backlog`). A peer that breaks the protocol of this channel is disconnected. Over a
+WebSocket the same messages go in the same chunks and are never sent twice.
 
 ## Security over UDP
 

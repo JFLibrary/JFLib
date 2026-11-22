@@ -6,10 +6,13 @@
 //                                        a WebSocket (or any reliable message stream)
 //     .tick(now)                         keep-alives, timeouts, streams that never said CONNECT
 //     .send(conn, payload, now) -> seq   .disconnect(conn, now)
+//     .send_reliable(conn, message, now) the reliable channel: any size up to max_message, in
+//                                        order, resent until it arrives (reliable.rs)
 //     .take_out() -> Out (what to send where, streams to close)   .poll_event() -> ServerEvent
 //     .set_static_key(secret) / .public_key()   a long-lived X25519 key clients may pin
 //   ClientCore::new(ClientConfig, random [32], stream)
 //     .start(now) / .packet(bytes, now) / .tick(now) / .send(payload, now) / .disconnect(now)
+//     .send_reliable(message, now)
 //     .transport_closed(code) / .take_out() -> bytes / .poll_event() -> ClientEvent
 //
 // Time and randomness are the caller's (microseconds; the server's secret, the client's 32 random
@@ -37,6 +40,7 @@ use crypto::x25519;
 
 use crate::conn::{Bucket, Conn, Event, Settings, Stats};
 use crate::packet::{self, Packet, DATA_HEADER, DISCONNECT_HEADER, FLAG_STATIC_KEY, HANDSHAKE_SIZE, MAX_UDP_PAYLOAD, TAG};
+use crate::reliable::{self, CHUNK_HEAD};
 use crate::seal::{self, Generator, Handshake, Keys};
 use crate::{Error, Reason, Transport};
 
@@ -70,6 +74,13 @@ pub struct ServerConfig {
     pub challenges_per_s: u32,
     /// a WebSocket must send its CONNECT within this long
     pub handshake_ms: u32,
+    /// the largest message of the reliable channel, both ways (a client's larger one ends its
+    /// connection)
+    pub max_message: usize,
+    /// bytes of reliable messages queued for one client before send_reliable says Backlog
+    pub max_reliable_queued: usize,
+    /// bytes a second of reliable chunks to one client (below what its bytes_per_s takes)
+    pub reliable_bytes_per_s: u32,
 }
 
 impl Default for ServerConfig {
@@ -86,6 +97,9 @@ impl Default for ServerConfig {
             bytes_per_s: 256 * 1024,
             challenges_per_s: 2000,
             handshake_ms: 5000,
+            max_message: 1 << 20,
+            max_reliable_queued: 4 << 20,
+            reliable_bytes_per_s: 128 * 1024,
         }
     }
 }
@@ -110,11 +124,14 @@ pub enum Out {
 
 /// what happened on the server
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ServerEvent {
     /// a client came (`addr`: its address, if the transport knows it)
     Connected { id: u32, transport: Transport, addr: Option<SocketAddr> },
     /// a message of a client
     Message { id: u32, seq: u16, data: Vec<u8> },
+    /// a message of a client's reliable channel, whole and in order
+    Reliable { id: u32, data: Vec<u8> },
     /// a client has a packet the server sent
     Delivered { id: u32, seq: u16 },
     /// a packet the server sent did not reach the client (UDP)
@@ -234,6 +251,29 @@ impl ServerCore {
         Settings { timeout_ms: self.cfg.timeout_ms, keepalive_ms: self.cfg.keepalive_ms, packets_per_s: self.cfg.packets_per_s, bytes_per_s: self.cfg.bytes_per_s }
     }
 
+    fn limits(&self) -> reliable::Limits {
+        reliable::Limits { max_message: self.cfg.max_message, max_queued: self.cfg.max_reliable_queued, bytes_per_s: self.cfg.reliable_bytes_per_s }
+    }
+
+    // the payload a packet to this peer may have
+    fn room(&self, route: Route) -> usize {
+        if matches!(route, Route::Udp(_)) { self.cfg.max_payload } else { self.cfg.max_stream_payload }
+    }
+
+    // the RELIABLE packets that are due for a peer
+    fn flush(&mut self, id: u32, now: u64) {
+        let Some(p) = self.peers.get(&id) else { return };
+        let (route, room) = (p.route, self.room(p.route));
+        let Some(p) = self.peers.get_mut(&id) else { return };
+        loop {
+            let mut b = Vec::new();
+            if p.conn.write_reliable(now, room, &mut b).is_none() {
+                break;
+            }
+            self.out.push_back(Out::Send(route, b));
+        }
+    }
+
     fn cookie(&self, from: &SocketAddr, nonce: u64, time: u32) -> [u8; 16] {
         let mut d = [0u8; 34];
         d[..16].copy_from_slice(&ip16(&from.ip));
@@ -277,6 +317,7 @@ impl ServerCore {
         while let Some(e) = p.conn.take_event() {
             self.events.push_back(match e {
                 Event::Message { seq, data } => ServerEvent::Message { id, seq, data },
+                Event::Reliable(data) => ServerEvent::Reliable { id, data },
                 Event::Delivered(seq) => ServerEvent::Delivered { id, seq },
                 Event::Lost(seq) => ServerEvent::Lost { id, seq },
             });
@@ -409,7 +450,7 @@ impl ServerCore {
                 let at = accept.len() - 16;
                 let confirm = seal::confirm_tag(&keys.confirm, &accept[..at]);
                 accept[at..].copy_from_slice(&confirm);
-                let conn = Conn::new(token, false, self.settings(), now).with_keys(Keys::new(keys.s2c, keys.c2s));
+                let conn = Conn::new(token, false, self.settings(), now).with_keys(Keys::new(keys.s2c, keys.c2s)).with_reliable(self.limits());
                 self.peers.insert(id, Peer { conn, route: Route::Udp(from), nonce, addr: Some(from), client_key: key, accept: accept.clone() });
                 self.by_addr.insert(from, id);
                 self.stats.accepted += 1;
@@ -441,6 +482,40 @@ impl ServerCore {
                     peer.conn.write_data(&[], now, &mut b);
                     self.out.push_back(Out::Send(Route::Udp(from), b));
                 }
+                // (acks free room in the reliable window)
+                self.flush(id, now);
+                self.drain(id);
+            }
+            Packet::Reliable { token, seq, ack, bits, payload } => {
+                let Some(&id) = self.by_addr.get(&from) else {
+                    self.stats.unknown += 1;
+                    return;
+                };
+                let max = self.cfg.max_payload;
+                let Some(peer) = self.peers.get_mut(&id) else { return };
+                if token != peer.conn.token() {
+                    self.stats.bad += 1;
+                    return;
+                }
+                if payload.len() > max + TAG {
+                    peer.conn.count_dropped();
+                    return;
+                }
+                if !peer.conn.rate_ok(data.len(), now) {
+                    return;
+                }
+                let Some(plain) = peer.conn.open(data, DATA_HEADER, seq) else { return };
+                if !peer.conn.on_reliable(seq, ack, bits, &plain, now) {
+                    // authentic, and against the protocol
+                    self.drain(id);
+                    return self.remove(id, Some(packet::BYE_PROTOCOL), Reason::Protocol);
+                }
+                if peer.conn.ack_due() {
+                    let mut b = Vec::with_capacity(DATA_HEADER);
+                    peer.conn.write_data(&[], now, &mut b);
+                    self.out.push_back(Out::Send(Route::Udp(from), b));
+                }
+                self.flush(id, now);
                 self.drain(id);
             }
             Packet::Disconnect { token, seq, reason, .. } => {
@@ -478,6 +553,26 @@ impl ServerCore {
                         return;
                     }
                     peer.conn.on_data(seq, ack, bits, payload, now);
+                    self.flush(id, now);
+                    self.drain(id);
+                }
+                Some(Packet::Reliable { seq, ack, bits, payload, .. }) => {
+                    let max = self.cfg.max_stream_payload;
+                    let Some(peer) = self.peers.get_mut(&id) else { return };
+                    if payload.len() > max {
+                        self.remove(id, Some(packet::BYE_PROTOCOL), Reason::Protocol);
+                        return;
+                    }
+                    if !peer.conn.rate_ok(data.len(), now) {
+                        self.remove(id, Some(packet::BYE_RATE), Reason::RateLimit);
+                        return;
+                    }
+                    if !peer.conn.on_reliable(seq, ack, bits, payload, now) {
+                        self.drain(id);
+                        self.remove(id, Some(packet::BYE_PROTOCOL), Reason::Protocol);
+                        return;
+                    }
+                    self.flush(id, now);
                     self.drain(id);
                 }
                 Some(Packet::Disconnect { reason, .. }) => self.remove(id, None, Reason::Peer(reason)),
@@ -510,7 +605,7 @@ impl ServerCore {
             return;
         }
         let id = self.new_id();
-        let conn = Conn::new(0, true, self.settings(), now);
+        let conn = Conn::new(0, true, self.settings(), now).with_reliable(self.limits());
         self.peers.insert(id, Peer { conn, route: Route::Stream(stream), nonce, addr, client_key: [0; 32], accept: Vec::new() });
         self.by_stream.insert(stream, id);
         self.stats.accepted += 1;
@@ -536,13 +631,18 @@ impl ServerCore {
             let Some(p) = self.peers.get_mut(&id) else { continue };
             if p.conn.timed_out(now) {
                 self.remove(id, Some(packet::BYE_TIMEOUT), Reason::Timeout);
-            } else if p.conn.keepalive_due(now) {
+                continue;
+            }
+            // reliable chunks that are due (a RELIABLE packet carries the acks, as a keep-alive)
+            self.flush(id, now);
+            let Some(p) = self.peers.get_mut(&id) else { continue };
+            if p.conn.keepalive_due(now) {
                 let mut b = Vec::with_capacity(DATA_HEADER);
                 p.conn.write_data(&[], now, &mut b);
                 let route = p.route;
                 self.out.push_back(Out::Send(route, b));
-                self.drain(id);
             }
+            self.drain(id);
         }
         let limit = self.cfg.handshake_ms as u64 * 1000;
         let late: Vec<u32> = self.pending.iter().filter(|(_, (t, _))| now.saturating_sub(*t) >= limit).map(|(s, _)| *s).collect();
@@ -567,6 +667,20 @@ impl ServerCore {
         self.out.push_back(Out::Send(route, b));
         self.drain(id);
         Ok(seq)
+    }
+
+    /// send a message on a client's reliable channel: any size up to max_message, cut into
+    /// chunks of a packet each, in order, over UDP sent again until the client has it; it goes
+    /// out at reliable_bytes_per_s, so a large one takes a while (Size: empty or over
+    /// max_message; Backlog: more than max_reliable_queued would wait; NotConnected)
+    pub fn send_reliable(&mut self, id: u32, payload: &[u8], now: u64) -> Result<(), Error> {
+        let route = self.peers.get(&id).ok_or(Error::NotConnected)?.route;
+        let chunk = self.room(route).saturating_sub(CHUNK_HEAD);
+        let p = self.peers.get_mut(&id).ok_or(Error::NotConnected)?;
+        p.conn.send_reliable(payload, chunk)?;
+        self.flush(id, now);
+        self.drain(id);
+        Ok(())
     }
 
     /// end a client's connection (DISCONNECT goes out, Disconnected(Local) follows)
@@ -663,6 +777,13 @@ pub struct ClientConfig {
     /// (Reason::ServerKey); None: ephemeral keys only, safe from listeners but not from someone
     /// on the path who answers in the server's place
     pub server_key: Option<[u8; 32]>,
+    /// the largest message of the reliable channel, both ways (the server's larger one ends the
+    /// connection)
+    pub max_message: usize,
+    /// bytes of reliable messages queued before send_reliable says Backlog
+    pub max_reliable_queued: usize,
+    /// bytes a second of reliable chunks to the server (below its bytes_per_s)
+    pub reliable_bytes_per_s: u32,
 }
 
 impl Default for ClientConfig {
@@ -677,6 +798,9 @@ impl Default for ClientConfig {
             packets_per_s: 4000,
             bytes_per_s: 16 << 20,
             server_key: None,
+            max_message: 1 << 20,
+            max_reliable_queued: 4 << 20,
+            reliable_bytes_per_s: 128 * 1024,
         }
     }
 }
@@ -694,11 +818,14 @@ pub enum State {
 
 /// what happened on the client
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ClientEvent {
     /// the server took the connection
     Connected,
     /// a message of the server
     Message { seq: u16, data: Vec<u8> },
+    /// a message of the server's reliable channel, whole and in order
+    Reliable(Vec<u8>),
     /// the server has a packet this side sent
     Delivered(u16),
     /// a packet this side sent did not reach the server (UDP)
@@ -794,6 +921,7 @@ impl ClientCore {
         while let Some(e) = conn.take_event() {
             self.events.push_back(match e {
                 Event::Message { seq, data } => ClientEvent::Message { seq, data },
+                Event::Reliable(data) => ClientEvent::Reliable(data),
                 Event::Delivered(s) => ClientEvent::Delivered(s),
                 Event::Lost(s) => ClientEvent::Lost(s),
             });
@@ -814,7 +942,8 @@ impl ClientCore {
             (Phase::Connecting { .. }, Packet::Accept { nonce: n, token, max_payload, key, confirm }) if n == nonce => {
                 let set = Settings { timeout_ms: self.cfg.timeout_ms, keepalive_ms: self.cfg.keepalive_ms, packets_per_s: self.cfg.packets_per_s, bytes_per_s: self.cfg.bytes_per_s };
                 let cap = if self.stream { usize::MAX } else { MAX_UDP_PAYLOAD };
-                let mut conn = Conn::new(token, self.stream, set, now);
+                let limits = reliable::Limits { max_message: self.cfg.max_message, max_queued: self.cfg.max_reliable_queued, bytes_per_s: self.cfg.reliable_bytes_per_s };
+                let mut conn = Conn::new(token, self.stream, set, now).with_reliable(limits);
                 if !self.stream {
                     match self.accept_keys(data, &key, &confirm) {
                         Some(k) => conn = conn.with_keys(k),
@@ -850,6 +979,29 @@ impl ClientCore {
                     conn.write_data(&[], now, &mut b);
                     self.out.push_back(b);
                 }
+                self.flush(now);
+                self.drain();
+            }
+            (Phase::Connected { conn, .. }, Packet::Reliable { token, seq, ack, bits, payload }) if token == conn.token() => {
+                let tag = if conn.sealed() { TAG } else { 0 };
+                if payload.len() > self.cfg.max_payload + tag || !conn.rate_ok(data.len(), now) {
+                    if payload.len() > self.cfg.max_payload + tag {
+                        conn.count_dropped();
+                    }
+                    return;
+                }
+                let Some(plain) = conn.open(data, DATA_HEADER, seq) else { return };
+                if !conn.on_reliable(seq, ack, bits, &plain, now) {
+                    // authentic, and against the protocol
+                    self.drain();
+                    return self.abort();
+                }
+                if conn.ack_due() {
+                    let mut b = Vec::with_capacity(DATA_HEADER);
+                    conn.write_data(&[], now, &mut b);
+                    self.out.push_back(b);
+                }
+                self.flush(now);
                 self.drain();
             }
             (Phase::Connected { conn, .. }, Packet::Disconnect { token, seq, reason, .. }) if token == conn.token() => {
@@ -880,12 +1032,18 @@ impl ClientCore {
             Phase::Connected { conn, .. } => {
                 if conn.timed_out(now) {
                     self.end(Reason::Timeout);
-                } else if conn.keepalive_due(now) {
-                    let mut b = Vec::with_capacity(DATA_HEADER);
-                    conn.write_data(&[], now, &mut b);
-                    self.out.push_back(b);
-                    self.drain();
+                    return;
                 }
+                // reliable chunks that are due (a RELIABLE packet carries the acks, as a keep-alive)
+                self.flush(now);
+                if let Phase::Connected { conn, .. } = &mut self.phase {
+                    if conn.keepalive_due(now) {
+                        let mut b = Vec::with_capacity(DATA_HEADER);
+                        conn.write_data(&[], now, &mut b);
+                        self.out.push_back(b);
+                    }
+                }
+                self.drain();
             }
             _ => {}
         }
@@ -903,6 +1061,42 @@ impl ClientCore {
         self.out.push_back(b);
         self.drain();
         Ok(seq)
+    }
+
+    /// send a message on the reliable channel: any size up to max_message, cut into chunks of
+    /// a packet each, in order, over UDP sent again until the server has it; it goes out at
+    /// reliable_bytes_per_s (Size: empty or over max_message; Backlog: more than
+    /// max_reliable_queued would wait; NotConnected before Connected and after the end)
+    pub fn send_reliable(&mut self, payload: &[u8], now: u64) -> Result<(), Error> {
+        let Phase::Connected { conn, max_send } = &mut self.phase else { return Err(Error::NotConnected) };
+        conn.send_reliable(payload, max_send.saturating_sub(CHUNK_HEAD))?;
+        self.flush(now);
+        self.drain();
+        Ok(())
+    }
+
+    // the RELIABLE packets that are due
+    fn flush(&mut self, now: u64) {
+        let Phase::Connected { conn, max_send } = &mut self.phase else { return };
+        loop {
+            let mut b = Vec::new();
+            if conn.write_reliable(now, *max_send, &mut b).is_none() {
+                break;
+            }
+            self.out.push_back(b);
+        }
+    }
+
+    // the server broke the protocol: a DISCONNECT and the end
+    fn abort(&mut self) {
+        if let Phase::Connected { conn, .. } = &mut self.phase {
+            let mut b = Vec::new();
+            conn.write_disconnect(packet::BYE_PROTOCOL, &mut b);
+            for _ in 0..if self.stream { 1 } else { BYE_COPIES } {
+                self.out.push_back(b.clone());
+            }
+        }
+        self.end(Reason::Protocol);
     }
 
     /// end the connection (DISCONNECT goes out; UDP several times)
