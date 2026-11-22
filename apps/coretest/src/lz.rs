@@ -93,6 +93,7 @@ pub fn run(t: &mut T) {
     bad[5] ^= 0x40; // header checksum no longer matches
     t.check("lz4 frame header checksum", lz4::frame_decompress(&bad, 1000).is_none());
     zstd_run(t);
+    zdict_run(t);
     let mut fuzz = Rng(42);
     let mut no_panic = 0;
     for _ in 0..2000 {
@@ -376,12 +377,42 @@ fn zstd_run(t: &mut T) {
     t.check("zstd mutated frames", sound);
 }
 
-/// --zstd c|d IN OUT [LEVEL]: compress or decompress a file (for tools/zstd_check.py)
-pub fn zstd_file_mode(op: &str, input: &str, output: &str, level: i32) -> i32 {
+/// --zstd c IN OUT [LEVEL [DICT]] | d IN OUT [DICT] | train DICT MAXSIZE FILE...: compress or
+/// decompress a file, with a dictionary file, or train one (for tools/zstd_check.py)
+pub fn zstd_args(op: &str, rest: &[alloc::string::String]) -> i32 {
+    let dict_at = |k: usize| -> Option<Option<zstd::Dictionary>> {
+        match rest.get(k) {
+            None => Some(None),
+            Some(f) => Some(Some(zstd::Dictionary::parse(&plat::read_file(f)?)?)),
+        }
+    };
+    if op == "train" {
+        let (Some(out), Some(max)) = (rest.first(), rest.get(1).and_then(|m| m.parse().ok())) else { return 2 };
+        let Some(samples) = rest[2..].iter().map(|f| plat::read_file(f)).collect::<Option<Vec<_>>>() else { return 2 };
+        let refs: Vec<&[u8]> = samples.iter().map(|s| &s[..]).collect();
+        return match zstd::Dictionary::train(&refs, max) {
+            Some(d) if plat::write_file(out, &d.to_bytes()) => 0,
+            _ => 1,
+        };
+    }
+    let (Some(input), Some(output)) = (rest.first(), rest.get(1)) else { return 2 };
     let Some(data) = plat::read_file(input) else { return 2 };
     let out = match op {
-        "c" => Some(zstd::compress(&data, level)),
-        _ => zstd::decompress(&data, 1 << 30),
+        "c" => {
+            let level = rest.get(2).and_then(|l| l.parse().ok()).unwrap_or(3);
+            let Some(dict) = dict_at(3) else { return 2 };
+            Some(match &dict {
+                Some(d) => zstd::compress_with_dict(&data, level, d),
+                None => zstd::compress(&data, level),
+            })
+        }
+        _ => {
+            let Some(dict) = dict_at(2) else { return 2 };
+            match &dict {
+                Some(d) => zstd::decompress_with_dict(&data, 1 << 30, d),
+                None => zstd::decompress(&data, 1 << 30),
+            }
+        }
     };
     match out {
         Some(o) if plat::write_file(output, &o) => 0,
@@ -400,4 +431,148 @@ pub fn file_mode(op: &str, input: &str, output: &str) -> i32 {
         Some(o) if plat::write_file(output, &o) => 0,
         _ => 1,
     }
+}
+
+// ---------------------------------------------------------------------------- zstd dictionaries
+
+/// records of a backup log as JSON, the data dictionaries are for: many small, alike pieces
+fn records(r: &mut Rng, n: usize) -> Vec<Vec<u8>> {
+    let users = ["anna", "bert", "carla", "dieter", "eva", "frank"];
+    let states = ["ok", "ok", "ok", "skipped", "failed: permission denied"];
+    (0..n)
+        .map(|i| {
+            let u = users[r.next() as usize % users.len()];
+            let mut chunks = alloc::string::String::new();
+            for k in 0..1 + r.next() % 5 {
+                if k > 0 {
+                    chunks.push_str(", ");
+                }
+                chunks.push_str(&alloc::format!("{}", r.next() % 100_000));
+            }
+            alloc::format!(
+                "{{\n \"id\": {},\n \"time\": \"2026-11-{:02}T{:02}:{:02}:00Z\",\n \"host\": \"srv-{:02}.backup.lan\",\n \"user\": \"{u}\",\n \"path\": \"/home/{u}/Dokumente/{:06x}\",\n \"status\": \"{}\",\n \"bytes\": {},\n \"chunks\": [{chunks}]\n}}",
+                100_000 + i,
+                1 + r.next() % 28,
+                r.next() % 24,
+                r.next() % 60,
+                r.next() % 20,
+                r.next() % 0xFF_FFFF,
+                states[r.next() as usize % states.len()],
+                r.next() % 1_000_000_000,
+            )
+            .into_bytes()
+        })
+        .collect()
+}
+
+fn zdict_run(t: &mut T) {
+    use compress::stream::{Decode, Encode, Error, Flush, Status};
+    use zstd::Dictionary;
+    let mut r = Rng(0x2545_F491_4F6C_DD1D);
+    let recs = records(&mut r, 1500);
+    let (learn, test) = recs.split_at(1200);
+    let refs: Vec<&[u8]> = learn.iter().map(|s| &s[..]).collect();
+    let dict = Dictionary::train(&refs, 16 << 10);
+    t.check("zstd dictionary trained", dict.as_ref().is_some_and(|d| d.has_tables() && d.id() >= 32768 && d.to_bytes().len() <= 16 << 10));
+    let Some(dict) = dict else { return };
+    let again = Dictionary::train(&refs, 16 << 10);
+    t.check("zstd dictionary training is deterministic", again.is_some_and(|d| d.to_bytes() == dict.to_bytes()));
+    let bytes = dict.to_bytes();
+    let back = Dictionary::parse(&bytes);
+    t.check("zstd dictionary parse(to_bytes())", back.as_ref().is_some_and(|d| d.id() == dict.id() && d.content() == dict.content() && d.has_tables()));
+    // every test record: back with the dictionary, smaller than without, and the frame names it
+    let (mut with, mut without, mut raw) = (0usize, 0usize, 0usize);
+    let mut ok = true;
+    for s in test {
+        let c = zstd::compress_with_dict(s, 3, &dict);
+        ok &= zstd::decompress_with_dict(&c, s.len(), &dict).as_deref() == Some(&s[..]) && zstd::dictionary_id(&c) == Some(dict.id());
+        ok &= zstd::decompress(&c, 1 << 20).is_none(); // it needs the dictionary
+        with += c.len();
+        without += zstd::compress(s, 3).len();
+        raw += s.len();
+    }
+    t.check("zstd with a dictionary: 300 records back", ok);
+    t.check(&alloc::format!("zstd with a dictionary: records at least 2x smaller than without ({raw} -> {without} without, {with} with)"), with * 2 <= without);
+    // the stream encoder with a size gives the same bytes, the stream decoder takes them in pieces
+    let s = &test[7];
+    let one = zstd::compress_with_dict(s, 3, &dict);
+    let mut e = zstd::Encoder::new(3).with_size(s.len() as u64).with_dictionary(&dict);
+    let mut out = alloc::vec![0u8; 4096];
+    let st = e.encode(s, &mut out, Flush::Finish);
+    t.check("zstd stream encoder with_dictionary: the bytes of compress_with_dict", st.is_ok_and(|st| st.status == Status::End && out[..st.written] == one[..]));
+    let mut d = zstd::Decoder::new().with_dictionary(dict.clone());
+    let (mut got, mut o) = (Vec::new(), [0u8; 37]);
+    let mut p = 0;
+    let mut fine = true;
+    while p < one.len() || got.len() < s.len() {
+        let k = (one.len() - p).min(5);
+        match d.decode(&one[p..p + k], &mut o) {
+            Ok(st) => {
+                p += st.read;
+                got.extend_from_slice(&o[..st.written]);
+                if st.status == Status::End {
+                    break;
+                }
+            }
+            Err(_) => {
+                fine = false;
+                break;
+            }
+        }
+    }
+    t.check("zstd stream decoder with_dictionary, in pieces", fine && got == *s);
+    // several blocks with the dictionary: the tables carry on
+    let big: Vec<u8> = recs.concat();
+    for level in [1, 3, 9] {
+        let c = zstd::compress_with_dict(&big, level, &dict);
+        t.check(&alloc::format!("zstd {} KiB with a dictionary level {level}", big.len() >> 10), zstd::decompress_with_dict(&c, big.len(), &dict).as_deref() == Some(&big[..]));
+    }
+    // another dictionary, none, the wrong one
+    let other = Dictionary::train(&refs[..600], 8 << 10).unwrap();
+    let c = zstd::compress_with_dict(&test[0], 3, &dict);
+    t.check("zstd: a frame with another dictionary", other.id() != dict.id() && zstd::decompress_with_dict(&c, 1 << 20, &other).is_none());
+    let mut d = zstd::Decoder::new().with_dictionary(other.clone());
+    t.check("zstd stream decoder: a dictionary not given", d.decode(&c, &mut [0u8; 64]) == Err(Error::Dictionary));
+    let mut d = zstd::Decoder::new().with_dictionary(other.clone()).with_dictionary(dict.clone());
+    let mut o = alloc::vec![0u8; 4096];
+    t.check("zstd stream decoder: the dictionary chosen by its ID", d.decode(&c, &mut o).is_ok_and(|st| o[..st.written] == test[0][..]));
+    // raw content: the frame names no dictionary, the decoder must be given it
+    let rawd = Dictionary::raw(&learn[..50].concat());
+    let c = zstd::compress_with_dict(&test[1], 3, &rawd);
+    t.check("zstd raw content dictionary", rawd.id() == 0 && zstd::dictionary_id(&c).is_none() && zstd::decompress_with_dict(&c, 1 << 20, &rawd).as_deref() == Some(&test[1][..]));
+    t.check("zstd raw content: parse of bytes without the magic", Dictionary::parse(b"just some text that is content").is_some_and(|d| d.id() == 0 && !d.has_tables()));
+    // a damaged dictionary is refused or, read, never breaks a decoder
+    let mut sound = true;
+    let mut refused = 0;
+    for k in 0..400 {
+        let mut b = bytes.clone();
+        let cut = 8 + (r.next() as usize) % (bytes.len() - dict.content().len() - 8);
+        if k % 2 == 0 {
+            b.truncate(cut);
+        } else {
+            b[cut] ^= 1 << (r.next() % 8);
+        }
+        match Dictionary::parse(&b) {
+            None => refused += 1,
+            Some(dd) => {
+                let c = zstd::compress_with_dict(&test[k % 300], 3, &dd);
+                sound &= zstd::decompress_with_dict(&c, 1 << 20, &dd).as_deref() == Some(&test[k % 300][..]);
+            }
+        }
+    }
+    t.check(&alloc::format!("zstd damaged dictionaries: {refused} of 400 refused, the rest still round trip"), sound && refused > 100);
+    // damaged frames with a dictionary: one-shot and stream agree, nothing above the limit
+    let base = zstd::compress_with_dict(&big[..60_000], 3, &dict);
+    let mut agree = true;
+    for _ in 0..1000 {
+        let mut m = base.clone();
+        let i = r.next() as usize % m.len();
+        m[i] ^= 1 << (r.next() % 8);
+        let a = zstd::decompress_with_dict(&m, 1 << 20, &dict);
+        let mut d = zstd::Decoder::new().with_dictionary(dict.clone());
+        let mut o = alloc::vec![0u8; 1 << 20];
+        let b = d.decode(&m, &mut o).ok().filter(|st| st.status == Status::End).map(|st| o[..st.written].to_vec());
+        agree &= a == b;
+    }
+    t.check("zstd damaged frames with a dictionary: one-shot and stream agree", agree);
 }

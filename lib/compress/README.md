@@ -3,9 +3,9 @@
 Lossless compression for [JFLib](https://jflib.org): DEFLATE, zlib, gzip, Brotli, LZ4 and
 Zstandard in plain Rust, without the standard library, without a line of `unsafe` code and
 without a dependency. All formats are the real ones: what is written here opens with `gzip`,
-`zlib`, `lz4` and `zstd`, and what those tools write opens here (Zstandard as long as it needs no
-dictionary). Each also comes in pieces, with bounded memory, for data that is too large to hold
-or that arrives over time.
+`zlib`, `lz4` and `zstd`, and what those tools write opens here, Zstandard with dictionaries
+too. Each also comes in pieces, with bounded memory, for data that is too large to hold or that
+arrives over time.
 
 ## What it does
 
@@ -26,8 +26,29 @@ checksums. JFLib's build packs an app's `assets/` with it.
 
 **Zstandard** is the strongest, the one for archives and backups. `zstd::compress(data, level)`
 writes a frame with the content size and a checksum, at levels 1 to 19 (`zstd::LEVEL_DEFAULT` is
-3). `zstd::decompress` reads any conforming frames that do not need a dictionary, several in a row
-and skippable ones included, as RFC 8878 describes them.
+3). `zstd::decompress` reads any conforming frames, several in a row and skippable ones included,
+as RFC 8878 describes them.
+
+**Dictionaries** make small pieces of data compress well: records of a log, messages, rows of a
+database, each too short to have much to repeat on its own. A dictionary holds what such pieces
+have in common. `zstd::Dictionary::train(&samples, 16 << 10)` learns one from samples of the
+data, as `zstd --train` does, and `to_bytes` / `Dictionary::parse` store and read it in the same
+format, so the zstd tool takes ours (`zstd -D`) and we take its. `compress_with_dict` and
+`decompress_with_dict` use it; the frame names the dictionary's ID. Bytes that are no dictionary
+of that format, or `Dictionary::raw(content)`, are content only. On 600 JSON records of 225
+bytes each, a 16 KiB dictionary makes them 3.15 times smaller instead of about 1.2 times without
+one; the zstd tool with a dictionary of its own training reaches 3.22. The stream `Encoder` and `Decoder` take dictionaries too
+(`with_dictionary`).
+
+```rust
+use jflib::compress::zstd::{self, Dictionary};
+
+let samples: Vec<&[u8]> = records.iter().map(|r| r.as_slice()).collect();
+let dict = Dictionary::train(&samples, 16 << 10).unwrap();
+let packed = zstd::compress_with_dict(&record, 3, &dict);
+let back = zstd::decompress_with_dict(&packed, 1 << 20, &dict);
+let file = dict.to_bytes();                        // what `zstd -D file` reads
+```
 
 Every decoder takes the largest output the caller accepts and treats its input as untrusted:
 truncated or corrupt data, a bad checksum, bytes after the stream or more output than allowed are
