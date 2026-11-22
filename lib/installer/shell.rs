@@ -1,45 +1,103 @@
 // shell -- Windows shell integration of the setup: known folders, .lnk shortcuts, the
-// "installed apps" entry (HKCU ...\Uninstall), starting a program and the uninstaller's
-// self-delete.  The OS calls live in plat::inst (COM IShellLinkW, registry, CreateProcessW;
-// ole32 / shell32 / advapi32 loaded with LoadLibraryA there).    [apps/installer/src/shell.s]
+// "installed apps" entry (...\Uninstall below HKCU, or HKLM for all users), starting a program
+// and the uninstaller's self-delete.  The OS calls live in plat::inst (COM IShellLinkW,
+// registry, CreateProcessW; ole32 / shell32 / advapi32 loaded with LoadLibraryA there).
+//                                                              [apps/installer/src/shell.s]
 //
-//   sh_folder(which) -> Some(dir)       0 = desktop, 1 = start menu programs
+//   Scope                               for the current user, or for all users (Machine: the
+//                                       common desktop and start menu, HKLM; administrator
+//                                       rights needed)
+//   sh_folder(which, scope) -> Some(dir)   0 = desktop, 1 = start menu programs
+//   sh_program_files() -> dir           the default folder of an installation for all users
 //   sh_link(lnk, target, dir, desc, app_id) -> bool   create a shortcut file (app_id: its
 //                                       System.AppUserModel.ID, "" = none)
 //   sh_pins(exe, app_id) -> usize       the user's taskbar pins of exe get app_id (pinned before
 //                                       the program ran under its id)
-//   Reg::begin(app) -> Some(Reg), sz(name, value), dword(name, value), end()
+//   Reg::begin(app, scope) -> Some(Reg), sz(name, value), dword(name, value), end()
 //                                       write the uninstall key of the app
-//   sh_reg_delete(app) -> bool          remove it again
+//   sh_reg_delete(app, scope) -> bool   remove it again
 //   sh_run(cmdline, dir, hidden) -> bool
-//   sh_assoc_set(entries) / sh_assoc_remove(list)   the file types and URL schemes (assoc.rs):
-//                                       registry values under HKCU, then SHChangeNotify
+//   sh_assoc_set(entries, scope) / sh_assoc_remove(list, scope)   the file types and URL schemes
+//                                       (assoc.rs): registry values, then SHChangeNotify
 //   sh_browser_request(pkg, headless) -> bool   (browser=1) Settings at the app's page of the
 //                                       default apps (plat::assoc::browser_request)
+//   sh_admin() -> bool                  this process has administrator rights
+//   sh_elevate(exe, args) -> Ok(exit code) / Err   the setup again with administrator rights
+//                                       (the UAC prompt), waiting for it
 //
 // Test mode: with the environment variable ASMINST_SHELL_DIR set, the desktop and the start
 // menu are <dir>\Desktop and <dir>\Programs, the pins <dir>\Pinned, and registry values go to
 // <dir>\registry.txt (the file types and schemes to <dir>\assoc.txt, "subkey|name=value"
-// lines) -- a test never touches the user's shell or registry; Settings never opens (the
-// default browser's page is printed).
+// lines); for all users the same below <dir>\machine -- a test never touches the user's shell
+// or registry; Settings never opens (the default browser's page is printed).  ASMINST_ADMIN=1 /
+// 0 then stands for the administrator rights, and sh_elevate starts the setup without a UAC
+// prompt (the same environment with ASMINST_ADMIN=1, waited for; ASMINST_UAC=no: as if the user
+// refused it).
 
 use alloc::format;
 use alloc::string::String;
 
 use crate::{PATH_CAP, str_cap};
+use plat::inst::Root;
 
-/// ASMINST_SHELL_DIR when set (and not empty)  [sh_testdir]
-fn sh_testdir() -> Option<String> {
+/// where an installation goes
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+pub(crate) enum Scope {
+    /// the current user: %LOCALAPPDATA%\Programs, the user's desktop and start menu, HKCU
+    #[default]
+    User,
+    /// all users: Program Files, the common desktop and start menu, HKLM
+    Machine,
+}
+
+impl Scope {
+    fn root(self) -> Root {
+        match self {
+            Scope::User => Root::User,
+            Scope::Machine => Root::Machine,
+        }
+    }
+}
+
+/// ASMINST_SHELL_DIR when set (and not empty)
+fn sh_testroot() -> Option<String> {
     plat::env("ASMINST_SHELL_DIR").filter(|d| !d.is_empty()).map(|d| str_cap(&d, PATH_CAP))
 }
 
-/// 0 desktop, 1 start menu "Programs" -> the folder (UTF-8) or None  [sh_folder]
-pub(crate) fn sh_folder(which: u32) -> Option<String> {
-    if let Some(t) = sh_testdir() {
+/// the test folder of a scope: ASMINST_SHELL_DIR, for all users its "machine" folder  [sh_testdir]
+fn sh_testdir(scope: Scope) -> Option<String> {
+    let t = sh_testroot()?;
+    Some(match scope {
+        Scope::User => t,
+        Scope::Machine => {
+            let d = str_cap(&(t + "\\machine"), PATH_CAP);
+            plat::mkdir(&d);
+            d
+        }
+    })
+}
+
+/// the setup runs in test mode (ASMINST_SHELL_DIR)
+pub(crate) fn sh_test_mode() -> bool {
+    sh_testroot().is_some()
+}
+
+/// 0 desktop, 1 start menu "Programs" (of the user or of all users) -> the folder (UTF-8) or
+/// None  [sh_folder]
+pub(crate) fn sh_folder(which: u32, scope: Scope) -> Option<String> {
+    if let Some(t) = sh_testdir(scope) {
         let d = str_cap(&(t + if which == 0 { "\\Desktop" } else { "\\Programs" }), PATH_CAP);
         return if plat::mkdir(&d) { Some(d) } else { None };
     }
-    plat::inst::known_folder(which)
+    plat::inst::known_folder(which + if scope == Scope::Machine { 2 } else { 0 })
+}
+
+/// the programs folder of all users ("C:\Program Files"; the environment's ProgramFiles when the
+/// shell gives none)
+pub(crate) fn sh_program_files() -> String {
+    plat::inst::known_folder(4)
+        .or_else(|| plat::env("ProgramFiles").filter(|v| !v.is_empty()))
+        .map_or_else(|| String::from("C:\\Program Files"), |v| str_cap(&v, PATH_CAP))
 }
 
 /// a shortcut lnk -> target (working folder dir, icon 0 of the target, comment desc, the
@@ -53,7 +111,7 @@ pub(crate) fn sh_pins(exe: &str, app_id: &str) -> usize {
     if app_id.is_empty() {
         return 0;
     }
-    let dir = match sh_testdir() {
+    let dir = match sh_testdir(Scope::User) {
         Some(t) => t + "\\Pinned",
         None => match plat::inst::pinned_dir() {
             Some(d) => d,
@@ -79,11 +137,11 @@ const REGBUF_CAP: usize = 4096;
 
 impl Reg {
     /// open (create) the uninstall key; test mode: start the text  [sh_reg_begin]
-    pub(crate) fn begin(app: &str) -> Option<Reg> {
-        if let Some(t) = sh_testdir() {
+    pub(crate) fn begin(app: &str, scope: Scope) -> Option<Reg> {
+        if let Some(t) = sh_testdir(scope) {
             return Some(Reg::Test(str_cap(&(t + "\\registry.txt"), PATH_CAP), String::new()));
         }
-        plat::inst::reg_create(&sh_regpath(app)).map(Reg::Key)
+        plat::inst::reg_create_in(scope.root(), &sh_regpath(app)).map(Reg::Key)
     }
 
     /// a REG_SZ value  [sh_reg_sz]
@@ -119,19 +177,19 @@ fn txt_line(buf: &mut String, name: &str, value: &str) {
 }
 
 /// remove the uninstall key (test mode: delete registry.txt)  [sh_reg_delete]
-pub(crate) fn sh_reg_delete(app: &str) -> bool {
-    if let Some(t) = sh_testdir() {
+pub(crate) fn sh_reg_delete(app: &str, scope: Scope) -> bool {
+    if let Some(t) = sh_testdir(scope) {
         return plat::delete(&str_cap(&(t + "\\registry.txt"), PATH_CAP));
     }
-    plat::inst::reg_delete(&sh_regpath(app))
+    plat::inst::reg_delete_in(scope.root(), &sh_regpath(app))
 }
 
 /// write the registry values of the file types and URL schemes (test mode: assoc.txt)
-pub(crate) fn sh_assoc_set(entries: &[(String, String, String)]) {
+pub(crate) fn sh_assoc_set(entries: &[(String, String, String)], scope: Scope) {
     if entries.is_empty() {
         return;
     }
-    if let Some(t) = sh_testdir() {
+    if let Some(t) = sh_testdir(scope) {
         let mut text = String::new();
         for (k, n, v) in entries {
             text.push_str(&format!("{k}|{n}={v}\n"));
@@ -140,7 +198,7 @@ pub(crate) fn sh_assoc_set(entries: &[(String, String, String)]) {
         return;
     }
     for (k, n, v) in entries {
-        if let Some(key) = plat::inst::reg_create(k) {
+        if let Some(key) = plat::inst::reg_create_in(scope.root(), k) {
             key.set_sz(n, v);
         }
     }
@@ -149,19 +207,19 @@ pub(crate) fn sh_assoc_set(entries: &[(String, String, String)]) {
 
 /// remove what sh_assoc_set added: "T:<subkey>" trees, "V:<subkey>|<name>" values (';'
 /// separated; test mode: delete assoc.txt)
-pub(crate) fn sh_assoc_remove(list: &str) {
+pub(crate) fn sh_assoc_remove(list: &str, scope: Scope) {
     if list.is_empty() {
         return;
     }
-    if let Some(t) = sh_testdir() {
+    if let Some(t) = sh_testdir(scope) {
         plat::delete(&str_cap(&(t + "\\assoc.txt"), PATH_CAP));
         return;
     }
     for item in list.split(';') {
         if let Some(k) = item.strip_prefix("T:") {
-            plat::inst::reg_delete_tree(k);
+            plat::inst::reg_delete_tree_in(scope.root(), k);
         } else if let Some((k, n)) = item.strip_prefix("V:").and_then(|v| v.split_once('|')) {
-            plat::inst::reg_delete_value(k, n);
+            plat::inst::reg_delete_value_in(scope.root(), k, n);
         }
     }
     plat::inst::assoc_changed();
@@ -172,7 +230,7 @@ pub(crate) fn sh_assoc_remove(list: &str) {
 /// jfgui_OPEN_DRYRUN=1 prints the page).  Test mode and script runs (headless) never open it:
 /// they print "setup_default_browser: <page>" -> opened / printed
 pub(crate) fn sh_browser_request(pkg: &plat::assoc::Package, headless: bool) -> bool {
-    if sh_testdir().is_some() || headless {
+    if sh_test_mode() || headless {
         let mut app = String::new();
         for &c in pkg.app.as_bytes() {
             if c.is_ascii_alphanumeric() || b"-._~".contains(&c) {
@@ -192,4 +250,56 @@ pub(crate) fn sh_browser_request(pkg: &plat::assoc::Package, headless: bool) -> 
 /// CREATE_NO_WINDOW  [sh_run]
 pub(crate) fn sh_run(cmdline: &str, dir: Option<&str>, hidden: bool) -> bool {
     plat::inst::run_cmdline(cmdline, dir, hidden)
+}
+
+/// this process may write what an installation for all users writes (test mode: ASMINST_ADMIN=1)
+pub(crate) fn sh_admin() -> bool {
+    if sh_test_mode() {
+        return plat::env("ASMINST_ADMIN").is_some_and(|v| v == "1");
+    }
+    plat::process::elevated()
+}
+
+/// the setup exe once more with administrator rights (the UAC prompt; hidden: the elevated run
+/// is quiet), waited for -> its exit code; Err when the user refused or it could not start.
+/// Test mode: started as it is, with this process's environment and ASMINST_ADMIN=1
+pub(crate) fn sh_elevate(exe: &str, args: &[&str]) -> Result<i32, ()> {
+    if !sh_test_mode() {
+        return plat::process::run_elevated(exe, args).map_err(|_| ());
+    }
+    if plat::env("ASMINST_UAC").is_some_and(|v| v == "no") {
+        return Err(()); // (the test of a refused prompt)
+    }
+    // (no process::Command: its job would end the uninstaller's cleanup with the child, which
+    // an elevated start never does)
+    let mut line = quote_arg(exe);
+    for a in args {
+        line.push(' ');
+        line.push_str(&quote_arg(a));
+    }
+    let before = plat::env("ASMINST_ADMIN");
+    plat::setenv("ASMINST_ADMIN", Some("1"));
+    let code = plat::inst::run_cmdline_wait(&line, None, true);
+    plat::setenv("ASMINST_ADMIN", before.as_deref());
+    code.map(|c| c as i32).ok_or(())
+}
+
+/// an argument quoted for CommandLineToArgvW: in quotes, a quote and the backslashes before it
+/// (or before the closing quote) escaped
+fn quote_arg(s: &str) -> String {
+    let mut out = String::from("\"");
+    let mut slashes = 0;
+    for c in s.chars() {
+        if c == '\\' {
+            slashes += 1;
+            continue;
+        }
+        let n = if c == '"' { slashes * 2 + 1 } else { slashes };
+        out.extend(core::iter::repeat_n('\\', n));
+        slashes = 0;
+        out.push(c);
+    }
+    out.extend(core::iter::repeat_n('\\', slashes * 2));
+    out.push('"');
+    out
 }

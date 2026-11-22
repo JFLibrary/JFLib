@@ -756,7 +756,10 @@ Sortierung nach Sprache und Groß- / Kleinschreibung.
   Fenstergriffe und IME sehen physische Koordinaten. Getestet mit `gallery/tests/rtl.uis`.
   Bibliothekstexte gibt es auch auf Arabisch und Hebräisch (`datagallery/tests/lang_ar.uis`).
   Es fehlen noch: rechtsbündige Eingabe mit Bidi-Cursor für RTL-Text in Textfeldern, der
-  native Fensterrahmen (Titelleiste des Systems).
+  native Fensterrahmen (Titelleiste des Systems). Texte der Steuerelemente werden ohne
+  Bidi-Umordnung gezeichnet (das Shaping ist dort aus): hebräische und arabische Wörter stehen in
+  umgekehrter Buchstabenfolge, z. B. „מחיקה“ als „הקיחמ“ (gesehen 2026-11-21 in
+  `datagallery --lang he` und im Setup, U7).
 - **P1** · *erledigt* · Pluralregeln (CLDR) und Platzhalter mit Namen bzw. Index
   ([`ui/i18n_msg.rs`](../lib/ui/i18n_msg.rs)): `i18n::msg` versteht `{name}`, `{0}`, `{}`,
   `plural` (Kategorien `zero` … `other`, `=N`, `#`, `offset`), `select`, `number` (gruppiert,
@@ -2576,9 +2579,17 @@ Crates, die einer JF-App folgen:
   Lesen und Anzeigen, Formulare, Verschlüsselung, PDF/A und Signaturen.
 - **P2** · *fehlt* · `physics` hat Kollisionen und einen Charakter-Controller nach Quake 3, was
   Spiel 1 braucht; es fehlen Starrkörper-Dynamik, Gelenke und ein Solver.
-- **P2** · *teilweise* · `installer`: Seiten nur auf Deutsch (außer der Browser-Option), nur für
-  den aktuellen Benutzer, keine unbeaufsichtigte Installation (nur `--dir`, `--style`,
-  `--uninstall`); die Wahl des Stils ist ein JF-Konzept und sollte sich abschalten lassen.
+- **P2** · *erledigt* (2026-11-21, U7) · `installer`: Die Seiten sprechen die Sprache des
+  Benutzers (Deutsch, Englisch, Französisch, Spanisch, Italienisch, Niederländisch, Polnisch,
+  Arabisch, Hebräisch; die Namen und Beschreibungen der Stile aus `styles/S/INFO` mit). Die
+  Optionsseite fragt, für wen: für alle Benutzer nach Program Files mit HKLM und den
+  gemeinsamen Verknüpfungen; ohne Administratorrechte startet sich das Setup mit ihnen neu (UAC)
+  und macht danach weiter, der Uninstaller ebenso. `--quiet` installiert und entfernt ohne
+  Fenster (Optionen für alles auf den Seiten, `--log`, Exit-Codes 0 / 1 / 2 / 740,
+  `QuietUninstallString`). Mit einem Stil im Paket entfällt die Stilseite. Geprüft mit
+  `tools/setup_check.py` (Windows oder Wine). Offen: Arabisch und Hebräisch werden wie alle
+  Texte der Steuerelemente ohne Bidi-Umordnung gezeichnet, also rückwärts (Abschnitt 4,
+  RTL-Layout); die Fragen der .deb (debconf) sind deutsch.
 - **P2** · *teilweise* · `netchan` außer der Sicherheit: Nutzlast höchstens 1200 Byte ohne
   Fragmentierung, über UDP nur unzuverlässig, kein NAT-Traversal, kein Android (dieses steht
   schon unter G7d Teil 2).

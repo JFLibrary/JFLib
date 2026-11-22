@@ -34291,11 +34291,13 @@ Source: [`lib/plat/win_inst.rs`](../lib/plat/win_inst.rs)
 ```text
 win_inst -- the Windows calls of the setup (apps/installer): the own exe path, known
 folders, .lnk shortcuts through COM IShellLinkW, the HKCU registry key of the "installed
-apps" entry, starting a command line             (r12-inst)  [apps/installer/src/shell.s]
+apps" entry (HKLM for a setup for all users), starting a command line
+                                                 (r12-inst)  [apps/installer/src/shell.s]
 
   exe_path() -> Some(path)        GetModuleFileNameW of the running exe as UTF-8 (None when
                                   it does not fit PATH_CAP wide chars)  [self_path]
-  known_folder(which) -> Some(p)  0 = desktop, 1 = start menu "Programs" (SHGetKnownFolderPath,
+  known_folder(which) -> Some(p)  0 = desktop, 1 = start menu "Programs", 2 / 3 = the same of
+                                  all users, 4 = "C:\Program Files" (SHGetKnownFolderPath,
                                   dirs.rs)
   shell_link(lnk, target, dir, desc) -> bool   a shortcut file lnk -> target (working
                                   folder dir, icon 0 of the target, comment desc)  [sh_link]
@@ -34319,10 +34321,16 @@ apps" entry, starting a command line             (r12-inst)  [apps/installer/src
                                   key below Software\Classes or a browser's below
                                   Software\Clients\StartMenuInternet; other names are refused)
   reg_delete_value(subkey, name) -> bool   RegDeleteKeyValueW (name "" = the default value)
+  reg_create_in / reg_delete_in / reg_delete_tree_in / reg_delete_value_in(Root, ..)   the
+                                  same in HKCU (Root::User) or HKLM (Root::Machine: a setup
+                                  for all users, with administrator rights)
   assoc_changed()                 SHChangeNotify(SHCNE_ASSOCCHANGED): Explorer re-reads the
                                   file types and URL schemes
   run_cmdline(cmdline, dir, hidden) -> bool    CreateProcessW (dir None = the current one,
-                                  hidden = CREATE_NO_WINDOW)  [sh_run]
+                                  hidden = CREATE_NO_WINDOW; the whole line, up to 32767
+                                  wide chars; outside this process's job when it lets go)
+                                  [sh_run]
+  run_cmdline_wait(cmdline, dir, hidden) -> Some(exit code)   the same, waited for
 
 ole32 / shell32 / advapi32 are loaded with LoadLibraryA on the first use (inst_load, as the
 asm's sh_load): only kernel32 / user32 / gdi32 are linked.  Paths are converted with the
@@ -34340,8 +34348,9 @@ PATH_CAP: usize = 520
   the running exe's path, UTF-8  [self_path]
 
 - **`fn known_folder(which: u32) -> Option<String>`**
-  0 = the desktop, 1 = the start menu's "Programs" folder (dirs.rs; backslashes, at most
-  PATH_CAP - 1 bytes)  [sh_folder, real mode]
+  0 = the desktop, 1 = the start menu's "Programs" folder, 2 = the desktop of all users, 3 =
+  the start menu's "Programs" of all users, 4 = the programs folder ("C:\\Program Files") (dirs.rs;
+  backslashes, at most PATH_CAP - 1 bytes; None for another number)  [sh_folder, real mode]
 
 - **`fn shell_link(lnk: &str, target: &str, dir: &str, desc: &str) -> bool`**
   a shortcut lnk -> target (working folder dir, icon 0 of the target, comment desc)  [sh_link]
@@ -34366,8 +34375,19 @@ PATH_CAP: usize = 520
 - **`struct RegKey(isize)`**
   an open registry key (closed when dropped)
 
+- **`enum Root`**
+  the part of the registry an installation writes to: the current user's (HKEY_CURRENT_USER,
+  a setup for one user) or the computer's (HKEY_LOCAL_MACHINE, a setup for all users; writing
+  there needs administrator rights)
+  - `User`
+  - `Machine`
+
 - **`fn reg_create(subkey: &str) -> Option<RegKey>`**
   HKCU\\subkey opened for writing, created when missing  [sh_reg_begin, real mode]
+
+- **`fn reg_create_in(root: Root, subkey: &str) -> Option<RegKey>`**
+  root\\subkey opened for writing, created when missing (Root::Machine: None without
+  administrator rights)
 
 **`impl RegKey`**
 
@@ -34379,6 +34399,9 @@ PATH_CAP: usize = 520
 - **`fn reg_delete(subkey: &str) -> bool`**
   RegDeleteKeyW(HKCU, subkey)  [sh_reg_delete, real mode]
 
+- **`fn reg_delete_in(root: Root, subkey: &str) -> bool`**
+  RegDeleteKeyW(root, subkey): a key without keys below it
+
 - **`fn reg_delete_tree(subkey: &str) -> bool`**
   HKCU\\subkey with all its keys and values  (RegDeleteTreeW, then RegDeleteKeyW).  Only a
   key below Software\\Classes (a ProgID, a URL scheme: what file types and schemes add) or
@@ -34386,15 +34409,27 @@ PATH_CAP: usize = 520
   refused: an empty one would clear HKCU itself, "Software" every program's settings, and
   such a name is what a damaged or cut list of an uninstaller holds
 
+- **`fn reg_delete_tree_in(root: Root, subkey: &str) -> bool`**
+  reg_delete_tree in root: the same names only (Root::Machine: what a setup for all users
+  added, below HKLM)
+
 - **`fn reg_delete_value(subkey: &str, name: &str) -> bool`**
   one value of HKCU\\subkey ("" = its default value)  (RegDeleteKeyValueW)
+
+- **`fn reg_delete_value_in(root: Root, subkey: &str, name: &str) -> bool`**
+  one value of root\\subkey ("" = its default value)
 
 - **`fn assoc_changed()`**
   tell the shell that file types or URL schemes changed (SHCNE_ASSOCCHANGED, SHCNF_IDLIST)
 
 - **`fn run_cmdline(cmdline: &str, dir: Option<&str>, hidden: bool) -> bool`**
-  start a command line (UTF-8, PATH_CAP wide chars) in dir (None = the current folder);
-  hidden = CREATE_NO_WINDOW  [sh_run]
+  start a command line (UTF-8, at most 32767 wide chars: CreateProcessW's limit; an older
+  version cut it at PATH_CAP) in dir (None = the current folder); hidden = CREATE_NO_WINDOW.
+  It outlives a job of this process that lets it go (a tool that ends its children with
+  itself)  [sh_run]
+
+- **`fn run_cmdline_wait(cmdline: &str, dir: Option<&str>, hidden: bool) -> Option<u32>`**
+  run_cmdline and wait for the process -> its exit code (None: it did not start)
 
 ### `plat/win_screen.rs` (Windows)
 

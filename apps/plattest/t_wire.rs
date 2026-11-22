@@ -195,7 +195,11 @@ pub fn t_wirefuzz(t: &mut T) {
         seeds.push(wl_event(&[1, 0xffff_fff0, 3]));
     }
     let mut r = Rng(0x7769_7265_6675_7a7a);
-    let (mut cases, mut bad_len, mut bad_text, mut bad_bmp) = (0u64, 0u64, 0u64, 0u64);
+    let (mut cases, mut bad_text, mut bad_bmp) = (0u64, 0u64, 0u64);
+    // (counted by a decoder of Linux, D-Bus: elsewhere it stays 0, and plattest for Windows did
+    // not build with it mutable)
+    #[cfg_attr(not(target_os = "linux"), allow(unused_mut))]
+    let mut bad_len = 0u64;
     let n = if t.quiet { 20_000 } else { 100_000 };
     for k in 0..n {
         let mut b = if k % 5 == 4 {
