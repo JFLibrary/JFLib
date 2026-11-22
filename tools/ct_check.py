@@ -397,7 +397,9 @@ def memcheck_one(exe, target):
     text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
     m = re.search(r"^exe 0x([0-9a-f]+) 0x([0-9a-f]+)$", p.stdout, re.M)
     span = (int(m.group(1), 16), int(m.group(2), 16)) if m else None
-    return target, p.returncode, resymbolize(exe, vg_errors(text), span), (p.stdout + p.stderr)[-500:]
+    # when valgrind itself ends the run (neither 0 nor memcheck's 99), its log says why
+    tail = (p.stdout + p.stderr + ("" if p.returncode in (0, 99) else "\n".join(text.splitlines()[-8:])))[-800:]
+    return target, p.returncode, resymbolize(exe, vg_errors(text), span), tail
 
 
 def memcheck(level, exe, targets):
@@ -410,7 +412,7 @@ def memcheck(level, exe, targets):
     for target, rc, errors, tail in results:
         if rc not in (0, 99):
             bad += 1
-            lines.append(f"  {target:<24} ERROR exit {rc}: {tail.strip()[-200:]}")
+            lines.append(f"  {target:<24} ERROR exit {rc}: {' | '.join(tail.strip().splitlines())[-600:]}")
             continue
         found = {}
         for kind, frames in errors:

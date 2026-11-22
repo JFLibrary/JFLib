@@ -43,6 +43,8 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   PYTHONUTF8: 1
+  # the levels' lines as they come (a pipe would hold them until the end)
+  PYTHONUNBUFFERED: 1
 
 jobs:
   ct_check:
@@ -71,6 +73,16 @@ jobs:
           rustc --version
       - name: ct_check (trace and memcheck, all levels)
         run: python3 tools/ct_check.py
+      # what a report needs to be read elsewhere: memcheck's logs and the probes they came from
+      # (addr2line or llvm-symbolizer on another machine, any architecture)
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ct_check-${{ matrix.os }}-${{ matrix.toolchain }}
+          retention-days: 7
+          path: |
+            build/ct_check/*/memcheck-*.log
+            build/ct_check/*/target/release/probe
 
   wasm:
     # the wasm the compiler makes for the browser (wasm32-unknown-unknown) in WABT's wasm-interp: the
