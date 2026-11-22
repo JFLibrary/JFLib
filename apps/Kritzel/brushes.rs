@@ -130,6 +130,7 @@ static BTAB: [Bp; 9] = [
     bp(SHP_CAPSULE, TEX_NONE, LUT_WATER, KM_DEPTH, [1.0, 1.0, 1.0, 0.0, 1.0, 0.5, 0.0, 1.0]),
 ];
 
+// i18n
 static BS_NAMES: [&str; 9] = [
     "Pinsel",
     "Kalligrafiepinsel",
@@ -1078,7 +1079,7 @@ pub(crate) fn brush_ribbon(p: &mut Kritzel, ui: &mut Ui) {
     let y = r[1].wrapping_add(r[3]).wrapping_sub(ui.dp(22));
     let x = (r[2].wrapping_sub(s) >> 1).wrapping_add(r[0]);
     ui.draw_icon(IC_CHEV_DOWN_SMALL, x, y, s << 8);
-    ui.sem(K_COMBO, ID_BRUSH, Some("Pinselart"), p.tools.brush);
+    ui.sem(K_COMBO, ID_BRUSH, Some(i18n::t("Pinselart")), p.tools.brush);
     // a click toggles the flyout
     if ev & EV_ACT != 0 {
         if open {
@@ -1137,7 +1138,7 @@ fn bs_menu_row(p: &mut Kritzel, ui: &mut Ui, i: i32) {
     let line = ui.ts_line(TS_BODY);
     let base = (r[3].wrapping_sub(line) >> 1).wrapping_add(r[1]).wrapping_add(ui.ts_base(TS_BODY)); // baseline
     let fs = (ui.dp(14) as u32) << 16 | FONT_REG;
-    let name = BS_NAMES[i as usize];
+    let name = i18n::t(BS_NAMES[i as usize]);
     ui.draw_text(tx, base, name, fs);
     ui.sem(K_MENUITEM, id, Some(name), 0);
     if ev & EV_ACT != 0 {

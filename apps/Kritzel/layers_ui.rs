@@ -97,8 +97,8 @@ pub(crate) fn layers_panel(p: &mut Kritzel, ui: &mut Ui) {
     // header: title + add
     ui.box_begin(0, BOX_H | BOX_XCENTER, 4);
     ui.next_size(-1, 0);
-    ui.text(TS_BODY_STRONG, "Ebenen");
-    if ui.icon_button(ID_LADD, IC_ADD, "Ebene hinzufügen") & EV_ACT != 0 {
+    ui.text(TS_BODY_STRONG, i18n::t("Ebenen"));
+    if ui.icon_button(ID_LADD, IC_ADD, i18n::t("Ebene hinzufügen")) & EV_ACT != 0 {
         ui.cmd_run(CMD_LAYER_ADD, 0);
     }
     ui.box_end();
@@ -112,7 +112,7 @@ pub(crate) fn layers_panel(p: &mut Kritzel, ui: &mut Ui) {
     // opacity of the current layer (percent)
     let cur = p.doc.cur_layer as usize;
     p.lay.lop = (p.doc.layer_opac[cur] as i32 * 100 + 127) / 255;
-    let t = fmt_cap(format!("Deckkraft: {} %", p.lay.lop), 32);
+    let t = fmt_cap(i18n::tf("Deckkraft: {} %", &[&format!("{}", p.lay.lop)]), 32);
     ui.text(TS_CAPTION, &t);
     if ui.slider(ID_LOPAC, &mut p.lay.lop, &RANGE_LOP) & EV_ACT != 0 {
         p.doc.layer_opac[cur] = (p.lay.lop.wrapping_mul(255).wrapping_add(50) / 100) as u8;
@@ -120,17 +120,17 @@ pub(crate) fn layers_panel(p: &mut Kritzel, ui: &mut Ui) {
     }
     // actions
     ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_CENTER, 2);
-    action_button(ui, ID_LUP, IC_UP, "Nach oben", CMD_LAYER_UP);
-    action_button(ui, ID_LDOWN, IC_DOWN, "Nach unten", CMD_LAYER_DOWN);
-    action_button(ui, ID_LDUP, IC_COPY, "Duplizieren", CMD_LAYER_DUP);
+    action_button(ui, ID_LUP, IC_UP, i18n::t("Nach oben"), CMD_LAYER_UP);
+    action_button(ui, ID_LDOWN, IC_DOWN, i18n::t("Nach unten"), CMD_LAYER_DOWN);
+    action_button(ui, ID_LDUP, IC_COPY, i18n::t("Duplizieren"), CMD_LAYER_DUP);
     if p.doc.cur_layer == 0 {
         ui.next_flags(ST_DISABLED);
     }
-    action_button(ui, ID_LMERGE, IC_DOWNLOAD, "Nach unten zusammenführen", CMD_LAYER_MERGE);
+    action_button(ui, ID_LMERGE, IC_DOWNLOAD, i18n::t("Nach unten zusammenführen"), CMD_LAYER_MERGE);
     if p.doc.nlayers == 1 {
         ui.next_flags(ST_DISABLED);
     }
-    action_button(ui, ID_LDEL, IC_DELETE, "Ebene löschen", CMD_LAYER_DEL);
+    action_button(ui, ID_LDEL, IC_DELETE, i18n::t("Ebene löschen"), CMD_LAYER_DEL);
     ui.box_end();
     ui.box_end();
 }
@@ -209,12 +209,12 @@ fn layer_row(p: &mut Kritzel, ui: &mut Ui, i: i32) {
         ui.draw_color(c);
         ui.draw_frame(r[0], r[1], r[2], r[3], 0, 1);
     }
-    let name = fmt_cap(format!("Ebene {}", i + 1), 32);
+    let name = fmt_cap(i18n::tf("Ebene {}", &[&format!("{}", i + 1)]), 32);
     ui.next_size(-1, 0);
     ui.text(TS_BODY, &name);
     // visibility
     let ic = if p.doc.layer_vis[i as usize] != 0 { IC_VIEW } else { IC_HIDE };
-    if ui.icon_button(ID_LVIS0 + i as u32, ic, "Sichtbarkeit") & EV_ACT != 0 {
+    if ui.icon_button(ID_LVIS0 + i as u32, ic, i18n::t("Sichtbarkeit")) & EV_ACT != 0 {
         layer_toggle(p, i);
     }
     ui.box_end();

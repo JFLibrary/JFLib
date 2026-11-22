@@ -256,6 +256,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **spell:** The n-gram step builds an affixed form only when its length can be within reach of the word (and finds the edit distance only within its limit, and drops duplicates through a set): real suggestions are faster, hu_HU 35 -> 9 s for 400 (the slowest 953 -> 275 ms), ko_KR 43 -> 20 s, the same answers
 - **game:** The netcode's matches over netchan's ClientEvent and ServerEvent take the new events with a _ arm (it does not use the reliable channel)
 - **plat:** `net::resolve` answers a name under .localhost (app.localhost) with the loopback addresses, as "localhost" itself and as netio::dns does on Linux (RFC 6761 6.3): on Windows such a name went to the system resolver and needed a net.connect rule of its name, so the same app resolved it differently by system (and since netio::dns asks plat on macOS and iOS, there too); written absolute (app.localhost.) as well, and a net.connect rule of the name (app.localhost:8080) covers the loopback addresses of the answer
+- **build:** Kritzel, the Build Manager and permprompt have English catalogues (the reasons of permprompt's ask lines too); python build_rs.py i18n also reads the reasons of an app's PERMISSIONS files
 
 ### Deprecated
 

@@ -1,0 +1,117 @@
+de	en
+JFLib · Apps, Builds und Releases	JFLib · Apps, builds and releases
+Hell / Dunkel	Light / Dark
+Projekt & Werkzeuge	Project & Tools
+Aktualisieren	Refresh
+Entwicklung	Development
+Release	Release
+Starten	Start
+Paketdaten	Package data
+Apps	Apps
+Apps suchen	Search apps
+Alle	All
+{} von {} ausgewählt	{} of {} selected
+Entwicklungs-Build	Development build
+Geprüftes Release	Verified release
+Inkrementell bauen und Ergebnisse direkt starten.	Build incrementally and run the results right away.
+Varianten bauen → App-Tests → Installer und Pakete.	Build variants → app tests → installers and packages.
+Aktuelle Auswahl	Current selection
+Mein Buildprofil	My build profile
+Standard	Default
+Profilname	Profile name
+Profil speichern	Save profile
+Zielplattformen	Target platforms
+Styles	Styles
+Ohne Auswahl: App-Standard; bei Release die Paket-Styles.	Nothing selected: the app’s default; for a release, the package styles.
+Compiler-Prozesse	Compiler processes
+Kleine Pakete (size)	Small packages (size)
+Release mit LTO	Release with LTO
+Optimiert ohne LTO (o2)	Optimized without LTO (o2)
+Ausgabebasis im Projekt	Output base in the project
+Aufträge vorbereiten	Prepare jobs
+Einstellungen und Aufrufe vor dem Start prüfen.	Check the settings and commands before starting.
+Startprofil · {}	Start profile · {}
+Aktuelle Argumente	Current arguments
+Startprofil speichern	Save start profile
+Theme der App	App theme
+Skalierung %	Scale %
+Fenstergröße, z. B. 1280x800 (leer = App-Standard)	Window size, e.g. 1280x800 (empty = app default)
+Weitere Argumente: ein Argument pro Zeile, ohne Shell-Anführungszeichen.	More arguments: one argument per line, without shell quotes.
+Unten ein erfolgreiches App-Ergebnis auswählen und starten.	Choose a successful app result below and start it.
+Paketdaten · {}	Package data · {}
+Paketdaten speichern	Save package data
+Styles mit Leerzeichen trennen. Icons: res/app_48.png, app_128.png, app_256.png.	Separate styles with spaces. Icons: res/app_48.png, app_128.png, app_256.png.
+Anzeigename	Display name
+Version	Version
+Herausgeber	Publisher
+Kurzbeschreibung	Summary
+Beschreibung	Description
+Programmtyp	Program type
+Kategorien	Categories
+Debian-Paketname	Debian package name
+Windows-Standard	Windows default
+Linux-Standard	Linux default
+Paket-Styles	Package styles
+Aufträge & Ergebnisse	Jobs & Results
+Erneut ausführen	Run again
+Protokoll	Log
+Ergebnisse	Results
+Tests	Tests
+Ordner öffnen	Open folder
+App starten	Start app
+Noch keine Testergebnisse.	No test results yet.
+Build-Ausgabe erscheint hier. Vollständige Logs bleiben im Projekt gespeichert.	Build output appears here. Complete logs stay saved in the project.
+Aufträge starten	Start jobs
+Aufgelöster Programmaufruf:	Resolved command:
+Diese Aufträge werden nacheinander ausgeführt:	These jobs run one after the other:
+Programm starten	Start program
+In Warteschlange einreihen	Add to queue
+Laufende Aufträge	Running jobs
+Beim Schließen werden laufende Builds und gestartete Apps beendet.	Closing ends running builds and started apps.
+Weiterarbeiten	Keep working
+Aufträge abbrechen und schließen	Cancel jobs and close
+Projektordner (Repository oder RustLib)	Project folder (repository or RustLib)
+build_rs.py auswählen …	Choose build_rs.py …
+py=Python-Projektdatei	py=Python project file
+Python-Programm (leer = python / python3)	Python program (empty = python / python3)
+WSL-Distribution auf Windows	WSL distribution on Windows
+Rust-Compiler nicht gefunden.	Rust compiler not found.
+{} · Bauen: {} · Starten: {} · Pakete: {}	{} · Build: {} · Run: {} · Packages: {}
+ja	yes
+nein	no
+Verbinden	Connect
+Wartend	Queued
+Läuft	Running
+Erfolgreich	Succeeded
+Fehlgeschlagen	Failed
+Abgebrochen	Cancelled
+Unterbrochen	Interrupted
+Noch kein Build	No build yet
+Bestanden	Passed
+Ausstehend	Pending
+Keine App-Tests vorhanden	No app tests available
+Nicht anwendbar	Not applicable
+Warteschlange	Queue
+Voraussetzungen prüfen	Check prerequisites
+Varianten bauen	Build variants
+App-Tests ausführen	Run app tests
+Ergebnisse übernehmen	Collect results
+Pakete zusammenstellen	Assemble packages
+App läuft	App running
+Abgeschlossen	Finished
+Offline-Vorschau: keine Projektdateien oder Builds werden verändert.	Offline preview: no project files or builds are changed.
+Vor dem Projektwechsel laufende Aufträge beenden.	Finish the running jobs before switching projects.
+Bitte den RustLib-Projektordner auswählen.	Please choose the RustLib project folder.
+Apps und Werkzeuge werden erkannt …	Detecting apps and tools …
+Backend beendet.	Backend ended.
+Profil gespeichert.	Profile saved.
+Paketdaten gespeichert.	Package data saved.
+Aufträge wurden eingereiht.	Jobs were queued.
+Vorschaudaten konnten nicht geladen werden.	The preview data could not be loaded.
+Build-Backend beendet. Verbindung erneut herstellen.	Build backend ended. Connect again.
+Python konnte nicht gestartet werden (Fehler {}). Python-Pfad und Projektordner prüfen.	Python could not be started (error {}). Check the Python path and the project folder.
+Verbindung unterbrochen (Schreiben: {}).	Connection lost (writing: {}).
+Verbindung unterbrochen (Lesen: {}).	Connection lost (reading: {}).
+Ungültige Antwort des Build-Backends.	Invalid response from the build backend.
+Backend-Antwort überschreitet 1 MiB.	Backend response exceeds 1 MiB.
+IO-Thread konnte nicht gestartet werden.	The I/O thread could not be started.

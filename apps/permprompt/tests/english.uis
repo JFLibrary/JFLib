@@ -1,0 +1,22 @@
+#!args --lang en
+# the page and the library's dialog in English: the reason of an ask line comes through the app's
+# catalogue, in the dialog and in the settings section (the rows of locales/ui.tsv)
+perm answer dialog
+click "Write file"
+expect text:"File: waiting for an answer" exists
+perm expect open
+expect text:"Reason: Save letters" exists
+expect text:"Rule: fs.write $TEMP/permprompt-ask/**" exists
+shot build/permprompt_dialog_en.png
+click "Allow once"
+perm expect none
+expect text:"File: written" exists
+expect text:"Back up in the background" exists
+expect text:"Write an email to support" exists
+expect text:"Notification sounds" exists
+shot build/permprompt_page_en.png
+click "Check mail"
+perm expect open
+click "Deny"
+expect text:"Mail: refused" exists
+expect_nowarn
