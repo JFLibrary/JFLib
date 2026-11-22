@@ -44025,12 +44025,14 @@ Name servers on IPv6 link-local addresses carry their zone into the socket addre
 plat::net::ip_scope_parse), the adapter's index on Windows.  A server whose zone names no
 interface of this computer is left out.
 
-Queries: A and AAAA over UDP (2 s per server and attempt, two rounds), over TCP when the answer
-is truncated; an answer must come from the server asked and carry the query's id and question,
-and only addresses of the asked name count, or of the name its CNAME chain in the answer leads
-to (at most 8 steps): records for other names in an answer are ignored.
-IPv4 addresses come first (the system resolver keeps its own order, RFC 6724's).  Not here
-(Linux): DNSSEC validation, mDNS, caching.
+Queries of this resolver (resolve on Linux, resolve_with everywhere; the system resolver of
+Windows, macOS and iOS checks its answers in its own way): A and AAAA over UDP (2 s per server
+and attempt, two rounds), over TCP when the answer is truncated; an answer must come from the
+server asked and carry the query's id and question (an NXDOMAIN too), and only addresses of the
+asked name count, or of the name its CNAME chain in the answer leads to (at most 8 steps):
+records for other names in an answer are ignored, names compared label by label.
+IPv4 addresses come first (the system resolver keeps its own order, RFC 6724's, and a
+link-local address's zone).  Not here: DNSSEC validation, mDNS, caching.
 
 The app's permissions: a name its net.connect rules do not cover fails with
 NetErrorKind::Denied before any query; the addresses of a covered name are registered

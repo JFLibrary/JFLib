@@ -101,6 +101,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Windows: files and folders made by `fs::write_file_private` and `fs::mkdir_private` grant the user the process runs as by name, besides SYSTEM, the administrators and the owner. Made by a process run as administrator, their owner is the administrators' group, and the same user without administrator rights could no longer open them.
 - iOS: a text box of no width or height no longer panics when UIKit asks for the position at a point (VoiceOver, the space bar's trackpad): clamp got a minimum above its maximum.
 - Wayland: an event for an object that is already gone closed only the first 8 of its file descriptors, the rest stayed open; every one is closed now. The event arguments are decoded by a pure function (decode_args), which the fuzz checks reach; a message that does not hold what its signature says ends the connection as before (ROADMAP section 13, U6)
+- `net::resolve` on Windows, macOS and iOS keeps the zone of a link-local IPv6 address the system resolver returns (sin6_scope_id; a name under .local often has one): the addresses came back without it, and a connection to them failed
 
 ### Security
 

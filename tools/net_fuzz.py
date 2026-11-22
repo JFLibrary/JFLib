@@ -4,8 +4,9 @@ netio, netpkt and plat.
 Builds tools/net_fuzz/fuzz.rs (with panic = "unwind", overflow checks and debug assertions) into
 build/net_fuzz and runs every target on its own thread for N seconds (default 60):
   zstd, lz4                     decompress with an output limit
-  deflate, zlib, gzip, brotli   decompress with an output limit (DEFLATE also in pieces through its
-                                streaming state; gzip with several members); Brotli's seeds are
+  deflate, zlib, gzip, brotli   decompress with an output limit (DEFLATE also into a small buffer,
+                                and its InflateState after any input decodes a known stream as a
+                                fresh one does; gzip with several members); Brotli's seeds are
                                 the reference encoder's streams of coretest
   json, xml, charsets           formats: JSON with default and tight limits, the XML tree, the
                                 strict Reader and the Lenient tokenizer with its entity decoding

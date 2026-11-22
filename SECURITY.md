@@ -50,8 +50,9 @@ another library. They have **not had an external audit**. What has been done ins
   `tools/tls_web_check.py`, `tools/ssh_interop.py`)
 - constant time: the secret-dependent operations of `crypto` and netio's key files take the same
   branches for every secret, and under valgrind's memcheck neither branch on the secret nor use
-  it as an address, at five optimization levels on x86-64; their wasm32 code executes the same
-  instructions with the same memory addresses for every secret (`tools/ct_check.py`, `--wasm`;
+  it as an address, at five optimization levels on x86-64; the wasm32 code of `crypto`'s
+  operations (netio's key files are not built for wasm) executes the same instructions with the
+  same memory addresses for every secret (`tools/ct_check.py`, `--wasm`;
   the workflow `.github/workflows/ct-check.yml` runs both, the trace also on an ARM64 machine);
   not checked: the machine code a browser's JIT makes, instructions whose time depends on their
   operands

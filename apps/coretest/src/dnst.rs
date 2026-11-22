@@ -173,6 +173,13 @@ pub fn run(t: &mut T) {
     };
     let foreign = with(&qf, &[("evil.test", 1, alloc::vec![6, 6, 6, 6]), ("?", 1, alloc::vec![10, 1, 2, 3])]);
     t.eq("a record for another name is ignored", dns::parse_answer(&foreign, &qf, 1), Answer::Found(alloc::vec![IpAddr::V4([10, 1, 2, 3])]));
+    // the owner one label "fake.test" (a dot inside it) instead of the labels "fake", "test"
+    let mut dotted = foreign.clone();
+    dotted[qf.len()..qf.len() + 11].copy_from_slice(b"\x09fake.test\x00");
+    t.eq("a label with a dot is not the name of its parts", dns::parse_answer(&dotted, &qf, 1), Answer::Found(alloc::vec![IpAddr::V4([10, 1, 2, 3])]));
+    // "no such name" with our id but another question
+    let qn7 = dns::query(7, "none.test", 1).unwrap_or_default();
+    t.eq("no such name for another question", dns::parse_answer(&answer(&qn7, false), &qf, 1), Answer::Bad);
     let chain = with(&qf, &[("?", 5, b"cdn.test".to_vec()), ("cdn.test", 5, b"edge.cdn.test".to_vec()), ("other.test", 1, alloc::vec![6, 6, 6, 6]), ("Edge.CDN.test", 1, alloc::vec![10, 9, 9, 9])]);
     t.eq("a CNAME chain is followed", dns::parse_answer(&chain, &qf, 1), Answer::Found(alloc::vec![IpAddr::V4([10, 9, 9, 9])]));
     let skipped = with(&qf, &[("?", 5, b"cdn.test".to_vec()), ("?", 1, alloc::vec![6, 6, 6, 6]), ("cdn.test", 1, alloc::vec![10, 9, 9, 9])]);

@@ -52,23 +52,25 @@ const SIGSTOP: i32 = 19;
 
 /// the traced child's program counter
 #[cfg(target_arch = "x86_64")]
-unsafe fn pc_of(pid: i32) -> u64 {
+unsafe fn pc_of(pid: i32) -> Option<u64> {
     const PTRACE_PEEKUSER: i32 = 3;
     /// offsetof(struct user_regs_struct, rip)
     const RIP: usize = 16 * 8;
     // SAFETY: PEEKUSER reads one word of the stopped child's registers
-    unsafe { ptrace(PTRACE_PEEKUSER, pid, RIP, 0usize) as u64 }
+    let pc = unsafe { ptrace(PTRACE_PEEKUSER, pid, RIP, 0usize) };
+    // -1 is the failure (errno), never a user address
+    (pc != -1).then_some(pc as u64)
 }
 
 /// no tracer on other processors (wasm32: ct_run below instead)
 #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-unsafe fn pc_of(_pid: i32) -> u64 {
-    0
+unsafe fn pc_of(_pid: i32) -> Option<u64> {
+    None
 }
 
 /// the traced child's program counter: struct user_pt_regs { regs[31], sp, pc, pstate }
 #[cfg(target_arch = "aarch64")]
-unsafe fn pc_of(pid: i32) -> u64 {
+unsafe fn pc_of(pid: i32) -> Option<u64> {
     const PTRACE_GETREGSET: i32 = 0x4204;
     const NT_PRSTATUS: usize = 1;
     #[repr(C)]
@@ -79,8 +81,9 @@ unsafe fn pc_of(pid: i32) -> u64 {
     let mut regs = [0u64; 34];
     let mut iov = Iovec { base: regs.as_mut_ptr(), len: core::mem::size_of_val(&regs) };
     // SAFETY: GETREGSET writes at most iov.len bytes of the stopped child's registers into regs
-    unsafe { ptrace(PTRACE_GETREGSET, pid, NT_PRSTATUS, &mut iov as *mut Iovec) };
-    regs[32]
+    let r = unsafe { ptrace(PTRACE_GETREGSET, pid, NT_PRSTATUS, &mut iov as *mut Iovec) };
+    // the kernel sets iov.len to what it wrote: the whole set, or pc is not among it
+    (r == 0 && iov.len == core::mem::size_of_val(&regs)).then_some(regs[32])
 }
 /// the most instructions one operation may take
 const MAX_STEPS: usize = 200_000_000;
@@ -600,7 +603,13 @@ fn trace(name: &str, seed: u64, step: i32, fine_from: usize) -> Result<Vec<u64>,
                 return Err(format!("the child ended during the operation (status {:#x})", st));
             }
             match (st >> 8) & 0xff {
-                SIGTRAP => out.push(pc_of(pid)),
+                SIGTRAP => match pc_of(pid) {
+                    Some(pc) => out.push(pc),
+                    None => {
+                        end(pid, &mut st);
+                        return Err("the child's program counter could not be read".into());
+                    }
+                },
                 SIGSTOP => break,
                 sig => {
                     end(pid, &mut st);

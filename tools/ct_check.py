@@ -590,8 +590,11 @@ def wasm_diff(wasm, mark, names, index, digests):
     """the digests of one target's secrets (1, 2, ...) -> None, ("diff", where, count A, count B)
     or ("error", text)"""
     first = digests[0]
-    if first[2] < 2:
-        return ("error", f"the marks were not reached ({first[2]}): did wasm-interp run it?")
+    # every secret's run reached both marks (one that ended early would be a difference or,
+    # with the same digest, the same as a part)
+    for s, d in enumerate(digests, start=1):
+        if d[2] < 2:
+            return ("error", f"secret {s}: the marks were not reached ({d[2]}): did wasm-interp run it?")
     for s, other in enumerate(digests[1:], start=2):
         if other[1] != first[1]:
             return ("diff", wasm_parting(wasm, mark, names, index, s), first[0], other[0])
@@ -657,15 +660,22 @@ def main_wasm(a, levels, crate_dir, label):
     for tool in ("wasm-interp", "wasm-objdump"):
         if shutil.which(tool) is None:
             sys.exit(f"ct_check: --wasm needs {tool} (WABT: apt install wabt, brew install wabt)")
+    # the probe's list in wasm: TARGETS without the key files (netio), in the same order (the
+    # index is what ct_run takes)
+    listed = [ln for ln in PROBE.read_text(encoding="utf-8").split("const TARGETS: &[&str] = &[", 1)[1].split("];", 1)[0].splitlines()
+              if ln.strip().startswith('"')]
+    order = [ln.strip().strip('",') for ln in listed]
+    key_files = ("pem_pkcs8_key", "ssh_private_key")
+    wasm_targets = [t for t in order if t not in key_files]
+    asked = [t for t in a.only.split(",") if t]
+    unknown = [t for t in asked if t not in wasm_targets]
+    if unknown:
+        why = " (netio's key files are not built for wasm)" if any(t in key_files for t in unknown) else ""
+        sys.exit(f"ct_check: unknown targets for --wasm {', '.join(unknown)}{why}")
+    targets = [(i, t) for i, t in enumerate(wasm_targets) if not asked or t in asked or t in (SELFTEST, SELFTEST_LOOKUP)]
     bad = 0
     for lv in levels:
         wasm = build_wasm(lv, crate_dir, label)
-        # the probe's list in wasm: TARGETS without the key files (netio), in the same order
-        listed = [ln for ln in PROBE.read_text(encoding="utf-8").split("const TARGETS: &[&str] = &[", 1)[1].split("];", 1)[0].splitlines()
-                  if ln.strip().startswith('"')]
-        order = [ln.strip().strip('",') for ln in listed]
-        wasm_targets = [t for t in order if t not in ("pem_pkcs8_key", "ssh_private_key")]
-        targets = [(i, t) for i, t in enumerate(wasm_targets) if not a.only or t in a.only.split(",") or t in (SELFTEST, SELFTEST_LOOKUP)]
         bad += check_wasm(lv, wasm, targets, max(2, a.seeds))
     print("ct_check: " + ("no difference" if bad == 0 else f"{bad} problem(s)"))
     return 1 if bad else 0

@@ -688,20 +688,24 @@ pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
                 let _ = netpkt::ssh::KexInit::parse(b);
             }
         })),
-        ("deflate", deflate_seeds("deflate"), Box::new(|d: &[u8]| {
-            let _ = compress::deflate::decompress(d, 1 << 22);
-            // the streaming state with a small output buffer: the stream across many calls
-            let mut st = compress::deflate::InflateState::new();
-            let mut dst = [0u8; 700];
-            let (mut at, mut calls) = (0, 0);
-            while at < d.len() && calls < 10_000 {
-                match compress::deflate::decompress_into(Some(&mut st), &d[at..], &mut dst) {
-                    Ok((used, wrote)) if used > 0 || wrote > 0 => at += used,
-                    _ => break,
-                }
-                calls += 1;
-            }
-        })),
+        ("deflate", deflate_seeds("deflate"), {
+            // a stream with Huffman tables, the part of InflateState a call leaves for the next
+            let text: Vec<u8> = (0..2000u32).map(|i| b"the quick brown fox "[(i % 20) as usize] ^ (i / 97) as u8).collect();
+            let known = compress::deflate::compress(&text, 9);
+            Box::new(move |d: &[u8]| {
+                let _ = compress::deflate::decompress(d, 1 << 22);
+                // every call is a stream of its own (a small buffer: Overflow too); after any
+                // input, decoded or refused, the same state decodes the known stream as a fresh
+                // one does
+                let mut st = compress::deflate::InflateState::new();
+                let mut dst = [0u8; 700];
+                let _ = compress::deflate::decompress_into(Some(&mut st), d, &mut dst);
+                let (mut again, mut fresh) = (vec![0u8; 4096], vec![0u8; 4096]);
+                let a = compress::deflate::decompress_into(Some(&mut st), &known, &mut again);
+                let b = compress::deflate::decompress_into(None, &known, &mut fresh);
+                assert!(a == b && a == Ok((text.len(), known.len())) && again == fresh, "InflateState after an input: {a:?}, fresh: {b:?}");
+            })
+        }),
         ("zlib", deflate_seeds("zlib"), Box::new(|d: &[u8]| {
             let _ = compress::zlib::decompress(d, 1 << 22);
             let mut dst = [0u8; 4096];
