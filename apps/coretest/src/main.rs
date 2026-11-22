@@ -156,11 +156,7 @@ fn run() -> i32 {
     }
     if let Some(op) = plat::arg_value("--zstd") {
         let rest: alloc::vec::Vec<String> = args.iter().skip_while(|a| a.as_str() != "--zstd").skip(2).cloned().collect();
-        return match rest.as_slice() {
-            [i, o, l, ..] => lz::zstd_file_mode(&op, i, o, l.parse().unwrap_or(3)),
-            [i, o] => lz::zstd_file_mode(&op, i, o, 3),
-            _ => 2,
-        };
+        return lz::zstd_args(&op, &rest);
     }
     #[cfg(not(target_os = "android"))]
     if let Some(code) = server_modes(&args) {

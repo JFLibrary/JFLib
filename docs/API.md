@@ -85,7 +85,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [x509](#x509) -- X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)
   <br>[lib.rs](#x509-crate-root) · [der.rs](#x509derrs) · [ip.rs](#x509iprs)
 - [compress](#compress) -- DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids
-  <br>[lib.rs](#compress-crate-root) · [brotli/mod.rs](#compressbrotlimodrs) · [brotli/sdec.rs](#compressbrotlisdecrs) · [checksum.rs](#compresschecksumrs) · [deflate/mod.rs](#compressdeflatemodrs) · [deflate/dec.rs](#compressdeflatedecrs) · [deflate/enc.rs](#compressdeflateencrs) · [deflate/sdec.rs](#compressdeflatesdecrs) · [gzip.rs](#compressgziprs) · [lz4.rs](#compresslz4rs) · [stream.rs](#compressstreamrs) · [xxh.rs](#compressxxhrs) · [zlib.rs](#compresszlibrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/enc.rs](#compresszstdencrs) · [zstd/sdec.rs](#compresszstdsdecrs) · [zstd/senc.rs](#compresszstdsencrs)
+  <br>[lib.rs](#compress-crate-root) · [brotli/mod.rs](#compressbrotlimodrs) · [brotli/sdec.rs](#compressbrotlisdecrs) · [checksum.rs](#compresschecksumrs) · [deflate/mod.rs](#compressdeflatemodrs) · [deflate/dec.rs](#compressdeflatedecrs) · [deflate/enc.rs](#compressdeflateencrs) · [deflate/sdec.rs](#compressdeflatesdecrs) · [gzip.rs](#compressgziprs) · [lz4.rs](#compresslz4rs) · [stream.rs](#compressstreamrs) · [xxh.rs](#compressxxhrs) · [zlib.rs](#compresszlibrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/dict.rs](#compresszstddictrs) · [zstd/enc.rs](#compresszstdencrs) · [zstd/sdec.rs](#compresszstdsdecrs) · [zstd/senc.rs](#compresszstdsencrs)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery, secondary indexes, encryption at rest
   <br>[lib.rs](#datastore-crate-root) · [index.rs](#datastoreindexrs) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
@@ -43349,6 +43349,8 @@ compress -- lossless compression: DEFLATE, zlib, gzip, Brotli, LZ4 and Zstandard
                                                   interoperable), xxHash32 checksums
   zstd::compress(data, level) / decompress        Zstandard frames (RFC 8878; the zstd tool
                                                   reads ours and we read its)
+  zstd::Dictionary, compress_with_dict / decompress_with_dict   dictionaries: trained on
+                                                  samples or raw content, as zstd -D uses them
   crc32(crc, data), adler32(adler, data)          the checksums of gzip / PNG / ZIP and zlib
   xxh32(data, seed), xxh64(data, seed); Xxh32, Xxh64   the same over data in pieces
   stream::{Decode, Encode}                        every format in pieces, with bounded memory:
@@ -43895,11 +43897,12 @@ the input or memory beyond the format's window.
   - `Truncated` -- the input ended inside a stream
   - `Corrupt` -- the data is damaged, or is no stream of the format
   - `Checksum` -- a checksum or a stored size does not match the data
-  - `Unsupported` -- the stream needs something this crate does not read: a zstd or LZ4 dictionary, a
-    Brotli large window
+  - `Unsupported` -- the stream needs something this crate does not read: an LZ4 dictionary, a zlib preset
+    dictionary, a Brotli large window
   - `Limit` -- more memory or output than allowed: a zstd window above the decoder's limit, more
     output than a pump's limit
   - `Size` -- the encoder got more or less input than the size it was given
+  - `Dictionary` -- a zstd frame names a dictionary that was not given
   - `Io` -- a pump's reader or writer failed
 
 - **`trait Decode`**
@@ -44030,14 +44033,17 @@ zstd -- the Zstandard format (RFC 8878), interoperable with the zstd tool both w
 
   compress(data, level) -> frame        levels 1..=19 (LEVEL_DEFAULT 3); content size and
                                         checksum in the frame; window up to 8 MiB
-  decompress(frames, max_out)           any conforming frames without a dictionary,
-                                        concatenated and skippable ones too; None on
-                                        corruption, a checksum mismatch or > max_out bytes
-  content_size(frame)                   the size a frame header declares
+  decompress(frames, max_out)           any conforming frames, concatenated and skippable
+                                        ones too; None on corruption, a checksum mismatch,
+                                        > max_out bytes or a frame that names a dictionary
+  Dictionary::train(samples, max) / parse / raw / to_bytes   dictionaries as `zstd --train`
+                                        makes them (dict.rs, train.rs)
+  compress_with_dict / decompress_with_dict   frames with a dictionary (zstd -D)
+  content_size(frame), dictionary_id(frame)   what a frame header declares
   bound(n)                              the largest frame compress() makes from n bytes
   Decoder / Encoder                     in pieces (stream::Decode / Encode; sdec.rs, senc.rs):
                                         windows up to 128 MiB (with_window_max), with_size
-                                        for the bytes of compress()
+                                        for the bytes of compress(), with_dictionary
 ```
 
 ```rust
@@ -44053,15 +44059,69 @@ Source: [`lib/compress/zstd/dec.rs`](../lib/compress/zstd/dec.rs)
 dec -- the zstd frame decoder (RFC 8878): frames and skippable frames, raw / RLE /
 compressed blocks, raw / RLE / Huffman / treeless literals with 1 or 4 streams, sequences
 with predefined / RLE / FSE / repeat tables, repeat offsets, content size and checksum.
-Dictionaries are not supported (a frame that names one is refused).  Every length, offset
-and table is checked: corrupt input gives None, never a panic or more than max_out bytes.
+A frame that names a dictionary needs it (decompress_with_dict; dict.rs): its tables and
+repeat offsets start the frame, its content stands before the output.  Every length,
+offset and table is checked: corrupt input gives None, never a panic or more than max_out
+bytes.
 ```
 
 - **`fn decompress(src: &[u8], max_out: usize) -> Option<Vec<u8>>`**
   decode all frames of src -> None on corruption, unsupported features or > max_out bytes
 
+- **`fn decompress_with_dict(src: &[u8], max_out: usize, dict: &Dictionary) -> Option<Vec<u8>>`**
+  decompress with a dictionary: frames that name it or none (None also for a frame that
+  names another one)
+
+- **`fn dictionary_id(src: &[u8]) -> Option<u32>`**
+  the dictionary ID a frame header names (None: none, or not a zstd frame)
+
 - **`fn content_size(src: &[u8]) -> Option<u64>`**
   the content size a frame header declares (None: not stated or not a zstd frame)
+
+### `compress/zstd/dict.rs`
+
+Source: [`lib/compress/zstd/dict.rs`](../lib/compress/zstd/dict.rs)
+
+```text
+dict -- Zstandard dictionaries (RFC 8878 section 5)
+
+  Dictionary::parse(bytes)   the format of `zstd --train` (magic EC30A437, the ID, the
+                             literals' Huffman table, the FSE tables of the offset, match
+                             length and literal length codes, three repeat offsets, the
+                             content), or bytes without the magic as raw content (ID 0)
+  Dictionary::raw(content)   content only: matches may reach into it, no tables
+  Dictionary::train(samples, max_size)   train.rs
+  to_bytes / id / content
+
+A frame that names a dictionary starts with its tables and repeat offsets, and its content
+stands before the frame's output, where matches may reach.  Every table is checked as a
+frame's would be: a damaged dictionary is refused, never a panic.
+```
+
+- **`struct Dictionary`**
+  a Zstandard dictionary: content that matches may reach into, and for the trained
+  format the entropy tables and repeat offsets a frame starts with
+
+**`impl Dictionary`**
+
+- **`fn raw(content: &[u8]) -> Dictionary`**
+  a dictionary of content only (ID 0): frames made with it name no dictionary, so the
+  decoder must be given it
+- **`fn parse(b: &[u8]) -> Option<Dictionary>`**
+  a dictionary in the zstd format, or raw content when the bytes do not start with its
+  magic (as libzstd reads them); None for a damaged zstd-format dictionary
+- **`fn train(samples: &[&[u8]], max_size: usize) -> Option<Dictionary>`**
+  a dictionary of at most max_size bytes (at least 256; zstd's default is 112 640)
+  trained on samples of the data it will compress, as `zstd --train` makes them
+  (train.rs); None without enough samples
+- **`fn to_bytes(&self) -> Vec<u8>`**
+  the dictionary as a file of `zstd --train` (raw content: the content)
+- **`fn id(&self) -> u32`**
+  the ID frames name it by (0: raw content, named by none)
+- **`fn content(&self) -> &[u8]`**
+  the content matches may reach into
+- **`fn has_tables(&self) -> bool`**
+  whether it has the trained format's entropy tables
 
 ### `compress/zstd/enc.rs`
 
@@ -44076,6 +44136,10 @@ offsets are tried first.  Literals are Huffman coded when that is smaller; each 
 sequence codes takes the cheapest of RLE, the predefined distribution and its own table.
 A block that does not get smaller is stored raw; a run of one byte value becomes an RLE
 block.  The decoder's repeat offsets do not move on raw blocks, so the encoder rolls them back.
+The tables the decoder already has (the previous block's, or a dictionary's at the start)
+are used again when that is cheapest: the literals without a new tree, a sequence code in
+Repeat_Mode.  With a dictionary its content stands before the input, so the first matches
+can reach into it.
 ```
 
 - **`const fn bound(n: usize) -> usize`**
@@ -44083,6 +44147,11 @@ block.  The decoder's repeat offsets do not move on raw blocks, so the encoder r
 
 - **`fn compress(src: &[u8], level: i32) -> Vec<u8>`**
   one zstd frame
+
+- **`fn compress_with_dict(src: &[u8], level: i32, dict: &Dictionary) -> Vec<u8>`**
+  one zstd frame with a dictionary: its content is where the first matches can come from,
+  its tables and repeat offsets start the frame, the frame names its ID (none for raw
+  content, Dictionary::raw)
 
 ### `compress/zstd/sdec.rs`
 
@@ -44098,7 +44167,9 @@ its Window_Size (the content size when it is smaller), refused above the decoder
 (128 MiB by default, as the zstd tool's).  A match farther back than the window is an
 error, as in the zstd tool's streaming decoder (dec.rs's one-shot decompress allows any
 distance inside the frame).  The next block is decoded once the caller has taken the
-output of the last one; the window moves when it holds more than twice its size.
+output of the last one; the window moves when it holds more than twice its size.  With a
+dictionary (with_dictionary), its content goes into the window before the frame's output
+(not given to the caller) and widens the reach by its length.
 ```
 
 - **`struct Decoder`**
@@ -44114,6 +44185,10 @@ output of the last one; the window moves when it holds more than twice its size.
   a decoder of one frame: Status::End after it, input behind it is not taken
 - **`fn with_window_max(mut self, bytes: usize) -> Decoder`**
   refuse frames whose window is larger than `bytes` (Error::Limit)
+- **`fn with_dictionary(mut self, dict: Dictionary) -> Decoder`**
+  a dictionary for the frames that name its ID (several may be given); a frame that
+  names none takes the only one given (raw content: Dictionary::raw).  A frame that names
+  one not given is Error::Dictionary.
 - **`fn reset(&mut self)`**
   start anew (the limit and single() stay)
 - **`fn frames(&self) -> u64`**
@@ -44148,6 +44223,8 @@ window and 4 MiB; the tables move with it.
 - **`fn with_size(mut self, bytes: u64) -> Encoder`**
   state the content size in the frame (the input must have exactly this length, else
   Error::Size); the frame is then the same bytes as compress()
+- **`fn with_dictionary(mut self, dict: &Dictionary) -> Encoder`**
+  compress with a dictionary (as compress_with_dict; with a size, the same bytes)
 
 ## datastore
 

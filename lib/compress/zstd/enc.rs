@@ -6,12 +6,17 @@
 // sequence codes takes the cheapest of RLE, the predefined distribution and its own table.
 // A block that does not get smaller is stored raw; a run of one byte value becomes an RLE
 // block.  The decoder's repeat offsets do not move on raw blocks, so the encoder rolls them back.
+// The tables the decoder already has (the previous block's, or a dictionary's at the start)
+// are used again when that is cheapest: the literals without a new tree, a sequence code in
+// Repeat_Mode.  With a dictionary its content stands before the input, so the first matches
+// can reach into it.
 
 use alloc::vec;
 use alloc::vec::Vec;
 
 use super::bits::Writer;
 use super::dec::{BLOCK_MAX, MAGIC};
+use super::dict::{Dictionary, Tab};
 use super::fse::{self, CTable};
 use super::huf;
 use super::seq::*;
@@ -117,6 +122,14 @@ impl Finder<'_> {
         self.hash[h] = q as u32 + 1;
     }
 
+    /// enter every position before `end` (a dictionary's content)
+    pub(super) fn enter(&mut self, end: usize) {
+        while self.next < end {
+            self.insert(self.next);
+            self.next += 1;
+        }
+    }
+
     /// the longest earlier match at p that ends by `end` -> (length, offset); p is entered
     /// (and the positions before it, unless the finder is sparse: then skipped ones stay out)
     fn find(&mut self, p: usize, end: usize) -> (usize, usize) {
@@ -162,10 +175,10 @@ impl Finder<'_> {
 
 #[derive(Clone, Copy)]
 pub(super) struct Seq {
-    ll: u32,
-    ml: u32,
+    pub(super) ll: u32,
+    pub(super) ml: u32,
     /// the offset value: offset + 3, or 1..=3 for a repeat offset
-    ov: u32,
+    pub(super) ov: u32,
 }
 
 /// the offset value of a match and the repeat offsets the decoder will have afterwards
@@ -295,7 +308,55 @@ fn raw_lit_header(out: &mut Vec<u8>, ty: u8, n: usize) {
     }
 }
 
-fn literals(lits: &[u8], out: &mut Vec<u8>) {
+/// the tables the decoder holds after a block, which the next block may use again (treeless
+/// literals, the Repeat_Mode of a sequence code); a dictionary gives the first block's
+#[derive(Clone, Default)]
+pub(super) struct Prev {
+    pub huf: Option<huf::Code>,
+    pub ll: Option<Tab>,
+    pub of: Option<Tab>,
+    pub ml: Option<Tab>,
+}
+
+// the literals as Huffman streams (1, or 4 above 1023 bytes) with `code`, after its tree
+// description (type 2) or with the previous block's tree (type 3) -> the whole section;
+// None when the sizes do not fit the format
+fn huf_section(code: &huf::Code, lits: &[u8], table: bool) -> Option<Vec<u8>> {
+    let n = lits.len();
+    let mut body = Vec::new();
+    if table && !code.write_table(&mut body) {
+        return None;
+    }
+    let streams = if n > 1023 { 4 } else { 1 };
+    if streams == 1 {
+        body.extend_from_slice(&code.encode(lits));
+    } else {
+        let seg = n.div_ceil(4);
+        let parts: Vec<Vec<u8>> = (0..4).map(|k| code.encode(&lits[(k * seg).min(n)..((k + 1) * seg).min(n)])).collect();
+        for p in &parts[..3] {
+            body.extend_from_slice(&(p.len() as u16).to_le_bytes());
+        }
+        for p in &parts {
+            body.extend_from_slice(p);
+        }
+    }
+    let c = body.len();
+    let big = n.max(c);
+    let (sf, hs, bits) = if streams == 1 { (0, 3, 10) } else if big <= 1023 { (1, 3, 10) } else if big <= 16383 { (2, 4, 14) } else { (3, 5, 18) };
+    if (big >> bits) != 0 {
+        return None;
+    }
+    let ty = if table { 2u64 } else { 3 };
+    let h = ty | (sf as u64) << 2 | (n as u64) << 4 | (c as u64) << (4 + bits);
+    let mut sec = Vec::with_capacity(hs + c);
+    sec.extend_from_slice(&h.to_le_bytes()[..hs]);
+    sec.extend_from_slice(&body);
+    Some(sec)
+}
+
+// the literals section: RLE, raw, Huffman with its own tree, or Huffman with the tree the
+// decoder already has (prev; it becomes the new tree when one is written)
+fn literals(lits: &[u8], out: &mut Vec<u8>, prev: &mut Option<huf::Code>) {
     let n = lits.len();
     if n > 1 && lits.iter().all(|&b| b == lits[0]) {
         raw_lit_header(out, 1, n);
@@ -303,55 +364,55 @@ fn literals(lits: &[u8], out: &mut Vec<u8>) {
         return;
     }
     let raw_size = n + if n < 32 { 1 } else if n < 4096 { 2 } else { 3 };
+    let mut hist = [0u32; 256];
+    for &b in lits {
+        hist[b as usize] += 1;
+    }
+    let mut best: Option<(Vec<u8>, Option<huf::Code>)> = None;
     if n >= 64 {
-        let mut hist = [0u32; 256];
-        for &b in lits {
-            hist[b as usize] += 1;
-        }
         if let Some(code) = huf::Code::build(&hist) {
             if (code.cost(&hist) / 8) as usize + 16 < n {
-                let mut body = Vec::new();
-                if code.write_table(&mut body) {
-                    let streams = if n > 1023 { 4 } else { 1 };
-                    if streams == 1 {
-                        body.extend_from_slice(&code.encode(lits));
-                    } else {
-                        let seg = n.div_ceil(4);
-                        let parts: Vec<Vec<u8>> = (0..4).map(|k| code.encode(&lits[(k * seg).min(n)..((k + 1) * seg).min(n)])).collect();
-                        for p in &parts[..3] {
-                            body.extend_from_slice(&(p.len() as u16).to_le_bytes());
-                        }
-                        for p in &parts {
-                            body.extend_from_slice(p);
-                        }
-                    }
-                    let c = body.len();
-                    let big = n.max(c);
-                    let (sf, hs, bits) = if streams == 1 { (0, 3, 10) } else if big <= 1023 { (1, 3, 10) } else if big <= 16383 { (2, 4, 14) } else { (3, 5, 18) };
-                    if (big >> bits) == 0 && hs + c < raw_size {
-                        let h = 2u64 | (sf as u64) << 2 | (n as u64) << 4 | (c as u64) << (4 + bits);
-                        out.extend_from_slice(&h.to_le_bytes()[..hs]);
-                        out.extend_from_slice(&body);
-                        return;
+                if let Some(sec) = huf_section(&code, lits, true) {
+                    if sec.len() < raw_size {
+                        best = Some((sec, Some(code)));
                     }
                 }
             }
         }
     }
-    raw_lit_header(out, 0, n);
-    out.extend_from_slice(lits);
+    if let Some(code) = prev.as_ref().filter(|c| n > 0 && c.covers(&hist)) {
+        if let Some(sec) = huf_section(code, lits, false) {
+            if sec.len() < best.as_ref().map_or(raw_size, |b| b.0.len()) {
+                best = Some((sec, None));
+            }
+        }
+    }
+    match best {
+        Some((sec, code)) => {
+            out.extend_from_slice(&sec);
+            if code.is_some() {
+                *prev = code;
+            }
+        }
+        None => {
+            raw_lit_header(out, 0, n);
+            out.extend_from_slice(lits);
+        }
+    }
 }
 
-/// the cheapest way to code one of the three sequence codes -> (mode, table, description)
-fn choose(hist: &[u32], n: usize, def: &[i16], def_log: u32, max_log: u32) -> Option<(u8, CTable, Vec<u8>)> {
+/// the cheapest way to code one of the three sequence codes -> (mode, table, description,
+/// the table the decoder holds afterwards: none after RLE, which is not repeated)
+fn choose(hist: &[u32], n: usize, def: &[i16], def_log: u32, max_log: u32, prev: &Option<Tab>) -> Option<(u8, CTable, Vec<u8>, Option<Tab>)> {
     let used = hist.iter().filter(|&&c| c > 0).count();
     let top = hist.iter().rposition(|&c| c > 0)?;
     if used == 1 {
-        return Some((1, CTable::rle(), vec![top as u8]));
+        return Some((1, CTable::rle(), vec![top as u8], None));
     }
-    let mut best: Option<(u64, u8, CTable, Vec<u8>)> = None;
+    let mut best: Option<(u64, u8, Vec<u8>, Tab)> = None;
     if let Some(c) = fse::cost(hist, def, def_log) {
-        best = Some((c, 0, CTable::build(def, def_log)?, Vec::new()));
+        let ct = CTable::build(def, def_log)?;
+        best = Some((c, 0, Vec::new(), Tab { norm: def.to_vec(), log: def_log, ct }));
     }
     let log = fse::choose_log(n, top, max_log);
     let norm = fse::normalize(&hist[..=top], log);
@@ -361,14 +422,21 @@ fn choose(hist: &[u32], n: usize, def: &[i16], def_log: u32, max_log: u32) -> Op
         if let Some(c) = fse::cost(hist, &norm, log) {
             let c = c + d.len() as u64 * 8 * 256;
             if best.as_ref().is_none_or(|b| c < b.0) {
-                best = Some((c, 2, ct, d));
+                best = Some((c, 2, d, Tab { norm, log, ct }));
             }
         }
     }
-    best.map(|(_, m, t, d)| (m, t, d))
+    if let Some(t) = prev {
+        if let Some(c) = fse::cost(hist, &t.norm, t.log) {
+            if best.as_ref().is_none_or(|b| c < b.0) {
+                best = Some((c, 3, Vec::new(), t.clone()));
+            }
+        }
+    }
+    best.map(|(_, m, d, t)| (m, t.ct.clone(), d, Some(t)))
 }
 
-fn sequences(seqs: &[Seq], out: &mut Vec<u8>) -> Option<()> {
+fn sequences(seqs: &[Seq], out: &mut Vec<u8>, prev: &mut Prev) -> Option<()> {
     let n = seqs.len();
     if n < 128 {
         out.push(n as u8);
@@ -394,9 +462,10 @@ fn sequences(seqs: &[Seq], out: &mut Vec<u8>) -> Option<()> {
         mlc.push(b);
         ofc.push(c);
     }
-    let (mode_l, tl, dl) = choose(&hl, n, &LL_DEFAULT, LL_DEFAULT_LOG, LL_LOG_MAX)?;
-    let (mode_o, to, d_o) = choose(&ho, n, &OF_DEFAULT, OF_DEFAULT_LOG, OF_LOG_MAX)?;
-    let (mode_m, tm, dm) = choose(&hm, n, &ML_DEFAULT, ML_DEFAULT_LOG, ML_LOG_MAX)?;
+    let (mode_l, tl, dl, pl) = choose(&hl, n, &LL_DEFAULT, LL_DEFAULT_LOG, LL_LOG_MAX, &prev.ll)?;
+    let (mode_o, to, d_o, po) = choose(&ho, n, &OF_DEFAULT, OF_DEFAULT_LOG, OF_LOG_MAX, &prev.of)?;
+    let (mode_m, tm, dm, pm) = choose(&hm, n, &ML_DEFAULT, ML_DEFAULT_LOG, ML_LOG_MAX, &prev.ml)?;
+    (prev.ll, prev.of, prev.ml) = (pl, po, pm);
     out.push(mode_l << 6 | mode_o << 4 | mode_m << 2);
     out.extend_from_slice(&dl);
     out.extend_from_slice(&d_o);
@@ -437,31 +506,53 @@ pub const fn bound(n: usize) -> usize {
 
 /// one zstd frame
 pub fn compress(src: &[u8], level: i32) -> Vec<u8> {
+    frame(src, level, None)
+}
+
+/// one zstd frame with a dictionary: its content is where the first matches can come from,
+/// its tables and repeat offsets start the frame, the frame names its ID (none for raw
+/// content, Dictionary::raw)
+pub fn compress_with_dict(src: &[u8], level: i32, dict: &Dictionary) -> Vec<u8> {
+    frame(src, level, Some(dict))
+}
+
+fn frame(src: &[u8], level: i32, dict: Option<&Dictionary>) -> Vec<u8> {
     let prm = params(level);
     let n = src.len();
     let mut out = Vec::with_capacity(bound(n).min(n / 2 + 4096));
-    let single = frame_header(&mut out, Some(n as u64));
+    let pre = dict.map_or(0, |d| d.content.len());
+    let single = frame_header(&mut out, Some(n as u64), dict.map_or(0, |d| d.id));
     if n == 0 {
         block_header(&mut out, true, 0, 0);
     } else {
-        let (hash_log, chain_log) = table_logs(&prm, Some(n as u64));
+        // the dictionary's content before the input: matches reach into it
+        let joined: Vec<u8>;
+        let s = match dict {
+            Some(d) if pre > 0 => {
+                joined = [&d.content[..], src].concat();
+                &joined[..]
+            }
+            _ => src,
+        };
+        let (hash_log, chain_log) = table_logs(&prm, Some((pre + n) as u64));
         let mut f = Finder {
-            s: src,
+            s,
             hash: vec![0; 1 << hash_log],
             chain: if prm.chain_log == 0 { Vec::new() } else { vec![0; 1 << chain_log] },
             hash_log,
             cmask: (1usize << chain_log) - 1,
             depth: prm.depth,
-            window: if single { n } else { (1 << WINDOW_LOG) - 1 },
+            window: if single { pre + n } else { (1 << WINDOW_LOG) - 1 },
             min: prm.min,
             sparse: prm.sparse,
             next: 0,
         };
-        let mut b = Blocks::new();
-        let mut bs = 0;
-        while bs < n {
-            let be = (bs + BLOCK_MAX).min(n);
-            b.put(&mut f, &prm, bs, be, be == n, &mut out);
+        f.enter(pre);
+        let mut b = Blocks::new(dict);
+        let mut bs = pre;
+        while bs < pre + n {
+            let be = (bs + BLOCK_MAX).min(pre + n);
+            b.put(&mut f, &prm, bs, be, be == pre + n, &mut out);
             bs = be;
         }
     }
@@ -469,13 +560,20 @@ pub fn compress(src: &[u8], level: i32) -> Vec<u8> {
     out
 }
 
-/// the frame header for a content size (None: not stated, a window of 8 MiB) -> whether
-/// the frame is single-segment (its window is the content)
-pub(super) fn frame_header(out: &mut Vec<u8>, size: Option<u64>) -> bool {
+/// the frame header for a content size (None: not stated, a window of 8 MiB) and a
+/// dictionary ID (0: none) -> whether the frame is single-segment (its window is the content)
+pub(super) fn frame_header(out: &mut Vec<u8>, size: Option<u64>, dict_id: u32) -> bool {
     out.extend_from_slice(&MAGIC.to_le_bytes());
+    let (did_flag, did_bytes) = match dict_id {
+        0 => (0u8, 0usize),
+        1..=255 => (1, 1),
+        256..=65535 => (2, 2),
+        _ => (3, 4),
+    };
     let Some(n) = size else {
-        out.push(0x04);
+        out.push(0x04 | did_flag);
         out.push(((WINDOW_LOG - 10) << 3) as u8);
+        out.extend_from_slice(&dict_id.to_le_bytes()[..did_bytes]);
         return false;
     };
     let single = n <= SINGLE_MAX as u64;
@@ -488,10 +586,11 @@ pub(super) fn frame_header(out: &mut Vec<u8>, size: Option<u64>) -> bool {
     } else {
         (3, 8)
     };
-    out.push(fcs_flag << 6 | u8::from(single) << 5 | 0x04);
+    out.push(fcs_flag << 6 | u8::from(single) << 5 | 0x04 | did_flag);
     if !single {
         out.push(((WINDOW_LOG - 10) << 3) as u8);
     }
+    out.extend_from_slice(&dict_id.to_le_bytes()[..did_bytes]);
     let fcs = if fcs_bytes == 2 { n - 256 } else { n };
     out.extend_from_slice(&fcs.to_le_bytes()[..fcs_bytes]);
     single
@@ -508,20 +607,31 @@ pub(super) fn table_logs(prm: &Params, size: Option<u64>) -> (u32, u32) {
     }
 }
 
-/// what carries from block to block: the repeat offsets and the buffers of a block
+/// what carries from block to block: the repeat offsets, the decoder's tables and the
+/// buffers of a block
 pub(super) struct Blocks {
     rep: [u32; 3],
+    prev: Prev,
     seqs: Vec<Seq>,
     lits: Vec<u8>,
     body: Vec<u8>,
 }
 
 impl Blocks {
-    pub(super) fn new() -> Blocks {
-        Blocks { rep: [1, 4, 8], seqs: Vec::new(), lits: Vec::new(), body: Vec::new() }
+    /// the state of a frame's start: the dictionary's repeat offsets and tables, if any
+    pub(super) fn new(dict: Option<&Dictionary>) -> Blocks {
+        let mut b = Blocks { rep: [1, 4, 8], prev: Prev::default(), seqs: Vec::new(), lits: Vec::new(), body: Vec::new() };
+        if let Some(d) = dict {
+            b.rep = d.rep;
+            if let Some(e) = &d.ent {
+                b.prev = Prev { huf: Some(e.code.clone()), ll: Some(e.ll.clone()), of: Some(e.of.clone()), ml: Some(e.ml.clone()) };
+            }
+        }
+        b
     }
 
-    /// the block of f.s[bs..be] -> out: RLE, compressed or raw, whichever is smallest
+    /// the block of f.s[bs..be] -> out: RLE, compressed or raw, whichever is smallest (a raw
+    /// or RLE block leaves the decoder's offsets and tables as they were)
     pub(super) fn put(&mut self, f: &mut Finder, prm: &Params, bs: usize, be: usize, last: bool, out: &mut Vec<u8>) {
         let src = f.s;
         let b = &src[bs..be];
@@ -530,19 +640,45 @@ impl Blocks {
             out.push(b[0]);
             return;
         }
-        let saved = self.rep;
+        let saved = (self.rep, self.prev.clone());
         self.seqs.clear();
         self.lits.clear();
         self.body.clear();
         parse(f, prm, bs, be, &mut self.rep, &mut self.seqs, &mut self.lits);
-        literals(&self.lits, &mut self.body);
-        if sequences(&self.seqs, &mut self.body).is_some() && self.body.len() < b.len() {
+        literals(&self.lits, &mut self.body, &mut self.prev.huf);
+        if sequences(&self.seqs, &mut self.body, &mut self.prev).is_some() && self.body.len() < b.len() {
             block_header(out, last, 2, self.body.len());
             out.extend_from_slice(&self.body);
         } else {
-            self.rep = saved;
+            (self.rep, self.prev) = saved;
             block_header(out, last, 0, b.len());
             out.extend_from_slice(b);
         }
     }
+}
+
+/// the sequences and literals of the first block of src (at most 128 KiB) with `content`
+/// before it, at `level` (train.rs: the statistics of a dictionary's tables)
+pub(super) fn sequences_of(src: &[u8], level: i32, content: &[u8]) -> (Vec<Seq>, Vec<u8>) {
+    let prm = params(level);
+    let src = &src[..src.len().min(BLOCK_MAX)];
+    let s = [content, src].concat();
+    let pre = content.len();
+    let (hash_log, chain_log) = table_logs(&prm, Some(s.len() as u64));
+    let mut f = Finder {
+        s: &s,
+        hash: vec![0; 1 << hash_log],
+        chain: if prm.chain_log == 0 { Vec::new() } else { vec![0; 1 << chain_log] },
+        hash_log,
+        cmask: (1usize << chain_log) - 1,
+        depth: prm.depth,
+        window: s.len(),
+        min: prm.min,
+        sparse: prm.sparse,
+        next: 0,
+    };
+    f.enter(pre);
+    let (mut seqs, mut lits) = (Vec::new(), Vec::new());
+    parse(&mut f, &prm, pre, s.len(), &mut [1, 4, 8], &mut seqs, &mut lits);
+    (seqs, lits)
 }

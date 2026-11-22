@@ -2581,11 +2581,21 @@ Grundbausteine am falschen Ort oder mehrfach:
   Sync-Punkte, beschädigte Ströme scheitern genau dort, wo die einmaligen Decoder scheitern) und
   mit `tools/stream_check.py` gegen `gzip`, Pythons zlib, `zstd` (auch `--long=27`, `-T4`, aus
   einer Pipe) und die Brotli-Ströme der WOFF2-Schriften des Systems. In Stücken entpackt gzip mit
-  317 statt 213 MB/s (der einmalige Decoder fängt mit größerem Puffer neu an). Offen:
-  zstd-Wörterbücher, ein Brotli-Encoder; Content-Encoding gzip/br im HTTP-Client von `netio` (über
-  die Sicherheits-Sitzung, jetzt mit den Stream-Decodern); `cargo-jflib` mit `compress` statt
-  seines eigenen Encoders ([`cargo_jflib/src/deflate.rs`](../lib/cargo_jflib/src/deflate.rs),
-  heute ohne jede Abhängigkeit; die Bytes der Pakete ändern sich dabei).
+  317 statt 213 MB/s (der einmalige Decoder fängt mit größerem Puffer neu an). zstd-Wörterbücher
+  (2026-11-22, U13; [`zstd/dict.rs`](../lib/compress/zstd/dict.rs),
+  [`zstd/train.rs`](../lib/compress/zstd/train.rs)): `Dictionary::train` lernt wie
+  `zstd --train` (fastCover, k und d an einem Viertel der Beispiele gewählt, die Tabellen aus der
+  Kompression der Beispiele), `parse` / `to_bytes` im Format des zstd-Werkzeugs, auch roher
+  Inhalt; `compress_with_dict` / `decompress_with_dict` und die Stream-Typen mit
+  `with_dictionary`. Der Encoder nutzt die Tabellen des Wörterbuchs und des vorigen Blocks wieder
+  (Literale ohne neuen Baum, Repeat_Mode), was auch Frames ohne Wörterbuch bis zu 4 % kleiner
+  macht. Geprüft in `coretest --only compress` (17 neue) und mit `tools/zstd_check.py` in beide
+  Richtungen gegen `zstd --train` / `zstd -D`: 600 JSON-Datensätze werden mit 16 KiB Wörterbuch
+  3,15-mal kleiner (zstds eigenes: 3,22; ohne: 1,2). Offen: ein Brotli-Encoder; Content-Encoding
+  gzip/br im HTTP-Client von `netio` (über die Sicherheits-Sitzung, jetzt mit den
+  Stream-Decodern); `cargo-jflib` mit `compress` statt seines eigenen Encoders
+  ([`cargo_jflib/src/deflate.rs`](../lib/cargo_jflib/src/deflate.rs), heute ohne jede
+  Abhängigkeit; die Bytes der Pakete ändern sich dabei).
 - **P1** · *erledigt* (2026-11-21, U2) · JSON aus `agent_core` gelöst: die neue Blatt-Crate
   `formats` ([`formats/src/lib.rs`](../lib/formats/src/lib.rs), nur `alloc`) hat `json` und `jmap`
   aus `agent_core` und `xml` und `encoding` aus `base` übernommen, unverändert; die alten Pfade
