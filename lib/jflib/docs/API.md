@@ -15075,7 +15075,14 @@ case form it made and rejects "Cd-rom").  Not supported: COMPOUNDSYLLABLE, COMPO
 COMPOUNDMORESUFFIXES, COMPLEXPREFIXES (two prefixes), a prefix together with two suffixes,
 morphology (AM, the fields of the .dic), PHONE suggestions, OCONV, the replacements of
 CHECKCOMPOUNDPATTERN (simplified compounds), the Turkish / Azeri casing of LANG; no clock
-limits (Hunspell's results depend on the machine's speed, these never do).
+limits (Hunspell's results depend on the machine's speed, these never do).  The work is
+bounded by counts instead, also for a crafted dictionary (config://hunspell is the user's to
+fill): a check tries at most 6 million rules and patterns of the .aff (check.rs, CHECK_WORK),
+a search for suggestions 64 million, its n-gram step 32 million (suggest.rs); the word list
+keeps every lookup short, also for words whose hashes collide (dic.rs), and the .aff loads
+in one pass over its rules (aff.rs).  Real dictionaries use a sixth of that or less (20 of
+them measured, docs/ROADMAP.md section 13, U11); a crafted one takes at most about 0.15 s for
+a check and 1.6 s for a suggestion instead of seconds and minutes.
 
 Personal word list: one word per line (a first line with a number is skipped), UTF-8.  A
 word added in lower case is also accepted Capitalised and in UPPER case; "Paris" only so.

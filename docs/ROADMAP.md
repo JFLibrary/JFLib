@@ -2540,8 +2540,22 @@ Sicherheit:
 - **P2** · *fehlt* · `crypto`, sofern nicht schon Teil der laufenden Überarbeitung: die
   RSA-Schlüsselerzeugung zeitkonstant machen oder deutlich abgrenzen (heute laut README „meant
   for simulators and tests“); `tools/ct_check.py` auch für ARM64.
-- **P3** · *fehlt* · `spell`: prüfen, ob ein präpariertes Wörterbuch (`config://hunspell`) die
-  Vorschläge hängen lassen kann; die Crate hat keine Zeitgrenzen.
+- **P3** · *erledigt* (2026-11-22, U11) · `spell`: Ein präpariertes Wörterbuch (`config://hunspell`) konnte Prüfung
+  und Vorschläge hängen lassen, gemessen mit `spelltest --test hostile`: 20 000 leere Suffixe, die einander folgen
+  dürfen, brauchten 2–9 s für eine Prüfung und 540 s für einen Vorschlag; Kreuzprodukte aus 3000 × 3000 leeren Affixen
+  7–63 s für einen Vorschlag; die Formen des N-Gramm-Schritts über 120 s; 10 000 BREAK-Muster 0,95 s für eine Prüfung;
+  Wörter mit gleichem Hash luden quadratisch; 23 000 Affixregeln luden 0,56 s (zwei Schleifen über alle Regeln). Jetzt
+  ist die Arbeit gezählt, nicht gemessen, die Antworten hängen weiter nicht von der Maschine ab: Jede Affixregel,
+  COMPOUNDRULE, CHECKCOMPOUNDPATTERN, jedes BREAK-Muster und jede REP-Regel von CHECKCOMPOUNDREP, die versucht wird,
+  kostet eine Einheit, 6 Mio. je Prüfung, 64 Mio. je Suche nach Vorschlägen, 32 Mio. für die Formen des
+  N-Gramm-Schritts (der eine Form erst baut, wenn ihre Länge passt); die Erzeuger der Vorschläge (TRY, KEY, REP, MAP)
+  hören auf, sobald die Arbeit verbraucht ist. Die Wortliste sucht ein Wort höchstens 128 Plätze weit und hält den Rest
+  in einer sortierten Karte daneben; die Regelgruppen und die äußeren Suffixe entstehen in einem Durchgang. Danach:
+  höchstens 0,15 s für eine Prüfung und 1,6 s für einen Vorschlag. 20 echte Wörterbücher (de_DE und de_CH frami,
+  en_US, en_GB, hu, ko, fr, es, it, nl, pl, cs, ru, uk, pt_BR, sv, da, tr, he, ar; je rund 5300 Wörter, bei de 11 300,
+  dazu 400 Vorschläge) geben dieselben Antworten wie vorher; ihr Höchstes: 638 000 Einheiten je Prüfung (da),
+  10,9 Mio. je Suche (hu), 5,3 Mio. für die Formen (hu). Der Längenfilter macht echte Vorschläge schneller: hu 35 →
+  9 s für 400 (der langsamste 953 → 275 ms), ko 43 → 20 s.
 
 Grundbausteine am falschen Ort oder mehrfach:
 

@@ -1,0 +1,6 @@
+#!args --test hostile
+# spelltest --test hostile: crafted dictionaries against the spell crate's bounds (hostile.rs):
+# thousands of affix rules on one ending, cross products, huge ICONV / REP / TRY / KEY / MAP
+# tables, compound rules and patterns, BREAK patterns, colliding hashes.  Every load, check and
+# suggestion within its limit, a word of the list still taken.  The whole test runs before the
+# UI starts; the exit code is the number of operations over their limit.

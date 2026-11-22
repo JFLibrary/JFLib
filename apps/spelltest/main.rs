@@ -9,6 +9,9 @@
 //                                                (tests/async.uis: the menu waits for them)
 //   build/win/spelltest.exe --test engine [--only GROUP]   self-checks of the spell crate
 //                                                (engine.rs); exit code = failures
+//   build/win/spelltest.exe --test hostile [--only NAME]   crafted dictionaries against the
+//                                                crate's bounds (hostile.rs); exit code =
+//                                                operations over their limit
 //   build/win/spelltest.exe --hyphenate DIC WORDS   every line of WORDS hyphenated with a
 //                                                hyphenation dictionary from any path
 //   build/win/spelltest.exe --hyphen [--hyph-lang TAG]   hyphenated texts and a text box
@@ -37,6 +40,7 @@ extern crate alloc;
 
 mod compare;
 mod engine;
+mod hostile;
 mod hyphen;
 
 use alloc::format;
@@ -212,6 +216,9 @@ fn spelltest() -> i32 {
     i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
     if plat::arg_value("--test").as_deref() == Some("engine") {
         return engine::run();
+    }
+    if plat::arg_value("--test").as_deref() == Some("hostile") {
+        return hostile::run();
     }
     if plat::args().iter().any(|a| a == "--compare") {
         return compare::run();
