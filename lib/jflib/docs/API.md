@@ -28561,8 +28561,10 @@ net -- TCP, UDP and Unix domain sockets (IPv4 and IPv6) with timeouts
             (bind removes only a socket file nobody listens on; the drop only its own)
             -> UnixStream (the stream calls of TcpStream; addresses and nodelay do not apply)
             Linux, and Windows 10 1803 and later (AF_UNIX)
-  resolve(host, port): numeric addresses, "localhost"; Windows also the system resolver
-            (GetAddrInfoW).  Linux names go through netio::dns (no libc here).
+  resolve(host, port): numeric addresses, "localhost" and names under .localhost (the loopback
+            addresses, RFC 6761; with a final dot as well); Windows, macOS and iOS also the
+            system resolver (GetAddrInfoW, getaddrinfo).  Linux: other names NotFound, since
+            there is no libc here: netio::dns resolves them (/etc/hosts, the name servers).
   NetError: the kinds callers act on, with the OS code
 
 (G7d) Everywhere: the addresses, NetError and host_port.  The sockets, names and interfaces are
@@ -28725,8 +28727,12 @@ one thread may read while another writes (Arc<TcpStream>).
   connect to a socket file within `timeout_ms` (0: block)
 
 - **`fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>>`**
-  the addresses of a host: numeric forms and "localhost" everywhere; on Windows, macOS and iOS
-  other names through the system resolver (Linux: netio::dns)
+  the addresses of a host: numeric forms, "localhost" and names under .localhost, with a final
+  dot as well (both loopback addresses, RFC 6761 6.3, as netio::dns answers them) everywhere;
+  on Windows, macOS and iOS other names through the system resolver, on Linux NotFound for them
+  (no libc here: netio::dns::resolve reads /etc/hosts and asks the name servers).  The
+  addresses of a name are registered with the app's rules (policy::net_resolved), so a rule
+  for the name (app.localhost:8080) covers connections to them
 
 - **`fn hostname() -> String`**
   the host name of this computer
@@ -44168,9 +44174,14 @@ Source: [`lib/netio/dns.rs`](../lib/netio/dns.rs)
 ```text
 dns -- host names to addresses
 
-  resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses and "localhost"
-                    directly; Windows: the system resolver (plat); Linux: /etc/hosts, then
-                    the name servers of /etc/resolv.conf (search domains, ndots)
+  resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses, "localhost" and
+                    names under .localhost, with a final dot as well (the loopback addresses,
+                    RFC 6761) directly, on every system; Windows, macOS and iOS: the system
+                    resolver (plat::net::resolve, getaddrinfo on Apple: VPNs with name
+                    servers of their own, .local over mDNS, iOS's profiles and the app
+                    sandbox, none of which /etc/resolv.conf shows); Linux: /etc/hosts, then
+                    the name servers of /etc/resolv.conf
+                    (search domains, ndots)
   resolve_with(host, port, &Config)   the same with a given configuration (tests)
   Config::system()                    /etc/hosts + /etc/resolv.conf; Windows: the hosts file
                                       of %SystemRoot% and the DNS servers of the adapters
@@ -44181,15 +44192,20 @@ Name servers on IPv6 link-local addresses carry their zone into the socket addre
 plat::net::ip_scope_parse), the adapter's index on Windows.  A server whose zone names no
 interface of this computer is left out.
 
-Queries: A and AAAA over UDP (2 s per server and attempt, two rounds), over TCP when the answer
-is truncated; an answer must come from the server asked and carry the query's id and question,
-and only addresses of the asked name count, or of the name its CNAME chain in the answer leads
-to (at most 8 steps): records for other names in an answer are ignored.
-IPv4 addresses come first.  Not here: DNSSEC validation, mDNS, caching.
+Queries of this resolver (resolve on Linux, resolve_with everywhere; the system resolver of
+Windows, macOS and iOS checks its answers in its own way): A and AAAA over UDP (2 s per server
+and attempt, two rounds), over TCP when the answer is truncated; an answer must come from the
+server asked and carry the query's id and question (an NXDOMAIN too), and only addresses of the
+asked name count, or of the name its CNAME chain in the answer leads to (at most 8 steps):
+records for other names in an answer are ignored, names compared label by label.
+IPv4 addresses come first (the system resolver keeps its own order, RFC 6724's, and a
+link-local address's zone).  Not here: DNSSEC validation, mDNS, caching.
 
 The app's permissions: a name its net.connect rules do not cover fails with
 NetErrorKind::Denied before any query; the addresses of a covered name are registered
-(plat::policy::net_resolved), so connections to them follow that name's ports.
+(plat::policy::net_resolved), so connections to them follow that name's ports.  Names under
+.localhost need no rule, since nothing is asked for them, but their loopback addresses are
+registered too: a rule for app.localhost:8080 covers them.
 ```
 
 - **`struct Config`**

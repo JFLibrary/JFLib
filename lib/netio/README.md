@@ -119,11 +119,14 @@ A game's channel over UDP and WebSocket, for the desktop and the browser, is
 
 ## Names, SSH and mail
 
-`dns::resolve(host, port)` takes numeric addresses and `localhost` as they are. On Windows it asks
-the system's resolver; elsewhere it reads the hosts file and then asks the name servers of
-`/etc/resolv.conf` itself, over UDP and over TCP when an answer was truncated, and accepts an
-answer only from the server it asked, with the query's id and question. A name server on an IPv6
-link-local address keeps its zone (`nameserver fe80::1%eth0`). There is no DNSSEC, mDNS or cache.
+`dns::resolve(host, port)` takes numeric addresses and `localhost` as they are. On Windows, macOS
+and iOS it asks the system's resolver (`getaddrinfo` on Apple), which knows the name servers of a
+VPN, `.local` over mDNS and iOS's rules (a link-local address it returns keeps its zone); on Linux
+it reads the hosts file and then asks the name servers of `/etc/resolv.conf` itself, over UDP and
+over TCP when an answer was truncated, and accepts an answer only from the server it asked, with
+the query's id and question (a "no such name" too) and only for the asked name or its CNAME chain,
+compared label by label. A name server on an IPv6 link-local address keeps its zone
+(`nameserver fe80::1%eth0`). That resolver has no DNSSEC, mDNS or cache.
 
 `ssh::Client` runs commands on another machine: it connects with curve25519-sha256 and the strict
 key exchange that closes the Terrapin attack, checks the host key against a pinned fingerprint,

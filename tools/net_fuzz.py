@@ -1,8 +1,23 @@
-"""net_fuzz.py -- mutation fuzzing of the parsers that read untrusted bytes in compress, netio and netpkt.
+"""net_fuzz.py -- mutation fuzzing of the parsers that read untrusted bytes in compress, formats, netchan,
+netio, netpkt and plat.
     python tools/net_fuzz.py [--seconds N] [--only T,..]
 Builds tools/net_fuzz/fuzz.rs (with panic = "unwind", overflow checks and debug assertions) into
 build/net_fuzz and runs every target on its own thread for N seconds (default 60):
   zstd, lz4                     decompress with an output limit
+  deflate, zlib, gzip, brotli   decompress with an output limit (DEFLATE also into a small buffer,
+                                and its InflateState after any input decodes a known stream as a
+                                fresh one does; gzip with several members); Brotli's seeds are
+                                the reference encoder's streams of coretest
+  json, xml, charsets           formats: JSON with default and tight limits, the XML tree, the
+                                strict Reader and the Lenient tokenizer with its entity decoding
+                                (every XML reader of the library is one of these), the charsets
+  netchan_packet                netchan's packet parser and writer
+  netchan_server, netchan_client   netchan's handshake cores fed datagrams (seeds: a real UDP
+                                handshake with fixed secrets, its sealed packets included)
+  netchan_open                  ChaCha20-Poly1305 and packet-number reconstruction of a connection
+  plat_clipboard, plat_dbus, plat_wayland   plat's decoders of other programs' data: clipboard
+                                and drops (Windows' and Linux' formats), D-Bus messages, Wayland
+                                events (docs/PLAT_INPUTS.md; plat::fuzz)
   x509, x509_netpkt             the certificate parser (the crate jflib-x509) with names,
                                 fingerprint and verify_chain; netpkt's check_chain over it;
                                 seeds: the system's CA bundle
@@ -49,7 +64,9 @@ def build():
         dep("crypto", "jflib-crypto"),
         dep("compress", "jflib-compress"),
         dep("netpkt", "jflib-netpkt"),
-        dep("netio", "jflib-netio"), "",
+        dep("netio", "jflib-netio"),
+        dep("formats", "jflib-formats"),
+        dep("netchan", "jflib-netchan"), "",
         "[profile.release]", "opt-level = 3", "debug = 1", "debug-assertions = true", "overflow-checks = true",
         'panic = "unwind"', "",
     ]), encoding="utf-8")

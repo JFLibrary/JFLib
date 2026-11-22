@@ -25,11 +25,18 @@ someone else made:
 | Crate | What it does |
 | --- | --- |
 | `crypto` | hashes, MACs, AEADs, X25519, Ed25519, P-256, RSA, ECDSA, Argon2id, Base64 |
-| `netio` | TLS 1.3 / 1.2, X.509, HTTP/1.1, WebSocket, DNS, SSH client, SMTP |
+| `netio` | TLS 1.3 / 1.2, HTTP/1.1, WebSocket, DNS, SSH client, SMTP |
+| `x509` | X.509 certificates and chains (netio's and netpkt's) |
 | `netpkt` | packet and protocol parsers, a TLS and SSH core for simulators |
-| `compress` | LZ4 and Zstandard decoders |
+| `netchan` | an encrypted and authenticated channel over UDP and WebSocket |
+| `compress` | DEFLATE, zlib, gzip, Brotli, LZ4 and Zstandard decoders |
+| `formats` | JSON, XML (every XML reader of the library), text encodings |
 | `update`, `cas`, `datastore` | signed updates, encrypted backup repositories, stores |
-| `plat` | the system's random numbers, sockets, files, the app permission rules |
+| `plat` | the system's random numbers, sockets, files, the app permission rules, and the data of other programs: clipboard, drops, the Wayland and X11 wire, D-Bus |
+
+`plat` holds most of the library's `unsafe` code, because it calls the operating systems.
+[docs/PLAT_INPUTS.md](docs/PLAT_INPUTS.md) lists every way another program's data reaches it,
+how each is bounded, where its `unsafe` is, what tests it and what is still open.
 
 ## What to know before relying on it
 
@@ -43,12 +50,18 @@ another library. They have **not had an external audit**. What has been done ins
   `tools/tls_web_check.py`, `tools/ssh_interop.py`)
 - constant time: the secret-dependent operations of `crypto` and netio's key files take the same
   branches for every secret, and under valgrind's memcheck neither branch on the secret nor use
-  it as an address, at five optimization levels on x86-64 (`tools/ct_check.py`); not checked:
-  other processors, instructions whose time depends on their operands
+  it as an address, at five optimization levels on x86-64; the wasm32 code of `crypto`'s
+  operations (netio's key files are not built for wasm) executes the same instructions with the
+  same memory addresses for every secret (`tools/ct_check.py`, `--wasm`;
+  the workflow `.github/workflows/ct-check.yml` runs both, the trace also on an ARM64 machine);
+  not checked: the machine code a browser's JIT makes, instructions whose time depends on their
+  operands
 - netio's TLS 1.3 server against tlsfuzzer (`tools/tlsfuzzer_check.py`), its client against
   TLS-Anvil (`tools/tlsanvil_check.py`)
-- mutation fuzzing (`tools/net_fuzz.py`, `apps/nettest`) and coverage-guided fuzzing with
-  libFuzzer and AddressSanitizer (`tools/cov_fuzz.py`) of the parsers of untrusted bytes
+- mutation fuzzing (`tools/net_fuzz.py`, `apps/nettest`, `plattest --test wirefuzz`) and
+  coverage-guided fuzzing with libFuzzer and AddressSanitizer (`tools/cov_fuzz.py`) of the parsers
+  of untrusted bytes: compress, formats, X.509, DNS, HTTP, TLS, netpkt, netchan and plat's
+  decoders of other programs' data
 
 Limits that are documented in the crates: no revocation checks for certificates, no DNSSEC
 validation, no TLS session resumption. Each crate's README says what it does and does not do.

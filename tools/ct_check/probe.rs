@@ -12,23 +12,35 @@
 //   probe --run TARGET SEED           run once without tracing (timing, debugging)
 //   probe --memcheck TARGET SEED      under valgrind --tool=memcheck: the secret marked undefined
 //                                     (see memcheck below)
+//   wasm32 (a cdylib): ct_run(INDEX, SEED) prepares TARGETS[INDEX] and runs it between two
+//                                     calls of ct_mark; ct_check.py --wasm traces it in WABT's
+//                                     wasm-interp and compares the wasm instructions and memory
+//                                     addresses between the marks
 //
-// A child process is forked per secret: it prepares the inputs, stops itself (SIGSTOP), runs the
-// operation and stops again; the parent steps it in between and records where it goes.  MODE
-// block (PTRACE_SINGLEBLOCK, the processor's branch trap): the target of every taken branch;
-// step (PTRACE_SINGLESTEP, CT_STEP=step, or where the branch trap is missing, as in some virtual
-// machines): every instruction, some thousand times slower.  Equal sequences for all secrets mean
+//   probe --child TARGET SEED         one secret's run, started by the tracing probe (below)
+//
+// A child process is started per secret, the probe anew (fork, then execv of --child), without
+// address randomization: so every secret's run begins with the same stack and heap, whatever the
+// tracing probe did before.  It prepares the inputs, stops itself (SIGSTOP), runs the operation
+// and stops again; the parent steps it in between and records where it goes.  MODE
+// block (PTRACE_SINGLEBLOCK, the processor's branch trap; x86-64): the target of every taken
+// branch; step (PTRACE_SINGLESTEP, CT_STEP=step, on ARM64, or where the branch trap is missing, as
+// in some virtual machines): every instruction, some thousand times slower.  Equal sequences for all secrets mean
 // control flow without secret-dependent branches or jump tables.  Not seen: memory addresses that
 // depend on a secret without a branch, and instructions whose time depends on their operands
 // (division, some multipliers).
 //
-// Linux on x86-64 only (PTRACE_PEEKUSER of rip).  The operations' inputs are valid, so the checks
-// at their end (an AEAD's tag, a point at infinity) take the same way for every secret.
+// Linux on x86-64 (the program counter through PTRACE_PEEKUSER of rip) and ARM64 (through
+// PTRACE_GETREGSET of NT_PRSTATUS; no branch trap there, so step).  The operations' inputs are
+// valid, so the checks at their end (an AEAD's tag, a point at infinity) take the same way for
+// every secret.
 
 use std::hint::black_box;
 
 unsafe extern "C" {
     fn fork() -> i32;
+    fn execv(path: *const std::ffi::c_char, argv: *const *const std::ffi::c_char) -> i32;
+    fn personality(persona: u64) -> i32;
     fn ptrace(request: i32, ...) -> i64;
     fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
     fn raise(sig: i32) -> i32;
@@ -37,15 +49,51 @@ unsafe extern "C" {
 }
 
 const PTRACE_TRACEME: i32 = 0;
-const PTRACE_PEEKUSER: i32 = 3;
+const PTRACE_CONT: i32 = 7;
 const PTRACE_SINGLESTEP: i32 = 9;
-/// stop after the next taken branch (x86: the processor's branch trap flag)
+/// personality(2): no address randomization (setarch -R)
+const ADDR_NO_RANDOMIZE: i32 = 0x0040000;
+/// stop after the next taken branch (x86: the processor's branch trap flag; ARM64 has none)
 const PTRACE_SINGLEBLOCK: i32 = 33;
 const SIGKILL: i32 = 9;
 const SIGTRAP: i32 = 5;
 const SIGSTOP: i32 = 19;
-/// offsetof(struct user_regs_struct, rip) on x86-64
-const RIP: usize = 16 * 8;
+
+/// the traced child's program counter
+#[cfg(target_arch = "x86_64")]
+unsafe fn pc_of(pid: i32) -> Option<u64> {
+    const PTRACE_PEEKUSER: i32 = 3;
+    /// offsetof(struct user_regs_struct, rip)
+    const RIP: usize = 16 * 8;
+    // SAFETY: PEEKUSER reads one word of the stopped child's registers
+    let pc = unsafe { ptrace(PTRACE_PEEKUSER, pid, RIP, 0usize) };
+    // -1 is the failure (errno), never a user address
+    (pc != -1).then_some(pc as u64)
+}
+
+/// no tracer on other processors (wasm32: ct_run below instead)
+#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+unsafe fn pc_of(_pid: i32) -> Option<u64> {
+    None
+}
+
+/// the traced child's program counter: struct user_pt_regs { regs[31], sp, pc, pstate }
+#[cfg(target_arch = "aarch64")]
+unsafe fn pc_of(pid: i32) -> Option<u64> {
+    const PTRACE_GETREGSET: i32 = 0x4204;
+    const NT_PRSTATUS: usize = 1;
+    #[repr(C)]
+    struct Iovec {
+        base: *mut u64,
+        len: usize,
+    }
+    let mut regs = [0u64; 34];
+    let mut iov = Iovec { base: regs.as_mut_ptr(), len: core::mem::size_of_val(&regs) };
+    // SAFETY: GETREGSET writes at most iov.len bytes of the stopped child's registers into regs
+    let r = unsafe { ptrace(PTRACE_GETREGSET, pid, NT_PRSTATUS, &mut iov as *mut Iovec) };
+    // the kernel sets iov.len to what it wrote: the whole set, or pc is not among it
+    (r == 0 && iov.len == core::mem::size_of_val(&regs)).then_some(regs[32])
+}
 /// the most instructions one operation may take
 const MAX_STEPS: usize = 200_000_000;
 /// the most instructions followed one by one in the block where two runs part
@@ -393,6 +441,7 @@ fn prepare_from(name: &str, s: Vec<u8>) -> Op {
 
 /// a valgrind client request (x86-64: the magic preamble, rax -> the arguments, rdx -> the result;
 /// natively a no-op that gives `default`)
+#[cfg(target_arch = "x86_64")]
 fn vg_request(default: usize, args: [usize; 6]) -> usize {
     let mut result = default;
     // SAFETY: the rotations leave rdi as it was (3 + 13 + 61 + 51 = 128), xchg rbx, rbx changes
@@ -409,6 +458,32 @@ fn vg_request(default: usize, args: [usize; 6]) -> usize {
     result
 }
 
+/// a valgrind client request (ARM64, valgrind.h: the preamble rotates x12 by 128 bits, x4 -> the
+/// arguments, x3 -> the default and the result, orr x10, x10, x10 marks the request; natively a
+/// no-op that gives `default`)
+#[cfg(target_arch = "aarch64")]
+fn vg_request(default: usize, args: [usize; 6]) -> usize {
+    let mut result = default;
+    // SAFETY: the rotations leave x12 as it was (3 + 13 + 51 + 61 = 128), orr x10, x10, x10
+    // changes nothing; valgrind reads the six words at x4 and writes the answer into x3
+    unsafe {
+        core::arch::asm!(
+            "ror x12, x12, #3", "ror x12, x12, #13", "ror x12, x12, #51", "ror x12, x12, #61", "orr x10, x10, x10",
+            inout("x3") result,
+            in("x4") args.as_ptr(),
+            inout("x12") 0usize => _,
+            options(nostack),
+        );
+    }
+    result
+}
+
+/// no valgrind on other processors
+#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+fn vg_request(default: usize, _args: [usize; 6]) -> usize {
+    default
+}
+
 const VG_RUNNING_ON_VALGRIND: usize = 0x1001;
 const VG_CHANGE_ERR_DISABLEMENT: usize = 0x1801;
 /// VG_USERREQ_TOOL_BASE('M', 'C') + 1, + 2
@@ -423,6 +498,13 @@ fn memcheck(name: &str, seed: u64) -> i32 {
     if vg_request(0, [VG_RUNNING_ON_VALGRIND, 0, 0, 0, 0, 0]) == 0 {
         eprintln!("--memcheck runs under valgrind --tool=memcheck only");
         return 2;
+    }
+    // where valgrind loaded this program (its own choice, which differs between architectures):
+    // ct_check.py looks the frames of memcheck's reports up with addr2line from there
+    let maps = Maps::read();
+    let own: Vec<&(u64, u64, String)> = maps.ranges.iter().filter(|r| std::path::Path::new(&r.2) == maps.exe).collect();
+    if let (Some(lo), Some(hi)) = (own.iter().map(|r| r.0).min(), own.iter().map(|r| r.1).max()) {
+        println!("exe {:#x} {:#x}", lo, hi);
     }
     let s = secret_bytes(seed, 4096);
     vg_request(0, [VG_CHANGE_ERR_DISABLEMENT, 1, 0, 0, 0, 0]);
@@ -491,12 +573,76 @@ impl Maps {
     }
 }
 
+/// an execv of the probe itself: its path, the arguments (argv[0] first) and the pointers to them
+/// that execv takes, ending in null (they point into `_args`, which is kept for them)
+struct Exec {
+    path: std::ffi::CString,
+    _args: Vec<std::ffi::CString>,
+    argv: Vec<*const std::ffi::c_char>,
+}
+
+impl Exec {
+    fn new(args: impl IntoIterator<Item = Vec<u8>>) -> Result<Exec, String> {
+        let path = std::env::current_exe().map_err(|e| format!("the probe's own path: {}", e))?;
+        let path = std::ffi::CString::new(path.into_os_string().into_encoded_bytes()).map_err(|_| "a NUL in the probe's path")?;
+        let args = args.into_iter().map(std::ffi::CString::new).collect::<Result<Vec<_>, _>>().map_err(|_| "a NUL in an argument")?;
+        let mut argv: Vec<*const std::ffi::c_char> = args.iter().map(|a| a.as_ptr()).collect();
+        argv.push(std::ptr::null());
+        Ok(Exec { path, _args: args, argv })
+    }
+
+    /// returns only when execv fails
+    fn run(&self) {
+        // SAFETY: a path and a null-terminated argument list of C strings, alive for the call
+        unsafe {
+            execv(self.path.as_ptr(), self.argv.as_ptr());
+        }
+    }
+}
+
+/// this process without address randomization (what setarch -R does; started again so when it
+/// is not yet): the children trace starts then have its layout, whose /proc/self/maps names
+/// their addresses, and the same in every one.  Without it every child would have a layout of
+/// its own, and the traces, absolute addresses, would part where no secret decides; so no
+/// tracing then (an error) -- unless the system randomizes nothing anyway (randomize_va_space 0)
+fn unrandomized() -> Result<(), String> {
+    // SAFETY: personality as its manual page describes (0xffffffff only asks)
+    let p = unsafe { personality(0xffff_ffff) };
+    if p == -1 {
+        return Err("personality(2) does not answer: address randomization unknown".into());
+    }
+    let off = std::fs::read_to_string("/proc/sys/kernel/randomize_va_space").is_ok_and(|s| s.trim() == "0");
+    if p & ADDR_NO_RANDOMIZE != 0 || off {
+        return Ok(());
+    }
+    // SAFETY: as above, the persona with one flag more
+    if unsafe { personality((p | ADDR_NO_RANDOMIZE) as u64) } == -1 {
+        return Err("address randomization cannot be turned off (personality(2) refuses ADDR_NO_RANDOMIZE)".into());
+    }
+    let why = match Exec::new(std::env::args_os().map(|a| a.into_encoded_bytes())) {
+        Ok(e) => {
+            e.run();
+            String::from("execv failed")
+        }
+        Err(e) => e,
+    };
+    Err(format!("the probe could not start again without address randomization: {}", why))
+}
+
 /// the addresses the operation of `name` reaches with the secret of `seed`: the target of every
 /// taken branch (PTRACE_SINGLEBLOCK) or every instruction (PTRACE_SINGLESTEP); with `fine_from`,
 /// after that many entries every instruction, at most FINE_MAX more
 fn trace(name: &str, seed: u64, step: i32, fine_from: usize) -> Result<Vec<u64>, String> {
-    // SAFETY: fork, ptrace, raise, waitpid and kill are called as their manual pages describe;
-    // the child only prepares, runs one operation and ends with _exit.
+    // The child is the probe started anew (--child), not a fork that goes on: a fork takes the
+    // parent's stack and heap over, and those differ between the secrets (the depth of the call
+    // that got here, the traces allocated before), while memset's and memcpy's ways follow the
+    // alignment of the addresses they get -- at opt-level z on ARM64, HMAC-SHA1's buffers on the
+    // stack lay 112 bytes deeper for the second and third secret, and memset took two rounds
+    // more.  Started anew, without address randomization (main), every secret's run begins with
+    // the same layout; the seed has a fixed width, so the arguments on the new stack are as long.
+    let exec = Exec::new([b"probe".to_vec(), b"--child".to_vec(), name.as_bytes().to_vec(), format!("{:020}", seed).into_bytes()])?;
+    // SAFETY: fork, ptrace, execv, waitpid and kill are called as their manual pages describe;
+    // the child only asks to be traced and becomes the probe (--child), or ends with _exit.
     unsafe {
         let pid = fork();
         if pid < 0 {
@@ -504,18 +650,20 @@ fn trace(name: &str, seed: u64, step: i32, fine_from: usize) -> Result<Vec<u64>,
         }
         if pid == 0 {
             ptrace(PTRACE_TRACEME, 0i32, 0usize, 0usize);
-            let mut op = prepare(name, seed);
-            raise(SIGSTOP);
-            op();
-            raise(SIGSTOP);
-            _exit(0);
+            exec.run();
+            _exit(127);
         }
         let mut st = 0i32;
         let end = |pid: i32, st: &mut i32| {
             kill(pid, SIGKILL);
             waitpid(pid, st, 0);
         };
-        if waitpid(pid, &mut st, 0) != pid || st & 0xff != 0x7f || (st >> 8) & 0xff != SIGSTOP {
+        // its stop at execv (a SIGTRAP, PTRACE_TRACEME), then on to its own before the operation
+        if waitpid(pid, &mut st, 0) != pid || st & 0xff != 0x7f || (st >> 8) & 0xff != SIGTRAP {
+            end(pid, &mut st);
+            return Err(format!("the child did not start (status {:#x})", st));
+        }
+        if ptrace(PTRACE_CONT, pid, 0usize, 0usize) < 0 || waitpid(pid, &mut st, 0) != pid || st & 0xff != 0x7f || (st >> 8) & 0xff != SIGSTOP {
             end(pid, &mut st);
             return Err(format!("the child did not stop before the operation (status {:#x})", st));
         }
@@ -530,7 +678,13 @@ fn trace(name: &str, seed: u64, step: i32, fine_from: usize) -> Result<Vec<u64>,
                 return Err(format!("the child ended during the operation (status {:#x})", st));
             }
             match (st >> 8) & 0xff {
-                SIGTRAP => out.push(ptrace(PTRACE_PEEKUSER, pid, RIP, 0usize) as u64),
+                SIGTRAP => match pc_of(pid) {
+                    Some(pc) => out.push(pc),
+                    None => {
+                        end(pid, &mut st);
+                        return Err("the child's program counter could not be read".into());
+                    }
+                },
                 SIGSTOP => break,
                 sig => {
                     end(pid, &mut st);
@@ -597,9 +751,26 @@ fn main() {
             op();
             println!("{} us", t.elapsed().as_micros());
         }
+        Some("--child") => {
+            // one secret's run, started by trace: prepare, stop, the operation, stop
+            let name = args.get(2).map(String::as_str).unwrap_or("");
+            let seed: u64 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1);
+            let mut op = prepare(name, seed);
+            // SAFETY: raise and _exit as their manual pages describe
+            unsafe {
+                raise(SIGSTOP);
+                op();
+                raise(SIGSTOP);
+                _exit(0);
+            }
+        }
         Some(name) => {
+            if let Err(e) = unrandomized() {
+                println!("error {}", e);
+                std::process::exit(3);
+            }
             let seeds: u64 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(3).max(2);
-            let mut step = if std::env::var("CT_STEP").as_deref() == Ok("step") { PTRACE_SINGLESTEP } else { PTRACE_SINGLEBLOCK };
+            let mut step = if std::env::var("CT_STEP").as_deref() == Ok("step") || cfg!(target_arch = "aarch64") { PTRACE_SINGLESTEP } else { PTRACE_SINGLEBLOCK };
             let mut first = trace(name, 1, step, usize::MAX);
             if step == PTRACE_SINGLEBLOCK && first.as_ref().is_err_and(|e| e == "no-block") {
                 // a processor or virtual machine without the branch trap: every instruction
@@ -614,33 +785,67 @@ fn main() {
                     std::process::exit(3);
                 }
             };
+            let traced = |seed: u64| match trace(name, seed, step, usize::MAX) {
+                Ok(t) => t,
+                Err(e) => {
+                    println!("error {}", e);
+                    std::process::exit(3);
+                }
+            };
+            // every secret against the first: the earliest parting counts (an expected late one,
+            // Argon2id's, must not hide an early one of another secret); its trace is made again
+            // at the end, so at most two are held (single steps on ARM64 take hundreds of MB)
+            let mut earliest: Option<(usize, u64)> = None;
             for seed in 2..=seeds {
-                let other = match trace(name, seed, step, usize::MAX) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        println!("error {}", e);
-                        std::process::exit(3);
-                    }
-                };
+                let other = traced(seed);
                 if other != first {
                     let i = first.iter().zip(&other).position(|(a, b)| a != b).unwrap_or(first.len().min(other.len()));
-                    let maps = Maps::read();
-                    let at = match parting(name, step, seed, &first, &other) {
-                        Ok((br, na, nb, callers)) => {
-                            let c: Vec<String> = callers.iter().map(|&x| maps.locate(Some(x))).collect();
-                            [maps.locate(br), maps.locate(na), maps.locate(nb), if c.is_empty() { String::from("-") } else { c.join(",") }]
-                        }
-                        Err(e) => [e.replace(' ', "_"), String::from("-"), String::from("-"), String::from("-")],
-                    };
-                    println!("diff {} {} {} {} {} {} {} {}", i, first.len(), other.len(), at[0], at[1], at[2], at[3], mode);
-                    return;
+                    if earliest.is_none_or(|(e, _)| i < e) {
+                        earliest = Some((i, seed));
+                    }
                 }
             }
-            println!("same {} {}", first.len(), mode);
+            let Some((i, seed)) = earliest else {
+                println!("same {} {}", first.len(), mode);
+                return;
+            };
+            let other = traced(seed);
+            let maps = Maps::read();
+            let at = match parting(name, step, seed, &first, &other) {
+                Ok((br, na, nb, callers)) => {
+                    let c: Vec<String> = callers.iter().map(|&x| maps.locate(Some(x))).collect();
+                    [maps.locate(br), maps.locate(na), maps.locate(nb), if c.is_empty() { String::from("-") } else { c.join(",") }]
+                }
+                Err(e) => [e.replace(' ', "_"), String::from("-"), String::from("-"), String::from("-")],
+            };
+            println!("diff {} {} {} {} {} {} {} {}", i, first.len(), other.len(), at[0], at[1], at[2], at[3], mode);
         }
         None => {
-            eprintln!("usage: probe --list | TARGET [SEEDS] | --run TARGET SEED");
+            eprintln!("usage: probe --list | TARGET [SEEDS] | --run TARGET SEED | --memcheck TARGET SEED");
             std::process::exit(2);
         }
     }
+}
+
+// ------------------------------------------------------------------ wasm32
+
+/// the marks around the operation: a call the trace shows (ct_check.py --wasm looks for it)
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+#[inline(never)]
+pub extern "C" fn ct_mark() {
+    black_box(());
+}
+
+/// TARGETS[index] with the inputs of secret `seed`, prepared before the first mark, run between
+/// the marks -> 0, or 1 for an index past the list
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+pub extern "C" fn ct_run(index: u32, seed: u64) -> u32 {
+    let Some(name) = TARGETS.get(index as usize) else { return 1 };
+    let mut op = prepare(name, seed);
+    ct_mark();
+    op();
+    ct_mark();
+    0
 }
