@@ -428,6 +428,7 @@ impl Ui {
             let (a0, z0) = (a.max(ls), z.min(le));
             let x0 = x.wrapping_add(self.text.caret_x(&self.m.edit.buf[ls..], a0 - ls));
             let x1 = x.wrapping_add(self.text.caret_x(&self.m.edit.buf[ls..], z0 - ls));
+            let (x0, x1) = (x0.min(x1), x0.max(x1)); // a right-to-left word: its start on the right
             self.spell_wave(x0, x1, base);
             let (lh, win) = (self.dp(20), self.uiw_cur);
             if let Some(m) = self.m.edit.spell.menu.as_mut() {
