@@ -112,6 +112,7 @@ DECLASSIFIED = [
 # own frames whose declassification holds only for errors raised inside std's text handling
 TEXT_FILES = ("crypto/b64.rs", "netio/pem.rs", "netio/ssh.rs")
 # operations whose way may depend on the secret by design, from this fraction of it on
+# (a share of the first secret's trace: a parting of any secret before it is a difference)
 KNOWN = {
     "argon2id": (0.5, "Argon2id addresses its memory by the password after the first half of the "
                       "first pass (RFC 9106 3.4), and memcpy's path follows the addresses"),
@@ -311,7 +312,9 @@ def check(level, exe, targets, seeds, step):
             i, na, nb, branch, a, b, caller = r[1:8]
             unit = "branches" if mode == "block" else "instructions"
             known = KNOWN.get(t)
-            if known and int(i) >= known[0] * min(int(na), int(nb)):
+            # one threshold for every secret, of the first secret's trace (the reference the
+            # parting is counted in): so the earliest parting the probe reports decides for all
+            if known and int(i) >= known[0] * int(na):
                 same += 1
                 lines.append(f"  {t:<24} differs after {i} of {na} {unit}, as expected: {known[1]}")
                 continue
@@ -687,7 +690,9 @@ def check_wasm(level, wasm, targets, seeds):
             continue
         pos = where[0] if where else 0
         known = KNOWN.get(t)
-        if known and pos >= known[0] * min(na, nb):
+        # one threshold for every secret, of the first secret's run (the reference the parting is
+        # counted in): so the earliest parting, the one wasm_diff returns, decides for all
+        if known and pos >= known[0] * na:
             same += 1
             lines.append(f"  {t:<24} differs after {pos} of {na} wasm instructions, as expected: {known[1]}")
             continue
