@@ -17,7 +17,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [gfx](#gfx) -- surfaces, the draw context, blend kernels, paths, strokes, masks, gradients
   <br>[lib.rs](#gfx-crate-root) · [blend.rs](#gfxblendrs) · [blendmode.rs](#gfxblendmoders) · [dash.rs](#gfxdashrs) · [flood.rs](#gfxfloodrs) · [gradient.rs](#gfxgradientrs) · [path.rs](#gfxpathrs) · [panel.rs](#gfxpanelrs) · [pathdata.rs](#gfxpathdatars) · [raster.rs](#gfxrasterrs) · [shapes.rs](#gfxshapesrs) · [straight.rs](#gfxstraightrs) · [stroke.rs](#gfxstrokers) · [tmask.rs](#gfxtmaskrs) · [xform.rs](#gfxxformrs)
 - [text](#text) -- fonts (SGF1, TrueType, CFF, COLR), glyph cache, text runs
-  <br>[lib.rs](#text-crate-root) · [cff.rs](#textcffrs) · [colr.rs](#textcolrrs) · [fallback.rs](#textfallbackrs) · [font.rs](#textfontrs) · [fontconf.rs](#textfontconfrs) · [fontdb.rs](#textfontdbrs) · [glyphcache.rs](#textglyphcachers) · [lcd.rs](#textlcdrs) · [outline.rs](#textoutliners) · [record.rs](#textrecordrs) · [rendering.rs](#textrenderingrs) · [registry.rs](#textregistryrs) · [segment.rs](#textsegmentrs) · [ttf.rs](#textttfrs) · [shaping.rs](#textshapingrs) · [var.rs](#textvarrs)
+  <br>[lib.rs](#text-crate-root) · [bidi.rs](#textbidirs) · [cff.rs](#textcffrs) · [colr.rs](#textcolrrs) · [fallback.rs](#textfallbackrs) · [font.rs](#textfontrs) · [fontconf.rs](#textfontconfrs) · [fontdb.rs](#textfontdbrs) · [glyphcache.rs](#textglyphcachers) · [lcd.rs](#textlcdrs) · [outline.rs](#textoutliners) · [record.rs](#textrecordrs) · [rendering.rs](#textrenderingrs) · [registry.rs](#textregistryrs) · [segment.rs](#textsegmentrs) · [ttf.rs](#textttfrs) · [shaping.rs](#textshapingrs) · [var.rs](#textvarrs)
 - [spell](#spell) -- spell checking: Hunspell dictionaries, the system's checker, a personal word list
   <br>[lib.rs](#spell-crate-root) · [hyphen.rs](#spellhyphenrs) · [speller.rs](#spellspellerrs) · [token.rs](#spelltokenrs)
 - [img_core](#img_core) -- image I/O dispatch, records, metadata, colour, resampling, image operations
@@ -86,8 +86,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#x509-crate-root) · [der.rs](#x509derrs) · [ip.rs](#x509iprs)
 - [compress](#compress) -- DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids
   <br>[lib.rs](#compress-crate-root) · [brotli/mod.rs](#compressbrotlimodrs) · [checksum.rs](#compresschecksumrs) · [deflate/mod.rs](#compressdeflatemodrs) · [deflate/dec.rs](#compressdeflatedecrs) · [deflate/enc.rs](#compressdeflateencrs) · [gzip.rs](#compressgziprs) · [lz4.rs](#compresslz4rs) · [xxh.rs](#compressxxhrs) · [zlib.rs](#compresszlibrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/enc.rs](#compresszstdencrs)
-- [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery
-  <br>[lib.rs](#datastore-crate-root) · [journal.rs](#datastorejournalrs)
+- [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery, secondary indexes, encryption at rest
+  <br>[lib.rs](#datastore-crate-root) · [index.rs](#datastoreindexrs) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
   <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng
@@ -13630,6 +13630,10 @@ colour glyphs), the glyph cache and text runs                        [src/text/*
                                  on opaque targets (lcd.rs); NONE (default): greyscale
   set_fallback_fonts / set_system_fallback / fallback_for   characters the font lacks come
                                  from other fonts (fallback.rs; also when shaping)
+  set_bidi(on) / has_rtl(s)      (default on) lines with right-to-left characters in their
+                                 visual order, Hebrew and Arabic shaped by their fallback
+                                 font, also while set_shaping is off (bidi.rs); other lines
+                                 keep their metrics
   record_n / record_icon / glyphs   glyphs placed now, blended later from the glyph cache by
                                  any thread (record.rs: GlyphRec, GlyphView)
   var_axes / var_instances / var_values / vary / vary_named   variable fonts: their axes,
@@ -13700,6 +13704,42 @@ FONT_ICON: u32 = 3
   size (filled from x, w px long; y = baseline)
 - **`fn icon_draw(&mut self, dc: &mut Dc, sf: &mut Surface, cp: u32, x: i32, y: i32, size_fx: i32)`**
   icon_draw(cp, x, y, size_fx): the icon's em box has its top-left corner at x, y
+
+### `text/bidi.rs`
+
+Source: [`lib/text/bidi.rs`](../lib/text/bidi.rs)
+
+```text
+bidi -- lines with right-to-left characters in their visual order, also without set_shaping
+
+  has_rtl(s)                       s has right-to-left characters (what set_bidi lays out)
+  set_bidi(on) -> previous         (default on) a line with right-to-left characters (Hebrew,
+                                   Arabic, Syriac, Thaana, N'Ko, ... or the marks RLM, RLE,
+                                   RLO, RLI) is laid out by the Unicode bidi algorithm while
+                                   shaping is off; off: every line in logical order (text
+                                   that is in visual order already)
+
+The line's directional runs come in visual order (text_shape::visual_runs; the line's
+direction is that of its first strong character).  A right-to-left run's characters from a
+TrueType / OpenType font (the fallback font of Hebrew or Arabic, usually) are shaped with
+it (HarfRust: Arabic joining, marks, ligatures, mirrored brackets); the others are drawn
+one grapheme cluster after the other as run draws them, right to left, brackets mirrored.
+Left-to-right runs are drawn as run draws them.  Draw, measure, caret_x, hit and
+selection_spans all read the same layout (shaping.rs: the line laid out last, with the 128
+bidi lines before it).  Lines without right-to-left characters keep run's metrics and
+pixels.
+```
+
+- **`fn has_rtl(s: &[u8]) -> bool`**
+  Whether s has right-to-left characters (Hebrew, Arabic, ... or the marks RLM, RLE, RLO,
+  RLI): a line with them is laid out in its visual order (set_bidi). Views that place their
+  carets by logical prefixes draw such text cluster by cluster to keep the logical order.
+
+**`impl Text`**
+
+- **`fn set_bidi(&mut self, on: bool) -> bool`**
+  Lay out lines with right-to-left characters in their visual order while shaping is off
+  (default on). Returns the previous state.
 
 ### `text/cff.rs`
 
@@ -43745,7 +43785,7 @@ block.  The decoder's repeat offsets do not move on raw blocks, so the encoder r
 
 ## datastore
 
-*an embedded journal database: JSON collections, transactions, snapshots, crash recovery* -- crate root [`lib/datastore/lib.rs`](../lib/datastore/lib.rs)
+*an embedded journal database: JSON collections, transactions, snapshots, crash recovery, secondary indexes, encryption at rest* -- crate root [`lib/datastore/lib.rs`](../lib/datastore/lib.rs)
 
 ```text
 datastore -- an embedded, crash-safe store for one server process: collections of JSON
@@ -43757,18 +43797,27 @@ append-only journals for logs that grow without bound (audit, session logs)
   write(|tx| { tx.put(coll, id, v); tx.delete(coll, id); }) -> Result<seq>
   update(coll, id, |v| ...)                                     read-modify-write in one txn
   compact()                                                     snapshot now
-  Journal::open(dir, durable) / append(name, yyyymm, &value) / tail(name, n) / read_month(name, yyyymm)
+  add_index(coll, name, Index::field("owner").unique()) / find / find_one / range
+                                secondary indexes in memory (index.rs), unique ones refuse a
+                                transaction that breaks them (StoreError::Conflict)
+  Store::open_encrypted(dir, opts, &key) / rekey(Some(&key) | None)   encryption at rest
+                                (seal.rs): snapshots and log sealed, rekey encrypts, changes
+                                the key or decrypts
+  Journal::open(dir, durable) / open_encrypted(dir, durable, &key) / append(name, yyyymm,
+       &value) / tail(name, n) / read_month(name, yyyymm) / rekey
 
 Files in `dir`: LOCK, snap-<seq>.bcs, wal-<first seq>.log; journal/<name>/<yyyymm>.jl.
   snapshot: "BCS1" seq:u64 | colls:u32 | per collection name, records:u32 | per record id,
-            JSON | BLAKE3 of everything before (32 bytes)
+            JSON | BLAKE3 of everything before (32 bytes); encrypted: "BCE1" (seal.rs)
   WAL frame: "BCW1" len:u32 seq:u64 payload BLAKE3(len ‖ seq ‖ payload)[..16]; the payload is
-            a JSON array of ["put", coll, id, value] / ["del", coll, id]
+            a JSON array of ["put", coll, id, value] / ["del", coll, id]; encrypted: "BCW2"
+            and the payload sealed (seal.rs)
 A transaction is one frame, written and fsynced before it becomes visible.  Opening loads the
 newest valid snapshot and replays the frames after it.  A torn frame at the very end (a crash
 during a write) is cut off; a damaged frame with intact data behind it stops the open with
-StoreError::Corrupt unless Options::repair is set (then the log is cut there).
-Values are plain JSON: secrets are sealed by the caller (crypto::aead) before they get here.
+StoreError::Corrupt unless Options::repair is set (then the log is cut there).  An encrypted
+store always has a snapshot (one at seq 0 when it is new): its key id names the key.  A store
+opened with the wrong key, or one of the other kind, is StoreError::Key, never repaired.
 ```
 
 ### `datastore` crate root
@@ -43781,6 +43830,10 @@ Values are plain JSON: secrets are sealed by the caller (crypto::aead) before th
   - `Io(String)` -- reading or writing a file failed
   - `Corrupt(String)` -- a damaged log frame with intact data behind it (open with repair to cut the log there)
   - `TooLarge` -- a record or transaction over the size limits
+  - `Conflict(String)` -- a transaction or a new index that would give two records the key of a unique index
+  - `Key(String)` -- the store is encrypted and no key was given, it is not and one was, or it is sealed
+    with another key
+  - `NoIndex(String)` -- no index of this name on the collection (Store::add_index)
 
 - **`type StoreResult<T> = Result<T, StoreError>`**
 
@@ -43815,6 +43868,12 @@ Values are plain JSON: secrets are sealed by the caller (crypto::aead) before th
 
 - **`fn open(dir: &str) -> StoreResult<Store>`**
 - **`fn open_with(dir: &str, opts: Options) -> StoreResult<Store>`**
+- **`fn open_encrypted(dir: &str, opts: Options, key: &[u8; 32]) -> StoreResult<Store>`**
+  open an encrypted store (a new one in an empty or missing folder) with its 32-byte key,
+  for example one kept in the system's secret store (plat::secret::secret_get).  A store
+  in the clear, or one sealed with another key, is StoreError::Key
+- **`fn encrypted(&self) -> bool`**
+  whether the store is encrypted
 - **`fn recovery(&self) -> &Recovery`**
   what open() found and repaired
 - **`fn seq(&self) -> u64`**
@@ -43838,6 +43897,84 @@ Values are plain JSON: secrets are sealed by the caller (crypto::aead) before th
   change one record in place (None: it does not exist)
 - **`fn compact(&self) -> StoreResult<()>`**
   write a snapshot now and start a new log
+- **`fn rekey(&self, key: Option<&[u8; 32]>) -> StoreResult<()>`**
+  encrypt the store with `key`, change its key, or (None) keep it in the clear again: a
+  snapshot under the new key and a new log, then every other snapshot and log goes (they
+  are under the old key).  Removed, not wiped: on an SSD nothing promises the old blocks
+  are gone.  A crash in between leaves the new snapshot, which the new key opens.  Err(Io)
+  after the switch names files under the old key that could not be removed
+- **`fn add_index(&self, coll: &str, name: &str, def: Index) -> StoreResult<()>`**
+  index the records of a collection (built now from what is there, kept up to date by
+  every commit; replaces an index of the same name).  A unique index over records that
+  share a key is refused (Conflict), and from then on every transaction that would make
+  two share one.  Indexes are not stored: add them after each open
+- **`fn drop_index(&self, coll: &str, name: &str) -> bool`**
+  remove an index -> whether there was one
+- **`fn index_names(&self, coll: &str) -> Vec<String>`**
+  the names of a collection's indexes
+- **`fn find(&self, coll: &str, index: &str, key: &Key) -> StoreResult<Vec<(String, Value)>>`**
+  the records that have `key` in the index, ordered by id
+- **`fn find_one(&self, coll: &str, index: &str, key: &Key) -> StoreResult<Option<(String, Value)>>`**
+  the first record that has `key` (the one of a unique index)
+- **`fn range(&self, coll: &str, index: &str, keys: impl RangeBounds<Key>, order: Order, limit: usize) -> StoreResult<Vec<(String, Value)>>`**
+  the records whose keys lie in `keys`, by key and then id (Desc: the other way round),
+  at most `limit` (usize::MAX: all); a record with several keys in the range comes once
+  for each
+- **`fn count_key(&self, coll: &str, index: &str, key: &Key) -> StoreResult<usize>`**
+  how many records have `key` in the index
+
+### `datastore/index.rs`
+
+Source: [`lib/datastore/index.rs`](../lib/datastore/index.rs)
+
+```text
+index -- secondary indexes of a collection: keys of a record (a field, or a function of the
+record) -> the ids that have them, kept in memory beside the data and updated by every
+commit.  A unique index refuses a transaction that would give two records one key
+(StoreError::Conflict) before anything is written.
+
+  Key            Bool < Int < Str (by kind, then value); Key::of(&Value): strings, booleans
+                 and integral numbers (i64 and u64), nothing else
+  Index::field("owner.id") / Index::by(|id, v| keys) / .unique()
+  Store::add_index / drop_index / find / find_one / range (lib.rs)
+
+Indexes are not stored: an app adds them after every open, and they are built from the
+records then (one pass).  An array at a field's path gives one key per element; missing
+members, null, objects and fractions give none (the record is not in the index).
+```
+
+- **`enum Key`**
+  a key of an index
+  - `Bool(bool)`
+  - `Int(i128)` -- an integral number (every i64 and u64)
+  - `Str(String)`
+
+**`impl Key`**
+
+- **`fn of(v: &Value) -> Option<Key>`**
+  a JSON value as a key: a string, a boolean or an integral number; None for the rest
+  (null, arrays, objects, fractions and numbers beyond i64 and u64)
+
+- **`struct Index`**
+  what an index takes from a record: Index::field or Index::by, maybe unique
+
+**`impl Index`**
+
+- **`fn field(path: &str) -> Index`**
+  the value at a path of members, '.' between them ("owner" or "owner.id"); an array
+  there gives a key for each element that is one (Key::of)
+- **`fn by(f: impl Fn(&str, &Value) -> Vec<Key> + Send + Sync + 'static) -> Index`**
+  keys computed from a record (its id and value): a member name with a '.', several
+  fields together (as one Key::Str), a fraction scaled to an integer.  The keys of a
+  record are kept with it, so they are removed exactly when it changes
+- **`fn unique(mut self) -> Index`**
+  no two records may share a key (a record may have a key twice)
+- **`fn is_unique(&self) -> bool`**
+
+- **`enum Order`**
+  the order of Store::range
+  - `Asc` -- by key, then id
+  - `Desc` -- the other way round
 
 ### `datastore/journal.rs`
 
@@ -43847,6 +43984,9 @@ Source: [`lib/datastore/journal.rs`](../lib/datastore/journal.rs)
 journal -- append-only logs of JSON lines, one file per name and month
 (<dir>/<name>/<yyyymm>.jl): audit entries, session logs.  A line is complete or ignored (a
 crash during an append leaves at most one partial last line, which readers skip).
+Encrypted (open_encrypted): every line sealed on its own ("~" + base64url, seal.rs), bound
+to its journal and month; lines that do not open -- plain ones too -- are skipped.
+Journal::rekey rewrites the files for another key, or none.
 ```
 
 - **`struct Journal`**
@@ -43855,6 +43995,11 @@ crash during an append leaves at most one partial last line, which readers skip)
 
 - **`fn open(dir: &str, durable: bool) -> StoreResult<Journal>`**
   journals below `dir`; `durable`: fsync each append
+- **`fn open_encrypted(dir: &str, durable: bool, key: &[u8; 32]) -> StoreResult<Journal>`**
+  journals below `dir` whose lines are sealed with a 32-byte key (the key of a Store may
+  be used: the journal derives keys of its own)
+- **`fn encrypted(&self) -> bool`**
+  whether the lines are sealed
 - **`fn append(&self, name: &str, month: u32, v: &Value) -> StoreResult<()>`**
   append one entry to journal `name` in month `yyyymm` (e.g. 202610)
 - **`fn months(&self, name: &str) -> Vec<u32>`**
@@ -43867,6 +44012,13 @@ crash during an append leaves at most one partial last line, which readers skip)
   remove the months before `month` (retention)
 - **`fn remove(&self, name: &str)`**
   remove a whole journal (e.g. the log of a deleted session)
+- **`fn rekey(dir: &str, from: Option<&[u8; 32]>, to: Option<&[u8; 32]>) -> StoreResult<usize>`**
+  rewrite the journals below `dir` for another key: `from` (None: in the clear) is the
+  key they have, `to` the one they get (None: in the clear) -> the files rewritten.  Each
+  file is replaced whole (written aside, synced, renamed).  Interrupted, it is run again
+  with the same keys: lines that are under `to` already stay.  Lines that open under
+  neither (damaged, a third key) stay as they are, unreadable as before.  No Journal may
+  be open on `dir` meanwhile (an append could be lost)
 
 ## netio
 
