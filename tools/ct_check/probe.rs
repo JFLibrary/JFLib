@@ -17,8 +17,12 @@
 //                                     wasm-interp and compares the wasm instructions and memory
 //                                     addresses between the marks
 //
-// A child process is forked per secret: it prepares the inputs, stops itself (SIGSTOP), runs the
-// operation and stops again; the parent steps it in between and records where it goes.  MODE
+//   probe --child TARGET SEED         one secret's run, started by the tracing probe (below)
+//
+// A child process is started per secret, the probe anew (fork, then execv of --child), without
+// address randomization: so every secret's run begins with the same stack and heap, whatever the
+// tracing probe did before.  It prepares the inputs, stops itself (SIGSTOP), runs the operation
+// and stops again; the parent steps it in between and records where it goes.  MODE
 // block (PTRACE_SINGLEBLOCK, the processor's branch trap; x86-64): the target of every taken
 // branch; step (PTRACE_SINGLESTEP, CT_STEP=step, on ARM64, or where the branch trap is missing, as
 // in some virtual machines): every instruction, some thousand times slower.  Equal sequences for all secrets mean
@@ -35,6 +39,8 @@ use std::hint::black_box;
 
 unsafe extern "C" {
     fn fork() -> i32;
+    fn execv(path: *const std::ffi::c_char, argv: *const *const std::ffi::c_char) -> i32;
+    fn personality(persona: u64) -> i32;
     fn ptrace(request: i32, ...) -> i64;
     fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
     fn raise(sig: i32) -> i32;
@@ -43,7 +49,10 @@ unsafe extern "C" {
 }
 
 const PTRACE_TRACEME: i32 = 0;
+const PTRACE_CONT: i32 = 7;
 const PTRACE_SINGLESTEP: i32 = 9;
+/// personality(2): no address randomization (setarch -R)
+const ADDR_NO_RANDOMIZE: i32 = 0x0040000;
 /// stop after the next taken branch (x86: the processor's branch trap flag; ARM64 has none)
 const PTRACE_SINGLEBLOCK: i32 = 33;
 const SIGKILL: i32 = 9;
@@ -564,12 +573,47 @@ impl Maps {
     }
 }
 
+/// an execv of the probe itself: its path, the arguments (argv[0] first) and the pointers to them
+/// that execv takes, ending in null (they point into `_args`, which is kept for them)
+struct Exec {
+    path: std::ffi::CString,
+    _args: Vec<std::ffi::CString>,
+    argv: Vec<*const std::ffi::c_char>,
+}
+
+impl Exec {
+    fn new(args: impl IntoIterator<Item = Vec<u8>>) -> Result<Exec, String> {
+        let path = std::env::current_exe().map_err(|e| format!("the probe's own path: {}", e))?;
+        let path = std::ffi::CString::new(path.into_os_string().into_encoded_bytes()).map_err(|_| "a NUL in the probe's path")?;
+        let args = args.into_iter().map(std::ffi::CString::new).collect::<Result<Vec<_>, _>>().map_err(|_| "a NUL in an argument")?;
+        let mut argv: Vec<*const std::ffi::c_char> = args.iter().map(|a| a.as_ptr()).collect();
+        argv.push(std::ptr::null());
+        Ok(Exec { path, _args: args, argv })
+    }
+
+    /// returns only when execv fails
+    fn run(&self) {
+        // SAFETY: a path and a null-terminated argument list of C strings, alive for the call
+        unsafe {
+            execv(self.path.as_ptr(), self.argv.as_ptr());
+        }
+    }
+}
+
 /// the addresses the operation of `name` reaches with the secret of `seed`: the target of every
 /// taken branch (PTRACE_SINGLEBLOCK) or every instruction (PTRACE_SINGLESTEP); with `fine_from`,
 /// after that many entries every instruction, at most FINE_MAX more
 fn trace(name: &str, seed: u64, step: i32, fine_from: usize) -> Result<Vec<u64>, String> {
-    // SAFETY: fork, ptrace, raise, waitpid and kill are called as their manual pages describe;
-    // the child only prepares, runs one operation and ends with _exit.
+    // The child is the probe started anew (--child), not a fork that goes on: a fork takes the
+    // parent's stack and heap over, and those differ between the secrets (the depth of the call
+    // that got here, the traces allocated before), while memset's and memcpy's ways follow the
+    // alignment of the addresses they get -- at opt-level z on ARM64, HMAC-SHA1's buffers on the
+    // stack lay 112 bytes deeper for the second and third secret, and memset took two rounds
+    // more.  Started anew, without address randomization (main), every secret's run begins with
+    // the same layout; the seed has a fixed width, so the arguments on the new stack are as long.
+    let exec = Exec::new([b"probe".to_vec(), b"--child".to_vec(), name.as_bytes().to_vec(), format!("{:020}", seed).into_bytes()])?;
+    // SAFETY: fork, ptrace, execv, waitpid and kill are called as their manual pages describe;
+    // the child only asks to be traced and becomes the probe (--child), or ends with _exit.
     unsafe {
         let pid = fork();
         if pid < 0 {
@@ -577,18 +621,20 @@ fn trace(name: &str, seed: u64, step: i32, fine_from: usize) -> Result<Vec<u64>,
         }
         if pid == 0 {
             ptrace(PTRACE_TRACEME, 0i32, 0usize, 0usize);
-            let mut op = prepare(name, seed);
-            raise(SIGSTOP);
-            op();
-            raise(SIGSTOP);
-            _exit(0);
+            exec.run();
+            _exit(127);
         }
         let mut st = 0i32;
         let end = |pid: i32, st: &mut i32| {
             kill(pid, SIGKILL);
             waitpid(pid, st, 0);
         };
-        if waitpid(pid, &mut st, 0) != pid || st & 0xff != 0x7f || (st >> 8) & 0xff != SIGSTOP {
+        // its stop at execv (a SIGTRAP, PTRACE_TRACEME), then on to its own before the operation
+        if waitpid(pid, &mut st, 0) != pid || st & 0xff != 0x7f || (st >> 8) & 0xff != SIGTRAP {
+            end(pid, &mut st);
+            return Err(format!("the child did not start (status {:#x})", st));
+        }
+        if ptrace(PTRACE_CONT, pid, 0usize, 0usize) < 0 || waitpid(pid, &mut st, 0) != pid || st & 0xff != 0x7f || (st >> 8) & 0xff != SIGSTOP {
             end(pid, &mut st);
             return Err(format!("the child did not stop before the operation (status {:#x})", st));
         }
@@ -676,7 +722,34 @@ fn main() {
             op();
             println!("{} us", t.elapsed().as_micros());
         }
+        Some("--child") => {
+            // one secret's run, started by trace: prepare, stop, the operation, stop
+            let name = args.get(2).map(String::as_str).unwrap_or("");
+            let seed: u64 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1);
+            let mut op = prepare(name, seed);
+            // SAFETY: raise and _exit as their manual pages describe
+            unsafe {
+                raise(SIGSTOP);
+                op();
+                raise(SIGSTOP);
+                _exit(0);
+            }
+        }
         Some(name) => {
+            // without address randomization (what setarch -R does), started again so: the children
+            // then have the layout of this process, whose /proc/self/maps names their addresses,
+            // and the same in every one
+            // SAFETY: personality as its manual page describes
+            unsafe {
+                let p = personality(0xffff_ffff);
+                if p != -1 && p & ADDR_NO_RANDOMIZE == 0 && personality((p | ADDR_NO_RANDOMIZE) as u64) != -1 {
+                    if let Ok(e) = Exec::new(std::env::args_os().map(|a| a.into_encoded_bytes())) {
+                        e.run();
+                    }
+                    // no new start: the children as randomized as this process
+                    personality(p as u64);
+                }
+            }
             let seeds: u64 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(3).max(2);
             let mut step = if std::env::var("CT_STEP").as_deref() == Ok("step") || cfg!(target_arch = "aarch64") { PTRACE_SINGLESTEP } else { PTRACE_SINGLEBLOCK };
             let mut first = trace(name, 1, step, usize::MAX);
@@ -729,7 +802,7 @@ fn main() {
             println!("diff {} {} {} {} {} {} {} {}", i, first.len(), other.len(), at[0], at[1], at[2], at[3], mode);
         }
         None => {
-            eprintln!("usage: probe --list | TARGET [SEEDS] | --run TARGET SEED");
+            eprintln!("usage: probe --list | TARGET [SEEDS] | --run TARGET SEED | --memcheck TARGET SEED");
             std::process::exit(2);
         }
     }

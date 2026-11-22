@@ -30,10 +30,12 @@ executed wasm instructions and the addresses of every load, store, memory.copy a
 memcheck see on a processor, for the wasm the compiler made.  A browser's JIT turns it into
 machine code of its own, which no tool here sees.  Needs wasm-interp and wasm-objdump (WABT) and
 the target (rustup target add wasm32-unknown-unknown); runs anywhere those do.
-Linux on x86-64 or ARM64 (from Windows: runs itself again in WSL); needs cargo, binutils (addr2line,
-objdump) and util-linux' setarch (runs without address randomization; without it results may
-vary).  ARM64 has no branch trap for ptrace, so there the trace follows every instruction (as
---step does on x86-64): some minutes per level instead of seconds.  The workflow
+Linux on x86-64 or ARM64 (from Windows: runs itself again in WSL); needs cargo and binutils
+(addr2line, objdump).  The probe runs without address randomization (personality(2), as
+setarch -R) and starts every secret's run anew in that layout, so the ways of memcpy and the
+allocator, which follow addresses, are the same.  ARM64 has no branch trap for ptrace, so there
+the trace follows every instruction (as --step does on x86-64): some minutes per level instead of
+seconds.  The workflow
 .github/workflows/ct-check.yml runs it on both, on x86-64 and on an ARM64 runner.
 Exit code 1 on any difference."""
 import argparse
@@ -119,7 +121,6 @@ KNOWN = {
 }
 # folders cut from the paths in reports (the checked crate's parent is added by main)
 PREFIXES = [str(ROOT) + "/"]
-SETARCH = subprocess.run(["sh", "-c", "command -v setarch"], capture_output=True).returncode == 0
 
 
 def package_name(crate_dir):
@@ -281,10 +282,9 @@ def trace(exe, target, seeds, step):
     env = dict(os.environ)
     if step:
         env["CT_STEP"] = "step"
-    # without address randomization: the paths of memcpy and the allocator depend on addresses,
-    # which then are the same in every run
-    cmd = (["setarch", "-R"] if SETARCH else []) + [str(exe), target, str(seeds)]
-    p = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    # the probe turns address randomization off itself (as setarch -R) and starts every secret's
+    # run anew in that layout: the ways of memcpy and the allocator depend on addresses
+    p = subprocess.run([str(exe), target, str(seeds)], capture_output=True, text=True, env=env)
     return target, p.stdout.strip() or p.stderr.strip() or f"exit {p.returncode}"
 
 
