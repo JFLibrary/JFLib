@@ -38,6 +38,7 @@ vary).  ARM64 has no branch trap for ptrace, so there the trace follows every in
 Exit code 1 on any difference."""
 import argparse
 import concurrent.futures
+import functools
 import hashlib
 import os
 import platform
@@ -80,6 +81,9 @@ DECLASSIFIED = [
     ("crypto/p256.rs", r"ct_mask\(br & nonzero\) == 1", "secret_from: whether random bytes make a scalar is public (they are drawn again)"),
     ("crypto/p256.rs", r"p\.z == \[0; 4\]", "the point at infinity ends the operation (None): reaching it is public"),
     ("crypto/p256.rs", r"\(found != 0\)\.then_some", "y_for_x: the answer whether there is a point (EAP-PWD calls the branch-free core)"),
+    # ARM64 makes secret_from's answer without a branch (the Option's tag from the mask), and
+    # public_key's assert branches on it: the same answer, where it is used
+    ("crypto/p256.rs", r"assert!\(secret_from\(secret\)\.is_some\(\)", "public_key's assert takes secret_from's answer: whether the scalar is in [1, n - 1] is public"),
     # EAP-PWD: rand and mask are drawn again when they make no valid scalar; Scalar is sent
     ("crypto/eappwd.rs", r"scalar_ok\(rand\)|scalar_ok\(&scalar\)", "rand / mask that make no valid scalar are drawn again; Scalar itself is sent to the peer"),
     ("crypto/eappwd.rs", r"rounds < ROUNDS as u32 \|\| found == 0", "after the 40 rounds RFC 5931 asks for, a password without a point (2^-40) goes on"),
@@ -92,10 +96,16 @@ DECLASSIFIED = [
     ("crypto/lib.rs", r"s\.push\(\(b'0' \+ n", "the characters are ASCII by construction (std's String::push looks at the high bit)"),
     ("x509/lib.rs", r"\(seed\.len\(\) == 32\)\.then", "the PKCS #8 structure around the key is public"),
     ("ct_check/probe.rs", r"\.map\(\|kp\| kp\.public\)", "the probe takes the loader's answer (Some or None is its public verdict)"),
-    ("crypto/b64.rs", r"trim_end_matches|pad > 2|b\.len\(\) % 4|b\.chunks\(4\)|out\.push|with_capacity|c\.iter\(\)\.enumerate|for i in 0\.\.bytes|if bytes < 3", "padding and length are the public layout of the text (memcheck sees the length come from comparing the last characters with '=')"),
+    ("ct_check/probe.rs", r"pem::decode\(.*\.expect\(\"pem\"\)", "the probe takes the PEM decoder's answer (Some or None is its public verdict)"),
+    ("crypto/b64.rs", r"trim_end_matches|let bytes = c\.len\(\) - 1|pad > 2|b\.len\(\) % 4|b\.chunks\(4\)|out\.push|with_capacity|c\.iter\(\)\.enumerate|for i in 0\.\.bytes|if bytes < 3", "padding and length are the public layout of the text (memcheck sees the length come from comparing the last characters with '=')"),
     ("x509/der.rs", r".", "DER's tags and lengths are the public structure of a key file"),
     ("x509/lib.rs", r"fn ed25519_from_pkcs8|d\.u64\(\)\? != 0|is_ed25519_alg|read\(der::OCTET_STRING\)", "the PKCS #8 structure around the key is public"),
     ("crypto/lib.rs", r"for b in buf\.iter_mut\(\)|\*b = 0", "zeroize's length is the buffer's, which is public"),
+    # the Base64 decoder's answer where pem.rs takes it (ARM64 makes the Option's tag without a
+    # branch), and the body's tag: Option<String> keeps None in the capacity, which grows with
+    # the characters pushed, and their UTF-8 length is 1 (Base64 is ASCII by construction)
+    ("netio/pem.rs", r"if let Some\(d\) = crypto::b64::decode\(b\)", "the Base64 decoder's verdict (valid or not) is its public answer"),
+    ("netio/pem.rs", r"match body\.as_mut\(\)", "the body's tag lives in its capacity, which grows by the characters' UTF-8 length: 1, ASCII by construction"),
     ("netio/pem.rs", r".", "PEM's layout (markers, line ends) is public; Base64 characters are none of them"),
     ("netio/ssh.rs", r".", "the OpenSSH key file's layout and fields other than the key are public"),
 ]
@@ -117,6 +127,24 @@ def package_name(crate_dir):
     if not m:
         sys.exit(f"ct_check: no package name in {crate_dir / 'Cargo.toml'}")
     return m.group(1)
+
+
+# where the probe's image begins (build): above every range the debug information of dropped
+# functions gives from address 0
+IMAGE_BASE = 0x10000000
+
+
+@functools.lru_cache(maxsize=None)
+def image_base(exe):
+    """the lowest address of the probe's loaded segments (ELF64, little endian): an offset in
+    its mapping plus this is an address of the file, the one addr2line and objdump take"""
+    import struct
+    b = Path(exe).read_bytes()[:65536]
+    phoff, = struct.unpack_from("<Q", b, 0x20)
+    phentsize, phnum = struct.unpack_from("<HH", b, 0x36)
+    loads = [struct.unpack_from("<Q", b, phoff + i * phentsize + 16)[0] for i in range(phnum)
+             if struct.unpack_from("<I", b, phoff + i * phentsize)[0] == 1]
+    return min(loads, default=0) & ~0xfff
 
 
 def build(level, crate_dir, label):
@@ -160,10 +188,21 @@ debug = "line-tables-only"
     env = dict(os.environ, CARGO_TARGET_DIR=str(d / "target"))
     env.pop("RUSTFLAGS", None)
     # DWARF 4 line tables: valgrind 3.26 puts lines of a binary of many codegen units in the wrong
-    # files when they are DWARF 5 (memcheck's reports need the right line); code is the same
-    env["CARGO_ENCODED_RUSTFLAGS"] = "-Cdwarf-version=4"
-    p = subprocess.run(["cargo", "build", "--release", "--quiet", "--manifest-path", str(d / "Cargo.toml")],
-                       env=env, capture_output=True, text=True)
+    # files when they are DWARF 5 (memcheck's reports need the right line); code is the same.
+    # The image from IMAGE_BASE up: without LTO (o3, dev) the dependencies' unused functions are
+    # compiled and then dropped by the linker, and their debug information stays, from address 0
+    # on.  One as long as netpkt's decode::layers covered the first 96 KiB of ARM64's .text (at
+    # 0x6080: crypto's code there was decode.rs to valgrind and addr2line alike; x86-64's .text
+    # began after most of it, by luck).  Above 256 MiB no range from 0 reaches the code; the
+    # machine code of each function is the same (keeping the dropped functions instead does not
+    # link: they name what only an app defines, plat's jfgui_main).  --image-base: lld and GNU ld
+    # 2.38 on; -Ttext-segment: older GNU ld
+    for base_flag in (f"--image-base={IMAGE_BASE:#x}", f"-Ttext-segment={IMAGE_BASE:#x}"):
+        env["CARGO_ENCODED_RUSTFLAGS"] = "\x1f".join(["-Cdwarf-version=4", f"-Clink-arg=-Wl,{base_flag}"])
+        p = subprocess.run(["cargo", "build", "--release", "--quiet", "--manifest-path", str(d / "Cargo.toml")],
+                           env=env, capture_output=True, text=True)
+        if p.returncode == 0 or base_flag.split("=")[0].lstrip("-") not in p.stdout + p.stderr:
+            break
     if p.returncode != 0:
         sys.stderr.write(p.stdout + p.stderr)
         sys.exit(f"ct_check: the probe did not build at level {level}")
@@ -174,7 +213,8 @@ def frames(exe, off):
     """addr2line's inlined frames at an offset of the probe: [(function, file:line)], innermost
     first.  Asked twice with -a, the second answer counts: binutils' addr2line gives the first
     address of a compilation unit no line"""
-    p = subprocess.run(["addr2line", "-a", "-f", "-C", "-i", "-e", str(exe), hex(off), hex(off)], capture_output=True, text=True)
+    at = hex(off + image_base(exe))
+    p = subprocess.run(["addr2line", "-a", "-f", "-C", "-i", "-e", str(exe), at, at], capture_output=True, text=True)
     blocks = re.split(r"^0x[0-9a-f]+$", p.stdout, flags=re.M)
     lines = blocks[-1].strip("\n").split("\n") if len(blocks) > 2 else []
     out = []
@@ -192,6 +232,7 @@ def has_line(fr):
 
 def label(exe, off):
     """objdump's symbol label at an offset of the probe ('bcmp@plt', 'crypto::p256::mul+0x1c')"""
+    off += image_base(exe)
     p = subprocess.run(["objdump", "-d", "-C", "--no-show-raw-insn", f"--start-address={off:#x}", f"--stop-address={off + 1:#x}", str(exe)],
                        capture_output=True, text=True)
     m = re.findall(r"<([^>]+)>:", p.stdout)
@@ -317,9 +358,9 @@ def resymbolize(exe, errors, span=None):
     """valgrind 3.26 puts lines of a binary of many codegen units into the wrong files; its
     function names are right.  The frames inside the probe get their (inlined) functions and
     lines from addr2line instead, at the load address under which addr2line names the same
-    functions as valgrind.  `span` is where the probe says it was loaded (valgrind's choice:
-    0x4000000 on x86-64, lower on ARM64); without it, x86-64's.  Every frame comes back as
-    (function, file, line)"""
+    functions as valgrind.  `span` is where the probe says it was loaded (valgrind's choice,
+    which differs between architectures and linkers); without it, x86-64's of a probe from
+    address 0.  Every frame comes back as (function, file, line)"""
     lo, hi = span if span else (0x1000000, 1 << 64)
     addrs = sorted({fr[3] - (1 if fr[4] else 0) for _, frames in errors for fr in frames if lo <= fr[3] < hi})
     if not addrs:
@@ -327,7 +368,7 @@ def resymbolize(exe, errors, span=None):
 
     def lookup(base, some):
         # each address asked twice: binutils' addr2line answers the first one of a unit without a line
-        args = [hex(a - base) for a in some for _ in (0, 1)]
+        args = [hex(a - base + img) for a in some for _ in (0, 1)]
         out = subprocess.run(["addr2line", "-a", "-f", "-C", "-i", "-e", str(exe)] + args, capture_output=True, text=True).stdout
         blocks = re.split(r"^0x([0-9a-f]+)$", out, flags=re.M)[1:]
         res = {}
@@ -340,9 +381,10 @@ def resymbolize(exe, errors, span=None):
             for fn, at in zip(lines[0::2], lines[1::2]):
                 m = re.match(r"(.*):(\d+)", at)
                 fr.append((fn, m.group(1) if m else at, int(m.group(2)) if m else 0))
-            res[off + base] = fr
+            res[off - img + base] = fr
         return res
 
+    img = image_base(exe)
     names = {fr[3] - (1 if fr[4] else 0): fr[0] for _, frames in errors for fr in frames}
     best, base = -1, None
     for b in dict.fromkeys(([span[0]] if span else []) + [0x4000000, 0x108000, 0x400000, 0]):
@@ -381,9 +423,10 @@ def declassified(fr, frames):
     for file, pattern, why in DECLASSIFIED:
         if not path.endswith(file) or not re.search(pattern, text):
             continue
-        # a text file's entry covers std's text handling under it, and its own lines when the
-        # pattern names them; netio's parsers of the decoded structure are public layout too
-        if file in TEXT_FILES and file != "crypto/b64.rs" and frames and frames[0][1] == path and "ssh.rs" not in file:
+        # a text file's catch-all covers std's text handling under it, not its own lines (those
+        # need an entry that names them); netio's parsers of the decoded structure are public
+        # layout too
+        if pattern == "." and file in TEXT_FILES and file != "crypto/b64.rs" and frames and frames[0][1] == path and "ssh.rs" not in file:
             continue
         return why
     return None
@@ -391,7 +434,11 @@ def declassified(fr, frames):
 
 def memcheck_one(exe, target):
     log = exe.parent.parent.parent / f"memcheck-{target}.log"
-    cmd = [VALGRIND, "--tool=memcheck", "-q", "--error-exitcode=99", "--track-origins=yes", "--num-callers=40",
+    # ARM64: smaller translation blocks.  VEX's ARM64 back end has 4 KiB of spill slots, and a
+    # long run of straight-line code (AES, with --track-origins' shadows) needed more
+    # ("genSpill_ARM64: Assertion `offsetB < 4096' failed"); what memcheck sees is the same
+    small = ["--vex-guest-max-insns=32", "--vex-guest-chase=no"] if platform.machine() in ("aarch64", "arm64") else []
+    cmd = [VALGRIND, "--tool=memcheck", "-q", "--error-exitcode=99", "--track-origins=yes", "--num-callers=40", *small,
            "--fullpath-after=", f"--log-file={log}", str(exe), "--memcheck", target, "1"]
     p = subprocess.run(cmd, capture_output=True, text=True)
     text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
@@ -595,10 +642,13 @@ def wasm_diff(wasm, mark, names, index, digests):
     for s, d in enumerate(digests, start=1):
         if d[2] < 2:
             return ("error", f"secret {s}: the marks were not reached ({d[2]}): did wasm-interp run it?")
-    for s, other in enumerate(digests[1:], start=2):
-        if other[1] != first[1]:
-            return ("diff", wasm_parting(wasm, mark, names, index, s), first[0], other[0])
-    return None
+    # every differing secret's parting: the earliest counts (an expected late one, Argon2id's,
+    # must not hide an early one of another secret)
+    parts = [(wasm_parting(wasm, mark, names, index, s), other[0]) for s, other in enumerate(digests[1:], start=2) if other[1] != first[1]]
+    if not parts:
+        return None
+    where, count = min(parts, key=lambda p: p[0][0] if p[0] else 0)
+    return ("diff", where, first[0], count)
 
 
 def check_wasm(level, wasm, targets, seeds):

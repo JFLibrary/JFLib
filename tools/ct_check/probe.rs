@@ -693,29 +693,40 @@ fn main() {
                     std::process::exit(3);
                 }
             };
+            let traced = |seed: u64| match trace(name, seed, step, usize::MAX) {
+                Ok(t) => t,
+                Err(e) => {
+                    println!("error {}", e);
+                    std::process::exit(3);
+                }
+            };
+            // every secret against the first: the earliest parting counts (an expected late one,
+            // Argon2id's, must not hide an early one of another secret); its trace is made again
+            // at the end, so at most two are held (single steps on ARM64 take hundreds of MB)
+            let mut earliest: Option<(usize, u64)> = None;
             for seed in 2..=seeds {
-                let other = match trace(name, seed, step, usize::MAX) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        println!("error {}", e);
-                        std::process::exit(3);
-                    }
-                };
+                let other = traced(seed);
                 if other != first {
                     let i = first.iter().zip(&other).position(|(a, b)| a != b).unwrap_or(first.len().min(other.len()));
-                    let maps = Maps::read();
-                    let at = match parting(name, step, seed, &first, &other) {
-                        Ok((br, na, nb, callers)) => {
-                            let c: Vec<String> = callers.iter().map(|&x| maps.locate(Some(x))).collect();
-                            [maps.locate(br), maps.locate(na), maps.locate(nb), if c.is_empty() { String::from("-") } else { c.join(",") }]
-                        }
-                        Err(e) => [e.replace(' ', "_"), String::from("-"), String::from("-"), String::from("-")],
-                    };
-                    println!("diff {} {} {} {} {} {} {} {}", i, first.len(), other.len(), at[0], at[1], at[2], at[3], mode);
-                    return;
+                    if earliest.is_none_or(|(e, _)| i < e) {
+                        earliest = Some((i, seed));
+                    }
                 }
             }
-            println!("same {} {}", first.len(), mode);
+            let Some((i, seed)) = earliest else {
+                println!("same {} {}", first.len(), mode);
+                return;
+            };
+            let other = traced(seed);
+            let maps = Maps::read();
+            let at = match parting(name, step, seed, &first, &other) {
+                Ok((br, na, nb, callers)) => {
+                    let c: Vec<String> = callers.iter().map(|&x| maps.locate(Some(x))).collect();
+                    [maps.locate(br), maps.locate(na), maps.locate(nb), if c.is_empty() { String::from("-") } else { c.join(",") }]
+                }
+                Err(e) => [e.replace(' ', "_"), String::from("-"), String::from("-"), String::from("-")],
+            };
+            println!("diff {} {} {} {} {} {} {} {}", i, first.len(), other.len(), at[0], at[1], at[2], at[3], mode);
         }
         None => {
             eprintln!("usage: probe --list | TARGET [SEEDS] | --run TARGET SEED");
