@@ -36,7 +36,7 @@ use crate::checksum::adler32;
 use super::Error;
 
 const FAST_BITS: u32 = 10;
-const FAST_MASK: u64 = 1023;
+pub(super) const FAST_MASK: u64 = 1023;
 const PAD_MAX: u32 = 8;
 
 pub static LBASE: [u16; 32] = [
@@ -60,8 +60,8 @@ pub const fn rev16(x: u32) -> u32 {
 
 // Huffman decode table (HT_*)
 #[derive(Clone)]
-struct Huff {
-    fast: [u16; 1024], // (symbol << 6) | len, 0 = slow path (the length: a shift count as is)
+pub(super) struct Huff {
+    pub(super) fast: [u16; 1024], // (symbol << 6) | len, 0 = slow path (the length: a shift count as is)
     fcode: [u16; 16],  // first canonical code per length
     fsym: [u16; 16],   // first sorted index per length
     maxc: [u32; 17],   // (last code + 1) << (16 - len)
@@ -74,13 +74,13 @@ impl Huff {
 
     // huff_build(ht, lens, n) -> 0 / Error::Code (over-subscribed); incomplete codes are
     // accepted (unused bit patterns decode as Error::Code)
-    fn build(&mut self, lens: &[u8]) -> Result<(), Error> {
+    pub(super) fn build(&mut self, lens: &[u8]) -> Result<(), Error> {
         self.build_into(lens, None)
     }
 
     // build with the fast-loop table xt instead of the u16 one (its entry of each code
     // computed once by xf; the literal / length and distance codes)
-    fn build_x(&mut self, lens: &[u8], xt: &mut [u32; 1024], xf: fn(u32) -> u32) -> Result<(), Error> {
+    pub(super) fn build_x(&mut self, lens: &[u8], xt: &mut [u32; 1024], xf: fn(u32) -> u32) -> Result<(), Error> {
         self.build_into(lens, Some((xt, xf)))
     }
 
@@ -150,7 +150,7 @@ impl Huff {
     // FAST_BITS, 0 = a bad code
     #[cold]
     #[inline(never)]
-    fn slow_entry(&self, bb: u64) -> u32 {
+    pub(super) fn slow_entry(&self, bb: u64) -> u32 {
         let v = rev16((bb & 0xFFFF) as u32);
         let mut l = FAST_BITS as usize + 1;
         while l < 16 && v >= self.maxc[l] {
@@ -168,7 +168,7 @@ impl Huff {
 
     // .ic_slow: canonical decode of a code longer than FAST_BITS -> (symbol, length)
     #[inline(never)]
-    fn slow(&self, bb: u64) -> Option<(u32, u32)> {
+    pub(super) fn slow(&self, bb: u64) -> Option<(u32, u32)> {
         let v = rev16((bb & 0xFFFF) as u32);
         let mut l = FAST_BITS as usize + 1;
         loop {
@@ -190,23 +190,23 @@ impl Huff {
 
 // the two code tables of a block (one pointer in the symbol loop) and their extended fast
 // tables for codes_fast
-struct Tabs {
-    lit: Huff,
-    dist: Huff,
-    lx: [u32; 1024], // the fast table of lit as fast-loop entries (X_*; lit.fast unused)
-    dx: [u32; 1024], // the fast table of dist
+pub(super) struct Tabs {
+    pub(super) lit: Huff,
+    pub(super) dist: Huff,
+    pub(super) lx: [u32; 1024], // the fast table of lit as fast-loop entries (X_*; lit.fast unused)
+    pub(super) dx: [u32; 1024], // the fast table of dist
 }
 
 // fast-loop entries: bits 0..5 the code length (a shift count as is), 10..13 the extra bits,
 // 14..15 the kind, 16..31 the literal byte / the length or distance base; 0 = slow path
-const X_LEN: u32 = 1 << 14; // a length symbol
-const X_EOB: u32 = 2 << 14; // the end-of-block code
-const X_BAD: u32 = 3 << 14; // literal / length symbols 286, 287, distance symbols 30, 31
-const X_KIND: u32 = 3 << 14;
+pub(super) const X_LEN: u32 = 1 << 14; // a length symbol
+pub(super) const X_EOB: u32 = 2 << 14; // the end-of-block code
+pub(super) const X_BAD: u32 = 3 << 14; // literal / length symbols 286, 287, distance symbols 30, 31
+pub(super) const X_KIND: u32 = 3 << 14;
 
 // the fast-loop entry of the literal / length code's fast entry e (0 stays 0)
 #[inline(always)]
-fn lit_x(e: u32) -> u32 {
+pub(super) fn lit_x(e: u32) -> u32 {
     let (sym, l) = (e >> 6, e & 63);
     if e == 0 {
         0
@@ -225,7 +225,7 @@ fn lit_x(e: u32) -> u32 {
 
 // the fast-loop entry of the distance code's fast entry e (0 stays 0)
 #[inline(always)]
-fn dist_x(e: u32) -> u32 {
+pub(super) fn dist_x(e: u32) -> u32 {
     let (sym, l) = (e >> 6, e & 63);
     if e == 0 {
         0
@@ -240,11 +240,11 @@ fn dist_x(e: u32) -> u32 {
 /// a reusable decoder state (IS_*); only `pad` is reset per call, the fixed tables are built
 /// once per state, every other table is rebuilt before it is read
 pub struct InflateState {
-    tabs: Tabs, // literal / length and distance codes
-    cl: Huff,
-    lens: [u8; 320], // code lengths being built
-    cll: [u8; 24],   // code-length code lengths
-    fixed: bool,     // lit / dist hold the fixed code
+    pub(super) tabs: Tabs, // literal / length and distance codes
+    pub(super) cl: Huff,
+    pub(super) lens: [u8; 320], // code lengths being built
+    pub(super) cll: [u8; 24],   // code-length code lengths
+    pub(super) fixed: bool,     // lit / dist hold the fixed code
     pad: u32,        // zero bytes appended after the input end
 }
 
@@ -367,7 +367,7 @@ fn core(st: Option<&mut InflateState>, src: &[u8], dst: &mut [u8], zlib: bool) -
 }
 
 // the fixed literal / distance code lengths
-fn fixed_lens(l: &mut [u8; 320]) {
+pub(super) fn fixed_lens(l: &mut [u8; 320]) {
     l[..144].fill(8);
     l[144..256].fill(9);
     l[256..280].fill(7);
@@ -520,7 +520,7 @@ fn body(st: &mut InflateState, src: &[u8], dst: &mut [u8], zlib: bool) -> Result
 
 // free output bytes the fast loop needs before a symbol: the longest match plus the slack of
 // its wide moves
-const FAST_ROOM: usize = 258 + 16;
+pub(super) const FAST_ROOM: usize = 258 + 16;
 
 // .ic_codes: literal / length / distance symbols until the end-of-block code; the bit
 // state (bb, cnt, pos) in plain locals -> (output position, bb, cnt, pos).  codes_fast runs
@@ -627,11 +627,11 @@ fn codes(
 
 // the state codes_fast continues and leaves: the unread input, the bit buffer, the output
 // position (a struct behind one pointer: every argument in a register)
-struct Fast<'a> {
-    rest: &'a [u8],
-    bb: u64,
-    cnt: u32,
-    o: usize,
+pub(super) struct Fast<'a> {
+    pub(super) rest: &'a [u8],
+    pub(super) bb: u64,
+    pub(super) cnt: u32,
+    pub(super) o: usize,
 }
 
 // the symbol loop of codes while 8 input bytes are there at every refill and FAST_ROOM output
@@ -639,7 +639,7 @@ struct Fast<'a> {
 // at the end-of-block code, Ok(false) before the symbol where a condition fails.  Literals
 // run in an inner loop of their own (the register allocator favours its values).
 #[inline(never)]
-fn codes_fast(f: &mut Fast, t: &Tabs, dst: &mut [u8]) -> Result<bool, Error> {
+pub(super) fn codes_fast(f: &mut Fast, t: &Tabs, dst: &mut [u8]) -> Result<bool, Error> {
     let mut rest = f.rest;
     let mut bb = f.bb;
     let mut cnt = f.cnt;
@@ -778,7 +778,7 @@ fn copy_fast(dst: &mut [u8], o: usize, dis: usize, end: usize) {
 
 // the bytes of an LZ77 match (overlapping copies repeat the pattern)
 #[inline(always)]
-fn copy_match(dst: &mut [u8], o: usize, dis: usize, len: usize) {
+pub(super) fn copy_match(dst: &mut [u8], o: usize, dis: usize, len: usize) {
     let s = o - dis;
     if dis >= len && len >= 32 {
         dst.copy_within(s..s + len, o); // no overlap: one move

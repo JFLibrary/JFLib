@@ -46,6 +46,7 @@ mod charsett;
 mod jmapt;
 mod xmlt;
 mod lz;
+mod lzs;
 mod metricst;
 mod netpktt;
 mod ntpt;
@@ -145,6 +146,14 @@ fn run() -> i32 {
             _ => 2,
         };
     }
+    if let Some(fmt) = plat::arg_value("--stream") {
+        let rest: alloc::vec::Vec<String> = args.iter().skip_while(|a| a.as_str() != "--stream").skip(2).cloned().collect();
+        return match rest.as_slice() {
+            [op, i, o, l, ..] => lzs::file_mode(&fmt, op, i, o, l.parse().unwrap_or(6)),
+            [op, i, o] => lzs::file_mode(&fmt, op, i, o, if fmt == "zstd" { 3 } else { 6 }),
+            _ => 2,
+        };
+    }
     if let Some(op) = plat::arg_value("--zstd") {
         let rest: alloc::vec::Vec<String> = args.iter().skip_while(|a| a.as_str() != "--zstd").skip(2).cloned().collect();
         return match rest.as_slice() {
@@ -161,6 +170,7 @@ fn run() -> i32 {
         ("datetime", Some(dt::run)),
         ("crypto", Some(crypto::run)),
         ("compress", Some(lz::run)),
+        ("stream", Some(lzs::run)),
         ("plat", Some(platx::run)), // (Android: sync and rand, AN1)
         native!("datastore", store::run),
         native!("http", httpt::run),

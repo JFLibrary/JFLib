@@ -619,8 +619,15 @@ impl DeflateState {
     // chains through the state, no reloads); they return at every point where the
     // assembly's CHECK_FLUSH finds a full buffer, the flush happens here.
     fn compress(&mut self, src: &[u8], o: &mut [u8]) {
+        self.compress_at(src, 0, o, true);
+    }
+
+    // compress src[start..] (src[..start]: earlier input the matches may reach, inserted
+    // into the chains before) as blocks after the bits so far; fin: the last of them ends
+    // the stream
+    fn compress_at(&mut self, src: &[u8], start: usize, o: &mut [u8], fin: bool) {
         let end = self.base + src.len() as u64;
-        let mut z = Lz { p: self.base, mlen: 2, mdist: 0, avail: false };
+        let mut z = Lz { p: self.base + start as u64, mlen: 2, mdist: 0, avail: false };
         while !if self.mode != 0 { self.lazy_run(src, end, &mut z) } else { self.greedy_run(src, end, &mut z) } {
             self.flush(o, src, false);
             if self.ovf {
@@ -634,7 +641,7 @@ impl DeflateState {
             self.lfreq[c as usize] += 1;
             self.bbytes += 1;
         }
-        self.flush(o, src, true);
+        self.flush(o, src, fin);
     }
 
     // the greedy loop (levels 1..3) until the input ends (true) or the symbol buffer is full
@@ -851,6 +858,69 @@ impl DeflateState {
         }
         self.align(o);
         Ok(())
+    }
+}
+
+impl DeflateState {
+    /// deflate::Encoder: a piece of a stream.  buf[start..] is new input, buf[..start] the
+    /// input before it (at most 32 KiB, the window; base is the global position of buf[0]);
+    /// the blocks go to o[0..] after the bits of the earlier pieces (bitbuf / bitcnt stay).
+    /// o has room for deflate_bound(new) + 16 bytes.  fin: the last block ends the stream
+    /// and the bits are padded to a byte.
+    pub(super) fn piece(&mut self, buf: &[u8], start: usize, level: u32, fin: bool, o: &mut [u8]) -> usize {
+        self.out = 0;
+        self.limit = o.len() - 8;
+        self.bstart = start;
+        self.bbytes = 0;
+        self.nsym = 0;
+        self.ovf = false;
+        self.lfreq = [0; 288];
+        self.dfreq = [0; 32];
+        if level == 0 {
+            if start < buf.len() || fin {
+                self.stored(o, &buf[start..], fin);
+            }
+        } else {
+            let lv = &LEVELS[level as usize];
+            self.good = lv[0];
+            self.lazy = lv[1];
+            self.nice = lv[2];
+            self.chain = lv[3];
+            self.mode = lv[4];
+            self.compress_at(buf, start, o, fin);
+        }
+        if fin {
+            self.align(o);
+        }
+        self.out
+    }
+
+    /// an empty stored block after the bits so far: the stream is byte aligned and a decoder
+    /// can give back everything before it (zlib's Z_SYNC_FLUSH, 00 00 FF FF)
+    /// a new stream: no bits wait
+    pub(super) fn begin(&mut self) {
+        self.bitbuf = 0;
+        self.bitcnt = 0;
+    }
+
+    pub(super) fn sync_mark(&mut self, o: &mut [u8]) -> usize {
+        self.out = 0;
+        self.stored(o, &[], false);
+        self.out
+    }
+
+    /// buf lost `drop` bytes at its start: buf[0] is now `drop` positions further.  Before
+    /// the positions near 2^32, every one in the chains moves down by a multiple of the
+    /// window (older ones become 0: too far for any match)
+    pub(super) fn slid(&mut self, drop: usize) {
+        self.base += drop as u64;
+        if self.base >= 1 << 31 {
+            let shift = (self.base & !(WMASK as u64)) as u32;
+            for e in self.head.iter_mut().chain(self.prev.iter_mut()) {
+                *e = e.saturating_sub(shift);
+            }
+            self.base -= shift as u64;
+        }
     }
 }
 

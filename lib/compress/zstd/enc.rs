@@ -18,25 +18,25 @@ use super::seq::*;
 use crate::xxh::xxh64;
 
 /// a frame stays single-segment (window = content) up to this size
-const SINGLE_MAX: usize = 8 << 20;
-const WINDOW_LOG: u32 = 23;
+pub(super) const SINGLE_MAX: usize = 8 << 20;
+pub(super) const WINDOW_LOG: u32 = 23;
 
-struct Params {
-    depth: u32,
+pub(super) struct Params {
+    pub(super) depth: u32,
     lazy: u32,
-    hash_log: u32,
-    chain_log: u32,
+    pub(super) hash_log: u32,
+    pub(super) chain_log: u32,
     reps: usize,
     /// the shortest match the finder reports (repeat offsets: 4); longer minimums keep short
     /// matches at far offsets out, which cost more bits than their literals
-    min: usize,
+    pub(super) min: usize,
     /// enter only a few positions inside a match into the tables; misses before the step
     /// grows (log2) on data without matches
-    sparse: bool,
+    pub(super) sparse: bool,
     skip_log: u32,
 }
 
-fn params(level: i32) -> Params {
+pub(super) fn params(level: i32) -> Params {
     let l = level.clamp(1, 19) as u32;
     let p = |depth, lazy, hash_log, chain_log, reps, min, sparse, skip_log| Params { depth, lazy, hash_log, chain_log, reps, min, sparse, skip_log };
     match l {
@@ -80,18 +80,18 @@ fn common(s: &[u8], a: usize, b: usize, max: usize) -> usize {
     n
 }
 
-struct Finder<'a> {
-    s: &'a [u8],
-    hash: Vec<u32>,
-    chain: Vec<u32>,
-    hash_log: u32,
-    cmask: usize,
-    depth: u32,
-    window: usize,
-    min: usize,
-    sparse: bool,
+pub(super) struct Finder<'a> {
+    pub(super) s: &'a [u8],
+    pub(super) hash: Vec<u32>,
+    pub(super) chain: Vec<u32>,
+    pub(super) hash_log: u32,
+    pub(super) cmask: usize,
+    pub(super) depth: u32,
+    pub(super) window: usize,
+    pub(super) min: usize,
+    pub(super) sparse: bool,
     /// the next position to enter into the tables
-    next: usize,
+    pub(super) next: usize,
 }
 
 impl Finder<'_> {
@@ -161,7 +161,7 @@ impl Finder<'_> {
 }
 
 #[derive(Clone, Copy)]
-struct Seq {
+pub(super) struct Seq {
     ll: u32,
     ml: u32,
     /// the offset value: offset + 3, or 1..=3 for a repeat offset
@@ -425,7 +425,7 @@ fn sequences(seqs: &[Seq], out: &mut Vec<u8>) -> Option<()> {
     Some(())
 }
 
-fn block_header(out: &mut Vec<u8>, last: bool, ty: u32, size: usize) {
+pub(super) fn block_header(out: &mut Vec<u8>, last: bool, ty: u32, size: usize) {
     let h = u32::from(last) | ty << 1 | (size as u32) << 3;
     out.extend_from_slice(&h.to_le_bytes()[..3]);
 }
@@ -440,30 +440,11 @@ pub fn compress(src: &[u8], level: i32) -> Vec<u8> {
     let prm = params(level);
     let n = src.len();
     let mut out = Vec::with_capacity(bound(n).min(n / 2 + 4096));
-    out.extend_from_slice(&MAGIC.to_le_bytes());
-    let single = n <= SINGLE_MAX;
-    let (fcs_flag, fcs_bytes) = if single && n < 256 {
-        (0u8, 1usize)
-    } else if (256..65536 + 256).contains(&n) {
-        (1, 2)
-    } else if n as u64 <= u32::MAX as u64 {
-        (2, 4)
-    } else {
-        (3, 8)
-    };
-    out.push(fcs_flag << 6 | u8::from(single) << 5 | 0x04);
-    if !single {
-        out.push(((WINDOW_LOG - 10) << 3) as u8);
-    }
-    let fcs = if fcs_bytes == 2 { n as u64 - 256 } else { n as u64 };
-    out.extend_from_slice(&fcs.to_le_bytes()[..fcs_bytes]);
+    let single = frame_header(&mut out, Some(n as u64));
     if n == 0 {
         block_header(&mut out, true, 0, 0);
     } else {
-        // tables no larger than the input needs
-        let bits = 64 - (n as u64 | 1 << 10).leading_zeros();
-        let hash_log = prm.hash_log.min(bits + 1);
-        let chain_log = prm.chain_log.min(bits);
+        let (hash_log, chain_log) = table_logs(&prm, Some(n as u64));
         let mut f = Finder {
             s: src,
             hash: vec![0; 1 << hash_log],
@@ -476,38 +457,92 @@ pub fn compress(src: &[u8], level: i32) -> Vec<u8> {
             sparse: prm.sparse,
             next: 0,
         };
-        let mut rep = [1u32, 4, 8];
-        let mut seqs = Vec::new();
-        let mut lits = Vec::new();
-        let mut body = Vec::new();
+        let mut b = Blocks::new();
         let mut bs = 0;
         while bs < n {
             let be = (bs + BLOCK_MAX).min(n);
-            let last = be == n;
-            let b = &src[bs..be];
-            if b.len() > 16 && b.iter().all(|&x| x == b[0]) {
-                block_header(&mut out, last, 1, b.len());
-                out.push(b[0]);
-                bs = be;
-                continue;
-            }
-            let saved = rep;
-            seqs.clear();
-            lits.clear();
-            body.clear();
-            parse(&mut f, &prm, bs, be, &mut rep, &mut seqs, &mut lits);
-            literals(&lits, &mut body);
-            if sequences(&seqs, &mut body).is_some() && body.len() < b.len() {
-                block_header(&mut out, last, 2, body.len());
-                out.extend_from_slice(&body);
-            } else {
-                rep = saved;
-                block_header(&mut out, last, 0, b.len());
-                out.extend_from_slice(b);
-            }
+            b.put(&mut f, &prm, bs, be, be == n, &mut out);
             bs = be;
         }
     }
     out.extend_from_slice(&(xxh64(src, 0) as u32).to_le_bytes());
     out
+}
+
+/// the frame header for a content size (None: not stated, a window of 8 MiB) -> whether
+/// the frame is single-segment (its window is the content)
+pub(super) fn frame_header(out: &mut Vec<u8>, size: Option<u64>) -> bool {
+    out.extend_from_slice(&MAGIC.to_le_bytes());
+    let Some(n) = size else {
+        out.push(0x04);
+        out.push(((WINDOW_LOG - 10) << 3) as u8);
+        return false;
+    };
+    let single = n <= SINGLE_MAX as u64;
+    let (fcs_flag, fcs_bytes) = if single && n < 256 {
+        (0u8, 1usize)
+    } else if (256..65536 + 256).contains(&n) {
+        (1, 2)
+    } else if n <= u32::MAX as u64 {
+        (2, 4)
+    } else {
+        (3, 8)
+    };
+    out.push(fcs_flag << 6 | u8::from(single) << 5 | 0x04);
+    if !single {
+        out.push(((WINDOW_LOG - 10) << 3) as u8);
+    }
+    let fcs = if fcs_bytes == 2 { n - 256 } else { n };
+    out.extend_from_slice(&fcs.to_le_bytes()[..fcs_bytes]);
+    single
+}
+
+/// the sizes (log2) of the hash and chain tables: no larger than the input needs
+pub(super) fn table_logs(prm: &Params, size: Option<u64>) -> (u32, u32) {
+    match size {
+        Some(n) => {
+            let bits = 64 - (n | 1 << 10).leading_zeros();
+            (prm.hash_log.min(bits + 1), prm.chain_log.min(bits))
+        }
+        None => (prm.hash_log, prm.chain_log),
+    }
+}
+
+/// what carries from block to block: the repeat offsets and the buffers of a block
+pub(super) struct Blocks {
+    rep: [u32; 3],
+    seqs: Vec<Seq>,
+    lits: Vec<u8>,
+    body: Vec<u8>,
+}
+
+impl Blocks {
+    pub(super) fn new() -> Blocks {
+        Blocks { rep: [1, 4, 8], seqs: Vec::new(), lits: Vec::new(), body: Vec::new() }
+    }
+
+    /// the block of f.s[bs..be] -> out: RLE, compressed or raw, whichever is smallest
+    pub(super) fn put(&mut self, f: &mut Finder, prm: &Params, bs: usize, be: usize, last: bool, out: &mut Vec<u8>) {
+        let src = f.s;
+        let b = &src[bs..be];
+        if b.len() > 16 && b.iter().all(|&x| x == b[0]) {
+            block_header(out, last, 1, b.len());
+            out.push(b[0]);
+            return;
+        }
+        let saved = self.rep;
+        self.seqs.clear();
+        self.lits.clear();
+        self.body.clear();
+        parse(f, prm, bs, be, &mut self.rep, &mut self.seqs, &mut self.lits);
+        literals(&self.lits, &mut self.body);
+        if sequences(&self.seqs, &mut self.body).is_some() && self.body.len() < b.len() {
+            block_header(out, last, 2, self.body.len());
+            out.extend_from_slice(&self.body);
+        } else {
+            self.rep = saved;
+            block_header(out, last, 0, b.len());
+            out.extend_from_slice(b);
+        }
+    }
 }
