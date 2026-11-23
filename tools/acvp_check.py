@@ -144,11 +144,14 @@ CT_LEN = {1: 768, 2: 1088, 3: 1568}
 
 
 def key_check(got, want):
-    """a passing key check ("ok:N") is an answer of N bytes in hex, not a refusal; other
-    answers stay as they are"""
-    if want.startswith("ok:") and len(got) == 2 * int(want[3:]) and all(ch in "0123456789abcdef" for ch in got):
+    """a passing key check ("ok:N") is an answer of N bytes in hex: then want, any other answer
+    (a refusal, a wrong length, the text "ok:N" itself) marked as wrong; answers to anything
+    but a passing check stay as they are"""
+    if not want.startswith("ok:"):
+        return got
+    if len(got) == 2 * int(want[3:]) and all(ch in "0123456789abcdef" for ch in got):
         return want
-    return got
+    return f"not {want}: {got}"
 
 
 def det_ecdsa(file, j):
