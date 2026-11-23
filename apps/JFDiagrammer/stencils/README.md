@@ -156,6 +156,35 @@ aus dem berechneten Wert. Mit `svg:` geht eine Formel nur zusammen mit `size:` i
 Pin und Masterseite bestimmt (JD13, die Rack-Einschübe: Höhe aus den Höheneinheiten). Ausnahme
 sind 1D-Master (Abschnitt „1D-Shapes“).
 
+### Gruppen aus Teilen (`[Part NAME]`, JD26)
+
+Ein Master mit Teilen wird eine Gruppe: jedes `[Part NAME]` beginnt ein Untershape. Danach folgen
+seine eigenen Kopfzeilen und seine Abschnitte bis zum nächsten `[Part …]` oder zum Dateiende;
+alles vor dem ersten `[Part]` gehört zum Master-Shape (der Gruppe). Die Teile liegen in der
+Reihenfolge der Datei übereinander (ein späteres oben).
+
+| Kopfzeile eines Teils | Bedeutung |
+|---|---|
+| `text.<sprache>` | sein Text, alle fünf oder keiner |
+| `style`, `line_style`, `fill_style`, `text_style` | seine Formatvorlagen (Standard `Normal`) |
+
+- **Bezüge:** In allen Formeln des Masters zählt `Sheet.N!` logisch: `Sheet.1!` ist das
+  Master-Shape (die Gruppe), `Sheet.2!` der erste Teil, `Sheet.3!` der zweite usw. Das Werkzeug
+  schreibt die echten IDs (Zeichenketten in Anführungszeichen bleiben); ein `Sheet.N!` ohne Shape ist
+  ein Baufehler.
+- **Größe und Lage:** Fehlt `PinX`, `PinY`, `Width`, `Height`, `LocPinX` oder `LocPinY`, bekommt
+  das Teil die Größe der Gruppe (`GUARD(Sheet.1!Width)` …). Eigene Transformationen schreiben die
+  Master ebenso mit `GUARD(...)`: Visio skaliert ein Untershape beim Vergrößern der Gruppe sonst
+  selbst, statt die Formel rechnen zu lassen.
+- **Texte:** Der Text des Teils steht in der Bausprache in der Datei, alle fünf in `User.JFD_Text`
+  seines Blatts im Master. Beim Ablegen (`instance::localize_parts`, von `instance::place`
+  gerufen) und in neuen Zeichnungen aus Vorlagen (`template::to_drawing`) bekommt ein Teil den Text
+  der aktuellen Sprache, solange es einen der fünf (oder keinen) zeigt. Instanzen erben
+  `JFD_Text` vom Master, sie schreiben ihn nicht.
+- **Nicht erlaubt:** Zellen mit Sprachendung in Teilen (übersetzte Zellen wie `Tip` oder Shape-Daten
+  gehören ans Master-Shape), Teile zusammen mit `svg:` und Teile an 1D-Mastern.
+- Klicken wählt erst die Gruppe, ein zweiter Klick das Teil (Visios `SelectMode` 1, nicht gesetzt).
+
 ### Eingebundene Dateien (`include:`, JD13)
 
 Eine eingebundene Datei (Endung `.inc`, in einem Ordner ohne `stencil.txt`, z. B.
@@ -273,6 +302,27 @@ Schablone alle Master.
 - **Kategorien für Regeln:** Flussdiagramm-Shapes tragen `User.msvShapeCategories`
   (`"Flowchart"`, die Entscheidung `"Flowchart;Decision"`, Start/Ende `"Flowchart;Terminator"`).
 
+Ergänzt mit dem JD26-Probeblatt (vom Nutzer abgenommen, 2026-11-23):
+
+- **Mehrere Farben in einem Shape** (Mengen, Felder, Ebenen, Phasen): Teile mit
+  `QuickStyleFillColor` und `QuickStyleLineColor` 100 bis 106, den sieben Variantenfarben des
+  Designs; schattierte 3D-Flächen über Formeln auf die Designfarbe (`THEMEGUARD(SHADE(THEMEVAL("FillColor"),25))`).
+  Feste Farben bleiben verboten. Durchsicht (`FillForegndTrans`) nur begründet (Venn).
+- **Designs ohne Shape-Linien** (Kontrast): Was nur Linien zeichnet, verschwindet dort. Trennungen
+  zwischen Flächen sind deshalb Fugen (1 mm) statt Innenlinien, kleine Innenformen (Augen, Mund)
+  Löcher. Reine Linien-Shapes (Achsen, Gräten) nehmen `style: Connector` mit
+  `QuickStyleType = 3` (ausdrücklich: Visio wählt die Verbinder-Liste des Designs sonst nach der
+  Art des Shapes, JFDiagrammer nach dem Namen der Formatvorlage) und `BeginArrow`/`EndArrow 0`,
+  wenn das Shape eigene Spitzen zeichnet. Linien und Flächen in einem Shape: `line_style:
+  Connector`, `fill_style`/`text_style: Normal`, `QuickStyleType = 3`, `QuickStyleFillMatrix` und
+  `QuickStyleFontMatrix` 100; oder eine Gruppe mit einem Linien- und einem Flächen-Teil.
+- **Anzahl aus Shape-Daten** (Ebenen, Stufen, Phasen, Segmente): `Prop.<Name>` (Typ 2) mit Label
+  und Prompt in fünf Sprachen, `User.N` begrenzt; Teile oder Abschnitte über N mit `NoShow` und
+  `HideText`, deckungsgleich mit dem letzten sichtbaren und darunter. Wo Ziehen Elemente
+  vermehrt, schreibt ein Steuerpunkt per `SETATREF(Prop.<Name>, SETATREFEVAL(…))` die Zahl und die
+  Größe ist Zahl x Elementgröße (`SETATREF` der Größe schickt das Strecken in die Elementgröße);
+  gezeichnet wird nach der tatsächlichen Größe (Width/N).
+
 ## SVG-Grafik (`svg:`)
 
 Für gestaltete Shapes im JFNetworker-Stil. Die SVG-Datei braucht eine `viewBox`; sie wird auf
@@ -348,6 +398,29 @@ Regeln für die Master:
   (`hidden: true`); die Listen zeichnen nichts (`NoShow`).
 - Vorschau aller Master mit allen Stilen: `diagramiotest --write-stencil-previews ORDNER`;
   Prüfungen: `diagramiotest --check --only stencils/structure`.
+
+## Allgemein und Geschäftsgrafiken (JD26)
+
+Acht Schablonen: `decorative` (SH-003), `charting` (SH-004), `venn` (SH-007) in der Kategorie
+`general`, `marketing` (SH-030), `matrix` (SH-031), `pyramid` (SH-032), `cycle` (SH-033) und
+`cause_effect` (SH-041) in `business`.
+
+- **Gruppen aus Teilen:** SWOT, Matrizen, Venn-Diagramme, Pyramiden und Zyklen mit Text je Feld,
+  Menge, Ebene oder Phase (siehe „Gruppen aus Teilen“).
+- **Zahlen und Werte aus Shape-Daten:** Ebenen, Stufen, Phasen, Segmente, Ringe; das
+  Kreisdiagrammsegment nimmt Beginn, Anteil und Farbe (`Prop.Start`, `Prop.Share`, `Prop.Color`).
+  Das Stufendiagramm und die Pyramide mit Ebenen wachsen beim Ziehen am Steuerpunkt.
+- **Fischgräte:** Die Hauptgräte (`Effect`) hat 15 Verbindungspunkte entlang der Gräte. Die
+  Kategorien sind 1D-Shapes mit aufrechtem Kasten; ihr Ende klebt an der Hauptgräte, ihre Gräte
+  hat selbst Punkte für die Ursachen (begründete Ausnahme von „1D-Shapes haben keine
+  Verbindungspunkte“). JFDiagrammer bietet die Verbindungspunkte von 1D-Shapes beim Kleben an
+  (`edit_canvas.rs`).
+- Gemeinsame Master als Kopie mit gleichem NameU: Teil- und Konzentrische Ebenen aus `blocks` in
+  `cycle`, der dynamische Verbinder aus `blocks` in `marketing`, das Venn-Diagramm aus 2 Mengen in
+  `marketing`, das Zwiebeldiagramm aus `venn` in `cycle`.
+- Prüfen: `diagramiotest --check --only stencils/business`, Ansicht
+  `diagramiotest --write-stencil-previews DIR` (`probeblatt-jd26.png`, `<ordner>-alle.png` und
+  `<ordner>-alle-kontrast.png`).
 
 ## Was in der `.vssx` steht
 

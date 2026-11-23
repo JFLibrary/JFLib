@@ -1,6 +1,7 @@
 // In-memory ZIP interchange (ZIP32, ZIP64 when it is needed). New native library code,
 // independent of document/UI code. Raw DEFLATE, inflate and CRC reuse img_core's safe codec
-// primitives; no paths are extracted. `opc` builds the Open Packaging Conventions on top.
+// primitives; no paths are extracted. `opc` builds the Open Packaging Conventions on top;
+// `cfb` reads compound files ("OLE", [MS-CFB]), the container of Office's binary formats.
 // ZipFs shows an archive as a read-only plat::vfs tree:
 //   plat::vfs::mount("pack", Arc::new(archive::ZipFs::new(&bytes, Limits::default())?))
 //   -> plat::read_file("pack://textures/a.png"), plat::File::open("pack://..", FO_READ),
@@ -16,6 +17,7 @@ use alloc::{
 };
 use img_core::{checksum::crc32, deflate::deflate_raw, inflate::inflate_raw_ex};
 
+pub mod cfb;
 pub mod opc;
 
 /// One decoded archive part with a normalized, relative UTF-8 name.

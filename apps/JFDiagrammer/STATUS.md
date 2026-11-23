@@ -1,6 +1,6 @@
 # JFDiagrammer – Stand der Features
 
-Stand 2026-11-24, Etappe JD15 (PLAN.md › „JD15: Bestandsaufnahme und P1-Abnahme“), mit JD16 und JD18. Diese Datei hält für
+Stand 2026-11-24, Etappe JD15 (PLAN.md › „JD15: Bestandsaufnahme und P1-Abnahme“), mit JD16, JD17, JD18 und JD26. Diese Datei hält für
 jede P1- und P2-Zeile aus [FEATURES.md](FEATURES.md) fest, wie weit sie in JFDiagrammer ist. Geprüft wurde
 in der laufenden App (Skripte unter `tests/`, Screenshots), nicht nur im Code; die Schablonen aus
 FEATURES 4.2 stehen mit einer Zeile je Schablone da.
@@ -25,7 +25,8 @@ Leseschlüssel:
   `diagram_io`; Skriptnamen ohne Pfad liegen in `tests/`. „Befehl …“ heißt: in der App bedienbar, aber noch
   ohne eigenen Check (nur bei teilweise); „(Probe)“ ist eine Beobachtung aus JD15 zusätzlich zum Check.
 - Die P2-Zeilen gehören laut PLAN in Phase 2b (JD16–JD25) und Phase 3 (JD26–JD34). JD16 (ältere XML-Formate,
-  Makro-Teile, Dokumenteigenschaften, Fensterzustand) und JD18 (Datenquellen und Verknüpfung) sind eingetragen.
+  Makro-Teile, Dokumenteigenschaften, Fensterzustand), JD17 (binäre Schablonen), JD18 (Datenquellen und
+  Verknüpfung) und JD26 (Geschäftsgrafiken) sind eingetragen.
 
 ## Zusammenfassung
 
@@ -34,7 +35,7 @@ Leseschlüssel:
 |---|---:|---:|---:|---:|---:|---:|
 | 1.1 Visio-Formate ab 2013 (OPC/XML, „VSDX-Familie“) | 5 | 1 | 0 | 4 | 3 | 0 |
 | 1.2 Ältere XML-Formate 2003–2010 | 0 | 0 | 0 | 2 | 0 | 0 |
-| 1.3 Binärformate (nur Import) | 0 | 0 | 0 | 0 | 0 | 2 |
+| 1.3 Binärformate (nur Import) | 0 | 0 | 0 | 0 | 2 | 0 |
 | 1.4 Export („Speichern unter“ und „Exportieren“) | 3 | 3 | 0 | 0 | 1 | 4 |
 | 1.5 Import | 0 | 2 | 0 | 3 | 0 | 1 |
 | 2.1 Dokument | 5 | 1 | 0 | 0 | 0 | 4 |
@@ -68,14 +69,14 @@ Leseschlüssel:
 | 3.16 Tastenkürzel | 9 | 6 | 0 | 0 | 1 | 2 |
 | 3.17 Sprachen und Regionen | 7 | 1 | 0 | 1 | 0 | 2 |
 | 4.0 Regeln für alle Schablonen | 4 | 2 | 0 | 0 | 0 | 2 |
-| 4.2 Übersicht aller Schablonen | 15 | 1 | 0 | 0 | 0 | 65 |
+| 4.2 Übersicht aller Schablonen | 15 | 1 | 0 | 7 | 1 | 57 |
 | 4.14 Vorschläge für eigene Kategorien | 0 | 0 | 0 | 0 | 0 | 6 |
 | 5.1 Vorlagen-Infrastruktur | 4 | 0 | 0 | 0 | 0 | 0 |
-| 5.2 Vorlagen nach Kategorie | 5 | 2 | 0 | 0 | 0 | 13 |
+| 5.2 Vorlagen nach Kategorie | 6 | 1 | 0 | 2 | 1 | 10 |
 | 5.3 Assistenten und Generatoren | 0 | 0 | 0 | 3 | 0 | 4 |
-| **zusammen** | **173** | **107** | **1** | **30** | **33** | **194** |
+| **zusammen** | **174** | **106** | **1** | **39** | **37** | **181** |
 
-P2-Zeilen, die schon fertig sind (30): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, ST-09, DA-05, TH-06, SS-11, SS-21, SS-22, SS-31, SS-33, SS-36, FX-11, FX-12, RD-02, RD-03, RD-09, LG-05, AS-03, AS-04, AS-20.
+P2-Zeilen, die schon fertig sind (39): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, ST-09, DA-05, TH-06, SS-11, SS-21, SS-22, SS-31, SS-33, SS-36, FX-11, FX-12, RD-02, RD-03, RD-09, LG-05, SH-003, SH-004, SH-007, SH-031, SH-032, SH-033, SH-041, VL-32, VL-38, AS-03, AS-04, AS-20.
 <!-- summary:end -->
 
 ## Offene Entscheidungen des Nutzers
@@ -200,8 +201,8 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 
 | ID | Feature | Prio | Stand | Beleg | Fehlt |
 |---|---|---|---|---|---|
-| DF-30 | `.vss` importieren | P2 | fehlt | – | alles (JD17) |
-| DF-34 | Lokaler Testkorpus Binärformate | P2 | fehlt | (nur der XML-Korpus: dit corpus wird übersprungen, wenn er fehlt) | Korpus-Tests für `.vss`/`.vsd` (JD17) |
+| DF-30 | `.vss` importieren | P2 | teilweise | binary_stencil.uis (.vss in der Seitenleiste, Hinweis „umgewandelt“, Master ablegen); dit vss (Container, Streams, feindliche und abgeschnittene Dateien, Korpus, Rundlauf nach .vssx), vss/sample | Visio-Gegenprobe von JD17 offen; binäre Mastersymbole (die App zeichnet eigene), NURBS- und Polylinien-Zeilen, Bilder (Fremdobjekte), Ebenen der Masterseite, Seiten-Abschnitte (Lineal/Raster, Layout, Druck); Version 6 (Visio 2000/2002) |
+| DF-34 | Lokaler Testkorpus Binärformate | P2 | teilweise | dit vss/corpus und vss/compare (`context/files/SWDB_DE` per Hochwandern oder `JFD_VSS_CORPUS`, Visios .vssx daneben per `JFD_VSS_REFERENCE`; fehlen sie, übersprungen) | Korpus nur Version 11 und nur Schablonen: Version 6 und binäre Zeichnungen fehlen |
 
 ### 1.4 Export („Speichern unter“ und „Exportieren“)
 
@@ -648,7 +649,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | SL-02 | Shape-Kacheln | P1 | teilweise | stencils.uis (4 Ansichten), Probe (QuickInfo „Name – Beschreibung“) | Livevorschau beim Zeigen (Option) |
 | SL-03 | Platzieren | P1 | teilweise | stencils_drop.uis, status_ui_panel.uis (Strg+Enter) | Strg-Ziehen für mehrere (Probe: legt eins ab); Ablegen auf Verbinder teilt ihn nicht (p4); Container-/Listen-Leuchten beim Ziehen aus der Leiste (JD10-Notiz) |
 | SL-04 | Shapes suchen | P1 | fertig | stencils_search.uis (ein Wort genügt, Suche ausblenden), stencils_lang.uis; core instance::tests::search_reads_the_quickinfo | – |
-| SL-05 | Weitere Shapes | P1 | teilweise | stencils.uis, network_devices.uis, Probe | „Dokumentschablone anzeigen“; Filter `.vss/.vsx` (Formate JD16/17); Azure-Eintrag (P3) |
+| SL-05 | Weitere Shapes | P1 | teilweise | stencils.uis, network_devices.uis, Probe | „Dokumentschablone anzeigen“; Azure-Eintrag (P3) |
 | SL-06 | Schnell-Shapes | P1 | teilweise | stencils.uis | Schnell-Shapes speisen die Verbindungspfeile nicht (keine Schnell-Shape-Leiste, CN-07-Rest) |
 | SL-07 | Favoriten / Meine Shapes | P1 | fertig | stencils_favorites.uis, my_shapes.uis | – (`.vssx` im Benutzerordner nur in Fensterläufen, headless im Speicher) |
 | SL-08 | Schablonen-Menü | P2 | teilweise | stencils.uis, panes.uis | Bearbeiten, Neues Master-Shape, Reihenfolge grau (cmds_later.rs) → JD23 |
@@ -782,10 +783,10 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | ID | Feature | Prio | Stand | Beleg | Fehlt |
 |---|---|---|---|---|---|
 | SH-002 | Blöcke (`blocks`, 37) | P1 | fertig | dio stencils/shapes | – |
-| SH-003 | Dekorative Shapes | P2 | fehlt | – | – |
-| SH-004 | Diagramm- und Mathematik-Shapes | P2 | fehlt | – | – |
+| SH-003 | Dekorative Shapes (`decorative`, 17) | P2 | fertig | dio stencils/business | – |
+| SH-004 | Diagramm- und Mathematik-Shapes (`charting`, 10) | P2 | fertig | dio stencils/business/values, business_charts.uis | – („Mehrzeilig“ heißt „Linienzug“, Visios Name als Stichwort) |
 | SH-006 | Standard-Shapes (`standard`, 50) | P1 | fertig | stencils.uis, dio stencils | – (+ Pfeil, Textfeld) |
-| SH-007 | Venn-Diagramm-Shapes | P2 | fehlt | – | – |
+| SH-007 | Venn-Diagramm-Shapes (`venn`, 12) | P2 | fertig | dio stencils/business/parts | – |
 | SH-009 | Abteilung | P2 | fehlt | – | – |
 | SH-015 | BPMN-Standard-Shapes | P2 | fehlt | – | – |
 | SH-016 | Funktionsübergreifendes Flussdiagramm (`cff`, 4 + 3 verborgen) | P1 | fertig | structures_cff.uis, dio stencil_structs | – |
@@ -793,12 +794,12 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | SH-021 | Standardflussdiagramm ISO 5807 (`flowchart`, 14) | P1 | fertig | dio stencils/shapes/flowchart, templates.uis | – |
 | SH-023 | Workflowobjekte | P2 | fehlt | – | – |
 | SH-025 | Workflowschritte | P2 | fehlt | – | – |
-| SH-030 | Marketingdiagramme | P2 | fehlt | – | – |
-| SH-031 | Matrixdiagramm-Shapes | P2 | fehlt | – | – |
-| SH-032 | Pyramiden-Shapes | P2 | fehlt | – | – |
-| SH-033 | Zyklusdiagramm-Shapes | P2 | fehlt | – | – |
+| SH-030 | Marketingdiagramme (`marketing`, 30) | P2 | teilweise | dio stencils/business/counts, business_charts.uis | Werte als Text: Marktanteil, Marktanalyse und Unterteilter 3D-Balken zeigen ihre Shape-Daten nicht als Textfeld (Teile schreiben noch keine `{fld N}`) |
+| SH-031 | Matrixdiagramm-Shapes (`matrix`, 15) | P2 | fertig | dio stencils/business | – |
+| SH-032 | Pyramiden-Shapes (`pyramid`, 11) | P2 | fertig | dio stencils/business/counts, business_charts.uis | – |
+| SH-033 | Zyklusdiagramm-Shapes (`cycle`, 20) | P2 | fertig | dio stencils/business/counts | – |
 | SH-036 | EPC-Diagramm-Shapes | P2 | fehlt | – | – |
-| SH-041 | Ursache/Wirkung-Diagramme | P2 | fehlt | – | – |
+| SH-041 | Ursache/Wirkung-Diagramme (`cause_effect`, 12) | P2 | fertig | dio stencils/business/fishbone, business_templates.uis | – |
 | SH-049 | Karten – Organigramm-Shapes | P2 | fehlt | – | – |
 | SH-061 | Grundlegende Elemente (Elektro) | P2 | fehlt | – | – |
 | SH-063 | Halbleiter und Elektronenröhren | P2 | fehlt | – | – |
@@ -890,16 +891,16 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | ID | Feature | Prio | Stand | Beleg | Fehlt |
 |---|---|---|---|---|---|
 | VL-10 | Leere Zeichnung | P1 | fertig | templates.uis | – |
-| VL-11 | Standarddiagramm | P1 | teilweise | templates.uis, dio templates | Dekorative Shapes (SH-003, P2) in der Schablonenliste → JD26 |
-| VL-12 | Blockdiagramm, Blockdiagramm mit Perspektive, 3D-Blockdiagramm | P2 | fehlt | – | → JD26 |
+| VL-11 | Standarddiagramm | P1 | fertig | templates.uis, dio templates | – |
+| VL-12 | Blockdiagramm, Blockdiagramm mit Perspektive, 3D-Blockdiagramm | P2 | teilweise | business_templates.uis, dio templates/starter/glue | mit Perspektive und 3D brauchen Perspektivische Blöcke (SH-005) und 3D-Block-Shapes (SH-001), beide P3 |
 | VL-20 | Standardflussdiagramm | P1 | fertig | templates.uis, dio templates | – |
 | VL-21 | Funktionsübergreifendes Flussdiagramm | P1 | fertig | templates.uis, structures_cff.uis | – |
 | VL-22 | BPMN-Diagramm | P2 | fehlt | – | → JD27 |
 | VL-23 | Arbeitsflussdiagramm (2D/3D) | P2 | fehlt | – | → JD27 |
 | VL-30 | Organigramm, Organigramm-Assistent | P2 | fehlt | – | → JD28 |
-| VL-32 | Ursache-Wirkung-Diagramm (Ishikawa) | P2 | fehlt | – | → JD26 |
+| VL-32 | Ursache-Wirkung-Diagramm (Ishikawa) | P2 | fertig | business_templates.uis, dio templates/starter/glue | – |
 | VL-33 | Auditdiagramm, EPK-Diagramm | P2 | fehlt | – | → JD27 |
-| VL-38 | Diagramme und Grafiken, Marketingdiagramme | P2 | fehlt | – | → JD26 |
+| VL-38 | Diagramme und Grafiken, Marketingdiagramme | P2 | fertig | business_charts.uis, dio templates | – |
 | VL-40 | Grundlagen Elektrotechnik, Schaltkreise und Logik, Industriesteuerungen, Elektrische Systeme | P2 | fehlt | – | → JD30 |
 | VL-50 | Standardnetzwerk (2D/3D) | P1 | fertig | network_templates.uis, network_devices.uis, dio templates | – (3D-Form braucht P3-Schablonen) |
 | VL-51 | Detailliertes Netzwerk (2D/3D) | P1 | teilweise | network_templates.uis, dio templates | Netzwerkberichte (DA-09 → JD19); Raumelemente (SH-155) und 3D sind P3 |

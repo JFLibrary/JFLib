@@ -1,0 +1,53 @@
+# Mond (SH-003, JD26): eine Mondsichel, offen nach rechts.  Die Spitzen liegen in der rechten
+# oberen und unteren Ecke; der äußere Bogen ist eine halbe Ellipse um die Mitte der rechten Kante
+# durch (0 | Höhe/2), der innere eine halbe Ellipse um denselben Punkt durch den Steuerpunkt.
+# Row_1 auf der Innenkante in halber Höhe ändert die Breite der Sichel (anteilig, nur waagrecht,
+# 10 bis 90 % der Breite).  Beide Bögen als Ellipsenbögen durch ihren Scheitel.
+master: Moon
+name.de: Mond
+name.en: Moon
+name.es: Luna
+name.it: Luna
+name.fr: Lune
+prompt.de: Mondsichel für Nacht und Ruhezeiten. Mit dem gelben Steuerpunkt ändern Sie die Breite der Sichel.
+prompt.en: Crescent moon for night and quiet times. Drag the yellow control handle to change the width of the crescent.
+prompt.es: Luna creciente para la noche y los periodos de descanso. Arrastre el controlador amarillo para cambiar el ancho de la media luna.
+prompt.it: Falce di luna per la notte e i periodi di riposo. Trascina la maniglia di controllo gialla per cambiare la larghezza della falce.
+prompt.fr: Croissant de lune pour la nuit et les périodes de repos. Faites glisser la poignée de contrôle jaune pour modifier la largeur du croissant.
+keywords.de: Mond, Mondsichel, Sichel, Nacht, Ruhezeit, Schlaf, Dekor
+keywords.en: moon, crescent, night, quiet time, sleep, decoration
+keywords.es: luna, media luna, creciente, noche, descanso, sueño, decoración
+keywords.it: luna, falce di luna, mezzaluna, notte, riposo, sonno, decorazione
+keywords.fr: lune, croissant, nuit, repos, sommeil, décoration
+
+[Shape]
+Width = 20 mm
+Width.us = 0.75 in
+Height = 40 mm
+Height.us = 1.5 in
+
+[User]
+# die Breite der Sichel in halber Höhe
+B:  Value = MIN(MAX(Controls.Row_1, Width*0.1), Width*0.9)
+
+# äußerer Bogen von der oberen zur unteren Spitze, innerer zurück
+[Geometry]
+MoveTo           X = Width; Y = Height
+EllipticalArcTo  X = Width; Y = 0; A = 0; B = Height*0.5; C = 0 deg; D = Width/(Height*0.5)
+EllipticalArcTo  X = Width; Y = Height; A = User.B; B = Height*0.5; C = 0 deg; D = (Width-User.B)/(Height*0.5)
+
+[Controls]
+Row_1:  X = Width*0.45; Y = Height*0.5
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Breite der Sichel ändern"
+        Tip.en = "Change the width of the crescent"
+        Tip.es = "Cambiar el ancho de la media luna"
+        Tip.it = "Cambia la larghezza della falce"
+        Tip.fr = "Modifier la largeur du croissant"
+
+[Connection]
+Row  X = Width; Y = 0; DirX = 0; DirY = 1
+Row  X = User.B; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

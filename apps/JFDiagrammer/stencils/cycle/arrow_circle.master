@@ -1,0 +1,421 @@
+# Pfeilkreis (SH-033, JD26; in Visio „Pfeilkreis mit 6 Schritten“): drei bis acht gebogene
+# Blockpfeile im Kreis, im Uhrzeigersinn, mit Lücken dazwischen; jeder Pfeil ein Teil der Gruppe mit
+# eigenem Text und eigener Variantenfarbe (100 bis 106, der achte 103).  Schaft mit geradem Ende,
+# die Spitze doppelt so breit wie der Schaft (Stilregel), 0,4 der Pfeillänge lang (höchstens
+# 0,45 rad).  Ein Text, breiter als 1,5 Schaftbreiten, folgt dem Bogen: um den Winkel der Tangente
+# gedreht, in der unteren Hälfte um 180° gewendet, damit er nicht auf dem Kopf steht (TEXTWIDTH);
+# kürzere wie die anfängliche Nummer stehen aufrecht.  Der Text sitzt etwas zum Schaftende hin.
+# Die Zahl steht in den Shape-Daten (Prop.Steps, sechs wie bei Visio); Pfeile über der Zahl sind
+# verborgen.  Row_1 am Innenrand oben (in der Lücke) ändert die Breite der Pfeile (anteilig, nur
+# senkrecht).  Alle Teile sind so groß wie die Gruppe.  Die Pfeile tragen anfangs ihre Nummer.
+master: Arrow circle
+name.de: Pfeilkreis
+name.en: Arrow circle
+name.es: Círculo de flechas
+name.it: Cerchio di frecce
+name.fr: Cercle de flèches
+prompt.de: Kreis aus gebogenen Pfeilen für die Schritte eines Kreislaufs. Die Zahl der Schritte stellen Sie in den Shape-Daten ein, die Breite der Pfeile mit dem gelben Steuerpunkt.
+prompt.en: Circle of curved arrows for the steps of a cycle. Set the number of steps in the shape data and the width of the arrows with the yellow control handle.
+prompt.es: Círculo de flechas curvas para los pasos de un ciclo. Defina el número de pasos en los datos de la forma y el ancho de las flechas con el controlador amarillo.
+prompt.it: Cerchio di frecce curve per i passi di un ciclo. Imposta il numero di passi nei dati della forma e la larghezza delle frecce con la maniglia di controllo gialla.
+prompt.fr: Cercle de flèches courbes pour les étapes d'un cycle. Définissez le nombre d'étapes dans les données de la forme et la largeur des flèches avec la poignée de contrôle jaune.
+keywords.de: Pfeilkreis, Pfeilkreis mit 6 Schritten, Kreislauf, Schritte, Pfeile, Zyklus, Prozess
+keywords.en: arrow circle, cycle, steps, arrows, circular, process
+keywords.es: círculo de flechas, ciclo, pasos, flechas, circular, proceso
+keywords.it: cerchio di frecce, ciclo, passi, frecce, circolare, processo
+keywords.fr: cercle de flèches, cycle, étapes, flèches, circulaire, processus
+
+[Shape]
+Width = 70 mm
+Width.us = 2.75 in
+Height = 70 mm
+Height.us = 2.75 in
+
+[User]
+# die Zahl der Schritte (3 bis 8), der Winkel je Schritt, die Breite des Schafts als Anteil des
+# Halbmessers (aus Row_1: Innenrand des Schafts); die Radien: Schaft außen und innen, Mitte
+# (Spitze), Spitze innen; die halbe Lücke und die Länge der Spitze im Bogenmaß
+N:   Value = MIN(MAX(ROUND(Prop.Steps,0),3),8)
+S:   Value = 2*PI()/User.N
+T:   Value = MIN(MAX((1-(Controls.Row_1.Y-Height*0.5)/(Height*0.5))/1.5,0.1),0.3)
+Ro:  Value = 1-User.T*0.5
+Ri:  Value = 1-User.T*1.5
+Rc:  Value = 1-User.T
+Rh:  Value = 1-User.T*2
+G:   Value = 0.07
+Hd:  Value = MIN((User.S-2*User.G)*0.4,0.45)
+
+[Property]
+Steps:  Type = 2; Format = "0"; Value = 6
+        Label.de = Schritte
+        Label.en = Steps
+        Label.es = Pasos
+        Label.it = Passi
+        Label.fr = Étapes
+        Prompt.de = Anzahl der Schritte (3 bis 8)
+        Prompt.en = Number of steps (3 to 8)
+        Prompt.es = Número de pasos (de 3 a 8)
+        Prompt.it = Numero di passi (da 3 a 8)
+        Prompt.fr = Nombre d'étapes (de 3 à 8)
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.82
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Breite der Pfeile ändern"
+        Tip.en = "Change the width of the arrows"
+        Tip.es = "Cambiar el ancho de las flechas"
+        Tip.it = "Cambia la larghezza delle frecce"
+        Tip.fr = "Modifier la largeur des flèches"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# Schritt 1: immer sichtbar
+[Part A1]
+text.de: 1
+text.en: 1
+text.es: 1
+text.it: 1
+text.fr: 1
+
+[User]
+# Schaftende, Spitze, Fuß der Spitze (mathematisch, im Bogenmaß), die Mitte des Schafts, der Ort
+# des Texts und sein Winkel
+A0:  Value = PI()*0.5-Sheet.1!User.G
+A1:  Value = PI()*0.5-1*Sheet.1!User.S+Sheet.1!User.G
+Ae:  Value = User.A1+Sheet.1!User.Hd
+Ms:  Value = (User.A0+User.Ae)*0.5
+Am:  Value = (User.A0+User.A1)*0.5+Sheet.1!User.Hd*0.2
+Ta:  Value = IF(SIN(User.Am)<0,User.Am+PI()*0.5,User.Am-PI()*0.5)
+
+[Shape]
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rc*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.Am))
+TxtWidth = Width*0.5*Sheet.1!User.Rc*(User.A0-User.A1)
+TxtHeight = Height*0.5*Sheet.1!User.T*1.6
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+# kurze Texte (die Nummer) aufrecht, längere dem Bogen nach
+TxtAngle = IF(TEXTWIDTH(TheText)>Height*0.75*Sheet.1!User.T,User.Ta,0)
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ae))
+                 A = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+COS(User.Ae)); Y = Height*0.5*(1+SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rc*COS(User.A1)); Y = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.A1))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rh*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Rh*SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ae))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Schritt 2: immer sichtbar
+[Part A2]
+text.de: 2
+text.en: 2
+text.es: 2
+text.it: 2
+text.fr: 2
+
+[User]
+# Schaftende, Spitze, Fuß der Spitze (mathematisch, im Bogenmaß), die Mitte des Schafts, der Ort
+# des Texts und sein Winkel
+A0:  Value = PI()*0.5-1*Sheet.1!User.S-Sheet.1!User.G
+A1:  Value = PI()*0.5-2*Sheet.1!User.S+Sheet.1!User.G
+Ae:  Value = User.A1+Sheet.1!User.Hd
+Ms:  Value = (User.A0+User.Ae)*0.5
+Am:  Value = (User.A0+User.A1)*0.5+Sheet.1!User.Hd*0.2
+Ta:  Value = IF(SIN(User.Am)<0,User.Am+PI()*0.5,User.Am-PI()*0.5)
+
+[Shape]
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rc*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.Am))
+TxtWidth = Width*0.5*Sheet.1!User.Rc*(User.A0-User.A1)
+TxtHeight = Height*0.5*Sheet.1!User.T*1.6
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+# kurze Texte (die Nummer) aufrecht, längere dem Bogen nach
+TxtAngle = IF(TEXTWIDTH(TheText)>Height*0.75*Sheet.1!User.T,User.Ta,0)
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ae))
+                 A = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+COS(User.Ae)); Y = Height*0.5*(1+SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rc*COS(User.A1)); Y = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.A1))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rh*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Rh*SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ae))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Schritt 3: immer sichtbar
+[Part A3]
+text.de: 3
+text.en: 3
+text.es: 3
+text.it: 3
+text.fr: 3
+
+[User]
+# Schaftende, Spitze, Fuß der Spitze (mathematisch, im Bogenmaß), die Mitte des Schafts, der Ort
+# des Texts und sein Winkel
+A0:  Value = PI()*0.5-2*Sheet.1!User.S-Sheet.1!User.G
+A1:  Value = PI()*0.5-3*Sheet.1!User.S+Sheet.1!User.G
+Ae:  Value = User.A1+Sheet.1!User.Hd
+Ms:  Value = (User.A0+User.Ae)*0.5
+Am:  Value = (User.A0+User.A1)*0.5+Sheet.1!User.Hd*0.2
+Ta:  Value = IF(SIN(User.Am)<0,User.Am+PI()*0.5,User.Am-PI()*0.5)
+
+[Shape]
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rc*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.Am))
+TxtWidth = Width*0.5*Sheet.1!User.Rc*(User.A0-User.A1)
+TxtHeight = Height*0.5*Sheet.1!User.T*1.6
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+# kurze Texte (die Nummer) aufrecht, längere dem Bogen nach
+TxtAngle = IF(TEXTWIDTH(TheText)>Height*0.75*Sheet.1!User.T,User.Ta,0)
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ae))
+                 A = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+COS(User.Ae)); Y = Height*0.5*(1+SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rc*COS(User.A1)); Y = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.A1))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rh*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Rh*SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ae))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Schritt 4: sichtbar ab 4 Schritten
+[Part A4]
+text.de: 4
+text.en: 4
+text.es: 4
+text.it: 4
+text.fr: 4
+
+[User]
+# Schaftende, Spitze, Fuß der Spitze (mathematisch, im Bogenmaß), die Mitte des Schafts, der Ort
+# des Texts und sein Winkel
+A0:  Value = PI()*0.5-3*Sheet.1!User.S-Sheet.1!User.G
+A1:  Value = PI()*0.5-4*Sheet.1!User.S+Sheet.1!User.G
+Ae:  Value = User.A1+Sheet.1!User.Hd
+Ms:  Value = (User.A0+User.Ae)*0.5
+Am:  Value = (User.A0+User.A1)*0.5+Sheet.1!User.Hd*0.2
+Ta:  Value = IF(SIN(User.Am)<0,User.Am+PI()*0.5,User.Am-PI()*0.5)
+
+[Shape]
+HideText = 4>Sheet.1!User.N
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rc*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.Am))
+TxtWidth = Width*0.5*Sheet.1!User.Rc*(User.A0-User.A1)
+TxtHeight = Height*0.5*Sheet.1!User.T*1.6
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+# kurze Texte (die Nummer) aufrecht, längere dem Bogen nach
+TxtAngle = IF(TEXTWIDTH(TheText)>Height*0.75*Sheet.1!User.T,User.Ta,0)
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ae))
+                 A = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+COS(User.Ae)); Y = Height*0.5*(1+SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rc*COS(User.A1)); Y = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.A1))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rh*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Rh*SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ae))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Schritt 5: sichtbar ab 5 Schritten
+[Part A5]
+text.de: 5
+text.en: 5
+text.es: 5
+text.it: 5
+text.fr: 5
+
+[User]
+# Schaftende, Spitze, Fuß der Spitze (mathematisch, im Bogenmaß), die Mitte des Schafts, der Ort
+# des Texts und sein Winkel
+A0:  Value = PI()*0.5-4*Sheet.1!User.S-Sheet.1!User.G
+A1:  Value = PI()*0.5-5*Sheet.1!User.S+Sheet.1!User.G
+Ae:  Value = User.A1+Sheet.1!User.Hd
+Ms:  Value = (User.A0+User.Ae)*0.5
+Am:  Value = (User.A0+User.A1)*0.5+Sheet.1!User.Hd*0.2
+Ta:  Value = IF(SIN(User.Am)<0,User.Am+PI()*0.5,User.Am-PI()*0.5)
+
+[Shape]
+HideText = 5>Sheet.1!User.N
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rc*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.Am))
+TxtWidth = Width*0.5*Sheet.1!User.Rc*(User.A0-User.A1)
+TxtHeight = Height*0.5*Sheet.1!User.T*1.6
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+# kurze Texte (die Nummer) aufrecht, längere dem Bogen nach
+TxtAngle = IF(TEXTWIDTH(TheText)>Height*0.75*Sheet.1!User.T,User.Ta,0)
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ae))
+                 A = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+COS(User.Ae)); Y = Height*0.5*(1+SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rc*COS(User.A1)); Y = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.A1))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rh*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Rh*SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ae))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Schritt 6: sichtbar ab 6 Schritten
+[Part A6]
+text.de: 6
+text.en: 6
+text.es: 6
+text.it: 6
+text.fr: 6
+
+[User]
+# Schaftende, Spitze, Fuß der Spitze (mathematisch, im Bogenmaß), die Mitte des Schafts, der Ort
+# des Texts und sein Winkel
+A0:  Value = PI()*0.5-5*Sheet.1!User.S-Sheet.1!User.G
+A1:  Value = PI()*0.5-6*Sheet.1!User.S+Sheet.1!User.G
+Ae:  Value = User.A1+Sheet.1!User.Hd
+Ms:  Value = (User.A0+User.Ae)*0.5
+Am:  Value = (User.A0+User.A1)*0.5+Sheet.1!User.Hd*0.2
+Ta:  Value = IF(SIN(User.Am)<0,User.Am+PI()*0.5,User.Am-PI()*0.5)
+
+[Shape]
+HideText = 6>Sheet.1!User.N
+QuickStyleLineColor = 105
+QuickStyleFillColor = 105
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rc*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.Am))
+TxtWidth = Width*0.5*Sheet.1!User.Rc*(User.A0-User.A1)
+TxtHeight = Height*0.5*Sheet.1!User.T*1.6
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+# kurze Texte (die Nummer) aufrecht, längere dem Bogen nach
+TxtAngle = IF(TEXTWIDTH(TheText)>Height*0.75*Sheet.1!User.T,User.Ta,0)
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ae))
+                 A = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+COS(User.Ae)); Y = Height*0.5*(1+SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rc*COS(User.A1)); Y = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.A1))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rh*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Rh*SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ae))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Schritt 7: sichtbar ab 7 Schritten
+[Part A7]
+text.de: 7
+text.en: 7
+text.es: 7
+text.it: 7
+text.fr: 7
+
+[User]
+# Schaftende, Spitze, Fuß der Spitze (mathematisch, im Bogenmaß), die Mitte des Schafts, der Ort
+# des Texts und sein Winkel
+A0:  Value = PI()*0.5-6*Sheet.1!User.S-Sheet.1!User.G
+A1:  Value = PI()*0.5-7*Sheet.1!User.S+Sheet.1!User.G
+Ae:  Value = User.A1+Sheet.1!User.Hd
+Ms:  Value = (User.A0+User.Ae)*0.5
+Am:  Value = (User.A0+User.A1)*0.5+Sheet.1!User.Hd*0.2
+Ta:  Value = IF(SIN(User.Am)<0,User.Am+PI()*0.5,User.Am-PI()*0.5)
+
+[Shape]
+HideText = 7>Sheet.1!User.N
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rc*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.Am))
+TxtWidth = Width*0.5*Sheet.1!User.Rc*(User.A0-User.A1)
+TxtHeight = Height*0.5*Sheet.1!User.T*1.6
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+# kurze Texte (die Nummer) aufrecht, längere dem Bogen nach
+TxtAngle = IF(TEXTWIDTH(TheText)>Height*0.75*Sheet.1!User.T,User.Ta,0)
+
+[Geometry]
+NoShow = 7>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ae))
+                 A = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+COS(User.Ae)); Y = Height*0.5*(1+SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rc*COS(User.A1)); Y = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.A1))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rh*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Rh*SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ae))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Schritt 8: sichtbar ab 8 Schritten
+[Part A8]
+text.de: 8
+text.en: 8
+text.es: 8
+text.it: 8
+text.fr: 8
+
+[User]
+# Schaftende, Spitze, Fuß der Spitze (mathematisch, im Bogenmaß), die Mitte des Schafts, der Ort
+# des Texts und sein Winkel
+A0:  Value = PI()*0.5-7*Sheet.1!User.S-Sheet.1!User.G
+A1:  Value = PI()*0.5-8*Sheet.1!User.S+Sheet.1!User.G
+Ae:  Value = User.A1+Sheet.1!User.Hd
+Ms:  Value = (User.A0+User.Ae)*0.5
+Am:  Value = (User.A0+User.A1)*0.5+Sheet.1!User.Hd*0.2
+Ta:  Value = IF(SIN(User.Am)<0,User.Am+PI()*0.5,User.Am-PI()*0.5)
+
+[Shape]
+HideText = 8>Sheet.1!User.N
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rc*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.Am))
+TxtWidth = Width*0.5*Sheet.1!User.Rc*(User.A0-User.A1)
+TxtHeight = Height*0.5*Sheet.1!User.T*1.6
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+# kurze Texte (die Nummer) aufrecht, längere dem Bogen nach
+TxtAngle = IF(TEXTWIDTH(TheText)>Height*0.75*Sheet.1!User.T,User.Ta,0)
+
+[Geometry]
+NoShow = 8>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ae))
+                 A = Width*0.5*(1+Sheet.1!User.Ro*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ro*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+COS(User.Ae)); Y = Height*0.5*(1+SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rc*COS(User.A1)); Y = Height*0.5*(1+Sheet.1!User.Rc*SIN(User.A1))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rh*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Rh*SIN(User.Ae))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ae)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ae))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.A0)); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ms)); B = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ms)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1

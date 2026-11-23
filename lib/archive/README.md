@@ -38,6 +38,11 @@ let main = package.main_part();                               // Some("visio/doc
 let pages = package.relationships("visio/document.xml")?;     // ids, types, targets
 ```
 
+`archive::cfb` reads compound files ("OLE", Microsoft's open specification [MS-CFB]), the
+container of Office's binary formats (Visio's `.vss`, Word's `.doc`, a macro project): the
+directory of storages and streams and each stream's bytes, read only and checked like a ZIP
+archive (sizes bounded, sector chains and the directory without loops).
+
 `ZipFs` shows an archive as a read-only folder tree in JFLib's file namespace. Mounted under a
 scheme of its own, its files open with the ordinary file functions of `plat`:
 

@@ -368,7 +368,7 @@ fn drawing(h: &mut H) {
 
 // written in `format` and read back: no warnings, the same content, the second write the same
 // bytes
-fn round_trip(h: &mut H, name: &str, doc: &Document, format: Format) -> Option<Vec<u8>> {
+pub(crate) fn round_trip(h: &mut H, name: &str, doc: &Document, format: Format) -> Option<Vec<u8>> {
     let opts = WriteOptions { format: Some(format), ..WriteOptions::DEFAULT };
     let bytes = match vsdx::write(doc, &opts) {
         Ok(b) => b,

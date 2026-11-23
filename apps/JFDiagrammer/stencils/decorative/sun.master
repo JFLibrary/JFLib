@@ -1,0 +1,147 @@
+# Sonne (SH-003, JD26): eine Scheibe (Kreis, gestreckt Ellipse) und zwölf Strahlen als spitze
+# Dreiecke ringsum, alle 30°, die Spitzen auf dem Rand des Kastens.  Scheibe und Strahlen sind
+# getrennte Flächen: die Strahlen beginnen eine Fuge (1 mm, als Anteil des Radius) außerhalb der
+# Scheibe, so bleiben sie auch in einem Design ohne Shape-Linien getrennt.  Row_1 am oberen Rand
+# der Scheibe ändert ihren Radius und damit die Länge der Strahlen (anteilig, nur senkrecht;
+# Radius 30 bis 80 % des äußeren).  Die Strahlen sind an der Basis 16° breit.  Der Text steht in
+# der Scheibe.
+master: Sun
+name.de: Sonne
+name.en: Sun
+name.es: Sol
+name.it: Sole
+name.fr: Soleil
+prompt.de: Sonne mit Strahlen für Wetter, Tag und gute Stimmung. Mit dem gelben Steuerpunkt ändern Sie die Länge der Strahlen.
+prompt.en: Sun with rays for weather, daytime and good mood. Drag the yellow control handle to change the length of the rays.
+prompt.es: Sol con rayos para el tiempo, el día y el buen humor. Arrastre el controlador amarillo para cambiar la longitud de los rayos.
+prompt.it: Sole con raggi per meteo, giorno e buon umore. Trascina la maniglia di controllo gialla per cambiare la lunghezza dei raggi.
+prompt.fr: Soleil avec rayons pour la météo, le jour et la bonne humeur. Faites glisser la poignée de contrôle jaune pour modifier la longueur des rayons.
+keywords.de: Sonne, Strahlen, Wetter, Tag, Sommer, Licht, Dekor
+keywords.en: sun, rays, weather, day, summer, light, sunshine, decoration
+keywords.es: sol, rayos, tiempo, día, verano, luz, decoración
+keywords.it: sole, raggi, meteo, giorno, estate, luce, decorazione
+keywords.fr: soleil, rayons, météo, jour, été, lumière, décoration
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Width*User.K*0.9
+TxtHeight = Height*User.K*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# der Radius der Scheibe als Anteil des äußeren (30 bis 80 %), die Fuge als Anteil (1 mm in der
+# kleineren Richtung), der Radius, auf dem die Strahlen beginnen
+K:  Value = MIN(MAX((Controls.Row_1.Y-Height*0.5)/(Height*0.5),0.3),0.8)
+G:  Value = MIN(1 mm/(MIN(Width,Height)*0.5),0.1)
+R:  Value = User.K+User.G
+
+# die Scheibe
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width*0.5*(1+User.K); B = Height*0.5
+         C = Width*0.5; D = Height*0.5*(1+User.K)
+
+# Strahl bei 0°
+[Geometry]
+MoveTo  X = Width*0.5*(1+User.R*0.9903); Y = Height*0.5*(1-User.R*0.1392)
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width*0.5*(1+User.R*0.9903); Y = Height*0.5*(1+User.R*0.1392)
+LineTo  X = Width*0.5*(1+User.R*0.9903); Y = Height*0.5*(1-User.R*0.1392)
+
+# Strahl bei 30°
+[Geometry]
+MoveTo  X = Width*0.5*(1+User.R*0.9272); Y = Height*0.5*(1+User.R*0.3746)
+LineTo  X = Width*0.933; Y = Height*0.75
+LineTo  X = Width*0.5*(1+User.R*0.788); Y = Height*0.5*(1+User.R*0.6157)
+LineTo  X = Width*0.5*(1+User.R*0.9272); Y = Height*0.5*(1+User.R*0.3746)
+
+# Strahl bei 60°
+[Geometry]
+MoveTo  X = Width*0.5*(1+User.R*0.6157); Y = Height*0.5*(1+User.R*0.788)
+LineTo  X = Width*0.75; Y = Height*0.933
+LineTo  X = Width*0.5*(1+User.R*0.3746); Y = Height*0.5*(1+User.R*0.9272)
+LineTo  X = Width*0.5*(1+User.R*0.6157); Y = Height*0.5*(1+User.R*0.788)
+
+# Strahl bei 90°
+[Geometry]
+MoveTo  X = Width*0.5*(1+User.R*0.1392); Y = Height*0.5*(1+User.R*0.9903)
+LineTo  X = Width*0.5; Y = Height
+LineTo  X = Width*0.5*(1-User.R*0.1392); Y = Height*0.5*(1+User.R*0.9903)
+LineTo  X = Width*0.5*(1+User.R*0.1392); Y = Height*0.5*(1+User.R*0.9903)
+
+# Strahl bei 120°
+[Geometry]
+MoveTo  X = Width*0.5*(1-User.R*0.3746); Y = Height*0.5*(1+User.R*0.9272)
+LineTo  X = Width*0.25; Y = Height*0.933
+LineTo  X = Width*0.5*(1-User.R*0.6157); Y = Height*0.5*(1+User.R*0.788)
+LineTo  X = Width*0.5*(1-User.R*0.3746); Y = Height*0.5*(1+User.R*0.9272)
+
+# Strahl bei 150°
+[Geometry]
+MoveTo  X = Width*0.5*(1-User.R*0.788); Y = Height*0.5*(1+User.R*0.6157)
+LineTo  X = Width*0.067; Y = Height*0.75
+LineTo  X = Width*0.5*(1-User.R*0.9272); Y = Height*0.5*(1+User.R*0.3746)
+LineTo  X = Width*0.5*(1-User.R*0.788); Y = Height*0.5*(1+User.R*0.6157)
+
+# Strahl bei 180°
+[Geometry]
+MoveTo  X = Width*0.5*(1-User.R*0.9903); Y = Height*0.5*(1+User.R*0.1392)
+LineTo  X = 0; Y = Height*0.5
+LineTo  X = Width*0.5*(1-User.R*0.9903); Y = Height*0.5*(1-User.R*0.1392)
+LineTo  X = Width*0.5*(1-User.R*0.9903); Y = Height*0.5*(1+User.R*0.1392)
+
+# Strahl bei 210°
+[Geometry]
+MoveTo  X = Width*0.5*(1-User.R*0.9272); Y = Height*0.5*(1-User.R*0.3746)
+LineTo  X = Width*0.067; Y = Height*0.25
+LineTo  X = Width*0.5*(1-User.R*0.788); Y = Height*0.5*(1-User.R*0.6157)
+LineTo  X = Width*0.5*(1-User.R*0.9272); Y = Height*0.5*(1-User.R*0.3746)
+
+# Strahl bei 240°
+[Geometry]
+MoveTo  X = Width*0.5*(1-User.R*0.6157); Y = Height*0.5*(1-User.R*0.788)
+LineTo  X = Width*0.25; Y = Height*0.067
+LineTo  X = Width*0.5*(1-User.R*0.3746); Y = Height*0.5*(1-User.R*0.9272)
+LineTo  X = Width*0.5*(1-User.R*0.6157); Y = Height*0.5*(1-User.R*0.788)
+
+# Strahl bei 270°
+[Geometry]
+MoveTo  X = Width*0.5*(1-User.R*0.1392); Y = Height*0.5*(1-User.R*0.9903)
+LineTo  X = Width*0.5; Y = 0
+LineTo  X = Width*0.5*(1+User.R*0.1392); Y = Height*0.5*(1-User.R*0.9903)
+LineTo  X = Width*0.5*(1-User.R*0.1392); Y = Height*0.5*(1-User.R*0.9903)
+
+# Strahl bei 300°
+[Geometry]
+MoveTo  X = Width*0.5*(1+User.R*0.3746); Y = Height*0.5*(1-User.R*0.9272)
+LineTo  X = Width*0.75; Y = Height*0.067
+LineTo  X = Width*0.5*(1+User.R*0.6157); Y = Height*0.5*(1-User.R*0.788)
+LineTo  X = Width*0.5*(1+User.R*0.3746); Y = Height*0.5*(1-User.R*0.9272)
+
+# Strahl bei 330°
+[Geometry]
+MoveTo  X = Width*0.5*(1+User.R*0.788); Y = Height*0.5*(1-User.R*0.6157)
+LineTo  X = Width*0.933; Y = Height*0.25
+LineTo  X = Width*0.5*(1+User.R*0.9272); Y = Height*0.5*(1-User.R*0.3746)
+LineTo  X = Width*0.5*(1+User.R*0.788); Y = Height*0.5*(1-User.R*0.6157)
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.8
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Länge der Strahlen ändern"
+        Tip.en = "Change the length of the rays"
+        Tip.es = "Cambiar la longitud de los rayos"
+        Tip.it = "Cambia la lunghezza dei raggi"
+        Tip.fr = "Modifier la longueur des rayons"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

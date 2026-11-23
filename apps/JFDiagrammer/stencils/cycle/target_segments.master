@@ -1,0 +1,365 @@
+# Zielsegmente (SH-033, JD26): eine Zielscheibe aus einer Mittelscheibe und einem Ring, der in zwei
+# bis acht Segmente geteilt ist; jedes Segment und die Mitte ein Teil der Gruppe mit eigenem Text,
+# die Segmente in den Variantenfarben des Designs (100 bis 106, das achte 103, damit Nachbarn
+# verschieden bleiben), die Mitte in 106.  Zwischen allen Flächen 1 mm Fuge gleicher Breite (der
+# Winkel an jedem Rand aus ASIN der halben Fuge durch den Radius).  Segment 1 beginnt oben, im
+# Uhrzeigersinn.  Die Zahl steht in den Shape-Daten (Prop.Segments); Segmente über der Zahl sind
+# verborgen.  Row_1 am Innenrand oben ändert die Breite des Rings (anteilig, nur senkrecht).  Alle
+# Teile sind so groß wie die Gruppe; Bögen sind Ellipsenbögen durch die Mitte des Segments.  Die
+# Segmente tragen anfangs ihre Nummer (sie passt auch in schmale Segmente), die Mitte „Ziel“.
+master: Target segments
+name.de: Zielsegmente
+name.en: Target segments
+name.es: Segmentos de diana
+name.it: Segmenti di bersaglio
+name.fr: Segments de cible
+prompt.de: Zielscheibe aus Mitte und Ring, geteilt in farbige Segmente. Die Zahl der Segmente stellen Sie in den Shape-Daten ein, die Breite des Rings mit dem gelben Steuerpunkt.
+prompt.en: Target of a centre and a ring divided into coloured segments. Set the number of segments in the shape data and the width of the ring with the yellow control handle.
+prompt.es: Diana con centro y anillo dividido en segmentos de colores. Defina el número de segmentos en los datos de la forma y el ancho del anillo con el controlador amarillo.
+prompt.it: Bersaglio con centro e anello diviso in segmenti colorati. Imposta il numero di segmenti nei dati della forma e la larghezza dell'anello con la maniglia di controllo gialla.
+prompt.fr: Cible avec un centre et un anneau divisé en segments colorés. Définissez le nombre de segments dans les données de la forme et la largeur de l'anneau avec la poignée de contrôle jaune.
+keywords.de: Zielscheibe, Segmente, Ziel, Ring, Sektoren, Kreis, Fokus
+keywords.en: target, segments, goal, ring, sectors, circle, focus
+keywords.es: diana, segmentos, objetivo, anillo, sectores, círculo
+keywords.it: bersaglio, segmenti, obiettivo, anello, settori, cerchio
+keywords.fr: cible, segments, objectif, anneau, secteurs, cercle
+
+[Shape]
+Width = 60 mm
+Width.us = 2.25 in
+Height = 60 mm
+Height.us = 2.25 in
+
+[User]
+# die Zahl der Segmente (2 bis 8), der Winkel je Segment, der Innenradius des Rings als Anteil des
+# äußeren; die Fuge, ihre Hälfte als Anteil des Halbmessers, der Winkel der halben Fuge außen und innen
+N:   Value = MIN(MAX(ROUND(Prop.Segments,0),2),8)
+S:   Value = 2*PI()/User.N
+K:   Value = MIN(MAX((Controls.Row_1.Y-Height*0.5)/(Height*0.5),0.2),0.8)
+Gp:  Value = 1 mm
+     Value.us = 0.04 in
+Gh:  Value = User.Gp/Width
+Go:  Value = ASIN(User.Gh)
+Gi:  Value = ASIN(MIN(User.Gh/User.K,0.5))
+
+[Property]
+Segments:  Type = 2; Format = "0"; Value = 4
+           Label.de = Segmente
+           Label.en = Segments
+           Label.es = Segmentos
+           Label.it = Segmenti
+           Label.fr = Segments
+           Prompt.de = Anzahl der Segmente (2 bis 8)
+           Prompt.en = Number of segments (2 to 8)
+           Prompt.es = Número de segmentos (de 2 a 8)
+           Prompt.it = Numero di segmenti (da 2 a 8)
+           Prompt.fr = Nombre de segments (de 2 à 8)
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.7
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Breite des Rings ändern"
+        Tip.en = "Change the width of the ring"
+        Tip.es = "Cambiar el ancho del anillo"
+        Tip.it = "Cambia la larghezza dell'anello"
+        Tip.fr = "Modifier la largeur de l'anneau"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# die Mitte, eine Fuge innerhalb des Rings
+[Part Center]
+text.de: Ziel
+text.en: Goal
+text.es: Meta
+text.it: Meta
+text.fr: But
+
+[Shape]
+Width = GUARD(Sheet.1!Width*(Sheet.1!User.K-2*Sheet.1!User.Gh))
+Height = GUARD(Sheet.1!Height*(Sheet.1!User.K-2*Sheet.1!User.Gh))
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+[Part S1]
+text.de: 1
+text.en: 1
+text.es: 1
+text.it: 1
+text.fr: 1
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte, der mittlere Radius
+A0:  Value = PI()*0.5
+A1:  Value = PI()*0.5-1*Sheet.1!User.S
+Am:  Value = (User.A0+User.A1)*0.5
+Rm:  Value = (Sheet.1!User.K+1)*0.5
+
+[Shape]
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*MIN(0.4,User.Rm*SIN(Sheet.1!User.S*0.5))
+TxtHeight = Height*0.5*(1-Sheet.1!User.K)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+COS(User.A0-Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A0-Sheet.1!User.Go))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1+Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A1+Sheet.1!User.Go))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+Sheet.1!User.K*COS(User.A1+Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A1+Sheet.1!User.Gi))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.K*COS(User.A0-Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A0-Sheet.1!User.Gi))
+                 A = Width*0.5*(1+Sheet.1!User.K*COS(User.Am)); B = Height*0.5*(1+Sheet.1!User.K*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Part S2]
+text.de: 2
+text.en: 2
+text.es: 2
+text.it: 2
+text.fr: 2
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte, der mittlere Radius
+A0:  Value = PI()*0.5-1*Sheet.1!User.S
+A1:  Value = PI()*0.5-2*Sheet.1!User.S
+Am:  Value = (User.A0+User.A1)*0.5
+Rm:  Value = (Sheet.1!User.K+1)*0.5
+
+[Shape]
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*MIN(0.4,User.Rm*SIN(Sheet.1!User.S*0.5))
+TxtHeight = Height*0.5*(1-Sheet.1!User.K)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+COS(User.A0-Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A0-Sheet.1!User.Go))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1+Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A1+Sheet.1!User.Go))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+Sheet.1!User.K*COS(User.A1+Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A1+Sheet.1!User.Gi))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.K*COS(User.A0-Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A0-Sheet.1!User.Gi))
+                 A = Width*0.5*(1+Sheet.1!User.K*COS(User.Am)); B = Height*0.5*(1+Sheet.1!User.K*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Part S3]
+text.de: 3
+text.en: 3
+text.es: 3
+text.it: 3
+text.fr: 3
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte, der mittlere Radius
+A0:  Value = PI()*0.5-2*Sheet.1!User.S
+A1:  Value = PI()*0.5-3*Sheet.1!User.S
+Am:  Value = (User.A0+User.A1)*0.5
+Rm:  Value = (Sheet.1!User.K+1)*0.5
+
+[Shape]
+HideText = 3>Sheet.1!User.N
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*MIN(0.4,User.Rm*SIN(Sheet.1!User.S*0.5))
+TxtHeight = Height*0.5*(1-Sheet.1!User.K)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+COS(User.A0-Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A0-Sheet.1!User.Go))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1+Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A1+Sheet.1!User.Go))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+Sheet.1!User.K*COS(User.A1+Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A1+Sheet.1!User.Gi))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.K*COS(User.A0-Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A0-Sheet.1!User.Gi))
+                 A = Width*0.5*(1+Sheet.1!User.K*COS(User.Am)); B = Height*0.5*(1+Sheet.1!User.K*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Part S4]
+text.de: 4
+text.en: 4
+text.es: 4
+text.it: 4
+text.fr: 4
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte, der mittlere Radius
+A0:  Value = PI()*0.5-3*Sheet.1!User.S
+A1:  Value = PI()*0.5-4*Sheet.1!User.S
+Am:  Value = (User.A0+User.A1)*0.5
+Rm:  Value = (Sheet.1!User.K+1)*0.5
+
+[Shape]
+HideText = 4>Sheet.1!User.N
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*MIN(0.4,User.Rm*SIN(Sheet.1!User.S*0.5))
+TxtHeight = Height*0.5*(1-Sheet.1!User.K)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+COS(User.A0-Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A0-Sheet.1!User.Go))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1+Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A1+Sheet.1!User.Go))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+Sheet.1!User.K*COS(User.A1+Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A1+Sheet.1!User.Gi))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.K*COS(User.A0-Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A0-Sheet.1!User.Gi))
+                 A = Width*0.5*(1+Sheet.1!User.K*COS(User.Am)); B = Height*0.5*(1+Sheet.1!User.K*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Part S5]
+text.de: 5
+text.en: 5
+text.es: 5
+text.it: 5
+text.fr: 5
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte, der mittlere Radius
+A0:  Value = PI()*0.5-4*Sheet.1!User.S
+A1:  Value = PI()*0.5-5*Sheet.1!User.S
+Am:  Value = (User.A0+User.A1)*0.5
+Rm:  Value = (Sheet.1!User.K+1)*0.5
+
+[Shape]
+HideText = 5>Sheet.1!User.N
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*MIN(0.4,User.Rm*SIN(Sheet.1!User.S*0.5))
+TxtHeight = Height*0.5*(1-Sheet.1!User.K)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+COS(User.A0-Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A0-Sheet.1!User.Go))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1+Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A1+Sheet.1!User.Go))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+Sheet.1!User.K*COS(User.A1+Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A1+Sheet.1!User.Gi))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.K*COS(User.A0-Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A0-Sheet.1!User.Gi))
+                 A = Width*0.5*(1+Sheet.1!User.K*COS(User.Am)); B = Height*0.5*(1+Sheet.1!User.K*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Part S6]
+text.de: 6
+text.en: 6
+text.es: 6
+text.it: 6
+text.fr: 6
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte, der mittlere Radius
+A0:  Value = PI()*0.5-5*Sheet.1!User.S
+A1:  Value = PI()*0.5-6*Sheet.1!User.S
+Am:  Value = (User.A0+User.A1)*0.5
+Rm:  Value = (Sheet.1!User.K+1)*0.5
+
+[Shape]
+HideText = 6>Sheet.1!User.N
+QuickStyleLineColor = 105
+QuickStyleFillColor = 105
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*MIN(0.4,User.Rm*SIN(Sheet.1!User.S*0.5))
+TxtHeight = Height*0.5*(1-Sheet.1!User.K)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+COS(User.A0-Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A0-Sheet.1!User.Go))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1+Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A1+Sheet.1!User.Go))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+Sheet.1!User.K*COS(User.A1+Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A1+Sheet.1!User.Gi))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.K*COS(User.A0-Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A0-Sheet.1!User.Gi))
+                 A = Width*0.5*(1+Sheet.1!User.K*COS(User.Am)); B = Height*0.5*(1+Sheet.1!User.K*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Part S7]
+text.de: 7
+text.en: 7
+text.es: 7
+text.it: 7
+text.fr: 7
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte, der mittlere Radius
+A0:  Value = PI()*0.5-6*Sheet.1!User.S
+A1:  Value = PI()*0.5-7*Sheet.1!User.S
+Am:  Value = (User.A0+User.A1)*0.5
+Rm:  Value = (Sheet.1!User.K+1)*0.5
+
+[Shape]
+HideText = 7>Sheet.1!User.N
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*MIN(0.4,User.Rm*SIN(Sheet.1!User.S*0.5))
+TxtHeight = Height*0.5*(1-Sheet.1!User.K)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 7>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+COS(User.A0-Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A0-Sheet.1!User.Go))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1+Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A1+Sheet.1!User.Go))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+Sheet.1!User.K*COS(User.A1+Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A1+Sheet.1!User.Gi))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.K*COS(User.A0-Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A0-Sheet.1!User.Gi))
+                 A = Width*0.5*(1+Sheet.1!User.K*COS(User.Am)); B = Height*0.5*(1+Sheet.1!User.K*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Part S8]
+text.de: 8
+text.en: 8
+text.es: 8
+text.it: 8
+text.fr: 8
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte, der mittlere Radius
+A0:  Value = PI()*0.5-7*Sheet.1!User.S
+A1:  Value = PI()*0.5-8*Sheet.1!User.S
+Am:  Value = (User.A0+User.A1)*0.5
+Rm:  Value = (Sheet.1!User.K+1)*0.5
+
+[Shape]
+HideText = 8>Sheet.1!User.N
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*MIN(0.4,User.Rm*SIN(Sheet.1!User.S*0.5))
+TxtHeight = Height*0.5*(1-Sheet.1!User.K)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 8>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+COS(User.A0-Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A0-Sheet.1!User.Go))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1+Sheet.1!User.Go)); Y = Height*0.5*(1+SIN(User.A1+Sheet.1!User.Go))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+Sheet.1!User.K*COS(User.A1+Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A1+Sheet.1!User.Gi))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.K*COS(User.A0-Sheet.1!User.Gi)); Y = Height*0.5*(1+Sheet.1!User.K*SIN(User.A0-Sheet.1!User.Gi))
+                 A = Width*0.5*(1+Sheet.1!User.K*COS(User.Am)); B = Height*0.5*(1+Sheet.1!User.K*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1

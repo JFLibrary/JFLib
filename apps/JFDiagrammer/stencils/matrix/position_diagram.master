@@ -1,0 +1,176 @@
+# Positionsdiagramm (SH-031, JD26): ein Achsenkreuz durch die Mitte mit Pfeilspitzen an allen vier
+# Enden und vier Kreisen verschiedener Größe (Teile der Gruppe, je mit Text und eigener
+# Variantenfarbe 100 bis 103).  Jeder Kreis sitzt auf einem gelben Steuerpunkt der Gruppe (Row_1
+# bis Row_4, anteilig): wer ihn zieht, verschiebt den Kreis; beim Strecken wandern die Kreise
+# anteilig mit.  Die Kreise bleiben rund (Durchmesser aus der kleineren Seite).  Die Achsen nehmen
+# die Formatvorlage Connector (sichtbar auch in Designs ohne Shape-Linien) ohne deren
+# Pfeilspitzen; die Spitzen zeichnet das Teil selbst.
+master: Position diagram
+name.de: Positionsdiagramm
+name.en: Position diagram
+name.es: Diagrama de posicionamiento
+name.it: Diagramma di posizionamento
+name.fr: Diagramme de positionnement
+prompt.de: Achsenkreuz mit Kreisen für Positionierungen und Marktübersichten. Die Kreise verschieben Sie mit den gelben Steuerpunkten.
+prompt.en: Axis cross with circles for positioning and market overviews. Drag the yellow control handles to move the circles.
+prompt.es: Ejes cruzados con círculos para posicionamientos y visiones del mercado. Arrastre los controladores amarillos para mover los círculos.
+prompt.it: Assi incrociati con cerchi per posizionamenti e panoramiche di mercato. Trascina le maniglie di controllo gialle per spostare i cerchi.
+prompt.fr: Axes croisés avec des cercles pour les positionnements et les aperçus du marché. Faites glisser les poignées de contrôle jaunes pour déplacer les cercles.
+keywords.de: Positionierung, Positionsdiagramm, Achsen, Kreise, Blasen, Marktübersicht, Wahrnehmung
+keywords.en: positioning, positioning chart, axes, circles, bubbles, market map, perceptual map
+keywords.es: posicionamiento, ejes, círculos, burbujas, mapa de mercado, mapa perceptual
+keywords.it: posizionamento, assi, cerchi, bolle, mappa di mercato, mappa percettiva
+keywords.fr: positionnement, axes, cercles, bulles, carte de marché, carte perceptuelle
+
+[Shape]
+Width = 70 mm
+Width.us = 2.75 in
+Height = 60 mm
+Height.us = 2.25 in
+
+[User]
+# die Länge der Pfeilspitzen
+L:   Value = 3 mm
+     Value.us = 0.12 in
+
+[Controls]
+Row_1:  X = Width*0.25; Y = Height*0.75
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Kreis verschieben"
+        Tip.en = "Move the circle"
+        Tip.es = "Mover el círculo"
+        Tip.it = "Sposta il cerchio"
+        Tip.fr = "Déplacer le cercle"
+Row_2:  X = Width*0.74; Y = Height*0.7
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Kreis verschieben"
+        Tip.en = "Move the circle"
+        Tip.es = "Mover el círculo"
+        Tip.it = "Sposta il cerchio"
+        Tip.fr = "Déplacer le cercle"
+Row_3:  X = Width*0.3; Y = Height*0.27
+        XDyn = Controls.Row_3; YDyn = Controls.Row_3.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Kreis verschieben"
+        Tip.en = "Move the circle"
+        Tip.es = "Mover el círculo"
+        Tip.it = "Sposta il cerchio"
+        Tip.fr = "Déplacer le cercle"
+Row_4:  X = Width*0.72; Y = Height*0.28
+        XDyn = Controls.Row_4; YDyn = Controls.Row_4.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Kreis verschieben"
+        Tip.en = "Move the circle"
+        Tip.es = "Mover el círculo"
+        Tip.it = "Sposta il cerchio"
+        Tip.fr = "Déplacer le cercle"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# das Achsenkreuz mit vier Spitzen
+[Part Axes]
+style: Connector
+
+[Shape]
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width; Y = Height*0.5
+MoveTo  X = Width*0.5; Y = 0
+LineTo  X = Width*0.5; Y = Height
+MoveTo  X = Width-Sheet.1!User.L; Y = Height*0.5+Sheet.1!User.L*0.5
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-Sheet.1!User.L; Y = Height*0.5-Sheet.1!User.L*0.5
+MoveTo  X = Sheet.1!User.L; Y = Height*0.5+Sheet.1!User.L*0.5
+LineTo  X = 0; Y = Height*0.5
+LineTo  X = Sheet.1!User.L; Y = Height*0.5-Sheet.1!User.L*0.5
+MoveTo  X = Width*0.5-Sheet.1!User.L*0.5; Y = Height-Sheet.1!User.L
+LineTo  X = Width*0.5; Y = Height
+LineTo  X = Width*0.5+Sheet.1!User.L*0.5; Y = Height-Sheet.1!User.L
+MoveTo  X = Width*0.5-Sheet.1!User.L*0.5; Y = Sheet.1!User.L
+LineTo  X = Width*0.5; Y = 0
+LineTo  X = Width*0.5+Sheet.1!User.L*0.5; Y = Sheet.1!User.L
+
+# die Kreise auf den Steuerpunkten Row_1 bis Row_4
+[Part A]
+text.de: A
+text.en: A
+text.es: A
+text.it: A
+text.fr: A
+
+[Shape]
+Width = GUARD(MIN(Sheet.1!Width,Sheet.1!Height)*0.3)
+Height = GUARD(Width)
+PinX = GUARD(Sheet.1!Controls.Row_1)
+PinY = GUARD(Sheet.1!Controls.Row_1.Y)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+[Part B]
+text.de: B
+text.en: B
+text.es: B
+text.it: B
+text.fr: B
+
+[Shape]
+Width = GUARD(MIN(Sheet.1!Width,Sheet.1!Height)*0.22)
+Height = GUARD(Width)
+PinX = GUARD(Sheet.1!Controls.Row_2)
+PinY = GUARD(Sheet.1!Controls.Row_2.Y)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+[Part C]
+text.de: C
+text.en: C
+text.es: C
+text.it: C
+text.fr: C
+
+[Shape]
+Width = GUARD(MIN(Sheet.1!Width,Sheet.1!Height)*0.18)
+Height = GUARD(Width)
+PinX = GUARD(Sheet.1!Controls.Row_3)
+PinY = GUARD(Sheet.1!Controls.Row_3.Y)
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+[Part D]
+text.de: D
+text.en: D
+text.es: D
+text.it: D
+text.fr: D
+
+[Shape]
+Width = GUARD(MIN(Sheet.1!Width,Sheet.1!Height)*0.26)
+Height = GUARD(Width)
+PinX = GUARD(Sheet.1!Controls.Row_4)
+PinY = GUARD(Sheet.1!Controls.Row_4.Y)
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height

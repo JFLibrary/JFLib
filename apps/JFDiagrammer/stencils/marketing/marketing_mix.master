@@ -1,0 +1,190 @@
+# Marketing-Mix (SH-030, JD26): ein Ring aus vier Vierteln (oben rechts beginnend im Uhrzeigersinn
+# Produkt, Preis, Distribution, Kommunikation) um eine Mitte „Marketing-Mix“.  Aufbau wie
+# Sektoren 2 mit fester Zahl 4: jedes Viertel ein Teil mit Text und Variantenfarbe (100 bis 103),
+# die Mitte in der siebten Variantenfarbe (106); 1 mm Fuge, die Kanten parallel verschoben (die
+# Bögen beginnen um ASIN(Fuge/Radius) später), sichtbar auch in Designs ohne Shape-Linien.
+master: Marketing mix
+name.de: Marketing-Mix
+name.en: Marketing mix
+name.es: Marketing mix
+name.it: Marketing mix
+name.fr: Mix marketing
+prompt.de: Marketing-Mix als Kreis mit den vier Bereichen Produkt, Preis, Distribution und Kommunikation um eine Mitte. Klicken Sie einen Bereich zweimal an, um seinen Text zu ändern.
+prompt.en: Marketing mix as a circle with the four areas product, price, place and promotion around a centre. Click an area twice to change its text.
+prompt.es: Marketing mix como círculo con las cuatro áreas producto, precio, distribución y promoción alrededor de un centro. Haga clic dos veces en un área para cambiar su texto.
+prompt.it: Marketing mix come cerchio con le quattro aree prodotto, prezzo, distribuzione e comunicazione attorno a un centro. Fai clic due volte su un'area per cambiarne il testo.
+prompt.fr: Mix marketing sous forme de cercle avec les quatre domaines produit, prix, distribution et communication autour d'un centre. Cliquez deux fois sur un domaine pour modifier son texte.
+keywords.de: Marketing-Mix, 4P, Produkt, Preis, Distribution, Kommunikation, Marketing
+keywords.en: marketing mix, 4P, product, price, place, promotion, marketing
+keywords.es: marketing mix, 4P, producto, precio, distribución, promoción, marketing
+keywords.it: marketing mix, 4P, prodotto, prezzo, distribuzione, comunicazione, marketing
+keywords.fr: mix marketing, 4P, produit, prix, distribution, communication, marketing
+
+[Shape]
+Width = 80 mm
+Width.us = 3.25 in
+Height = 80 mm
+Height.us = 3.25 in
+
+[User]
+# der Winkel je Viertel, die halbe Fuge als Anteil des Radius, Innenradius des Rings, Radius der
+# Mitte und der Texte
+S:   Value = PI()*0.5
+Gp:  Value = 1 mm
+     Value.us = 0.04 in
+Gn:  Value = User.Gp/Width
+Ri:  Value = 0.42
+Rc:  Value = User.Ri-2*User.Gn
+Rt:  Value = 0.66
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+[Part P1]
+text.de: Produkt
+text.en: Product
+text.es: Producto
+text.it: Prodotto
+text.fr: Produit
+
+[User]
+As:  Value = PI()*0.5-0*Sheet.1!User.S
+Ae:  Value = User.As-Sheet.1!User.S
+Am:  Value = (User.As+User.Ae)*0.5
+
+[Shape]
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rt*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rt*SIN(User.Am))
+TxtWidth = Width*0.39
+TxtHeight = Height*0.16
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+1*COS(User.As-ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.As-ASIN(Sheet.1!User.Gn)))
+EllipticalArcTo  X = Width*0.5*(1+1*COS(User.Ae+ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.Ae+ASIN(Sheet.1!User.Gn)))
+                 A = Width*0.5*(1+1*COS(User.Am)); B = Height*0.5*(1+1*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ae+ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri))); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ae+ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri)))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.As-ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri))); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.As-ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri)))
+                 A = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Am)); B = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Part P2]
+text.de: Preis
+text.en: Price
+text.es: Precio
+text.it: Prezzo
+text.fr: Prix
+
+[User]
+As:  Value = PI()*0.5-1*Sheet.1!User.S
+Ae:  Value = User.As-Sheet.1!User.S
+Am:  Value = (User.As+User.Ae)*0.5
+
+[Shape]
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rt*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rt*SIN(User.Am))
+TxtWidth = Width*0.39
+TxtHeight = Height*0.16
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+1*COS(User.As-ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.As-ASIN(Sheet.1!User.Gn)))
+EllipticalArcTo  X = Width*0.5*(1+1*COS(User.Ae+ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.Ae+ASIN(Sheet.1!User.Gn)))
+                 A = Width*0.5*(1+1*COS(User.Am)); B = Height*0.5*(1+1*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ae+ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri))); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ae+ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri)))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.As-ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri))); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.As-ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri)))
+                 A = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Am)); B = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Part P3]
+text.de: Distribution
+text.en: Place
+text.es: Distribución
+text.it: Distribuzione
+text.fr: Distribution
+
+[User]
+As:  Value = PI()*0.5-2*Sheet.1!User.S
+Ae:  Value = User.As-Sheet.1!User.S
+Am:  Value = (User.As+User.Ae)*0.5
+
+[Shape]
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rt*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rt*SIN(User.Am))
+TxtWidth = Width*0.39
+TxtHeight = Height*0.16
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+1*COS(User.As-ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.As-ASIN(Sheet.1!User.Gn)))
+EllipticalArcTo  X = Width*0.5*(1+1*COS(User.Ae+ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.Ae+ASIN(Sheet.1!User.Gn)))
+                 A = Width*0.5*(1+1*COS(User.Am)); B = Height*0.5*(1+1*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ae+ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri))); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ae+ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri)))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.As-ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri))); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.As-ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri)))
+                 A = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Am)); B = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Part P4]
+text.de: Kommunikation
+text.en: Promotion
+text.es: Promoción
+text.it: Comunicazione
+text.fr: Communication
+
+[User]
+As:  Value = PI()*0.5-3*Sheet.1!User.S
+Ae:  Value = User.As-Sheet.1!User.S
+Am:  Value = (User.As+User.Ae)*0.5
+
+[Shape]
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rt*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rt*SIN(User.Am))
+TxtWidth = Width*0.39
+TxtHeight = Height*0.16
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+1*COS(User.As-ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.As-ASIN(Sheet.1!User.Gn)))
+EllipticalArcTo  X = Width*0.5*(1+1*COS(User.Ae+ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.Ae+ASIN(Sheet.1!User.Gn)))
+                 A = Width*0.5*(1+1*COS(User.Am)); B = Height*0.5*(1+1*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Ae+ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri))); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Ae+ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri)))
+EllipticalArcTo  X = Width*0.5*(1+Sheet.1!User.Ri*COS(User.As-ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri))); Y = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.As-ASIN(Sheet.1!User.Gn/Sheet.1!User.Ri)))
+                 A = Width*0.5*(1+Sheet.1!User.Ri*COS(User.Am)); B = Height*0.5*(1+Sheet.1!User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# die Mitte
+[Part Hub]
+text.de: Marketing-Mix
+text.en: Marketing mix
+text.es: Marketing mix
+text.it: Marketing mix
+text.fr: Mix marketing
+
+[Shape]
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Width*Sheet.1!User.Rc
+TxtHeight = Height*Sheet.1!User.Rc*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width*0.5*(1+Sheet.1!User.Rc); B = Height*0.5
+         C = Width*0.5; D = Height*0.5*(1+Sheet.1!User.Rc)

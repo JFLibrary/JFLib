@@ -1,0 +1,621 @@
+# Pyramide mit Beschriftungen (SH-032, JD26): die Pyramide mit Ebenen (wie pyramid_levels: zwei
+# bis acht Ebenen als Teile in den Variantenfarben 100 bis 106, ab der achten wieder von vorn, 1 mm
+# Fuge) ohne Text in den Ebenen, dafür rechts daneben je Ebene eine Beschriftung (ein Teil mit
+# Text): eine waagrechte Linie von der Seite der Ebene in ihrer Mitte bis zum Text, der links
+# ausgerichtet folgt.  Die Pyramide ist User.P breit (60 % der Gruppe), der Text beginnt User.Gl
+# rechts davon.  Die Zahl der Ebenen steht in den Shape-Daten (Prop.Levels); Row_1 an der Spitze
+# ändert sie beim Ziehen nach oben oder unten: jede Ebene ist User.LH hoch, die Höhe Ebenen x LH;
+# zieht man die Höhe selbst, schickt SETATREF die neue Ebenenhöhe nach User.LH.  Ebenen und
+# Beschriftungen über der Zahl liegen verborgen auf der untersten (die Teile stehen von unten nach
+# oben in der Datei).  Die Beschriftungen nehmen die Formatvorlage Connector (Linie und Text
+# sichtbar auch in Designs ohne Shape-Linien) ohne deren Pfeilspitzen.
+master: Pyramid with labels
+name.de: Pyramide mit Beschriftungen
+name.en: Pyramid with labels
+name.es: Pirámide con etiquetas
+name.it: Piramide con etichette
+name.fr: Pyramide avec étiquettes
+prompt.de: Pyramide mit farbigen Ebenen und Texten daneben. Ziehen Sie den gelben Steuerpunkt an der Spitze nach oben oder unten, um Ebenen hinzuzufügen oder zu entfernen.
+prompt.en: Pyramid with coloured levels and texts beside them. Drag the yellow control handle at the top up or down to add or remove levels.
+prompt.es: Pirámide con niveles de colores y textos junto a ellos. Arrastre el controlador amarillo de la cúspide hacia arriba o hacia abajo para agregar o quitar niveles.
+prompt.it: Piramide a livelli colorati con testi accanto. Trascina la maniglia di controllo gialla sulla punta in alto o in basso per aggiungere o togliere livelli.
+prompt.fr: Pyramide à niveaux colorés avec des textes à côté. Faites glisser la poignée de contrôle jaune du sommet vers le haut ou le bas pour ajouter ou supprimer des niveaux.
+keywords.de: Pyramide, Beschriftung, Ebenen, farbig, Hierarchie, Legende, Schichten
+keywords.en: pyramid, labels, levels, coloured, hierarchy, legend, layers
+keywords.es: pirámide, etiquetas, niveles, colores, jerarquía, leyenda
+keywords.it: piramide, etichette, livelli, colorata, gerarchia, legenda
+keywords.fr: pyramide, étiquettes, niveaux, couleurs, hiérarchie, légende
+
+[Shape]
+Width = 100 mm
+Width.us = 4 in
+Height = SETATREF(User.LH,SETATREFEVAL(SETATREFEXPR()/User.N))*User.N
+
+[User]
+# die Zahl der Ebenen (2 bis 8), die Höhe einer Ebene, die Fuge
+N:   Value = MIN(MAX(ROUND(Prop.Levels,0),2),8)
+LH:  Value = 12.5 mm
+     Value.us = 0.5 in
+Gp:  Value = 1 mm
+     Value.us = 0.04 in
+# die Höhe einer Ebene, wie die Teile sie zeichnen
+H1:  Value = Height/User.N
+# die Breite der Pyramide, der Abstand des Texts von ihr
+P:   Value = Width*0.6
+Gl:  Value = 4 mm
+     Value.us = 0.16 in
+
+[Property]
+Levels:  Type = 2; Format = "0"; Value = 4
+         Label.de = Ebenen
+         Label.en = Levels
+         Label.es = Niveles
+         Label.it = Livelli
+         Label.fr = Niveaux
+         Prompt.de = Anzahl der Ebenen (2 bis 8)
+         Prompt.en = Number of levels (2 to 8)
+         Prompt.es = Número de niveles (de 2 a 8)
+         Prompt.it = Numero di livelli (da 2 a 8)
+         Prompt.fr = Nombre de niveaux (de 2 à 8)
+
+[Controls]
+Row_1:  X = User.P*0.5; Y = SETATREF(Prop.Levels,SETATREFEVAL(MIN(MAX(ROUND(SETATREFEXPR()/User.LH,0),2),8)))*User.LH
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Ebenen hinzufügen oder entfernen"
+        Tip.en = "Add or remove levels"
+        Tip.es = "Agregar o quitar niveles"
+        Tip.it = "Aggiungi o togli livelli"
+        Tip.fr = "Ajouter ou supprimer des niveaux"
+
+[Connection]
+Row  X = User.P*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = User.P*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = User.P*0.25; Y = Height*0.5; DirX = 1; DirY = 0
+
+# Ebene 8 (von oben): sichtbar ab 8 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part L8]
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(8,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!User.P*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!User.P*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!User.P*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+NoShow = 8>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Ebene 7 (von oben): sichtbar ab 7 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part L7]
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(7,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!User.P*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!User.P*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!User.P*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+NoShow = 7>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Ebene 6 (von oben): sichtbar ab 6 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part L6]
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(6,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!User.P*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!User.P*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!User.P*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+QuickStyleLineColor = 105
+QuickStyleFillColor = 105
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Ebene 5 (von oben): sichtbar ab 5 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part L5]
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(5,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!User.P*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!User.P*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!User.P*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Ebene 4 (von oben): sichtbar ab 4 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part L4]
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(4,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!User.P*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!User.P*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!User.P*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Ebene 3 (von oben): sichtbar ab 3 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part L3]
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(3,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!User.P*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!User.P*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!User.P*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Ebene 2 (von oben): immer sichtbar
+[Part L2]
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(2,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!User.P*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!User.P*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!User.P*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Ebene 1 (von oben): immer sichtbar
+[Part L1]
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(1,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!User.P*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!User.P*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!User.P*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Beschriftung 8: sichtbar ab 8 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part T8]
+text.de: Ebene 8
+text.en: Level 8
+text.es: Nivel 8
+text.it: Livello 8
+text.fr: Niveau 8
+style: Connector
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Mitte, der Anfang der Linie und des Texts
+K:   Value = MIN(8,Sheet.1!User.N)
+Ym:  Value = Sheet.1!Height-(User.K-0.5)*Sheet.1!User.H1
+X0:  Value = Sheet.1!User.P*(1-0.5*User.Ym/Sheet.1!Height)+Sheet.1!User.Gp
+X1:  Value = Sheet.1!User.P+Sheet.1!User.Gl
+
+[Shape]
+Width = GUARD(Sheet.1!Width-User.X0)
+Height = GUARD(Sheet.1!User.H1-Sheet.1!User.Gp)
+PinX = GUARD(User.X0+Width*0.5)
+PinY = GUARD(User.Ym)
+TxtWidth = Width-(User.X1-User.X0)
+TxtHeight = Height
+TxtPinX = Width-TxtWidth*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+HideText = 8>Sheet.1!User.N
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Paragraph]
+Row  HorzAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoShow = 8>Sheet.1!User.N
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = User.X1-User.X0; Y = Height*0.5
+
+# Beschriftung 7: sichtbar ab 7 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part T7]
+text.de: Ebene 7
+text.en: Level 7
+text.es: Nivel 7
+text.it: Livello 7
+text.fr: Niveau 7
+style: Connector
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Mitte, der Anfang der Linie und des Texts
+K:   Value = MIN(7,Sheet.1!User.N)
+Ym:  Value = Sheet.1!Height-(User.K-0.5)*Sheet.1!User.H1
+X0:  Value = Sheet.1!User.P*(1-0.5*User.Ym/Sheet.1!Height)+Sheet.1!User.Gp
+X1:  Value = Sheet.1!User.P+Sheet.1!User.Gl
+
+[Shape]
+Width = GUARD(Sheet.1!Width-User.X0)
+Height = GUARD(Sheet.1!User.H1-Sheet.1!User.Gp)
+PinX = GUARD(User.X0+Width*0.5)
+PinY = GUARD(User.Ym)
+TxtWidth = Width-(User.X1-User.X0)
+TxtHeight = Height
+TxtPinX = Width-TxtWidth*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+HideText = 7>Sheet.1!User.N
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Paragraph]
+Row  HorzAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoShow = 7>Sheet.1!User.N
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = User.X1-User.X0; Y = Height*0.5
+
+# Beschriftung 6: sichtbar ab 6 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part T6]
+text.de: Ebene 6
+text.en: Level 6
+text.es: Nivel 6
+text.it: Livello 6
+text.fr: Niveau 6
+style: Connector
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Mitte, der Anfang der Linie und des Texts
+K:   Value = MIN(6,Sheet.1!User.N)
+Ym:  Value = Sheet.1!Height-(User.K-0.5)*Sheet.1!User.H1
+X0:  Value = Sheet.1!User.P*(1-0.5*User.Ym/Sheet.1!Height)+Sheet.1!User.Gp
+X1:  Value = Sheet.1!User.P+Sheet.1!User.Gl
+
+[Shape]
+Width = GUARD(Sheet.1!Width-User.X0)
+Height = GUARD(Sheet.1!User.H1-Sheet.1!User.Gp)
+PinX = GUARD(User.X0+Width*0.5)
+PinY = GUARD(User.Ym)
+TxtWidth = Width-(User.X1-User.X0)
+TxtHeight = Height
+TxtPinX = Width-TxtWidth*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+HideText = 6>Sheet.1!User.N
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Paragraph]
+Row  HorzAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoShow = 6>Sheet.1!User.N
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = User.X1-User.X0; Y = Height*0.5
+
+# Beschriftung 5: sichtbar ab 5 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part T5]
+text.de: Ebene 5
+text.en: Level 5
+text.es: Nivel 5
+text.it: Livello 5
+text.fr: Niveau 5
+style: Connector
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Mitte, der Anfang der Linie und des Texts
+K:   Value = MIN(5,Sheet.1!User.N)
+Ym:  Value = Sheet.1!Height-(User.K-0.5)*Sheet.1!User.H1
+X0:  Value = Sheet.1!User.P*(1-0.5*User.Ym/Sheet.1!Height)+Sheet.1!User.Gp
+X1:  Value = Sheet.1!User.P+Sheet.1!User.Gl
+
+[Shape]
+Width = GUARD(Sheet.1!Width-User.X0)
+Height = GUARD(Sheet.1!User.H1-Sheet.1!User.Gp)
+PinX = GUARD(User.X0+Width*0.5)
+PinY = GUARD(User.Ym)
+TxtWidth = Width-(User.X1-User.X0)
+TxtHeight = Height
+TxtPinX = Width-TxtWidth*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+HideText = 5>Sheet.1!User.N
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Paragraph]
+Row  HorzAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoShow = 5>Sheet.1!User.N
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = User.X1-User.X0; Y = Height*0.5
+
+# Beschriftung 4: sichtbar ab 4 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part T4]
+text.de: Ebene 4
+text.en: Level 4
+text.es: Nivel 4
+text.it: Livello 4
+text.fr: Niveau 4
+style: Connector
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Mitte, der Anfang der Linie und des Texts
+K:   Value = MIN(4,Sheet.1!User.N)
+Ym:  Value = Sheet.1!Height-(User.K-0.5)*Sheet.1!User.H1
+X0:  Value = Sheet.1!User.P*(1-0.5*User.Ym/Sheet.1!Height)+Sheet.1!User.Gp
+X1:  Value = Sheet.1!User.P+Sheet.1!User.Gl
+
+[Shape]
+Width = GUARD(Sheet.1!Width-User.X0)
+Height = GUARD(Sheet.1!User.H1-Sheet.1!User.Gp)
+PinX = GUARD(User.X0+Width*0.5)
+PinY = GUARD(User.Ym)
+TxtWidth = Width-(User.X1-User.X0)
+TxtHeight = Height
+TxtPinX = Width-TxtWidth*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+HideText = 4>Sheet.1!User.N
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Paragraph]
+Row  HorzAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoShow = 4>Sheet.1!User.N
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = User.X1-User.X0; Y = Height*0.5
+
+# Beschriftung 3: sichtbar ab 3 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part T3]
+text.de: Ebene 3
+text.en: Level 3
+text.es: Nivel 3
+text.it: Livello 3
+text.fr: Niveau 3
+style: Connector
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Mitte, der Anfang der Linie und des Texts
+K:   Value = MIN(3,Sheet.1!User.N)
+Ym:  Value = Sheet.1!Height-(User.K-0.5)*Sheet.1!User.H1
+X0:  Value = Sheet.1!User.P*(1-0.5*User.Ym/Sheet.1!Height)+Sheet.1!User.Gp
+X1:  Value = Sheet.1!User.P+Sheet.1!User.Gl
+
+[Shape]
+Width = GUARD(Sheet.1!Width-User.X0)
+Height = GUARD(Sheet.1!User.H1-Sheet.1!User.Gp)
+PinX = GUARD(User.X0+Width*0.5)
+PinY = GUARD(User.Ym)
+TxtWidth = Width-(User.X1-User.X0)
+TxtHeight = Height
+TxtPinX = Width-TxtWidth*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+HideText = 3>Sheet.1!User.N
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Paragraph]
+Row  HorzAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoShow = 3>Sheet.1!User.N
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = User.X1-User.X0; Y = Height*0.5
+
+# Beschriftung 2: immer sichtbar
+[Part T2]
+text.de: Ebene 2
+text.en: Level 2
+text.es: Nivel 2
+text.it: Livello 2
+text.fr: Niveau 2
+style: Connector
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Mitte, der Anfang der Linie und des Texts
+K:   Value = MIN(2,Sheet.1!User.N)
+Ym:  Value = Sheet.1!Height-(User.K-0.5)*Sheet.1!User.H1
+X0:  Value = Sheet.1!User.P*(1-0.5*User.Ym/Sheet.1!Height)+Sheet.1!User.Gp
+X1:  Value = Sheet.1!User.P+Sheet.1!User.Gl
+
+[Shape]
+Width = GUARD(Sheet.1!Width-User.X0)
+Height = GUARD(Sheet.1!User.H1-Sheet.1!User.Gp)
+PinX = GUARD(User.X0+Width*0.5)
+PinY = GUARD(User.Ym)
+TxtWidth = Width-(User.X1-User.X0)
+TxtHeight = Height
+TxtPinX = Width-TxtWidth*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Paragraph]
+Row  HorzAlign = 0
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = User.X1-User.X0; Y = Height*0.5
+
+# Beschriftung 1: immer sichtbar
+[Part T1]
+text.de: Ebene 1
+text.en: Level 1
+text.es: Nivel 1
+text.it: Livello 1
+text.fr: Niveau 1
+style: Connector
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Mitte, der Anfang der Linie und des Texts
+K:   Value = MIN(1,Sheet.1!User.N)
+Ym:  Value = Sheet.1!Height-(User.K-0.5)*Sheet.1!User.H1
+X0:  Value = Sheet.1!User.P*(1-0.5*User.Ym/Sheet.1!Height)+Sheet.1!User.Gp
+X1:  Value = Sheet.1!User.P+Sheet.1!User.Gl
+
+[Shape]
+Width = GUARD(Sheet.1!Width-User.X0)
+Height = GUARD(Sheet.1!User.H1-Sheet.1!User.Gp)
+PinX = GUARD(User.X0+Width*0.5)
+PinY = GUARD(User.Ym)
+TxtWidth = Width-(User.X1-User.X0)
+TxtHeight = Height
+TxtPinX = Width-TxtWidth*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Paragraph]
+Row  HorzAlign = 0
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = User.X1-User.X0; Y = Height*0.5

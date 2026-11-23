@@ -1,7 +1,9 @@
 // stencil_src -- the text sources of a stencil (stencil.txt, *.master) as entries (JD9)
 //
-//   parse(file, text, sections) -> Source { header, sections }   lines, header lines, sections,
-//                                       rows with continuation lines, ';'-separated cells
+//   parse(file, text, sections) -> Source { header, sections, parts }   lines, header lines,
+//                                       sections, rows with continuation lines, ';'-separated
+//                                       cells; (JD26) `[Part NAME]` starts a subshape with its own
+//                                       header lines and sections
 //   resolve(&entries, measure)       the entries of one variant: a ".metric" / ".us" entry
 //                                       replaces the one without suffix (duplicates refused)
 //   classify(text) -> Value0         a constant (number with unit, TRUE/FALSE, "string",
@@ -106,13 +108,26 @@ pub(crate) struct SrcSection {
     /// single cells ([Shape]) or the section's own cells (Geometry's NoFill ...)
     pub cells: Vec<Entry>,
     pub rows: Vec<SrcRow>,
+    /// (JD26) whose section it is: 0 the master shape, k the k-th `[Part]` (parts[k-1])
+    pub part: usize,
 }
 
-/// a source file: the header lines and the sections
+/// (JD26) a subshape of a group master: `[Part NAME]`, then its own header lines (`text.de:` ...),
+/// then its sections up to the next `[Part]`
+#[derive(Clone, Debug)]
+pub(crate) struct SrcPart {
+    /// the name in the brackets
+    pub name: String,
+    pub line: u32,
+    pub header: Vec<Entry>,
+}
+
+/// a source file: the header lines, the sections and (JD26) the parts
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Source {
     pub header: Vec<Entry>,
     pub sections: Vec<SrcSection>,
+    pub parts: Vec<SrcPart>,
 }
 
 pub(crate) fn err(file: &str, line: u32, message: impl Into<String>) -> SourceError {
@@ -211,6 +226,8 @@ pub(crate) fn parse(file: &str, text: &str, sections: bool) -> Result<Source, So
     let mut src = Source::default();
     // the row names of the current section
     let mut names: BTreeSet<String> = BTreeSet::new();
+    // (JD26) between `[Part NAME]` and the part's first section: its header lines
+    let mut part_head = false;
     for (i, raw) in text.split('\n').enumerate() {
         if i >= MAX_LINES {
             return Err(err(file, i as u32 + 1, "zu viele Zeilen"));
@@ -230,20 +247,39 @@ pub(crate) fn parse(file: &str, text: &str, sections: bool) -> Result<Source, So
                 return Err(err(file, line_no, format!("Abschnittskopf {t}: erwartet [Name]")));
             };
             let name = name.trim();
+            // (JD26) [Part NAME]: a subshape of the master; what follows is its own
+            if let Some(pn) = name.strip_prefix("Part").filter(|r| r.starts_with(char::is_whitespace)).map(str::trim) {
+                if pn.is_empty() || !pn.chars().all(is_ident_char) || pn.contains('.') {
+                    return Err(err(file, line_no, format!("[Part {pn}]: erwartet [Part Name] mit einem Namen aus Buchstaben, Ziffern und _")));
+                }
+                if src.parts.iter().any(|p| p.name == pn) {
+                    return Err(err(file, line_no, format!("[Part {pn}] doppelt")));
+                }
+                if src.parts.len() >= MAX_SECTIONS {
+                    return Err(err(file, line_no, "zu viele Teile"));
+                }
+                src.parts.push(SrcPart { name: String::from(pn), line: line_no, header: Vec::new() });
+                part_head = true;
+                names.clear();
+                continue;
+            }
             let Some(&(_, model, kind)) = SECTIONS.iter().find(|(w, _, _)| *w == name) else {
                 return Err(err(file, line_no, format!("unbekannter Abschnitt [{name}]")));
             };
-            if kind != SecKind::Geometry && src.sections.iter().any(|s| s.kind == kind && s.model == model) {
+            let part = src.parts.len();
+            if kind != SecKind::Geometry && src.sections.iter().any(|s| s.kind == kind && s.model == model && s.part == part) {
                 return Err(err(file, line_no, format!("Abschnitt [{name}] doppelt")));
             }
             if src.sections.len() >= MAX_SECTIONS {
                 return Err(err(file, line_no, "zu viele Abschnitte"));
             }
             names.clear();
-            src.sections.push(SrcSection { model, written: String::from(name), kind, line: line_no, cells: Vec::new(), rows: Vec::new() });
+            part_head = false;
+            src.sections.push(SrcSection { model, written: String::from(name), kind, line: line_no, cells: Vec::new(), rows: Vec::new(), part });
             continue;
         }
-        let Some(sec) = src.sections.last_mut() else {
+        let sec = if part_head { None } else { src.sections.last_mut() };
+        let Some(sec) = sec else {
             // a header line: key: value
             let Some((key, value)) = t.split_once(':') else {
                 return Err(err(file, line_no, format!("Kopfzeile ohne „:“ ({t})")));
@@ -253,10 +289,15 @@ pub(crate) fn parse(file: &str, text: &str, sections: bool) -> Result<Source, So
                 return Err(err(file, line_no, format!("„{key}“ ist kein Schlüssel")));
             }
             let (name, lang, variant) = suffixes(file, line_no, key)?;
-            if src.header.len() >= MAX_ITEMS {
+            // (JD26) the header lines of a part
+            let header = match src.parts.last_mut() {
+                Some(p) if part_head => &mut p.header,
+                _ => &mut src.header,
+            };
+            if header.len() >= MAX_ITEMS {
                 return Err(err(file, line_no, "zu viele Kopfzeilen"));
             }
-            src.header.push(Entry { name, lang, variant, value: String::from(value.trim()), line: line_no, file: None });
+            header.push(Entry { name, lang, variant, value: String::from(value.trim()), line: line_no, file: None });
             continue;
         };
         if sec.kind == SecKind::Shape {
@@ -323,6 +364,9 @@ pub(crate) fn merge_include(src: &mut Source, name: &str, inc: Source) -> Result
     if let Some(e) = inc.header.first() {
         return Err(err(name, e.line, format!("eine eingebundene Datei hat nur Abschnitte, keine Kopfzeilen ({}: …)", e.name)));
     }
+    if let Some(p) = inc.parts.first() {
+        return Err(err(name, p.line, format!("eine eingebundene Datei hat keine Teile ([Part {}])", p.name)));
+    }
     let mark = |es: &mut Vec<Entry>| es.iter_mut().for_each(|e| e.file = Some(String::from(name)));
     for mut s in inc.sections {
         mark(&mut s.cells);
@@ -331,7 +375,7 @@ pub(crate) fn merge_include(src: &mut Source, name: &str, inc: Source) -> Result
             mark(&mut r.cells);
         }
         let kind = s.kind;
-        let own = if kind == SecKind::Geometry { None } else { src.sections.iter_mut().find(|o| o.kind == kind && o.model == s.model) };
+        let own = if kind == SecKind::Geometry { None } else { src.sections.iter_mut().find(|o| o.kind == kind && o.model == s.model && o.part == 0) };
         let Some(o) = own else {
             if src.sections.len() >= MAX_SECTIONS {
                 return Err(err(name, s.line, "zu viele Abschnitte"));

@@ -2,6 +2,7 @@
 // looking at a whole stencil while its masters are drawn and before the user's approval
 //
 //   diagramiotest --write-stencil-previews DIR   writes DIR/<folder>-alle.png for every stencil
+//                                                (JD26: and <folder>-alle-kontrast.png)
 //                                                folder (besides the sheets of stencil_structs.rs
 //                                                and stencil_shapes.rs)
 //
@@ -13,6 +14,9 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use diagram_core::design::apply::{self as design_apply, Scope};
+use diagram_core::design::catalog;
+use diagram_core::formula::Engine;
 use diagram_core::instance::{MasterTexts, StencilTexts};
 use diagram_core::{CellAddr, Document, MasterRef, Owner, ShapeRef, SheetRef};
 use diagram_io::stencil;
@@ -98,5 +102,16 @@ fn write(dir: &str, folder: &'static str) -> bool {
         }
         let _ = tx.commit();
     }
-    render_page_at(&mut doc, page, &format!("{dir}/{folder}-alle.png"), 110.0)
+    let mut ok = render_page_at(&mut doc, page, &format!("{dir}/{folder}-alle.png"), 110.0);
+    // (JD26) the same in the design Kontrast (no shape lines, solid fills): what only lines draw
+    // must show there too
+    if let Some(d) = catalog::all().into_iter().find(|d| d.id == catalog::CONTRAST) {
+        let mut tx = doc.transaction("design");
+        let mut eng = Engine::new();
+        if design_apply::apply(&mut tx, &mut eng, d.id, &d.theme_xml(), Scope::All, 0).is_ok() {
+            let _ = tx.commit();
+            ok &= render_page_at(&mut doc, page, &format!("{dir}/{folder}-alle-kontrast.png"), 110.0);
+        }
+    }
+    ok
 }

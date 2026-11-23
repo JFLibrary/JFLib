@@ -1,0 +1,472 @@
+# Normalverteilung (SH-030, JD26): die Glockenkurve exp(-x²/2) von -3,5 bis +3,5
+# Standardabweichungen als Polylinie in Schritten von 0,1 (im Skript ausgewertet, als Anteile der
+# Kurvenfläche).  Teile der Gruppe: die Fläche unter der Kurve (Füllung von Normal, ohne Linie), die
+# Linien darüber (Grundlinie, Kurve und senkrechte Linien bei μ und μ ± 1, 2, 3 σ bis an die
+# Kurve; Formatvorlage Connector ohne Pfeilspitzen, sichtbar auch in Designs ohne Shape-Linien)
+# und die Beschriftungen μ-3σ … μ+3σ im Band unten (Text Only).
+master: Normal distribution
+name.de: Normalverteilung
+name.en: Normal distribution
+name.es: Distribución normal
+name.it: Distribuzione normale
+name.fr: Distribution normale
+prompt.de: Glockenkurve der Normalverteilung mit Achse und Linien bei einer, zwei und drei Standardabweichungen. Klicken Sie eine Beschriftung zweimal an, um ihren Text zu ändern.
+prompt.en: Bell curve of the normal distribution with an axis and lines at one, two and three standard deviations. Click a label twice to change its text.
+prompt.es: Curva de campana de la distribución normal con eje y líneas a una, dos y tres desviaciones típicas. Haga clic dos veces en una etiqueta para cambiar su texto.
+prompt.it: Curva a campana della distribuzione normale con asse e linee a una, due e tre deviazioni standard. Fai clic due volte su un'etichetta per cambiarne il testo.
+prompt.fr: Courbe en cloche de la loi normale avec axe et lignes à un, deux et trois écarts-types. Cliquez deux fois sur une étiquette pour modifier son texte.
+keywords.de: Normalverteilung, Glockenkurve, Gauß, Standardabweichung, Sigma, Statistik, Verteilung
+keywords.en: normal distribution, bell curve, Gaussian, standard deviation, sigma, statistics, distribution
+keywords.es: distribución normal, campana de Gauss, desviación típica, sigma, estadística, distribución
+keywords.it: distribuzione normale, curva a campana, gaussiana, deviazione standard, sigma, statistica
+keywords.fr: loi normale, courbe en cloche, gaussienne, écart-type, sigma, statistique, distribution
+
+[Shape]
+Width = 100 mm
+Width.us = 4 in
+Height = 50 mm
+Height.us = 2 in
+
+[User]
+# das Band unten für die Beschriftungen, die Höhe der Kurvenfläche
+MB:  Value = 7 mm
+     Value.us = 0.3 in
+CH:  Value = Height-User.MB
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = User.MB+User.CH*0.05; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.MB+User.CH*0.05; DirX = 1; DirY = 0
+
+# die Fläche unter der Kurve
+[Part Area]
+
+[Shape]
+Width = GUARD(Sheet.1!Width)
+Height = GUARD(Sheet.1!User.CH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+
+[Geometry]
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width*0; Y = Height*0.0021
+LineTo  X = Width*0.0143; Y = Height*0.0029
+LineTo  X = Width*0.0286; Y = Height*0.0041
+LineTo  X = Width*0.0429; Y = Height*0.0057
+LineTo  X = Width*0.0571; Y = Height*0.0078
+LineTo  X = Width*0.0714; Y = Height*0.0106
+LineTo  X = Width*0.0857; Y = Height*0.0142
+LineTo  X = Width*0.1; Y = Height*0.0188
+LineTo  X = Width*0.1143; Y = Height*0.0248
+LineTo  X = Width*0.1286; Y = Height*0.0323
+LineTo  X = Width*0.1429; Y = Height*0.0417
+LineTo  X = Width*0.1571; Y = Height*0.0533
+LineTo  X = Width*0.1714; Y = Height*0.0675
+LineTo  X = Width*0.1857; Y = Height*0.0845
+LineTo  X = Width*0.2; Y = Height*0.1047
+LineTo  X = Width*0.2143; Y = Height*0.1286
+LineTo  X = Width*0.2286; Y = Height*0.1563
+LineTo  X = Width*0.2429; Y = Height*0.188
+LineTo  X = Width*0.2571; Y = Height*0.224
+LineTo  X = Width*0.2714; Y = Height*0.2641
+LineTo  X = Width*0.2857; Y = Height*0.3084
+LineTo  X = Width*0.3; Y = Height*0.3565
+LineTo  X = Width*0.3143; Y = Height*0.4081
+LineTo  X = Width*0.3286; Y = Height*0.4624
+LineTo  X = Width*0.3429; Y = Height*0.5188
+LineTo  X = Width*0.3571; Y = Height*0.5762
+LineTo  X = Width*0.3714; Y = Height*0.6336
+LineTo  X = Width*0.3857; Y = Height*0.6898
+LineTo  X = Width*0.4; Y = Height*0.7436
+LineTo  X = Width*0.4143; Y = Height*0.7935
+LineTo  X = Width*0.4286; Y = Height*0.8384
+LineTo  X = Width*0.4429; Y = Height*0.877
+LineTo  X = Width*0.4571; Y = Height*0.9082
+LineTo  X = Width*0.4714; Y = Height*0.9312
+LineTo  X = Width*0.4857; Y = Height*0.9453
+LineTo  X = Width*0.5; Y = Height*0.95
+LineTo  X = Width*0.5143; Y = Height*0.9453
+LineTo  X = Width*0.5286; Y = Height*0.9312
+LineTo  X = Width*0.5429; Y = Height*0.9082
+LineTo  X = Width*0.5571; Y = Height*0.877
+LineTo  X = Width*0.5714; Y = Height*0.8384
+LineTo  X = Width*0.5857; Y = Height*0.7935
+LineTo  X = Width*0.6; Y = Height*0.7436
+LineTo  X = Width*0.6143; Y = Height*0.6898
+LineTo  X = Width*0.6286; Y = Height*0.6336
+LineTo  X = Width*0.6429; Y = Height*0.5762
+LineTo  X = Width*0.6571; Y = Height*0.5188
+LineTo  X = Width*0.6714; Y = Height*0.4624
+LineTo  X = Width*0.6857; Y = Height*0.4081
+LineTo  X = Width*0.7; Y = Height*0.3565
+LineTo  X = Width*0.7143; Y = Height*0.3084
+LineTo  X = Width*0.7286; Y = Height*0.2641
+LineTo  X = Width*0.7429; Y = Height*0.224
+LineTo  X = Width*0.7571; Y = Height*0.188
+LineTo  X = Width*0.7714; Y = Height*0.1563
+LineTo  X = Width*0.7857; Y = Height*0.1286
+LineTo  X = Width*0.8; Y = Height*0.1047
+LineTo  X = Width*0.8143; Y = Height*0.0845
+LineTo  X = Width*0.8286; Y = Height*0.0675
+LineTo  X = Width*0.8429; Y = Height*0.0533
+LineTo  X = Width*0.8571; Y = Height*0.0417
+LineTo  X = Width*0.8714; Y = Height*0.0323
+LineTo  X = Width*0.8857; Y = Height*0.0248
+LineTo  X = Width*0.9; Y = Height*0.0188
+LineTo  X = Width*0.9143; Y = Height*0.0142
+LineTo  X = Width*0.9286; Y = Height*0.0106
+LineTo  X = Width*0.9429; Y = Height*0.0078
+LineTo  X = Width*0.9571; Y = Height*0.0057
+LineTo  X = Width*0.9714; Y = Height*0.0041
+LineTo  X = Width*0.9857; Y = Height*0.0029
+LineTo  X = Width*1; Y = Height*0.0021
+LineTo  X = Width; Y = 0
+LineTo  X = 0; Y = 0
+
+# Grundlinie, Kurve und die Linien bei μ und μ ± 1, 2, 3 σ
+[Part Lines]
+style: Connector
+
+[Shape]
+Width = GUARD(Sheet.1!Width)
+Height = GUARD(Sheet.1!User.CH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0; Y = Height*0.0021
+LineTo  X = Width*0.0143; Y = Height*0.0029
+LineTo  X = Width*0.0286; Y = Height*0.0041
+LineTo  X = Width*0.0429; Y = Height*0.0057
+LineTo  X = Width*0.0571; Y = Height*0.0078
+LineTo  X = Width*0.0714; Y = Height*0.0106
+LineTo  X = Width*0.0857; Y = Height*0.0142
+LineTo  X = Width*0.1; Y = Height*0.0188
+LineTo  X = Width*0.1143; Y = Height*0.0248
+LineTo  X = Width*0.1286; Y = Height*0.0323
+LineTo  X = Width*0.1429; Y = Height*0.0417
+LineTo  X = Width*0.1571; Y = Height*0.0533
+LineTo  X = Width*0.1714; Y = Height*0.0675
+LineTo  X = Width*0.1857; Y = Height*0.0845
+LineTo  X = Width*0.2; Y = Height*0.1047
+LineTo  X = Width*0.2143; Y = Height*0.1286
+LineTo  X = Width*0.2286; Y = Height*0.1563
+LineTo  X = Width*0.2429; Y = Height*0.188
+LineTo  X = Width*0.2571; Y = Height*0.224
+LineTo  X = Width*0.2714; Y = Height*0.2641
+LineTo  X = Width*0.2857; Y = Height*0.3084
+LineTo  X = Width*0.3; Y = Height*0.3565
+LineTo  X = Width*0.3143; Y = Height*0.4081
+LineTo  X = Width*0.3286; Y = Height*0.4624
+LineTo  X = Width*0.3429; Y = Height*0.5188
+LineTo  X = Width*0.3571; Y = Height*0.5762
+LineTo  X = Width*0.3714; Y = Height*0.6336
+LineTo  X = Width*0.3857; Y = Height*0.6898
+LineTo  X = Width*0.4; Y = Height*0.7436
+LineTo  X = Width*0.4143; Y = Height*0.7935
+LineTo  X = Width*0.4286; Y = Height*0.8384
+LineTo  X = Width*0.4429; Y = Height*0.877
+LineTo  X = Width*0.4571; Y = Height*0.9082
+LineTo  X = Width*0.4714; Y = Height*0.9312
+LineTo  X = Width*0.4857; Y = Height*0.9453
+LineTo  X = Width*0.5; Y = Height*0.95
+LineTo  X = Width*0.5143; Y = Height*0.9453
+LineTo  X = Width*0.5286; Y = Height*0.9312
+LineTo  X = Width*0.5429; Y = Height*0.9082
+LineTo  X = Width*0.5571; Y = Height*0.877
+LineTo  X = Width*0.5714; Y = Height*0.8384
+LineTo  X = Width*0.5857; Y = Height*0.7935
+LineTo  X = Width*0.6; Y = Height*0.7436
+LineTo  X = Width*0.6143; Y = Height*0.6898
+LineTo  X = Width*0.6286; Y = Height*0.6336
+LineTo  X = Width*0.6429; Y = Height*0.5762
+LineTo  X = Width*0.6571; Y = Height*0.5188
+LineTo  X = Width*0.6714; Y = Height*0.4624
+LineTo  X = Width*0.6857; Y = Height*0.4081
+LineTo  X = Width*0.7; Y = Height*0.3565
+LineTo  X = Width*0.7143; Y = Height*0.3084
+LineTo  X = Width*0.7286; Y = Height*0.2641
+LineTo  X = Width*0.7429; Y = Height*0.224
+LineTo  X = Width*0.7571; Y = Height*0.188
+LineTo  X = Width*0.7714; Y = Height*0.1563
+LineTo  X = Width*0.7857; Y = Height*0.1286
+LineTo  X = Width*0.8; Y = Height*0.1047
+LineTo  X = Width*0.8143; Y = Height*0.0845
+LineTo  X = Width*0.8286; Y = Height*0.0675
+LineTo  X = Width*0.8429; Y = Height*0.0533
+LineTo  X = Width*0.8571; Y = Height*0.0417
+LineTo  X = Width*0.8714; Y = Height*0.0323
+LineTo  X = Width*0.8857; Y = Height*0.0248
+LineTo  X = Width*0.9; Y = Height*0.0188
+LineTo  X = Width*0.9143; Y = Height*0.0142
+LineTo  X = Width*0.9286; Y = Height*0.0106
+LineTo  X = Width*0.9429; Y = Height*0.0078
+LineTo  X = Width*0.9571; Y = Height*0.0057
+LineTo  X = Width*0.9714; Y = Height*0.0041
+LineTo  X = Width*0.9857; Y = Height*0.0029
+LineTo  X = Width*1; Y = Height*0.0021
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.0714; Y = 0
+LineTo  X = Width*0.0714; Y = Height*0.0106
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.2143; Y = 0
+LineTo  X = Width*0.2143; Y = Height*0.1286
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.3571; Y = 0
+LineTo  X = Width*0.3571; Y = Height*0.5762
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5; Y = 0
+LineTo  X = Width*0.5; Y = Height*0.95
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.6429; Y = 0
+LineTo  X = Width*0.6429; Y = Height*0.5762
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.7857; Y = 0
+LineTo  X = Width*0.7857; Y = Height*0.1286
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.9286; Y = 0
+LineTo  X = Width*0.9286; Y = Height*0.0106
+
+# die Beschriftungen der Linien
+[Part S1]
+text.de: μ−3σ
+text.en: μ−3σ
+text.es: μ−3σ
+text.it: μ−3σ
+text.fr: μ−3σ
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!Width/7)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!Width*0.0714)
+PinY = GUARD(Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part S2]
+text.de: μ−2σ
+text.en: μ−2σ
+text.es: μ−2σ
+text.it: μ−2σ
+text.fr: μ−2σ
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!Width/7)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!Width*0.2143)
+PinY = GUARD(Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part S3]
+text.de: μ−σ
+text.en: μ−σ
+text.es: μ−σ
+text.it: μ−σ
+text.fr: μ−σ
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!Width/7)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!Width*0.3571)
+PinY = GUARD(Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part S4]
+text.de: μ
+text.en: μ
+text.es: μ
+text.it: μ
+text.fr: μ
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!Width/7)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD(Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part S5]
+text.de: μ+σ
+text.en: μ+σ
+text.es: μ+σ
+text.it: μ+σ
+text.fr: μ+σ
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!Width/7)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!Width*0.6429)
+PinY = GUARD(Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part S6]
+text.de: μ+2σ
+text.en: μ+2σ
+text.es: μ+2σ
+text.it: μ+2σ
+text.fr: μ+2σ
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!Width/7)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!Width*0.7857)
+PinY = GUARD(Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part S7]
+text.de: μ+3σ
+text.en: μ+3σ
+text.es: μ+3σ
+text.it: μ+3σ
+text.fr: μ+3σ
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!Width/7)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!Width*0.9286)
+PinY = GUARD(Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

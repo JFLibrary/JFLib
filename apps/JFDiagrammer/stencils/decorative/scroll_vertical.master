@@ -1,0 +1,99 @@
+# Vertikale Schriftrolle (SH-003, JD26): ein hohes Blatt zwischen zwei Rollen oben und unten.  Die
+# Rollen sind Balken über die ganze Breite, das Blatt ist links und rechts um eine halbe
+# Rollendicke schmaler; zwischen Blatt und Rollen liegt eine Fuge von 0,8 mm (sichtbar auch in
+# einem Design ohne Shape-Linien).  Die Enden der Rollen zeigen je ein rundes Loch (das
+# aufgerollte Papier, Gerade-Ungerade-Regel).  Row_1 an der Unterkante der oberen Rolle ändert die
+# Dicke beider Rollen (Abstand vom oberen Rand, nur senkrecht: die Rollen bleiben beim Strecken
+# gleich dick).  Der Text steht auf dem Blatt.  Gegenstück: scroll_horizontal.master.
+master: Vertical scroll
+name.de: Vertikale Schriftrolle
+name.en: Vertical scroll
+name.es: Pergamino vertical
+name.it: Pergamena verticale
+name.fr: Parchemin vertical
+prompt.de: Hohe Schriftrolle für Urkunden, Regeln und Listen. Mit dem gelben Steuerpunkt ändern Sie die Dicke der Rollen.
+prompt.en: Tall scroll for certificates, rules and lists. Drag the yellow control handle to change the thickness of the rolls.
+prompt.es: Pergamino alto para certificados, reglas y listas. Arrastre el controlador amarillo para cambiar el grosor de los rollos.
+prompt.it: Pergamena alta per attestati, regole ed elenchi. Trascina la maniglia di controllo gialla per cambiare lo spessore dei rotoli.
+prompt.fr: Parchemin vertical pour les certificats, les règles et les listes. Faites glisser la poignée de contrôle jaune pour modifier l'épaisseur des rouleaux.
+keywords.de: Schriftrolle, Rolle, Pergament, Urkunde, Scrollen, Liste, Dekor
+keywords.en: scroll, roll, parchment, certificate, list, decoration
+keywords.es: pergamino, rollo, certificado, lista, desplazamiento, decoración
+keywords.it: pergamena, rotolo, attestato, elenco, scorrimento, decorazione
+keywords.fr: parchemin, rouleau, certificat, liste, défilement, décoration
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 40 mm
+Height.us = 1.5 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Width-User.R
+TxtHeight = Height-User.R*2-User.G*2
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Dicke der Rollen, die Fuge, der Radius der Löcher
+R:   Value = MIN(MAX(Height-Controls.Row_1.Y, 2 mm), Height*0.25, Width*0.3)
+G:   Value = MIN(0.8 mm, User.R*0.2)
+Hr:  Value = User.R*0.22
+
+# 1 das Blatt
+[Geometry]
+MoveTo  X = User.R*0.5; Y = User.R+User.G
+LineTo  X = Width-User.R*0.5; Y = User.R+User.G
+LineTo  X = Width-User.R*0.5; Y = Height-User.R-User.G
+LineTo  X = User.R*0.5; Y = Height-User.R-User.G
+LineTo  X = User.R*0.5; Y = User.R+User.G
+
+# 2 die obere Rolle
+[Geometry]
+MoveTo  X = 0; Y = Height-User.R
+LineTo  X = Width; Y = Height-User.R
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = Height-User.R
+
+# 3 die untere Rolle
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = User.R
+LineTo  X = 0; Y = User.R
+LineTo  X = 0; Y = 0
+
+# 4 bis 7 die Löcher an den Enden der Rollen
+[Geometry]
+Ellipse  X = User.R*0.5; Y = Height-User.R*0.5; A = User.R*0.5+User.Hr; B = Height-User.R*0.5
+         C = User.R*0.5; D = Height-User.R*0.5+User.Hr
+
+[Geometry]
+Ellipse  X = Width-User.R*0.5; Y = Height-User.R*0.5; A = Width-User.R*0.5+User.Hr; B = Height-User.R*0.5
+         C = Width-User.R*0.5; D = Height-User.R*0.5+User.Hr
+
+[Geometry]
+Ellipse  X = User.R*0.5; Y = User.R*0.5; A = User.R*0.5+User.Hr; B = User.R*0.5
+         C = User.R*0.5; D = User.R*0.5+User.Hr
+
+[Geometry]
+Ellipse  X = Width-User.R*0.5; Y = User.R*0.5; A = Width-User.R*0.5+User.Hr; B = User.R*0.5
+         C = Width-User.R*0.5; D = User.R*0.5+User.Hr
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height-5 mm
+        Y.us = Height-0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 4; CanGlue = FALSE
+        Tip.de = "Dicke der Rollen ändern"
+        Tip.en = "Change the thickness of the rolls"
+        Tip.es = "Cambiar el grosor de los rollos"
+        Tip.it = "Cambia lo spessore dei rotoli"
+        Tip.fr = "Modifier l'épaisseur des rouleaux"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width-User.R*0.5; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = User.R*0.5; Y = Height*0.5; DirX = 1; DirY = 0

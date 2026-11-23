@@ -289,8 +289,9 @@ pub(crate) fn model(app: &mut Diagrammer) {
         });
         let k = key_of(r);
         let p0 = m.points.len() as u32;
-        // connection points (top-level shapes: glue targets)
-        if parent == 0 && flags & SEF_1D == 0 {
+        // connection points (top-level shapes: glue targets); (JD26) also those of 1-D shapes
+        // that have some: the causes of a fishbone glue to the bones of its categories
+        if parent == 0 {
             for c in glue::connection_points(doc, r) {
                 let dir = c.dir.map_or([0.0, 0.0], |d| [d[0] as f32, -(d[1] as f32)]);
                 // (JD15, SS-29) Type 1 points outward only: no target for ends; the Prompt is

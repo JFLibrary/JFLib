@@ -1,0 +1,42 @@
+# Gewitterblitz (SH-003, JD26): ein Blitz als ein Umriss aus geraden Kanten: ein schräges Stück
+# oben, ein breiter Absatz in der Mitte und eine lange Spitze nach links unten.  Alle Ecken
+# anteilig in der Breite und Höhe, der Blitz streckt sich also mit dem Kasten.  Keine
+# Steuerpunkte; Verbindungspunkte an der Spitze, am rechten und linken Absatz und oben.
+master: Lightning bolt
+name.de: Gewitterblitz
+name.en: Lightning bolt
+name.es: Rayo
+name.it: Fulmine
+name.fr: Éclair
+prompt.de: Blitz für Energie, Störungen und schnelle Abläufe.
+prompt.en: Lightning bolt for energy, faults and fast processes.
+prompt.es: Rayo para energía, fallos y procesos rápidos.
+prompt.it: Fulmine per energia, guasti e processi rapidi.
+prompt.fr: Éclair pour l'énergie, les pannes et les processus rapides.
+keywords.de: Blitz, Gewitter, Energie, Strom, Störung, schnell, Dekor
+keywords.en: lightning, bolt, thunderstorm, energy, power, fault, fast, decoration
+keywords.es: rayo, tormenta, energía, electricidad, fallo, rápido, decoración
+keywords.it: fulmine, temporale, energia, elettricità, guasto, veloce, decorazione
+keywords.fr: éclair, orage, énergie, électricité, panne, rapide, décoration
+
+[Shape]
+Width = 20 mm
+Width.us = 0.75 in
+Height = 30 mm
+Height.us = 1.25 in
+
+[Geometry]
+MoveTo  X = Width*0.38; Y = Height
+LineTo  X = Width*0.92; Y = Height
+LineTo  X = Width*0.62; Y = Height*0.62
+LineTo  X = Width*0.95; Y = Height*0.62
+LineTo  X = Width*0.15; Y = 0
+LineTo  X = Width*0.42; Y = Height*0.44
+LineTo  X = Width*0.08; Y = Height*0.44
+LineTo  X = Width*0.38; Y = Height
+
+[Connection]
+Row  X = Width*0.15; Y = 0; DirX = 0; DirY = 1
+Row  X = Width*0.95; Y = Height*0.62; DirX = -1; DirY = 0
+Row  X = Width*0.65; Y = Height; DirX = 0; DirY = -1
+Row  X = Width*0.08; Y = Height*0.44; DirX = 1; DirY = 0

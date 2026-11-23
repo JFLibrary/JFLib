@@ -1,0 +1,66 @@
+# Welle (SH-003, JD26): ein Band, dessen Ober- und Unterkante gleich verlaufende Wellen sind (eine
+# Periode, links zuerst nach oben), wie eine wehende Fahne.  Jede Kante ist eine kubische
+# Bézierkurve (RelCubBezTo, Anteile des Kastens) mit den Kontrollpunkten bei 1/3 und 2/3 der
+# Breite, um ±K über und unter der Grundlinie; K = A x 3,4641 gibt genau die Höhe A der Welle
+# (Scheitel bei 21 % und 79 % der Breite).  Die Wellen reichen bis an die Ränder des Kastens.
+# Row_1 an der linken unteren Ecke des Bands ändert die Höhe der Welle (anteilig, nur senkrecht,
+# bis 20 % der Höhe).  Der Text steht in der Mitte.  Gegenstück: double_wave.master.
+master: Wave
+name.de: Welle
+name.en: Wave
+name.es: Onda
+name.it: Onda
+name.fr: Vague
+prompt.de: Gewelltes Band wie eine wehende Fahne. Mit dem gelben Steuerpunkt ändern Sie die Höhe der Welle.
+prompt.en: Wavy band like a waving flag. Drag the yellow control handle to change the height of the wave.
+prompt.es: Banda ondulada como una bandera al viento. Arrastre el controlador amarillo para cambiar la altura de la onda.
+prompt.it: Banda ondulata come una bandiera al vento. Trascina la maniglia di controllo gialla per cambiare l'altezza dell'onda.
+prompt.fr: Bande ondulée comme un drapeau au vent. Faites glisser la poignée de contrôle jaune pour modifier la hauteur de la vague.
+keywords.de: Welle, Fahne, Flagge, Band, gewellt, Banner, Dekor
+keywords.en: wave, flag, band, wavy, banner, decoration
+keywords.es: onda, bandera, banda, ondulado, pancarta, decoración
+keywords.it: onda, bandiera, banda, ondulato, striscione, decorazione
+keywords.fr: vague, drapeau, bande, ondulé, bannière, décoration
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 25 mm
+Height.us = 1 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Width*0.8
+TxtHeight = Height-User.A*4
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Höhe der Welle (0 bis 20 % der Höhe), als Anteil der Höhe, der Abstand der Kontrollpunkte
+# von der Grundlinie als Anteil
+A:   Value = MIN(MAX(Controls.Row_1.Y, 0), Height*0.2)
+Ay:  Value = User.A/Height
+K:   Value = User.Ay*3.4641
+
+# Unterkante von links nach rechts, rechte Kante, Oberkante zurück
+[Geometry]
+RelMoveTo    X = 0; Y = User.Ay
+RelCubBezTo  X = 1; Y = User.Ay; A = 0.3333; B = User.Ay+User.K; C = 0.6667; D = User.Ay-User.K
+RelLineTo    X = 1; Y = 1-User.Ay
+RelCubBezTo  X = 0; Y = 1-User.Ay; A = 0.6667; B = 1-User.Ay-User.K; C = 0.3333; D = 1-User.Ay+User.K
+RelLineTo    X = 0; Y = User.Ay
+
+[Controls]
+Row_1:  X = 0; Y = Height*0.12
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Höhe der Welle ändern"
+        Tip.en = "Change the height of the wave"
+        Tip.es = "Cambiar la altura de la onda"
+        Tip.it = "Cambia l'altezza dell'onda"
+        Tip.fr = "Modifier la hauteur de la vague"
+
+[Connection]
+Row  X = Width*0.5; Y = User.A; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height-User.A; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

@@ -1,0 +1,48 @@
+# Herz (SH-003, JD26): zwei Bögen oben und eine Spitze unten.  Die Bögen sind Kreise (gestreckt
+# Ellipsen) mit dem Radius 0,26 der Breite um (0,26 | 0,74) und (0,74 | 0,74); sie schneiden sich
+# in der Kerbe oben in der Mitte (0,5 | 0,84).  Die Seiten laufen als Tangenten von der Spitze
+# (0,5 | 0) an die Kreise (Berührpunkte 0,0537 | 0,5817 und gespiegelt), so gehen Bogen und Seite
+# ohne Knick ineinander über.  Jeder Bogen ist ein Ellipsenbogen durch den höchsten Punkt seines
+# Kreises.  Keine Steuerpunkte (die Form hat keinen Parameter); der Text steht in der Mitte.
+master: Heart
+name.de: Herz
+name.en: Heart
+name.es: Corazón
+name.it: Cuore
+name.fr: Cœur
+prompt.de: Herzform für Zuneigung, Favoriten und Bewertungen.
+prompt.en: Heart shape for affection, favourites and ratings.
+prompt.es: Forma de corazón para afecto, favoritos y valoraciones.
+prompt.it: Forma a cuore per affetto, preferiti e valutazioni.
+prompt.fr: Forme de cœur pour l'affection, les favoris et les évaluations.
+keywords.de: Herz, Liebe, Favorit, Gefällt mir, Zuneigung, Gesundheit, Dekor
+keywords.en: heart, love, favourite, like, affection, health, decoration
+keywords.es: corazón, amor, favorito, me gusta, afecto, salud, decoración
+keywords.it: cuore, amore, preferito, mi piace, affetto, salute, decorazione
+keywords.fr: cœur, amour, favori, j'aime, affection, santé, décoration
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.6
+TxtWidth = Width*0.6
+TxtHeight = Height*0.4
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+# die Spitze, die linke Seite, der linke Bogen bis zur Kerbe, der rechte Bogen, die rechte Seite
+[Geometry]
+MoveTo           X = Width*0.5; Y = 0
+LineTo           X = Width*0.0537; Y = Height*0.5817
+EllipticalArcTo  X = Width*0.5; Y = Height*0.84; A = Width*0.26; B = Height; C = 0 deg; D = Width/Height
+EllipticalArcTo  X = Width*0.9463; Y = Height*0.5817; A = Width*0.74; B = Height; C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5; Y = 0
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.74; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height*0.84; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.74; DirX = 1; DirY = 0

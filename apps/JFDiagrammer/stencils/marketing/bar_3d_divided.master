@@ -1,0 +1,469 @@
+# Unterteilter 3D-Balken (SH-030, JD26): ein senkrechter Balken mit Tiefe aus zwei bis sechs
+# Abschnitten (Prop.Sections), unten beginnend.  Die Anteile stehen in den Shape-Daten
+# (Prop.Share1 bis Share6, beliebige Zahlen ab 0): jeder Abschnitt ist so hoch wie sein Anteil an
+# der Summe der gezeigten.  Je Abschnitt zwei Teile: die Vorderseite mit Text und Variantenfarbe
+# (100 bis 105) und die rechte Seite in derselben Farbe, dunkler über SHADE(…,50) mit THEMEGUARD;
+# dazu der Deckel in der Farbe des obersten Abschnitts (QuickStyleFillColor per Formel), heller
+# über TINT(…,40).  1 mm Fuge zwischen den Abschnitten.  Abschnitte über der Zahl liegen
+# verborgen (NoShow, HideText) deckungsgleich unter dem obersten (die Teile stehen von hinten nach
+# vorn in der Datei).  Row_1 an der hinteren linken Ecke des Deckels ändert die Tiefe (Abstand vom
+# linken Rand).  Rounding 0 an allen Flächen (sonst fiele der Quader in den abgerundeten Design-
+# Varianten auseinander).
+master: Divided 3-D bar
+name.de: Unterteilter 3D-Balken
+name.en: Divided 3-D bar
+name.es: Barra 3D dividida
+name.it: Barra 3D suddivisa
+name.fr: Barre 3D divisée
+prompt.de: Gestapelter Balken mit Tiefe, dessen Abschnitte Anteile zeigen. Zahl und Anteile der Abschnitte stellen Sie in den Shape-Daten ein, die Tiefe mit dem gelben Steuerpunkt.
+prompt.en: Stacked bar with depth whose sections show shares. Set the number and shares of the sections in the shape data and the depth with the yellow control handle.
+prompt.es: Barra apilada con profundidad cuyas secciones muestran proporciones. Defina el número y las proporciones en los datos de la forma y la profundidad con el controlador amarillo.
+prompt.it: Barra impilata con profondità le cui sezioni mostrano quote. Imposta il numero e le quote delle sezioni nei dati della forma e la profondità con la maniglia di controllo gialla.
+prompt.fr: Barre empilée avec profondeur dont les sections montrent des parts. Définissez le nombre et les parts des sections dans les données de la forme et la profondeur avec la poignée de contrôle jaune.
+keywords.de: Balken, gestapelt, 3D, Anteile, Abschnitte, Zusammensetzung, Prozent
+keywords.en: bar, stacked, 3D, shares, sections, composition, percent
+keywords.es: barra, apilada, 3D, proporciones, secciones, composición, porcentaje
+keywords.it: barra, impilata, 3D, quote, sezioni, composizione, percentuale
+keywords.fr: barre, empilée, 3D, parts, sections, composition, pourcentage
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 60 mm
+Height.us = 2.5 in
+
+[User]
+# die Zahl der Abschnitte (2 bis 6), die Tiefe, die Fuge, Breite und Höhe der Vorderseite
+N:   Value = MIN(MAX(ROUND(Prop.Sections,0),2),6)
+D:   Value = MIN(MAX(Controls.Row_1,0),Width*0.5,Height*0.25)
+Gp:  Value = 1 mm
+     Value.us = 0.04 in
+Wf:  Value = Width-User.D
+Hf:  Value = Height-User.D
+# die gezeigten Anteile (ab 0), ihre Summe, die Obergrenzen der Abschnitte als Anteil der Höhe und
+# die Untergrenze des obersten
+S1:  Value = MAX(Prop.Share1,0)
+S2:  Value = MAX(Prop.Share2,0)
+S3:  Value = IF(User.N>=3,MAX(Prop.Share3,0),0)
+S4:  Value = IF(User.N>=4,MAX(Prop.Share4,0),0)
+S5:  Value = IF(User.N>=5,MAX(Prop.Share5,0),0)
+S6:  Value = IF(User.N>=6,MAX(Prop.Share6,0),0)
+Sum: Value = MAX(User.S1+User.S2+User.S3+User.S4+User.S5+User.S6,0.000001)
+C1:  Value = (User.S1)/User.Sum
+C2:  Value = (User.S1+User.S2)/User.Sum
+C3:  Value = (User.S1+User.S2+User.S3)/User.Sum
+C4:  Value = (User.S1+User.S2+User.S3+User.S4)/User.Sum
+C5:  Value = (User.S1+User.S2+User.S3+User.S4+User.S5)/User.Sum
+CN:  Value = IF(User.N=2,User.C1,IF(User.N=3,User.C2,IF(User.N=4,User.C3,IF(User.N=5,User.C4,User.C5))))
+
+[Property]
+Sections:  Type = 2; Format = "0"; Value = 4
+           Label.de = Abschnitte
+           Label.en = Sections
+           Label.es = Secciones
+           Label.it = Sezioni
+           Label.fr = Sections
+           Prompt.de = Anzahl der Abschnitte (2 bis 6)
+           Prompt.en = Number of sections (2 to 6)
+           Prompt.es = Número de secciones (de 2 a 6)
+           Prompt.it = Numero di sezioni (da 2 a 6)
+           Prompt.fr = Nombre de sections (de 2 à 6)
+Share1:  Type = 2; Format = "0.0"; Value = 40
+         Label.de = Anteil 1
+         Label.en = Share 1
+         Label.es = Proporción 1
+         Label.it = Quota 1
+         Label.fr = Part 1
+Share2:  Type = 2; Format = "0.0"; Value = 30
+         Label.de = Anteil 2
+         Label.en = Share 2
+         Label.es = Proporción 2
+         Label.it = Quota 2
+         Label.fr = Part 2
+Share3:  Type = 2; Format = "0.0"; Value = 20
+         Label.de = Anteil 3
+         Label.en = Share 3
+         Label.es = Proporción 3
+         Label.it = Quota 3
+         Label.fr = Part 3
+Share4:  Type = 2; Format = "0.0"; Value = 10
+         Label.de = Anteil 4
+         Label.en = Share 4
+         Label.es = Proporción 4
+         Label.it = Quota 4
+         Label.fr = Part 4
+Share5:  Type = 2; Format = "0.0"; Value = 10
+         Label.de = Anteil 5
+         Label.en = Share 5
+         Label.es = Proporción 5
+         Label.it = Quota 5
+         Label.fr = Part 5
+Share6:  Type = 2; Format = "0.0"; Value = 10
+         Label.de = Anteil 6
+         Label.en = Share 6
+         Label.es = Proporción 6
+         Label.it = Quota 6
+         Label.fr = Part 6
+
+[Controls]
+Row_1:  X = 5 mm; Y = Height
+        X.us = 0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Tiefe ändern"
+        Tip.en = "Change the depth"
+        Tip.es = "Cambiar la profundidad"
+        Tip.it = "Cambia la profondità"
+        Tip.fr = "Modifier la profondeur"
+
+[Connection]
+Row  X = User.Wf*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = (Height+User.D)*0.5; DirX = -1; DirY = 0
+Row  X = (Width+User.D)*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.Hf*0.5; DirX = 1; DirY = 0
+
+# Abschnitt 6: Vorderseite, dann rechte Seite; verborgen unter 6 Abschnitten
+[Part F6]
+text.de: Teil 6
+text.en: Part 6
+text.es: Parte 6
+text.it: Parte 6
+text.fr: Partie 6
+
+[User]
+# Unter- und Obergrenze (Anteil der Höhe; über der Zahl die des obersten), die Kanten in der Höhe
+Lo:  Value = IF(6<=Sheet.1!User.N,Sheet.1!User.C5,Sheet.1!User.CN)
+Hi:  Value = IF(6<=Sheet.1!User.N,1,1)
+Y0:  Value = Sheet.1!User.Hf*User.Lo+IF(User.Lo>0.000001,Sheet.1!User.Gp*0.5,0)
+Y1:  Value = MAX(Sheet.1!User.Hf*User.Hi-IF(User.Hi<0.999999,Sheet.1!User.Gp*0.5,0),User.Y0)
+
+[Shape]
+Width = GUARD(Sheet.1!User.Wf)
+Height = GUARD(User.Y1-User.Y0)
+PinX = GUARD(Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+HideText = 6>Sheet.1!User.N
+QuickStyleLineColor = 105
+QuickStyleFillColor = 105
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F6S]
+
+[User]
+Lo:  Value = IF(6<=Sheet.1!User.N,Sheet.1!User.C5,Sheet.1!User.CN)
+Hi:  Value = IF(6<=Sheet.1!User.N,1,1)
+Y0:  Value = Sheet.1!User.Hf*User.Lo+IF(User.Lo>0.000001,Sheet.1!User.Gp*0.5,0)
+Y1:  Value = MAX(Sheet.1!User.Hf*User.Hi-IF(User.Hi<0.999999,Sheet.1!User.Gp*0.5,0),User.Y0)
+
+[Shape]
+QuickStyleLineColor = 105
+QuickStyleFillColor = 105
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+MoveTo  X = Sheet.1!User.Wf; Y = User.Y0
+LineTo  X = Width; Y = User.Y0+Sheet.1!User.D
+LineTo  X = Width; Y = User.Y1+Sheet.1!User.D
+LineTo  X = Sheet.1!User.Wf; Y = User.Y1
+LineTo  X = Sheet.1!User.Wf; Y = User.Y0
+
+# Abschnitt 5: Vorderseite, dann rechte Seite; verborgen unter 5 Abschnitten
+[Part F5]
+text.de: Teil 5
+text.en: Part 5
+text.es: Parte 5
+text.it: Parte 5
+text.fr: Partie 5
+
+[User]
+# Unter- und Obergrenze (Anteil der Höhe; über der Zahl die des obersten), die Kanten in der Höhe
+Lo:  Value = IF(5<=Sheet.1!User.N,Sheet.1!User.C4,Sheet.1!User.CN)
+Hi:  Value = IF(5<=Sheet.1!User.N,Sheet.1!User.C5,1)
+Y0:  Value = Sheet.1!User.Hf*User.Lo+IF(User.Lo>0.000001,Sheet.1!User.Gp*0.5,0)
+Y1:  Value = MAX(Sheet.1!User.Hf*User.Hi-IF(User.Hi<0.999999,Sheet.1!User.Gp*0.5,0),User.Y0)
+
+[Shape]
+Width = GUARD(Sheet.1!User.Wf)
+Height = GUARD(User.Y1-User.Y0)
+PinX = GUARD(Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+HideText = 5>Sheet.1!User.N
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F5S]
+
+[User]
+Lo:  Value = IF(5<=Sheet.1!User.N,Sheet.1!User.C4,Sheet.1!User.CN)
+Hi:  Value = IF(5<=Sheet.1!User.N,Sheet.1!User.C5,1)
+Y0:  Value = Sheet.1!User.Hf*User.Lo+IF(User.Lo>0.000001,Sheet.1!User.Gp*0.5,0)
+Y1:  Value = MAX(Sheet.1!User.Hf*User.Hi-IF(User.Hi<0.999999,Sheet.1!User.Gp*0.5,0),User.Y0)
+
+[Shape]
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+MoveTo  X = Sheet.1!User.Wf; Y = User.Y0
+LineTo  X = Width; Y = User.Y0+Sheet.1!User.D
+LineTo  X = Width; Y = User.Y1+Sheet.1!User.D
+LineTo  X = Sheet.1!User.Wf; Y = User.Y1
+LineTo  X = Sheet.1!User.Wf; Y = User.Y0
+
+# Abschnitt 4: Vorderseite, dann rechte Seite; verborgen unter 4 Abschnitten
+[Part F4]
+text.de: Teil 4
+text.en: Part 4
+text.es: Parte 4
+text.it: Parte 4
+text.fr: Partie 4
+
+[User]
+# Unter- und Obergrenze (Anteil der Höhe; über der Zahl die des obersten), die Kanten in der Höhe
+Lo:  Value = IF(4<=Sheet.1!User.N,Sheet.1!User.C3,Sheet.1!User.CN)
+Hi:  Value = IF(4<=Sheet.1!User.N,Sheet.1!User.C4,1)
+Y0:  Value = Sheet.1!User.Hf*User.Lo+IF(User.Lo>0.000001,Sheet.1!User.Gp*0.5,0)
+Y1:  Value = MAX(Sheet.1!User.Hf*User.Hi-IF(User.Hi<0.999999,Sheet.1!User.Gp*0.5,0),User.Y0)
+
+[Shape]
+Width = GUARD(Sheet.1!User.Wf)
+Height = GUARD(User.Y1-User.Y0)
+PinX = GUARD(Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+HideText = 4>Sheet.1!User.N
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F4S]
+
+[User]
+Lo:  Value = IF(4<=Sheet.1!User.N,Sheet.1!User.C3,Sheet.1!User.CN)
+Hi:  Value = IF(4<=Sheet.1!User.N,Sheet.1!User.C4,1)
+Y0:  Value = Sheet.1!User.Hf*User.Lo+IF(User.Lo>0.000001,Sheet.1!User.Gp*0.5,0)
+Y1:  Value = MAX(Sheet.1!User.Hf*User.Hi-IF(User.Hi<0.999999,Sheet.1!User.Gp*0.5,0),User.Y0)
+
+[Shape]
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+MoveTo  X = Sheet.1!User.Wf; Y = User.Y0
+LineTo  X = Width; Y = User.Y0+Sheet.1!User.D
+LineTo  X = Width; Y = User.Y1+Sheet.1!User.D
+LineTo  X = Sheet.1!User.Wf; Y = User.Y1
+LineTo  X = Sheet.1!User.Wf; Y = User.Y0
+
+# Abschnitt 3: Vorderseite, dann rechte Seite; verborgen unter 3 Abschnitten
+[Part F3]
+text.de: Teil 3
+text.en: Part 3
+text.es: Parte 3
+text.it: Parte 3
+text.fr: Partie 3
+
+[User]
+# Unter- und Obergrenze (Anteil der Höhe; über der Zahl die des obersten), die Kanten in der Höhe
+Lo:  Value = IF(3<=Sheet.1!User.N,Sheet.1!User.C2,Sheet.1!User.CN)
+Hi:  Value = IF(3<=Sheet.1!User.N,Sheet.1!User.C3,1)
+Y0:  Value = Sheet.1!User.Hf*User.Lo+IF(User.Lo>0.000001,Sheet.1!User.Gp*0.5,0)
+Y1:  Value = MAX(Sheet.1!User.Hf*User.Hi-IF(User.Hi<0.999999,Sheet.1!User.Gp*0.5,0),User.Y0)
+
+[Shape]
+Width = GUARD(Sheet.1!User.Wf)
+Height = GUARD(User.Y1-User.Y0)
+PinX = GUARD(Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+HideText = 3>Sheet.1!User.N
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F3S]
+
+[User]
+Lo:  Value = IF(3<=Sheet.1!User.N,Sheet.1!User.C2,Sheet.1!User.CN)
+Hi:  Value = IF(3<=Sheet.1!User.N,Sheet.1!User.C3,1)
+Y0:  Value = Sheet.1!User.Hf*User.Lo+IF(User.Lo>0.000001,Sheet.1!User.Gp*0.5,0)
+Y1:  Value = MAX(Sheet.1!User.Hf*User.Hi-IF(User.Hi<0.999999,Sheet.1!User.Gp*0.5,0),User.Y0)
+
+[Shape]
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+MoveTo  X = Sheet.1!User.Wf; Y = User.Y0
+LineTo  X = Width; Y = User.Y0+Sheet.1!User.D
+LineTo  X = Width; Y = User.Y1+Sheet.1!User.D
+LineTo  X = Sheet.1!User.Wf; Y = User.Y1
+LineTo  X = Sheet.1!User.Wf; Y = User.Y0
+
+# Abschnitt 2: Vorderseite, dann rechte Seite; verborgen unter 2 Abschnitten
+[Part F2]
+text.de: Teil 2
+text.en: Part 2
+text.es: Parte 2
+text.it: Parte 2
+text.fr: Partie 2
+
+[User]
+# Unter- und Obergrenze (Anteil der Höhe; über der Zahl die des obersten), die Kanten in der Höhe
+Lo:  Value = Sheet.1!User.C1
+Hi:  Value = IF(2<=Sheet.1!User.N,Sheet.1!User.C2,1)
+Y0:  Value = Sheet.1!User.Hf*User.Lo+IF(User.Lo>0.000001,Sheet.1!User.Gp*0.5,0)
+Y1:  Value = MAX(Sheet.1!User.Hf*User.Hi-IF(User.Hi<0.999999,Sheet.1!User.Gp*0.5,0),User.Y0)
+
+[Shape]
+Width = GUARD(Sheet.1!User.Wf)
+Height = GUARD(User.Y1-User.Y0)
+PinX = GUARD(Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+HideText = 2>Sheet.1!User.N
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 2>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F2S]
+
+[User]
+Lo:  Value = Sheet.1!User.C1
+Hi:  Value = IF(2<=Sheet.1!User.N,Sheet.1!User.C2,1)
+Y0:  Value = Sheet.1!User.Hf*User.Lo+IF(User.Lo>0.000001,Sheet.1!User.Gp*0.5,0)
+Y1:  Value = MAX(Sheet.1!User.Hf*User.Hi-IF(User.Hi<0.999999,Sheet.1!User.Gp*0.5,0),User.Y0)
+
+[Shape]
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 2>Sheet.1!User.N
+MoveTo  X = Sheet.1!User.Wf; Y = User.Y0
+LineTo  X = Width; Y = User.Y0+Sheet.1!User.D
+LineTo  X = Width; Y = User.Y1+Sheet.1!User.D
+LineTo  X = Sheet.1!User.Wf; Y = User.Y1
+LineTo  X = Sheet.1!User.Wf; Y = User.Y0
+
+# Abschnitt 1: Vorderseite, dann rechte Seite; verborgen unter 1 Abschnitten
+[Part F1]
+text.de: Teil 1
+text.en: Part 1
+text.es: Parte 1
+text.it: Parte 1
+text.fr: Partie 1
+
+[User]
+# Unter- und Obergrenze (Anteil der Höhe; über der Zahl die des obersten), die Kanten in der Höhe
+Lo:  Value = 0
+Hi:  Value = Sheet.1!User.C1
+Y0:  Value = Sheet.1!User.Hf*User.Lo+IF(User.Lo>0.000001,Sheet.1!User.Gp*0.5,0)
+Y1:  Value = MAX(Sheet.1!User.Hf*User.Hi-IF(User.Hi<0.999999,Sheet.1!User.Gp*0.5,0),User.Y0)
+
+[Shape]
+Width = GUARD(Sheet.1!User.Wf)
+Height = GUARD(User.Y1-User.Y0)
+PinX = GUARD(Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+HideText = 1>Sheet.1!User.N
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 1>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F1S]
+
+[User]
+Lo:  Value = 0
+Hi:  Value = Sheet.1!User.C1
+Y0:  Value = Sheet.1!User.Hf*User.Lo+IF(User.Lo>0.000001,Sheet.1!User.Gp*0.5,0)
+Y1:  Value = MAX(Sheet.1!User.Hf*User.Hi-IF(User.Hi<0.999999,Sheet.1!User.Gp*0.5,0),User.Y0)
+
+[Shape]
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 1>Sheet.1!User.N
+MoveTo  X = Sheet.1!User.Wf; Y = User.Y0
+LineTo  X = Width; Y = User.Y0+Sheet.1!User.D
+LineTo  X = Width; Y = User.Y1+Sheet.1!User.D
+LineTo  X = Sheet.1!User.Wf; Y = User.Y1
+LineTo  X = Sheet.1!User.Wf; Y = User.Y0
+
+# der Deckel in der Farbe des obersten Abschnitts
+[Part Top]
+
+[Shape]
+QuickStyleLineColor = 99+Sheet.1!User.N
+QuickStyleFillColor = 99+Sheet.1!User.N
+FillForegnd = THEMEGUARD(TINT(THEMEVAL("FillColor"),40))
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = 0; Y = Sheet.1!User.Hf
+LineTo  X = Sheet.1!User.Wf; Y = Sheet.1!User.Hf
+LineTo  X = Width; Y = Height
+LineTo  X = Sheet.1!User.D; Y = Height
+LineTo  X = 0; Y = Sheet.1!User.Hf
