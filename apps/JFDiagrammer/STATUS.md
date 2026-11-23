@@ -1,6 +1,6 @@
 # JFDiagrammer – Stand der Features
 
-Stand 2026-11-23, Etappe JD15 (PLAN.md › „JD15: Bestandsaufnahme und P1-Abnahme“), mit JD16. Diese Datei hält für
+Stand 2026-11-24, Etappe JD15 (PLAN.md › „JD15: Bestandsaufnahme und P1-Abnahme“), mit JD16 und JD18. Diese Datei hält für
 jede P1- und P2-Zeile aus [FEATURES.md](FEATURES.md) fest, wie weit sie in JFDiagrammer ist. Geprüft wurde
 in der laufenden App (Skripte unter `tests/`, Screenshots), nicht nur im Code; die Schablonen aus
 FEATURES 4.2 stehen mit einer Zeile je Schablone da.
@@ -25,28 +25,28 @@ Leseschlüssel:
   `diagram_io`; Skriptnamen ohne Pfad liegen in `tests/`. „Befehl …“ heißt: in der App bedienbar, aber noch
   ohne eigenen Check (nur bei teilweise); „(Probe)“ ist eine Beobachtung aus JD15 zusätzlich zum Check.
 - Die P2-Zeilen gehören laut PLAN in Phase 2b (JD16–JD25) und Phase 3 (JD26–JD34). JD16 (ältere XML-Formate,
-  Makro-Teile, Dokumenteigenschaften, Fensterzustand) ist schon eingetragen.
+  Makro-Teile, Dokumenteigenschaften, Fensterzustand) und JD18 (Datenquellen und Verknüpfung) sind eingetragen.
 
 ## Zusammenfassung
 
 <!-- summary:begin (check_status.py --write) -->
 | Abschnitt | P1 fertig | P1 teilweise | P1 fehlt | P2 fertig | P2 teilweise | P2 fehlt |
 |---|---:|---:|---:|---:|---:|---:|
-| 1.1 Visio-Formate ab 2013 (OPC/XML, „VSDX-Familie“) | 5 | 1 | 0 | 3 | 4 | 0 |
+| 1.1 Visio-Formate ab 2013 (OPC/XML, „VSDX-Familie“) | 5 | 1 | 0 | 4 | 3 | 0 |
 | 1.2 Ältere XML-Formate 2003–2010 | 0 | 0 | 0 | 2 | 0 | 0 |
 | 1.3 Binärformate (nur Import) | 0 | 0 | 0 | 0 | 0 | 2 |
 | 1.4 Export („Speichern unter“ und „Exportieren“) | 3 | 3 | 0 | 0 | 1 | 4 |
-| 1.5 Import | 0 | 2 | 0 | 0 | 0 | 4 |
+| 1.5 Import | 0 | 2 | 0 | 3 | 0 | 1 |
 | 2.1 Dokument | 5 | 1 | 0 | 0 | 0 | 4 |
 | 2.2 Seiten | 6 | 2 | 0 | 0 | 2 | 4 |
 | 2.3 Ebenen | 4 | 0 | 0 | 1 | 0 | 0 |
 | 2.4 Master, Schablonen und Formatvorlagen | 3 | 2 | 1 | 1 | 1 | 2 |
-| 2.5 Shapes, Geometrie und Gruppen | 5 | 6 | 0 | 0 | 0 | 6 |
+| 2.5 Shapes, Geometrie und Gruppen | 5 | 6 | 0 | 1 | 0 | 5 |
 | 2.6 Format: Linie, Füllung, Schatten, Effekte | 3 | 2 | 0 | 0 | 1 | 1 |
 | 2.7 Text und Felder | 6 | 2 | 0 | 0 | 0 | 2 |
 | 2.8 Verbinder, Kleben, Routing und Layout | 4 | 6 | 0 | 0 | 1 | 6 |
 | 2.9 Container, Listen, Swimlanes, Beschriftungen, Legenden | 4 | 1 | 0 | 1 | 0 | 2 |
-| 2.10 Daten | 2 | 0 | 0 | 0 | 0 | 8 |
+| 2.10 Daten | 2 | 0 | 0 | 1 | 1 | 6 |
 | 2.11 Hyperlinks, QuickInfos und Kommentare | 1 | 0 | 0 | 0 | 0 | 4 |
 | 2.12 Designs (Themes), Varianten und Schnellformatvorlagen | 4 | 0 | 0 | 1 | 0 | 1 |
 | 2.13 ShapeSheet: Abschnitte | 11 | 12 | 0 | 6 | 9 | 1 |
@@ -56,13 +56,13 @@ Leseschlüssel:
 | 3.3 Register „Start“ | 19 | 4 | 0 | 0 | 3 | 4 |
 | 3.4 Register „Einfügen“ | 6 | 2 | 0 | 0 | 0 | 2 |
 | 3.6 Register „Entwurf“ | 6 | 2 | 0 | 0 | 0 | 3 |
-| 3.7 Register „Daten“ | 0 | 1 | 0 | 0 | 0 | 7 |
+| 3.7 Register „Daten“ | 0 | 1 | 0 | 3 | 0 | 4 |
 | 3.8 Register „Prozess“ | 0 | 0 | 0 | 0 | 0 | 5 |
 | 3.9 Register „Überprüfen“, „Ansicht“, „Entwicklertools“, „Hilfe“ | 3 | 3 | 0 | 0 | 1 | 15 |
 | 3.10 Kontext- und Vorlagenregister | 1 | 2 | 0 | 0 | 0 | 4 |
 | 3.11 Shapes-Seitenleiste | 3 | 5 | 0 | 0 | 2 | 0 |
 | 3.12 Zeichenfenster | 5 | 11 | 0 | 0 | 1 | 5 |
-| 3.13 Aufgabenbereiche | 1 | 5 | 0 | 0 | 1 | 6 |
+| 3.13 Aufgabenbereiche | 1 | 5 | 0 | 0 | 2 | 5 |
 | 3.14 Statusleiste | 2 | 1 | 0 | 0 | 0 | 1 |
 | 3.15 Drucken und Seite einrichten | 3 | 5 | 0 | 0 | 0 | 1 |
 | 3.16 Tastenkürzel | 9 | 6 | 0 | 0 | 1 | 2 |
@@ -72,10 +72,10 @@ Leseschlüssel:
 | 4.14 Vorschläge für eigene Kategorien | 0 | 0 | 0 | 0 | 0 | 6 |
 | 5.1 Vorlagen-Infrastruktur | 4 | 0 | 0 | 0 | 0 | 0 |
 | 5.2 Vorlagen nach Kategorie | 5 | 2 | 0 | 0 | 0 | 13 |
-| 5.3 Assistenten und Generatoren | 0 | 0 | 0 | 0 | 0 | 7 |
-| **zusammen** | **173** | **107** | **1** | **18** | **32** | **207** |
+| 5.3 Assistenten und Generatoren | 0 | 0 | 0 | 3 | 0 | 4 |
+| **zusammen** | **173** | **107** | **1** | **30** | **33** | **194** |
 
-P2-Zeilen, die schon fertig sind (18): DF-04, DF-05, DF-07, DF-20, DF-21, LY-05, MS-07, ST-09, TH-06, SS-11, SS-21, SS-22, SS-31, SS-33, SS-36, FX-11, FX-12, LG-05.
+P2-Zeilen, die schon fertig sind (30): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, ST-09, DA-05, TH-06, SS-11, SS-21, SS-22, SS-31, SS-33, SS-36, FX-11, FX-12, RD-02, RD-03, RD-09, LG-05, AS-03, AS-04, AS-20.
 <!-- summary:end -->
 
 ## Offene Entscheidungen des Nutzers
@@ -185,7 +185,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | DF-09 | Dokumenteigenschaften | P2 | teilweise | xml_formats.uis (Datei › Info zeigt und ändert den Titel, gespeichert und wieder geöffnet); dit vdx (props) | benutzerdefinierte Eigenschaften in der Oberfläche, Datum nach Region, „Geändert“/„zuletzt geändert von“ beim Speichern; Visio-Gegenprobe von JD16 offen |
 | DF-10 | Fenster- und Ansichtszustand | P2 | teilweise | xml_formats.uis (Zoom aus der Datei); dit vdx (windows), roundtrip (Zeichenfenster) | „Arbeitsbereich speichern“ abschaltbar, Verbindungspunkte-Anzeige, Schablonen neben der Zeichnung öffnen (fs.user); Visio-Gegenprobe von JD16 offen |
 | DF-11 | Kommentare-Teil | P2 | teilweise | `comments.xml` bleibt unverändert erhalten (dit samples/parts) | Kommentare ins Modell lesen, anzeigen, schreiben (HL-04) |
-| DF-12 | Datenverbindungen-Teile | P2 | teilweise | `connections.xml`/`recordsets.xml` bleiben erhalten (dit samples/parts) | ins Modell lesen, anzeigen, schreiben (JD18) |
+| DF-12 | Datenverbindungen-Teile | P2 | fertig | dit data (Rundlauf von connections.xml, recordsets.xml und den ADO-Datenteilen, Paket wie Visio es schreibt: Visio_RowID, RefreshConflict, AutoLinkComparison, unbekannte Attribute; Aktualisieren gespeichert; Nichtverstandenes bleibt Bytes; feindliche Teile), io data::tests; die Daten zeigt der Bereich Externe Daten ohne Dateizugriff (data_import_xlsx.uis); Visio-Gegenprobe ausstehend | – |
 | DF-14 | Eingebettete Medien | P1 | teilweise | PNG/JPEG/GIF/BMP lesen, schreiben, zeichnen: pictures.uis, dit render/pictures, roundtrip „new pictures“ | TIFF, EMF, WMF, SVG und OLE-Vorschaubilder nur als Platzhalter gezeichnet (gelesen und geschrieben werden sie) |
 | DF-15 | Robustheit | P1 | fertig | file_broken.uis (beschädigte Datei auf der Kommandozeile meldet sich), file_open_modes.uis (Durchsuchen: Meldung sofort); dit xml, limits, zip, refs, rels (Grenzen, ZIP64, Bomben) | – (der Detailtext aus vsdx::Error ist englisch) |
 
@@ -225,10 +225,10 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 |---|---|---|---|---|---|
 | IM-01 | Bilder einfügen | P1 | teilweise | pictures.uis (PNG, BMP, GIF), dit roundtrip „new pictures“ (JPEG) | TIFF, WebP; Zuschneiden, Helligkeit/Kontrast, Transparenz |
 | IM-02 | SVG einfügen | P2 | fehlt | Bild aus Datei nimmt nur png/jpg/gif/bmp | alles (JD25) |
-| IM-05 | Daten importieren | P2 | fehlt | – | alles (JD18) |
+| IM-05 | Daten importieren | P2 | fertig | data_import_xlsx.uis (Blatt, Schlüssel), data_import_csv.uis (Semikolon, Windows-1252, Dezimalkomma, ohne Kopfzeile), data_refresh_conflict.uis (erneut lesen); CSV und .xlsx in P2, ODBC/SQL grau (P3, F6); als Quelle des Organigramm-Assistenten mit JD28 (AS-01) | – |
 | IM-06 | Einfügen aus der Zwischenablage | P1 | teilweise | paste_special.uis (Text → Textfeld, Bild, eigene Shapes, Inhalte einfügen mit Formatwahl, Als Link) | SVG einfügen; eigene Shapes aus einem anderen Fenster/Programmlauf (kein Systemformat) |
-| IM-08 | Verbundene Zeichnung aus CSV | P2 | fehlt | – | alles (JD18) |
-| IM-10 | XLSX-Leser | P2 | fehlt | – | alles (JD18) |
+| IM-08 | Verbundene Zeichnung aus CSV | P2 | fertig | data_text_drawing.uis (Komma, mehrzeiliger Text, Shape-Daten, X/Y, Probleme je Zeile, Ebenen-Layout, geklebte Verbinder, Rückgängig, neue Seite), io textdraw::tests (Tab, Semikolon, sep=, Kommentar-Überschriften, Einheiten, feindliche Texte, Layout, Aufbau); Feldfolge nach UG Kap. 21, ohne Visio-Gegenprobe | – |
+| IM-10 | XLSX-Leser | P2 | fertig | lib/sheet_io (`cargo test -p jflib-sheet-io --lib`: Blätter, Namen, Tabellen, Shared Strings, alle Zelltypen, Datumssysteme, strict OOXML, feindliche Mappen), codectest --sheet (Bomben, Tiefe, Grenzen mit Zeitschranke), data_import_xlsx.uis | – |
 
 ## 2. Dokumentmodell
 
@@ -307,7 +307,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | SP-10 | Führungslinien und -punkte | P1 | teilweise | edit_view.uis (aus dem Lineal, Shapes rasten ein), canvas_guides.uis (Ansicht › Führungslinien aus, Nach Typ auswählen, Entf, Rückgängig) | per Klick wählen, verschieben, drehen; Kleben und Mitnehmen; Führungspunkte; per Größe und Position; Ausrichten legt Führungslinien an |
 | SP-11 | Shape ändern | P2 | fehlt | – | alles (JD21) |
 | SP-12 | Intelligente Shapes | P1 | fertig | actions_menu.uis (Actions-Zeilen im Kontextmenü, Formel wirkt, Rückgängig), network_rack.uis (Höheneinheiten); dit render/geometry/sections | – (Trennlinie BeginGroup fehlt im Menü) |
-| SP-13 | Shape-Daten beim Ablegen abfragen | P2 | fehlt | – | alles (JD18) |
+| SP-13 | Shape-Daten beim Ablegen abfragen | P2 | fertig | data_ask_drop.uis (Ablegen aus Favoriten, Duplizieren, Einfügen, Strg+Umschalt+Ziehen; OK schreibt, Abbrechen behält, Rückgängig) | – |
 | SP-14 | Verschieben ohne Raster und Feinschritte | P1 | fertig | status_model.uis (Pfeil = Rasterschritt, Umschalt = 1 px, Alt-Ziehen frei) | – |
 | SP-15 | Gruppe öffnen | P2 | fehlt | – | alles (JD21) |
 | SP-16 | Ausrichtungsrahmen aktualisieren | P2 | fehlt | – | alles (JD21) |
@@ -381,8 +381,8 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 |---|---|---|---|---|---|
 | DA-01 | Shape-Daten | P1 | fertig | panes_edit.uis (Zahl, feste Liste); Bereich kennt alle 8 Typen (pane_data.rs); Werte über `Engine::user_set` | – |
 | DA-02 | Shape-Daten definieren | P1 | fertig | panes_edit.uis (Shape-Daten definieren, mehrere Shapes) | – |
-| DA-04 | Datenverknüpfung | P2 | fehlt | – | alles (JD18) |
-| DA-05 | Daten aktualisieren | P2 | fehlt | – | alles (JD18) |
+| DA-04 | Datenverknüpfung | P2 | teilweise | data_import_xlsx.uis (Quelle anbinden, Schlüssel, Spalten umbenennen/umtypisieren/ordnen, Quelle umbenennen und entfernen), data_drag_row.uis (Zeile auf ein Shape, auf die leere Fläche mit und ohne gewählten Master, mehrere Zeilen, Verknüpfung aufheben), data_link.uis (automatisch über Spaltenabgleich), core data::tests | Spalten ausblenden (Visios Format kennt dafür kein Feld, das wir kennen); mehrere Zeilen auf ein Shape gezogen: nur die erste |
+| DA-05 | Daten aktualisieren | P2 | fertig | data_refresh_conflict.uis (alle und einzeln, Intervall, Quelle neu wählen, fehlende Zeile, eigener Wert, gelöst mit Rückgängig), core data::tests (Schlüssel, Reihenfolge, doppelte Schlüssel, überschreiben), dit data (Aktualisieren gespeichert); Visio-Gegenprobe ausstehend | – |
 | DA-07 | Datengrafiken | P2 | fehlt | – | alles (JD19) |
 | DA-08 | Datengrafik-Felder | P2 | fehlt | – | alles (JD19) |
 | DA-09 | Shape-Berichte | P2 | fehlt | – | alles (JD19) |
@@ -582,13 +582,13 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 
 | ID | Feature | Prio | Stand | Beleg | Fehlt |
 |---|---|---|---|---|---|
-| RD-02 | Benutzerdefinierter Import | P2 | fehlt | – | Register fehlt (JD18) |
-| RD-03 | Alle aktualisieren | P2 | fehlt | – | (JD18) |
+| RD-02 | Benutzerdefinierter Import | P2 | fertig | data_import_xlsx.uis, data_import_csv.uis (Datenauswahl-Assistent; ODBC/SQL grau, P3) | – |
+| RD-03 | Alle aktualisieren | P2 | fertig | data_refresh_conflict.uis (Alle aktualisieren, Daten aktualisieren..., Intervall, nach Aktualisierung automatisch verknüpfen) | – |
 | RD-04 | Datengrafik-Katalog | P2 | fehlt | – | (JD19) |
 | RD-05 | Position, Konfigurieren | P2 | fehlt | – | (JD19) |
 | RD-07 | Legende einfügen | P2 | fehlt | – | (JD19) |
-| RD-08 | Fenster Shape-Daten, Externe Daten, Datengrafikfelder | P1 | teilweise | tests/panes.uis, tests/panes_edit.uis (Shape-Daten über Ansicht › Aufgabenbereiche) | Register Daten mit den Kästchen; Externe Daten, Datengrafikfelder (P2, JD18/JD19) |
-| RD-09 | Daten verknüpfen | P2 | fehlt | – | (JD18) |
+| RD-08 | Fenster Shape-Daten, Externe Daten, Datengrafikfelder | P1 | teilweise | tests/panes.uis, tests/panes_edit.uis, data_import_xlsx.uis (Register Daten: Fenster „Shape-Daten“ und „Externe Daten“) | Datengrafikfelder (JD19) |
+| RD-09 | Daten verknüpfen | P2 | fertig | data_link.uis | – |
 | RD-10 | Erweiterte Datengrafiken | P2 | fehlt | – | (JD19) |
 
 ### 3.8 Register „Prozess“
@@ -670,7 +670,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | ZF-09 | Livedynamik | P1 | teilweise | edit_shapes.uis (Vorschau beim Ziehen) | Option „Livedynamik aktivieren“ ohne Wirkung (nur in options.rs gelesen), kein Umriss-Modus |
 | ZF-10 | AutoVerbinden-Pfeile und Schnell-Shape-Leiste | P1 | teilweise | structures_arrows.uis, structures_arrows_overlap.uis | Schnell-Shape-Leiste mit Vorschau (CN-07-Rest) |
 | ZF-11 | Minisymbolleiste | P2 | fehlt | Probe | → JD22 |
-| ZF-12 | Kontextmenü am Shape | P1 | teilweise | status_ui_panel.uis, hyperlink.uis, my_shapes.uis, actions_menu.uis (Aktionen des Shapes), context_jd15.uis (Shape-Name, Bahn davor/danach) | Daten ▸ verknüpfte Zeile/Datengrafik (JD18/19), Kommentar grau (JD20) |
+| ZF-12 | Kontextmenü am Shape | P1 | teilweise | status_ui_panel.uis, hyperlink.uis, my_shapes.uis, actions_menu.uis (Aktionen des Shapes), context_jd15.uis (Shape-Name, Bahn davor/danach), data_drag_row.uis (Daten › Verknüpfung mit Zeile aufheben) | Daten ▸ verknüpfte Zeile anzeigen, Datengrafik (JD19), Kommentar grau (JD20) |
 | ZF-13 | Kontextmenüs Seite, Register, Schablone | P1 | fertig | status_ui_panel.uis, pages.uis, panes.uis | – |
 | ZF-14 | Seitenregister | P1 | teilweise | pages.uis, viewer.uis | Ziehen = Umordnen (Probe; nur Dialog „Seiten neu anordnen“) |
 | ZF-15 | Hyperlink-Zeiger | P1 | fertig | hyperlink.uis | – (Link-Cursor nicht skriptbar) |
@@ -688,7 +688,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 |---|---|---|---|---|---|
 | AB-01 | Allgemein | P1 | teilweise | panes.uis, status_ui_panel.uis | Andocken oben (Dock kennt links/rechts/unten, schwebend, Einklappen, Ausblenden) |
 | AB-02 | Shapes | P1 | teilweise | stencils.uis, status_ui_panel.uis (wie 3.11) | wie SL-01 bis SL-06 (eingeklappte Leiste, Livevorschau, Teilen beim Ablegen …) |
-| AB-03 | Shape-Daten | P1 | teilweise | panes_edit.uis (Zahl, feste Liste), context_jd15.uis (Kontextmenü: Shape-Daten definieren) | Datensätze im Kontextmenü (JD18); Datum/Boolesch/Mehrfachauswahl ohne Skript |
+| AB-03 | Shape-Daten | P1 | teilweise | panes_edit.uis (Zahl, feste Liste), context_jd15.uis (Kontextmenü: Shape-Daten definieren), data_ask_drop.uis (Boolesch, Mehrfachauswahl; Boolesch schrieb immer FALSE, behoben in JD18) | Shape-Datensätze im Kontextmenü (DA-03, P3); Datum ohne Skript |
 | AB-04 | Größe und Position | P1 | teilweise | panes_edit.uis | Führungslinien-Felder (Art, X, Y, Winkel); 1D-Formen „Anfang+Länge+Winkel“/„Ende+…“ als Wahl (alle Felder auf einmal) |
 | AB-05 | Shape formatieren | P1 | teilweise | format.uis, panes.uis | Effekte Spiegelung, Leuchten, weiche Kanten, 3D grau; Schatten nur aus/außen ohne Voreinstellungen |
 | AB-06 | Verschieben und Zoomen | P1 | fertig | panes_edit.uis, status_ui_panel.uis (Rahmen ziehen schwenkt), canvas_view.uis (Kante oder Ecke ziehen zoomt) | – |
@@ -696,7 +696,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | AB-08 | Zeichnungsexplorer | P2 | fehlt | – | → JD22 |
 | AB-09 | Ebenen | P2 | teilweise | layers.uis (Dialog) | als Bereich → JD22 |
 | AB-10 | Kommentare | P2 | fehlt | commands_check.uis (COMMENT_NEW zurückgestellt) | → JD20 |
-| AB-11 | Externe Daten | P2 | fehlt | – | → JD18 |
+| AB-11 | Externe Daten | P2 | teilweise | data_import_xlsx.uis, data_import_csv.uis, data_drag_row.uis (Register je Quelle, Kettensymbol, Sortieren, Kontextmenü, Ziehen) | Datengrafikfelder im Menü (JD19); seitliches Scrollen bei vielen Spalten |
 | AB-12 | Datengrafikfelder | P2 | fehlt | – | → JD19 |
 | AB-13 | Probleme | P2 | fehlt | – | → JD24 |
 
@@ -915,9 +915,9 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | ID | Feature | Prio | Stand | Beleg | Fehlt |
 |---|---|---|---|---|---|
 | AS-01 | Organigramm-Assistent | P2 | fehlt | – | → JD28 |
-| AS-03 | Datenauswahl-Assistent | P2 | fehlt | – | → JD18 |
-| AS-04 | Daten verknüpfen | P2 | fehlt | – | → JD18 |
+| AS-03 | Datenauswahl-Assistent | P2 | fertig | data_import_xlsx.uis, data_import_csv.uis (Quelle, Bereich, Spalten und Zeilen, Schlüssel) | – |
+| AS-04 | Daten verknüpfen | P2 | fertig | data_link.uis (Seite oder Auswahl, mehrere Paare, ersetzen, Rückgängig) | – |
 | AS-05 | Berichtsdefinition | P2 | fehlt | – | → JD19 |
 | AS-11 | Shapes nummerieren, Array, Maßlinien | P2 | fehlt | – | → JD21 |
 | AS-17 | Verhalten-Assistent (ohne Formeln) | P2 | fehlt | – | → JD23 |
-| AS-20 | Verbundene Zeichnung aus Text | P2 | fehlt | – | → JD18 |
+| AS-20 | Verbundene Zeichnung aus Text | P2 | fertig | data_text_drawing.uis (Vorschau der Datensätze und Probleme als Tabelle, Trennzeichen und Einheit, Master-Zuordnung aus geöffneten Schablonen und Zeichnung, angezeigte oder neue Seite) | – |
