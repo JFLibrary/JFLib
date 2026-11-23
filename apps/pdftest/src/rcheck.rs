@@ -37,30 +37,30 @@ pub const GROUPS: &[(&str, fn(&mut T))] = &[
 // ------------------------------------------------------------------ files made here
 
 /// objects by number, laid out with a table or with cross-reference streams
-struct Mk {
+pub(crate) struct Mk {
     objs: BTreeMap<u32, Vec<u8>>,
 }
 
-fn cat(parts: &[&[u8]]) -> Vec<u8> {
+pub(crate) fn cat(parts: &[&[u8]]) -> Vec<u8> {
     parts.concat()
 }
 
 /// a stream object's body, uncompressed
-fn stream(dict: &str, data: &[u8]) -> Vec<u8> {
+pub(crate) fn stream(dict: &str, data: &[u8]) -> Vec<u8> {
     cat(&[format!("<< {dict} /Length {} >>\nstream\n", data.len()).as_bytes(), data, b"\nendstream"])
 }
 
 /// a stream object's body, with FlateDecode
-fn flate(dict: &str, data: &[u8]) -> Vec<u8> {
+pub(crate) fn flate(dict: &str, data: &[u8]) -> Vec<u8> {
     stream(&format!("/Filter /FlateDecode {dict}"), &compress::zlib::compress(data, 6))
 }
 
 impl Mk {
-    fn new() -> Mk {
+    pub(crate) fn new() -> Mk {
         Mk { objs: BTreeMap::new() }
     }
 
-    fn add(&mut self, n: u32, body: impl AsRef<[u8]>) -> &mut Mk {
+    pub(crate) fn add(&mut self, n: u32, body: impl AsRef<[u8]>) -> &mut Mk {
         self.objs.insert(n, body.as_ref().to_vec());
         self
     }
@@ -78,7 +78,7 @@ impl Mk {
     }
 
     /// a classic cross-reference table; `trailer` without << >>
-    fn table(&self, trailer: &str) -> Vec<u8> {
+    pub(crate) fn table(&self, trailer: &str) -> Vec<u8> {
         let (mut out, offs) = self.body();
         let max = self.objs.keys().max().copied().unwrap_or(0);
         let x = out.len();
@@ -95,7 +95,7 @@ impl Mk {
 
     /// a cross-reference stream (PDF 1.5); with `objstm` every object that is no stream goes
     /// into one object stream
-    fn xref_stream(&self, trailer: &str, objstm: bool) -> Vec<u8> {
+    pub(crate) fn xref_stream(&self, trailer: &str, objstm: bool) -> Vec<u8> {
         let mut m = Mk { objs: BTreeMap::new() };
         let mut inside: BTreeMap<u32, usize> = BTreeMap::new();
         let max = self.objs.keys().max().copied().unwrap_or(0);
@@ -526,7 +526,7 @@ fn read_filters(t: &mut T) {
 
 // ------------------------------------------------------------------ encryption
 
-const FIX: &[(&str, &[u8], u8, bool)] = &[
+pub(crate) const FIX: &[(&str, &[u8], u8, bool)] = &[
     ("r2_rc4_40", include_bytes!("../tests/read/r2_rc4_40.pdf"), 2, true),
     ("r3_rc4_128", include_bytes!("../tests/read/r3_rc4_128.pdf"), 3, true),
     ("r3_rc4_128_no_user_pw", include_bytes!("../tests/read/r3_rc4_128_no_user_pw.pdf"), 3, false),

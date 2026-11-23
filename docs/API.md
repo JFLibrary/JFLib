@@ -114,8 +114,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
-- [pdf](#pdf) -- PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments)
-  <br>[lib.rs](#pdf-crate-root) · [src/canvas.rs](#pdfsrccanvasrs) · [src/font.rs](#pdfsrcfontrs) · [src/geom.rs](#pdfsrcgeomrs) · [src/image.rs](#pdfsrcimagers) · [src/read/mod.rs](#pdfsrcreadmodrs) · [src/read/content.rs](#pdfsrcreadcontentrs) · [src/read/nav.rs](#pdfsrcreadnavrs) · [src/read/object.rs](#pdfsrcreadobjectrs) · [src/read/text.rs](#pdfsrcreadtextrs) · [src/shading.rs](#pdfsrcshadingrs)
+- [pdf](#pdf) -- PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments, drawing pages)
+  <br>[lib.rs](#pdf-crate-root) · [src/canvas.rs](#pdfsrccanvasrs) · [src/font.rs](#pdfsrcfontrs) · [src/geom.rs](#pdfsrcgeomrs) · [src/image.rs](#pdfsrcimagers) · [src/read/mod.rs](#pdfsrcreadmodrs) · [src/read/content.rs](#pdfsrcreadcontentrs) · [src/read/nav.rs](#pdfsrcreadnavrs) · [src/read/object.rs](#pdfsrcreadobjectrs) · [src/read/render/mod.rs](#pdfsrcreadrendermodrs) · [src/read/render/shade.rs](#pdfsrcreadrendershaders) · [src/read/text.rs](#pdfsrcreadtextrs) · [src/shading.rs](#pdfsrcshadingrs)
 - [diagram_view](#diagram_view) -- draws diagram pages (the display list of diagram_core) on render2d and gfx
   <br>[src/export/mod.rs](#diagram_viewsrcexportmodrs) · [src/export/pdf.rs](#diagram_viewsrcexportpdfrs) · [src/export/raster.rs](#diagram_viewsrcexportrasterrs) · [src/export/svg.rs](#diagram_viewsrcexportsvgrs) · [src/fonts.rs](#diagram_viewsrcfontsrs) · [src/image.rs](#diagram_viewsrcimagers) · [src/measure.rs](#diagram_viewsrcmeasurers) · [src/view.rs](#diagram_viewsrcviewrs)
 - [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
@@ -13760,13 +13760,18 @@ outlines                                                               [src/text
        buffer (OLT_ON / OLT_CUBIC, font units)
   outline_var(table, glyph, coords, ol)   the same at a CFF2 instance's normalized
        coordinates (F2Dot14 per axis, avar applied: var.rs normalize; empty = the default)
+  outline_seac(table, glyph, ol) -> (ok, seac)   outline, and the accent of an endchar with
+       four arguments (adx, ady, bchar, achar: the base and the accent by StandardEncoding
+       code, the accent moved by adx, ady before the FontMatrix), for a caller that has the
+       glyph names (a font of a PDF file: the CFF charset)
+  matrix() -> the FontMatrix scaled to the units of the outline (None: none or 1/upem)
 
 Type 2 operators: all path operators (r/h/v moveto, lineto, rrcurveto, hh/vv/hv/vh curveto,
 rcurveline, rlinecurve, flex, hflex, hflex1, flex1), hint operators (stems are counted for
 hintmask / cntrmask and skipped), callsubr / callgsubr (bias 107 / 1131 / 32768, nesting
-<= 10), return, endchar (a seac accent is ignored), the arithmetic / storage operators
-(abs add sub div neg eq drop put get ifelse random mul sqrt dup exch index roll and or
-not).  Argument stack 48, transient array 32, at most 200000 operators per glyph, at most
+<= 10), return, endchar (a seac accent is not drawn: outline_seac reports it), the
+arithmetic / storage operators (abs add sub div neg eq drop put get ifelse random mul sqrt
+dup exch index roll and or not).  Argument stack 48, transient array 32, at most 200000 operators per glyph, at most
 256 font DICTs, a Private DICT read to at most 64 KiB.  The
 width argument is dropped (advances come from hmtx).  Like the assembly, the transient
 array and the random generator are process-wide.
@@ -13798,6 +13803,11 @@ variation data, a vsindex after a blend is an error.  Advances come from hmtx + 
 - **`fn outline_var(&self, t: Tb, glyph: u32, coords: &[i16], ol: &mut Outline) -> bool`**
   outline at a CFF2 instance's normalized coordinates (empty: the default instance; CFF
   ignores them)
+- **`fn outline_seac(&self, t: Tb, glyph: u32, ol: &mut Outline) -> (bool, Option<[f32; 4]>)`**
+  outline, and the accent of a seac endchar: (adx, ady, bchar, achar)
+- **`fn matrix(&self) -> Option<[f32; 6]>`**
+  the FontMatrix in the units of the outline (applied to it already): None when the font
+  has none or it is 1/unitsPerEm
 
 ### `text/colr.rs`
 
@@ -14935,9 +14945,11 @@ TFF_MACCMAP: u32 = 32
 
 - **`fn open(data: Vec<u8>, face: u32, ol: &mut Outline, serial: u64) -> Result<Box<TtFont>, i32>`**
   ttf_open(data, face): the context, or ERR_\*
-- **`fn glyph(&self, cp: u32) -> u32`**
+- **`fn cff(&self) -> Option<&Cff>`**
   glyph for cp (0 = .notdef).  Symbol fonts ((3,0) cmap) map like GDI: U+0000..U+00FF
   and the Windows-1252 characters to U+F000 + their code page byte  [ttf_glyph]
+  the CFF or CFF2 outlines of an OpenType font (None: TrueType outlines)
+- **`fn glyph(&self, cp: u32) -> u32`**
 - **`fn has(&self, cp: u32) -> bool`**
 - **`fn adv(&self, g: u32) -> i32`**
   advance (hmtx; the last long metric repeats)  [ttf_adv]
@@ -15668,6 +15680,9 @@ JDF_NO_ORIENT: u32 = 2  // keep the stored orientation
 JDF_RGB: u32 = 4  // 3 components are R, G, B (TIFF Photometric 2)
 JDF_YCC: u32 = 8  // 3 components are YCbCr (Photometric 6)
 JDF_CMYK: u32 = 16  // 4 components are plain CMYK (Photometric 5)
+/// 4 components: the samples as stored (C, M, Y, K; a YCCK image's CMY after the YCC step) in the
+/// bytes R, G, B and A instead of RGB, for a caller with its own CMYK conversion (a PDF page)
+JDF_RAW_CMYK: u32 = 32
 PNG_IOM: u32 = IOM_BITDEPTH | IOM_DITHER | IOM_ATHRESH | IOM_EFFORT | IO ...
 JPEG_IOM: u32 = IOM_QUALITY | IOM_CHROMA | IOM_ICC | IOM_EXIF | IOM_XMP
 BMP_IOM: u32 = IOM_BITDEPTH | IOM_DITHER
@@ -17141,7 +17156,7 @@ IMGOPT glue).
 
 ### `img_jpeg` API
 
-Re-exports: `img_core::{JDF_CMYK, JDF_NO_ORIENT, JDF_RGB, JDF_STRAIGHT, JDF_YCC, JPEG_IOM}`
+Re-exports: `img_core::{JDF_CMYK, JDF_NO_ORIENT, JDF_RAW_CMYK, JDF_RGB, JDF_STRAIGHT, JDF_YCC, JPEG_IOM}`
 
 - **`fn decode(data: &[u8]) -> Result<Surface, i32>`**
   jpeg_decode: decode a JPEG file into a new FMT_PARGB surface
@@ -62964,7 +62979,7 @@ callback such as a window procedure: core panics once more there, with one of NO
 
 ## pdf
 
-*PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments)* -- crate root [`lib/pdf/src/lib.rs`](../lib/pdf/src/lib.rs)
+*PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments, drawing pages)* -- crate root [`lib/pdf/src/lib.rs`](../lib/pdf/src/lib.rs)
 
 ```text
 pdf -- a vector PDF writer: pages of their own size drawn on a canvas (paths, fills with the
@@ -62976,7 +62991,8 @@ FlateDecode and their alpha as a soft mask), text in embedded TrueType / OpenTyp
 library's shaping), links to URIs and to places in the document, nested outlines
 (bookmarks), the document information and XMP metadata.  PDF 1.7 with a classic xref table;
 the same document always gives the same bytes.  Not here: PDF/A, encryption, forms.  And a
-reader, pdf::read: structure, encryption, text, outlines, forms, attachments (below).
+reader, pdf::read: structure, encryption, text, outlines, forms, attachments, and drawing pages
+(below).
 
   let mut doc = Document::new();
   let page = doc.add_page(A4.0, A4.1);              // points (1/72 inch); mm(210.0) converts
@@ -63458,8 +63474,8 @@ Source: [`lib/pdf/src/read/mod.rs`](../lib/pdf/src/read/mod.rs)
 
 ```text
 pdf::read -- a PDF reader: the objects of a file, its pages, information, outlines, links and
-other annotations, form fields, attachments, page labels and the text of each page with
-where each glyph stands.  PDF 1.0 to 2.0: classic cross-reference tables and cross-reference
+other annotations, form fields, attachments, page labels, the text of each page with where
+each glyph stands, and the pages drawn as pixels (render/).  PDF 1.0 to 2.0: classic cross-reference tables and cross-reference
 streams, object streams, incremental updates, hybrid files; files whose table is missing or
 wrong are rebuilt from their objects, as the common readers do.  Encrypted files with the
 standard security handler open with their password, or without one when only the owner
@@ -63472,12 +63488,15 @@ password is set (RC4 40 to 128 bit, AES-128, AES-256).
   }
   let info = doc.info();                             // pdf::Info: title, author, dates, ...
   for o in doc.outlines() { .. }                     // bookmarks with their Action
+  let px = doc.render(0, &RenderOptions { dpi: 150.0, ..Default::default() })?;  // gfx::Surface
 
   Document     open / open_with, version, is_encrypted / permissions / opened_as_owner,
                was_repaired, trailer / catalog, get(Ref) / resolve, decode(Stream) /
                decode_until_image, page_count / page / pages / contents, info / metadata /
                language, outlines, named_dest, annotations / links, fields, attachments,
-               page_label, page_text (glyphs with positions) / text
+               page_label, page_text (glyphs with positions) / text, page_pixels / render
+               (RenderOptions: dpi, region, background, annotations, fonts: a FontSource,
+               SystemFonts by default)
   Object       Null, Bool, Int, Real, String, Name, Array, Dict, Stream, Ref; text_string
   Ops          the operators of a content stream with their operands (content::Op)
 
@@ -63487,10 +63506,10 @@ references, page trees, outlines and form XObjects are bounded; every decoded st
 most Options::max_stream bytes.  Permissions are reported, not enforced: what a program
 allows its user to do with the document is its own decision.
 
-Not here: drawing pages (the images, the shading and the glyphs' outlines), the image
-filters (DCT, JPX, JBIG2, CCITTFax: decode_until_image stops before them), the predefined
-CMaps of East Asian fonts other than Identity and the Unicode ones, verifying signatures,
-changing and saving documents.
+Not here: the image filters for decode_until_image (it stops before DCT, JPX, JBIG2 and
+CCITTFax; drawing decodes DCT and CCITTFax), JPX and JBIG2 images at all, the predefined CMaps
+of East Asian fonts other than Identity and the Unicode ones, verifying signatures, changing
+and saving documents.
 ```
 
 - **`struct Options`**
@@ -63807,6 +63826,95 @@ where its data lies in the file; Document::decode gives the data with the filter
 - **`fn text_string(b: &[u8]) -> String`**
   a text string (7.9.2.2) as text: UTF-16BE after FE FF, UTF-16LE after FF FE (seen in the
   wild), UTF-8 after EF BB BF (PDF 2.0), else PDFDocEncoding
+
+### `pdf/src/read/render/mod.rs`
+
+Source: [`lib/pdf/src/read/render/mod.rs`](../lib/pdf/src/read/render/mod.rs)
+
+```text
+Drawing pages (ISO 32000-1, 8 to 11): Document::render gives the page as pixels.  The content
+stream runs through a graphics state (q / Q, cm, the line style, colours in every colour
+space, ExtGState with alpha, blend mode and soft mask), paths are filled with the non-zero or
+even-odd rule and stroked with caps, joins, miter limit and dashes in user space (also under
+a non-uniform matrix), clipping paths and text clipping are masks.  Text through the glyph
+outlines of the embedded fonts (Type 1, CFF, TrueType, OpenType, Type 3) or substitutes
+(FontSource); every text render mode.  Images with every bit depth and colour space, Decode,
+stencil masks, colour-key masks, soft masks, the JPEG filter (through img_jpeg) and
+CCITTFax; shadings of every type (sh and as patterns), tiling patterns coloured and
+uncoloured; form XObjects, transparency groups and soft masks (luminosity and alpha, with
+backdrop and transfer function); the annotations' appearances; optional content (the
+default configuration, membership dictionaries).  Not here: JPXDecode and JBIG2Decode images
+(left out), knockout and non-isolated groups (drawn as isolated ones), overprint, halftones,
+transfer functions outside soft masks.
+
+  let doc = read::Document::open(bytes)?;
+  let page: gfx::Surface = doc.render(0, &RenderOptions { dpi: 150.0, ..Default::default() })?;
+
+Untrusted input: the work of a page is bounded (the operators, the pixels painted, forms,
+patterns, Type 3 glyphs and soft masks inside each other, the pixels of images and layers),
+a page that needs more gives Error::Limit.
+```
+
+- **`struct RenderOptions`**
+  how to draw a page
+  - `dpi: f64` -- pixels per inch: 72 draws a point as a pixel
+  - `region: Option<[u32; 4]>` -- the part of the page image to draw, in pixels: x, y, width, height (None: all of it)
+  - `background: Option<u32>` -- the colour under the page, straight 0xAARRGGBB (None: transparent)
+  - `annotations: bool` -- draw the annotations' appearances (form fields, stamps, comments)
+  - `fonts: Option<Rc<dyn FontSource>>` -- fonts for the fonts a document does not embed (None: the system's, text::fontdb)
+  - `max_pixels: u64` -- the largest image to draw, in pixels
+
+- **`struct FontQuery<'a>`**
+  a font a page uses but does not embed
+  - `name: &'a str` -- its PostScript name without a subset tag (Helvetica-Bold, ArialMT, ...)
+  - `family: Option<&'a str>`
+  - `bold: bool`
+  - `italic: bool`
+  - `serif: bool` -- serifs, a fixed pitch, a symbol font (by the descriptor's flags)
+  - `fixed: bool`
+  - `symbolic: bool`
+  - `text: bool` -- a simple font (one byte per code), not a composite one
+
+- **`trait FontSource`**
+  where substitutes for fonts that are not embedded come from: a TrueType, OpenType or Type 1
+  file and the face in it
+  - `fn find(&self, q: &FontQuery) -> Option<(Vec<u8>, u32)>`
+
+- **`struct SystemFonts`**
+  the system's fonts (text::fontdb), searched once: for the 14 standard fonts their
+  metric-compatible families (URW's Nimbus, Liberation, the Windows fonts), others by name and
+  flags
+
+**`impl SystemFonts`**
+
+- **`fn new() -> SystemFonts`**
+
+**`impl Document`**
+
+- **`fn page_pixels(&self, page: usize, dpi: f64) -> Result<(u32, u32), Error>`**
+  the size of a page drawn at dpi: width and height in pixels (the crop box after /Rotate)
+- **`fn render(&self, page: usize, opt: &RenderOptions) -> Result<gfx::Surface, Error>`**
+  draw a page into a new surface (premultiplied ARGB, gfx::FMT_PARGB)
+
+### `pdf/src/read/render/shade.rs`
+
+Source: [`lib/pdf/src/read/render/shade.rs`](../lib/pdf/src/read/render/shade.rs)
+
+```text
+Shadings and patterns (ISO 32000-1, 8.7): function-based, axial and radial shadings by pixel
+(axial and radial through a table of 1024 colours over their domain, with Extend), the mesh
+shadings (free-form and lattice triangles, Coons and tensor-product patches, the patches
+cut into a grid of triangles fine enough for the device; each vertex, and each patch, begins
+on a byte as Poppler and pdf.js read them) drawn with Gouraud colours and without
+antialiasing between their triangles; sh fills the clip (and the shading's BBox),
+a shading pattern fills a path, with its Background where the shading does not reach.
+Tiling patterns draw one cell at device resolution into a tile (coloured, or uncoloured in
+the colour of the scn) that repeats with the pattern's steps.
+```
+
+**`impl Shading`**
+
+- **`fn parse(doc: &Document, o: &Object, res: &Dict) -> Option<Shading>`**
 
 ### `pdf/src/read/text.rs`
 

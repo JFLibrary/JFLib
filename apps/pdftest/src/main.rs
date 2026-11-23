@@ -3,7 +3,7 @@
 // offsets, objects complete, references resolved, stream lengths, FlateDecode, shadings,
 // functions, soft masks, patterns), and its pages, fonts, images, gradients, hatches, links and
 // outlines are checked against what was drawn; and the reader pdf::read (rcheck.rs: the read_*
-// groups).
+// groups) with its renderer (rdraw.rs: the render_* groups).
 // Console program; exit code 1 when a check fails.
 //
 //   python build_rs.py app pdftest
@@ -13,6 +13,9 @@
 //   build/win/pdftest.exe --read FILE [--password PW]
 //                                            what pdf::read finds in FILE, as JSON
 //                                            (tools/pdf_read_check.py)
+//   build/win/pdftest.exe --render FILE --out PREFIX [--page N] [--dpi D] [--password PW]
+//                                            pages drawn as PREFIX-<page>.ppm
+//                                            (tools/pdf_render_check.py)
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -24,7 +27,9 @@ use alloc::string::String;
 
 mod checks;
 mod rcheck;
+mod rdraw;
 mod rdump;
+mod rrender;
 mod reader;
 mod sample;
 
@@ -69,6 +74,10 @@ impl T {
 }
 
 fn run() -> i32 {
+    if let Some(path) = plat::arg_value("--render") {
+        let out = plat::arg_value("--out").unwrap_or_else(|| String::from("page"));
+        return rrender::render(&path, &out, plat::arg_value("--password"));
+    }
     if let Some(path) = plat::arg_value("--read") {
         return rdump::dump(&path, plat::arg_value("--password"));
     }
@@ -90,7 +99,7 @@ fn run() -> i32 {
     let only = plat::arg_value("--only").map(String::from);
     let mut failed = 0;
     let mut total = 0;
-    for (group, f) in checks::GROUPS.iter().chain(rcheck::GROUPS) {
+    for (group, f) in checks::GROUPS.iter().chain(rcheck::GROUPS).chain(rdraw::GROUPS) {
         if only.as_ref().is_some_and(|o| !group.starts_with(o.as_str())) {
             continue;
         }

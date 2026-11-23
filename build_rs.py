@@ -222,8 +222,8 @@ def run_cmd(cmd, quiet=False, env=None):
 # ---------------------------------------------------------------- crates
 def compute_crate(name):
     """crates whose speed matters in development builds too (opt-level 2; Kritzel draws with its
-    own pixel loops)"""
-    return (name in ("gfx", "text", "simd", "fx", "Kritzel", "crypto", "compress", "cas", "spell", "physics", "geom")
+    own pixel loops, pdf draws pages)"""
+    return (name in ("gfx", "text", "simd", "fx", "Kritzel", "crypto", "compress", "cas", "spell", "physics", "geom", "pdf")
             or name.startswith("img_"))
 
 

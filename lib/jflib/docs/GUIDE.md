@@ -1730,7 +1730,12 @@ ui.dialog_end(); // always
   (the page's text in reading order), `page_text(i)` (every glyph with its position, for search
   and selection), `info`, `outlines`, `links`, `fields` (the form's values), `attachments`
   (embedded files such as the XML of a ZUGFeRD invoice). A damaged file is rebuilt from its
-  objects; a hostile one gives an error, never a panic. Drawing the pages is not there yet.
+  objects; a hostile one gives an error, never a panic. `render(i, &RenderOptions { dpi, region,
+  background, annotations, fonts, .. })` draws a page into a `gfx::Surface` (a viewer asks for
+  the tiles it shows with `region`; `page_pixels(i, dpi)` gives the size): every colour space,
+  embedded fonts and the system's fonts for the others, images, shadings, patterns and
+  transparency, as Poppler's `pdftoppm` draws them. Fonts a document does not embed come from a
+  `FontSource` (by default `SystemFonts`, the installed fonts through `text::fontdb`).
 
 **Logging** (`plat::log`): `plat::log!(plat::LOG_INFO, "net", "{} bytes from {}", n, host)` formats
 only when a sink wants the level; `plat::log_error / log_warn / log_info / log_debug(target, msg)`

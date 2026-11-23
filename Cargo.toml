@@ -284,7 +284,7 @@ codegen-units = 16
 strip = "symbols"
 
 # the crates whose speed matters in development builds too (build_rs.py's compute_crate): pixels and
-# codecs stay fast in the tests, Kritzel draws with its own pixel loops, physicstest's references run
+# codecs stay fast in the tests (pdf draws pages), Kritzel draws with its own pixel loops, physicstest's references run
 # hundreds of thousands of queries, modeltool's checks build meshes of a few 100 000 triangles
 [profile.dev.package.jflib-gfx]
 opt-level = 2
@@ -311,6 +311,9 @@ opt-level = 2
 opt-level = 2
 
 [profile.dev.package.jflib-img-core]
+opt-level = 2
+
+[profile.dev.package.jflib-pdf]
 opt-level = 2
 
 [profile.dev.package.jflib-img-png]
