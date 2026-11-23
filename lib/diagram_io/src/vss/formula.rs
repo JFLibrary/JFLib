@@ -3,7 +3,7 @@
 // A formula block holds tokens in postfix order, ended by 0xFE:
 //   0x20..0x5F  a number: the token is its unit code (0x20 none, 0x21 percent, 0x46 mm ...),
 //               a double follows (in internal units)
-//   0x60        a string: a byte n, n UTF-16 units, a NUL unit
+//   0x60        a string: a byte n, n UTF-16 units, a NUL unit; 0x69 the same with a u32 n
 //   0x61        TRUE or FALSE; 0x62 an integer of two bytes (0x63: four bytes)
 //   0x75        a cell of the shape's own single-row sections: a byte, the cell's number in the
 //               shape's cell table (object_cell), two bytes, 0x60
@@ -74,6 +74,9 @@ pub(super) fn object_cell(n: u8) -> Option<&'static str> {
         11 => "BeginY",
         12 => "EndX",
         13 => "EndY",
+        14 => "LineWeight",
+        15 => "LineColor",
+        17 => "FillForegnd",
         31 => "TxtWidth",
         32 => "TxtHeight",
         52 => "LeftMargin",
@@ -83,6 +86,7 @@ pub(super) fn object_cell(n: u8) -> Option<&'static str> {
         77 => "EventDblClick",
         78 => "EventXFMod",
         79 => "EventDrop",
+        92 => "HideText",
         102 => "BegTrigger",
         103 => "EndTrigger",
         _ => return None,
@@ -95,6 +99,7 @@ pub(super) fn function(id: u16) -> Option<(&'static str, usize)> {
         0x09 => ("MAX", 2),
         0x0A => ("MIN", 2),
         0x0F => ("ABS", 1),
+        0x10 => ("POW", 2),
         0x11 => ("SQRT", 1),
         0x12 => ("ATAN2", 2),
         0x1F => ("NOT", 1),
@@ -131,8 +136,11 @@ pub(super) fn function(id: u16) -> Option<(&'static str, usize)> {
         0x7F => ("LOOKUP", 2),
         0x80 => ("INDEX", 2),
         0x82 => ("DOCMD", 1),
+        0x83 => ("RGB", 3),
         0xC1 => ("MASTERNAME", 0),
         0xC2 => ("FIELDPICTURE", 1),
+        0xC3 => ("STRSAME", 2),
+        0xC5 => ("SHAPETEXT", 1),
         0xD3 => ("BOUND", 5),
         0xDB => ("THEME", 1),
         0xE3 => ("THEMEGUARD", 1),
@@ -259,10 +267,11 @@ pub(super) fn decode(t: &[u8], cx: &Ctx) -> Option<String> {
                 i += 8;
                 st.push(number(c, v)?);
             }
-            0x60 => {
-                let n = *t.get(i)? as usize;
-                let b = t.get(i + 1..i + 1 + 2 * n)?;
-                i += 1 + 2 * n + 2;
+            0x60 | 0x69 => {
+                let (n, w) = if c == 0x60 { (*t.get(i)? as usize, 1) } else { (u32at(t, i)? as usize, 4) };
+                let end = n.checked_mul(2).and_then(|b| b.checked_add(i + w))?;
+                let b = t.get(i + w..end)?;
+                i = end + 2;
                 let units: Vec<u16> = b.chunks_exact(2).map(|x| u16::from_le_bytes([x[0], x[1]])).collect();
                 let s = String::from_utf16_lossy(&units);
                 st.push(format!("\"{}\"", s.replace('"', "\"\"")));
@@ -353,10 +362,14 @@ pub(super) fn decode(t: &[u8], cx: &Ctx) -> Option<String> {
 }
 
 /// whether a formula is a single literal (a number with or without unit, a string, TRUE or
-/// FALSE): Visio writes such a cell as its value alone
+/// FALSE, a colour RGB(r,g,b) of numbers): Visio writes such a cell as its value alone
 pub(super) fn is_literal(f: &str) -> bool {
     if f == "TRUE" || f == "FALSE" {
         return true;
+    }
+    if let Some(args) = f.strip_prefix("RGB(").and_then(|x| x.strip_suffix(')')) {
+        let parts: Vec<&str> = args.split(',').collect();
+        return parts.len() == 3 && parts.iter().all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()));
     }
     if let Some(inner) = f.strip_prefix('"').and_then(|x| x.strip_suffix('"')) {
         return !inner.replace("\"\"", "").contains('"');
