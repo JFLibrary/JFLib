@@ -7,8 +7,9 @@
 //                       a .vsdx, .vsdm, .vstx, .vstm, .vssx or .vssm file into a Document:
 //                       styles, the document sheet, colours and fonts, pages with shapes and
 //                       connects, masters, themes (raw), windows.xml, properties, media,
-//                       comments and data recordsets (kept as parts); unknown items in the
-//                       Extras where they stood (DF-03); nothing recomputed or rerouted
+//                       comments (kept as parts), data connections and recordsets (JD18:
+//                       doc.data, data.rs); unknown items in the Extras where they stood
+//                       (DF-03); nothing recomputed or rerouted
 //   vsdx::write(&doc, &vsdx::WriteOptions::DEFAULT) -> Result<Vec<u8>, vsdx::WriteError>
 //                       the model as a file of any of the six formats, with everything it does
 //                       not know where it stood; deterministic, DEFLATE; a file read and written
@@ -38,6 +39,9 @@
 //   windows::drawing_window(&doc) / set_drawing_window(&mut doc, &w)
 //                       (JD16) the drawing window of windows.xml: page, zoom, centre, what is
 //                       shown; vsdx::remove_macros takes a macro project out
+//   data::ado(&recordset) -> String
+//                       (JD18) a recordset's rows as an ADO persisted recordset (the recordset
+//                       parts of a .vsdx; Visio's DataAsXML format)
 //
 // What is to come here, by stage of the plan:
 //   JD17  importing the binary .vss
@@ -52,6 +56,7 @@
 extern crate alloc;
 
 mod blank;
+pub mod data;
 mod pack;
 pub mod props;
 mod read;

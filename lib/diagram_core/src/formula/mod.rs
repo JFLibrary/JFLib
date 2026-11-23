@@ -45,6 +45,7 @@ pub use eval::Keep;
 pub use parse::{cell_part, parse, unit_code, BinOp, CellPart, CellRef, Func, ParseError, ParseErrorKind, Parsed, SheetName};
 pub use theme::Theme;
 pub use val::{close, Axis, Stored, Target, Val};
+pub(crate) use val::fmt_num;
 pub use xml::{Elem, Tree};
 
 #[cfg(test)]

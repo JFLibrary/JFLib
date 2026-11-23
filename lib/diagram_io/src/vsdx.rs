@@ -20,9 +20,11 @@
 //   themes         every part a theme relationship names, raw (doc.themes); a page part's own
 //                  theme relationship sets Page::theme (Visio files pick a page's theme by its
 //                  ThemeIndex cell: JD4 reads that)
+//   data           (JD18) connections.xml, recordsets.xml and the recordset parts: doc.data
+//                  (data.rs; kept as parts when not understood)
 //   everything else  windows.xml, docProps (core, app, custom), the thumbnail, media, comments,
-//                  data connections and recordsets, validation, solutions, the macro project,
-//                  unknown parts: doc.parts as bytes, in package order
+//                  validation, solutions, the macro project, unknown parts: doc.parts as
+//                  bytes, in package order
 //   relationships  every one as read in doc.rels (also the external ones, never followed)
 // Unknown attributes, elements and text go into the Extras of the element they stood in
 // (diagram_core's sheet.rs says how).  Nothing is computed on opening: values stay the cached
@@ -410,7 +412,11 @@ pub fn remove_macros(doc: &mut Document) -> bool {
 /// always gives the same bytes, and a document read from a file and written unchanged reads
 /// back as the same model
 pub fn write(doc: &Document, options: &WriteOptions) -> Result<Vec<u8>, WriteError> {
-    crate::pack::write(doc, options)
+    // (JD18) doc.data goes back as parts: a copy of the document carries them
+    match crate::data::with_parts(doc) {
+        Some(d) => crate::pack::write(&d, options),
+        None => crate::pack::write(doc, options),
+    }
 }
 
 // ---- relationship types and content types ([MS-VSDX] 2.1)
@@ -499,6 +505,8 @@ pub fn read(bytes: &[u8], limits: &Limits) -> Result<Loaded, Error> {
     ld.masters(&main)?;
     ld.pages(&main)?;
     ld.parts();
+    // (JD18) the data parts become doc.data (they stay parts when not understood)
+    crate::data::load(&mut ld.doc, limits);
     ld.check()?;
     Ok(Loaded { doc: ld.doc, format, warnings: ld.warnings, more_warnings: ld.more })
 }
