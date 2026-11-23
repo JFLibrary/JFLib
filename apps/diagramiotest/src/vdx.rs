@@ -110,6 +110,60 @@ pub fn run(h: &mut H) {
     hostile(h);
     macros(h);
     props_checks(h);
+    window_checks(h);
+}
+
+// ---- the drawing window (DF-10)
+
+fn window_checks(h: &mut H) {
+    use diagram_io::template::{set_stencil_windows, stencil_windows, StencilWindow};
+    use diagram_io::windows::{drawing_window, set_drawing_window, DrawingWindow};
+    // a new drawing: its windows part has no drawing window yet
+    let mut doc = vsdx::new_document(DocKind::Drawing, vsdx::Measure::Metric);
+    h.check("vdx/window/new", drawing_window(&doc).is_none(), String::from("none"));
+    let w = DrawingWindow {
+        page: Some(0),
+        view_scale: Some(1.5),
+        center: Some((4.25, 3.5)),
+        show_rulers: Some(true),
+        show_grid: Some(false),
+        show_page_breaks: Some(false),
+        show_guides: Some(true),
+        show_connection_points: None,
+    };
+    set_drawing_window(&mut doc, &w);
+    set_stencil_windows(&mut doc, &[StencilWindow { document: String::from("jfd_basic_m.vssx"), active: true }]);
+    // the stencil windows stay when the drawing window changes, and the other way round
+    let mut w2 = w.clone();
+    w2.view_scale = Some(0.75);
+    set_drawing_window(&mut doc, &w2);
+    let bytes = vsdx::write(&doc, &WriteOptions::DEFAULT).ok();
+    let back = bytes.as_ref().and_then(|b| vsdx::read(b, &Limits::VSDX).ok());
+    let got = back.as_ref().and_then(|l| drawing_window(&l.doc));
+    let st = back.as_ref().map(|l| stencil_windows(&l.doc)).unwrap_or_default();
+    h.check(
+        "vdx/window/set",
+        got.as_ref() == Some(&w2) && st.len() == 1 && st[0].document == "jfd_basic_m.vssx" && back.as_ref().is_some_and(|l| l.warnings.is_empty()),
+        format!("{got:?}, {} stencils", st.len()),
+    );
+    // a foreign window part: its other windows and their children stay as written
+    let text = sample::drawing();
+    if let Ok(l) = read(&text, DocKind::Drawing) {
+        let mut doc = l.doc;
+        let mut w3 = drawing_window(&doc).unwrap_or_default();
+        w3.page = Some(1);
+        set_drawing_window(&mut doc, &w3);
+        let part = doc.parts.iter().find(|p| doc.str(p.content_type) == "application/vnd.ms-vsdx.windows+xml" || doc.str(p.name) == "/visio/windows.xml").map(|p| String::from_utf8_lossy(&p.data).into_owned()).unwrap_or_default();
+        h.check(
+            "vdx/window/foreign",
+            drawing_window(&doc).and_then(|x| x.page) == Some(1)
+                && part.contains("WindowLeft='-8'")
+                && part.contains("<TabSplitterPos>0.5</TabSplitterPos>")
+                && part.contains("Document='jd16-schablone.vsx'")
+                && stencil_windows(&doc).len() == 1,
+            part.chars().take(300).collect(),
+        );
+    }
 }
 
 // ---- the drawing
@@ -334,8 +388,7 @@ fn round_trip(h: &mut H, name: &str, doc: &Document, format: Format) -> Option<V
     let (a, mut b) = (content(doc), content(&back.doc));
     // the writer gives a document without windows part one of its own (desktop Visio wants it)
     if !a.contains("part \"/visio/windows.xml\"") {
-        b = b.lines().filter(|l| !l.starts_with("part \"/visio/windows.xml\"")).map(|l| format!("{l}
-")).collect();
+        b = b.lines().filter(|l| !l.starts_with("part \"/visio/windows.xml\"")).map(|l| format!("{l}\n")).collect();
     }
     if a != b {
         if let Some(dir) = plat::arg_value("--dump-dir") {
