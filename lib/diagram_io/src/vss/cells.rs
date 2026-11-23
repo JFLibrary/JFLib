@@ -652,9 +652,6 @@ fn text(bin: &mut Bin, o: &Obj, s: &[u8], ctx: &Ctx) -> R<()> {
     let Some(t) = o.kids.iter().find(|k| k.c.ty == C_TEXT) else { return Ok(()) };
     let d = t.c.data(s);
     let units: Vec<u16> = d.get(8..).unwrap_or(&[]).chunks_exact(2).map(|x| u16::from_le_bytes([x[0], x[1]])).take_while(|&u| u != 0).collect();
-    if units.is_empty() {
-        return bin.out.raw("<Text/>");
-    }
     // the fields' values (a Field row's Value: a typed number holding a string index), in order:
     // each U+FFFC of the text stands for the next one
     let mut fields: Vec<String> = Vec::new();
@@ -683,6 +680,20 @@ fn text(bin: &mut Bin, o: &Obj, s: &[u8], ctx: &Ctx) -> R<()> {
     };
     let cps = runs(L_CHAR);
     let pps = runs(L_PARA);
+    let tps = runs(L_TABS);
+    if units.is_empty() {
+        // an empty text keeps the marks of its first runs (Visio writes <Text><cp IX='0'/></Text>)
+        if cps.is_empty() && pps.is_empty() && tps.is_empty() {
+            return bin.out.raw("<Text/>");
+        }
+        bin.out.raw("<Text>")?;
+        for (list, tag) in [(&cps, "cp"), (&pps, "pp"), (&tps, "tp")] {
+            if !list.is_empty() {
+                bin.out.raw(&format!("<{tag} IX='0'/>"))?;
+            }
+        }
+        return bin.out.raw("</Text>");
+    }
     bin.out.raw("<Text>")?;
     let mut buf: Vec<u16> = Vec::new();
     let flush = |bin: &mut Bin, buf: &mut Vec<u16>| -> R<()> {
@@ -696,13 +707,13 @@ fn text(bin: &mut Bin, o: &Obj, s: &[u8], ctx: &Ctx) -> R<()> {
     for (i, &u) in units.iter().enumerate() {
         let cp = cps.iter().position(|&p| p == i);
         let pp = pps.iter().position(|&p| p == i);
-        if cp.is_some() || pp.is_some() {
+        let tp = tps.iter().position(|&p| p == i);
+        if cp.is_some() || pp.is_some() || tp.is_some() {
             flush(bin, &mut buf)?;
-            if let Some(k) = cp {
-                bin.out.raw(&format!("<cp IX='{k}'/>"))?;
-            }
-            if let Some(k) = pp {
-                bin.out.raw(&format!("<pp IX='{k}'/>"))?;
+            for (m, tag) in [(cp, "cp"), (pp, "pp"), (tp, "tp")] {
+                if let Some(k) = m {
+                    bin.out.raw(&format!("<{tag} IX='{k}'/>"))?;
+                }
             }
         }
         if u == 0xFFFC {
