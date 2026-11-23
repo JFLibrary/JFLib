@@ -42,6 +42,10 @@
 //   data::ado(&recordset) -> String
 //                       (JD18) a recordset's rows as an ADO persisted recordset (the recordset
 //                       parts of a .vsdx; Visio's DataAsXML format)
+//   textdraw::parse(text, &opts, &limits) / textdraw::apply(tx, eng, page, &plan, &masters, &b)
+//                       (JD18, IM-08) a connected drawing from a text file: Shape and Link
+//                       records (Visio's text import) into a plan with problems per line, then
+//                       shapes, shape data and glued dynamic connectors, laid out in layers
 //
 // What is to come here, by stage of the plan:
 //   JD17  importing the binary .vss
@@ -66,6 +70,7 @@ mod stencil_src;
 mod stencil_svg;
 pub mod template;
 mod template_src;
+pub mod textdraw;
 pub mod vdx;
 pub mod vsdx;
 pub mod windows;
