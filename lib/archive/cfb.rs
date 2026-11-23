@@ -194,7 +194,13 @@ impl<'a> File<'a> {
         if count == 0 {
             return Err(Error::Invalid);
         }
-        let mut entries = Vec::new();
+        // every slot is kept (indices stay the file's), so their number is bounded too: a
+        // directory of unused slots must not cost more than a full one
+        if count > limits.entries.saturating_mul(16).max(64) {
+            return Err(Error::Limit);
+        }
+        let mut entries = Vec::with_capacity(count);
+        let mut used = 0usize;
         for i in 0..count {
             let e = &dir[i * 128..(i + 1) * 128];
             let kind = match e[66] {
@@ -212,9 +218,10 @@ impl<'a> File<'a> {
             if i == 0 && kind != Kind::Root {
                 return Err(Error::Invalid);
             }
-            if entries.iter().flatten().count() >= limits.entries {
+            if used >= limits.entries {
                 return Err(Error::Limit);
             }
+            used += 1;
             let nlen = u16at(e, 64)? as usize;
             if nlen < 2 || nlen > 64 || nlen % 2 != 0 {
                 return Err(Error::Invalid);

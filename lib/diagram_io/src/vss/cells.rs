@@ -719,9 +719,15 @@ fn text(bin: &mut Bin, o: &Obj, s: &[u8], ctx: &Ctx) -> R<()> {
         if u == 0xFFFC {
             flush(bin, &mut buf)?;
             let k = cps_fields(&units[..i]);
-            bin.out.raw(&format!("<fld IX='{k}'>"))?;
-            bin.out.text(fields.get(k).map_or("", String::as_str))?;
-            bin.out.raw("</fld>")?;
+            match fields.get(k).filter(|v| !v.is_empty()) {
+                Some(v) => {
+                    bin.out.raw(&format!("<fld IX='{k}'>"))?;
+                    bin.out.text(v)?;
+                    bin.out.raw("</fld>")?;
+                }
+                // a field without a value is the mark alone (as VSDX reads it back)
+                None => bin.out.raw(&format!("<fld IX='{k}'/>"))?,
+            }
             continue;
         }
         buf.push(u);
