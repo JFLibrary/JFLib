@@ -49,6 +49,9 @@
 //   src/templates.rs  (JD13) the templates: built-in (build.rs builds them from templates/ into
 //                     .vstx), the own ones, a new drawing from one, Speichern als Vorlage
 //   src/templates_ui.rs  (JD13) Datei › Neu: the catalogue with rendered previews
+//   src/doc_file.rs   (JD16) Visio's XML formats of 2003-2010 (.vdx, .vsx, .vtx) opened, the
+//                     question before a macro project is left out, Datei › Info's properties,
+//                     the window state (page, zoom, stencils) read and written for own files
 //   src/cmds_arrange.rs  (JD8 rest) Automatisch ausrichten
 //   src/cmds_later.rs    (JD8 rest) the commands left for later with their reasons, the check
 //   src/cmds_myshapes.rs (JD8 rest) Zu meinen Shapes hinzufügen (shapes of the page into Favoriten)
@@ -72,6 +75,10 @@
 //   src/dlg_field.rs  (JD8 rest) the dialog Feld (fields in the text, TX-06)
 //   src/dlg_link.rs   (JD8 rest) the dialog Hyperlinks, following links, the link pointer
 //   src/dlg_find.rs   (JD8 rest) the dialog Suchen und Ersetzen
+//   src/ask_save.rs   (JD15) Speichern-Rückfrage before Schließen, Neu, Öffnen and the window's
+//                     close (UI-12); Öffnen schreibgeschützt and als Kopie (DM-09, UI-06, UI-05)
+//   src/dlg_shape_name.rs  (JD15) the dialog Shape-Name (SP-01)
+//   src/dlg_snap.rs   (JD15) the dialog Ausrichten und Kleben
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too); templates/ (JD13) the
@@ -110,7 +117,10 @@
 
 extern crate alloc;
 
+// (JD15) the question before changes are lost, the ways a file opens
+mod ask_save;
 mod backstage;
+mod cmds_actions;
 mod cmds_arrange;
 mod cmds_later;
 mod cmds_myshapes;
@@ -125,7 +135,12 @@ mod design_store;
 mod dlg_field;
 mod dlg_find;
 mod dlg_link;
+// (JD15) Shape-Name (SP-01)
+mod dlg_shape_name;
+// (JD15) Ausrichten und Kleben (RA-07)
+mod dlg_snap;
 mod dlg_text;
+mod doc_file;
 mod edit_canvas;
 mod edit_cmds;
 mod edit_doc;
@@ -213,7 +228,7 @@ pub(crate) struct Diagrammer {
     pub preview: u8,
     /// the ribbon icons' hook (set in init)
     icons: Option<icons::Icons>,
-    /// (JD4) the drawing shown, read-only (None: the empty drawing)
+    /// (JD4) the drawing shown, editable since JD7 (None: no drawing, after Datei › Schließen)
     pub opened: Option<viewer::Opened>,
     /// a file that could not be opened: title and message of the notice
     pub error: Option<(alloc::string::String, alloc::string::String)>,
@@ -282,6 +297,18 @@ pub(crate) struct Diagrammer {
     pub select: select_type::SelectState,
     /// (JD8 rest) the text, field, link and search commands (cmds_text.rs)
     pub txt: cmds_text::TextCmds,
+    /// (JD16) the older XML formats, macros, properties, window state (doc_file.rs)
+    pub docfile: doc_file::DocFile,
+    /// (JD15) the question before changes are lost; how Öffnen opens a file
+    pub ask: ask_save::AskSave,
+    pub shape_name: dlg_shape_name::NameDialog,
+    /// (JD15) Ausrichten und Kleben: snapping to the grid (Ausrichten an › Raster), the dialog
+    pub snap_grid: bool,
+    pub snap_dlg: dlg_snap::SnapDialog,
+    /// (JD15, ZF-08) the view of each page of the drawing (serial, page: zoom, middle), the page
+    /// the canvas showed last
+    pub page_views: alloc::vec::Vec<(u32, diagram_core::PageRef, f32, f64, f64)>,
+    pub view_page: Option<(u32, diagram_core::PageRef)>,
 }
 
 impl Diagrammer {
@@ -344,6 +371,13 @@ impl Diagrammer {
             layers: layers::LayerState::default(),
             select: select_type::SelectState::default(),
             txt: cmds_text::TextCmds::default(),
+            docfile: doc_file::DocFile::default(),
+            ask: ask_save::AskSave::default(),
+            shape_name: dlg_shape_name::NameDialog::default(),
+            snap_grid: true,
+            snap_dlg: dlg_snap::SnapDialog::default(),
+            page_views: alloc::vec::Vec::new(),
+            view_page: None,
         }
     }
 
@@ -394,6 +428,8 @@ impl Diagrammer {
         self.template = None;
         // (JD13) the own templates are read again
         self.catalog.own_read = false;
+        // (JD15, LG-07) Neu offers the region's units first
+        self.units_us = (stencils::measure(self) == diagram_io::vsdx::Measure::Us) as i32;
         ui.keytips_off();
         ui.repass();
     }
@@ -457,8 +493,14 @@ impl App for Diagrammer {
             None => false,
         };
         if !opened && self.preview == ribbon::SEL_NONE {
-            edit_doc::new_drawing(self, ui, false);
+            // (JD15, DF-15) a file that could not be opened keeps its notice over the new drawing
+            let error = self.error.take();
+            // (JD15, LG-07) in the region's units
+            let us = stencils::measure(self) == diagram_io::vsdx::Measure::Us;
+            edit_doc::new_drawing(self, ui, us);
+            self.error = error;
         }
+        self.units_us = (stencils::measure(self) == diagram_io::vsdx::Measure::Us) as i32;
         // (JD8 rest) --check-commands: which commands still lack a function (cmds_later.rs)
         if plat::args().iter().any(|a| a == "--check-commands") {
             self.error = Some((alloc::format!("Befehlsprüfung: {}", cmds_later::report_text()), alloc::string::String::new()));
@@ -478,6 +520,9 @@ impl App for Diagrammer {
         // (JD8 rest) what the system's clipboard offers (Einfügen, Inhalte einfügen)
         cmds_paste::poll(self, ui);
         commands::states(self, ui);
+        // (JD15) the lane commands show in a lane's menu only (ST-05); QuickInfos off (UI-13)
+        structures_cff::menu_states(self, ui);
+        ui.tooltips_set(self.opts.get(&options::TIPS) != 2);
         stencils_panel::states(self, ui);
         shell::frame(self, ui);
         design_gallery::after(self, ui);
@@ -497,9 +542,27 @@ impl App for Diagrammer {
         layers::props_dialog(self, ui);
         select_type::dialog(self, ui);
         cmds_text::frame(self, ui);
+        // (JD16) the question about macros, the file's zoom after the fit
+        doc_file::dialog(self, ui);
+        doc_file::frame(self, ui);
+        // (JD15) Speichern-Rückfrage (UI-12), Shape-Name (SP-01)
+        ask_save::dialog(self, ui);
+        dlg_shape_name::dialog(self, ui);
+        // (JD15) Ausrichten und Kleben
+        dlg_snap::dialog(self, ui);
+        // (JD15, SP-12) the rows of the selected shape's Actions section for its menu
+        cmds_actions::frame(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
+        // (JD15, SP-12) a row of the shape's Actions section
+        if cmds_actions::command(self, ui, id) {
+            return true;
+        }
+        // (JD15, UI-12) Schließen and the window's close ask first when there are changes
+        if ask_save::command(self, ui, id) {
+            return true;
+        }
         cmds_text::command(self, ui, id) || stencils::command(self, ui, id) || commands::run(self, ui, id)
     }
 }

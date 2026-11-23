@@ -33,6 +33,8 @@
 //                                         every master for the Visio counter-check
 //   diagramiotest --write-templates DIR  (JD13) every form of JFDiagrammer's templates as .vstx,
 //                                         metric and US (templates.rs)
+//   diagramiotest --write-vdx DIR        (JD16) the self-written .vdx / .vsx files and the .vsdx /
+//                                         .vssx JFDiagrammer writes from them (vdx.rs)
 //
 // Groups:
 //   samples   self-built files of all six formats: what lands where in the model (fields,
@@ -72,6 +74,9 @@
 //   templates (JD13, templates.rs) JFDiagrammer's templates built from their sources in both
 //             measures: round trip, stencil windows, JFD_ cells, pages, the rule set, the
 //             starters (cross-functional flowcharts, connectors, tips), to_drawing
+//   vdx       (JD16, vdx.rs) the XML formats of 2003-2010: the self-written drawing, stencil and
+//             bitmap read into the model and written as .vsdx / .vssx, hostile files and
+//             limits; macro projects passed through unchanged; document properties
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -114,6 +119,8 @@ mod structures;
 mod svgdump;
 mod symbol_sheet;
 mod templates;
+mod vdx;
+mod vdx_sample;
 mod zipkit;
 
 /// a refusal must come within this many microseconds
@@ -218,6 +225,10 @@ fn run() -> i32 {
     if let Some(dir) = arg(&args, "--write-templates") {
         return templates::write(&dir);
     }
+    if let Some(dir) = arg(&args, "--write-vdx") {
+        // (JD16) the self-written .vdx / .vsx and what JFDiagrammer writes from them
+        return vdx::write(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-probe") {
         return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
     }
@@ -268,6 +279,10 @@ fn run() -> i32 {
         }
         if h.on("templates") {
             templates::run(&mut h);
+        }
+        // (JD16) the XML formats of 2003-2010, the macro parts, the document properties
+        if h.on("vdx") {
+            vdx::run(&mut h);
         }
     }
     if h.on("corpus") {

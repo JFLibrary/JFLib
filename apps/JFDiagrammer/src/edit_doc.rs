@@ -13,6 +13,15 @@
 //   new_drawing(app, ui)         "Zeichnung1", "Zeichnung2" ... (a counter per run, DM-01)
 //   save(app, ui, as_new)        Speichern: to the file it came from (in its format), else and
 //                                for Speichern unter the file dialog; save_to(app, ui, path)
+//   save_in(app, ui, dir, ext)   (JD15) Speichern unter's dialog in a folder (the folders used
+//                                last, UI-08) with a file type (Dateityp ändern, UI-11)
+//
+// (JD15) A drawing opened read-only (DM-09, EditState::read_only) is edited like any other, but
+// Speichern asks for another file; its own file is never written.  A new drawing's Speichern
+// unter starts in the option Standardspeicherort für Zeichnungen (UI-15).  The history keeps
+// the option Anzahl der Rückgängig-Schritte (UI-18; a change applies to the next drawing).  A
+// drawing opens on its TopPage and is saved with the page shown as its TopPage (DM-04).  After
+// writing, an action that waited for the save goes on (ask_save.rs, UI-12).
 //
 // The flow of a gesture (jd6-formeln.md): cells through Engine::user_set (GUARD, SETATREF) and
 // recalc_cells inside the transaction, so undo takes the results back with the change; after
@@ -77,6 +86,8 @@ pub(crate) struct EditState {
     /// (JD8 rest: pages) pages the last gesture grew or shrank (Automatisch anpassen) and how far
     /// their drawing moved in world units (pages::sync moves the view along)
     pub grown: Vec<(diagram_core::PageRef, [f32; 2])>,
+    /// (JD15, DM-09) opened read-only: Speichern goes to Speichern unter, the file stays
+    pub read_only: bool,
 }
 
 impl EditState {
@@ -95,6 +106,7 @@ impl EditState {
             rebuild: false,
             theme_new_shapes: true,
             grown: Vec::new(),
+            read_only: false,
         }
     }
 
@@ -236,12 +248,16 @@ pub(crate) fn install(app: &mut Diagrammer, ui: &mut Ui, doc: Document, name: St
     let tabs = crate::pages::tabs_of(&doc);
     let serial = app.opened.as_ref().map_or(1, |o| o.serial.wrapping_add(1));
     let metrics = Some(crate::viewer::metrics(app));
-    let ed = EditState::new(path, format, metrics);
+    let mut ed = EditState::new(path, format, metrics);
+    // (JD15, UI-18) Datei › Optionen › Erweitert › Anzahl der Rückgängig-Schritte
+    ed.history = History::new(app.opts.get(&crate::options::UNDO_LEVELS).clamp(1, 99) as usize);
+    // (JD15, DM-04) the page the file names as its TopPage first
+    let top = doc.settings.top_page.and_then(|id| tabs.iter().position(|t| doc.page(t.page).is_some_and(|p| p.header.id == id))).unwrap_or(0);
     let n = tabs.len();
     app.opened = Some(Opened::new(doc, name, tabs, notice, serial, ed));
     let _ = n;
     app.error = None;
-    app.page_tab = 0;
+    app.page_tab = top as i32;
     app.backstage = None;
     app.se = SeState::new();
     // (JD10) the drawing's own switch for the Verbindungspfeile
@@ -254,28 +270,44 @@ pub(crate) fn install(app: &mut Diagrammer, ui: &mut Ui, doc: Document, name: St
 /// Speichern (as_new = false) / Speichern unter: to the drawing's file, else ask for one
 pub(crate) fn save(app: &mut Diagrammer, ui: &mut Ui, as_new: bool) {
     let Some(o) = app.opened.as_ref() else { return };
-    match (&o.ed.path, as_new) {
-        (Some(p), false) => {
+    // (JD15, DM-09) a drawing opened read-only goes to another file; (JD16) a file of the XML
+    // format of 2003-2010 is never written back: a new name
+    match (&o.ed.path, as_new || o.ed.read_only) {
+        (Some(p), false) if !crate::doc_file::is_xml(p) => {
             let p = p.clone();
             save_to(app, ui, &p);
         }
-        _ => {
-            let stem = o.name.clone();
-            let ext = o.ed.format.extension();
-            // the folder of the file it came from, else --save-dir (a test aid), else the
-            // dialog's own start
-            let dir = match &o.ed.path {
-                Some(p) => p.rsplit_once(['/', '\\']).map(|x| String::from(x.0)),
-                None => plat::arg_value("--save-dir").map(|d| if d.starts_with('/') || d.get(1..2) == Some(":") { d } else { format!("{}/{}", plat::cwd(), d) }),
-            };
-            app.save_path = match dir {
-                Some(d) => format!("{d}/{stem}.{ext}"),
-                None => format!("{stem}.{ext}"),
-            };
-            app.save_dlg.set(1);
-            ui.repass();
-        }
+        _ => save_in(app, ui, None, None),
     }
+}
+
+/// (JD15) Speichern unter's dialog in folder `dir` (None: --save-dir, else the folder of the
+/// drawing's file; a new drawing: the option Standardspeicherort für Zeichnungen, else --save-dir,
+/// else the dialog's own start)
+/// with extension `ext` (None: the drawing's format)
+pub(crate) fn save_in(app: &mut Diagrammer, ui: &mut Ui, dir: Option<&str>, ext: Option<&str>) {
+    let Some(o) = app.opened.as_ref() else { return };
+    let stem = o.name.clone();
+    let ext = String::from(ext.unwrap_or(o.ed.format.extension()));
+    let absolute = |d: String| if d.starts_with('/') || d.get(1..2) == Some(":") || d.contains("://") { d } else { format!("{}/{}", plat::cwd(), d) };
+    let drawings = String::from(app.opts.get(&crate::options::DRAWINGS).trim());
+    let dir = match (dir, &o.ed.path) {
+        (Some(d), _) => Some(String::from(d)),
+        // (JD16) --save-dir (a test aid) wins when given: the files a test opens from its own folder
+        // stay as they are
+        (None, Some(_)) if plat::arg_value("--save-dir").is_some() => plat::arg_value("--save-dir").map(absolute),
+        (None, Some(p)) => p.rsplit_once(['/', '\\']).map(|x| String::from(x.0)),
+        // (UI-15) the option, else --save-dir (a test aid)
+        (None, None) if !drawings.is_empty() => Some(absolute(drawings)),
+        (None, None) => plat::arg_value("--save-dir").map(absolute),
+    };
+    app.save_path = match dir {
+        Some(d) => format!("{}/{stem}.{ext}", d.trim_end_matches(['/', '\\'])),
+        None => format!("{stem}.{ext}"),
+    };
+    app.backstage = None;
+    app.save_dlg.set(1);
+    ui.repass();
 }
 
 /// write the drawing to `path` (its format from the extension; unknown: .vsdx appended)
@@ -287,8 +319,27 @@ pub(crate) fn save_to(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
     };
     // (JD13) a template keeps the open stencils (EX-11, VL-02)
     let windows = (format.kind == DocKind::Template).then(|| crate::templates::windows_of_panel(app));
+    // (JD16, DF-04) a macro project into a format without macros: ask first
+    if !format.macros && app.opened.as_ref().is_some_and(|o| o.doc.macros) {
+        crate::doc_file::ask_macros(app, ui, &path);
+        return false;
+    }
+    // (JD16, DF-10) an own file keeps its window state
+    crate::doc_file::before_save(app, format);
+    let shown = app.page_index();
     let Some(o) = app.opened.as_mut() else { return false };
+    // (JD15, DM-09) the file opened read-only is never written
+    if o.ed.read_only && o.ed.path.as_deref() == Some(path.as_str()) {
+        let name = String::from(plat::display_name(&path));
+        app.error = Some((tf("„{}“ kann nicht gespeichert werden.", &[&name]), String::from(t("Die Zeichnung ist schreibgeschützt geöffnet. Speichern Sie sie unter einem anderen Namen."))));
+        ui.repass();
+        return false;
+    }
     take_back(o);
+    // (JD15, DM-04) the page shown is the file's TopPage, as Visio writes it
+    if let Some(id) = o.tabs.get(shown).and_then(|tab| o.doc.page(tab.page)).map(|p| p.header.id) {
+        o.doc.settings.top_page = Some(id);
+    }
     if let Some(w) = windows {
         diagram_io::template::set_stencil_windows(&mut o.doc, &w);
     }
@@ -312,8 +363,11 @@ pub(crate) fn save_to(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
     o.ed.path = Some(path.clone());
     o.ed.format = format;
     o.ed.history.mark_saved();
+    o.ed.read_only = false;
     app.error = None;
     ui.recent_add(&path);
     ui.repass();
+    // (JD15, UI-12) what waited for the save goes on (closing, a new drawing, opening, quitting)
+    crate::ask_save::saved(app, ui);
     true
 }

@@ -1,0 +1,82 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD15 (status of FEATURES 3.1 and 3.10, the context registers): Textwerkzeuge ›
+# Text while a text is edited (Feld and Link on, Symbol and QuickInfo still off), the commands of
+# Container-Tools › Format that no other script runs (Ränder, Automatische Größe, the style and
+# heading menus, Container sperren, Inhalt auswählen), the check boxes of the cross-functional
+# flowchart's register, and a double click on a template's preview creating the drawing
+theme light
+# RK-11: Textwerkzeuge › Text while the text of a shape is edited
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+key f2
+expect tab:"Text" exists
+click tab:"Text"
+expect button:"Feld" enabled
+expect button:"Link" enabled
+expect button:"Symbol" disabled
+expect button:"QuickInfo" disabled
+type "A"
+click 1000,700
+expect tab:"Text" missing
+# RK-01: a container around the box, the register Container-Tools › Format
+click 570,375
+cmd 5409
+expect listitem:"Container" rect 488 291 176 146
+click tab:"Format"
+click button:"Ränder"
+expect menuitem:"Mittel" checked
+click menuitem:"Breit"
+expect listitem:"Container" rect 475 278 201 171
+click button:"Ränder"
+expect menuitem:"Breit" checked
+key esc
+click button:"Automatische Größe"
+expect menuitem:"Nach Bedarf erweitern" checked
+click menuitem:"Immer an Inhalt anpassen"
+click button:"Automatische Größe"
+expect menuitem:"Immer an Inhalt anpassen" checked
+key esc
+click button:"Containerformatvorlagen"
+expect menuitem:"Klar" checked
+click menuitem:"Akzent"
+click button:"Containerformatvorlagen"
+expect menuitem:"Akzent" checked
+key esc
+click button:"Kopfzeilenstil"
+expect menuitem:"Kopfband oben" checked
+click menuitem:"Kopfband links"
+click button:"Kopfzeilenstil"
+expect menuitem:"Kopfband links" checked
+key esc
+expect button:"Container sperren" unchecked
+click button:"Container sperren"
+expect button:"Container sperren" checked
+click button:"Container sperren"
+expect button:"Container sperren" unchecked
+expect listitem:"A" unselected
+click button:"Inhalt auswählen"
+expect listitem:"A" selected
+expect listitem:"Container" unselected
+# UI-04: Datei › Neu, a template's preview: a double click on its picture creates the drawing
+cmd 4097
+click button:"Standardflussdiagramm"
+dblclick button:"Standardflussdiagramm · Leer"
+# (JD15, UI-12) the drawing has changes: the question first
+expect dialog:"Änderungen speichern" exists
+click button:"Nicht speichern"
+expect text:"Zeichnung2 – JFDiagrammer" exists
+expect tab:"Start" selected
+# RK-03: Bahn makes a cross-functional flowchart; the check boxes of its register
+cmd 5424
+click #106
+expect checkbox:"Titelleiste anzeigen" checked
+expect checkbox:"Trennlinien anzeigen" checked
+click checkbox:"Trennlinien anzeigen"
+expect checkbox:"Trennlinien anzeigen" unchecked
+expect checkbox:"Bahnbeschriftungen waagerecht" unchecked
+click checkbox:"Bahnbeschriftungen waagerecht"
+expect checkbox:"Bahnbeschriftungen waagerecht" checked
+click button:"Ausrichtung"
+expect menuitem:"Horizontal" checked
+key esc

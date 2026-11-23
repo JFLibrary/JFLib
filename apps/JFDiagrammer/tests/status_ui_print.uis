@@ -1,0 +1,62 @@
+#!args apps/JFDiagrammer/tests/viewer.vsdx --no-system-fonts
+# JFDiagrammer, JD15 (status check of FEATURES 3.15): what Datei › Drucken and the registers of
+# Seite einrichten offer.  viewer.vsdx: two foreground pages of 6 x 4 in and a background page.
+# PR-02: the range -- all pages, the current page, a range of pages; background pages; copies
+key ctrl+p
+expect text:"Exemplare" exists
+expect checkbox:"Hintergrundseiten drucken" checked
+click combo:"Alle Seiten drucken"
+expect "Aktuelle Seite drucken" exists
+expect "Seitenbereich drucken" exists
+key esc
+# PR-01: the preview with its sheets, colour or grey
+expect text:"Blatt 1 von 2" exists
+click combo:"Farbe"
+expect "Graustufen" exists
+key esc
+key esc
+# PR-05: Drucken einrichten -- paper, orientation, zoom to a percentage or onto n x m sheets
+cmd 4871
+expect dialog:"Seite einrichten" exists
+expect tab:"Drucken einrichten" selected
+expect combo:"A4" exists
+expect radio:"Hochformat" exists
+expect radio:"Anpassen auf" checked
+expect radio:"Anpassen an" exists
+expect checkbox:"Horizontal zentrieren" exists
+# PR-06: Seitengröße -- as the paper, predefined, own size, orientation, the new size shown
+click tab:"Seitengröße"
+expect radio:"Wie Druckerpapier (210 × 297 mm)" exists
+expect radio:"Vordefinierte Größe" exists
+expect radio:"Benutzerdefinierte Größe" checked
+expect text:"Neue Seitengröße: 152 × 102 mm" exists
+# PR-07: Zeichnungsmaßstab -- none, predefined, own; the page in drawing units
+click tab:"Zeichnungsmaßstab"
+expect radio:"Kein Maßstab (1:1)" checked
+expect radio:"Vordefinierter Maßstab" exists
+expect radio:"Benutzerdefinierter Maßstab" exists
+expect text:"Seitengröße in Zeichnungseinheiten: 152 × 102 mm" exists
+# PR-08: Seiteneigenschaften -- type, name, background page, unit, shadow direction
+click tab:"Seiteneigenschaften"
+expect radio:"Vordergrund" checked
+expect radio:"Hintergrund" exists
+expect combo:"Hintergrund-1" exists
+expect text:"Maßeinheit" exists
+expect text:"Schattenrichtung" exists
+# PR-09: Layout und Routing -- routing style, line jumps and their style, spacing, the two
+# options for dropping
+click tab:"Layout und Routing"
+expect text:"Routing-Stil" exists
+expect text:"Linienübergänge" exists
+expect text:"Stil der Linienübergänge" exists
+expect checkbox:"Shapes beim Ablegen verschieben" exists
+expect checkbox:"Shapes auf Verbinder teilen" exists
+click button:"Abbrechen"
+expect dialog:"Seite einrichten" missing
+# ZF-01: Ansicht › Seitenumbrüche on the page at 1:10 (the lines at the sheets' edges: the shot)
+click tab:"Massstab"
+expect button:"Seite 2 von 3" exists
+cmd 5121
+click tab:"Ansicht"
+expect checkbox:"Seitenumbrüche" checked
+shot build/JFDiagrammer-status-breaks.png

@@ -53,6 +53,9 @@ click button:"Standardflussdiagramm"
 click radio:"US-Einheiten"
 expect radio:"US-Einheiten" checked
 click button:"Erstellen"
+# (JD15, UI-12) the sample has a change (the tip deleted): the question first
+expect dialog:"Änderungen speichern" exists
+click button:"Nicht speichern"
 expect text:"Zeichnung3 – JFDiagrammer" exists
 expect listitem:"Bestellung prüfen" missing
 key ctrl+p

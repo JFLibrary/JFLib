@@ -186,3 +186,67 @@ fn stencil_sheet_ids() {
     assert_eq!(crate::stencil::sheet_ids_for_test("\"Sheet.1!\"&Sheet.2!X", &[5, 9]).ok().as_deref(), Some("\"Sheet.1!\"&Sheet.9!X"));
     assert_eq!(crate::stencil::sheet_ids_for_test("MySheet.1!X+Sheet.10", &[5]).ok().as_deref(), Some("MySheet.1!X+Sheet.10"));
 }
+
+// (JD15) text fields in a master: a [Field] row with `Unit` and a "{fld 0}" mark in the text; the
+// master shows the computed value, an instance dropped from it keeps the field and follows its
+// width, and the file writes the field as <fld IX='0'/> with Value in the unit shown; a mark
+// without its row and a `Unit` that is no unit are build errors
+#[test]
+fn stencil_text_fields() {
+    use crate::stencil;
+    use diagram_core::formula::Engine;
+    use diagram_core::{field, instance, Owner, ShapeRef, SheetRef, TextItem, Unit, Value};
+
+    const ST: &str = "stencil: Test\nfile: test\nname.de: T\nname.en: T\nname.es: T\nname.it: T\nname.fr: T\ncategory: general\nmasters: dim\n";
+    let master = |text: &str, unit: &str| {
+        alloc::format!(
+            "master: Dim\nname.de: D\nname.en: D\nname.es: D\nname.it: D\nname.fr: D\nprompt.de: P\nprompt.en: P\nprompt.es: P\nprompt.it: P\nprompt.fr: P\n\
+             text.de: Breite {text}\ntext.en: Width {text}\ntext.es: {text}\ntext.it: {text}\ntext.fr: {text}\n\n\
+             [Shape]\nWidth = 40 mm\nHeight = 10 mm\n\n[Field]\nRow  Value = Width*2; Unit = {unit}; Format = \"0 u\"; Type = 2\n\n\
+             [Geometry]\nMoveTo  X = 0; Y = 0\nLineTo  X = Width; Y = 0\n"
+        )
+    };
+    let build = |m: alloc::string::String| {
+        let files = move |f: &str| match f {
+            "stencil.txt" => Some(alloc::string::String::from(ST)),
+            "dim.master" => Some(m.clone()),
+            _ => None,
+        };
+        stencil::build(&files, Measure::Metric)
+    };
+    let built = build(master("{fld 0}", "mm")).expect("a master with a field builds");
+    let doc = &built.doc;
+    let m = doc.masters().next().expect("the master");
+    let slot = doc.master(m).and_then(|x| x.master_shape()).expect("the master shape");
+    let ms = ShapeRef { owner: Owner::Master(m), slot };
+    assert_eq!(field::plain(doc, ms), "Breite 80 mm");
+    let value = doc.sym("Value").and_then(|v| doc.sheet(SheetRef::Shape(ms)).map(|s| s.find(&diagram_core::CellAddr::row(diagram_core::SecKey::one(doc.sym("Field").unwrap()), diagram_core::RowKey::Index(0), v))));
+    match value {
+        Some(diagram_core::Local::Cell(c)) => assert_eq!(c.unit, Some(Unit::Millimeters)),
+        o => panic!("{o:?}"),
+    }
+    // an instance: the field comes along and follows the width
+    let mut d = vsdx::new_document(DocKind::Drawing, Measure::Metric);
+    let pg = d.pages().next().expect("a page");
+    let s = {
+        let mut tx = d.transaction("drop");
+        let local = instance::import_master(&mut tx, doc, m).expect("import");
+        let s = instance::place(&mut tx, pg, local, 2.0, 2.0, 1).expect("place");
+        let w = tx.single("Width");
+        tx.set_constant(SheetRef::Shape(s), &w, Value::Num(50.0 / 25.4), Some(Unit::Millimeters)).expect("width");
+        Engine::new().recalc(&mut tx, &[SheetRef::Shape(s)]).expect("recalc");
+        tx.commit();
+        s
+    };
+    assert!(d.shape(s).and_then(|x| x.text()).is_some_and(|t| t.items.contains(&TextItem::Field(0))));
+    assert_eq!(field::plain(&d, s), "Width 100 mm");
+    let bytes = vsdx::write(&d, &vsdx::WriteOptions::DEFAULT).expect("write");
+    let back = vsdx::read(&bytes, &vsdx::Limits::VSDX).expect("read");
+    let s2 = back.doc.pages().next().and_then(|p| back.doc.all_shapes(Owner::Page(p)).next()).expect("the shape");
+    assert_eq!(field::plain(&back.doc, s2), "Width 100 mm");
+    // refused: a mark without its row, a unit that is none
+    let e = build(master("{fld 1}", "mm")).expect_err("a mark without its row");
+    assert!(e.message.contains("{fld 1}"), "{e}");
+    let e = build(master("{fld 0}", "Width")).expect_err("no unit");
+    assert!(e.message.contains("Unit"), "{e}");
+}

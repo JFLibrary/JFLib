@@ -282,6 +282,9 @@ commands! {
     CFF_TITLE = 0x1535, "Titelleiste anzeigen", JD_CFF_TITLE_BAR, 0;
     CFF_SEPARATORS = 0x1536, "Trennlinien anzeigen", JD_CFF_SEPARATORS, 0;
     CFF_ROTATE = 0x1537, "Bahnbeschriftungen waagerecht", JD_CFF_ROTATE_LABELS, 0;
+    // (JD15, ST-05) a lane's context menu (structures_cff.rs)
+    CFF_LANE_BEFORE = 0x1538, "Bahn davor einfügen", JD_CFF_SWIMLANE, 0;
+    CFF_LANE_AFTER = 0x1539, "Bahn danach einfügen", JD_CFF_SWIMLANE, 0;
     // the shape's context menu
     SHAPE_DATA_DEFINE = 0x1600, "Shape-Daten definieren", 0, 0;
     HYPERLINK = 0x1601, "Hyperlink", 0, 0;
@@ -292,6 +295,8 @@ commands! {
     CONN_RESET = 0x1606, "Verbinder zurücksetzen", 0, 0;
     ADD_TO_MY_SHAPES = 0x1607, "Zu meinen Shapes hinzufügen", 0, 0;
     COMMENT_NEW = 0x1608, "Neuer Kommentar", 0, 0;
+    // (JD15, SP-01) the dialog Shape-Name (dlg_shape_name.rs)
+    SHAPE_NAME = 0x1609, "Shape-Name", 0, 0;
     // the stencil's menu (Shapes sidebar)
     STENCIL_CLOSE = 0x1700, "Schablone schließen", 0, 0;
     STENCIL_SAVE = 0x1701, "Schablone speichern", 0, 0;
@@ -317,6 +322,15 @@ commands! {
     SIZE_A3 = 0x1806, "A3", 0, 0;
     SIZE_B5 = 0x1807, "B5 (JIS)", 0, 0;
     SIZE_B4 = 0x1808, "B4 (JIS)", 0, 0;
+    // (JD15, RW-02) envelopes and the US government sizes
+    SIZE_ENV_10 = 0x1809, "Umschlag #10", 0, 0;
+    SIZE_ENV_DL = 0x180A, "Umschlag DL", 0, 0;
+    SIZE_ENV_C4 = 0x180B, "Umschlag C4", 0, 0;
+    SIZE_ENV_C5 = 0x180C, "Umschlag C5", 0, 0;
+    SIZE_ENV_C6 = 0x180D, "Umschlag C6", 0, 0;
+    SIZE_ENV_MONARCH = 0x180E, "Umschlag Monarch", 0, 0;
+    SIZE_GOV_LETTER = 0x180F, "Government Letter", 0, 0;
+    SIZE_GOV_LEGAL = 0x1810, "Government Legal", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -394,10 +408,8 @@ static HANDLERS: &[(u32, Handler)] = &[
     (GUIDES, |a, _| a.view_guides = !a.view_guides),
     (DYN_GRID, |a, _| a.se.dyn_grid = !a.se.dyn_grid),
     (CONN_POINTS, |a, _| a.se.show_points = !a.se.show_points),
-    (SNAP_GLUE, |a, _| {
-        a.snap = !a.snap;
-        a.se.glue = a.snap;
-    }),
+    // (JD15, RA-07) the dialog, no silent toggle
+    (SNAP_GLUE, crate::dlg_snap::open),
     (CONN_RIGHT_ANGLE, |a, ui| crate::edit_cmds::conn_style(a, ui, diagram_core::glue::Style::RightAngle)),
     (CONN_STRAIGHT, |a, ui| crate::edit_cmds::conn_style(a, ui, diagram_core::glue::Style::Straight)),
     (CONN_CURVED, |a, ui| crate::edit_cmds::conn_style(a, ui, diagram_core::glue::Style::Curved)),
@@ -508,6 +520,14 @@ static HANDLERS: &[(u32, Handler)] = &[
     (SIZE_A3, |a, ui| crate::page_size::size(a, ui, SIZE_A3)),
     (SIZE_B5, |a, ui| crate::page_size::size(a, ui, SIZE_B5)),
     (SIZE_B4, |a, ui| crate::page_size::size(a, ui, SIZE_B4)),
+    (SIZE_ENV_10, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_10)),
+    (SIZE_ENV_DL, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_DL)),
+    (SIZE_ENV_C4, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_C4)),
+    (SIZE_ENV_C5, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_C5)),
+    (SIZE_ENV_C6, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_C6)),
+    (SIZE_ENV_MONARCH, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_MONARCH)),
+    (SIZE_GOV_LETTER, |a, ui| crate::page_size::size(a, ui, SIZE_GOV_LETTER)),
+    (SIZE_GOV_LEGAL, |a, ui| crate::page_size::size(a, ui, SIZE_GOV_LEGAL)),
     // (JD8 rest: Zeichentools, Bilder, Inhalte einfügen, Ebenen, Nach Typ auswählen)
     (DRAW_TOOLS, crate::cmds_draw::draw_tools),
     (FREEFORM, |a, _| crate::edit_cmds::tool(a, FREEFORM)),
@@ -527,6 +547,8 @@ static HANDLERS: &[(u32, Handler)] = &[
     (HYPERLINK, crate::dlg_link::open),
     (FIND, |a, ui| crate::dlg_find::open(a, ui, false)),
     (REPLACE, |a, ui| crate::dlg_find::open(a, ui, true)),
+    // (JD15, SP-01) Shape-Name
+    (SHAPE_NAME, crate::dlg_shape_name::open),
 ];
 
 // toggles: whether the command is on
@@ -543,7 +565,6 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (GUIDES, |a| a.view_guides),
     (DYN_GRID, |a| a.se.dyn_grid),
     (CONN_POINTS, |a| a.se.show_points),
-    (SNAP_GLUE, |a| a.snap),
     (LASSO, |a| a.se.lasso),
     (SELECT_AREA, |a| !a.se.lasso),
     (GRID, |a| a.view_grid),
@@ -582,6 +603,14 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (SIZE_A3, |a| crate::page_size::checked(a, SIZE_A3)),
     (SIZE_B5, |a| crate::page_size::checked(a, SIZE_B5)),
     (SIZE_B4, |a| crate::page_size::checked(a, SIZE_B4)),
+    (SIZE_ENV_10, |a| crate::page_size::checked(a, SIZE_ENV_10)),
+    (SIZE_ENV_DL, |a| crate::page_size::checked(a, SIZE_ENV_DL)),
+    (SIZE_ENV_C4, |a| crate::page_size::checked(a, SIZE_ENV_C4)),
+    (SIZE_ENV_C5, |a| crate::page_size::checked(a, SIZE_ENV_C5)),
+    (SIZE_ENV_C6, |a| crate::page_size::checked(a, SIZE_ENV_C6)),
+    (SIZE_ENV_MONARCH, |a| crate::page_size::checked(a, SIZE_ENV_MONARCH)),
+    (SIZE_GOV_LETTER, |a| crate::page_size::checked(a, SIZE_GOV_LETTER)),
+    (SIZE_GOV_LEGAL, |a| crate::page_size::checked(a, SIZE_GOV_LEGAL)),
     // (JD8 rest: Zeichentools)
     (DRAW_TOOLS, crate::cmds_draw::any_tool),
     (FREEFORM, |a| a.tool == FREEFORM),

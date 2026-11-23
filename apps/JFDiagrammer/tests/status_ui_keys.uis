@@ -1,0 +1,123 @@
+#!args --no-system-fonts --save-dir build
+# JFDiagrammer, JD15 (status check of FEATURES 3.16): the German shortcuts of the file, zoom, pan,
+# page, focus, arrange, tool, text and menu areas do what their row says.  Two rectangles on the
+# new drawing's A4 page (fitted at 67 %).
+cmd 4404
+drag 400,300 480,360
+drag 600,300 680,360
+cmd 4400
+click 900,650
+# KB-03: zoom -- Alt+F6 in, Shift+Alt+F6 out, Ctrl+Shift+W fits, Ctrl+wheel and Ctrl+Shift+wheel
+# at the pointer, Ctrl+Shift+drag zooms to the rectangle
+expect button:"67 %" exists
+key shift+alt+f6
+expect button:"50 %" exists
+key ctrl+shift+w
+expect button:"67 %" exists
+move 700,400
+wheel 700,400 -120 ctrl
+wait 400
+expect button:"50 %" exists
+wheel 700,400 120 ctrl shift
+wait 400
+expect button:"67 %" exists
+drag 380,280 700,380 ctrl shift
+expect button:"100 %" exists
+key ctrl+shift+w
+expect button:"67 %" exists
+# KB-04: the wheel scrolls the page up and down, with Shift sideways
+expect listitem:"Sheet.4" rect 400 299 * *
+wheel 700,400 -240
+wait 400
+expect listitem:"Sheet.4" rect 400 203 * *
+wheel 700,400 -240 shift
+wait 400
+expect listitem:"Sheet.4" rect 304 203 * *
+key ctrl+shift+w
+# KB-06: Tab and Shift+Tab walk the shapes, Esc clears the selection
+click 440,330
+key tab
+expect listitem:"Sheet.5" selected
+key shift+tab
+expect listitem:"Sheet.4" selected
+key esc
+expect listitem:"Sheet.4" unselected
+# KB-07: Ctrl+L / Ctrl+R turn by 90 degrees, Shift+arrow nudges one pixel, Ctrl+G groups,
+# Ctrl+Shift+G (German) ungroups
+wait 600
+click 440,330
+key ctrl+l
+expect button:"Breite: 30 mm  Höhe: 20 mm  Winkel: 90°" exists
+key ctrl+r
+expect button:"Breite: 30 mm  Höhe: 20 mm  Winkel: 0°" exists
+key shift+right
+expect listitem:"Sheet.4" rect 401 299 * *
+key ctrl+z
+key ctrl+a
+key ctrl+g
+expect listitem:"Sheet.4" missing
+expect button:"Breite: 110 mm  Höhe: 20 mm  Winkel: 0°" exists
+key ctrl+shift+g
+expect listitem:"Sheet.4" selected
+expect listitem:"Sheet.5" selected
+# KB-12: text alignment, Ctrl+Shift+L left, Ctrl+Shift+T top
+wait 600
+click 900,650
+click 440,330
+key ctrl+shift+l
+expect button:"Linksbündig" checked
+key ctrl+shift+t
+expect button:"Oben ausrichten" checked
+# KB-11: bold Ctrl+Shift+F, italic Ctrl+Shift+K, underline Ctrl+Shift+U (German Office, F10)
+key ctrl+shift+f
+expect button:"Fett" checked
+key ctrl+shift+k
+expect button:"Kursiv" checked
+key ctrl+shift+u
+expect button:"Unterstrichen" checked
+# KB-08 / KB-09: tools -- Ctrl+3 connector, Ctrl+2 text, Ctrl+8 rectangle, Ctrl+1 pointer
+key ctrl+3
+expect button:"Verbinder" checked
+key ctrl+2
+expect button:"Text" checked
+key ctrl+8
+drag 500,500 560,540
+key ctrl+1
+expect button:"Zeigertool" checked
+expect listitem:"Sheet.7" exists
+# KB-16: Shift+F10 opens the selected shape's menu
+wait 600
+click 440,330
+key shift+f10
+expect menuitem:"Zu meinen Shapes hinzufügen" exists
+key esc
+# KB-05: Shift+F11 a new page, Ctrl+PgUp back, Alt+F3 the list of all pages, Shift+F5 Seite
+# einrichten
+key shift+f11
+expect button:"Seite 2 von 2" exists
+key ctrl+pgup
+expect button:"Seite 1 von 2" exists
+key alt+f3
+expect menuitem:"Seite-2" exists
+key esc
+key shift+f5
+expect dialog:"Seite einrichten" exists
+key esc
+expect dialog:"Seite einrichten" missing
+# KB-01: Ctrl+P Drucken, Ctrl+O Öffnen, F12 and Ctrl+S (a new drawing) Speichern unter, Ctrl+N
+# the template catalogue
+key ctrl+p
+expect text:"Exemplare" exists
+key esc
+key ctrl+o
+expect text:"Zuletzt verwendet" exists
+key esc
+key f12
+expect dialog:"Speichern unter" exists
+key esc
+key ctrl+s
+expect dialog:"Speichern unter" exists
+key esc
+key ctrl+n
+expect "Alle Vorlagen" exists
+key esc

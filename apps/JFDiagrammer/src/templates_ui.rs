@@ -11,6 +11,12 @@
 //
 // The tiles are buttons named after the template (scripts click button:"Standardflussdiagramm");
 // the forms are buttons too, checked while chosen.
+//
+// (JD15) A double click on a tile creates the drawing (UI-04): its first click opens the
+// preview at once, so the second press, landing on the preview at the same place within the
+// double-click time, counts as the double click.  The search box over the tiles finds templates
+// by their names in every language, accents and case aside (UI-05); Neu aus vorhandener
+// Zeichnung opens a drawing as a new, unnamed copy (Öffnen's file dialog, ask_save::Mode::Copy).
 
 use alloc::format;
 use alloc::string::String;
@@ -26,6 +32,7 @@ const ID_PAGE: u32 = 0x6100;
 const ID_CAT: u32 = 0x6180;
 const ID_TILE: u32 = 0x6200;
 const ID_FORM: u32 = 0x6300;
+const ID_SEARCH: u32 = 0x6380;
 
 // the names of the categories, in the order of stencils::CATEGORIES (the names of "Weitere
 // Shapes")
@@ -58,9 +65,27 @@ pub(crate) fn page(app: &mut Diagrammer, ui: &mut Ui) {
     ui.box_begin(ID_PAGE, BOX_H, 24);
     categories(app, ui);
     ui.box_begin(0, BOX_V, 8);
+    // (JD15, UI-05) the search over every template, a drawing as a new one
+    ui.box_begin(ID_SEARCH, BOX_H | BOX_XCENTER, 12);
+    ui.next_size(300, 0);
+    ui.textbox(ID_SEARCH + 1, Some(t("Nach Vorlagen suchen")), &mut app.catalog.query, 128);
+    ui.next_flags(ST_SUBTLE);
+    ui.next_icon(crate::icons::JD_OPEN);
+    if ui.button(ID_SEARCH + 2, t("Neu aus vorhandener Zeichnung…")) & EV_ACT != 0 {
+        crate::backstage::open_dialog(app, ui, crate::ask_save::Mode::Copy);
+    }
+    ui.tooltip(t("Eine vorhandene Zeichnung als neue, unbenannte Zeichnung öffnen; die Datei bleibt, wie sie ist"));
+    ui.box_end();
+    let words: Vec<String> = app.catalog.query.split_whitespace().map(diagram_core::instance::fold).collect();
     let shown = app.catalog.category.clone();
-    ui.text(TS_BODY_STRONG, shown.as_deref().map_or(t("Vorlagen"), category_name));
-    let list: Vec<usize> = (0..app.catalog.len()).filter(|&k| app.catalog.get(k).is_some_and(|e| shown.as_deref().is_none_or(|c| e.category == c))).collect();
+    let heading = if !words.is_empty() { t("Suchergebnisse") } else { shown.as_deref().map_or(t("Vorlagen"), category_name) };
+    ui.text(TS_BODY_STRONG, heading);
+    let list: Vec<usize> = (0..app.catalog.len())
+        .filter(|&k| app.catalog.get(k).is_some_and(|e| if words.is_empty() { shown.as_deref().is_none_or(|c| e.category == c) } else { found(e, &words) }))
+        .collect();
+    if list.is_empty() && !words.is_empty() {
+        ui.text(TS_BODY | TX_SECONDARY, t("Keine Vorlagen gefunden"));
+    }
     if list.is_empty() && shown.as_deref() == Some(MINE) {
         let dir = templates::own_dir(app, ui).unwrap_or_default();
         ui.next_size(560, 0);
@@ -84,6 +109,8 @@ pub(crate) fn page(app: &mut Diagrammer, ui: &mut Ui) {
         } else if ev & EV_ACT != 0 {
             app.template = Some(k);
             app.catalog.form = form;
+            // (JD15, UI-04) a second press here soon is the double click
+            app.catalog.clicked = Some((k, ui.now(), ui.mouse()));
             ui.repass();
         }
         ui.next_size(152, 0);
@@ -93,6 +120,19 @@ pub(crate) fn page(app: &mut Diagrammer, ui: &mut Ui) {
     ui.box_end();
     ui.box_end();
     ui.box_end();
+}
+
+// (JD15, UI-05) whether every word of the search is in one of the entry's names (any language) or
+// its file name
+fn found(e: &templates::Entry, words: &[String]) -> bool {
+    let mut names: Vec<String> = e.names.iter().flatten().map(|n| diagram_core::instance::fold(n)).collect();
+    names.push(diagram_core::instance::fold(&e.stem));
+    words.iter().all(|w| names.iter().any(|n| n.contains(w.as_str())))
+}
+
+// (JD15, UI-04) the double-click time (the library's default in headless runs)
+fn double_ms(ui: &Ui) -> u32 {
+    if ui.headless() { 500 } else { plat::sys_settings().double_click_ms.clamp(200, 2000) }
 }
 
 // the form a tile shows: the default one unless it is the blank page and a starter diagram can
@@ -159,6 +199,20 @@ fn tile(app: &mut Diagrammer, ui: &mut Ui, id: u32, k: usize, f: usize, name: &s
 
 // a template's preview (UI-04): picture, forms, name, description, units, Erstellen
 fn preview(app: &mut Diagrammer, ui: &mut Ui, k: usize) {
+    // (JD15, UI-04) the second press of a double click on the tile that opened this preview
+    if let Some((tile, t0, (mx, my))) = app.catalog.clicked {
+        let (x, y) = ui.mouse();
+        let soon = ui.now().wrapping_sub(t0) <= double_ms(ui);
+        let near = (x - mx).abs() <= ui.dp(4) && (y - my).abs() <= ui.dp(4);
+        if !soon || tile != k {
+            app.catalog.clicked = None;
+        } else if near && ui.pressed() & (1 << BTN_LEFT) != 0 {
+            app.catalog.clicked = None;
+            let f = app.catalog.form;
+            templates::create(app, ui, k, f);
+            return;
+        }
+    }
     let l = stencils::lang();
     let Some(e) = app.catalog.get(k) else { return };
     let name = e.title(l);

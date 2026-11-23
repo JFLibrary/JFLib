@@ -19,6 +19,16 @@
 //
 // Keys: a shape's key is its slot + 1 in the page's tree; a guide's key the same (guides are
 // shapes of type Guide, diagram_core::render does not draw them, the edit layer does).
+//
+// (JD15) Ansicht › Führungslinien off leaves the guides out of the edit layer (not drawn, no
+// snapping, none from the rulers, RA-02); a guide selected by Nach Typ auswählen is in the model
+// as a 1-D shape across the page as well, drawn in the accent colour (RS-31).  Snapping follows
+// Ausrichten und Kleben (dlg_snap.rs) and the page's InhibitSnap (SS-39); connection points of
+// Type 1 are no glue target, a point's Prompt is its QuickInfo (SS-29).  Each page keeps its
+// view (zoom, middle) while another one is shown; shown again it gets it back instead of the fit
+// (ZF-08, Diagrammer::page_views).  Ctrl + Shift + drag copies the selection (SeEv::MoveCopy,
+// KB-09); the marquee takes touched shapes with Optionen › Erweitert › Teilweise umschlossene
+// Shapes auswählen (ZF-06).
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -102,6 +112,8 @@ pub(crate) struct Model {
     pub page: Option<PageRef>,
     /// the rows of the control points listed (a control point's tag is its index here)
     pub controls: Vec<RowKey>,
+    /// (JD15, SS-29) the connection points with a Prompt: shape key, row, the text
+    pub prompts: Vec<(u64, u32, String)>,
 }
 
 /// the tool of the active command
@@ -216,10 +228,20 @@ pub(crate) fn model(app: &mut Diagrammer) {
             None => 0,
         };
         let sheet = SheetRef::Shape(r);
-        // guides: lines for the edit layer, no frame
+        // guides: lines for the edit layer, no frame; (JD15, RS-31) a selected one (Nach Typ
+        // auswählen) also as a 1-D shape across the page, so that it stays selected, moves with
+        // the arrow keys and goes with Del
         if s.header().kind == ShapeKind::Guide {
             if let Some(g) = guide_of(doc, &geo, r) {
                 m.guides.push(g);
+                if parent == 0 && sel.contains(&g.key) {
+                    let (pw, ph) = ((geo.w * DIP) as f32, (geo.h * DIP) as f32);
+                    let ends = if g.vertical { [[g.at, 0.0], [g.at, ph]] } else { [[0.0, g.at], [pw, g.at]] };
+                    let bbox = [ends[0][0], ends[0][1], ends[1][0], ends[1][1]];
+                    let flags = SEF_1D | SEF_NOARROWS | SEF_NOSNAP | SEF_NOGLUE | SEF_LOCK_BEGIN | SEF_LOCK_END | SEF_LOCK_ROTATE;
+                    let p = m.points.len() as u32;
+                    m.shapes.push(SeShape { key: g.key, parent: 0, bx: SeBox::rect(bbox), ends, pin: ends[0], bbox, flags, points: p..p });
+                }
             }
             return;
         }
@@ -272,7 +294,13 @@ pub(crate) fn model(app: &mut Diagrammer) {
         if parent == 0 {
             for c in glue::connection_points(doc, r) {
                 let dir = c.dir.map_or([0.0, 0.0], |d| [d[0] as f32, -(d[1] as f32)]);
-                m.points.push(SePoint { at: geo.world(c.at), kind: SP_CONN, tag: c.row, dir, flags: 0 });
+                // (JD15, SS-29) Type 1 points outward only: no target for ends; the Prompt is
+                // the point's QuickInfo
+                let flags = if c.kind == 1 { SPF_OUTWARD } else { 0 };
+                m.points.push(SePoint { at: geo.world(c.at), kind: SP_CONN, tag: c.row, dir, flags });
+                if let Some(p) = conn_prompt(doc, r, c.row) {
+                    m.prompts.push((key_of(r), c.row, p));
+                }
             }
         }
         // control points and vertices of the selection
@@ -306,6 +334,15 @@ pub(crate) fn model(app: &mut Diagrammer) {
     }
     drop(view);
     app.model = m;
+}
+
+// (JD15, SS-29) the Prompt of connection point row `ix` (None: none or empty)
+fn conn_prompt(doc: &Document, s: ShapeRef, ix: u32) -> Option<String> {
+    let sk = SecKey::one(doc.sym("Connection")?);
+    let c = doc.sym("Prompt")?;
+    let v = doc.resolve(SheetRef::Shape(s), &CellAddr::row(sk, RowKey::Index(ix), c)).value().text()?;
+    let t = doc.str(v).trim();
+    (!t.is_empty()).then(|| String::from(t))
 }
 
 fn lock_flags(l: &ops::Locks) -> u32 {
@@ -369,8 +406,15 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
         st.name = name.into();
     }
     st.grid = grid;
-    st.snap = app.snap;
+    // (JD15) Ausrichten und Kleben (dlg_snap.rs): Ausrichten with its targets Raster and
+    // Führungslinien; a page whose InhibitSnap is set snaps to nothing (SS-39)
+    let inhibit = page_inhibits_snap(app);
+    app.canvas.snap = app.snap && app.snap_grid && !inhibit;
+    app.se.snap = !inhibit;
+    app.se.partial = app.opts.get(&crate::options::PARTIAL_SELECT);
     let k = app.page_index();
+    // (JD15, ZF-08) the page shown: drawing serial, page
+    let here = app.opened.as_ref().and_then(|o| o.tabs.get(k).map(|t| (o.serial, t.page)));
     let paint = crate::viewer::paint(app, k);
     let nodes: Vec<DNode> = crate::viewer::sheet_node(app, k).into_iter().collect();
     let ver = app.opened.as_ref().map_or(0, |o| crate::viewer::canvas_ver(o.serial, k, o.ed.rev));
@@ -386,8 +430,35 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
         let cur = crate::dlg_link::cursor(app, ui);
         ui.cursor_next(cur);
     }
+    // (JD15, SS-29) the Prompt of the connection point under the pointer while the points show
+    let prompt = if link.is_none() { prompt_hover(app, ui) } else { None };
     ui.next_size(-1, -1);
     ui.diagram(id, &mut app.canvas, &dm, DG_EDIT, paint, ver);
+    // (JD15, ZF-08) a page shown again gets its view back instead of the fit the page change
+    // asked for (fit_again: the tabs, the page list, Nächste / Vorherige Seite, a page that came
+    // or went); a page shown the first time keeps the fit, a view set with the change stays (a
+    // shape brought into view by Suchen or a link: cmds_text::show_shape)
+    if here != app.view_page {
+        let kept = here.and_then(|h| app.page_views.iter().find(|v| (v.0, v.1) == h).copied());
+        if let (Some((_, _, zoom, cx, cy)), true) = (kept, app.fit_again) {
+            let vp = &mut app.canvas.vp;
+            vp.zoom = zoom;
+            vp.cx = cx;
+            vp.cy = cy;
+            app.fit_again = false;
+            ui.repass();
+        }
+        app.view_page = here;
+    }
+    // the view of the page shown, kept for its return (the drawing's pages only)
+    if let Some((serial, page)) = here {
+        let vp = app.canvas.vp;
+        app.page_views.retain(|v| v.0 == serial && v.1 != page);
+        app.page_views.push((serial, page, vp.zoom, vp.cx, vp.cy));
+    }
+    if let Some((part, tip)) = &prompt {
+        ui.tooltip_part(tip, *part);
+    }
     let follow = link.as_ref().filter(|_| ui.pressed() & (1 << BTN_LEFT) != 0 && ui.mods() & (MOD_CTRL | MOD_SHIFT | MOD_ALT) == MOD_CTRL && ui.last_state() & SS_HOVER as u32 != 0).map(|l| l.0);
     if let Some((key, tip)) = &link {
         ui.tooltip_part(tip, *key);
@@ -410,7 +481,9 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
             let (Some(view), Some(geo), Some(page), Some(doc)) = (view.as_ref(), geo, page, doc) else { return 0 };
             hit_at(doc, view.drawing(), &geo, page, p, tol, within)
         };
-        let sm = SeModel { shapes: &m.shapes, points: &m.points, guides: &m.guides, marks: &marks, ver: m.ver, hit: &hitf };
+        // (JD15, RA-02) Ansicht › Führungslinien off: the guides neither show nor snap
+        let guides: &[SeGuide] = if app.view_guides { &m.guides } else { &[] };
+        let sm = SeModel { shapes: &m.shapes, points: &m.points, guides, marks: &marks, ver: m.ver, hit: &hitf };
         if follow.is_some() { Vec::new() } else { ui.shape_edit(id, &mut app.se, &mut app.canvas, &sm, tool) }
     };
     for ev in evs {
@@ -435,7 +508,8 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
             }
         };
         let nohit = |_: [f32; 2], _: f32, _: u64| 0u64;
-        let sm = SeModel { shapes: &m.shapes, points: &m.points, guides: &m.guides, marks: &marks, ver: m.ver, hit: &nohit };
+        let guides: &[SeGuide] = if app.view_guides { &m.guides } else { &[] };
+        let sm = SeModel { shapes: &m.shapes, points: &m.points, guides, marks: &marks, ver: m.ver, hit: &nohit };
         ui.shape_edit_sems(id, &mut app.se, &app.canvas, &sm, &label);
     }
     // page breaks, a guide being dragged out of a ruler
@@ -452,11 +526,67 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
         dashed(ui, vp.to_screen(a), vp.to_screen(b));
         ui.clip_pop();
     }
+    // (JD15, RS-31) selected guides: a solid line in the accent colour across the canvas
+    if app.view_guides && app.model.guides.iter().any(|g| app.se.sel.contains(&g.key)) {
+        let vp = app.canvas.vp;
+        let r = vp.rect;
+        let wr = vp.world_rect();
+        ui.clip_push(r[0], r[1], r[2], r[3]);
+        ui.draw_color(ui.color(T_ACCENT) | 0xFF00_0000);
+        let w = (ui.hair().max(1) * 2 * 256) as i32;
+        for g in app.model.guides.iter().filter(|g| app.se.sel.contains(&g.key)) {
+            let (a, b) = if g.vertical { ([g.at, wr[1]], [g.at, wr[3]]) } else { ([wr[0], g.at], [wr[2], g.at]) };
+            let (a, b) = (vp.to_screen(a), vp.to_screen(b));
+            ui.draw_line((a[0] * 256.0) as i32, (a[1] * 256.0) as i32, (b[0] * 256.0) as i32, (b[1] * 256.0) as i32, w);
+        }
+        ui.clip_pop();
+    }
     // the text being edited
     crate::edit_text::frame(app, ui);
     if rulers {
         ui.box_end();
     }
+}
+
+// (JD15, SS-39) the page shown has InhibitSnap set
+fn page_inhibits_snap(app: &Diagrammer) -> bool {
+    let Some(o) = app.opened.as_ref() else { return false };
+    let Some(tab) = o.tabs.get(app.page_index()) else { return false };
+    num(&o.doc, SheetRef::Page(tab.page), "InhibitSnap").is_some_and(|v| v != 0.0)
+}
+
+// (JD15, SS-29) the connection point with a Prompt under the pointer while connection points show
+// (a tool that glues, an end being dragged, Ansicht › Verbindungspunkte): its part key and text
+fn prompt_hover(app: &Diagrammer, ui: &Ui) -> Option<(u64, String)> {
+    let m = &app.model;
+    if m.prompts.is_empty() || ui.popup_count() != 0 || app.text.is_some() {
+        return None;
+    }
+    let showing = app.se.show_points || app.se.live() || matches!(tool_of(app), SE_CONNECT | SE_LINE | SE_FREEFORM | SE_ARC);
+    let vp = app.canvas.vp;
+    let (mx, my) = ui.mouse();
+    if !showing || mx < vp.rect[0] || my < vp.rect[1] || mx >= vp.rect[0] + vp.rect[2] || my >= vp.rect[1] + vp.rect[3] {
+        return None;
+    }
+    let p = [mx as f32 + 0.5, my as f32 + 0.5];
+    let reach = ui.dp(8) as f32;
+    let mut best: Option<(f32, u64, u32)> = None;
+    for sh in &m.shapes {
+        for q in m.points.get(sh.points.start as usize..sh.points.end as usize).unwrap_or(&[]) {
+            if q.kind != SP_CONN {
+                continue;
+            }
+            let s = vp.to_screen(q.at);
+            let d = ((s[0] - p[0]) * (s[0] - p[0]) + (s[1] - p[1]) * (s[1] - p[1])) as f64;
+            let d = sqrt(d) as f32;
+            if d <= reach && best.is_none_or(|b| d < b.0) {
+                best = Some((d, sh.key, q.tag));
+            }
+        }
+    }
+    let (_, key, tag) = best?;
+    let text = m.prompts.iter().find(|x| x.0 == key && x.1 == tag)?.2.clone();
+    Some(((key << 20 | tag as u64) + 1, text))
 }
 
 // (JD8 rest) the top-level shape with a hyperlink under the pointer and its QuickInfo: with the
@@ -591,6 +721,8 @@ fn ruler(app: &mut Diagrammer, ui: &mut Ui, vertical: bool) {
     };
     ui.next_size(if vertical { RULER_DIP } else { -1 }, if vertical { -1 } else { RULER_DIP });
     let ev = ui.ruler(if vertical { ID_RULER_LEFT } else { ID_RULER_TOP }, &vp, &spec);
+    // (JD15, RA-02) with Ansicht › Führungslinien off no guide comes out of the ruler
+    let ev = if app.view_guides { ev } else { RulerEv::GuideCancel };
     match ev {
         RulerEv::Guide { at, done: true } => add_guide(app, ui, !vertical, at),
         RulerEv::Guide { at, done: false } => app.guide_drag = Some((!vertical, at)),
@@ -768,6 +900,33 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
             let d = geo.page_vec(total);
             // (JD10) members and callouts come along; released: containers, lists
             edit_doc::edit(o, t("Verschieben"), done, |tx, eng| crate::structures::move_shapes(tx, eng, owner, &shapes, d, done))
+        }
+        // (JD15, KB-09) Ctrl + Shift + drag: a copy of the selection (with its members and
+        // callouts, as Duplizieren) goes `total` from it.  While dragging, the selection itself
+        // moves as the preview (a copy made anew each step would use up shape IDs: Sheet.n would
+        // skip numbers); released, the preview goes back and the copy is made there, one undo
+        // step, selected.  Not moved: no copy
+        SeEv::MoveCopy { keys, total, done } => {
+            let shapes = refs(&keys);
+            let d = geo.page_vec(total);
+            if done && total == [0.0, 0.0] {
+                edit_doc::cancel(o);
+                Ok(())
+            } else if !done {
+                edit_doc::edit(o, t("Duplizieren"), false, |tx, eng| crate::structures::move_shapes(tx, eng, owner, &shapes, d, false))
+            } else {
+                let r = edit_doc::edit(o, t("Duplizieren"), done, |tx, eng| {
+                    let clip = ops::copy(tx.doc(), &crate::structures::carried(tx.doc(), &shapes));
+                    let new = ops::paste(tx, eng, owner, &clip, d)?;
+                    crate::structures::pasted(tx, eng, owner, &new)?;
+                    Ok(new)
+                });
+                r.map(|new| {
+                    if done {
+                        select = Some(new.iter().map(|&s| key_of(s)).collect());
+                    }
+                })
+            }
         }
         SeEv::Resize { keys, from, to, done } => {
             let shapes = refs(&keys);

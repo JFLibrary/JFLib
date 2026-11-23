@@ -26,7 +26,7 @@ cmd 4472
 expect dialog:"Nach Typ auswählen" exists
 expect radio:"Shapetyp" checked
 expect checkbox:"Shapes" checked
-expect checkbox:"Führungslinien" disabled
+expect checkbox:"Führungslinien" enabled
 click checkbox:"Shapes"
 click checkbox:"Bilder"
 click checkbox:"Verbinder"

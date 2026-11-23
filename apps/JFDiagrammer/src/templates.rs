@@ -135,6 +135,11 @@ pub(crate) struct Catalog {
     pub category: Option<String>,
     /// the form chosen in the preview
     pub form: usize,
+    /// (JD15, UI-05) the search over the templates' names (every language)
+    pub query: String,
+    /// (JD15, UI-04) the tile clicked last: entry, time, pointer (the double click's second
+    /// press lands on the preview that opened)
+    pub clicked: Option<(usize, u32, (i32, i32))>,
 }
 
 impl Catalog {
@@ -331,6 +336,10 @@ fn page_size(doc: &Document) -> (f64, f64) {
 
 /// Erstellen: a new drawing from form `f` of entry `k` in the units chosen
 pub(crate) fn create(app: &mut Diagrammer, ui: &mut Ui, k: usize, f: usize) -> bool {
+    // (JD15, UI-12) the changes of the open drawing first
+    if !crate::ask_save::guard(app, ui, crate::ask_save::Next::Template(k, f)) {
+        return false;
+    }
     let us = app.units_us == 1;
     let Some(e) = app.catalog.get(k) else { return false };
     let own = e.own();
@@ -355,7 +364,8 @@ pub(crate) fn create_from(app: &mut Diagrammer, ui: &mut Ui, mut doc: Document, 
     let windows = template::stencil_windows(&doc);
     template::to_drawing(&mut doc, stencils::lang());
     let name = crate::edit_doc::next_name();
-    let format = Format { kind: DocKind::Drawing, macros: false };
+    // (JD16, DF-05) a drawing from a .vstm keeps its macro project: a .vsdm
+    let format = Format { kind: DocKind::Drawing, macros: doc.macros };
     crate::edit_doc::install(app, ui, doc, name, None, format, None);
     open_stencils(app, ui, &windows, dir);
 }

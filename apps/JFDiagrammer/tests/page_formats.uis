@@ -1,0 +1,116 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD15: the page's formats -- Entwurf › Größe with the envelopes and the US
+# government sizes below their captions (RW-02); Seite einrichten: the predefined sizes ISO B,
+# envelopes, ANSI and ARCH (PG-04), the scale groups Architektur and Bauingenieurwesen (PG-06,
+# PR-07), the measuring units km, yd, mi, Pica, Cicero, Didot and the page's own unit shown
+# (PG-07, PR-08), Gitternetz drucken (PR-05), the placement style, direction, depth and flipping
+# of Layout und Routing (PG-11); Größe und Position takes yd and Cicero (PG-07).  The new
+# drawing's page is A4 landscape in millimetres.
+click tab:"Entwurf"
+click button:"Größe"
+expect text:"Umschläge" exists
+expect text:"Behördenformate" exists
+expect menuitem:"Umschlag C5" unchecked
+expect menuitem:"Government Legal" exists
+shot build/JFDiagrammer-page-formats.png
+click menuitem:"Umschlag C5"
+move 600,400
+cmd 4871
+expect radio:"Querformat" exists
+click tab:"Seitengröße"
+expect text:"Neue Seitengröße: 229 × 162 mm" exists
+click button:"Abbrechen"
+click button:"Größe"
+expect menuitem:"Umschlag C5" checked
+expect menuitem:"A4" unchecked
+click menuitem:"Government Letter"
+move 600,400
+cmd 4871
+click tab:"Seitengröße"
+expect text:"Neue Seitengröße: 267 × 203 mm" exists
+# PG-04: ANSI C from the predefined sizes, kept after OK
+expect radio:"Vordefinierte Größe" checked
+click combo:"Government Letter: 8 × 10,5 in"
+click "ANSI C: 17 × 22 in"
+expect text:"Neue Seitengröße: 559 × 432 mm" exists
+click button:"OK"
+cmd 4871
+click tab:"Seitengröße"
+expect radio:"Vordefinierte Größe" checked
+expect combo:"ANSI C: 17 × 22 in" exists
+# PR-08: the page's unit; PG-07: yards
+click tab:"Seiteneigenschaften"
+expect combo:"Millimeter" exists
+click combo:"Millimeter"
+expect "Cicero" exists
+expect "Didot" exists
+click "Yard"
+# PG-06 / PR-07: an architectural scale
+click tab:"Zeichnungsmaßstab"
+click radio:"Vordefinierter Maßstab"
+click combo:"Metrisch 1:10"
+click "Architektur 1/4″ = 1′ 0″"
+expect text:"Seitengröße in Zeichnungseinheiten: 26822 × 20726 mm" exists
+# PR-05: the grid prints
+click tab:"Drucken einrichten"
+expect checkbox:"Gitternetz drucken" unchecked
+click checkbox:"Gitternetz drucken"
+# PG-11: hierarchy from left to right, deep, flipped vertically
+click tab:"Layout und Routing"
+expect combo:"Von oben nach unten" disabled
+click #25924
+click "Hierarchie"
+expect combo:"Von oben nach unten" enabled
+click combo:"Von oben nach unten"
+click "Von links nach rechts"
+click #25926
+click "Tief"
+click #25927
+click "Vertikal"
+shot build/JFDiagrammer-page-layout.png
+click button:"OK"
+expect dialog:"Seite einrichten" missing
+# everything read back from the page
+cmd 4886
+expect tab:"Layout und Routing" selected
+expect combo:"Hierarchie" exists
+expect combo:"Von links nach rechts" exists
+expect combo:"Tief" exists
+expect combo:"Vertikal" exists
+click tab:"Seiteneigenschaften"
+expect combo:"Yard" exists
+click tab:"Zeichnungsmaßstab"
+expect radio:"Vordefinierter Maßstab" checked
+expect combo:"Architektur 1/4″ = 1′ 0″" exists
+click tab:"Drucken einrichten"
+expect checkbox:"Gitternetz drucken" checked
+click button:"Abbrechen"
+# undo takes the page's setup back in one step
+key ctrl+z
+cmd 4871
+click tab:"Seiteneigenschaften"
+expect combo:"Millimeter" exists
+click tab:"Zeichnungsmaßstab"
+expect radio:"Kein Maßstab (1:1)" checked
+click button:"Abbrechen"
+# the preview prints the grid (the ANSI C page on six A4 sheets)
+key ctrl+p
+expect text:"Blatt 1 von 6" exists
+shot build/JFDiagrammer-print-grid.png
+key esc
+# PG-07: Größe und Position takes yards and ciceros
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+click 570,375
+cmd 5138
+click #20515
+key ctrl+a
+type "0,1 yd"
+key enter
+expect #20515 text "91,4 mm"
+click #20515
+key ctrl+a
+type "20 c"
+key enter
+expect #20515 text "90,3 mm"

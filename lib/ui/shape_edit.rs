@@ -32,9 +32,11 @@
 //                       that is neither turned nor flipped; a flip reverses u or v); handles at
 //                       fx, fy in {0, 0.5, 1}, the rotation handle beyond the edge fy = 0
 //   SePoint { at, kind, tag, dir, flags }   SP_CONTROL (yellow), SP_CONN (connection points:
-//                       shown while connecting), SP_VERTEX (shown for a single selection when
-//                       the app lists them: vertex editing)
+//                       shown while connecting, with SeState::show_points those of every
+//                       visible shape, RA-06; SPF_OUTWARD: shown, no target), SP_VERTEX (shown
+//                       for a single selection when the app lists them: vertex editing)
 //   SeGuide { key, vertical, at }   guides (blue, dashed, across the canvas); moves snap to them
+//                       (SeState::snap and snap_guides; an app hides guides by leaving them out)
 //   SeMark { at, dir, tag, owner }  the app's insertion marks (Visio's blue triangle between two
 //                       items of a list): a small triangle, its tip at `at`, pointing in `dir`
 //   hit(p, tol, within) -> key      the topmost shape at world point p within tol world units
@@ -49,7 +51,10 @@
 // the model (the app's preview), the gesture keeps what it had at the start.  The connector and
 // line tools and the drawing tools draw a rubber band and report Connect / Draw when released;
 // a click with them selects like the pointer.  With Shift the rectangle and the ellipse tool draw
-// a square and a circle, and a move with Shift keeps to one axis (KB-09).  The freeform tool
+// a square and a circle, and a move with Shift keeps to one axis (KB-09); a drag of the selection
+// that starts with Ctrl + Shift moves a copy of it (SeEv::MoveCopy, live like Move: the app
+// shows a preview each step and makes the copy when released; one axis while Shift is held,
+// KB-09).  The freeform tool
 // records the pointer's way (a point every 2 px) and reports SeEv::Stroke when released; the arc
 // tool shows a quarter ellipse from the press to the pointer, bowing the way the drag started
 // (horizontally or vertically, decided once the pointer left the drag threshold), and reports
@@ -59,17 +64,23 @@
 // selects it (Shift adds, Ctrl toggles) and a drag moves the selection (grid, dynamic grid,
 // guides; Alt: free); a second, slow click on a selected group selects the child under the
 // pointer; a double click edits the text (SeEv::Text); on the background a drag draws a marquee
-// or, with SeState::lasso, a free outline (shapes fully inside; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
+// or, with SeState::lasso, a free outline (shapes fully inside, with SeState::partial also those
+// it touches, ZF-06; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
 // handles change one side (a locked aspect: both), Ctrl resizes about the middle; locked handles
 // are drawn grey and do nothing.  The rotation handle turns about the pin (one shape) or the
 // middle of the selection: in 15-degree steps near the shape, in single degrees farther away.
 // An end or a control point that can glue snaps to a connection point under the pointer (static
 // glue); over a shape a dynamic connector's end glues to the whole shape (dynamic glue, the
-// shape's frame is highlighted).  Ctrl + Shift + click zooms in at the pointer, + drag zooms to
-// the rectangle, + right click zooms out (ZF-22).  Keys while the canvas has the focus: Esc
+// shape's frame is highlighted); with Ctrl held a dynamic end swaps the two (CN-03): over a
+// connection point it glues to that point's shape as a whole, over a shape to the shape's
+// nearest connection point.  Connection points with SPF_OUTWARD are no target for ends (SS-29).
+// Ctrl + Shift + click zooms in at the pointer (on a selected shape too), + drag zooms to the
+// rectangle (from a selected shape: the copy above), + right click zooms out (ZF-22), + right
+// drag pans the view (KB-04).  Keys while the canvas has the focus: Esc
 // cancels the gesture, else clears the selection; Del deletes; Ctrl+A selects all; arrows nudge
 // by a grid step (Shift: a pixel) or pan without a selection; Tab / Shift+Tab walk the top-level
-// shapes; F2 and Enter edit the text of the single selection, so does typing a character (the
+// shapes (without a selection Tab takes the first, Shift+Tab the last, KB-06); F2 and Enter edit
+// the text of the single selection, so does typing a character (the
 // character is handed on).  A right click selects the shape under the pointer first and reports
 // SeEv::Context; the menu itself (also from Shift+F10 and the menu key) is the app's
 // ui.context_menu right after this call.
@@ -162,6 +173,9 @@ pub const SP_CONN: u8 = 1;
 pub const SP_VERTEX: u8 = 2;
 /// point flags (SePoint::flags)
 pub const SPF_GLUE: u32 = 1; // a control point that glues to connection points (SP-04)
+/// a connection point that points outward only (Visio's Type 1): shown, but no end glues to it
+/// (SS-29)
+pub const SPF_OUTWARD: u32 = 2;
 
 /// a frame in world units: the point o + fx u + fy v for fx, fy in 0..1
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -296,6 +310,9 @@ pub enum SeEv {
     Select,
     /// move `keys` by total (world units, from the start of the drag; a key nudge: done at once)
     Move { keys: Vec<u64>, total: [f32; 2], done: bool },
+    /// a drag with Ctrl + Shift: a copy of `keys` goes `total` from them (live like Move: a
+    /// preview each step, done: the copy, one undo step; KB-09)
+    MoveCopy { keys: Vec<u64>, total: [f32; 2], done: bool },
     /// resize: the frame `from` (one shape: its frame; several: the box around them) became `to`
     Resize { keys: Vec<u64>, from: SeBox, to: SeBox, done: bool },
     /// turn `keys` about `centre` by `angle` radians (counter-clockwise as seen)
@@ -499,7 +516,8 @@ enum G {
     /// shape was selected before
     Press { hit: SHit, px: [i32; 2], at: [f32; 2], mods: u32, was: bool },
     Hold,
-    Move { keys: Vec<u64>, start: [f32; 2], bb: [f32; 4], total: [f32; 2] },
+    /// copy: a copy moves (Ctrl + Shift at the press, KB-09)
+    Move { keys: Vec<u64>, start: [f32; 2], bb: [f32; 4], total: [f32; 2], copy: bool },
     Resize { keys: Vec<u64>, h: u8, from: SeBox, to: SeBox, aspect: bool },
     Rotate { keys: Vec<u64>, centre: [f32; 2], last: f32, turn: f32, angle: f32 },
     Pin { key: u64, at: [f32; 2] },
@@ -515,6 +533,15 @@ enum G {
     Stroke { pts: Vec<[f32; 2]>, ga: SeGlue },
     /// the arc tool: from a to b, the direction it leaves a (None: not decided yet)
     Arc { a: [f32; 2], ga: SeGlue, b: [f32; 2], h: Option<bool> },
+}
+
+// a pan with the right button (Ctrl + Shift held at the press)
+#[derive(Clone, Copy)]
+struct RPan {
+    px: [i32; 2],
+    cx: f64,
+    cy: f64,
+    moved: bool,
 }
 
 // an alignment line of the dynamic grid: from a to b (world)
@@ -537,10 +564,19 @@ pub struct SeState {
     pub dyn_grid: bool,
     /// ends glue (Ansicht › Ausrichten und Kleben)
     pub glue: bool,
-    /// show every connection point of the hovered shape, not only while connecting (CN-01)
+    /// show the connection points of every visible shape, not only while connecting (CN-01,
+    /// RA-06; also while glue is off)
     pub show_points: bool,
     /// a drag on the background draws a lasso (a free outline) instead of a rectangle (ZF-06)
     pub lasso: bool,
+    /// the marquee and the lasso also take the shapes they only touch (ZF-06; off: only those
+    /// wholly inside)
+    pub partial: bool,
+    /// moves snap to guides and to the dynamic grid at all (off: a page that inhibits snapping,
+    /// SS-39; the grid is DiagramState::snap)
+    pub snap: bool,
+    /// moves snap to guides (Ausrichten und Kleben › Führungslinien)
+    pub snap_guides: bool,
     /// the vertex chosen with a click (Del removes it): its shape and tag
     pub vertex: Option<(u64, u32)>,
     /// connection arrows around the shape under the pointer (Ansicht › Verbindungspfeile; see
@@ -561,6 +597,11 @@ pub struct SeState {
     // the shape whose rotation pin shows (after the pointer rested on its rotation handle, as
     // in Visio: a press in a shape's middle moves the shape, not its pin)
     pin_shown: u64,
+    // Ctrl + Shift + right button held: where it went down, the view's middle then, whether it
+    // left the drag threshold (a pan, KB-04)
+    rpan: Option<RPan>,
+    // this call's right release was the magnifier's or a pan's (no context menu)
+    rtaken: bool,
     g: G,
     hover: SHit,
     // what the glue would be now (drawing)
@@ -583,7 +624,7 @@ impl Default for SeState {
 }
 
 impl SeState {
-    /// nothing selected; dynamic grid, glue and connection arrows on
+    /// nothing selected; dynamic grid, glue, snapping and connection arrows on
     pub fn new() -> SeState {
         SeState {
             sel: BTreeSet::new(),
@@ -593,6 +634,9 @@ impl SeState {
             glue: true,
             show_points: false,
             lasso: false,
+            partial: false,
+            snap: true,
+            snap_guides: true,
             vertex: None,
             arrows: true,
             arrow_key: 0,
@@ -603,6 +647,8 @@ impl SeState {
             quiet: None,
             pend: Vec::new(),
             pin_shown: 0,
+            rpan: None,
+            rtaken: false,
             g: G::Idle,
             hover: SHit::None,
             glue_now: SeGlue::None,
@@ -625,6 +671,12 @@ impl SeState {
     /// a live gesture is in progress (the app shows a preview of it)
     pub fn live(&self) -> bool {
         matches!(self.g, G::Move { .. } | G::Resize { .. } | G::Rotate { .. } | G::Pin { .. } | G::End { .. } | G::Point { .. })
+    }
+
+    /// the right button's release in the last call of ui.shape_edit belonged to Ctrl + Shift
+    /// (the magnifier zooming out, a pan): the app opens no context menu for it
+    pub fn right_taken(&self) -> bool {
+        self.rtaken
     }
 
     /// the connection arrow under the pointer: the shape's key and the direction (0 right,
@@ -970,9 +1022,36 @@ impl Ui {
         };
         let g = core::mem::take(&mut st.g);
         st.g = self.se_follow(st, dg, m, &i, g, &mut out);
-        // right click (not with Ctrl + Shift: the magnifier zooms out)
-        if i.ev & EV_RCLICK != 0 && idle {
-            if i.mods & (MOD_CTRL | MOD_SHIFT) == MOD_CTRL | MOD_SHIFT {
+        // Ctrl + Shift + right drag pans (KB-04); released without a drag it is the click below
+        let right = 1 << BTN_RIGHT;
+        let both = i.mods & (MOD_CTRL | MOD_SHIFT) == MOD_CTRL | MOD_SHIFT;
+        if st.rpan.is_none() && idle && both && i.pressed & right != 0 && i.ev & EV_HOVER != 0 && !i.space && !i.panning {
+            st.rpan = Some(RPan { px: i.px, cx: dg.vp.cx, cy: dg.vp.cy, moved: false });
+        }
+        let mut panned = false;
+        if let Some(mut rp) = st.rpan.take() {
+            if (i.px[0] - rp.px[0]).abs() > i.lim || (i.px[1] - rp.px[1]).abs() > i.lim {
+                rp.moved = true;
+            }
+            if rp.moved {
+                let sc = dg.vp.scale();
+                let (cx, cy) = (rp.cx - (i.px[0] - rp.px[0]) as f64 / sc, rp.cy - (i.px[1] - rp.px[1]) as f64 / sc);
+                if (cx, cy) != (dg.vp.cx, dg.vp.cy) {
+                    dg.vp.cx = cx;
+                    dg.vp.cy = cy;
+                    self.repass();
+                }
+            }
+            if i.btn & right != 0 {
+                st.rpan = Some(rp);
+            } else {
+                panned = rp.moved;
+            }
+        }
+        // right click (not with Ctrl + Shift: the magnifier zooms out; nothing after a pan)
+        st.rtaken = panned || (i.ev & EV_RCLICK != 0 && idle && both);
+        if i.ev & EV_RCLICK != 0 && idle && !panned {
+            if both {
                 dg.vp.step(-1, i.px[0] as f32 + 0.5, i.px[1] as f32 + 0.5);
             } else {
                 let k = match st.hover {
@@ -1002,7 +1081,7 @@ impl Ui {
         }
         // the cursor for the next call of ui.diagram
         dg.ext_cursor = self.se_cursor(st, m, tool);
-        dg.ext_moving = st.live() || matches!(st.g, G::Marquee { .. } | G::Lasso { .. } | G::Connect { .. } | G::Draw { .. } | G::Zoom { .. } | G::Stroke { .. } | G::Arc { .. });
+        dg.ext_moving = st.live() || st.rpan.is_some_and(|r| r.moved) || matches!(st.g, G::Marquee { .. } | G::Lasso { .. } | G::Connect { .. } | G::Draw { .. } | G::Zoom { .. } | G::Stroke { .. } | G::Arc { .. });
         // (pointer moves bring the frames of a gesture: no pass is asked for while one runs)
         if !out.is_empty() {
             self.repass();
@@ -1219,14 +1298,20 @@ impl Ui {
         st.say_arrow(out);
     }
 
-    // what an end or a control point at p would glue to; the point it would go to
-    fn se_glue(&self, st: &SeState, dg: &DiagramState, m: &SeModel, p: [f32; 2], exclude: u64, dynamic: bool) -> (SeGlue, [f32; 2]) {
+    // what an end or a control point at p would glue to; the point it would go to.  `swap`
+    // (Ctrl held, a dynamic end): a connection point under p gives its shape as a whole, a shape
+    // under p its nearest connection point (CN-03)
+    #[allow(clippy::too_many_arguments)]
+    fn se_glue(&self, st: &SeState, dg: &DiagramState, m: &SeModel, p: [f32; 2], exclude: u64, dynamic: bool, swap: bool) -> (SeGlue, [f32; 2]) {
         if !st.glue {
             return (SeGlue::None, p);
         }
         let s = dg.vp.scale() as f32;
         let reach = self.dp(GLUE_DIP) as f32 / s;
-        // connection points of the shapes near p
+        let swap = swap && dynamic;
+        let whole = |k: u64| k != 0 && k != exclude && st.shape(m, k).is_some_and(|sh| sh.flags & (SEF_NOGLUE | SEF_1D) == 0);
+        // connection points of the shapes near p (those pointing outward only are no target)
+        let target = |q: &SePoint| q.kind == SP_CONN && q.flags & SPF_OUTWARD == 0;
         let mut best: Option<(f32, u64, u32, [f32; 2])> = None;
         for sh in m.shapes {
             if sh.key == exclude || sh.flags & SEF_NOGLUE != 0 || sh.points.is_empty() {
@@ -1238,7 +1323,7 @@ impl Ui {
             }
             for k in range_of(&sh.points, m.points.len()) {
                 let q = &m.points[k];
-                if q.kind != SP_CONN {
+                if !target(q) {
                     continue;
                 }
                 let d = dist(p, q.at);
@@ -1248,11 +1333,23 @@ impl Ui {
             }
         }
         if let Some((_, key, tag, at)) = best {
+            if swap && whole(key) {
+                return (SeGlue::Shape(key), p);
+            }
             return (SeGlue::Point { key, tag }, at);
         }
         if dynamic {
             let k = (m.hit)(p, self.dp(2) as f32 / s, 0);
-            if k != 0 && k != exclude && st.shape(m, k).is_some_and(|sh| sh.flags & (SEF_NOGLUE | SEF_1D) == 0) {
+            if whole(k) {
+                if swap {
+                    // the shape's nearest connection point
+                    let near = st.shape(m, k).and_then(|sh| {
+                        range_of(&sh.points, m.points.len()).map(|j| &m.points[j]).filter(|q| target(q)).min_by(|a, b| dist(p, a.at).total_cmp(&dist(p, b.at)))
+                    });
+                    if let Some(q) = near {
+                        return (SeGlue::Point { key: k, tag: q.tag }, q.at);
+                    }
+                }
                 return (SeGlue::Shape(k), p);
             }
         }
@@ -1264,6 +1361,9 @@ impl Ui {
     }
 
     fn se_cursor(&self, st: &SeState, m: &SeModel, tool: u32) -> u32 {
+        if st.rpan.is_some_and(|r| r.moved) {
+            return CUR_HAND;
+        }
         match st.g {
             G::Move { .. } => return CUR_MOVE,
             G::Resize { h, ref to, .. } => return size_cursor([to.at(HANDLES[h as usize][0], HANDLES[h as usize][1])[0] - to.at(0.5, 0.5)[0], to.at(HANDLES[h as usize][0], HANDLES[h as usize][1])[1] - to.at(0.5, 0.5)[1]]),
@@ -1295,8 +1395,15 @@ impl Ui {
         if !lpress {
             return G::Idle;
         }
-        // the magnifier
+        // the magnifier; on a selected shape a press that becomes a drag copies the selection
+        // (KB-09), a click zooms in there too (se_click)
         if i.mods & (MOD_CTRL | MOD_SHIFT) == MOD_CTRL | MOD_SHIFT {
+            if let (SHit::Shape(k), SE_POINTER) = (st.hover, tool) {
+                if st.sel.contains(&k) {
+                    st.last_hit = None;
+                    return G::Press { hit: st.hover, px: i.px, at: i.p, mods: i.mods, was: true };
+                }
+            }
             return G::Zoom { start: i.p, cur: i.p };
         }
         let hit = st.hover;
@@ -1367,6 +1474,12 @@ impl Ui {
             out.push(SeEv::Draw { tool, a, b: a });
             return G::Idle;
         }
+        // Ctrl + Shift + click on a selected shape: the magnifier as anywhere else
+        if mods & (MOD_CTRL | MOD_SHIFT) == MOD_CTRL | MOD_SHIFT {
+            let p = dg.vp.to_screen(at);
+            dg.vp.step(1, p[0], p[1]);
+            return G::Idle;
+        }
         match hit {
             SHit::Shape(k) => {
                 if mods & (MOD_SHIFT | MOD_CTRL) == 0 && was {
@@ -1429,7 +1542,7 @@ impl Ui {
         // the freeform and the arc tool start glued like a line (CN-12); the stroke starts where
         // the press was, the arc on the grid
         if matches!(tool, SE_FREEFORM | SE_ARC) && !matches!(hit, SHit::Point(..) | SHit::End(..)) {
-            let (ga, a) = self.se_glue(st, dg, m, at, 0, false);
+            let (ga, a) = self.se_glue(st, dg, m, at, 0, false, false);
             if tool == SE_FREEFORM {
                 return G::Stroke { pts: alloc::vec![a], ga };
             }
@@ -1438,13 +1551,15 @@ impl Ui {
         }
         if tool == SE_CONNECT || (tool == SE_LINE && !matches!(hit, SHit::Point(..) | SHit::End(..))) {
             let dynamic = tool == SE_CONNECT;
-            let (ga, a) = self.se_glue(st, dg, m, at, 0, dynamic);
+            let (ga, a) = self.se_glue(st, dg, m, at, 0, dynamic, mods & MOD_CTRL != 0);
             let a = if ga == SeGlue::None { self.se_snap_pt(dg, a, mods) } else { a };
             return G::Connect { tool, a, ga, b: a };
         }
         match hit {
             SHit::Shape(k) if st.sel.contains(&k) => {
-                let keys = st.movable(m);
+                // Ctrl + Shift: a copy of the whole selection moves (KB-09)
+                let copy = mods & (MOD_CTRL | MOD_SHIFT) == MOD_CTRL | MOD_SHIFT;
+                let keys = if copy { st.sel.iter().copied().collect() } else { st.movable(m) };
                 if keys.is_empty() {
                     return G::Hold;
                 }
@@ -1458,7 +1573,7 @@ impl Ui {
                         });
                     }
                 }
-                G::Move { keys, start: at, bb: bb.unwrap_or([at[0], at[1], at[0], at[1]]), total: [0.0; 2] }
+                G::Move { keys, start: at, bb: bb.unwrap_or([at[0], at[1], at[0], at[1]]), total: [0.0; 2], copy }
             }
             SHit::Handle(k, h) => match st.shape(m, k) {
                 Some(sh) if handle_free(sh.flags, h) => {
@@ -1530,15 +1645,16 @@ impl Ui {
                     G::Idle
                 }
             }
-            G::Move { keys, start, bb, total } => {
+            G::Move { keys, start, bb, total, copy } => {
                 let raw = [i.p[0] - start[0], i.p[1] - start[1]];
                 // Shift: along one axis, the one the pointer went farther on (KB-09)
                 let raw = if i.mods & MOD_SHIFT != 0 { if raw[0].abs() >= raw[1].abs() { [raw[0], 0.0] } else { [0.0, raw[1]] } } else { raw };
                 let t = self.se_snap_move(st, dg, m, &keys, bb, raw, i.mods);
                 if t != total || done {
-                    out.push(SeEv::Move { keys: keys.clone(), total: t, done });
+                    let keys = keys.clone();
+                    out.push(if copy { SeEv::MoveCopy { keys, total: t, done } } else { SeEv::Move { keys, total: t, done } });
                 }
-                if done { G::Idle } else { G::Move { keys, start, bb, total: t } }
+                if done { G::Idle } else { G::Move { keys, start, bb, total: t, copy } }
             }
             G::Resize { keys, h, from, to, aspect } => {
                 let p = if from.axis_parallel() { self.se_snap_pt(dg, i.p, i.mods) } else { i.p };
@@ -1581,7 +1697,7 @@ impl Ui {
                 if done { G::Idle } else { G::Pin { key, at: a } }
             }
             G::End { key, end, at, glue, dynamic } => {
-                let (gl, p) = self.se_glue(st, dg, m, i.p, key, dynamic);
+                let (gl, p) = self.se_glue(st, dg, m, i.p, key, dynamic, i.mods & MOD_CTRL != 0);
                 let a = if gl == SeGlue::None { self.se_snap_pt(dg, p, i.mods) } else { p };
                 st.glue_now = gl;
                 if a != at || gl != glue || done {
@@ -1590,7 +1706,7 @@ impl Ui {
                 if done { G::Idle } else { G::End { key, end, at: a, glue: gl, dynamic } }
             }
             G::Point { key, idx, tag, at, glue, glues } => {
-                let (gl, p) = if glues { self.se_glue(st, dg, m, i.p, key, false) } else { (SeGlue::None, i.p) };
+                let (gl, p) = if glues { self.se_glue(st, dg, m, i.p, key, false, false) } else { (SeGlue::None, i.p) };
                 let a = if gl == SeGlue::None { self.se_snap_pt(dg, p, i.mods) } else { p };
                 st.glue_now = gl;
                 if a != at || gl != glue || done {
@@ -1604,7 +1720,9 @@ impl Ui {
                 let toggle = mods & MOD_CTRL != 0;
                 let mut sel = base.clone();
                 for sh in m.shapes {
-                    if sh.parent != 0 || sh.flags & SEF_NOSELECT != 0 || !inside(sh.bbox, rr) {
+                    // wholly inside, or (SeState::partial) touched
+                    let taken = if st.partial { overlaps(sh.bbox, rr) } else { inside(sh.bbox, rr) };
+                    if sh.parent != 0 || sh.flags & SEF_NOSELECT != 0 || !taken {
                         continue;
                     }
                     if toggle && sel.contains(&sh.key) {
@@ -1632,9 +1750,16 @@ impl Ui {
                     if sh.parent != 0 || sh.flags & SEF_NOSELECT != 0 {
                         continue;
                     }
-                    // fully inside: the corners of its box inside the outline
+                    // fully inside: the corners of its box inside the outline; (SeState::partial)
+                    // touched: a corner inside, or the outline's way through its box
                     let b = sh.bbox;
-                    if ![[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].iter().all(|&c| in_polygon(&pts, c)) {
+                    let corners = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]];
+                    let taken = if st.partial {
+                        corners.iter().any(|&c| in_polygon(&pts, c)) || pts.iter().any(|q| inside([q[0], q[1], q[0], q[1]], b))
+                    } else {
+                        corners.iter().all(|&c| in_polygon(&pts, c))
+                    };
+                    if !taken {
                         continue;
                     }
                     if toggle && sel.contains(&sh.key) {
@@ -1667,7 +1792,7 @@ impl Ui {
                 }
             }
             G::Connect { tool, a, ga, .. } => {
-                let (gb, p) = self.se_glue(st, dg, m, i.p, 0, tool == SE_CONNECT);
+                let (gb, p) = self.se_glue(st, dg, m, i.p, 0, tool == SE_CONNECT, i.mods & MOD_CTRL != 0);
                 // an end does not glue to the shape the other end glues to as a whole
                 let gb = match (ga, gb) {
                     (SeGlue::Shape(x), SeGlue::Shape(y)) if x == y => SeGlue::None,
@@ -1705,7 +1830,7 @@ impl Ui {
                 if pts.last().is_none_or(|q| dist(*q, i.p) * s >= 2.0) && pts.len() < 8192 {
                     pts.push(i.p);
                 }
-                let (gb, p) = self.se_glue(st, dg, m, i.p, 0, false);
+                let (gb, p) = self.se_glue(st, dg, m, i.p, 0, false, false);
                 st.glue_now = gb;
                 if done {
                     st.glue_now = SeGlue::None;
@@ -1722,7 +1847,7 @@ impl Ui {
                 }
             }
             G::Arc { a, ga, h, .. } => {
-                let (gb, p) = self.se_glue(st, dg, m, i.p, 0, false);
+                let (gb, p) = self.se_glue(st, dg, m, i.p, 0, false, false);
                 let b = if gb == SeGlue::None { self.se_snap_pt(dg, p, i.mods) } else { p };
                 // the bow: the axis the pointer left the threshold along
                 let raw = [(i.p[0] - a[0]) * s, (i.p[1] - a[1]) * s];
@@ -1763,15 +1888,16 @@ impl Ui {
                 best[axis] = Some((prio, d.abs(), d, v, b));
             }
         };
+        let guides: &[SeGuide] = if st.snap && st.snap_guides { m.guides } else { &[] };
         for axis in 0..2 {
             let ours = [mv[axis], (mv[axis] + mv[axis + 2]) * 0.5, mv[axis + 2]];
-            for gd in m.guides.iter().filter(|g| g.vertical == (axis == 0)) {
+            for gd in guides.iter().filter(|g| g.vertical == (axis == 0)) {
                 let b = if axis == 0 { [gd.at, page[1], gd.at, page[3]] } else { [page[0], gd.at, page[2], gd.at] };
                 for &x in &ours {
                     offer(axis, 0, gd.at - x, gd.at, b);
                 }
             }
-            if st.dyn_grid {
+            if st.snap && st.dyn_grid {
                 for sh in m.shapes {
                     if sh.parent != 0 || keys.contains(&sh.key) || sh.flags & (SEF_1D | SEF_NOSNAP) != 0 || !overlaps(sh.bbox, page) {
                         continue;
@@ -1872,10 +1998,11 @@ impl Ui {
             let k = if km & MOD_SHIFT != 0 { 1.0 / sc as f32 } else if dg.grid > 0.0 { dg.grid } else { 8.0 };
             out.push(SeEv::Move { keys, total: [dx * k, dy * k], done: true });
         }
-        // Tab / Shift+Tab: the next top-level shape (after the last one the focus leaves)
+        // Tab / Shift+Tab: the next top-level shape (after the last one the focus leaves);
+        // without a selection the first (Shift: the last) one, wherever the focus was (KB-06)
         if let Some((i, km)) = self.dg_key_find(VK_TAB, 0, MOD_CTRL | MOD_ALT) {
             let keys: Vec<u64> = m.shapes.iter().filter(|s| s.parent == 0 && s.flags & SEF_NOSELECT == 0).map(|s| s.key).collect();
-            let pos = keys.iter().position(|&k| k == st.focus);
+            let pos = if st.sel.is_empty() { None } else { keys.iter().position(|&k| k == st.focus) };
             let next = match (pos, km & MOD_SHIFT != 0) {
                 (None, false) => keys.first().copied(),
                 (None, true) => keys.last().copied(),
@@ -2054,10 +2181,14 @@ impl Ui {
                 self.cmd_rrect(x, y, e * 2, e * 2, 0, hair, bg, accent, accent);
             }
         }
-        // connection points: while connecting or moving an end, with the connector tool, or always
-        let connecting = matches!(st.g, G::Connect { .. } | G::End { .. } | G::Stroke { .. } | G::Arc { .. }) || matches!(st.g, G::Point { glues: true, .. }) || matches!(tool, SE_CONNECT | SE_LINE | SE_FREEFORM | SE_ARC) || st.show_points;
-        if connecting && st.glue {
+        // connection points: while connecting or moving an end, with the connector tool (the
+        // shapes under the pointer and glued to), or always those of every visible shape (RA-06)
+        let connecting = matches!(st.g, G::Connect { .. } | G::End { .. } | G::Stroke { .. } | G::Arc { .. }) || matches!(st.g, G::Point { glues: true, .. }) || matches!(tool, SE_CONNECT | SE_LINE | SE_FREEFORM | SE_ARC);
+        if connecting && st.glue || st.show_points {
             let mut keys: Vec<u64> = Vec::new();
+            if st.show_points {
+                keys.extend(m.shapes.iter().filter(|s| !s.points.is_empty() && overlaps(s.bbox, wr)).map(|s| s.key));
+            }
             if st.hover_shape != 0 {
                 keys.push(st.hover_shape);
             }

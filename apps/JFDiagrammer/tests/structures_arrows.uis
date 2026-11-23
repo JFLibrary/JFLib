@@ -3,7 +3,8 @@
 # pointer on a shape shows four arrows; with a shape below, a click on the lower arrow connects to
 # it; a click on the right one puts a copy of the shape (no stencil open) to the right at the
 # page's spacing (7.5 mm) with a connector; Ansicht › Verbindungspfeile switches them off; Shapes
-# verbinden chains the selection in the order it was selected
+# verbinden chains the selection in the order it was selected, (JD15) with the connector master
+# marked in the Shapes panel
 cmd 4404
 drag 500,430 640,520
 cmd 4404
@@ -33,3 +34,17 @@ expect listitem:"Sheet.9" exists
 shot build/JFDiagrammer-structures-arrows.png
 key ctrl+z
 expect listitem:"Sheet.9" missing
+# (JD15) Shapes verbinden with the connector master marked in the Shapes panel (Verbinder ›
+# Kurvenverbinder armed): an instance of it glued to both shapes, the tile disarmed
+click button:"Weitere Shapes"
+click "Extras"
+click menuitem:"Verbinder"
+click 760,470
+click 600,670 shift
+click button:"Kurvenverbinder"
+cmd 5421
+expect listitem:"Kurvenverbinder" exists
+expect listitem:"Sheet.9" missing
+shot build/JFDiagrammer-structures-connect-master.png
+key ctrl+z
+expect listitem:"Kurvenverbinder" missing

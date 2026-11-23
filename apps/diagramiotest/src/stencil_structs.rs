@@ -88,6 +88,7 @@ pub(crate) const CALLOUTS: &[(&str, &str)] = &[
     ("sticker_rounded.master", include_str!("../../JFDiagrammer/stencils/callouts/sticker_rounded.master")),
     ("jagged_star_1.master", include_str!("../../JFDiagrammer/stencils/callouts/jagged_star_1.master")),
     ("jagged_star_2.master", include_str!("../../JFDiagrammer/stencils/callouts/jagged_star_2.master")),
+    ("auto_dimension.master", include_str!("../../JFDiagrammer/stencils/callouts/auto_dimension.master")),
     ("tip.master", include_str!("../../JFDiagrammer/stencils/callouts/tip.master")),
 ];
 
@@ -149,6 +150,8 @@ const SETS: [(&str, &[(&str, &str)], &[Want]); 3] = [
             ("Rounded sticker", "", false),
             ("Jagged star 1", "", false),
             ("Jagged star 2", "", false),
+            // (JD15) a dimension line whose text field shows its length: no callout
+            ("Auto-dimension", "", false),
             // (JD13) the hidden note box of the templates' start drawings: no callout
             ("Tip", "", true),
         ],
@@ -262,6 +265,11 @@ pub fn run(h: &mut H) {
                 .collect();
             let same = got.len() == want.len() && got.iter().zip(want.iter()).all(|(g, w)| g.0 == w.0 && g.1 == w.1 && g.2 == w.2);
             h.check(&format!("{tag}/masters"), same, format!("{got:?}"));
+            // (JD15, SH-G04) the callouts' quick shapes: the four most used, at the front
+            if name == "callouts" {
+                let quick: Vec<bool> = doc.masters().map(|mr| MasterTexts::of(&doc, mr).quick).collect();
+                h.check(&format!("{tag}/quick"), quick.iter().enumerate().all(|(i, q)| *q == (i < 4)), format!("{} quick of {}: {quick:?}", quick.iter().filter(|q| **q).count(), quick.len()));
+            }
             let mut d = doc.clone();
             let res = Engine::new().calculate(&d);
             let bad: Vec<String> = res

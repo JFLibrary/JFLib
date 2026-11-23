@@ -8,9 +8,12 @@
 //
 // Pages today: Neu is the template catalogue (templates_ui.rs, JD13: categories, rendered
 // previews, starter diagrams, units, Erstellen; UI-04, VL-01).  Öffnen (JD4) browses
-// with the file dialog and lists the drawings opened last; they open read-only (viewer.rs).
+// with the file dialog and lists the drawings opened last; they open for editing (JD7), with
+// Schreibgeschützt öffnen read-only (JD15, DM-09), with Als Kopie öffnen as a new, unnamed
+// drawing (JD15, UI-06); a drawing with changes asks first (ask_save.rs, UI-12).
 // Speichern and Speichern unter write the drawing (JD7), Speichern unter also as a template
-// into the own template folder (JD13, EX-11); Drucken
+// into the own template folder (JD13, EX-11), in one of the folders used last and as one of the
+// file types (JD15, UI-08, UI-11); Drucken
 // and Exportieren are print_ui.rs and export_ui.rs (JD12).  Info names the version, the licences and the place of the
 // AWS attribution.  Optionen lists its pages at the side (options.rs).
 
@@ -18,6 +21,7 @@ use alloc::format;
 use ui::i18n::{t, tf};
 use ui::*;
 
+use crate::ask_save::Mode;
 use crate::commands;
 use crate::icons::*;
 use crate::options;
@@ -76,7 +80,11 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
         PAGE_SAVE | PAGE_SAVE_AS => save_page(app, ui, page == PAGE_SAVE_AS),
         PAGE_PRINT => crate::print_ui::page(app, ui),
         PAGE_EXPORT => crate::export_ui::page(app, ui),
-        PAGE_INFO => info_page(ui),
+        PAGE_INFO => {
+            // (JD16, DF-09) the drawing's properties first
+            crate::doc_file::props_page(app, ui);
+            info_page(ui)
+        }
         _ => options_page(app, ui),
     }
     ui.backstage_end();
@@ -93,12 +101,23 @@ fn title(ui: &mut Ui, s: &str) {
 fn open_page(app: &mut Diagrammer, ui: &mut Ui) {
     title(ui, t("Öffnen"));
     ui.box_begin(ID_PAGE, BOX_H, 24);
+    // (JD15, DM-09, UI-06) under Durchsuchen: read-only (for Durchsuchen and Zuletzt verwendet),
+    // a copy
+    ui.next_size(200, 0);
+    ui.box_begin(ID_PAGE + 3, BOX_V | BOX_XSTART, 8);
     ui.next_size(96, 66);
     if ui.ribbon_button(ID_PAGE + 1, t("Durchsuchen"), JD_OPEN_L, ST_LARGE) & EV_ACT != 0 {
-        app.open_dlg.set(1);
-        ui.repass();
+        open_dialog(app, ui, if app.ask.read_only != 0 { Mode::ReadOnly } else { Mode::Edit });
     }
-    ui.tooltip(t("Eine Zeichnung, Schablone oder Vorlage öffnen (schreibgeschützt)"));
+    ui.tooltip(t("Eine Zeichnung, Schablone oder Vorlage öffnen"));
+    ui.checkbox(ID_PAGE + 4, t("Schreibgeschützt öffnen"), &mut app.ask.read_only);
+    ui.next_flags(ST_SUBTLE | ST_ALIGN_START);
+    ui.next_icon(JD_OPEN);
+    if ui.button(ID_PAGE + 5, t("Als Kopie öffnen…")) & EV_ACT != 0 {
+        open_dialog(app, ui, Mode::Copy);
+    }
+    ui.tooltip(t("Eine Zeichnung als neue, unbenannte Zeichnung öffnen; die Datei bleibt, wie sie ist"));
+    ui.box_end();
     ui.next_size(420, 0);
     ui.box_begin(0, BOX_V, 6);
     ui.text(TS_BODY_STRONG, t("Zuletzt verwendet"));
@@ -120,12 +139,41 @@ fn open_page(app: &mut Diagrammer, ui: &mut Ui) {
     ui.box_end();
     ui.box_end();
     if let Some(p) = chosen {
-        crate::viewer::open(app, ui, &p);
+        let mode = if app.ask.read_only != 0 { Mode::ReadOnly } else { Mode::Edit };
+        crate::ask_save::open(app, ui, &p, mode);
     }
 }
 
+// (JD15) Öffnen's file dialog for a file opened as `mode`; it starts in the folder of the open
+// drawing's file (else where it was used last)
+pub(crate) fn open_dialog(app: &mut Diagrammer, ui: &mut Ui, mode: Mode) {
+    if let Some(dir) = app.opened.as_ref().and_then(|o| o.ed.path.as_ref()).and_then(|p| p.rsplit_once(['/', '\\'])).map(|x| x.0) {
+        app.open_path = format!("{dir}/");
+    }
+    app.ask.dlg_mode = mode;
+    app.open_dlg.set(1);
+    ui.repass();
+}
+
+// the file types of Speichern unter: description, extension (viewer::SAVE_EXTS)
 // i18n
 static FILE_TYPES: [&str; 4] = ["Visio-Zeichnung (.vsdx)", "Visio-Schablone (.vssx)", "Visio-Vorlage (.vstx)", "Visio-Zeichnung mit Makros (.vsdm)"];
+const FILE_EXTS: [&str; 4] = ["vsdx", "vssx", "vstx", "vsdm"];
+
+/// (JD15, UI-08) the folders of the files used last (Zuletzt verwendet), each once, at most 8
+pub(crate) fn recent_folders(ui: &Ui) -> alloc::vec::Vec<alloc::string::String> {
+    let mut out: alloc::vec::Vec<alloc::string::String> = alloc::vec::Vec::new();
+    for p in ui.recent_files() {
+        let Some((dir, _)) = p.rsplit_once(['/', '\\']) else { continue };
+        if !dir.is_empty() && !out.iter().any(|d| d.eq_ignore_ascii_case(dir)) {
+            out.push(alloc::string::String::from(dir));
+        }
+        if out.len() >= 8 {
+            break;
+        }
+    }
+    out
+}
 
 // (JD7) Speichern / Speichern unter: the file it goes to, Durchsuchen opens the file dialog
 fn save_page(app: &mut Diagrammer, ui: &mut Ui, as_new: bool) {
@@ -159,9 +207,46 @@ fn save_page(app: &mut Diagrammer, ui: &mut Ui, as_new: bool) {
         }
         ui.tooltip(t("Die Zeichnung als Vorlage (.vstx) im Ordner Ihrer Vorlagen speichern; die offenen Schablonen gehen mit"));
     }
-    let names: alloc::vec::Vec<&str> = FILE_TYPES.iter().map(|s| t(s)).collect();
-    let _ = names;
     ui.box_end();
+    if !as_new {
+        return;
+    }
+    // (JD15, UI-11) the file types: each opens the dialog with its extension
+    ui.spacer(12);
+    ui.text(TS_BODY_STRONG, t("Dateityp"));
+    ui.next_size(480, 0);
+    ui.box_begin(ID_PAGE + 0x20, BOX_V, 2);
+    let mut chosen: Option<(Option<alloc::string::String>, &str)> = None;
+    for (k, (name, ext)) in FILE_TYPES.iter().zip(FILE_EXTS).enumerate() {
+        ui.next_size(-1, 30);
+        ui.next_flags(ST_SUBTLE | ST_ALIGN_START | if open { 0 } else { ST_DISABLED });
+        if ui.button(ID_PAGE + 0x21 + k as u32, t(name)) & EV_ACT != 0 {
+            chosen = Some((None, ext));
+        }
+    }
+    ui.box_end();
+    // (JD15, UI-08) the folders used last: the dialog starts there
+    let folders = recent_folders(ui);
+    if !folders.is_empty() {
+        ui.spacer(12);
+        ui.text(TS_BODY_STRONG, t("Zuletzt verwendete Ordner"));
+        ui.next_size(480, 0);
+        ui.box_begin(ID_PAGE + 0x30, BOX_V, 2);
+        for (k, dir) in folders.iter().enumerate() {
+            ui.next_size(-1, 30);
+            ui.next_flags(ST_SUBTLE | ST_ALIGN_START | if open { 0 } else { ST_DISABLED });
+            ui.next_icon(JD_OPEN);
+            let name = dir.rsplit(['/', '\\']).next().filter(|n| !n.is_empty()).unwrap_or(dir);
+            if ui.button(ID_PAGE + 0x31 + k as u32, name) & EV_ACT != 0 {
+                chosen = Some((Some(dir.clone()), ""));
+            }
+            ui.tooltip(dir);
+        }
+        ui.box_end();
+    }
+    if let Some((dir, ext)) = chosen {
+        crate::edit_doc::save_in(app, ui, dir.as_deref(), (!ext.is_empty()).then_some(ext));
+    }
 }
 
 // ------------------------------------------------------------------ Info, Optionen

@@ -7,5 +7,5 @@ name.es: Equipos montados en rack
 name.it: Apparecchiature a rack
 name.fr: Équipements montés en baie
 category: network
-masters: rack, cabinet, server, switch, patch_panel, raid_array, router_1, router_2, bridge, nas, tape_drive, lcd_monitor, power_supply, power_strip, keyboard_tray, shelf, cable_management
+masters: rack, cabinet, server, switch, patch_panel, raid_array, router_1, router_2, bridge, nas, tape_drive, lcd_monitor, power_supply, power_strip, keyboard_tray, shelf, cable_management, dim_horizontal, dim_vertical
 quick: 5

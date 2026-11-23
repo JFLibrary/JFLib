@@ -11,7 +11,8 @@
 //   center(app, ui)           the canvas and the page tabs under it; with an open drawing
 //                             (JD4) the page of the tab drawn by viewer.rs, one tab per page
 //                             (background pages after the others), Alle Seiten as a list
-//   status(app, ui)           page, measures of the selection, zoom
+//   status(app, ui)           page, measures of the selection (a 1-D shape: length and angle,
+//                             JD15 SB-02), zoom (the slider has 100 % in the middle, SB-04)
 //
 // The contents live in their own files: the Shapes panel (JD9, stencils_panel.rs), Shape
 // formatieren (JD11, format_pane.rs), Größe und Position, Shape-Daten, Verschieben und Zoomen
@@ -76,13 +77,17 @@ pub(crate) fn content(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
 // ------------------------------------------------------------------ the context menus
 
 // i18n
-static SHAPE_MENU: [Mi; 18] = [
+static SHAPE_MENU: [Mi; 22] = [
+    // (JD15, SP-12) the rows of the shape's Actions section first, as in Visio (cmds_actions.rs)
+    Mi::List(crate::cmds_actions::ACTION_ROWS, crate::cmds_actions::ACTION_ROWS_MAX, ""),
     Mi::Cmd(CUT), Mi::Cmd(COPY), Mi::Cmd(PASTE), Mi::Sep,
     Mi::Sub("Gruppierung", &[Mi::Cmd(GROUP), Mi::Cmd(UNGROUP)]),
     // (JD8 rest) ZF-12's Shape ▸
     Mi::Sub("Shape", &[Mi::Cmd(ROTATE_LEFT), Mi::Cmd(ROTATE_RIGHT), Mi::Cmd(FLIP_H), Mi::Cmd(FLIP_V), Mi::Sep, Mi::Cmd(PANE_SIZEPOS)]),
     Mi::Sub("Container", &[Mi::Cmd(CT_ADD), Mi::Cmd(CT_REMOVE), Mi::Sep, Mi::Cmd(CT_SELECT), Mi::Cmd(CT_LOCK), Mi::Cmd(CT_DISBAND)]),
     Mi::Cmd(CONNECT_SHAPES), Mi::Cmd(LAYOUT_BEHAVIOR),
+    // (JD15, ST-05) a lane's commands (hidden for other shapes)
+    Mi::Cmd(CFF_LANE_BEFORE), Mi::Cmd(CFF_LANE_AFTER),
     Mi::Sub("Anordnen", &[Mi::Cmd(BRING_FRONT), Mi::Cmd(BRING_FORWARD), Mi::Cmd(SEND_BACK), Mi::Cmd(SEND_BACKWARD)]),
     Mi::Sub("Daten", &[Mi::Cmd(PANE_DATA), Mi::Cmd(SHAPE_DATA_DEFINE)]),
     // (JD8 rest) the shape's links follow its Hyperlink row (cmds_text::LINK_ROWS, ZF-12)
@@ -90,6 +95,8 @@ static SHAPE_MENU: [Mi; 18] = [
     Mi::Sub("Formatieren", &[Mi::Cmd(FORMAT_TEXT), Mi::Cmd(FORMAT_LINE), Mi::Cmd(FORMAT_FILL), Mi::Cmd(FORMAT_SHADOW)]),
     Mi::Sub("Verbinderart", &[Mi::Cmd(CONN_RIGHT_ANGLE), Mi::Cmd(CONN_STRAIGHT), Mi::Cmd(CONN_CURVED), Mi::Sep, Mi::Cmd(CONN_RESET)]),
     Mi::Sep, Mi::Cmd(ADD_TO_MY_SHAPES),
+    // (JD15, SP-01) Shape-Name
+    Mi::Cmd(SHAPE_NAME),
 ];
 // i18n
 static PAGE_MENU: [Mi; 4] = [
@@ -112,6 +119,10 @@ pub(crate) fn center(app: &mut Diagrammer, ui: &mut Ui) {
     // (JD7) the canvas with the rulers and the edit layer (edit_canvas.rs); the shape's menu while
     // a shape is selected, else the page's (the edit layer selects on the right click first)
     crate::edit_canvas::canvas(app, ui, ID_CANVAS, |app, ui| {
+        // (JD15, KB-04) not for a Ctrl + Shift right click (the magnifier) or right drag (a pan)
+        if app.se.right_taken() {
+            return;
+        }
         let menu: &'static [Mi] = if matches!(app.selection_kind(), SEL_SHAPE | SEL_CONTAINER | SEL_TEXT) { &SHAPE_MENU } else { &PAGE_MENU };
         ui.context_menu(i18n::menu(menu));
     });
@@ -221,10 +232,22 @@ fn pan_zoom(app: &mut Diagrammer, ui: &mut Ui) {
 
 // a zoom slider 10 .. 400 % (width -1: the rest of the row)
 fn zoom_slider(app: &mut Diagrammer, ui: &mut Ui, id: u32, w: i32) {
-    let mut z = (app.canvas.vp.zoom * 100.0 + 0.5) as i32;
     ui.next_size(w, 0);
-    if ui.slider(id, &mut z, &Range::new(10, 400, 10, 0)) & (EV_ACT | EV_COMMIT) != 0 {
-        app.set_zoom(z);
+    zoom_slider_here(app, ui, id);
+}
+
+/// (JD15, SB-04, AB-06) the zoom slider with 100 % in the middle: the left half runs from 10 to
+/// 100 %, the right half from 100 to 400 % (Visio's); its value is the position 0 .. 1000 (500:
+/// 100 %), the size comes from next_size
+pub(crate) fn zoom_slider_here(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
+    let z = app.canvas.vp.zoom * 100.0;
+    let mut pos = if z <= 100.0 { (z - 10.0) / 90.0 * 500.0 } else { 500.0 + (z - 100.0) / 300.0 * 500.0 };
+    pos = pos.clamp(0.0, 1000.0);
+    let mut v = (pos + 0.5) as i32;
+    if ui.slider(id, &mut v, &Range::new(0, 1000, 50, 0)) & (EV_ACT | EV_COMMIT) != 0 {
+        let p = v.clamp(0, 1000) as f32;
+        let z = if p <= 500.0 { 10.0 + p / 500.0 * 90.0 } else { 100.0 + (p - 500.0) / 500.0 * 300.0 };
+        app.set_zoom((z + 0.5) as i32);
     }
     ui.tooltip(t("Zoom"));
 }
@@ -247,7 +270,13 @@ pub(crate) fn status(app: &mut Diagrammer, ui: &mut Ui) {
     ui.flyout_end();
     // the selection's measures (JD7: the single selection's); a click opens Größe und Position
     let unit = if crate::edit_canvas::metric(app) { "mm" } else { "in" };
+    // (JD15, SB-02) a 1-D shape: its length (the Width cell) and angle
+    let one_d = app.se.sel.len() == 1 && app.model.shapes.iter().any(|s| app.se.sel.contains(&s.key) && s.flags & SEF_1D != 0);
+    // (a selected guide has no measures)
+    let guide = app.model.guides.iter().any(|g| app.se.sel.contains(&g.key));
     let dims = match crate::edit_canvas::measures(app) {
+        Some(_) if guide => tf("Breite: {}  Höhe: {}  Winkel: {}", &["–", "–", "–"]),
+        Some(v) if one_d => tf("Länge: {}  Winkel: {}", &[&length(v[2], unit), &angle(v[4])]),
         Some(v) => tf("Breite: {}  Höhe: {}  Winkel: {}", &[&length(v[2], unit), &length(v[3], unit), &angle(v[4])]),
         None if app.selection_kind() == SEL_NONE || app.opened.is_some() => tf("Breite: {}  Höhe: {}  Winkel: {}", &["–", "–", "–"]),
         None => tf("Breite: {}  Höhe: {}  Winkel: {}", &["40 mm", "20 mm", "0°"]),

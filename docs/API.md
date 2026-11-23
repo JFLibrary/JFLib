@@ -107,7 +107,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
   <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
-  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
+  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
@@ -184,7 +184,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `pointer_lock`, `pointer_lock_state`, `pointer_motion`, `key_code_down`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `key_event_take`, `text_take`, `cursor_at`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`, `canvas_label`
-- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `popup_close_id`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
+- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `popup_close_id`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`, `tooltips_set`, `tooltips_on`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_preedit`, `ime_enable`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_reveal`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
 - [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `list_end_full`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
@@ -1111,6 +1111,8 @@ Tooltips:
   tooltip_part(s, part)               the same for one part of the last widget (an item of
                                       a canvas, part != 0): the delay starts again when the
                                       part changes, a press hides it until another part
+  tooltips_set(on) / tooltips_on()    every tooltip of the app on or off (an app's option
+                                      "no ScreenTips"; on at start)
 Runtime: accel_dispatch() at the start of uiw_pass_end: runtime-drawn menus, stale
 popups, command accelerators.
 
@@ -1269,6 +1271,11 @@ numbers for them.
   (an item on a canvas: a cable, a port).  The delay starts again when `part` changes (at
   once when a tooltip hid less than 300 ms ago, as between toolbar buttons); a press hides
   it until the pointer is over another part; part 0 shows nothing.
+- **`fn tooltips_set(&mut self, on: bool)`**
+  tooltips_set(on): every tooltip of the app on (the default) or off -- an app's option
+  "no ScreenTips"; a tooltip up hides with the next pass
+- **`fn tooltips_on(&self) -> bool`**
+  whether tooltips show (tooltips_set)
 
 ### Text boxes and the clipboard
 
@@ -7829,9 +7836,11 @@ Model (SeModel, borrowed per call; world units are the canvas's, y down):
                       that is neither turned nor flipped; a flip reverses u or v); handles at
                       fx, fy in {0, 0.5, 1}, the rotation handle beyond the edge fy = 0
   SePoint { at, kind, tag, dir, flags }   SP_CONTROL (yellow), SP_CONN (connection points:
-                      shown while connecting), SP_VERTEX (shown for a single selection when
-                      the app lists them: vertex editing)
+                      shown while connecting, with SeState::show_points those of every
+                      visible shape, RA-06; SPF_OUTWARD: shown, no target), SP_VERTEX (shown
+                      for a single selection when the app lists them: vertex editing)
   SeGuide { key, vertical, at }   guides (blue, dashed, across the canvas); moves snap to them
+                      (SeState::snap and snap_guides; an app hides guides by leaving them out)
   SeMark { at, dir, tag, owner }  the app's insertion marks (Visio's blue triangle between two
                       items of a list): a small triangle, its tip at `at`, pointing in `dir`
   hit(p, tol, within) -> key      the topmost shape at world point p within tol world units
@@ -7846,7 +7855,10 @@ total each step, and keeps the last one as the undo step.  The frames of the sel
 the model (the app's preview), the gesture keeps what it had at the start.  The connector and
 line tools and the drawing tools draw a rubber band and report Connect / Draw when released;
 a click with them selects like the pointer.  With Shift the rectangle and the ellipse tool draw
-a square and a circle, and a move with Shift keeps to one axis (KB-09).  The freeform tool
+a square and a circle, and a move with Shift keeps to one axis (KB-09); a drag of the selection
+that starts with Ctrl + Shift moves a copy of it (SeEv::MoveCopy, live like Move: the app
+shows a preview each step and makes the copy when released; one axis while Shift is held,
+KB-09).  The freeform tool
 records the pointer's way (a point every 2 px) and reports SeEv::Stroke when released; the arc
 tool shows a quarter ellipse from the press to the pointer, bowing the way the drag started
 (horizontally or vertically, decided once the pointer left the drag threshold), and reports
@@ -7856,17 +7868,23 @@ Input (pointer tool): a press on a handle of the selection starts its drag; on a
 selects it (Shift adds, Ctrl toggles) and a drag moves the selection (grid, dynamic grid,
 guides; Alt: free); a second, slow click on a selected group selects the child under the
 pointer; a double click edits the text (SeEv::Text); on the background a drag draws a marquee
-or, with SeState::lasso, a free outline (shapes fully inside; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
+or, with SeState::lasso, a free outline (shapes fully inside, with SeState::partial also those
+it touches, ZF-06; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
 handles change one side (a locked aspect: both), Ctrl resizes about the middle; locked handles
 are drawn grey and do nothing.  The rotation handle turns about the pin (one shape) or the
 middle of the selection: in 15-degree steps near the shape, in single degrees farther away.
 An end or a control point that can glue snaps to a connection point under the pointer (static
 glue); over a shape a dynamic connector's end glues to the whole shape (dynamic glue, the
-shape's frame is highlighted).  Ctrl + Shift + click zooms in at the pointer, + drag zooms to
-the rectangle, + right click zooms out (ZF-22).  Keys while the canvas has the focus: Esc
+shape's frame is highlighted); with Ctrl held a dynamic end swaps the two (CN-03): over a
+connection point it glues to that point's shape as a whole, over a shape to the shape's
+nearest connection point.  Connection points with SPF_OUTWARD are no target for ends (SS-29).
+Ctrl + Shift + click zooms in at the pointer (on a selected shape too), + drag zooms to the
+rectangle (from a selected shape: the copy above), + right click zooms out (ZF-22), + right
+drag pans the view (KB-04).  Keys while the canvas has the focus: Esc
 cancels the gesture, else clears the selection; Del deletes; Ctrl+A selects all; arrows nudge
 by a grid step (Shift: a pixel) or pan without a selection; Tab / Shift+Tab walk the top-level
-shapes; F2 and Enter edit the text of the single selection, so does typing a character (the
+shapes (without a selection Tab takes the first, Shift+Tab the last, KB-06); F2 and Enter edit
+the text of the single selection, so does typing a character (the
 character is handed on).  A right click selects the shape under the pointer first and reports
 SeEv::Context; the menu itself (also from Shift+F10 and the menu key) is the app's
 ui.context_menu right after this call.
@@ -7945,6 +7963,9 @@ SP_CONN: u8 = 1
 SP_VERTEX: u8 = 2
 /// point flags (SePoint::flags)
 SPF_GLUE: u32 = 1  // a control point that glues to connection points (SP-04)
+/// a connection point that points outward only (Visio's Type 1): shown, but no end glues to it
+/// (SS-29)
+SPF_OUTWARD: u32 = 2
 ```
 
 - **`struct SeBox`**
@@ -8020,6 +8041,8 @@ SPF_GLUE: u32 = 1  // a control point that glues to connection points (SP-04)
   what the user did (ui.shape_edit's result, in order)
   - `Select` -- st.sel changed
   - `Move { keys: Vec<u64>, total: [f32; 2], done: bool }` -- move `keys` by total (world units, from the start of the drag; a key nudge: done at once)
+  - `MoveCopy { keys: Vec<u64>, total: [f32; 2], done: bool }` -- a drag with Ctrl + Shift: a copy of `keys` goes `total` from them (live like Move: a
+    preview each step, done: the copy, one undo step; KB-09)
   - `Resize { keys: Vec<u64>, from: SeBox, to: SeBox, done: bool }` -- resize: the frame `from` (one shape: its frame; several: the box around them) became `to`
   - `Rotate { keys: Vec<u64>, centre: [f32; 2], angle: f32, done: bool }` -- turn `keys` about `centre` by `angle` radians (counter-clockwise as seen)
   - `Pin { key: u64, at: [f32; 2], done: bool }` -- the rotation pin of a shape goes to `at`
@@ -8051,8 +8074,14 @@ SPF_GLUE: u32 = 1  // a control point that glues to connection points (SP-04)
   - `focus: u64` -- the shape with the keyboard focus (Tab walks)
   - `dyn_grid: bool` -- the dynamic grid: moves snap to other shapes' edges and middles (ZF-05)
   - `glue: bool` -- ends glue (Ansicht › Ausrichten und Kleben)
-  - `show_points: bool` -- show every connection point of the hovered shape, not only while connecting (CN-01)
+  - `show_points: bool` -- show the connection points of every visible shape, not only while connecting (CN-01,
+    RA-06; also while glue is off)
   - `lasso: bool` -- a drag on the background draws a lasso (a free outline) instead of a rectangle (ZF-06)
+  - `partial: bool` -- the marquee and the lasso also take the shapes they only touch (ZF-06; off: only those
+    wholly inside)
+  - `snap: bool` -- moves snap to guides and to the dynamic grid at all (off: a page that inhibits snapping,
+    SS-39; the grid is DiagramState::snap)
+  - `snap_guides: bool` -- moves snap to guides (Ausrichten und Kleben › Führungslinien)
   - `vertex: Option<(u64, u32)>` -- the vertex chosen with a click (Del removes it): its shape and tag
   - `arrows: bool` -- connection arrows around the shape under the pointer (Ansicht › Verbindungspfeile; see
     the file header)
@@ -8060,11 +8089,14 @@ SPF_GLUE: u32 = 1  // a control point that glues to connection points (SP-04)
 **`impl SeState`**
 
 - **`fn new() -> SeState`**
-  nothing selected; dynamic grid, glue and connection arrows on
+  nothing selected; dynamic grid, glue, snapping and connection arrows on
 - **`fn busy(&self) -> bool`**
   a gesture is in progress
 - **`fn live(&self) -> bool`**
   a live gesture is in progress (the app shows a preview of it)
+- **`fn right_taken(&self) -> bool`**
+  the right button's release in the last call of ui.shape_edit belonged to Ctrl + Shift
+  (the magnifier zooming out, a pan): the app opens no context menu for it
 - **`fn arrow_hover(&self) -> Option<(u64, u8)>`**
   the connection arrow under the pointer: the shape's key and the direction (0 right,
   1 down, 2 left, 3 up, as seen)
@@ -10813,7 +10845,8 @@ happened.  It knows nothing about diagrams; every text it shows comes from the a
 
   stencil_panel(id, &mut StencilState, &StencilPanel) -> Vec<StencilEvent>
        top to bottom: the search box (IC_SEARCH, labels.search as its placeholder) with a
-       button for the recent searches (labels.history), the "More shapes" button
+       button for the recent searches (labels.history; neither with StencilState::no_search,
+       JD15), the "More shapes" button
        (StencilPanel::more_id, labels.more), the title rows -- the quick shapes collection
        (SK_QUICK, labels.quick), the search results while StencilPanel::results is Some
        (SK_SEARCH, labels.results with "{}" = their number), a row per stencil --, a movable
@@ -10962,6 +10995,8 @@ SK_SEARCH: u32 = 0xFFFF_FFFF
   - `history: Vec<String>` -- the recent searches, newest first (at most 10; the app may store and restore them)
   - `split: i32` -- the height of the title rows in DIP (the splitter; 0 = automatic: up to 40 % of the
     panel); the panel keeps it between one row and all of them
+  - `no_search: bool` -- (JD15) the panel shows no search box (Visio's option "Show Shape Search pane" off); the
+    query stays, set it to "" to end a search
 
 **`impl StencilState`**
 
@@ -56026,6 +56061,10 @@ shape, the value of its Value cell in the format picture of its Format cell
                                              each field with the text it shows (editing in
                                              place, Find and Replace)
   plain(doc, shape) -> String                the text as it shows, fields included
+  marked("Länge: {fld 0}") -> Text / marks(&text)   (JD15) a text written with field marks as
+                                             characters and fields (the stencil build tool's
+                                             master texts, the instance of such a master) / the
+                                             Field rows a text names
   Kind / Spec / insert(tx, eng, shape, at, &spec) -> ix   a new field: its Field row (Value
                                              formula, Format, Type) and its mark in the text,
                                              computed at once
@@ -56148,6 +56187,22 @@ DAYS_EN: [&str; 7] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", ..
   - `unit: Option<Unit>` -- the unit the value shows in (MM, DEG, DATE ...; None: a plain number; a text: STR)
   - `kind: Kind` -- what it holds
 
+```rust
+/// the mark of Field row N in a text written as source (MARK_OPEN N MARK_CLOSE: "{fld 0}"), as
+/// the stencil build tool reads a master's text and the instance of such a master gets it (JD15)
+MARK_OPEN: &str = "{fld "
+/// the end of a field mark (MARK_OPEN)
+MARK_CLOSE: char = '}'
+```
+
+- **`fn marked(s: &str) -> Text`**
+  a text written with field marks ("Länge: {fld 0}") as characters and fields: "{fld N}" with N
+  a row index (decimal digits) is the mark of Field row N, everything else stays characters
+  (also a "{" that starts no such mark)
+
+- **`fn marks(text: &Text) -> Vec<u32>`**
+  the Field rows a text's marks name (the IX of each TextItem::Field, in text order)
+
 - **`fn insert_item(doc: &Document, sheet: SheetRef, text: &Text, at: Option<usize>, item: TextItem) -> Text`**
   a text with `item` put in at a shown position (fields count with the text they show; a
   position inside a field goes behind it; None: at the end, in front of the last line break)
@@ -56231,6 +56286,9 @@ engine -- recalculation over the cells of a document (FX-02, FX-04)
   eng.user_set(&mut tx, sheet, addr, input)    a user's change: GUARD, SETATREF redirection
   eng.run_action(&mut tx, sheet, addr)         an action or event cell: SETF and effects
   eng.evaluate(&doc, sheet, addr)              one cell with stored inputs
+  Engine::with_seed(seed) / eng.seed(seed)     (JD15, FX-06) RAND's generator from that seed
+                                               (SplitMix64; every engine starts with the same
+                                               one, an app may seed it, e.g. from a clock)
 
 Nothing is recalculated on its own: opening a file computes nothing (PLAN.md, "Fallen").  A
 formula that cannot be computed here -- an unknown function, a glue helper, a cycle -- keeps
@@ -56329,8 +56387,13 @@ LOCKS: &[&str] = &[ "LockWidth", "LockHeight", "LockAspect", "LockMoveX", ...
   an engine with the text estimate
 - **`fn with_metrics(metrics: Rc<dyn TextMetrics>) -> Engine`**
   an engine that measures text with the app's fonts
+- **`fn with_seed(seed: u64) -> Engine`**
+  (JD15, FX-06) an engine whose RAND starts from `seed` (the same numbers every time)
+- **`fn seed(&mut self, seed: u64)`**
+  (JD15, FX-06) RAND's generator anew from `seed`
 - **`fn reset(&mut self)`**
-  forget everything (the document was replaced, or its themes changed)
+  forget everything (the document was replaced, or its themes changed); RAND's generator
+  goes on
 - **`fn themes_changed(&mut self)`**
   forget the parsed theme parts (JD11: a design was applied or a part replaced); the
   caller recalculates the sheets that use them
@@ -57007,7 +57070,9 @@ Dynamic glue docks in the middle of a side of the target, on its outline (the fa
 of its geometry on the line through its middle), on the side that gives the cheapest way
 among the obstacles (length + bends; one search over the sides of both ends, route::best);
 where the other end lies within a side's reach, the point straight opposite it is offered
-too (Visio's files show such straight connections).  The straight style docks where the line
+too (Visio's files show such straight connections).  (JD15, SS-18) WalkPreference bit 1 / 2
+(visWalkPrefBegNS / EndNS): that end prefers top and bottom -- a way from there wins when it is
+as short and has as few bends as the cheapest one.  The straight style docks where the line
 between the two ends leaves the outline.  Obstacles are the boxes of the page's top-level
 shapes that are not 1-D (route.rs keeps the page's LineToNodeX/Y as clearance, else 1/8 in).
 ConFixedCode 1 and 2 (reroute manually / never) keep the corners and only move the first and
@@ -57264,7 +57329,8 @@ instance of it dropped on a page, the texts of masters and stencils in five lang
                                      page sheet; a master without them: Name, Prompt and
                                      ShapeKeywords for every language)
     texts.name(lang) / matches(&words, any)   the name shown, the search (NameU, the names in
-                                     all five languages, the keywords)
+                                     all five languages, the keywords, since JD15 the
+                                     QuickInfos)
   StencilTexts::of(&doc)             a stencil's title in five languages and its category
                                      (User.JFD_Name, User.JFD_Category of the document sheet)
   import_master(&mut tx, &src, m) -> MasterRef   master m of document src in tx's document:
@@ -57274,8 +57340,15 @@ instance of it dropped on a page, the texts of masters and stencils in five lang
                                      bases), masters its shapes are instances of first,
                                      pictures of package parts inline
   move_master(&mut tx, m, pos)      a master to another place in the order (own stencils)
+  scale_factor(&doc, page, master)   (JD15, MS-10) Visio's range of eight: 1 while the
+                                     master's drawing scale is within eight times the page's,
+                                     else the factor that keeps its size on the paper
   place(&mut tx, page, master, x, y, lang) -> ShapeRef   an instance at (x, y) inches on the
-                                     page (y up): Name in language lang, NameU the master's
+                                     page (y up), (JD15, MS-10) its constant lengths (Shape and
+                                     Text Transform, User / Prop values with a unit of length,
+                                     X and Y of Geometry, Connection, Control rows; a 1-D
+                                     shape's ends around the pin) times scale_factor when that
+                                     is not 1: Name in language lang, NameU the master's
                                      (LG-04; "Rechteck.7" when the page has one already), its
                                      text and translated cells in that language; (JD8 rest,
                                      LY-03) the master's layers come along: the page gets the
@@ -57339,8 +57412,8 @@ JFD_TR: &str = "JFD_Tr"
   the QuickInfo in language `lang`
 - **`fn matches(&self, words: &[&str], any: bool) -> bool`**
   whether the master matches the search words (lower case expected): all of them
-  (any = false) or one of them, each a part of NameU, of a name in any language or of a
-  keyword (SL-04)
+  (any = false) or one of them, each a part of NameU, of a name in any language, of a
+  keyword or (JD15) of a QuickInfo in any language (SL-04: Visio searches the description)
 
 - **`fn fold(s: &str) -> String`**
   a text in lower case without the accents of the five languages (search ignores both)
@@ -57365,6 +57438,20 @@ JFD_TR: &str = "JFD_Tr"
   drop an instance of `master` at (x, y) inches on `page` (MS-02, LG-04): Name in language
   `lang` (an index into LANGS), NameU the master's, unique on the page with ".ID" like Visio;
   the text and translated cells in that language where they differ from the master's
+
+- **`fn localize_parts(tx: &mut Transaction, shape: ShapeRef, lang: usize) -> Result<Vec<ShapeRef>, EditError>`**
+  (JD26) the subshapes of instance `shape` in language `lang` (an index into LANGS): a subshape
+  whose master subshape has User.JFD_Text (its text in five languages: the parts of a group
+  master, stencils/README.md) gets the text of `lang` where it shows one of the five or none
+  -> the subshapes whose text changed
+
+- **`fn scale_factor(doc: &Document, page: PageRef, master: MasterRef) -> f64`**
+  (JD15, MS-10) Visio's range of eight (User's Guide, chapter 18: "Visio adjusts an instance of
+  a master automatically if its drawing scale is more than eight times larger or smaller than
+  the drawing scale of the page.  If the scales differ less, Visio doesn't adjust the shape"):
+  1 within the range, else the factor that keeps the instance's size on the paper -- the
+  master's page units per drawing unit (PageScale / DrawingScale of its page sheet) over the
+  page's
 
 - **`fn bring_layers(tx: &mut Transaction, page: PageRef, master: MasterRef, shape: ShapeRef) -> Result<(), EditError>`**
   (LY-03) the layers of `master` that the shapes of its instance `shape` are on: the page gets
@@ -57440,7 +57527,10 @@ groups, z-order, new shapes, text, copy and paste (JD7: SP-03..07, TX-01, TX-03,
   vertices / set_vertex / insert_vertex / delete_vertex     Geometry rows (SP-05)
   group(tx, eng, owner, shapes) / ungroup(tx, eng, group)   (SP-06)
   reorder(tx, shapes, Z::Front | Back | Forward | Backward) (SP-07)
-  new_shape(tx, eng, owner, Basic::Rectangle | Ellipse | TextBox, a, b)
+  new_shape(tx, eng, owner, Basic::Rectangle | Ellipse | TextBox, a, b)   rectangle and
+                                      ellipse with the document's default line, fill and text
+                                      styles (DocumentSettings, else "Normal"), a text box with
+                                      "Text Only" (DM-04)
   set_text(tx, eng, shape, text) / text_frame / set_text_frame   (TX-01, TX-03)
   copy(doc, shapes) -> Clip / paste(tx, eng, owner, &clip, offset)
   new_freeform / new_arc / simplify / Spline / quarter_arc   (JD8 rest) the freeform and arc
@@ -59735,9 +59825,19 @@ format follows the public specification [MS-VSDX]; no code of other implementati
                       set and the catalogue's cells; template::stencil_windows,
                       set_stencil_windows, info, registers and to_drawing for the app
 
+  vdx::read(&bytes, DocKind::Drawing, &vsdx::Limits::VSDX) -> Result<vsdx::Loaded, vsdx::Error>
+                      (JD16) the XML formats of Visio 2003-2010 (.vdx drawing, .vsx stencil,
+                      .vtx template) into the same model: cells with formula and value,
+                      sections, masters, pages, pictures as parts, fonts by name, document
+                      properties, windows, the macro project; vdx::kind_of, vdx::sniff
+  props::read(&doc) / props::write(&mut doc, &props)
+                      (JD16) the document properties (docProps core, app and custom)
+  windows::drawing_window(&doc) / set_drawing_window(&mut doc, &w)
+                      (JD16) the drawing window of windows.xml: page, zoom, centre, what is
+                      shown; vsdx::remove_macros takes a macro project out
+
 What is to come here, by stage of the plan:
-  JD12  exports: SVG, PNG and PDF through the library's writers
-  later the XML formats of 2003-2010 (.vdx, .vsx) and importing the binary .vss / .vsd
+  JD17  importing the binary .vss
 
 The ZIP and OPC parts come from archive (archive::opc, JD1), shared with doc_io's DOCX.
 Every file is untrusted input: sizes, counts and nesting are bounded, a file that breaks a
@@ -59790,6 +59890,74 @@ and shows the design NetLab, variant 1 (design::catalog).
 - **`fn new_document(kind: DocKind, measure: Measure) -> Document`**
   a new document of this kind with JFLib's own defaults (see the module comment); a stencil
   has no masters yet, a drawing and a template one empty page
+
+### `diagram_io/src/props.rs`
+
+Source: [`lib/diagram_io/src/props.rs`](../lib/diagram_io/src/props.rs)
+
+```text
+props -- the document properties of a drawing (DF-09): docProps/core.xml, app.xml, custom.xml
+
+  props::read(&doc) -> Props          what the three parts say ("" where an entry is missing)
+  props::write(&mut doc, &props)      the parts made to say it: a part is only touched when one
+                                      of its own entries changed, so an unchanged file keeps its
+                                      bytes; a missing part is created, a custom part without
+                                      entries is removed
+  Custom { name, kind, value }        a custom property: kind is the vt element ("lpwstr",
+                                      "i4", "r8", "bool", "filetime" ...), value its text
+
+The parts are found by their content type (OPC names them freely).  core.xml is written anew
+from Props in the order Office writes it; app.xml keeps everything it had (Visio's page and
+master lists, the version) and only gets the four entries Props names (Template, Company,
+Manager, HyperlinkBase) replaced or added; custom.xml is written anew from the list.  Dates
+stay the W3CDTF text the file had ("2026-11-14T18:04:59Z"); nothing here reads a clock.
+Reading is bounded like every part (vsdx::Limits::VSDX's XML bounds) and never fails: a part
+that is no XML reads as empty.
+```
+
+```rust
+/// the content type of docProps/core.xml
+CT_CORE: &str = "application/vnd.openxmlformats-package.core-properties+xml"
+/// the content type of docProps/app.xml
+CT_APP: &str = "application/vnd.openxmlformats-officedocument.extended-p ...
+/// the content type of docProps/custom.xml
+CT_CUSTOM: &str = "application/vnd.openxmlformats-officedocument.custom-pro ...
+```
+
+- **`struct Custom`**
+  one custom property
+  - `name: String` -- its name
+  - `kind: String` -- the vt element of its value: "lpwstr", "i4", "r8", "bool", "filetime", "date" ...
+  - `value: String` -- the value as text
+
+- **`struct Props`**
+  the document properties; "" where the file has none
+  - `title: String` -- Titel (dc:title)
+  - `subject: String` -- Thema (dc:subject)
+  - `creator: String` -- Autor (dc:creator)
+  - `keywords: String` -- Stichwörter (cp:keywords)
+  - `description: String` -- Kommentare (dc:description)
+  - `category: String` -- Kategorie (cp:category)
+  - `language: String` -- Sprache (dc:language)
+  - `last_modified_by: String` -- zuletzt geändert von (cp:lastModifiedBy)
+  - `content_status: String` -- Status (cp:contentStatus)
+  - `revision: String` -- Revision (cp:revision)
+  - `created: String` -- erstellt (dcterms:created, W3CDTF)
+  - `modified: String` -- geändert (dcterms:modified, W3CDTF)
+  - `last_printed: String` -- zuletzt gedruckt (cp:lastPrinted, W3CDTF)
+  - `template: String` -- Vorlage (app.xml Template)
+  - `company: String` -- Firma (app.xml Company)
+  - `manager: String` -- Manager (app.xml Manager)
+  - `hyperlink_base: String` -- Hyperlinkbasis (app.xml HyperlinkBase)
+  - `application: String` -- the program that wrote the file (app.xml Application; read only)
+  - `custom: Vec<Custom>` -- the custom properties in file order
+
+- **`fn read(doc: &Document) -> Props`**
+  what the document's property parts say
+
+- **`fn write(doc: &mut Document, p: &Props)`**
+  make the property parts say `p` (see the module comment); parts whose entries did not change
+  keep their bytes
 
 ### `diagram_io/src/stencil.rs`
 
@@ -59856,6 +60024,10 @@ The JFD_ cells (diagram_core::instance reads them): the document sheet's User.JF
 title in de|en|es|it|fr) and User.JFD_Category; per master page User.JFD_Name, JFD_Prompt,
 JFD_Keywords, JFD_Text, JFD_Quick (1 for the first `quick` masters) and JFD_Tr1, JFD_Tr2 ...
 ("Section.Row.Cell|de|en|es|it|fr" with VSDX section names: Control.Row_1.Tip).
+
+(JD15) Text fields: a [Field] section (Value, Format, Type ...; `Unit = mm` gives Value the unit
+the field shows) and "{fld N}" marks in a master's text (diagram_core::field::marked); a mark
+without its row is a build error.
 
 Sources are files of the repository, trusted but checked all the same: no panic on any input,
 counts bounded, no recursion.
@@ -60076,6 +60248,82 @@ REGISTERS: [&str; 1] = ["cff"]
   make a template a new drawing in language `lang` (an index into instance::LANGS; see the
   module comment)
 
+### `diagram_io/src/vdx/mod.rs`
+
+Source: [`lib/diagram_io/src/vdx/mod.rs`](../lib/diagram_io/src/vdx/mod.rs)
+
+```text
+vdx -- the XML formats of Visio 2003-2010 ("DatadiagramML": .vdx drawing, .vsx stencil,
+.vtx template) read into diagram_core's model (DF-20, DF-21, DF-22; JD16)
+
+  vdx::read(&bytes, DocKind::Drawing, &vsdx::Limits::VSDX) -> Result<vsdx::Loaded, vsdx::Error>
+                      one file of the format; the caller says by its extension what it is
+                      (kind_of): the XML itself does not
+  vdx::kind_of("vsx") -> Some(DocKind::Stencil)     the kind of an extension (vdx vsx vtx)
+  vdx::sniff(&bytes) -> bool         whether the bytes are such a file (root VisioDocument in
+                                     the namespace http://schemas.microsoft.com/visio/2003/core)
+
+The model is the one vsdx.rs fills, so a file read here is written as a .vsdx, .vssx or .vstx
+(a .vsdm ... with a macro project) by vsdx::write.  Microsoft's public "XML for Visio"
+schema reference describes the format; nothing of other implementations is used.  What goes
+where:
+  cells          an element per cell (<PinX F='..' Unit='MM' Err='..'>1.5</PinX>): the text is
+                 the value in internal units, F the formula ("Inh", "No Formula" as in VSDX),
+                 Unit the unit (VSDX's U), Err the error (E).  Formula and value stay a pair,
+                 nothing is computed (V1)
+  single-row sections (XForm, Line, Fill, TextBlock, Misc, PageProps ...)   flattened into the
+                 sheet's cells, the names are VSDX's (Char.Locale and Char.Perpendicular, gone
+                 since Visio 2003, are left out)
+  rows           Char -> Character, Para -> Paragraph, Prop -> Property, Act -> Actions,
+                 SmartTagDef -> ActionTag; User, Control, Connection, Scratch, Field, Layer,
+                 Hyperlink, Reviewer, Annotation by their names.  Named rows take NameU, else
+                 Name, else Row_<ID> (as Visio names them); Connection rows get T='Connection'
+                 (Visio's previewer hangs on rows without it, JD13)
+  Geom           a Geometry section per element (IX = its index), NoFill .. NoQuickDrag its
+                 cells, MoveTo, LineTo ... its rows (T = the element, IX as written)
+  Tabs           the row stays, its tab stops are left out (Warning::LeftOut "Tab": VSDX
+                 names their cells differently, and the model draws no tabs yet)
+  fonts          the Font cells of Character rows (Font, AsianFont, ComplexScriptFont) and
+                 Paragraph's BulletFont hold a FaceName ID in this format and a font name in
+                 VSDX: the ID becomes the name; FaceName Name / Panos become NameU / Panose
+  pictures       ForeignData's base64 becomes a part /visio/media/imageN.<ext> by what the bytes
+                 are (PNG, JPEG, GIF, TIFF, BMP, EMF, WMF; a bitmap without file header gets
+                 one); anything else is left out with a warning
+  masters, pages their elements with sheet, icon, shapes and connects; the writer gives them
+                 parts of their own
+  DocumentProperties   docProps core.xml, app.xml and custom.xml (props.rs); Visio's own
+                 entries (AlternateNames, BuildNumber*, TimeEdited, the root's metric) as the
+                 custom properties Visio writes in VSDX
+  Windows        windows.xml as VSDX has it (same elements), EventList and HeaderFooter the
+                 document element's own children as in VSDX
+  VBProjectData  base64 of the macro project: when it is an OLE file it becomes
+                 /visio/vbaProject.bin and Document::macros is set (written as .vsdm, never run);
+                 anything else is left out with a warning
+  everything else  (SolutionXML, DataConnections, DataRecordsets, the preview picture, elements
+                 of other namespaces) has no place in a VSDX file: left out, Warning::LeftOut
+Unknown attributes are dropped: this reader converts, it does not keep the file's XML (DF-23,
+writing .vdx, is not planned).
+
+Every file is untrusted input, bounded like a VSDX file (vsdx::Limits): the file's size by
+Limits::zip.part_bytes, nesting and attributes by the XML reader, counts of shapes, cells,
+rows, sections, objects and items, the length of formulas and texts, each picture by the
+file's size.  Cycles of styles, masters and background pages are refused as in vsdx.rs, a
+reference that names nothing is a warning.  No DOCTYPE, no external anything, no recursion
+(groups at any depth go through a stack of their own), never a panic.
+```
+
+- **`fn kind_of(ext: &str) -> Option<DocKind>`**
+  the kind of document an extension of the format stands for ("vdx", "vsx", "vtx"; ASCII case
+  ignored)
+
+- **`fn sniff(bytes: &[u8]) -> bool`**
+  whether `bytes` are a file of this format: XML whose root is VisioDocument in the namespace of
+  2003 (only the start is read)
+
+- **`fn read(bytes: &[u8], kind: DocKind, limits: &Limits) -> Result<Loaded, Error>`**
+  read a file of the XML format of 2003-2010 as a document of `kind` (see the module comment);
+  `limits` bound everything (vsdx::Limits::VSDX for real files)
+
 ### `diagram_io/src/vsdx.rs`
 
 Source: [`lib/diagram_io/src/vsdx.rs`](../lib/diagram_io/src/vsdx.rs)
@@ -60209,6 +60457,10 @@ never stack.
   - `NoContents { what: &'static str, id: u32, }` -- a page or master without a Rel to its contents: it has no shapes
   - `ExternalPicture { part: String, shape: u32, }` -- a picture whose relationship points outside the package: kept, never fetched
   - `UnusedPart { part: String, }` -- a page or master part that no Page or Master element names: kept as a plain part
+  - `LeftOut { what: String, }` -- (vdx.rs) something of the XML formats of 2003-2010 that has no place in a file of the
+    VSDX family, left out: tab stops, solution XML, data connections, a preview picture, a
+    picture of an unknown kind, a macro project that is no OLE file, elements of other
+    namespaces
 
 - **`struct Loaded`**
   a file read into the model
@@ -60242,6 +60494,11 @@ never stack.
   - `Xml { part: String, line: u32, }` -- XML the model holds as written (unknown elements in the extras, unknown text marks,
     trigger contents) does not fit where it stands: the part would not be well-formed
 
+- **`fn remove_macros(doc: &mut Document) -> bool`**
+  (JD16, DF-04) take the macro project out of a document: the parts a macro-enabled format
+  carries for it (vbaProject.bin, vbaData.xml) and the relationships to them; Document::macros
+  becomes false.  For "Speichern als .vsdx" after the user said yes; true when there was one
+
 - **`fn write(doc: &Document, options: &WriteOptions) -> Result<Vec<u8>, WriteError>`**
   write a document as a file of the VSDX family (see the module comment); the same document
   always gives the same bytes, and a document read from a file and written unchanged reads
@@ -60249,6 +60506,43 @@ never stack.
 
 - **`fn read(bytes: &[u8], limits: &Limits) -> Result<Loaded, Error>`**
   read a file of the VSDX family; `limits` bound everything (Limits::VSDX for real files)
+
+### `diagram_io/src/windows.rs`
+
+Source: [`lib/diagram_io/src/windows.rs`](../lib/diagram_io/src/windows.rs)
+
+```text
+windows -- the drawing window of a document's windows part (DF-10): the page it shows, the
+zoom, the centre and what is shown, so that a file opens as it was saved
+
+  windows::drawing_window(&doc) -> Option<DrawingWindow>    the first window of type Drawing
+  windows::set_drawing_window(&mut doc, &w)   that window replaced by `w` (its ID and state
+                               kept), added before the others when there is none, a part of
+                               its own when the document has none; the other windows (stencils,
+                               panes) stay as written
+  DrawingWindow { page, view_scale, center, show_* }   None: not written / not in the file
+
+ViewScale is the zoom (1 = 100 %); Visio writes -1 for "whole page" and -2 for "page width".
+ViewCenterX/Y are the point in the window's middle, in inches from the page's lower left
+corner.  The stencil windows are template.rs's (stencil_windows, set_stencil_windows).
+```
+
+- **`struct DrawingWindow`**
+  what the drawing window shows
+  - `page: Option<u32>` -- the page's ID (Page)
+  - `view_scale: Option<f64>` -- the zoom, 1 = 100 %; -1 the whole page, -2 the page's width (ViewScale)
+  - `center: Option<(f64, f64)>` -- the point in the window's middle, inches from the page's lower left corner
+  - `show_rulers: Option<bool>` -- ShowRulers
+  - `show_grid: Option<bool>` -- ShowGrid
+  - `show_page_breaks: Option<bool>` -- ShowPageBreaks
+  - `show_guides: Option<bool>` -- ShowGuides
+  - `show_connection_points: Option<bool>` -- ShowConnectionPoints
+
+- **`fn drawing_window(doc: &Document) -> Option<DrawingWindow>`**
+  the document's drawing window (the first window of type Drawing), None without one
+
+- **`fn set_drawing_window(doc: &mut Document, w: &DrawingWindow)`**
+  make the document's drawing window `w` (see the module comment)
 
 ### `diagram_io/src/xml.rs`
 

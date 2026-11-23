@@ -299,6 +299,14 @@ pub enum Warning {
         /// the part
         part: String,
     },
+    /// (vdx.rs) something of the XML formats of 2003-2010 that has no place in a file of the
+    /// VSDX family, left out: tab stops, solution XML, data connections, a preview picture, a
+    /// picture of an unknown kind, a macro project that is no OLE file, elements of other
+    /// namespaces
+    LeftOut {
+        /// the element's name (Tab, SolutionXML, DataConnections ...)
+        what: String,
+    },
 }
 
 /// a file read into the model
@@ -381,6 +389,22 @@ impl fmt::Display for WriteError {
 }
 
 pub use crate::blank::{new_document, Measure};
+
+/// (JD16, DF-04) take the macro project out of a document: the parts a macro-enabled format
+/// carries for it (vbaProject.bin, vbaData.xml) and the relationships to them; Document::macros
+/// becomes false.  For "Speichern als .vsdx" after the user said yes; true when there was one
+pub fn remove_macros(doc: &mut Document) -> bool {
+    let before = doc.parts.len();
+    let gone: Vec<Sym> = doc.parts.iter().filter(|p| macro_name(doc.str(p.name)) || macro_type(doc.str(p.content_type))).map(|p| p.name).collect();
+    doc.parts.retain(|p| !gone.contains(&p.name));
+    let removed = doc.parts.len() != before;
+    let keep: Vec<bool> = doc.rels.iter().map(|r| !r.part.is_some_and(|p| gone.contains(&p)) && !macro_type(doc.str(r.kind))).collect();
+    let mut k = keep.iter();
+    doc.rels.retain(|_| k.next().copied().unwrap_or(true));
+    let had = doc.macros;
+    doc.macros = false;
+    removed || had
+}
 
 /// write a document as a file of the VSDX family (see the module comment); the same document
 /// always gives the same bytes, and a document read from a file and written unchanged reads
@@ -739,10 +763,18 @@ impl<'p> Loader<'p> {
 
     // cycles (errors) and references that name nothing (warnings)
     fn check(&mut self) -> Result<(), Error> {
-        let doc = &self.doc;
-        let mut warnings = Ws { list: core::mem::take(&mut self.warnings), more: self.more, cap: self.lim.warnings };
-        // styles: per category the based-on chain must end (a style naming itself ends it)
         let main = slash(&self.main);
+        check_doc(&self.doc, &main, &mut self.warnings, &mut self.more, self.lim.warnings)
+    }
+}
+
+/// cycles (errors) and references that name nothing (warnings, at most `cap` kept) of a document
+/// read from a file; `main` names the part of the document element (vdx.rs shares it)
+pub(crate) fn check_doc(doc: &Document, main: &str, list: &mut Vec<Warning>, more: &mut usize, cap: usize) -> Result<(), Error> {
+    {
+        let mut warnings = Ws { list: core::mem::take(list), more: *more, cap };
+        // styles: per category the based-on chain must end (a style naming itself ends it)
+        let main = String::from(main);
         let styles: Vec<(u32, StyleRefs)> = doc.styles().filter_map(|s| doc.style(s)).map(|s| (s.header.id, s.header.based_on)).collect();
         let by_id: BTreeMap<u32, StyleRefs> = styles.iter().copied().collect();
         let getters: [fn(&StyleRefs) -> Option<u32>; 3] = [|r| r.line, |r| r.fill, |r| r.text];
@@ -838,8 +870,8 @@ impl<'p> Loader<'p> {
                 }
             }
         }
-        self.warnings = warnings.list;
-        self.more = warnings.more;
+        *list = warnings.list;
+        *more = warnings.more;
         Ok(())
     }
 }

@@ -28,9 +28,19 @@
 //                       set and the catalogue's cells; template::stencil_windows,
 //                       set_stencil_windows, info, registers and to_drawing for the app
 //
+//   vdx::read(&bytes, DocKind::Drawing, &vsdx::Limits::VSDX) -> Result<vsdx::Loaded, vsdx::Error>
+//                       (JD16) the XML formats of Visio 2003-2010 (.vdx drawing, .vsx stencil,
+//                       .vtx template) into the same model: cells with formula and value,
+//                       sections, masters, pages, pictures as parts, fonts by name, document
+//                       properties, windows, the macro project; vdx::kind_of, vdx::sniff
+//   props::read(&doc) / props::write(&mut doc, &props)
+//                       (JD16) the document properties (docProps core, app and custom)
+//   windows::drawing_window(&doc) / set_drawing_window(&mut doc, &w)
+//                       (JD16) the drawing window of windows.xml: page, zoom, centre, what is
+//                       shown; vsdx::remove_macros takes a macro project out
+//
 // What is to come here, by stage of the plan:
-//   JD12  exports: SVG, PNG and PDF through the library's writers
-//   later the XML formats of 2003-2010 (.vdx, .vsx) and importing the binary .vss / .vsd
+//   JD17  importing the binary .vss
 //
 // The ZIP and OPC parts come from archive (archive::opc, JD1), shared with doc_io's DOCX.
 // Every file is untrusted input: sizes, counts and nesting are bounded, a file that breaks a
@@ -43,6 +53,7 @@ extern crate alloc;
 
 mod blank;
 mod pack;
+pub mod props;
 mod read;
 pub mod stencil;
 mod stencil_icon;
@@ -50,7 +61,9 @@ mod stencil_src;
 mod stencil_svg;
 pub mod template;
 mod template_src;
+pub mod vdx;
 pub mod vsdx;
+pub mod windows;
 mod write;
 mod xml;
 

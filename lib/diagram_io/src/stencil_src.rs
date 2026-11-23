@@ -75,6 +75,8 @@ pub(crate) const SECTIONS: &[(&str, &str, SecKind)] = &[
     ("Actions", "Actions", SecKind::Named),
     ("Hyperlink", "Hyperlink", SecKind::Named),
     ("Scratch", "Scratch", SecKind::Indexed),
+    // (JD15) text fields: the Value formula a "{fld N}" mark in the text shows
+    ("Field", "Field", SecKind::Indexed),
 ];
 
 /// the row types of a Geometry section
