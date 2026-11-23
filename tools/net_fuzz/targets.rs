@@ -673,8 +673,10 @@ pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
             let _ = s.take_out();
         })),
         // with tickets and 0-RTT: the pre_shared_key, its binders, the tickets, the early data
+        // (each input with a replay register of its own, the same keys: a seed's 0-RTT is
+        // taken again in every run)
         ("tls_server_psk", psk_hellos(&tk), Box::new(move |d: &[u8]| {
-            let mut s = netio::tls::Conn::server(pcfg.clone());
+            let mut s = netio::tls::Conn::server(netio::tls::ServerConfig { tickets: Some(psk_tickets()), ..pcfg.clone() });
             let _ = s.feed(d);
             let _ = s.take_out();
             let mut b = [0u8; 64];

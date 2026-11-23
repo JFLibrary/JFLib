@@ -439,6 +439,11 @@ pub struct Conn {
     early_in: Vec<u8>,
     /// a client: the 0-RTT key, for its data and its EndOfEarlyData
     early_wr: Option<Cipher>,
+    /// a client: its ClientHello carried psk_key_exchange_modes (a second one keeps it)
+    modes_sent: bool,
+    /// (tests) a server's suites in its order and the groups it has (empty: all of its own)
+    test_suites: Vec<u16>,
+    test_groups: Vec<u16>,
 }
 
 // the secrets of the key schedule are wiped when the connection goes
@@ -518,6 +523,9 @@ impl Conn {
             early_max: 0,
             early_in: Vec::new(),
             early_wr: None,
+            modes_sent: false,
+            test_suites: Vec::new(),
+            test_groups: Vec::new(),
         }
     }
 
@@ -674,6 +682,14 @@ impl Conn {
     #[doc(hidden)]
     pub fn test_cr_sig_algs(&mut self, algs: Vec<u16>) {
         self.cr_algs = algs;
+    }
+
+    /// (tests) a server that prefers these suites, in this order, and has only these groups
+    /// (empty: its own): HelloRetryRequests and suites of SHA-384 between two JFLib programs
+    #[doc(hidden)]
+    pub fn test_server_prefs(&mut self, suites: Vec<u16>, groups: Vec<u16>) {
+        self.test_suites = suites;
+        self.test_groups = groups;
     }
 
     /// (tests) an application data record without data
@@ -1225,10 +1241,12 @@ impl Conn {
         }
         // a session to resume: after a HelloRetryRequest only one of the suite's hash (RFC 8446
         // 4.1.4); psk_key_exchange_modes, early_data and pre_shared_key, which comes last
-        // (4.2.11), when they fit
+        // (4.2.11), when they fit.  A second ClientHello keeps psk_key_exchange_modes of the
+        // first even when its PSK goes (4.1.2 lets only the PSKs change)
         if self.hrr && self.offer.as_ref().is_some_and(|s| record::suite_hash(s.suite) != self.hash_alg) {
             self.offer = None;
         }
+        let keep_modes = self.hrr && self.modes_sent;
         let mut binder_len = 0;
         let mut early = false;
         if let Some(s) = self.offer.as_ref() {
@@ -1244,7 +1262,7 @@ impl Conn {
             put_v16(&mut p, &ids);
             put_v16(&mut p, &binders);
             early = !self.hrr && s.max_early > 0 && !self.early_out.is_empty();
-            if e.len() + 6 + 4 + 4 + p.len() <= 0xFFFF {
+            if (!self.hrr || keep_modes) && e.len() + 6 + 4 + 4 + p.len() <= 0xFFFF {
                 put_ext(&mut e, EXT_PSK_MODES, &[1, PSK_DHE_KE]);
                 if early {
                     put_ext(&mut e, EXT_EARLY_DATA, &[]);
@@ -1256,7 +1274,11 @@ impl Conn {
         if binder_len == 0 {
             self.offer = None;
             early = false;
+            if keep_modes {
+                put_ext(&mut e, EXT_PSK_MODES, &[1, PSK_DHE_KE]);
+            }
         }
+        self.modes_sent = binder_len > 0 || keep_modes;
         // a length field that overflows makes the extensions pass 2^16 - 1 too (the ALPN list
         // is bounded, a share is short; a server name or cookie of tens of KiB is not)
         if e.len() > 0xFFFF {
@@ -1752,7 +1774,8 @@ impl Conn {
         }
         // the first of ours the client offers: ChaCha20-Poly1305, AES-128-GCM (which RFC 8446
         // 9.1 makes mandatory), AES-256-GCM with SHA-384
-        let Some(suite) = SUITES_13.iter().copied().find(|s| suites.contains(s)) else {
+        let ours_suites: &[u16] = if self.test_suites.is_empty() { &SUITES_13 } else { &self.test_suites };
+        let Some(suite) = ours_suites.iter().copied().find(|s| SUITES_13.contains(s) && suites.contains(s)) else {
             return Err(fail(AL_HANDSHAKE_FAILURE, "no common cipher suite (ChaCha20-Poly1305, AES-128-GCM, AES-256-GCM)"));
         };
         if self.hrr && suite != self.suite {
@@ -1820,12 +1843,16 @@ impl Conn {
         if self.hrr {
             self.early_skip = 0;
         }
-        let wants_early = ext(&exts, EXT_EARLY_DATA).is_some();
+        let wants_early = match ext(&exts, EXT_EARLY_DATA) {
+            Some([]) => true,
+            Some(_) => return Err(fail(AL_DECODE_ERROR, "early_data that is not empty")),
+            None => false,
+        };
         if wants_early {
             if self.hrr {
                 return Err(fail(AL_ILLEGAL_PARAMETER, "early_data in the second ClientHello"));
             }
-            self.early_skip = MAX_EARLY_SKIP.max(cfg.early_data as usize + cfg.early_data as usize / 8 + 256);
+            self.early_skip = skip_budget(cfg.early_data);
         }
         // supported_groups and key_share come together (RFC 8446 9.2)
         if ext(&exts, EXT_KEY_SHARE).is_none() {
@@ -1858,7 +1885,8 @@ impl Conn {
         // the client's order decides: the first group it lists that we have and sent a share of
         // (a share of a later group spares the HelloRetryRequest); with no share of a group we
         // have, a HelloRetryRequest for the first of them it lists
-        let ours = |g: &u16| kx::known(*g);
+        let test_groups = &self.test_groups;
+        let ours = |g: &u16| kx::known(*g) && (test_groups.is_empty() || test_groups.contains(g));
         let pick = groups.iter().filter(|g| ours(g)).find_map(|g| shares.iter().find(|s| s.0 == *g)).copied();
         let Some((group, pk)) = pick else {
             let Some(&want) = groups.iter().find(|g| ours(g)) else {
@@ -1909,10 +1937,12 @@ impl Conn {
             });
         }
         // 0-RTT: only of the first identity, with the suite and ALPN protocol of its session, a
-        // ClientHello as fresh as the ticket's age says, the first time it comes (4.2.10, 8)
+        // ClientHello as fresh as the ticket's age says, the first time it comes (4.2.10, 8), and
+        // no more than the server takes now (a ticket that allows more is resumed without it:
+        // its client may send what the ticket says)
         let cfg_early = cfg.early_data;
         let early_ok = match (&taken, tickets.as_ref()) {
-            (Some((i, t, binder, age)), Some(tk)) if wants_early && *i == 0 && cfg_early > 0 && t.max_early > 0 => {
+            (Some((i, t, binder, age)), Some(tk)) if wants_early && *i == 0 && t.max_early > 0 && t.max_early <= cfg_early => {
                 let client_age = age.wrapping_sub(t.age_add) as i64;
                 let server_age = tk.now_ms() - t.issued_ms;
                 let fresh = (server_age - client_age).abs() <= FRESH_WINDOW_MS && client_age <= t.lifetime_s as i64 * 1000;
@@ -1935,8 +1965,11 @@ impl Conn {
             }
             if early_ok {
                 self.early = Early::Accepted;
-                self.early_max = cfg_early.min(t.max_early) as usize;
+                self.early_max = t.max_early as usize;
                 self.early_skip = 0;
+            } else if wants_early {
+                // refused: skip what the ticket lets the client send
+                self.early_skip = self.early_skip.max(skip_budget(t.max_early));
             }
         }
         if wants_early && !early_ok {
@@ -2107,7 +2140,7 @@ impl Conn {
 
     /// a ticket this handshake may take: of the suite's hash, the same server name, within its
     /// lifetime, 7 days from the handshake that authenticated the client; when this server asks
-    /// for client certificates, one with certificates checked by the same trust and not expired
+    /// for client certificates, one with certificates of the same trust that pass its check again
     /// (or none, when a client without one is taken)
     fn ticket_fits(&self, t: &TicketData, sni: &str, now_ms: i64) -> bool {
         let Some(cfg) = self.scfg.as_ref() else { return false };
@@ -2118,15 +2151,19 @@ impl Conn {
             && age >= -FRESH_WINDOW_MS
             && age <= t.lifetime_s as i64 * 1000
             && now_s - t.auth_s <= MAX_LIFETIME as i64;
-        let client = match cfg.client_auth.as_ref() {
+        if !basic {
+            return false;
+        }
+        // the certificates go through the check of a full handshake again: every one in its
+        // validity, the anchors, a Trust::Custom (a client revoked since is not resumed)
+        match cfg.client_auth.as_ref() {
             None => true,
             Some(_) if t.chain.is_empty() => cfg.client_auth_optional,
             Some(trust) => {
-                let leaf = t.chain.first().and_then(|d| Cert::parse(d));
-                t.client_trust == session::trust_hash(trust) && leaf.is_some_and(|c| now_s <= c.not_after && now_s >= c.not_before)
+                let certs: Vec<Cert> = t.chain.iter().filter_map(|d| Cert::parse(d)).collect();
+                t.client_trust == session::trust_hash(trust) && certs.len() == t.chain.len() && check_trust(trust, &certs, None, Usage::Client).is_ok()
             }
-        };
-        basic && client
+        }
     }
 
     /// a server's tickets after the client's Finished (ServerConfig::tickets): each for a PSK of
@@ -2161,7 +2198,11 @@ impl Conn {
                 client_trust,
                 chain: chain.clone(),
             };
+            // (none for a chain too long for a ticket; a ticket's length is 16 bits)
             let Some(ticket) = tk.seal(&t) else { return Ok(()) };
+            if ticket.len() > 0xFFFF {
+                return Ok(());
+            }
             let mut b = Vec::new();
             b.extend_from_slice(&tk.lifetime_s().to_be_bytes());
             b.extend_from_slice(&age_add.to_be_bytes());
@@ -2259,6 +2300,13 @@ fn ch_fixed(sid: &[u8], suites: &[u16], comp: &[u8], exts: &[(u16, &[u8])]) -> V
         }
     }
     out
+}
+
+/// the bytes of records of 0-RTT data a server skips when it does not take them: the data a
+/// ticket allows, the records' overhead, at least MAX_EARLY_SKIP
+fn skip_budget(max_early: u32) -> usize {
+    let n = max_early as usize;
+    MAX_EARLY_SKIP.max(n.saturating_add(n / 8).saturating_add(256))
 }
 
 /// the TLS 1.3 record keys of a traffic secret for a suite

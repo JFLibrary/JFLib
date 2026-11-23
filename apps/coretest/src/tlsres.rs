@@ -6,6 +6,7 @@
 // its data before and after the handshake, and the same over TCP (connect_early, read_early)
 
 use alloc::boxed::Box;
+use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -28,7 +29,35 @@ pub fn run(t: &mut T) {
     cache(t, &p);
     early(t, &p);
     early_refused(t, &p);
+    retry(t, &p);
     over_tcp(t, &p);
+}
+
+/// a handshake with the server's suites and groups set (Conn::test_server_prefs)
+fn go_prefs(c: ClientConfig, s: ServerConfig, suites: &[u16], groups: &[u16]) -> Result<(Conn, Conn), TlsError> {
+    let mut c = Conn::client(c);
+    let mut s = Conn::server(s);
+    s.test_server_prefs(suites.to_vec(), groups.to_vec());
+    pump(&mut c, &mut s)?;
+    Ok((c, s))
+}
+
+/// resumption after a HelloRetryRequest, sessions of SHA-384
+fn retry(t: &mut T, p: &Pki) {
+    use netio::tls::record::{TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256};
+    let p256 = [tls::kx::SECP256R1];
+    let (ss, tk) = (Arc::new(Sessions::default()), Arc::new(Tickets::new()));
+    let _ = go(ccfg(p, &ss), scfg(p, &tk));
+    let r = go_prefs(ccfg(p, &ss), scfg(p, &tk), &[], &p256);
+    t.check("retry: resumed after a HelloRetryRequest (P-256)", r.as_ref().is_ok_and(|(c, s)| c.resumed() && s.resumed() && c.group() == tls::kx::SECP256R1));
+    let (ss, tk) = (Arc::new(Sessions::default()), Arc::new(Tickets::new()));
+    let _ = go_prefs(ccfg(p, &ss), scfg(p, &tk), &[TLS_AES_256_GCM_SHA384], &[]);
+    let r = go_prefs(ccfg(p, &ss), scfg(p, &tk), &[TLS_AES_256_GCM_SHA384], &[]);
+    t.check("retry: a session of TLS_AES_256_GCM_SHA384 resumes", r.as_ref().is_ok_and(|(c, s)| c.resumed() && s.resumed() && c.suite() == TLS_AES_256_GCM_SHA384));
+    // a HelloRetryRequest for a suite of SHA-256: the SHA-384 ticket goes, psk_key_exchange_modes
+    // stays (the server checks that the second ClientHello keeps it)
+    let r = go_prefs(ccfg(p, &ss), scfg(p, &tk), &[TLS_CHACHA20_POLY1305_SHA256], &p256);
+    t.check("retry: ... a HelloRetryRequest to SHA-256 drops its ticket: a full handshake", r.as_ref().is_ok_and(|(c, s)| !c.resumed() && !s.resumed() && c.suite() == TLS_CHACHA20_POLY1305_SHA256));
 }
 
 fn anchors(p: &Pki) -> Trust {
@@ -194,11 +223,50 @@ fn client_certs(t: &mut T, p: &Pki) {
     // the same cache without the client identity: no ticket of it
     let r = go(ccfg(p, &ss), scfg(p, &tk));
     t.eq("client certs: a connection without the identity does not offer its tickets", resumed(&r), Some(false));
-    // a ticket without a client certificate at a server that requires one
+    // a ticket without a client certificate (a server that asked for none) at a server that
+    // requires one: the same client config, so the ticket is offered
     let ss2 = Arc::new(Sessions::default());
-    let _ = go(ccfg(p, &ss2), scfg(p, &tk));
-    let r = go(ClientConfig { identity: Some(p.client.clone()), ..ccfg(p, &ss2) }, mtls(anchors(p)));
-    t.eq("client certs: a ticket without a certificate is not taken where one is required", resumed(&r), Some(false));
+    let id2 = || ClientConfig { identity: Some(p.client.clone()), ..ccfg(p, &ss2) };
+    let _ = go(id2(), scfg(p, &tk));
+    let offered = ss2.len();
+    let r = go(id2(), mtls(anchors(p)));
+    t.check("client certs: a ticket without a certificate is not taken where one is required", offered > 0 && resumed(&r) == Some(false) && ss2.len() == offered + 1);
+    // the certificates are checked again: a client the trust refuses since is not resumed
+    let revoked = Arc::new(core::sync::atomic::AtomicBool::new(false));
+    let rv = revoked.clone();
+    let ca = p.ca.clone();
+    let check: tls::Verifier = Arc::new(move |chain, _, now| {
+        if rv.load(core::sync::atomic::Ordering::Relaxed) {
+            return Err(String::from("revoked"));
+        }
+        netio::x509::verify_chain(chain, core::slice::from_ref(&ca), now, None, netio::x509::Usage::Client)
+    });
+    let custom = || ServerConfig { client_auth: Some(Trust::Custom(check.clone())), ..scfg(p, &tk) };
+    let ss4 = Arc::new(Sessions::default());
+    let id4 = || ClientConfig { identity: Some(p.client.clone()), ..ccfg(p, &ss4) };
+    let _ = go(id4(), custom());
+    let r = go(id4(), custom());
+    t.eq("client certs: resumed while the client's check passes", resumed(&r), Some(true));
+    revoked.store(true, core::sync::atomic::Ordering::Relaxed);
+    let r = go(id4(), custom());
+    t.check("client certs: ... not once it refuses the client (a full handshake, refused)", matches!(r, Err(TlsError::Alert(42, _)) | Err(TlsError::PeerAlert(42))));
+    // a client chain too long for a ticket (over 16 KiB) gets none
+    let names: Vec<String> = (0..900).map(|i| format!("agent-{:04}.web.lab", i)).collect();
+    let big = netio::x509::CertBuilder {
+        serial: [99; 16],
+        cn: String::from("agent-big"),
+        not_before: 1_791_000_000 - 3600,
+        not_after: 1_791_000_000 + 365 * 86_400,
+        client_auth: true,
+        dns: names,
+        spki: p.client.key.spki(),
+        ..netio::x509::CertBuilder::default()
+    }
+    .sign_key(Some(&p.ca), &p.ca_key, &[])
+    .unwrap_or_default();
+    let ss5 = Arc::new(Sessions::default());
+    let r = go(ClientConfig { identity: Some(tls::Identity::new(alloc::vec![big.clone()], p.client.key.clone())), ..ccfg(p, &ss5) }, mtls(anchors(p)));
+    t.check("client certs: a chain of over 16 KiB: no ticket (a ticket holds all of it or none)", big.len() > 16 * 1024 && r.is_ok() && ss5.is_empty());
     let ss3 = Arc::new(Sessions::default());
     let _ = go(ccfg(p, &ss3), ServerConfig { client_auth_optional: true, ..mtls(anchors(p)) });
     let r = go(ccfg(p, &ss3), ServerConfig { client_auth_optional: true, ..mtls(anchors(p)) });
@@ -255,7 +323,7 @@ fn early(t: &mut T, p: &Pki) {
     t.check("early: EndOfEarlyData, the client's Finished: established", r.is_ok() && s.established() && !s.in_early());
     // data not read during the handshake comes first from read_plain
     let _ = go(ccfg(p, &ss), ecfg(4096));
-    if let Ok((mut c, mut s, _)) = early_start(p, &ss, ecfg(4096), b"first ") {
+    if let Some((mut c, mut s, _)) = started(t, "early: unread data", early_start(p, &ss, ecfg(4096), b"first ")) {
         let _ = c.feed(&s.take_out());
         let _ = c.write_plain(b"then");
         let _ = s.feed(&c.take_out());
@@ -265,15 +333,35 @@ fn early(t: &mut T, p: &Pki) {
     // more data than the ticket allows: the client sends what it takes
     let (ss2, tk2) = (Arc::new(Sessions::default()), Arc::new(Tickets::new()));
     let _ = go(ccfg(p, &ss2), ServerConfig { early_data: 16, ..scfg(p, &tk2) });
-    if let Ok((mut c, mut s, _)) = early_start(p, &ss2, ServerConfig { early_data: 16, ..scfg(p, &tk2) }, &[b'x'; 100]) {
+    if let Some((mut c, mut s, _)) = started(t, "early: the ticket's limit", early_start(p, &ss2, ServerConfig { early_data: 16, ..scfg(p, &tk2) }, &[b'x'; 100])) {
         let _ = c.feed(&s.take_out());
         t.eq("early: a client sends at most the ticket's max_early_data_size", c.early_taken(), 16);
     }
-    // a server that now takes less than its tickets said: more is unexpected_message
+    // a server that now takes less than its tickets allow: resumed without 0-RTT (the client
+    // may send what the ticket says)
     let (ss3, tk3) = (Arc::new(Sessions::default()), Arc::new(Tickets::new()));
     let _ = go(ccfg(p, &ss3), ServerConfig { early_data: 1000, ..scfg(p, &tk3) });
-    let r = early_start(p, &ss3, ServerConfig { early_data: 8, ..scfg(p, &tk3) }, &[b'x'; 100]);
-    t.check("early: more than the server takes is unexpected_message", matches!(r, Err(TlsError::Alert(10, _))));
+    if let Some((mut c, mut s, _)) = started(t, "early: a lower limit", early_start(p, &ss3, ServerConfig { early_data: 8, ..scfg(p, &tk3) }, &[b'x'; 100])) {
+        let r = c.feed(&s.take_out()).and_then(|_| s.feed(&c.take_out()));
+        t.check("early: a ticket allowing more than the server takes now: resumed, no 0-RTT", r.is_ok() && s.established() && s.resumed() && c.early_taken() == 0 && !s.has_early());
+    }
+    // a client that sends more than its ticket allows: unexpected_message
+    let (ss4, tk4) = (Arc::new(Sessions::default()), Arc::new(Tickets::new()));
+    let _ = go(ccfg(p, &ss4), ServerConfig { early_data: 8, ..scfg(p, &tk4) });
+    ss4.test_max_early(1000);
+    let r = early_start(p, &ss4, ServerConfig { early_data: 8, ..scfg(p, &tk4) }, &[b'x'; 100]);
+    t.check("early: more than the ticket allows is unexpected_message", matches!(r, Err(TlsError::Alert(10, _))));
+}
+
+/// the first flight of early_start, or a failed check
+fn started(t: &mut T, what: &str, r: Result<(Conn, Conn, Vec<u8>), TlsError>) -> Option<(Conn, Conn, Vec<u8>)> {
+    match r {
+        Ok(x) => Some(x),
+        Err(e) => {
+            t.check(&format!("{}: the first flight: {}", what, e), false);
+            None
+        }
+    }
 }
 
 fn early_refused(t: &mut T, p: &Pki) {
@@ -282,7 +370,7 @@ fn early_refused(t: &mut T, p: &Pki) {
     let mut b = [0u8; 64];
     // the same ClientHello again (a replay): resumption, no 0-RTT
     let _ = go(ccfg(p, &ss), ecfg(4096));
-    if let Ok((_, s1, first)) = early_start(p, &ss, ecfg(4096), b"POST /pay") {
+    if let Some((_, s1, first)) = started(t, "early refused: replay", early_start(p, &ss, ecfg(4096), b"POST /pay")) {
         let mut s2 = Conn::server(ecfg(4096));
         let r = s2.feed(&first);
         t.check("early refused: a replayed ClientHello: no 0-RTT", r.is_ok() && s1.in_early() && !s2.in_early() && !s2.has_early() && s2.read_early(&mut b) == 0);
@@ -291,7 +379,7 @@ fn early_refused(t: &mut T, p: &Pki) {
     // stale: the server's age of the ticket 11 s off the client's
     let _ = go(ccfg(p, &ss), ecfg(4096));
     tk.test_shift(11_000);
-    if let Ok((mut c, mut s, _)) = early_start(p, &ss, ecfg(4096), b"GET /") {
+    if let Some((mut c, mut s, _)) = started(t, "early refused: stale", early_start(p, &ss, ecfg(4096), b"GET /")) {
         let _ = c.feed(&s.take_out());
         let r = s.feed(&c.take_out());
         t.check("early refused: a ticket age 11 s off: resumed without 0-RTT", r.is_ok() && s.established() && s.resumed() && !s.has_early() && c.early_taken() == 0);
@@ -310,7 +398,7 @@ fn early_refused(t: &mut T, p: &Pki) {
     // a server that takes no 0-RTT now
     let (ss, tk) = (Arc::new(Sessions::default()), Arc::new(Tickets::new()));
     let _ = go(ccfg(p, &ss), ServerConfig { early_data: 4096, ..scfg(p, &tk) });
-    if let Ok((mut c, mut s, _)) = early_start(p, &ss, scfg(p, &tk), b"GET /") {
+    if let Some((mut c, mut s, _)) = started(t, "early refused: off", early_start(p, &ss, scfg(p, &tk), b"GET /")) {
         let r = c.feed(&s.take_out()).and_then(|_| s.feed(&c.take_out()));
         t.check("early refused: early_data 0 at the server: resumed, no 0-RTT", r.is_ok() && s.resumed() && c.early_taken() == 0 && !s.has_early());
     }

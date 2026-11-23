@@ -258,6 +258,22 @@ fn server_records(t: &mut T) {
     t.check("server records: pre_shared_key as the last extension is taken (a ticket not ours: ignored)", feed(&with_psk(false, true)).0.is_ok());
     t.check("server records: pre_shared_key before another extension is refused", alert(&feed(&with_psk(true, true)).0) == Some(tls::conn::AL_ILLEGAL_PARAMETER));
     t.check("server records: pre_shared_key without psk_key_exchange_modes is missing_extension", alert(&feed(&with_psk(false, false)).0) == Some(tls::conn::AL_MISSING_EXTENSION));
+    // early_data in a ClientHello is empty (RFC 8446 4.2.10)
+    let with_ext = |x: &[u8]| {
+        let sid = 4 + 2 + 32;
+        let suites = sid + 1 + ch[sid] as usize;
+        let comp = suites + 2 + ((ch[suites] as usize) << 8 | ch[suites + 1] as usize);
+        let exts = comp + 1 + ch[comp] as usize;
+        let mut m = ch.to_vec();
+        m.extend_from_slice(x);
+        let ext_len = m.len() - exts - 2;
+        m[exts..exts + 2].copy_from_slice(&(ext_len as u16).to_be_bytes());
+        let body = m.len() - 4;
+        m[1..4].copy_from_slice(&(body as u32).to_be_bytes()[1..]);
+        record(22, &m)
+    };
+    t.check("server records: an empty early_data is taken (and the 0-RTT skipped)", feed(&with_ext(&[0, 42, 0, 0])).0.is_ok());
+    t.check("server records: early_data with a body is decode_error", alert(&feed(&with_ext(&[0, 42, 0, 1, 7])).0) == Some(tls::conn::AL_DECODE_ERROR));
 }
 
 /// a server's first flight with one extension more in its ServerHello (the first record, put

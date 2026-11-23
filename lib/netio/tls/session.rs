@@ -10,7 +10,8 @@
 //
 // A ticket holds the resumption PSK and what the server must check before it takes it again:
 // the suite, the server name, the ALPN protocol, when the handshake that authenticated the
-// client ran, the client's certificates and the trust that checked them.  A session lasts at
+// client ran, the client's certificates (which a resumption checks again) and the trust that
+// checked them.  A session lasts at
 // most 7 days from that handshake, however often its tickets are renewed (RFC 8446 4.6.1).
 
 use alloc::collections::{BTreeSet, VecDeque};
@@ -32,7 +33,7 @@ pub const FRESH_WINDOW_MS: i64 = 10_000;
 const PER_SERVER: usize = 8;
 /// the ClientHellos of 0-RTT the default replay register keeps (it refuses 0-RTT when full)
 const MAX_STRIKES: usize = 100_000;
-/// the bytes of client certificates a ticket carries (more: the leaf only)
+/// the bytes of client certificates a ticket carries (a longer chain gets no ticket)
 const MAX_TICKET_CHAIN: usize = 16 * 1024;
 
 fn clock_ms() -> i64 {
@@ -113,6 +114,13 @@ impl Sessions {
 
     pub(crate) fn now_ms(&self) -> i64 {
         clock_ms() + *self.shift_ms.lock()
+    }
+
+    /// (tests) the 0-RTT limit of every kept ticket, as a client that sends more than its
+    /// ticket allows would believe
+    #[doc(hidden)]
+    pub fn test_max_early(&self, n: u32) {
+        self.inner.lock().iter_mut().for_each(|(_, l)| l.iter_mut().for_each(|s| s.max_early = n));
     }
 
     /// the newest ticket of this server that is still valid (it is gone from the cache then)
@@ -351,7 +359,7 @@ impl Tickets {
         self.due(&mut g, now);
         let k = g.list.first()?;
         let nonce: [u8; 24] = plat::random_bytes();
-        let mut plain = t.encode();
+        let mut plain = t.encode()?;
         let sealed = crypto::aead::x_seal(&k.key, &nonce, &k.id, &plain);
         crypto::zeroize(&mut plain);
         let mut out = Vec::with_capacity(8 + 24 + sealed.len());
@@ -431,7 +439,13 @@ impl Drop for TicketData {
 const TICKET_FORMAT: u8 = 1;
 
 impl TicketData {
-    fn encode(&self) -> Vec<u8> {
+    /// None: the client's certificates are too long for a ticket (it holds all or none, since
+    /// a resumption checks them again)
+    fn encode(&self) -> Option<Vec<u8>> {
+        let total: usize = self.chain.iter().map(|c| c.len()).sum();
+        if total > MAX_TICKET_CHAIN || self.chain.len() > 255 {
+            return None;
+        }
         let mut b = Vec::new();
         b.push(TICKET_FORMAT);
         b.extend_from_slice(&self.suite.to_be_bytes());
@@ -453,14 +467,12 @@ impl TicketData {
             None => b.push(0),
         }
         b.extend_from_slice(&self.client_trust);
-        let total: usize = self.chain.iter().map(|c| c.len()).sum();
-        let chain = if total > MAX_TICKET_CHAIN { &self.chain[..self.chain.len().min(1)] } else { &self.chain[..] };
-        b.push(chain.len() as u8);
-        for c in chain {
+        b.push(self.chain.len() as u8);
+        for c in &self.chain {
             b.extend_from_slice(&(c.len() as u32).to_be_bytes());
             b.extend_from_slice(c);
         }
-        b
+        Some(b)
     }
 
     fn decode(b: &[u8]) -> Option<TicketData> {

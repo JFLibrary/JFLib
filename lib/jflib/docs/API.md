@@ -45588,9 +45588,10 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   - `tickets: Option<Arc<Tickets>>` -- session tickets (TLS 1.3 resumption): sent after each handshake and taken back for a
     handshake without certificates.  A resumed connection keeps the client certificates of
     its first handshake (peer_certs) for up to 7 days, while the same client_auth trust asks
-    for them.  None: no tickets
+    for them and takes them again (each resumption checks them).  None: no tickets
   - `early_data: u32` -- 0-RTT (needs tickets): the most bytes of early data a client may send with a ticket; 0
-    (the default): none.  Early data can be replayed by an attacker (RFC 8446 8, E.5): the
+    (the default): none.  A ticket that allows more than the server takes now is resumed
+    without 0-RTT.  Early data can be replayed by an attacker (RFC 8446 8, E.5): the
     server takes it only from a ClientHello within 10 seconds of the ticket's age and the
     first time it comes (Tickets::replay_check), keeps it apart (TlsStream::read_early) and
     hands it to read() only once the handshake is done.  With 0-RTT taken, accept returns
@@ -45759,6 +45760,9 @@ AL_NO_APPLICATION_PROTOCOL: u8 = 120
 - **`fn write_plain(&mut self, data: &[u8]) -> Result<(), TlsError>`**
 - **`fn test_cr_sig_algs(&mut self, algs: Vec<u16>)`**
   (tests) the signature schemes a server's CertificateRequest lists (empty: all it takes)
+- **`fn test_server_prefs(&mut self, suites: Vec<u16>, groups: Vec<u16>)`**
+  (tests) a server that prefers these suites, in this order, and has only these groups
+  (empty: its own): HelloRetryRequests and suites of SHA-384 between two JFLib programs
 - **`fn write_empty(&mut self) -> Result<(), TlsError>`**
   (tests) an application data record without data
 - **`fn close(&mut self)`**
@@ -45978,7 +45982,8 @@ and the anti-replay register of 0-RTT (RFC 8446 8)
 
 A ticket holds the resumption PSK and what the server must check before it takes it again:
 the suite, the server name, the ALPN protocol, when the handshake that authenticated the
-client ran, the client's certificates and the trust that checked them.  A session lasts at
+client ran, the client's certificates (which a resumption checks again) and the trust that
+checked them.  A session lasts at
 most 7 days from that handshake, however often its tickets are renewed (RFC 8446 4.6.1).
 ```
 
@@ -46009,6 +46014,9 @@ FRESH_WINDOW_MS: i64 = 10_000
   no ticket kept
 - **`fn test_shift(&self, ms: i64)`**
   (tests) move this cache's clock by `ms`
+- **`fn test_max_early(&self, n: u32)`**
+  (tests) the 0-RTT limit of every kept ticket, as a client that sends more than its
+  ticket allows would believe
 
 - **`type ReplayCheck = Arc<dyn Fn(&[u8]) -> bool + Send + Sync>`**
   the replay check of 0-RTT (Tickets::replay_check): a value unique to a ClientHello with early

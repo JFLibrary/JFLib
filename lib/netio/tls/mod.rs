@@ -163,10 +163,11 @@ pub struct ServerConfig {
     /// session tickets (TLS 1.3 resumption): sent after each handshake and taken back for a
     /// handshake without certificates.  A resumed connection keeps the client certificates of
     /// its first handshake (peer_certs) for up to 7 days, while the same client_auth trust asks
-    /// for them.  None: no tickets
+    /// for them and takes them again (each resumption checks them).  None: no tickets
     pub tickets: Option<Arc<Tickets>>,
     /// 0-RTT (needs tickets): the most bytes of early data a client may send with a ticket; 0
-    /// (the default): none.  Early data can be replayed by an attacker (RFC 8446 8, E.5): the
+    /// (the default): none.  A ticket that allows more than the server takes now is resumed
+    /// without 0-RTT.  Early data can be replayed by an attacker (RFC 8446 8, E.5): the
     /// server takes it only from a ClientHello within 10 seconds of the ticket's age and the
     /// first time it comes (Tickets::replay_check), keeps it apart (TlsStream::read_early) and
     /// hands it to read() only once the handshake is done.  With 0-RTT taken, accept returns
@@ -341,6 +342,8 @@ impl TlsStream {
     /// comes first from read() once the handshake is done
     pub fn read_early(&self, buf: &mut [u8]) -> NetResult<usize> {
         let mut raw = alloc::vec![0u8; 16 * 1024 + 512];
+        let t0 = plat::time_us();
+        let read_ms = self.read_ms.load(core::sync::atomic::Ordering::Relaxed);
         loop {
             {
                 let mut c = self.conn.lock();
@@ -350,6 +353,10 @@ impl TlsStream {
                 if !c.in_early() || c.closed() {
                     return Ok(0);
                 }
+            }
+            // records without data (empty ones) do not keep it going past the timeout, as read
+            if read_ms != u32::MAX && plat::time_us().saturating_sub(t0) >= read_ms as u64 * 1000 {
+                return Err(NetError::new(NetErrorKind::TimedOut, 0));
             }
             let n = self.inner.read(&mut raw)?;
             if n == 0 {

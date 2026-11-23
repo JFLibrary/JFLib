@@ -90,7 +90,8 @@ and OpenSSL's server
 ([docs/EXTERNAL_SUITES.md](https://github.com/JFLibrary/JFLib/blob/main/docs/EXTERNAL_SUITES.md)).
 
 ```rust
-use jflib::netio::tls::{self, ClientConfig, Identity, ServerConfig};
+use std::sync::Arc;
+use jflib::netio::tls::{self, ClientConfig, Identity, ServerConfig, Trust};
 
 // a certificate chain and its key as a CA hands them out (PEM), HTTP/1.1 by ALPN
 let identity = Identity::from_pem(&chain_pem, &key_pem)?; // Result<Identity, String>
@@ -99,7 +100,7 @@ let tls = tls::accept(Box::new(tcp), cfg.clone()); // Result<TlsStream, TlsError
 
 // resumption: one Tickets for all connections of the server, one Sessions for a client's
 let cfg = ServerConfig { tickets: Some(Arc::new(tls::Tickets::new())), ..cfg };
-let client = ClientConfig { sessions: Some(Arc::new(tls::Sessions::default())), ..ClientConfig::new(trust, "host") };
+let client = ClientConfig { sessions: Some(Arc::new(tls::Sessions::default())), ..ClientConfig::new(Trust::System(Vec::new()), "example.org") };
 ```
 
 `netio::x509` (the crate [`jflib-x509`](https://docs.rs/jflib-x509), which netpkt shares) parses
