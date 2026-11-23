@@ -324,7 +324,8 @@ fn message(p: &Problem) -> String {
         Issue::TooBig => s(t("Die Datei ist zu groß (höchstens 16 MB).")),
         Issue::TooManyRecords => s(t("Zu viele Datensätze: der Rest wird nicht gelesen.")),
         Issue::TooManyProblems => s(t("Weitere Probleme werden nicht aufgeführt.")),
-        Issue::UnknownRecord(k) => tf("Unbekannte Datensatzart „{}“ (erwartet: Shape oder Link).", &[k]),
+        // the record types are the file's words, never translated
+        Issue::UnknownRecord(k) => tf("Unbekannte Datensatzart „{}“ (erwartet: {} oder {}).", &[k, "Shape", "Link"]),
         Issue::UnclosedQuote => s(t("Ein Anführungszeichen wird nicht geschlossen.")),
         Issue::TooManyFields => s(t("Zu viele Felder: die übrigen werden übergangen.")),
         Issue::FieldTooLong => s(t("Ein Feld ist zu lang und wird gekürzt.")),
@@ -334,7 +335,7 @@ fn message(p: &Problem) -> String {
         Issue::DuplicateLinkId(id) => tf("Die ID „{}“ hat schon ein anderer Link.", &[id]),
         Issue::NoEnd => s(t("Dem Link fehlt „Von“ oder „Nach“.")),
         Issue::UnknownEnd(id) => tf("Kein Shape hat die ID „{}“.", &[id]),
-        Issue::SelfLink(id) => tf("Der Link verbindet „{}“ mit sich selbst.", &[id]),
+        Issue::SelfLink(id) => tf("Der Link führt von „{}“ zu sich selbst.", &[id]),
         Issue::BadNumber(f, v) => tf("{}: „{}“ ist keine Zahl.", &[field_name(*f), v]),
         Issue::OutOfRange(f, v) => tf("{}: „{}“ liegt außerhalb des erlaubten Bereichs.", &[field_name(*f), v]),
         Issue::HalfPosition => s(t("X ohne Y oder Y ohne X: das Shape wird automatisch angeordnet.")),
@@ -516,7 +517,7 @@ fn mapping(app: &mut Diagrammer, ui: &mut Ui) {
     ui.next_size(W, 0);
     ui.text(TS_CAPTION | TX_SECONDARY, &tf("Schritt {} von {}: {}", &["2", "2", t("Master-Zuordnung")]));
     ui.next_size(W, 0);
-    ui.text(TS_BODY | TX_WRAP, t("Wählen Sie für jeden Master-Namen der Datei ein Master-Shape der Zeichnung oder der geöffneten Schablonen."));
+    ui.text(TS_BODY | TX_WRAP, t("Wählen Sie für jeden Master-Namen der Datei ein Master-Shape der Zeichnung oder einer geöffneten Schablone."));
     let labels2: Vec<&str> = st.cands2.iter().map(|c| c.label.as_str()).collect();
     let labels1: Vec<&str> = st.cands1.iter().map(|c| c.label.as_str()).collect();
     ui.next_size(W, 260);
@@ -548,7 +549,7 @@ fn mapping(app: &mut Diagrammer, ui: &mut Ui) {
     ui.radio(ID + 6, t("der angezeigten Seite"), &mut st.new_page, 0);
     ui.radio(ID + 7, t("einer neuen Seite"), &mut st.new_page, 1);
     ui.next_size(W, 0);
-    ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Shapes ohne X und Y werden in Ebenen von oben nach unten angeordnet, Links werden zu dynamischen Verbindern."));
+    ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Shapes ohne X und Y werden in Stufen von oben nach unten angeordnet, Links werden zu dynamischen Verbindern."));
 }
 
 // ---------------------------------------------------------------- building

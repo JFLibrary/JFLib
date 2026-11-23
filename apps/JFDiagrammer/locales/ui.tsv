@@ -996,7 +996,7 @@ Dynamischer Verbinder	Dynamic connector	Conector dinámico	Connettore dinamico	C
 Zeichnung: {}	Drawing: {}	Dibujo: {}	Disegno: {}	Dessin : {}
 Zu viele Datensätze: der Rest wird nicht gelesen.	Too many records: the rest is not read.	Demasiados registros: el resto no se lee.	Troppi record: il resto non viene letto.	Trop d'enregistrements : le reste n'est pas lu.
 Weitere Probleme werden nicht aufgeführt.	Further problems are not listed.	No se enumeran más problemas.	Ulteriori problemi non vengono elencati.	Les autres problèmes ne sont pas listés.
-Unbekannte Datensatzart „{}“ (erwartet: Shape oder Link).	Unknown record type “{}” (expected: Shape or Link).	Tipo de registro desconocido «{}» (se esperaba Shape o Link).	Tipo di record sconosciuto «{}» (previsto: Shape o Link).	Type d'enregistrement inconnu « {} » (attendu : Shape ou Link).
+Unbekannte Datensatzart „{}“ (erwartet: {} oder {}).	Unknown record type “{}” (expected: {} or {}).	Tipo de registro desconocido «{}» (se esperaba {} o {}).	Tipo di record sconosciuto «{}» (previsto: {} o {}).	Type d'enregistrement inconnu « {} » (attendu : {} ou {}).
 Ein Anführungszeichen wird nicht geschlossen.	A quotation mark is not closed.	Unas comillas no se cierran.	Una virgoletta non viene chiusa.	Un guillemet n'est pas fermé.
 Zu viele Felder: die übrigen werden übergangen.	Too many fields: the others are skipped.	Demasiados campos: los demás se omiten.	Troppi campi: gli altri vengono ignorati.	Trop de champs : les autres sont ignorés.
 Ein Feld ist zu lang und wird gekürzt.	A field is too long and is shortened.	Un campo es demasiado largo y se acorta.	Un campo è troppo lungo e viene accorciato.	Un champ est trop long et est raccourci.
@@ -1006,7 +1006,7 @@ Die ID „{}“ hat schon ein anderes Shape.	Another shape already has the ID �
 Die ID „{}“ hat schon ein anderer Link.	Another link already has the ID “{}”.	Otro vínculo ya tiene el Id. «{}».	Un altro collegamento ha già l'ID «{}».	Un autre lien a déjà l'ID « {} ».
 Dem Link fehlt „Von“ oder „Nach“.	The link lacks “From” or “To”.	Al vínculo le falta «Desde» o «Hasta».	Al collegamento manca «Da» o «A».	Il manque « De » ou « À » au lien.
 Kein Shape hat die ID „{}“.	No shape has the ID “{}”.	Ninguna forma tiene el Id. «{}».	Nessuna forma ha l'ID «{}».	Aucune forme n'a l'ID « {} ».
-Der Link verbindet „{}“ mit sich selbst.	The link connects “{}” with itself.	El vínculo conecta «{}» consigo misma.	Il collegamento collega «{}» con se stessa.	Le lien relie « {} » à elle-même.
+Der Link führt von „{}“ zu sich selbst.	The link leads from “{}” to itself.	El vínculo va de «{}» a sí misma.	Il collegamento va da «{}» a se stessa.	Le lien va de « {} » à elle-même.
 {}: „{}“ ist keine Zahl.	{}: “{}” is not a number.	{}: «{}» no es un número.	{}: «{}» non è un numero.	{} : « {} » n'est pas un nombre.
 {}: „{}“ liegt außerhalb des erlaubten Bereichs.	{}: “{}” is outside the allowed range.	{}: «{}» está fuera del intervalo permitido.	{}: «{}» è fuori dall'intervallo consentito.	{} : « {} » est en dehors de la plage autorisée.
 X ohne Y oder Y ohne X: das Shape wird automatisch angeordnet.	X without Y or Y without X: the shape is arranged automatically.	X sin Y o Y sin X: la forma se organiza automáticamente.	X senza Y o Y senza X: la forma viene disposta automaticamente.	X sans Y ou Y sans X : la forme est disposée automatiquement.
@@ -1031,14 +1031,14 @@ Meldung	Message	Mensaje	Messaggio	Message
 Fehler	Error	Error	Errore	Erreur
 Warnung	Warning	Advertencia	Avviso	Avertissement
 Master-Zuordnung	Master Assignment	Asignación de formas maestras	Assegnazione forme master	Attribution des formes maîtres
-Wählen Sie für jeden Master-Namen der Datei ein Master-Shape der Zeichnung oder der geöffneten Schablonen.	For each master name in the file, choose a master shape of the drawing or of the open stencils.	Para cada nombre de forma maestra del archivo, elija una forma maestra del dibujo o de las colecciones de formas abiertas.	Per ogni nome di forma master del file, scegliere una forma master del disegno o delle raccolte di forme aperte.	Pour chaque nom de forme maître du fichier, choisissez une forme maître du dessin ou des bibliothèques de formes ouvertes.
+Wählen Sie für jeden Master-Namen der Datei ein Master-Shape der Zeichnung oder einer geöffneten Schablone.	For each master name in the file, choose a master shape of the drawing or of an open stencil.	Para cada nombre de forma maestra del archivo, elija una forma maestra del dibujo o de una colección de formas abierta.	Per ogni nome di forma master del file, scegliere una forma master del disegno o di una raccolta di forme aperta.	Pour chaque nom de forme maître du fichier, choisissez une forme maître du dessin ou d'une bibliothèque de formes ouverte.
 (kein Master-Shape)	(no master shape)	(sin forma maestra)	(nessuna forma master)	(aucune forme maître)
 für {} Verbinder	for {} connectors	para {} conectores	per {} connettori	pour {} connecteurs
 für {} Shapes	for {} shapes	para {} formas	per {} forme	pour {} formes
 Zeichnen auf	Draw on	Dibujar en	Disegna su	Dessiner sur
 der angezeigten Seite	the page shown	la página mostrada	la pagina visualizzata	la page affichée
 einer neuen Seite	a new page	una página nueva	una nuova pagina	une nouvelle page
-Shapes ohne X und Y werden in Ebenen von oben nach unten angeordnet, Links werden zu dynamischen Verbindern.	Shapes without X and Y are arranged in layers from top to bottom; links become dynamic connectors.	Las formas sin X ni Y se organizan en niveles de arriba abajo; los vínculos se convierten en conectores dinámicos.	Le forme senza X e Y vengono disposte su livelli dall'alto in basso; i collegamenti diventano connettori dinamici.	Les formes sans X ni Y sont disposées en niveaux de haut en bas ; les liens deviennent des connecteurs dynamiques.
+Shapes ohne X und Y werden in Stufen von oben nach unten angeordnet, Links werden zu dynamischen Verbindern.	Shapes without X and Y are arranged in tiers from top to bottom; links become dynamic connectors.	Las formas sin X ni Y se organizan en niveles de arriba abajo; los vínculos se convierten en conectores dinámicos.	Le forme senza X e Y vengono disposte su livelli dall'alto in basso; i collegamenti diventano connettori dinamici.	Les formes sans X ni Y sont disposées en niveaux de haut en bas ; les liens deviennent des connecteurs dynamiques.
 {} Shapes und {} Verbinder erstellt	{} shapes and {} connectors created	{} formas y {} conectores creados	{} forme e {} connettori creati	{} formes et {} connecteurs créés
 Die Zeichnung lässt sich nicht erstellen.	The drawing cannot be created.	No se puede crear el dibujo.	Impossibile creare il disegno.	Impossible de créer le dessin.
 Shape-Daten in Zeile {}: {}	Shape data in line {}: {}	Datos de forma en la línea {}: {}	Dati forma nella riga {}: {}	Données de forme à la ligne {} : {}
