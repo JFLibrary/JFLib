@@ -62,7 +62,7 @@ pub(crate) fn files_of(kind: &'static str, folder: &'static str) -> impl Fn(&str
 }
 
 /// every stencil of apps/JFDiagrammer/stencils built for measure m
-fn stencils(m: Measure) -> Result<Vec<stencil::Built>, String> {
+pub(crate) fn stencils(m: Measure) -> Result<Vec<stencil::Built>, String> {
     let mut v = Vec::new();
     for f in folders("stencils") {
         let files = files_of("stencils", f);
@@ -75,7 +75,7 @@ fn stencils(m: Measure) -> Result<Vec<stencil::Built>, String> {
 }
 
 /// every template built for measure m with the stencils of m: (folder, forms with their bytes)
-fn build_all(m: Measure, st: &[stencil::Built]) -> Vec<(&'static str, Result<Vec<(BuiltTemplate, Vec<u8>)>, String>)> {
+pub(crate) fn build_all(m: Measure, st: &[stencil::Built]) -> Vec<(&'static str, Result<Vec<(BuiltTemplate, Vec<u8>)>, String>)> {
     let lookup = |stem: &str| st.iter().find(|b| b.file == stem).map(|b| b.doc.clone());
     folders("templates")
         .into_iter()

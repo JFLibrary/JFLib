@@ -28,6 +28,9 @@
 //                                         (stencil_overview.rs), (JD26) probeblatt-jd26.png: the
 //                                         general and business-graphics stencils
 //                                         (stencil_business.rs)
+//   diagramiotest --write-jd26-gegenprobe DIR   (JD26) the general and business-graphics
+//                                         stencils, their templates, a drawing from each and
+//                                         every master for the Visio counter-check
 //   diagramiotest --write-templates DIR  (JD13) every form of JFDiagrammer's templates as .vstx,
 //                                         metric and US (templates.rs)
 //
@@ -197,6 +200,10 @@ fn run() -> i32 {
     if let Some(dir) = arg(&args, "--write-stencil-previews") {
         // (JD26) probeblatt-jd26.png: the general and business-graphics stencils
         return stencil_structs::previews(&dir).max(stencil_shapes::previews(&dir)).max(stencil_overview::write_all(&dir)).max(stencil_business::previews(&dir));
+    }
+    if let Some(dir) = arg(&args, "--write-jd26-gegenprobe") {
+        // (JD26) the stencils, templates and drawings for the Visio counter-check
+        return stencil_business::gegenprobe(&dir);
     }
     if let Some(dir) = arg(&args, "--write-gegenprobe") {
         // (JD7) the glue drawing, (JD10) the structures drawing

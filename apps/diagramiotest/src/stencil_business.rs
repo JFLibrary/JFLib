@@ -21,6 +21,7 @@
 //                       together, control points as yellow diamonds, connection points as blue
 //                       dots; probeblatt-jd26-zeile1.png .. -zeile5.png each row enlarged;
 //                       probeblatt-jd26-kontur.png, -kontrast.png the sheet in two other designs
+//   diagramiotest --write-jd26-gegenprobe DIR   the files of the Visio counter-check (gegenprobe())
 
 use alloc::format;
 use alloc::string::String;
@@ -34,7 +35,7 @@ use diagram_core::instance::{self, MasterTexts, StencilTexts};
 use diagram_core::render::Options;
 use diagram_core::{ops, CellAddr, Document, Owner, PageRef, RowKey, SecKey, ShapeRef, SheetRef, Text, Transaction, Unit, Value};
 use diagram_io::stencil;
-use diagram_io::vsdx::Measure;
+use diagram_io::vsdx::{self, Measure};
 use diagram_view::export::raster;
 use diagram_view::PageView;
 
@@ -124,26 +125,82 @@ fn centred(tx: &mut Transaction, s: ShapeRef) {
     let _ = tx.set_constant(SheetRef::Shape(s), &a, Value::Num(1.0), None);
 }
 
-/// diagramiotest --write-stencil-previews DIR: probeblatt-jd26.png and its parts
-pub fn previews(dir: &str) -> i32 {
+// the probe sheet's page and rows (mm)
+const PW: f64 = 420.0;
+const PH: f64 = 410.0;
+const ROWS: [f64; 5] = [66.0, 82.0, 76.0, 70.0, 96.0];
+
+fn row_top(r: usize) -> f64 {
+    PH - 12.0 - ROWS[..r].iter().sum::<f64>()
+}
+
+// every JD26 stencil built (metric), in the order of FOLDERS
+fn all_built() -> Option<Vec<Document>> {
     let mut docs: Vec<Document> = Vec::new();
     for f in FOLDERS {
         match built(f) {
             Ok(d) => docs.push(d),
             Err(e) => {
                 out(&format!("error: {e}\n"));
-                return 1;
+                return None;
             }
         }
     }
-    let [dec, cha, ven, mkt, mat, pyr, cyc, cae] = [&docs[0], &docs[1], &docs[2], &docs[3], &docs[4], &docs[5], &docs[6], &docs[7]];
+    Some(docs)
+}
+
+/// diagramiotest --write-stencil-previews DIR: probeblatt-jd26.png and its parts
+pub fn previews(dir: &str) -> i32 {
     let Ok(st) = built("standard") else { return 1 };
-    const PW: f64 = 420.0;
-    const PH: f64 = 410.0;
-    let Some((mut doc, page)) = sheet_doc(PW, PH) else { return 1 };
+    let Some((mut doc, page, marked)) = probe_doc() else { return 1 };
+    // the markers
+    {
+        let all: Vec<SheetRef> = doc.all_shapes(Owner::Page(page)).map(SheetRef::Shape).collect();
+        let mut tx = doc.transaction("recalc");
+        let _ = Engine::new().recalc(&mut tx, &all);
+        let _ = tx.commit();
+    }
+    let mut marks: Vec<([f64; 2], bool)> = Vec::new();
+    for &s in &marked {
+        marks.extend(ops::controls(&doc, s).into_iter().map(|c| (c.at, true)));
+        marks.extend(glue::connection_points(&doc, s).into_iter().map(|p| (p.at, false)));
+    }
+    let mut tx = doc.transaction("markers");
+    for (p, ctl) in marks {
+        let (x, y) = (p[0] / MM, p[1] / MM);
+        if ctl {
+            put(&mut tx, &st, page, "Diamond", (x, y), (2.6, 2.6), None, &|tx, s| paint(tx, s, "#FFD21F", Some("#6B5600")));
+        } else {
+            put(&mut tx, &st, page, "Ellipse", (x, y), (1.6, 1.6), None, &|tx, s| paint(tx, s, "#2F7FD8", None));
+        }
+    }
+    let _ = tx.commit();
+    let mut ok = render_page_at(&mut doc, page, &format!("{dir}/probeblatt-jd26.png"), 150.0);
+    for r in 0..5 {
+        let t = row_top(r) + 1.0;
+        ok &= render_region(&mut doc, page, &format!("{dir}/probeblatt-jd26-zeile{}.png", r + 1), 250.0, [0.0, t - ROWS[r] - 1.0, PW, t]);
+    }
+    for (id, variant, file) in [(catalog::CONTOUR, 0, "probeblatt-jd26-kontur.png"), (catalog::CONTRAST, 0, "probeblatt-jd26-kontrast.png")] {
+        let Some(d) = catalog::all().into_iter().find(|d| d.id == id) else { continue };
+        let mut other = doc.clone();
+        let mut tx = other.transaction("design");
+        let mut eng = Engine::new();
+        if design_apply::apply(&mut tx, &mut eng, d.id, &d.theme_xml(), Scope::All, variant).is_ok() {
+            let _ = tx.commit();
+            ok &= render_page_at(&mut other, page, &format!("{dir}/{file}"), 110.0);
+        }
+    }
+    if ok { 0 } else { 1 }
+}
+
+// the probe sheet as a drawing (without the markers): the page and the shapes to mark
+fn probe_doc() -> Option<(Document, PageRef, Vec<ShapeRef>)> {
+    let docs = all_built()?;
+    let [dec, cha, ven, mkt, mat, pyr, cyc, cae] = [&docs[0], &docs[1], &docs[2], &docs[3], &docs[4], &docs[5], &docs[6], &docs[7]];
+    let st = built("standard").ok()?;
+    let (mut doc, page) = sheet_doc(PW, PH)?;
     // five rows under the title, each with its title at the top and labels at the bottom
-    const ROWS: [f64; 5] = [66.0, 82.0, 76.0, 70.0, 96.0];
-    let top = |r: usize| PH - 12.0 - ROWS[..r].iter().sum::<f64>();
+    let top = row_top;
     let mid = |r: usize| top(r) - 6.0 - (ROWS[r] - 16.0) * 0.5;
     let lab = |r: usize| top(r) - ROWS[r] + 5.0;
     let mut marked: Vec<ShapeRef> = Vec::new();
@@ -300,45 +357,7 @@ pub fn previews(dir: &str) -> i32 {
     out(&format!("probeblatt-jd26: {glued} von 7 Enden geklebt\n"));
     label(&mut tx, 200.0, lab(4), 300.0, "Wirkung, je zwei Kategorien oben (Kategorie 1) und unten (Kategorie 2), drei Primäre Ursachen");
     let _ = tx.commit();
-
-    // the markers
-    {
-        let all: Vec<SheetRef> = doc.all_shapes(Owner::Page(page)).map(SheetRef::Shape).collect();
-        let mut tx = doc.transaction("recalc");
-        let _ = Engine::new().recalc(&mut tx, &all);
-        let _ = tx.commit();
-    }
-    let mut marks: Vec<([f64; 2], bool)> = Vec::new();
-    for &s in &marked {
-        marks.extend(ops::controls(&doc, s).into_iter().map(|c| (c.at, true)));
-        marks.extend(glue::connection_points(&doc, s).into_iter().map(|p| (p.at, false)));
-    }
-    let mut tx = doc.transaction("markers");
-    for (p, ctl) in marks {
-        let (x, y) = (p[0] / MM, p[1] / MM);
-        if ctl {
-            put(&mut tx, &st, page, "Diamond", (x, y), (2.6, 2.6), None, &|tx, s| paint(tx, s, "#FFD21F", Some("#6B5600")));
-        } else {
-            put(&mut tx, &st, page, "Ellipse", (x, y), (1.6, 1.6), None, &|tx, s| paint(tx, s, "#2F7FD8", None));
-        }
-    }
-    let _ = tx.commit();
-    let mut ok = render_page_at(&mut doc, page, &format!("{dir}/probeblatt-jd26.png"), 150.0);
-    for r in 0..5 {
-        let t = top(r) + 1.0;
-        ok &= render_region(&mut doc, page, &format!("{dir}/probeblatt-jd26-zeile{}.png", r + 1), 250.0, [0.0, t - ROWS[r] - 1.0, PW, t]);
-    }
-    for (id, variant, file) in [(catalog::CONTOUR, 0, "probeblatt-jd26-kontur.png"), (catalog::CONTRAST, 0, "probeblatt-jd26-kontrast.png")] {
-        let Some(d) = catalog::all().into_iter().find(|d| d.id == id) else { continue };
-        let mut other = doc.clone();
-        let mut tx = other.transaction("design");
-        let mut eng = Engine::new();
-        if design_apply::apply(&mut tx, &mut eng, d.id, &d.theme_xml(), Scope::All, variant).is_ok() {
-            let _ = tx.commit();
-            ok &= render_page_at(&mut other, page, &format!("{dir}/{file}"), 110.0);
-        }
-    }
-    if ok { 0 } else { 1 }
+    Some((doc, page, marked))
 }
 
 // a part of the page (mm, y up: x0, y0, x1, y1) as PNG at `dpi`
@@ -634,4 +653,152 @@ fn fishbone(h: &mut H, docs: &[Document]) {
         ok,
         format!("effect moved: category end at the spine point {}, cause end at the bone point {}", near(cat_end, point(&doc, e, 4)), near(cause_end, point(&doc, c, 4))),
     );
+}
+
+// ---------------------------------------------------------------- the Visio counter-check
+
+// a master's size in inches (its master shape's Width and Height)
+fn master_size(doc: &Document, m: diagram_core::MasterRef) -> (f64, f64) {
+    let Some(slot) = doc.master(m).and_then(|x| x.master_shape()) else { return (1.0, 1.0) };
+    let sheet = SheetRef::Shape(ShapeRef { owner: Owner::Master(m), slot });
+    let n = |c: &str| doc.sym(c).and_then(|s| doc.resolve(sheet, &CellAddr::single(s)).num()).unwrap_or(1.0).abs();
+    (n("Width"), n("Height"))
+}
+
+fn save(doc: &Document, path: &str) -> bool {
+    let ok = vsdx::write(doc, &vsdx::WriteOptions::DEFAULT).is_ok_and(|b| plat::write_file(path, &b));
+    out(&format!("{} {path}\n", if ok { "wrote" } else { "error: cannot write" }));
+    ok
+}
+
+// the top-level shape of a page whose NameU is `nu`
+fn by_name_u(doc: &Document, page: PageRef, nu: &str) -> Option<ShapeRef> {
+    doc.top_shapes(Owner::Page(page)).find(|&s| doc.shape(s).and_then(|x| x.header().name_u).is_some_and(|n| doc.str(n) == nu))
+}
+
+/// diagramiotest --write-jd26-gegenprobe DIR: the files for the Visio counter-check of JD26 --
+/// schablonen/: the eight stencils as .vssx (metric and US); vorlagen/: the templates block,
+/// cause_effect and charts (both measures, blank and with their starter); one drawing per template
+/// made with it in German (template::to_drawing; in the charts drawing the pyramid set to 5
+/// levels and the cycle to 6 phases through their shape data) with a PNG beside it;
+/// JD26-Probeblatt.vsdx (the probe sheet without markers); JD26-Alle-Shapes.vsdx (every master
+/// of the eight stencils, a page per stencil)
+pub fn gegenprobe(dir: &str) -> i32 {
+    let mut ok = true;
+    let _ = plat::fs::mkdir_private(&format!("{dir}/schablonen"));
+    let _ = plat::fs::mkdir_private(&format!("{dir}/vorlagen"));
+    for folder in FOLDERS {
+        for m in [Measure::Metric, Measure::Us] {
+            match stencil::build_vssx(&files_of("stencils", folder), m) {
+                Ok((b, bytes)) => ok &= plat::write_file(&format!("{dir}/schablonen/{}", b.vssx_name()), &bytes),
+                Err(e) => {
+                    out(&format!("error: stencils/{folder}/{e}\n"));
+                    ok = false;
+                }
+            }
+        }
+    }
+    // the templates and a drawing made with each
+    for m in [Measure::Metric, Measure::Us] {
+        let Ok(st) = crate::templates::stencils(m) else {
+            out("error: the stencils do not build\n");
+            return 1;
+        };
+        for (folder, r) in crate::templates::build_all(m, &st) {
+            if !matches!(folder, "block" | "cause_effect" | "charts") {
+                continue;
+            }
+            let Ok(forms) = r else {
+                out(&format!("error: templates/{folder}\n"));
+                ok = false;
+                continue;
+            };
+            for (b, bytes) in forms {
+                ok &= plat::write_file(&format!("{dir}/vorlagen/{}", b.vstx_name()), &bytes);
+                if b.starter.is_none() || m == Measure::Us {
+                    continue;
+                }
+                let Ok(l) = vsdx::read(&bytes, &vsdx::Limits::VSDX) else {
+                    ok = false;
+                    continue;
+                };
+                let mut doc = l.doc;
+                diagram_io::template::to_drawing(&mut doc, 0);
+                let Some(page) = doc.pages().next() else { continue };
+                if folder == "charts" {
+                    let mut eng = Engine::new();
+                    let mut tx = doc.transaction("data");
+                    for (nu, row, v) in [("Layered pyramid", "Levels", 5.0), ("Circular motion", "Phases", 6.0)] {
+                        if let Some(s) = by_name_u(tx.doc(), page, nu) {
+                            let a = CellAddr::row(SecKey::one(tx.intern("Property")), RowKey::Named(tx.intern(row)), tx.intern("Value"));
+                            let _ = eng.user_set(&mut tx, SheetRef::Shape(s), &a, Input::Value(Value::Num(v), None));
+                        }
+                    }
+                    recalc_page(&mut tx, &mut eng, page);
+                    let _ = tx.commit();
+                }
+                let name = match folder {
+                    "block" => "JD26-Blockdiagramm",
+                    "cause_effect" => "JD26-Ursache-Wirkung",
+                    _ => "JD26-Diagramme-und-Grafiken",
+                };
+                ok &= save(&doc, &format!("{dir}/{name}.vsdx"));
+                ok &= render_page_at(&mut doc, page, &format!("{dir}/{name}.png"), 110.0);
+            }
+        }
+    }
+    // the probe sheet
+    match probe_doc() {
+        Some((mut doc, page, _)) => {
+            recalc_all(&mut doc, page);
+            ok &= save(&doc, &format!("{dir}/JD26-Probeblatt.vsdx"));
+        }
+        None => ok = false,
+    }
+    // every master, a page per stencil (A3 landscape), in rows by their own size
+    let Some(docs) = all_built() else { return 1 };
+    let Some((mut doc, first)) = sheet_doc(420.0, 297.0) else { return 1 };
+    {
+        let mut tx = doc.transaction("Alle Shapes");
+        let mut page = first;
+        for (k, src) in docs.iter().enumerate() {
+            let title = String::from(StencilTexts::of(src).name(0));
+            if k == 0 {
+                let _ = tx.rename_page(page, &title, FOLDERS[k]);
+            } else {
+                match tx.add_page_like(first, &title, FOLDERS[k], false, None) {
+                    Ok(p) => page = p,
+                    Err(_) => {
+                        ok = false;
+                        continue;
+                    }
+                }
+            }
+            let (mut x, mut y, mut row_h) = (10.0 * MM, 287.0 * MM, 0.0f64);
+            let mut placed: Vec<SheetRef> = Vec::new();
+            for m in src.masters() {
+                let (w, h) = master_size(src, m);
+                if x + w > 410.0 * MM && x > 10.0 * MM {
+                    x = 10.0 * MM;
+                    y -= row_h + 12.0 * MM;
+                    row_h = 0.0;
+                }
+                let local = instance::import_master(&mut tx, src, m);
+                let s = local.and_then(|l| instance::place(&mut tx, page, l, x + w * 0.5, y - h * 0.5, 0));
+                match s {
+                    Ok(s) => {
+                        placed.push(SheetRef::Shape(s));
+                        placed.extend(children(tx.doc(), s).into_iter().map(SheetRef::Shape));
+                    }
+                    Err(_) => ok = false,
+                }
+                x += w + 10.0 * MM;
+                row_h = row_h.max(h);
+            }
+            let _ = Engine::new().recalc(&mut tx, &placed);
+        }
+        let _ = tx.commit();
+    }
+    ok &= save(&doc, &format!("{dir}/JD26-Alle-Shapes.vsdx"));
+    if ok { 0 } else { 1 }
 }
