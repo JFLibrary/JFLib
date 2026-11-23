@@ -1,0 +1,84 @@
+# Kreisförmiger Pfeil (SH-033, JD26): ein Ringpfeil, der fast ganz herumläuft: der Schaft beginnt
+# oben rechts der Mitte, läuft im Uhrzeigersinn herum und endet mit einer Spitze, die auf den
+# Anfang zeigt; oben bleibt eine Lücke von 40°.  Die Spitze ist doppelt so breit wie der Schaft
+# (Stilregel), ihr Außenrand berührt den Kasten.  Schaft-Bögen sind Ellipsenbögen durch Zwischenpunkte
+# (zwei Stücke je Rand, jedes unter 180°), gestreckt folgt der Ring der Ellipse.  Row_1 am
+# Innenrand unten ändert die Breite des Schafts (anteilig, nur senkrecht).  Der Text steht in der
+# Mitte.
+master: Circular arrow
+name.de: Kreisförmiger Pfeil
+name.en: Circular arrow
+name.es: Flecha circular
+name.it: Freccia circolare
+name.fr: Flèche circulaire
+prompt.de: Ringpfeil für Kreisläufe und Wiederholungen. Die Breite des Rings ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Ring arrow for cycles and repetitions. Drag the yellow control handle to change the width of the ring.
+prompt.es: Flecha en anillo para ciclos y repeticiones. Arrastre el controlador amarillo para cambiar el ancho del anillo.
+prompt.it: Freccia ad anello per cicli e ripetizioni. Trascina la maniglia di controllo gialla per cambiare la larghezza dell'anello.
+prompt.fr: Flèche en anneau pour les cycles et les répétitions. Faites glisser la poignée de contrôle jaune pour modifier la largeur de l'anneau.
+keywords.de: Pfeil, Kreis, Ring, Kreislauf, Wiederholung, Zyklus, Schleife
+keywords.en: arrow, circle, ring, cycle, repetition, loop, circular
+keywords.es: flecha, círculo, anillo, ciclo, repetición, bucle
+keywords.it: freccia, cerchio, anello, ciclo, ripetizione, loop
+keywords.fr: flèche, cercle, anneau, cycle, répétition, boucle
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 40 mm
+Height.us = 1.5 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Width*User.Ri*0.8
+TxtHeight = Height*User.Ri*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Breite des Schafts als Anteil des Halbmessers; die Radien: Schaft außen und innen, Mitte
+# (Spitze), Spitze innen
+S:   Value = MIN(MAX(Controls.Row_1.Y/(Height*0.75),0.06),0.3)
+Ro:  Value = 1-User.S*0.5
+Ri:  Value = 1-User.S*1.5
+Rc:  Value = 1-User.S
+Rh:  Value = 1-User.S*2
+# die halbe Lücke oben, der Anfang (mathematisch, im Bogenmaß), die Länge der Spitze, der Bogen
+# des Schafts, sein Ende (Fuß der Spitze) und die Spitze
+G0:  Value = 0.35
+A0:  Value = PI()*0.5-User.G0
+Hd:  Value = 0.5
+Sw:  Value = 2*PI()-2*User.G0-User.Hd
+Ae:  Value = User.A0-User.Sw
+At:  Value = User.Ae-User.Hd
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+User.Ro*COS(User.A0)); Y = Height*0.5*(1+User.Ro*SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+User.Ro*COS(User.A0-User.Sw*0.5)); Y = Height*0.5*(1+User.Ro*SIN(User.A0-User.Sw*0.5))
+                 A = Width*0.5*(1+User.Ro*COS(User.A0-User.Sw*0.25)); B = Height*0.5*(1+User.Ro*SIN(User.A0-User.Sw*0.25)); C = 0 deg; D = Width/Height
+EllipticalArcTo  X = Width*0.5*(1+User.Ro*COS(User.Ae)); Y = Height*0.5*(1+User.Ro*SIN(User.Ae))
+                 A = Width*0.5*(1+User.Ro*COS(User.A0-User.Sw*0.75)); B = Height*0.5*(1+User.Ro*SIN(User.A0-User.Sw*0.75)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+COS(User.Ae)); Y = Height*0.5*(1+SIN(User.Ae))
+LineTo           X = Width*0.5*(1+User.Rc*COS(User.At)); Y = Height*0.5*(1+User.Rc*SIN(User.At))
+LineTo           X = Width*0.5*(1+User.Rh*COS(User.Ae)); Y = Height*0.5*(1+User.Rh*SIN(User.Ae))
+LineTo           X = Width*0.5*(1+User.Ri*COS(User.Ae)); Y = Height*0.5*(1+User.Ri*SIN(User.Ae))
+EllipticalArcTo  X = Width*0.5*(1+User.Ri*COS(User.A0-User.Sw*0.5)); Y = Height*0.5*(1+User.Ri*SIN(User.A0-User.Sw*0.5))
+                 A = Width*0.5*(1+User.Ri*COS(User.A0-User.Sw*0.75)); B = Height*0.5*(1+User.Ri*SIN(User.A0-User.Sw*0.75)); C = 0 deg; D = Width/Height
+EllipticalArcTo  X = Width*0.5*(1+User.Ri*COS(User.A0)); Y = Height*0.5*(1+User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+User.Ri*COS(User.A0-User.Sw*0.25)); B = Height*0.5*(1+User.Ri*SIN(User.A0-User.Sw*0.25)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.135
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Breite des Rings ändern"
+        Tip.en = "Change the width of the ring"
+        Tip.es = "Cambiar el ancho del anillo"
+        Tip.it = "Cambia la larghezza dell'anello"
+        Tip.fr = "Modifier la largeur de l'anneau"
+
+[Connection]
+Row  X = Width*0.5; Y = Height*0.5*(1-User.Ro); DirX = 0; DirY = 1
+Row  X = Width*0.5*(1+User.Ro); Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height*0.5*(1+User.Ro); DirX = 0; DirY = -1
+Row  X = Width*0.5*(1-User.Ro); Y = Height*0.5; DirX = 1; DirY = 0

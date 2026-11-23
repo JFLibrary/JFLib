@@ -1,0 +1,126 @@
+# Matrix 2 (SH-031, JD26): vier Quadrate mit 6 mm Abstand als Teile einer Gruppe, je mit eigenem
+# Text, schachbrettartig in zwei Variantenfarben des Designs (Schnellformatvorlage 100 und 101).
+# Die Quadrate folgen der Größe der Gruppe.
+master: Matrix 2
+name.de: Matrix 2
+name.en: Matrix 2
+name.es: Matriz 2
+name.it: Matrice 2
+name.fr: Matrice 2
+prompt.de: Vier Quadrate mit Abstand in zwei Farben als Vierfeldermatrix. Klicken Sie ein Quadrat zweimal an, um seinen Text zu ändern.
+prompt.en: Four spaced squares in two colours as a four-field matrix. Click a square twice to change its text.
+prompt.es: Cuatro cuadrados separados en dos colores como matriz de cuatro campos. Haga clic dos veces en un cuadrado para cambiar su texto.
+prompt.it: Quattro quadrati distanziati in due colori come matrice a quattro campi. Fai clic due volte su un quadrato per cambiarne il testo.
+prompt.fr: Quatre carrés espacés en deux couleurs formant une matrice à quatre champs. Cliquez deux fois sur un carré pour modifier son texte.
+keywords.de: Matrix, Quadrate, Raster, Vierfeldermatrix, Schachbrett, Einordnung
+keywords.en: matrix, squares, grid, four-field matrix, checkerboard, classification
+keywords.es: matriz, cuadrados, cuadrícula, cuatro cuadrantes, tablero, clasificación
+keywords.it: matrice, quadrati, griglia, quattro quadranti, scacchiera, classificazione
+keywords.fr: matrice, carrés, grille, quatre quadrants, damier, classement
+
+[Shape]
+Width = 60 mm
+Width.us = 2.25 in
+Height = 60 mm
+Height.us = 2.25 in
+
+[User]
+# der Abstand der Quadrate, Breite und Höhe eines Quadrats
+G:   Value = 6 mm
+     Value.us = 0.25 in
+QW:  Value = (Width-User.G)*0.5
+QH:  Value = (Height-User.G)*0.5
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+[Part F1]
+text.de: Feld 1
+text.en: Field 1
+text.es: Campo 1
+text.it: Campo 1
+text.fr: Champ 1
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F2]
+text.de: Feld 2
+text.en: Field 2
+text.es: Campo 2
+text.it: Campo 2
+text.fr: Champ 2
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F3]
+text.de: Feld 3
+text.en: Field 3
+text.es: Campo 3
+text.it: Campo 3
+text.fr: Champ 3
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Height*0.5)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F4]
+text.de: Feld 4
+text.en: Field 4
+text.es: Campo 4
+text.it: Campo 4
+text.fr: Champ 4
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

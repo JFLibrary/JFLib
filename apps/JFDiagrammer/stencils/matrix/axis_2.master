@@ -1,0 +1,67 @@
+# Achse 2 (SH-031, JD26): ein Achsenkreuz durch die Mitte mit offenen Pfeilspitzen rechts und
+# oben (wie Achse 1, aber mit dem Ursprung in der Mitte, für vier Quadranten).  Nur Linien, keine
+# Füllung.  Row_1 an der Spitze der waagrechten Achse ändert die Größe beider Spitzen (Abstand vom
+# rechten Rand, nur waagrecht; XCon 4).  Formatvorlage Connector (die Linien bleiben auch in einem
+# Design ohne Shape-Linien sichtbar), ohne deren Pfeilspitzen.
+master: Axis 2
+style: Connector
+name.de: Achse 2
+name.en: Axis 2
+name.es: Eje 2
+name.it: Asse 2
+name.fr: Axe 2
+prompt.de: Zwei Achsen, die sich in der Mitte kreuzen. Mit dem gelben Steuerpunkt ändern Sie die Größe der Pfeilspitzen.
+prompt.en: Two axes crossing in the middle. Drag the yellow control handle to change the size of the arrowheads.
+prompt.es: Dos ejes que se cruzan en el centro. Arrastre el controlador amarillo para cambiar el tamaño de las puntas.
+prompt.it: Due assi che si incrociano al centro. Trascina la maniglia di controllo gialla per cambiare la dimensione delle punte.
+prompt.fr: Deux axes qui se croisent au centre. Faites glisser la poignée de contrôle jaune pour modifier la taille des pointes.
+keywords.de: Achse, Achsenkreuz, Koordinaten, Quadranten, Mitte, Pfeil, Positionierung
+keywords.en: axis, axes, coordinates, quadrants, centre, arrow, positioning
+keywords.es: eje, ejes, coordenadas, cuadrantes, centro, flecha, posicionamiento
+keywords.it: asse, assi, coordinate, quadranti, centro, freccia, posizionamento
+keywords.fr: axe, axes, coordonnées, quadrants, centre, flèche, positionnement
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 40 mm
+Height.us = 1.5 in
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[User]
+# die Länge der Spitzen
+L:  Value = MIN(MAX(Width-Controls.Row_1,1 mm),Width*0.3,Height*0.3)
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width; Y = Height*0.5
+MoveTo  X = Width*0.5; Y = 0
+LineTo  X = Width*0.5; Y = Height
+MoveTo  X = Width-User.L; Y = Height*0.5+User.L*0.5
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.L; Y = Height*0.5-User.L*0.5
+MoveTo  X = Width*0.5-User.L*0.5; Y = Height-User.L
+LineTo  X = Width*0.5; Y = Height
+LineTo  X = Width*0.5+User.L*0.5; Y = Height-User.L
+
+[Controls]
+Row_1:  X = Width-3 mm; Y = Height*0.5
+        X.us = Width-0.12 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Größe der Pfeilspitzen ändern"
+        Tip.en = "Change the size of the arrowheads"
+        Tip.es = "Cambiar el tamaño de las puntas"
+        Tip.it = "Cambia la dimensione delle punte"
+        Tip.fr = "Modifier la taille des pointes"
+
+[Connection]
+Row  X = Width*0.5; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

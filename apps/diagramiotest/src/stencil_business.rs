@@ -455,17 +455,23 @@ fn drop_all(h: &mut H, docs: &[Document]) {
     let mut tx = doc.transaction("drop");
     let mut shapes: Vec<ShapeRef> = Vec::new();
     let mut fail = String::new();
+    let mut eng = Engine::new();
+    let mut kept = 0usize;
     for (k, src) in docs.iter().enumerate() {
         for (i, m) in src.masters().enumerate() {
             let nu = MasterTexts::of(src, m).name_u;
             match instance::import_master(&mut tx, src, m).and_then(|local| instance::place(&mut tx, page, local, 1.0 + 0.5 * i as f64, 1.0 + 1.5 * k as f64, fr)) {
-                Ok(s) => shapes.push(s),
+                Ok(s) => {
+                    // one drop at a time, as the app recalculates (Engine::recalc over many sheets
+                    // in one call grows quadratically, JD13)
+                    let sheets: Vec<SheetRef> = core::iter::once(s).chain(children(tx.doc(), s)).map(SheetRef::Shape).collect();
+                    kept += eng.recalc(&mut tx, &sheets).map_or(usize::MAX / 2, |r| r.kept.len());
+                    shapes.push(s);
+                }
                 Err(e) => fail.push_str(&format!(" {nu}: {e:?}")),
             }
         }
     }
-    let sheets: Vec<SheetRef> = shapes.iter().flat_map(|&s| core::iter::once(s).chain(children(tx.doc(), s))).map(SheetRef::Shape).collect();
-    let kept = Engine::new().recalc(&mut tx, &sheets).map_or(usize::MAX, |r| r.kept.len());
     let _ = tx.commit();
     let (_, _, bad) = crate::stencil_shapes::engine_state(&doc);
     let want: usize = docs.iter().map(|d| d.masters().count()).sum();
@@ -682,7 +688,7 @@ fn by_name_u(doc: &Document, page: PageRef, nu: &str) -> Option<ShapeRef> {
 /// made with it in German (template::to_drawing; in the charts drawing the pyramid set to 5
 /// levels and the cycle to 6 phases through their shape data) with a PNG beside it;
 /// JD26-Probeblatt.vsdx (the probe sheet without markers); JD26-Alle-Shapes.vsdx (every master
-/// of the eight stencils, a page per stencil)
+/// of the eight stencils, a page per stencil) and each page as JD26-Alle-Shapes-<folder>.png
 pub fn gegenprobe(dir: &str) -> i32 {
     let mut ok = true;
     let _ = plat::fs::mkdir_private(&format!("{dir}/schablonen"));
@@ -755,9 +761,9 @@ pub fn gegenprobe(dir: &str) -> i32 {
         }
         None => ok = false,
     }
-    // every master, a page per stencil (A3 landscape), in rows by their own size
+    // every master, a page per stencil (420 x 600 mm), in rows by their own size
     let Some(docs) = all_built() else { return 1 };
-    let Some((mut doc, first)) = sheet_doc(420.0, 297.0) else { return 1 };
+    let Some((mut doc, first)) = sheet_doc(420.0, 600.0) else { return 1 };
     {
         let mut tx = doc.transaction("Alle Shapes");
         let mut page = first;
@@ -774,7 +780,7 @@ pub fn gegenprobe(dir: &str) -> i32 {
                     }
                 }
             }
-            let (mut x, mut y, mut row_h) = (10.0 * MM, 287.0 * MM, 0.0f64);
+            let (mut x, mut y, mut row_h) = (10.0 * MM, 590.0 * MM, 0.0f64);
             let mut placed: Vec<SheetRef> = Vec::new();
             for m in src.masters() {
                 let (w, h) = master_size(src, m);
@@ -800,5 +806,12 @@ pub fn gegenprobe(dir: &str) -> i32 {
         let _ = tx.commit();
     }
     ok &= save(&doc, &format!("{dir}/JD26-Alle-Shapes.vsdx"));
+    // each page in the masters' own size, to look at
+    let pages: Vec<PageRef> = doc.pages().collect();
+    for (k, p) in pages.into_iter().enumerate() {
+        if let Some(f) = FOLDERS.get(k) {
+            ok &= render_page_at(&mut doc, p, &format!("{dir}/JD26-Alle-Shapes-{f}.png"), 110.0);
+        }
+    }
     if ok { 0 } else { 1 }
 }

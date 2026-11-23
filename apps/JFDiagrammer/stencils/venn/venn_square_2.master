@@ -1,0 +1,94 @@
+# Quadratisches Venn-Diagramm (2) (SH-007, JD26): zwei überlappende Quadrate als Teile einer
+# Gruppe, jede Menge mit eigenem Text in ihrem freien Teil.  Die Quadrate sind 0,6 der Breite
+# breit und so hoch wie die Gruppe, links und rechts bündig; sie überlappen auf 0,2 der Breite.
+# Die Farben kommen über die Schnellformatvorlage aus dem Design (Variantenfarben 1 und 2); die
+# Füllung ist zu 35 % durchscheinend, damit die Schnittmenge sichtbar bleibt (Ausnahme von der
+# Stilregel wie bei venn_3.master).  Die Teile folgen der Größe der Gruppe.
+master: Square Venn diagram 2
+name.de: Quadratisches Venn-Diagramm (2)
+name.en: Square Venn diagram (2)
+name.es: Diagrama de Venn cuadrado (2)
+name.it: Diagramma di Venn quadrato (2)
+name.fr: Diagramme de Venn carré (2)
+prompt.de: Zwei überlappende quadratische Mengen. Klicken Sie eine Menge zweimal an, um ihren Text zu ändern.
+prompt.en: Two overlapping square sets. Click a set twice to change its text.
+prompt.es: Dos conjuntos cuadrados superpuestos. Haga clic dos veces en un conjunto para cambiar su texto.
+prompt.it: Due insiemi quadrati sovrapposti. Fai clic due volte su un insieme per cambiarne il testo.
+prompt.fr: Deux ensembles carrés qui se chevauchent. Cliquez deux fois sur un ensemble pour modifier son texte.
+keywords.de: Venn, Menge, Quadrat, Mengendiagramm, Schnittmenge, Überlappung, zwei
+keywords.en: Venn, set, square, set diagram, intersection, overlap, two
+keywords.es: Venn, conjunto, cuadrado, diagrama de conjuntos, intersección, superposición, dos
+keywords.it: Venn, insieme, quadrato, diagramma degli insiemi, intersezione, sovrapposizione, due
+keywords.fr: Venn, ensemble, carré, diagramme d'ensembles, intersection, chevauchement, deux
+
+[Shape]
+Width = 50 mm
+Width.us = 2 in
+Height = 30 mm
+Height.us = 1.2 in
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# Menge A, links
+[Part A]
+text.de: Menge A
+text.en: Set A
+text.es: Conjunto A
+text.it: Insieme A
+text.fr: Ensemble A
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.3)
+PinY = GUARD(Sheet.1!Height*0.5)
+Width = GUARD(Sheet.1!Width*0.6)
+Height = GUARD(Sheet.1!Height)
+TxtPinX = Width*0.3333
+TxtPinY = Height*0.5
+TxtWidth = Width*0.65
+TxtHeight = Height*0.4
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+FillForegndTrans = 35%
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Menge B, rechts
+[Part B]
+text.de: Menge B
+text.en: Set B
+text.es: Conjunto B
+text.it: Insieme B
+text.fr: Ensemble B
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.7)
+PinY = GUARD(Sheet.1!Height*0.5)
+Width = GUARD(Sheet.1!Width*0.6)
+Height = GUARD(Sheet.1!Height)
+TxtPinX = Width*0.6667
+TxtPinY = Height*0.5
+TxtWidth = Width*0.65
+TxtHeight = Height*0.4
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+FillForegndTrans = 35%
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

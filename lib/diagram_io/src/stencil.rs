@@ -1033,7 +1033,8 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
     }
     // (JD13) an SVG group's subshapes are its formats, no parts of their own: a click selects the
     // group only (SelectMode 0, as Visio names it), never one colour of it
-    if kind == ShapeKind::Group && !mi.shape.iter().any(|c| c.name == "SelectMode") {
+    // ((JD26) a group of parts keeps Visio's default: the group first, a part on a second click)
+    if layers.len() > 1 && !mi.shape.iter().any(|c| c.name == "SelectMode") {
         let a = single_addr(tx, "SelectMode");
         sink.constant(tx, sheet, &a, Value::Num(0.0), None, line)?;
     }

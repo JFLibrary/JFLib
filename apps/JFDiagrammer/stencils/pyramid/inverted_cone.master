@@ -1,0 +1,187 @@
+# Invertierter Kegel (SH-032, JD26): ein Kegel auf der Spitze mit elliptischer Deckfläche, der
+# Körper aus zwei bis acht Ebenen.  Eine Gruppe aus zwei Teilen: der Körper (je Ebene ein
+# Geometrieabschnitt, 1 mm Fuge zwischen den Ebenen) und darüber die Deckfläche, um 40 Einheiten
+# heller als die Füllung (TINT auf THEMEVAL("FillColor"), unter THEMEGUARD; so bleibt sie auch in
+# Designs ohne Shape-Linien sichtbar).  Die Grenzen der Ebenen sind die vorderen Hälften der
+# Ellipsen auf ihrer Höhe (Ellipsenbögen durch den vordersten Punkt, Achsenverhältnis wie die
+# Deckfläche), die Seiten Geraden zur Spitze; die unterste Ebene endet an der Spitze (ihr Bogen
+# dort ist winzig statt null, damit er nicht entartet).  Die Zahl der Ebenen steht in den
+# Shape-Daten (Prop.Levels), Abschnitte über der Zahl sind verborgen.  Row_1 am vordersten Punkt
+# der Deckfläche ändert ihre Höhe (anteilig, nur senkrecht).  Der Text der Gruppe steht im Körper.
+master: Inverted cone
+name.de: Invertierter Kegel
+name.en: Inverted cone
+name.es: Cono invertido
+name.it: Cono invertito
+name.fr: Cône inversé
+prompt.de: Kegel auf der Spitze aus Ebenen, mit elliptischer Deckfläche. Die Zahl der Ebenen stellen Sie in den Shape-Daten ein, die Höhe der Deckfläche mit dem gelben Steuerpunkt.
+prompt.en: Cone standing on its tip, made of levels, with an elliptical top. Set the number of levels in the shape data and the height of the top with the yellow control handle.
+prompt.es: Cono apoyado en la punta, formado por niveles, con una cara superior elíptica. Defina el número de niveles en los datos de la forma y la altura de la cara superior con el controlador amarillo.
+prompt.it: Cono poggiato sulla punta, composto da livelli, con una faccia superiore ellittica. Imposta il numero di livelli nei dati della forma e l'altezza della faccia superiore con la maniglia di controllo gialla.
+prompt.fr: Cône posé sur sa pointe, composé de niveaux, avec une face supérieure elliptique. Définissez le nombre de niveaux dans les données de la forme et la hauteur de la face supérieure avec la poignée de contrôle jaune.
+keywords.de: Kegel, invertiert, Trichter, Ebenen, 3D, Tornado, Filter
+keywords.en: cone, inverted, funnel, levels, 3D, tornado, filter
+keywords.es: cono, invertido, embudo, niveles, 3D, tornado, filtro
+keywords.it: cono, invertito, imbuto, livelli, 3D, tornado, filtro
+keywords.fr: cône, inversé, entonnoir, niveaux, 3D, tornade, filtre
+
+[Shape]
+Width = 50 mm
+Width.us = 2 in
+Height = 60 mm
+Height.us = 2.5 in
+TxtPinX = Width*0.5
+TxtPinY = User.Hc*0.55
+TxtWidth = Width*0.45
+TxtHeight = User.H1
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Zahl der Ebenen (2 bis 8), die Höhe der Deckfläche (ganze Ellipse), die Höhe von der Spitze
+# bis zur Mitte der Deckfläche, die Höhe einer Ebene, die Fuge
+N:   Value = MIN(MAX(ROUND(Prop.Levels,0),2),8)
+E:   Value = MIN(MAX(Height-Controls.Row_1.Y,Height*0.05),Height*0.5)
+Hc:  Value = Height-User.E*0.5
+H1:  Value = User.Hc/User.N
+Gp:  Value = 1 mm
+     Value.us = 0.04 in
+
+[Property]
+Levels:  Type = 2; Format = "0"; Value = 3
+         Label.de = Ebenen
+         Label.en = Levels
+         Label.es = Niveles
+         Label.it = Livelli
+         Label.fr = Niveaux
+         Prompt.de = Anzahl der Ebenen (2 bis 8)
+         Prompt.en = Number of levels (2 to 8)
+         Prompt.es = Número de niveles (de 2 a 8)
+         Prompt.it = Numero di livelli (da 2 a 8)
+         Prompt.fr = Nombre de niveaux (de 2 à 8)
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.75
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Höhe der Deckfläche ändern"
+        Tip.en = "Change the height of the top"
+        Tip.es = "Cambiar la altura de la cara superior"
+        Tip.it = "Cambia l'altezza della faccia superiore"
+        Tip.fr = "Modifier la hauteur de la face supérieure"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width*0.75; Y = User.Hc*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = Width*0.25; Y = User.Hc*0.5; DirX = 1; DirY = 0
+
+# der Körper: je Ebene k die Höhe der oberen und der unteren Grenze (Mitte der Ellipse)
+[Part Body]
+
+[User]
+T1:  Value = Sheet.1!User.Hc
+T2:  Value = IF(2>Sheet.1!User.N,0,Sheet.1!User.Hc-1*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+T3:  Value = IF(3>Sheet.1!User.N,0,Sheet.1!User.Hc-2*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+T4:  Value = IF(4>Sheet.1!User.N,0,Sheet.1!User.Hc-3*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+T5:  Value = IF(5>Sheet.1!User.N,0,Sheet.1!User.Hc-4*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+T6:  Value = IF(6>Sheet.1!User.N,0,Sheet.1!User.Hc-5*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+T7:  Value = IF(7>Sheet.1!User.N,0,Sheet.1!User.Hc-6*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+T8:  Value = IF(8>Sheet.1!User.N,0,Sheet.1!User.Hc-7*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B1:  Value = MAX(IF(1>=Sheet.1!User.N,0,Sheet.1!User.Hc-1*Sheet.1!User.H1+Sheet.1!User.Gp*0.5),Sheet.1!User.Hc*0.002)
+B2:  Value = MAX(IF(2>=Sheet.1!User.N,0,Sheet.1!User.Hc-2*Sheet.1!User.H1+Sheet.1!User.Gp*0.5),Sheet.1!User.Hc*0.002)
+B3:  Value = MAX(IF(3>=Sheet.1!User.N,0,Sheet.1!User.Hc-3*Sheet.1!User.H1+Sheet.1!User.Gp*0.5),Sheet.1!User.Hc*0.002)
+B4:  Value = MAX(IF(4>=Sheet.1!User.N,0,Sheet.1!User.Hc-4*Sheet.1!User.H1+Sheet.1!User.Gp*0.5),Sheet.1!User.Hc*0.002)
+B5:  Value = MAX(IF(5>=Sheet.1!User.N,0,Sheet.1!User.Hc-5*Sheet.1!User.H1+Sheet.1!User.Gp*0.5),Sheet.1!User.Hc*0.002)
+B6:  Value = MAX(IF(6>=Sheet.1!User.N,0,Sheet.1!User.Hc-6*Sheet.1!User.H1+Sheet.1!User.Gp*0.5),Sheet.1!User.Hc*0.002)
+B7:  Value = MAX(IF(7>=Sheet.1!User.N,0,Sheet.1!User.Hc-7*Sheet.1!User.H1+Sheet.1!User.Gp*0.5),Sheet.1!User.Hc*0.002)
+B8:  Value = MAX(IF(8>=Sheet.1!User.N,0,Sheet.1!User.Hc-8*Sheet.1!User.H1+Sheet.1!User.Gp*0.5),Sheet.1!User.Hc*0.002)
+
+[Geometry]
+MoveTo           X = Width*0.5*(1-User.T1/Sheet.1!User.Hc); Y = User.T1
+LineTo           X = Width*0.5*(1-User.B1/Sheet.1!User.Hc); Y = User.B1
+EllipticalArcTo  X = Width-Geometry1.X2; Y = User.B1
+                 A = Width*0.5; B = User.B1*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+LineTo           X = Width-Geometry1.X1; Y = User.T1
+EllipticalArcTo  X = Geometry1.X1; Y = Geometry1.Y1
+                 A = Width*0.5; B = User.T1*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+
+[Geometry]
+MoveTo           X = Width*0.5*(1-User.T2/Sheet.1!User.Hc); Y = User.T2
+LineTo           X = Width*0.5*(1-User.B2/Sheet.1!User.Hc); Y = User.B2
+EllipticalArcTo  X = Width-Geometry2.X2; Y = User.B2
+                 A = Width*0.5; B = User.B2*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+LineTo           X = Width-Geometry2.X1; Y = User.T2
+EllipticalArcTo  X = Geometry2.X1; Y = Geometry2.Y1
+                 A = Width*0.5; B = User.T2*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1-User.T3/Sheet.1!User.Hc); Y = User.T3
+LineTo           X = Width*0.5*(1-User.B3/Sheet.1!User.Hc); Y = User.B3
+EllipticalArcTo  X = Width-Geometry3.X2; Y = User.B3
+                 A = Width*0.5; B = User.B3*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+LineTo           X = Width-Geometry3.X1; Y = User.T3
+EllipticalArcTo  X = Geometry3.X1; Y = Geometry3.Y1
+                 A = Width*0.5; B = User.T3*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1-User.T4/Sheet.1!User.Hc); Y = User.T4
+LineTo           X = Width*0.5*(1-User.B4/Sheet.1!User.Hc); Y = User.B4
+EllipticalArcTo  X = Width-Geometry4.X2; Y = User.B4
+                 A = Width*0.5; B = User.B4*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+LineTo           X = Width-Geometry4.X1; Y = User.T4
+EllipticalArcTo  X = Geometry4.X1; Y = Geometry4.Y1
+                 A = Width*0.5; B = User.T4*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1-User.T5/Sheet.1!User.Hc); Y = User.T5
+LineTo           X = Width*0.5*(1-User.B5/Sheet.1!User.Hc); Y = User.B5
+EllipticalArcTo  X = Width-Geometry5.X2; Y = User.B5
+                 A = Width*0.5; B = User.B5*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+LineTo           X = Width-Geometry5.X1; Y = User.T5
+EllipticalArcTo  X = Geometry5.X1; Y = Geometry5.Y1
+                 A = Width*0.5; B = User.T5*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1-User.T6/Sheet.1!User.Hc); Y = User.T6
+LineTo           X = Width*0.5*(1-User.B6/Sheet.1!User.Hc); Y = User.B6
+EllipticalArcTo  X = Width-Geometry6.X2; Y = User.B6
+                 A = Width*0.5; B = User.B6*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+LineTo           X = Width-Geometry6.X1; Y = User.T6
+EllipticalArcTo  X = Geometry6.X1; Y = Geometry6.Y1
+                 A = Width*0.5; B = User.T6*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+
+[Geometry]
+NoShow = 7>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1-User.T7/Sheet.1!User.Hc); Y = User.T7
+LineTo           X = Width*0.5*(1-User.B7/Sheet.1!User.Hc); Y = User.B7
+EllipticalArcTo  X = Width-Geometry7.X2; Y = User.B7
+                 A = Width*0.5; B = User.B7*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+LineTo           X = Width-Geometry7.X1; Y = User.T7
+EllipticalArcTo  X = Geometry7.X1; Y = Geometry7.Y1
+                 A = Width*0.5; B = User.T7*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+
+[Geometry]
+NoShow = 8>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1-User.T8/Sheet.1!User.Hc); Y = User.T8
+LineTo           X = Width*0.5*(1-User.B8/Sheet.1!User.Hc); Y = User.B8
+EllipticalArcTo  X = Width-Geometry8.X2; Y = User.B8
+                 A = Width*0.5; B = User.B8*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+LineTo           X = Width-Geometry8.X1; Y = User.T8
+EllipticalArcTo  X = Geometry8.X1; Y = Geometry8.Y1
+                 A = Width*0.5; B = User.T8*(1-Sheet.1!User.E*0.5/Sheet.1!User.Hc); C = 0 deg; D = Width/Sheet.1!User.E
+
+# die Deckfläche, heller
+[Part Top]
+
+[Shape]
+Height = GUARD(Sheet.1!User.E)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+FillForegnd = THEMEGUARD(TINT(THEMEVAL("FillColor"),40))
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height

@@ -4,7 +4,8 @@
 # Drittel; die Schnittpunkte liegen dann bei halber Breite, ±0,433 der Höhe um die Mitte.
 # Eine Gruppe aus zwei Teilen: die Umrisse der Mengen in der Linie der Formatvorlage Connector
 # (Verbinder-Liste des Designs, QuickStyleType 3, ohne Pfeilspitzen: sichtbar auch in Designs ohne
-# Shape-Linien) und die Linse mit der Füllung von Normal.  Der Text der Gruppe steht in der Linse.
+# Shape-Linien) und die Linse mit der Füllung von Normal.  Der Text der Gruppe steht in der Linse,
+# 0,3 der Breite breit (so breit wie die Linse in halber Höhe: kurze Texte brechen nicht um).
 master: Intersection of 2 sets
 name.de: Schnittmenge von 2 Mengen
 name.en: Intersection of two sets
@@ -29,10 +30,13 @@ Height = 40 mm
 Height.us = 1.5 in
 TxtPinX = Width*0.5
 TxtPinY = Height*0.5
-TxtWidth = Width*0.16
+TxtWidth = Width*0.3
 TxtHeight = Height*0.4
 TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight*0.5
+# nur die Gruppe (SelectMode 0, ausdrücklich): die Teile sind Fläche und Umriss, keine eigenen
+# Objekte; der Text gehört der Gruppe
+SelectMode = 0
 
 [Connection]
 Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1

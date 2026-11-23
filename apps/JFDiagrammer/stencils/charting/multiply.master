@@ -1,0 +1,73 @@
+# Multiplikation (SH-004, JD26): das Malkreuz nach DIN 1302 / ISO 80000-2 (×): zwei diagonale
+# Balken, das Pluszeichen (plus.master) um 45° gedreht.  Jeder Balken ist so lang (80 % der
+# Höhe, entlang der Diagonale gemessen) und so dick wie die Balken des Ungleichheitszeichens
+# (not_equal.master); das Kreuz wirkt deshalb kleiner als das Plus.  Ein Umriss mit zwölf Ecken
+# (die Vereinigung, keine Überlappung).  Gerechnet im gedrehten Kreuz (halbe Länge L, halbe
+# Dicke t) mit den Versätzen (L+t), (L-t) und 2t mal cos 45°; waagrecht mit Breite/Höhe
+# gestreckt.  Row_1 an der oberen Innenecke (über der Mitte) ändert die Strichstärke (anteilig,
+# nur senkrecht: der Punkt liegt T x cos 45° über der Mitte).
+master: Multiplication
+name.de: Multiplikation
+name.en: Multiplication
+name.es: Multiplicación
+name.it: Moltiplicazione
+name.fr: Multiplication
+prompt.de: Malkreuz (×). Mit dem gelben Steuerpunkt ändern Sie die Strichstärke.
+prompt.en: Multiplication sign (×). Drag the yellow control handle to change the stroke width.
+prompt.es: Signo de multiplicación (×). Arrastre el controlador amarillo para cambiar el grosor del trazo.
+prompt.it: Segno di moltiplicazione (×). Trascina la maniglia di controllo gialla per cambiare lo spessore del tratto.
+prompt.fr: Signe de multiplication (×). Faites glisser la poignée de contrôle jaune pour modifier l'épaisseur du trait.
+keywords.de: mal, Malkreuz, Multiplikation, Rechenzeichen, Mathematik, Symbol, Kreuz
+keywords.en: times, multiplication sign, multiply, operator, math, symbol, cross
+keywords.es: por, signo de multiplicación, multiplicar, operador, matemáticas, símbolo, cruz
+keywords.it: per, segno di moltiplicazione, moltiplicare, operatore, matematica, simbolo, croce
+keywords.fr: fois, signe de multiplication, multiplier, opérateur, mathématiques, symbole, croix
+
+[Shape]
+Width = 20 mm
+Width.us = 0.75 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# die Strichstärke (wie not_equal.master: 4 bis 25 % der Höhe), die halbe Länge eines Balkens
+T:    Value = MIN(MAX((Controls.Row_1.Y-Height*0.5)*1.4142, Height*0.04), Height*0.25)
+L:    Value = Height*0.4
+# die Versätze der Ecken von der Mitte: senkrecht, und waagrecht mit Breite/Höhe gestreckt
+Dy1:  Value = (User.L+User.T*0.5)*0.7071
+Dy2:  Value = (User.L-User.T*0.5)*0.7071
+Dy0:  Value = User.T*0.7071
+Dx1:  Value = User.Dy1*Width/Height
+Dx2:  Value = User.Dy2*Width/Height
+Dx0:  Value = User.Dy0*Width/Height
+
+[Geometry]
+MoveTo  X = Width*0.5-User.Dx2; Y = Height*0.5-User.Dy1
+LineTo  X = Width*0.5; Y = Height*0.5-User.Dy0
+LineTo  X = Width*0.5+User.Dx2; Y = Height*0.5-User.Dy1
+LineTo  X = Width*0.5+User.Dx1; Y = Height*0.5-User.Dy2
+LineTo  X = Width*0.5+User.Dx0; Y = Height*0.5
+LineTo  X = Width*0.5+User.Dx1; Y = Height*0.5+User.Dy2
+LineTo  X = Width*0.5+User.Dx2; Y = Height*0.5+User.Dy1
+LineTo  X = Width*0.5; Y = Height*0.5+User.Dy0
+LineTo  X = Width*0.5-User.Dx2; Y = Height*0.5+User.Dy1
+LineTo  X = Width*0.5-User.Dx1; Y = Height*0.5+User.Dy2
+LineTo  X = Width*0.5-User.Dx0; Y = Height*0.5
+LineTo  X = Width*0.5-User.Dx1; Y = Height*0.5-User.Dy2
+LineTo  X = Width*0.5-User.Dx2; Y = Height*0.5-User.Dy1
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.599
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Strichstärke ändern"
+        Tip.en = "Change the stroke width"
+        Tip.es = "Cambiar el grosor del trazo"
+        Tip.it = "Cambia lo spessore del tratto"
+        Tip.fr = "Modifier l'épaisseur du trait"
+
+[Connection]
+Row  X = Width*0.5; Y = Height*0.5-User.Dy1; DirX = 0; DirY = 1
+Row  X = Width*0.5+User.Dx1; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height*0.5+User.Dy1; DirX = 0; DirY = -1
+Row  X = Width*0.5-User.Dx1; Y = Height*0.5; DirX = 1; DirY = 0

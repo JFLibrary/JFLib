@@ -1,0 +1,165 @@
+# Venn-Diagramm aus 2 Mengen mit Beschriftungslinien (SH-007, JD26): zwei überlappende Kreise
+# (gestreckt Ellipsen) wie venn_2.master, dazu drei Beschriftungen mit Hinweislinie: Menge A oben
+# links, Menge B oben rechts, die Schnittmenge unten.  Teile der Gruppe: die Mengen (Variantenfarben
+# 1 und 2 über die Schnellformatvorlage, 35 % durchscheinend wie venn_3.master, ohne eigenen
+# Text) und die Beschriftungen (Formatvorlage Connector, QuickStyleType 3, ohne Pfeilspitzen und
+# ohne Texthintergrund: die Linien bleiben auch in einem Design ohne Shape-Linien sichtbar).  Je
+# eine Hinweislinie läuft senkrecht vom freien Teil der Menge (von der Mitte der Linse) bis an
+# das Textband; die Textbänder oben und unten sind je 1/6 der Höhe (User.Lb, 10 mm), die Kreise
+# füllen den Rest.  Die Teile folgen der Größe der Gruppe.
+master: Venn diagram 2 sets with labels
+name.de: Venn-Diagramm aus 2 Mengen mit Beschriftung
+name.en: Two-set Venn diagram with labels
+name.es: Diagrama de Venn de 2 conjuntos con etiquetas
+name.it: Diagramma di Venn a 2 insiemi con etichette
+name.fr: Diagramme de Venn à 2 ensembles avec étiquettes
+prompt.de: Zwei überlappende Mengen mit Beschriftungslinien. Klicken Sie eine Beschriftung zweimal an, um ihren Text zu ändern.
+prompt.en: Two overlapping sets with label lines. Click a label twice to change its text.
+prompt.es: Dos conjuntos superpuestos con líneas de etiqueta. Haga clic dos veces en una etiqueta para cambiar su texto.
+prompt.it: Due insiemi sovrapposti con linee di etichetta. Fai clic due volte su un'etichetta per cambiarne il testo.
+prompt.fr: Deux ensembles qui se chevauchent avec lignes d'étiquette. Cliquez deux fois sur une étiquette pour modifier son texte.
+keywords.de: Venn, Menge, Mengendiagramm, Beschriftung, Schnittmenge, Überlappung, zwei
+keywords.en: Venn, set, set diagram, labels, intersection, overlap, two
+keywords.es: Venn, conjunto, diagrama de conjuntos, etiquetas, intersección, superposición, dos
+keywords.it: Venn, insieme, diagramma degli insiemi, etichette, intersezione, sovrapposizione, due
+keywords.fr: Venn, ensemble, diagramme d'ensembles, étiquettes, intersection, chevauchement, deux
+
+[Shape]
+Width = 60 mm
+Width.us = 2.25 in
+Height = 60 mm
+Height.us = 2.25 in
+
+[User]
+# die Höhe der Textbänder oben und unten, die Höhe der Kreise
+Lb:  Value = Height/6
+Hc:  Value = Height-User.Lb*2
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# Menge A, links
+[Part A]
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.3333)
+PinY = GUARD(Sheet.1!Height*0.5)
+Width = GUARD(Sheet.1!Width*0.6667)
+Height = GUARD(Sheet.1!User.Hc)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+FillForegndTrans = 35%
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Menge B, rechts
+[Part B]
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.6667)
+PinY = GUARD(Sheet.1!Height*0.5)
+Width = GUARD(Sheet.1!Width*0.6667)
+Height = GUARD(Sheet.1!User.Hc)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+FillForegndTrans = 35%
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Beschriftung von A: vom freien Teil von A nach oben
+[Part LA]
+text.de: Menge A
+text.en: Set A
+text.es: Conjunto A
+text.it: Insieme A
+text.fr: Ensemble A
+style: Connector
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.2)
+PinY = GUARD((Sheet.1!Height*0.5+Sheet.1!Height)*0.5)
+Width = GUARD(Sheet.1!Width*0.4)
+Height = GUARD(Sheet.1!Height-Sheet.1!Height*0.5)
+TxtPinX = Width*0.5
+TxtPinY = Height-Sheet.1!User.Lb*0.5
+TxtWidth = Width
+TxtHeight = Sheet.1!User.Lb*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TextBkgnd = 0
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5; Y = 0
+LineTo  X = Width*0.5; Y = Height-Sheet.1!User.Lb
+
+# Beschriftung von B: vom freien Teil von B nach oben
+[Part LB]
+text.de: Menge B
+text.en: Set B
+text.es: Conjunto B
+text.it: Insieme B
+text.fr: Ensemble B
+style: Connector
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.8)
+PinY = GUARD((Sheet.1!Height*0.5+Sheet.1!Height)*0.5)
+Width = GUARD(Sheet.1!Width*0.4)
+Height = GUARD(Sheet.1!Height-Sheet.1!Height*0.5)
+TxtPinX = Width*0.5
+TxtPinY = Height-Sheet.1!User.Lb*0.5
+TxtWidth = Width
+TxtHeight = Sheet.1!User.Lb*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TextBkgnd = 0
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5; Y = 0
+LineTo  X = Width*0.5; Y = Height-Sheet.1!User.Lb
+
+# Beschriftung der Schnittmenge: von der Mitte der Linse nach unten
+[Part LI]
+text.de: A und B
+text.en: A and B
+text.es: A y B
+text.it: A e B
+text.fr: A et B
+style: Connector
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((Sheet.1!Height*0.5)*0.5)
+Width = GUARD(Sheet.1!Width*0.4)
+Height = GUARD(Sheet.1!Height*0.5)
+TxtPinX = Width*0.5
+TxtPinY = Sheet.1!User.Lb*0.5
+TxtWidth = Width
+TxtHeight = Sheet.1!User.Lb*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TextBkgnd = 0
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5; Y = Height
+LineTo  X = Width*0.5; Y = Sheet.1!User.Lb

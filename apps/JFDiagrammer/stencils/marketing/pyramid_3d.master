@@ -1,0 +1,536 @@
+# 3D-Pyramide (SH-030, JD26): eine vierseitige Pyramide, schräg von vorn rechts gesehen: die
+# Vorderseite (unten von 0 bis Wf) und die rechte Seitenfläche (unten von Wf bis zur hinteren
+# rechten Ecke, User.Dp höher), die Spitze über der Mitte der Grundfläche.  Zwei bis acht Ebenen
+# (Prop.Levels), Ebene 1 ist die Spitze; jede Ebene sind zwei Teile: die Vorderseite mit Text und
+# eigener Variantenfarbe (100 bis 106, ab der achten wieder von vorn), die Seitenfläche in
+# derselben Farbe, dunkler über SHADE(THEMEVAL("FillColor"),50) mit THEMEGUARD.  Die Ebenen teilen
+# die Kanten gleich (Parameter t von der Grundfläche zur Spitze), 1 mm Fuge zwischen ihnen.
+# Teile über der Zahl liegen verborgen deckungsgleich unter der untersten Ebene (die Teile stehen
+# von unten nach oben in der Datei).  Der Text steht auf der Vorderseite, mindestens 18 mm breit,
+# in der Spitze tiefer.  Row_1 an der vorderen rechten Ecke der Grundfläche ändert
+# die Breite der Seitenfläche (anteilig, nur waagrecht).  Rounding 0: in den abgerundeten Design-
+# Varianten fielen Vorder- und Seitenfläche sonst an der Kante auseinander.
+master: 3-D pyramid
+name.de: 3D-Pyramide
+name.en: 3-D pyramid
+name.es: Pirámide 3D
+name.it: Piramide 3D
+name.fr: Pyramide 3D
+prompt.de: Pyramide mit sichtbarer Seitenfläche aus farbigen Ebenen. Die Zahl der Ebenen stellen Sie in den Shape-Daten ein, die Breite der Seitenfläche mit dem gelben Steuerpunkt.
+prompt.en: Pyramid with a visible side face, made of coloured levels. Set the number of levels in the shape data and the width of the side face with the yellow control handle.
+prompt.es: Pirámide con cara lateral visible y niveles de colores. Defina el número de niveles en los datos de la forma y el ancho de la cara lateral con el controlador amarillo.
+prompt.it: Piramide con faccia laterale visibile e livelli colorati. Imposta il numero di livelli nei dati della forma e la larghezza della faccia laterale con la maniglia di controllo gialla.
+prompt.fr: Pyramide avec face latérale visible et niveaux colorés. Définissez le nombre de niveaux dans les données de la forme et la largeur de la face latérale avec la poignée de contrôle jaune.
+keywords.de: Pyramide, 3D, Ebenen, Hierarchie, Stufen, Schichten, räumlich
+keywords.en: pyramid, 3D, levels, hierarchy, tiers, layers, three-dimensional
+keywords.es: pirámide, 3D, niveles, jerarquía, capas, tridimensional
+keywords.it: piramide, 3D, livelli, gerarchia, strati, tridimensionale
+keywords.fr: pyramide, 3D, niveaux, hiérarchie, couches, tridimensionnel
+
+[Shape]
+Width = 60 mm
+Width.us = 2.5 in
+Height = 50 mm
+Height.us = 2 in
+
+[User]
+# die Zahl der Ebenen (2 bis 8), die Fuge, die Breite der Vorderseite unten, wie hoch die
+# hintere rechte Ecke liegt
+N:   Value = MIN(MAX(ROUND(Prop.Levels,0),2),8)
+Gp:  Value = 1 mm
+     Value.us = 0.04 in
+Wf:  Value = MIN(MAX(Controls.Row_1,Width*0.5),Width*0.95)
+Dp:  Value = Height*0.12
+
+[Property]
+Levels:  Type = 2; Format = "0"; Value = 4
+         Label.de = Ebenen
+         Label.en = Levels
+         Label.es = Niveles
+         Label.it = Livelli
+         Label.fr = Niveaux
+         Prompt.de = Anzahl der Ebenen (2 bis 8)
+         Prompt.en = Number of levels (2 to 8)
+         Prompt.es = Número de niveles (de 2 a 8)
+         Prompt.it = Numero di livelli (da 2 a 8)
+         Prompt.fr = Nombre de niveaux (de 2 à 8)
+
+[Controls]
+Row_1:  X = Width*0.72; Y = 0
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Breite der Seitenfläche ändern"
+        Tip.en = "Change the width of the side face"
+        Tip.es = "Cambiar el ancho de la cara lateral"
+        Tip.it = "Cambia la larghezza della faccia laterale"
+        Tip.fr = "Modifier la largeur de la face latérale"
+
+[Connection]
+Row  X = User.Wf*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width*0.75; Y = (Height+User.Dp)*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = Width*0.25; Y = Height*0.5; DirX = 1; DirY = 0
+
+# Ebene 8 (von oben): Vorderseite, dann Seitenfläche; verborgen unter 8 Ebenen
+[Part L8]
+text.de: Ebene 8
+text.en: Level 8
+text.es: Nivel 8
+text.it: Livello 8
+text.fr: Niveau 8
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, Unter- und Oberkante als Anteil t der Kanten
+K:   Value = MIN(8,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+# die Höhe des Texts: Mitte der Ebene, in der Spitze tiefer
+Tt:  Value = User.T0+(User.T1-User.T0)*IF(User.K<=1,0.35,0.5)
+
+[Shape]
+HideText = 8>Sheet.1!User.N
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+Rounding = 0 mm
+TxtPinX = (Sheet.1!User.Wf*(1-User.Tt)+Width*User.Tt)*0.5
+TxtPinY = Height*User.Tt
+TxtWidth = MAX(Sheet.1!User.Wf*(1-User.Tt),18 mm)
+TxtHeight = Height*(User.T1-User.T0)
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Sheet.1!User.Wf*(1-User.Tt),0.7 in)
+
+[Geometry]
+NoShow = 8>Sheet.1!User.N
+MoveTo  X = Width*0.5*User.T0; Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Width*0.5*User.T1; Y = Height*User.T1
+LineTo  X = Width*0.5*User.T0; Y = Height*User.T0
+
+[Part L8S]
+
+[User]
+K:   Value = MIN(8,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+
+[Shape]
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 8>Sheet.1!User.N
+MoveTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Width*(1-User.T0*0.5); Y = Sheet.1!User.Dp+User.T0*(Height-Sheet.1!User.Dp)
+LineTo  X = Width*(1-User.T1*0.5); Y = Sheet.1!User.Dp+User.T1*(Height-Sheet.1!User.Dp)
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+
+# Ebene 7 (von oben): Vorderseite, dann Seitenfläche; verborgen unter 7 Ebenen
+[Part L7]
+text.de: Ebene 7
+text.en: Level 7
+text.es: Nivel 7
+text.it: Livello 7
+text.fr: Niveau 7
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, Unter- und Oberkante als Anteil t der Kanten
+K:   Value = MIN(7,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+# die Höhe des Texts: Mitte der Ebene, in der Spitze tiefer
+Tt:  Value = User.T0+(User.T1-User.T0)*IF(User.K<=1,0.35,0.5)
+
+[Shape]
+HideText = 7>Sheet.1!User.N
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+Rounding = 0 mm
+TxtPinX = (Sheet.1!User.Wf*(1-User.Tt)+Width*User.Tt)*0.5
+TxtPinY = Height*User.Tt
+TxtWidth = MAX(Sheet.1!User.Wf*(1-User.Tt),18 mm)
+TxtHeight = Height*(User.T1-User.T0)
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Sheet.1!User.Wf*(1-User.Tt),0.7 in)
+
+[Geometry]
+NoShow = 7>Sheet.1!User.N
+MoveTo  X = Width*0.5*User.T0; Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Width*0.5*User.T1; Y = Height*User.T1
+LineTo  X = Width*0.5*User.T0; Y = Height*User.T0
+
+[Part L7S]
+
+[User]
+K:   Value = MIN(7,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+
+[Shape]
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 7>Sheet.1!User.N
+MoveTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Width*(1-User.T0*0.5); Y = Sheet.1!User.Dp+User.T0*(Height-Sheet.1!User.Dp)
+LineTo  X = Width*(1-User.T1*0.5); Y = Sheet.1!User.Dp+User.T1*(Height-Sheet.1!User.Dp)
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+
+# Ebene 6 (von oben): Vorderseite, dann Seitenfläche; verborgen unter 6 Ebenen
+[Part L6]
+text.de: Ebene 6
+text.en: Level 6
+text.es: Nivel 6
+text.it: Livello 6
+text.fr: Niveau 6
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, Unter- und Oberkante als Anteil t der Kanten
+K:   Value = MIN(6,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+# die Höhe des Texts: Mitte der Ebene, in der Spitze tiefer
+Tt:  Value = User.T0+(User.T1-User.T0)*IF(User.K<=1,0.35,0.5)
+
+[Shape]
+HideText = 6>Sheet.1!User.N
+QuickStyleLineColor = 105
+QuickStyleFillColor = 105
+Rounding = 0 mm
+TxtPinX = (Sheet.1!User.Wf*(1-User.Tt)+Width*User.Tt)*0.5
+TxtPinY = Height*User.Tt
+TxtWidth = MAX(Sheet.1!User.Wf*(1-User.Tt),18 mm)
+TxtHeight = Height*(User.T1-User.T0)
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Sheet.1!User.Wf*(1-User.Tt),0.7 in)
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+MoveTo  X = Width*0.5*User.T0; Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Width*0.5*User.T1; Y = Height*User.T1
+LineTo  X = Width*0.5*User.T0; Y = Height*User.T0
+
+[Part L6S]
+
+[User]
+K:   Value = MIN(6,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+
+[Shape]
+QuickStyleLineColor = 105
+QuickStyleFillColor = 105
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+MoveTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Width*(1-User.T0*0.5); Y = Sheet.1!User.Dp+User.T0*(Height-Sheet.1!User.Dp)
+LineTo  X = Width*(1-User.T1*0.5); Y = Sheet.1!User.Dp+User.T1*(Height-Sheet.1!User.Dp)
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+
+# Ebene 5 (von oben): Vorderseite, dann Seitenfläche; verborgen unter 5 Ebenen
+[Part L5]
+text.de: Ebene 5
+text.en: Level 5
+text.es: Nivel 5
+text.it: Livello 5
+text.fr: Niveau 5
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, Unter- und Oberkante als Anteil t der Kanten
+K:   Value = MIN(5,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+# die Höhe des Texts: Mitte der Ebene, in der Spitze tiefer
+Tt:  Value = User.T0+(User.T1-User.T0)*IF(User.K<=1,0.35,0.5)
+
+[Shape]
+HideText = 5>Sheet.1!User.N
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+Rounding = 0 mm
+TxtPinX = (Sheet.1!User.Wf*(1-User.Tt)+Width*User.Tt)*0.5
+TxtPinY = Height*User.Tt
+TxtWidth = MAX(Sheet.1!User.Wf*(1-User.Tt),18 mm)
+TxtHeight = Height*(User.T1-User.T0)
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Sheet.1!User.Wf*(1-User.Tt),0.7 in)
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+MoveTo  X = Width*0.5*User.T0; Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Width*0.5*User.T1; Y = Height*User.T1
+LineTo  X = Width*0.5*User.T0; Y = Height*User.T0
+
+[Part L5S]
+
+[User]
+K:   Value = MIN(5,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+
+[Shape]
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+MoveTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Width*(1-User.T0*0.5); Y = Sheet.1!User.Dp+User.T0*(Height-Sheet.1!User.Dp)
+LineTo  X = Width*(1-User.T1*0.5); Y = Sheet.1!User.Dp+User.T1*(Height-Sheet.1!User.Dp)
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+
+# Ebene 4 (von oben): Vorderseite, dann Seitenfläche; verborgen unter 4 Ebenen
+[Part L4]
+text.de: Ebene 4
+text.en: Level 4
+text.es: Nivel 4
+text.it: Livello 4
+text.fr: Niveau 4
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, Unter- und Oberkante als Anteil t der Kanten
+K:   Value = MIN(4,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+# die Höhe des Texts: Mitte der Ebene, in der Spitze tiefer
+Tt:  Value = User.T0+(User.T1-User.T0)*IF(User.K<=1,0.35,0.5)
+
+[Shape]
+HideText = 4>Sheet.1!User.N
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+Rounding = 0 mm
+TxtPinX = (Sheet.1!User.Wf*(1-User.Tt)+Width*User.Tt)*0.5
+TxtPinY = Height*User.Tt
+TxtWidth = MAX(Sheet.1!User.Wf*(1-User.Tt),18 mm)
+TxtHeight = Height*(User.T1-User.T0)
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Sheet.1!User.Wf*(1-User.Tt),0.7 in)
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+MoveTo  X = Width*0.5*User.T0; Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Width*0.5*User.T1; Y = Height*User.T1
+LineTo  X = Width*0.5*User.T0; Y = Height*User.T0
+
+[Part L4S]
+
+[User]
+K:   Value = MIN(4,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+
+[Shape]
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+MoveTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Width*(1-User.T0*0.5); Y = Sheet.1!User.Dp+User.T0*(Height-Sheet.1!User.Dp)
+LineTo  X = Width*(1-User.T1*0.5); Y = Sheet.1!User.Dp+User.T1*(Height-Sheet.1!User.Dp)
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+
+# Ebene 3 (von oben): Vorderseite, dann Seitenfläche; verborgen unter 3 Ebenen
+[Part L3]
+text.de: Ebene 3
+text.en: Level 3
+text.es: Nivel 3
+text.it: Livello 3
+text.fr: Niveau 3
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, Unter- und Oberkante als Anteil t der Kanten
+K:   Value = MIN(3,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+# die Höhe des Texts: Mitte der Ebene, in der Spitze tiefer
+Tt:  Value = User.T0+(User.T1-User.T0)*IF(User.K<=1,0.35,0.5)
+
+[Shape]
+HideText = 3>Sheet.1!User.N
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+Rounding = 0 mm
+TxtPinX = (Sheet.1!User.Wf*(1-User.Tt)+Width*User.Tt)*0.5
+TxtPinY = Height*User.Tt
+TxtWidth = MAX(Sheet.1!User.Wf*(1-User.Tt),18 mm)
+TxtHeight = Height*(User.T1-User.T0)
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Sheet.1!User.Wf*(1-User.Tt),0.7 in)
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+MoveTo  X = Width*0.5*User.T0; Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Width*0.5*User.T1; Y = Height*User.T1
+LineTo  X = Width*0.5*User.T0; Y = Height*User.T0
+
+[Part L3S]
+
+[User]
+K:   Value = MIN(3,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+
+[Shape]
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+MoveTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Width*(1-User.T0*0.5); Y = Sheet.1!User.Dp+User.T0*(Height-Sheet.1!User.Dp)
+LineTo  X = Width*(1-User.T1*0.5); Y = Sheet.1!User.Dp+User.T1*(Height-Sheet.1!User.Dp)
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+
+# Ebene 2 (von oben): Vorderseite, dann Seitenfläche; verborgen unter 2 Ebenen
+[Part L2]
+text.de: Ebene 2
+text.en: Level 2
+text.es: Nivel 2
+text.it: Livello 2
+text.fr: Niveau 2
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, Unter- und Oberkante als Anteil t der Kanten
+K:   Value = MIN(2,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+# die Höhe des Texts: Mitte der Ebene, in der Spitze tiefer
+Tt:  Value = User.T0+(User.T1-User.T0)*IF(User.K<=1,0.35,0.5)
+
+[Shape]
+HideText = 2>Sheet.1!User.N
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+Rounding = 0 mm
+TxtPinX = (Sheet.1!User.Wf*(1-User.Tt)+Width*User.Tt)*0.5
+TxtPinY = Height*User.Tt
+TxtWidth = MAX(Sheet.1!User.Wf*(1-User.Tt),18 mm)
+TxtHeight = Height*(User.T1-User.T0)
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Sheet.1!User.Wf*(1-User.Tt),0.7 in)
+
+[Geometry]
+NoShow = 2>Sheet.1!User.N
+MoveTo  X = Width*0.5*User.T0; Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Width*0.5*User.T1; Y = Height*User.T1
+LineTo  X = Width*0.5*User.T0; Y = Height*User.T0
+
+[Part L2S]
+
+[User]
+K:   Value = MIN(2,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+
+[Shape]
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 2>Sheet.1!User.N
+MoveTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Width*(1-User.T0*0.5); Y = Sheet.1!User.Dp+User.T0*(Height-Sheet.1!User.Dp)
+LineTo  X = Width*(1-User.T1*0.5); Y = Sheet.1!User.Dp+User.T1*(Height-Sheet.1!User.Dp)
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+
+# Ebene 1 (von oben): Vorderseite, dann Seitenfläche; verborgen unter 1 Ebenen
+[Part L1]
+text.de: Ebene 1
+text.en: Level 1
+text.es: Nivel 1
+text.it: Livello 1
+text.fr: Niveau 1
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, Unter- und Oberkante als Anteil t der Kanten
+K:   Value = MIN(1,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+# die Höhe des Texts: Mitte der Ebene, in der Spitze tiefer
+Tt:  Value = User.T0+(User.T1-User.T0)*IF(User.K<=1,0.35,0.5)
+
+[Shape]
+HideText = 1>Sheet.1!User.N
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+Rounding = 0 mm
+TxtPinX = (Sheet.1!User.Wf*(1-User.Tt)+Width*User.Tt)*0.5
+TxtPinY = Height*User.Tt
+TxtWidth = MAX(Sheet.1!User.Wf*(1-User.Tt),18 mm)
+TxtHeight = Height*(User.T1-User.T0)
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Sheet.1!User.Wf*(1-User.Tt),0.7 in)
+
+[Geometry]
+NoShow = 1>Sheet.1!User.N
+MoveTo  X = Width*0.5*User.T0; Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Width*0.5*User.T1; Y = Height*User.T1
+LineTo  X = Width*0.5*User.T0; Y = Height*User.T0
+
+[Part L1S]
+
+[User]
+K:   Value = MIN(1,Sheet.1!User.N)
+T0:  Value = IF(User.K>=Sheet.1!User.N,0,1-User.K/Sheet.1!User.N+Sheet.1!User.Gp*0.5/Height)
+T1:  Value = IF(User.K<=1,1,1-(User.K-1)/Sheet.1!User.N-Sheet.1!User.Gp*0.5/Height)
+
+[Shape]
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+NoShow = 1>Sheet.1!User.N
+MoveTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0
+LineTo  X = Width*(1-User.T0*0.5); Y = Sheet.1!User.Dp+User.T0*(Height-Sheet.1!User.Dp)
+LineTo  X = Width*(1-User.T1*0.5); Y = Sheet.1!User.Dp+User.T1*(Height-Sheet.1!User.Dp)
+LineTo  X = Sheet.1!User.Wf+User.T1*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T1
+LineTo  X = Sheet.1!User.Wf+User.T0*(Width*0.5-Sheet.1!User.Wf); Y = Height*User.T0

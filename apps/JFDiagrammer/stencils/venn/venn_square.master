@@ -1,0 +1,40 @@
+# Quadratisches Venn-Diagramm (SH-007, JD26): ein Quadrat für Mengendiagramme, zu 35 %
+# durchscheinend wie der Venn-Kreis (venn.master): legt man mehrere übereinander, bleiben die
+# Überlappungen sichtbar (Ausnahme von der Stilregel: ohne Durchsicht verdeckte das obere Quadrat
+# die Überlappung).  Farbe aus dem Design.  Keine Steuerpunkte; der Text steht in der Mitte.
+master: Square Venn diagram
+name.de: Quadratisches Venn-Diagramm
+name.en: Square Venn diagram
+name.es: Diagrama de Venn cuadrado
+name.it: Diagramma di Venn quadrato
+name.fr: Diagramme de Venn carré
+prompt.de: Durchscheinendes Quadrat für Mengendiagramme. Legen Sie mehrere Quadrate übereinander, um Schnittmengen zu zeigen.
+prompt.en: Translucent square for set diagrams. Place several squares on top of each other to show intersections.
+prompt.es: Cuadrado translúcido para diagramas de conjuntos. Superponga varios cuadrados para mostrar intersecciones.
+prompt.it: Quadrato traslucido per diagrammi degli insiemi. Sovrapponi più quadrati per mostrare le intersezioni.
+prompt.fr: Carré translucide pour les diagrammes d'ensembles. Superposez plusieurs carrés pour montrer les intersections.
+keywords.de: Venn, Menge, Quadrat, Mengendiagramm, Schnittmenge, Überlappung, durchscheinend
+keywords.en: Venn, set, square, set diagram, intersection, overlap, translucent
+keywords.es: Venn, conjunto, cuadrado, diagrama de conjuntos, intersección, superposición, translúcido
+keywords.it: Venn, insieme, quadrato, diagramma degli insiemi, intersezione, sovrapposizione, traslucido
+keywords.fr: Venn, ensemble, carré, diagramme d'ensembles, intersection, chevauchement, translucide
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+FillForegndTrans = 35%
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

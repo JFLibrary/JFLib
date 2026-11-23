@@ -323,7 +323,7 @@ Height = GUARD(User.Y1-User.Y0)
 HideText = 1>Sheet.1!User.N
 QuickStyleLineColor = 100
 QuickStyleFillColor = 100
-TxtPinY = Height*0.33
+TxtPinY = Height*0.26
 
 [Geometry]
 NoShow = 1>Sheet.1!User.N

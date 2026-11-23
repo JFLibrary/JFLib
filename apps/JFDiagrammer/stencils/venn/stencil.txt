@@ -1,6 +1,6 @@
 # Venn-Diagramm-Shapes (SH-007, JD26): Mengendiagramme aus überlappenden, durchscheinenden
-# Kreisen.  Die Mengen sind Teile einer Gruppe; ihre Farben kommen über die Schnellformatvorlage
-# (Variantenfarben 1 bis 3) aus dem Design.
+# Kreisen und Quadraten, die Mengenoperationen und das Zwiebeldiagramm.  Die Mengen sind Teile
+# einer Gruppe; ihre Farben kommen über die Schnellformatvorlage (Variantenfarben) aus dem Design.
 stencil: Venn Diagram Shapes
 file: venn
 name.de: Venn-Diagramm-Shapes
@@ -9,5 +9,5 @@ name.es: Formas de diagrama de Venn
 name.it: Forme per diagrammi di Venn
 name.fr: Formes de diagramme de Venn
 category: general
-masters: venn_3, intersection_2
-quick: 2
+masters: venn, venn_square, venn_square_2, venn_2, venn_2_labeled, venn_3, venn_3_labeled, union_2, intersection_2, difference_2, complement_2, onion
+quick: 4

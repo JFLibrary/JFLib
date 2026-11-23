@@ -1,0 +1,100 @@
+# 3D-Feld (SH-030, JD26): ein Block mit Tiefe aus drei Teilen der Gruppe: der Deckel heller
+# (TINT(THEMEVAL("FillColor"),40)), die rechte Seite dunkler (SHADE(…,50)), beide mit THEMEGUARD,
+# und die Vorderseite; der Text gehört der Gruppe und steht auf der Vorderseite.  Anders als das 3D-Feld der Schablone blocks (eine Fläche,
+# gleich gefüllt) sind die Flächen schattiert und bleiben so auch in Designs ohne Shape-Linien
+# unterscheidbar; deshalb ein eigener NameU.  Row_1 an der hinteren linken Ecke des Deckels ändert
+# die Tiefe (nur waagrecht, Abstand von links: die Tiefe bleibt beim Vergrößern).  Rounding 0 an
+# allen Flächen: in den abgerundeten Design-Varianten würde jede Fläche für sich gerundet und der
+# Quader fiele auseinander.
+master: 3-D block
+name.de: 3D-Feld
+name.en: 3-D block
+name.es: Bloque 3D
+name.it: Blocco 3D
+name.fr: Bloc 3D
+prompt.de: Block mit Tiefe und schattierten Flächen. Die Tiefe ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Block with depth and shaded faces. Drag the yellow control handle to change the depth.
+prompt.es: Bloque con profundidad y caras sombreadas. Arrastre el controlador amarillo para cambiar la profundidad.
+prompt.it: Blocco con profondità e facce ombreggiate. Trascina la maniglia di controllo gialla per cambiare la profondità.
+prompt.fr: Bloc avec profondeur et faces ombrées. Faites glisser la poignée de contrôle jaune pour modifier la profondeur.
+keywords.de: Block, 3D, Feld, Quader, Tiefe, räumlich, schattiert
+keywords.en: block, 3D, box, cuboid, depth, three-dimensional, shaded
+keywords.es: bloque, 3D, cuadro, prisma, profundidad, tridimensional, sombreado
+keywords.it: blocco, 3D, riquadro, parallelepipedo, profondità, tridimensionale, ombreggiato
+keywords.fr: bloc, 3D, pavé, profondeur, tridimensionnel, ombré
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 25 mm
+Height.us = 1 in
+TxtPinX = (Width-User.D)*0.5
+TxtPinY = (Height-User.D)*0.5
+TxtWidth = Width-User.D
+TxtHeight = Height-User.D
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Tiefe
+D:   Value = MIN(MAX(Controls.Row_1,0),Width*0.5,Height*0.5)
+
+[Controls]
+Row_1:  X = 5 mm; Y = Height
+        X.us = 0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Tiefe ändern"
+        Tip.en = "Change the depth"
+        Tip.es = "Cambiar la profundidad"
+        Tip.it = "Cambia la profondità"
+        Tip.fr = "Modifier la profondeur"
+
+[Connection]
+Row  X = (Width-User.D)*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = (Height+User.D)*0.5; DirX = -1; DirY = 0
+Row  X = (Width+User.D)*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = (Height-User.D)*0.5; DirX = 1; DirY = 0
+
+# der Deckel, die rechte Seite, die Vorderseite
+[Part Top]
+
+[Shape]
+FillForegnd = THEMEGUARD(TINT(THEMEVAL("FillColor"),40))
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = 0; Y = Height-Sheet.1!User.D
+LineTo  X = Width-Sheet.1!User.D; Y = Height-Sheet.1!User.D
+LineTo  X = Width; Y = Height
+LineTo  X = Sheet.1!User.D; Y = Height
+LineTo  X = 0; Y = Height-Sheet.1!User.D
+
+[Part Side]
+
+[Shape]
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = Width-Sheet.1!User.D; Y = 0
+LineTo  X = Width; Y = Sheet.1!User.D
+LineTo  X = Width; Y = Height
+LineTo  X = Width-Sheet.1!User.D; Y = Height-Sheet.1!User.D
+LineTo  X = Width-Sheet.1!User.D; Y = 0
+
+[Part Front]
+
+[Shape]
+Width = GUARD(Sheet.1!Width-Sheet.1!User.D)
+Height = GUARD(Sheet.1!Height-Sheet.1!User.D)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Height*0.5)
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

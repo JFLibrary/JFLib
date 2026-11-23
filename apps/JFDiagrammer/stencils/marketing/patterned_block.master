@@ -1,0 +1,42 @@
+# Gemusterter Block (SH-030, JD26): ein Rechteck mit festem Füllmuster 7 (Kreuzschraffur schräg,
+# weit).  Die Farben kommen aus dem Design: der Grund ist die Füllung der Formatvorlage
+# (THEMEVAL("FillColor")), die Schraffur dieselbe Farbe dunkler (SHADE(…,50)), beide mit
+# THEMEGUARD.  Ausnahme von der Stilregel (Muster im Master), begründet durch den Zweck.
+master: Patterned block
+name.de: Gemusterter Block
+name.en: Patterned block
+name.es: Bloque con trama
+name.it: Blocco con motivo
+name.fr: Bloc à motif
+prompt.de: Block mit Gittermuster in den Farben des Designs.
+prompt.en: Block with a grid pattern in the colours of the design.
+prompt.es: Bloque con trama de rejilla en los colores del diseño.
+prompt.it: Blocco con motivo a griglia nei colori del tema.
+prompt.fr: Bloc avec motif quadrillé aux couleurs du thème.
+keywords.de: Block, Muster, Schraffur, Gitter, Fläche, Hervorhebung
+keywords.en: block, pattern, hatching, grid, area, highlight
+keywords.es: bloque, trama, sombreado, rejilla, área, resaltado
+keywords.it: blocco, motivo, tratteggio, griglia, area, evidenziazione
+keywords.fr: bloc, motif, hachures, quadrillage, zone, mise en valeur
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+FillPattern = 7
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+FillBkgnd = THEMEGUARD(THEMEVAL("FillColor"))
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

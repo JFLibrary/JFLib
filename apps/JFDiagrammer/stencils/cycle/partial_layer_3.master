@@ -1,0 +1,63 @@
+# Teilebene 3: ein Viertelring um die linke untere Ecke wie Teilebene 1, 60 mm groß, der
+# Innenradius drei Viertel des Außenradius (45 mm): um dieselbe Ecke gelegt, umschließt
+# er Teilebene 2 genau (Ringbreite 15 mm).  Außen- und Innenbogen sind Ellipsenbögen durch den
+# 45°-Punkt, das Shape bleibt also auch gestreckt sauber.  Row_1 an der unteren Kante ändert
+# den Innenradius als Anteil des Außenradius (anteilig, nur waagrecht).  Der Text steht in der
+# Mitte des Rings.
+# Kopie aus blocks, gleich halten.
+master: Partial layer 3
+name.de: Teilebene 3
+name.en: Partial layer 3
+name.es: Capa parcial 3
+name.it: Livello parziale 3
+name.fr: Couche partielle 3
+prompt.de: Viertelring für Ebenen- und Schichtenmodelle, passend um Teilebene 2. Die Breite des Rings ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Quarter ring for layer models that fits around partial layer 2. Drag the yellow control handle to change the width of the ring.
+prompt.es: Cuarto de anillo para modelos de capas que encaja alrededor de la capa parcial 2. Arrastre el controlador amarillo para cambiar el ancho del anillo.
+prompt.it: Quarto di anello per modelli a livelli che avvolge il livello parziale 2. Trascina la maniglia di controllo gialla per cambiare la larghezza dell'anello.
+prompt.fr: Quart d'anneau pour les modèles en couches qui entoure la couche partielle 2. Faites glisser la poignée de contrôle jaune pour modifier la largeur de l'anneau.
+keywords.de: Ebene, Schicht, Ring, Viertelring, Segment, konzentrisch, Schalenmodell
+keywords.en: layer, ring, quarter ring, segment, concentric, onion model
+keywords.es: capa, nivel, anillo, cuarto de anillo, segmento, concéntrico
+keywords.it: livello, strato, anello, quarto di anello, segmento, concentrico
+keywords.fr: couche, niveau, anneau, quart d'anneau, segment, concentrique
+
+[Shape]
+Width = 60 mm
+Width.us = 2.5 in
+Height = 60 mm
+Height.us = 2.5 in
+TxtWidth = Width*(1-User.K)
+TxtHeight = Height*(1-User.K)*0.5
+TxtPinX = Width*(1+User.K)*0.35355339
+TxtPinY = Height*(1+User.K)*0.35355339
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# der Innenradius als Anteil des Außenradius, die Halbachsen des Innenbogens
+K:   Value = MIN(MAX(Controls.Row_1/Width, 0), 0.9)
+Ix:  Value = Width*User.K
+Iy:  Value = Height*User.K
+
+[Geometry]
+MoveTo           X = User.Ix; Y = 0
+LineTo           X = Width; Y = 0
+EllipticalArcTo  X = 0; Y = Height; A = Width*0.70710678; B = Height*0.70710678; C = 0 deg; D = Width/Height
+LineTo           X = 0; Y = User.Iy
+EllipticalArcTo  X = User.Ix; Y = 0; A = User.Ix*0.70710678; B = User.Iy*0.70710678; C = 0 deg; D = Width/Height
+
+[Controls]
+Row_1:  X = Width*0.75; Y = 0
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Breite des Rings ändern"
+        Tip.en = "Change the width of the ring"
+        Tip.es = "Cambiar el ancho del anillo"
+        Tip.it = "Cambia la larghezza dell'anello"
+        Tip.fr = "Modifier la largeur de l'anneau"
+
+[Connection]
+Row  X = Width*(1+User.K)*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width*0.70710678; Y = Height*0.70710678; DirX = -0.70710678; DirY = -0.70710678
+Row  X = 0; Y = Height*(1+User.K)*0.5; DirX = 1; DirY = 0

@@ -1,0 +1,143 @@
+# Invertierte Pyramide (SH-032, JD26): eine Pyramide auf der Spitze aus zwei bis acht Ebenen in
+# einem Shape (eine Farbe, ein Text), jede Ebene ein eigener Geometrieabschnitt mit 1 mm Fuge zur
+# nächsten (sichtbar auch in Designs ohne Shape-Linien).  Ebene 1 ist die breiteste oben.  Die Zahl
+# steht in den Shape-Daten (Prop.Levels); Row_1 in der Mitte der oberen Kante ändert sie beim Ziehen
+# nach oben oder unten: jede Ebene ist User.LH hoch, die Höhe Ebenen x LH; zieht man die Höhe
+# selbst, schickt SETATREF die neue Ebenenhöhe nach User.LH.  Abschnitte über der Zahl sind
+# verborgen.  Gezeichnet wird nach Height/N (User.H1).
+master: Inverted pyramid
+name.de: Invertierte Pyramide
+name.en: Inverted pyramid
+name.es: Pirámide invertida
+name.it: Piramide invertita
+name.fr: Pyramide inversée
+prompt.de: Pyramide auf der Spitze aus Ebenen, etwa um von breit nach eng einzugrenzen. Ziehen Sie den gelben Steuerpunkt an der oberen Kante nach oben oder unten, um Ebenen hinzuzufügen oder zu entfernen.
+prompt.en: Pyramid standing on its tip, made of levels, for example to narrow down from broad to specific. Drag the yellow control handle on the top edge up or down to add or remove levels.
+prompt.es: Pirámide apoyada en la punta, formada por niveles, por ejemplo para acotar de lo general a lo concreto. Arrastre el controlador amarillo del borde superior hacia arriba o hacia abajo para agregar o quitar niveles.
+prompt.it: Piramide poggiata sulla punta, composta da livelli, ad esempio per restringere dal generale al particolare. Trascina la maniglia di controllo gialla sul bordo superiore in alto o in basso per aggiungere o togliere livelli.
+prompt.fr: Pyramide posée sur sa pointe, composée de niveaux, par exemple pour aller du général au particulier. Faites glisser la poignée de contrôle jaune du bord supérieur vers le haut ou le bas pour ajouter ou supprimer des niveaux.
+keywords.de: Pyramide, invertiert, umgekehrt, Ebenen, Trichter, Eingrenzung, Hierarchie
+keywords.en: pyramid, inverted, upside down, levels, funnel, narrowing, hierarchy
+keywords.es: pirámide, invertida, niveles, embudo, acotar, jerarquía
+keywords.it: piramide, invertita, rovesciata, livelli, imbuto, gerarchia
+keywords.fr: pyramide, inversée, renversée, niveaux, entonnoir, hiérarchie
+
+[Shape]
+Width = 80 mm
+Width.us = 3.25 in
+Height = SETATREF(User.LH,SETATREFEVAL(SETATREFEXPR()/User.N))*User.N
+TxtPinX = Width*0.5
+TxtPinY = Height*0.7
+TxtWidth = Width*0.5
+TxtHeight = Height*0.3
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Zahl der Ebenen (2 bis 8), die Höhe einer Ebene, die Fuge
+N:   Value = MIN(MAX(ROUND(Prop.Levels,0),2),8)
+LH:  Value = 12.5 mm
+     Value.us = 0.5 in
+Gp:  Value = 1 mm
+     Value.us = 0.04 in
+# die Höhe einer Ebene, wie die Teile sie zeichnen
+H1:  Value = Height/User.N
+
+[Property]
+Levels:  Type = 2; Format = "0"; Value = 4
+         Label.de = Ebenen
+         Label.en = Levels
+         Label.es = Niveles
+         Label.it = Livelli
+         Label.fr = Niveaux
+         Prompt.de = Anzahl der Ebenen (2 bis 8)
+         Prompt.en = Number of levels (2 to 8)
+         Prompt.es = Número de niveles (de 2 a 8)
+         Prompt.it = Numero di livelli (da 2 a 8)
+         Prompt.fr = Nombre de niveaux (de 2 à 8)
+
+[Controls]
+Row_1:  X = Width*0.5; Y = SETATREF(Prop.Levels,SETATREFEVAL(MIN(MAX(ROUND(SETATREFEXPR()/User.LH,0),2),8)))*User.LH
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Ebenen hinzufügen oder entfernen"
+        Tip.en = "Add or remove levels"
+        Tip.es = "Agregar o quitar niveles"
+        Tip.it = "Aggiungi o togli livelli"
+        Tip.fr = "Ajouter ou supprimer des niveaux"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width*0.75; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = Width*0.25; Y = Height*0.5; DirX = 1; DirY = 0
+
+# Ebene 1 (von oben)
+[Geometry]
+MoveTo  X = Width*0.5*(1-Geometry1.Y1/Height); Y = IF(1>=User.N,0,Height-1*User.H1+User.Gp*0.5)
+LineTo  X = Width-Geometry1.X1; Y = Geometry1.Y1
+LineTo  X = Width*0.5*(1+Geometry1.Y3/Height); Y = Height
+LineTo  X = Width-Geometry1.X3; Y = Geometry1.Y3
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# Ebene 2 (von oben)
+[Geometry]
+MoveTo  X = Width*0.5*(1-Geometry2.Y1/Height); Y = IF(2>=User.N,0,Height-2*User.H1+User.Gp*0.5)
+LineTo  X = Width-Geometry2.X1; Y = Geometry2.Y1
+LineTo  X = Width*0.5*(1+Geometry2.Y3/Height); Y = Height-User.H1-User.Gp*0.5
+LineTo  X = Width-Geometry2.X3; Y = Geometry2.Y3
+LineTo  X = Geometry2.X1; Y = Geometry2.Y1
+
+# Ebene 3 (von oben)
+[Geometry]
+NoShow = 3>User.N
+MoveTo  X = Width*0.5*(1-Geometry3.Y1/Height); Y = IF(3>=User.N,0,Height-3*User.H1+User.Gp*0.5)
+LineTo  X = Width-Geometry3.X1; Y = Geometry3.Y1
+LineTo  X = Width*0.5*(1+Geometry3.Y3/Height); Y = IF(3>User.N,0,Height-2*User.H1-User.Gp*0.5)
+LineTo  X = Width-Geometry3.X3; Y = Geometry3.Y3
+LineTo  X = Geometry3.X1; Y = Geometry3.Y1
+
+# Ebene 4 (von oben)
+[Geometry]
+NoShow = 4>User.N
+MoveTo  X = Width*0.5*(1-Geometry4.Y1/Height); Y = IF(4>=User.N,0,Height-4*User.H1+User.Gp*0.5)
+LineTo  X = Width-Geometry4.X1; Y = Geometry4.Y1
+LineTo  X = Width*0.5*(1+Geometry4.Y3/Height); Y = IF(4>User.N,0,Height-3*User.H1-User.Gp*0.5)
+LineTo  X = Width-Geometry4.X3; Y = Geometry4.Y3
+LineTo  X = Geometry4.X1; Y = Geometry4.Y1
+
+# Ebene 5 (von oben)
+[Geometry]
+NoShow = 5>User.N
+MoveTo  X = Width*0.5*(1-Geometry5.Y1/Height); Y = IF(5>=User.N,0,Height-5*User.H1+User.Gp*0.5)
+LineTo  X = Width-Geometry5.X1; Y = Geometry5.Y1
+LineTo  X = Width*0.5*(1+Geometry5.Y3/Height); Y = IF(5>User.N,0,Height-4*User.H1-User.Gp*0.5)
+LineTo  X = Width-Geometry5.X3; Y = Geometry5.Y3
+LineTo  X = Geometry5.X1; Y = Geometry5.Y1
+
+# Ebene 6 (von oben)
+[Geometry]
+NoShow = 6>User.N
+MoveTo  X = Width*0.5*(1-Geometry6.Y1/Height); Y = IF(6>=User.N,0,Height-6*User.H1+User.Gp*0.5)
+LineTo  X = Width-Geometry6.X1; Y = Geometry6.Y1
+LineTo  X = Width*0.5*(1+Geometry6.Y3/Height); Y = IF(6>User.N,0,Height-5*User.H1-User.Gp*0.5)
+LineTo  X = Width-Geometry6.X3; Y = Geometry6.Y3
+LineTo  X = Geometry6.X1; Y = Geometry6.Y1
+
+# Ebene 7 (von oben)
+[Geometry]
+NoShow = 7>User.N
+MoveTo  X = Width*0.5*(1-Geometry7.Y1/Height); Y = IF(7>=User.N,0,Height-7*User.H1+User.Gp*0.5)
+LineTo  X = Width-Geometry7.X1; Y = Geometry7.Y1
+LineTo  X = Width*0.5*(1+Geometry7.Y3/Height); Y = IF(7>User.N,0,Height-6*User.H1-User.Gp*0.5)
+LineTo  X = Width-Geometry7.X3; Y = Geometry7.Y3
+LineTo  X = Geometry7.X1; Y = Geometry7.Y1
+
+# Ebene 8 (von oben)
+[Geometry]
+NoShow = 8>User.N
+MoveTo  X = Width*0.5*(1-Geometry8.Y1/Height); Y = 0
+LineTo  X = Width-Geometry8.X1; Y = Geometry8.Y1
+LineTo  X = Width*0.5*(1+Geometry8.Y3/Height); Y = IF(8>User.N,0,Height-7*User.H1-User.Gp*0.5)
+LineTo  X = Width-Geometry8.X3; Y = Geometry8.Y3
+LineTo  X = Geometry8.X1; Y = Geometry8.Y1

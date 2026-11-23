@@ -1,0 +1,91 @@
+# Ergänzungsmenge von 2 Mengen (SH-007, JD26): zwei Kreise (gestreckt Ellipsen) in einer
+# Grundmenge (Rechteck); hervorgehoben ist das Komplement ihrer Vereinigung, also alles, was in
+# keiner der beiden Mengen liegt.  Die Kreise liegen wie bei der Schnittmenge
+# (intersection_2.master), aber mit einem Rand von 5 mm zur Grundmenge links, rechts und unten
+# und einem Textband oben (bei 70 x 60 mm, anteilig): Mitten bei 0,3571 und 0,6429 der Breite und
+# 0,4167 der Höhe, Halbachsen 0,2857 der Breite und 0,3333 der Höhe, Schnittpunkte bei halber
+# Breite, ±0,2887 der Höhe um die Mitte.  Eine Gruppe aus zwei
+# Teilen wie intersection_2.master: die gefüllte Fläche (das Rechteck, die Vereinigung als Loch
+# nach der Gerade-Ungerade-Regel) mit der Füllung von Normal, darüber die Umrisse der Grundmenge
+# und der Mengen in der Linie der Formatvorlage Connector (QuickStyleType 3, ohne Pfeilspitzen:
+# sichtbar auch in Designs ohne Shape-Linien).  Der Text der Gruppe steht im Band über den
+# Kreisen.
+master: Complement of 2 sets
+name.de: Ergänzungsmenge von 2 Mengen
+name.en: Complement of two sets
+name.es: Complemento de 2 conjuntos
+name.it: Complemento di 2 insiemi
+name.fr: Complémentaire de 2 ensembles
+prompt.de: Zwei Mengen in einer Grundmenge; hervorgehoben ist, was in keiner der beiden liegt (das Komplement der Vereinigung).
+prompt.en: Two sets in a universe; what lies in neither of them is highlighted (the complement of the union).
+prompt.es: Dos conjuntos en un conjunto universal; está resaltado lo que no pertenece a ninguno (el complemento de la unión).
+prompt.it: Due insiemi in un insieme universo; è evidenziato ciò che non appartiene a nessuno dei due (il complemento dell'unione).
+prompt.fr: Deux ensembles dans un univers ; ce qui n'appartient à aucun des deux est mis en évidence (le complémentaire de l'union).
+keywords.de: Venn, Komplement, Ergänzungsmenge, Grundmenge, weder noch, Mengenlehre, Rest
+keywords.en: Venn, complement, universe, neither nor, set, set theory
+keywords.es: Venn, complemento, conjunto universal, ni ni, conjunto, teoría de conjuntos
+keywords.it: Venn, complemento, insieme universo, né né, insieme, teoria degli insiemi
+keywords.fr: Venn, complémentaire, univers, ni ni, ensemble, théorie des ensembles
+
+[Shape]
+Width = 70 mm
+Width.us = 2.75 in
+Height = 60 mm
+Height.us = 2.375 in
+# nur die Gruppe (SelectMode 0, ausdrücklich): die Teile sind Fläche und Umriss, keine eigenen
+# Objekte; der Text gehört der Gruppe
+SelectMode = 0
+TxtPinX = Width*0.5
+TxtPinY = Height*0.875
+TxtWidth = Width*0.9
+TxtHeight = Height*0.2
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# das Komplement: die Grundmenge, die Vereinigung als Loch (linker Bogen von A, rechter von B)
+[Part Complement]
+
+[Geometry]
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Geometry]
+NoLine = TRUE
+MoveTo           X = Width*0.5; Y = Height*0.7054
+EllipticalArcTo  X = Width*0.5; Y = Height*0.128; A = Width*0.0714; B = Height*0.4167; C = 0 deg; D = Width*0.8571/Height
+EllipticalArcTo  X = Width*0.5; Y = Height*0.7054; A = Width*0.9286; B = Height*0.4167; C = 0 deg; D = Width*0.8571/Height
+
+# die Grundmenge und die Mengen als Umriss
+[Part Sets]
+style: Connector
+
+[Shape]
+BeginArrow = 0
+EndArrow = 0
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Geometry]
+NoFill = TRUE
+Ellipse  X = Width*0.3571; Y = Height*0.4167; A = Width*0.6429; B = Height*0.4167; C = Width*0.3571; D = Height*0.75
+
+[Geometry]
+NoFill = TRUE
+Ellipse  X = Width*0.6429; Y = Height*0.4167; A = Width*0.9286; B = Height*0.4167; C = Width*0.6429; D = Height*0.75

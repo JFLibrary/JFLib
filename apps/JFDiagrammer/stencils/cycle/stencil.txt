@@ -1,5 +1,6 @@
-# Zyklusdiagramm-Shapes (SH-033, JD26): Kreisläufe, Ringe und Zielscheiben; die Zahl der Phasen
-# und Ringe steht in den Shape-Daten.
+# Zyklusdiagramm-Shapes (SH-033, JD26): Kreisläufe, Ringe und Zielscheiben; die Zahl der Phasen,
+# Segmente und Elemente steht in den Shape-Daten.  Teilebenen und konzentrische Ebenen sind Kopien
+# aus blocks (gleicher NameU).
 stencil: Cycle Shapes
 file: cycle
 name.de: Zyklusdiagramm-Shapes
@@ -8,5 +9,5 @@ name.es: Formas de diagrama de ciclo
 name.it: Forme per diagrammi a ciclo
 name.fr: Formes de diagramme de cycle
 category: business
-masters: cycle_phases, target
-quick: 2
+masters: circular_arrow, cycle_phases, arc, partial_layer, partial_layer_2, partial_layer_3, partial_layer_4, target_segments, target_segments_2, arrow_circle, radial_cycle, arrow_loop, radial_diagram, hexagon_loop, concentric_layer_1, concentric_layer_2, concentric_layer_3, concentric_center, target, onion
+quick: 4

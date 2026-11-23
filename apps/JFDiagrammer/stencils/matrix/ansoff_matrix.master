@@ -1,0 +1,239 @@
+# Ansoff-Matrix (SH-031, JD26): die Produkt-Markt-Matrix nach Ansoff, eigene Gestaltung für diese
+# Schablone.  Vier Felder mit den Wachstumsstrategien (Marktdurchdringung, Produktentwicklung,
+# Marktentwicklung, Diversifikation) in den Variantenfarben 100 bis 103; darüber zwei Spaltenköpfe
+# (bestehende, neue Produkte), links zwei Zeilenköpfe (bestehende, neue Märkte, Text um 90°
+# gedreht), die Köpfe in 106 (in NetLab Schiefer).  Alles Teile der Gruppe mit eigenem Text, 2 mm
+# Abstand; die Teile folgen der Größe der Gruppe.  So breit, dass die langen Wörter
+# (Marktdurchdringung) in 12 pt in eine Zeile passen.
+master: Ansoff matrix
+name.de: Ansoff-Matrix
+name.en: Ansoff matrix
+name.es: Matriz de Ansoff
+name.it: Matrice di Ansoff
+name.fr: Matrice d'Ansoff
+prompt.de: Produkt-Markt-Matrix nach Ansoff mit den vier Wachstumsstrategien. Klicken Sie ein Feld oder einen Kopf zweimal an, um den Text zu ändern.
+prompt.en: Ansoff's product-market matrix with the four growth strategies. Click a field or a header twice to change its text.
+prompt.es: Matriz producto-mercado de Ansoff con las cuatro estrategias de crecimiento. Haga clic dos veces en un campo o un encabezado para cambiar el texto.
+prompt.it: Matrice prodotto-mercato di Ansoff con le quattro strategie di crescita. Fai clic due volte su un campo o un'intestazione per cambiarne il testo.
+prompt.fr: Matrice produit-marché d'Ansoff avec les quatre stratégies de croissance. Cliquez deux fois sur un champ ou un en-tête pour modifier le texte.
+keywords.de: Ansoff, Produkt-Markt-Matrix, Wachstumsstrategie, Marktdurchdringung, Diversifikation, Strategie
+keywords.en: Ansoff, product-market matrix, growth strategy, market penetration, diversification, strategy
+keywords.es: Ansoff, matriz producto-mercado, estrategia de crecimiento, penetración de mercado, diversificación, estrategia
+keywords.it: Ansoff, matrice prodotto-mercato, strategia di crescita, penetrazione del mercato, diversificazione, strategia
+keywords.fr: Ansoff, matrice produit-marché, stratégie de croissance, pénétration du marché, diversification, stratégie
+
+[Shape]
+Width = 110 mm
+Width.us = 4.25 in
+Height = 85 mm
+Height.us = 3.25 in
+
+[User]
+# die Breite der Zeilenköpfe, die Höhe der Spaltenköpfe, der Abstand, Breite und Höhe eines Felds
+M:   Value = 12 mm
+     Value.us = 0.5 in
+T:   Value = 10 mm
+     Value.us = 0.4 in
+G:   Value = 2 mm
+     Value.us = 0.08 in
+CW:  Value = (Width-User.M-2*User.G)*0.5
+RH:  Value = (Height-User.T-2*User.G)*0.5
+
+[Connection]
+Row  X = User.M+(Width-User.M)*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = (Height-User.T)*0.5; DirX = -1; DirY = 0
+Row  X = User.M+(Width-User.M)*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = (Height-User.T)*0.5; DirX = 1; DirY = 0
+
+# die Spaltenköpfe: Produkte
+[Part Products_1]
+text.de: Bestehende Produkte
+text.en: Existing products
+text.es: Productos existentes
+text.it: Prodotti esistenti
+text.fr: Produits existants
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.T)
+PinX = GUARD(Sheet.1!User.M+Sheet.1!User.G+Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Products_2]
+text.de: Neue Produkte
+text.en: New products
+text.es: Productos nuevos
+text.it: Nuovi prodotti
+text.fr: Nouveaux produits
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.T)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# die Zeilenköpfe: Märkte, der Text um 90° gedreht
+[Part Markets_1]
+text.de: Bestehende Märkte
+text.en: Existing markets
+text.es: Mercados existentes
+text.it: Mercati esistenti
+text.fr: Marchés existants
+
+[Shape]
+Width = GUARD(Sheet.1!User.M)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!Height-Sheet.1!User.T-Sheet.1!User.G-Height*0.5)
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Height
+TxtHeight = Width
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = 90 deg
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Markets_2]
+text.de: Neue Märkte
+text.en: New markets
+text.es: Mercados nuevos
+text.it: Nuovi mercati
+text.fr: Nouveaux marchés
+
+[Shape]
+Width = GUARD(Sheet.1!User.M)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Height*0.5)
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Height
+TxtHeight = Width
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = 90 deg
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# die Strategien
+[Part Penetration]
+text.de: Marktdurchdringung
+text.en: Market penetration
+text.es: Penetración de mercado
+text.it: Penetrazione del mercato
+text.fr: Pénétration du marché
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Sheet.1!User.M+Sheet.1!User.G+Width*0.5)
+PinY = GUARD(Sheet.1!Height-Sheet.1!User.T-Sheet.1!User.G-Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Product_development]
+text.de: Produktentwicklung
+text.en: Product development
+text.es: Desarrollo de productos
+text.it: Sviluppo del prodotto
+text.fr: Développement de produits
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!Height-Sheet.1!User.T-Sheet.1!User.G-Height*0.5)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Market_development]
+text.de: Marktentwicklung
+text.en: Market development
+text.es: Desarrollo de mercados
+text.it: Sviluppo del mercato
+text.fr: Développement de marchés
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Sheet.1!User.M+Sheet.1!User.G+Width*0.5)
+PinY = GUARD(Height*0.5)
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Diversification]
+text.de: Diversifikation
+text.en: Diversification
+text.es: Diversificación
+text.it: Diversificazione
+text.fr: Diversification
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Height*0.5)
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

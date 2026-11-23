@@ -1,10 +1,11 @@
 # Kreisbewegung (SH-033, JD26): ein Kreislauf aus drei bis acht Ringsegmenten, jedes mit einer
 # Spitze in Laufrichtung (im Uhrzeigersinn) und der passenden Kerbe am Anfang; je ein Teil der
 # Gruppe mit eigenem Text und eigener Variantenfarbe des Designs (Schnellformatvorlage 100 bis
-# 106).  Phase 1 beginnt oben.  Die Zahl steht in den Shape-Daten (Prop.Phases, vier wie
-# Visios „Kreisbewegung in vier Phasen“); Row_1 am Innenrand oben ändert die Breite des Rings
-# (anteilig, nur senkrecht).  Alle Teile sind so groß wie die Gruppe; Bögen sind Ellipsenbögen
-# durch die Mitte des Segments, gestreckt folgt der Ring der Ellipse.
+# 106, die achte 103, damit sie sich von ihren Nachbarn 7 und 1 abhebt).  Phase 1 beginnt oben.
+# Die Zahl steht in den Shape-Daten (Prop.Phases, vier wie Visios „Kreisbewegung in vier
+# Phasen“); Row_1 am Innenrand oben ändert die Breite des Rings (anteilig, nur senkrecht).  Alle
+# Teile sind so groß wie die Gruppe; Bögen sind Ellipsenbögen durch die Mitte des Segments,
+# gestreckt folgt der Ring der Ellipse.
 master: Circular motion
 name.de: Kreisbewegung
 name.en: Circular motion
@@ -365,8 +366,8 @@ Rm:  Value = (1+Sheet.1!User.K)*0.5
 
 [Shape]
 HideText = 8>Sheet.1!User.N
-QuickStyleLineColor = 100
-QuickStyleFillColor = 100
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
 TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
 TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
 TxtWidth = Width*0.4
