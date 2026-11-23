@@ -135,8 +135,6 @@ pub(super) enum K {
     U8,
     /// two bytes
     U16,
-    /// four bytes, signed
-    I32,
     /// a colour: index byte, R, G, B (the transparency byte after them is a cell of its own, Trans)
     Color,
     /// a transparency byte (0..255 -> 0..1)
@@ -220,7 +218,8 @@ pub(super) const LAYOUTS: &[Layout] = &[
         f("LockAspect", Bool, 4, 4), f("LockDelete", Bool, 5, 5), f("LockBegin", Bool, 6, 6), f("LockEnd", Bool, 7, 7),
         f("LockRotate", Bool, 8, 8), f("LockCrop", Bool, 9, 9), f("LockVtxEdit", Bool, 10, 10), f("LockTextEdit", Bool, 11, 11),
         f("LockFormat", Bool, 12, 12), f("LockGroup", Bool, 13, 13), f("LockCalcWH", Bool, 14, 14), f("LockSelect", Bool, 15, 15),
-        f("LockCustProp", Bool, 16, 16),
+        f("LockCustProp", Bool, 16, 16), f("LockFromGroupFormat", Bool, 17, 17), f("LockThemeColors", Bool, 18, 18),
+        f("LockThemeEffects", Bool, 19, 19),
     ]),
     lay(0x93, "StyleProp", 4, 2, &[
         f("EnableLineProps", Bool, 0, 0), f("EnableFillProps", Bool, 1, 1), f("EnableTextProps", Bool, 2, 2), f("HideForApply", Bool, 3, 3),
@@ -230,7 +229,16 @@ pub(super) const LAYOUTS: &[Layout] = &[
     ]),
     lay(0xA7, "LayerMem", 4, 1, &[f("LayerMember", Str, 0, 0)]),
     lay(0xA3, "Help", 28, 1, &[f("HelpTopic", Str, 0, 0), f("Copyright", Str, 4, 1)]),
-    lay(0xBE, "Group", 20, 4, &[f("SelectMode", U8, 0, 0), f("DisplayMode", U8, 1, 1)]),
+    lay(0xBE, "Group", 20, 4, &[
+        f("SelectMode", U8, 0, 0), f("DisplayMode", U8, 1, 1), bit("IsDropTarget", 2, 0, 2), bit("IsSnapTarget", 2, 1, 3),
+        bit("IsTextEditTarget", 2, 2, 4), bit("DontMoveChildren", 2, 3, 5),
+    ]),
+    lay(0xA4, "Misc", 40, 4, &[
+        bit("NoObjHandles", 0, 0, 0), bit("NonPrinting", 0, 1, 1), bit("NoCtlHandles", 0, 2, 2), bit("NoAlignBox", 0, 3, 3),
+        bit("UpdateAlignBox", 0, 4, 4), bit("HideText", 0, 5, 5), f("DynFeedback", U8, 1, 8), f("GlueType", U8, 2, 9),
+        f("WalkPreference", U8, 3, 10), f("BegTrigger", U8, 4, 11), f("EndTrigger", U8, 5, 12), f("ObjType", U8, 6, 13),
+        f("Comment", Str, 12, 16), f("LangID", U16, 18, 26), f("ShapeKeywords", Str, 20, 27), f("DropOnPageScale", Dbl, 24, 28),
+    ]),
     lay(0x92, "PageProps", 125, 6, &[
         f("PageWidth", Num, 0, 0), f("PageHeight", Num, 9, 1), f("ShdwOffsetX", Num, 18, 2), f("ShdwOffsetY", Num, 27, 3),
         f("PageScale", Num, 36, 4), f("DrawingScale", Num, 45, 5), f("DrawingSizeType", U8, 54, 6), f("DrawingScaleType", U8, 55, 7),
@@ -255,9 +263,19 @@ pub(super) const LAYOUTS: &[Layout] = &[
         f("YCon", U8, 37, 5), f("CanGlue", Bool, 38, 6), f("Prompt", Str, 40, 8),
     ]),
     lay(0xB4, "User", 13, 1, &[f("Value", Num, 0, 0), f("Prompt", Str, 9, 1)]),
+    lay(0xA9, "Act", 52, 4, &[
+        f("Menu", Str, 0, 0), f("Action", Num, 12, 3), f("Checked", U8, 21, 4), f("Disabled", U8, 22, 5), f("ReadOnly", U8, 23, 6),
+        f("Invisible", U8, 36, 7), f("BeginGroup", U8, 37, 8), f("TagName", Str, 24, 9), f("ButtonFace", Str, 28, 10),
+        f("SortKey", Str, 32, 11), f("FlyoutChild", U8, 38, 12),
+    ]),
+    lay(0xA1, "Field", 51, 2, &[
+        f("Value", Num, 7, 0), f("Format", Num, 17, 2), f("Type", U8, 26, 3), f("UICat", U8, 28, 4), f("UICod", U8, 29, 5),
+        f("UIFmt", U8, 30, 6), f("Calendar", U8, 31, 7), f("ObjectKind", U8, 32, 8),
+    ]),
     lay(0xB6, "Prop", 31, 4, &[
         f("Value", Num, 0, 0), f("Prompt", Str, 9, 1), f("Label", Str, 13, 2), f("Format", Str, 17, 3), f("SortKey", Str, 21, 4),
-        f("Type", U8, 25, 5), f("Invisible", Bool, 26, 6), f("Verify", Bool, 27, 7),
+        f("Type", U8, 25, 5), f("Invisible", Bool, 26, 6), f("Verify", Bool, 27, 7), f("LangID", U16, 28, 14),
+        f("Calendar", U8, 30, 15),
     ]),
     lay(0x9E, "Scratch", 54, 1, &[
         f("X", Num, 0, 0), f("Y", Num, 9, 1), f("A", Num, 18, 2), f("B", Num, 27, 3), f("C", Num, 36, 4), f("D", Num, 45, 5),
@@ -316,14 +334,46 @@ pub(super) fn unit_name(code: u8) -> Option<&'static str> {
     })
 }
 
-// a double as the XML writes it
+// a double as Visio writes a value: at most 16 significant digits (0.01 stays 0.01 although
+// the double is 0.009999999999999998), E notation below 1E-5 and from 1E16; -0 is 0 (the VSDX
+// writer writes it so, and a round trip must not tell them apart)
 pub(super) fn num(v: f64) -> String {
-    // -0 is 0 (the VSDX writer writes it so, and a round trip must not tell them apart)
-    let v = if v == 0.0 { 0.0 } else { v };
-    if v.is_finite() {
-        format!("{v}")
-    } else {
+    if v == 0.0 || !v.is_finite() {
+        return String::from("0");
+    }
+    let sci = format!("{:e}", v.abs());
+    let e: i32 = sci.split_once('e').and_then(|(_, e)| e.parse().ok()).unwrap_or(0);
+    if !(-5..16).contains(&e) {
+        let m = format!("{:.15e}", v);
+        let (mant, ex) = m.split_once('e').unwrap_or((m.as_str(), "0"));
+        let mant = trim_zeros(mant);
+        return format!("{mant}E{ex}");
+    }
+    let d = (15 - e).max(0) as usize;
+    let t = trim_zeros(&format!("{:.*}", d, v));
+    if t == "-0" {
         String::from("0")
+    } else {
+        t
+    }
+}
+
+fn trim_zeros(s: &str) -> String {
+    if s.contains('.') {
+        String::from(s.trim_end_matches('0').trim_end_matches('.'))
+    } else {
+        String::from(s)
+    }
+}
+
+/// the unit code even where it is a cell's default (Geometry and Scratch A..E have no default
+/// unit: Visio writes DL and DA there)
+fn unit_code(code: u8) -> Option<&'static str> {
+    match code {
+        0x30 => Some("DT"),
+        0x40 => Some("DL"),
+        0x50 => Some("DA"),
+        _ => unit_name(code),
     }
 }
 
@@ -347,19 +397,28 @@ fn value(d: &[u8], fl: &Field, ctx: &Ctx) -> Option<(String, Option<&'static str
     Some(match fl.k {
         Num => {
             let u = *d.get(at)?;
-            (num(f64at(d, at + 1)?), unit_name(u))
+            match u {
+                // a truth value, a string (an index into the object's strings), a colour index
+                0x61 => (format!("{}", u32at(d, at + 1)?), Some("BOOL")),
+                0xE8 => (ctx.string(u32at(d, at + 1)? as i32), Some("STR")),
+                0xFB => (format!("{}", u32at(d, at + 1)?), Some("COLOR")),
+                _ => {
+                    let keep = matches!(fl.name, "A" | "B" | "C" | "D" | "E");
+                    (num(f64at(d, at + 1)?), if keep { unit_code(u) } else { unit_name(u) })
+                }
+            }
         }
         Dbl => (num(f64at(d, at)?), None),
         Bool => (format!("{}", (*d.get(at)? != 0) as u8), None),
         Bit => (format!("{}", (*d.get(at)? >> fl.bit) & 1), None),
         U8 => (format!("{}", *d.get(at)?), None),
         U16 => (format!("{}", u16at(d, at)?), None),
-        I32 => (format!("{}", u32at(d, at)? as i32), None),
         Color => {
             let ix = *d.get(at)?;
             let rgb = d.get(at + 1..at + 4)?;
-            if ix == 0xFF {
-                (format!("#{:02X}{:02X}{:02X}", rgb[0], rgb[1], rgb[2]), None)
+            // the document's 24 colours by index, any other by its RGB
+            if ix >= 24 {
+                (format!("#{:02x}{:02x}{:02x}", rgb[0], rgb[1], rgb[2]), None)
             } else {
                 (format!("{ix}"), None)
             }
@@ -426,6 +485,9 @@ fn row_cells(bin: &mut Bin, l: &Layout, d: &[u8], ctx: &Ctx, fcx: &formula::Ctx,
                 f = None;
             }
         }
+        if unset == Unset::Inherit && f.is_none() && v.is_empty() && matches!(fl.k, Str) {
+            continue;
+        }
         let f = match (&f, block, local) {
             (None, None, false) => Some(String::from("No Formula")),
             _ => f,
@@ -447,6 +509,7 @@ fn rows_elem(ty: u32) -> Option<(&'static str, u8, bool)> {
         L_ACT => ("Act", 240, true),
         L_USER => ("User", 242, true),
         L_PROP => ("Prop", 243, true),
+        L_FIELD => ("Field", 8, false),
         _ => return None,
     })
 }
@@ -472,14 +535,15 @@ fn ordered<'o>(sec: &'o Obj, s: &[u8]) -> Vec<&'o Obj> {
 }
 
 // a name index (0xC9) of a list: (row ID, Name, NameU)
-fn list_names(bin: &Bin, sec: &Obj, s: &[u8]) -> Vec<(u32, Option<String>, Option<String>)> {
+fn list_names(names: &[String], sec: &Obj, s: &[u8]) -> Vec<(u32, Option<String>, Option<String>)> {
     let mut v = Vec::new();
     for k in sec.kids.iter().filter(|k| k.c.ty == C_NAMES) {
         let d = k.c.data(s);
         let n = u32at(d, 0).unwrap_or(0) as usize;
         for i in 0..n.min(d.len() / 13) {
             let (Some(a), Some(b), Some(r)) = (u32at(d, 4 + 13 * i), u32at(d, 8 + 13 * i), u32at(d, 12 + 13 * i)) else { break };
-            v.push((r, bin.name(a).map(String::from), bin.name(b).map(String::from)));
+            let get = |i: u32| names.get(i as usize).filter(|n| !n.is_empty()).cloned();
+            v.push((r, get(a), get(b)));
         }
     }
     v
@@ -549,12 +613,12 @@ fn sheet_with(bin: &mut Bin, o: &Obj, s: &[u8], ctx: &Ctx, fcx: &formula::Ctx) -
     }
     for sec in &o.kids {
         let Some((elem, _, is_named)) = rows_elem(sec.c.ty) else {
-            if !matches!(sec.c.ty, L_PROPS | L_GEOM | L_SHAPES | C_TEXT | C_STRINGS | 0x42 | L_TABS | L_LAYER | L_FIELD) {
+            if !matches!(sec.c.ty, L_PROPS | L_GEOM | L_SHAPES | C_TEXT | C_STRINGS | 0x42 | L_TABS | L_LAYER) {
                 bin.warn(format!("section 0x{:02X}", sec.c.ty));
             }
             continue;
         };
-        let rnames = if is_named { list_names(bin, sec, s) } else { Vec::new() };
+        let rnames = if is_named { list_names(fcx.names, sec, s) } else { Vec::new() };
         for (k, r) in ordered(sec, s).into_iter().enumerate() {
             let Some(l) = layout(r.c.ty) else {
                 bin.warn(format!("row 0x{:02X}", r.c.ty));
@@ -579,17 +643,31 @@ fn sheet_with(bin: &mut Bin, o: &Obj, s: &[u8], ctx: &Ctx, fcx: &formula::Ctx) -
             bin.out.end(elem)?;
         }
     }
-    text(bin, o, s)
+    text(bin, o, s, ctx)
 }
 
 // the text: [8 bytes][UTF-16, NUL-terminated]; the Character and Paragraph rows say how many
 // characters each runs over (the first word of their data; 0: to the end)
-fn text(bin: &mut Bin, o: &Obj, s: &[u8]) -> R<()> {
+fn text(bin: &mut Bin, o: &Obj, s: &[u8], ctx: &Ctx) -> R<()> {
     let Some(t) = o.kids.iter().find(|k| k.c.ty == C_TEXT) else { return Ok(()) };
     let d = t.c.data(s);
     let units: Vec<u16> = d.get(8..).unwrap_or(&[]).chunks_exact(2).map(|x| u16::from_le_bytes([x[0], x[1]])).take_while(|&u| u != 0).collect();
     if units.is_empty() {
-        return Ok(());
+        return bin.out.raw("<Text/>");
+    }
+    // the fields' values (a Field row's Value: a typed number holding a string index), in order:
+    // each U+FFFC of the text stands for the next one
+    let mut fields: Vec<String> = Vec::new();
+    for sec in o.kids.iter().filter(|k| k.c.ty == L_FIELD) {
+        for r in ordered(sec, s) {
+            let d = r.c.data(s);
+            let v = match d.get(7) {
+                Some(0xE8) => ctx.string(u32at(d, 8).unwrap_or(u32::MAX) as i32),
+                Some(_) => f64at(d, 8).map(num).unwrap_or_default(),
+                None => String::new(),
+            };
+            fields.push(v);
+        }
     }
     let runs = |ty: u32| -> Vec<usize> {
         let mut v = Vec::new();
@@ -627,8 +705,21 @@ fn text(bin: &mut Bin, o: &Obj, s: &[u8]) -> R<()> {
                 bin.out.raw(&format!("<pp IX='{k}'/>"))?;
             }
         }
+        if u == 0xFFFC {
+            flush(bin, &mut buf)?;
+            let k = cps_fields(&units[..i]);
+            bin.out.raw(&format!("<fld IX='{k}'>"))?;
+            bin.out.text(fields.get(k).map_or("", String::as_str))?;
+            bin.out.raw("</fld>")?;
+            continue;
+        }
         buf.push(u);
     }
     flush(bin, &mut buf)?;
     bin.out.raw("</Text>")
+}
+
+// the number of fields before a place in the text
+fn cps_fields(before: &[u16]) -> usize {
+    before.iter().filter(|&&u| u == 0xFFFC).count()
 }

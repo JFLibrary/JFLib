@@ -129,21 +129,21 @@ fn convert(bytes: &[u8], kind: DocKind, limits: &Limits) -> Result<(String, Vec<
         _ => Error::Binary { offset: 0, what: "the VisioDocument stream" },
     })?;
     let tree = stream::tree(&doc, limits)?;
-    let mut b = Bin { lim: limits, out: Out::new(limits.zip.part_bytes), names: Vec::new(), faces: Vec::new(), warnings: Vec::new(), more: 0, chunks: 0 };
+    let mut b = Bin { lim: limits, out: Out::new(limits.zip.part_bytes), names: Vec::new(), warnings: Vec::new(), more: 0, chunks: 0 };
     b.document(&tree.root, kind)?;
     let Bin { out, warnings, more, .. } = b;
     Ok((out.s, warnings, more))
 }
 
 /// a chunk with the chunks nested in it (by level)
-pub(super) struct Obj {
-    pub c: Chunk,
-    pub kids: Vec<Obj>,
+struct Obj {
+    c: Chunk,
+    kids: Vec<Obj>,
 }
 
 /// the chunks of a stream nested by their levels: a chunk belongs to the nearest chunk before it
 /// with a lower level
-pub(super) fn nest(chunks: &[Chunk]) -> Vec<Obj> {
+fn nest(chunks: &[Chunk]) -> Vec<Obj> {
     let mut top: Vec<Obj> = Vec::new();
     // the open chain: indices down from the last top-level object
     for &c in chunks {
@@ -161,13 +161,11 @@ pub(super) fn nest(chunks: &[Chunk]) -> Vec<Obj> {
 }
 
 // the reading of one file
-pub(super) struct Bin<'l> {
+struct Bin<'l> {
     lim: &'l Limits,
-    pub out: Out,
+    out: Out,
     // the strings of the name list, by their index
     names: Vec<String>,
-    // the font names, by their index
-    faces: Vec<String>,
     warnings: Vec<Warning>,
     more: usize,
     // chunks read so far
@@ -175,7 +173,7 @@ pub(super) struct Bin<'l> {
 }
 
 impl Bin<'_> {
-    pub fn warn(&mut self, what: String) {
+    fn warn(&mut self, what: String) {
         if self.warnings.iter().any(|w| matches!(w, Warning::LeftOut { what: x } if *x == what)) {
             return;
         }
@@ -196,13 +194,8 @@ impl Bin<'_> {
     }
 
     /// a string of the name list
-    pub fn name(&self, ix: u32) -> Option<&str> {
+    fn name(&self, ix: u32) -> Option<&str> {
         self.names.get(ix as usize).map(String::as_str).filter(|s| !s.is_empty())
-    }
-
-    /// a font name by its index
-    pub fn face(&self, ix: u32) -> Option<&str> {
-        self.faces.get(ix as usize).map(String::as_str).filter(|s| !s.is_empty())
     }
 
     fn document(&mut self, root: &Node, kind: DocKind) -> R<()> {
@@ -259,7 +252,6 @@ impl Bin<'_> {
         let Some(list) = root.kid(T_FACES) else { return Ok(()) };
         let Body::List { items, .. } = &list.body else { return Ok(()) };
         self.out.raw("<FaceNames>")?;
-        let mut faces = Vec::new();
         for (i, n) in items {
             if n.ty != T_FACE {
                 continue;
@@ -267,10 +259,6 @@ impl Bin<'_> {
             let Some(b) = n.blob() else { continue };
             let flags = u32at(b, 0).unwrap_or(0);
             let name = utf16z(b.get(4..68).unwrap_or(&[]));
-            while faces.len() < *i {
-                faces.push(String::new());
-            }
-            faces.push(name.clone());
             if name.is_empty() {
                 continue;
             }
@@ -286,7 +274,6 @@ impl Bin<'_> {
             self.out.attr("Flags", &format!("{flags}"));
             self.out.end_empty()?;
         }
-        self.faces = faces;
         self.out.raw("</FaceNames>")
     }
 
@@ -308,8 +295,17 @@ impl Bin<'_> {
             let (name, name_u) = names.iter().find(|n| n.2 == id).map_or((None, None), |n| (Some(n.0), Some(n.1)));
             self.out.open("StyleSheet");
             self.out.attr("ID", &format!("{id}"));
-            if let Some(n) = name_u.and_then(|i| self.name(i)).map(String::from) {
-                self.out.attr("NameU", &n);
+            // Visio's four styles of every document have no names in the file (the program gives
+            // them in its language): their universal names
+            let builtin = ["No Style", "Text Only", "None", "Normal"].get(id as usize).filter(|_| name_u.is_none()).copied();
+            match name_u.and_then(|i| self.name(i)).map(String::from) {
+                Some(n) => self.out.attr("NameU", &n),
+                None => {
+                    if let Some(b) = builtin {
+                        self.out.attr("NameU", b);
+                        self.out.attr("Name", b);
+                    }
+                }
             }
             if let Some(n) = name.and_then(|i| self.name(i)).map(String::from) {
                 self.out.attr("Name", &n);
@@ -339,7 +335,7 @@ impl Bin<'_> {
 
     fn masters(&mut self, root: &Node) -> R<()> {
         let Some(list) = root.kid(T_STENCILS) else { return Ok(()) };
-        let Body::List { items, order } = &list.body else { return Ok(()) };
+        let Body::List { items, order, .. } = &list.body else { return Ok(()) };
         // the name index of the masters: (Name, NameU, pointer index)
         let mut names: Vec<(u32, u32, u32)> = Vec::new();
         for (_, n) in items.iter().filter(|(_, n)| n.ty == T_NAME_INDEX) {
@@ -370,6 +366,28 @@ impl Bin<'_> {
         }
         if let Some(n) = name.as_ref().or(name_u.as_ref()) {
             self.out.attr("Name", n);
+        }
+        // the master's own header (the bytes of the list before its pointers): AlignName, IconSize,
+        // MasterType and BaseID (whose Data4 stands apart from Data1..3)
+        if let Some(h) = master_head(node) {
+            if let Some(&a) = h.get(8) {
+                self.out.attr("AlignName", &format!("{a}"));
+            }
+            if let Some(v) = u16at(h, 38) {
+                self.out.attr("IconSize", &format!("{v}"));
+            }
+            if let Some(v) = u16at(h, 40) {
+                self.out.attr("MasterType", &format!("{v}"));
+            }
+            if let (Some(d4), Some(d23), Some(d1)) = (h.get(28..36), h.get(48..52), h.get(52..56)) {
+                let mut g = [0u8; 16];
+                g[..4].copy_from_slice(d1);
+                g[4..8].copy_from_slice(d23);
+                g[8..].copy_from_slice(d4);
+                if let Some(t) = cells::guid(&g) {
+                    self.out.attr("BaseID", &t);
+                }
+            }
         }
         // the prompt: the first plain stream of type 0x0A (index 2)
         if let Some(b) = items.iter().find(|(i, n)| *i == 2 && n.ty == T_PROMPT).and_then(|(_, n)| n.blob()) {
@@ -483,7 +501,7 @@ impl Bin<'_> {
 }
 
 /// a NUL-terminated (or not) UTF-16 string
-pub(super) fn utf16z(b: &[u8]) -> String {
+fn utf16z(b: &[u8]) -> String {
     let units: Vec<u16> = b.chunks_exact(2).map(|x| u16::from_le_bytes([x[0], x[1]])).take_while(|&u| u != 0).collect();
     String::from_utf16_lossy(&units)
 }
@@ -497,4 +515,13 @@ fn name_index(d: &[u8]) -> Vec<(u32, u32, u32)> {
 // the same in a plain stream (after the length word of a compressed one)
 fn name_index_blob(b: &[u8]) -> Vec<(u32, u32, u32)> {
     name_index(b)
+}
+
+// the header of a master's list of streams: the bytes after the list's first word and before
+// its head
+fn master_head(node: &Node) -> Option<&[u8]> {
+    match &node.body {
+        Body::List { head, .. } => Some(head.as_slice()),
+        _ => None,
+    }
 }

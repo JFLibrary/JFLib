@@ -132,9 +132,10 @@ impl Pointer {
 pub(super) enum Body {
     /// plain bytes
     Blob(Vec<u8>),
-    /// further streams: in pointer order (gaps left out), and the order the list gives (indices
-    /// into the pointers as written, gaps counted)
-    List { items: Vec<(usize, Node)>, order: Vec<u32> },
+    /// further streams: in pointer order (gaps left out), the order the list gives (indices
+    /// into the pointers as written, gaps counted), and the list's own bytes before its head
+    /// (after its first word)
+    List { items: Vec<(usize, Node)>, order: Vec<u32>, head: Vec<u8> },
     /// a run of chunks
     Chunks(Vec<u8>),
 }
@@ -181,7 +182,6 @@ impl Node {
 
 /// the whole tree of a VisioDocument stream and its version
 pub(super) struct Tree {
-    pub version: u16,
     pub root: Node,
 }
 
@@ -210,7 +210,7 @@ pub(super) fn tree(doc: &[u8], lim: &Limits) -> R<Tree> {
     let trailer = Pointer::at(doc, 0x24).ok_or_else(|| bad(0x24, "header"))?;
     let mut w = Walk { doc, lim, total: 0, streams: 0, used: Vec::new() };
     let root = w.node(trailer, 0)?;
-    Ok(Tree { version, root })
+    Ok(Tree { root })
 }
 
 impl Walk<'_> {
@@ -262,7 +262,7 @@ impl Walk<'_> {
         let base = p.offset as usize;
         let shift = if p.compressed() { 4 } else { 0 };
         if bytes.is_empty() {
-            return Ok(Body::List { items: Vec::new(), order: Vec::new() });
+            return Ok(Body::List { items: Vec::new(), order: Vec::new(), head: Vec::new() });
         }
         let head = u32at(bytes, shift).ok_or_else(|| bad(base, "a list without head"))? as usize;
         let at = head.checked_add(shift).filter(|&a| a >= 4).ok_or_else(|| bad(base, "a list's head"))?;
@@ -281,7 +281,8 @@ impl Walk<'_> {
         }
         let order = (0..order_len).filter_map(|k| u32at(bytes, end + 4 * k)).filter(|&ix| (ix as usize) < count).collect();
         let _ = order_end;
-        Ok(Body::List { items, order })
+        let head = bytes.get(shift + 4..at - 4).unwrap_or(&[]).to_vec();
+        Ok(Body::List { items, order, head })
     }
 }
 
