@@ -381,6 +381,7 @@ fn wizard(app: &mut Diagrammer, ui: &mut Ui) {
         (DLG_PRIMARY, _) => {
             app.textdraw.wizard.set(0);
             finish(app, ui);
+            release(&mut app.textdraw);
             ui.repass();
         }
         (DLG_SECONDARY, _) => {
@@ -390,10 +391,20 @@ fn wizard(app: &mut Diagrammer, ui: &mut Ui) {
         }
         (DLG_CLOSE, _) => {
             app.textdraw.wizard.set(0);
+            release(&mut app.textdraw);
             ui.repass();
         }
         _ => {}
     }
+}
+
+// the wizard closed: the text and the plan are not kept (a file may be large)
+fn release(st: &mut TextDrawState) {
+    st.text = String::new();
+    st.plan = Plan::default();
+    st.pick.clear();
+    st.cands1.clear();
+    st.cands2.clear();
 }
 
 // step 1: the records and the problems
