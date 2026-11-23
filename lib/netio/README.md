@@ -71,20 +71,35 @@ application protocol (ALPN; https offers http/1.1). Mutual authentication works 
 of key, HelloRetryRequest and key updates both ways. A client that talks to public servers
 (`Trust::System`, or `Trust::Custom` with a check of the program's own: a PKI of its own, pinning,
 Certificate Transparency) also falls back to TLS 1.2 with ECDHE and AEAD suites only, the extended
-master secret (when the server has it; without resumption and renegotiation a server without it is
-safe to take) and the TLS 1.3 downgrade check; other connections never fall back. Not here yet:
-session resumption, 0-RTT, OCSP stapling; not here at all: renegotiation. The server is checked
-against tlsfuzzer with RSA, ECDSA and Ed25519 certificates and against OpenSSL's client, the
-client against TLS-Anvil and OpenSSL's server
+master secret (when the server has it; without TLS 1.2 resumption and renegotiation a server
+without it is safe to take) and the TLS 1.3 downgrade check; other connections never fall back.
+
+TLS 1.3 sessions resume with tickets: a server with `ServerConfig::tickets` (`Tickets`: stateless
+tickets under keys that rotate by themselves, or keys shared by several servers) sends two after
+each handshake, and a client with `ClientConfig::sessions` (`Sessions`, kept per server name,
+trust and client identity, each ticket used once) offers one; the handshake keeps a fresh key
+exchange (psk_dhe_ke) and skips the certificates, a session lasts at most 7 days from the handshake
+that authenticated it, and a resumed server keeps the client's certificate. https resumes by
+itself (`trust::system_connector`, `trust::connector` with a CA). 0-RTT is the server's choice
+(`ServerConfig::early_data`): `tls::connect_early` sends a request with the ClientHello, the
+server takes it only fresh and the first time it sees it, and hands it apart (`read_early`),
+since early data can be replayed. Not here yet: OCSP stapling; not here at all: renegotiation,
+external PSKs, TLS 1.2 resumption. The server is checked against tlsfuzzer with RSA, ECDSA and
+Ed25519 certificates and against OpenSSL's client, curl and Python, the client against TLS-Anvil
+and OpenSSL's server
 ([docs/EXTERNAL_SUITES.md](https://github.com/JFLibrary/JFLib/blob/main/docs/EXTERNAL_SUITES.md)).
 
 ```rust
-use jflib::netio::tls::{self, Identity, ServerConfig};
+use jflib::netio::tls::{self, ClientConfig, Identity, ServerConfig};
 
 // a certificate chain and its key as a CA hands them out (PEM), HTTP/1.1 by ALPN
 let identity = Identity::from_pem(&chain_pem, &key_pem)?; // Result<Identity, String>
 let cfg = ServerConfig { alpn: vec![String::from("http/1.1")], ..ServerConfig::new(identity) };
 let tls = tls::accept(Box::new(tcp), cfg.clone()); // Result<TlsStream, TlsError>
+
+// resumption: one Tickets for all connections of the server, one Sessions for a client's
+let cfg = ServerConfig { tickets: Some(Arc::new(tls::Tickets::new())), ..cfg };
+let client = ClientConfig { sessions: Some(Arc::new(tls::Sessions::default())), ..ClientConfig::new(trust, "host") };
 ```
 
 `netio::x509` (the crate [`jflib-x509`](https://docs.rs/jflib-x509), which netpkt shares) parses

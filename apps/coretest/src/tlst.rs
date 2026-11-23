@@ -227,10 +227,12 @@ fn server_records(t: &mut T) {
     between.extend(record(23, &[]));
     between.extend(record(22, &ch[2..]));
     t.check("server records: an empty application_data record inside the ClientHello is refused", alert(&feed(&between).0) == Some(tls::conn::AL_UNEXPECTED_MESSAGE));
-    // pre_shared_key (an identity, a binder) must be the last extension (RFC 8446 4.2.11)
+    // pre_shared_key (an identity, a binder) must be the last extension (RFC 8446 4.2.11), and
+    // comes with psk_key_exchange_modes (4.2.9, 9.2)
+    let modes = [0u8, 45, 0, 2, 1, 1];
     let mut psk = alloc::vec![0, 41, 0, 45, 0, 8, 0, 2, b'i', b'd', 0, 0, 0, 0, 0, 33, 32];
     psk.extend_from_slice(&[7u8; 32]);
-    let with_psk = |first: bool| {
+    let with_psk = |first: bool, with_modes: bool| {
         // legacy_version, random, session id, suites, compression, then the extensions
         let sid = 4 + 2 + 32;
         let suites = sid + 1 + ch[sid] as usize;
@@ -242,6 +244,9 @@ fn server_records(t: &mut T) {
             m.extend_from_slice(&ch[exts + 2..]);
         } else {
             m.extend_from_slice(&ch[exts + 2..]);
+            if with_modes {
+                m.extend_from_slice(&modes);
+            }
             m.extend_from_slice(&psk);
         }
         let ext_len = m.len() - exts - 2;
@@ -250,8 +255,9 @@ fn server_records(t: &mut T) {
         m[1..4].copy_from_slice(&(body as u32).to_be_bytes()[1..]);
         record(22, &m)
     };
-    t.check("server records: pre_shared_key as the last extension is taken (and ignored)", feed(&with_psk(false)).0.is_ok());
-    t.check("server records: pre_shared_key before another extension is refused", alert(&feed(&with_psk(true)).0) == Some(tls::conn::AL_ILLEGAL_PARAMETER));
+    t.check("server records: pre_shared_key as the last extension is taken (a ticket not ours: ignored)", feed(&with_psk(false, true)).0.is_ok());
+    t.check("server records: pre_shared_key before another extension is refused", alert(&feed(&with_psk(true, true)).0) == Some(tls::conn::AL_ILLEGAL_PARAMETER));
+    t.check("server records: pre_shared_key without psk_key_exchange_modes is missing_extension", alert(&feed(&with_psk(false, false)).0) == Some(tls::conn::AL_MISSING_EXTENSION));
 }
 
 /// a server's first flight with one extension more in its ServerHello (the first record, put
@@ -550,16 +556,37 @@ pub fn write_pki(dir: &str) -> i32 {
     if ok { 0 } else { 1 }
 }
 
-/// --tls-serve PORT [--mtls]: answer one HTTPS request per connection (for curl / openssl)
+/// --tickets [--early N]: session tickets of the --tls-* server modes, and 0-RTT of up to N bytes
+fn mode_tickets() -> (Option<Arc<tls::Tickets>>, u32) {
+    let on = plat::args().iter().any(|a| a == "--tickets");
+    let early = plat::arg_value("--early").and_then(|n| n.parse().ok()).unwrap_or(0);
+    (on.then(|| Arc::new(tls::Tickets::new())), early)
+}
+
+/// --tls-serve PORT [--mtls] [--tickets [--early N]]: answer one HTTPS request per connection
+/// (for curl / openssl)
 pub fn serve(port: u16, mtls: bool) -> i32 {
     let p = mode_pki();
     // --mtls-optional: a client certificate asked for, not required
     let optional = plat::args().iter().any(|a| a == "--mtls-optional");
     let client_auth = if mtls || optional { Some(Trust::Anchors(alloc::vec![p.ca.clone()])) } else { None };
-    let scfg = ServerConfig { client_auth, client_auth_optional: optional, alpn: mode_alpn(), identities: mode_more(), ..ServerConfig::new(p.server.clone()) };
+    let (tickets, early_data) = mode_tickets();
+    let scfg = ServerConfig {
+        client_auth,
+        client_auth_optional: optional,
+        alpn: mode_alpn(),
+        identities: mode_more(),
+        tickets,
+        early_data,
+        ..ServerConfig::new(p.server.clone())
+    };
+    // the answer names the client certificate and a resumption: "JFLib tls ok agent-1 resumed"
     let wrap: netio::server::Wrap = Arc::new(move |tcp: TcpStream| match tls::accept(Box::new(tcp), scfg.clone()) {
         Ok(s) => {
-            let who = s.peer_certs().first().map(|c| c.subject_cn.clone());
+            let mut who = s.peer_certs().first().map(|c| c.subject_cn.clone());
+            if s.resumed() {
+                who = Some(format!("{} resumed", who.unwrap_or_default()).trim_start().into());
+            }
             Some((Box::new(s) as Box<dyn Stream>, who))
         }
         Err(e) => {
@@ -581,7 +608,8 @@ pub fn serve(port: u16, mtls: bool) -> i32 {
 /// `openssl s_server -rev`, which keeps the length too).  Four threads take the connections
 pub fn echo(port: u16) -> i32 {
     let p = mode_pki();
-    let scfg = ServerConfig::new(p.server.clone());
+    let (tickets, early_data) = mode_tickets();
+    let scfg = ServerConfig { tickets, early_data, ..ServerConfig::new(p.server.clone()) };
     let Ok(l) = TcpListener::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, port)) else { return 1 };
     let l = Arc::new(l);
     let mut threads = Vec::new();
@@ -612,31 +640,51 @@ pub fn echo(port: u16) -> i32 {
     1
 }
 
-/// --tls-get HOST PORT [--mtls]: one HTTPS GET against an OpenSSL server -> the body on stdout
+/// --tls-get HOST PORT [--mtls] [--resume N [--early]]: one HTTPS GET against an OpenSSL
+/// server -> the body on stdout.  --resume N: N connections one after another, sharing their
+/// tickets, each body after a line "--- connection I: resumed R, early E" (E: the bytes of the
+/// request the server took as 0-RTT); --early sends the request as 0-RTT when a ticket allows
 pub fn get(host: &str, port: u16, mtls: bool) -> i32 {
     let p = mode_pki();
-    let cfg = ClientConfig { identity: if mtls { Some(p.client.clone()) } else { None }, alpn: mode_alpn(), ..ClientConfig::new(Trust::Anchors(alloc::vec![p.ca.clone()]), host) };
-    let Ok(tcp) = TcpStream::connect(&SocketAddr::new(IpAddr::LOCALHOST_V4, port), 3000) else { return 3 };
-    tcp.set_read_timeout(Some(5000));
-    match tls::connect(Box::new(tcp), cfg) {
-        Ok(s) => {
-            let _ = s.write_all(format!("GET / HTTP/1.0\r\nHost: {}\r\n\r\n", host).as_bytes());
-            let mut out = Vec::new();
-            let mut b = [0u8; 4096];
-            while let Ok(n) = s.read(&mut b) {
-                if n == 0 {
-                    break;
+    let runs: usize = plat::arg_value("--resume").and_then(|n| n.parse().ok()).unwrap_or(0);
+    let early = plat::args().iter().any(|a| a == "--early");
+    let sessions = (runs > 0).then(|| Arc::new(tls::Sessions::default()));
+    let cfg = ClientConfig {
+        identity: if mtls { Some(p.client.clone()) } else { None },
+        alpn: mode_alpn(),
+        sessions,
+        ..ClientConfig::new(Trust::Anchors(alloc::vec![p.ca.clone()]), host)
+    };
+    let req = format!("GET / HTTP/1.0\r\nHost: {}\r\n\r\n", host);
+    for i in 0..runs.max(1) {
+        let Ok(tcp) = TcpStream::connect(&SocketAddr::new(IpAddr::LOCALHOST_V4, port), 3000) else { return 3 };
+        tcp.set_read_timeout(Some(5000));
+        let r = if early { tls::connect_early(Box::new(tcp), cfg.clone(), req.as_bytes()) } else { tls::connect(Box::new(tcp), cfg.clone()).map(|s| (s, 0)) };
+        match r {
+            Ok((s, taken)) => {
+                let _ = s.write_all(&req.as_bytes()[taken..]);
+                let mut out = Vec::new();
+                let mut b = [0u8; 4096];
+                while let Ok(n) = s.read(&mut b) {
+                    if n == 0 {
+                        break;
+                    }
+                    out.extend_from_slice(&b[..n]);
                 }
-                out.extend_from_slice(&b[..n]);
+                // close_notify: OpenSSL forgets a session that ends without it
+                s.shutdown();
+                if runs > 0 {
+                    plat::write_stdout(format!("--- connection {}: resumed {}, early {}\n", i + 1, s.resumed(), taken).as_bytes());
+                }
+                plat::write_stdout(&out);
             }
-            plat::write_stdout(&out);
-            0
-        }
-        Err(e) => {
-            plat::write_stderr(format!("tls: {}\n", e).as_bytes());
-            1
+            Err(e) => {
+                plat::write_stderr(format!("tls: {}\n", e).as_bytes());
+                return 1;
+            }
         }
     }
+    0
 }
 
 /// --tls-anvil-client PORT: one connection of netio's web client (TLS 1.3 and the TLS 1.2

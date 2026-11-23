@@ -138,6 +138,34 @@ fn client_hellos() -> Vec<Vec<u8>> {
     out
 }
 
+/// the tickets of tls_server_psk: fixed keys, so the seeds' tickets open in every run
+fn psk_tickets() -> std::sync::Arc<netio::tls::Tickets> {
+    let tk = std::sync::Arc::new(netio::tls::Tickets::new());
+    tk.set_keys(&[[3; 32]]);
+    tk
+}
+
+fn psk_server(tk: &std::sync::Arc<netio::tls::Tickets>) -> netio::tls::ServerConfig {
+    netio::tls::ServerConfig { tickets: Some(tk.clone()), early_data: 4096, ..netio::tls::ServerConfig::new(tls_ids()) }
+}
+
+/// ClientHellos that offer a ticket of psk_tickets, one with 0-RTT data behind it
+fn psk_hellos(tk: &std::sync::Arc<netio::tls::Tickets>) -> Vec<Vec<u8>> {
+    let ss = std::sync::Arc::new(netio::tls::Sessions::default());
+    let ccfg = || netio::tls::ClientConfig { sessions: Some(ss.clone()), ..netio::tls::ClientConfig::new(netio::tls::Trust::Any, "a.lab") };
+    let mut c = netio::tls::Conn::client(ccfg());
+    let mut s = netio::tls::Conn::server(psk_server(tk));
+    for _ in 0..10 {
+        let a = c.take_out();
+        let _ = s.feed(&a);
+        let b = s.take_out();
+        let _ = c.feed(&b);
+    }
+    let mut out = vec![netio::tls::Conn::client(ccfg()).take_out()];
+    out.push(netio::tls::Conn::client_early(ccfg(), b"GET / HTTP/1.1\r\nHost: a.lab\r\n\r\n").take_out());
+    out
+}
+
 fn server_flight() -> Vec<Vec<u8>> {
     let mut c = netio::tls::Conn::client(netio::tls::ClientConfig::new(netio::tls::Trust::Any, "a.lab"));
     let mut s = netio::tls::Conn::server(netio::tls::ServerConfig::new(tls_ids()));
@@ -588,6 +616,8 @@ pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
     let certs = pem_certs(seed_dir);
     let anchors: Vec<netio::x509::Cert> = certs.iter().filter_map(|c| netio::x509::Cert::parse(c)).take(20).collect();
     let id = tls_ids();
+    let tk = psk_tickets();
+    let pcfg = psk_server(&tk);
     vec![
         // a deliberate panic on inputs that start with 0xEE: the run must find it (net_fuzz.py)
         ("selftest_panic", vec![b"seed".to_vec()], Box::new(|d: &[u8]| {
@@ -641,6 +671,14 @@ pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
             let mut s = netio::tls::Conn::server(netio::tls::ServerConfig::new(id.clone()));
             let _ = s.feed(d);
             let _ = s.take_out();
+        })),
+        // with tickets and 0-RTT: the pre_shared_key, its binders, the tickets, the early data
+        ("tls_server_psk", psk_hellos(&tk), Box::new(move |d: &[u8]| {
+            let mut s = netio::tls::Conn::server(pcfg.clone());
+            let _ = s.feed(d);
+            let _ = s.take_out();
+            let mut b = [0u8; 64];
+            let _ = s.read_early(&mut b);
         })),
         ("tls_client", server_flight(), Box::new(|d: &[u8]| {
             let mut c = netio::tls::Conn::client(netio::tls::ClientConfig::new(netio::tls::Trust::Any, "a.lab"));

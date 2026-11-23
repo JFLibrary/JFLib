@@ -9,8 +9,9 @@
 //   server     Server::start(addr, ServerConfig, handler): accept thread + worker pool
 //   client     Client::request(...): blocking, timeouts, size limit
 //   tls        TLS 1.3 servers and clients (ChaCha20-Poly1305, AES-GCM; X25519MLKEM768,
-//              X25519, P-256, P-384; Ed25519, ECDSA, RSA keys; SNI, ALPN, mutual auth) and the
-//              TLS 1.2 fallback for public servers: connect / accept -> TlsStream (a Stream)
+//              X25519, P-256, P-384; Ed25519, ECDSA, RSA keys; SNI, ALPN, mutual auth;
+//              resumption with tickets, 0-RTT where the server allows it) and the TLS 1.2
+//              fallback for public servers: connect / accept -> TlsStream (a Stream)
 //   x509 / der the crate jflib-x509 (re-exported): certificates (parse, build with any key,
 //              verify chains) of a private CA and of the web PKI; PrivateKey (PKCS #8 ...)
 //   pem        PEM blocks

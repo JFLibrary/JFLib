@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import net_fuzz  # noqa: E402
 
 NAMES = ["zstd", "lz4", "deflate", "zlib", "gzip", "brotli", "json", "xml", "charsets", "x509", "x509_netpkt", "dns",
-         "dns_netpkt", "http_netio", "http_netpkt", "tls_server", "tls_client", "tls_webclient", "ipv4_reassembly",
+         "dns_netpkt", "http_netio", "http_netpkt", "tls_server", "tls_server_psk", "tls_client", "tls_webclient", "ipv4_reassembly",
          "ipv6_reassembly", "netpkt_decode", "netpkt_app", "netchan_packet", "netchan_server", "netchan_client",
          "netchan_open", "plat_clipboard"] + (["plat_dbus", "plat_wayland"] if sys.platform.startswith("linux") else [])
 

@@ -21,9 +21,14 @@
 // master secret when the server has it and the TLS 1.3 downgrade check.  Other connections
 // never fall back.
 //
-// No PSK, no 0-RTT, no session tickets (a client ignores them), no renegotiation;
-// post-handshake KeyUpdate is supported.  Every protocol error ends the connection with the
-// matching alert.
+// Resumption (TLS 1.3, RFC 8446 2.2, 4.6.1): a server with ServerConfig::tickets sends session
+// tickets after the client's Finished and takes them back with psk_dhe_ke (the PSK and a fresh
+// key exchange); a client with ClientConfig::sessions keeps the tickets it gets and offers one.
+// 0-RTT (2.3, 4.2.10) when the server allows it (ServerConfig::early_data): the client sends
+// data right after its ClientHello, the server takes it only from a fresh ClientHello it has
+// not seen (8.2, 8.3) and hands it apart from the rest (read_early).  No external PSKs, no
+// psk_ke, no TLS 1.2 resumption, no renegotiation; post-handshake KeyUpdate is supported.
+// Every protocol error ends the connection with the matching alert.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -33,6 +38,7 @@ use super::kx::{self, Share, SECP256R1, SECP256R1_MLKEM768, SECP384R1, SECP384R1
 use super::record::{self, Cipher, ALERT, APPLICATION_DATA, CHANGE_CIPHER_SPEC, HANDSHAKE, MAX_PLAIN, MAX_RECORD};
 use super::record::{ECDHE_ECDSA_AES128_GCM, ECDHE_ECDSA_AES256_GCM, ECDHE_ECDSA_CHACHA20, ECDHE_RSA_AES128_GCM, ECDHE_RSA_AES256_GCM, ECDHE_RSA_CHACHA20};
 use super::record::{TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256};
+use super::session::{self, Session, TicketData, Tickets, FRESH_WINDOW_MS, MAX_LIFETIME};
 use super::{ClientConfig, Hello, Identity, ServerConfig, TlsError, Trust};
 use crate::x509::{verify_chain, Cert, PrivateKey, PubKey, SigAlg, Usage};
 use crypto::ecdsa::Curve;
@@ -63,9 +69,16 @@ const EXT_EMS: u16 = 23;
 const EXT_COOKIE: u16 = 44;
 const EXT_EARLY_DATA: u16 = 42;
 const EXT_PSK: u16 = 41;
+const EXT_PSK_MODES: u16 = 45;
 const EXT_PADDING: u16 = 21;
-/// early data a server skips (it never accepts 0-RTT, RFC 8446 4.2.10): at most this many bytes
+/// psk_key_exchange_modes: the PSK with a fresh (EC)DHE / hybrid key exchange, the only mode
+/// taken (psk_ke would give up forward secrecy)
+const PSK_DHE_KE: u8 = 1;
+/// early data a server skips when it does not take it (RFC 8446 4.2.10): at least this many
+/// bytes, more when ServerConfig::early_data allows more
 const MAX_EARLY_SKIP: usize = 4 * 16384;
+/// the longest ticket a client keeps (a ClientHello must still fit around it)
+const MAX_TICKET: usize = 32 * 1024;
 const EXT_VERSIONS: u16 = 43;
 const EXT_KEY_SHARE: u16 = 51;
 const EXT_RENEGOTIATION_INFO: u16 = 0xff01;
@@ -74,6 +87,7 @@ const HS_HELLO_REQUEST: u8 = 0;
 const HS_CLIENT_HELLO: u8 = 1;
 const HS_SERVER_HELLO: u8 = 2;
 const HS_NEW_SESSION_TICKET: u8 = 4;
+const HS_END_OF_EARLY_DATA: u8 = 5;
 const HS_ENCRYPTED_EXTENSIONS: u8 = 8;
 const HS_CERTIFICATE: u8 = 11;
 const HS_SERVER_KEY_EXCHANGE: u8 = 12;
@@ -135,6 +149,10 @@ impl<'a> R<'a> {
     fn u16(&mut self) -> Result<u16, TlsError> {
         let b = self.take(2)?;
         Ok(u16::from_be_bytes([b[0], b[1]]))
+    }
+    fn u32(&mut self) -> Result<u32, TlsError> {
+        let b = self.take(4)?;
+        Ok(u32::from_be_bytes([b[0], b[1], b[2], b[3]]))
     }
     fn u24(&mut self) -> Result<usize, TlsError> {
         let b = self.take(3)?;
@@ -311,11 +329,24 @@ enum State {
     Client12Ccs,
     Client12Fin,
     ServerCh,
+    /// 0-RTT taken: early data until the client's EndOfEarlyData
+    ServerEarly,
     ServerClientCert,
     ServerClientCv,
     ServerFinished,
     Established,
     Closed,
+}
+
+/// 0-RTT of a connection
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Early {
+    /// not offered
+    No,
+    /// a client sent early data, the server has not answered yet
+    Offered,
+    Accepted,
+    Rejected,
 }
 
 pub struct Conn {
@@ -385,13 +416,39 @@ pub struct Conn {
     /// a server: the name the client asked for (SNI), and the identity it shows
     sni: String,
     identity: Option<Identity>,
+    /// a client: the session it offers (ClientConfig::sessions) and the key it keeps new
+    /// tickets under
+    offer: Option<Session>,
+    session_key: [u8; 32],
+    /// the PSK of a resumption (a client's offer, a server's ticket) and whether it was taken
+    psk: Option<Vec<u8>>,
+    resumed: bool,
+    /// the secret of the tickets ("res master", RFC 8446 7.1)
+    res_master: Secret,
+    /// when the handshake that authenticated the peer ran (Unix seconds): this one's, or the
+    /// session's; tickets carry it on
+    auth_s: i64,
+    /// the tickets a server sent on this connection (their nonces)
+    tickets_sent: u8,
+    /// 0-RTT: a client's data until the ClientHello goes, then the bytes sent; a server's data
+    /// received (read_early), its count and limit
+    early: Early,
+    early_out: Vec<u8>,
+    early_len: usize,
+    early_max: usize,
+    early_in: Vec<u8>,
+    /// a client: the 0-RTT key, for its data and its EndOfEarlyData
+    early_wr: Option<Cipher>,
 }
 
 // the secrets of the key schedule are wiped when the connection goes
 impl Drop for Conn {
     fn drop(&mut self) {
-        for s in [&mut self.c_hs, &mut self.s_hs, &mut self.c_ap, &mut self.s_ap, &mut self.master] {
+        for s in [&mut self.c_hs, &mut self.s_hs, &mut self.c_ap, &mut self.s_ap, &mut self.master, &mut self.res_master] {
             crypto::zeroize(s);
+        }
+        if let Some(p) = self.psk.as_mut() {
+            crypto::zeroize(p);
         }
         crypto::zeroize(&mut self.master12);
         if let Some(p) = self.pms.as_mut() {
@@ -448,6 +505,19 @@ impl Conn {
             alpn: None,
             sni: String::new(),
             identity: None,
+            offer: None,
+            session_key: [0; 32],
+            psk: None,
+            resumed: false,
+            res_master: Vec::new(),
+            auth_s: 0,
+            tickets_sent: 0,
+            early: Early::No,
+            early_out: Vec::new(),
+            early_len: 0,
+            early_max: 0,
+            early_in: Vec::new(),
+            early_wr: None,
         }
     }
 
@@ -474,16 +544,30 @@ impl Conn {
     }
 
     pub fn client(cfg: ClientConfig) -> Conn {
+        Conn::client_early(cfg, &[])
+    }
+
+    /// a client that sends `early` as 0-RTT data right after its ClientHello when a session of
+    /// cfg.sessions allows it (as much as the session takes); early_taken() says after the
+    /// handshake what the server took.  Empty: Conn::client
+    pub fn client_early(cfg: ClientConfig, early: &[u8]) -> Conn {
         let mut c = Conn::new(false);
         c.session_id = Vec::from(&plat::random_bytes::<32>()[..]);
         c.client_random = plat::random_bytes();
         c.web = matches!(cfg.trust, Trust::System(_) | Trust::Custom(_));
+        if let Some(cache) = cfg.sessions.as_ref() {
+            c.session_key = session::session_key(&cfg);
+            c.offer = cache.take(&c.session_key);
+        }
+        c.early_out = Vec::from(early);
         c.ccfg = Some(cfg);
         // a ClientHello too long to send (a server name of tens of KiB): the connection is
         // closed before it begins
         if c.send_client_hello().is_err() {
             c.state = State::Closed;
         }
+        crypto::zeroize(&mut c.early_out);
+        c.early_out = Vec::new();
         c
     }
 
@@ -495,6 +579,45 @@ impl Conn {
 
     pub fn established(&self) -> bool {
         self.state == State::Established
+    }
+
+    /// the connection carries data: established, or a server that took 0-RTT and sent its
+    /// flight (it may read the early data and answer before the client's Finished, RFC 8446
+    /// 4.2.10; read_plain gives data only once the handshake is done)
+    pub fn ready(&self) -> bool {
+        self.established() || (self.server && self.early == Early::Accepted && matches!(self.state, State::ServerEarly | State::ServerFinished))
+    }
+
+    /// the handshake took a ticket (a PSK) instead of certificates
+    pub fn resumed(&self) -> bool {
+        self.resumed
+    }
+
+    /// a client: the bytes of its 0-RTT data the server took (0: none sent, the server refused
+    /// them, or it has not answered yet)
+    pub fn early_taken(&self) -> usize {
+        if !self.server && self.early == Early::Accepted { self.early_len } else { 0 }
+    }
+
+    /// a server: 0-RTT data may still come (it took 0-RTT and the client's EndOfEarlyData has
+    /// not come)
+    pub fn in_early(&self) -> bool {
+        self.server && self.state == State::ServerEarly
+    }
+
+    /// a server: 0-RTT data received and not read yet
+    pub fn has_early(&self) -> bool {
+        !self.early_in.is_empty()
+    }
+
+    /// a server: read 0-RTT data (data an attacker may have replayed, RFC 8446 8: for requests
+    /// that do no harm twice); what is not read here comes first from read_plain once the
+    /// handshake is done
+    pub fn read_early(&mut self, buf: &mut [u8]) -> usize {
+        let n = buf.len().min(self.early_in.len());
+        buf[..n].copy_from_slice(&self.early_in[..n]);
+        self.early_in.drain(..n);
+        n
     }
 
     pub fn closed(&self) -> bool {
@@ -537,7 +660,7 @@ impl Conn {
     }
 
     pub fn write_plain(&mut self, data: &[u8]) -> Result<(), TlsError> {
-        if self.state != State::Established {
+        if !self.ready() {
             return Err(TlsError::Closed);
         }
         for chunk in data.chunks(MAX_PLAIN) {
@@ -604,9 +727,17 @@ impl Conn {
 
     /// the TLS 1.3 record keys of a traffic secret for the negotiated suite
     fn cipher13(&self, secret: &Secret) -> Result<Cipher, TlsError> {
-        let (kl, _) = record::key_iv_len(self.suite).ok_or(fail(AL_INTERNAL_ERROR, "suite"))?;
-        let (k, iv) = keysched::traffic_keys_len(self.hash_alg, secret, kl);
-        Cipher::for_suite(self.suite, &k, &iv, false).ok_or(fail(AL_INTERNAL_ERROR, "suite"))
+        cipher_of(self.suite, secret)
+    }
+
+    /// a handshake message after the handshake (NewSessionTicket), under the write key; not part
+    /// of the transcript
+    fn send_post_hs(&mut self, msg: &[u8]) -> Result<(), TlsError> {
+        for part in msg.chunks(MAX_PLAIN) {
+            let rec = self.wr.as_mut().ok_or(TlsError::Closed)?.seal(HANDSHAKE, part);
+            self.out.extend_from_slice(&rec);
+        }
+        Ok(())
     }
 
     /// the new read key (every change counts, see handshake_bytes)
@@ -715,6 +846,15 @@ impl Conn {
                     match inner {
                         HANDSHAKE => self.handshake_bytes(&content)?,
                         ALERT => self.peer_alert(&content)?,
+                        // 0-RTT taken: early data, at most what the ticket allows (RFC 8446 4.6.1)
+                        APPLICATION_DATA if self.state == State::ServerEarly => {
+                            self.whole_messages()?;
+                            self.early_len += content.len();
+                            if self.early_len > self.early_max {
+                                return Err(fail(AL_UNEXPECTED_MESSAGE, "more early data than the ticket allows"));
+                            }
+                            self.early_in.extend_from_slice(&content);
+                        }
                         APPLICATION_DATA => {
                             if self.state != State::Established {
                                 return Err(fail(AL_UNEXPECTED_MESSAGE, "data during the handshake"));
@@ -824,11 +964,14 @@ impl Conn {
                 let mut r = R { b: body };
                 let exts = extensions(r.v16()?)?;
                 r.done()?;
-                // server_name (empty: the server used the name), the server's supported_groups, ALPN
-                self.server_exts(&exts, &[EXT_SERVER_NAME, EXT_GROUPS, EXT_ALPN])?;
+                // server_name (empty: the server used the name), the server's supported_groups,
+                // ALPN, early_data (0-RTT taken)
+                self.server_exts(&exts, &[EXT_SERVER_NAME, EXT_GROUPS, EXT_ALPN, EXT_EARLY_DATA])?;
                 self.server_alpn(&exts)?;
+                self.client_early_answer(&exts)?;
                 self.add(msg);
-                self.state = State::ClientCertOrCr;
+                // a resumption has no certificates: the server's Finished comes next
+                self.state = if self.resumed { State::ClientFinished } else { State::ClientCertOrCr };
                 Ok(())
             }
             (State::ClientCertOrCr, HS_CERTIFICATE_REQUEST) => {
@@ -895,6 +1038,29 @@ impl Conn {
                 let c = self.cipher13(&self.c_ap)?;
                 self.set_rd(Some(c));
                 self.state = State::Established;
+                // 0-RTT data not read during the handshake comes first now
+                if !self.early_in.is_empty() {
+                    let rest = core::mem::take(&mut self.plain);
+                    self.plain = core::mem::take(&mut self.early_in);
+                    self.plain.extend_from_slice(&rest);
+                }
+                self.res_master = keysched::derive(self.hash_alg, &self.master, "res master", &self.hash());
+                crypto::zeroize(&mut self.master);
+                if !self.resumed {
+                    let now = self.scfg.as_ref().and_then(|c| c.tickets.as_ref()).map(|t| t.now_ms()).unwrap_or_else(|| plat::unix_time_ns().div_euclid(1_000_000));
+                    self.auth_s = now.div_euclid(1000);
+                }
+                self.send_tickets()
+            }
+            // the client's 0-RTT ends: its handshake messages come under the handshake key
+            (State::ServerEarly, HS_END_OF_EARLY_DATA) => {
+                if !body.is_empty() {
+                    return Err(fail(AL_DECODE_ERROR, "end_of_early_data"));
+                }
+                self.add(msg);
+                let c = self.cipher13(&self.c_hs)?;
+                self.set_rd(Some(c));
+                self.state = State::ServerFinished;
                 Ok(())
             }
             // ------------------------------------------------ TLS 1.2 (client)
@@ -947,7 +1113,8 @@ impl Conn {
                 self.alert(AL_NO_RENEGOTIATION, false);
                 Ok(())
             }
-            (State::Established, HS_NEW_SESSION_TICKET) if !self.server => Ok(()), // no resumption
+            // TLS 1.2 tickets come during the handshake, and only to a client that asked for them
+            (State::Established, HS_NEW_SESSION_TICKET) if !self.server && !self.v12 => self.new_session_ticket(body),
             (State::Established, HS_KEY_UPDATE) if !self.v12 => {
                 let mut r = R { b: body };
                 let requested = r.u8()?;
@@ -1056,6 +1223,40 @@ impl Conn {
             put_v16(&mut c, &self.cookie);
             put_ext(&mut e, EXT_COOKIE, &c);
         }
+        // a session to resume: after a HelloRetryRequest only one of the suite's hash (RFC 8446
+        // 4.1.4); psk_key_exchange_modes, early_data and pre_shared_key, which comes last
+        // (4.2.11), when they fit
+        if self.hrr && self.offer.as_ref().is_some_and(|s| record::suite_hash(s.suite) != self.hash_alg) {
+            self.offer = None;
+        }
+        let mut binder_len = 0;
+        let mut early = false;
+        if let Some(s) = self.offer.as_ref() {
+            let h = record::suite_hash(s.suite);
+            let now = self.ccfg.as_ref().and_then(|c| c.sessions.as_ref()).map(|c| c.now_ms()).unwrap_or(s.received_ms);
+            let age = ((now - s.received_ms).max(0) as u32).wrapping_add(s.age_add);
+            let mut ids = Vec::new();
+            put_v16(&mut ids, &s.ticket);
+            ids.extend_from_slice(&age.to_be_bytes());
+            let mut binders = Vec::new();
+            put_v8(&mut binders, &alloc::vec![0u8; h.len()]);
+            let mut p = Vec::new();
+            put_v16(&mut p, &ids);
+            put_v16(&mut p, &binders);
+            early = !self.hrr && s.max_early > 0 && !self.early_out.is_empty();
+            if e.len() + 6 + 4 + 4 + p.len() <= 0xFFFF {
+                put_ext(&mut e, EXT_PSK_MODES, &[1, PSK_DHE_KE]);
+                if early {
+                    put_ext(&mut e, EXT_EARLY_DATA, &[]);
+                }
+                put_ext(&mut e, EXT_PSK, &p);
+                binder_len = h.len();
+            }
+        }
+        if binder_len == 0 {
+            self.offer = None;
+            early = false;
+        }
         // a length field that overflows makes the extensions pass 2^16 - 1 too (the ALPN list
         // is bounded, a share is short; a server name or cookie of tens of KiB is not)
         if e.len() > 0xFFFF {
@@ -1068,8 +1269,115 @@ impl Conn {
             i += 4 + (u16::from_be_bytes([e[i + 2], e[i + 3]]) as usize);
         }
         put_v16(&mut b, &e);
-        let msg = hs_msg(HS_CLIENT_HELLO, &b);
+        let mut msg = hs_msg(HS_CLIENT_HELLO, &b);
+        // the binder: an HMAC over the transcript up to the ClientHello without its binders
+        // (4.2.11.2); the 0-RTT key comes from the whole ClientHello
+        let mut es = Vec::new();
+        if let Some(s) = self.offer.as_ref() {
+            let h = record::suite_hash(s.suite);
+            let cut = msg.len() - (3 + binder_len);
+            let mut t = self.transcript.clone();
+            t.update(&msg[..cut]);
+            es = keysched::early_secret(h, &s.psk);
+            let mut bk = keysched::binder_key(h, &es);
+            let binder = keysched::finished(h, &bk, &t.hash(h));
+            crypto::zeroize(&mut bk);
+            msg[cut + 3..].copy_from_slice(&binder);
+            if let Some(p) = self.psk.as_mut() {
+                crypto::zeroize(p);
+            }
+            self.psk = Some(s.psk.clone());
+        }
         self.send_hs(&msg);
+        if early {
+            let Some(s) = self.offer.as_ref() else { return Ok(()) };
+            let h = record::suite_hash(s.suite);
+            let mut ces = keysched::derive(h, &es, "c e traffic", &self.transcript.hash(h));
+            let mut c = cipher_of(s.suite, &ces)?;
+            crypto::zeroize(&mut ces);
+            let n = self.early_out.len().min(s.max_early as usize);
+            for part in self.early_out[..n].chunks(MAX_PLAIN) {
+                let rec = c.seal(APPLICATION_DATA, part);
+                self.out.extend_from_slice(&rec);
+            }
+            self.early_wr = Some(c);
+            self.early = Early::Offered;
+            self.early_len = n;
+        }
+        crypto::zeroize(&mut es);
+        Ok(())
+    }
+
+    /// a server's answer to 0-RTT (EncryptedExtensions): taken only with the session it was sent
+    /// under (identity 0, the same suite and ALPN protocol, RFC 8446 4.2.10); without the
+    /// extension it was refused
+    fn client_early_answer(&mut self, exts: &[(u16, &[u8])]) -> Result<(), TlsError> {
+        let Some(ed) = ext(exts, EXT_EARLY_DATA) else {
+            if self.early == Early::Offered {
+                self.early = Early::Rejected;
+                self.early_wr = None;
+            }
+            return Ok(());
+        };
+        if !ed.is_empty() {
+            return Err(fail(AL_DECODE_ERROR, "early_data"));
+        }
+        let same = self.offer.as_ref().is_some_and(|s| s.suite == self.suite && s.alpn == self.alpn);
+        if self.early != Early::Offered || !self.resumed || !same {
+            return Err(fail(AL_ILLEGAL_PARAMETER, "early data taken without its session"));
+        }
+        self.early = Early::Accepted;
+        Ok(())
+    }
+
+    /// a ticket from the server (RFC 8446 4.6.1): kept in ClientConfig::sessions, with the PSK it
+    /// stands for; one of lifetime 0 is dropped, one of more than 7 days kept for 7
+    fn new_session_ticket(&mut self, body: &[u8]) -> Result<(), TlsError> {
+        let mut r = R { b: body };
+        let lifetime = r.u32()?;
+        let age_add = r.u32()?;
+        let nonce = r.v8()?;
+        let ticket = r.v16()?;
+        let exts = extensions(r.v16()?)?;
+        r.done()?;
+        if ticket.is_empty() {
+            return Err(fail(AL_DECODE_ERROR, "an empty ticket"));
+        }
+        // early_data is the one extension of a ticket; others we know do not belong here, those
+        // we do not know are skipped (4.6.1)
+        let mut max_early = 0;
+        for (t, d) in &exts {
+            match *t {
+                EXT_EARLY_DATA => max_early = R { b: d }.u32().and_then(|v| if d.len() == 4 { Ok(v) } else { Err(fail(AL_DECODE_ERROR, "early_data")) })?,
+                t if KNOWN_EXTS.contains(&t) => return Err(fail(AL_ILLEGAL_PARAMETER, "an extension that does not belong in a ticket")),
+                _ => {}
+            }
+        }
+        let Some(cache) = self.ccfg.as_ref().and_then(|c| c.sessions.clone()) else { return Ok(()) };
+        if lifetime == 0 || ticket.len() > MAX_TICKET {
+            return Ok(());
+        }
+        let h = self.hash_alg;
+        let mut psk = alloc::vec![0u8; h.len()];
+        keysched::expand_label(h, &self.res_master, "resumption", nonce, &mut psk);
+        let pin = match self.ccfg.as_ref().map(|c| &c.trust) {
+            Some(Trust::Custom(f)) => Some(f.clone()),
+            _ => None,
+        };
+        let s = Session {
+            suite: self.suite,
+            psk,
+            ticket: Vec::from(ticket),
+            age_add,
+            received_ms: cache.now_ms(),
+            lifetime_ms: lifetime.min(MAX_LIFETIME) as i64 * 1000,
+            max_early,
+            alpn: self.alpn.clone(),
+            peer: self.peer.clone(),
+            auth_s: self.auth_s,
+            _pin: pin,
+        };
+        cache.put(self.session_key, s);
         Ok(())
     }
 
@@ -1123,6 +1431,11 @@ impl Conn {
             if legacy != 0x0303 {
                 return Err(fail(AL_PROTOCOL_VERSION, "a version older than TLS 1.2"));
             }
+            // a client that sent 0-RTT data fails when the server speaks an older version (RFC
+            // 8446 4.2.10): its ticket was of TLS 1.3
+            if self.early != Early::No {
+                return Err(fail(AL_PROTOCOL_VERSION, "TLS 1.2 after early data of TLS 1.3"));
+            }
             if self.web && !self.hrr && random != HRR_RANDOM {
                 return self.server_hello12(msg, random, suite, &exts);
             }
@@ -1134,7 +1447,7 @@ impl Conn {
         if random == HRR_RANDOM {
             self.server_exts(&exts, &[EXT_VERSIONS, EXT_KEY_SHARE, EXT_COOKIE])?;
         } else {
-            self.server_exts(&exts, &[EXT_VERSIONS, EXT_KEY_SHARE])?;
+            self.server_exts(&exts, &[EXT_VERSIONS, EXT_KEY_SHARE, EXT_PSK])?;
         }
         if !SUITES_13.contains(&suite) || (self.hrr && suite != self.suite) {
             return Err(fail(AL_ILLEGAL_PARAMETER, "cipher suite"));
@@ -1164,6 +1477,11 @@ impl Conn {
             if let Some(c) = cookie {
                 self.cookie = Vec::from(whole16(c)?);
             }
+            // 0-RTT is over: the second ClientHello offers none (4.2.10)
+            if self.early == Early::Offered {
+                self.early = Early::Rejected;
+                self.early_wr = None;
+            }
             self.hrr = true;
             // transcript: message_hash(ClientHello1), HRR
             let h1 = self.hash();
@@ -1179,6 +1497,26 @@ impl Conn {
         let g = k.u16()?;
         let pk = k.v16()?;
         k.done()?;
+        // the server took our PSK: identity 0 (the one offered), a suite of its hash (4.2.11)
+        if let Some(p) = ext(&exts, EXT_PSK) {
+            let mut r = R { b: p };
+            let i = r.u16()?;
+            r.done()?;
+            let fits = self.offer.as_ref().is_some_and(|s| record::suite_hash(s.suite) == self.hash_alg);
+            if i != 0 || !fits {
+                return Err(fail(AL_ILLEGAL_PARAMETER, "pre_shared_key: an identity or suite not offered"));
+            }
+            self.resumed = true;
+            if let Some(s) = self.offer.as_ref() {
+                self.peer = s.peer.clone();
+                self.auth_s = s.auth_s;
+            }
+        } else {
+            if let Some(p) = self.psk.as_mut() {
+                crypto::zeroize(p);
+            }
+            self.psk = None;
+        }
         let share = self.shares.iter().find(|s| s.group == g).ok_or(fail(AL_ILLEGAL_PARAMETER, "key share group"))?;
         let mut shared = share.finish(pk).ok_or(fail(AL_ILLEGAL_PARAMETER, "key share"))?;
         self.group = g;
@@ -1192,9 +1530,11 @@ impl Conn {
         Ok(())
     }
 
+    /// the handshake secrets of the (EC)DHE / hybrid secret, and of the PSK when one was taken
     fn handshake_keys(&mut self, shared: &[u8]) {
         let a = self.hash_alg;
-        let mut s = Schedule::new(a, None, shared);
+        let psk = if self.resumed { self.psk.as_deref() } else { None };
+        let mut s = Schedule::new(a, psk, shared);
         let h = self.hash();
         self.c_hs = keysched::derive(a, &s.handshake, "c hs traffic", &h);
         self.s_hs = keysched::derive(a, &s.handshake, "s hs traffic", &h);
@@ -1227,6 +1567,15 @@ impl Conn {
         }
         self.add(msg);
         self.app_secrets();
+        // 0-RTT taken: EndOfEarlyData closes it, under the early key (RFC 8446 4.5)
+        if let Some(mut ew) = self.early_wr.take() {
+            if self.early == Early::Accepted {
+                let m = hs_msg(HS_END_OF_EARLY_DATA, &[]);
+                self.add(&m);
+                let rec = ew.seal(HANDSHAKE, &m);
+                self.out.extend_from_slice(&rec);
+            }
+        }
         // our handshake messages go under the client handshake key
         self.wr = Some(self.cipher13(&self.c_hs)?);
         if self.cert_requested {
@@ -1248,6 +1597,13 @@ impl Conn {
         let c = self.cipher13(&self.s_ap)?;
         self.set_rd(Some(c));
         self.state = State::Established;
+        // the secret of the tickets the server may send, over the whole handshake
+        self.res_master = keysched::derive(self.hash_alg, &self.master, "res master", &self.hash());
+        crypto::zeroize(&mut self.master);
+        if !self.resumed {
+            let now = self.ccfg.as_ref().and_then(|c| c.sessions.as_ref()).map(|c| c.now_ms()).unwrap_or_else(|| plat::unix_time_ns().div_euclid(1_000_000));
+            self.auth_s = now.div_euclid(1000);
+        }
         Ok(())
     }
 
@@ -1386,7 +1742,7 @@ impl Conn {
         if comp != [0] {
             return Err(fail(AL_ILLEGAL_PARAMETER, "compression"));
         }
-        // pre_shared_key comes last (RFC 8446 4.2.11; the server checks it though it takes no PSK)
+        // pre_shared_key comes last (RFC 8446 4.2.11)
         if exts.iter().rev().skip(1).any(|(t, _)| *t == EXT_PSK) {
             return Err(fail(AL_ILLEGAL_PARAMETER, "pre_shared_key not the last extension"));
         }
@@ -1405,11 +1761,32 @@ impl Conn {
         if !self.hrr {
             self.set_suite(suite);
         }
-        let algs = u16_list(whole16(ext(&exts, EXT_SIG_ALGS).ok_or(fail(AL_MISSING_EXTENSION, "signature_algorithms"))?)?)?;
-        // both lists hold at least one entry (RFC 8446 4.2.3, 4.2.7)
-        if algs.is_empty() {
-            return Err(fail(AL_DECODE_ERROR, "an empty signature_algorithms list"));
-        }
+        // a PSK needs psk_key_exchange_modes (4.2.9, 9.2), and spares signature_algorithms when
+        // it is taken
+        let psk_ext = ext(&exts, EXT_PSK);
+        let modes = match ext(&exts, EXT_PSK_MODES) {
+            Some(b) => {
+                let m = whole8(b)?;
+                if m.is_empty() {
+                    return Err(fail(AL_DECODE_ERROR, "an empty psk_key_exchange_modes list"));
+                }
+                Vec::from(m)
+            }
+            None if psk_ext.is_some() => return Err(fail(AL_MISSING_EXTENSION, "pre_shared_key without psk_key_exchange_modes")),
+            None => Vec::new(),
+        };
+        let algs = match ext(&exts, EXT_SIG_ALGS) {
+            // both lists hold at least one entry (RFC 8446 4.2.3, 4.2.7)
+            Some(b) => {
+                let a = u16_list(whole16(b)?)?;
+                if a.is_empty() {
+                    return Err(fail(AL_DECODE_ERROR, "an empty signature_algorithms list"));
+                }
+                Some(a)
+            }
+            None if psk_ext.is_some() => None,
+            None => return Err(fail(AL_MISSING_EXTENSION, "signature_algorithms")),
+        };
         let sni = match ext(&exts, EXT_SERVER_NAME) {
             Some(b) => client_server_name(b)?,
             None => String::new(),
@@ -1426,26 +1803,29 @@ impl Conn {
             let p = cfg.alpn.iter().find(|p| offered_alpn.iter().any(|o| o.as_slice() == p.as_bytes()));
             Some(Vec::from(p.ok_or(fail(AL_NO_APPLICATION_PROTOCOL, "no application protocol in common"))?.as_bytes()))
         };
-        let hello = Hello { server_name: sni.clone(), alpn: offered_alpn.clone(), sig_algs: algs.clone() };
+        let hello = Hello { server_name: sni.clone(), alpn: offered_alpn.clone(), sig_algs: algs.clone().unwrap_or_default() };
         let identity = choose_identity(cfg, &hello);
-        if our_scheme(&identity.key, &algs).is_none() {
+        // a key the client takes no signature of: refused now, unless a PSK may spare the
+        // signature (checked again when none is taken)
+        let signs = algs.as_ref().is_some_and(|a| our_scheme(&identity.key, a).is_some());
+        if !signs && psk_ext.is_none() {
             return Err(fail(AL_HANDSHAKE_FAILURE, "the client takes no signature our key makes"));
         }
         let groups = u16_list(whole16(ext(&exts, EXT_GROUPS).ok_or(fail(AL_MISSING_EXTENSION, "supported_groups"))?)?)?;
         if groups.is_empty() {
             return Err(fail(AL_DECODE_ERROR, "an empty supported_groups list"));
         }
-        // early data is never taken (no tickets, no PSK): its records are skipped; a second
-        // ClientHello must not offer it, and after it the client sends none (RFC 8446 4.2.10):
-        // a record that does not open is an error again
+        // early data not taken is skipped; a second ClientHello must not offer it, and after it
+        // the client sends none (RFC 8446 4.2.10): a record that does not open is an error again
         if self.hrr {
             self.early_skip = 0;
         }
-        if ext(&exts, EXT_EARLY_DATA).is_some() {
+        let wants_early = ext(&exts, EXT_EARLY_DATA).is_some();
+        if wants_early {
             if self.hrr {
                 return Err(fail(AL_ILLEGAL_PARAMETER, "early_data in the second ClientHello"));
             }
-            self.early_skip = MAX_EARLY_SKIP;
+            self.early_skip = MAX_EARLY_SKIP.max(cfg.early_data as usize + cfg.early_data as usize / 8 + 256);
         }
         // supported_groups and key_share come together (RFC 8446 9.2)
         if ext(&exts, EXT_KEY_SHARE).is_none() {
@@ -1515,13 +1895,69 @@ impl Conn {
         if self.hrr && (group != self.group || shares.len() != 1) {
             return Err(fail(AL_ILLEGAL_PARAMETER, "the share after HelloRetryRequest is not the one asked for"));
         }
+        // resumption: the first identity that is a ticket of ours fit for this handshake, with a
+        // fresh key exchange (psk_dhe_ke); its binder must be right
+        let tickets = cfg.tickets.clone();
+        let taken = match (psk_ext, tickets.as_ref()) {
+            (Some(p), Some(tk)) if modes.contains(&PSK_DHE_KE) => self.server_psk(tk, msg, p, &sni)?,
+            _ => None,
+        };
+        if taken.is_none() && !signs {
+            return Err(match algs {
+                None => fail(AL_MISSING_EXTENSION, "signature_algorithms"),
+                Some(_) => fail(AL_HANDSHAKE_FAILURE, "the client takes no signature our key makes"),
+            });
+        }
+        // 0-RTT: only of the first identity, with the suite and ALPN protocol of its session, a
+        // ClientHello as fresh as the ticket's age says, the first time it comes (4.2.10, 8)
+        let cfg_early = cfg.early_data;
+        let early_ok = match (&taken, tickets.as_ref()) {
+            (Some((i, t, binder, age)), Some(tk)) if wants_early && *i == 0 && cfg_early > 0 && t.max_early > 0 => {
+                let client_age = age.wrapping_sub(t.age_add) as i64;
+                let server_age = tk.now_ms() - t.issued_ms;
+                let fresh = (server_age - client_age).abs() <= FRESH_WINDOW_MS && client_age <= t.lifetime_s as i64 * 1000;
+                t.suite == suite && t.alpn == alpn && fresh && tk.first_time(&binder[..16])
+            }
+            _ => false,
+        };
         self.group = group;
         let named = !sni.is_empty() && Cert::parse(identity.chain.first().map(|c| c.as_slice()).unwrap_or(&[])).is_some_and(|c| c.names(&sni));
         self.sni = sni;
         self.alpn = alpn;
         self.identity = Some(identity);
+        if let Some((_, t, _, _)) = &taken {
+            self.resumed = true;
+            self.psk = Some(t.psk.clone());
+            self.auth_s = t.auth_s;
+            // the client's certificates of the ticket, while this server still asks for them
+            if cfg.client_auth.is_some() {
+                self.peer = t.chain.iter().filter_map(|d| Cert::parse(d)).collect();
+            }
+            if early_ok {
+                self.early = Early::Accepted;
+                self.early_max = cfg_early.min(t.max_early) as usize;
+                self.early_skip = 0;
+            }
+        }
+        if wants_early && !early_ok {
+            self.early = Early::Rejected;
+        }
         let (public, mut shared) = kx::respond(group, pk).ok_or(fail(AL_ILLEGAL_PARAMETER, "key share"))?;
         self.add(msg);
+        // the 0-RTT key, of the ClientHello
+        let early_rd = match (&taken, early_ok) {
+            (Some((_, t, _, _)), true) => {
+                let mut es = keysched::early_secret(self.hash_alg, &t.psk);
+                let mut ces = keysched::derive(self.hash_alg, &es, "c e traffic", &self.hash());
+                let c = self.cipher13(&ces);
+                crypto::zeroize(&mut es);
+                crypto::zeroize(&mut ces);
+                Some(c?)
+            }
+            _ => None,
+        };
+        let selected = taken.as_ref().map(|(i, ..)| *i as u16);
+        drop(taken);
         // ServerHello
         let mut b = Vec::new();
         put16(&mut b, 0x0303);
@@ -1535,6 +1971,9 @@ impl Conn {
         put16(&mut ks, group);
         put_v16(&mut ks, &public);
         put_ext(&mut e, EXT_KEY_SHARE, &ks);
+        if let Some(i) = selected {
+            put_ext(&mut e, EXT_PSK, &i.to_be_bytes());
+        }
         put_v16(&mut b, &e);
         let sh = hs_msg(HS_SERVER_HELLO, &b);
         self.send_hs(&sh);
@@ -1544,12 +1983,16 @@ impl Conn {
         self.handshake_keys(&shared);
         crypto::zeroize(&mut shared);
         self.wr = Some(self.cipher13(&self.s_hs)?);
-        let c = self.cipher13(&self.c_hs)?;
+        let c = match early_rd {
+            Some(c) => c,
+            None => self.cipher13(&self.c_hs)?,
+        };
         self.set_rd(Some(c));
         // EncryptedExtensions: server_name (empty) when the certificate is for the name asked
-        // for (RFC 6066 3), the protocol chosen (ALPN)
+        // for (RFC 6066 3; not on a resumption, which shows no certificate), the protocol chosen
+        // (ALPN), early_data when the 0-RTT is taken
         let mut e = Vec::new();
-        if named {
+        if named && !self.resumed {
             put_ext(&mut e, EXT_SERVER_NAME, &[]);
         }
         if let Some(p) = &self.alpn {
@@ -1559,35 +2002,179 @@ impl Conn {
             put_v16(&mut v, &list);
             put_ext(&mut e, EXT_ALPN, &v);
         }
+        if self.early == Early::Accepted {
+            put_ext(&mut e, EXT_EARLY_DATA, &[]);
+        }
         let mut b = Vec::new();
         put_v16(&mut b, &e);
         let ee = hs_msg(HS_ENCRYPTED_EXTENSIONS, &b);
         self.send_hs(&ee);
         let cfg = self.scfg.as_ref().ok_or(fail(AL_INTERNAL_ERROR, "config"))?;
-        let want_client = cfg.client_auth.is_some();
-        let id = self.identity.clone().ok_or(fail(AL_INTERNAL_ERROR, "identity"))?;
-        let (chain, key) = (id.chain, id.key);
-        if want_client {
-            let mut b = Vec::new();
-            b.push(0); // empty context
-            let mut e = Vec::new();
-            let mut list = Vec::new();
-            put_v16(&mut list, &u16s(if self.cr_algs.is_empty() { &WEB_SIG_ALGS[..] } else { &self.cr_algs }));
-            put_ext(&mut e, EXT_SIG_ALGS, &list);
-            put_v16(&mut b, &e);
-            let m = hs_msg(HS_CERTIFICATE_REQUEST, &b);
+        // a resumption shows no certificate and asks for none (RFC 8446 4.3.2): Finished
+        let want_client = cfg.client_auth.is_some() && !self.resumed;
+        if !self.resumed {
+            let id = self.identity.clone().ok_or(fail(AL_INTERNAL_ERROR, "identity"))?;
+            let (chain, key) = (id.chain, id.key);
+            if want_client {
+                let mut b = Vec::new();
+                b.push(0); // empty context
+                let mut e = Vec::new();
+                let mut list = Vec::new();
+                put_v16(&mut list, &u16s(if self.cr_algs.is_empty() { &WEB_SIG_ALGS[..] } else { &self.cr_algs }));
+                put_ext(&mut e, EXT_SIG_ALGS, &list);
+                put_v16(&mut b, &e);
+                let m = hs_msg(HS_CERTIFICATE_REQUEST, &b);
+                self.send_hs(&m);
+            }
+            let cm = hs_msg(HS_CERTIFICATE, &certificate_body(&chain));
+            self.send_hs(&cm);
+            let m = certificate_verify(&key, algs.as_deref().unwrap_or(&[]), true, &self.hash())?;
             self.send_hs(&m);
         }
-        let cm = hs_msg(HS_CERTIFICATE, &certificate_body(&chain));
-        self.send_hs(&cm);
-        let m = certificate_verify(&key, &algs, true, &self.hash())?;
-        self.send_hs(&m);
         let fin = keysched::finished(self.hash_alg, &self.s_hs, &self.hash());
         let m = hs_msg(HS_FINISHED, &fin);
         self.send_hs(&m);
         self.app_secrets();
         self.wr = Some(self.cipher13(&self.s_ap)?);
-        self.state = if want_client { State::ServerClientCert } else { State::ServerFinished };
+        self.state = if self.early == Early::Accepted {
+            State::ServerEarly
+        } else if want_client {
+            State::ServerClientCert
+        } else {
+            State::ServerFinished
+        };
+        Ok(())
+    }
+
+    /// the PSK a server takes (RFC 8446 4.2.11): the first identity that opens as a ticket of
+    /// ours fit for this handshake (ticket_fits), whose binder it checks then (a wrong one ends
+    /// the handshake with decrypt_error); others are skipped.  -> its index, the ticket, its
+    /// binder and the client's obfuscated age of it
+    fn server_psk(&self, tk: &Tickets, msg: &[u8], p: &[u8], sni: &str) -> Result<Option<(usize, TicketData, Vec<u8>, u32)>, TlsError> {
+        let mut r = R { b: p };
+        let ids_b = r.v16()?;
+        let binders_b = r.v16()?;
+        r.done()?;
+        let mut ids = Vec::new();
+        let mut ir = R { b: ids_b };
+        while !ir.b.is_empty() {
+            let id = ir.v16()?;
+            let age = ir.u32()?;
+            if id.is_empty() {
+                return Err(fail(AL_DECODE_ERROR, "an empty PSK identity"));
+            }
+            ids.push((id, age));
+        }
+        let mut binders = Vec::new();
+        let mut br = R { b: binders_b };
+        while !br.b.is_empty() {
+            let b = br.v8()?;
+            if b.len() < 32 {
+                return Err(fail(AL_DECODE_ERROR, "a PSK binder shorter than 32 bytes"));
+            }
+            binders.push(b);
+        }
+        if ids.is_empty() || binders.is_empty() {
+            return Err(fail(AL_DECODE_ERROR, "pre_shared_key without identities or binders"));
+        }
+        if ids.len() != binders.len() {
+            return Err(fail(AL_ILLEGAL_PARAMETER, "pre_shared_key: as many binders as identities"));
+        }
+        let h = self.hash_alg;
+        let now = tk.now_ms();
+        for (i, (id, age)) in ids.iter().enumerate() {
+            let Some(t) = tk.open(id) else { continue };
+            if !self.ticket_fits(&t, sni, now) {
+                continue;
+            }
+            // the binder: over the transcript up to this ClientHello without its binders, which
+            // end it (pre_shared_key is the last extension)
+            let cut = msg.len() - (2 + binders_b.len());
+            let mut tr = self.transcript.clone();
+            tr.update(&msg[..cut]);
+            let mut es = keysched::early_secret(h, &t.psk);
+            let mut bk = keysched::binder_key(h, &es);
+            let want = keysched::finished(h, &bk, &tr.hash(h));
+            crypto::zeroize(&mut es);
+            crypto::zeroize(&mut bk);
+            if binders[i].len() != want.len() || !crypto::ct_eq(&want, binders[i]) {
+                return Err(fail(AL_DECRYPT_ERROR, "PSK binder"));
+            }
+            return Ok(Some((i, t, Vec::from(binders[i]), *age)));
+        }
+        Ok(None)
+    }
+
+    /// a ticket this handshake may take: of the suite's hash, the same server name, within its
+    /// lifetime, 7 days from the handshake that authenticated the client; when this server asks
+    /// for client certificates, one with certificates checked by the same trust and not expired
+    /// (or none, when a client without one is taken)
+    fn ticket_fits(&self, t: &TicketData, sni: &str, now_ms: i64) -> bool {
+        let Some(cfg) = self.scfg.as_ref() else { return false };
+        let now_s = now_ms.div_euclid(1000);
+        let age = now_ms - t.issued_ms;
+        let basic = record::suite_hash(t.suite) == self.hash_alg
+            && t.sni == sni
+            && age >= -FRESH_WINDOW_MS
+            && age <= t.lifetime_s as i64 * 1000
+            && now_s - t.auth_s <= MAX_LIFETIME as i64;
+        let client = match cfg.client_auth.as_ref() {
+            None => true,
+            Some(_) if t.chain.is_empty() => cfg.client_auth_optional,
+            Some(trust) => {
+                let leaf = t.chain.first().and_then(|d| Cert::parse(d));
+                t.client_trust == session::trust_hash(trust) && leaf.is_some_and(|c| now_s <= c.not_after && now_s >= c.not_before)
+            }
+        };
+        basic && client
+    }
+
+    /// a server's tickets after the client's Finished (ServerConfig::tickets): each for a PSK of
+    /// the resumption secret and its own nonce (RFC 8446 4.6.1), with early_data when 0-RTT is
+    /// allowed
+    fn send_tickets(&mut self) -> Result<(), TlsError> {
+        let Some(cfg) = self.scfg.as_ref() else { return Ok(()) };
+        let Some(tk) = cfg.tickets.clone() else { return Ok(()) };
+        let max_early = cfg.early_data;
+        let client_trust = match (cfg.client_auth.as_ref(), self.peer.is_empty()) {
+            (Some(t), false) => session::trust_hash(t),
+            _ => [0; 32],
+        };
+        let chain: Vec<Vec<u8>> = if client_trust == [0; 32] { Vec::new() } else { self.peer.iter().map(|c| c.der.clone()).collect() };
+        let h = self.hash_alg;
+        for _ in 0..tk.count() {
+            let nonce = [self.tickets_sent];
+            self.tickets_sent = self.tickets_sent.wrapping_add(1);
+            let mut psk = alloc::vec![0u8; h.len()];
+            keysched::expand_label(h, &self.res_master, "resumption", &nonce, &mut psk);
+            let age_add = u32::from_be_bytes(plat::random_bytes::<4>());
+            let t = TicketData {
+                suite: self.suite,
+                psk,
+                issued_ms: tk.now_ms(),
+                auth_s: self.auth_s,
+                age_add,
+                lifetime_s: tk.lifetime_s(),
+                max_early,
+                sni: self.sni.clone(),
+                alpn: self.alpn.clone(),
+                client_trust,
+                chain: chain.clone(),
+            };
+            let Some(ticket) = tk.seal(&t) else { return Ok(()) };
+            let mut b = Vec::new();
+            b.extend_from_slice(&tk.lifetime_s().to_be_bytes());
+            b.extend_from_slice(&age_add.to_be_bytes());
+            put_v8(&mut b, &nonce);
+            put_v16(&mut b, &ticket);
+            let mut e = Vec::new();
+            if max_early > 0 {
+                put_ext(&mut e, EXT_EARLY_DATA, &max_early.to_be_bytes());
+            }
+            put_v16(&mut b, &e);
+            let m = hs_msg(HS_NEW_SESSION_TICKET, &b);
+            self.send_post_hs(&m)?;
+        }
         Ok(())
     }
 }
@@ -1673,6 +2260,21 @@ fn ch_fixed(sid: &[u8], suites: &[u16], comp: &[u8], exts: &[(u16, &[u8])]) -> V
     }
     out
 }
+
+/// the TLS 1.3 record keys of a traffic secret for a suite
+fn cipher_of(suite: u16, secret: &[u8]) -> Result<Cipher, TlsError> {
+    let (kl, _) = record::key_iv_len(suite).ok_or(fail(AL_INTERNAL_ERROR, "suite"))?;
+    let (mut k, iv) = keysched::traffic_keys_len(record::suite_hash(suite), secret, kl);
+    let c = Cipher::for_suite(suite, &k, &iv, false).ok_or(fail(AL_INTERNAL_ERROR, "suite"));
+    crypto::zeroize(&mut k);
+    c
+}
+
+/// the extensions this side knows (one of them where it does not belong is illegal_parameter)
+const KNOWN_EXTS: [u16; 14] = [
+    EXT_SERVER_NAME, EXT_GROUPS, EXT_POINT_FORMATS, EXT_SIG_ALGS, EXT_ALPN, EXT_EMS, EXT_COOKIE, EXT_EARLY_DATA, EXT_PSK, EXT_PSK_MODES, EXT_PADDING, EXT_VERSIONS,
+    EXT_KEY_SHARE, EXT_RENEGOTIATION_INFO,
+];
 
 /// the alert for a protected record that does not open
 fn open_failure(e: record::OpenError) -> TlsError {
