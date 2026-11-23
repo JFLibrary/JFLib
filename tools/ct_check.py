@@ -45,6 +45,7 @@ import argparse
 import concurrent.futures
 import functools
 import hashlib
+import itertools
 import os
 import platform
 import re
@@ -478,12 +479,22 @@ def resymbolize(exe, errors, span=None):
     return out
 
 
+def is_own(fr):
+    """whether a frame is in this repository's sources, with a line"""
+    return fr[2] > 0 and (fr[1].startswith(tuple(PREFIXES)) or "/lib/" in fr[1])
+
+
 def own_frame(frames):
     """the innermost frame in this repository's sources with a line (or the innermost one)"""
     for fr in frames:
-        if fr[2] > 0 and (fr[1].startswith(tuple(p for p in PREFIXES)) or "/lib/" in fr[1]):
+        if is_own(fr):
             return fr
     return frames[0] if frames else ("?", "?", 0)
+
+
+# std's allocation code, which branches on a buffer's size alone
+ALLOC_SOURCES = ("/alloc/src/raw_vec/", "/alloc/src/vec/", "/alloc/src/alloc.rs", "/core/src/alloc/layout",
+                 "/core/src/intrinsics/", "/core/src/num/uint_macros")
 
 
 def declassified(fr, frames):
@@ -539,9 +550,12 @@ def memcheck(level, exe, targets):
             if declassified(fr, frames):
                 continue
             # allocation sizes come from lengths, which are public (std's capacity checks and
-            # frees of a buffer whose length memcheck follows from a text's padding)
-            if frames and all("/alloc/src/raw_vec/" in f[1] or "/alloc/src/vec/" in f[1] or "/core/src/alloc/layout" in f[1]
-                              or "/core/src/intrinsics/" in f[1] or "/core/src/num/uint_macros" in f[1] for f in frames[:3]):
+            # frees of a buffer whose length memcheck follows from a text's padding): the std
+            # frames inside the first own one (up to three) are all allocation code.  How many
+            # there are depends on the inlining: at opt-level z on ARM64 a Vec's free is two
+            # frames of raw_vec, or Global::deallocate's three of alloc.rs
+            head = list(itertools.takewhile(lambda f: not is_own(f), frames))[:3]
+            if head and all(any(s in f[1] for s in ALLOC_SOURCES) for f in head):
                 continue
             # String::push of a Base64 or hex character (ASCII by construction) where the line
             # of the caller is lost
