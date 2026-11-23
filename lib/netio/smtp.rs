@@ -155,7 +155,7 @@ pub fn send(cfg: &SmtpConfig, mail: &Mail) -> Result<String, String> {
     let tcp = TcpStream::connect_any(&addrs, cfg.timeout_ms).map_err(|e| format!("{}:{} nicht erreichbar: {}", cfg.host, cfg.port, e))?;
     tcp.set_read_timeout(Some(cfg.timeout_ms));
     tcp.set_write_timeout(Some(cfg.timeout_ms));
-    let tls_cfg = || ClientConfig { trust: Trust::System(cfg.extra_cas.clone()), identity: None, server_name: cfg.host.clone() };
+    let tls_cfg = || ClientConfig::new(Trust::System(cfg.extra_cas.clone()), &cfg.host);
     let s: Box<dyn Stream> = if cfg.security == Security::Tls {
         Box::new(tls::connect(Box::new(tcp), tls_cfg()).map_err(|e| format!("TLS mit {}: {}", cfg.host, e))?)
     } else {

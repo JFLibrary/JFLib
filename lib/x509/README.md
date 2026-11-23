@@ -20,8 +20,12 @@ It has no I/O and no clock; the caller passes the time.
   certificates below. RSA keys under 2048 bits are not taken.
 - **Names:** `Cert::names(host)` checks a DNS name (one wildcard label at the left) or an IP
   address against the subject alternative names; the common name does not count.
-- **A private CA:** `CertBuilder` builds and signs Ed25519 certificates, CAs and leaves with
-  names, key usages and further extensions (`sign_ext`); PKCS #8 for Ed25519 keys.
+- **A private CA:** `CertBuilder` builds and signs certificates, CAs and leaves with names, key
+  usages and further extensions: Ed25519 ones with `sign` / `sign_ext`, ones of any key with
+  `sign_key` (the subject's key as `spki`, signed with Ed25519, ECDSA or RSA).
+- **Private keys:** `PrivateKey` holds an Ed25519, ECDSA (P-256 / P-384) or RSA key, reads PKCS #8,
+  SEC 1 and PKCS #1 (the DER inside the PEM files of OpenSSL and the CAs), writes PKCS #8, gives
+  the public key and its SubjectPublicKeyInfo and signs; netio's TLS signs its handshakes with it.
 - **Dialogs and tools:** fingerprints (`fingerprint`, `fingerprint_bytes`, `fingerprint_text`),
   `name_list`, the subject's and issuer's names, `self_signed`.
 - **DER:** the bounded reader and the writer certificates need (`x509::der`).

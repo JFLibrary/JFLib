@@ -8,7 +8,11 @@ The certificates come from `coretest --tls-pki` (Ed25519, own CA).  Checked:
   our server  <- openssl s_client (with and without a client certificate), curl --cacert,
                  Python ssl, a client that offers P-256 first (HelloRetryRequest)
   our client  -> openssl s_server (with and without requiring a client certificate)
-  refusals    curl without the CA, a server requiring a certificate the client lacks"""
+  refusals    curl without the CA, a server requiring a certificate the client lacks
+Then for each key kind (`--key p256 / p384 / rsa / ed25519`: CA, server and client keys of that
+kind), our server <- openssl s_client with each TLS 1.3 suite, each group (the hybrids with
+ML-KEM, X25519, P-256, P-384, and a HelloRetryRequest), ALPN (its choice, no_application_protocol)
+and a client certificate; curl --cacert."""
 import os
 import socket
 import ssl
@@ -210,9 +214,58 @@ def main():
     finally:
         srv.terminate()
         srv.wait(5)
+    server_matrix(exe, check)
     n = len(results)
     print(f"tls_interop: {sum(results)} of {n} passed")
     return 0 if all(results) else 1
+
+
+def server_matrix(exe, check):
+    """our server with each kind of key against openssl s_client and curl"""
+    req = b"GET / HTTP/1.0\r\nHost: localhost\r\n\r\n"
+    for kind in ("p256", "p384", "rsa", "ed25519"):
+        d = Path(tempfile.mkdtemp(prefix=f"tls-{kind}-"))
+        subprocess.run([exe, "--tls-pki", str(d), "--key", kind], check=True)
+        # the keys netio writes (PKCS #8) as OpenSSL reads them; RSA's CRT numbers checked
+        r = subprocess.run(["openssl", "pkey", "-in", str(d / "client.key"), "-check", "-noout"], capture_output=True, text=True)
+        check(f"[{kind}] openssl reads and checks netio's PKCS #8 key", r.returncode == 0 and "valid" in (r.stdout + r.stderr).lower(), r.stdout + r.stderr)
+        for mtls in (False, True):
+            port = free_port()
+            srv = subprocess.Popen([exe, "--tls-serve", str(port), "--key", kind, "--alpn", "http/1.1"] + (["--mtls"] if mtls else []), stderr=subprocess.PIPE)
+            try:
+                wait_port(port)
+
+                def s_client(*opts):
+                    cmd = ["openssl", "s_client", "-connect", f"127.0.0.1:{port}", "-servername", "localhost", "-CAfile", str(d / "ca.pem"),
+                           "-verify_return_error", "-ign_eof", *opts]
+                    if mtls:
+                        cmd += ["-cert", str(d / "client.pem"), "-key", str(d / "client.key")]
+                    r = subprocess.run(cmd, input=req, capture_output=True, timeout=20)
+                    return r.stdout.decode(errors="replace") + r.stderr.decode(errors="replace")
+
+                tag = f"[{kind}{' mTLS' if mtls else ''}]"
+                if mtls:
+                    out = s_client("-tls1_3")
+                    check(f"{tag} s_client with a client certificate", "JFLib tls ok agent-1" in out, out[-300:])
+                    continue
+                for suite in ("TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"):
+                    out = s_client("-tls1_3", "-ciphersuites", suite)
+                    check(f"{tag} s_client {suite}", "JFLib tls ok" in out and f"Cipher is {suite}" in out, out[-300:])
+                for group, hrr in (("X25519MLKEM768", ""), ("SecP256r1MLKEM768", ""), ("SecP384r1MLKEM1024", ""), ("X25519", ""), ("P-256", ""),
+                                   ("P-384", ""), ("P-384", "X448:"), ("SecP384r1MLKEM1024", "X448:")):
+                    out = s_client("-tls1_3", "-groups", hrr + group)
+                    # OpenSSL names a hybrid as the negotiated group, an ECDHE group as the peer's key
+                    seen = {"X25519": "Peer Temp Key: X25519", "P-256": "Peer Temp Key: ECDH, prime256v1", "P-384": "Peer Temp Key: ECDH, secp384r1"}.get(group, f"Negotiated TLS1.3 group: {group}")
+                    check(f"{tag} s_client group {hrr}{group}" + (" (HelloRetryRequest)" if hrr else ""), "JFLib tls ok" in out and seen in out, out[-300:])
+                out = s_client("-tls1_3", "-alpn", "foo,http/1.1")
+                check(f"{tag} s_client ALPN: the server's protocol", "JFLib tls ok" in out and "ALPN protocol: http/1.1" in out, out[-300:])
+                out = s_client("-tls1_3", "-alpn", "h2")
+                check(f"{tag} s_client ALPN: none in common is refused", "JFLib tls ok" not in out and "no application protocol" in out.lower(), out[-300:])
+                r = subprocess.run(["curl", "-sS", "--cacert", str(d / "ca.pem"), f"https://localhost:{port}/"], capture_output=True, timeout=20)
+                check(f"{tag} curl", b"JFLib tls ok" in r.stdout, r.stderr.decode(errors="replace"))
+            finally:
+                srv.terminate()
+                srv.wait(5)
 
 
 if __name__ == "__main__":

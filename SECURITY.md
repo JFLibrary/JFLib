@@ -56,8 +56,8 @@ another library. They have **not had an external audit**. What has been done ins
   the workflow `.github/workflows/ct-check.yml` runs all three, on an x86-64 and an ARM64 machine);
   not checked: the machine code a browser's JIT makes, instructions whose time depends on their
   operands
-- netio's TLS 1.3 server against tlsfuzzer (`tools/tlsfuzzer_check.py`), its client against
-  TLS-Anvil (`tools/tlsanvil_check.py`)
+- netio's TLS 1.3 server against tlsfuzzer (`tools/tlsfuzzer_check.py`, with RSA, ECDSA and
+  Ed25519 certificates) and TLS-Anvil, its client against TLS-Anvil (`tools/tlsanvil_check.py`)
 - mutation fuzzing (`tools/net_fuzz.py`, `apps/nettest`, `plattest --test wirefuzz`) and
   coverage-guided fuzzing with libFuzzer and AddressSanitizer (`tools/cov_fuzz.py`) of the parsers
   of untrusted bytes: compress, formats, X.509, DNS, HTTP, TLS, netpkt, netchan and plat's

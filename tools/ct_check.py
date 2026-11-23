@@ -95,7 +95,9 @@ DECLASSIFIED = [
     ("crypto/p384.rs", r"assert!\(secret_from\(secret\)\.is_some\(\)|\.then_some\(\*random\)", "public_key's assert takes secret_from's answer: whether the scalar is in [1, n - 1] is public"),
     ("crypto/p384.rs", r"if finite == 0", "the point at infinity ends the operation (None): reaching it is public"),
     # ECDSA signing: refused keys and nonces, and the signature itself
-    ("crypto/ecdsa.rs", r"in_range_mask\(&d\) == 0", "a secret key outside [1, n - 1] is refused: the API's public answer"),
+    ("crypto/ecdsa.rs", r"in_range_mask\(&d\) == 0|if !secret_ok\(curve, secret\)", "a secret key outside [1, n - 1] is refused: the API's public answer"),
+    # a key file: the public key stored with an ECDSA secret is compared with the one it gives
+    ("x509/key.rs", r"ct_eq\(p, public\)", "the public key stored in the file is public: whether it is the secret's own is the reader's public answer"),
     ("crypto/ecdsa.rs", r"in_range_mask\(&kk\) != 0|if let Some\(sig\) = found",
      "a nonce outside [1, n - 1] is drawn again (RFC 6979 3.2 h.3, about 2^-32 on P-256): that one was refused shows nothing of the one taken"),
     ("crypto/ecdsa.rs", r"r\.iter\(\)\.all\(\|&w\| w == 0\) \|\| s\.iter", "r and s are the signature, which is published"),
@@ -476,12 +478,22 @@ def resymbolize(exe, errors, span=None):
     return out
 
 
+def is_own(fr):
+    """whether a frame is in this repository's sources, with a line"""
+    return fr[2] > 0 and (fr[1].startswith(tuple(PREFIXES)) or "/lib/" in fr[1])
+
+
 def own_frame(frames):
     """the innermost frame in this repository's sources with a line (or the innermost one)"""
     for fr in frames:
-        if fr[2] > 0 and (fr[1].startswith(tuple(p for p in PREFIXES)) or "/lib/" in fr[1]):
+        if is_own(fr):
             return fr
     return frames[0] if frames else ("?", "?", 0)
+
+
+# std's allocation code, which branches on a buffer's size alone
+ALLOC_SOURCES = ("/alloc/src/raw_vec/", "/alloc/src/vec/", "/alloc/src/alloc.rs", "/core/src/alloc/layout",
+                 "/core/src/intrinsics/", "/core/src/num/uint_macros")
 
 
 def declassified(fr, frames):
@@ -534,12 +546,23 @@ def memcheck(level, exe, targets):
         found = {}
         for kind, frames in errors:
             fr = own_frame(frames)
+            # invalid reads and writes (and a system call given the secret) are never excused:
+            # the exceptions below are for branches and addresses that follow public values
+            if kind == "other":
+                found.setdefault((kind, fr), frames)
+                continue
             if declassified(fr, frames):
                 continue
             # allocation sizes come from lengths, which are public (std's capacity checks and
-            # frees of a buffer whose length memcheck follows from a text's padding)
-            if frames and all("/alloc/src/raw_vec/" in f[1] or "/alloc/src/vec/" in f[1] or "/core/src/alloc/layout" in f[1]
-                              or "/core/src/intrinsics/" in f[1] or "/core/src/num/uint_macros" in f[1] for f in frames[:3]):
+            # frees of a buffer whose length memcheck follows from a text's padding): the branch
+            # is in allocation code, so the frames inside the first own one, up to the three
+            # innermost, are all allocation code.  Up to three: how many there are depends on
+            # the inlining (at opt-level z on ARM64 a Vec's free is two frames of raw_vec, or
+            # Global::deallocate's three of alloc.rs), and std code may stand between them and
+            # the own frame (String::push growing its Vec at opt-level z on x86-64).  A stack
+            # without an own frame is not excused
+            own_at = next((i for i, f in enumerate(frames) if is_own(f)), 0)
+            if own_at and all(any(s in f[1] for s in ALLOC_SOURCES) for f in frames[:min(own_at, 3)]):
                 continue
             # String::push of a Base64 or hex character (ASCII by construction) where the line
             # of the caller is lost
@@ -820,13 +843,17 @@ def main_wasm(a, levels, crate_dir, label):
     for tool in ("wasm-interp", "wasm-objdump"):
         if shutil.which(tool) is None:
             sys.exit(f"ct_check: --wasm needs {tool} (WABT: apt install wabt, brew install wabt)")
-    # the probe's list in wasm: TARGETS without the key files (netio), in the same order (the
-    # index is what ct_run takes)
-    listed = [ln for ln in PROBE.read_text(encoding="utf-8").split("const TARGETS: &[&str] = &[", 1)[1].split("];", 1)[0].splitlines()
-              if ln.strip().startswith('"')]
-    order = [ln.strip().strip('",') for ln in listed]
-    key_files = ("pem_pkcs8_key", "ssh_private_key")
-    wasm_targets = [t for t in order if t not in key_files]
+    # the probe's list in wasm: TARGETS without the key files (each behind #[cfg(feature =
+    # "netio")]), in the same order (the index is what ct_run takes)
+    order, key_files, gated = [], [], False
+    for ln in PROBE.read_text(encoding="utf-8").split("const TARGETS: &[&str] = &[", 1)[1].split("];", 1)[0].splitlines():
+        ln = ln.strip()
+        if ln == '#[cfg(feature = "netio")]':
+            gated = True
+        elif ln.startswith('"'):
+            (key_files if gated else order).append(ln.strip('",'))
+            gated = False
+    wasm_targets = order
     asked = [t for t in a.only.split(",") if t]
     unknown = [t for t in asked if t not in wasm_targets]
     if unknown:

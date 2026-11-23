@@ -81,10 +81,16 @@ pub fn parse_fingerprint(s: &str) -> Option<[u8; 32]> {
     })
 }
 
+/// what https offers in ALPN: HTTP/1.1, which a server that speaks other protocols on the same
+/// port tells apart from them (RFC 9325 3.8, against cross-protocol attacks as ALPACA)
+fn http11() -> Vec<String> {
+    alloc::vec![String::from("http/1.1")]
+}
+
 /// https to public servers (the system's certificate authorities and `extra`)
 pub fn system_connector(extra: Vec<Cert>) -> Connector {
     Arc::new(move |url: &Url, tcp: TcpStream| {
-        let cfg = ClientConfig { trust: Trust::System(extra.clone()), identity: None, server_name: url.host.clone() };
+        let cfg = ClientConfig { alpn: http11(), ..ClientConfig::new(Trust::System(extra.clone()), &url.host) };
         tls::connect(Box::new(tcp), cfg).map(|s| Box::new(s) as Box<dyn Stream>).map_err(|e| HttpError::Tls(format!("{}", e)))
     })
 }
@@ -93,9 +99,9 @@ pub fn connector(trust: ServerTrust, identity: Option<Identity>, seen: Arc<Mutex
     Arc::new(move |url: &Url, tcp: TcpStream| {
         let host = url.host.clone();
         let cfg = match &trust {
-            ServerTrust::Ca(ca) => ClientConfig { trust: Trust::Anchors(alloc::vec![ca.clone()]), identity: identity.clone(), server_name: host },
+            ServerTrust::Ca(ca) => ClientConfig { identity: identity.clone(), alpn: http11(), ..ClientConfig::new(Trust::Anchors(alloc::vec![ca.clone()]), &host) },
             // the chain is checked below, against the CA it ends in
-            _ => ClientConfig { trust: Trust::Any, identity: identity.clone(), server_name: String::new() },
+            _ => ClientConfig { identity: identity.clone(), alpn: http11(), ..ClientConfig::new(Trust::Any, "") },
         };
         let s = tls::connect(Box::new(tcp), cfg).map_err(|e| HttpError::Tls(format!("{}", e)))?;
         if let ServerTrust::Ca(_) = trust {

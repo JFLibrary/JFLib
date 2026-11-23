@@ -390,7 +390,7 @@ fn serve() -> i32 {
 /// issued at pairing (CN = host id); it counts only while the host exists, the fingerprint is
 /// the one on record and it is not revoked
 fn tls_wrap(ctx: &Arc<Ctx>) -> Wrap {
-    let cfg = netio::tls::ServerConfig { identity: ctx.pki.server.clone(), client_auth: Some(Trust::Anchors(alloc::vec![ctx.pki.ca.clone()])), client_auth_optional: true };
+    let cfg = netio::tls::ServerConfig { client_auth: Some(Trust::Anchors(alloc::vec![ctx.pki.ca.clone()])), client_auth_optional: true, ..netio::tls::ServerConfig::new(ctx.pki.server.clone()) };
     let ctx = ctx.clone();
     Arc::new(move |tcp: TcpStream| {
         let s = netio::tls::accept(Box::new(tcp), cfg.clone()).ok()?;
