@@ -1,6 +1,6 @@
 [package]
 name = "jflib-pdf"
-description = "PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments)"
+description = "PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments, drawing pages)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -18,10 +18,16 @@ doctest = false
 workspace = true
 
 [dependencies]
+rt.workspace = true
 gfx.workspace = true
 compress.workspace = true
 crypto.workspace = true
 text_shape.workspace = true
+# drawing pages: glyph outlines (TrueType, CFF), the system's fonts, JPEG images
+text.workspace = true
+plat.workspace = true
+img_core.workspace = true
+img_jpeg.workspace = true
 
 # docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
 # of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)

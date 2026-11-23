@@ -8,10 +8,10 @@ nothing is installed system-wide.  The servers are `coretest --tls-serve --key K
 server, HTTP behind it); the scripts of ECHO, which check the length of what comes back, get
 `coretest --tls-echo` (each line back in one record).
 SCRIPTS below says for each script what to expect and which server it talks to (RSA, ECDSA P-256
-or Ed25519 certificates of coretest's PKI, one asking for a client certificate): run (every probe
-must pass, the probes named there are expected to fail for the reason given) or not applicable (a
-feature netio does not have: ML-DSA, PSK and resumption, FFDHE, brainpool, post-handshake auth,
-certificate compression).  Linux (from Windows: runs itself again in WSL); needs git, pip and the Linux coretest
+or Ed25519 certificates of coretest's PKI, one asking for a client certificate; all of them send
+session tickets): run (every probe must pass, the probes named there are expected to fail for the
+reason given) or not applicable (a feature netio does not have: ML-DSA, external PSKs, FFDHE,
+brainpool, post-handshake auth, certificate compression).  Linux (from Windows: runs itself again in WSL); needs git, pip and the Linux coretest
 (python build_rs.py app coretest --target linux).  Exit code 1 on any unexpected result."""
 import argparse
 import os
@@ -30,13 +30,14 @@ PIP = ["ecdsa==0.19.2", "six==1.17.0"]
 
 # the servers: coretest --tls-serve with keys of a kind (--key), one asking for a client
 # certificate of coretest's CA (--mtls; the scripts get its client key and certificate)
+# (all with session tickets, two per handshake)
 SERVERS = {
-    "rsa": ["--key", "rsa"],
+    "rsa": ["--key", "rsa", "--tickets"],
     # a P-256 and a P-384 certificate, chosen by the client's signature schemes
-    "ecdsa": ["--key", "p256,p384"],
-    "ed25519": ["--key", "ed25519"],
+    "ecdsa": ["--key", "p256,p384", "--tickets"],
+    "ed25519": ["--key", "ed25519", "--tickets"],
     # asks for a client certificate of coretest's CA, takes a client without one
-    "rsa-mtls": ["--key", "rsa", "--mtls-optional"],
+    "rsa-mtls": ["--key", "rsa", "--mtls-optional", "--tickets"],
 }
 # a script's arguments may name the client's key and certificate of the PKI
 CLIENT = ["-k", "{pki}/client.key", "-c", "{pki}/client.pem"]
@@ -46,11 +47,11 @@ CR_SIGALGS = ["-s", "ecdsa_secp256r1_sha256 ecdsa_secp384r1_sha384 rsa_pss_rsae_
 
 # script -> (extra arguments, None to run it or the reason it does not apply, the server);
 # probes expected to fail go in XFAIL with their reason
-NO_PSK = "no PSK, session tickets or resumption"
+NO_EXT_PSK = "no external PSKs (resumption with tickets: test-tls13-session-resumption)"
 SCRIPTS = {
     "test-tls13-conversation": ([], None, "rsa"),
     "test-tls13-ccs": ([], None, "rsa"),
-    "test-tls13-count-tickets": ([], None, "rsa"),
+    "test-tls13-count-tickets": (["-t", "2"], None, "rsa"),
     "test-tls13-dhe-shared-secret-padding": ([], None, "rsa"),
     "test-tls13-empty-alert": ([], None, "rsa"),
     "test-tls13-finished": ([], None, "rsa"),
@@ -102,9 +103,10 @@ SCRIPTS = {
     "test-tls13-ffdhe-groups": ([], "no FFDHE groups", "rsa"),
     "test-tls13-ffdhe-sanity": ([], "no FFDHE groups", "rsa"),
     "test-tls13-non-support": ([], "for servers without TLS 1.3", "rsa"),
-    "test-tls13-psk_dhe_ke": ([], NO_PSK, "rsa"),
-    "test-tls13-psk_ke": ([], NO_PSK, "rsa"),
-    "test-tls13-session-resumption": ([], NO_PSK, "rsa"),
+    "test-tls13-psk_dhe_ke": ([], NO_EXT_PSK, "rsa"),
+    "test-tls13-psk_ke": ([], NO_EXT_PSK, "rsa"),
+    # psk_dhe_ke only: psk_ke would give up forward secrecy
+    "test-tls13-session-resumption": (["--client-pke", "psk_dhe_ke"], None, "rsa"),
 }
 # the groups netio's server does not have (probes named "TLS 1.3 with GROUP")
 GROUPS_NOT = "secp521r1|x448|ffdhe|brainpool"
@@ -118,13 +120,13 @@ XFAIL = {
     "test-tls13-finished": [("pad_left 0, pad_right (196608|1677\\d{4})$", "a race in tlsfuzzer's runner when the server refuses a message of 192 KiB or more at its header")],
     "test-tls13-symetric-ciphers": [("CCM", "no CCM suites")],
     "test-tls13-keyupdate-from-server": [("post-handshake KeyUpdate msg from server", "the server does not start key updates by itself")],
-    "test-tls13-connection-abort": [("After NewSessionTicket", "no session tickets")],
     "test-tls13-crfg-curves": [("x448", "no x448")],
     "test-tls13-ecdhe-curves": [("secp521r1|x448", "no secp521r1, no x448")],
     "test-tls13-obsolete-curves": [(".", "a client listing obsolete groups (RFC 8446 4.2.7) is not refused; netio takes a group it has from the list")],
     "test-tls13-serverhello-random": [(GROUPS_NOT, "no secp521r1, x448, FFDHE, brainpool")],
     "test-tls13-dhe-shared-secret-padding": [(GROUPS_NOT, "no secp521r1, x448, FFDHE, brainpool")],
     "test-tls13-0rtt-garbage": [("downgrade to TLS 1\\.2", "the server speaks TLS 1.3 only")],
+    "test-tls13-session-resumption": [("TLS 1\\.2", "the server speaks TLS 1.3 only (no TLS 1.2 tickets)")],
     "test-tls13-unrecognised-groups": [("ffdhe", "no FFDHE groups")],
     "test-tls13-version-negotiation": [("1\\.2|TLS 1\\.2|\\(3, 3\\)|fallback|in client hello legacy field",
                                         "the server speaks TLS 1.3 only (a ClientHello without supported_versions asks for TLS 1.2)")],
@@ -217,7 +219,7 @@ def main():
     ports = {k: free_port() for k in SERVERS}
     echo_port = free_port()
     procs = [subprocess.Popen([str(exe), "--tls-serve", str(ports[k])] + v, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) for k, v in SERVERS.items()]
-    procs.append(subprocess.Popen([str(exe), "--tls-echo", str(echo_port), "--key", "rsa"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    procs.append(subprocess.Popen([str(exe), "--tls-echo", str(echo_port), "--key", "rsa", "--tickets"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     bad = 0
     try:
         if not all(wait_port(p) for p in list(ports.values()) + [echo_port]):

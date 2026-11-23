@@ -7,7 +7,8 @@
 // library's shaping), links to URIs and to places in the document, nested outlines
 // (bookmarks), the document information and XMP metadata.  PDF 1.7 with a classic xref table;
 // the same document always gives the same bytes.  Not here: PDF/A, encryption, forms.  And a
-// reader, pdf::read: structure, encryption, text, outlines, forms, attachments (below).
+// reader, pdf::read: structure, encryption, text, outlines, forms, attachments, and drawing pages
+// (below).
 //
 //   let mut doc = Document::new();
 //   let page = doc.add_page(A4.0, A4.1);              // points (1/72 inch); mm(210.0) converts

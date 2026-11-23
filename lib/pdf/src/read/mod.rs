@@ -1,6 +1,6 @@
 // pdf::read -- a PDF reader: the objects of a file, its pages, information, outlines, links and
-// other annotations, form fields, attachments, page labels and the text of each page with
-// where each glyph stands.  PDF 1.0 to 2.0: classic cross-reference tables and cross-reference
+// other annotations, form fields, attachments, page labels, the text of each page with where
+// each glyph stands, and the pages drawn as pixels (render/).  PDF 1.0 to 2.0: classic cross-reference tables and cross-reference
 // streams, object streams, incremental updates, hybrid files; files whose table is missing or
 // wrong are rebuilt from their objects, as the common readers do.  Encrypted files with the
 // standard security handler open with their password, or without one when only the owner
@@ -13,12 +13,15 @@
 //   }
 //   let info = doc.info();                             // pdf::Info: title, author, dates, ...
 //   for o in doc.outlines() { .. }                     // bookmarks with their Action
+//   let px = doc.render(0, &RenderOptions { dpi: 150.0, ..Default::default() })?;  // gfx::Surface
 //
 //   Document     open / open_with, version, is_encrypted / permissions / opened_as_owner,
 //                was_repaired, trailer / catalog, get(Ref) / resolve, decode(Stream) /
 //                decode_until_image, page_count / page / pages / contents, info / metadata /
 //                language, outlines, named_dest, annotations / links, fields, attachments,
-//                page_label, page_text (glyphs with positions) / text
+//                page_label, page_text (glyphs with positions) / text, page_pixels / render
+//                (RenderOptions: dpi, region, background, annotations, fonts: a FontSource,
+//                SystemFonts by default)
 //   Object       Null, Bool, Int, Real, String, Name, Array, Dict, Stream, Ref; text_string
 //   Ops          the operators of a content stream with their operands (content::Op)
 //
@@ -28,10 +31,10 @@
 // most Options::max_stream bytes.  Permissions are reported, not enforced: what a program
 // allows its user to do with the document is its own decision.
 //
-// Not here: drawing pages (the images, the shading and the glyphs' outlines), the image
-// filters (DCT, JPX, JBIG2, CCITTFax: decode_until_image stops before them), the predefined
-// CMaps of East Asian fonts other than Identity and the Unicode ones, verifying signatures,
-// changing and saving documents.
+// Not here: the image filters for decode_until_image (it stops before DCT, JPX, JBIG2 and
+// CCITTFax; drawing decodes DCT and CCITTFax), JPX and JBIG2 images at all, the predefined CMaps
+// of East Asian fonts other than Identity and the Unicode ones, verifying signatures, changing
+// and saving documents.
 
 mod cmap;
 mod content;
@@ -41,6 +44,7 @@ mod font;
 mod lex;
 mod nav;
 mod object;
+mod render;
 pub(crate) mod tables;
 mod text;
 mod xref;
@@ -48,6 +52,7 @@ mod xref;
 pub use content::{Op, Ops};
 pub use nav::{Action, Annotation, Attachment, Dest, Field, FieldKind, Outline, Signature, View};
 pub use object::{text_string, Dict, Name, Object, Ref, Stream};
+pub use render::{FontQuery, FontSource, RenderOptions, SystemFonts};
 pub use text::{PageText, TextItem};
 
 use crate::{Date, Info};
@@ -161,6 +166,8 @@ pub struct Document {
     page_index: BTreeMap<Ref, usize>,
     version: (u8, u8),
     max_stream: usize,
+    /// what drawing keeps across pages (fonts, the system's font list)
+    render: render::Cache,
 }
 
 impl Document {
@@ -193,6 +200,7 @@ impl Document {
             page_index: BTreeMap::new(),
             version,
             max_stream: opt.max_stream,
+            render: render::Cache::default(),
         };
         doc.setup_crypt(&opt.password)?;
         // a catalog that does not load: rebuild from the objects

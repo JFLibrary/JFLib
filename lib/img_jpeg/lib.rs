@@ -33,7 +33,7 @@ pub use dec::{decode_abbrev, decode_abbrev_max, decode_fl, decode_fl_max};
 pub use enc::{encode, encode_ex, EncCfg};
 pub use glue::{decode_ex, encode_opt, meta, probe};
 // decode flags (img.inc JDF_*) and the encoder options this codec honours
-pub use img_core::{JDF_CMYK, JDF_NO_ORIENT, JDF_RGB, JDF_STRAIGHT, JDF_YCC, JPEG_IOM};
+pub use img_core::{JDF_CMYK, JDF_NO_ORIENT, JDF_RAW_CMYK, JDF_RGB, JDF_STRAIGHT, JDF_YCC, JPEG_IOM};
 
 /// jpeg_decode: decode a JPEG file into a new FMT_PARGB surface
 pub fn decode(data: &[u8]) -> Result<Surface, i32> {

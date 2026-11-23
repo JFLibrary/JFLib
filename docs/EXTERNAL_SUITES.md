@@ -29,9 +29,9 @@ tlsfuzzer and TLS-Anvil talk to `coretest` over TCP (sections below).
 | Wycheproof | 18 813 | 18 532 | 0 | 281 | 15 s |
 | ACVP | 13 199 | 3 608 | 0 | 9 591 | 2 s |
 | x509-limbo | 9 807 | 9 720 | 28 (+14 optional) | 45 | 10 s |
-| tlsfuzzer | 57 scripts | 42 scripts (2 770 probes, 540 failing as expected) | 0 | 15 scripts | 58 s |
+| tlsfuzzer | 57 scripts | 43 scripts (2 903 probes, 530 failing as expected) | 0 | 14 scripts | 63 s |
 | TLS-Anvil (client) | 232 tests | 192 | 2 (TLS-Anvil's own) | 38 | 85 s |
-| TLS-Anvil (server) | 302 tests | 110 | 0 | 192 | 10 min |
+| TLS-Anvil (server) | 289 tests | 123 | 0 | 166 | 9 min |
 
 Not one primitive in `lib/crypto` failed. The 15 Wycheproof failures of the first run were all
 in netio's DER decoding of ECDSA signatures and are fixed (below). The limbo failures that changed what netio accepts (17 in
@@ -222,17 +222,20 @@ and pass.
 `tools/tlsfuzzer_check.py` starts four `coretest --tls-serve` servers (netio's TLS 1.3 server,
 HTTP behind it) with certificates of coretest's PKI: RSA-2048 (most scripts), ECDSA P-256 and
 P-384 (both, chosen by the client's signature schemes), Ed25519, and RSA asking for a client
-certificate it does not require (the scripts get the PKI's client key and certificate).
+certificate it does not require (the scripts get the PKI's client key and certificate); all of
+them send two session tickets after each handshake (`--tickets`).
 `coretest --tls-echo` (every line back in one record) serves test-tls13-lengths, which checks the
 length of what comes back. `--list` prints what is expected of each script and why; `--only`
 runs some. Until phase 2b the server had an Ed25519 certificate only, and a sitecustomize in
 front of tlslite added ed25519 to the scripts' signature lists; that patch is gone.
 
-All 42 scripts that apply give the expected answer to every probe (2 770 probes, 540 failing as
+All 43 scripts that apply give the expected answer to every probe (2 903 probes, 530 failing as
 expected, two more that may). What fails as expected is a feature netio's server does not have: the CCM suites; the
 groups secp521r1, x448, FFDHE and brainpool; TLS 1.2 (a ClientHello without supported_versions,
-or one falling back); Ed448; a certificate with an RSASSA-PSS key (rsa_pss_pss_*); session
-tickets; KeyUpdates the server starts by itself. Three more:
+or one falling back, and the TLS 1.2 tickets of test-tls13-session-resumption); Ed448; a
+certificate with an RSASSA-PSS key (rsa_pss_pss_*); KeyUpdates the server starts by itself.
+test-tls13-session-resumption runs with `--client-pke psk_dhe_ke`: the server takes a ticket only
+with a fresh key exchange (psk_ke would give up forward secrecy). Three more:
 
 - a client that lists obsolete groups is not refused (netio takes a group it has from the list);
 - test-tls13-no-unknown-groups' range of "unknown" groups (4356 to 4611) holds the three ML-KEM
@@ -242,12 +245,12 @@ tickets; KeyUpdates the server starts by itself. Three more:
   tlsfuzzer's runner skips the expected alert (runner.py, a socket error on send) and then reports
   it as unexpected. Either answer can come, so both are taken.
 
-Not applicable (15 scripts):
+Not applicable (14 scripts):
 
 | Scripts | Reason |
 | ---: | --- |
-| 3 | PSK, session tickets, resumption (phase 2b, part 2) |
 | 3 | FFDHE and brainpool groups |
+| 2 | external PSKs (test-tls13-psk_dhe_ke, test-tls13-psk_ke; resumption with tickets runs) |
 | 2 | certificate compression (RFC 8879) |
 | 2 | client certificates with an ECDSA or Ed25519 key for tlsfuzzer (the tool hands it the PKI's RSA client) |
 | 1 | brainpool curves in CertificateVerify |
@@ -285,9 +288,9 @@ place); the others stay with tlsfuzzer.
 starts `coretest --tls-anvil-client PORT` for each handshake (netio's web client: TLS 1.3 with the
 TLS 1.2 fallback; a `Trust::Custom` that takes TLS-Anvil's made-up certificates, in the test
 program only). The client writes how each connection ended to `build/tlsanvil/run/client.log`.
-`--server` runs the server tests against `coretest --tls-serve --key rsa` (netio's TLS 1.3 server
-with an RSA-2048 certificate; `--key p256` and the others also work, but TLS-Scanner's probes
-offer no Ed25519). Strength 1 (each pair of parameters at least once), 4 tests at a time. The tool
+`--server` runs the server tests against `coretest --tls-serve --key rsa --tickets --early 16384`
+(netio's TLS 1.3 server with an RSA-2048 certificate, session tickets and 0-RTT; `--key p256` and
+the others also work, but TLS-Scanner's probes offer no Ed25519). Strength 1 (each pair of parameters at least once), 4 tests at a time. The tool
 starts TLS-Anvil with `-ignoreCache`: TLS-Anvil fails to save a scan whose peer offered ML-KEM key
 shares (NotSerializableException of MlKemPublicKey), and the cache is of no use in a run folder
 that starts empty.
@@ -309,12 +312,18 @@ through defects of TLS-Anvil itself (KNOWN in the script):
   of one byte).
 
 The server tests ran for the first time with phase 2b (before it the server had an Ed25519
-certificate only, which TLS-Scanner's probes do not offer). Of the 302 tests for servers and for
-both sides, all 110 that apply pass; 192 are disabled: 115 for TLS 1.2 and older versions, 23 for
-PSK, session tickets, resumption and 0-RTT (phase 2b, part 2), 21 for cipher suites, groups and
-signatures beyond netio's (FFDHE, CCM, DSA, RC4 ...), 14 for the client side of tests for both,
-the rest for Encrypt-then-MAC, max_fragment_length, rules TLS-Anvil does not expect a server to
-enforce and client authentication (the test server asks for no client certificate). Two answers were wrong and are fixed: the server ended a
+certificate only, which TLS-Scanner's probes do not offer). With session tickets and 0-RTT (phase
+2b, part 2), all 123 of the 289 tests for servers and for both sides that apply pass (110 before
+tickets); among them the tests of PreSharedKey (the binder's identity, psk_dhe_ke, a ticket of
+another suite's hash, pre_shared_key without psk_key_exchange_modes), PSKKeyExchangeModes,
+NewSessionTicket and EarlyData.sendEndOfEarlyUnprompted. TLS-Scanner finds the server's 0-RTT. 166
+are disabled: 119 for TLS 1.2 and older versions (its session resumption by ID among them), 21 for
+cipher suites, groups and signatures beyond the test server's (FFDHE, CCM, DSA, RC4 ...), 8 that TLS-Anvil
+marks `@Disabled` itself (five of them of 0-RTT: an invalid tag or ciphertext, another version or
+suite, the first identity), one for psk_ke (left out on purpose) and one for servers without
+0-RTT, the rest for Encrypt-then-MAC, max_fragment_length, rules TLS-Anvil does not expect a
+server to enforce and client authentication (the test server asks for no client certificate).
+Two answers were wrong and are fixed: the server ended a
 connection the client had closed without its own close_notify (AlertProtocol.sendsCloseNotify,
 RFC 8446 6.1: `netio::Server` now answers it), and one combination of
 ClientHello.sendStatusRequestExtension timed out because `coretest --tls-serve` had two workers

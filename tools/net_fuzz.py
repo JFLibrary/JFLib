@@ -24,6 +24,8 @@ build/net_fuzz and runs every target on its own thread for N seconds (default 60
   dns, dns_netpkt               netio's answer parser and netpkt's message parser
   http_netio, http_netpkt       netio's request reader over a stream in pieces, netpkt's heads
   tls_server                    netio's TLS server fed a mutated ClientHello
+  tls_server_psk                ... with session tickets and 0-RTT, the ClientHello offering a
+                                ticket (pre_shared_key, binders, early data behind it)
   tls_client, tls_webclient     netio's clients (own CA, web PKI) fed a mutated server flight
   ipv4_reassembly, ipv6_reassembly   netpkt's fragment reassembly fed mutated, reordered,
                                 duplicated and overlapping fragments

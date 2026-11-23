@@ -1270,6 +1270,11 @@ dependencies = [
  "jflib-compress",
  "jflib-crypto",
  "jflib-gfx",
+ "jflib-img-core",
+ "jflib-img-jpeg",
+ "jflib-plat",
+ "jflib-rt",
+ "jflib-text",
  "jflib-text-shape",
 ]
 

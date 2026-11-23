@@ -1730,7 +1730,12 @@ ui.dialog_end(); // always
   (the page's text in reading order), `page_text(i)` (every glyph with its position, for search
   and selection), `info`, `outlines`, `links`, `fields` (the form's values), `attachments`
   (embedded files such as the XML of a ZUGFeRD invoice). A damaged file is rebuilt from its
-  objects; a hostile one gives an error, never a panic. Drawing the pages is not there yet.
+  objects; a hostile one gives an error, never a panic. `render(i, &RenderOptions { dpi, region,
+  background, annotations, fonts, .. })` draws a page into a `gfx::Surface` (a viewer asks for
+  the tiles it shows with `region`; `page_pixels(i, dpi)` gives the size): every colour space,
+  embedded fonts and the system's fonts for the others, images, shadings, patterns and
+  transparency, as Poppler's `pdftoppm` draws them. Fonts a document does not embed come from a
+  `FontSource` (by default `SystemFonts`, the installed fonts through `text::fontdb`).
 
 **Logging** (`plat::log`): `plat::log!(plat::LOG_INFO, "net", "{} bytes from {}", n, host)` formats
 only when a sink wants the level; `plat::log_error / log_warn / log_info / log_debug(target, msg)`
@@ -2802,7 +2807,11 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   X25519, P-256, P-384; Ed25519, ECDSA and RSA certificates and keys, mutual authentication),
   certificates by SNI (`ServerConfig::identities`, `select`), ALPN (`ClientConfig::alpn`,
   `ServerConfig::alpn`); `Identity::from_pem(chain, key)` reads what a CA hands out (PKCS #8,
-  SEC 1, PKCS #1). `netio::x509` builds and checks the certificates of a private CA
+  SEC 1, PKCS #1). Resumption with session tickets: `ServerConfig::tickets`
+  (`Arc<tls::Tickets>`, one for all connections of a server) and `ClientConfig::sessions`
+  (`Arc<tls::Sessions>`, a client's tickets); 0-RTT only where the server allows it
+  (`ServerConfig::early_data`, `tls::connect_early`, `TlsStream::read_early` for data that may be
+  a replay). `netio::x509` builds and checks the certificates of a private CA
   (`CertBuilder::sign_key` with any key, `sign_ext` adds or replaces extensions: name
   constraints, a CA's purposes; `x509::PrivateKey`).
   The chain check honours name constraints for wildcards by the names they stand for and the

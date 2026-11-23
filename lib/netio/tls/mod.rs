@@ -3,12 +3,17 @@
 //   Both sides: TLS 1.3 · ChaCha20-Poly1305, AES-128-GCM, AES-256-GCM · X25519MLKEM768
 //   (post-quantum hybrid), X25519, P-256, P-384 · certificates and keys of Ed25519, ECDSA
 //   (P-256 / P-384) and RSA (the web PKI or a CA of one's own) · mutual authentication ·
-//   HelloRetryRequest · KeyUpdate.
+//   HelloRetryRequest · KeyUpdate · resumption with session tickets (psk_dhe_ke) · 0-RTT with
+//   replay protection (opt-in).
 //   Public servers (client side, Trust::System / Custom): also TLS 1.2 with ECDHE and AEAD suites.
-//   Not here: PSK / resumption, 0-RTT, renegotiation, revocation checks.
+//   Not here: external PSKs, psk_ke, TLS 1.2 resumption, renegotiation, revocation checks.
 //
 //   connect(stream, ClientConfig) -> TlsStream     accept(stream, ServerConfig) -> TlsStream
 //   TlsStream implements Stream (HTTP runs over it unchanged); peer_certs() after the handshake
+//   Resumption: ServerConfig::tickets (Tickets: keys, lifetime), ClientConfig::sessions
+//   (Sessions: a client's tickets per server); TlsStream::resumed()
+//   0-RTT: ServerConfig::early_data (bytes; 0 = none), connect_early(stream, cfg, data) ->
+//   (TlsStream, bytes taken), TlsStream::read_early (a server: data that may be a replay)
 //   Identity::new(chain, key) / Identity::from_pem(certs, key): a chain and its key (PrivateKey:
 //   Ed25519, ECDSA, RSA; PKCS #8, SEC 1, PKCS #1)
 //   Trust::Anchors(CAs) / Pinned(SHA-256 of the leaf) / Any (trust on first use: the caller
@@ -20,6 +25,7 @@ pub mod conn;
 pub mod keysched;
 pub mod kx;
 pub mod record;
+pub mod session;
 
 use alloc::boxed::Box;
 use alloc::sync::Arc;
@@ -34,6 +40,7 @@ use crate::x509::{Cert, PrivateKey};
 use crate::Stream;
 
 pub use conn::Conn;
+pub use session::{ReplayCheck, Sessions, Tickets};
 
 /// a certificate chain (DER, leaf first) and the leaf's private key (Ed25519, ECDSA, RSA)
 #[derive(Clone)]
@@ -104,12 +111,16 @@ pub struct ClientConfig {
     /// over 255 bytes is left out, and the names after the first 8 KiB of them; none left: no
     /// ALPN offered
     pub alpn: Vec<String>,
+    /// session tickets to resume with (TLS 1.3): the connection offers one of this server and
+    /// keeps the ones it gets.  Several configs may share a cache: it keeps the tickets by
+    /// server name, trust and client identity.  None: no resumption
+    pub sessions: Option<Arc<Sessions>>,
 }
 
 impl ClientConfig {
-    /// this trust and server name; no client certificate, no ALPN
+    /// this trust and server name; no client certificate, no ALPN, no resumption
     pub fn new(trust: Trust, server_name: &str) -> ClientConfig {
-        ClientConfig { trust, identity: None, server_name: String::from(server_name), alpn: Vec::new() }
+        ClientConfig { trust, identity: None, server_name: String::from(server_name), alpn: Vec::new(), sessions: None }
     }
 }
 
@@ -149,12 +160,34 @@ pub struct ServerConfig {
     /// client that offers protocols, none of them these, is refused (no_application_protocol,
     /// RFC 7301 3.2).  Empty: ALPN is not answered
     pub alpn: Vec<String>,
+    /// session tickets (TLS 1.3 resumption): sent after each handshake and taken back for a
+    /// handshake without certificates.  A resumed connection keeps the client certificates of
+    /// its first handshake (peer_certs) for up to 7 days, while the same client_auth trust asks
+    /// for them and takes them again (each resumption checks them).  None: no tickets
+    pub tickets: Option<Arc<Tickets>>,
+    /// 0-RTT (needs tickets): the most bytes of early data a client may send with a ticket; 0
+    /// (the default): none.  A ticket that allows more than the server takes now is resumed
+    /// without 0-RTT.  Early data can be replayed by an attacker (RFC 8446 8, E.5): the
+    /// server takes it only from a ClientHello within 10 seconds of the ticket's age and the
+    /// first time it comes (Tickets::replay_check), keeps it apart (TlsStream::read_early) and
+    /// hands it to read() only once the handshake is done.  With 0-RTT taken, accept returns
+    /// after the server's flight, before the client's Finished
+    pub early_data: u32,
 }
 
 impl ServerConfig {
-    /// this identity; no client certificates, no ALPN
+    /// this identity; no client certificates, no ALPN, no tickets
     pub fn new(identity: Identity) -> ServerConfig {
-        ServerConfig { identity, identities: Vec::new(), select: None, client_auth: None, client_auth_optional: false, alpn: Vec::new() }
+        ServerConfig {
+            identity,
+            identities: Vec::new(),
+            select: None,
+            client_auth: None,
+            client_auth_optional: false,
+            alpn: Vec::new(),
+            tickets: None,
+            early_data: 0,
+        }
     }
 }
 
@@ -246,7 +279,7 @@ impl TlsStream {
             self.flush()?;
             {
                 let c = self.conn.lock();
-                if c.established() {
+                if c.ready() {
                     return Ok(());
                 }
                 if c.closed() {
@@ -297,6 +330,46 @@ impl TlsStream {
     pub fn server_name(&self) -> String {
         String::from(self.conn.lock().server_name())
     }
+
+    /// the handshake resumed a session (a ticket instead of certificates)
+    pub fn resumed(&self) -> bool {
+        self.conn.lock().resumed()
+    }
+
+    /// a server that took 0-RTT: the client's early data as it comes, before the handshake is
+    /// done; Ok(0) at its end (or when none was taken).  An attacker may have replayed it
+    /// (RFC 8446 8): act on it only where twice does no harm (RFC 8470).  What is not read here
+    /// comes first from read() once the handshake is done
+    pub fn read_early(&self, buf: &mut [u8]) -> NetResult<usize> {
+        let mut raw = alloc::vec![0u8; 16 * 1024 + 512];
+        let t0 = plat::time_us();
+        let read_ms = self.read_ms.load(core::sync::atomic::Ordering::Relaxed);
+        loop {
+            {
+                let mut c = self.conn.lock();
+                if c.has_early() {
+                    return Ok(c.read_early(buf));
+                }
+                if !c.in_early() || c.closed() {
+                    return Ok(0);
+                }
+            }
+            // records without data (empty ones) do not keep it going past the timeout, as read
+            if read_ms != u32::MAX && plat::time_us().saturating_sub(t0) >= read_ms as u64 * 1000 {
+                return Err(NetError::new(NetErrorKind::TimedOut, 0));
+            }
+            let n = self.inner.read(&mut raw)?;
+            if n == 0 {
+                return Ok(0);
+            }
+            let r = self.conn.lock().feed(&raw[..n]);
+            let _ = self.flush();
+            if let Err(e) = r {
+                *self.last_error.lock() = Some(e);
+                return Err(to_net(e));
+            }
+        }
+    }
 }
 
 /// client side: handshake over `inner`
@@ -304,6 +377,19 @@ pub fn connect(inner: Box<dyn Stream>, cfg: ClientConfig) -> Result<TlsStream, T
     let s = TlsStream::new(inner, Conn::client(cfg));
     s.handshake()?;
     Ok(s)
+}
+
+/// client side with 0-RTT: `early` goes right after the ClientHello when a ticket of
+/// cfg.sessions allows early data (as much as the ticket takes).  -> the stream and the bytes of
+/// `early` the server took: 0 when none went (no such ticket) or the server refused them; the
+/// caller sends the rest with write_all, if it still applies (TlsStream::alpn may differ: RFC
+/// 8446 4.2.10).  Early data can be replayed by an attacker: only for requests that do no harm
+/// twice
+pub fn connect_early(inner: Box<dyn Stream>, cfg: ClientConfig, early: &[u8]) -> Result<(TlsStream, usize), TlsError> {
+    let s = TlsStream::new(inner, Conn::client_early(cfg, early));
+    s.handshake()?;
+    let n = s.conn.lock().early_taken();
+    Ok((s, n))
 }
 
 /// server side: handshake over `inner`
