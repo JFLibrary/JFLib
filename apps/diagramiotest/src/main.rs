@@ -30,6 +30,8 @@
 //                                         metric and US (templates.rs)
 //   diagramiotest --write-vdx DIR        (JD16) the self-written .vdx / .vsx files and the .vsdx /
 //                                         .vssx JFDiagrammer writes from them (vdx.rs)
+//   diagramiotest --write-vss DIR        (JD17) the sample stencil jd17-schablone.vss (three masters
+//                                        with geometry formulas; JFDiagrammer's binary_stencil.uis)
 //   diagramiotest --write-vss-hostile DIR (JD17) the synthetic .vss files and their hostile
 //                                         variants (vss.rs)
 //   diagramiotest --write-vss-overview DIR [--corpus DIR]   (JD17) every master of each local .vss
@@ -123,6 +125,7 @@ mod templates;
 mod vdx;
 mod vdx_sample;
 mod vss;
+mod vss_sample;
 mod vsskit;
 mod zipkit;
 
@@ -231,6 +234,10 @@ fn run() -> i32 {
         // (JD17) every master of each local .vss on one sheet
         return vss::write_overview(&dir, arg(&args, "--corpus"));
     }
+    if let Some(dir) = arg(&args, "--write-vss") {
+        // (JD17) the sample stencil jd17-schablone.vss (JFDiagrammer's tests/binary_stencil.uis)
+        return vss_sample::write(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-vss-hostile") {
         // (JD17) the synthetic .vss files and their hostile variants
         return vss::write_hostile(&dir);
@@ -288,6 +295,7 @@ fn run() -> i32 {
         }
         // (JD17) the binary stencils of 2003-2010 (subgroups vss/cfb, vss/stream ...)
         vss::run(&mut h);
+        vss_sample::run(&mut h);
     }
     if h.on("corpus") {
         corpus::run(&mut h, corpus_dir.clone());
