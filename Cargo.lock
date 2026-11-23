@@ -266,6 +266,9 @@ dependencies = [
 [[package]]
 name = "cargo-jflib"
 version = "0.2.1"
+dependencies = [
+ "jflib-compress",
+]
 
 [[package]]
 name = "codectest"

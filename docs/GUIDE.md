@@ -2836,8 +2836,10 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   For protocols defined with MD5 (RADIUS): MD5 (`md5`, `Md5`, `md5_parts`) and HMAC-MD5
   (`hmac_md5`); broken for collisions, so new designs take SHA-256 (RFC 1321, 2104).
 * `compress` -- DEFLATE, zlib and gzip in both directions (`compress::gzip::compress(data,
-  level)` / `decompress(data, max_out)`; levels 0 to 9), the Brotli decoder
-  (`compress::brotli::decompress`), LZ4 and zstd (`compress::zstd::compress(data, level)` /
+  level)` / `decompress(data, max_out)`; levels 0 to 9), Brotli, the `br` of HTTP
+  (`compress::brotli::compress(data, level)` / `decompress`; levels 0 to 11, `LEVEL_DEFAULT` 5
+  for a web server's responses, 11 for files compressed once), LZ4 (`lz4::compress_hc` for
+  smaller blocks) and zstd (`compress::zstd::compress(data, level)` /
   `decompress`; levels 1 to 19, single-segment frames with checksums), zstd dictionaries for
   small records (`zstd::Dictionary::train(&samples, 16 << 10)`, `compress_with_dict`, in the
   format of `zstd --train`), CRC-32, Adler-32 and xxHash; `Codec` picks LZ4 or zstd by name. Each format also in pieces (`compress::stream`):

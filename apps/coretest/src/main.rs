@@ -150,7 +150,11 @@ fn run() -> i32 {
         let rest: alloc::vec::Vec<String> = args.iter().skip_while(|a| a.as_str() != "--stream").skip(2).cloned().collect();
         return match rest.as_slice() {
             [op, i, o, l, ..] => lzs::file_mode(&fmt, op, i, o, l.parse().unwrap_or(6)),
-            [op, i, o] => lzs::file_mode(&fmt, op, i, o, if fmt == "zstd" { 3 } else { 6 }),
+            [op, i, o] => lzs::file_mode(&fmt, op, i, o, match fmt.as_str() {
+                "zstd" => 3,
+                "brotli" => compress::brotli::LEVEL_DEFAULT,
+                _ => 6,
+            }),
             _ => 2,
         };
     }

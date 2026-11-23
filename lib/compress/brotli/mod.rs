@@ -1,29 +1,42 @@
-// brotli -- Brotli decompression (RFC 7932), the Content-Encoding "br" of the web and the
+// brotli -- Brotli (RFC 7932) both ways, the Content-Encoding "br" of the web and the
 // compression of WOFF2 fonts and of JPEG XL's JPEG reconstruction data (until 0.2 in
 // img_jxl)                                                               [jxl-plus: no asm]
 //
+//   compress(data, level) -> stream              levels 0..=11 (LEVEL_DEFAULT 5), the window
+//                                                as small as the data allows (enc.rs)
 //   decompress(data, max_out) -> Option<Vec<u8>>   the stream that fills data completely;
 //                                                None for a damaged stream, data after it
 //                                                or more than max_out bytes
 //   decompress_prefix(data, max_out) -> Ok((bytes, consumed))   the stream at the start of
 //                                                data; Error::Corrupt for a damaged stream,
 //                                                Error::Limit past max_out bytes
-//   Decoder                                      in pieces (stream::Decode; sdec.rs)
+//   Decoder / Encoder                            in pieces (stream::Decode / Encode; sdec.rs,
+//                                                senc.rs)
 //
-// One pass over the whole input: bit reader, prefix codes (simple and complex), block switches,
-// context maps (RLE + move to front), insert-and-copy commands, the distance ring buffer and
-// the static dictionary with its 121 transforms (tab.rs, dict.bin; tools/gen_brotli_dict.py).
-// The output is bounded by max_out before it grows, every distance is checked against the
-// output so far.  Large windows (an extension outside RFC 7932) are refused.
+// The decoder makes one pass over the whole input: bit reader, prefix codes (simple and
+// complex), block switches, context maps (RLE + move to front), insert-and-copy commands, the
+// distance ring buffer and the static dictionary with its 121 transforms (tab.rs, dict.bin;
+// tools/gen_brotli_dict.py).  The output is bounded by max_out before it grows, every
+// distance is checked against the output so far.  Large windows (an extension outside RFC
+// 7932) are refused.
 
 use alloc::vec;
 use alloc::vec::Vec;
 
+mod enc;
 mod sdec;
+mod senc;
 mod tab;
 use tab as T;
 
+pub use enc::{bound, compress};
 pub use sdec::Decoder;
+pub use senc::Encoder;
+
+/// the level of compress() for most uses, as for the responses of a web server
+pub const LEVEL_DEFAULT: i32 = 5;
+/// the strongest level, for files compressed once and sent often (as `brotli -q 11`)
+pub const LEVEL_MAX: i32 = 11;
 
 /// why a Brotli stream could not be read
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

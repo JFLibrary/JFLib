@@ -2,6 +2,8 @@
 //
 //   compress(data) -> block                greedy matcher, 16K-entry hash table, skip
 //                                          acceleration on incompressible data
+//   compress_hc(data, level) -> block      the longest match along a hash chain of
+//                                          2^(level-1) candidates (levels 3..=12, as lz4 -9)
 //   decompress(block, max_out)             None on truncation, a bad offset, or more than
 //                                          max_out bytes; never reads or writes out of bounds
 //   decompress_into(block, &mut out, limit) appends (back references may reach into the
@@ -110,6 +112,90 @@ pub fn compress(src: &[u8]) -> Vec<u8> {
         } else {
             misses += 1;
             ip += 1 + (misses >> 6);
+        }
+    }
+    last(&mut out, &src[anchor..]);
+    out
+}
+
+/// the level of compress_hc() for most uses (as `lz4 -9`)
+pub const LEVEL_HC_DEFAULT: i32 = 9;
+
+/// equal bytes at a and b (a < b), at most max
+fn common(s: &[u8], a: usize, b: usize, max: usize) -> usize {
+    let mut n = 0;
+    while n + 8 <= max {
+        let mut x = [0u8; 8];
+        let mut y = [0u8; 8];
+        x.copy_from_slice(&s[a + n..a + n + 8]);
+        y.copy_from_slice(&s[b + n..b + n + 8]);
+        let d = u64::from_le_bytes(x) ^ u64::from_le_bytes(y);
+        if d != 0 {
+            return n + (d.trailing_zeros() / 8) as usize;
+        }
+        n += 8;
+    }
+    while n < max && s[a + n] == s[b + n] {
+        n += 1;
+    }
+    n
+}
+
+/// compress into one LZ4 block, smaller than compress() and slower: at each position the
+/// longest match along a hash chain of 2^(level-1) candidates (level 3..=12; LZ4's own high
+/// compression levels search as far, its levels 10 to 12 also parse optimally)
+pub fn compress_hc(src: &[u8], level: i32) -> Vec<u8> {
+    const HC_LOG: u32 = 16;
+    let n = src.len();
+    let mut out = Vec::with_capacity(bound(n));
+    if n <= MF_LIMIT {
+        last(&mut out, src);
+        return out;
+    }
+    let depth = 1usize << (level.clamp(3, 12) - 1);
+    let mut head = vec![0u32; 1 << HC_LOG]; // position + 1
+    let mut prev = vec![0u32; MAX_DIST + 1]; // the position before with the same hash, + 1
+    let mflimit = n - MF_LIMIT;
+    let match_end = n - LAST_LITERALS;
+    let hash = |i: usize| (rd32(src, i).wrapping_mul(2_654_435_761) >> (32 - HC_LOG)) as usize;
+    let (mut i, mut anchor, mut next) = (0, 0, 0);
+    while i <= mflimit {
+        // the positions up to i into the chains
+        while next < i {
+            let h = hash(next);
+            prev[next & MAX_DIST] = head[h];
+            head[h] = next as u32 + 1;
+            next += 1;
+        }
+        let max = match_end - i;
+        let (mut best, mut off) = (0, 0);
+        let mut cand = head[hash(i)];
+        let mut k = 0;
+        while cand != 0 && k < depth {
+            let q = cand as usize - 1;
+            if i - q > MAX_DIST {
+                break;
+            }
+            if best < max && src[q + best] == src[i + best] {
+                let len = common(src, q, i, max);
+                if len > best {
+                    best = len;
+                    off = i - q;
+                }
+            }
+            let p = prev[q & MAX_DIST];
+            if p == 0 || p as usize - 1 >= q {
+                break; // the end of the chain, or an entry of later positions
+            }
+            cand = p;
+            k += 1;
+        }
+        if best >= MIN_MATCH {
+            sequence(&mut out, &src[anchor..i], off, best);
+            i += best;
+            anchor = i;
+        } else {
+            i += 1;
         }
     }
     last(&mut out, &src[anchor..]);

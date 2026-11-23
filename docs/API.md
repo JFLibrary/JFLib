@@ -85,7 +85,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [x509](#x509) -- X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)
   <br>[lib.rs](#x509-crate-root) · [der.rs](#x509derrs) · [ip.rs](#x509iprs)
 - [compress](#compress) -- DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids
-  <br>[lib.rs](#compress-crate-root) · [brotli/mod.rs](#compressbrotlimodrs) · [brotli/sdec.rs](#compressbrotlisdecrs) · [checksum.rs](#compresschecksumrs) · [deflate/mod.rs](#compressdeflatemodrs) · [deflate/dec.rs](#compressdeflatedecrs) · [deflate/enc.rs](#compressdeflateencrs) · [deflate/sdec.rs](#compressdeflatesdecrs) · [gzip.rs](#compressgziprs) · [lz4.rs](#compresslz4rs) · [stream.rs](#compressstreamrs) · [xxh.rs](#compressxxhrs) · [zlib.rs](#compresszlibrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/dict.rs](#compresszstddictrs) · [zstd/enc.rs](#compresszstdencrs) · [zstd/sdec.rs](#compresszstdsdecrs) · [zstd/senc.rs](#compresszstdsencrs)
+  <br>[lib.rs](#compress-crate-root) · [brotli/mod.rs](#compressbrotlimodrs) · [brotli/enc.rs](#compressbrotliencrs) · [brotli/sdec.rs](#compressbrotlisdecrs) · [brotli/senc.rs](#compressbrotlisencrs) · [checksum.rs](#compresschecksumrs) · [deflate/mod.rs](#compressdeflatemodrs) · [deflate/dec.rs](#compressdeflatedecrs) · [deflate/enc.rs](#compressdeflateencrs) · [deflate/sdec.rs](#compressdeflatesdecrs) · [gzip.rs](#compressgziprs) · [lz4.rs](#compresslz4rs) · [stream.rs](#compressstreamrs) · [xxh.rs](#compressxxhrs) · [zlib.rs](#compresszlibrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/dict.rs](#compresszstddictrs) · [zstd/enc.rs](#compresszstdencrs) · [zstd/sdec.rs](#compresszstdsdecrs) · [zstd/senc.rs](#compresszstdsencrs)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery, secondary indexes, encryption at rest
   <br>[lib.rs](#datastore-crate-root) · [index.rs](#datastoreindexrs) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
@@ -43342,8 +43342,10 @@ compress -- lossless compression: DEFLATE, zlib, gzip, Brotli, LZ4 and Zstandard
   zlib::compress / decompress                     zlib streams (RFC 1950)
   gzip::compress / decompress                     gzip members (RFC 1952; decompress reads
                                                   all members, as gunzip does)
-  brotli::decompress(data, max_out)               Brotli streams (RFC 7932), decoder only
+  brotli::compress(data, level) / decompress      Brotli streams (RFC 7932; levels 0 to 11,
+                                                  read by libbrotli and the browsers)
   lz4::compress(data) -> Vec<u8>                  LZ4 block (greedy, 64 KiB window)
+  lz4::compress_hc(data, level)                   LZ4 block, longest matches (as lz4 -9)
   lz4::decompress(block, max_out) -> Option<Vec>  bounds-checked; None on any corruption
   lz4::frame_compress / frame_decompress          the LZ4 frame format (lz4 / zstd --format=lz4
                                                   interoperable), xxHash32 checksums
@@ -43356,7 +43358,7 @@ compress -- lossless compression: DEFLATE, zlib, gzip, Brotli, LZ4 and Zstandard
   stream::{Decode, Encode}                        every format in pieces, with bounded memory:
                                                   deflate::, zlib::, gzip::, zstd::Decoder /
                                                   Encoder, lz4::FrameDecoder / FrameEncoder,
-                                                  brotli::Decoder; decode(input, out) /
+                                                  brotli::Decoder / Encoder; decode(input, out) /
                                                   encode(input, out, flush) -> Step; the
                                                   pumps stream::decode_all / encode_all
   Codec { None, Lz4, Zstd } with id(): the codec byte that formats on disk store per blob;
@@ -43393,23 +43395,34 @@ format's window (stream.rs).
 Source: [`lib/compress/brotli/mod.rs`](../lib/compress/brotli/mod.rs)
 
 ```text
-brotli -- Brotli decompression (RFC 7932), the Content-Encoding "br" of the web and the
+brotli -- Brotli (RFC 7932) both ways, the Content-Encoding "br" of the web and the
 compression of WOFF2 fonts and of JPEG XL's JPEG reconstruction data (until 0.2 in
 img_jxl)                                                               [jxl-plus: no asm]
 
+  compress(data, level) -> stream              levels 0..=11 (LEVEL_DEFAULT 5), the window
+                                               as small as the data allows (enc.rs)
   decompress(data, max_out) -> Option<Vec<u8>>   the stream that fills data completely;
                                                None for a damaged stream, data after it
                                                or more than max_out bytes
   decompress_prefix(data, max_out) -> Ok((bytes, consumed))   the stream at the start of
                                                data; Error::Corrupt for a damaged stream,
                                                Error::Limit past max_out bytes
-  Decoder                                      in pieces (stream::Decode; sdec.rs)
+  Decoder / Encoder                            in pieces (stream::Decode / Encode; sdec.rs,
+                                               senc.rs)
 
-One pass over the whole input: bit reader, prefix codes (simple and complex), block switches,
-context maps (RLE + move to front), insert-and-copy commands, the distance ring buffer and
-the static dictionary with its 121 transforms (tab.rs, dict.bin; tools/gen_brotli_dict.py).
-The output is bounded by max_out before it grows, every distance is checked against the
-output so far.  Large windows (an extension outside RFC 7932) are refused.
+The decoder makes one pass over the whole input: bit reader, prefix codes (simple and
+complex), block switches, context maps (RLE + move to front), insert-and-copy commands, the
+distance ring buffer and the static dictionary with its 121 transforms (tab.rs, dict.bin;
+tools/gen_brotli_dict.py).  The output is bounded by max_out before it grows, every
+distance is checked against the output so far.  Large windows (an extension outside RFC
+7932) are refused.
+```
+
+```rust
+/// the level of compress() for most uses, as for the responses of a web server
+LEVEL_DEFAULT: i32 = 5
+/// the strongest level, for files compressed once and sent often (as `brotli -q 11`)
+LEVEL_MAX: i32 = 11
 ```
 
 - **`enum Error`**
@@ -43422,6 +43435,37 @@ output so far.  Large windows (an extension outside RFC 7932) are refused.
 
 - **`fn decompress_prefix(data: &[u8], max: usize) -> Result<(Vec<u8>, usize), Error>`**
   the Brotli stream at the start of `data`: (output, bytes of input used)
+
+### `compress/brotli/enc.rs`
+
+Source: [`lib/compress/brotli/enc.rs`](../lib/compress/brotli/enc.rs)
+
+```text
+brotli::enc -- Brotli compression (RFC 7932): compress(), and the parts brotli::Encoder
+(senc.rs) shares with it
+
+Levels 0 to 9 match greedily with lazy evaluation: hash chains over the window (deeper by
+level), after the last distances and their neighbours (the short distance codes, a few
+bits each); a candidate scores as in libbrotli (135 per byte, 30 per bit of distance); the
+search skips ahead in data without matches.  Levels 10 and 11 parse near-optimally: every
+position's matches once, then the cheapest path through the meta-block under a cost model,
+at level 11 a second time with the costs of the first path's commands (as libbrotli's
+Zopfli parse).  A position without a match looks for a word of the static dictionary, also
+with a space before it, its first letter in upper case, one of 44 suffixes after it or up
+to 9 of its last letters cut (the transforms of RFC 7932 appendix B).  Each meta-block
+(64 KiB to 1 MiB of input, by level) gets its own prefix codes: the literals 64 contexts
+from the two bytes before them (the UTF-8 context mode for text, the signed one for the
+rest, from level 9 whichever costs less), merged greedily into as few trees as pays, or
+one tree when that takes fewer bits; the distances 4 contexts by copy length, merged the
+same way.  A meta-block that would come out larger than its input is stored.
+```
+
+- **`const fn bound(n: usize) -> usize`**
+  the largest stream compress() makes from n bytes
+
+- **`fn compress(data: &[u8], level: i32) -> Vec<u8>`**
+  a Brotli stream of `data` at `level` (0..=11; brotli::LEVEL_DEFAULT is 5), with the
+  smallest window that holds the data (at most 4 MiB, 16 MiB at levels 10 and 11)
 
 ### `compress/brotli/sdec.rs`
 
@@ -43453,6 +43497,38 @@ more than twice that.  Distances beyond it are static dictionary words, as in mo
 - **`fn new() -> Decoder`**
 - **`fn reset(&mut self)`**
   start a new stream
+
+### `compress/brotli/senc.rs`
+
+Source: [`lib/compress/brotli/senc.rs`](../lib/compress/brotli/senc.rs)
+
+```text
+brotli::senc -- brotli::Encoder, a Brotli stream in pieces
+
+The input collects in a buffer that keeps the window before the bytes not yet compressed;
+a meta-block is compressed once its input and the 8 bytes after it are there (the match
+finder looks that far ahead), with the same finder, codes and choices as compress().  So a
+stream whose size is given (with_size) is the same bytes as compress() of the whole input;
+without a size the window is the level's (4 MiB, 16 MiB at levels 10 and 11) or the one
+with_window asks for.  Flush::Sync ends a meta-block early and fills the last byte with an
+empty metadata block.  The buffer moves by a step (1 MiB, or the reach of the hash chains)
+once it holds that much more than the window; the tables move with it.
+```
+
+- **`struct Encoder`**
+  a Brotli encoder that takes its input in pieces (stream::Encode): one stream of RFC 7932;
+  memory about twice the window and a meta-block (1 MiB at most), plus the tables of the level
+
+**`impl Encoder`**
+
+- **`fn new(level: i32) -> Encoder`**
+  an encoder at `level` (0..=11 as compress)
+- **`fn with_size(mut self, bytes: u64) -> Encoder`**
+  the input is exactly this long (else Error::Size): the window and the tables fit it,
+  and the stream is the same bytes as compress()
+- **`fn with_window(mut self, log: u32) -> Encoder`**
+  a window of 2^log - 16 bytes (log 10..=24) instead of the level's: what a decoder
+  must keep of the output
 
 ### `compress/checksum.rs`
 
@@ -43775,6 +43851,8 @@ lz4 -- the LZ4 block and frame formats
 
   compress(data) -> block                greedy matcher, 16K-entry hash table, skip
                                          acceleration on incompressible data
+  compress_hc(data, level) -> block      the longest match along a hash chain of
+                                         2^(level-1) candidates (levels 3..=12, as lz4 -9)
   decompress(block, max_out)             None on truncation, a bad offset, or more than
                                          max_out bytes; never reads or writes out of bounds
   decompress_into(block, &mut out, limit) appends (back references may reach into the
@@ -43791,6 +43869,16 @@ last 12 bytes, offsets 1..=65535.
 
 - **`fn compress(src: &[u8]) -> Vec<u8>`**
   compress into one LZ4 block
+
+```rust
+/// the level of compress_hc() for most uses (as `lz4 -9`)
+LEVEL_HC_DEFAULT: i32 = 9
+```
+
+- **`fn compress_hc(src: &[u8], level: i32) -> Vec<u8>`**
+  compress into one LZ4 block, smaller than compress() and slower: at each position the
+  longest match along a hash chain of 2^(level-1) candidates (level 3..=12; LZ4's own high
+  compression levels search as far, its levels 10 to 12 also parse optimally)
 
 - **`fn decompress_into(src: &[u8], out: &mut Vec<u8>, limit: usize) -> bool`**
   decode one block, appending to out (out.len() stays &lt;= limit) -> false on corrupt input

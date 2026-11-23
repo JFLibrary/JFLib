@@ -2566,7 +2566,7 @@ Grundbausteine am falschen Ort oder mehrfach:
   und `img_jxl` behalten ihre Aufrufe als dünne Module, `plat::print` braucht keinen
   `unsafe`-Hook mehr. Byte-gleich mit dem alten Encoder auf allen Stufen; compress hängt weiter
   an nichts, damit die std-Werkzeuge es nutzen können.
-- **P2** · *teilweise* (2026-11-22, U12) · `compress`: Die Streaming-API ist da
+- **P2** · *teilweise* (2026-11-23, U12 bis U14) · `compress`: Die Streaming-API ist da
   ([`compress/stream.rs`](../lib/compress/stream.rs)): `Decode::decode(input, out)` und
   `Encode::encode(input, out, flush)` nehmen die Eingabe in Stücken und schreiben in den Puffer
   des Aufrufers, für jedes Format (`deflate`, `zlib`, `gzip`, `zstd` als Decoder und Encoder,
@@ -2591,11 +2591,22 @@ Grundbausteine am falschen Ort oder mehrfach:
   (Literale ohne neuen Baum, Repeat_Mode), was auch Frames ohne Wörterbuch bis zu 4 % kleiner
   macht. Geprüft in `coretest --only compress` (17 neue) und mit `tools/zstd_check.py` in beide
   Richtungen gegen `zstd --train` / `zstd -D`: 600 JSON-Datensätze werden mit 16 KiB Wörterbuch
-  3,15-mal kleiner (zstds eigenes: 3,22; ohne: 1,2). Offen: ein Brotli-Encoder; Content-Encoding
-  gzip/br im HTTP-Client von `netio` (über die Sicherheits-Sitzung, jetzt mit den
-  Stream-Decodern); `cargo-jflib` mit `compress` statt seines eigenen Encoders
-  ([`cargo_jflib/src/deflate.rs`](../lib/cargo_jflib/src/deflate.rs), heute ohne jede
-  Abhängigkeit; die Bytes der Pakete ändern sich dabei).
+  3,15-mal kleiner (zstds eigenes: 3,22; ohne: 1,2). Ein Brotli-Encoder (2026-11-23, U14;
+  [`brotli/enc.rs`](../lib/compress/brotli/enc.rs), [`brotli/senc.rs`](../lib/compress/brotli/senc.rs)):
+  `brotli::compress(data, level)` auf den Stufen 0 bis 11 und `brotli::Encoder` in Stücken
+  (`with_size` gibt dieselben Bytes, `with_window`, `Flush::Sync`). Bis Stufe 9 Hash-Buckets wie
+  in libbrotli mit Lazy Matching, auf 10 und 11 eine nahezu optimale Zerlegung (11 in zwei Runden);
+  das statische Wörterbuch mit Leerzeichen davor, großem Anfangsbuchstaben, Suffixen und
+  gekürzten Wörtern; 64 Literal-Kontexte (UTF-8 oder signed), zu Clustern zusammengefasst. Am
+  Leitfaden (430 KB) macht Stufe 5 158 KB (libbrotli 163 KB, gzip -9 173 KB), Stufe 11 147 KB
+  (libbrotli 145 KB); libbrotli ist auf den Stufen 0 bis 9 1,5- bis 3-mal so schnell, auf 10 und
+  11 etwa gleich schnell. Geprüft mit
+  `tools/brotli_check.py` gegen libbrotli in beide Richtungen, in Chromium 156 (115 Ströme als
+  `Content-Encoding: br`) und in `coretest --only compress` / `--only stream`. Dazu
+  `lz4::compress_hc` (wie `lz4 -9`). `cargo-jflib` nimmt jetzt `compress` (DEFLATE auf Stufe 9,
+  LZ4 HC für das SquashFS, CRC-32) statt seines eigenen Deflate und LZ4; die Pakete werden dabei
+  0,2 bis 0,3 % kleiner. Offen: Content-Encoding gzip/br im HTTP-Client von `netio` (über die
+  Sicherheits-Sitzung, mit den Stream-Decodern).
 - **P1** · *erledigt* (2026-11-21, U2) · JSON aus `agent_core` gelöst: die neue Blatt-Crate
   `formats` ([`formats/src/lib.rs`](../lib/formats/src/lib.rs), nur `alloc`) hat `json` und `jmap`
   aus `agent_core` und `xml` und `encoding` aus `base` übernommen, unverändert; die alten Pfade
