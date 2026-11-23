@@ -28,6 +28,8 @@
 //                                         (stencil_overview.rs)
 //   diagramiotest --write-templates DIR  (JD13) every form of JFDiagrammer's templates as .vstx,
 //                                         metric and US (templates.rs)
+//   diagramiotest --write-data DIR [--xlsx PATH]   (JD18) jd18-verknuepft.vsdx: a drawing with
+//                                         linked data for the Visio counter-check (data.rs)
 //   diagramiotest --write-vdx DIR        (JD16) the self-written .vdx / .vsx files and the .vsdx /
 //                                         .vssx JFDiagrammer writes from them (vdx.rs)
 //
@@ -66,6 +68,9 @@
 //   templates (JD13, templates.rs) JFDiagrammer's templates built from their sources in both
 //             measures: round trip, stencil windows, JFD_ cells, pages, the rule set, the
 //             starters (cross-functional flowcharts, connectors, tips), to_drawing
+//   data      (JD18, data.rs) external data: recordsets and connections written and read back,
+//             a package as Visio writes one, a refresh saved, parts not understood kept, hostile
+//             data parts
 //   vdx       (JD16, vdx.rs) the XML formats of 2003-2010: the self-written drawing, stencil and
 //             bitmap read into the model and written as .vsdx / .vssx, hostile files and
 //             limits; macro projects passed through unchanged; document properties
@@ -85,6 +90,8 @@ use alloc::vec::Vec;
 
 mod build;
 mod corpus;
+// (JD18) external data: connections, recordsets, linked shapes
+mod data;
 mod designs;
 mod drawings;
 mod dump;
@@ -215,6 +222,10 @@ fn run() -> i32 {
         // (JD16) the self-written .vdx / .vsx and what JFDiagrammer writes from them
         return vdx::write(&dir);
     }
+    if let Some(dir) = arg(&args, "--write-data") {
+        // (JD18) the drawing with linked data for the Visio counter-check
+        return data::write_check(&dir, arg(&args, "--xlsx").as_deref());
+    }
     if let Some(dir) = arg(&args, "--write-probe") {
         return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
     }
@@ -265,6 +276,10 @@ fn run() -> i32 {
         // (JD16) the XML formats of 2003-2010, the macro parts, the document properties
         if h.on("vdx") {
             vdx::run(&mut h);
+        }
+        // (JD18) external data (DF-12)
+        if h.on("data") {
+            data::run(&mut h);
         }
     }
     if h.on("corpus") {
