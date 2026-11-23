@@ -282,6 +282,9 @@ commands! {
     CFF_TITLE = 0x1535, "Titelleiste anzeigen", JD_CFF_TITLE_BAR, 0;
     CFF_SEPARATORS = 0x1536, "Trennlinien anzeigen", JD_CFF_SEPARATORS, 0;
     CFF_ROTATE = 0x1537, "Bahnbeschriftungen waagerecht", JD_CFF_ROTATE_LABELS, 0;
+    // (JD15, ST-05) a lane's context menu (structures_cff.rs)
+    CFF_LANE_BEFORE = 0x1538, "Bahn davor einfügen", JD_CFF_SWIMLANE, 0;
+    CFF_LANE_AFTER = 0x1539, "Bahn danach einfügen", JD_CFF_SWIMLANE, 0;
     // the shape's context menu
     SHAPE_DATA_DEFINE = 0x1600, "Shape-Daten definieren", 0, 0;
     HYPERLINK = 0x1601, "Hyperlink", 0, 0;
@@ -292,6 +295,8 @@ commands! {
     CONN_RESET = 0x1606, "Verbinder zurücksetzen", 0, 0;
     ADD_TO_MY_SHAPES = 0x1607, "Zu meinen Shapes hinzufügen", 0, 0;
     COMMENT_NEW = 0x1608, "Neuer Kommentar", 0, 0;
+    // (JD15, SP-01) the dialog Shape-Name (dlg_shape_name.rs)
+    SHAPE_NAME = 0x1609, "Shape-Name", 0, 0;
     // the stencil's menu (Shapes sidebar)
     STENCIL_CLOSE = 0x1700, "Schablone schließen", 0, 0;
     STENCIL_SAVE = 0x1701, "Schablone speichern", 0, 0;
@@ -527,6 +532,8 @@ static HANDLERS: &[(u32, Handler)] = &[
     (HYPERLINK, crate::dlg_link::open),
     (FIND, |a, ui| crate::dlg_find::open(a, ui, false)),
     (REPLACE, |a, ui| crate::dlg_find::open(a, ui, true)),
+    // (JD15, SP-01) Shape-Name
+    (SHAPE_NAME, crate::dlg_shape_name::open),
 ];
 
 // toggles: whether the command is on

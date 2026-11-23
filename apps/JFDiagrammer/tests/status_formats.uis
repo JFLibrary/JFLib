@@ -35,6 +35,10 @@ key ctrl+a
 type "jd15-status-s.vssx"
 click button:"Speichern"
 expect dialog:"Speichern unter" missing
+# (JD16, DF-04) the drawing came from a .vsdm: a stencil without macros asks first
+expect dialog:"Makros speichern?" exists
+click button:"Ohne Makros speichern"
+expect dialog:"Makros speichern?" missing
 cmd 4098
 click button:"jd15-status-s.vssx"
 expect tab:"jd15-status-s" exists

@@ -75,6 +75,9 @@
 //   src/dlg_field.rs  (JD8 rest) the dialog Feld (fields in the text, TX-06)
 //   src/dlg_link.rs   (JD8 rest) the dialog Hyperlinks, following links, the link pointer
 //   src/dlg_find.rs   (JD8 rest) the dialog Suchen und Ersetzen
+//   src/ask_save.rs   (JD15) Speichern-Rückfrage before Schließen, Neu, Öffnen and the window's
+//                     close (UI-12); Öffnen schreibgeschützt and als Kopie (DM-09, UI-06, UI-05)
+//   src/dlg_shape_name.rs  (JD15) the dialog Shape-Name (SP-01)
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too); templates/ (JD13) the
@@ -113,6 +116,8 @@
 
 extern crate alloc;
 
+// (JD15) the question before changes are lost, the ways a file opens
+mod ask_save;
 mod backstage;
 mod cmds_arrange;
 mod cmds_later;
@@ -128,6 +133,8 @@ mod design_store;
 mod dlg_field;
 mod dlg_find;
 mod dlg_link;
+// (JD15) Shape-Name (SP-01)
+mod dlg_shape_name;
 mod dlg_text;
 mod doc_file;
 mod edit_canvas;
@@ -217,7 +224,7 @@ pub(crate) struct Diagrammer {
     pub preview: u8,
     /// the ribbon icons' hook (set in init)
     icons: Option<icons::Icons>,
-    /// (JD4) the drawing shown, read-only (None: the empty drawing)
+    /// (JD4) the drawing shown, editable since JD7 (None: no drawing, after Datei › Schließen)
     pub opened: Option<viewer::Opened>,
     /// a file that could not be opened: title and message of the notice
     pub error: Option<(alloc::string::String, alloc::string::String)>,
@@ -288,6 +295,9 @@ pub(crate) struct Diagrammer {
     pub txt: cmds_text::TextCmds,
     /// (JD16) the older XML formats, macros, properties, window state (doc_file.rs)
     pub docfile: doc_file::DocFile,
+    /// (JD15) the question before changes are lost; how Öffnen opens a file
+    pub ask: ask_save::AskSave,
+    pub shape_name: dlg_shape_name::NameDialog,
 }
 
 impl Diagrammer {
@@ -351,6 +361,8 @@ impl Diagrammer {
             select: select_type::SelectState::default(),
             txt: cmds_text::TextCmds::default(),
             docfile: doc_file::DocFile::default(),
+            ask: ask_save::AskSave::default(),
+            shape_name: dlg_shape_name::NameDialog::default(),
         }
     }
 
@@ -401,6 +413,8 @@ impl Diagrammer {
         self.template = None;
         // (JD13) the own templates are read again
         self.catalog.own_read = false;
+        // (JD15, LG-07) Neu offers the region's units first
+        self.units_us = (stencils::measure(self) == diagram_io::vsdx::Measure::Us) as i32;
         ui.keytips_off();
         ui.repass();
     }
@@ -464,8 +478,14 @@ impl App for Diagrammer {
             None => false,
         };
         if !opened && self.preview == ribbon::SEL_NONE {
-            edit_doc::new_drawing(self, ui, false);
+            // (JD15, DF-15) a file that could not be opened keeps its notice over the new drawing
+            let error = self.error.take();
+            // (JD15, LG-07) in the region's units
+            let us = stencils::measure(self) == diagram_io::vsdx::Measure::Us;
+            edit_doc::new_drawing(self, ui, us);
+            self.error = error;
         }
+        self.units_us = (stencils::measure(self) == diagram_io::vsdx::Measure::Us) as i32;
         // (JD8 rest) --check-commands: which commands still lack a function (cmds_later.rs)
         if plat::args().iter().any(|a| a == "--check-commands") {
             self.error = Some((alloc::format!("Befehlsprüfung: {}", cmds_later::report_text()), alloc::string::String::new()));
@@ -485,6 +505,9 @@ impl App for Diagrammer {
         // (JD8 rest) what the system's clipboard offers (Einfügen, Inhalte einfügen)
         cmds_paste::poll(self, ui);
         commands::states(self, ui);
+        // (JD15) the lane commands show in a lane's menu only (ST-05); QuickInfos off (UI-13)
+        structures_cff::menu_states(self, ui);
+        ui.tooltips_set(self.opts.get(&options::TIPS) != 2);
         stencils_panel::states(self, ui);
         shell::frame(self, ui);
         design_gallery::after(self, ui);
@@ -507,9 +530,16 @@ impl App for Diagrammer {
         // (JD16) the question about macros, the file's zoom after the fit
         doc_file::dialog(self, ui);
         doc_file::frame(self, ui);
+        // (JD15) Speichern-Rückfrage (UI-12), Shape-Name (SP-01)
+        ask_save::dialog(self, ui);
+        dlg_shape_name::dialog(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
+        // (JD15, UI-12) Schließen and the window's close ask first when there are changes
+        if ask_save::command(self, ui, id) {
+            return true;
+        }
         cmds_text::command(self, ui, id) || stencils::command(self, ui, id) || commands::run(self, ui, id)
     }
 }

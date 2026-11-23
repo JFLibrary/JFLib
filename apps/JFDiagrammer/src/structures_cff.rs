@@ -7,6 +7,8 @@
 //   new_flowchart(app, ui)          Swimlane on a page without a flowchart: one with two lanes
 //                                   and a phase in the middle of the view
 //   insert_lane / insert_phase      after the selected lane / phase, else at the end
+//   (JD15, ST-05) Bahn davor / danach einfügen   the selected lane's context menu: a lane before
+//                                   or after it; menu_states hides both while no lane is selected
 //   title, separators, upright labels   the switches of Entwurf (pool / phases / lanes cells)
 //   orientation                     new flowcharts horizontal or vertical
 //
@@ -30,6 +32,24 @@ use crate::Diagrammer;
 /// whether `id` is a command of the flowchart's register
 pub(crate) fn owns(id: u32) -> bool {
     matches!(id, CFF_LANE | CFF_SEPARATOR | CFF_HORIZONTAL | CFF_VERTICAL | CFF_TITLE | CFF_SEPARATORS | CFF_ROTATE | CFF_ORIENTATION)
+        || matches!(id, CFF_LANE_BEFORE | CFF_LANE_AFTER)
+}
+
+// (JD15, ST-05) whether a lane of a flowchart is selected
+fn lane_selected(app: &Diagrammer) -> bool {
+    let (Some(o), Some(f)) = (app.opened.as_ref(), current(app)) else { return false };
+    let lanes = cff::lanes(&o.doc, &f);
+    edit_canvas::selected(app).iter().any(|s| lanes.contains(s))
+}
+
+/// (JD15, ST-05) every pass after commands::states: Bahn davor / danach einfügen show in the
+/// shape's menu only while a lane is selected
+pub(crate) fn menu_states(app: &Diagrammer, ui: &mut Ui) {
+    if !lane_selected(app) {
+        for id in [CFF_LANE_BEFORE, CFF_LANE_AFTER] {
+            ui.cmd_state(id, CF_DISABLED | CF_HIDDEN);
+        }
+    }
 }
 
 // the flowchart of the selection, else the page's first
@@ -43,6 +63,7 @@ fn current(app: &Diagrammer) -> Option<cff::Cff> {
 pub(crate) fn available(app: &Diagrammer, id: u32) -> bool {
     match id {
         CFF_LANE | CFF_HORIZONTAL | CFF_VERTICAL | CFF_ORIENTATION => app.opened.is_some(),
+        CFF_LANE_BEFORE | CFF_LANE_AFTER => lane_selected(app),
         _ => current(app).is_some(),
     }
 }
@@ -68,8 +89,10 @@ pub(crate) fn checked(app: &Diagrammer, id: u32) -> bool {
 
 pub(crate) fn run(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
     match id {
-        CFF_LANE => insert(app, ui, true),
-        CFF_SEPARATOR => insert(app, ui, false),
+        CFF_LANE => insert(app, ui, true, false),
+        CFF_SEPARATOR => insert(app, ui, false, false),
+        CFF_LANE_BEFORE if lane_selected(app) => insert(app, ui, true, true),
+        CFF_LANE_AFTER if lane_selected(app) => insert(app, ui, true, false),
         CFF_HORIZONTAL => app.structs.cff_vertical = false,
         CFF_VERTICAL => app.structs.cff_vertical = true,
         CFF_ORIENTATION => app.structs.cff_vertical = !app.structs.cff_vertical,
@@ -106,8 +129,9 @@ fn build(tx: &mut Transaction, eng: &mut Engine, src: &Document, page: PageRef, 
     edit_canvas::follow(tx, eng, Owner::Page(page), &parts)
 }
 
-// Swimlane / Trennlinie: after the selected one, else at the end; without a flowchart a new one
-fn insert(app: &mut Diagrammer, ui: &mut Ui, lane: bool) {
+// Swimlane / Trennlinie: after the selected one (before: before it), else at the end; without a
+// flowchart a new one
+fn insert(app: &mut Diagrammer, ui: &mut Ui, lane: bool, before: bool) {
     let (Some(page), Some(geo)) = (app.model.page, app.model.geo) else { return };
     let f = current(app);
     let sel = edit_canvas::selected(app);
@@ -136,7 +160,7 @@ fn insert(app: &mut Diagrammer, ui: &mut Ui, lane: bool) {
             let cs = structure::containers_of(tx.doc(), s);
             items.iter().position(|x| cs.contains(x))
         });
-        let at = after.map_or(items.len(), |i| i + 1);
+        let at = after.map_or(items.len(), |i| if before { i } else { i + 1 });
         let pb = structure::shape_box(tx.doc(), f.pool);
         let name = if lane { lane_master(f.horizontal) } else { phase_master(f.horizontal) };
         let s = place_master(tx, eng, src, name, page, [pb[2], pb[1]])?;

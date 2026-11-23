@@ -12,6 +12,9 @@
 // keys (Alt or F10, UI-37); the quick access buttons answer to 1, 2, 3.  Under the ribbon (JD4)
 // the notice of an open drawing (read-only, substituted fonts, macros) or of a file that could
 // not be opened; the file dialog of Backstage › Öffnen runs here on every pass.
+// (JD15) Without a drawing (Datei › Schließen) the window shows no page, no page tabs, no
+// Shapes panel and an empty status bar, only what can come next (Neu, Öffnen); the title bar
+// names a drawing opened read-only so (DM-09).
 
 use alloc::format;
 use ui::*;
@@ -22,10 +25,16 @@ pub(crate) const ID_TABS: u32 = 100;
 const ID_NOTICE: u32 = 130;
 const ID_OPEN_DLG: u32 = 0x7000;
 const ID_SAVE_DLG: u32 = 0x7100;
+const ID_EMPTY: u32 = 0x7920_0000;
 
 /// the main window
 pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
-    let title = format!("{} – JFDiagrammer", app.drawing_name());
+    let title = match (&app.opened, crate::ask_save::read_only(app)) {
+        // (JD15) no drawing open; a drawing opened read-only (DM-09)
+        (None, _) if app.preview == ribbon::SEL_NONE => alloc::string::String::from("JFDiagrammer"),
+        (_, true) => format!("{} – JFDiagrammer", ui::i18n::tf("{} [Schreibgeschützt]", &[&app.drawing_name()])),
+        _ => format!("{} – JFDiagrammer", app.drawing_name()),
+    };
     if ui.title() != title {
         ui.set_title(&title);
     }
@@ -50,6 +59,12 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
     }
     ribbon::draw(app, ui, app.reg);
     notice(app, ui);
+    // (JD15, UI-12) no drawing: nothing of the last one stays (page tabs, status bar)
+    if app.opened.is_none() && app.preview == ribbon::SEL_NONE {
+        empty(ui);
+        ui.box_end();
+        return;
+    }
     // the dock area: the Shapes panel, the canvas, the task panes
     let panels = panes::panels();
     ui.next_size(-1, -1);
@@ -94,8 +109,31 @@ fn open_dialog(app: &mut Diagrammer, ui: &mut Ui) {
     let exts: alloc::vec::Vec<&str> = crate::viewer::EXTS.iter().map(|e| ui::i18n::t(e)).collect();
     if ui.filedlg(ID_OPEN_DLG, FD_OPEN, &dlg, &mut app.open_path, 4096, &exts) & EV_ACT != 0 {
         let path = app.open_path.clone();
-        crate::viewer::open(app, ui, &path);
+        // (JD15) as Durchsuchen, Als Kopie öffnen or Neu aus vorhandener Zeichnung asked, after
+        // the question about the changes (ask_save.rs)
+        let mode = core::mem::take(&mut app.ask.dlg_mode);
+        crate::ask_save::open(app, ui, &path, mode);
     }
+}
+
+// (JD15) the window without a drawing: what can come next, an empty status bar
+fn empty(ui: &mut Ui) {
+    ui.next_size(-1, -1);
+    ui.box_begin(ID_EMPTY, BOX_V | BOX_CENTER | BOX_XCENTER | BOX_BG, 12);
+    ui.text(TS_SUBTITLE, ui::i18n::t("Keine Zeichnung geöffnet"));
+    ui.text(TS_BODY | TX_SECONDARY, ui::i18n::t("Erstellen Sie eine neue Zeichnung, oder öffnen Sie eine vorhandene."));
+    ui.box_begin(ID_EMPTY + 1, BOX_H, 8);
+    // (own widget ids: the quick access toolbar may show the same commands)
+    for (k, id) in [crate::commands::NEW, crate::commands::OPEN].into_iter().enumerate() {
+        ui.next_icon(crate::commands::def(id).map_or(0, |d| d.icon));
+        if ui.button(ID_EMPTY + 2 + k as u32, crate::commands::label(id)) & EV_ACT != 0 {
+            ui.cmd_run(id, 0);
+        }
+    }
+    ui.box_end();
+    ui.box_end();
+    ui.statusbar_begin();
+    ui.statusbar_end();
 }
 
 // (JD7) the file dialog of Speichern unter (shown while app.save_dlg is set)
