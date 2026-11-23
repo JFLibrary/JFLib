@@ -15,6 +15,15 @@ expect text:"Verbindung zu einer Microsoft Excel-Arbeitsmappe" exists
 # no file yet: Weiter asks for one
 click button:"Weiter >"
 expect text:"Wählen Sie eine Datei aus." exists
+# a path typed in is read only when the run may (PERMISSIONS fs.user: what the file dialog chose,
+# here also the folder named by --data-dir)
+click #2086666250
+type "apps/JFDiagrammer/PLAN.md"
+click button:"Weiter >"
+expect text:"Diese Datei darf nicht gelesen werden: wählen Sie sie über „Durchsuchen...“ aus." exists
+click #2086666250
+key ctrl+a
+key delete
 click button:"Durchsuchen..."
 expect dialog:"Öffnen" exists
 expect text:"data_geraete.xlsx" exists
