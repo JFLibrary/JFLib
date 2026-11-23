@@ -95,7 +95,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [update](#update) -- signed app updates: check, download, apply at the next start, health marker, rollback
   <br>[lib.rs](#update-crate-root) · [appimage.rs](#updateappimagers) · [apply.rs](#updateapplyrs) · [fetch.rs](#updatefetchrs) · [manifest.rs](#updatemanifestrs)
 - [archive](#archive) -- bounded ZIP32 containers (stored and DEFLATE)
-  <br>[lib.rs](#archive-crate-root) · [opc.rs](#archiveopcrs)
+  <br>[lib.rs](#archive-crate-root) · [cfb.rs](#archivecfbrs) · [opc.rs](#archiveopcrs)
 - [doc_core](#doc_core) -- structured documents, sources, citations and undo/redo
   <br>[lib.rs](#doc_core-crate-root) · [citation.rs](#doc_corecitationrs) · [format.rs](#doc_coreformatrs) · [tabs.rs](#doc_coretabsrs) · [tables.rs](#doc_coretablesrs) · [table_grid.rs](#doc_coretable_gridrs) · [table_tree.rs](#doc_coretable_treers) · [table_position.rs](#doc_coretable_positionrs) · [table_styles.rs](#doc_coretable_stylesrs) · [cell_borders.rs](#doc_corecell_bordersrs) · [character.rs](#doc_corecharacterrs) · [formula/mod.rs](#doc_coreformulamodrs) · [styles.rs](#doc_corestylesrs) · [fragment.rs](#doc_corefragmentrs) · [table_fragment.rs](#doc_coretable_fragmentrs) · [notes.rs](#doc_corenotesrs) · [paragraph_edit.rs](#doc_coreparagraph_editrs) · [text_range.rs](#doc_coretext_rangers) · [story_range.rs](#doc_corestory_rangers) · [search.rs](#doc_coresearchrs) · [source.rs](#doc_coresourcers) · [source_audit.rs](#doc_coresource_auditrs) · [source_import.rs](#doc_coresource_importrs) · [source_library.rs](#doc_coresource_libraryrs) · [source_merge.rs](#doc_coresource_mergers)
 - [doc_layout](#doc_layout) -- typographic paragraph flow and page layout
@@ -107,7 +107,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
   <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
-  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
+  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vss/mod.rs](#diagram_iosrcvssmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
@@ -52425,7 +52425,8 @@ MAX_SIG: usize = 4096
 ```text
 In-memory ZIP interchange (ZIP32, ZIP64 when it is needed). New native library code,
 independent of document/UI code. Raw DEFLATE, inflate and CRC reuse img_core's safe codec
-primitives; no paths are extracted. `opc` builds the Open Packaging Conventions on top.
+primitives; no paths are extracted. `opc` builds the Open Packaging Conventions on top;
+`cfb` reads compound files ("OLE", [MS-CFB]), the container of Office's binary formats.
 ZipFs shows an archive as a read-only plat::vfs tree:
   plat::vfs::mount("pack", Arc::new(archive::ZipFs::new(&bytes, Limits::default())?))
   -> plat::read_file("pack://textures/a.png"), plat::File::open("pack://..", FO_READ),
@@ -52492,6 +52493,80 @@ ZipFs shows an archive as a read-only plat::vfs tree:
 
 - **`fn new(b: &[u8], limits: Limits) -> Result<ZipFs, Error>`**
   Read every part of the archive; Invalid also for names that collide as file and folder.
+
+### `archive/cfb.rs`
+
+Source: [`lib/archive/cfb.rs`](../lib/archive/cfb.rs)
+
+```text
+Compound files ("OLE", "structured storage") as Microsoft's open specification [MS-CFB]
+describes them: a file system of storages and streams inside one file, the container of
+Office's binary formats (Visio's .vss/.vsd, Word's .doc, Outlook's .msg, the VBA project of
+a macro document). New native library code from the specification; read only.
+
+  cfb::File::read(&bytes, cfb::Limits::default())? -> the directory, checked
+  file.entries() / file.children(i) / file.find(&["VisioDocument"]) -> entries by path
+  file.stream(i)? -> the bytes of a stream
+
+Every file is untrusted input. Everything the header and the directory claim is checked
+before it is believed: the file's and each stream's size against Limits, every sector
+number against the file, each chain of sectors walked at most once around (a loop is
+Invalid, never a hang), the directory's tree of siblings without cycles and with every entry
+at most once, names as the specification allows them. Nothing is ever written.
+```
+
+```rust
+/// The first eight bytes of every compound file.
+SIGNATURE: [u8; 8] = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]
+```
+
+- **`struct Limits`**
+  Bounds of a compound file, checked before anything is allocated. The default (64 MiB a
+  file and a stream, 4096 directory entries) suits documents.
+  - `file_bytes: usize` -- Most bytes of the file itself.
+  - `stream_bytes: usize` -- Most bytes of one stream.
+  - `entries: usize` -- Most directory entries (storages, streams and unused slots together).
+
+- **`enum Kind`**
+  What a directory entry is.
+  - `Root` -- The root storage (entry 0); its stream is the mini stream.
+  - `Storage` -- A storage: a directory of further entries.
+  - `Stream` -- A stream of bytes.
+
+- **`struct Entry`**
+  One storage or stream of the directory.
+  - `name: String` -- The name (at most 31 UTF-16 code units, without "/", "\\", ":" and "!").
+  - `kind: Kind`
+  - `clsid: [u8; 16]` -- The class id of a storage (zeros for a stream).
+  - `size: u64` -- The size of a stream in bytes.
+
+- **`struct File<'a>`**
+  A compound file read into memory: its directory and the tables to find a stream's bytes.
+
+- **`fn sniff(bytes: &[u8]) -> bool`**
+  Whether `bytes` start like a compound file (only the signature is looked at).
+
+**`impl<'a> File<'a>`**
+
+- **`fn read(bytes: &'a [u8], limits: Limits) -> Result<File<'a>, Error>`**
+  Read the header, the allocation tables and the directory of a compound file, version 3
+  (512-byte sectors) or 4 (4096-byte sectors). Refused with `Invalid`: a wrong signature,
+  byte order or sector size, a sector number outside the file, a chain that loops or ends
+  early, a directory tree with a cycle, an entry reached twice or a malformed name;
+  `Unsupported`: another major version; `Limit`: the file, a stream or the directory over
+  `limits`.
+- **`fn entries(&self) -> &[Entry]`**
+  All directory entries; index 0 is the root. Unused slots and entries no storage reaches
+  have an empty name and are nobody's child.
+- **`fn children(&self, index: usize) -> &[usize]`**
+  The children of the storage at `index` (the root is 0), in the directory's order.
+- **`fn find(&self, path: &[&str]) -> Option<usize>`**
+  The entry at a path of names from the root (`&["VisioDocument"]`,
+  `&["Macros", "VBA", "dir"]`); names compare as the specification says, upper case
+  against upper case.
+- **`fn stream(&self, index: usize) -> Result<Vec<u8>, Error>`**
+  The bytes of the stream at `index`: `Invalid` for a storage or a chain that is too
+  short, `Limit` for a stream over `Limits::stream_bytes`.
 
 ### `archive/opc.rs`
 
@@ -59830,8 +59905,13 @@ format follows the public specification [MS-VSDX]; no code of other implementati
                       (JD16) the drawing window of windows.xml: page, zoom, centre, what is
                       shown; vsdx::remove_macros takes a macro project out
 
-What is to come here, by stage of the plan:
-  JD17  importing the binary .vss
+  vss::read(&bytes, DocKind::Stencil, &vsdx::Limits::VSDX) -> Result<vsdx::Loaded, vsdx::Error>
+                      (JD17) the binary formats of Visio 2003-2010 (.vss; .vsd, .vst as far
+                      as their masters and styles go), import only: the compound file
+                      (archive::cfb), the VisioDocument stream's compressed tree of streams and
+                      chunks become the XML of 2003-2010 and go through vdx::read; cells with
+                      formula and value, formulas in Visio's text, texts with fields, styles,
+                      masters; vss::to_vdx, vss::kind_of, vss::sniff
 
 The ZIP and OPC parts come from archive (archive::opc, JD1), shared with doc_io's DOCX.
 Every file is untrusted input: sizes, counts and nesting are bounded, a file that breaks a
@@ -60318,6 +60398,61 @@ reference that names nothing is a warning.  No DOCTYPE, no external anything, no
   read a file of the XML format of 2003-2010 as a document of `kind` (see the module comment);
   `limits` bound everything (vsdx::Limits::VSDX for real files)
 
+### `diagram_io/src/vss/mod.rs`
+
+Source: [`lib/diagram_io/src/vss/mod.rs`](../lib/diagram_io/src/vss/mod.rs)
+
+```text
+vss -- the binary formats of Visio 2003-2010 (.vss stencil; .vsd drawing and .vst template
+alike) read into diagram_core's model, import only (DF-30; JD17).  Nothing is ever written in
+these formats (NO-12).
+
+  vss::read(&bytes, DocKind::Stencil, &vsdx::Limits::VSDX) -> Result<vsdx::Loaded, vsdx::Error>
+                      one file; the caller says by its extension what it is (kind_of)
+  vss::kind_of("vss") -> Some(DocKind::Stencil)     (vss vsd vst)
+  vss::sniff(&bytes) -> bool         a compound file with a VisioDocument stream
+
+Microsoft has published no specification of these formats.  This reader comes from our own
+analysis of files (the container is the openly specified compound file, archive::cfb); no
+code of other implementations is used.  What it found:
+  container      a compound file with the stream VisioDocument (and the property sets
+                 SummaryInformation and DocumentSummaryInformation)
+  VisioDocument  a header and a tree of streams, some compressed (stream.rs)
+  objects        chunk streams: a style, a sheet or a shape is a chunk at level 0, its sections
+                 are lists (chunks with child IDs) at level 1, their rows chunks at level 2; a
+                 row holds its cells as fixed fields (a number is a unit byte and a double), a
+                 byte 1, a mask of the cells that hold a value of their own, then blocks: the
+                 formulas (cells.rs, formula.rs)
+  names          a list of strings; masters, styles and named rows point into it
+The objects become the XML of Visio 2003-2010 (the format vdx.rs reads, whose element and cell
+names Microsoft's schema reference documents), and vdx::read builds the model from that: so
+both formats share every rule of the model, and what vdx.rs keeps or leaves out holds here too.
+
+Every file is untrusted input, bounded like a VSDX file (vsdx::Limits): the compound file by
+Limits::zip.archive_bytes, each stream after decompression by Limits::zip.part_bytes, all of
+them by Limits::zip.total_bytes (LZSS cannot grow anything more than nine-fold), the tree of
+streams by its depth and by each stream being used once, chunks by Limits::items, the XML made
+from them by Limits::zip.part_bytes, and then everything vdx::read bounds.  Never a panic, no
+recursion deeper than the format's fixed levels.
+```
+
+- **`fn kind_of(ext: &str) -> Option<DocKind>`**
+  the kind of document an extension of the binary formats stands for ("vss", "vsd", "vst";
+  ASCII case ignored)
+
+- **`fn sniff(bytes: &[u8]) -> bool`**
+  whether `bytes` are a file of these formats: a compound file whose stream VisioDocument starts
+  with Visio's signature (the directory is read, no stream but the start of that one)
+
+- **`fn read(bytes: &[u8], kind: DocKind, limits: &Limits) -> Result<Loaded, Error>`**
+  read a binary file of Visio 2003-2010 (version 11) as a document of `kind` (see the module
+  comment); `limits` bound everything (vsdx::Limits::VSDX for real files)
+
+- **`fn to_vdx(bytes: &[u8], kind: DocKind, limits: &Limits) -> Result<(String, Vec<Warning>), Error>`**
+  the XML of Visio 2003-2010 (a .vdx, .vsx or .vtx by `kind`) that a binary file becomes before
+  vdx::read builds the model from it, with the warnings of the conversion (what it left out);
+  for checks and for opening the conversion in other programs
+
 ### `diagram_io/src/vsdx.rs`
 
 Source: [`lib/diagram_io/src/vsdx.rs`](../lib/diagram_io/src/vsdx.rs)
@@ -60440,6 +60575,10 @@ never stack.
     "objects", "items", "formula", "text"
   - `Cycle { what: &'static str, id: u32, }` -- a cycle: "style" (styles based on each other), "master" (masters containing instances of
     each other), "background" (background pages of each other); the ID where it was found
+  - `Binary { offset: u64, what: &'static str, }` -- (vss.rs) a binary file of Visio 2003-2010 (.vss, .vsd, .vst) breaks its structure: the
+    compound file, the VisioDocument stream or a stream or chunk in it; `offset` is where in
+    the stream (0 for the compound file), `what` says how ("version 6 (Visio 2000/2002)" for a
+    version this reader does not take)
 
 - **`enum Warning`**
   something odd that was kept as it is
