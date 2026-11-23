@@ -264,12 +264,19 @@ fn blocks<'s>(d: &'s [u8], from: usize) -> Vec<(u8, &'s [u8])> {
     v
 }
 
+struct NoNames;
+impl formula::Names for NoNames {
+    fn row(&self, _: Option<u32>, _: u8, _: u32) -> Option<String> {
+        None
+    }
+}
+
 /// write one row's cells; `local`: the mask says this cell is local
 fn row_cells(bin: &mut Bin, l: &Layout, d: &[u8]) -> R<()> {
     let mask = d.get(l.fixed + 1..l.fixed + 1 + l.mask).unwrap_or(&[]);
     let bl = blocks(d, l.fixed + 1 + l.mask);
     for fl in l.fields {
-        let formula = bl.iter().find(|b| b.0 == fl.ix).and_then(|b| formula::decode(b.1));
+        let formula = bl.iter().find(|b| b.0 == fl.ix).and_then(|b| formula::decode(b.1, &NoNames));
         let has_block = bl.iter().any(|b| b.0 == fl.ix);
         let local = mask.get(fl.ix as usize / 8).is_some_and(|m| m & (1 << (fl.ix % 8)) != 0);
         if !has_block && !local {

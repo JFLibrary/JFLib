@@ -90,6 +90,31 @@ pub fn sniff(bytes: &[u8]) -> bool {
 /// read a binary file of Visio 2003-2010 (version 11) as a document of `kind` (see the module
 /// comment); `limits` bound everything (vsdx::Limits::VSDX for real files)
 pub fn read(bytes: &[u8], kind: DocKind, limits: &Limits) -> Result<Loaded, Error> {
+    let (xml, own, own_more) = convert(bytes, kind, limits)?;
+    let mut loaded = crate::vdx::read(xml.as_bytes(), kind, limits)?;
+    // our own warnings first: they say what the conversion left out
+    let mut w = own;
+    let mut more = own_more;
+    for x in loaded.warnings.drain(..) {
+        if w.len() < limits.warnings {
+            w.push(x);
+        } else {
+            more += 1;
+        }
+    }
+    loaded.warnings = w;
+    loaded.more_warnings += more;
+    Ok(loaded)
+}
+
+/// the XML of Visio 2003-2010 (a .vdx, .vsx or .vtx by `kind`) that a binary file becomes before
+/// vdx::read builds the model from it, with the warnings of the conversion (what it left out);
+/// for checks and for opening the conversion in other programs
+pub fn to_vdx(bytes: &[u8], kind: DocKind, limits: &Limits) -> Result<(String, Vec<Warning>), Error> {
+    convert(bytes, kind, limits).map(|(x, w, _)| (x, w))
+}
+
+fn convert(bytes: &[u8], kind: DocKind, limits: &Limits) -> Result<(String, Vec<Warning>, usize), Error> {
     if bytes.len() > limits.zip.archive_bytes {
         return Err(Error::Limit("file"));
     }
@@ -106,21 +131,8 @@ pub fn read(bytes: &[u8], kind: DocKind, limits: &Limits) -> Result<Loaded, Erro
     let tree = stream::tree(&doc, limits)?;
     let mut b = Bin { lim: limits, out: Out::new(limits.zip.part_bytes), names: Vec::new(), faces: Vec::new(), warnings: Vec::new(), more: 0, chunks: 0 };
     b.document(&tree.root, kind)?;
-    let Bin { out, warnings: own, more: own_more, .. } = b;
-    let mut loaded = crate::vdx::read(out.s.as_bytes(), kind, limits)?;
-    // our own warnings first: they say what the conversion left out
-    let mut w = own;
-    let mut more = own_more;
-    for x in loaded.warnings.drain(..) {
-        if w.len() < limits.warnings {
-            w.push(x);
-        } else {
-            more += 1;
-        }
-    }
-    loaded.warnings = w;
-    loaded.more_warnings += more;
-    Ok(loaded)
+    let Bin { out, warnings, more, .. } = b;
+    Ok((out.s, warnings, more))
 }
 
 /// a chunk with the chunks nested in it (by level)
@@ -282,19 +294,16 @@ impl Bin<'_> {
     fn styles(&mut self, root: &Node) -> R<()> {
         let Some(node) = root.kid(T_STYLES) else { return Ok(()) };
         let (objs, s) = self.objects(node)?;
-        // the stream's own object (type 0x1A) holds the styles' name index
+        // the stream's own object (type 0x1A) holds the styles and their name index
+        let Some(top) = objs.iter().find(|o| o.c.ty == T_STYLES) else { return Ok(()) };
         let mut names: Vec<(u32, u32, u32)> = Vec::new();
-        for o in &objs {
-            if o.c.ty == T_STYLES {
-                for k in &o.kids {
-                    if k.c.ty == T_NAME_INDEX {
-                        names.extend(name_index(k.c.data(&s)));
-                    }
-                }
+        for k in &top.kids {
+            if k.c.ty == T_NAME_INDEX {
+                names.extend(name_index(k.c.data(&s)));
             }
         }
         self.out.raw("<StyleSheets>")?;
-        for o in objs.iter().filter(|o| o.c.ty == T_STYLE) {
+        for o in top.kids.iter().filter(|o| o.c.ty == T_STYLE) {
             let id = o.c.id;
             let (name, name_u) = names.iter().find(|n| n.2 == id).map_or((None, None), |n| (Some(n.0), Some(n.1)));
             self.out.open("StyleSheet");
