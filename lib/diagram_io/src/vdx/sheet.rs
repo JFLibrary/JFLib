@@ -61,6 +61,14 @@ fn plain_text(x: &str) -> String {
     inner.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'").replace("&#13;", "\r").replace("&amp;", "&")
 }
 
+// what a sheet being read has so far: the next Geometry index, its sections of rows by name (at
+// most the 16 names of ROWS and Tabs: finding one never searches the sheet)
+#[derive(Default)]
+struct SheetIx {
+    geometry: u32,
+    secs: Vec<(&'static str, usize)>,
+}
+
 // a shape read but not yet in its tree: its parent's index in the list
 struct Pending {
     parent: Option<usize>,
@@ -73,7 +81,7 @@ struct ShapeFrame {
     idx: usize,
     id: u32,
     data: ShapeData,
-    geometry: u32,
+    ix: SheetIx,
     listed: bool,
 }
 
@@ -114,8 +122,9 @@ impl<'a> Vx<'a, '_> {
         Ok(Cell { name, value, formula, unit, error, stale: false })
     }
 
-    // the cells of a row or group element into `cells` (a later cell of a name replaces an
-    // earlier one); `section`: the VSDX section, for the cells it no longer has and the fonts
+    // the cells of a row or group element into `cells`, in file order (a name written twice stays
+    // twice, as vsdx.rs keeps it: no search, so no file makes reading slow); `section`: the VSDX
+    // section, for the cells it no longer has and the fonts
     fn cells_into(&mut self, s: &Start<'a>, cells: &mut Vec<Cell>, section: &str) -> R<()> {
         if s.empty {
             self.next()?;
@@ -138,10 +147,7 @@ impl<'a> Vx<'a, '_> {
                             }
                         }
                     }
-                    match cells.iter_mut().find(|x| x.name == cell.name) {
-                        Some(old) => *old = cell,
-                        None => cells.push(cell),
-                    }
+                    cells.push(cell);
                 }
                 Event::Start(c) => self.left_out(&c)?,
                 Event::Text(_) => {}
@@ -153,16 +159,16 @@ impl<'a> Vx<'a, '_> {
 
     // a child of a sheet element that is a section or a single-row group -> true; false: none
     // (not read)
-    fn sheet_child(&mut self, c: &Start<'a>, sheet: &mut Sheet, geometry: &mut u32) -> R<bool> {
+    fn sheet_child(&mut self, c: &Start<'a>, sheet: &mut Sheet, ix: &mut SheetIx) -> R<bool> {
         if c.ns != Ns::Vdx {
             return Ok(false);
         }
         if c.local == "Geom" {
-            self.geom(c, sheet, geometry)?;
+            self.geom(c, sheet, &mut ix.geometry)?;
         } else if c.local == "Tabs" {
-            self.tabs(c, sheet)?;
+            self.tabs(c, sheet, ix)?;
         } else if let Some(&(_, sec, named, kind)) = ROWS.iter().find(|r| r.0 == c.local) {
-            self.row(c, sheet, sec, named, kind)?;
+            self.row(c, sheet, ix, sec, named, kind)?;
         } else if SINGLE.contains(&c.local) {
             let mut cells = core::mem::take(&mut sheet.cells);
             let r = self.cells_into(c, &mut cells, "");
@@ -175,19 +181,20 @@ impl<'a> Vx<'a, '_> {
     }
 
     // the section `name` of a sheet (made when new); its position
-    fn section_of(&mut self, sheet: &mut Sheet, name: &str) -> R<usize> {
-        let sym = self.sym(name);
-        let key = SecKey { name: sym, index: 0 };
-        if let Some(i) = sheet.section_pos(key) {
+    fn section_of(&mut self, sheet: &mut Sheet, ix: &mut SheetIx, name: &'static str) -> R<usize> {
+        if let Some(&(_, i)) = ix.secs.iter().find(|s| s.0 == name) {
             return Ok(i);
         }
         self.count(Count::Section)?;
-        sheet.sections.push(Section::new(key));
-        Ok(sheet.sections.len() - 1)
+        let sym = self.sym(name);
+        sheet.sections.push(Section::new(SecKey { name: sym, index: 0 }));
+        let i = sheet.sections.len() - 1;
+        ix.secs.push((name, i));
+        Ok(i)
     }
 
     // a row element of a section of rows
-    fn row(&mut self, s: &Start<'a>, sheet: &mut Sheet, sec: &'static str, named: bool, kind: Option<&str>) -> R<()> {
+    fn row(&mut self, s: &Start<'a>, sheet: &mut Sheet, six: &mut SheetIx, sec: &'static str, named: bool, kind: Option<&str>) -> R<()> {
         self.count(Count::Row)?;
         let (mut ix, mut del, mut name, mut name_u, mut id) = (None, false, None, None, None);
         for a in &s.attrs {
@@ -200,7 +207,7 @@ impl<'a> Vx<'a, '_> {
                 _ => {}
             }
         }
-        let si = self.section_of(sheet, sec)?;
+        let si = self.section_of(sheet, six, sec)?;
         let n = sheet.sections[si].rows.len();
         // a named row: NameU, else Name, else Row_<ID> (Visio's name for it)
         let key_name = name_u.clone().or_else(|| name.clone()).or_else(|| id.map(|i| alloc::format!("Row_{i}")));
@@ -227,17 +234,13 @@ impl<'a> Vx<'a, '_> {
         let mut cells = Vec::new();
         self.cells_into(s, &mut cells, sec)?;
         row.cells = cells;
-        let section = &mut sheet.sections[si];
-        if section.row(row.key).is_some() {
-            self.warn(Warning::LeftOut { what: String::from(s.qname) });
-            return Ok(());
-        }
-        section.rows.push(row);
+        // a key written twice stays twice, as vsdx.rs keeps it
+        sheet.sections[si].rows.push(row);
         Ok(())
     }
 
     // a Tabs element: the row; its tab stops are left out
-    fn tabs(&mut self, s: &Start<'a>, sheet: &mut Sheet) -> R<()> {
+    fn tabs(&mut self, s: &Start<'a>, sheet: &mut Sheet, six: &mut SheetIx) -> R<()> {
         self.count(Count::Row)?;
         let mut ix = None;
         let mut del = false;
@@ -248,7 +251,7 @@ impl<'a> Vx<'a, '_> {
                 _ => {}
             }
         }
-        let si = self.section_of(sheet, "Tabs")?;
+        let si = self.section_of(sheet, six, "Tabs")?;
         let n = sheet.sections[si].rows.len() as u32;
         let mut row = Row::new(RowKey::Index(ix.unwrap_or(n)));
         row.del = del;
@@ -271,10 +274,7 @@ impl<'a> Vx<'a, '_> {
         if stops {
             self.warn(Warning::LeftOut { what: String::from("Tab") });
         }
-        let section = &mut sheet.sections[si];
-        if section.row(row.key).is_none() {
-            section.rows.push(row);
-        }
+        sheet.sections[si].rows.push(row);
         Ok(())
     }
 
@@ -306,10 +306,7 @@ impl<'a> Vx<'a, '_> {
                     self.left_out(&c)?;
                 } else if GEOM_CELLS.contains(&c.local) {
                     let cell = self.cell(&c)?;
-                    match sec.cells.iter_mut().find(|x| x.name == cell.name) {
-                        Some(old) => *old = cell,
-                        None => sec.cells.push(cell),
-                    }
+                    sec.cells.push(cell);
                 } else {
                     self.count(Count::Row)?;
                     let (mut rix, mut rdel) = (None, false);
@@ -327,19 +324,11 @@ impl<'a> Vx<'a, '_> {
                     let mut cells = Vec::new();
                     self.cells_into(&c, &mut cells, "Geometry")?;
                     row.cells = cells;
-                    if sec.row(row.key).is_some() {
-                        self.warn(Warning::LeftOut { what: String::from(c.qname) });
-                    } else {
-                        sec.rows.push(row);
-                    }
+                    sec.rows.push(row);
                 }
             }
         } else {
             self.next()?;
-        }
-        if sheet.section(sec.key()).is_some() {
-            self.warn(Warning::LeftOut { what: String::from("Geom") });
-            return Ok(());
         }
         sheet.sections.push(sec);
         Ok(())
@@ -352,11 +341,11 @@ impl<'a> Vx<'a, '_> {
             self.next()?;
             return Ok(());
         }
-        let mut geometry = 0u32;
+        let mut ix = SheetIx::default();
         loop {
             match self.next()? {
                 Event::Start(c) => {
-                    if !self.sheet_child(&c, sheet, &mut geometry)? {
+                    if !self.sheet_child(&c, sheet, &mut ix)? {
                         self.left_out(&c)?;
                     }
                 }
@@ -824,7 +813,7 @@ impl<'a> Vx<'a, '_> {
 
     // a child of a Shape other than its Shapes list
     fn shape_child(&mut self, c: &Start<'a>, f: &mut ShapeFrame) -> R<()> {
-        if self.sheet_child(c, &mut f.data.sheet, &mut f.geometry)? {
+        if self.sheet_child(c, &mut f.data.sheet, &mut f.ix)? {
             return Ok(());
         }
         let data = &mut f.data;
@@ -865,7 +854,7 @@ impl<'a> Vx<'a, '_> {
                         let (id, data) = self.shape_start(&c)?;
                         let idx = list.len();
                         list.push(Pending { parent, id, data: ShapeData::default() });
-                        stack.push(Frame::Shape(Box::new(ShapeFrame { idx, id, data, geometry: 0, listed: false })));
+                        stack.push(Frame::Shape(Box::new(ShapeFrame { idx, id, data, ix: SheetIx::default(), listed: false })));
                     }
                     Event::Start(c) => self.left_out(&c)?,
                     Event::Text(_) => {}

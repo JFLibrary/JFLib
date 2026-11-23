@@ -568,6 +568,25 @@ fn hostile(h: &mut H) {
         let good = if ok { r.as_ref().is_ok_and(|l| page_of(&l.doc, 0).is_some_and(|p| p.shapes.iter().count() == levels)) } else { matches!(r, Err(Error::Xml { error: vsdx::XmlError::Depth, .. })) };
         h.check("vdx/limits/depth", good, format!("{levels} levels: {:?}", r.map(|_| ())));
     }
+    // wide sheets in linear time: one group of 100000 cells, 30000 Geom sections and 30000 Char
+    // rows in one shape (no search for names, rows or sections)
+    let mut s = String::from("<VisioDocument xmlns='http://schemas.microsoft.com/visio/2003/core'><Pages><Page ID='0'><Shapes><Shape ID='1' Type='Shape'><XForm>");
+    for i in 0..100_000 {
+        s.push_str(&format!("<C{i}>1</C{i}>"));
+    }
+    s.push_str("</XForm>");
+    for i in 0..30_000 {
+        s.push_str(&format!("<Geom IX='{i}'><NoFill>0</NoFill></Geom><Char IX='{i}'><Size>0.1</Size></Char>"));
+    }
+    s.push_str("</Shape></Shapes></Page></Pages></VisioDocument>");
+    let t0 = plat::time_us();
+    let r = read(&s, DocKind::Drawing);
+    let ms = plat::time_us().wrapping_sub(t0) / 1000;
+    let counts = r.as_ref().ok().and_then(|l| {
+        let d = shape(&l.doc, 0, 1).and_then(|s| l.doc.shape(s))?;
+        Some((d.sheet().cells.len(), d.sheet().sections.len()))
+    });
+    h.check("vdx/limits/wide", counts == Some((100_000, 30_001)) && ms < 3000, format!("{counts:?} in {ms} ms"));
     // many shapes in reasonable time; many warnings: only Limits::warnings kept
     let mut s = String::from("<VisioDocument xmlns='http://schemas.microsoft.com/visio/2003/core'><Pages><Page ID='0'><Shapes>");
     for i in 0..20000 {

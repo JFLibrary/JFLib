@@ -75,6 +75,21 @@ const PART: &str = "VDX";
 const CT_VBA: &str = "application/vnd.ms-office.vbaProject";
 const REL_VBA: &str = "http://schemas.microsoft.com/office/2006/relationships/vbaProject";
 const REL_WINDOWS: &str = "http://schemas.microsoft.com/visio/2010/relationships/windows";
+/// the children of VisioDocument this reader takes
+const ROOT_CHILDREN: [&str; 12] = [
+    "DocumentProperties",
+    "DocumentSettings",
+    "Colors",
+    "FaceNames",
+    "StyleSheets",
+    "DocumentSheet",
+    "Masters",
+    "Pages",
+    "Windows",
+    "EventList",
+    "HeaderFooter",
+    "VBProjectData",
+];
 
 /// the kind of document an extension of the format stands for ("vdx", "vsx", "vtx"; ASCII case
 /// ignored)
@@ -328,8 +343,9 @@ impl<'a> Vx<'a, '_> {
                 Event::End { .. } => break,
                 Event::Eof => return Err(self.bad("VisioDocument without end")),
             };
-            // each child once; a second one is left out
-            if c.ns != Ns::Vdx || seen.contains(&c.local) {
+            // each known child once; a second one is left out (only known names are remembered:
+            // the list stays short whatever the file holds)
+            if c.ns != Ns::Vdx || seen.contains(&c.local) || !ROOT_CHILDREN.contains(&c.local) {
                 self.left_out(&c)?;
                 continue;
             }
