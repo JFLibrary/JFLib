@@ -1,7 +1,8 @@
-// lz -- lib/compress: xxHash32/64, CRC-32 and Adler-32 vectors, LZ4 block and frame, zstd,
-// DEFLATE, zlib and gzip round trips on many shapes of data and levels, streams of zlib, gzip
-// and libbrotlienc (Brotli), corrupt, truncated and trailing input, and the file modes for
-// tools/lz4_check.py and tools/zstd_check.py (interop with the zstd tool)
+// lz -- lib/compress: xxHash32/64, CRC-32 and Adler-32 vectors, LZ4 block (also compress_hc)
+// and frame, zstd, DEFLATE, zlib and gzip round trips on many shapes of data and levels,
+// streams of zlib, gzip and libbrotlienc (Brotli) and the Brotli encoder at every level,
+// corrupt, truncated and trailing input, and the file modes for tools/lz4_check.py and
+// tools/zstd_check.py (interop with the zstd tool)
 
 use alloc::vec::Vec;
 
@@ -70,6 +71,18 @@ pub fn run(t: &mut T) {
         if name == "random" {
             t.check("lz4 random stays small", c.len() <= data.len() + data.len() / 200 + 16);
         }
+        let mut hc_ok = true;
+        for level in [3, lz4::LEVEL_HC_DEFAULT, 12] {
+            if data.len() > 1 << 20 && level == 12 {
+                continue;
+            }
+            let h = lz4::compress_hc(&data, level);
+            hc_ok &= h.len() <= lz4::bound(data.len()) && lz4::decompress(&h, data.len()).as_deref() == Some(&data[..]);
+        }
+        t.check(&alloc::format!("lz4 compress_hc {}: levels 3, 9, 12", name), hc_ok);
+        if name == "mixed" {
+            t.check(&alloc::format!("lz4 compress_hc {}: smaller than compress", name), lz4::compress_hc(&data, 9).len() * 100 < c.len() * 97);
+        }
     }
     // limits and corruption: never more output than allowed, no panic on any truncation
     let data = b"hello hello hello hello hello hello hello hello hello world".to_vec();
@@ -107,6 +120,7 @@ pub fn run(t: &mut T) {
     checksum_run(t);
     flate_run(t);
     brotli_run(t);
+    brotli_enc_run(t);
 }
 
 // Adler-32 byte by byte, as RFC 1950 defines it
@@ -431,6 +445,42 @@ pub fn file_mode(op: &str, input: &str, output: &str) -> i32 {
         Some(o) if plat::write_file(output, &o) => 0,
         _ => 1,
     }
+}
+
+// ---------------------------------------------------------------------------- the Brotli encoder
+
+fn brotli_enc_run(t: &mut T) {
+    let all = samples();
+    for (name, data) in &all {
+        let mut ok = true;
+        for level in 0..=11 {
+            // the large inputs at a few levels, levels 10 and 11 up to 300 KB
+            if (data.len() > 1 << 20 && level % 5 != 0) || (level >= 10 && data.len() > 300_000) {
+                continue;
+            }
+            let c = brotli::compress(data, level);
+            ok &= c.len() <= brotli::bound(data.len()) && brotli::decompress(&c, data.len()).as_deref() == Some(&data[..]);
+        }
+        t.check(&alloc::format!("brotli compress {name}: levels 0 to 11 decode"), ok);
+    }
+    let text = &all.iter().find(|s| s.0 == "text").unwrap().1;
+    let (c0, c5, c11) = (brotli::compress(text, 0).len(), brotli::compress(text, 5).len(), brotli::compress(text, 11).len());
+    t.check("brotli compress text: smaller with the level", c11 <= c0 && c5 <= c0 && c5 < text.len() / 100);
+    let random = &all.iter().find(|s| s.0 == "random").unwrap().1;
+    t.check("brotli compress random: stored, a few bytes larger", brotli::compress(random, 5).len() <= random.len() + random.len() / 1000 + 16);
+    // words of the static dictionary, each once: only the dictionary finds them
+    let words = b"The international development of information technology is the environment of the community, and the government knows it. ";
+    let (plain, dict) = (brotli::compress(words, 1).len(), brotli::compress(words, 5).len());
+    t.check("brotli compress: words of the static dictionary", dict * 10 < plain * 8 && brotli::decompress(&brotli::compress(words, 11), 200).as_deref() == Some(&words[..]));
+    let mixed = &all.iter().find(|s| s.0 == "mixed").unwrap().1;
+    t.check("brotli compress: the same bytes again", brotli::compress(mixed, 9) == brotli::compress(mixed, 9));
+    t.check("brotli compress: levels out of range clamp", brotli::compress(mixed, -4) == brotli::compress(mixed, 0) && brotli::compress(words, 40) == brotli::compress(words, 11));
+    // nothing: one byte (WBITS 16 in one bit, ISLAST, ISLASTEMPTY); a small input keeps WBITS 16
+    t.check("brotli compress: nothing", brotli::compress(b"", 5) == [6] && brotli::decompress(&[6], 0).is_some_and(|o| o.is_empty()));
+    t.check("brotli compress: a small window for a small input", brotli::compress(words, 5)[0] & 1 == 0);
+    // the window of a large input: 4 MiB (WBITS 22), 16 MiB at levels 10 and 11
+    let big = &all.iter().find(|s| s.0 == "big 9 MiB").unwrap().1;
+    t.check("brotli compress: the window of 9 MiB", brotli::compress(big, 0)[0] & 0x0F == ((22 - 17) << 1 | 1) as u8);
 }
 
 // ---------------------------------------------------------------------------- zstd dictionaries

@@ -336,7 +336,7 @@ kleinen JSON-Leser für Cargos Meldungen hat sie selbst. Vorlage und Web-Host tr
     die Crate `jflib-installer` (`lib/installer`); `apps/installer` bindet sie nur noch ein. Das Werkzeug baut ihn in
     einem eigenen kleinen Projekt unter `target/` mit den Profilen und der `Cargo.lock` der App, sodass die schon
     gebauten Crates wieder genommen werden. Das `.deb` schreibt es selbst (ar, ustar, gzip), ohne `dpkg-deb` und
-    ohne WSL; dafür hat `cargo-jflib` ein eigenes Deflate (0,16 % größer als zlib -9 an einem echten Programm), PNG
+    ohne WSL; dafür hat `cargo-jflib` ein eigenes Deflate (0,16 % größer als zlib -9 an einem echten Programm; seit 2026-11-23 das von `compress`), PNG
     lesen und schreiben und das Verkleinern von `pngutil.py`. Aus `PACKAGE` liest es die Schlüssel von
     `package.py` (ohne `cross_bins`, `unit_*` und Module). Dabei aufgefallen und behoben: `web` und `android`
     lieferten die Schrift- und Symbol-Lizenzen der Stile (`assets/OFL-*.txt`, `DejaVu-LICENSE.txt`,

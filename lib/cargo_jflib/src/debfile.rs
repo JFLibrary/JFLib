@@ -5,7 +5,6 @@
 
 use std::collections::BTreeMap;
 
-use crate::deflate;
 
 /// the files of one tar: path below "./" -> contents (folders are added for every path)
 pub(crate) type Tree = BTreeMap<String, Vec<u8>>;
@@ -107,8 +106,8 @@ pub(crate) fn tar(tree: &Tree, mtime: u64, scripts: bool) -> Vec<u8> {
 pub(crate) fn deb(control: &Tree, data: &Tree, mtime: u64) -> Vec<u8> {
     let members: [(&str, Vec<u8>); 3] = [
         ("debian-binary", b"2.0\n".to_vec()),
-        ("control.tar.gz", deflate::gzip(&tar(control, mtime, true))),
-        ("data.tar.gz", deflate::gzip(&tar(data, mtime, false))),
+        ("control.tar.gz", compress::gzip::compress(&tar(control, mtime, true), 9)),
+        ("data.tar.gz", compress::gzip::compress(&tar(data, mtime, false), 9)),
     ];
     let mut out = b"!<arch>\n".to_vec();
     for (name, body) in members {

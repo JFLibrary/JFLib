@@ -2,12 +2,13 @@
 //
 // Input in pieces of 1 byte to all at once and output buffers of 1 byte to 1 MiB give the
 // one-shot functions' data; the encoders give the same bytes as compress() where they
-// promise to (DEFLATE, zlib and gzip up to 256 KiB, zstd and LZ4 frames with their size),
-// every Flush::Sync point decodes to all input before it, damaged and truncated streams
-// fail exactly when the one-shot decoders do, bytes after a stream are not taken, the pumps
-// keep their limits, Xxh32 / Xxh64 in pieces equal xxh32 / xxh64.  The file mode
-// --stream FORMAT c|d IN OUT [LEVEL] reads and writes in pieces of 64 KiB (for
-// tools/stream_check.py: the gzip and zstd tools, Brotli streams of WOFF2 fonts).
+// promise to (DEFLATE, zlib and gzip up to 256 KiB, zstd, LZ4 and Brotli streams with their
+// size), every Flush::Sync point decodes to all input before it, damaged and truncated
+// streams fail exactly when the one-shot decoders do, bytes after a stream are not taken, the
+// pumps keep their limits, Xxh32 / Xxh64 in pieces equal xxh32 / xxh64.  The file mode
+// --stream FORMAT c|d IN OUT [LEVEL] reads and writes in pieces of 64 KiB, c1 / d1 in one
+// piece (for tools/stream_check.py and tools/brotli_check.py: the gzip and zstd tools,
+// libbrotli, Brotli streams of WOFF2 fonts).
 
 use alloc::boxed::Box;
 use alloc::format;
@@ -189,6 +190,7 @@ pub fn run(t: &mut T) {
     zstd_run(t, &mut r, &shapes);
     lz4_run(t, &mut r, &shapes);
     brotli_run(t, &mut r);
+    brotli_enc_run(t, &mut r, &shapes);
     pumps(t, &mut r);
     hashes(t, &mut r);
 }
@@ -437,6 +439,52 @@ fn brotli_run(t: &mut T, r: &mut R) {
     t.check("brotli decoder: 4000 damaged streams as decompress_prefix()", agree);
 }
 
+fn brotli_enc_run(t: &mut T, r: &mut R, shapes: &[(&'static str, Vec<u8>)]) {
+    for (name, data) in shapes {
+        for level in [1, 5, 9] {
+            if data.len() > 1 << 20 && level != 1 {
+                continue;
+            }
+            let one = brotli::compress(data, level);
+            let mut ok = true;
+            for &(cuts, osz) in cutsets(one.len()).iter().take(3) {
+                ok &= dec(&mut brotli::Decoder::new(), &one, r, cuts, osz).is_ok_and(|(o, u)| o == *data && u == one.len());
+            }
+            t.check(&format!("brotli decoder {name} level {level}: our stream"), ok);
+            let (mut same, mut back) = (true, true);
+            for &(cuts, osz) in cutsets(data.len()).iter().take(3) {
+                let sized = enc(&mut brotli::Encoder::new(level).with_size(data.len() as u64), data, r, cuts, osz, 0);
+                same &= sized.as_ref().is_ok_and(|(s, _)| *s == one);
+                let plain = enc(&mut brotli::Encoder::new(level), data, r, cuts, osz, 3);
+                back &= plain.is_ok_and(|(s, _)| brotli::decompress(&s, data.len()).as_deref() == Some(&data[..]));
+            }
+            t.check(&format!("brotli encoder {name} level {level} with_size: the bytes of compress()"), same);
+            t.check(&format!("brotli encoder {name} level {level} without a size, with Flush::Sync"), back);
+        }
+    }
+    let data = &shapes[8].1;
+    let (st, marks) = enc(&mut brotli::Encoder::new(5), data, r, 20_000, 9000, 2).unwrap();
+    let mut synced = !marks.is_empty();
+    for &(ip, op) in &marks {
+        let mut o = vec![0u8; ip + 10];
+        let s = brotli::Decoder::new().decode(&st[..op], &mut o);
+        synced &= s.is_ok_and(|s| s.written == ip && s.status == Status::Input) && o[..ip] == data[..ip];
+    }
+    t.check("brotli encoder: Flush::Sync points", synced);
+    // Sync with nothing new: no bytes; Sync twice in a row: the second adds none
+    let mut e = brotli::Encoder::new(5);
+    let mut ob = [0u8; 64];
+    let a = e.encode(b"", &mut ob, Flush::Sync).unwrap();
+    let b = e.encode(b"abc", &mut ob, Flush::Sync).unwrap();
+    let c = e.encode(b"", &mut ob, Flush::Sync).unwrap();
+    t.check("brotli encoder: Flush::Sync without new input", a.status == Status::Input && b.written > 0 && c.written == 0 && c.status == Status::Input);
+    let small = enc(&mut brotli::Encoder::new(5).with_window(10), data, r, 3000, 500, 0).unwrap().0;
+    t.check("brotli encoder with_window(10)", small[0] & 0x7F == 0x21 && brotli::decompress(&small, data.len()).as_deref() == Some(&data[..]));
+    t.check("brotli encoder: a wrong size", enc(&mut brotli::Encoder::new(5).with_size(10), b"0123456789A", r, 0, 64, 0).err() == Some(Error::Size));
+    t.check("brotli encoder: a short input", enc(&mut brotli::Encoder::new(5).with_size(12), b"0123456789A", r, 0, 64, 0).err() == Some(Error::Size));
+    t.check("brotli encoder: nothing", enc(&mut brotli::Encoder::new(5), b"", r, 0, 1, 0).is_ok_and(|(s, _)| brotli::decompress(&s, 0).is_some_and(|o| o.is_empty())));
+}
+
 fn pumps(t: &mut T, r: &mut R) {
     let data = &samples()[8].1;
     let mut src = 0;
@@ -509,9 +557,24 @@ fn hashes(t: &mut T, r: &mut R) {
     t.check("Xxh32 of nothing", Xxh32::new(0).digest() == xxh32(b"", 0) && Xxh64::new(0).digest() == xxh64(b"", 0));
 }
 
-/// --stream FORMAT c|d IN OUT [LEVEL]: compress or decompress a file in pieces of 64 KiB
-/// (FORMAT deflate, zlib, gzip, zstd, lz4, brotli; for tools/stream_check.py)
+/// --stream FORMAT c|d IN OUT [LEVEL]: compress or decompress a file in pieces of 64 KiB, c1 /
+/// d1 in one piece (FORMAT deflate, zlib, gzip, zstd, lz4, brotli; for tools/stream_check.py
+/// and tools/brotli_check.py)
 pub fn file_mode(fmt: &str, op: &str, input: &str, output: &str, level: i32) -> i32 {
+    if op == "c1" {
+        // the one-shot encoder
+        let Some(data) = plat::read_file(input) else { return 2 };
+        let out = match fmt {
+            "deflate" => deflate::compress(&data, level),
+            "zlib" => zlib::compress(&data, level),
+            "gzip" => gzip::compress(&data, level),
+            "zstd" => zstd::compress(&data, level),
+            "lz4" => lz4::frame_compress(&data),
+            "brotli" => brotli::compress(&data, level),
+            _ => return 2,
+        };
+        return if plat::write_file(output, &out) { 0 } else { 1 };
+    }
     if op == "d1" {
         // the one-shot decoder, to hold the streams against
         let Some(data) = plat::read_file(input) else { return 2 };
@@ -551,6 +614,7 @@ pub fn file_mode(fmt: &str, op: &str, input: &str, output: &str, level: i32) -> 
             "gzip" => Box::new(gzip::Encoder::new(level)),
             "zstd" => Box::new(zstd::Encoder::new(level)),
             "lz4" => Box::new(lz4::FrameEncoder::new()),
+            "brotli" => Box::new(brotli::Encoder::new(level)),
             _ => return 2,
         };
         encode_all(&mut *e, read, write)

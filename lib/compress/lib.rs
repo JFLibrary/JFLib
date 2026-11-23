@@ -4,8 +4,10 @@
 //   zlib::compress / decompress                     zlib streams (RFC 1950)
 //   gzip::compress / decompress                     gzip members (RFC 1952; decompress reads
 //                                                   all members, as gunzip does)
-//   brotli::decompress(data, max_out)               Brotli streams (RFC 7932), decoder only
+//   brotli::compress(data, level) / decompress      Brotli streams (RFC 7932; levels 0 to 11,
+//                                                   read by libbrotli and the browsers)
 //   lz4::compress(data) -> Vec<u8>                  LZ4 block (greedy, 64 KiB window)
+//   lz4::compress_hc(data, level)                   LZ4 block, longest matches (as lz4 -9)
 //   lz4::decompress(block, max_out) -> Option<Vec>  bounds-checked; None on any corruption
 //   lz4::frame_compress / frame_decompress          the LZ4 frame format (lz4 / zstd --format=lz4
 //                                                   interoperable), xxHash32 checksums
@@ -18,7 +20,7 @@
 //   stream::{Decode, Encode}                        every format in pieces, with bounded memory:
 //                                                   deflate::, zlib::, gzip::, zstd::Decoder /
 //                                                   Encoder, lz4::FrameDecoder / FrameEncoder,
-//                                                   brotli::Decoder; decode(input, out) /
+//                                                   brotli::Decoder / Encoder; decode(input, out) /
 //                                                   encode(input, out, flush) -> Step; the
 //                                                   pumps stream::decode_all / encode_all
 //   Codec { None, Lz4, Zstd } with id(): the codec byte that formats on disk store per blob;

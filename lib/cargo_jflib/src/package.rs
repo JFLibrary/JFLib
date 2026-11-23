@@ -21,7 +21,6 @@ use std::process::{Command, Stdio};
 
 use crate::cargo::{self, Project};
 use crate::debfile::{self, Tree};
-use crate::deflate;
 use crate::notices;
 use crate::pkgmeta::{self, Meta};
 use crate::png;
@@ -532,11 +531,11 @@ impl App<'_> {
         }
         man.push(format!("app_id={}", pkgmeta::app_id(&self.meta, &self.name)?));
         let mtext = (man.join("\n") + "\n").into_bytes();
-        let mut entries = vec![(PK_MANIFEST, PF_ZLIB, "manifest".to_string(), String::new(), deflate::zlib(&mtext), mtext.len())];
+        let mut entries = vec![(PK_MANIFEST, PF_ZLIB, "manifest".to_string(), String::new(), compress::zlib::compress(&mtext, 9), mtext.len())];
         for s in &self.styles {
             let label = style_info(&self.infos, s).0;
             let exe = read(&self.exe(s, "win"))?;
-            entries.push((PK_STYLE, PF_ZLIB, s.clone(), label.clone(), deflate::zlib(&exe), exe.len()));
+            entries.push((PK_STYLE, PF_ZLIB, s.clone(), label.clone(), compress::zlib::compress(&exe, 9), exe.len()));
             if let Some(png) = previews.get(s) {
                 entries.push((PK_PREVIEW, 0, s.clone(), label, png.clone(), png.len()));
             }
@@ -547,7 +546,7 @@ impl App<'_> {
         for (rel, data) in self.notices("win")? {
             let name = format!("licenses/{rel}");
             if name.len() <= NAME_MAX {
-                entries.push((PK_FILE, PF_ZLIB, name, String::new(), deflate::zlib(data), data.len()));
+                entries.push((PK_FILE, PF_ZLIB, name, String::new(), compress::zlib::compress(data, 9), data.len()));
                 continue;
             }
             let folder = format!("licenses/{}.txt", rel.split('/').next().unwrap_or_default());
@@ -558,7 +557,7 @@ impl App<'_> {
             text.extend_from_slice(b"\n\n");
         }
         for (name, data) in combined {
-            entries.push((PK_FILE, PF_ZLIB, name, String::new(), deflate::zlib(&data), data.len()));
+            entries.push((PK_FILE, PF_ZLIB, name, String::new(), compress::zlib::compress(&data, 9), data.len()));
         }
         if entries.len() > PAY_MAX_ENT {
             return Err(format!("the setup's payload would hold {} entries, at most {PAY_MAX_ENT}", entries.len()));

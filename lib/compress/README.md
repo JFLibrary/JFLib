@@ -3,9 +3,9 @@
 Lossless compression for [JFLib](https://jflib.org): DEFLATE, zlib, gzip, Brotli, LZ4 and
 Zstandard in plain Rust, without the standard library, without a line of `unsafe` code and
 without a dependency. All formats are the real ones: what is written here opens with `gzip`,
-`zlib`, `lz4` and `zstd`, and what those tools write opens here, Zstandard with dictionaries
-too. Each also comes in pieces, with bounded memory, for data that is too large to hold or that
-arrives over time.
+`zlib`, `lz4`, `zstd`, `brotli` and every browser, and what those tools write opens here,
+Zstandard with dictionaries too. Each also comes in pieces, with bounded memory, for data that
+is too large to hold or that arrives over time.
 
 ## What it does
 
@@ -17,12 +17,30 @@ other, as `gunzip` does. For codecs that handle many small pieces there are reus
 (`deflate::DeflateState`, `deflate::InflateState`) and variants that work in the caller's buffer
 and report how much input a stream took (`decompress_into`, `compress_into`).
 
-**Brotli** is the `br` of HTTP and the compression of WOFF2 fonts. `brotli::decompress(data,
-max_out)` reads any stream of RFC 7932 with its static dictionary; there is no Brotli encoder.
+**Brotli** is the `br` of HTTP and the compression of WOFF2 fonts. `brotli::compress(data,
+level)` writes a stream at levels 0 to 11 (`brotli::LEVEL_DEFAULT` is 5, for the responses of a
+web server; `LEVEL_MAX` for files compressed once and sent often), with the smallest window that
+holds the data. It uses what makes Brotli smaller than gzip: a window of up to 16 MiB, the static
+dictionary of 13 504 words and pieces of HTML in several languages with their transforms, the
+context of the two bytes before each literal, and at levels 10 and 11 a near-optimal parse. On
+JFLib's guide (430 KB of Markdown) level 5 makes 158 KB (gzip -9: 173 KB, libbrotli at the
+same level: 163 KB), level 11 147 KB (libbrotli: 145 KB). libbrotli is 1.5 to 3 times as fast
+at levels 0 to 9 and about as fast at 10 and 11. `brotli::decompress(data, max_out)` reads any
+stream of RFC 7932.
+
+```rust
+use jflib::compress::brotli;
+
+let body = brotli::compress(page.as_bytes(), brotli::LEVEL_DEFAULT);  // Content-Encoding: br
+let font = brotli::compress(&tables, brotli::LEVEL_MAX);              // once, for a WOFF2 file
+let back = brotli::decompress(&body, 16 << 20);
+```
 
 **LZ4** is the fast one. `lz4::compress` and `lz4::decompress` work on single blocks,
 `lz4::frame_compress` and `lz4::frame_decompress` on the LZ4 frame format with its xxHash32
-checksums. JFLib's build packs an app's `assets/` with it.
+checksums. `lz4::compress_hc(data, level)` searches harder for the same block format, as `lz4 -9`
+does: slower, a few percent smaller, as fast to decompress. JFLib's build packs an app's
+`assets/` with LZ4, cargo-jflib the AppImage with `compress_hc`.
 
 **Zstandard** is the strongest, the one for archives and backups. `zstd::compress(data, level)`
 writes a frame with the content size and a checksum, at levels 1 to 19 (`zstd::LEVEL_DEFAULT` is
@@ -37,8 +55,8 @@ format, so the zstd tool takes ours (`zstd -D`) and we take its. `compress_with_
 `decompress_with_dict` use it; the frame names the dictionary's ID. Bytes that are no dictionary
 of that format, or `Dictionary::raw(content)`, are content only. On 600 JSON records of 225
 bytes each, a 16 KiB dictionary makes them 3.15 times smaller instead of about 1.2 times without
-one; the zstd tool with a dictionary of its own training reaches 3.22. The stream `Encoder` and `Decoder` take dictionaries too
-(`with_dictionary`).
+one; the zstd tool with a dictionary of its own training reaches 3.22. The stream `Encoder` and
+`Decoder` take dictionaries too (`with_dictionary`).
 
 ```rust
 use jflib::compress::zstd::{self, Dictionary};
@@ -74,17 +92,18 @@ For formats that store blobs with their compression, `Codec` (`None`, `Lz4`, `Zs
 to store beside each blob and a name for configuration files.
 
 **Streams** are for data too large to hold, or that arrives in pieces: a download, a file of
-gigabytes, a socket. Every format has a decoder and, except Brotli, an encoder that takes its
-input in pieces and writes into a buffer of the caller (`compress::stream`): `deflate::Decoder`
-and `Encoder`, the same for `zlib` and `gzip`, `zstd::Decoder` and `Encoder`,
-`lz4::FrameDecoder` and `FrameEncoder`, and `brotli::Decoder`. A call returns how much input it
-took, how much it wrote, and whether it wants more input, more room or is at the end. The memory
-stays bounded by the format: 32 KiB of window for DEFLATE, the frame's window for zstd and
-Brotli, 64 KiB and one block for LZ4. A small piece of input never makes more output than the
-buffer holds, so a compression bomb is the caller's to stop, not a large allocation. Encoders
-can flush (`Flush::Sync`) so that a reader can decode everything so far, as for a log or a live
-connection. Up to 256 KiB, the DEFLATE, zlib and gzip encoders write the same bytes as
-`compress()`; the zstd and LZ4 encoders do for any size once they are told it (`with_size`).
+gigabytes, a socket. Every format has a decoder and an encoder that take their input in pieces
+and write into a buffer of the caller (`compress::stream`): `deflate::Decoder` and `Encoder`, the
+same for `zlib` and `gzip`, `zstd::Decoder` and `Encoder`, `lz4::FrameDecoder` and
+`FrameEncoder`, `brotli::Decoder` and `Encoder`. A call returns how much input it took, how much
+it wrote, and whether it wants more input, more room or is at the end. The memory stays bounded
+by the format: 32 KiB of window for DEFLATE, the frame's window for zstd and Brotli (the Brotli
+encoder's `with_window` makes it smaller, for decoders with little memory), 64 KiB and one block
+for LZ4. A small piece of input never makes more output than the buffer holds, so a compression
+bomb is the caller's to stop, not a large allocation. Encoders can flush (`Flush::Sync`) so that
+a reader can decode everything so far, as for a log or a live connection. Up to 256 KiB, the
+DEFLATE, zlib and gzip encoders write the same bytes as `compress()`; the zstd, LZ4 and Brotli
+encoders do for any size once they are told it (`with_size`).
 `stream::decode_all` and `encode_all` pump a whole stream between a reader and a writer.
 
 ```rust
@@ -134,6 +153,7 @@ same.
 
 MIT or Apache-2.0, at your choice. The DEFLATE encoder follows zlib's compression levels and
 miniz's way of limiting code lengths, the decoder builds its Huffman tables as stb_image does, and
-the Brotli decoder carries Brotli's static dictionary; those parts also stand under the licenses
-of their sources (Zlib, MIT, and MIT or Unlicense), whose texts are in the crate's
+Brotli's decoder and encoder carry its static dictionary, the encoder scores matches, estimates
+costs and writes its prefix codes as libbrotli does; those parts also stand under the licenses of
+their sources (Zlib, MIT, and MIT or Unlicense), whose texts are in the crate's
 [`licenses/`](https://github.com/JFLibrary/JFLib/tree/main/lib/compress/licenses) folder.

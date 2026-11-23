@@ -20,6 +20,10 @@ path = "src/main.rs"
 [lints]
 workspace = true
 
+[dependencies]
+# DEFLATE, zlib, gzip, LZ4 and CRC-32 of the packages, the PNGs and the AppImage's SquashFS
+compress.workspace = true
+
 # docs.rs: a program, nothing to document but its page; one target instead of five
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
