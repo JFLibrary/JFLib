@@ -1,8 +1,9 @@
 """ct_check.py -- lib/crypto's secret-dependent operations take the same way for every secret.
     python tools/ct_check.py [--opt release,dev,o3,s,z] [--only T,..] [--seeds N] [--crypto DIR] [--step] [--wasm]
 Builds tools/ct_check/probe.rs against lib/crypto (or the crate in DIR) at each optimization level
-below and lets it run every operation of its list (X25519, Ed25519, P-256, EAP-PWD, the RSA / DH
-exponentiation, the AEADs, AES, MACs, KDFs, Argon2id, Base64 and hex, and with this
+below and lets it run every operation of its list (X25519, Ed25519, P-256, P-384, ECDSA signing,
+ML-KEM, EAP-PWD, the RSA / DH exponentiation, the AEADs, AES, MACs, SHA-3 and SHAKE, KDFs,
+Argon2id, Base64 and hex, and with this
 repository's crypto the key files of netio: PEM / PKCS #8 and OpenSSH) with SEEDS different secrets under
 ptrace.  An operation fails when two secrets take different branches or jump-table entries; the
 report names the function and the line where the paths part (addr2line).
@@ -27,7 +28,9 @@ some multipliers).
 wasm-interp runs each operation with --trace, and between two calls of ct_mark the sequence of the
 executed wasm instructions and the addresses of every load, store, memory.copy and memory.fill
 (not the values) must be the same for every secret; one comparison sees what the trace and
-memcheck see on a processor, for the wasm the compiler made.  A browser's JIT turns it into
+memcheck see on a processor, for the wasm the compiler made.  After a parting KNOWN allows in
+named functions the comparison goes on from where they return, and selftest_resync (such a
+parting, then a leak) must be reported.  A browser's JIT turns it into
 machine code of its own, which no tool here sees.  Needs wasm-interp and wasm-objdump (WABT) and
 the target (rustup target add wasm32-unknown-unknown); runs anywhere those do.
 Linux on x86-64 or ARM64 (from Windows: runs itself again in WSL); needs cargo and binutils
@@ -66,6 +69,9 @@ SELFTEST = "selftest_leak"
 # a deliberate table lookup at a secret index: the same branches every time (the trace does not see
 # it), memcheck must report it
 SELFTEST_LOOKUP = "selftest_lookup"
+# in wasm: a parting KNOWN allows, then a leak after it, which the check must still see
+SELFTEST_RESYNC = "selftest_resync"
+SELFTESTS = (SELFTEST, SELFTEST_LOOKUP, SELFTEST_RESYNC)
 VALGRIND = shutil.which("valgrind")
 
 # Where a secret becomes public on purpose, memcheck reports the branch on it as well: (file,
@@ -86,6 +92,16 @@ DECLASSIFIED = [
     # ARM64 makes secret_from's answer without a branch (the Option's tag from the mask), and
     # public_key's assert branches on it: the same answer, where it is used
     ("crypto/p256.rs", r"assert!\(secret_from\(secret\)\.is_some\(\)", "public_key's assert takes secret_from's answer: whether the scalar is in [1, n - 1] is public"),
+    ("crypto/p384.rs", r"assert!\(secret_from\(secret\)\.is_some\(\)|\.then_some\(\*random\)", "public_key's assert takes secret_from's answer: whether the scalar is in [1, n - 1] is public"),
+    ("crypto/p384.rs", r"if finite == 0", "the point at infinity ends the operation (None): reaching it is public"),
+    # ECDSA signing: refused keys and nonces, and the signature itself
+    ("crypto/ecdsa.rs", r"in_range_mask\(&d\) == 0", "a secret key outside [1, n - 1] is refused: the API's public answer"),
+    ("crypto/ecdsa.rs", r"in_range_mask\(&kk\) != 0|if let Some\(sig\) = found",
+     "a nonce outside [1, n - 1] is drawn again (RFC 6979 3.2 h.3, about 2^-32 on P-256): that one was refused shows nothing of the one taken"),
+    ("crypto/ecdsa.rs", r"r\.iter\(\)\.all\(\|&w\| w == 0\) \|\| s\.iter", "r and s are the signature, which is published"),
+    # ML-KEM: the matrix comes from rho, which the encapsulation key carries
+    ("crypto/mlkem.rs", r"if d1 < Q && n < N|if d2 < Q && n < N|while n < N|f\[n\] = d",
+     "SampleNTT's rejection sampling (FIPS 203 algorithm 7) reads rho, which the encapsulation key publishes"),
     # EAP-PWD: rand and mask are drawn again when they make no valid scalar; Scalar is sent
     ("crypto/eappwd.rs", r"scalar_ok\(rand\)|scalar_ok\(&scalar\)", "rand / mask that make no valid scalar are drawn again; Scalar itself is sent to the peer"),
     ("crypto/eappwd.rs", r"rounds < ROUNDS as u32 \|\| found == 0", "after the 40 rounds RFC 5931 asks for, a password without a point (2^-40) goes on"),
@@ -114,11 +130,54 @@ DECLASSIFIED = [
 # own frames whose declassification holds only for errors raised inside std's text handling
 TEXT_FILES = ("crypto/b64.rs", "netio/pem.rs", "netio/ssh.rs")
 # operations whose way may depend on the secret by design, from this fraction of it on
-# (a share of the first secret's trace: a parting of any secret before it is a difference)
+# (a share of the first secret's trace: a parting of any secret before it is a difference), and
+# with a third entry only where the paths part there: in one of these functions (a frame at the
+# branch; in wasm, a call; inlined code is named after the function it went into) or, natively,
+# on a source line of this file that matches the pattern.  With a third entry the wasm traces
+# are compared again from where they return from those functions; natively the probe reports
+# the first parting only, and memcheck, which lets through no more than DECLASSIFIED's lines,
+# checks the rest
 KNOWN = {
     "argon2id": (0.5, "Argon2id addresses its memory by the password after the first half of the "
                       "first pass (RFC 9106 3.4), and memcpy's path follows the addresses"),
+    "mlkem768_keygen": (0.15, "ML-KEM's keygen samples s and e first and the matrix after them, from "
+                              "rho, which the encapsulation key publishes: its rejection sampling "
+                              "(FIPS 203 algorithm 7) follows rho",
+                        {"functions": ("mlkem::sample_ntt", "mlkem::matrix"),
+                         "line": ("crypto/mlkem.rs", r"if d1 < Q && n < N|if d2 < Q && n < N|while n < N|r\.read\(&mut c\)")}),
+    SELFTEST_RESYNC: (0.0, "the self-test's allowed part", {"functions": ("resync_public",), "line": ("ct_check/probe.rs", r"$^")}),
 }
+
+
+def source_line(at):
+    """the text of file:line as a report gives it (relative to one of PREFIXES), or None"""
+    path, _, line = at.rpartition(":")
+    if not line.isdigit():
+        return None
+    for pre in [""] + PREFIXES + [str(ROOT / "lib") + "/"]:
+        f = Path(pre + path)
+        if f.is_file():
+            try:
+                return f.read_text(encoding="utf-8").splitlines()[int(line) - 1]
+            except (OSError, IndexError):
+                return None
+    return None
+
+
+def known_parting(t, pos, total, functions, locations=()):
+    """the reason when target t may part at pos of total, else None; functions: the names of the
+    frames (or calls) at the parting, locations: their file:line, innermost first"""
+    k = KNOWN.get(t)
+    if not k or pos < k[0] * total:
+        return None
+    if len(k) > 2:
+        spec = k[2]
+        by_name = any(want in fn for want in spec["functions"] for fn in functions)
+        file, pattern = spec["line"]
+        text = source_line(locations[0]) if locations and locations[0].startswith(file) else None
+        if not by_name and not (text is not None and re.search(pattern, text)):
+            return None
+    return k[1]
 # folders cut from the paths in reports (the checked crate's parent is added by main)
 PREFIXES = [str(ROOT) + "/"]
 
@@ -311,12 +370,20 @@ def check(level, exe, targets, seeds, step):
                 continue
             i, na, nb, branch, a, b, caller = r[1:8]
             unit = "branches" if mode == "block" else "instructions"
-            known = KNOWN.get(t)
             # one threshold for every secret, of the first secret's trace (the reference the
             # parting is counted in): so the earliest parting the probe reports decides for all
-            if known and int(i) >= known[0] * int(na):
+            fr = []
+            if branch.startswith("exe+"):
+                # where the branch's own line is missing, the instructions just before it (as where)
+                off = int(branch[4:], 16)
+                fr = frames(exe, off)
+                k = 1
+                while not has_line(fr) and k < 48:
+                    fr, k = frames(exe, off - k), k + 1
+            why = known_parting(t, int(i), int(na), [fn for fn, _ in fr], [at for _, at in fr])
+            if why:
                 same += 1
-                lines.append(f"  {t:<24} differs after {i} of {na} {unit}, as expected: {known[1]}")
+                lines.append(f"  {t:<24} differs after {i} of {na} {unit}, as expected: {why}")
                 continue
             bad += 1
             lines.append(f"  {t:<24} DIFF after {i} of {na} / {nb} {unit}")
@@ -602,56 +669,92 @@ def wasm_digest(wasm, mark, index, seed):
     return n, h.hexdigest(), marks
 
 
-def wasm_parting(wasm, mark, names, index, seed):
-    """both traces side by side up to where they part -> (position, line of seed 1, line of the
-    other, the functions at that place, outermost first)"""
+def wasm_depth(line):
+    return int(line[1:line.find(b".")])
+
+
+def wasm_parting(wasm, mark, names, index, seed, target, total):
+    """both traces side by side from the first mark to the second -> (the first parting the
+    design does not allow, the first it allows, with KNOWN's reason), each None or (position in
+    seed 1's trace of `total`, line of seed 1, line of the other, the functions there, outermost
+    first).  A parting KNOWN allows in its functions is passed over: each trace goes on to where
+    it has returned from the outermost of them, and from there both are compared again, so a
+    parting after it (in the code that follows the public part) is still a difference.  One
+    KNOWN allows without functions (Argon2id's) ends the comparison"""
+    k = KNOWN.get(target)
+    resync = k[2]["functions"] if k and len(k) > 2 else ()
     a = subprocess.Popen(wasm_cmd(wasm, index, 1), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     b = subprocess.Popen(wasm_cmd(wasm, index, seed), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    ia, ib = iter(a.stdout), iter(b.stdout)
     stack = {}
-    marks, n, found = 0, 0, None
+    n, bad, allowed = 0, None, None
     try:
-        for la, lb in zip(a.stdout, b.stdout):
-            if la.endswith(mark):
-                marks += 1
-                if marks == 2:
-                    break
-                continue
-            if marks != 1:
-                continue
-            depth = int(la[1:la.find(b".")])
-            if wasm_key(la) != wasm_key(lb):
-                chain = [names.get(stack.get(d), "?") for d in range(1, depth + 1)]
-                found = (n, la.decode(errors="replace").strip(), lb.decode(errors="replace").strip(), chain)
+        for it in (ia, ib):
+            if not any(ln.endswith(mark) for ln in it):
+                return None, None
+        la, lb = next(ia, None), next(ib, None)
+        while la is not None and lb is not None:
+            ma, mb = la.endswith(mark), lb.endswith(mark)
+            if ma and mb:
                 break
+            depth = wasm_depth(la)
+            if ma or mb or wasm_key(la) != wasm_key(lb):
+                chain = [names.get(stack.get(d), "?") for d in range(1, depth + 1)]
+                where = (n, la.decode(errors="replace").strip(), lb.decode(errors="replace").strip(), chain)
+                why = known_parting(target, n, total, chain)
+                if not why:
+                    bad = where
+                    break
+                if allowed is None:
+                    allowed = where + (why,)
+                outer = next((d for d in range(1, depth + 1) if any(f in chain[d - 1] for f in resync)), None)
+                if outer is None or ma or mb:
+                    break
+                # each trace on to its first line outside that function: the call that entered it
+                # was the same in both, so the frames below it are too
+                while la is not None and not la.endswith(mark) and wasm_depth(la) >= outer:
+                    la, n = next(ia, None), n + 1
+                while lb is not None and not lb.endswith(mark) and wasm_depth(lb) >= outer:
+                    lb = next(ib, None)
+                continue
             rest = la[la.find(b"|") + 2:]
             if rest.startswith(b"call $"):
                 stack[depth + 1] = int(rest[6:].strip())
             elif rest.startswith(b"call_indirect"):
                 stack[depth + 1] = None
             n += 1
+            la, lb = next(ia, None), next(ib, None)
     finally:
         for p in (a, b):
             p.kill()
             p.wait()
-    return found
+    return bad, allowed
 
 
-def wasm_diff(wasm, mark, names, index, digests):
-    """the digests of one target's secrets (1, 2, ...) -> None, ("diff", where, count A, count B)
-    or ("error", text)"""
+def wasm_diff(wasm, mark, names, index, digests, target):
+    """the digests of one target's secrets (1, 2, ...) -> None, ("diff", where, count A, count B),
+    ("known", where and reason, count A) or ("error", text)"""
     first = digests[0]
     # every secret's run reached both marks (one that ended early would be a difference or,
     # with the same digest, the same as a part)
     for s, d in enumerate(digests, start=1):
         if d[2] < 2:
             return ("error", f"secret {s}: the marks were not reached ({d[2]}): did wasm-interp run it?")
-    # every differing secret's parting: the earliest counts (an expected late one, Argon2id's,
-    # must not hide an early one of another secret)
-    parts = [(wasm_parting(wasm, mark, names, index, s), other[0]) for s, other in enumerate(digests[1:], start=2) if other[1] != first[1]]
+    # every differing secret's partings: the earliest one the design does not allow counts (an
+    # expected late one, Argon2id's, must not hide an early one of another secret)
+    parts = [(wasm_parting(wasm, mark, names, index, s, target, first[0]), other[0])
+             for s, other in enumerate(digests[1:], start=2) if other[1] != first[1]]
     if not parts:
         return None
-    where, count = min(parts, key=lambda p: p[0][0] if p[0] else 0)
-    return ("diff", where, first[0], count)
+    bad = [(p[0], count) for p, count in parts if p[0]]
+    if bad:
+        where, count = min(bad, key=lambda p: p[0][0])
+        return ("diff", where, first[0], count)
+    known = [p[1] for p, _ in parts if p[1]]
+    if len(known) == len(parts):
+        return ("known", min(known, key=lambda w: w[0]), first[0])
+    # the digests differ, but side by side the traces did not part: say so
+    return ("diff", None, first[0], next(count for p, count in parts if not p[1]))
 
 
 def check_wasm(level, wasm, targets, seeds):
@@ -668,15 +771,16 @@ def check_wasm(level, wasm, targets, seeds):
     with concurrent.futures.ProcessPoolExecutor(jobs) as pool:
         digests = dict(zip([(t, s) for _, t, s in runs], pool.map(wasm_digest, *zip(*[(wasm, mark, i, s) for i, _, s in runs]))))
         results = dict(zip([t for _, t in targets], pool.map(
-            wasm_diff, *zip(*[(wasm, mark, names, i, [digests[(t, s)] for s in range(1, seeds + 1)]) for i, t in targets]))))
+            wasm_diff, *zip(*[(wasm, mark, names, i, [digests[(t, s)] for s in range(1, seeds + 1)], t) for i, t in targets]))))
     bad, same, seen = 0, 0, set()
     lines = []
     for _, t in targets:
         r = results[t]
-        if r is None:
-            if t in (SELFTEST, SELFTEST_LOOKUP):
+        if r is None or (t == SELFTEST_RESYNC and r[0] == "known"):
+            if t in SELFTESTS:
                 bad += 1
-                lines.append(f"  {t:<24} FAIL: the self-test's leak was not seen (is the trace working?)")
+                after = " after the parting it allows" if t == SELFTEST_RESYNC else ""
+                lines.append(f"  {t:<24} FAIL: the self-test's leak{after} was not seen (is the trace working?)")
             else:
                 same += 1
             continue
@@ -684,28 +788,29 @@ def check_wasm(level, wasm, targets, seeds):
             bad += 1
             lines.append(f"  {t:<24} ERROR {r[1]}")
             continue
-        _, where, na, nb = r
-        if t in (SELFTEST, SELFTEST_LOOKUP):
+        if t in SELFTESTS:
             seen.add(t)
             continue
-        pos = where[0] if where else 0
-        known = KNOWN.get(t)
-        # one threshold for every secret, of the first secret's run (the reference the parting is
-        # counted in): so the earliest parting, the one wasm_diff returns, decides for all
-        if known and pos >= known[0] * na:
+        if r[0] == "known":
+            # one threshold for every secret, of the first secret's run (the reference the
+            # parting is counted in): wasm_parting judged each parting with it
+            _, where, na = r
+            again = " (compared again after it: the same)" if len(KNOWN[t]) > 2 else ""
             same += 1
-            lines.append(f"  {t:<24} differs after {pos} of {na} wasm instructions, as expected: {known[1]}")
+            lines.append(f"  {t:<24} differs after {where[0]} of {na} wasm instructions, as expected{again}: {where[4]}")
             continue
+        _, where, na, nb = r
+        pos = where[0] if where else 0
         bad += 1
         lines.append(f"  {t:<24} DIFF after {pos} of {na} / {nb} wasm instructions")
         if where:
             lines.append(f"      in      {' < '.join(reversed(where[3])) or '?'}")
             lines.append(f"      secret 1  {where[1]}")
             lines.append(f"      another   {where[2]}")
-    checked = len([1 for _, t in targets if t not in (SELFTEST, SELFTEST_LOOKUP)])
-    both = SELFTEST in seen and SELFTEST_LOOKUP in seen
+    checked = len([1 for _, t in targets if t not in SELFTESTS])
+    every = all(t in seen for t in SELFTESTS)
     print(f"[wasm {level}] {same} of {checked} operations take one way with the same addresses for {seeds} secrets"
-          + (", both self-tests seen" if both else ""))
+          + (", the three self-tests seen" if every else ""))
     for ln in lines:
         print(ln)
     return bad
@@ -727,7 +832,7 @@ def main_wasm(a, levels, crate_dir, label):
     if unknown:
         why = " (netio's key files are not built for wasm)" if any(t in key_files for t in unknown) else ""
         sys.exit(f"ct_check: unknown targets for --wasm {', '.join(unknown)}{why}")
-    targets = [(i, t) for i, t in enumerate(wasm_targets) if not asked or t in asked or t in (SELFTEST, SELFTEST_LOOKUP)]
+    targets = [(i, t) for i, t in enumerate(wasm_targets) if not asked or t in asked or t in SELFTESTS]
     bad = 0
     for lv in levels:
         wasm = build_wasm(lv, crate_dir, label)

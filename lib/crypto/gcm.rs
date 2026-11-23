@@ -1,6 +1,6 @@
 // gcm -- AES-GCM (NIST SP 800-38D) with 12-byte nonces and 16-byte tags, in constant time
 //
-//   AesGcm::new(key)                          16 (AES-128-GCM) or 32 bytes (AES-256-GCM)
+//   AesGcm::new(key)                          16, 24 or 32 bytes (AES-128/192/256-GCM)
 //   seal_in_place(nonce, aad, data) -> tag    open_in_place(nonce, aad, data, tag) -> bool
 //
 // GHASH runs on the bit-reversed form of the blocks, where multiplication in GF(2^128) is a

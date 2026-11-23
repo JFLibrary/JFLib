@@ -24,7 +24,7 @@ someone else made:
 
 | Crate | What it does |
 | --- | --- |
-| `crypto` | hashes, MACs, AEADs, X25519, Ed25519, P-256, RSA, ECDSA, Argon2id, Base64 |
+| `crypto` | hashes (SHA-2, SHA-3, SHAKE, BLAKE), MACs, AEADs, X25519, Ed25519, P-256, P-384, RSA, ECDSA, ML-KEM, Argon2id, Base64 |
 | `netio` | TLS 1.3 / 1.2, HTTP/1.1, WebSocket, DNS, SSH client, SMTP |
 | `x509` | X.509 certificates and chains (netio's and netpkt's) |
 | `netpkt` | packet and protocol parsers, a TLS and SSH core for simulators |
@@ -45,15 +45,15 @@ another library. They have **not had an external audit**. What has been done ins
 
 - known-answer and round-trip tests, and random cases compared with OpenSSL through Python's
   `cryptography` (`tools/crypto_check.py`)
-- Wycheproof and x509-limbo ([docs/EXTERNAL_SUITES.md](docs/EXTERNAL_SUITES.md))
+- Wycheproof, NIST's ACVP vectors and x509-limbo ([docs/EXTERNAL_SUITES.md](docs/EXTERNAL_SUITES.md))
 - interoperability with OpenSSL, curl, Python's `ssl` and OpenSSH (`tools/tls_interop.py`,
   `tools/tls_web_check.py`, `tools/ssh_interop.py`)
 - constant time: the secret-dependent operations of `crypto` and netio's key files take the same
   branches for every secret, and under valgrind's memcheck neither branch on the secret nor use
-  it as an address, at five optimization levels on x86-64; the wasm32 code of `crypto`'s
+  it as an address, at five optimization levels on x86-64 and ARM64; the wasm32 code of `crypto`'s
   operations (netio's key files are not built for wasm) executes the same instructions with the
   same memory addresses for every secret (`tools/ct_check.py`, `--wasm`;
-  the workflow `.github/workflows/ct-check.yml` runs both, the trace also on an ARM64 machine);
+  the workflow `.github/workflows/ct-check.yml` runs all three, on an x86-64 and an ARM64 machine);
   not checked: the machine code a browser's JIT makes, instructions whose time depends on their
   operands
 - netio's TLS 1.3 server against tlsfuzzer (`tools/tlsfuzzer_check.py`), its client against

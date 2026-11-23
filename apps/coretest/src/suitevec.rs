@@ -7,13 +7,14 @@
 //       kind 1 Ed25519 (keyA: 32 bytes), 2 RSA (keyA n, keyB e), 3 P-256, 4 P-384 (keyA 04||x||y)
 //       alg  1 Ed25519, 2 RSA PKCS #1 v1.5, 3 RSA-PSS (salt: 2 bytes big-endian, empty: any),
 //            4 ECDSA (sig: the DER Ecdsa-Sig-Value)
-//       hash 1 SHA-256, 2 SHA-384, 3 SHA-512 (the message is hashed here)
+//       hash 1 SHA-256, 2 SHA-384, 3 SHA-512, 4 SHA-224, 5..8 SHA3-224 / 256 / 384 / 512 (the
+//            message is hashed here; crate::crypto::hash_of)
 //   rsasign hash n e d p q digest              -> RSASSA-PKCS1-v1_5 signature, - (key refused)
 //   x25519shared k u                           -> x25519::shared, - (None: all-zero secret)
 //   aeadopen / xaead / xaeadopen k nonce aad x -> (X)ChaCha20-Poly1305 open (x = ct||tag) / seal
 //   hkdf hash salt ikm info len(2 bytes)       -> okm; - when len > 255 HashLen (hkdf_expand
 //                                                 asserts that: the caller's precondition)
-//   hmac hash key msg                          -> the full HMAC; hash 0 = SHA-1
+//   hmac hash key msg                          -> the full HMAC; hash 0 = SHA-1, else as above
 //   x509chain usage now name n leaf inter.. anchors..
 //       usage 0 server / 1 client, now: 8 bytes big-endian (seconds), name: 00 = none or 01 + UTF-8,
 //       n: the number of intermediates (2 bytes); then the DER certificates
@@ -25,13 +26,9 @@ use alloc::vec::Vec;
 use crypto::HashAlg;
 use netio::x509::{verify_chain, Cert, PubKey, SigAlg, Usage};
 
+/// hash ids: crate::crypto::hash_of
 fn hash(id: Option<&u8>) -> Option<HashAlg> {
-    match id {
-        Some(1) => Some(HashAlg::Sha256),
-        Some(2) => Some(HashAlg::Sha384),
-        Some(3) => Some(HashAlg::Sha512),
-        _ => None,
-    }
+    crate::crypto::hash_of(id)
 }
 
 fn hkdf<H: crypto::Hash>(salt: &[u8], ikm: &[u8], info: &[u8], len: usize) -> Option<Vec<u8>> {
@@ -109,6 +106,11 @@ pub fn op(alg: &str, args: &[Vec<u8>]) -> Option<Vec<u8>> {
             1 => Some(hmac::<crypto::Sha256>(arg(1), arg(2))),
             2 => Some(hmac::<crypto::Sha384>(arg(1), arg(2))),
             3 => Some(hmac::<crypto::Sha512>(arg(1), arg(2))),
+            4 => Some(hmac::<crypto::Sha224>(arg(1), arg(2))),
+            5 => Some(hmac::<crypto::Sha3_224>(arg(1), arg(2))),
+            6 => Some(hmac::<crypto::Sha3_256>(arg(1), arg(2))),
+            7 => Some(hmac::<crypto::Sha3_384>(arg(1), arg(2))),
+            8 => Some(hmac::<crypto::Sha3_512>(arg(1), arg(2))),
             _ => None,
         },
         "x509chain" => {

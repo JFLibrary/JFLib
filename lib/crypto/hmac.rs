@@ -17,7 +17,7 @@ pub struct Hmac<H: Hash> {
 
 impl<H: Hash> Hmac<H> {
     pub fn new(key: &[u8]) -> Hmac<H> {
-        let mut k = [0u8; 128];
+        let mut k = [0u8; 168];
         if key.len() > H::BLOCK {
             let mut h = H::new();
             h.update(key);
@@ -25,7 +25,7 @@ impl<H: Hash> Hmac<H> {
         } else {
             k[..key.len()].copy_from_slice(key);
         }
-        let mut pad = [0u8; 128];
+        let mut pad = [0u8; 168];
         for (p, k) in pad.iter_mut().zip(&k).take(H::BLOCK) {
             *p = k ^ 0x36;
         }
