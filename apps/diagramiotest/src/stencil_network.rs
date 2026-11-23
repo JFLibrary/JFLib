@@ -9,7 +9,9 @@
 //                       network, computer) with the labels in the language it was dropped in
 //   stencils/network/rack      the rack: height = base + top + units x 44.45 mm, its connection
 //                       points on every unit boundary; a user's height goes to Prop.RackUnits
-//                       (SETATREF) and snaps; devices alike; the master pages are 1:20
+//                       (SETATREF) and snaps; devices alike; the master pages are 1:20; (JD15,
+//                       MS-10) on a 1:1 page the rack keeps its size on the paper, on 1:10 its
+//                       real size (Visio's range of eight)
 //
 //   stencils/network/dock      a server dropped over a rack docks with its outward point on the
 //                       nearest unit boundary of the rail (diagram_core::dock) and joins the
@@ -269,6 +271,28 @@ fn rack_checks(h: &mut H, src: &Document) {
         c.map(|c| doc.resolve(SheetRef::Shape(s), &CellAddr::single(c)).formula()).map(|f| matches!(f, diagram_core::Formula::Expr(_) | diagram_core::Formula::Inherited))
     };
     h.check("stencils/network/rack/formula-kept", formula(&doc, rack) == Some(true) && formula(&doc, switch) == Some(true), format!("rack {:?}, switch {:?}", formula(&doc, rack), formula(&doc, switch)));
+    // (JD15, MS-10) Visio's range of eight: on a 1:1 page the 1:20 rack keeps its size on the
+    // paper (a twentieth in drawing units), its units still count and snap (1000 mm / 20 -> 20 U);
+    // on a 1:10 page (within eight times) its real size
+    for (scale, f) in [(1.0, 0.05), (10.0, 1.0)] {
+        let Some((mut doc, page)) = new_drawing(scale) else { return };
+        let r = {
+            let mut tx = doc.transaction("drop");
+            let r = put(&mut tx, src, page, "Rack", (100.0, 100.0), 0);
+            let _ = tx.commit();
+            r
+        };
+        let Some(r) = r else {
+            h.check(&format!("stencils/network/rack/range-of-eight/1-{scale}"), false, String::from("rack not placed"));
+            continue;
+        };
+        recalc_all(&mut doc, page);
+        let before = hmm(&doc, r);
+        let ok = user_height(&mut doc, r, 1000.0 * f);
+        h.check(&format!("stencils/network/rack/range-of-eight/1-{scale}"),
+            (before - (100.0 + 42.0 * u) * f).abs() < 1e-6 && ok && units(&doc, r) == 20.0 && (hmm(&doc, r) - (100.0 + 20.0 * u) * f).abs() < 1e-6,
+            format!("{before:.3} mm (want {:.3}), after {:.0} mm: {} U {:.3} mm", (100.0 + 42.0 * u) * f, 1000.0 * f, units(&doc, r), hmm(&doc, r)));
+    }
 }
 
 /// diagramiotest --write-network-previews DIR
