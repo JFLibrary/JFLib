@@ -78,6 +78,7 @@
 //   src/ask_save.rs   (JD15) Speichern-Rückfrage before Schließen, Neu, Öffnen and the window's
 //                     close (UI-12); Öffnen schreibgeschützt and als Kopie (DM-09, UI-06, UI-05)
 //   src/dlg_shape_name.rs  (JD15) the dialog Shape-Name (SP-01)
+//   src/dlg_snap.rs   (JD15) the dialog Ausrichten und Kleben
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too); templates/ (JD13) the
@@ -135,6 +136,8 @@ mod dlg_find;
 mod dlg_link;
 // (JD15) Shape-Name (SP-01)
 mod dlg_shape_name;
+// (JD15) Ausrichten und Kleben (RA-07)
+mod dlg_snap;
 mod dlg_text;
 mod doc_file;
 mod edit_canvas;
@@ -298,6 +301,13 @@ pub(crate) struct Diagrammer {
     /// (JD15) the question before changes are lost; how Öffnen opens a file
     pub ask: ask_save::AskSave,
     pub shape_name: dlg_shape_name::NameDialog,
+    /// (JD15) Ausrichten und Kleben: snapping to the grid (Ausrichten an › Raster), the dialog
+    pub snap_grid: bool,
+    pub snap_dlg: dlg_snap::SnapDialog,
+    /// (JD15, ZF-08) the view of each page of the drawing (serial, page: zoom, middle), the page
+    /// the canvas showed last
+    pub page_views: alloc::vec::Vec<(u32, diagram_core::PageRef, f32, f64, f64)>,
+    pub view_page: Option<(u32, diagram_core::PageRef)>,
 }
 
 impl Diagrammer {
@@ -363,6 +373,10 @@ impl Diagrammer {
             docfile: doc_file::DocFile::default(),
             ask: ask_save::AskSave::default(),
             shape_name: dlg_shape_name::NameDialog::default(),
+            snap_grid: true,
+            snap_dlg: dlg_snap::SnapDialog::default(),
+            page_views: alloc::vec::Vec::new(),
+            view_page: None,
         }
     }
 
@@ -533,6 +547,8 @@ impl App for Diagrammer {
         // (JD15) Speichern-Rückfrage (UI-12), Shape-Name (SP-01)
         ask_save::dialog(self, ui);
         dlg_shape_name::dialog(self, ui);
+        // (JD15) Ausrichten und Kleben
+        dlg_snap::dialog(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

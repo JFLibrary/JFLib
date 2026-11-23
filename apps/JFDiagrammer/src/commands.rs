@@ -399,10 +399,8 @@ static HANDLERS: &[(u32, Handler)] = &[
     (GUIDES, |a, _| a.view_guides = !a.view_guides),
     (DYN_GRID, |a, _| a.se.dyn_grid = !a.se.dyn_grid),
     (CONN_POINTS, |a, _| a.se.show_points = !a.se.show_points),
-    (SNAP_GLUE, |a, _| {
-        a.snap = !a.snap;
-        a.se.glue = a.snap;
-    }),
+    // (JD15, RA-07) the dialog, no silent toggle
+    (SNAP_GLUE, crate::dlg_snap::open),
     (CONN_RIGHT_ANGLE, |a, ui| crate::edit_cmds::conn_style(a, ui, diagram_core::glue::Style::RightAngle)),
     (CONN_STRAIGHT, |a, ui| crate::edit_cmds::conn_style(a, ui, diagram_core::glue::Style::Straight)),
     (CONN_CURVED, |a, ui| crate::edit_cmds::conn_style(a, ui, diagram_core::glue::Style::Curved)),
@@ -550,7 +548,6 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (GUIDES, |a| a.view_guides),
     (DYN_GRID, |a| a.se.dyn_grid),
     (CONN_POINTS, |a| a.se.show_points),
-    (SNAP_GLUE, |a| a.snap),
     (LASSO, |a| a.se.lasso),
     (SELECT_AREA, |a| !a.se.lasso),
     (GRID, |a| a.view_grid),

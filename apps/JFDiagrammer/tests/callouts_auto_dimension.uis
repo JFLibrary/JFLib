@@ -17,7 +17,7 @@ wait 600
 drag 726,400 474,400
 expect listitem:"25 mm" exists
 expect listitem:"75 mm" missing
-expect button:"Breite: 25 mm  Höhe: 0 mm  Winkel: 179°" exists
+expect button:"Länge: 25 mm  Winkel: 179°" exists
 key ctrl+z
 expect listitem:"75 mm" exists
 expect listitem:"25 mm" missing

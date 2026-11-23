@@ -1,0 +1,63 @@
+#!args apps/JFDiagrammer/tests/snap_glue.vsdx --no-system-fonts
+# JFDiagrammer, JD15 (SS-29, CN-03, SS-39): snap_glue.vsdx (made from rack_page.vsdx for JD15)
+# has on the page "Kleben" the rectangle "Ziel" (60 x 40 mm, 701,412 151 x 100 on the screen)
+# with four connection points: top Type 0 with the Prompt "Oben", right Type 1 (outward only),
+# bottom Type 2, left Type 0; on the page "Gesperrt" (InhibitSnap 1) the rectangle "Block".
+# SS-29: a line's end dropped on the outward point does not glue (the line stays when Ziel
+# moves), dropped on the left point it does (and follows)
+cmd 4406
+drag 1000,462 854,462
+cmd 4406
+drag 600,300 703,462
+cmd 4400
+wait 600
+click 1100,700
+expect listitem:"Sheet.4" rect 852 475 151 1
+expect listitem:"Sheet.5" rect 601 299 100 163
+drag 776,470 776,570
+expect listitem:"Ziel" rect 701 500 151 100
+expect listitem:"Sheet.4" rect 852 475 151 1
+expect listitem:"Sheet.5" rect 601 299 100 251
+key ctrl+z
+key ctrl+z
+key ctrl+z
+expect listitem:"Sheet.4" missing
+# SS-29: the point's Prompt is its QuickInfo while the points show (the connector tool)
+cmd 4401
+move 770,420
+move 776,413
+wait 800
+expect text:"Oben" exists
+# CN-03 with the connector tool, from the right: dropped on the left point it glues there
+# (static: the route ends at the left side) ...
+drag 1100,462 703,462
+expect listitem:"Sheet.6" rect 701 462 403 13
+# its end dragged with Ctrl and dropped on the same point: now glued to the whole shape
+cmd 4400
+drag button:"Endpunkt" 707,466 ctrl
+expect listitem:"Sheet.6" rect 852 475 252 1
+key ctrl+z
+expect listitem:"Sheet.6" rect 701 462 403 13
+key ctrl+z
+cmd 4401
+# ... with Ctrl to the whole shape (dynamic: it ends at the near, right side)
+drag 1100,462 703,462 ctrl
+expect listitem:"Sheet.7" rect 852 475 252 1
+key ctrl+z
+# dropped on the shape itself: dynamic, with Ctrl the nearest connection point (the top one)
+drag 1100,462 760,440
+expect listitem:"Sheet.8" rect 852 475 252 1
+key ctrl+z
+drag 1100,462 760,440 ctrl
+expect listitem:"Sheet.9" rect 777 412 327 63
+key ctrl+z
+# SS-39: on "Kleben" a move snaps to the grid, on "Gesperrt" (InhibitSnap) it goes where the
+# pointer went
+cmd 4400
+wait 600
+drag 776,470 783,483
+expect listitem:"Ziel" rect 701 424 151 101
+key ctrl+z
+click tab:"Gesperrt"
+drag 776,470 783,483
+expect listitem:"Block" rect 708 425 151 100

@@ -868,3 +868,11 @@ Ein Shape-Name darf kein „!“ enthalten.	A shape name cannot contain “!”.
 Ein anderes Shape der Seite hat diesen Namen schon.	Another shape on the page already has this name.	Otra forma de la página ya tiene este nombre.	Un'altra forma della pagina ha già questo nome.	Une autre forme de la page porte déjà ce nom.
 Leer: der Name wird abgeleitet (Sheet.n oder der Name des Master-Shapes mit der Nummer).	Empty: the name is derived (Sheet.n or the master shape's name with the number).	Vacío: el nombre se deriva (Sheet.n o el nombre de la forma maestra con el número).	Vuoto: il nome viene derivato (Sheet.n o il nome della forma master con il numero).	Vide : le nom est dérivé (Sheet.n ou le nom de la forme maître suivi du numéro).
 Das Shape gibt es nicht mehr.	The shape no longer exists.	La forma ya no existe.	La forma non esiste più.	La forme n'existe plus.
+# (JD15) the canvas: Ausrichten und Kleben (dlg_snap.rs), the status bar, the options
+Ausrichten|Einrasten	Snap	Ajustar	Aggancia	Magnétisme
+Derzeit aktiv	Currently active	Activo actualmente	Attualmente attivo	Actuellement actif
+Ausrichten an	Snap to	Ajustar a	Aggancia a	Magnétisme vers
+Raster	Grid	Cuadrícula	Griglia	Grille
+Verbindungspunkte anzeigen	Show connection points	Mostrar puntos de conexión	Mostra punti di connessione	Afficher les points de connexion
+Länge: {}  Winkel: {}	Length: {}  Angle: {}	Longitud: {}  Ángulo: {}	Lunghezza: {}  Angolo: {}	Longueur : {}  Angle : {}
+Teilweise umschlossene Shapes auswählen	Select shapes partially within area	Seleccionar formas parcialmente dentro del área	Seleziona forme parzialmente nell'area	Sélectionner les formes partiellement dans la zone

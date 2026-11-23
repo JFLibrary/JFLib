@@ -1,7 +1,7 @@
 // edit_cmds -- (JD7) the handlers of the editing commands (commands.rs HANDLERS calls them):
 // undo and redo, the clipboard for shapes inside the app, select all, the tools, arrange (z-order,
 // align, distribute, rotate, flip), group and ungroup, the connector styles, edit text, the view
-// toggles (rulers, page breaks, guides, dynamic grid, connection points, snap and glue), saving
+// toggles (rulers, page breaks, guides, dynamic grid, connection points; snap and glue: dlg_snap.rs), saving
 // and a new drawing
 //
 //   available(app, id)     whether a command can run now (a selection, something to undo ...);
