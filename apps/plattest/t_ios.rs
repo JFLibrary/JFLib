@@ -188,11 +188,14 @@ mod ios {
         record(capabilities().supports(CAP_SHARE), "ios: share: CAP_SHARE under UIKit's host");
         ASK_SHARE.store(true, SeqCst);
         plat::wake();
-        wait(3000, || SHARED.load(SeqCst) != i32::MIN);
-        record(SHARED.load(SeqCst) == SHARE_PENDING && share_open(), "ios: share: the sheet opens (SHARE_PENDING)");
+        wait(8000, || SHARED.load(SeqCst) != i32::MIN);
+        let (opened, open, early) = (SHARED.load(SeqCst), share_open(), SHARE_ANSWER.load(SeqCst));
+        record(opened == SHARE_PENDING && open && early == i32::MIN,
+               &format!("ios: share: the sheet opens (SHARE_PENDING), no answer yet (share {opened}, open {open}, answer {early})"));
         let shown = wait(5000, || ios_share_shown().is_some_and(|c| c.contains("ActivityViewController")));
         record(shown, &format!("ios: share: the sheet on screen ({:?})", ios_share_shown()));
         plat::sleep_ms(1000);
+        record(SHARE_ANSWER.load(SeqCst) == i32::MIN, &format!("ios: share: no answer while the sheet shows ({})", SHARE_ANSWER.load(SeqCst)));
         ios_share_dismiss();
         let got = wait(8000, || SHARE_ANSWER.load(SeqCst) != i32::MIN);
         let a = SHARE_ANSWER.load(SeqCst);
