@@ -107,7 +107,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
   <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
-  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
+  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
@@ -59735,9 +59735,19 @@ format follows the public specification [MS-VSDX]; no code of other implementati
                       set and the catalogue's cells; template::stencil_windows,
                       set_stencil_windows, info, registers and to_drawing for the app
 
+  vdx::read(&bytes, DocKind::Drawing, &vsdx::Limits::VSDX) -> Result<vsdx::Loaded, vsdx::Error>
+                      (JD16) the XML formats of Visio 2003-2010 (.vdx drawing, .vsx stencil,
+                      .vtx template) into the same model: cells with formula and value,
+                      sections, masters, pages, pictures as parts, fonts by name, document
+                      properties, windows, the macro project; vdx::kind_of, vdx::sniff
+  props::read(&doc) / props::write(&mut doc, &props)
+                      (JD16) the document properties (docProps core, app and custom)
+  windows::drawing_window(&doc) / set_drawing_window(&mut doc, &w)
+                      (JD16) the drawing window of windows.xml: page, zoom, centre, what is
+                      shown; vsdx::remove_macros takes a macro project out
+
 What is to come here, by stage of the plan:
-  JD12  exports: SVG, PNG and PDF through the library's writers
-  later the XML formats of 2003-2010 (.vdx, .vsx) and importing the binary .vss / .vsd
+  JD17  importing the binary .vss
 
 The ZIP and OPC parts come from archive (archive::opc, JD1), shared with doc_io's DOCX.
 Every file is untrusted input: sizes, counts and nesting are bounded, a file that breaks a
@@ -59790,6 +59800,74 @@ and shows the design NetLab, variant 1 (design::catalog).
 - **`fn new_document(kind: DocKind, measure: Measure) -> Document`**
   a new document of this kind with JFLib's own defaults (see the module comment); a stencil
   has no masters yet, a drawing and a template one empty page
+
+### `diagram_io/src/props.rs`
+
+Source: [`lib/diagram_io/src/props.rs`](../lib/diagram_io/src/props.rs)
+
+```text
+props -- the document properties of a drawing (DF-09): docProps/core.xml, app.xml, custom.xml
+
+  props::read(&doc) -> Props          what the three parts say ("" where an entry is missing)
+  props::write(&mut doc, &props)      the parts made to say it: a part is only touched when one
+                                      of its own entries changed, so an unchanged file keeps its
+                                      bytes; a missing part is created, a custom part without
+                                      entries is removed
+  Custom { name, kind, value }        a custom property: kind is the vt element ("lpwstr",
+                                      "i4", "r8", "bool", "filetime" ...), value its text
+
+The parts are found by their content type (OPC names them freely).  core.xml is written anew
+from Props in the order Office writes it; app.xml keeps everything it had (Visio's page and
+master lists, the version) and only gets the four entries Props names (Template, Company,
+Manager, HyperlinkBase) replaced or added; custom.xml is written anew from the list.  Dates
+stay the W3CDTF text the file had ("2026-11-14T18:04:59Z"); nothing here reads a clock.
+Reading is bounded like every part (vsdx::Limits::VSDX's XML bounds) and never fails: a part
+that is no XML reads as empty.
+```
+
+```rust
+/// the content type of docProps/core.xml
+CT_CORE: &str = "application/vnd.openxmlformats-package.core-properties+xml"
+/// the content type of docProps/app.xml
+CT_APP: &str = "application/vnd.openxmlformats-officedocument.extended-p ...
+/// the content type of docProps/custom.xml
+CT_CUSTOM: &str = "application/vnd.openxmlformats-officedocument.custom-pro ...
+```
+
+- **`struct Custom`**
+  one custom property
+  - `name: String` -- its name
+  - `kind: String` -- the vt element of its value: "lpwstr", "i4", "r8", "bool", "filetime", "date" ...
+  - `value: String` -- the value as text
+
+- **`struct Props`**
+  the document properties; "" where the file has none
+  - `title: String` -- Titel (dc:title)
+  - `subject: String` -- Thema (dc:subject)
+  - `creator: String` -- Autor (dc:creator)
+  - `keywords: String` -- Stichwörter (cp:keywords)
+  - `description: String` -- Kommentare (dc:description)
+  - `category: String` -- Kategorie (cp:category)
+  - `language: String` -- Sprache (dc:language)
+  - `last_modified_by: String` -- zuletzt geändert von (cp:lastModifiedBy)
+  - `content_status: String` -- Status (cp:contentStatus)
+  - `revision: String` -- Revision (cp:revision)
+  - `created: String` -- erstellt (dcterms:created, W3CDTF)
+  - `modified: String` -- geändert (dcterms:modified, W3CDTF)
+  - `last_printed: String` -- zuletzt gedruckt (cp:lastPrinted, W3CDTF)
+  - `template: String` -- Vorlage (app.xml Template)
+  - `company: String` -- Firma (app.xml Company)
+  - `manager: String` -- Manager (app.xml Manager)
+  - `hyperlink_base: String` -- Hyperlinkbasis (app.xml HyperlinkBase)
+  - `application: String` -- the program that wrote the file (app.xml Application; read only)
+  - `custom: Vec<Custom>` -- the custom properties in file order
+
+- **`fn read(doc: &Document) -> Props`**
+  what the document's property parts say
+
+- **`fn write(doc: &mut Document, p: &Props)`**
+  make the property parts say `p` (see the module comment); parts whose entries did not change
+  keep their bytes
 
 ### `diagram_io/src/stencil.rs`
 
@@ -60076,6 +60154,82 @@ REGISTERS: [&str; 1] = ["cff"]
   make a template a new drawing in language `lang` (an index into instance::LANGS; see the
   module comment)
 
+### `diagram_io/src/vdx/mod.rs`
+
+Source: [`lib/diagram_io/src/vdx/mod.rs`](../lib/diagram_io/src/vdx/mod.rs)
+
+```text
+vdx -- the XML formats of Visio 2003-2010 ("DatadiagramML": .vdx drawing, .vsx stencil,
+.vtx template) read into diagram_core's model (DF-20, DF-21, DF-22; JD16)
+
+  vdx::read(&bytes, DocKind::Drawing, &vsdx::Limits::VSDX) -> Result<vsdx::Loaded, vsdx::Error>
+                      one file of the format; the caller says by its extension what it is
+                      (kind_of): the XML itself does not
+  vdx::kind_of("vsx") -> Some(DocKind::Stencil)     the kind of an extension (vdx vsx vtx)
+  vdx::sniff(&bytes) -> bool         whether the bytes are such a file (root VisioDocument in
+                                     the namespace http://schemas.microsoft.com/visio/2003/core)
+
+The model is the one vsdx.rs fills, so a file read here is written as a .vsdx, .vssx or .vstx
+(a .vsdm ... with a macro project) by vsdx::write.  Microsoft's public "XML for Visio"
+schema reference describes the format; nothing of other implementations is used.  What goes
+where:
+  cells          an element per cell (<PinX F='..' Unit='MM' Err='..'>1.5</PinX>): the text is
+                 the value in internal units, F the formula ("Inh", "No Formula" as in VSDX),
+                 Unit the unit (VSDX's U), Err the error (E).  Formula and value stay a pair,
+                 nothing is computed (V1)
+  single-row sections (XForm, Line, Fill, TextBlock, Misc, PageProps ...)   flattened into the
+                 sheet's cells, the names are VSDX's (Char.Locale and Char.Perpendicular, gone
+                 since Visio 2003, are left out)
+  rows           Char -> Character, Para -> Paragraph, Prop -> Property, Act -> Actions,
+                 SmartTagDef -> ActionTag; User, Control, Connection, Scratch, Field, Layer,
+                 Hyperlink, Reviewer, Annotation by their names.  Named rows take NameU, else
+                 Name, else Row_<ID> (as Visio names them); Connection rows get T='Connection'
+                 (Visio's previewer hangs on rows without it, JD13)
+  Geom           a Geometry section per element (IX = its index), NoFill .. NoQuickDrag its
+                 cells, MoveTo, LineTo ... its rows (T = the element, IX as written)
+  Tabs           the row stays, its tab stops are left out (Warning::LeftOut "Tab": VSDX
+                 names their cells differently, and the model draws no tabs yet)
+  fonts          the Font cells of Character rows (Font, AsianFont, ComplexScriptFont) and
+                 Paragraph's BulletFont hold a FaceName ID in this format and a font name in
+                 VSDX: the ID becomes the name; FaceName Name / Panos become NameU / Panose
+  pictures       ForeignData's base64 becomes a part /visio/media/imageN.<ext> by what the bytes
+                 are (PNG, JPEG, GIF, TIFF, BMP, EMF, WMF; a bitmap without file header gets
+                 one); anything else is left out with a warning
+  masters, pages their elements with sheet, icon, shapes and connects; the writer gives them
+                 parts of their own
+  DocumentProperties   docProps core.xml, app.xml and custom.xml (props.rs); Visio's own
+                 entries (AlternateNames, BuildNumber*, TimeEdited, the root's metric) as the
+                 custom properties Visio writes in VSDX
+  Windows        windows.xml as VSDX has it (same elements), EventList and HeaderFooter the
+                 document element's own children as in VSDX
+  VBProjectData  base64 of the macro project: when it is an OLE file it becomes
+                 /visio/vbaProject.bin and Document::macros is set (written as .vsdm, never run);
+                 anything else is left out with a warning
+  everything else  (SolutionXML, DataConnections, DataRecordsets, the preview picture, elements
+                 of other namespaces) has no place in a VSDX file: left out, Warning::LeftOut
+Unknown attributes are dropped: this reader converts, it does not keep the file's XML (DF-23,
+writing .vdx, is not planned).
+
+Every file is untrusted input, bounded like a VSDX file (vsdx::Limits): the file's size by
+Limits::zip.part_bytes, nesting and attributes by the XML reader, counts of shapes, cells,
+rows, sections, objects and items, the length of formulas and texts, each picture by the
+file's size.  Cycles of styles, masters and background pages are refused as in vsdx.rs, a
+reference that names nothing is a warning.  No DOCTYPE, no external anything, no recursion
+(groups at any depth go through a stack of their own), never a panic.
+```
+
+- **`fn kind_of(ext: &str) -> Option<DocKind>`**
+  the kind of document an extension of the format stands for ("vdx", "vsx", "vtx"; ASCII case
+  ignored)
+
+- **`fn sniff(bytes: &[u8]) -> bool`**
+  whether `bytes` are a file of this format: XML whose root is VisioDocument in the namespace of
+  2003 (only the start is read)
+
+- **`fn read(bytes: &[u8], kind: DocKind, limits: &Limits) -> Result<Loaded, Error>`**
+  read a file of the XML format of 2003-2010 as a document of `kind` (see the module comment);
+  `limits` bound everything (vsdx::Limits::VSDX for real files)
+
 ### `diagram_io/src/vsdx.rs`
 
 Source: [`lib/diagram_io/src/vsdx.rs`](../lib/diagram_io/src/vsdx.rs)
@@ -60209,6 +60363,10 @@ never stack.
   - `NoContents { what: &'static str, id: u32, }` -- a page or master without a Rel to its contents: it has no shapes
   - `ExternalPicture { part: String, shape: u32, }` -- a picture whose relationship points outside the package: kept, never fetched
   - `UnusedPart { part: String, }` -- a page or master part that no Page or Master element names: kept as a plain part
+  - `LeftOut { what: String, }` -- (vdx.rs) something of the XML formats of 2003-2010 that has no place in a file of the
+    VSDX family, left out: tab stops, solution XML, data connections, a preview picture, a
+    picture of an unknown kind, a macro project that is no OLE file, elements of other
+    namespaces
 
 - **`struct Loaded`**
   a file read into the model
@@ -60242,6 +60400,11 @@ never stack.
   - `Xml { part: String, line: u32, }` -- XML the model holds as written (unknown elements in the extras, unknown text marks,
     trigger contents) does not fit where it stands: the part would not be well-formed
 
+- **`fn remove_macros(doc: &mut Document) -> bool`**
+  (JD16, DF-04) take the macro project out of a document: the parts a macro-enabled format
+  carries for it (vbaProject.bin, vbaData.xml) and the relationships to them; Document::macros
+  becomes false.  For "Speichern als .vsdx" after the user said yes; true when there was one
+
 - **`fn write(doc: &Document, options: &WriteOptions) -> Result<Vec<u8>, WriteError>`**
   write a document as a file of the VSDX family (see the module comment); the same document
   always gives the same bytes, and a document read from a file and written unchanged reads
@@ -60249,6 +60412,43 @@ never stack.
 
 - **`fn read(bytes: &[u8], limits: &Limits) -> Result<Loaded, Error>`**
   read a file of the VSDX family; `limits` bound everything (Limits::VSDX for real files)
+
+### `diagram_io/src/windows.rs`
+
+Source: [`lib/diagram_io/src/windows.rs`](../lib/diagram_io/src/windows.rs)
+
+```text
+windows -- the drawing window of a document's windows part (DF-10): the page it shows, the
+zoom, the centre and what is shown, so that a file opens as it was saved
+
+  windows::drawing_window(&doc) -> Option<DrawingWindow>    the first window of type Drawing
+  windows::set_drawing_window(&mut doc, &w)   that window replaced by `w` (its ID and state
+                               kept), added before the others when there is none, a part of
+                               its own when the document has none; the other windows (stencils,
+                               panes) stay as written
+  DrawingWindow { page, view_scale, center, show_* }   None: not written / not in the file
+
+ViewScale is the zoom (1 = 100 %); Visio writes -1 for "whole page" and -2 for "page width".
+ViewCenterX/Y are the point in the window's middle, in inches from the page's lower left
+corner.  The stencil windows are template.rs's (stencil_windows, set_stencil_windows).
+```
+
+- **`struct DrawingWindow`**
+  what the drawing window shows
+  - `page: Option<u32>` -- the page's ID (Page)
+  - `view_scale: Option<f64>` -- the zoom, 1 = 100 %; -1 the whole page, -2 the page's width (ViewScale)
+  - `center: Option<(f64, f64)>` -- the point in the window's middle, inches from the page's lower left corner
+  - `show_rulers: Option<bool>` -- ShowRulers
+  - `show_grid: Option<bool>` -- ShowGrid
+  - `show_page_breaks: Option<bool>` -- ShowPageBreaks
+  - `show_guides: Option<bool>` -- ShowGuides
+  - `show_connection_points: Option<bool>` -- ShowConnectionPoints
+
+- **`fn drawing_window(doc: &Document) -> Option<DrawingWindow>`**
+  the document's drawing window (the first window of type Drawing), None without one
+
+- **`fn set_drawing_window(doc: &mut Document, w: &DrawingWindow)`**
+  make the document's drawing window `w` (see the module comment)
 
 ### `diagram_io/src/xml.rs`
 
