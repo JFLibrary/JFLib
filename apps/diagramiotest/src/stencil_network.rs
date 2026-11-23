@@ -3,6 +3,8 @@
 //
 //   stencils/network/<set>/<measure>   every set builds in both measures, write -> read ->
 //                       write is the same, a second build gives the same bytes
+//   stencils/network/rack_equipment/<measure>/dimension/...   (JD15) the dimensions show their
+//                       length in a text field: 600 mm / 1000 mm, US 24 in / 40 in
 //   stencils/network/data      a dropped device has the shape data of its includes (asset,
 //                       network, computer) with the labels in the language it was dropped in
 //   stencils/network/rack      the rack: height = base + top + units x 44.45 mm, its connection
@@ -42,7 +44,7 @@ pub(crate) const SETS: &[(&str, &str, usize)] = &[
     ("locations", "net_locations", 8),
     ("symbols", "net_symbols", 24),
     ("servers", "net_servers", 17),
-    ("rack_equipment", "rack_equipment", 17),
+    ("rack_equipment", "rack_equipment", 19),
     ("rack_freestanding", "rack_freestanding", 9),
     ("rack_servers", "rack_servers", 17),
 ];
@@ -76,6 +78,9 @@ pub fn run(h: &mut H) {
                     let again = build_set(set, m).map(|(_, x)| x).unwrap_or_default();
                     h.check(&format!("{tag}/deterministic"), again == bytes, format!("same bytes: {}", again == bytes));
                     let back = read_back(h, &format!("{tag}/roundtrip"), &bytes);
+                    if name == "rack_equipment" {
+                        dimension_checks(h, &b.doc, m, &tag);
+                    }
                     if m == Measure::Metric {
                         match name {
                             "rack_equipment" => rack = back,
@@ -93,6 +98,20 @@ pub fn run(h: &mut H) {
     if let Some(doc) = &rack {
         rack_checks(h, doc);
         dock_checks(h, doc);
+    }
+}
+
+// (JD15) the dimensions of the rack stencil show their length in a text field: 600 mm and 1000 mm
+// on the metric master pages, 24 in and 40 in on the US ones
+fn dimension_checks(h: &mut H, doc: &Document, m: Measure, tag: &str) {
+    let want = if m == Measure::Us { [("Dimension - horizontal", "24 in"), ("Dimension - vertical", "40 in")] } else { [("Dimension - horizontal", "600 mm"), ("Dimension - vertical", "1000 mm")] };
+    for (nu, text) in want {
+        let shown = doc
+            .masters()
+            .find(|&mr| MasterTexts::of(doc, mr).name_u == nu)
+            .and_then(|mr| doc.master(mr).and_then(|x| x.master_shape()).map(|slot| ShapeRef { owner: Owner::Master(mr), slot }))
+            .map(|s| diagram_core::field::plain(doc, s));
+        h.check(&format!("{tag}/dimension/{nu}"), shown.as_deref() == Some(text), format!("{shown:?} (want {text})"));
     }
 }
 

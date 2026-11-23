@@ -1,0 +1,31 @@
+#!args apps/JFDiagrammer/tests/rack_page.vsdx --no-system-fonts
+# JFDiagrammer, JD15: the dimensions of the rack stencil (SH-146, TX-06) -- Bemaßung horizontal and
+# vertikal are 1-D shapes whose text is a field: the horizontal or vertical distance of their ends
+# in mm, on a 1:20 page as on paper (rack_page.vsdx: A4 at 1:20, the rack is 600 mm wide); the
+# value follows when an end is dragged, and undo takes it back.  #24577 is the panel's search box
+# (stencils_panel.rs ID_PANEL + 1); `wait 600` between the drops keeps them two single clicks
+click button:"Weitere Shapes"
+click "Netzwerk"
+click "Gestellmontierte Geräte"
+focus #24577
+type "Bemaßung"
+expect button:"Bemaßung - horizontal" exists
+expect button:"Bemaßung - vertikal" exists
+drag button:"Bemaßung - horizontal" 400,230
+a11y expect announced "„Bemaßung - horizontal“ abgelegt"
+expect listitem:"600 mm" rect 362 210 76 20
+wait 600
+drag button:"Bemaßung - vertikal" 300,400
+a11y expect announced "„Bemaßung - vertikal“ abgelegt"
+expect listitem:"1000 mm" rect 280 337 20 126
+wait 600
+shot build/JFDiagrammer-rack-dimension.png
+# the horizontal one by its line, then its end to the right: the field follows
+click 400,214
+wait 600
+drag 438,228 476,228
+expect listitem:"600 mm" missing
+expect listitem:"811 mm" exists
+key ctrl+z
+expect listitem:"600 mm" exists
+expect listitem:"811 mm" missing

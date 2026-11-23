@@ -584,9 +584,16 @@ pub fn place(tx: &mut Transaction, page: PageRef, master: MasterRef, x: f64, y: 
         tx.set_shape_names(shape, Some(&name), Some(&name_u))?;
         // the text in this language
         if let Some(text) = texts.text.as_ref().and_then(|t| t.get(lang)).filter(|t| !t.is_empty()) {
-            let own = tx.doc().shape(shape).and_then(|s| s.text()).map(|t| t.chars()).unwrap_or_default();
-            if own.trim_end_matches('\n') != text.as_str() {
-                tx.set_text(shape, Some(Text::plain(text)))?;
+            // (JD15) a text with field marks ("{fld 0}", the stencil build tool's) keeps its fields
+            let want = crate::field::marked(text);
+            let own = tx.doc().shape(shape).and_then(|s| s.text()).cloned().unwrap_or_default();
+            let same = if crate::field::marks(&want).is_empty() {
+                own.chars().trim_end_matches('\n') == text.as_str()
+            } else {
+                own.items == want.items
+            };
+            if !same {
+                tx.set_text(shape, Some(want))?;
             }
         }
         // (LY-03) the master's layers onto the page

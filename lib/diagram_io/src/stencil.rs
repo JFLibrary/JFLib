@@ -59,6 +59,10 @@
 // JFD_Keywords, JFD_Text, JFD_Quick (1 for the first `quick` masters) and JFD_Tr1, JFD_Tr2 ...
 // ("Section.Row.Cell|de|en|es|it|fr" with VSDX section names: Control.Row_1.Tip).
 //
+// (JD15) Text fields: a [Field] section (Value, Format, Type ...; `Unit = mm` gives Value the unit
+// the field shows) and "{fld N}" marks in a master's text (diagram_core::field::marked); a mark
+// without its row is a build error.
+//
 // Sources are files of the repository, trusted but checked all the same: no panic on any input,
 // counts bounded, no recursion.
 
@@ -68,10 +72,11 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
 
+use diagram_core::field;
 use diagram_core::formula::{self, CellPart, Engine, Keep, Outcome, SheetName, LOCKS};
 use diagram_core::instance::{self, join_fields, LANGS};
 use diagram_core::{
-    CellAddr, DocKind, Document, EditError, MasterRef, Owner, RowKey, SecKey, ShapeKind, ShapeRef, SheetRef, StyleRefs, Text,
+    CellAddr, DocKind, Document, EditError, MasterRef, Owner, RowKey, SecKey, ShapeKind, ShapeRef, SheetRef, StyleRefs,
     Transaction, Unit, Value,
 };
 
@@ -234,6 +239,8 @@ pub(crate) fn row_cells(model: &str) -> &'static [&'static str] {
         "Actions" => &["Menu", "Action", "Checked", "Disabled", "ReadOnly", "Invisible", "BeginGroup", "TagName", "ButtonFace", "SortKey", "FlyoutChild"],
         "Hyperlink" => &["Description", "Address", "SubAddress", "ExtraInfo", "Frame", "NewWindow", "Default", "Invisible", "SortKey"],
         "Scratch" => &["X", "Y", "A", "B", "C", "D"],
+        // (JD15) Unit is the tool's own: the unit of Value (its U attribute), the unit the field shows
+        "Field" => &["Value", "Format", "Type", "Calendar", "ObjectKind", "UICat", "UICod", "UIFmt", "Unit"],
         _ => &[],
     }
 }
@@ -937,8 +944,9 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
         let a = single_addr(tx, &c.name);
         sink.put(tx, sheet, &a, c, Some(c.name.clone()))?;
     }
+    // (JD15) "{fld N}" in the text is the mark of [Field] row N (checked below)
     if let Some(t) = &mi.text {
-        tx.set_text(shape, Some(Text::plain(&t[lang]))).map_err(|e| sink.fail(line, "der Text", e))?;
+        tx.set_text(shape, Some(field::marked(&t[lang]))).map_err(|e| sink.fail(line, "der Text", e))?;
     }
     // the sections as written
     for sec in &mi.sections {
@@ -965,11 +973,31 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
                     if !tx.doc().has_row(sheet, sk, rk) {
                         tx.add_row(sheet, sk, Some(rk), None).map_err(|e| sink.fail(row.line, &row.head, e))?;
                     }
-                    for c in &row.cells {
+                    // (JD15) a text field's `Unit = mm`: Value gets that unit before its formula
+                    // (the unit the field shows, U="MM"); not a cell of its own
+                    if let Some(c) = row.cells.iter().find(|c| c.name == "Unit") {
+                        let unit = match &c.val {
+                            CellVal::Plain(Value0::Formula(u)) => formula::unit_code(u.trim()),
+                            _ => None,
+                        };
+                        let unit = unit.ok_or_else(|| err(c.file.as_deref().unwrap_or(file), c.line, "Unit: keine Einheit (mm, cm, m, in, ft, pt, deg …)"))?;
+                        let a = CellAddr::row(sk, rk, tx.intern("Value"));
+                        sink.constant(tx, sheet, &a, Value::Num(0.0), Some(unit), c.line)?;
+                    }
+                    for c in row.cells.iter().filter(|c| !(sec.model == "Field" && c.name == "Unit")) {
                         let a = CellAddr::row(sk, rk, tx.intern(&c.name));
                         sink.put(tx, sheet, &a, c, Some(format!("{}.{rname}.{}", sec.model, c.name)))?;
                     }
                 }
+            }
+        }
+    }
+    // every field mark of the text in every language names a [Field] row
+    if let Some(t) = &mi.text {
+        let fk = SecKey::one(tx.intern("Field"));
+        for ix in t.iter().flat_map(|s| field::marks(&field::marked(s))) {
+            if !tx.doc().has_row(sheet, fk, RowKey::Index(ix)) {
+                return Err(err(file, line, format!("text: die Feldmarke {}{ix}{} hat keine Zeile {ix} in [Field]", field::MARK_OPEN, field::MARK_CLOSE)));
             }
         }
     }

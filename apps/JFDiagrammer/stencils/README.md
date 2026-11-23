@@ -170,6 +170,30 @@ Masters gemischt:
   Master nicht selbst setzt (`RackUnits: Value = 2` übernimmt Bezeichnung und Typ aus der Datei).
 - Fehler nennen die eingebundene Datei und ihre Zeile; ihr Text gehört zur `UniqueID`.
 
+### Textfelder (`[Field]`, JD15)
+
+Ein Text kann Felder enthalten, die einen berechneten Wert zeigen (TX-06), etwa die Länge einer
+Bemaßung. Im Text (`text.<sprache>`) steht dafür die Marke `{fld N}`; sie zeigt Zeile N (ab 0) des
+Abschnitts `[Field]` (in VSDX `N="Field"`, Visios Textfelder). Jede andere `{`-Folge bleibt Text. Eine
+Marke ohne ihre Zeile ist ein Baufehler. Die Zeilen beginnen wie bei `[Connection]` mit `Row`:
+
+```
+text.de: {fld 0}
+...
+[Field]
+Row  Value = ABS(Width); Unit = mm; Format = "0 u"; Type = 2
+     Unit.us = in
+     Format.us = "0.## u"
+```
+
+- `Value`: die Formel, deren Wert das Feld zeigt; `Format`: das Formatbild (Visios FORMAT, siehe
+  `diagram_core::field`); `Type`: 0 Text, 2 Zahl, 5 Datum oder Uhrzeit, 6 Dauer, 7 Währung.
+- `Unit` ist ein Schlüssel des Werkzeugs, keine Visio-Zelle: die Einheit, in der das Feld den Wert
+  zeigt (`U` von `Value`; `mm`, `cm`, `m`, `in`, `ft`, `pt`, `deg` …). Ohne `Unit` zeigt eine Länge
+  in Zoll.
+- Beim Ablegen bekommt die Instanz den Text mit seinen Feldern; die Feldzeilen erbt sie vom Master,
+  der Wert folgt jeder Änderung (`diagram_core::field::marked`, `instance::place`).
+
 ## 1D-Shapes (Verbinder, Linienpfeile)
 
 Ein Master ist ein 1D-Shape, wenn `[Shape]` die Enden `BeginX`, `BeginY`, `EndX` und `EndY`
@@ -385,9 +409,10 @@ Neun Schablonen der Kategorie `network`: `net_computers` (SH-140), `net_detailed
   JFDiagrammer (`diagram_core::dock`, App `rack.rs`) und in Visio auf den HE einrasten.
 - **Besondere Master:** `ethernet` und `ring_network` (acht Steuerpunkte, deren Leitungen zu den
   Geräten führen; in Visio kleben sie), `legend` (JFDiagrammer schreibt die Zählung, App
-  `legend.rs`), `dialup` (Wählverbindung, ein 1D-Shape mit Blitz). Die Bemaßungen der
-  Rack-Schablone fehlen noch: Sie zeigen ihre Länge in einem Textfeld, das das Bauwerkzeug
-  nicht schreibt.
+  `legend.rs`), `dialup` (Wählverbindung, ein 1D-Shape mit Blitz), `dim_horizontal` und
+  `dim_vertical` (JD15: Bemaßungen der Rack-Schablone, 1D mit aufrechtem Kasten; ein Textfeld zeigt
+  den waagerechten bzw. senkrechten Abstand der Enden, der gelbe Punkt verschiebt die Maßlinie;
+  Pfeile und Text in Papiermaß über `ThePage!DrawingScale/ThePage!PageScale`).
 - Vorlagen: `templates/network` (VL-50), `templates/network_detailed` (VL-51), `templates/rack`
   (VL-52, Seite 1:20).
 - Prüfen: `diagramiotest --check --only stencils/network`, Ansicht
