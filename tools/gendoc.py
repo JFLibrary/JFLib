@@ -158,7 +158,7 @@ CRATES = [
     ("diagram_io", "Visio file formats (the VSDX family) and diagram exports", "full"),
     ("rt", "the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records",
      "full"),
-    ("pdf", "PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments)", "full"),
+    ("pdf", "PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments, drawing pages)", "full"),
     ("diagram_view", "draws diagram pages (the display list of diagram_core) on render2d and gfx", "full"),
     ("dxf", "DXF import (ASCII): tables, blocks and entities of model space, without a GPU", "full"),
     ("physics", "Collision shapes, broad phase and deterministic queries for games", "full"),

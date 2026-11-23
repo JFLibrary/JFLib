@@ -5,8 +5,8 @@ on a canvas, with real paths, embedded font subsets, images, links and bookmarks
 raster image per page; JFDiagrammer exports its drawings with it, jfWord can use it for its
 documents as well. The reader (`pdf::read`) opens PDF files of every version, encrypted and
 damaged ones too, and gives their pages, the text with the position of every glyph, outlines,
-links, form fields and attachments. It is plain Rust, without the standard library and without a
-line of `unsafe` code.
+links, form fields and attachments, and draws the pages as pixels. It is plain Rust, without the
+standard library and without a line of `unsafe` code.
 
 ## What it writes
 
@@ -63,9 +63,39 @@ PDF/A, encryption and forms. Fonts whose licence (OS/2 `fsType`) forbids embeddi
 A damaged or hostile file gives an error or less than it claims, never a panic, a hang or memory
 without end: nesting, the depth of references, page trees, outlines and form XObjects are
 bounded, every decoded stream is at most `Options::max_stream` bytes (256 MiB). Not supported:
-drawing pages (images, shadings, the outlines of glyphs), the image filters themselves, the
-predefined CMaps of East Asian fonts other than Identity and the Unicode ones, verifying
+the predefined CMaps of East Asian fonts other than Identity and the Unicode ones, verifying
 signatures, and changing and saving a document.
+
+## What it draws
+
+`Document::render` draws a page into a `gfx::Surface` at any resolution, the whole page or a
+region of it (tiles for a viewer), over paper of any colour or none:
+
+- **Paths**: fills with the non-zero and even-odd rule, strokes with caps, joins, miter limit and
+  dashes in user space (also under a matrix that scales unevenly), thin rules and frames on whole
+  pixels as Poppler draws them, clipping paths and text clipping.
+- **Colours** in every colour space: Device, CalGray, CalRGB, Lab, ICCBased (by its component
+  count or its alternate), Indexed, Separation and DeviceN through their tint transforms, and
+  functions of all four types (sampled, exponential, stitching, PostScript calculator). CMYK as
+  printing inks look (the Neugebauer model over the colours of the SWOP inks).
+- **Text** through the glyph outlines of the embedded fonts -- Type 1, CFF (with seac accents),
+  TrueType, OpenType, CID-keyed fonts, Type 3 -- and for fonts that are not embedded substitutes
+  from a `FontSource` (by default the system's fonts: URW's Nimbus, Liberation or the Windows
+  fonts for the 14 standard fonts); every text render mode.
+- **Images** of every bit depth and colour space with Decode, stencil masks, colour-key and
+  explicit masks, soft masks with Matte, inline images, JPEG (CMYK too) and CCITT Group 3 and 4;
+  shrunk images averaged over the pixels they cover, enlarged ones sampled bilinearly.
+- **Shadings** of all seven types, with `sh` and as patterns; tiling patterns, coloured and
+  uncoloured.
+- **Transparency**: alpha, the sixteen blend modes, soft masks (luminosity and alpha, with
+  backdrop and transfer function), transparency groups.
+- **Annotations** through their appearance streams (with their states and flags), and optional
+  content (the default configuration, membership dictionaries).
+
+Pages agree with Poppler's `pdftoppm` (tools/pdf_render_check.py), and drawing takes about as
+long. Not drawn: JPEG 2000 and JBIG2 images, knockout groups and groups that are not isolated
+(drawn as isolated ones), overprint. The work of a page is bounded: a hostile page gives
+`Error::Limit`, never a hang.
 
 ## How it is used
 
@@ -115,6 +145,17 @@ for f in doc.fields() { /* f.name, f.kind, f.value */ }
 for a in doc.attachments() {
     let xml = doc.decode(a.stream.as_ref().unwrap())?;  // "factur-x.xml", "text/xml"
 }
+```
+
+And drawing one:
+
+```rust
+use jflib::pdf::read::{Document, RenderOptions};
+
+let doc = Document::open(bytes)?;
+let (w, h) = doc.page_pixels(0, 150.0)?;                // the page's size at 150 dpi
+let page: gfx::Surface = doc.render(0, &RenderOptions { dpi: 150.0, ..RenderOptions::default() })?;
+let tile = doc.render(0, &RenderOptions { dpi: 300.0, region: Some([0, 0, 512, 512]), ..RenderOptions::default() })?;
 ```
 
 ## How to get it

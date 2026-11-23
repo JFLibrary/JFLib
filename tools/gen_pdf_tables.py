@@ -11,6 +11,9 @@
   - the advance widths of Helvetica and Times (regular, bold, italic, bold italic) for the
     characters of those encodings, from the Liberation fonts (SIL OFL 1.1), whose widths match
     them: what a page in one of the 14 standard fonts without /Widths needs (Courier is 600)
+  - for drawing glyphs: the glyph names of those encodings and of the ZapfDingbats font's
+    built-in encoding (gs_dbt_e.ps), and the 391 standard strings of CFF (Adobe Technical Note
+    5176, Appendix A; written out below and checked against the encodings)
 
   python tools/gen_pdf_tables.py [--check]     --check: fail when tables.rs is not what it writes
 
@@ -79,9 +82,63 @@ def read_encodings(d):
         assert len(out) == 256, (fname, len(out))
         encs[name] = out
 
-    for f in ["gs_std_e.ps", "gs_il1_e.ps", "gs_wan_e.ps", "gs_mro_e.ps", "gs_mex_e.ps", "gs_pdf_e.ps", "gs_sym_e.ps"]:
+    for f in ["gs_std_e.ps", "gs_il1_e.ps", "gs_wan_e.ps", "gs_mro_e.ps", "gs_mex_e.ps", "gs_pdf_e.ps", "gs_sym_e.ps", "gs_dbt_e.ps"]:
         parse(f)
     return encs
+
+
+# CFF's standard strings (SID 0 to 390): the ISOAdobe charset (0 to 228), the expert names, the
+# names of the weights
+CFF_STRINGS = (""".notdef space exclam quotedbl numbersign dollar percent ampersand quoteright parenleft
+parenright asterisk plus comma hyphen period slash zero one two three four five six seven eight nine
+colon semicolon less equal greater question at A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
+bracketleft backslash bracketright asciicircum underscore quoteleft a b c d e f g h i j k l m n o p q
+r s t u v w x y z braceleft bar braceright asciitilde exclamdown cent sterling fraction yen florin
+section currency quotesingle quotedblleft guillemotleft guilsinglleft guilsinglright fi fl endash
+dagger daggerdbl periodcentered paragraph bullet quotesinglbase quotedblbase quotedblright
+guillemotright ellipsis perthousand questiondown grave acute circumflex tilde macron breve dotaccent
+dieresis ring cedilla hungarumlaut ogonek caron emdash AE ordfeminine Lslash Oslash OE ordmasculine
+ae dotlessi lslash oslash oe germandbls onesuperior logicalnot mu trademark Eth onehalf plusminus
+Thorn onequarter divide brokenbar degree thorn threequarters twosuperior registered minus eth
+multiply threesuperior copyright Aacute Acircumflex Adieresis Agrave Aring Atilde Ccedilla Eacute
+Ecircumflex Edieresis Egrave Iacute Icircumflex Idieresis Igrave Ntilde Oacute Ocircumflex Odieresis
+Ograve Otilde Scaron Uacute Ucircumflex Udieresis Ugrave Yacute Ydieresis Zcaron aacute acircumflex
+adieresis agrave aring atilde ccedilla eacute ecircumflex edieresis egrave iacute icircumflex
+idieresis igrave ntilde oacute ocircumflex odieresis ograve otilde scaron uacute ucircumflex
+udieresis ugrave yacute ydieresis zcaron exclamsmall Hungarumlautsmall dollaroldstyle dollarsuperior
+ampersandsmall Acutesmall parenleftsuperior parenrightsuperior twodotenleader onedotenleader
+zerooldstyle oneoldstyle twooldstyle threeoldstyle fouroldstyle fiveoldstyle sixoldstyle
+sevenoldstyle eightoldstyle nineoldstyle commasuperior threequartersemdash periodsuperior
+questionsmall asuperior bsuperior centsuperior dsuperior esuperior isuperior lsuperior msuperior
+nsuperior osuperior rsuperior ssuperior tsuperior ff ffi ffl parenleftinferior parenrightinferior
+Circumflexsmall hyphensuperior Gravesmall Asmall Bsmall Csmall Dsmall Esmall Fsmall Gsmall Hsmall
+Ismall Jsmall Ksmall Lsmall Msmall Nsmall Osmall Psmall Qsmall Rsmall Ssmall Tsmall Usmall Vsmall
+Wsmall Xsmall Ysmall Zsmall colonmonetary onefitted rupiah Tildesmall exclamdownsmall centoldstyle
+Lslashsmall Scaronsmall Zcaronsmall Dieresissmall Brevesmall Caronsmall Dotaccentsmall Macronsmall
+figuredash hypheninferior Ogoneksmall Ringsmall Cedillasmall questiondownsmall oneeighth
+threeeighths fiveeighths seveneighths onethird twothirds zerosuperior foursuperior fivesuperior
+sixsuperior sevensuperior eightsuperior ninesuperior zeroinferior oneinferior twoinferior
+threeinferior fourinferior fiveinferior sixinferior seveninferior eightinferior nineinferior
+centinferior dollarinferior periodinferior commainferior Agravesmall Aacutesmall Acircumflexsmall
+Atildesmall Adieresissmall Aringsmall AEsmall Ccedillasmall Egravesmall Eacutesmall Ecircumflexsmall
+Edieresissmall Igravesmall Iacutesmall Icircumflexsmall Idieresissmall Ethsmall Ntildesmall
+Ogravesmall Oacutesmall Ocircumflexsmall Otildesmall Odieresissmall OEsmall Oslashsmall Ugravesmall
+Uacutesmall Ucircumflexsmall Udieresissmall Yacutesmall Thornsmall Ydieresissmall 001.000 001.001
+001.002 001.003 Black Bold Book Light Medium Regular Roman Semibold""").split()
+
+
+def check_cff_strings(encs):
+    """the standard strings against what they must agree with: StandardEncoding's names in code
+    order are SIDs 1 to 149, the expert names are MacExpertEncoding's"""
+    assert len(CFF_STRINGS) == 391, len(CFF_STRINGS)
+    assert len(set(CFF_STRINGS)) == 391
+    std = [n for n in encs["StandardEncoding"][32:] if n != ".notdef"]
+    assert CFF_STRINGS[1:150] == std, "the ISOAdobe names do not follow StandardEncoding"
+    lat = set(encs["WinAnsiEncoding"]) | set(encs["MacRomanEncoding"]) | set(encs["ISOLatin1Encoding"])
+    assert all(n in lat for n in CFF_STRINGS[150:229]), [n for n in CFF_STRINGS[150:229] if n not in lat]
+    mex = set(encs["MacExpertEncoding"])
+    extra = [n for n in CFF_STRINGS[229:379] if n not in mex]
+    assert not extra, extra
 
 
 def ttf_widths(path, chars):
@@ -199,6 +256,27 @@ def generate():
     o.append("];\n\n")
     for name, (vals, doc) in tables.items():
         o.append(rust_u16(name, vals, doc))
+    o.append("\n")
+    # glyph names: the encodings' and CFF's standard strings in one sorted pool
+    check_cff_strings(encs)
+    name_encs = [("STANDARD", "StandardEncoding"), ("WINANSI", "WinAnsiEncoding"), ("MACROMAN", "MacRomanEncoding"),
+                 ("MACEXPERT", "MacExpertEncoding"), ("SYMBOL", "SymbolEncoding"), ("DINGBATS", "DingbatsEncoding")]
+    pool = sorted(set(CFF_STRINGS).union(*(encs[e] for _, e in name_encs)))
+    at = {n: i for i, n in enumerate(pool)}
+    nblob, nstart = bytearray(), []
+    for n in pool:
+        nstart.append(len(nblob))
+        nblob += n.encode()
+    nstart.append(len(nblob))
+    o.append(f"/// the glyph names of the encodings and of CFF's standard strings, sorted, one after the other\npub(crate) static GLYPH_NAMES: &[u8] = b\"{nblob.decode()}\";\n")
+    o.append(f"/// where each name starts in GLYPH_NAMES (and where the last ends)\npub(crate) static GLYPH_START: [u16; {len(nstart)}] = [\n")
+    for i in range(0, len(nstart), 16):
+        o.append("    " + ", ".join(str(v) for v in nstart[i:i + 16]) + ",\n")
+    o.append("];\n")
+    for rname, e in name_encs:
+        vals = [0xFFFF if n == ".notdef" else at[n] for n in encs[e]]
+        o.append(rust_u16(f"NAMES_{rname}", vals, f"{e}: each code's glyph name in GLYPH_NAMES (0xFFFF: none)"))
+    o.append(rust_u16("CFF_STRINGS", [at[n] for n in CFF_STRINGS], "CFF's standard strings: each SID's name in GLYPH_NAMES"))
     o.append("\n")
     for name, file in fonts:
         w = ttf_widths(liberation(file), latin)

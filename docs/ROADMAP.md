@@ -2526,7 +2526,9 @@ Sicherheit:
   Bild-Decoder und die Schriften (bisher nur abgeschnittene und gekippte Kopien in den
   Python-Prüfungen, [`tools/imgtest_common.py`](../tools/imgtest_common.py),
   `tools/font_check.py --fuzz`), `doc_io` (RTF und HTML aus der Zwischenablage, die jedes andere
-  Programm füllen kann), `diagram_io`, `dxf`, `gltf`, `img_svg` und `spell` (`.aff`, `.dic`). Mit
+  Programm füllen kann), `diagram_io`, `dxf`, `gltf`, `img_svg`, `spell` (`.aff`, `.dic`) und
+  `pdf::read` mit seinem Renderer (bisher nur Mutationen in `pdftest` und Läufe mit festem Seed:
+  Struktur, Filter, CMaps, Type-1-, CFF- und TrueType-Programme, CCITT, Funktionen). Mit
   `panic = "abort"` beendet jeder Panic in einem Parser die ganze App.
 - **P2** · *teilweise* (2026-11-21, U6) · `unsafe` außerhalb von `rt` und `simd` prüfen: `plat` hat rund 3000
   Stellen mit `unsafe`, `gpu` rund 300. Durchgesehen sind die Wege, auf denen Daten anderer Programme ankommen
@@ -2637,7 +2639,7 @@ Grundbausteine am falschen Ort oder mehrfach:
 
 Crates, die einer JF-App folgen:
 
-- **P2** · *teilweise* (2026-11-23, U15) · `pdf`: Lesen ist da ([`pdf/src/read/`](../lib/pdf/src/read/mod.rs),
+- **P2** · *teilweise* (2026-11-23, U15 und U16) · `pdf`: Lesen ist da ([`pdf/src/read/`](../lib/pdf/src/read/mod.rs),
   `pdf::read::Document`). PDF 1.0 bis 2.0 mit klassischen Tabellen, Querverweis- und Objektströmen,
   inkrementellen Updates und hybriden Dateien; beschädigte, abgeschnittene und Dateien ohne Tabelle
   werden aus ihren Objekten neu aufgebaut. Verschlüsselung mit dem Standard-Handler (RC4 40 bis
@@ -2656,10 +2658,37 @@ Crates, die einer JF-App folgen:
   LibreOffice (Writer und Calc), cairo, Manpages über groff, die PDFs des Systems; in
   `pdftest --only read_*` (411 Prüfungen, auch 1600 Mutationen) und mit 45 000 Mutationen der
   Dateien ohne Absturz und ohne Zeitüberschreitung. Etwa so schnell wie `pdftotext` (die 97 Seiten
-  der bash-Manpage in 0,14 s) bei einem Drittel des Speichers. Offen: Anzeigen (Seiten zeichnen:
-  Bilder und ihre Filter, Shadings, die Umrisse der Glyphen), Formulare ausfüllen und schreiben,
-  Verschlüsselung, PDF/A und Signaturen beim Schreiben, Signaturen prüfen, die vordefinierten
-  CMaps Ostasiens außer Identity und den Unicode-CMaps.
+  der bash-Manpage in 0,14 s) bei einem Drittel des Speichers. Anzeigen ist da (U16,
+  [`pdf/src/read/render/`](../lib/pdf/src/read/render/mod.rs)): `Document::render(seite, &RenderOptions)`
+  zeichnet eine Seite in eine `gfx::Surface`, in jeder Auflösung, auch nur einen Ausschnitt
+  (Kacheln für einen Betrachter), auf Papier jeder Farbe oder durchsichtig. Pfade mit beiden
+  Füllregeln, Striche mit Kappen, Ecken, Gehrung und Strichmustern im Nutzerraum (auch unter einer
+  ungleich skalierenden Matrix), dünne Linien und Rahmen auf ganzen Pixeln wie bei Poppler,
+  Clipping auch durch Text; alle Farbräume (CalGray, CalRGB, Lab, ICCBased über seine
+  Komponentenzahl, Indexed, Separation und DeviceN) und Funktionen aller vier Typen, CMYK wie
+  Druckfarben (das Neugebauer-Modell über den Farben der SWOP-Farben; `img_jpeg` gibt dafür die
+  Rohwerte eines CMYK-JPEG). Text über die Umrisse der eingebetteten Schriften: Type 1 (ein
+  eigener Parser mit eexec, Subrs, Flex und seac), CFF und CID-CFF (seac-Akzente, `text::cff`
+  meldet sie jetzt), TrueType nach den cmap-Regeln von 9.6.6.4, OpenType, Type 3; nicht
+  eingebettete Schriften aus einer `FontSource` (vorgegeben: die Schriften des Systems, für die 14
+  Standardschriften die metrisch gleichen Familien), alle Render-Modi, Glyphen auf Viertelpixeln
+  und je Dokument gecacht. Bilder aller Bittiefen und Farbräume mit Decode, Masken aller Arten,
+  JPEG und CCITT Gruppe 3 und 4 (ein eigener Decoder), verkleinert gemittelt; Shadings aller
+  sieben Typen, Kachelmuster farbig und ungefärbt; Alpha, die 16 Mischmodi, weiche Masken,
+  Transparenzgruppen; Anmerkungen über ihre Erscheinungsbilder; Optional Content. Die Arbeit
+  einer Seite ist begrenzt. Geprüft mit `tools/pdf_render_check.py` gegen Poppler (`pdftoppm`),
+  Pixel für Pixel (eine Verschiebung unter einem Pixel zählt nicht): 62 von 62 Dateien bei 72
+  und bei 150 dpi gleich, der Korpus des Lesens und eigene Seiten für jede Zeichenfunktion,
+  Ghostscript, LibreOffice Draw und pycairo dazu; drei Abweichungen sind begründet ausgenommen
+  (Poppler setzt die Zellen eines gedrehten Kachelmusters neben ihr Raster, an 3000 Punkten
+  nachgerechnet; die Linien der CUPS-Formulare aus 0,1 pt breiten Rechtecken zeichnet Poppler
+  dunkler, als ihre Fläche ist). In `pdftest --only render_*` (524 Prüfungen, ohne Schriften des
+  Systems; unter Wine dieselben Pixel bis auf Seiten mit Ersatzschriften) und mit 55 000
+  Mutationen ohne Absturz und ohne Zeitüberschreitung. Etwa so schnell wie `pdftoppm` (der Korpus
+  bei 150 dpi in 3,4 s, Poppler 3,0 s). Offen: JPEG-2000- und JBIG2-Bilder, Knockout- und nicht
+  isolierte Gruppen (wie isolierte gezeichnet), Überdrucken, ICC-Profile (wie ihre Gerätefarben),
+  Formulare ausfüllen und schreiben, Verschlüsselung, PDF/A und Signaturen beim Schreiben,
+  Signaturen prüfen, die vordefinierten CMaps Ostasiens außer Identity und den Unicode-CMaps.
 - **P2** · *fehlt* · `physics` hat Kollisionen und einen Charakter-Controller nach Quake 3, was
   Spiel 1 braucht; es fehlen Starrkörper-Dynamik, Gelenke und ein Solver.
 - **P2** · *erledigt* (2026-11-21, U7) · `installer`: Die Seiten sprechen die Sprache des

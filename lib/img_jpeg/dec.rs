@@ -6,10 +6,11 @@
 // Flags (JDF_*): JDF_STRAIGHT -> FMT_ARGB output (same bytes, JPEG is opaque); JDF_NO_ORIENT
 // -> the EXIF orientation is not applied; JDF_RGB / JDF_YCC force the colour space of
 // 3-component images (TIFF Photometric RGB / YCbCr), JDF_CMYK makes 4 components plain
-// (non-inverted) CMYK.  decode_abbrev parses `tables` first (SOI, DQT / DHT / DRI / APPn /
-// COM, EOI or end of data; SOF / SOS there -> ERR_HDR; empty = none), keeps those tables and
-// then decodes `data` like decode_fl with JDF_NO_ORIENT (tables in `data` replace them per
-// slot).
+// (non-inverted) CMYK, JDF_RAW_CMYK puts 4 components into the pixels as stored (C, M, Y, K in
+// R, G, B, A; YCCK after its YCC step, as libjpeg gives them) for a caller that converts them.
+// decode_abbrev parses `tables` first (SOI, DQT / DHT / DRI / APPn / COM, EOI or end of data;
+// SOF / SOS there -> ERR_HDR; empty = none), keeps those tables and then decodes `data` like
+// decode_fl with JDF_NO_ORIENT (tables in `data` replace them per slot).
 //
 // Output: a new FMT_PARGB surface (alpha 255, SFF_OPAQUE).  Supported: baseline (SOF0),
 // extended sequential 8-bit Huffman (SOF1) and progressive (SOF2, spectral selection +
@@ -63,7 +64,7 @@ use gfx::{Surface, FMT_ARGB, FMT_PARGB, SFF_OPAQUE};
 use img_core::{ERR_CODE, ERR_DIMS, ERR_HDR, ERR_NOMEM, ERR_TRUNC, ERR_UNSUPPORTED};
 
 use crate::dsp;
-use crate::{JDF_CMYK, JDF_NO_ORIENT, JDF_RGB, JDF_STRAIGHT, JDF_YCC};
+use crate::{JDF_CMYK, JDF_NO_ORIENT, JDF_RAW_CMYK, JDF_RGB, JDF_STRAIGHT, JDF_YCC};
 
 const MAX_DIM: u32 = 32768;
 const MAX_PIXELS: u64 = 1 << 28;
@@ -1580,6 +1581,9 @@ impl<'a> Dec<'a> {
         }
         self.cspace = cs;
         self.cmode = cm;
+        if nc == 4 && self.flags & JDF_RAW_CMYK != 0 {
+            self.cmode |= 4; // the samples as stored
+        }
     }
 
     /// jd_comp_row: samples of component ci for output row y at full resolution: Some(plane

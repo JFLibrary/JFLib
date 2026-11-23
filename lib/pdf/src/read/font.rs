@@ -379,6 +379,32 @@ impl Font {
         }
     }
 
+    /// the CID of a composite font's code (a simple font's code is its own)
+    pub fn cid(&self, code: u32) -> u32 {
+        match &self.cmap {
+            Some(cm) => cm.cid(code),
+            None => code,
+        }
+    }
+
+    /// a composite font's horizontal advance of a code (the origin of a vertical glyph is
+    /// half of it to the left)
+    pub fn h_width(&self, code: u32) -> f64 {
+        match &self.cmap {
+            None => self.width(code),
+            Some(cm) => {
+                let cid = cm.cid(code);
+                let i = self.cid_widths.partition_point(|e| e.0 <= cid);
+                for e in self.cid_widths[..i].iter().rev().take(4) {
+                    if e.0 <= cid && cid <= e.1 {
+                        return e.2;
+                    }
+                }
+                self.dw
+            }
+        }
+    }
+
     /// the advance of a code in text space per unit of font size (horizontal; for vertical
     /// writing the vertical advance, negative downwards)
     pub fn width(&self, code: u32) -> f64 {

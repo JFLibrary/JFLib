@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- cff::Cff::outline_seac (the outline and the accent of an endchar with the arguments of seac, for a caller with the glyph names) and Cff::matrix (the FontMatrix in the outline's units); ttf::TtFont::cff (the CFF outlines of an OpenType font)
+
 ### Changed
 
 - fontconfig files are read with jflib-formats' forgiving `formats::xml::Lenient` instead of a reader of the crate's own (`fontconf`): a '>' inside a quoted attribute value no longer ends the tag, an unquoted value no longer ends the attributes; the system's 63 fontconfig files give the same rules as before.
