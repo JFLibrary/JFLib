@@ -37,6 +37,9 @@ pub(crate) const P_DATA: u32 = 13;
 pub(crate) const P_PANZOOM: u32 = 14;
 /// (JD18, AB-11) Externe Daten: under the canvas, as in Visio (data_pane.rs)
 pub(crate) const P_EXTERNAL: u32 = 15;
+/// (JD18, DA-05) Aktualisierungskonflikte: on the right, shown after a refresh with conflicts
+/// (data_refresh.rs)
+pub(crate) const P_CONFLICTS: u32 = 16;
 
 pub(crate) const ID_DOCK: u32 = 500;
 /// the canvas (JD8 rest: the task panes hand the keyboard back to it after Enter)
@@ -48,7 +51,7 @@ const ID_STATUS: u32 = 0x5800;
 const SIDEBAR_W: i32 = 240;
 
 /// the panels (titles in the current language)
-pub(crate) fn panels() -> [DockPanel<'static>; 6] {
+pub(crate) fn panels() -> [DockPanel<'static>; 7] {
     [
         DockPanel::new(P_SHAPES, t("Shapes"), JD_STENCIL_MENU).at(DOCK_LEFT, 0),
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_FORMAT, crate::tc("Shape formatieren|Bereich"), JD_FILL).at(DOCK_RIGHT, 0) },
@@ -56,6 +59,7 @@ pub(crate) fn panels() -> [DockPanel<'static>; 6] {
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_DATA, t("Shape-Daten"), JD_SHAPE_DATA).at(DOCK_RIGHT, 0) },
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_PANZOOM, t("Verschieben und Zoomen"), JD_ZOOM).at(DOCK_RIGHT, 0) },
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_EXTERNAL, t("Externe Daten"), JD_EXTERNAL_DATA).at(DOCK_BOTTOM, 0) },
+        DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_CONFLICTS, t("Aktualisierungskonflikte"), JD_REFRESH_ALL).at(DOCK_RIGHT, 0) },
     ]
 }
 
@@ -75,6 +79,7 @@ pub(crate) fn content(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
         P_DATA => shape_data(app, ui),
         P_PANZOOM => pan_zoom(app, ui),
         P_EXTERNAL => crate::data_pane::pane(app, ui),
+        P_CONFLICTS => crate::data_refresh::pane(app, ui),
         _ => {}
     }
 }

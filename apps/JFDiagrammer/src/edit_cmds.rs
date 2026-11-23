@@ -124,6 +124,8 @@ pub(crate) fn paste(app: &mut Diagrammer, ui: &mut Ui) {
         app.clip_offset += 1;
         let keys: Vec<u64> = new.iter().map(|&s| key_of(s)).collect();
         app.se.select(&keys);
+        // (JD18, SP-13) pasted or duplicated: fields marked "ask on drop"
+        crate::data_ask::after_drop(app, ui, &new);
     }
     ui.repass();
 }

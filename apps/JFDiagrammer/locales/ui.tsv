@@ -988,3 +988,59 @@ Einblenden/Ausblenden	Show/Hide	Mostrar u ocultar	Mostra/Nascondi	Afficher/Masqu
 Erweiterte Datenverknüpfung	Advanced Data Linking	Vinculación de datos avanzada	Collegamento dati avanzato	Liaison de données avancée
 keine Excel-Arbeitsmappe und keine Textdatei	neither an Excel workbook nor a text file	ni un libro de Excel ni un archivo de texto	né una cartella di lavoro di Excel né un file di testo	ni un classeur Excel ni un fichier texte
 „{}“ ist nicht in der Arbeitsmappe	“{}” is not in the workbook	«{}» no está en el libro	“{}” non è nella cartella di lavoro	« {} » ne figure pas dans le classeur
+Shape-Text	Shape text	Texto de la forma	Testo forma	Texte de la forme
+Automatisch verknüpfen	Automatically Link	Vincular automáticamente	Collega automaticamente	Lier automatiquement
+Fertig stellen	Finish	Finalizar	Fine	Terminer
+Datenquelle	Data source	Origen de datos	Origine dati	Source de données
+Welche Shapes sollen verknüpft werden?	Which shapes do you want to link?	¿Qué formas desea vincular?	Quali forme collegare?	Quelles formes voulez-vous lier ?
+Ausgewählte Shapes	Selected shapes	Formas seleccionadas	Forme selezionate	Formes sélectionnées
+Alle Shapes dieser Seite	All shapes on this page	Todas las formas de esta página	Tutte le forme di questa pagina	Toutes les formes de cette page
+Ein Shape wird mit der Zeile verknüpft, deren Werte zu seinen Feldern passen.	A shape is linked to the row whose values match its fields.	Una forma se vincula a la fila cuyos valores coinciden con sus campos.	Una forma viene collegata alla riga i cui valori corrispondono ai suoi campi.	Une forme est liée à la ligne dont les valeurs correspondent à ses champs.
+Zeile automatisch mit dem Shape verknüpfen, wenn:	Automatically link a row to the shape if:	Vincular automáticamente una fila a la forma si:	Collegare automaticamente una riga alla forma se:	Lier automatiquement une ligne à la forme si :
+Datenspalte	Data column	Columna de datos	Colonna dati	Colonne de données
+Shape-Feld	Shape field	Campo de forma	Campo forma	Champ de forme
+Und	And	Y	E	Et
+Vorhandene Verknüpfungen ersetzen	Replace existing links	Reemplazar los vínculos existentes	Sostituire i collegamenti esistenti	Remplacer les liens existants
+Kein Shape wurde verknüpft: zu keinem Shape passt eine Zeile.	No shape was linked: no row matches a shape.	No se vinculó ninguna forma: ninguna fila coincide con una forma.	Nessuna forma collegata: nessuna riga corrisponde a una forma.	Aucune forme n'a été liée : aucune ligne ne correspond à une forme.
+1 Shape wurde verknüpft.	1 shape was linked.	Se vinculó 1 forma.	1 forma collegata.	1 forme a été liée.
+{} Shapes wurden verknüpft.	{} shapes were linked.	Se vincularon {} formas.	{} forme collegate.	{} formes ont été liées.
+Die Shapes lassen sich nicht verknüpfen: {}	The shapes cannot be linked: {}	Las formas no se pueden vincular: {}	Impossibile collegare le forme: {}	Impossible de lier les formes : {}
+Shape löschen	Delete shape	Eliminar forma	Eliminare la forma	Supprimer la forme
+Verknüpfung aufheben	Unlink	Desvincular	Scollegare	Dissocier
+Datenwert übernehmen	Use data value	Usar el valor de los datos	Usare il valore dei dati	Utiliser la valeur des données
+Eigenen Wert behalten	Keep own value	Conservar su valor	Mantenere il proprio valore	Conserver votre valeur
+„{}“ lässt sich nicht aktualisieren.	“{}” cannot be refreshed.	«{}» no se puede actualizar.	Impossibile aggiornare “{}”.	« {} » ne peut pas être actualisé.
+„{}“ wurde in dieser Sitzung noch nicht geöffnet. Wählen Sie die Datei aus, damit die Daten von „{}“ aktualisiert werden.	“{}” has not been opened in this session yet. Choose the file to refresh the data of “{}”.	«{}» aún no se ha abierto en esta sesión. Elija el archivo para actualizar los datos de «{}».	“{}” non è ancora stato aperto in questa sessione. Scegliere il file per aggiornare i dati di “{}”.	« {} » n'a pas encore été ouvert dans cette session. Choisissez le fichier pour actualiser les données de « {} ».
+„{}“ wurde nicht gefunden. Wählen Sie die Datei aus, damit die Daten von „{}“ aktualisiert werden.	“{}” was not found. Choose the file to refresh the data of “{}”.	No se encontró «{}». Elija el archivo para actualizar los datos de «{}».	“{}” non è stato trovato. Scegliere il file per aggiornare i dati di “{}”.	« {} » est introuvable. Choisissez le fichier pour actualiser les données de « {} ».
+Die Datenquelle ist nicht lesbar: {}	The data source cannot be read: {}	No se puede leer el origen de datos: {}	Impossibile leggere l'origine dati: {}	La source de données est illisible : {}
+Daten aktualisieren	Refresh Data	Actualizar datos	Aggiorna dati	Actualiser les données
+„{}“ aktualisiert: {} geänderte, {} neue, {} entfernte Zeilen.	“{}” refreshed: {} changed, {} new, {} removed rows.	«{}» actualizado: {} filas cambiadas, {} nuevas, {} quitadas.	“{}” aggiornato: {} righe modificate, {} nuove, {} rimosse.	« {} » actualisé : {} lignes modifiées, {} nouvelles, {} supprimées.
+1 Shape neu verknüpft.	1 more shape linked.	Se vinculó 1 forma más.	Collegata 1 forma in più.	1 forme liée en plus.
+{} Shapes neu verknüpft.	{} more shapes linked.	Se vincularon {} formas más.	Collegate {} forme in più.	{} formes liées en plus.
+1 Konflikt.	1 conflict.	1 conflicto.	1 conflitto.	1 conflit.
+{} Konflikte.	{} conflicts.	{} conflictos.	{} conflitti.	{} conflits.
+noch nie	never	nunca	mai	jamais
+{} – zuletzt aktualisiert: {}	{} – last refreshed: {}	{} – última actualización: {}	{} – ultimo aggiornamento: {}	{} – dernière actualisation : {}
+{} – lässt sich nicht aktualisieren	{} – cannot be refreshed	{} – no se puede actualizar	{} – non aggiornabile	{} – ne peut pas être actualisé
+Datenquellen	Data sources	Orígenes de datos	Origini dati	Sources de données
+Konfigurieren	Configure	Configurar	Configura	Configurer
+Aktualisieren	Refresh	Actualizar	Aggiorna	Actualiser
+Datenquelle suchen	Find Data Source	Buscar origen de datos	Cerca origine dati	Rechercher la source de données
+Überspringen	Skip	Omitir	Ignora	Ignorer
+xlsx;xlsm;csv;txt=Datenquellen	xlsx;xlsm;csv;txt=Data sources	xlsx;xlsm;csv;txt=Orígenes de datos	xlsx;xlsm;csv;txt=Origini dati	xlsx;xlsm;csv;txt=Sources de données
+xlsx;xlsm=Excel-Arbeitsmappen	xlsx;xlsm=Excel workbooks	xlsx;xlsm=Libros de Excel	xlsx;xlsm=Cartelle di lavoro di Excel	xlsx;xlsm=Classeurs Excel
+csv;txt=Textdateien	csv;txt=Text files	csv;txt=Archivos de texto	csv;txt=File di testo	csv;txt=Fichiers texte
+Keine Datei: diese Datenquelle wird nicht aktualisiert.	No file: this data source is not refreshed.	Sin archivo: este origen de datos no se actualiza.	Nessun file: questa origine dati non viene aggiornata.	Aucun fichier : cette source de données n'est pas actualisée.
+Datei: {}	File: {}	Archivo: {}	File: {}	Fichier : {}
+Datei ändern	Change File	Cambiar archivo	Cambia file	Changer de fichier
+Automatische Aktualisierung	Automatic refresh	Actualización automática	Aggiornamento automatico	Actualisation automatique
+Aktualisieren alle	Refresh every	Actualizar cada	Aggiorna ogni	Actualiser toutes les
+Minuten	minutes	minutos	minuti	minutes
+Benutzerdefinierte Änderungen an Shape-Daten überschreiben	Overwrite user changes to shape data	Sobrescribir los cambios del usuario en los datos de forma	Sovrascrivere le modifiche dell'utente ai dati forma	Remplacer les modifications de l'utilisateur dans les données de forme
+Keine Konflikte	No conflicts	No hay conflictos	Nessun conflitto	Aucun conflit
+Nach dem Aktualisieren stehen hier die Zeilen, die in der Datenquelle fehlen, und die Werte, die Sie selbst geändert haben.	After a refresh, the rows missing from the data source and the values you changed yourself are listed here.	Después de actualizar, aquí aparecen las filas que faltan en el origen de datos y los valores que usted mismo cambió.	Dopo l'aggiornamento qui compaiono le righe mancanti nell'origine dati e i valori modificati manualmente.	Après une actualisation, les lignes absentes de la source de données et les valeurs que vous avez modifiées vous-même s'affichent ici.
+Die Zeile fehlt in „{}“.	The row is missing from “{}”.	La fila falta en «{}».	La riga manca in “{}”.	La ligne est absente de « {} ».
+{}: Ihr Wert „{}“, in der Datenquelle „{}“.	{}: your value “{}”, in the data source “{}”.	{}: su valor «{}», en el origen de datos «{}».	{}: valore proprio “{}”, nell'origine dati “{}”.	{} : votre valeur « {} », dans la source de données « {} ».
+Der Schlüssel „{}“ steht {}-mal in „{}“; die erste Zeile gilt.	The key “{}” appears {} times in “{}”; the first row applies.	La clave «{}» aparece {} veces en «{}»; se usa la primera fila.	La chiave “{}” compare {} volte in “{}”; vale la prima riga.	La clé « {} » apparaît {} fois dans « {} » ; la première ligne s'applique.
+Doppelter Schlüssel	Duplicate key	Clave duplicada	Chiave duplicata	Clé en double
+Nach Aktualisierung automatisch verknüpfen	Automatically Link After Refresh	Vincular automáticamente después de actualizar	Collega automaticamente dopo l'aggiornamento	Lier automatiquement après l'actualisation

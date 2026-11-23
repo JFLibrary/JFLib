@@ -891,6 +891,8 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
     let owner = Owner::Page(page);
     let refs = |keys: &[u64]| -> Vec<ShapeRef> { keys.iter().map(|&k| shape_of(page, k)).collect() };
     let mut select: Option<Vec<u64>> = None;
+    // (JD18, SP-13) the copies of Ctrl + Shift + drag ask for their fields
+    let mut copied: Vec<ShapeRef> = Vec::new();
     let Some(o) = app.opened.as_mut() else { return };
     let r: Result<(), diagram_core::EditError> = match ev {
         SeEv::Select => Ok(()),
@@ -923,6 +925,7 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
                 r.map(|new| {
                     if done {
                         select = Some(new.iter().map(|&s| key_of(s)).collect());
+                        copied = new;
                     }
                 })
             }
@@ -1088,6 +1091,9 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
     }
     if let Some(keys) = select {
         app.se.select(&keys);
+    }
+    if !copied.is_empty() {
+        crate::data_ask::after_drop(app, ui, &copied);
     }
     ui.repass();
 }

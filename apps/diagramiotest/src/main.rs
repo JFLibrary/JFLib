@@ -30,6 +30,9 @@
 //                                         metric and US (templates.rs)
 //   diagramiotest --write-data DIR [--xlsx PATH]   (JD18) jd18-verknuepft.vsdx: a drawing with
 //                                         linked data for the Visio counter-check (data.rs)
+//   diagramiotest --write-link-fixture DIR   (JD18) jd18-link.vsdx and jd18-link.csv, the fixture
+//                                         of JFDiagrammer's data_link.uis and
+//                                         data_refresh_conflict.uis (data_fixture.rs)
 //   diagramiotest --write-vdx DIR        (JD16) the self-written .vdx / .vsx files and the .vsdx /
 //                                         .vssx JFDiagrammer writes from them (vdx.rs)
 //
@@ -92,6 +95,7 @@ mod build;
 mod corpus;
 // (JD18) external data: connections, recordsets, linked shapes
 mod data;
+mod data_fixture;
 mod designs;
 mod drawings;
 mod dump;
@@ -221,6 +225,10 @@ fn run() -> i32 {
     if let Some(dir) = arg(&args, "--write-vdx") {
         // (JD16) the self-written .vdx / .vsx and what JFDiagrammer writes from them
         return vdx::write(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-link-fixture") {
+        // (JD18) the drawing and the text file of JFDiagrammer's data scripts
+        return data_fixture::write(&dir);
     }
     if let Some(dir) = arg(&args, "--write-data") {
         // (JD18) the drawing with linked data for the Visio counter-check

@@ -87,7 +87,7 @@ struct Field {
 }
 
 // a value as text: a text as it is, a number with the region's decimal sign
-fn value_text(doc: &Document, v: Value) -> String {
+pub(crate) fn value_text(doc: &Document, v: Value) -> String {
     match v {
         Value::Text(s) => String::from(doc.str(s)),
         Value::Num(x) => {
@@ -270,7 +270,7 @@ pub(crate) fn pane(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
 }
 
 // a value typed for a field of type `kind` as a formula
-fn formula_for(kind: i32, text: &str) -> String {
+pub(crate) fn formula_for(kind: i32, text: &str) -> String {
     let t = text.trim();
     let number = t.replace(',', ".");
     match kind {
@@ -302,6 +302,8 @@ fn set_value(app: &mut Diagrammer, ui: &mut Ui, shapes: &[ShapeRef], name: &str,
                 Ok(_) | Err(EditError::Guarded) => {}
                 Err(e) => return Err(e),
             }
+            // (JD18, DA-05) a linked value the user changed stays the user's at a refresh
+            diagram_core::data::user_edited(tx, sheet, name)?;
         }
         Ok(())
     });
@@ -526,6 +528,10 @@ fn define_apply(app: &mut Diagrammer, ui: &mut Ui) {
                     match res {
                         Ok(_) | Err(EditError::Guarded) => {}
                         Err(e) => return Err(e),
+                    }
+                    // (JD18, DA-05) as in the pane: the user's value now
+                    if has {
+                        diagram_core::data::user_edited(tx, sheet, &name)?;
                     }
                 }
             }

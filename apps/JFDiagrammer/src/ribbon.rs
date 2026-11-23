@@ -212,7 +212,7 @@ static DESIGN: [Group; 4] = [
 ];
 
 // (JD18) Daten, as Visio's register (FEATURES 3.7); the data graphics wait for JD19
-static REFRESH_MENU: [It; 2] = [C(DATA_REFRESH_ALL), C(DATA_REFRESH)];
+static REFRESH_MENU: [It; 4] = [C(DATA_REFRESH_ALL), C(DATA_REFRESH), Sep, C(DATA_AUTO_LINK_REFRESH)];
 // i18n
 static DATA: [Group; 5] = [
     Group("Externe Daten", 0, &[Col::Big(DATA_QUICK_IMPORT), Col::Big(DATA_CUSTOM_IMPORT), Col::BigSplit(DATA_REFRESH_ALL, &REFRESH_MENU), Col::Big(DATA_TEXT_DRAWING)]),
@@ -327,7 +327,8 @@ pub(crate) fn menu_place(id: u32) -> Option<(Reg, u32)> {
 pub(crate) fn menu_usable(app: &Diagrammer, id: u32) -> Option<bool> {
     let (_, _, items) = menu_of(id)?;
     // a split button's action is a command of its own (Neue Seite, Zeichentools)
-    if matches!(id, NEW_PAGE | DRAW_TOOLS | PASTE | TEXT_BOX | BRING_FRONT | SEND_BACK | FONT_COLOR) {
+    // (JD18) Alle aktualisieren is a row of its own menu: asking the rows would ask it again
+    if matches!(id, NEW_PAGE | DRAW_TOOLS | PASTE | TEXT_BOX | BRING_FRONT | SEND_BACK | FONT_COLOR | DATA_REFRESH_ALL) {
         return None;
     }
     Some(any_enabled(app, items))
