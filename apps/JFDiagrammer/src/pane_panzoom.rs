@@ -6,9 +6,10 @@
 // The overview is the page drawn the way the canvas draws it (PagePaint::thumbnail, kept while the
 // page and its edits stay the same).  On it:
 //   - dragging inside the frame moves the view along (pan);
+//   - (JD15) dragging an edge or a corner of the frame (EDGE_DIP around it) changes the frame's
+//     size, and the canvas zooms to the new frame as it goes (Visio's);
 //   - dragging elsewhere draws a rectangle the canvas then zooms to; a click centres the view there;
 //   - the wheel zooms in and out around the frame's middle.
-// Visio also lets the frame's edges be dragged to zoom; the rectangle does the same here.
 
 use alloc::rc::Rc;
 
@@ -24,6 +25,8 @@ use crate::Diagrammer;
 pub(crate) struct PanZoom {
     thumb: Option<(u32, i32, i32, Rc<Surface>)>,
     drag: Option<Drag>,
+    /// the frame as drawn last (overview px x, y, w, h): the size pointer over its edges
+    frame: Option<[i32; 4]>,
 }
 
 #[derive(Clone, Copy)]
@@ -32,9 +35,41 @@ enum Drag {
     Pan([f32; 2]),
     /// a rectangle from this point (overview px)
     Rect([i32; 2]),
+    /// (JD15) edges of the frame grabbed (1 left, 2 top, 4 right, 8 bottom) and the frame at
+    /// the press (overview px x0, y0, x1, y1)
+    Edge(u8, [f32; 4]),
 }
 
 const AREA_H: i32 = 180;
+// how near to an edge of the frame a press grabs it (DIP)
+const EDGE_DIP: i32 = 4;
+
+// the edges of `frame` (x, y, w, h) a pointer at (mx, my) is on: 1 left, 2 top, 4 right, 8 bottom
+// (a side shorter than three times the reach has none, so a small frame can still be dragged)
+fn edges_at(frame: [i32; 4], mx: i32, my: i32, tol: i32) -> u8 {
+    let (x0, y0, x1, y1) = (frame[0], frame[1], frame[0] + frame[2], frame[1] + frame[3]);
+    if mx < x0 - tol || mx > x1 + tol || my < y0 - tol || my > y1 + tol {
+        return 0;
+    }
+    let mut e = 0;
+    if frame[2] >= 3 * tol {
+        e |= if (mx - x0).abs() <= tol { 1 } else if (mx - x1).abs() <= tol { 4 } else { 0 };
+    }
+    if frame[3] >= 3 * tol {
+        e |= if (my - y0).abs() <= tol { 2 } else if (my - y1).abs() <= tol { 8 } else { 0 };
+    }
+    e
+}
+
+// the size pointer for edges
+fn edge_cursor(e: u8) -> u32 {
+    match e {
+        1 | 4 => CUR_SIZE_WE,
+        2 | 8 => CUR_SIZE_NS,
+        3 | 12 => CUR_SIZE_NWSE,
+        _ => CUR_SIZE_NESW,
+    }
+}
 
 /// the pane
 pub(crate) fn pane(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
@@ -43,6 +78,17 @@ pub(crate) fn pane(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
     let k = app.page_index();
     let paint = viewer::paint(app, k);
     let ver = app.opened.as_ref().map_or(0, |o| viewer::canvas_ver(o.serial, k, o.ed.rev));
+    // (JD15) over an edge of the frame (or dragging one): the size pointer
+    let tol = ui.dp(EDGE_DIP);
+    let (mx, my) = ui.mouse();
+    let hot = match app.panzoom.drag {
+        Some(Drag::Edge(e, _)) => e,
+        Some(_) => 0,
+        None => app.panzoom.frame.map_or(0, |f| edges_at(f, mx, my, tol)),
+    };
+    if hot != 0 {
+        ui.cursor_next(edge_cursor(hot));
+    }
     ui.next_size(-1, AREA_H);
     let inp = ui.canvas(id + 1, None, 0, ver).clone();
     let r = inp.rect;
@@ -74,6 +120,7 @@ pub(crate) fn pane(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
         let b = to_px(view[2], view[3]);
         let accent = ui.color(T_ACCENT);
         let frame = [a[0] as i32, a[1] as i32, (b[0] - a[0]).max(2.0) as i32, (b[1] - a[1]).max(2.0) as i32];
+        app.panzoom.frame = Some(frame);
         ui.clip_push(r[0], r[1], r[2], r[3]);
         ui.cmd_rrect(frame[0], frame[1], frame[2], frame[3], 0, ui.dp(2), (accent & 0x00FF_FFFF) | 0x2000_0000, accent, accent);
         // the pointer, absolute
@@ -82,9 +129,50 @@ pub(crate) fn pane(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
         if inp.pressed & left != 0 && inp.ev & EV_HOVER != 0 {
             let inside = mx >= frame[0] && mx < frame[0] + frame[2] && my >= frame[1] && my < frame[1] + frame[3];
             let c = [(a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5];
-            app.panzoom.drag = Some(if inside { Drag::Pan([mx as f32 - c[0], my as f32 - c[1]]) } else { Drag::Rect([mx, my]) });
+            let e = edges_at(frame, mx, my, tol);
+            app.panzoom.drag = Some(if e != 0 {
+                Drag::Edge(e, [a[0], a[1], b[0], b[1]])
+            } else if inside {
+                Drag::Pan([mx as f32 - c[0], my as f32 - c[1]])
+            } else {
+                Drag::Rect([mx, my])
+            });
         }
         match app.panzoom.drag {
+            // (JD15) an edge: the frame from the press with the grabbed edges at the pointer; the
+            // canvas shows it (its middle, the zoom that fits it in)
+            Some(Drag::Edge(e, f0)) if inp.btn & left != 0 => {
+                let (px, py) = (mx as f32, my as f32);
+                let mut f = f0;
+                let min = 4.0;
+                if e & 1 != 0 {
+                    f[0] = px.min(f[2] - min);
+                }
+                if e & 4 != 0 {
+                    f[2] = px.max(f[0] + min);
+                }
+                if e & 2 != 0 {
+                    f[1] = py.min(f[3] - min);
+                }
+                if e & 8 != 0 {
+                    f[3] = py.max(f[1] + min);
+                }
+                let a0 = to_world(f[0], f[1]);
+                let b0 = to_world(f[2], f[3]);
+                let vp = &mut app.canvas.vp;
+                let dpi = vp.dpi.max(1) as f32 / 96.0;
+                let z = (vp.rect[2] as f32 / ((b0[0] - a0[0]) * dpi)).min(vp.rect[3] as f32 / ((b0[1] - a0[1]) * dpi));
+                if z.is_finite() && z > 0.0 {
+                    let z = z.clamp(ui::Viewport::ZOOM_MIN, ui::Viewport::ZOOM_MAX);
+                    let (cx, cy) = (((a0[0] + b0[0]) * 0.5) as f64, ((a0[1] + b0[1]) * 0.5) as f64);
+                    if (z, cx, cy) != (vp.zoom, vp.cx, vp.cy) {
+                        vp.zoom = z;
+                        vp.cx = cx;
+                        vp.cy = cy;
+                        ui.repass();
+                    }
+                }
+            }
             Some(Drag::Pan(off)) if inp.btn & left != 0 => {
                 let w0 = to_world(mx as f32 - off[0], my as f32 - off[1]);
                 app.canvas.vp.cx = w0[0] as f64;
@@ -122,11 +210,8 @@ pub(crate) fn pane(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
         ui.clip_pop();
         ui.tooltip(t("Ziehen verschiebt die Ansicht, ein Rechteck zoomt dorthin."));
     }
-    let mut z = (app.canvas.vp.zoom * 100.0 + 0.5) as i32;
+    // (JD15) the status bar's slider: 100 % in the middle
     ui.next_size(-1, 0);
-    if ui.slider(id + 2, &mut z, &Range::new(10, 400, 10, 0)) & (EV_ACT | EV_COMMIT) != 0 {
-        app.set_zoom(z);
-    }
-    ui.tooltip(t("Zoom"));
+    crate::panes::zoom_slider_here(app, ui, id + 2);
     ui.box_end();
 }

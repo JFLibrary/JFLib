@@ -72,6 +72,7 @@
 //   src/dlg_field.rs  (JD8 rest) the dialog Feld (fields in the text, TX-06)
 //   src/dlg_link.rs   (JD8 rest) the dialog Hyperlinks, following links, the link pointer
 //   src/dlg_find.rs   (JD8 rest) the dialog Suchen und Ersetzen
+//   src/dlg_snap.rs   (JD15) the dialog Ausrichten und Kleben
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too); templates/ (JD13) the
@@ -125,6 +126,8 @@ mod design_store;
 mod dlg_field;
 mod dlg_find;
 mod dlg_link;
+// (JD15) Ausrichten und Kleben (RA-07)
+mod dlg_snap;
 mod dlg_text;
 mod edit_canvas;
 mod edit_cmds;
@@ -282,6 +285,13 @@ pub(crate) struct Diagrammer {
     pub select: select_type::SelectState,
     /// (JD8 rest) the text, field, link and search commands (cmds_text.rs)
     pub txt: cmds_text::TextCmds,
+    /// (JD15) Ausrichten und Kleben: snapping to the grid (Ausrichten an › Raster), the dialog
+    pub snap_grid: bool,
+    pub snap_dlg: dlg_snap::SnapDialog,
+    /// (JD15, ZF-08) the view of each page of the drawing (serial, page: zoom, middle), the page
+    /// the canvas showed last
+    pub page_views: alloc::vec::Vec<(u32, diagram_core::PageRef, f32, f64, f64)>,
+    pub view_page: Option<(u32, diagram_core::PageRef)>,
 }
 
 impl Diagrammer {
@@ -344,6 +354,10 @@ impl Diagrammer {
             layers: layers::LayerState::default(),
             select: select_type::SelectState::default(),
             txt: cmds_text::TextCmds::default(),
+            snap_grid: true,
+            snap_dlg: dlg_snap::SnapDialog::default(),
+            page_views: alloc::vec::Vec::new(),
+            view_page: None,
         }
     }
 
@@ -497,6 +511,8 @@ impl App for Diagrammer {
         layers::props_dialog(self, ui);
         select_type::dialog(self, ui);
         cmds_text::frame(self, ui);
+        // (JD15) Ausrichten und Kleben
+        dlg_snap::dialog(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

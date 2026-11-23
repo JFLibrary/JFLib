@@ -1,0 +1,81 @@
+#!args apps/JFDiagrammer/tests/snap_glue.vsdx --no-system-fonts
+# JFDiagrammer, JD15 (RA-06, RA-07 with the small part of DM-03): snap_glue.vsdx's rectangle
+# "Ziel" with four connection points (see canvas_glue.uis).  Ansicht › Verbindungspunkte shows
+# the points of every shape while the pointer is elsewhere; the launcher of Ansicht › Visuelle
+# Unterstützung and Alt+F9 open the dialog Ausrichten und Kleben (no silent toggle): its
+# switches are those of the ribbon, OK applies them, Abbrechen does not; Ausrichten off or
+# Raster off moves freely, Kleben off lets an end not glue
+# RA-06: the bottom point's cross (an arm at 779,509) shows with the pointer elsewhere
+move 1100,700
+expect pixel 779 509 #E6EFF8
+click tab:"Ansicht"
+expect checkbox:"Verbindungspunkte" unchecked
+click checkbox:"Verbindungspunkte"
+move 1100,700
+expect pixel 779 509 #3D6FB5
+expect pixel 779 414 #3D6FB5
+click checkbox:"Verbindungspunkte"
+move 1100,700
+expect pixel 779 509 #E6EFF8
+# RA-07: the launcher opens the dialog with the switches as they are
+click button:"Ausrichten und Kleben: Visuelle Unterstützung"
+expect dialog:"Ausrichten und Kleben" exists
+expect checkbox:"Ausrichten" checked
+expect checkbox:"Kleben" checked
+expect checkbox:"Dynamisches Gitter" checked
+expect checkbox:"Raster" checked
+expect checkbox:"Führungslinien" checked
+expect checkbox:"Verbindungspunkte anzeigen" unchecked
+click checkbox:"Dynamisches Gitter"
+click checkbox:"Verbindungspunkte anzeigen"
+click button:"OK"
+expect dialog:"Ausrichten und Kleben" missing
+expect checkbox:"Dynamisches Gitter" unchecked
+expect checkbox:"Verbindungspunkte" checked
+move 1100,700
+expect pixel 779 509 #3D6FB5
+# Alt+F9 opens it too; Abbrechen leaves everything as it was
+key alt+f9
+expect dialog:"Ausrichten und Kleben" exists
+expect checkbox:"Dynamisches Gitter" unchecked
+click checkbox:"Dynamisches Gitter"
+click checkbox:"Verbindungspunkte anzeigen"
+click button:"Abbrechen"
+expect dialog:"Ausrichten und Kleben" missing
+expect checkbox:"Dynamisches Gitter" unchecked
+expect checkbox:"Verbindungspunkte" checked
+# Ausrichten off (its targets grey): a move goes where the pointer went
+key alt+f9
+click checkbox:"Ausrichten"
+expect checkbox:"Raster" disabled
+click button:"OK"
+drag 776,470 783,483
+expect listitem:"Ziel" rect 708 425 151 100
+key ctrl+z
+# Ausrichten on, Raster off: the same
+key alt+f9
+click checkbox:"Ausrichten"
+click checkbox:"Raster"
+click button:"OK"
+drag 776,470 783,483
+expect listitem:"Ziel" rect 708 425 151 100
+key ctrl+z
+# Raster on again: the grid
+key alt+f9
+click checkbox:"Raster"
+click button:"OK"
+drag 776,470 783,483
+expect listitem:"Ziel" rect 701 424 151 101
+key ctrl+z
+# Kleben off: a line's end on the left point does not glue (the line stays when Ziel moves)
+key alt+f9
+click checkbox:"Kleben"
+click button:"OK"
+cmd 4406
+drag 600,300 703,462
+cmd 4400
+wait 600
+click 1100,700
+drag 776,470 776,570
+expect listitem:"Ziel" rect 701 500 151 100
+expect listitem:"Sheet.4" rect 601 299 100 176

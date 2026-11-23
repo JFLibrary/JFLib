@@ -825,3 +825,11 @@ Vertikale Ausrichtung	Vertical alignment	Alineación vertical	Allineamento verti
 Texthintergrund	Text background	Fondo del texto	Sfondo del testo	Arrière-plan du texte
 Keiner	None	Ninguno	Nessuno	Aucun
 Hintergrundfarbe	Background color	Color de fondo	Colore di sfondo	Couleur d'arrière-plan
+# (JD15) the canvas: Ausrichten und Kleben (dlg_snap.rs), the status bar, the options
+Ausrichten|Einrasten	Snap	Ajustar	Aggancia	Magnétisme
+Derzeit aktiv	Currently active	Activo actualmente	Attualmente attivo	Actuellement actif
+Ausrichten an	Snap to	Ajustar a	Aggancia a	Magnétisme vers
+Raster	Grid	Cuadrícula	Griglia	Grille
+Verbindungspunkte anzeigen	Show connection points	Mostrar puntos de conexión	Mostra punti di connessione	Afficher les points de connexion
+Länge: {}  Winkel: {}	Length: {}  Angle: {}	Longitud: {}  Ángulo: {}	Lunghezza: {}  Angolo: {}	Longueur : {}  Angle : {}
+Teilweise umschlossene Shapes auswählen	Select shapes partially within area	Seleccionar formas parcialmente dentro del área	Seleziona forme parzialmente nell'area	Sélectionner les formes partiellement dans la zone

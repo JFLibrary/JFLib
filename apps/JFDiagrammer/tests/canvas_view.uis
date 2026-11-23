@@ -1,0 +1,67 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD15 (SB-04, ZF-08, AB-06): the zoom slider of the status bar has 100 % in the
+# middle (its value is the position 0 .. 1000: the left half 10 .. 100 %, the right half
+# 100 .. 400 %), the pane Verschieben und Zoomen's slider the same; each page keeps its view
+# (zoom and place) while another one is shown and gets it back; in Verschieben und Zoomen
+# dragging an edge or a corner of the frame changes its size and so the zoom
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+key esc
+# SB-04: 66.7 % (the fit), 100 %, 200 %, 50 %
+expect button:"67 %" exists
+expect #22532 value 314
+cmd 5125
+click "100 %"
+click "OK"
+expect button:"100 %" exists
+expect #22532 value 500
+cmd 5125
+click "200 %"
+click "OK"
+expect #22532 value 667
+cmd 5125
+click "50 %"
+click "OK"
+expect #22532 value 222
+cmd 5126
+# ZF-08: a second page with a rectangle at 75 %, moved a step to the left (the view to the
+# right); Seite-1 still has its fit; back on Seite-2 the 75 % and the place come back
+cmd 4608
+expect tab:"Seite-2" selected
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+key esc
+cmd 5132
+cmd 5132
+expect button:"75 %" exists
+key right
+expect listitem:"Sheet.4" rect 339 306 170 113
+click tab:"Seite-1"
+expect button:"67 %" exists
+expect listitem:"Sheet.4" rect 500 324 151 100
+click tab:"Seite-2"
+expect button:"75 %" exists
+expect listitem:"Sheet.4" rect 339 306 170 113
+# the page list of the status bar shows the page with its view too
+click button:"Seite 2 von 2"
+click menuitem:"Seite-1"
+expect button:"67 %" exists
+click button:"Seite 1 von 2"
+click menuitem:"Seite-2"
+expect button:"75 %" exists
+# AB-06: at 200 % the frame is small in the overview; its right edge dragged to the right makes
+# it wider: the zoom goes down, the pane's slider follows
+cmd 5140
+cmd 5125
+click "200 %"
+click "OK"
+expect button:"200 %" exists
+expect #20546 value 667
+drag 1219,278 1255,278
+expect button:"135 %" exists
+expect #20546 value 558
+# its lower left corner dragged out: wider and higher, the zoom down again
+drag 1141,308 1100,340
+expect button:"102 %" exists

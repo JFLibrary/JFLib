@@ -14,6 +14,7 @@
 // What the options do today: the language and the region switch at once (LG-02, LG-07), the
 // theme follows "Design"; the rest is stored and waits for its stage (start screen JD13,
 // AutoRecover JD5, live dynamics and units JD7, undo depth JD2's history in the app).
+// (JD15) Teilweise umschlossene Shapes auswählen works: the marquee takes touched shapes (ZF-06).
 
 use alloc::string::String;
 use base::settings::{Key, Schema, Settings};
@@ -72,12 +73,16 @@ pub(crate) const UNITS: Key<usize> = Key::choice("advanced.units", 0, &[("auto",
     .label("Maßeinheit der Seite");
 pub(crate) const DEV: Key<bool> = Key::bool("advanced.developer", false)
     .label("Im Entwicklermodus ausführen");
+// (JD15, ZF-06) the marquee also takes the shapes it only touches (edit_canvas.rs: SeState::partial)
+pub(crate) const PARTIAL_SELECT: Key<bool> = Key::bool("advanced.partial_select", false)
+    .label("Teilweise umschlossene Shapes auswählen");
 
 static SCHEMA: Schema = Schema::new(1, &[
     THEME.d, USER.d, INITIALS.d, START.d, LIVE.d, TIPS.d,
     FORMAT.d, AUTOREC.d, AUTOREC_MIN.d, DRAWINGS.d, TEMPLATES.d,
     UI_LANG.d, REGION.d,
     LIVE_DYN.d, WHEEL_ZOOM.d, CENTER_ZOOM.d, CONNECT_ARROWS.d, SPLIT_CONN.d, DELETE_CONN.d, ENTER_ENDS.d, UNDO_LEVELS.d, UNITS.d, DEV.d,
+    PARTIAL_SELECT.d,
 ])
 .sections(SECTIONS);
 
