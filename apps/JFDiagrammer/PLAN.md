@@ -311,17 +311,125 @@ Funktionen dahinter fertig sind.
 - Quellen als SVG im App-Ordner.
 - Hängt ab von: nichts außer der Abnahme des Probeblatts.
 
-### Danach: Phase 2b und Phase 3
+### Phase 2b: die P2-Funktionen (JD15–JD25)
 
-- **Phase 2b (P2-Formate und Daten):**
-  - `.vsx`/`.vdx` lesen
-  - `.vss` importieren mit dem lokalen Korpus `context/files/SWDB_DE` (Version 11)
-  - CSV- und XLSX-Leser (IM-10)
-  - Shape-Daten-Dialoge, Kommentare, Datengrafiken, Shape-Berichte
-- **Phase 3 (Shapes):** alle Kategorien aus FEATURES.md Abschnitt 4 in Wellen je Kategorie,
-  Reihenfolge nach Priorität; dazu die eigenen Kategorien aus 4.14.
-- **Umzug:** sobald `diagram_core` und `diagram_io` mit einem jflib-Release auf crates.io sind,
-  zieht die App nach JFLibrary/JFDiagrammer.
+Stand 2026-11-23: In FEATURES.md stehen außerhalb der Schablonen rund 180 P2-Zeilen. Einige davon
+sind schon da, weil frühere Etappen sie mitgenommen haben (z. B. `.vstx` öffnen, JPEG, Textfelder,
+Shape-Daten definieren, Schnellzugriff anpassen). JD15 hält das fest, bevor der Rest beginnt.
+
+#### JD15: Bestandsaufnahme und P1-Abnahme (M)
+
+- Jede P1- und P2-Zeile aus FEATURES.md bekommt einen Stand (fertig, teilweise, fehlt), geprüft
+  in der App und nicht nur im Code. Die Liste liegt als `STATUS.md` neben FEATURES.md, spätere
+  Etappen tragen dort nach.
+- Kleine P1-Lücken schließen, große als eigene Punkte auflisten.
+- Offene Punkte aus Phase 2: die Bemaßung der Rack-Schablone (das Bauwerkzeug schreibt noch keine
+  Textfelder), „Neue Seite“ hinter der aktuellen Seite oder am Ende (Entscheidung des Nutzers).
+
+#### JD16: Ältere XML-Formate und Makro-Teile (M)
+
+- `.vsx` und `.vdx` lesen (DF-20, DF-21), ein eigener Leser für das XML von 2003–2010 auf das
+  vorhandene Modell.
+- `.vsdm` und `.vssm`: den Makro-Teil unverändert durchreichen, nie ausführen (DF-04, DF-07).
+- Dokumenteigenschaften und Fensterzustand (DF-09, DF-10), metrische und US-Varianten (MS-07).
+
+#### JD17: Binäre Schablonen `.vss` importieren (L)
+
+- DF-30 mit dem lokalen Korpus `context/files/SWDB_DE` (DF-34), nur Import.
+- Es gibt keine offene Spezifikation. libvisio darf gelesen, aber nicht übernommen werden.
+- Tests laufen nur, wenn der Korpus da ist; im Repo liegen keine Microsoft-Dateien.
+
+#### JD18: Datenquellen und Verknüpfung (L)
+
+- Ein XLSX-Leser in der Bibliothek (IM-10; JFLib hat noch keinen) und ein CSV-Leser.
+- Daten importieren und mit Shapes verknüpfen, aktualisieren (IM-05, DA-04, DA-05, AS-03, AS-04,
+  DF-12), Register „Daten“ mit externen Daten (RD-02, RD-03, RD-09, RD-10, AB-11).
+- Verbundene Zeichnung aus CSV/Text (IM-08, AS-20), Shape-Daten beim Ablegen abfragen (SP-13).
+
+#### JD19: Datengrafiken und Berichte (L)
+
+- Datengrafiken mit ihren Feldern und der Legende (DA-07, DA-08, ST-08, RD-04, RD-05, RD-07, AB-12).
+- Shape-Berichte samt Definition, Aktualisieren und Export (DA-09, DA-13, AS-05, EX-12, EX-16, RU-06).
+- Hängt ab von: JD18.
+
+#### JD20: Kommentare, Prüfen und Sprache (M)
+
+- Kommentare mit Teil, Bereich und Knopf (HL-04, DF-11, AB-10, UI-33, RU-05).
+- QuickInfo am Shape, Hyperlinkbasis, Link-Verlauf (HL-02, HL-03, HL-06).
+- Rechtschreibprüfung je Sprache über die vorhandene Prüfung der Bibliothek (TX-07, LG-09, RU-01,
+  RU-04, SB-03), Barrierefreiheit (RU-03, UI-17), Optionen der Dokumentprüfung (UI-14).
+
+#### JD21: Verbinder-Automatik und Shape-Operationen (L)
+
+- Linienübergänge (CN-06, bisher grau), automatisch einfügen und löschen, Verbinderwerkzeug
+  (CN-08 bis CN-11), Seite neu layouten mit Auto-Ausrichten (CN-13, CN-14, RW-09).
+- Shape-Operationen: Vereinigen, Kombinieren, Fragmentieren, Schneiden, Subtrahieren (SP-08);
+  zu prüfen, ob die Booleschen Operationen von `lib/geom` passen.
+- Shape ändern, Gruppe öffnen, Ausrichtungsrahmen, Grenzfälle (SP-11, SP-15 bis SP-17).
+- Randmitglieder, zählende Legende (ST-03, ST-09); Shapes nummerieren, Array, Maßlinien (AS-11).
+
+#### JD22: Seiten, Format und Ansicht (M)
+
+- Seitenfarbe, Hintergründe, Rahmen und Titel als Galerien, Seitengröße am Rand ziehen (PG-08 bis
+  PG-14, RW-07, RW-08).
+- Schatten, Format wiederholen, Tabstopps und Textlineal (FM-04, FM-09, KB-18, TX-10, SS-08).
+- Die Untermenüs der Varianten: Farben, Effekte, Verbinder, Schriftarten, Verzierung (TH-05, TH-06;
+  bisher grau).
+- Ansicht: Minisymbolleiste, Text-Zoom, Präsentationsmodus, Stempel, Zeichnung zentrieren,
+  Nullpunkt (ZF-11, ZF-16, ZF-17, ZF-19 bis ZF-21); Navigation, Zeichnungsexplorer, Ebenen-Bereich
+  (AB-07 bis AB-09, RA-01, RA-04, LY-05); Kopf- und Fußzeile beim Drucken (PR-04).
+
+#### JD23: Entwicklertools ohne VBA (L)
+
+- ShapeSheet-Fenster und Formel-Editor (SS-46, FX-16), die übrigen P2-Abschnitte (SS-05, SS-12,
+  SS-13, SS-16, SS-21, SS-22, SS-26, SS-31, SS-33, SS-36, SS-42 bis SS-44) und Funktionen (FX-10,
+  FX-11, FX-12, FX-14).
+- Shape-Design, Schablonen und Master bearbeiten, Dokumentschablone, Formatvorlagen, Muster
+  (RX-03 bis RX-09, RK-08, RK-10, SL-08, SL-10, MS-05, MS-08, MS-11; die Befehle „Schablone
+  bearbeiten“, „Neues Master-Shape“, „Reihenfolge der Schablonen“ sind bisher grau).
+- Verhalten-Assistent ohne Formeln (AS-17), Tastenkürzel der Entwicklertools (KB-17),
+  übersetzte Formelnamen (LG-10).
+
+#### JD24: Prozess und Diagrammprüfung (M)
+
+- Teilprozesse (RP-01, RP-02), Diagrammüberprüfung mit Regelsätzen und Bereich „Probleme“
+  (RP-04 bis RP-06, AB-13). Die Vorlagen aus JD13 bringen schon Regelsätze mit.
+
+#### JD25: Dokument, Fenster, Export und Import (M)
+
+- Dateigröße verringern, persönliche Informationen entfernen, automatisch wiederherstellen,
+  Dokumentschutz (DM-06, DM-07, DM-10, DM-11).
+- Informationen, Befehlssuche, Livevorschau, Hilfe, Fenster-Tastenkürzel (UI-07, UI-32, UI-35,
+  RH-01, KB-14), mehrsprachige Shape-Suche (LG-05), Bildtools (RK-02), die restlichen P2-Befehle
+  der Register Start und Einfügen.
+- EMF und Webseite exportieren, SVG einfügen (EX-07, EX-09, IM-02).
+- Vektordruck unter Windows (bisher Raster mit 300 dpi), falls dafür eine Druckschicht in `plat`
+  entsteht.
+
+### Phase 3: Shapes und Vorlagen P2 (JD26–JD34)
+
+65 Schablonen mit rund 1 200 Shapes und 13 Vorlagen haben Priorität P2. Alle Shapes entstehen neu im
+JFNetworker-Stil über das Bauwerkzeug, je Schablone erst ein Probeblatt für den Nutzer.
+
+| Etappe | Inhalt | Shapes | Vorlagen |
+|---|---|---|---|
+| JD26 Allgemein und Geschäftsgrafiken (M) | SH-003, SH-004, SH-007, SH-030 bis SH-033, SH-041 | ~150 | VL-12, VL-32, VL-38 |
+| JD27 Prozessnotationen (M) | BPMN SH-015 (Typwahl per Kontextmenü), EPK SH-036, Workflow SH-009, SH-023, SH-025 | ~110 | VL-22, VL-23, VL-33 |
+| JD28 Organigramm (M) | SH-049, Ablegen auf Vorgesetzte, Layouts, Assistent (AS-01, DA-11, RK-04); hängt an JD18 | ~10 | VL-30 |
+| JD29 Software und Datenbank (M) | UML SH-251 bis SH-258, Datenbank SH-222 bis SH-227 | ~130 | VL-70, VL-71 |
+| JD30 Elektrotechnik (M) | IEC 60617 in der DIN-EN-Fassung (F14): SH-061, SH-063 | ~90 | VL-40 |
+| JD31 Pläne, Bemaßung, Titelblöcke (L) | SH-171, SH-192, SH-213, SH-267, SH-268, SH-274, SH-276, eigene SH-E03; Maßstab und Bemaßung | ~200 | VL-60, VL-61 |
+| JD32 AWS-Architektur (M) | SH-095 bis SH-121 als Originale (CC BY-ND 2.0, unverändert, mit Namensnennung), per Generator aus dem offiziellen Paket | ~530 | VL-54 |
+| JD33 Zeitachse (S) | SH-266 mit der Mechanik der Zeitachse | ~20 | – |
+| JD34 Eigene Kategorien (M) | SH-E01 Kubernetes, SH-E02 C4, SH-E05 KNX, SH-E08 Flucht- und Rettungspläne, SH-E13 Netzwerk-Dokumentation | offen | – |
+
+Die P3-Schablonen (rund 180) und P3-Vorlagen kommen danach in einem eigenen Plan.
+
+### Umzug
+
+Sobald `diagram_core` und `diagram_io` mit einem jflib-Release auf crates.io sind, zieht die App nach
+JFLibrary/JFDiagrammer. Der gemeinsame Netzwerk-Symbolsatz wird dann ein eigenes Repository, das
+JFNetworker und JFDiagrammer als Submodule einbinden (`symbols/README.md`).
 
 ## Reihenfolge
 
@@ -337,6 +445,13 @@ Gemergt wird nach grünen gezielten Prüfungen, gepusht nach Rückfrage.
 | E | JD7, JD9, JD14 (Rest) | **M2 Editor**: zeichnen, verbinden, speichern; Visio öffnet es |
 | F | JD10, JD11, JD12 (Rest) | Strukturen, Designs, Export |
 | G | JD13, JD8 (Rest) | **M3 P1 komplett** |
+| H | JD15, JD16, JD26 | Bestand, ältere XML-Formate, Geschäftsgrafiken |
+| I | JD17, JD18, JD27 | `.vss`, Daten, Prozessnotationen |
+| J | JD19, JD21, JD29 | Datengrafiken, Verbinder-Automatik, UML |
+| K | JD20, JD22, JD28 | Kommentare, Seiten und Ansicht, Organigramm |
+| L | JD23, JD24, JD30 | Entwicklertools, Prozess, Elektrotechnik |
+| M | JD25, JD31, JD32 | Dokument und Export, Pläne, AWS |
+| N | JD33, JD34 | **M4 P2 komplett** |
 
 ## Fallen
 
@@ -361,6 +476,11 @@ Gemergt wird nach grünen gezielten Prüfungen, gepusht nach Rückfrage.
   `test --quick` prüft das nicht.
 - **Große Zeichnungen:** Tausende Shapes, deshalb rechnet die Engine inkrementell und das Canvas
   nutzt den räumlichen Index.
+- **Fremde Symbole:** AWS-Icons nur unverändert und mit Namensnennung (CC BY-ND 2.0); das offizielle
+  Paket wird erst nach dem Ja des Nutzers geladen. Für die ISO-7010-Zeichen (SH-274, SH-E08) und die
+  Kubernetes-Icons (SH-E01) die Rechte vor dem Zeichnen klären.
+- **Keine App-Assets in der Bibliothek:** JFLib ist öffentlich. Geteilte Assets der eigenen Apps
+  (Symbolsätze) kommen in eigene Repositorys, nicht nach `lib/`.
 
 ## Testen
 
@@ -382,3 +502,4 @@ Gemergt wird nach grünen gezielten Prüfungen, gepusht nach Rückfrage.
 
 1. Kann der Nutzer die Referenz-Exporte und die Visio-Gegenprobe machen, hat er also Visio zur Hand?
 2. Welcher deutsche Begriff ersetzt „AutoVerbinden“? Platzhalter: „Verbindungspfeile“.
+3. Soll „Neue Seite“ wie Visio am Ende anhängen? Bisher fügt sie hinter der aktuellen Seite ein.
