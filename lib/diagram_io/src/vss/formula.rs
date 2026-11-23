@@ -6,20 +6,21 @@
 //   0x60        a string: a byte n, n UTF-16 units, a NUL unit
 //   0x61 0x62   an integer of one / two bytes (0x63: four bytes)
 //   0x75        a cell of the shape's own single-row sections: a byte, the cell's number in the
-//               shape's cell table (OBJECT_CELLS), two bytes, 0x60
+//               shape's cell table (object_cell), two bytes, 0x60
 //   0x74        the same in another shape: those four bytes, then the shape's ID (u32)
 //   0x72        a cell of a row: the row (u32), the section (Visio's section index: 10.. the
 //               Geometry sections, 240 Actions, 242 User ...), the cell, a flag byte
 //   0x70        the same in another shape: the shape's ID (u32) before
-//   0x76        a row of another sheet (17 bytes)
-//   0x80        a function with its usual number of arguments: its ID (u16), two bytes
+//   0x80        a function with its fixed number of arguments: its ID (u16), two bytes
 //   0x81 0x7B   a function with a count of arguments (u32) before its ID
-//   0x7A        a function of one string
-//   0x00..0x1F  operators; 0xE4 the parentheses around the value before
-//   0x90..0x93  the ends of IF, AND, OR ...; 0xA0..0xA3 (+ u32) the jumps of their lazy
-//               arguments, which the text does not show
+//   0x03..0x0E  + - * / ^ & < <= = >= > <>; 0x13 the unary minus; 0xE4 the parentheses around
+//               the value before (Visio keeps them, so no precedence is needed)
+//   0x90        IF of the three values before it; 0x91 AND, 0x92 OR, each with a u32 that counts
+//               their values and jumps (2n - 1); 0x93 and 0xA0..0xA3 (+ u32) the jumps of the
+//               lazy arguments, which the text does not show
 // Anything else, or a table without the name a token needs, leaves the whole formula out: the
-// cell keeps its value (V1), and the reader warns.
+// cell keeps its value (V1), and the reader warns.  The meanings come from evaluating formulas
+// against the values the files store with them and from files Visio wrote from known formulas.
 
 use alloc::format;
 use alloc::string::String;
@@ -74,12 +75,22 @@ pub(super) fn object_cell(n: u16) -> Option<&'static str> {
     })
 }
 
-/// a function's name by its ID
-pub(super) fn function(id: u16) -> Option<&'static str> {
+/// a function's name and its number of arguments (when the token does not count them) by its ID
+pub(super) fn function(id: u16) -> Option<(&'static str, usize)> {
     Some(match id {
-        0x11 => "SQRT",
+        0x11 => ("SQRT", 1),
         _ => return None,
     })
+}
+
+// a call of `name` with the last `n` values as its arguments
+fn call(st: &mut Vec<String>, name: &str, n: usize) -> Option<()> {
+    if n > st.len() {
+        return None;
+    }
+    let args = st.split_off(st.len() - n);
+    st.push(format!("{name}({})", args.join(",")));
+    Some(())
 }
 
 /// the section's name in a reference and the names of its cells by number
@@ -196,8 +207,27 @@ pub(super) fn decode(t: &[u8], names: &dyn Names) -> Option<String> {
             0x80 => {
                 let id = u16at(t, i)?;
                 i += 4;
-                let _ = function(id)?;
-                return None;
+                let (name, n) = function(id)?;
+                call(&mut st, name, n)?;
+            }
+            0x81 | 0x7B => {
+                let n = u32at(t, i)? as usize;
+                let id = u16at(t, i + 4)?;
+                i += 8;
+                let (name, _) = function(id)?;
+                call(&mut st, name, n)?;
+            }
+            0x90 => call(&mut st, "IF", 3)?,
+            0x91 | 0x92 => {
+                let n = (u32at(t, i)? as usize).div_ceil(2);
+                i += 4;
+                call(&mut st, if c == 0x91 { "AND" } else { "OR" }, n)?;
+            }
+            0x93 => {}
+            0xA0..=0xA3 => i += 4,
+            0x13 => {
+                let x = st.pop()?;
+                st.push(format!("-{x}"));
             }
             0xE4 => {
                 let x = st.pop()?;

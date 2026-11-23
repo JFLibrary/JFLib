@@ -290,7 +290,8 @@ pub(crate) fn open_builtin_in(app: &mut Diagrammer, ui: &mut Ui, k: usize, m: Me
     Some(key)
 }
 
-/// open a stencil file in the panel (Schablone öffnen, Backstage › Öffnen of a .vssx)
+/// open a stencil file in the panel (Schablone öffnen, Backstage › Öffnen of a .vssx; JD16 .vsx,
+/// JD17 .vss: read only, never written back)
 pub(crate) fn open_file(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
     let origin = Origin::File(String::from(path));
     if let Some(key) = app.stencils.find(&origin) {
@@ -305,16 +306,21 @@ pub(crate) fn open_file(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
         ui.repass();
         return false;
     };
-    // (JD16) a .vsx by the XML reader of 2003-2010
+    // (JD16) a .vsx by the XML reader of 2003-2010; (JD17) a .vss by the binary one
     match crate::doc_file::read(&bytes, path) {
         Ok(l) if l.doc.kind == DocKind::Stencil => {
+            let warnings = l.warnings.len() + l.more_warnings;
             let key = app.stencils.add(origin, l.doc, &stem, false);
             app.stencils.show(key);
             app.stencils.error = None;
             ui.recent_add(path);
+            // (JD17) converted, import only: the notice says so (NO-12)
+            if crate::doc_file::is_binary(path) {
+                crate::doc_file::binary_notice(app, &name, warnings);
+            }
         }
         Ok(_) => app.stencils.error = Some(tf("„{}“ ist keine Schablone.", &[&name])),
-        Err(e) => app.stencils.error = Some(format!("{} {e}", tf("„{}“ kann nicht geöffnet werden.", &[&name]))),
+        Err(e) => app.stencils.error = Some(format!("{} {}", tf("„{}“ kann nicht geöffnet werden.", &[&name]), crate::doc_file::error_text(&e))),
     }
     ui.repass();
     true
@@ -526,7 +532,7 @@ pub(crate) fn my_files(ui: &Ui) -> Vec<String> {
     let mut v: Vec<String> = Vec::new();
     plat::dir_list(&dir, &mut |name, is_dir, _| {
         let l = name.to_ascii_lowercase();
-        if !is_dir && (l.ends_with(".vssx") || l.ends_with(".vssm") || l.ends_with(".vsx")) && l != "favorites.vssx" {
+        if !is_dir && (l.ends_with(".vssx") || l.ends_with(".vssm") || l.ends_with(".vsx") || l.ends_with(".vss")) && l != "favorites.vssx" {
             v.push(format!("{dir}/{name}"));
         }
     });

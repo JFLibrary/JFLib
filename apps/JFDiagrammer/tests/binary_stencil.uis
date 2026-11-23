@@ -1,0 +1,17 @@
+#!args apps/JFDiagrammer/tests/jd17-schablone.vss --no-system-fonts
+# JFDiagrammer, JD17: a binary stencil of Visio 2003-2010 (DF-30; jd17-schablone.vss is
+# diagramiotest's self-written file, --write-vss) named on the command line goes into the Shapes
+# panel as a stencil, converted from the binary format: import only, never written back (NO-12),
+# the notice under the ribbon says so; its three masters as tiles; a click on a tile and one on
+# the page place it
+expect tab:"jd17-schablone" selected
+expect box:"Hinweise zur Schablone" exists
+expect button:"Kasten" exists
+expect button:"Kreis" exists
+expect button:"Pfeil" exists
+expect text:"Keine Schablone geöffnet." missing
+click button:"Kreis"
+expect button:"Kreis" checked
+click canvas:"Zeichenfläche"
+a11y expect announced "„Kreis“ abgelegt"
+expect listitem:"Kreis" exists

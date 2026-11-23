@@ -1,11 +1,16 @@
 // doc_file -- (JD16) what a drawing file brings besides its pages: Visio's older XML formats
 // (.vdx, .vsx, .vtx: DF-20 .. DF-22), the macro project (.vsdm, .vssm, .vstm: DF-04, DF-07),
-// the document properties on Datei › Info (DF-09) and the window state (DF-10)
+// the document properties on Datei › Info (DF-09) and the window state (DF-10); (JD17) the
+// binary stencils of Visio 2003-2010 (.vss: DF-30), import only (NO-12)
 //
 //   read(bytes, path) -> Result<Loaded, Error>   a file of the VSDX family, or of the XML format
-//                                     of 2003-2010 by its extension (or its first bytes)
+//                                     of 2003-2010 by its extension (or its first bytes), or
+//                                     (JD17) a .vss by its extension
 //   is_xml(path)                      .vdx, .vsx, .vtx: opened, never written back (a save asks
 //                                     for a new name and writes the VSDX family)
+//   is_binary(path)                   (JD17) .vss: the same, a stencil saved is a .vssx
+//   binary_notice(app, name, n)       (JD17) the notice that a .vss was converted (import only)
+//   error_text(e)                     what a read error says (Visio 2000/2002 in words)
 //   ask_macros(app, ui, path)         Speichern in a format without macros while the drawing has a
 //                                     macro project: the question first (DF-04)
 //   dialog(app, ui)                   that question (every pass)
@@ -30,7 +35,7 @@ use diagram_io::props::{self, Props};
 use diagram_io::template::StencilWindow;
 use diagram_io::vsdx::{self, Format, Loaded};
 use diagram_io::windows::{self, DrawingWindow};
-use diagram_io::{stencil, vdx};
+use diagram_io::{stencil, vdx, vss};
 use ui::i18n::{t, tf};
 use ui::*;
 
@@ -64,14 +69,58 @@ fn ext(path: &str) -> Option<&str> {
     name.rsplit_once('.').map(|x| x.1)
 }
 
+/// (JD17) whether a file name is a binary stencil of Visio 2003-2010 (.vss; .vsd and .vst are
+/// not opened yet: DF-31, DF-32)
+pub(crate) fn is_binary(path: &str) -> bool {
+    ext(path).and_then(vss::kind_of) == Some(DocKind::Stencil)
+}
+
 /// read a drawing, stencil or template: the XML format of 2003-2010 by its extension (or, for
-/// another name, by its first bytes), else the VSDX family
+/// another name, by its first bytes), (JD17) a binary stencil by its extension, else the VSDX
+/// family
 pub(crate) fn read(bytes: &[u8], path: &str) -> Result<Loaded, vsdx::Error> {
+    // (JD17) a .vss by the reader of the binary formats, import only (DF-30, NO-12)
+    if is_binary(path) {
+        return vss::read(bytes, DocKind::Stencil, &vsdx::Limits::VSDX);
+    }
     let kind = ext(path).and_then(vdx::kind_of);
     match kind {
         Some(k) => vdx::read(bytes, k, &vsdx::Limits::VSDX),
         None if vdx::sniff(bytes) => vdx::read(bytes, DocKind::Drawing, &vsdx::Limits::VSDX),
         None => vsdx::read(bytes, &vsdx::Limits::VSDX),
+    }
+}
+
+/// what a read error says: a version the binary reader does not take in words, else the
+/// reader's own text
+pub(crate) fn error_text(e: &vsdx::Error) -> String {
+    match e {
+        vsdx::Error::Binary { what, .. } if what.starts_with("version 6") => String::from(t("Dateien von Visio 2000/2002 (Version 6) werden noch nicht gelesen.")),
+        vsdx::Error::Binary { what: "version", .. } => String::from(t("Diese Version des Binärformats von Visio wird nicht gelesen.")),
+        _ => format!("{e}"),
+    }
+}
+
+/// (JD17) a stencil read from a .vss: the notice under the ribbon says it was converted from the
+/// binary format (import only, NO-12) and how many notes the reader had; a notice the drawing
+/// shows already gets it added
+pub(crate) fn binary_notice(app: &mut Diagrammer, name: &str, warnings: usize) {
+    let mut msg = tf("„{}“ wurde aus dem Binärformat von Visio 2003–2010 umgewandelt (nur Import); gespeichert wird als .vssx.", &[name]);
+    if warnings > 0 {
+        msg.push(' ');
+        msg.push_str(&tf("{} Hinweise beim Lesen.", &[&format!("{warnings}")]));
+    }
+    match app.opened.as_mut() {
+        Some(o) => match o.notice.as_mut() {
+            Some((_, m)) if !m.contains(&msg) => {
+                m.push(' ');
+                m.push_str(&msg);
+            }
+            Some(_) => {}
+            None => o.notice = Some((String::from(t("Hinweise zur Schablone")), msg)),
+        },
+        // no drawing (cannot happen: the panel is shown with one): the panel's message
+        None => app.stencils.error = Some(msg),
     }
 }
 
