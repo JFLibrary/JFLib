@@ -29,4 +29,14 @@ pub(crate) fn has_conflicts(_app: &Diagrammer) -> bool {
 }
 
 /// every pass: the dialogs, the interval refresh
-pub(crate) fn dialog(_app: &mut Diagrammer, _ui: &mut Ui) {}
+pub(crate) fn dialog(app: &mut Diagrammer, _ui: &mut Ui) {
+    // STUB: keeps build_rs's -D dead-code quiet until the real file comes
+    let _ = &app.drefresh;
+    let _ = crate::data_cmds::now_text;
+    let _ = crate::data_cmds::recordset_shown;
+    match crate::data_source::read(&diagram_core::data::Source::Other) {
+        Ok(l) => drop((l.headers, l.rows)),
+        Err(crate::data_source::ReadError::Invalid(m)) => drop(m),
+        Err(_) => {}
+    }
+}

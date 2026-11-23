@@ -326,8 +326,9 @@ pub(crate) fn menu_place(id: u32) -> Option<(Reg, u32)> {
 /// no menu of the ribbon)
 pub(crate) fn menu_usable(app: &Diagrammer, id: u32) -> Option<bool> {
     let (_, _, items) = menu_of(id)?;
-    // a split button's action is a command of its own (Neue Seite, Zeichentools)
-    if matches!(id, NEW_PAGE | DRAW_TOOLS | PASTE | TEXT_BOX | BRING_FRONT | SEND_BACK | FONT_COLOR) {
+    // a split button's action is a command of its own (Neue Seite, Zeichentools; JD18: Alle
+    // aktualisieren, whose menu holds itself -- asking its menu would ask itself again)
+    if matches!(id, NEW_PAGE | DRAW_TOOLS | PASTE | TEXT_BOX | BRING_FRONT | SEND_BACK | FONT_COLOR | DATA_REFRESH_ALL) {
         return None;
     }
     Some(any_enabled(app, items))
