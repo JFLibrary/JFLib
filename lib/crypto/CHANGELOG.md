@@ -17,6 +17,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - ECDSA signing on P-256 and P-384 in constant time: ecdsa::sign(curve, secret, hash, digest, extra) with deterministic nonces (RFC 6979, the digest's hash for HMAC_DRBG); extra bytes, when given, go into the nonce as RFC 6979 3.6's additional data and hedge it against faults and a poor random source. ecdsa::public_key and secret_from; verify_p1363 for r || s signatures (IEEE P1363: JOSE, COSE, WebCrypto), der_from_p1363 and p1363_from_der (strict DER) to convert. The same signatures as OpenSSL's deterministic ECDSA, byte for byte
 - RSA-PSS signing: rsa::PrivateKey::sign_pss(hash, digest, salt) (EMSA-PSS with MGF1 of the same hash, the caller's salt; an empty salt gives the same signature each time), with the constant-time exponentiation of sign_pkcs1
 - ML-KEM (FIPS 203, lib/crypto/mlkem.rs): mlkem::keygen(params, seed) from d || z, encaps(params, ek, m) with the encapsulation key's modulus check, decaps(params, dk, ct) with the decapsulation key's hash check and implicit rejection (a ciphertext that does not re-encrypt to itself gives J(z || c)); Params::MlKem512, MlKem768, MlKem1024 and their ek_len, dk_len, ct_len. No branch or table lookup on secrets, and no division: reductions and Compress are Barrett's with masked corrections (KyberSlash)
+- `rsa::PrivateKey::dp()` and `dq()`: d mod (p - 1) and d mod (q - 1) for PKCS #1's RSAPrivateKey, one bit at a time with the subtraction kept by mask
+
+### Fixed
+
+- `rsa::PrivateKey::iqmp` of a key whose q has more 64-bit words than p: q is reduced mod p first; the words above p's length were dropped, and the coefficient a key file keeps was wrong
 
 ### Security
 

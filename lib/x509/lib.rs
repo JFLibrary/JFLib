@@ -13,7 +13,9 @@
 //   cert.verify(alg, data, sig)             a signature made with the certificate's key
 //   verify_chain(&[leaf, ...], &anchors, now, name, usage) -> Result<(), String>   builds a
 //                                           path through the given intermediates to an anchor
-//   CertBuilder { .. }.sign(&issuer_cert_or_self, &issuer_key) -> DER
+//   CertBuilder { .. }.sign(&issuer_cert_or_self, &issuer_key) -> DER     (Ed25519)
+//   CertBuilder { spki, .. }.sign_key(issuer, &PrivateKey, extra) -> DER   any key, signed by any
+//   PrivateKey: Ed25519, ECDSA (P-256 / P-384), RSA; PKCS #8 / SEC 1 / PKCS #1 (key.rs)
 //
 // Not checked: revocation (CRL / OCSP), certificate policies.  Name constraints are processed
 // for DNS names, IP addresses, e-mail addresses (rfc822Name), URIs (their host) and directory
@@ -28,8 +30,10 @@ extern crate alloc;
 
 pub mod der;
 mod ip;
+mod key;
 
 pub use ip::IpAddr;
+pub use key::{spki_of, PrivateKey};
 
 use alloc::format;
 use alloc::string::String;
@@ -93,7 +97,7 @@ pub enum PubKey {
     #[default]
     Other,
     Ed25519([u8; 32]),
-    /// modulus and exponent, big-endian
+    /// modulus and exponent, big-endian without leading zero bytes
     Rsa { n: Vec<u8>, e: Vec<u8> },
     /// an uncompressed point (04 || x || y)
     Ec { curve: Curve, point: Vec<u8> },
@@ -335,7 +339,7 @@ fn pub_key(alg: &[u8], key: &[u8]) -> PubKey {
             let mut k = Der::new(key).seq()?;
             let n = k.read(der::INTEGER)?;
             let e = k.read(der::INTEGER)?;
-            (k.is_empty() && n.first().is_some_and(|b| b & 0x80 == 0)).then(|| PubKey::Rsa { n: Vec::from(n), e: Vec::from(e) })
+            (k.is_empty() && n.first().is_some_and(|b| b & 0x80 == 0)).then(|| PubKey::Rsa { n: Vec::from(strip_zeros(n)), e: Vec::from(strip_zeros(e)) })
         };
         return rsa().unwrap_or(PubKey::Other);
     }
@@ -463,6 +467,11 @@ fn rsa_key(n: &[u8], e: &[u8]) -> Option<crypto::rsa::PublicKey> {
 
 /// the content of a non-negative DER INTEGER -> its big-endian bytes without the sign byte;
 /// None when it is empty, negative or not in the shortest form (a 00 before a byte below 0x80)
+/// the bytes after the leading zero bytes of a number (all of them for 0: no bytes)
+fn strip_zeros(b: &[u8]) -> &[u8] {
+    &b[b.iter().position(|&x| x != 0).unwrap_or(b.len())..]
+}
+
 fn der_unsigned(b: &[u8]) -> Option<&[u8]> {
     match b {
         [] => None,
@@ -1029,6 +1038,28 @@ pub struct CertBuilder {
     pub ips: Vec<IpAddr>,
     pub server_auth: bool,
     pub client_auth: bool,
+    /// the subject's key as a SubjectPublicKeyInfo (PrivateKey::spki, spki_of); empty: the
+    /// Ed25519 key `public_key`
+    pub spki: Vec<u8>,
+}
+
+/// the AlgorithmIdentifier of a signature (None for PSS, which certificates here do not use)
+fn alg_id(alg: SigAlg) -> Option<Vec<u8>> {
+    let hash_oid = |h: HashAlg, rsa: bool| match (h, rsa) {
+        (HashAlg::Sha256, true) => Some(OID_RSA_SHA256),
+        (HashAlg::Sha384, true) => Some(OID_RSA_SHA384),
+        (HashAlg::Sha512, true) => Some(OID_RSA_SHA512),
+        (HashAlg::Sha256, false) => Some(OID_ECDSA_SHA256),
+        (HashAlg::Sha384, false) => Some(OID_ECDSA_SHA384),
+        (HashAlg::Sha512, false) => Some(OID_ECDSA_SHA512),
+        _ => None,
+    };
+    match alg {
+        SigAlg::Ed25519 => Some(der::seq(&[&der::oid(OID_ED25519)])),
+        SigAlg::Ecdsa(h) => Some(der::seq(&[&der::oid(hash_oid(h, false)?)])),
+        SigAlg::RsaPkcs1(h) => Some(der::seq(&[&der::oid(hash_oid(h, true)?), &[der::NULL, 0]])),
+        _ => None,
+    }
 }
 
 /// a DER Extension (oid, the critical flag, the DER value) for CertBuilder::sign_ext
@@ -1048,13 +1079,33 @@ impl CertBuilder {
     /// replaces that one (basic constraints without a path length, other key usages)
     pub fn sign_ext(&self, issuer: Option<&Cert>, key: &Keypair, extra: &[Vec<u8>]) -> Vec<u8> {
         let alg = der::seq(&[&der::oid(OID_ED25519)]);
+        self.build(issuer, &alg, extra, &mut |tbs| Some(Vec::from(&key.sign(tbs)[..]))).unwrap_or_default()
+    }
+
+    /// the DER certificate for the key `spki` (any key), signed by `key` (any key: ECDSA with
+    /// the hash of its curve, RSA with PKCS #1 v1.5 and SHA-256, Ed25519) with further
+    /// extensions as sign_ext; None when `spki` is not a SubjectPublicKeyInfo
+    pub fn sign_key(&self, issuer: Option<&Cert>, key: &PrivateKey, extra: &[Vec<u8>]) -> Option<Vec<u8>> {
+        let alg = key.cert_alg();
+        let id = alg_id(alg)?;
+        self.build(issuer, &id, extra, &mut |tbs| key.sign(alg, tbs, &[]))
+    }
+
+    fn build(&self, issuer: Option<&Cert>, alg: &[u8], extra: &[Vec<u8>], sign: &mut dyn FnMut(&[u8]) -> Option<Vec<u8>>) -> Option<Vec<u8>> {
         let mut serial = self.serial;
         serial[0] &= 0x7f; // positive
         let subject = name(&self.cn, &self.org);
         let issuer_name = issuer.map_or(subject.clone(), |i| i.subject.clone());
         let validity = der::seq(&[&encode_time(self.not_before), &encode_time(self.not_after)]);
-        let spki = der::seq(&[&alg, &der::bits(&self.public_key)]);
-        let ski = crypto::sha256(&self.public_key);
+        let (spki, key_bits) = if self.spki.is_empty() {
+            (der::seq(&[&der::seq(&[&der::oid(OID_ED25519)]), &der::bits(&self.public_key)]), Vec::from(&self.public_key[..]))
+        } else {
+            let mut d = Der::new(&self.spki).seq()?;
+            d.read(der::SEQUENCE)?;
+            let bits = Vec::from(d.bits()?);
+            (self.spki.clone(), bits)
+        };
+        let ski = crypto::sha256(&key_bits);
         let mut exts: Vec<Vec<u8>> = Vec::new();
         if self.is_ca {
             exts.push(ext(OID_BASIC, true, &der::seq(&[&der::boolean(true), &der::small_int(0)])));
@@ -1096,15 +1147,15 @@ impl CertBuilder {
         let tbs = der::seq(&[
             &der::explicit(0, &der::small_int(2)),
             &der::int_u(&serial),
-            &alg,
+            alg,
             &issuer_name,
             &validity,
             &subject,
             &spki,
             &der::explicit(3, &der::seq(&ext_parts)),
         ]);
-        let sig = key.sign(&tbs);
-        der::seq(&[&tbs, &alg, &der::bits(&sig)])
+        let sig = sign(&tbs)?;
+        Some(der::seq(&[&tbs, alg, &der::bits(&sig)]))
     }
 }
 

@@ -2798,13 +2798,16 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
 * `netio::Client` / `client::Session` -- requests with timeouts and size limits, kept-alive
   sessions; `with_connector(netio::trust::connector(..))` for https to a server with its own CA
   (a CA file, a pinned fingerprint, or trust on first use).
-* `netio::tls` -- TLS 1.3 (ChaCha20-Poly1305, X25519, Ed25519 certificates, mutual
-  authentication); `netio::x509` builds and checks the certificates of a private CA
-  (`CertBuilder::sign_ext` adds or replaces extensions: name constraints, a CA's purposes).
+* `netio::tls` -- TLS 1.3 servers and clients (ChaCha20-Poly1305, AES-GCM; X25519MLKEM768,
+  X25519, P-256, P-384; Ed25519, ECDSA and RSA certificates and keys, mutual authentication),
+  certificates by SNI (`ServerConfig::identities`, `select`), ALPN (`ClientConfig::alpn`,
+  `ServerConfig::alpn`); `Identity::from_pem(chain, key)` reads what a CA hands out (PKCS #8,
+  SEC 1, PKCS #1). `netio::x509` builds and checks the certificates of a private CA
+  (`CertBuilder::sign_key` with any key, `sign_ext` adds or replaces extensions: name
+  constraints, a CA's purposes; `x509::PrivateKey`).
   The chain check honours name constraints for wildcards by the names they stand for and the
   extended key usage of every CA on the path (a CA for client certificates certifies no server).
-  `Trust::System(extra)` connects to public servers: TLS 1.3 (AES-GCM or ChaCha20, X25519 or
-  P-256) or TLS 1.2 with ECDHE, RSA / ECDSA / Ed25519 certificates, the chain built and checked
+  `Trust::System(extra)` connects to public servers: TLS 1.3 or TLS 1.2 with ECDHE, the chain built and checked
   against the system's authorities (Windows CryptoAPI, Linux CA bundle) and extra CAs;
   `netio::trust::system_connector(extra)` gives the connector for `Client`.
 * `netio::smtp::send(&SmtpConfig, &Mail)` -- e-mail (STARTTLS, TLS, or plain to any server

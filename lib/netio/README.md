@@ -58,22 +58,37 @@ let server = Server::start(&addr, ServerConfig::default(), handler); // NetResul
 
 ## TLS and certificates
 
-Between an app's own servers and clients, `netio::tls` speaks TLS 1.3 on both sides with
-ChaCha20-Poly1305, X25519 and Ed25519 certificates of the app's own certificate authority,
-mutual authentication, HelloRetryRequest and key updates. The server also takes AES-128-GCM and
-P-256 key shares, as RFC 8446 requires of every TLS 1.3 implementation; its certificate is
-Ed25519, so browsers, which do not take Ed25519 certificates, cannot use it yet. A client that talks to public servers
+`netio::tls` speaks TLS 1.3 as a server and a client with ChaCha20-Poly1305, AES-128-GCM and
+AES-256-GCM; the key exchange X25519MLKEM768 (the post-quantum hybrid that browsers and
+Cloudflare use; a client sends it first, with X25519 besides), X25519, P-256, P-384 and the
+hybrids SecP256r1MLKEM768 and SecP384r1MLKEM1024; certificates and keys of Ed25519, ECDSA (P-256,
+P-384) and RSA, so the same server serves browsers with the certificate of a public CA and an
+app's own agents with certificates of its own CA. A key comes from PEM or DER as OpenSSL and the
+CAs write it (`Identity::from_pem`: PKCS #8, SEC 1, PKCS #1). The server picks its certificate by
+the name the client asks for (SNI) and by the signatures it takes, or by a choice of the program's
+own (`ServerConfig::select`: certificates renewed while it runs), and both sides agree on the
+application protocol (ALPN; https offers http/1.1). Mutual authentication works with every kind
+of key, HelloRetryRequest and key updates both ways. A client that talks to public servers
 (`Trust::System`, or `Trust::Custom` with a check of the program's own: a PKI of its own, pinning,
-Certificate Transparency) also offers AES-128-GCM, RSA and ECDSA certificates and the P-256 key exchange,
-and falls back to TLS 1.2 with ECDHE and AEAD suites only, the extended master secret (when the
-server has it; without resumption and renegotiation a server without it is safe to take) and
-the TLS 1.3 downgrade check; connections between an app's own parts never fall back. Not here:
-session resumption, 0-RTT, renegotiation and revocation checks. The server is checked against
-tlsfuzzer, the client against TLS-Anvil
+Certificate Transparency) also falls back to TLS 1.2 with ECDHE and AEAD suites only, the extended
+master secret (when the server has it; without resumption and renegotiation a server without it is
+safe to take) and the TLS 1.3 downgrade check; other connections never fall back. Not here yet:
+session resumption, 0-RTT, OCSP stapling; not here at all: renegotiation. The server is checked
+against tlsfuzzer with RSA, ECDSA and Ed25519 certificates and against OpenSSL's client, the
+client against TLS-Anvil and OpenSSL's server
 ([docs/EXTERNAL_SUITES.md](https://github.com/JFLibrary/JFLib/blob/main/docs/EXTERNAL_SUITES.md)).
 
+```rust
+use jflib::netio::tls::{self, Identity, ServerConfig};
+
+// a certificate chain and its key as a CA hands them out (PEM), HTTP/1.1 by ALPN
+let identity = Identity::from_pem(&chain_pem, &key_pem)?; // Result<Identity, String>
+let cfg = ServerConfig { alpn: vec![String::from("http/1.1")], ..ServerConfig::new(identity) };
+let tls = tls::accept(Box::new(tcp), cfg.clone()); // Result<TlsStream, TlsError>
+```
+
 `netio::x509` (the crate [`jflib-x509`](https://docs.rs/jflib-x509), which netpkt shares) parses
-certificates strictly, builds and signs those of a private Ed25519 CA, and
+certificates strictly, builds and signs certificates of a private CA with any of these keys, and
 verifies chains up to a trusted anchor, name constraints included. For https to a server with
 its own CA, `trust::connector` trusts a CA the app knows or one with a pinned fingerprint, or
 learns the CA on the first connection and hands it back for the user to decide, the way SSH

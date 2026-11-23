@@ -213,6 +213,8 @@ const TARGETS: &[&str] = &[
     #[cfg(feature = "netio")]
     "pem_pkcs8_key",
     #[cfg(feature = "netio")]
+    "pem_pkcs8_ec_key",
+    #[cfg(feature = "netio")]
     "ssh_private_key",
 ];
 
@@ -553,6 +555,18 @@ fn prepare_from(name: &str, s: Vec<u8>) -> Op {
             Box::new(move || {
                 let der = netio::pem::decode(black_box(&text), "PRIVATE KEY").expect("pem");
                 black_box(netio::x509::ed25519_from_pkcs8(&der));
+            })
+        }
+        // an ECDSA P-256 key from its PEM file (PKCS #8, as OpenSSL and the ACME clients write
+        // it): read, checked to be in [1, n - 1], its public key computed and compared
+        #[cfg(feature = "netio")]
+        "pem_pkcs8_ec_key" => {
+            let key = netio::x509::PrivateKey::ecdsa(crypto::ecdsa::Curve::P256, &p256_scalar(&s)).expect("a P-256 secret");
+            let mut text = netio::pem::encode("PRIVATE KEY", &key.to_pkcs8().expect("pkcs8"));
+            public_layout(&mut text);
+            Box::new(move || {
+                let der = netio::pem::decode(black_box(&text), "PRIVATE KEY").expect("pem");
+                black_box(netio::x509::PrivateKey::from_der(&der).is_some());
             })
         }
         // an OpenSSH key file (netio's SSH client logs in with it)

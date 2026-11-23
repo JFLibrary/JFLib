@@ -83,13 +83,13 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
   <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [p384.rs](#cryptop384rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [sha3.rs](#cryptosha3rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs) · [md5.rs](#cryptomd5rs) · [mlkem.rs](#cryptomlkemrs) · [eappwd.rs](#cryptoeappwdrs)
 - [x509](#x509) -- X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)
-  <br>[lib.rs](#x509-crate-root) · [der.rs](#x509derrs) · [ip.rs](#x509iprs)
+  <br>[lib.rs](#x509-crate-root) · [der.rs](#x509derrs) · [ip.rs](#x509iprs) · [key.rs](#x509keyrs)
 - [compress](#compress) -- DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids
   <br>[lib.rs](#compress-crate-root) · [brotli/mod.rs](#compressbrotlimodrs) · [brotli/enc.rs](#compressbrotliencrs) · [brotli/sdec.rs](#compressbrotlisdecrs) · [brotli/senc.rs](#compressbrotlisencrs) · [checksum.rs](#compresschecksumrs) · [deflate/mod.rs](#compressdeflatemodrs) · [deflate/dec.rs](#compressdeflatedecrs) · [deflate/enc.rs](#compressdeflateencrs) · [deflate/sdec.rs](#compressdeflatesdecrs) · [gzip.rs](#compressgziprs) · [lz4.rs](#compresslz4rs) · [stream.rs](#compressstreamrs) · [xxh.rs](#compressxxhrs) · [zlib.rs](#compresszlibrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/dict.rs](#compresszstddictrs) · [zstd/enc.rs](#compresszstdencrs) · [zstd/sdec.rs](#compresszstdsdecrs) · [zstd/senc.rs](#compresszstdsencrs)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery, secondary indexes, encryption at rest
   <br>[lib.rs](#datastore-crate-root) · [index.rs](#datastoreindexrs) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
-  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs)
+  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/kx.rs](#netiotlskxrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng
   <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs) · [uri.rs](#netpkturirs) · [ssh.rs](#netpktsshrs) · [snmpv3.rs](#netpktsnmpv3rs) · [eap.rs](#netpkteaprs) · [imap.rs](#netpktimaprs) · [cookie.rs](#netpktcookiers) · [x509.rs](#netpktx509rs) · [tls.rs](#netpkttlsrs)
 - [eapm](#eapm) -- EAP-MD5 and EAP-PWD as peer and server state machines without I/O
@@ -42832,6 +42832,9 @@ and PSS signing, key generation
                                             caller's salt (hash.len() random bytes, as TLS 1.3
                                             and X.509 use; empty: the same signature each time)
   key.n() / e() / d() / p() / q() / iqmp()  big-endian without leading zeros
+  key.dp() / dq()                           d mod (p - 1), d mod (q - 1) (PKCS #1's
+                                            RSAPrivateKey; one bit of d at a time, the
+                                            subtraction kept by mask)
 
 Public operations are variable time (that is fine for them).  Signing uses pow_ct; generate is
 variable time and meant for simulators and tests, where the random bytes are no secret either.
@@ -42871,7 +42874,12 @@ variable time and meant for simulators and tests, where the random bytes are no 
 - **`fn p(&self) -> &[u8]`**
 - **`fn q(&self) -> &[u8]`**
 - **`fn iqmp(&self) -> Vec<u8>`**
-  q^-1 mod p, big-endian (what key files keep beside the primes; p > q)
+  q^-1 mod p, big-endian (what key files keep beside the primes): q is reduced mod p
+  first (a masked remainder), so the primes may come in either order and of any lengths
+- **`fn dp(&self) -> Vec<u8>`**
+  d mod (p - 1)
+- **`fn dq(&self) -> Vec<u8>`**
+  d mod (q - 1)
 - **`fn public(&self) -> Option<PublicKey>`**
   the public half
 - **`fn sign_pkcs1(&self, hash: HashAlg, digest: &[u8]) -> Option<Vec<u8>>`**
@@ -43236,7 +43244,9 @@ SHA-256 / 384 / 512), parsed strictly; no I/O, no clock (the caller passes the t
   cert.verify(alg, data, sig)             a signature made with the certificate's key
   verify_chain(&[leaf, ...], &anchors, now, name, usage) -> Result<(), String>   builds a
                                           path through the given intermediates to an anchor
-  CertBuilder { .. }.sign(&issuer_cert_or_self, &issuer_key) -> DER
+  CertBuilder { .. }.sign(&issuer_cert_or_self, &issuer_key) -> DER     (Ed25519)
+  CertBuilder { spki, .. }.sign_key(issuer, &PrivateKey, extra) -> DER   any key, signed by any
+  PrivateKey: Ed25519, ECDSA (P-256 / P-384), RSA; PKCS #8 / SEC 1 / PKCS #1 (key.rs)
 
 Not checked: revocation (CRL / OCSP), certificate policies.  Name constraints are processed
 for DNS names, IP addresses, e-mail addresses (rfc822Name), URIs (their host) and directory
@@ -43263,7 +43273,7 @@ KU_CRL_SIGN: u8 = 0x02
   a public key
   - `Other` -- a key type this code does not use
   - `Ed25519([u8; 32])`
-  - `Rsa { n: Vec<u8>, e: Vec<u8> }` -- modulus and exponent, big-endian
+  - `Rsa { n: Vec<u8>, e: Vec<u8> }` -- modulus and exponent, big-endian without leading zero bytes
   - `Ec { curve: Curve, point: Vec<u8> }` -- an uncompressed point (04 || x || y)
 
 - **`enum SigAlg`**
@@ -43366,6 +43376,8 @@ KU_CRL_SIGN: u8 = 0x02
   - `ips: Vec<IpAddr>`
   - `server_auth: bool`
   - `client_auth: bool`
+  - `spki: Vec<u8>` -- the subject's key as a SubjectPublicKeyInfo (PrivateKey::spki, spki_of); empty: the
+    Ed25519 key `public_key`
 
 - **`fn extension(oid: &[u64], critical: bool, value: &[u8]) -> Vec<u8>`**
   a DER Extension (oid, the critical flag, the DER value) for CertBuilder::sign_ext
@@ -43379,6 +43391,10 @@ KU_CRL_SIGN: u8 = 0x02
   sign with further extensions (each one from `extension`: name constraints, a CA's
   extended key usage ...); one with the OID of an extension the builder writes itself
   replaces that one (basic constraints without a path length, other key usages)
+- **`fn sign_key(&self, issuer: Option<&Cert>, key: &PrivateKey, extra: &[Vec<u8>]) -> Option<Vec<u8>>`**
+  the DER certificate for the key `spki` (any key), signed by `key` (any key: ECDSA with
+  the hash of its curve, RSA with PKCS #1 v1.5 and SHA-256, Ed25519) with further
+  extensions as sign_ext; None when `spki` is not a SubjectPublicKeyInfo
 
 - **`fn ed25519_pkcs8(seed: &[u8; 32]) -> Vec<u8>`**
   the PKCS#8 form of an Ed25519 private key (for interoperable PEM files)
@@ -43498,6 +43514,72 @@ plain octets with a parser and the text form of RFC 5952; the same shape as plat
   the address of 4 or 16 octets (None for another length)
 - **`fn octets(&self) -> &[u8]`**
   its 4 or 16 octets
+
+### `x509/key.rs`
+
+Source: [`lib/x509/key.rs`](../lib/x509/key.rs)
+
+```text
+key -- private keys that sign: Ed25519, ECDSA on P-256 / P-384 and RSA
+
+  PrivateKey::from(ed25519::Keypair)        PrivateKey::ecdsa(curve, secret)
+  PrivateKey::from_der(der)                 PKCS #8 (RFC 5958: Ed25519, EC, RSA), SEC 1's
+                                            ECPrivateKey (RFC 5915), PKCS #1's RSAPrivateKey
+                                            (RFC 8017 A.1.2); not encrypted ones
+  key.to_pkcs8() -> Option<DER>             to store it (secret)
+  key.public_key() -> PubKey                key.spki() -> SubjectPublicKeyInfo (DER)
+  key.sign(alg, data, random) -> Option<signature>   Ed25519; ECDSA (DER, RFC 6979, `random`
+                                            mixed in as extra entropy); RSA PKCS #1 v1.5 or PSS
+                                            (the salt from `random`)
+  key.cert_alg()                            what it signs certificates with
+
+An ECDSA key is read without a branch on its bytes and checked to be in [1, n - 1]; a public
+key stored with it must be its own.  An RSA key is read once (its numbers are checked against
+each other in variable time, as a program does at start), then signs in constant time.
+```
+
+- **`struct PrivateKey`**
+  a private key that signs (Ed25519, ECDSA on P-256 or P-384, RSA)
+
+**`impl PrivateKey`**
+
+- **`fn ecdsa(curve: Curve, secret: &[u8]) -> Option<PrivateKey>`**
+  an ECDSA key from its secret scalar (curve.bytes() big-endian bytes in [1, n - 1])
+- **`fn generate_ecdsa(curve: Curve, rand: &mut dyn FnMut(&mut [u8])) -> PrivateKey`**
+  a new ECDSA key from `rand` (the platform's random bytes): drawn again until it is in
+  [1, n - 1]
+- **`fn rsa(key: rsa::PrivateKey) -> Option<PrivateKey>`**
+  an RSA key
+- **`fn from_der(b: &[u8]) -> Option<PrivateKey>`**
+  a key in DER: PKCS #8 (PrivateKeyInfo / OneAsymmetricKey), an ECPrivateKey with its curve
+  or an RSAPrivateKey; None for anything else (an encrypted PKCS #8 key among them)
+- **`fn to_pkcs8(&self) -> Option<Vec<u8>>`**
+  the PKCS #8 form (to store the key; secret); None only for a curve without a name here
+- **`fn public_key(&self) -> PubKey`**
+  the public half
+- **`fn spki(&self) -> Vec<u8>`**
+  the public half as a SubjectPublicKeyInfo (DER), as certificates and CSRs carry it
+- **`fn rsa_bits(&self) -> usize`**
+  the RSA modulus's bits (0 for other keys)
+- **`fn ed25519(&self) -> Option<&Keypair>`**
+  the Ed25519 key pair, if it is one
+- **`fn can(&self, alg: SigAlg) -> bool`**
+  whether this key makes signatures of `alg` (ECDSA: of its curve's size or any hash, as
+  X.509 and TLS 1.2 allow; TLS 1.3 ties the hash to the curve itself; RSA-PSS: when the
+  modulus holds the hash, the salt and two bytes, RFC 8017 9.1.1, so a 1024-bit key makes no
+  PSS with SHA-512 and a salt as long)
+- **`fn cert_alg(&self) -> SigAlg`**
+  the algorithm it signs certificates with: Ed25519, ECDSA with SHA-256 (P-256) or
+  SHA-384 (P-384), RSA PKCS #1 v1.5 with SHA-256
+- **`fn sign(&self, alg: SigAlg, data: &[u8], random: &[u8]) -> Option<Vec<u8>>`**
+  a signature of `data` with `alg` (None when the key does not make it): Ed25519's 64
+  bytes; ECDSA as DER (Ecdsa-Sig-Value), its nonce by RFC 6979 with `random` mixed in (empty:
+  the same signature each time); RSA PKCS #1 v1.5, or PSS with MGF1 of the same hash and a
+  salt of the first bytes of `random` (as long as the salt length, the hash length when
+  the algorithm leaves it open; a shorter `random` gives None)
+
+- **`fn spki_of(key: &PubKey) -> Vec<u8>`**
+  the SubjectPublicKeyInfo of a public key (empty for PubKey::Other)
 
 ## compress
 
@@ -44744,11 +44826,11 @@ netio -- network protocols on top of plat::net
              the HTTP/1.1 wire format (bounded parsing, chunked transfer, keep-alive)
   server     Server::start(addr, ServerConfig, handler): accept thread + worker pool
   client     Client::request(...): blocking, timeouts, size limit
-  tls        TLS 1.3 for own deployments (ChaCha20-Poly1305, X25519, Ed25519, mutual auth)
-             and a client for public servers (AES-GCM, RSA / ECDSA, TLS 1.2 fallback):
-             connect / accept -> TlsStream (a Stream)
-  x509 / der the crate jflib-x509 (re-exported): certificates of a private Ed25519 CA (parse,
-             build, verify chains) and the RSA / ECDSA certificates of the web PKI
+  tls        TLS 1.3 servers and clients (ChaCha20-Poly1305, AES-GCM; X25519MLKEM768,
+             X25519, P-256, P-384; Ed25519, ECDSA, RSA keys; SNI, ALPN, mutual auth) and the
+             TLS 1.2 fallback for public servers: connect / accept -> TlsStream (a Stream)
+  x509 / der the crate jflib-x509 (re-exported): certificates (parse, build with any key,
+             verify chains) of a private CA and of the web PKI; PrivateKey (PKCS #8 ...)
   pem        PEM blocks
   roots      the system's certificate authorities (Windows: CryptoAPI; Linux: the bundle)
   ssh        SSH-2 client (curve25519, ssh-ed25519, chacha20-poly1305): run commands with
@@ -45405,16 +45487,19 @@ MSG_CHANNEL_FAILURE: u8 = 100
 Source: [`lib/netio/tls/mod.rs`](../lib/netio/tls/mod.rs)
 
 ```text
-tls -- TLS between a program's own servers and clients and to public servers (RFC 8446, 5246)
+tls -- TLS 1.3 servers and clients, and TLS 1.2 towards public servers (RFC 8446, 5246)
 
-  Own deployments (both sides): TLS 1.3, TLS_CHACHA20_POLY1305_SHA256 · X25519 · Ed25519
-  certificates (own CA) · mutual authentication · HelloRetryRequest · KeyUpdate.
-  Public servers (client side, Trust::System): also TLS_AES_128_GCM_SHA256, RSA / ECDSA
-  certificates of the system's CAs, and TLS 1.2 with ECDHE (X25519) and AEAD suites.
+  Both sides: TLS 1.3 · ChaCha20-Poly1305, AES-128-GCM, AES-256-GCM · X25519MLKEM768
+  (post-quantum hybrid), X25519, P-256, P-384 · certificates and keys of Ed25519, ECDSA
+  (P-256 / P-384) and RSA (the web PKI or a CA of one's own) · mutual authentication ·
+  HelloRetryRequest · KeyUpdate.
+  Public servers (client side, Trust::System / Custom): also TLS 1.2 with ECDHE and AEAD suites.
   Not here: PSK / resumption, 0-RTT, renegotiation, revocation checks.
 
   connect(stream, ClientConfig) -> TlsStream     accept(stream, ServerConfig) -> TlsStream
   TlsStream implements Stream (HTTP runs over it unchanged); peer_certs() after the handshake
+  Identity::new(chain, key) / Identity::from_pem(certs, key): a chain and its key (PrivateKey:
+  Ed25519, ECDSA, RSA; PKCS #8, SEC 1, PKCS #1)
   Trust::Anchors(CAs) / Pinned(SHA-256 of the leaf) / Any (trust on first use: the caller
   shows the fingerprint and pins it) / System(extra CAs) (the operating system's CAs)
 
@@ -45422,9 +45507,18 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
 ```
 
 - **`struct Identity`**
-  a certificate chain (DER, leaf first) and the leaf's private key
+  a certificate chain (DER, leaf first) and the leaf's private key (Ed25519, ECDSA, RSA)
   - `chain: Vec<Vec<u8>>`
-  - `key: Keypair`
+  - `key: PrivateKey`
+
+**`impl Identity`**
+
+- **`fn new(chain: Vec<Vec<u8>>, key: impl Into<PrivateKey>) -> Identity`**
+  a chain (DER, leaf first) and its key (an ed25519::Keypair or an x509::PrivateKey)
+- **`fn from_pem(certs: &str, key: &str) -> Result<Identity, String>`**
+  from PEM: the certificates (leaf first, as a CA hands them out) and the key ("PRIVATE
+  KEY", "EC PRIVATE KEY" or "RSA PRIVATE KEY"; not an encrypted one); the key must be the
+  leaf's
 
 - **`enum Trust`**
   - `Anchors(Vec<Cert>)` -- certificates issued by one of these CAs
@@ -45442,16 +45536,51 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   Ok, or why they are refused (the handshake ends with bad_certificate)
 
 - **`struct ClientConfig`**
+  a client's side: `ClientConfig { identity: Some(id), ..ClientConfig::new(trust, "host") }`
   - `trust: Trust`
   - `identity: Option<Identity>`
   - `server_name: String` -- the name the certificate must carry (DNS name or IP address); may be empty only with
     Trust::Pinned / Trust::Any, which do not check it
+  - `alpn: Vec<String>` -- the application protocols to offer (ALPN, RFC 7301: "h2", "http/1.1", "acme-tls/1"),
+    in order of preference; the server's choice is TlsStream::alpn.  An empty name or one
+    over 255 bytes is left out, and the names after the first 8 KiB of them; none left: no
+    ALPN offered
+
+**`impl ClientConfig`**
+
+- **`fn new(trust: Trust, server_name: &str) -> ClientConfig`**
+  this trust and server name; no client certificate, no ALPN
+
+- **`struct Hello`**
+  what a ClientHello asks for: the program's ServerConfig::select picks the identity by it
+  - `server_name: String` -- the name of server_name (SNI), lower case; empty: none
+  - `alpn: Vec<Vec<u8>>` -- the application protocols offered (ALPN), as the client sent them: byte strings
+    (RFC 7301 3.1), b"h2", b"http/1.1"
+  - `sig_algs: Vec<u16>` -- the signature schemes the client takes (TLS code points)
+
+- **`type Select = Arc<dyn Fn(&Hello) -> Option<Identity> + Send + Sync>`**
+  ServerConfig::select: the identity for a ClientHello, or None for the configured ones
 
 - **`struct ServerConfig`**
+  a server's side: `ServerConfig { client_auth: Some(trust), ..ServerConfig::new(identity) }`
   - `identity: Identity`
+  - `identities: Vec<Identity>` -- more certificates (SNI: other names; or other key types for the same name, as an ECDSA
+    and an RSA certificate): the server shows the first of these and then `identity` that
+    names the server_name the client asked for and whose key makes a signature the client
+    takes; without such one `identity`, or the first whose key fits when its key does not
+  - `select: Option<Select>` -- a choice of the program's own, asked before the lists (certificates renewed while the
+    server runs, ACME's tls-alpn-01 challenge); None from it: the lists decide
   - `client_auth: Option<Trust>` -- ask for a client certificate trusted like this
   - `client_auth_optional: bool` -- a client without a certificate is accepted too (one that sends one must pass the
     check); for a port that consoles and agents share
+  - `alpn: Vec<String>` -- the application protocols the server speaks (ALPN), in its order of preference; a
+    client that offers protocols, none of them these, is refused (no_application_protocol,
+    RFC 7301 3.2).  Empty: ALPN is not answered
+
+**`impl ServerConfig`**
+
+- **`fn new(identity: Identity) -> ServerConfig`**
+  this identity; no client certificates, no ALPN
 
 - **`enum TlsError`**
   - `Alert(u8, &'static str)` -- we ended the connection with this alert
@@ -45473,6 +45602,12 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
 - **`fn last_error(&self) -> Option<TlsError>`**
 - **`fn version(&self) -> (&'static str, u16)`**
   "TLS 1.3" / "TLS 1.2" and the cipher suite number
+- **`fn group(&self) -> u16`**
+  the key exchange group (kx: X25519_MLKEM768, X25519, SECP256R1 ...)
+- **`fn alpn(&self) -> Option<String>`**
+  the application protocol both sides agreed on (ALPN), if any
+- **`fn server_name(&self) -> String`**
+  a server: the name the client asked for (SNI, lower case; empty: none)
 
 - **`fn connect(inner: Box<dyn Stream>, cfg: ClientConfig) -> Result<TlsStream, TlsError>`**
   client side: handshake over `inner`
@@ -45493,19 +45628,20 @@ conn -- the TLS handshake and the record stream, without I/O
   read_plain / write_plain / close
   established(), peer_cert(), version(), suite()
 
-Our own servers and agents (private PKI): TLS 1.3 with TLS_CHACHA20_POLY1305_SHA256, X25519,
-Ed25519 signatures and certificates, mutual authentication.  The server also takes what RFC
-8446 9.1 makes mandatory, TLS_AES_128_GCM_SHA256 and P-256 (secp256r1) key shares, sends a
-HelloRetryRequest for X25519 or P-256 when the client offered no usable share, and a dummy
-change_cipher_spec for middleboxes (D.4); its certificate and signatures are Ed25519 only.
+TLS 1.3 on both sides: the suites ChaCha20-Poly1305, AES-128-GCM (SHA-256) and AES-256-GCM
+(SHA-384); the groups X25519MLKEM768 (post-quantum hybrid), X25519, P-256 and P-384, and on
+the server also SecP256r1MLKEM768 and SecP384r1MLKEM1024 (kx.rs); certificates and handshake
+signatures with Ed25519, ECDSA (P-256 / P-384), RSA-PSS (RSA PKCS #1 v1.5 for certificates);
+mutual authentication with any of these keys.  A client sends key shares for
+X25519MLKEM768 and X25519 and takes a HelloRetryRequest for P-256 or P-384; a server sends one
+for the first group of the client it has when no share fits, and a dummy change_cipher_spec
+for middleboxes (D.4).
 
 A client that trusts the system's certificate authorities (Trust::System: mail servers,
-update servers, web hooks) also offers TLS_AES_128_GCM_SHA256, RSA (PKCS #1 v1.5 / PSS) and
-ECDSA (P-256 / P-384) signatures and the P-256 key exchange (after a HelloRetryRequest),
-and falls back to TLS 1.2 with ECDHE (X25519 or P-256) and AEAD suites (AES-128-GCM,
-ChaCha20-Poly1305), the extended master secret when the server has it and the TLS 1.3
-downgrade check.  Private
-connections never fall back.
+update servers, web hooks) or a check of its own (Trust::Custom) falls back to TLS 1.2 with
+ECDHE (X25519, P-256, P-384) and AEAD suites (AES-GCM, ChaCha20-Poly1305), the extended
+master secret when the server has it and the TLS 1.3 downgrade check.  Other connections
+never fall back.
 
 No PSK, no 0-RTT, no session tickets (a client ignores them), no renegotiation;
 post-handshake KeyUpdate is supported.  Every protocol error ends the connection with the
@@ -45531,12 +45667,19 @@ AL_NO_RENEGOTIATION: u8 = 100
 AL_MISSING_EXTENSION: u8 = 109
 AL_UNSUPPORTED_EXTENSION: u8 = 110
 AL_CERTIFICATE_REQUIRED: u8 = 116
+AL_NO_APPLICATION_PROTOCOL: u8 = 120
 ```
 
 - **`struct Conn`**
 
 **`impl Conn`**
 
+- **`fn group(&self) -> u16`**
+  the key exchange group
+- **`fn alpn(&self) -> Option<&str>`**
+  the application protocol agreed on (ALPN; one that is not UTF-8 gives None)
+- **`fn server_name(&self) -> &str`**
+  a server: the name of the client's server_name (lower case)
 - **`fn client(cfg: ClientConfig) -> Conn`**
 - **`fn server(cfg: ServerConfig) -> Conn`**
 - **`fn established(&self) -> bool`**
@@ -45553,6 +45696,8 @@ AL_CERTIFICATE_REQUIRED: u8 = 116
 - **`fn has_plain(&self) -> bool`**
 - **`fn read_plain(&mut self, buf: &mut [u8]) -> usize`**
 - **`fn write_plain(&mut self, data: &[u8]) -> Result<(), TlsError>`**
+- **`fn test_cr_sig_algs(&mut self, algs: Vec<u16>)`**
+  (tests) the signature schemes a server's CertificateRequest lists (empty: all it takes)
 - **`fn write_empty(&mut self) -> Result<(), TlsError>`**
   (tests) an application data record without data
 - **`fn close(&mut self)`**
@@ -45565,47 +45710,121 @@ AL_CERTIFICATE_REQUIRED: u8 = 116
 Source: [`lib/netio/tls/keysched.rs`](../lib/netio/tls/keysched.rs)
 
 ```text
-keysched -- the TLS 1.3 key schedule with SHA-256 (RFC 8446 7.1): HKDF-Expand-Label,
-Derive-Secret, traffic keys and finished keys; the TLS 1.2 PRF with SHA-256 (RFC 5246 5)
+keysched -- the TLS 1.3 key schedule (RFC 8446 7.1) with the hash of the cipher suite (SHA-256
+or SHA-384): HKDF-Expand-Label, Derive-Secret, traffic keys and finished keys; the TLS 1.2 PRF
+(RFC 5246 5) with SHA-256 or SHA-384; the running transcript hash of a handshake
+
+Every function computes with the hash it is given (HMAC of any HashAlg); the TLS suites use
+SHA-256 and SHA-384, and the Transcript keeps those two only
 ```
 
-- **`type Secret = [u8; 32]`**
+- **`type Secret = Vec<u8>`**
+  a secret of the schedule (as long as the hash: 32 or 48 bytes)
 
-- **`fn expand_label(secret: &[u8], label: &str, context: &[u8], out: &mut [u8])`**
-  HKDF-Expand-Label(secret, label, context, len)
+- **`fn expand_label(h: HashAlg, secret: &[u8], label: &str, context: &[u8], out: &mut [u8])`**
+  HKDF-Expand-Label(secret, label, context, len); `out` at most 255 blocks of the hash (panics
+  beyond)
 
-- **`fn derive(secret: &Secret, label: &str, hash: &[u8; 32]) -> Secret`**
+- **`fn derive(h: HashAlg, secret: &[u8], label: &str, hash: &[u8]) -> Secret`**
   Derive-Secret(secret, label, transcript hash)
 
-- **`fn extract(salt: &[u8], ikm: &[u8]) -> Secret`**
+- **`fn extract(h: HashAlg, salt: &[u8], ikm: &[u8]) -> Secret`**
+  HKDF-Extract (RFC 5869 2.2): HMAC(salt, ikm); an empty salt is the same as zeros of the
+  hash's length (HMAC pads its key with zeros)
 
-- **`fn empty_hash() -> [u8; 32]`**
+- **`fn empty_hash(h: HashAlg) -> Vec<u8>`**
   the hash of no messages
 
 - **`struct Schedule`**
   the secrets of one handshake
+  - `hash: HashAlg`
+  - `early: Secret` -- the early secret (of the PSK, or of zeros)
   - `handshake: Secret`
   - `master: Secret`
 
 **`impl Schedule`**
 
-- **`fn new(ecdhe: &[u8; 32]) -> Schedule`**
-  from the (EC)DHE shared secret (no PSK)
+- **`fn new(h: HashAlg, psk: Option<&[u8]>, shared: &[u8]) -> Schedule`**
+  from the pre-shared key (None: zeros) and the (EC)DHE / hybrid shared secret
+- **`fn binder_key(&self, external: bool) -> Secret`**
+  the binder key of a resumption PSK ("res binder") or an external one ("ext binder")
 
-- **`fn traffic_keys_len(secret: &Secret, key_len: usize) -> (Vec<u8>, [u8; 12])`**
+- **`fn traffic_keys_len(h: HashAlg, secret: &[u8], key_len: usize) -> (Vec<u8>, [u8; 12])`**
   the AEAD key (of key_len bytes) and IV of a traffic secret
 
-- **`fn prf12(secret: &[u8], label: &str, seed: &[u8], out: &mut [u8])`**
-  TLS 1.2: PRF(secret, label, seed) with P_SHA256
+- **`fn prf12(h: HashAlg, secret: &[u8], label: &str, seed: &[u8], out: &mut [u8])`**
+  TLS 1.2: PRF(secret, label, seed) with P_SHA256, or P_SHA384 for the SHA-384 suites
 
-- **`fn traffic_keys(secret: &Secret) -> ([u8; 32], [u8; 12])`**
-  the AEAD key and IV of a traffic secret
+- **`fn finished(h: HashAlg, base: &[u8], transcript: &[u8]) -> Vec<u8>`**
+  verify_data of a Finished message (and a PSK binder: the binder key as `base`)
 
-- **`fn finished(base: &Secret, transcript: &[u8; 32]) -> [u8; 32]`**
-  verify_data of a Finished message
-
-- **`fn update(secret: &Secret) -> Secret`**
+- **`fn update(h: HashAlg, secret: &[u8]) -> Secret`**
   the next traffic secret (KeyUpdate)
+
+- **`struct Transcript`**
+  the transcript hash of a handshake: both hashes until the cipher suite picks one
+
+**`impl Transcript`**
+
+- **`fn new() -> Transcript`**
+- **`fn update(&mut self, m: &[u8])`**
+- **`fn hash(&self, h: HashAlg) -> Vec<u8>`**
+  the hash so far with `h`: SHA-256 or SHA-384 while it is kept, else empty
+- **`fn keep(&mut self, h: HashAlg)`**
+  keep only `h` from here on (the suite is chosen); a hash other than these two keeps none
+
+### `netio/tls/kx.rs`
+
+Source: [`lib/netio/tls/kx.rs`](../lib/netio/tls/kx.rs)
+
+```text
+kx -- the key exchange groups of TLS: X25519, P-256 and P-384 (ECDHE: RFC 8446 4.2.8.2, RFC
+8422 5.4) and the hybrids of an ECDHE share and ML-KEM (draft-ietf-tls-ecdhe-mlkem): each
+side's share is the two halves concatenated, the shared secret both secrets
+
+  group                 client share                server share                secret
+  X25519MLKEM768        ML-KEM-768 ek || X25519     ciphertext || X25519        ML-KEM || X25519
+  SecP256r1MLKEM768     P-256 point || ek           P-256 point || ciphertext   ECDH || ML-KEM
+  SecP384r1MLKEM1024    P-384 point || ek (1024)    P-384 point || ciphertext   ECDH || ML-KEM
+
+  Share::new(group) -> our key share (client, TLS 1.2 client: ECDHE only), its secrets
+  share.finish(peer) -> the shared secret from the peer's share
+  respond(group, client_share) -> (our share, the shared secret) for a TLS 1.3 server
+
+Every length is exact; an ECDHE point off the curve, an X25519 result of zeros or an
+encapsulation key that fails FIPS 203's modulus check gives None (illegal_parameter).
+```
+
+```rust
+SECP256R1: u16 = 0x0017
+SECP384R1: u16 = 0x0018
+X25519: u16 = 0x001d
+SECP256R1_MLKEM768: u16 = 0x11eb
+X25519_MLKEM768: u16 = 0x11ec
+SECP384R1_MLKEM1024: u16 = 0x11ed
+/// every group here.  The order is no preference: a server goes by the client's list and takes
+/// the first group here that the client sent a share of; without one it asks for the first
+/// group here the client lists (HelloRetryRequest)
+GROUPS: [u16; 6] = [X25519_MLKEM768, X25519, SECP256R1, SECP384R1, SECP256R1 ...
+```
+
+- **`fn known(group: u16) -> bool`**
+  whether this is a group here
+
+- **`struct Share`**
+  a key share we made, with its secrets (wiped when dropped)
+  - `group: u16`
+  - `public: Vec<u8>`
+
+**`impl Share`**
+
+- **`fn new(group: u16) -> Option<Share>`**
+  a new share of `group` (None: not a group here)
+- **`fn finish(&self, peer: &[u8]) -> Option<Vec<u8>>`**
+  the shared secret from the peer's share (None: of the wrong length or not valid)
+
+- **`fn respond(group: u16, client: &[u8]) -> Option<(Vec<u8>, Vec<u8>)>`**
+  a TLS 1.3 server's answer to the client's share of `group`: (our share, the shared secret)
 
 ### `netio/tls/record.rs`
 
@@ -45613,7 +45832,7 @@ Source: [`lib/netio/tls/record.rs`](../lib/netio/tls/record.rs)
 
 ```text
 record -- the TLS record layer: TLS 1.3 (RFC 8446) and, for public servers, TLS 1.2 (RFC
-5246 with AEAD suites only: RFC 5288 AES-GCM, RFC 7905 ChaCha20-Poly1305)
+5246 with AEAD suites only: RFC 5288 / 5289 AES-GCM, RFC 7905 ChaCha20-Poly1305)
 
   plaintext record    type | 0x0303 | length | fragment          (handshake before keys,
                                                                    alerts, CCS)
@@ -45636,15 +45855,21 @@ MAX_PLAIN: usize = 1 << 14
 MAX_RECORD: usize = MAX_PLAIN + 256
 /// the cipher suites (TLS 1.3, then TLS 1.2 ECDHE)
 TLS_AES_128_GCM_SHA256: u16 = 0x1301
+TLS_AES_256_GCM_SHA384: u16 = 0x1302
 TLS_CHACHA20_POLY1305_SHA256: u16 = 0x1303
 ECDHE_ECDSA_AES128_GCM: u16 = 0xC02B
+ECDHE_ECDSA_AES256_GCM: u16 = 0xC02C
 ECDHE_RSA_AES128_GCM: u16 = 0xC02F
+ECDHE_RSA_AES256_GCM: u16 = 0xC030
 ECDHE_RSA_CHACHA20: u16 = 0xCCA8
 ECDHE_ECDSA_CHACHA20: u16 = 0xCCA9
 ```
 
 - **`fn key_iv_len(suite: u16) -> Option<(usize, usize)>`**
   key and IV lengths of a suite (TLS 1.2: the IV is the implicit part)
+
+- **`fn suite_hash(suite: u16) -> crypto::HashAlg`**
+  the hash of a suite's key schedule (TLS 1.3) or PRF (TLS 1.2)
 
 - **`struct Cipher`**
   one direction's keys

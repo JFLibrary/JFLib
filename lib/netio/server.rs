@@ -241,7 +241,11 @@ fn serve(s: &dyn Stream, peer: SocketAddr, id: Option<String>, cfg: &ServerConfi
         rd.set_deadline(None);
         let (start, headers) = match head {
             Ok(x) => x,
-            Err(ReadError::Closed) | Err(ReadError::Net(_)) => return None,
+            // the client's end (its close_notify over TLS) is answered with ours (RFC 8446 6.1)
+            Err(ReadError::Closed) | Err(ReadError::Net(_)) => {
+                s.shutdown();
+                return None;
+            }
             Err(ReadError::HeadTooLarge) => return error(s, 431, stop),
             Err(_) => return error(s, 400, stop),
         };
@@ -282,7 +286,10 @@ fn serve(s: &dyn Stream, peer: SocketAddr, id: Option<String>, cfg: &ServerConfi
         let body = match body {
             Ok(b) => b,
             Err(ReadError::BodyTooLarge) => return error(s, 413, stop),
-            Err(ReadError::Net(_)) | Err(ReadError::Closed) => return None,
+            Err(ReadError::Net(_)) | Err(ReadError::Closed) => {
+                s.shutdown();
+                return None;
+            }
             Err(_) => return error(s, 400, stop),
         };
         let req = Request { method: String::from(method), target: String::from(target), headers, body, peer: Some(peer), client_id: id.clone() };
