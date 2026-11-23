@@ -17,4 +17,6 @@ pub(crate) struct AskState {}
 pub(crate) fn after_drop(_app: &mut Diagrammer, _ui: &mut Ui, _shapes: &[ShapeRef]) {}
 
 /// every pass: the dialog when open
-pub(crate) fn dialog(_app: &mut Diagrammer, _ui: &mut Ui) {}
+pub(crate) fn dialog(app: &mut Diagrammer, _ui: &mut Ui) {
+    let _ = &app.dask; // STUB: keeps build_rs's -D dead-code quiet until the real file comes
+}
