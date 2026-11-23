@@ -822,13 +822,17 @@ def main_wasm(a, levels, crate_dir, label):
     for tool in ("wasm-interp", "wasm-objdump"):
         if shutil.which(tool) is None:
             sys.exit(f"ct_check: --wasm needs {tool} (WABT: apt install wabt, brew install wabt)")
-    # the probe's list in wasm: TARGETS without the key files (netio), in the same order (the
-    # index is what ct_run takes)
-    listed = [ln for ln in PROBE.read_text(encoding="utf-8").split("const TARGETS: &[&str] = &[", 1)[1].split("];", 1)[0].splitlines()
-              if ln.strip().startswith('"')]
-    order = [ln.strip().strip('",') for ln in listed]
-    key_files = ("pem_pkcs8_key", "ssh_private_key")
-    wasm_targets = [t for t in order if t not in key_files]
+    # the probe's list in wasm: TARGETS without the key files (each behind #[cfg(feature =
+    # "netio")]), in the same order (the index is what ct_run takes)
+    order, key_files, gated = [], [], False
+    for ln in PROBE.read_text(encoding="utf-8").split("const TARGETS: &[&str] = &[", 1)[1].split("];", 1)[0].splitlines():
+        ln = ln.strip()
+        if ln == '#[cfg(feature = "netio")]':
+            gated = True
+        elif ln.startswith('"'):
+            (key_files if gated else order).append(ln.strip('",'))
+            gated = False
+    wasm_targets = order
     asked = [t for t in a.only.split(",") if t]
     unknown = [t for t in asked if t not in wasm_targets]
     if unknown:
