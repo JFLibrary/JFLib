@@ -1,0 +1,5 @@
+#!args --sheet
+# codectest is a console program: --sheet runs sheet_checks.rs (lib/sheet_io's XLSX and CSV
+# readers against crafted workbooks and texts: refused quickly with the right error, controls of
+# the same shape read) and ignores the script (build_rs.py test passes --script); a failing check
+# exits with code 1
