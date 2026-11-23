@@ -1,10 +1,10 @@
 [package]
 name = "jflib-pdf"
-description = "vector PDF writer with embedded font subsets, links and outlines"
+description = "PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
+license = "(MIT OR Apache-2.0) AND BSD-3-Clause AND OFL-1.1"
 repository.workspace = true
 homepage.workspace = true
 
@@ -20,6 +20,7 @@ workspace = true
 [dependencies]
 gfx.workspace = true
 compress.workspace = true
+crypto.workspace = true
 text_shape.workspace = true
 
 # docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none

@@ -1,14 +1,18 @@
-// pdftest -- self-checks of lib/pdf, the vector PDF writer: every file it writes is read back by
+// pdftest -- self-checks of lib/pdf: the vector PDF writer, whose every file is read back by
 // reader.rs, a small PDF reader of its own that shares no code with the writer (header, xref
 // offsets, objects complete, references resolved, stream lengths, FlateDecode, shadings,
 // functions, soft masks, patterns), and its pages, fonts, images, gradients, hatches, links and
-// outlines are checked against what was drawn.
+// outlines are checked against what was drawn; and the reader pdf::read (rcheck.rs: the read_*
+// groups).
 // Console program; exit code 1 when a check fails.
 //
 //   python build_rs.py app pdftest
 //   build/win/pdftest.exe [--only NAME]      the checks (build_rs.py test runs them through
 //                                            tests/checks.uis; --script is ignored)
 //   build/win/pdftest.exe --sample FILE      the sample document with every feature -> FILE
+//   build/win/pdftest.exe --read FILE [--password PW]
+//                                            what pdf::read finds in FILE, as JSON
+//                                            (tools/pdf_read_check.py)
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -19,6 +23,8 @@ use alloc::format;
 use alloc::string::String;
 
 mod checks;
+mod rcheck;
+mod rdump;
 mod reader;
 mod sample;
 
@@ -63,6 +69,9 @@ impl T {
 }
 
 fn run() -> i32 {
+    if let Some(path) = plat::arg_value("--read") {
+        return rdump::dump(&path, plat::arg_value("--password"));
+    }
     if let Some(path) = plat::arg_value("--sample") {
         let bytes = match sample::build() {
             Ok(b) => b,
@@ -81,7 +90,7 @@ fn run() -> i32 {
     let only = plat::arg_value("--only").map(String::from);
     let mut failed = 0;
     let mut total = 0;
-    for (group, f) in checks::GROUPS {
+    for (group, f) in checks::GROUPS.iter().chain(rcheck::GROUPS) {
         if only.as_ref().is_some_and(|o| !group.starts_with(o.as_str())) {
             continue;
         }

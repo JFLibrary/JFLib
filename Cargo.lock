@@ -1268,6 +1268,7 @@ name = "jflib-pdf"
 version = "0.2.1"
 dependencies = [
  "jflib-compress",
+ "jflib-crypto",
  "jflib-gfx",
  "jflib-text-shape",
 ]
@@ -1566,6 +1567,7 @@ name = "pdftest"
 version = "0.0.0"
 dependencies = [
  "jflib-build",
+ "jflib-compress",
  "jflib-gfx",
  "jflib-img-core",
  "jflib-img-jpeg",

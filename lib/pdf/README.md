@@ -1,9 +1,12 @@
 # jflib-pdf
 
-A vector PDF writer for [JFLib](https://jflib.org): documents drawn page by page on a canvas,
-with real paths, embedded font subsets, images, links and bookmarks, instead of one raster image
-per page. It is plain Rust, without the standard library and without a line of `unsafe` code.
-JFDiagrammer exports its drawings with it; jfWord can use it for its documents as well.
+A PDF writer and reader for [JFLib](https://jflib.org). The writer draws documents page by page
+on a canvas, with real paths, embedded font subsets, images, links and bookmarks, instead of one
+raster image per page; JFDiagrammer exports its drawings with it, jfWord can use it for its
+documents as well. The reader (`pdf::read`) opens PDF files of every version, encrypted and
+damaged ones too, and gives their pages, the text with the position of every glyph, outlines,
+links, form fields and attachments. It is plain Rust, without the standard library and without a
+line of `unsafe` code.
 
 ## What it writes
 
@@ -32,6 +35,38 @@ The output is PDF 1.7 with a classic cross-reference table. It is deterministic:
 document always gives the same bytes, with no time stamp unless you set one. Not supported:
 PDF/A, encryption and forms. Fonts whose licence (OS/2 `fsType`) forbids embedding are refused.
 
+## What it reads
+
+- **Files** of PDF 1.0 to 2.0: classic cross-reference tables and cross-reference streams,
+  object streams, incremental updates and hybrid files. A file whose table is wrong or missing,
+  or that was cut off, is rebuilt from its objects, as Acrobat, pdf.js and Poppler do.
+- **Encryption** of the standard security handler: RC4 with 40 to 128 bits, AES-128 and AES-256
+  (revisions 2 to 6), with the user or the owner password, or without one when only the owner
+  password is set. The permissions are reported, not enforced.
+- **Streams** with FlateDecode (raw DEFLATE too, and damaged data up to the damage),
+  LZWDecode, ASCIIHexDecode, ASCII85Decode, RunLengthDecode and the PNG and TIFF predictors.
+  An image filter (DCT, JPX, JBIG2, CCITTFax) ends the chain: `decode_until_image` gives the JPEG
+  or JPEG 2000 file as it is.
+- **Pages** with their boxes, rotation and inherited resources, and their labels ("iv", "A-3").
+- **Text**: every glyph with its characters, position, advance and size, and each page's text
+  in reading order, laid out as Poppler's `pdftotext -raw` does (words apart where the glyphs
+  are, Hebrew and Arabic in reading order, fake bold once). Simple fonts through their ToUnicode
+  map, their encoding and the Adobe Glyph List; Type 0 fonts through their CMaps; Type 3 fonts;
+  the 14 standard fonts with their widths; text in form XObjects.
+- **Navigation**: the document information, the XMP metadata, the language, the outline with
+  explicit and named destinations, links and other annotations with their actions.
+- **Forms**: every field of the interactive form with its full name, kind, value, options and
+  widgets; for a signature field what the signature states (it is not verified).
+- **Attachments**: embedded files with their name, MIME type, description, size and
+  relationship (as ZUGFeRD and Factur-X invoices carry their XML), and their data.
+
+A damaged or hostile file gives an error or less than it claims, never a panic, a hang or memory
+without end: nesting, the depth of references, page trees, outlines and form XObjects are
+bounded, every decoded stream is at most `Options::max_stream` bytes (256 MiB). Not supported:
+drawing pages (images, shadings, the outlines of glyphs), the image filters themselves, the
+predefined CMaps of East Asian fonts other than Identity and the Unicode ones, verifying
+signatures, and changing and saving a document.
+
 ## How it is used
 
 ```rust
@@ -58,6 +93,30 @@ doc.add_outline(None, "Start", Dest::Fit(page));
 let bytes = doc.write()?;
 ```
 
+And reading one:
+
+```rust
+use jflib::pdf::read::{Action, Document, Options};
+
+let doc = Document::open(bytes)?;                        // Error::Password when it needs one
+let doc = Document::open_with(bytes, &Options { password: "geheim".into(), ..Options::default() })?;
+for i in 0..doc.page_count() {
+    let (w, h) = doc.page(i)?.size();                    // points, as the page is shown
+    let text = doc.text(i)?;                             // the text in reading order
+}
+for g in doc.page_text(0)?.items {                       // every glyph: text, x, y, size
+    if g.text == "€" { /* g.x, g.y */ }
+}
+let title = doc.info().title;
+for o in doc.outlines() {
+    if let Some(Action::GoTo(dest)) = o.action { /* dest.page */ }
+}
+for f in doc.fields() { /* f.name, f.kind, f.value */ }
+for a in doc.attachments() {
+    let xml = doc.decode(a.stream.as_ref().unwrap())?;  // "factur-x.xml", "text/xml"
+}
+```
+
 ## How to get it
 
 Like all of JFLib, the crate comes through the one dependency
@@ -79,4 +138,7 @@ Everything is in the [changelog](https://docs.rs/crate/jflib-pdf/latest/source/C
 
 ## License
 
-MIT or Apache-2.0, at your choice.
+MIT or Apache-2.0, at your choice. The reader carries the Adobe Glyph List (BSD 3-Clause License,
+Copyright Adobe) and the advance widths of the Liberation fonts Sans and Serif (SIL Open Font
+License 1.1); their texts are in the crate's
+[`licenses/`](https://github.com/JFLibrary/JFLib/tree/main/lib/pdf/licenses) folder.
