@@ -359,6 +359,9 @@ pub struct Conn {
     ems: bool,
     /// KeyUpdate messages received (a flood is answered with an alert)
     key_updates: u32,
+    /// a client: the protocol names its ClientHello offered (ALPN), the only ones the server may
+    /// choose (ClientConfig::alpn leaves some out)
+    alpn_sent: Vec<Vec<u8>>,
     /// a client: the signature schemes of the server's CertificateRequest; a server: the ones
     /// it lists there (empty: every scheme it takes; other lists only in tests)
     cr_algs: Vec<u16>,
@@ -432,6 +435,7 @@ impl Conn {
             server_random: [0; 32],
             ems: false,
             key_updates: 0,
+            alpn_sent: Vec::new(),
             cr_algs: Vec::new(),
             pms: None,
             master12: [0; 48],
@@ -1007,11 +1011,13 @@ impl Conn {
         // ALPN: the names of 1 to 255 bytes, as many as fit in MAX_ALPN (ClientConfig::alpn)
         let alpn = self.ccfg.as_ref().map(|c| c.alpn.clone()).unwrap_or_default();
         let mut list = Vec::new();
+        self.alpn_sent.clear();
         for p in alpn.iter().filter(|p| !p.is_empty() && p.len() < 256) {
             if list.len() + 1 + p.len() > MAX_ALPN {
                 break;
             }
             put_v8(&mut list, p.as_bytes());
+            self.alpn_sent.push(Vec::from(p.as_bytes()));
         }
         if !list.is_empty() {
             let mut v = Vec::new();
@@ -1084,7 +1090,7 @@ impl Conn {
     }
 
     /// the server's ALPN answer (EncryptedExtensions, a TLS 1.2 ServerHello): exactly one
-    /// protocol, one we offered (RFC 7301 3.1)
+    /// protocol, one the ClientHello carried (RFC 7301 3.1), not merely one of the config's
     fn server_alpn(&mut self, exts: &[(u16, &[u8])]) -> Result<(), TlsError> {
         let Some(a) = ext(exts, EXT_ALPN) else { return Ok(()) };
         let mut r = R { b: a };
@@ -1092,7 +1098,7 @@ impl Conn {
         r.done()?;
         let p = list.v8()?;
         list.done()?;
-        let offered = self.ccfg.as_ref().is_some_and(|c| c.alpn.iter().any(|o| o.as_bytes() == p));
+        let offered = self.alpn_sent.iter().any(|o| o.as_slice() == p);
         if p.is_empty() || !offered {
             return Err(fail(AL_ILLEGAL_PARAMETER, "an application protocol the client did not offer"));
         }

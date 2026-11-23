@@ -409,6 +409,36 @@ fn alpn(t: &mut T) {
     names.extend(many.iter().map(|s| s.as_str()));
     t.check("alpn: 20 KB of names: the first 8 KiB offered", go(&names, &["h2"]) == both("h2"));
     t.check("alpn: ... the rest not", matches!(go(&names, &[many[99].as_str()]), Err(TlsError::PeerAlert(120)) | Err(TlsError::Alert(120, _))));
+    // a server that chooses a name the client left out (past the 8 KiB) is refused like one that
+    // chooses a name never configured: a TLS 1.2 ServerHello carries the answer in the clear
+    let answer = |name: &str| {
+        let accept_all: tls::Verifier = Arc::new(|_, _, _| Ok(()));
+        let ccfg = ClientConfig { alpn: names.iter().map(|s| String::from(*s)).collect(), ..ClientConfig::new(Trust::Custom(accept_all), "localhost") };
+        let mut c = Conn::client(ccfg);
+        let ch = c.take_out();
+        let sid = ch.get(44..44 + *ch.get(43).unwrap_or(&0) as usize).unwrap_or_default().to_vec();
+        let mut exts = Vec::new();
+        for (ty, data) in [(23u16, Vec::new()), (0xff01, alloc::vec![0]), (16, [&((name.len() + 1) as u16).to_be_bytes()[..], &[name.len() as u8], name.as_bytes()].concat())] {
+            exts.extend_from_slice(&ty.to_be_bytes());
+            exts.extend_from_slice(&(data.len() as u16).to_be_bytes());
+            exts.extend_from_slice(&data);
+        }
+        let mut body = alloc::vec![3u8, 3];
+        body.extend_from_slice(&[0x5a; 32]);
+        body.push(sid.len() as u8);
+        body.extend_from_slice(&sid);
+        body.extend_from_slice(&[0xc0, 0x2f, 0]);
+        body.extend_from_slice(&(exts.len() as u16).to_be_bytes());
+        body.extend_from_slice(&exts);
+        let mut hs = alloc::vec![2u8, 0, (body.len() >> 8) as u8, body.len() as u8];
+        hs.extend_from_slice(&body);
+        let mut rec = alloc::vec![22u8, 3, 3, (hs.len() >> 8) as u8, hs.len() as u8];
+        rec.extend_from_slice(&hs);
+        c.feed(&rec)
+    };
+    t.check("alpn: a TLS 1.2 server choosing an offered name is taken", answer("h2").is_ok());
+    t.check("alpn: ... one the client left out is illegal_parameter", matches!(answer(&many[99]), Err(TlsError::Alert(47, _))));
+    t.check("alpn: ... one never configured too", matches!(answer("spdy/3"), Err(TlsError::Alert(47, _))));
     // the client's view of the names: the bytes it sent
     let seen = Arc::new(plat::sync::Mutex::new(Vec::new()));
     let s2 = seen.clone();
