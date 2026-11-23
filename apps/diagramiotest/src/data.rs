@@ -51,7 +51,7 @@ pub(crate) fn devices() -> (Vec<String>, Vec<Vec<DataValue>>) {
 
 // a drawing with three boxes named by their text, the devices linked by the column "Gerät", a
 // second recordset in row order from a text file
-fn drawing(xlsx: &str) -> (Document, Vec<ShapeRef>) {
+fn drawing(xlsx: &str, csv: &str) -> (Document, Vec<ShapeRef>) {
     let mut doc = vsdx::new_document(DocKind::Drawing, Measure::Metric);
     let page = doc.pages().next().expect("page");
     let mut eng = diagram_core::formula::Engine::new();
@@ -73,7 +73,7 @@ fn drawing(xlsx: &str) -> (Document, Vec<ShapeRef>) {
     let id = data::add_recordset(&mut tx, Some(conn), rs).expect("recordset");
     let _ = data::auto_link(&mut tx, &shapes, id, &[(0, data::ShapeField::Text)], false);
     let list = Recordset::from_table("Liste", &[s("Name"), s("Wert")], vec![vec![t("a"), DataValue::Num(1.0)], vec![t("b"), DataValue::Num(2.5)]], &[]);
-    let (cs, cmd) = data::text_connection("C:\\Daten\\liste.csv", true);
+    let (cs, cmd) = data::text_connection(csv, true);
     let mut list = list;
     list.command = Some(cmd.clone());
     let id2 = data::add_recordset(&mut tx, Some(Connection { connection_string: Some(cs), command: Some(cmd), ..Connection::default() }), list).expect("list");
@@ -111,7 +111,7 @@ pub(crate) fn run(h: &mut H) {
 }
 
 fn own_round_trip(h: &mut H) {
-    let (doc, shapes) = drawing("C:\\Daten\\geräte.xlsx");
+    let (doc, shapes) = drawing("C:\\Daten\\geräte.xlsx", "C:\\Daten\\liste.csv");
     let linked = shapes.iter().filter(|&&s| doc.data_link(s, 1).is_some()).count();
     h.check("data/link/auto", linked == 3, format!("{linked} of 3 shapes linked by their text"));
     let bytes = write(&doc);
@@ -224,7 +224,7 @@ fn visio_like(h: &mut H) {
 
 // a refresh in the model (a row gone, a value changed, the user's own value) saved and read
 fn refresh_saved(h: &mut H) {
-    let (mut doc, shapes) = drawing("C:\\Daten\\geräte.xlsx");
+    let (mut doc, shapes) = drawing("C:\\Daten\\geräte.xlsx", "C:\\Daten\\liste.csv");
     let mut tx = doc.transaction("user");
     let _ = data::user_edited(&mut tx, SheetRef::Shape(shapes[0]), "Ports");
     tx.commit();
@@ -293,17 +293,20 @@ fn kept_and_hostile(h: &mut H) {
     h.check("data/hostile/wide", doc.is_some_and(|d| d.data.recordsets.first().is_some_and(|r| r.raw.is_some())) && us < crate::QUICK_US, format!("40000 attributes on a row: kept as bytes ({} ms)", us / 1000));
 }
 
-/// --write-data DIR [--xlsx PATH]: the drawing for the Visio counter-check
+/// --write-data DIR [--xlsx PATH]: the drawing for the Visio counter-check, and next to it the
+/// text file of its second recordset (jd18-liste.csv, comma-separated as the ACE text driver
+/// reads by default)
 pub(crate) fn write_check(dir: &str, xlsx: Option<&str>) -> i32 {
     let default = format!("{dir}\\jd18-daten.xlsx");
     let path = xlsx.unwrap_or(&default);
-    let (doc, _) = drawing(path);
+    let csv = format!("{dir}\\jd18-liste.csv");
+    let (doc, _) = drawing(path, &csv);
     let bytes = write(&doc);
     let out = format!("{dir}/jd18-verknuepft.vsdx");
-    if bytes.is_empty() || !plat::write_file(&out, &bytes) {
+    if bytes.is_empty() || !plat::write_file(&out, &bytes) || !plat::write_file(&format!("{dir}/jd18-liste.csv"), b"Name,Wert\r\na,1\r\nb,2.5\r\n") {
         crate::out(&format!("cannot write {out}\n"));
         return 1;
     }
-    crate::out(&format!("{out}: {} bytes, data from {path}\n", bytes.len()));
+    crate::out(&format!("{out}: {} bytes, data from {path} and {csv}\n", bytes.len()));
     0
 }
