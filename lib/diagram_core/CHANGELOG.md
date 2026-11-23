@@ -83,6 +83,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - (JD11) The display list works out cells stored as "Themed" through the formula engine (THEMEVAL with the style lists, colour transforms, variants, line ends, fill patterns), so a design applied shows at once; `ThemeInfo` reads the format scheme's number from `vt:fmtSchemeEx` as Visio writes it; the text tool's box uses the style "Text Only" for its text too
 - `instance::import_master`: a master whose NameU the document has already (the same name in two stencils) gets ".ID" in Name and NameU, as Visio names it
 - (JD8) A field without cached text (a mark `<fld IX='n'/>`) shows its Field row's value in its format instead of the raw number; SHAPETEXT, TEXTWIDTH and TEXTHEIGHT count the text of a shape's fields (their Value cells are read as dependencies)
+- (JD15, DM-04) `ops::new_shape`: a rectangle or an ellipse of the drawing tools takes the document's default line, fill and text styles (DocumentSettings DefaultLineStyle, DefaultFillStyle, DefaultTextStyle, those that exist; else "Normal") as a line of the line tool already did; the text box keeps "Text Only"
 
 ### Fixed
 

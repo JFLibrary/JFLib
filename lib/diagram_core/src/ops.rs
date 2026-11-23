@@ -16,7 +16,10 @@
 //   vertices / set_vertex / insert_vertex / delete_vertex     Geometry rows (SP-05)
 //   group(tx, eng, owner, shapes) / ungroup(tx, eng, group)   (SP-06)
 //   reorder(tx, shapes, Z::Front | Back | Forward | Backward) (SP-07)
-//   new_shape(tx, eng, owner, Basic::Rectangle | Ellipse | TextBox, a, b)
+//   new_shape(tx, eng, owner, Basic::Rectangle | Ellipse | TextBox, a, b)   rectangle and
+//                                       ellipse with the document's default line, fill and text
+//                                       styles (DocumentSettings, else "Normal"), a text box with
+//                                       "Text Only" (DM-04)
 //   set_text(tx, eng, shape, text) / text_frame / set_text_frame   (TX-01, TX-03)
 //   copy(doc, shapes) -> Clip / paste(tx, eng, owner, &clip, offset)
 //   new_freeform / new_arc / simplify / Spline / quarter_arc   (JD8 rest) the freeform and arc
@@ -1219,15 +1222,18 @@ pub fn new_shape(tx: &mut Transaction, eng: &mut Engine, owner: Owner, kind: Bas
     if w < EPS || h < EPS {
         return Err(EditError::Invalid);
     }
-    let (unit, normal, text_only) = {
+    let (unit, normal, text_only, defaults) = {
         let doc = tx.doc();
         let id = |n: &str| doc.style_by_name_u(n).and_then(|s| doc.style(s)).map(|s| s.header.id);
-        (page_unit(doc, owner), id("Normal"), id("Text Only"))
+        // the document's default styles (DocumentSettings), those that exist
+        let st = &doc.settings;
+        let known = |i: Option<u32>| i.filter(|&i| doc.style_by_id(i).is_some());
+        (page_unit(doc, owner), id("Normal"), id("Text Only"), [known(st.default_line_style), known(st.default_fill_style), known(st.default_text_style)])
     };
     let mut d = ShapeData::new(ShapeKind::Shape);
     d.header.styles = match kind {
-        Basic::TextBox => StyleRefs { line: text_only.or(normal), fill: text_only.or(normal), text: text_only.or(normal) },
-        _ => StyleRefs { line: normal, fill: normal, text: normal },
+        Basic::TextBox => StyleRefs { line: text_only.or(defaults[0]).or(normal), fill: text_only.or(defaults[1]).or(normal), text: text_only.or(defaults[2]).or(normal) },
+        _ => StyleRefs { line: defaults[0].or(normal), fill: defaults[1].or(normal), text: defaults[2].or(normal) },
     };
     d.sheet.cells = basic_cells(tx, pin, w, h, unit);
     let gk = SecKey { name: names::GEOMETRY, index: 0 };
