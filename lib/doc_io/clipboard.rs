@@ -4,6 +4,7 @@
 use crate::{Document, Error, Inline, Paragraph, ParagraphFormat, ParagraphStyle, TextFormat};
 use alloc::{format, string::String, vec::Vec};
 use doc_core::{Alignment, FontFamily, Highlight, ResolvedFormat, TextColor, TextPositioning};
+use formats::encoding::{Decoder, Label, MultiByte};
 
 #[path="rtf_tables.rs"] mod rtf_tables;
 
@@ -481,6 +482,8 @@ struct Reader<'a> {
     text_bytes: usize,
     skip: usize,
     high: Option<(u16, TextFormat)>,
+    // the lead byte of a double-byte character (code pages 932, 936, 949, 950) waiting for its trail byte
+    lead: Option<u8>,
     colors: Vec<TextColor>,
     rgb: [u8; 3],
     color_set: bool,
@@ -511,6 +514,7 @@ impl<'a> Reader<'a> {
             text_bytes: 0,
             skip: 0,
             high: None,
+            lead: None,
             colors: Vec::new(),
             rgb: [0; 3],
             color_set: false,
@@ -523,7 +527,7 @@ impl<'a> Reader<'a> {
         }
     }
     fn text(&mut self, c: char) -> Result<(), Error> {
-        if self.high.is_some() {
+        if self.high.is_some() || self.lead.is_some() {
             return Err(Error::Invalid);
         }
         self.append(c)
@@ -569,6 +573,28 @@ impl<'a> Reader<'a> {
         });
         Ok(())
     }
+    // a byte of a double-byte code page: ASCII, a character of one byte (Shift_JIS's half-width katakana, GBK's
+    // euro sign) or a lead byte, which the next byte completes; bytes that are no character are invalid
+    fn double_byte(&mut self, m: MultiByte, value: u8) -> Result<(), Error> {
+        let mut s = String::new();
+        match self.lead.take() {
+            Some(lead) => s = m.decode(&[lead, value]),
+            None if value < 0x80 => return self.text(char::from(value)),
+            None => {
+                let mut d = Decoder::new(Label::Multi(m));
+                d.decode(&[value], false, &mut s);
+                if s.is_empty() && !d.malformed() {
+                    self.lead = Some(value);
+                    return Ok(());
+                }
+            }
+        }
+        if s.is_empty() || s.contains('\u{FFFD}') {
+            return Err(Error::Invalid);
+        }
+        // (Big5 has four pairs that are two characters)
+        s.chars().try_for_each(|c| self.text(c))
+    }
     fn unicode(&mut self, value: i32) -> Result<(), Error> {
         if !(-32768..=65535).contains(&value) {
             return Err(Error::Invalid);
@@ -606,6 +632,12 @@ impl<'a> Reader<'a> {
                     .map(|f| f.1)
                     .unwrap_or(0);
                 let cp = if cp == 0 { self.codepage } else { cp };
+                if let Some(m) = u16::try_from(cp).ok().and_then(MultiByte::from_code_page).filter(|_| matches!(cp, 932 | 936 | 949 | 950)) {
+                    return self.double_byte(m, value);
+                }
+                if self.lead.is_some() {
+                    return Err(Error::Invalid);
+                }
                 if cp == -2 || value >= 128 && !supported_codepage(cp) {
                     return Err(unsupported("character code page/font"));
                 }
@@ -646,7 +678,7 @@ impl<'a> Reader<'a> {
         Ok(f)
     }
     fn paragraph_end(&mut self) -> Result<(), Error> {
-        if self.high.is_some() {
+        if self.high.is_some() || self.lead.is_some() {
             return Err(Error::Invalid);
         }
         if self.document.paragraphs.len() == 2048 {
@@ -718,7 +750,7 @@ impl<'a> Reader<'a> {
                 }
             }
         }
-        if !self.header || !self.stack.is_empty() || self.high.is_some() {
+        if !self.header || !self.stack.is_empty() || self.high.is_some() || self.lead.is_some() {
             return Err(Error::Invalid);
         }
         if !self.current.is_empty() { self.paragraph_end()?; }
@@ -920,6 +952,10 @@ impl<'a> Reader<'a> {
                         204 => 1251,
                         222 => 874,
                         238 => 1250,
+                        128 => 932,
+                        129 => 949,
+                        134 => 936,
+                        136 => 950,
                         _ => -1,
                     }
                 };

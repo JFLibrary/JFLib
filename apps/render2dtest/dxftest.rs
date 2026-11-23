@@ -1062,7 +1062,18 @@ fn reader(t: &mut T) {
     let b = cp("AC1015", "ANSI_1252", &[0x45, 0xE9, 0x80]);
     let c = cp("AC1021", "ANSI_1252", "Größe \\U+2300".as_bytes());
     let d = cp("AC1015", "ANSI_932", &[0x41, 0x82, 0xA0]);
-    t.ok(a == "Аб" && b == "Eé€" && c == "Größe ⌀" && d == "A\u{FFFD}\u{FFFD}", &format!("code pages: ANSI_1251 {a:?}, ANSI_1252 {b:?}, AC1021 UTF-8 with \\U+ {c:?}, ANSI_932 (no table) {d:?}"));
+    t.ok(a == "Аб" && b == "Eé€" && c == "Größe ⌀" && d == "Aあ", &format!("code pages: ANSI_1251 {a:?}, ANSI_1252 {b:?}, AC1021 UTF-8 with \\U+ {c:?}, ANSI_932 {d:?}"));
+    // the East Asian pages (a trail byte 0x5C is no escape), Johab without a table, \M+NXXXX
+    let sj = cp("AC1015", "ANSI_932", &[0x83, 0x5C, 0x83, 0x74, 0x83, 0x67, 0xB1]);
+    let gb = cp("AC1015", "ANSI_936", &[0xD6, 0xD0, 0xCE, 0xC4]);
+    let kr = cp("AC1015", "ANSI_949", &[0xC7, 0xD1, 0x8C, 0x63]);
+    let b5 = cp("AC1015", "BIG5", &[0xA4, 0xA4, 0xA4, 0xE5]);
+    let jo = cp("AC1015", "ANSI_1361", &[0x41, 0x88, 0x61]);
+    t.ok(sj == "ソフトｱ" && gb == "中文" && kr == "한똠" && b5 == "中文" && jo == "A\u{FFFD}a", &format!("code pages: ANSI_932 {sj:?}, ANSI_936 {gb:?}, ANSI_949 {kr:?}, BIG5 {b5:?}, ANSI_1361 (no table) {jo:?}"));
+    let m = cp("AC1015", "ANSI_1252", b"x\\M+182A0\\M+2A4A4\\M+3C7D1\\M+5D6D0\\M+48861\\M+18120y");
+    let mt = dxf::mtext::parse("\\M+182A0\\M+5CEC4", 1.0);
+    let mt_text: String = mt.paragraphs.iter().flat_map(|p| p.items.iter()).filter_map(|i| match i { dxf::mtext::Item::Text(s, _) => Some(s.clone()), _ => None }).collect();
+    t.ok(m == "xあ中한中\u{FFFD}\u{FFFD}y" && mt_text == "あ文", &format!("\\M+NXXXX: TEXT {m:?}, MTEXT {mt_text:?}"));
     // the DOS pages by their number, KOI8_R by name, an unknown page as Windows-1252
     let e = cp("AC1015", "DOS850", &[0x82]);
     let f = cp("AC1015", "DOS737", &[0x80]);

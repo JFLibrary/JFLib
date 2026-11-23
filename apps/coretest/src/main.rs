@@ -166,6 +166,10 @@ fn run() -> i32 {
         let rest: alloc::vec::Vec<String> = args.iter().skip_while(|a| a.as_str() != "--zstd").skip(2).cloned().collect();
         return lz::zstd_args(&op, &rest);
     }
+    if let Some(op) = plat::arg_value("--encoding") {
+        let rest: alloc::vec::Vec<String> = args.iter().skip_while(|a| a.as_str() != "--encoding").skip(2).cloned().collect();
+        return charsett::cli(&op, &rest);
+    }
     #[cfg(not(target_os = "android"))]
     if let Some(code) = server_modes(&args) {
         return code;

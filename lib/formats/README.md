@@ -1,7 +1,7 @@
 # jflib-formats
 
 Data formats as text for [JFLib](https://jflib.org): JSON, typed JSON records, a bounded XML
-subset and the Unicode text encodings, in plain Rust, without the standard library, without a line
+subset and the text encodings of the web and of old files, in plain Rust, without the standard library, without a line
 of `unsafe` code and without a dependency. The crate holds what settings and project files,
 manifests, protocols and document formats all need, so that a program that only reads JSON or XML
 does not have to depend on the crate of the agent interface or on the platform layer.
@@ -42,14 +42,25 @@ old and a new program read each other's data.
 **Encodings** (`formats::encoding`) decode bytes to a `String` and back. `decode` and `encode` are
 the strict Unicode interchange: UTF-8 with or without a byte-order mark and UTF-16 in both byte
 orders, told apart by the mark; nothing is replaced or guessed, invalid sequences and UTF-32 are
-errors. For text from the web, from mail and from old files there are the single-byte character
-sets (`Charset`): every single-byte encoding of the
-[WHATWG Encoding Standard](https://encoding.spec.whatwg.org/) (windows-1252 and the other Windows
-pages, ISO-8859-2 to -16, KOI8-R and KOI8-U, macintosh, IBM866, x-mac-cyrillic), the DOS code pages
-of old files (IBM437, 737, 775, 850 to 869) and an exact ISO-8859-1. `label` reads the standard's
-labels as browsers do ("latin1" is windows-1252, multi-byte encodings such as Shift_JIS are named
-but not decoded), `Charset::from_code_page` takes Windows code page numbers, and `decode_label`
-is the standard's decode: a byte-order mark wins over the label, malformed input becomes U+FFFD.
+errors. For text from the web, from mail and from old files there is every encoding of the
+[WHATWG Encoding Standard](https://encoding.spec.whatwg.org/), as browsers decode and encode it:
+
+- the single-byte character sets (`Charset`): windows-1252 and the other Windows pages,
+  ISO-8859-2 to -16, KOI8-R and KOI8-U, macintosh, IBM866, x-mac-cyrillic; besides them the DOS
+  code pages of old files (IBM437, 737, 775, 850 to 869) and an exact ISO-8859-1
+- the multi-byte encodings of Chinese, Japanese and Korean (`MultiByte`): Shift_JIS (Windows' code
+  page 932), EUC-JP, ISO-2022-JP (mail), GBK, gb18030 (all of Unicode, GB18030-2022), Big5 with
+  HKSCS-2008 and EUC-KR (Windows' 949, every Hangul syllable). `encode` refuses a character the
+  encoding lacks (`Error::Unmappable`), `encode_html` writes it as a character reference, as
+  browsers submit forms.
+
+`label` reads the standard's labels as browsers do ("latin1" is windows-1252, "sjis" Shift_JIS,
+"gb2312" GBK), `from_code_page` takes Windows code page numbers (what RTF's `\ansicpg` and DXF's
+`$DWGCODEPAGE` give), and `decode_label` is the standard's decode: a byte-order mark wins over the
+label, malformed input becomes U+FFFD. A `Decoder` takes input in pieces, a character cut between
+two of them included, and gives the same text as decoding all of it at once. Every decoder and
+encoder gives the same output as encoding_rs, Firefox's implementation of the standard, on every
+character and every two-byte sequence (the repository's `tools/encoding_check.py`).
 
 Every reader treats its input as untrusted. It checks the size before it reads and the nesting,
 the values or the elements while it reads (`json::Limits`, `xml::Limits`, the `limit` of
@@ -74,11 +85,17 @@ Like all of JFLib, the crate comes through the one dependency
 version and are released together. It runs on every platform JFLib supports.
 
 ```rust
-use jflib::formats::encoding::{self, Charset};
+use jflib::formats::encoding::{self, Charset, MultiByte};
 
 let text = encoding::decode_label("iso-8859-2", &bytes, 1 << 20)?;   // a mail's charset=
 let dos = Charset::from_code_page(850).map(|c| c.decode(&name));     // a ZIP or DBF from DOS
 let back = Charset::Windows1252.encode("€100")?;                     // Err: a character it lacks
+let sjis = MultiByte::ShiftJis.encode("日本語")?;                      // 93 FA 96 7B 8C EA
+
+let mut d = encoding::Decoder::new(encoding::label("gb18030").unwrap());
+let mut text = String::new();
+d.decode(&first_piece, false, &mut text);                            // a character may be cut here
+d.decode(&last_piece, true, &mut text);
 ```
 
 Until 0.2.1, JSON and the typed records were `agent_core::json` and `agent_core::jmap`, XML and
@@ -99,6 +116,6 @@ in `agent_core` and `base` until then. The
 ## License
 
 MIT or Apache-2.0, at your choice. The labels of the WHATWG Encoding Standard and the entries of its
-single-byte indexes in `charsets.rs` are under the standard's BSD 3-Clause License (Copyright ©
+indexes in `charsets.rs`, `cjk.rs` and `cjk.bin` are under the standard's BSD 3-Clause License (Copyright ©
 WHATWG: Apple, Google, Mozilla, Microsoft); the text is in the crate's
 [`licenses/`](https://github.com/JFLibrary/JFLib/tree/main/lib/formats/licenses) folder.

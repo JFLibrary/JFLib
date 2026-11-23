@@ -1,11 +1,23 @@
 #!/usr/bin/env python3
-"""gen_encodings.py -- lib/formats/src/charsets.rs: the single-byte character sets of formats::encoding
+"""gen_encodings.py -- the tables of formats::encoding: lib/formats/src/charsets.rs (the single-byte
+character sets and the labels), cjk.rs and cjk.bin (the indexes of the multi-byte encodings)
 
-    python tools/gen_encodings.py            write lib/formats/src/charsets.rs
-    python tools/gen_encodings.py --check    exit 1 when the file is not what this script writes
+    python tools/gen_encodings.py            write the three files
+    python tools/gen_encodings.py --check    exit 1 when a file is not what this script writes
     python tools/gen_encodings.py --verify   compare the tables and labels with the WHATWG data of
                                              encoding_rs (in Cargo's registry, when it is there) and
-                                             with Node's TextDecoder (when node is on PATH)
+                                             with Node's TextDecoder (when node is on PATH); the
+                                             multi-byte indexes with encoding_rs's decoders, built
+                                             offline (tools/encoding_check.py)
+
+The multi-byte encodings are the standard's Shift_JIS, EUC-JP, ISO-2022-JP (index jis0208 and
+jis0212), EUC-KR (index euc-kr), Big5 (index big5) and GBK / gb18030 (index gb18030 and its
+ranges).  Their indexes are Python's codecs as well: cp932 for jis0208 (without the rows 95 to
+114, which the Shift_JIS decoder maps to the Private Use Area itself), the 0x8F rows of euc_jp for
+jis0212, cp949 for euc-kr, big5hkscs for big5, gb18030 for gb18030 and, from its four-byte
+sequences, the ranges; where the standard differs (Big5's HKSCS-2008 additions, GB18030-2022, one
+tilde) the entries are listed below.  cjk.bin holds them as little-endian 16-bit words, with the
+pointers sorted by code point for the encoders.
 
 The character sets are the single-byte encodings of the WHATWG Encoding Standard
 (https://encoding.spec.whatwg.org/, the ones browsers, HTML and mail use) and the DOS code pages
@@ -128,20 +140,303 @@ LABELS = {
     "Windows1258": ["cp1258", "windows-1258", "x-cp1258"],
     "XMacCyrillic": ["x-mac-cyrillic", "x-mac-ukrainian"],
     "XUserDefined": ["x-user-defined"],
-    "Other(\"GBK\")": ["chinese", "csgb2312", "csiso58gb231280", "gb2312", "gb_2312", "gb_2312-80", "gbk", "iso-ir-58", "x-gbk"],
-    "Other(\"gb18030\")": ["gb18030"],
-    "Other(\"Big5\")": ["big5", "big5-hkscs", "cn-big5", "csbig5", "x-x-big5"],
-    "Other(\"EUC-JP\")": ["cseucpkdfmtjapanese", "euc-jp", "x-euc-jp"],
-    "Other(\"ISO-2022-JP\")": ["csiso2022jp", "iso-2022-jp"],
-    "Other(\"Shift_JIS\")": ["csshiftjis", "ms932", "ms_kanji", "shift-jis", "shift_jis", "sjis", "windows-31j", "x-sjis"],
-    "Other(\"EUC-KR\")": ["cseuckr", "csksc56011987", "euc-kr", "iso-ir-149", "korean", "ks_c_5601-1987", "ks_c_5601-1989", "ksc5601",
-                          "ksc_5601", "windows-949"],
+    "Multi(MultiByte::Gbk)": ["chinese", "csgb2312", "csiso58gb231280", "gb2312", "gb_2312", "gb_2312-80", "gbk", "iso-ir-58", "x-gbk"],
+    "Multi(MultiByte::Gb18030)": ["gb18030"],
+    "Multi(MultiByte::Big5)": ["big5", "big5-hkscs", "cn-big5", "csbig5", "x-x-big5"],
+    "Multi(MultiByte::EucJp)": ["cseucpkdfmtjapanese", "euc-jp", "x-euc-jp"],
+    "Multi(MultiByte::Iso2022Jp)": ["csiso2022jp", "iso-2022-jp"],
+    "Multi(MultiByte::ShiftJis)": ["csshiftjis", "ms932", "ms_kanji", "shift-jis", "shift_jis", "sjis", "windows-31j", "x-sjis"],
+    "Multi(MultiByte::EucKr)": ["cseuckr", "csksc56011987", "euc-kr", "iso-ir-149", "korean", "ks_c_5601-1987", "ks_c_5601-1989",
+                                "ksc5601", "ksc_5601", "windows-949"],
     "Replacement": ["csiso2022kr", "hz-gb-2312", "iso-2022-cn", "iso-2022-cn-ext", "iso-2022-kr", "replacement"],
     "Utf16Be": ["unicodefffe", "utf-16be"],
     "Utf16Le": ["csunicode", "iso-10646-ucs-2", "ucs-2", "unicode", "unicodefeff", "utf-16", "utf-16le"],
 }
 # the WHATWG name of each Label that is not a character set (for --verify against Node)
-LABEL_NAMES = {"Utf8": "utf-8", "Utf16Be": "utf-16be", "Utf16Le": "utf-16le", "Replacement": "replacement"}
+LABEL_NAMES = {"Utf8": "utf-8", "Utf16Be": "utf-16be", "Utf16Le": "utf-16le", "Replacement": "replacement",
+               "Multi(MultiByte::Gbk)": "GBK",
+               "Multi(MultiByte::Gb18030)": "gb18030",
+               "Multi(MultiByte::Big5)": "Big5",
+               "Multi(MultiByte::EucJp)": "EUC-JP",
+               "Multi(MultiByte::Iso2022Jp)": "ISO-2022-JP",
+               "Multi(MultiByte::ShiftJis)": "Shift_JIS",
+               "Multi(MultiByte::EucKr)": "EUC-KR"}
+
+
+# ---------------------------------------------------------------- the multi-byte encodings
+OUT_CJK = ROOT / "lib" / "formats" / "src" / "cjk.rs"
+OUT_CJK_BIN = ROOT / "lib" / "formats" / "src" / "cjk.bin"
+
+# the sizes of the indexes here: the standard's pointers above them are empty
+JIS0208_LEN, JIS0212_LEN, EUC_KR_LEN, BIG5_LEN, GB18030_LEN = 11104, 7211, 23750, 19782, 23940
+# Big5 pointers that decode to two code points (the decoder writes them itself, the index has nothing)
+BIG5_PAIRS = {1133: (0x00CA, 0x0304), 1135: (0x00CA, 0x030C), 1164: (0x00EA, 0x0304), 1166: (0x00EA, 0x030C)}
+# where the standard's index differs from Python's codec
+JIS0212_FIXES = {116: 0xFF5E}  # FULLWIDTH TILDE (Python: TILDE)
+BIG5_CHANGED = {  # the symbols of rows 0xA1 and 0xA2 as in cp950
+    5029: 0x2027, 5038: 0xFE51, 5120: 0x00AF, 5153: 0xFF5E, 5168: 0x2295, 5169: 0x2299, 5182: 0x2215, 5183: 0xFE68,
+    5185: 0xFFE5, 5187: 0xFFE0, 5188: 0xFFE1,
+}
+# the HKSCS-2008 additions (Python's big5hkscs is HKSCS-2004) and the control pictures of row 0xA3: (pointer, code points)
+BIG5_ADDED = [
+    (1000, [0x3875, 0x21D53, 0x2369E, 0x26021, 0x3EEC, 0x258DE, 0x3AF5, 0x7AFC, 0x9F97, 0x24161, 0x2890D, 0x231EA,
+           0x20A8A, 0x2325E, 0x430A, 0x8484, 0x9F96, 0x942F, 0x4930, 0x8613, 0x5896, 0x974A, 0x9218, 0x79D0, 0x7A32,
+           0x6660, 0x6A29, 0x889D, 0x744C, 0x7BC5, 0x6782, 0x7A2C, 0x524F, 0x9046, 0x34E6, 0x73C4, 0x25DB9, 0x74C6,
+           0x9FC7, 0x57B3, 0x492F, 0x544C, 0x4131, 0x2368E, 0x5818, 0x7A72, 0x27B65, 0x8B8F, 0x46AE, 0x26E88, 0x4181,
+           0x25D99, 0x7BAE, 0x224BC, 0x9FC8, 0x224C1, 0x224C9, 0x224CC, 0x9FC9, 0x8504, 0x235BB, 0x40B4, 0x9FCA,
+           0x44E1, 0x2ADFF, 0x62C1, 0x706E, 0x9FCB]),
+    (2082, [0x7BB8]),
+    (2088, [0x7C06]),
+    (2103, [0x7CCE]),
+    (2114, [0x7DD2]),
+    (2123, [0x7E1D]),
+    (2148, [0x8005]),
+    (2151, [0x8028]),
+    (2221, [0x83C1]),
+    (2239, [0x84A8]),
+    (2244, [0x840F]),
+    (2303, [0x89A6, 0x89A9]),
+    (2354, [0x8D77]),
+    (2400, [0x90FD]),
+    (2413, [0x92B9]),
+    (2477, [0x975C]),
+    (2498, [0x97FF]),
+    (2605, [0x9F16]),
+    (2673, [0x8503]),
+    (2746, [0x5159, 0x515B, 0x515D, 0x515E]),
+    (2771, [0x936E]),
+    (2780, [0x7479]),
+    (2990, [0x6D67]),
+    (3087, [0x799B]),
+    (3259, [0x9097]),
+    (3301, [0x975D]),
+    (3436, [0x701E]),
+    (3451, [0x5B28]),
+    (4136, [0x7201]),
+    (4138, [0x77D7]),
+    (4141, [0x7E87]),
+    (4182, [0x99D6]),
+    (4206, [0x91D4]),
+    (4220, [0x60DE]),
+    (4230, [0x6FB6]),
+    (4241, [0x8F36]),
+    (4258, [0x4FBB]),
+    (4273, [0x71DF]),
+    (4279, [0x9104]),
+    (4282, [0x9DF0]),
+    (4294, [0x83CF]),
+    (4329, [0x5C10, 0x79E3]),
+    (4349, [0x5A67]),
+    (4419, [0x8F0B]),
+    (4422, [0x7B51]),
+    (4494, [0x62D0]),
+    (4624, [0x6062]),
+    (4694, [0x75F9]),
+    (4708, [0x6C4A]),
+    (4742, [0x9B2E]),
+    (4748, [0x9F17]),
+    (4815, [0x50ED]),
+    (4828, [0x5F0C]),
+    (4902, [0x880F]),
+    (4922, [0x62CE]),
+    (4982, [0x7468]),
+    (4992, [0x7162]),
+    (4997, [0x7250]),
+    (5432, [0x2400, 0x2401, 0x2402, 0x2403, 0x2404, 0x2405, 0x2406, 0x2407, 0x2408, 0x2409, 0x240A, 0x240B, 0x240C,
+           0x240D, 0x240E, 0x240F, 0x2410, 0x2411, 0x2412, 0x2413, 0x2414, 0x2415, 0x2416, 0x2417, 0x2418, 0x2419,
+           0x241A, 0x241B, 0x241C, 0x241D, 0x241E, 0x241F, 0x2421, 0x20AC]),
+    (10942, [0x5EF4]),
+    (10946, [0x65E0]),
+    (10948, [0x7676]),
+    (10950, [0x96B6]),
+    (10957, [0x3003, 0x4EDD]),
+    (19028, [0x5029]),
+    (19035, [0x507D]),
+    (19088, [0x5305]),
+    (19096, [0x5344]),
+    (19112, [0x537F]),
+    (19162, [0x5605]),
+    (19240, [0x5A77]),
+    (19299, [0x5E75]),
+    (19305, [0x5ED0]),
+    (19326, [0x5F58]),
+    (19355, [0x60A4]),
+    (19398, [0x6490]),
+    (19439, [0x6674]),
+    (19454, [0x675E]),
+    (19553, [0x6C9C, 0x6E1D]),
+    (19557, [0x6E2F]),
+    (19611, [0x716E]),
+    (19643, [0x732A]),
+    (19672, [0x745C]),
+    (19697, [0x74E9]),
+    (19748, [0x7809]),
+]
+GB18030_FIXES = {  # GB18030-2022: 0xA3A0 is U+3000, 18 characters left the Private Use Area; 0xA8BC is U+1E3F
+    6555: 0x3000, 7182: 0xFE10, 7183: 0xFE12, 7184: 0xFE11, 7185: 0xFE13, 7186: 0xFE14, 7187: 0xFE15, 7188: 0xFE16,
+    7201: 0xFE17, 7202: 0xFE18, 7208: 0xFE19, 7533: 0x1E3F, 23775: 0x9FB4, 23783: 0x9FB5, 23788: 0x9FB6,
+    23789: 0x9FB7, 23795: 0x9FB8, 23812: 0x9FB9, 23829: 0x9FBA, 23845: 0x9FBB,
+}
+
+
+def _one(b, codec):
+    try:
+        s = b.decode(codec)
+    except UnicodeDecodeError:
+        return 0
+    return ord(s) if len(s) == 1 else 0
+
+
+def _sjis(p):
+    return bytes([p // 188 + (0x81 if p // 188 < 0x1F else 0xC1), p % 188 + (0x40 if p % 188 < 0x3F else 0x41)])
+
+
+def _big5(p):
+    return bytes([p // 157 + 0x81, p % 157 + (0x40 if p % 157 < 0x3F else 0x62)])
+
+
+def _gb(p):
+    return bytes([p // 190 + 0x81, p % 190 + (0x40 if p % 190 < 0x3F else 0x41)])
+
+
+def _gb4(p):
+    return bytes([p // 12600 + 0x81, p // 1260 % 10 + 0x30, p // 10 % 126 + 0x81, p % 10 + 0x30])
+
+
+def cjk_tables():
+    """the standard's indexes (name -> pointer -> code point, 0: none) and the gb18030 ranges (pointer, code point)"""
+    t = {"jis0208": [0 if 8836 <= p < 10716 else _one(_sjis(p), "cp932") for p in range(JIS0208_LEN)],
+         "jis0212": [_one(bytes([0x8F, p // 94 + 0xA1, p % 94 + 0xA1]), "euc_jp") for p in range(JIS0212_LEN)],
+         "euc_kr": [_one(bytes([p // 190 + 0x81, p % 190 + 0x41]), "cp949") for p in range(EUC_KR_LEN)],
+         "big5": [_one(_big5(p), "big5hkscs") for p in range(BIG5_LEN)],
+         "gb18030": [_one(_gb(p), "gb18030") for p in range(GB18030_LEN)]}
+    for p, c in JIS0212_FIXES.items():
+        t["jis0212"][p] = c
+    for p, c in BIG5_CHANGED.items():
+        t["big5"][p] = c
+    for p, cs in BIG5_ADDED:
+        t["big5"][p:p + len(cs)] = cs
+    for p in BIG5_PAIRS:
+        t["big5"][p] = 0
+    for p, c in GB18030_FIXES.items():
+        t["gb18030"][p] = c
+    # the four-byte sequences of the BMP: a range starts where the code points stop counting up.  Pointer 7457 is the
+    # standard's exception (U+E7C7, the decoders and encoders know it); Python still has GB18030-2000's U+1E3F, which
+    # continues its range as the standard's table does.
+    four = [_one(_gb4(p), "gb18030") for p in range(39420)]
+    ranges = [(p, c) for p, c in enumerate(four) if p == 0 or c != four[p - 1] + 1] + [(189000, 0x10000)]
+    return t, ranges
+
+
+def gb18030_pua():
+    """the 18 characters GB18030-2022 moved out of the Private Use Area, whose old code points the encoder still
+    writes as before: (old code point, pointer)"""
+    out = []
+    for p in sorted(GB18030_FIXES):
+        old = _one(_gb(p), "gb18030")
+        if 0xE000 <= old <= 0xF8FF and old not in (0xE5E5, 0xE7C7):
+            out.append((old, p))
+    return sorted(out)
+
+
+def iso2022jp_katakana():
+    """index ISO-2022-JP katakana: U+FF61..U+FF9F -> the full-width characters jis0208 has (the encoder's)"""
+    import unicodedata
+    out = []
+    for u in range(0xFF61, 0xFFA0):
+        d = unicodedata.decomposition(chr(u)).split()
+        assert d[0] == "<narrow>", hex(u)
+        out.append(int(d[1], 16))
+    # the sound marks as spacing characters (their decomposition is the combining ones)
+    out[0xFF9E - 0xFF61], out[0xFF9F - 0xFF61] = 0x309B, 0x309C
+    return out
+
+
+def render_cjk():
+    t, ranges = cjk_tables()
+    big5 = t["big5"]
+    assert all(c <= 0xFFFF or 0x20000 <= c <= 0x2FFFF for c in big5)
+    # the EUC-JP and ISO-2022-JP encoders take a character's first pointer, which must be one of the 94 rows
+    first = {}
+    for p, c in enumerate(t["jis0208"]):
+        if c:
+            first.setdefault(c, p)
+    assert all(p < 8836 for p in first.values())
+    kana = iso2022jp_katakana()
+    assert all(c in first for c in kana)
+    bits = [0] * ((BIG5_LEN + 15) // 16)
+    for p, c in enumerate(big5):
+        if c > 0xFFFF:
+            bits[p // 16] |= 1 << (p % 16)
+
+    def order(table, lo=0):
+        return [p for c, p in sorted((c, p) for p, c in enumerate(table) if c and p >= lo)]
+
+    parts = [
+        ("JIS0208", "jis0208: pointer -> code point (Shift_JIS, EUC-JP, ISO-2022-JP)", t["jis0208"]),
+        ("JIS0212", "jis0212: pointer -> code point (EUC-JP after 0x8F)", t["jis0212"]),
+        ("EUC_KR", "euc-kr: pointer -> code point", t["euc_kr"]),
+        ("BIG5", "big5: pointer -> the low 16 bits of the code point (plus 0x20000 where BIG5_ASTRAL says so)", [c & 0xFFFF for c in big5]),
+        ("BIG5_ASTRAL", "big5: bit p % 16 of word p / 16 is set when the code point of pointer p is in plane 2", bits),
+        ("GB18030", "gb18030: pointer -> code point (the two-byte sequences)", t["gb18030"]),
+        ("JIS0208_ORDER", "the pointers of jis0208 by code point, then pointer (the encoders search them)", order(t["jis0208"])),
+        ("EUC_KR_ORDER", "the pointers of euc-kr by code point, then pointer", order(t["euc_kr"])),
+        ("BIG5_ORDER", "the pointers of big5 from 5024 on (the encoder's part) by code point, then pointer",
+         [p for c, p in sorted((c, p) for p, c in enumerate(big5) if c and p >= 5024)]),
+        ("GB18030_ORDER", "the pointers of gb18030 by code point, then pointer", order(t["gb18030"])),
+    ]
+    blob = bytearray()
+    L = ["// cjk -- the indexes of the WHATWG Encoding Standard's multi-byte encodings for formats::encoding (generated",
+         "// by tools/gen_encodings.py, do not edit).  cjk.bin holds them as little-endian 16-bit words; a Table is",
+         "// where one starts and how many words it has.  The indexes: Copyright \u00a9 WHATWG (Apple, Google, Mozilla,",
+         "// Microsoft), BSD 3-Clause License (licenses/WHATWG-LICENSE.txt).",
+         "",
+         "#[derive(Clone, Copy)]",
+         "pub(crate) struct Table {",
+         "    pub at: usize,",
+         "    pub len: usize,",
+         "}",
+         "",
+         "impl Table {",
+         "    /// word i (0 past the end)",
+         "    #[inline]",
+         "    pub(crate) fn get(self, i: usize) -> u16 {",
+         "        if i >= self.len {",
+         "            return 0;",
+         "        }",
+         "        let o = 2 * (self.at + i);",
+         "        u16::from_le_bytes([BIN[o], BIN[o + 1]])",
+         "    }",
+         "}",
+         ""]
+    for name, doc, arr in parts:
+        L.append(f"/// {doc}")
+        L.append(f"pub(crate) const {name}: Table = Table {{ at: {len(blob) // 2}, len: {len(arr)} }};")
+        blob += b"".join(x.to_bytes(2, "little") for x in arr)
+    L.insert(L.index("#[derive(Clone, Copy)]"), f"static BIN: &[u8; {len(blob)}] = include_bytes!(\"cjk.bin\");")
+    L.insert(L.index("#[derive(Clone, Copy)]"), "")
+    L += ["", "/// index gb18030 ranges: (pointer, code point), both ascending; a pointer from one on counts up from its code point",
+          f"pub(crate) static GB18030_RANGES: [(u32, u32); {len(ranges)}] = ["]
+    row = []
+    for p, c in ranges:
+        row.append(f"({p}, 0x{c:04X}),")
+        if len(row) == 8:
+            L.append("    " + " ".join(row))
+            row = []
+    if row:
+        L.append("    " + " ".join(row))
+    pua = gb18030_pua()
+    L += ["];", "", "/// the old code points of the 18 characters GB18030-2022 moved out of the Private Use Area, which the encoder",
+          "/// still writes with their two bytes: (code point, pointer), by code point",
+          f"pub(crate) static GB18030_PUA: [(u16, u16); {len(pua)}] = ["]
+    for i in range(0, len(pua), 6):
+        L.append("    " + " ".join(f"(0x{c:04X}, {p})," for c, p in pua[i:i + 6]))
+    L += ["];", "", "/// index ISO-2022-JP katakana: U+FF61..U+FF9F (half-width) -> the full-width character the encoder writes",
+          f"pub(crate) static ISO2022JP_KATAKANA: [u16; {len(kana)}] = ["]
+    for i in range(0, len(kana), 12):
+        L.append("    " + " ".join(f"0x{c:04X}," for c in kana[i:i + 12]))
+    L += ["];", ""]
+    return "\n".join(L), bytes(blob)
 
 
 def table(variant, codec, whatwg):
@@ -171,7 +466,7 @@ def render():
         "// the standard's tables: Copyright © WHATWG (Apple, Google, Mozilla, Microsoft), BSD 3-Clause License",
         "// (licenses/WHATWG-LICENSE.txt).",
         "",
-        "use crate::encoding::Label;",
+        "use crate::encoding::{Label, MultiByte};",
         "",
         "/// a single-byte character set: the bytes below 0x80 are ASCII, the others come from its table.",
         "/// The single-byte encodings of the WHATWG Encoding Standard (what browsers, HTML and mail use; `whatwg()`)",
@@ -246,6 +541,45 @@ def rs_field(v):
     return None
 
 
+def verify_cjk():
+    """the multi-byte indexes against encoding_rs's decoders (tools/encoding_ref.rs: what each pointer's bytes decode to)"""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import encoding_check
+    exe = encoding_check.reference()
+    if exe is None:
+        print("verify: encoding_rs is not in Cargo's registry (or cargo is missing): the multi-byte indexes were not compared")
+        return []
+    out = ROOT / "build" / "encoding_ref" / "index.json"
+    subprocess.run([str(exe), "index", str(out)], check=True)
+    ref = json.loads(out.read_text(encoding="utf-8"))
+    t, ranges = cjk_tables()
+
+    def ranges_code_point(p):
+        if p == 7457:
+            return 0xE7C7
+        q, c = max(e for e in ranges if e[0] <= p)
+        return c + p - q
+
+    def entry(name, p):
+        if name == "big5" and p in BIG5_PAIRS:
+            return list(BIG5_PAIRS[p])
+        key = {"jis0208_euc": "jis0208", "gb18030_four": None}.get(name, name)
+        if key is None:
+            return [ranges_code_point(p)]
+        table = t[key]
+        return [table[p]] if p < len(table) and table[p] else []
+
+    bad, n = [], 0
+    for name, want in ref.items():
+        diff = [p for p, w in enumerate(want) if not (name == "jis0208" and 8836 <= p < 10716) and entry(name, p) != w]
+        n += len(want)
+        if diff:
+            bad.append(f"{name}: {len(diff)} pointers differ from encoding_rs, first {diff[:8]}")
+    print(f"verify: {n} pointers of the multi-byte indexes (jis0208 by Shift_JIS and EUC-JP, jis0212, euc-kr, big5, gb18030"
+          f" and its {len(ranges)} ranges) against encoding_rs's decoders")
+    return bad
+
+
 def verify():
     bad = []
     by_name = {c[0]: c for c in CHARSETS}
@@ -286,7 +620,7 @@ def verify():
         js = ("const L=%s,T=%s,out={labels:{},tables:{}};for(const [l,n] of L){try{out.labels[l]=new TextDecoder(l).encoding}catch(e){out.labels[l]=null}}"
               "for(const n of T){let d;try{d=new TextDecoder(n)}catch(e){continue}out.tables[n]=[];for(let b=128;b<256;b++){const s=d.decode(new Uint8Array([b]));"
               "out.tables[n].push(s.codePointAt(0))}}console.log(JSON.stringify(out))")
-        pairs = [(l, names[k]) for k, ls in LABELS.items() if names[k] and not k.startswith("Other") for l in ls]
+        pairs = [(l, names[k]) for k, ls in LABELS.items() if names[k] for l in ls]
         node = json.loads(subprocess.run(["node", "-e", js % (json.dumps(pairs), json.dumps([c[1] for c in CHARSETS if c[4]]))],
                                          capture_output=True, text=True, check=True).stdout)
         # what ICU (Node) does other than the standard, known and expected
@@ -317,6 +651,7 @@ def verify():
               f" {tables_ok} tables agree; ICU's known differences seen: {len(seen_icu)} of {len(icu)}; labels Node lacks: {missing}")
     else:
         print("verify: no node on PATH: TextDecoder was not compared")
+    bad += verify_cjk()
     for b in bad:
         print("FAIL", b)
     return 1 if bad else 0
@@ -326,13 +661,16 @@ def main():
     if "--verify" in sys.argv:
         return verify()
     text = render()
+    cjk, blob = render_cjk()
+    files = [(OUT, text.encode("utf-8")), (OUT_CJK, cjk.encode("utf-8")), (OUT_CJK_BIN, blob)]
     if "--check" in sys.argv:
-        ok = OUT.exists() and OUT.read_text(encoding="utf-8") == text
-        print("charsets.rs is current" if ok else "charsets.rs is stale: python tools/gen_encodings.py")
-        return 0 if ok else 1
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(text, encoding="utf-8", newline="\n")
-    print(f"wrote {OUT.relative_to(ROOT)}")
+        stale = [p.name for p, b in files if not p.exists() or p.read_bytes() != b]
+        print(f"{', '.join(stale)} stale: python tools/gen_encodings.py" if stale else "charsets.rs, cjk.rs and cjk.bin are current")
+        return 1 if stale else 0
+    for p, b in files:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(b)
+        print(f"wrote {p.relative_to(ROOT)} ({len(b)} bytes)")
     return 0
 
 

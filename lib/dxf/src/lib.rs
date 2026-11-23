@@ -14,8 +14,9 @@
 // Binary DXF is refused (Error::Binary).  Files are untrusted input: every count, length and size is bounded
 // (Limits), a malformed value is skipped with a note, a group code that is no number ends the file with an error;
 // nothing nests deeper than POLYLINE / VERTEX and INSERT / ATTRIB, so there is no recursion.  Strings before AutoCAD
-// 2007 are in the header's code page ($DWGCODEPAGE, formats::encoding's character sets), from AC1021 on UTF-8; \U+XXXX is decoded
-// everywhere, %% codes and MTEXT's codes where the text is drawn (specials, mtext).
+// 2007 are in the header's code page ($DWGCODEPAGE, formats::encoding's character sets and multi-byte encodings), from
+// AC1021 on UTF-8; \U+XXXX and \M+NXXXX are decoded everywhere, %% codes and MTEXT's codes where the text is drawn
+// (specials, mtext).
 #![no_std]
 #![forbid(unsafe_code)]
 

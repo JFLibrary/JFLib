@@ -1,10 +1,11 @@
 // strings -- a DXF's bytes as text: UTF-8 from AutoCAD 2007 (AC1021) on, before that the header's code page
-// ($DWGCODEPAGE: formats::encoding's character sets), \U+XXXX in any version; TEXT's %% codes (specials).
+// ($DWGCODEPAGE: formats::encoding's character sets and multi-byte encodings), \U+XXXX and \M+NXXXX in any
+// version; TEXT's %% codes (specials).
 
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use formats::encoding::Charset;
+use formats::encoding::{Charset, MultiByte};
 
 /// how a file's strings are decoded
 #[derive(Clone, Copy)]
@@ -13,13 +14,15 @@ pub(crate) struct Decoder {
     pub utf8: bool,
     /// the code page (windows-1252 also for unknown pages)
     pub charset: Charset,
-    /// a multi-byte page this reader has no table of (bytes above 0x7F become U+FFFD)
-    pub multibyte: bool,
+    /// a multi-byte page: Shift_JIS (ANSI_932, DOS932), GBK (ANSI_936, GB2312), EUC-KR (ANSI_949), Big5 (ANSI_950, BIG5)
+    pub multi: Option<MultiByte>,
+    /// a multi-byte page without a table here (Johab: ANSI_1361, JOHAB): bytes above 0x7F become U+FFFD
+    pub unknown: bool,
 }
 
 impl Default for Decoder {
     fn default() -> Decoder {
-        Decoder { utf8: false, charset: Charset::Windows1252, multibyte: false }
+        Decoder { utf8: false, charset: Charset::Windows1252, multi: None, unknown: false }
     }
 }
 
@@ -42,14 +45,26 @@ fn charset(cp: &str) -> Option<Charset> {
     })
 }
 
+/// the multi-byte encoding of a $DWGCODEPAGE name (upper case)
+fn multi(cp: &str) -> Option<MultiByte> {
+    Some(match cp {
+        "ANSI_932" | "DOS932" => MultiByte::ShiftJis,
+        "ANSI_936" | "GB2312" => MultiByte::Gbk,
+        "ANSI_949" => MultiByte::EucKr,
+        "ANSI_950" | "BIG5" => MultiByte::Big5,
+        _ => return None,
+    })
+}
+
 impl Decoder {
     /// the decoder of a header's $ACADVER and $DWGCODEPAGE
     pub fn of(version: &str, codepage: &str) -> Decoder {
         let utf8 = version.len() == 6 && version.is_ascii() && version.starts_with("AC") && version[2..].parse::<u32>().is_ok_and(|v| v >= 1021);
         let cp: String = codepage.trim().chars().map(|c| c.to_ascii_uppercase()).collect();
-        let multibyte = matches!(cp.as_str(), "ANSI_932" | "ANSI_936" | "ANSI_949" | "ANSI_950" | "ANSI_1361" | "DOS932" | "BIG5" | "GB2312" | "JOHAB");
-        let charset = if multibyte { Charset::Windows1252 } else { charset(&cp).unwrap_or(Charset::Windows1252) };
-        Decoder { utf8, charset, multibyte }
+        let multi = multi(&cp);
+        let unknown = matches!(cp.as_str(), "ANSI_1361" | "JOHAB");
+        let charset = if multi.is_some() || unknown { Charset::Windows1252 } else { charset(&cp).unwrap_or(Charset::Windows1252) };
+        Decoder { utf8, charset, multi, unknown }
     }
 
     /// bytes as text: valid UTF-8 stays UTF-8 in any version (writers put UTF-8 into older files: GDAL's utf-8.dxf), the
@@ -67,7 +82,10 @@ impl Decoder {
             lossy(b, &mut out);
             return out;
         }
-        if !self.multibyte {
+        if let Some(m) = self.multi {
+            return m.decode(b);
+        }
+        if !self.unknown {
             return self.charset.decode(b);
         }
         for &c in b {
@@ -81,7 +99,11 @@ impl Decoder {
         if c < 0x80 {
             return c as char;
         }
-        let cs = if self.utf8 || self.multibyte { Charset::Windows1252 } else { self.charset };
+        if let (false, Some(m)) = (self.utf8, self.multi) {
+            // (a single byte of a multi-byte page: Shift_JIS's half-width katakana)
+            return m.decode(&[c]).chars().next().unwrap_or('\u{FFFD}');
+        }
+        let cs = if self.utf8 || self.unknown { Charset::Windows1252 } else { self.charset };
         cs.decode_char(c).unwrap_or('\u{FFFD}')
     }
 }
@@ -108,8 +130,8 @@ fn lossy(mut b: &[u8], out: &mut String) {
     }
 }
 
-/// \U+XXXX (four or five hex digits) as the character it names; \M+NXXXX (a double byte of an East Asian page) as
-/// U+FFFD.  Everything else stays (also "\\": TEXT has no escapes; MTEXT is parsed by mtext::parse)
+/// \U+XXXX (four or five hex digits) as the character it names; \M+NXXXX as the double byte XXXX of the East Asian
+/// page N (`mbcs`).  Everything else stays (also "\\": TEXT has no escapes; MTEXT is parsed by mtext::parse)
 pub fn decode_unicode_escapes(s: &str) -> String {
     if !s.contains('\\') {
         return String::from(s);
@@ -132,7 +154,7 @@ pub fn decode_unicode_escapes(s: &str) -> String {
             let h = &b[i + 4..];
             if h.len() >= 4 && h[..4].iter().all(|c| c.is_ascii_hexdigit()) {
                 out.push_str(&s[last..i]);
-                out.push('\u{FFFD}');
+                mbcs(&mut out, b[i + 3], &h[..4]);
                 i += 8;
                 last = i;
                 continue;
@@ -142,6 +164,27 @@ pub fn decode_unicode_escapes(s: &str) -> String {
     }
     out.push_str(&s[last..]);
     out
+}
+
+/// \M+NXXXX: the double byte XXXX (four hex digits, lead byte first) of AutoCAD's East Asian page N: 1 Shift_JIS
+/// (932), 2 Big5 (950), 3 EUC-KR (949), 5 GBK (936); 4 (Johab, 1361) and the others as U+FFFD
+pub(crate) fn mbcs(out: &mut String, n: u8, hex: &[u8]) {
+    let m = match n {
+        b'1' => Some(MultiByte::ShiftJis),
+        b'2' => Some(MultiByte::Big5),
+        b'3' => Some(MultiByte::EucKr),
+        b'5' => Some(MultiByte::Gbk),
+        _ => None,
+    };
+    let v = hex.iter().take(4).fold(0u16, |v, c| v << 4 | (*c as char).to_digit(16).unwrap_or(0) as u16);
+    match m {
+        // (two bytes that are no character: one U+FFFD, not the trail byte as ASCII)
+        Some(m) => {
+            let s = m.decode(&v.to_be_bytes());
+            out.push_str(if s.starts_with('\u{FFFD}') { "\u{FFFD}" } else { &s });
+        }
+        None => out.push('\u{FFFD}'),
+    }
 }
 
 /// the character of four (or five) hex digits at the start, and how many digits it took

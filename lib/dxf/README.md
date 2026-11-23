@@ -52,7 +52,8 @@ ATTDEF, MTEXT (with R2018's columns), INSERT with MINSERT's array and its attrib
 of lines, arcs, elliptic arcs, splines and bulged polylines; the pattern's line families; solid and
 gradient), SOLID, TRACE, 3DFACE, DIMENSION and ACAD_TABLE (through their anonymous blocks), LEADER,
 WIPEOUT, RAY and XLINE. Other kinds are counted by name. Strings before AutoCAD 2007 are decoded
-from the header's code page, later ones as UTF-8, and `\U+XXXX` everywhere. `mtext::parse` turns
+from the header's code page (the Western and Cyrillic pages, the DOS pages and the East Asian ones:
+Shift_JIS, GBK, EUC-KR, Big5), later ones as UTF-8, and `\U+XXXX` and `\M+NXXXX` everywhere. `mtext::parse` turns
 MTEXT's inline format codes into paragraphs of formatted runs, `specials` TEXT's `%%` codes into
 runs with their underline, overline and strike-through. `aci_rgb` gives AutoCAD's colour index,
 `font_substitute` which font of JFLib's repository stands in for a text style's font: SHX fonts
