@@ -26,7 +26,7 @@ context of the two bytes before each literal, and at levels 10 and 11 a near-opt
 JFLib's guide (430 KB of Markdown) level 5 makes 158 KB (gzip -9: 173 KB, libbrotli at the
 same level: 163 KB), level 11 147 KB (libbrotli: 145 KB). libbrotli is 1.5 to 3 times as fast
 at levels 0 to 9 and about as fast at 10 and 11. `brotli::decompress(data, max_out)` reads any
-stream of RFC 7932.
+stream of RFC 7932; libbrotli decodes up to 1.5 times as fast.
 
 ```rust
 use jflib::compress::brotli;
@@ -153,7 +153,8 @@ same.
 
 MIT or Apache-2.0, at your choice. The DEFLATE encoder follows zlib's compression levels and
 miniz's way of limiting code lengths, the decoder builds its Huffman tables as stb_image does, and
-Brotli's decoder and encoder carry its static dictionary, the encoder scores matches, estimates
-costs and writes its prefix codes as libbrotli does; those parts also stand under the licenses of
+Brotli's decoder and encoder carry its static dictionary, the decoder builds its prefix-code
+tables and the encoder scores matches, estimates costs and writes its prefix codes as libbrotli
+does; those parts also stand under the licenses of
 their sources (Zlib, MIT, and MIT or Unlicense), whose texts are in the crate's
 [`licenses/`](https://github.com/JFLibrary/JFLib/tree/main/lib/compress/licenses) folder.
