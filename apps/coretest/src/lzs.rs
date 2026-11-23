@@ -462,6 +462,26 @@ fn brotli_enc_run(t: &mut T, r: &mut R, shapes: &[(&'static str, Vec<u8>)]) {
             t.check(&format!("brotli encoder {name} level {level} without a size, with Flush::Sync"), back);
         }
     }
+    // bytes with Fibonacci frequencies, shuffled: literal codes of 14 (level 1) and 15 bits
+    // (level 11), the decoders' deepest second-level tables
+    let mut fib = Vec::new();
+    let (mut a, mut b) = (1usize, 1usize);
+    for i in 0..23u8 {
+        fib.extend(core::iter::repeat_n(i.wrapping_mul(11), a));
+        (a, b) = (b, a + b);
+    }
+    for i in (1..fib.len()).rev() {
+        fib.swap(i, r.below(i + 1));
+    }
+    let mut deep = true;
+    for level in [1, 11] {
+        let c = brotli::compress(&fib, level);
+        deep &= brotli::decompress(&c, fib.len()).as_deref() == Some(&fib[..]);
+        for &(cuts, osz) in cutsets(c.len()).iter().take(3) {
+            deep &= dec(&mut brotli::Decoder::new(), &c, r, cuts, osz).is_ok_and(|(o, u)| o == fib && u == c.len());
+        }
+    }
+    t.check("brotli decoder: prefix codes of up to 15 bits (Fibonacci frequencies), one-shot and in pieces", deep);
     let data = &shapes[8].1;
     let (st, marks) = enc(&mut brotli::Encoder::new(5), data, r, 20_000, 9000, 2).unwrap();
     let mut synced = !marks.is_empty();
