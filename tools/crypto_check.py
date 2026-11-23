@@ -7,7 +7,7 @@ hmac (SHA-2 with SHA-224, SHA-3, SHAKE) and, when installed, the `cryptography` 
 (ChaCha20-Poly1305, AES-GCM with 128-, 192- and 256-bit keys, X25519, Ed25519, HKDF; RSA PKCS #1
 v1.5 / PSS and ECDSA P-256 / P-384 signatures of random keys, also forged ones that must fail;
 P-384 keys and Diffie-Hellman; ECDSA signing, deterministic (OpenSSL's RFC 6979 gives the same
-bytes) and hedged (OpenSSL verifies), with SHA-2 and SHA-3; RSA-PSS signing, verified by OpenSSL
+bytes; before cryptography 43 OpenSSL verifies) and hedged (OpenSSL verifies), with SHA-2 and SHA-3; RSA-PSS signing, verified by OpenSSL
 and with an empty salt the same bytes).  Under Windows without `cryptography` the script runs itself again inside WSL (the
 Linux build of coretest).  Exit code 1 on any difference."""
 import argparse
@@ -77,6 +77,13 @@ def phase2a_cases(n, rnd):
     names = {1: "sha256", 2: "sha384", 3: "sha512", 4: "sha224", 5: "sha3_224", 6: "sha3_256", 7: "sha3_384", 8: "sha3_512"}
     order384 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC7634D81F4372DDF581A0DB248B0A77AECEC196ACCC52973
     out = []
+    # OpenSSL's deterministic ECDSA (RFC 6979) comes through cryptography 43 and later; before it
+    # a signature without extra bytes is checked by verification, as a hedged one is
+    try:
+        ec.ECDSA(hashes.SHA256(), deterministic_signing=True)
+        deterministic = True
+    except TypeError:
+        deterministic = False
 
     def point(k, nb):
         pn = k.public_key().public_numbers()
@@ -111,8 +118,11 @@ def phase2a_cases(n, rnd):
         out.append(("ecdsapub", [bytes([cid]), d], point(key, nb)))
         hid = rnd.choice(list(hs))
         dg = hashlib.new(names[hid], rnd.randbytes(rnd.randint(0, 200))).digest()
-        r, s_ = utils.decode_dss_signature(key.sign(dg, ec.ECDSA(utils.Prehashed(hs[hid]), deterministic_signing=True)))
-        out.append(("ecdsasign", [bytes([cid]), bytes([hid]), d, dg, b""], r.to_bytes(nb, "big") + s_.to_bytes(nb, "big")))
+        if deterministic:
+            r, s_ = utils.decode_dss_signature(key.sign(dg, ec.ECDSA(utils.Prehashed(hs[hid]), deterministic_signing=True)))
+            out.append(("ecdsasign", [bytes([cid]), bytes([hid]), d, dg, b""], r.to_bytes(nb, "big") + s_.to_bytes(nb, "big")))
+        else:
+            out.append(("ecdsasign", [bytes([cid]), bytes([hid]), d, dg, b""], None, verifies(key.public_key(), dg, hs[hid], nb)))
         out.append(("ecdsasign", [bytes([cid]), bytes([hid]), d, dg, rnd.randbytes(32)], None, verifies(key.public_key(), dg, hs[hid], nb)))
         # RSA-PSS signing: a random salt (OpenSSL verifies), an empty one (the same bytes)
         bits = rnd.choice([2048, 3072])

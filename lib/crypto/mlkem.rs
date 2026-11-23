@@ -6,9 +6,10 @@
 //   encaps(params, ek, &m) -> Option<(ct, key)>   m: 32 random bytes; None when ek has the wrong
 //                                              length or a coefficient of q or more (FIPS 203 7.2)
 //   decaps(params, dk, ct) -> Option<key>      None when a length is wrong or dk's hash of its
-//                                              encapsulation key does not match (7.3); a changed
-//                                              ciphertext gives the implicit-rejection key
-//                                              J(z || ct), which nothing tells apart from a key
+//                                              encapsulation key does not match (7.3); a
+//                                              ciphertext that does not re-encrypt to itself
+//                                              gives the implicit-rejection key J(z || ct),
+//                                              which nothing tells apart from a key
 //
 // The secret paths (keygen's s and e, encryption's y, decapsulation's message and the choice
 // between its two keys) have no branch and no table lookup on secret data, and no division:
@@ -392,6 +393,7 @@ fn pke_encrypt(p: &P, ek: &[u8], m: &[u8; 32], r: &[u8], ct: &mut [u8]) {
             *x = fadd(*x, *e);
         }
         encode(&compress(&u, p.du), p.du, &mut ct[ulen * i..ulen * (i + 1)]);
+        zero_polys(core::slice::from_mut(&mut u));
     }
     // v = NTT^-1(t^T y) + e2 + Decompress_1(m)
     let mut v = [0u16; N];
@@ -399,7 +401,9 @@ fn pke_encrypt(p: &P, ek: &[u8], m: &[u8; 32], r: &[u8], ct: &mut [u8]) {
         mul_acc(&mut v, &t[j], &y[j]);
     }
     ntt_inv(&mut v);
-    let mu = decompress(&decode(m, 1), 1);
+    let mut bits = decode(m, 1);
+    let mut mu = decompress(&bits, 1);
+    zero_polys(core::slice::from_mut(&mut bits));
     for ((x, e), u) in v.iter_mut().zip(e2.iter()).zip(mu.iter()) {
         *x = fadd(fadd(*x, *e), *u);
     }
@@ -408,6 +412,7 @@ fn pke_encrypt(p: &P, ek: &[u8], m: &[u8; 32], r: &[u8], ct: &mut [u8]) {
     zero_polys(&mut e1);
     zero_polys(core::slice::from_mut(&mut e2));
     zero_polys(core::slice::from_mut(&mut v));
+    zero_polys(core::slice::from_mut(&mut mu));
 }
 
 /// K-PKE.Decrypt: the 32-byte message

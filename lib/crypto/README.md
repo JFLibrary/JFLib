@@ -47,16 +47,21 @@ Work on secrets avoids branches and table lookups that depend on them: field ari
 limbs with masked swaps and selects, and an AES that is bitsliced instead of looking up tables, in
 both directions. The masks pass an optimization barrier, so the compiler cannot turn a select back
 into a branch, and [`tools/ct_check.py`](https://github.com/JFLibrary/JFLib/blob/main/tools/ct_check.py)
-runs each of these operations with different secrets and checks that the machine code takes the
-same branches for all of them and, under valgrind's memcheck, neither branches on a secret nor
+runs each of these operations with a few different secrets and checks that the machine code takes
+the same branches for all of them and, under valgrind's memcheck, neither branches on a secret nor
 makes an address of it, at five optimization levels on x86-64 and ARM64, and for the wasm the
-compiler makes. ML-KEM reduces and compresses without dividing (KyberSlash). Ed25519 verifies
+compiler makes. It allows two exceptions by design, each only where it happens: Argon2id addresses
+its memory by the password (RFC 9106), and ML-KEM's key generation samples its matrix from rho,
+which the public key carries. A test with a few secrets is a strong check, not a proof for all of
+them. ML-KEM reduces and compresses without dividing (KyberSlash). Ed25519 verifies
 strictly (canonical points, no cofactor), so a signature is valid or not the same way everywhere.
 Operations on public data, such as RSA and ECDSA verification, are allowed to take variable time;
 RSA signing uses a constant-time exponentiation. RSA key generation is variable time and meant
 for simulators and tests. What Project Wycheproof and NIST's ACVP have test vectors for (the
-hashes, HMAC and HKDF, the AEADs, AES, X25519, Ed25519, ECDH, ECDSA, RSA and ML-KEM) passes them
-([docs/EXTERNAL_SUITES.md](https://github.com/JFLibrary/JFLib/blob/main/docs/EXTERNAL_SUITES.md)).
+hashes, HMAC and HKDF, the AEADs, AES, X25519, Ed25519, ECDH, ECDSA, RSA and ML-KEM) passes in
+every case the checks run; the cases they skip, inputs the API does not take such as other curves
+or messages that are not whole bytes, are listed with their reasons in
+[docs/EXTERNAL_SUITES.md](https://github.com/JFLibrary/JFLib/blob/main/docs/EXTERNAL_SUITES.md).
 
 ## How to get it
 

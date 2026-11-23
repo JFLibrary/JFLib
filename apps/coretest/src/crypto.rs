@@ -118,6 +118,14 @@ fn phase2a(t: &mut T) {
     small[31] = 1;
     small[63] = 0x80;
     t.eq("ecdsa: DER of small r and s (a zero byte before a high bit)", hex(&ecdsa::der_from_p1363(&small).unwrap_or_default()), String::from("3007020101020200 80".replace(' ', "")));
+    // the longest halves (125 bytes) with a high bit: 256 bytes of content, two length bytes
+    let long = [[0x80u8; 1].as_slice(), &[0x11; 124]].concat().repeat(2);
+    let der = ecdsa::der_from_p1363(&long).unwrap_or_default();
+    t.check("ecdsa: DER of 256 bytes of content (30 82 01 00) and the lengths around it",
+        der.len() == 260 && der[..4] == [0x30, 0x82, 0x01, 0x00] && der[4..7] == [0x02, 0x7e, 0x00]
+            && ecdsa::der_from_p1363(&long[1..]).is_none()
+            && ecdsa::der_from_p1363(&[long.as_slice(), &[0, 0]].concat()).is_none()
+            && ecdsa::der_from_p1363(&[0x7f; 250]).is_some_and(|d| d[..3] == [0x30, 0x81, 0xfe]));
     t.check("ecdsa: non-minimal, negative and trailing DER refused",
         ecdsa::p1363_from_der(Curve::P256, &h("300802020001020200 80".replace(' ', "").as_str())).is_none()
             && ecdsa::p1363_from_der(Curve::P256, &h("3006020181020101")).is_none()
@@ -751,7 +759,11 @@ fn more(alg: &str, args: &[Vec<u8>]) -> Option<Vec<u8>> {
             }
             Some(out)
         }
-        "p384pub" => Some(crypto::p384::public_key(&arg(0).try_into().ok()?).to_vec()),
+        "p384pub" => {
+            let k: [u8; 48] = arg(0).try_into().ok()?;
+            crypto::p384::secret_from(&k)?;
+            Some(crypto::p384::public_key(&k).to_vec())
+        }
         "p384ecdh" => crypto::p384::shared(&arg(0).try_into().ok()?, arg(1)).map(|v| v.to_vec()),
         "ecdsapub" => crypto::ecdsa::public_key(curve_of(arg(0))?, arg(1)),
         // curve point digest r||s -> 01 / 00 (ecdsa::verify_p1363)

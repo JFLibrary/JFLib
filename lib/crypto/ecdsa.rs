@@ -256,9 +256,13 @@ pub fn der_from_p1363(sig: &[u8]) -> Option<Vec<u8>> {
     let mut body = Vec::with_capacity(sig.len() + 6);
     der_uint(r, &mut body);
     der_uint(s, &mut body);
-    let mut out = Vec::with_capacity(body.len() + 3);
+    let mut out = Vec::with_capacity(body.len() + 4);
     out.push(0x30);
-    if body.len() >= 0x80 {
+    // halves of up to 125 bytes give at most 256 bytes of content: two length bytes from 256 on
+    if body.len() > 0xff {
+        out.push(0x82);
+        out.push((body.len() >> 8) as u8);
+    } else if body.len() >= 0x80 {
         out.push(0x81);
     }
     out.push(body.len() as u8);
@@ -311,19 +315,26 @@ pub fn p1363_from_der(curve: Curve, der: &[u8]) -> Option<Vec<u8>> {
 /// a secret key in [1, n - 1] from curve.bytes() random bytes (None: draw again, or another
 /// length); only the answer is a branch
 pub fn secret_from(curve: Curve, random: &[u8]) -> Option<Vec<u8>> {
-    if random.len() != curve.bytes() {
-        return None;
+    secret_ok(curve, random).then(|| Vec::from(random))
+}
+
+/// whether these bytes are a secret key: curve.bytes() long, in [1, n - 1]
+fn secret_ok(curve: Curve, secret: &[u8]) -> bool {
+    if secret.len() != curve.bytes() {
+        return false;
     }
     let ok = match curve {
-        Curve::P256 => P256.n.in_range_mask(&nist::from_be::<4>(random)),
-        Curve::P384 => P384.n.in_range_mask(&nist::from_be::<6>(random)),
+        Curve::P256 => P256.n.in_range_mask(&nist::from_be::<4>(secret)),
+        Curve::P384 => P384.n.in_range_mask(&nist::from_be::<6>(secret)),
     };
-    (ok != 0).then(|| Vec::from(random))
+    ok != 0
 }
 
 /// the public key (04 || x || y) of a secret key; None when the secret is not in [1, n - 1]
 pub fn public_key(curve: Curve, secret: &[u8]) -> Option<Vec<u8>> {
-    secret_from(curve, secret)?;
+    if !secret_ok(curve, secret) {
+        return None;
+    }
     Some(match curve {
         Curve::P256 => P256.public_key(secret),
         Curve::P384 => P384.public_key(secret),

@@ -141,6 +141,17 @@ fn leak_tick(x: u64) -> u64 {
     black_box(x).wrapping_mul(3).wrapping_add(1)
 }
 
+/// the self-test's part that may follow the secret (KNOWN's selftest_resync): n rounds
+#[cfg(target_arch = "wasm32")]
+#[inline(never)]
+fn resync_public(n: u8) -> u64 {
+    let mut acc = 0u64;
+    for _ in 0..black_box(n) {
+        acc = leak_tick(acc);
+    }
+    acc
+}
+
 // ------------------------------------------------------------------ targets
 
 type Op = Box<dyn FnMut()>;
@@ -148,6 +159,8 @@ type Op = Box<dyn FnMut()>;
 const TARGETS: &[&str] = &[
     "selftest_leak",
     "selftest_lookup",
+    #[cfg(target_arch = "wasm32")]
+    "selftest_resync",
     "ct_eq",
     "x25519",
     "x25519_shared",
@@ -224,6 +237,16 @@ fn prepare_from(name: &str, s: Vec<u8>) -> Op {
                 if (k[i / 8] >> (i % 8)) & 1 == 1 {
                     acc = leak_tick(acc);
                 }
+            }
+            black_box(acc);
+        }),
+        // a parting the check allows (resync_public's rounds) and then a leak, as selftest_leak's,
+        // that it must still see: wasm only (the native trace reports its first parting)
+        #[cfg(target_arch = "wasm32")]
+        "selftest_resync" => Box::new(move || {
+            let mut acc = resync_public(k[0] & 7);
+            if (k[0] >> 1) & 1 == 1 {
+                acc = leak_tick(acc);
             }
             black_box(acc);
         }),

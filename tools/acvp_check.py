@@ -131,11 +131,24 @@ def mlkem_encdec(file, j):
             elif f == "decapsulation":
                 yield Case(file, t["tcId"], [line("mlkemdecaps", p, hx(t["dk"]), hx(t["c"]))], [t["k"].lower()])
             elif f == "encapsulationKeyCheck":
-                # the check is encaps's: a key it refuses gives "-"
-                yield Case(file, t["tcId"], [line("mlkemencaps", p, hx(t["ek"]), bytes(32))], ["ok" if t["testPassed"] else "-"])
+                # the check is encaps's: a key it refuses gives "-", one it takes ct || key
+                n = CT_LEN[p[0]] + 32
+                yield Case(file, t["tcId"], [line("mlkemencaps", p, hx(t["ek"]), bytes(32))], [f"ok:{n}" if t["testPassed"] else "-"])
             else:
-                ct = bytes({1: 768, 2: 1088, 3: 1568}[p[0]])
-                yield Case(file, t["tcId"], [line("mlkemdecaps", p, hx(t["dk"]), ct)], ["ok" if t["testPassed"] else "-"])
+                ct = bytes(CT_LEN[p[0]])
+                yield Case(file, t["tcId"], [line("mlkemdecaps", p, hx(t["dk"]), ct)], ["ok:32" if t["testPassed"] else "-"])
+
+
+# ML-KEM's ciphertext length by coretest's parameter id
+CT_LEN = {1: 768, 2: 1088, 3: 1568}
+
+
+def key_check(got, want):
+    """a passing key check ("ok:N") is an answer of N bytes in hex, not a refusal; other
+    answers stay as they are"""
+    if want.startswith("ok:") and len(got) == 2 * int(want[3:]) and all(ch in "0123456789abcdef" for ch in got):
+        return want
+    return got
 
 
 def det_ecdsa(file, j):
@@ -176,9 +189,9 @@ def run_coretest(exe, lines):
         os.unlink(path)
     if r.returncode != 0:
         sys.exit(f"acvp_check: coretest failed ({r.returncode}): {r.stderr.strip()[-2000:]}")
-    out = r.stdout.split("\n")
-    if len(out) < len(lines):
-        sys.exit(f"acvp_check: coretest answered {len(out)} of {len(lines)} lines")
+    out = r.stdout.splitlines()
+    if len(out) != len(lines):
+        sys.exit(f"acvp_check: coretest answered {len(out)} lines to {len(lines)}")
     return out
 
 
@@ -205,8 +218,7 @@ def main():
             continue
         got = out[i:i + len(c.ops)]
         i += len(c.ops)
-        # a key check passes when the operation is not refused
-        c.got = ["ok" if (w == "ok" and g != "-") else g for g, w in zip(got, c.want)]
+        c.got = [key_check(g, w) for g, w in zip(got, c.want, strict=True)]
 
     per = collections.OrderedDict()
     for c in cases:

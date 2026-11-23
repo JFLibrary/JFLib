@@ -43112,9 +43112,10 @@ mlkem -- ML-KEM (FIPS 203), the module-lattice key encapsulation: ML-KEM-512, -7
   encaps(params, ek, &m) -> Option<(ct, key)>   m: 32 random bytes; None when ek has the wrong
                                              length or a coefficient of q or more (FIPS 203 7.2)
   decaps(params, dk, ct) -> Option<key>      None when a length is wrong or dk's hash of its
-                                             encapsulation key does not match (7.3); a changed
-                                             ciphertext gives the implicit-rejection key
-                                             J(z || ct), which nothing tells apart from a key
+                                             encapsulation key does not match (7.3); a
+                                             ciphertext that does not re-encrypt to itself
+                                             gives the implicit-rejection key J(z || ct),
+                                             which nothing tells apart from a key
 
 The secret paths (keygen's s and e, encryption's y, decapsulation's message and the choice
 between its two keys) have no branch and no table lookup on secret data, and no division:
