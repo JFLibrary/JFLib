@@ -319,6 +319,8 @@ pub(super) fn unit_name(code: u8) -> Option<&'static str> {
 
 // a double as the XML writes it
 pub(super) fn num(v: f64) -> String {
+    // -0 is 0 (the VSDX writer writes it so, and a round trip must not tell them apart)
+    let v = if v == 0.0 { 0.0 } else { v };
     if v.is_finite() {
         format!("{v}")
     } else {

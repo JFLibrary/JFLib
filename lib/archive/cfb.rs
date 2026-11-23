@@ -161,10 +161,16 @@ impl<'a> File<'a> {
             difat.push(u32at(bytes, 0x4C + 4 * i)?);
         }
         let mut d = difat_start;
+        let mut difat_seen: Vec<u32> = Vec::new();
         for _ in 0..ndifat {
             if difat.len() >= nfat {
                 break;
             }
+            // a sector of the DIFAT chain twice is a loop
+            if difat_seen.contains(&d) {
+                return Err(Error::Invalid);
+            }
+            difat_seen.push(d);
             let s = f.sector_bytes(d)?;
             for i in 0..per - 1 {
                 difat.push(u32at(s, 4 * i)?);
@@ -343,6 +349,8 @@ impl<'a> File<'a> {
         let mut out = Vec::with_capacity(size.unwrap_or(0));
         let mut n = start;
         let mut hops = 0usize;
+        // the sectors of this chain so far: one that comes again is a loop
+        let mut seen = vec![0u64; sectors.div_ceil(64)];
         while n != ENDOFCHAIN {
             if need.is_some_and(|k| hops >= k) {
                 break;
@@ -350,6 +358,12 @@ impl<'a> File<'a> {
             hops += 1;
             if hops > sectors || hops > self.fat.len() {
                 return Err(Error::Invalid);
+            }
+            let (w, b) = (n as usize / 64, n as usize % 64);
+            match seen.get_mut(w) {
+                Some(x) if *x & (1 << b) != 0 => return Err(Error::Invalid),
+                Some(x) => *x |= 1 << b,
+                None => return Err(Error::Invalid),
             }
             if size.is_none() && out.len() + self.sector > self.limits.stream_bytes {
                 return Err(Error::Limit);
@@ -412,10 +426,17 @@ impl<'a> File<'a> {
         let mut out = Vec::with_capacity(size);
         let mut n = e.start;
         let mut hops = 0usize;
+        let mut seen = vec![0u64; self.minifat.len().div_ceil(64)];
         while out.len() < size {
             hops += 1;
             if n > MAXREG || hops > self.minifat.len() {
                 return Err(Error::Invalid);
+            }
+            let (w, b) = (n as usize / 64, n as usize % 64);
+            match seen.get_mut(w) {
+                Some(x) if *x & (1 << b) != 0 => return Err(Error::Invalid),
+                Some(x) => *x |= 1 << b,
+                None => return Err(Error::Invalid),
             }
             let at = (n as usize).checked_mul(64).ok_or(Error::Invalid)?;
             let s = self.mini.get(at..at.checked_add(64).ok_or(Error::Invalid)?).ok_or(Error::Invalid)?;
