@@ -43663,6 +43663,11 @@ distance ring buffer and the static dictionary with its 121 transforms (tab.rs, 
 tools/gen_brotli_dict.py).  The output is bounded by max_out before it grows, every
 distance is checked against the output so far.  Large windows (an extension outside RFC
 7932) are refused.
+
+The bit reader holds up to 63 bits in a register, refilled eight bytes at a time (byte by
+byte near the end).  A prefix code is a table of its first 8 bits (fewer for short codes)
+and second-level tables for the longer ones, so a symbol takes one or two lookups; reading
+past the end fails exactly where reading bit by bit would.
 ```
 
 ```rust
@@ -43729,6 +43734,11 @@ literals, commands and distances, and then per command: the insert-and-copy code
 extra bits, each literal, the distance.  The largest step is a prefix code of 704 symbols,
 well under a kilobyte.  Copies and uncompressed meta-blocks go out in pieces as the
 caller takes them.
+
+While the input surely holds the next part of a command (CMD_BITS, LIT_BITS, DIST_BITS:
+the most a part can read) and the output has room for it, Core::fast runs whole commands
+without the steps and their restarts; it stops in a state the steps go on from, so a call
+ends where the steps alone would end it.
 
 The output goes into a window of the stream's size ((1 << WBITS) - 16, at most 16 MiB):
 it keeps that much of the output, as far as a distance may reach, and moves when it holds
