@@ -38,4 +38,6 @@ pub(crate) fn selection_linked(_app: &Diagrammer) -> bool {
 }
 
 /// every pass: the pane's dialogs (rename, column settings)
-pub(crate) fn dialog(_app: &mut Diagrammer, _ui: &mut Ui) {}
+pub(crate) fn dialog(app: &mut Diagrammer, _ui: &mut Ui) {
+    let _ = app.ext.tab; // STUB: keeps build_rs's -D dead-code quiet until the real file comes
+}

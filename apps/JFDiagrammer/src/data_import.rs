@@ -15,4 +15,6 @@ pub(crate) struct ImportState {}
 pub(crate) fn open(_app: &mut Diagrammer, _ui: &mut Ui) {}
 
 /// every pass: the data selector when open
-pub(crate) fn dialog(_app: &mut Diagrammer, _ui: &mut Ui) {}
+pub(crate) fn dialog(app: &mut Diagrammer, _ui: &mut Ui) {
+    let _ = &app.dimport; // STUB: keeps build_rs's -D dead-code quiet until the real file comes
+}
