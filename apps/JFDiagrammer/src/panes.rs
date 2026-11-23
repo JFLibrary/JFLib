@@ -76,7 +76,9 @@ pub(crate) fn content(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
 // ------------------------------------------------------------------ the context menus
 
 // i18n
-static SHAPE_MENU: [Mi; 18] = [
+static SHAPE_MENU: [Mi; 19] = [
+    // (JD15, SP-12) the rows of the shape's Actions section first, as in Visio (cmds_actions.rs)
+    Mi::List(crate::cmds_actions::ACTION_ROWS, crate::cmds_actions::ACTION_ROWS_MAX, ""),
     Mi::Cmd(CUT), Mi::Cmd(COPY), Mi::Cmd(PASTE), Mi::Sep,
     Mi::Sub("Gruppierung", &[Mi::Cmd(GROUP), Mi::Cmd(UNGROUP)]),
     // (JD8 rest) ZF-12's Shape ▸

@@ -904,3 +904,5 @@ Groß-/Kleinschreibung	Case	Mayúsculas y minúsculas	Maiuscole/minuscole	Casse
 Erster Buchstabe groß	Initial caps	Iniciales en mayúscula	Iniziali maiuscole	Initiales en majuscules
 Skalierung	Scale	Escala	Scala	Échelle
 Zeichenabstand	Spacing	Espaciado	Spaziatura	Espacement
+Die Aktion lässt sich nicht ausführen.	The action cannot be run.	La acción no se puede ejecutar.	Impossibile eseguire l'azione.	L'action ne peut pas être exécutée.
+„{}“ führt JFDiagrammer nicht aus.	JFDiagrammer does not run "{}".	JFDiagrammer no ejecuta "{}".	JFDiagrammer non esegue "{}".	JFDiagrammer n'exécute pas « {} ».

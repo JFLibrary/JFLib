@@ -111,6 +111,7 @@
 extern crate alloc;
 
 mod backstage;
+mod cmds_actions;
 mod cmds_arrange;
 mod cmds_later;
 mod cmds_myshapes;
@@ -497,9 +498,15 @@ impl App for Diagrammer {
         layers::props_dialog(self, ui);
         select_type::dialog(self, ui);
         cmds_text::frame(self, ui);
+        // (JD15, SP-12) the rows of the selected shape's Actions section for its menu
+        cmds_actions::frame(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
+        // (JD15, SP-12) a row of the shape's Actions section
+        if cmds_actions::command(self, ui, id) {
+            return true;
+        }
         cmds_text::command(self, ui, id) || stencils::command(self, ui, id) || commands::run(self, ui, id)
     }
 }
