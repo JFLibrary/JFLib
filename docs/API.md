@@ -42874,7 +42874,8 @@ variable time and meant for simulators and tests, where the random bytes are no 
 - **`fn p(&self) -> &[u8]`**
 - **`fn q(&self) -> &[u8]`**
 - **`fn iqmp(&self) -> Vec<u8>`**
-  q^-1 mod p, big-endian (what key files keep beside the primes; p > q)
+  q^-1 mod p, big-endian (what key files keep beside the primes): q is reduced mod p
+  first (a masked remainder), so the primes may come in either order and of any lengths
 - **`fn dp(&self) -> Vec<u8>`**
   d mod (p - 1)
 - **`fn dq(&self) -> Vec<u8>`**
@@ -43564,7 +43565,9 @@ each other in variable time, as a program does at start), then signs in constant
   the Ed25519 key pair, if it is one
 - **`fn can(&self, alg: SigAlg) -> bool`**
   whether this key makes signatures of `alg` (ECDSA: of its curve's size or any hash, as
-  X.509 and TLS 1.2 allow; TLS 1.3 ties the hash to the curve itself)
+  X.509 and TLS 1.2 allow; TLS 1.3 ties the hash to the curve itself; RSA-PSS: when the
+  modulus holds the hash, the salt and two bytes, RFC 8017 9.1.1, so a 1024-bit key makes no
+  PSS with SHA-512 and a salt as long)
 - **`fn cert_alg(&self) -> SigAlg`**
   the algorithm it signs certificates with: Ed25519, ECDSA with SHA-256 (P-256) or
   SHA-384 (P-384), RSA PKCS #1 v1.5 with SHA-256
@@ -45539,7 +45542,9 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   - `server_name: String` -- the name the certificate must carry (DNS name or IP address); may be empty only with
     Trust::Pinned / Trust::Any, which do not check it
   - `alpn: Vec<String>` -- the application protocols to offer (ALPN, RFC 7301: "h2", "http/1.1", "acme-tls/1"),
-    in order of preference; the server's choice is TlsStream::alpn.  Empty: none offered
+    in order of preference; the server's choice is TlsStream::alpn.  An empty name or one
+    over 255 bytes is left out, and the names after the first 8 KiB of them; none left: no
+    ALPN offered
 
 **`impl ClientConfig`**
 
@@ -45549,7 +45554,8 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
 - **`struct Hello`**
   what a ClientHello asks for: the program's ServerConfig::select picks the identity by it
   - `server_name: String` -- the name of server_name (SNI), lower case; empty: none
-  - `alpn: Vec<String>` -- the application protocols offered (ALPN)
+  - `alpn: Vec<Vec<u8>>` -- the application protocols offered (ALPN), as the client sent them: byte strings
+    (RFC 7301 3.1), b"h2", b"http/1.1"
   - `sig_algs: Vec<u16>` -- the signature schemes the client takes (TLS code points)
 
 - **`type Select = Arc<dyn Fn(&Hello) -> Option<Identity> + Send + Sync>`**
@@ -45690,6 +45696,8 @@ AL_NO_APPLICATION_PROTOCOL: u8 = 120
 - **`fn has_plain(&self) -> bool`**
 - **`fn read_plain(&mut self, buf: &mut [u8]) -> usize`**
 - **`fn write_plain(&mut self, data: &[u8]) -> Result<(), TlsError>`**
+- **`fn test_cr_sig_algs(&mut self, algs: Vec<u16>)`**
+  (tests) the signature schemes a server's CertificateRequest lists (empty: all it takes)
 - **`fn write_empty(&mut self) -> Result<(), TlsError>`**
   (tests) an application data record without data
 - **`fn close(&mut self)`**
@@ -45705,6 +45713,9 @@ Source: [`lib/netio/tls/keysched.rs`](../lib/netio/tls/keysched.rs)
 keysched -- the TLS 1.3 key schedule (RFC 8446 7.1) with the hash of the cipher suite (SHA-256
 or SHA-384): HKDF-Expand-Label, Derive-Secret, traffic keys and finished keys; the TLS 1.2 PRF
 (RFC 5246 5) with SHA-256 or SHA-384; the running transcript hash of a handshake
+
+Every function computes with the hash it is given (HMAC of any HashAlg); the TLS suites use
+SHA-256 and SHA-384, and the Transcript keeps those two only
 ```
 
 - **`type Secret = Vec<u8>`**
@@ -45717,6 +45728,8 @@ or SHA-384): HKDF-Expand-Label, Derive-Secret, traffic keys and finished keys; t
   Derive-Secret(secret, label, transcript hash)
 
 - **`fn extract(h: HashAlg, salt: &[u8], ikm: &[u8]) -> Secret`**
+  HKDF-Extract (RFC 5869 2.2): HMAC(salt, ikm); an empty salt is the same as zeros of the
+  hash's length (HMAC pads its key with zeros)
 
 - **`fn empty_hash(h: HashAlg) -> Vec<u8>`**
   the hash of no messages
@@ -45755,9 +45768,9 @@ or SHA-384): HKDF-Expand-Label, Derive-Secret, traffic keys and finished keys; t
 - **`fn new() -> Transcript`**
 - **`fn update(&mut self, m: &[u8])`**
 - **`fn hash(&self, h: HashAlg) -> Vec<u8>`**
-  the hash so far with `h` (SHA-384 or SHA-256)
+  the hash so far with `h`: SHA-256 or SHA-384 while it is kept, else empty
 - **`fn keep(&mut self, h: HashAlg)`**
-  keep only `h` from here on (the suite is chosen)
+  keep only `h` from here on (the suite is chosen); a hash other than these two keeps none
 
 ### `netio/tls/kx.rs`
 
@@ -45788,7 +45801,9 @@ X25519: u16 = 0x001d
 SECP256R1_MLKEM768: u16 = 0x11eb
 X25519_MLKEM768: u16 = 0x11ec
 SECP384R1_MLKEM1024: u16 = 0x11ed
-/// every group here, in the order a server prefers them when it may choose
+/// every group here.  The order is no preference: a server goes by the client's list and takes
+/// the first group here that the client sent a share of; without one it asks for the first
+/// group here the client lists (HelloRetryRequest)
 GROUPS: [u16; 6] = [X25519_MLKEM768, X25519, SECP256R1, SECP384R1, SECP256R1 ...
 ```
 

@@ -561,7 +561,7 @@ fn prepare_from(name: &str, s: Vec<u8>) -> Op {
         // it): read, checked to be in [1, n - 1], its public key computed and compared
         #[cfg(feature = "netio")]
         "pem_pkcs8_ec_key" => {
-            let key = netio::x509::PrivateKey::ecdsa(crypto::ecdsa::Curve::P256, &k).expect("a P-256 secret");
+            let key = netio::x509::PrivateKey::ecdsa(crypto::ecdsa::Curve::P256, &p256_scalar(&s)).expect("a P-256 secret");
             let mut text = netio::pem::encode("PRIVATE KEY", &key.to_pkcs8().expect("pkcs8"));
             public_layout(&mut text);
             Box::new(move || {

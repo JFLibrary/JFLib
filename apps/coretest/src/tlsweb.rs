@@ -127,6 +127,7 @@ pub fn run(t: &mut T) {
     handshakes(t);
     sni(t);
     alpn(t);
+    client_cert_schemes(t);
 }
 
 fn keys(t: &mut T) {
@@ -176,6 +177,25 @@ fn keys(t: &mut T) {
         t.check("keys: an RSA key", false);
     }
     t.check("keys: anything else is refused", PrivateKey::from_der(b"\x30\x03\x02\x01\x05").is_none());
+    // q^-1 mod p of primes of other lengths, the shorter one first (p 448 bits, q 576: q has
+    // more limbs than p and is reduced mod p first)
+    let h = |x: &str| crypto::unhex(x).unwrap_or_default();
+    let n = h("a34b04be12477be2c06ec2fb49aaea3c3b9b32e8b6f643179bd29962a088913b8fec2c4111cab80814742212920e41fb9e07e027716772818cbb4ba6e92e38e5ad13c9faef95d99c9bc7c2e6f1357aafd66735ea0cb4559abe23ad2367b45a64d7cb66bab626f0fdf387e23a61d45bf92ffd6640e0fd0e56a5d8cafe2d7c41c7");
+    let d = h("12cb549d67cf307415bfe9d330546aa74a18ffd00716eafbf1a458a12066f7884a755d5693eca827cdeadbed15406cd9c0039a0a10245eea704c3b59366af4399442c977373bc4845eb18b075977cc66903a8c8f4bcc3b0097ea3b8ea7f4a5249730b85d95a5f7f22d1c6378691df07490b3ab2d85d6b044915afc6630928e69");
+    let pp = h("c8e6c223c176c6e21d0ff7fd60bc39610e184a6ecc01f3c169d27a4064a9d9e23aa3b80a42cdbf88c748b5fb6be400ca2389ea61f99cb86d");
+    let qq = h("d013c92d25849bc6cf2c5eb321b6a4b18992fcba35b68fbf958816415ee90c591575990b9367d58ad00b7828cc05cf2fe9f291ac8dfe60e4b636c7a60bea1cad45cf7ac9b7282a83");
+    let small = crypto::rsa::PrivateKey::from_parts(&n, &[1, 0, 1], &d, &pp, &qq);
+    t.check("keys: iqmp of a short p and a long q", small.as_ref().is_some_and(|k| k.iqmp() == h("4eddf4739231c867c8ee78d5f2cb6c9d40cc94ca8bde8e8dd4715b06b5bf660d442b5ed284f478988d3ffbe282b481c6c9788c73a1118c1a")));
+    // a 1024-bit key holds PSS with SHA-256, not with SHA-512 and a salt as long (130 > 128
+    // bytes): TLS picks only a scheme the key makes
+    if let Some(k) = small.and_then(PrivateKey::rsa) {
+        use netio::x509::SigAlg;
+        t.check("keys: RSA-1024 makes PSS with SHA-256", k.can(SigAlg::RsaPss(crypto::HashAlg::Sha256, None)) && k.sign(SigAlg::RsaPss(crypto::HashAlg::Sha256, None), b"m", &[7; 64]).is_some());
+        t.check("keys: ... not with SHA-512", !k.can(SigAlg::RsaPss(crypto::HashAlg::Sha512, None)) && k.sign(SigAlg::RsaPss(crypto::HashAlg::Sha512, None), b"m", &[7; 64]).is_none());
+        t.check("keys: ... but PKCS #1 v1.5 with SHA-512", k.can(SigAlg::RsaPkcs1(crypto::HashAlg::Sha512)));
+    } else {
+        t.check("keys: an RSA key of a short p and a long q", false);
+    }
     // certificates signed with every kind, below CAs of other kinds
     let kinds = [Kind::Ed25519, Kind::P256, Kind::P384, Kind::Rsa];
     let cas: Vec<(Cert, PrivateKey)> = kinds.iter().map(|&k| {
@@ -306,6 +326,36 @@ fn handshakes(t: &mut T) {
     // a server whose key the client's signature schemes do not cover: none here, every kind is
     // offered; a key of a curve TLS 1.3 ties to another hash still signs with its own
     t.check("P-384 server: ECDSA with SHA-384", pkis[2].server.key.can(netio::x509::SigAlg::Ecdsa(crypto::HashAlg::Sha384)));
+    // a certificate of over 16 KiB (900 names): its Certificate message goes in several records
+    let p = &pkis[1];
+    let names: Vec<String> = (0..900).map(|i| format!("host-{:04}.web.lab", i)).collect();
+    let mut all: Vec<&str> = alloc::vec!["localhost"];
+    all.extend(names.iter().map(|s| s.as_str()));
+    let big = issue(&p.server.key, "localhost", &all, Some((&p.ca, &p.ca_key)), 98);
+    t.check("a certificate of over 16 KiB", big.len() > 16 * 1024);
+    let r = talk(ClientConfig::new(Trust::Anchors(alloc::vec![p.ca.clone()]), "localhost"), ServerConfig::new(Identity::new(alloc::vec![big], p.server.key.clone())));
+    t.check("... is sent in several records and taken", r.is_ok_and(|(c, _)| c.peer_certs().first().is_some_and(|x| x.names("host-0899.web.lab"))));
+    // a server name no ClientHello can carry: the connection is closed before it begins
+    let c = Conn::client(ClientConfig::new(Trust::Any, &"a".repeat(70_000)));
+    t.check("a server name of 70 000 bytes: no ClientHello", c.closed());
+}
+
+/// a client whose key signs in none of the schemes a CertificateRequest lists sends no
+/// certificate (RFC 8446 4.4.2): here the request, rewritten in flight, lists Ed25519 alone
+fn client_cert_schemes(t: &mut T) {
+    let p = pki(90, Kind::P256);
+    let r = pki(91, Kind::Rsa);
+    let run = |required: bool| -> Result<(Conn, Conn), TlsError> {
+        let ccfg = ClientConfig { identity: Some(r.client.clone()), ..ClientConfig::new(Trust::Anchors(alloc::vec![p.ca.clone()]), "localhost") };
+        let scfg = ServerConfig { client_auth: Some(Trust::Anchors(alloc::vec![r.ca.clone()])), client_auth_optional: !required, ..ServerConfig::new(p.server.clone()) };
+        let mut c = Conn::client(ccfg);
+        let mut s = Conn::server(scfg);
+        s.test_cr_sig_algs(alloc::vec![0x0807]);
+        pump(&mut c, &mut s)?;
+        Ok((c, s))
+    };
+    t.check("client certificate: no scheme of the request fits: none sent, accepted when optional", run(false).is_ok_and(|(_, s)| s.peer_certs().is_empty()));
+    t.check("client certificate: ... refused when required (certificate_required)", matches!(run(true), Err(TlsError::PeerAlert(116)) | Err(TlsError::Alert(116, _))));
 }
 
 fn sni(t: &mut T) {
@@ -350,4 +400,24 @@ fn alpn(t: &mut T) {
     t.check("alpn: a client without ALPN gets none", go(&[], &["h2"]) == Ok((None, None)));
     let r = go(&["spdy/1"], &["h2"]);
     t.check("alpn: no protocol in common is no_application_protocol", matches!(r, Err(TlsError::PeerAlert(120)) | Err(TlsError::Alert(120, _))));
+    // names a ClientHello cannot carry are left out, and without names no ALPN goes out
+    let long = "x".repeat(256);
+    t.check("alpn: an empty name and one of 256 bytes are not offered", go(&["", &long], &["h2"]) == Ok((None, None)));
+    t.check("alpn: ... the others are", go(&["", &long, "h2"], &["h2"]) == both("h2"));
+    let many: Vec<String> = (0..100).map(|i| format!("{:0200}", i)).collect();
+    let mut names: Vec<&str> = alloc::vec!["h2"];
+    names.extend(many.iter().map(|s| s.as_str()));
+    t.check("alpn: 20 KB of names: the first 8 KiB offered", go(&names, &["h2"]) == both("h2"));
+    t.check("alpn: ... the rest not", matches!(go(&names, &[many[99].as_str()]), Err(TlsError::PeerAlert(120)) | Err(TlsError::Alert(120, _))));
+    // the client's view of the names: the bytes it sent
+    let seen = Arc::new(plat::sync::Mutex::new(Vec::new()));
+    let s2 = seen.clone();
+    let sel: tls::Select = Arc::new(move |h: &tls::Hello| {
+        *s2.lock() = h.alpn.clone();
+        None
+    });
+    let ccfg = ClientConfig { alpn: v(&["h2", "http/1.1"]), ..ClientConfig::new(trust.clone(), "localhost") };
+    let scfg = ServerConfig { select: Some(sel), ..ServerConfig::new(p.server.clone()) };
+    let ok = talk(ccfg, scfg).is_ok();
+    t.check("alpn: Hello::alpn has the names as bytes", ok && *seen.lock() == alloc::vec![b"h2".to_vec(), b"http/1.1".to_vec()]);
 }

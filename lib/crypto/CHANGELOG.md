@@ -19,6 +19,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - ML-KEM (FIPS 203, lib/crypto/mlkem.rs): mlkem::keygen(params, seed) from d || z, encaps(params, ek, m) with the encapsulation key's modulus check, decaps(params, dk, ct) with the decapsulation key's hash check and implicit rejection (a ciphertext that does not re-encrypt to itself gives J(z || c)); Params::MlKem512, MlKem768, MlKem1024 and their ek_len, dk_len, ct_len. No branch or table lookup on secrets, and no division: reductions and Compress are Barrett's with masked corrections (KyberSlash)
 - `rsa::PrivateKey::dp()` and `dq()`: d mod (p - 1) and d mod (q - 1) for PKCS #1's RSAPrivateKey, one bit at a time with the subtraction kept by mask
 
+### Fixed
+
+- `rsa::PrivateKey::iqmp` of a key whose q has more 64-bit words than p: q is reduced mod p first; the words above p's length were dropped, and the coefficient a key file keeps was wrong
+
 ### Security
 
 - `eappwd::shared` refuses a peer scalar of 1 (RFC 8146 2.1; hostapd since CVE-2019-9497). `argon2::verify` refuses a PHC string that asks for more than the new `VERIFY_WORK` (2^24 KiB times passes) instead of running it; 4 GiB with 2^32 - 1 passes passed `valid()`. `aes::Aes::new` overwrites the expanded key words with a store the compiler keeps.

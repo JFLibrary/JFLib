@@ -100,7 +100,9 @@ pub struct ClientConfig {
     /// Trust::Pinned / Trust::Any, which do not check it
     pub server_name: String,
     /// the application protocols to offer (ALPN, RFC 7301: "h2", "http/1.1", "acme-tls/1"),
-    /// in order of preference; the server's choice is TlsStream::alpn.  Empty: none offered
+    /// in order of preference; the server's choice is TlsStream::alpn.  An empty name or one
+    /// over 255 bytes is left out, and the names after the first 8 KiB of them; none left: no
+    /// ALPN offered
     pub alpn: Vec<String>,
 }
 
@@ -116,8 +118,9 @@ impl ClientConfig {
 pub struct Hello {
     /// the name of server_name (SNI), lower case; empty: none
     pub server_name: String,
-    /// the application protocols offered (ALPN)
-    pub alpn: Vec<String>,
+    /// the application protocols offered (ALPN), as the client sent them: byte strings
+    /// (RFC 7301 3.1), b"h2", b"http/1.1"
+    pub alpn: Vec<Vec<u8>>,
     /// the signature schemes the client takes (TLS code points)
     pub sig_algs: Vec<u16>,
 }

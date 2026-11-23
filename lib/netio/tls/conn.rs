@@ -57,6 +57,8 @@ const EXT_GROUPS: u16 = 10;
 const EXT_POINT_FORMATS: u16 = 11;
 const EXT_SIG_ALGS: u16 = 13;
 const EXT_ALPN: u16 = 16;
+/// the most bytes of protocol names a ClientHello offers (ClientConfig::alpn)
+const MAX_ALPN: usize = 8 * 1024;
 const EXT_EMS: u16 = 23;
 const EXT_COOKIE: u16 = 44;
 const EXT_EARLY_DATA: u16 = 42;
@@ -357,7 +359,8 @@ pub struct Conn {
     ems: bool,
     /// KeyUpdate messages received (a flood is answered with an alert)
     key_updates: u32,
-    /// a client: the signature schemes of the server's CertificateRequest
+    /// a client: the signature schemes of the server's CertificateRequest; a server: the ones
+    /// it lists there (empty: every scheme it takes; other lists only in tests)
     cr_algs: Vec<u16>,
     /// TLS 1.2: the ECDHE secret, the master secret, the server's keys until its CCS
     pms: Option<Vec<u8>>,
@@ -379,6 +382,19 @@ pub struct Conn {
     /// a server: the name the client asked for (SNI), and the identity it shows
     sni: String,
     identity: Option<Identity>,
+}
+
+// the secrets of the key schedule are wiped when the connection goes
+impl Drop for Conn {
+    fn drop(&mut self) {
+        for s in [&mut self.c_hs, &mut self.s_hs, &mut self.c_ap, &mut self.s_ap, &mut self.master] {
+            crypto::zeroize(s);
+        }
+        crypto::zeroize(&mut self.master12);
+        if let Some(p) = self.pms.as_mut() {
+            crypto::zeroize(p);
+        }
+    }
 }
 
 impl Conn {
@@ -459,7 +475,11 @@ impl Conn {
         c.client_random = plat::random_bytes();
         c.web = matches!(cfg.trust, Trust::System(_) | Trust::Custom(_));
         c.ccfg = Some(cfg);
-        c.send_client_hello();
+        // a ClientHello too long to send (a server name of tens of KiB): the connection is
+        // closed before it begins
+        if c.send_client_hello().is_err() {
+            c.state = State::Closed;
+        }
         c
     }
 
@@ -523,6 +543,12 @@ impl Conn {
         Ok(())
     }
 
+    /// (tests) the signature schemes a server's CertificateRequest lists (empty: all it takes)
+    #[doc(hidden)]
+    pub fn test_cr_sig_algs(&mut self, algs: Vec<u16>) {
+        self.cr_algs = algs;
+    }
+
     /// (tests) an application data record without data
     pub fn write_empty(&mut self) -> Result<(), TlsError> {
         if self.state != State::Established {
@@ -561,11 +587,15 @@ impl Conn {
     /// queue a handshake message (protected when write keys exist)
     fn send_hs(&mut self, msg: &[u8]) {
         self.add(msg);
-        let rec = match self.wr.as_mut() {
-            Some(c) => c.seal(HANDSHAKE, msg),
-            None => record::plain(HANDSHAKE, msg),
-        };
-        self.out.extend_from_slice(&rec);
+        // a message longer than a record (a long certificate chain, a large ClientHello) goes in
+        // several (RFC 8446 5.1); the transcript has it once, whole
+        for part in msg.chunks(MAX_PLAIN) {
+            let rec = match self.wr.as_mut() {
+                Some(c) => c.seal(HANDSHAKE, part),
+                None => record::plain(HANDSHAKE, part),
+            };
+            self.out.extend_from_slice(&rec);
+        }
     }
 
     /// the TLS 1.3 record keys of a traffic secret for the negotiated suite
@@ -808,10 +838,8 @@ impl Conn {
                 if algs.is_empty() {
                     return Err(fail(AL_DECODE_ERROR, "an empty signature_algorithms list"));
                 }
-                let key = self.ccfg.as_ref().and_then(|c| c.identity.as_ref()).map(|i| &i.key);
-                if key.is_some_and(|k| our_scheme(k, &algs).is_none()) {
-                    return Err(fail(AL_HANDSHAKE_FAILURE, "the server takes no signature our key makes"));
-                }
+                // an identity whose key signs in none of these schemes is not shown: the Certificate
+                // is empty (RFC 8446 4.4.2), and a server that requires one refuses that
                 self.cr_algs = algs;
                 self.cert_requested = true;
                 self.add(msg);
@@ -860,7 +888,7 @@ impl Conn {
                     return Err(fail(AL_DECRYPT_ERROR, "client Finished"));
                 }
                 self.add(msg);
-                let c = self.cipher13(&self.c_ap.clone())?;
+                let c = self.cipher13(&self.c_ap)?;
                 self.set_rd(Some(c));
                 self.state = State::Established;
                 Ok(())
@@ -927,20 +955,25 @@ impl Conn {
                 if self.key_updates > 1024 {
                     return Err(fail(AL_UNEXPECTED_MESSAGE, "too many key updates"));
                 }
+                // the next secret replaces the old one, which is wiped
                 let h = self.hash_alg;
+                let next = keysched::update(h, if self.server { &self.c_ap } else { &self.s_ap });
+                let c = self.cipher13(&next)?;
                 let peer_secret = if self.server { &mut self.c_ap } else { &mut self.s_ap };
-                *peer_secret = keysched::update(h, peer_secret);
-                let ps = peer_secret.clone();
-                let c = self.cipher13(&ps)?;
+                crypto::zeroize(peer_secret);
+                *peer_secret = next;
                 self.set_rd(Some(c));
                 if requested == 1 {
+                    // our answer still goes under the old write key
                     let msg = hs_msg(HS_KEY_UPDATE, &[0]);
                     let rec = self.wr.as_mut().ok_or(TlsError::Closed)?.seal(HANDSHAKE, &msg);
                     self.out.extend_from_slice(&rec);
+                    let next = keysched::update(h, if self.server { &self.s_ap } else { &self.c_ap });
+                    let c = self.cipher13(&next)?;
                     let my_secret = if self.server { &mut self.s_ap } else { &mut self.c_ap };
-                    *my_secret = keysched::update(h, my_secret);
-                    let ms = my_secret.clone();
-                    self.wr = Some(self.cipher13(&ms)?);
+                    crypto::zeroize(my_secret);
+                    *my_secret = next;
+                    self.wr = Some(c);
                 }
                 Ok(())
             }
@@ -950,7 +983,7 @@ impl Conn {
 
     // ------------------------------------------------------------------ client
 
-    fn send_client_hello(&mut self) {
+    fn send_client_hello(&mut self) -> Result<(), TlsError> {
         let cfg = self.ccfg.as_ref().map(|c| c.server_name.clone()).unwrap_or_default();
         let mut b = Vec::new();
         put16(&mut b, 0x0303);
@@ -971,12 +1004,16 @@ impl Conn {
             put_v16(&mut list, &sni);
             put_ext(&mut e, EXT_SERVER_NAME, &list);
         }
+        // ALPN: the names of 1 to 255 bytes, as many as fit in MAX_ALPN (ClientConfig::alpn)
         let alpn = self.ccfg.as_ref().map(|c| c.alpn.clone()).unwrap_or_default();
-        if !alpn.is_empty() {
-            let mut list = Vec::new();
-            for p in alpn.iter().filter(|p| !p.is_empty() && p.len() < 256) {
-                put_v8(&mut list, p.as_bytes());
+        let mut list = Vec::new();
+        for p in alpn.iter().filter(|p| !p.is_empty() && p.len() < 256) {
+            if list.len() + 1 + p.len() > MAX_ALPN {
+                break;
             }
+            put_v8(&mut list, p.as_bytes());
+        }
+        if !list.is_empty() {
             let mut v = Vec::new();
             put_v16(&mut v, &list);
             put_ext(&mut e, EXT_ALPN, &v);
@@ -1013,6 +1050,11 @@ impl Conn {
             put_v16(&mut c, &self.cookie);
             put_ext(&mut e, EXT_COOKIE, &c);
         }
+        // a length field that overflows makes the extensions pass 2^16 - 1 too (the ALPN list
+        // is bounded, a share is short; a server name or cookie of tens of KiB is not)
+        if e.len() > 0xFFFF {
+            return Err(fail(AL_INTERNAL_ERROR, "the ClientHello's extensions are too long"));
+        }
         self.sent_exts.clear();
         let mut i = 0;
         while i + 4 <= e.len() {
@@ -1022,6 +1064,7 @@ impl Conn {
         put_v16(&mut b, &e);
         let msg = hs_msg(HS_CLIENT_HELLO, &b);
         self.send_hs(&msg);
+        Ok(())
     }
 
     /// what a server's message may hold (RFC 8446 4.2, RFC 5246 7.4.1.4): an extension the
@@ -1123,8 +1166,7 @@ impl Conn {
             let mh = hs_msg(HS_MESSAGE_HASH, &h1);
             self.add(&mh);
             self.add(msg);
-            self.send_client_hello();
-            return Ok(());
+            return self.send_client_hello();
         }
         let ks = ext(&exts, EXT_KEY_SHARE).ok_or(fail(AL_MISSING_EXTENSION, "key_share"))?;
         let mut k = R { b: ks };
@@ -1138,7 +1180,7 @@ impl Conn {
         self.add(msg);
         self.handshake_keys(&shared);
         crypto::zeroize(&mut shared);
-        let c = self.cipher13(&self.s_hs.clone())?;
+        let c = self.cipher13(&self.s_hs)?;
         self.set_rd(Some(c));
         self.state = State::ClientEe;
         Ok(())
@@ -1146,11 +1188,12 @@ impl Conn {
 
     fn handshake_keys(&mut self, shared: &[u8]) {
         let a = self.hash_alg;
-        let s = Schedule::new(a, None, shared);
+        let mut s = Schedule::new(a, None, shared);
         let h = self.hash();
         self.c_hs = keysched::derive(a, &s.handshake, "c hs traffic", &h);
         self.s_hs = keysched::derive(a, &s.handshake, "s hs traffic", &h);
-        self.master = s.master.clone();
+        crypto::zeroize(&mut self.master);
+        self.master = core::mem::take(&mut s.master);
     }
 
     fn app_secrets(&mut self) {
@@ -1179,9 +1222,9 @@ impl Conn {
         self.add(msg);
         self.app_secrets();
         // our handshake messages go under the client handshake key
-        self.wr = Some(self.cipher13(&self.c_hs.clone())?);
+        self.wr = Some(self.cipher13(&self.c_hs)?);
         if self.cert_requested {
-            let id = self.ccfg.as_ref().and_then(|c| c.identity.clone());
+            let id = self.ccfg.as_ref().and_then(|c| c.identity.clone()).filter(|i| our_scheme(&i.key, &self.cr_algs).is_some());
             let chain: Vec<Vec<u8>> = id.as_ref().map(|i| i.chain.clone()).unwrap_or_default();
             let cm = hs_msg(HS_CERTIFICATE, &certificate_body(&chain));
             self.send_hs(&cm);
@@ -1195,8 +1238,8 @@ impl Conn {
         let fin = keysched::finished(self.hash_alg, &self.c_hs, &self.hash());
         let m = hs_msg(HS_FINISHED, &fin);
         self.send_hs(&m);
-        self.wr = Some(self.cipher13(&self.c_ap.clone())?);
-        let c = self.cipher13(&self.s_ap.clone())?;
+        self.wr = Some(self.cipher13(&self.c_ap)?);
+        let c = self.cipher13(&self.s_ap)?;
         self.set_rd(Some(c));
         self.state = State::Established;
         Ok(())
@@ -1377,7 +1420,7 @@ impl Conn {
             let p = cfg.alpn.iter().find(|p| offered_alpn.iter().any(|o| o.as_slice() == p.as_bytes()));
             Some(Vec::from(p.ok_or(fail(AL_NO_APPLICATION_PROTOCOL, "no application protocol in common"))?.as_bytes()))
         };
-        let hello = Hello { server_name: sni.clone(), alpn: offered_alpn.iter().map(|p| String::from_utf8_lossy(p).into_owned()).collect(), sig_algs: algs.clone() };
+        let hello = Hello { server_name: sni.clone(), alpn: offered_alpn.clone(), sig_algs: algs.clone() };
         let identity = choose_identity(cfg, &hello);
         if our_scheme(&identity.key, &algs).is_none() {
             return Err(fail(AL_HANDSHAKE_FAILURE, "the client takes no signature our key makes"));
@@ -1493,8 +1536,8 @@ impl Conn {
         }
         self.handshake_keys(&shared);
         crypto::zeroize(&mut shared);
-        self.wr = Some(self.cipher13(&self.s_hs.clone())?);
-        let c = self.cipher13(&self.c_hs.clone())?;
+        self.wr = Some(self.cipher13(&self.s_hs)?);
+        let c = self.cipher13(&self.c_hs)?;
         self.set_rd(Some(c));
         // EncryptedExtensions: server_name (empty) when the certificate is for the name asked
         // for (RFC 6066 3), the protocol chosen (ALPN)
@@ -1522,7 +1565,7 @@ impl Conn {
             b.push(0); // empty context
             let mut e = Vec::new();
             let mut list = Vec::new();
-            put_v16(&mut list, &u16s(&WEB_SIG_ALGS));
+            put_v16(&mut list, &u16s(if self.cr_algs.is_empty() { &WEB_SIG_ALGS[..] } else { &self.cr_algs }));
             put_ext(&mut e, EXT_SIG_ALGS, &list);
             put_v16(&mut b, &e);
             let m = hs_msg(HS_CERTIFICATE_REQUEST, &b);
@@ -1536,7 +1579,7 @@ impl Conn {
         let m = hs_msg(HS_FINISHED, &fin);
         self.send_hs(&m);
         self.app_secrets();
-        self.wr = Some(self.cipher13(&self.s_ap.clone())?);
+        self.wr = Some(self.cipher13(&self.s_ap)?);
         self.state = if want_client { State::ServerClientCert } else { State::ServerFinished };
         Ok(())
     }

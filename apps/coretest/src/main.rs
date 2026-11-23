@@ -58,6 +58,7 @@ mod sshd;
 mod store;
 #[cfg(not(target_os = "android"))]
 mod tlst;
+#[cfg(not(target_os = "android"))]
 mod tlsweb;
 #[cfg(not(target_os = "android"))]
 mod suitevec;

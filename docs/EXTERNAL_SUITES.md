@@ -335,7 +335,7 @@ KeyUpdate.appDataUnderNewKeysSucceeds); it now ends with `shutdown()`, as a prog
 
 ### netio's server
 
-`--server` points TLS-Anvil at `coretest --tls-serve`. For now its preparation fails: TLS-Scanner
-offers no Ed25519 in the probes it starts with, and Ed25519 is all netio's server signs with, so
-no server test runs. Once the server signs with ECDSA or RSA it will; until then tlsfuzzer tests
-the server.
+`--server` points TLS-Anvil at `coretest --tls-serve --key rsa` (an RSA-2048 certificate; `--key
+p256`, `p384` and `rsa` all work, Ed25519 does not, since TLS-Scanner's probes offer none). Its
+results are above: all 110 server tests that apply pass, and tlsfuzzer tests the server with every
+kind of key besides.

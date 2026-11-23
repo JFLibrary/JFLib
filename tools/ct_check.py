@@ -45,7 +45,6 @@ import argparse
 import concurrent.futures
 import functools
 import hashlib
-import itertools
 import os
 import platform
 import re
@@ -547,15 +546,23 @@ def memcheck(level, exe, targets):
         found = {}
         for kind, frames in errors:
             fr = own_frame(frames)
+            # invalid reads and writes (and a system call given the secret) are never excused:
+            # the exceptions below are for branches and addresses that follow public values
+            if kind == "other":
+                found.setdefault((kind, fr), frames)
+                continue
             if declassified(fr, frames):
                 continue
             # allocation sizes come from lengths, which are public (std's capacity checks and
-            # frees of a buffer whose length memcheck follows from a text's padding): the std
-            # frames inside the first own one (up to three) are all allocation code.  How many
-            # there are depends on the inlining: at opt-level z on ARM64 a Vec's free is two
-            # frames of raw_vec, or Global::deallocate's three of alloc.rs
-            head = list(itertools.takewhile(lambda f: not is_own(f), frames))[:3]
-            if head and all(any(s in f[1] for s in ALLOC_SOURCES) for f in head):
+            # frees of a buffer whose length memcheck follows from a text's padding): the branch
+            # is in allocation code, so the frames inside the first own one, up to the three
+            # innermost, are all allocation code.  Up to three: how many there are depends on
+            # the inlining (at opt-level z on ARM64 a Vec's free is two frames of raw_vec, or
+            # Global::deallocate's three of alloc.rs), and std code may stand between them and
+            # the own frame (String::push growing its Vec at opt-level z on x86-64).  A stack
+            # without an own frame is not excused
+            own_at = next((i for i, f in enumerate(frames) if is_own(f)), 0)
+            if own_at and all(any(s in f[1] for s in ALLOC_SOURCES) for f in frames[:min(own_at, 3)]):
                 continue
             # String::push of a Base64 or hex character (ASCII by construction) where the line
             # of the caller is lost

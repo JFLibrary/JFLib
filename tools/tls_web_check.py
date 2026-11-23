@@ -116,6 +116,8 @@ def main():
     conf = d / "no-ems.cnf"
     conf.write_text("openssl_conf = init\n[init]\nssl_conf = ssl\n[ssl]\nsystem_default = sys\n[sys]\nOptions = -ExtendedMasterSecret\n")
 
+    skipped = []
+
     def run(name, cert, server_opts, want, ca=True, host="localhost", env=None, group=None):
         nonlocal bad
         port = free_port()
@@ -125,7 +127,12 @@ def main():
                                 *server_opts.split()], cwd=d, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                env=dict(os.environ, **(env or {})))
         try:
-            wait_port(port)
+            # an s_server that does not listen (this OpenSSL lacks an option: ML-KEM before 3.5)
+            # proves nothing, a refusal least of all: the case is not run
+            if not wait_port(port):
+                skipped.append(name)
+                print(f"n/a  {name:46} openssl s_server did not start ({server_opts})")
+                return
             args = [exe, "--tls-web", f"https://{host}:{port}/"] + (["--ca", str(d / "root.pem")] if ca else [])
             out = subprocess.run(args, capture_output=True, text=True, timeout=30).stdout.strip()
         finally:
@@ -171,11 +178,12 @@ def main():
     run("1.2 only P-256 key exchange", "rsa", "-tls1_2 -groups P-256 -cipher ECDHE-RSA-AES128-GCM-SHA256", "TLS 1.2 0xC02F 200")
     run("1.2 P-256 key exchange, ECDSA", "p256", "-tls1_2 -groups P-256 -cipher ECDHE-ECDSA-CHACHA20-POLY1305", "TLS 1.2 0xCCA9 200")
     run("1.3 only P-384 key exchange (HelloRetryRequest)", "rsa", "-tls1_3 -groups P-384", "TLS 1.3 ", group="0x0018")
-    run("refused: only pure ML-KEM-768 key exchange", "rsa", "-tls1_3 -groups MLKEM768", "error ")
-    run("refused: TLS 1.1 only", "rsa", "-tls1_1", "error ")
+    run("refused: only pure ML-KEM-768 key exchange", "rsa", "-tls1_3 -groups MLKEM768", "error TLS: ")
+    run("refused: TLS 1.1 only", "rsa", "-tls1_1", "error TLS: ")
     if internet:
         bad += internet_checks([exe], "linux")
-    print("tls_web_check:", "all ok" if not bad else f"{bad} failures")
+    not_run = f", {len(skipped)} not run (openssl s_server did not start)" if skipped else ""
+    print("tls_web_check:", ("all ok" if not bad else f"{bad} failures") + not_run)
     return 1 if bad else 0
 
 

@@ -1,20 +1,29 @@
 // keysched -- the TLS 1.3 key schedule (RFC 8446 7.1) with the hash of the cipher suite (SHA-256
 // or SHA-384): HKDF-Expand-Label, Derive-Secret, traffic keys and finished keys; the TLS 1.2 PRF
 // (RFC 5246 5) with SHA-256 or SHA-384; the running transcript hash of a handshake
+//
+// Every function computes with the hash it is given (HMAC of any HashAlg); the TLS suites use
+// SHA-256 and SHA-384, and the Transcript keeps those two only
 
 use alloc::vec::Vec;
 
-use crypto::hmac::{hkdf_expand, hkdf_extract};
 use crypto::{HashAlg, Sha256, Sha384};
 
 /// a secret of the schedule (as long as the hash: 32 or 48 bytes)
 pub type Secret = Vec<u8>;
 
+/// HKDF-Expand (RFC 5869 2.3) with HMAC of `h`; `out` at most 255 blocks of the hash
 fn expand(h: HashAlg, prk: &[u8], info: &[u8], out: &mut [u8]) {
-    match h {
-        HashAlg::Sha384 => hkdf_expand::<Sha384>(prk, info, out),
-        _ => hkdf_expand::<Sha256>(prk, info, out),
+    let mut t = Vec::new();
+    for (i, part) in out.chunks_mut(h.len()).enumerate() {
+        let mut m = core::mem::take(&mut t);
+        m.extend_from_slice(info);
+        m.push(i as u8 + 1);
+        t = h.hmac(prk, &m);
+        crypto::zeroize(&mut m);
+        part.copy_from_slice(&t[..part.len()]);
     }
+    crypto::zeroize(&mut t);
 }
 
 /// HKDF-Expand-Label(secret, label, context, len)
@@ -36,13 +45,10 @@ pub fn derive(h: HashAlg, secret: &[u8], label: &str, hash: &[u8]) -> Secret {
     out
 }
 
+/// HKDF-Extract (RFC 5869 2.2): HMAC(salt, ikm); an empty salt is the same as zeros of the
+/// hash's length (HMAC pads its key with zeros)
 pub fn extract(h: HashAlg, salt: &[u8], ikm: &[u8]) -> Secret {
-    let mut out = alloc::vec![0u8; h.len()];
-    match h {
-        HashAlg::Sha384 => hkdf_extract::<Sha384>(salt, ikm, &mut out),
-        _ => hkdf_extract::<Sha256>(salt, ikm, &mut out),
-    }
-    out
+    h.hmac(salt, ikm)
 }
 
 /// the hash of no messages
@@ -154,19 +160,21 @@ impl Transcript {
         }
     }
 
-    /// the hash so far with `h` (SHA-384 or SHA-256)
+    /// the hash so far with `h`: SHA-256 or SHA-384 while it is kept, else empty
     pub fn hash(&self, h: HashAlg) -> Vec<u8> {
         match h {
+            HashAlg::Sha256 => self.s256.clone().map(|s| s.finalize().to_vec()).unwrap_or_default(),
             HashAlg::Sha384 => self.s384.clone().map(|s| s.finalize().to_vec()).unwrap_or_default(),
-            _ => self.s256.clone().map(|s| s.finalize().to_vec()).unwrap_or_default(),
+            _ => Vec::new(),
         }
     }
 
-    /// keep only `h` from here on (the suite is chosen)
+    /// keep only `h` from here on (the suite is chosen); a hash other than these two keeps none
     pub fn keep(&mut self, h: HashAlg) {
-        if h == HashAlg::Sha384 {
+        if h != HashAlg::Sha256 {
             self.s256 = None;
-        } else {
+        }
+        if h != HashAlg::Sha384 {
             self.s384 = None;
         }
     }

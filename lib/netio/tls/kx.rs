@@ -26,7 +26,9 @@ pub const SECP256R1_MLKEM768: u16 = 0x11eb;
 pub const X25519_MLKEM768: u16 = 0x11ec;
 pub const SECP384R1_MLKEM1024: u16 = 0x11ed;
 
-/// every group here, in the order a server prefers them when it may choose
+/// every group here.  The order is no preference: a server goes by the client's list and takes
+/// the first group here that the client sent a share of; without one it asks for the first
+/// group here the client lists (HelloRetryRequest)
 pub const GROUPS: [u16; 6] = [X25519_MLKEM768, X25519, SECP256R1, SECP384R1, SECP256R1_MLKEM768, SECP384R1_MLKEM1024];
 
 /// the ECDHE part and the ML-KEM part of a group
@@ -138,7 +140,10 @@ impl Share {
         };
         let (ec, ct) = split(self.group, peer, params.ct_len())?;
         let mut e = ec_shared(curve, &self.ec_secret, ec)?;
-        let mut k = mlkem::decaps(params, &self.dk, ct)?;
+        let Some(mut k) = mlkem::decaps(params, &self.dk, ct) else {
+            crypto::zeroize(&mut e);
+            return None;
+        };
         let out = join(self.group, &e, &k);
         crypto::zeroize(&mut e);
         crypto::zeroize(&mut k);
@@ -162,7 +167,11 @@ pub fn respond(group: u16, client: &[u8]) -> Option<(Vec<u8>, Vec<u8>)> {
     let mut m: [u8; 32] = plat::random_bytes();
     let enc = mlkem::encaps(params, ek, &m);
     crypto::zeroize(&mut m);
-    let (ct, mut k) = enc?;
+    // an encapsulation key FIPS 203 refuses: the ECDH secret is wiped all the same
+    let Some((ct, mut k)) = enc else {
+        crypto::zeroize(&mut e);
+        return None;
+    };
     let shared = join(group, &e, &k);
     crypto::zeroize(&mut e);
     crypto::zeroize(&mut k);

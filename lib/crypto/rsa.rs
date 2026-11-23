@@ -423,13 +423,23 @@ impl PrivateKey {
     pub fn q(&self) -> &[u8] {
         &self.q
     }
-    /// q^-1 mod p, big-endian (what key files keep beside the primes; p > q)
+    /// q^-1 mod p, big-endian (what key files keep beside the primes): q is reduced mod p
+    /// first (a masked remainder), so the primes may come in either order and of any lengths
     pub fn iqmp(&self) -> Vec<u8> {
-        let Some(mp) = Mont::new(&bn::from_be(&self.p, 0)) else {
+        let pl = bn::from_be(&self.p, 0);
+        let Some(mp) = Mont::new(&pl) else {
             return Vec::new();
         };
-        let q = bn::from_be(&self.q, mp.limbs());
-        be_min(&mp.from_mont(&mp.inv_mont(&mp.to_mont(&q))))
+        let mut q = bn::from_be(&self.q, 0);
+        let mut qr = rem_big(&q, &pl);
+        crate::zeroize_words(&mut q);
+        let mut x = mp.to_mont(&qr);
+        crate::zeroize_words(&mut qr);
+        let mut y = mp.from_mont(&mp.inv_mont(&x));
+        crate::zeroize_words(&mut x);
+        let out = be_min(&y);
+        crate::zeroize_words(&mut y);
+        out
     }
     /// d mod (p - 1)
     pub fn dp(&self) -> Vec<u8> {

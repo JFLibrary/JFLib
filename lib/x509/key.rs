@@ -187,12 +187,20 @@ impl PrivateKey {
     }
 
     /// whether this key makes signatures of `alg` (ECDSA: of its curve's size or any hash, as
-    /// X.509 and TLS 1.2 allow; TLS 1.3 ties the hash to the curve itself)
+    /// X.509 and TLS 1.2 allow; TLS 1.3 ties the hash to the curve itself; RSA-PSS: when the
+    /// modulus holds the hash, the salt and two bytes, RFC 8017 9.1.1, so a 1024-bit key makes no
+    /// PSS with SHA-512 and a salt as long)
     pub fn can(&self, alg: SigAlg) -> bool {
-        matches!(
-            (&self.k, alg),
-            (Kind::Ed25519(_), SigAlg::Ed25519) | (Kind::Ec { .. }, SigAlg::Ecdsa(HashAlg::Sha256 | HashAlg::Sha384 | HashAlg::Sha512)) | (Kind::Rsa(..), SigAlg::RsaPkcs1(HashAlg::Sha256 | HashAlg::Sha384 | HashAlg::Sha512)) | (Kind::Rsa(..), SigAlg::RsaPss(HashAlg::Sha256 | HashAlg::Sha384 | HashAlg::Sha512, _))
-        )
+        match (&self.k, alg) {
+            (Kind::Ed25519(_), SigAlg::Ed25519) => true,
+            (Kind::Ec { .. }, SigAlg::Ecdsa(HashAlg::Sha256 | HashAlg::Sha384 | HashAlg::Sha512)) => true,
+            // the smallest modulus (1024 bits) holds PKCS #1 v1.5 of SHA-512 (94 of 128 bytes)
+            (Kind::Rsa(..), SigAlg::RsaPkcs1(HashAlg::Sha256 | HashAlg::Sha384 | HashAlg::Sha512)) => true,
+            (Kind::Rsa(k), SigAlg::RsaPss(h @ (HashAlg::Sha256 | HashAlg::Sha384 | HashAlg::Sha512), salt)) => {
+                (k.bits() - 1).div_ceil(8) >= h.len() + salt.unwrap_or(h.len()) + 2
+            }
+            _ => false,
+        }
     }
 
     /// the algorithm it signs certificates with: Ed25519, ECDSA with SHA-256 (P-256) or
