@@ -9,6 +9,11 @@
 // well under a kilobyte.  Copies and uncompressed meta-blocks go out in pieces as the
 // caller takes them.
 //
+// While the input surely holds the next part of a command (CMD_BITS, LIT_BITS, DIST_BITS:
+// the most a part can read) and the output has room for it, Core::fast runs whole commands
+// without the steps and their restarts; it stops in a state the steps go on from, so a call
+// ends where the steps alone would end it.
+//
 // The output goes into a window of the stream's size ((1 << WBITS) - 16, at most 16 MiB):
 // it keeps that much of the output, as far as a distance may reach, and moves when it holds
 // more than twice that.  Distances beyond it are static dictionary words, as in mod.rs.
@@ -18,7 +23,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use super::tab as T;
-use super::{dict_word, read_code, Blocks, Br, Huff, CELLS, COPY, INS};
+use super::{command, copy_back, dict_ref, distance, lit_ones, read_code, Blocks, Br, Huff, LitCtx};
 use crate::stream::{self, Decode, Engine, Error, Stage, Step, Stop};
 
 impl From<super::Error> for Error {
@@ -32,6 +37,13 @@ impl From<super::Error> for Error {
 
 const STAGE_MAX: usize = 4096;
 const PEND: usize = 64 << 10; // output that may wait for the caller
+/// the most bits a block switch reads (type code, length code, 24 extra bits)
+const SWITCH_BITS: usize = 15 + 15 + 24;
+/// the most bits of an insert-and-copy command (block switch, code, the extra bits of both
+/// lengths), of a literal and of a distance
+const CMD_BITS: usize = SWITCH_BITS + 15 + 24 + 24;
+const LIT_BITS: usize = SWITCH_BITS + 15;
+const DIST_BITS: usize = SWITCH_BITS + 15 + 24;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Ph {
@@ -71,6 +83,7 @@ struct Mb {
     ntl: usize,
     ntd: usize,
     cmap_l: Vec<u8>,
+    ones: Vec<u16>, // lit_ones(cmap_l)
     cmap_d: Vec<u8>,
     lit_h: Vec<Huff>,
     cmd_h: Vec<Huff>,
@@ -78,6 +91,18 @@ struct Mb {
 }
 
 type BState = (u32, u32, u32, u32);
+
+/// after a command: the next one, or the end of the meta-block
+#[inline(always)]
+fn after_cmd(left: usize, last: bool) -> Ph {
+    if left > 0 {
+        Ph::Cmd
+    } else if last {
+        Ph::Done
+    } else {
+        Ph::Meta
+    }
+}
 
 fn bsave(b: &Blocks) -> BState {
     (b.cur, b.last, b.second, b.left)
@@ -120,11 +145,6 @@ impl Core {
             clen: 0,
             d0: false,
         }
-    }
-
-    fn push(&mut self, b: u8) {
-        self.out.push(b);
-        self.total += 1;
     }
 
     fn meta_end(&mut self) {
@@ -290,12 +310,7 @@ impl Core {
                 let r = (|| -> Result<(usize, usize, bool), Error> {
                     bi.next(br)?;
                     let cmd = mb.cmd_h.get(bi.cur as usize).ok_or(Error::Corrupt)?.decode(br)?;
-                    let (ib, cb, d0) = CELLS[(cmd >> 6) as usize];
-                    let ic = (ib + ((cmd >> 3) & 7)) as usize;
-                    let cc = (cb + (cmd & 7)) as usize;
-                    let ilen = INS[ic].0 as usize + br.bits(INS[ic].1)? as usize;
-                    let clen = COPY[cc].0 as usize + br.bits(COPY[cc].1)? as usize;
-                    Ok((ilen, clen, d0))
+                    Ok(command(cmd, br)?)
                 })();
                 match r {
                     Ok((ilen, clen, d0)) => {
@@ -314,33 +329,44 @@ impl Core {
                     self.ph = Ph::Dist;
                     return Ok(());
                 }
+                // one literal; more in the same step while the input surely holds the next
+                // one (it cannot run out halfway) and there is room for it, as between steps
                 let mb = &mut *self.mb;
                 let bl = mb.bl.as_mut().ok_or(Error::Corrupt)?;
-                let save = bsave(bl);
                 let k = self.out.len();
-                let p1 = if self.total > 0 { self.out[k - 1] } else { 0 } as usize;
-                let p2 = if self.total > 1 { self.out[k - 2] } else { 0 } as usize;
-                let r = (|| -> Result<u32, Error> {
-                    bl.next(br)?;
-                    let lut = &T::CONTEXT_LUT[(*mb.cmode.get(bl.cur as usize).ok_or(Error::Corrupt)? as usize) << 9..];
-                    let ctx = (lut[p1] | lut[256 + p2]) as usize;
-                    let tree = *mb.cmap_l.get(bl.cur as usize * 64 + ctx).ok_or(Error::Corrupt)? as usize;
-                    Ok(mb.lit_h.get(tree).ok_or(Error::Corrupt)?.decode(br)?)
-                })();
-                match r {
-                    Ok(lit) => {
-                        self.push(lit as u8);
-                        self.left -= 1;
-                        if self.left == 0 {
-                            self.meta_end();
-                        } else {
-                            self.ph = Ph::Lits(n - 1);
+                let mut p1 = if self.total > 0 { self.out[k - 1] } else { 0 } as usize;
+                let mut p2 = if self.total > 1 { self.out[k - 2] } else { 0 } as usize;
+                let mut n = n;
+                loop {
+                    let save = bsave(bl);
+                    let r = (|| -> Result<u32, Error> {
+                        bl.next(br)?;
+                        let lut = &T::CONTEXT_LUT[(*mb.cmode.get(bl.cur as usize).ok_or(Error::Corrupt)? as usize) << 9..];
+                        let ctx = (lut[p1] | lut[256 + p2]) as usize;
+                        let tree = *mb.cmap_l.get(bl.cur as usize * 64 + ctx).ok_or(Error::Corrupt)? as usize;
+                        Ok(mb.lit_h.get(tree).ok_or(Error::Corrupt)?.decode(br)?)
+                    })();
+                    let lit = match r {
+                        Ok(lit) => lit as u8,
+                        Err(e) => {
+                            bload(bl, save);
+                            return Err(e);
                         }
+                    };
+                    self.out.push(lit);
+                    self.total += 1;
+                    self.left -= 1;
+                    n -= 1;
+                    if self.left == 0 {
+                        self.meta_end();
+                        return Ok(());
                     }
-                    Err(e) => {
-                        bload(bl, save);
-                        return Err(e);
+                    if n == 0 || br.left() < LIT_BITS || self.out.len() - self.from + 64 > PEND {
+                        self.ph = Ph::Lits(n);
+                        return Ok(());
                     }
+                    p2 = p1;
+                    p1 = lit as usize;
                 }
             }
             Ph::Dist => {
@@ -358,26 +384,7 @@ impl Core {
                         let dctx = if clen > 4 { 3 } else { clen - 2 };
                         let tree = *mb.cmap_d.get(bd.cur as usize * 4 + dctx).ok_or(Error::Corrupt)? as usize;
                         let dc = mb.dist_h.get(tree).ok_or(Error::Corrupt)?.decode(br)? as usize;
-                        let d = if dc < 16 {
-                            let r = |k: usize| rb[(rb_idx + 4 - k) & 3] as i64;
-                            static IDX: [usize; 16] = [0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1];
-                            static OFF: [i64; 16] = [0, 0, 0, 0, -1, 1, -2, 2, -3, 3, -1, 1, -2, 2, -3, 3];
-                            let v = r(IDX[dc]) + OFF[dc];
-                            if v <= 0 {
-                                return Err(Error::Corrupt);
-                            }
-                            v as usize
-                        } else if dc < 16 + ndirect {
-                            dc - 15
-                        } else {
-                            let x = dc - ndirect - 16;
-                            let nb = 1 + (x >> (npostfix + 1));
-                            let hcode = x >> npostfix;
-                            let lcode = x & ((1usize << npostfix) - 1);
-                            let off = ((2 + (hcode & 1)) << nb) - 4;
-                            ((off + br.bits(nb as u32)? as usize) << npostfix) + lcode + ndirect + 1
-                        };
-                        Ok((d, dc))
+                        Ok((distance(dc, &rb, rb_idx, npostfix, ndirect, br)?, dc))
                     })();
                     match r {
                         Ok(x) => x,
@@ -387,45 +394,111 @@ impl Core {
                         }
                     }
                 };
-                let maxd = (self.total.min(self.window as u64)) as usize;
-                if dist > maxd {
-                    // a static dictionary word
-                    if !(4..=24).contains(&clen) {
-                        return Err(Error::Corrupt);
-                    }
-                    let nb = T::SIZE_BITS[clen] as usize;
-                    let id = dist - maxd - 1;
-                    let idx = id & ((1usize << nb) - 1);
-                    let t = id >> nb;
-                    if t >= T::TRANSFORMS.len() || nb == 0 {
-                        return Err(Error::Corrupt);
-                    }
-                    let before = self.out.len();
-                    dict_word(&mut self.out, clen, idx, t);
-                    let n = self.out.len() - before;
-                    self.total += n as u64;
-                    if n > self.left {
-                        return Err(Error::Corrupt);
-                    }
-                    self.left -= n;
-                    if self.left == 0 {
-                        self.meta_end();
-                    } else {
-                        self.ph = Ph::Cmd;
-                    }
-                } else {
-                    if clen > self.left {
-                        return Err(Error::Corrupt);
-                    }
-                    if dcode != 0 {
-                        self.rb_idx = (self.rb_idx + 1) & 3;
-                        self.rb[self.rb_idx] = dist;
-                    }
-                    self.left -= clen;
-                    self.ph = Ph::Copy { dist, n: clen };
-                }
+                self.ph = self.dist_done(dist, dcode)?;
             }
             Ph::Skip(_) | Ph::Raw | Ph::Copy { .. } | Ph::Done => {}
+        }
+        Ok(())
+    }
+
+    /// the distance of the current command is known: a static dictionary word, or the copy
+    /// to come -> the next phase (Cmd, Copy or the end of the meta-block)
+    #[inline(always)]
+    fn dist_done(&mut self, dist: usize, dcode: usize) -> Result<Ph, Error> {
+        let clen = self.clen;
+        let maxd = (self.total.min(self.window as u64)) as usize;
+        if dist > maxd {
+            let n = dict_ref(&mut self.out, clen, dist - maxd - 1)?;
+            self.total += n as u64;
+            if n > self.left {
+                return Err(Error::Corrupt);
+            }
+            self.left -= n;
+            return Ok(after_cmd(self.left, self.last));
+        }
+        if clen > self.left {
+            return Err(Error::Corrupt);
+        }
+        if dcode != 0 {
+            self.rb_idx = (self.rb_idx + 1) & 3;
+            self.rb[self.rb_idx] = dist;
+        }
+        self.left -= clen;
+        Ok(Ph::Copy { dist, n: clen })
+    }
+
+    /// whole commands in one go, from Ph::Cmd on, while the input surely holds each next part
+    /// of one (none can run out halfway, so none needs the restart of a step) and the output
+    /// has room for it as between steps; ph is left where the steps go on
+    fn fast(&mut self, br: &mut Br) -> Result<(), Error> {
+        while self.ph == Ph::Cmd {
+            if br.left() < CMD_BITS || self.out.len() - self.from + 64 > PEND {
+                return Ok(());
+            }
+            let mb = &mut *self.mb;
+            let (Some(bi), Some(bl), Some(bd)) = (mb.bi.as_mut(), mb.bl.as_mut(), mb.bd.as_mut()) else {
+                return Err(Error::Corrupt);
+            };
+            bi.next(br)?;
+            let cmd = mb.cmd_h.get(bi.cur as usize).ok_or(Error::Corrupt)?.decode(br)?;
+            let (ilen, clen, d0) = command(cmd, br)?;
+            self.clen = clen;
+            self.d0 = d0;
+            if ilen > 0 {
+                let k = self.out.len();
+                let mut p = (if self.total > 0 { self.out[k - 1] } else { 0 }, if self.total > 1 { self.out[k - 2] } else { 0 });
+                let mut n = ilen;
+                loop {
+                    if br.left() < LIT_BITS || self.out.len() - self.from + 64 > PEND {
+                        self.ph = Ph::Lits(n);
+                        return Ok(());
+                    }
+                    if bl.left == 0 {
+                        bl.switch(br)?;
+                    }
+                    let c = LitCtx::new(&mb.cmode, &mb.cmap_l, &mb.ones, &mb.lit_h, bl.cur)?;
+                    // the literals that surely fit: in the block, the command and the
+                    // meta-block, in the input (15 bits each), in the room the steps would
+                    // allow each of them
+                    let room = PEND - 64 - (self.out.len() - self.from) + 1;
+                    let m = n.min(bl.left as usize).min(self.left).min(br.left() / 15).min(room);
+                    bl.left -= m as u32;
+                    c.run(m, &mut self.out, br, &mut p)?;
+                    self.total += m as u64;
+                    self.left -= m;
+                    if self.left == 0 {
+                        self.ph = after_cmd(0, self.last);
+                        return Ok(());
+                    }
+                    n -= m;
+                    if n == 0 {
+                        break;
+                    }
+                }
+            }
+            if br.left() < DIST_BITS || self.out.len() - self.from + 64 > PEND {
+                self.ph = Ph::Dist;
+                return Ok(());
+            }
+            let (dist, dcode) = if d0 {
+                (self.rb[self.rb_idx], 0usize)
+            } else {
+                bd.next(br)?;
+                let dctx = if clen > 4 { 3 } else { clen - 2 };
+                let tree = *mb.cmap_d.get(bd.cur as usize * 4 + dctx).ok_or(Error::Corrupt)? as usize;
+                let dc = mb.dist_h.get(tree).ok_or(Error::Corrupt)?.decode(br)? as usize;
+                (distance(dc, &self.rb, self.rb_idx, mb.npostfix as usize, mb.ndirect as usize, br)?, dc)
+            };
+            self.ph = self.dist_done(dist, dcode)?;
+            if let Ph::Copy { dist, n } = self.ph {
+                // the copy at once when it fits (else in pieces by steps())
+                if n > PEND.saturating_sub(self.out.len() - self.from) {
+                    return Ok(());
+                }
+                copy_back(&mut self.out, dist, n);
+                self.total += n as u64;
+                self.ph = after_cmd(self.left, self.last);
+            }
         }
         Ok(())
     }
@@ -434,6 +507,7 @@ impl Core {
     // header
     fn cmap_done(&mut self, which: u8, map: Vec<u8>) {
         if which == 0 {
+            self.mb.ones = lit_ones(&map);
             self.mb.cmap_l = map;
             self.ph = Ph::CmapHead { which: 1 };
         } else {
@@ -447,9 +521,9 @@ impl Core {
             match self.ph {
                 Ph::Done => return Ok(Stop::End),
                 Ph::Skip(n) => {
-                    let p = br.pos / 8;
+                    let p = br.pos() / 8;
                     let k = n.min(src.len() - p);
-                    br.pos += 8 * k;
+                    br.seek(8 * (p + k));
                     if k < n {
                         self.ph = Ph::Skip(n - k);
                         return Ok(Stop::Need);
@@ -466,14 +540,14 @@ impl Core {
                     if room == 0 {
                         return Ok(Stop::Full);
                     }
-                    let p = br.pos / 8;
+                    let p = br.pos() / 8;
                     let k = self.left.min(src.len() - p).min(room);
                     if k == 0 {
                         return Ok(Stop::Need);
                     }
                     self.out.extend_from_slice(&src[p..p + k]);
                     self.total += k as u64;
-                    br.pos += 8 * k;
+                    br.seek(8 * (p + k));
                     self.left -= k;
                     continue;
                 }
@@ -491,15 +565,7 @@ impl Core {
                         return Ok(Stop::Full);
                     }
                     let k = n.min(room);
-                    let s = self.out.len() - dist;
-                    if dist >= k {
-                        self.out.extend_from_within(s..s + k);
-                    } else {
-                        for j in 0..k {
-                            let v = self.out[s + j];
-                            self.out.push(v);
-                        }
-                    }
+                    copy_back(&mut self.out, dist, k);
                     self.total += k as u64;
                     self.ph = Ph::Copy { dist, n: n - k };
                     continue;
@@ -510,13 +576,18 @@ impl Core {
             if self.out.len() - self.from + 64 > PEND {
                 return Ok(Stop::Full);
             }
-            let at = br.pos;
+            if self.ph == Ph::Cmd && br.left() >= CMD_BITS {
+                // (nothing in fast() runs out of input: an error there is the stream's)
+                self.fast(br)?;
+                continue;
+            }
+            let at = br.pos();
             let ph = self.ph;
             br.short = false;
             match self.step(br) {
                 Ok(()) => {}
                 Err(_) if br.short => {
-                    br.pos = at;
+                    br.seek(at);
                     self.ph = ph;
                     return Ok(Stop::Need);
                 }
@@ -528,9 +599,9 @@ impl Core {
 
 impl Engine for Core {
     fn run(&mut self, src: &[u8], bit: &mut usize) -> Result<Stop, Error> {
-        let mut br = Br { d: src, pos: *bit, short: false };
+        let mut br = Br::new(src, *bit);
         let r = self.steps(src, &mut br);
-        *bit = br.pos;
+        *bit = br.pos();
         r
     }
 
