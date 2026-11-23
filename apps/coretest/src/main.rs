@@ -58,6 +58,7 @@ mod sshd;
 mod store;
 #[cfg(not(target_os = "android"))]
 mod tlst;
+mod tlsweb;
 #[cfg(not(target_os = "android"))]
 mod suitevec;
 mod sshcoret;
@@ -176,6 +177,7 @@ fn run() -> i32 {
         native!("http", httpt::run),
         native!("cas", cast::run),
         native!("tls", tlst::run),
+        native!("tlsweb", tlsweb::run),
         native!("ssh", sshd::run),
         native!("dns", dnst::run),
         ("netpkt", Some(netpktt::run)),

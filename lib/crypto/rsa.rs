@@ -13,6 +13,9 @@
 //                                             caller's salt (hash.len() random bytes, as TLS 1.3
 //                                             and X.509 use; empty: the same signature each time)
 //   key.n() / e() / d() / p() / q() / iqmp()  big-endian without leading zeros
+//   key.dp() / dq()                           d mod (p - 1), d mod (q - 1) (PKCS #1's
+//                                             RSAPrivateKey; one bit of d at a time, the
+//                                             subtraction kept by mask)
 //
 // Public operations are variable time (that is fine for them).  Signing uses pow_ct; generate is
 // variable time and meant for simulators and tests, where the random bytes are no secret either.
@@ -176,6 +179,39 @@ fn mul(a: &[u64], b: &[u64]) -> Vec<u64> {
         }
         r[i + b.len()] = c as u64;
     }
+    r
+}
+
+/// a mod m (m > 0) by shift and subtract, a bit of `a` at a time: the steps are the same for
+/// every value of the same lengths, the subtraction is kept or not by a mask
+fn rem_big(a: &[u64], m: &[u64]) -> Vec<u64> {
+    let k = m.len() + 1;
+    let mut r = alloc::vec![0u64; k];
+    let mut t = alloc::vec![0u64; k];
+    for i in (0..a.len() * 64).rev() {
+        // r = 2 r + bit (r < m before, so 2 r + 1 < 2 m fits k limbs)
+        let mut carry = (a[i / 64] >> (i % 64)) & 1;
+        for w in r.iter_mut() {
+            let next = *w >> 63;
+            *w = (*w << 1) | carry;
+            carry = next;
+        }
+        // t = r - m; keep it when there was no borrow
+        let mut borrow = 0u64;
+        for j in 0..k {
+            let y = m.get(j).copied().unwrap_or(0);
+            let (d1, b1) = r[j].overflowing_sub(y);
+            let (d2, b2) = d1.overflowing_sub(borrow);
+            t[j] = d2;
+            borrow = (b1 | b2) as u64;
+        }
+        let keep = crate::ct_mask(borrow.wrapping_sub(1)); // all ones: r >= m
+        for j in 0..k {
+            r[j] = (t[j] & keep) | (r[j] & !keep);
+        }
+    }
+    crate::zeroize_words(&mut t);
+    r.truncate(m.len());
     r
 }
 
@@ -395,6 +431,28 @@ impl PrivateKey {
         let q = bn::from_be(&self.q, mp.limbs());
         be_min(&mp.from_mont(&mp.inv_mont(&mp.to_mont(&q))))
     }
+    /// d mod (p - 1)
+    pub fn dp(&self) -> Vec<u8> {
+        self.d_mod(&self.p)
+    }
+
+    /// d mod (q - 1)
+    pub fn dq(&self) -> Vec<u8> {
+        self.d_mod(&self.q)
+    }
+
+    /// d mod (prime - 1): d read at the modulus's length, so the steps do not follow its own;
+    /// the result's leading zero bytes are dropped (its DER shows them anyway)
+    fn d_mod(&self, prime: &[u8]) -> Vec<u8> {
+        let pl = minus_one(&bn::from_be(prime, 0));
+        let mut d = bn::from_be(&self.d, self.m.limbs());
+        let mut r = rem_big(&d, &pl);
+        crate::zeroize_words(&mut d);
+        let out = be_min(&r);
+        crate::zeroize_words(&mut r);
+        out
+    }
+
     /// the public half
     pub fn public(&self) -> Option<PublicKey> {
         PublicKey::new(&self.n(), &self.e)

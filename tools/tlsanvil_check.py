@@ -1,14 +1,13 @@
 """tlsanvil_check.py -- netio's TLS client and server against TLS-Anvil (github.com/tls-attacker/TLS-Anvil).
-    python tools/tlsanvil_check.py [--server] [--strength N] [--parallel N] [--package P] [--tags T,..] [--setup-only]
+    python tools/tlsanvil_check.py [--server [--key rsa|p256|p384|ed25519]] [--strength N] [--parallel N] [--package P] [--tags T,..] [--setup-only]
 TLS-Anvil runs about 450 test templates derived from the RFCs (TLS 1.2 and 1.3: the handshake,
 extensions, alerts, record layer, cipher suites, key exchange groups, signature algorithms,
 combinations of them), some for clients, some for servers.  Client (the default): TLS-Anvil plays
 the server and starts `coretest --tls-anvil-client PORT` for each handshake (netio's web client,
 Trust::Custom taking TLS-Anvil's made-up certificates, in the test program only).  --server:
-TLS-Anvil connects to `coretest --tls-serve` (netio's server, Ed25519 certificate, TLS 1.3); its
-TLS-Scanner offers no Ed25519 in the probes it starts with, so for now the preparation fails and
-no server test runs (it will once netio's server signs with ECDSA or RSA; tlsfuzzer tests the
-server meanwhile).  TLS-Anvil judges what netio sends.
+TLS-Anvil connects to `coretest --tls-serve --key KIND` (netio's server, TLS 1.3, a certificate
+of that kind of coretest's PKI: RSA by default; TLS-Scanner's probes offer no Ed25519).
+TLS-Anvil judges what netio sends.
 Everything comes into build/tlsanvil once, pinned and checked: Eclipse Temurin 21 (SHA-256 of
 Adoptium's API), Maven 3.9.9 (SHA-512 of Apache's archive), TLS-Anvil at a commit, built with
 Maven into its own repository (build/tlsanvil/m2); nothing is installed system-wide.  The results
@@ -103,6 +102,7 @@ def summarize(run):
 def main():
     ap = argparse.ArgumentParser(description="netio's TLS client or server against TLS-Anvil")
     ap.add_argument("--server", action="store_true", help="test netio's server (coretest --tls-serve) instead of its client")
+    ap.add_argument("--key", default="rsa", help="--server: the kind of the server's key (rsa, p256, p384, ed25519)")
     ap.add_argument("--strength", type=int, default=1, help="t-way strength of TLS-Anvil's combinatorial tests")
     ap.add_argument("--parallel", type=int, default=2, help="tests and handshakes at a time")
     ap.add_argument("--package", default="", help="only the tests of one package (e.g. de.rub.nds.tlstest.suite.tests.client.tls13.rfc8446)")
@@ -119,13 +119,15 @@ def main():
     shutil.rmtree(run, ignore_errors=True)
     run.mkdir(parents=True)
     port = free_port()
-    # no packet capture (tcpdump would need root); the results as JSON in run
-    cmd = [str(java), "-jar", str(jar), "-disableTcpDump", "-parallelHandshakes", str(a.parallel), "-parallelTests", str(a.parallel),
+    # no packet capture (tcpdump would need root); the results as JSON in run; no cache of the
+    # scan (run is new each time, and TLS-Anvil fails to serialize a scan with ML-KEM key shares:
+    # NotSerializableException MlKemPublicKey in TestPreparator.saveToCache)
+    cmd = [str(java), "-jar", str(jar), "-disableTcpDump", "-ignoreCache", "-parallelHandshakes", str(a.parallel), "-parallelTests", str(a.parallel),
            "-strength", str(a.strength), "-identifier", "netio-server" if a.server else "netio-client"] + \
           (["-testPackage", a.package] if a.package else []) + (["-tags"] + a.tags.split(",") if a.tags else [])
     srv = None
     if a.server:
-        srv = subprocess.Popen([str(exe), "--tls-serve", str(port)], stdout=subprocess.DEVNULL, stderr=open(run / "server.log", "w"))
+        srv = subprocess.Popen([str(exe), "--tls-serve", str(port), "--key", a.key], stdout=subprocess.DEVNULL, stderr=open(run / "server.log", "w"))
         cmd += ["server", "-connect", f"localhost:{port}"]
     else:
         cmd += ["client", "-port", str(port), "-triggerScript", "sh", "-c", f"exec '{exe}' --tls-anvil-client {port} 2>>'{run / 'client.log'}'"]

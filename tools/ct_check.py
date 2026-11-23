@@ -95,7 +95,9 @@ DECLASSIFIED = [
     ("crypto/p384.rs", r"assert!\(secret_from\(secret\)\.is_some\(\)|\.then_some\(\*random\)", "public_key's assert takes secret_from's answer: whether the scalar is in [1, n - 1] is public"),
     ("crypto/p384.rs", r"if finite == 0", "the point at infinity ends the operation (None): reaching it is public"),
     # ECDSA signing: refused keys and nonces, and the signature itself
-    ("crypto/ecdsa.rs", r"in_range_mask\(&d\) == 0", "a secret key outside [1, n - 1] is refused: the API's public answer"),
+    ("crypto/ecdsa.rs", r"in_range_mask\(&d\) == 0|if !secret_ok\(curve, secret\)", "a secret key outside [1, n - 1] is refused: the API's public answer"),
+    # a key file: the public key stored with an ECDSA secret is compared with the one it gives
+    ("x509/key.rs", r"ct_eq\(p, public\)", "the public key stored in the file is public: whether it is the secret's own is the reader's public answer"),
     ("crypto/ecdsa.rs", r"in_range_mask\(&kk\) != 0|if let Some\(sig\) = found",
      "a nonce outside [1, n - 1] is drawn again (RFC 6979 3.2 h.3, about 2^-32 on P-256): that one was refused shows nothing of the one taken"),
     ("crypto/ecdsa.rs", r"r\.iter\(\)\.all\(\|&w\| w == 0\) \|\| s\.iter", "r and s are the signature, which is published"),

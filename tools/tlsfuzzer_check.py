@@ -4,13 +4,14 @@ tlsfuzzer (github.com/tlsfuzzer/tlsfuzzer) sends a server well-formed and delibe
 handshakes and checks every answer against RFC 8446: alerts, the state machine, record layer,
 lengths, padding, key updates, version and group negotiation.  The pinned commits of tlsfuzzer
 and tlslite-ng come into build/tlsfuzzer once (git), python-ecdsa and six through pip --target;
-nothing is installed system-wide.  The server is `coretest --tls-serve` (netio's server with the
-Ed25519 certificate of coretest's PKI, HTTP behind it); the scripts of ECHO, which check the
-length of what comes back, get `coretest --tls-echo` (each line back in one record).
-SCRIPTS below says for each script what to expect: run (every probe must pass, the probes named
-there are expected to fail for the reason given) or not applicable (a feature netio does not have:
-RSA / ECDSA / ML-DSA certificates, PSK and resumption, FFDHE, brainpool, ML-KEM, post-handshake
-auth).  Linux (from Windows: runs itself again in WSL); needs git, pip and the Linux coretest
+nothing is installed system-wide.  The servers are `coretest --tls-serve --key KIND` (netio's
+server, HTTP behind it); the scripts of ECHO, which check the length of what comes back, get
+`coretest --tls-echo` (each line back in one record).
+SCRIPTS below says for each script what to expect and which server it talks to (RSA, ECDSA P-256
+or Ed25519 certificates of coretest's PKI, one asking for a client certificate): run (every probe
+must pass, the probes named there are expected to fail for the reason given) or not applicable (a
+feature netio does not have: ML-DSA, PSK and resumption, FFDHE, brainpool, post-handshake auth,
+certificate compression).  Linux (from Windows: runs itself again in WSL); needs git, pip and the Linux coretest
 (python build_rs.py app coretest --target linux).  Exit code 1 on any unexpected result."""
 import argparse
 import os
@@ -27,117 +28,111 @@ TLSFUZZER = ("https://github.com/tlsfuzzer/tlsfuzzer", "51aad6e9ae42f5b045fa9b76
 TLSLITE = ("https://github.com/tlsfuzzer/tlslite-ng", "7e95ea1a86c0d42d8d931ff14134d31f01ce1d76")
 PIP = ["ecdsa==0.19.2", "six==1.17.0"]
 
-# netio's test server has an Ed25519 certificate only, while most scripts offer RSA / ECDSA
-# signatures alone.  For those (patch True) a sitecustomize appends ed25519 to every
-# signature_algorithms list that names RSA or ECDSA schemes; nothing else of the script changes.
-# Scripts about signature negotiation run without it.
-PATCH = """# written by tools/tlsfuzzer_check.py -- see PATCH there
-try:
-    import tlslite.extensions as _e
-    from tlslite.constants import SignatureScheme as _S, SignatureAlgorithm as _A
+# the servers: coretest --tls-serve with keys of a kind (--key), one asking for a client
+# certificate of coretest's CA (--mtls; the scripts get its client key and certificate)
+SERVERS = {
+    "rsa": ["--key", "rsa"],
+    # a P-256 and a P-384 certificate, chosen by the client's signature schemes
+    "ecdsa": ["--key", "p256,p384"],
+    "ed25519": ["--key", "ed25519"],
+    # asks for a client certificate of coretest's CA, takes a client without one
+    "rsa-mtls": ["--key", "rsa", "--mtls-optional"],
+}
+# a script's arguments may name the client's key and certificate of the PKI
+CLIENT = ["-k", "{pki}/client.key", "-c", "{pki}/client.pem"]
+# the signature schemes of the server's CertificateRequest, in its order
+CR_SIGALGS = ["-s", "ecdsa_secp256r1_sha256 ecdsa_secp384r1_sha384 rsa_pss_rsae_sha256 rsa_pss_rsae_sha384 rsa_pss_rsae_sha512 ed25519 "
+              "rsa_pkcs1_sha256 rsa_pkcs1_sha384 rsa_pkcs1_sha512"]
 
-    def _ours(alg):
-        name = _S.toRepr(alg)
-        if name:
-            return name.startswith(("rsa_", "ecdsa_"))
-        return isinstance(alg, tuple) and alg[1] in (_A.rsa, _A.ecdsa)
-
-    _orig = _e._SigListExt.create
-
-    def _create(self, sigalgs=None):
-        if sigalgs and _S.ed25519 not in sigalgs and any(_ours(a) for a in sigalgs):
-            sigalgs = list(sigalgs) + [_S.ed25519]
-        return _orig(self, sigalgs)
-
-    _e._SigListExt.create = _create
-except ImportError:
-    pass
-"""
-
-# script -> (extra arguments, None to run it or the reason it does not apply, with the Ed25519
-# patch); probes expected to fail go in XFAIL with their reason
-NO_RSA = "the server has an Ed25519 certificate only (RSA / ECDSA certificates: phase 2b)"
+# script -> (extra arguments, None to run it or the reason it does not apply, the server);
+# probes expected to fail go in XFAIL with their reason
 NO_PSK = "no PSK, session tickets or resumption"
-NO_CLIENT_CERT = "needs a client key and certificate for tlsfuzzer and a server asking for them"
 SCRIPTS = {
-    "test-tls13-conversation": ([], None, True),
-    "test-tls13-ccs": ([], None, True),
-    "test-tls13-count-tickets": ([], None, True),
-    "test-tls13-dhe-shared-secret-padding": ([], None, True),
-    "test-tls13-empty-alert": ([], None, True),
-    "test-tls13-finished": ([], None, True),
-    "test-tls13-finished-plaintext": ([], None, True),
-    "test-tls13-hrr": ([], None, True),
-    "test-tls13-invalid-ciphers": ([], None, True),
-    "test-tls13-keyshare-omitted": ([], None, True),
-    "test-tls13-keyupdate": ([], None, True),
-    "test-tls13-keyupdate-from-server": ([], None, True),
-    "test-tls13-large-number-of-extensions": ([], None, True),
-    "test-tls13-legacy-version": ([], None, True),
-    "test-tls13-minerva": ([], None, True),
-    "test-tls13-multiple-ccs-messages": ([], None, True),
-    "test-tls13-nociphers": ([], None, True),
-    "test-tls13-no-unknown-groups": ([], None, True),
-    "test-tls13-record-layer-limits": ([], None, True),
-    "test-tls13-record-padding": ([], None, True),
-    "test-tls13-shuffled-extentions": ([], None, True),
-    "test-tls13-unencrypted-alert": ([], None, True),
-    "test-tls13-zero-content-type": ([], None, True),
-    "test-tls13-zero-length-data": ([], None, True),
-    "test-tls13-0rtt-garbage": ([], None, True),
-    "test-tls13-connection-abort": ([], None, True),
-    "test-tls13-crfg-curves": ([], None, True),
-    "test-tls13-ecdhe-curves": ([], None, True),
-    "test-tls13-obsolete-curves": ([], None, True),
-    "test-tls13-serverhello-random": ([], None, True),
-    "test-tls13-symetric-ciphers": ([], None, True),
-    "test-tls13-unrecognised-groups": ([], None, True),
-    "test-tls13-version-negotiation": ([], None, True),
-    "test-tls13-eddsa": ([], None, False),
-    "test-tls13-lengths": ([], None, True),
-    "test-tls13-certificate-compression": ([], "no certificate compression (RFC 8879)", True),
-    "test-tls13-client-certificate-compression": ([], "no certificate compression (RFC 8879)", True),
-    "test-tls13-certificate-request": ([], NO_CLIENT_CERT, True),
-    "test-tls13-certificate-verify": ([], NO_CLIENT_CERT, True),
-    "test-tls13-post-handshake-auth": ([], NO_CLIENT_CERT + "; no post-handshake auth", True),
-    "test-tls13-ecdsa-support": ([], NO_RSA, False),
-    "test-tls13-ecdsa-in-certificate-verify": ([], NO_RSA, False),
-    "test-tls13-ecdsa-brainpool-in-certificate-verify": ([], NO_RSA, False),
-    "test-tls13-eddsa-in-certificate-verify": ([], NO_CLIENT_CERT, False),
-    "test-tls13-mldsa-in-certificate-verify": ([], "no ML-DSA", False),
-    "test-tls13-pkcs-signature": ([], NO_RSA, False),
-    "test-tls13-rsa-signatures": ([], NO_RSA, False),
-    "test-tls13-rsapss-signatures": ([], NO_RSA, False),
-    "test-tls13-signature-algorithms": ([], NO_RSA, False),
-    "test-tls13-ecdhe-brainpool-curves": ([], "no brainpool groups", True),
-    "test-tls13-ffdhe-groups": ([], "no FFDHE groups", True),
-    "test-tls13-ffdhe-sanity": ([], "no FFDHE groups", True),
-    "test-tls13-mlkem": ([], "no ML-KEM (phase 2)", True),
-    "test-tls13-non-support": ([], "for servers without TLS 1.3", True),
-    "test-tls13-psk_dhe_ke": ([], NO_PSK, True),
-    "test-tls13-psk_ke": ([], NO_PSK, True),
-    "test-tls13-session-resumption": ([], NO_PSK, True),
+    "test-tls13-conversation": ([], None, "rsa"),
+    "test-tls13-ccs": ([], None, "rsa"),
+    "test-tls13-count-tickets": ([], None, "rsa"),
+    "test-tls13-dhe-shared-secret-padding": ([], None, "rsa"),
+    "test-tls13-empty-alert": ([], None, "rsa"),
+    "test-tls13-finished": ([], None, "rsa"),
+    "test-tls13-finished-plaintext": ([], None, "rsa"),
+    "test-tls13-hrr": ([], None, "rsa"),
+    "test-tls13-invalid-ciphers": ([], None, "rsa"),
+    "test-tls13-keyshare-omitted": ([], None, "rsa"),
+    "test-tls13-keyupdate": ([], None, "rsa"),
+    "test-tls13-keyupdate-from-server": ([], None, "rsa"),
+    "test-tls13-large-number-of-extensions": ([], None, "rsa"),
+    "test-tls13-legacy-version": ([], None, "rsa"),
+    "test-tls13-minerva": ([], None, "ecdsa"),
+    "test-tls13-multiple-ccs-messages": ([], None, "rsa"),
+    "test-tls13-nociphers": ([], None, "rsa"),
+    "test-tls13-no-unknown-groups": ([], None, "rsa"),
+    "test-tls13-record-layer-limits": ([], None, "rsa"),
+    "test-tls13-record-padding": ([], None, "rsa"),
+    "test-tls13-shuffled-extentions": ([], None, "rsa"),
+    "test-tls13-unencrypted-alert": ([], None, "rsa"),
+    "test-tls13-zero-content-type": ([], None, "rsa"),
+    "test-tls13-zero-length-data": ([], None, "rsa"),
+    "test-tls13-0rtt-garbage": ([], None, "rsa"),
+    "test-tls13-connection-abort": ([], None, "rsa"),
+    "test-tls13-crfg-curves": ([], None, "rsa"),
+    "test-tls13-ecdhe-curves": ([], None, "rsa"),
+    "test-tls13-obsolete-curves": ([], None, "rsa"),
+    "test-tls13-serverhello-random": ([], None, "rsa"),
+    "test-tls13-symetric-ciphers": ([], None, "rsa"),
+    "test-tls13-unrecognised-groups": ([], None, "rsa"),
+    "test-tls13-version-negotiation": ([], None, "rsa"),
+    "test-tls13-eddsa": ([], None, "ed25519"),
+    "test-tls13-lengths": ([], None, "rsa"),
+    "test-tls13-mlkem": ([], "needs kyber-py, which the tool does not fetch yet (ML-KEM: tools/tls_interop.py, OpenSSL 3.5)", "rsa"),
+    "test-tls13-ecdsa-support": ([], None, "ecdsa"),
+    "test-tls13-pkcs-signature": ([], None, "rsa"),
+    "test-tls13-rsa-signatures": ([], None, "rsa"),
+    "test-tls13-rsapss-signatures": (["-b"], None, "rsa"),
+    "test-tls13-signature-algorithms": ([], None, "rsa"),
+    "test-tls13-certificate-request": (CLIENT + CR_SIGALGS, None, "rsa-mtls"),
+    "test-tls13-certificate-verify": (CLIENT + CR_SIGALGS, None, "rsa-mtls"),
+    "test-tls13-ecdsa-in-certificate-verify": ([], "needs an ECDSA client key and certificate of the server's CA for tlsfuzzer", "rsa-mtls"),
+    "test-tls13-ecdsa-brainpool-in-certificate-verify": ([], "no brainpool curves", "rsa-mtls"),
+    "test-tls13-eddsa-in-certificate-verify": ([], "needs an Ed25519 client key and certificate of the server's CA for tlsfuzzer", "rsa-mtls"),
+    "test-tls13-mldsa-in-certificate-verify": ([], "no ML-DSA", "rsa-mtls"),
+    "test-tls13-post-handshake-auth": ([], "no post-handshake authentication", "rsa-mtls"),
+    "test-tls13-certificate-compression": ([], "no certificate compression (RFC 8879)", "rsa"),
+    "test-tls13-client-certificate-compression": ([], "no certificate compression (RFC 8879)", "rsa"),
+    "test-tls13-ecdhe-brainpool-curves": ([], "no brainpool groups", "rsa"),
+    "test-tls13-ffdhe-groups": ([], "no FFDHE groups", "rsa"),
+    "test-tls13-ffdhe-sanity": ([], "no FFDHE groups", "rsa"),
+    "test-tls13-non-support": ([], "for servers without TLS 1.3", "rsa"),
+    "test-tls13-psk_dhe_ke": ([], NO_PSK, "rsa"),
+    "test-tls13-psk_ke": ([], NO_PSK, "rsa"),
+    "test-tls13-session-resumption": ([], NO_PSK, "rsa"),
 }
 # the groups netio's server does not have (probes named "TLS 1.3 with GROUP")
-GROUPS_NOT = "secp384r1|secp521r1|x448|ffdhe|brainpool"
+GROUPS_NOT = "secp521r1|x448|ffdhe|brainpool"
 # scripts that expect the server to send back what they sent, of the same length
 ECHO = {"test-tls13-lengths"}
 XFAIL = {
-    "test-tls13-finished": [("TLS_AES_256_GCM_SHA384", "no TLS_AES_256_GCM_SHA384 (needs SHA-384 in the key schedule)")],
-    "test-tls13-symetric-ciphers": [("TLS_AES_256_GCM_SHA384|CCM", "only TLS_AES_128_GCM_SHA256 and TLS_CHACHA20_POLY1305_SHA256")],
-    "test-tls13-record-layer-limits": [("^max size of ClientHello msg", "the Ed25519 patch makes the ClientHello 4 bytes larger than the 2^14 the script fills it to")],
+    # a Finished padded past the largest message: the server refuses it at its header, sends
+    # decode_error and closes while tlslite still sends; when that send fails first, tlsfuzzer's
+    # runner skips the ExpectAlert and reads the alert in ExpectClose (runner.py, socket.error on
+    # send) -- a race of the script, either answer can come
+    "test-tls13-finished": [("pad_left 0, pad_right (196608|1677\\d{4})$", "a race in tlsfuzzer's runner when the server refuses a message of 192 KiB or more at its header")],
+    "test-tls13-symetric-ciphers": [("CCM", "no CCM suites")],
     "test-tls13-keyupdate-from-server": [("post-handshake KeyUpdate msg from server", "the server does not start key updates by itself")],
     "test-tls13-connection-abort": [("After NewSessionTicket", "no session tickets")],
     "test-tls13-crfg-curves": [("x448", "no x448")],
-    "test-tls13-ecdhe-curves": [("secp384r1|secp521r1|x448", "X25519 and P-256 only")],
-    "test-tls13-obsolete-curves": [(".", "a client listing obsolete groups (RFC 8446 4.2.7) is not refused; netio takes X25519 or P-256 from the list")],
-    "test-tls13-serverhello-random": [(GROUPS_NOT, "X25519 and P-256 only")],
-    "test-tls13-dhe-shared-secret-padding": [(GROUPS_NOT, "X25519 and P-256 only")],
+    "test-tls13-ecdhe-curves": [("secp521r1|x448", "no secp521r1, no x448")],
+    "test-tls13-obsolete-curves": [(".", "a client listing obsolete groups (RFC 8446 4.2.7) is not refused; netio takes a group it has from the list")],
+    "test-tls13-serverhello-random": [(GROUPS_NOT, "no secp521r1, x448, FFDHE, brainpool")],
+    "test-tls13-dhe-shared-secret-padding": [(GROUPS_NOT, "no secp521r1, x448, FFDHE, brainpool")],
     "test-tls13-0rtt-garbage": [("downgrade to TLS 1\\.2", "the server speaks TLS 1.3 only")],
     "test-tls13-unrecognised-groups": [("ffdhe", "no FFDHE groups")],
     "test-tls13-version-negotiation": [("1\\.2|TLS 1\\.2|\\(3, 3\\)|fallback|in client hello legacy field",
                                         "the server speaks TLS 1.3 only (a ClientHello without supported_versions asks for TLS 1.2)")],
     "test-tls13-eddsa": [("ed448", "no Ed448")],
+    "test-tls13-rsapss-signatures": [("rsa_pss_pss_", "no certificate with an RSASSA-PSS key (one with an rsaEncryption key signs with rsa_pss_rsae_*)")],
+    "test-tls13-ecdsa-support": [("brainpool|secp521r1", "no brainpool curves, no P-521")],
+    "test-tls13-no-unknown-groups": [("long list of unknown \\(between 4356 and 4611\\)",
+                                      "the range holds SecP256r1MLKEM768, X25519MLKEM768 and SecP384r1MLKEM1024, which the server has: a HelloRetryRequest for the first")],
 }
 
 
@@ -157,11 +152,7 @@ def setup():
     pylib = OUT / "pylib"
     if not (pylib / "ecdsa").is_dir():
         subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--target", str(pylib)] + PIP, check=True)
-    patch = OUT / "ed25519_patch"
-    patch.mkdir(exist_ok=True)
-    (patch / "sitecustomize.py").write_text(PATCH, encoding="utf-8")
-    plain = os.pathsep.join([str(lite), str(pylib), str(fuzzer)])
-    return fuzzer, plain, os.pathsep.join([str(patch), plain])
+    return fuzzer, os.pathsep.join([str(lite), str(pylib), str(fuzzer)])
 
 
 def free_port():
@@ -209,8 +200,8 @@ def main():
     ap.add_argument("--timeout", type=int, default=900, help="seconds per script")
     a = ap.parse_args()
     if a.list:
-        for name, (args, why, patch) in SCRIPTS.items():
-            print(f"{name:<52} " + ("run" + (" " + " ".join(args) if args else "") + (" (Ed25519 added)" if patch else "") if why is None else f"n/a: {why}"))
+        for name, (args, why, server) in SCRIPTS.items():
+            print(f"{name:<52} " + (f"run against {server}" + (" " + " ".join(args) if args else "") if why is None else f"n/a: {why}"))
             for rx, reason in XFAIL.get(name, []):
                 print(f"    expected to fail: /{rx}/: {reason}")
         return 0
@@ -218,24 +209,29 @@ def main():
     if not exe.exists():
         sys.exit("tlsfuzzer_check: build coretest first (python build_rs.py app coretest --target linux)")
     OUT.mkdir(parents=True, exist_ok=True)
-    fuzzer, plain, patched = setup()
+    fuzzer, pypath = setup()
     only = [s for s in a.only.split(",") if s]
-    port, echo_port = free_port(), free_port()
-    srv = subprocess.Popen([str(exe), "--tls-serve", str(port)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    echo = subprocess.Popen([str(exe), "--tls-echo", str(echo_port)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    pki = OUT / "pki"
+    pki.mkdir(exist_ok=True)
+    subprocess.run([str(exe), "--tls-pki", str(pki), "--key", "rsa"], check=True)
+    ports = {k: free_port() for k in SERVERS}
+    echo_port = free_port()
+    procs = [subprocess.Popen([str(exe), "--tls-serve", str(ports[k])] + v, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) for k, v in SERVERS.items()]
+    procs.append(subprocess.Popen([str(exe), "--tls-echo", str(echo_port), "--key", "rsa"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     bad = 0
     try:
-        if not wait_port(port) or not wait_port(echo_port):
+        if not all(wait_port(p) for p in list(ports.values()) + [echo_port]):
             sys.exit("tlsfuzzer_check: the test servers did not start")
         logs = OUT / "logs"
         logs.mkdir(exist_ok=True)
-        for name, (args, why, patch) in SCRIPTS.items():
+        for name, (args, why, server) in SCRIPTS.items():
             if only and name not in only:
                 continue
             if why is not None:
                 print(f"  n/a  {name:<50} {why}")
                 continue
-            counts, out = run_script(fuzzer, patched if patch else plain, echo_port if name in ECHO else port, name, args, a.timeout)
+            args = [x.format(pki=pki) for x in args]
+            counts, out = run_script(fuzzer, pypath, echo_port if name in ECHO else ports[server], name, args, a.timeout)
             (logs / f"{name}.log").write_text(out, encoding="utf-8")
             expected = XFAIL.get(name, [])
             # a failed probe whose name an expected pattern covers is a feature netio does not have
@@ -248,7 +244,7 @@ def main():
             else:
                 print(f"  ok   {name:<50} {counts.get('PASS', 0)} passed" + (f", {known} failed as expected" if known else ""))
     finally:
-        for s in (srv, echo):
+        for s in procs:
             s.terminate()
             s.wait(5)
     print("tlsfuzzer_check: " + ("all as expected" if not bad else f"{bad} script(s) not as expected (logs in {(OUT / 'logs').relative_to(ROOT)})"))

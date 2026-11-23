@@ -125,7 +125,7 @@ impl Pki {
             if let (Some(c), Some(k)) = (read_cert(&path), read_key(keys, &plat::fs::join(&dir, &format!("{}.key", name)), &format!("pki:{}", name))) {
                 let names_ok = dns.iter().all(|d| c.dns.contains(d)) && ips.iter().all(|i| c.ips.contains(&cert_ip(i)));
                 if c.public_key == k.public && c.signed_by(&ca) && c.not_after - t > 30 * 86_400 && names_ok {
-                    return Ok(Identity { chain: alloc::vec![c.der.clone(), ca.der.clone()], key: k });
+                    return Ok(Identity::new(alloc::vec![c.der.clone(), ca.der.clone()], k));
                 }
             }
             let k = Keypair::from_seed(&plat::random_bytes());
@@ -144,7 +144,7 @@ impl Pki {
             }
             .sign(Some(&ca), &ca_key);
             write_pair(keys, &dir, name, &der, &k)?;
-            Ok(Identity { chain: alloc::vec![der, ca.der.clone()], key: k })
+            Ok(Identity::new(alloc::vec![der, ca.der.clone()], k))
         };
         let server = issue("server", &plat::net::hostname(), true, false, dns, ips)?;
         let client = issue("client", bc_proto::agent::SERVER_CN, false, true, &[], &[])?;

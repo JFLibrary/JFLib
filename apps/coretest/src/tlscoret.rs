@@ -358,7 +358,7 @@ fn with_netio(t: &mut T) {
     t.check("netio reads our leaf", nleaf.as_ref().is_some_and(|c| c.names("web.lab") && c.signed_by(&nroot)));
     t.check("netio's chain check takes it", nleaf.is_some_and(|c| netio::x509::verify_chain(&[c], core::slice::from_ref(&nroot), NOW, Some("web.lab"), netio::x509::Usage::Server).is_ok()));
     // netio's client, our server
-    let mut c = Conn::client(ClientConfig { trust: Trust::Anchors(alloc::vec![nroot.clone()]), identity: None, server_name: String::from("web.lab") });
+    let mut c = Conn::client(ClientConfig::new(Trust::Anchors(alloc::vec![nroot.clone()]), "web.lab"));
     let mut s = Core::server(Identity { chain: alloc::vec![leaf.clone()], key: k.clone() }, &seed(2));
     for _ in 0..8 {
         let x = c.take_out();
@@ -388,7 +388,7 @@ fn with_netio(t: &mut T) {
     let our_root = Cert::parse(&nca);
     t.check("we read netio's CA", our_root.as_ref().is_some_and(|c| c.is_ca && c.subject_cn == "Netio-CA" && c.subject_org == "JFLib" && c.self_signed()));
     let our_root = our_root.unwrap_or_default();
-    let mut s = Conn::server(ServerConfig { identity: NIdentity { chain: alloc::vec![nleaf], key: sk }, client_auth: None, client_auth_optional: false });
+    let mut s = Conn::server(ServerConfig::new(NIdentity { chain: alloc::vec![nleaf], key: sk.into() }));
     let mut c = Core::client(ClientCfg { name: String::from("web.lab"), anchors: alloc::vec![our_root], now: NOW, insecure: false, accept: Vec::new() }, &seed(1));
     for _ in 0..8 {
         let x = c.take_out();

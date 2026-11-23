@@ -126,21 +126,21 @@ impl netio::Stream for Mock {
 fn tls_ids() -> netio::tls::Identity {
     let k = crypto::ed25519::Keypair::from_seed(&[9; 32]);
     let der = netio::x509::CertBuilder { serial: [3; 16], cn: "a.lab".into(), not_before: 0, not_after: 4_000_000_000, public_key: k.public, dns: vec!["a.lab".into()], server_auth: true, ..Default::default() }.sign(None, &k);
-    netio::tls::Identity { chain: vec![der], key: k }
+    netio::tls::Identity::new(vec![der], k)
 }
 
 fn client_hellos() -> Vec<Vec<u8>> {
     let mut out = Vec::new();
-    let mut c = netio::tls::Conn::client(netio::tls::ClientConfig { trust: netio::tls::Trust::Any, identity: None, server_name: "a.lab".into() });
+    let mut c = netio::tls::Conn::client(netio::tls::ClientConfig::new(netio::tls::Trust::Any, "a.lab"));
     out.push(c.take_out());
-    let mut c = netio::tls::Conn::client(netio::tls::ClientConfig { trust: netio::tls::Trust::System(vec![]), identity: None, server_name: "a.lab".into() });
+    let mut c = netio::tls::Conn::client(netio::tls::ClientConfig::new(netio::tls::Trust::System(vec![]), "a.lab"));
     out.push(c.take_out());
     out
 }
 
 fn server_flight() -> Vec<Vec<u8>> {
-    let mut c = netio::tls::Conn::client(netio::tls::ClientConfig { trust: netio::tls::Trust::Any, identity: None, server_name: "a.lab".into() });
-    let mut s = netio::tls::Conn::server(netio::tls::ServerConfig { identity: tls_ids(), client_auth: None, client_auth_optional: false });
+    let mut c = netio::tls::Conn::client(netio::tls::ClientConfig::new(netio::tls::Trust::Any, "a.lab"));
+    let mut s = netio::tls::Conn::server(netio::tls::ServerConfig::new(tls_ids()));
     let _ = s.feed(&c.take_out());
     vec![s.take_out()]
 }
@@ -638,17 +638,17 @@ pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
             let _ = netpkt::http::parse_head(d, false);
         })),
         ("tls_server", client_hellos(), Box::new(move |d: &[u8]| {
-            let mut s = netio::tls::Conn::server(netio::tls::ServerConfig { identity: id.clone(), client_auth: None, client_auth_optional: false });
+            let mut s = netio::tls::Conn::server(netio::tls::ServerConfig::new(id.clone()));
             let _ = s.feed(d);
             let _ = s.take_out();
         })),
         ("tls_client", server_flight(), Box::new(|d: &[u8]| {
-            let mut c = netio::tls::Conn::client(netio::tls::ClientConfig { trust: netio::tls::Trust::Any, identity: None, server_name: "a.lab".into() });
+            let mut c = netio::tls::Conn::client(netio::tls::ClientConfig::new(netio::tls::Trust::Any, "a.lab"));
             let _ = c.take_out();
             let _ = c.feed(d);
         })),
         ("tls_webclient", server_flight(), Box::new(|d: &[u8]| {
-            let mut c = netio::tls::Conn::client(netio::tls::ClientConfig { trust: netio::tls::Trust::System(vec![]), identity: None, server_name: "a.lab".into() });
+            let mut c = netio::tls::Conn::client(netio::tls::ClientConfig::new(netio::tls::Trust::System(vec![]), "a.lab"));
             let _ = c.take_out();
             let _ = c.feed(d);
         })),

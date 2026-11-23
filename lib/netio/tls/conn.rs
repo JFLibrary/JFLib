@@ -6,19 +6,20 @@
 //   read_plain / write_plain / close
 //   established(), peer_cert(), version(), suite()
 //
-// Our own servers and agents (private PKI): TLS 1.3 with TLS_CHACHA20_POLY1305_SHA256, X25519,
-// Ed25519 signatures and certificates, mutual authentication.  The server also takes what RFC
-// 8446 9.1 makes mandatory, TLS_AES_128_GCM_SHA256 and P-256 (secp256r1) key shares, sends a
-// HelloRetryRequest for X25519 or P-256 when the client offered no usable share, and a dummy
-// change_cipher_spec for middleboxes (D.4); its certificate and signatures are Ed25519 only.
+// TLS 1.3 on both sides: the suites ChaCha20-Poly1305, AES-128-GCM (SHA-256) and AES-256-GCM
+// (SHA-384); the groups X25519MLKEM768 (post-quantum hybrid), X25519, P-256 and P-384, and on
+// the server also SecP256r1MLKEM768 and SecP384r1MLKEM1024 (kx.rs); certificates and handshake
+// signatures with Ed25519, ECDSA (P-256 / P-384), RSA-PSS (RSA PKCS #1 v1.5 for certificates);
+// mutual authentication with any of these keys.  A client sends key shares for
+// X25519MLKEM768 and X25519 and takes a HelloRetryRequest for P-256 or P-384; a server sends one
+// for the first group of the client it has when no share fits, and a dummy change_cipher_spec
+// for middleboxes (D.4).
 //
 // A client that trusts the system's certificate authorities (Trust::System: mail servers,
-// update servers, web hooks) also offers TLS_AES_128_GCM_SHA256, RSA (PKCS #1 v1.5 / PSS) and
-// ECDSA (P-256 / P-384) signatures and the P-256 key exchange (after a HelloRetryRequest),
-// and falls back to TLS 1.2 with ECDHE (X25519 or P-256) and AEAD suites (AES-128-GCM,
-// ChaCha20-Poly1305), the extended master secret when the server has it and the TLS 1.3
-// downgrade check.  Private
-// connections never fall back.
+// update servers, web hooks) or a check of its own (Trust::Custom) falls back to TLS 1.2 with
+// ECDHE (X25519, P-256, P-384) and AEAD suites (AES-GCM, ChaCha20-Poly1305), the extended
+// master secret when the server has it and the TLS 1.3 downgrade check.  Other connections
+// never fall back.
 //
 // No PSK, no 0-RTT, no session tickets (a client ignores them), no renegotiation;
 // post-handshake KeyUpdate is supported.  Every protocol error ends the connection with the
@@ -27,24 +28,25 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use crypto::{x25519, Sha256};
-
-use super::keysched::{self, Schedule, Secret};
+use super::keysched::{self, Schedule, Secret, Transcript};
+use super::kx::{self, Share, SECP256R1, SECP256R1_MLKEM768, SECP384R1, SECP384R1_MLKEM1024, X25519, X25519_MLKEM768};
 use super::record::{self, Cipher, ALERT, APPLICATION_DATA, CHANGE_CIPHER_SPEC, HANDSHAKE, MAX_PLAIN, MAX_RECORD};
-use super::record::{ECDHE_ECDSA_AES128_GCM, ECDHE_ECDSA_CHACHA20, ECDHE_RSA_AES128_GCM, ECDHE_RSA_CHACHA20, TLS_AES_128_GCM_SHA256, TLS_CHACHA20_POLY1305_SHA256};
-use super::{ClientConfig, ServerConfig, TlsError, Trust};
-use crate::x509::{verify_chain, Cert, PubKey, SigAlg, Usage};
+use super::record::{ECDHE_ECDSA_AES128_GCM, ECDHE_ECDSA_AES256_GCM, ECDHE_ECDSA_CHACHA20, ECDHE_RSA_AES128_GCM, ECDHE_RSA_AES256_GCM, ECDHE_RSA_CHACHA20};
+use super::record::{TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256};
+use super::{ClientConfig, Hello, Identity, ServerConfig, TlsError, Trust};
+use crate::x509::{verify_chain, Cert, PrivateKey, PubKey, SigAlg, Usage};
 use crypto::ecdsa::Curve;
 use crypto::HashAlg;
 
-const SUITE: u16 = TLS_CHACHA20_POLY1305_SHA256;
-const X25519: u16 = 0x001d;
-const SECP256R1: u16 = 0x0017;
 const ED25519: u16 = 0x0807;
 const TLS13: u16 = 0x0304;
 
-const SUITES_13: [u16; 2] = [TLS_CHACHA20_POLY1305_SHA256, TLS_AES_128_GCM_SHA256];
-const SUITES_12: [u16; 4] = [ECDHE_ECDSA_CHACHA20, ECDHE_RSA_CHACHA20, ECDHE_ECDSA_AES128_GCM, ECDHE_RSA_AES128_GCM];
+/// the TLS 1.3 suites, in the order a client offers them and a server prefers them
+const SUITES_13: [u16; 3] = [TLS_CHACHA20_POLY1305_SHA256, TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384];
+const SUITES_12: [u16; 6] = [ECDHE_ECDSA_CHACHA20, ECDHE_RSA_CHACHA20, ECDHE_ECDSA_AES128_GCM, ECDHE_RSA_AES128_GCM, ECDHE_ECDSA_AES256_GCM, ECDHE_RSA_AES256_GCM];
+/// the groups a client lists (the first two with a key share in its first ClientHello, the
+/// others for a HelloRetryRequest)
+const CLIENT_GROUPS: [u16; 6] = [X25519_MLKEM768, X25519, SECP256R1, SECP384R1, SECP256R1_MLKEM768, SECP384R1_MLKEM1024];
 /// signature schemes a web client accepts (CertificateVerify, ServerKeyExchange, certificates)
 const WEB_SIG_ALGS: [u16; 9] = [0x0403, 0x0503, 0x0804, 0x0805, 0x0806, ED25519, 0x0401, 0x0501, 0x0601];
 /// "DOWNGRD" + 1 / 0: the last bytes of a TLS 1.3 server's random when it speaks TLS 1.2 / older
@@ -54,6 +56,7 @@ const EXT_SERVER_NAME: u16 = 0;
 const EXT_GROUPS: u16 = 10;
 const EXT_POINT_FORMATS: u16 = 11;
 const EXT_SIG_ALGS: u16 = 13;
+const EXT_ALPN: u16 = 16;
 const EXT_EMS: u16 = 23;
 const EXT_COOKIE: u16 = 44;
 const EXT_EARLY_DATA: u16 = 42;
@@ -98,6 +101,7 @@ pub const AL_NO_RENEGOTIATION: u8 = 100;
 pub const AL_MISSING_EXTENSION: u8 = 109;
 pub const AL_UNSUPPORTED_EXTENSION: u8 = 110;
 pub const AL_CERTIFICATE_REQUIRED: u8 = 116;
+pub const AL_NO_APPLICATION_PROTOCOL: u8 = 120;
 
 /// SHA-256("HelloRetryRequest"): the random of a HelloRetryRequest
 const HRR_RANDOM: [u8; 32] = [
@@ -149,6 +153,22 @@ impl<'a> R<'a> {
     fn done(&self) -> Result<(), TlsError> {
         if self.b.is_empty() { Ok(()) } else { Err(fail(AL_DECODE_ERROR, "trailing bytes")) }
     }
+}
+
+/// the body of an extension that is one vector with a 16-bit (8-bit) length: nothing may follow
+/// it (decode_error)
+fn whole16(b: &[u8]) -> Result<&[u8], TlsError> {
+    let mut r = R { b };
+    let v = r.v16()?;
+    r.done()?;
+    Ok(v)
+}
+
+fn whole8(b: &[u8]) -> Result<&[u8], TlsError> {
+    let mut r = R { b };
+    let v = r.v8()?;
+    r.done()?;
+    Ok(v)
 }
 
 /// extensions -> (type, data), checked for duplicates
@@ -218,7 +238,7 @@ fn hs_msg(ty: u8, body: &[u8]) -> Vec<u8> {
     m
 }
 
-fn cv_content(server: bool, hash: &[u8; 32]) -> Vec<u8> {
+fn cv_content(server: bool, hash: &[u8]) -> Vec<u8> {
     let mut c = Vec::from(&[0x20u8; 64][..]);
     c.extend_from_slice(if server { b"TLS 1.3, server CertificateVerify" as &[u8] } else { b"TLS 1.3, client CertificateVerify" });
     c.push(0);
@@ -253,6 +273,27 @@ fn scheme(s: u16, key: &PubKey, v12: bool) -> Option<SigAlg> {
     fits.then_some(alg)
 }
 
+/// the signature scheme our key signs the handshake with: the first of the peer's list it makes
+/// (TLS 1.3: ECDSA with the hash of its curve, RSA with PSS)
+fn our_scheme(key: &PrivateKey, offered: &[u16]) -> Option<(u16, SigAlg)> {
+    let pk = key.public_key();
+    offered.iter().find_map(|&s| {
+        let alg = scheme(s, &pk, false)?;
+        (WEB_SIG_ALGS.contains(&s) && key.can(alg)).then_some((s, alg))
+    })
+}
+
+/// our CertificateVerify over the transcript hash, in a scheme of the peer's list
+fn certificate_verify(key: &PrivateKey, offered: &[u16], server: bool, hash: &[u8]) -> Result<Vec<u8>, TlsError> {
+    let (sch, alg) = our_scheme(key, offered).ok_or(fail(AL_HANDSHAKE_FAILURE, "no signature scheme in common"))?;
+    let random: [u8; 64] = plat::random_bytes();
+    let sig = key.sign(alg, &cv_content(server, hash), &random).ok_or(fail(AL_INTERNAL_ERROR, "the key does not sign"))?;
+    let mut b = Vec::new();
+    put16(&mut b, sch);
+    put_v16(&mut b, &sig);
+    Ok(hs_msg(HS_CERTIFICATE_VERIFY, &b))
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum State {
     ClientSh,
@@ -278,7 +319,9 @@ enum State {
 pub struct Conn {
     server: bool,
     state: State,
-    transcript: Sha256,
+    transcript: Transcript,
+    /// the hash of the suite (SHA-256 until a suite is chosen)
+    hash_alg: HashAlg,
     inbuf: Vec<u8>,
     hs: Vec<u8>,
     out: Vec<u8>,
@@ -290,7 +333,9 @@ pub struct Conn {
     c_ap: Secret,
     s_ap: Secret,
     master: Secret,
-    eph: [u8; 32],
+    /// a client's key shares (two in its first ClientHello, one after a HelloRetryRequest; the
+    /// TLS 1.2 client's ECDHE key)
+    shares: Vec<Share>,
     session_id: Vec<u8>,
     cookie: Vec<u8>,
     /// client: the extensions of its last ClientHello, the only ones the server may answer
@@ -312,8 +357,10 @@ pub struct Conn {
     ems: bool,
     /// KeyUpdate messages received (a flood is answered with an alert)
     key_updates: u32,
+    /// a client: the signature schemes of the server's CertificateRequest
+    cr_algs: Vec<u16>,
     /// TLS 1.2: the ECDHE secret, the master secret, the server's keys until its CCS
-    pms: Option<[u8; 32]>,
+    pms: Option<Vec<u8>>,
     master12: [u8; 48],
     rd_next: Option<Cipher>,
     /// counts the changes of the read key (set_rd): handshake data must not cross one
@@ -325,9 +372,13 @@ pub struct Conn {
     /// a server after its HelloRetryRequest: the first ClientHello without what the second may
     /// change (RFC 8446 4.1.2)
     ch1: Option<Vec<u8>>,
-    /// the group of our key share (X25519, or P-256 when the server asks for it)
+    /// the negotiated group (a client: the one a HelloRetryRequest asked for)
     group: u16,
-    eph256: [u8; 32],
+    /// the application protocol agreed on (ALPN)
+    alpn: Option<Vec<u8>>,
+    /// a server: the name the client asked for (SNI), and the identity it shows
+    sni: String,
+    identity: Option<Identity>,
 }
 
 impl Conn {
@@ -335,19 +386,20 @@ impl Conn {
         Conn {
             server,
             state: if server { State::ServerCh } else { State::ClientSh },
-            transcript: Sha256::new(),
+            transcript: Transcript::new(),
+            hash_alg: HashAlg::Sha256,
             inbuf: Vec::new(),
             hs: Vec::new(),
             out: Vec::new(),
             plain: Vec::new(),
             rd: None,
             wr: None,
-            c_hs: [0; 32],
-            s_hs: [0; 32],
-            c_ap: [0; 32],
-            s_ap: [0; 32],
-            master: [0; 32],
-            eph: plat::random_bytes(),
+            c_hs: Vec::new(),
+            s_hs: Vec::new(),
+            c_ap: Vec::new(),
+            s_ap: Vec::new(),
+            master: Vec::new(),
+            shares: Vec::new(),
             session_id: Vec::new(),
             cookie: Vec::new(),
             sent_exts: Vec::new(),
@@ -357,13 +409,14 @@ impl Conn {
             ccfg: None,
             scfg: None,
             peer_closed: false,
-            suite: SUITE,
+            suite: TLS_CHACHA20_POLY1305_SHA256,
             v12: false,
             web: false,
             client_random: [0; 32],
             server_random: [0; 32],
             ems: false,
             key_updates: 0,
+            cr_algs: Vec::new(),
             pms: None,
             master12: [0; 48],
             rd_next: None,
@@ -371,36 +424,33 @@ impl Conn {
             ccs_seen: false,
             early_skip: 0,
             ch1: None,
-            group: X25519,
-            eph256: [0; 32],
+            group: 0,
+            alpn: None,
+            sni: String::new(),
+            identity: None,
         }
     }
 
-    /// our public key share in `group`
-    fn key_share(&mut self, group: u16) -> Vec<u8> {
-        if group == SECP256R1 {
-            if self.eph256 == [0; 32] {
-                self.eph256 = loop {
-                    if let Some(k) = crypto::p256::secret_from(&plat::random_bytes()) {
-                        break k;
-                    }
-                };
-            }
-            Vec::from(&crypto::p256::public_key(&self.eph256)[..])
-        } else {
-            Vec::from(&x25519::public_key(&self.eph)[..])
-        }
+    /// the key exchange group
+    pub fn group(&self) -> u16 {
+        self.group
     }
 
-    /// the shared secret with the peer's share in `group`
-    fn ecdhe(&self, group: u16, peer: &[u8]) -> Result<[u8; 32], TlsError> {
-        let r = if group == SECP256R1 {
-            crypto::p256::shared(&self.eph256, peer)
-        } else {
-            let p: [u8; 32] = peer.try_into().map_err(|_| fail(AL_ILLEGAL_PARAMETER, "key share length"))?;
-            x25519::shared(&self.eph, &p)
-        };
-        r.ok_or(fail(AL_ILLEGAL_PARAMETER, "key share"))
+    /// the application protocol agreed on (ALPN; one that is not UTF-8 gives None)
+    pub fn alpn(&self) -> Option<&str> {
+        self.alpn.as_deref().and_then(|a| core::str::from_utf8(a).ok())
+    }
+
+    /// a server: the name of the client's server_name (lower case)
+    pub fn server_name(&self) -> &str {
+        &self.sni
+    }
+
+    /// the suite is chosen: its hash from here on
+    fn set_suite(&mut self, suite: u16) {
+        self.suite = suite;
+        self.hash_alg = record::suite_hash(suite);
+        self.transcript.keep(self.hash_alg);
     }
 
     pub fn client(cfg: ClientConfig) -> Conn {
@@ -500,8 +550,8 @@ impl Conn {
         self.out.extend_from_slice(&rec);
     }
 
-    fn hash(&self) -> [u8; 32] {
-        self.transcript.clone().finalize()
+    fn hash(&self) -> Vec<u8> {
+        self.transcript.hash(self.hash_alg)
     }
 
     fn add(&mut self, msg: &[u8]) {
@@ -521,7 +571,7 @@ impl Conn {
     /// the TLS 1.3 record keys of a traffic secret for the negotiated suite
     fn cipher13(&self, secret: &Secret) -> Result<Cipher, TlsError> {
         let (kl, _) = record::key_iv_len(self.suite).ok_or(fail(AL_INTERNAL_ERROR, "suite"))?;
-        let (k, iv) = keysched::traffic_keys_len(secret, kl);
+        let (k, iv) = keysched::traffic_keys_len(self.hash_alg, secret, kl);
         Cipher::for_suite(self.suite, &k, &iv, false).ok_or(fail(AL_INTERNAL_ERROR, "suite"))
     }
 
@@ -710,7 +760,9 @@ impl Conn {
                 return Ok(());
             }
             let n = (self.hs[1] as usize) << 16 | (self.hs[2] as usize) << 8 | self.hs[3] as usize;
-            if n > 64 * 1024 {
+            // 128 KiB: a ClientHello may list 32 767 signature schemes (RFC 8446 4.2.3; OpenSSL
+            // takes 131 396 bytes)
+            if n > MAX_HANDSHAKE {
                 return Err(fail(AL_DECODE_ERROR, "handshake message too long"));
             }
             if self.hs.len() < 4 + n {
@@ -738,8 +790,9 @@ impl Conn {
                 let mut r = R { b: body };
                 let exts = extensions(r.v16()?)?;
                 r.done()?;
-                // server_name (empty: the server used the name), the server's supported_groups
-                self.server_exts(&exts, &[EXT_SERVER_NAME, EXT_GROUPS])?;
+                // server_name (empty: the server used the name), the server's supported_groups, ALPN
+                self.server_exts(&exts, &[EXT_SERVER_NAME, EXT_GROUPS, EXT_ALPN])?;
+                self.server_alpn(&exts)?;
                 self.add(msg);
                 self.state = State::ClientCertOrCr;
                 Ok(())
@@ -751,11 +804,15 @@ impl Conn {
                 }
                 let exts = extensions(r.v16()?)?;
                 r.done()?;
-                let algs = u16_list(R { b: ext(&exts, EXT_SIG_ALGS).ok_or(fail(AL_MISSING_EXTENSION, "signature_algorithms"))? }.v16()?)?;
-                let have_identity = self.ccfg.as_ref().is_some_and(|c| c.identity.is_some());
-                if have_identity && !algs.contains(&ED25519) {
-                    return Err(fail(AL_HANDSHAKE_FAILURE, "server does not accept Ed25519"));
+                let algs = u16_list(whole16(ext(&exts, EXT_SIG_ALGS).ok_or(fail(AL_MISSING_EXTENSION, "signature_algorithms"))?)?)?;
+                if algs.is_empty() {
+                    return Err(fail(AL_DECODE_ERROR, "an empty signature_algorithms list"));
                 }
+                let key = self.ccfg.as_ref().and_then(|c| c.identity.as_ref()).map(|i| &i.key);
+                if key.is_some_and(|k| our_scheme(k, &algs).is_none()) {
+                    return Err(fail(AL_HANDSHAKE_FAILURE, "the server takes no signature our key makes"));
+                }
+                self.cr_algs = algs;
                 self.cert_requested = true;
                 self.add(msg);
                 self.state = State::ClientCert;
@@ -774,7 +831,7 @@ impl Conn {
             (State::ClientCv, HS_CERTIFICATE_VERIFY) | (State::ServerClientCv, HS_CERTIFICATE_VERIFY) => {
                 let server = self.state == State::ClientCv;
                 let hash = self.hash();
-                verify_cv(body, &self.peer[0], server, &hash, self.web && server)?;
+                verify_cv(body, &self.peer[0], server, &hash)?;
                 self.add(msg);
                 self.state = if server { State::ClientFinished } else { State::ServerFinished };
                 Ok(())
@@ -797,7 +854,7 @@ impl Conn {
                 Ok(())
             }
             (State::ServerFinished, HS_FINISHED) => {
-                let want = keysched::finished(&self.c_hs, &self.hash());
+                let want = keysched::finished(self.hash_alg, &self.c_hs, &self.hash());
                 finished_len(body, want.len())?;
                 if !crypto::ct_eq(&want, body) {
                     return Err(fail(AL_DECRYPT_ERROR, "client Finished"));
@@ -845,7 +902,7 @@ impl Conn {
             }
             (State::Client12Fin, HS_FINISHED) => {
                 let mut want = [0u8; 12];
-                keysched::prf12(&self.master12, "server finished", &self.hash(), &mut want);
+                keysched::prf12(self.hash_alg, &self.master12, "server finished", &self.hash(), &mut want);
                 finished_len(body, want.len())?;
                 if !crypto::ct_eq(&want, body) {
                     return Err(fail(AL_DECRYPT_ERROR, "server Finished"));
@@ -870,9 +927,10 @@ impl Conn {
                 if self.key_updates > 1024 {
                     return Err(fail(AL_UNEXPECTED_MESSAGE, "too many key updates"));
                 }
+                let h = self.hash_alg;
                 let peer_secret = if self.server { &mut self.c_ap } else { &mut self.s_ap };
-                *peer_secret = keysched::update(peer_secret);
-                let ps = *peer_secret;
+                *peer_secret = keysched::update(h, peer_secret);
+                let ps = peer_secret.clone();
                 let c = self.cipher13(&ps)?;
                 self.set_rd(Some(c));
                 if requested == 1 {
@@ -880,8 +938,8 @@ impl Conn {
                     let rec = self.wr.as_mut().ok_or(TlsError::Closed)?.seal(HANDSHAKE, &msg);
                     self.out.extend_from_slice(&rec);
                     let my_secret = if self.server { &mut self.s_ap } else { &mut self.c_ap };
-                    *my_secret = keysched::update(my_secret);
-                    let ms = *my_secret;
+                    *my_secret = keysched::update(h, my_secret);
+                    let ms = my_secret.clone();
                     self.wr = Some(self.cipher13(&ms)?);
                 }
                 Ok(())
@@ -901,7 +959,7 @@ impl Conn {
         if self.web {
             put_v16(&mut b, &u16s(&[&SUITES_13[..], &SUITES_12[..]].concat()));
         } else {
-            put_v16(&mut b, &SUITE.to_be_bytes());
+            put_v16(&mut b, &u16s(&SUITES_13));
         }
         put_v8(&mut b, &[0]);
         let mut e = Vec::new();
@@ -913,6 +971,16 @@ impl Conn {
             put_v16(&mut list, &sni);
             put_ext(&mut e, EXT_SERVER_NAME, &list);
         }
+        let alpn = self.ccfg.as_ref().map(|c| c.alpn.clone()).unwrap_or_default();
+        if !alpn.is_empty() {
+            let mut list = Vec::new();
+            for p in alpn.iter().filter(|p| !p.is_empty() && p.len() < 256) {
+                put_v8(&mut list, p.as_bytes());
+            }
+            let mut v = Vec::new();
+            put_v16(&mut v, &list);
+            put_ext(&mut e, EXT_ALPN, &v);
+        }
         if self.web {
             put_ext(&mut e, EXT_VERSIONS, &[4, 0x03, 0x04, 0x03, 0x03]);
             put_ext(&mut e, EXT_POINT_FORMATS, &[1, 0]);
@@ -921,25 +989,24 @@ impl Conn {
         } else {
             put_ext(&mut e, EXT_VERSIONS, &[2, 0x03, 0x04]);
         }
-        if self.web {
-            // P-384 last: TLS 1.2 servers with a P-384 certificate want to see the curve listed
-            put_ext(&mut e, EXT_GROUPS, &[0, 6, 0x00, 0x1d, 0x00, 0x17, 0x00, 0x18]);
-        } else {
-            put_ext(&mut e, EXT_GROUPS, &[0, 2, 0x00, 0x1d]);
+        // P-384 listed: TLS 1.2 servers with a P-384 certificate want to see the curve
+        let mut groups = Vec::new();
+        put_v16(&mut groups, &u16s(&CLIENT_GROUPS));
+        put_ext(&mut e, EXT_GROUPS, &groups);
+        let mut algs = Vec::new();
+        put_v16(&mut algs, &u16s(&WEB_SIG_ALGS));
+        put_ext(&mut e, EXT_SIG_ALGS, &algs);
+        // shares for X25519MLKEM768 and X25519; after a HelloRetryRequest the one it asked for
+        if self.shares.is_empty() {
+            self.shares = [X25519_MLKEM768, X25519].iter().filter_map(|g| Share::new(*g)).collect();
         }
-        if self.web {
-            let mut algs = Vec::new();
-            put_v16(&mut algs, &u16s(&WEB_SIG_ALGS));
-            put_ext(&mut e, EXT_SIG_ALGS, &algs);
-        } else {
-            put_ext(&mut e, EXT_SIG_ALGS, &[0, 2, 0x08, 0x07]);
+        let mut entries = Vec::new();
+        for sh in &self.shares {
+            put16(&mut entries, sh.group);
+            put_v16(&mut entries, &sh.public);
         }
         let mut ks = Vec::new();
-        let mut entry = Vec::new();
-        let group = self.group;
-        put16(&mut entry, group);
-        put_v16(&mut entry, &self.key_share(group));
-        put_v16(&mut ks, &entry);
+        put_v16(&mut ks, &entries);
         put_ext(&mut e, EXT_KEY_SHARE, &ks);
         if !self.cookie.is_empty() {
             let mut c = Vec::new();
@@ -973,6 +1040,23 @@ impl Conn {
         Ok(())
     }
 
+    /// the server's ALPN answer (EncryptedExtensions, a TLS 1.2 ServerHello): exactly one
+    /// protocol, one we offered (RFC 7301 3.1)
+    fn server_alpn(&mut self, exts: &[(u16, &[u8])]) -> Result<(), TlsError> {
+        let Some(a) = ext(exts, EXT_ALPN) else { return Ok(()) };
+        let mut r = R { b: a };
+        let mut list = R { b: r.v16()? };
+        r.done()?;
+        let p = list.v8()?;
+        list.done()?;
+        let offered = self.ccfg.as_ref().is_some_and(|c| c.alpn.iter().any(|o| o.as_bytes() == p));
+        if p.is_empty() || !offered {
+            return Err(fail(AL_ILLEGAL_PARAMETER, "an application protocol the client did not offer"));
+        }
+        self.alpn = Some(Vec::from(p));
+        Ok(())
+    }
+
     fn client_server_hello(&mut self, msg: &[u8], body: &[u8]) -> Result<(), TlsError> {
         let mut r = R { b: body };
         let legacy = r.u16()?;
@@ -1003,11 +1087,10 @@ impl Conn {
         } else {
             self.server_exts(&exts, &[EXT_VERSIONS, EXT_KEY_SHARE])?;
         }
-        let offered: &[u16] = if self.web { &SUITES_13 } else { &[SUITE] };
-        if !offered.contains(&suite) || (self.hrr && suite != self.suite) {
+        if !SUITES_13.contains(&suite) || (self.hrr && suite != self.suite) {
             return Err(fail(AL_ILLEGAL_PARAMETER, "cipher suite"));
         }
-        self.suite = suite;
+        self.set_suite(suite);
         if v != [0x03, 0x04] {
             return Err(fail(AL_ILLEGAL_PARAMETER, "supported_versions"));
         }
@@ -1016,20 +1099,27 @@ impl Conn {
                 return Err(fail(AL_UNEXPECTED_MESSAGE, "second HelloRetryRequest"));
             }
             let cookie = ext(&exts, EXT_COOKIE);
+            // the group asked for must be one the client listed and sent no share for (4.1.4)
             match ext(&exts, EXT_KEY_SHARE) {
-                Some(g) if g == self.group.to_be_bytes() => return Err(fail(AL_ILLEGAL_PARAMETER, "HelloRetryRequest for the offered group")),
-                Some(g) if self.web && g == SECP256R1.to_be_bytes() => self.group = SECP256R1,
-                Some(_) => return Err(fail(AL_HANDSHAKE_FAILURE, "the server wants a key exchange other than X25519 / P-256")),
+                Some(g) => {
+                    let g = R { b: g }.u16().and_then(|v| if g.len() == 2 { Ok(v) } else { Err(fail(AL_DECODE_ERROR, "key_share")) })?;
+                    if !CLIENT_GROUPS.contains(&g) || self.shares.iter().any(|s| s.group == g) {
+                        return Err(fail(AL_ILLEGAL_PARAMETER, "HelloRetryRequest for a group not listed, or one with a share"));
+                    }
+                    self.group = g;
+                    self.shares = Share::new(g).into_iter().collect();
+                }
                 None if cookie.is_none() => return Err(fail(AL_ILLEGAL_PARAMETER, "HelloRetryRequest without a change")),
                 None => {}
             }
             if let Some(c) = cookie {
-                self.cookie = Vec::from(R { b: c }.v16()?);
+                self.cookie = Vec::from(whole16(c)?);
             }
             self.hrr = true;
             // transcript: message_hash(ClientHello1), HRR
             let h1 = self.hash();
-            self.transcript = Sha256::new();
+            self.transcript = Transcript::new();
+            self.transcript.keep(self.hash_alg);
             let mh = hs_msg(HS_MESSAGE_HASH, &h1);
             self.add(&mh);
             self.add(msg);
@@ -1038,32 +1128,36 @@ impl Conn {
         }
         let ks = ext(&exts, EXT_KEY_SHARE).ok_or(fail(AL_MISSING_EXTENSION, "key_share"))?;
         let mut k = R { b: ks };
-        if k.u16()? != self.group {
-            return Err(fail(AL_ILLEGAL_PARAMETER, "key share group"));
-        }
+        let g = k.u16()?;
         let pk = k.v16()?;
         k.done()?;
-        let shared = self.ecdhe(self.group, pk)?;
+        let share = self.shares.iter().find(|s| s.group == g).ok_or(fail(AL_ILLEGAL_PARAMETER, "key share group"))?;
+        let mut shared = share.finish(pk).ok_or(fail(AL_ILLEGAL_PARAMETER, "key share"))?;
+        self.group = g;
+        self.shares.clear();
         self.add(msg);
         self.handshake_keys(&shared);
+        crypto::zeroize(&mut shared);
         let c = self.cipher13(&self.s_hs.clone())?;
         self.set_rd(Some(c));
         self.state = State::ClientEe;
         Ok(())
     }
 
-    fn handshake_keys(&mut self, shared: &[u8; 32]) {
-        let s = Schedule::new(shared);
+    fn handshake_keys(&mut self, shared: &[u8]) {
+        let a = self.hash_alg;
+        let s = Schedule::new(a, None, shared);
         let h = self.hash();
-        self.c_hs = keysched::derive(&s.handshake, "c hs traffic", &h);
-        self.s_hs = keysched::derive(&s.handshake, "s hs traffic", &h);
-        self.master = s.master;
+        self.c_hs = keysched::derive(a, &s.handshake, "c hs traffic", &h);
+        self.s_hs = keysched::derive(a, &s.handshake, "s hs traffic", &h);
+        self.master = s.master.clone();
     }
 
     fn app_secrets(&mut self) {
+        let a = self.hash_alg;
         let h = self.hash();
-        self.c_ap = keysched::derive(&self.master, "c ap traffic", &h);
-        self.s_ap = keysched::derive(&self.master, "s ap traffic", &h);
+        self.c_ap = keysched::derive(a, &self.master, "c ap traffic", &h);
+        self.s_ap = keysched::derive(a, &self.master, "s ap traffic", &h);
     }
 
     fn check_server_chain(&mut self) -> Result<(), TlsError> {
@@ -1073,14 +1167,11 @@ impl Conn {
 
     fn check_client_chain(&mut self) -> Result<(), TlsError> {
         let trust = self.scfg.as_ref().and_then(|c| c.client_auth.as_ref()).ok_or(fail(AL_UNEXPECTED_MESSAGE, "certificate not requested"))?;
-        if self.peer[0].public_key.len() != 32 {
-            return Err(fail(AL_UNSUPPORTED_CERTIFICATE, "not an Ed25519 certificate"));
-        }
         check_trust(trust, &self.peer, None, Usage::Client)
     }
 
     fn client_server_finished(&mut self, msg: &[u8], body: &[u8]) -> Result<(), TlsError> {
-        let want = keysched::finished(&self.s_hs, &self.hash());
+        let want = keysched::finished(self.hash_alg, &self.s_hs, &self.hash());
         finished_len(body, want.len())?;
         if !crypto::ct_eq(&want, body) {
             return Err(fail(AL_DECRYPT_ERROR, "server Finished"));
@@ -1096,16 +1187,12 @@ impl Conn {
             self.send_hs(&cm);
             if let Some(i) = id {
                 if !chain.is_empty() {
-                    let sig = i.key.sign(&cv_content(false, &self.hash()));
-                    let mut b = Vec::new();
-                    put16(&mut b, ED25519);
-                    put_v16(&mut b, &sig);
-                    let m = hs_msg(HS_CERTIFICATE_VERIFY, &b);
+                    let m = certificate_verify(&i.key, &self.cr_algs, false, &self.hash())?;
                     self.send_hs(&m);
                 }
             }
         }
-        let fin = keysched::finished(&self.c_hs, &self.hash());
+        let fin = keysched::finished(self.hash_alg, &self.c_hs, &self.hash());
         let m = hs_msg(HS_FINISHED, &fin);
         self.send_hs(&m);
         self.wr = Some(self.cipher13(&self.c_ap.clone())?);
@@ -1124,12 +1211,13 @@ impl Conn {
         if !SUITES_12.contains(&suite) {
             return Err(fail(AL_ILLEGAL_PARAMETER, "cipher suite"));
         }
-        self.server_exts(exts, &[EXT_SERVER_NAME, EXT_POINT_FORMATS, EXT_EMS, EXT_RENEGOTIATION_INFO])?;
+        self.server_exts(exts, &[EXT_SERVER_NAME, EXT_POINT_FORMATS, EXT_EMS, EXT_RENEGOTIATION_INFO, EXT_ALPN])?;
+        self.server_alpn(exts)?;
         if ext(exts, EXT_RENEGOTIATION_INFO).is_some_and(|r| r != [0]) {
             return Err(fail(AL_HANDSHAKE_FAILURE, "renegotiation_info"));
         }
         self.v12 = true;
-        self.suite = suite;
+        self.set_suite(suite);
         // the extended master secret when the server has it (RFC 7627); a server without it is
         // taken: the attack it closes (Triple Handshake) needs resumption or renegotiation,
         // which this client does neither of.  Resumption, once it comes, must require it
@@ -1147,8 +1235,8 @@ impl Conn {
             return Err(fail(AL_HANDSHAKE_FAILURE, "not a named curve"));
         }
         let group = r.u16()?;
-        if group != X25519 && group != SECP256R1 {
-            return Err(fail(AL_HANDSHAKE_FAILURE, "the server chose a curve other than X25519 / P-256"));
+        if ![X25519, SECP256R1, SECP384R1].contains(&group) {
+            return Err(fail(AL_HANDSHAKE_FAILURE, "the server chose a curve other than X25519 / P-256 / P-384"));
         }
         let point = r.v8()?;
         let params = &params_start[..params_start.len() - r.b.len()];
@@ -1161,7 +1249,7 @@ impl Conn {
         }
         let alg = scheme(sch, &leaf.key, true).ok_or(fail(AL_ILLEGAL_PARAMETER, "signature scheme"))?;
         // ECDHE_ECDSA suites need an EC (or Ed25519, RFC 8422) key, ECDHE_RSA an RSA key
-        let ecdsa_suite = matches!(self.suite, ECDHE_ECDSA_AES128_GCM | ECDHE_ECDSA_CHACHA20);
+        let ecdsa_suite = matches!(self.suite, ECDHE_ECDSA_AES128_GCM | ECDHE_ECDSA_AES256_GCM | ECDHE_ECDSA_CHACHA20);
         if ecdsa_suite != matches!(leaf.key, PubKey::Ec { .. } | PubKey::Ed25519(_)) {
             return Err(fail(AL_UNSUPPORTED_CERTIFICATE, "key type does not fit the suite"));
         }
@@ -1172,10 +1260,9 @@ impl Conn {
         if !leaf.verify(alg, &signed, sig) {
             return Err(fail(AL_DECRYPT_ERROR, "ServerKeyExchange signature"));
         }
-        if group == SECP256R1 {
-            self.key_share(SECP256R1);
-        }
-        self.pms = Some(self.ecdhe(group, point)?);
+        let share = Share::new(group).ok_or(fail(AL_INTERNAL_ERROR, "group"))?;
+        self.pms = Some(share.finish(point).ok_or(fail(AL_ILLEGAL_PARAMETER, "key share"))?);
+        self.shares = alloc::vec![share];
         self.group = group;
         Ok(())
     }
@@ -1186,21 +1273,24 @@ impl Conn {
             self.send_hs(&cm);
         }
         let mut b = Vec::new();
-        let share = self.key_share(self.group);
+        let share = self.shares.first().map(|s| s.public.clone()).ok_or(fail(AL_UNEXPECTED_MESSAGE, "no key exchange"))?;
         put_v8(&mut b, &share);
         let cke = hs_msg(HS_CLIENT_KEY_EXCHANGE, &b);
         self.send_hs(&cke);
-        let pms = self.pms.take().ok_or(fail(AL_UNEXPECTED_MESSAGE, "no key exchange"))?;
+        self.shares.clear();
+        let mut pms = self.pms.take().ok_or(fail(AL_UNEXPECTED_MESSAGE, "no key exchange"))?;
+        let h = self.hash_alg;
         if self.ems {
-            keysched::prf12(&pms, "extended master secret", &self.hash(), &mut self.master12);
+            keysched::prf12(h, &pms, "extended master secret", &self.hash(), &mut self.master12);
         } else {
             let seed = [self.client_random, self.server_random].concat();
-            keysched::prf12(&pms, "master secret", &seed, &mut self.master12);
+            keysched::prf12(h, &pms, "master secret", &seed, &mut self.master12);
         }
+        crypto::zeroize(&mut pms);
         let (kl, il) = record::key_iv_len(self.suite).ok_or(fail(AL_INTERNAL_ERROR, "suite"))?;
         let mut kb = alloc::vec![0u8; 2 * (kl + il)];
         let seed = [self.server_random, self.client_random].concat();
-        keysched::prf12(&self.master12, "key expansion", &seed, &mut kb);
+        keysched::prf12(h, &self.master12, "key expansion", &seed, &mut kb);
         let (ck, rest) = kb.split_at(kl);
         let (sk, rest) = rest.split_at(kl);
         let (civ, siv) = rest.split_at(il);
@@ -1210,7 +1300,7 @@ impl Conn {
         self.out.extend_from_slice(&record::plain(CHANGE_CIPHER_SPEC, &[1]));
         self.wr = Some(wr);
         let mut fin = [0u8; 12];
-        keysched::prf12(&self.master12, "client finished", &self.hash(), &mut fin);
+        keysched::prf12(h, &self.master12, "client finished", &self.hash(), &mut fin);
         let m = hs_msg(HS_FINISHED, &fin);
         self.send_hs(&m);
         self.state = State::Client12Ccs;
@@ -1252,27 +1342,50 @@ impl Conn {
             return Err(fail(AL_ILLEGAL_PARAMETER, "pre_shared_key not the last extension"));
         }
         let versions = ext(&exts, EXT_VERSIONS).ok_or(fail(AL_PROTOCOL_VERSION, "TLS 1.3 required"))?;
-        if !u16_list(R { b: versions }.v8()?)?.contains(&TLS13) {
+        if !u16_list(whole8(versions)?)?.contains(&TLS13) {
             return Err(fail(AL_PROTOCOL_VERSION, "TLS 1.3 required"));
         }
-        // ChaCha20-Poly1305 when the client offers it, else AES-128-GCM (RFC 8446 9.1: every
-        // TLS 1.3 implementation has it); both with SHA-256
-        let suite = if suites.contains(&TLS_CHACHA20_POLY1305_SHA256) {
-            TLS_CHACHA20_POLY1305_SHA256
-        } else if suites.contains(&TLS_AES_128_GCM_SHA256) {
-            TLS_AES_128_GCM_SHA256
-        } else {
-            return Err(fail(AL_HANDSHAKE_FAILURE, "no common cipher suite (ChaCha20-Poly1305, AES-128-GCM)"));
+        // the first of ours the client offers: ChaCha20-Poly1305, AES-128-GCM (which RFC 8446
+        // 9.1 makes mandatory), AES-256-GCM with SHA-384
+        let Some(suite) = SUITES_13.iter().copied().find(|s| suites.contains(s)) else {
+            return Err(fail(AL_HANDSHAKE_FAILURE, "no common cipher suite (ChaCha20-Poly1305, AES-128-GCM, AES-256-GCM)"));
         };
         if self.hrr && suite != self.suite {
             return Err(fail(AL_ILLEGAL_PARAMETER, "another cipher suite after HelloRetryRequest"));
         }
-        self.suite = suite;
-        let algs = u16_list(R { b: ext(&exts, EXT_SIG_ALGS).ok_or(fail(AL_MISSING_EXTENSION, "signature_algorithms"))? }.v16()?)?;
-        if !algs.contains(&ED25519) {
-            return Err(fail(AL_HANDSHAKE_FAILURE, "Ed25519 required"));
+        if !self.hrr {
+            self.set_suite(suite);
         }
-        let groups = u16_list(R { b: ext(&exts, EXT_GROUPS).ok_or(fail(AL_MISSING_EXTENSION, "supported_groups"))? }.v16()?)?;
+        let algs = u16_list(whole16(ext(&exts, EXT_SIG_ALGS).ok_or(fail(AL_MISSING_EXTENSION, "signature_algorithms"))?)?)?;
+        // both lists hold at least one entry (RFC 8446 4.2.3, 4.2.7)
+        if algs.is_empty() {
+            return Err(fail(AL_DECODE_ERROR, "an empty signature_algorithms list"));
+        }
+        let sni = match ext(&exts, EXT_SERVER_NAME) {
+            Some(b) => client_server_name(b)?,
+            None => String::new(),
+        };
+        let offered_alpn = match ext(&exts, EXT_ALPN) {
+            Some(b) => alpn_list(b)?,
+            None => Vec::new(),
+        };
+        let cfg = self.scfg.as_ref().ok_or(fail(AL_INTERNAL_ERROR, "config"))?;
+        // ALPN: the server's first protocol that the client offers (RFC 7301 3.2)
+        let alpn = if cfg.alpn.is_empty() || offered_alpn.is_empty() {
+            None
+        } else {
+            let p = cfg.alpn.iter().find(|p| offered_alpn.iter().any(|o| o.as_slice() == p.as_bytes()));
+            Some(Vec::from(p.ok_or(fail(AL_NO_APPLICATION_PROTOCOL, "no application protocol in common"))?.as_bytes()))
+        };
+        let hello = Hello { server_name: sni.clone(), alpn: offered_alpn.iter().map(|p| String::from_utf8_lossy(p).into_owned()).collect(), sig_algs: algs.clone() };
+        let identity = choose_identity(cfg, &hello);
+        if our_scheme(&identity.key, &algs).is_none() {
+            return Err(fail(AL_HANDSHAKE_FAILURE, "the client takes no signature our key makes"));
+        }
+        let groups = u16_list(whole16(ext(&exts, EXT_GROUPS).ok_or(fail(AL_MISSING_EXTENSION, "supported_groups"))?)?)?;
+        if groups.is_empty() {
+            return Err(fail(AL_DECODE_ERROR, "an empty supported_groups list"));
+        }
         // early data is never taken (no tickets, no PSK): its records are skipped; a second
         // ClientHello must not offer it, and after it the client sends none (RFC 8446 4.2.10):
         // a record that does not open is an error again
@@ -1297,10 +1410,10 @@ impl Conn {
             return Err(fail(AL_ILLEGAL_PARAMETER, "the second ClientHello changed"));
         }
         // the key shares: each for a group the client lists, at most one per group (RFC 8446
-        // 4.2.8); groups: X25519 and P-256 (secp256r1, which 9.1 makes mandatory)
+        // 4.2.8); the groups of kx (P-256, which 9.1 makes mandatory, among them)
         let mut shares: Vec<(u16, &[u8])> = Vec::new();
         if let Some(ks) = ext(&exts, EXT_KEY_SHARE) {
-            let mut k = R { b: R { b: ks }.v16()? };
+            let mut k = R { b: whole16(ks)? };
             while !k.b.is_empty() {
                 let g = k.u16()?;
                 let key = k.v16()?;
@@ -1310,16 +1423,16 @@ impl Conn {
                 shares.push((g, key));
             }
         }
-        if self.hrr && ext(&exts, EXT_COOKIE).is_some_and(|c| R { b: c }.v16().map(|v| v != self.cookie.as_slice()).unwrap_or(true)) {
+        if self.hrr && ext(&exts, EXT_COOKIE).is_some_and(|c| whole16(c).map(|v| v != self.cookie.as_slice()).unwrap_or(true)) {
             return Err(fail(AL_ILLEGAL_PARAMETER, "cookie"));
         }
         // the client's order decides: the first group it lists that we have, with its share when
         // it sent one, else a HelloRetryRequest for that group
-        let ours = |g: &u16| *g == X25519 || *g == SECP256R1;
+        let ours = |g: &u16| kx::known(*g);
         let pick = groups.iter().filter(|g| ours(g)).find_map(|g| shares.iter().find(|s| s.0 == *g)).copied();
         let Some((group, pk)) = pick else {
             let Some(&want) = groups.iter().find(|g| ours(g)) else {
-                return Err(fail(AL_HANDSHAKE_FAILURE, "no common group (X25519, P-256)"));
+                return Err(fail(AL_HANDSHAKE_FAILURE, "no common group"));
             };
             if self.hrr {
                 return Err(fail(AL_ILLEGAL_PARAMETER, "no share for the asked group after HelloRetryRequest"));
@@ -1330,7 +1443,8 @@ impl Conn {
             self.group = want;
             self.add(msg);
             let h1 = self.hash();
-            self.transcript = Sha256::new();
+            self.transcript = Transcript::new();
+            self.transcript.keep(self.hash_alg);
             let mh = hs_msg(HS_MESSAGE_HASH, &h1);
             self.add(&mh);
             let mut b = Vec::new();
@@ -1352,9 +1466,11 @@ impl Conn {
             return Err(fail(AL_ILLEGAL_PARAMETER, "the share after HelloRetryRequest is not the one asked for"));
         }
         self.group = group;
-        // our share first: it makes the P-256 secret the shared secret needs
-        let public = self.key_share(group);
-        let shared = self.ecdhe(group, pk)?;
+        let named = !sni.is_empty() && Cert::parse(identity.chain.first().map(|c| c.as_slice()).unwrap_or(&[])).is_some_and(|c| c.names(&sni));
+        self.sni = sni;
+        self.alpn = alpn;
+        self.identity = Some(identity);
+        let (public, mut shared) = kx::respond(group, pk).ok_or(fail(AL_ILLEGAL_PARAMETER, "key share"))?;
         self.add(msg);
         // ServerHello
         let mut b = Vec::new();
@@ -1376,34 +1492,47 @@ impl Conn {
             self.compat_ccs(&sid);
         }
         self.handshake_keys(&shared);
+        crypto::zeroize(&mut shared);
         self.wr = Some(self.cipher13(&self.s_hs.clone())?);
         let c = self.cipher13(&self.c_hs.clone())?;
         self.set_rd(Some(c));
-        // EncryptedExtensions
-        let ee = hs_msg(HS_ENCRYPTED_EXTENSIONS, &[0, 0]);
+        // EncryptedExtensions: server_name (empty) when the certificate is for the name asked
+        // for (RFC 6066 3), the protocol chosen (ALPN)
+        let mut e = Vec::new();
+        if named {
+            put_ext(&mut e, EXT_SERVER_NAME, &[]);
+        }
+        if let Some(p) = &self.alpn {
+            let mut list = Vec::new();
+            put_v8(&mut list, p);
+            let mut v = Vec::new();
+            put_v16(&mut v, &list);
+            put_ext(&mut e, EXT_ALPN, &v);
+        }
+        let mut b = Vec::new();
+        put_v16(&mut b, &e);
+        let ee = hs_msg(HS_ENCRYPTED_EXTENSIONS, &b);
         self.send_hs(&ee);
         let cfg = self.scfg.as_ref().ok_or(fail(AL_INTERNAL_ERROR, "config"))?;
         let want_client = cfg.client_auth.is_some();
-        let chain = cfg.identity.chain.clone();
-        let key = cfg.identity.key.clone();
+        let id = self.identity.clone().ok_or(fail(AL_INTERNAL_ERROR, "identity"))?;
+        let (chain, key) = (id.chain, id.key);
         if want_client {
             let mut b = Vec::new();
             b.push(0); // empty context
             let mut e = Vec::new();
-            put_ext(&mut e, EXT_SIG_ALGS, &[0, 2, 0x08, 0x07]);
+            let mut list = Vec::new();
+            put_v16(&mut list, &u16s(&WEB_SIG_ALGS));
+            put_ext(&mut e, EXT_SIG_ALGS, &list);
             put_v16(&mut b, &e);
             let m = hs_msg(HS_CERTIFICATE_REQUEST, &b);
             self.send_hs(&m);
         }
         let cm = hs_msg(HS_CERTIFICATE, &certificate_body(&chain));
         self.send_hs(&cm);
-        let sig = key.sign(&cv_content(true, &self.hash()));
-        let mut b = Vec::new();
-        put16(&mut b, ED25519);
-        put_v16(&mut b, &sig);
-        let m = hs_msg(HS_CERTIFICATE_VERIFY, &b);
+        let m = certificate_verify(&key, &algs, true, &self.hash())?;
         self.send_hs(&m);
-        let fin = keysched::finished(&self.s_hs, &self.hash());
+        let fin = keysched::finished(self.hash_alg, &self.s_hs, &self.hash());
         let m = hs_msg(HS_FINISHED, &fin);
         self.send_hs(&m);
         self.app_secrets();
@@ -1411,6 +1540,68 @@ impl Conn {
         self.state = if want_client { State::ServerClientCert } else { State::ServerFinished };
         Ok(())
     }
+}
+
+/// the host name of a client's server_name (RFC 6066 3): one host_name entry (lower case);
+/// other name types are skipped, a second host_name is illegal_parameter, a name that is not one
+/// (an IP address, a trailing dot, bytes outside letters, digits, '-', '_', '.') is taken as none
+fn client_server_name(b: &[u8]) -> Result<String, TlsError> {
+    let mut r = R { b };
+    let mut list = R { b: r.v16()? };
+    r.done()?;
+    if list.b.is_empty() {
+        return Err(fail(AL_DECODE_ERROR, "empty server_name list"));
+    }
+    let mut host: Option<&[u8]> = None;
+    while !list.b.is_empty() {
+        let ty = list.u8()?;
+        let name = list.v16()?;
+        if ty == 0 {
+            if host.is_some() {
+                return Err(fail(AL_ILLEGAL_PARAMETER, "two host names in server_name"));
+            }
+            host = Some(name);
+        }
+    }
+    let Some(h) = host else { return Ok(String::new()) };
+    let ok = !h.is_empty() && h.len() <= 253 && h.last() != Some(&b'.') && h.iter().all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b'.'));
+    let text = String::from_utf8_lossy(h).to_ascii_lowercase();
+    Ok(if ok && plat::net::IpAddr::parse(&text).is_none() { text } else { String::new() })
+}
+
+/// a ProtocolNameList (RFC 7301 3.1): at least one name, none empty
+fn alpn_list(b: &[u8]) -> Result<Vec<Vec<u8>>, TlsError> {
+    let mut r = R { b };
+    let mut list = R { b: r.v16()? };
+    r.done()?;
+    let mut out = Vec::new();
+    while !list.b.is_empty() {
+        let p = list.v8()?;
+        if p.is_empty() {
+            return Err(fail(AL_DECODE_ERROR, "an empty protocol name"));
+        }
+        out.push(Vec::from(p));
+    }
+    if out.is_empty() {
+        return Err(fail(AL_DECODE_ERROR, "an empty protocol list"));
+    }
+    Ok(out)
+}
+
+/// the identity a server shows (ServerConfig::identities): the program's choice; else the first
+/// of the lists that names the host asked for with a key the client takes; else `identity` when
+/// its key fits, else the first that does (the handshake fails when none does)
+fn choose_identity(cfg: &ServerConfig, hello: &Hello) -> Identity {
+    if let Some(id) = cfg.select.as_ref().and_then(|f| f(hello)) {
+        return id;
+    }
+    let all: Vec<&Identity> = core::iter::once(&cfg.identity).chain(cfg.identities.iter()).collect();
+    let fits = |i: &&Identity| our_scheme(&i.key, &hello.sig_algs).is_some();
+    let names = |i: &&Identity| !hello.server_name.is_empty() && i.chain.first().and_then(|c| Cert::parse(c)).is_some_and(|c| c.names(&hello.server_name));
+    // a name: the more specific lists first, then the default
+    let named = cfg.identities.iter().chain(core::iter::once(&cfg.identity)).find(|i| fits(i) && names(i));
+    let pick = named.or_else(|| all.iter().copied().find(|i| fits(i)));
+    pick.unwrap_or(&cfg.identity).clone()
 }
 
 /// what a second ClientHello must repeat of the first: the session id, the cipher suites, the
@@ -1478,6 +1669,9 @@ fn parse_certificates(body: &[u8]) -> Result<Vec<Cert>, TlsError> {
     Ok(out)
 }
 
+/// the longest handshake message taken
+const MAX_HANDSHAKE: usize = 128 * 1024;
+
 /// the most certificates a Certificate message may hold (the path search has its own limits:
 /// nine certificates deep, 64 signature checks)
 const MAX_CERTS: usize = 20;
@@ -1511,25 +1705,20 @@ fn parse_certificates12(body: &[u8]) -> Result<Vec<Cert>, TlsError> {
     Ok(out)
 }
 
-fn verify_cv(body: &[u8], leaf: &Cert, server: bool, hash: &[u8; 32], web: bool) -> Result<(), TlsError> {
+/// the peer's CertificateVerify: a scheme we offered that fits its certificate's key (TLS 1.3:
+/// no PKCS #1 v1.5, ECDSA with its curve's hash)
+fn verify_cv(body: &[u8], leaf: &Cert, server: bool, hash: &[u8]) -> Result<(), TlsError> {
     let mut r = R { b: body };
     let sch = r.u16()?;
     let sig = r.v16()?;
     r.done()?;
-    let alg = if web {
-        if !WEB_SIG_ALGS.contains(&sch) {
-            return Err(fail(AL_ILLEGAL_PARAMETER, "signature scheme"));
-        }
-        scheme(sch, &leaf.key, false).ok_or(fail(AL_ILLEGAL_PARAMETER, "signature scheme"))?
-    } else {
-        if sch != ED25519 {
-            return Err(fail(AL_ILLEGAL_PARAMETER, "signature scheme"));
-        }
-        if leaf.public_key.len() != 32 || sig.len() != 64 {
-            return Err(fail(AL_UNSUPPORTED_CERTIFICATE, "not an Ed25519 certificate"));
-        }
-        SigAlg::Ed25519
-    };
+    if !WEB_SIG_ALGS.contains(&sch) {
+        return Err(fail(AL_ILLEGAL_PARAMETER, "signature scheme"));
+    }
+    if matches!(leaf.key, PubKey::Other) {
+        return Err(fail(AL_UNSUPPORTED_CERTIFICATE, "a key type this side does not take"));
+    }
+    let alg = scheme(sch, &leaf.key, false).ok_or(fail(AL_ILLEGAL_PARAMETER, "signature scheme"))?;
     if !leaf.verify(alg, &cv_content(server, hash), sig) {
         return Err(fail(AL_DECRYPT_ERROR, "CertificateVerify"));
     }
@@ -1550,9 +1739,6 @@ fn check_trust(trust: &Trust, chain: &[Cert], name: Option<&String>, usage: Usag
             if pins.iter().any(|p| crypto::ct_eq(p, &fp)) { Ok(()) } else { Err(fail(AL_BAD_CERTIFICATE, "certificate not pinned")) }
         }
         Trust::Anchors(anchors) => {
-            if leaf.public_key.len() != 32 {
-                return Err(fail(AL_UNSUPPORTED_CERTIFICATE, "not an Ed25519 certificate"));
-            }
             let name = name.filter(|n| !n.is_empty()).map(|s| s.as_str());
             verify_chain(chain, anchors, now, name, usage)
                 .map_err(|_| if expired { fail(AL_CERTIFICATE_EXPIRED, "certificate expired") } else { fail(AL_UNKNOWN_CA, "certificate not trusted") })

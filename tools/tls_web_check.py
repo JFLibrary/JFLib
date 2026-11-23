@@ -7,11 +7,14 @@ RSA-2048, RSA-PSS, ECDSA P-256 and P-384 keys) and `openssl s_server -www` in on
 time; `coretest --tls-web URL --ca root.pem` must connect with the expected version and suite,
 or refuse with the expected reason:
 
-  TLS 1.3  AES-128-GCM / ChaCha20 x RSA / RSA-PSS / P-256 / P-384 (through the intermediate)
-  TLS 1.2  ECDHE-RSA / ECDHE-ECDSA x AES-128-GCM / ChaCha20, without the extended master secret
-  both     X25519 and P-256 (TLS 1.3 by HelloRetryRequest), a request for a client certificate
-  refused  unknown CA, wrong host name, expired certificate, only P-384 key exchange, TLS 1.1,
-           only AES-256-GCM, a server certificate signed with SHA-1
+  TLS 1.3  AES-128-GCM / ChaCha20 / AES-256-GCM x RSA / RSA-PSS / P-256 / P-384 (through the
+           intermediate); X25519MLKEM768 (the client's first share), SecP256r1MLKEM768,
+           SecP384r1MLKEM1024, P-256 and P-384 (by HelloRetryRequest)
+  TLS 1.2  ECDHE-RSA / ECDHE-ECDSA x AES-128-GCM / AES-256-GCM / ChaCha20, X25519 / P-256 /
+           P-384, without the extended master secret
+  both     a request for a client certificate
+  refused  unknown CA, wrong host name, expired certificate, only pure ML-KEM key exchange,
+           TLS 1.1, a server certificate signed with SHA-1
 
 --internet adds public servers (system trust, Windows build too when run from Windows):
 www.google.com, github.com, and badssl.com's TLS 1.2-only, RSA-2048/4096, P-256/384 hosts (must work)
@@ -113,7 +116,7 @@ def main():
     conf = d / "no-ems.cnf"
     conf.write_text("openssl_conf = init\n[init]\nssl_conf = ssl\n[ssl]\nsystem_default = sys\n[sys]\nOptions = -ExtendedMasterSecret\n")
 
-    def run(name, cert, server_opts, want, ca=True, host="localhost", env=None):
+    def run(name, cert, server_opts, want, ca=True, host="localhost", env=None, group=None):
         nonlocal bad
         port = free_port()
         keyfile = {"other": "rsa", "old": "rsa"}.get(cert, cert)
@@ -129,6 +132,7 @@ def main():
             srv.terminate()
             srv.wait(5)
         ok = out.startswith(want) if not want.startswith("error") else out.startswith("error") and want[6:] in out
+        ok = ok and (group is None or out.endswith(f"group {group}"))
         bad += not ok
         print(f"{'ok  ' if ok else 'FAIL'} {name:46} {out[:100]}")
 
@@ -139,11 +143,21 @@ def main():
     run("1.3 AES-128-GCM, P-256 via P-384 intermediate", "p256", f"{v13} TLS_AES_128_GCM_SHA256", "TLS 1.3 0x1301 200")
     run("1.3 ChaCha20, P-384 via intermediate", "p384", f"{v13} TLS_CHACHA20_POLY1305_SHA256", "TLS 1.3 0x1303 200")
     run("1.3 both suites offered", "rsa", f"{v13} TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256", "TLS 1.3 ")
+    run("1.3 AES-256-GCM-SHA384, RSA", "rsa", f"{v13} TLS_AES_256_GCM_SHA384", "TLS 1.3 0x1302 200")
+    run("1.3 AES-256-GCM-SHA384, P-384 via intermediate", "p384", f"{v13} TLS_AES_256_GCM_SHA384", "TLS 1.3 0x1302 200")
+    run("1.3 X25519MLKEM768 (OpenSSL's default first)", "rsa", "-tls1_3", "TLS 1.3 ", group="0x11EC")
+    run("1.3 only X25519MLKEM768", "p256", "-tls1_3 -groups X25519MLKEM768", "TLS 1.3 ", group="0x11EC")
+    run("1.3 only SecP256r1MLKEM768 (HelloRetryRequest)", "p256", "-tls1_3 -groups SecP256r1MLKEM768", "TLS 1.3 ", group="0x11EB")
+    run("1.3 only SecP384r1MLKEM1024 (HelloRetryRequest)", "p384", "-tls1_3 -groups SecP384r1MLKEM1024", "TLS 1.3 ", group="0x11ED")
+    run("1.3 only X25519", "rsa", "-tls1_3 -groups X25519", "TLS 1.3 ", group="0x001D")
     run("1.2 ECDHE-RSA-AES128-GCM", "rsa", "-tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256", "TLS 1.2 0xC02F 200")
     run("1.2 ECDHE-RSA-CHACHA20", "rsa", "-tls1_2 -cipher ECDHE-RSA-CHACHA20-POLY1305", "TLS 1.2 0xCCA8 200")
     run("1.2 ECDHE-ECDSA-AES128-GCM (P-256)", "p256", "-tls1_2 -cipher ECDHE-ECDSA-AES128-GCM-SHA256", "TLS 1.2 0xC02B 200")
     run("1.2 ECDHE-ECDSA-CHACHA20 (P-384)", "p384", "-tls1_2 -cipher ECDHE-ECDSA-CHACHA20-POLY1305", "TLS 1.2 0xCCA9 200")
     run("1.2 RSA-PSS certificate", "pss", "-tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256", "TLS 1.2 0xC02F 200")
+    run("1.2 ECDHE-RSA-AES256-GCM-SHA384", "rsa", "-tls1_2 -cipher ECDHE-RSA-AES256-GCM-SHA384", "TLS 1.2 0xC030 200")
+    run("1.2 ECDHE-ECDSA-AES256-GCM-SHA384 (P-384)", "p384", "-tls1_2 -cipher ECDHE-ECDSA-AES256-GCM-SHA384", "TLS 1.2 0xC02C 200")
+    run("1.2 P-384 key exchange", "rsa", "-tls1_2 -groups P-384 -cipher ECDHE-RSA-AES128-GCM-SHA256", "TLS 1.2 0xC02F 200", group="0x0018")
     # a TLS 1.2 server without the extended master secret is taken (no resumption, no renegotiation)
     run("1.2 without extended master secret", "rsa", "-tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256", "TLS 1.2 0xC02F 200",
         env={"OPENSSL_CONF": str(conf)})
@@ -153,12 +167,12 @@ def main():
     run("refused: wrong host name", "other", "", "error another name")
     run("refused: expired certificate", "old", "", "error expired")
     run("refused: SHA-1 signed certificate", "sha1", "-cipher DEFAULT@SECLEVEL=0", "error not trusted")
-    run("1.3 only P-256 key exchange (HelloRetryRequest)", "rsa", "-tls1_3 -groups P-256", "TLS 1.3 ")
+    run("1.3 only P-256 key exchange (HelloRetryRequest)", "rsa", "-tls1_3 -groups P-256", "TLS 1.3 ", group="0x0017")
     run("1.2 only P-256 key exchange", "rsa", "-tls1_2 -groups P-256 -cipher ECDHE-RSA-AES128-GCM-SHA256", "TLS 1.2 0xC02F 200")
     run("1.2 P-256 key exchange, ECDSA", "p256", "-tls1_2 -groups P-256 -cipher ECDHE-ECDSA-CHACHA20-POLY1305", "TLS 1.2 0xCCA9 200")
-    run("refused: only P-384 key exchange", "rsa", "-groups P-384", "error ")
+    run("1.3 only P-384 key exchange (HelloRetryRequest)", "rsa", "-tls1_3 -groups P-384", "TLS 1.3 ", group="0x0018")
+    run("refused: only pure ML-KEM-768 key exchange", "rsa", "-tls1_3 -groups MLKEM768", "error ")
     run("refused: TLS 1.1 only", "rsa", "-tls1_1", "error ")
-    run("refused: only AES-256-GCM", "rsa", f"{v13} TLS_AES_256_GCM_SHA384", "error ")
     if internet:
         bad += internet_checks([exe], "linux")
     print("tls_web_check:", "all ok" if not bad else f"{bad} failures")
