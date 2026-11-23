@@ -469,6 +469,9 @@ impl Bin<'_> {
         };
         self.out.attr("Type", ty);
         cells::refs_attrs(&mut self.out, cells::style_refs(o, s));
+        if let Some(g) = cells::unique_id(o, s) {
+            self.out.attr("UniqueID", &g);
+        }
         self.out.close()?;
         self.sheet(o, s)
     }
