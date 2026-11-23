@@ -5,8 +5,9 @@ extensions, alerts, record layer, cipher suites, key exchange groups, signature 
 combinations of them), some for clients, some for servers.  Client (the default): TLS-Anvil plays
 the server and starts `coretest --tls-anvil-client PORT` for each handshake (netio's web client,
 Trust::Custom taking TLS-Anvil's made-up certificates, in the test program only).  --server:
-TLS-Anvil connects to `coretest --tls-serve --key KIND` (netio's server, TLS 1.3, a certificate
-of that kind of coretest's PKI: RSA by default; TLS-Scanner's probes offer no Ed25519).
+TLS-Anvil connects to `coretest --tls-serve --key KIND --tickets --early 16384` (netio's server,
+TLS 1.3, a certificate of that kind of coretest's PKI: RSA by default, TLS-Scanner's probes offer
+no Ed25519; session tickets and 0-RTT).
 TLS-Anvil judges what netio sends.
 Everything comes into build/tlsanvil once, pinned and checked: Eclipse Temurin 21 (SHA-256 of
 Adoptium's API), Maven 3.9.9 (SHA-512 of Apache's archive), TLS-Anvil at a commit, built with
@@ -127,7 +128,9 @@ def main():
           (["-testPackage", a.package] if a.package else []) + (["-tags"] + a.tags.split(",") if a.tags else [])
     srv = None
     if a.server:
-        srv = subprocess.Popen([str(exe), "--tls-serve", str(port), "--key", a.key], stdout=subprocess.DEVNULL, stderr=open(run / "server.log", "w"))
+        # with session tickets and 0-RTT, which TLS-Anvil's resumption and early data tests need
+        srv = subprocess.Popen([str(exe), "--tls-serve", str(port), "--key", a.key, "--tickets", "--early", "16384"], stdout=subprocess.DEVNULL,
+                               stderr=open(run / "server.log", "w"))
         cmd += ["server", "-connect", f"localhost:{port}"]
     else:
         cmd += ["client", "-port", str(port), "-triggerScript", "sh", "-c", f"exec '{exe}' --tls-anvil-client {port} 2>>'{run / 'client.log'}'"]
