@@ -201,7 +201,8 @@ pub(crate) fn pane(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
             3 => {
                 let mut v = f.flag as i32;
                 if ui.checkbox(fid, &f.label, &mut v) & EV_ACT != 0 {
-                    change = Some((f.name.clone(), 3, Input::Formula(if v != 0 { "TRUE" } else { "FALSE" }), String::new()));
+                    // (JD18) the text carries the value: set_value writes formula_for(kind, text)
+                    change = Some((f.name.clone(), 3, Input::Formula(""), String::from(if v != 0 { "TRUE" } else { "FALSE" })));
                 }
             }
             1 => {

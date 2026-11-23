@@ -184,12 +184,24 @@ fn moved(source: &Source, path: &str) -> Source {
     }
 }
 
+// a chosen file as a connection names it: a Windows path with backslashes, as Visio's provider
+// writes it (the file dialog gives '/')
+fn native(path: &str) -> String {
+    let b = path.as_bytes();
+    if (b.len() > 2 && b[1] == b':') || path.starts_with("//") {
+        path.replace('/', "\\")
+    } else {
+        String::from(path)
+    }
+}
+
 // a recordset reading another file: its connection (when it has one) and the recordset with the
 // new command
 fn relinked(doc: &Document, rs: &Recordset, path: &str) -> Option<(Option<Connection>, Recordset)> {
+    let path = native(path);
     let (cs, cmd) = match data::source_of(&doc.data, rs) {
-        Source::Excel { table, header, .. } => data::excel_connection(path, &table, header),
-        Source::Text { header, .. } => data::text_connection(path, header),
+        Source::Excel { table, header, .. } => data::excel_connection(&path, &table, header),
+        Source::Text { header, .. } => data::text_connection(&path, header),
         Source::Other => return None,
     };
     let conn = rs.connection.and_then(|id| doc.data.connections.iter().find(|c| c.id == id)).map(|c| {

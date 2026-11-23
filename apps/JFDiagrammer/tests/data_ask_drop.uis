@@ -1,0 +1,121 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD18: Shape-Daten beim Ablegen abfragen (SP-13) -- a rectangle gets five fields
+# in Shape-Daten definieren, four of them „Beim Ablegen fragen“ (text, number, fixed list,
+# Boolean), one not.  Duplizieren (Strg+D): the dialog Shape-Daten asks for the four; OK writes
+# the values in one undo step.  Zu meinen Shapes hinzufügen, the master dropped from Favoriten:
+# asked again, Abbrechen keeps the master's values; Ctrl + Shift + drag asks too.  The pane
+# Shape-Daten with two shapes (AB-03): the fields both have, a Boolean set for both
+cmd 4404
+drag 500,430 640,520
+cmd 4400
+click 570,470
+type "Kasse"
+click 900,650
+click 570,470
+cmd 5632
+expect dialog:"Shape-Daten definieren" exists
+click button:"Neu"
+click #1544552464
+key ctrl+a
+type "Seriennummer"
+click checkbox:"Beim Ablegen fragen"
+click button:"Neu"
+click #1544552464
+key ctrl+a
+type "Preis"
+click #1544552466
+click "Zahl"
+click #1544552468
+type "10"
+click checkbox:"Beim Ablegen fragen"
+click button:"Neu"
+click #1544552464
+key ctrl+a
+type "Status"
+click #1544552466
+click "Feste Liste"
+click #1544552467
+type "Offen;Aktiv;Erledigt"
+click #1544552468
+type "Offen"
+click checkbox:"Beim Ablegen fragen"
+click button:"Neu"
+click #1544552464
+key ctrl+a
+type "Geprüft"
+click #1544552466
+click "Boolesch"
+click checkbox:"Beim Ablegen fragen"
+click button:"Neu"
+click #1544552464
+key ctrl+a
+type "Notiz"
+click "OK"
+expect dialog:"Shape-Daten definieren" missing
+# the definition itself asks nothing
+expect dialog:"Shape-Daten" missing
+# Duplizieren: the four fields asked for, the master's values shown
+key ctrl+d
+expect dialog:"Shape-Daten" exists
+expect text:"Seriennummer" exists
+expect text:"Notiz" missing
+expect #2087714836 text "10"
+expect #2087714840 text "Offen"
+expect checkbox:"Geprüft" unchecked
+click #2087714832
+type "SN-4711"
+click #2087714836
+key ctrl+a
+type "12,5"
+click #2087714840
+click "Aktiv"
+click checkbox:"Geprüft"
+click button:"OK"
+expect dialog:"Shape-Daten" missing
+cmd 5139
+expect tab:"Shape-Daten" selected
+expect #20784 text "SN-4711"
+expect #20788 text "12,5"
+expect #20792 text "Aktiv"
+expect checkbox:"Geprüft" checked
+expect text:"Notiz" exists
+# one undo step for the values, one for the copy
+key ctrl+z
+expect #20784 text ""
+expect #20788 text "10"
+expect checkbox:"Geprüft" unchecked
+key ctrl+z
+# (the pane made the canvas narrower: the rectangle is at 432,474 now)
+# the master in Favoriten, dropped: asked again, Abbrechen keeps its values
+rclick 432,474
+click "Zu meinen Shapes hinzufügen"
+expect button:"Kasse" exists
+drag button:"Kasse" 800,300
+expect dialog:"Shape-Daten" exists
+expect #2087714836 text "10"
+# (the first field has the keyboard: Esc there leaves the field, a second Esc closes)
+key esc
+key esc
+expect dialog:"Shape-Daten" missing
+click tab:"Shape-Daten"
+expect #20788 text "10"
+expect #20784 text ""
+# Ctrl + Shift + drag: the copy asks as well
+click 432,474
+drag 432,474 700,640 ctrl shift
+expect dialog:"Shape-Daten" exists
+click #2087714832
+type "SN-0815"
+click button:"OK"
+expect #20784 text "SN-0815"
+# two shapes: the fields they share, a Boolean set for both
+click 432,474 shift
+expect text:"Seriennummer" exists
+expect checkbox:"Geprüft" unchecked
+click checkbox:"Geprüft"
+expect checkbox:"Geprüft" checked
+click 900,600
+click 432,474
+expect checkbox:"Geprüft" checked
+expect #20784 text ""
+shot build/JFDiagrammer-data-ask.png
