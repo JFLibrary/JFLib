@@ -317,7 +317,7 @@ impl Bin<'_> {
             let refs = cells::style_refs(o, &s);
             cells::refs_attrs(&mut self.out, refs);
             self.out.close()?;
-            self.sheet(o, &s)?;
+            self.sheet(o, &s, 0)?;
             self.out.end("StyleSheet")?;
         }
         self.out.raw("</StyleSheets>")
@@ -331,7 +331,7 @@ impl Bin<'_> {
         self.out.open("DocumentSheet");
         cells::refs_attrs(&mut self.out, cells::style_refs(o, &s));
         self.out.close()?;
-        self.sheet(o, &s)?;
+        self.sheet(o, &s, 0)?;
         self.out.end("DocumentSheet")
     }
 
@@ -386,7 +386,7 @@ impl Bin<'_> {
                 self.out.open("PageSheet");
                 cells::refs_attrs(&mut self.out, cells::style_refs(o, &s));
                 self.out.close()?;
-                self.sheet(o, &s)?;
+                self.sheet(o, &s, 0)?;
                 self.out.end("PageSheet")?;
             }
         }
@@ -473,12 +473,12 @@ impl Bin<'_> {
             self.out.attr("UniqueID", &g);
         }
         self.out.close()?;
-        self.sheet(o, s)
+        self.sheet(o, s, id)
     }
 
     /// the sections of an object (shape, style, sheet) as the XML has them
-    fn sheet(&mut self, o: &Obj, s: &[u8]) -> R<()> {
-        cells::sheet(self, o, s)
+    fn sheet(&mut self, o: &Obj, s: &[u8], own: u32) -> R<()> {
+        cells::sheet(self, o, s, own)
     }
 }
 

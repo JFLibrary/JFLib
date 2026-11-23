@@ -285,10 +285,11 @@ fn layout(ty: u32) -> Option<&'static Layout> {
 pub(super) fn unit_name(code: u8) -> Option<&'static str> {
     Some(match code {
         0x21 => "PER",
+        // drawing units, default angles and text units are each cell's default: Visio writes no U
+        0x30 | 0x40 | 0x50 => return None,
         0x24 => "AC",
         0x25 => "HA",
         0x28 => "DATE",
-        0x30 => "DT",
         0x32 => "PT",
         0x33 => "P",
         0x34 => "P_PT",
@@ -296,7 +297,6 @@ pub(super) fn unit_name(code: u8) -> Option<&'static str> {
         0x36 => "C",
         0x37 => "C_D",
         0x3F => "DP",
-        0x40 => "DL",
         0x41 => "IN",
         0x42 => "FT",
         0x43 => "F_I",
@@ -309,7 +309,6 @@ pub(super) fn unit_name(code: u8) -> Option<&'static str> {
         0x4A => "MI_F",
         0x4B => "YD",
         0x4C => "NM",
-        0x50 => "DA",
         0x51 => "DEG",
         0x52 => "AD",
         0x53 => "RAD",
@@ -390,36 +389,48 @@ fn blocks(d: &[u8], from: usize) -> Vec<(u8, &[u8])> {
     v
 }
 
-/// the names of the rows of an object's named sections, for formulas
-pub(super) struct RowNames<'a> {
-    pub own: &'a [(u8, u32, String)],
-}
-
-impl formula::Names for RowNames<'_> {
-    fn row(&self, shape: Option<u32>, section: u8, row: u32) -> Option<String> {
-        if shape.is_some() {
-            return None;
-        }
-        self.own.iter().find(|(s, r, _)| *s == section && *r == row).map(|(_, _, n)| n.clone())
-    }
+/// how a row's cells without formula and without their mask bit are written
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Unset {
+    /// inherited (from the style or the master): not written
+    Inherit,
+    /// a value of its own without formula: written with the formula "No Formula" (the rows of
+    /// sections that no style gives, Geometry, Connection, User ...)
+    NoFormula,
 }
 
 /// write one row's cells
-fn row_cells(bin: &mut Bin, l: &Layout, d: &[u8], ctx: &Ctx, names: &RowNames) -> R<()> {
+fn row_cells(bin: &mut Bin, l: &Layout, d: &[u8], ctx: &Ctx, fcx: &formula::Ctx, unset: Unset) -> R<()> {
     let mask = d.get(l.fixed + 1..l.fixed + 1 + l.mask).unwrap_or(&[]);
     let bl = blocks(d, l.fixed + 1 + l.mask);
     for fl in l.fields {
         let block = bl.iter().find(|b| b.0 == fl.ix);
         let local = mask.get(fl.ix as usize / 8).is_some_and(|m| m & (1 << (fl.ix % 8)) != 0);
-        if block.is_none() && !local {
+        if block.is_none() && !local && unset == Unset::Inherit {
             continue;
         }
-        let formula = block.and_then(|b| formula::decode(b.1, names));
-        let Some((v, u)) = value(d, fl, ctx) else { continue };
-        if block.is_some() && formula.is_none() {
+        let Some((mut v, u)) = value(d, fl, ctx) else { continue };
+        let mut f = block.and_then(|b| formula::decode(b.1, fcx));
+        if block.is_some() && f.is_none() {
             bin.warn(String::from("formula"));
         }
-        bin.out.cell(fl.name, &v, u, formula.as_deref())?;
+        // a literal is the value itself (Visio writes no formula for it); a string literal also
+        // gives a string cell its value
+        if let Some(x) = f.as_deref() {
+            if formula::is_literal(x) {
+                if let Some(t) = formula::literal_text(x) {
+                    if fl.k == Str || v.is_empty() {
+                        v = t;
+                    }
+                }
+                f = None;
+            }
+        }
+        let f = match (&f, block, local) {
+            (None, None, false) => Some(String::from("No Formula")),
+            _ => f,
+        };
+        bin.out.cell(fl.name, &v, u, f.as_deref())?;
     }
     Ok(())
 }
@@ -486,21 +497,16 @@ fn strings(o: &Obj, s: &[u8]) -> Vec<(u32, String)> {
 }
 
 /// the sections of an object, then its text
-pub(super) fn sheet(bin: &mut Bin, o: &Obj, s: &[u8]) -> R<()> {
+pub(super) fn sheet(bin: &mut Bin, o: &Obj, s: &[u8], own: u32) -> R<()> {
     let strs = strings(o, s);
     let ctx = Ctx { strings: &strs };
-    // the names of all named rows (formulas refer to them across sections)
-    let mut named: Vec<(u8, u32, String)> = Vec::new();
-    for sec in &o.kids {
-        if let Some((_, code, true)) = rows_elem(sec.c.ty) {
-            for (r, name, name_u) in list_names(bin, sec, s) {
-                if let Some(n) = name_u.or(name) {
-                    named.push((code, r, n));
-                }
-            }
-        }
-    }
-    let names = RowNames { own: &named };
+    let names = core::mem::take(&mut bin.names);
+    let r = sheet_with(bin, o, s, &ctx, &formula::Ctx { names: &names, own });
+    bin.names = names;
+    r
+}
+
+fn sheet_with(bin: &mut Bin, o: &Obj, s: &[u8], ctx: &Ctx, fcx: &formula::Ctx) -> R<()> {
     // the order of the Geometry sections: the object's own child IDs
     let geo_order: Vec<u32> = o.c.list_parts(s).map(|(_, ids)| ids).unwrap_or_default();
     let mut geoms: Vec<&Obj> = o.kids.iter().filter(|k| k.c.ty == L_GEOM).collect();
@@ -515,7 +521,7 @@ pub(super) fn sheet(bin: &mut Bin, o: &Obj, s: &[u8]) -> R<()> {
                 bin.out.raw("<")?;
                 bin.out.raw(l.elem)?;
                 bin.out.raw(">")?;
-                row_cells(bin, l, r.c.data(s), &ctx, &names)?;
+                row_cells(bin, l, r.c.data(s), ctx, fcx, Unset::Inherit)?;
                 bin.out.end(l.elem)?;
             }
         }
@@ -530,13 +536,13 @@ pub(super) fn sheet(bin: &mut Bin, o: &Obj, s: &[u8]) -> R<()> {
                 continue;
             };
             if l.elem.is_empty() {
-                row_cells(bin, l, r.c.data(s), &ctx, &names)?;
+                row_cells(bin, l, r.c.data(s), ctx, fcx, Unset::NoFormula)?;
                 continue;
             }
             bin.out.open(l.elem);
             bin.out.attr("IX", &format!("{}", r.c.id));
             bin.out.close()?;
-            row_cells(bin, l, r.c.data(s), &ctx, &names)?;
+            row_cells(bin, l, r.c.data(s), ctx, fcx, Unset::NoFormula)?;
             bin.out.end(l.elem)?;
         }
         bin.out.end("Geom")?;
@@ -567,7 +573,9 @@ pub(super) fn sheet(bin: &mut Bin, o: &Obj, s: &[u8]) -> R<()> {
                 bin.out.attr("IX", &format!("{k}"));
             }
             bin.out.close()?;
-            row_cells(bin, l, r.c.data(s), &ctx, &names)?;
+            // Character and Paragraph rows inherit from the text style like single-row sections
+            let unset = if matches!(sec.c.ty, L_CHAR | L_PARA) { Unset::Inherit } else { Unset::NoFormula };
+            row_cells(bin, l, r.c.data(s), ctx, fcx, unset)?;
             bin.out.end(elem)?;
         }
     }
