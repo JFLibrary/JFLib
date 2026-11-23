@@ -1456,6 +1456,10 @@ fn localize_shape(tx: &mut Transaction, s: ShapeRef, lang: usize) -> bool {
     }
     let Some(m) = tx.doc().shape(s).and_then(|x| x.header().master).and_then(|id| tx.doc().master_by_id(id)) else { return changed };
     let texts = MasterTexts::of(tx.doc(), m);
+    // (JD26) the texts of a group master's parts
+    if instance::localize_parts(tx, s, lang).is_ok_and(|v| !v.is_empty()) {
+        changed = true;
+    }
     // the name: the master's in this language, with the ".ID" a second instance got
     let name_u = tx.doc().shape(s).and_then(|x| x.header().name_u).map(|n| String::from(tx.doc().str(n)));
     if let Some(nu) = name_u.filter(|_| !texts.name_u.is_empty()) {

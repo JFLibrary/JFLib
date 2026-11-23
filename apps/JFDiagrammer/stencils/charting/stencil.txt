@@ -1,0 +1,13 @@
+# Diagramm- und Mathematik-Shapes (SH-004, JD26): Kreissegmente für Tortendiagramme (Winkel per
+# Steuerpunkt oder aus den Shape-Daten) und die Rechenzeichen nach DIN 1302 / ISO 80000-2 als
+# Flächen gleicher Strichstärke.
+stencil: Charting Shapes
+file: charting
+name.de: Diagramm- und Mathematik-Shapes
+name.en: Chart and Math Shapes
+name.es: Formas de gráficos y matemáticas
+name.it: Forme per grafici e matematica
+name.fr: Formes de graphiques et mathématiques
+category: general
+masters: pie_slice, pie_chart_slice, not_equal
+quick: 2

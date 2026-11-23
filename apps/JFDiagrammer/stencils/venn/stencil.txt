@@ -1,0 +1,13 @@
+# Venn-Diagramm-Shapes (SH-007, JD26): Mengendiagramme aus überlappenden, durchscheinenden
+# Kreisen.  Die Mengen sind Teile einer Gruppe; ihre Farben kommen über die Schnellformatvorlage
+# (Variantenfarben 1 bis 3) aus dem Design.
+stencil: Venn Diagram Shapes
+file: venn
+name.de: Venn-Diagramm-Shapes
+name.en: Venn Diagram Shapes
+name.es: Formas de diagrama de Venn
+name.it: Forme per diagrammi di Venn
+name.fr: Formes de diagramme de Venn
+category: general
+masters: venn_3, intersection_2
+quick: 2

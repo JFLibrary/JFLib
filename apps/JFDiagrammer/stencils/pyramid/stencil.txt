@@ -1,0 +1,12 @@
+# Pyramiden-Shapes (SH-032, JD26): Pyramiden und Trichter mit einstellbarer Zahl der Ebenen
+# (Shape-Daten oder Steuerpunkt an der Spitze; Ziehen vermehrt die Ebenen).
+stencil: Pyramid Shapes
+file: pyramid
+name.de: Pyramiden-Shapes
+name.en: Pyramid Shapes
+name.es: Formas de pirámide
+name.it: Forme a piramide
+name.fr: Formes de pyramide
+category: business
+masters: pyramid_levels, funnel
+quick: 2

@@ -1,0 +1,12 @@
+# Marketingdiagramme (SH-030, JD26): fertige Schaubilder für Strategie und Marketing im
+# NetLab-Stil; Matrizen und Stufen sind Gruppen aus Teilen mit eigenem Text.
+stencil: Marketing Diagrams
+file: marketing
+name.de: Marketingdiagramme
+name.en: Marketing Diagrams
+name.es: Diagramas de marketing
+name.it: Diagrammi di marketing
+name.fr: Diagrammes marketing
+category: business
+masters: swot, step_chart
+quick: 2

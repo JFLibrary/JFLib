@@ -1,0 +1,66 @@
+# Achse 1 (SH-031, JD26): ein L-förmiges Achsenpaar mit offenen Pfeilspitzen, der Ursprung
+# links unten (1,5 mm eingerückt, damit die Spitzen im Kasten bleiben).  Nur Linien, keine
+# Füllung.  Row_1 an der Spitze der waagrechten Achse ändert die Größe beider Spitzen (Abstand
+# vom rechten Rand, nur waagrecht; XCon 4).  Formatvorlage Connector (die Linien bleiben auch in
+# einem Design ohne Shape-Linien sichtbar), ohne deren Pfeilspitzen.
+master: Axis 1
+style: Connector
+name.de: Achse 1
+name.en: Axis 1
+name.es: Eje 1
+name.it: Asse 1
+name.fr: Axe 1
+prompt.de: Zwei Achsen mit gemeinsamem Ursprung links unten. Mit dem gelben Steuerpunkt ändern Sie die Größe der Pfeilspitzen.
+prompt.en: Two axes with a common origin at the bottom left. Drag the yellow control handle to change the size of the arrowheads.
+prompt.es: Dos ejes con origen común abajo a la izquierda. Arrastre el controlador amarillo para cambiar el tamaño de las puntas.
+prompt.it: Due assi con origine comune in basso a sinistra. Trascina la maniglia di controllo gialla per cambiare la dimensione delle punte.
+prompt.fr: Deux axes avec une origine commune en bas à gauche. Faites glisser la poignée de contrôle jaune pour modifier la taille des pointes.
+keywords.de: Achse, Achsenkreuz, Koordinaten, Diagramm, Ursprung, Pfeil, Portfolio
+keywords.en: axis, axes, coordinates, chart, origin, arrow, portfolio
+keywords.es: eje, ejes, coordenadas, gráfico, origen, flecha, cartera
+keywords.it: asse, assi, coordinate, grafico, origine, freccia, portafoglio
+keywords.fr: axe, axes, coordonnées, graphique, origine, flèche, portefeuille
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 40 mm
+Height.us = 1.5 in
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[User]
+# der Einzug des Ursprungs, die Länge der Spitzen
+I:  Value = 1.5 mm
+     Value.us = 0.06 in
+L:  Value = MIN(MAX(Width-Controls.Row_1, 1 mm), Width*0.3, Height*0.3)
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.I; Y = Height
+LineTo  X = User.I; Y = User.I
+LineTo  X = Width; Y = User.I
+MoveTo  X = Width-User.L; Y = User.I+User.L*0.5
+LineTo  X = Width; Y = User.I
+LineTo  X = Width-User.L; Y = User.I-User.L*0.5
+MoveTo  X = User.I-User.L*0.5; Y = Height-User.L
+LineTo  X = User.I; Y = Height
+LineTo  X = User.I+User.L*0.5; Y = Height-User.L
+
+[Controls]
+Row_1:  X = Width-3 mm; Y = User.I
+        X.us = Width-0.12 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Größe der Pfeilspitzen ändern"
+        Tip.en = "Change the size of the arrowheads"
+        Tip.es = "Cambiar el tamaño de las puntas"
+        Tip.it = "Cambia la dimensione delle punte"
+        Tip.fr = "Modifier la taille des pointes"
+
+[Connection]
+Row  X = User.I; Y = User.I; DirX = 0; DirY = 0
+Row  X = Width; Y = User.I; DirX = -1; DirY = 0
+Row  X = User.I; Y = Height; DirX = 0; DirY = -1

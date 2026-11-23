@@ -1,0 +1,80 @@
+# Ungleich (SH-004, JD26): das Ungleichheitszeichen nach DIN 1302 / ISO 80000-2 (≠): zwei
+# waagrechte Balken wie beim Gleichheitszeichen und ein Schrägstrich von links unten nach rechts
+# oben durch beide, alle gleich dick.  Ein Umriss (die Vereinigung, keine Überlappung, sonst
+# spart die Gerade-Ungerade-Regel die Kreuzungen aus).  Row_1 auf der Oberkante des oberen Balkens
+# ändert die Strichstärke (anteilig, nur senkrecht); der Abstand der Balken bleibt.
+master: Not equal
+name.de: Ungleich
+name.en: Not equal
+name.es: Distinto de
+name.it: Diverso da
+name.fr: Différent de
+prompt.de: Ungleichheitszeichen (≠). Mit dem gelben Steuerpunkt ändern Sie die Strichstärke.
+prompt.en: Not-equal sign (≠). Drag the yellow control handle to change the stroke width.
+prompt.es: Signo de distinto (≠). Arrastre el controlador amarillo para cambiar el grosor del trazo.
+prompt.it: Segno di diverso (≠). Trascina la maniglia di controllo gialla per cambiare lo spessore del tratto.
+prompt.fr: Signe différent (≠). Faites glisser la poignée de contrôle jaune pour modifier l'épaisseur du trait.
+keywords.de: ungleich, Ungleichheitszeichen, Rechenzeichen, Mathematik, Vergleich, Symbol
+keywords.en: not equal, inequality, operator, math, comparison, symbol
+keywords.es: distinto, desigualdad, operador, matemáticas, comparación, símbolo
+keywords.it: diverso, disuguaglianza, operatore, matematica, confronto, simbolo
+keywords.fr: différent, inégalité, opérateur, mathématiques, comparaison, symbole
+
+[Shape]
+Width = 20 mm
+Width.us = 0.75 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# die Strichstärke, der halbe Abstand der Balken, ihre Kanten (unten, oben)
+T:    Value = MIN(MAX(Controls.Row_1.Y-Height*0.58, Height*0.04), Height*0.25)
+G:    Value = Height*0.08
+Yb0:  Value = Height*0.5-User.G-User.T
+Yb1:  Value = Height*0.5-User.G
+Yt0:  Value = Height*0.5+User.G
+Yt1:  Value = Height*0.5+User.G+User.T
+# der Schrägstrich: waagrechte Breite (senkrecht gemessen so dick wie die Balken), Steigung
+# dx/dy, linke Kante unten (bei 5 % der Höhe)
+K:    Value = Width*0.4/(Height*0.9)
+Th:   Value = User.T*SQRT(1+User.K^2)
+X0:   Value = Width*0.3-User.Th*0.5
+
+[Geometry]
+MoveTo  X = Width*0.1; Y = User.Yb0
+LineTo  X = User.X0+(User.Yb0-Height*0.05)*User.K; Y = User.Yb0
+LineTo  X = User.X0; Y = Height*0.05
+LineTo  X = User.X0+User.Th; Y = Height*0.05
+LineTo  X = User.X0+(User.Yb0-Height*0.05)*User.K+User.Th; Y = User.Yb0
+LineTo  X = Width*0.9; Y = User.Yb0
+LineTo  X = Width*0.9; Y = User.Yb1
+LineTo  X = User.X0+(User.Yb1-Height*0.05)*User.K+User.Th; Y = User.Yb1
+LineTo  X = User.X0+(User.Yt0-Height*0.05)*User.K+User.Th; Y = User.Yt0
+LineTo  X = Width*0.9; Y = User.Yt0
+LineTo  X = Width*0.9; Y = User.Yt1
+LineTo  X = User.X0+(User.Yt1-Height*0.05)*User.K+User.Th; Y = User.Yt1
+LineTo  X = User.X0+Height*0.9*User.K+User.Th; Y = Height*0.95
+LineTo  X = User.X0+Height*0.9*User.K; Y = Height*0.95
+LineTo  X = User.X0+(User.Yt1-Height*0.05)*User.K; Y = User.Yt1
+LineTo  X = Width*0.1; Y = User.Yt1
+LineTo  X = Width*0.1; Y = User.Yt0
+LineTo  X = User.X0+(User.Yt0-Height*0.05)*User.K; Y = User.Yt0
+LineTo  X = User.X0+(User.Yb1-Height*0.05)*User.K; Y = User.Yb1
+LineTo  X = Width*0.1; Y = User.Yb1
+LineTo  X = Width*0.1; Y = User.Yb0
+
+[Controls]
+Row_1:  X = Width*0.9; Y = Height*0.72
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Strichstärke ändern"
+        Tip.en = "Change the stroke width"
+        Tip.es = "Cambiar el grosor del trazo"
+        Tip.it = "Cambia lo spessore del tratto"
+        Tip.fr = "Modifier l'épaisseur du trait"
+
+[Connection]
+Row  X = Width*0.5; Y = Height*0.05; DirX = 0; DirY = 1
+Row  X = Width*0.9; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height*0.95; DirX = 0; DirY = -1
+Row  X = Width*0.1; Y = Height*0.5; DirX = 1; DirY = 0

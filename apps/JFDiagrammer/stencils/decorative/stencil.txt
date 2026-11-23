@@ -1,0 +1,12 @@
+# Dekorative Shapes (SH-003, JD26): Schmuckformen für Präsentationen, Banner und Hinweise im
+# NetLab-Stil; Linie, Füllung und Text aus der Formatvorlage "Normal", damit die Designs wirken.
+stencil: Decorative Shapes
+file: decorative
+name.de: Dekorative Shapes
+name.en: Decorative Shapes
+name.es: Formas decorativas
+name.it: Forme decorative
+name.fr: Formes décoratives
+category: general
+masters: smiley, ribbon_up
+quick: 2

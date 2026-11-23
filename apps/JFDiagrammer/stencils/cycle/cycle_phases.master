@@ -1,0 +1,387 @@
+# Kreisbewegung (SH-033, JD26): ein Kreislauf aus drei bis acht Ringsegmenten, jedes mit einer
+# Spitze in Laufrichtung (im Uhrzeigersinn) und der passenden Kerbe am Anfang; je ein Teil der
+# Gruppe mit eigenem Text und eigener Variantenfarbe des Designs (Schnellformatvorlage 100 bis
+# 106).  Phase 1 beginnt oben.  Die Zahl steht in den Shape-Daten (Prop.Phases, vier wie
+# Visios „Kreisbewegung in vier Phasen“); Row_1 am Innenrand oben ändert die Breite des Rings
+# (anteilig, nur senkrecht).  Alle Teile sind so groß wie die Gruppe; Bögen sind Ellipsenbögen
+# durch die Mitte des Segments, gestreckt folgt der Ring der Ellipse.
+master: Circular motion
+name.de: Kreisbewegung
+name.en: Circular motion
+name.es: Movimiento circular
+name.it: Movimento circolare
+name.fr: Mouvement circulaire
+prompt.de: Kreislauf aus Phasen. Die Zahl der Phasen stellen Sie in den Shape-Daten ein, die Breite des Rings mit dem gelben Steuerpunkt.
+prompt.en: Cycle of phases. Set the number of phases in the shape data and the width of the ring with the yellow control handle.
+prompt.es: Ciclo de fases. Defina el número de fases en los datos de la forma y el ancho del anillo con el controlador amarillo.
+prompt.it: Ciclo di fasi. Imposta il numero di fasi nei dati della forma e la larghezza dell'anello con la maniglia di controllo gialla.
+prompt.fr: Cycle de phases. Définissez le nombre de phases dans les données de la forme et la largeur de l'anneau avec la poignée de contrôle jaune.
+keywords.de: Kreislauf, Zyklus, Phasen, Kreisbewegung, Prozess, Ring, wiederkehrend
+keywords.en: cycle, circular, phases, loop, process, ring, recurring
+keywords.es: ciclo, circular, fases, bucle, proceso, anillo, recurrente
+keywords.it: ciclo, circolare, fasi, anello, processo, ricorrente
+keywords.fr: cycle, circulaire, phases, boucle, processus, anneau, récurrent
+
+[Shape]
+Width = 50 mm
+Width.us = 2 in
+Height = 50 mm
+Height.us = 2 in
+
+[User]
+# die Zahl der Phasen (3 bis 8), der Winkel je Phase, die halbe Fuge und die Tiefe der Spitze
+# (Bogenmaß), der Innenradius als Anteil des äußeren
+N:    Value = MIN(MAX(ROUND(Prop.Phases,0),3),8)
+S:    Value = 2*PI()/User.N
+Gap:  Value = 0.025
+Tip:  Value = MIN(0.16,User.S*0.25)
+K:    Value = MIN(MAX((Controls.Row_1.Y-Height*0.5)/(Height*0.5),0.2),0.85)
+
+[Property]
+Phases:  Type = 2; Format = "0"; Value = 4
+         Label.de = Phasen
+         Label.en = Phases
+         Label.es = Fases
+         Label.it = Fasi
+         Label.fr = Phases
+         Prompt.de = Anzahl der Phasen (3 bis 8)
+         Prompt.en = Number of phases (3 to 8)
+         Prompt.es = Número de fases (de 3 a 8)
+         Prompt.it = Numero di fasi (da 3 a 8)
+         Prompt.fr = Nombre de phases (de 3 à 8)
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.75
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Breite des Rings ändern"
+        Tip.en = "Change the width of the ring"
+        Tip.es = "Cambiar el ancho del anillo"
+        Tip.it = "Cambia la larghezza dell'anello"
+        Tip.fr = "Modifier la largeur de l'anneau"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# Phase 1: sichtbar ab 1 Phasen
+[Part P1]
+text.de: Phase 1
+text.en: Phase 1
+text.es: Fase 1
+text.it: Fase 1
+text.fr: Phase 1
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte; die Radien
+# innen und in der Mitte des Rings als Anteil des äußeren
+A0:  Value = PI()*0.5-0*Sheet.1!User.S-Sheet.1!User.Gap
+A1:  Value = PI()*0.5-1*Sheet.1!User.S+Sheet.1!User.Gap
+Am:  Value = (User.A0+User.A1)*0.5
+Ri:  Value = Sheet.1!User.K
+Rm:  Value = (1+Sheet.1!User.K)*0.5
+
+[Shape]
+HideText = 1>Sheet.1!User.N
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.5*(1-User.Ri)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 1>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+COS(User.A0)); Y = Height*0.5*(1+SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1)); Y = Height*0.5*(1+SIN(User.A1))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A1-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A1-Sheet.1!User.Tip))
+LineTo           X = Width*0.5*(1+User.Ri*COS(User.A1)); Y = Height*0.5*(1+User.Ri*SIN(User.A1))
+EllipticalArcTo  X = Width*0.5*(1+User.Ri*COS(User.A0)); Y = Height*0.5*(1+User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+User.Ri*COS(User.Am)); B = Height*0.5*(1+User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A0-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A0-Sheet.1!User.Tip))
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Phase 2: sichtbar ab 2 Phasen
+[Part P2]
+text.de: Phase 2
+text.en: Phase 2
+text.es: Fase 2
+text.it: Fase 2
+text.fr: Phase 2
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte; die Radien
+# innen und in der Mitte des Rings als Anteil des äußeren
+A0:  Value = PI()*0.5-1*Sheet.1!User.S-Sheet.1!User.Gap
+A1:  Value = PI()*0.5-2*Sheet.1!User.S+Sheet.1!User.Gap
+Am:  Value = (User.A0+User.A1)*0.5
+Ri:  Value = Sheet.1!User.K
+Rm:  Value = (1+Sheet.1!User.K)*0.5
+
+[Shape]
+HideText = 2>Sheet.1!User.N
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.5*(1-User.Ri)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 2>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+COS(User.A0)); Y = Height*0.5*(1+SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1)); Y = Height*0.5*(1+SIN(User.A1))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A1-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A1-Sheet.1!User.Tip))
+LineTo           X = Width*0.5*(1+User.Ri*COS(User.A1)); Y = Height*0.5*(1+User.Ri*SIN(User.A1))
+EllipticalArcTo  X = Width*0.5*(1+User.Ri*COS(User.A0)); Y = Height*0.5*(1+User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+User.Ri*COS(User.Am)); B = Height*0.5*(1+User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A0-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A0-Sheet.1!User.Tip))
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Phase 3: sichtbar ab 3 Phasen
+[Part P3]
+text.de: Phase 3
+text.en: Phase 3
+text.es: Fase 3
+text.it: Fase 3
+text.fr: Phase 3
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte; die Radien
+# innen und in der Mitte des Rings als Anteil des äußeren
+A0:  Value = PI()*0.5-2*Sheet.1!User.S-Sheet.1!User.Gap
+A1:  Value = PI()*0.5-3*Sheet.1!User.S+Sheet.1!User.Gap
+Am:  Value = (User.A0+User.A1)*0.5
+Ri:  Value = Sheet.1!User.K
+Rm:  Value = (1+Sheet.1!User.K)*0.5
+
+[Shape]
+HideText = 3>Sheet.1!User.N
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.5*(1-User.Ri)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+COS(User.A0)); Y = Height*0.5*(1+SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1)); Y = Height*0.5*(1+SIN(User.A1))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A1-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A1-Sheet.1!User.Tip))
+LineTo           X = Width*0.5*(1+User.Ri*COS(User.A1)); Y = Height*0.5*(1+User.Ri*SIN(User.A1))
+EllipticalArcTo  X = Width*0.5*(1+User.Ri*COS(User.A0)); Y = Height*0.5*(1+User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+User.Ri*COS(User.Am)); B = Height*0.5*(1+User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A0-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A0-Sheet.1!User.Tip))
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Phase 4: sichtbar ab 4 Phasen
+[Part P4]
+text.de: Phase 4
+text.en: Phase 4
+text.es: Fase 4
+text.it: Fase 4
+text.fr: Phase 4
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte; die Radien
+# innen und in der Mitte des Rings als Anteil des äußeren
+A0:  Value = PI()*0.5-3*Sheet.1!User.S-Sheet.1!User.Gap
+A1:  Value = PI()*0.5-4*Sheet.1!User.S+Sheet.1!User.Gap
+Am:  Value = (User.A0+User.A1)*0.5
+Ri:  Value = Sheet.1!User.K
+Rm:  Value = (1+Sheet.1!User.K)*0.5
+
+[Shape]
+HideText = 4>Sheet.1!User.N
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.5*(1-User.Ri)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+COS(User.A0)); Y = Height*0.5*(1+SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1)); Y = Height*0.5*(1+SIN(User.A1))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A1-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A1-Sheet.1!User.Tip))
+LineTo           X = Width*0.5*(1+User.Ri*COS(User.A1)); Y = Height*0.5*(1+User.Ri*SIN(User.A1))
+EllipticalArcTo  X = Width*0.5*(1+User.Ri*COS(User.A0)); Y = Height*0.5*(1+User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+User.Ri*COS(User.Am)); B = Height*0.5*(1+User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A0-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A0-Sheet.1!User.Tip))
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Phase 5: sichtbar ab 5 Phasen
+[Part P5]
+text.de: Phase 5
+text.en: Phase 5
+text.es: Fase 5
+text.it: Fase 5
+text.fr: Phase 5
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte; die Radien
+# innen und in der Mitte des Rings als Anteil des äußeren
+A0:  Value = PI()*0.5-4*Sheet.1!User.S-Sheet.1!User.Gap
+A1:  Value = PI()*0.5-5*Sheet.1!User.S+Sheet.1!User.Gap
+Am:  Value = (User.A0+User.A1)*0.5
+Ri:  Value = Sheet.1!User.K
+Rm:  Value = (1+Sheet.1!User.K)*0.5
+
+[Shape]
+HideText = 5>Sheet.1!User.N
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.5*(1-User.Ri)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+COS(User.A0)); Y = Height*0.5*(1+SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1)); Y = Height*0.5*(1+SIN(User.A1))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A1-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A1-Sheet.1!User.Tip))
+LineTo           X = Width*0.5*(1+User.Ri*COS(User.A1)); Y = Height*0.5*(1+User.Ri*SIN(User.A1))
+EllipticalArcTo  X = Width*0.5*(1+User.Ri*COS(User.A0)); Y = Height*0.5*(1+User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+User.Ri*COS(User.Am)); B = Height*0.5*(1+User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A0-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A0-Sheet.1!User.Tip))
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Phase 6: sichtbar ab 6 Phasen
+[Part P6]
+text.de: Phase 6
+text.en: Phase 6
+text.es: Fase 6
+text.it: Fase 6
+text.fr: Phase 6
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte; die Radien
+# innen und in der Mitte des Rings als Anteil des äußeren
+A0:  Value = PI()*0.5-5*Sheet.1!User.S-Sheet.1!User.Gap
+A1:  Value = PI()*0.5-6*Sheet.1!User.S+Sheet.1!User.Gap
+Am:  Value = (User.A0+User.A1)*0.5
+Ri:  Value = Sheet.1!User.K
+Rm:  Value = (1+Sheet.1!User.K)*0.5
+
+[Shape]
+HideText = 6>Sheet.1!User.N
+QuickStyleLineColor = 105
+QuickStyleFillColor = 105
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.5*(1-User.Ri)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+COS(User.A0)); Y = Height*0.5*(1+SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1)); Y = Height*0.5*(1+SIN(User.A1))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A1-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A1-Sheet.1!User.Tip))
+LineTo           X = Width*0.5*(1+User.Ri*COS(User.A1)); Y = Height*0.5*(1+User.Ri*SIN(User.A1))
+EllipticalArcTo  X = Width*0.5*(1+User.Ri*COS(User.A0)); Y = Height*0.5*(1+User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+User.Ri*COS(User.Am)); B = Height*0.5*(1+User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A0-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A0-Sheet.1!User.Tip))
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Phase 7: sichtbar ab 7 Phasen
+[Part P7]
+text.de: Phase 7
+text.en: Phase 7
+text.es: Fase 7
+text.it: Fase 7
+text.fr: Phase 7
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte; die Radien
+# innen und in der Mitte des Rings als Anteil des äußeren
+A0:  Value = PI()*0.5-6*Sheet.1!User.S-Sheet.1!User.Gap
+A1:  Value = PI()*0.5-7*Sheet.1!User.S+Sheet.1!User.Gap
+Am:  Value = (User.A0+User.A1)*0.5
+Ri:  Value = Sheet.1!User.K
+Rm:  Value = (1+Sheet.1!User.K)*0.5
+
+[Shape]
+HideText = 7>Sheet.1!User.N
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.5*(1-User.Ri)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 7>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+COS(User.A0)); Y = Height*0.5*(1+SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1)); Y = Height*0.5*(1+SIN(User.A1))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A1-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A1-Sheet.1!User.Tip))
+LineTo           X = Width*0.5*(1+User.Ri*COS(User.A1)); Y = Height*0.5*(1+User.Ri*SIN(User.A1))
+EllipticalArcTo  X = Width*0.5*(1+User.Ri*COS(User.A0)); Y = Height*0.5*(1+User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+User.Ri*COS(User.Am)); B = Height*0.5*(1+User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A0-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A0-Sheet.1!User.Tip))
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Phase 8: sichtbar ab 8 Phasen
+[Part P8]
+text.de: Phase 8
+text.en: Phase 8
+text.es: Fase 8
+text.it: Fase 8
+text.fr: Phase 8
+
+[User]
+# Beginn und Ende im Bogenmaß (mathematisch, von oben im Uhrzeigersinn), die Mitte; die Radien
+# innen und in der Mitte des Rings als Anteil des äußeren
+A0:  Value = PI()*0.5-7*Sheet.1!User.S-Sheet.1!User.Gap
+A1:  Value = PI()*0.5-8*Sheet.1!User.S+Sheet.1!User.Gap
+Am:  Value = (User.A0+User.A1)*0.5
+Ri:  Value = Sheet.1!User.K
+Rm:  Value = (1+Sheet.1!User.K)*0.5
+
+[Shape]
+HideText = 8>Sheet.1!User.N
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.5*(1-User.Ri)*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 8>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+COS(User.A0)); Y = Height*0.5*(1+SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A1)); Y = Height*0.5*(1+SIN(User.A1))
+                 A = Width*0.5*(1+COS(User.Am)); B = Height*0.5*(1+SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A1-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A1-Sheet.1!User.Tip))
+LineTo           X = Width*0.5*(1+User.Ri*COS(User.A1)); Y = Height*0.5*(1+User.Ri*SIN(User.A1))
+EllipticalArcTo  X = Width*0.5*(1+User.Ri*COS(User.A0)); Y = Height*0.5*(1+User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+User.Ri*COS(User.Am)); B = Height*0.5*(1+User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Rm*COS(User.A0-Sheet.1!User.Tip)); Y = Height*0.5*(1+User.Rm*SIN(User.A0-Sheet.1!User.Tip))
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1

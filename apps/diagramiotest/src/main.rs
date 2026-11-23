@@ -25,7 +25,9 @@
 //                                         (containers, cff, callouts; stencil_structs.rs), (JD13)
 //                                         probeblatt.png: the shape stencils (stencil_shapes.rs),
 //                                         <folder>-alle.png: every master of each stencil
-//                                         (stencil_overview.rs)
+//                                         (stencil_overview.rs), (JD26) probeblatt-jd26.png: the
+//                                         general and business-graphics stencils
+//                                         (stencil_business.rs)
 //   diagramiotest --write-templates DIR  (JD13) every form of JFDiagrammer's templates as .vstx,
 //                                         metric and US (templates.rs)
 //
@@ -96,6 +98,7 @@ mod pdfreader;
 mod render;
 mod roundtrip;
 mod samples;
+mod stencil_business;
 mod stencil_network;
 mod stencil_overview;
 mod stencil_shapes;
@@ -189,7 +192,8 @@ fn run() -> i32 {
         return stencil_network::previews(&dir);
     }
     if let Some(dir) = arg(&args, "--write-stencil-previews") {
-        return stencil_structs::previews(&dir).max(stencil_shapes::previews(&dir)).max(stencil_overview::write_all(&dir));
+        // (JD26) probeblatt-jd26.png: the general and business-graphics stencils
+        return stencil_structs::previews(&dir).max(stencil_shapes::previews(&dir)).max(stencil_overview::write_all(&dir)).max(stencil_business::previews(&dir));
     }
     if let Some(dir) = arg(&args, "--write-gegenprobe") {
         // (JD7) the glue drawing, (JD10) the structures drawing

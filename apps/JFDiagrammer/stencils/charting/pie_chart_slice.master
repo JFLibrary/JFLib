@@ -1,0 +1,73 @@
+# Kreisdiagrammsegment (SH-004, JD26): ein Tortenstück, dessen Lage und Größe aus den
+# Shape-Daten kommen: Beginn und Anteil in Prozent, im Uhrzeigersinn von oben.  Mehrere Segmente
+# an derselben Stelle ergeben ein Kreisdiagramm (Beginn des nächsten = Beginn + Anteil des
+# vorigen).  Die Farbe ist eine der sieben Variantenfarben des Designs (Prop.Color, 1 bis 7, über
+# die Schnellformatvorlage).  Der Text zeigt den Anteil nicht selbst; er steht in der Mitte des
+# Stücks.
+master: Pie chart slice
+name.de: Kreisdiagrammsegment
+name.en: Pie chart slice
+name.es: Segmento de gráfico circular
+name.it: Segmento di grafico a torta
+name.fr: Segment de graphique en secteurs
+prompt.de: Segment eines Kreisdiagramms. Beginn, Anteil in Prozent und Farbe stellen Sie in den Shape-Daten ein.
+prompt.en: Slice of a pie chart. Set its start, its share in percent and its colour in the shape data.
+prompt.es: Segmento de un gráfico circular. Defina el inicio, la proporción en porcentaje y el color en los datos de la forma.
+prompt.it: Segmento di un grafico a torta. Imposta l'inizio, la quota in percentuale e il colore nei dati della forma.
+prompt.fr: Segment d'un graphique en secteurs. Définissez le début, la part en pourcentage et la couleur dans les données de la forme.
+keywords.de: Kreisdiagramm, Segment, Anteil, Prozent, Torte, Daten, Sektor
+keywords.en: pie chart, slice, share, percent, data, sector
+keywords.es: gráfico circular, segmento, proporción, porcentaje, datos, sector
+keywords.it: grafico a torta, segmento, quota, percentuale, dati, settore
+keywords.fr: graphique en secteurs, segment, part, pourcentage, données, secteur
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+TxtWidth = Width*0.4
+TxtHeight = Height*0.2
+TxtPinX = Width*0.5*(1+0.55*SIN(User.Am))
+TxtPinY = Height*0.5*(1+0.55*COS(User.Am))
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+QuickStyleLineColor = 99+MIN(MAX(ROUND(Prop.Color,0),1),7)
+QuickStyleFillColor = 99+MIN(MAX(ROUND(Prop.Color,0),1),7)
+
+[User]
+# Beginn und Ende im Bogenmaß, im Uhrzeigersinn von oben; der Anteil 1 bis 99,9 %
+A0:  Value = MODULUS(Prop.Start,100)*0.02*PI()
+A1:  Value = User.A0+MIN(MAX(Prop.Share,1),99.9)*0.02*PI()
+Am:  Value = (User.A0+User.A1)*0.5
+
+[Property]
+Start:  Type = 2; Format = "0.0"; Value = 0
+        Label.de = Beginn (%)
+        Label.en = Start (%)
+        Label.es = Inicio (%)
+        Label.it = Inizio (%)
+        Label.fr = Début (%)
+Share:  Type = 2; Format = "0.0"; Value = 25
+        Label.de = Anteil (%)
+        Label.en = Share (%)
+        Label.es = Proporción (%)
+        Label.it = Quota (%)
+        Label.fr = Part (%)
+Color:  Type = 2; Format = "0"; Value = 1
+        Label.de = Farbe (1 bis 7)
+        Label.en = Colour (1 to 7)
+        Label.es = Color (1 a 7)
+        Label.it = Colore (da 1 a 7)
+        Label.fr = Couleur (1 à 7)
+
+[Geometry]
+MoveTo           X = Width*0.5; Y = Height*0.5
+LineTo           X = Width*0.5*(1+SIN(User.A0)); Y = Height*0.5*(1+COS(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+SIN(User.A1)); Y = Height*0.5*(1+COS(User.A1))
+                 A = Width*0.5*(1+SIN(User.Am)); B = Height*0.5*(1+COS(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5; Y = Height*0.5
+
+[Connection]
+Row  X = Width*0.5; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = Width*0.5*(1+SIN(User.Am)); Y = Height*0.5*(1+COS(User.Am)); DirX = -SIN(User.Am); DirY = -COS(User.Am)

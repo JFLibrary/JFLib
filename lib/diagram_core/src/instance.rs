@@ -589,6 +589,8 @@ pub fn place(tx: &mut Transaction, page: PageRef, master: MasterRef, x: f64, y: 
                 tx.set_text(shape, Some(Text::plain(text)))?;
             }
         }
+        // (JD26) the texts of the subshapes of a group master's parts in this language
+        localize_parts(tx, shape, lang)?;
         // (LY-03) the master's layers onto the page
         bring_layers(tx, page, master, shape)?;
         // translated cells (Controls.Row_1.Tip ...) in this language
@@ -611,6 +613,31 @@ pub fn place(tx: &mut Transaction, page: PageRef, master: MasterRef, x: f64, y: 
         }
         Ok(shape)
     })
+}
+
+/// (JD26) the subshapes of instance `shape` in language `lang` (an index into LANGS): a subshape
+/// whose master subshape has User.JFD_Text (its text in five languages: the parts of a group
+/// master, stencils/README.md) gets the text of `lang` where it shows one of the five or none
+/// -> the subshapes whose text changed
+pub fn localize_parts(tx: &mut Transaction, shape: ShapeRef, lang: usize) -> Result<Vec<ShapeRef>, EditError> {
+    let mut changed = Vec::new();
+    let mut stack: Vec<ShapeRef> = tx.doc().shape(shape).map(|s| s.children().collect()).unwrap_or_default();
+    while let Some(sub) = stack.pop() {
+        let Some(node) = tx.doc().shape(sub) else { continue };
+        stack.extend(node.children());
+        let Some(ms) = tx.doc().master_shape_of(sub) else { continue };
+        let Some(all) = user_text(tx.doc(), SheetRef::Shape(ms), JFD_TEXT).map(|t| five(&t)) else { continue };
+        let Some(want) = all.get(lang).filter(|w| !w.is_empty()) else { continue };
+        let shown = |doc: &Document, r: ShapeRef| doc.shape(r).and_then(|s| s.text()).map(|t| t.chars());
+        let cur = shown(tx.doc(), sub).or_else(|| shown(tx.doc(), ms)).unwrap_or_default();
+        let cur = cur.trim_end_matches('\n');
+        if cur == want.as_str() || !(cur.is_empty() || all.iter().any(|x| x == cur)) {
+            continue;
+        }
+        tx.set_text(sub, Some(Text::plain(want)))?;
+        changed.push(sub);
+    }
+    Ok(changed)
 }
 
 // (JD13) a 1-D master (its shape sets BeginX, BeginY, EndX, EndY): the instance's ends are the

@@ -1,0 +1,12 @@
+# Zyklusdiagramm-Shapes (SH-033, JD26): Kreisläufe, Ringe und Zielscheiben; die Zahl der Phasen
+# und Ringe steht in den Shape-Daten.
+stencil: Cycle Shapes
+file: cycle
+name.de: Zyklusdiagramm-Shapes
+name.en: Cycle Diagram Shapes
+name.es: Formas de diagrama de ciclo
+name.it: Forme per diagrammi a ciclo
+name.fr: Formes de diagramme de cycle
+category: business
+masters: cycle_phases, target
+quick: 2

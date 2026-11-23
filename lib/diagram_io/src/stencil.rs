@@ -310,8 +310,21 @@ struct MasterInfo {
     one_d: bool,
     shape: Vec<Cell0>,
     sections: Vec<Sec0>,
+    // (JD26) the subshapes ([Part NAME]): the master is a group
+    parts: Vec<PartInfo>,
     // the content for the UniqueID
     canon: String,
+}
+
+// (JD26) a subshape of a group master ([Part NAME], README: Gruppen aus Teilen)
+struct PartInfo {
+    name: String,
+    line: u32,
+    text: Option<[String; 5]>,
+    // line, fill, text style by NameU with the line naming it (None: Normal)
+    styles: [Option<(String, u32)>; 3],
+    shape: Vec<Cell0>,
+    sections: Vec<Sec0>,
 }
 
 // the values of a key in five languages (`required`: an error when there is none)
@@ -527,48 +540,25 @@ fn master_info(file: &str, text: &str, m: Measure, files: &dyn Fn(&str) -> Optio
             Some((art, e.line))
         }
     };
-    let mut shape = Vec::new();
-    let mut sections = Vec::new();
-    for s in &src.sections {
-        let place = format!("[{}]", s.written);
-        let (cells, rows) = match s.kind {
-            SecKind::Shape => {
-                let cells = cells_of(file, &s.cells, m, &shape_cell_known, &place, true)?;
-                shape.extend(cells);
-                canon.push_str("[Shape]\u{1e}");
-                (Vec::new(), Vec::new())
-            }
-            SecKind::Geometry => {
-                let cells = cells_of(file, &s.cells, m, &|n| GEO_SECTION_CELLS.contains(&n), &place, false)?;
-                let mut rows = Vec::new();
-                for r in &s.rows {
-                    rows.push(Row0 { head: r.head.clone(), line: r.line, cells: cells_of(file, &r.cells, m, &|n| GEO_ROW_CELLS.contains(&n), &place, false)? });
-                }
-                (cells, rows)
-            }
-            SecKind::Indexed | SecKind::Named => {
-                if let Some(e) = s.cells.first() {
-                    return Err(err(file, e.line, format!("{place} hat keine eigenen Zellen ({} = …): Zeilen beginnen mit {}", e.name, if s.kind == SecKind::Named { "Name:" } else { "Row" })));
-                }
-                let allowed = row_cells(s.model);
-                let mut rows = Vec::new();
-                for r in &s.rows {
-                    rows.push(Row0 { head: r.head.clone(), line: r.line, cells: cells_of(file, &r.cells, m, &|n| allowed.contains(&n), &place, true)? });
-                }
-                (Vec::new(), rows)
-            }
-        };
-        if s.kind != SecKind::Shape {
-            canon.push_str(&format!("[{}]\u{1e}", s.model));
-            canon_cells(&mut canon, &cells);
-            for r in &rows {
-                canon.push_str(&format!("{}:\u{1e}", r.head));
-                canon_cells(&mut canon, &r.cells);
-            }
-            sections.push(Sec0 { model: s.model, kind: s.kind, line: s.line, cells, rows });
-        }
-    }
+    let (shape, sections) = sections_of(file, src.sections.iter().filter(|s| s.part == 0), m, true, &mut canon)?;
     canon_cells(&mut canon, &shape);
+    // (JD26) the parts: subshapes with their own header lines (text, styles) and sections
+    let mut parts = Vec::new();
+    for (k, p) in src.parts.iter().enumerate() {
+        let pes = stencil_src::resolve(file, &p.header, m)?;
+        keys_known(file, &pes, &["text", "style", "line_style", "fill_style", "text_style"])?;
+        canon.push_str(&format!("[Part {}]\u{1e}", p.name));
+        for e in &pes {
+            canon.push_str(&format!("{}\u{1f}{}\u{1f}{}\u{1e}", e.name, e.lang.map_or("", |l| LANGS[l]), e.value));
+        }
+        let ptext = five(file, &pes, "text", false, p.line)?;
+        let pstyle = |key: &str| -> Result<Option<(String, u32)>, SourceError> { Ok(single(file, &pes, key)?.map(|e| (e.value.clone(), e.line))) };
+        let pall = pstyle("style")?;
+        let pstyles = [pstyle("line_style")?.or(pall.clone()), pstyle("fill_style")?.or(pall.clone()), pstyle("text_style")?.or(pall)];
+        let (pshape, psections) = sections_of(file, src.sections.iter().filter(|s| s.part == k + 1), m, false, &mut canon)?;
+        canon_cells(&mut canon, &pshape);
+        parts.push(PartInfo { name: p.name.clone(), line: p.line, text: ptext, styles: pstyles, shape: pshape, sections: psections });
+    }
     // (JD13) `size: 482.6 mm x 88.9 mm`: the size of a master whose Width or Height is a formula,
     // also one drawn from an SVG (the rack: height from its height units); it sizes the master page
     // and the pin
@@ -590,7 +580,63 @@ fn master_info(file: &str, text: &str, m: Measure, files: &dyn Fn(&str) -> Optio
         };
         (dim("Width", 0)?, dim("Height", 1)?)
     };
-    Ok(MasterInfo { file: String::from(file), line, name_u, names, prompts, keywords, text, styles, svg, hidden, scale, width, height, one_d, shape, sections, canon })
+    if let Some(p) = parts.first() {
+        if svg.is_some() {
+            return Err(err(file, p.line, "[Part] und svg: zusammen gibt es nicht: ein Master ist eine Gruppe aus Teilen oder aus einer Grafik"));
+        }
+        if one_d {
+            return Err(err(file, p.line, "ein 1D-Master hat keine Teile ([Part])"));
+        }
+    }
+    Ok(MasterInfo { file: String::from(file), line, name_u, names, prompts, keywords, text, styles, svg, hidden, scale, width, height, one_d, shape, sections, parts, canon })
+}
+
+// the sections of the master shape or of one part: the single cells of [Shape] and the other
+// sections; their content goes into `canon` (the UniqueID).  `langs`: language-suffixed cells
+// are allowed (the master shape's, translated through JFD_Tr; a part has only its text)
+fn sections_of<'s>(file: &str, secs: impl Iterator<Item = &'s stencil_src::SrcSection>, m: Measure, langs: bool, canon: &mut String) -> Result<(Vec<Cell0>, Vec<Sec0>), SourceError> {
+    let mut shape = Vec::new();
+    let mut sections = Vec::new();
+    for s in secs {
+        let place = format!("[{}]", s.written);
+        let (cells, rows) = match s.kind {
+            SecKind::Shape => {
+                let cells = cells_of(file, &s.cells, m, &shape_cell_known, &place, langs)?;
+                shape.extend(cells);
+                canon.push_str("[Shape]\u{1e}");
+                (Vec::new(), Vec::new())
+            }
+            SecKind::Geometry => {
+                let cells = cells_of(file, &s.cells, m, &|n| GEO_SECTION_CELLS.contains(&n), &place, false)?;
+                let mut rows = Vec::new();
+                for r in &s.rows {
+                    rows.push(Row0 { head: r.head.clone(), line: r.line, cells: cells_of(file, &r.cells, m, &|n| GEO_ROW_CELLS.contains(&n), &place, false)? });
+                }
+                (cells, rows)
+            }
+            SecKind::Indexed | SecKind::Named => {
+                if let Some(e) = s.cells.first() {
+                    return Err(err(file, e.line, format!("{place} hat keine eigenen Zellen ({} = …): Zeilen beginnen mit {}", e.name, if s.kind == SecKind::Named { "Name:" } else { "Row" })));
+                }
+                let allowed = row_cells(s.model);
+                let mut rows = Vec::new();
+                for r in &s.rows {
+                    rows.push(Row0 { head: r.head.clone(), line: r.line, cells: cells_of(file, &r.cells, m, &|n| allowed.contains(&n), &place, langs)? });
+                }
+                (Vec::new(), rows)
+            }
+        };
+        if s.kind != SecKind::Shape {
+            canon.push_str(&format!("[{}]\u{1e}", s.model));
+            canon_cells(canon, &cells);
+            for r in &rows {
+                canon.push_str(&format!("{}:\u{1e}", r.head));
+                canon_cells(canon, &r.cells);
+            }
+            sections.push(Sec0 { model: s.model, kind: s.kind, line: s.line, cells, rows });
+        }
+    }
+    Ok((shape, sections))
 }
 
 // the cells that make a master 1-D (README: 1D-Shapes)
@@ -767,6 +813,9 @@ struct Sink<'a> {
     tr: Vec<(String, [String; 5])>,
     // the included file of the cell being written (`include:`), else None
     cur: Option<String>,
+    // (JD26) a group master of parts: the IDs of Sheet.1 (the master shape), Sheet.2 (its first
+    // part) ... as the formulas name them; empty for every other master
+    ids: Vec<u32>,
 }
 
 impl Sink<'_> {
@@ -784,6 +833,13 @@ impl Sink<'_> {
     }
 
     fn formula(&mut self, tx: &mut Transaction, sheet: SheetRef, addr: &CellAddr, f: &str, line: u32) -> Result<(), SourceError> {
+        let owned;
+        let f = if self.ids.is_empty() {
+            f
+        } else {
+            owned = sheet_ids(f, &self.ids).map_err(|m| err(self.cur.as_deref().unwrap_or(self.file), line, format!("{m} in „{f}“")))?;
+            owned.as_str()
+        };
         tx.set_formula(sheet, addr, f).map_err(|e| self.fail(line, tx.doc().str(addr.cell), e))?;
         self.formulas.push(FormulaAt { sheet, addr: *addr, master: self.master, line, text: String::from(f), file: self.cur.clone() });
         Ok(())
@@ -821,6 +877,40 @@ fn single_addr(tx: &mut Transaction, name: &str) -> CellAddr {
     CellAddr::single(tx.intern(name))
 }
 
+// (JD26) a group master's formula with its logical sheet numbers (Sheet.1! the master shape,
+// Sheet.2! its first part ..., README: Gruppen aus Teilen) as the shapes' IDs; strings stay
+fn sheet_ids(f: &str, ids: &[u32]) -> Result<String, String> {
+    let b = f.as_bytes();
+    let mut out = String::with_capacity(f.len() + 8);
+    let (mut i, mut start, mut in_str) = (0, 0, false);
+    while i < b.len() {
+        if b[i] == b'"' {
+            in_str = !in_str;
+            i += 1;
+            continue;
+        }
+        let before = i.checked_sub(1).map(|j| b[j]);
+        let word_start = !before.is_some_and(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'.');
+        if !in_str && word_start && f[i..].starts_with("Sheet.") {
+            let digits = f[i + 6..].bytes().take_while(u8::is_ascii_digit).count();
+            if digits > 0 && b.get(i + 6 + digits) == Some(&b'!') {
+                let n: usize = f[i + 6..i + 6 + digits].parse().unwrap_or(0);
+                let Some(id) = n.checked_sub(1).and_then(|k| ids.get(k)) else {
+                    return Err(format!("Sheet.{n}! gibt es nicht (Sheet.1 ist der Master, Sheet.2 bis Sheet.{} seine Teile)", ids.len()));
+                };
+                out.push_str(&f[start..i]);
+                out.push_str(&format!("Sheet.{id}!"));
+                i += 7 + digits;
+                start = i;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    out.push_str(&f[start..]);
+    Ok(out)
+}
+
 // a number in a formula: at most nine decimals, no "-0"
 fn frac(x: f64) -> String {
     let r = formula::math::round(x * 1e9) / 1e9;
@@ -840,7 +930,7 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
     let lang = st.lang;
     let file = mi.file.as_str();
     let line = mi.line;
-    let mut sink = Sink { file, master: ix, lang, formulas, tr: Vec::new(), cur: None };
+    let mut sink = Sink { file, master: ix, lang, formulas, tr: Vec::new(), cur: None, ids: Vec::new() };
     let quick = ix < st.quick;
     // the master and its attributes
     let mref = tx.add_master(&mi.names[lang], &mi.name_u).map_err(|e| sink.fail(line, "der Master", e))?;
@@ -888,7 +978,7 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
     }
     // the master shape
     let layers: &[Layer] = mi.svg.as_ref().map_or(&[], |(a, _)| a.layers.as_slice());
-    let kind = if layers.len() > 1 { ShapeKind::Group } else { ShapeKind::Shape };
+    let kind = if layers.len() > 1 || !mi.parts.is_empty() { ShapeKind::Group } else { ShapeKind::Shape };
     let shape = tx.add_shape(Owner::Master(mref), None, kind).map_err(|e| sink.fail(line, "das Master-Shape", e))?;
     let refs = StyleRefs {
         line: Some(style_id(tx, file, &mi.styles[0], line)?),
@@ -897,6 +987,15 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
     };
     tx.set_shape_styles(shape, refs).map_err(|e| sink.fail(line, "die Formatvorlagen", e))?;
     let sheet = SheetRef::Shape(shape);
+    // (JD26) the parts first, empty, so that every formula can name them (Sheet.2! ...)
+    let mut subs: Vec<ShapeRef> = Vec::with_capacity(mi.parts.len());
+    for p in &mi.parts {
+        let sub = tx.add_shape(Owner::Master(mref), Some(shape), ShapeKind::Shape).map_err(|e| sink.fail(p.line, &format!("[Part {}]", p.name), e))?;
+        subs.push(sub);
+    }
+    if !subs.is_empty() {
+        sink.ids = core::iter::once(shape).chain(subs.iter().copied()).map(|r| tx.doc().shape(r).map_or(0, |x| x.id())).collect();
+    }
     // the transform first, in Visio's order; a 1-D master's box follows its ends (Visio's own
     // formulas for a 1-D shape, README: 1D-Shapes) unless the master writes a cell itself
     const FIRST: &[&str] = &["PinX", "PinY", "Width", "Height", "LocPinX", "LocPinY"];
@@ -941,36 +1040,45 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
         tx.set_text(shape, Some(Text::plain(&t[lang]))).map_err(|e| sink.fail(line, "der Text", e))?;
     }
     // the sections as written
-    for sec in &mi.sections {
-        match sec.kind {
-            SecKind::Shape => {}
-            SecKind::Geometry => {
-                let sk = tx.add_section(sheet, "Geometry").map_err(|e| sink.fail(sec.line, "[Geometry]", e))?;
-                for c in &sec.cells {
-                    let a = CellAddr::section(sk, tx.intern(&c.name));
-                    sink.put(tx, sheet, &a, c, None)?;
-                }
-                for row in &sec.rows {
-                    let rk = tx.add_row(sheet, sk, None, Some(&row.head)).map_err(|e| sink.fail(row.line, &row.head, e))?;
-                    for c in &row.cells {
-                        let a = CellAddr::row(sk, rk, tx.intern(&c.name));
-                        sink.put(tx, sheet, &a, c, None)?;
-                    }
+    emit_sections(tx, &mut sink, sheet, &mi.sections, true)?;
+    // (JD26) the parts: each a subshape the size of the group unless it says otherwise (GUARD: Visio
+    // does not scale it when the group is resized, the formulas do), its
+    // cells, sections and text; the text's five languages in its own User.JFD_Text (the app
+    // shows the current language's on dropping, instance::localize_parts)
+    for (p, &sub) in mi.parts.iter().zip(&subs) {
+        let prefs = StyleRefs {
+            line: Some(style_id(tx, file, &p.styles[0], p.line)?),
+            fill: Some(style_id(tx, file, &p.styles[1], p.line)?),
+            text: Some(style_id(tx, file, &p.styles[2], p.line)?),
+        };
+        tx.set_shape_styles(sub, prefs).map_err(|e| sink.fail(p.line, "die Formatvorlagen", e))?;
+        let ss = SheetRef::Shape(sub);
+        for &name in FIRST {
+            let a = single_addr(tx, name);
+            match p.shape.iter().find(|c| c.name == name) {
+                Some(c) => sink.put(tx, ss, &a, c, None)?,
+                None => {
+                    let f = match name {
+                        "PinX" => "GUARD(Sheet.1!Width*0.5)",
+                        "PinY" => "GUARD(Sheet.1!Height*0.5)",
+                        "Width" => "GUARD(Sheet.1!Width)",
+                        "Height" => "GUARD(Sheet.1!Height)",
+                        "LocPinX" => "GUARD(Width*0.5)",
+                        _ => "GUARD(Height*0.5)",
+                    };
+                    sink.formula(tx, ss, &a, f, p.line)?;
                 }
             }
-            SecKind::Indexed | SecKind::Named => {
-                let sk = SecKey::one(tx.intern(sec.model));
-                for (n, row) in sec.rows.iter().enumerate() {
-                    let (rk, rname) = if sec.kind == SecKind::Named { (RowKey::Named(tx.intern(&row.head)), row.head.clone()) } else { (RowKey::Index(n as u32), n.to_string()) };
-                    if !tx.doc().has_row(sheet, sk, rk) {
-                        tx.add_row(sheet, sk, Some(rk), None).map_err(|e| sink.fail(row.line, &row.head, e))?;
-                    }
-                    for c in &row.cells {
-                        let a = CellAddr::row(sk, rk, tx.intern(&c.name));
-                        sink.put(tx, sheet, &a, c, Some(format!("{}.{rname}.{}", sec.model, c.name)))?;
-                    }
-                }
-            }
+        }
+        for c in p.shape.iter().filter(|c| !FIRST.contains(&c.name.as_str())) {
+            let a = single_addr(tx, &c.name);
+            sink.put(tx, ss, &a, c, None)?;
+        }
+        emit_sections(tx, &mut sink, ss, &p.sections, false)?;
+        if let Some(t) = &p.text {
+            tx.set_text(sub, Some(Text::plain(&t[lang]))).map_err(|e| sink.fail(p.line, &format!("der Text von [Part {}]", p.name), e))?;
+            let v = tx.intern(&join_fields(&[&t[0], &t[1], &t[2], &t[3], &t[4]]));
+            tx.set_user(ss, instance::JFD_TEXT, Value::Text(v), Some(Unit::Str)).map_err(|e| sink.fail(p.line, instance::JFD_TEXT, e))?;
         }
     }
     // the SVG geometry: on the master shape, or one subshape per format
@@ -1023,6 +1131,44 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
         tx.set_user(ps, &name, Value::Text(v), Some(Unit::Str)).map_err(|e| err(file, line, format!("{name} lässt sich nicht schreiben ({e:?})")))?;
     }
     Ok(mref)
+}
+
+// the sections of the master shape or of a part as written; `tr`: language-suffixed cells
+// are translated (JFD_Tr, the master shape only)
+fn emit_sections(tx: &mut Transaction, sink: &mut Sink, sheet: SheetRef, sections: &[Sec0], tr: bool) -> Result<(), SourceError> {
+    for sec in sections {
+        match sec.kind {
+            SecKind::Shape => {}
+            SecKind::Geometry => {
+                let sk = tx.add_section(sheet, "Geometry").map_err(|e| sink.fail(sec.line, "[Geometry]", e))?;
+                for c in &sec.cells {
+                    let a = CellAddr::section(sk, tx.intern(&c.name));
+                    sink.put(tx, sheet, &a, c, None)?;
+                }
+                for row in &sec.rows {
+                    let rk = tx.add_row(sheet, sk, None, Some(&row.head)).map_err(|e| sink.fail(row.line, &row.head, e))?;
+                    for c in &row.cells {
+                        let a = CellAddr::row(sk, rk, tx.intern(&c.name));
+                        sink.put(tx, sheet, &a, c, None)?;
+                    }
+                }
+            }
+            SecKind::Indexed | SecKind::Named => {
+                let sk = SecKey::one(tx.intern(sec.model));
+                for (n, row) in sec.rows.iter().enumerate() {
+                    let (rk, rname) = if sec.kind == SecKind::Named { (RowKey::Named(tx.intern(&row.head)), row.head.clone()) } else { (RowKey::Index(n as u32), n.to_string()) };
+                    if !tx.doc().has_row(sheet, sk, rk) {
+                        tx.add_row(sheet, sk, Some(rk), None).map_err(|e| sink.fail(row.line, &row.head, e))?;
+                    }
+                    for c in &row.cells {
+                        let a = CellAddr::row(sk, rk, tx.intern(&c.name));
+                        sink.put(tx, sheet, &a, c, tr.then(|| format!("{}.{rname}.{}", sec.model, c.name)))?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 // one SVG format: its line and fill cells (unless the master sets them itself) and its sections

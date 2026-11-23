@@ -1,0 +1,13 @@
+# Shapes für Ursache-Wirkung-Diagramme (SH-041, JD26): Fischgrätdiagramme nach Ishikawa.  Die
+# Hauptgräte (Wirkung) hat Verbindungspunkte entlang der Gräte; die Kategorien sind 1D-Shapes,
+# deren Ende dort klebt, und haben selbst Punkte entlang ihrer Gräte für die Ursachen.
+stencil: Cause and Effect Diagram Shapes
+file: cause_effect
+name.de: Ursache-Wirkung-Diagramm-Shapes
+name.en: Cause and Effect Diagram Shapes
+name.es: Formas de diagrama de causa y efecto
+name.it: Forme per diagrammi causa-effetto
+name.fr: Formes de diagramme de cause à effet
+category: business
+masters: effect, category_1, category_2, primary_cause_1
+quick: 4

@@ -1,0 +1,11 @@
+# Matrixdiagramm-Shapes (SH-031, JD26): Matrizen und Achsen für Einordnungen und Portfolios.
+stencil: Matrix Shapes
+file: matrix
+name.de: Matrixdiagramm-Shapes
+name.en: Matrix Shapes
+name.es: Formas de matriz
+name.it: Forme a matrice
+name.fr: Formes de matrice
+category: business
+masters: matrix_labeled, axis_1
+quick: 2
