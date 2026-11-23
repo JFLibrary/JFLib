@@ -75,8 +75,12 @@ const EXT_PADDING: u16 = 21;
 /// taken (psk_ke would give up forward secrecy)
 const PSK_DHE_KE: u8 = 1;
 /// early data a server skips when it does not take it (RFC 8446 4.2.10): at least this many
-/// bytes, more when ServerConfig::early_data allows more
+/// bytes, more when ServerConfig::early_data or the ticket allows more.  Counted as the data
+/// itself: a record's body less its content type and AEAD tag (EARLY_OVERHEAD), at least one byte
+/// a record, so data in records of a byte each is skipped too and empty records end at the limit
 const MAX_EARLY_SKIP: usize = 4 * 16384;
+/// a protected record's body beyond its data: the inner content type and the 16-byte tag
+const EARLY_OVERHEAD: usize = 17;
 /// the longest ticket a client keeps (a ClientHello must still fit around it)
 const MAX_TICKET: usize = 32 * 1024;
 const EXT_VERSIONS: u16 = 43;
@@ -845,15 +849,15 @@ impl Conn {
                 }
                 // 0-RTT data the server does not take (RFC 8446 4.2.10): before its keys (after a
                 // HelloRetryRequest) every application_data record, after them those that do not
-                // open with the client's handshake key, up to MAX_EARLY_SKIP bytes
+                // open with the client's handshake key, up to the skip budget (MAX_EARLY_SKIP)
                 APPLICATION_DATA if self.skips_early(body.len()) && self.rd.is_none() => {
-                    self.early_skip -= body.len();
+                    self.early_skip -= early_cost(body.len());
                 }
                 APPLICATION_DATA => {
                     let rd = self.rd.as_mut().ok_or(fail(AL_UNEXPECTED_MESSAGE, "data before keys"))?;
                     let opened = rd.open(&hdr, &body);
                     if self.skips_early(body.len()) && opened == Err(record::OpenError::Mac) {
-                        self.early_skip -= body.len();
+                        self.early_skip -= early_cost(body.len());
                         continue;
                     }
                     let (inner, content) = opened.map_err(open_failure)?;
@@ -900,9 +904,9 @@ impl Conn {
     }
 
     /// a record of len bytes is 0-RTT data to skip: the client offered early data, a ClientHello
-    /// came whole (early data follows it), and len fits what is left to skip
+    /// came whole (early data follows it), and its data fits what is left to skip
     fn skips_early(&self, len: usize) -> bool {
-        self.server && self.early_skip > 0 && len <= self.early_skip && self.hs.is_empty()
+        self.server && self.early_skip > 0 && early_cost(len) <= self.early_skip && self.hs.is_empty()
     }
 
     /// a handshake message split over records has no other records between its parts (RFC 8446
@@ -2302,8 +2306,13 @@ fn ch_fixed(sid: &[u8], suites: &[u16], comp: &[u8], exts: &[(u16, &[u8])]) -> V
     out
 }
 
-/// the bytes of records of 0-RTT data a server skips when it does not take them: the data a
-/// ticket allows, the records' overhead, at least MAX_EARLY_SKIP
+/// what a skipped record of 0-RTT data counts: its body less type and tag, at least 1
+fn early_cost(len: usize) -> usize {
+    len.saturating_sub(EARLY_OVERHEAD).max(1)
+}
+
+/// the 0-RTT data a server skips when it does not take it: what a ticket allows and some slack
+/// (padding), at least MAX_EARLY_SKIP
 fn skip_budget(max_early: u32) -> usize {
     let n = max_early as usize;
     MAX_EARLY_SKIP.max(n.saturating_add(n / 8).saturating_add(256))

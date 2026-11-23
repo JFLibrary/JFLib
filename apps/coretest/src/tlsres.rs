@@ -345,6 +345,19 @@ fn early(t: &mut T, p: &Pki) {
         let r = c.feed(&s.take_out()).and_then(|_| s.feed(&c.take_out()));
         t.check("early: a ticket allowing more than the server takes now: resumed, no 0-RTT", r.is_ok() && s.established() && s.resumed() && c.early_taken() == 0 && !s.has_early());
     }
+    // refused 0-RTT in records of one byte each (8 KiB of them the ticket allows): all skipped,
+    // the budget counts the data, not the records' type and tag
+    let (ss5, tk5) = (Arc::new(Sessions::default()), Arc::new(Tickets::new()));
+    let _ = go(ccfg(p, &ss5), ServerConfig { early_data: 8192, ..scfg(p, &tk5) });
+    if let Some((mut c, mut s, _)) = started(t, "early: small records", early_start(p, &ss5, ServerConfig { early_data: 4096, ..scfg(p, &tk5) }, b"GET /")) {
+        let mut small = Vec::new();
+        for i in 0..4000u32 {
+            small.extend_from_slice(&[23, 3, 3, 0, 18]);
+            small.extend((0..18u32).map(|j| (i.wrapping_mul(31) ^ j) as u8));
+        }
+        let r = s.feed(&small).and_then(|_| c.feed(&s.take_out())).and_then(|_| s.feed(&c.take_out()));
+        t.check("early: refused 0-RTT in 4000 records of one byte each is skipped", r.is_ok() && s.established() && s.resumed() && c.early_taken() == 0);
+    }
     // a client that sends more than its ticket allows: unexpected_message
     let (ss4, tk4) = (Arc::new(Sessions::default()), Arc::new(Tickets::new()));
     let _ = go(ccfg(p, &ss4), ServerConfig { early_data: 8, ..scfg(p, &tk4) });
