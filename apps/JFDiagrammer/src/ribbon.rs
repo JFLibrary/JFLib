@@ -150,10 +150,15 @@ static CFF_ORIENT_MENU: [It; 2] = [C(CFF_HORIZONTAL), C(CFF_VERTICAL)];
 static TEXTBOX_MENU: [It; 2] = [C(TEXT_BOX_H), C(TEXT_BOX_V)];
 static ORIENT_MENU: [It; 2] = [C(PORTRAIT), C(LANDSCAPE)];
 // (JD8 rest: pages) the paper sizes with their measures (page_size.rs)
-static SIZE_MENU: [It; 12] = [
+static SIZE_MENU: [It; 14] = [
     C(SIZE_LETTER), C(SIZE_LEGAL), C(SIZE_TABLOID), C(SIZE_EXECUTIVE), C(SIZE_A5), C(SIZE_A4), C(SIZE_A3), C(SIZE_B5), C(SIZE_B4),
+    // (JD15, RW-02) envelopes and the US government sizes below captions
+    Sub("Umschläge", &ENVELOPE_MENU), // i18n
+    Sub("Behördenformate", &GOV_MENU), // i18n
     Sep, C(FIT_DRAWING), C(MORE_SIZES),
 ];
+static ENVELOPE_MENU: [It; 6] = [C(SIZE_ENV_10), C(SIZE_ENV_DL), C(SIZE_ENV_C4), C(SIZE_ENV_C5), C(SIZE_ENV_C6), C(SIZE_ENV_MONARCH)];
+static GOV_MENU: [It; 2] = [C(SIZE_GOV_LETTER), C(SIZE_GOV_LEGAL)];
 // (JD11) the variants' own menus (TH-05: new colours, effects, connectors, fonts, embellishment) are P2
 static THEME_MENU: [It; 0] = [];
 static CONN_MENU: [It; 8] = [C(CONN_RIGHT_ANGLE), C(CONN_STRAIGHT), C(CONN_CURVED), Sep, C(LINE_JUMPS), C(REROUTE), Sep, C(CONNECT_SHAPES)];

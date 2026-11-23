@@ -5,7 +5,8 @@
 //
 //   stencil_panel(id, &mut StencilState, &StencilPanel) -> Vec<StencilEvent>
 //        top to bottom: the search box (IC_SEARCH, labels.search as its placeholder) with a
-//        button for the recent searches (labels.history), the "More shapes" button
+//        button for the recent searches (labels.history; neither with StencilState::no_search,
+//        JD15), the "More shapes" button
 //        (StencilPanel::more_id, labels.more), the title rows -- the quick shapes collection
 //        (SK_QUICK, labels.quick), the search results while StencilPanel::results is Some
 //        (SK_SEARCH, labels.results with "{}" = their number), a row per stencil --, a movable
@@ -238,6 +239,9 @@ pub struct StencilState {
     /// the height of the title rows in DIP (the splitter; 0 = automatic: up to 40 % of the
     /// panel); the panel keeps it between one row and all of them
     pub split: i32,
+    /// (JD15) the panel shows no search box (Visio's option "Show Shape Search pane" off); the
+    /// query stays, set it to "" to end a search
+    pub no_search: bool,
     // the view before the search took over
     prev: u32,
     // the view shown in the last pass (another one starts at its top)
@@ -261,6 +265,7 @@ impl Default for StencilState {
             query: String::new(),
             history: Vec::new(),
             split: 0,
+            no_search: false,
             prev: SK_NONE,
             shown: SK_NONE,
             dbl: 0,
@@ -482,7 +487,9 @@ impl Ui {
 
         // ---- the search box with its history, "More shapes"
         self.box_begin(0, BOX_V | pad(8), 8);
-        self.stencil_search(id, st, p, &mut out);
+        if !st.no_search {
+            self.stencil_search(id, st, p, &mut out);
+        }
         let more = self.stencil_more(p, &mut out);
         self.box_end();
 

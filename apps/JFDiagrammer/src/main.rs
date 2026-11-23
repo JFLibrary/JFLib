@@ -120,6 +120,7 @@ extern crate alloc;
 // (JD15) the question before changes are lost, the ways a file opens
 mod ask_save;
 mod backstage;
+mod cmds_actions;
 mod cmds_arrange;
 mod cmds_later;
 mod cmds_myshapes;
@@ -549,9 +550,15 @@ impl App for Diagrammer {
         dlg_shape_name::dialog(self, ui);
         // (JD15) Ausrichten und Kleben
         dlg_snap::dialog(self, ui);
+        // (JD15, SP-12) the rows of the selected shape's Actions section for its menu
+        cmds_actions::frame(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
+        // (JD15, SP-12) a row of the shape's Actions section
+        if cmds_actions::command(self, ui, id) {
+            return true;
+        }
         // (JD15, UI-12) Schließen and the window's close ask first when there are changes
         if ask_save::command(self, ui, id) {
             return true;

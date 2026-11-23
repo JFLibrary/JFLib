@@ -82,6 +82,13 @@ pub(crate) const DEV: Key<bool> = Key::bool("advanced.developer", false)
 // (JD15, ZF-06) the marquee also takes the shapes it only touches (edit_canvas.rs: SeState::partial)
 pub(crate) const PARTIAL_SELECT: Key<bool> = Key::bool("advanced.partial_select", false)
     .label("Teilweise umschlossene Shapes auswählen");
+// (JD15, SL-04) the shape search: shown or not, every word or one of them (Visio's Advanced
+// options "Show Shape Search pane", "Search for: All of the words (AND) / Any of the words (OR)")
+pub(crate) const SEARCH_SHOW: Key<bool> = Key::bool("advanced.shape_search", true)
+    .label("Shape-Suche anzeigen");
+pub(crate) const SEARCH_ANY: Key<bool> = Key::bool("advanced.shape_search_any", false)
+    .label("Shape-Suche: ein Wort genügt")
+    .help("Aus: Ein Shape muss alle Suchwörter enthalten.");
 
 static SCHEMA: Schema = Schema::new(1, &[
     THEME.d, USER.d, INITIALS.d, START.d, LIVE.d, TIPS.d,
@@ -89,6 +96,7 @@ static SCHEMA: Schema = Schema::new(1, &[
     UI_LANG.d, REGION.d,
     LIVE_DYN.d, WHEEL_ZOOM.d, CENTER_ZOOM.d, CONNECT_ARROWS.d, SPLIT_CONN.d, DELETE_CONN.d, ENTER_ENDS.d, UNDO_LEVELS.d, UNITS.d, DEV.d,
     PARTIAL_SELECT.d,
+    SEARCH_SHOW.d, SEARCH_ANY.d,
 ])
 .sections(SECTIONS);
 

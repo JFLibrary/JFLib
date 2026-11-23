@@ -347,6 +347,40 @@ fn dynamic_glue_faces_the_other_shape() {
     assert_eq!(f.formula(c, "EndX"), "_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)");
 }
 
+// (JD15, SS-18) WalkPreference decides between ways of the same cost: B diagonal to A, both ends
+// dynamic -- by default the begin leaves A's side (Visio's side to side), with bit 1
+// (visWalkPrefBegNS) its top; bit 2 (visWalkPrefEndNS) docks the end on B's bottom; a dearer way
+// is never taken for it (B straight right of A: side to side whatever the bits say)
+#[test]
+fn walk_preference_picks_the_sides() {
+    let mut f = fx();
+    let a = f.rect(None, 1, [2.0, 2.0], [1.0, 1.0], 0.0);
+    let b = f.rect(None, 2, [6.0, 6.0], [1.0, 1.0], 0.0);
+    let c = f.connector(([2.0, 2.0], Target::Shape(a)), ([6.0, 6.0], Target::Shape(b)));
+    let walk = |f: &mut Fx, v: f64| {
+        let mut tx = f.doc.transaction("WalkPreference");
+        let cell = CellAddr::single(tx.intern("WalkPreference"));
+        tx.set_constant(SheetRef::Shape(c), &cell, Value::Num(v), None).unwrap();
+        update(&mut tx, &mut f.eng, &[c]).unwrap();
+        tx.commit();
+        path(&f.doc, c)
+    };
+    let p = path(&f.doc, c);
+    assert_eq!(route::bends(&p), 1, "{p:?}");
+    assert_pt!(p[0], [2.5, 2.0]);
+    let p = walk(&mut f, 1.0);
+    assert_path(&p, &[[2.0, 2.5], [2.0, 6.0], [5.5, 6.0]]);
+    let p = walk(&mut f, 2.0);
+    assert_path(&p, &[[2.5, 2.0], [6.0, 2.0], [6.0, 5.5]]);
+    // back to the default
+    let p = walk(&mut f, 0.0);
+    assert_pt!(p[0], [2.5, 2.0]);
+    // a dearer way is never taken
+    f.move_to(b, [6.0, 2.0]).unwrap();
+    let p = walk(&mut f, 3.0);
+    assert_path(&p, &[[2.5, 2.0], [5.5, 2.0]]);
+}
+
 #[test]
 fn dynamic_glue_lines_up_when_it_can() {
     // B is a little to the right of A's top point: the end docks straight above it

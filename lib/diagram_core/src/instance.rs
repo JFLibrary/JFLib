@@ -9,7 +9,8 @@
 //                                      page sheet; a master without them: Name, Prompt and
 //                                      ShapeKeywords for every language)
 //     texts.name(lang) / matches(&words, any)   the name shown, the search (NameU, the names in
-//                                      all five languages, the keywords)
+//                                      all five languages, the keywords, since JD15 the
+//                                      QuickInfos)
 //   StencilTexts::of(&doc)             a stencil's title in five languages and its category
 //                                      (User.JFD_Name, User.JFD_Category of the document sheet)
 //   import_master(&mut tx, &src, m) -> MasterRef   master m of document src in tx's document:
@@ -19,8 +20,15 @@
 //                                      bases), masters its shapes are instances of first,
 //                                      pictures of package parts inline
 //   move_master(&mut tx, m, pos)      a master to another place in the order (own stencils)
+//   scale_factor(&doc, page, master)   (JD15, MS-10) Visio's range of eight: 1 while the
+//                                      master's drawing scale is within eight times the page's,
+//                                      else the factor that keeps its size on the paper
 //   place(&mut tx, page, master, x, y, lang) -> ShapeRef   an instance at (x, y) inches on the
-//                                      page (y up): Name in language lang, NameU the master's
+//                                      page (y up), (JD15, MS-10) its constant lengths (Shape and
+//                                      Text Transform, User / Prop values with a unit of length,
+//                                      X and Y of Geometry, Connection, Control rows; a 1-D
+//                                      shape's ends around the pin) times scale_factor when that
+//                                      is not 1: Name in language lang, NameU the master's
 //                                      (LG-04; "Rechteck.7" when the page has one already), its
 //                                      text and translated cells in that language; (JD8 rest,
 //                                      LY-03) the master's layers come along: the page gets the
@@ -218,13 +226,13 @@ impl MasterTexts {
     }
 
     /// whether the master matches the search words (lower case expected): all of them
-    /// (any = false) or one of them, each a part of NameU, of a name in any language or of a
-    /// keyword (SL-04)
+    /// (any = false) or one of them, each a part of NameU, of a name in any language, of a
+    /// keyword or (JD15) of a QuickInfo in any language (SL-04: Visio searches the description)
     pub fn matches(&self, words: &[&str], any: bool) -> bool {
         if words.is_empty() {
             return false;
         }
-        let hay: Vec<String> = core::iter::once(&self.name_u).chain(self.names.iter()).chain(self.keywords.iter()).map(|s| fold(s)).collect();
+        let hay: Vec<String> = core::iter::once(&self.name_u).chain(self.names.iter()).chain(self.keywords.iter()).chain(self.prompts.iter()).map(|s| fold(s)).collect();
         let hit = |w: &&str| {
             let w = fold(w);
             !w.is_empty() && hay.iter().any(|h| h.contains(w.as_str()))
@@ -571,7 +579,13 @@ pub fn place(tx: &mut Transaction, page: PageRef, master: MasterRef, x: f64, y: 
     tx.atomic(|tx| {
         let texts = MasterTexts::of(tx.doc(), master);
         let shape = tx.add_instance(Owner::Page(page), master, x, y)?;
-        one_d_ends(tx, master, shape, x, y)?;
+        // (JD15, MS-10) a master more than eight times off the page's scale keeps its size on
+        // the paper
+        let f = scale_factor(tx.doc(), page, master);
+        one_d_ends(tx, master, shape, x, y, f)?;
+        if f != 1.0 {
+            rescale(tx, shape, f)?;
+        }
         let id = tx.doc().shape(shape).map_or(0, |s| s.id());
         let base = texts.name(lang).to_string();
         let base_u = if texts.name_u.is_empty() { base.clone() } else { texts.name_u.clone() };
@@ -623,8 +637,9 @@ pub fn place(tx: &mut Transaction, page: PageRef, master: MasterRef, x: f64, y: 
 // (JD13) a 1-D master (its shape sets BeginX, BeginY, EndX, EndY): the instance's ends are the
 // master's moved so that its pin lands on (x, y), and PinX / PinY inherit the master's formulas
 // again (GUARD((BeginX+EndX)/2) ...), so pin, width and angle follow the ends as in Visio;
-// add_instance alone would put the pin there and leave the ends where the master page has them
-fn one_d_ends(tx: &mut Transaction, master: MasterRef, shape: ShapeRef, x: f64, y: f64) -> Result<(), EditError> {
+// add_instance alone would put the pin there and leave the ends where the master page has them;
+// (JD15, MS-10) `f` scales the ends' distance from the pin (1: the master's)
+fn one_d_ends(tx: &mut Transaction, master: MasterRef, shape: ShapeRef, x: f64, y: f64, f: f64) -> Result<(), EditError> {
     let Some(slot) = tx.doc().master(master).and_then(|m| m.master_shape()) else { return Ok(()) };
     let ms = SheetRef::Shape(ShapeRef { owner: Owner::Master(master), slot });
     let local = |tx: &Transaction, name: &str| -> Option<(f64, Option<Unit>)> {
@@ -643,15 +658,112 @@ fn one_d_ends(tx: &mut Transaction, master: MasterRef, shape: ShapeRef, x: f64, 
         r.cached.or(r.cell).and_then(|c| c.value.num()).filter(|v| v.is_finite()).unwrap_or(fallback)
     };
     let (px, py) = (pin(tx, "PinX", (bx.0 + ex.0) * 0.5), pin(tx, "PinY", (by.0 + ey.0) * 0.5));
-    let (dx, dy) = (x - px, y - py);
     let sheet = SheetRef::Shape(shape);
-    for (name, (v, unit), d) in [("BeginX", bx, dx), ("BeginY", by, dy), ("EndX", ex, dx), ("EndY", ey, dy)] {
+    for (name, (v, unit), p, at) in [("BeginX", bx, px, x), ("BeginY", by, py, y), ("EndX", ex, px, x), ("EndY", ey, py, y)] {
         let a = tx.single(name);
-        tx.set_constant(sheet, &a, Value::Num(v + d), unit)?;
+        tx.set_constant(sheet, &a, Value::Num(at + (v - p) * f), unit)?;
     }
     for name in ["PinX", "PinY"] {
         let a = tx.single(name);
         tx.inherit_cell(sheet, &a)?;
+    }
+    Ok(())
+}
+
+/// (JD15, MS-10) Visio's range of eight (User's Guide, chapter 18: "Visio adjusts an instance of
+/// a master automatically if its drawing scale is more than eight times larger or smaller than
+/// the drawing scale of the page.  If the scales differ less, Visio doesn't adjust the shape"):
+/// 1 within the range, else the factor that keeps the instance's size on the paper -- the
+/// master's page units per drawing unit (PageScale / DrawingScale of its page sheet) over the
+/// page's
+pub fn scale_factor(doc: &Document, page: PageRef, master: MasterRef) -> f64 {
+    let ratio = |s: SheetRef| {
+        let num = |n: &str| doc.sym(n).and_then(|c| doc.resolve(s, &CellAddr::single(c)).num()).filter(|v| v.is_finite() && *v > 0.0);
+        num("PageScale").unwrap_or(1.0) / num("DrawingScale").unwrap_or(1.0)
+    };
+    let f = ratio(SheetRef::Master(master)) / ratio(SheetRef::Page(page));
+    if f.is_finite() && (f > 8.0 || f < 0.125) { f } else { 1.0 }
+}
+
+// (JD15, MS-10) the cells of a shape sheet whose constant lengths an adjusted instance scales:
+// Shape Transform and Text Transform (the pin only for subshapes: the instance's own pin is
+// where it was dropped)
+const SCALED: [&str; 10] = ["Width", "Height", "LocPinX", "LocPinY", "TxtWidth", "TxtHeight", "TxtPinX", "TxtPinY", "TxtLocPinX", "TxtLocPinY"];
+
+// a constant length in drawing units: no formula, a number, a unit of length that is not a
+// typographic or page unit (a row of Geometry, Connection or Controls may have no unit: inches)
+fn scaled_length(c: &Cell, unitless: bool) -> Option<f64> {
+    if !matches!(c.formula, Formula::Absent | Formula::NoFormula) {
+        return None;
+    }
+    let v = c.value.num().filter(|v| v.is_finite() && *v != 0.0)?;
+    let ok = match c.unit {
+        None => unitless,
+        Some(u) => {
+            u.dimension() == crate::units::Dimension::Length
+                && !matches!(u, Unit::Points | Unit::Picas | Unit::PicasPoints | Unit::Didots | Unit::Ciceros | Unit::CicerosDidots | Unit::PageLength | Unit::TextLength)
+        }
+    };
+    ok.then_some(v)
+}
+
+// (JD15, MS-10) the instance `shape` adjusted by `f`: every constant length of its master shapes
+// (SCALED, a subshape's pin, the values of User and Prop rows with a unit of length, X and Y of
+// Geometry, Connection and Controls rows) becomes the instance's own constant times f; the
+// formulas built on them (Height = Prop.RackUnits*User.U, Geometry X = Width*0.5 ...) follow,
+// texts, line weights and margins (page units) stay
+fn rescale(tx: &mut Transaction, shape: ShapeRef, f: f64) -> Result<(), EditError> {
+    let mut shapes = alloc::vec![shape];
+    let mut i = 0;
+    while i < shapes.len() {
+        if let Some(s) = tx.doc().shape(shapes[i]) {
+            let kids: Vec<ShapeRef> = s.children().collect();
+            shapes.extend(kids);
+        }
+        i += 1;
+    }
+    for s in shapes {
+        let changes: Vec<(CellAddr, f64, Option<Unit>)> = {
+            let doc = tx.doc();
+            let Some(ms) = doc.master_shape_of(s) else { continue };
+            let Some(sheet) = doc.sheet(SheetRef::Shape(ms)) else { continue };
+            let mut out = Vec::new();
+            for c in &sheet.cells {
+                let name = doc.str(c.name);
+                let pin = s != shape && (name == "PinX" || name == "PinY");
+                if !(SCALED.contains(&name) || pin) {
+                    continue;
+                }
+                if let Some(v) = scaled_length(c, false) {
+                    out.push((CellAddr::single(c.name), v * f, c.unit));
+                }
+            }
+            for sec in &sheet.sections {
+                let sname = doc.str(sec.name);
+                let (cells, unitless): (&[&str], bool) = match sname {
+                    "User" | "Property" => (&["Value"], false),
+                    "Geometry" | "Connection" | "Control" => (&["X", "Y"], true),
+                    _ => continue,
+                };
+                let key = SecKey { name: sec.name, index: sec.index };
+                for row in &sec.rows {
+                    for c in &row.cells {
+                        if !cells.contains(&doc.str(c.name)) {
+                            continue;
+                        }
+                        if let Some(v) = scaled_length(c, unitless) {
+                            out.push((CellAddr::row(key, row.key, c.name), v * f, c.unit));
+                        }
+                    }
+                }
+            }
+            out
+        };
+        for (addr, v, unit) in changes {
+            // a row the instance inherits is made its own by set_constant; a cell that cannot
+            // be set (a guard of its own) keeps the master's value
+            let _ = tx.set_constant(SheetRef::Shape(s), &addr, Value::Num(v), unit);
+        }
     }
     Ok(())
 }
@@ -898,6 +1010,75 @@ mod tests {
         assert!(change.undo(&mut dst));
         assert_eq!(dst.masters().count(), 0);
         assert_eq!(dst.top_shapes(Owner::Page(page)).count(), 0);
+    }
+
+    // (JD15, MS-10) Visio's range of eight: a 1:1 master keeps its real size on pages of 1:1 and
+    // 1:5 and its size on the paper on 1:20 and 1:100 (20 and 100 times its width in drawing
+    // units, its constant User lengths alike); a master drawn 1:20 (the rack stencil's) on a 1:1
+    // page is a twentieth, on a 1:20 page as drawn
+    #[test]
+    fn place_adjusts_beyond_eight_times_the_scale() {
+        let src = stencil();
+        let box_m = src.masters().next().unwrap();
+        let mut dst = Document::new(DocKind::Drawing);
+        let mut tx = dst.transaction("pages");
+        let mut pages = Vec::new();
+        for (k, scale) in [1.0, 5.0, 20.0, 100.0].iter().enumerate() {
+            let p = tx.add_page(&format!("S{k}"), &format!("S{k}"), false, None).unwrap();
+            let (ps, ds) = (tx.single("PageScale"), tx.single("DrawingScale"));
+            tx.set_length(SheetRef::Page(p), &ps, 1.0, Unit::Inches).unwrap();
+            tx.set_length(SheetRef::Page(p), &ds, *scale, Unit::Inches).unwrap();
+            pages.push(p);
+        }
+        tx.commit();
+        let mut tx = dst.transaction("drop");
+        let m = import_master(&mut tx, &src, box_m).unwrap();
+        let ms = ShapeRef { owner: Owner::Master(m), slot: tx.doc().master(m).unwrap().master_shape().unwrap() };
+        tx.set_user(SheetRef::Shape(ms), "U", Value::Num(0.5), Some(Unit::Inches)).unwrap();
+        let num = |tx: &Transaction, s: ShapeRef, addr: CellAddr| tx.doc().resolve(SheetRef::Shape(s), &addr).num().unwrap_or(f64::NAN);
+        let w = tx.single("Width");
+        let user = SecKey::one(tx.intern("User"));
+        let u = CellAddr::row(user, RowKey::Named(tx.intern("U")), tx.intern("Value"));
+        let got: Vec<(f64, f64)> = pages
+            .iter()
+            .map(|&p| {
+                let s = place(&mut tx, p, m, 1.0, 1.0, 0).unwrap();
+                (num(&tx, s, w), num(&tx, s, u))
+            })
+            .collect();
+        let want = [(1.0, 0.5), (1.0, 0.5), (20.0, 10.0), (100.0, 50.0)];
+        for (g, w) in got.iter().zip(want) {
+            assert!((g.0 - w.0).abs() < 1e-9 && (g.1 - w.1).abs() < 1e-9, "{got:?} want {want:?}");
+        }
+        assert_eq!(scale_factor(tx.doc(), pages[1], m), 1.0);
+        // the master drawn 1:20
+        let (ps, ds) = (tx.single("PageScale"), tx.single("DrawingScale"));
+        tx.set_length(SheetRef::Master(m), &ps, 1.0, Unit::Inches).unwrap();
+        tx.set_length(SheetRef::Master(m), &ds, 20.0, Unit::Inches).unwrap();
+        let a = place(&mut tx, pages[0], m, 3.0, 3.0, 0).unwrap();
+        let b = place(&mut tx, pages[2], m, 3.0, 3.0, 0).unwrap();
+        assert!((num(&tx, a, w) - 0.05).abs() < 1e-9, "{}", num(&tx, a, w));
+        assert!((num(&tx, b, w) - 1.0).abs() < 1e-9, "{}", num(&tx, b, w));
+        // the pin stays where the shape was dropped
+        let px = tx.single("PinX");
+        assert_eq!(num(&tx, a, px), 3.0);
+        tx.commit();
+    }
+
+    // (JD15, SL-04) the search finds a master by its QuickInfo, in any language
+    #[test]
+    fn search_reads_the_quickinfo() {
+        let mut doc = stencil();
+        let m = doc.masters().nth(1).unwrap();
+        let mut tx = doc.transaction("prompt");
+        let v = tx.intern(&join_fields(&["Ein runder Rahmen", "A round frame", "", "", ""]));
+        tx.set_user(SheetRef::Master(m), JFD_PROMPT, Value::Text(v), Some(Unit::Str)).unwrap();
+        tx.commit();
+        let t = MasterTexts::of(&doc, m);
+        assert!(t.matches(&["rahmen"], false));
+        assert!(t.matches(&["round", "frame"], false));
+        assert!(!t.matches(&["round", "box"], false));
+        assert!(t.matches(&["round", "box"], true));
     }
 
     // (LY-03) a master on the layer "Connector" brings it to the page, once

@@ -12,9 +12,13 @@
 //   dialogs(app, ui)           the dialog, every pass
 //
 // Seite einrichten: Drucken einrichten (paper, orientation, zoom or n x m sheets, margins,
-// centring: the print setup, PR-05), Seitengröße (as the printer's paper, a predefined size or
-// an own one, orientation, PR-06), Zeichnungsmaßstab (none, predefined, own; the page's size in
-// drawing units, PR-07), Seiteneigenschaften (type, name, background page, measuring unit, the
+// centring, since JD15 Gitternetz drucken: the print setup, PR-05), Seitengröße (as the
+// printer's paper, a predefined size -- since JD15 also ISO A0/A6, ISO and JIS B, envelopes,
+// Executive, the US government sizes, ANSI A-E, ARCH A-E, PG-04 -- or an own one, orientation,
+// PR-06), Zeichnungsmaßstab (none, predefined in the groups Metrisch, Maschinenbau and since
+// JD15 Architektur and Bauingenieurwesen with inches per feet, or own; the page's size in
+// drawing units, PR-07, PG-06), Seiteneigenschaften (type, name, background page, measuring
+// unit -- the page's own, since JD15 also km, yd, mi, Pica, Cicero, Didot, PR-08, PG-07 --, the
 // shadow direction shown, PR-08), Layout und Routing (the page's routing cells, PR-09 and
 // PG-11; layout_ui.rs since JD10, its own undo step).  OK writes what changed of the page registers into
 // the page as one undo step of the editing layer (edit_doc::edit, JD7): Strg+Z takes it back,
@@ -292,7 +296,12 @@ fn preview(app: &mut Diagrammer, ui: &mut Ui) {
         if app.print.preview.as_ref().is_none_or(|p| p.0 != key) {
             if let Some((vk, tl)) = page_tiling(app, page) {
                 let gray = app.print.setup.gray;
-                if let Some(sf) = print_layout::render_sheet(&mut app.print.views[vk].3, &tl, k, dpi, None, gray) {
+                // (JD15, PR-05) the grid's lines when they print
+                let grid = match app.opened.as_ref() {
+                    Some(o) if app.print.setup.grid => print_layout::grid_step(&o.doc, page),
+                    _ => 0.0,
+                };
+                if let Some(sf) = print_layout::render_sheet(&mut app.print.views[vk].3, &tl, k, dpi, None, gray, grid) {
                     app.print.ver = app.print.ver.wrapping_add(1);
                     app.print.preview = Some((key, Rc::new(sf)));
                 }
@@ -380,11 +389,13 @@ struct PageEdit {
     name: String,
     background: i32,
     unit: i32,
+    /// (JD15, PR-08) the unit the page had when the dialog opened
+    unit0: i32,
 }
 
 /// predefined page sizes (mm, portrait)
 // i18n
-static SIZES: [(&str, f64, f64); 8] = [
+static SIZES: [(&str, f64, f64); 34] = [
     ("A4: 210 × 297 mm", 210.0, 297.0),
     ("A3: 297 × 420 mm", 297.0, 420.0),
     ("A5: 148 × 210 mm", 148.0, 210.0),
@@ -393,28 +404,101 @@ static SIZES: [(&str, f64, f64); 8] = [
     ("Letter: 8,5 × 11 in", 215.9, 279.4),
     ("Legal: 8,5 × 14 in", 215.9, 355.6),
     ("Tabloid: 11 × 17 in", 279.4, 431.8),
+    // (JD15, PG-04) ISO A0 and A6, ISO B, JIS B, the envelopes, the US sizes, ANSI and ARCH
+    ("A0: 841 × 1189 mm", 841.0, 1189.0),
+    ("A6: 105 × 148 mm", 105.0, 148.0),
+    ("B3 (ISO): 353 × 500 mm", 353.0, 500.0),
+    ("B4 (ISO): 250 × 353 mm", 250.0, 353.0),
+    ("B5 (ISO): 176 × 250 mm", 176.0, 250.0),
+    ("B4 (JIS): 257 × 364 mm", 257.0, 364.0),
+    ("B5 (JIS): 182 × 257 mm", 182.0, 257.0),
+    ("Umschlag C4: 229 × 324 mm", 229.0, 324.0),
+    ("Umschlag C5: 162 × 229 mm", 162.0, 229.0),
+    ("Umschlag C6: 114 × 162 mm", 114.0, 162.0),
+    ("Umschlag DL: 110 × 220 mm", 110.0, 220.0),
+    ("Umschlag #10: 4,125 × 9,5 in", 104.775, 241.3),
+    ("Umschlag Monarch: 3,875 × 7,5 in", 98.425, 190.5),
+    ("Executive: 7,25 × 10,5 in", 184.15, 266.7),
+    ("Government Letter: 8 × 10,5 in", 203.2, 266.7),
+    ("Government Legal: 8,5 × 13 in", 215.9, 330.2),
+    // (ANSI A and B have the sizes of Letter and Tabloid: an open page shows those)
+    ("ANSI A: 8,5 × 11 in", 215.9, 279.4),
+    ("ANSI B: 11 × 17 in", 279.4, 431.8),
+    ("ANSI C: 17 × 22 in", 431.8, 558.8),
+    ("ANSI D: 22 × 34 in", 558.8, 863.6),
+    ("ANSI E: 34 × 44 in", 863.6, 1117.6),
+    ("ARCH A: 9 × 12 in", 228.6, 304.8),
+    ("ARCH B: 12 × 18 in", 304.8, 457.2),
+    ("ARCH C: 18 × 24 in", 457.2, 609.6),
+    ("ARCH D: 24 × 36 in", 609.6, 914.4),
+    ("ARCH E: 36 × 48 in", 914.4, 1219.2),
 ];
 
-/// predefined scales: name, page units per drawing unit
+/// predefined scales: name, page units per drawing unit, (JD15, PG-06) for the US groups the
+/// page length in inches and the drawing length in feet Visio writes (PageScale, DrawingScale)
 // i18n
-static SCALES: [(&str, f64); 12] = [
-    ("Metrisch 1:2", 0.5),
-    ("Metrisch 1:5", 0.2),
-    ("Metrisch 1:10", 0.1),
-    ("Metrisch 1:20", 0.05),
-    ("Metrisch 1:50", 0.02),
-    ("Metrisch 1:100", 0.01),
-    ("Metrisch 1:200", 0.005),
-    ("Metrisch 1:500", 0.002),
-    ("Metrisch 1:1000", 0.001),
-    ("Maschinenbau 2:1", 2.0),
-    ("Maschinenbau 5:1", 5.0),
-    ("Maschinenbau 10:1", 10.0),
+static SCALES: [(&str, f64, Option<(f64, f64)>); 26] = [
+    ("Metrisch 1:2", 0.5, None),
+    ("Metrisch 1:5", 0.2, None),
+    ("Metrisch 1:10", 0.1, None),
+    ("Metrisch 1:20", 0.05, None),
+    ("Metrisch 1:50", 0.02, None),
+    ("Metrisch 1:100", 0.01, None),
+    ("Metrisch 1:200", 0.005, None),
+    ("Metrisch 1:500", 0.002, None),
+    ("Metrisch 1:1000", 0.001, None),
+    ("Maschinenbau 2:1", 2.0, None),
+    ("Maschinenbau 5:1", 5.0, None),
+    ("Maschinenbau 10:1", 10.0, None),
+    // (JD15, PG-06, PR-07) Architektur and Bauingenieurwesen: inches on the page per feet
+    ("Architektur 1/16″ = 1′ 0″", 1.0 / 192.0, Some((0.0625, 1.0))),
+    ("Architektur 1/8″ = 1′ 0″", 1.0 / 96.0, Some((0.125, 1.0))),
+    ("Architektur 1/4″ = 1′ 0″", 1.0 / 48.0, Some((0.25, 1.0))),
+    ("Architektur 3/8″ = 1′ 0″", 1.0 / 32.0, Some((0.375, 1.0))),
+    ("Architektur 1/2″ = 1′ 0″", 1.0 / 24.0, Some((0.5, 1.0))),
+    ("Architektur 3/4″ = 1′ 0″", 1.0 / 16.0, Some((0.75, 1.0))),
+    ("Architektur 1″ = 1′ 0″", 1.0 / 12.0, Some((1.0, 1.0))),
+    ("Architektur 3″ = 1′ 0″", 0.25, Some((3.0, 1.0))),
+    ("Bauingenieurwesen 1″ = 10′ 0″", 1.0 / 120.0, Some((1.0, 10.0))),
+    ("Bauingenieurwesen 1″ = 20′ 0″", 1.0 / 240.0, Some((1.0, 20.0))),
+    ("Bauingenieurwesen 1″ = 30′ 0″", 1.0 / 360.0, Some((1.0, 30.0))),
+    ("Bauingenieurwesen 1″ = 40′ 0″", 1.0 / 480.0, Some((1.0, 40.0))),
+    ("Bauingenieurwesen 1″ = 50′ 0″", 1.0 / 600.0, Some((1.0, 50.0))),
+    ("Bauingenieurwesen 1″ = 100′ 0″", 1.0 / 1200.0, Some((1.0, 100.0))),
 ];
 
 /// the measuring units on offer
 // i18n
-static UNITS: [(&str, Unit); 6] = [("Millimeter", Unit::Millimeters), ("Zentimeter", Unit::Centimeters), ("Meter", Unit::Meters), ("Zoll", Unit::Inches), ("Fuß", Unit::Feet), ("Punkt", Unit::Points)];
+static UNITS: [(&str, Unit); 12] = [
+    ("Millimeter", Unit::Millimeters),
+    ("Zentimeter", Unit::Centimeters),
+    ("Meter", Unit::Meters),
+    ("Zoll", Unit::Inches),
+    ("Fuß", Unit::Feet),
+    ("Punkt", Unit::Points),
+    // (JD15, PG-07)
+    ("Kilometer", Unit::Kilometers),
+    ("Yard", Unit::Yards),
+    ("Meilen", Unit::Miles),
+    ("Pica", Unit::Picas),
+    ("Cicero", Unit::Ciceros),
+    ("Didot", Unit::Didots),
+];
+
+/// (JD15, PR-08) the index in UNITS of a page's unit (the unit of PageWidth; the forms with
+/// fractions as their unit; else millimetres, or inches for a US unit)
+fn unit_index(u: Option<Unit>) -> i32 {
+    let u = match u {
+        Some(Unit::InchesFrac) => Unit::Inches,
+        Some(Unit::FeetInches) => Unit::Feet,
+        Some(Unit::MilesFrac) => Unit::Miles,
+        Some(Unit::PicasPoints) => Unit::Picas,
+        Some(Unit::CicerosDidots) => Unit::Ciceros,
+        Some(u) => u,
+        None => Unit::Millimeters,
+    };
+    UNITS.iter().position(|x| x.1 == u).map_or(if matches!(u, Unit::NauticalMiles) { 8 } else { 0 }, |k| k as i32)
+}
 
 /// open Seite einrichten on register `tab`
 pub(crate) fn open_setup(app: &mut Diagrammer, ui: &mut Ui, tab: i32) {
@@ -439,7 +523,9 @@ pub(crate) fn open_setup(app: &mut Diagrammer, ui: &mut Ui, tab: i32) {
     let (w, h) = (num("PageWidth").unwrap_or(8.5) * ps / ds, num("PageHeight").unwrap_or(11.0) * ps / ds);
     let mm = |v: f64| v * 25.4;
     let ratio = ps / ds;
-    let scale_pick = SCALES.iter().position(|(_, r)| (r - ratio).abs() < 1e-9);
+    let scale_pick = SCALES.iter().position(|(_, r, _)| (r - ratio).abs() < 1e-9);
+    // (JD15, PR-08) the page's measuring unit: the unit of PageWidth
+    let unit = doc.sym("PageWidth").map_or(0, |c| unit_index(doc.resolve(SheetRef::Page(page), &CellAddr::single(c)).unit()));
     let pg = doc.page(page);
     let name = pg.and_then(|p| p.header.name.or(p.header.name_u)).map(|n| String::from(doc.str(n))).unwrap_or_default();
     let backs = background_pages(app, page);
@@ -463,7 +549,8 @@ pub(crate) fn open_setup(app: &mut Diagrammer, ui: &mut Ui, tab: i32) {
         scale_own: [1.0, 1.0 / ratio],
         name,
         background,
-        unit: 0,
+        unit,
+        unit0: unit,
     });
     crate::layout_ui::load(app, page);
     app.print.tab = tab;
@@ -500,7 +587,8 @@ pub(crate) fn dialogs(app: &mut Diagrammer, ui: &mut Ui) {
     let regs = [t("Drucken einrichten"), t("Seitengröße"), t("Zeichnungsmaßstab"), t("Seiteneigenschaften"), t("Layout und Routing")];
     ui.next_size(500, 0);
     ui.tabs(ID_DLG + 1, &mut app.print.tab, &regs);
-    ui.next_size(500, 300);
+    // (JD15) 340 high: Layout und Routing has the placement's rows too
+    ui.next_size(500, 340);
     ui.box_begin(ID_DLG + 2, BOX_V, 8);
     match app.print.tab {
         0 => tab_print(app, ui, &mut e),
@@ -574,6 +662,10 @@ fn tab_print(_app: &mut Diagrammer, ui: &mut Ui, e: &mut PageEdit) {
     ui.checkbox(ID_DLG + 23, t("Vertikal zentrieren"), &mut e.center[1]);
     e.setup.center = [e.center[0] != 0, e.center[1] != 0];
     ui.box_end();
+    // (JD15, PR-05) the grid's lines under the page
+    let mut grid = e.setup.grid as i32;
+    ui.checkbox(ID_DLG + 24, t("Gitternetz drucken"), &mut grid);
+    e.setup.grid = grid != 0;
 }
 
 fn tab_size(app: &mut Diagrammer, ui: &mut Ui, e: &mut PageEdit) {
@@ -582,7 +674,7 @@ fn tab_size(app: &mut Diagrammer, ui: &mut Ui, e: &mut PageEdit) {
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.radio(ID_DLG + 31, t("Vordefinierte Größe"), &mut e.size_mode, 1);
     let names: Vec<&str> = SIZES.iter().map(|s| t(s.0)).collect();
-    ui.next_size(220, 0);
+    ui.next_size(260, 0);
     ui.next_flags(if e.size_mode == 1 { 0 } else { ST_DISABLED });
     ui.combobox(ID_DLG + 32, &mut e.size_pick, &names);
     ui.box_end();
@@ -640,7 +732,7 @@ fn tab_scale(_app: &mut Diagrammer, ui: &mut Ui, e: &mut PageEdit) {
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.radio(ID_DLG + 41, t("Vordefinierter Maßstab"), &mut e.scale_mode, 1);
     let names: Vec<&str> = SCALES.iter().map(|s| t(s.0)).collect();
-    ui.next_size(200, 0);
+    ui.next_size(260, 0);
     ui.next_flags(if e.scale_mode == 1 { 0 } else { ST_DISABLED });
     ui.combobox(ID_DLG + 42, &mut e.scale_pick, &names);
     ui.box_end();
@@ -744,7 +836,9 @@ fn apply(app: &mut Diagrammer, ui: &mut Ui, e: &PageEdit) {
         let ds = num("DrawingScale").filter(|v| *v > 0.0).unwrap_or(1.0);
         (num("PageWidth").unwrap_or(8.5) * ps / ds * 25.4, num("PageHeight").unwrap_or(11.0) * ps / ds * 25.4, ps / ds)
     };
-    let resize = (w - w0).abs() > 0.05 || (h - h0).abs() > 0.05 || (r - r0).abs() > 1e-9 || e.unit != 0;
+    let resize = (w - w0).abs() > 0.05 || (h - h0).abs() > 0.05 || (r - r0).abs() > 1e-9 || e.unit != e.unit0;
+    // (JD15, PG-06) a scale of the US groups: inches on the page, feet in the drawing
+    let us_scale = if e.scale_mode == 1 { SCALES[e.scale_pick.clamp(0, SCALES.len() as i32 - 1) as usize].2 } else { None };
     let old_bg = o.doc.background_of(page);
     let want_bg = if e.background > 0 { backs.get(e.background as usize - 1).map(|b| b.0) } else { None };
     let name_now = o.doc.page(page).and_then(|p| p.header.name.or(p.header.name_u)).map(|n| String::from(o.doc.str(n))).unwrap_or_default();
@@ -765,8 +859,13 @@ fn apply(app: &mut Diagrammer, ui: &mut Ui, e: &PageEdit) {
             tx.set_length(sheet, &pw, to_unit(w / 25.4 / r), unit)?;
             tx.set_length(sheet, &ph, to_unit(h / 25.4 / r), unit)?;
             // PageScale / DrawingScale = r: one page unit stands for 1 / r drawing units
-            tx.set_length(sheet, &pscale, to_unit(1.0), unit)?;
-            tx.set_length(sheet, &dscale, to_unit(1.0 / r), unit)?;
+            if let Some((page_in, drawing_ft)) = us_scale {
+                tx.set_length(sheet, &pscale, page_in, Unit::Inches)?;
+                tx.set_length(sheet, &dscale, drawing_ft, Unit::Feet)?;
+            } else {
+                tx.set_length(sheet, &pscale, to_unit(1.0), unit)?;
+                tx.set_length(sheet, &dscale, to_unit(1.0 / r), unit)?;
+            }
         }
         if rename {
             // (JD8 rest: pages) Name and NameU, marked as own names (pages.rs)

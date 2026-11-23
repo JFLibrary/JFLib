@@ -241,7 +241,14 @@ pub(crate) fn call(ev: &mut Ev, f: Func, start: u32, n: u32, sheet: u32) -> R {
             let pos = list.split(delim.as_str()).position(|s| s.eq_ignore_ascii_case(&key));
             Ok(Val::Num(pos.map_or(-1.0, |p| p as f64)))
         }
-        Rand => Err(ev.keep(Keep::NotComputed("RAND"))),
+        // (JD15, FX-06) 0 <= x < 1 from the engine's generator, anew each time the cell is
+        // computed
+        Rand => {
+            if n != 0 {
+                return Err(CellError::Value);
+            }
+            Ok(Val::Num(ev.run.random()))
+        }
 
         // ---- geometry
         Pnt | PntX | PntY | Par | Loc | Nurbs | Polyline | Bound | AngleToLoc | AngleToPar | LocToLoc | LocToPar => {
