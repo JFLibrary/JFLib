@@ -105,9 +105,9 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
-  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
+  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/data.rs](#diagram_iosrcdatars) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/textdraw.rs](#diagram_iosrctextdrawrs) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
@@ -126,6 +126,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/csg.rs](#geomsrccsgrs) · [src/exact.rs](#geomsrcexactrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
 - [netchan](#netchan) -- Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network
   <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
+- [sheet_io](#sheet_io) -- XLSX and CSV import: workbooks and delimited text as typed tables
+  <br>[lib.rs](#sheet_io-crate-root) · [src/csv.rs](#sheet_iosrccsvrs) · [src/xlsx.rs](#sheet_iosrcxlsxrs)
 
 ## ui
 
@@ -54947,6 +54949,9 @@ a file loses nothing, and the behaviour Visio files carry works without translat
                                 orientation, sizes, fit to the drawing, automatic size in
                                 tiles of the printed sheet; Transaction::add_page_like and
                                 duplicate_page insert pages with settings or content
+  data::*                       (JD18) external data: connections, recordsets with their
+                                cached rows, rows bound to shapes (Prop rows, DataLinked),
+                                refresh with conflicts, automatic linking (DA-04, DA-05)
   field::*                      (JD8) text fields: a Field row's value in its format picture,
                                 new fields, the text with its fields, the document's
                                 properties (Document::fields: the app's locale and clock)
@@ -55058,6 +55063,336 @@ strings, NURBS(...) and POLYLINE(...) results, "1.#INF".
   a constant: the value is the formula
 - **`fn has_own_formula(&self) -> bool`**
   whether the cell keeps its own formula (not F="Inh")
+
+### `diagram_core/src/data.rs`
+
+Source: [`lib/diagram_core/src/data.rs`](../lib/diagram_core/src/data.rs)
+
+```text
+data -- (JD18) external data in a document: connections, recordsets with their rows, rows
+linked to shapes (DA-04, DA-05, DF-12)
+
+  doc.data: DataSets              connections, recordsets (Document::data; diagram_io reads and
+                                  writes them as Visio's connections.xml, recordsets.xml and one
+                                  recordset part per recordset)
+  Recordset                       columns, the key (or the row order), the cached rows (shown
+                                  without file or network access), the links row -> shape,
+                                  refresh settings and conflicts as Visio keeps them
+  Recordset::from_table(..)       a new recordset from columns and rows (types guessed per column)
+  doc.data_link(shape, rs)        the row a shape is linked to; doc.data_links(shape) all of them
+  rs.shapes_of(row)               the shapes linked to a row (page ID, shape ID)
+
+  Transactions (undo like every edit; they return the Value cells written, for the formula
+  engine's recalc_cells):
+  add_recordset(tx, conn, rs)     -> the recordset's ID (IDs and a unique name handed out)
+  remove_recordset(tx, id)        the recordset, its links, its connection when no other uses it
+  set_recordset(tx, rs)           replace one (column settings, refresh interval, name ...)
+  link(tx, shape, rs, row)        bind a row to a shape: one Property row per column (Label,
+                                  Type, Value, DataLinked = 1); a shape has at most one row of
+                                  a recordset, an earlier one is replaced
+  unlink(tx, shape, rs)           the binding goes, the shape data stays with its last values
+  auto_link(tx, shapes, rs, pairs, replace)   AS-04: a column against a shape field (text,
+                                  name or a shape data field) -> the rows bound where they match
+  refresh(tx, rs, columns, rows, now)   DA-05: new data for a recordset: rows matched by key
+                                  (or by order), linked shapes updated, conflicts reported
+  user_edited(tx, sheet, name)    a user's change of a linked value: DataLinked = 0, so a
+                                  refresh keeps it (unless the recordset overwrites all)
+  resolve_*                       what the user decides about a conflict
+
+Visio's rules (MS-VSDX 2.2.10.2, 2.3.4.2.39): a column maps to the shape data rows whose name
+(N) equals the column's Name; a RowMap binds a row (RowID) to a shape (PageID, ShapeID);
+with PrimaryKey elements the key columns identify a row across refreshes, without them
+(RowOrder = 1) its position does; RefreshOverwriteAll = 0 updates only the Value cells whose
+row has DataLinked = 1.  Row IDs start at 1 in the order of the source (Visio's DataAsXML).
+Visio's codes stay as they are in the model: Type and DataType 0 text, 1 fixed list,
+2 number, 3 Boolean, 4 variable list, 5 date, 6 duration, 7 currency.
+```
+
+- **`struct DataSets`**
+  the document's external data: Visio's DataConnections and DataRecordSets
+  - `connections: Vec<Connection>` -- the connections (an Excel workbook, a text file ...)
+  - `next_connection: u32` -- NextID of DataConnections
+  - `recordsets: Vec<Recordset>` -- the recordsets in file order (the External Data pane's tabs)
+  - `next_recordset: u32` -- NextID of DataRecordSets
+  - `active: Option<u32>` -- ActiveRecordsetID: the tab shown
+  - `window_order: Option<String>` -- DataWindowOrder as written
+  - `connections_attrs: Vec<(String, String)>` -- unknown attributes of DataConnections
+  - `recordsets_attrs: Vec<(String, String)>` -- unknown attributes of DataRecordSets
+
+- **`struct Connection`**
+  a data connection (DataConnection)
+  - `id: u32` -- ID, unique among the connections
+  - `file_name: String` -- FileName: an .odc or data source file ("" when the connection string says it all)
+  - `connection_string: Option<String>` -- ConnectionString (an OLE DB / ODBC string; see excel_connection, text_connection)
+  - `command: Option<String>` -- Command: the query
+  - `friendly_name: Option<String>` -- FriendlyName
+  - `timeout: Option<u32>` -- Timeout
+  - `always_use_file: Option<bool>` -- AlwaysUseConnectionFile
+  - `attrs: Vec<(String, String)>` -- unknown attributes as read
+
+- **`struct Column`**
+  a column of a recordset (DataColumn)
+  - `id: String` -- ColumnNameID: the column's name in the source, unique in the recordset
+  - `name: String` -- Name: the name of the shape data rows (Prop.&lt;Name>) the column maps to, unique
+  - `label: String` -- Label: what the user sees (the shape data label; renaming a column changes it)
+  - `orig_label: Option<String>` -- OrigLabel
+  - `lang: Option<u32>` -- LangID
+  - `calendar: Option<u16>` -- Calendar
+  - `data_type: u16` -- DataType (kind::\*)
+  - `unit_type: Option<String>` -- UnitType
+  - `currency: Option<u16>` -- Currency
+  - `degree: Option<u32>` -- Degree
+  - `display_width: Option<u32>` -- DisplayWidth
+  - `display_order: Option<u32>` -- DisplayOrder
+  - `mapped: Option<bool>` -- Mapped
+  - `hyperlink: Option<bool>` -- Hyperlink
+  - `attrs: Vec<(String, String)>` -- unknown attributes as read
+
+- **`enum DataValue`**
+  a cell of a recordset's row
+  - `Empty` -- no value
+  - `Text(String)` -- text
+  - `Num(f64)` -- a number
+  - `Bool(bool)` -- a truth value
+  - `Date(f64)` -- a date: days since 30 December 1899 (the fraction is the time of day)
+  - `Currency(f64)` -- an amount of money
+
+**`impl DataValue`**
+
+- **`fn text(&self) -> String`**
+  the value as the External Data pane shows it and as keys and matching compare it:
+  numbers in their shortest form, dates "2026-11-23" (with " 14:05:00" when there is a
+  time), TRUE / FALSE
+- **`fn kind(&self) -> u16`**
+  the data type a value of this kind has (kind::\*)
+
+- **`struct DataRow`**
+  a row of a recordset with its Visio row ID
+  - `id: u32` -- the row ID (from 1; stays the same across refreshes while the key matches)
+  - `values: Vec<DataValue>` -- one value per column, in the order of Recordset::columns
+
+- **`struct RowLink`**
+  a row bound to a shape (RowMap; RefreshConflict has the same three numbers)
+  - `row: u32` -- RowID
+  - `page: u32` -- PageID: the ID of the shape's page
+  - `shape: u32` -- ShapeID: the shape's ID on that page
+
+- **`struct Key`**
+  a key column with the key value of every row (PrimaryKey with its RowKeyValue elements)
+  - `column: String` -- ColumnNameID of the key column
+  - `values: Arc<Vec<(u32, String)>>` -- (RowID, value) per row
+
+- **`struct AutoLink`**
+  AutoLinkComparison as read (which column was compared with which shape field)
+  - `column: String` -- ColumnName
+  - `context: u32` -- ContextType
+  - `label: Option<String>` -- ContextTypeLabel
+
+- **`struct Recordset`**
+  a recordset (DataRecordSet): what a source delivered and how its rows are bound to shapes
+  - `id: u32` -- ID, unique among the recordsets
+  - `connection: Option<u32>` -- ConnectionID (None: data without connection, e.g. pasted XML)
+  - `command: Option<String>` -- Command: the query
+  - `options: Option<u32>` -- Options (bit 1: no refresh)
+  - `time_refreshed: Option<String>` -- TimeRefreshed as written ("2026-11-23T14:05:00")
+  - `next_row: u32` -- NextRowID: the next free row ID
+  - `name: String` -- Name: the tab's name in the External Data pane
+  - `row_order: bool` -- RowOrder: without key columns the position identifies a row
+  - `overwrite_all: bool` -- RefreshOverwriteAll: a refresh overwrites values the user changed too
+  - `no_reconcile_ui: Option<bool>` -- RefreshNoReconciliationUI
+  - `refresh_interval: u32` -- RefreshInterval in minutes (0: none)
+  - `replace_links: Option<u32>` -- ReplaceLinks
+  - `checksum: Option<u32>` -- Checksum
+  - `columns: Vec<Column>` -- DataColumns: the columns
+  - `sort_column: Option<String>` -- SortColumn of DataColumns
+  - `sort_asc: Option<bool>` -- SortAsc of DataColumns
+  - `key: Vec<Key>` -- the key columns with their values (empty: the row order identifies rows)
+  - `links: Vec<RowLink>` -- RowMap: rows bound to shapes
+  - `conflicts: Vec<RowLink>` -- RefreshConflict: bound shapes whose row was not found at the last refresh
+  - `auto_link: Vec<AutoLink>` -- AutoLinkComparison as read
+  - `rows: Arc<Vec<DataRow>>` -- the cached rows (the recordset part); shared so that an undo step is cheap
+  - `raw: Option<Arc<Vec<u8>>>` -- the recordset part as read when it could not be understood: written back unchanged
+  - `attrs: Vec<(String, String)>` -- unknown attributes as read
+
+**`impl Recordset`**
+
+- **`fn from_table(name: &str, headers: &[String], rows: Vec<Vec<DataValue>>, key: &[String]) -> Recordset`**
+  a new recordset from a table: one column per header (types guessed from the values),
+  row IDs from 1; `key`: the source names of the key columns (empty: the row order).
+  IDs and the name are handed out by add_recordset.
+- **`fn column_by_id(&self, id: &str) -> Option<usize>`**
+  the column with this source name (ColumnNameID)
+- **`fn column_by_name(&self, name: &str) -> Option<usize>`**
+  the column with this shape data name (Name)
+- **`fn row(&self, id: u32) -> Option<&DataRow>`**
+  a row by ID
+- **`fn shapes_of(&self, row: u32) -> impl Iterator<Item = (u32, u32)> + '_`**
+  the shapes a row is bound to: (page ID, shape ID)
+- **`fn row_of(&self, page: u32, shape: u32) -> Option<u32>`**
+  the row a shape is bound to
+- **`fn no_refresh(&self) -> bool`**
+  whether refreshing is switched off for it (Options bit 1)
+- **`fn key_of(&self, row: &DataRow) -> String`**
+  a row's key as text (the key columns' values joined by TAB; the row ID without key)
+- **`fn update_key_values(&mut self)`**
+  recompute the RowKeyValue lists from the rows (after a change of rows or key columns)
+
+- **`fn guess_kind<'a>(values: impl Iterator<Item = &'a DataValue>) -> u16`**
+  the data type of a column from its values: number, date, Boolean or currency when every
+  non-empty value is one, else text
+
+- **`enum ExcelTable`**
+  what an Excel connection reads: the table name of the OLE DB provider ("Tabelle1$" a sheet,
+  "Tabelle1$A1:C9" a range of a sheet, "Geräte" a named range)
+  - `Sheet(String)` -- a whole sheet (its used range)
+  - `Range(String, String)` -- a range of a sheet ("A1:C9")
+  - `Name(String)` -- a named range of the workbook
+
+**`impl ExcelTable`**
+
+- **`fn ole(&self) -> String`**
+  the provider's table name: "Tabelle1$", "Tabelle1$A1:C9", "Geräte"
+- **`fn parse(table: &str) -> ExcelTable`**
+  a provider's table name back (quotes around a sheet name removed)
+
+- **`enum Source`**
+  what a connection reads, as far as JFDiagrammer can read it itself
+  - `Excel { path: String, table: ExcelTable, header: bool }` -- an Excel workbook: its path, the sheet, range or named range, whether the first row
+    holds the column names
+  - `Text { path: String, header: bool }` -- a text file (CSV): its path, whether the first row holds the column names
+  - `Other` -- anything else (a database, a SharePoint list): shown from the cache, not refreshed
+
+- **`fn excel_connection(path: &str, table: &ExcelTable, header: bool) -> (String, String)`**
+  the connection string and command Visio writes for an Excel workbook (the ACE OLE DB
+  provider, as Visio's data selector does; Visio refreshes through it)
+
+- **`fn text_connection(path: &str, header: bool) -> (String, String)`**
+  the connection string and command for a text file (the ACE text driver; Visio's "Other OLE
+  DB" path): the folder is the data source, the file the table
+
+- **`fn source_of(data: &DataSets, rs: &Recordset) -> Source`**
+  what a recordset's connection reads (Source::Other when it is not a workbook or text file
+  JFDiagrammer can open)
+
+**`impl Document`**
+
+- **`fn data_ids(&self, shape: ShapeRef) -> Option<(u32, u32)>`**
+  the page ID and shape ID of a shape on a page (None for master shapes)
+- **`fn data_shape(&self, page: u32, shape: u32) -> Option<ShapeRef>`**
+  the shape with this page ID and shape ID
+- **`fn data_link(&self, shape: ShapeRef, rs: u32) -> Option<u32>`**
+  the row of recordset `rs` a shape is bound to
+- **`fn data_links(&self, shape: ShapeRef) -> Vec<(u32, u32)>`**
+  every binding of a shape: (recordset ID, row ID)
+- **`fn recordset(&self, id: u32) -> Option<&Recordset>`**
+  a recordset by ID
+
+- **`type Written = (SheetRef, CellAddr)`**
+  a Value cell a data edit wrote (for Engine::recalc_cells)
+
+- **`fn add_recordset(tx: &mut Transaction, conn: Option<Connection>, mut rs: Recordset) -> Result<u32, EditError>`**
+  add a recordset (and its connection, if any) -> the recordset's ID.  The connection gets the
+  next connection ID, the recordset the next recordset ID and a name no other has
+  ("Daten", "Daten (2)" ...); it becomes the active one.
+
+- **`fn remove_recordset(tx: &mut Transaction, id: u32) -> Result<(), EditError>`**
+  remove a recordset with its links (the shape data stays); its connection goes too when no
+  other recordset uses it
+
+- **`fn set_recordset(tx: &mut Transaction, rs: Recordset) -> Result<(), EditError>`**
+  replace a recordset (same ID): its name, columns' labels and types, refresh settings ...
+
+- **`fn set_connection(tx: &mut Transaction, conn: Connection) -> Result<(), EditError>`**
+  replace a connection (same ID)
+
+- **`fn set_active(tx: &mut Transaction, id: u32) -> Result<(), EditError>`**
+  make a recordset the active one (the tab the External Data pane shows)
+
+```rust
+/// the Property cell that says a value comes from linked data (1) or was changed by the user (0)
+DATA_LINKED: &str = "DataLinked"
+```
+
+- **`fn link(tx: &mut Transaction, shape: ShapeRef, rs: u32, row: u32) -> Result<Vec<Written>, EditError>`**
+  bind a row to a shape on a page: the shape's earlier row of this recordset is replaced, one
+  shape data row per column gets the row's value -> the Value cells written
+
+- **`fn unlink(tx: &mut Transaction, shape: ShapeRef, rs: Option<u32>) -> Result<(), EditError>`**
+  remove a shape's binding to recordset `rs` (None: to every recordset); the shape data
+  stays with its last values, marked as no longer linked
+
+- **`fn user_edited(tx: &mut Transaction, sheet: SheetRef, name: &str) -> Result<(), EditError>`**
+  a user changed the value of shape data field `name` (the Shape Data pane, a dialog): when
+  it came from linked data, it is marked as the user's (DataLinked = 0), so that a refresh
+  keeps it and reports it as a conflict instead
+
+- **`enum ShapeField`**
+  the shape field a column is compared with by auto_link
+  - `Text` -- the shape's text
+  - `Name` -- the shape's name (Name, else NameU)
+  - `Data(String)` -- a shape data field by row name (Prop.&lt;name>)
+
+- **`fn shape_field(doc: &Document, shape: ShapeRef, field: &ShapeField) -> Option<String>`**
+  what a shape shows for a field (None: the shape has no such field)
+
+- **`fn auto_link(tx: &mut Transaction, shapes: &[ShapeRef], rs: u32, pairs: &[(usize, ShapeField)], replace: bool) -> Result<(Vec<(ShapeRef, u32)>, Vec<Written>), EditError>`**
+  AS-04: bind rows to shapes where a column's value equals a shape field (all pairs must
+  match; compared as text, trimmed, ignoring case); shapes already bound to the recordset
+  keep their row unless `replace` -> the bindings made (shape, row) and the Value cells
+
+- **`enum Conflict`**
+  a conflict a refresh found
+  - `RowGone { row: u32, shape: ShapeRef }` -- the row a shape is bound to is gone from the source (the binding stays until the user
+    decides: resolve_unlink or delete the shape)
+  - `DuplicateKey { key: String, rows: u32 }` -- several new rows have the key of one bound row; the first one was taken
+  - `UserValue { shape: ShapeRef, column: String, user: String, data: DataValue }` -- the user changed a linked value and the source changed it too; the user's value stayed
+
+- **`struct Refreshed`**
+  what refresh did
+  - `added: usize` -- rows that are new
+  - `changed: usize` -- rows whose values changed
+  - `removed: usize` -- rows that are gone
+  - `shapes: usize` -- shapes whose data was updated
+  - `conflicts: Vec<Conflict>` -- what needs the user
+  - `written: Vec<Written>` -- the Value cells written
+
+- **`fn refresh(tx: &mut Transaction, rs: u32, headers: &[String], rows: Vec<Vec<DataValue>>, now: &str) -> Result<Refreshed, EditError>`**
+  DA-05: new data for recordset `rs` (the source's columns by name and its rows in source
+  order).  Rows keep their IDs while their key matches (without key: their position); new
+  rows get new IDs; columns keep their Name, label and type when the source still has them,
+  new ones are added.  Every bound shape gets the new values -- a value the user changed
+  (DataLinked = 0) only when the recordset overwrites all, else it stays and is reported.
+  Shapes whose row is gone stay bound and are reported (and kept as RefreshConflict).
+  `now` is the time to note ("2026-11-23T14:05:00").
+
+- **`fn resolve_take_data(tx: &mut Transaction, shape: ShapeRef, rs: u32, column: &str) -> Result<Vec<Written>, EditError>`**
+  a conflict resolved by taking the source's value over the user's (DataLinked = 1 again)
+
+- **`fn resolve_unlink(tx: &mut Transaction, shape: ShapeRef, rs: u32) -> Result<(), EditError>`**
+  a conflict resolved by keeping the shape without its row: the binding goes
+
+**`mod kind`**
+
+Visio's data type codes (a column's DataType, a shape data row's Type)
+
+```rust
+/// text (string)
+TEXT: u16 = 0
+/// fixed list
+FIXED_LIST: u16 = 1
+/// number
+NUMBER: u16 = 2
+/// Boolean
+BOOL: u16 = 3
+/// variable list
+VAR_LIST: u16 = 4
+/// date and time
+DATE: u16 = 5
+/// duration
+DURATION: u16 = 6
+/// currency
+CURRENCY: u16 = 7
+```
 
 ### `diagram_core/src/design/mod.rs`
 
@@ -55567,7 +55902,7 @@ instance "<master's NameU>.<ID>"; without Name it shows its NameU.
 
 - **`struct Part`**
   a package part the model keeps as bytes: media, document properties, windows, comments,
-  data recordsets, the thumbnail, a macro project
+  the thumbnail, a macro project (data recordsets are Document::data since JD18)
   - `name: Sym` -- the part name
   - `content_type: Sym` -- its content type
   - `rel_type: Sym` -- the type of the relationship that points to it
@@ -55598,6 +55933,8 @@ instance "<master's NameU>.<ID>"; without Name it shows its NameU.
   - `faces: Vec<FaceName>` -- the fonts
   - `themes: Vec<Theme>` -- the theme parts (Page::theme indexes them)
   - `parts: Vec<Part>` -- the other package parts, as bytes
+  - `data: crate::data::DataSets` -- (JD18) external data: connections, recordsets, rows bound to shapes (data.rs; changed
+    through data::\* in transactions)
   - `rels: Vec<Relationship>` -- every relationship of the package as read (see Relationship)
   - `attrs: Vec<(Sym, Sym)>` -- the attributes of the VisioDocument element
   - `extras: Extras` -- unknown items of the VisioDocument element (EventList, HeaderFooter, PublishSettings ...
@@ -55962,6 +56299,9 @@ a Del="1" mark; restore_row and restore_section remove it again.
   leading '/' too) is refused (Exists)
 - **`fn remove_part(&mut self, index: usize) -> Result<(), EditError>`**
   remove the part at `index` of Document::parts (shapes that name it show no picture)
+- **`fn set_data(&mut self, data: crate::data::DataSets) -> Result<(), EditError>`**
+  (JD18) replace the document's external data (data.rs builds the new value; one step
+  keeps the old value for undo, the cached rows are shared, not copied)
 - **`fn set_foreign(&mut self, shape: ShapeRef, foreign: Option<ForeignData>) -> Result<(), EditError>`**
   set the picture data of a Foreign shape
 - **`fn add_connect(&mut self, owner: Owner, connect: Connect) -> Result<(), EditError>`**
@@ -59798,8 +60138,9 @@ format follows the public specification [MS-VSDX]; no code of other implementati
                       a .vsdx, .vsdm, .vstx, .vstm, .vssx or .vssm file into a Document:
                       styles, the document sheet, colours and fonts, pages with shapes and
                       connects, masters, themes (raw), windows.xml, properties, media,
-                      comments and data recordsets (kept as parts); unknown items in the
-                      Extras where they stood (DF-03); nothing recomputed or rerouted
+                      comments (kept as parts), data connections and recordsets (JD18:
+                      doc.data, data.rs); unknown items in the Extras where they stood
+                      (DF-03); nothing recomputed or rerouted
   vsdx::write(&doc, &vsdx::WriteOptions::DEFAULT) -> Result<Vec<u8>, vsdx::WriteError>
                       the model as a file of any of the six formats, with everything it does
                       not know where it stood; deterministic, DEFLATE; a file read and written
@@ -59829,6 +60170,13 @@ format follows the public specification [MS-VSDX]; no code of other implementati
   windows::drawing_window(&doc) / set_drawing_window(&mut doc, &w)
                       (JD16) the drawing window of windows.xml: page, zoom, centre, what is
                       shown; vsdx::remove_macros takes a macro project out
+  data::ado(&recordset) -> String
+                      (JD18) a recordset's rows as an ADO persisted recordset (the recordset
+                      parts of a .vsdx; Visio's DataAsXML format)
+  textdraw::parse(text, &opts, &limits) / textdraw::apply(tx, eng, page, &plan, &masters, &b)
+                      (JD18, IM-08) a connected drawing from a text file: Shape and Link
+                      records (Visio's text import) into a plan with problems per line, then
+                      shapes, shape data and glued dynamic connectors, laid out in layers
 
 What is to come here, by stage of the plan:
   JD17  importing the binary .vss
@@ -59884,6 +60232,52 @@ and shows the design NetLab, variant 1 (design::catalog).
 - **`fn new_document(kind: DocKind, measure: Measure) -> Document`**
   a new document of this kind with JFLib's own defaults (see the module comment); a stencil
   has no masters yet, a drawing and a template one empty page
+
+### `diagram_io/src/data.rs`
+
+Source: [`lib/diagram_io/src/data.rs`](../lib/diagram_io/src/data.rs)
+
+```text
+data -- (JD18) the external data parts of a VSDX package and diagram_core's data::DataSets
+(DF-12)
+
+  load(doc, limits)        after reading (vsdx::read): connections.xml, recordsets.xml and the
+                           recordset parts they name become doc.data; the parts and the
+                           relationships from recordsets.xml leave doc.parts / doc.rels.  When
+                           one of them is not understood, all stay parts as before (kept as
+                           bytes, written back unchanged).
+  with_parts(doc)          for writing (vsdx::write): a copy of the document with doc.data as
+                           parts again (None when there is no data: nothing to add)
+  ado(rs) / read_ado(..)   a recordset's rows as an ADO persisted recordset ("ADO classic XML",
+                           what Visio's DataRecordset.DataAsXML gives and AddFromXML takes)
+
+The parts ([MS-VSDX] 2.3.3.2, 2.3.3.10; desktop Visio):
+  /visio/data/connections.xml    DataConnections (NextID) > DataConnection (ID, FileName,
+                                 ConnectionString, Command, FriendlyName, Timeout,
+                                 AlwaysUseConnectionFile); the main part names it
+                                 (…/visio/2010/relationships/connections)
+  /visio/data/recordsets.xml     DataRecordSets (NextID, ActiveRecordsetID, DataWindowOrder)
+                                 > DataRecordSet (attributes in data.rs) > Rel r:id,
+                                 DataColumns > DataColumn, PrimaryKey > RowKeyValue, RowMap,
+                                 RefreshConflict, AutoLinkComparison; named by the main part
+                                 (…/recordsets)
+  /visio/data/recordsetN.xml     one per DataRecordSet, named by its Rel r:id from
+                                 recordsets.xml (…/recordset): the cached rows as an ADO
+                                 persisted recordset: <xml> s:Schema > s:ElementType >
+                                 s:AttributeType (name, rs:name, s:datatype dt:type) and
+                                 rs:data > z:row with one attribute per column
+Row IDs: a Visio_RowID column when the data has one (DataAsXML adds it), else the
+RowKeyValue of the row's key, else the position (from 1).  The data is written without
+Visio_RowID: the key or the position gives the IDs back.
+
+Everything is untrusted: the parts are bounded by the ZIP limits (part size), the XML by the
+reader's depth and attribute limits; nothing recurses.
+```
+
+- **`fn ado(rs: &Recordset) -> String`**
+  a recordset's rows as an ADO persisted recordset (ADO classic XML): one AttributeType per
+  column (c1, c2 ... with rs:name = the column's source name; types from DataType: string,
+  float, boolean, dateTime, currency), rs:data with one z:row per row, empty values left out
 
 ### `diagram_io/src/props.rs`
 
@@ -60242,6 +60636,240 @@ REGISTERS: [&str; 1] = ["cff"]
   make a template a new drawing in language `lang` (an index into instance::LANGS; see the
   module comment)
 
+### `diagram_io/src/textdraw.rs`
+
+Source: [`lib/diagram_io/src/textdraw.rs`](../lib/diagram_io/src/textdraw.rs)
+
+```text
+textdraw -- (JD18, IM-08) a connected drawing from a text file: records of the types "Shape"
+and "Link" (Visio's text import filter; Visio 5.0 user guide, chapter 21, on connected
+drawings from text files) read into a plan, which then becomes shapes and dynamic connectors
+on a page
+
+  parse(text, &Options, &Limits) -> Plan   the records: shapes (ID, master, text, position,
+                      size, shape data), links (ID, master, text, from, to), the master names
+                      they use, the problems with their line numbers; it never fails (a
+                      record it cannot use is a problem and left out)
+  detect_sep(text, fallback)              the field separator the records use
+  layout(&sizes, &edges, gap) -> centres  the automatic arrangement of the shapes without a
+                      position (top to bottom in layers, see below)
+  apply(tx, eng, page, &plan, &masters, &Build) -> Built   the plan on a page inside the
+                      caller's transaction: instances of the chosen masters (else plain
+                      rectangles), text, size, shape data, laid out; the links as dynamic
+                      connectors (or instances of a chosen 1-D master) glued to the whole
+                      shapes and routed.  The caller takes stencil masters into the document
+                      first (instance::import_master) and passes one master (or None) per
+                      Plan::masters entry.
+
+The format as the guide describes it, and what is decided here where it says nothing:
+* One record per line (CR, LF or CR LF ends it); the first field names the record type,
+  "Shape" or "Link" (any case).  Another type is a warning and the line is left out.
+* Fields are separated by a comma (the guide: the default of .csv files), a tab (.txt files)
+  or -- decided here, the CSV of a German Excel -- a semicolon.  The separator is the one an
+  Excel first line "sep=X" names (the line is no record), else the character right after the
+  type word of the first record or field heading (";Shape,ID,..."), else the caller's fallback
+  (the file's extension).
+* A field in double quotes is text as it stands: separators, line breaks (kept as paragraph
+  breaks, '\n') and doubled quotes ("" for ") inside; an unquoted field is trimmed of spaces.
+  A quote left open at the end of the file is an error and its record is left out.
+* A line that starts with a semicolon (spaces before it allowed) is a comment.  Decided here:
+  a comment that lists the field headings of Shape records (";Shape,ID,Master,Text,X,Y,Width,
+  Height,Cost,Owner") names the shape data fields of the records after it by the headings
+  past Height (a heading "Property" names nothing).
+* Shape: ID, Master, Text, X, Y, Width, Height, then shape data fields.  Link: ID, Master,
+  Text, From, To (the IDs of two shapes; further fields are ignored).  Empty fields are
+  allowed (the guide's example leaves Master and the link IDs empty).
+* IDs are compared trimmed and without regard to ASCII case.  A shape without an ID is drawn
+  but cannot be linked (a warning); a second shape with the same ID is an error and left out;
+  a link whose end is missing or names no shape is an error, a link from a shape to itself as
+  well (both left out); two links with the same ID only a warning.
+* Masters are named by the master's name (NameU or the name in any language; the caller maps
+  each name to a master of its stencils or of the document).  An empty master is the default:
+  a plain rectangle for a shape, the dynamic connector for a link.  A chosen master that does
+  not fit (a 1-D master for shapes, a 2-D one for links) is replaced by the default
+  (Built::unfit names it).
+* Numbers (X, Y, Width, Height) are in the unit the caller gives (Options::per_number, drawing
+  inches per number: the guide says nothing about units; the wizard asks), or carry their own
+  unit: "25 mm", "2.5cm", "1 m", "1.5 in", "1.5\"", "2 ft", "36 pt".  A decimal comma is
+  taken when there is no point ("2,5").  X and Y are the middle of the shape (its pin for
+  nearly every master) in page coordinates as Visio has them: from the page's bottom left
+  corner, y up.  A number that does not read, X without Y and the like are warnings: the
+  record is drawn without that value.  Lengths beyond 100 000 inches and sizes <= 0 are
+  refused.  Width and Height replace the master's size (around the same middle).
+* A shape data field "Name=Value" sets field Name (Name: letters, digits, spaces, '_', '-',
+  '.' only, at most 64 characters, else the whole field is the value); otherwise the field's
+  heading names it, else "Property1", "Property2" ... by its place.  An empty field sets
+  nothing.  A value of the form -12 / 12.5 / 12,5 (no leading zeros) becomes a number (Type 2),
+  everything else text.  A field the shape has already (by name or by label, any case) gets
+  the value; otherwise a new Property row (its name made of letters, digits and '_').
+
+The automatic layout (layout()), for the shapes without X and Y: each connected group of shapes
+(the links between them) is laid out in layers from top to bottom -- the guide's example, an
+organisation chart, comes out as its picture shows.  Cycles are broken where a depth-first walk
+meets a shape on its own path; a shape's layer is one below the lowest layer of the shapes
+linking to it (longest path), a shape that no link reaches sits right above its highest
+successor; the order within a layer starts as the file's order, then follows the mean place of
+the neighbours (barycentre sweeps down and up); the x places are where the neighbours want
+them, the overlaps taken out with the least movement (isotonic regression: order kept, the gap
+between neighbours), in alternating passes up and down, so children centre under their parents
+and parents over their children.  The groups (and single shapes) are then packed left to right
+in rows no wider than about 1.5 times the square root of their total area (a grid for shapes
+without links).  The whole block starts at the page's top left corner (Build::margin inside
+it); when it would cover the page's earlier shapes or the shapes placed by X and Y there, it
+starts right of all of them.
+
+Every text is untrusted input: its size, the number of records, of fields per record, of shape
+data fields per shape, the length of each field and of an ID and the number of problems are
+bounded (Limits); the walks of the layout use explicit stacks (no recursion over the file).
+```
+
+- **`struct Options`**
+  how to read the numbers and the fields
+  - `sep: Option<char>` -- the field separator; None: detected (detect_sep), else `fallback_sep`
+  - `fallback_sep: char` -- the separator when none is detected (',' for .csv, '\\t' for .txt)
+  - `per_number: f64` -- drawing inches per number without a unit (1/25.4: the numbers are millimetres)
+
+- **`struct Limits`**
+  the bounds of a text (untrusted input)
+  - `max_bytes: usize` -- the text's size in bytes
+  - `max_records: usize` -- Shape and Link records together
+  - `max_fields: usize` -- fields of one record (more are left out)
+  - `max_field_chars: usize` -- characters of one field (more are cut)
+  - `max_id_chars: usize` -- characters of an ID (a longer one is an error)
+  - `max_props: usize` -- shape data fields of one shape
+  - `max_problems: usize` -- problems kept (then one TooManyProblems)
+
+**`impl Limits`**
+
+- **`const DEFAULT: Limits = Limits { max_bytes: 16 << 20, max_records: 10_000, max_fi ...`**
+  what the app reads: 16 MiB, 10 000 records, 1 000 fields of up to 32 768 characters
+
+- **`struct Prop`**
+  a shape data field of a shape record
+  - `name: String` -- the row's name (Prop.&lt;name>): letters, digits, '_'
+  - `label: String` -- the label as the file names it
+  - `value: String` -- the value as written
+
+- **`struct ShapeRec`**
+  a Shape record
+  - `line: u32` -- the line it starts on (from 1)
+  - `id: String` -- its ID (empty: none, it cannot be linked)
+  - `master: usize` -- index into Plan::masters
+  - `text: String` -- the text ('\\n' between paragraphs)
+  - `pos: Option<[f64; 2]>` -- X and Y: the middle (drawing inches, y up; None: laid out)
+  - `size: [Option<f64>; 2]` -- Width and Height (drawing inches; None: the master's or the default)
+  - `props: Vec<Prop>` -- shape data
+
+- **`struct LinkRec`**
+  a Link record
+  - `line: u32` -- the line it starts on (from 1)
+  - `id: String` -- its ID (may be empty)
+  - `master: usize` -- index into Plan::masters
+  - `text: String` -- the connector's text
+  - `from: usize` -- the shapes it connects (indices into Plan::shapes)
+  - `to: usize`
+
+- **`struct MasterUse`**
+  a master name as the records use it: one entry per name and kind of record
+  - `name: String` -- the name as first written ("" for the default)
+  - `link: bool` -- used by Link records (a 1-D master is wanted), else by Shape records
+  - `count: usize` -- how many records use it
+
+- **`enum NumField`**
+  a number field of a Shape record
+  - `X`
+  - `Y`
+  - `Width`
+  - `Height`
+
+- **`enum Issue`**
+  what is wrong with a record or the text
+  - `TooBig` -- the text is larger than Limits::max_bytes: nothing read
+  - `TooManyRecords` -- more records than Limits::max_records: the rest is left out
+  - `TooManyProblems` -- more problems than Limits::max_problems: the rest is not listed
+  - `UnknownRecord(String)` -- a record type other than Shape and Link (the type as written, cut to 40 characters)
+  - `UnclosedQuote` -- a quote left open at the end of the text
+  - `TooManyFields` -- more fields than Limits::max_fields (the rest left out)
+  - `FieldTooLong` -- a field longer than Limits::max_field_chars (cut)
+  - `IdTooLong` -- an ID longer than Limits::max_id_chars
+  - `NoId` -- a shape without an ID (drawn, but no link can reach it)
+  - `DuplicateId(String)` -- a second shape with this ID
+  - `DuplicateLinkId(String)` -- a second link with this ID (kept)
+  - `NoEnd` -- a link without From or To
+  - `UnknownEnd(String)` -- a link to an ID no shape has
+  - `SelfLink(String)` -- a link from a shape to itself
+  - `BadNumber(NumField, String)` -- a number field that does not read (the field, the text)
+  - `OutOfRange(NumField, String)` -- a number out of range (beyond 100 000 inches, a size &lt;= 0)
+  - `HalfPosition` -- X without Y or Y without X: laid out instead
+  - `TooManyProps` -- more shape data fields than Limits::max_props (the rest left out)
+
+- **`struct Problem`**
+  a problem of the text, at its line
+  - `line: u32` -- the line (from 1; 0: the whole text)
+  - `issue: Issue`
+  - `skipped: bool` -- the record was left out (an error), else only a warning
+
+- **`struct Plan`**
+  what a text says
+  - `sep: char` -- the separator used
+  - `sep_detected: bool` -- it was detected from the records (not the fallback, not given)
+  - `shapes: Vec<ShapeRec>`
+  - `links: Vec<LinkRec>`
+  - `masters: Vec<MasterUse>` -- the master names the records use, shapes' first, each in the order it first appears
+  - `problems: Vec<Problem>`
+  - `comments: usize` -- comment lines
+
+**`impl Plan`**
+
+- **`fn errors(&self) -> usize`**
+  the problems that left a record out
+- **`fn warnings(&self) -> usize`**
+  the problems that did not
+
+- **`fn detect_sep(text: &str, fallback: char) -> (char, bool)`**
+  the separator of the records: Excel's first line "sep=X", else the character right after
+  "Shape" or "Link" in the first record or comment heading that has ',', a tab or ';' there ->
+  (it, detected); else (`fallback`, false)
+
+- **`fn length(s: &str, per_number: f64) -> Option<f64>`**
+  a length "number [unit]" -> drawing inches (`per_number` inches per number without a unit;
+  None: no number, an unknown unit)
+
+- **`fn plain_number(s: &str) -> Option<f64>`**
+  a shape data value that is a number: -12, 12.5, 12,5 (no leading zeros, no exponent, no
+  plus sign: "0049", "+49" and "1e3" stay text)
+
+- **`fn row_name(s: &str) -> String`**
+  a name as a shape data row name: letters, digits and '_', not starting with a digit
+
+- **`fn parse(text: &str, opts: &Options, lim: &Limits) -> Plan`**
+  read a text (see the file header) -> the plan; never fails
+
+- **`fn layout(sizes: &[[f64; 2]], edges: &[(usize, usize)], gap: [f64; 2]) -> Vec<[f64; 2]>`**
+  the arrangement of shapes of `sizes` (width, height) linked by `edges` (from, to; indices into
+  sizes): their middles, x to the right and y down from the block's top left corner (see the
+  file header); `gap`: the space across and down between shapes
+
+- **`struct Build`**
+  how apply builds (lengths in drawing inches)
+  - `lang: usize` -- the language of new instances' names (instance::LANGS)
+  - `default_size: [f64; 2]` -- a plain rectangle's size when the record gives none
+  - `gap: [f64; 2]` -- the space between laid-out shapes: across, down
+  - `margin: f64` -- the laid-out block's distance from the page's top left corner
+
+- **`struct Built`**
+  what apply built
+  - `shapes: Vec<ShapeRef>` -- the shape of each Plan::shapes entry
+  - `connectors: Vec<ShapeRef>` -- the connector of each Plan::links entry
+  - `unfit: Vec<usize>` -- the Plan::masters entries whose master did not fit (a 1-D master for shapes, a 2-D one
+    for links): drawn as the default instead
+  - `bounds: Option<[f64; 4]>` -- the box of all of it on the page (x0, y0, x1, y1; None: nothing built)
+
+- **`fn apply(tx: &mut Transaction, eng: &mut Engine, page: PageRef, plan: &Plan, masters: &[Option<MasterRef>], opts: &Build) -> Result<Built, EditError>`**
+  build the plan on page `page` inside the caller's transaction (see the file header):
+  `masters[k]` is the master (of tx's document) for Plan::masters[k], None or missing: the
+  default (a plain rectangle, the dynamic connector) -> what was built
+
 ### `diagram_io/src/vdx/mod.rs`
 
 Source: [`lib/diagram_io/src/vdx/mod.rs`](../lib/diagram_io/src/vdx/mod.rs)
@@ -60345,9 +60973,11 @@ What lands where (MS-VSDX; FEATURES.md 1.1 and 1.6):
   themes         every part a theme relationship names, raw (doc.themes); a page part's own
                  theme relationship sets Page::theme (Visio files pick a page's theme by its
                  ThemeIndex cell: JD4 reads that)
+  data           (JD18) connections.xml, recordsets.xml and the recordset parts: doc.data
+                 (data.rs; kept as parts when not understood)
   everything else  windows.xml, docProps (core, app, custom), the thumbnail, media, comments,
-                 data connections and recordsets, validation, solutions, the macro project,
-                 unknown parts: doc.parts as bytes, in package order
+                 validation, solutions, the macro project, unknown parts: doc.parts as
+                 bytes, in package order
   relationships  every one as read in doc.rels (also the external ones, never followed)
 Unknown attributes, elements and text go into the Extras of the element they stood in
 (diagram_core's sheet.rs says how).  Nothing is computed on opening: values stay the cached
@@ -68163,3 +68793,465 @@ anything else (Error::Net with NetErrorKind::Denied).
   while it is not Closed
 - **`fn unsent(&self) -> usize`**
   (desktop) bytes queued by send and not written yet (the browser buffers on its own: 0)
+
+## sheet_io
+
+*XLSX and CSV import: workbooks and delimited text as typed tables* -- crate root [`lib/sheet_io/src/lib.rs`](../lib/sheet_io/src/lib.rs)
+
+```text
+sheet_io -- XLSX and CSV import: workbooks and delimited text as typed tables (JFDiagrammer JD18,
+FEATURES.md IM-05 / IM-10, decision F6: "CSV und .xlsx in P2 mit XLSX-Leser in JFLib")
+
+  xlsx::Workbook::open(bytes, Limits) -> Workbook     the workbook part, its relationships,
+       the shared strings and the styles (which number formats are dates); not the sheets yet
+  wb.sheets() / names() / date1904()                   sheets with state and kind, defined
+       names (global and sheet-local, _xlnm.* included) and tables (ListObjects) as names
+  wb.sheet(i) -> Grid                                  one worksheet, sparse: stored values
+       (a formula's cached result, formulas are never evaluated)
+  wb.table(&area, header) / wb.sheet_table(i, header) -> Table   a rectangle as a table
+  csv::read(bytes, &Options) -> Csv                    RFC 4180 and what Excel writes: the
+       encoding (BOM, UTF-8, else Windows-1252) and the delimiter (; , TAB |) detected
+  csv::to_table(&csv, header, infer) -> Table          with numbers, booleans and dates typed
+  Value, CellError, CellRef / parse_ref / col_name, Area / parse_area, civil / serial
+
+Why a crate of its own: one crate per foreign format family, like dxf, gltf and pdf.  Not
+doc_io: that is jfWord's document model, and every user of a spreadsheet reader would pull in
+doc_core, doc_layout and text.  Not archive: that holds containers (ZIP, OPC), not their
+content.  Not base: base::encoding is strict Unicode by design ("no guessed legacy code
+pages"), while CSV files from Excel come in Windows-1252.  CSV sits next to XLSX because both
+deliver the same typed Table.
+
+Every file is untrusted input: the ZIP container is bounded before anything is inflated
+(archive::Limits, the compression ratio included), the XML reader takes no DTD and no entity
+but the five predefined ones and bounds the nesting, rows, columns, cells, shared strings and
+their bytes are bounded, no size a file advertises (<dimension>, count, uniqueCount) sizes an
+allocation, cells are stored sparsely, nothing recurses.  A broken file is an error, never a
+panic.
+```
+
+### `sheet_io` crate root
+
+Re-exports: `datetime::Civil`
+
+```rust
+/// Excel's rows per sheet: the last row of a whole-column reference (`A:C`)
+MAX_ROWS: u32 = 1_048_576
+/// Excel's columns per sheet (A to XFD): the last column of a whole-row reference (`1:3`)
+MAX_COLS: u32 = 16_384
+```
+
+- **`enum Value`**
+  A cell value with its type.
+
+  `Date` holds an OLE Automation date, as Visio and Excel's 1900 date system use it: days since
+  1899-12-30, the fraction is the time of day (values are taken as linear, also below zero).
+  Values from 0 to below 1 are a time of day without a date.  The XLSX reader converts the
+  1904 date system and Excel's fake 1900-02-29 (see `xlsx`).
+  - `Empty` -- no value (an empty cell, a formula without a cached result)
+  - `Number(f64)` -- a number
+  - `Text(String)` -- a text
+  - `Bool(bool)` -- TRUE or FALSE
+  - `Date(f64)` -- a date and time as an OLE Automation date (days since 1899-12-30)
+  - `Error(CellError)` -- an error value of a cell (#N/A, #DIV/0! ...)
+
+**`impl Value`**
+
+- **`fn text(&self) -> String`**
+  The display form: numbers as the shortest text that reads back (`base::f64_format`,
+  `-0` as `0`), dates as ISO 8601 (`2026-11-23`, `2026-11-23 14:05:00`, a time of day alone
+  as `14:05:00`, milliseconds only when there are some: `14:05:00.250`), booleans as
+  `TRUE` / `FALSE`, errors as Excel writes them (`#N/A`), Empty as "".
+- **`fn is_empty(&self) -> bool`**
+  Whether this is `Empty`.
+- **`fn number(&self) -> Option<f64>`**
+  The number of a Number or a Date (its serial), else None.
+
+- **`fn civil(serial: f64) -> Option<Civil>`**
+  The date and time of an OLE Automation date (days since 1899-12-30, the fraction the time of
+  day), rounded to the millisecond; None for NaN, infinities and values beyond 10^8 days.
+
+- **`fn serial(c: &Civil) -> f64`**
+  The OLE Automation date of a date and time (days since 1899-12-30, the fraction the time of
+  day); `civil` reads it back.
+
+- **`enum CellError`**
+  An error value of a cell.
+  - `Null` -- `#NULL!`
+  - `Div0` -- `#DIV/0!`
+  - `Value` -- `#VALUE!`
+  - `Ref` -- `#REF!`
+  - `Name` -- `#NAME?`
+  - `Num` -- `#NUM!`
+  - `NA` -- `#N/A`
+  - `GettingData` -- `#GETTING_DATA`
+  - `Spill` -- `#SPILL!`
+  - `Calc` -- `#CALC!`
+  - `Other(String)` -- another error text, as written (`#BUSY!`, `#FIELD!` ...)
+
+**`impl CellError`**
+
+- **`fn text(&self) -> &str`**
+  The error as Excel writes it (`#N/A`).
+- **`fn parse(s: &str) -> CellError`**
+  The error of a text (ASCII case-insensitive, white space at the ends ignored); any other
+  text is `Other` with the text as written.
+
+- **`struct CellRef`**
+  A cell position, 0-based (`B3` is row 2, column 1).
+  - `row: u32` -- the row, 0-based
+  - `col: u32` -- the column, 0-based
+
+**`impl CellRef`**
+
+- **`const fn new(row: u32, col: u32) -> CellRef`**
+  A cell position from a 0-based row and column.
+- **`fn a1(&self) -> String`**
+  The A1 form without `$` (`B3`).
+
+- **`fn col_name(col: u32) -> String`**
+  The letters of a 0-based column (0 is `A`, 27 is `AB`, 16383 is `XFD`).
+
+- **`fn parse_ref(s: &str) -> Option<CellRef>`**
+  A cell reference in A1 form: column letters (either case), then the 1-based row, each with
+  an optional `$` (`B3`, `$B$3`, `b$3`); None for anything else.
+
+- **`struct Area`**
+  A rectangle of cells, `first` and `last` included, on a sheet (an index into the workbook's
+  sheets) or on no sheet in particular.
+  - `sheet: Option<usize>` -- the sheet, an index into `xlsx::Workbook::sheets`; None when the reference named none
+  - `first: CellRef` -- the top left cell
+  - `last: CellRef` -- the bottom right cell
+
+**`impl Area`**
+
+- **`fn new(sheet: Option<usize>, a: CellRef, b: CellRef) -> Area`**
+  The rectangle between two corners in any order.
+- **`fn rows(&self) -> u64`**
+  Its rows.
+- **`fn cols(&self) -> u64`**
+  Its columns.
+- **`fn contains(&self, at: CellRef) -> bool`**
+  Whether a cell lies inside.
+- **`fn a1(&self) -> String`**
+  The A1 form without sheet and `$`: `B3` for one cell, `A1:C10` for more.
+
+- **`fn quote_sheet(name: &str) -> String`**
+  A sheet name as a formula writes it before `!`: as it is when it is a plain name (letters,
+  digits, `_`, `.`, not starting with a digit, no cell reference), else in single quotes with
+  each `'` doubled (`'Tab 1'`, `'O''Brien'`).
+
+- **`fn parse_area<S: AsRef<str>>(text: &str, sheets: &[S]) -> Option<Area>`**
+  A reference to one rectangle as formulas and defined names write it: `B3`, `$A$1:$C$10`,
+  whole columns `A:C` (rows 0 to MAX_ROWS - 1), whole rows `1:3` (columns 0 to MAX_COLS - 1),
+  with an optional sheet before `!` (`Sheet1!A1`, `'Tab 1'!$A$1:$C$10`, `''` for a quote in a
+  quoted name) and an optional leading `=`.  The sheet is resolved by name among `sheets`
+  (ASCII and Unicode case-insensitive, as Excel compares sheet names); without a sheet the
+  area's `sheet` is None.  None for an unknown sheet, a 3-D reference (`Sheet1:Sheet3!A1`), an
+  external one (`[1]Sheet1!A1`), a union (`A1,B2`), a function or `#REF!`.
+
+- **`struct Table`**
+  A rectangular table: every row has `columns.len()` values.
+  - `columns: Vec<String>` -- the column names: trimmed, an empty one is `F<n>` (n the 1-based column, as Excel's OLE
+    DB driver names them), a repeated one gets a number (`Name`, `Name1`, `Name2`; compared
+    case-insensitively); without a header row all are `F1` ... `Fn`
+  - `rows: Vec<Vec<Value>>` -- the rows of values
+
+**`impl Table`**
+
+- **`fn column(&self, name: &str) -> Option<usize>`**
+  The index of a column by name (case-insensitive).
+
+### `sheet_io/src/csv.rs`
+
+Source: [`lib/sheet_io/src/csv.rs`](../lib/sheet_io/src/csv.rs)
+
+```text
+csv -- delimited text: RFC 4180 and what Excel writes
+
+  read(bytes, &Options) -> Csv         decode, find the delimiter, split into records
+  decode(bytes) -> (String, Encoding)  a BOM decides; else valid UTF-8; else Windows-1252
+  detect_delimiter(text) -> u8         ; , TAB or |
+  to_table(&csv, header, infer) -> Table   numbers, booleans and dates typed on request
+
+The grammar: a field in quotes may hold the delimiter, line breaks and "" for a quote; records
+end with CR LF, LF or CR; the last record may end without a line break, and a line break at
+the very end starts no further record; an empty line is a record of one empty field.  Lenient
+where Excel is: a quote inside a field that does not start with one is kept as it is (ab"cd),
+text after a closing quote is kept and the field goes on to the next delimiter ("ab"cd is
+abcd), a quote left open runs to the end of the text.  Line breaks inside quotes are read as
+LF (CR LF and CR too), as Excel keeps them in a cell.  A first line "sep=;" (Excel's hint) sets
+the delimiter unless Options gives one, and is never a record.
+
+Encodings: a BOM (UTF-8, UTF-16 LE / BE: Excel's "Unicode text" is UTF-16 LE with TAB),
+UTF-16 without a BOM when every second byte of the start is zero, valid UTF-8, else
+Windows-1252 as WHATWG defines it (0x80 is the euro sign; the five bytes it leaves open are the
+C1 controls of the same number).  Decoding never fails: a forced encoding turns what it cannot
+read into U+FFFD.
+
+Untrusted input: CsvLimits bounds the bytes, records, fields of a record, fields in all and the
+bytes of one field; nothing recurses.
+```
+
+- **`enum Encoding`**
+  The text encoding of a CSV file.
+  - `Utf8` -- UTF-8 without a byte-order mark
+  - `Utf8Bom` -- UTF-8 with a byte-order mark (Excel's "CSV UTF-8")
+  - `Utf16Le` -- UTF-16 little-endian (Excel's "Unicode text", with BOM)
+  - `Utf16Be` -- UTF-16 big-endian
+  - `Windows1252` -- Windows-1252, the ANSI code page of Western European Windows (Excel's plain "CSV")
+
+- **`struct CsvLimits`**
+  What a CSV file may hold.  The default: 256 MiB, two million records, Excel's 16384 fields a
+  record, eight million fields in all, 1 MiB a field.
+  - `bytes: usize` -- bytes of the file
+  - `records: usize` -- records (lines)
+  - `fields: usize` -- fields of one record
+  - `cells: usize` -- fields of all records together (each costs memory even when empty)
+  - `field_bytes: usize` -- bytes of one field (UTF-8)
+
+**`impl CsvLimits`**
+
+- **`const DEFAULT: CsvLimits = CsvLimits { bytes: 256 << 20, records: 2_000_000, fields: ...`**
+  The default limits (see `CsvLimits`).
+
+- **`struct Options`**
+  How a CSV file is read.
+  - `delimiter: Option<u8>` -- the delimiter (an ASCII byte); None: a `sep=` line, else `detect_delimiter`
+  - `encoding: Option<Encoding>` -- the encoding; None: `decode` detects it
+  - `quote: u8` -- the quote character (an ASCII byte), `"` as a rule
+  - `limits: CsvLimits` -- the bounds of the file
+
+**`impl Options`**
+
+- **`const DEFAULT: Options = Options { delimiter: None, encoding: None, quote: b'"', l ...`**
+  Detect delimiter and encoding, quote with `"`, the default limits.
+
+- **`struct Csv`**
+  A CSV file read: its records of fields, as text.
+  - `delimiter: u8` -- the delimiter used
+  - `encoding: Encoding` -- the encoding read
+  - `records: Vec<Vec<String>>` -- the records, each a list of fields (records may differ in length)
+
+- **`enum Error`**
+  Why a CSV file was not read.
+  - `Limit(&'static str)` -- over a limit: the name of the field of `CsvLimits`
+  - `Options` -- a delimiter or quote that is no ASCII byte, or both the same
+
+**`impl Error`**
+
+- **`fn text(&self) -> String`**
+  The error as a sentence in English.
+
+- **`fn decode(bytes: &[u8]) -> (String, Encoding)`**
+  Decode a CSV file: a byte-order mark decides (UTF-8, UTF-16 LE, UTF-16 BE); else UTF-16
+  when every second byte of the start is zero; else UTF-8 when it is valid; else
+  Windows-1252.  The BOM is not part of the text.
+
+- **`fn decode_as(bytes: &[u8], encoding: Encoding) -> String`**
+  Decode in a given encoding (a matching BOM is skipped; what is not valid becomes U+FFFD).
+
+- **`fn detect_delimiter(text: &str) -> u8`**
+  The delimiter of a CSV text: a first line `sep=X` names it; else, over the first 20
+  non-empty records (quotes respected, so a quoted delimiter or line break does not count), a
+  candidate that occurs the same number of times, at least once, in every one of them wins, in
+  the order TAB, `;`, `,`, `|` (a TAB is rarely data; German Excel writes `;` and `,` in its
+  numbers, so `;` goes before `,`); when none is that consistent, the one found in the most
+  records (the same order breaks ties); `,` when there is none at all.
+
+- **`fn read(bytes: &[u8], opts: &Options) -> Result<Csv, Error>`**
+  Read a CSV file (see the module's head for the grammar).
+
+- **`fn to_table(csv: &Csv, header: bool, infer: bool) -> Table`**
+  The records as a Table.  `header`: the first record names the columns (see
+  `Table::columns`).  The table is as wide as the longest record: shorter records are padded
+  with Empty, nothing is cut off; with a header, columns past it that are empty in every
+  record are dropped (a delimiter at the end of the data lines).  Empty records at the end are
+  dropped.  An empty field is Empty.  `infer`: the other fields are typed, else they are Text:
+
+  - numbers: `1.5`, `-3`, `+2`, `.5`, `1e3`; with `;` as delimiter also German ones, `1,5`,
+  ```text
+  `1.234,5`, `-1.234.567,89` (a field with a comma reads `.` as the thousands separator, in
+  groups of three; without a comma `1.234` is 1.234).  A number with a leading zero (`007`,
+  `0123`) stays Text: it is an identifier more often than not.  White space at the ends is
+  ignored.
+  ```
+  - booleans: TRUE, FALSE, WAHR, FALSCH in any case
+  - dates: ISO 8601 (`2026-11-23`, `2026-11-23T14:05`, `2026-11-23 14:05:00`) and German
+  ```text
+  `d.m.yyyy` (`23.11.2026`, `1.2.2026 14:05`) as `Value::Date`
+  ```
+
+### `sheet_io/src/xlsx.rs`
+
+Source: [`lib/sheet_io/src/xlsx.rs`](../lib/sheet_io/src/xlsx.rs)
+
+```text
+xlsx -- Office Open XML workbooks: .xlsx, .xlsm (the macros are never read), .xltx, .xltm, in
+transitional and strict OOXML
+
+  Workbook::open(bytes, Limits)      the package (archive::opc), the workbook part found through
+                                     the package's officeDocument relationship, the sheets
+                                     through the workbook's relationships (never by guessing
+                                     paths), the shared strings and the styles; tables
+                                     (ListObjects) of the worksheets as names
+  wb.sheet(i) -> Grid                one worksheet part, read when asked for
+  wb.table(&area, header)            a rectangle as a Table; wb.sheet_table(i, header) the used
+                                     range of a sheet
+
+Values: the stored ones.  Formulas are never evaluated: a formula's cached <v> counts, a
+formula without one is Empty.  Cell types s (shared string), str (a formula's text),
+inlineStr, b, e, n and d (ISO 8601 text); a number is a Date when its style's number format is
+one: the built-in ids 14-22, 27-36, 45-47, 50-58 (the last two groups are dates in Excel's
+East Asian locales and Excel treats them so everywhere), or a custom code with a date or time
+token (d m y h s e g) outside quotes, brackets and the escapes \x _x *x; [h] [mm] [ss] make an
+elapsed time.
+
+Dates become OLE Automation dates (days since 1899-12-30, as Visio uses them):
+  1900 system   serials from 1 to below 60 (1900-01-01 .. 1900-02-28) move one day up, Excel
+                counts the 1900-02-29 that never was; serial 60 itself, that day, reads as
+                1900-02-28 like the serial before it; from 61 (1900-03-01) on serials are OLE
+                dates already; from 0 to below 1 (Excel's "1900-01-00") a time of day
+                without a date, as it is
+  1904 system   (workbookPr date1904) serial + 1462; under a format of a time of day alone
+                (h:mm) a value from 0 to below 1 stays a time without a date
+  both          an elapsed-time format keeps the value as it is (1.5 = 36 hours)
+
+Text: shared strings with rich runs (<r><t>), phonetic runs (<rPh>) left out; a <t> without
+xml:space="preserve" (on it or an element around it) loses its white space at either end, as
+in Excel; _xHHHH_ is decoded (Excel's escape of control characters; _x005F_ is "_", so
+"_x005F_x0041_" reads "_x0041_").
+
+Positions: a row without r follows the previous row, a cell without r the previous cell of its
+row (the first at column A).  Rows and cells out of order are sorted; a cell given twice: the
+last one wins.  Only cells with a value are kept (sparse): one cell at A1 and one at XFD1048576
+are two cells.
+
+Untrusted input: the ZIP within Limits::archive (the compression ratio checked before
+inflating), the XML without DTD and with the nesting bounded (Limits::depth), the rows,
+columns, cells, shared strings and their bytes bounded; <dimension>, count and uniqueCount are
+never read; a shared-string index out of range is Invalid.
+```
+
+- **`struct Limits`**
+  What a workbook may hold.  The default is generous for real workbooks: Excel's own sheet size,
+  four million cells a sheet, two million shared strings of 256 MiB, ZIP parts up to 512 MiB
+  and a compression ratio of at most 200 for parts over 1 MiB.
+  - `archive: archive::Limits` -- the ZIP container: parts, sizes, the compression ratio (checked before inflating)
+  - `rows: u32` -- rows of a sheet: a row index from 0 to `rows - 1`
+  - `cols: u32` -- columns of a sheet: a column index from 0 to `cols - 1`
+  - `cells: usize` -- cells kept of one sheet (those with a value), and values of one Table
+  - `strings: usize` -- entries of the shared-string table
+  - `string_bytes: usize` -- bytes of the shared strings together, and of the texts of one sheet together
+  - `depth: usize` -- nesting of the XML elements of a part
+
+**`impl Limits`**
+
+- **`const DEFAULT: Limits = Limits { archive: archive::Limits { entries: 10_000, part ...`**
+  The default limits (see `Limits`).
+
+- **`enum Error`**
+  Why a workbook or a sheet was not read.
+  - `Archive(archive::Error)` -- the ZIP container (archive's reader), its limits included
+  - `Package(opc::Error)` -- the OPC package: content types, relationships, part names (archive::opc)
+  - `NotXlsx` -- not an OOXML workbook: no ZIP, no officeDocument relationship, another main part (a
+    document, a binary .xlsb)
+  - `Xml { part: String, offset: usize, what: &'static str, }` -- a part's XML is not well-formed or uses what the reader refuses (a DOCTYPE)
+  - `Limit(&'static str)` -- over a limit: the name of the field of `Limits`
+  - `Missing(&'static str)` -- something the workbook needs is not there
+  - `Invalid(&'static str)` -- a value or structure that breaks the format
+
+**`impl Error`**
+
+- **`fn text(&self) -> String`**
+  The error as a sentence in English.
+
+- **`enum SheetState`**
+  Whether a sheet is shown.
+  - `Visible` -- shown as a tab
+  - `Hidden` -- hidden; the user can show it again
+  - `VeryHidden` -- hidden; only a macro or the file can show it again
+
+- **`enum SheetKind`**
+  What a sheet holds.
+  - `Worksheet` -- cells
+  - `Chartsheet` -- one chart, no cells (`sheet` gives an empty Grid)
+  - `Other` -- a dialog or macro sheet, or a sheet whose part is missing (`sheet` gives an empty Grid)
+
+- **`struct SheetInfo`**
+  A sheet of the workbook, in tab order.
+  - `name: String` -- the tab's name
+  - `state: SheetState` -- shown or hidden
+  - `kind: SheetKind` -- worksheet, chartsheet or other
+
+- **`struct DefinedName`**
+  A defined name of the workbook, or a table (ListObject) of a worksheet.
+  - `name: String` -- the name as written (`Daten`, `_xlnm.Print_Area`; a table's display name)
+  - `scope: Option<usize>` -- the sheet a sheet-local name belongs to (localSheetId); None for a global name
+  - `hidden: bool` -- hidden from the user (`hidden="1"`)
+  - `formula: String` -- the formula as written (`'Tab 1'!$A$1:$C$10`); for a table its sheet and range
+  - `area: Option<Area>` -- the rectangle when the formula is one (`parse_area`); a reference without a sheet takes
+    the sheet of the name's scope.  A table's area leaves out its totals row.
+  - `table: bool` -- a table (ListObject, xl/tables/tableN.xml) rather than a defined name
+
+**`impl DefinedName`**
+
+- **`fn builtin(&self) -> bool`**
+  Whether this is one of Excel's built-in names (`_xlnm.Print_Area`, `_xlnm._FilterDatabase` ...).
+
+- **`struct Grid`**
+  The cells of one sheet that hold a value, sparse: rows in ascending order, each with its
+  cells (column, value) in ascending order.
+
+**`impl Grid`**
+
+- **`fn sheet(&self) -> usize`**
+  The sheet's index.
+- **`fn get(&self, row: u32, col: u32) -> &Value`**
+  The value of a cell (0-based); Empty where there is none.
+- **`fn row(&self, row: u32) -> &[(u32, Value)]`**
+  The cells of a row with a value: (column, value) in ascending columns.
+- **`fn rows(&self) -> impl Iterator<Item = (u32, &[(u32, Value)])>`**
+  The rows with a value, ascending: (row, its cells).
+- **`fn cells(&self) -> usize`**
+  The cells with a value.
+- **`fn is_empty(&self) -> bool`**
+  Whether no cell has a value.
+- **`fn used(&self) -> Option<Area>`**
+  The used range: from the first to the last row and column that hold a value; None for an
+  empty sheet.
+- **`fn table(&self, area: &Area, header: bool, cells: usize) -> Result<Table, Error>`**
+  A rectangle of this grid as a Table (`header`: its first row names the columns).  Rows
+  and columns past the used range are left out (a whole-column reference gives the rows
+  that hold data), the area's first row and column stay; at most `cells` values (rows times
+  columns), else `Limit("cells")`.  The area's sheet is not looked at.
+
+- **`struct Workbook`**
+  An XLSX workbook: its sheets, names, shared strings and styles; the sheets themselves are read
+  when asked for.
+
+**`impl Workbook`**
+
+- **`fn open(bytes: &[u8], limits: Limits) -> Result<Workbook, Error>`**
+  Read a workbook within `limits`: the package, workbook.xml, its relationships, the shared
+  strings, the styles and the tables of the worksheets; not the cells.
+- **`fn sheets(&self) -> &[SheetInfo]`**
+  The sheets in tab order.
+- **`fn names(&self) -> &[DefinedName]`**
+  The defined names in file order (built-in `_xlnm.*` ones included, see
+  `DefinedName::builtin`), then the tables of the worksheets (`DefinedName::table`).
+- **`fn date1904(&self) -> bool`**
+  Whether the workbook counts dates from 1904 (its serials are converted either way).
+- **`fn sheet_by_name(&self, name: &str) -> Option<usize>`**
+  The index of a sheet by name (ASCII and Unicode case-insensitive, as Excel compares them).
+- **`fn area(&self, text: &str) -> Option<Area>`**
+  `parse_area` with this workbook's sheet names.
+- **`fn sheet(&self, index: usize) -> Result<Grid, Error>`**
+  Read one sheet: its stored values.  A chartsheet or another kind of sheet gives an empty
+  Grid; `Missing("sheet")` for an index past the sheets.
+- **`fn table(&self, area: &Area, header: bool) -> Result<Table, Error>`**
+  A rectangle of a sheet as a Table (`header`: its first row names the columns, see
+  `Table::columns`); see `Grid::table` for how it is cut to the used range.  The area needs
+  a sheet (`Missing("the area's sheet")` without one); at most `Limits::cells` values.
+- **`fn sheet_table(&self, index: usize, header: bool) -> Result<Table, Error>`**
+  The used range of a sheet as a Table (from the first to the last row and column that hold
+  a value); an empty sheet gives an empty Table.
