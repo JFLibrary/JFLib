@@ -16,6 +16,7 @@ use alloc::{
 };
 use img_core::{checksum::crc32, deflate::deflate_raw, inflate::inflate_raw_ex};
 
+pub mod cfb;
 pub mod opc;
 
 /// One decoded archive part with a normalized, relative UTF-8 name.

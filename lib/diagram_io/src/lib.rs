@@ -62,6 +62,7 @@ mod stencil_svg;
 pub mod template;
 mod template_src;
 pub mod vdx;
+pub mod vss;
 pub mod vsdx;
 pub mod windows;
 mod write;
