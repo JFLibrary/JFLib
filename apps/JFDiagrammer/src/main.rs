@@ -79,6 +79,11 @@
 //                     close (UI-12); Öffnen schreibgeschützt and als Kopie (DM-09, UI-06, UI-05)
 //   src/dlg_shape_name.rs  (JD15) the dialog Shape-Name (SP-01)
 //   src/dlg_snap.rs   (JD15) the dialog Ausrichten und Kleben
+//   src/data_*.rs     (JD18) external data: data_cmds (when the commands run), data_source
+//                     (reading .xlsx/.csv), data_import (Benutzerdefinierter Import), data_pane
+//                     (Externe Daten), data_refresh (aktualisieren, Intervall, Konflikte),
+//                     data_link (Daten verknüpfen), data_ask (Abfrage beim Ablegen),
+//                     data_textdraw (Zeichnung aus Text)
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too); templates/ (JD13) the
@@ -130,6 +135,15 @@ mod cmds_paste;
 mod cmds_picture;
 mod cmds_text;
 mod commands;
+// (JD18) data: the register Daten, the pane Externe Daten, import, link, refresh, drawing from text
+mod data_ask;
+mod data_cmds;
+mod data_import;
+mod data_link;
+mod data_pane;
+mod data_refresh;
+mod data_source;
+mod data_textdraw;
 mod design_gallery;
 mod design_store;
 mod dlg_field;
@@ -309,6 +323,14 @@ pub(crate) struct Diagrammer {
     /// the canvas showed last
     pub page_views: alloc::vec::Vec<(u32, diagram_core::PageRef, f32, f64, f64)>,
     pub view_page: Option<(u32, diagram_core::PageRef)>,
+    /// (JD18) external data: the pane, the data selector, refreshing, linking, asking on
+    /// drop, the drawing from text (data_*.rs)
+    pub ext: data_pane::ExtState,
+    pub dimport: data_import::ImportState,
+    pub drefresh: data_refresh::RefreshState,
+    pub dlink: data_link::LinkState,
+    pub dask: data_ask::AskState,
+    pub textdraw: data_textdraw::TextDrawState,
 }
 
 impl Diagrammer {
@@ -376,6 +398,12 @@ impl Diagrammer {
             shape_name: dlg_shape_name::NameDialog::default(),
             snap_grid: true,
             snap_dlg: dlg_snap::SnapDialog::default(),
+            ext: data_pane::ExtState::default(),
+            dimport: data_import::ImportState::default(),
+            drefresh: data_refresh::RefreshState::default(),
+            dlink: data_link::LinkState::default(),
+            dask: data_ask::AskState::default(),
+            textdraw: data_textdraw::TextDrawState::default(),
             page_views: alloc::vec::Vec::new(),
             view_page: None,
         }
@@ -552,6 +580,13 @@ impl App for Diagrammer {
         dlg_snap::dialog(self, ui);
         // (JD15, SP-12) the rows of the selected shape's Actions section for its menu
         cmds_actions::frame(self, ui);
+        // (JD18) the data dialogs, the refresh interval
+        data_import::dialog(self, ui);
+        data_pane::dialog(self, ui);
+        data_refresh::dialog(self, ui);
+        data_link::dialog(self, ui);
+        data_ask::dialog(self, ui);
+        data_textdraw::dialog(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

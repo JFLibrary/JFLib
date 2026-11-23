@@ -960,3 +960,29 @@ Die Aktion lässt sich nicht ausführen.	The action cannot be run.	La acción no
 Shape-Suche anzeigen	Show shape search	Mostrar la búsqueda de formas	Mostra la ricerca forme	Afficher la recherche de formes
 Shape-Suche: ein Wort genügt	Shape search: one word is enough	Búsqueda de formas: basta con una palabra	Ricerca forme: basta una parola	Recherche de formes : un mot suffit
 Aus: Ein Shape muss alle Suchwörter enthalten.	Off: a shape must contain every search word.	Desactivado: una forma debe contener todas las palabras buscadas.	Disattivato: una forma deve contenere tutte le parole cercate.	Désactivé : une forme doit contenir tous les mots recherchés.
+Schnellimport	Quick Import	Importación rápida	Importazione rapida	Importation rapide
+Benutzerdefinierter Import	Custom Import	Importación personalizada	Importazione personalizzata	Importation personnalisée
+Alle aktualisieren	Refresh All	Actualizar todo	Aggiorna tutto	Actualiser tout
+Daten aktualisieren...	Refresh Data...	Actualizar datos...	Aggiorna dati...	Actualiser les données...
+Zeichnung aus Text	Drawing from Text	Dibujo a partir de texto	Disegno da testo	Dessin à partir de texte
+Datengrafiken	Data Graphics	Gráficos de datos	Grafiche dati	Graphiques de données
+Position|Datengrafik	Position	Posición	Posizione	Position
+Konfigurieren|Datengrafik	Configure	Configurar	Configura	Configurer
+Automatischer Abstand	Automatic Spacing	Espaciado automático	Spaziatura automatica	Espacement automatique
+Legende einfügen	Insert Legend	Insertar leyenda	Inserisci legenda	Insérer une légende
+Fenster „Shape-Daten“	Shape Data Window	Ventana Datos de forma	Finestra Dati forma	Fenêtre Données de forme
+Fenster „Externe Daten“	External Data Window	Ventana Datos externos	Finestra Dati esterni	Fenêtre Données externes
+Datengrafikfelder	Data Graphic Fields	Campos de gráfico de datos	Campi grafica dati	Champs de graphique de données
+Daten verknüpfen	Link Data	Vincular datos	Collega dati	Lier des données
+Erweiterte Datengrafiken	Advanced Data Graphics	Gráficos de datos avanzados	Grafiche dati avanzate	Graphiques de données avancés
+Datenquelle entfernen	Remove Data Source	Quitar origen de datos	Rimuovi origine dati	Supprimer la source de données
+Datenquelle umbenennen	Rename Data Source	Cambiar nombre del origen de datos	Rinomina origine dati	Renommer la source de données
+Spalteneinstellungen...	Column Settings...	Configuración de columnas...	Impostazioni colonne...	Paramètres des colonnes...
+Verknüpfte Shapes auswählen	Select Linked Shapes	Seleccionar formas vinculadas	Seleziona forme collegate	Sélectionner les formes liées
+Verknüpfung mit Zeile aufheben	Unlink from Row	Desvincular de la fila	Scollega dalla riga	Dissocier de la ligne
+Aktualisierung konfigurieren...	Configure Refresh...	Configurar actualización...	Configura aggiornamento...	Configurer l'actualisation...
+Aktualisierungskonflikte	Refresh Conflicts	Conflictos de actualización	Conflitti di aggiornamento	Conflits d'actualisation
+Externe Daten	External Data	Datos externos	Dati esterni	Données externes
+Daten anzeigen	Display Data	Mostrar datos	Visualizza dati	Afficher les données
+Einblenden/Ausblenden	Show/Hide	Mostrar u ocultar	Mostra/Nascondi	Afficher/Masquer
+Erweiterte Datenverknüpfung	Advanced Data Linking	Vinculación de datos avanzada	Collegamento dati avanzato	Liaison de données avancée

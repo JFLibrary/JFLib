@@ -331,6 +331,31 @@ commands! {
     SIZE_ENV_MONARCH = 0x180E, "Umschlag Monarch", 0, 0;
     SIZE_GOV_LETTER = 0x180F, "Government Letter", 0, 0;
     SIZE_GOV_LEGAL = 0x1810, "Government Legal", 0, 0;
+    // (JD18) Daten: Externe Daten, Datengrafiken (JD19), Daten anzeigen, Einblenden/Ausblenden,
+    // Erweiterte Datenverknüpfung (FEATURES 3.7); data_cmds.rs says when they can run
+    DATA_QUICK_IMPORT = 0x1900, "Schnellimport", 0, JD_QUICK_IMPORT_L;
+    DATA_CUSTOM_IMPORT = 0x1901, "Benutzerdefinierter Import", 0, JD_CUSTOM_IMPORT_L;
+    DATA_REFRESH_ALL = 0x1902, "Alle aktualisieren", JD_REFRESH_ALL, JD_REFRESH_ALL_L;
+    DATA_REFRESH = 0x1903, "Daten aktualisieren...", JD_REFRESH_ALL, 0;
+    DATA_TEXT_DRAWING = 0x1904, "Zeichnung aus Text", 0, JD_CUSTOM_IMPORT_L;
+    DATA_GRAPHICS = 0x1905, "Datengrafiken", 0, JD_ADVANCED_DG;
+    DG_POSITION = 0x1906, "Position|Datengrafik", JD_DG_POSITION, 0;
+    DG_CONFIGURE = 0x1907, "Konfigurieren|Datengrafik", JD_DG_CONFIGURE, 0;
+    DG_AUTO_SPACE = 0x1908, "Automatischer Abstand", JD_AUTO_SPACE, 0;
+    DATA_LEGEND = 0x1909, "Legende einfügen", 0, JD_LEGEND_L;
+    PANE_SHAPE_DATA_WINDOW = 0x190A, "Fenster „Shape-Daten“", JD_SHAPE_DATA, 0;
+    PANE_EXTERNAL_DATA = 0x190B, "Fenster „Externe Daten“", JD_EXTERNAL_DATA, 0;
+    PANE_DG_FIELDS = 0x190C, "Datengrafikfelder", JD_DG_FIELDS, 0;
+    DATA_LINK = 0x190D, "Daten verknüpfen", JD_LINK_DATA, 0;
+    DATA_ADVANCED_DG = 0x190E, "Erweiterte Datengrafiken", JD_ADVANCED_DG, 0;
+    // (JD18) the menus of the pane Externe Daten (AB-11) and of a linked shape
+    DATA_SOURCE_REMOVE = 0x1910, "Datenquelle entfernen", 0, 0;
+    DATA_SOURCE_RENAME = 0x1911, "Datenquelle umbenennen", 0, 0;
+    DATA_COLUMNS = 0x1912, "Spalteneinstellungen...", 0, 0;
+    DATA_SELECT_LINKED = 0x1913, "Verknüpfte Shapes auswählen", 0, 0;
+    DATA_UNLINK = 0x1914, "Verknüpfung mit Zeile aufheben", 0, 0;
+    DATA_REFRESH_SETTINGS = 0x1915, "Aktualisierung konfigurieren...", 0, 0;
+    DATA_CONFLICTS = 0x1916, "Aktualisierungskonflikte", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -549,6 +574,21 @@ static HANDLERS: &[(u32, Handler)] = &[
     (REPLACE, |a, ui| crate::dlg_find::open(a, ui, true)),
     // (JD15, SP-01) Shape-Name
     (SHAPE_NAME, crate::dlg_shape_name::open),
+    // (JD18) Daten (data_*.rs; DATA_QUICK_IMPORT and the data graphics wait, cmds_later.rs)
+    (DATA_CUSTOM_IMPORT, crate::data_import::open),
+    (DATA_REFRESH_ALL, crate::data_refresh::refresh_all),
+    (DATA_REFRESH, crate::data_refresh::open),
+    (DATA_TEXT_DRAWING, crate::data_textdraw::open),
+    (PANE_SHAPE_DATA_WINDOW, |a, _| a.panes.toggle(crate::panes::P_DATA)),
+    (PANE_EXTERNAL_DATA, |a, _| a.panes.toggle(crate::panes::P_EXTERNAL)),
+    (DATA_LINK, crate::data_link::open),
+    (DATA_SOURCE_REMOVE, crate::data_pane::remove_source),
+    (DATA_SOURCE_RENAME, crate::data_pane::rename_source),
+    (DATA_COLUMNS, crate::data_pane::columns_open),
+    (DATA_SELECT_LINKED, crate::data_pane::select_linked),
+    (DATA_UNLINK, crate::data_pane::unlink),
+    (DATA_REFRESH_SETTINGS, crate::data_refresh::settings_open),
+    (DATA_CONFLICTS, crate::data_refresh::conflicts_open),
 ];
 
 // toggles: whether the command is on
@@ -617,6 +657,9 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (ARC, |a| a.tool == ARC),
     // (JD8 rest: Text, Felder, Links, Suchen)
     (TEXT_BOX_V, |a| a.tool == TEXT_BOX_V),
+    // (JD18) Daten › Einblenden/Ausblenden
+    (PANE_SHAPE_DATA_WINDOW, |a| a.panes.visible(crate::panes::P_DATA)),
+    (PANE_EXTERNAL_DATA, |a| a.panes.visible(crate::panes::P_EXTERNAL)),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -641,6 +684,8 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
         && crate::cmds_paste::available(app, id)
         && crate::layers::available(app, id)
         && crate::cmds_text::available(app, id)
+        // (JD18) the data commands
+        && crate::data_cmds::available(app, id)
 }
 
 /// the toggle is on

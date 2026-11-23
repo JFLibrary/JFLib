@@ -112,8 +112,9 @@ pub(crate) fn command(app: &mut Diagrammer, ui: &mut Ui, id: u32) -> bool {
 
 // ---------------------------------------------------------------- the fields' locale and clock
 
-// the local time as days since 30 Dec 1899 and the zone's offset in days
-fn local_now() -> (f64, f64) {
+// the local time as days since 30 Dec 1899 and the zone's offset in days (JD18: a refresh's
+// time too)
+pub(crate) fn local_now() -> (f64, f64) {
     let ns = plat::unix_time_ns();
     let off = zone_offset(ns.div_euclid(1_000_000_000));
     let days = (ns as f64 / 1e9 + off) / 86_400.0 + 25_569.0;
