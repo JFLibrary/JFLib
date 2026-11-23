@@ -1,0 +1,51 @@
+#!args --no-system-fonts --save-dir build
+# JFDiagrammer, JD15 (stock-taking): the file types of FEATURES 1.1 through Speichern unter and
+# Datei › Öffnen that no other script checks -- a drawing with macros (.vsdm, DF-04: opened again
+# it shows the notice that macros are kept and never run), a drawing saved as a stencil (.vssx,
+# DF-06, EX-11) and as a stencil with macros (.vssm, DF-07): opened, both go to the Shapes panel
+# a rectangle, saved as .vsdm
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+key ctrl+s
+expect dialog:"Speichern unter" exists
+click #28940
+key ctrl+a
+type "jd15-status.vsdm"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+expect text:"jd15-status – JFDiagrammer" exists
+expect box:"Hinweise zur Datei" missing
+# DF-04: a new drawing, then the .vsdm again from Zuletzt verwendet: the notice about its macros
+cmd 4097
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+expect text:"Zeichnung2 – JFDiagrammer" exists
+cmd 4098
+click button:"jd15-status.vsdm"
+expect text:"jd15-status – JFDiagrammer" exists
+expect box:"Hinweise zur Datei" exists
+expect listitem:"Sheet.4" exists
+# DF-06, EX-11: Speichern unter as a stencil; opened, it is a stencil of the Shapes panel and the
+# drawing stays
+cmd 4100
+expect dialog:"Speichern unter" exists
+click #28940
+key ctrl+a
+type "jd15-status-s.vssx"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+cmd 4098
+click button:"jd15-status-s.vssx"
+expect tab:"jd15-status-s" exists
+expect listitem:"Sheet.4" exists
+# DF-07: the same as a stencil with macros
+cmd 4100
+click #28940
+key ctrl+a
+type "jd15-status-m.vssm"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+cmd 4098
+click button:"jd15-status-m.vssm"
+expect tab:"jd15-status-m" exists
