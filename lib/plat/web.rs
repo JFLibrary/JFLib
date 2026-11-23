@@ -631,6 +631,13 @@ pub(crate) fn host_wake() {
 pub(crate) fn host_viewport(width: i32, height: i32, dpi: i32) {
     windows::viewport(width, height, dpi);
 }
+/// (iOS: apple_ios.rs run) UIKit's host takes over with the installed runtime: what the host sends
+/// from now on is a change for the app (E_SETTINGS: the traits, the screens), as after jfgui_start
+/// in the browser and on Android
+#[cfg(target_os = "ios")]
+pub(crate) fn host_started() {
+    STARTED.store(true, Ordering::Relaxed);
+}
 /// (iOS) whether jfgui_main installed a runtime: the host then takes over the main thread
 #[cfg(target_os = "ios")]
 pub(crate) fn installed() -> bool {

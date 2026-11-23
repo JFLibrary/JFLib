@@ -184,6 +184,8 @@ pub mod sysmenu;
 /// Keeping the computer awake: no standby, no screen saver while a guard lives.
 pub mod power;
 pub use power::{INHIBIT_IDLE, INHIBIT_SUSPEND, Inhibit, inhibit, inhibited};
+#[cfg(target_os = "ios")]
+pub use power::ios_idle_timer_off;
 
 pub mod sensors;
 

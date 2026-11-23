@@ -12,6 +12,13 @@
 //                                one at a time ((0, 0) while one is open), (-1, 0) without a window
 //   file_dialog_poll()           None while it is open, then once (1, 0, path) / (0, 0, "") -- the
 //                                path a security-scoped URL's, its access started for the session
+//   bookmarks_restore()          (the host's launch) the files and folders chosen in earlier runs
+//                                readable again: each choice leaves a bookmark in the app's
+//                                container ($HOME/Library/jfgui/bookmarks, newest first, at most
+//                                BM_MAX, a path once); the launch resolves them and starts their
+//                                access, so the same path opens again (a recent file, a saved
+//                                setting).  A file moved meanwhile is kept under its new path (the
+//                                old one no longer opens); one gone is dropped
 //   notes::*                     (tray.rs) notifications: no symbol of a notification area on iOS;
 //                                notify asks the user once (alert, sound) and hands the note to the
 //                                centre when allowed -- refused, it goes away at once (NoteClosed); one
@@ -252,10 +259,135 @@ extern "C" fn picked(_this: Id, _sel: Sel, _picker: Id, urls: Id) {
             None
         } else {
             msg!(url, c"startAccessingSecurityScopedResource"; bool);
-            Some(string_of(msg!(url, c"path"; Id))).filter(|p| !p.is_empty())
+            let path = Some(string_of(msg!(url, c"path"; Id))).filter(|p| !p.is_empty());
+            if let Some(p) = &path {
+                remember(url, p);
+            }
+            path
         }
     };
     answer(path);
+}
+
+// ---------------------------------------------------------------- bookmarks of chosen files
+
+/// bookmarks kept (newest first)
+const BM_MAX: usize = 100;
+const BM_MAGIC: &[u8] = b"JFBM1\n";
+/// NSURLBookmarkCreationMinimalBookmark (what Apple's document picker guide uses)
+const BM_MINIMAL: usize = 1 << 9;
+
+fn bm_file() -> Option<String> {
+    Some(alloc::format!("{}/Library/jfgui/bookmarks", crate::env("HOME").filter(|h| h.starts_with('/'))?.trim_end_matches('/')))
+}
+
+/// the kept bookmarks: (path, bookmark data), newest first
+fn bm_load() -> Vec<(String, Vec<u8>)> {
+    let Some(f) = bm_file() else { return Vec::new() };
+    let Some(b) = crate::read_file_raw(&f) else { return Vec::new() };
+    let mut out = Vec::new();
+    let Some(mut rest) = b.strip_prefix(BM_MAGIC) else { return out };
+    // a length (u32, little-endian) and that many bytes
+    fn part<'a>(rest: &mut &'a [u8]) -> Option<&'a [u8]> {
+        let r: &'a [u8] = rest;
+        let n = u32::from_le_bytes(r.get(..4)?.try_into().ok()?) as usize;
+        let v = r.get(4..4usize.checked_add(n)?)?;
+        *rest = &r[4 + n..];
+        Some(v)
+    }
+    while !rest.is_empty() && out.len() < BM_MAX {
+        let (Some(p), Some(d)) = (part(&mut rest), part(&mut rest)) else { break };
+        let Ok(p) = core::str::from_utf8(p) else { break };
+        out.push((String::from(p), d.to_vec()));
+    }
+    out
+}
+
+fn bm_save(v: &[(String, Vec<u8>)]) {
+    let Some(f) = bm_file() else { return };
+    let mut b = Vec::from(BM_MAGIC);
+    for (p, d) in v.iter().take(BM_MAX) {
+        b.extend_from_slice(&(p.len() as u32).to_le_bytes());
+        b.extend_from_slice(p.as_bytes());
+        b.extend_from_slice(&(d.len() as u32).to_le_bytes());
+        b.extend_from_slice(d);
+    }
+    if let Some((dir, _)) = f.rsplit_once('/') {
+        let _ = crate::fs::mkdir_private(dir);
+    }
+    let _ = crate::fs::write_file_private(&f, &b);
+}
+
+/// a URL's bookmark data (its security scope included: the URL's access is started)
+///
+/// SAFETY: url is a live NSURL; an autorelease pool is in place.
+unsafe fn bm_data(url: Id) -> Option<Vec<u8>> {
+    // SAFETY: (caller) a live NSURL; the data is copied out of the autoreleased NSData.
+    unsafe {
+        let d: Id = msg!(url, c"bookmarkDataWithOptions:includingResourceValuesForKeys:relativeToURL:error:", BM_MINIMAL => usize, NIL => Id,
+                         NIL => Id, core::ptr::null_mut::<Id>() => *mut Id; Id);
+        if d.is_null() {
+            return None;
+        }
+        let n: usize = msg!(d, c"length"; usize);
+        let b: *const u8 = msg!(d, c"bytes"; *const u8);
+        (n > 0 && !b.is_null()).then(|| core::slice::from_raw_parts(b, n).to_vec())
+    }
+}
+
+/// the chosen URL's bookmark kept for later runs (in front, the same path once)
+///
+/// SAFETY: url is a live NSURL whose access was started; an autorelease pool is in place.
+unsafe fn remember(url: Id, path: &str) {
+    // SAFETY: (caller)
+    let Some(d) = (unsafe { bm_data(url) }) else { return };
+    let mut v = bm_load();
+    v.retain(|(p, _)| p != path);
+    v.insert(0, (String::from(path), d));
+    v.truncate(BM_MAX);
+    bm_save(&v);
+}
+
+/// (the host's launch) every kept bookmark resolved, its access started for this run; stale ones
+/// renewed, moved files under their new path, gone ones dropped (see the module header)
+pub(crate) fn bookmarks_restore() {
+    let v = bm_load();
+    if v.is_empty() {
+        return;
+    }
+    let mut keep: Vec<(String, Vec<u8>)> = Vec::new();
+    let mut changed = false;
+    for (path, data) in v {
+        let r = pooled(|| {
+            // SAFETY: an NSData of our bytes, NSURL's class method with an out flag of ours; the URL
+            // (autoreleased) used inside the pool.
+            unsafe {
+                let d: Id = msg!(class(c"NSData"), c"dataWithBytes:length:", data.as_ptr() => *const u8, data.len() => usize; Id);
+                if d.is_null() {
+                    return None;
+                }
+                let mut stale = false;
+                let url: Id = msg!(class(c"NSURL"), c"URLByResolvingBookmarkData:options:relativeToURL:bookmarkDataIsStale:error:", d => Id,
+                                   0usize => usize, NIL => Id, &raw mut stale => *mut bool, core::ptr::null_mut::<Id>() => *mut Id; Id);
+                if url.is_null() || !msg!(url, c"startAccessingSecurityScopedResource"; bool) {
+                    return None;
+                }
+                let now = string_of(msg!(url, c"path"; Id));
+                let renewed = if stale || now != path { bm_data(url) } else { None };
+                Some((now, renewed))
+            }
+        });
+        match r {
+            Some((now, renewed)) if !now.is_empty() && !keep.iter().any(|(p, _)| *p == now) => {
+                changed |= now != path || renewed.is_some();
+                keep.push((now, renewed.unwrap_or(data)));
+            }
+            _ => changed = true,
+        }
+    }
+    if changed {
+        bm_save(&keep);
+    }
 }
 
 extern "C" fn cancelled(_this: Id, _sel: Sel, _picker: Id) {
@@ -393,6 +525,38 @@ pub fn file_dialog_poll() -> Option<(i32, u32, String)> {
         Some(path) => (1, 0, path),
         None => (0, 0, String::new()),
     })
+}
+
+/// (tests) a path kept as if the picker had chosen it -> its bookmark made and kept in front
+pub fn ios_bookmark_add(path: &str) -> bool {
+    pooled(|| {
+        // SAFETY: an NSURL of the path (autoreleased in the pool), its bookmark made from it.
+        unsafe {
+            let p = nsstring(path);
+            let url: Id = msg!(class(c"NSURL"), c"fileURLWithPath:", p => Id; Id);
+            release(p);
+            if url.is_null() {
+                return false;
+            }
+            remember(url, path);
+        }
+        bm_load().first().is_some_and(|(p, _)| p == path)
+    })
+}
+
+/// (tests) the kept paths, newest first
+pub fn ios_bookmark_paths() -> Vec<String> {
+    bm_load().into_iter().map(|(p, _)| p).collect()
+}
+
+/// (tests) what the host's launch does: every kept bookmark resolved, the list renewed
+pub fn ios_bookmarks_restore() {
+    bookmarks_restore();
+}
+
+/// (tests) none kept
+pub fn ios_bookmarks_clear() {
+    bm_save(&[]);
 }
 
 // ---------------------------------------------------------------- notifications
