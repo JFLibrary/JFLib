@@ -21,6 +21,7 @@
 // (start screen, AutoRecover, live dynamics, units, the rest of Erweitert).
 // (JD15) Teilweise umschlossene Shapes auswählen works: the marquee and the lasso take touched
 // shapes (ZF-06).
+// (JD15) Shape-Suche anzeigen and Shape-Suche: ein Wort genügt act on the Shapes panel (SL-04).
 
 use alloc::string::String;
 use base::settings::{Key, Schema, Settings};
