@@ -99,9 +99,13 @@ fn ws(rows: &str) -> String {
     format!("{DECL}<worksheet xmlns=\"{MAIN}\" xmlns:r=\"{R}\"><dimension ref=\"A1:XFD1048576\"/><sheetData>{rows}</sheetData></worksheet>")
 }
 
-fn zip(entries: &[Entry]) -> Vec<u8> {
+fn zip_at(entries: &[Entry], level: u8) -> Vec<u8> {
     let big = archive::Limits { entries: 1000, part_bytes: 256 << 20, total_bytes: 512 << 20, archive_bytes: 512 << 20, ratio: 1032 };
-    archive::write_with(entries, big, Method::Deflate(1)).unwrap_or_default()
+    archive::write_with(entries, big, Method::Deflate(level)).unwrap_or_default()
+}
+
+fn zip(entries: &[Entry]) -> Vec<u8> {
+    zip_at(entries, 1)
 }
 
 fn open(z: &[u8], limits: Limits) -> Result<Workbook, Error> {
@@ -120,8 +124,8 @@ fn sheet_err(z: &[u8], limits: Limits) -> Option<Error> {
 
 fn xlsx_zip(t: &mut H) {
     let rows = "<row/>".repeat(700_000);
-    let bomb = zip(&book(&ws(&rows), "", &[], ""));
-    t.check("xlsx_zip/bomb_size", bomb.len() < (4 << 20) / 200, format!("{} bytes for 4.2 MB of XML", bomb.len()));
+    let bomb = zip_at(&book(&ws(&rows), "", &[], ""), 9);
+    t.check("xlsx_zip/bomb_size", bomb.len() < (4 << 20) / 400, format!("{} bytes for 4.2 MB of XML", bomb.len()));
     t.quick("xlsx_zip/bomb", Some(Error::Archive(archive::Error::Limit)), || open(&bomb, Limits::default()).err());
     let roomy = Limits { archive: archive::Limits { ratio: 1032, ..Limits::DEFAULT.archive }, ..Limits::DEFAULT };
     t.check("xlsx_zip/bomb_allowed", open(&bomb, roomy).is_ok_and(|wb| wb.sheet(0).is_ok_and(|g| g.is_empty())), String::from("the same file with the ratio raised: 700000 empty rows"));
