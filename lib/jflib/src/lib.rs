@@ -74,6 +74,7 @@ pub use game;
 pub use game_render3d;
 pub use geom;
 pub use netchan;
+pub use sheet_io;
 #[doc(hidden)]
 pub use style_assets;
 

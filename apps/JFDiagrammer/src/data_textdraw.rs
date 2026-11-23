@@ -8,9 +8,9 @@
 //   TextDrawState         the file dialog, the wizard, the text read, the plan, the choices
 //   open(app, ui)         DATA_TEXT_DRAWING: the file dialog (Textdateien: csv, txt)
 //   dialog(app, ui)       every pass: the file dialog, then the wizard; Fertigstellen builds
-//   decode(bytes)         UTF-8 with or without BOM, UTF-16 with BOM, else Windows-1252 ->
-//                         (text, the encoding's name); a local stand-in until the JD18 session
-//                         switches to sheet_io::csv::decode
+//
+// The file is decoded by sheet_io::csv::decode (a BOM, UTF-16, UTF-8, else Windows-1252); its
+// records are read by diagram_io::textdraw's own tokenizer (the format is not a table).
 //
 // What the app decides (FEATURES IM-08, AS-20; UG chapter 21 names neither):
 // * The separator: detected from the records (textdraw::detect_sep), else the extension's (.txt a
@@ -44,6 +44,7 @@ use alloc::vec::Vec;
 use diagram_core::instance::{self, fold, MasterTexts};
 use diagram_core::{glue, pagesetup, Document, MasterRef, Owner, PageRef, ShapeRef, SheetRef};
 use diagram_io::textdraw::{self, Build, Issue, Limits, NumField, Options, Plan, Problem};
+use sheet_io::csv::Encoding;
 use ui::i18n::{t, tf};
 use ui::*;
 
@@ -164,31 +165,18 @@ pub(crate) fn dialog(app: &mut Diagrammer, ui: &mut Ui) {
 
 // ---------------------------------------------------------------- reading
 
-/// a text file's bytes as text: UTF-8 (a BOM dropped), UTF-16 with its BOM, else Windows-1252
+/// a text file's bytes as text (sheet_io::csv::decode: BOM, UTF-16, UTF-8, else Windows-1252)
 /// -> (text, the encoding's name)
-pub(crate) fn decode(bytes: &[u8]) -> (String, &'static str) {
-    if let Some(rest) = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]) {
-        return (String::from_utf8_lossy(rest).into_owned(), "UTF-8");
-    }
-    let utf16 = |rest: &[u8], le: bool| -> String {
-        let units = rest.chunks_exact(2).map(|c| if le { u16::from_le_bytes([c[0], c[1]]) } else { u16::from_be_bytes([c[0], c[1]]) });
-        char::decode_utf16(units).map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER)).collect()
+fn decode(bytes: &[u8]) -> (String, &'static str) {
+    let (text, enc) = sheet_io::csv::decode(bytes);
+    let name = match enc {
+        Encoding::Utf8 => "UTF-8",
+        Encoding::Utf8Bom => "UTF-8 (BOM)",
+        Encoding::Utf16Le => "UTF-16 LE",
+        Encoding::Utf16Be => "UTF-16 BE",
+        Encoding::Windows1252 => "Windows-1252",
     };
-    if let Some(rest) = bytes.strip_prefix(&[0xFF, 0xFE]) {
-        return (utf16(rest, true), "UTF-16");
-    }
-    if let Some(rest) = bytes.strip_prefix(&[0xFE, 0xFF]) {
-        return (utf16(rest, false), "UTF-16");
-    }
-    if let Ok(s) = core::str::from_utf8(bytes) {
-        return (String::from(s), "UTF-8");
-    }
-    // Windows-1252: 0x80..0x9F are its own characters (the five unused ones stay C1 codes)
-    const HIGH: [char; 32] = [
-        '€', '\u{81}', '‚', 'ƒ', '„', '…', '†', '‡', 'ˆ', '‰', 'Š', '‹', 'Œ', '\u{8d}', 'Ž', '\u{8f}', '\u{90}', '‘', '’', '“', '”', '•', '–', '—', '˜', '™', 'š', '›', 'œ', '\u{9d}', 'ž', 'Ÿ',
-    ];
-    let text = bytes.iter().map(|&b| if (0x80..0xA0).contains(&b) { HIGH[(b - 0x80) as usize] } else { char::from(b) }).collect();
-    (text, "Windows-1252")
+    (text, name)
 }
 
 // a chosen file: read, decoded, parsed, the wizard opened
