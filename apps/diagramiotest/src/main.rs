@@ -30,6 +30,11 @@
 //                                         metric and US (templates.rs)
 //   diagramiotest --write-vdx DIR        (JD16) the self-written .vdx / .vsx files and the .vsdx /
 //                                         .vssx JFDiagrammer writes from them (vdx.rs)
+//   diagramiotest --write-vss-hostile DIR (JD17) the synthetic .vss files and their hostile
+//                                         variants (vss.rs)
+//   diagramiotest --write-vss-overview DIR [--corpus DIR]   (JD17) every master of each local .vss
+//                                         on one sheet (<stem>-alle.png), and of each .vssx Visio
+//                                         saved from them (<stem>-visio-alle.png; vss.rs)
 //
 // Groups:
 //   samples   self-built files of all six formats: what lands where in the model (fields,
@@ -69,6 +74,10 @@
 //   vdx       (JD16, vdx.rs) the XML formats of 2003-2010: the self-written drawing, stencil and
 //             bitmap read into the model and written as .vsdx / .vssx, hostile files and
 //             limits; macro projects passed through unchanged; document properties
+//   vss       (JD17, vss.rs) the binary stencils of 2003-2010: compound files (cfbkit.rs) and
+//             VisioDocument streams (vsskit.rs) built here, hostile variants of both, cut and
+//             mutated files; the local .vss of SWDB_DE read, written as .vssx and read back, and
+//             drawn against Visio's .vssx of them (skipped without the files)
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -84,6 +93,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 mod build;
+mod cfbkit;
 mod corpus;
 mod designs;
 mod drawings;
@@ -112,6 +122,8 @@ mod symbol_sheet;
 mod templates;
 mod vdx;
 mod vdx_sample;
+mod vss;
+mod vsskit;
 mod zipkit;
 
 /// a refusal must come within this many microseconds
@@ -215,6 +227,14 @@ fn run() -> i32 {
         // (JD16) the self-written .vdx / .vsx and what JFDiagrammer writes from them
         return vdx::write(&dir);
     }
+    if let Some(dir) = arg(&args, "--write-vss-overview") {
+        // (JD17) every master of each local .vss on one sheet
+        return vss::write_overview(&dir, arg(&args, "--corpus"));
+    }
+    if let Some(dir) = arg(&args, "--write-vss-hostile") {
+        // (JD17) the synthetic .vss files and their hostile variants
+        return vss::write_hostile(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-probe") {
         return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
     }
@@ -266,6 +286,8 @@ fn run() -> i32 {
         if h.on("vdx") {
             vdx::run(&mut h);
         }
+        // (JD17) the binary stencils of 2003-2010 (subgroups vss/cfb, vss/stream ...)
+        vss::run(&mut h);
     }
     if h.on("corpus") {
         corpus::run(&mut h, corpus_dir.clone());
