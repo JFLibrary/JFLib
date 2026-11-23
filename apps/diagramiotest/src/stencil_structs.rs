@@ -265,6 +265,11 @@ pub fn run(h: &mut H) {
                 .collect();
             let same = got.len() == want.len() && got.iter().zip(want.iter()).all(|(g, w)| g.0 == w.0 && g.1 == w.1 && g.2 == w.2);
             h.check(&format!("{tag}/masters"), same, format!("{got:?}"));
+            // (JD15, SH-G04) the callouts' quick shapes: the four most used, at the front
+            if name == "callouts" {
+                let quick: Vec<bool> = doc.masters().map(|mr| MasterTexts::of(&doc, mr).quick).collect();
+                h.check(&format!("{tag}/quick"), quick.iter().enumerate().all(|(i, q)| *q == (i < 4)), format!("{} quick of {}: {quick:?}", quick.iter().filter(|q| **q).count(), quick.len()));
+            }
             let mut d = doc.clone();
             let res = Engine::new().calculate(&d);
             let bad: Vec<String> = res

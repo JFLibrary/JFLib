@@ -74,6 +74,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - (JD8) `ui.tabs` and `ui.tabs_scrolling` report `EV_DOUBLE` when a tab is double-clicked (it is the selected one then); a double click on the strip beside the tabs no longer does. A right click on a tab selects it as a click does, so a context menu on the strip belongs to the tab under the pointer
 - (JD11) `ui.color_menu(id, &ColorMenu)` -> `Option<(ColorPick, rgb)>`: the swatches of an Office colour menu (design colours with five shades each, variant colours, fixed colours, last used; the current one marked) and `color_shades(rgb)`; `ui.ribbon_image_tile(id, label, &surface, ver)`: a gallery tile with a picture the app made
 - (G7a part 2) `ui.gamepads()`: the game pads connected now (`ui::Gamepad`, the same as `plat::Gamepad`) with the edges of their buttons in this batch; the first call starts watching (`plat::pad_watch`), every change gives a frame, a pad that comes or goes gives `App::command(UIC_GAMEPAD, index | PADEV_* << 8)`; `ui.gamepads_watching()`; `ui::PadStyle`. Scripts: `pad connect N [xbox|playstation|nintendo|other] [NAME]`, `pad disconnect N`, `pad press N BUTTON [VALUE]`, `pad release N BUTTON`, `pad axis N lx|ly|rx|ry VALUE`. docs/GUIDE.md sections 12 and 39
+- (JD15) `StencilState::no_search`: the Shapes window shows no search box (Visio's option to hide the shape search); the query stays until the app clears it
 
 ### Changed
 

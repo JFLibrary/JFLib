@@ -906,3 +906,6 @@ Skalierung	Scale	Escala	Scala	Échelle
 Zeichenabstand	Spacing	Espaciado	Spaziatura	Espacement
 Die Aktion lässt sich nicht ausführen.	The action cannot be run.	La acción no se puede ejecutar.	Impossibile eseguire l'azione.	L'action ne peut pas être exécutée.
 „{}“ führt JFDiagrammer nicht aus.	JFDiagrammer does not run "{}".	JFDiagrammer no ejecuta "{}".	JFDiagrammer non esegue "{}".	JFDiagrammer n'exécute pas « {} ».
+Shape-Suche anzeigen	Show shape search	Mostrar la búsqueda de formas	Mostra la ricerca forme	Afficher la recherche de formes
+Shape-Suche: ein Wort genügt	Shape search: one word is enough	Búsqueda de formas: basta con una palabra	Ricerca forme: basta una parola	Recherche de formes : un mot suffit
+Aus: Ein Shape muss alle Suchwörter enthalten.	Off: a shape must contain every search word.	Desactivado: una forma debe contener todas las palabras buscadas.	Disattivato: una forma deve contenere tutte le parole cercate.	Désactivé : une forme doit contenir tous les mots recherchés.

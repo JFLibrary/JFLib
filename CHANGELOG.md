@@ -167,6 +167,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **JFDiagrammer:** (JD15) Dimensions with a text field: Bemaßung horizontal and vertikal in the rack stencil (SH-146, the horizontal or vertical distance of their ends, in paper size on a 1:20 page) and Auto-Bemaßung in Beschriftungen (SH-272, its own length; the text stays upright on lines from right to left)
 - **diagram_core:** (JD15, MS-10) Visio's range of eight: `instance::place` adjusts an instance whose master's drawing scale (PageScale / DrawingScale of its page sheet) is more than eight times larger or smaller than the page's, so it keeps its size on the paper: its constant lengths (Shape and Text Transform, User and Prop values with a unit of length, X and Y of Geometry, Connection and Control rows, a 1-D shape's ends around the pin) times `instance::scale_factor`; the formulas built on them follow
 - **diagram_core:** (JD15, FX-06) RAND computes: a number 0 <= x < 1 from the engine's generator (SplitMix64), anew each time its cell is computed; `Engine::with_seed` and `Engine::seed` start it from a seed (every engine starts from the same one)
+- **ui:** (JD15) `StencilState::no_search`: the Shapes window shows no search box (Visio's option to hide the shape search); the query stays until the app clears it
 
 ### Changed
 

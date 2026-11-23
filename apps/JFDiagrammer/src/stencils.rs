@@ -11,7 +11,9 @@
 //   add_favorite(app, ui, key, entry)   copy a master into "Favoriten" (data://shapes/
 //                               favorites.vssx, created on first use; MS-06, SL-07)
 //   search(app)                 the hits of the panel's query: NameU, the names in all five
-//                               languages, the keywords (SL-04), over every stencil read
+//                               languages, the keywords, (JD15) the QuickInfos (SL-04), over
+//                               every stencil read; every word, or one of them with the option
+//                               "Shape-Suche: ein Wort genügt"
 //   MORE_MENU / command(app, ui, id)   "Weitere Shapes" (SL-05): Meine Shapes, the categories
 //                               with their stencils, Schablone öffnen, Neue Schablone (metric /
 //                               US); the rows of each submenu are Mi::List rows, their commands
@@ -535,11 +537,14 @@ pub(crate) fn my_files(ui: &Ui) -> Vec<String> {
 
 /// the hits of the panel's query (cached while it stays the same)
 pub(crate) fn search(app: &mut Diagrammer) -> &[(u32, usize)] {
+    // (JD15, SL-04) every word or one of them (Optionen › Erweitert); the cache knows which
+    let any = app.opts.get(&crate::options::SEARCH_ANY);
     let st = &mut app.stencils;
-    let q = st.panel.query.trim().to_string();
+    let words_of = st.panel.query.trim().to_string();
+    let q = if any { format!("\u{1}{words_of}") } else { words_of.clone() };
     if q != st.hits_for {
         st.hits.clear();
-        let words: Vec<String> = q.split_whitespace().map(instance::fold).collect();
+        let words: Vec<String> = words_of.split_whitespace().map(instance::fold).collect();
         let words: Vec<&str> = words.iter().map(|s| s.as_str()).collect();
         if !words.is_empty() {
             // the open stencils first, in panel order, then the others read
@@ -548,7 +553,7 @@ pub(crate) fn search(app: &mut Diagrammer) -> &[(u32, usize)] {
             for i in order {
                 let l = &st.loaded[i];
                 for (k, e) in l.entries.iter().enumerate() {
-                    if e.texts.matches(&words, false) {
+                    if e.texts.matches(&words, any) {
                         st.hits.push((l.key, k));
                     }
                 }

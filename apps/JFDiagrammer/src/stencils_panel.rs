@@ -212,6 +212,13 @@ pub(crate) fn states(app: &mut Diagrammer, ui: &mut Ui) {
 pub(crate) fn panel(app: &mut Diagrammer, ui: &mut Ui) {
     stencils::menu_rows(app, ui);
     open_dialog(app, ui);
+    // (JD15, SL-04) Optionen › Erweitert › Shape-Suche anzeigen: off hides the search box and
+    // ends a search
+    let show = app.opts.get(&crate::options::SEARCH_SHOW);
+    app.stencils.panel.no_search = !show;
+    if !show && !app.stencils.panel.query.is_empty() {
+        app.stencils.panel.query.clear();
+    }
     let lang = stencils::lang();
     // the tiles of the open stencils and of the search hits, with their previews
     let open: Vec<u32> = app.stencils.open.clone();

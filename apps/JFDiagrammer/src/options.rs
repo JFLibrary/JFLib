@@ -72,12 +72,20 @@ pub(crate) const UNITS: Key<usize> = Key::choice("advanced.units", 0, &[("auto",
     .label("Maßeinheit der Seite");
 pub(crate) const DEV: Key<bool> = Key::bool("advanced.developer", false)
     .label("Im Entwicklermodus ausführen");
+// (JD15, SL-04) the shape search: shown or not, every word or one of them (Visio's Advanced
+// options "Show Shape Search pane", "Search for: All of the words (AND) / Any of the words (OR)")
+pub(crate) const SEARCH_SHOW: Key<bool> = Key::bool("advanced.shape_search", true)
+    .label("Shape-Suche anzeigen");
+pub(crate) const SEARCH_ANY: Key<bool> = Key::bool("advanced.shape_search_any", false)
+    .label("Shape-Suche: ein Wort genügt")
+    .help("Aus: Ein Shape muss alle Suchwörter enthalten.");
 
 static SCHEMA: Schema = Schema::new(1, &[
     THEME.d, USER.d, INITIALS.d, START.d, LIVE.d, TIPS.d,
     FORMAT.d, AUTOREC.d, AUTOREC_MIN.d, DRAWINGS.d, TEMPLATES.d,
     UI_LANG.d, REGION.d,
     LIVE_DYN.d, WHEEL_ZOOM.d, CENTER_ZOOM.d, CONNECT_ARROWS.d, SPLIT_CONN.d, DELETE_CONN.d, ENTER_ENDS.d, UNDO_LEVELS.d, UNITS.d, DEV.d,
+    SEARCH_SHOW.d, SEARCH_ANY.d,
 ])
 .sections(SECTIONS);
 
