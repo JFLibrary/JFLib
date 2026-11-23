@@ -317,6 +317,15 @@ commands! {
     SIZE_A3 = 0x1806, "A3", 0, 0;
     SIZE_B5 = 0x1807, "B5 (JIS)", 0, 0;
     SIZE_B4 = 0x1808, "B4 (JIS)", 0, 0;
+    // (JD15, RW-02) envelopes and the US government sizes
+    SIZE_ENV_10 = 0x1809, "Umschlag #10", 0, 0;
+    SIZE_ENV_DL = 0x180A, "Umschlag DL", 0, 0;
+    SIZE_ENV_C4 = 0x180B, "Umschlag C4", 0, 0;
+    SIZE_ENV_C5 = 0x180C, "Umschlag C5", 0, 0;
+    SIZE_ENV_C6 = 0x180D, "Umschlag C6", 0, 0;
+    SIZE_ENV_MONARCH = 0x180E, "Umschlag Monarch", 0, 0;
+    SIZE_GOV_LETTER = 0x180F, "Government Letter", 0, 0;
+    SIZE_GOV_LEGAL = 0x1810, "Government Legal", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -508,6 +517,14 @@ static HANDLERS: &[(u32, Handler)] = &[
     (SIZE_A3, |a, ui| crate::page_size::size(a, ui, SIZE_A3)),
     (SIZE_B5, |a, ui| crate::page_size::size(a, ui, SIZE_B5)),
     (SIZE_B4, |a, ui| crate::page_size::size(a, ui, SIZE_B4)),
+    (SIZE_ENV_10, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_10)),
+    (SIZE_ENV_DL, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_DL)),
+    (SIZE_ENV_C4, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_C4)),
+    (SIZE_ENV_C5, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_C5)),
+    (SIZE_ENV_C6, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_C6)),
+    (SIZE_ENV_MONARCH, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_MONARCH)),
+    (SIZE_GOV_LETTER, |a, ui| crate::page_size::size(a, ui, SIZE_GOV_LETTER)),
+    (SIZE_GOV_LEGAL, |a, ui| crate::page_size::size(a, ui, SIZE_GOV_LEGAL)),
     // (JD8 rest: Zeichentools, Bilder, Inhalte einfügen, Ebenen, Nach Typ auswählen)
     (DRAW_TOOLS, crate::cmds_draw::draw_tools),
     (FREEFORM, |a, _| crate::edit_cmds::tool(a, FREEFORM)),
@@ -582,6 +599,14 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (SIZE_A3, |a| crate::page_size::checked(a, SIZE_A3)),
     (SIZE_B5, |a| crate::page_size::checked(a, SIZE_B5)),
     (SIZE_B4, |a| crate::page_size::checked(a, SIZE_B4)),
+    (SIZE_ENV_10, |a| crate::page_size::checked(a, SIZE_ENV_10)),
+    (SIZE_ENV_DL, |a| crate::page_size::checked(a, SIZE_ENV_DL)),
+    (SIZE_ENV_C4, |a| crate::page_size::checked(a, SIZE_ENV_C4)),
+    (SIZE_ENV_C5, |a| crate::page_size::checked(a, SIZE_ENV_C5)),
+    (SIZE_ENV_C6, |a| crate::page_size::checked(a, SIZE_ENV_C6)),
+    (SIZE_ENV_MONARCH, |a| crate::page_size::checked(a, SIZE_ENV_MONARCH)),
+    (SIZE_GOV_LETTER, |a| crate::page_size::checked(a, SIZE_GOV_LETTER)),
+    (SIZE_GOV_LEGAL, |a| crate::page_size::checked(a, SIZE_GOV_LEGAL)),
     // (JD8 rest: Zeichentools)
     (DRAW_TOOLS, crate::cmds_draw::any_tool),
     (FREEFORM, |a| a.tool == FREEFORM),

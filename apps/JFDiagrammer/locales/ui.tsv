@@ -825,3 +825,74 @@ Vertikale Ausrichtung	Vertical alignment	Alineación vertical	Allineamento verti
 Texthintergrund	Text background	Fondo del texto	Sfondo del testo	Arrière-plan du texte
 Keiner	None	Ninguno	Nessuno	Aucun
 Hintergrundfarbe	Background color	Color de fondo	Colore di sfondo	Couleur d'arrière-plan
+Umschlag #10	Envelope #10	Sobre n.º 10	Busta n. 10	Enveloppe n° 10
+Umschlag DL	Envelope DL	Sobre DL	Busta DL	Enveloppe DL
+Umschlag C4	Envelope C4	Sobre C4	Busta C4	Enveloppe C4
+Umschlag C5	Envelope C5	Sobre C5	Busta C5	Enveloppe C5
+Umschlag C6	Envelope C6	Sobre C6	Busta C6	Enveloppe C6
+Umschlag Monarch	Envelope Monarch	Sobre Monarch	Busta Monarch	Enveloppe Monarch
+Government Letter	Government Letter	Government Letter (EE. UU.)	Government Letter (USA)	Government Letter (États-Unis)
+Government Legal	Government Legal	Government Legal (EE. UU.)	Government Legal (USA)	Government Legal (États-Unis)
+Umschläge	Envelopes	Sobres	Buste	Enveloppes
+Behördenformate	Government sizes	Formatos gubernamentales	Formati governativi	Formats gouvernementaux
+A0: 841 × 1189 mm	A0: 841 × 1189 mm	A0: 841 × 1189 mm	A0: 841 × 1189 mm	A0 : 841 × 1189 mm
+A6: 105 × 148 mm	A6: 105 × 148 mm	A6: 105 × 148 mm	A6: 105 × 148 mm	A6 : 105 × 148 mm
+B3 (ISO): 353 × 500 mm	B3 (ISO): 353 × 500 mm	B3 (ISO): 353 × 500 mm	B3 (ISO): 353 × 500 mm	B3 (ISO) : 353 × 500 mm
+B4 (ISO): 250 × 353 mm	B4 (ISO): 250 × 353 mm	B4 (ISO): 250 × 353 mm	B4 (ISO): 250 × 353 mm	B4 (ISO) : 250 × 353 mm
+B5 (ISO): 176 × 250 mm	B5 (ISO): 176 × 250 mm	B5 (ISO): 176 × 250 mm	B5 (ISO): 176 × 250 mm	B5 (ISO) : 176 × 250 mm
+B4 (JIS): 257 × 364 mm	B4 (JIS): 257 × 364 mm	B4 (JIS): 257 × 364 mm	B4 (JIS): 257 × 364 mm	B4 (JIS) : 257 × 364 mm
+B5 (JIS): 182 × 257 mm	B5 (JIS): 182 × 257 mm	B5 (JIS): 182 × 257 mm	B5 (JIS): 182 × 257 mm	B5 (JIS) : 182 × 257 mm
+Umschlag C4: 229 × 324 mm	Envelope C4: 229 × 324 mm	Sobre C4: 229 × 324 mm	Busta C4: 229 × 324 mm	Enveloppe C4 : 229 × 324 mm
+Umschlag C5: 162 × 229 mm	Envelope C5: 162 × 229 mm	Sobre C5: 162 × 229 mm	Busta C5: 162 × 229 mm	Enveloppe C5 : 162 × 229 mm
+Umschlag C6: 114 × 162 mm	Envelope C6: 114 × 162 mm	Sobre C6: 114 × 162 mm	Busta C6: 114 × 162 mm	Enveloppe C6 : 114 × 162 mm
+Umschlag DL: 110 × 220 mm	Envelope DL: 110 × 220 mm	Sobre DL: 110 × 220 mm	Busta DL: 110 × 220 mm	Enveloppe DL : 110 × 220 mm
+Umschlag #10: 4,125 × 9,5 in	Envelope #10: 4.125 × 9.5 in	Sobre n.º 10: 4,125 × 9,5 in	Busta n. 10: 4,125 × 9,5 in	Enveloppe n° 10 : 4,125 × 9,5 in
+Umschlag Monarch: 3,875 × 7,5 in	Envelope Monarch: 3.875 × 7.5 in	Sobre Monarch: 3,875 × 7,5 in	Busta Monarch: 3,875 × 7,5 in	Enveloppe Monarch : 3,875 × 7,5 in
+Executive: 7,25 × 10,5 in	Executive: 7.25 × 10.5 in	Executive: 7,25 × 10,5 in	Executive: 7,25 × 10,5 in	Executive : 7,25 × 10,5 in
+Government Letter: 8 × 10,5 in	Government Letter: 8 × 10.5 in	Government Letter (EE. UU.): 8 × 10,5 in	Government Letter (USA): 8 × 10,5 in	Government Letter (États-Unis) : 8 × 10,5 in
+Government Legal: 8,5 × 13 in	Government Legal: 8.5 × 13 in	Government Legal (EE. UU.): 8,5 × 13 in	Government Legal (USA): 8,5 × 13 in	Government Legal (États-Unis) : 8,5 × 13 in
+ANSI A: 8,5 × 11 in	ANSI A: 8.5 × 11 in	ANSI A: 8,5 × 11 in	ANSI A: 8,5 × 11 in	ANSI A : 8,5 × 11 in
+ANSI B: 11 × 17 in	ANSI B: 11 × 17 in	ANSI B: 11 × 17 in	ANSI B: 11 × 17 in	ANSI B : 11 × 17 in
+ANSI C: 17 × 22 in	ANSI C: 17 × 22 in	ANSI C: 17 × 22 in	ANSI C: 17 × 22 in	ANSI C : 17 × 22 in
+ANSI D: 22 × 34 in	ANSI D: 22 × 34 in	ANSI D: 22 × 34 in	ANSI D: 22 × 34 in	ANSI D : 22 × 34 in
+ANSI E: 34 × 44 in	ANSI E: 34 × 44 in	ANSI E: 34 × 44 in	ANSI E: 34 × 44 in	ANSI E : 34 × 44 in
+ARCH A: 9 × 12 in	ARCH A: 9 × 12 in	ARCH A: 9 × 12 in	ARCH A: 9 × 12 in	ARCH A : 9 × 12 in
+ARCH B: 12 × 18 in	ARCH B: 12 × 18 in	ARCH B: 12 × 18 in	ARCH B: 12 × 18 in	ARCH B : 12 × 18 in
+ARCH C: 18 × 24 in	ARCH C: 18 × 24 in	ARCH C: 18 × 24 in	ARCH C: 18 × 24 in	ARCH C : 18 × 24 in
+ARCH D: 24 × 36 in	ARCH D: 24 × 36 in	ARCH D: 24 × 36 in	ARCH D: 24 × 36 in	ARCH D : 24 × 36 in
+ARCH E: 36 × 48 in	ARCH E: 36 × 48 in	ARCH E: 36 × 48 in	ARCH E: 36 × 48 in	ARCH E : 36 × 48 in
+Architektur 1/16″ = 1′ 0″	Architectural 1/16″ = 1′ 0″	Arquitectura 1/16″ = 1′ 0″	Architettura 1/16″ = 1′ 0″	Architecture 1/16″ = 1′ 0″
+Architektur 1/8″ = 1′ 0″	Architectural 1/8″ = 1′ 0″	Arquitectura 1/8″ = 1′ 0″	Architettura 1/8″ = 1′ 0″	Architecture 1/8″ = 1′ 0″
+Architektur 1/4″ = 1′ 0″	Architectural 1/4″ = 1′ 0″	Arquitectura 1/4″ = 1′ 0″	Architettura 1/4″ = 1′ 0″	Architecture 1/4″ = 1′ 0″
+Architektur 3/8″ = 1′ 0″	Architectural 3/8″ = 1′ 0″	Arquitectura 3/8″ = 1′ 0″	Architettura 3/8″ = 1′ 0″	Architecture 3/8″ = 1′ 0″
+Architektur 1/2″ = 1′ 0″	Architectural 1/2″ = 1′ 0″	Arquitectura 1/2″ = 1′ 0″	Architettura 1/2″ = 1′ 0″	Architecture 1/2″ = 1′ 0″
+Architektur 3/4″ = 1′ 0″	Architectural 3/4″ = 1′ 0″	Arquitectura 3/4″ = 1′ 0″	Architettura 3/4″ = 1′ 0″	Architecture 3/4″ = 1′ 0″
+Architektur 1″ = 1′ 0″	Architectural 1″ = 1′ 0″	Arquitectura 1″ = 1′ 0″	Architettura 1″ = 1′ 0″	Architecture 1″ = 1′ 0″
+Architektur 3″ = 1′ 0″	Architectural 3″ = 1′ 0″	Arquitectura 3″ = 1′ 0″	Architettura 3″ = 1′ 0″	Architecture 3″ = 1′ 0″
+Bauingenieurwesen 1″ = 10′ 0″	Civil Engineering 1″ = 10′ 0″	Ingeniería civil 1″ = 10′ 0″	Ingegneria civile 1″ = 10′ 0″	Génie civil 1″ = 10′ 0″
+Bauingenieurwesen 1″ = 20′ 0″	Civil Engineering 1″ = 20′ 0″	Ingeniería civil 1″ = 20′ 0″	Ingegneria civile 1″ = 20′ 0″	Génie civil 1″ = 20′ 0″
+Bauingenieurwesen 1″ = 30′ 0″	Civil Engineering 1″ = 30′ 0″	Ingeniería civil 1″ = 30′ 0″	Ingegneria civile 1″ = 30′ 0″	Génie civil 1″ = 30′ 0″
+Bauingenieurwesen 1″ = 40′ 0″	Civil Engineering 1″ = 40′ 0″	Ingeniería civil 1″ = 40′ 0″	Ingegneria civile 1″ = 40′ 0″	Génie civil 1″ = 40′ 0″
+Bauingenieurwesen 1″ = 50′ 0″	Civil Engineering 1″ = 50′ 0″	Ingeniería civil 1″ = 50′ 0″	Ingegneria civile 1″ = 50′ 0″	Génie civil 1″ = 50′ 0″
+Bauingenieurwesen 1″ = 100′ 0″	Civil Engineering 1″ = 100′ 0″	Ingeniería civil 1″ = 100′ 0″	Ingegneria civile 1″ = 100′ 0″	Génie civil 1″ = 100′ 0″
+Kilometer	Kilometers	Kilómetros	Chilometri	Kilomètres
+Yard	Yards	Yardas	Iarde	Yards
+Meilen	Miles	Millas	Miglia	Miles
+Pica	Picas	Picas	Pica	Picas
+Cicero	Ciceros	Cíceros	Cicero	Cicéros
+Didot	Didot points	Puntos Didot	Punti Didot	Points Didot
+Platzierungsstil	Placement style	Estilo de colocación	Stile di posizionamento	Style de placement
+Kompakte Struktur	Compact tree	Árbol compacto	Albero compatto	Arborescence compacte
+Hierarchie	Hierarchy	Jerarquía	Gerarchia	Hiérarchie
+Radial	Radial	Radial	Radiale	Radial
+Kreisförmig	Circular	Circular	Circolare	Circulaire
+Von oben nach unten	Top to bottom	De arriba abajo	Dall'alto in basso	De haut en bas
+Von unten nach oben	Bottom to top	De abajo arriba	Dal basso in alto	De bas en haut
+Von links nach rechts	Left to right	De izquierda a derecha	Da sinistra a destra	De gauche à droite
+Von rechts nach links	Right to left	De derecha a izquierda	Da destra a sinistra	De droite à gauche
+Tiefe und Spiegelung	Depth and flipping	Profundidad y volteo	Profondità e capovolgimento	Profondeur et retournement
+Tief	Deep	Profunda	Profonda	Profonde
+Gitternetz drucken	Print grid	Imprimir cuadrícula	Stampa griglia	Imprimer la grille
+Flach|Tiefe	Shallow	Poco profunda	Poco profonda	Peu profonde
+Richtung	Direction	Dirección	Direzione	Direction
+Beide	Both	Ambos	Entrambi	Les deux
