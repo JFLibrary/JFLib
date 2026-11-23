@@ -1,6 +1,6 @@
 // textdraw -- (JD18, IM-08) a connected drawing from a text file: records of the types "Shape"
-// and "Link" (Visio's text import filter; Visio 5.0 user guide, chapter 21, "Creating connected
-// drawings from text files") read into a plan, which then becomes shapes and dynamic connectors
+// and "Link" (Visio's text import filter; Visio 5.0 user guide, chapter 21, on connected
+// drawings from text files) read into a plan, which then becomes shapes and dynamic connectors
 // on a page
 //
 //   parse(text, &Options, &Limits) -> Plan   the records: shapes (ID, master, text, position,

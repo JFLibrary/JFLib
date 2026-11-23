@@ -12,21 +12,22 @@ use diagram_core::{DocKind, Document};
 
 const MM: f64 = 1.0 / 25.4;
 
-// the user guide's example (chapter 21), as printed: comment headings, empty fields, a space
-// before an ID
-const GUIDE: &str = ";Shape,ID,Master,Text,X,Y,Width,Height,Property
-Shape,PATRICIA,,Patricia Rodman
-Shape,STEVE,,Steve Melvin
-Shape,TROY,,Troy Morris
-Shape,ELIZABETH,,Elizabeth Davis
-Shape,SARAH,,Sarah Wright
-
-;Link,ID,Master,Text,From,To
-Link,,,,PATRICIA,TROY
-Link,,,, PATRICIA,STEVE
-Link,,,,TROY,ELIZABETH
-Link,,,,TROY,SARAH
-";
+// an organisation chart in the form the user guide shows (own content): comment headings, empty
+// fields, a space before an ID, the links not in the shapes' order
+const GUIDE: &str = concat!(
+    ";Shape,ID,Master,Text,X,Y,Width,Height,Property\n",
+    "Shape,CHEF,,Geschäftsleitung\n",
+    "Shape,EINKAUF,,Einkauf\n",
+    "Shape,TECHNIK,,Technik\n",
+    "Shape,WERKSTATT,,Werkstatt\n",
+    "Shape,LABOR,,Labor\n",
+    "\n",
+    ";Link,ID,Master,Text,From,To\n",
+    "Link,,,,CHEF,TECHNIK\n",
+    "Link,,,, CHEF,EINKAUF\n",
+    "Link,,,,TECHNIK,WERKSTATT\n",
+    "Link,,,,TECHNIK,LABOR\n",
+);
 
 fn read(text: &str) -> Plan {
     parse(text, &Options::default(), &Limits::DEFAULT)
@@ -44,7 +45,7 @@ fn guide_example() {
     assert_eq!(p.comments, 2);
     assert!(p.problems.is_empty(), "{:?}", p.problems);
     let texts: Vec<&str> = p.shapes.iter().map(|s| s.text.as_str()).collect();
-    assert_eq!(texts, ["Patricia Rodman", "Steve Melvin", "Troy Morris", "Elizabeth Davis", "Sarah Wright"]);
+    assert_eq!(texts, ["Geschäftsleitung", "Einkauf", "Technik", "Werkstatt", "Labor"]);
     assert_eq!(p.shapes[0].line, 2);
     assert!(p.shapes.iter().all(|s| s.pos.is_none() && s.size == [None, None] && s.props.is_empty()));
     let ends: Vec<(usize, usize)> = p.links.iter().map(|l| (l.from, l.to)).collect();
@@ -133,10 +134,11 @@ fn numbers_units_and_positions() {
 
 #[test]
 fn shape_data_fields() {
-    let text = "Shape,a,,A,,,,,Kosten=12,Owner = Jakob,frei,http://x.y/?a=b,,=leer
-;Shape,ID,Master,Text,X,Y,Width,Height,Abteilung,Property,Telefon
-Shape,b,,B,,,,,Finanzen,ohne Kopf,555-4300,Abteilung=doppelt
-";
+    let text = concat!(
+        "Shape,a,,A,,,,,Kosten=12,Owner = Jakob,frei,http://x.y/?a=b,,=leer\n",
+        ";Shape,ID,Master,Text,X,Y,Width,Height,Abteilung,Property,Telefon\n",
+        "Shape,b,,B,,,,,Finanzen,ohne Kopf,555-4300,Abteilung=doppelt\n",
+    );
     let p = read(text);
     assert!(p.problems.is_empty(), "{:?}", p.problems);
     let a: Vec<(&str, &str, &str)> = p.shapes[0].props.iter().map(|x| (x.name.as_str(), x.label.as_str(), x.value.as_str())).collect();
@@ -150,19 +152,20 @@ Shape,b,,B,,,,,Finanzen,ohne Kopf,555-4300,Abteilung=doppelt
 
 #[test]
 fn broken_records() {
-    let text = "Shape,a,,A
-Shape,A,,again
-Shape,,,no id
-Rect,x,,?
-Link,l1,,,a,zz
-Link,l1,,,a,a
-Link,l2,,,a,
-Link,,,,zz,a
-Link,l1,,,b,a
-Shape,b,,B
-Link,dup,,,a,b
-Link,DUP,,,b,a
-";
+    let text = concat!(
+        "Shape,a,,A\n",
+        "Shape,A,,again\n",
+        "Shape,,,no id\n",
+        "Rect,x,,?\n",
+        "Link,l1,,,a,zz\n",
+        "Link,l1,,,a,a\n",
+        "Link,l2,,,a,\n",
+        "Link,,,,zz,a\n",
+        "Link,l1,,,b,a\n",
+        "Shape,b,,B\n",
+        "Link,dup,,,a,b\n",
+        "Link,DUP,,,b,a\n",
+    );
     let p = read(text);
     let i = issues(&p);
     assert_eq!(
@@ -255,12 +258,12 @@ fn layout_of_the_guide_example() {
     let edges: Vec<(usize, usize)> = p.links.iter().map(|l| (l.from, l.to)).collect();
     let c = layout(&sizes, &edges, [0.4, 0.6]);
     let near = |a: f64, b: f64| (a - b).abs() < 1e-9;
-    // three layers: Patricia; Steve, Troy; Elizabeth, Sarah
+    // three layers: Geschäftsleitung; Einkauf, Technik; Werkstatt, Labor
     assert!(near(c[0][1], 0.25));
     assert!(near(c[1][1], 1.35) && near(c[2][1], 1.35));
     assert!(near(c[3][1], 2.45) && near(c[4][1], 2.45));
-    // Steve left of Troy (file order), Elizabeth and Sarah centred under Troy, Patricia over
-    // her two
+    // Einkauf left of Technik (file order, not the links' order), Werkstatt and Labor centred
+    // under Technik, Geschäftsleitung over its two
     assert!(c[1][0] < c[2][0]);
     assert!(near((c[3][0] + c[4][0]) * 0.5, c[2][0]));
     assert!(near((c[1][0] + c[2][0]) * 0.5, c[0][0]));
@@ -337,15 +340,16 @@ fn builds_shapes_connectors_and_data_on_a_page() {
     let st = stencil();
     let mut doc = vsdx::new_document(DocKind::Drawing, Measure::Metric);
     let page = doc.pages().next().expect("a page");
-    let text = ";Shape,ID,Master,Text,X,Y,Width,Height,Kosten,Ort
-Shape,s1,Kasten,Start,,,,,12,Halle 1
-Shape,s2,,\"Zwei\nZeilen\",,,50,,Kosten=7
-Shape,s3,Box,Drei,100,50,30,15
-Shape,s4,Linie,falsch
-Link,l1,,ja,s1,s2
-Link,l2,Line,,s2,s3
-Link,l3,Kasten,,s1,s3
-";
+    let text = concat!(
+        ";Shape,ID,Master,Text,X,Y,Width,Height,Kosten,Ort\n",
+        "Shape,s1,Kasten,Start,,,,,12,Halle 1\n",
+        "Shape,s2,,\"Zwei\nZeilen\",,,50,,Kosten=7\n",
+        "Shape,s3,Box,Drei,100,50,30,15\n",
+        "Shape,s4,Linie,falsch\n",
+        "Link,l1,,ja,s1,s2\n",
+        "Link,l2,Line,,s2,s3\n",
+        "Link,l3,Kasten,,s1,s3\n",
+    );
     let plan = parse(text, &Options { per_number: MM, ..Options::default() }, &Limits::DEFAULT);
     assert!(plan.problems.is_empty(), "{:?}", plan.problems);
     let names: Vec<(&str, bool)> = plan.masters.iter().map(|m| (m.name.as_str(), m.link)).collect();
@@ -431,7 +435,7 @@ fn builds_beside_earlier_shapes_and_rolls_back() {
     for &s in &built.shapes {
         assert!(ops::frame(doc_now, s).bounds()[0] >= 3.0 + 0.4 - 1e-9);
     }
-    // the tree as the guide's picture: Patricia over Steve and Troy, Troy over Elizabeth and Sarah
+    // the tree: Geschäftsleitung over Einkauf and Technik, Technik over Werkstatt and Labor
     let c: Vec<[f64; 2]> = built.shapes.iter().map(|&s| ops::frame(doc_now, s).centre()).collect();
     assert!(c[0][1] > c[1][1] && (c[1][1] - c[2][1]).abs() < 1e-9 && c[2][1] > c[3][1]);
     assert!(((c[3][0] + c[4][0]) * 0.5 - c[2][0]).abs() < 1e-6);
