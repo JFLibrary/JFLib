@@ -126,15 +126,22 @@ pub(crate) fn dialog(app: &mut Diagrammer, ui: &mut Ui) {
 
 // ------------------------------------------------------------------ the window state (DF-10)
 
-/// after a drawing was installed (opened from a file): its stencils, its page and zoom
-pub(crate) fn opened(app: &mut Diagrammer, ui: &mut Ui, dir: Option<&str>) {
+/// after a drawing was installed (opened from a file): its stencils, its page, zoom and what the
+/// window shows (rulers, grid, guides, page breaks)
+pub(crate) fn opened(app: &mut Diagrammer, ui: &mut Ui) {
     let Some(o) = app.opened.as_ref() else { return };
     let list = diagram_io::template::stencil_windows(&o.doc);
     let win = windows::drawing_window(&o.doc);
     if !list.is_empty() {
-        open_stencils(app, ui, &list, dir);
+        open_stencils(app, ui, &list);
     }
     let Some(w) = win else { return };
+    let shows = [(w.show_rulers, &mut app.view_rulers), (w.show_grid, &mut app.view_grid), (w.show_guides, &mut app.view_guides), (w.show_page_breaks, &mut app.view_breaks)];
+    for (v, field) in shows {
+        if let Some(v) = v {
+            *field = v;
+        }
+    }
     // the page shown
     if let (Some(id), Some(o)) = (w.page, app.opened.as_ref()) {
         if let Some(k) = o.doc.page_by_id(id).and_then(|p| o.tabs.iter().position(|tab| tab.page == p)) {
@@ -150,19 +157,18 @@ pub(crate) fn opened(app: &mut Diagrammer, ui: &mut Ui, dir: Option<&str>) {
 
 // the stencils of the file's windows, in their order, the active one unfolded; those not found
 // are left out (Visio does the same); the stencils open before are closed when the file names any
-fn open_stencils(app: &mut Diagrammer, ui: &mut Ui, list: &[StencilWindow], dir: Option<&str>) {
+fn open_stencils(app: &mut Diagrammer, ui: &mut Ui, list: &[StencilWindow]) {
     let mut keys: Vec<(u32, bool)> = Vec::new();
     for w in list {
         let name = String::from(w.document.rsplit(['/', '\\']).next().unwrap_or(&w.document));
         // a built-in stencil by its file name, in the measure the name says
         let builtin = stencil::parse_file_name(&name).and_then(|(stem, m)| stencils::BUILTIN.iter().position(|b| b.file.eq_ignore_ascii_case(&stem)).map(|k| (k, m)));
         // else one of the own stencils (data://shapes); other files only with the user's choice
-        // (PERMISSIONS: fs.user), as the drawing's folder is not given with it
+        // (PERMISSIONS: fs.user), so not those next to the drawing
         let key = if let Some((b, m)) = builtin {
             stencils::open_builtin_in(app, ui, b, m)
         } else {
             let own = format!("data://shapes/{name}");
-            let _ = dir;
             plat::read_file(&own).is_some().then(|| {
                 stencils::open_file(app, ui, &own);
                 app.stencils.loaded.iter().find(|l| l.origin == Origin::File(own.clone())).map(|l| l.key)
@@ -194,11 +200,21 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
         ui.repass();
         return;
     }
-    let Some(z) = w.view_scale.filter(|z| *z > 0.0) else { return };
-    app.set_zoom((z * 100.0 + 0.5) as i32);
-    if let (Some((x, y)), Some(h)) = (w.center, page_height(app)) {
-        app.canvas.vp.cx = x * DIP;
-        app.canvas.vp.cy = (h - y) * DIP;
+    let Some(z) = w.view_scale.filter(|z| z.is_finite() && *z > 0.0) else { return };
+    // the zoom as the file has it (not rounded to a percent: an own file opens exactly as it was
+    // saved), around its centre, else around the canvas' middle
+    let z = (z as f32).clamp(Viewport::ZOOM_MIN, Viewport::ZOOM_MAX);
+    match (w.center, page_height(app)) {
+        (Some((x, y)), Some(h)) if x.is_finite() && y.is_finite() => {
+            let vp = &mut app.canvas.vp;
+            vp.zoom = z;
+            vp.cx = x * DIP;
+            vp.cy = (h - y) * DIP;
+        }
+        _ => {
+            let r = app.canvas.vp.rect;
+            app.canvas.vp.zoom_at(z, r[0] as f32 + r[2] as f32 * 0.5, r[1] as f32 + r[3] as f32 * 0.5);
+        }
     }
     ui.repass();
 }

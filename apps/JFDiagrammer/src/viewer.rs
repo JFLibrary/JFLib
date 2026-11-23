@@ -202,9 +202,8 @@ pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
     }
     let notice = (!msg.is_empty()).then(|| (String::from(t("Hinweise zur Datei")), msg));
     crate::edit_doc::install(app, ui, doc, stem, Some(String::from(path)), loaded.format, notice);
-    // (JD16, DF-10) the file's stencils, page and zoom
-    let dir = path.rsplit_once(['/', '\\']).map(|x| String::from(x.0));
-    crate::doc_file::opened(app, ui, dir.as_deref());
+    // (JD16, DF-10) the file's stencils, page, zoom and what its window shows
+    crate::doc_file::opened(app, ui);
     ui.recent_add(path);
     ui.repass();
     true
