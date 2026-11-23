@@ -1,0 +1,90 @@
+#!args --no-system-fonts --data-dir apps/JFDiagrammer/tests
+# JFDiagrammer, JD18: rows of the pane Externe Daten onto the page (DA-04, AB-11) -- a row dragged
+# onto a shape binds it (its Shape-Daten show the row's values, the row gets the link mark; a
+# second row replaces the first; one undo step), a row dragged onto the empty page makes a
+# rectangle bound to it, two rows two shapes side by side, with a master armed in the Shapes
+# panel the shape comes from it.  A double click on a linked row selects its shape; the pane's
+# menu: Verknüpfte Shapes auswählen, Verknüpfung aufheben; the shape's menu: Daten ›
+# Verknüpfung mit Zeile aufheben (the shape data stays).
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+drag button:"Rechteck" canvas:"Zeichenfläche"
+a11y expect announced "„Rechteck“ abgelegt"
+# the workbook as it is
+cmd 6401
+click button:"Weiter >"
+click button:"Durchsuchen..."
+click #2087714828
+key ctrl+a
+type "data_geraete.xlsx"
+click button:"Öffnen"
+click button:"Weiter >"
+click button:"Weiter >"
+click button:"Fertig stellen"
+expect tab:"Geräte" selected
+expect icon:"Zeile 2 ist verknüpft" missing
+# a row onto the shape
+drag text:"Server2" listitem:"Rechteck"
+a11y expect announced "Zeile mit „Rechteck“ verknüpft"
+expect listitem:"Rechteck" selected
+expect icon:"Zeile 2 ist verknüpft" exists
+cmd 5139
+expect tab:"Shape-Daten" selected
+expect text:"IP-Adresse" exists
+expect #20784 text "Server2"
+expect #20788 text "10.0.0.2"
+expect #20792 text "48"
+# another row onto it: the shape is bound to that one instead
+drag text:"Server1" listitem:"Rechteck"
+expect #20784 text "Server1"
+expect icon:"Zeile 1 ist verknüpft" exists
+expect icon:"Zeile 2 ist verknüpft" missing
+key ctrl+z
+expect #20784 text "Server2"
+expect icon:"Zeile 2 ist verknüpft" exists
+# a row onto the empty page: a rectangle bound to it
+drag text:"Router" 500,300
+a11y expect announced "Shape aus Zeile erstellt"
+expect listitem:"Sheet.5" selected
+expect #20784 text "Router"
+expect #20788 text "10.0.0.254"
+expect icon:"Zeile 4 ist verknüpft" exists
+# two rows at once: two shapes side by side
+click text:"Server1"
+click text:"Switch" ctrl
+drag text:"Switch" 450,470
+a11y expect announced "2 Shapes aus Zeilen erstellt"
+expect listitem:"Sheet.6" selected
+expect listitem:"Sheet.7" selected
+expect icon:"Zeile 1 ist verknüpft" exists
+expect icon:"Zeile 3 ist verknüpft" exists
+# a double click on a linked row selects its shape
+dblclick text:"Router"
+expect listitem:"Sheet.5" selected
+expect listitem:"Rechteck" unselected
+# the pane's menu
+rclick text:"Server2"
+click "Verknüpfte Shapes auswählen"
+expect listitem:"Rechteck" selected
+expect listitem:"Sheet.5" unselected
+rclick text:"Server2"
+click "Verknüpfung aufheben"
+expect icon:"Zeile 2 ist verknüpft" missing
+expect #20784 text "Server2"
+# the shape's menu: Daten › Verknüpfung mit Zeile aufheben
+dblclick text:"Router"
+rclick listitem:"Sheet.5"
+click "Daten"
+click "Verknüpfung mit Zeile aufheben"
+expect icon:"Zeile 4 ist verknüpft" missing
+expect #20784 text "Router"
+# with a master armed in the Shapes panel the new shape is one of it
+click button:"Ellipse"
+expect button:"Ellipse" checked
+drag text:"Server2" 850,300
+a11y expect announced "Shape aus Zeile erstellt"
+expect listitem:"Ellipse" selected
+expect #20784 text "Server2"
+expect icon:"Zeile 2 ist verknüpft" exists
+shot build/JFDiagrammer-data-drag-row.png

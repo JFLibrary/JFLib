@@ -464,6 +464,8 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
     }
     // (JD9) the canvas takes the Shapes panel's tiles (its rectangle is the last one)
     crate::stencils_drop::drop_target(app, ui, id);
+    // (JD18, DA-04) and the rows of the pane Externe Daten (data_pane.rs)
+    crate::data_pane::drop_target(app, ui);
     // the edit layer; (JD10) the insert triangles of the lists
     let marks = crate::structures::marks(app);
     app.se.arrows = app.structs.arrows && app.opts.get(&crate::options::CONNECT_ARROWS);
@@ -609,6 +611,18 @@ fn link_hover(app: &Diagrammer, ui: &Ui, k: usize) -> Option<(u64, String)> {
         return None;
     }
     crate::dlg_link::tip(app, shape_of(page, key)).map(|t| (key, t))
+}
+
+/// (JD18, DA-04) the top-level shape at a world point of the page shown, as a click finds it
+/// (a container's inside is the page): rows of the pane Externe Daten dropped there (data_pane.rs)
+pub(crate) fn shape_at(app: &Diagrammer, ui: &Ui, at: [f32; 2]) -> Option<ShapeRef> {
+    let (Some(o), Some(geo), Some(page)) = (app.opened.as_ref(), app.model.geo, app.model.page) else { return None };
+    let pv = o.paint_of(app.page_index())?;
+    let view = pv.view();
+    let scale = app.canvas.vp.scale() as f32;
+    let tol = if scale > 0.0 { ui.dp(3) as f32 / scale } else { 3.0 };
+    let key = hit_at(&o.doc, view.drawing(), &geo, page, at, tol, 0);
+    (key != 0).then(|| shape_of(page, key))
 }
 
 /// a shape's name for scripts and screen readers: its text (the first line), else its name

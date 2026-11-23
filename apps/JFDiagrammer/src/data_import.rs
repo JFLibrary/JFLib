@@ -250,7 +250,7 @@ fn page_source(d: &mut ImportState, ui: &mut Ui) {
 fn page_file(d: &mut ImportState, ui: &mut Ui) {
     let excel = d.kind == EXCEL;
     ui.next_size(W, 0);
-    ui.text(TS_BODY_STRONG | TX_WRAP, if excel { t("Mit Microsoft Excel-Arbeitsmappe verbinden") } else { t("Mit Textdatei verbinden") });
+    ui.text(TS_BODY_STRONG | TX_WRAP, if excel { t("Verbindung zu einer Microsoft Excel-Arbeitsmappe") } else { t("Verbindung zu einer Textdatei") });
     ui.text(TS_BODY, if excel { t("Arbeitsmappe") } else { t("Textdatei") });
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.next_size(W - 140, 0);
@@ -315,17 +315,28 @@ fn page_rows(d: &mut ImportState, ui: &mut Ui) {
     ui.next_size(W, 0);
     ui.text(TS_BODY_STRONG | TX_WRAP, t("Spalten und Zeilen auswählen"));
     ui.text(TS_BODY, t("Spalten"));
-    ui.next_size(W, 96);
-    ui.scroll_begin(ID + 0x20, SC_V | BOX_V);
+    // side by side, lines as needed; many columns scroll
+    let many = l.headers.len() > 12;
+    if many {
+        ui.next_size(W, 96);
+        ui.scroll_begin(ID + 0x20, SC_V | BOX_V);
+    }
+    ui.next_size(W - if many { 16 } else { 0 }, 0);
+    ui.box_begin(ID + 0x23, BOX_H | BOX_WRAP, 12);
     for (c, h) in l.headers.iter().enumerate().take(0x5000) {
         ui.checkbox(ID_COL + c as u32, h, &mut d.cols[c]);
     }
-    ui.scroll_end();
+    ui.box_end();
+    if many {
+        ui.scroll_end();
+    }
     ui.text(TS_BODY, t("Zeilen"));
     // the preview: a check box per row, the columns taken
     let shown: Vec<usize> = (0..l.headers.len()).filter(|&c| d.cols.get(c).is_some_and(|&v| v != 0)).collect();
+    // the columns share the width (the grid does not scroll sideways)
+    let cw = ((W - 64 - 16) / shown.len().max(1) as i32).clamp(48, 110);
     let mut gcols = vec![GridCol::new("", 64).flags(GC_NOSORT)];
-    gcols.extend(shown.iter().map(|&c| GridCol::new(l.headers[c].as_str(), 110).flags(GC_NOSORT)));
+    gcols.extend(shown.iter().map(|&c| GridCol::new(l.headers[c].as_str(), cw).flags(GC_NOSORT)));
     let keys: Vec<u64> = (0..l.rows.len() as u64).collect();
     ui.next_size(W, 180);
     let (first, end) = ui.grid_begin(ID_GRID, &mut d.grid, &gcols, &keys);
@@ -496,7 +507,7 @@ fn read_table(d: &mut ImportState) -> bool {
                         ExcelTable::Range(sheet, a.a1())
                     }
                     _ => {
-                        d.error = Some(String::from(t("Geben Sie einen Bereich mit Blatt an, z. B. Tabelle1!A1:C9.")));
+                        d.error = Some(String::from(t("Tragen Sie einen Bereich mit Blatt ein, z. B. Tabelle1!A1:C9.")));
                         return false;
                     }
                 },

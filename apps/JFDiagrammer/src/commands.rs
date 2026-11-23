@@ -356,6 +356,8 @@ commands! {
     DATA_UNLINK = 0x1914, "Verknüpfung mit Zeile aufheben", 0, 0;
     DATA_REFRESH_SETTINGS = 0x1915, "Aktualisierung konfigurieren...", 0, 0;
     DATA_CONFLICTS = 0x1916, "Aktualisierungskonflikte", 0, 0;
+    // (JD18, AB-11) the pane Externe Daten's Verknüpfung aufheben: the selected rows' shapes
+    DATA_UNLINK_ROWS = 0x1960, "Verknüpfung aufheben", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -589,6 +591,7 @@ static HANDLERS: &[(u32, Handler)] = &[
     (DATA_UNLINK, crate::data_pane::unlink),
     (DATA_REFRESH_SETTINGS, crate::data_refresh::settings_open),
     (DATA_CONFLICTS, crate::data_refresh::conflicts_open),
+    (DATA_UNLINK_ROWS, crate::data_pane::unlink_rows),
 ];
 
 // toggles: whether the command is on
@@ -686,6 +689,7 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
         && crate::cmds_text::available(app, id)
         // (JD18) the data commands
         && crate::data_cmds::available(app, id)
+        && crate::data_pane::available(app, id)
 }
 
 /// the toggle is on

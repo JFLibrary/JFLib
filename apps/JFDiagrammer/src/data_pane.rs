@@ -211,7 +211,8 @@ pub(crate) fn pane(app: &mut Diagrammer, ui: &mut Ui) {
     cols.extend(order.iter().map(|&k| GridCol::new(rs.columns[k].label.as_str(), 120)));
     ui.next_size(-1, -1);
     let (first, end) = ui.grid_begin(ID_GRID, &mut ext.grid, &cols, &keys);
-    let icon = commands::def(HYPERLINK).map_or(0, |d| d.icon);
+    // the chain of a link
+    let icon = crate::icons::JD_LINK;
     for i in first..end {
         let row = &rs.rows[idx[i as usize]];
         let ev = ui.grid_row(&mut ext.grid, i);
@@ -300,7 +301,7 @@ fn inside(ui: &Ui, r: [i32; 4]) -> bool {
 fn empty(app: &mut Diagrammer, ui: &mut Ui) {
     ui.next_size(-1, -1);
     ui.box_begin(ID + 1, BOX_V | BOX_XCENTER | pad(10), 8);
-    ui.empty_state(crate::icons::JD_EXTERNAL_DATA, t("Keine Datenquelle"), t("Benutzerdefinierter Import verbindet die Zeichnung mit einer Excel-Arbeitsmappe oder einer Textdatei. Ihre Zeilen erscheinen hier; zieht man sie auf die Seite, werden sie mit Shapes verknüpft."));
+    ui.empty_state(crate::icons::JD_EXTERNAL_DATA, t("Keine Datenquelle"), t("Benutzerdefinierter Import holt die Zeilen einer Excel-Arbeitsmappe oder einer Textdatei hierher. Auf die Seite gezogen, werden sie mit Shapes verknüpft."));
     ui.next_size(220, 0);
     ui.cmd_button(DATA_CUSTOM_IMPORT, 0);
     ui.box_end();
@@ -446,7 +447,8 @@ fn dropped(app: &mut Diagrammer, ui: &mut Ui, at: [f32; 2], rs: u32, rows: &[u32
         Ok(shapes) => {
             let keys: Vec<u64> = shapes.iter().map(|&s| key_of(s)).collect();
             app.se.select(&keys);
-            ui.announce(&tf("{} Shapes mit Zeilen erstellt", &[&format!("{}", shapes.len())]), LIVE_POLITE);
+            let said = if shapes.len() == 1 { String::from(t("Shape aus Zeile erstellt")) } else { tf("{} Shapes aus Zeilen erstellt", &[&format!("{}", shapes.len())]) };
+            ui.announce(&said, LIVE_POLITE);
         }
         Err(e) => app.ext.error = Some(tf("Die Shapes lassen sich nicht erstellen: {}", &[&format!("{e:?}")])),
     }
@@ -765,7 +767,7 @@ fn columns_dialog(app: &mut Diagrammer, ui: &mut Ui) {
         ui.combobox(ID_COLS + 0x201, &mut c.kind, &types);
     }
     ui.next_size(420, 0);
-    ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Name und Datentyp gelten für die Shape-Daten, die beim Verknüpfen und Aktualisieren geschrieben werden."));
+    ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Name und Datentyp gelten für die Shape-Daten, die das Verknüpfen und das Aktualisieren schreiben."));
     let r = ui.dialog_buttons(Some(t("OK")), None, Some(t("Abbrechen")));
     ui.dialog_end();
     if r == DLG_PRIMARY {
