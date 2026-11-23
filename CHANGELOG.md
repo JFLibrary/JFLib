@@ -225,6 +225,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netio:** TLS: SNI on the server: `ServerConfig::identities` (certificates for other names, or of other key types for the same name) and `ServerConfig::select` (the program's own choice by `tls::Hello`: the name, the protocols, the signature schemes; certificates renewed while the server runs); the server confirms a name its certificate has (RFC 6066), `TlsStream::server_name()`. ALPN (RFC 7301) on both sides: `ClientConfig::alpn` (names of 1 to 255 bytes, 8 KiB of them at most), `ServerConfig::alpn`, `TlsStream::alpn()`, the client's names as bytes in `Hello::alpn`; a client that shares no protocol with the server gets no_application_protocol. https and wss connectors offer http/1.1 (RFC 9325, against cross-protocol attacks)
 - **x509:** `PrivateKey`: Ed25519, ECDSA (P-256 / P-384) and RSA keys from PKCS #8, SEC 1 and PKCS #1 DER (ECDSA without a branch on the secret, checked to be in [1, n - 1] and against a stored public key), written as PKCS #8; `public_key`, `spki`, `sign(alg, data, random)` (ECDSA as DER with RFC 6979 and `random` mixed in, RSA PKCS #1 v1.5 or PSS), `cert_alg`, `can`; `spki_of(&PubKey)`. `CertBuilder::spki` and `CertBuilder::sign_key`: certificates of any of these keys, signed with any of them (ECDSA with SHA-256 / SHA-384, RSA PKCS #1 v1.5 with SHA-256, Ed25519)
 - **crypto:** `rsa::PrivateKey::dp()` and `dq()`: d mod (p - 1) and d mod (q - 1) for PKCS #1's RSAPrivateKey, one bit at a time with the subtraction kept by mask
+- **plat:** `plat::share(&Share)`: the system's share sheet hands a title, a text, a link and files to another app (Windows DataTransferManager, macOS NSSharingServicePicker, iOS UIActivityViewController with an iPad popover at `Share::anchor`, Android a chooser for ACTION_SEND through GalleryFiles, the browser `navigator.share`; Linux none); `share_poll()` answers once SHARE_DONE / SHARE_CANCELLED / SHARE_FAILED, `CAP_SHARE` says where it exists
+- **plat:** iOS: `plat::inhibit(INHIBIT_IDLE)` keeps the screen on (UIApplication's idle timer off while a guard lives; INHIBIT_SUSPEND alone stays None), the system's text size (Dynamic Type) is `SysSettings::text_scale`, and files and folders chosen in the system's picker open again after a new start (bookmarks kept in the app's container)
 
 ### Changed
 
@@ -417,6 +419,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netio:** HTTP server: a connection the client ends (its close_notify over TLS, or a closed socket) is ended with the server's close_notify, as RFC 8446 6.1 asks; before the server only closed the socket (TLS-Anvil AlertProtocol.sendsCloseNotify)
 - **netio:** TLS: a handshake message longer than a record (a certificate chain of over 16 KiB) goes in several records (RFC 8446 5.1); it went in one record, which the peer refused (record_overflow)
 - **crypto:** `rsa::PrivateKey::iqmp` of a key whose q has more 64-bit words than p: q is reduced mod p first; the words above p's length were dropped, and the coefficient a key file keeps was wrong
+- **plat:** iOS: a change of dark mode, contrast, motion or text size while the app ran never reached it (no E_SETTINGS): the host now marks the app as started when UIKit takes over
 
 ### Security
 

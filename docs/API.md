@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_pad.rs (Windows)](#platwin_padrs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_pad.rs (Linux)](#platlinux_padrs-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_pad.rs (Apple)](#platapple_mac_padrs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [fuzz.rs](#platfuzzrs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [pad.rs](#platpadrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [apple_power_ios.rs](#platapple_power_iosrs) · [share.rs](#platsharers) · [win_share.rs (Windows)](#platwin_sharers-windows) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_pad.rs (Windows)](#platwin_padrs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_pad.rs (Linux)](#platlinux_padrs-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_share.rs (Apple)](#platapple_ios_sharers-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_pad.rs (Apple)](#platapple_mac_padrs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_share.rs (Apple)](#platapple_mac_sharers-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [fuzz.rs](#platfuzzrs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [pad.rs](#platpadrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [formats](#formats) -- bounded JSON with exact numbers, typed JSON records, an XML subset, Unicode text encodings
@@ -29378,6 +29378,8 @@ CAP_WINDOWING: u64 = 1 << 10
 CAP_THREADS: u64 = 1 << 11
 /// Install operating-system shortcuts or integrations.
 CAP_SHELL_INTEGRATION: u64 = 1 << 12
+/// Hand a text, a link or files to another app through the system's share sheet (share.rs).
+CAP_SHARE: u64 = 1 << 13
 ```
 
 - **`struct Capabilities`**
@@ -30675,7 +30677,9 @@ notice.  logind's Inhibit is not used: it answers with a file descriptor, which 
 D-Bus client does not receive.  Browser and Android (web_power.rs): the Screen Wake Lock
 (INHIBIT_IDLE only; taken again when the tab is visible again), FLAG_KEEP_SCREEN_ON and a
 partial WakeLock (INHIBIT_SUSPEND).  macOS (apple_power.rs): IOKit power assertions
-(PreventUserIdleSystemSleep, with INHIBIT_IDLE also PreventUserIdleDisplaySleep); iOS: None.
+(PreventUserIdleSystemSleep, with INHIBIT_IDLE also PreventUserIdleDisplaySleep).  iOS
+(apple_power_ios.rs): INHIBIT_IDLE turns UIApplication's idle timer off (no auto-lock while
+the app is in front); INHIBIT_SUSPEND alone is None (iOS has no sleep but the screen's lock).
 ```
 
 ```rust
@@ -30700,6 +30704,140 @@ INHIBIT_IDLE: u32 = 2
 
 - **`fn inhibited() -> u32`**
   the INHIBIT_\* bits the live guards of this process hold
+
+### `plat/apple_power_ios.rs`
+
+Source: [`lib/plat/apple_power_ios.rs`](../lib/plat/apple_power_ios.rs)
+
+```text
+apple_power_ios -- (power.rs) keep an iPhone or iPad awake: UIApplication's idle timer
+
+  hold(reason, what) -> Some(Held)   INHIBIT_IDLE: idleTimerDisabled while a guard of this
+                                     process holds it (the screen stays on, no auto-lock; iOS
+                                     honours it while the app is in front).  INHIBIT_SUSPEND
+                                     alone -> None: iOS has no sleep of its own besides the
+                                     screen's lock, and an app in the background runs only
+                                     seconds; the reason is not shown anywhere
+  release(held)                      the last guard turns the timer on again
+  ios_idle_timer_off() -> bool       (tests) idleTimerDisabled as UIKit has it now
+
+The property belongs to the main thread: set there at once, from another thread through the
+main queue.  Each setting applies the count of that moment, so settings that arrive out of
+order still end in the right state.  Without an app (no UIApplication) nothing happens and
+hold still answers: the request is noted for an app that starts later in the process.
+```
+
+- **`fn ios_idle_timer_off() -> bool`**
+  (tests) UIApplication's idleTimerDisabled now (false outside an app)
+
+### `plat/share.rs`
+
+Source: [`lib/plat/share.rs`](../lib/plat/share.rs)
+
+```text
+share -- the system's share sheet: hand a text, a link or files to another app (mail, messages,
+AirDrop, Nearby Share, a chat ...)
+
+  share(&Share) -> i32          SHARE_PENDING: the sheet is open, its answer comes through
+                                share_poll (and wakes the UI); SHARE_NONE: not here -- no sheet on
+                                this system (Linux), no window, nothing to share, a file the app
+                                may not read or that is not there, one sheet open already
+  share_poll() -> Option<i32>   None while it is open (or none was), then once: SHARE_DONE (a
+                                target took the items), SHARE_CANCELLED (closed without one) or
+                                SHARE_FAILED (the target or the system refused)
+  share_open() -> bool          a sheet is open (its answer not taken yet)
+  CAP_SHARE                     capabilities(): this system has a share sheet
+
+Share { title, text, url, files, anchor }: `title` the subject (a mail's subject line, Windows'
+title of the data; may be empty), `text` plain text, `url` a link (http, https, mailto ...),
+`files` paths of the file system (the browser: of its virtual files) -- at least one of text, url,
+files.  `anchor` [x, y, w, h] in the window's pixels: what the sheet points at where it is a
+popover (macOS, an iPad); empty: the window's middle (macOS, iPad) / its usual place.
+
+What "done" means differs (it says nothing about delivery): iOS and macOS a service was chosen
+and took the items; Windows the target app took them (TargetApplicationChosen); the browser
+navigator.share resolved; Android a target was chosen (the chooser's callback, API 22+).
+
+Windows (win_share.rs): DataTransferManager of the active window through
+IDataTransferManagerInterop (Windows 10), the data package filled in DataRequested (text, a web
+link, storage items of the files).  macOS (apple_mac_share.rs): NSSharingServicePicker at the
+anchor in the key window.  iOS (apple_ios_share.rs): UIActivityViewController over the scene's
+window, on an iPad a popover at the anchor.  Browser and Android (web_share.rs): the host --
+navigator.share (files as File objects; the browser asks for the user's gesture: call it while
+handling input) / Intent.ACTION_SEND(_MULTIPLE) in a chooser (files through the host's provider,
+readable by the target only).  Linux: none.
+```
+
+```rust
+/// the sheet is open; the answer comes through share_poll
+SHARE_PENDING: i32 = 2
+/// a target took the items
+SHARE_DONE: i32 = 1
+/// closed without a target
+SHARE_CANCELLED: i32 = 0
+/// not here: no sheet, no window, nothing to share, a file not readable, one open already
+SHARE_NONE: i32 = -1
+/// the target or the system refused
+SHARE_FAILED: i32 = -2
+```
+
+- **`struct Share`**
+  what to share (see the module comment)
+  - `title: String`
+  - `text: String`
+  - `url: String`
+  - `files: Vec<String>`
+  - `anchor: [i32; 4]` -- [x, y, w, h] in the window's pixels (all 0: none)
+
+**`impl Share`**
+
+- **`fn text(text: &str) -> Share`**
+  a text to share
+- **`fn url(url: &str) -> Share`**
+  a link to share
+- **`fn files(files: &[&str]) -> Share`**
+  files to share
+- **`fn is_empty(&self) -> bool`**
+  nothing to share
+
+- **`fn share(s: &Share) -> i32`**
+  open the system's share sheet with these items -> SHARE_PENDING / SHARE_NONE
+
+- **`fn share_poll() -> Option<i32>`**
+  the open sheet's answer: None while open (or none was), then once SHARE_DONE /
+  SHARE_CANCELLED / SHARE_FAILED
+
+- **`fn share_open() -> bool`**
+  a sheet is open (its answer not taken yet)
+
+### `plat/win_share.rs` (Windows)
+
+Source: [`lib/plat/win_share.rs`](../lib/plat/win_share.rs)
+
+```text
+win_share -- (share.rs) Windows' share sheet: the DataTransferManager of a window through
+IDataTransferManagerInterop (Windows 10), raw COM as win_winrt.rs
+
+  share(&Share) -> SHARE_PENDING / SHARE_NONE   the active window of the UI thread (else the main
+                               window): DataRequested is registered, ShowShareUIForWindow opens
+                               the sheet; the files become StorageFiles first (on an MTA thread,
+                               GetFileFromPathAsync, at most 5 s each)
+  available() -> bool          the interop factory exists (Windows 10 and later)
+  win_share_dismiss()          (tests) the sheet in front gets Esc, the app's window comes back
+
+DataRequested (on the UI thread, while the sheet opens) fills the request's DataPackage: the title
+(the sheet requires one: the title, else the app's id), the text (SetText), the link (SetWebLink
+through Windows.Foundation.Uri), the files (SetStorageItems with an IIterable of our own), and
+registers ShareCompleted (IDataPackage3: SHARE_DONE) and ShareCanceled (IDataPackage4, Windows 10
+2004: SHARE_CANCELLED).  The handlers are small COM objects of ours (IUnknown + Invoke, agile).
+A failure inside DataRequested answers SHARE_FAILED (the sheet then says it cannot share).
+```
+
+- **`fn win_share_dismiss() -> bool`**
+  (tests, any thread) the open sheet closed as the user's Esc would: the sheet is the foreground
+  window of another process with the class Windows.UI.Core.CoreWindow (ShellExperienceHost's
+  "Share"); it gets Esc (a posted key, no real input), then the window the sheet came from is put
+  in front again -> false when no such sheet was in front
 
 ### `plat/sensors.rs`
 
@@ -36325,6 +36463,13 @@ the system's file picker (UIDocumentPickerViewController), notifications (UNUser
                                one at a time ((0, 0) while one is open), (-1, 0) without a window
   file_dialog_poll()           None while it is open, then once (1, 0, path) / (0, 0, "") -- the
                                path a security-scoped URL's, its access started for the session
+  bookmarks_restore()          (the host's launch) the files and folders chosen in earlier runs
+                               readable again: each choice leaves a bookmark in the app's
+                               container ($HOME/Library/jfgui/bookmarks, newest first, at most
+                               BM_MAX, a path once); the launch resolves them and starts their
+                               access, so the same path opens again (a recent file, a saved
+                               setting).  A file moved meanwhile is kept under its new path (the
+                               old one no longer opens); one gone is dropped
   notes::*                     (tray.rs) notifications: no symbol of a notification area on iOS;
                                notify asks the user once (alert, sound) and hands the note to the
                                centre when allowed -- refused, it goes away at once (NoteClosed); one
@@ -36354,6 +36499,47 @@ pasteboard has does not.
 
 - **`fn file_dialog_poll() -> Option<(i32, u32, String)>`**
   the picker's answer (see the module header)
+
+- **`fn ios_bookmark_add(path: &str) -> bool`**
+  (tests) a path kept as if the picker had chosen it -> its bookmark made and kept in front
+
+- **`fn ios_bookmark_paths() -> Vec<String>`**
+  (tests) the kept paths, newest first
+
+- **`fn ios_bookmarks_restore()`**
+  (tests) what the host's launch does: every kept bookmark resolved, the list renewed
+
+- **`fn ios_bookmarks_clear()`**
+  (tests) none kept
+
+### `plat/apple_ios_share.rs` (Apple)
+
+Source: [`lib/plat/apple_ios_share.rs`](../lib/plat/apple_ios_share.rs)
+
+```text
+apple_ios_share -- (share.rs) iOS's share sheet: UIActivityViewController over the scene's window
+
+  share(&Share) -> SHARE_PENDING / SHARE_NONE   the sheet, presented by the topmost controller (as
+                               the file picker); on an iPad a popover at the anchor (points = px over
+                               the canvas's scale), without one in the view's middle and without an
+                               arrow.  SHARE_NONE without UIKit's host or off the main thread.
+  available() -> bool          (any thread) UIKit's host runs the app
+  ios_share_shown() / ios_share_dismiss()   (tests) the sheet on screen, closed again
+
+Items: the text (NSString), the link (NSURL), the files (file URLs).  A title goes in as the
+subject (Mail's subject line) through an item source (JFShareItem) wrapping the first item.  The
+completion handler (a global block: one sheet at a time) answers SHARE_DONE when an activity
+completed, SHARE_FAILED with an error, SHARE_CANCELLED otherwise (the sheet or the activity closed).
+```
+
+- **`fn ios_share_shown() -> Option<String>`**
+  (tests, any thread) the class of the controller presented over the window now (the share sheet:
+  "UIActivityViewController"), None when nothing is presented or without the host
+
+- **`fn ios_share_dismiss() -> bool`**
+  (tests, any thread) the presented sheet closed as its Close button does: the controller's
+  completion handler with nothing chosen (UIKit calls it for the user's Close, not for a
+  dismissal by code), then the dismissal -> false when none
 
 ### `plat/apple_ios_a11y.rs` (Apple)
 
@@ -36505,6 +36691,13 @@ trackpad's pinch into Ctrl + wheel (as macOS).  None of them takes or delays a f
   - `shown: (i32, i32)` -- the size of the last picture shown (px)
   - `keyboard: bool` -- the on-screen keyboard is asked for (JFView first responder)
   - `last_wheel: (u8, u8, u32)` -- the last E_WHEEL the wheel or the pinch sent: btn, mods, data
+  - `gpu: Option<IosGpuLayer>` -- the GPU's layer (apple_ios_gpu.rs): made, shown, its drawable's size (px) and frame (points)
+
+- **`struct IosGpuLayer`**
+  the GPU's layer as the host has it (IosPadView::gpu)
+  - `shown: bool`
+  - `drawable: (f64, f64)`
+  - `frame: (f64, f64)`
 
 - **`fn ios_pad_view() -> Option<IosPadView>`**
   (tests, any thread) the host's sizes now; None without UIKit's host
@@ -36516,6 +36709,16 @@ trackpad's pinch into Ctrl + wheel (as macOS).  None of them takes or delays a f
 - **`fn ios_pad_rotate(landscape: bool) -> bool`**
   (tests, any thread) the scene turned to landscape (true) or portrait, as the user turning the
   iPad would (requestGeometryUpdateWithPreferences:) -> false without the host
+
+- **`fn ios_text_size(category: Option<&str>) -> bool`**
+  (tests, any thread) the text size of the system as the user would set it (Settings, Display &
+  Text Size): the window's trait override of preferredContentSizeCategory ("XXL": the size after
+  the default "Large"; None: the override gone, the system's again) -> false without the host or
+  before iOS 17 (no trait overrides)
+
+- **`fn ios_dark(dark: Option<bool>) -> bool`**
+  (tests, any thread) dark (Some(true)) or light for the window, as the user's setting would be
+  (overrideUserInterfaceStyle); None: the system's again -> false without the host
 
 - **`fn ios_pad_keyboard(show: bool) -> bool`**
   (tests, any thread) the on-screen keyboard as a tap into a text box brings it (JFView first
@@ -36987,6 +37190,33 @@ as all of AppKit; lib/gpu may use the layer on its own thread (nextDrawable, dra
 - **`fn gpu_test_presented() -> Vec<(u64, u64)>`**
   (bench: Wayland's presentation feedback) nothing here
 
+### `plat/apple_mac_share.rs` (Apple)
+
+Source: [`lib/plat/apple_mac_share.rs`](../lib/plat/apple_mac_share.rs)
+
+```text
+apple_mac_share -- (share.rs) macOS's share sheet: NSSharingServicePicker at the anchor in the key
+window (the main window when none is key)
+
+  share(&Share) -> SHARE_PENDING / SHARE_NONE   the picker shown relative to the anchor (points =
+                               px over the window's backingScaleFactor; our views are flipped, so
+                               y counts from the top), without one in the content view's middle
+  available() -> bool          true (AppKit has the picker since 10.8)
+  mac_share_shown() / mac_share_close()   (tests) the picker's window on screen, closed again
+
+Items: the text (NSString), the link (NSURL), the files (file URLs).  The picker's delegate answers:
+a service chosen -> SHARE_DONE (the service gets the title as its subject, Mail's subject line);
+none (the picker closed) -> SHARE_CANCELLED.  Whether the service then delivers is its own
+business (Android's chooser says as little).
+```
+
+- **`fn mac_share_shown() -> bool`**
+  (tests) the picker waits for the user (its answer not given yet)
+
+- **`fn mac_share_close() -> bool`**
+  (tests, any thread) the open picker closed without a service, as the user's click outside it would
+  (NSSharingServicePicker close, macOS 13; before that the delegate's answer is sent directly)
+
 ### `plat/apple_mac_a11y.rs` (Apple)
 
 Source: [`lib/plat/apple_mac_a11y.rs`](../lib/plat/apple_mac_a11y.rs)
@@ -37165,6 +37395,10 @@ REQUEST_FILE_DIALOG: u32 = 12
 /// 2 delete), app, service, account and for set the value, each as u32 length + bytes; the
 /// host encrypts and stores it in order and completes with 2, or an error
 REQUEST_SECRET: u32 = 13
+/// (browser, Android) the share sheet (share.rs, web_share.rs): the title, the text, the link (u32
+/// length + UTF-8 each), u32 count, per file its name and its bytes (u32 length + bytes each); the
+/// host completes with 2 (shared), -4 (closed without a target), anything else (failed)
+REQUEST_SHARE: u32 = 34
 /// (browser) read a file of the user's own (/handles/..) again: the path (UTF-8); the host asks
 /// for the permission the handle needs (from the user's gesture), imports the file and
 /// completes with 2

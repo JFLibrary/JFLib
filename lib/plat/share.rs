@@ -104,6 +104,8 @@ pub fn share(s: &Share) -> i32 {
     OPEN.store(true, core::sync::atomic::Ordering::Release);
     let r = native::share(&s);
     if r != SHARE_PENDING {
+        // (a host that refused at once may have answered already: no sheet, no answer)
+        *ANSWER.lock() = None;
         OPEN.store(false, core::sync::atomic::Ordering::Release);
         return SHARE_NONE;
     }
@@ -123,7 +125,9 @@ pub fn share_open() -> bool {
     OPEN.load(core::sync::atomic::Ordering::Acquire)
 }
 
-/// whether this system has a share sheet (CAP_SHARE)
+/// whether this system has a share sheet (CAP_SHARE; the browser's and Android's capabilities ask
+/// their host instead, web.rs)
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android"), allow(dead_code))]
 pub(crate) fn available() -> bool {
     native::available()
 }

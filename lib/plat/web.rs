@@ -166,6 +166,11 @@ pub const REQUEST_FILE_DIALOG: u32 = 12;
 /// 2 delete), app, service, account and for set the value, each as u32 length + bytes; the
 /// host encrypts and stores it in order and completes with 2, or an error
 pub const REQUEST_SECRET: u32 = 13;
+/// (browser, Android) the share sheet (share.rs, web_share.rs): the title, the text, the link (u32
+/// length + UTF-8 each), u32 count, per file its name and its bytes (u32 length + bytes each); the
+/// host completes with 2 (shared), -4 (closed without a target), anything else (failed)
+#[cfg(not(target_os = "ios"))]
+pub const REQUEST_SHARE: u32 = 34;
 /// (browser) read a file of the user's own (/handles/..) again: the path (UTF-8); the host asks
 /// for the permission the handle needs (from the user's gesture), imports the file and
 /// completes with 2
@@ -275,6 +280,12 @@ struct AppSlot(UnsafeCell<Option<Box<dyn WebApplication>>>);
 // callbacks, so a synchronous host re-entry observes None instead of aliasing the app.
 unsafe impl Sync for AppSlot {}
 static APP: AppSlot = AppSlot(UnsafeCell::new(None));
+
+/// (web_share.rs) the services the host granted (jfgui_capabilities)
+#[cfg(not(target_os = "ios"))]
+pub(crate) fn host_caps() -> u64 {
+    CAP_EXTRA.load(Ordering::Relaxed) as u64
+}
 
 /// Install the owned runtime. Returns false if an app is already registered.
 pub fn install(app: Box<dyn WebApplication>) -> bool {
@@ -471,7 +482,7 @@ pub fn capabilities() -> Capabilities {
             | if cfg!(any(web_threads, target_os = "android")) { crate::CAP_THREADS } else { 0 }
             // Android: internal storage and the ClipboardManager (images: GalleryFiles)
             | if cfg!(target_os = "android") {
-                crate::CAP_PERSISTENT_STORAGE | crate::CAP_CLIPBOARD_TEXT | crate::CAP_CLIPBOARD_IMAGE
+                crate::CAP_PERSISTENT_STORAGE | crate::CAP_CLIPBOARD_TEXT | crate::CAP_CLIPBOARD_IMAGE | crate::CAP_SHARE
             } else {
                 0
             }
@@ -1179,7 +1190,7 @@ pub extern "C" fn jfgui_agent(enabled: u32) -> u32 {
 /// Grant only browser-supported dynamic services; native plugins/IPC/threads cannot be granted.
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_capabilities(bits: u32) {
-    let allowed = crate::CAP_PERSISTENT_STORAGE | crate::CAP_CLIPBOARD_TEXT;
+    let allowed = crate::CAP_PERSISTENT_STORAGE | crate::CAP_CLIPBOARD_TEXT | crate::CAP_SHARE;
     CAP_EXTRA.store(bits & allowed as u32, Ordering::Relaxed);
     TOUCH_PRIMARY.store(bits & HOST_COARSE != 0, Ordering::Relaxed);
     HANDLES.store(bits & HOST_HANDLES != 0, Ordering::Relaxed);
@@ -1360,7 +1371,17 @@ pub extern "C" fn jfgui_complete(id: u32, status: i32) -> u32 {
     if kind == REQUEST_SECRET {
         crate::secret::committed(id, status);
     }
-    #[cfg(not(target_arch = "wasm32"))]
+    // the share sheet's answer (share_poll)
+    #[cfg(not(target_os = "ios"))]
+    if kind == REQUEST_SHARE {
+        forget_request(id);
+        crate::share::answer(match status {
+            2 => crate::SHARE_DONE,
+            -4 => crate::SHARE_CANCELLED,
+            _ => crate::SHARE_FAILED,
+        });
+    }
+    #[cfg(target_os = "ios")]
     let _ = kind;
     wake();
     1
