@@ -2,6 +2,19 @@
 // decorative, charting (SH-003, SH-004), venn (SH-007), marketing, matrix, pyramid, cycle (SH-030 to
 // SH-033) and cause_effect (SH-041); own sources only
 //
+//   stencils/business/<folder>/<measure>   both measures build; write -> read -> write is the
+//                       same; names, QuickInfos and keywords in five languages, the category;
+//                       the engine keeps nothing
+//   stencils/business/drop   every master dropped in French and recalculated: no error values
+//   stencils/business/parts   the parts of a group master (SWOT) show their texts in the
+//                       language of the drop; the master's parts carry five texts, guarded
+//   stencils/business/counts   levels, steps and phases from the shape data and from a control
+//                       point (SETATREF): the parts shown, the group growing
+//   stencils/business/values   the pie slice's angle from its control point, the pie chart
+//                       slice's start, share and colour from its shape data
+//   stencils/business/fishbone   a category glued to the effect's spine and a cause glued to the
+//                       category follow when the effect moves
+//
 //   diagramiotest --write-stencil-previews DIR   also probeblatt-jd26.png: the sample masters of
 //                       the eight stencils in their own size and in a variant (a moved control
 //                       point, other shape data, the parts in English), the fishbone glued
@@ -15,9 +28,9 @@ use alloc::vec::Vec;
 
 use diagram_core::design::apply::{self as design_apply, Scope};
 use diagram_core::design::catalog;
-use diagram_core::formula::Engine;
+use diagram_core::formula::{Engine, Input};
 use diagram_core::glue::{self, End, Target};
-use diagram_core::instance::{self, MasterTexts};
+use diagram_core::instance::{self, MasterTexts, StencilTexts};
 use diagram_core::render::Options;
 use diagram_core::{ops, CellAddr, Document, Owner, PageRef, RowKey, SecKey, ShapeRef, SheetRef, Text, Transaction, Unit, Value};
 use diagram_io::stencil;
@@ -27,7 +40,7 @@ use diagram_view::PageView;
 
 use crate::stencil_structs::{none, put, render_page_at, set_single, sheet_doc};
 use crate::templates::files_of;
-use crate::out;
+use crate::{out, H};
 
 const MM: f64 = 1.0 / 25.4;
 
@@ -337,4 +350,288 @@ fn render_region(doc: &mut Document, page: PageRef, path: &str, dpi: f64, r: [f6
     let ok = plat::write_file(path, &crate::render::png(&img));
     out(&format!("{} {path} ({} x {})\n", if ok { "wrote" } else { "error: cannot write" }, img.w, img.h));
     ok
+}
+
+// ---------------------------------------------------------------- the checks
+
+fn num(doc: &Document, s: SheetRef, n: &str) -> f64 {
+    crate::stencils::cell(doc, s, None, None, n).and_then(|c| c.value.num()).unwrap_or(f64::NAN)
+}
+
+fn user_num(doc: &Document, s: SheetRef, n: &str) -> f64 {
+    crate::stencils::cell(doc, s, Some(("User", 0)), crate::stencils::named(doc, n), "Value").and_then(|c| c.value.num()).unwrap_or(f64::NAN)
+}
+
+fn prop_num(doc: &Document, s: SheetRef, n: &str) -> f64 {
+    crate::stencils::cell(doc, s, Some(("Property", 0)), crate::stencils::named(doc, n), "Value").and_then(|c| c.value.num()).unwrap_or(f64::NAN)
+}
+
+// geometry section `ix` (from 0) of a sheet hidden (NoShow)?
+fn no_show(doc: &Document, s: SheetRef, ix: u32) -> bool {
+    crate::stencils::cell(doc, s, Some(("Geometry", ix)), None, "NoShow").and_then(|c| c.value.num()).is_some_and(|v| v != 0.0)
+}
+
+fn text_of(doc: &Document, s: ShapeRef) -> String {
+    doc.shape(s).and_then(|x| x.text()).map(|t| t.chars()).unwrap_or_default()
+}
+
+// the text a subshape shows: its own, else its master subshape's
+fn shown_text(doc: &Document, s: ShapeRef) -> String {
+    let own = text_of(doc, s);
+    if !own.is_empty() {
+        return own;
+    }
+    doc.master_shape_of(s).map(|m| text_of(doc, m)).unwrap_or_default()
+}
+
+fn children(doc: &Document, s: ShapeRef) -> Vec<ShapeRef> {
+    doc.shape(s).map(|x| x.children().collect()).unwrap_or_default()
+}
+
+/// the group "stencils/business" (with the group "stencils")
+pub fn run(h: &mut H) {
+    // every stencil in both measures: built, written and read back unchanged, five languages,
+    // the category, the master pages in the measure's unit, nothing the engine keeps
+    let mut metric: Vec<Document> = Vec::new();
+    for folder in FOLDERS {
+        for m in [Measure::Metric, Measure::Us] {
+            let tag = format!("stencils/business/{folder}/{}", if m == Measure::Us { "us" } else { "metric" });
+            let bytes = match stencil::build_vssx(&files_of("stencils", folder), m) {
+                Ok((_, b)) => b,
+                Err(e) => {
+                    h.check(&tag, false, format!("{e}"));
+                    continue;
+                }
+            };
+            let Some(doc) = crate::stencils::read_back(h, &format!("{tag}/roundtrip"), &bytes) else { continue };
+            let n = doc.masters().count();
+            let five = doc.masters().all(|mr| {
+                let t = MasterTexts::of(&doc, mr);
+                t.names.iter().chain(t.prompts.iter()).chain(t.keywords.iter()).all(|x| !x.is_empty())
+            });
+            let st = StencilTexts::of(&doc);
+            let cat_ok = st.category == if matches!(folder, "decorative" | "charting" | "venn") { "general" } else { "business" };
+            h.check(&format!("{tag}/masters"), n > 0 && five && cat_ok && st.names.iter().all(|x| !x.is_empty()), format!("{n} masters, five languages {five}, category {}", st.category));
+            let (cells, written, bad) = crate::stencil_shapes::engine_state(&doc);
+            h.check(&format!("{tag}/engine"), bad.is_empty() && written == 0, format!("{cells} formula cells, {written} changed, kept {bad:?}"));
+            if m == Measure::Metric {
+                metric.push(doc);
+            }
+        }
+    }
+    if metric.len() != FOLDERS.len() {
+        return;
+    }
+    drop_all(h, &metric);
+    parts(h, &metric);
+    counts(h, &metric);
+    values(h, &metric);
+    fishbone(h, &metric);
+}
+
+// every master dropped in French and recalculated: no error values, nothing kept
+fn drop_all(h: &mut H, docs: &[Document]) {
+    let Some((mut doc, page)) = sheet_doc(400.0, 400.0) else { return };
+    let fr = instance::lang_index("fr").unwrap_or(4);
+    let mut tx = doc.transaction("drop");
+    let mut shapes: Vec<ShapeRef> = Vec::new();
+    let mut fail = String::new();
+    for (k, src) in docs.iter().enumerate() {
+        for (i, m) in src.masters().enumerate() {
+            let nu = MasterTexts::of(src, m).name_u;
+            match instance::import_master(&mut tx, src, m).and_then(|local| instance::place(&mut tx, page, local, 1.0 + 0.5 * i as f64, 1.0 + 1.5 * k as f64, fr)) {
+                Ok(s) => shapes.push(s),
+                Err(e) => fail.push_str(&format!(" {nu}: {e:?}")),
+            }
+        }
+    }
+    let sheets: Vec<SheetRef> = shapes.iter().flat_map(|&s| core::iter::once(s).chain(children(tx.doc(), s))).map(SheetRef::Shape).collect();
+    let kept = Engine::new().recalc(&mut tx, &sheets).map_or(usize::MAX, |r| r.kept.len());
+    let _ = tx.commit();
+    let (_, _, bad) = crate::stencil_shapes::engine_state(&doc);
+    let want: usize = docs.iter().map(|d| d.masters().count()).sum();
+    h.check("stencils/business/drop", fail.is_empty() && shapes.len() == want && kept == 0 && bad.is_empty(), format!("{} instances of {want}, recalc kept {kept}, errors {bad:?}{fail}", shapes.len()));
+}
+
+fn master<'d>(docs: &'d [Document], folder: &str, nu: &str) -> Option<(&'d Document, diagram_core::MasterRef)> {
+    let k = FOLDERS.iter().position(|f| *f == folder)?;
+    let d = &docs[k];
+    d.masters().find(|&m| MasterTexts::of(d, m).name_u == nu).map(|m| (d, m))
+}
+
+// a drawing with an instance of folder/nu in language `lang` at (x, y) mm
+fn one(docs: &[Document], folder: &str, nu: &str, lang: usize) -> Option<(Document, PageRef, ShapeRef)> {
+    let (src, m) = master(docs, folder, nu)?;
+    let (mut doc, page) = sheet_doc(300.0, 200.0)?;
+    let s = {
+        let mut tx = doc.transaction("drop");
+        let local = instance::import_master(&mut tx, src, m).ok()?;
+        let s = instance::place(&mut tx, page, local, 100.0 * MM, 100.0 * MM, lang).ok()?;
+        let sheets: Vec<SheetRef> = core::iter::once(s).chain(children(tx.doc(), s)).map(SheetRef::Shape).collect();
+        let _ = Engine::new().recalc(&mut tx, &sheets);
+        let _ = tx.commit();
+        s
+    };
+    Some((doc, page, s))
+}
+
+// a change by the user (a dialog or a gesture) and its consequences
+fn user_set(doc: &mut Document, sheet: SheetRef, addr: impl Fn(&mut Transaction) -> CellAddr, v: f64, u: Option<Unit>) -> bool {
+    let mut tx = doc.transaction("set");
+    let a = addr(&mut tx);
+    let ok = Engine::new().user_set(&mut tx, sheet, &a, Input::Value(Value::Num(v), u)).is_ok();
+    let _ = tx.commit();
+    ok
+}
+
+fn recalc_all(doc: &mut Document, page: PageRef) {
+    let mut tx = doc.transaction("recalc");
+    let all: Vec<SheetRef> = tx.doc().all_shapes(Owner::Page(page)).map(SheetRef::Shape).collect();
+    let _ = Engine::new().recalc(&mut tx, &all);
+    let _ = tx.commit();
+}
+
+// the parts of group masters: their texts in five languages, in the language of the drop
+fn parts(h: &mut H, docs: &[Document]) {
+    for (lang, want) in [(0usize, ["Stärken", "Schwächen", "Chancen", "Risiken"]), (1, ["Strengths", "Weaknesses", "Opportunities", "Threats"]), (4, ["Forces", "Faiblesses", "Opportunités", "Menaces"])] {
+        let Some((doc, _, s)) = one(docs, "marketing", "SWOT", lang) else {
+            h.check("stencils/business/parts", false, String::from("SWOT does not drop"));
+            return;
+        };
+        let got: Vec<String> = children(&doc, s).iter().map(|&c| shown_text(&doc, c)).collect();
+        h.check("stencils/business/parts", got == want, format!("SWOT dropped in {}: {got:?}", instance::LANGS[lang]));
+    }
+    // the master's subshapes: five texts in User.JFD_Text, the transform guarded
+    if let Some((d, m)) = master(docs, "venn", "Venn diagram 3 sets") {
+        let slot = d.master(m).and_then(|x| x.master_shape());
+        let subs: Vec<ShapeRef> = slot.map(|sl| children(d, ShapeRef { owner: Owner::Master(m), slot: sl })).unwrap_or_default();
+        let texts: Vec<String> = subs
+            .iter()
+            .map(|&c| crate::stencils::cell(d, SheetRef::Shape(c), Some(("User", 0)), crate::stencils::named(d, instance::JFD_TEXT), "Value").map(|x| crate::stencils::sym_text(d, x.value)).unwrap_or_default())
+            .collect();
+        let guarded = subs.iter().all(|&c| {
+            crate::stencils::cell(d, SheetRef::Shape(c), None, None, "PinX").and_then(|x| x.formula.expr()).is_some_and(|f| d.str(f).starts_with("GUARD(Sheet."))
+        });
+        h.check("stencils/business/parts/master", subs.len() == 3 && texts.iter().all(|t| t.split('|').count() == 5) && guarded, format!("{} parts, JFD_Text {texts:?}, guarded {guarded}", subs.len()));
+    }
+}
+
+// counts from the shape data and from a control point (SETATREF): levels, steps, phases
+fn counts(h: &mut H, docs: &[Document]) {
+    // the layered pyramid: 6 levels from the shape data, the group grows, 6 parts shown
+    if let Some((mut doc, page, s)) = one(docs, "pyramid", "Layered pyramid", 0) {
+        let sh = SheetRef::Shape(s);
+        let h0 = num(&doc, sh, "Height");
+        let ok = user_set(&mut doc, sh, |tx| CellAddr::row(SecKey::one(tx.intern("Property")), RowKey::Named(tx.intern("Levels")), tx.intern("Value")), 6.0, None);
+        recalc_all(&mut doc, page);
+        let h1 = num(&doc, sh, "Height");
+        let kids = children(&doc, s);
+        let shown = kids.iter().filter(|&&c| !no_show(&doc, SheetRef::Shape(c), 0)).count();
+        h.check("stencils/business/counts/levels", ok && (h1 / h0 - 1.5).abs() < 1e-6 && shown == 6, format!("4 -> 6 levels: height {:.1} -> {:.1} mm, {shown} of {} parts shown", h0 / MM, h1 / MM, kids.len()));
+        // the control point at the top dragged down by one level: 5 levels
+        let y = num(&doc, sh, "Height") - user_num(&doc, sh, "LH");
+        let ok = user_set(&mut doc, sh, |tx| CellAddr::row(SecKey::one(tx.intern("Control")), RowKey::Named(tx.intern("Row_1")), tx.intern("Y")), y, Some(Unit::Millimeters));
+        recalc_all(&mut doc, page);
+        let n = prop_num(&doc, sh, "Levels");
+        h.check("stencils/business/counts/levels-drag", ok && n == 5.0, format!("control point down by one level: Prop.Levels {n}, height {:.1} mm", num(&doc, sh, "Height") / MM));
+    }
+    // the step chart: dragging the control point two steps to the right gives 6 steps
+    if let Some((mut doc, page, s)) = one(docs, "marketing", "Step chart", 0) {
+        let sh = SheetRef::Shape(s);
+        let (w0, sw) = (num(&doc, sh, "Width"), user_num(&doc, sh, "SW"));
+        let ok = user_set(&mut doc, sh, |tx| CellAddr::row(SecKey::one(tx.intern("Control")), RowKey::Named(tx.intern("Row_1")), tx.intern("X")), w0 + 2.0 * sw, Some(Unit::Millimeters));
+        recalc_all(&mut doc, page);
+        let (n, w1) = (prop_num(&doc, sh, "Steps"), num(&doc, sh, "Width"));
+        let shown = children(&doc, s).iter().filter(|&&c| !no_show(&doc, SheetRef::Shape(c), 0)).count();
+        h.check("stencils/business/counts/steps", ok && n == 6.0 && (w1 - 6.0 * sw).abs() < 1e-9 && shown == 6, format!("control point +2 steps: Prop.Steps {n}, width {:.1} -> {:.1} mm, {shown} steps shown", w0 / MM, w1 / MM));
+        // resizing the width goes to the width of a step (SETATREF)
+        let ok = user_set(&mut doc, sh, |tx| tx.single("Width"), w1 * 1.5, Some(Unit::Millimeters));
+        recalc_all(&mut doc, page);
+        let sw1 = user_num(&doc, sh, "SW");
+        h.check("stencils/business/counts/steps-width", ok && (sw1 - sw * 1.5).abs() < 1e-9 && (num(&doc, sh, "Width") - w1 * 1.5).abs() < 1e-9, format!("width x 1.5: step width {:.1} -> {:.1} mm", sw / MM, sw1 / MM));
+    }
+    // the circular motion: 6 phases from the shape data
+    if let Some((mut doc, page, s)) = one(docs, "cycle", "Circular motion", 0) {
+        let sh = SheetRef::Shape(s);
+        let ok = user_set(&mut doc, sh, |tx| CellAddr::row(SecKey::one(tx.intern("Property")), RowKey::Named(tx.intern("Phases")), tx.intern("Value")), 6.0, None);
+        recalc_all(&mut doc, page);
+        let shown = children(&doc, s).iter().filter(|&&c| !no_show(&doc, SheetRef::Shape(c), 0)).count();
+        h.check("stencils/business/counts/phases", ok && shown == 6, format!("6 phases: {shown} segments shown"));
+    }
+}
+
+// values: the pie slice's angle from its control point, the pie chart slice from its data
+fn values(h: &mut H, docs: &[Document]) {
+    if let Some((mut doc, page, s)) = one(docs, "charting", "Pie slice", 0) {
+        let sh = SheetRef::Shape(s);
+        let (w, hh) = (num(&doc, sh, "Width"), num(&doc, sh, "Height"));
+        // the handle to the left (270° clockwise from the top)
+        let okx = user_set(&mut doc, sh, |tx| CellAddr::row(SecKey::one(tx.intern("Control")), RowKey::Named(tx.intern("Row_1")), tx.intern("X")), 0.0, Some(Unit::Millimeters));
+        let oky = user_set(&mut doc, sh, |tx| CellAddr::row(SecKey::one(tx.intern("Control")), RowKey::Named(tx.intern("Row_1")), tx.intern("Y")), hh * 0.5, Some(Unit::Millimeters));
+        recalc_all(&mut doc, page);
+        let a = user_num(&doc, sh, "S").to_degrees();
+        h.check("stencils/business/values/pie-slice", okx && oky && (a - 270.0).abs() < 0.01, format!("handle at the left of a {:.0} mm slice: {a:.2}°", w / MM));
+    }
+    if let Some((mut doc, page, s)) = one(docs, "charting", "Pie chart slice", 0) {
+        let sh = SheetRef::Shape(s);
+        let p = |tx: &mut Transaction, n: &str| CellAddr::row(SecKey::one(tx.intern("Property")), RowKey::Named(tx.intern(n)), tx.intern("Value"));
+        let ok = user_set(&mut doc, sh, |tx| p(tx, "Start"), 20.0, None) && user_set(&mut doc, sh, |tx| p(tx, "Share"), 30.0, None) && user_set(&mut doc, sh, |tx| p(tx, "Color"), 3.0, None);
+        recalc_all(&mut doc, page);
+        let (a0, a1) = (user_num(&doc, sh, "A0").to_degrees(), user_num(&doc, sh, "A1").to_degrees());
+        let colour = num(&doc, sh, "QuickStyleFillColor");
+        h.check("stencils/business/values/pie-chart", ok && (a0 - 72.0).abs() < 1e-6 && (a1 - 180.0).abs() < 1e-6 && colour == 102.0, format!("start 20 %, share 30 %, colour 3: {a0:.1}° .. {a1:.1}°, QuickStyleFillColor {colour}"));
+    }
+}
+
+// the fishbone: a category glued to the effect's spine follows it, a cause glued to the
+// category follows the category
+fn fishbone(h: &mut H, docs: &[Document]) {
+    let (Some((ce, me)), Some((cc, mc)), Some((cp, mp))) = (master(docs, "cause_effect", "Effect"), master(docs, "cause_effect", "Category 1"), master(docs, "cause_effect", "Primary cause 1")) else {
+        h.check("stencils/business/fishbone", false, String::from("masters missing"));
+        return;
+    };
+    let _ = (me, mc, mp);
+    let Some((mut doc, page)) = sheet_doc(300.0, 200.0) else { return };
+    let mut eng = Engine::new();
+    let mut tx = doc.transaction("fishbone");
+    let effect = put(&mut tx, ce, page, "Effect", (150.0, 100.0), (0.0, 0.0), None, &none);
+    recalc_page(&mut tx, &mut eng, page);
+    let mut cat = None;
+    let mut cause = None;
+    let mut glued = 0;
+    if let Some(e) = effect {
+        if let Some(p) = point(tx.doc(), e, 4) {
+            cat = put_1d(&mut tx, cc, page, "Category 1", (p[0] / MM - 20.0, p[1] / MM + 30.0), (p[0] / MM, p[1] / MM));
+            if let Some(c) = cat {
+                glued += usize::from(glue_to(&mut tx, &mut eng, c, End::End, e, 4));
+                recalc_page(&mut tx, &mut eng, page);
+                if let Some(q) = point(tx.doc(), c, 4) {
+                    cause = put_1d(&mut tx, cp, page, "Primary cause 1", (q[0] / MM - 30.0, q[1] / MM), (q[0] / MM, q[1] / MM));
+                    if let Some(u) = cause {
+                        glued += usize::from(glue_to(&mut tx, &mut eng, u, End::End, c, 4));
+                    }
+                }
+            }
+        }
+    }
+    let _ = tx.commit();
+    let (Some(e), Some(c), Some(u)) = (effect, cat, cause) else {
+        h.check("stencils/business/fishbone", false, String::from("the shapes do not drop"));
+        return;
+    };
+    h.check("stencils/business/fishbone/glue", glued == 2, format!("{glued} of 2 ends glued"));
+    // move the effect by (20, -10) mm: the category's end and the cause's end follow
+    let mut tx = doc.transaction("move");
+    let moved = ops::move_shapes(&mut tx, &mut eng, &[e], [20.0 * MM, -10.0 * MM]).is_ok();
+    let _ = tx.commit();
+    recalc_all(&mut doc, page);
+    let near = |a: Option<[f64; 2]>, b: Option<[f64; 2]>| a.zip(b).is_some_and(|(a, b)| (a[0] - b[0]).abs() < 1e-6 && (a[1] - b[1]).abs() < 1e-6);
+    let cat_end = glue::ends(&doc, c).map(|x| x.1);
+    let cause_end = glue::ends(&doc, u).map(|x| x.1);
+    let ok = moved && near(cat_end, point(&doc, e, 4)) && near(cause_end, point(&doc, c, 4));
+    h.check(
+        "stencils/business/fishbone/follow",
+        ok,
+        format!("effect moved: category end at the spine point {}, cause end at the bone point {}", near(cat_end, point(&doc, e, 4)), near(cause_end, point(&doc, c, 4))),
+    );
 }

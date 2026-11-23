@@ -86,6 +86,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
 - Stencil sources (stage JD13): the master keys `include:` (sections shared by many masters from .inc files, merged under the master's own cells, errors name the included file), `scale: 1:N` (a master page drawn to scale, line weights on paper) and `size:` (the size of a master whose Width or Height is a formula); apps/JFDiagrammer/stencils/README.md
+- (JD26) Stencil sources: group masters of parts. `[Part NAME]` in a master file starts a subshape with its own header lines (`text.<lang>` in five languages, `style`, `line_style`, `fill_style`, `text_style`) and sections; `Sheet.1!` names the master shape and `Sheet.2!` ... the parts in every formula of the master and is written as the shapes' IDs; a part without its own transform is as large as the group (`GUARD(Sheet.1!Width)` ...); its five texts go into `User.JFD_Text` of its sheet in the master. Parts next to `svg:`, on a 1-D master, with language-suffixed cells, and a `Sheet.N!` that is not there are refused with file and line
+- (JD26) Template starters place 1-D masters by their ends (`BeginX`, `BeginY`, `EndX`, `EndY`) and glue an end to a connection point of a shape in an earlier row (`BeginOn`/`BeginPoint`, `EndOn`/`EndPoint`, the point from 1) through `glue::glue`; `template::to_drawing` gives the parts of group masters the text of the chosen language (`instance::localize_parts`)
 
 ### Changed
 

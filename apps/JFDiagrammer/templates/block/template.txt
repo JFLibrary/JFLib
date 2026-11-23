@@ -1,0 +1,20 @@
+# Blockdiagramm (VL-12, JD26): Blöcke, Pfeile und Grundformen für Blockdiagramme, A4 bzw. Letter
+# quer.  Die Varianten „Blockdiagramm mit Perspektive“ und „3D-Blockdiagramm“ brauchen die
+# Schablonen Perspektivische Blöcke (SH-005) und 3D-Block-Shapes (SH-001); beide sind P3 und kommen
+# mit deren Plan.  Quellformat: ../README.md
+template: Block Diagram
+file: block
+name.de: Blockdiagramm
+name.en: Block Diagram
+name.es: Diagrama de bloques
+name.it: Diagramma a blocchi
+name.fr: Diagramme de blocs
+description.de: Blöcke, Pfeile und Grundformen für Systemübersichten, Signalflüsse und Strukturen.
+description.en: Blocks, arrows and basic shapes for system overviews, signal flows and structures.
+description.es: Bloques, flechas y formas básicas para vistas generales de sistemas, flujos de señales y estructuras.
+description.it: Blocchi, frecce e forme di base per panoramiche di sistema, flussi di segnali e strutture.
+description.fr: Blocs, flèches et formes de base pour les vues d'ensemble de systèmes, les flux de signaux et les structures.
+category: general
+order: 25
+stencils: blocks, arrows, standard, decorative
+starters: sample

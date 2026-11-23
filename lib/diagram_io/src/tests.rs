@@ -123,3 +123,66 @@ fn stencil_file_names() {
         assert_eq!(parse_file_name(other), None, "{other}");
     }
 }
+
+// (JD26) a group master of parts: [Part NAME] with its text in five languages and its own
+// sections; Sheet.1 / Sheet.2 name the master shape and the first part and are written as their
+// IDs; a drop in English shows the part's English text; parts next to svg: or on a 1-D master,
+// a Sheet.N that is not there and a language suffix on a part's cell are refused
+#[test]
+fn stencil_parts() {
+    use crate::stencil;
+    use diagram_core::{instance, CellAddr, Owner, ShapeRef, SheetRef};
+
+    const ST: &str = "stencil: Test\nfile: test\nname.de: T\nname.en: T\nname.es: T\nname.it: T\nname.fr: T\ncategory: general\nmasters: grp\n";
+    let names = "name.de: A\nname.en: A\nname.es: A\nname.it: A\nname.fr: A\nprompt.de: P\nprompt.en: P\nprompt.es: P\nprompt.it: P\nprompt.fr: P\n";
+    let part = "[Part Left]\ntext.de: Links\ntext.en: Left\ntext.es: Izquierda\ntext.it: Sinistra\ntext.fr: Gauche\n\n[Shape]\nWidth = GUARD(Sheet.1!Width*0.5)\nPinX = GUARD(Width*0.5)\nQuickStyleFillColor = 101\n\n[Geometry]\nMoveTo  X = 0; Y = 0\nLineTo  X = Width; Y = 0\nLineTo  X = Width; Y = Height\nLineTo  X = Geometry1.X1; Y = Geometry1.Y1\n";
+    let master = |extra: &str, shape: &str, p: &str| alloc::format!("master: Group\n{names}{extra}\n[Shape]\nWidth = 40 mm\nHeight = 20 mm\n{shape}\n{p}");
+    let build = |m: &str| {
+        let m = alloc::string::String::from(m);
+        let files = move |f: &str| match f {
+            "stencil.txt" => Some(alloc::string::String::from(ST)),
+            "grp.master" => Some(m.clone()),
+            "a.svg" => Some(alloc::string::String::from("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 10 10\"><rect width=\"10\" height=\"10\"/></svg>")),
+            _ => None,
+        };
+        stencil::build(&files, Measure::Metric)
+    };
+    let built = build(&master("", "TxtWidth = Sheet.2!Width", part)).expect("a group of parts builds");
+    let doc = &built.doc;
+    let m = doc.masters().next().expect("the master");
+    let slot = doc.master(m).and_then(|x| x.master_shape()).expect("the master shape");
+    let group = ShapeRef { owner: Owner::Master(m), slot };
+    let kids: alloc::vec::Vec<ShapeRef> = doc.shape(group).map(|s| s.children().collect()).unwrap_or_default();
+    assert_eq!(kids.len(), 1);
+    let (gid, pid) = (doc.shape(group).map_or(0, |s| s.id()), doc.shape(kids[0]).map_or(0, |s| s.id()));
+    let formula = |s: SheetRef, n: &str| doc.sym(n).and_then(|c| doc.resolve(s, &CellAddr::single(c)).formula().expr()).map(|f| alloc::string::String::from(doc.str(f))).unwrap_or_default();
+    assert_eq!(formula(SheetRef::Shape(kids[0]), "Width"), alloc::format!("GUARD(Sheet.{gid}!Width*0.5)"));
+    assert_eq!(formula(SheetRef::Shape(group), "TxtWidth"), alloc::format!("Sheet.{pid}!Width"));
+    // unset transform cells of a part: the group's size, guarded
+    assert_eq!(formula(SheetRef::Shape(kids[0]), "Height"), alloc::format!("GUARD(Sheet.{gid}!Height)"));
+    let num = |d: &diagram_core::Document, s: SheetRef, n: &str| d.sym(n).and_then(|c| d.resolve(s, &CellAddr::single(c)).num()).unwrap_or(f64::NAN);
+    assert!((num(doc, SheetRef::Shape(kids[0]), "Width") * 25.4 - 20.0).abs() < 1e-9);
+    // dropped in English: the part shows its English text
+    let mut d = vsdx::new_document(DocKind::Drawing, Measure::Metric);
+    let pg = d.pages().next().expect("a page");
+    let mut tx = d.transaction("drop");
+    let local = instance::import_master(&mut tx, doc, m).expect("import");
+    let s = instance::place(&mut tx, pg, local, 1.0, 1.0, 1).expect("place");
+    let sub = tx.doc().shape(s).and_then(|x| x.children().next()).expect("the part's instance");
+    assert_eq!(tx.doc().shape(sub).and_then(|x| x.text()).map(|t| t.chars()).as_deref(), Some("Left"));
+    drop(tx);
+    // refused
+    let refused = |m: &str, what: &str| build(m).err().is_some_and(|e| e.message.contains(what));
+    assert!(refused(&master("svg: a.svg\n", "", part), "svg"));
+    assert!(refused(&master("", "TxtWidth = Sheet.3!Width", part), "Sheet.3!"));
+    assert!(refused(&master("", "", &part.replace("QuickStyleFillColor = 101", "Comment.de = \"x\"")), "Sprachendungen"));
+}
+
+// (JD26) the logical sheet numbers of a group master become IDs, strings stay as written
+#[test]
+fn stencil_sheet_ids() {
+    assert_eq!(crate::stencil::sheet_ids_for_test("Sheet.1!Width+Sheet.12!Height", &[5, 6]).err().map(|_| ()), Some(()));
+    assert_eq!(crate::stencil::sheet_ids_for_test("Sheet.1!Width*0.5+Sheet.2!X", &[5, 9]).ok().as_deref(), Some("Sheet.5!Width*0.5+Sheet.9!X"));
+    assert_eq!(crate::stencil::sheet_ids_for_test("\"Sheet.1!\"&Sheet.2!X", &[5, 9]).ok().as_deref(), Some("\"Sheet.1!\"&Sheet.9!X"));
+    assert_eq!(crate::stencil::sheet_ids_for_test("MySheet.1!X+Sheet.10", &[5]).ok().as_deref(), Some("MySheet.1!X+Sheet.10"));
+}

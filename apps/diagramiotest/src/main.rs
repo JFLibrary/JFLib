@@ -60,6 +60,9 @@
 //             (JD10, stencil_structs.rs) the structure stencils: containers, lists, lanes, callouts
 //             (JD13, stencil_shapes.rs) the shape stencils: blocks, arrows, flowchart, connectors
 //             (1-D masters, glue)
+//             (JD26, stencil_business.rs) stencils/business: the general and business-graphics
+//             stencils: parts in five languages, counts and values from shape data and control
+//             points, the fishbone's glue
 //   structures  (JD10, structures.rs) a container, a list, a cross-functional flowchart and a
 //             callout built as JFDiagrammer builds them: relationships on both sides, written and
 //             read back unchanged, members, steps and callouts carried after reading
@@ -251,6 +254,10 @@ fn run() -> i32 {
         // (JD13) the network and rack stencils
         if h.on("stencils/network") {
             stencil_network::run(&mut h);
+        }
+        // (JD26) the general and business-graphics stencils
+        if h.on("stencils/business") {
+            stencil_business::run(&mut h);
         }
         if h.on("templates") {
             templates::run(&mut h);

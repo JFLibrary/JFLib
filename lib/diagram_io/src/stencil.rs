@@ -877,6 +877,11 @@ fn single_addr(tx: &mut Transaction, name: &str) -> CellAddr {
     CellAddr::single(tx.intern(name))
 }
 
+#[cfg(test)]
+pub(crate) fn sheet_ids_for_test(f: &str, ids: &[u32]) -> Result<String, String> {
+    sheet_ids(f, ids)
+}
+
 // (JD26) a group master's formula with its logical sheet numbers (Sheet.1! the master shape,
 // Sheet.2! its first part ..., README: Gruppen aus Teilen) as the shapes' IDs; strings stay
 fn sheet_ids(f: &str, ids: &[u32]) -> Result<String, String> {

@@ -282,6 +282,20 @@ fn check_starter(h: &mut H, b: &BuiltTemplate) {
     let connectors: Vec<ShapeRef> = shapes.iter().copied().filter(|&s| glue::is_connector(doc, s)).collect();
     let glued = connectors.iter().all(|&c| glue::glued(doc, c).iter().all(|t| matches!(t, Target::Shape(_))));
     h.check("templates/starter", glued, format!("{name}: {} connectors glued at both ends", connectors.len()));
+    // (JD26) 1-D masters glued to connection points by the starter (BeginOn / EndOn): the arrows
+    // of the block diagram, the bones and causes of the fishbone
+    let point_glued = |s: ShapeRef| glue::glued(doc, s).iter().filter(|t| matches!(t, Target::Point { .. })).count();
+    let want = if name.starts_with("block-") {
+        Some(6)
+    } else if name.starts_with("cause_effect-") {
+        Some(8)
+    } else {
+        None
+    };
+    if let Some(want) = want {
+        let got: usize = shapes.iter().filter(|&&s| glue::is_one_d(doc, s) && !glue::is_connector(doc, s)).map(|&s| point_glued(s)).sum();
+        h.check("templates/starter/glue", got == want, format!("{name}: {got} of {want} ends glued to connection points"));
+    }
     let res = Engine::new().calculate(doc);
     let mut d2 = doc.clone();
     let mut tx = d2.transaction("check");
@@ -301,7 +315,12 @@ fn check_drawing(h: &mut H, b: &BuiltTemplate, bytes: &[u8]) {
     let pname = p.and_then(|p| doc.page(p)).and_then(|pg| pg.header.name).map(|n| String::from(doc.str(n))).unwrap_or_default();
     let gone = ["JFD_Name", "JFD_Description", "JFD_Category", "JFD_Order", "JFD_Starter", "JFD_Default"].iter().all(|n| user(&doc, ds, n).is_none());
     let kept = user(&doc, ds, "JFD_Template").as_deref() == Some(b.template.as_str()) && template::stencil_windows(&doc) == windows;
-    let texts_gone = p.is_some_and(|p| doc.all_shapes(Owner::Page(p)).all(|s| user(&doc, SheetRef::Shape(s), "JFD_Text").is_none()));
+    // (JD26) the shapes' own JFD_Text; the parts of a group master inherit theirs from the master
+    let own_text = |s: SheetRef| -> bool {
+        let (Some(u), Some(n)) = (doc.sym("User"), doc.sym("JFD_Text")) else { return false };
+        doc.sheet(s).and_then(|sh| sh.section(SecKey::one(u))).and_then(|sec| sec.row(RowKey::Named(n))).is_some_and(|r| !r.del)
+    };
+    let texts_gone = p.is_some_and(|p| doc.all_shapes(Owner::Page(p)).all(|s| !own_text(SheetRef::Shape(s))));
     let page_ok = pname == "Page-1" && p.is_some_and(|p| user(&doc, SheetRef::Page(p), "JFD_Name").is_none());
     h.check("templates/drawing", doc.kind == DocKind::Drawing && gone && kept && texts_gone && page_ok, format!("{name}: a drawing, page „{pname}“, cells gone {gone}, kept {kept}"));
     // English texts: the tip, the masters' texts

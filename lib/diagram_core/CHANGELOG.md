@@ -71,6 +71,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   the page's layer indices (`instance::bring_layers`, LY-03); `ops::paste` on another page brings the
   copied shapes' layers along by name
 - (JD8) Text fields (TX-06), `diagram_core::field`: `shown` gives the text of a Field row -- its Value in the format picture of its Format cell (`format`: numbers with digits, decimals, digit groups, sections, percent and the unit of the cell, dates and times in `{{ }}`, texts with `@`, `@+`, `@-`, the general format), `insert` puts a new field (Value formula, Format, Type) into a shape's text at a shown position or at its end and computes it, `segments`/`plain` give a text with its fields as they show, `props` reads the document's properties (docProps core and app parts), `ole_days`/`civil` convert Visio's date values; `Document::fields` (`field::Env`) carries what fields show that the file does not hold: the app's decimal sign, digit groups, month and day names, date picture, clock, file path and zone offset. Formulas: NOW, DOCCREATION, DOCLASTSAVE, DOCLASTPRINT, DOCLASTEDIT, CREATOR, DESCRIPTION, DIRECTORY, FILENAME, KEYWORDS, SUBJECT, TITLE, MANAGER, COMPANY, CATEGORY, HYPERLINKBASE (what the engine cannot know here keeps the stored value)
+- (JD26) `instance::localize_parts(tx, shape, lang)`: the subshapes of an instance whose master subshape carries `User.JFD_Text` (a group master's parts from the stencil tool) show the text of the language while they show one of the five or none; `instance::place` calls it
 
 ### Changed
 
