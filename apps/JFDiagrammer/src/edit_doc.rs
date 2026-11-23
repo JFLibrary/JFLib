@@ -255,18 +255,23 @@ pub(crate) fn install(app: &mut Diagrammer, ui: &mut Ui, doc: Document, name: St
 pub(crate) fn save(app: &mut Diagrammer, ui: &mut Ui, as_new: bool) {
     let Some(o) = app.opened.as_ref() else { return };
     match (&o.ed.path, as_new) {
-        (Some(p), false) => {
+        // (JD16) a file of the XML format of 2003-2010 is never written back: a new name
+        (Some(p), false) if !crate::doc_file::is_xml(p) => {
             let p = p.clone();
             save_to(app, ui, &p);
         }
         _ => {
             let stem = o.name.clone();
             let ext = o.ed.format.extension();
-            // the folder of the file it came from, else --save-dir (a test aid), else the
-            // dialog's own start
+            // --save-dir (a test aid) when given, else the folder of the file it came from, else
+            // the dialog's own start
+            let save_dir = || plat::arg_value("--save-dir").map(|d| if d.starts_with('/') || d.get(1..2) == Some(":") { d } else { format!("{}/{}", plat::cwd(), d) });
+            // (JD16) --save-dir wins when given: the files a test opens from its own folder
+            // stay as they are
             let dir = match &o.ed.path {
+                Some(_) if save_dir().is_some() => save_dir(),
                 Some(p) => p.rsplit_once(['/', '\\']).map(|x| String::from(x.0)),
-                None => plat::arg_value("--save-dir").map(|d| if d.starts_with('/') || d.get(1..2) == Some(":") { d } else { format!("{}/{}", plat::cwd(), d) }),
+                None => save_dir(),
             };
             app.save_path = match dir {
                 Some(d) => format!("{d}/{stem}.{ext}"),
@@ -287,6 +292,13 @@ pub(crate) fn save_to(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
     };
     // (JD13) a template keeps the open stencils (EX-11, VL-02)
     let windows = (format.kind == DocKind::Template).then(|| crate::templates::windows_of_panel(app));
+    // (JD16, DF-04) a macro project into a format without macros: ask first
+    if !format.macros && app.opened.as_ref().is_some_and(|o| o.doc.macros) {
+        crate::doc_file::ask_macros(app, ui, &path);
+        return false;
+    }
+    // (JD16, DF-10) an own file keeps its window state
+    crate::doc_file::before_save(app, format);
     let Some(o) = app.opened.as_mut() else { return false };
     take_back(o);
     if let Some(w) = windows {

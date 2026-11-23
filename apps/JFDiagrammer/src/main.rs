@@ -49,6 +49,9 @@
 //   src/templates.rs  (JD13) the templates: built-in (build.rs builds them from templates/ into
 //                     .vstx), the own ones, a new drawing from one, Speichern als Vorlage
 //   src/templates_ui.rs  (JD13) Datei › Neu: the catalogue with rendered previews
+//   src/doc_file.rs   (JD16) Visio's XML formats of 2003-2010 (.vdx, .vsx, .vtx) opened, the
+//                     question before a macro project is left out, Datei › Info's properties,
+//                     the window state (page, zoom, stencils) read and written for own files
 //   src/cmds_arrange.rs  (JD8 rest) Automatisch ausrichten
 //   src/cmds_later.rs    (JD8 rest) the commands left for later with their reasons, the check
 //   src/cmds_myshapes.rs (JD8 rest) Zu meinen Shapes hinzufügen (shapes of the page into Favoriten)
@@ -126,6 +129,7 @@ mod dlg_field;
 mod dlg_find;
 mod dlg_link;
 mod dlg_text;
+mod doc_file;
 mod edit_canvas;
 mod edit_cmds;
 mod edit_doc;
@@ -282,6 +286,8 @@ pub(crate) struct Diagrammer {
     pub select: select_type::SelectState,
     /// (JD8 rest) the text, field, link and search commands (cmds_text.rs)
     pub txt: cmds_text::TextCmds,
+    /// (JD16) the older XML formats, macros, properties, window state (doc_file.rs)
+    pub docfile: doc_file::DocFile,
 }
 
 impl Diagrammer {
@@ -344,6 +350,7 @@ impl Diagrammer {
             layers: layers::LayerState::default(),
             select: select_type::SelectState::default(),
             txt: cmds_text::TextCmds::default(),
+            docfile: doc_file::DocFile::default(),
         }
     }
 
@@ -497,6 +504,9 @@ impl App for Diagrammer {
         layers::props_dialog(self, ui);
         select_type::dialog(self, ui);
         cmds_text::frame(self, ui);
+        // (JD16) the question about macros, the file's zoom after the fit
+        doc_file::dialog(self, ui);
+        doc_file::frame(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

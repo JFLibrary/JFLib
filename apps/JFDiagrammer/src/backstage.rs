@@ -76,7 +76,11 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
         PAGE_SAVE | PAGE_SAVE_AS => save_page(app, ui, page == PAGE_SAVE_AS),
         PAGE_PRINT => crate::print_ui::page(app, ui),
         PAGE_EXPORT => crate::export_ui::page(app, ui),
-        PAGE_INFO => info_page(ui),
+        PAGE_INFO => {
+            // (JD16, DF-09) the drawing's properties first
+            crate::doc_file::props_page(app, ui);
+            info_page(ui)
+        }
         _ => options_page(app, ui),
     }
     ui.backstage_end();

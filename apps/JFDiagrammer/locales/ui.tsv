@@ -825,3 +825,21 @@ Vertikale Ausrichtung	Vertical alignment	Alineación vertical	Allineamento verti
 Texthintergrund	Text background	Fondo del texto	Sfondo del testo	Arrière-plan du texte
 Keiner	None	Ninguno	Nessuno	Aucun
 Hintergrundfarbe	Background color	Color de fondo	Colore di sfondo	Couleur d'arrière-plan
+Makros speichern?	Save macros?	¿Guardar macros?	Salvare le macro?	Enregistrer les macros ?
+Die Zeichnung enthält Makros (VBA). „{}“ ist ein Format ohne Makros: Beim Speichern gehen sie verloren.	The drawing contains macros (VBA). “{}” is a format without macros: they are lost when saving.	El dibujo contiene macros (VBA). «{}» es un formato sin macros: se pierden al guardar.	Il disegno contiene macro (VBA). «{}» è un formato senza macro: vanno perse al salvataggio.	Le dessin contient des macros (VBA). « {} » est un format sans macros : elles sont perdues à l’enregistrement.
+Als Zeichnung mit Makros (.vsdm) bleiben sie erhalten. JFDiagrammer führt Makros nie aus.	As a drawing with macros (.vsdm) they are kept. JFDiagrammer never runs macros.	Como dibujo con macros (.vsdm) se conservan. JFDiagrammer nunca ejecuta macros.	Come disegno con macro (.vsdm) vengono conservate. JFDiagrammer non esegue mai le macro.	En tant que dessin avec macros (.vsdm), elles sont conservées. JFDiagrammer n’exécute jamais de macros.
+Ohne Makros speichern	Save without macros	Guardar sin macros	Salva senza macro	Enregistrer sans macros
+Mit Makros speichern	Save with macros	Guardar con macros	Salva con macro	Enregistrer avec macros
+Thema	Subject	Asunto	Oggetto	Objet
+Autor	Author	Autor	Autore	Auteur
+Kommentare	Comments	Comentarios	Commenti	Commentaires
+Eigenschaften	Properties	Propiedades	Proprietà	Propriétés
+Erstellt	Created	Creado	Creato	Créé
+Geändert	Modified	Modificado	Modificato	Modifié
+Zuletzt gedruckt	Last printed	Última impresión	Ultima stampa	Dernière impression
+Vorlage	Template	Plantilla	Modello	Modèle
+Die Zeichnung enthält Makros (VBA). Sie bleiben beim Speichern als .vsdm erhalten und werden nie ausgeführt.	The drawing contains macros (VBA). They are kept when saved as .vsdm and are never run.	El dibujo contiene macros (VBA). Se conservan al guardar como .vsdm y nunca se ejecutan.	Il disegno contiene macro (VBA). Vengono conservate salvando come .vsdm e non vengono mai eseguite.	Le dessin contient des macros (VBA). Elles sont conservées à l’enregistrement en .vsdm et ne sont jamais exécutées.
+Geöffnet aus dem XML-Format von Visio 2003–2010; gespeichert wird als .vsdx.	Opened from the XML format of Visio 2003–2010; it is saved as .vsdx.	Abierto desde el formato XML de Visio 2003–2010; se guarda como .vsdx.	Aperto dal formato XML di Visio 2003–2010; viene salvato come .vsdx.	Ouvert depuis le format XML de Visio 2003–2010 ; il est enregistré en .vsdx.
+vsx=Visio-XML-Schablone (2003–2010)	vsx=Visio XML stencil (2003–2010)	vsx=Colección de formas XML de Visio (2003–2010)	vsx=Raccolta di forme XML di Visio (2003–2010)	vsx=Bibliothèque de formes XML Visio (2003–2010)
+vdx;vsx;vtx=Visio-XML (2003–2010)	vdx;vsx;vtx=Visio XML (2003–2010)	vdx;vsx;vtx=XML de Visio (2003–2010)	vdx;vsx;vtx=XML di Visio (2003–2010)	vdx;vsx;vtx=XML Visio (2003–2010)
+Die Datei hat das XML-Format von Visio 2003–2010; gespeichert wird sie als .vsdx.	The file has the XML format of Visio 2003–2010; it is saved as .vsdx.	El archivo tiene el formato XML de Visio 2003–2010; se guarda como .vsdx.	Il file ha il formato XML di Visio 2003–2010; viene salvato come .vsdx.	Le fichier est au format XML de Visio 2003–2010 ; il est enregistré en .vsdx.
