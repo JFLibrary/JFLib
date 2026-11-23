@@ -22,9 +22,10 @@
 // * One record per line (CR, LF or CR LF ends it); the first field names the record type,
 //   "Shape" or "Link" (any case).  Another type is a warning and the line is left out.
 // * Fields are separated by a comma (the guide: the default of .csv files), a tab (.txt files)
-//   or -- decided here, the CSV of a German Excel -- a semicolon.  The separator is the
-//   character right after the type word of the first record or field heading (";Shape,ID,..."),
-//   else the caller's fallback (the file's extension).
+//   or -- decided here, the CSV of a German Excel -- a semicolon.  The separator is the one an
+//   Excel first line "sep=X" names (the line is no record), else the character right after the
+//   type word of the first record or field heading (";Shape,ID,..."), else the caller's fallback
+//   (the file's extension).
 // * A field in double quotes is text as it stands: separators, line breaks (kept as paragraph
 //   breaks, '\n') and doubled quotes ("" for ") inside; an unquoted field is trimmed of spaces.
 //   A quote left open at the end of the file is an error and its record is left out.
@@ -281,10 +282,26 @@ impl Plan {
 
 // ---------------------------------------------------------------- reading
 
-/// the separator of the records: the character right after "Shape" or "Link" in the first
-/// record or comment heading that has ',', a tab or ';' there -> (it, detected); else
-/// (`fallback`, false)
+// Excel's first line "sep=X" (any case, X one character) -> X and the text after that line
+fn sep_line(text: &str) -> Option<(char, &str)> {
+    let head = text.get(..4)?;
+    if !head.eq_ignore_ascii_case("sep=") {
+        return None;
+    }
+    let c = text[4..].chars().next()?;
+    let rest = &text[4 + c.len_utf8()..];
+    let rest = rest.strip_prefix("\r\n").or_else(|| rest.strip_prefix('\n')).or_else(|| rest.strip_prefix('\r'))?;
+    (c != '\r' && c != '\n').then_some((c, rest))
+}
+
+/// the separator of the records: Excel's first line "sep=X", else the character right after
+/// "Shape" or "Link" in the first record or comment heading that has ',', a tab or ';' there ->
+/// (it, detected); else (`fallback`, false)
 pub fn detect_sep(text: &str, fallback: char) -> (char, bool) {
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    if let Some((c, _)) = sep_line(text) {
+        return (c, true);
+    }
     for line in text.split(['\n', '\r']) {
         let mut l = line.trim_start_matches([' ', '\u{feff}']);
         if let Some(rest) = l.strip_prefix(';') {
@@ -673,16 +690,22 @@ impl Reader<'_> {
 /// read a text (see the file header) -> the plan; never fails
 pub fn parse(text: &str, opts: &Options, lim: &Limits) -> Plan {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    let (sep, detected) = match opts.sep {
-        Some(s) => (s, false),
-        None => detect_sep(text, opts.fallback_sep),
+    // Excel's first line "sep=X" names the separator
+    let (hint, text, first_line) = match sep_line(text) {
+        Some((c, rest)) => (Some(c), rest, 2),
+        None => (None, text, 1),
+    };
+    let (sep, detected) = match (opts.sep, hint) {
+        (Some(s), _) => (s, false),
+        (None, Some(c)) => (c, true),
+        (None, None) => detect_sep(text, opts.fallback_sep),
     };
     let mut r = Reader { plan: Plan { sep, sep_detected: detected, ..Plan::default() }, lim, masters: BTreeMap::new(), full: false };
     if text.len() > lim.max_bytes {
         r.problem(0, Issue::TooBig, true);
         return r.plan;
     }
-    let mut tok = Tok { chars: text.chars().peekable(), line: 1, sep, max_fields: lim.max_fields.max(1), max_chars: lim.max_field_chars };
+    let mut tok = Tok { chars: text.chars().peekable(), line: first_line, sep, max_fields: lim.max_fields.max(1), max_chars: lim.max_field_chars };
     // the shape data headings of the last ";Shape,..." comment (index 0: the 9th field)
     let mut headings: Vec<String> = Vec::new();
     // shape ID (id_key) -> index; links are resolved at the end (they may come first)

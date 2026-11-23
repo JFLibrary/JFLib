@@ -80,6 +80,13 @@ fn quotes_line_breaks_and_separators() {
     assert_eq!((p.sep, p.sep_detected), (';', true));
     assert_eq!(p.shapes[0].text, "a;b");
     assert_eq!(p.links.len(), 1);
+    // Excel's "sep=" line: the separator, no record, the lines counted on
+    let p = read("SEP=|\r\nShape|a|;x\nShape|b\n");
+    assert_eq!((p.sep, p.sep_detected), ('|', true));
+    assert!(p.problems.is_empty(), "{:?}", p.problems);
+    assert_eq!((p.shapes[0].master, p.shapes[1].line), (0, 3));
+    assert_eq!(p.masters[0].name, ";x");
+    assert_eq!(detect_sep("sep=;\nShape,a", ','), (';', true));
     // nothing to detect: the fallback; a given separator wins
     assert_eq!(detect_sep("nothing here", '\t'), ('\t', false));
     let p = parse("Shape,a;b", &Options { sep: Some(';'), ..Options::default() }, &Limits::DEFAULT);
