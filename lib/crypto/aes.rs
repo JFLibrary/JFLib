@@ -1,6 +1,6 @@
-// aes -- AES-128 / AES-256 (FIPS 197) in constant time
+// aes -- AES-128 / AES-192 / AES-256 (FIPS 197) in constant time
 //
-//   Aes::new(key) (16 or 32 bytes)    aes.encrypt4(&mut [[u8; 16]; 4])    aes.encrypt(&mut block)
+//   Aes::new(key) (16, 24 or 32 bytes)    aes.encrypt4(&mut [[u8; 16]; 4])    aes.encrypt(&mut block)
 //                                     aes.decrypt4(&mut [[u8; 16]; 4])    aes.decrypt(&mut block)
 //
 // Bitsliced: four blocks at a time in eight 64-bit words, word i holding bit i of all 64 bytes
@@ -189,10 +189,11 @@ impl Drop for Aes {
 }
 
 impl Aes {
-    /// a 16-byte (AES-128) or 32-byte (AES-256) key
+    /// a 16-byte (AES-128), 24-byte (AES-192) or 32-byte (AES-256) key
     pub fn new(key: &[u8]) -> Option<Aes> {
         let nk = match key.len() {
             16 => 4,
+            24 => 6,
             32 => 8,
             _ => return None,
         };

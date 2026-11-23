@@ -14,19 +14,24 @@ runs coretest once and holds each answer against the case's `result`:
 Covered, through the API the library's programs call:
   X25519             x25519::shared (low-order points: None)
   Ed25519            x509::Cert::verify -> ed25519::verify (strict)
-  ECDSA P-256/P-384  DER: x509::Cert::verify (netio's Ecdsa-Sig-Value decoding) -> ecdsa::verify;
-                     P1363: ecdsa::verify(r, s) on the two halves (JFLib has no P1363 decoder:
-                     signatures of another length are skipped)
-  AES-GCM            gcm::AesGcm seal and open: 12-byte nonces, 16-byte tags, AES-128 / AES-256
-                     (other nonce sizes and AES-192 are skipped: the API does not take them)
+  ECDSA P-256/P-384  DER: x509::Cert::verify (netio's Ecdsa-Sig-Value decoding) -> ecdsa::verify,
+                     and ecdsa::p1363_from_der -> verify_p1363 for the valid ones;
+                     P1363: ecdsa::verify_p1363 (any length: a wrong one is refused there)
+  ECDH P-256/P-384   p256::shared / p384::shared on the raw points (the ecpoint files;
+                     compressed points are skipped: shared takes 04 || x || y)
+  AES-GCM            gcm::AesGcm seal and open: 12-byte nonces, 16-byte tags, AES-128 / 192 / 256
+                     (other nonce sizes are skipped: the API does not take them)
   (X)ChaCha20-Poly1305  aead::seal / open, x_seal / x_open (12- / 24-byte nonces only)
   RSA PKCS #1 v1.5   x509::Cert::verify -> rsa::PublicKey::verify_pkcs1; signing:
                      rsa::PrivateKey::sign_pkcs1 (the sig_gen files)
   RSA-PSS            x509::Cert::verify -> verify_pss with the group's salt length (MGF1 of the
                      message hash only, like the API)
-  HKDF, HMAC         hmac::hkdf_extract / hkdf_expand and Hmac over SHA-1 / 256 / 384 / 512
-Hashes other than SHA-256 / 384 / 512 (SHA-1 / 224, SHA-512/t, SHA-3, SHAKE) are skipped for
-signatures: HashAlg has no others.  Exit code 1 on any failure."""
+  HKDF, HMAC         hmac::hkdf_extract / hkdf_expand and Hmac over SHA-1 / 224 / 256 / 384 / 512
+                     and SHA3-224 / 256 / 384 / 512
+  ML-KEM             mlkem::keygen from the seed, encaps (with FIPS 203's modulus check), decaps
+                     (the expanded key's hash check, implicit rejection): 512, 768 and 1024
+Hashes other than SHA-224 / 256 / 384 / 512 and SHA3-224 / 256 / 384 / 512 (SHA-1, SHA-512/t,
+SHAKE) are skipped for signatures: HashAlg has no others.  Exit code 1 on any failure."""
 import argparse
 import collections
 import hashlib
@@ -45,17 +50,26 @@ REPO = "C2SP/wycheproof"
 COMMIT = "65ca494727a52944c204441c860b039e6786b99b"
 
 FILES = (["x25519", "ed25519", "aes_gcm", "chacha20_poly1305", "xchacha20_poly1305"]
-         + [f"ecdsa_secp256r1_{h}" for h in ("sha256", "sha512", "sha256_p1363", "sha512_p1363")]
-         + [f"ecdsa_secp384r1_{h}" for h in ("sha256", "sha384", "sha512", "sha384_p1363", "sha512_p1363")]
+         + [f"ecdsa_secp256r1_{h}" for h in ("sha256", "sha512", "sha3_256", "sha3_512", "sha256_p1363", "sha512_p1363")]
+         + [f"ecdsa_secp384r1_{h}" for h in ("sha256", "sha384", "sha512", "sha3_384", "sha3_512", "sha384_p1363", "sha512_p1363")]
+         + ["ecdh_secp256r1_ecpoint", "ecdh_secp384r1_ecpoint"]
          + [f"rsa_signature_{b}_{h}" for b in (2048, 3072, 4096, 8192) for h in ("sha256", "sha384", "sha512")]
+         + [f"rsa_signature_2048_{h}" for h in ("sha224", "sha3_224", "sha3_256", "sha3_384", "sha3_512")]
+         + [f"rsa_signature_3072_{h}" for h in ("sha3_256", "sha3_384", "sha3_512")]
          + [f"rsa_pkcs1_{b}_sig_gen" for b in (1024, 1536, 2048, 3072, 4096)]
          + [f"rsa_pss_{x}" for x in ("2048_sha256_mgf1_0", "2048_sha256_mgf1_32", "2048_sha384_mgf1_48", "3072_sha256_mgf1_32",
                                      "4096_sha256_mgf1_32", "4096_sha384_mgf1_48", "4096_sha512_mgf1_32", "4096_sha512_mgf1_64", "misc")]
-         + [f"{k}_{h}" for k in ("hkdf", "hmac") for h in ("sha1", "sha256", "sha384", "sha512")])
+         + [f"{k}_{h}" for k in ("hkdf", "hmac") for h in ("sha1", "sha256", "sha384", "sha512")]
+         + [f"hmac_{h}" for h in ("sha224", "sha3_224", "sha3_256", "sha3_384", "sha3_512")]
+         + [f"mlkem_{n}{s}" for n in (512, 768, 1024) for s in ("", "_keygen_seed", "_encaps", "_semi_expanded_decaps")])
 
-SIG_HASH = {"SHA-256": 1, "SHA-384": 2, "SHA-512": 3}          # suitevec.rs: hash ids
-MAC_HASH = {"SHA-1": 0, "SHA-256": 1, "SHA-384": 2, "SHA-512": 3}
-HASHLIB = {"SHA-256": "sha256", "SHA-384": "sha384", "SHA-512": "sha512"}
+# coretest's hash ids (crypto.rs hash_of)
+SIG_HASH = {"SHA-256": 1, "SHA-384": 2, "SHA-512": 3, "SHA-224": 4,
+            "SHA3-224": 5, "SHA3-256": 6, "SHA3-384": 7, "SHA3-512": 8}
+MAC_HASH = {"SHA-1": 0, **SIG_HASH}
+HASHLIB = {"SHA-256": "sha256", "SHA-384": "sha384", "SHA-512": "sha512", "SHA-224": "sha224",
+           "SHA3-224": "sha3_224", "SHA3-256": "sha3_256", "SHA3-384": "sha3_384", "SHA3-512": "sha3_512"}
+MLKEM = {"ML-KEM-512": 1, "ML-KEM-768": 2, "ML-KEM-1024": 3}
 
 
 class Case:
@@ -120,14 +134,54 @@ def ecdsa(file, j):
         for t in g["tests"]:
             msg, sig = bytes.fromhex(t["msg"]), bytes.fromhex(t["sig"])
             if h not in SIG_HASH:
-                yield Case(file, t, skip=f"{h}: HashAlg has SHA-256/384/512 only")
-            elif g["type"] == "EcdsaVerify":
-                yield Case(file, t, [line("certverify", bytes([kind]), b"\x04", bytes([SIG_HASH[h]]), b"", pt, b"", msg, sig)], accept_byte)
-            elif len(sig) != 2 * nb:
-                yield Case(file, t, skip=f"P1363 signatures of {{}} bytes, not {2 * nb}: JFLib has no P1363 decoder (ecdsa::verify takes r, s)", size=len(sig))
+                yield Case(file, t, skip=f"{h}: HashAlg has SHA-224/256/384/512 and SHA3 only")
+                continue
+            d = hashlib.new(HASHLIB[h], msg).digest()
+            if g["type"] == "EcdsaVerify":
+                ops = [line("certverify", bytes([kind]), b"\x04", bytes([SIG_HASH[h]]), b"", pt, b"", msg, sig)]
+                # crypto's strict DER decoder, then verify_p1363: the same answer as netio's way
+                ops.append(line("ecdsaderverify", bytes([kind - 2]), pt, d, sig))
+
+                def judge(outs):
+                    verdict, detail = accept_byte(outs[:1])
+                    if outs[1] != outs[0]:
+                        return "wrong", f"p1363_from_der + verify_p1363 gave {outs[1]}, Cert::verify {outs[0]}"
+                    return verdict, detail
+                yield Case(file, t, ops, judge)
             else:
-                d = hashlib.new(HASHLIB[h], msg).digest()
-                yield Case(file, t, [line("ecdsa", bytes([kind - 2]), pt, d, sig[:nb], sig[nb:])], accept_byte)
+                yield Case(file, t, [line("ecdsap1363", bytes([kind - 2]), pt, d, sig)], accept_byte)
+
+
+def ecdh(file, j):
+    for g in j["testGroups"]:
+        cid, nb = {"secp256r1": (1, 32), "secp384r1": (2, 48)}[g["curve"]]
+        for t in g["tests"]:
+            pub, shared = bytes.fromhex(t["public"]), bytes.fromhex(t["shared"])
+            k = int(t["private"], 16) if t["private"] else 0
+            if pub[:1] in (b"\x02", b"\x03") and t["result"] != "invalid":
+                yield Case(file, t, skip="compressed points: shared takes 04 || x || y")
+                continue
+            if k >= 1 << (8 * nb):
+                yield Case(file, t, skip=f"secrets over {nb} bytes: shared takes [u8; {nb}]")
+                continue
+            op = "p256ecdh" if cid == 1 else "p384ecdh"
+            yield Case(file, t, [line(op, k.to_bytes(nb, "big"), pub)], value(shared))
+
+
+def mlkem(file, j):
+    for g in j["testGroups"]:
+        pid = bytes([MLKEM[g["parameterSet"]]])
+        typ = g["type"]
+        for t in g["tests"]:
+            x = {k: bytes.fromhex(v) for k, v in t.items() if isinstance(v, str) and k not in ("result", "comment")}
+            if typ == "MLKEMKeyGen":
+                yield Case(file, t, [line("mlkemkeygen", pid, x["seed"])], value(x["ek"] + x["dk"]))
+            elif typ == "MLKEMTest":
+                yield Case(file, t, [line("mlkemseed", pid, x["seed"], x["c"])], value(x.get("ek", b"") + x.get("K", b"")))
+            elif typ == "MLKEMEncapsTest":
+                yield Case(file, t, [line("mlkemencaps", pid, x["ek"], x["m"])], value(x.get("c", b"") + x.get("K", b"")))
+            else:
+                yield Case(file, t, [line("mlkemdecaps", pid, x["dk"], x["c"])], value(x.get("K", b"")))
 
 
 def aead(file, j):
@@ -137,8 +191,8 @@ def aead(file, j):
             key, iv, aad, msg, ct, tag = (bytes.fromhex(t[x]) for x in ("key", "iv", "aad", "msg", "ct", "tag"))
             if alg == "AES-GCM":
                 seal, open_, ivlen = "aesgcm", "aesgcmopen", 12
-                if len(key) not in (16, 32):
-                    yield Case(file, t, skip=f"AES-{len(key) * 8}: aes.rs takes 16- and 32-byte keys only")
+                if len(key) not in (16, 24, 32):
+                    yield Case(file, t, skip=f"AES-{len(key) * 8}: aes.rs takes 16-, 24- and 32-byte keys only")
                     continue
             elif alg == "CHACHA20-POLY1305":
                 seal, open_, ivlen = "aead", "aeadopen", 12
@@ -202,7 +256,7 @@ def rsa_pkcs1(file, j):
         for t in g["tests"]:
             msg, sig = bytes.fromhex(t["msg"]), bytes.fromhex(t["sig"])
             if h not in SIG_HASH:
-                yield Case(file, t, skip=f"{h}: HashAlg has SHA-256/384/512 only")
+                yield Case(file, t, skip=f"{h}: HashAlg has SHA-224/256/384/512 and SHA3 only")
                 continue
             ops = [line("certverify", b"\x02", b"\x02", bytes([SIG_HASH[h]]), b"", n, e, msg, sig)]
             if g["type"] == "RsassaPkcs1Generate":
@@ -222,7 +276,7 @@ def rsa_pss(file, j):
         h, mh = g["sha"], g["mgfSha"]
         for t in g["tests"]:
             if h not in SIG_HASH:
-                yield Case(file, t, skip=f"{h}: HashAlg has SHA-256/384/512 only")
+                yield Case(file, t, skip=f"{h}: HashAlg has SHA-224/256/384/512 and SHA3 only")
             elif g["mgf"] != "MGF1" or mh != h:
                 yield Case(file, t, skip=f"MGF1 with {mh} for {h}: verify_pss uses MGF1 of the message hash")
             else:
@@ -239,7 +293,8 @@ def hkdf(file, j):
 
 
 def hmac(file, j):
-    h = {"HMACSHA1": "SHA-1", "HMACSHA256": "SHA-256", "HMACSHA384": "SHA-384", "HMACSHA512": "SHA-512"}[j["algorithm"]]
+    a = j["algorithm"].removeprefix("HMAC")
+    h = a if a.startswith("SHA3-") else a.replace("SHA", "SHA-")
     for g in j["testGroups"]:
         n = g["tagSize"] // 8
         for t in g["tests"]:
@@ -252,7 +307,8 @@ def hmac(file, j):
 
 
 def handler(name):
-    for prefix, fn in (("x25519", x25519), ("ed25519", ed25519), ("ecdsa", ecdsa), ("aes_gcm", aead), ("chacha", aead), ("xchacha", aead),
+    for prefix, fn in (("x25519", x25519), ("ed25519", ed25519), ("ecdsa", ecdsa), ("ecdh", ecdh), ("mlkem", mlkem),
+                       ("aes_gcm", aead), ("chacha", aead), ("xchacha", aead),
                        ("rsa_signature", rsa_pkcs1), ("rsa_pkcs1", rsa_pkcs1), ("rsa_pss", rsa_pss), ("hkdf", hkdf), ("hmac", hmac)):
         if name.startswith(prefix):
             return fn

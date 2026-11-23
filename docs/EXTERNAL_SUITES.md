@@ -1,30 +1,32 @@
-# External test suites -- Wycheproof, x509-limbo, tlsfuzzer, TLS-Anvil
+# External test suites -- Wycheproof, ACVP, x509-limbo, tlsfuzzer, TLS-Anvil
 
 Four adversarial suites that found bugs in OpenSSL, Go, Java, BouncyCastle, GnuTLS, NSS and
-others, run against JFLib's own crypto (`lib/crypto`), certificate code (`lib/x509`, the crate
-jflib-x509) and TLS (`lib/netio/tls`). None is in git: each tool fetches its pinned commit on
-the first run, Wycheproof and limbo into `build/vectors/` (`tools/suite_fetch.py`, read as JSON
-only), tlsfuzzer into `build/tlsfuzzer/`, TLS-Anvil with its Java and Maven into
-`build/tlsanvil/`.
+others, and NIST's conformance vectors (ACVP, which FIPS validations are tested with), run
+against JFLib's own crypto (`lib/crypto`), certificate code (`lib/x509`, the crate jflib-x509)
+and TLS (`lib/netio/tls`). None is in git: each tool fetches its pinned commit on the first run,
+Wycheproof, ACVP and limbo into `build/vectors/` (`tools/suite_fetch.py`, read as JSON only),
+tlsfuzzer into `build/tlsfuzzer/`, TLS-Anvil with its Java and Maven into `build/tlsanvil/`.
 
 ```
 python build_rs.py app coretest --target linux
-python tools/wycheproof_check.py      # C2SP/wycheproof @ 65ca494727a5: 48 files, 11 MB
+python tools/wycheproof_check.py      # C2SP/wycheproof @ 65ca494727a5: 79 files, 24 MB
+python tools/acvp_check.py            # usnistgov/ACVP-Server @ 975de31eb83d: 11 files, 15 MB
 python tools/limbo_check.py           # C2SP/x509-limbo @ b12423782a88: limbo.json, 42 MB
 python tools/tlsfuzzer_check.py       # tlsfuzzer @ 51aad6e9ae42, tlslite-ng @ 7e95ea1a86c0: netio's TLS 1.3 server
 python tools/tlsanvil_check.py        # TLS-Anvil @ c1762f4 (Temurin 21, Maven 3.9.9; 850 MB): netio's TLS client
 ```
 
-Wycheproof and limbo turn each case into a `coretest --vectors` line (the operations are in
-`apps/coretest/src/suitevec.rs`) and exit with 1 on a failure. Options: `--only` / `--id` to
+Wycheproof, ACVP and limbo turn each case into a `coretest --vectors` line (the operations are
+in `apps/coretest/src/suitevec.rs` and `crypto.rs`) and exit with 1 on a failure. Options: `--only` / `--id` to
 filter, `--acceptable` (Wycheproof), `--list` and `--show ID` (limbo), `--target win`.
 tlsfuzzer and TLS-Anvil talk to `coretest` over TCP (sections below).
 
-## Results (2026-11-21, Linux x86-64)
+## Results (Wycheproof and ACVP 2026-11-23, the others 2026-11-21; Linux x86-64)
 
 | Suite | Cases | Pass | Fail | Skipped | Time |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Wycheproof | 10 942 | 10 489 | 0 | 453 | 14 s |
+| Wycheproof | 18 813 | 18 532 | 0 | 281 | 15 s |
+| ACVP | 13 199 | 3 608 | 0 | 9 591 | 2 s |
 | x509-limbo | 9 807 | 9 720 | 28 (+14 optional) | 45 | 10 s |
 | tlsfuzzer | 57 scripts | 35 scripts (2 662 probes, 622 failing as expected) | 0 | 22 scripts | 51 s |
 | TLS-Anvil (client) | 232 tests | 192 | 2 (TLS-Anvil's own) | 38 | 90 s |
@@ -45,13 +47,15 @@ Each case goes through the API JFLib's programs call:
 | --- | --- |
 | X25519 (incl. low-order points) | `x25519::shared` |
 | Ed25519 (strict) | `x509::Cert::verify` -> `ed25519::verify` |
-| ECDSA P-256 / P-384, DER | `x509::Cert::verify` (netio decodes Ecdsa-Sig-Value) -> `ecdsa::verify` |
-| ECDSA P-256 / P-384, P1363 | `ecdsa::verify(r, s)` on the two halves |
-| AES-GCM | `gcm::AesGcm` seal and open (12-byte nonce, 16-byte tag, AES-128 / 256) |
+| ECDSA P-256 / P-384, DER (SHA-2 and SHA-3) | `x509::Cert::verify` (netio decodes Ecdsa-Sig-Value) -> `ecdsa::verify`; and `ecdsa::p1363_from_der` -> `verify_p1363`, which must give the same answer |
+| ECDSA P-256 / P-384, P1363 | `ecdsa::verify_p1363` (a signature of another length is refused there) |
+| ECDH P-256 / P-384 (raw points) | `p256::shared` / `p384::shared` |
+| AES-GCM | `gcm::AesGcm` seal and open (12-byte nonce, 16-byte tag, AES-128 / 192 / 256) |
 | ChaCha20-Poly1305, XChaCha20-Poly1305 | `aead::seal` / `open`, `x_seal` / `x_open` |
-| RSA PKCS #1 v1.5 | `x509::Cert::verify` -> `rsa::PublicKey::verify_pkcs1`; signing: `rsa::PrivateKey::sign_pkcs1` |
+| RSA PKCS #1 v1.5 (SHA-224, SHA-2, SHA-3) | `x509::Cert::verify` -> `rsa::PublicKey::verify_pkcs1`; signing: `rsa::PrivateKey::sign_pkcs1` |
 | RSA-PSS | `x509::Cert::verify` -> `verify_pss` with the group's salt length |
-| HKDF, HMAC (SHA-1 / 256 / 384 / 512) | `hmac::hkdf_extract` / `hkdf_expand`, `Hmac<H>` |
+| HKDF, HMAC (SHA-1 / 224 / 256 / 384 / 512, SHA3-224 / 256 / 384 / 512) | `hmac::hkdf_extract` / `hkdf_expand`, `Hmac<H>` |
+| ML-KEM-512 / 768 / 1024 | `mlkem::keygen` from the seed, `encaps` (with FIPS 203's modulus check), `decaps` (the expanded key's hash check, implicit rejection) |
 
 ### Fixed: ECDSA DER decoding in netio (the 15 failures of the first run)
 
@@ -87,18 +91,39 @@ The 12 invalid HKDF cases ask for more than 255 x HashLen bytes. `hkdf_expand` a
 limit (`hmac.rs:87`, documented: it panics), and the coretest operation checks it before the
 call. These cases pass the documented contract; the API has no error return for them.
 
-### Skipped (453): inputs the API cannot take
+### Skipped (281): inputs the API cannot take
 
 | Count | Reason |
 | ---: | --- |
-| 103 | AES-192: `aes.rs:195` takes 16- and 32-byte keys only |
-| 80 | AES-GCM nonces other than 12 bytes (0 to 257 bytes): the API takes `[u8; 12]` |
+| 119 | AES-GCM nonces other than 12 bytes (0 to 257 bytes): the API takes `[u8; 12]` |
 | 18 | ChaCha20 / XChaCha20 nonces of the other length (`[u8; 12]` / `[u8; 24]`) |
-| 80 | P1363 signatures that are not 2 x n bytes: JFLib has no P1363 decoder |
-| 40 | RSA sig_gen with SHA-1 / SHA-224: `HashAlg` has SHA-256 / 384 / 512 only |
-| 132 | rsa_pss_misc with SHA-1 / 224, or an MGF1 hash other than the message hash |
+| 2 | ECDH with a compressed public point: `shared` takes 04 \|\| x \|\| y |
+| 16 | RSA sig_gen with SHA-1: `HashAlg` has no SHA-1 |
+| 126 | rsa_pss_misc with SHA-1, or an MGF1 hash other than the message hash |
+
+Until 2026-11-23 there were 453: AES-192 (103), P1363 signatures of another length (80, no
+decoder then) and SHA-224 / SHA-3 (172) were skipped as well; Phase 2a of the security plan
+added them to the API, and they all pass.
 
 Every tag in the AEAD files is 16 bytes, so none was skipped for its tag size.
+
+## ACVP
+
+NIST's Automated Cryptographic Validation Protocol vectors (`gen-val/json-files`, the
+`internalProjection.json` of each algorithm: inputs and the expected answers):
+
+| Family | Path | Run |
+| --- | --- | --- |
+| SHA2-224, SHA3-224 / 256 / 384 / 512 | `sha224`, `sha3_*` | AFT and the standard Monte Carlo test (100 x 1000 hashes, in coretest) |
+| SHAKE-128 / 256 | `shake128` / `shake256` | AFT and VOT |
+| AES-ECB 128 / 192 / 256 | `aes::Aes` both ways | GFSBox, KeySBox, VarTxt, VarKey, MMT and the Monte Carlo test (AESAVS 6.4.1) |
+| ML-KEM-512 / 768 / 1024 | `mlkem::keygen`, `encaps`, `decaps` | keyGen, encapsulation, decapsulation (valid and modified ciphertexts), both key checks |
+| DetECDSA P-256 / P-384 | `ecdsa::sign` with no extra bytes (RFC 6979) | SHA2-224 to SHA2-512, SHA3-224 to SHA3-512 |
+
+Skipped (9 591): bit-oriented messages and outputs (7 105: the API hashes whole bytes), the
+gigabyte messages of the LDT (20), SHAKE's Monte Carlo test (2), and of DetECDSA the other
+curves (2 200), SHA2-512/224 and /256 (88) and the groups with SP 800-106's randomized hashing
+of the message (176, which OpenSSL "fails" the same way: they are not plain ECDSA).
 
 ## x509-limbo
 

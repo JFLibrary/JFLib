@@ -81,7 +81,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
   <br>[lib.rs](#datetime-crate-root) · [cron.rs](#datetimecronrs) · [tz.rs](#datetimetzrs)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
-  <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs) · [md5.rs](#cryptomd5rs) · [eappwd.rs](#cryptoeappwdrs)
+  <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [p384.rs](#cryptop384rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [sha3.rs](#cryptosha3rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs) · [md5.rs](#cryptomd5rs) · [mlkem.rs](#cryptomlkemrs) · [eappwd.rs](#cryptoeappwdrs)
 - [x509](#x509) -- X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)
   <br>[lib.rs](#x509-crate-root) · [der.rs](#x509derrs) · [ip.rs](#x509iprs)
 - [compress](#compress) -- DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids
@@ -42128,7 +42128,9 @@ times before that change use today's rule.
 ```text
 crypto -- the primitives BackupCraft (and anything else) builds on, in plain Rust
 
-  sha2      Sha256 / Sha384 / Sha512, sha256 / sha384 / sha512(data)         (FIPS 180-4)
+  sha2      Sha224 / Sha256 / Sha384 / Sha512, sha224 .. sha512(data)       (FIPS 180-4)
+  sha3      Sha3_224 .. Sha3_512, sha3_224 .. sha3_512(data); Shake128 / Shake256 with any
+            output length, shake128 / shake256(data, out)                  (FIPS 202)
   hmac      Hmac<H>, hmac_sha256 / hmac_sha512, hkdf_sha256 / hkdf_sha512,
             pbkdf2_sha256 (import of foreign key files only)                (RFC 2104/5869/8018)
   blake2b   Blake2b (keyed, 1..64 byte digests)                             (RFC 7693)
@@ -42140,13 +42142,16 @@ crypto -- the primitives BackupCraft (and anything else) builds on, in plain Rus
   x25519    Diffie-Hellman over Curve25519                                  (RFC 7748)
   ed25519   signatures, strict verification                                 (RFC 8032)
   sealbox   anonymous public-key encryption: X25519 + HKDF-SHA256 + XChaCha20-Poly1305
-  aes, gcm  AES-128/256 (bitsliced, constant time; both directions), AES-GCM seal / open
+  aes, gcm  AES-128/192/256 (bitsliced, constant time; both directions), AES-GCM seal / open
             (FIPS 197, SP 800-38D)
   bn        big integers modulo odd numbers (public values: variable time; pow_ct for a
             secret exponent)
-  rsa       RSA PKCS #1 v1.5 and PSS verification                            (RFC 8017)
-  ecdsa     ECDSA verification on P-256 / P-384                              (FIPS 186-4)
+  rsa       RSA PKCS #1 v1.5 and PSS verification (MGF1 of the same hash)     (RFC 8017)
+  ecdsa     ECDSA on P-256 / P-384: verification; signing in constant time with
+            deterministic nonces (RFC 6979), hedged by optional random bytes; keys; r || s
+            (IEEE P1363) and DER                                    (FIPS 186-5, RFC 6979)
   p256      Diffie-Hellman on P-256 in constant time (complete formulas)      (SEC 1)
+  p384      Diffie-Hellman on P-384 in constant time (complete formulas)      (SEC 1)
   b64       Base64 (standard and URL alphabet, with or without padding)
   ct_eq / zeroize / hex
   sha1      Sha1, sha1(data); with hmac_sha1, pbkdf2 (any Hash) and pbkdf2_sha1 in hmac:
@@ -42155,8 +42160,11 @@ crypto -- the primitives BackupCraft (and anything else) builds on, in plain Rus
   cmac      cmac_aes: AES-CMAC                                              (RFC 4493)
   md5       Md5, md5(data), md5_parts(parts); with hmac_md5 in hmac: only for protocols
             defined with MD5 (RADIUS); broken for collisions                 (RFC 1321, 2104)
-  rsa also  PrivateKey: generate from the caller's bytes, PKCS #1 v1.5 signing (RFC 8017)
+  rsa also  PrivateKey: generate from the caller's bytes, PKCS #1 v1.5 and PSS signing
+            (RFC 8017)
   eappwd    the sums of EAP-PWD on P-256: pwe, commit, shared, confirm, keys  (RFC 5931)
+  mlkem     ML-KEM-512 / 768 / 1024: keygen from a 64-byte seed, encaps, decaps with implicit
+            rejection, in constant time                                    (FIPS 203)
 
 No randomness here: callers pass random bytes in (plat::fill_random on Windows, Linux, Apple
 and Android; in the browser the page's crypto.getRandomValues), so everything is
@@ -42170,7 +42178,7 @@ from secret data passes ct_mask, so the optimizer cannot turn a select back into
 - **`trait Hash: Clone`**
   a hash function for Hmac / HKDF / PBKDF2
   - `const BLOCK: usize`
-    block size in bytes (at most 128)
+    block size in bytes (at most 168)
   - `const OUT: usize`
     digest size in bytes (at most 64)
   - `fn new() -> Self`
@@ -42183,11 +42191,18 @@ from secret data passes ct_mask, so the optimizer cannot turn a select back into
   - `Sha256`
   - `Sha384`
   - `Sha512`
+  - `Sha224`
+  - `Sha3_224`
+  - `Sha3_256`
+  - `Sha3_384`
+  - `Sha3_512`
 
 **`impl HashAlg`**
 
 - **`fn len(self) -> usize`**
 - **`fn digest(self, data: &[u8]) -> Vec<u8>`**
+- **`fn hmac(self, key: &[u8], data: &[u8]) -> Vec<u8>`**
+  HMAC with this hash (RFC 2104): the full tag
 
 - **`fn ct_eq(a: &[u8], b: &[u8]) -> bool`**
   equality of two byte strings in time that depends only on their lengths
@@ -42251,9 +42266,9 @@ TAG_LEN: usize = 16
 Source: [`lib/crypto/aes.rs`](../lib/crypto/aes.rs)
 
 ```text
-aes -- AES-128 / AES-256 (FIPS 197) in constant time
+aes -- AES-128 / AES-192 / AES-256 (FIPS 197) in constant time
 
-  Aes::new(key) (16 or 32 bytes)    aes.encrypt4(&mut [[u8; 16]; 4])    aes.encrypt(&mut block)
+  Aes::new(key) (16, 24 or 32 bytes)    aes.encrypt4(&mut [[u8; 16]; 4])    aes.encrypt(&mut block)
                                     aes.decrypt4(&mut [[u8; 16]; 4])    aes.decrypt(&mut block)
 
 Bitsliced: four blocks at a time in eight 64-bit words, word i holding bit i of all 64 bytes
@@ -42270,7 +42285,7 @@ before the same inversion; InvMixColumns is MixColumns after a_r ^= 4 (a_r ^ a_(
 **`impl Aes`**
 
 - **`fn new(key: &[u8]) -> Option<Aes>`**
-  a 16-byte (AES-128) or 32-byte (AES-256) key
+  a 16-byte (AES-128), 24-byte (AES-192) or 32-byte (AES-256) key
 - **`fn encrypt4(&self, blocks: &mut [[u8; 16]; 4])`**
   encrypt four blocks in place
 - **`fn encrypt(&self, block: &mut [u8; 16])`**
@@ -42513,13 +42528,26 @@ counter), HChaCha20 and XChaCha20 (192-bit nonce; draft-irtf-cfrg-xchacha)
 Source: [`lib/crypto/ecdsa.rs`](../lib/crypto/ecdsa.rs)
 
 ```text
-ecdsa -- ECDSA verification on NIST P-256 and P-384 (FIPS 186-4, SEC 1)
+ecdsa -- ECDSA on NIST P-256 and P-384 (FIPS 186-5, SEC 1, RFC 6979)
 
   verify(curve, public_key, digest, r, s)   public key uncompressed (04 || x || y), checked
                                             to lie on the curve; r, s big-endian integers
+  verify_p1363(curve, public_key, digest, sig)   sig = r || s, each curve.bytes() long (IEEE
+                                            P1363: JOSE, COSE, WebCrypto)
+  sign(curve, secret, hash, digest, extra) -> Option<r || s>   deterministic nonces (RFC 6979
+                                            with `hash`, the digest's hash); `extra`, when not
+                                            empty, goes into the nonce as RFC 6979 3.6's
+                                            additional data: 32 random bytes there hedge against
+                                            faults and a poor random source alike
+  public_key(curve, secret) -> Option<04 || x || y>    secret_from(curve, random) -> Option<secret>
+  der_from_p1363(sig) / p1363_from_der(curve, der)     r || s <-> the DER Ecdsa-Sig-Value
+                                            (strict: minimal lengths and integers, nothing after)
 
-Jacobian coordinates in the Montgomery domain (a = -3 formulas), u1 G + u2 Q by Shamir's
-trick.  Public data only: variable time.
+Verification: Jacobian coordinates in the Montgomery domain (a = -3 formulas), u1 G + u2 Q by
+Shamir's trick; public data only, variable time.  Signing: nist.rs in constant time (complete
+formulas, windows read in full, inverses as powers to n - 2); a nonce outside [1, n - 1], or
+an r or s of 0, draws the next one as RFC 6979 says (about 2^-32 on P-256, which shows only that
+a nonce was refused, nothing of the one taken).
 ```
 
 - **`enum Curve`**
@@ -42533,6 +42561,29 @@ trick.  Public data only: variable time.
 
 - **`fn verify(curve: Curve, public_key: &[u8], digest: &[u8], r: &[u8], s: &[u8]) -> bool`**
   verify an ECDSA signature over `digest` (the hash of the message, any length)
+
+- **`fn verify_p1363(curve: Curve, public_key: &[u8], digest: &[u8], sig: &[u8]) -> bool`**
+  verify an r || s signature (IEEE P1363: each half curve.bytes() long)
+
+- **`fn der_from_p1363(sig: &[u8]) -> Option<Vec<u8>>`**
+  the DER Ecdsa-Sig-Value (SEQUENCE { r INTEGER, s INTEGER }) of an r || s signature; None
+  for an empty or odd length, or halves over 125 bytes
+
+- **`fn p1363_from_der(curve: Curve, der: &[u8]) -> Option<Vec<u8>>`**
+  r || s (each curve.bytes() long) from a DER Ecdsa-Sig-Value; None unless it is strict DER: one
+  SEQUENCE of two minimal, non-negative INTEGERs no longer than the curve's size, nothing after
+
+- **`fn secret_from(curve: Curve, random: &[u8]) -> Option<Vec<u8>>`**
+  a secret key in [1, n - 1] from curve.bytes() random bytes (None: draw again, or another
+  length); only the answer is a branch
+
+- **`fn public_key(curve: Curve, secret: &[u8]) -> Option<Vec<u8>>`**
+  the public key (04 || x || y) of a secret key; None when the secret is not in [1, n - 1]
+
+- **`fn sign(curve: Curve, secret: &[u8], hash: HashAlg, digest: &[u8], extra: &[u8]) -> Option<Vec<u8>>`**
+  sign a digest (`hash`'s output, which RFC 6979 also derives the nonce with): r || s, each
+  curve.bytes() long.  None when the secret is not in [1, n - 1] or the digest is not
+  hash.len() bytes.  The same secret, digest and extra give the same signature
 
 ### `crypto/ed25519.rs`
 
@@ -42575,7 +42626,7 @@ Source: [`lib/crypto/gcm.rs`](../lib/crypto/gcm.rs)
 ```text
 gcm -- AES-GCM (NIST SP 800-38D) with 12-byte nonces and 16-byte tags, in constant time
 
-  AesGcm::new(key)                          16 (AES-128-GCM) or 32 bytes (AES-256-GCM)
+  AesGcm::new(key)                          16, 24 or 32 bytes (AES-128/192/256-GCM)
   seal_in_place(nonce, aad, data) -> tag    open_in_place(nonce, aad, data, tag) -> bool
 
 GHASH runs on the bit-reversed form of the blocks, where multiplication in GF(2^128) is a
@@ -42714,6 +42765,31 @@ multiplication by four-bit windows with a table read in full for every window.
 - **`fn scalar_ok(k: &[u8; 32]) -> bool`**
   k lies in [1, n - 1]
 
+### `crypto/p384.rs`
+
+Source: [`lib/crypto/p384.rs`](../lib/crypto/p384.rs)
+
+```text
+p384 -- Diffie-Hellman on NIST P-384 (SEC 1, RFC 8446 4.2.8.2) in constant time
+
+  public_key(&secret) -> [u8; 97]          (panics on an invalid secret) 04 || x || y of secret * G
+  shared(&secret, &peer_point) -> Option<[u8; 48]>   the x coordinate of secret * peer;
+                                           None for a point that is not on the curve
+  secret_from(random) -> Option<[u8; 48]>  a scalar in [1, n - 1] from 48 random bytes
+
+The arithmetic is nist.rs's: six limbs in Montgomery form, complete addition formulas,
+four-bit windows that read the whole table.
+```
+
+- **`fn secret_from(random: &[u8; 48]) -> Option<[u8; 48]>`**
+  a scalar in [1, n - 1] from random bytes (None: draw again); only the answer is a branch
+
+- **`fn public_key(secret: &[u8; 48]) -> [u8; 97]`**
+  the public key of a secret scalar: 04 || x || y
+
+- **`fn shared(secret: &[u8; 48], peer: &[u8]) -> Option<[u8; 48]>`**
+  the shared secret (x coordinate) with a peer's public point (04 || x || y)
+
 ### `crypto/poly1305.rs`
 
 Source: [`lib/crypto/poly1305.rs`](../lib/crypto/poly1305.rs)
@@ -42742,7 +42818,7 @@ Source: [`lib/crypto/rsa.rs`](../lib/crypto/rsa.rs)
 
 ```text
 rsa -- RSA signatures (RFC 8017): PKCS #1 v1.5 and PSS verification with MGF1, PKCS #1 v1.5
-signing, key generation
+and PSS signing, key generation
 
   PublicKey::new(n, e)                      big-endian modulus (1024..8192 bits) and exponent
   key.verify_pkcs1(hash, digest, sig)       the encoding is rebuilt and compared whole
@@ -42752,6 +42828,9 @@ signing, key generation
                                             same key)
   PrivateKey::from_parts(n, e, d, p, q)     big-endian numbers, checked against each other
   key.sign_pkcs1(hash, digest)              RSASSA-PKCS1-v1_5; the exponent in constant time
+  key.sign_pss(hash, digest, salt)          RSASSA-PSS with MGF1 of the same hash and the
+                                            caller's salt (hash.len() random bytes, as TLS 1.3
+                                            and X.509 use; empty: the same signature each time)
   key.n() / e() / d() / p() / q() / iqmp()  big-endian without leading zeros
 
 Public operations are variable time (that is fine for them).  Signing uses pow_ct; generate is
@@ -42798,6 +42877,9 @@ variable time and meant for simulators and tests, where the random bytes are no 
 - **`fn sign_pkcs1(&self, hash: HashAlg, digest: &[u8]) -> Option<Vec<u8>>`**
   RSASSA-PKCS1-v1_5 of a digest: k bytes (None: the digest has the wrong length or the
   modulus is too short for it)
+- **`fn sign_pss(&self, hash: HashAlg, digest: &[u8], salt: &[u8]) -> Option<Vec<u8>>`**
+  RSASSA-PSS of a digest (EMSA-PSS, RFC 8017 9.1.1) with MGF1 of the same hash: k bytes.
+  None when the digest has the wrong length or the modulus is too short for digest and salt
 
 ### `crypto/sealbox.rs`
 
@@ -42830,7 +42912,7 @@ OVERHEAD: usize = 32 + 24 + 16
 Source: [`lib/crypto/sha2.rs`](../lib/crypto/sha2.rs)
 
 ```text
-sha2 -- SHA-256, SHA-384 and SHA-512 (FIPS 180-4), streaming and one-shot
+sha2 -- SHA-224, SHA-256, SHA-384 and SHA-512 (FIPS 180-4), streaming and one-shot
 ```
 
 - **`struct Sha256`**
@@ -42841,6 +42923,15 @@ sha2 -- SHA-256, SHA-384 and SHA-512 (FIPS 180-4), streaming and one-shot
 - **`const fn new() -> Sha256`**
 - **`fn update(&mut self, mut data: &[u8])`**
 - **`fn finalize(mut self) -> [u8; 32]`**
+
+- **`struct Sha224(Sha256)`**
+  SHA-224 (SHA-256 with its own initial value, cut to 28 bytes)
+
+**`impl Sha224`**
+
+- **`const fn new() -> Sha224`**
+- **`fn update(&mut self, data: &[u8])`**
+- **`fn finalize(self) -> [u8; 28]`**
 
 - **`struct Sha512`**
   SHA-512
@@ -42860,6 +42951,9 @@ sha2 -- SHA-256, SHA-384 and SHA-512 (FIPS 180-4), streaming and one-shot
 - **`fn update(&mut self, data: &[u8])`**
 - **`fn finalize(self) -> [u8; 48]`**
 
+- **`fn sha224(data: &[u8]) -> [u8; 28]`**
+  SHA-224 of a byte string
+
 - **`fn sha256(data: &[u8]) -> [u8; 32]`**
   SHA-256 of a byte string
 
@@ -42868,6 +42962,30 @@ sha2 -- SHA-256, SHA-384 and SHA-512 (FIPS 180-4), streaming and one-shot
 
 - **`fn sha512(data: &[u8]) -> [u8; 64]`**
   SHA-512 of a byte string
+
+### `crypto/sha3.rs`
+
+Source: [`lib/crypto/sha3.rs`](../lib/crypto/sha3.rs)
+
+```text
+sha3 -- SHA-3 and SHAKE (FIPS 202), streaming and one-shot
+
+  Sha3_224 / Sha3_256 / Sha3_384 / Sha3_512   new, update, finalize; sha3_224(data) .. sha3_512
+  Shake128 / Shake256                         new, update, finalize_xof -> ShakeReader::read(out)
+                                              (any length, read in as many calls as wanted);
+                                              shake128(data, out) / shake256(data, out)
+
+Keccak-f[1600] on 25 64-bit lanes: no tables, no branches on the data.  The state is
+overwritten when a hash is dropped (ML-KEM and HMAC put secrets through it).
+```
+
+- **`struct ShakeReader(Sponge)`**
+  the output of a SHAKE: read as much as wanted, in pieces or at once (the same bytes)
+
+**`impl ShakeReader`**
+
+- **`fn read(&mut self, out: &mut [u8])`**
+  the next out.len() bytes
 
 ### `crypto/x25519.rs`
 
@@ -42925,7 +43043,7 @@ station in message 3 of the 4-way handshake
                                               the result is 8 bytes longer
   aes_unwrap(kek, wrapped) -> Option<Vec<u8>> None when the integrity check fails
 
-kek is a 16- or 32-byte AES key.
+kek is a 16-, 24- or 32-byte AES key.
 ```
 
 - **`fn aes_wrap(kek: &[u8], plain: &[u8]) -> Option<Vec<u8>>`**
@@ -42943,7 +43061,7 @@ Source: [`lib/crypto/cmac.rs`](../lib/crypto/cmac.rs)
 cmac -- AES-CMAC (RFC 4493, NIST SP 800-38B): a message authentication code from the AES
 block cipher, as the MIC of WPA3-Personal's 4-way handshake (AKM 8) and of 802.11w use it
 
-  cmac_aes(key, data) -> Option<[u8; 16]>   key: 16 (AES-128) or 32 bytes; None otherwise
+  cmac_aes(key, data) -> Option<[u8; 16]>   key: 16, 24 or 32 bytes (AES-128/192/256); None otherwise
 ```
 
 - **`fn cmac_aes(key: &[u8], data: &[u8]) -> Option<[u8; 16]>`**
@@ -42980,6 +43098,56 @@ Message-Authenticator of RFC 3579); it is broken for collisions, so new designs 
 
 - **`fn md5_parts(parts: &[&[u8]]) -> [u8; 16]`**
   MD5 of the concatenation of `parts`
+
+### `crypto/mlkem.rs`
+
+Source: [`lib/crypto/mlkem.rs`](../lib/crypto/mlkem.rs)
+
+```text
+mlkem -- ML-KEM (FIPS 203), the module-lattice key encapsulation: ML-KEM-512, -768 and -1024
+
+  Params::MlKem512 / MlKem768 / MlKem1024    .ek_len() .dk_len() .ct_len() (bytes)
+  keygen(params, &seed) -> (ek, dk)          seed = d || z, 64 random bytes (FIPS 203's seed
+                                             form: a key may be kept as these 64 bytes)
+  encaps(params, ek, &m) -> Option<(ct, key)>   m: 32 random bytes; None when ek has the wrong
+                                             length or a coefficient of q or more (FIPS 203 7.2)
+  decaps(params, dk, ct) -> Option<key>      None when a length is wrong or dk's hash of its
+                                             encapsulation key does not match (7.3); a
+                                             ciphertext that does not re-encrypt to itself
+                                             gives the implicit-rejection key J(z || ct),
+                                             which nothing tells apart from a key
+
+The secret paths (keygen's s and e, encryption's y, decapsulation's message and the choice
+between its two keys) have no branch and no table lookup on secret data, and no division:
+reductions modulo q = 3329 are Barrett's with a masked correction, and Compress divides by q
+the same way (KyberSlash, 2024: a division by q compiled to a div instruction whose time
+depends on its operand).  The matrix comes from the public seed rho, so its rejection
+sampling may branch.
+```
+
+- **`enum Params`**
+  the parameter sets of FIPS 203, table 2
+  - `MlKem512`
+  - `MlKem768`
+  - `MlKem1024`
+
+**`impl Params`**
+
+- **`fn ek_len(self) -> usize`**
+  the encapsulation key's length: 384 k + 32
+- **`fn dk_len(self) -> usize`**
+  the decapsulation key's length: 768 k + 96
+- **`fn ct_len(self) -> usize`**
+  the ciphertext's length: 32 (du k + dv)
+
+- **`fn keygen(params: Params, seed: &[u8; 64]) -> (Vec<u8>, Vec<u8>)`**
+  ML-KEM.KeyGen from the 64-byte seed d || z: (encapsulation key, decapsulation key)
+
+- **`fn encaps(params: Params, ek: &[u8], m: &[u8; 32]) -> Option<(Vec<u8>, [u8; 32])>`**
+  ML-KEM.Encaps with the 32 random bytes m: (ciphertext, shared key)
+
+- **`fn decaps(params: Params, dk: &[u8], ct: &[u8]) -> Option<[u8; 32]>`**
+  ML-KEM.Decaps: the shared key (implicit rejection for a ciphertext that does not re-encrypt)
 
 ### `crypto/eappwd.rs`
 
