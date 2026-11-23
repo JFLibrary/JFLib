@@ -271,9 +271,9 @@ pub(crate) fn install(app: &mut Diagrammer, ui: &mut Ui, doc: Document, name: St
 pub(crate) fn save(app: &mut Diagrammer, ui: &mut Ui, as_new: bool) {
     let Some(o) = app.opened.as_ref() else { return };
     // (JD15, DM-09) a drawing opened read-only goes to another file; (JD16) a file of the XML
-    // format of 2003-2010 is never written back: a new name
+    // format of 2003-2010 is never written back: a new name; (JD17) nor a binary one (NO-12)
     match (&o.ed.path, as_new || o.ed.read_only) {
-        (Some(p), false) if !crate::doc_file::is_xml(p) => {
+        (Some(p), false) if !crate::doc_file::is_xml(p) && !crate::doc_file::is_binary(p) => {
             let p = p.clone();
             save_to(app, ui, &p);
         }

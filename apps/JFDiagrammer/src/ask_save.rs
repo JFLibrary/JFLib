@@ -122,8 +122,8 @@ pub(crate) fn guard(app: &mut Diagrammer, ui: &mut Ui, next: Next) -> bool {
 /// open a file from Datei › Öffnen (its dialog, Zuletzt verwendet) -> opened
 pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui, path: &str, mode: Mode) -> bool {
     let l = path.to_ascii_lowercase();
-    // a stencil goes into the Shapes panel, the drawing stays
-    let stencil = l.ends_with(".vssx") || l.ends_with(".vssm");
+    // a stencil goes into the Shapes panel, the drawing stays (JD17: also .vsx and .vss)
+    let stencil = l.ends_with(".vssx") || l.ends_with(".vssm") || l.ends_with(".vsx") || l.ends_with(".vss");
     if !stencil && !guard(app, ui, Next::Open(String::from(path), mode)) {
         return false;
     }

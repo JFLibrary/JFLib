@@ -348,13 +348,13 @@ fn handle(app: &mut Diagrammer, ui: &mut Ui, ev: StencilEvent) {
     }
 }
 
-// Schablone öffnen: the file dialog (.vssx, .vssm; JD16: .vsx)
+// Schablone öffnen: the file dialog (.vssx, .vssm; JD16: .vsx; JD17: .vss, import only)
 fn open_dialog(app: &mut Diagrammer, ui: &mut Ui) {
     let dlg = app.stencils.open_dlg.clone();
     if dlg.get() == 0 {
         return;
     }
-    let exts = [t("vssx;vssm=Visio-Schablone"), t("vsx=Visio-XML-Schablone (2003–2010)"), t("=Alle Dateien")];
+    let exts = [t("vssx;vssm=Visio-Schablone"), t("vsx=Visio-XML-Schablone (2003–2010)"), t("vss=Visio-Schablone (2003–2010)"), t("=Alle Dateien")];
     if ui.filedlg(ID_OPEN_DLG, FD_OPEN, &dlg, &mut app.stencils.open_path, 4096, &exts) & EV_ACT != 0 {
         let path = app.stencils.open_path.clone();
         stencils::open_file(app, ui, &path);

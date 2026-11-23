@@ -221,6 +221,16 @@ pub enum Error {
         /// a style, master or page ID on the cycle
         id: u32,
     },
+    /// (vss.rs) a binary file of Visio 2003-2010 (.vss, .vsd, .vst) breaks its structure: the
+    /// compound file, the VisioDocument stream or a stream or chunk in it; `offset` is where in
+    /// the stream (0 for the compound file), `what` says how ("version 6 (Visio 2000/2002)" for a
+    /// version this reader does not take)
+    Binary {
+        /// the byte offset in the stream the problem was found at
+        offset: u64,
+        /// what is wrong
+        what: &'static str,
+    },
 }
 
 impl fmt::Display for Error {
@@ -233,6 +243,7 @@ impl fmt::Display for Error {
             Error::Structure { part, line, what } => write!(f, "{part}, line {line}: {what}"),
             Error::Limit(what) => write!(f, "too large: {what}"),
             Error::Cycle { what, id } => write!(f, "cycle of {what} references at ID {id}"),
+            Error::Binary { offset, what } => write!(f, "binary file, offset {offset}: {what}"),
         }
     }
 }

@@ -8,7 +8,8 @@
 //                                dialog of Backstage › Öffnen or the command line; a notice names
 //                                substituted fonts (TX-09), macros (kept, never run, DF-04) and
 //                                what the reader warned about; (JD9) a .vssx goes to the Shapes
-//                                panel instead
+//                                panel instead (JD16: a .vsx, JD17: a .vss converted from the
+//                                binary format, import only)
 //   close(app, ui)               back to the empty drawing
 //   paint(app, k) -> PagePaint   page k as a ui.diagram content (DgPaint): built on first use,
 //                                kept while the document is open, brought up to date after edits
@@ -87,12 +88,14 @@ impl Opened {
 
 /// the extensions the file dialog offers
 // i18n
-pub(crate) static EXTS: [&str; 5] = [
+pub(crate) static EXTS: [&str; 6] = [
     "vsdx;vsdm=Visio-Zeichnung",
     "vssx;vssm=Visio-Schablone",
     "vstx;vstm=Visio-Vorlage",
     // (JD16) the XML formats of 2003-2010
     "vdx;vsx;vtx=Visio-XML (2003–2010)",
+    // (JD17) the binary stencils of 2003-2010 (import only)
+    "vss=Visio-Schablone (2003–2010)",
     "=Alle Dateien",
 ];
 
@@ -103,7 +106,7 @@ pub(crate) static SAVE_EXTS: [&str; 4] = ["vsdx=Visio-Zeichnung", "vssx=Visio-Sc
 /// whether a command-line argument names a drawing
 pub(crate) fn is_drawing(arg: &str) -> bool {
     let a = arg.to_ascii_lowercase();
-    [".vsdx", ".vsdm", ".vssx", ".vssm", ".vstx", ".vstm", ".vdx", ".vsx", ".vtx"].iter().any(|e| a.ends_with(e))
+    [".vsdx", ".vsdm", ".vssx", ".vssm", ".vstx", ".vstm", ".vdx", ".vsx", ".vtx", ".vss"].iter().any(|e| a.ends_with(e))
 }
 
 /// the installed fonts by family name (scanned on the first request)
@@ -154,11 +157,11 @@ pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
         ui.repass();
         return false;
     };
-    // (JD16) .vdx / .vsx / .vtx by the XML reader of 2003-2010
+    // (JD16) .vdx / .vsx / .vtx by the XML reader of 2003-2010; (JD17) .vss by the binary one
     let loaded = match crate::doc_file::read(&bytes, path) {
         Ok(l) => l,
         Err(e) => {
-            app.error = Some((tf("„{}“ kann nicht geöffnet werden.", &[&name]), format!("{e}")));
+            app.error = Some((tf("„{}“ kann nicht geöffnet werden.", &[&name]), crate::doc_file::error_text(&e)));
             ui.repass();
             return false;
         }

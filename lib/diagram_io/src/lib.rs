@@ -39,8 +39,13 @@
 //                       (JD16) the drawing window of windows.xml: page, zoom, centre, what is
 //                       shown; vsdx::remove_macros takes a macro project out
 //
-// What is to come here, by stage of the plan:
-//   JD17  importing the binary .vss
+//   vss::read(&bytes, DocKind::Stencil, &vsdx::Limits::VSDX) -> Result<vsdx::Loaded, vsdx::Error>
+//                       (JD17) the binary formats of Visio 2003-2010 (.vss; .vsd, .vst as far
+//                       as their masters and styles go), import only: the compound file
+//                       (archive::cfb), the VisioDocument stream's compressed tree of streams and
+//                       chunks become the XML of 2003-2010 and go through vdx::read; cells with
+//                       formula and value, formulas in Visio's text, texts with fields, styles,
+//                       masters; vss::to_vdx, vss::kind_of, vss::sniff
 //
 // The ZIP and OPC parts come from archive (archive::opc, JD1), shared with doc_io's DOCX.
 // Every file is untrusted input: sizes, counts and nesting are bounded, a file that breaks a
@@ -62,6 +67,7 @@ mod stencil_svg;
 pub mod template;
 mod template_src;
 pub mod vdx;
+pub mod vss;
 pub mod vsdx;
 pub mod windows;
 mod write;

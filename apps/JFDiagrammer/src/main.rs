@@ -52,6 +52,8 @@
 //   src/doc_file.rs   (JD16) Visio's XML formats of 2003-2010 (.vdx, .vsx, .vtx) opened, the
 //                     question before a macro project is left out, Datei › Info's properties,
 //                     the window state (page, zoom, stencils) read and written for own files
+//                     (JD17) and the binary stencils of 2003-2010 (.vss) converted for the
+//                     Shapes panel: import only, never written back (a save writes .vssx)
 //   src/cmds_arrange.rs  (JD8 rest) Automatisch ausrichten
 //   src/cmds_later.rs    (JD8 rest) the commands left for later with their reasons, the check
 //   src/cmds_myshapes.rs (JD8 rest) Zu meinen Shapes hinzufügen (shapes of the page into Favoriten)

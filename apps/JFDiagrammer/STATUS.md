@@ -1,6 +1,6 @@
 # JFDiagrammer – Stand der Features
 
-Stand 2026-11-23, Etappe JD15 (PLAN.md › „JD15: Bestandsaufnahme und P1-Abnahme“), mit JD16 und JD26. Diese Datei hält für
+Stand 2026-11-23, Etappe JD15 (PLAN.md › „JD15: Bestandsaufnahme und P1-Abnahme“), mit JD16, JD17 und JD26. Diese Datei hält für
 jede P1- und P2-Zeile aus [FEATURES.md](FEATURES.md) fest, wie weit sie in JFDiagrammer ist. Geprüft wurde
 in der laufenden App (Skripte unter `tests/`, Screenshots), nicht nur im Code; die Schablonen aus
 FEATURES 4.2 stehen mit einer Zeile je Schablone da.
@@ -34,7 +34,7 @@ Leseschlüssel:
 |---|---:|---:|---:|---:|---:|---:|
 | 1.1 Visio-Formate ab 2013 (OPC/XML, „VSDX-Familie“) | 5 | 1 | 0 | 3 | 4 | 0 |
 | 1.2 Ältere XML-Formate 2003–2010 | 0 | 0 | 0 | 2 | 0 | 0 |
-| 1.3 Binärformate (nur Import) | 0 | 0 | 0 | 0 | 0 | 2 |
+| 1.3 Binärformate (nur Import) | 0 | 0 | 0 | 0 | 2 | 0 |
 | 1.4 Export („Speichern unter“ und „Exportieren“) | 3 | 3 | 0 | 0 | 1 | 4 |
 | 1.5 Import | 0 | 2 | 0 | 0 | 0 | 4 |
 | 2.1 Dokument | 5 | 1 | 0 | 0 | 0 | 4 |
@@ -73,7 +73,7 @@ Leseschlüssel:
 | 5.1 Vorlagen-Infrastruktur | 4 | 0 | 0 | 0 | 0 | 0 |
 | 5.2 Vorlagen nach Kategorie | 6 | 1 | 0 | 2 | 1 | 10 |
 | 5.3 Assistenten und Generatoren | 0 | 0 | 0 | 0 | 0 | 7 |
-| **zusammen** | **174** | **106** | **1** | **27** | **34** | **196** |
+| **zusammen** | **174** | **106** | **1** | **27** | **36** | **194** |
 
 P2-Zeilen, die schon fertig sind (27): DF-04, DF-05, DF-07, DF-20, DF-21, LY-05, MS-07, ST-09, TH-06, SS-11, SS-21, SS-22, SS-31, SS-33, SS-36, FX-11, FX-12, LG-05, SH-003, SH-004, SH-007, SH-031, SH-032, SH-033, SH-041, VL-32, VL-38.
 <!-- summary:end -->
@@ -200,8 +200,8 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 
 | ID | Feature | Prio | Stand | Beleg | Fehlt |
 |---|---|---|---|---|---|
-| DF-30 | `.vss` importieren | P2 | fehlt | – | alles (JD17) |
-| DF-34 | Lokaler Testkorpus Binärformate | P2 | fehlt | (nur der XML-Korpus: dit corpus wird übersprungen, wenn er fehlt) | Korpus-Tests für `.vss`/`.vsd` (JD17) |
+| DF-30 | `.vss` importieren | P2 | teilweise | binary_stencil.uis (.vss in der Seitenleiste, Hinweis „umgewandelt“, Master ablegen); dit vss (Container, Streams, feindliche und abgeschnittene Dateien, Korpus, Rundlauf nach .vssx), vss/sample | Visio-Gegenprobe von JD17 offen; binäre Mastersymbole (die App zeichnet eigene), NURBS- und Polylinien-Zeilen, Bilder (Fremdobjekte), Ebenen der Masterseite, Seiten-Abschnitte (Lineal/Raster, Layout, Druck); Version 6 (Visio 2000/2002) |
+| DF-34 | Lokaler Testkorpus Binärformate | P2 | teilweise | dit vss/corpus und vss/compare (`context/files/SWDB_DE` per Hochwandern oder `JFD_VSS_CORPUS`, Visios .vssx daneben per `JFD_VSS_REFERENCE`; fehlen sie, übersprungen) | Korpus nur Version 11 und nur Schablonen: Version 6 und binäre Zeichnungen fehlen |
 
 ### 1.4 Export („Speichern unter“ und „Exportieren“)
 
@@ -648,7 +648,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | SL-02 | Shape-Kacheln | P1 | teilweise | stencils.uis (4 Ansichten), Probe (QuickInfo „Name – Beschreibung“) | Livevorschau beim Zeigen (Option) |
 | SL-03 | Platzieren | P1 | teilweise | stencils_drop.uis, status_ui_panel.uis (Strg+Enter) | Strg-Ziehen für mehrere (Probe: legt eins ab); Ablegen auf Verbinder teilt ihn nicht (p4); Container-/Listen-Leuchten beim Ziehen aus der Leiste (JD10-Notiz) |
 | SL-04 | Shapes suchen | P1 | fertig | stencils_search.uis (ein Wort genügt, Suche ausblenden), stencils_lang.uis; core instance::tests::search_reads_the_quickinfo | – |
-| SL-05 | Weitere Shapes | P1 | teilweise | stencils.uis, network_devices.uis, Probe | „Dokumentschablone anzeigen“; Filter `.vss/.vsx` (Formate JD16/17); Azure-Eintrag (P3) |
+| SL-05 | Weitere Shapes | P1 | teilweise | stencils.uis, network_devices.uis, Probe | „Dokumentschablone anzeigen“; Azure-Eintrag (P3) |
 | SL-06 | Schnell-Shapes | P1 | teilweise | stencils.uis | Schnell-Shapes speisen die Verbindungspfeile nicht (keine Schnell-Shape-Leiste, CN-07-Rest) |
 | SL-07 | Favoriten / Meine Shapes | P1 | fertig | stencils_favorites.uis, my_shapes.uis | – (`.vssx` im Benutzerordner nur in Fensterläufen, headless im Speicher) |
 | SL-08 | Schablonen-Menü | P2 | teilweise | stencils.uis, panes.uis | Bearbeiten, Neues Master-Shape, Reihenfolge grau (cmds_later.rs) → JD23 |
