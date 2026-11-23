@@ -49,7 +49,7 @@ errors. For text from the web, from mail and from old files there is every encod
   ISO-8859-2 to -16, KOI8-R and KOI8-U, macintosh, IBM866, x-mac-cyrillic; besides them the DOS
   code pages of old files (IBM437, 737, 775, 850 to 869) and an exact ISO-8859-1
 - the multi-byte encodings of Chinese, Japanese and Korean (`MultiByte`): Shift_JIS (Windows' code
-  page 932), EUC-JP, ISO-2022-JP (mail), GBK, gb18030 (all of Unicode, GB18030-2022), Big5 with
+  page 932), EUC-JP, ISO-2022-JP (mail), GBK, gb18030 (all of Unicode but U+E5E5, GB18030-2022), Big5 with
   HKSCS-2008 and EUC-KR (Windows' 949, every Hangul syllable). `encode` refuses a character the
   encoding lacks (`Error::Unmappable`), `encode_html` writes it as a character reference, as
   browsers submit forms.

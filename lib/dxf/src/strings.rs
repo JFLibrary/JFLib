@@ -5,7 +5,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use formats::encoding::{Charset, MultiByte};
+use formats::encoding::{self, Charset, Label, MultiByte};
 
 /// how a file's strings are decoded
 #[derive(Clone, Copy)]
@@ -177,14 +177,22 @@ pub(crate) fn mbcs(out: &mut String, n: u8, hex: &[u8]) {
         _ => None,
     };
     let v = hex.iter().take(4).fold(0u16, |v, c| v << 4 | (*c as char).to_digit(16).unwrap_or(0) as u16);
-    match m {
-        // (two bytes that are no character: one U+FFFD, not the trail byte as ASCII)
-        Some(m) => {
-            let s = m.decode(&v.to_be_bytes());
-            out.push_str(if s.starts_with('\u{FFFD}') { "\u{FFFD}" } else { &s });
+    // a lead byte that its trail byte completes (Big5 has pairs that are two characters); anything else, such
+    // as two ASCII bytes or a lead without a fitting trail byte, is one U+FFFD
+    let [lead, trail] = v.to_be_bytes();
+    if let Some(m) = m {
+        let mut d = encoding::Decoder::new(Label::Multi(m));
+        let mut s = String::new();
+        d.decode(&[lead], false, &mut s);
+        if s.is_empty() {
+            d.decode(&[trail], true, &mut s);
+            if !s.is_empty() && !d.malformed() {
+                out.push_str(&s);
+                return;
+            }
         }
-        None => out.push('\u{FFFD}'),
     }
+    out.push('\u{FFFD}');
 }
 
 /// the character of four (or five) hex digits at the start, and how many digits it took

@@ -142,15 +142,15 @@ fn main() {
                 match r {
                     EncoderResult::InputEmpty => {
                         for x in &buf[..written] {
-                            let _ = write!(o, "{x:02x}");
+                            write!(o, "{x:02x}").unwrap();
                         }
-                        let _ = writeln!(o);
+                        writeln!(o).unwrap();
                     }
-                    _ => {
-                        let _ = writeln!(o, "-");
-                    }
+                    _ => writeln!(o, "-").unwrap(),
                 }
             }
+            // (a failed write ends in a panic, exit code 101: never a short file with exit code 0)
+            o.flush().unwrap();
         }
         "encode-html" => {
             let e = Encoding::for_label(a[2].as_bytes()).unwrap();

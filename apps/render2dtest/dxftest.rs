@@ -1070,10 +1070,10 @@ fn reader(t: &mut T) {
     let b5 = cp("AC1015", "BIG5", &[0xA4, 0xA4, 0xA4, 0xE5]);
     let jo = cp("AC1015", "ANSI_1361", &[0x41, 0x88, 0x61]);
     t.ok(sj == "ソフトｱ" && gb == "中文" && kr == "한똠" && b5 == "中文" && jo == "A\u{FFFD}a", &format!("code pages: ANSI_932 {sj:?}, ANSI_936 {gb:?}, ANSI_949 {kr:?}, BIG5 {b5:?}, ANSI_1361 (no table) {jo:?}"));
-    let m = cp("AC1015", "ANSI_1252", b"x\\M+182A0\\M+2A4A4\\M+3C7D1\\M+5D6D0\\M+48861\\M+18120y");
+    let m = cp("AC1015", "ANSI_1252", b"x\\M+182A0\\M+2A4A4\\M+3C7D1\\M+5D6D0\\M+48861\\M+18120\\M+14142\\M+1B141\\M+28862y");
     let mt = dxf::mtext::parse("\\M+182A0\\M+5CEC4", 1.0);
     let mt_text: String = mt.paragraphs.iter().flat_map(|p| p.items.iter()).filter_map(|i| match i { dxf::mtext::Item::Text(s, _) => Some(s.clone()), _ => None }).collect();
-    t.ok(m == "xあ中한中\u{FFFD}\u{FFFD}y" && mt_text == "あ文", &format!("\\M+NXXXX: TEXT {m:?}, MTEXT {mt_text:?}"));
+    t.ok(m == "xあ中한中\u{FFFD}\u{FFFD}\u{FFFD}\u{FFFD}Ê\u{304}y" && mt_text == "あ文", &format!("\\M+NXXXX: TEXT {m:?}, MTEXT {mt_text:?}"));
     // the DOS pages by their number, KOI8_R by name, an unknown page as Windows-1252
     let e = cp("AC1015", "DOS850", &[0x82]);
     let f = cp("AC1015", "DOS737", &[0x80]);

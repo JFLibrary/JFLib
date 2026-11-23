@@ -545,10 +545,13 @@ def verify_cjk():
     """the multi-byte indexes against encoding_rs's decoders (tools/encoding_ref.rs: what each pointer's bytes decode to)"""
     sys.path.insert(0, str(ROOT / "tools"))
     import encoding_check
-    exe = encoding_check.reference()
-    if exe is None:
-        print("verify: encoding_rs is not in Cargo's registry (or cargo is missing): the multi-byte indexes were not compared")
+    try:
+        exe = encoding_check.reference()
+    except encoding_check.Unavailable as e:
+        print(f"verify: {e}: the multi-byte indexes were not compared")
         return []
+    except encoding_check.BuildFailed as e:
+        return [f"the reference for the multi-byte indexes: {e}"]
     out = ROOT / "build" / "encoding_ref" / "index.json"
     subprocess.run([str(exe), "index", str(out)], check=True)
     ref = json.loads(out.read_text(encoding="utf-8"))
@@ -664,7 +667,13 @@ def main():
     cjk, blob = render_cjk()
     files = [(OUT, text.encode("utf-8")), (OUT_CJK, cjk.encode("utf-8")), (OUT_CJK_BIN, blob)]
     if "--check" in sys.argv:
-        stale = [p.name for p, b in files if not p.exists() or p.read_bytes() != b]
+        # (the Rust files as text, whatever line ends the checkout gave them; cjk.bin byte for byte)
+        def current(p, b):
+            if not p.exists():
+                return False
+            have = p.read_bytes()
+            return have == b if p.suffix == ".bin" else have.replace(b"\r\n", b"\n") == b
+        stale = [p.name for p, b in files if not current(p, b)]
         print(f"{', '.join(stale)} stale: python tools/gen_encodings.py" if stale else "charsets.rs, cjk.rs and cjk.bin are current")
         return 1 if stale else 0
     for p, b in files:

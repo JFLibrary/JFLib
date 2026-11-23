@@ -161,6 +161,10 @@ pub(crate) fn run() -> (usize, usize) {
             == Some(String::from("ソフ中한文x")),
         "East Asian font code pages, a trail byte 0x5C, raw double bytes"
     );
+    check!(
+        text(b"{\\rtf1\\ansi\\ansicpg932 \x83\x5c\x83\x7b\x83\x7d}") == Some(String::from("ソボマ")),
+        "raw trail bytes 0x5C, 0x7B and 0x7D are no RTF syntax"
+    );
     check!(text(br"{\rtf1{\fonttbl{\f0\fcharset161 Arial;}{\f1\fcharset204 Arial;}}\f0\'e1\'e2 \f1\'df}") == Some(String::from("αβ Я")), "Greek and Cyrillic font code pages");
     check!(
         text(br"{\rtf1\ansicpg1250\'e8\'e1\'f8}") == Some(String::from("čář")),
@@ -251,6 +255,11 @@ pub(crate) fn run() -> (usize, usize) {
         (&br"{\rtf1\ansi\ansicpg932\'82 x}"[..], "text between lead and trail byte"),
         (&br"{\rtf1\ansi\ansicpg932\'82\'20}"[..], "a double byte that is no character"),
         (&br"{\rtf1\ansi\ansicpg932\'a0}"[..], "a single byte that is no character"),
+        (&br"{\rtf1\ansicpg932\uc0\'82\u-10188\u-8930\'a0}"[..], "Unicode between lead and trail byte"),
+        (
+            &br"{\rtf1{\fonttbl{\f0\fcharset134 SimSun;}{\f1\fcharset128 Mincho;}}\f0\'d6\f1\'d0}"[..],
+            "a trail byte in another font's code page",
+        ),
         (
             &br"{\rtf1\ansi\ansicpg1361\'88\'61}"[..],
             "unsupported multibyte page (Johab)",

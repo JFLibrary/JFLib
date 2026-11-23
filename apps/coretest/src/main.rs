@@ -166,7 +166,8 @@ fn run() -> i32 {
         let rest: alloc::vec::Vec<String> = args.iter().skip_while(|a| a.as_str() != "--zstd").skip(2).cloned().collect();
         return lz::zstd_args(&op, &rest);
     }
-    if let Some(op) = plat::arg_value("--encoding") {
+    if args.iter().any(|a| a == "--encoding") {
+        let Some(op) = plat::arg_value("--encoding") else { return 2 };
         let rest: alloc::vec::Vec<String> = args.iter().skip_while(|a| a.as_str() != "--encoding").skip(2).cloned().collect();
         return charsett::cli(&op, &rest);
     }

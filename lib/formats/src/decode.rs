@@ -12,15 +12,8 @@ use crate::multibyte::{big5_code_point, gb18030_range_code_point, MultiByte};
 
 /// A decoder for input in pieces: `decode(piece, last, out)` appends the text of each piece to `out`; a
 /// sequence cut between two pieces is finished by the next one.  The output is the same as decoding the whole
-/// input at once with `decode_label` (without its byte-order mark rule; see `Decoder::sniffing`).
-///
-/// ```ignore
-/// let mut d = Decoder::new(Label::Multi(MultiByte::ShiftJis));
-/// let mut text = String::new();
-/// d.decode(&[0x82], false, &mut text);
-/// d.decode(&[0xA0], true, &mut text);
-/// assert_eq!(text, "あ");
-/// ```
+/// input at once with `decode_label` (without its byte-order mark rule; see `Decoder::sniffing`).  Shift_JIS's
+/// "あ" in two pieces, 0x82 and then 0xA0 with `last`, gives "あ".
 #[derive(Clone, Debug)]
 pub struct Decoder {
     label: Label,

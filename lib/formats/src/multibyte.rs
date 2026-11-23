@@ -28,7 +28,8 @@ pub enum MultiByte {
     /// GBK: simplified Chinese (code page 936; also what the labels gb2312 and chinese name).  It reads
     /// gb18030; it writes only its two-byte characters and the euro sign as 0x80.
     Gbk,
-    /// gb18030: simplified Chinese with all of Unicode (GB18030-2022; code page 54936)
+    /// gb18030: simplified Chinese with all of Unicode but U+E5E5, which it does not write (GB18030-2022;
+    /// code page 54936)
     Gb18030,
     /// Big5: traditional Chinese with the Hong Kong Supplementary Character Set (HKSCS-2008; code page 950)
     Big5,
@@ -68,13 +69,14 @@ impl MultiByte {
         }
     }
 
-    /// the encoding of a Windows code page number: 932, 936, 949, 950, 20932 and 51932 (EUC-JP), 50220 to
-    /// 50222 (ISO-2022-JP), 51949 (EUC-KR), 54936.  None for the others (Johab, 1361, is none of the standard's).
+    /// the encoding of a Windows code page number: 932, 936, 949, 950, 20932 and 51932 (EUC-JP), 50220 and
+    /// 50221 (ISO-2022-JP), 51949 (EUC-KR), 54936.  None for the others: Johab (1361) is none of the standard's,
+    /// and 50222 writes half-width katakana between SO and SI, which the standard's ISO-2022-JP does not read.
     pub const fn from_code_page(cp: u16) -> Option<MultiByte> {
         Some(match cp {
             932 => MultiByte::ShiftJis,
             20932 | 51932 => MultiByte::EucJp,
-            50220..=50222 => MultiByte::Iso2022Jp,
+            50220 | 50221 => MultiByte::Iso2022Jp,
             936 => MultiByte::Gbk,
             54936 => MultiByte::Gb18030,
             950 => MultiByte::Big5,

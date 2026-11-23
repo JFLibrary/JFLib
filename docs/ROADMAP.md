@@ -2636,11 +2636,11 @@ Grundbausteine am falschen Ort oder mehrfach:
   `gen_dxf_codepages.py` (dxf), `--verify` vergleicht mit den Daten des Standards und Nodes `TextDecoder`. Die
   mehrbytigen Kodierungen Ostasiens (U17, [`formats/src/multibyte.rs`](../lib/formats/src/multibyte.rs),
   [`decode.rs`](../lib/formats/src/decode.rs)): `MultiByte` mit Shift_JIS (Code-Page 932 mit den Erweiterungen von
-  NEC und IBM), EUC-JP (mit JIS X 0212), ISO-2022-JP, GBK, gb18030 (GB18030-2022, ganz Unicode), Big5 (mit
+  NEC und IBM), EUC-JP (mit JIS X 0212), ISO-2022-JP, GBK, gb18030 (GB18030-2022, ganz Unicode außer U+E5E5), Big5 (mit
   HKSCS-2008) und EUC-KR (Code-Page 949, alle Hangul-Silben), lesen und schreiben wie der Standard (`encode` mit
   `Unmappable`, `encode_html` mit Zeichenreferenzen wie beim Absenden eines Formulars); `Decoder` liest jede
-  Kodierung in Stücken, ein Zeichen darf zwischen zweien geteilt sein; `encoding::from_code_page` für jede
-  Windows-Nummer. Die Tabellen (`cjk.bin`, 300 KB) erzeugt `gen_encodings.py` aus Pythons Codecs und den Stellen,
+  Kodierung in Stücken, ein Zeichen darf zwischen zweien geteilt sein; `encoding::from_code_page` für die
+  unterstützten Windows-Nummern (für andere None). Die Tabellen (`cjk.bin`, 300 KB) erzeugt `gen_encodings.py` aus Pythons Codecs und den Stellen,
   an denen der Standard abweicht. Geprüft mit `tools/encoding_check.py` gegen encoding_rs (die Umsetzung von
   Firefox, offline aus Cargos Registry gebaut): jeder Unicode-Codepunkt beim Schreiben, jede Zweibytefolge, die
   Dreibytefolgen von EUC-JP und die 1,6 Millionen Vierbytefolgen von gb18030 beim Lesen, Zufallsströme auf einmal

@@ -41452,15 +41452,8 @@ They wait in a small queue here, so a sequence may end in one piece of input and
 - **`struct Decoder`**
   A decoder for input in pieces: `decode(piece, last, out)` appends the text of each piece to `out`; a
   sequence cut between two pieces is finished by the next one.  The output is the same as decoding the whole
-  input at once with `decode_label` (without its byte-order mark rule; see `Decoder::sniffing`).
-
-  \\`\\`\\`ignore
-  let mut d = Decoder::new(Label::Multi(MultiByte::ShiftJis));
-  let mut text = String::new();
-  d.decode(&[0x82], false, &mut text);
-  d.decode(&[0xA0], true, &mut text);
-  assert_eq!(text, "あ");
-  \\`\\`\\`
+  input at once with `decode_label` (without its byte-order mark rule; see `Decoder::sniffing`).  Shift_JIS's
+  "あ" in two pieces, 0x82 and then 0xA0 with `last`, gives "あ".
 
 **`impl Decoder`**
 
@@ -41546,7 +41539,8 @@ codecs, made the standard's indexes where they differ (checked against the stand
 
 - **`fn from_code_page(cp: u16) -> Option<Label>`**
   The encoding of a Windows code page number: 65001 (UTF-8), 1200 and 1201 (UTF-16), the single-byte
-  sets (`Charset::from_code_page`) and the multi-byte encodings (`MultiByte::from_code_page`).  What RTF's
+  sets (`Charset::from_code_page`) and the multi-byte encodings (`MultiByte::from_code_page`); None for the
+  others.  What RTF's
   `\ansicpg`, DXF's $DWGCODEPAGE or a DBF's language driver name.
 
 - **`fn label(name: &str) -> Option<Label>`**
@@ -41745,7 +41739,8 @@ compute the bytes from it.
     katakana, JIS X 0208)
   - `Gbk` -- GBK: simplified Chinese (code page 936; also what the labels gb2312 and chinese name).  It reads
     gb18030; it writes only its two-byte characters and the euro sign as 0x80.
-  - `Gb18030` -- gb18030: simplified Chinese with all of Unicode (GB18030-2022; code page 54936)
+  - `Gb18030` -- gb18030: simplified Chinese with all of Unicode but U+E5E5, which it does not write (GB18030-2022;
+    code page 54936)
   - `Big5` -- Big5: traditional Chinese with the Hong Kong Supplementary Character Set (HKSCS-2008; code page 950)
   - `EucKr` -- EUC-KR: Korean as Windows writes it (code page 949, the Unified Hangul Code: all 11 172 syllables)
 
@@ -41759,8 +41754,9 @@ compute the bytes from it.
 - **`const fn code_page(self) -> u16`**
   its Windows code page number: 932, 20932, 50220, 936, 54936, 950, 949
 - **`const fn from_code_page(cp: u16) -> Option<MultiByte>`**
-  the encoding of a Windows code page number: 932, 936, 949, 950, 20932 and 51932 (EUC-JP), 50220 to
-  50222 (ISO-2022-JP), 51949 (EUC-KR), 54936.  None for the others (Johab, 1361, is none of the standard's).
+  the encoding of a Windows code page number: 932, 936, 949, 950, 20932 and 51932 (EUC-JP), 50220 and
+  50221 (ISO-2022-JP), 51949 (EUC-KR), 54936.  None for the others: Johab (1361) is none of the standard's,
+  and 50222 writes half-width katakana between SO and SI, which the standard's ISO-2022-JP does not read.
 - **`fn from_label(name: &str) -> Option<MultiByte>`**
   the encoding a WHATWG label names ("shift_jis", "sjis", "windows-31j", "gb2312", "big5-hkscs",
   "ks_c_5601-1987" ...; `encoding::label`), multi-byte encodings only

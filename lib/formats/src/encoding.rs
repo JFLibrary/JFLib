@@ -153,7 +153,8 @@ impl Label {
 }
 
 /// The encoding of a Windows code page number: 65001 (UTF-8), 1200 and 1201 (UTF-16), the single-byte
-/// sets (`Charset::from_code_page`) and the multi-byte encodings (`MultiByte::from_code_page`).  What RTF's
+/// sets (`Charset::from_code_page`) and the multi-byte encodings (`MultiByte::from_code_page`); None for the
+/// others.  What RTF's
 /// `\ansicpg`, DXF's $DWGCODEPAGE or a DBF's language driver name.
 pub fn from_code_page(cp: u16) -> Option<Label> {
     match cp {
@@ -197,7 +198,9 @@ pub fn decode_label(label: &str, bytes: &[u8], limit: usize) -> Result<String, E
         (self::label(label), bytes)
     };
     let named = named.ok_or(Error::Unsupported)?;
-    let mut text = String::with_capacity(body.len().min(limit) + body.len().min(limit) / 2);
+    // (the replacement encoding writes one U+FFFD whatever the input)
+    let cap = if named == Label::Replacement { 0 } else { body.len().min(limit) + body.len().min(limit) / 2 };
+    let mut text = String::with_capacity(cap);
     Decoder::new(named).decode(body, true, &mut text);
     if text.len() > limit {
         return Err(Error::Limit);

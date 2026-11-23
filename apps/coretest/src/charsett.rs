@@ -222,8 +222,9 @@ fn multibyte(t: &mut T) {
     // labels and code pages
     t.eq("labels", ["sjis", "windows-31j", "x-euc-jp", "csiso2022jp", "gb2312", "GB18030", "big5-hkscs", "ks_c_5601-1987"].map(MultiByte::from_label),
         [Some(ShiftJis), Some(ShiftJis), Some(EucJp), Some(Iso2022Jp), Some(Gbk), Some(Gb18030), Some(Big5), Some(EucKr)]);
-    t.eq("from_code_page", [65001u16, 1200, 1252, 932, 51949, 50222, 1361].map(encoding::from_code_page),
-        [Some(Label::Utf8), Some(Label::Utf16Le), Some(Label::Single(Charset::Windows1252)), Some(Label::Multi(ShiftJis)), Some(Label::Multi(EucKr)), Some(Label::Multi(Iso2022Jp)), None]);
+    t.eq("from_code_page", [65001u16, 1200, 1252, 932, 51949, 50221, 50222, 1361].map(encoding::from_code_page),
+        [Some(Label::Utf8), Some(Label::Utf16Le), Some(Label::Single(Charset::Windows1252)), Some(Label::Multi(ShiftJis)), Some(Label::Multi(EucKr)), Some(Label::Multi(Iso2022Jp)), None, None]);
+    t.eq("decode_label: the replacement encoding keeps no room for its input", encoding::decode_label("iso-2022-kr", &[0x41; 4096], 1 << 20).map(|s| (s.len(), s.capacity() < 64)), Ok((3, true)));
     t.eq("Label::name", [Label::Utf16Be, Label::Multi(Gb18030), Label::Single(Charset::Koi8U), Label::Replacement].map(Label::name), ["UTF-16BE", "gb18030", "KOI8-U", "replacement"]);
     t.eq("decode_label GBK", encoding::decode_label("gb2312", &[0xD6, 0xD0, 0xCE, 0xC4], 100), Ok(String::from("中文")));
     // hostile input: no panic, bounded output
