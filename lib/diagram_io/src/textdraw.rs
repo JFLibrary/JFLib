@@ -72,7 +72,8 @@
 // and parents over their children.  The groups (and single shapes) are then packed left to right
 // in rows no wider than about 1.5 times the square root of their total area (a grid for shapes
 // without links).  The whole block starts at the page's top left corner (Build::margin inside
-// it), right of the page's earlier shapes and of the shapes placed by X and Y.
+// it); when it would cover the page's earlier shapes or the shapes placed by X and Y there, it
+// starts right of all of them.
 //
 // Every text is untrusted input: its size, the number of records, of fields per record, of shape
 // data fields per shape, the length of each field and of an ID and the number of problems are
@@ -1296,12 +1297,18 @@ pub fn apply(tx: &mut Transaction, eng: &mut Engine, page: PageRef, plan: &Plan,
             .collect();
         let edges: Vec<(usize, usize)> = plan.links.iter().filter_map(|l| Some((*ix.get(l.from)?, *ix.get(l.to)?))).filter(|&(a, b)| a != usize::MAX && b != usize::MAX).collect();
         let centres = layout(&sizes, &edges, opts.gap);
-        // the block at the page's top left corner, right of what is there already
+        // the block at the page's top left corner; when it would cover what is there already,
+        // right of that
         let placed: Vec<ShapeRef> = (0..plan.shapes.len()).filter(|&i| plan.shapes[i].pos.is_some()).map(|i| built.shapes[i]).collect();
         let avoid = union(before, ops::bounds(tx.doc(), &placed));
         let [_, ph] = pagesetup::size(tx.doc(), page);
-        let left = avoid.map_or(opts.margin, |b| opts.margin.max(b[2] + opts.gap[0]));
         let top = ph - opts.margin;
+        let (bw, bh) = centres.iter().zip(&sizes).fold((0.0f64, 0.0f64), |(w, h), (c, s)| (w.max(c[0] + s[0] * 0.5), h.max(c[1] + s[1] * 0.5)));
+        let block = [opts.margin, top - bh, opts.margin + bw, top];
+        let left = match avoid {
+            Some(b) if b[0] < block[2] && block[0] < b[2] && b[1] < block[3] && block[1] < b[3] => opts.margin.max(b[2] + opts.gap[0]),
+            _ => opts.margin,
+        };
         for (k, &i) in auto.iter().enumerate() {
             centre_at(tx, eng, built.shapes[i], [left + centres[k][0], top - centres[k][1]])?;
         }

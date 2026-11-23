@@ -393,10 +393,11 @@ fn builds_shapes_connectors_and_data_on_a_page() {
     assert!(near(f4.w, 30.0 * MM) && near(f4.h, 15.0 * MM));
     assert_eq!(master_of(&doc, s4), None);
     assert_eq!(master_of(&doc, s1), Some(bx));
-    // laid out: right of the placed s3, top at the page's top margin, s2 below s1
+    // laid out at the page's top left corner (s3 lies lower, out of the way), s2 below s1
     let [_, ph] = pagesetup::size(&doc, page);
     let b1 = f1.bounds();
-    assert!(b1[0] >= c3[0] + 15.0 * MM + 10.0 * MM - 1e-6);
+    let left = [s1, s2, s4].iter().map(|&s| ops::frame(&doc, s).bounds()[0]).fold(f64::INFINITY, f64::min);
+    assert!(near(left, 10.0 * MM));
     assert!(near(b1[3], ph - 10.0 * MM));
     assert!(ops::frame(&doc, s2).centre()[1] < f1.centre()[1]);
     // shape data: the master's field by its label, new fields with Type 2 for numbers
@@ -428,10 +429,11 @@ fn builds_beside_earlier_shapes_and_rolls_back() {
     let mut doc = vsdx::new_document(DocKind::Drawing, Measure::Metric);
     let page = doc.pages().next().expect("a page");
     let mut eng = Engine::new();
-    // an earlier shape at the left
+    // an earlier shape at the top left, where the block would go
+    let [_, ph] = pagesetup::size(&doc, page);
     let earlier = {
         let mut tx = doc.transaction("Rechteck");
-        let s = ops::new_shape(&mut tx, &mut eng, Owner::Page(page), ops::Basic::Rectangle, [0.5, 5.0], [3.0, 6.0]).expect("rect");
+        let s = ops::new_shape(&mut tx, &mut eng, Owner::Page(page), ops::Basic::Rectangle, [0.5, ph - 2.0], [3.0, ph - 1.0]).expect("rect");
         tx.commit();
         s
     };

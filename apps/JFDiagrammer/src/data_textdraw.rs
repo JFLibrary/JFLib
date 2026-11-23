@@ -55,8 +55,8 @@ const ID_FILE: u32 = 0x8B40;
 const ID: u32 = 0x7B60_0000;
 const ID_GRID: u32 = ID + 0x1000;
 const ID_MAP: u32 = ID + 0x1_0000;
-/// the wizard's width (DIP)
-const W: i32 = 760;
+/// the wizard's content width (DIP; a content dialog is at most 548 wide)
+const W: i32 = 500;
 
 /// where a candidate master is
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -368,18 +368,23 @@ fn wizard(app: &mut Diagrammer, ui: &mut Ui) {
     let empty = app.textdraw.plan.shapes.is_empty();
     let r = if step == 0 { ui.dialog_buttons(Some(t("Weiter")), None, Some(t("Abbrechen"))) } else { ui.dialog_buttons(Some(t("Fertigstellen")), Some(t("Zurück")), Some(t("Abbrechen"))) };
     ui.dialog_end();
+    // (any result of dialog_buttons closes the dialog: Weiter and Zurück open it again)
     match (r, step) {
-        (DLG_PRIMARY, 0) if !empty => {
-            app.textdraw.step = 1;
+        (DLG_PRIMARY, 0) => {
+            if !empty {
+                app.textdraw.step = 1;
+            }
+            app.textdraw.wizard.set(1);
             ui.repass();
         }
-        (DLG_PRIMARY, 1) => {
+        (DLG_PRIMARY, _) => {
             app.textdraw.wizard.set(0);
             finish(app, ui);
             ui.repass();
         }
         (DLG_SECONDARY, _) => {
             app.textdraw.step = 0;
+            app.textdraw.wizard.set(1);
             ui.repass();
         }
         (DLG_CLOSE, _) => {
@@ -397,18 +402,21 @@ fn preview(app: &mut Diagrammer, ui: &mut Ui) {
     ui.text(TS_CAPTION | TX_SECONDARY, &tf("Schritt {} von {}: {}", &["1", "2", t("Vorschau")]));
     ui.next_size(W, 0);
     ui.text(TS_BODY | TX_ELLIPSIS, &tf("Datei: {} ({})", &[&st.name, st.encoding]));
-    // the separator and the unit
-    ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-    ui.text(TS_BODY, t("Trennzeichen"));
+    // the separator and the unit, side by side
     let auto = tf("Automatisch ({})", &[sep_name(st.auto_sep)]);
     let seps = [auto.as_str(), t("Komma"), t("Tabulator"), t("Semikolon")];
     let (sep_was, unit_was) = (st.sep_pick, st.unit_pick);
-    ui.next_size(200, 0);
+    ui.box_begin(0, BOX_H, 16);
+    ui.box_begin(0, BOX_V, 4);
+    ui.text(TS_BODY, t("Trennzeichen"));
+    ui.next_size(220, 0);
     ui.combobox(ID + 2, &mut st.sep_pick, &seps);
-    ui.spacer(16);
+    ui.box_end();
+    ui.box_begin(0, BOX_V, 4);
     ui.text(TS_BODY, t("Einheit der Zahlen"));
-    ui.next_size(160, 0);
+    ui.next_size(220, 0);
     ui.combobox(ID + 3, &mut st.unit_pick, &[t("Millimeter"), t("Zentimeter"), t("Zoll"), t("Punkt")]);
+    ui.box_end();
     ui.box_end();
     if st.sep_pick != sep_was || st.unit_pick != unit_was {
         reparse(st);
@@ -425,25 +433,23 @@ fn preview(app: &mut Diagrammer, ui: &mut Ui) {
     let tabs = [tf("Shapes ({})", &[&format!("{ns}")]), tf("Verbinder ({})", &[&format!("{nl}")]), tf("Probleme ({})", &[&format!("{}", p.problems.len())])];
     let names: Vec<&str> = tabs.iter().map(|s| s.as_str()).collect();
     let tab_was = st.tab;
-    ui.tabs(ID + 4, &mut st.tab, &names);
+    // (its items are ID + 0x21 ..)
+    ui.tabs(ID + 0x20, &mut st.tab, &names);
     if st.tab != tab_was {
         st.grid = GridState::default();
         ui.repass();
     }
-    ui.next_size(W, 260);
+    ui.next_size(W, 220);
     let per = st.unit_pick;
     match st.tab {
         0 => {
             let cols = [
-                GridCol::new(t("Zeile"), 56),
-                GridCol::new(t("ID"), 90),
-                GridCol::new(t("Master-Shape"), 120),
-                GridCol::new(t("Text"), 150).flags(GC_FILL),
-                GridCol::new("X", 56),
-                GridCol::new("Y", 56),
-                GridCol::new(t("Breite"), 60),
-                GridCol::new(t("Höhe"), 60),
-                GridCol::new(t("Shape-Daten"), 140),
+                GridCol::new(t("Zeile"), 44).min(40),
+                GridCol::new(t("ID"), 72),
+                GridCol::new(t("Master-Shape"), 92),
+                GridCol::new(t("Text"), 110).flags(GC_FILL),
+                GridCol::new("X, Y", 70),
+                GridCol::new(t("Größe"), 70),
             ];
             let keys: Vec<u64> = (0..p.shapes.len() as u64).collect();
             let (a, b) = ui.grid_begin(ID_GRID, &mut st.grid, &cols, &keys);
@@ -455,17 +461,23 @@ fn preview(app: &mut Diagrammer, ui: &mut Ui) {
                 ui.grid_text(g, 1, &s.id);
                 ui.grid_text(g, 2, &p.masters[s.master].name);
                 ui.grid_text(g, 3, &one_line(&s.text));
-                ui.grid_text(g, 4, &len_text(s.pos.map(|q| q[0]), per));
-                ui.grid_text(g, 5, &len_text(s.pos.map(|q| q[1]), per));
-                ui.grid_text(g, 6, &len_text(s.size[0], per));
-                ui.grid_text(g, 7, &len_text(s.size[1], per));
-                let data: Vec<String> = s.props.iter().map(|x| format!("{}={}", x.label, x.value)).collect();
-                ui.grid_text(g, 8, &data.join("; "));
+                let pos = s.pos.map_or(String::new(), |q| format!("{}; {}", len_text(Some(q[0]), per), len_text(Some(q[1]), per)));
+                ui.grid_text(g, 4, &pos);
+                let size = if s.size.iter().any(Option::is_some) { format!("{} × {}", len_text(s.size[0], per), len_text(s.size[1], per)) } else { String::new() };
+                ui.grid_text(g, 5, &size);
             }
             ui.grid_end(&mut st.grid);
+            // the shape data of the current row (the first one until a row is chosen)
+            let row = st.grid.cur.map_or(0, |k| k as usize);
+            if let Some(s) = p.shapes.get(row) {
+                let data: Vec<String> = s.props.iter().map(|x| format!("{}={}", x.label, x.value)).collect();
+                let data = if data.is_empty() { String::from("–") } else { data.join("; ") };
+                ui.next_size(W, 0);
+                ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, &tf("Shape-Daten in Zeile {}: {}", &[&format!("{}", s.line), &data]));
+            }
         }
         1 => {
-            let cols = [GridCol::new(t("Zeile"), 56), GridCol::new(t("ID"), 90), GridCol::new(t("Master-Shape"), 140), GridCol::new(t("Text"), 160).flags(GC_FILL), GridCol::new(t("Von"), 120), GridCol::new(tc("Nach|Linkziel"), 120)];
+            let cols = [GridCol::new(t("Zeile"), 48).min(40), GridCol::new(t("ID"), 64), GridCol::new(t("Master-Shape"), 100), GridCol::new(t("Text"), 96).flags(GC_FILL), GridCol::new(t("Von"), 88), GridCol::new(tc("Nach|Linkziel"), 88)];
             let keys: Vec<u64> = (0..p.links.len() as u64).collect();
             let (a, b) = ui.grid_begin(ID_GRID, &mut st.grid, &cols, &keys);
             for i in a..b {
@@ -482,7 +494,7 @@ fn preview(app: &mut Diagrammer, ui: &mut Ui) {
             ui.grid_end(&mut st.grid);
         }
         _ => {
-            let cols = [GridCol::new(t("Zeile"), 56), GridCol::new(t("Typ"), 90), GridCol::new(t("Meldung"), 400).flags(GC_FILL)];
+            let cols = [GridCol::new(t("Zeile"), 48).min(40), GridCol::new(t("Typ"), 80), GridCol::new(t("Meldung"), 360).flags(GC_FILL)];
             let keys: Vec<u64> = (0..p.problems.len() as u64).collect();
             let (a, b) = ui.grid_begin(ID_GRID, &mut st.grid, &cols, &keys);
             for i in a..b {
@@ -512,14 +524,16 @@ fn mapping(app: &mut Diagrammer, ui: &mut Ui) {
     for (k, u) in st.plan.masters.iter().enumerate() {
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
         let name = if u.name.is_empty() { String::from(t("(kein Master-Shape)")) } else { format!("„{}“", u.name) };
-        ui.next_size(260, 0);
+        ui.box_begin(0, BOX_V, 0);
+        ui.next_size(220, 0);
         ui.text(TS_BODY | TX_ELLIPSIS, &name);
         let count = format!("{}", u.count);
-        ui.next_size(150, 0);
+        ui.next_size(220, 0);
         ui.text(TS_CAPTION | TX_SECONDARY, &if u.link { tf("für {} Verbinder", &[&count]) } else { tf("für {} Shapes", &[&count]) });
+        ui.box_end();
         if let Some(pick) = st.pick.get_mut(k) {
             let was = *pick;
-            ui.next_size(300, 0);
+            ui.next_size(250, 0);
             ui.combobox(ID_MAP + k as u32, pick, if u.link { &labels1 } else { &labels2 });
             if *pick != was {
                 st.chosen.insert((fold(u.name.trim()), u.link), *pick);
