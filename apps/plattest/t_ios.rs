@@ -10,6 +10,9 @@
 //               user's setting arrives): the settings' text_scale follows UIFontMetrics ("Large"
 //               100 %, XXL above it, an accessibility size beyond 200 %), E_SETTINGS reaches the
 //               app and its text scale follows; the override gone: the start again
+//   share       plat::share from the app's frame (a title, a text, a link, a file): the sheet
+//               (UIActivityViewController) shows, SHARE_PENDING; closed again -> SHARE_CANCELLED;
+//               CAP_SHARE under the host
 //   turning     landscape and back (requestGeometryUpdate, as the user turning the phone): the
 //               canvas, the app's size and the picture follow the view; with the GPU's output
 //               (jfgui_GPU=1) the layer stays shown, at the view's frame, its drawable at the
@@ -34,7 +37,8 @@ mod ios {
     use alloc::format;
     use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering::SeqCst};
 
-    use plat::{INHIBIT_IDLE, IosPadView, inhibit, ios_dark, ios_idle_timer_off, ios_pad_rotate, ios_pad_view, ios_text_size, sys_settings};
+    use plat::{CAP_SHARE, INHIBIT_IDLE, IosPadView, SHARE_CANCELLED, SHARE_PENDING, Share, capabilities, inhibit, ios_dark, ios_idle_timer_off,
+               ios_pad_rotate, ios_pad_view, ios_share_dismiss, ios_share_shown, ios_text_size, share, share_open, share_poll, sys_settings};
     use ui::{App, AppDesc, Ui};
 
     use super::*;
@@ -47,6 +51,10 @@ mod ios {
     static CH: AtomicI32 = AtomicI32::new(0);
     static SCALE: AtomicU32 = AtomicU32::new(0);
     static DARK: AtomicBool = AtomicBool::new(false);
+    // the client asks the frame for a share sheet; what share answered, what share_poll gave
+    static ASK_SHARE: AtomicBool = AtomicBool::new(false);
+    static SHARED: AtomicI32 = AtomicI32::new(i32::MIN);
+    static SHARE_ANSWER: AtomicI32 = AtomicI32::new(i32::MIN);
     // UIC_SETTINGS: how many, their bits
     static SETTINGS: AtomicU32 = AtomicU32::new(0);
     static SETTINGS_BITS: AtomicU32 = AtomicU32::new(0);
@@ -79,6 +87,21 @@ mod ios {
             CH.store(h, SeqCst);
             SCALE.store(ui.text_scale(), SeqCst);
             DARK.store(ui.theme_dark(), SeqCst);
+            if ASK_SHARE.swap(false, SeqCst) {
+                let file = alloc::format!("{}/plattest-share.txt", plat::temp_dir().unwrap_or_default().trim_end_matches('/'));
+                let _ = plat::write_file(&file, b"plattest");
+                let s = Share {
+                    title: alloc::string::String::from("plattest"),
+                    text: alloc::string::String::from("Ein Text"),
+                    url: alloc::string::String::from("https://jflib.org/"),
+                    files: alloc::vec![file],
+                    anchor: ui.last_rect(),
+                };
+                SHARED.store(share(&s), SeqCst);
+            }
+            if let Some(r) = share_poll() {
+                SHARE_ANSWER.store(r, SeqCst);
+            }
             FRAMES.fetch_add(1, SeqCst);
         }
 
@@ -141,6 +164,7 @@ mod ios {
             screen_on();
             dark();
             text_size();
+            share_sheet();
             turning();
         }
         let (n, f) = (CHECKS.load(SeqCst), FAILS.load(SeqCst));
@@ -158,6 +182,22 @@ mod ios {
         record(ios_idle_timer_off(), "ios: screen on: still off while a second guard lives");
         drop(b);
         record(!ios_idle_timer_off(), "ios: screen on: the last guard gone, the timer runs again");
+    }
+
+    fn share_sheet() {
+        record(capabilities().supports(CAP_SHARE), "ios: share: CAP_SHARE under UIKit's host");
+        ASK_SHARE.store(true, SeqCst);
+        plat::wake();
+        wait(3000, || SHARED.load(SeqCst) != i32::MIN);
+        record(SHARED.load(SeqCst) == SHARE_PENDING && share_open(), "ios: share: the sheet opens (SHARE_PENDING)");
+        let shown = wait(5000, || ios_share_shown().is_some_and(|c| c.contains("ActivityViewController")));
+        record(shown, &format!("ios: share: the sheet on screen ({:?})", ios_share_shown()));
+        plat::sleep_ms(1000);
+        ios_share_dismiss();
+        let got = wait(8000, || SHARE_ANSWER.load(SeqCst) != i32::MIN);
+        let a = SHARE_ANSWER.load(SeqCst);
+        record(got && a == SHARE_CANCELLED, &format!("ios: share: closed without a target -> SHARE_CANCELLED ({a})"));
+        record(!share_open() && wait(3000, || ios_share_shown().is_none()), "ios: share: nothing open after the answer");
     }
 
     /// dark and light as the user switches them while the app runs: the settings follow, E_SETTINGS

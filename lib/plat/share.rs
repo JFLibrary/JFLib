@@ -144,14 +144,19 @@ fn clean(s: &str, n: usize) -> String {
 #[cfg(windows)]
 #[path = "win_share.rs"]
 mod native;
+/// (tests) Windows: the app's window in front again, the open sheet closes
+#[cfg(windows)]
+pub use native::win_share_dismiss;
 
 #[cfg(target_os = "macos")]
-#[path = "apple_mac_share.rs"]
-mod native;
+mod native {
+    pub use crate::apple::mac::share_sheet::{available, share};
+}
 
 #[cfg(target_os = "ios")]
-#[path = "apple_ios_share.rs"]
-mod native;
+mod native {
+    pub use crate::apple::ios::share_sheet::{available, share};
+}
 
 #[cfg(any(target_arch = "wasm32", target_os = "android"))]
 #[path = "web_share.rs"]

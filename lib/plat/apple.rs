@@ -37,6 +37,9 @@ pub(crate) mod ios;
 // (tests) VoiceOver's view of the elements (apple_ios_a11y.rs)
 #[cfg(target_os = "ios")]
 pub use ios::{IosAxAct, IosAxElem, IosAxText, ios_ax_act, ios_ax_escape, ios_ax_events, ios_ax_listen, ios_ax_select, ios_ax_text, ios_ax_tree, ios_ax_type};
+// (tests) the share sheet on screen, closed again (apple_ios_share.rs)
+#[cfg(target_os = "ios")]
+pub use ios::{ios_share_dismiss, ios_share_shown};
 // (tests) the bookmarks of files chosen in the picker (apple_ios_services.rs)
 #[cfg(target_os = "ios")]
 pub use ios::{ios_bookmark_add, ios_bookmark_paths, ios_bookmarks_clear, ios_bookmarks_restore};

@@ -54,6 +54,10 @@ pub(crate) use services::notes;
 pub use services::{clip_get, clip_has, clip_set, clip_set_many, file_dialog, file_dialog_poll};
 // (tests) the bookmarks of chosen files
 pub use services::{ios_bookmark_add, ios_bookmark_paths, ios_bookmarks_clear, ios_bookmarks_restore};
+// the share sheet (share.rs): UIActivityViewController
+#[path = "apple_ios_share.rs"]
+pub(crate) mod share_sheet;
+pub use share_sheet::{ios_share_dismiss, ios_share_shown};
 // the motion sensors and the location (sensors.rs through web_sensors.rs)
 #[path = "apple_ios_motion.rs"]
 pub(crate) mod motion;

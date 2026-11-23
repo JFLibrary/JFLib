@@ -94,6 +94,9 @@
 //                                          through AppKit's accessibility entry points (a window),
 //                                          iOS through UIAccessibility under UIKit (simapp);
 //                                          a11y-show: the demo by hand, for a screen reader
+//   plattest --test share / share-ui       (t_share.rs) the system's share sheet: the contract and
+//                                          CAP_SHARE; share-ui (Windows, macOS) a real window opens
+//                                          the sheet and closes it again -> SHARE_CANCELLED
 //   plattest --test ios                    (t_ios.rs, iOS under UIKit: tools/apple.py simapp) the screen
 //                                          kept on (the idle timer), the system's text size followed,
 //                                          turning (with jfgui_GPU=1 on the GPU's layer)
@@ -242,6 +245,8 @@ mod t_ipad;
 mod t_bookmarks;
 // iOS under UIKit: screen on, text size, turning
 mod t_ios;
+// the system's share sheet
+mod t_share;
 // a web page's accessibility tree (apps/a11ytest's page)
 mod t_a11y_rich;
 // what that tree costs per frame
@@ -609,6 +614,8 @@ fn plattest() -> i32 {
         Some("ipad") => t_ipad::t_ipad,                // iOS on an iPad under UIKit (simapp): sizes, menu bar, pointer (AP9)
         Some("bookmarks") => t_bookmarks::t_bookmarks,  // iOS: the bookmarks of chosen files
         Some("ios") => t_ios::t_ios,                  // iOS under UIKit (simapp): screen on, text size, turning
+        Some("share") => t_share::t_share,            // plat::share: the contract, CAP_SHARE
+        Some("share-ui") => t_share::t_share_ui,      // Windows, macOS, a real window: the sheet opened and closed
         Some("secret") => t_secret::t_secret,          // the system's secret store (not in "all")
         Some("secret-bus") => t_secret::t_secret_bus,  // Linux: against tools/platshared/secret_bus.py
         Some("power") => t_power::t_power,             // plat::inhibit (Windows: real power requests)
