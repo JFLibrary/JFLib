@@ -1,0 +1,14 @@
+#!args apps/JFDiagrammer/tests/jd16-schablone.vsx --no-system-fonts
+# JFDiagrammer, JD16: a stencil in Visio's XML format of 2003-2010 (DF-20; jd16-schablone.vsx is
+# diagramiotest's self-written file, --write-vdx) named on the command line goes into the Shapes
+# panel as a stencil: its three masters as tiles; a click on a tile and one on the page place it
+expect tab:"jd16-schablone" selected
+expect button:"Kasten" exists
+expect button:"Kreis" exists
+expect button:"Pfeil" exists
+expect text:"Keine Schablone geöffnet." missing
+click button:"Kreis"
+expect button:"Kreis" checked
+click canvas:"Zeichenfläche"
+a11y expect announced "„Kreis“ abgelegt"
+expect listitem:"Kreis" exists

@@ -355,7 +355,8 @@ pub(crate) fn create_from(app: &mut Diagrammer, ui: &mut Ui, mut doc: Document, 
     let windows = template::stencil_windows(&doc);
     template::to_drawing(&mut doc, stencils::lang());
     let name = crate::edit_doc::next_name();
-    let format = Format { kind: DocKind::Drawing, macros: false };
+    // (JD16, DF-05) a drawing from a .vstm keeps its macro project: a .vsdm
+    let format = Format { kind: DocKind::Drawing, macros: doc.macros };
     crate::edit_doc::install(app, ui, doc, name, None, format, None);
     open_stencils(app, ui, &windows, dir);
 }

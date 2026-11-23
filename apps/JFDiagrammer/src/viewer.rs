@@ -34,7 +34,6 @@ use core::cell::RefCell;
 
 use diagram_core::render::Options;
 use diagram_core::{DocKind, Document, PageRef};
-use diagram_io::vsdx;
 use diagram_view::{Class, FontSet, FontSource, PageView};
 use render2d::Camera;
 use ui::i18n::{t, tf};
@@ -88,7 +87,14 @@ impl Opened {
 
 /// the extensions the file dialog offers
 // i18n
-pub(crate) static EXTS: [&str; 4] = ["vsdx;vsdm=Visio-Zeichnung", "vssx;vssm=Visio-Schablone", "vstx;vstm=Visio-Vorlage", "=Alle Dateien"];
+pub(crate) static EXTS: [&str; 5] = [
+    "vsdx;vsdm=Visio-Zeichnung",
+    "vssx;vssm=Visio-Schablone",
+    "vstx;vstm=Visio-Vorlage",
+    // (JD16) the XML formats of 2003-2010
+    "vdx;vsx;vtx=Visio-XML (2003–2010)",
+    "=Alle Dateien",
+];
 
 /// the file types Speichern unter offers (JD7)
 // i18n
@@ -97,7 +103,7 @@ pub(crate) static SAVE_EXTS: [&str; 4] = ["vsdx=Visio-Zeichnung", "vssx=Visio-Sc
 /// whether a command-line argument names a drawing
 pub(crate) fn is_drawing(arg: &str) -> bool {
     let a = arg.to_ascii_lowercase();
-    [".vsdx", ".vsdm", ".vssx", ".vssm", ".vstx", ".vstm"].iter().any(|e| a.ends_with(e))
+    [".vsdx", ".vsdm", ".vssx", ".vssm", ".vstx", ".vstm", ".vdx", ".vsx", ".vtx"].iter().any(|e| a.ends_with(e))
 }
 
 /// the installed fonts by family name (scanned on the first request)
@@ -148,7 +154,8 @@ pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
         ui.repass();
         return false;
     };
-    let loaded = match vsdx::read(&bytes, &vsdx::Limits::VSDX) {
+    // (JD16) .vdx / .vsx / .vtx by the XML reader of 2003-2010
+    let loaded = match crate::doc_file::read(&bytes, path) {
         Ok(l) => l,
         Err(e) => {
             app.error = Some((tf("„{}“ kann nicht geöffnet werden.", &[&name]), format!("{e}")));
@@ -160,6 +167,10 @@ pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
     // (JD9) a stencil goes into the Shapes panel; the drawing stays
     if doc.kind == DocKind::Stencil {
         app.backstage = None;
+        // (JD16) a stencil named on the command line: a new drawing for its shapes
+        if app.opened.is_none() {
+            crate::edit_doc::new_drawing(app, ui, false);
+        }
         return crate::stencils::open_file(app, ui, path);
     }
     // (JD13) a template starts a new, unnamed drawing (DF-05, VL-03); its folder is where
@@ -175,6 +186,13 @@ pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
     if loaded.format.macros {
         msg.push_str(t("Die Makros der Datei bleiben erhalten und werden nie ausgeführt."));
     }
+    // (JD16) the older XML format: saving writes a .vsdx
+    if crate::doc_file::is_xml(path) {
+        if !msg.is_empty() {
+            msg.push(' ');
+        }
+        msg.push_str(t("Die Datei hat das XML-Format von Visio 2003–2010; gespeichert wird sie als .vsdx."));
+    }
     let warnings = loaded.warnings.len() + loaded.more_warnings as usize;
     if warnings > 0 {
         if !msg.is_empty() {
@@ -184,6 +202,8 @@ pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
     }
     let notice = (!msg.is_empty()).then(|| (String::from(t("Hinweise zur Datei")), msg));
     crate::edit_doc::install(app, ui, doc, stem, Some(String::from(path)), loaded.format, notice);
+    // (JD16, DF-10) the file's stencils, page, zoom and what its window shows
+    crate::doc_file::opened(app, ui);
     ui.recent_add(path);
     ui.repass();
     true

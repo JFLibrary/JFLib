@@ -303,7 +303,8 @@ pub(crate) fn open_file(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
         ui.repass();
         return false;
     };
-    match vsdx::read(&bytes, &vsdx::Limits::VSDX) {
+    // (JD16) a .vsx by the XML reader of 2003-2010
+    match crate::doc_file::read(&bytes, path) {
         Ok(l) if l.doc.kind == DocKind::Stencil => {
             let key = app.stencils.add(origin, l.doc, &stem, false);
             app.stencils.show(key);
@@ -523,7 +524,7 @@ pub(crate) fn my_files(ui: &Ui) -> Vec<String> {
     let mut v: Vec<String> = Vec::new();
     plat::dir_list(&dir, &mut |name, is_dir, _| {
         let l = name.to_ascii_lowercase();
-        if !is_dir && (l.ends_with(".vssx") || l.ends_with(".vssm")) && l != "favorites.vssx" {
+        if !is_dir && (l.ends_with(".vssx") || l.ends_with(".vssm") || l.ends_with(".vsx")) && l != "favorites.vssx" {
             v.push(format!("{dir}/{name}"));
         }
     });
