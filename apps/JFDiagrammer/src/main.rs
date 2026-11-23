@@ -110,6 +110,7 @@
 // the own templates (JD13); --picture-dir DIR is where Bild aus Datei's dialog starts (JD8 rest);
 // --check-commands shows which commands still lack a function as the notice (JD8 rest,
 // cmds_later.rs).
+// (JD18) --data-dir DIR is where Benutzerdefinierter Import's file dialog starts (scripts).
 //
 //   python build_rs.py run JFDiagrammer
 //   python build_rs.py test JFDiagrammer          tests/*.uis

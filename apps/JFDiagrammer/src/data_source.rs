@@ -10,6 +10,13 @@
 //                             not there
 //   workbook(bytes) / text(bytes)   the parsed file for the data selector's pages
 //   loaded(table)             a sheet_io::Table as headers and DataValues
+//   recordset_columns(data, rs) / read_columns(source, cols)   what a refresh reads: the
+//                             recordset's source (or the file it moved to) with only the
+//                             columns its Command names ("select `A`,`B` from ..."; the data
+//                             selector writes such a list when columns were left out, as Visio
+//                             does, so that Visio's refresh leaves them out too)
+//   command_columns(cmd) / command_with_columns(cmd, cols) / keep_columns(loaded, cols)   the
+//                             column list of a Command read and written, a table cut to it
 //
 // Values: numbers, texts, Booleans and dates keep their type (a date is a day number since
 // 1899-12-30, as Visio keeps it); an error value of a cell becomes its text ("#N/A").  A text
@@ -102,6 +109,85 @@ pub(crate) fn excel_table(wb: &xlsx::Workbook, table: &ExcelTable, header: bool)
 pub(crate) fn loaded(t: Table) -> Loaded {
     let rows = t.rows.into_iter().map(|r| r.into_iter().map(value).collect()).collect();
     Loaded { headers: t.columns, rows }
+}
+
+/// the columns a recordset's Command names (None: all, "select *")
+pub(crate) fn recordset_columns(data: &diagram_core::data::DataSets, rs: &diagram_core::data::Recordset) -> Option<Vec<String>> {
+    let conn = rs.connection.and_then(|id| data.connections.iter().find(|c| c.id == id));
+    let cmd = rs.command.as_deref().or(conn.and_then(|c| c.command.as_deref())).unwrap_or("");
+    command_columns(cmd)
+}
+
+/// read a source (also one moved to another file) and keep only `cols` when given
+pub(crate) fn read_columns(source: &Source, cols: &Option<Vec<String>>) -> Result<Loaded, ReadError> {
+    let l = read(source)?;
+    Ok(match cols {
+        Some(c) => keep_columns(l, c),
+        None => l,
+    })
+}
+
+/// the columns a Command selects ("select `A`,`B` from `X$`", also [A] or plain names); None
+/// for "select * ..." or anything that is no such list
+pub(crate) fn command_columns(cmd: &str) -> Option<Vec<String>> {
+    let lower = cmd.to_ascii_lowercase();
+    let lead = lower.len() - lower.trim_start().len();
+    if !lower[lead..].starts_with("select ") {
+        return None;
+    }
+    let end = lower.find(" from ")?;
+    let list = cmd.get(lead + 7..end)?.trim();
+    if list.is_empty() || list == "*" {
+        return None;
+    }
+    let mut out = Vec::new();
+    let mut rest = list;
+    while !rest.is_empty() {
+        let r = rest.trim_start();
+        let (name, after) = match r.chars().next()? {
+            '`' => {
+                let e = r[1..].find('`')? + 1;
+                (&r[1..e], &r[e + 1..])
+            }
+            '[' => {
+                let e = r.find(']')?;
+                (&r[1..e], &r[e + 1..])
+            }
+            _ => match r.find(',') {
+                Some(e) => (r[..e].trim(), &r[e..]),
+                None => (r.trim(), ""),
+            },
+        };
+        out.push(String::from(name));
+        let after = after.trim_start();
+        rest = match after.strip_prefix(',') {
+            Some(a) => a,
+            None if after.is_empty() => "",
+            None => return None,
+        };
+    }
+    (!out.is_empty()).then_some(out)
+}
+
+/// a Command ("select * from `X$`") with a column list instead of "*"; a name with '`' cannot
+/// be written in it: the Command stays as it is
+pub(crate) fn command_with_columns(cmd: &str, cols: &[String]) -> String {
+    let lower = cmd.to_ascii_lowercase();
+    let Some(at) = lower.find(" from ") else { return String::from(cmd) };
+    if cols.is_empty() || cols.iter().any(|c| c.contains('`')) || !lower.trim_start().starts_with("select ") {
+        return String::from(cmd);
+    }
+    let list: Vec<String> = cols.iter().map(|c| alloc::format!("`{c}`")).collect();
+    alloc::format!("select {}{}", list.join(","), &cmd[at..])
+}
+
+/// a table cut to these columns (in this order; names compared without case, as the OLE DB
+/// provider does; a column the table lacks is left out)
+pub(crate) fn keep_columns(l: Loaded, cols: &[String]) -> Loaded {
+    let idx: Vec<usize> = cols.iter().filter_map(|c| l.headers.iter().position(|h| h.to_lowercase() == c.to_lowercase())).collect();
+    let headers = idx.iter().map(|&i| l.headers[i].clone()).collect();
+    let rows = l.rows.into_iter().map(|r| idx.iter().map(|&i| r.get(i).cloned().unwrap_or_default()).collect()).collect();
+    Loaded { headers, rows }
 }
 
 /// a cell value as a recordset value

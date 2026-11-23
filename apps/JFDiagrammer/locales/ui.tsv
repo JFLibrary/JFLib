@@ -1044,3 +1044,71 @@ Die Zeile fehlt in „{}“.	The row is missing from “{}”.	La fila falta en 
 Der Schlüssel „{}“ steht {}-mal in „{}“; die erste Zeile gilt.	The key “{}” appears {} times in “{}”; the first row applies.	La clave «{}» aparece {} veces en «{}»; se usa la primera fila.	La chiave “{}” compare {} volte in “{}”; vale la prima riga.	La clé « {} » apparaît {} fois dans « {} » ; la première ligne s'applique.
 Doppelter Schlüssel	Duplicate key	Clave duplicada	Chiave duplicata	Clé en double
 Nach Aktualisierung automatisch verknüpfen	Automatically Link After Refresh	Vincular automáticamente después de actualizar	Collega automaticamente dopo l'aggiornamento	Lier automatiquement après l'actualisation
+Datenauswahl	Data Selector	Selector de datos	Selezione dati	Sélecteur de données
+Weiter >	Next >	Siguiente >	Avanti >	Suivant >
+< Zurück	< Back	< Atrás	< Indietro	< Précédent
+csv;txt=Textdatei	csv;txt=Text file	csv;txt=Archivo de texto	csv;txt=File di testo	csv;txt=Fichier texte
+xlsx;xlsm=Excel-Arbeitsmappe	xlsx;xlsm=Excel workbook	xlsx;xlsm=Libro de Excel	xlsx;xlsm=Cartella di lavoro di Excel	xlsx;xlsm=Classeur Excel
+Welche Daten möchten Sie importieren?	Which data do you want to import?	¿Qué datos desea importar?	Quali dati importare?	Quelles données voulez-vous importer ?
+Microsoft Excel-Arbeitsmappe	Microsoft Excel workbook	Libro de Microsoft Excel	Cartella di lavoro di Microsoft Excel	Classeur Microsoft Excel
+Textdatei (CSV)	Text file (CSV)	Archivo de texto (CSV)	File di testo (CSV)	Fichier texte (CSV)
+Microsoft SQL Server, Access, ODBC oder OLE DB	Microsoft SQL Server, Access, ODBC or OLE DB	Microsoft SQL Server, Access, ODBC u OLE DB	Microsoft SQL Server, Access, ODBC o OLE DB	Microsoft SQL Server, Access, ODBC ou OLE DB
+Datenbanken folgen in einer späteren Version.	Databases follow in a later version.	Las bases de datos llegarán en una versión posterior.	I database arriveranno in una versione successiva.	Les bases de données arriveront dans une version ultérieure.
+Verbindung zu einer Microsoft Excel-Arbeitsmappe	Connection to a Microsoft Excel workbook	Conexión con un libro de Microsoft Excel	Connessione a una cartella di lavoro di Microsoft Excel	Connexion à un classeur Microsoft Excel
+Verbindung zu einer Textdatei	Connection to a text file	Conexión con un archivo de texto	Connessione a un file di testo	Connexion à un fichier texte
+Arbeitsmappe	Workbook	Libro	Cartella di lavoro	Classeur
+Textdatei	Text file	Archivo de texto	File di testo	Fichier texte
+Durchsuchen...	Browse...	Examinar...	Sfoglia...	Parcourir...
+Welches Arbeitsblatt oder welchen Bereich möchten Sie verwenden?	Which worksheet or range do you want to use?	¿Qué hoja de cálculo o rango desea usar?	Quale foglio di lavoro o intervallo usare?	Quelle feuille de calcul ou quelle plage voulez-vous utiliser ?
+Bereich, z. B. Tabelle1!A1:C9	Range, e.g. Sheet1!A1:C9	Rango, p. ej. Hoja1!A1:C9	Intervallo, ad es. Foglio1!A1:C9	Plage, par ex. Feuil1!A1:C9
+Semikolon	Semicolon	Punto y coma	Punto e virgola	Point-virgule
+Komma	Comma	Coma	Virgola	Virgule
+Tabstopp	Tab	Tabulación	Tabulazione	Tabulation
+Senkrechter Strich	Vertical bar	Barra vertical	Barra verticale	Barre verticale
+UTF-8 mit BOM	UTF-8 with BOM	UTF-8 con BOM	UTF-8 con BOM	UTF-8 avec BOM
+Trennzeichen: {}	Delimiter: {}	Delimitador: {}	Delimitatore: {}	Séparateur : {}
+Codierung: {}	Encoding: {}	Codificación: {}	Codifica: {}	Codage : {}
+Trennzeichen und Codierung werden beim Lesen erkannt, auch beim Aktualisieren.	The delimiter and the encoding are detected when the file is read, also on refresh.	El delimitador y la codificación se detectan al leer el archivo, también al actualizar.	Il delimitatore e la codifica vengono rilevati alla lettura del file, anche durante l'aggiornamento.	Le séparateur et le codage sont détectés à la lecture du fichier, également lors de l'actualisation.
+Erste Datenzeile enthält Spaltenüberschriften	First row of data contains column headings	La primera fila de datos contiene encabezados de columna	La prima riga di dati contiene le intestazioni di colonna	La première ligne de données contient les en-têtes de colonne
+Spalten und Zeilen auswählen	Select columns and rows	Seleccionar columnas y filas	Selezionare colonne e righe	Sélectionner les colonnes et les lignes
+Spalten	Columns	Columnas	Colonne	Colonnes
+Zeilen	Rows	Filas	Righe	Lignes
+Alle Zeilen	All rows	Todas las filas	Tutte le righe	Toutes les lignes
+Keine Zeile	No row	Ninguna fila	Nessuna riga	Aucune ligne
+Ausgelassene Spalten bleiben draußen; ausgelassene Zeilen kommen beim Aktualisieren wieder dazu.	Columns left out stay out; rows left out come back when the data is refreshed.	Las columnas omitidas quedan fuera; las filas omitidas vuelven al actualizar los datos.	Le colonne escluse restano fuori; le righe escluse tornano quando i dati vengono aggiornati.	Les colonnes omises restent exclues ; les lignes omises reviennent lors de l'actualisation des données.
+Eindeutigen Bezeichner festlegen	Set the unique identifier	Establecer el identificador único	Impostare l'identificatore univoco	Définir l'identificateur unique
+Mit einem eindeutigen Bezeichner erkennt das Aktualisieren die Zeilen wieder, auch wenn sich ihre Reihenfolge in der Quelle ändert.	With a unique identifier, a refresh recognizes the rows again even when their order in the source changes.	Con un identificador único, la actualización reconoce las filas aunque cambie su orden en el origen.	Con un identificatore univoco l'aggiornamento riconosce le righe anche se il loro ordine nell'origine cambia.	Avec un identificateur unique, l'actualisation reconnaît les lignes même si leur ordre change dans la source.
+Zeilen werden anhand der Werte dieser Spalten identifiziert:	Rows are identified by the values of these columns:	Las filas se identifican por los valores de estas columnas:	Le righe sono identificate dai valori di queste colonne:	Les lignes sont identifiées par les valeurs de ces colonnes :
+{} (empfohlen)	{} (recommended)	{} (recomendado)	{} (consigliato)	{} (recommandé)
+Zeilen werden anhand ihrer Reihenfolge identifiziert	Rows are identified by their order	Las filas se identifican por su orden	Le righe sono identificate dal loro ordine	Les lignes sont identifiées par leur ordre
+Einige Zeilen haben in diesen Spalten dieselben Werte: sie werden beim Aktualisieren nicht sicher wiedererkannt.	Some rows have the same values in these columns: a refresh cannot reliably recognize them.	Algunas filas tienen los mismos valores en estas columnas: la actualización no puede reconocerlas con seguridad.	Alcune righe hanno gli stessi valori in queste colonne: l'aggiornamento non può riconoscerle con certezza.	Certaines lignes ont les mêmes valeurs dans ces colonnes : l'actualisation ne peut pas les reconnaître de façon sûre.
+Werden in der Quelle Zeilen eingefügt, gelöscht oder umsortiert, passen die Verknüpfungen danach nicht mehr.	If rows are inserted, deleted or reordered in the source, the links no longer fit afterwards.	Si se insertan, eliminan o reordenan filas en el origen, los vínculos dejan de coincidir.	Se nell'origine si inseriscono, eliminano o riordinano righe, i collegamenti non corrispondono più.	Si des lignes sont insérées, supprimées ou réordonnées dans la source, les liens ne correspondent plus.
+Wählen Sie mindestens eine Spalte aus.	Select at least one column.	Seleccione al menos una columna.	Selezionare almeno una colonna.	Sélectionnez au moins une colonne.
+Wählen Sie eine Datei aus.	Select a file.	Seleccione un archivo.	Selezionare un file.	Sélectionnez un fichier.
+Benutzerdefinierter Bereich	Custom range	Rango personalizado	Intervallo personalizzato	Plage personnalisée
+Diese Datei darf nicht gelesen werden: wählen Sie sie über „Durchsuchen...“ aus.	This file may not be read: select it with “Browse...”.	Este archivo no se puede leer: selecciónelo con «Examinar...».	Questo file non può essere letto: selezionarlo con “Sfoglia...”.	Ce fichier ne peut pas être lu : sélectionnez-le avec « Parcourir... ».
+Die Datei ist nicht vorhanden.	The file does not exist.	El archivo no existe.	Il file non esiste.	Le fichier n'existe pas.
+Tragen Sie einen Bereich mit Blatt ein, z. B. Tabelle1!A1:C9.	Enter a range with its sheet, e.g. Sheet1!A1:C9.	Escriba un rango con su hoja, p. ej. Hoja1!A1:C9.	Immettere un intervallo con il foglio, ad es. Foglio1!A1:C9.	Saisissez une plage avec sa feuille, par ex. Feuil1!A1:C9.
+Hier stehen keine Daten.	There is no data here.	Aquí no hay datos.	Qui non ci sono dati.	Il n'y a pas de données ici.
+Wählen Sie eine Spalte als Bezeichner oder die Reihenfolge der Zeilen.	Choose a column as the identifier, or the order of the rows.	Elija una columna como identificador o el orden de las filas.	Scegliere una colonna come identificatore o l'ordine delle righe.	Choisissez une colonne comme identificateur ou l'ordre des lignes.
+Datenquelle „{}“ importiert	Data source “{}” imported	Origen de datos «{}» importado	Origine dati “{}” importata	Source de données « {} » importée
+Die Daten lassen sich nicht importieren: {}	The data cannot be imported: {}	No se pueden importar los datos: {}	Impossibile importare i dati: {}	Impossible d'importer les données : {}
+Zeile {}	Row {}	Fila {}	Riga {}	Ligne {}
+{} Zeilen	{} rows	{} filas	{} righe	{} lignes
+Zeile {} ist verknüpft	Row {} is linked	La fila {} está vinculada	La riga {} è collegata	La ligne {} est liée
+Benutzerdefinierter Import holt die Zeilen einer Excel-Arbeitsmappe oder einer Textdatei hierher. Auf die Seite gezogen, werden sie mit Shapes verknüpft.	Custom Import brings the rows of an Excel workbook or a text file here. Dragged onto the page, they are linked to shapes.	Importación personalizada trae aquí las filas de un libro de Excel o de un archivo de texto. Al arrastrarlas a la página, se vinculan con formas.	Importazione personalizzata porta qui le righe di una cartella di lavoro di Excel o di un file di testo. Trascinate sulla pagina, vengono collegate alle forme.	Importation personnalisée apporte ici les lignes d'un classeur Excel ou d'un fichier texte. Glissées sur la page, elles sont liées à des formes.
+Keine Datenquelle	No data source	Ningún origen de datos	Nessuna origine dati	Aucune source de données
+Zeile mit Shape verknüpfen	Link row to shape	Vincular fila con forma	Collega riga a forma	Lier la ligne à la forme
+Zeile mit „{}“ verknüpft	Row linked to “{}”	Fila vinculada con «{}»	Riga collegata a “{}”	Ligne liée à « {} »
+Die Zeile lässt sich nicht verknüpfen: {}	The row cannot be linked: {}	No se puede vincular la fila: {}	Impossibile collegare la riga: {}	Impossible de lier la ligne : {}
+Shape aus Zeile erstellen	Create shape from row	Crear forma a partir de fila	Crea forma da riga	Créer une forme à partir d'une ligne
+Shapes aus Zeilen erstellen	Create shapes from rows	Crear formas a partir de filas	Crea forme da righe	Créer des formes à partir de lignes
+Shape aus Zeile erstellt	Shape created from row	Forma creada a partir de fila	Forma creata da riga	Forme créée à partir d'une ligne
+{} Shapes aus Zeilen erstellt	{} shapes created from rows	{} formas creadas a partir de filas	{} forme create da righe	{} formes créées à partir de lignes
+Die Shapes lassen sich nicht erstellen: {}	The shapes cannot be created: {}	No se pueden crear las formas: {}	Impossibile creare le forme: {}	Impossible de créer les formes : {}
+Datenquelle „{}“ entfernen? Die verknüpften Shapes behalten ihre Shape-Daten.	Remove data source “{}”? The linked shapes keep their shape data.	¿Quitar el origen de datos «{}»? Las formas vinculadas conservan sus datos de forma.	Rimuovere l'origine dati “{}”? Le forme collegate mantengono i loro dati forma.	Supprimer la source de données « {} » ? Les formes liées conservent leurs données de forme.
+Eine andere Datenquelle hat diesen Namen schon.	Another data source already has this name.	Otro origen de datos ya tiene este nombre.	Un'altra origine dati ha già questo nome.	Une autre source de données porte déjà ce nom.
+Name der Datenquelle	Data source name	Nombre del origen de datos	Nome dell'origine dati	Nom de la source de données
+Die Datenquelle gibt es nicht mehr.	The data source no longer exists.	El origen de datos ya no existe.	L'origine dati non esiste più.	La source de données n'existe plus.
+Datentyp	Data type	Tipo de datos	Tipo di dati	Type de données
+Name und Datentyp gelten für die Shape-Daten, die das Verknüpfen und das Aktualisieren schreiben.	The name and data type apply to the shape data that linking and refreshing write.	El nombre y el tipo de datos se aplican a los datos de forma que escriben la vinculación y la actualización.	Il nome e il tipo di dati valgono per i dati forma scritti dal collegamento e dall'aggiornamento.	Le nom et le type de données s'appliquent aux données de forme écrites par la liaison et l'actualisation.

@@ -336,13 +336,15 @@ fn run(app: &mut Diagrammer, ui: &mut Ui) {
             continue;
         };
         let source = data::source_of(&o.doc.data, set);
+        // (JD18) the columns the import kept (the Command's list)
+        let cols = data_source::recordset_columns(&o.doc.data, set);
         let name = set.name.clone();
         if !refreshable(&o.doc.data, set) {
             note(app, tf("„{}“ lässt sich nicht aktualisieren.", &[&name]));
             app.drefresh.queue.remove(0);
             continue;
         }
-        match data_source::read(&source) {
+        match data_source::read_columns(&source, &cols) {
             Ok(l) => {
                 apply(app, ui, rs, None, l);
                 app.drefresh.queue.remove(0);
@@ -395,10 +397,10 @@ fn failed(app: &mut Diagrammer, name: &str, msg: &str) {
 fn located(app: &mut Diagrammer, ui: &mut Ui, rs: u32, path: &str) {
     let found = app.opened.as_ref().and_then(|o| {
         let set = o.doc.recordset(rs)?;
-        Some((moved(&data::source_of(&o.doc.data, set), path), set.name.clone()))
+        Some((moved(&data::source_of(&o.doc.data, set), path), set.name.clone(), data_source::recordset_columns(&o.doc.data, set)))
     });
-    if let Some((source, name)) = found {
-        match data_source::read(&source) {
+    if let Some((source, name, cols)) = found {
+        match data_source::read_columns(&source, &cols) {
             Ok(l) => apply(app, ui, rs, Some(path), l),
             Err(ReadError::Invalid(m)) => failed(app, &name, &m),
             Err(_) => failed(app, &name, t("Die Datei lässt sich nicht lesen.")),
