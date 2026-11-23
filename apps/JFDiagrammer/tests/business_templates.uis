@@ -54,6 +54,9 @@ expect button:"Blockdiagramm" exists
 click button:"Blockdiagramm"
 click button:"Beispiel: System"
 click button:"Erstellen"
+# (JD15) the fishbone has changes: the question before it goes
+expect dialog:"Änderungen speichern" exists
+click button:"Nicht speichern"
 expect tab:"Blöcke" selected
 expect listitem:"Verarbeitung" rect 721 387 101 50
 expect listitem:"1D-Pfeil" rect 626 399 95 25

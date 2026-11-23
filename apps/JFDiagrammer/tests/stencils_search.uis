@@ -10,15 +10,16 @@ type "carreau"
 expect button:"Raute" exists
 expect button:"Rechteck" missing
 key esc
-# a German keyword of the ellipse, a stencil that is not open
+# a German keyword of the ellipse, a stencil that is not open (JD26: "kreis" finds a dozen
+# business shapes too, "oval" the ellipse only)
 focus #24577
-type "kreis"
+type "oval"
 expect button:"Ellipse" exists
 key esc
-# an English keyword without its accent, Spanish "rectángulo" without the accent
+# an English keyword without its accent, Spanish "rectángulo" without the accent (JD26: the
+# marketing diagrams have a Rechteck of their own, so the rounded one names the hit)
 focus #24577
 type "rectangulo"
-expect button:"Rechteck" exists
 expect button:"Abgerundetes Rechteck" exists
 key esc
 # nothing found
@@ -35,7 +36,7 @@ key esc
 # every word must match by default; with Optionen › Erweitert › "Shape-Suche: ein Wort genügt"
 # one is enough
 focus #24577
-type "zzzz kreis"
+type "zzzz oval"
 expect text:"Keine Shapes gefunden" exists
 key esc
 click tab:"Datei"
@@ -45,7 +46,7 @@ expect switch:"Shape-Suche: ein Wort genügt" unchecked
 click switch:"Shape-Suche: ein Wort genügt"
 click button:"Zurück"
 focus #24577
-type "zzzz kreis"
+type "zzzz oval"
 expect button:"Ellipse" exists
 key esc
 # "Shape-Suche anzeigen" off: no search box
