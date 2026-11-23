@@ -45722,7 +45722,8 @@ SHA-256 and SHA-384, and the Transcript keeps those two only
   a secret of the schedule (as long as the hash: 32 or 48 bytes)
 
 - **`fn expand_label(h: HashAlg, secret: &[u8], label: &str, context: &[u8], out: &mut [u8])`**
-  HKDF-Expand-Label(secret, label, context, len)
+  HKDF-Expand-Label(secret, label, context, len); `out` at most 255 blocks of the hash (panics
+  beyond)
 
 - **`fn derive(h: HashAlg, secret: &[u8], label: &str, hash: &[u8]) -> Secret`**
   Derive-Secret(secret, label, transcript hash)

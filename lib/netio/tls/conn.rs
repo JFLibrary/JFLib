@@ -1475,8 +1475,9 @@ impl Conn {
         if self.hrr && ext(&exts, EXT_COOKIE).is_some_and(|c| whole16(c).map(|v| v != self.cookie.as_slice()).unwrap_or(true)) {
             return Err(fail(AL_ILLEGAL_PARAMETER, "cookie"));
         }
-        // the client's order decides: the first group it lists that we have, with its share when
-        // it sent one, else a HelloRetryRequest for that group
+        // the client's order decides: the first group it lists that we have and sent a share of
+        // (a share of a later group spares the HelloRetryRequest); with no share of a group we
+        // have, a HelloRetryRequest for the first of them it lists
         let ours = |g: &u16| kx::known(*g);
         let pick = groups.iter().filter(|g| ours(g)).find_map(|g| shares.iter().find(|s| s.0 == *g)).copied();
         let Some((group, pk)) = pick else {

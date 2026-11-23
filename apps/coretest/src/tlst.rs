@@ -325,6 +325,19 @@ fn schedule(t: &mut T) {
     h.copy_from_slice(&hx("860c06edc07858ee8e78f0e7428c58edd6b43f2ca3e6e95f02ed063cf0e1cad8"));
     t.eq("c hs traffic", crypto::hex(&tls::keysched::derive(crypto::HashAlg::Sha256, &s.handshake, "c hs traffic", &h)), String::from("b3eddb126e067f35a780b3abf45e2d8f3b1a950738f52e9600746a0e27a55a21"));
     t.eq("s hs traffic", crypto::hex(&tls::keysched::derive(crypto::HashAlg::Sha256, &s.handshake, "s hs traffic", &h)), String::from("b67b7d690cc16c4e75e54213cb2d37b4e9c912bcded9105d42befd59d391ad38"));
+    // HKDF-Expand-Label up to its limit, 255 blocks of the hash (the counter's last value),
+    // the same as crypto's HKDF-Expand of the HkdfLabel (RFC 8446 7.1)
+    for (alg, n) in [(crypto::HashAlg::Sha256, 255 * 32), (crypto::HashAlg::Sha384, 255 * 48)] {
+        let mut ours = alloc::vec![0u8; n];
+        tls::keysched::expand_label(alg, &s.handshake, "long", b"ctx", &mut ours);
+        let info = [&(n as u16).to_be_bytes()[..], &[10], b"tls13 long", &[3], b"ctx"].concat();
+        let mut want = alloc::vec![0u8; n];
+        match alg {
+            crypto::HashAlg::Sha384 => crypto::hmac::hkdf_expand::<crypto::Sha384>(&s.handshake, &info, &mut want),
+            _ => crypto::hmac::hkdf_expand::<crypto::Sha256>(&s.handshake, &info, &mut want),
+        }
+        t.check(&format!("HKDF-Expand-Label: 255 blocks of {:?}", alg), ours == want);
+    }
 }
 
 fn certs(t: &mut T) {

@@ -12,8 +12,10 @@ use crypto::{HashAlg, Sha256, Sha384};
 /// a secret of the schedule (as long as the hash: 32 or 48 bytes)
 pub type Secret = Vec<u8>;
 
-/// HKDF-Expand (RFC 5869 2.3) with HMAC of `h`; `out` at most 255 blocks of the hash
+/// HKDF-Expand (RFC 5869 2.3) with HMAC of `h`; `out` at most 255 blocks of the hash (panics
+/// beyond, as crypto::hmac::hkdf_expand does: the block counter is one byte)
 fn expand(h: HashAlg, prk: &[u8], info: &[u8], out: &mut [u8]) {
+    assert!(out.len() <= 255 * h.len(), "hkdf: output too long");
     let mut t = Vec::new();
     for (i, part) in out.chunks_mut(h.len()).enumerate() {
         let mut m = core::mem::take(&mut t);
@@ -26,7 +28,8 @@ fn expand(h: HashAlg, prk: &[u8], info: &[u8], out: &mut [u8]) {
     crypto::zeroize(&mut t);
 }
 
-/// HKDF-Expand-Label(secret, label, context, len)
+/// HKDF-Expand-Label(secret, label, context, len); `out` at most 255 blocks of the hash (panics
+/// beyond)
 pub fn expand_label(h: HashAlg, secret: &[u8], label: &str, context: &[u8], out: &mut [u8]) {
     let full = [b"tls13 ", label.as_bytes()].concat();
     let mut info = Vec::with_capacity(4 + full.len() + context.len());
