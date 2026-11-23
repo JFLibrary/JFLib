@@ -2637,8 +2637,29 @@ Grundbausteine am falschen Ort oder mehrfach:
 
 Crates, die einer JF-App folgen:
 
-- **P2** · *fehlt* · `pdf` schreibt nur (der Export von JFDiagrammer und jfWord). Es fehlen
-  Lesen und Anzeigen, Formulare, Verschlüsselung, PDF/A und Signaturen.
+- **P2** · *teilweise* (2026-11-23, U15) · `pdf`: Lesen ist da ([`pdf/src/read/`](../lib/pdf/src/read/mod.rs),
+  `pdf::read::Document`). PDF 1.0 bis 2.0 mit klassischen Tabellen, Querverweis- und Objektströmen,
+  inkrementellen Updates und hybriden Dateien; beschädigte, abgeschnittene und Dateien ohne Tabelle
+  werden aus ihren Objekten neu aufgebaut. Verschlüsselung mit dem Standard-Handler (RC4 40 bis
+  128 Bit, AES-128, AES-256, Revisionen 2 bis 6), Benutzer- und Eigentümerpasswort. Die Filter
+  außer den Bildfiltern (Flate auch roh und bis zur Beschädigung, LZW, ASCIIHex, ASCII85,
+  RunLength, PNG- und TIFF-Prädiktoren). Der Text jeder Seite mit der Position jeder Glyphe und
+  als Zeilen in Lesereihenfolge wie `pdftotext -raw` (ToUnicode, Kodierungen und Glyphennamen über
+  die Adobe Glyph List, Type-0-, Type-3- und die 14 Standardschriften mit ihren Breiten,
+  Form-XObjects, Hebräisch und Arabisch in Lesereihenfolge); Information, XMP, Lesezeichen mit
+  benannten Zielen, Links und andere Anmerkungen, Seitenbeschriftungen, die Felder des Formulars
+  mit Werten, Signaturfelder (wie angegeben, nicht geprüft), Anhänge (ZUGFeRD / Factur-X).
+  Geprüft mit `tools/pdf_read_check.py` gegen Poppler: 63 von 63 Dateien gleich (Seiten, Größen,
+  Titel, Verschlüsselung, Anhänge, die Wörter jeder Seite; eine Tabelle, bei der Poppler zwei Zellen
+  zusammenzieht, ist begründet ausgenommen): eigene Proben aller Strukturen, beschädigte Dateien,
+  die Verschlüsselungen von Ghostscript und LibreOffice und eigene in allen Revisionen, Ghostscript,
+  LibreOffice (Writer und Calc), cairo, Manpages über groff, die PDFs des Systems; in
+  `pdftest --only read_*` (411 Prüfungen, auch 1600 Mutationen) und mit 45 000 Mutationen der
+  Dateien ohne Absturz und ohne Zeitüberschreitung. Etwa so schnell wie `pdftotext` (die 97 Seiten
+  der bash-Manpage in 0,14 s) bei einem Drittel des Speichers. Offen: Anzeigen (Seiten zeichnen:
+  Bilder und ihre Filter, Shadings, die Umrisse der Glyphen), Formulare ausfüllen und schreiben,
+  Verschlüsselung, PDF/A und Signaturen beim Schreiben, Signaturen prüfen, die vordefinierten
+  CMaps Ostasiens außer Identity und den Unicode-CMaps.
 - **P2** · *fehlt* · `physics` hat Kollisionen und einen Charakter-Controller nach Quake 3, was
   Spiel 1 braucht; es fehlen Starrkörper-Dynamik, Gelenke und ein Solver.
 - **P2** · *erledigt* (2026-11-21, U7) · `installer`: Die Seiten sprechen die Sprache des

@@ -114,8 +114,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
-- [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
-  <br>[lib.rs](#pdf-crate-root) · [src/canvas.rs](#pdfsrccanvasrs) · [src/font.rs](#pdfsrcfontrs) · [src/geom.rs](#pdfsrcgeomrs) · [src/image.rs](#pdfsrcimagers) · [src/shading.rs](#pdfsrcshadingrs)
+- [pdf](#pdf) -- PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments)
+  <br>[lib.rs](#pdf-crate-root) · [src/canvas.rs](#pdfsrccanvasrs) · [src/font.rs](#pdfsrcfontrs) · [src/geom.rs](#pdfsrcgeomrs) · [src/image.rs](#pdfsrcimagers) · [src/read/mod.rs](#pdfsrcreadmodrs) · [src/read/content.rs](#pdfsrcreadcontentrs) · [src/read/nav.rs](#pdfsrcreadnavrs) · [src/read/object.rs](#pdfsrcreadobjectrs) · [src/read/text.rs](#pdfsrcreadtextrs) · [src/shading.rs](#pdfsrcshadingrs)
 - [diagram_view](#diagram_view) -- draws diagram pages (the display list of diagram_core) on render2d and gfx
   <br>[src/export/mod.rs](#diagram_viewsrcexportmodrs) · [src/export/pdf.rs](#diagram_viewsrcexportpdfrs) · [src/export/raster.rs](#diagram_viewsrcexportrasterrs) · [src/export/svg.rs](#diagram_viewsrcexportsvgrs) · [src/fonts.rs](#diagram_viewsrcfontsrs) · [src/image.rs](#diagram_viewsrcimagers) · [src/measure.rs](#diagram_viewsrcmeasurers) · [src/view.rs](#diagram_viewsrcviewrs)
 - [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
@@ -43584,6 +43584,11 @@ distance ring buffer and the static dictionary with its 121 transforms (tab.rs, 
 tools/gen_brotli_dict.py).  The output is bounded by max_out before it grows, every
 distance is checked against the output so far.  Large windows (an extension outside RFC
 7932) are refused.
+
+The bit reader holds up to 63 bits in a register, refilled eight bytes at a time (byte by
+byte near the end).  A prefix code is a table of its first 8 bits (fewer for short codes)
+and second-level tables for the longer ones, so a symbol takes one or two lookups; reading
+past the end fails exactly where reading bit by bit would.
 ```
 
 ```rust
@@ -43650,6 +43655,11 @@ literals, commands and distances, and then per command: the insert-and-copy code
 extra bits, each literal, the distance.  The largest step is a prefix code of 704 symbols,
 well under a kilobyte.  Copies and uncompressed meta-blocks go out in pieces as the
 caller takes them.
+
+While the input surely holds the next part of a command (CMD_BITS, LIT_BITS, DIST_BITS:
+the most a part can read) and the output has room for it, Core::fast runs whole commands
+without the steps and their restarts; it stops in a state the steps go on from, so a call
+ends where the steps alone would end it.
 
 The output goes into a window of the stream's size ((1 << WBITS) - 16, at most 16 MiB):
 it keeps that much of the output, as far as a distance may reach, and moves when it holds
@@ -62565,7 +62575,7 @@ callback such as a window procedure: core panics once more there, with one of NO
 
 ## pdf
 
-*vector PDF writer with embedded font subsets, links and outlines* -- crate root [`lib/pdf/src/lib.rs`](../lib/pdf/src/lib.rs)
+*PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments)* -- crate root [`lib/pdf/src/lib.rs`](../lib/pdf/src/lib.rs)
 
 ```text
 pdf -- a vector PDF writer: pages of their own size drawn on a canvas (paths, fills with the
@@ -62576,7 +62586,8 @@ FlateDecode and their alpha as a soft mask), text in embedded TrueType / OpenTyp
 (CID fonts with Identity-H, ToUnicode for search and copy, glyphs and widths from the
 library's shaping), links to URIs and to places in the document, nested outlines
 (bookmarks), the document information and XMP metadata.  PDF 1.7 with a classic xref table;
-the same document always gives the same bytes.  Not here: PDF/A, encryption, forms.
+the same document always gives the same bytes.  Not here: PDF/A, encryption, forms.  And a
+reader, pdf::read: structure, encryption, text, outlines, forms, attachments (below).
 
   let mut doc = Document::new();
   let page = doc.add_page(A4.0, A4.1);              // points (1/72 inch); mm(210.0) converts
@@ -62624,6 +62635,11 @@ alpha a luminosity soft mask (a transparency group painting the alphas as a Devi
 in the same user space).  Degenerate gradients paint the last stop's colour as SVG does.
 Hatches are clipped, stroked lines in one path, not tiling patterns (pdfium shows seams between
 rotated pattern cells, and readers round the cell step to device pixels).
+
+Reading: pdf::read (read/mod.rs) opens PDF files of every version, also encrypted and damaged
+ones, and gives their objects, pages, text with the position of every glyph, information,
+outlines, links and other annotations, form fields, attachments and page labels.  It shares
+Info and Date with the writer and nothing else.
 ```
 
 ### `pdf` crate root
@@ -63046,6 +63062,410 @@ FlateDecode with PNG predictors and their alpha as a soft mask (SMask)
   width and height in pixels
 - **`fn is_jpeg(&self) -> bool`**
 - **`fn has_alpha(&self) -> bool`**
+
+### `pdf/src/read/mod.rs`
+
+Source: [`lib/pdf/src/read/mod.rs`](../lib/pdf/src/read/mod.rs)
+
+```text
+pdf::read -- a PDF reader: the objects of a file, its pages, information, outlines, links and
+other annotations, form fields, attachments, page labels and the text of each page with
+where each glyph stands.  PDF 1.0 to 2.0: classic cross-reference tables and cross-reference
+streams, object streams, incremental updates, hybrid files; files whose table is missing or
+wrong are rebuilt from their objects, as the common readers do.  Encrypted files with the
+standard security handler open with their password, or without one when only the owner
+password is set (RC4 40 to 128 bit, AES-128, AES-256).
+
+  let doc = read::Document::open(bytes)?;            // or open_with(bytes, &Options { password, .. })
+  for i in 0..doc.page_count() {
+      let text = doc.text(i)?;                       // the page's text in reading order
+      let size = doc.page(i)?.size();                // points, after /Rotate
+  }
+  let info = doc.info();                             // pdf::Info: title, author, dates, ...
+  for o in doc.outlines() { .. }                     // bookmarks with their Action
+
+  Document     open / open_with, version, is_encrypted / permissions / opened_as_owner,
+               was_repaired, trailer / catalog, get(Ref) / resolve, decode(Stream) /
+               decode_until_image, page_count / page / pages / contents, info / metadata /
+               language, outlines, named_dest, annotations / links, fields, attachments,
+               page_label, page_text (glyphs with positions) / text
+  Object       Null, Bool, Int, Real, String, Name, Array, Dict, Stream, Ref; text_string
+  Ops          the operators of a content stream with their operands (content::Op)
+
+Untrusted input: a damaged or hostile file gives an Error or less than it claims, never a
+panic, a hang or memory without end.  Nesting, the objects of one parse, the depth of
+references, page trees, outlines and form XObjects are bounded; every decoded stream is at
+most Options::max_stream bytes.  Permissions are reported, not enforced: what a program
+allows its user to do with the document is its own decision.
+
+Not here: drawing pages (the images, the shading and the glyphs' outlines), the image
+filters (DCT, JPX, JBIG2, CCITTFax: decode_until_image stops before them), the predefined
+CMaps of East Asian fonts other than Identity and the Unicode ones, verifying signatures,
+changing and saving documents.
+```
+
+- **`struct Options`**
+  how a document is opened
+  - `password: String` -- the user or the owner password ("" for files without one)
+  - `max_stream: usize` -- the largest decoded stream, in bytes (a content stream, an image, an attachment)
+
+- **`enum Error`**
+  why a document or a part of it cannot be read
+  - `NotPdf` -- not a PDF file: no header and no objects
+  - `Damaged(&'static str)` -- the file is damaged where it was needed
+  - `Password` -- encrypted, and the password is missing or wrong
+  - `Unsupported(&'static str)` -- something this reader does not do (a security handler other than the standard one, an
+    image filter)
+  - `Limit(&'static str)` -- more than the Options allow
+  - `NoPage` -- a page number past the last page
+
+- **`struct Page`**
+  a page: its boxes (points, PDF page space with y up), rotation and dictionaries
+  - `obj: Option<Ref>` -- the page object
+  - `media_box: [f64; 4]` -- x0, y0, x1, y1
+  - `crop_box: [f64; 4]` -- the visible part (the media box when the page sets none)
+  - `rotate: u16` -- clockwise when shown: 0, 90, 180 or 270
+  - `user_unit: f64` -- the size of a unit in points (PDF 1.6; usually 1)
+  - `dict: Dict` -- the page dictionary, and its resources (inherited ones included)
+  - `resources: Dict`
+
+**`impl Page`**
+
+- **`fn size(&self) -> (f64, f64)`**
+  width and height of the crop box in points as the page is shown (after /Rotate)
+
+- **`struct Document`**
+  a PDF document opened for reading
+
+**`impl Document`**
+
+- **`fn open(data: Vec<u8>) -> Result<Document, Error>`**
+  open a document without a password
+- **`fn open_with(data: Vec<u8>, opt: &Options) -> Result<Document, Error>`**
+- **`fn version(&self) -> (u8, u8)`**
+  the version of the header, or of the catalog's /Version when that is newer
+- **`fn is_encrypted(&self) -> bool`**
+- **`fn permissions(&self) -> Option<u32>`**
+  the permission bits /P of an encrypted file (ISO 32000-1, Table 22: bit 3 print, 4
+  modify, 5 copy text and graphics, 6 annotate, 9 fill in forms, 10 extract for
+  accessibility, 11 assemble, 12 print in high quality; counted from 1)
+- **`fn encryption_revision(&self) -> Option<u8>`**
+  the revision of the standard security handler (2 to 6) of an encrypted file
+- **`fn opened_as_owner(&self) -> bool`**
+  the password given was the owner password
+- **`fn was_repaired(&self) -> bool`**
+  the cross-reference was rebuilt from the objects of the file
+- **`fn trailer(&self) -> &Dict`**
+- **`fn catalog(&self) -> Dict`**
+  the document catalog (empty when there is none)
+- **`fn data(&self) -> &[u8]`**
+  the raw bytes of the file
+- **`fn get(&self, r: Ref) -> Object`**
+  an indirect object (Null when it is missing, as ISO 32000 has it)
+- **`fn resolve(&self, o: &Object) -> Object`**
+  follow references until an object that is none (Null after too many)
+- **`fn decode(&self, s: &Stream) -> Result<Vec<u8>, Error>`**
+  a stream's data with all its filters applied (an image filter is Error::Unsupported)
+- **`fn decode_until_image(&self, s: &Stream) -> Result<(Vec<u8>, Option<(Name, Dict)>), Error>`**
+  a stream's data with its filters applied up to an image filter: the data, and the image
+  filter with its parameters (DCTDecode is a JPEG file then, JPXDecode a JPEG 2000 one)
+- **`fn page_count(&self) -> usize`**
+- **`fn pages(&self) -> &[Page]`**
+- **`fn page(&self, i: usize) -> Result<&Page, Error>`**
+- **`fn page_of(&self, r: Ref) -> Option<usize>`**
+  the page a page object is (for destinations)
+- **`fn contents(&self, i: usize) -> Result<Vec<u8>, Error>`**
+  the content of a page: its content streams decoded and joined (a stream that cannot be
+  decoded adds nothing)
+- **`fn info(&self) -> Info`**
+  the document information (the Info dictionary; dates as the file writes them)
+- **`fn metadata(&self) -> Option<Vec<u8>>`**
+  the XMP metadata of the document (the catalog's /Metadata stream)
+- **`fn language(&self) -> Option<String>`**
+  the natural language of the document (/Lang: "de-DE")
+
+- **`fn parse_date(s: &str) -> Option<Date>`**
+  a date of a PDF file (7.9.4: "D:YYYYMMDDHHmmSSOHH'mm'"; every part after the year may be
+  missing, as may "D:")
+
+### `pdf/src/read/content.rs`
+
+Source: [`lib/pdf/src/read/content.rs`](../lib/pdf/src/read/content.rs)
+
+```text
+The operators of a content stream (ISO 32000-1, 7.8.2): operands, then the operator.  An
+inline image (BI ... ID data EI) comes as one operator "BI" with two operands, its
+dictionary and its data.  Damaged content gives what can be read: an unknown token is skipped,
+operands beyond MAX_OPERANDS are dropped, and the stream ends where the bytes end.
+```
+
+- **`struct Op<'a>`**
+  one operator with its operands
+  - `operator: &'a [u8]` -- the operator: b"Tj", b"re", b"BI" (an inline image), ...
+  - `operands: Vec<Object>`
+
+- **`struct Ops<'a>`**
+  the operators of content-stream bytes, in order
+
+**`impl<'a> Ops<'a>`**
+
+- **`fn new(content: &'a [u8]) -> Ops<'a>`**
+
+### `pdf/src/read/nav.rs`
+
+Source: [`lib/pdf/src/read/nav.rs`](../lib/pdf/src/read/nav.rs)
+
+```text
+What a document holds besides its pages' content (ISO 32000-1, 12): the outline
+(bookmarks), destinations (explicit and named, through the /Dests dictionary or the name
+tree), actions, annotations with links, the fields of an interactive form with their values
+and signatures (read, not verified), embedded files and page labels.  Trees and lists are
+walked with a set of the objects seen and a budget, so a loop or a huge tree ends.
+```
+
+- **`enum View`**
+  how a destination shows its page (12.3.2.2); None keeps what the viewer has
+  - `Xyz { left: Option<f64>, top: Option<f64>, zoom: Option<f64> }`
+  - `Fit`
+  - `FitH(Option<f64>)`
+  - `FitV(Option<f64>)`
+  - `FitR([f64; 4])` -- left, bottom, right, top
+  - `FitB`
+  - `FitBH(Option<f64>)`
+  - `FitBV(Option<f64>)`
+
+- **`struct Dest`**
+  a place in the document: a page (counted from 0) and how it is shown
+  - `page: usize`
+  - `view: View`
+
+- **`enum Action`**
+  what an outline item or a link does (12.6.4)
+  - `GoTo(Dest)`
+  - `Uri(String)` -- a web address or other URI
+  - `GoToFile { file: String, page: Option<usize> }` -- a page of another PDF file (GoToR): the file, the page when given as a number
+  - `Launch(String)` -- start another file or program (Launch)
+  - `Named(String)` -- a viewer command (Named: NextPage, PrevPage, FirstPage, LastPage, ...)
+  - `Other(String)` -- any other kind of action (JavaScript, SubmitForm, ...), by its /S
+
+- **`struct Outline`**
+  an item of the outline, with its children
+  - `title: String`
+  - `action: Option<Action>`
+  - `open: bool` -- its children are shown
+  - `children: Vec<Outline>`
+
+- **`struct Annotation`**
+  an annotation of a page
+  - `subtype: String` -- /Subtype: Link, Text, Highlight, Widget, FileAttachment, ...
+  - `rect: [f64; 4]` -- x0, y0, x1, y1 in page space
+  - `contents: Option<String>` -- /Contents: the text of a note or comment
+  - `author: Option<String>` -- /T: the author of a markup annotation
+  - `modified: Option<Date>`
+  - `action: Option<Action>` -- a link's action (its /A, or its /Dest as GoTo)
+  - `obj: Option<Ref>`
+
+- **`enum FieldKind`**
+  a form field's kind (12.7.4)
+  - `Text`
+  - `CheckBox`
+  - `Radio`
+  - `PushButton`
+  - `ComboBox`
+  - `ListBox`
+  - `Signature`
+  - `Unknown` -- a field without /FT
+
+- **`struct Signature`**
+  a field's signature as the file states it (12.8): the signature is not verified
+  - `filter: String` -- /Filter and /SubFilter: Adobe.PPKLite, adbe.pkcs7.detached, ETSI.CAdES.detached, ...
+  - `sub_filter: String`
+  - `name: Option<String>` -- /Name, /Reason, /Location, /ContactInfo as given
+  - `reason: Option<String>`
+  - `location: Option<String>`
+  - `time: Option<Date>`
+  - `byte_range: Vec<(u64, u64)>` -- the byte ranges of the file the signature covers: (start, length) pairs
+  - `contents: Vec<u8>` -- the signature (a PKCS #7 / CMS structure for the usual kinds)
+  - `covers_file: bool` -- the ranges cover the whole file but the signature itself (later changes make it false)
+
+- **`struct Field`**
+  a field of the interactive form
+  - `name: String` -- the full name: the partial names of its parents and its own, with dots
+  - `kind: FieldKind`
+  - `value: Vec<String>` -- the value: text, the chosen option(s), a button's state ("Off" when not checked)
+  - `flags: u32` -- /Ff
+  - `read_only: bool`
+  - `required: bool`
+  - `options: Vec<String>` -- the options of a choice field, as shown
+  - `widgets: Vec<(Option<usize>, [f64; 4])>` -- the widgets: the page (when known) and the rectangle
+  - `signature: Option<Signature>` -- for a signature field with a value
+
+- **`struct Attachment`**
+  a file embedded in the document (7.11.4)
+  - `name: String` -- the file name (/UF, else /F)
+  - `description: Option<String>`
+  - `mime: Option<String>` -- /Subtype of the file stream: a MIME type ("text/xml")
+  - `size: Option<u64>`
+  - `modified: Option<Date>`
+  - `relationship: Option<String>` -- /AFRelationship (PDF/A-3, ZUGFeRD: Data, Source, Alternative, ...)
+  - `stream: Option<Stream>` -- the data: Document::decode(&stream)
+
+**`impl Document`**
+
+- **`fn named_dest(&self, name: &str) -> Option<Dest>`**
+  a named destination ("chapter1")
+- **`fn outlines(&self) -> Vec<Outline>`**
+  the outline (bookmarks)
+- **`fn annotations(&self, page: usize) -> Result<Vec<Annotation>, Error>`**
+  the annotations of a page
+- **`fn links(&self, page: usize) -> Result<Vec<([f64; 4], Action)>, Error>`**
+  the links of a page: (rectangle, action)
+- **`fn fields(&self) -> Vec<Field>`**
+  the fields of the interactive form (the AcroForm), terminal fields only
+- **`fn attachments(&self) -> Vec<Attachment>`**
+  the embedded files: the /EmbeddedFiles name tree, then file attachment annotations
+- **`fn page_label(&self, page: usize) -> Option<String>`**
+  a page's label (12.4.2: "iv", "A-3"); None when the document sets no labels
+
+### `pdf/src/read/object.rs`
+
+Source: [`lib/pdf/src/read/object.rs`](../lib/pdf/src/read/object.rs)
+
+```text
+The objects of a PDF file as the reader gives them (ISO 32000-1, 7.3): null, booleans,
+integers, reals, strings (bytes; text strings are decoded by text_string), names, arrays,
+dictionaries, streams and references to indirect objects.  A stream holds its dictionary and
+where its data lies in the file; Document::decode gives the data with the filters applied.
+```
+
+- **`struct Ref`**
+  a reference to an indirect object: its number and generation
+  - `num: u32`
+  - `generation: u16`
+
+- **`struct Name(pub Vec<u8>)`**
+  a name (/Type): its bytes with #xx escapes resolved
+
+**`impl Name`**
+
+- **`fn as_bytes(&self) -> &[u8]`**
+- **`fn to_text(&self) -> String`**
+  the name as text (bytes that are not UTF-8 become U+FFFD)
+
+- **`struct Dict(pub(crate) BTreeMap<Name, Object>)`**
+  a dictionary; a key given twice keeps its last value
+
+**`impl Dict`**
+
+- **`fn new() -> Dict`**
+- **`fn get(&self, key: &str) -> Option<&Object>`**
+  the value of a key (without the slash: "Type")
+- **`fn get_bytes(&self, key: &[u8]) -> Option<&Object>`**
+- **`fn contains(&self, key: &str) -> bool`**
+- **`fn insert(&mut self, key: &str, value: Object)`**
+- **`fn len(&self) -> usize`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn iter(&self) -> impl Iterator<Item = (&Name, &Object)>`**
+- **`fn name(&self, key: &str) -> Option<&[u8]>`**
+  the name under a key (Type, Subtype, ...), if it is one
+- **`fn is(&self, key: &str, v: &str) -> bool`**
+  a key whose value is the name `v`
+- **`fn int(&self, key: &str) -> Option<i64>`**
+- **`fn num(&self, key: &str) -> Option<f64>`**
+
+- **`struct Stream`**
+  a stream: its dictionary, and where its (still encoded) data lies in the file
+  - `dict: Dict`
+
+**`impl Stream`**
+
+- **`fn raw_len(&self) -> usize`**
+  the number of encoded bytes
+
+- **`enum Object`**
+  one object of a PDF file
+  - `Null`
+  - `Bool(bool)`
+  - `Int(i64)`
+  - `Real(f64)`
+  - `String(Vec<u8>)` -- a string's bytes (decrypted); text strings decode with text_string
+  - `Name(Name)`
+  - `Array(Vec<Object>)`
+  - `Dict(Dict)`
+  - `Stream(alloc::boxed::Box<Stream>)` -- boxed: keeps every object at 32 bytes
+  - `Ref(Ref)`
+
+**`impl Object`**
+
+- **`fn name(s: &str) -> Object`**
+- **`fn is_null(&self) -> bool`**
+- **`fn as_bool(&self) -> Option<bool>`**
+- **`fn as_int(&self) -> Option<i64>`**
+  an integer, or a real that is one (some writers put 1.0 where an integer belongs)
+- **`fn as_f64(&self) -> Option<f64>`**
+  a number
+- **`fn as_name(&self) -> Option<&[u8]>`**
+- **`fn as_bytes(&self) -> Option<&[u8]>`**
+  a string's bytes
+- **`fn as_array(&self) -> Option<&[Object]>`**
+- **`fn as_dict(&self) -> Option<&Dict>`**
+  a dictionary, or a stream's dictionary
+- **`fn as_stream(&self) -> Option<&Stream>`**
+- **`fn as_ref(&self) -> Option<Ref>`**
+- **`fn as_rect(&self) -> Option<[f64; 4]>`**
+  a rectangle [x0 y0 x1 y1], normalized so that x0 &lt;= x1 and y0 &lt;= y1
+
+- **`fn text_string(b: &[u8]) -> String`**
+  a text string (7.9.2.2) as text: UTF-16BE after FE FF, UTF-16LE after FF FE (seen in the
+  wild), UTF-8 after EF BB BF (PDF 2.0), else PDFDocEncoding
+
+### `pdf/src/read/text.rs`
+
+Source: [`lib/pdf/src/read/text.rs`](../lib/pdf/src/read/text.rs)
+
+```text
+The text of a page (ISO 32000-1, 9.4): the content stream is interpreted for its text
+state (fonts, sizes, the text and line matrices, character and word spacing, horizontal
+scaling, rise, the current transformation matrix with q / Q and cm, form XObjects with their
+own matrix and resources), and every glyph shown becomes a TextItem with its text, origin and
+advance in page space.  PageText::text lays them out as Poppler's pdftotext -raw does: in the
+order the page draws them, a new line where the baseline moves by more than half the font
+size, a space where a gap is wider than 0.15 of it (0.08 after a space glyph; a space glyph
+that leaves no gap is no space; a glyph without text leaves a gap), a glyph drawn again on
+one of the last 64 (fake bold, a word printed twice) once, a run of Hebrew or Arabic drawn
+left to right in reading order.
+```
+
+- **`struct TextItem`**
+  one glyph shown on a page
+  - `text: String` -- the characters the glyph stands for (usually one; empty when the font does not say)
+  - `x: f64` -- where the glyph starts on its baseline, in page space (points, y up, before /Rotate)
+  - `y: f64`
+  - `dx: f64` -- how far the glyph moves the pen, in page space (along the baseline; with character and
+    word spacing)
+  - `dy: f64`
+  - `width: f64` -- the glyph's own width along the baseline in page space (without the spacing)
+  - `size: f64` -- the font size in page space
+  - `font: u16` -- which of PageText::fonts
+  - `invisible: bool` -- render mode 3: drawn invisibly (the text layer of a scan)
+
+- **`struct PageText`**
+  the glyphs of a page and the names of their fonts
+  - `items: Vec<TextItem>`
+  - `fonts: Vec<String>`
+
+**`impl Document`**
+
+- **`fn page_text(&self, page: usize) -> Result<PageText, Error>`**
+  the glyphs of a page, in the order the page draws them
+- **`fn text(&self, page: usize) -> Result<String, Error>`**
+  the text of a page in reading order (PageText::text)
+
+**`impl PageText`**
+
+- **`fn text(&self) -> String`**
+  the text: lines in the order the page draws them, words apart where the glyphs are,
+  right-to-left runs in reading order
 
 ### `pdf/src/shading.rs`
 

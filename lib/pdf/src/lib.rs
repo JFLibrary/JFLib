@@ -6,7 +6,8 @@
 // (CID fonts with Identity-H, ToUnicode for search and copy, glyphs and widths from the
 // library's shaping), links to URIs and to places in the document, nested outlines
 // (bookmarks), the document information and XMP metadata.  PDF 1.7 with a classic xref table;
-// the same document always gives the same bytes.  Not here: PDF/A, encryption, forms.
+// the same document always gives the same bytes.  Not here: PDF/A, encryption, forms.  And a
+// reader, pdf::read: structure, encryption, text, outlines, forms, attachments (below).
 //
 //   let mut doc = Document::new();
 //   let page = doc.add_page(A4.0, A4.1);              // points (1/72 inch); mm(210.0) converts
@@ -54,6 +55,11 @@
 // in the same user space).  Degenerate gradients paint the last stop's colour as SVG does.
 // Hatches are clipped, stroked lines in one path, not tiling patterns (pdfium shows seams between
 // rotated pattern cells, and readers round the cell step to device pixels).
+//
+// Reading: pdf::read (read/mod.rs) opens PDF files of every version, also encrypted and damaged
+// ones, and gives their objects, pages, text with the position of every glyph, information,
+// outlines, links and other annotations, form fields, attachments and page labels.  It shares
+// Info and Date with the writer and nothing else.
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -65,6 +71,7 @@ mod font;
 mod geom;
 mod image;
 mod obj;
+pub mod read;
 mod shading;
 mod write;
 

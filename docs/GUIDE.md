@@ -1724,6 +1724,13 @@ ui.dialog_end(); // always
   * Metadata and colour: `img_core::meta` (conversions `convert` / `surf_convert` between
     `FMT_PARGB` and `FMT_ARGB`, `all_opaque`), `img_core::exif`, `img_core::icc` /
     `icc_xform` (colour management, `legacy/ASMLIB/docs/modules/COLOR_MANAGEMENT.md`).
+* **PDF files** (`pdf`): `pdf::Document` writes them (pages drawn on a canvas, font subsets,
+  images, links, bookmarks). `pdf::read::Document::open(bytes)` reads any of them, encrypted ones
+  with `open_with(bytes, &Options { password, .. })`: `page_count`, `page(i).size()`, `text(i)`
+  (the page's text in reading order), `page_text(i)` (every glyph with its position, for search
+  and selection), `info`, `outlines`, `links`, `fields` (the form's values), `attachments`
+  (embedded files such as the XML of a ZUGFeRD invoice). A damaged file is rebuilt from its
+  objects; a hostile one gives an error, never a panic. Drawing the pages is not there yet.
 
 **Logging** (`plat::log`): `plat::log!(plat::LOG_INFO, "net", "{} bytes from {}", n, host)` formats
 only when a sink wants the level; `plat::log_error / log_warn / log_info / log_debug(target, msg)`

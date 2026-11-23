@@ -1,4 +1,4 @@
 #!args --check
-# pdftest is a console program: it runs every self-check of lib/pdf (the vector PDF writer; each
-# file read back by its own reader) and ignores the script (build_rs.py test passes --script); a
-# failing check exits with code 1
+# pdftest is a console program: it runs every self-check of lib/pdf (the vector PDF writer, each
+# file read back by its own reader; the reader pdf::read, the read_* groups) and ignores the
+# script (build_rs.py test passes --script); a failing check exits with code 1
