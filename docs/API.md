@@ -89,7 +89,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery, secondary indexes, encryption at rest
   <br>[lib.rs](#datastore-crate-root) · [index.rs](#datastoreindexrs) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
-  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/kx.rs](#netiotlskxrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs)
+  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/kx.rs](#netiotlskxrs) · [tls/record.rs](#netiotlsrecordrs) · [tls/session.rs](#netiotlssessionrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng
   <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs) · [uri.rs](#netpkturirs) · [ssh.rs](#netpktsshrs) · [snmpv3.rs](#netpktsnmpv3rs) · [eap.rs](#netpkteaprs) · [imap.rs](#netpktimaprs) · [cookie.rs](#netpktcookiers) · [x509.rs](#netpktx509rs) · [tls.rs](#netpkttlsrs)
 - [eapm](#eapm) -- EAP-MD5 and EAP-PWD as peer and server state machines without I/O
@@ -44842,8 +44842,9 @@ netio -- network protocols on top of plat::net
   server     Server::start(addr, ServerConfig, handler): accept thread + worker pool
   client     Client::request(...): blocking, timeouts, size limit
   tls        TLS 1.3 servers and clients (ChaCha20-Poly1305, AES-GCM; X25519MLKEM768,
-             X25519, P-256, P-384; Ed25519, ECDSA, RSA keys; SNI, ALPN, mutual auth) and the
-             TLS 1.2 fallback for public servers: connect / accept -> TlsStream (a Stream)
+             X25519, P-256, P-384; Ed25519, ECDSA, RSA keys; SNI, ALPN, mutual auth;
+             resumption with tickets, 0-RTT where the server allows it) and the TLS 1.2
+             fallback for public servers: connect / accept -> TlsStream (a Stream)
   x509 / der the crate jflib-x509 (re-exported): certificates (parse, build with any key,
              verify chains) of a private CA and of the web PKI; PrivateKey (PKCS #8 ...)
   pem        PEM blocks
@@ -45507,12 +45508,17 @@ tls -- TLS 1.3 servers and clients, and TLS 1.2 towards public servers (RFC 8446
   Both sides: TLS 1.3 · ChaCha20-Poly1305, AES-128-GCM, AES-256-GCM · X25519MLKEM768
   (post-quantum hybrid), X25519, P-256, P-384 · certificates and keys of Ed25519, ECDSA
   (P-256 / P-384) and RSA (the web PKI or a CA of one's own) · mutual authentication ·
-  HelloRetryRequest · KeyUpdate.
+  HelloRetryRequest · KeyUpdate · resumption with session tickets (psk_dhe_ke) · 0-RTT with
+  replay protection (opt-in).
   Public servers (client side, Trust::System / Custom): also TLS 1.2 with ECDHE and AEAD suites.
-  Not here: PSK / resumption, 0-RTT, renegotiation, revocation checks.
+  Not here: external PSKs, psk_ke, TLS 1.2 resumption, renegotiation, revocation checks.
 
   connect(stream, ClientConfig) -> TlsStream     accept(stream, ServerConfig) -> TlsStream
   TlsStream implements Stream (HTTP runs over it unchanged); peer_certs() after the handshake
+  Resumption: ServerConfig::tickets (Tickets: keys, lifetime), ClientConfig::sessions
+  (Sessions: a client's tickets per server); TlsStream::resumed()
+  0-RTT: ServerConfig::early_data (bytes; 0 = none), connect_early(stream, cfg, data) ->
+  (TlsStream, bytes taken), TlsStream::read_early (a server: data that may be a replay)
   Identity::new(chain, key) / Identity::from_pem(certs, key): a chain and its key (PrivateKey:
   Ed25519, ECDSA, RSA; PKCS #8, SEC 1, PKCS #1)
   Trust::Anchors(CAs) / Pinned(SHA-256 of the leaf) / Any (trust on first use: the caller
@@ -45560,11 +45566,14 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
     in order of preference; the server's choice is TlsStream::alpn.  An empty name or one
     over 255 bytes is left out, and the names after the first 8 KiB of them; none left: no
     ALPN offered
+  - `sessions: Option<Arc<Sessions>>` -- session tickets to resume with (TLS 1.3): the connection offers one of this server and
+    keeps the ones it gets.  Several configs may share a cache: it keeps the tickets by
+    server name, trust and client identity.  None: no resumption
 
 **`impl ClientConfig`**
 
 - **`fn new(trust: Trust, server_name: &str) -> ClientConfig`**
-  this trust and server name; no client certificate, no ALPN
+  this trust and server name; no client certificate, no ALPN, no resumption
 
 - **`struct Hello`**
   what a ClientHello asks for: the program's ServerConfig::select picks the identity by it
@@ -45591,11 +45600,22 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   - `alpn: Vec<String>` -- the application protocols the server speaks (ALPN), in its order of preference; a
     client that offers protocols, none of them these, is refused (no_application_protocol,
     RFC 7301 3.2).  Empty: ALPN is not answered
+  - `tickets: Option<Arc<Tickets>>` -- session tickets (TLS 1.3 resumption): sent after each handshake and taken back for a
+    handshake without certificates.  A resumed connection keeps the client certificates of
+    its first handshake (peer_certs) for up to 7 days, while the same client_auth trust asks
+    for them and takes them again (each resumption checks them).  None: no tickets
+  - `early_data: u32` -- 0-RTT (needs tickets): the most bytes of early data a client may send with a ticket; 0
+    (the default): none.  A ticket that allows more than the server takes now is resumed
+    without 0-RTT.  Early data can be replayed by an attacker (RFC 8446 8, E.5): the
+    server takes it only from a ClientHello within 10 seconds of the ticket's age and the
+    first time it comes (Tickets::replay_check), keeps it apart (TlsStream::read_early) and
+    hands it to read() only once the handshake is done.  With 0-RTT taken, accept returns
+    after the server's flight, before the client's Finished
 
 **`impl ServerConfig`**
 
 - **`fn new(identity: Identity) -> ServerConfig`**
-  this identity; no client certificates, no ALPN
+  this identity; no client certificates, no ALPN, no tickets
 
 - **`enum TlsError`**
   - `Alert(u8, &'static str)` -- we ended the connection with this alert
@@ -45623,9 +45643,24 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   the application protocol both sides agreed on (ALPN), if any
 - **`fn server_name(&self) -> String`**
   a server: the name the client asked for (SNI, lower case; empty: none)
+- **`fn resumed(&self) -> bool`**
+  the handshake resumed a session (a ticket instead of certificates)
+- **`fn read_early(&self, buf: &mut [u8]) -> NetResult<usize>`**
+  a server that took 0-RTT: the client's early data as it comes, before the handshake is
+  done; Ok(0) at its end (or when none was taken).  An attacker may have replayed it
+  (RFC 8446 8): act on it only where twice does no harm (RFC 8470).  What is not read here
+  comes first from read() once the handshake is done
 
 - **`fn connect(inner: Box<dyn Stream>, cfg: ClientConfig) -> Result<TlsStream, TlsError>`**
   client side: handshake over `inner`
+
+- **`fn connect_early(inner: Box<dyn Stream>, cfg: ClientConfig, early: &[u8]) -> Result<(TlsStream, usize), TlsError>`**
+  client side with 0-RTT: `early` goes right after the ClientHello when a ticket of
+  cfg.sessions allows early data (as much as the ticket takes).  -> the stream and the bytes of
+  `early` the server took: 0 when none went (no such ticket) or the server refused them; the
+  caller sends the rest with write_all, if it still applies (TlsStream::alpn may differ: RFC
+  8446 4.2.10).  Early data can be replayed by an attacker: only for requests that do no harm
+  twice
 
 - **`fn accept(inner: Box<dyn Stream>, cfg: ServerConfig) -> Result<TlsStream, TlsError>`**
   server side: handshake over `inner`
@@ -45658,9 +45693,14 @@ ECDHE (X25519, P-256, P-384) and AEAD suites (AES-GCM, ChaCha20-Poly1305), the e
 master secret when the server has it and the TLS 1.3 downgrade check.  Other connections
 never fall back.
 
-No PSK, no 0-RTT, no session tickets (a client ignores them), no renegotiation;
-post-handshake KeyUpdate is supported.  Every protocol error ends the connection with the
-matching alert.
+Resumption (TLS 1.3, RFC 8446 2.2, 4.6.1): a server with ServerConfig::tickets sends session
+tickets after the client's Finished and takes them back with psk_dhe_ke (the PSK and a fresh
+key exchange); a client with ClientConfig::sessions keeps the tickets it gets and offers one.
+0-RTT (2.3, 4.2.10) when the server allows it (ServerConfig::early_data): the client sends
+data right after its ClientHello, the server takes it only from a fresh ClientHello it has
+not seen (8.2, 8.3) and hands it apart from the rest (read_early).  No external PSKs, no
+psk_ke, no TLS 1.2 resumption, no renegotiation; post-handshake KeyUpdate is supported.
+Every protocol error ends the connection with the matching alert.
 ```
 
 ```rust
@@ -45696,8 +45736,30 @@ AL_NO_APPLICATION_PROTOCOL: u8 = 120
 - **`fn server_name(&self) -> &str`**
   a server: the name of the client's server_name (lower case)
 - **`fn client(cfg: ClientConfig) -> Conn`**
+- **`fn client_early(cfg: ClientConfig, early: &[u8]) -> Conn`**
+  a client that sends `early` as 0-RTT data right after its ClientHello when a session of
+  cfg.sessions allows it (as much as the session takes); early_taken() says after the
+  handshake what the server took.  Empty: Conn::client
 - **`fn server(cfg: ServerConfig) -> Conn`**
 - **`fn established(&self) -> bool`**
+- **`fn ready(&self) -> bool`**
+  the connection carries data: established, or a server that took 0-RTT and sent its
+  flight (it may read the early data and answer before the client's Finished, RFC 8446
+  4.2.10; read_plain gives data only once the handshake is done)
+- **`fn resumed(&self) -> bool`**
+  the handshake took a ticket (a PSK) instead of certificates
+- **`fn early_taken(&self) -> usize`**
+  a client: the bytes of its 0-RTT data the server took (0: none sent, the server refused
+  them, or it has not answered yet)
+- **`fn in_early(&self) -> bool`**
+  a server: 0-RTT data may still come (it took 0-RTT and the client's EndOfEarlyData has
+  not come)
+- **`fn has_early(&self) -> bool`**
+  a server: 0-RTT data received and not read yet
+- **`fn read_early(&mut self, buf: &mut [u8]) -> usize`**
+  a server: read 0-RTT data (data an attacker may have replayed, RFC 8446 8: for requests
+  that do no harm twice); what is not read here comes first from read_plain once the
+  handshake is done
 - **`fn closed(&self) -> bool`**
 - **`fn peer_closed(&self) -> bool`**
   the peer sent close_notify (an orderly end, not a cut connection)
@@ -45713,6 +45775,9 @@ AL_NO_APPLICATION_PROTOCOL: u8 = 120
 - **`fn write_plain(&mut self, data: &[u8]) -> Result<(), TlsError>`**
 - **`fn test_cr_sig_algs(&mut self, algs: Vec<u16>)`**
   (tests) the signature schemes a server's CertificateRequest lists (empty: all it takes)
+- **`fn test_server_prefs(&mut self, suites: Vec<u16>, groups: Vec<u16>)`**
+  (tests) a server that prefers these suites, in this order, and has only these groups
+  (empty: its own): HelloRetryRequests and suites of SHA-384 between two JFLib programs
 - **`fn write_empty(&mut self) -> Result<(), TlsError>`**
   (tests) an application data record without data
 - **`fn close(&mut self)`**
@@ -45749,6 +45814,12 @@ SHA-256 and SHA-384, and the Transcript keeps those two only
 
 - **`fn empty_hash(h: HashAlg) -> Vec<u8>`**
   the hash of no messages
+
+- **`fn early_secret(h: HashAlg, psk: &[u8]) -> Secret`**
+  the early secret of a pre-shared key (RFC 8446 7.1): HKDF-Extract(0, PSK)
+
+- **`fn binder_key(h: HashAlg, early: &[u8]) -> Secret`**
+  the binder key of a resumption PSK ("res binder", RFC 8446 4.2.11.2) from its early secret
 
 - **`struct Schedule`**
   the secrets of one handshake
@@ -45909,6 +45980,94 @@ ECDHE_ECDSA_CHACHA20: u16 = 0xCCA9
 - **`fn plain(ty: u8, content: &[u8]) -> Vec<u8>`**
   a plaintext record
 
+### `netio/tls/session.rs`
+
+Source: [`lib/netio/tls/session.rs`](../lib/netio/tls/session.rs)
+
+```text
+session -- TLS 1.3 resumption (RFC 8446 2.2, 4.6.1): a server's tickets, a client's sessions,
+and the anti-replay register of 0-RTT (RFC 8446 8)
+
+  Tickets::new()          a server's tickets: stateless, sealed with XChaCha20-Poly1305 under
+                          keys that are made and rotated by themselves (or set_keys, for
+                          servers that share them); lifetime, tickets per handshake, the
+                          replay check of 0-RTT
+  Sessions::new(servers)  a client's tickets, per server: the name, the trust and the client
+                          identity of the connection that got them; each is used once
+
+A ticket holds the resumption PSK and what the server must check before it takes it again:
+the suite, the server name, the ALPN protocol, when the handshake that authenticated the
+client ran, the client's certificates (which a resumption checks again) and the trust that
+checked them.  A session lasts at
+most 7 days from that handshake, however often its tickets are renewed (RFC 8446 4.6.1).
+```
+
+```rust
+/// the longest a ticket is valid and a session lasts from the handshake that authenticated the
+/// peer: 7 days (RFC 8446 4.6.1)
+MAX_LIFETIME: u32 = 604_800
+/// how far the client's age of a ticket and the server's may differ for 0-RTT (RFC 8446 8.3)
+FRESH_WINDOW_MS: i64 = 10_000
+```
+
+- **`struct Sessions`**
+  a client's tickets (ClientConfig::sessions): per server, a connection takes the newest and
+  the server sends new ones.  The key of a server is its name, the trust of the connection and
+  its client identity, so a ticket a connection with Trust::Any got is never offered by one that
+  checks certificates, nor one of a client certificate by a connection without it.  Shared by
+  threads; in memory only
+
+**`impl Sessions`**
+
+- **`fn new(servers: usize) -> Sessions`**
+  the tickets of up to `servers` servers (the least recently used go first), 8 each
+- **`fn clear(&self)`**
+  forget every ticket
+- **`fn len(&self) -> usize`**
+  the tickets kept (all servers)
+- **`fn is_empty(&self) -> bool`**
+  no ticket kept
+- **`fn test_shift(&self, ms: i64)`**
+  (tests) move this cache's clock by `ms`
+- **`fn test_max_early(&self, n: u32)`**
+  (tests) the 0-RTT limit of every kept ticket, as a client that sends more than its
+  ticket allows would believe
+
+- **`type ReplayCheck = Arc<dyn Fn(&[u8]) -> bool + Send + Sync>`**
+  the replay check of 0-RTT (Tickets::replay_check): a value unique to a ClientHello with early
+  data (16 bytes of its PSK binder, which the PSK authenticates) -> true the first time it is
+  seen, false when it was seen in the last 20 seconds (the client's 0-RTT is refused then, not
+  the connection)
+
+- **`struct Tickets`**
+  a server's session tickets (ServerConfig::tickets).  A ticket is the session's state, sealed
+  with XChaCha20-Poly1305: the server keeps nothing per client.  Its keys are made at random and
+  replaced every lifetime, the previous one still opening the tickets it sealed; servers that
+  share tickets (behind a load balancer) set the same keys with set_keys.  Shared by threads
+
+**`impl Tickets`**
+
+- **`fn new() -> Tickets`**
+  tickets valid for a day, two per handshake, keys of their own
+- **`fn lifetime(mut self, secs: u32) -> Tickets`**
+  how long a ticket is valid (seconds, 1 to 7 days); the keys change at this interval
+- **`fn per_handshake(mut self, n: u8) -> Tickets`**
+  the tickets a handshake gets (1 to 8): a client uses each once, so one that opens
+  connections in parallel wants several
+- **`fn replay_check(mut self, f: ReplayCheck) -> Tickets`**
+  the replay check of 0-RTT instead of this process's register: servers that share tickets
+  must share it too, or a ClientHello replayed to another of them gets its 0-RTT taken
+  again (RFC 8446 8.2)
+- **`fn set_keys(&self, keys: &[[u8; 32]])`**
+  the keys of servers that share tickets: the first seals, all open (the previous ones,
+  while tickets they sealed may still come); they no longer change by themselves.  Empty:
+  keys of their own again
+- **`fn rotate(&self)`**
+  a new key now (keys of their own): the tickets of the previous one are taken for one
+  more lifetime, older ones no longer
+- **`fn test_shift(&self, ms: i64)`**
+  (tests) move these tickets' clock by `ms`
+
 ### `netio/trust.rs`
 
 Source: [`lib/netio/trust.rs`](../lib/netio/trust.rs)
@@ -45926,6 +46085,10 @@ the user decide (trust on first use, like SSH host keys)
   fingerprint_text(&digest)        "AB:CD:..." for people to compare
   system_connector(extra_cas)      https to public servers: the system's CAs (and these),
                                    TLS 1.3 or 1.2 (mail servers, update servers, web hooks)
+
+The connectors of a CA (system_connector, ServerTrust::Ca) keep the session tickets of the
+servers they reach (tls::Sessions), so the next request to a server resumes its session
+(TLS 1.3, no 0-RTT).
 ```
 
 ```rust
@@ -45954,7 +46117,8 @@ UNTRUSTED: &str = "untrusted-ca"
   "AB:CD:.." / "abcd.." / with spaces -> the 32 bytes
 
 - **`fn system_connector(extra: Vec<Cert>) -> Connector`**
-  https to public servers (the system's certificate authorities and `extra`)
+  https to public servers (the system's certificate authorities and `extra`); resumes the
+  sessions of servers it reached before
 
 - **`fn connector(trust: ServerTrust, identity: Option<Identity>, seen: Arc<Mutex<Option<Presented>>>) -> Connector`**
 

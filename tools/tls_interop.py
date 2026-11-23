@@ -12,7 +12,14 @@ The certificates come from `coretest --tls-pki` (Ed25519, own CA).  Checked:
 Then for each key kind (`--key p256 / p384 / rsa / ed25519`: CA, server and client keys of that
 kind), our server <- openssl s_client with each TLS 1.3 suite, each group (the hybrids with
 ML-KEM, X25519, P-256, P-384, and a HelloRetryRequest), ALPN (its choice, no_application_protocol)
-and a client certificate; curl --cacert."""
+and a client certificate; curl --cacert.
+Resumption and 0-RTT (`--tickets [--early N]`, `--resume N [--early]`):
+  our server  <- openssl s_client -sess_out / -sess_in (each suite, after a HelloRetryRequest,
+                 with a client certificate, another server name: no resumption), -early_data
+                 (taken; not sent with a ticket of a server without 0-RTT), curl and Python ssl
+                 reusing their session
+  our client  -> openssl s_server (each suite, a HelloRetryRequest, a client certificate),
+                 -early_data (the request taken as 0-RTT; refused after a HelloRetryRequest)"""
 import os
 import socket
 import ssl
@@ -215,6 +222,7 @@ def main():
         srv.terminate()
         srv.wait(5)
     server_matrix(exe, check)
+    resumption(exe, d, check)
     n = len(results)
     print(f"tls_interop: {sum(results)} of {n} passed")
     return 0 if all(results) else 1
@@ -266,6 +274,122 @@ def server_matrix(exe, check):
             finally:
                 srv.terminate()
                 srv.wait(5)
+
+
+def resumption(exe, d, check):
+    """session tickets and 0-RTT both ways"""
+    req = b"GET / HTTP/1.0\r\nHost: localhost\r\n\r\n"
+    reqfile = d / "req.txt"
+    reqfile.write_bytes(req)
+    for mtls in (False, True):
+        port = free_port()
+        srv = subprocess.Popen([exe, "--tls-serve", str(port), "--tickets", "--early", "16384"] + (["--mtls"] if mtls else []), stderr=subprocess.PIPE)
+        try:
+            wait_port(port)
+
+            def s_client(*opts, name="localhost", early=False):
+                cmd = ["openssl", "s_client", "-connect", f"127.0.0.1:{port}", "-servername", name, "-CAfile", str(d / "ca.pem"), "-tls1_3", "-ign_eof", *opts]
+                if mtls:
+                    cmd += ["-cert", str(d / "client.pem"), "-key", str(d / "client.key")]
+                if early:
+                    cmd += ["-early_data", str(reqfile)]
+                r = subprocess.run(cmd, input=b"" if early else req, capture_output=True, timeout=20)
+                return r.stdout.decode(errors="replace") + r.stderr.decode(errors="replace")
+
+            sess = str(d / "sess.pem")
+            if mtls:
+                s_client("-sess_out", sess)
+                out = s_client("-sess_in", sess)
+                check("resume: s_client -> our server with a client certificate", "Reused, TLSv1.3" in out and "JFLib tls ok agent-1 resumed" in out, out[-300:])
+                continue
+            for suite in ("TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"):
+                first = s_client("-ciphersuites", suite, "-sess_out", sess)
+                out = s_client("-ciphersuites", suite, "-sess_in", sess)
+                check(f"resume: s_client -> our server, {suite}", "New, TLSv1.3" in first and "Reused, TLSv1.3" in out and "JFLib tls ok resumed" in out, out[-300:])
+            s_client("-sess_out", sess)
+            out = s_client("-groups", "X448:P-256", "-sess_in", sess)
+            check("resume: s_client -> our server after a HelloRetryRequest", "Reused, TLSv1.3" in out and "JFLib tls ok resumed" in out, out[-300:])
+            s_client("-sess_out", sess)
+            out = s_client("-sess_in", sess, name="other.lab")
+            check("resume: a ticket of localhost is not taken for another server name", "New, TLSv1.3" in out and "JFLib tls ok" in out and "resumed" not in out, out[-300:])
+            s_client("-sess_out", sess)
+            out = s_client("-sess_in", sess, early=True)
+            check("0-RTT: s_client -> our server: the request as early data, taken", "Early data was accepted" in out and "JFLib tls ok resumed" in out, out[-300:])
+            # curl and Python ssl reuse their sessions
+            r = subprocess.run(["curl", "-sS", "-H", "Connection: close", "--cacert", str(d / "ca.pem"), f"https://localhost:{port}/a", f"https://localhost:{port}/b"],
+                               capture_output=True, timeout=20)
+            check("resume: curl, the second request", r.stdout.count(b"JFLib tls ok") == 2 and b"JFLib tls ok resumed" in r.stdout, r.stdout.decode(errors="replace"))
+            try:
+                ctx = ssl.create_default_context(cafile=str(d / "ca.pem"))
+
+                def get(session=None):
+                    with socket.create_connection(("127.0.0.1", port), 5) as s, ctx.wrap_socket(s, server_hostname="localhost", session=session) as t:
+                        t.sendall(req)
+                        data = b""
+                        while chunk := t.recv(4096):
+                            data += chunk
+                        return t.session, t.session_reused, data
+
+                s1, _, _ = get()
+                _, reused, data = get(s1)
+                check("resume: python ssl", reused and b"JFLib tls ok resumed" in data, repr(data[:80]))
+            except Exception as e:  # noqa: BLE001
+                check("resume: python ssl", False, repr(e))
+        finally:
+            srv.terminate()
+            srv.wait(5)
+    # a server without 0-RTT: its tickets allow none, s_client sends none
+    port = free_port()
+    srv = subprocess.Popen([exe, "--tls-serve", str(port), "--tickets"], stderr=subprocess.PIPE)
+    try:
+        wait_port(port)
+        sess = str(d / "sess.pem")
+        base = ["openssl", "s_client", "-connect", f"127.0.0.1:{port}", "-servername", "localhost", "-CAfile", str(d / "ca.pem"), "-tls1_3", "-ign_eof"]
+        subprocess.run(base + ["-sess_out", sess], input=req, capture_output=True, timeout=20)
+        # (the request on stdin too: s_client sends the file only as early data)
+        r = subprocess.run(base + ["-sess_in", sess, "-early_data", str(reqfile)], input=req, capture_output=True, timeout=20)
+        out = r.stdout.decode(errors="replace")
+        check("0-RTT: a ticket of a server without 0-RTT: none sent, resumed", "Early data was not sent" in out and "JFLib tls ok resumed" in out, out[-300:])
+    finally:
+        srv.terminate()
+        srv.wait(5)
+    # our client -> openssl s_server (it issues tickets by itself; -www shows "Reused")
+    def get(port, *opts):
+        r = subprocess.run([exe, "--tls-get", str(port), "--host", "localhost", "--resume", "2", *opts], capture_output=True, timeout=40)
+        return (r.stdout + r.stderr).decode(errors="replace")
+
+    for opts, what in (([], ""), (["-ciphersuites", "TLS_AES_256_GCM_SHA384"], ", TLS_AES_256_GCM_SHA384"), (["-groups", "P-384"], " after a HelloRetryRequest"),
+                       (["-Verify", "1", "-CAfile", str(d / "ca.pem"), "-verify_return_error"], " with a client certificate")):
+        port = free_port()
+        srv = subprocess.Popen(["openssl", "s_server", "-accept", str(port), "-cert", str(d / "server.pem"), "-key", str(d / "server.key"), "-tls1_3", "-www", *opts],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            wait_port(port)
+            out = get(port, *(["--mtls"] if "-Verify" in opts else []))
+            second = out.split("--- connection 2:", 1)[-1]
+            check(f"resume: our client -> openssl s_server{what}", "--- connection 1: resumed false" in out and second.startswith(" resumed true") and "Reused, TLSv1.3" in second, out[-300:])
+        finally:
+            srv.terminate()
+            srv.wait(5)
+    # 0-RTT: s_server -early_data echoes nothing; it keeps its stdin open, our client reads until
+    # its timeout.  After a HelloRetryRequest it does not resume: its tickets of 0-RTT are single
+    # use (anti-replay), and the first ClientHello spent this one (so does OpenSSL's own client)
+    for opts, what, want in (([], "the request taken as 0-RTT", " resumed true, early 35"), (["-groups", "P-384"], "refused after a HelloRetryRequest", " resumed false, early 0")):
+        port = free_port()
+        log = d / f"s_server-early-{port}.log"
+        srv = subprocess.Popen(["openssl", "s_server", "-accept", str(port), "-cert", str(d / "server.pem"), "-key", str(d / "server.key"), "-tls1_3", "-early_data", *opts],
+                               stdin=subprocess.PIPE, stdout=open(log, "wb"), stderr=subprocess.STDOUT)
+        try:
+            wait_port(port)
+            out = get(port, "--early")
+            second = out.split("--- connection 2:", 1)[-1]
+            # (s_server writes the early data itself straight to its stdout, before its buffered note)
+            seen = log.read_bytes()
+            mark = b"Early data received" if want.endswith("35") else b"Early data was rejected"
+            check(f"0-RTT: our client -> openssl s_server -early_data: {what}", second.startswith(want) and mark in seen and b"GET / HTTP/1.0" in seen, out[-300:])
+        finally:
+            srv.terminate()
+            srv.wait(5)
 
 
 if __name__ == "__main__":

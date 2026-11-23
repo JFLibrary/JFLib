@@ -2807,7 +2807,11 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   X25519, P-256, P-384; Ed25519, ECDSA and RSA certificates and keys, mutual authentication),
   certificates by SNI (`ServerConfig::identities`, `select`), ALPN (`ClientConfig::alpn`,
   `ServerConfig::alpn`); `Identity::from_pem(chain, key)` reads what a CA hands out (PKCS #8,
-  SEC 1, PKCS #1). `netio::x509` builds and checks the certificates of a private CA
+  SEC 1, PKCS #1). Resumption with session tickets: `ServerConfig::tickets`
+  (`Arc<tls::Tickets>`, one for all connections of a server) and `ClientConfig::sessions`
+  (`Arc<tls::Sessions>`, a client's tickets); 0-RTT only where the server allows it
+  (`ServerConfig::early_data`, `tls::connect_early`, `TlsStream::read_early` for data that may be
+  a replay). `netio::x509` builds and checks the certificates of a private CA
   (`CertBuilder::sign_key` with any key, `sign_ext` adds or replaces extensions: name
   constraints, a CA's purposes; `x509::PrivateKey`).
   The chain check honours name constraints for wildcards by the names they stand for and the

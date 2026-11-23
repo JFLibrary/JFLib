@@ -59,6 +59,17 @@ pub fn empty_hash(h: HashAlg) -> Vec<u8> {
     h.digest(b"")
 }
 
+/// the early secret of a pre-shared key (RFC 8446 7.1): HKDF-Extract(0, PSK)
+pub fn early_secret(h: HashAlg, psk: &[u8]) -> Secret {
+    let zeros = alloc::vec![0u8; h.len()];
+    extract(h, &zeros, psk)
+}
+
+/// the binder key of a resumption PSK ("res binder", RFC 8446 4.2.11.2) from its early secret
+pub fn binder_key(h: HashAlg, early: &[u8]) -> Secret {
+    derive(h, early, "res binder", &empty_hash(h))
+}
+
 /// the secrets of one handshake
 pub struct Schedule {
     pub hash: HashAlg,

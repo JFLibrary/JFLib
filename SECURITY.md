@@ -64,4 +64,7 @@ another library. They have **not had an external audit**. What has been done ins
   decoders of other programs' data
 
 Limits that are documented in the crates: no revocation checks for certificates, no DNSSEC
-validation, no TLS session resumption. Each crate's README says what it does and does not do.
+validation, no TLS 1.2 session resumption; TLS 1.3 0-RTT data can be replayed within its
+freshness window to servers that do not share their replay check, which is why a server takes it
+only when it sets `ServerConfig::early_data` and gets it apart from the rest (`read_early`). Each
+crate's README says what it does and does not do.
