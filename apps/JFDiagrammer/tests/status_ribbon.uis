@@ -72,6 +72,10 @@ click button:"Linie"
 click "Pfeile"
 expect menuitem:"———→" exists
 expect menuitem:"•——•" exists
+# (JD15) 13 quick choices as Visio's: the begin-only forms of 4, 1 and 20 too
+expect menuitem:"←———  4" exists
+expect menuitem:"<———  1" exists
+expect menuitem:"•———" exists
 key esc
 key esc
 key ctrl+z
