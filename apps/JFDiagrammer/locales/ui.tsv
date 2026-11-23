@@ -1112,3 +1112,54 @@ Name der Datenquelle	Data source name	Nombre del origen de datos	Nome dell'origi
 Die Datenquelle gibt es nicht mehr.	The data source no longer exists.	El origen de datos ya no existe.	L'origine dati non esiste più.	La source de données n'existe plus.
 Datentyp	Data type	Tipo de datos	Tipo di dati	Type de données
 Name und Datentyp gelten für die Shape-Daten, die das Verknüpfen und das Aktualisieren schreiben.	The name and data type apply to the shape data that linking and refreshing write.	El nombre y el tipo de datos se aplican a los datos de forma que escriben la vinculación y la actualización.	Il nome e il tipo di dati valgono per i dati forma scritti dal collegamento e dall'aggiornamento.	Le nom et le type de données s'appliquent aux données de forme écrites par la liaison et l'actualisation.
+„{}“ kann nicht gelesen werden.	“{}” cannot be read.	No se puede leer «{}».	Impossibile leggere «{}».	Impossible de lire « {} ».
+Die Datei ist zu groß (höchstens 16 MB).	The file is too large (16 MB at most).	El archivo es demasiado grande (16 MB como máximo).	Il file è troppo grande (al massimo 16 MB).	Le fichier est trop volumineux (16 Mo au maximum).
+Einfaches Rechteck	Plain rectangle	Rectángulo simple	Rettangolo semplice	Rectangle simple
+Dynamischer Verbinder	Dynamic connector	Conector dinámico	Connettore dinamico	Connecteur dynamique
+Zeichnung: {}	Drawing: {}	Dibujo: {}	Disegno: {}	Dessin : {}
+Zu viele Datensätze: der Rest wird nicht gelesen.	Too many records: the rest is not read.	Demasiados registros: el resto no se lee.	Troppi record: il resto non viene letto.	Trop d'enregistrements : le reste n'est pas lu.
+Weitere Probleme werden nicht aufgeführt.	Further problems are not listed.	No se enumeran más problemas.	Ulteriori problemi non vengono elencati.	Les autres problèmes ne sont pas listés.
+Unbekannte Datensatzart „{}“ (erwartet: {} oder {}).	Unknown record type “{}” (expected: {} or {}).	Tipo de registro desconocido «{}» (se esperaba {} o {}).	Tipo di record sconosciuto «{}» (previsto: {} o {}).	Type d'enregistrement inconnu « {} » (attendu : {} ou {}).
+Ein Anführungszeichen wird nicht geschlossen.	A quotation mark is not closed.	Unas comillas no se cierran.	Una virgoletta non viene chiusa.	Un guillemet n'est pas fermé.
+Zu viele Felder: die übrigen werden übergangen.	Too many fields: the others are skipped.	Demasiados campos: los demás se omiten.	Troppi campi: gli altri vengono ignorati.	Trop de champs : les autres sont ignorés.
+Ein Feld ist zu lang und wird gekürzt.	A field is too long and is shortened.	Un campo es demasiado largo y se acorta.	Un campo è troppo lungo e viene accorciato.	Un champ est trop long et est raccourci.
+Die ID ist zu lang.	The ID is too long.	El Id. es demasiado largo.	L'ID è troppo lungo.	L'ID est trop longue.
+Shape ohne ID: es wird gezeichnet, aber kein Link erreicht es.	Shape without an ID: it is drawn, but no link reaches it.	Forma sin Id.: se dibuja, pero ningún vínculo llega a ella.	Forma senza ID: viene disegnata, ma nessun collegamento la raggiunge.	Forme sans ID : elle est dessinée, mais aucun lien ne l'atteint.
+Die ID „{}“ hat schon ein anderes Shape.	Another shape already has the ID “{}”.	Otra forma ya tiene el Id. «{}».	Un'altra forma ha già l'ID «{}».	Une autre forme a déjà l'ID « {} ».
+Die ID „{}“ hat schon ein anderer Link.	Another link already has the ID “{}”.	Otro vínculo ya tiene el Id. «{}».	Un altro collegamento ha già l'ID «{}».	Un autre lien a déjà l'ID « {} ».
+Dem Link fehlt „Von“ oder „Nach“.	The link lacks “From” or “To”.	Al vínculo le falta «Desde» o «Hasta».	Al collegamento manca «Da» o «A».	Il manque « De » ou « À » au lien.
+Kein Shape hat die ID „{}“.	No shape has the ID “{}”.	Ninguna forma tiene el Id. «{}».	Nessuna forma ha l'ID «{}».	Aucune forme n'a l'ID « {} ».
+Der Link führt von „{}“ zu sich selbst.	The link leads from “{}” to itself.	El vínculo va de «{}» a sí misma.	Il collegamento va da «{}» a se stessa.	Le lien va de « {} » à elle-même.
+{}: „{}“ ist keine Zahl.	{}: “{}” is not a number.	{}: «{}» no es un número.	{}: «{}» non è un numero.	{} : « {} » n'est pas un nombre.
+{}: „{}“ liegt außerhalb des erlaubten Bereichs.	{}: “{}” is outside the allowed range.	{}: «{}» está fuera del intervalo permitido.	{}: «{}» è fuori dall'intervallo consentito.	{} : « {} » est en dehors de la plage autorisée.
+X ohne Y oder Y ohne X: das Shape wird automatisch angeordnet.	X without Y or Y without X: the shape is arranged automatically.	X sin Y o Y sin X: la forma se organiza automáticamente.	X senza Y o Y senza X: la forma viene disposta automaticamente.	X sans Y ou Y sans X : la forme est disposée automatiquement.
+Zu viele Shape-Daten: die übrigen werden übergangen.	Too much shape data: the rest is skipped.	Demasiados datos de forma: el resto se omite.	Troppi dati forma: il resto viene ignorato.	Trop de données de forme : le reste est ignoré.
+Tabulator	Tab	Tabulación	Tabulazione	Tabulation
+Schritt {} von {}: {}	Step {} of {}: {}	Paso {} de {}: {}	Passaggio {} di {}: {}	Étape {} sur {} : {}
+Vorschau	Preview	Vista previa	Anteprima	Aperçu
+Datei: {} ({})	File: {} ({})	Archivo: {} ({})	File: {} ({})	Fichier : {} ({})
+Trennzeichen	Delimiter	Delimitador	Delimitatore	Délimiteur
+Automatisch ({})	Automatic ({})	Automático ({})	Automatico ({})	Automatique ({})
+Einheit der Zahlen	Unit of the numbers	Unidad de los números	Unità dei numeri	Unité des nombres
+{} Shapes, {} Verbinder, {} Fehler, {} Warnungen	{} shapes, {} connectors, {} errors, {} warnings	{} formas, {} conectores, {} errores, {} advertencias	{} forme, {} connettori, {} errori, {} avvisi	{} formes, {} connecteurs, {} erreurs, {} avertissements
+Die Datei enthält keine Shapes: es gibt nichts zu zeichnen.	The file contains no shapes: there is nothing to draw.	El archivo no contiene formas: no hay nada que dibujar.	Il file non contiene forme: non c'è nulla da disegnare.	Le fichier ne contient aucune forme : il n'y a rien à dessiner.
+Shapes ({})	Shapes ({})	Formas ({})	Forme ({})	Formes ({})
+Verbinder ({})	Connectors ({})	Conectores ({})	Connettori ({})	Connecteurs ({})
+Probleme ({})	Problems ({})	Problemas ({})	Problemi ({})	Problèmes ({})
+Zeile	Line	Línea	Riga	Ligne
+Nach|Linkziel	To	Hasta	A	À
+Meldung	Message	Mensaje	Messaggio	Message
+Fehler	Error	Error	Errore	Erreur
+Warnung	Warning	Advertencia	Avviso	Avertissement
+Master-Zuordnung	Master Assignment	Asignación de formas maestras	Assegnazione forme master	Attribution des formes maîtres
+Wählen Sie für jeden Master-Namen der Datei ein Master-Shape der Zeichnung oder einer geöffneten Schablone.	For each master name in the file, choose a master shape of the drawing or of an open stencil.	Para cada nombre de forma maestra del archivo, elija una forma maestra del dibujo o de una colección de formas abierta.	Per ogni nome di forma master del file, scegliere una forma master del disegno o di una raccolta di forme aperta.	Pour chaque nom de forme maître du fichier, choisissez une forme maître du dessin ou d'une bibliothèque de formes ouverte.
+(kein Master-Shape)	(no master shape)	(sin forma maestra)	(nessuna forma master)	(aucune forme maître)
+für {} Verbinder	for {} connectors	para {} conectores	per {} connettori	pour {} connecteurs
+für {} Shapes	for {} shapes	para {} formas	per {} forme	pour {} formes
+Zeichnen auf	Draw on	Dibujar en	Disegna su	Dessiner sur
+der angezeigten Seite	the page shown	la página mostrada	la pagina visualizzata	la page affichée
+einer neuen Seite	a new page	una página nueva	una nuova pagina	une nouvelle page
+Shapes ohne X und Y werden in Stufen von oben nach unten angeordnet, Links werden zu dynamischen Verbindern.	Shapes without X and Y are arranged in tiers from top to bottom; links become dynamic connectors.	Las formas sin X ni Y se organizan en niveles de arriba abajo; los vínculos se convierten en conectores dinámicos.	Le forme senza X e Y vengono disposte su livelli dall'alto in basso; i collegamenti diventano connettori dinamici.	Les formes sans X ni Y sont disposées en niveaux de haut en bas ; les liens deviennent des connecteurs dynamiques.
+{} Shapes und {} Verbinder erstellt	{} shapes and {} connectors created	{} formas y {} conectores creados	{} forme e {} connettori creati	{} formes et {} connecteurs créés
+Die Zeichnung lässt sich nicht erstellen.	The drawing cannot be created.	No se puede crear el dibujo.	Impossibile creare il disegno.	Impossible de créer le dessin.
+Shape-Daten in Zeile {}: {}	Shape data in line {}: {}	Datos de forma en la línea {}: {}	Dati forma nella riga {}: {}	Données de forme à la ligne {} : {}
