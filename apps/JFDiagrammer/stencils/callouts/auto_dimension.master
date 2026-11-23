@@ -1,0 +1,82 @@
+# Auto-Bemaßung (JD15, SH-272): eine Maßlinie, die ihre eigene Länge in einem Textfeld zeigt (Feld 0:
+# Width, in mm bzw. Zoll; folgt jeder Änderung der Enden).  1D mit Visios Formeln (das Bauwerkzeug
+# setzt sie): der Kasten liegt gedreht auf der Linie, x läuft vom Anfang (0) zum Ende (Width).  Pfeile
+# und Endstriche an beiden Enden, der Text steht über der Linie und kippt bei Linien von rechts nach
+# links nicht auf den Kopf.  Pfeile, Striche und Textblock in Papiermaß (User.S = Zeichnungs- zu
+# Seitenmaßstab).  Formatvorlage Connector ohne Pfeilspitzen (README: Stilregeln); die Pfeile
+# zeichnet die Geometrie.  Keine Beschriftung im Sinne von msvStructureType (kein Zeiger).
+master: Auto-dimension
+name.de: Auto-Bemaßung
+name.en: Auto-dimension
+name.es: Cota automática
+name.it: Quota automatica
+name.fr: Cote automatique
+prompt.de: Auto-Bemaßung: zeigt ihre eigene Länge. Ziehen Sie die Enden an die Punkte, deren Abstand sie zeigen soll.
+prompt.en: Auto-dimension: shows its own length. Drag its ends to the points whose distance it should show.
+prompt.es: Cota automática: muestra su propia longitud. Arrastre los extremos a los puntos cuya distancia debe mostrar.
+prompt.it: Quota automatica: mostra la propria lunghezza. Trascina le estremità sui punti di cui deve mostrare la distanza.
+prompt.fr: Cote automatique : affiche sa propre longueur. Faites glisser ses extrémités sur les points dont elle doit afficher la distance.
+keywords.de: Bemaßung, Maß, Maßlinie, Länge, Abstand, automatisch
+keywords.en: dimension, measure, dimension line, length, distance, automatic
+keywords.es: cota, medida, línea de cota, longitud, distancia, automática
+keywords.it: quota, misura, linea di quota, lunghezza, distanza, automatica
+keywords.fr: cote, mesure, ligne de cote, longueur, distance, automatique
+text.de: {fld 0}
+text.en: {fld 0}
+text.es: {fld 0}
+text.it: {fld 0}
+text.fr: {fld 0}
+style: Connector
+
+[Shape]
+BeginX = 5 mm
+BeginX.us = 0.2 in
+BeginY = 10 mm
+BeginY.us = 0.4 in
+EndX = 55 mm
+EndX.us = 2.2 in
+EndY = 10 mm
+EndY.us = 0.4 in
+Height = 0 mm
+BeginArrow = 0
+EndArrow = 0
+TxtPinX = Width*0.5
+TxtPinY = 0 mm
+TxtWidth = MAX(Width, 15 mm*User.S)
+TxtHeight = 5 mm*User.S
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = 0 mm
+TxtAngle = IF(ABS(Angle)>90 deg,180 deg,0 deg)
+VerticalAlign = 2
+
+[User]
+# Zeichnungs- zu Papiermaß (1 auf einer Seite 1:1)
+S:   Value = ThePage!DrawingScale/ThePage!PageScale
+# Länge und halbe Breite der Pfeilspitzen, halbe Länge der Endstriche
+L:   Value = 3 mm*User.S
+     Value.us = 0.12 in*User.S
+Aw:  Value = 1 mm*User.S
+     Value.us = 0.04 in*User.S
+T:   Value = 2 mm*User.S
+     Value.us = 0.08 in*User.S
+
+[Field]
+Row  Value = Width; Unit = mm; Format = "0 u"; Type = 2
+     Unit.us = in
+     Format.us = "0.## u"
+
+# Linie, Pfeile und Endstriche an beiden Enden
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+MoveTo  X = User.L; Y = User.Aw
+LineTo  X = 0; Y = 0
+LineTo  X = User.L; Y = -User.Aw
+MoveTo  X = Width-User.L; Y = User.Aw
+LineTo  X = Width; Y = 0
+LineTo  X = Width-User.L; Y = -User.Aw
+MoveTo  X = 0; Y = -User.T
+LineTo  X = 0; Y = User.T
+MoveTo  X = Width; Y = -User.T
+LineTo  X = Width; Y = User.T

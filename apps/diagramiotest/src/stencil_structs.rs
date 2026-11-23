@@ -88,6 +88,7 @@ pub(crate) const CALLOUTS: &[(&str, &str)] = &[
     ("sticker_rounded.master", include_str!("../../JFDiagrammer/stencils/callouts/sticker_rounded.master")),
     ("jagged_star_1.master", include_str!("../../JFDiagrammer/stencils/callouts/jagged_star_1.master")),
     ("jagged_star_2.master", include_str!("../../JFDiagrammer/stencils/callouts/jagged_star_2.master")),
+    ("auto_dimension.master", include_str!("../../JFDiagrammer/stencils/callouts/auto_dimension.master")),
     ("tip.master", include_str!("../../JFDiagrammer/stencils/callouts/tip.master")),
 ];
 
@@ -149,6 +150,8 @@ const SETS: [(&str, &[(&str, &str)], &[Want]); 3] = [
             ("Rounded sticker", "", false),
             ("Jagged star 1", "", false),
             ("Jagged star 2", "", false),
+            // (JD15) a dimension line whose text field shows its length: no callout
+            ("Auto-dimension", "", false),
             // (JD13) the hidden note box of the templates' start drawings: no callout
             ("Tip", "", true),
         ],

@@ -193,6 +193,8 @@ Row  Value = ABS(Width); Unit = mm; Format = "0 u"; Type = 2
   in Zoll.
 - Beim Ablegen bekommt die Instanz den Text mit seinen Feldern; die Feldzeilen erbt sie vom Master,
   der Wert folgt jeder Änderung (`diagram_core::field::marked`, `instance::place`).
+- Im Einsatz: die Bemaßungen der Rack-Schablone (`rack_equipment/dim_*.master`) und die
+  Auto-Bemaßung der Beschriftungen (`callouts/auto_dimension.master`, zeigt ihre eigene Länge).
 
 ## 1D-Shapes (Verbinder, Linienpfeile)
 
