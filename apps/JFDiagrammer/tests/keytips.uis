@@ -1,10 +1,11 @@
 # JFDiagrammer, JD8: the access keys (key tips, UI-37): F10 or a tap of Alt shows the keys of
 # the registers, a register's key its ribbon's keys, a command's key runs it; Esc steps back.
-# The keys come from the labels (German: Datei D, Start S, Einfügen E, Entwurf N, Ansicht A).
+# The keys come from the labels (German: Datei D, Start S, Einfügen E, Entwurf N, Daten A,
+# Ansicht I).
 key f10
 expect tab:"Start" selected
 shot build/JFDiagrammer-keytips.png
-key a
+key i
 expect tab:"Ansicht" selected
 shot build/JFDiagrammer-keytips2.png
 # Ansicht: Lineal L, Seitenumbrüche S, Gitternetz G
