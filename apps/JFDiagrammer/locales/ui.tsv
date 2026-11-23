@@ -303,7 +303,7 @@ Vorschauen folgen mit den Designs	Previews will come with the themes	Las vistas 
 # the settings (options.rs): labels, help texts and choice labels the settings page translates
 Hell	Light	Claro	Chiaro	Clair
 Dunkel	Dark	Oscuro	Scuro	Sombre
-Eine Zeichnung, Schablone oder Vorlage öffnen (schreibgeschützt)	Open a drawing, stencil or template (read-only)	Abrir un dibujo, una colección de formas o una plantilla (solo lectura)	Apri un disegno, una raccolta di forme o un modello (sola lettura)	Ouvrir un dessin, une bibliothèque de formes ou un modèle (lecture seule)
+Eine Zeichnung, Schablone oder Vorlage öffnen	Open a drawing, stencil or template	Abrir un dibujo, una colección de formas o una plantilla	Apri un disegno, una raccolta di forme o un modello	Ouvrir un dessin, une bibliothèque de formes ou un modèle
 =Alle Dateien	=All files	=Todos los archivos	=Tutti i file	=Tous les fichiers
 vsdx;vsdm=Visio-Zeichnung	vsdx;vsdm=Visio drawing	vsdx;vsdm=Dibujo de Visio	vsdx;vsdm=Disegno di Visio	vsdx;vsdm=Dessin Visio
 vssx;vssm=Visio-Schablone	vssx;vssm=Visio stencil	vssx;vssm=Colección de formas de Visio	vssx;vssm=Raccolta di forme di Visio	vssx;vssm=Bibliothèque de formes Visio
@@ -825,3 +825,28 @@ Vertikale Ausrichtung	Vertical alignment	Alineación vertical	Allineamento verti
 Texthintergrund	Text background	Fondo del texto	Sfondo del testo	Arrière-plan du texte
 Keiner	None	Ninguno	Nessuno	Aucun
 Hintergrundfarbe	Background color	Color de fondo	Colore di sfondo	Couleur d'arrière-plan
+Änderungen speichern	Save changes	Guardar cambios	Salva modifiche	Enregistrer les modifications
+Möchten Sie die Änderungen an „{}“ speichern?	Do you want to save the changes to “{}”?	¿Desea guardar los cambios en «{}»?	Salvare le modifiche a «{}»?	Voulez-vous enregistrer les modifications apportées à « {} » ?
+Nicht speichern	Don't Save	No guardar	Non salvare	Ne pas enregistrer
+Keine Zeichnung geöffnet	No drawing open	No hay ningún dibujo abierto	Nessun disegno aperto	Aucun dessin ouvert
+Erstellen Sie eine neue Zeichnung, oder öffnen Sie eine vorhandene.	Create a new drawing or open an existing one.	Cree un dibujo nuevo o abra uno existente.	Crea un nuovo disegno o aprine uno esistente.	Créez un nouveau dessin ou ouvrez un dessin existant.
+{} [Schreibgeschützt]	{} [Read-Only]	{} [Solo lectura]	{} [Sola lettura]	{} [Lecture seule]
+Die Zeichnung ist schreibgeschützt geöffnet. Speichern Sie sie unter einem anderen Namen.	The drawing is open as read-only. Save it under another name.	El dibujo está abierto como de solo lectura. Guárdelo con otro nombre.	Il disegno è aperto in sola lettura. Salvalo con un altro nome.	Le dessin est ouvert en lecture seule. Enregistrez-le sous un autre nom.
+Nach Vorlagen suchen	Search for templates	Buscar plantillas	Cerca modelli	Rechercher des modèles
+Neu aus vorhandener Zeichnung…	New from Existing Drawing…	Nuevo a partir de un dibujo existente…	Nuovo da disegno esistente…	Nouveau à partir d'un dessin existant…
+Eine vorhandene Zeichnung als neue, unbenannte Zeichnung öffnen; die Datei bleibt, wie sie ist	Open an existing drawing as a new, unnamed drawing; the file stays as it is	Abrir un dibujo existente como un dibujo nuevo sin nombre; el archivo no cambia	Apri un disegno esistente come nuovo disegno senza nome; il file resta invariato	Ouvrir un dessin existant comme nouveau dessin sans nom ; le fichier reste inchangé
+Suchergebnisse	Search results	Resultados de la búsqueda	Risultati della ricerca	Résultats de la recherche
+Keine Vorlagen gefunden	No templates found	No se encontraron plantillas	Nessun modello trovato	Aucun modèle trouvé
+Schreibgeschützt öffnen	Open read-only	Abrir como de solo lectura	Apri in sola lettura	Ouvrir en lecture seule
+Als Kopie öffnen…	Open as Copy…	Abrir como copia…	Apri come copia…	Ouvrir une copie…
+Eine Zeichnung als neue, unbenannte Zeichnung öffnen; die Datei bleibt, wie sie ist	Open a drawing as a new, unnamed drawing; the file stays as it is	Abrir un dibujo como un dibujo nuevo sin nombre; el archivo no cambia	Apri un disegno come nuovo disegno senza nome; il file resta invariato	Ouvrir un dessin comme nouveau dessin sans nom ; le fichier reste inchangé
+Dateityp	File type	Tipo de archivo	Tipo di file	Type de fichier
+Zuletzt verwendete Ordner	Recent folders	Carpetas recientes	Cartelle recenti	Dossiers récents
+Die Zeichnung als anderen Dateityp speichern (Speichern unter)	Save the drawing as another file type (Save As)	Guardar el dibujo como otro tipo de archivo (Guardar como)	Salva il disegno come un altro tipo di file (Salva con nome)	Enregistrer le dessin dans un autre type de fichier (Enregistrer sous)
+Bahn davor einfügen	Insert Lane Before	Insertar calle antes	Inserisci corsia prima	Insérer un couloir avant
+Bahn danach einfügen	Insert Lane After	Insertar calle después	Inserisci corsia dopo	Insérer un couloir après
+Name universell	Universal name	Nombre universal	Nome universale	Nom universel
+Ein Shape-Name darf kein „!“ enthalten.	A shape name cannot contain “!”.	Un nombre de forma no puede contener «!».	Il nome di una forma non può contenere «!».	Un nom de forme ne peut pas contenir « ! ».
+Ein anderes Shape der Seite hat diesen Namen schon.	Another shape on the page already has this name.	Otra forma de la página ya tiene este nombre.	Un'altra forma della pagina ha già questo nome.	Une autre forme de la page porte déjà ce nom.
+Leer: der Name wird abgeleitet (Sheet.n oder der Name des Master-Shapes mit der Nummer).	Empty: the name is derived (Sheet.n or the master shape's name with the number).	Vacío: el nombre se deriva (Sheet.n o el nombre de la forma maestra con el número).	Vuoto: il nome viene derivato (Sheet.n o il nome della forma master con il numero).	Vide : le nom est dérivé (Sheet.n ou le nom de la forme maître suivi du numéro).
+Das Shape gibt es nicht mehr.	The shape no longer exists.	La forma ya no existe.	La forma non esiste più.	La forme n'existe plus.

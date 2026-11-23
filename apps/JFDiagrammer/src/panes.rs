@@ -76,13 +76,15 @@ pub(crate) fn content(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
 // ------------------------------------------------------------------ the context menus
 
 // i18n
-static SHAPE_MENU: [Mi; 18] = [
+static SHAPE_MENU: [Mi; 21] = [
     Mi::Cmd(CUT), Mi::Cmd(COPY), Mi::Cmd(PASTE), Mi::Sep,
     Mi::Sub("Gruppierung", &[Mi::Cmd(GROUP), Mi::Cmd(UNGROUP)]),
     // (JD8 rest) ZF-12's Shape ▸
     Mi::Sub("Shape", &[Mi::Cmd(ROTATE_LEFT), Mi::Cmd(ROTATE_RIGHT), Mi::Cmd(FLIP_H), Mi::Cmd(FLIP_V), Mi::Sep, Mi::Cmd(PANE_SIZEPOS)]),
     Mi::Sub("Container", &[Mi::Cmd(CT_ADD), Mi::Cmd(CT_REMOVE), Mi::Sep, Mi::Cmd(CT_SELECT), Mi::Cmd(CT_LOCK), Mi::Cmd(CT_DISBAND)]),
     Mi::Cmd(CONNECT_SHAPES), Mi::Cmd(LAYOUT_BEHAVIOR),
+    // (JD15, ST-05) a lane's commands (hidden for other shapes)
+    Mi::Cmd(CFF_LANE_BEFORE), Mi::Cmd(CFF_LANE_AFTER),
     Mi::Sub("Anordnen", &[Mi::Cmd(BRING_FRONT), Mi::Cmd(BRING_FORWARD), Mi::Cmd(SEND_BACK), Mi::Cmd(SEND_BACKWARD)]),
     Mi::Sub("Daten", &[Mi::Cmd(PANE_DATA), Mi::Cmd(SHAPE_DATA_DEFINE)]),
     // (JD8 rest) the shape's links follow its Hyperlink row (cmds_text::LINK_ROWS, ZF-12)
@@ -90,6 +92,8 @@ static SHAPE_MENU: [Mi; 18] = [
     Mi::Sub("Formatieren", &[Mi::Cmd(FORMAT_TEXT), Mi::Cmd(FORMAT_LINE), Mi::Cmd(FORMAT_FILL), Mi::Cmd(FORMAT_SHADOW)]),
     Mi::Sub("Verbinderart", &[Mi::Cmd(CONN_RIGHT_ANGLE), Mi::Cmd(CONN_STRAIGHT), Mi::Cmd(CONN_CURVED), Mi::Sep, Mi::Cmd(CONN_RESET)]),
     Mi::Sep, Mi::Cmd(ADD_TO_MY_SHAPES),
+    // (JD15, SP-01) Shape-Name
+    Mi::Cmd(SHAPE_NAME),
 ];
 // i18n
 static PAGE_MENU: [Mi; 4] = [

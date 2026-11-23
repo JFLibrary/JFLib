@@ -11,9 +11,14 @@
 //   keys_page(app, ui)        the shortcuts of the current language (read only; own ones go
 //                             into [keys] of the settings file, UI-19 comes later)
 //
-// What the options do today: the language and the region switch at once (LG-02, LG-07), the
-// theme follows "Design"; the rest is stored and waits for its stage (start screen JD13,
-// AutoRecover JD5, live dynamics and units JD7, undo depth JD2's history in the app).
+// What the options do today: the language and the region switch at once (LG-02, LG-07; the
+// region also gives the units of a new drawing and of Datei › Neu), the theme follows "Design",
+// Livevorschau, Verbindungspfeile and Speicherort für persönliche Vorlagen act; (JD15) QuickInfos ›
+// Keine QuickInfos hides every QuickInfo (main.rs, ui.tooltips_set; UI-13), Standardspeicherort
+// für Zeichnungen is where a new drawing's Speichern unter starts (edit_doc.rs, UI-15), Anzahl der
+// Rückgängig-Schritte limits undo for the drawings opened or made after it (UI-18), Eingabetaste
+// beendet die Textbearbeitung (edit_text.rs, TX-01).  The rest is stored and waits for its stage
+// (start screen, AutoRecover, live dynamics, units, the rest of Erweitert).
 
 use alloc::string::String;
 use base::settings::{Key, Schema, Settings};

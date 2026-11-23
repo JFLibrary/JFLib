@@ -1,0 +1,32 @@
+#!args --no-system-fonts --save-dir build
+# JFDiagrammer, JD15: Speichern unter -- Exportieren › Dateityp ändern leads there (UI-11); its file
+# types open the save dialog with their extension; the folders of the files used last are listed
+# (Zuletzt verwendete Ordner) and open the dialog in them (UI-08)
+click tab:"Datei"
+click button:"Exportieren"
+expect button:"Dateityp ändern" enabled
+click button:"Dateityp ändern"
+expect text:"Wählen Sie den Ort und den Dateityp." exists
+expect button:"Visio-Vorlage (.vstx)" exists
+expect text:"Zuletzt verwendete Ordner" missing
+click button:"Visio-Vorlage (.vstx)"
+expect dialog:"Speichern unter" exists
+expect #28940 text "Zeichnung1.vstx"
+key esc
+expect dialog:"Speichern unter" missing
+# saved into build/: the folder is listed
+key ctrl+s
+expect dialog:"Speichern unter" exists
+click #28940
+key ctrl+a
+type "jd15-ordner.vsdx"
+click button:"Speichern"
+expect text:"jd15-ordner – JFDiagrammer" exists
+click tab:"Datei"
+click button:"Speichern unter"
+expect text:"Zuletzt verwendete Ordner" exists
+click button:"build"
+expect dialog:"Speichern unter" exists
+expect #28940 text "jd15-ordner.vsdx"
+expect text:"win" exists
+key esc

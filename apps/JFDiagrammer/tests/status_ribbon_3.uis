@@ -62,6 +62,9 @@ expect listitem:"Container" unselected
 cmd 4097
 click button:"Standardflussdiagramm"
 dblclick button:"Standardflussdiagramm · Leer"
+# (JD15, UI-12) the drawing has changes: the question first
+expect dialog:"Änderungen speichern" exists
+click button:"Nicht speichern"
 expect text:"Zeichnung2 – JFDiagrammer" exists
 expect tab:"Start" selected
 # RK-03: Bahn makes a cross-functional flowchart; the check boxes of its register
