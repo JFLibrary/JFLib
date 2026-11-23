@@ -1,0 +1,67 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD26: the templates Ursache-Wirkung-Diagramm (VL-32) and Blockdiagramm (VL-12) in
+# Datei › Neu -- the category Geschäft shows Ursache-Wirkung-Diagramm and Diagramme und Grafiken;
+# the fishbone (6M) is preselected and opens with its stencils; the effect moved by its head: the
+# ends of the six categories stay on its spine and the two causes on their bones (glued by the
+# template to connection points of 1-D shapes); a new primary cause from the stencil, its end
+# dragged onto the bone of a category, glues there (connection points of 1-D shapes are glue
+# targets) and follows when the effect moves; the block diagram's arrows stay glued to the boxes
+# when the processing box moves
+click tab:"Datei"
+expect button:"Neu" selected
+click button:"Geschäft"
+expect button:"Geschäft" checked
+expect button:"Ursache-Wirkung-Diagramm" exists
+expect button:"Diagramme und Grafiken" exists
+expect button:"Standardflussdiagramm" missing
+click button:"Ursache-Wirkung-Diagramm"
+expect button:"Fischgräte (6M)" checked
+expect button:"Leer" exists
+click button:"Erstellen"
+expect tab:"Start" selected
+expect tab:"Ursache-Wirkung-Diagramm-Shapes" selected
+expect tab:"Standard-Shapes" exists
+expect listitem:"Wirkung (Problem)" rect 638 449 378 51
+expect listitem:"Mensch" rect 597 364 93 111
+expect listitem:"Material" rect 597 475 93 110
+shot build/JFDiagrammer-business-fishbone.png
+# the effect by its head: the bones' ends follow the spine, the causes follow the bones
+drag 990,474 1010,494
+expect listitem:"Wirkung (Problem)" rect 651 475 377 50
+expect listitem:"Mensch" rect 597 364 106 136
+expect listitem:"Mitwelt" rect 770 500 106 85
+expect listitem:"Material" rect 597 500 106 85
+shot build/JFDiagrammer-business-fishbone-moved.png
+key ctrl+z
+expect listitem:"Mensch" rect 597 364 93 111
+# a new cause onto the bone of Maschine (its point 7), then the effect moved again
+drag button:"Primäre Ursache 1" 560,320
+key f2
+type "Lieferant"
+click 900,650
+click 560,320
+expect listitem:"Lieferant" rect 522 317 76 6
+drag button:"Endpunkt" 760,448
+expect listitem:"Lieferant" rect 522 320 238 127
+drag 990,474 1010,494
+expect listitem:"Maschine" rect 684 364 105 136
+expect listitem:"Lieferant" rect 522 320 247 145
+shot build/JFDiagrammer-business-fishbone-cause.png
+# the block diagram from its starter: three boxes, a store, 1-D arrows glued between them
+click tab:"Datei"
+click button:"Allgemein"
+expect button:"Blockdiagramm" exists
+click button:"Blockdiagramm"
+click button:"Beispiel: System"
+click button:"Erstellen"
+expect tab:"Blöcke" selected
+expect listitem:"Verarbeitung" rect 721 387 101 50
+expect listitem:"1D-Pfeil" rect 626 399 95 25
+expect listitem:"1D-Doppelpfeil" rect 759 437 25 95
+shot build/JFDiagrammer-business-block.png
+# the processing box down: the arrows' ends stay on its connection points
+drag 771,420 771,460
+expect listitem:"Verarbeitung" exists
+expect listitem:"1D-Pfeil" rect 624 406 97 48
+expect listitem:"1D-Doppelpfeil" rect 759 475 25 57
+shot build/JFDiagrammer-business-block-moved.png
