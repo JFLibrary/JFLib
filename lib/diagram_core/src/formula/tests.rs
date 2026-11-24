@@ -1217,7 +1217,9 @@ fn text_sizes_with_the_apps_metrics() {
 fn not_computed_functions_are_kept() {
     let (mut doc, sh) = one(&[]);
     let cases = [
-        (r#"FORMAT(1,"0.0")"#, Keep::NotComputed("FORMAT")),
+        (r#"EVALTEXT("1+1")"#, Keep::NotComputed("EVALTEXT")),
+        // (JD19) a length's unit is not known here: FORMAT keeps its stored value
+        (r#"FORMAT(Width,"0.0")"#, Keep::NotComputed("FORMAT")),
         ("_WALKGLUE(1)", Keep::NotComputed("_WALKGLUE")),
         (r#"FONT("Calibri")"#, Keep::NotComputed("FONT")),
         ("Reviewer.X1", Keep::Reference),
@@ -1232,6 +1234,31 @@ fn not_computed_functions_are_kept() {
         Engine::new().evaluate_text(&doc, sh, &font, r#"FONT("Calibri")"#),
         Ok(Outcome::Value(Val::Font(Rc::from("Calibri"))))
     );
+}
+
+#[test]
+fn format_pictures() {
+    // (JD19) FORMAT and FORMATEX of numbers, texts, dates and shape data in field.rs's pictures
+    let (mut doc, sh) = one(&[("Cost", "", 1999.5), ("Load", "", 0.35)]);
+    let date = crate::field::ole_days(2026, 11, 24, 0, 0, 0);
+    let s = |doc: &Document, t: &str| match eval_in(doc, sh, t) {
+        Val::Str(s) => String::from(&*s),
+        other => panic!("{t}: {other:?}"),
+    };
+    assert_eq!(s(&doc, r##"FORMAT(1234.5,"#,##0.00")"##), "1,234.50");
+    assert_eq!(s(&doc, r#"FORMAT(User.Cost,"0")"#), "2000");
+    assert_eq!(s(&doc, r#"FORMAT(User.Cost*2,"0.0")"#), "3999.0");
+    assert_eq!(s(&doc, r#"FORMAT(User.Load,"0%")"#), "35%");
+    assert_eq!(s(&doc, r#"FORMAT("ok","@+")"#), "OK");
+    assert_eq!(s(&doc, r#"FORMATEX(2.5,"0.00",1031,1031)"#), "2.50");
+    assert_eq!(s(&doc, &format!("FORMAT({date},\"{{{{dd.MM.yyyy}}}}\")")), "24.11.2026");
+    // the document's decimal sign
+    doc.fields.decimal = ',';
+    doc.fields.group = '.';
+    assert_eq!(s(&doc, r##"FORMAT(1234.5,"#,##0.00")"##), "1.234,50");
+    // errors pass through, a wrong count of arguments is an error
+    assert!(matches!(eval_in(&doc, sh, r#"FORMAT(1/0,"0")"#), Val::Err(CellError::DivZero)));
+    assert!(matches!(eval_in(&doc, sh, "FORMAT(1)"), Val::Err(CellError::Value)));
 }
 
 #[test]
