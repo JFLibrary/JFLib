@@ -15,6 +15,10 @@
 //                  corners rounded once at the end), bevel (chamfer or round edges and corners)
 //   exact          expansions (Shewchuk), orient2d, the side of a plane at a meeting of three planes,
 //                  the correctly rounded quotient
+//   region         plane regions with holes (JD21): union, intersection, difference, xor and the
+//                  decomposition of an overlay (Visio's Fragment) of contour sets, non-zero or even-odd,
+//                  open polylines as cutters; every output edge marks the input edge it lies on;
+//                  decided by snap rounding on an integer grid (exact, the same bits everywhere)
 //   Report         closed, manifold, outward, degenerate triangles, normals, bounds, area, volume, Euler
 //                  characteristic, components; json()
 //   math           Vec3, Aabb, Affine in f64; sqrt correctly rounded, sin / cos / atan2 from rt's portable
@@ -43,6 +47,8 @@ mod mesh;
 mod normals;
 /// 2D profiles: area, orientation, triangulation and the profiles of the modelling API
 pub mod poly;
+/// plane regions with holes: Boolean operations and the decomposition of an overlay (snap rounding)
+pub mod region;
 
 pub use build::{DEFAULT_SMOOTH_DEG, arch, cone, cuboid, cylinder, extrude, lathe, prism, sphere, stairs, sweep, torus};
 pub use check::{DEGENERATE_RATIO, NORMAL_TOLERANCE, Report, fnum};
@@ -90,3 +96,6 @@ impl core::fmt::Display for Error {
         f.write_str(self.message())
     }
 }
+
+#[cfg(test)]
+mod tests;

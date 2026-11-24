@@ -22,7 +22,10 @@
 // absolute rows keep the proportional form of their formulas (Visio's "Width*0.5").  Adding and
 // taking out a vertex inserts or removes a row in the middle of the section
 // (Transaction::insert_row / remove_row: the rows after it are renumbered, formulas follow, an
-// instance's inherited section becomes its own).  LockVtxEdit refuses (Invalid).
+// instance's inherited section becomes its own).  LockVtxEdit refuses (Invalid).  (JD21, SP-05)
+// After each of them the box follows the geometry (shapeops::fit_frame: Width, Height, Pin and
+// the rows into the box of the geometry, the shape stays on the page; not with LockCalcWH), as
+// Visio does after a vertex edit.
 
 use alloc::format;
 use alloc::string::String;
@@ -331,7 +334,10 @@ pub fn set_vertex(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, secti
     };
     let mut wr = Writer::new();
     wr.put_all(tx, eng, sheet, sets)?;
-    wr.finish(tx, eng)
+    wr.finish(tx, eng)?;
+    // (JD21, SP-05) the box follows the geometry
+    crate::shapeops::fit_frame(tx, eng, shape)?;
+    Ok(())
 }
 
 /// add a vertex at the page point `at` after row `after` (on the segment to the next row):
@@ -354,6 +360,7 @@ pub fn insert_vertex(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, se
         tx.set_constant(sheet, &a, Value::Num(v), None)?;
     }
     eng.recalc(tx, &[sheet])?;
+    crate::shapeops::fit_frame(tx, eng, shape)?;
     Ok(ix)
 }
 
@@ -384,5 +391,6 @@ pub fn delete_vertex(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, se
     }
     tx.remove_row(sheet, sk, RowKey::Index(row))?;
     eng.recalc(tx, &[sheet])?;
+    crate::shapeops::fit_frame(tx, eng, shape)?;
     Ok(())
 }

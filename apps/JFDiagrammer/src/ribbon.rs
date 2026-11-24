@@ -139,7 +139,11 @@ static ROTATE_MENU: [It; 4] = [C(ROTATE_LEFT), C(ROTATE_RIGHT), C(FLIP_H), C(FLI
 static POSITION_MENU: [It; 4] = [C(DISTRIBUTE_H), C(DISTRIBUTE_V), Sep, Sub("Shapes drehen", &ROTATE_MENU)];
 static FRONT_MENU: [It; 2] = [C(BRING_FRONT), C(BRING_FORWARD)];
 static BACK_MENU: [It; 2] = [C(SEND_BACK), C(SEND_BACKWARD)];
-static GROUP_MENU_ITEMS: [It; 2] = [C(GROUP), C(UNGROUP)];
+// (JD21 ops) the shape operations (Entwicklertools › Shape-Design › Vorgänge in Visio; JD23 brings
+// that register)
+// i18n
+static GROUP_MENU_ITEMS: [It; 4] = [C(GROUP), C(UNGROUP), Sep, Sub("Vorgänge", &OPERATIONS_MENU)];
+static OPERATIONS_MENU: [It; 7] = [C(OP_UNION), C(OP_COMBINE), C(OP_FRAGMENT), C(OP_INTERSECT), C(OP_SUBTRACT), Sep, C(UPDATE_ALIGN_BOX)];
 static FIND_MENU_ITEMS: [It; 2] = [C(FIND), C(REPLACE)];
 static LAYER_MENU: [It; 2] = [C(LAYER_ASSIGN), C(LAYER_PROPERTIES)];
 static SELECT_MENU_ITEMS: [It; 4] = [C(SELECT_ALL), C(SELECT_BY_TYPE), C(SELECT_AREA), C(LASSO)];

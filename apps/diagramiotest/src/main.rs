@@ -44,6 +44,9 @@
 //                                        with geometry formulas; JFDiagrammer's binary_stencil.uis)
 //   diagramiotest --write-vss-hostile DIR (JD17) the synthetic .vss files and their hostile
 //                                         variants (vss.rs)
+//   diagramiotest --write-jd21-ops DIR   (JD21) jd21-vorgaenge.vsdx: input sets of the shape
+//                                         operations and JFDiagrammer's results for the Visio
+//                                         counter-check (shapeops.rs)
 //   diagramiotest --write-vss-overview DIR [--corpus DIR]   (JD17) every master of each local .vss
 //                                         on one sheet (<stem>-alle.png), and of each .vssx Visio
 //                                         saved from them (<stem>-visio-alle.png; vss.rs)
@@ -92,6 +95,9 @@
 //   vdx       (JD16, vdx.rs) the XML formats of 2003-2010: the self-written drawing, stencil and
 //             bitmap read into the model and written as .vsdx / .vssx, hostile files and
 //             limits; macro projects passed through unchanged; document properties
+//   shapeops  (JD21, shapeops.rs) the shape operations on rectangles, an ellipse, a turned
+//             rectangle, an ArcTo shape and a shape with a hole: arcs stay arcs, the results
+//             written and read back with the same rows, formulas and frames, stretched results
 //   vss       (JD17, vss.rs) the binary stencils of 2003-2010: compound files (cfbkit.rs) and
 //             VisioDocument streams (vsskit.rs) built here, hostile variants of both, cut and
 //             mutated files; the local .vss of SWDB_DE read, written as .vssx and read back, and
@@ -132,6 +138,8 @@ mod pdfreader;
 mod render;
 mod roundtrip;
 mod samples;
+// (JD21) the shape operations
+mod shapeops;
 mod stencil_business;
 mod stencil_network;
 mod stencil_overview;
@@ -275,6 +283,10 @@ fn run() -> i32 {
         // (JD17) the synthetic .vss files and their hostile variants
         return vss::write_hostile(&dir);
     }
+    if let Some(dir) = arg(&args, "--write-jd21-ops") {
+        // (JD21) the shape operations for the Visio counter-check
+        return shapeops::write(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-probe") {
         return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
     }
@@ -333,6 +345,10 @@ fn run() -> i32 {
         // (JD18) external data (DF-12)
         if h.on("data") {
             data::run(&mut h);
+        }
+        // (JD21) the shape operations
+        if h.on("shapeops") {
+            shapeops::check(&mut h);
         }
         // (JD17) the binary stencils of 2003-2010 (subgroups vss/cfb, vss/stream ...)
         vss::run(&mut h);

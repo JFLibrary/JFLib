@@ -42,7 +42,7 @@ Leseschlüssel:
 | 2.2 Seiten | 6 | 2 | 0 | 0 | 2 | 4 |
 | 2.3 Ebenen | 4 | 0 | 0 | 1 | 0 | 0 |
 | 2.4 Master, Schablonen und Formatvorlagen | 3 | 2 | 1 | 1 | 1 | 2 |
-| 2.5 Shapes, Geometrie und Gruppen | 5 | 6 | 0 | 1 | 0 | 5 |
+| 2.5 Shapes, Geometrie und Gruppen | 5 | 6 | 0 | 2 | 1 | 3 |
 | 2.6 Format: Linie, Füllung, Schatten, Effekte | 3 | 2 | 0 | 0 | 1 | 1 |
 | 2.7 Text und Felder | 6 | 2 | 0 | 0 | 0 | 2 |
 | 2.8 Verbinder, Kleben, Routing und Layout | 4 | 6 | 0 | 0 | 1 | 6 |
@@ -74,9 +74,9 @@ Leseschlüssel:
 | 5.1 Vorlagen-Infrastruktur | 4 | 0 | 0 | 0 | 0 | 0 |
 | 5.2 Vorlagen nach Kategorie | 6 | 1 | 0 | 2 | 1 | 10 |
 | 5.3 Assistenten und Generatoren | 0 | 0 | 0 | 3 | 0 | 4 |
-| **zusammen** | **174** | **106** | **1** | **39** | **37** | **181** |
+| **zusammen** | **174** | **106** | **1** | **40** | **38** | **179** |
 
-P2-Zeilen, die schon fertig sind (39): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, ST-09, DA-05, TH-06, SS-11, SS-21, SS-22, SS-31, SS-33, SS-36, FX-11, FX-12, RD-02, RD-03, RD-09, LG-05, SH-003, SH-004, SH-007, SH-031, SH-032, SH-033, SH-041, VL-32, VL-38, AS-03, AS-04, AS-20.
+P2-Zeilen, die schon fertig sind (40): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, SP-16, ST-09, DA-05, TH-06, SS-11, SS-21, SS-22, SS-31, SS-33, SS-36, FX-11, FX-12, RD-02, RD-03, RD-09, LG-05, SH-003, SH-004, SH-007, SH-031, SH-032, SH-033, SH-041, VL-32, VL-38, AS-03, AS-04, AS-20.
 <!-- summary:end -->
 
 ## Offene Entscheidungen des Nutzers
@@ -120,7 +120,7 @@ L = mehr. P2-Teile von P1-Zeilen stehen bei ihrer P2-Etappe.
 | JD20 | UI-16 | Bearbeitungs- und Korrektursprachen | S |
 | JD20 | ZF-18 | Alternativtext und Lesereihenfolge für Bildschirmleser (RU-03) | S |
 | JD21 | SP-04, SS-30 | Steuerpunkte kleben (CanGlue: Ethernet, Ringnetz, Bus), Tip als QuickInfo | S |
-| JD21 | SP-05 | Scheitelpunkte: Rahmen folgt der Geometrie, Mehrfachauswahl, Bogen-Griffe | S |
+| JD21 | SP-05 | Scheitelpunkte: Mehrfachauswahl, Bogen-Griffe | S |
 | JD21 | SP-06, SS-17 | Gruppen: Warnung, Ablegen in eine Gruppe, SelectMode 1/2, DontMoveChildren | S |
 | JD21 | CN-01, CN-02 | Verbindungspunkt-Werkzeug; Kleben an Scheitelpunkt, Führungslinie, Steuerpunkt | S |
 | JD21 | CN-04, CN-05, SS-19, SS-40 | Knick- und Segment-Ziehpunkte; Routing-Stile, Richtung, Durchlässigkeit je Richtung | M |
@@ -300,10 +300,10 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | SP-02 | Geometrie darstellen | P1 | fertig | dit render/geometry (alle Zeilenarten, mehrere Abschnitte mit NoFill/NoLine/NoShow), render/corpus; core geometry-Tests | – |
 | SP-03 | Transformation | P1 | fertig | edit_shapes.uis, edit_golden.uis; core ops::tests::every_grip_keeps_the_opposite_edge, rotate_about_a_centre, set_pin_leaves_the_shape_in_place, lock_bits_follow_the_lock_names | – |
 | SP-04 | Steuerpunkte | P1 | teilweise | status_model.uis (ziehen, Rückgängig); core ops::tests::control_points_write_cells_as_visio_does; structures_callout.uis | Steuerpunkte an anderen Shapes kleben (CanGlue; `edit_canvas` verwirft den Kleber außer bei Beschriftungen) |
-| SP-05 | Scheitelpunkte bearbeiten | P1/P2 | teilweise | status_model.uis (ziehen, Strg+Klick fügt ein); core ops::tests::vertices_move_insert_delete_with_closing_rows | Width/Height/Pin folgen der Geometrie nicht; mehrere mit Umschalt; Bogen-Griffe; Segment beim Zeichnen zurücknehmen |
+| SP-05 | Scheitelpunkte bearbeiten | P1/P2 | teilweise | status_model.uis (ziehen, Strg+Klick fügt ein); shapeops_frame.uis (JD21: der Rahmen folgt der Geometrie); core ops::tests::vertices_move_insert_delete_with_closing_rows, shapeops::tests::frame_follows_vertex_edits, frame_follows_a_shape_with_an_arc | mehrere mit Umschalt; Bogen-Griffe; Segment beim Zeichnen zurücknehmen |
 | SP-06 | Gruppen | P1 | teilweise | edit_group.uis (gruppieren, aufheben, Unterauswahl); core ops::tests::group_inside_a_group_and_setatref, turning_and_flipping_a_group_takes_its_members_along | Warnung bei formelgebundenen Gruppen, Ablegen in Gruppe (IsDropTarget), „Kinder zuerst“ (nur SelectMode 0 wirkt) |
 | SP-07 | Stapelreihenfolge | P1 | fertig | edit_group.uis; core ops::tests::reorder_front_back_forward_backward | – |
-| SP-08 | Shape-Operationen | P2 | fehlt | – | alles (JD21) |
+| SP-08 | Shape-Operationen | P2 | teilweise | shapeops_union.uis, shapeops_combine.uis, shapeops_fragment.uis, shapeops_intersect.uis, shapeops_subtract.uis (Start › Anordnen › Gruppieren › Vorgänge bis JD23); dit shapeops (Bögen bleiben Bögen, Rundlauf der Zeilen und Formeln, gestreckt); core shapeops::tests (Rechtecke, Ellipsen, gedreht, gespiegelt, Gruppen, Löcher, leeres Ergebnis); geom tests (region) | Verbinden, Trimmen, Versatz, Kurve anpassen, benutzerdefiniertes Anpassen; Visio-Gegenprobe der Zeilen und Formeln (jd21-vorgaenge.vsdx) |
 | SP-09 | Bilder als Shapes | P1 | teilweise | pictures.uis (Bild-Shape, drehbar, gespeichert); dit render/pictures (ImgOffset/ImgWidth) | Zuschneiden, Helligkeit, Kontrast, Gamma, Transparenz; SVG als Vektor |
 | SP-10 | Führungslinien und -punkte | P1 | teilweise | edit_view.uis (aus dem Lineal, Shapes rasten ein), canvas_guides.uis (Ansicht › Führungslinien aus, Nach Typ auswählen, Entf, Rückgängig) | per Klick wählen, verschieben, drehen; Kleben und Mitnehmen; Führungspunkte; per Größe und Position; Ausrichten legt Führungslinien an |
 | SP-11 | Shape ändern | P2 | fehlt | – | alles (JD21) |
@@ -311,7 +311,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | SP-13 | Shape-Daten beim Ablegen abfragen | P2 | fertig | data_ask_drop.uis (Ablegen aus Favoriten, Duplizieren, Einfügen, Strg+Umschalt+Ziehen; OK schreibt, Abbrechen behält, Rückgängig) | – |
 | SP-14 | Verschieben ohne Raster und Feinschritte | P1 | fertig | status_model.uis (Pfeil = Rasterschritt, Umschalt = 1 px, Alt-Ziehen frei) | – |
 | SP-15 | Gruppe öffnen | P2 | fehlt | – | alles (JD21) |
-| SP-16 | Ausrichtungsrahmen aktualisieren | P2 | fehlt | – | alles (JD21) |
+| SP-16 | Ausrichtungsrahmen aktualisieren | P2 | fertig | shapeops_frame.uis (Gruppe um ein herausgeschobenes Mitglied, Rückgängig); core shapeops::tests::alignment_box_of_a_group | – |
 | SP-17 | Grenzfälle Gruppen | P2 | fehlt | – | alles (JD21) |
 
 ### 2.6 Format: Linie, Füllung, Schatten, Effekte
@@ -621,7 +621,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | RA-08 | Neues Fenster, Anordnen, Wechseln | P2 | fehlt | – | (JD25) |
 | RA-09 | Add-Ons (Array, Nummerieren) | P2 | fehlt | – | (JD21) |
 | RX-03 | ShapeSheet anzeigen | P2 | fehlt | – | Register fehlt (JD23) |
-| RX-04 | Zeichentools, Vorgänge, Gruppieren | P1 | teilweise | tests/draw_tools.uis, tests/edit_group.uis (im Register Start) | Register Entwicklertools (JD23); Vorgänge (P2, SP-08, JD21) |
+| RX-04 | Zeichentools, Vorgänge, Gruppieren | P1 | teilweise | tests/draw_tools.uis, tests/edit_group.uis (im Register Start); shapeops_union.uis (Vorgänge, JD21: in Start › Anordnen › Gruppieren) | Register Entwicklertools (JD23); Verbinden, Trimmen, Versatz (SP-08) |
 | RX-05 | Shape-Name | P2 | fehlt | – | (JD23) |
 | RX-06 | Verhalten | P2 | fehlt | – | (JD23) |
 | RX-07 | Schutz | P2 | fehlt | – | (JD23) |

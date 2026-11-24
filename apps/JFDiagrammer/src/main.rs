@@ -86,6 +86,8 @@
 //                     (Externe Daten), data_refresh (aktualisieren, Intervall, Konflikte),
 //                     data_link (Daten verknüpfen), data_ask (Abfrage beim Ablegen),
 //                     data_textdraw (Zeichnung aus Text)
+//   src/shapeops_cmds.rs  (JD21) the shape operations and Ausrichtungsfeld aktualisieren
+//                     (Start › Anordnen › Gruppieren › Vorgänge until JD23)
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too); templates/ (JD13) the
@@ -187,6 +189,9 @@ mod qat;
 mod rack;
 mod ribbon;
 mod select_type;
+// (JD21) Vorgänge: Gesamtmenge, Kombinieren, In Einzelmengen zerlegen, Schnittmenge bilden,
+// Subtrahieren, Ausrichtungsfeld aktualisieren
+mod shapeops_cmds;
 mod shell;
 mod stencils;
 mod stencils_drop;

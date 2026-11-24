@@ -1,0 +1,28 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 (SP-08): Subtrahieren -- the shape selected first keeps its place and loses
+# what the others cover; the order of the clicks decides
+cmd 4404
+drag 500,330 640,420
+drag 580,380 720,470
+cmd 4400
+# the first one first: its box stays
+key esc
+click 520,340
+click 700,450 shift
+click button:"Gruppieren"
+click menuitem:"Subtrahieren"
+expect listitem:"Sheet.6" selected
+expect listitem:"Sheet.5" missing
+expect listitem:"Sheet.6" rect 500 324 151 100
+expect button:"Breite: 60 mm  Höhe: 40 mm  Winkel: 0°" exists
+key ctrl+z
+# the second one first
+key esc
+click 700,450
+click 520,340 shift
+click button:"Gruppieren"
+click menuitem:"Subtrahieren"
+expect listitem:"Sheet.4" missing
+expect listitem:"Sheet.7" selected
+expect listitem:"Sheet.7" rect 576 374 150 101
+expect button:"Breite: 60 mm  Höhe: 40 mm  Winkel: 0°" exists

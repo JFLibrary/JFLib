@@ -1168,3 +1168,10 @@ Shapes ohne X und Y werden in Stufen von oben nach unten angeordnet, Links werde
 {} Shapes und {} Verbinder erstellt	{} shapes and {} connectors created	{} formas y {} conectores creados	{} forme e {} connettori creati	{} formes et {} connecteurs créés
 Die Zeichnung lässt sich nicht erstellen.	The drawing cannot be created.	No se puede crear el dibujo.	Impossibile creare il disegno.	Impossible de créer le dessin.
 Shape-Daten in Zeile {}: {}	Shape data in line {}: {}	Datos de forma en la línea {}: {}	Dati forma nella riga {}: {}	Données de forme à la ligne {} : {}
+Vorgänge	Operations	Operaciones	Operazioni	Opérations
+Gesamtmenge	Union	Unión	Unione	Union
+Kombinieren	Combine	Combinar	Combina	Combiner
+In Einzelmengen zerlegen	Fragment	Fragmentar	Frammenta	Fragmenter
+Schnittmenge bilden	Intersect	Intersecar	Interseca	Intersection
+Subtrahieren	Subtract	Restar	Sottrai	Soustraire
+Ausrichtungsfeld aktualisieren	Update Alignment Box	Actualizar cuadro de alineación	Aggiorna casella di allineamento	Mettre à jour la zone d'alignement

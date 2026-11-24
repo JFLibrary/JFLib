@@ -105,7 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shapeops.rs](#diagram_coresrcshapeopsrs) · [src/shapeops/frame.rs](#diagram_coresrcshapeopsframers) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/data.rs](#diagram_iosrcdatars) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/textdraw.rs](#diagram_iosrctextdrawrs) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vss/mod.rs](#diagram_iosrcvssmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -123,7 +123,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [game_render3d](#game_render3d) -- The bridge from the game core to render3d: entities with a mesh as scene instances
   <br>[lib.rs](#game_render3d-crate-root) · [src/models.rs](#game_render3dsrcmodelsrs)
 - [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
-  <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/csg.rs](#geomsrccsgrs) · [src/exact.rs](#geomsrcexactrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
+  <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/csg.rs](#geomsrccsgrs) · [src/exact.rs](#geomsrcexactrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs) · [src/region.rs](#geomsrcregionrs)
 - [netchan](#netchan) -- Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network
   <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 - [sheet_io](#sheet_io) -- XLSX and CSV import: workbooks and delimited text as typed tables
@@ -55027,6 +55027,10 @@ a file loses nothing, and the behaviour Visio files carry works without translat
   data::*                       (JD18) external data: connections, recordsets with their
                                 cached rows, rows bound to shapes (Prop rows, DataLinked),
                                 refresh with conflicts, automatic linking (DA-04, DA-05)
+  shapeops::*                   (JD21) shape operations: Vereinigen, Kombinieren,
+                                Fragmentieren, Schneiden, Subtrahieren (SP-08) on geom's plane
+                                Booleans, arcs rebuilt as arcs; fit_frame (the box follows the
+                                geometry after vertex edits, SP-05), update_alignment_box (SP-16)
   field::*                      (JD8) text fields: a Field row's value in its format picture,
                                 new fields, the text with its fields, the document's
                                 properties (Document::fields: the app's locale and clock)
@@ -57281,6 +57285,9 @@ geometry -- the Geometry sections of a shape as paths, and the transforms of sha
                                    Bézier pieces where they are polynomial, else sampled)
   doc.geometry_paths(sheet, w, h)  the Geometry sections of a sheet with their flags (NoFill,
                                    NoLine, NoShow, NoSnap) and paths in local coordinates
+  doc.geometry_tagged(sheet, w, h) (JD21) the same, and per piece the row (IX) it comes from
+  Conic / row_conic                (JD21) the ellipse an ArcTo, EllipticalArcTo, Ellipse or
+                                   RelEllipticalArcTo row draws: c + u cos t + v sin t
   doc.local_xform(sheet)           local -> parent: Pin, LocPin, Angle, FlipX, FlipY
   doc.page_xform(shape)            local -> page: the chain of groups up to the page
   round_corners(path, r)           the Rounding cell: corners between straight lines rounded
@@ -57391,6 +57398,9 @@ INFINITE: f64 = 1000.0
   the Geometry sections `sheet` really has (inherited ones included, deleted ones left out)
   with their rows as paths in local coordinates; `w` and `h` are the shape's Width and
   Height (the relative rows and the relative points of NURBS and POLYLINE need them)
+- **`fn geometry_tagged(&self, sheet: SheetRef, w: f64, h: f64) -> Vec<(GeoSection, Vec<Vec<u32>>)>`**
+  (JD21) geometry_paths and, per sub-path, the IX of the row each piece comes from (a row
+  that draws several pieces -- an arc, a NURBS curve, a polyline -- gives each of them its IX)
 - **`fn local_xform(&self, sheet: SheetRef) -> Xform`**
   the transform of a shape's local coordinates to its parent's (the page, or the local
   coordinates of its group): T(Pin) R(Angle) Flip T(-LocPin)
@@ -57401,6 +57411,43 @@ INFINITE: f64 = 1000.0
 - **`fn arc_cubics(c: [f64; 2], r: f64, start: f64, sweep: f64, out: &mut Vec<Seg>)`**
   a circular arc (centre, radius, start angle, sweep in radians, positive counter-clockwise)
   as cubic pieces of at most 90 degrees
+
+- **`struct Conic`**
+  An ellipse and an arc of it: the points c + u cos t + v sin t for t from `t0` to `t0 + sweep`
+  (radians, positive counter-clockwise from u towards v; u and v are conjugate half axes, the
+  half axes themselves for an upright ellipse).  An affine map keeps the form: map() maps c, u
+  and v and the parameters stay, so an arc of a turned, flipped or stretched shape is a Conic
+  on the page too.
+  - `c: [f64; 2]`
+  - `u: [f64; 2]`
+  - `v: [f64; 2]`
+  - `t0: f64`
+  - `sweep: f64`
+
+**`impl Conic`**
+
+- **`fn at(&self, t: f64) -> [f64; 2]`**
+  the point at parameter t
+- **`fn is_full(&self) -> bool`**
+  the whole ellipse (a sweep of a full turn)
+- **`fn map(&self, m: &Xform) -> Conic`**
+  the same under an affine map
+- **`fn param(&self, p: [f64; 2]) -> Option<f64>`**
+  the parameter of the point of the ellipse that `p` projects to from the centre (in the
+  space where the ellipse is the unit circle); None for a degenerate ellipse
+- **`fn axes(&self) -> (f64, f64, f64)`**
+  the principal axes: the angle of the major axis (radians), the major and the minor half
+  length (the singular value decomposition of the matrix [u v])
+- **`fn bounds(&self) -> [f64; 4]`**
+  the box of the arc (x0, y0, x1, y1): its ends and the extremes it passes
+
+**`impl Document`**
+
+- **`fn row_conic(&self, sheet: SheetRef, sec: SecKey, key: crate::sheet::RowKey, from: [f64; 2], w: f64, h: f64) -> Option<Conic>`**
+  (JD21) the ellipse arc a Geometry row draws, in local coordinates, the way section_path
+  draws it: ArcTo, EllipticalArcTo and RelEllipticalArcTo from `from` (the current point) to
+  their X, Y, Ellipse as a whole; `w`, `h` the shape's Width and Height.  None for other rows
+  and for arcs that are drawn as a line (a bow of 0, three points on a line)
 
 - **`fn parse_args(text: &str, name: &str) -> Option<Vec<f64>>`**
   the numbers of a NURBS(...) or POLYLINE(...) value (None: not that function, or a part that
@@ -58380,7 +58427,10 @@ its own and moves with the start.  Relative rows keep fractions of Width and Hei
 absolute rows keep the proportional form of their formulas (Visio's "Width*0.5").  Adding and
 taking out a vertex inserts or removes a row in the middle of the section
 (Transaction::insert_row / remove_row: the rows after it are renumbered, formulas follow, an
-instance's inherited section becomes its own).  LockVtxEdit refuses (Invalid).
+instance's inherited section becomes its own).  LockVtxEdit refuses (Invalid).  (JD21, SP-05)
+After each of them the box follows the geometry (shapeops::fit_frame: Width, Height, Pin and
+the rows into the box of the geometry, the shape stays on the page; not with LockCalcWH), as
+Visio does after a vertex edit.
 ```
 
 - **`struct Control`**
@@ -59151,6 +59201,142 @@ How orthogonal finds its way (deterministic, no state between calls):
   the cheapest right-angle route from any of the ports `a` to any of the ports `b` (one
   search: a dynamic end offers a port per side) -> the indices of the two ports and the
   route; both lists must not be empty
+
+### `diagram_core/src/shapeops.rs`
+
+Source: [`lib/diagram_core/src/shapeops.rs`](../lib/diagram_core/src/shapeops.rs)
+
+```text
+shapeops -- (JD21) Visio's shape operations (SP-08: Vereinigen, Kombinieren, Fragmentieren,
+Schneiden, Subtrahieren), a frame that follows its geometry (SP-05) and Ausrichtungsfeld
+aktualisieren (SP-16)
+
+  Operation::{Union, Combine, Fragment, Intersect, Subtract}
+  available(doc, shapes, op) -> bool       whether the operation can run on the selection
+  operate(tx, eng, shapes, op) -> Vec<ShapeRef>   the operation; shapes[0] is the primary
+                                           shape (the first one selected): the result(s), empty
+                                           when nothing is left (the inputs are gone then too)
+  fit_frame(tx, eng, shape) -> bool        Width, Height, Pin and the rows to the geometry's box,
+                                           the shape stays where it is on the page (frame.rs)
+  update_alignment_box(tx, eng, shape) -> bool    (SP-16) a group's box around its members, a
+                                           shape's around its geometry (frame.rs)
+  geometry_bounds(doc, shape) -> Option<[f64; 4]>  the box of a shape's geometry in its own
+                                           coordinates: arcs by their extremes (frame.rs)
+
+How an operation works:
+* Each input shape becomes an operand in page coordinates: its Geometry sections (hidden ones,
+  NoShow, and InfiniteLine rows left out) through the shape's transform (turns, flips, groups
+  around it).  Lines stay exact; arcs (ArcTo, EllipticalArcTo, RelEllipticalArcTo, Ellipse) are
+  flattened into short chords that remember their arc (geometry::Conic); other curves (NURBS,
+  splines, Bézier rows) into chords that remember their row.  Closed sub-paths are the area,
+  filled even-odd as Visio fills a shape's sections (overlapping sections make holes); open
+  sub-paths are lines.  A group is the union of its members (and of its own geometry).
+* The Boolean operations run in geom::region (exact decisions on a grid of 2^30 steps across
+  the inputs; jflib-geom, docs/GEOM.md "Ebene Regionen"); every edge of the result names the
+  input edge it lies on, so the result is rebuilt row by row: a run of edges on one arc is
+  EllipticalArcTo again (pieces of at most half a turn, the ends projected onto the arc), a
+  whole ellipse an Ellipse row, a run on one line one LineTo, other curves LineTo polylines.
+  Kombinieren needs no Boolean operation: the sections are taken over as they are, each one a
+  section of the result.
+* The result is a new shape without master: Angle 0, its box around the geometry (arcs by their
+  extremes), PinX/PinY in its middle, LocPin "Width*0.5"/"Height*0.5", every geometry cell as
+  "Width*k" / "Height*k" (the control points of arcs too, and D of an upright arc as
+  "Width/Height*k") so that the result stretches with its box; one Geometry section per contour
+  (Visio fills them even-odd: holes stay holes).  It goes into the primary shape's parent on top
+  of its siblings.  The inputs are deleted (glue to them let go, container memberships
+  forgotten); with an empty result nothing new comes.
+
+Visio's rules (the sources: Visio 5 User Guide ch. 24 pp. 210-215, the VBA reference of
+Selection.Union / Combine / Fragment / Intersect / Subtract / UpdateAlignmentBox, "Merged
+Shapes" and "Alignment Boxes" of the Visio 2002 developer reference, Visio 2003 Inside Out ch. 22;
+details in the JD21 notes):
+* belegt: format (line, fill) and text come from the primary shape (the first one selected);
+  Fragmentieren gives every piece the primary's format and no text; the result is the topmost
+  shape of its parent; the inputs are deleted; the result has a ShapeSheet of its own (formulas
+  of the inputs are gone); Vereinigen leaves open paths out; Schneiden keeps what all inputs
+  cover, of disjoint shapes nothing (and the inputs are gone); Subtrahieren takes the area of
+  the others away from the primary shape, the others are deleted even where they do not
+  overlap; Kombinieren keeps each input's sections, overlaps become holes; Fragmentieren makes a
+  shape of every region, and lines (1-D shapes, open paths) cut regions.
+* angenommen: the result is a plain shape without master (the primary's format is copied with
+  its inherited cells, styles stay referenced); shape data, user cells, hyperlinks and the
+  protection cells of the inputs are not taken over; LayerMember and the text block cells are;
+  a closed path of a NoFill section is area too; a shape without area does not take part in
+  Vereinigen, Schneiden and Subtrahieren and is left alone; a group takes part as the union of
+  its members; after an operation the result(s) are selected (the app does that); Vereinigen and
+  Fragmentieren also run on one shape (its own sections merged or cut), Kombinieren, Schneiden
+  and Subtrahieren need two; locks (LockDelete ...) do not protect the inputs; the shapes are
+  given in selection order, the primary first, and Subtrahieren takes the others away together.
+```
+
+- **`enum Operation`**
+  the shape operations (Entwicklertools › Shape-Design › Vorgänge)
+  - `Union` -- Vereinigen (Union): the outline of all of them
+  - `Combine` -- Kombinieren (Combine): all sections in one shape, overlaps become holes
+  - `Fragment` -- Fragmentieren (Fragment): a shape for every region the outlines and lines make
+  - `Intersect` -- Schneiden (Intersect): what all of them cover
+  - `Subtract` -- Subtrahieren (Subtract): the primary shape without the others
+
+- **`fn available(doc: &Document, shapes: &[ShapeRef], op: Operation) -> bool`**
+  whether `op` can run on these shapes (shapes[0] the primary one): Vereinigen and
+  Fragmentieren need one shape with geometry (Vereinigen: with an area), Kombinieren two with
+  geometry, Schneiden two with an area, Subtrahieren a primary shape with an area and another one
+  with an area
+
+- **`fn operate(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], op: Operation) -> Result<Vec<ShapeRef>, EditError>`**
+  Run a shape operation on shapes of one page or master, `shapes[0]` the primary shape (the
+  first one selected): its format and text go to the result (Fragmentieren: the format only),
+  the result goes into its parent on top.  The shapes that take part are deleted (Vereinigen,
+  Schneiden, Subtrahieren: those with an area; Kombinieren, Fragmentieren: all).  -> the new
+  shapes: one, a piece each for Fragmentieren, none when nothing is left.  Invalid when the
+  operation cannot run on these shapes (available)
+
+### `diagram_core/src/shapeops/frame.rs`
+
+Source: [`lib/diagram_core/src/shapeops/frame.rs`](../lib/diagram_core/src/shapeops/frame.rs)
+
+```text
+shapeops::frame -- (JD21) a frame that follows its geometry (SP-05, "Rahmen folgt der Geometrie")
+and Ausrichtungsfeld aktualisieren (SP-16)
+
+  geometry_bounds(doc, shape)          the box of a shape's geometry in its local coordinates
+  fit_frame(tx, eng, shape)            Width, Height, Pin to that box (after vertices changed)
+  update_alignment_box(tx, eng, shape) a group's box around its members; a shape's: fit_frame
+
+Visio recomputes a shape's box when a vertex is edited or a row type changes, unless LockCalcWH
+is set (belegt: [MS-VSDX]/ShapeSheet reference of LockCalcWH, "Alignment Boxes" of the Visio
+2002 developer reference); Ausrichtungsfeld aktualisieren does it on request, for a group around
+its members, also only without LockCalcWH (belegt: VBA Selection.UpdateAlignmentBox).  How it
+writes the cells is not documented; here (angenommen): the shape stays where it is on the page,
+Angle and the flips stay, Width and Height become the box's size (a proportional formula keeps
+its form), LocPin follows its own formula (mostly Width*0.5), the pin goes where the old frame
+had the new local pin, and every geometry cell moves into the new box: absolute rows keep
+"Width*k" with a new k (constants stay constants), relative rows get new fractions (the
+ellipse of RelEllipticalArcTo a new C and D), NURBS(...) and POLYLINE(...) values their
+points, a D of "Width/Height*k" a new k; a cell that names another geometry cell (a closing
+row's Geometry1.X1) follows by itself.  Connection points, control points and the text block
+keep their formulas (they are relative to the box) -- also an assumption.  A group's members get
+their pins (and 1-D members their free ends) in the new box, "Sheet.<group>!Width*k" with a new
+k, sizes that are proportional to the group keep their value.  Bézier pieces count with their
+extremes (not their control points), arcs with theirs.
+```
+
+- **`fn geometry_bounds(doc: &Document, shape: ShapeRef) -> Option<[f64; 4]>`**
+  the box of a shape's geometry in its local coordinates (x0, y0, x1, y1): lines by their ends,
+  arcs and Bézier pieces with their extremes; hidden sections (NoShow) and InfiniteLine rows
+  left out.  None: no geometry
+
+- **`fn fit_frame(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef) -> Result<bool, EditError>`**
+  The frame follows the geometry (SP-05): Width, Height, Pin and LocPin to the box of the
+  shape's geometry (geometry_bounds), the geometry rows into the new box, the shape staying where
+  it is on the page (see the module comment).  Only for a 2-D shape that is no group, and not
+  with LockCalcWH or a guarded Width or Height -> whether it changed
+
+- **`fn update_alignment_box(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef) -> Result<bool, EditError>`**
+  Ausrichtungsfeld aktualisieren (SP-16): a group's box around its members (2-D ones by their
+  frames, 1-D ones by their ends) and its own geometry, the members staying where they are on the
+  page; a shape that is no group gets the box of its geometry (fit_frame).  Not with LockCalcWH
+  -> whether it changed
 
 ### `diagram_core/src/shape.rs`
 
@@ -67595,6 +67781,10 @@ built from primitives, profiles and operations, checked, the same bits on every 
                  corners rounded once at the end), bevel (chamfer or round edges and corners)
   exact          expansions (Shewchuk), orient2d, the side of a plane at a meeting of three planes,
                  the correctly rounded quotient
+  region         plane regions with holes (JD21): union, intersection, difference, xor and the
+                 decomposition of an overlay (Visio's Fragment) of contour sets, non-zero or even-odd,
+                 open polylines as cutters; every output edge marks the input edge it lies on;
+                 decided by snap rounding on an integer grid (exact, the same bits everywhere)
   Report         closed, manifold, outward, degenerate triangles, normals, bounds, area, volume, Euler
                  characteristic, components; json()
   math           Vec3, Aabb, Affine in f64; sqrt correctly rounded, sin / cos / atan2 from rt's portable
@@ -68317,6 +68507,145 @@ MERGE_RATIO: f64 = 1e-9
 - **`fn rounded_rect(w: f64, h: f64, r: f64, n: usize) -> Vec<[f64; 2]>`**
   a rectangle `w` x `h` centred on the origin with corners rounded by radius `r` (at most half the shorter
   side), `n` segments per corner, counter-clockwise
+
+### `geom/src/region.rs`
+
+Source: [`lib/geom/src/region.rs`](../lib/geom/src/region.rs)
+
+```text
+region -- Boolean operations on plane regions (docs/GEOM.md, "Ebene Regionen"): sets given as contours
+(outer contours and holes, nested to any depth, several operands, filled by a rule: non-zero or
+even-odd), union, intersection, difference, exclusive or, and the decomposition of their overlay into
+its faces with the operands that cover each one (Visio's "Fragment", the polygons of a map made from
+overlapping areas).  Open polylines go in as cutters: they split the faces of a decomposition.
+
+  boolean(operands, op, rule) -> Vec<Contour>      the result's boundary: outer contours
+                                                    counter-clockwise, holes clockwise
+  decompose(operands, rule) -> Vec<Piece>           every covered face with its operands
+  union / intersection / difference / xor           shorthands; area(contours)
+  Operand { contours, open }, Contour { points, marks }, Mark { operand, contour, edge, reversed }
+
+Every output edge carries a Mark: the input edge it lies on (operand, contour, the edge from point i to
+point i + 1, and whether it runs against it).  A caller that flattened curves into polylines
+(diagram_core: the arcs of a shape) finds its curves again by these marks.  Consecutive output edges
+with the same mark are one edge (the vertex between them is gone).
+
+How it decides (snap rounding to an integer grid, exact integer arithmetic):
+* The input is put on a grid: the box around all points is 2^30 steps across its longer side (the
+  coordinate minus the box's corner times a power of two, rounded to the nearest step), so every point
+  becomes a pair of integers below 2^30.  Points closer than a step (10^-9 of the extent) are one.
+* Snap rounding (Hobby; Guibas and Marimont): every endpoint and every point where two segments cross
+  makes a "hot pixel", the unit square around the grid point it rounds to; every segment is bent
+  through the centre of each hot pixel it passes through, in order.  The result has no crossings: its
+  segments meet at their ends or lie on each other.  Done again on its own output until nothing changes
+  (iterated snap rounding, Halperin and Packer), which also splits a segment where a vertex lies on it.
+  All tests are signs of determinants and comparisons of fractions in i128: exact, the same answer on
+  every target, and no case is special (touching in a point or along an edge, identical operands, a
+  hole on its outer contour, an operand overlapping itself).  Only crossing points move, by at most
+  half a step; input points come back with their own f64 bits.
+* The overlay: equal segments become one edge that keeps, per operand, how much the winding number
+  grows from its right to its left (+1 for an edge of a counter-clockwise contour).  Edges that change
+  nothing (an operand's edge drawn there and back) are left out.  Around each vertex the edges are
+  sorted by angle (exactly: half-plane, then cross product) and the faces traced as cycles; a cycle with
+  positive area is a face, the one with area <= 0 of each connected part is its outside.  Which face
+  holds a part is found by a ray down from just left of its lowest-leftmost vertex: the first edge it
+  meets, compared as exact fractions.  Winding numbers spread from the face around a part across its
+  edges.
+* A face is inside an operand when its winding number is not 0 (non-zero) or odd (even-odd).  The result
+  of an operation is its boundary: the edges with a different answer left and right, traced so that each
+  contour turns as sharply as it can where two pieces touch (two squares corner to corner stay two
+  contours).
+
+Deterministic like the rest of geom: integers and + - * on f64, sorting with unique keys, no unordered
+containers, no threads.  Limits against runaway input: MAX_EDGES input edges, MAX_HOT crossings.
+```
+
+```rust
+/// The input's box is 2^GRID_BITS steps across its longer side (a step is 10^-9 of the extent).
+GRID_BITS: i32 = 30
+/// the most input edges (all operands together)
+MAX_EDGES: usize = 1 << 20
+/// the most points where edges cross
+MAX_HOT: usize = 1 << 22
+```
+
+- **`enum FillRule`**
+  how contours fill: where the winding number is not 0, or where it is odd
+  - `NonZero`
+  - `EvenOdd`
+
+- **`enum BoolOp`**
+  the Boolean operations
+  - `Union` -- in any operand
+  - `Intersection` -- in every operand
+  - `Difference` -- in the first and in none of the others
+  - `Xor` -- in an odd number of operands
+
+- **`struct Operand`**
+  An operand: closed contours (the last point joins the first; outer contours and holes in any order and
+  direction, the fill rule decides) or, `open`, polylines that only cut (decompose).
+  - `contours: Vec<Vec<[f64; 2]>>`
+  - `open: bool`
+
+**`impl Operand`**
+
+- **`fn closed(contours: Vec<Vec<[f64; 2]>>) -> Operand`**
+  an area from closed contours
+- **`fn open(polylines: Vec<Vec<[f64; 2]>>) -> Operand`**
+  cutters from open polylines
+
+- **`struct Mark`**
+  Where an output edge comes from: the input edge from point `edge` to point `edge + 1` (the closing edge
+  of a closed contour has the index of its last point) of contour `contour` of operand `operand`;
+  `reversed`: the output runs against it.  Where input edges lie on each other, the smallest of them.
+  - `operand: u32`
+  - `contour: u32`
+  - `edge: u32`
+  - `reversed: bool`
+
+- **`struct Contour`**
+  An output contour: closed, `marks[i]` the mark of the edge from `points[i]` to the next point.
+  - `points: Vec<[f64; 2]>`
+  - `marks: Vec<Mark>`
+
+**`impl Contour`**
+
+- **`fn area(&self) -> f64`**
+  the signed area (shoelace about the first point, so that far coordinates do not cancel): positive
+  for an outer contour, negative for a hole
+- **`fn is_hole(&self) -> bool`**
+  whether it runs clockwise (a hole)
+
+- **`struct Piece`**
+  A face of a decomposition: the operands that cover it (indices, rising) and its boundary (an outer
+  contour, counter-clockwise, and its holes, clockwise).
+  - `cover: Vec<u32>`
+  - `contours: Vec<Contour>`
+
+- **`fn area(contours: &[Contour]) -> f64`**
+  the sum of the signed areas of contours (the area of a result)
+
+- **`fn union(operands: &[Operand], rule: FillRule) -> Result<Vec<Contour>, Error>`**
+  union of the closed operands
+
+- **`fn intersection(operands: &[Operand], rule: FillRule) -> Result<Vec<Contour>, Error>`**
+  intersection of the closed operands
+
+- **`fn difference(operands: &[Operand], rule: FillRule) -> Result<Vec<Contour>, Error>`**
+  the first closed operand without the others
+
+- **`fn xor(operands: &[Operand], rule: FillRule) -> Result<Vec<Contour>, Error>`**
+  what an odd number of closed operands cover
+
+- **`fn boolean(operands: &[Operand], op: BoolOp, rule: FillRule) -> Result<Vec<Contour>, Error>`**
+  The boundary of a Boolean operation on the closed operands (open ones do not take part): outer contours
+  counter-clockwise, holes clockwise, none crossing another (they may touch in a point).  Empty when
+  nothing is left.
+
+- **`fn decompose(operands: &[Operand], rule: FillRule) -> Result<Vec<Piece>, Error>`**
+  The faces of the overlay that at least one closed operand covers, each with the operands covering it
+  (by `rule`) and its boundary.  Neighbouring faces with the same cover are one piece unless a cutter (an
+  open operand) runs between them.  Pieces in a fixed order (the order their edges were found).
 
 ## netchan
 

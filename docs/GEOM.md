@@ -17,6 +17,11 @@ Prädikaten, das [Abschrägen](#abschrägen) von Kanten und Ecken, den [Beobacht
 mit ihrem Ort und den [Bewertungslauf](#der-bewertungslauf): fünf Bezugsobjekte, die ein Agent aus Beschreibungen
 gebaut hat, mit Bildern und Bericht als einziger Sicht.
 
+Dazu (JD21, 2026-11-24): [Boolesche Operationen auf ebenen Regionen](#ebene-regionen-snap-rounding-exakt-entschieden)
+mit Löchern und beliebig vielen Operanden, und die Zerlegung einer Überlagerung in ihre Flächen. Sie sind nicht für
+das Modellieren gebaut, sondern für jede 2D-Anwendung (JFDiagrammers Shape-Operationen, Vektorzeichnen, DXF,
+Leveleditoren); `csg.rs` passt dafür nicht (siehe dort).
+
 | Teil | Wo |
 | --- | --- |
 | Vektoren, Boxen, affine Abbildungen; Wurzel, sin, cos, atan2, Winkel in Grad | [`math.rs`](../lib/geom/src/math.rs) |
@@ -26,6 +31,7 @@ gebaut hat, mit Bildern und Bericht als einziger Sicht.
 | Profile: Fläche, Aufräumen, Zerlegen in Dreiecke, Rechteck, Kreis, Bogen | [`poly.rs`](../lib/geom/src/poly.rs) |
 | Boolesche Operationen auf konvexen Zellen (`Solid`), Abschrägen | [`csg.rs`](../lib/geom/src/csg.rs) |
 | exakte Arithmetik: Erweiterungen nach Shewchuk, `orient2d`, Ebenen und ihre Schnittpunkte | [`exact.rs`](../lib/geom/src/exact.rs) |
+| ebene Regionen: Vereinigung, Schnitt, Differenz, XOR, Zerlegung, Schneider (Snap Rounding) | [`region.rs`](../lib/geom/src/region.rs), Tests in [`tests.rs`](../lib/geom/src/tests.rs) |
 | die Prüfungen und ihr Bericht | [`check.rs`](../lib/geom/src/check.rs) |
 | glTF schreiben | [`lib/gltf/write.rs`](../lib/gltf/write.rs) |
 | die Skript-Funktionen, Materialien, `--api` | [`apps/modeltool/src/host.rs`](../apps/modeltool/src/host.rs) |
@@ -207,6 +213,11 @@ modeltool startet dafür außerhalb des Browsers über `ui::main!` (ui und der S
   `plane_count`, `cells`, `bounds`, `is_empty`; `Plane { n, w }`; auf Meshes `geom::union(&[&Mesh])`,
   `difference(&Mesh, &[&Mesh])`, `intersection(&[&Mesh])`, `bevel(&Mesh, breite, segmente, Option<Axis>)`;
   `WELD_RATIO` (10⁻⁹), `MAX_CELLS` (20 000).
+- **Ebene Regionen** (`geom::region`): `boolean(operanden, BoolOp, FillRule) -> Vec<Contour>`, `union`,
+  `intersection`, `difference`, `xor`, `decompose(operanden, FillRule) -> Vec<Piece>`, `area`; `Operand { contours,
+  open }` (`Operand::closed`, `Operand::open` für Schneider), `Contour { points, marks }` (`area`, `is_hole`),
+  `Mark { operand, contour, edge, reversed }`, `Piece { cover, contours }`, `BoolOp::{Union, Intersection,
+  Difference, Xor}`, `FillRule::{NonZero, EvenOdd}`; `GRID_BITS` (30), `MAX_EDGES` (2²⁰), `MAX_HOT` (2²²).
 - **Exakt** (`geom::exact`): `Exp` (Erweiterungen: `add`, `sub`, `scale`, `mul`, `compress`, `sign`, `estimate`),
   `orient2d`, `Meet` (wo drei Ebenen sich schneiden: `w_sign`, `dot_sign`, `point`), `div_round`.
 - **Mathematik** (`geom::math`, die Typen an der Wurzel): `Vec3`, `Aabb`, `Affine` (`IDENTITY`, `translation`, `scale`,
@@ -344,6 +355,53 @@ Fenster und eine Tür fallen), und darum ist die Eingabe konvex: Ein konvexer K�
   und wird gemeldet (im Bewertungslauf genau so passiert: die zwei Hälften eines Dachs). Allgemeine Netze
   (nicht konvex, ohne Zellen) gehen nicht hinein; `MAX_CELLS` 20 000 Zellen. Die Ergebnisse sind nicht minimal: Eine
   ebene Fläche aus mehreren Zellen bleibt in Stücken, mit mehr Dreiecken als nötig.
+
+### Ebene Regionen: Snap Rounding, exakt entschieden
+
+`csg.rs` taugt für ebene Polygone nicht: Seine Körper sind Mengen konvexer Zellen aus Halbräumen, die Eingabe muss
+konvex sein, und ein Punkt ist der Schnitt dreier Ebenen. Ein Umriss mit Löchern, Einbuchtungen und abgeflachten Bögen
+(hunderte kurze Sehnen) müsste erst in konvexe Stücke zerlegt werden, und die Ausgabe sind Dreiecke, keine Umrisse mit
+Herkunft der Kanten. `region.rs` ist deshalb ein eigenes Modul für Mengen aus Konturen.
+
+- **Eingabe**: Operanden aus geschlossenen Konturen (Außenkonturen und Löcher, verschachtelt, in beliebiger Richtung;
+  die Füllregel entscheidet: ungleich null oder ungerade) oder offenen Linienzügen (Schneider, nur für die Zerlegung).
+  Nicht endliche Koordinaten werden abgewiesen, mehr als `MAX_EDGES` Kanten oder `MAX_HOT` Schnittpunkte auch.
+  Doppelte Punkte, Konturen ohne Fläche, ein Operand, der sich selbst überlappt, sind erlaubt.
+- **Warum Snap Rounding statt Shewchuk-Prädikaten auf f64**: Schnittpunkte zweier Strecken liegen nicht auf f64.
+  Rundet man sie, entstehen neue Kreuzungen (eine Strecke rutscht über einen Punkt), und jede Reparatur braucht wieder
+  Toleranzen. Snap Rounding (Hobby; Guibas und Marimont) löst das mit einer Garantie: Die Eingabe kommt auf ein Raster
+  (2³⁰ Schritte über die längere Seite ihrer Box, ein Schritt ist 10⁻⁹ der Ausdehnung, Punkte relativ zur Ecke der Box
+  mal einer Zweierpotenz, gerundet), jeder Endpunkt und jeder Kreuzungspunkt macht sein Rasterquadrat „heiß“, und jede
+  Strecke wird durch die Mitte jedes heißen Quadrats gelegt, das sie berührt (halboffen, damit jeder Punkt genau einem
+  Quadrat gehört). Danach kreuzt sich nichts mehr: Strecken treffen sich an Enden oder liegen aufeinander. Das wird
+  wiederholt, bis sich nichts ändert (Iterated Snap Rounding nach Halperin und Packer; in der Praxis eine Runde, die
+  ändert, und eine, die bestätigt); dabei wird eine Strecke auch dort geteilt, wo ein Punkt genau auf ihr liegt.
+- **Exakt**: Alles danach rechnet mit ganzen Zahlen: Orientierungen als Vorzeichen von Determinanten in `i128`,
+  Kreuzungspunkte als Brüche, auf das Raster gerundet (halb nach oben, passend zu den halboffenen Quadraten), die
+  Lage einer Strecke zu einem Quadrat als Vergleich von Brüchen. Damit gibt es keine Sonderfälle: Berührung in einem
+  Punkt oder entlang einer Kante, identische Operanden, ein Loch auf seiner Außenkontur, kollineare Kanten. Nur
+  Kreuzungspunkte bewegen sich, um höchstens einen halben Schritt; Eingabepunkte kommen mit ihren eigenen f64-Bits
+  zurück, die Kreuzungspunkte als Ecke der Box plus Rasterpunkt mal Zweierpotenz (eine Rundung).
+- **Die Überlagerung**: Gleiche Strecken werden eine Kante, die je Operand weiß, um wie viel die Windungszahl von
+  rechts nach links wächst. Kanten ohne Wirkung (ein Operand hin und zurück) fallen weg. Um jeden Punkt sind die
+  Kanten nach Winkel sortiert (exakt: Halbebene, dann Kreuzprodukt), die Flächen werden als Zyklen verfolgt. Ein
+  Zyklus mit positiver Fläche ist eine Fläche, der mit Fläche ≤ 0 eines zusammenhängenden Teils dessen Außenseite.
+  Welche Fläche einen Teil umgibt, findet ein Strahl nach unten, knapp links des untersten linken Punkts des Teils:
+  die erste Kante eines anderen Teils (Höhen als exakte Brüche verglichen, bei Gleichstand die Steigung). Die
+  Windungszahlen gehen von dort über die Kanten durch den Teil, Teile in der Reihenfolge ihres linken Punkts (der
+  umgebende ist dann schon bekannt).
+- **Ergebnis**: Eine Operation (Vereinigung, Schnitt, Differenz des ersten Operanden ohne die anderen, XOR als
+  ungerade Anzahl) ist ihr Rand: die Kanten mit verschiedener Antwort links und rechts, so verfolgt, dass jede Kontur
+  an einem Punkt, an dem sich zwei Stücke berühren, so scharf wie möglich abbiegt (zwei Quadrate Ecke an Ecke bleiben
+  zwei Konturen). Außenkonturen laufen gegen den Uhrzeigersinn, Löcher mit ihm. Die Zerlegung gibt jede bedeckte
+  Fläche mit ihren Operanden; Nachbarn mit gleicher Bedeckung sind ein Stück, außer ein Schneider liegt dazwischen.
+- **Marken**: Jede Ausgabekante nennt die Eingabekante, auf der sie liegt (Operand, Kontur, Index, Richtung; bei
+  aufeinanderliegenden Kanten die kleinste). Wer Bögen abgeflacht hat, setzt sie daraus wieder zusammen
+  (diagram_core macht aus einem Lauf auf einem Bogen wieder `EllipticalArcTo`). Folgen gleiche Marken aufeinander,
+  sind sie eine Kante.
+- **Grenzen**: Merkmale unter einem Rasterschritt (10⁻⁹ der Ausdehnung) fallen zusammen. Der Zeitaufwand ist
+  O((n + k) log n) für Kreuzungen und Quadrate in einem Streifen, im schlechtesten Fall quadratisch; die
+  Behälter-Suche je Teil ist linear in den Kanten (viele getrennte Teile: quadratisch).
 
 ### Abschrägen
 
@@ -559,6 +617,16 @@ des Bewertungslaufs 60 bis 160 ms, das Haus aus Modulen 18 ms, die Tür 60 ms. T
 Zelle); ein Vorfilter über Boxen und behaltene Polytope wären der nächste Schritt. Die Rückmeldeschleife kostet sonst
 rund 0,3 s je Lauf, davon das meiste in render3d (Gerät, Szenen, vier Bilder mit Warten) und im PNG-Kodierer; im
 Beobachtungsmodus zeichnet nur die eine Ansicht.
+
+Die ebenen Regionen haben Unit-Tests in `lib/geom/src/tests.rs` (`cargo test -p jflib-geom --lib`, in der Suite über
+`build_rs.py`): Quadrate mit gemeinsamer Kante und Ecke an Ecke, identische Operanden (auch gegenläufig), Löcher auf
+der Außenkontur, Inseln in Löchern, Selbstüberlappung (non-zero und even-odd), eine Schleife, entartete Eingaben,
+sehr kleine, sehr große und weit entfernte Koordinaten, Kreuzungspunkte und Marken, Schneider; dazu 300 Runden mit
+zufälligen Sternen und Rechtecken (ein Drittel auf einem groben Raster: gemeinsame Kanten, berührende Ecken):
+Fläche(A ∪ B) + Fläche(A ∩ B) = Fläche(A) + Fläche(B), Fläche(A − B) + Fläche(A ∩ B) = Fläche(A), XOR, die Zerlegung
+deckt genau die Vereinigung und je Operand seine Fläche ab, gestreute Punkte auf der richtigen Seite jedes Ergebnisses
+und im richtigen Stück, keine zwei Ausgabekanten kreuzen sich, jede Marke liegt auf ihrer Eingabekante; 40 Runden mit
+vier Vielecken von 32 bis 95 Ecken.
 
 ## Was nicht getestet ist
 

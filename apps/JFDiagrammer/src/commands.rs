@@ -361,6 +361,14 @@ commands! {
     DATA_AUTO_LINK_REFRESH = 0x1920, "Nach Aktualisierung automatisch verknüpfen", 0, 0;
     // (JD18, AB-11) the pane Externe Daten's Verknüpfung aufheben: the selected rows' shapes
     DATA_UNLINK_ROWS = 0x1960, "Verknüpfung aufheben", 0, 0;
+    // (JD21 ops) the shape operations, Entwicklertools › Shape-Design › Vorgänge in Visio, until
+    // JD23 in Start › Anordnen › Gruppieren › Vorgänge (shapeops_cmds.rs)
+    OP_UNION = 0x1C00, "Gesamtmenge", JD_OP_UNION, 0;
+    OP_COMBINE = 0x1C01, "Kombinieren", JD_OP_COMBINE, 0;
+    OP_FRAGMENT = 0x1C02, "In Einzelmengen zerlegen", JD_OP_FRAGMENT, 0;
+    OP_INTERSECT = 0x1C03, "Schnittmenge bilden", JD_OP_INTERSECT, 0;
+    OP_SUBTRACT = 0x1C04, "Subtrahieren", JD_OP_SUBTRACT, 0;
+    UPDATE_ALIGN_BOX = 0x1C08, "Ausrichtungsfeld aktualisieren", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -596,6 +604,13 @@ static HANDLERS: &[(u32, Handler)] = &[
     (DATA_CONFLICTS, crate::data_refresh::conflicts_open),
     (DATA_AUTO_LINK_REFRESH, crate::data_refresh::toggle_auto_link),
     (DATA_UNLINK_ROWS, crate::data_pane::unlink_rows),
+    // (JD21 ops) Vorgänge (shapeops_cmds.rs)
+    (OP_UNION, |a, ui| crate::shapeops_cmds::run(a, ui, OP_UNION)),
+    (OP_COMBINE, |a, ui| crate::shapeops_cmds::run(a, ui, OP_COMBINE)),
+    (OP_FRAGMENT, |a, ui| crate::shapeops_cmds::run(a, ui, OP_FRAGMENT)),
+    (OP_INTERSECT, |a, ui| crate::shapeops_cmds::run(a, ui, OP_INTERSECT)),
+    (OP_SUBTRACT, |a, ui| crate::shapeops_cmds::run(a, ui, OP_SUBTRACT)),
+    (UPDATE_ALIGN_BOX, |a, ui| crate::shapeops_cmds::run(a, ui, UPDATE_ALIGN_BOX)),
 ];
 
 // toggles: whether the command is on
@@ -695,6 +710,8 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
         // (JD18) the data commands
         && crate::data_cmds::available(app, id)
         && crate::data_pane::available(app, id)
+        // (JD21 ops) the shape operations
+        && crate::shapeops_cmds::available(app, id)
 }
 
 /// the toggle is on
