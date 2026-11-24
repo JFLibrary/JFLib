@@ -45756,8 +45756,9 @@ MAX_CHAIN: usize = 1 << 20
   - `directory: Arc<Directory>`
   - `timeout_ms: u64` -- the longest wait for an authorization or the order to be decided (ms; 3 minutes)
   - `poll_ms: u32` -- the pause between two looks at an authorization or the order when the CA sends no
-    Retry-After (ms; 2 seconds), and the longest one it takes from Retry-After (ms; 30 s)
-  - `max_poll_ms: u32`
+    Retry-After (ms; 2 seconds)
+  - `max_poll_ms: u32` -- the longest pause taken from a Retry-After (ms; 30 s); a shorter Retry-After counts as
+    at least half a second (or max_poll_ms, when that is less)
 
 **`impl Acme`**
 
