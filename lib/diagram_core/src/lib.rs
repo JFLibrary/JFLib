@@ -57,6 +57,9 @@
 //                                 hierarchy, compact tree, radial, circular; CN-13), connected
 //                                 shapes aligned and spaced (CN-14), shapes off the page
 //                                 breaks (PR-03), the diagram turned or flipped (RS-25)
+//   tools::*                      (JD21) Visio's add-ons as tools (AS-11, RA-09): numbering
+//                                 shapes, arrays of copies, dimension lines glued or tied to
+//                                 the shapes they measure
 //
 // Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 // opening a file (connectors, layout and containers move only when something moves), and a
@@ -90,6 +93,7 @@ mod shape;
 pub mod structure;
 mod sheet;
 mod strings;
+pub mod tools;
 mod units;
 mod views;
 
