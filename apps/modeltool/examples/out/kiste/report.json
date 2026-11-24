@@ -1,9 +1,10 @@
 {
   "tool": "modeltool 0.1.0",
   "script": "kiste.jfs",
-  "key": "b5f82b15831f228ac07bcf7242a1fba2",
+  "key": "a83ce278dade88a3d9a3ffad2b02988f",
   "ok": true,
   "errors": [],
+  "warnings": [],
   "findings": [],
   "params": {},
   "model": {
@@ -74,7 +75,8 @@
     {"name": "kantenleisten", "material": "leiste", "ok": true, "closed": true, "outward": true, "triangles": 48, "vertices": 96, "min": [-0.4, 0, -0.375], "size": [0.8, 0.8, 0.75], "area": 0.457, "volume": 0.0036, "degenerate": 0}
   ],
   "expect": [
-    {"rule": "size", "expected": [0.8, 0.8, 0.8], "actual": [0.8, 0.8, 0.8], "tolerance": 0.0005, "ok": true}
+    {"rule": "size", "file": "kiste.jfs", "line": 53, "expected": [0.8, 0.8, 0.8], "actual": [0.8, 0.8, 0.8], "tolerance": 0.0005, "ok": true},
+    {"rule": "budget", "file": "kiste.jfs", "line": 52, "expected": 800, "actual": 444, "ok": true}
   ],
   "materials": [
     {"name": "dunkelholz", "color": "#5c3b1f", "roughness": 0.75, "metallic": 0},
@@ -86,5 +88,5 @@
   "imports": [],
   "files": {"report": "report.json", "glb": "model.glb", "sheet": "sheet.png", "front": "front.png", "side": "side.png", "top": "top.png", "iso": "iso.png"},
   "views": {"images": true, "size": 512, "grid_on": true, "grid": 0.1, "sheet": "front | side over top | iso", "cameras": "front: from +Z; side: from +X; top: from +Y, front at the bottom; the three at one scale; iso: from front right above", "adapter": "NVIDIA GeForce RTX 2070 SUPER"},
-  "timing": {"script_ms": 1.236, "geometry_ms": 1.093, "checks_ms": 0.886, "render_ms": 21652.759, "export_ms": 1.603, "total_ms": 21799.585, "fuel": 841}
+  "timing": {"script_ms": 0.737, "geometry_ms": 0.503, "checks_ms": 0.633, "render_ms": 8610.28, "export_ms": 0.897, "total_ms": 8826.182, "fuel": 841}
 }

@@ -4,9 +4,12 @@
 // methods reach the host as "map.move" and so on; meshes never change, every operation makes a new one.
 // Names are English, parameters included (decision G9.3 of JFScript's docs/RICHTUNG.md: with named arguments
 // they become part of the interface); the descriptions and messages are German.  Wrong arguments throw a
-// message that names the function and the parameter; the VM adds the line and column of the call.  A mesh made by a Boolean operation keeps its convex cells (geom::Solid) beside it,
-// moved, turned, scaled and mirrored with it, so it can go into the next Boolean operation; any other mesh
-// goes in as one convex solid.
+// message that names the function and the parameter; the VM adds the line and column of the call.  What the
+// host accepts but is very likely a mistake (arguments beyond the last parameter, a value for `closed` that is
+// no bool, a second model.name / budget / uv_scale or material definition that replaces the first) is a
+// warning at the call (cx.warn); the script goes on.  A mesh made by a Boolean operation keeps its convex cells
+// (geom::Solid) beside it, moved, turned, scaled and mirrored with it, so it can go into the next Boolean
+// operation; any other mesh goes in as one convex solid.
 
 use alloc::format;
 use alloc::rc::Rc;
@@ -15,7 +18,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use geom::{Affine, Axis, Mesh, Solid, Vec3};
-use script::{Cx, Fail, Host, Value};
+use script::{Cx, Fail, Host, Position, Value};
 
 /// the names the host answers (compile_with: any other unknown name is an error before the run)
 pub const GLOBALS: &[&str] = &["geom", "model", "profile", "vec", "params"];
@@ -84,8 +87,8 @@ pub const API: &[ApiEntry] = &[
     ApiEntry { name: "model.add", params: "m, material = \"grau\", name", doc: "Teil des Modells; material: Name oder {color, roughness, metallic}" },
     ApiEntry { name: "model.material", params: "name, {color: \"#rrggbb\" | [r, g, b], roughness = 0.8, metallic = 0}", doc: "Material festlegen (Farben in sRGB, 0 bis 1)" },
     ApiEntry { name: "model.name", params: "text", doc: "Name des Modells" },
-    ApiEntry { name: "model.budget", params: "triangles", doc: "höchstens so viele Dreiecke (Prüfung im Bericht)" },
-    ApiEntry { name: "model.expect_size", params: "x, y, z, tolerance = 0.001 | [x, y, z], tolerance", doc: "erwartete Maße der Box in Metern (Prüfung im Bericht); nil: diese Achse nicht prüfen" },
+    ApiEntry { name: "model.budget", params: "triangles", doc: "höchstens so viele Dreiecke (Prüfung im Bericht, mit der Zeile der Regel)" },
+    ApiEntry { name: "model.expect_size", params: "x, y, z, tolerance = 0.001 | [x, y, z], tolerance", doc: "erwartete Maße der Box in Metern (Prüfung im Bericht, mit der Zeile der Regel); nil: diese Achse nicht prüfen" },
     ApiEntry { name: "model.uv_scale", params: "meters = 1", doc: "Meter je UV-Einheit der Box-Projektion" },
     ApiEntry { name: "params", params: "", doc: "Map der Parameter von --param NAME=WERT; params.get(\"b\", 0.8)" },
 ];
@@ -131,6 +134,8 @@ pub struct Part {
 pub struct Expect {
     pub size: [f64; 3],
     pub tolerance: f64,
+    /// where the script states it (the file as errors name it)
+    pub at: Position,
 }
 
 /// what the script built
@@ -141,6 +146,8 @@ pub struct Model {
     /// the materials the parts use, in the order of first use
     pub materials: Vec<MaterialDef>,
     pub budget: Option<u64>,
+    /// where the script set the budget (its last model.budget)
+    pub budget_at: Position,
     pub expects: Vec<Expect>,
     /// metres per UV unit (1)
     pub uv_scale: f64,
@@ -152,7 +159,11 @@ pub struct ModelHost<'a> {
     /// the convex cells of a mesh made by a Boolean operation (moved with it), by mesh id
     solids: Vec<Option<Rc<Solid>>>,
     arena: usize,
-    defined: Vec<MaterialDef>,
+    /// the materials of model.material with where they were set
+    defined: Vec<(MaterialDef, Position)>,
+    /// where model.name and model.uv_scale were called last (for the warning when a second call replaces them)
+    name_at: Option<Position>,
+    uv_at: Option<Position>,
     pub model: Model,
     loader: &'a mut dyn FnMut(&str) -> Result<String, String>,
     /// (path, source) of every module the script imported, in order
@@ -168,6 +179,8 @@ impl<'a> ModelHost<'a> {
             solids: Vec::new(),
             arena: 0,
             defined: Vec::new(),
+            name_at: None,
+            uv_at: None,
             model: Model { uv_scale: 1.0, ..Model::default() },
             loader,
             imports: Vec::new(),
@@ -180,6 +193,9 @@ impl Host for ModelHost<'_> {
     fn call(&mut self, cx: &mut Cx, name: &str, args: &[Value]) -> Result<Value, Fail> {
         let t0 = plat::time_us();
         let r = self.dispatch(cx, name, args);
+        if r.is_ok() {
+            extra_arguments(cx, name, args);
+        }
         self.host_us += plat::time_us().saturating_sub(t0);
         r
     }
@@ -190,6 +206,74 @@ impl Host for ModelHost<'_> {
         self.imports.push((String::from(path), src.clone()));
         Ok(src)
     }
+}
+
+/// `modeltool --api`: every function with its parameters and what it does, then the built-in materials
+pub fn api_text() -> String {
+    let mut s = String::new();
+    for e in API {
+        s.push_str(&format!("{}({})\n    {}\n", e.name, e.params, e.doc));
+    }
+    s.push_str("Materialien: ");
+    s.push_str(&PALETTE.iter().map(|p| p.0).collect::<Vec<_>>().join(", "));
+    s.push('\n');
+    s
+}
+
+/// "haus.jfs:71" (the line alone when the file is not known)
+pub fn place(at: &Position) -> String {
+    if at.file.is_empty() { format!("Zeile {}", at.line) } else { format!("{}:{}", at.file, at.line) }
+}
+
+/// The most arguments a host function reads (a method of a mesh: besides the mesh, under its API name "m.NAME"),
+/// over all its forms; None for the ones that take any number (merge and the Boolean operations).
+pub fn max_args(api: &str) -> Option<usize> {
+    Some(match api {
+        "geom.extrude" | "geom.prism" => 2,
+        "geom.box" | "geom.cylinder" | "geom.sphere" | "geom.lathe" => 3,
+        "geom.cone" | "geom.torus" | "geom.stairs" | "geom.sweep" => 4,
+        "geom.arch" => 5,
+        "m.center" | "m.flip" | "m.flat" | "m.bounds" | "m.area" | "m.volume" | "m.check" => 0,
+        "m.rotate_x" | "m.rotate_y" | "m.rotate_z" | "m.mirror" | "m.weld" | "m.smooth" => 1,
+        "m.radial" => 2,
+        "m.move" | "m.place" | "m.scale" | "m.bevel" => 3,
+        "m.rotate" | "m.array" => 4,
+        "profile.area" => 1,
+        "profile.rect" | "profile.circle" | "profile.rotate" => 2,
+        "profile.move" | "profile.scale" => 3,
+        "profile.rounded" | "profile.arc" => 4,
+        "vec.len" | "vec.norm" => 1,
+        "vec.add" | "vec.sub" | "vec.mul" | "vec.dot" | "vec.cross" | "vec.dist" => 2,
+        "vec.lerp" => 3,
+        "model.name" | "model.budget" | "model.uv_scale" => 1,
+        "model.material" => 2,
+        "model.add" => 3,
+        "model.expect_size" => 4,
+        _ => return None,
+    })
+}
+
+/// A warning when a call that worked got more arguments than the function reads: the others were never looked at
+/// (`geom.cylinder(0.3, 1.2, 32, 0.1)` with a radius for the top meant for geom.cone).
+fn extra_arguments(cx: &mut Cx, name: &str, args: &[Value]) {
+    let (ns, f) = name.split_once('.').unwrap_or(("", name));
+    let functions = ["box", "cylinder", "cone", "sphere", "torus", "stairs", "arch", "extrude", "prism", "sweep", "lathe", "merge", "union", "difference", "intersection"];
+    // a method: map.move(m, ..), also geom.move(m, ..); its messages name it "move()"
+    let method = ns == "map" || (ns == "geom" && !functions.contains(&f));
+    let (api, shown_as, given) = if method { (format!("m.{f}"), format!("{f}()"), args.len().saturating_sub(1)) } else { (String::from(name), String::from(name), args.len()) };
+    let Some(max) = max_args(&api) else { return };
+    if given <= max {
+        return;
+    }
+    let params = API.iter().find(|e| e.name == api).map_or("", |e| e.params);
+    let count = if given == 1 { String::from("1 Argument") } else { format!("{} Argumente", given) };
+    let takes = if max == 0 { String::from("nimmt aber keine") } else { format!("nimmt aber höchstens {} ({})", max, params) };
+    let rest = match given - max {
+        1 if given == 1 => "es bleibt unbeachtet",
+        1 => "das letzte bleibt unbeachtet",
+        _ => "die übrigen bleiben unbeachtet",
+    };
+    cx.warn(&format!("{}: {}, {}; {}", shown_as, count, takes, rest));
 }
 
 // ---------------------------------------------------------------- arguments
@@ -480,7 +564,14 @@ impl ModelHost<'_> {
             "sweep" => {
                 let p = points2(cx, name, arg(args, 0), "profile")?;
                 let path = points3(cx, name, arg(args, 1), "path")?;
-                let closed = arg(args, 2).truthy();
+                // any value is true but nil and false: a number here is very likely the smoothing angle one place
+                // too early (geom.sweep(p, path, 30)), and 0 does not mean false
+                let closed_v = arg(args, 2);
+                let closed = closed_v.truthy();
+                if !matches!(closed_v, Value::Nil | Value::Bool(_)) {
+                    let s = shown(cx, closed_v);
+                    cx.warn(&format!("{}: closed sollte true oder false sein, nicht {} (gilt als {})", name, s, closed));
+                }
                 let smooth = num_or(cx, name, args, 3, geom::DEFAULT_SMOOTH_DEG, "smooth")?;
                 geom::sweep(&p, &path, closed, smooth)
             }
@@ -810,13 +901,13 @@ impl ModelHost<'_> {
     }
 
     fn named_material(&mut self, cx: &mut Cx, f: &str, n: &str) -> Result<MaterialDef, Fail> {
-        if let Some(m) = self.defined.iter().find(|m| m.name == n) {
+        if let Some((m, _)) = self.defined.iter().find(|(m, _)| m.name == n) {
             return Ok(m.clone());
         }
         if let Some(&(name, color, roughness, metallic)) = PALETTE.iter().find(|p| p.0 == n) {
             return Ok(MaterialDef { name: String::from(name), color, roughness, metallic });
         }
-        let mut names: Vec<&str> = self.defined.iter().map(|m| m.name.as_str()).collect();
+        let mut names: Vec<&str> = self.defined.iter().map(|(m, _)| m.name.as_str()).collect();
         names.extend(PALETTE.iter().map(|p| p.0));
         Err(throw(cx, f, &format!("das Material \"{}\" gibt es nicht (model.material legt eins fest; es gibt: {})", n, names.join(", "))))
     }
@@ -842,17 +933,41 @@ impl ModelHost<'_> {
                     return Err(throw(cx, name, &format!("name muss ein str sein, nicht {}", s)));
                 };
                 let def = material_from_map(cx, name, &n, arg(args, 1))?;
-                self.defined.retain(|m| m.name != n);
-                self.defined.push(def);
+                // a second definition with other values: the first is lost, or the parts added in between keep it
+                // (two materials of one name); redefining a built-in one that no part uses yet is what it is for
+                if let Some((old, at)) = self.defined.iter().find(|(m, _)| m.name == n) {
+                    if *old != def {
+                        let msg = format!("{}: das Material \"{}\" ist schon in {} anders festgelegt; ab hier gilt das neue, Teile davor behalten das alte", name, n, place(at));
+                        cx.warn(&msg);
+                    }
+                } else if self.model.materials.iter().any(|m| m.name == n && *m != def) {
+                    cx.warn(&format!("{}: das Material \"{}\" haben schon Teile mit anderen Werten; sie behalten sie, das neue gilt erst für Teile danach", name, n));
+                }
+                let here = cx.position();
+                self.defined.retain(|(m, _)| m.name != n);
+                self.defined.push((def, here));
                 cx.new_str(&n)
             }
             "name" => {
-                self.model.name = cx.display(arg(args, 0));
+                let n = cx.display(arg(args, 0));
+                if let Some(at) = &self.name_at {
+                    if self.model.name != n {
+                        let msg = format!("{}: \"{}\" ersetzt den Namen \"{}\" aus {}", name, n, self.model.name, place(at));
+                        cx.warn(&msg);
+                    }
+                }
+                self.model.name = n;
+                self.name_at = Some(cx.position());
                 Ok(Value::Nil)
             }
             "budget" => {
-                let n = count_or(cx, name, args, 0, None, "triangles")?;
-                self.model.budget = Some(n as u64);
+                let n = count_or(cx, name, args, 0, None, "triangles")? as u64;
+                if let Some(old) = self.model.budget.filter(|&b| b != n) {
+                    let msg = format!("{}: {} ersetzt das Budget {} aus {}", name, n, old, place(&self.model.budget_at));
+                    cx.warn(&msg);
+                }
+                self.model.budget = Some(n);
+                self.model.budget_at = cx.position();
                 Ok(Value::Nil)
             }
             "expect_size" => {
@@ -877,7 +992,7 @@ impl ModelHost<'_> {
                 if tol < 0.0 {
                     return Err(throw(cx, name, "die Toleranz darf nicht negativ sein"));
                 }
-                self.model.expects.push(Expect { size, tolerance: tol });
+                self.model.expects.push(Expect { size, tolerance: tol, at: cx.position() });
                 Ok(Value::Nil)
             }
             "uv_scale" => {
@@ -885,7 +1000,15 @@ impl ModelHost<'_> {
                 if !(s > 0.0) {
                     return Err(throw(cx, name, "meters muss größer 0 sein"));
                 }
+                // (the parts get their UV at the end of the run, all with the last value)
+                if let Some(at) = &self.uv_at {
+                    if self.model.uv_scale != s {
+                        let msg = format!("{}: {} ersetzt {} aus {}; alle Teile bekommen den letzten Wert", name, geom::fnum(s), geom::fnum(self.model.uv_scale), place(at));
+                        cx.warn(&msg);
+                    }
+                }
                 self.model.uv_scale = s;
+                self.uv_at = Some(cx.position());
                 Ok(Value::Nil)
             }
             _ => Err(Fail::Unknown),

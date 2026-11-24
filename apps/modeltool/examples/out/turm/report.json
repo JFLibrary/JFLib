@@ -1,9 +1,10 @@
 {
   "tool": "modeltool 0.1.0",
   "script": "turm.jfs",
-  "key": "fd4723780e9a55ff455f24d4a0afe6c0",
+  "key": "55fa80dda10e8aa0eb2ede135b0c76a0",
   "ok": true,
   "errors": [],
+  "warnings": [],
   "findings": [],
   "params": {},
   "model": {
@@ -48,7 +49,8 @@
     {"name": "turm", "material": "stein", "ok": true, "closed": true, "outward": true, "triangles": 3524, "vertices": 2591, "min": [-1.6, 0.5, -1.6], "size": [3.2, 6.8, 3.2], "area": 124.263352595, "volume": 21.95702128, "degenerate": 0}
   ],
   "expect": [
-    {"rule": "size", "expected": [4, 7.3, 4], "actual": [4, 7.3, 4], "tolerance": 0.001, "ok": true}
+    {"rule": "size", "file": "turm.jfs", "line": 40, "expected": [4, 7.3, 4], "actual": [4, 7.3, 4], "tolerance": 0.001, "ok": true},
+    {"rule": "budget", "file": "turm.jfs", "line": 39, "expected": 6000, "actual": 3680, "ok": true}
   ],
   "materials": [
     {"name": "beton", "color": "#a8a8a3", "roughness": 0.9, "metallic": 0},
@@ -59,5 +61,5 @@
   "imports": [],
   "files": {"report": "report.json", "glb": "model.glb", "sheet": "sheet.png", "front": "front.png", "side": "side.png", "top": "top.png", "iso": "iso.png"},
   "views": {"images": true, "size": 512, "grid_on": true, "grid": 1, "sheet": "front | side over top | iso", "cameras": "front: from +Z; side: from +X; top: from +Y, front at the bottom; the three at one scale; iso: from front right above", "adapter": "NVIDIA GeForce RTX 2070 SUPER"},
-  "timing": {"script_ms": 1.598, "geometry_ms": 310.67, "checks_ms": 3.354, "render_ms": 257.482, "export_ms": 0.237, "total_ms": 607.198, "fuel": 9485}
+  "timing": {"script_ms": 1.491, "geometry_ms": 329.643, "checks_ms": 4.217, "render_ms": 292.484, "export_ms": 0.533, "total_ms": 657.119, "fuel": 9485}
 }
