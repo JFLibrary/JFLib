@@ -47,6 +47,9 @@
 //   diagramiotest --write-vss-overview DIR [--corpus DIR]   (JD17) every master of each local .vss
 //                                         on one sheet (<stem>-alle.png), and of each .vssx Visio
 //                                         saved from them (<stem>-visio-alle.png; vss.rs)
+//   diagramiotest --write-jd21-jumps DIR  (JD21) JD21-Gegenprobe-Linienuebergaenge.vsdx (line
+//                                         jumps: a page per style, code, direction ...) and a PNG
+//                                         of each page (jumps.rs)
 //
 // Groups:
 //   samples   self-built files of all six formats: what lands where in the model (fields,
@@ -96,6 +99,9 @@
 //             VisioDocument streams (vsskit.rs) built here, hostile variants of both, cut and
 //             mutated files; the local .vss of SWDB_DE read, written as .vssx and read back, and
 //             drawn against Visio's .vssx of them (skipped without the files)
+//   jumps     (JD21, jumps.rs) line jumps: crossing connectors per style, code, direction, size;
+//             the jumps in the display list, the cells written and read back (no geometry), the
+//             SVG and PNG export
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -125,6 +131,8 @@ mod formulas;
 mod gegenprobe;
 mod hostile;
 mod hostile_write;
+// (JD21) line jumps
+mod jumps;
 mod pkg;
 // (JD12) pdftest's independent PDF reader checks the exported PDFs
 #[path = "../../pdftest/src/reader.rs"]
@@ -275,6 +283,10 @@ fn run() -> i32 {
         // (JD17) the synthetic .vss files and their hostile variants
         return vss::write_hostile(&dir);
     }
+    if let Some(dir) = arg(&args, "--write-jd21-jumps") {
+        // (JD21) the line jumps drawing for the Visio counter-check, a PNG per page
+        return jumps::write(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-probe") {
         return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
     }
@@ -337,6 +349,10 @@ fn run() -> i32 {
         // (JD17) the binary stencils of 2003-2010 (subgroups vss/cfb, vss/stream ...)
         vss::run(&mut h);
         vss_sample::run(&mut h);
+        // (JD21) line jumps
+        if h.on("jumps") {
+            jumps::check(&mut h);
+        }
     }
     if h.on("corpus") {
         corpus::run(&mut h, corpus_dir.clone());

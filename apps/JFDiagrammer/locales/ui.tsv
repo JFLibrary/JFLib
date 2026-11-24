@@ -458,11 +458,8 @@ Baum (von rechts nach links)	Tree (Right to Left)	Árbol (de derecha a izquierda
 Mittig zu Mittig	Center to Center	De centro a centro	Da centro a centro	Centre à centre
 Horizontale Linien	Horizontal Lines	Líneas horizontales	Linee orizzontali	Lignes horizontales
 Vertikale Linien	Vertical Lines	Líneas verticales	Linee verticali	Lignes verticales
-Zuletzt gezeichnete Linien	Last Drawn Lines	Últimas líneas dibujadas	Ultime linee disegnate	Dernières lignes tracées
-Zuletzt gezeichnete Linien (umgekehrt)	Last Drawn Lines (Reversed)	Últimas líneas dibujadas (orden inverso)	Ultime linee disegnate (ordine inverso)	Dernières lignes tracées (ordre inverse)
 Lücke	Gap	Hueco	Spazio	Espace
 Quadrat	Square	Cuadrado	Quadrato	Carré
-Mehrseitig	Multi-sided	Poligonal	Poligonale	Polygonal
 Routing-Stil	Routing style	Estilo de enrutamiento	Stile di routing	Style de routage
 Linienübergänge	Line jumps	Saltos de línea	Salti di linea	Sauts de ligne
 Stil der Linienübergänge	Line jump style	Estilo de salto de línea	Stile salto di linea	Style de saut de ligne
@@ -1168,3 +1165,22 @@ Shapes ohne X und Y werden in Stufen von oben nach unten angeordnet, Links werde
 {} Shapes und {} Verbinder erstellt	{} shapes and {} connectors created	{} formas y {} conectores creados	{} forme e {} connettori creati	{} formes et {} connecteurs créés
 Die Zeichnung lässt sich nicht erstellen.	The drawing cannot be created.	No se puede crear el dibujo.	Impossibile creare il disegno.	Impossible de créer le dessin.
 Shape-Daten in Zeile {}: {}	Shape data in line {}: {}	Datos de forma en la línea {}: {}	Dati forma nella riga {}: {}	Données de forme à la ligne {} : {}
+Verbinder-Verhalten	Connector Behavior	Comportamiento del conector	Comportamento connettore	Comportement du connecteur
+Seitenvorgabe	Page default	Valor predeterminado de la página	Impostazione della pagina	Valeur de la page
+{} Seiten|Linienübergang	{} sides	{} lados	{} lati	{} côtés
+Linienübergänge hinzufügen	Add line jumps	Agregar saltos de línea	Aggiungi salti di linea	Ajouter des sauts de ligne
+Nie	Never	Nunca	Mai	Jamais
+Immer	Always	Siempre	Sempre	Toujours
+Der andere Verbinder springt	Other connector jumps	Salta el otro conector	Salta l'altro connettore	L'autre connecteur saute
+Kein Verbinder springt	Neither connector jumps	No salta ningún conector	Non salta nessun connettore	Aucun connecteur ne saute
+Waagerechte Richtung	Horizontal direction	Dirección horizontal	Direzione orizzontale	Direction horizontale
+Senkrechte Richtung	Vertical direction	Dirección vertical	Direzione verticale	Direction verticale
+Nach oben|Linienübergang	Up	Arriba	Su	Vers le haut
+Nach unten|Linienübergang	Down	Abajo	Giù	Vers le bas
+Nach links|Linienübergang	Left	Izquierda	Sinistra	Vers la gauche
+Nach rechts|Linienübergang	Right	Derecha	Destra	Vers la droite
+Zuletzt verlegte Linie	Last routed line	Última línea enrutada	Ultima linea instradata	Dernière ligne routée
+Zuletzt angezeigte Linie	Last displayed line	Última línea mostrada	Ultima linea visualizzata	Dernière ligne affichée
+Zuerst angezeigte Linie	First displayed line	Primera línea mostrada	Prima linea visualizzata	Première ligne affichée
+Größe der Linienübergänge (waagerecht, senkrecht)	Line jump size (horizontal, vertical)	Tamaño de los saltos de línea (horizontal, vertical)	Dimensioni dei salti di linea (orizzontale, verticale)	Taille des sauts de ligne (horizontale, verticale)
+Richtung der Linienübergänge (waagerecht, senkrecht)	Line jump direction (horizontal, vertical)	Dirección de los saltos de línea (horizontal, vertical)	Direzione dei salti di linea (orizzontale, verticale)	Direction des sauts de ligne (horizontale, verticale)

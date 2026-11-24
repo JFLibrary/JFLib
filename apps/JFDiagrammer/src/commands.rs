@@ -361,6 +361,8 @@ commands! {
     DATA_AUTO_LINK_REFRESH = 0x1920, "Nach Aktualisierung automatisch verknüpfen", 0, 0;
     // (JD18, AB-11) the pane Externe Daten's Verknüpfung aufheben: the selected rows' shapes
     DATA_UNLINK_ROWS = 0x1960, "Verknüpfung aufheben", 0, 0;
+    // (JD21 jumps) the dialog Verbinder-Verhalten (line jumps per connector, jumps_ui.rs)
+    CONN_BEHAVIOR = 0x1C20, "Verbinder-Verhalten", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -596,6 +598,9 @@ static HANDLERS: &[(u32, Handler)] = &[
     (DATA_CONFLICTS, crate::data_refresh::conflicts_open),
     (DATA_AUTO_LINK_REFRESH, crate::data_refresh::toggle_auto_link),
     (DATA_UNLINK_ROWS, crate::data_pane::unlink_rows),
+    // (JD21 jumps) Linienübergänge anzeigen, Verbinder-Verhalten (jumps_ui.rs)
+    (LINE_JUMPS, crate::jumps_ui::toggle),
+    (CONN_BEHAVIOR, crate::jumps_ui::open),
 ];
 
 // toggles: whether the command is on
@@ -668,6 +673,8 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (PANE_SHAPE_DATA_WINDOW, |a| a.panes.visible(crate::panes::P_DATA)),
     (PANE_EXTERNAL_DATA, |a| a.panes.visible(crate::panes::P_EXTERNAL)),
     (DATA_AUTO_LINK_REFRESH, crate::data_refresh::auto_link_on),
+    // (JD21 jumps) the page shown has line jumps
+    (LINE_JUMPS, crate::jumps_ui::shown),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -695,6 +702,8 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
         // (JD18) the data commands
         && crate::data_cmds::available(app, id)
         && crate::data_pane::available(app, id)
+        // (JD21 jumps) Linienübergänge anzeigen, Verbinder-Verhalten
+        && crate::jumps_ui::available(app, id)
 }
 
 /// the toggle is on

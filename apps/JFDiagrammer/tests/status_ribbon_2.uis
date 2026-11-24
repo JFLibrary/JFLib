@@ -39,7 +39,8 @@ cmd 4400
 expect listitem:"Sheet.8" rect 500 273 255 176
 click tab:"Entwurf"
 click #4880
-expect menuitem:"Linienübergänge anzeigen" disabled
+# (JD21) Linienübergänge anzeigen works (jumps.uis): the new page has jumps
+expect menuitem:"Linienübergänge anzeigen" checked
 click menuitem:"Gerade"
 expect listitem:"Sheet.8" rect 488 299 226 150
 click #4880
