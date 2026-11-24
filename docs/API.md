@@ -45758,7 +45758,8 @@ MAX_CHAIN: usize = 1 << 20
   - `poll_ms: u32` -- the pause between two looks at an authorization or the order when the CA sends no
     Retry-After (ms; 2 seconds)
   - `max_poll_ms: u32` -- the longest pause taken from a Retry-After (ms; 30 s); a shorter Retry-After counts as
-    at least half a second (or max_poll_ms, when that is less)
+    at least half a second (or max_poll_ms, when that is less). No pause of either kind goes
+    past timeout_ms: the last one ends at it
 
 **`impl Acme`**
 
