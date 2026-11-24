@@ -91,7 +91,8 @@ static SHAPE_MENU: [Mi; 23] = [
     // (JD15, SP-12) the rows of the shape's Actions section first, as in Visio (cmds_actions.rs)
     Mi::List(crate::cmds_actions::ACTION_ROWS, crate::cmds_actions::ACTION_ROWS_MAX, ""),
     Mi::Cmd(CUT), Mi::Cmd(COPY), Mi::Cmd(PASTE), Mi::Sep,
-    Mi::Sub("Gruppierung", &[Mi::Cmd(GROUP), Mi::Cmd(UNGROUP)]),
+    // (JD21 groups) Zu/Aus Gruppe, Gruppe öffnen, Verhalten
+    Mi::Sub("Gruppierung", &[Mi::Cmd(GROUP), Mi::Cmd(UNGROUP), Mi::Cmd(ADD_TO_GROUP), Mi::Cmd(REMOVE_FROM_GROUP), Mi::Sep, Mi::Cmd(OPEN_GROUP), Mi::Cmd(CLOSE_GROUP), Mi::Cmd(GROUP_BEHAVIOR)]),
     // (JD8 rest) ZF-12's Shape ▸
     Mi::Sub("Shape", &[Mi::Cmd(ROTATE_LEFT), Mi::Cmd(ROTATE_RIGHT), Mi::Cmd(FLIP_H), Mi::Cmd(FLIP_V), Mi::Sep, Mi::Cmd(PANE_SIZEPOS)]),
     Mi::Sub("Container", &[Mi::Cmd(CT_ADD), Mi::Cmd(CT_REMOVE), Mi::Sep, Mi::Cmd(CT_SELECT), Mi::Cmd(CT_LOCK), Mi::Cmd(CT_DISBAND)]),
@@ -129,6 +130,8 @@ static TAB_MENU: [Mi; 8] = [
 pub(crate) fn center(app: &mut Diagrammer, ui: &mut Ui) {
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V, 0);
+    // (JD21 groups) the bar of a group opened on the canvas (groups_view.rs)
+    crate::groups_view::bar(app, ui);
     // (JD7) the canvas with the rulers and the edit layer (edit_canvas.rs); the shape's menu while
     // a shape is selected, else the page's (the edit layer selects on the right click first)
     crate::edit_canvas::canvas(app, ui, ID_CANVAS, |app, ui| {

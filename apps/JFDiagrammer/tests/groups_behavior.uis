@@ -1,0 +1,71 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21: group behaviour (SS-17, SP-06) set in Verhalten -- SelectMode 2 ("Elemente
+# zuerst": a click selects the member, a second click the group), DontMoveChildren (a member does
+# not move by dragging), IsDropTarget with the shape's IsDropSource (a shape dropped onto the group
+# joins it), IsTextEditTarget off (typing on the group goes to its top member)
+cmd 4404
+drag 500,330 640,420
+drag 700,330 800,420
+cmd 4400
+click 560,380
+click 750,380 shift
+cmd 4453
+expect listitem:"Sheet.6" selected
+click button:"Gruppieren"
+click menuitem:"Verhalten..."
+expect checkbox:"Abgelegte Shapes übernehmen" unchecked
+click #2048000001
+click "Elemente zuerst"
+click checkbox:"Elemente nicht mit der Maus verschieben"
+click checkbox:"Abgelegte Shapes übernehmen"
+click button:"OK"
+# members first: a click selects the member under the pointer, a second, slow one the group
+click 1100,650
+click 560,380
+expect listitem:"Sheet.4" selected
+wait 600
+click 560,380
+expect listitem:"Sheet.6" selected
+# the group moves as a whole
+wait 600
+drag 600,400 600,430
+expect listitem:"Sheet.6" rect 500 349 302 100
+key ctrl+z
+# DontMoveChildren: the member stays where it is
+click 1100,650
+click 560,380
+expect listitem:"Sheet.4" selected
+wait 600
+drag 560,380 560,450
+expect listitem:"Sheet.4" rect 500 324 151 100
+# a shape that may be dropped into groups: dropped onto the group it joins it
+cmd 4404
+drag 900,500 960,540
+cmd 4400
+click button:"Gruppieren"
+click menuitem:"Verhalten..."
+click checkbox:"Shape bei Ablage zu Gruppen hinzufügen"
+click button:"OK"
+drag 930,520 780,400
+expect listitem:"Sheet.7" selected
+click button:"Gruppieren"
+expect menuitem:"Aus Gruppe entfernen" enabled
+key esc
+key ctrl+z
+click button:"Gruppieren"
+expect menuitem:"Aus Gruppe entfernen" disabled
+key esc
+# typing on a group whose text goes to its top member
+click 1100,650
+click 560,380
+wait 600
+click 560,380
+expect listitem:"Sheet.6" selected
+click button:"Gruppieren"
+click menuitem:"Verhalten..."
+click checkbox:"Gruppentext bearbeiten"
+click button:"OK"
+key f2
+type "Oben"
+click 1100,650
+expect listitem:"Oben" exists

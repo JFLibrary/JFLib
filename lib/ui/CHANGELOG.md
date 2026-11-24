@@ -10,6 +10,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
+- (JD21) `ui.shape_edit`: `SEF_UP` -- a second, slow click on a selected member with this flag selects its group
+  (Visio's "members first" groups)
 - (JD8 rest) `ui.shape_edit`: the freeform tool `SE_FREEFORM` (the pointer's way, reported as
   `SeEv::Stroke` with the glue of both ends) and the arc tool `SE_ARC` (a quarter ellipse as the
   rubber band, bowing the way the drag started, reported as `SeEv::Arc`); both glue to connection

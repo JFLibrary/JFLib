@@ -190,26 +190,10 @@ pub(crate) fn group(app: &mut Diagrammer, ui: &mut Ui) {
     ui.repass();
 }
 
-/// Gruppierung aufheben
+/// Gruppierung aufheben: (JD21) Visio's warning first when the groups are instances of masters or
+/// formulas name them (groups_cmds.rs)
 pub(crate) fn ungroup(app: &mut Diagrammer, ui: &mut Ui) {
-    let shapes = selected(app);
-    let Some(o) = app.opened.as_mut() else { return };
-    let r = edit_doc::edit(o, t("Gruppierung aufheben"), true, |tx, eng| {
-        let mut all = Vec::new();
-        for &s in &shapes {
-            if tx.doc().shape(s).is_some_and(|x| x.header().kind == diagram_core::ShapeKind::Group) {
-                all.extend(ops::ungroup(tx, eng, s)?);
-            } else {
-                all.push(s);
-            }
-        }
-        Ok(all)
-    });
-    if let Ok(kids) = r {
-        let keys: Vec<u64> = kids.iter().map(|&s| key_of(s)).collect();
-        app.se.select(&keys);
-    }
-    ui.repass();
+    crate::groups_cmds::ungroup(app, ui);
 }
 
 // the box of the selection on the page (drawing units): x0, y0, x1, y1

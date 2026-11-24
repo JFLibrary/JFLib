@@ -20,6 +20,8 @@
 //   disband(tx, eng, c)                     the container goes, its members stay
 //   repair(tx, owner)                       relationships named on one side only are dropped
 //   aim_callouts(tx, eng, callouts)         a callout's tail back onto its target
+//   edge::*                                 (JD21, ST-03) boundary members: on a container's
+//                                           edge (Relationships 7 .. 10), they go with the edge
 //
 // The file keeps the structure in the Relationships cell of both shapes (structure::rel) and
 // the settings in User cells named as Visio names them (msvStructureType, msvSDContainer*,
@@ -49,8 +51,12 @@
 // * Moving a container moves its members (nested ones too) and the callouts of everything
 //   moved; deleting and copying take them along (carried).
 // * Nothing is computed when a file opens: settle runs only after a gesture.
+// * (JD21, ST-03) A shape dropped across an edge of a container sits on that edge (structure::edge):
+//   a member that follows the edge, which the container's automatic size leaves out.
 
 pub mod cff;
+// (JD21, ST-03) boundary members
+pub mod edge;
 pub mod rel;
 
 #[cfg(test)]
@@ -472,6 +478,8 @@ fn leave(tx: &mut Transaction, c: ShapeRef, shapes: &[ShapeRef]) -> Result<(), E
     for &s in shapes {
         unlink(tx, c, REL_CONTAINER, s, REL_MEMBER)?;
         unlink(tx, c, REL_LIST, s, REL_ITEM)?;
+        // (JD21) off its edge too
+        edge::set_edge(tx, s, c, None)?;
     }
     Ok(())
 }
@@ -682,7 +690,9 @@ fn depth(doc: &Document, c: ShapeRef) -> usize {
 /// their box, the margin around it, the heading
 pub fn needed_box(doc: &Document, c: ShapeRef) -> Option<[f64; 4]> {
     let info = container(doc, c)?;
-    let ms = if kind(doc, c) == Some(Kind::List) { items(doc, c) } else { members(doc, c) };
+    let mut ms = if kind(doc, c) == Some(Kind::List) { items(doc, c) } else { members(doc, c) };
+    // (JD21, ST-03) boundary members sit on the edge: they do not size the container
+    ms.retain(|&m| edge::edge_of(doc, m, c).is_none());
     let b = ops::bounds(doc, &ms)?;
     let m = info.margin;
     Some(add_heading([b[0] - m, b[1] - m, b[2] + m, b[3] + m], info.heading, info.heading_size))
@@ -937,14 +947,22 @@ pub fn settle(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[Sh
                 }
                 (containers_of(doc, s), drop_targets(doc, owner, s, &moving))
             };
+            // (JD21, ST-03) the containers whose edge it lies across (not those it is wholly in)
+            // a plain member moved partly out stays one (the container grows, JD10): only a shape
+            // that comes from outside or sits on an edge already takes an edge
+            let edges: Vec<(ShapeRef, Edge)> = {
+                let doc = tx.doc();
+                edge::targets(doc, owner, s, &moving).into_iter().filter(|e| !targets.contains(&e.0) && !(now.contains(&e.0) && edge::edge_of(doc, s, e.0).is_none())).collect()
+            };
             // it found containers it is not in yet: it leaves the ones it is not wholly in
-            let found = targets.iter().any(|t| !now.contains(t));
+            let found = targets.iter().chain(edges.iter().map(|e| &e.0)).any(|t| !now.contains(t));
             let mut stays: Vec<ShapeRef> = Vec::new();
             for &c in &now {
                 let keep = {
                     let doc = tx.doc();
                     moving.contains(&c)
                         || targets.contains(&c)
+                        || edges.iter().any(|e| e.0 == c)
                         || container(doc, c).is_some_and(|i| i.locked)
                         || (!found && meets(shape_box(doc, c), shape_box(doc, s)))
                 };
@@ -973,6 +991,25 @@ pub fn settle(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[Sh
                 relchg.push(t);
                 relchg.push(s);
                 touched.insert(t);
+            }
+            // (JD21, ST-03) on an edge: a member with its edge; wholly inside: no edge any more
+            for &(c, e) in &edges {
+                if tx.doc().shape(c).is_none() {
+                    continue;
+                }
+                if !containers_of(tx.doc(), s).contains(&c) {
+                    link(tx, c, REL_CONTAINER, s, REL_MEMBER, None)?;
+                }
+                edge::set_edge(tx, s, c, Some(e))?;
+                relchg.push(c);
+                relchg.push(s);
+                touched.insert(c);
+            }
+            for &t in &targets {
+                if edge::edge_of(tx.doc(), s, t).is_some() {
+                    edge::set_edge(tx, s, t, None)?;
+                    relchg.push(s);
+                }
             }
             // a list member dropped elsewhere in its list: its new place in the order
             for &l in &stays {
@@ -1004,6 +1041,7 @@ pub fn settle(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[Sh
         }
         stack.extend(containers_of(tx.doc(), c));
     }
+    let all_containers: Vec<ShapeRef> = all.iter().copied().collect();
     let mut order: Vec<(usize, ShapeRef)> = all.into_iter().map(|c| (depth(tx.doc(), c), c)).collect();
     order.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
     let mut moved: Vec<ShapeRef> = Vec::new();
@@ -1030,6 +1068,19 @@ pub fn settle(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[Sh
             }
         } else if info.resize != Resize::None && fit(tx, eng, c, info.resize == Resize::Fit)? && !moved.contains(&c) {
             moved.push(c);
+        }
+    }
+    // (JD21, ST-03) boundary members back onto their edges (a container resized, moved, fitted)
+    let edged: Vec<ShapeRef> = {
+        let mut v: Vec<ShapeRef> = all_containers.iter().copied().collect();
+        v.retain(|&c| tx.doc().shape(c).is_some());
+        v
+    };
+    for c in edged {
+        for s in edge::align(tx, eng, c)? {
+            if !moved.contains(&s) {
+                moved.push(s);
+            }
         }
     }
     for p in pools {
@@ -1086,6 +1137,10 @@ pub fn forget(tx: &mut Transaction, eng: &mut Engine, deleted: &[ShapeRef]) -> R
                 let mut ro = rel::relations(tx.doc(), o);
                 ro.get_mut(back).retain(|&x| x != d);
                 rel::write(tx, o, &ro)?;
+                // (JD21) a member on the edge of a container that goes
+                if *k == REL_CONTAINER {
+                    edge::set_edge(tx, o, d, None)?;
+                }
                 recalc(tx, eng, &[o])?;
                 if *k == REL_ITEM && !lists.contains(&o) {
                     lists.push(o);

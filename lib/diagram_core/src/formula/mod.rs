@@ -42,6 +42,8 @@ pub use engine::{
     TextMetrics,
 };
 pub use eval::Keep;
+// (JD21) a cell part's address (replace.rs: ReplaceCopyCells)
+pub(crate) use eval::bind;
 pub use parse::{cell_part, parse, unit_code, BinOp, CellPart, CellRef, Func, ParseError, ParseErrorKind, Parsed, SheetName};
 pub use theme::Theme;
 pub use val::{close, Axis, Stored, Target, Val};

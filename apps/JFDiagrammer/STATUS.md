@@ -42,19 +42,19 @@ Leseschlüssel:
 | 2.2 Seiten | 6 | 2 | 0 | 0 | 2 | 4 |
 | 2.3 Ebenen | 4 | 0 | 0 | 1 | 0 | 0 |
 | 2.4 Master, Schablonen und Formatvorlagen | 3 | 2 | 1 | 1 | 1 | 2 |
-| 2.5 Shapes, Geometrie und Gruppen | 5 | 6 | 0 | 2 | 1 | 3 |
+| 2.5 Shapes, Geometrie und Gruppen | 6 | 5 | 0 | 3 | 3 | 0 |
 | 2.6 Format: Linie, Füllung, Schatten, Effekte | 3 | 2 | 0 | 0 | 1 | 1 |
 | 2.7 Text und Felder | 6 | 2 | 0 | 0 | 0 | 2 |
 | 2.8 Verbinder, Kleben, Routing und Layout | 4 | 6 | 0 | 2 | 1 | 4 |
-| 2.9 Container, Listen, Swimlanes, Beschriftungen, Legenden | 4 | 1 | 0 | 1 | 0 | 2 |
+| 2.9 Container, Listen, Swimlanes, Beschriftungen, Legenden | 4 | 1 | 0 | 2 | 0 | 1 |
 | 2.10 Daten | 2 | 0 | 0 | 1 | 1 | 6 |
 | 2.11 Hyperlinks, QuickInfos und Kommentare | 1 | 0 | 0 | 0 | 0 | 4 |
 | 2.12 Designs (Themes), Varianten und Schnellformatvorlagen | 4 | 0 | 0 | 1 | 0 | 1 |
-| 2.13 ShapeSheet: Abschnitte | 11 | 12 | 0 | 6 | 9 | 1 |
+| 2.13 ShapeSheet: Abschnitte | 12 | 11 | 0 | 7 | 8 | 1 |
 | 2.14 Formel-Engine und Funktionen | 5 | 4 | 0 | 2 | 2 | 1 |
 | 3.1 Fenster, Start und Backstage | 7 | 7 | 0 | 0 | 1 | 3 |
 | 3.2 Titelleiste, Registerzeile und Menüband allgemein | 2 | 3 | 0 | 0 | 1 | 2 |
-| 3.3 Register „Start“ | 20 | 3 | 0 | 0 | 3 | 4 |
+| 3.3 Register „Start“ | 21 | 2 | 0 | 1 | 3 | 3 |
 | 3.4 Register „Einfügen“ | 6 | 2 | 0 | 0 | 0 | 2 |
 | 3.6 Register „Entwurf“ | 7 | 1 | 0 | 1 | 0 | 2 |
 | 3.7 Register „Daten“ | 0 | 1 | 0 | 3 | 0 | 4 |
@@ -74,9 +74,9 @@ Leseschlüssel:
 | 5.1 Vorlagen-Infrastruktur | 4 | 0 | 0 | 0 | 0 | 0 |
 | 5.2 Vorlagen nach Kategorie | 6 | 1 | 0 | 2 | 1 | 10 |
 | 5.3 Assistenten und Generatoren | 0 | 0 | 0 | 3 | 0 | 4 |
-| **zusammen** | **177** | **103** | **1** | **43** | **38** | **176** |
+| **zusammen** | **180** | **100** | **1** | **47** | **39** | **171** |
 
-P2-Zeilen, die schon fertig sind (43): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, SP-16, CN-06, CN-14, ST-09, DA-05, TH-06, SS-11, SS-21, SS-22, SS-31, SS-33, SS-36, FX-11, FX-12, RW-09, RD-02, RD-03, RD-09, LG-05, SH-003, SH-004, SH-007, SH-031, SH-032, SH-033, SH-041, VL-32, VL-38, AS-03, AS-04, AS-20.
+P2-Zeilen, die schon fertig sind (47): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, SP-15, SP-16, CN-06, CN-14, ST-03, ST-09, DA-05, TH-06, SS-11, SS-21, SS-22, SS-26, SS-31, SS-33, SS-36, FX-11, FX-12, RS-28, RW-09, RD-02, RD-03, RD-09, LG-05, SH-003, SH-004, SH-007, SH-031, SH-032, SH-033, SH-041, VL-32, VL-38, AS-03, AS-04, AS-20.
 <!-- summary:end -->
 
 ## Offene Entscheidungen des Nutzers
@@ -121,13 +121,11 @@ L = mehr. P2-Teile von P1-Zeilen stehen bei ihrer P2-Etappe.
 | JD20 | ZF-18 | Alternativtext und Lesereihenfolge für Bildschirmleser (RU-03) | S |
 | JD21 | SP-04, SS-30 | Steuerpunkte kleben (CanGlue: Ethernet, Ringnetz, Bus), Tip als QuickInfo | S |
 | JD21 | SP-05 | Scheitelpunkte: Mehrfachauswahl, Bogen-Griffe | S |
-| JD21 | SP-06, SS-17 | Gruppen: Warnung, Ablegen in eine Gruppe, SelectMode 1/2, DontMoveChildren | S |
 | JD21 | CN-01, CN-02 | Verbindungspunkt-Werkzeug; Kleben an Scheitelpunkt, Führungslinie, Steuerpunkt | S |
 | JD21 | CN-04, CN-05, SS-19, SS-40 | Knick- und Segment-Ziehpunkte; Routing-Stile, Richtung, Durchlässigkeit je Richtung | M |
 | JD21 | CN-07, SL-06, ZF-10 | Schnell-Shapes-Leiste an den Verbindungspfeilen mit Livevorschau | M |
 | JD21 | CN-16 | Einfügen › Verbinder mit dem Verbinder-Master der markierten Kachel (Shapes verbinden kann es) | S |
 | JD21 | ST-02 | Container-Stilkatalog (14) als Galerie, Kategorien bearbeiten | S |
-| JD21 | RS-27 | Zu Gruppe hinzufügen / Aus Gruppe entfernen | S |
 | JD21 | SL-03, PR-09 | Strg-Ziehen mehrerer Master, Teilen beim Ablegen auf Verbinder, Leuchten von Container/Liste | M |
 | JD22 | DM-03, RA-07 | Einrast- und Klebeziele, Stärke, Einrastwinkel, im Dokument speichern | S |
 | JD22 | PG-03, ZF-14 | Seitenregister per Ziehen umordnen (`ui.tabs`) | S |
@@ -300,18 +298,18 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | SP-03 | Transformation | P1 | fertig | edit_shapes.uis, edit_golden.uis; core ops::tests::every_grip_keeps_the_opposite_edge, rotate_about_a_centre, set_pin_leaves_the_shape_in_place, lock_bits_follow_the_lock_names | – |
 | SP-04 | Steuerpunkte | P1 | teilweise | status_model.uis (ziehen, Rückgängig); core ops::tests::control_points_write_cells_as_visio_does; structures_callout.uis | Steuerpunkte an anderen Shapes kleben (CanGlue; `edit_canvas` verwirft den Kleber außer bei Beschriftungen) |
 | SP-05 | Scheitelpunkte bearbeiten | P1/P2 | teilweise | status_model.uis (ziehen, Strg+Klick fügt ein); shapeops_frame.uis (JD21: der Rahmen folgt der Geometrie); core ops::tests::vertices_move_insert_delete_with_closing_rows, shapeops::tests::frame_follows_vertex_edits, frame_follows_a_shape_with_an_arc | mehrere mit Umschalt; Bogen-Griffe; Segment beim Zeichnen zurücknehmen |
-| SP-06 | Gruppen | P1 | teilweise | edit_group.uis (gruppieren, aufheben, Unterauswahl); core ops::tests::group_inside_a_group_and_setatref, turning_and_flipping_a_group_takes_its_members_along | Warnung bei formelgebundenen Gruppen, Ablegen in Gruppe (IsDropTarget), „Kinder zuerst“ (nur SelectMode 0 wirkt) |
+| SP-06 | Gruppen | P1 | fertig | edit_group.uis (gruppieren, aufheben, Unterauswahl); groups_behavior.uis (JD21: Elemente zuerst, DontMoveChildren, Ablegen in die Gruppe, Gruppentext); core ops::tests::group_inside_a_group_and_setatref, turning_and_flipping_a_group_takes_its_members_along, groups::tests (the_ungroup_warning, an_instance_made_plain_and_ungrouped, dropping_into_a_group_needs_both_cells) | – (Warnung vor dem Aufheben: Master-Instanz und Formeln, die die Gruppe nennen; Visio-Gegenprobe jd21-gruppen.vsdx) |
 | SP-07 | Stapelreihenfolge | P1 | fertig | edit_group.uis; core ops::tests::reorder_front_back_forward_backward | – |
 | SP-08 | Shape-Operationen | P2 | teilweise | shapeops_union.uis, shapeops_combine.uis, shapeops_fragment.uis, shapeops_intersect.uis, shapeops_subtract.uis (Start › Anordnen › Gruppieren › Vorgänge bis JD23); dit shapeops (Bögen bleiben Bögen, Rundlauf der Zeilen und Formeln, gestreckt); core shapeops::tests (Rechtecke, Ellipsen, gedreht, gespiegelt, Gruppen, Löcher, leeres Ergebnis); geom tests (region) | Verbinden, Trimmen, Versatz, Kurve anpassen, benutzerdefiniertes Anpassen; Visio-Gegenprobe der Zeilen und Formeln (jd21-vorgaenge.vsdx) |
 | SP-09 | Bilder als Shapes | P1 | teilweise | pictures.uis (Bild-Shape, drehbar, gespeichert); dit render/pictures (ImgOffset/ImgWidth) | Zuschneiden, Helligkeit, Kontrast, Gamma, Transparenz; SVG als Vektor |
 | SP-10 | Führungslinien und -punkte | P1 | teilweise | edit_view.uis (aus dem Lineal, Shapes rasten ein), canvas_guides.uis (Ansicht › Führungslinien aus, Nach Typ auswählen, Entf, Rückgängig) | per Klick wählen, verschieben, drehen; Kleben und Mitnehmen; Führungspunkte; per Größe und Position; Ausrichten legt Führungslinien an |
-| SP-11 | Shape ändern | P2 | fehlt | – | alles (JD21) |
+| SP-11 | Shape ändern | P2 | teilweise | groups_change_shape.uis (Galerie, einzeln und mehrere, Text, Größe, Verbinder, Rückgängig); dit groups (Rundlauf: Text, Daten, ReplaceCopyCells, Klebung); core replace::tests (Sperrzellen, ReplaceCopyCells, nicht ersetzbare Shapes, Container) | Kommentare und Datenverknüpfungen (JD18) bleiben beim alten Shape-ID; Galerie ohne Vorschaubilder; Visio-Gegenprobe jd21-gruppen.vsdx |
 | SP-12 | Intelligente Shapes | P1 | fertig | actions_menu.uis (Actions-Zeilen im Kontextmenü, Formel wirkt, Rückgängig), network_rack.uis (Höheneinheiten); dit render/geometry/sections | – (Trennlinie BeginGroup fehlt im Menü) |
 | SP-13 | Shape-Daten beim Ablegen abfragen | P2 | fertig | data_ask_drop.uis (Ablegen aus Favoriten, Duplizieren, Einfügen, Strg+Umschalt+Ziehen; OK schreibt, Abbrechen behält, Rückgängig) | – |
 | SP-14 | Verschieben ohne Raster und Feinschritte | P1 | fertig | status_model.uis (Pfeil = Rasterschritt, Umschalt = 1 px, Alt-Ziehen frei) | – |
-| SP-15 | Gruppe öffnen | P2 | fehlt | – | alles (JD21) |
+| SP-15 | Gruppe öffnen | P2 | fertig | groups_open.uis (isolierte Ansicht auf der Zeichenfläche: Mitglieder wählen, verschieben, Zeichnen, Ziehen von der Seite und aus der Schablone, Schließen passt den Rahmen an, Doppelklick OPENGROUPWIN) | – (eigenes Fenster bewusst nicht: siehe groups_view.rs) |
 | SP-16 | Ausrichtungsrahmen aktualisieren | P2 | fertig | shapeops_frame.uis (Gruppe um ein herausgeschobenes Mitglied, Rückgängig); core shapeops::tests::alignment_box_of_a_group | – |
-| SP-17 | Grenzfälle Gruppen | P2 | fehlt | – | alles (JD21) |
+| SP-17 | Grenzfälle Gruppen | P2 | teilweise | core groups::tests::a_guide_and_its_shape_only_together (Führungslinie und angeklebte Shapes nur gemeinsam) | In Gruppe umwandeln (Metadateien liegen nur als Bytes vor, ohne EMF/WMF-Leser); Bitmaps drehen mit (Visio ab 2010 dreht Bilder, die alte Regel nicht übernommen) |
 
 ### 2.6 Format: Linie, Füllung, Schatten, Effekte
 
@@ -368,7 +366,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 |---|---|---|---|---|---|
 | ST-01 | Container | P1 | fertig | structures_container.uis; core structure::tests (membership_follows_moves, container_carries_its_members, overlapping_containers_both_take_a_shape); dit structures | – |
 | ST-02 | Containerformat | P1 | teilweise | structures_container.uis, context.uis (Container-Tools: Ränder, Größe, Sperren, Inhalt, Auflösen, 4 Kopfzeilenstile) | 6 statt 14 Stile, als Menü statt Galerie; ausgeschlossene/erforderliche Kategorien ohne Oberfläche |
-| ST-03 | Randmitglieder | P2 | fehlt | – | alles (JD21) |
+| ST-03 | Randmitglieder | P2 | fertig | groups_boundary.uis (auf die Kante gezogen, Container breiter, verschoben, Rückgängig); dit groups (Relationships 7–10 Rundlauf); core structure::tests::boundary_members_follow_their_edge | – (Visio-Gegenprobe jd21-gruppen.vsdx: Erkennung, Mitte auf der Kante) |
 | ST-04 | Listen | P1 | fertig | structures_list.uis; core structure::tests::lists_keep_order, structure_functions (LISTORDER) | – |
 | ST-05 | Swimlanes | P1 | fertig | structures_cff.uis, context_jd15.uis (Bahn davor/danach einfügen); dit structures | – |
 | ST-06 | Beschriftungen | P1 | fertig | structures_callout.uis; core structure::tests::callouts_follow_their_target; Lösen/Anheften über den Steuerpunkt (structures.rs `callout_point`) | – |
@@ -431,13 +429,13 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | SS-14 | Fremdbild-Info | P1 | teilweise | dit render/pictures (ImgOffset/ImgWidth, Zuschnitt am Shape-Kasten) | ClippingPath (Zuschnitt per Pfad in Darstellung, PDF und SVG; S–M, JD23) |
 | SS-15 | Schutz | P1 | teilweise | core ops::tests::lock_bits_follow_the_lock_names, move_shapes_subshapes_lines_and_locks, set_frame_locks_aspect_and_1d; graue Griffe | Schutz-Dialog; LockDelete, LockSelect, LockFormat, LockCustProp, LockCrop, LockReplace ohne Wirkung |
 | SS-16 | Verschiedenes | P2 | teilweise | stencils_search.uis (ShapeKeywords); dit stencils/structure (HideText); NonPrinting/ObjType in der Darstellung | Comment als QuickInfo, NoObjHandles/NoCtlHandles, DropOnPageScale, Kalender |
-| SS-17 | Gruppeneigenschaften | P1 | teilweise | network_devices.uis (SVG-Gruppen mit SelectMode 0); DisplayMode in der Darstellung (dit render) | SelectMode 1/2, IsDropTarget, IsSnapTarget, IsTextEditTarget, DontMoveChildren |
+| SS-17 | Gruppeneigenschaften | P1 | fertig | network_devices.uis (SVG-Gruppen mit SelectMode 0); groups_behavior.uis (SelectMode 2, DontMoveChildren, IsDropTarget/IsDropSource, IsTextEditTarget im Dialog Verhalten); dit groups (Rundlauf der Zellen); core groups::tests, glue_to_a_member_of_a_group (IsSnapTarget); DisplayMode in der Darstellung (dit render) | – |
 | SS-18 | Klebeinfo | P1 | fertig | core glue_tests::static_glue_writes_visio_cells_and_follows, glue::tests::walk_preference_picks_the_sides; dit edit | – (WalkPreference als Vorrang zwischen gleich teuren Wegen) |
 | SS-19 | Shape-Layout | P1 | teilweise | ObjType, ShapeRouteStyle, ConFixedCode, Relationships wirken (structures_layout.uis, dit structures); ObjType und ShapeFixedCode im Seitenlayout (core layout::tests::fixed_and_unplaceable_shapes_stay); ConLineJumpCode/-Style/-DirX/-DirY (jumps.uis, dit jumps) | Durchlässigkeit je Richtung, ShapePlowCode, ShapePlaceFlip/ShapePlaceStyle, DisplayLevel |
 | SS-20 | Ebenenzugehörigkeit | P1 | fertig | layers.uis; dit render/fills/hidden-layer, two-layers | – |
 | SS-21 | Theme-Eigenschaften | P2 | fertig | dit designs (foreign/mixed-numbers), render/pages/themed; core formula::tests::themed_values | – |
 | SS-22 | Schnellformatvorlage | P2 | fertig | format.uis (Schnellformatvorlagen); core formula::tests::themed_values | – |
-| SS-26 | Shape-ersetzen-Verhalten | P2 | teilweise | dit roundtrip (Abschnitt bleibt erhalten) | ohne Wirkung (SP-11 fehlt) |
+| SS-26 | Shape-ersetzen-Verhalten | P2 | fertig | dit roundtrip (Abschnitt bleibt erhalten), dit groups (Rundlauf); core replace::tests::the_masters_locks_and_copy_cells (ReplaceLockShapeData/Text/Format, ReplaceCopyCells) | – |
 | SS-28 | Geometrie (mehrere Abschnitte) | P1 | fertig | dit render/geometry (alle Zeilenarten inkl. Spline, Rel*), core geometry-Tests | – |
 | SS-29 | Verbindungspunkte | P1 | fertig | canvas_glue.uis (Type 1 ist kein Ziel, Prompt als QuickInfo); core glue_tests::connection_points_turn_with_the_shape, static_glue_* | – |
 | SS-30 | Steuerelemente (Controls) | P1 | teilweise | status_model.uis; core ops::tests::control_points_write_cells_as_visio_does | CanGlue (SP-04), Tip nicht als QuickInfo |
@@ -541,8 +539,8 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | RS-24 | Ausrichten | P1 | fertig | tests/shell_commands.uis (Automatisch ausrichten), tests/status_ribbon.uis (Links ausrichten zum Anker) | – |
 | RS-25 | Positionieren | P1 | fertig | layout_position.uis (Automatischer Abstand, Automatische Ausrichtung und Abstände, Abstandsoptionen, Weitere Verteilungsoptionen, Seitenumbrüche verschieben/vermeiden, Diagramm drehen), tests/status_ribbon.uis (Horizontal verteilen), tests/edit_shapes.uis (Drehen/Spiegeln) | – |
 | RS-26 | Vordergrund / Hintergrund | P1 | fertig | tests/edit_group.uis | – |
-| RS-27 | Gruppieren | P1 | teilweise | tests/edit_group.uis | Zu Gruppe hinzufügen, Aus Gruppe entfernen |
-| RS-28 | Shape ändern | P2 | fehlt | – | (JD21) |
+| RS-27 | Gruppieren | P1 | fertig | tests/edit_group.uis; groups_add_remove.uis (Zu Gruppe hinzufügen, Aus Gruppe entfernen, Kontextmenü) | – |
+| RS-28 | Shape ändern | P2 | fertig | groups_change_shape.uis (Start › Bearbeiten › Shape ändern: Schnell-Shapes der aktiven Schablone, Schablonen aufklappbar) | – |
 | RS-29 | Suchen | P1 | fertig | tests/find.uis | – |
 | RS-30 | Ebenen | P1 | fertig | tests/layers.uis | – |
 | RS-31 | Markieren | P1 | teilweise | tests/qat.uis, tests/edit_group.uis (Lasso), tests/select_by_type.uis, tests/canvas_guides.uis (Führungslinien nach Typ) | Nach Typ: OLE und Freihand |
@@ -772,7 +770,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | SH-G02 | Echte Master | P1 | teilweise | dio stencils (masters, engine, shapes, network) | keine Ebene in den Mastern (Bauwerkzeug schreibt keine Master-Ebenen); Kategorien nur bei Flussdiagramm, Strukturen, Rack |
 | SH-G03 | Schablonen als Dateien | P1 | fertig | dio stencils, stencils_lang.uis | – |
 | SH-G04 | Schnell-Shapes je Schablone | P1 | fertig | stencils.uis, dio stencils/masters, dio stencils/structure/callouts/*/quick (Beschriftungen mit vier Schnell-Shapes) | – (Nutzung für AutoVerbinden: CN-07, JD21) |
-| SH-G05 | Fremde Master anzeigen | P1 | fertig | dio render (lokaler Korpus), viewer.uis | – („Shape ändern“ ist SP-11, P2/JD21) |
+| SH-G05 | Fremde Master anzeigen | P1 | fertig | dio render (lokaler Korpus), viewer.uis | – („Shape ändern“ wechselt auf eigene Shapes: SP-11, groups_change_shape.uis) |
 | SH-G06 | AWS-Icons ausliefern | P2 | fehlt | – | → JD32 |
 | SH-G08 | Eigene Ergänzungen | P2 | fehlt | – | → JD34 |
 | SH-G09 | Gemeinsamer Netzwerk-Symbolsatz | P1 | teilweise | network_devices.uis, dio stencils/network | liegt in `apps/JFDiagrammer/symbols/`; eigenes Repo + Submodule, JFNetworker noch auf eigenem `icons/` |

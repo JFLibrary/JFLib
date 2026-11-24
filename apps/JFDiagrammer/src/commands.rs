@@ -400,6 +400,14 @@ commands! {
     OP_INTERSECT = 0x1C03, "Schnittmenge bilden", JD_OP_INTERSECT, 0;
     OP_SUBTRACT = 0x1C04, "Subtrahieren", JD_OP_SUBTRACT, 0;
     UPDATE_ALIGN_BOX = 0x1C08, "Ausrichtungsfeld aktualisieren", 0, 0;
+    // (JD21 groups) Shape ändern (Start › Bearbeiten), Zu Gruppe hinzufügen, Aus Gruppe entfernen,
+    // Gruppe öffnen / schließen, Verhalten (change_shape.rs, groups_cmds.rs, groups_view.rs)
+    CHANGE_SHAPE = 0x1C80, "Shape ändern", 0, JD_CHANGE_SHAPE_L;
+    ADD_TO_GROUP = 0x1C81, "Zu Gruppe hinzufügen", 0, 0;
+    REMOVE_FROM_GROUP = 0x1C82, "Aus Gruppe entfernen", 0, 0;
+    OPEN_GROUP = 0x1C83, "Gruppe öffnen", 0, 0;
+    CLOSE_GROUP = 0x1C84, "Gruppe schließen", 0, 0;
+    GROUP_BEHAVIOR = 0x1C85, "Verhalten...", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -672,6 +680,13 @@ static HANDLERS: &[(u32, Handler)] = &[
     (OP_INTERSECT, |a, ui| crate::shapeops_cmds::run(a, ui, OP_INTERSECT)),
     (OP_SUBTRACT, |a, ui| crate::shapeops_cmds::run(a, ui, OP_SUBTRACT)),
     (UPDATE_ALIGN_BOX, |a, ui| crate::shapeops_cmds::run(a, ui, UPDATE_ALIGN_BOX)),
+    // (JD21 groups) Shape ändern opens its gallery; the group commands (groups_cmds.rs)
+    (CHANGE_SHAPE, |a, ui| crate::cmds_shell::open_menu(a, ui, CHANGE_SHAPE)),
+    (ADD_TO_GROUP, crate::groups_cmds::add),
+    (REMOVE_FROM_GROUP, crate::groups_cmds::remove),
+    (OPEN_GROUP, crate::groups_cmds::open),
+    (CLOSE_GROUP, crate::groups_cmds::close),
+    (GROUP_BEHAVIOR, crate::groups_cmds::behavior),
 ];
 
 // toggles: whether the command is on
@@ -781,6 +796,8 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
         && crate::jumps_ui::available(app, id)
         // (JD21 ops) the shape operations
         && crate::shapeops_cmds::available(app, id)
+        // (JD21 groups) Shape ändern, the group commands
+        && crate::groups_cmds::available(app, id)
 }
 
 /// the toggle is on

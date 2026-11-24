@@ -63,9 +63,10 @@
 // Input (pointer tool): a press on a handle of the selection starts its drag; on a shape it
 // selects it (Shift adds, Ctrl toggles) and a drag moves the selection (grid, dynamic grid,
 // guides; Alt: free); a second, slow click on a selected group selects the child under the
-// pointer; a double click edits the text (SeEv::Text); on the background a drag draws a marquee
-// or, with SeState::lasso, a free outline (shapes fully inside, with SeState::partial also those
-// it touches, ZF-06; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
+// pointer, on a selected child with SEF_UP its group (Visio's "members first"); a double click
+// edits the text (SeEv::Text); on the background a drag draws a marquee or, with
+// SeState::lasso, a free outline (shapes fully inside, with SeState::partial also those it
+// touches, ZF-06; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
 // handles change one side (a locked aspect: both), Ctrl resizes about the middle; locked handles
 // are drawn grey and do nothing.  The rotation handle turns about the pin (one shape) or the
 // middle of the selection: in 15-degree steps near the shape, in single degrees farther away.
@@ -166,6 +167,9 @@ pub const SEF_END_DYN: u32 = 0x8000;
 pub const SEF_LOCK_PIN: u32 = 0x1_0000; // no rotation pin handle
 pub const SEF_NOARROWS: u32 = 0x2_0000; // no connection arrows around it (see the file header)
 pub const SEF_NOSNAP: u32 = 0x4_0000; // moves do not snap to it (the dynamic grid leaves it out)
+/// (JD21) a member of a "members first" group: a second, slow click on it selects its group
+/// (SeShape::parent)
+pub const SEF_UP: u32 = 0x8_0000;
 
 /// kinds of SePoint
 pub const SP_CONTROL: u8 = 0;
@@ -1492,6 +1496,12 @@ impl Ui {
                     } else if st.sel.len() > 1 {
                         st.select(&[k]);
                         out.push(SeEv::Select);
+                    } else if let Some(p) = st.shape(m, k).filter(|s| s.flags & SEF_UP != 0 && s.parent != 0).map(|s| s.parent) {
+                        // (JD21) a member of a "members first" group: now the group
+                        if st.shape(m, p).is_some_and(|s| s.flags & SEF_NOSELECT == 0) {
+                            st.select(&[p]);
+                            out.push(SeEv::Select);
+                        }
                     }
                 }
             }

@@ -37,6 +37,9 @@
 //                                      ColorTrans) and every shape of the instance its own
 //                                      LayerMember with the page's indices (the master's name
 //                                      the rows of its own Layer section)
+//   detach(&mut tx, shape)             (JD21, SP-06) an instance made plain shapes: what it
+//                                      inherits from its master shapes becomes its own, the link
+//                                      to the master goes (before it is ungrouped; detach.rs)
 //
 // The JFD_ cells are JFDiagrammer's own (apps/JFDiagrammer/stencils/README.md); diagram_io's
 // stencil builder writes them, the Shapes panel reads them.  Visio keeps them as ordinary User
@@ -57,6 +60,9 @@ use crate::shape::{ForeignData, ForeignPayload, ShapeData, ShapeKind, ShapeTree,
 use crate::sheet::{CellAddr, Extra, ExtraItem, Extras, Row, RowKey, SecKey, Section, Sheet, Trigger};
 use crate::strings::Sym;
 use crate::units::Unit;
+
+mod detach;
+pub use detach::detach;
 
 /// the five languages, in the order of every five-language value
 pub const LANGS: [&str; 5] = ["de", "en", "es", "it", "fr"];
