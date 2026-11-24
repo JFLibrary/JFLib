@@ -325,7 +325,7 @@ pub(crate) fn dialog(app: &mut Diagrammer, ui: &mut Ui) {
 
 // Weiter: the step's choices into the definition -> stay open
 fn next(app: &mut Diagrammer) -> bool {
-    let doc = app.opened.as_ref().map(|o| o.doc.clone());
+    let doc = app.opened.as_ref().map(|o| &o.doc);
     let w = &mut app.reports.wizard;
     w.error = None;
     match w.step {
@@ -338,7 +338,7 @@ fn next(app: &mut Diagrammer) -> bool {
                 w.error = Some(String::from(t("Wählen Sie mindestens eine Eigenschaft.")));
                 return true;
             }
-            take_columns(w, &doc);
+            take_columns(w, doc);
             if w.title.trim().is_empty() {
                 w.title = String::from(t("Bericht"));
             }
