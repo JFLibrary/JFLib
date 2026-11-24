@@ -115,7 +115,7 @@ mod radial;
 #[cfg(test)]
 mod tests;
 
-use alloc::collections::BTreeSet;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
 use crate::cell::Value;
@@ -521,9 +521,11 @@ pub fn diagram(doc: &Document, owner: Owner, only: &[ShapeRef]) -> Diagram {
             _ => d.obstacles.push(b),
         }
     }
+    let index: BTreeMap<ShapeRef, usize> = d.nodes.iter().enumerate().map(|(i, &s)| (s, i)).collect();
+    let mut seen: BTreeSet<(usize, usize)> = BTreeSet::new();
     for (a, b) in links {
-        let (Some(i), Some(j)) = (d.nodes.iter().position(|&x| x == a), d.nodes.iter().position(|&x| x == b)) else { continue };
-        if i != j && !d.edges.contains(&(i, j)) {
+        let (Some(&i), Some(&j)) = (index.get(&a), index.get(&b)) else { continue };
+        if i != j && seen.insert((i, j)) {
             d.edges.push((i, j));
         }
     }
@@ -622,11 +624,21 @@ pub fn arrange(d: &Diagram, opts: &Opts) -> Vec<[f64; 2]> {
         .collect();
     // each part laid out in the frame
     let mut parts: Vec<(Vec<usize>, Vec<[f64; 2]>, [f64; 4])> = Vec::new();
-    for comp in components(n, &edges) {
-        let idx_of = |g: usize| comp.iter().position(|&x| x == g);
+    // each node's part and its index in it
+    let comps = components(n, &edges);
+    let mut local = alloc::vec![(0usize, 0usize); n];
+    for (k, comp) in comps.iter().enumerate() {
+        for (i, &g) in comp.iter().enumerate() {
+            local[g] = (k, i);
+        }
+    }
+    let mut part_edges: Vec<Vec<(usize, usize)>> = alloc::vec![Vec::new(); comps.len()];
+    for &(a, b) in &edges {
+        part_edges[local[a].0].push((local[a].1, local[b].1));
+    }
+    for (comp, cedges) in comps.into_iter().zip(part_edges) {
         let ce: Vec<[f64; 2]> = comp.iter().map(|&g| ext[g]).collect();
         let co: Vec<[f64; 2]> = comp.iter().map(|&g| orig[g]).collect();
-        let cedges: Vec<(usize, usize)> = edges.iter().filter_map(|&(a, b)| Some((idx_of(a)?, idx_of(b)?))).collect();
         let c = Comp { ext: &ce, orig: &co, edges: &cedges, gap, step, depth: opts.depth };
         let pos = match opts.place.style {
             Style::Flowchart => layered::layout(&c, None),

@@ -15,7 +15,7 @@
 // The moves are applied with layout::move_nodes (members and callouts along) and the
 // connectors follow with layout::reroute, all in the caller's transaction.
 
-use alloc::collections::{BTreeSet, VecDeque};
+use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
 use alloc::vec;
 use alloc::vec::Vec;
 
@@ -49,9 +49,11 @@ fn net(doc: &Document, owner: Owner) -> Net {
         n.boxes.push(b);
         n.fixed.push(fixed(doc, s));
     }
+    let index: BTreeMap<ShapeRef, usize> = n.shapes.iter().enumerate().map(|(i, &s)| (s, i)).collect();
+    let mut seen: BTreeSet<(usize, usize)> = BTreeSet::new();
     for (a, b) in lk {
-        let (Some(i), Some(j)) = (n.shapes.iter().position(|&x| x == a), n.shapes.iter().position(|&x| x == b)) else { continue };
-        if i != j && !n.edges.contains(&(i, j)) {
+        let (Some(&i), Some(&j)) = (index.get(&a), index.get(&b)) else { continue };
+        if i != j && seen.insert((i, j)) {
             n.edges.push((i, j));
         }
     }
@@ -132,8 +134,15 @@ pub fn align_space(doc: &Document, owner: Owner, only: &[ShapeRef], align: bool,
         let c = centre(&net.boxes[i]);
         [c[0] + delta[i][0], c[1] + delta[i][1]]
     };
+    // each shape's children in the order of the walk
+    let mut children: Vec<Vec<usize>> = vec![Vec::new(); n];
+    for &c in &walk {
+        if let Some(p) = parent[c] {
+            children[p].push(c);
+        }
+    }
     for &p in &walk {
-        let ch: Vec<usize> = walk.iter().copied().filter(|&c| parent[c] == Some(p)).collect();
+        let ch = core::mem::take(&mut children[p]);
         // carried along with the parent
         for &c in &ch {
             if !net.fixed[c] {
