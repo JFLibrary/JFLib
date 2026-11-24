@@ -21,7 +21,7 @@
 // deliver the same typed Table.
 //
 // Every file is untrusted input: the ZIP container is bounded before anything is inflated
-// (archive::Limits, the compression ratio included), the XML reader takes no DTD and no entity
+// (archive::Limits, the compression ratio included), the XML reader (formats::xml::Reader) takes no DTD and no entity
 // but the five predefined ones and bounds the nesting, rows, columns, cells, shared strings and
 // their bytes are bounded, no size a file advertises (<dimension>, count, uniqueCount) sizes an
 // allocation, cells are stored sparsely, nothing recurses.  A broken file is an error, never a

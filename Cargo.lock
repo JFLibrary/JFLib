@@ -1333,6 +1333,7 @@ dependencies = [
  "jflib-archive",
  "jflib-base",
  "jflib-datetime",
+ "jflib-formats",
  "jflib-plat",
  "jflib-rt",
 ]
