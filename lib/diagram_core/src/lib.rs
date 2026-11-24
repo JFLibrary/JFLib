@@ -53,8 +53,10 @@
 //   field::*                      (JD8) text fields: a Field row's value in its format picture,
 //                                 new fields, the text with its fields, the document's
 //                                 properties (Document::fields: the app's locale and clock)
-//
-// What is to come here, by stage of the plan: page layout (CN-13, P2)
+//   layout::*                     (JD21) the page laid out anew in Visio's styles (flowchart,
+//                                 hierarchy, compact tree, radial, circular; CN-13), connected
+//                                 shapes aligned and spaced (CN-14), shapes off the page
+//                                 breaks (PR-03), the diagram turned or flipped (RS-25)
 //
 // Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 // opening a file (connectors, layout and containers move only when something moves), and a
@@ -77,6 +79,7 @@ pub mod glue;
 pub mod hit;
 mod inherit;
 pub mod instance;
+pub mod layout;
 mod names;
 pub mod ops;
 mod page;

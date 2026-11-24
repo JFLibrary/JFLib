@@ -361,6 +361,35 @@ commands! {
     DATA_AUTO_LINK_REFRESH = 0x1920, "Nach Aktualisierung automatisch verknüpfen", 0, 0;
     // (JD18, AB-11) the pane Externe Daten's Verknüpfung aufheben: the selected rows' shapes
     DATA_UNLINK_ROWS = 0x1960, "Verknüpfung aufheben", 0, 0;
+    // (JD21 layout) Entwurf › Layout › Seitenlayout neu anordnen with its styles, Start ›
+    // Anordnen › Positionieren: spacing, distribution, page breaks, Diagramm drehen
+    // (layout_cmds.rs, dlg_layout.rs)
+    RELAYOUT = 0x1C40, "Seitenlayout neu anordnen", JD_RELAYOUT, JD_RELAYOUT_L;
+    LAYOUT_FLOW_DOWN = 0x1C41, "Flussdiagramm (von oben nach unten)", JD_LAYOUT_FLOW_DOWN, 0;
+    LAYOUT_FLOW_UP = 0x1C42, "Flussdiagramm (von unten nach oben)", JD_LAYOUT_FLOW_UP, 0;
+    LAYOUT_FLOW_RIGHT = 0x1C43, "Flussdiagramm (von links nach rechts)", JD_LAYOUT_FLOW_RIGHT, 0;
+    LAYOUT_FLOW_LEFT = 0x1C44, "Flussdiagramm (von rechts nach links)", JD_LAYOUT_FLOW_LEFT, 0;
+    LAYOUT_HIER_DOWN = 0x1C45, "Hierarchie (von oben nach unten)", JD_LAYOUT_HIERARCHY, 0;
+    LAYOUT_HIER_UP = 0x1C46, "Hierarchie (von unten nach oben)", JD_LAYOUT_HIERARCHY, 0;
+    LAYOUT_HIER_RIGHT = 0x1C47, "Hierarchie (von links nach rechts)", JD_LAYOUT_HIERARCHY, 0;
+    LAYOUT_HIER_LEFT = 0x1C48, "Hierarchie (von rechts nach links)", JD_LAYOUT_HIERARCHY, 0;
+    LAYOUT_TREE_DOWN_RIGHT = 0x1C49, "Kompakte Struktur (nach unten, dann rechts)", JD_LAYOUT_COMPACT, 0;
+    LAYOUT_TREE_RIGHT_DOWN = 0x1C4A, "Kompakte Struktur (nach rechts, dann unten)", JD_LAYOUT_COMPACT, 0;
+    LAYOUT_TREE_DOWN_LEFT = 0x1C4B, "Kompakte Struktur (nach unten, dann links)", JD_LAYOUT_COMPACT, 0;
+    LAYOUT_TREE_LEFT_DOWN = 0x1C4C, "Kompakte Struktur (nach links, dann unten)", JD_LAYOUT_COMPACT, 0;
+    LAYOUT_RADIAL = 0x1C4D, "Radial", JD_LAYOUT_RADIAL, 0;
+    LAYOUT_CIRCULAR = 0x1C4E, "Kreisförmig", JD_LAYOUT_CIRCULAR, 0;
+    LAYOUT_MORE = 0x1C4F, "Weitere Layoutoptionen...", 0, 0;
+    AUTO_SPACE = 0x1C50, "Automatischer Abstand", JD_AUTO_SPACE, 0;
+    AUTO_ALIGN_SPACE = 0x1C51, "Automatische Ausrichtung und Abstände", JD_AUTO_ALIGN_SPACE, 0;
+    SPACING_OPTIONS = 0x1C52, "Abstandsoptionen...", JD_SPACING_OPTIONS, 0;
+    DISTRIBUTE_MORE = 0x1C53, "Weitere Verteilungsoptionen...", 0, 0;
+    MOVE_OFF_BREAKS = 0x1C54, "Von Seitenumbrüchen verschieben", JD_MOVE_OFF_BREAKS, 0;
+    AVOID_BREAKS = 0x1C55, "Seitenumbrüche vermeiden", 0, 0;
+    DIAGRAM_ROTATE_LEFT = 0x1C56, "Diagramm um 90° nach links drehen", JD_ROTATE_LEFT, 0;
+    DIAGRAM_ROTATE_RIGHT = 0x1C57, "Diagramm um 90° nach rechts drehen", JD_ROTATE_RIGHT, 0;
+    DIAGRAM_FLIP_V = 0x1C58, "Diagramm vertikal spiegeln", JD_FLIP_V, 0;
+    DIAGRAM_FLIP_H = 0x1C59, "Diagramm horizontal spiegeln", JD_FLIP_H, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -596,6 +625,33 @@ static HANDLERS: &[(u32, Handler)] = &[
     (DATA_CONFLICTS, crate::data_refresh::conflicts_open),
     (DATA_AUTO_LINK_REFRESH, crate::data_refresh::toggle_auto_link),
     (DATA_UNLINK_ROWS, crate::data_pane::unlink_rows),
+    // (JD21 layout) Seitenlayout neu anordnen, Positionieren (layout_cmds.rs, dlg_layout.rs)
+    (RELAYOUT, |a, ui| crate::cmds_shell::open_menu(a, ui, RELAYOUT)),
+    (LAYOUT_FLOW_DOWN, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_FLOW_DOWN)),
+    (LAYOUT_FLOW_UP, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_FLOW_UP)),
+    (LAYOUT_FLOW_RIGHT, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_FLOW_RIGHT)),
+    (LAYOUT_FLOW_LEFT, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_FLOW_LEFT)),
+    (LAYOUT_HIER_DOWN, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_HIER_DOWN)),
+    (LAYOUT_HIER_UP, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_HIER_UP)),
+    (LAYOUT_HIER_RIGHT, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_HIER_RIGHT)),
+    (LAYOUT_HIER_LEFT, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_HIER_LEFT)),
+    (LAYOUT_TREE_DOWN_RIGHT, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_TREE_DOWN_RIGHT)),
+    (LAYOUT_TREE_RIGHT_DOWN, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_TREE_RIGHT_DOWN)),
+    (LAYOUT_TREE_DOWN_LEFT, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_TREE_DOWN_LEFT)),
+    (LAYOUT_TREE_LEFT_DOWN, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_TREE_LEFT_DOWN)),
+    (LAYOUT_RADIAL, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_RADIAL)),
+    (LAYOUT_CIRCULAR, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_CIRCULAR)),
+    (LAYOUT_MORE, crate::dlg_layout::open_layout),
+    (AUTO_SPACE, |a, ui| crate::layout_cmds::auto(a, ui, false, true, true)),
+    (AUTO_ALIGN_SPACE, |a, ui| crate::layout_cmds::auto(a, ui, true, true, true)),
+    (SPACING_OPTIONS, crate::dlg_layout::open_spacing),
+    (DISTRIBUTE_MORE, crate::dlg_layout::open_distribute),
+    (MOVE_OFF_BREAKS, crate::layout_cmds::off_breaks),
+    (AVOID_BREAKS, crate::layout_cmds::toggle_avoid),
+    (DIAGRAM_ROTATE_LEFT, |a, ui| crate::layout_cmds::turn(a, ui, diagram_core::layout::Turn::Left)),
+    (DIAGRAM_ROTATE_RIGHT, |a, ui| crate::layout_cmds::turn(a, ui, diagram_core::layout::Turn::Right)),
+    (DIAGRAM_FLIP_V, |a, ui| crate::layout_cmds::turn(a, ui, diagram_core::layout::Turn::FlipV)),
+    (DIAGRAM_FLIP_H, |a, ui| crate::layout_cmds::turn(a, ui, diagram_core::layout::Turn::FlipH)),
 ];
 
 // toggles: whether the command is on
@@ -668,6 +724,8 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (PANE_SHAPE_DATA_WINDOW, |a| a.panes.visible(crate::panes::P_DATA)),
     (PANE_EXTERNAL_DATA, |a| a.panes.visible(crate::panes::P_EXTERNAL)),
     (DATA_AUTO_LINK_REFRESH, crate::data_refresh::auto_link_on),
+    // (JD21 layout) Positionieren › Seitenumbrüche vermeiden
+    (AVOID_BREAKS, crate::layout_cmds::avoid_on),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -695,6 +753,8 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
         // (JD18) the data commands
         && crate::data_cmds::available(app, id)
         && crate::data_pane::available(app, id)
+        // (JD21 layout) the layout commands
+        && crate::layout_cmds::available(app, id)
 }
 
 /// the toggle is on

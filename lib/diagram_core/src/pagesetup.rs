@@ -14,6 +14,8 @@
 //   fit_to_drawing(tx, eng, page, margins) the page around its drawing, the shapes moved in
 //   Tiles::new(paper, margins, zoom); grow(tx, eng, page, &tiles)   automatic size after a
 //                                          gesture: whole tiles added or taken away
+//   shift(tx, eng, page, d)                (JD21) the drawing moved with the page's origin,
+//                                          dynamically glued connector ends along
 //
 // The cells (Visio's ShapeSheet reference, Page Properties and Print Properties sections):
 // * DrawingSizeType: 0 same as printer (visPrintSetup), 1 fit page to drawing contents
@@ -170,7 +172,7 @@ pub fn fit_to_drawing(tx: &mut Transaction, eng: &mut Engine, page: PageRef, mar
     let d = [m[0] - b[0], m[3] - b[1]];
     let mut changed = false;
     if d[0].abs() > EPS || d[1].abs() > EPS {
-        ops::shift_all(tx, eng, Owner::Page(page), d)?;
+        shift(tx, eng, page, d)?;
         changed = true;
     }
     changed |= put_size(tx, page, w.max(EPS), h.max(EPS))?;
@@ -277,11 +279,53 @@ pub fn grow(tx: &mut Transaction, eng: &mut Engine, page: PageRef, tiles: &Tiles
         return Ok(None);
     }
     if d[0].abs() > EPS || d[1].abs() > EPS {
-        ops::shift_all(tx, eng, Owner::Page(page), d)?;
+        shift(tx, eng, page, d)?;
     }
     put_size(tx, page, nw, nh)?;
     eng.recalc(tx, &[SheetRef::Page(page)])?;
     Ok(Some(d))
+}
+
+/// (JD21) every top-level shape of the page moved by `d` (ops::shift_all: the page's origin
+/// moves under the drawing), and the ends of 1-D shapes glued to a whole shape along: their
+/// _WALKGLUE has no value of the engine's, so the stored point moves by `d` too (the formula
+/// stays); static glue follows its formula by itself.  Before, a page that grew to the left or
+/// down left such connectors behind
+pub fn shift(tx: &mut Transaction, eng: &mut Engine, page: PageRef, d: [f64; 2]) -> Result<(), EditError> {
+    let owner = Owner::Page(page);
+    // the walking ends before the move (top-level 1-D shapes: their cells are page coordinates)
+    let mut ends: Vec<(SheetRef, CellAddr, f64)> = Vec::new();
+    {
+        let doc = tx.doc();
+        for s in doc.top_shapes(owner) {
+            if doc.shape(s).is_none_or(|x| x.is_deleted()) || !crate::glue::is_one_d(doc, s) {
+                continue;
+            }
+            let sheet = SheetRef::Shape(s);
+            for (t, (cx, cy)) in crate::glue::glued(doc, s).into_iter().zip([("BeginX", "BeginY"), ("EndX", "EndY")]) {
+                if !matches!(t, crate::glue::Target::Shape(_)) {
+                    continue;
+                }
+                for (c, k) in [(cx, 0), (cy, 1)] {
+                    let Some(sym) = doc.sym(c) else { continue };
+                    let a = CellAddr::single(sym);
+                    if let Some(v) = doc.resolve(sheet, &a).num() {
+                        ends.push((sheet, a, v + d[k]));
+                    }
+                }
+            }
+        }
+    }
+    ops::shift_all(tx, eng, owner, d)?;
+    if ends.is_empty() {
+        return Ok(());
+    }
+    for (sheet, a, v) in &ends {
+        tx.set_result(*sheet, a, Value::Num(*v), None)?;
+    }
+    let cells: Vec<(SheetRef, CellAddr)> = ends.into_iter().map(|(s, a, _)| (s, a)).collect();
+    eng.recalc_cells(tx, &cells)?;
+    Ok(())
 }
 
 #[cfg(test)]

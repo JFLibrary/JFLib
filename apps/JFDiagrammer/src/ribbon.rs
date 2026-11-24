@@ -136,7 +136,23 @@ static COLOR_MENU: [It; 1] = [C(MORE_COLORS)];
 static ALIGN_MENU: [It; 9] = [C(AUTO_ALIGN), Sep, C(ALIGN_LEFT), C(ALIGN_CENTER), C(ALIGN_RIGHT), Sep, C(ALIGN_TOP), C(ALIGN_MIDDLE), C(ALIGN_BOTTOM)];
 static ROTATE_MENU: [It; 4] = [C(ROTATE_LEFT), C(ROTATE_RIGHT), C(FLIP_H), C(FLIP_V)];
 // i18n
-static POSITION_MENU: [It; 4] = [C(DISTRIBUTE_H), C(DISTRIBUTE_V), Sep, Sub("Shapes drehen", &ROTATE_MENU)];
+// (JD21 layout) Visio's Positionieren: spacing, distribution, page breaks, turning
+static POSITION_MENU: [It; 13] = [
+    C(AUTO_SPACE),
+    C(AUTO_ALIGN_SPACE),
+    C(SPACING_OPTIONS),
+    Sep,
+    C(DISTRIBUTE_H),
+    C(DISTRIBUTE_V),
+    C(DISTRIBUTE_MORE),
+    Sep,
+    C(MOVE_OFF_BREAKS),
+    C(AVOID_BREAKS),
+    Sep,
+    Sub("Shapes drehen", &ROTATE_MENU),
+    Sub("Diagramm drehen", &DIAGRAM_MENU), // i18n
+];
+static DIAGRAM_MENU: [It; 4] = [C(DIAGRAM_ROTATE_LEFT), C(DIAGRAM_ROTATE_RIGHT), C(DIAGRAM_FLIP_V), C(DIAGRAM_FLIP_H)];
 static FRONT_MENU: [It; 2] = [C(BRING_FRONT), C(BRING_FORWARD)];
 static BACK_MENU: [It; 2] = [C(SEND_BACK), C(SEND_BACKWARD)];
 static GROUP_MENU_ITEMS: [It; 2] = [C(GROUP), C(UNGROUP)];
@@ -208,7 +224,31 @@ static DESIGN: [Group; 4] = [
         Col::Small(&[Sm::Menu(VAR_COLORS, &THEME_MENU), Sm::Menu(VAR_EFFECTS, &THEME_MENU), Sm::Menu(VAR_CONNECTORS, &THEME_MENU)]),
         Col::Small(&[Sm::Menu(VAR_FONTS, &THEME_MENU), Sm::Menu(VAR_EMBELLISHMENT, &THEME_MENU)]),
     ]),
-    Group("Layout", LAYOUT_ROUTING, &[Col::BigMenu(CONNECTORS, &CONN_MENU)]),
+    Group("Layout", LAYOUT_ROUTING, &[Col::BigMenu(RELAYOUT, &RELAYOUT_MENU), Col::BigMenu(CONNECTORS, &CONN_MENU)]),
+];
+
+// (JD21 layout) Seitenlayout neu anordnen: Visio's gallery as rows (a live preview while one is
+// pointed at, layout_cmds::row_event), then the dialog
+static RELAYOUT_MENU: [It; 19] = [
+    C(LAYOUT_FLOW_DOWN),
+    C(LAYOUT_FLOW_UP),
+    C(LAYOUT_FLOW_RIGHT),
+    C(LAYOUT_FLOW_LEFT),
+    Sep,
+    C(LAYOUT_HIER_DOWN),
+    C(LAYOUT_HIER_UP),
+    C(LAYOUT_HIER_RIGHT),
+    C(LAYOUT_HIER_LEFT),
+    Sep,
+    C(LAYOUT_TREE_DOWN_RIGHT),
+    C(LAYOUT_TREE_RIGHT_DOWN),
+    C(LAYOUT_TREE_DOWN_LEFT),
+    C(LAYOUT_TREE_LEFT_DOWN),
+    Sep,
+    C(LAYOUT_RADIAL),
+    C(LAYOUT_CIRCULAR),
+    Sep,
+    C(LAYOUT_MORE),
 ];
 
 // (JD18) Daten, as Visio's register (FEATURES 3.7); the data graphics wait for JD19
@@ -611,7 +651,10 @@ fn rows(app: &mut Diagrammer, ui: &mut Ui, items: &[It]) {
                 ui.next_flags(cflags(app, *id));
                 // (JD8 rest: pages) a paper size shows its measures where shortcuts stand
                 let keys = crate::page_size::size_note(*id).unwrap_or_else(|| shortcut(ui, *id));
-                if ui.menu_item_keys(*id, commands::label(*id), &keys) & EV_ACT != 0 {
+                let ev = ui.menu_item_keys(*id, commands::label(*id), &keys);
+                // (JD21 layout) a layout's live preview while its row is pointed at
+                crate::layout_cmds::row_event(app, ui, *id, ev);
+                if ev & EV_ACT != 0 {
                     ui.cmd_run(*id, 0);
                 }
             }

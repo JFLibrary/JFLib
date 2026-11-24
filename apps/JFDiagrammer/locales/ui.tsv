@@ -1168,3 +1168,57 @@ Shapes ohne X und Y werden in Stufen von oben nach unten angeordnet, Links werde
 {} Shapes und {} Verbinder erstellt	{} shapes and {} connectors created	{} formas y {} conectores creados	{} forme e {} connettori creati	{} formes et {} connecteurs créés
 Die Zeichnung lässt sich nicht erstellen.	The drawing cannot be created.	No se puede crear el dibujo.	Impossibile creare il disegno.	Impossible de créer le dessin.
 Shape-Daten in Zeile {}: {}	Shape data in line {}: {}	Datos de forma en la línea {}: {}	Dati forma nella riga {}: {}	Données de forme à la ligne {} : {}
+Seitenlayout neu anordnen	Re-Layout Page	Reorganizar la página	Riorganizza la pagina	Réorganiser la page
+Hierarchie (von oben nach unten)	Hierarchy (Top to Bottom)	Jerarquía (de arriba abajo)	Gerarchia (dall'alto in basso)	Hiérarchie (de haut en bas)
+Hierarchie (von unten nach oben)	Hierarchy (Bottom to Top)	Jerarquía (de abajo arriba)	Gerarchia (dal basso in alto)	Hiérarchie (de bas en haut)
+Hierarchie (von links nach rechts)	Hierarchy (Left to Right)	Jerarquía (de izquierda a derecha)	Gerarchia (da sinistra a destra)	Hiérarchie (de gauche à droite)
+Hierarchie (von rechts nach links)	Hierarchy (Right to Left)	Jerarquía (de derecha a izquierda)	Gerarchia (da destra a sinistra)	Hiérarchie (de droite à gauche)
+Kompakte Struktur (nach unten, dann rechts)	Compact Tree (Down then Right)	Árbol compacto (abajo y luego derecha)	Albero compatto (in basso, poi a destra)	Arborescence compacte (bas puis droite)
+Kompakte Struktur (nach rechts, dann unten)	Compact Tree (Right then Down)	Árbol compacto (derecha y luego abajo)	Albero compatto (a destra, poi in basso)	Arborescence compacte (droite puis bas)
+Kompakte Struktur (nach unten, dann links)	Compact Tree (Down then Left)	Árbol compacto (abajo y luego izquierda)	Albero compatto (in basso, poi a sinistra)	Arborescence compacte (bas puis gauche)
+Kompakte Struktur (nach links, dann unten)	Compact Tree (Left then Down)	Árbol compacto (izquierda y luego abajo)	Albero compatto (a sinistra, poi in basso)	Arborescence compacte (gauche puis bas)
+Weitere Layoutoptionen...	More Layout Options...	Más opciones de disposición...	Altre opzioni di layout...	Autres options de disposition...
+Automatische Ausrichtung und Abstände	Auto Align & Space	Alineación y espaciado automáticos	Allineamento e spaziatura automatici	Alignement et espacement automatiques
+Abstandsoptionen...	Spacing Options...	Opciones de espaciado...	Opzioni di spaziatura...	Options d'espacement...
+Weitere Verteilungsoptionen...	More Distribute Options...	Más opciones de distribución...	Altre opzioni di distribuzione...	Autres options de distribution...
+Von Seitenumbrüchen verschieben	Move Off Page Breaks	Alejar de los saltos de página	Sposta dalle interruzioni di pagina	Éloigner des sauts de page
+Seitenumbrüche vermeiden	Avoid Page Breaks	Evitar saltos de página	Evita interruzioni di pagina	Éviter les sauts de page
+Diagramm um 90° nach links drehen	Rotate Diagram Left 90°	Girar diagrama 90° a la izquierda	Ruota diagramma a sinistra di 90°	Faire pivoter le diagramme à gauche de 90°
+Diagramm um 90° nach rechts drehen	Rotate Diagram Right 90°	Girar diagrama 90° a la derecha	Ruota diagramma a destra di 90°	Faire pivoter le diagramme à droite de 90°
+Diagramm vertikal spiegeln	Flip Diagram Vertical	Voltear diagrama verticalmente	Capovolgi diagramma verticalmente	Retourner le diagramme verticalement
+Diagramm horizontal spiegeln	Flip Diagram Horizontal	Voltear diagrama horizontalmente	Capovolgi diagramma orizzontalmente	Retourner le diagramme horizontalement
+Diagramm drehen	Rotate Diagram	Girar diagrama	Ruota diagramma	Faire pivoter le diagramme
+Layout konfigurieren	Configure Layout	Configurar disposición	Configura layout	Configurer la disposition
+Stil|Layout	Style	Estilo	Stile	Style
+Ausrichtung|Layout	Alignment	Alineación	Allineamento	Alignement
+Links|Ausrichtung	Left	Izquierda	Sinistra	Gauche
+Zentriert|Ausrichtung	Center	Centro	Centro	Centre
+Rechts|Ausrichtung	Right	Derecha	Destra	Droite
+Oben|Ausrichtung	Top	Arriba	In alto	Haut
+Mitte|Ausrichtung	Middle	Medio	Al centro	Milieu
+Unten|Ausrichtung	Bottom	Abajo	In basso	Bas
+Nach unten, dann rechts	Down then right	Abajo y luego derecha	In basso, poi a destra	Bas puis droite
+Nach rechts, dann unten	Right then down	Derecha y luego abajo	A destra, poi in basso	Droite puis bas
+Nach rechts, dann oben	Right then up	Derecha y luego arriba	A destra, poi in alto	Droite puis haut
+Nach oben, dann rechts	Up then right	Arriba y luego derecha	In alto, poi a destra	Haut puis droite
+Nach oben, dann links	Up then left	Arriba y luego izquierda	In alto, poi a sinistra	Haut puis gauche
+Nach links, dann oben	Left then up	Izquierda y luego arriba	A sinistra, poi in alto	Gauche puis haut
+Nach links, dann unten	Left then down	Izquierda y luego abajo	A sinistra, poi in basso	Gauche puis bas
+Nach unten, dann links	Down then left	Abajo y luego izquierda	In basso, poi a sinistra	Bas puis gauche
+Darstellung	Appearance	Apariencia	Aspetto	Apparence
+Routing-Stil auf Verbinder anwenden	Apply routing style to connectors	Aplicar estilo de enrutamiento a los conectores	Applica stile di routing ai connettori	Appliquer le style de routage aux connecteurs
+Einstellungen anwenden auf	Apply settings to	Aplicar configuración a	Applica impostazioni a	Appliquer les paramètres à
+Seite vergrößern, damit die Zeichnung passt	Enlarge page to fit drawing	Ampliar la página para ajustar el dibujo	Ingrandisci la pagina per adattarla al disegno	Agrandir la page pour l'ajuster au dessin
+Abstandsoptionen	Spacing Options	Opciones de espaciado	Opzioni di spaziatura	Options d'espacement
+Standardabstand der Seite verwenden	Use the page's default spacing	Usar el espaciado predeterminado de la página	Usa la spaziatura predefinita della pagina	Utiliser l'espacement par défaut de la page
+Diesen Abstand verwenden	Use this spacing	Usar este espaciado	Usa questa spaziatura	Utiliser cet espacement
+Horizontal (0,1 mm)	Horizontal (0.1 mm)	Horizontal (0,1 mm)	Orizzontale (0,1 mm)	Horizontal (0,1 mm)
+Vertikal (0,1 mm)	Vertical (0.1 mm)	Vertical (0,1 mm)	Verticale (0,1 mm)	Vertical (0,1 mm)
+Shapes verteilen	Distribute Shapes	Distribuir formas	Distribuisci forme	Distribuer les formes
+Gleicher Abstand	Equal spacing	Espaciado uniforme	Spaziatura uniforme	Espacement égal
+Linke Kanten	Left edges	Bordes izquierdos	Bordi sinistri	Bords gauches
+Mitten	Centers	Centros	Centri	Centres
+Rechte Kanten	Right edges	Bordes derechos	Bordi destri	Bords droits
+Unterkanten	Bottom edges	Bordes inferiores	Bordi inferiori	Bords inférieurs
+Oberkanten	Top edges	Bordes superiores	Bordi superiori	Bords supérieurs
+Abstand (0,1 mm)	Spacing (0.1 mm)	Espaciado (0,1 mm)	Spaziatura (0,1 mm)	Espacement (0,1 mm)

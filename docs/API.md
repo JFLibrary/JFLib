@@ -105,7 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/data.rs](#diagram_iosrcdatars) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/textdraw.rs](#diagram_iosrctextdrawrs) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vss/mod.rs](#diagram_iosrcvssmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -55030,8 +55030,10 @@ a file loses nothing, and the behaviour Visio files carry works without translat
   field::*                      (JD8) text fields: a Field row's value in its format picture,
                                 new fields, the text with its fields, the document's
                                 properties (Document::fields: the app's locale and clock)
-
-What is to come here, by stage of the plan: page layout (CN-13, P2)
+  layout::*                     (JD21) the page laid out anew in Visio's styles (flowchart,
+                                hierarchy, compact tree, radial, circular; CN-13), connected
+                                shapes aligned and spaced (CN-14), shapes off the page
+                                breaks (PR-03), the diagram turned or flipped (RS-25)
 
 Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 opening a file (connectors, layout and containers move only when something moves), and a
@@ -57881,6 +57883,307 @@ JFD_TR: &str = "JFD_Tr"
   move master `m` to position `pos` among the masters (a stencil's order: MS-04, SL-07);
   a master in use by shapes of the document stays where it is (InUse)
 
+### `diagram_core/src/layout.rs`
+
+Source: [`lib/diagram_core/src/layout.rs`](../lib/diagram_core/src/layout.rs)
+
+```text
+layout -- (JD21) a page laid out anew (Seitenlayout neu anordnen: CN-13, RW-09), connected
+shapes aligned and spaced (CN-14, RS-25), shapes off the page breaks (PR-03), the diagram
+turned or flipped with its shapes upright (RS-25)
+
+  Place::from_code(PlaceStyle) / place.code()   Visio's placement codes <-> style, direction,
+                                 the side a compact tree steps to, a hierarchy's alignment
+  Opts::from_page(doc, page)     the page's cells: PlaceStyle, PlaceDepth, AvenueSizeX/Y (the
+                                 space between shapes), BlockSizeX/Y (the layout grid)
+  diagram(doc, owner, only) -> Diagram   what a layout moves: the placeable shapes (nodes),
+                                 their boxes, the connections Begin -> End between them, the
+                                 boxes that stay (obstacles)
+  arrange(&diagram, &opts) -> centres    where the nodes' middles go (pure: no document)
+  plan(doc, owner, only, &opts) -> moves the nodes' moves
+  relayout(tx, eng, owner, only, &opts, routing) -> moved   the command: moves, members and
+                                 callouts along, containers settled, connectors routed
+  store(tx, eng, page, &opts, route, resize)   the page's cells as the dialog sets them
+  enlarge_page(tx, eng, page, margin)    Seite vergrößern: the page around its drawing
+  align_space(doc, owner, only, align, space, spacing) -> moves   (adjust.rs) Automatische
+                                 Ausrichtung und Abstände, Automatischer Abstand
+  turn(doc, owner, only, Turn, spacing) -> moves   (adjust.rs) Diagramm drehen
+  off_breaks(doc, owner, only, &xs, &ys, margin) -> moves   (adjust.rs) Von Seitenumbrüchen
+                                 verschieben, Seitenumbrüche vermeiden
+  move_nodes(tx, eng, owner, &moves) / reroute(tx, eng, owner, &moved, routing, all)
+
+Coordinates are the page's (drawing units, inches, y up).  Everything is deterministic: the
+same drawing gives the same layout (orders come from positions and shape ids, never from a
+hash).  Nothing runs on its own: opening a file lays out nothing (PLAN.md, "Fallen").
+
+Visio's rules -- belegt (Microsoft Learn: the ShapeSheet reference of the Page Layout and
+Shape Layout sections, VisCellVals, Page.Layout, Page.LayoutIncremental, VisLayoutDirection;
+support.microsoft.com: "Re-layout a diagram", "Align and position shapes in a diagram",
+"Configure Layout dialog box", "Layout and Routing Spacing dialog box"; the Visio blog
+"Layout improvements in Visio 2010" and the Office developer blog on LayoutChangeDirection;
+the German ribbon of Visio for Microsoft 365):
+* Design > Layout > Re-Layout Page (Entwurf › Layout › Zeichenblattlayout neu anordnen): a
+  gallery (flowchart, hierarchy, compact tree, radial, circular) with a live preview while
+  pointing; More Layout Options = Configure Layout: placement style, direction (flowchart,
+  compact tree and hierarchy only), alignment (hierarchy only), spacing; connector style and
+  appearance (straight / curved), "Apply routing style to connectors" (to all connectors of
+  the page or the selected ones); "Apply settings to" the selection or the current page;
+  "Enlarge page to fit drawing".  A layout of a selection lays out the selected shapes only,
+  with nothing selected the whole page.
+* PlaceStyle (visPLOPlace*/visLOPlace*): 0 default, 1 top to bottom, 2 left to right,
+  3 radial, 4 bottom to top, 5 right to left, 6 circular, 7..14 compact trees (7 down-right,
+  8 right-down, 9 right-up, 10 up-right, 11 up-left, 12 left-up, 13 left-down, 14 down-left),
+  15 parent default (ShapePlaceStyle), 16..27 hierarchies (top to bottom left/centre/right
+  16-18, bottom to top 19-21, left to right top/middle/bottom 22-24, right to left 25-27).
+* PlaceDepth: 0 page default, 1 medium, 2 deep, 3 shallow ("the method by which the drawing
+  is analyzed before creating the layout").  PlaceFlip / ShapePlaceFlip: 0 default, 1 flip x,
+  2 flip y, 4 in 90 degree steps, 8 none.  ResizePage: TRUE enlarges the page to enclose the
+  drawing.  AvenueSizeX/Y: the space between shapes of a layout ("Space between shapes" of
+  Layout and Routing Spacing); BlockSizeX/Y: "the area in which each of your shapes must fit"
+  ("Average shape size"); LineToLineX/Y and LineToNodeX/Y: the clearance between connectors and
+  between connectors and shapes; LineAdjustFrom/To: which overlapping connectors are spaced
+  apart; PlowCode / ShapePlowCode: placeable shapes move away on a drop; PageShapeSplit: a
+  shape dropped on a connector splits it.  A metric document's defaults (local corpus):
+  AvenueSize 7.5 mm, BlockSize 5 mm, LineToLine and LineToNode 2.5 mm.
+* ObjType: 0 Visio decides by context (a shape becomes placeable, 1, when the Connector tool
+  glues a connector to it), 1 placeable, 2 routable (1-D), 4 neither -- it wins over the
+  others --, 8 a group with placeable or routable shapes.  ShapeFixedCode: &H1 not moved by a
+  layout, &H2 not moved and plowing shapes stay off it, &H4 not moved and they may lie on it,
+  &H20 / &H40 connection points ignored / only, &H80 glue to the alignment box.
+* Auto Align & Space (Home > Arrange > Position; Automatische Ausrichtung und Abstände):
+  connected shapes; a shape downstream of another (over a connector) is its child; a child is
+  aligned with its parent and set at the default page spacing (or the one of Spacing
+  Options), shapes further downstream are carried along; the selected shapes, all shapes with
+  nothing selected.  Auto Space only spaces, Auto Align only aligns.  Avoid Page Breaks (a
+  toggle) keeps those commands off the page breaks; Move Off Page Breaks moves the selected
+  shapes (all with nothing selected) off them.
+* Rotate Diagram: the connected shapes (every set of two or more connected shapes; the
+  selected ones) turned 90 degrees right or left or flipped vertically or horizontally as a
+  unit; the shapes themselves keep their orientation (visLayoutDirRotateRight 0, ..Left 1,
+  ..FlipVert 2, ..FlipHorz 3).
+
+Angenommen (no source says it; chosen here, the user's check in Visio may correct it):
+* The flow follows Begin -> End of each connector (FEATURES CN-13); a shape glued to a 1-D
+  shape counts as connected whatever its glue (static or dynamic).  A container is laid out
+  as one block with its members (and every callout moves with its target); a connection to a
+  member is one to the outermost container.
+* Shapes that are not placeable (ObjType 0 without glue), fixed shapes (ShapeFixedCode &H7,
+  LockMoveX/Y) and, for a selection, the placeable shapes outside it stay where they are and
+  are kept clear: the laid-out drawing is shifted across past them.  A shape that encloses
+  all the moved ones (a frame) is no obstacle.  ObjType 4 shapes are ignored altogether.
+* The laid-out drawing keeps the corner of the moved shapes' box where the flow starts (top
+  left for top to bottom, ...); separate parts (components) follow each other across the
+  flow, in the order they had; placeable shapes without connections are parts of their own.
+* PlaceStyle 0 is a flowchart top to bottom, PlaceDepth 0 is medium; the depth is how hard
+  the crossings of connectors are reduced (shallow: two sweeps, medium: eight, deep:
+  twenty-four and exchanges of neighbours).  Middles snap to the layout grid (BlockSizeX/Y)
+  when Opts::grid is set; the distances between middles are then whole grid steps.
+* Compact tree "Down then right" (7): the tree grows downwards, each level steps right by
+  half its parent's width plus half the spacing (an outline); the other seven alike.
+* Hierarchy: the levels as rows, each row packed at the spacing and aligned at its start,
+  centred or at its end; flowchart: each shape centred over (and under) its connections.
+* Radial: the root is the shape with the most connections (among equals one without
+  incoming connections, then the one that reaches most), the others on circles around it in
+  wedges by the leaves of their subtrees, the root's first child at the top, clockwise.  Circular: a ring per part in the order
+  of a walk along the connections, the first at the top, clockwise.
+* Rotate Diagram turns each connected part (two or more shapes; a selection as one part)
+  about the middle of its box; where shapes would come too close after a turn the distances
+  grow along that axis (to the page spacing).  Avoid Page Breaks also applies to Re-Layout
+  Page (the dialog offers it).
+
+How a layered style works (flowchart, hierarchy; layered.rs): cycles broken by a depth-first
+walk (the connector leading back is reversed for the layout only), levels by the longest
+path (a source moved down next to its first successor), long connections through dummy
+points, the order in each level by barycentre sweeps with the crossings counted (the best
+order kept), levels at the spacing apart; then across: flowchart nodes as near the median of
+their neighbours as the order and the spacing allow (isotonic regression, pool adjacent
+violators), hierarchy rows packed and aligned.
+```
+
+```rust
+/// Visio's default space between shapes of a metric drawing (7.5 mm)
+AVENUE: f64 = 7.5 / 25.4
+/// Visio's default layout block of a metric drawing (5 mm)
+BLOCK: f64 = 5.0 / 25.4
+```
+
+- **`enum Style`**
+  a layout style of Seitenlayout neu anordnen
+  - `Flowchart` -- levels in the flow, each shape centred over its connections
+  - `Hierarchy` -- levels in the flow as rows, aligned at their start, centre or end
+  - `CompactTree` -- a tree as an outline: down (right, ...) with the levels stepping aside
+  - `Radial` -- the root in the middle, the others on circles around it
+  - `Circular` -- a ring
+
+- **`enum Dir`**
+  a direction on the page
+  - `Down` -- top to bottom
+  - `Up` -- bottom to top
+  - `Right` -- left to right
+  - `Left` -- right to left
+
+**`impl Dir`**
+
+- **`fn vector(self) -> [f64; 2]`**
+  the unit vector on the page (y up)
+- **`fn vertical(self) -> bool`**
+  up or down
+
+- **`enum Align`**
+  where a hierarchy's rows line up
+  - `Start` -- left (top for a horizontal flow)
+  - `Centre` -- centred (middle)
+  - `End` -- right (bottom)
+
+- **`enum Depth`**
+  how hard a layout works on the crossings (PlaceDepth)
+  - `Shallow` -- 3: few sweeps
+  - `Medium` -- 1 (and the page default 0)
+  - `Deep` -- 2: many sweeps and exchanges
+
+**`impl Depth`**
+
+- **`fn from_code(code: i64) -> Depth`**
+  PlaceDepth -> depth (0 and unknown values: medium)
+- **`fn code(self) -> i64`**
+  depth -> PlaceDepth
+
+- **`struct Place`**
+  a placement: style, direction, the side a compact tree steps to, a hierarchy's alignment
+  - `style: Style`
+  - `dir: Dir` -- the flow (flowchart, hierarchy), the way a compact tree grows; radial, circular: Down
+  - `then: Dir` -- across `dir`: the side a compact tree's levels step to; else where the levels spread
+  - `align: Align` -- a hierarchy's rows (else Centre)
+
+**`impl Place`**
+
+- **`fn new(style: Style, dir: Dir) -> Place`**
+  a style in a direction, the rest as Visio's gallery offers it (hierarchies centred,
+  compact trees stepping right of a vertical and down of a horizontal growth)
+- **`fn from_code(code: i64) -> Option<Place>`**
+  PlaceStyle / ShapePlaceStyle -> placement (None: 0 default, 15 parent default, unknown)
+- **`fn code(&self) -> i64`**
+  placement -> PlaceStyle
+- **`fn side(&self) -> Dir`**
+  the side across the flow (`then`, mended when it runs along the flow)
+
+- **`struct Opts`**
+  what a layout needs besides the drawing
+  - `place: Place`
+  - `spacing: [f64; 2]` -- the space between shapes, x and y (AvenueSizeX/Y), drawing units
+  - `depth: Depth`
+  - `grid: Option<[f64; 2]>` -- the layout grid the middles snap to (BlockSizeX/Y), drawing units; None: no grid
+
+**`impl Opts`**
+
+- **`fn new(place: Place) -> Opts`**
+  a placement with Visio's metric defaults (7.5 mm apart, medium depth, no grid)
+- **`fn from_page(doc: &Document, page: PageRef) -> Opts`**
+  the page's cells (lengths on paper, turned into drawing units): PlaceStyle (0: a
+  flowchart top to bottom), PlaceDepth, AvenueSizeX/Y, BlockSizeX/Y as the grid
+
+- **`fn fixed(doc: &Document, s: ShapeRef) -> bool`**
+  the shape stays where a layout or an adjustment leaves it: ShapeFixedCode &H1, &H2 or &H4,
+  LockMoveX or LockMoveY set
+
+- **`struct Diagram`**
+  what a layout works on
+  - `nodes: Vec<ShapeRef>` -- the shapes laid out (placeable, free; a container stands for its members), page order
+  - `boxes: Vec<[f64; 4]>` -- their boxes on the page
+  - `edges: Vec<(usize, usize)>` -- the connections Begin -> End between nodes (indices into `nodes`), each once, no loops
+  - `obstacles: Vec<[f64; 4]>` -- the boxes of what stays and is kept clear: shapes not placeable, fixed ones and (a
+    selection) the placeable ones outside it
+
+- **`fn diagram(doc: &Document, owner: Owner, only: &[ShapeRef]) -> Diagram`**
+  the shapes a layout of `owner` moves and what it keeps clear; `only` (not empty): a
+  selection, the others stay (a member selected stands for its outermost container)
+
+- **`fn arrange(d: &Diagram, opts: &Opts) -> Vec<[f64; 2]>`**
+  where the middles of the diagram's nodes go (page coordinates; see the file header): the
+  parts laid out in the style, one after the other across the flow (a compact tree's along
+  it), the start corner of the nodes' box kept, the obstacles kept clear
+
+- **`fn plan(doc: &Document, owner: Owner, only: &[ShapeRef], opts: &Opts) -> Vec<(ShapeRef, [f64; 2])>`**
+  the moves of a layout: each node by how far its middle goes
+
+- **`enum Routing`**
+  how connectors follow a layout
+  - `Follow` -- they follow the moved shapes (glue::update: ConFixedCode keeps a fixed way)
+  - `Apply { route: i64, ext: i64, }` -- Routing-Stil auf Verbinder anwenden: ShapeRouteStyle `route` and ConLineRouteExt `ext`
+    (1 straight, 2 curved) on the connectors, routed anew
+
+- **`fn move_nodes(tx: &mut Transaction, eng: &mut Engine, owner: Owner, moves: &[(ShapeRef, [f64; 2])]) -> Result<Vec<ShapeRef>, EditError>`**
+  move the nodes with what they carry (members, callouts), each shape once; then their
+  containers settle (lists laid out, sizes; no membership changes) -> every shape moved
+
+- **`fn reroute(tx: &mut Transaction, eng: &mut Engine, owner: Owner, moved: &[ShapeRef], routing: Routing, all: bool) -> Result<(), EditError>`**
+  the connectors after shapes moved: the ones glued to them and the ones whose way now runs
+  through them follow; Routing::Apply gives its style to those (`all`: to every connector of
+  `owner`) and routes them anew
+
+- **`fn relayout(tx: &mut Transaction, eng: &mut Engine, owner: Owner, only: &[ShapeRef], opts: &Opts, routing: Routing) -> Result<Vec<ShapeRef>, EditError>`**
+  Seitenlayout neu anordnen: the nodes of `owner` (`only`: a selection) laid out by `opts`,
+  what they carry along, the containers settled, the connectors routed (Routing::Apply: the
+  style on every connector of the page, or on the selection's) -> the shapes moved
+
+- **`fn store(tx: &mut Transaction, eng: &mut Engine, page: PageRef, opts: &Opts, route: Option<(i64, i64)>, resize: Option<bool>) -> Result<bool, EditError>`**
+  the page's layout cells as the dialog sets them: PlaceStyle, PlaceDepth (the page default
+  0 stays where it means the same), AvenueSizeX/Y (on paper); RouteStyle and LineRouteExt
+  when `route` is given; ResizePage when `resize` is -> whether anything changed
+
+- **`fn enlarge_page(tx: &mut Transaction, eng: &mut Engine, page: PageRef, margin: f64) -> Result<Option<[f64; 2]>, EditError>`**
+  Seite vergrößern (ResizePage): the page grows around its drawing with `margin` (drawing
+  units) where the drawing juts out, never shrinks; a drawing past the left or bottom edge
+  moves with the page's origin -> the move of the drawing (None: the page holds it already)
+
+### `diagram_core/src/layout/adjust.rs`
+
+Source: [`lib/diagram_core/src/layout/adjust.rs`](../lib/diagram_core/src/layout/adjust.rs)
+
+```text
+layout/adjust -- (JD21) small adjustments of connected shapes: Automatische Ausrichtung und
+Abstände and Automatischer Abstand (CN-14, RS-25), Diagramm drehen (RS-25), Von
+Seitenumbrüchen verschieben and Seitenumbrüche vermeiden (PR-03); the rules in layout.rs
+
+  align_space(doc, owner, only, align, space, spacing) -> moves   each child (downstream over
+                      a connector) lined up with its parent and set at the spacing from it,
+                      its siblings on that side at the spacing from each other, everything
+                      further downstream carried along
+  turn(doc, owner, only, Turn, spacing) -> moves   each connected part (a selection: one)
+                      turned or flipped about the middle of its box, the shapes upright;
+                      distances grow where shapes would come too close
+  off_breaks(doc, owner, only, &xs, &ys, margin) -> moves   shapes across a page break
+                      moved to the side where more of them lies, `margin` from the break
+
+The moves are applied with layout::move_nodes (members and callouts along) and the
+connectors follow with layout::reroute, all in the caller's transaction.
+```
+
+- **`fn align_space(doc: &Document, owner: Owner, only: &[ShapeRef], align: bool, space: bool, spacing: [f64; 2]) -> Vec<(ShapeRef, [f64; 2])>`**
+  Automatische Ausrichtung und Abstände (`align` and `space`), Automatischer Abstand (`space`
+  alone), automatisch ausrichten (`align` alone) on the connected shapes of `owner` (`only`
+  not empty: the selected ones adjust, what lies downstream of them is carried along) ->
+  the moves of the shapes (see the file header)
+
+- **`enum Turn`**
+  Diagramm drehen: VisLayoutDirection's four (0 right, 1 left, 2 vertical, 3 horizontal)
+  - `Right` -- 90 degrees clockwise
+  - `Left` -- 90 degrees anticlockwise
+  - `FlipV` -- top and bottom exchanged
+  - `FlipH` -- left and right exchanged
+
+- **`fn turn(doc: &Document, owner: Owner, only: &[ShapeRef], how: Turn, spacing: [f64; 2]) -> Vec<(ShapeRef, [f64; 2])>`**
+  Diagramm drehen: every connected part of two or more shapes of `owner` (`only` not empty:
+  the selected shapes as one part) turned or flipped about the middle of its box; the shapes
+  keep their own orientation, fixed ones stay; after a turn the distances along an axis grow
+  where two shapes would come closer than `spacing` on both axes -> the moves
+
+- **`fn off_breaks(doc: &Document, owner: Owner, only: &[ShapeRef], xs: &[f64], ys: &[f64], margin: f64) -> Vec<(ShapeRef, [f64; 2])>`**
+  Von Seitenumbrüchen verschieben: the shapes of `owner` (`only` not empty: those; members
+  move with their containers, fixed shapes stay) that lie across a page break (`xs`: the
+  vertical lines, `ys`: the horizontal ones, drawing units) moved to the side where more of
+  them lies, `margin` from the break -> the moves
+
 ### `diagram_core/src/names.rs`
 
 Source: [`lib/diagram_core/src/names.rs`](../lib/diagram_core/src/names.rs)
@@ -58558,6 +58861,8 @@ tiles of the printed sheet
   fit_to_drawing(tx, eng, page, margins) the page around its drawing, the shapes moved in
   Tiles::new(paper, margins, zoom); grow(tx, eng, page, &tiles)   automatic size after a
                                          gesture: whole tiles added or taken away
+  shift(tx, eng, page, d)                (JD21) the drawing moved with the page's origin,
+                                         dynamically glued connector ends along
 
 The cells (Visio's ShapeSheet reference, Page Properties and Print Properties sections):
 * DrawingSizeType: 0 same as printer (visPrintSetup), 1 fit page to drawing contents
@@ -58634,6 +58939,13 @@ happens on opening a file (PLAN.md, "Fallen"): only the app's gesture asks.
   tiles where its drawing juts out or left empty space, the drawing moves by what the page
   grew or shrank at its left and bottom edge -> that move (drawing units) when the page
   changed, None when it stays (the automatic size is off, it fits, a step is too small)
+
+- **`fn shift(tx: &mut Transaction, eng: &mut Engine, page: PageRef, d: [f64; 2]) -> Result<(), EditError>`**
+  (JD21) every top-level shape of the page moved by `d` (ops::shift_all: the page's origin
+  moves under the drawing), and the ends of 1-D shapes glued to a whole shape along: their
+  \_WALKGLUE has no value of the engine's, so the stored point moves by `d` too (the formula
+  stays); static glue follows its formula by itself.  Before, a page that grew to the left or
+  down left such connectors behind
 
 ### `diagram_core/src/render/mod.rs`
 
