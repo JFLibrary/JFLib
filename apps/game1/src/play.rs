@@ -331,7 +331,7 @@ impl Play {
                 let (dir, _, _) = game::camera::basis(yaw, pitch);
                 self.fx.push(Fx::Muzzle { at: muzzle, dir });
                 let eye = feet + Vec3::new(0.0, mover.height(pose.crouched) - EYE_BELOW_TOP, 0.0);
-                self.shot_fx(muzzle, eye, dir);
+                self.shot_fx(Some(muzzle), eye, dir);
             }
             self.shots.insert(r.id, shots);
             // deaths: the counter went up -> a puff where the figure is seen (the feed's line is the event's)
@@ -402,13 +402,13 @@ impl Play {
         self.hud.ammo = cur.ammo();
         self.hud.reloading = cur.reload() > 0;
         self.hud.dead = cur.dead();
-        // the own shots: muzzle flash in front of the camera, a tracer and an impact
+        // the own shots: muzzle flash in front of the camera, a tracer from the muzzle there (the scene knows where the
+        // screen shows it) and an impact; the hit is the server's, along the view from the eye
         if fired > 0 && !cur.dead() {
             self.vm.kick = 1.0;
             self.fx.push(Fx::MuzzleOwn);
-            let (dir, right, up) = game::camera::basis(self.yaw, self.pitch);
-            let from = eye + right * 0.2 - up * 0.15 + dir * 0.6;
-            self.shot_fx(from, eye, dir);
+            let (dir, _, _) = game::camera::basis(self.yaw, self.pitch);
+            self.shot_fx(None, eye, dir);
         }
         // the viewmodel
         let speed = Vec3::new(cur.vel[0] as f64, 0.0, cur.vel[2] as f64).length() / POS_STEPS;
@@ -434,15 +434,19 @@ impl Play {
         Vec3::new(-0.12, 1.23, 0.96)
     }
 
-    /// a tracer from `from` along the shot from `eye` in `dir` to where it meets the map, and the impact there
-    fn shot_fx(&mut self, from: Vec3, eye: Vec3, dir: Vec3) {
-        match self.map.world.ray_cast(eye, dir, RANGE, &Filter::ALL) {
-            Some((_, hit)) => {
-                let at = eye + dir * hit.t;
-                self.fx.push(Fx::Tracer { from, to: at });
-                self.fx.push(Fx::Impact { at, normal: hit.normal });
-            }
-            None => self.fx.push(Fx::Tracer { from, to: eye + dir * RANGE }),
+    /// a tracer from `from` (None: the own muzzle in front of the camera) along the shot from `eye` in `dir` to where
+    /// it meets the map, and the impact there
+    fn shot_fx(&mut self, from: Option<Vec3>, eye: Vec3, dir: Vec3) {
+        let (to, impact) = match self.map.world.ray_cast(eye, dir, RANGE, &Filter::ALL) {
+            Some((_, hit)) => (eye + dir * hit.t, Some(hit.normal)),
+            None => (eye + dir * RANGE, None),
+        };
+        self.fx.push(match from {
+            Some(from) => Fx::Tracer { from, to },
+            None => Fx::TracerOwn { to },
+        });
+        if let Some(normal) = impact {
+            self.fx.push(Fx::Impact { at: to, normal });
         }
     }
 
