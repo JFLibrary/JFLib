@@ -100,7 +100,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - (JD15, SS-18) Dynamic glue reads WalkPreference: an end whose bit is set (1 Begin, 2 End: visWalkPrefBegNS, visWalkPrefEndNS) docks on the top or bottom of its shape when that way is as short and has as few bends as the cheapest one
 - (JD15, SL-04) `MasterTexts::matches` searches the QuickInfos in the five languages too
 - (JD21, SP-05) `ops::set_vertex`, `insert_vertex` and `delete_vertex` end with `shapeops::fit_frame`: Width, Height and Pin follow the geometry as in Visio (a shape with LockCalcWH keeps its box)
-- (JD21, CN-04, CN-05, SS-19) `glue`: a connector routes in its routing style with direction (`route_styles`), through shapes with ShapePermeableX / Y, network (9) draws straight; a kept way (ConFixedCode 1, 2 and now 3) keeps its corners with a dynamic end on the side the way leaves by, 1 and 3 are laid anew when the kept way runs through a shape (1 also when an end piece would run back into its shape), a straight way keeps vertices of its own; `layout::diagram` leaves shapes with ShapePermeablePlace out of the obstacles
+- (JD21, CN-04, CN-05, SS-19) `glue`: a connector routes in its routing style with direction (`route_styles`), through shapes with ShapePermeableX / Y, network (9) draws straight; a kept way (ConFixedCode 1, 2) keeps its corners with a dynamic end on the side the way leaves by, 1 is laid anew when the kept way runs through a shape or an end piece would run back into its shape (3 .. 6, which Visio writes for the connectors it routes, stay free), a straight way keeps vertices of its own; `layout::diagram` leaves shapes with ShapePermeablePlace out of the obstacles
 
 ### Fixed
 
