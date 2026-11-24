@@ -95,6 +95,9 @@ impl Default for Limits {
     }
 }
 
+// the writer (xlsx_write.rs): typed rows as a workbook
+pub use crate::xlsx_write::{write, BookOut, SheetOut, WriteError, WriteOptions, MAX_SHEET_NAME, MAX_TEXT};
+
 /// Why a workbook or a sheet was not read.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
