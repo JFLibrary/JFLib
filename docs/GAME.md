@@ -178,7 +178,8 @@ anfassen:
   XInput unter Windows (PlayStation nur über Steam Input), im Flatpak `--device=input`.
 - Vom Nutzer entschieden am 24.11.2026 (Fragen nach Teil 2): ein Pad spielt ohne Pointer-Lock, wie gebaut. Mit einer
   PERMISSIONS-Datei liest eine App Pads nur mit dem eigenen Schlüssel `gamepad`, und nur damit setzt das Flatpak
-  `--device=input` (das zeigt der App alle Eingabegeräte, auch die Tastatur). Vibration kommt später als eigener
+  `--device=input` (das zeigt der App alle Eingabegeräte, auch die Tastatur). Umgesetzt am 24.11.2026 (PERMISSIONS.md,
+  PACKAGING.md; `ask gamepad` fragt beim ersten Zugriff). Vibration kommt später als eigener
   Schritt für alle Systeme (XInput, evdev, Gamepad API, Core Haptics).
 
 **G7b Spielkern und Spielfenster** (`lib/game`)
@@ -231,7 +232,10 @@ anfassen:
   lesen jedes Bild zurück), echte Fenster unter Linux.
 - Vom Nutzer entschieden am 24.11.2026 (Fragen nach Teil 2): Spiele nehmen Weg a, die `gpu_view` mit der UI darüber;
   auf dem Mac fehlt dafür noch die GPU-Ausgabe der UI. Im Browser zeichnet eine laufende Ansicht mit der Bildrate
-  des Bildschirms (die Zeile in `web/worker.js`), ruhende Apps bleiben dabei ruhig.
+  des Bildschirms (die Zeile in `web/worker.js`), ruhende Apps bleiben dabei ruhig. Umgesetzt am 24.11.2026: der Worker meldet die
+  nächste Frist der App, die Seite gibt die Runde zu ihr (in Chrome bei 165 Hz 147–161 Bilder/s statt 30); eine App
+  in Ruhe bekommt weiter die 30 Runden je Sekunde des Leerlauf-Takts, ein langsamer Zeitgeber ersetzt einen davon
+  ([GAMECORE.md](GAMECORE.md)).
 
 **G7c Physik 1** (`lib/physics`)
 
@@ -299,7 +303,8 @@ anfassen:
   Anfang und werden in Teil 2 mit Messungen abgestimmt.
 - Vom Nutzer entschieden am 24.11.2026 (Frage nach G7e Teil 2): ein UDP-Socket, den `net.listen` erlaubt hat,
   darf Gegenstellen antworten, die ihm zuerst gesendet haben, ohne `net.connect`-Regel; `game1-server` braucht
-  `net.connect` dann nur noch für den eigenen Client auf Loopback (`--check`).
+  `net.connect` dann nur noch für den eigenen Client auf Loopback (`--check`). Umgesetzt am 24.11.2026: Antworten an Absender der
+  letzten 60 s, höchstens 1024 je Socket ([TRANSPORT.md](TRANSPORT.md)); im LAN geprüft, ohne `PERMDENY`.
 
 **G7e Netcode** (`lib/game`)
 
