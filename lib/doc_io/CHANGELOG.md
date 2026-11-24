@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- clipboard_rtf_decode reads the double-byte code pages of Windows, 932, 936, 949 and 950, by \ansicpg or a font's \fcharset 128, 129, 134 and 136 (until now refused as unsupported): a lead byte and its trail byte, escaped or raw, make one character; a lead byte without its trail byte, text between them or two bytes that are no character are Error::Invalid. Johab (1361) stays unsupported
+
 ### Changed
 
 - The DOCX reader's package checks (content types, relationships, part names) are jflib-archive's

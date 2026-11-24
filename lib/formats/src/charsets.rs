@@ -4,7 +4,7 @@
 // the standard's tables: Copyright © WHATWG (Apple, Google, Mozilla, Microsoft), BSD 3-Clause License
 // (licenses/WHATWG-LICENSE.txt).
 
-use crate::encoding::Label;
+use crate::encoding::{Label, MultiByte};
 
 /// a single-byte character set: the bytes below 0x80 are ASCII, the others come from its table.
 /// The single-byte encodings of the WHATWG Encoding Standard (what browsers, HTML and mail use; `whatwg()`)
@@ -363,13 +363,13 @@ pub(crate) fn lookup(label: &str) -> Option<Label> {
         "cp1258" | "windows-1258" | "x-cp1258" => Label::Single(Charset::Windows1258),
         "x-mac-cyrillic" | "x-mac-ukrainian" => Label::Single(Charset::XMacCyrillic),
         "x-user-defined" => Label::Single(Charset::XUserDefined),
-        "chinese" | "csgb2312" | "csiso58gb231280" | "gb2312" | "gb_2312" | "gb_2312-80" | "gbk" | "iso-ir-58" | "x-gbk" => Label::Other("GBK"),
-        "gb18030" => Label::Other("gb18030"),
-        "big5" | "big5-hkscs" | "cn-big5" | "csbig5" | "x-x-big5" => Label::Other("Big5"),
-        "cseucpkdfmtjapanese" | "euc-jp" | "x-euc-jp" => Label::Other("EUC-JP"),
-        "csiso2022jp" | "iso-2022-jp" => Label::Other("ISO-2022-JP"),
-        "csshiftjis" | "ms932" | "ms_kanji" | "shift-jis" | "shift_jis" | "sjis" | "windows-31j" | "x-sjis" => Label::Other("Shift_JIS"),
-        "cseuckr" | "csksc56011987" | "euc-kr" | "iso-ir-149" | "korean" | "ks_c_5601-1987" | "ks_c_5601-1989" | "ksc5601" | "ksc_5601" | "windows-949" => Label::Other("EUC-KR"),
+        "chinese" | "csgb2312" | "csiso58gb231280" | "gb2312" | "gb_2312" | "gb_2312-80" | "gbk" | "iso-ir-58" | "x-gbk" => Label::Multi(MultiByte::Gbk),
+        "gb18030" => Label::Multi(MultiByte::Gb18030),
+        "big5" | "big5-hkscs" | "cn-big5" | "csbig5" | "x-x-big5" => Label::Multi(MultiByte::Big5),
+        "cseucpkdfmtjapanese" | "euc-jp" | "x-euc-jp" => Label::Multi(MultiByte::EucJp),
+        "csiso2022jp" | "iso-2022-jp" => Label::Multi(MultiByte::Iso2022Jp),
+        "csshiftjis" | "ms932" | "ms_kanji" | "shift-jis" | "shift_jis" | "sjis" | "windows-31j" | "x-sjis" => Label::Multi(MultiByte::ShiftJis),
+        "cseuckr" | "csksc56011987" | "euc-kr" | "iso-ir-149" | "korean" | "ks_c_5601-1987" | "ks_c_5601-1989" | "ksc5601" | "ksc_5601" | "windows-949" => Label::Multi(MultiByte::EucKr),
         "csiso2022kr" | "hz-gb-2312" | "iso-2022-cn" | "iso-2022-cn-ext" | "iso-2022-kr" | "replacement" => Label::Replacement,
         "unicodefffe" | "utf-16be" => Label::Utf16Be,
         "csunicode" | "iso-10646-ucs-2" | "ucs-2" | "unicode" | "unicodefeff" | "utf-16" | "utf-16le" => Label::Utf16Le,

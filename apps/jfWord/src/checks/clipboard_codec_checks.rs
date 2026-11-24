@@ -150,7 +150,20 @@ pub(crate) fn run() -> (usize, usize) {
     );
     check!(
         text(br"{\rtf1\ansi\ansicpg932\uc1 \u26085?\u26412?}") == Some(String::from("日本")),
-        "Unicode is independent of unsupported legacy byte page"
+        "Unicode is independent of the legacy byte page"
+    );
+    check!(
+        text(br"{\rtf1\ansi\ansicpg932\'82\'a0\'93\'fa \'b1}") == Some(String::from("あ日 ｱ")),
+        "Japanese document code page: double bytes and half-width katakana"
+    );
+    check!(
+        text(b"{\\rtf1{\\fonttbl{\\f0\\fcharset0 Arial;}{\\f1\\fcharset128 \\'82\\'6c\\'82\\'72 Mincho;}{\\f2\\fcharset134 SimSun;}{\\f3\\fcharset129 Gulim;}{\\f4\\fcharset136 MingLiU;}}\\f1 \\'83\\'5c\x83\x74\\f2\\'d6\\'d0\\f3\\'c7\\'d1\\f4\\'a4\\'e5\\f0 x}")
+            == Some(String::from("ソフ中한文x")),
+        "East Asian font code pages, a trail byte 0x5C, raw double bytes"
+    );
+    check!(
+        text(b"{\\rtf1\\ansi\\ansicpg932 \x83\x5c\x83\x7b\x83\x7d}") == Some(String::from("ソボマ")),
+        "raw trail bytes 0x5C, 0x7B and 0x7D are no RTF syntax"
     );
     check!(text(br"{\rtf1{\fonttbl{\f0\fcharset161 Arial;}{\f1\fcharset204 Arial;}}\f0\'e1\'e2 \f1\'df}") == Some(String::from("αβ Я")), "Greek and Cyrillic font code pages");
     check!(
@@ -238,9 +251,18 @@ pub(crate) fn run() -> (usize, usize) {
         (&br"{\rtf1\u65535?}"[..], "non XML Unicode"),
         (&br"{\rtf1\'8z}"[..], "invalid hex escape"),
         (&br"{\rtf1\'81}"[..], "undefined Windows 1252 byte"),
+        (&br"{\rtf1\ansi\ansicpg932\'82}"[..], "a lead byte without its trail byte"),
+        (&br"{\rtf1\ansi\ansicpg932\'82 x}"[..], "text between lead and trail byte"),
+        (&br"{\rtf1\ansi\ansicpg932\'82\'20}"[..], "a double byte that is no character"),
+        (&br"{\rtf1\ansi\ansicpg932\'a0}"[..], "a single byte that is no character"),
+        (&br"{\rtf1\ansicpg932\uc0\'82\u-10188\u-8930\'a0}"[..], "Unicode between lead and trail byte"),
         (
-            &br"{\rtf1\ansi\ansicpg932\'82\'a0}"[..],
-            "unsupported multibyte page",
+            &br"{\rtf1{\fonttbl{\f0\fcharset134 SimSun;}{\f1\fcharset128 Mincho;}}\f0\'d6\f1\'d0}"[..],
+            "a trail byte in another font's code page",
+        ),
+        (
+            &br"{\rtf1\ansi\ansicpg1361\'88\'61}"[..],
+            "unsupported multibyte page (Johab)",
         ),
         (
             &br"{\rtf1{\fonttbl{\f0\fcharset2 Symbol;}}\f0 a}"[..],
