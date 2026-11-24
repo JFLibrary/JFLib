@@ -486,7 +486,7 @@ pub fn clip_get(fmt: u32) -> Option<Vec<u8>> {
             if !available(CF_UNICODETEXT) {
                 return None;
             }
-            get_block(CF_UNICODETEXT, text_from_wide)
+            get_block(CF_UNICODETEXT, crate::clip_wide_text)
         }
         CLIP_PNG => {
             let f = png_format();
@@ -520,44 +520,6 @@ pub fn clip_get(fmt: u32) -> Option<Vec<u8>> {
         },
         _ => None,
     }
-}
-
-/// UTF-16 up to the NUL (or the end of the block) -> UTF-8, "\r\n" -> "\n", bad surrogates ->
-/// U+FFFD (None: no room for it)
-fn text_from_wide(b: &[u8]) -> Option<Vec<u8>> {
-    let n = b.chunks_exact(2).position(|c| c == [0, 0]).unwrap_or(b.len() / 2);
-    let mut w: Vec<u16> = Vec::new();
-    w.try_reserve_exact(n).ok()?;
-    w.extend(b.chunks_exact(2).take(n).map(|c| u16::from_le_bytes([c[0], c[1]])));
-    let mut out = Vec::new();
-    out.try_reserve(w.len().saturating_mul(3)).ok()?;
-    let mut i = 0;
-    while i < w.len() {
-        let c = w[i] as u32;
-        if c == 13 && i + 1 < w.len() && w[i + 1] == 10 {
-            i += 1; // "\r\n" -> "\n"
-            continue;
-        }
-        let cp;
-        if c & 0xFC00 == 0xD800 {
-            if i + 1 >= w.len() {
-                cp = 0xFFFD; // high surrogate at the very end
-                i += 1;
-            } else if w[i + 1] as u32 & 0xFC00 == 0xDC00 {
-                cp = 0x10000 + ((c - 0xD800) << 10) + (w[i + 1] as u32 - 0xDC00);
-                i += 2;
-            } else {
-                cp = 0xFFFD;
-                i += 1;
-            }
-        } else {
-            cp = if c & 0xFC00 == 0xDC00 { 0xFFFD } else { c };
-            i += 1;
-        }
-        let mut b4 = [0u8; 4];
-        out.extend_from_slice(char::from_u32(cp).unwrap_or('\u{FFFD}').encode_utf8(&mut b4).as_bytes());
-    }
-    Some(out)
 }
 
 /// CLIP_IMAGE: "PNG", "image/png", CF_DIBV5, CF_DIB  [cg_image]

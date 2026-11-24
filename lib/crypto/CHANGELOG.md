@@ -11,10 +11,25 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Added
 
 - `argon2::VERIFY_WORK`: the most work `verify` does for a PHC string.
+- SHA-224 (sha2::Sha224, sha224) and SHA-3 / SHAKE (FIPS 202, lib/crypto/sha3.rs): Sha3_224, Sha3_256, Sha3_384, Sha3_512 and sha3_224 .. sha3_512, Shake128 / Shake256 with finalize_xof and ShakeReader::read for any output length, shake128 / shake256 (an XOF, not a crypto::Hash). SHA-224 and the four SHA-3 hashes are crypto::Hash (HMAC, HKDF, PBKDF2 over them; Hash::BLOCK may now be up to 168 bytes, SHA3-224's is 144). HashAlg has Sha224 and Sha3_224 .. Sha3_512 (signatures over them, MGF1 with them), and HashAlg::hmac(key, data)
+- AES-192: aes::Aes::new, gcm::AesGcm::new, aes_wrap / aes_unwrap and cmac_aes take 24-byte keys
+- p384: Diffie-Hellman on P-384 in constant time (public_key, shared, secret_from, as p256's), on a new core for the NIST curves of any size (nist.rs: Montgomery arithmetic whose constants are worked out at compile time, the complete formulas of Renes, Costello and Batina, four-bit windows that read the whole table)
+- ECDSA signing on P-256 and P-384 in constant time: ecdsa::sign(curve, secret, hash, digest, extra) with deterministic nonces (RFC 6979, the digest's hash for HMAC_DRBG); extra bytes, when given, go into the nonce as RFC 6979 3.6's additional data and hedge it against faults and a poor random source. ecdsa::public_key and secret_from; verify_p1363 for r || s signatures (IEEE P1363: JOSE, COSE, WebCrypto), der_from_p1363 and p1363_from_der (strict DER) to convert. The same signatures as OpenSSL's deterministic ECDSA, byte for byte
+- RSA-PSS signing: rsa::PrivateKey::sign_pss(hash, digest, salt) (EMSA-PSS with MGF1 of the same hash, the caller's salt; an empty salt gives the same signature each time), with the constant-time exponentiation of sign_pkcs1
+- ML-KEM (FIPS 203, lib/crypto/mlkem.rs): mlkem::keygen(params, seed) from d || z, encaps(params, ek, m) with the encapsulation key's modulus check, decaps(params, dk, ct) with the decapsulation key's hash check and implicit rejection (a ciphertext that does not re-encrypt to itself gives J(z || c)); Params::MlKem512, MlKem768, MlKem1024 and their ek_len, dk_len, ct_len. No branch or table lookup on secrets, and no division: reductions and Compress are Barrett's with masked corrections (KyberSlash)
+- `rsa::PrivateKey::dp()` and `dq()`: d mod (p - 1) and d mod (q - 1) for PKCS #1's RSAPrivateKey, one bit at a time with the subtraction kept by mask
+
+### Fixed
+
+- `rsa::PrivateKey::iqmp` of a key whose q has more 64-bit words than p: q is reduced mod p first; the words above p's length were dropped, and the coefficient a key file keeps was wrong
 
 ### Security
 
 - `eappwd::shared` refuses a peer scalar of 1 (RFC 8146 2.1; hostapd since CVE-2019-9497). `argon2::verify` refuses a PHC string that asks for more than the new `VERIFY_WORK` (2^24 KiB times passes) instead of running it; 4 GiB with 2^32 - 1 passes passed `valid()`. `aes::Aes::new` overwrites the expanded key words with a store the compiler keeps.
+- The masks of secret-dependent selects pass an optimization barrier (`ct_mask`). On x86-64 with Rust 1.98 LLVM had compiled the masked final subtractions of the P-256 field arithmetic and of the Ed25519 scalar reduction into branches, the select over all 16 entries of P-256's window table into a jump table indexed by the secret nibble, and at opt-level 2 with LTO (JFLib's release) the window select of `bn::Mont::pow_ct` into a branch: the time and the memory accesses of `p256::public_key`, `shared` and `mul_point` (EAP-PWD too), of Ed25519 signing and of `pow_ct` (RSA signing, the Diffie-Hellman of plat's Secret Service client on Linux) depended on the secret. Results are unchanged; P-256 is about 24 % slower
+- EAP-PWD's hunting and pecking no longer branches on whether a round's x has a point: `p256::y_for_x` (variable time before) has no branch on x up to its answer, and `eappwd::pwe` uses its branch-free core, so which rounds find a point no longer shows in the way the program takes (the partitioning of Dragonblood, CVE-2019-9494, and the cache attacks after it). `p256::scalar_add` (the Scalar rand + mask of a commit), `p256::secret_from` and the subkeys of AES-CMAC select without branches as well; `tools/ct_check.py` found them
+- Base64 and hex without a branch on a character or a value and without table lookups: `b64::decode` and `decode_url` look at every character before they answer, `b64::encode` and `hex` compute the characters instead of reading an alphabet at the value, `unhex` likewise. Private keys come this way from PEM files, OpenSSH key files and PHC strings (the attack of "Util::Lookup", 2021, on the key decoding of other libraries); the results are unchanged
+- EAP-PWD's commit and shared secret no longer check the password element and the points made from it as if they came from outside: `point_of` branched on their secret coordinates (`p256::mul_point_known`, `add_points_known`; the peer's element is still checked) (tools/ct_check.py's memcheck found it)
 
 ## [0.2.1] - 2026-11-16
 

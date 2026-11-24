@@ -60,7 +60,9 @@ Texts of the sources (*.rs below the app; files named *test.rs are left out)
                           less indented or empty line, or a line ending in "];")
   // i18n: name title     the same, only the literals after "name:" or "title:"
   … // i18n               at the end of a line: the literals of that line
-Only texts with a letter count.  The library: tr("…") in lib/**/*.rs.
+Only texts with a letter count.  The library: tr("…") in lib/**/*.rs.  The app's manifests
+(PERMISSIONS, PERMISSIONS.<bin>): the reasons of the ask lines, which the permission dialog reads
+through the catalogue.
 
 Catalogues: apps/NAME/**/locales/*.tsv.  The first line names the languages ("de\ten";
 Catalog::from_tsv), or a comment "# languages: de en fr" does (a catalogue the app reads
@@ -124,6 +126,7 @@ TRANSLATES_MENUS = re.compile(r"=>\s*Mi::(?:Item|Menu|Sub|List)\([^;]*?[\w:]+\(\
 TRANSLATES_CMDS = re.compile(r"\blabel\s*[:=]\s*[\w:]+\(\s*\w+\.label\b|\bi18n::commands\s*\(|\.translated\(\)")
 FIELD = re.compile(r"\b(\w+)\s*:\s*$")
 LIST_CALL = re.compile(r"(?<![\w.])(?:\w+::)*\blist\s*\(\s*&\s*([A-Z_][A-Z0-9_]*)\s*\)")
+ASK_REASON = re.compile(r'\s*ask\s[^#"]*"([^"]*)"')   # plat::policy split_line: '#' outside the quotes is a comment
 
 # the CLDR plural categories ui::i18n::plural gives each language ("other" included)
 PLURALS = {
@@ -139,8 +142,9 @@ PLURALS = {
 CATEGORIES = {"zero", "one", "two", "few", "many", "other"}
 # complete today (2026-11-02): in --check a missing or untranslated text is an error there too,
 # so they stay complete; the other apps' gaps are reported only
-COMPLETE = ("BackupCraft", "androidGallery", "audiotest", "datagallery", "diagramtest", "dndtest", "docktest",
-            "editortest", "fontpicktest", "gallery", "mdviewtest", "prefstest", "spelltest", "svgtest", "template", "lib")
+COMPLETE = ("BackupCraft", "Kritzel", "androidGallery", "audiotest", "buildManager", "datagallery", "diagramtest", "dndtest",
+            "docktest", "editortest", "fontpicktest", "gallery", "mdviewtest", "permprompt", "prefstest", "spelltest", "svgtest",
+            "template", "lib")
 
 
 def plural_categories(lang):
@@ -318,6 +322,15 @@ class Sources:
         self.uses_i18n = re.search(r"\bset_catalog\s*\(", both) is not None
         for f, text in texts.items():
             self.scan(f, text, library, skip)
+
+    def manifests(self, app):
+        """the reasons of the ask lines in the app's manifests"""
+        for f in sorted(app.glob("PERMISSIONS*")):
+            for no, ln in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+                m = ASK_REASON.match(ln)
+                if m:
+                    self.literals.add(m.group(1))
+                    self.add(m.group(1), f"{rel_path(f)}:{no}", "t")
 
     def add(self, val, where, kind):
         if LETTER.search(val):
@@ -679,6 +692,7 @@ def check_app(app, folders=None):
         if c.langs != rep.langs:
             rep.add("error", c.rel, f"languages {' '.join(c.langs)}, {cats[0].rel}: {' '.join(rep.langs)}")
     every = Sources(app, app_folders(app))
+    every.manifests(app)
     src = every if folders is None else Sources(app, folders)
     rep.texts = len(src.found)
     # ui::i18n::t falls back to the library's texts (an app with Catalog / set_catalog)

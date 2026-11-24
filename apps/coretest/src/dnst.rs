@@ -142,6 +142,50 @@ pub fn run(t: &mut T) {
     let qn = dns::query(8, "none.test", 1).unwrap_or_default();
     t.eq("no such name", dns::parse_answer(&answer(&qn, false), &qn, 1), Answer::NoName);
     t.eq("cut answer", dns::parse_answer(&answer(&qf, false)[..30], &qf, 1), Answer::Bad);
+    // only the asked name's records count, or those of the name its CNAME chain leads to
+    let with = |q: &[u8], rrs: &[(&str, u16, Vec<u8>)]| {
+        let mut m = q.to_vec();
+        m[2] = 0x81;
+        m[3] = 0x80;
+        m[7] = rrs.len() as u8;
+        let enc = |n: &str| {
+            let mut v = Vec::new();
+            for l in n.split('.') {
+                v.push(l.len() as u8);
+                v.extend_from_slice(l.as_bytes());
+            }
+            v.push(0);
+            v
+        };
+        for (owner, t, data) in rrs {
+            if *owner == "?" {
+                m.extend_from_slice(&[0xC0, 12]);
+            } else {
+                m.extend_from_slice(&enc(owner));
+            }
+            m.extend_from_slice(&t.to_be_bytes());
+            m.extend_from_slice(&[0, 1, 0, 0, 0, 60]);
+            let data = if *t == 5 { enc(core::str::from_utf8(data).unwrap_or("")) } else { data.clone() };
+            m.extend_from_slice(&(data.len() as u16).to_be_bytes());
+            m.extend_from_slice(&data);
+        }
+        m
+    };
+    let foreign = with(&qf, &[("evil.test", 1, alloc::vec![6, 6, 6, 6]), ("?", 1, alloc::vec![10, 1, 2, 3])]);
+    t.eq("a record for another name is ignored", dns::parse_answer(&foreign, &qf, 1), Answer::Found(alloc::vec![IpAddr::V4([10, 1, 2, 3])]));
+    // the owner one label "fake.test" (a dot inside it) instead of the labels "fake", "test"
+    let mut dotted = foreign.clone();
+    dotted[qf.len()..qf.len() + 11].copy_from_slice(b"\x09fake.test\x00");
+    t.eq("a label with a dot is not the name of its parts", dns::parse_answer(&dotted, &qf, 1), Answer::Found(alloc::vec![IpAddr::V4([10, 1, 2, 3])]));
+    // "no such name" with our id but another question
+    let qn7 = dns::query(7, "none.test", 1).unwrap_or_default();
+    t.eq("no such name for another question", dns::parse_answer(&answer(&qn7, false), &qf, 1), Answer::Bad);
+    let chain = with(&qf, &[("?", 5, b"cdn.test".to_vec()), ("cdn.test", 5, b"edge.cdn.test".to_vec()), ("other.test", 1, alloc::vec![6, 6, 6, 6]), ("Edge.CDN.test", 1, alloc::vec![10, 9, 9, 9])]);
+    t.eq("a CNAME chain is followed", dns::parse_answer(&chain, &qf, 1), Answer::Found(alloc::vec![IpAddr::V4([10, 9, 9, 9])]));
+    let skipped = with(&qf, &[("?", 5, b"cdn.test".to_vec()), ("?", 1, alloc::vec![6, 6, 6, 6]), ("cdn.test", 1, alloc::vec![10, 9, 9, 9])]);
+    t.eq("an address beside the CNAME does not count", dns::parse_answer(&skipped, &qf, 1), Answer::Found(alloc::vec![IpAddr::V4([10, 9, 9, 9])]));
+    let looped = with(&qf, &[("?", 5, b"a.test".to_vec()), ("a.test", 5, b"fake.test".to_vec())]);
+    t.eq("a CNAME loop ends", dns::parse_answer(&looped, &qf, 1), Answer::Found(Vec::new()));
 
     // a name server on loopback
     let Some(ns) = server() else {
@@ -165,6 +209,14 @@ pub fn run(t: &mut T) {
     t.check("within the time limits", plat::time_us() - t0 < 20_000_000);
     // this machine: localhost always; its own name through the system's hosts file (Linux)
     t.check("localhost", dns::resolve("localhost", 80).is_ok_and(|v| v[0].ip.is_loopback()));
+    // a name under .localhost is loopback too (RFC 6761 6.3), in netio and in plat alike
+    let both_loopback = |r: plat::net::NetResult<Vec<SocketAddr>>| r.is_ok_and(|v| v.len() == 2 && v.iter().all(|a| a.ip.is_loopback() && a.port == 80));
+    t.check("a name under .localhost (netio)", both_loopback(dns::resolve("App.Localhost", 80)));
+    t.check("a name under .localhost (plat)", both_loopback(plat::net::resolve("app.localhost", 80)));
+    // the absolute forms as well: no query to /etc/hosts or a name server (the silent one here)
+    t.check("an absolute name under .localhost (netio)",
+        both_loopback(dns::resolve_with("app.localhost.", 80, &silent)) && both_loopback(dns::resolve_with("LOCALHOST.", 80, &silent)));
+    t.check("an absolute name under .localhost (plat)", both_loopback(plat::net::resolve("app.localhost.", 80)));
     let sys = Config::system();
     t.check("Config::system: name servers (link-local ones with their zone)",
         !sys.nameservers.is_empty() && sys.nameservers.iter().all(|a| !link_local(&a.ip) || a.scope != 0));

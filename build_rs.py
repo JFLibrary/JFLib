@@ -222,8 +222,8 @@ def run_cmd(cmd, quiet=False, env=None):
 # ---------------------------------------------------------------- crates
 def compute_crate(name):
     """crates whose speed matters in development builds too (opt-level 2; Kritzel draws with its
-    own pixel loops)"""
-    return (name in ("gfx", "text", "simd", "fx", "Kritzel", "crypto", "compress", "cas", "spell", "physics", "geom")
+    own pixel loops, pdf draws pages)"""
+    return (name in ("gfx", "text", "simd", "fx", "Kritzel", "crypto", "compress", "cas", "spell", "physics", "geom", "pdf")
             or name.startswith("img_"))
 
 
@@ -294,8 +294,9 @@ def incremental_flags(inc):
 
 # a path's first segment (NAME::) and extern crate NAME: whole identifiers, like \bNAME:: and
 # extern crate NAME\b per name -- one scan of the sources instead of one per name (all_libs ran
-# a regex per crate over every source set: half a minute per app build)
-CRATE_MENTION = re.compile(r"\b(\w+)::|extern crate (\w+)\b")
+# a regex per crate over every source set: half a minute per app build).  Not a segment after
+# NAME:: -- in netio::x509::Cert, x509 is netio's (a crate netio re-exports), not one the source names
+CRATE_MENTION = re.compile(r"(?<!\w::)\b(\w+)::|extern crate (\w+)\b")
 
 
 def named_crates(root, names):

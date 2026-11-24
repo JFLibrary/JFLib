@@ -137,6 +137,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - `History`: `undo` / `redo` while a group is open close it first, its edits so far are the newest step (undo reverted the older step under them, redo did an undone step over newer edits); `can_undo`, `can_redo` and the labels count the open group.
 - A box nested beyond the layout's limit pushes no clip or disabled level and its `box_end` pops nothing (it took the parent's frame, clip and disabled level); an expander beyond the 16 kept ones opens no content card (its box stayed open).
 - `list_end` packs a drop into `from | to << 16` only while both fit in 16 bits: a move from or to a row past 65 535 is no longer reported (no EV_DRAG, the row stays selected) -- the packed value gave another item and another place (`list_end_full` reports them).
+- Hebrew and Arabic in labels, buttons, check boxes, radio buttons, headings and lists read backwards ("מחיקה" as "הקיחמ", also on the Windows setup's pages): text now lays out lines with right-to-left characters in their visual order without shaping (`text::Text::set_bidi`), Arabic joined. Text fields draw, place the caret and select in that order too: a selection is drawn as its visual spans (`Text::selection_spans`), several where it crosses directions, and the end of a right-to-left line is its width. The rich-text and code editors keep such letters in logical order, cluster by cluster, as their carets are
 
 ### Security
 

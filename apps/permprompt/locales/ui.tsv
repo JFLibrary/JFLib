@@ -1,0 +1,31 @@
+de	en
+# the reasons of the ask lines in apps/permprompt/PERMISSIONS (the dialog reads them through this catalogue)
+Briefe speichern	Save letters
+Im Hintergrund sichern	Back up in the background
+Eine Mail an den Support schreiben	Write an email to support
+Hinweistöne	Notification sounds
+# the page
+Rückfragen	Questions
+Datei schreiben	Write file
+Im Hintergrund schreiben	Write in the background
+Mail prüfen	Check mail
+Drucken prüfen	Check printing
+Antworten überschreiben	Overwrite answers
+Klang abspielen	Play sound
+Hinweis mit Klang	Notice with sound
+Datei: {}	File: {}
+Hintergrund: {}	Background: {}
+Mail: {}	Mail: {}
+Drucken: {}	Printing: {}
+Antworten: {}	Answers: {}
+Klang: {}	Sound: {}
+Agent: {} gespeichert	Agent: {} saved
+Berechtigungen	Permissions
+Hinweis	Notice
+Ein Hinweis, der beim Öffnen klingt, sobald Klänge erlaubt sind.	A notice that plays a sound when it opens, once sounds are allowed.
+OK	OK
+geschrieben	written
+wartet auf Antwort	waiting for an answer
+abgelehnt	refused
+erlaubt	allowed
+läuft	running

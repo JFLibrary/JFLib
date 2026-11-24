@@ -1,6 +1,7 @@
 // svgtest -- SVG images (lib/img_svg) and the image viewer (ui.image_view); for tests/*.uis
 //
 //   build/win/svgtest.exe --test unit     self-checks of img_svg (unit.rs); exit code = failures
+//   build/win/svgtest.exe --render F.svg --to F.png   one SVG at its intrinsic size, no window
 //   build/win/svgtest.exe --script apps/svgtest/tests/gallery.uis
 //   build/win/svgtest.exe                 a window
 //
@@ -229,9 +230,37 @@ impl App for SvgTest {
     }
 }
 
+// --render FILE --to OUT.png: one SVG at its intrinsic size as a PNG, without a window (the
+// parser's and renderer's output compared across builds: every SVG of the repository)
+fn render(src: &str, to: &str) -> i32 {
+    img_core::io::set_file_io(img_core::io::FileIo { read: plat::read_file, write: plat::write_file });
+    img_all::use_all_codecs();
+    let Some(data) = plat::read_file(src) else {
+        plat::write_stderr(format!("{src}: not readable\n").as_bytes());
+        return 1;
+    };
+    match img_svg::rasterize(&data, 0, 0) {
+        Ok(sf) => {
+            let r = img_core::io::save(to, &sf);
+            if r != 0 {
+                plat::write_stderr(format!("{to}: error {r}\n").as_bytes());
+            }
+            (r != 0) as i32
+        }
+        Err(e) => {
+            plat::write_stderr(format!("{src}: error {e}\n").as_bytes());
+            2
+        }
+    }
+}
+
+
 fn svgtest() -> i32 {
     if plat::arg_value("--test").as_deref() == Some("unit") {
         return unit::run();
+    }
+    if let (Some(src), Some(to)) = (plat::arg_value("--render"), plat::arg_value("--to")) {
+        return render(&src, &to);
     }
     i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
     ui::launch(&DESC.translated(), SvgTest::new(), &style::STYLE)

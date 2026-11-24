@@ -2,8 +2,8 @@
 // suggestion tables (TRY, KEY, REP, MAP)
 //
 // The file is decoded first (SET: UTF-8, ISO8859-1 .. -16, KOI8-R / -U, microsoft-cp1251 /
-// -cp1252, TIS620-2533; charsets.rs) and parsed line by line; the .dic file is decoded the same
-// way.  Flags are numbers (u32): FLAG (default) one character each, FLAG long two characters,
+// -cp1252, TIS620-2533 and every other label of the WHATWG Encoding Standard; the tables are
+// formats::encoding's) and parsed line by line; the .dic file is decoded the same way.  Flags are numbers (u32): FLAG (default) one character each, FLAG long two characters,
 // FLAG num comma separated decimals, FLAG UTF-8 one Unicode character each; with AF aliases the
 // flag fields of the .dic and of the affixes' continuation classes are alias numbers.
 //
@@ -22,7 +22,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use crate::charsets;
+use formats::encoding::Charset;
 
 /// a flag (0: an option that is not set)
 pub(crate) type Flag = u32;
@@ -149,11 +149,17 @@ impl AddIndex {
     // the index of the rules (i, rule)
     fn build<'r>(rules: impl Iterator<Item = (usize, &'r Affix)>) -> AddIndex {
         let mut map: BTreeMap<(u64, String), Vec<Group>> = BTreeMap::new();
+        // (add, strip) -> its group's place: the groups keep the order of the file, found
+        // without a search through them (a file with thousands of strips for one text)
+        let mut at: BTreeMap<(String, String), usize> = BTreeMap::new();
         for (i, r) in rules {
             let gs = map.entry((add_key(&r.add), r.add.clone())).or_default();
-            match gs.iter_mut().find(|g| g.strip == r.strip) {
-                Some(g) => g.rules.push(i as u32),
-                None => gs.push(Group { strip: r.strip.clone(), rules: alloc::vec![i as u32] }),
+            match at.get(&(r.add.clone(), r.strip.clone())) {
+                Some(&k) => gs[k].rules.push(i as u32),
+                None => {
+                    at.insert((r.add.clone(), r.strip.clone()), gs.len());
+                    gs.push(Group { strip: r.strip.clone(), rules: alloc::vec![i as u32] });
+                }
             }
         }
         let mut x = AddIndex::default();
@@ -387,18 +393,27 @@ pub(crate) fn decode(b: &[u8], enc: &str) -> String {
     if e == "utf8" {
         return String::from_utf8_lossy(b).into_owned();
     }
-    let table = charsets::table(enc);
-    let mut s = String::with_capacity(b.len() + b.len() / 8);
-    for &c in b {
-        if c < 0x80 {
-            s.push(c as char);
-        } else if let Some(t) = table {
-            s.push(char::from_u32(t[c as usize - 0x80] as u32).unwrap_or('\u{FFFD}'));
-        } else {
-            s.push(c as char); // ISO8859-1 (and unknown sets)
-        }
+    charset(enc, &e).unwrap_or(Charset::Latin1).decode(b)
+}
+
+/// the character set of a SET name (`squashed`: lower case without '-' and '_'): Hunspell's
+/// ISO8859-1 exactly (each byte its code point, as Hunspell reads it), a label of the WHATWG
+/// Encoding Standard, or one of Hunspell's own spellings; None: unknown (read as ISO8859-1)
+fn charset(name: &str, squashed: &str) -> Option<Charset> {
+    use Charset::*;
+    match squashed {
+        "iso88591" | "latin1" => return Some(Latin1),
+        "microsoftcp1251" => return Some(Windows1251),
+        "microsoftcp1252" => return Some(Windows1252),
+        "tis6202533" | "tis620" => return Some(Windows874),
+        "latin7" => return Some(Iso8859_13),
+        "latin8" => return Some(Iso8859_14),
+        "latin9" => return Some(Iso8859_15),
+        "latin10" | "iso885916" => return Some(Iso8859_16),
+        "koi8u" => return Some(Koi8U),
+        _ => {}
     }
-    s
+    Charset::from_label(name).or_else(|| Charset::from_label(squashed))
 }
 
 /// the SET value of an affix file (read from its raw bytes), default ISO8859-1
@@ -648,7 +663,10 @@ pub(crate) fn parse(text: &str, encoding: &str) -> Aff {
     a.sfx_by_add = AddIndex::build(a.sfx.iter().enumerate());
     a.pfx_max = a.pfx.iter().map(|r| r.add.chars().count()).max().unwrap_or(0);
     a.sfx_max = a.sfx.iter().map(|r| r.add.chars().count()).max().unwrap_or(0);
-    let mut outer: Vec<Flag> = a.sfx.iter().map(|r| r.flag).filter(|&f| a.sfx.iter().any(|r| r.has(f))).collect();
+    // the suffix flags some suffix's continuation names (one pass: a file with many rules
+    // costs no square)
+    let conts: alloc::collections::BTreeSet<Flag> = a.sfx.iter().flat_map(|r| r.cont.iter().copied()).collect();
+    let mut outer: Vec<Flag> = a.sfx.iter().map(|r| r.flag).filter(|f| conts.contains(f)).collect();
     outer.sort_unstable();
     outer.dedup();
     a.sfx_outer = outer;

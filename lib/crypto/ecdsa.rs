@@ -1,12 +1,29 @@
-// ecdsa -- ECDSA verification on NIST P-256 and P-384 (FIPS 186-4, SEC 1)
+// ecdsa -- ECDSA on NIST P-256 and P-384 (FIPS 186-5, SEC 1, RFC 6979)
 //
 //   verify(curve, public_key, digest, r, s)   public key uncompressed (04 || x || y), checked
 //                                             to lie on the curve; r, s big-endian integers
+//   verify_p1363(curve, public_key, digest, sig)   sig = r || s, each curve.bytes() long (IEEE
+//                                             P1363: JOSE, COSE, WebCrypto)
+//   sign(curve, secret, hash, digest, extra) -> Option<r || s>   deterministic nonces (RFC 6979
+//                                             with `hash`, the digest's hash); `extra`, when not
+//                                             empty, goes into the nonce as RFC 6979 3.6's
+//                                             additional data: 32 random bytes there hedge against
+//                                             faults and a poor random source alike
+//   public_key(curve, secret) -> Option<04 || x || y>    secret_from(curve, random) -> Option<secret>
+//   der_from_p1363(sig) / p1363_from_der(curve, der)     r || s <-> the DER Ecdsa-Sig-Value
+//                                             (strict: minimal lengths and integers, nothing after)
 //
-// Jacobian coordinates in the Montgomery domain (a = -3 formulas), u1 G + u2 Q by Shamir's
-// trick.  Public data only: variable time.
+// Verification: Jacobian coordinates in the Montgomery domain (a = -3 formulas), u1 G + u2 Q by
+// Shamir's trick; public data only, variable time.  Signing: nist.rs in constant time (complete
+// formulas, windows read in full, inverses as powers to n - 2); a nonce outside [1, n - 1], or
+// an r or s of 0, draws the next one as RFC 6979 says (about 2^-32 on P-256, which shows only that
+// a nonce was refused, nothing of the one taken).
+
+use alloc::vec::Vec;
 
 use crate::bn::{self, Limbs, Mont};
+use crate::nist::{self, P256, P384};
+use crate::HashAlg;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -207,4 +224,230 @@ pub fn verify(curve: Curve, public_key: &[u8], digest: &[u8], r: &[u8], s: &[u8]
     let x = f.m.from_mont(&f.mul(&acc.x, &f.sq(&zinv)));
     let xn = nm.reduce_once(&x);
     xn == r
+}
+
+// ---------------------------------------------------------------- P1363 and DER
+
+/// verify an r || s signature (IEEE P1363: each half curve.bytes() long)
+pub fn verify_p1363(curve: Curve, public_key: &[u8], digest: &[u8], sig: &[u8]) -> bool {
+    let nb = curve.bytes();
+    sig.len() == 2 * nb && verify(curve, public_key, digest, &sig[..nb], &sig[nb..])
+}
+
+/// a DER INTEGER of a big-endian unsigned number (minimal, with a zero byte before a high bit)
+fn der_uint(x: &[u8], out: &mut Vec<u8>) {
+    let x = &x[x.iter().position(|&b| b != 0).unwrap_or(x.len().saturating_sub(1))..];
+    let pad = x[0] & 0x80 != 0;
+    out.push(0x02);
+    out.push((x.len() + pad as usize) as u8);
+    if pad {
+        out.push(0);
+    }
+    out.extend_from_slice(x);
+}
+
+/// the DER Ecdsa-Sig-Value (SEQUENCE { r INTEGER, s INTEGER }) of an r || s signature; None
+/// for an empty or odd length, or halves over 125 bytes
+pub fn der_from_p1363(sig: &[u8]) -> Option<Vec<u8>> {
+    if sig.is_empty() || sig.len() % 2 != 0 || sig.len() > 250 {
+        return None;
+    }
+    let (r, s) = sig.split_at(sig.len() / 2);
+    let mut body = Vec::with_capacity(sig.len() + 6);
+    der_uint(r, &mut body);
+    der_uint(s, &mut body);
+    let mut out = Vec::with_capacity(body.len() + 4);
+    out.push(0x30);
+    // halves of up to 125 bytes give at most 256 bytes of content: two length bytes from 256 on
+    if body.len() > 0xff {
+        out.push(0x82);
+        out.push((body.len() >> 8) as u8);
+    } else if body.len() >= 0x80 {
+        out.push(0x81);
+    }
+    out.push(body.len() as u8);
+    out.extend_from_slice(&body);
+    Some(out)
+}
+
+/// one DER element of this tag: (contents, what follows); lengths in their shortest form only
+fn der_tlv(b: &[u8], tag: u8) -> Option<(&[u8], &[u8])> {
+    if b.len() < 2 || b[0] != tag {
+        return None;
+    }
+    let (len, at) = match b[1] {
+        l if l < 0x80 => (l as usize, 2),
+        0x81 if b.len() > 2 && b[2] >= 0x80 => (b[2] as usize, 3),
+        _ => return None,
+    };
+    if b.len() - at < len {
+        return None;
+    }
+    Some((&b[at..at + len], &b[at + len..]))
+}
+
+/// r || s (each curve.bytes() long) from a DER Ecdsa-Sig-Value; None unless it is strict DER: one
+/// SEQUENCE of two minimal, non-negative INTEGERs no longer than the curve's size, nothing after
+pub fn p1363_from_der(curve: Curve, der: &[u8]) -> Option<Vec<u8>> {
+    let nb = curve.bytes();
+    let (body, rest) = der_tlv(der, 0x30)?;
+    let (r, body) = der_tlv(body, 0x02)?;
+    let (s, body) = der_tlv(body, 0x02)?;
+    if !rest.is_empty() || !body.is_empty() {
+        return None;
+    }
+    let mut out = alloc::vec![0u8; 2 * nb];
+    for (v, half) in [(r, 0), (s, nb)] {
+        if v.is_empty() || v[0] & 0x80 != 0 || (v.len() > 1 && v[0] == 0 && v[1] & 0x80 == 0) {
+            return None;
+        }
+        let v = if v[0] == 0 && v.len() > 1 { &v[1..] } else { v };
+        if v.len() > nb {
+            return None;
+        }
+        out[half + nb - v.len()..half + nb].copy_from_slice(v);
+    }
+    Some(out)
+}
+
+// ---------------------------------------------------------------- keys and signing
+
+/// a secret key in [1, n - 1] from curve.bytes() random bytes (None: draw again, or another
+/// length); only the answer is a branch
+pub fn secret_from(curve: Curve, random: &[u8]) -> Option<Vec<u8>> {
+    secret_ok(curve, random).then(|| Vec::from(random))
+}
+
+/// whether these bytes are a secret key: curve.bytes() long, in [1, n - 1]
+fn secret_ok(curve: Curve, secret: &[u8]) -> bool {
+    if secret.len() != curve.bytes() {
+        return false;
+    }
+    let ok = match curve {
+        Curve::P256 => P256.n.in_range_mask(&nist::from_be::<4>(secret)),
+        Curve::P384 => P384.n.in_range_mask(&nist::from_be::<6>(secret)),
+    };
+    ok != 0
+}
+
+/// the public key (04 || x || y) of a secret key; None when the secret is not in [1, n - 1]
+pub fn public_key(curve: Curve, secret: &[u8]) -> Option<Vec<u8>> {
+    if !secret_ok(curve, secret) {
+        return None;
+    }
+    Some(match curve {
+        Curve::P256 => P256.public_key(secret),
+        Curve::P384 => P384.public_key(secret),
+    })
+}
+
+/// sign a digest (`hash`'s output, which RFC 6979 also derives the nonce with): r || s, each
+/// curve.bytes() long.  None when the secret is not in [1, n - 1] or the digest is not
+/// hash.len() bytes.  The same secret, digest and extra give the same signature
+pub fn sign(curve: Curve, secret: &[u8], hash: HashAlg, digest: &[u8], extra: &[u8]) -> Option<Vec<u8>> {
+    match curve {
+        Curve::P256 => sign_on(&P256, secret, hash, digest, extra),
+        Curve::P384 => sign_on(&P384, secret, hash, digest, extra),
+    }
+}
+
+/// HMAC_K(data) replaces k (the old key overwritten)
+fn rekey(hash: HashAlg, k: &mut Vec<u8>, data: &[u8]) {
+    let mut next = hash.hmac(k, data);
+    core::mem::swap(k, &mut next);
+    crate::zeroize(&mut next);
+}
+
+/// V = HMAC_K(V)
+fn step(hash: HashAlg, k: &[u8], v: &mut Vec<u8>) {
+    let mut next = hash.hmac(k, v);
+    core::mem::swap(v, &mut next);
+    crate::zeroize(&mut next);
+}
+
+fn sign_on<const L: usize>(c: &nist::Curve<L>, secret: &[u8], hash: HashAlg, digest: &[u8], extra: &[u8]) -> Option<Vec<u8>> {
+    let nb = nist::Curve::<L>::BYTES;
+    if secret.len() != nb || digest.len() != hash.len() {
+        return None;
+    }
+    let mut d = nist::from_be::<L>(secret);
+    if c.n.in_range_mask(&d) == 0 {
+        return None;
+    }
+    // bits2int(digest) mod n: the leftmost 8 nb bits (n has exactly that many); below 2^(8 nb) < 2 n
+    let take = digest.len().min(nb);
+    let mut padded = alloc::vec![0u8; nb];
+    padded[nb - take..].copy_from_slice(&digest[..take]);
+    let e = c.n.reduce_once(&nist::from_be::<L>(&padded));
+    // RFC 6979 3.2 (with 3.6's additional data): K and V from x = int2octets(d), h1 = bits2octets
+    nist::to_be(&e, &mut padded);
+    let hl = hash.len();
+    let mut v = alloc::vec![1u8; hl];
+    let mut k = alloc::vec![0u8; hl];
+    let mut msg = Vec::with_capacity(hl + 1 + 2 * nb + extra.len());
+    for sep in [0u8, 1] {
+        msg.clear();
+        msg.extend_from_slice(&v);
+        msg.push(sep);
+        msg.extend_from_slice(secret);
+        msg.extend_from_slice(&padded);
+        msg.extend_from_slice(extra);
+        rekey(hash, &mut k, &msg);
+        step(hash, &k, &mut v);
+    }
+    crate::zeroize(&mut msg);
+    let mut t = Vec::with_capacity(nb + hl);
+    let sig = loop {
+        t.clear();
+        while t.len() < nb {
+            step(hash, &k, &mut v);
+            t.extend_from_slice(&v);
+        }
+        // bits2int(T): the first nb bytes (qlen = 8 nb)
+        let mut kk = nist::from_be::<L>(&t[..nb]);
+        crate::zeroize(&mut t);
+        let found = if c.n.in_range_mask(&kk) != 0 { sign_with(c, &d, &e, &kk) } else { None };
+        crate::zeroize_words(&mut kk);
+        if let Some(sig) = found {
+            break sig;
+        }
+        // K = HMAC_K(V || 0x00), V = HMAC_K(V)
+        let mut again = v.clone();
+        again.push(0);
+        rekey(hash, &mut k, &again);
+        crate::zeroize(&mut again);
+        step(hash, &k, &mut v);
+    };
+    crate::zeroize(&mut k);
+    crate::zeroize(&mut v);
+    crate::zeroize_words(&mut d);
+    Some(sig)
+}
+
+/// r || s with the nonce k (in [1, n - 1]); None when r or s comes out 0
+fn sign_with<const L: usize>(c: &nist::Curve<L>, d: &[u64; L], e: &[u64; L], k: &[u64; L]) -> Option<Vec<u8>> {
+    let nb = nist::Curve::<L>::BYTES;
+    let mut kb = alloc::vec![0u8; nb];
+    nist::to_be(k, &mut kb);
+    let (_, x, _) = c.affine(&c.mul(&kb, &c.generator()));
+    crate::zeroize(&mut kb);
+    // x < p < 2 n on both curves: one subtraction makes it x mod n
+    let r = c.n.reduce_once(&x);
+    let n = &c.n;
+    // s = k^-1 (e + r d) mod n, in Montgomery form throughout
+    let mut kinv = n.inv(&n.to_mont(k));
+    let mut rd = n.mul(&n.to_mont(&r), &n.to_mont(d));
+    let mut sum = n.add(&n.to_mont(e), &rd);
+    let s = n.from_mont(&n.mul(&kinv, &sum));
+    crate::zeroize_words(&mut kinv);
+    crate::zeroize_words(&mut rd);
+    crate::zeroize_words(&mut sum);
+    // r and s are the public signature: these branches show what is published anyway
+    if r.iter().all(|&w| w == 0) || s.iter().all(|&w| w == 0) {
+        return None;
+    }
+    let mut out = alloc::vec![0u8; 2 * nb];
+    nist::to_be(&r, &mut out[..nb]);
+    nist::to_be(&s, &mut out[nb..]);
+    Some(out)
 }

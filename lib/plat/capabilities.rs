@@ -27,6 +27,8 @@ pub const CAP_WINDOWING: u64 = 1 << 10;
 pub const CAP_THREADS: u64 = 1 << 11;
 /// Install operating-system shortcuts or integrations.
 pub const CAP_SHELL_INTEGRATION: u64 = 1 << 12;
+/// Hand a text, a link or files to another app through the system's share sheet (share.rs).
+pub const CAP_SHARE: u64 = 1 << 13;
 
 /// Snapshot of services actually provided by the current host.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -56,6 +58,7 @@ impl Capabilities {
             (CAP_WINDOWING, "No window surface is available."),
             (CAP_THREADS, "This host uses sequential execution instead of operating-system threads."),
             (CAP_SHELL_INTEGRATION, "Operating-system installation is unavailable on this host."),
+            (CAP_SHARE, "This system has no share sheet."),
         ];
         reasons.iter().find(|(flag, _)| missing & flag != 0).map(|(_, reason)| *reason)
             .or(if missing != 0 { Some("An unknown platform capability was requested.") } else { None })
@@ -66,5 +69,6 @@ impl Capabilities {
 /// Browser permissions are supplied by its host adapter.
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub fn capabilities() -> Capabilities {
-    Capabilities { available: ((1 << 13) - 1) & crate::policy::cap_mask() }
+    let share = if crate::share::available() { CAP_SHARE } else { 0 };
+    Capabilities { available: (((1 << 13) - 1) | share) & crate::policy::cap_mask() }
 }

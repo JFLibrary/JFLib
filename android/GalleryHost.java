@@ -3,21 +3,26 @@
  * names, the ClipboardManager, the persisted grants, the secret store (GallerySecrets: the
  * Android Keystore); a ContentObserver per provider whose tree is listed reports changes
  * (nativeChanged); request(kind, id, bytes) starts the
- * system's picker (Storage Access Framework) and answers later through nativeResult.
+ * system's picker (Storage Access Framework) or the share sheet (a chooser for ACTION_SEND) and
+ * answers later through nativeResult.
  * Wire: little endian; strings and byte blocks as u32 length + bytes (android_host.rs). */
 package org.jflib.gallery;
 
 import android.app.Activity;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipDescription;
 import android.content.ClipboardManager;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.UriPermission;
 import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
@@ -48,7 +53,7 @@ final class GalleryHost {
         CALL_OPEN = 6, CALL_CLIP_GET = 10, CALL_CLIP_SET = 11, CALL_CLIP_HAS = 12, CALL_CLIP_STAMP = 13, CALL_CLIP_OURS = 14,
         CALL_GRANTS = 20, CALL_RELEASE = 21;
     // web.rs requests and plat consts
-    static final int REQUEST_DOWNLOAD = 2, REQUEST_OPEN = 3, REQUEST_FILE_DIALOG = 12;
+    static final int REQUEST_DOWNLOAD = 2, REQUEST_OPEN = 3, REQUEST_FILE_DIALOG = 12, REQUEST_SHARE = 34;
     static final int FD_SAVE = 1, FD_FOLDER = 2, FO_READ = 0, FO_WRITE = 1, FO_RW = 2;
     static final int CLIP_TEXT = 1, CLIP_IMAGE = 3, CLIP_HTML = 4;
     static final int DOC_WRITE = 1, DOC_DELETE = 2, DOC_RENAME = 4, DOC_CREATE = 8;
@@ -322,6 +327,7 @@ final class GalleryHost {
         Activity a = activity;
         if (a == null) return false;
         try {
+            if (kind == REQUEST_SHARE) return share(a, id, new In(payload));
             Intent intent;
             if (kind == REQUEST_FILE_DIALOG) intent = dialog(new In(payload));
             else if (kind == REQUEST_OPEN) intent = openIntent(extensions(new String(payload, StandardCharsets.UTF_8)));
@@ -382,12 +388,80 @@ final class GalleryHost {
             | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
     }
 
+    // ------------------------------------------------------------ the share sheet
+
+    // the share requests whose chooser reported a chosen target (main thread)
+    private static final HashSet<Integer> sharePicked = new HashSet<>();
+    private static boolean shareReceiving;
+    private static final String EXTRA_SHARE_ID = "org.jflib.gallery.share.id";
+    private static String shareAction(Context c) { return c.getPackageName() + ".jfgui.SHARE_PICKED"; }
+
+    /** plat::share (web_share.rs): the title, the text, the link, u32 count, per file its name and
+     *  bytes.  The files become content:// URIs of GalleryFiles (the target may read them); one
+     *  file ACTION_SEND, several ACTION_SEND_MULTIPLE, else text/plain; the text and the link go in
+     *  EXTRA_TEXT, the title in EXTRA_SUBJECT and as the chooser's title.  The chooser reports the
+     *  chosen target through a broadcast of ours (API 22): done; its result alone: cancelled. */
+    private static boolean share(Activity a, int id, In r) {
+        String title = r.str(), text = r.str(), url = r.str();
+        ArrayList<Uri> uris = new ArrayList<>();
+        String type = null;
+        for (int n = r.u32(); n > 0; n--) {
+            String name = r.str();
+            byte[] bytes = r.bytes();
+            Uri u = GalleryFiles.share(a, name.isEmpty() ? "Datei" : name, bytes);
+            if (u == null) return false; // no GalleryFiles provider in the manifest
+            uris.add(u);
+            String m = mimeOf(name);
+            type = type == null || type.equals(m) ? m : "*/*";
+        }
+        Intent send;
+        if (uris.size() > 1) send = new Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris).setType(type);
+        else if (uris.size() == 1) send = new Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris.get(0)).setType(type);
+        else send = new Intent(Intent.ACTION_SEND).setType("text/plain");
+        String body = text.isEmpty() ? url : url.isEmpty() ? text : text + "\n" + url;
+        if (!body.isEmpty()) send.putExtra(Intent.EXTRA_TEXT, body);
+        if (!title.isEmpty()) send.putExtra(Intent.EXTRA_SUBJECT, title);
+        if (!uris.isEmpty()) {
+            ClipData clip = ClipData.newRawUri(title, uris.get(0));
+            for (int k = 1; k < uris.size(); k++) clip.addItem(new ClipData.Item(uris.get(k)));
+            send.setClipData(clip);
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        }
+        shareReceive(a.getApplicationContext());
+        int code = REQUEST_BASE + (nextCode++ & 0xFF);
+        Intent picked = new Intent(shareAction(a)).setPackage(a.getPackageName()).putExtra(EXTRA_SHARE_ID, id);
+        // (mutable: the chooser adds the chosen component)
+        PendingIntent pi = PendingIntent.getBroadcast(a, code, picked, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+        Intent chooser = Intent.createChooser(send, title.isEmpty() ? null : title, pi.getIntentSender());
+        pending.put(code, new Object[] {id, REQUEST_SHARE, null});
+        a.startActivityForResult(chooser, code);
+        return true;
+    }
+    private static void shareReceive(Context app) {
+        if (shareReceiving) return;
+        shareReceiving = true;
+        BroadcastReceiver r = new BroadcastReceiver() {
+            @Override public void onReceive(Context c, Intent i) {
+                int id = i.getIntExtra(EXTRA_SHARE_ID, 0);
+                if (id != 0) sharePicked.add(id);
+            }
+        };
+        IntentFilter f = new IntentFilter(shareAction(app));
+        if (Build.VERSION.SDK_INT >= 33) app.registerReceiver(r, f, Context.RECEIVER_NOT_EXPORTED);
+        else app.registerReceiver(r, f);
+    }
+
     /** GalleryActivity.onActivityResult: true when it was one of ours. */
     static boolean onResult(Activity a, int code, int result, Intent data) {
         Object[] p = pending.get(code);
         if (p == null) return false;
         pending.remove(code);
         int id = (Integer)p[0], kind = (Integer)p[1];
+        if (kind == REQUEST_SHARE) {
+            // the chooser's broadcast (a target chosen) may come just after its result
+            new Handler(Looper.getMainLooper()).postDelayed(() -> nativeResult(id, sharePicked.remove(id) ? DONE : CANCELLED, null), 400);
+            return true;
+        }
         Uri uri = result == Activity.RESULT_OK && data != null ? data.getData() : null;
         if (uri == null) {
             nativeResult(id, CANCELLED, null);

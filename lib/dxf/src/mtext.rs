@@ -9,7 +9,7 @@
 //   \C<aci>;  colour of the palette (0 by block, 256 by layer)   \c<bgr>;  a true colour (blue in the high byte)
 //   \S<top><sep><bottom>;  stacked: / with a bar, # diagonal, ^ without a bar (tolerances)
 //   \p...;  paragraph: i<first line indent>, l<left indent>, r<right>, q<l|c|r|j|d> alignment, t<tabs> (x: ignored)
-//   \U+XXXX  a character   \M+NXXXX  a double-byte character (read as U+FFFD)   ^I tab, ^J line break, ^<c> control
+//   \U+XXXX  a character   \M+NXXXX  a double byte of an East Asian page   ^I tab, ^J line break, ^<c> control
 //   %%c %%d %%p %%% %%nnn  as in TEXT (strings::specials)
 //
 // Unknown codes are dropped with their letter (a code with a ';' to its end); nothing recurses (the groups are a stack
@@ -397,7 +397,7 @@ pub fn parse(text: &str, height: f64) -> Mtext {
                     b'M' | b'm' if p.i + 1 < p.b.len() && p.b[p.i] == b'+' => {
                         let h = &p.b[p.i + 2..];
                         if h.len() >= 4 && h[..4].iter().all(|c| c.is_ascii_hexdigit()) {
-                            cur.push('\u{FFFD}');
+                            crate::strings::mbcs(&mut cur, p.b[p.i + 1], &h[..4]);
                             p.i += 6;
                         }
                     }

@@ -1,4 +1,4 @@
-// xml -- a bounded pull reader for the XML parts of the VSDX family
+// xml -- the XML parts of the VSDX family: formats::xml's strict pull reader with the namespaces it knows
 //
 //   Reader::new(text, depth, attrs)    a part's text (UTF-8 or UTF-16 decoded by text_of)
 //   r.next() -> Event                  Start, End, Text, Eof; an empty element <a/> gives Start
@@ -6,22 +6,20 @@
 //   r.skip(&start) -> &str             the rest of an element, returned as the file wrote it
 //                                      (an unknown element kept for DF-03)
 //
-// Why not base::xml: shape text is mixed content (<Text>ab<cp IX='0'/>cd</Text>), and unknown
-// elements must come back as written; base::xml builds trees of element-only or text-only nodes.
-//
-// What it reads: elements, attributes in ' or ", the five predefined entities and character
-// references, CDATA, comments and processing instructions (both skipped), namespaces (each name
-// is resolved to the few namespaces the reader knows, Ns).  Refused: a DOCTYPE (no entities,
-// no external anything), an undefined entity, a character XML does not allow, an encoding other
-// than UTF-8 / UTF-16 in the declaration, mismatched or unclosed tags, an unbound prefix, a
-// duplicate attribute, more nesting than `depth` and more attributes on one element than
-// `attrs`.  Line ends are normalised as XML says: CR LF and CR become LF in text; in attribute
-// values a literal tab, line end or CR becomes a space (character references stay).  Nothing
-// recurses: a reader's stack is its own Vec, bounded by `depth`.
+// The reader is formats::xml::Reader (strict: well-formed XML 1.0 with namespaces; mixed content,
+// which shape text is: <Text>ab<cp IX='0'/>cd</Text>; positions for the raw text of unknown
+// elements).  This file maps its namespace URIs to the few the VSDX reader knows (Ns), its errors to
+// XmlError, and skips comments and processing instructions; CDATA is text.  Refused, as there: a
+// DOCTYPE (no entities, no external anything), an undefined entity, a character XML does not allow,
+// an encoding other than UTF-8 / UTF-16 in the declaration, mismatched or unclosed tags, an unbound
+// prefix, a duplicate attribute, more nesting than `depth` and more attributes on one element than
+// `attrs`.  Nothing recurses.
 
 use alloc::borrow::Cow;
 use alloc::string::String;
 use alloc::vec::Vec;
+
+use formats::xml;
 
 /// the Visio namespace of the VSDX parts
 pub(crate) const NS_VISIO: &str = "http://schemas.microsoft.com/office/visio/2012/main";
@@ -31,10 +29,6 @@ pub(crate) const NS_VDX: &str = "http://schemas.microsoft.com/visio/2003/core";
 pub(crate) const NS_REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 /// the namespace of r:id in strict OOXML
 pub(crate) const NS_REL_STRICT: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
-const NS_XML: &str = "http://www.w3.org/XML/1998/namespace";
-const NS_XMLNS: &str = "http://www.w3.org/2000/xmlns/";
-/// the most namespace declarations in scope at a time (a name is looked up through them)
-const MAX_BINDINGS: usize = 64;
 
 /// what is wrong with a part's XML
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -77,7 +71,7 @@ fn ns_of(uri: &str) -> Ns {
         NS_VISIO => Ns::Visio,
         NS_VDX => Ns::Vdx,
         NS_REL | NS_REL_STRICT => Ns::Rel,
-        NS_XML => Ns::Xml,
+        xml::NS_XML => Ns::Xml,
         _ => Ns::Other,
     }
 }
@@ -155,452 +149,71 @@ pub(crate) fn text_of(b: &[u8]) -> Option<Cow<'_, str>> {
     core::str::from_utf8(b).ok().map(Cow::Borrowed)
 }
 
-fn is_space(c: u8) -> bool {
-    matches!(c, b' ' | b'\t' | b'\n' | b'\r')
-}
-
 /// whether a text holds nothing but XML white space
 pub(crate) fn is_blank(s: &str) -> bool {
-    s.bytes().all(is_space)
+    s.bytes().all(|c| matches!(c, b' ' | b'\t' | b'\n' | b'\r'))
 }
 
-fn name_end(c: u8) -> bool {
-    is_space(c) || matches!(c, b'/' | b'>' | b'=' | b'<' | b'"' | b'\'' | b'&' | b'!' | b'?')
-}
-
-// characters XML 1.0 does not allow (the bytes below 0x20 but tab, LF, CR; U+FFFE, U+FFFF)
-fn bad_chars(s: &str) -> bool {
-    s.bytes().any(|c| c < 0x20 && !matches!(c, b'\t' | b'\n' | b'\r')) || s.contains(['\u{fffe}', '\u{ffff}'])
-}
-
-fn char_ok(c: u32) -> bool {
-    matches!(c, 9 | 10 | 13 | 0x20..=0xd7ff | 0xe000..=0xfffd | 0x10000..=0x10ffff)
-}
-
-// replace entities and character references; `attr`: literal white space becomes a space
-fn unescape(raw: &str, attr: bool) -> Option<Cow<'_, str>> {
-    if bad_chars(raw) {
-        return None;
-    }
-    let plain = !raw.contains('&') && !raw.contains('\r') && !(attr && raw.contains(['\t', '\n']));
-    if plain {
-        return Some(Cow::Borrowed(raw));
-    }
-    let mut out = String::with_capacity(raw.len());
-    let b = raw.as_bytes();
-    let mut i = 0;
-    let mut run = 0;
-    while i < b.len() {
-        let c = b[i];
-        if c == b'&' {
-            out.push_str(&raw[run..i]);
-            let semi = raw[i..].find(';')? + i;
-            let name = &raw[i + 1..semi];
-            match name {
-                "lt" => out.push('<'),
-                "gt" => out.push('>'),
-                "amp" => out.push('&'),
-                "quot" => out.push('"'),
-                "apos" => out.push('\''),
-                _ => {
-                    // leading zeros are allowed, the rest must fit a code point
-                    let v = if let Some(h) = name.strip_prefix("#x") {
-                        let t = h.trim_start_matches('0');
-                        if h.is_empty() || t.len() > 8 || !h.bytes().all(|d| d.is_ascii_hexdigit()) {
-                            return None;
-                        }
-                        if t.is_empty() { 0 } else { u32::from_str_radix(t, 16).ok()? }
-                    } else if let Some(d) = name.strip_prefix('#') {
-                        let t = d.trim_start_matches('0');
-                        if d.is_empty() || t.len() > 10 || !d.bytes().all(|x| x.is_ascii_digit()) {
-                            return None;
-                        }
-                        if t.is_empty() { 0 } else { t.parse::<u32>().ok()? }
-                    } else {
-                        return None;
-                    };
-                    if !char_ok(v) {
-                        return None;
-                    }
-                    out.push(char::from_u32(v)?);
-                }
-            }
-            i = semi + 1;
-            run = i;
-        } else if c == b'\r' {
-            out.push_str(&raw[run..i]);
-            out.push(if attr { ' ' } else { '\n' });
-            i += if b.get(i + 1) == Some(&b'\n') { 2 } else { 1 };
-            run = i;
-        } else if attr && (c == b'\t' || c == b'\n') {
-            out.push_str(&raw[run..i]);
-            out.push(' ');
-            i += 1;
-            run = i;
-        } else {
-            i += 1;
-        }
-    }
-    out.push_str(&raw[run..]);
-    Some(Cow::Owned(out))
-}
-
-// a binding of a prefix ("" = the default namespace) made by the element at `depth`
-struct Binding<'a> {
-    prefix: &'a str,
-    ns: Ns,
-    depth: usize,
-}
-
-/// the pull reader of one part
+/// the pull reader of one part: formats::xml's strict Reader, its namespaces as Ns
 pub(crate) struct Reader<'a> {
-    s: &'a str,
-    pos: usize,
-    open: Vec<&'a str>,
-    bindings: Vec<Binding<'a>>,
-    max_depth: usize,
-    max_attrs: usize,
-    // an empty element was returned: its End comes next
-    pending_end: Option<usize>,
-    root_seen: bool,
+    r: xml::Reader<'a>,
+}
+
+fn kind(e: xml::ReadError) -> (XmlError, usize) {
+    let k = match e.error {
+        xml::Error::Depth => XmlError::Depth,
+        xml::Error::Attributes => XmlError::Attributes,
+        xml::Error::Unsupported => XmlError::Unsupported,
+        _ => XmlError::Syntax,
+    };
+    (k, e.at)
+}
+
+fn attr<'a>(a: xml::Attr<'a>) -> Attr<'a> {
+    let ns = if a.ns == xml::NS_XMLNS { Ns::Decl } else { ns_of(&a.ns) };
+    Attr { qname: a.qname, local: a.local, ns, value: a.value }
 }
 
 impl<'a> Reader<'a> {
     /// a reader of `s` with at most `depth` open elements and `attrs` attributes per element
     pub fn new(s: &'a str, depth: usize, attrs: usize) -> Self {
-        Reader { s, pos: 0, open: Vec::new(), bindings: Vec::new(), max_depth: depth, max_attrs: attrs, pending_end: None, root_seen: false }
+        Reader { r: xml::Reader::new(s, depth, attrs) }
     }
 
     /// the offset the reader is at
     pub fn pos(&self) -> usize {
-        self.pos
+        self.r.pos()
     }
 
     /// the source text
     pub fn src(&self) -> &'a str {
-        self.s
+        self.r.src()
     }
 
-    fn err<T>(&self, e: XmlError) -> XmlResult<T> {
-        Err((e, self.pos))
-    }
-
-    fn rest(&self) -> &'a str {
-        &self.s[self.pos..]
-    }
-
-    fn skip_space(&mut self) {
-        let b = self.s.as_bytes();
-        while self.pos < b.len() && is_space(b[self.pos]) {
-            self.pos += 1;
-        }
-    }
-
-    fn name(&mut self) -> XmlResult<&'a str> {
-        let b = self.s.as_bytes();
-        let start = self.pos;
-        while self.pos < b.len() && !name_end(b[self.pos]) {
-            self.pos += 1;
-        }
-        let n = &self.s[start..self.pos];
-        let name_char = |c: u8| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'-' | b'.' | b':') || c >= 0x80;
-        if !n.bytes().all(name_char) || n.contains(['\u{fffe}', '\u{ffff}']) {
-            return self.err(XmlError::Syntax);
-        }
-        let first = n.as_bytes().first().copied();
-        if n.is_empty() || matches!(first, Some(b'0'..=b'9' | b'-' | b'.' | b':')) || n.ends_with(':') || n.matches(':').count() > 1 {
-            return self.err(XmlError::Syntax);
-        }
-        Ok(n)
-    }
-
-    // the namespace bound to a prefix ("" = default)
-    fn lookup(&self, prefix: &str) -> Option<Ns> {
-        if prefix == "xml" {
-            return Some(Ns::Xml);
-        }
-        match self.bindings.iter().rev().find(|b| b.prefix == prefix) {
-            Some(b) => Some(b.ns),
-            None if prefix.is_empty() => Some(Ns::None),
-            None => None,
-        }
-    }
-
-    // the XML declaration: version, encoding (UTF-8 or UTF-16 only), standalone
-    fn declaration(&mut self) -> XmlResult<()> {
-        let Some(end) = self.rest().find("?>") else { return self.err(XmlError::Syntax) };
-        let body = &self.s[self.pos + 5..self.pos + end];
-        if let Some(i) = body.find("encoding") {
-            let v = body[i + 8..].trim_start().strip_prefix('=').map(str::trim_start).unwrap_or("");
-            let q = v.as_bytes().first().copied();
-            let val = match q {
-                Some(c @ (b'"' | b'\'')) => v[1..].split(c as char).next().unwrap_or(""),
-                _ => return self.err(XmlError::Syntax),
-            };
-            if !val.eq_ignore_ascii_case("utf-8") && !val.eq_ignore_ascii_case("utf-16") {
-                return self.err(XmlError::Unsupported);
-            }
-        }
-        self.pos += end + 2;
-        Ok(())
-    }
-
-    /// the next event
+    /// the next event (comments and processing instructions are skipped, CDATA is text)
     pub fn next(&mut self) -> XmlResult<Event<'a>> {
-        if let Some(end) = self.pending_end.take() {
-            self.close();
-            return Ok(Event::End { end });
-        }
         loop {
-            if self.pos >= self.s.len() {
-                if !self.open.is_empty() || !self.root_seen {
-                    return self.err(XmlError::Syntax);
-                }
-                return Ok(Event::Eof);
-            }
-            let rest = self.rest();
-            if !rest.starts_with('<') {
-                let start = self.pos;
-                let n = rest.find('<').unwrap_or(rest.len());
-                self.pos += n;
-                let raw = &self.s[start..self.pos];
-                if self.open.is_empty() {
-                    if !is_blank(raw) {
-                        self.pos = start;
-                        return self.err(XmlError::Syntax);
-                    }
-                    continue;
-                }
-                if raw.contains(']') && raw.contains("]]>") {
-                    self.pos = start;
-                    return self.err(XmlError::Syntax);
-                }
-                return match unescape(raw, false) {
-                    Some(t) => Ok(Event::Text(t)),
-                    None => {
-                        self.pos = start;
-                        self.err(XmlError::Syntax)
-                    }
-                };
-            }
-            if rest.starts_with("<?") {
-                if rest.starts_with("<?xml") && rest.as_bytes().get(5).is_some_and(|&c| is_space(c)) {
-                    if self.pos != 0 {
-                        return self.err(XmlError::Syntax);
-                    }
-                    self.declaration()?;
-                    continue;
-                }
-                // a processing instruction: a target that is a name and not "xml" in any case
-                let Some(e) = rest.find("?>") else { return self.err(XmlError::Syntax) };
-                let body = &rest[2..e];
-                let target = body.split(|c: char| c.is_ascii_whitespace()).next().unwrap_or("");
-                if target.is_empty() || target.eq_ignore_ascii_case("xml") || bad_chars(body) {
-                    return self.err(XmlError::Syntax);
-                }
-                self.pos += e + 2;
-                continue;
-            }
-            if rest.starts_with("<!--") {
-                let Some(e) = rest[4..].find("-->") else { return self.err(XmlError::Syntax) };
-                let body = &rest[4..4 + e];
-                if bad_chars(body) || body.contains("--") || body.ends_with('-') {
-                    return self.err(XmlError::Syntax);
-                }
-                self.pos += 4 + e + 3;
-                continue;
-            }
-            if rest.starts_with("<![CDATA[") {
-                if self.open.is_empty() {
-                    return self.err(XmlError::Syntax);
-                }
-                let Some(e) = rest[9..].find("]]>") else { return self.err(XmlError::Syntax) };
-                let raw = &rest[9..9 + e];
-                if bad_chars(raw) {
-                    return self.err(XmlError::Syntax);
-                }
-                self.pos += 9 + e + 3;
-                let t = if raw.contains('\r') {
-                    Cow::Owned(raw.replace("\r\n", "\n").replace('\r', "\n"))
-                } else {
-                    Cow::Borrowed(raw)
-                };
-                return Ok(Event::Text(t));
-            }
-            if rest.starts_with("<!") {
-                // DOCTYPE and every other declaration: no entities, nothing external
-                return self.err(XmlError::Unsupported);
-            }
-            if rest.starts_with("</") {
-                return self.end_tag();
-            }
-            return self.start_tag();
+            return Ok(match self.r.next().map_err(kind)? {
+                xml::Event::Start(s) => Event::Start(Start {
+                    qname: s.qname,
+                    local: s.local,
+                    ns: ns_of(&s.ns),
+                    attrs: s.attrs.into_iter().map(attr).collect(),
+                    empty: s.empty,
+                    at: s.at,
+                    end: s.end,
+                }),
+                xml::Event::End { end } => Event::End { end },
+                xml::Event::Text(t) | xml::Event::CData(t) => Event::Text(t),
+                xml::Event::Eof => Event::Eof,
+                // comments, processing instructions
+                _ => continue,
+            });
         }
-    }
-
-    fn close(&mut self) {
-        let depth = self.open.len();
-        while self.bindings.last().is_some_and(|b| b.depth == depth) {
-            self.bindings.pop();
-        }
-        self.open.pop();
-    }
-
-    fn end_tag(&mut self) -> XmlResult<Event<'a>> {
-        self.pos += 2;
-        let name = self.name()?;
-        self.skip_space();
-        if !self.rest().starts_with('>') || self.open.last() != Some(&name) {
-            return self.err(XmlError::Syntax);
-        }
-        self.pos += 1;
-        self.close();
-        Ok(Event::End { end: self.pos })
-    }
-
-    fn start_tag(&mut self) -> XmlResult<Event<'a>> {
-        let at = self.pos;
-        if self.open.is_empty() && self.root_seen {
-            return self.err(XmlError::Syntax);
-        }
-        self.pos += 1;
-        let qname = self.name()?;
-        let mut raw: Vec<(&'a str, &'a str)> = Vec::new();
-        let empty;
-        loop {
-            let before = self.pos;
-            self.skip_space();
-            let rest = self.rest();
-            if rest.starts_with("/>") {
-                self.pos += 2;
-                empty = true;
-                break;
-            }
-            if rest.starts_with('>') {
-                self.pos += 1;
-                empty = false;
-                break;
-            }
-            if self.pos == before || rest.is_empty() {
-                return self.err(XmlError::Syntax);
-            }
-            let n = self.name()?;
-            self.skip_space();
-            if !self.rest().starts_with('=') {
-                return self.err(XmlError::Syntax);
-            }
-            self.pos += 1;
-            self.skip_space();
-            let q = match self.rest().as_bytes().first() {
-                Some(&c @ (b'"' | b'\'')) => c as char,
-                _ => return self.err(XmlError::Syntax),
-            };
-            self.pos += 1;
-            let Some(e) = self.rest().find(q) else { return self.err(XmlError::Syntax) };
-            let v = &self.s[self.pos..self.pos + e];
-            if v.contains('<') {
-                return self.err(XmlError::Syntax);
-            }
-            self.pos += e + 1;
-            if raw.len() >= self.max_attrs {
-                return self.err(XmlError::Attributes);
-            }
-            raw.push((n, v));
-        }
-        let end = self.pos;
-        if self.open.len() >= self.max_depth {
-            self.pos = at;
-            return self.err(XmlError::Depth);
-        }
-        // duplicate attributes (sorted when there are many: no quadratic time)
-        if raw.len() <= 8 {
-            for i in 0..raw.len() {
-                if raw[..i].iter().any(|(n, _)| *n == raw[i].0) {
-                    self.pos = at;
-                    return self.err(XmlError::Syntax);
-                }
-            }
-        } else {
-            let mut names: Vec<&str> = raw.iter().map(|(n, _)| *n).collect();
-            names.sort_unstable();
-            if names.windows(2).any(|w| w[0] == w[1]) {
-                self.pos = at;
-                return self.err(XmlError::Syntax);
-            }
-        }
-        self.open.push(qname);
-        self.root_seen = true;
-        let depth = self.open.len();
-        // the declarations first: they apply to the element's own name and attributes
-        let mut attrs = Vec::with_capacity(raw.len());
-        for &(n, v) in &raw {
-            let Some(value) = unescape(v, true) else {
-                self.pos = at;
-                return self.err(XmlError::Syntax);
-            };
-            if n == "xmlns" || n.starts_with("xmlns:") {
-                let prefix = n.strip_prefix("xmlns:").unwrap_or("");
-                // xml only to its own namespace, xmlns never; no other prefix to those two
-                let reserved = value == NS_XML || value == NS_XMLNS;
-                let bad = match prefix {
-                    "xml" => value != NS_XML,
-                    "xmlns" => true,
-                    "" => reserved,
-                    _ => reserved || value.is_empty(),
-                };
-                if bad {
-                    self.pos = at;
-                    return self.err(XmlError::Syntax);
-                }
-                if prefix != "xml" {
-                    if self.bindings.len() >= MAX_BINDINGS {
-                        self.pos = at;
-                        return self.err(XmlError::Attributes);
-                    }
-                    self.bindings.push(Binding { prefix, ns: ns_of(&value), depth });
-                }
-            }
-            attrs.push(Attr { qname: n, local: n, ns: Ns::None, value });
-        }
-        for a in &mut attrs {
-            if a.qname == "xmlns" || a.qname.starts_with("xmlns:") {
-                a.ns = Ns::Decl;
-                a.local = a.qname.strip_prefix("xmlns:").unwrap_or("");
-            } else if let Some((p, l)) = a.qname.split_once(':') {
-                let Some(ns) = self.lookup(p) else {
-                    self.pos = at;
-                    return self.err(XmlError::Syntax);
-                };
-                a.ns = ns;
-                a.local = l;
-            }
-        }
-        let (prefix, local) = qname.split_once(':').unwrap_or(("", qname));
-        let Some(ns) = self.lookup(prefix) else {
-            self.pos = at;
-            return self.err(XmlError::Syntax);
-        };
-        if empty {
-            self.pending_end = Some(end);
-        }
-        Ok(Event::Start(Start { qname, local, ns, attrs, empty, at, end }))
     }
 
     /// the rest of the element `start` (just returned by next), as the file wrote it
     pub fn skip(&mut self, start: &Start<'a>) -> XmlResult<&'a str> {
-        let mut depth = 0usize;
-        loop {
-            match self.next()? {
-                Event::Start(_) => depth += 1,
-                Event::End { end, .. } => {
-                    if depth == 0 {
-                        return Ok(&self.s[start.at..end]);
-                    }
-                    depth -= 1;
-                }
-                Event::Text(..) => {}
-                Event::Eof => return self.err(XmlError::Syntax),
-            }
-        }
+        self.r.skip(start.at).map_err(kind)
     }
 }

@@ -398,6 +398,9 @@ pub const JDF_NO_ORIENT: u32 = 2; // keep the stored orientation
 pub const JDF_RGB: u32 = 4; // 3 components are R, G, B (TIFF Photometric 2)
 pub const JDF_YCC: u32 = 8; // 3 components are YCbCr (Photometric 6)
 pub const JDF_CMYK: u32 = 16; // 4 components are plain CMYK (Photometric 5)
+/// 4 components: the samples as stored (C, M, Y, K; a YCCK image's CMY after the YCC step) in the
+/// bytes R, G, B and A instead of RGB, for a caller with its own CMYK conversion (a PDF page)
+pub const JDF_RAW_CMYK: u32 = 32;
 pub const PNG_IOM: u32 = IOM_BITDEPTH | IOM_DITHER | IOM_ATHRESH | IOM_EFFORT | IOM_ICC | IOM_EXIF | IOM_XMP;
 pub const JPEG_IOM: u32 = IOM_QUALITY | IOM_CHROMA | IOM_ICC | IOM_EXIF | IOM_XMP;
 pub const BMP_IOM: u32 = IOM_BITDEPTH | IOM_DITHER;

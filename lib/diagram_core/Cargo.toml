@@ -18,6 +18,7 @@ doctest = false
 workspace = true
 
 [dependencies]
+formats.workspace = true
 
 # docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
 # of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)

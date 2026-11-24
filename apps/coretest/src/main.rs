@@ -17,7 +17,8 @@
 // Console program; exit code 1 when a check fails.
 //
 //   python build_rs.py app coretest
-//   build/win/coretest.exe [--only NAME] [--bench] [--vectors FILE]  (FILE: tools/crypto_check.py)
+//   build/win/coretest.exe [--only NAME] [--bench] [--vectors FILE]  (FILE: tools/crypto_check.py,
+//                                     tools/wycheproof_check.py, tools/limbo_check.py)
 //   (build_rs.py test runs it through tests/all.uis; --script is ignored)
 //   Android (docs/ANDROID.md, AN0): a program without a UI, python tools/android_console.py coretest;
 //   the groups and parts that need what plat lacks there so far (fs, net: AN2, AN3) say "not on
@@ -41,8 +42,11 @@ mod dnst;
 mod dt;
 #[cfg(not(target_os = "android"))]
 mod httpt;
+mod charsett;
 mod jmapt;
+mod xmlt;
 mod lz;
+mod lzs;
 mod metricst;
 mod netpktt;
 mod ntpt;
@@ -54,6 +58,12 @@ mod sshd;
 mod store;
 #[cfg(not(target_os = "android"))]
 mod tlst;
+#[cfg(not(target_os = "android"))]
+mod tlsweb;
+#[cfg(not(target_os = "android"))]
+mod tlsres;
+#[cfg(not(target_os = "android"))]
+mod suitevec;
 mod sshcoret;
 mod cookiet;
 #[cfg(not(target_os = "android"))]
@@ -140,13 +150,26 @@ fn run() -> i32 {
             _ => 2,
         };
     }
-    if let Some(op) = plat::arg_value("--zstd") {
-        let rest: alloc::vec::Vec<String> = args.iter().skip_while(|a| a.as_str() != "--zstd").skip(2).cloned().collect();
+    if let Some(fmt) = plat::arg_value("--stream") {
+        let rest: alloc::vec::Vec<String> = args.iter().skip_while(|a| a.as_str() != "--stream").skip(2).cloned().collect();
         return match rest.as_slice() {
-            [i, o, l, ..] => lz::zstd_file_mode(&op, i, o, l.parse().unwrap_or(3)),
-            [i, o] => lz::zstd_file_mode(&op, i, o, 3),
+            [op, i, o, l, ..] => lzs::file_mode(&fmt, op, i, o, l.parse().unwrap_or(6)),
+            [op, i, o] => lzs::file_mode(&fmt, op, i, o, match fmt.as_str() {
+                "zstd" => 3,
+                "brotli" => compress::brotli::LEVEL_DEFAULT,
+                _ => 6,
+            }),
             _ => 2,
         };
+    }
+    if let Some(op) = plat::arg_value("--zstd") {
+        let rest: alloc::vec::Vec<String> = args.iter().skip_while(|a| a.as_str() != "--zstd").skip(2).cloned().collect();
+        return lz::zstd_args(&op, &rest);
+    }
+    if args.iter().any(|a| a == "--encoding") {
+        let Some(op) = plat::arg_value("--encoding") else { return 2 };
+        let rest: alloc::vec::Vec<String> = args.iter().skip_while(|a| a.as_str() != "--encoding").skip(2).cloned().collect();
+        return charsett::cli(&op, &rest);
     }
     #[cfg(not(target_os = "android"))]
     if let Some(code) = server_modes(&args) {
@@ -156,16 +179,21 @@ fn run() -> i32 {
         ("datetime", Some(dt::run)),
         ("crypto", Some(crypto::run)),
         ("compress", Some(lz::run)),
+        ("stream", Some(lzs::run)),
         ("plat", Some(platx::run)), // (Android: sync and rand, AN1)
         native!("datastore", store::run),
         native!("http", httpt::run),
         native!("cas", cast::run),
         native!("tls", tlst::run),
+        native!("tlsweb", tlsweb::run),
+        native!("tlsres", tlsres::run),
         native!("ssh", sshd::run),
         native!("dns", dnst::run),
         ("netpkt", Some(netpktt::run)),
         ("rng", Some(rngt::run)),
         ("jmap", Some(jmapt::run)),
+        ("charsets", Some(charsett::run)),
+        ("xml", Some(xmlt::run)),
         ("dhcp", Some(dhcpt::run)),
         ("dnsmsg", Some(dnsmsgt::run)),
         ("ntp", Some(ntpt::run)),
@@ -220,8 +248,14 @@ fn server_modes(args: &[String]) -> Option<i32> {
     if let Some(p) = plat::arg_value("--tls-serve").and_then(|p| p.parse().ok()) {
         return Some(tlst::serve(p, args.iter().any(|a| a == "--mtls")));
     }
+    if let Some(p) = plat::arg_value("--tls-echo").and_then(|p| p.parse().ok()) {
+        return Some(tlst::echo(p));
+    }
     if let Some(p) = plat::arg_value("--tls-get").and_then(|p| p.parse().ok()) {
         return Some(tlst::get(&plat::arg_value("--host").unwrap_or_else(|| String::from("localhost")), p, args.iter().any(|a| a == "--mtls")));
+    }
+    if let Some(p) = plat::arg_value("--tls-anvil-client").and_then(|p| p.parse().ok()) {
+        return Some(tlst::anvil_client(p));
     }
     if let Some(u) = plat::arg_value("--tls-web") {
         return Some(tlst::web(&u, plat::arg_value("--ca").as_deref()));

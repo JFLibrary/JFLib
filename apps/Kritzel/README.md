@@ -10,7 +10,8 @@ more image formats, layered PDN documents, effects, and plugins, see
 
 ![Kritzel with the WinUI style, drawing toolbar, color palette, and a canvas containing text and shapes](../../docs/images/readme/kritzel-winui.png)
 
-*Kritzel with the WinUI style and light theme. The current app UI uses German labels.*
+*Kritzel with the WinUI style and light theme, here with its German labels. The app follows the
+user's language: German or English (`locales/ui.tsv`).*
 
 ## Features
 
@@ -107,8 +108,7 @@ style = { package = "jflib-style-classic", path = "../../styles/classic" }
   BMP, and GIF exports are flattened. A dedicated project format is not implemented.
 - **More file formats:** the Open/Save workflow currently exposes only the four
   core formats above; wider format support is available in JFPainter.
-- **Localization and accessibility:** the current UI uses German labels;
-  accessibility remains a shared [JFLib TODO](../../Todo.md).
+- **Accessibility:** remains a shared [JFLib TODO](../../Todo.md).
 - **Plugins:** Kritzel has no plugin host. Work on original paint.net plugin
   compatibility belongs to [JFPainter](https://github.com/JFLibrary/JFPainter#original-paintnet-plugins).
 

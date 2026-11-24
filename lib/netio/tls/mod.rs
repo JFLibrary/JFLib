@@ -1,13 +1,21 @@
-// tls -- TLS between a program's own servers and clients and to public servers (RFC 8446, 5246)
+// tls -- TLS 1.3 servers and clients, and TLS 1.2 towards public servers (RFC 8446, 5246)
 //
-//   Own deployments (both sides): TLS 1.3, TLS_CHACHA20_POLY1305_SHA256 · X25519 · Ed25519
-//   certificates (own CA) · mutual authentication · HelloRetryRequest · KeyUpdate.
-//   Public servers (client side, Trust::System): also TLS_AES_128_GCM_SHA256, RSA / ECDSA
-//   certificates of the system's CAs, and TLS 1.2 with ECDHE (X25519) and AEAD suites.
-//   Not here: PSK / resumption, 0-RTT, renegotiation, revocation checks.
+//   Both sides: TLS 1.3 · ChaCha20-Poly1305, AES-128-GCM, AES-256-GCM · X25519MLKEM768
+//   (post-quantum hybrid), X25519, P-256, P-384 · certificates and keys of Ed25519, ECDSA
+//   (P-256 / P-384) and RSA (the web PKI or a CA of one's own) · mutual authentication ·
+//   HelloRetryRequest · KeyUpdate · resumption with session tickets (psk_dhe_ke) · 0-RTT with
+//   replay protection (opt-in).
+//   Public servers (client side, Trust::System / Custom): also TLS 1.2 with ECDHE and AEAD suites.
+//   Not here: external PSKs, psk_ke, TLS 1.2 resumption, renegotiation, revocation checks.
 //
 //   connect(stream, ClientConfig) -> TlsStream     accept(stream, ServerConfig) -> TlsStream
 //   TlsStream implements Stream (HTTP runs over it unchanged); peer_certs() after the handshake
+//   Resumption: ServerConfig::tickets (Tickets: keys, lifetime), ClientConfig::sessions
+//   (Sessions: a client's tickets per server); TlsStream::resumed()
+//   0-RTT: ServerConfig::early_data (bytes; 0 = none), connect_early(stream, cfg, data) ->
+//   (TlsStream, bytes taken), TlsStream::read_early (a server: data that may be a replay)
+//   Identity::new(chain, key) / Identity::from_pem(certs, key): a chain and its key (PrivateKey:
+//   Ed25519, ECDSA, RSA; PKCS #8, SEC 1, PKCS #1)
 //   Trust::Anchors(CAs) / Pinned(SHA-256 of the leaf) / Any (trust on first use: the caller
 //   shows the fingerprint and pins it) / System(extra CAs) (the operating system's CAs)
 //
@@ -15,27 +23,56 @@
 
 pub mod conn;
 pub mod keysched;
+pub mod kx;
 pub mod record;
+pub mod session;
 
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use crypto::ed25519::Keypair;
 use plat::net::{NetError, NetErrorKind, NetResult};
 use plat::sync::Mutex;
 
-use crate::x509::Cert;
+use crate::x509::{Cert, PrivateKey};
 use crate::Stream;
 
 pub use conn::Conn;
+pub use session::{ReplayCheck, Sessions, Tickets};
 
-/// a certificate chain (DER, leaf first) and the leaf's private key
+/// a certificate chain (DER, leaf first) and the leaf's private key (Ed25519, ECDSA, RSA)
 #[derive(Clone)]
 pub struct Identity {
     pub chain: Vec<Vec<u8>>,
-    pub key: Keypair,
+    pub key: PrivateKey,
+}
+
+impl Identity {
+    /// a chain (DER, leaf first) and its key (an ed25519::Keypair or an x509::PrivateKey)
+    pub fn new(chain: Vec<Vec<u8>>, key: impl Into<PrivateKey>) -> Identity {
+        Identity { chain, key: key.into() }
+    }
+
+    /// from PEM: the certificates (leaf first, as a CA hands them out) and the key ("PRIVATE
+    /// KEY", "EC PRIVATE KEY" or "RSA PRIVATE KEY"; not an encrypted one); the key must be the
+    /// leaf's
+    pub fn from_pem(certs: &str, key: &str) -> Result<Identity, String> {
+        let chain = crate::pem::decode_all(certs, "CERTIFICATE");
+        let leaf = chain.first().and_then(|c| Cert::parse(c)).ok_or_else(|| String::from("no certificate"))?;
+        let der = ["PRIVATE KEY", "EC PRIVATE KEY", "RSA PRIVATE KEY"].iter().find_map(|l| crate::pem::decode(key, l));
+        let Some(mut der) = der else {
+            return Err(String::from(if key.contains("ENCRYPTED") { "an encrypted key (decrypt it first)" } else { "no private key" }));
+        };
+        let k = PrivateKey::from_der(&der);
+        crypto::zeroize(&mut der);
+        let k = k.ok_or_else(|| String::from("a private key of a kind not taken here"))?;
+        if k.public_key() != leaf.key {
+            return Err(String::from("the key is not the certificate's"));
+        }
+        Ok(Identity { chain, key: k })
+    }
 }
 
 #[derive(Clone)]
@@ -50,8 +87,18 @@ pub enum Trust {
     /// the operating system's certificate authorities, and these as well (a company CA);
     /// allows TLS 1.2 and the public suites (crate::roots)
     System(Vec<Cert>),
+    /// a check the program brings (a PKI of its own, keys pinned by their SPKI, Certificate
+    /// Transparency, the platform's verifier, a test peer); a client offers with it what it
+    /// offers with System (TLS 1.2, the public suites)
+    Custom(Verifier),
 }
 
+/// the check of Trust::Custom: the certificates the peer sent that could be read (leaf first),
+/// the name the client asked for ("" for a client's certificate) and the time (Unix seconds) ->
+/// Ok, or why they are refused (the handshake ends with bad_certificate)
+pub type Verifier = Arc<dyn Fn(&[Cert], &str, i64) -> Result<(), String> + Send + Sync>;
+
+/// a client's side: `ClientConfig { identity: Some(id), ..ClientConfig::new(trust, "host") }`
 #[derive(Clone)]
 pub struct ClientConfig {
     pub trust: Trust,
@@ -59,16 +106,89 @@ pub struct ClientConfig {
     /// the name the certificate must carry (DNS name or IP address); may be empty only with
     /// Trust::Pinned / Trust::Any, which do not check it
     pub server_name: String,
+    /// the application protocols to offer (ALPN, RFC 7301: "h2", "http/1.1", "acme-tls/1"),
+    /// in order of preference; the server's choice is TlsStream::alpn.  An empty name or one
+    /// over 255 bytes is left out, and the names after the first 8 KiB of them; none left: no
+    /// ALPN offered
+    pub alpn: Vec<String>,
+    /// session tickets to resume with (TLS 1.3): the connection offers one of this server and
+    /// keeps the ones it gets.  Several configs may share a cache: it keeps the tickets by
+    /// server name, trust and client identity.  None: no resumption
+    pub sessions: Option<Arc<Sessions>>,
 }
 
+impl ClientConfig {
+    /// this trust and server name; no client certificate, no ALPN, no resumption
+    pub fn new(trust: Trust, server_name: &str) -> ClientConfig {
+        ClientConfig { trust, identity: None, server_name: String::from(server_name), alpn: Vec::new(), sessions: None }
+    }
+}
+
+/// what a ClientHello asks for: the program's ServerConfig::select picks the identity by it
+#[derive(Clone, Debug)]
+pub struct Hello {
+    /// the name of server_name (SNI), lower case; empty: none
+    pub server_name: String,
+    /// the application protocols offered (ALPN), as the client sent them: byte strings
+    /// (RFC 7301 3.1), b"h2", b"http/1.1"
+    pub alpn: Vec<Vec<u8>>,
+    /// the signature schemes the client takes (TLS code points)
+    pub sig_algs: Vec<u16>,
+}
+
+/// ServerConfig::select: the identity for a ClientHello, or None for the configured ones
+pub type Select = Arc<dyn Fn(&Hello) -> Option<Identity> + Send + Sync>;
+
+/// a server's side: `ServerConfig { client_auth: Some(trust), ..ServerConfig::new(identity) }`
 #[derive(Clone)]
 pub struct ServerConfig {
     pub identity: Identity,
+    /// more certificates (SNI: other names; or other key types for the same name, as an ECDSA
+    /// and an RSA certificate): the server shows the first of these and then `identity` that
+    /// names the server_name the client asked for and whose key makes a signature the client
+    /// takes; without such one `identity`, or the first whose key fits when its key does not
+    pub identities: Vec<Identity>,
+    /// a choice of the program's own, asked before the lists (certificates renewed while the
+    /// server runs, ACME's tls-alpn-01 challenge); None from it: the lists decide
+    pub select: Option<Select>,
     /// ask for a client certificate trusted like this
     pub client_auth: Option<Trust>,
     /// a client without a certificate is accepted too (one that sends one must pass the
     /// check); for a port that consoles and agents share
     pub client_auth_optional: bool,
+    /// the application protocols the server speaks (ALPN), in its order of preference; a
+    /// client that offers protocols, none of them these, is refused (no_application_protocol,
+    /// RFC 7301 3.2).  Empty: ALPN is not answered
+    pub alpn: Vec<String>,
+    /// session tickets (TLS 1.3 resumption): sent after each handshake and taken back for a
+    /// handshake without certificates.  A resumed connection keeps the client certificates of
+    /// its first handshake (peer_certs) for up to 7 days, while the same client_auth trust asks
+    /// for them and takes them again (each resumption checks them).  None: no tickets
+    pub tickets: Option<Arc<Tickets>>,
+    /// 0-RTT (needs tickets): the most bytes of early data a client may send with a ticket; 0
+    /// (the default): none.  A ticket that allows more than the server takes now is resumed
+    /// without 0-RTT.  Early data can be replayed by an attacker (RFC 8446 8, E.5): the
+    /// server takes it only from a ClientHello within 10 seconds of the ticket's age and the
+    /// first time it comes (Tickets::replay_check), keeps it apart (TlsStream::read_early) and
+    /// hands it to read() only once the handshake is done.  With 0-RTT taken, accept returns
+    /// after the server's flight, before the client's Finished
+    pub early_data: u32,
+}
+
+impl ServerConfig {
+    /// this identity; no client certificates, no ALPN, no tickets
+    pub fn new(identity: Identity) -> ServerConfig {
+        ServerConfig {
+            identity,
+            identities: Vec::new(),
+            select: None,
+            client_auth: None,
+            client_auth_optional: false,
+            alpn: Vec::new(),
+            tickets: None,
+            early_data: 0,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -102,6 +222,7 @@ pub fn alert_name(a: u8) -> String {
         conn::AL_CERTIFICATE_REQUIRED => "Client-Zertifikat erforderlich",
         conn::AL_DECRYPT_ERROR => "Prüfsumme falsch",
         conn::AL_PROTOCOL_VERSION => "TLS-Version nicht unterstützt",
+        conn::AL_NO_APPLICATION_PROTOCOL => "kein gemeinsames Anwendungsprotokoll (ALPN)",
         _ => return format!("TLS-Alert {}", a),
     })
 }
@@ -158,7 +279,7 @@ impl TlsStream {
             self.flush()?;
             {
                 let c = self.conn.lock();
-                if c.established() {
+                if c.ready() {
                     return Ok(());
                 }
                 if c.closed() {
@@ -194,6 +315,61 @@ impl TlsStream {
         let c = self.conn.lock();
         (c.version(), c.suite())
     }
+
+    /// the key exchange group (kx: X25519_MLKEM768, X25519, SECP256R1 ...)
+    pub fn group(&self) -> u16 {
+        self.conn.lock().group()
+    }
+
+    /// the application protocol both sides agreed on (ALPN), if any
+    pub fn alpn(&self) -> Option<String> {
+        self.conn.lock().alpn().map(String::from)
+    }
+
+    /// a server: the name the client asked for (SNI, lower case; empty: none)
+    pub fn server_name(&self) -> String {
+        String::from(self.conn.lock().server_name())
+    }
+
+    /// the handshake resumed a session (a ticket instead of certificates)
+    pub fn resumed(&self) -> bool {
+        self.conn.lock().resumed()
+    }
+
+    /// a server that took 0-RTT: the client's early data as it comes, before the handshake is
+    /// done; Ok(0) at its end (or when none was taken).  An attacker may have replayed it
+    /// (RFC 8446 8): act on it only where twice does no harm (RFC 8470).  What is not read here
+    /// comes first from read() once the handshake is done
+    pub fn read_early(&self, buf: &mut [u8]) -> NetResult<usize> {
+        let mut raw = alloc::vec![0u8; 16 * 1024 + 512];
+        let t0 = plat::time_us();
+        let read_ms = self.read_ms.load(core::sync::atomic::Ordering::Relaxed);
+        loop {
+            {
+                let mut c = self.conn.lock();
+                if c.has_early() {
+                    return Ok(c.read_early(buf));
+                }
+                if !c.in_early() || c.closed() {
+                    return Ok(0);
+                }
+            }
+            // records without data (empty ones) do not keep it going past the timeout, as read
+            if read_ms != u32::MAX && plat::time_us().saturating_sub(t0) >= read_ms as u64 * 1000 {
+                return Err(NetError::new(NetErrorKind::TimedOut, 0));
+            }
+            let n = self.inner.read(&mut raw)?;
+            if n == 0 {
+                return Ok(0);
+            }
+            let r = self.conn.lock().feed(&raw[..n]);
+            let _ = self.flush();
+            if let Err(e) = r {
+                *self.last_error.lock() = Some(e);
+                return Err(to_net(e));
+            }
+        }
+    }
 }
 
 /// client side: handshake over `inner`
@@ -201,6 +377,19 @@ pub fn connect(inner: Box<dyn Stream>, cfg: ClientConfig) -> Result<TlsStream, T
     let s = TlsStream::new(inner, Conn::client(cfg));
     s.handshake()?;
     Ok(s)
+}
+
+/// client side with 0-RTT: `early` goes right after the ClientHello when a ticket of
+/// cfg.sessions allows early data (as much as the ticket takes).  -> the stream and the bytes of
+/// `early` the server took: 0 when none went (no such ticket) or the server refused them; the
+/// caller sends the rest with write_all, if it still applies (TlsStream::alpn may differ: RFC
+/// 8446 4.2.10).  Early data can be replayed by an attacker: only for requests that do no harm
+/// twice
+pub fn connect_early(inner: Box<dyn Stream>, cfg: ClientConfig, early: &[u8]) -> Result<(TlsStream, usize), TlsError> {
+    let s = TlsStream::new(inner, Conn::client_early(cfg, early));
+    s.handshake()?;
+    let n = s.conn.lock().early_taken();
+    Ok((s, n))
 }
 
 /// server side: handshake over `inner`

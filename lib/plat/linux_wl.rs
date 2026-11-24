@@ -399,3 +399,18 @@ pub(crate) mod gpuw {
         with(|wl| wl.gpu_test_presented())
     }
 }
+
+/// (plat::fuzz) one event message decoded under every event signature of the protocol (each
+/// descriptor -1) -> how many signatures took it
+pub(crate) fn fuzz_args(msg: &[u8]) -> usize {
+    let mut ok = 0;
+    for i in proto::ALL_IFACES.iter() {
+        for e in i.evs {
+            let sig = e.sig.split_once(':').map_or("", |x| x.1);
+            if wire::decode_args(sig, msg, || Some(-1)).is_ok() {
+                ok += 1;
+            }
+        }
+    }
+    ok
+}

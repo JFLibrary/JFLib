@@ -242,7 +242,7 @@ fn listen_of(c: &Config) -> SocketAddr {
 
 /// the TLS layer of the agent's port: only the server's client certificate gets through
 fn tls_wrap(p: &config::Paired) -> Wrap {
-    let cfg = tls::ServerConfig { identity: p.identity.clone(), client_auth: Some(Trust::Anchors(alloc::vec![p.ca.clone()])), client_auth_optional: false };
+    let cfg = tls::ServerConfig { client_auth: Some(Trust::Anchors(alloc::vec![p.ca.clone()])), ..tls::ServerConfig::new(p.identity.clone()) };
     Arc::new(move |tcp: TcpStream| {
         let s = tls::accept(Box::new(tcp), cfg.clone()).ok()?;
         let server = s.peer_certs().first().is_some_and(|c| c.subject_cn == SERVER_CN);

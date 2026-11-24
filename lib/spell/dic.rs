@@ -10,6 +10,13 @@
 // Hunspell: "KDF" is checked as "Kdf", "Kdf" typed is not a word (check.rs).  Only when the
 // Title form is no word of its own: a hidden entry is dropped for a real one ("Hf" beside
 // "HF/SM": "HFS" stays wrong), and a real one coming later takes its place.
+//
+// The hash (FNV-1a) has no key, so a .dic can be made of words that all fall on one slot.  A
+// word is therefore looked for at most PROBES slots from its own; one that finds no room there
+// goes into a sorted map beside the table (`overflow`).  Nothing is ever removed, so a lookup
+// that meets an empty slot knows the word is not there, and one that runs out of probes asks
+// the map: a load stays linear and a lookup short whatever the words are (it grew with the
+// square of the colliding words).
 
 use alloc::collections::BTreeMap;
 use alloc::string::String;
@@ -19,6 +26,8 @@ use crate::aff::{has, Aff, Flag, ONLYUPCASE};
 use crate::check::{captype, lower, title, Cap};
 
 const EMPTY: u32 = u32::MAX;
+/// slots a word is looked for from its own (beyond: `overflow`)
+const PROBES: usize = 128;
 /// the entry bits of a slot (the top 8 bits: the hash's)
 const IDX: u32 = 0x00FF_FFFF;
 
@@ -38,6 +47,8 @@ pub(crate) struct Words {
     slots: Vec<u32>, // hash tag << 24 | first entry of a chain; EMPTY
     sets: Vec<Vec<Flag>>,
     set_ids: BTreeMap<Vec<Flag>, u32>,
+    /// words without room within PROBES of their slot -> the first entry of their chain
+    overflow: BTreeMap<String, u32>,
     /// some entry has a space ("a cappella")
     pub(crate) spaced: bool,
 }
@@ -52,7 +63,7 @@ fn hash(s: &str) -> u64 {
 
 impl Words {
     pub(crate) fn new() -> Words {
-        let mut w = Words { text: String::new(), ents: Vec::new(), slots: Vec::new(), sets: Vec::new(), set_ids: BTreeMap::new(), spaced: false };
+        let mut w = Words { text: String::new(), ents: Vec::new(), slots: Vec::new(), sets: Vec::new(), set_ids: BTreeMap::new(), overflow: BTreeMap::new(), spaced: false };
         w.set_id(Vec::new()); // set 0: no flags
         w.rehash(1024);
         w
@@ -71,35 +82,51 @@ impl Words {
     fn rehash(&mut self, n: usize) {
         let n = n.next_power_of_two();
         self.slots = alloc::vec![EMPTY; n];
+        self.overflow.clear();
         let mask = n - 1;
         // newest first: a chain's head is its newest entry (`next` points to older ones)
         for i in (0..self.ents.len()).rev() {
             let e = self.ents[i];
             let w = &self.text[e.off as usize..(e.off + e.len) as usize];
-            let (s, found, tag) = self.find_slot(w, mask);
-            if !found {
-                self.slots[s] = tag | i as u32;
+            match self.place(w, mask) {
+                (Place::Slot(s, false), tag) => self.slots[s] = tag | i as u32,
+                (Place::Slot(_, true), _) => {}
+                (Place::Over, _) => {
+                    if !self.overflow.contains_key(w) {
+                        self.overflow.insert(String::from(w), i as u32);
+                    }
+                }
             }
         }
     }
 
-    // the slot of word w: (index, found, the tag bits of its hash)
-    fn find_slot(&self, w: &str, mask: usize) -> (usize, bool, u32) {
+    // where word w is or goes, and the tag bits of its hash
+    fn place(&self, w: &str, mask: usize) -> (Place, u32) {
         let h = hash(w);
         let tag = ((h >> 56) as u32) << 24;
         let mut s = h as usize & mask;
-        loop {
+        for _ in 0..PROBES.min(mask + 1) {
             let v = self.slots[s];
             if v == EMPTY {
-                return (s, false, tag);
+                return (Place::Slot(s, false), tag);
             }
             if v & !IDX == tag {
                 let e = self.ents[(v & IDX) as usize];
                 if &self.text[e.off as usize..(e.off + e.len) as usize] == w {
-                    return (s, true, tag);
+                    return (Place::Slot(s, true), tag);
                 }
             }
             s = (s + 1) & mask;
+        }
+        (Place::Over, tag)
+    }
+
+    // the first entry of w's chain
+    fn head(&self, w: &str, p: &Place) -> Option<u32> {
+        match *p {
+            Place::Slot(s, true) => Some(self.slots[s] & IDX),
+            Place::Slot(_, false) => None,
+            Place::Over => self.overflow.get(w).copied(),
         }
     }
 
@@ -116,13 +143,15 @@ impl Words {
         }
         let set = self.set_id(flags);
         let mask = self.slots.len() - 1;
-        let (s, found, tag) = self.find_slot(w, mask);
-        if found {
+        let (p, tag) = self.place(w, mask);
+        let head = self.head(w, &p);
+        let found = head.is_some();
+        if let Some(first) = head {
             if hidden {
                 return;
             }
             // the same flags again: nothing to add; a hidden entry: the real word's flags now
-            let mut i = self.slots[s] & IDX;
+            let mut i = first;
             while i != EMPTY {
                 let e = &mut self.ents[i as usize];
                 if e.set == set {
@@ -139,9 +168,14 @@ impl Words {
         self.spaced |= w.contains(' ');
         self.text.push_str(w);
         let idx = self.ents.len() as u32;
-        let next = if found { self.slots[s] & IDX } else { EMPTY };
+        let next = head.unwrap_or(EMPTY);
         self.ents.push(Ent { off, len: w.len() as u32, set, next });
-        self.slots[s] = tag | idx;
+        match p {
+            Place::Slot(s, _) => self.slots[s] = tag | idx,
+            Place::Over => {
+                self.overflow.insert(String::from(w), idx);
+            }
+        }
         if !found && self.ents.len() * 4 > self.slots.len() * 3 {
             self.rehash(self.slots.len() * 2);
         }
@@ -150,8 +184,8 @@ impl Words {
     /// the flag sets of word w (one per homonym)
     pub(crate) fn get<'a>(&'a self, w: &str) -> Homonyms<'a> {
         let mask = self.slots.len() - 1;
-        let (s, found, _) = self.find_slot(w, mask);
-        Homonyms { words: self, i: if found { self.slots[s] & IDX } else { EMPTY } }
+        let (p, _) = self.place(w, mask);
+        Homonyms { words: self, i: self.head(w, &p).unwrap_or(EMPTY) }
     }
 
     /// the number of the flag set `flags` (0: none of them; Hit::set)
@@ -178,6 +212,12 @@ impl Words {
     pub(crate) fn len(&self) -> usize {
         self.ents.len()
     }
+}
+
+/// where a word is in the table: a slot (it is there, or it goes there), or the overflow map
+enum Place {
+    Slot(usize, bool),
+    Over,
 }
 
 /// the flag sets of one word's homonyms

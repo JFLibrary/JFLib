@@ -340,7 +340,8 @@ impl<M: Movement> NetClient<M> {
                     self.phase = Phase::Closed;
                 }
             }
-            ClientEvent::Delivered(_) | ClientEvent::Lost(_) => {}
+            // (acks of packets, and the reliable channel, which the netcode does not use)
+            _ => {}
         }
     }
 

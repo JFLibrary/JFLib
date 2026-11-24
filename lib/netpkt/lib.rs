@@ -93,7 +93,8 @@
 //   cookie    SetCookie::parse, parse_date, domain_match, path_match, default_path, site_of; Jar:
 //             store, header, matching, script_text, purge, drop_session; SameSite as far as a small
 //             browser needs it; the time comes from the caller          (RFC 6265, 6265bis)
-//   x509      certificates of a private PKI (Ed25519): CertSpec::sign, Cert::parse, names, fingerprint,
+//   x509      certificates: the crate jflib-x509 (netio's as well), CertSpec as its builder's
+//             earlier name, check_chain: what is wrong with a chain as fault bits for dialogs
 //             signed_by, check_chain with F_* faults; no clock; uses crate crypto  (RFC 5280, 8410)
 //   tls       TLS 1.3 without I/O: Core for a client or a server (push bytes, take_out bytes, read,
 //             send, take_events), TLS_CHACHA20_POLY1305_SHA256, X25519, Ed25519; the key schedule,

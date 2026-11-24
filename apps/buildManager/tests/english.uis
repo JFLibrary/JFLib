@@ -1,0 +1,20 @@
+#!args --lang en --fixture apps/buildManager/tests/fixture_en.json
+# the workspace in English (src/locales/ui.tsv) with the English data of the fixture; ids as smoke.uis
+expect "Development build" exists
+click "All"
+expect "5 of 5 selected" exists
+click "None"
+expect "0 of 5 selected" exists
+shot build/manager-check/english.png
+click #2002
+expect "Verified release" exists
+click #2003
+expect "Start profile · Kritzel" exists
+click #2004
+expect "Package data · Kritzel" exists
+expect "Display name" exists
+click #2001
+click #2412
+click "Start app"
+expect "Resolved command:" exists
+click "Back"

@@ -312,33 +312,8 @@ fn offered(o: usize) -> u32 {
 
 // the paths of a DROPFILES block (wide or ANSI) -> added to the pending drop
 fn hdrop_paths(b: &[u8]) -> u32 {
-    if b.len() < DROPFILES_SIZE {
-        return 0;
-    }
-    let off = u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize;
-    let wide = u32::from_le_bytes([b[16], b[17], b[18], b[19]]) != 0;
-    if off < DROPFILES_SIZE || off > b.len() {
-        return 0;
-    }
     let mut n = 0;
-    let mut paths: Vec<String> = Vec::new();
-    if wide {
-        let units: Vec<u16> = b[off..].chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
-        for p in units.split(|&u| u == 0) {
-            if p.is_empty() || paths.len() >= FILES_MAX {
-                break; // the empty string ends the list
-            }
-            paths.push(super::super::from_wide(p));
-        }
-    } else {
-        for p in b[off..].split(|&c| c == 0) {
-            if p.is_empty() || paths.len() >= FILES_MAX {
-                break;
-            }
-            paths.push(String::from_utf8_lossy(p).into_owned());
-        }
-    }
-    for p in paths {
+    for p in crate::hdrop_list(b, FILES_MAX) {
         if crate::drop_add(&p) {
             n += 1;
         }

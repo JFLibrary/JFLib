@@ -12,6 +12,10 @@ mod disp;
 pub use disp::*;
 #[path = "linux_wl.rs"]
 mod wl;
+/// (plat::fuzz) the Wayland event arguments under every signature
+pub(crate) fn wl_fuzz_args(msg: &[u8]) -> usize {
+    wl::fuzz_args(msg)
+}
 pub use wl::*;
 #[path = "linux_x11.rs"]
 mod x11;

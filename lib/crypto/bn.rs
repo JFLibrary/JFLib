@@ -154,7 +154,7 @@ impl Mont {
     fn mul_ct(&self, a: &[u64], b: &[u64]) -> Limbs {
         let mut t = self.product(a, b);
         let mut d = t.clone();
-        let keep = sub_in(&mut d, &self.n).wrapping_neg(); // borrow: t < n, keep t
+        let keep = crate::ct_mask(sub_in(&mut d, &self.n).wrapping_neg()); // borrow: t < n, keep t
         for (x, y) in t.iter_mut().zip(&d) {
             *x = (*x & keep) | (*y & !keep);
         }
@@ -269,7 +269,7 @@ impl Mont {
                 let mut pick = vec![0u64; self.k];
                 for (i, e) in table.iter().enumerate() {
                     let d = i as u64 ^ nib as u64;
-                    let m = ((d | d.wrapping_neg()) >> 63).wrapping_sub(1); // all ones for i == nib
+                    let m = crate::ct_mask(((d | d.wrapping_neg()) >> 63).wrapping_sub(1)); // all ones for i == nib
                     for (p, x) in pick.iter_mut().zip(e) {
                         *p |= x & m;
                     }

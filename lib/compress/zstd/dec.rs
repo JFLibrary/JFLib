@@ -1,12 +1,15 @@
 // dec -- the zstd frame decoder (RFC 8878): frames and skippable frames, raw / RLE /
 // compressed blocks, raw / RLE / Huffman / treeless literals with 1 or 4 streams, sequences
 // with predefined / RLE / FSE / repeat tables, repeat offsets, content size and checksum.
-// Dictionaries are not supported (a frame that names one is refused).  Every length, offset
-// and table is checked: corrupt input gives None, never a panic or more than max_out bytes.
+// A frame that names a dictionary needs it (decompress_with_dict; dict.rs): its tables and
+// repeat offsets start the frame, its content stands before the output.  Every length,
+// offset and table is checked: corrupt input gives None, never a panic or more than max_out
+// bytes.
 
 use alloc::vec::Vec;
 
 use super::bits::BackReader;
+use super::dict::Dictionary;
 use super::fse::{self, DTable};
 use super::huf;
 use super::seq::*;
@@ -16,7 +19,7 @@ pub const MAGIC: u32 = 0xFD2F_B528;
 pub const BLOCK_MAX: usize = 128 << 10;
 
 /// what carries over from block to block inside a frame
-struct State {
+pub(super) struct State {
     huf: Option<huf::Table>,
     ll: Option<DTable>,
     of: Option<DTable>,
@@ -25,12 +28,65 @@ struct State {
     lits: Vec<u8>,
 }
 
-fn rd_le(b: &[u8]) -> u64 {
+impl State {
+    pub(super) fn new() -> State {
+        State { huf: None, ll: None, of: None, ml: None, rep: [1, 4, 8], lits: Vec::new() }
+    }
+
+    /// the state a frame with this dictionary starts in
+    pub(super) fn with(dict: Option<&Dictionary>) -> State {
+        let mut st = State::new();
+        if let Some(d) = dict {
+            st.rep = d.rep.map(|r| r as u64);
+            if let Some(e) = &d.ent {
+                st.huf = Some(e.huf.clone());
+                st.of = DTable::build(&e.of.norm, e.of.log);
+                st.ml = DTable::build(&e.ml.norm, e.ml.log);
+                st.ll = DTable::build(&e.ll.norm, e.ll.log);
+            }
+        }
+        st
+    }
+}
+
+/// the dictionary a frame header names: Ok(None) for none, Err when the frame names one that
+/// is not given.  A frame that names none takes the given one (raw content dictionaries).
+pub(super) fn pick<'a>(id: u32, dict: Option<&'a Dictionary>) -> Result<Option<&'a Dictionary>, ()> {
+    match dict {
+        Some(d) if id == 0 || d.id == id => Ok(Some(d)),
+        _ if id == 0 => Ok(None),
+        _ => Err(()),
+    }
+}
+
+pub(super) fn rd_le(b: &[u8]) -> u64 {
     b.iter().rev().fold(0u64, |a, &x| a << 8 | x as u64)
 }
 
 /// decode all frames of src -> None on corruption, unsupported features or > max_out bytes
 pub fn decompress(src: &[u8], max_out: usize) -> Option<Vec<u8>> {
+    frames(src, max_out, None)
+}
+
+/// decompress with a dictionary: frames that name it or none (None also for a frame that
+/// names another one)
+pub fn decompress_with_dict(src: &[u8], max_out: usize, dict: &Dictionary) -> Option<Vec<u8>> {
+    frames(src, max_out, Some(dict))
+}
+
+/// the dictionary ID a frame header names (None: none, or not a zstd frame)
+pub fn dictionary_id(src: &[u8]) -> Option<u32> {
+    if rd_le(src.get(..4)?) as u32 != MAGIC {
+        return None;
+    }
+    let fhd = *src.get(4)?;
+    let p = 5 + usize::from(fhd & 0x20 == 0);
+    let n = [0, 1, 2, 4][(fhd & 3) as usize];
+    let id = rd_le(src.get(p..p + n)?) as u32;
+    (id != 0).then_some(id)
+}
+
+fn frames(src: &[u8], max_out: usize, dict: Option<&Dictionary>) -> Option<Vec<u8>> {
     let mut out = Vec::new();
     let mut i = 0;
     while i < src.len() {
@@ -43,7 +99,7 @@ pub fn decompress(src: &[u8], max_out: usize) -> Option<Vec<u8>> {
         if magic != MAGIC {
             return None;
         }
-        i += frame(&src[i..], &mut out, max_out)?;
+        i += frame(&src[i..], &mut out, max_out, dict)?;
     }
     Some(out)
 }
@@ -66,7 +122,7 @@ pub fn content_size(src: &[u8]) -> Option<u64> {
     }
 }
 
-fn frame(src: &[u8], out: &mut Vec<u8>, max_out: usize) -> Option<usize> {
+fn frame(src: &[u8], out: &mut Vec<u8>, max_out: usize, dict: Option<&Dictionary>) -> Option<usize> {
     let fhd = *src.get(4)?;
     if fhd & 0x08 != 0 {
         return None; // reserved bit
@@ -82,12 +138,9 @@ fn frame(src: &[u8], out: &mut Vec<u8>, max_out: usize) -> Option<usize> {
         }
     }
     let did_size = [0, 1, 2, 4][(fhd & 3) as usize];
-    if did_size > 0 {
-        if rd_le(src.get(p..p + did_size)?) != 0 {
-            return None; // dictionaries are not supported
-        }
-        p += did_size;
-    }
+    let id = rd_le(src.get(p..p + did_size)?) as u32;
+    p += did_size;
+    let dict = pick(id, dict).ok()?;
     let fcs_size = match fhd >> 6 {
         0 => usize::from(single),
         1 => 2,
@@ -104,11 +157,17 @@ fn frame(src: &[u8], out: &mut Vec<u8>, max_out: usize) -> Option<usize> {
     } else {
         None
     };
+    // the dictionary's content stands before the frame's output while it is decoded
+    let hist = out.len();
+    if let Some(d) = dict {
+        out.extend_from_slice(&d.content);
+    }
     let start = out.len();
+    let max_out = max_out + (start - hist);
     if let Some(n) = fcs {
         out.reserve((n as usize).min(64 << 20));
     }
-    let mut st = State { huf: None, ll: None, of: None, ml: None, rep: [1, 4, 8], lits: Vec::new() };
+    let mut st = State::with(dict);
     loop {
         let h = rd_le(src.get(p..p + 3)?) as usize;
         p += 3;
@@ -136,7 +195,7 @@ fn frame(src: &[u8], out: &mut Vec<u8>, max_out: usize) -> Option<usize> {
             }
             2 => {
                 let b = src.get(p..p + size)?;
-                block(&mut st, b, out, start, max_out)?;
+                block(&mut st, b, out, hist, max_out, usize::MAX)?;
                 p += size;
             }
             _ => return None,
@@ -155,6 +214,7 @@ fn frame(src: &[u8], out: &mut Vec<u8>, max_out: usize) -> Option<usize> {
         }
         p += 4;
     }
+    out.drain(hist..start);
     Some(p)
 }
 
@@ -251,7 +311,9 @@ fn table(mode: u8, src: &[u8], prev: &mut Option<DTable>, def: &[i16], def_log: 
 }
 
 /// a compressed block, appended to out (`start`: where the frame's output begins)
-fn block(st: &mut State, src: &[u8], out: &mut Vec<u8>, start: usize, max_out: usize) -> Option<()> {
+/// one compressed block appended to out (out[start..]: the frame's output so far; a match
+/// reaches at most `window` back)
+pub(super) fn block(st: &mut State, src: &[u8], out: &mut Vec<u8>, start: usize, max_out: usize, window: usize) -> Option<()> {
     let mut p = literals(st, src)?;
     let limit = max_out.min(out.len() + BLOCK_MAX);
     let b0 = *src.get(p)? as usize;
@@ -329,7 +391,7 @@ fn block(st: &mut State, src: &[u8], out: &mut Vec<u8>, start: usize, max_out: u
         out.extend_from_slice(&lits[lp..lp + ll]);
         lp += ll;
         let off = off as usize;
-        if off > out.len() - start {
+        if off > out.len() - start || off > window {
             return None;
         }
         let from = out.len() - off;

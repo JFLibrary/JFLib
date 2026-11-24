@@ -298,7 +298,7 @@ impl<'s> R<'s> {
             h.extmax = Some(pt);
         }
         self.dec = Decoder::of(&h.version, &h.codepage);
-        if self.dec.multibyte {
+        if self.dec.unknown {
             self.stats.note(format!("the code page {}: no table here, characters above 0x7F read as U+FFFD", h.codepage));
         }
         self.header = h;

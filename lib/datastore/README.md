@@ -2,7 +2,8 @@
 
 A small embedded database for programs built on [JFLib](https://jflib.org): collections of JSON
 records, kept in memory and made durable by a write-ahead log and snapshots, so that a crash or a
-power cut never loses a transaction that was confirmed and never leaves half of one behind. It
+power cut never loses a transaction that was confirmed and never leaves half of one behind.
+Secondary indexes find records by a field, and the files can be encrypted. It
 is meant for one server or service process that keeps its users, jobs or settings in a folder of
 its own, without an external database. It is plain Rust, without the standard library and
 without a line of `unsafe` code.
@@ -10,13 +11,13 @@ without a line of `unsafe` code.
 ## How it is used
 
 A `Store` lives in a folder. Each collection maps an id to a JSON value
-(`agent_core::json::Value` of [`jflib-agent-core`](https://crates.io/crates/jflib-agent-core)),
+(`formats::json::Value` of [`jflib-formats`](https://crates.io/crates/jflib-formats)),
 and reads return copies of the values, so nothing is held across a call. Changes run as
 transactions: the closure of `write` sees the current data and records puts and deletes, which
 then become durable and visible together, or not at all when it returns an error.
 
 ```rust
-use jflib::agent_core::json::Value;
+use jflib::formats::json::Value;
 use jflib::datastore::{Store, StoreError};
 
 let store = Store::open("data://db")?;                      // one process at a time
@@ -35,9 +36,65 @@ let admins = store.filter("users", |_, v| v.get("admin").and_then(Value::as_bool
 
 `get`, `list`, `ids`, `count` and `filter` read, `update` changes one record in place, and every
 transaction gets a sequence number. The store can be shared between threads; a lock file keeps a
-second process out (`StoreError::Locked`). Values are stored as plain JSON, so secrets should be
-sealed by the caller, for example with [`jflib-crypto`](https://crates.io/crates/jflib-crypto),
-before they go in.
+second process out (`StoreError::Locked`).
+
+## Indexes
+
+`filter` looks at every record of a collection. An index finds them by a key instead: the value
+of a field (`Index::field`, a path such as `"owner.id"`; an array there gives a key for each
+element) or keys computed from the record (`Index::by`). Keys are strings, booleans and integral
+numbers, compared exactly; a record without the field is not in the index. A unique index
+refuses every transaction that would give two records the same key, before anything is written
+(`StoreError::Conflict`), and so does adding one over records that already share a key.
+
+```rust
+use jflib::datastore::{Index, Key, Order};
+
+store.add_index("users", "email", Index::field("email").unique())?;
+store.add_index("ops", "started", Index::field("started"))?;
+
+let ada = store.find_one("users", "email", &Key::from("ada@example.org"))?;
+let newest = store.range("ops", "started", .., Order::Desc, 50)?;    // the 50 newest
+let today = store.range("ops", "started", Key::from(midnight).., Order::Asc, usize::MAX)?;
+```
+
+Indexes live in memory beside the data and every commit keeps them up to date. They are not
+stored: a program adds them after each open, and they are built from the records then, in one
+pass. `find`, `find_one`, `range` and `count_key` read through them; an index that was not added
+is `StoreError::NoIndex`.
+
+## Encryption
+
+`Store::open_encrypted(dir, options, &key)` opens or creates a store whose snapshots and log
+frames are sealed with a 32-byte key (XChaCha20-Poly1305), and `Journal::open_encrypted` does the
+same for each line of a journal. The key should come from the system's secret store, which
+JFLib's platform layer reaches with `plat::secret::secret_get` and `plat::secret::secret_set`
+(an app names `secrets` in its permission manifest for that).
+
+```rust
+let key: [u8; 32] = match plat::secret::secret_get("my-app", "db-key") {
+    Some(k) if k.len() == 32 => k.try_into().unwrap(),
+    _ => {
+        let k: [u8; 32] = plat::random_bytes();
+        plat::secret::secret_set("my-app", "db-key", &k)?;
+        k
+    }
+};
+let store = Store::open_encrypted("data://db", Options::default(), &key)?;
+```
+
+A store sealed with another key, an encrypted store opened without one and a store in the clear
+opened with one are all `StoreError::Key`, which `Options::repair` never cuts away. Every change
+of a sealed file is found: a frame of the log, a snapshot, a line moved to another journal or
+month. What encryption cannot find is someone who can write the folder removing or putting back
+whole files: an older snapshot, the end of a log, lines of a journal.
+
+`rekey(Some(&key))` encrypts a store that was in the clear or gives it another key, and
+`rekey(None)` decrypts it. It writes a snapshot under the new key, starts a new log and removes
+every file under the old key. A crash in between leaves the new snapshot, which the new key
+opens. The old files are removed, not wiped: on an SSD nothing promises that their blocks are
+gone. `Journal::rekey(dir, from, to)` rewrites the journals file by file and is run again with
+the same keys after an interruption.
 
 For logs that only grow, such as an audit trail or the log of a session, `Journal` appends JSON
 lines to one file per name and month, reads a month or the newest entries, and removes old
@@ -54,6 +111,10 @@ very end of the log is cut off; other damage, in the log or in the newest snapsh
 open with `StoreError::Corrupt`, unless `Options::repair` allows cutting the log at the damage or
 falling back to an older snapshot. `recovery()` reports what was found and repaired. A record
 may be up to 16 MiB of JSON, a transaction up to 64 MiB.
+
+An encrypted store seals the snapshot and the payload of each frame; a frame's checksum stays
+outside the seal, so a torn frame is still found and cut without the key. A new encrypted store
+writes a snapshot at once: its key id tells a wrong key from damage.
 
 ## Platforms
 

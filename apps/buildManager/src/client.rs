@@ -3,6 +3,9 @@ use alloc::{boxed::Box, collections::VecDeque, format, string::String, sync::Arc
 use core::sync::atomic::{AtomicBool, Ordering};
 use agent_core::{json, Value};
 use rt::sync::SpinLock;
+use ui::i18n::{t, tf};
+
+pub(crate) const BACKEND_ENDED: &str = "Build-Backend beendet. Verbindung erneut herstellen."; // i18n
 
 struct Channels {
     outgoing: SpinLock<VecDeque<Vec<u8>>>,
@@ -25,7 +28,7 @@ impl Client {
             let args = ["-u", &script, "--stdio", "--wsl-distro", &distro];
             let mut process = match (plat::process::Command { program, args: &args, cwd: Some(&root), env: &[("PYTHONIOENCODING", Some("utf-8"))] }).spawn() {
                 Ok(p) => p,
-                Err(e) => { error(&ch, format!("Python konnte nicht gestartet werden (Fehler {e}). Python-Pfad und Projektordner prüfen.")); return; }
+                Err(e) => { error(&ch, tf("Python konnte nicht gestartet werden (Fehler {}). Python-Pfad und Projektordner prüfen.", &[&format!("{e}")])); return; }
             };
             let mut pending = Vec::new(); let mut sent = 0; let mut input = Vec::new();
             let mut bytes = [0u8; 16384];
@@ -36,7 +39,7 @@ impl Client {
                     match process.write_stdin(&pending[sent..]) {
                         Ok(Some(n)) => sent += n,
                         Ok(None) => {},
-                        Err(e) => { error(&ch, format!("Verbindung unterbrochen (Schreiben: {e}).")); break; }
+                        Err(e) => { error(&ch, tf("Verbindung unterbrochen (Schreiben: {}).", &[&format!("{e}")])); break; }
                     }
                 }
                 // Backpressure preserves status events and bounds memory even for large logs.
@@ -49,13 +52,13 @@ impl Client {
                                 let line: Vec<u8> = input.drain(..=end).collect();
                                 match json::parse(&line) {
                                     Ok(value) => push(&ch, value),
-                                    Err(_) => error(&ch, String::from("Ungültige Antwort des Build-Backends.")),
+                                    Err(_) => error(&ch, String::from(t("Ungültige Antwort des Build-Backends."))),
                                 }
                             }
-                            if input.len() > 1048576 { error(&ch, String::from("Backend-Antwort überschreitet 1 MiB.")); break; }
+                            if input.len() > 1048576 { error(&ch, String::from(t("Backend-Antwort überschreitet 1 MiB."))); break; }
                         }
                         Ok(None) => {},
-                        Err(e) => { error(&ch, format!("Verbindung unterbrochen (Lesen: {e}).")); break; }
+                        Err(e) => { error(&ch, tf("Verbindung unterbrochen (Lesen: {}).", &[&format!("{e}")])); break; }
                     }
                     if let Ok(Some(n)) = process.read_stderr(&mut bytes) {
                         if n > 0 { error(&ch, String::from_utf8_lossy(&bytes[..n]).into_owned()); }
@@ -66,8 +69,8 @@ impl Client {
             process.close_stdin();
             let end = plat::time_us() + 5_000_000;
             while plat::time_us() < end && matches!(process.try_wait(), Ok(None)) { plat::sleep_ms(20); }
-            if !ch.stop.load(Ordering::Acquire) { error(&ch, String::from("Build-Backend beendet. Verbindung erneut herstellen.")); }
-        })).ok_or_else(|| String::from("IO-Thread konnte nicht gestartet werden."))?;
+            if !ch.stop.load(Ordering::Acquire) { error(&ch, String::from(t(BACKEND_ENDED))); }
+        })).ok_or_else(|| String::from(t("IO-Thread konnte nicht gestartet werden.")))?;
         Ok(Self { channels, worker: Some(worker), sequence: 0 })
     }
     pub(crate) fn send(&mut self, method: &str, params: Value) {

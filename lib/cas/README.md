@@ -9,8 +9,8 @@ is plain Rust, without the standard library and without a line of `unsafe` code.
 
 ## How it is used
 
-A repository is a folder. `Repo::create` sets one up with its options, `Repo::open` opens it with
-one of its keys. A backup writes the data of its files through a `Writer`, describes what it saved
+A repository is a folder, or any other place that keeps objects by name (see below).
+`Repo::create` sets one up with its options, `Repo::open` opens it with one of its keys. A backup writes the data of its files through a `Writer`, describes what it saved
 in a `Snapshot` and saves that; a restore loads a snapshot and reads the chunks back.
 
 ```rust
@@ -32,7 +32,51 @@ refuses any other key with `CasError::UntrustedSigner`, and `load_snapshot` retu
 only after checking its signature against the trusted keys. The list of trusted keys is
 protected by the repository key, so it keeps out other keys and mistakes, not someone who can
 open the repository: that can call `trust_signer` too. `read_chunk` and `read_tree` give back the
-plain data. Several writers can run at once; one process holds a repository at a time.
+plain data. Several writers can run at once; one holder (a process, through `Store::lock`) has
+a repository at a time.
+
+## Where it is stored
+
+A repository consists of objects of four kinds: its config, packs of sealed chunks, the index of
+each pack and the snapshots. The `Store` trait keeps them by kind and name, the way S3, SFTP or
+WebDAV keep files: `get`, `get_range`, `put`, `delete`, `list`, `init` for a new repository and
+`lock`. `Repo::create(path, ..)` and `Repo::open(path, ..)` use `Folder`, the store in a folder of
+the file system (a path of JFLib's file layer, so also `mem://` or another mount);
+`Repo::create_in(store, ..)` and `Repo::open_in(store, ..)` take any other.
+
+```rust
+use jflib::cas::store::{Kind, Store, StoreLock};
+use jflib::cas::{CasResult, Repo, Unlock};
+
+struct Bucket { /* a client of an object store */ }
+
+impl Store for Bucket {
+    fn location(&self) -> String { "s3://backups/office".into() }
+    fn init(&self) -> CasResult<()> { /* NotEmpty when the prefix holds anything */ }
+    fn lock(&self) -> CasResult<StoreLock> { /* a lock object; InUse while another holds it */ }
+    fn get(&self, kind: Kind, name: &str) -> CasResult<Option<Vec<u8>>> { /* GET */ }
+    fn get_range(&self, kind: Kind, name: &str, off: u64, len: usize) -> CasResult<Vec<u8>> { /* GET with Range */ }
+    fn put(&self, kind: Kind, name: &str, data: &[u8]) -> CasResult<()> { /* PUT */ }
+    fn delete(&self, kind: Kind, name: &str) -> CasResult<()> { /* DELETE */ }
+    fn list(&self, kind: Kind) -> CasResult<Vec<(String, u64)>> { /* LIST of the kind's prefix */ }
+}
+
+let repo = Repo::open_in(Bucket { /* .. */ }, Unlock::Master(&key))?;
+```
+
+A store keeps four rules. A `put` is atomic and durable: once it returns, the whole object is
+there, also after a crash, and a failed one leaves the old object or none. A `delete` that
+returned stays done, and deleting what is not there is fine. `get` and `list` see every `put`
+that returned before them. And `lock` keeps every other holder out, also one in another process
+or on another machine, until its guard is dropped. Reads of chunks and the repair of a lost index
+ask for ranges, so a store far away sends only what is needed; `get_range` has a default that
+reads the whole object.
+
+Nothing that comes back from a store is trusted. Packs, indexes and snapshots are sealed and
+`repo.json` carries a MAC, so a store that changes or swaps objects is found out; a rollback to
+older objects of the same repository is not. Names and sizes in a listing are checked before
+they are used. What a store does see: the names and sizes of the objects and when they come and
+go. Pack and index names are random, snapshot names are the ids given to `save_snapshot`.
 
 ## What is inside
 
@@ -44,8 +88,8 @@ key as well, so neither ids nor chunk sizes give anything away without it.
 
 Chunks are compressed with LZ4 or zstd when that saves something, sealed with XChaCha20-Poly1305
 and collected in pack files with sealed indexes; a pack repeats its index at the end, so a lost
-index file can be rebuilt. A backup commits in order, packs, then indexes, then the snapshot by an
-atomic rename, each synced to disk, so a crash leaves at most packs that nothing references.
+index file can be rebuilt. A backup commits in order, packs, then indexes, then the snapshot, each
+written atomically and durably, so a crash leaves at most packs that nothing references.
 
 Every key comes from one random repository key. The repository's `repo.json` keeps it wrapped
 several times: for the server's master key, for each passphrase (Argon2id with 64 MiB) and for a recovery
@@ -55,12 +99,13 @@ them; the period can be raised but never lowered.
 
 `check` verifies every snapshot, its signature and its references, and with `read_data` also reads,
 decrypts and compares every stored chunk. `gc` removes what no snapshot references any more:
-empty packs are deleted, packs less than 60 % in use are rewritten with their live chunks.
+empty packs are deleted, packs less than 60 % in use are rewritten with their live chunks. It
+stops, with nothing removed, when the snapshots cannot be listed or one of them does not open.
 
 ## Platforms
 
-The store needs the file system of JFLib's platform layer, so it is there on Windows, Linux,
-macOS and iOS. In the browser and on Android `jflib` leaves it out.
+The crate needs JFLib's platform layer for its random numbers, locks and the `Folder` store, so it
+is there on Windows, Linux, macOS and iOS. In the browser and on Android `jflib` leaves it out.
 
 ## How to get it
 

@@ -351,7 +351,7 @@ impl Document {
     }
 }
 fn check_text(t: &str) -> Result<(), Error> {
-    if t.chars().all(base::xml::valid_char) {
+    if t.chars().all(formats::xml::valid_char) {
         Ok(())
     } else {
         Err(Error::Invalid)

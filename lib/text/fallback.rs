@@ -79,8 +79,8 @@ pub(crate) struct Fallback {
     built: bool,
 }
 
-/// characters that fonts lack on purpose
-fn never(cp: u32) -> bool {
+/// characters that fonts lack on purpose (bidi.rs: drawn as nothing when no font has them)
+pub(crate) fn never(cp: u32) -> bool {
     cp < 0x20
         || (0x7F..=0x9F).contains(&cp)
         || (0x200B..=0x200F).contains(&cp)
@@ -107,6 +107,7 @@ impl Text {
             self.fb.lang = String::from(tag);
             self.fb.built = false;
             self.fb.cache.clear();
+            self.shaping_forget(); // the lines laid out may take other fonts now
         }
     }
 

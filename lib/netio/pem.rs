@@ -1,4 +1,4 @@
-// pem -- "-----BEGIN LABEL-----" blocks (RFC 7468)
+// pem -- "-----BEGIN LABEL-----" blocks (RFC 7468): each marker on a line of its own
 
 use alloc::format;
 use alloc::string::String;
@@ -16,20 +16,30 @@ pub fn encode(label: &str, der: &[u8]) -> String {
     s
 }
 
-/// every block with this label, decoded
+/// every block with this label, decoded.  Read line by line: the lines of a body (a private key
+/// is secret) are only compared with the markers, which no Base64 line equals (none begins with
+/// '-'); no substring search runs over them, whose steps would depend on the characters
 pub fn decode_all(text: &str, label: &str) -> Vec<Vec<u8>> {
     let begin = format!("-----BEGIN {}-----", label);
     let end = format!("-----END {}-----", label);
     let mut out = Vec::new();
-    let mut rest = text;
-    while let Some(i) = rest.find(&begin) {
-        let after = &rest[i + begin.len()..];
-        let Some(j) = after.find(&end) else { break };
-        let body: String = after[..j].chars().filter(|c| !c.is_whitespace()).collect();
-        if let Some(d) = crypto::b64::decode(&body) {
-            out.push(d);
+    let mut body: Option<String> = None;
+    for line in text.split('\n') {
+        let line = line.trim();
+        match body.as_mut() {
+            None => {
+                if line == begin {
+                    body = Some(String::new());
+                }
+            }
+            Some(b) if line == end => {
+                if let Some(d) = crypto::b64::decode(b) {
+                    out.push(d);
+                }
+                body = None;
+            }
+            Some(b) => b.extend(line.chars().filter(|c| !c.is_whitespace())),
         }
-        rest = &after[j + end.len()..];
     }
     out
 }

@@ -1,26 +1,59 @@
 // strings -- a DXF's bytes as text: UTF-8 from AutoCAD 2007 (AC1021) on, before that the header's code page
-// ($DWGCODEPAGE; codepages.rs), \U+XXXX in any version; TEXT's %% codes (specials).
+// ($DWGCODEPAGE: formats::encoding's character sets and multi-byte encodings), \U+XXXX and \M+NXXXX in any
+// version; TEXT's %% codes (specials).
 
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use crate::codepages;
+use formats::encoding::{self, Charset, Label, MultiByte};
 
 /// how a file's strings are decoded
 #[derive(Clone, Copy)]
 pub(crate) struct Decoder {
     /// AC1021 and later: UTF-8
     pub utf8: bool,
-    /// the code page's table (None: Windows-1252, also for unknown pages)
-    pub table: Option<&'static [u16; 128]>,
-    /// a multi-byte page this reader has no table of (bytes above 0x7F become U+FFFD)
-    pub multibyte: bool,
+    /// the code page (windows-1252 also for unknown pages)
+    pub charset: Charset,
+    /// a multi-byte page: Shift_JIS (ANSI_932, DOS932), GBK (ANSI_936, GB2312), EUC-KR (ANSI_949), Big5 (ANSI_950, BIG5)
+    pub multi: Option<MultiByte>,
+    /// a multi-byte page without a table here (Johab: ANSI_1361, JOHAB): bytes above 0x7F become U+FFFD
+    pub unknown: bool,
 }
 
 impl Default for Decoder {
     fn default() -> Decoder {
-        Decoder { utf8: false, table: codepages::table("ANSI_1252"), multibyte: false }
+        Decoder { utf8: false, charset: Charset::Windows1252, multi: None, unknown: false }
     }
+}
+
+/// the character set of a $DWGCODEPAGE name (upper case): ANSI_874 and ANSI_1250 to 1258, DOS437 to
+/// DOS869 by their code page, MACINTOSH, a few ISO-8859 and KOI8-R; None for the multi-byte pages and
+/// unknown names
+fn charset(cp: &str) -> Option<Charset> {
+    if let Some(n) = cp.strip_prefix("ANSI_").or_else(|| cp.strip_prefix("DOS")).and_then(|n| n.parse::<u16>().ok()) {
+        return Charset::from_code_page(n);
+    }
+    Some(match cp {
+        "ISO8859-1" | "ISO8859_1" => Charset::Windows1252,
+        "ISO8859-2" | "ISO8859_2" => Charset::Iso8859_2,
+        "ISO8859-5" | "ISO8859_5" => Charset::Iso8859_5,
+        "ISO8859-7" | "ISO8859_7" => Charset::Iso8859_7,
+        "ISO8859-9" | "ISO8859_9" => Charset::Windows1254,
+        "MACINTOSH" | "MAC_ROMAN" => Charset::Macintosh,
+        "KOI8-R" | "KOI8_R" => Charset::Koi8R,
+        _ => return None,
+    })
+}
+
+/// the multi-byte encoding of a $DWGCODEPAGE name (upper case)
+fn multi(cp: &str) -> Option<MultiByte> {
+    Some(match cp {
+        "ANSI_932" | "DOS932" => MultiByte::ShiftJis,
+        "ANSI_936" | "GB2312" => MultiByte::Gbk,
+        "ANSI_949" => MultiByte::EucKr,
+        "ANSI_950" | "BIG5" => MultiByte::Big5,
+        _ => return None,
+    })
 }
 
 impl Decoder {
@@ -28,9 +61,10 @@ impl Decoder {
     pub fn of(version: &str, codepage: &str) -> Decoder {
         let utf8 = version.len() == 6 && version.is_ascii() && version.starts_with("AC") && version[2..].parse::<u32>().is_ok_and(|v| v >= 1021);
         let cp: String = codepage.trim().chars().map(|c| c.to_ascii_uppercase()).collect();
-        let multibyte = matches!(cp.as_str(), "ANSI_932" | "ANSI_936" | "ANSI_949" | "ANSI_950" | "ANSI_1361" | "DOS932" | "BIG5" | "GB2312" | "JOHAB");
-        let table = codepages::table(&cp).or_else(|| if multibyte { None } else { codepages::table("ANSI_1252") });
-        Decoder { utf8, table, multibyte }
+        let multi = multi(&cp);
+        let unknown = matches!(cp.as_str(), "ANSI_1361" | "JOHAB");
+        let charset = if multi.is_some() || unknown { Charset::Windows1252 } else { charset(&cp).unwrap_or(Charset::Windows1252) };
+        Decoder { utf8, charset, multi, unknown }
     }
 
     /// bytes as text: valid UTF-8 stays UTF-8 in any version (writers put UTF-8 into older files: GDAL's utf-8.dxf), the
@@ -48,15 +82,14 @@ impl Decoder {
             lossy(b, &mut out);
             return out;
         }
+        if let Some(m) = self.multi {
+            return m.decode(b);
+        }
+        if !self.unknown {
+            return self.charset.decode(b);
+        }
         for &c in b {
-            if c < 0x80 {
-                out.push(c as char);
-            } else if self.multibyte {
-                out.push('\u{FFFD}');
-            } else {
-                let u = self.table.map_or(0xFFFD, |t| t[(c - 0x80) as usize]);
-                out.push(char::from_u32(u as u32).unwrap_or('\u{FFFD}'));
-            }
+            out.push(if c < 0x80 { c as char } else { '\u{FFFD}' });
         }
         out
     }
@@ -66,8 +99,12 @@ impl Decoder {
         if c < 0x80 {
             return c as char;
         }
-        let t = if self.utf8 || self.multibyte { codepages::table("ANSI_1252") } else { self.table };
-        t.and_then(|t| char::from_u32(t[(c - 0x80) as usize] as u32)).unwrap_or('\u{FFFD}')
+        if let (false, Some(m)) = (self.utf8, self.multi) {
+            // (a single byte of a multi-byte page: Shift_JIS's half-width katakana)
+            return m.decode(&[c]).chars().next().unwrap_or('\u{FFFD}');
+        }
+        let cs = if self.utf8 || self.unknown { Charset::Windows1252 } else { self.charset };
+        cs.decode_char(c).unwrap_or('\u{FFFD}')
     }
 }
 
@@ -93,8 +130,8 @@ fn lossy(mut b: &[u8], out: &mut String) {
     }
 }
 
-/// \U+XXXX (four or five hex digits) as the character it names; \M+NXXXX (a double byte of an East Asian page) as
-/// U+FFFD.  Everything else stays (also "\\": TEXT has no escapes; MTEXT is parsed by mtext::parse)
+/// \U+XXXX (four or five hex digits) as the character it names; \M+NXXXX as the double byte XXXX of the East Asian
+/// page N (`mbcs`).  Everything else stays (also "\\": TEXT has no escapes; MTEXT is parsed by mtext::parse)
 pub fn decode_unicode_escapes(s: &str) -> String {
     if !s.contains('\\') {
         return String::from(s);
@@ -117,7 +154,7 @@ pub fn decode_unicode_escapes(s: &str) -> String {
             let h = &b[i + 4..];
             if h.len() >= 4 && h[..4].iter().all(|c| c.is_ascii_hexdigit()) {
                 out.push_str(&s[last..i]);
-                out.push('\u{FFFD}');
+                mbcs(&mut out, b[i + 3], &h[..4]);
                 i += 8;
                 last = i;
                 continue;
@@ -127,6 +164,35 @@ pub fn decode_unicode_escapes(s: &str) -> String {
     }
     out.push_str(&s[last..]);
     out
+}
+
+/// \M+NXXXX: the double byte XXXX (four hex digits, lead byte first) of AutoCAD's East Asian page N: 1 Shift_JIS
+/// (932), 2 Big5 (950), 3 EUC-KR (949), 5 GBK (936); 4 (Johab, 1361) and the others as U+FFFD
+pub(crate) fn mbcs(out: &mut String, n: u8, hex: &[u8]) {
+    let m = match n {
+        b'1' => Some(MultiByte::ShiftJis),
+        b'2' => Some(MultiByte::Big5),
+        b'3' => Some(MultiByte::EucKr),
+        b'5' => Some(MultiByte::Gbk),
+        _ => None,
+    };
+    let v = hex.iter().take(4).fold(0u16, |v, c| v << 4 | (*c as char).to_digit(16).unwrap_or(0) as u16);
+    // a lead byte that its trail byte completes (Big5 has pairs that are two characters); anything else, such
+    // as two ASCII bytes or a lead without a fitting trail byte, is one U+FFFD
+    let [lead, trail] = v.to_be_bytes();
+    if let Some(m) = m {
+        let mut d = encoding::Decoder::new(Label::Multi(m));
+        let mut s = String::new();
+        d.decode(&[lead], false, &mut s);
+        if s.is_empty() {
+            d.decode(&[trail], true, &mut s);
+            if !s.is_empty() && !d.malformed() {
+                out.push_str(&s);
+                return;
+            }
+        }
+    }
+    out.push('\u{FFFD}');
 }
 
 /// the character of four (or five) hex digits at the start, and how many digits it took

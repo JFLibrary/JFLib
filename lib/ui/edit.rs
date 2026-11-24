@@ -710,9 +710,10 @@ impl Ui {
                 s = cx;
             }
         }
-        // never further than needed to show the end of the text
+        // never further than needed to show the end of the text (its width: in right-to-left
+        // text the caret after the last character is not the right end)
         let dlen = disp_of(&self.m.edit).len();
-        let ex = self.text.caret_x(disp_of(&self.m.edit), dlen).wrapping_sub(last);
+        let ex = ((self.text.measure_n(disp_of(&self.m.edit), dlen) + 128) >> 8).wrapping_sub(last);
         if s > ex {
             s = ex;
         }
@@ -746,24 +747,12 @@ impl Ui {
         } else {
             let (a, b) = self.tb_sel();
             if editing && a != b {
-                // selection: highlight, then the text in three clipped runs
+                // selection: highlight, then the text in clipped runs
                 let da = self.tb_to_disp(a);
-                let sx0 = self.text.caret_x(disp_of(&self.m.edit), da);
                 let db = self.tb_to_disp(b);
-                let sx1 = self.text.caret_x(disp_of(&self.m.edit), db);
-                let c = self.color(T_ACCENT);
-                self.draw_color(c);
-                self.draw_rect(bx.wrapping_add(sx0), top, sx1.wrapping_sub(sx0), lh);
-                self.tb_clip_x(r[0], bx.wrapping_add(sx0)); // before the selection
-                self.tb_emit_disp(bx, tcol);
-                self.draw_unclip();
-                self.tb_clip_x(bx.wrapping_add(sx0), bx.wrapping_add(sx1)); // inside: on the accent
-                let c = self.color(T_ON_ACCENT);
-                self.tb_emit_disp(bx, c);
-                self.draw_unclip();
-                self.tb_clip_x(bx.wrapping_add(sx1), r[0].wrapping_add(r[2])); // after
-                self.tb_emit_disp(bx, tcol);
-                self.draw_unclip();
+                let spans = self.text.selection_spans(disp_of(&self.m.edit), da, db);
+                let on = self.color(T_ON_ACCENT);
+                self.tb_sel_runs(&spans, bx, top, lh, [r[0], r[0].wrapping_add(r[2])], [tcol, on], &mut |ui, c| ui.tb_emit_disp(bx, c));
             } else {
                 self.tb_emit_disp(bx, tcol);
             }
@@ -1036,24 +1025,22 @@ impl Ui {
                 let s1 = sb.min(le);
                 let sel = sa != sb && (s0 < s1 || (s0 == s1 && sb > le));
                 if sel {
-                    let x0r = self.text.caret_x(&self.m.edit.buf[ls..], s0 - ls);
-                    let mut x1r = self.text.caret_x(&self.m.edit.buf[ls..], s1 - ls);
+                    let mut spans = self.text.selection_spans(&self.m.edit.buf[ls..], s0 - ls, s1 - ls);
                     if sb > le {
-                        x1r = x1r.wrapping_add(self.dp(4)); // the line break is selected
+                        // the line break is selected: a little after the line's last caret
+                        let xe = self.text.caret_x(&self.m.edit.buf[ls..], s1 - ls);
+                        spans.push((xe, xe.wrapping_add(self.dp(4))));
+                        spans.sort_unstable();
+                        let mut merged: Vec<(i32, i32)> = Vec::new();
+                        for (a, b) in spans {
+                            match merged.last_mut() {
+                                Some(m) if a <= m.1 => m.1 = m.1.max(b),
+                                _ => merged.push((a, b)),
+                            }
+                        }
+                        spans = merged;
                     }
-                    let c = self.color(T_ACCENT);
-                    self.draw_color(c);
-                    self.draw_rect(bx.wrapping_add(x0r), ly, x1r.wrapping_sub(x0r), lh);
-                    // three clipped runs: before, inside (on the accent), after
-                    self.tb_clip_x(r[0], bx.wrapping_add(x0r));
-                    self.tbm_run(bx, ls, le, tcol, hy);
-                    self.draw_unclip();
-                    self.tb_clip_x(bx.wrapping_add(x0r), bx.wrapping_add(x1r));
-                    self.tbm_run(bx, ls, le, scol, hy);
-                    self.draw_unclip();
-                    self.tb_clip_x(bx.wrapping_add(x1r), r[0].wrapping_add(r[2]));
-                    self.tbm_run(bx, ls, le, tcol, hy);
-                    self.draw_unclip();
+                    self.tb_sel_runs(&spans, bx, ly, lh, [r[0], r[0].wrapping_add(r[2])], [tcol, scol], &mut |ui, c| ui.tbm_run(bx, ls, le, c, hy));
                 } else {
                     self.tbm_run(bx, ls, le, tcol, hy);
                 }
@@ -1322,6 +1309,33 @@ impl Ui {
         let d = core::mem::take(if pw { &mut self.m.edit.disp } else { &mut self.m.edit.buf });
         self.tb_emit(x, &d, c);
         *(if pw { &mut self.m.edit.disp } else { &mut self.m.edit.buf }) = d;
+    }
+
+    // a line with a selection: the accent under its visual spans (px from the line's start bx;
+    // right-to-left text in it can need several), then the line by emit in clipped runs: before,
+    // inside each span (colour cols[1], on the accent), between them and after (cols[0]);
+    // columns: the box's x range
+    #[allow(clippy::too_many_arguments)]
+    fn tb_sel_runs(&mut self, spans: &[(i32, i32)], bx: i32, y: i32, h: i32, columns: [i32; 2], cols: [u32; 2],
+                   emit: &mut dyn FnMut(&mut Self, u32)) {
+        let c = self.color(T_ACCENT);
+        self.draw_color(c);
+        for &(a, b) in spans {
+            self.draw_rect(bx.wrapping_add(a), y, b.wrapping_sub(a), h);
+        }
+        let mut x = columns[0];
+        for &(a, b) in spans {
+            self.tb_clip_x(x, bx.wrapping_add(a));
+            emit(self, cols[0]);
+            self.draw_unclip();
+            self.tb_clip_x(bx.wrapping_add(a), bx.wrapping_add(b));
+            emit(self, cols[1]);
+            self.draw_unclip();
+            x = bx.wrapping_add(b);
+        }
+        self.tb_clip_x(x, columns[1]);
+        emit(self, cols[0]);
+        self.draw_unclip();
     }
 
     // tb_clip_x(x0, x1): clip drawing to the columns x0..x1 of the placed box

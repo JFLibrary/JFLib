@@ -56,9 +56,10 @@ the same .deb layout.
 | `apps/NAME/PERMISSIONS` | the app's permissions ([PERMISSIONS.md](PERMISSIONS.md)): the Flatpak finish-args, the MSIX capabilities and StartupTask follow them |
 | `apps/NAME/res/app.ico` | icon resource 1 of the Windows exe (`build_rs.py` compiles it with `llvm-rc` and links it: window, taskbar, Explorer, shortcuts) |
 | `apps/NAME/res/app_{48,128,256}.png` | Linux icons (hicolor theme); the MSIX logos are scaled from them. Missing sizes are scaled down from the largest; an app without any gets a plain placeholder (and a note) |
-| `styles/S/INFO` | line 1: the style's name in the setup / debconf, line 2: a one-line description (`--impl asm`: `legacy/ASMLIB/styles/S/INFO`) |
+| `styles/S/INFO` | line 1: the style's name in the setup / debconf, line 2: a one-line description; further lines `name.<lang>=` and `desc.<lang>=` (`<lang>` a language code such as `en`, `fr`) give both in another language, and the setup shows them in the user's (`--impl asm`: `legacy/ASMLIB/styles/S/INFO`) |
 
-Texts are German (the setup and the .deb questions are). Example, `apps/Kritzel/PACKAGE`:
+The texts of `PACKAGE` and the .deb's questions are German; the setup's own texts follow the user's
+language (below). Example, `apps/Kritzel/PACKAGE`:
 
 ```
 display=Kritzel
@@ -101,15 +102,34 @@ in the winui style; its code is the crate `jflib-installer` (`lib/installer`), w
 package` builds the same way for an app outside this repository (README.md of cargo-jflib). The
 packaged setup is that exe with a payload and a trailer appended.
 
-* **Pages**: style (list with the INFO names and descriptions, preview of the selection) ->
-  options (folder, default `%LOCALAPPDATA%\Programs\<display>` -- per user, no administrator
-  rights; desktop shortcut, start menu entry, "installed apps" entry, start after installing;
-  a web browser: make it the default browser) -> progress -> done (an error page on failures).
+* **Pages**: style (list with the INFO names and descriptions, preview of the selection; only
+  when the payload holds more than one style -- with `styles=` naming one, the default of
+  `cargo jflib package`, the setup starts on the options page) -> options (who it is for, the
+  folder, desktop shortcut, start menu entry, "installed apps" entry) -> progress -> done
+  (start the program now; a web browser: make it the default browser; an error page on
+  failures).
+* **Who it is for**: "just me" (the default): `%LOCALAPPDATA%\Programs\<display>`, the user's
+  desktop and start menu, `HKCU`, no administrator rights. "All users of this computer":
+  `C:\Program Files\<display>` (`FOLDERID_ProgramFiles`), the common desktop and start menu,
+  `HKLM` for the uninstall entry, the file types and a browser's registration, `scope=machine` in
+  `install.ini`. Without administrator rights the setup starts itself again with them
+  (`ShellExecuteEx` "runas": the UAC prompt) as `--quiet --all-users --dir ... --style ... --log
+  <temp file>` with the choices made, waits, and shows the done page, or the error from that log
+  (a refused prompt: an error page whose "Zurück" leads back to the options). The program is
+  started, and Settings opened, by the setup without the rights, in the user's session. The
+  uninstaller of such an installation does the same. When the app is installed in Program Files
+  and not for the user, running the setup again preselects all users.
+* **Languages**: the texts (`lib/installer/setup.tsv`, an `i18n::Catalog`) are German, English,
+  French, Spanish, Italian, Dutch, Polish, Arabic and Hebrew, picked from the user's languages
+  (`--lang CODE` chooses), otherwise English; the manifest's `label_<style>.<lang>` and
+  `desc_<style>.<lang>` (from `INFO`) name and describe the styles in that language. Script runs
+  are German, as every library app's.
 * **Installs** `<app>.exe` (the chosen variant), `uninstall.exe` (the setup without its
   payload), `install.ini` (what was created), `.lnk` files through COM `IShellLinkW`, and
-  `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\<app>` (DisplayName, DisplayIcon,
-  UninstallString, ...). ole32 / shell32 / advapi32 are loaded with `LoadLibraryA` inside
-  `plat::inst` (the only place of the shell calls).
+  `Software\Microsoft\Windows\CurrentVersion\Uninstall\<app>` below `HKCU` or `HKLM`
+  (DisplayName, DisplayIcon, UninstallString, QuietUninstallString, ...). ole32 / shell32 /
+  advapi32 are loaded with `LoadLibraryA` inside `plat::inst` (the only place of the shell
+  calls).
 * **The app's AppUserModelID**: the manifest carries `PACKAGE`'s `app_id`; the shortcuts get it
   as `System.AppUserModel.ID`, the ProgIDs as `AppUserModelID`, and `install.ini` as `app_id=`
   -- the installed program finds that line beside itself and runs under the id
@@ -119,10 +139,22 @@ packaged setup is that exe with a payload and a trailer appended.
 * `uninstall.exe --uninstall` removes everything listed in `install.ini` (`files=`: the extra
   files, one line of any length; the folders below the program folder that held them go too,
   deepest first, when nothing else is left in them); a hidden `cmd` deletes `uninstall.exe` and
-  the folder after the process ended. (An older setup cut `files=` at 4096 bytes and left the
-  rest behind; installing over it with a newer setup writes the whole list.)
+  the folder once the uninstaller has ended: it tries once a second for up to five minutes,
+  since Windows deletes no running program and the uninstaller's window stays open on its last
+  page. (An older uninstaller tried once after two seconds; an older setup cut `files=` at 4096
+  bytes and left the rest behind -- installing over it with a newer setup writes the whole
+  list.)
 * Running the setup again installs another style over the old one (the app's settings stay).
-* Options: `--dir PATH`, `--style ID`.
+* **Options** (they preset the pages): `--dir PATH`, `--style ID`, `--all-users` /
+  `--current-user`, `--no-desktop`, `--no-start-menu`, `--no-uninstall-entry`, `--launch`,
+  `--log FILE` (what the setup did, a line each; `error: ` before a failure), `--lang CODE`.
+* **Without questions** (package managers, deployment tools, scripts): `--quiet` installs with
+  those options and no window; `uninstall.exe --uninstall --quiet` removes, the uninstall entry
+  carries it as `QuietUninstallString`. Exit codes: 0 done, 1 failed (the reason on standard
+  output, or the console the setup was started from, and in the log), 2 a wrong command line (an
+  unknown option, a missing value, a style the setup does not hold), 740
+  (`ERROR_ELEVATION_REQUIRED`) for all users without administrator rights. A web browser never
+  opens Settings in this mode.
 * **File types and URL schemes** (`PACKAGE` `filetypes=` / `schemes=`, carried in the
   manifest; `lib/installer/assoc.rs`): for each type a ProgID `<app>.<ext>` under
   `HKCU\Software\Classes` (description, `DefaultIcon`, `shell\open\command` = `"<exe>" "%1"`) and
@@ -137,18 +169,21 @@ packaged setup is that exe with a payload and a trailer appended.
   own; the setup writes the ProgID `<app>URL`, `HKCU\Software\Clients\StartMenuInternet\<app>`
   with its `Capabilities` and the value `<app>` in `HKCU\Software\RegisteredApplications`, and
   `uninstall.exe` removes them with the rest (`install.ini` `assoc=`). The options page offers
-  "Als Standardbrowser festlegen" (in another language than German "Make <App> my default
-  browser"), checked as in Firefox's setup: "Fertigstellen" then opens Settings at the app's page
+  "Als Standardbrowser festlegen" on the done page (in English "Make <App> my default browser"),
+  checked as in Firefox's setup: "Fertigstellen" then opens Settings at the app's page
   of the default apps (`ms-settings:defaultapps?registeredAppUser=<app>`, through
   `plat::assoc::browser_request`: the same page as the app's `plat::default_browser_request()`),
   after starting the program when that is chosen too. Windows lets no program take the default
   itself; the user picks there. Test mode and script runs never open Settings: they print
-  `setup_default_browser: ms-settings:...` (the setup has no silent mode).
+  `setup_default_browser: ms-settings:...`; `--quiet` skips it. An installation for all users
+  registers the browser below `HKLM`, which `plat::assoc::browser_request` accepts as well.
 * **Test mode**: with `ASMINST_SHELL_DIR=DIR` the desktop, the start menu and the taskbar pins
   are `DIR\Desktop`, `DIR\Programs` and `DIR\Pinned`, and the registry values go to
-  `DIR\registry.txt` -- a test never touches
-  the user's shell or registry. Always run the setup with `--script` (and `--dir` into a test
-  folder):
+  `DIR\registry.txt` -- for all users the same below `DIR\machine` -- so a test never touches
+  the user's shell or registry. `ASMINST_ADMIN=1` / `0` stands for the administrator rights; the
+  setup then starts itself again without a UAC prompt (with `ASMINST_ADMIN=1`), and
+  `ASMINST_UAC=no` acts as a refused prompt. Always run the setup with `--script` or `--quiet`
+  (and `--dir` into a test folder):
 
   ```
   set ASMINST_SHELL_DIR=%CD%\build\dist\test\shell
@@ -159,7 +194,8 @@ packaged setup is that exe with a payload and a trailer appended.
   with, for example,
 
   ```
-  # inst.uis: the preselected style, default options (start after installing is off)
+  # inst.uis: the preselected style, default options (start after installing is off); a setup
+  # of one style has no style page and starts at "Installieren"
   click "Weiter"
   click "Installieren"
   wait 500
@@ -174,7 +210,15 @@ packaged setup is that exe with a payload and a trailer appended.
   ```
 
   `apps/installer/tests/nopayload.uis` checks the bare stub (no payload: the error page); it
-  runs in `build_rs.py test` and in parity.
+  runs in `build_rs.py test` and in parity. **`python tools/setup_check.py`** builds setups from
+  the stub and a payload of its own and runs them in test mode -- on Windows directly, elsewhere
+  under Wine (its own prefix in `build/setup_check/wine`): the pages in all nine languages, a
+  payload of one style, the quiet mode with its exit codes and log, all users with and without
+  the rights (the setup started again, a refused prompt), the uninstallers. Under Wine a running
+  program can be deleted, so there the uninstaller's wait for its own end is not tested; Wine
+  has no font for Arabic and Hebrew (`--shots DIR` brings DejaVu Sans along). Build the stub
+  first: `python build_rs.py app installer --target win` (on Linux `lld-link` must be on PATH:
+  LLVM's lld, or a link of that name to the toolchain's `rust-lld`).
 
 **Payload layout** (written by `tools/package.py` and `cargo jflib package`, read by `lib/installer/payload.rs`;
 little endian, offsets relative to the payload start):
@@ -183,7 +227,7 @@ little endian, offsets relative to the payload start):
 |---|---|
 | header | `"AIPK"`, u32 entry count (at most 65536; a setup of jflib 0.1.0 reads at most 256) |
 | entry (128 bytes each) | u32 kind, u32 stored size, u32 unpacked size, u32 flags (1 = zlib), u64 offset, u64 0, name[48], label[48] (UTF-8, NUL-padded) |
-| kinds | 1 manifest (`key=value` lines: `app`, `display`, `version`, `publisher`, `default`, `desc_<style>`), 2 a style variant (the exe; name = style id, label = INFO name), 3 its preview PNG, 5 an extra file (name = its path in the program folder; e.g. codectest's `jxlenc.dll` or `licenses/...`) |
+| kinds | 1 manifest (`key=value` lines: `app`, `display`, `version`, `publisher`, `default`, `desc_<style>`, `label_<style>.<lang>` and `desc_<style>.<lang>` (the INFO translations), `filetypes`, `schemes`, `browser`, `app_id`), 2 a style variant (the exe; name = style id, label = INFO name), 3 its preview PNG, 5 an extra file (name = its path in the program folder; e.g. codectest's `jxlenc.dll` or `licenses/...`) |
 | trailer | `"ASMINST1"`, u64 stub size, u64 payload size (the last 24 bytes of the file; in a signed setup the last 24 bytes before the Authenticode certificate table and its padding to 8 bytes) |
 
 A signed setup (below) keeps this layout: signtool appends the certificate table after the

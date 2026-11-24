@@ -5,7 +5,12 @@
 Files of several shapes: coretest --zstd c (levels 1, 3, 9, 19) -> zstd -d must restore them,
 and zstd at many settings (levels 1..19, --ultra -22, --fast, -T4 multithreaded, --long,
 --no-check, a dictionary-free --rsyncable stream, concatenated frames) -> coretest --zstd d
-likewise.  Prints the sizes next to the reference's and the speed of both directions."""
+likewise.  Prints the sizes next to the reference's and the speed of both directions.
+
+Dictionaries: 3000 JSON records of a backup log; a dictionary of 16 KiB trained by
+`zstd --train` and one by coretest --zstd train on the first 2400; the last 600 compressed
+with each dictionary by each side and decompressed by the other (zstd -D), and a raw content
+dictionary both ways.  Prints the ratios of the four combinations."""
 import os
 import random
 import subprocess
@@ -84,8 +89,76 @@ def main():
                 fails.append("concatenated")
             bad += len(fails)
             print(f"        zstd->ours: {'all ok' if not fails else 'FAIL ' + ', '.join(fails)}")
+    bad += dictionaries(exe)
     print("zstd_check:", "all ok" if not bad else f"{bad} failures")
     return 1 if bad else 0
+
+
+def dictionaries(exe):
+    import json
+    rnd = random.Random(5)
+    users = ["anna", "bert", "carla", "dieter", "eva", "frank"]
+
+    def record(i):
+        u = rnd.choice(users)
+        return json.dumps({
+            "id": 100000 + i, "time": f"2026-11-{rnd.randint(1, 28):02}T{rnd.randint(0, 23):02}:{rnd.randint(0, 59):02}:00Z",
+            "host": f"srv-{rnd.randrange(20):02}.backup.lan", "user": u,
+            "path": f"/home/{u}/" + rnd.choice(["Dokumente", "Bilder", "Musik"]) + "/" + "".join(rnd.choice("abcdefgh") for _ in range(6)),
+            "status": rnd.choice(["ok", "ok", "ok", "skipped", "failed: permission denied"]),
+            "bytes": rnd.randint(0, 10 ** 9), "chunks": [rnd.randint(0, 99999) for _ in range(rnd.randint(1, 6))],
+        }, indent=1).encode()
+
+    fails = []
+
+    def run(*a):
+        return subprocess.run([str(x) for x in a]).returncode
+
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        files = []
+        for i in range(3000):
+            f = d / f"s{i}.json"
+            f.write_bytes(record(i))
+            files.append(f)
+        learn, test = files[:2400], files[2400:]
+        zd, od = d / "zstd.dict", d / "ours.dict"
+        run("zstd", "-q", "--train", *learn, "-o", zd, "--maxdict=16384")
+        if run(exe, "--zstd", "train", od, 16384, *learn) != 0:
+            fails.append("ours trains")
+        sizes = {k: 0 for k in ("raw", "zstd+zstd's", "ours+zstd's", "zstd+ours", "ours+ours")}
+        back, z = d / "back", d / "t.zst"
+        for f in test:
+            data = f.read_bytes()
+            sizes["raw"] += len(data)
+            for name, dct in (("zstd's", zd), ("ours", od)):
+                run("zstd", "-q", "-f", "-3", "-D", dct, f, "-o", z)
+                sizes[f"zstd+{name}"] += z.stat().st_size
+                if run(exe, "--zstd", "d", z, back, dct) != 0 or back.read_bytes() != data:
+                    fails.append(f"zstd -D {name} -> ours")
+                run(exe, "--zstd", "c", f, z, 3, dct)
+                sizes[f"ours+{name}"] += z.stat().st_size
+                if run("zstd", "-q", "-f", "-d", "-D", dct, z, "-o", back) != 0 or back.read_bytes() != data:
+                    fails.append(f"ours -> zstd -d -D {name}")
+        raw = d / "raw.dict"
+        raw.write_bytes(b"".join(f.read_bytes() for f in learn[:40]))
+        data = test[0].read_bytes()
+        run(exe, "--zstd", "c", test[0], z, 3, raw)
+        if run("zstd", "-q", "-f", "-d", "-D", raw, z, "-o", back) != 0 or back.read_bytes() != data:
+            fails.append("raw content ours -> zstd")
+        run("zstd", "-q", "-f", "-D", raw, test[0], "-o", z)
+        if run(exe, "--zstd", "d", z, back, raw) != 0 or back.read_bytes() != data:
+            fails.append("raw content zstd -> ours")
+        big = d / "big"
+        big.write_bytes(b"".join(f.read_bytes() for f in files))
+        for lv in (1, 3, 19):
+            run(exe, "--zstd", "c", big, z, lv, od)
+            if run("zstd", "-q", "-f", "-d", "-D", od, z, "-o", back) != 0 or back.read_bytes() != big.read_bytes():
+                fails.append(f"big with our dictionary, level {lv}")
+        r = sizes["raw"]
+        print(f"dictionaries ({len(test)} records, {r} bytes): " + "  ".join(f"{k} {r / v:.2f}" for k, v in sizes.items() if k != "raw"))
+        print(f"        dictionaries: {'all ok' if not fails else 'FAIL ' + ', '.join(sorted(set(fails)))}")
+    return len(fails)
 
 
 if __name__ == "__main__":

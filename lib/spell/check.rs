@@ -34,10 +34,20 @@
 // or two words; Hunspell 1.7 -- "Fahrradweg" is "Fahrrad weg"; not for words starting with a
 // digit).  In suggestion mode compounds have two parts only.  The search is bounded
 // (Ctx::steps) and remembers its parts.
+//
+// Every table the .aff defines is walked under a budget (Ctx::work, a count, not a clock):
+// each affix rule tried (also as the inner one of two suffixes, also in a cross product), each
+// COMPOUNDRULE, CHECKCOMPOUNDPATTERN, BREAK pattern and REP rule of CHECKCOMPOUNDREP takes one
+// unit.  A check has CHECK_WORK of them, a whole search for suggestions SUG_WORK
+// (suggest.rs); when they are spent the search stops and finds nothing more.  Real
+// dictionaries stay far below: 638 000 for the dearest check of 20 measured (da_DK;
+// docs/ROADMAP.md, section 13, U11).  A crafted one with thousands of rules on one ending took
+// seconds for a check (two suffixes: the square of the rules), now at most CHECK_WORK.
 
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::cell::Cell;
 
 use crate::aff::{bit, has, Affix, Flag, Group, RuleEl, ONLYUPCASE};
 use crate::dic::Homonyms;
@@ -139,9 +149,11 @@ pub(crate) struct Opt {
 
 pub(crate) const CHECK: Opt = Opt { compounds: true, sug: false, upcase: true };
 
-/// the work a check may do (compound search steps)
+/// the work a check may do (compound search steps, the rules and patterns of the .aff tried)
 pub(crate) struct Ctx {
     pub(crate) steps: u32,
+    /// rules and patterns of the .aff still to be tried (see the module header)
+    pub(crate) work: Cell<u32>,
     /// BREAK pieces still allowed to be looked up (the splits of a long hyphenated word grow
     /// exponentially)
     pub(crate) breaks: u32,
@@ -151,11 +163,24 @@ pub(crate) struct Ctx {
 }
 
 pub(crate) const BREAK_WORK: u32 = 8192;
+/// rules and patterns tried in one check
+pub(crate) const CHECK_WORK: u32 = 6_000_000;
 
 impl Ctx {
     pub(crate) fn new(steps: u32) -> Ctx {
-        Ctx { steps, breaks: BREAK_WORK, parts: None }
+        Ctx { steps, work: Cell::new(CHECK_WORK), breaks: BREAK_WORK, parts: None }
     }
+}
+
+/// take n units of the work -> false when they are spent (the search stops)
+pub(crate) fn spend(work: &Cell<u32>, n: u32) -> bool {
+    let left = work.get();
+    if left < n {
+        work.set(0);
+        return false;
+    }
+    work.set(left - n);
+    true
 }
 
 /// compound parts and their results: an open-addressing table of 64-bit hashes of (part,
@@ -255,7 +280,7 @@ impl Dictionary {
     /// f(group, root, its entries when known) for every group of suffix rules whose text ends
     /// w (the rules' conditions are not tested yet); hw: the entries of w; true when f
     /// accepted one
-    fn each_sfx<'a>(&'a self, w: &str, hw: Option<Homonyms<'a>>, f: &mut dyn FnMut(&'a Group, &str, Option<Homonyms<'a>>) -> bool) -> bool {
+    fn each_sfx<'a>(&'a self, w: &str, hw: Option<Homonyms<'a>>, work: &Cell<u32>, f: &mut dyn FnMut(&'a Group, &str, Option<Homonyms<'a>>) -> bool) -> bool {
         let a = &self.aff;
         let mut cut = w.len();
         let mut chars = w.char_indices().rev();
@@ -275,6 +300,9 @@ impl Dictionary {
                 continue;
             }
             for g in groups {
+                if !spend(work, 1) {
+                    return false;
+                }
                 root.clear();
                 root.push_str(rest);
                 root.push_str(&g.strip);
@@ -289,7 +317,7 @@ impl Dictionary {
 
     /// f(rule, root, its entries) for every prefix rule whose text starts w and whose
     /// condition holds for the root it leaves; hw: the entries of w; true when f accepted one
-    fn each_pfx<'a>(&'a self, w: &str, hw: Option<Homonyms<'a>>, f: &mut dyn FnMut(&'a Affix, &str, Homonyms<'a>) -> bool) -> bool {
+    fn each_pfx<'a>(&'a self, w: &str, hw: Option<Homonyms<'a>>, work: &Cell<u32>, f: &mut dyn FnMut(&'a Affix, &str, Homonyms<'a>) -> bool) -> bool {
         let a = &self.aff;
         let mut cut = 0;
         let mut ends = w.char_indices().map(|(i, c)| i + c.len_utf8()); // after the k-th character
@@ -316,6 +344,9 @@ impl Dictionary {
                 }
                 let mut homs = if k == 0 && g.strip.is_empty() { hw } else { None };
                 for &i in &g.rules {
+                    if !spend(work, 1) {
+                        return false;
+                    }
                     let r = &a.pfx[i as usize];
                     if !r.cond_ok(&root, false) {
                         continue;
@@ -334,11 +365,14 @@ impl Dictionary {
     /// the caller looked them up); true when f accepted one.  One pass over the suffixes: a
     /// suffix alone, as the outer one of two, or with a prefix (cross products, cross(): once
     /// per root); then the prefixes alone.
-    pub(crate) fn analyze<'a>(&'a self, w: &str, hw: Homonyms<'a>, f: &mut dyn FnMut(&Deriv) -> bool) -> bool {
+    pub(crate) fn analyze<'a>(&'a self, w: &str, hw: Homonyms<'a>, work: &Cell<u32>, f: &mut dyn FnMut(&Deriv) -> bool) -> bool {
         let a = &self.aff;
-        let found = self.each_sfx(w, Some(hw), &mut |g, root, known| {
+        let found = self.each_sfx(w, Some(hw), work, &mut |g, root, known| {
             let (mut homs, mut cross) = (known, false);
             for &i in &g.rules {
+                if !spend(work, 1) {
+                    return false;
+                }
                 let s = &a.sfx[i as usize];
                 if !s.cond_ok(root, true) {
                     continue;
@@ -349,15 +383,15 @@ impl Dictionary {
                     }
                 }
                 // s as the outer of two suffixes: an inner one whose continuation names s
-                if has(&a.sfx_outer, s.flag) && self.inner_sfx(root, s, &mut *f) {
+                if has(&a.sfx_outer, s.flag) && self.inner_sfx(root, s, work, &mut *f) {
                     return true;
                 }
                 cross |= s.cross;
             }
-            cross && !a.pfx.is_empty() && self.cross(w, root, g, homs, &mut *f)
+            cross && !a.pfx.is_empty() && self.cross(w, root, g, homs, work, &mut *f)
         });
         found
-            || self.each_pfx(w, Some(hw), &mut |p, _, homs| {
+            || self.each_pfx(w, Some(hw), work, &mut |p, _, homs| {
                 for flags in homs {
                     if has(flags, p.flag) && f(&Deriv { flags, pfx: Some(p), sfx: None, sfx2: None }) {
                         return true;
@@ -368,10 +402,10 @@ impl Dictionary {
     }
 
     // the inner suffix of two: `root` is w without the outer suffix s
-    fn inner_sfx(&self, root: &str, s: &Affix, f: &mut dyn FnMut(&Deriv) -> bool) -> bool {
+    fn inner_sfx(&self, root: &str, s: &Affix, work: &Cell<u32>, f: &mut dyn FnMut(&Deriv) -> bool) -> bool {
         let a = &self.aff;
-        self.each_sfx(root, None, &mut |g1, root1, _| {
-            g1.rules.iter().map(|&i| &a.sfx[i as usize]).any(|s1| {
+        self.each_sfx(root, None, work, &mut |g1, root1, _| {
+            g1.rules.iter().map(|&i| &a.sfx[i as usize]).take_while(|_| spend(work, 1)).any(|s1| {
                 s1.has(s.flag) && s1.cond_ok(root1, true) && self.words.get(root1).any(|flags| has(flags, s1.flag) && f(&Deriv { flags, pfx: None, sfx: Some(s1), sfx2: Some(s) }))
             })
         })
@@ -381,7 +415,8 @@ impl Dictionary {
     // their text (the strip added; hr: its entries when known); the prefix's text starts w
     // before the suffix's part, its condition holds for w without it, the suffix's for the
     // root without both
-    fn cross<'a>(&'a self, w: &str, root: &str, g: &Group, hr: Option<Homonyms<'a>>, f: &mut dyn FnMut(&Deriv) -> bool) -> bool {
+    #[allow(clippy::too_many_arguments)]
+    fn cross<'a>(&'a self, w: &str, root: &str, g: &Group, hr: Option<Homonyms<'a>>, work: &Cell<u32>, f: &mut dyn FnMut(&Deriv) -> bool) -> bool {
         let a = &self.aff;
         let keep = root.len() - g.strip.len(); // w[..keep] == root[..keep]
         let mut cut = 0;
@@ -411,12 +446,18 @@ impl Dictionary {
                 }
                 let mut homs = if k == 0 && pg.strip.is_empty() { hr } else { None };
                 for &j in &pg.rules {
+                    if !spend(work, 1) {
+                        return false;
+                    }
                     let p = &a.pfx[j as usize];
                     if !p.cross || !p.cond_ok2(&pg.strip, &w[cut..]) {
                         continue;
                     }
                     let h = *homs.get_or_insert_with(|| self.words.get(&base));
                     for &i in &g.rules {
+                        if !spend(work, 1) {
+                            return false;
+                        }
                         let s = &a.sfx[i as usize];
                         if !s.cross || !s.cond_ok(&base, true) {
                             continue;
@@ -500,7 +541,7 @@ impl Dictionary {
             return Look::Hit(h);
         }
         let (mut hit, mut forbidden) = (None, false);
-        self.analyze(w, hw, &mut |d| match self.alone(d, opt) {
+        self.analyze(w, hw, &cx.work, &mut |d| match self.alone(d, opt) {
             Some(true) => {
                 hit = Some(Hit { keepcase: has(d.flags, a.keepcase), ..Hit::default() });
                 true
@@ -591,6 +632,9 @@ impl Dictionary {
             matches!(self.check_cased(s, opt, cx), Look::Hit(_)) || self.check_break(s, depth + 1, opt, cx)
         };
         for pat in &self.aff.breaks {
+            if !spend(&cx.work, 1) {
+                return false;
+            }
             if let Some(p) = pat.strip_prefix('^') {
                 if !p.is_empty() && w.len() > p.len() && w.starts_with(p) && piece(&w[p.len()..], cx) {
                     return true;
@@ -640,7 +684,7 @@ impl Dictionary {
         }
         let h = if a.cpd_flags() { self.cpd_rec(w, &b, 0, 0, "", None, None, usize::MAX, opt, cx, &mut memo) } else { None };
         let h = h.or_else(|| (rules && self.rule_rec(w, &b, 0, "", usize::MAX, &mut seq, cx)).then(Hit::default))?;
-        if self.word_pair(w) || (!w.starts_with(|c: char| c.is_ascii_digit()) && self.simple_sug(w)) {
+        if self.word_pair(w) || (!w.starts_with(|c: char| c.is_ascii_digit()) && self.simple_sug(w, &cx.work)) {
             return None;
         }
         Some(h)
@@ -672,14 +716,14 @@ impl Dictionary {
                 continue;
             }
             let Some(ph) = self.part_memo(w, b, s, e, pos, opt, cx, memo) else { continue };
-            if !self.boundary_ok(w, b, e) || left.is_some_and(|l| !self.patterns_ok(w, b[s], &l, &ph)) {
+            if !self.boundary_ok(w, b, e, &cx.work) || left.is_some_and(|l| !self.patterns_ok(w, b[s], &l, &ph, &cx.work)) {
                 continue;
             }
             let keep = keep.unwrap_or(ph.keepcase);
             let tail = &w[b[e]..];
             if parts + 2 <= lim {
                 if let Some(h) = self.part_memo(w, b, e, n, Pos::End, opt, cx, memo) {
-                    if !(a.cpd_dup && tail == part) && self.patterns_ok(w, b[e], &ph, &h) && !(a.cpd_rep && self.rep_word(w, cx)) {
+                    if !(a.cpd_dup && tail == part) && self.patterns_ok(w, b[e], &ph, &h, &cx.work) && !(a.cpd_rep && self.rep_word(w, cx)) {
                         return Some(Hit { keepcase: keep, forceucase: h.forceucase, ..Hit::default() });
                     }
                 }
@@ -738,7 +782,7 @@ impl Dictionary {
                     continue;
                 }
                 seq.push(flags);
-                let ok = if e == n { self.rules_match(seq, true) } else { self.rules_match(seq, false) && self.rule_rec(w, b, e, part, lim, seq, cx) };
+                let ok = if e == n { self.rules_match(seq, true, &cx.work) } else { self.rules_match(seq, false, &cx.work) && self.rule_rec(w, b, e, part, lim, seq, cx) };
                 seq.pop();
                 if ok {
                     return true;
@@ -746,13 +790,13 @@ impl Dictionary {
             }
             // the last part with affixes (a prefix needs COMPOUNDPERMITFLAG there)
             if e == n {
-                let found = self.analyze(part, hp, &mut |d| {
+                let found = self.analyze(part, hp, &cx.work, &mut |d| {
                     if d.any(a.forbidden) || has(d.flags, a.needaffix) || has(d.flags, ONLYUPCASE) || d.pfx.is_some_and(|x| !x.has(a.cpd_permit)) || !self.affixes_ok(d) {
                         return false;
                     }
                     let mut all: Vec<&[Flag]> = seq.clone();
                     all.push(d.flags);
-                    self.rules_match(&all, true)
+                    self.rules_match(&all, true, &cx.work)
                 });
                 if found {
                     return true;
@@ -763,8 +807,8 @@ impl Dictionary {
     }
 
     // the flag sets match a COMPOUNDRULE (full: completely; else they may begin a match)
-    fn rules_match(&self, seq: &[&[Flag]], full: bool) -> bool {
-        self.aff.cpd_rules.iter().any(|r| rule_at(r, seq, full))
+    fn rules_match(&self, seq: &[&[Flag]], full: bool, work: &Cell<u32>) -> bool {
+        self.aff.cpd_rules.iter().take_while(|_| spend(work, 1)).any(|r| rule_at(r, seq, full))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -816,7 +860,7 @@ impl Dictionary {
             }
         }
         let mut hit = None;
-        self.analyze(p, hp, &mut |d| {
+        self.analyze(p, hp, &cx.work, &mut |d| {
             if d.any(a.forbidden) || has(d.flags, a.cpd_forbid) || d.cont(a.cpd_forbid) || has(d.flags, ONLYUPCASE) || (opt.sug && d.any(a.nosuggest)) {
                 return false;
             }
@@ -839,7 +883,7 @@ impl Dictionary {
     }
 
     // the boundary before character e: CHECKCOMPOUNDCASE, -TRIPLE, -PATTERN
-    fn boundary_ok(&self, w: &str, b: &[usize], e: usize) -> bool {
+    fn boundary_ok(&self, w: &str, b: &[usize], e: usize, work: &Cell<u32>) -> bool {
         let a = &self.aff;
         let ch = |i: usize| -> Option<char> { if i + 1 < b.len() { w[b[i]..].chars().next() } else { None } };
         let (l, r) = (ch(e - 1), ch(e));
@@ -862,6 +906,9 @@ impl Dictionary {
             }
         }
         for p in a.cpd_patterns.iter().filter(|p| !p.roots()) {
+            if !spend(work, 1) {
+                return false;
+            }
             if (p.end.is_empty() && p.begin.is_empty()) || !w[..b[e]].ends_with(p.end.as_str()) || !w[b[e]..].starts_with(p.begin.as_str()) {
                 continue;
             }
@@ -872,12 +919,15 @@ impl Dictionary {
 
     // the CHECKCOMPOUNDPATTERNs that look at the roots: the boundary at byte `at` between the
     // parts l and r
-    fn patterns_ok(&self, w: &str, at: usize, l: &Hit, r: &Hit) -> bool {
+    fn patterns_ok(&self, w: &str, at: usize, l: &Hit, r: &Hit, work: &Cell<u32>) -> bool {
         let a = &self.aff;
         if !a.cpd_pat_roots {
             return true;
         }
         for p in a.cpd_patterns.iter().filter(|p| p.roots()) {
+            if !spend(work, 1) {
+                return false;
+            }
             let end_ok = if p.end == "0" { !l.affixed } else { w[..at].ends_with(p.end.as_str()) };
             if end_ok
                 && w[at..].starts_with(p.begin.as_str())
@@ -893,13 +943,17 @@ impl Dictionary {
     // CHECKCOMPOUNDREP: a REP rule turns the compound into a (non-compound) word (as Hunspell:
     // the rules without ^ / $ only; any entry of the list counts, also one only for compounds,
     // and any affixed form that may stand alone)
-    fn rep_word(&self, w: &str, _cx: &mut Ctx) -> bool {
+    fn rep_word(&self, w: &str, cx: &mut Ctx) -> bool {
         let a = &self.aff;
+        let work = &cx.work;
         let entry = |v: &str| {
             let mut hv = self.words.get(v);
-            hv.next().is_some() || self.analyze(v, self.words.get(v), &mut |d| !d.cont(a.onlyincompound) && self.affixes_ok(d))
+            hv.next().is_some() || self.analyze(v, self.words.get(v), work, &mut |d| !d.cont(a.onlyincompound) && self.affixes_ok(d))
         };
         for r in &self.aff.rep {
+            if !spend(work, 1) {
+                return false;
+            }
             if r.from.is_empty() || r.start || r.end {
                 continue;
             }

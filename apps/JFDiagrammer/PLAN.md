@@ -77,7 +77,7 @@ Vorhanden (Details in FEATURES.md 0.4):
   (512 Einträge, 8 MiB je Teil, 32 MiB gesamt, kein ZIP64) sind zu eng für große Zeichnungen.
 - **OPC:** `lib/doc_io/package.rs` und `preservation.rs` behandeln Beziehungen, Inhaltstypen und
   das Erhalten unbekannter Teile, allerdings nur für DOCX.
-- **XML:** `lib/base/xml.rs`.
+- **XML:** `lib/base/xml.rs` (seit 2026-11-21 `lib/formats/src/xml.rs`).
 - **Grafik:** `lib/img_svg` liest SVG und `lib/render2d` zeichnet Pfade und, seit G6c, Text.
   SVG schreiben kann die Bibliothek nicht.
 - **PDF:** Gedruckt wird nur als Rasterbild je Seite; einen Vektor-PDF-Schreiber gibt es nicht.
