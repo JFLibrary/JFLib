@@ -14,6 +14,8 @@
 //   audio_granted() -> bool                sound is allowed now, without asking or recording a
 //                                          refusal (ui's dialog sounds stay silent without it)
 //   net_connect_allowed(addr) / net_listen_allowed(addr) / net_name_allowed(host) -> bool
+//   net_listen_granted(addr) -> bool       net.listen without asking or recording (a UDP socket on
+//                                          port 0: may it answer its peers)
 //   net_host_allowed(host, port) -> bool   (G7d) a connection to a host as written, name or
 //                                          address (the browser's WebSocket resolves itself)
 //   net_resolved(host, addrs)              (resolvers) the addresses of a permitted name:
@@ -88,7 +90,13 @@
 //                         rule, port 53 (DNS) is open too
 //   net.listen ADDR:PORT..    TCP listeners and UDP sockets with a fixed port on ADDR (an
 //                         address, a block, localhost or *; 0.0.0.0 / [::] = every interface)
-//                         and PORT (port 0 = any free one: the rule needs 0 or *)
+//                         and PORT (port 0 = any free one: the rule needs 0 or *).  A UDP socket
+//                         whose address it covers may answer: send to an address it received a
+//                         datagram from in the last 60 s without a net.connect rule (net.rs
+//                         AnswerSet: at most 1024 addresses per socket, so forged source
+//                         addresses cannot grow it; inside a plugin's scope the plugin's
+//                         net.listen must cover the socket too).  Every other datagram needs
+//                         net.connect
 //   ask KEY ARGS.. ["reason"]   (every key but fs.user) the first access asks the user; a
 //                         plain rule that covers the access wins over an ask line
 //   agent.confirm NAME..  agent actions (glob: '*' any run) the user confirms first
@@ -2191,6 +2199,28 @@ pub fn net_connect_allowed(addr: &crate::net::SocketAddr) -> bool {
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub fn net_listen_allowed(addr: &crate::net::SocketAddr) -> bool {
     decide("net.listen", &alloc::format!("{}", addr), &Req::Listen(to16(&addr.ip), addr.port), false) == Verdict::Allow
+}
+
+/// whether net.listen allows a socket on addr now, quietly (nothing recorded, nobody asked; an ask line only by its
+/// answer): a UDP socket on port 0, which needs no rule, may answer its peers when one covers it (net.rs)
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+pub fn net_listen_granted(addr: &crate::net::SocketAddr) -> bool {
+    granted(&Req::Listen(to16(&addr.ip), addr.port))
+}
+
+/// whether a manifest or a plugin's scope on this thread restricts the network (else every datagram may go: a UDP
+/// socket keeps no answers)
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+pub(crate) fn net_restricted() -> bool {
+    active() || scoped_here()
+}
+
+/// whether a UDP socket bound on `bound` may send answers on this thread: outside plugin scopes always (its bind was
+/// allowed), inside them only when every scope's own net.listen covers `bound` (quietly)
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+pub(crate) fn net_answer_scoped(bound: &crate::net::SocketAddr) -> bool {
+    let req = Req::Listen(to16(&bound.ip), bound.port);
+    !scopes_here().iter().any(|s| s.p.as_ref().is_some_and(|pp| pp.grant(&req, &[], &[], false) != Grant::Allow))
 }
 
 /// (G7d) whether a connection to `host` as written (a name, an IPv4 address, an IPv6 address with

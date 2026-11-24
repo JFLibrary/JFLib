@@ -101,7 +101,9 @@ worker threads: there the pool's jobs run between frames.
 
 On Windows, Linux, macOS and iOS plat has TCP, UDP and Unix domain sockets for IPv4 and IPv6 with
 timeouts, name lookups, and the system's trusted certificate authorities, on which `jflib-netio`
-builds HTTP and TLS. Child processes start without a shell, with pipes, and dropping one ends its
+builds HTTP and TLS. With a `PERMISSIONS` file a UDP socket that `net.listen` allows answers the
+addresses that wrote to it in the last minute without a `net.connect` rule (at most 1024 per socket,
+`net::AnswerSet`); every other datagram still needs `net.connect`. Child processes start without a shell, with pipes, and dropping one ends its
 whole process tree. A program can run as a system service (the Windows service control manager,
 systemd, launchd) and keep one instance per user that later starts hand their arguments to; on
 Windows and Linux it can start a helper with administrator rights after the system's prompt.

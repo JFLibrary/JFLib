@@ -3,11 +3,10 @@
 # scripts and agent actions too).  The app's own folders (config://, data://, cache://,
 # logs://) and app:// need no line.  The build checks the syntax; the packages follow the file
 # (Flatpak finish-args, MSIX capabilities: docs/PACKAGING.md).
-# the server: UDP and the WebSocket on the address of --bind (127.0.0.1 unless set)
+# the server: UDP and the WebSocket on the address of --bind (127.0.0.1 unless set); the UDP socket answers every
+# client that writes to it without a net.connect rule (plat: answers of a socket net.listen allows)
 net.listen *:*
-# the UDP server's answers go to every client's address (plat checks send_to against net.connect: with only
-# localhost here a client on the LAN got no CHALLENGE, seen in G7e part 2's first run between two machines);
 # --check: a client of its own on the loopback address
-net.connect *:*
+net.connect localhost:*
 # --web DIR: the files of the browser build named on the command line
 fs.user

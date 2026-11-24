@@ -32,6 +32,7 @@ From then on the rules can only grow by files the user hands over.
 | Checked autostart entry | [`lib/plat/autostart.rs`](../lib/plat/autostart.rs) |
 | Checked sound output (streams, `play`, the system's sounds; `ui.beep`, `ui.dialog_sound`) | [`lib/plat/audio.rs`](../lib/plat/audio.rs), [`lib/ui/sound.rs`](../lib/ui/sound.rs) |
 | Checked global shortcuts and pictures of the screen | [`lib/plat/hotkey.rs`](../lib/plat/hotkey.rs), [`lib/plat/screen.rs`](../lib/plat/screen.rs) |
+| UDP answers without `net.connect` (`AnswerSet`) | [`lib/plat/net.rs`](../lib/plat/net.rs) |
 | Install at start-up, the command line's paths | [`lib/plat/boot.rs`](../lib/plat/boot.rs) (console programs reach it through [`rt::boot`](../lib/rt/boot.rs) and `rt::main!`) |
 | OS sandbox from the manifest (`sandbox` line) | [`lib/plat/sandbox.rs`](../lib/plat/sandbox.rs), [`lib/plat/linux_sandbox.rs`](../lib/plat/linux_sandbox.rs) (Landlock + seccomp), [`lib/plat/win_sandbox.rs`](../lib/plat/win_sandbox.rs) (mitigation policies) |
 | Grants for the user's files, trusted library code, the question dialog, `ui.permissions_page` | [`lib/ui/perm.rs`](../lib/ui/perm.rs) |
@@ -91,8 +92,8 @@ sandbox                               # let the OS enforce the manifest too (OS 
 | `screen.capture` | – | `plat::screen::capture_start` / `ui.screenshot`: pictures of the whole screen or a part of it (BitBlt, GetImage, the screenshot portal). Picking one pixel's colour (`ui.pick_color`, the colour picker's pipette) needs no right: the user chooses the pixel, as a file in the file dialog |
 | `location` | – | `plat::sensors::location_watch`: where the device is, however it knows (Android's `LocationManager`, the browser's geolocation). The system's own permission comes on top: Android asks `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` (the app's `android/AndroidManifest.xml` must list them: `build_rs.py` refuses to build otherwise), the browser asks by itself. Windows and Linux have no location yet: `LocationState::Unavailable` |
 | `sensors` | – | `plat::sensors::watch`: accelerometer, gravity, gyroscope, magnetic field, the rotation estimate. Android and the browsers ask no permission for them (Safari does), but they tell a lot: how the user walks, what the fingers type. Hence a rule of its own. Windows and Linux have no sensors yet: `SensorState::Unavailable` |
-| `net.connect` | `HOST:PORT` | TCP connections and UDP datagrams (`TcpStream::connect`, `UdpSocket::send_to`, and everything built on them: `netio` HTTP, TLS, SMTP, SSH, WebSocket, `netchan`); in the browser the page's WebSocket (`plat::net::WebSocket`, `netchan`) |
-| `net.listen` | `ADDR:PORT` | `TcpListener::bind` and UDP sockets with a fixed port |
+| `net.connect` | `HOST:PORT` | TCP connections and UDP datagrams (`TcpStream::connect`, `UdpSocket::send_to`, and everything built on them: `netio` HTTP, TLS, SMTP, SSH, WebSocket, `netchan`); in the browser the page's WebSocket (`plat::net::WebSocket`, `netchan`). A UDP socket that `net.listen` allows answers without it ([Network rules](#network-rules)) |
+| `net.listen` | `ADDR:PORT` | `TcpListener::bind` and UDP sockets with a fixed port; such a UDP socket may answer the addresses that send to it |
 | `ask KEY ...` | a rule of any key but `fs.user`, then an optional `"reason"` | the same access after the user agreed ([Asking the user](#asking-the-user)) |
 | `agent.confirm` | action names (`*`, `?`) | external control runs these actions after the user's confirmation |
 | `agent.deny` | action names (`*`, `?`) | external control may not run these actions |
@@ -127,6 +128,19 @@ sandbox                               # let the OS enforce the manifest too (OS 
 - `net.listen` takes addresses, blocks, `localhost` or `*`, not names. `0.0.0.0` and `[::]`
   mean every interface and must be listed as such. Port 0 (any free port) needs `0` or `*`.
   A UDP socket on port 0, which is a client's socket, needs no rule.
+- **Answers over UDP.** A UDP socket whose address `net.listen` allows (a fixed port through the
+  check; port 0 when a rule covers it with `0` or `*`, looked at quietly) may send to every
+  address it received a datagram from in the last 60 s, without a `net.connect` rule: a UDP
+  server answers its clients, wherever they are. Sends to an address that did not write first
+  still need `net.connect`. Each socket keeps the senders in a table of at most 1024 addresses
+  (`plat::net::AnswerSet`: two generations of 512, a full or 60 s old one replaces the older);
+  only a datagram renews an address, sending does not. UDP does not prove a sender: whoever can
+  forge a source address opens the way to that address for this socket, as any UDP server
+  answers whoever writes, but cannot grow the table; a flood of forged senders pushes older
+  ones out, and their peers are answered again after their next datagram. Inside a plugin's
+  scope the plugin's own `net.listen` must cover the socket as well. Without a manifest nothing
+  changes (every datagram may go, no table is kept). Windows, Linux, macOS and iOS share this
+  code; Android has no sockets in `plat` yet, the browser no UDP ([TRANSPORT.md](TRANSPORT.md)).
 - Names are checked when they are looked up: `netio::dns::resolve` on Linux and
   `plat::net::resolve` on Windows. A name that no `net.connect` rule covers fails with
   `NetErrorKind::Denied` before any DNS query is sent. Lookups of names that are not allowed
