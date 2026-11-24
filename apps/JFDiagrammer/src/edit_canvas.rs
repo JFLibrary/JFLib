@@ -131,6 +131,8 @@ pub(crate) fn tool_of(app: &Diagrammer) -> u32 {
         RECTANGLE => SE_RECT,
         ELLIPSE => SE_ELLIPSE,
         TEXT_TOOL | TEXT_BOX_V => SE_TEXT,
+        // (JD21 tools) the dimension tools draw a line (tools_dim.rs)
+        DIM_HORIZONTAL | DIM_VERTICAL | DIM_ALIGNED => SE_LINE,
         _ => SE_POINTER,
     }
 }
@@ -893,6 +895,10 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
     }
     // (JD8 rest) a freeform stroke, an arc (cmds_draw.rs)
     if crate::cmds_draw::apply(app, ui, &ev) {
+        return;
+    }
+    // (JD21 tools) a line drawn with a dimension tool is a dimension
+    if crate::tools_dim::apply(app, ui, &ev) {
         return;
     }
     // (JD10) a running move (the glow), the Verbindungspfeile, the insert triangles

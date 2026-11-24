@@ -1238,3 +1238,57 @@ Zuletzt angezeigte Linie	Last displayed line	Última línea mostrada	Ultima line
 Zuerst angezeigte Linie	First displayed line	Primera línea mostrada	Prima linea visualizzata	Première ligne affichée
 Größe der Linienübergänge (waagerecht, senkrecht)	Line jump size (horizontal, vertical)	Tamaño de los saltos de línea (horizontal, vertical)	Dimensioni dei salti di linea (orizzontale, verticale)	Taille des sauts de ligne (horizontale, verticale)
 Richtung der Linienübergänge (waagerecht, senkrecht)	Line jump direction (horizontal, vertical)	Dirección de los saltos de línea (horizontal, vertical)	Direzione dei salti di linea (orizzontale, verticale)	Direction des sauts de ligne (horizontale, verticale)
+Maßlinien	Dimensions	Cotas	Quote	Cotes
+Shapes nummerieren	Number Shapes	Numerar formas	Numera forme	Numéroter les formes
+Beim Ablegen weiterzählen	Continue numbering on drop	Seguir numerando al colocar	Continua a numerare al rilascio	Continuer la numérotation au dépôt
+Shapes vervielfältigen	Array Shapes	Repetir formas en matriz	Ripeti forme in matrice	Répéter les formes en matrice
+Maßlinie horizontal	Horizontal dimension	Cota horizontal	Quota orizzontale	Cote horizontale
+Maßlinie vertikal	Vertical dimension	Cota vertical	Quota verticale	Cote verticale
+Maßlinie ausgerichtet	Aligned dimension	Cota alineada	Quota allineata	Cote alignée
+Kategorien	Categories	Categorías	Categorie	Catégories
+Leiste|Container	Bar	Barra	Barra	Barre
+Doppelrahmen|Container	Double frame	Marco doble	Doppia cornice	Double cadre
+Schiefer|Container	Slate	Pizarra	Ardesia	Ardoise
+Reiter|Container	Tab	Pestaña	Scheda	Onglet
+Kopflinie|Container	Heading rule	Línea de título	Linea del titolo	Filet de titre
+Klammer|Container	Brackets	Corchetes	Parentesi quadre	Crochets
+Signal|Container	Signal	Señal	Segnale	Signal
+Kopf unten|Container	Heading below	Encabezado abajo	Intestazione in basso	En-tête en bas
+Kopfband rechts	Heading band at right	Banda de encabezado a la derecha	Banda intestazione a destra	Bandeau d'en-tête à droite
+Kopfband unten	Heading band at bottom	Banda de encabezado abajo	Banda intestazione in basso	Bandeau d'en-tête en bas
+Titel unten	Title at bottom	Título abajo	Titolo in basso	Titre en bas
+Alle Containerformatvorlagen	All container styles	Todos los estilos de contenedor	Tutti gli stili contenitore	Tous les styles de conteneur
+Nach rechts unten	Right and down	Hacia la derecha y abajo	Verso destra e in basso	Vers la droite et le bas
+Nach links unten	Left and down	Hacia la izquierda y abajo	Verso sinistra e in basso	Vers la gauche et le bas
+Nach rechts oben	Right and up	Hacia la derecha y arriba	Verso destra e in alto	Vers la droite et le haut
+Nach links oben	Left and up	Hacia la izquierda y arriba	Verso sinistra e in alto	Vers la gauche et le haut
+Zwischen den Zeilen ({})	Between rows ({})	Entre filas ({})	Tra le righe ({})	Entre les lignes ({})
+Zwischen den Spalten ({})	Between columns ({})	Entre columnas ({})	Tra le colonne ({})	Entre les colonnes ({})
+Zwischen den Shapes	Between the shapes	Entre las formas	Tra le forme	Entre les formes
+Von Mitte zu Mitte	Center to center	De centro a centro	Da centro a centro	De centre à centre
+Kopien: {}	Copies: {}	Copias: {}	Copie: {}	Copies : {}
+Erforderliche Kategorien	Required categories	Categorías requeridas	Categorie richieste	Catégories requises
+Ausgeschlossene Kategorien	Excluded categories	Categorías excluidas	Categorie escluse	Catégories exclues
+Ein Shape wird Mitglied, wenn es eine der erforderlichen Kategorien hat (ohne Angabe: jede) und keine der ausgeschlossenen. Die Regel gilt ab dem nächsten Verschieben oder Ablegen.	A shape becomes a member when it has one of the required categories (none given: any) and none of the excluded ones. The rule applies from the next move or drop.	Una forma pasa a ser miembro si tiene una de las categorías requeridas (si no se indica ninguna, cualquiera) y ninguna de las excluidas. La regla se aplica a partir del siguiente movimiento o colocación.	Una forma diventa membro se ha una delle categorie richieste (se non ne è indicata nessuna, qualsiasi) e nessuna di quelle escluse. La regola vale dal prossimo spostamento o rilascio.	Une forme devient membre si elle a l'une des catégories requises (aucune indiquée : n'importe laquelle) et aucune des catégories exclues. La règle s'applique au prochain déplacement ou dépôt.
+Kategorien des Shapes	Categories of the shape	Categorías de la forma	Categorie della forma	Catégories de la forme
+Die Shapes haben verschiedene Kategorien; leer lassen behält sie.	The shapes have different categories; leave empty to keep them.	Las formas tienen categorías distintas; déjelo vacío para conservarlas.	Le forme hanno categorie diverse; lasciare vuoto per mantenerle.	Les formes ont des catégories différentes ; laissez vide pour les conserver.
+Mehrere Kategorien durch Semikolon trennen.	Separate several categories with a semicolon.	Separe varias categorías con punto y coma.	Separare più categorie con un punto e virgola.	Séparez plusieurs catégories par un point-virgule.
+Auf dieser Seite: {}	On this page: {}	En esta página: {}	In questa pagina: {}	Sur cette page : {}
+Auswahlreihenfolge	Selection order	Orden de selección	Ordine di selezione	Ordre de sélection
+Von links nach rechts, dann von oben nach unten	Left to right, then top to bottom	De izquierda a derecha, luego de arriba abajo	Da sinistra a destra, poi dall'alto in basso	De gauche à droite, puis de haut en bas
+Von oben nach unten, dann von links nach rechts	Top to bottom, then left to right	De arriba abajo, luego de izquierda a derecha	Dall'alto in basso, poi da sinistra a destra	De haut en bas, puis de gauche à droite
+Entlang der Verbinder	Along the connectors	A lo largo de los conectores	Lungo i connettori	Le long des connecteurs
+Alle Shapes der Seite	All shapes on the page	Todas las formas de la página	Tutte le forme della pagina	Toutes les formes de la page
+Reihenfolge	Order	Orden	Ordine	Ordre
+Für die ganze Seite gilt die Reihenfolge von links nach rechts.	For the whole page the order is left to right.	Para toda la página, el orden es de izquierda a derecha.	Per l'intera pagina l'ordine è da sinistra a destra.	Pour toute la page, l'ordre est de gauche à droite.
+Nummern	Numbers	Números	Numeri	Numéros
+Startnummer	Start number	Número inicial	Numero iniziale	Numéro de départ
+Schrittweite	Interval	Intervalo	Intervallo	Intervalle
+Präfix	Prefix	Prefijo	Prefisso	Préfixe
+Nummer im Text	Number in the text	Número en el texto	Numero nel testo	Numéro dans le texte
+Vor dem Text	Before the text	Antes del texto	Prima del testo	Avant le texte
+Nach dem Text	After the text	Después del texto	Dopo il testo	Après le texte
+Text ersetzen	Replace the text	Reemplazar el texto	Sostituisci il testo	Remplacer le texte
+Beispiel: {}	Example: {}	Ejemplo: {}	Esempio: {}	Exemple : {}
+Add-Ons	Add-Ons	Complementos	Componenti aggiuntivi	Compléments
+Maßlinie	Dimension	Cota	Quota	Cote

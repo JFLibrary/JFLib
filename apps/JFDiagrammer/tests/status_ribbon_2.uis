@@ -8,9 +8,11 @@ theme light
 # RE-06: Einfügen › Container with nothing selected: an empty container, selected
 click tab:"Einfügen"
 click button:"Container"
-expect menuitem:"Klar" exists
-expect menuitem:"Abgerundet" exists
-click menuitem:"Akzent"
+expect button:"Klar" exists
+expect button:"Abgerundet" exists
+# (JD21) the 14 styles as pictures
+expect button:"Kopf unten" exists
+click button:"Akzent"
 expect listitem:"Container" selected
 expect tab:"Format" exists
 key ctrl+z

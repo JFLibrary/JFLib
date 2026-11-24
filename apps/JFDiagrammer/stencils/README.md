@@ -224,6 +224,9 @@ Row  Value = ABS(Width); Unit = mm; Format = "0 u"; Type = 2
   der Wert folgt jeder Änderung (`diagram_core::field::marked`, `instance::place`).
 - Im Einsatz: die Bemaßungen der Rack-Schablone (`rack_equipment/dim_*.master`) und die
   Auto-Bemaßung der Beschriftungen (`callouts/auto_dimension.master`, zeigt ihre eigene Länge).
+  (JD21) Ansicht › Add-Ons › Maßlinien legt genau diese drei Master ab (horizontal, vertikal,
+  ausgerichtet) und setzt ihre Enden an Shapes (`diagram_core::tools::dimension`); ihre NameU und
+  der Steuerpunkt `Controls.Line` sind dafür fest.
 
 ## 1D-Shapes (Verbinder, Linienpfeile)
 
@@ -389,6 +392,13 @@ Regeln für die Master:
   verschwindet der Kopf samt Text (`HideText`), die Box bleibt sauber gezeichnet. Beim Master
   `Container` sind beide Formeln aus `msvSDHeadingStyle` (1 Kopfband oben, 2 nur Titel oben,
   3 Kopfband links, 4 ohne Kopf).
+- (JD21, ST-02) Der Master `Container` hat 14 Containerstile (`msvSDContainerStyleCount = 14`;
+  1–6 unverändert seit JD10, 7–14: Leiste, Doppelrahmen, Schiefer, Reiter, Kopflinie, Klammer,
+  Signal, Kopf unten) und je Stil 2–4 Kopfzeilenstile (`msvSDHeadingStyleCount` per Formel aus dem
+  Stil; Stil 14 legt den Kopf unten bzw. rechts). Ein Kopfzeilenstil über der Anzahl zeigt keinen
+  Kopf. Die App zeigt die Stile als Galerien mit Bildern dieses Masters (`container_styles.rs`)
+  und bietet nur so viele Stile an, wie der Master des Containers hat (ältere Zeichnungen: 6).
+  Probeblatt: `diagramiotest --write-stencil-previews DIR` › `container-styles.png`.
 - Geometrie nur aus `Width`, `Height` und Zellformeln: die App vergrößert die Shapes per Code.
   Teile, die ein Stil nicht zeigt, schaltet `NoShow` im Geometrieabschnitt ab; ein Shape hat
   eine Linie und eine Füllung, verschiedene Looks entstehen über `NoFill`/`NoLine` je Abschnitt.

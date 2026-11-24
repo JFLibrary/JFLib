@@ -392,6 +392,32 @@ commands! {
     DIAGRAM_FLIP_H = 0x1C59, "Diagramm horizontal spiegeln", JD_FLIP_H, 0;
     // (JD21 jumps) the dialog Verbinder-Verhalten (line jumps per connector, jumps_ui.rs)
     CONN_BEHAVIOR = 0x1C20, "Verbinder-Verhalten", 0, 0;
+    // (JD21 tools) Ansicht › Add-Ons: Shapes nummerieren, vervielfältigen (Array), Maßlinien;
+    // Kategorien; container styles 7-14 and Einfügen › Container in them (addons.rs)
+    DIMENSIONS = 0x1CA0, "Maßlinien", JD_DIMENSION, JD_DIMENSION_L;
+    NUMBER_SHAPES = 0x1CA1, "Shapes nummerieren", JD_NUMBER_SHAPES, JD_NUMBER_SHAPES_L;
+    NUMBER_ON_DROP = 0x1CA2, "Beim Ablegen weiterzählen", 0, 0;
+    ARRAY_SHAPES = 0x1CA3, "Shapes vervielfältigen", JD_ARRAY_SHAPES, JD_ARRAY_SHAPES_L;
+    DIM_HORIZONTAL = 0x1CA4, "Maßlinie horizontal", JD_DIMENSION, 0;
+    DIM_VERTICAL = 0x1CA5, "Maßlinie vertikal", JD_DIMENSION, 0;
+    DIM_ALIGNED = 0x1CA6, "Maßlinie ausgerichtet", JD_DIMENSION, 0;
+    CATEGORIES = 0x1CA7, "Kategorien", JD_SHOW_TAGS, 0;
+    CT_STYLE_7 = 0x1CA8, "Leiste|Container", JD_CONTAINER, 0;
+    CT_STYLE_8 = 0x1CA9, "Doppelrahmen|Container", JD_CONTAINER, 0;
+    CT_STYLE_9 = 0x1CAA, "Schiefer|Container", JD_CONTAINER, 0;
+    CT_STYLE_10 = 0x1CAB, "Reiter|Container", JD_CONTAINER, 0;
+    CT_STYLE_11 = 0x1CAC, "Kopflinie|Container", JD_CONTAINER, 0;
+    CT_STYLE_12 = 0x1CAD, "Klammer|Container", JD_CONTAINER, 0;
+    CT_STYLE_13 = 0x1CAE, "Signal|Container", JD_CONTAINER, 0;
+    CT_STYLE_14 = 0x1CAF, "Kopf unten|Container", JD_CONTAINER, 0;
+    CONTAINER_7 = 0x1CB0, "Leiste|Container", JD_CONTAINER, 0;
+    CONTAINER_8 = 0x1CB1, "Doppelrahmen|Container", JD_CONTAINER, 0;
+    CONTAINER_9 = 0x1CB2, "Schiefer|Container", JD_CONTAINER, 0;
+    CONTAINER_10 = 0x1CB3, "Reiter|Container", JD_CONTAINER, 0;
+    CONTAINER_11 = 0x1CB4, "Kopflinie|Container", JD_CONTAINER, 0;
+    CONTAINER_12 = 0x1CB5, "Klammer|Container", JD_CONTAINER, 0;
+    CONTAINER_13 = 0x1CB6, "Signal|Container", JD_CONTAINER, 0;
+    CONTAINER_14 = 0x1CB7, "Kopf unten|Container", JD_CONTAINER, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -657,6 +683,15 @@ static HANDLERS: &[(u32, Handler)] = &[
     // (JD21 jumps) Linienübergänge anzeigen, Verbinder-Verhalten (jumps_ui.rs)
     (LINE_JUMPS, crate::jumps_ui::toggle),
     (CONN_BEHAVIOR, crate::jumps_ui::open),
+    // (JD21 tools) Ansicht › Add-Ons, Kategorien (addons.rs; the container styles: structures_cmds)
+    (DIMENSIONS, |a, ui| crate::cmds_shell::open_menu(a, ui, DIMENSIONS)),
+    (NUMBER_SHAPES, crate::dlg_number::open),
+    (NUMBER_ON_DROP, crate::dlg_number::toggle_drop),
+    (ARRAY_SHAPES, crate::dlg_array::open),
+    (DIM_HORIZONTAL, |a, ui| crate::tools_dim::run(a, ui, DIM_HORIZONTAL)),
+    (DIM_VERTICAL, |a, ui| crate::tools_dim::run(a, ui, DIM_VERTICAL)),
+    (DIM_ALIGNED, |a, ui| crate::tools_dim::run(a, ui, DIM_ALIGNED)),
+    (CATEGORIES, crate::dlg_categories::open),
 ];
 
 // toggles: whether the command is on
@@ -733,6 +768,11 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (AVOID_BREAKS, crate::layout_cmds::avoid_on),
     // (JD21 jumps) the page shown has line jumps
     (LINE_JUMPS, crate::jumps_ui::shown),
+    // (JD21 tools) the page numbers dropped shapes; a dimension tool is on
+    (NUMBER_ON_DROP, crate::dlg_number::drop_on),
+    (DIM_HORIZONTAL, |a| a.tool == DIM_HORIZONTAL),
+    (DIM_VERTICAL, |a| a.tool == DIM_VERTICAL),
+    (DIM_ALIGNED, |a| a.tool == DIM_ALIGNED),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -764,6 +804,8 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
         && crate::layout_cmds::available(app, id)
         // (JD21 jumps) Linienübergänge anzeigen, Verbinder-Verhalten
         && crate::jumps_ui::available(app, id)
+        // (JD21 tools) Add-Ons, Kategorien, the container styles a master has
+        && crate::addons::available(app, id)
 }
 
 /// the toggle is on

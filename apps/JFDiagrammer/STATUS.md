@@ -46,7 +46,7 @@ Leseschlüssel:
 | 2.6 Format: Linie, Füllung, Schatten, Effekte | 3 | 2 | 0 | 0 | 1 | 1 |
 | 2.7 Text und Felder | 6 | 2 | 0 | 0 | 0 | 2 |
 | 2.8 Verbinder, Kleben, Routing und Layout | 4 | 6 | 0 | 2 | 1 | 4 |
-| 2.9 Container, Listen, Swimlanes, Beschriftungen, Legenden | 4 | 1 | 0 | 1 | 0 | 2 |
+| 2.9 Container, Listen, Swimlanes, Beschriftungen, Legenden | 5 | 0 | 0 | 1 | 0 | 2 |
 | 2.10 Daten | 2 | 0 | 0 | 1 | 1 | 6 |
 | 2.11 Hyperlinks, QuickInfos und Kommentare | 1 | 0 | 0 | 0 | 0 | 4 |
 | 2.12 Designs (Themes), Varianten und Schnellformatvorlagen | 4 | 0 | 0 | 1 | 0 | 1 |
@@ -59,7 +59,7 @@ Leseschlüssel:
 | 3.6 Register „Entwurf“ | 7 | 1 | 0 | 1 | 0 | 2 |
 | 3.7 Register „Daten“ | 0 | 1 | 0 | 3 | 0 | 4 |
 | 3.8 Register „Prozess“ | 0 | 0 | 0 | 0 | 0 | 5 |
-| 3.9 Register „Überprüfen“, „Ansicht“, „Entwicklertools“, „Hilfe“ | 3 | 3 | 0 | 0 | 1 | 15 |
+| 3.9 Register „Überprüfen“, „Ansicht“, „Entwicklertools“, „Hilfe“ | 3 | 3 | 0 | 1 | 1 | 14 |
 | 3.10 Kontext- und Vorlagenregister | 1 | 2 | 0 | 0 | 0 | 4 |
 | 3.11 Shapes-Seitenleiste | 3 | 5 | 0 | 0 | 2 | 0 |
 | 3.12 Zeichenfenster | 5 | 11 | 0 | 0 | 1 | 5 |
@@ -73,10 +73,10 @@ Leseschlüssel:
 | 4.14 Vorschläge für eigene Kategorien | 0 | 0 | 0 | 0 | 0 | 6 |
 | 5.1 Vorlagen-Infrastruktur | 4 | 0 | 0 | 0 | 0 | 0 |
 | 5.2 Vorlagen nach Kategorie | 6 | 1 | 0 | 2 | 1 | 10 |
-| 5.3 Assistenten und Generatoren | 0 | 0 | 0 | 3 | 0 | 4 |
-| **zusammen** | **177** | **103** | **1** | **42** | **37** | **178** |
+| 5.3 Assistenten und Generatoren | 0 | 0 | 0 | 4 | 0 | 3 |
+| **zusammen** | **178** | **102** | **1** | **44** | **37** | **176** |
 
-P2-Zeilen, die schon fertig sind (42): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, CN-06, CN-14, ST-09, DA-05, TH-06, SS-11, SS-21, SS-22, SS-31, SS-33, SS-36, FX-11, FX-12, RW-09, RD-02, RD-03, RD-09, LG-05, SH-003, SH-004, SH-007, SH-031, SH-032, SH-033, SH-041, VL-32, VL-38, AS-03, AS-04, AS-20.
+P2-Zeilen, die schon fertig sind (44): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, CN-06, CN-14, ST-09, DA-05, TH-06, SS-11, SS-21, SS-22, SS-31, SS-33, SS-36, FX-11, FX-12, RW-09, RD-02, RD-03, RD-09, RA-09, LG-05, SH-003, SH-004, SH-007, SH-031, SH-032, SH-033, SH-041, VL-32, VL-38, AS-03, AS-04, AS-11, AS-20.
 <!-- summary:end -->
 
 ## Offene Entscheidungen des Nutzers
@@ -126,7 +126,6 @@ L = mehr. P2-Teile von P1-Zeilen stehen bei ihrer P2-Etappe.
 | JD21 | CN-04, CN-05, SS-19, SS-40 | Knick- und Segment-Ziehpunkte; Routing-Stile, Richtung, Durchlässigkeit je Richtung | M |
 | JD21 | CN-07, SL-06, ZF-10 | Schnell-Shapes-Leiste an den Verbindungspfeilen mit Livevorschau | M |
 | JD21 | CN-16 | Einfügen › Verbinder mit dem Verbinder-Master der markierten Kachel (Shapes verbinden kann es) | S |
-| JD21 | ST-02 | Container-Stilkatalog (14) als Galerie, Kategorien bearbeiten | S |
 | JD21 | RS-27 | Zu Gruppe hinzufügen / Aus Gruppe entfernen | S |
 | JD21 | SL-03, PR-09 | Strg-Ziehen mehrerer Master, Teilen beim Ablegen auf Verbinder, Leuchten von Container/Liste | M |
 | JD22 | DM-03, RA-07 | Einrast- und Klebeziele, Stärke, Einrastwinkel, im Dokument speichern | S |
@@ -367,7 +366,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | ID | Feature | Prio | Stand | Beleg | Fehlt |
 |---|---|---|---|---|---|
 | ST-01 | Container | P1 | fertig | structures_container.uis; core structure::tests (membership_follows_moves, container_carries_its_members, overlapping_containers_both_take_a_shape); dit structures | – |
-| ST-02 | Containerformat | P1 | teilweise | structures_container.uis, context.uis (Container-Tools: Ränder, Größe, Sperren, Inhalt, Auflösen, 4 Kopfzeilenstile) | 6 statt 14 Stile, als Menü statt Galerie; ausgeschlossene/erforderliche Kategorien ohne Oberfläche |
+| ST-02 | Containerformat | P1 | fertig | structures_styles.uis (14 Stile als Galerie mit Livevorschau, Kopfzeilenstile je Stil, Einfügen › Container), structures_categories.uis (erforderliche/ausgeschlossene Kategorien, Kategorien des Shapes), structures_container.uis, context.uis, status_ribbon_3.uis; dit stencils (stencils/structure/container/styles: 14 Stile × Kopfzeilenstile); Visio-Gegenprobe JD21 offen | – |
 | ST-03 | Randmitglieder | P2 | fehlt | – | alles (JD21) |
 | ST-04 | Listen | P1 | fertig | structures_list.uis; core structure::tests::lists_keep_order, structure_functions (LISTORDER) | – |
 | ST-05 | Swimlanes | P1 | fertig | structures_cff.uis, context_jd15.uis (Bahn davor/danach einfügen); dit structures | – |
@@ -618,7 +617,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | RA-06 | Dyn. Gitter, Verbindungspfeile, Verbindungspunkte | P1 | fertig | tests/edit_view.uis, tests/structures_arrows.uis, tests/status_ribbon_2.uis, tests/canvas_snap.uis (Verbindungspunkte aller Shapes, Pixelprüfung) | – |
 | RA-07 | DS Ausrichten und Kleben | P1 | teilweise | tests/canvas_snap.uis (Dialogstarter und Alt+F9 öffnen den Dialog; OK übernimmt, Abbrechen nicht) | übrige Ziele (Geometrie, Ziehpunkte, Scheitelpunkte …), Kleben-Ziele, Einraststärke, im Dokument speichern (DM-03; JD22) |
 | RA-08 | Neues Fenster, Anordnen, Wechseln | P2 | fehlt | – | (JD25) |
-| RA-09 | Add-Ons (Array, Nummerieren) | P2 | fehlt | – | (JD21) |
+| RA-09 | Add-Ons (Array, Nummerieren) | P2 | fertig | tools_number.uis, tools_array.uis, tools_dimension.uis (Ansicht › Add-Ons); core tools::tests; Zeichnung drucken nach Bereichen ist P3 | – |
 | RX-03 | ShapeSheet anzeigen | P2 | fehlt | – | Register fehlt (JD23) |
 | RX-04 | Zeichentools, Vorgänge, Gruppieren | P1 | teilweise | tests/draw_tools.uis, tests/edit_group.uis (im Register Start) | Register Entwicklertools (JD23); Vorgänge (P2, SP-08, JD21) |
 | RX-05 | Shape-Name | P2 | fehlt | – | (JD23) |
@@ -918,6 +917,6 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | AS-03 | Datenauswahl-Assistent | P2 | fertig | data_import_xlsx.uis, data_import_csv.uis (Quelle, Bereich, Spalten und Zeilen, Schlüssel) | – |
 | AS-04 | Daten verknüpfen | P2 | fertig | data_link.uis (Seite oder Auswahl, mehrere Paare, ersetzen, Rückgängig) | – |
 | AS-05 | Berichtsdefinition | P2 | fehlt | – | → JD19 |
-| AS-11 | Shapes nummerieren, Array, Maßlinien | P2 | fehlt | – | → JD21 |
+| AS-11 | Shapes nummerieren, Array, Maßlinien | P2 | fertig | tools_number.uis (Auswahlreihenfolge, Zeilen, Präfix/Start/Schritt, vor/nach dem Text, Undo, Weiterzählen beim Ablegen), tools_array.uis (2×3 mit Abstand, Mitte zu Mitte, Richtung), tools_dimension.uis (zwischen zwei Shapes, an einem Shape, als Werkzeug; folgt beim Verschieben); core tools::tests; Visio-Gegenprobe JD21 offen | – |
 | AS-17 | Verhalten-Assistent (ohne Formeln) | P2 | fehlt | – | → JD23 |
 | AS-20 | Verbundene Zeichnung aus Text | P2 | fertig | data_text_drawing.uis (Vorschau der Datensätze und Probleme als Tabelle, Trennzeichen und Einheit, Master-Zuordnung aus geöffneten Schablonen und Zeichnung, angezeigte oder neue Seite) | – |

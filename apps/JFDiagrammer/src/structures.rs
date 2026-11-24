@@ -212,6 +212,8 @@ pub(crate) fn dropped(tx: &mut Transaction, eng: &mut Engine, m: &Masters, owner
     }
     crate::rack::docked(tx, eng, owner, &[s])?;
     settle(tx, eng, owner, &[s], true)?;
+    // (JD21 tools) Beim Ablegen weiterzählen: the page's next number (dlg_number.rs)
+    diagram_core::tools::number::dropped(tx, eng, s)?;
     // (JD13) legends count the devices of the page
     crate::legend::refresh(tx, eng, owner)
 }

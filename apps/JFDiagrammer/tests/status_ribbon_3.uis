@@ -37,17 +37,16 @@ click menuitem:"Immer an Inhalt anpassen"
 click button:"Automatische Größe"
 expect menuitem:"Immer an Inhalt anpassen" checked
 key esc
-click button:"Containerformatvorlagen"
-expect menuitem:"Klar" checked
-click menuitem:"Akzent"
-click button:"Containerformatvorlagen"
-expect menuitem:"Akzent" checked
-key esc
+# (JD21) the styles as a gallery of pictures, the heading styles as pictures too
+expect button:"Klar" checked
+click button:"Akzent"
+expect button:"Akzent" checked
+expect button:"Klar" unchecked
 click button:"Kopfzeilenstil"
-expect menuitem:"Kopfband oben" checked
-click menuitem:"Kopfband links"
+expect button:"Kopfband oben" checked
+click button:"Kopfband links"
 click button:"Kopfzeilenstil"
-expect menuitem:"Kopfband links" checked
+expect button:"Kopfband links" checked
 key esc
 expect button:"Container sperren" unchecked
 click button:"Container sperren"
