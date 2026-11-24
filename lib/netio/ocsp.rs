@@ -76,5 +76,6 @@ pub fn refresh(staples: &Staples, client: &Client, chain: &[Vec<u8>], issuer: Op
     };
     let (der, _) = fetch(client, &leaf, issuer)?;
     let r = staples.set(chain, Some(issuer), der)?;
-    Ok(r.next_fetch(now))
+    // the minute's floor from when the fetch is done
+    Ok(r.next_fetch(staples.now()))
 }

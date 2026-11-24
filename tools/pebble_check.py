@@ -12,9 +12,10 @@ challenge servers off.  `coretest --acme-pebble` runs the checks: http-01, tls-a
 with a wildcard, an IP address, a profile, an invalid challenge, the account keys ES256, ES384,
 RS256 and EdDSA, renewal information and an order that replaces, revocation by the account and by
 the certificate's key, key change, contact, deactivation; every chain verified to Pebble's root.
-A second Pebble that requires an external account binding checks EAB.  Pebble reuses no
-authorization (PEBBLE_AUTHZREUSE=0: every order proves its names with the challenge it is
-about) and refuses 1 % of good nonces (--nonce-reject; Pebble's own default is 5 %, where three
+A second Pebble that requires an external account binding checks EAB.  Pebble reuses
+authorizations only now and then (PEBBLE_AUTHZREUSE=0; it still may, about once in a hundred),
+and the check of an IP address by tls-alpn-01 orders on an account of its own, so it proves its
+name by the challenge it is about; Pebble refuses 1 % of good nonces (--nonce-reject; Pebble's own default is 5 %, where three
 refusals of one request in a row would fail a run now and then): the client tries again with
 the nonce of the refusal.  The run's folder (PKI, config, logs) goes at the end unless --keep;
 the log of a Pebble whose checks failed is shown before.  Linux; exit code 1 on a failure."""

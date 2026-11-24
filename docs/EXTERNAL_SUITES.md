@@ -358,9 +358,10 @@ kind of key besides.
 client tests: the same protocol as its production CA, with its checks made stricter on purpose
 (it refuses good nonces at random, sends Retry-After). The run sets the refusals to 1 %
 (`--nonce-reject`; Pebble's own 5 % would now and then refuse one request three times in a row)
-and turns off the reuse of authorizations (`PEBBLE_AUTHZREUSE=0`), so each order proves its names
-by the challenge it is about; the check of an IP address by tls-alpn-01 also counts the
-challenges the solver set up. The release
+and turns the reuse of authorizations down (`PEBBLE_AUTHZREUSE=0`; Pebble may still reuse one about
+once in a hundred). The check of an IP address by tls-alpn-01, which follows one by http-01, orders
+on an account of its own, so no authorization of the first can stand in, and counts the challenges
+the solver set up. The release
 binaries of Pebble and pebble-challtestsrv come into `build/pebble/v2.10.1` once (`gh release
 download`). The tool writes Pebble a config of the run: its https certificate is the server
 certificate of `coretest --tls-pki DIR --key p256` (the client trusts that CA), the challenge

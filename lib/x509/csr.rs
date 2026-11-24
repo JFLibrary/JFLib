@@ -147,6 +147,8 @@ impl Csr {
             return None;
         }
         let mut a = Der::new(attrs);
+        // the extensions of every extensionRequest: each once in the request
+        let mut seen: Vec<&[u8]> = Vec::new();
         while !a.is_empty() {
             let mut attr = a.seq()?;
             let id = attr.read(der::OID)?;
@@ -161,7 +163,6 @@ impl Csr {
             if !vals.is_empty() {
                 return None;
             }
-            let mut seen: Vec<&[u8]> = Vec::new();
             while !exts.is_empty() {
                 let mut e = exts.seq()?;
                 let eid = e.read(der::OID)?;

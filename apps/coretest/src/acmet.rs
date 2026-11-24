@@ -259,6 +259,19 @@ fn issuance(t: &mut T, p: &Pki, rig: &Rig) {
     let second = other.present(&id, &ch2, "an0th3r.thumb");
     other.cleanup(&id, &ch2);
     t.check("acme: tls-alpn-01: a second challenge for a name is refused, its cleanup leaves the first", second.is_err() && hs(&["acme-tls/1"]) == Some((Some(String::from("acme-tls/1")), true)));
+    // the same challenge set up twice (two orders the CA gave it to): its first certificate
+    // stays, and stays until both are cleaned up
+    let shown_der = || {
+        let mut c = tls::Conn::client(ClientConfig { alpn: alloc::vec![String::from("acme-tls/1")], ..ClientConfig::new(Trust::Any, "c.example.test") });
+        let mut s = tls::Conn::server(bare.clone());
+        crate::tlsweb::pump(&mut c, &mut s).ok().and_then(|_| c.peer_certs().first().map(|x| x.der.clone()))
+    };
+    let first_der = shown_der();
+    let mut twin = solo.clone();
+    let again = twin.present(&id, &ch, "t0k3n.thumb");
+    let kept = shown_der() == first_der;
+    twin.cleanup(&id, &ch);
+    t.check("acme: ... the same challenge twice keeps its certificate, and it stays after one cleanup", again.is_ok() && first_der.is_some() && kept && shown_der() == first_der);
     up.cleanup(&id, &ch);
     t.check("acme: ... once the first is cleaned up the name is free", other.present(&id, &ch2, "an0th3r.thumb").is_ok());
     other.cleanup(&id, &ch2);
@@ -433,6 +446,33 @@ fn faults(t: &mut T, p: &Pki) {
         t.check("acme: ... a Retry-After date with a year of 19 digits counts as none", matches!(r, Err(AcmeError::Problem(ref p)) if p.is("rateLimited") && p.retry_after.is_none()));
         rig.stop();
     }
+    // a newNonce so slow that the deadline passes while it answers: the look is not sent
+    if let Some(rig) = start_rig(t, p, "slow_nonce", Faults { lone_nonces: true, slow_nonce_ms: 600, ..Faults::default() }) {
+        let acc = new_acme(p, &rig.acme).and_then(|mut a| {
+            a.timeout_ms = 300;
+            a.account(key(Kind::P256, 185), &agreed())
+        });
+        if let Some((acc, order)) = need(t, "slow_nonce: an order", acc.and_then(|acc| acc.new_order(&ids(&["sn.example.test"]), &OrderOptions::default()).map(|o| (acc, o)))) {
+            let before = rig.acme.state.lock().requests;
+            let r = order.authorizations.first().map(|u| acc.wait_authorization(u));
+            let after = rig.acme.state.lock().requests;
+            t.check("acme: the deadline passes while newNonce answers: Timeout, the look not sent (the HEAD only)", matches!(r, Some(Err(AcmeError::Timeout(_)))) && after == before + 1);
+        }
+        rig.stop();
+    }
+    // an order finalize makes invalid: that is final, no wait
+    if let Some(rig) = start_rig(t, p, "finalize_invalid", Faults { finalize_invalid: true, ..Faults::default() }) {
+        let acc = new_acme(p, &rig.acme).and_then(|mut a| {
+            a.timeout_ms = 3000;
+            a.poll_ms = 10_000;
+            a.account(key(Kind::P256, 186), &agreed())
+        });
+        if let Some(acc) = need(t, "finalize_invalid: the account", acc) {
+            let r = acc.issue(&ids(&["fi.example.test"]), &key(Kind::P256, 187), &mut rig.http01.clone(), &OrderOptions::default());
+            t.check("acme: an order finalize makes invalid: Invalid with the CA's error, no wait", matches!(r, Err(AcmeError::Invalid(_, Some(ref p))) if p.is("badCSR")));
+        }
+        rig.stop();
+    }
     // a CA that does not decide: the wait ends
     if let Some(rig) = start_rig(t, p, "stall", Faults { stall: true, ..Faults::default() }) {
         let r = new_acme(p, &rig.acme).and_then(|mut a| {
@@ -582,8 +622,10 @@ pub fn pebble() -> i32 {
     check("pebble: dns-01 for a wildcard (challtestsrv), http-01 beside it", r.as_ref().is_ok_and(|i| chain_ok(i, "x.w.example.test") && chain_ok(i, "w.example.test")), &err(&r));
     let r = acc.issue(&ids(&["127.0.0.1"]), &ck, &mut http01.clone(), &OrderOptions::default());
     check("pebble: an IP address (RFC 8738) by http-01", r.as_ref().is_ok_and(|i| chain_ok(i, "127.0.0.1")), &err(&r));
+    // (an account of its own: Pebble reuses a valid authorization of the same account now and
+    // then even with PEBBLE_AUTHZREUSE=0)
     let seen = Arc::new(Mutex::new(Vec::new()));
-    let r = acc.issue(&ids(&["127.0.0.1"]), &key(Kind::P256, 212), &mut Seen(alpn.clone(), seen.clone()), &OrderOptions::default());
+    let r = a.account(key(Kind::P256, 213), &agreed()).and_then(|own| own.issue(&ids(&["127.0.0.1"]), &key(Kind::P256, 212), &mut Seen(alpn.clone(), seen.clone()), &OrderOptions::default()));
     let proved = seen.lock().len();
     check("pebble: ... and by tls-alpn-01 (the reverse name in server_name; proved, not reused)", r.as_ref().is_ok_and(|i| chain_ok(i, "127.0.0.1")) && proved == 1, &format!("{} (challenges set up: {})", err(&r), proved));
     let r = acc.issue(&ids(&["s.example.test"]), &ck, &mut http01.clone(), &OrderOptions { profile: Some(String::from("shortlived")), ..OrderOptions::default() });

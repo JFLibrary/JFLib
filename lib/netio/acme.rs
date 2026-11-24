@@ -265,18 +265,22 @@ impl Answer {
 }
 
 /// a URL of a Location or Link header against the URL of the request (RFC 9110 10.2.2,
-/// RFC 8288 3.2), as RFC 3986 5.2 resolves a reference: absolute as it is, "//host/path" on the
-/// request's scheme, "/path" on its origin, else beside its path ("." and ".." taken out)
+/// RFC 8288 3.2), as RFC 3986 5.2 resolves a reference: absolute on its own authority,
+/// "//host/path" on the request's scheme, "/path" on its origin, else beside its path; "." and
+/// ".." taken out of the path every time (host, port and query as they are)
 fn resolve(base: &str, r: &str) -> String {
     // a scheme: an absolute URL
     let scheme_end = r.find(':').filter(|&i| i > 0 && !r[..i].contains(['/', '?', '#']));
-    if scheme_end.is_some() {
-        return String::from(r);
+    if let Some(i) = scheme_end {
+        return match r[i + 1..].strip_prefix("//") {
+            Some(rest) => format!("{}://{}", &r[..i], authority_path(rest)),
+            None => String::from(r),
+        };
     }
     let Some(u) = Url::parse(base) else { return String::from(r) };
     let scheme = base.split_once(':').map_or("https", |(s, _)| s);
-    if r.starts_with("//") {
-        return format!("{}:{}", scheme, r);
+    if let Some(rest) = r.strip_prefix("//") {
+        return format!("{}://{}", scheme, authority_path(rest));
     }
     let path = u.target.split(['?', '#']).next().unwrap_or("");
     if r.is_empty() || r.starts_with('#') {
@@ -288,6 +292,13 @@ fn resolve(base: &str, r: &str) -> String {
     }
     let merged = if r.starts_with('/') { String::from(r) } else { format!("{}/{}", path.rsplit_once('/').map_or("", |(d, _)| d), r) };
     format!("{}{}", u.origin(), remove_dots(&merged))
+}
+
+/// "authority/path?query" with the path's "." and ".." segments taken out
+fn authority_path(rest: &str) -> String {
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let (auth, tail) = rest.split_at(end);
+    if tail.starts_with('/') { format!("{}{}", auth, remove_dots(tail)) } else { String::from(rest) }
 }
 
 /// a path without its "." and ".." segments (RFC 3986 5.2.4); the query stays as it is
@@ -776,13 +787,22 @@ impl Acme {
     /// tried again with the nonce of that answer (RFC 8555 6.5: the retry's own, not shared
     /// with the clones); the nonces of other answers are kept for the next requests
     fn post(&self, key: &PrivateKey, kid: Option<&str>, url: &str, payload: Option<&Value>, max: usize) -> Result<Answer, AcmeError> {
+        self.post_until(key, kid, url, payload, max, None)
+    }
+
+    /// post, but none sent once `deadline` (ms) is reached: Timeout then (checked before the
+    /// nonce and again before the POST, which a slow newNonce may have delayed)
+    fn post_until(&self, key: &PrivateKey, kid: Option<&str>, url: &str, payload: Option<&Value>, max: usize, deadline: Option<u64>) -> Result<Answer, AcmeError> {
         let (alg, _) = jws_alg(key)?;
+        let in_time = || deadline.map_or(Ok(()), Account::in_time);
         let mut next: Option<String> = None;
         for attempt in 0..3 {
+            in_time()?;
             let nonce = match next.take() {
                 Some(n) => n,
                 None => self.nonce()?,
             };
+            in_time()?;
             let mut protected = Value::object([("alg", Value::string(alg)), ("nonce", Value::string(nonce)), ("url", Value::string(url))]);
             match kid {
                 Some(k) => protected.insert("kid", Value::string(k)),
@@ -929,6 +949,11 @@ impl Account {
         self.acme.post(&self.key, Some(&self.url), url, payload, MAX_ANSWER)
     }
 
+    /// a look (POST-as-GET) that is not sent once `deadline` is reached
+    fn look(&self, url: &str, deadline: u64) -> Result<Answer, AcmeError> {
+        self.acme.post_until(&self.key, Some(&self.url), url, None, MAX_ANSWER, Some(deadline))
+    }
+
     /// what a challenge with this token must show (RFC 8555 8.1): token "." the thumbprint of
     /// the account key
     pub fn key_authorization(&self, token: &str) -> String {
@@ -1002,8 +1027,7 @@ impl Account {
     pub fn wait_authorization(&self, url: &str) -> Result<Authorization, AcmeError> {
         let deadline = (plat::time_us() / 1000) + self.acme.timeout_ms;
         loop {
-            Self::in_time(deadline)?;
-            let a = self.post(url, None)?;
+            let a = self.look(url, deadline)?;
             let retry = a.retry_after();
             let z = Authorization::from_json(https_url(url)?, &a.json()?)?;
             match z.status.as_str() {
@@ -1027,8 +1051,7 @@ impl Account {
             self.pause(retry, deadline)?;
         }
         loop {
-            Self::in_time(deadline)?;
-            let a = self.post(url, None)?;
+            let a = self.look(url, deadline)?;
             let retry = a.retry_after();
             let o = Order::from_json(https_url(url)?, &a.json()?)?;
             match o.status.as_str() {
@@ -1099,7 +1122,12 @@ impl Account {
             b.cn = b.dns.first().filter(|d| d.len() <= 64).cloned().unwrap_or_default();
             let csr = b.sign(cert_key).ok_or_else(|| proto("the certificate request cannot be made (a name, the key)"))?;
             let (o, retry) = self.finalize_retry(&order, &csr)?;
-            if o.status == "valid" { o } else { self.wait_order_after(&o.url, Some(retry))? }
+            match o.status.as_str() {
+                "valid" => o,
+                // final (RFC 8555 7.1.6): the CA's error as it is, no look more
+                "invalid" => return Err(AcmeError::Invalid(String::from("the order is invalid"), o.error)),
+                _ => self.wait_order_after(&o.url, Some(retry))?,
+            }
         } else {
             order
         };
@@ -1247,12 +1275,13 @@ impl Solver for Http01 {
 
 /// tls-alpn-01 (RFC 8737): a certificate for the challenge, shown on port 443 to a client that
 /// offers only "acme-tls/1".  Clones share the certificates: one goes to the solver, one into
-/// the server's config (setup).  A name has one challenge at a time: a second one for it fails
-/// to be set up until the first is cleaned up
+/// the server's config (setup).  A name has one challenge at a time: another one for it fails
+/// to be set up until the first is cleaned up; the same challenge set up twice (two orders the
+/// CA gave it to) keeps its first certificate and stays until both are cleaned up
 #[derive(Clone, Default)]
 pub struct TlsAlpn01 {
-    /// the server name -> the challenge's token and certificate
-    ids: Arc<Mutex<BTreeMap<String, (String, Identity)>>>,
+    /// the server name -> the challenge's token, its certificate, how often it is set up
+    ids: Arc<Mutex<BTreeMap<String, (String, Identity, u32)>>>,
 }
 
 impl TlsAlpn01 {
@@ -1272,7 +1301,7 @@ impl TlsAlpn01 {
         let next = cfg.select.take();
         let sel: Select = Arc::new(move |h: &Hello| {
             if h.alpn.len() == 1 && h.alpn[0] == ACME_TLS_ALPN.as_bytes() {
-                if let Some((_, id)) = me.ids.lock().get(&h.server_name).cloned() {
+                if let Some((_, id, _)) = me.ids.lock().get(&h.server_name).cloned() {
                     return Some(id);
                 }
             }
@@ -1305,18 +1334,28 @@ impl Solver for TlsAlpn01 {
     fn present(&mut self, id: &Identifier, ch: &Challenge, key_auth: &str) -> Result<(), String> {
         let identity = TlsAlpn01::certificate(id, key_auth).ok_or_else(|| String::from("the challenge certificate cannot be made"))?;
         let mut ids = self.ids.lock();
-        match ids.get(&id.tls_name()) {
-            Some((token, _)) if *token != ch.token => Err(format!("a tls-alpn-01 challenge for {} is set up already", id.value())),
-            _ => {
-                ids.insert(id.tls_name(), (ch.token.clone(), identity));
+        match ids.get_mut(&id.tls_name()) {
+            Some((token, _, _)) if *token != ch.token => Err(format!("a tls-alpn-01 challenge for {} is set up already", id.value())),
+            Some((_, _, n)) => {
+                *n += 1;
+                Ok(())
+            }
+            None => {
+                ids.insert(id.tls_name(), (ch.token.clone(), identity, 1));
                 Ok(())
             }
         }
     }
     fn cleanup(&mut self, id: &Identifier, ch: &Challenge) {
         let mut ids = self.ids.lock();
-        if ids.get(&id.tls_name()).is_some_and(|(token, _)| *token == ch.token) {
-            ids.remove(&id.tls_name());
+        let name = id.tls_name();
+        if let Some((token, _, n)) = ids.get_mut(&name) {
+            if *token == ch.token {
+                *n -= 1;
+                if *n == 0 {
+                    ids.remove(&name);
+                }
+            }
         }
     }
 }

@@ -58,9 +58,11 @@ pub(crate) struct Session {
     pub peer: Vec<Cert>,
     /// when that handshake ran (Unix seconds)
     pub auth_s: i64,
-    /// until when the good OCSP response stapled in that handshake counts (Unix seconds);
-    /// None: none was checked.  The session is not offered after it, so a resumption takes the
-    /// certificate's status no longer than a full handshake would
+    /// until when the good OCSP response stapled in that handshake counts (Unix seconds): its
+    /// Response::expires plus the 5 minutes of clock skew (ocsp::SKEW) a full handshake
+    /// allows, but not past a delegated responder's certificate; None: none was checked.  The
+    /// session is not offered after it, so a resumption takes the certificate's status no
+    /// longer than a full handshake would
     pub status_until: Option<i64>,
     /// keeps the check of Trust::Custom alive while its address is part of the key
     pub _pin: Option<Verifier>,
@@ -77,7 +79,9 @@ impl Drop for Session {
 /// its client identity, so a ticket a connection with Trust::Any got is never offered by one that
 /// checks certificates, nor one of a client certificate by a connection without it; and its
 /// revocation check, so one of Revocation::Off is never offered by a connection that checks.
-/// A ticket whose handshake checked a stapled OCSP response goes when that response does.
+/// A ticket whose handshake checked a stapled OCSP response goes when that response does: 5
+/// minutes (ocsp::SKEW) after its Response::expires, as a full handshake would still take it,
+/// at the end of a delegated responder's certificate at the latest.
 /// Shared by threads; in memory only
 pub struct Sessions {
     inner: Mutex<Vec<([u8; 32], Vec<Session>)>>,

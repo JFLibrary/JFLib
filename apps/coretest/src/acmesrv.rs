@@ -39,8 +39,8 @@ pub struct Faults {
     pub drop_name: bool,
     /// challenge tokens with characters outside base64url
     pub bad_token: bool,
-    /// Location and Link headers relative to the request: the account's with its own host
-    /// ("//127.0.0.1:N/acct/1"), the order's with a dot segment ("../order/1"), the alternate
+    /// Location and Link headers relative to the request: the account's with its own host and a
+    /// dot segment ("//127.0.0.1:N/x/../acct/1"), the order's with a dot segment ("../order/1"), the alternate
     /// chain's beside the certificate ("1/alt")
     pub relative: bool,
     /// challenges are never decided (an authorization stays pending)
@@ -49,6 +49,12 @@ pub struct Faults {
     pub http_url: bool,
     /// accounts need an external account binding (kid, MAC key)
     pub eab: Option<(String, Vec<u8>)>,
+    /// a Replay-Nonce on newNonce's answers only (every request fetches its own), and newNonce
+    /// answers after this many ms
+    pub lone_nonces: bool,
+    pub slow_nonce_ms: u32,
+    /// finalize makes the order invalid (with an error)
+    pub finalize_invalid: bool,
 }
 
 struct Acct {
@@ -309,20 +315,25 @@ impl State {
         v
     }
 
+    /// challenge k of authorization i (RFC 8555 8: type, url, status, token, its error); its
+    /// status as given, else as it is
+    fn challenge_json(&self, i: usize, k: usize, status: Option<&str>) -> Value {
+        let c = &self.authz[i].challenges[k];
+        let mut v = Value::object([
+            ("type", Value::string(c.kind)),
+            ("url", Value::string(format!("{}/chall/{}/{}", self.base, i, k))),
+            ("status", Value::string(status.unwrap_or(c.status.as_str()))),
+            ("token", Value::string(c.token.as_str())),
+        ]);
+        if let Some(e) = &c.error {
+            v.insert("error", e.clone());
+        }
+        v
+    }
+
     fn authz_json(&self, i: usize, status: &str) -> Value {
         let a = &self.authz[i];
-        let chs: Vec<Value> = a
-            .challenges
-            .iter()
-            .enumerate()
-            .map(|(k, c)| {
-                let mut v = Value::object([("type", Value::string(c.kind)), ("url", Value::string(format!("{}/chall/{}/{}", self.base, i, k))), ("status", Value::string(c.status.as_str())), ("token", Value::string(c.token.as_str()))]);
-                if let Some(e) = &c.error {
-                    v.insert("error", e.clone());
-                }
-                v
-            })
-            .collect();
+        let chs: Vec<Value> = (0..a.challenges.len()).map(|k| self.challenge_json(i, k, None)).collect();
         let mut v = Value::object([
             ("status", Value::string(status)),
             ("identifier", Value::object([("type", Value::string(a.ty.as_str())), ("value", Value::string(a.value.as_str()))])),
@@ -368,10 +379,16 @@ pub fn start(p: &Pki, faults: Faults) -> Option<AcmeServer> {
     let (st, dn, ca, ca_key) = (state.clone(), dns.clone(), p.ca.clone(), p.ca_key.clone());
     let handler = move |r: &Request| -> Response {
         let mut resp = handle(&st, &dn, &ca, &ca_key, r);
-        st.lock().requests += 1;
-        let n = st.lock().nonce();
-        resp = resp.header("Replay-Nonce", &n).header("Cache-Control", "no-store");
-        resp
+        let lone = {
+            let mut s = st.lock();
+            s.requests += 1;
+            s.faults.lone_nonces && r.path() != "/nonce"
+        };
+        if !lone {
+            let n = st.lock().nonce();
+            resp = resp.header("Replay-Nonce", &n);
+        }
+        resp.header("Cache-Control", "no-store")
     };
     let scfg = ServerConfig::new(p.server.clone());
     let wrap: netio::server::Wrap = Arc::new(move |tcp: TcpStream| {
@@ -398,6 +415,10 @@ fn handle(st: &Mutex<State>, dns: &Mutex<BTreeMap<String, Vec<String>>>, ca: &Ce
         return ok_json(200, &v);
     }
     if path == "/nonce" {
+        let ms = st.lock().faults.slow_nonce_ms;
+        if ms > 0 {
+            plat::sleep_ms(ms);
+        }
         return Response::new(if r.method == "HEAD" { 200 } else { 204 });
     }
     if let Some(id) = path.strip_prefix("/renewal/") {
@@ -491,7 +512,7 @@ fn handle(st: &Mutex<State>, dns: &Mutex<BTreeMap<String, Vec<String>>>, ca: &Ce
             s.accts.push(Acct { key: jwk, status: String::from("valid"), contact });
             let i = s.accts.len() - 1;
             let v = Value::object([("status", Value::string("valid")), ("orders", Value::string(format!("{}/acct/{}/orders", base, i)))]);
-            let loc = if s.faults.relative { format!("//{}/acct/{}", base.trim_start_matches("https://"), i) } else { format!("{}/acct/{}", base, i) };
+            let loc = if s.faults.relative { format!("//{}/x/../acct/{}", base.trim_start_matches("https://"), i) } else { format!("{}/acct/{}", base, i) };
             ok_json(201, &v).header("Location", &loc)
         }
         "/new-order" => {
@@ -595,12 +616,11 @@ fn handle(st: &Mutex<State>, dns: &Mutex<BTreeMap<String, Vec<String>>>, ca: &Ce
             {
                 let s = st.lock();
                 if payload.is_none() || s.authz[i].status != "pending" {
-                    let c = &s.authz[i].challenges[k];
-                    return ok_json(200, &Value::object([("type", Value::string(c.kind)), ("status", Value::string(c.status.as_str())), ("token", Value::string(c.token.as_str()))]));
+                    return ok_json(200, &s.challenge_json(i, k, None));
                 }
-            }
-            if stall {
-                return ok_json(200, &Value::object([("type", Value::string(kind)), ("status", Value::string("processing")), ("token", Value::string(token))]));
+                if stall {
+                    return ok_json(200, &s.challenge_json(i, k, Some("processing")));
+                }
             }
             // checked now, outside the lock (the check makes connections); the authorization
             // says pending once more, so the client waits
@@ -615,7 +635,9 @@ fn handle(st: &Mutex<State>, dns: &Mutex<BTreeMap<String, Vec<String>>>, ca: &Ce
                 a.status = String::from(if problem.is_none() { "valid" } else { "invalid" });
                 a.lag = 1;
             }
-            ok_json(200, &Value::object([("type", Value::string(kind)), ("status", Value::string("processing")), ("token", Value::string(token))])).header("Link", &format!("<{}/authz/{}>;rel=\"up\"", base, i))
+            // (processing: the decision shows in the authorization, after its lag)
+            let url = format!("{}/chall/{}/{}", base, i, k);
+            ok_json(200, &Value::object([("type", Value::string(kind)), ("url", Value::string(url)), ("status", Value::string("processing")), ("token", Value::string(token))])).header("Link", &format!("<{}/authz/{}>;rel=\"up\"", base, i))
         }
         p if p.starts_with("/finalize/") => {
             let mut s = st.lock();
@@ -623,6 +645,12 @@ fn handle(st: &Mutex<State>, dns: &Mutex<BTreeMap<String, Vec<String>>>, ca: &Ce
             s.order_status(i);
             if s.orders[i].status != "ready" {
                 return err(403, "orderNotReady", "the order is not ready");
+            }
+            if s.faults.finalize_invalid {
+                s.orders[i].status = String::from("invalid");
+                let mut v = s.order_json(i);
+                v.insert("error", Value::object([("type", Value::string("urn:ietf:params:acme:error:badCSR")), ("detail", Value::string("the CA refuses this request"))]));
+                return ok_json(200, &v);
             }
             let Some(csr) = pl.get("csr").and_then(|x| x.as_str()).and_then(b64::decode_url).and_then(|d| Csr::parse(&d)) else { return err(400, "badCSR", "the CSR cannot be read") };
             let mut want: Vec<String> = s.orders[i].ids.iter().map(|(_, v)| v.to_ascii_lowercase()).collect();

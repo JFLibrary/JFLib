@@ -271,6 +271,16 @@ fn csr(t: &mut T, p: &Pki) {
     let feature = |v: &[u8]| pkix::extension(OID_TLS_FEATURE, false, v);
     t.check("csr: a name and a TLS feature are read (the requests below are well signed)", custom(&[san(b"a.example.test"), feature(&five)]).is_some_and(|r| r.dns == ["a.example.test"] && r.tls_features == [5]));
     t.check("csr: two subject alternative names are refused", custom(&[san(b"a.example.test"), san(b"b.example.test")]).is_none());
+    // ... also in two extensionRequest attributes
+    let two_attrs = {
+        use pkix::der;
+        let attr = |e: &Vec<u8>| der::seq(&[&der::oid(&[1, 2, 840, 113549, 1, 9, 14]), &der::set(&[&der::seq(&[e])])]);
+        let (a1, a2) = (attr(&san(b"a.example.test")), attr(&san(b"b.example.test")));
+        let info = der::seq(&[&der::small_int(0), &der::seq(&[]), &k.spki(), &der::tlv(0xa0, &[a1, a2].concat())]);
+        let sig = k.sign(k.cert_alg(), &info, &[]).unwrap_or_default();
+        Csr::parse(&der::seq(&[&info, &der::seq(&[&der::oid(&[1, 2, 840, 10045, 4, 3, 2])]), &der::bits(&sig)]))
+    };
+    t.check("csr: ... and in two extensionRequest attributes", two_attrs.is_none());
     t.check("csr: an empty subject alternative name is refused", custom(&[pkix::extension(&[2, 5, 29, 17], false, &pkix::der::seq(&[]))]).is_none());
     t.check("csr: a TLS feature with bytes after its list is refused", custom(&[feature(&[five.clone(), five.clone()].concat())]).is_none());
     let der = CsrBuilder::for_names(&["a.example.test"]).sign(&k).unwrap_or_default();
@@ -491,14 +501,18 @@ fn responder_at(p: &Pki, mode: Arc<core::sync::atomic::AtomicU8>) -> Option<Resp
             return Response::new(400);
         }
         let Some(req) = ocsp::Request::parse(&r.body) else { return Response::bytes(200, "application/ocsp-response", ocsp::error_response(ocsp::MALFORMED_REQUEST)) };
-        match mode.load(Ordering::Relaxed) {
+        // 3: slow (1.5 s), and a response due again at once (it ends in 100 s)
+        let m = mode.load(Ordering::Relaxed);
+        match m {
             1 => return Response::new(500),
             2 => return Response::bytes(200, "application/ocsp-response", ocsp::error_response(ocsp::TRY_LATER)),
+            3 => plat::sleep_ms(1500),
             _ => {}
         }
         // a stand-in certificate with the serial asked for: the CertID names it
         let probe = Cert { serial: req.ids[0].serial.clone(), issuer: ca.subject.clone(), ..Cert::default() };
-        let b = ResponseBuilder { nonce: req.nonce.clone(), ..ResponseBuilder::good(now()) };
+        let next_update = Some(now() + if m == 3 { 100 } else { 4 * 86_400 });
+        let b = ResponseBuilder { nonce: req.nonce.clone(), next_update, ..ResponseBuilder::good(now()) };
         match b.sign(&probe, &ca, None, &ca_key) {
             Some(d) => Response::bytes(200, "application/ocsp-response", d),
             None => Response::new(500),
@@ -538,6 +552,11 @@ fn fetch(t: &mut T, p: &Pki) {
     t.check("refresh: the responder fails (HTTP 500): Err, the old response stays", failed.is_err() && st.response(&der).is_some());
     mode.store(2, Ordering::Relaxed);
     t.check("refresh: tryLater: Err", netio::ocsp::refresh(&st, &client, &chain, Some(&p.ca)).is_err_and(|e| e.contains("tryLater")));
+    mode.store(3, Ordering::Relaxed);
+    let st2 = Staples::new();
+    let before = st2.now();
+    let slow = netio::ocsp::refresh(&st2, &client, &chain, Some(&p.ca));
+    t.check("refresh: the next fetch a minute after this one is done (a slow responder, a response due at once)", slow.as_ref().is_ok_and(|at| *at >= before + 61));
     rs.srv.stop();
 }
 

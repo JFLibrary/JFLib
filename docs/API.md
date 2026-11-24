@@ -43891,12 +43891,14 @@ UNAUTHORIZED: u8 = 6
   end of a delegated responder's certificate
 - **`fn refresh_at(&self) -> i64`**
   when a server fetches the next one: halfway between thisUpdate and the end (as RFC 5019
-  6.2 and the CAs advise), at least an hour before the end; never after the end (a
-  thisUpdate ahead within the clock skew, a delegated responder about to expire)
+  6.2 and the CAs advise), an hour before the end where that comes earlier but not before
+  thisUpdate (a short response gets less than an hour); never after the end (a thisUpdate
+  ahead within the clock skew, a delegated responder about to expire)
 - **`fn next_fetch(&self, now: i64) -> i64`**
   when a server that got it at `now` fetches the next one: refresh_at, a minute from now at
   the earliest (no fetch loop), but 10 seconds before the response expires when that comes
-  first (10 seconds from now at the earliest)
+  first (10 seconds from now at the earliest: a response that ends sooner than that lapses
+  before the next fetch, the floor that keeps a loop away wins)
 
 - **`fn check(b: &[u8], cert: &Cert, issuer: &Cert, now: i64) -> Result<Response, String>`**
   a response about `cert`, which `issuer` issued, at `now` (Unix seconds): its structure, its
@@ -45515,8 +45517,9 @@ MAX_CHAIN: usize = 1 << 20
 - **`struct TlsAlpn01`**
   tls-alpn-01 (RFC 8737): a certificate for the challenge, shown on port 443 to a client that
   offers only "acme-tls/1".  Clones share the certificates: one goes to the solver, one into
-  the server's config (setup).  A name has one challenge at a time: a second one for it fails
-  to be set up until the first is cleaned up
+  the server's config (setup).  A name has one challenge at a time: another one for it fails
+  to be set up until the first is cleaned up; the same challenge set up twice (two orders the
+  CA gave it to) keeps its first certificate and stays until both are cleaned up
 
 **`impl TlsAlpn01`**
 
@@ -46734,7 +46737,9 @@ FRESH_WINDOW_MS: i64 = 10_000
   its client identity, so a ticket a connection with Trust::Any got is never offered by one that
   checks certificates, nor one of a client certificate by a connection without it; and its
   revocation check, so one of Revocation::Off is never offered by a connection that checks.
-  A ticket whose handshake checked a stapled OCSP response goes when that response does.
+  A ticket whose handshake checked a stapled OCSP response goes when that response does: 5
+  minutes (ocsp::SKEW) after its Response::expires, as a full handshake would still take it,
+  at the end of a delegated responder's certificate at the latest.
   Shared by threads; in memory only
 
 **`impl Sessions`**
