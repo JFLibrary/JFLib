@@ -426,12 +426,17 @@ pub(crate) fn commit(app: &mut Diagrammer, ui: &mut Ui) {
         return;
     }
     let owner = diagram_core::Owner::Page(page);
+    // (JD21 jumps) line jumps are drawing only: they route nothing again
+    let reroute = changes.iter().any(|(c, _, _)| !c.starts_with("LineJump") && !c.starts_with("PageLineJump"));
     let _ = edit_doc::edit(o, t("Layout und Routing"), true, |tx, eng| {
         for (cell, v, unit) in &changes {
             let a = tx.single(cell);
             tx.set_constant(s, &a, Value::Num(*v), *unit)?;
         }
         eng.recalc(tx, &[s])?;
+        if !reroute {
+            return Ok(());
+        }
         // every dynamic connector of the page takes the new style and clearance
         let conns: Vec<ShapeRef> = tx.doc().top_shapes(owner).filter(|&c| diagram_core::glue::is_connector(tx.doc(), c)).collect();
         diagram_core::glue::update(tx, eng, &conns)
