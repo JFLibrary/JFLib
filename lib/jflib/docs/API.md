@@ -105,7 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/jumps.rs](#diagram_coresrcrenderjumpsrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/jumps.rs](#diagram_coresrcrenderjumpsrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/tools.rs](#diagram_coresrctoolsrs) · [src/tools/array.rs](#diagram_coresrctoolsarrayrs) · [src/tools/dimension.rs](#diagram_coresrctoolsdimensionrs) · [src/tools/number.rs](#diagram_coresrctoolsnumberrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/data.rs](#diagram_iosrcdatars) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/textdraw.rs](#diagram_iosrctextdrawrs) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vss/mod.rs](#diagram_iosrcvssmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -55034,6 +55034,9 @@ a file loses nothing, and the behaviour Visio files carry works without translat
                                 hierarchy, compact tree, radial, circular; CN-13), connected
                                 shapes aligned and spaced (CN-14), shapes off the page
                                 breaks (PR-03), the diagram turned or flipped (RS-25)
+  tools::*                      (JD21) Visio's add-ons as tools (AS-11, RA-09): numbering
+                                shapes, arrays of copies, dimension lines glued or tied to
+                                the shapes they measure
 
 Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 opening a file (connectors, layout and containers move only when something moves), and a
@@ -60455,6 +60458,262 @@ flooded with texts that all fall on one slot).
   the number of texts in the table
 - **`fn is_empty(&self) -> bool`**
   whether the table holds nothing but the empty text and the known names
+
+### `diagram_core/src/tools.rs`
+
+Source: [`lib/diagram_core/src/tools.rs`](../lib/diagram_core/src/tools.rs)
+
+```text
+tools -- (JD21) shape tools in place of Visio's add-ons (AS-11, RA-09): numbering shapes, arrays
+of copies, dimension lines
+
+  number::*      Shapes nummerieren: the order (as selected, in rows, in columns, along the
+                 connectors), the number written into the text before or after it or instead
+                 of it and kept in User.JFD_Number / JFD_NumberPlace, so a second run replaces
+                 it instead of adding one more; a page that goes on numbering shapes as they
+                 are dropped (User.JFD_NumberNext ... of the page sheet)
+  array::*       Array: copies of shapes in rows and columns, spaced between the shapes or from
+                 middle to middle, to the right or left and down or up; copies as a paste makes
+                 them (instances stay instances of their masters)
+  dimension::*   Maßlinien: the two ends of a dimension shape on two points, a shape's extent
+                 or between two shapes (horizontal, vertical, aligned): glued to a connection
+                 point where one is there (static glue, a Connect entry), else tied to a point of
+                 the shape's box by the same PAR(PNT(...)) formula; both follow the shape
+
+Every position is on the page in drawing units, y up.  Everything runs inside the caller's
+transaction (one undo step).  Visio's own add-ons are programs, not cells: nothing of them is
+in a file, so these tools write only ordinary cells (text, User rows, glue formulas) that Visio
+keeps and draws as they are.
+```
+
+- **`fn plain(doc: &Document, s: ShapeRef) -> bool`**
+  whether the tools take a shape as one of their own: a 2-D shape that is no guide, container,
+  list or callout (connectors, lines and dimensions are left out)
+
+### `diagram_core/src/tools/array.rs`
+
+Source: [`lib/diagram_core/src/tools/array.rs`](../lib/diagram_core/src/tools/array.rs)
+
+```text
+tools::array -- Array (AS-11, RA-09): copies of shapes in rows and columns
+
+  Grid                    rows, columns, the spacing, how it is measured, the directions
+  offsets(size, &grid)    the offset of every cell but the first (row by row): where the copy
+                          of that cell goes, from the shapes themselves
+  make(tx, eng, owner, shapes, &grid) -> Vec<ShapeRef>   the copies (new top-level shapes in
+                          the order of the cells)
+
+The shapes copied stand in the first cell (top left with the default directions); the cell is
+the box around all of them.  Spacing between the shapes: from the box's edge to the next box's
+edge; from middle to middle: the step itself (smaller than the box: the copies overlap, as the
+user asked).  Copies are made the way a paste makes them (ops::paste): masters stay masters,
+connectors between copied shapes come along, glue to shapes left behind is let go.
+```
+
+```rust
+/// the most cells an array makes (rows x columns)
+MAX_CELLS: u32 = 10_000
+```
+
+- **`struct Grid`**
+  an array of copies
+  - `rows: u32` -- rows (1 or more)
+  - `cols: u32` -- columns (1 or more)
+  - `gap: [f64; 2]` -- x: between columns, y: between rows (drawing units, 0 or more)
+  - `centres: bool` -- the gap is the step from middle to middle (else from edge to edge)
+  - `left: bool` -- the columns go to the left (else to the right)
+  - `up: bool` -- the rows go up (else down)
+
+- **`fn offsets(size: [f64; 2], g: &Grid) -> Vec<(u32, u32, [f64; 2])>`**
+  (row, column, offset) of every cell but the first, row by row, for shapes whose box is
+  `size` wide and high
+
+- **`fn make(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[ShapeRef], g: &Grid) -> Result<Vec<ShapeRef>, EditError>`**
+  the copies of `shapes` (top-level shapes of `owner`) for every cell but the first -> the new
+  top-level shapes, cell by cell.  Invalid: no rows or columns, more than MAX_CELLS
+
+### `diagram_core/src/tools/dimension.rs`
+
+Source: [`lib/diagram_core/src/tools/dimension.rs`](../lib/diagram_core/src/tools/dimension.rs)
+
+```text
+tools::dimension -- Maßlinien (AS-11): the ends of a dimension shape on points and shapes
+
+  Kind                     Horizontal, Vertical, Aligned (what the dimension shape measures:
+                           its master shows the horizontal or vertical distance of its ends or
+                           its own length)
+  Anchor                   where an end goes: a free point, a connection point of a shape
+                           (static glue), a point of a shape's box (Width and Height fractions)
+  anchor_at(doc, s, frac)  the connection point at that point of the box, else the box point
+  point(doc, &anchor)      where it is on the page now
+  of_shape(doc, s, kind)   the shape's own extent: its left and right side (bottom and top)
+  between(doc, a, b, kind) between two shapes: the sides that face each other (horizontal:
+                           the left shape's right side and the right shape's left side;
+                           vertical: the lower one's top and the upper one's bottom; aligned:
+                           the nearest pair)
+  attach(tx, eng, dim, end, &anchor)    one end there, glued or tied
+  place(tx, eng, dim, kind, &begin, &end, clear)   both ends; the dimension line (the control
+                           row "Line" of the master, if it has one) `clear` beyond the shapes:
+                           above them (horizontal), left of them (vertical)
+
+How an end follows (so it does in Visio too, the cells are Visio's own):
+* a connection point: static glue as glue::glue writes it -- BeginX = PAR(PNT(Sheet.N!
+  Connections.Xk,Sheet.N!Connections.Yk)), BegTrigger = _XFTRIGGER(Sheet.N!EventXFMod) and a
+  Connect entry;
+* any other point of a shape: the same formula on the box, BeginX = PAR(PNT(Sheet.N!Width*fx,
+  Sheet.N!Height*fy)) with the trigger, without a Connect entry (Visio has no Connect for it; the
+  formula alone moves the end, as PAR reads the shape's transform);
+* a free point: a constant.
+The candidates of a shape are its connection points (Type 0 and 2; outward ones are no glue
+target), a shape without any offers the middles of its four sides.
+```
+
+- **`enum Kind`**
+  what a dimension measures
+  - `Horizontal` -- the horizontal distance of its ends
+  - `Vertical` -- the vertical distance of its ends
+  - `Aligned` -- its length
+
+- **`enum Anchor`**
+  where an end of a dimension goes
+  - `Free([f64; 2])` -- a point of the page
+  - `Point { shape: ShapeRef, row: u32, }` -- connection point `row` (IX) of a shape: static glue
+  - `Box { shape: ShapeRef, at: [f64; 2], }` -- a point of a shape's box: fractions of Width and Height in its local coordinates
+
+**`impl Anchor`**
+
+- **`fn shape(&self) -> Option<ShapeRef>`**
+  the shape it is on (None: a free point)
+
+- **`fn point(doc: &Document, a: &Anchor) -> [f64; 2]`**
+  where an anchor is on the page now
+
+- **`fn anchor_at(doc: &Document, s: ShapeRef, frac: [f64; 2]) -> Anchor`**
+  the connection point at the box point `frac` (fractions of Width and Height), else the box
+  point itself
+
+- **`fn of_shape(doc: &Document, s: ShapeRef, kind: Kind) -> (Anchor, Anchor)`**
+  a shape's own extent: left and right side (Horizontal, Aligned: along its width), bottom and
+  top (Vertical); the first end left of (below) the second
+
+- **`fn between(doc: &Document, a: ShapeRef, b: ShapeRef, kind: Kind) -> (Anchor, Anchor)`**
+  between two shapes (see the file header); the first end left of (below) the second
+
+- **`fn attach(tx: &mut Transaction, eng: &mut Engine, dim: ShapeRef, end: End, anchor: &Anchor) -> Result<(), EditError>`**
+  put an end of dimension shape `dim` (1-D) on `anchor`: glued to a connection point, tied to a
+  box point by formula, or free
+
+- **`fn place(tx: &mut Transaction, eng: &mut Engine, dim: ShapeRef, kind: Kind, begin: &Anchor, end: &Anchor, clear: f64) -> Result<(), EditError>`**
+  both ends of `dim` on their anchors; the dimension line `clear` (drawing units) above the
+  shapes (Horizontal) or left of them (Vertical), when the master has the control row "Line"
+
+- **`fn end_formulas(doc: &Document, dim: ShapeRef) -> (Option<alloc::string::String>, Option<alloc::string::String>)`**
+  the formulas of BeginX and EndX of a 1-D shape (None: a constant), for checks
+
+### `diagram_core/src/tools/number.rs`
+
+Source: [`lib/diagram_core/src/tools/number.rs`](../lib/diagram_core/src/tools/number.rs)
+
+```text
+tools::number -- Shapes nummerieren (AS-11, RA-09): numbers in the shapes' texts
+
+  Order               Selection (as given), Rows (left to right, then top to bottom), Columns
+                      (top to bottom, then left to right), Connections (along the connectors)
+  Place               Before the text, After it, Instead of it
+  Numbering           start, step, prefix, place
+  order(doc, shapes, by) -> Vec<ShapeRef>     the shapes in the order they get their numbers
+  label(prefix, n)    the text a number shows: "S-" and 3 -> "S-3"
+  number(tx, eng, shapes, &numbering) -> next   the numbers written (one shape after the
+                      other, step by step) -> the number the next shape would get
+  set_number(tx, eng, s, text, place)     one shape's number (an earlier one replaced)
+  remove(tx, eng, s)  the number taken out of the text again
+  on_drop(doc, page) / keep_on_drop(tx, page, Some(&numbering) | None) / dropped(tx, eng, s)
+                      a page that numbers shapes as they are dropped: the settings and the next
+                      number in User cells of the page sheet; dropped() gives a dropped shape the
+                      next number and counts on
+
+Rules (Visio's add-on is a program; these are chosen and named here):
+* The number is plain text: before the text it is followed by a space ("3 Prüfen"), after it it
+  follows one ("Prüfen 3"), instead of it it is the whole text.  The characters' formatting
+  stays: the number goes into the first (last) run of characters.
+* User.JFD_Number keeps the number text written and User.JFD_NumberPlace where (0 before, 1
+  after, 2 instead): numbering again takes the old number out first, so a shape never carries
+  two.  A text the user changed so that the old number is gone is taken as it is.
+* Rows: the shapes are sorted by their middles from top to bottom; a shape whose middle lies
+  within the height of the first shape of the current row joins that row, else it starts the
+  next; each row runs from left to right.  Columns alike with the axes swapped.
+* Connections: the shapes in the order of the flow -- a shape gets its number once every shape
+  with a connector to it (Begin -> End) has one; among the shapes that are ready the one first in
+  rows comes first; in a loop the first shape in rows that is left goes on.  Shapes without
+  connectors are ready from the start.
+* A shape whose text is locked (LockTextEdit) is left out and takes no number.
+```
+
+```rust
+/// User cell: the number text a shape got (prefix and number)
+NUMBER_CELL: &str = "JFD_Number"
+/// User cell: where it went (Place::code)
+PLACE_CELL: &str = "JFD_NumberPlace"
+/// User cells of the page sheet while the page numbers shapes as they are dropped: the next
+/// number, the step, the prefix, the place
+NEXT_CELL: &str = "JFD_NumberNext"
+STEP_CELL: &str = "JFD_NumberStep"
+PREFIX_CELL: &str = "JFD_NumberPrefix"
+DROP_PLACE_CELL: &str = "JFD_NumberDropPlace"
+```
+
+- **`enum Order`**
+  the order the shapes get their numbers in
+  - `Selection` -- as given (the order the user selected them in)
+  - `Rows` -- left to right, then top to bottom
+  - `Columns` -- top to bottom, then left to right
+  - `Connections` -- along the connectors (Begin -> End)
+
+- **`enum Place`**
+  where the number goes in the text
+  - `Before` -- in front of the text, a space between
+  - `After` -- after the text, a space between
+  - `Instead` -- the number is the whole text
+
+**`impl Place`**
+
+- **`fn code(self) -> u8`**
+  the code of User.JFD_NumberPlace
+- **`fn from_code(c: f64) -> Place`**
+  the place of a code (anything else: Before)
+
+- **`struct Numbering`**
+  how shapes are numbered
+  - `start: i64` -- the first number
+  - `step: i64` -- added for every next shape (may be negative)
+  - `prefix: String` -- the text before the number ("S-", "Schritt ")
+  - `place: Place`
+
+- **`fn label(prefix: &str, n: i64) -> String`**
+  the text a number shows
+
+- **`fn order(doc: &Document, shapes: &[ShapeRef], by: Order) -> Vec<ShapeRef>`**
+  the shapes in the order they get their numbers
+
+- **`fn set_number(tx: &mut Transaction, eng: &mut Engine, s: ShapeRef, num: &str, place: Place) -> Result<(), EditError>`**
+  give shape `s` the number text `num` at `place`, an earlier number taken out first
+
+- **`fn remove(tx: &mut Transaction, eng: &mut Engine, s: ShapeRef) -> Result<(), EditError>`**
+  take a shape's number out of its text again (the User cells stay, empty)
+
+- **`fn number(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], n: &Numbering) -> Result<i64, EditError>`**
+  number `shapes` in the order given -> the number the next shape would get; shapes whose
+  text is locked are left out
+
+- **`fn on_drop(doc: &Document, page: PageRef) -> Option<Numbering>`**
+  the page numbers shapes as they are dropped: its numbering (start = the next number)
+
+- **`fn keep_on_drop(tx: &mut Transaction, page: PageRef, n: Option<&Numbering>) -> Result<(), EditError>`**
+  the page numbers dropped shapes from `n.start` on (None: no more); the page sheet's User cells
+
+- **`fn dropped(tx: &mut Transaction, eng: &mut Engine, s: ShapeRef) -> Result<bool, EditError>`**
+  a shape dropped on a page that numbers dropped shapes gets the next number, the page counts
+  on -> whether it got one
 
 ### `diagram_core/src/units.rs`
 
