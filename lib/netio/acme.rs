@@ -975,7 +975,14 @@ impl Account {
         self.post(&ch.url, Some(&Value::Object(Vec::new()))).map(|_| ())
     }
 
-    /// the pause before the next look: the CA's Retry-After within limits, else poll_ms
+    /// Timeout once the deadline is reached: no look starts then (timeout_ms 0: none at all)
+    fn in_time(deadline: u64) -> Result<(), AcmeError> {
+        if plat::time_us() / 1000 >= deadline {
+            return Err(AcmeError::Timeout(String::from("the CA did not decide in time")));
+        }
+        Ok(())
+    }
+
     /// the pause before the next look (Retry-After: half a second to max_poll_ms; else
     /// poll_ms), at most to the deadline; Timeout when that is reached (no look after it)
     fn pause(&self, retry: Option<u64>, deadline: u64) -> Result<(), AcmeError> {
@@ -985,18 +992,17 @@ impl Account {
         if now < deadline {
             plat::sleep_ms(want.min(deadline - now) as u32);
         }
-        if plat::time_us() / 1000 >= deadline {
-            return Err(AcmeError::Timeout(String::from("the CA did not decide in time")));
-        }
-        Ok(())
+        Self::in_time(deadline)
     }
 
     /// wait until the authorization is decided: Ok when valid.  Acme::timeout_ms bounds the
-    /// waiting: no look starts after it (a request under way runs out under the Client's
-    /// timeouts)
+    /// waiting: no look starts after it (0: none); a request under way runs out under the
+    /// Client's timeouts, and what it brings counts (a valid authorization is the CA's
+    /// decision, however late it comes)
     pub fn wait_authorization(&self, url: &str) -> Result<Authorization, AcmeError> {
         let deadline = (plat::time_us() / 1000) + self.acme.timeout_ms;
         loop {
+            Self::in_time(deadline)?;
             let a = self.post(url, None)?;
             let retry = a.retry_after();
             let z = Authorization::from_json(https_url(url)?, &a.json()?)?;
@@ -1021,6 +1027,7 @@ impl Account {
             self.pause(retry, deadline)?;
         }
         loop {
+            Self::in_time(deadline)?;
             let a = self.post(url, None)?;
             let retry = a.retry_after();
             let o = Order::from_json(https_url(url)?, &a.json()?)?;

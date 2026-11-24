@@ -109,6 +109,8 @@ pub struct State {
     pub csrs: Vec<Csr>,
     /// looks at an order before the Retry-After of its finalize answer was over
     pub early_polls: u32,
+    /// the requests answered
+    pub requests: u32,
 }
 
 pub struct AcmeServer {
@@ -360,11 +362,13 @@ pub fn start(p: &Pki, faults: Faults) -> Option<AcmeServer> {
         tls_port: 0,
         csrs: Vec::new(),
         early_polls: 0,
+        requests: 0,
     }));
     let dns: Arc<Mutex<BTreeMap<String, Vec<String>>>> = Arc::new(Mutex::new(BTreeMap::new()));
     let (st, dn, ca, ca_key) = (state.clone(), dns.clone(), p.ca.clone(), p.ca_key.clone());
     let handler = move |r: &Request| -> Response {
         let mut resp = handle(&st, &dn, &ca, &ca_key, r);
+        st.lock().requests += 1;
         let n = st.lock().nonce();
         resp = resp.header("Replay-Nonce", &n).header("Cache-Control", "no-store");
         resp

@@ -256,10 +256,20 @@ impl Response {
     }
 
     /// when a server fetches the next one: halfway between thisUpdate and the end (as RFC 5019
-    /// 6.2 and the CAs advise), at least an hour before the end
+    /// 6.2 and the CAs advise), at least an hour before the end; never after the end (a
+    /// thisUpdate ahead within the clock skew, a delegated responder about to expire)
     pub fn refresh_at(&self) -> i64 {
         let end = self.expires();
-        (self.this_update + (end - self.this_update) / 2).min(end - 3600).max(self.this_update)
+        (self.this_update + (end - self.this_update) / 2).min(end - 3600).max(self.this_update).min(end)
+    }
+
+    /// when a server that got it at `now` fetches the next one: refresh_at, a minute from now at
+    /// the earliest (no fetch loop), but 10 seconds before the response expires when that comes
+    /// first (10 seconds from now at the earliest)
+    pub fn next_fetch(&self, now: i64) -> i64 {
+        let next = self.refresh_at().max(now + 60);
+        let last = (self.expires() - 10).max(now + 10);
+        next.min(last)
     }
 }
 

@@ -1670,7 +1670,9 @@ impl Conn {
         match r.as_ref().map(|r| r.status) {
             Ok(ocsp::Status::Revoked { .. }) => Err(fail(AL_CERTIFICATE_REVOKED, "the certificate is revoked (OCSP)")),
             Ok(ocsp::Status::Good) => {
-                self.staple_until = r.ok().map(|r| r.expires() + ocsp::SKEW);
+                // as long as a full handshake would take it: the response's end and the clock
+                // skew, but not past a delegated responder's certificate
+                self.staple_until = r.ok().map(|r| r.responder_until.map_or(r.expires() + ocsp::SKEW, |u| u.min(r.expires() + ocsp::SKEW)));
                 Ok(())
             }
             _ if required => Err(fail(AL_BAD_CERTIFICATE_STATUS_RESPONSE, "no usable stapled OCSP response")),

@@ -43891,7 +43891,12 @@ UNAUTHORIZED: u8 = 6
   end of a delegated responder's certificate
 - **`fn refresh_at(&self) -> i64`**
   when a server fetches the next one: halfway between thisUpdate and the end (as RFC 5019
-  6.2 and the CAs advise), at least an hour before the end
+  6.2 and the CAs advise), at least an hour before the end; never after the end (a
+  thisUpdate ahead within the clock skew, a delegated responder about to expire)
+- **`fn next_fetch(&self, now: i64) -> i64`**
+  when a server that got it at `now` fetches the next one: refresh_at, a minute from now at
+  the earliest (no fetch loop), but 10 seconds before the response expires when that comes
+  first (10 seconds from now at the earliest)
 
 - **`fn check(b: &[u8], cert: &Cert, issuer: &Cert, now: i64) -> Result<Response, String>`**
   a response about `cert`, which `issuer` issued, at `now` (Unix seconds): its structure, its
@@ -45446,8 +45451,9 @@ MAX_CHAIN: usize = 1 << 20
   tell the CA a challenge is ready to be checked (RFC 8555 7.5.1)
 - **`fn wait_authorization(&self, url: &str) -> Result<Authorization, AcmeError>`**
   wait until the authorization is decided: Ok when valid.  Acme::timeout_ms bounds the
-  waiting: no look starts after it (a request under way runs out under the Client's
-  timeouts)
+  waiting: no look starts after it (0: none); a request under way runs out under the
+  Client's timeouts, and what it brings counts (a valid authorization is the CA's
+  decision, however late it comes)
 - **`fn wait_order(&self, url: &str) -> Result<Order, AcmeError>`**
   wait until the order is no longer pending or processing (Acme::timeout_ms as
   wait_authorization)

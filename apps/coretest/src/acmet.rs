@@ -390,8 +390,10 @@ fn faults(t: &mut T, p: &Pki) {
     }
     // the certificate for another key
     if let Some(rig) = start_rig(t, p, "wrong_key", Faults { wrong_key: true, ..Faults::default() }) {
-        let r = new_acme(p, &rig.acme).and_then(|a| a.account(key(Kind::P256, 170), &agreed())).and_then(|acc| acc.issue(&ids(&["w.example.test"]), &key(Kind::P256, 171), &mut rig.http01.clone(), &OrderOptions::default()));
-        t.check("acme: a certificate the CA issued for another key is refused", matches!(r, Err(AcmeError::Protocol(_))));
+        if let Some(acc) = need(t, "wrong_key: the account", new_acme(p, &rig.acme).and_then(|a| a.account(key(Kind::P256, 170), &agreed()))) {
+            let r = acc.issue(&ids(&["w.example.test"]), &key(Kind::P256, 171), &mut rig.http01.clone(), &OrderOptions::default());
+            t.check("acme: a certificate the CA issued for another key is refused", matches!(r, Err(AcmeError::Protocol(ref s)) if s.contains("another key")));
+        }
         rig.stop();
     }
     // a certificate without one of the names ordered
@@ -413,8 +415,10 @@ fn faults(t: &mut T, p: &Pki) {
     }
     // a token that is not base64url (it goes into a path and a file name)
     if let Some(rig) = start_rig(t, p, "bad_token", Faults { bad_token: true, ..Faults::default() }) {
-        let r = new_acme(p, &rig.acme).and_then(|a| a.account(key(Kind::P256, 177), &agreed())).and_then(|acc| acc.issue(&ids(&["o.example.test"]), &key(Kind::P256, 178), &mut rig.http01.clone(), &OrderOptions::default()));
-        t.check("acme: a challenge token outside base64url is refused", matches!(r, Err(AcmeError::Protocol(_))));
+        if let Some(acc) = need(t, "bad_token: the account", new_acme(p, &rig.acme).and_then(|a| a.account(key(Kind::P256, 177), &agreed()))) {
+            let r = acc.issue(&ids(&["o.example.test"]), &key(Kind::P256, 178), &mut rig.http01.clone(), &OrderOptions::default());
+            t.check("acme: a challenge token outside base64url is refused", matches!(r, Err(AcmeError::Protocol(ref s)) if s.contains("token")));
+        }
         rig.stop();
     }
     // rate limited: the problem with its Retry-After
@@ -447,6 +451,18 @@ fn faults(t: &mut T, p: &Pki) {
         });
         let r = r.and_then(|acc| acc.issue(&ids(&["u.example.test"]), &key(Kind::P256, 182), &mut rig.http01.clone(), &OrderOptions::default()));
         t.check("acme: ... with max_poll_ms under 500 ms too", matches!(r, Err(AcmeError::Timeout(_))));
+        // timeout_ms 0: no look at all
+        let acc = new_acme(p, &rig.acme).and_then(|mut a| {
+            a.timeout_ms = 0;
+            a.account(key(Kind::P256, 184), &agreed())
+        });
+        if let Some((acc, order)) = need(t, "stall: an order", acc.and_then(|acc| acc.new_order(&ids(&["t0.example.test"]), &OrderOptions::default()).map(|o| (acc, o)))) {
+            let before = rig.acme.state.lock().requests;
+            let r = order.authorizations.first().map(|u| acc.wait_authorization(u));
+            let w = acc.wait_order(&order.url);
+            let after = rig.acme.state.lock().requests;
+            t.check("acme: ... timeout_ms 0: Timeout without a request", matches!(r, Some(Err(AcmeError::Timeout(_)))) && matches!(w, Err(AcmeError::Timeout(_))) && after == before);
+        }
         rig.stop();
     }
 }

@@ -179,6 +179,18 @@ fn delegated(t: &mut T, p: &Pki) {
     let r = ocsp::check(&by(&soon), &c, &p.ca, n);
     t.check("ocsp: a response expires with its delegated responder", r.is_ok_and(|r| r.responder_until == Some(soon.0.not_after) && r.expires() == soon.0.not_after && r.refresh_at() <= n));
     t.check("ocsp: ... one signed by the issuer has no such end", ocsp::check(&good(p, &c), &c, &p.ca, n).is_ok_and(|r| r.responder_until.is_none()));
+    // a thisUpdate ahead within the clock skew, a responder that ends before it
+    let brief = responder(28, true, n + 60, (&p.ca, &p.ca_key));
+    let ahead = ResponseBuilder { this_update: n + 120, ..ResponseBuilder::good(n) }.sign(&c, &p.ca, Some(&brief.0), &brief.1).unwrap_or_default();
+    let r = ocsp::check(&ahead, &c, &p.ca, n);
+    t.check("ocsp: refresh_at is never after the end (a thisUpdate ahead, a responder about to end)", r.is_ok_and(|r| r.expires() == brief.0.not_after && r.refresh_at() <= r.expires()));
+    // the next fetch: a minute away at the earliest, before the end when that comes first
+    let r = ocsp::check(&by(&soon), &c, &p.ca, n);
+    t.check("ocsp: next_fetch: a minute away when it is due now", r.as_ref().is_ok_and(|r| r.next_fetch(n) == n + 60));
+    let r = ocsp::check(&by(&brief), &c, &p.ca, n);
+    t.check("ocsp: ... before the end when that is under a minute away (10 s from now at the earliest)", r.as_ref().is_ok_and(|r| r.next_fetch(n) == brief.0.not_after - 10 && r.next_fetch(brief.0.not_after) == brief.0.not_after + 10));
+    let r = ocsp::check(&good(p, &c), &c, &p.ca, n);
+    t.check("ocsp: ... refresh_at when that is later", r.is_ok_and(|r| r.next_fetch(n) == r.refresh_at()));
     t.check("ocsp: ResponseBuilder::sign refuses a key that is not the signer's", ResponseBuilder::good(n).sign(&c, &p.ca, None, &ok.1).is_none() && ResponseBuilder::good(n).sign(&c, &p.ca, Some(&ok.0), &p.ca_key).is_none());
 }
 
@@ -407,6 +419,17 @@ fn stapling(t: &mut T, p: &Pki) {
     let c2 = with(&ss, Revocation::Stapled, Some(&sst));
     t.check("stapling: a session is resumed while the staple its handshake checked is current", a.is_ok() && b.as_ref().is_ok_and(|c| c.resumed()));
     t.check("stapling: ... and not after it (a full handshake checks a new one)", c2.as_ref().is_ok_and(|c| !c.resumed() && c.ocsp_response().is_some()));
+    // ... nor after the end of the delegated responder that signed it (no clock skew there:
+    // a full handshake refuses the responder from then on)
+    let rs = responder(63, true, now() + 600, (&p.ca, &p.ca_key));
+    let by_rs = ResponseBuilder::good(now()).sign(&c, &p.ca, Some(&rs.0), &rs.1).unwrap_or_default();
+    let srs = Arc::new(Staples::new());
+    let _ = srs.set(&id.chain, Some(&p.ca), by_rs);
+    let ss = Arc::new(tls::Sessions::default());
+    let a = with(&ss, Revocation::Stapled, Some(&srs));
+    ss.test_shift(660 * 1000);
+    let b = with(&ss, Revocation::Stapled, Some(&srs));
+    t.check("stapling: a session goes with the delegated responder of its staple", a.is_ok() && srs.len() == 1 && b.as_ref().is_ok_and(|c| !c.resumed()));
 }
 
 /// status_request in a ClientHello as it comes (RFC 6066 8), and where a client takes none
