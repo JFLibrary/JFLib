@@ -306,6 +306,20 @@ fn hidden_and_grouped_connectors() {
     let j = jumps_of(&d, h);
     assert_eq!(j.len(), 2);
     assert!(near((j[1].from + j[1].to) * 0.5, 3.5));
+    // a connector on a hidden layer is not drawn and nobody jumps over it
+    let (mut doc, page, h, v) = plus();
+    let mut tx = doc.transaction("Ebene");
+    let hidden = tx.add_layer(page, "Verborgen", "Hidden").unwrap();
+    let visible = tx.single("Visible");
+    let sec = SecKey::one(tx.intern("Layer"));
+    tx.set_constant(SheetRef::Page(page), &CellAddr::row(sec, RowKey::Index(hidden), visible.cell), Value::Num(0.0), None).unwrap();
+    tx.set_layers(v, &[hidden]).unwrap();
+    tx.commit().unwrap();
+    let d = draw(&doc, page);
+    assert!(jumps_of(&d, h).is_empty());
+    // shown again with Options::hidden_layers: the jump is back
+    let d = crate::render::build(&doc, page, &mut ApproxMeasure, &Options { hidden_layers: true, ..Options::default() });
+    assert_eq!(jumps_of(&d, h).len(), 1);
 }
 
 fn redo(doc: &Document, d: &mut Drawing, shapes: &[ShapeRef]) -> bool {
