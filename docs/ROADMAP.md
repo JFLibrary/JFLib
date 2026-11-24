@@ -2628,14 +2628,27 @@ Grundbausteine am falschen Ort oder mehrfach:
   (Proben, Zeichnungen, Schablonen, Exporte, Renderings) byte-gleich, fontconf auf den 63 fontconfig-Dateien des
   Systems gleich. Dabei behoben: `<?>` ließ den Leser von `diagram_io` in Panik geraten. Gefuzzt mit festem Seed in
   der coretest-Gruppe `xml`; ein Fuzz-Ziel für `tools/net_fuzz` geht an die Sicherheits-Sitzung.
-- **P2** · *erledigt* (2026-11-21, U4) · Alte Textkodierungen in `formats::encoding`: `Charset` mit allen
+- **P2** · *erledigt* (2026-11-21, U4; 2026-11-23, U17) · Alte Textkodierungen in `formats::encoding`: `Charset` mit allen
   Einbyte-Kodierungen des WHATWG-Standards, den DOS-Seiten (IBM437, 737, 775, 850 bis 869) und einem genauen
-  ISO-8859-1; `label` mit allen 228 Labels des Standards (mehrbytige benannt, nicht dekodiert), `decode_label`
+  ISO-8859-1; `label` mit allen 228 Labels des Standards, `decode_label`
   wie das „decode“ des Standards, `Charset::from_code_page`. Eine Tabelle statt zweier:
   [`tools/gen_encodings.py`](../tools/gen_encodings.py) ersetzt `gen_charsets.py` (spell) und
-  `gen_dxf_codepages.py` (dxf), `--verify` vergleicht mit den Daten des Standards und Nodes `TextDecoder`. Offen:
-  [`netpkt/imf.rs`](../lib/netpkt/imf.rs) (Mail) liest außer UTF-8 nur ISO-8859-1 (über die Sicherheits-Sitzung),
-  die mehrbytigen Kodierungen Ostasiens (Shift_JIS, GBK, gb18030, Big5, EUC-KR, EUC-JP, ISO-2022-JP).
+  `gen_dxf_codepages.py` (dxf), `--verify` vergleicht mit den Daten des Standards und Nodes `TextDecoder`. Die
+  mehrbytigen Kodierungen Ostasiens (U17, [`formats/src/multibyte.rs`](../lib/formats/src/multibyte.rs),
+  [`decode.rs`](../lib/formats/src/decode.rs)): `MultiByte` mit Shift_JIS (Code-Page 932 mit den Erweiterungen von
+  NEC und IBM), EUC-JP (mit JIS X 0212), ISO-2022-JP, GBK, gb18030 (GB18030-2022, ganz Unicode außer U+E5E5), Big5 (mit
+  HKSCS-2008) und EUC-KR (Code-Page 949, alle Hangul-Silben), lesen und schreiben wie der Standard (`encode` mit
+  `Unmappable`, `encode_html` mit Zeichenreferenzen wie beim Absenden eines Formulars); `Decoder` liest jede
+  Kodierung in Stücken, ein Zeichen darf zwischen zweien geteilt sein; `encoding::from_code_page` für die
+  unterstützten Windows-Nummern (für andere None). Die Tabellen (`cjk.bin`, 300 KB) erzeugt `gen_encodings.py` aus Pythons Codecs und den Stellen,
+  an denen der Standard abweicht. Geprüft mit `tools/encoding_check.py` gegen encoding_rs (die Umsetzung von
+  Firefox, offline aus Cargos Registry gebaut): jeder Unicode-Codepunkt beim Schreiben, jede Zweibytefolge, die
+  Dreibytefolgen von EUC-JP und die 1,6 Millionen Vierbytefolgen von gb18030 beim Lesen, Zufallsströme auf einmal
+  und in Stücken; alle 6443 Vergleiche gleich. Lesen mit 206 bis 267 MB/s (encoding_rs 343 bis 401), Schreiben mit
+  86 bis 147 MB/s (encoding_rs 23 bis 90). Genutzt von `dxf` (ANSI_932, 936, 949, 950 und `\M+NXXXX`, bisher
+  U+FFFD) und vom RTF der Zwischenablage in `doc_io` (`\ansicpg932` und die `\fcharset` Ostasiens, bisher
+  abgelehnt). Offen: [`netpkt/imf.rs`](../lib/netpkt/imf.rs) (Mail) liest außer UTF-8 nur ISO-8859-1 (über die
+  Sicherheits-Sitzung); Johab (Code-Page 1361), das der Standard nicht kennt.
 
 Crates, die einer JF-App folgen:
 

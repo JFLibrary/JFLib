@@ -1,5 +1,6 @@
-// encoding -- text encodings: strict Unicode interchange, the single-byte character sets of the web and of
-// old files, the labels of the WHATWG Encoding Standard.  New native library functionality.
+// encoding -- text encodings: strict Unicode interchange, every encoding of the WHATWG Encoding Standard
+// (the single-byte character sets of the web, the multi-byte encodings of Chinese, Japanese and Korean) and
+// the DOS code pages of old files.  New native library functionality.
 //
 //   decode(bytes, limit) -> (String, Encoding)   strict UTF-8 / UTF-16 by the byte-order mark, no guessing
 //   encode(text, Encoding) -> bytes
@@ -7,16 +8,22 @@
 //            the DOS code pages (IBM437 ... 869), an exact ISO-8859-1; from_label (WHATWG), from_code_page
 //            (Windows numbers), name, code_page, decode (U+FFFD for unassigned bytes), decode_char,
 //            encode (Unmappable), encode_char
-//   label(name) -> Label      what a WHATWG label names: UTF-8, UTF-16, a Charset, the replacement
-//                             encoding, or an encoding this crate does not decode (Shift_JIS, GBK ...)
+//   MultiByte: Shift_JIS, EUC-JP, ISO-2022-JP, GBK, gb18030, Big5, EUC-KR; from_label, from_code_page,
+//            name, code_page, decode, encode (Unmappable), encode_html (character references)
+//   Decoder: the standard's decoders for input in pieces (new / sniffing, decode(piece, last, out),
+//            malformed)
+//   label(name) -> Label      what a WHATWG label names: UTF-8, UTF-16, a Charset, a MultiByte or the
+//                             replacement encoding; from_code_page(n) -> Label: the same for a Windows number
 //   decode_label(label, bytes, limit) -> String   the standard's decode: a byte-order mark wins over the
 //                             label, then the label's encoding, errors become U+FFFD
 //
-// The tables and labels are generated (charsets.rs, tools/gen_encodings.py): Python's codecs, made the
-// standard's index where it differs (checked against the standard's data with --verify).
+// The tables and labels are generated (charsets.rs, cjk.rs and cjk.bin, tools/gen_encodings.py): Python's
+// codecs, made the standard's indexes where they differ (checked against the standard's data with --verify).
 use alloc::{string::String, vec::Vec};
 
 pub use crate::charsets::Charset;
+pub use crate::decode::Decoder;
+pub use crate::multibyte::MultiByte;
 
 /// Explicit text encodings; unmarked input is interpreted as UTF-8.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -28,8 +35,8 @@ pub enum Encoding {
     Utf16Be,
 }
 
-/// Invalid Unicode, an encoding this crate does not decode (UTF-32, an unknown or multi-byte label), a
-/// caller-specified byte limit, or a character the character set cannot encode.
+/// Invalid Unicode, an encoding this crate does not decode (UTF-32, an unknown label), a caller-specified
+/// byte limit, or a character the encoding cannot encode.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
@@ -123,12 +130,39 @@ pub enum Label {
     Utf16Be,
     /// a single-byte character set of this crate
     Single(Charset),
+    /// a multi-byte encoding: Shift_JIS, EUC-JP, ISO-2022-JP, GBK, gb18030, Big5, EUC-KR
+    Multi(MultiByte),
     /// the standard's replacement encoding (ISO-2022-KR, HZ and other labels it closes): any input
     /// is one U+FFFD
     Replacement,
-    /// an encoding of the standard this crate does not decode, by its name: "Big5", "EUC-JP",
-    /// "EUC-KR", "gb18030", "GBK", "ISO-2022-JP", "Shift_JIS"
-    Other(&'static str),
+}
+
+impl Label {
+    /// Its name in the WHATWG Encoding Standard ("UTF-8", "UTF-16LE", "windows-1252", "Shift_JIS",
+    /// "replacement" ...; a character set without a web label by its IANA name, "IBM437").
+    pub const fn name(self) -> &'static str {
+        match self {
+            Label::Utf8 => "UTF-8",
+            Label::Utf16Le => "UTF-16LE",
+            Label::Utf16Be => "UTF-16BE",
+            Label::Single(c) => c.name(),
+            Label::Multi(m) => m.name(),
+            Label::Replacement => "replacement",
+        }
+    }
+}
+
+/// The encoding of a Windows code page number: 65001 (UTF-8), 1200 and 1201 (UTF-16), the single-byte
+/// sets (`Charset::from_code_page`) and the multi-byte encodings (`MultiByte::from_code_page`); None for the
+/// others.  What RTF's
+/// `\ansicpg`, DXF's $DWGCODEPAGE or a DBF's language driver name.
+pub fn from_code_page(cp: u16) -> Option<Label> {
+    match cp {
+        65001 => Some(Label::Utf8),
+        1200 => Some(Label::Utf16Le),
+        1201 => Some(Label::Utf16Be),
+        _ => Charset::from_code_page(cp).map(Label::Single).or_else(|| MultiByte::from_code_page(cp).map(Label::Multi)),
+    }
 }
 
 /// The encoding a label names, as the WHATWG Encoding Standard reads it ("get an encoding"): leading
@@ -149,8 +183,7 @@ pub fn label(name: &str) -> Option<Label> {
 
 /// Decode as the WHATWG Encoding Standard's "decode": a UTF-8 or UTF-16 byte-order mark wins over the
 /// label (and is dropped), else the label's encoding; malformed input becomes U+FFFD, never an error.
-/// Limit: more than `limit` bytes in or out; Unsupported: no label of the standard, or an encoding this
-/// crate does not decode (`Label::Other`).
+/// Limit: more than `limit` bytes in or out; Unsupported: no label of the standard (and no byte-order mark).
 pub fn decode_label(label: &str, bytes: &[u8], limit: usize) -> Result<String, Error> {
     if bytes.len() > limit {
         return Err(Error::Limit);
@@ -164,29 +197,15 @@ pub fn decode_label(label: &str, bytes: &[u8], limit: usize) -> Result<String, E
     } else {
         (self::label(label), bytes)
     };
-    let text = match named.ok_or(Error::Unsupported)? {
-        Label::Utf8 => String::from(String::from_utf8_lossy(body)),
-        Label::Utf16Le => utf16_lossy(body, true),
-        Label::Utf16Be => utf16_lossy(body, false),
-        Label::Single(c) => c.decode(body),
-        Label::Replacement if body.is_empty() => String::new(),
-        Label::Replacement => String::from(char::REPLACEMENT_CHARACTER),
-        Label::Other(_) => return Err(Error::Unsupported),
-    };
+    let named = named.ok_or(Error::Unsupported)?;
+    // (the replacement encoding writes one U+FFFD whatever the input)
+    let cap = if named == Label::Replacement { 0 } else { body.len().min(limit) + body.len().min(limit) / 2 };
+    let mut text = String::with_capacity(cap);
+    Decoder::new(named).decode(body, true, &mut text);
     if text.len() > limit {
         return Err(Error::Limit);
     }
     Ok(text)
-}
-
-// UTF-16 with U+FFFD for lone surrogates and a last odd byte
-fn utf16_lossy(b: &[u8], le: bool) -> String {
-    let units = b.chunks_exact(2).map(|p| if le { u16::from_le_bytes([p[0], p[1]]) } else { u16::from_be_bytes([p[0], p[1]]) });
-    let mut s: String = core::char::decode_utf16(units).map(|c| c.unwrap_or(char::REPLACEMENT_CHARACTER)).collect();
-    if b.len() % 2 != 0 {
-        s.push(char::REPLACEMENT_CHARACTER);
-    }
-    s
 }
 
 impl Charset {

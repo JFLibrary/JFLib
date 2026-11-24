@@ -133,7 +133,7 @@ CRATES = [
      "SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL", "full"),
     ("plat", "the platform layer: windows, input, files, threads, network, processes, desktop services", "full"),
     ("base", "UTF-8, command line, settings files, numbers and text", "full"),
-    ("formats", "bounded JSON with exact numbers, typed JSON records, an XML subset, Unicode text encodings", "full"),
+    ("formats", "bounded JSON with exact numbers, typed JSON records, an XML subset, the text encodings of the web", "full"),
     ("datetime", "timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules", "full"),
     ("crypto", "hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)", "full"),
     ("x509", "X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's "
