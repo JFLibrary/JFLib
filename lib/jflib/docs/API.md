@@ -76,8 +76,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_pad.rs (Windows)](#platwin_padrs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_pad.rs (Linux)](#platlinux_padrs-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_pad.rs (Apple)](#platapple_mac_padrs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [fuzz.rs](#platfuzzrs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [pad.rs](#platpadrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
-- [formats](#formats) -- bounded JSON with exact numbers, typed JSON records, an XML subset, Unicode text encodings
-  <br>[src/charsets.rs](#formatssrccharsetsrs) · [src/encoding.rs](#formatssrcencodingrs) · [src/jmap.rs](#formatssrcjmaprs) · [src/json.rs](#formatssrcjsonrs) · [src/xml/mod.rs](#formatssrcxmlmodrs) · [src/xml/lenient.rs](#formatssrcxmllenientrs) · [src/xml/reader.rs](#formatssrcxmlreaderrs)
+- [formats](#formats) -- bounded JSON with exact numbers, typed JSON records, an XML subset, the text encodings of the web
+  <br>[src/charsets.rs](#formatssrccharsetsrs) · [src/decode.rs](#formatssrcdecoders) · [src/encoding.rs](#formatssrcencodingrs) · [src/jmap.rs](#formatssrcjmaprs) · [src/json.rs](#formatssrcjsonrs) · [src/multibyte.rs](#formatssrcmultibyters) · [src/xml/mod.rs](#formatssrcxmlmodrs) · [src/xml/lenient.rs](#formatssrcxmllenientrs) · [src/xml/reader.rs](#formatssrcxmlreaderrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
   <br>[lib.rs](#datetime-crate-root) · [cron.rs](#datetimecronrs) · [tz.rs](#datetimetzrs)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
@@ -41325,7 +41325,7 @@ forms.
 
 ## formats
 
-*bounded JSON with exact numbers, typed JSON records, an XML subset, Unicode text encodings* -- crate root [`lib/formats/src/lib.rs`](../lib/formats/src/lib.rs)
+*bounded JSON with exact numbers, typed JSON records, an XML subset, the text encodings of the web* -- crate root [`lib/formats/src/lib.rs`](../lib/formats/src/lib.rs)
 
 ```text
 formats -- data formats as text: JSON, typed JSON records, an XML subset, Unicode encodings
@@ -41344,13 +41344,16 @@ formats -- data formats as text: JSON, typed JSON records, an XML subset, Unicod
   encoding  decode(bytes, limit) -> (String, Encoding) / encode(text, Encoding): UTF-8 with
          and without BOM, UTF-16 LE / BE, strict and without guessing; Charset: the single-byte
          sets of the web (WHATWG: windows-1252, ISO-8859-x, KOI8 ...) and of old files (the DOS
-         code pages); label / decode_label: the WHATWG Encoding Standard's labels and decode
+         code pages); MultiByte: Shift_JIS, EUC-JP, ISO-2022-JP, GBK, gb18030, Big5, EUC-KR;
+         Decoder for input in pieces; label / decode_label / from_code_page: the WHATWG Encoding
+         Standard's labels and decode, Windows code page numbers
 
 Every reader takes untrusted input: it checks the size before it reads and the nesting, the
 values or the elements while it reads, and reports a malformed or too large input as an error,
 never a panic.  Only alloc; no I/O.
 
-The single-byte tables and the WHATWG labels are generated (charsets.rs, tools/gen_encodings.py).
+The encodings' tables and the WHATWG labels are generated (charsets.rs, cjk.rs and cjk.bin,
+tools/gen_encodings.py).
 
 json and jmap came from agent_core, xml and encoding from base (0.3.0); agent_core::{json,
 jmap, record!, wire_enum!} and base::{xml, encoding} remain as re-exports of these modules.
@@ -41433,13 +41436,50 @@ the standard's tables: Copyright © WHATWG (Apple, Google, Mozilla, Microsoft), 
   (Mac), 20866 and 21866 (KOI8), 28591 to 28605 (ISO-8859; 28599, ISO-8859-9, is windows-1254 as on the
   web), 38598
 
+### `formats/src/decode.rs`
+
+Source: [`lib/formats/src/decode.rs`](../lib/formats/src/decode.rs)
+
+```text
+decode -- formats::encoding's Decoder: the decoders of the WHATWG Encoding Standard for input in pieces,
+UTF-8, UTF-16, the single-byte sets, the replacement encoding and the multi-byte encodings, each the
+standard's algorithm byte by byte (with a fast path for ASCII where no sequence is open).
+
+The standard lets a decoder "restore" bytes it has read: they are read again, before the rest of the input.
+They wait in a small queue here, so a sequence may end in one piece of input and be read again from the next.
+```
+
+- **`struct Decoder`**
+  A decoder for input in pieces: `decode(piece, last, out)` appends the text of each piece to `out`; a
+  sequence cut between two pieces is finished by the next one.  The output is the same as decoding the whole
+  input at once with `decode_label` (without its byte-order mark rule; see `Decoder::sniffing`).  Shift_JIS's
+  "あ" in two pieces, 0x82 and then 0xA0 with `last`, gives "あ".
+
+**`impl Decoder`**
+
+- **`fn new(label: Label) -> Decoder`**
+  A decoder of the encoding a label names (`encoding::label`).
+- **`fn sniffing(label: Label) -> Decoder`**
+  A decoder with the standard's byte-order mark rule (its "decode"): a UTF-8, UTF-16LE or UTF-16BE
+  byte-order mark at the start wins over the label and is dropped.
+- **`fn label(&self) -> Label`**
+  The encoding decoded: the label's, or the byte-order mark's once one was found.
+- **`fn malformed(&self) -> bool`**
+  Whether some input was malformed (a U+FFFD in the output came from an error, not from the input).
+- **`fn decode(&mut self, input: &[u8], last: bool, out: &mut String)`**
+  Append the text of `input` to `out`.  `last`: no more input follows; an open sequence becomes U+FFFD,
+  and a following call starts a new input in the encoding `label` names (a byte-order mark is not looked
+  for again).  The output grows by at most three bytes per input byte, and by six for what an earlier
+  piece left open.
+
 ### `formats/src/encoding.rs`
 
 Source: [`lib/formats/src/encoding.rs`](../lib/formats/src/encoding.rs)
 
 ```text
-encoding -- text encodings: strict Unicode interchange, the single-byte character sets of the web and of
-old files, the labels of the WHATWG Encoding Standard.  New native library functionality.
+encoding -- text encodings: strict Unicode interchange, every encoding of the WHATWG Encoding Standard
+(the single-byte character sets of the web, the multi-byte encodings of Chinese, Japanese and Korean) and
+the DOS code pages of old files.  New native library functionality.
 
   decode(bytes, limit) -> (String, Encoding)   strict UTF-8 / UTF-16 by the byte-order mark, no guessing
   encode(text, Encoding) -> bytes
@@ -41447,13 +41487,17 @@ old files, the labels of the WHATWG Encoding Standard.  New native library funct
            the DOS code pages (IBM437 ... 869), an exact ISO-8859-1; from_label (WHATWG), from_code_page
            (Windows numbers), name, code_page, decode (U+FFFD for unassigned bytes), decode_char,
            encode (Unmappable), encode_char
-  label(name) -> Label      what a WHATWG label names: UTF-8, UTF-16, a Charset, the replacement
-                            encoding, or an encoding this crate does not decode (Shift_JIS, GBK ...)
+  MultiByte: Shift_JIS, EUC-JP, ISO-2022-JP, GBK, gb18030, Big5, EUC-KR; from_label, from_code_page,
+           name, code_page, decode, encode (Unmappable), encode_html (character references)
+  Decoder: the standard's decoders for input in pieces (new / sniffing, decode(piece, last, out),
+           malformed)
+  label(name) -> Label      what a WHATWG label names: UTF-8, UTF-16, a Charset, a MultiByte or the
+                            replacement encoding; from_code_page(n) -> Label: the same for a Windows number
   decode_label(label, bytes, limit) -> String   the standard's decode: a byte-order mark wins over the
                             label, then the label's encoding, errors become U+FFFD
 
-The tables and labels are generated (charsets.rs, tools/gen_encodings.py): Python's codecs, made the
-standard's index where it differs (checked against the standard's data with --verify).
+The tables and labels are generated (charsets.rs, cjk.rs and cjk.bin, tools/gen_encodings.py): Python's
+codecs, made the standard's indexes where they differ (checked against the standard's data with --verify).
 ```
 
 - **`enum Encoding`**
@@ -41464,8 +41508,8 @@ standard's index where it differs (checked against the standard's data with --ve
   - `Utf16Be`
 
 - **`enum Error`**
-  Invalid Unicode, an encoding this crate does not decode (UTF-32, an unknown or multi-byte label), a
-  caller-specified byte limit, or a character the character set cannot encode.
+  Invalid Unicode, an encoding this crate does not decode (UTF-32, an unknown label), a caller-specified
+  byte limit, or a character the encoding cannot encode.
   - `Invalid`
   - `Unsupported`
   - `Limit`
@@ -41483,10 +41527,21 @@ standard's index where it differs (checked against the standard's data with --ve
   - `Utf16Le` -- UTF-16 little-endian (also the label "utf-16")
   - `Utf16Be` -- UTF-16 big-endian
   - `Single(Charset)` -- a single-byte character set of this crate
+  - `Multi(MultiByte)` -- a multi-byte encoding: Shift_JIS, EUC-JP, ISO-2022-JP, GBK, gb18030, Big5, EUC-KR
   - `Replacement` -- the standard's replacement encoding (ISO-2022-KR, HZ and other labels it closes): any input
     is one U+FFFD
-  - `Other(&'static str)` -- an encoding of the standard this crate does not decode, by its name: "Big5", "EUC-JP",
-    "EUC-KR", "gb18030", "GBK", "ISO-2022-JP", "Shift_JIS"
+
+**`impl Label`**
+
+- **`const fn name(self) -> &'static str`**
+  Its name in the WHATWG Encoding Standard ("UTF-8", "UTF-16LE", "windows-1252", "Shift_JIS",
+  "replacement" ...; a character set without a web label by its IANA name, "IBM437").
+
+- **`fn from_code_page(cp: u16) -> Option<Label>`**
+  The encoding of a Windows code page number: 65001 (UTF-8), 1200 and 1201 (UTF-16), the single-byte
+  sets (`Charset::from_code_page`) and the multi-byte encodings (`MultiByte::from_code_page`); None for the
+  others.  What RTF's
+  `\ansicpg`, DXF's $DWGCODEPAGE or a DBF's language driver name.
 
 - **`fn label(name: &str) -> Option<Label>`**
   The encoding a label names, as the WHATWG Encoding Standard reads it ("get an encoding"): leading
@@ -41496,8 +41551,7 @@ standard's index where it differs (checked against the standard's data with --ve
 - **`fn decode_label(label: &str, bytes: &[u8], limit: usize) -> Result<String, Error>`**
   Decode as the WHATWG Encoding Standard's "decode": a UTF-8 or UTF-16 byte-order mark wins over the
   label (and is dropped), else the label's encoding; malformed input becomes U+FFFD, never an error.
-  Limit: more than `limit` bytes in or out; Unsupported: no label of the standard, or an encoding this
-  crate does not decode (`Label::Other`).
+  Limit: more than `limit` bytes in or out; Unsupported: no label of the standard (and no byte-order mark).
 
 **`impl Charset`**
 
@@ -41659,6 +41713,62 @@ the agent interface's control channels. New shared code (agent_core::json until 
   Encode bounded JSON for people to read: every array element and object member on its own
   line, indented by `indent` spaces per level, "name": value; empty containers stay "[]" / "{}".
   The output ends without a newline.
+
+### `formats/src/multibyte.rs`
+
+Source: [`lib/formats/src/multibyte.rs`](../lib/formats/src/multibyte.rs)
+
+```text
+multibyte -- the multi-byte encodings of the WHATWG Encoding Standard for formats::encoding: Shift_JIS,
+EUC-JP, ISO-2022-JP, GBK, gb18030, Big5 and EUC-KR.  The encoders here, the decoders in decode.rs, both as
+the standard writes them step by step; the indexes are generated (cjk.rs, cjk.bin).
+
+A pointer is a character's place in an index (row × columns + column); the decoders compute it from the
+bytes and look the code point up, the encoders search the pointers sorted by code point (*_ORDER) and
+compute the bytes from it.
+```
+
+- **`enum MultiByte`**
+  A multi-byte encoding of the WHATWG Encoding Standard: the legacy encodings of Chinese, Japanese and
+  Korean text that browsers, mail and old files still use.  Each is the standard's: the Windows variants
+  where the web uses them (Shift_JIS is Windows' code page 932, EUC-KR its 949, GBK its 936).
+  - `ShiftJis` -- Shift_JIS: Japanese as Windows writes it (code page 932, windows-31j: JIS X 0208 with the NEC and
+    IBM extensions, half-width katakana, the user-defined rows as the Private Use Area)
+  - `EucJp` -- EUC-JP: Japanese on Unix (JIS X 0208, JIS X 0212 after 0x8F, half-width katakana after 0x8E)
+  - `Iso2022Jp` -- ISO-2022-JP: Japanese in mail and news, 7 bits with escape sequences (ASCII, JIS X 0201 Roman and
+    katakana, JIS X 0208)
+  - `Gbk` -- GBK: simplified Chinese (code page 936; also what the labels gb2312 and chinese name).  It reads
+    gb18030; it writes only its two-byte characters and the euro sign as 0x80.
+  - `Gb18030` -- gb18030: simplified Chinese with all of Unicode but U+E5E5, which it does not write (GB18030-2022;
+    code page 54936)
+  - `Big5` -- Big5: traditional Chinese with the Hong Kong Supplementary Character Set (HKSCS-2008; code page 950)
+  - `EucKr` -- EUC-KR: Korean as Windows writes it (code page 949, the Unified Hangul Code: all 11 172 syllables)
+
+**`impl MultiByte`**
+
+- **`const ALL: &'static [MultiByte] = &[MultiByte::ShiftJis, MultiByte::EucJp, MultiByte::Iso20 ...`**
+  every multi-byte encoding, in declaration order
+- **`const fn name(self) -> &'static str`**
+  its name in the WHATWG Encoding Standard ("Shift_JIS", "EUC-JP", "ISO-2022-JP", "GBK", "gb18030",
+  "Big5", "EUC-KR")
+- **`const fn code_page(self) -> u16`**
+  its Windows code page number: 932, 20932, 50220, 936, 54936, 950, 949
+- **`const fn from_code_page(cp: u16) -> Option<MultiByte>`**
+  the encoding of a Windows code page number: 932, 936, 949, 950, 20932 and 51932 (EUC-JP), 50220 and
+  50221 (ISO-2022-JP), 51949 (EUC-KR), 54936.  None for the others: Johab (1361) is none of the standard's,
+  and 50222 writes half-width katakana between SO and SI, which the standard's ISO-2022-JP does not read.
+- **`fn from_label(name: &str) -> Option<MultiByte>`**
+  the encoding a WHATWG label names ("shift_jis", "sjis", "windows-31j", "gb2312", "big5-hkscs",
+  "ks_c_5601-1987" ...; `encoding::label`), multi-byte encodings only
+- **`fn decode(self, bytes: &[u8]) -> String`**
+  The text of these bytes, as the standard decodes them: malformed or unassigned sequences become
+  U+FFFD, ASCII bytes after a broken lead byte are kept.  For input in pieces: `Decoder`.
+- **`fn encode(self, text: &str) -> Result<Vec<u8>, Error>`**
+  The bytes of a text; Unmappable: the first character this encoding does not have (ISO-2022-JP ends
+  in ASCII, with ESC ( B where needed).
+- **`fn encode_html(self, text: &str) -> Vec<u8>`**
+  The bytes of a text, a character this encoding does not have as a decimal character reference
+  ("&#128512;"), as browsers submit forms (the standard's "html" error mode).
 
 ### `formats/src/xml/mod.rs`
 
@@ -65160,8 +65270,9 @@ dimension styles, blocks with their entities, and the entities of the drawing.  
 Binary DXF is refused (Error::Binary).  Files are untrusted input: every count, length and size is bounded
 (Limits), a malformed value is skipped with a note, a group code that is no number ends the file with an error;
 nothing nests deeper than POLYLINE / VERTEX and INSERT / ATTRIB, so there is no recursion.  Strings before AutoCAD
-2007 are in the header's code page ($DWGCODEPAGE, formats::encoding's character sets), from AC1021 on UTF-8; \U+XXXX is decoded
-everywhere, %% codes and MTEXT's codes where the text is drawn (specials, mtext).
+2007 are in the header's code page ($DWGCODEPAGE, formats::encoding's character sets and multi-byte encodings), from
+AC1021 on UTF-8; \U+XXXX and \M+NXXXX are decoded everywhere, %% codes and MTEXT's codes where the text is drawn
+(specials, mtext).
 ```
 
 ### `dxf` crate root
@@ -65640,7 +65751,7 @@ mtext -- MTEXT's inline format codes (G6e2): a text as paragraphs of runs, each 
   \C<aci>;  colour of the palette (0 by block, 256 by layer)   \c<bgr>;  a true colour (blue in the high byte)
   \S<top><sep><bottom>;  stacked: / with a bar, # diagonal, ^ without a bar (tolerances)
   \p...;  paragraph: i<first line indent>, l<left indent>, r<right>, q<l|c|r|j|d> alignment, t<tabs> (x: ignored)
-  \U+XXXX  a character   \M+NXXXX  a double-byte character (read as U+FFFD)   ^I tab, ^J line break, ^<c> control
+  \U+XXXX  a character   \M+NXXXX  a double byte of an East Asian page   ^I tab, ^J line break, ^<c> control
   %%c %%d %%p %%% %%nnn  as in TEXT (strings::specials)
 
 Unknown codes are dropped with their letter (a code with a ';' to its end); nothing recurses (the groups are a stack
@@ -65720,12 +65831,13 @@ Source: [`lib/dxf/src/strings.rs`](../lib/dxf/src/strings.rs)
 
 ```text
 strings -- a DXF's bytes as text: UTF-8 from AutoCAD 2007 (AC1021) on, before that the header's code page
-($DWGCODEPAGE: formats::encoding's character sets), \U+XXXX in any version; TEXT's %% codes (specials).
+($DWGCODEPAGE: formats::encoding's character sets and multi-byte encodings), \U+XXXX and \M+NXXXX in any
+version; TEXT's %% codes (specials).
 ```
 
 - **`fn decode_unicode_escapes(s: &str) -> String`**
-  \\U+XXXX (four or five hex digits) as the character it names; \\M+NXXXX (a double byte of an East Asian page) as
-  U+FFFD.  Everything else stays (also "\\\\": TEXT has no escapes; MTEXT is parsed by mtext::parse)
+  \\U+XXXX (four or five hex digits) as the character it names; \\M+NXXXX as the double byte XXXX of the East Asian
+  page N (`mbcs`).  Everything else stays (also "\\\\": TEXT has no escapes; MTEXT is parsed by mtext::parse)
 
 - **`struct Special`**
   a run of a TEXT after its %% codes: the text and how it is decorated

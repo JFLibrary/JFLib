@@ -14,13 +14,16 @@
 //   encoding  decode(bytes, limit) -> (String, Encoding) / encode(text, Encoding): UTF-8 with
 //          and without BOM, UTF-16 LE / BE, strict and without guessing; Charset: the single-byte
 //          sets of the web (WHATWG: windows-1252, ISO-8859-x, KOI8 ...) and of old files (the DOS
-//          code pages); label / decode_label: the WHATWG Encoding Standard's labels and decode
+//          code pages); MultiByte: Shift_JIS, EUC-JP, ISO-2022-JP, GBK, gb18030, Big5, EUC-KR;
+//          Decoder for input in pieces; label / decode_label / from_code_page: the WHATWG Encoding
+//          Standard's labels and decode, Windows code page numbers
 //
 // Every reader takes untrusted input: it checks the size before it reads and the nesting, the
 // values or the elements while it reads, and reports a malformed or too large input as an error,
 // never a panic.  Only alloc; no I/O.
 //
-// The single-byte tables and the WHATWG labels are generated (charsets.rs, tools/gen_encodings.py).
+// The encodings' tables and the WHATWG labels are generated (charsets.rs, cjk.rs and cjk.bin,
+// tools/gen_encodings.py).
 //
 // json and jmap came from agent_core, xml and encoding from base (0.3.0); agent_core::{json,
 // jmap, record!, wire_enum!} and base::{xml, encoding} remain as re-exports of these modules.
@@ -30,7 +33,10 @@
 extern crate alloc;
 
 mod charsets;
+mod cjk;
+mod decode;
 pub mod encoding;
 pub mod jmap;
 pub mod json;
+mod multibyte;
 pub mod xml;

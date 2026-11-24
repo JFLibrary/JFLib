@@ -4,6 +4,7 @@
 use crate::{Document, Error, Inline, Paragraph, ParagraphFormat, ParagraphStyle, TextFormat};
 use alloc::{format, string::String, vec::Vec};
 use doc_core::{Alignment, FontFamily, Highlight, ResolvedFormat, TextColor, TextPositioning};
+use formats::encoding::{Decoder, Label, MultiByte};
 
 #[path="rtf_tables.rs"] mod rtf_tables;
 
@@ -481,6 +482,9 @@ struct Reader<'a> {
     text_bytes: usize,
     skip: usize,
     high: Option<(u16, TextFormat)>,
+    // the lead byte of a double-byte character (code pages 932, 936, 949, 950) waiting for its trail byte: the
+    // byte, its encoding, and whether it came raw (then the next raw byte is its trail byte, also \ { })
+    lead: Option<(u8, MultiByte, bool)>,
     colors: Vec<TextColor>,
     rgb: [u8; 3],
     color_set: bool,
@@ -511,6 +515,7 @@ impl<'a> Reader<'a> {
             text_bytes: 0,
             skip: 0,
             high: None,
+            lead: None,
             colors: Vec::new(),
             rgb: [0; 3],
             color_set: false,
@@ -523,7 +528,7 @@ impl<'a> Reader<'a> {
         }
     }
     fn text(&mut self, c: char) -> Result<(), Error> {
-        if self.high.is_some() {
+        if self.high.is_some() || self.lead.is_some() {
             return Err(Error::Invalid);
         }
         self.append(c)
@@ -569,8 +574,32 @@ impl<'a> Reader<'a> {
         });
         Ok(())
     }
+    // a byte of a double-byte code page: ASCII, a character of one byte (Shift_JIS's half-width katakana, GBK's
+    // euro sign) or a lead byte, which the next byte completes; bytes that are no character are invalid
+    fn double_byte(&mut self, m: MultiByte, value: u8, raw: bool) -> Result<(), Error> {
+        let mut s = String::new();
+        match self.lead.take() {
+            // (a trail byte in another font's code page completes nothing)
+            Some((_, lm, _)) if lm != m => return Err(Error::Invalid),
+            Some((lead, _, _)) => s = m.decode(&[lead, value]),
+            None if value < 0x80 => return self.text(char::from(value)),
+            None => {
+                let mut d = Decoder::new(Label::Multi(m));
+                d.decode(&[value], false, &mut s);
+                if s.is_empty() && !d.malformed() {
+                    self.lead = Some((value, m, raw));
+                    return Ok(());
+                }
+            }
+        }
+        if s.is_empty() || s.contains('\u{FFFD}') {
+            return Err(Error::Invalid);
+        }
+        // (Big5 has four pairs that are two characters)
+        s.chars().try_for_each(|c| self.text(c))
+    }
     fn unicode(&mut self, value: i32) -> Result<(), Error> {
-        if !(-32768..=65535).contains(&value) {
+        if !(-32768..=65535).contains(&value) || self.lead.is_some() {
             return Err(Error::Invalid);
         }
         let u = value as u16;
@@ -592,7 +621,7 @@ impl<'a> Reader<'a> {
             self.text(char::from_u32(u32::from(u)).ok_or(Error::Invalid)?)
         }
     }
-    fn byte(&mut self, value: u8) -> Result<(), Error> {
+    fn byte(&mut self, value: u8, raw: bool) -> Result<(), Error> {
         if self.skip != 0 {
             self.skip -= 1;
             return Ok(());
@@ -606,6 +635,12 @@ impl<'a> Reader<'a> {
                     .map(|f| f.1)
                     .unwrap_or(0);
                 let cp = if cp == 0 { self.codepage } else { cp };
+                if let Some(m) = u16::try_from(cp).ok().and_then(MultiByte::from_code_page).filter(|_| matches!(cp, 932 | 936 | 949 | 950)) {
+                    return self.double_byte(m, value, raw);
+                }
+                if self.lead.is_some() {
+                    return Err(Error::Invalid);
+                }
                 if cp == -2 || value >= 128 && !supported_codepage(cp) {
                     return Err(unsupported("character code page/font"));
                 }
@@ -646,7 +681,7 @@ impl<'a> Reader<'a> {
         Ok(f)
     }
     fn paragraph_end(&mut self) -> Result<(), Error> {
-        if self.high.is_some() {
+        if self.high.is_some() || self.lead.is_some() {
             return Err(Error::Invalid);
         }
         if self.document.paragraphs.len() == 2048 {
@@ -685,6 +720,12 @@ impl<'a> Reader<'a> {
             }
             let c = self.bytes[self.pos];
             self.pos += 1;
+            if matches!(self.lead, Some((_, _, true))) {
+                // the trail byte of a raw lead byte, whatever it is (Shift_JIS's ソ is 83 5C)
+                self.state.start = false;
+                self.byte(c, true)?;
+                continue;
+            }
             match c {
                 b'{' => {
                     if self.stack.len() == 64 || self.stack.is_empty() && self.header {
@@ -714,11 +755,11 @@ impl<'a> Reader<'a> {
                         return Err(Error::Invalid);
                     }
                     self.state.start = false;
-                    self.byte(c)?;
+                    self.byte(c, true)?;
                 }
             }
         }
-        if !self.header || !self.stack.is_empty() || self.high.is_some() {
+        if !self.header || !self.stack.is_empty() || self.high.is_some() || self.lead.is_some() {
             return Err(Error::Invalid);
         }
         if !self.current.is_empty() { self.paragraph_end()?; }
@@ -733,7 +774,7 @@ impl<'a> Reader<'a> {
                 let b = hex(*self.bytes.get(self.pos + 1).ok_or(Error::Invalid)?)?;
                 self.pos += 2;
                 self.state.start = false;
-                return self.byte(a * 16 + b);
+                return self.byte(a * 16 + b, false);
             }
             if self.skip != 0 {
                 self.skip -= 1;
@@ -748,7 +789,7 @@ impl<'a> Reader<'a> {
                 return Ok(());
             }
             match c {
-                b'\\' | b'{' | b'}' => self.byte(c),
+                b'\\' | b'{' | b'}' => self.byte(c, false),
                 b'~' => self.text('\u{a0}'),
                 b'_' => self.text('\u{2011}'),
                 b'-' => self.text('\u{ad}'),
@@ -920,6 +961,10 @@ impl<'a> Reader<'a> {
                         204 => 1251,
                         222 => 874,
                         238 => 1250,
+                        128 => 932,
+                        129 => 949,
+                        134 => 936,
+                        136 => 950,
                         _ => -1,
                     }
                 };

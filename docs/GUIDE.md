@@ -2888,9 +2888,11 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   `formats::jmap` (typed records, below), `formats::xml` (`Reader`, the strict pull reader with
   namespaces and offsets; `Lenient`, the forgiving one for files from editors; `parse`, a bounded
   tree of a subset that refuses a DTD, comments and mixed content) and `formats::encoding` (strict UTF-8 and
-  UTF-16 by their byte-order mark; `Charset`, the single-byte sets of the web and of DOS files,
-  `Charset::from_code_page(850)`, `label("iso-8859-2")` and `decode_label` as the WHATWG Encoding
-  Standard reads labels). `agent_core::json` / `jmap` and `base::xml` / `encoding` are the same
+  UTF-16 by their byte-order mark; every encoding of the WHATWG Encoding Standard as browsers read and
+  write it: `Charset`, the single-byte sets of the web and of DOS files, `MultiByte`, Shift_JIS, EUC-JP,
+  ISO-2022-JP, GBK, gb18030, Big5 and EUC-KR with `encode` / `encode_html`; `label("iso-8859-2")`,
+  `from_code_page(932)` and `decode_label` as the standard reads labels; `Decoder` for input in
+  pieces). `agent_core::json` / `jmap` and `base::xml` / `encoding` are the same
   modules under their names until 0.2.1.
 * `plat::watch::Watcher::new(&roots)` / `take(ms)` -- the changed paths below folders
   (ReadDirectoryChangesW / inotify, recursive; `overflow` when events were lost). Every change
