@@ -21,8 +21,9 @@
 // The codes are Visio's (learn.microsoft.com, Shape Layout and Page Layout sections; research in
 // jd10-strukturen.md).  The router of diagram_core::glue reads RouteStyle and ShapeRouteStyle
 // (straight for 2 and 16, else right angles), LineToNodeX/Y as its clearance, and leaves shapes
-// with ObjType 4 out of its obstacles; the other codes are kept for Visio and for the page
-// layout of P2 (CN-13).
+// with ObjType 4 out of its obstacles; (JD21) the page layout (diagram_core::layout,
+// layout_cmds.rs) reads PlaceStyle, PlaceDepth, AvenueSizeX/Y, BlockSizeX/Y, ResizePage, ObjType
+// and ShapeFixedCode; the other codes are kept for Visio.
 
 use alloc::vec::Vec;
 
@@ -110,37 +111,35 @@ static PLACE_DIRS: [&str; 4] = ["Von oben nach unten", "Von unten nach oben", "V
 
 /// (JD15, PG-11) style and direction -> PlaceStyle (Visio's visPLOPlace* codes: 1 top to
 /// bottom, 2 left to right, 3 radial, 4 bottom to top, 5 right to left, 6 circular, 7 .. 14 the
-/// compact trees, 15 .. 26 the hierarchies; centred where Visio offers an alignment)
+/// compact trees, 16 .. 27 the hierarchies; centred where Visio offers an alignment, a compact
+/// tree stepping right of a vertical and down of a horizontal growth).  (JD21) The codes are
+/// diagram_core::layout::Place's (JD15 had the hierarchies one off and two compact trees wrong)
 pub(crate) fn place_code(style: i32, dir: i32) -> i32 {
-    let d = dir.clamp(0, 3) as usize;
-    match style {
-        1 => [1, 4, 2, 5][d],
-        2 => [7, 11, 8, 10][d],
-        3 => [16, 19, 22, 25][d],
-        4 => 3,
-        5 => 6,
-        _ => 0,
-    }
+    use diagram_core::layout::{Dir, Place, Style};
+    let d = [Dir::Down, Dir::Up, Dir::Right, Dir::Left][dir.clamp(0, 3) as usize];
+    let st = match style {
+        1 => Style::Flowchart,
+        2 => Style::CompactTree,
+        3 => Style::Hierarchy,
+        4 => Style::Radial,
+        5 => Style::Circular,
+        _ => return 0,
+    };
+    Place::new(st, d).code() as i32
 }
 
-/// (JD15, PG-11) PlaceStyle -> (style, direction) of the register
+/// (JD15, PG-11) PlaceStyle -> (style, direction) of the register (a compact tree by the way
+/// it grows)
 pub(crate) fn place_split(code: i32) -> (i32, i32) {
-    match code {
-        1 => (1, 0),
-        4 => (1, 1),
-        2 => (1, 2),
-        5 => (1, 3),
-        3 => (4, 0),
-        6 => (5, 0),
-        7 | 9 => (2, 0),
-        11 | 13 => (2, 1),
-        8 | 12 => (2, 2),
-        10 | 14 => (2, 3),
-        15..=17 => (3, 0),
-        18..=20 => (3, 1),
-        21..=23 => (3, 2),
-        24..=26 => (3, 3),
-        _ => (0, 0),
+    use diagram_core::layout::{Dir, Place, Style};
+    let Some(p) = Place::from_code(code as i64) else { return (0, 0) };
+    let dir = [Dir::Down, Dir::Up, Dir::Right, Dir::Left].iter().position(|&d| d == p.dir).unwrap_or(0) as i32;
+    match p.style {
+        Style::Flowchart => (1, dir),
+        Style::CompactTree => (2, dir),
+        Style::Hierarchy => (3, dir),
+        Style::Radial => (4, 0),
+        Style::Circular => (5, 0),
     }
 }
 

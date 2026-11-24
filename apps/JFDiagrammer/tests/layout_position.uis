@@ -1,0 +1,127 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 (CN-14, RS-25, PR-03): Start › Anordnen › Positionieren -- Automatische
+# Ausrichtung und Abstände (live preview while pointed at; each child under or beside its parent
+# at the spacing, what lies downstream carried along), Automatischer Abstand, Abstandsoptionen
+# (20 mm), Diagramm drehen and spiegeln (the shapes upright), Von Seitenumbrüchen verschieben,
+# Seitenumbrüche vermeiden (a toggle), Weitere Verteilungsoptionen; each one undo step
+cmd 4404
+drag 600,280 700,320
+drag 540,400 640,440
+drag 760,420 860,460
+drag 560,540 660,580
+cmd 4400
+click 650,300
+type "Oben"
+click 1100,700
+click 590,420
+type "Links"
+click 1100,700
+click 810,440
+type "Rechts"
+click 1100,700
+click 610,560
+type "Unten"
+click 1100,700
+cmd 4401
+drag 650,300 590,420
+drag 650,300 810,440
+drag 590,420 610,560
+cmd 4400
+click 1100,700
+expect listitem:"Oben" rect 601 273 100 51
+expect listitem:"Links" rect 550 399 101 50
+expect listitem:"Rechts" rect 752 424 100 25
+expect listitem:"Unten" rect 550 550 101 25
+click button:"Positionieren"
+expect menuitem:"Automatischer Abstand" enabled
+expect menuitem:"Abstandsoptionen..." enabled
+expect menuitem:"Weitere Verteilungsoptionen..." disabled
+expect menuitem:"Von Seitenumbrüchen verschieben" disabled
+expect menuitem:"Seitenumbrüche vermeiden" unchecked
+expect menuitem:"Diagramm um 90° nach links drehen" enabled
+# pointed at: the preview; left: back
+move menuitem:"Automatische Ausrichtung und Abstände"
+expect listitem:"Links" rect 601 343 100 50
+move 300,700
+expect listitem:"Links" rect 550 399 101 50
+click menuitem:"Automatische Ausrichtung und Abstände"
+expect listitem:"Oben" rect 601 273 100 51
+expect listitem:"Links" rect 601 343 100 50
+expect listitem:"Rechts" rect 720 424 101 25
+expect listitem:"Unten" rect 601 412 100 25
+shot build/JFDiagrammer-layout-align-space.png
+key ctrl+z
+expect listitem:"Links" rect 550 399 101 50
+# Automatischer Abstand: the spacing only, the lines across stay
+cmd 7248
+expect listitem:"Links" rect 550 343 101 50
+expect listitem:"Rechts" rect 720 424 101 25
+expect listitem:"Unten" rect 550 412 101 25
+key ctrl+z
+# Abstandsoptionen: 20 mm instead of the page's 7.5 mm
+cmd 7250
+expect dialog:"Abstandsoptionen" exists
+expect radio:"Standardabstand der Seite verwenden" checked
+click radio:"Diesen Abstand verwenden"
+click #2108686340
+key ctrl+a
+type "200"
+click #2108686341
+key ctrl+a
+type "200"
+click button:"OK"
+cmd 7248
+expect listitem:"Links" rect 550 374 101 50
+expect listitem:"Unten" rect 550 475 101 25
+key ctrl+z
+# Diagramm drehen: turned left and flipped as a whole, each shape keeps its size
+cmd 7254
+expect listitem:"Oben" rect 525 449 101 51
+expect listitem:"Links" rect 651 500 101 50
+expect listitem:"Rechts" rect 664 311 100 25
+expect listitem:"Unten" rect 789 512 101 25
+key ctrl+z
+cmd 7257
+expect listitem:"Oben" rect 701 273 101 51
+expect listitem:"Links" rect 752 399 100 50
+expect listitem:"Rechts" rect 550 424 101 25
+expect listitem:"Unten" rect 752 550 100 25
+key ctrl+z
+expect listitem:"Oben" rect 601 273 100 51
+expect listitem:"Rechts" rect 752 424 100 25
+# Weitere Verteilungsoptionen: the left edges evenly between the outer two
+click listitem:"Oben"
+click listitem:"Links" shift
+click listitem:"Rechts" shift
+cmd 7251
+expect dialog:"Shapes verteilen" exists
+click radio:"Linke Kanten"
+click button:"OK"
+expect listitem:"Oben" rect 651 273 101 51
+expect listitem:"Links" rect 550 399 101 50
+expect listitem:"Rechts" rect 752 424 100 25
+key ctrl+z
+click 1100,700
+# a page larger than its paper (A3 on A4): the shape across the break moves right off it
+click tab:"Entwurf"
+cmd 6150
+cmd 5121
+cmd 4404
+drag 870,600 950,640
+cmd 4400
+click 1100,650
+expect listitem:"Sheet.11" rect 862 607 89 35
+click tab:"Start"
+click button:"Positionieren"
+expect menuitem:"Von Seitenumbrüchen verschieben" enabled
+click menuitem:"Von Seitenumbrüchen verschieben"
+expect listitem:"Sheet.11" rect 911 607 89 35
+shot build/JFDiagrammer-layout-breaks.png
+key ctrl+z
+expect listitem:"Sheet.11" rect 862 607 89 35
+# Seitenumbrüche vermeiden is a toggle
+cmd 7253
+click button:"Positionieren"
+expect menuitem:"Seitenumbrüche vermeiden" checked
+key esc
+cmd 7253

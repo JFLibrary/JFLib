@@ -55,6 +55,10 @@
 //                     (JD17) and the binary stencils of 2003-2010 (.vss) converted for the
 //                     Shapes panel: import only, never written back (a save writes .vssx)
 //   src/cmds_arrange.rs  (JD8 rest) Automatisch ausrichten
+//   src/layout_cmds.rs   (JD21) Seitenlayout neu anordnen (diagram_core::layout) with the live
+//                     preview of its rows, Positionieren: Automatischer Abstand, Automatische
+//                     Ausrichtung und Abstände, page breaks, Diagramm drehen
+//   src/dlg_layout.rs (JD21) Layout konfigurieren, Abstandsoptionen, Shapes verteilen
 //   src/cmds_later.rs    (JD8 rest) the commands left for later with their reasons, the check
 //   src/cmds_myshapes.rs (JD8 rest) Zu meinen Shapes hinzufügen (shapes of the page into Favoriten)
 //   src/pane_sizepos.rs, pane_data.rs, pane_panzoom.rs  (JD8 rest) the task panes Größe und
@@ -170,6 +174,9 @@ mod format_quick;
 mod icons;
 mod lang;
 mod layers;
+// (JD21 layout) Seitenlayout neu anordnen, Positionieren: spacing, page breaks, Diagramm drehen
+mod dlg_layout;
+mod layout_cmds;
 mod layout_ui;
 // (JD13) the legend of a network plan counts its devices
 mod legend;
@@ -334,6 +341,8 @@ pub(crate) struct Diagrammer {
     pub dlink: data_link::LinkState,
     pub dask: data_ask::AskState,
     pub textdraw: data_textdraw::TextDrawState,
+    /// (JD21 layout) the layout commands: live preview, Seitenumbrüche vermeiden, the dialogs
+    pub lay: layout_cmds::LayoutCmds,
 }
 
 impl Diagrammer {
@@ -407,6 +416,7 @@ impl Diagrammer {
             dlink: data_link::LinkState::default(),
             dask: data_ask::AskState::default(),
             textdraw: data_textdraw::TextDrawState::default(),
+            lay: layout_cmds::LayoutCmds::default(),
             page_views: alloc::vec::Vec::new(),
             view_page: None,
         }
@@ -505,6 +515,8 @@ impl App for Diagrammer {
         self.icons = Some(icons::Icons::install(ui));
         self.opts = options::open(ui);
         self.load_layout();
+        // (JD21 layout) Abstandsoptionen's spacing
+        dlg_layout::load_spacing(self);
         self.preview = match plat::arg_value("--shell-preview").as_deref() {
             Some("shape") => ribbon::SEL_SHAPE,
             Some("container") => ribbon::SEL_CONTAINER,
@@ -557,6 +569,9 @@ impl App for Diagrammer {
         stencils_panel::states(self, ui);
         shell::frame(self, ui);
         design_gallery::after(self, ui);
+        // (JD21 layout) a layout's live preview goes when its row is left; the dialogs
+        layout_cmds::after(self, ui);
+        dlg_layout::dialogs(self, ui);
         design_store::dialog(self, ui);
         format_menus::after(self, ui);
         export_ui::dialogs(self, ui);
