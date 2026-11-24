@@ -695,7 +695,7 @@ fn script(c: &mut Ctx) {
     // the messages name the file, line and column, show the line and point at it
     let cases: [(&str, &str, &str); 12] = [
         ("let a = geom.box(1, -2, 1)\nmodel.add(a)\n", "test.jfs:1:", "geom.box: die Höhe muss eine Zahl größer 0 sein, nicht -2"),
-        ("let a = 1\nlet b = geom.box(\"x\", 1, 1)\n", "test.jfs:2:", "geom.box: b muss eine Zahl sein, nicht str \"x\""),
+        ("let a = 1\nlet b = geom.box(\"x\", 1, 1)\n", "test.jfs:2:", "geom.box: w muss eine Zahl sein, nicht str \"x\""),
         ("let a = 1\n\nmodel.add(boks(1, 1, 1))\n", "test.jfs:3:", "Unbekannter Name boks"),
         ("let m = geom.box(1, 1, 1)\nmodel.add(m.spin(3))\n", "test.jfs:2:", "Ein Mesh hat keine Methode spin"),
         ("model.add(geom.box(1, 1, 1), \"plastik\")\n", "test.jfs:1:", "das Material \"plastik\" gibt es nicht"),
@@ -753,11 +753,17 @@ fn script(c: &mut Ctx) {
         ("model.add(geom.intersection(geom.box(1, 1, 1), geom.box(1, 1, 1).move(5, 0, 0)))\n", "geom.intersection: das Ergebnis ist leer"),
         ("model.add(geom.difference(geom.box(1, 1, 1)))\n", "geom.difference: braucht mindestens 2 Meshes"),
         ("model.add(geom.box(1, 1, 1).bevel(0.6, 2))\n", "bevel(): die Breite 0.6 ist zu groß"),
-        ("model.add(geom.box(1, 1, 1).bevel(0.1, 2, \"w\"))\n", "bevel(): achse muss"),
+        ("model.add(geom.box(1, 1, 1).bevel(0.1, 2, \"w\"))\n", "bevel(): axis muss"),
     ];
     for (src, msg) in bad {
         let (r, text) = script_run(src, &[]);
         c.check(!r.ok() && text.contains("test.jfs:") && text.contains(msg), || format!("{:?}: wanted {msg}, got: {text}", src));
+    }
+    // the parameters of --api are English (decision G9.3), the German ones are gone
+    let german = ["segmente", "r_oben", "ringe", "seiten", "stufen", "staerke", "profil,", "tiefe", "grundriss", "pfad", "geschlossen", "glatt", "grad", "toleranz", "anzahl", "schritt", "breite", "achse", "dreiecke", "meter =", "von", "bis", "abzug", "b, h"];
+    for e in crate::host::API {
+        let old: Vec<&&str> = german.iter().filter(|g| e.params.contains(**g)).collect();
+        c.check(old.is_empty(), || format!("--api: {}({}) has German names {:?}", e.name, e.params, old));
     }
     // a finding about the surface says where it lies first and in which part: two boxes joined that touch only along
     // an edge (four faces meet there)
