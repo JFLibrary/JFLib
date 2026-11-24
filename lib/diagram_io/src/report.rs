@@ -292,25 +292,11 @@ fn sort(s: &Start) -> Sort {
 
 // ---------------------------------------------------------------- writing
 
-// the one place that escapes: markup, both quotes, CR and the line ends and tabs an attribute
-// would lose; what XML 1.0 cannot carry is left out
+// the one place that escapes: formats::xml::escape (markup, both quotes, CR and the line ends
+// and tabs an attribute would lose); what XML 1.0 cannot carry is left out first, so it cannot fail
 fn esc(s: &str) -> String {
-    let mut o = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '&' => o.push_str("&amp;"),
-            '<' => o.push_str("&lt;"),
-            '>' => o.push_str("&gt;"),
-            '"' => o.push_str("&quot;"),
-            '\'' => o.push_str("&apos;"),
-            '\r' => o.push_str("&#13;"),
-            '\n' => o.push_str("&#10;"),
-            '\t' => o.push_str("&#9;"),
-            c if matches!(c as u32, 0x20..=0xd7ff | 0xe000..=0xfffd | 0x10000..=0x10ffff) => o.push(c),
-            _ => {}
-        }
-    }
-    o
+    let kept: String = s.chars().filter(|&c| formats::xml::valid_char(c)).collect();
+    formats::xml::escape(&kept).unwrap_or_default()
 }
 
 fn b(v: bool) -> &'static str {

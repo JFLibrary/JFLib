@@ -254,24 +254,10 @@ impl core::fmt::Display for WriteError {
 // a character XML 1.0 does not allow
 struct BadChar;
 
-// becomes formats::xml::escape once the base with U5 is merged
+// the one place that escapes: formats::xml::escape (markup, both quotes, CR, LF and TAB as
+// references); a character XML 1.0 cannot carry is an error
 fn esc(s: &str) -> Result<String, BadChar> {
-    let mut out = String::with_capacity(s.len() + s.len() / 8);
-    for c in s.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&apos;"),
-            '\r' => out.push_str("&#13;"),
-            '\n' => out.push_str("&#10;"),
-            '\t' => out.push_str("&#9;"),
-            _ if matches!(c as u32, 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF) => out.push(c),
-            _ => return Err(BadChar),
-        }
-    }
-    Ok(out)
+    formats::xml::escape(s).map_err(|_| BadChar)
 }
 
 // "_x" and four hex digits: what Excel and the reader decode as an escape
