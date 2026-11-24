@@ -23,6 +23,7 @@ Width = 30 mm
 Width.us = 1.25 in
 Height = 30 mm
 Height.us = 1.25 in
+ShapeSplit = 1
 
 [Geometry]
 Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height

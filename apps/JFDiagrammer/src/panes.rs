@@ -87,7 +87,7 @@ pub(crate) fn content(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
 // ------------------------------------------------------------------ the context menus
 
 // i18n
-static SHAPE_MENU: [Mi; 23] = [
+static SHAPE_MENU: [Mi; 24] = [
     // (JD15, SP-12) the rows of the shape's Actions section first, as in Visio (cmds_actions.rs)
     Mi::List(crate::cmds_actions::ACTION_ROWS, crate::cmds_actions::ACTION_ROWS_MAX, ""),
     Mi::Cmd(CUT), Mi::Cmd(COPY), Mi::Cmd(PASTE), Mi::Sep,
@@ -95,7 +95,8 @@ static SHAPE_MENU: [Mi; 23] = [
     // (JD8 rest) ZF-12's Shape ▸
     Mi::Sub("Shape", &[Mi::Cmd(ROTATE_LEFT), Mi::Cmd(ROTATE_RIGHT), Mi::Cmd(FLIP_H), Mi::Cmd(FLIP_V), Mi::Sep, Mi::Cmd(PANE_SIZEPOS)]),
     Mi::Sub("Container", &[Mi::Cmd(CT_ADD), Mi::Cmd(CT_REMOVE), Mi::Sep, Mi::Cmd(CT_SELECT), Mi::Cmd(CT_LOCK), Mi::Cmd(CT_DISBAND)]),
-    Mi::Cmd(CONNECT_SHAPES), Mi::Cmd(LAYOUT_BEHAVIOR),
+    // (JD21 autoconn, CN-11) Verbinder (einmal)
+    Mi::Cmd(CONNECT_SHAPES), Mi::Cmd(CONNECTOR_ONCE), Mi::Cmd(LAYOUT_BEHAVIOR),
     // (JD21 jumps) a connector's line jumps (hidden for other shapes)
     Mi::Cmd(CONN_BEHAVIOR),
     // (JD15, ST-05) a lane's commands (hidden for other shapes)

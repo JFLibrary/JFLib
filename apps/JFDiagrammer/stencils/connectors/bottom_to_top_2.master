@@ -36,6 +36,7 @@ Width = GUARD(EndX-BeginX)
 Height = GUARD(EndY-BeginY)
 Angle = GUARD(0DA)
 ObjType = 2
+ShapeSplittable = 1
 GlueType = 2
 ShapeRouteStyle = 17
 ConLineRouteExt = 1

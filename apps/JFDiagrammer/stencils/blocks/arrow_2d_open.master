@@ -25,6 +25,7 @@ Width = 40 mm
 Width.us = 1.5 in
 Height = 20 mm
 Height.us = 0.75 in
+ShapeSplit = 1
 
 [User]
 # die Länge der Spitze und der halbe Schaft

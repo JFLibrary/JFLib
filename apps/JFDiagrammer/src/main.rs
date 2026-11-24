@@ -134,6 +134,8 @@ extern crate alloc;
 
 // (JD15) the question before changes are lost, the ways a file opens
 mod ask_save;
+// (JD21 autoconn) the connector automatics: splitting, healing, the quick shapes bar
+mod autoconn;
 mod backstage;
 mod cmds_actions;
 mod cmds_arrange;
@@ -353,6 +355,9 @@ pub(crate) struct Diagrammer {
     pub lay: layout_cmds::LayoutCmds,
     /// (JD21 jumps) Verbinder-Verhalten, Linienübergänge anzeigen (jumps_ui.rs)
     pub jumps: jumps_ui::JumpsState,
+    /// (JD21 autoconn) the connector automatics: a move's split, the tool "once", marked tiles,
+    /// the quick shapes bar
+    pub autoconn: autoconn::AutoConn,
 }
 
 impl Diagrammer {
@@ -428,6 +433,7 @@ impl Diagrammer {
             textdraw: data_textdraw::TextDrawState::default(),
             lay: layout_cmds::LayoutCmds::default(),
             jumps: jumps_ui::JumpsState::default(),
+            autoconn: autoconn::AutoConn::default(),
             page_views: alloc::vec::Vec::new(),
             view_page: None,
         }

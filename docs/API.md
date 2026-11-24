@@ -105,7 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/jumps.rs](#diagram_coresrcrenderjumpsrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shapeops.rs](#diagram_coresrcshapeopsrs) · [src/shapeops/frame.rs](#diagram_coresrcshapeopsframers) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/autoconn.rs](#diagram_coresrcautoconnrs) · [src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/jumps.rs](#diagram_coresrcrenderjumpsrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shapeops.rs](#diagram_coresrcshapeopsrs) · [src/shapeops/frame.rs](#diagram_coresrcshapeopsframers) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/data.rs](#diagram_iosrcdatars) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/textdraw.rs](#diagram_iosrctextdrawrs) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vss/mod.rs](#diagram_iosrcvssmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -7830,6 +7830,8 @@ shapes to SeShape frames (diagram_core for JFDiagrammer).
                                   reader's click on an arrow or a mark reports it as a click)
   tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT, SE_PLACE, SE_FREEFORM,
         SE_ARC
+  SeState::quick: Vec<SeQuick>    (JD21) the quick shapes the bar at a hot connection arrow
+                                  offers (see below)
 
 Model (SeModel, borrowed per call; world units are the canvas's, y down):
   SeShape { key, parent, bx, ends, pin, bbox, flags, points }
@@ -7916,6 +7918,18 @@ SeEv::ArrowHover { key, dir } once (dir 255: off the arrows of `key`), for a pre
 Insertion marks (SeModel::marks): with the pointer tool and no gesture each mark shows while
 the pointer is on its owner (the shape under the pointer, or inside the owner's box) or
 within MARK_NEAR (16) DIP of it; a click reports SeEv::Mark { tag }, a drag does nothing.
+
+(JD21) Quick shapes bar (SeState::quick, Visio's mini toolbar of an AutoConnect arrow, CN-07):
+while an arrow is under the pointer and the app lists quick shapes, a bar with the first
+QUICK_MAX (4) of them shows beside the arrow where the new shape does not go (above the box
+for the arrows left and right, right of it for those up and down): a row of QUICK_TILE (28)
+DIP tiles with their previews (the app's Draw, like the Shapes panel's tiles), on the flyout
+colour with a thin frame, square.  The arrow stays hot while the pointer is on the bar or
+between it and the arrow; the tile under the pointer is drawn hot and each change of it is
+SeEv::QuickHover { key, dir, tile } once (tile 255: on no tile any more; the app's live
+preview), a click on a tile SeEv::Quick { key, dir, tile }; the bar goes with the arrows.
+Screen readers and scripts get a K_BUTTON per tile named "Schnell-Shape: <name>" (value: the
+tile's index).
 ```
 
 ```rust
@@ -8033,6 +8047,12 @@ SPF_OUTWARD: u32 = 2
   - `ver: u32` -- changes whenever shapes are added, removed or reordered
   - `hit: &'a dyn Fn([f32; 2], f32, u64) -> u64` -- the topmost shape at a world point (see the file header)
 
+- **`struct SeQuick`**
+  (JD21) a tile of the quick shapes bar at a hot connection arrow (SeState::quick)
+  - `name: String` -- its name (the button's name for screen readers and scripts)
+  - `draw: Option<DrawRef>` -- its preview, drawn into the tile (None: a generic shapes icon)
+  - `ver: u32` -- the preview's version (cmd_custom: change it when the drawing changes)
+
 - **`enum SeGlue`**
   what an end or a control point is glued to
   - `None`
@@ -8067,6 +8087,10 @@ SPF_OUTWARD: u32 = 2
   - `ArrowHover { key: u64, dir: u8 }` -- the pointer went onto the connection arrow `dir` of shape `key`, or off the arrows of
     `key` (dir 255); once per change
   - `Mark { tag: u32 }` -- a click on the insertion mark with this tag (SeModel::marks)
+  - `Quick { key: u64, dir: u8, tile: u8 }` -- (JD21) a click on tile `tile` of the quick shapes bar at the connection arrow `dir` of
+    shape `key`; the selection stays as it was
+  - `QuickHover { key: u64, dir: u8, tile: u8 }` -- (JD21) the pointer went onto tile `tile` of the quick shapes bar of arrow `dir` of shape
+    `key`, or off the tiles (tile 255, dir 255); once per change (a live preview)
 
 - **`struct SeState`**
   the editor's state, kept by the app: the selection, the focused shape, the options, the
@@ -8087,6 +8111,8 @@ SPF_OUTWARD: u32 = 2
   - `vertex: Option<(u64, u32)>` -- the vertex chosen with a click (Del removes it): its shape and tag
   - `arrows: bool` -- connection arrows around the shape under the pointer (Ansicht › Verbindungspfeile; see
     the file header)
+  - `quick: Vec<SeQuick>` -- (JD21) the quick shapes the bar at a hot connection arrow offers (the first QUICK_MAX;
+    empty: no bar); the app sets them (Visio: the active stencil's quick shapes)
 
 **`impl SeState`**
 
@@ -8102,6 +8128,9 @@ SPF_OUTWARD: u32 = 2
 - **`fn arrow_hover(&self) -> Option<(u64, u8)>`**
   the connection arrow under the pointer: the shape's key and the direction (0 right,
   1 down, 2 left, 3 up, as seen)
+- **`fn quick_hover(&self) -> Option<(u64, u8, u8)>`**
+  (JD21) the tile of the quick shapes bar under the pointer: the shape's key, the arrow's
+  direction, the tile's index
 - **`fn select(&mut self, keys: &[u64])`**
   select exactly these shapes (the app's commands: paste, group, a new shape)
 
@@ -55038,11 +55067,161 @@ a file loses nothing, and the behaviour Visio files carry works without translat
                                 hierarchy, compact tree, radial, circular; CN-13), connected
                                 shapes aligned and spaced (CN-14), shapes off the page
                                 breaks (PR-03), the diagram turned or flipped (RS-25)
+  autoconn::*                   (JD21) a shape dropped on a connector splits it and the shapes
+                                after it make room (CN-08), a deleted shape's connectors go
+                                and the flow through it heals (CN-09), drops push shapes
+                                away (PlowCode)
 
 Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 opening a file (connectors, layout and containers move only when something moves), and a
 formula with an unknown function keeps its cached value instead of failing.
 ```
+
+### `diagram_core/src/autoconn.rs`
+
+Source: [`lib/diagram_core/src/autoconn.rs`](../lib/diagram_core/src/autoconn.rs)
+
+```text
+autoconn -- (JD21) connectors that look after the shapes they join: a 2-D shape dropped on a
+connector is put into the flow (connector splitting, CN-08) and the shapes after it make
+room, a deleted shape takes its connectors along and the flow through it heals (CN-09),
+placeable shapes move away from a dropped one (PlowCode, PR-09)
+
+  page_splits(doc, page)            PageShapeSplit of the page (missing: on, Visio's default)
+  splits(doc, shape)                ShapeSplit: a top-level 2-D shape that splits connectors
+  splittable(doc, connector)        a dynamic connector with ShapeSplittable
+  can_insert(doc, owner, shape)     splits and has no connector glued to it yet
+  split_target(doc, owner, box, skip) -> Option<connector>   the connector a shape with this
+                                    box (page) splits when it is dropped there
+  split(tx, eng, connector, shape) -> new connector   Page.SplitConnector: the connector ends
+                                    at the shape, a copy of it (without its text) runs from
+                                    the shape to where it ended
+  insert(tx, eng, owner, shape, connector, gap) -> Inserted   split, the shape lined up with
+                                    the one before it, the shapes after it moved on as far as
+                                    the room needs
+  downstream(doc, owner, shape, stop) -> shapes   what follows a shape through connectors
+  plow(tx, eng, owner, shapes, gap) -> moved   placeable shapes under the dropped ones move
+                                    away (PlowCode / ShapePlowCode)
+  heal(tx, eng, owner, deleted) -> Healed   before shapes are deleted: their connectors to
+                                    delete as well, the flow through a shape joined again
+  spacing(doc, page) -> [x, y]      the page's spacing between shapes (AvenueSizeX/Y)
+
+Every point is on the page in drawing units (inches, y up).  Nothing runs on its own: the
+app calls these when the user drops, pastes, moves or deletes (PLAN.md, "Fallen").
+
+Visio's rules -- belegt (Microsoft Learn: the ShapeSplit, ShapeSplittable, PageShapeSplit,
+PlowCode and ShapePlowCode cells; Page.SplitConnector, ApplicationSettings.
+ConnectorSplittingEnabled and DeleteConnectorsEnabled, Shape.DeleteEx / VisDeleteFlags; the
+Visio blog "Inserting and Deleting Shapes in Visio 2010"):
+* Splitting needs all of: the app's option (Enable connector splitting), the page
+  (PageShapeSplit 1, the default), the shape (ShapeSplit 1; a 2-D shape or a placeable 1-D
+  one -- only 2-D here) and the connector (ShapeSplittable 1, a routable 1-D connector).
+* SplitConnector "duplicates the connector (except for text), positions the shape
+  automatically, and glues the shape to the two resulting connectors"; it returns the copy.
+* A drop on a connector moves the shapes downstream of the insertion "just enough to make
+  room"; a downstream shape beside the flow does not move; the new shape is aligned with the
+  upstream shape and spaced from it.
+* PlowCode 0 / 1: placeable shapes do not / do move away when a placeable shape is dropped
+  near them (Page Setup › "Move other shapes away on drop"); ShapePlowCode 0 as the page
+  says, 1 never, 2 always.
+* Deleting a shape deletes the connectors glued to it (the app's option Delete connectors
+  when deleting shapes) except connectors with text; the option "also determines whether two
+  connectors reconnect when a shape to which they are both connected is deleted"; with more
+  than one connector in and out the reconnection is ambiguous and nothing heals; the other
+  shapes do not move to close the gap.
+
+Angenommen (the user's check in Visio may correct it):
+* The connector a dropped shape splits is a splittable connector on the page whose way
+  crosses the shape's box while both its ends lie outside the box and the box overlaps none of
+  the shapes it is glued to; among several the one whose way passes nearest the box's middle.
+  A shape that already has a connector glued to it splits nothing (it is in a flow already).
+* The original connector keeps its Begin and its text and ends at the shape; the copy starts
+  at the shape and takes over the old End's glue (a connection point stays that point, a
+  whole shape stays dynamic, a free end stays where it was).  Both glue to the dropped shape
+  as a whole (dynamic glue).
+* The flow's axis is the main direction from the shape before to the shape after (else from
+  Begin to End).  The dropped shape's middle goes on the middle line of the shape before when
+  their bands across the axis overlap, and at least the page's spacing (AvenueSizeX/Y) after
+  it; when the shape after is then nearer than the spacing, it and the shapes downstream of it
+  (through connectors Begin -> End) that do not lie before the dropped shape move on along
+  the axis by what is missing.  Fixed shapes (ShapeFixedCode &H7, LockMoveX/Y), containers
+  and shapes with ShapePlowCode 1 stay, and so does what lies only behind them.  This always
+  comes with a split; PlowCode adds plowing for every drop.
+* Plowing: a placeable top-level 2-D shape (no container, no member of one, no callout, not
+  ObjType 4, not fixed) whose box overlaps a dropped shape's box moves the shortest way out of
+  it to the page's spacing, and in turn pushes what it then overlaps (each shape moves once).
+* Healing counts dynamic connectors only (plain lines lose their glue as before); a connector
+  whose both ends are on the deleted shape is deleted; with exactly one connector in (End on
+  the shape) and one out (Begin on it) the one coming in survives (the one going out when
+  only that one has text; both with text: no healing) and takes the other one's far end; a
+  heal that would join a shape to itself does not happen.  Healing runs through chains of
+  deleted shapes.
+```
+
+- **`fn page_splits(doc: &Document, page: PageRef) -> bool`**
+  whether shapes split connectors on the page: PageShapeSplit (missing: yes, Visio's default)
+
+- **`fn splits(doc: &Document, s: ShapeRef) -> bool`**
+  whether a shape splits connectors it is dropped on: a top-level 2-D shape (no guide, no
+  container, no callout) with ShapeSplit 1
+
+- **`fn splittable(doc: &Document, c: ShapeRef) -> bool`**
+  whether a connector can be split: a top-level dynamic connector with ShapeSplittable 1
+
+- **`fn can_insert(doc: &Document, owner: Owner, s: ShapeRef) -> bool`**
+  whether a shape may be put into a connector: it splits, and no connector is glued to it yet
+
+- **`fn split_target(doc: &Document, owner: Owner, b: [f64; 4], skip: &[ShapeRef]) -> Option<ShapeRef>`**
+  the connector a shape with box `b` (page) splits when dropped there: a splittable connector
+  whose way crosses the box, both ends outside it, the box over none of the shapes it is glued
+  to, nearest the box's middle; connectors glued to a shape of `skip` (the dropped shape and
+  what moves with it) do not count
+
+- **`fn split(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, s: ShapeRef) -> Result<ShapeRef, EditError>`**
+  split connector `c` with shape `s` (Visio's Page.SplitConnector): a copy of the connector
+  without its text is made, `c` ends at `s`, the copy runs from `s` to where `c` ended (with
+  that end's glue); both glue to `s` as a whole and route -> the copy.  Invalid: `c` is no
+  splittable connector, `s` is 1-D or elsewhere
+
+- **`struct Inserted`**
+  what insert did
+  - `connector: ShapeRef` -- the new connector (from the shape to the old End)
+  - `moved: Vec<ShapeRef>` -- the shapes moved: the inserted one when it was lined up, those after it
+
+- **`fn downstream(doc: &Document, owner: Owner, from: ShapeRef, stop: &[ShapeRef]) -> Vec<ShapeRef>`**
+  the shapes downstream of `from` through connectors (Begin on one, End on the next),
+  top-level, in the order found (breadth first); `stop` are never entered
+
+- **`fn insert(tx: &mut Transaction, eng: &mut Engine, owner: Owner, s: ShapeRef, c: ShapeRef, gap: [f64; 2]) -> Result<Inserted, EditError>`**
+  put shape `s` into connector `c` (a drop): split, `s` lined up with the shape before it and
+  spaced from it, the shapes after it moved on along the flow where the room is short (`gap`:
+  the page's spacing in x and y) -> the new connector and what moved; connectors follow
+
+- **`fn spacing(doc: &Document, page: PageRef) -> [f64; 2]`**
+  the page's spacing between shapes in drawing units: AvenueSizeX/Y (Seite einrichten ›
+  Layout und Routing; Visio's metric default 7.5 mm), through the drawing scale
+
+- **`fn plows(doc: &Document, page: PageRef) -> bool`**
+  whether a drop on the page may push shapes at all: PlowCode 1, or a shape on it with
+  ShapePlowCode 2
+
+- **`fn plow(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[ShapeRef], gap: [f64; 2]) -> Result<Vec<ShapeRef>, EditError>`**
+  the dropped `shapes` push the placeable shapes they cover out of the way (PlowCode of the
+  page, ShapePlowCode of each shape): the shortest way out to the page's spacing `gap`, and
+  what those then cover in turn; each shape moves once -> the moved shapes (connectors follow)
+
+- **`struct Healed`**
+  what heal decided
+  - `gone: Vec<ShapeRef>` -- connectors to delete with the shapes
+  - `joined: Vec<ShapeRef>` -- connectors that now join the shapes before and after a deleted one: route them once the
+    shapes are gone
+
+- **`fn heal(tx: &mut Transaction, eng: &mut Engine, owner: Owner, deleted: &[ShapeRef]) -> Result<Healed, EditError>`**
+  before `deleted` are deleted (Visio's "Delete connectors when deleting shapes"): the dynamic
+  connectors glued to a deleted 2-D shape go with it unless they have text; where exactly one
+  comes in (End) and one goes out (Begin), one of them survives and joins the shapes before and
+  after (the flow heals).  Glues the survivors anew; the caller deletes `gone` with the shapes,
+  detaches what stays and routes `joined` after the deletion
 
 ### `diagram_core/src/cell.rs`
 

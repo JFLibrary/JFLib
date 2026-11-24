@@ -400,6 +400,9 @@ commands! {
     OP_INTERSECT = 0x1C03, "Schnittmenge bilden", JD_OP_INTERSECT, 0;
     OP_SUBTRACT = 0x1C04, "Subtrahieren", JD_OP_SUBTRACT, 0;
     UPDATE_ALIGN_BOX = 0x1C08, "Ausrichtungsfeld aktualisieren", 0, 0;
+    // (JD21 autoconn) the connector tool for one connector, then the pointer (CN-11; the
+    // shape's menu, JD22's mini toolbar)
+    CONNECTOR_ONCE = 0x1C60, "Einen Verbinder zeichnen", JD_CONNECTOR, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -672,6 +675,8 @@ static HANDLERS: &[(u32, Handler)] = &[
     (OP_INTERSECT, |a, ui| crate::shapeops_cmds::run(a, ui, OP_INTERSECT)),
     (OP_SUBTRACT, |a, ui| crate::shapeops_cmds::run(a, ui, OP_SUBTRACT)),
     (UPDATE_ALIGN_BOX, |a, ui| crate::shapeops_cmds::run(a, ui, UPDATE_ALIGN_BOX)),
+    // (JD21 autoconn) Verbinder (einmal) (autoconn.rs)
+    (CONNECTOR_ONCE, crate::autoconn::once),
 ];
 
 // toggles: whether the command is on

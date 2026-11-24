@@ -35,6 +35,7 @@ Width = GUARD(EndX-BeginX)
 Height = GUARD(EndY-BeginY)
 Angle = GUARD(0DA)
 ObjType = 2
+ShapeSplittable = 1
 GlueType = 2
 ShapeRouteStyle = IF(LOOKUP(Prop.Route,Prop.Route.Format)=1,16,1)
 ConLineRouteExt = IF(LOOKUP(Prop.Route,Prop.Route.Format)=2,2,1)
