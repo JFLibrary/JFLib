@@ -195,7 +195,10 @@ def build_variants_rs(app, styles, work, targets, rsout, profile, arch="x86_64")
              *rs_mode(profile), "--out", rsout])
     for s in styles:
         for t in targets:
-            src = ROOT / rsout / arch_folder(t, arch) / s if len(styles) > 1 else ROOT / rsout / arch_folder(t, arch)
+            # the Mac's own part is always in "mac" (arch_folder("mac", "x86_64") is the Intel part's
+            # mac-x86_64, joined with it below)
+            folder = "mac" if t == "mac" else arch_folder(t, arch)
+            src = ROOT / rsout / folder / s if len(styles) > 1 else ROOT / rsout / folder
             (ROOT / work / s / t).mkdir(parents=True, exist_ok=True)
             if t == "mac":      # one program for every Mac (lipo), the app's further programs too (no modules)
                 sys.path.insert(0, str(ROOT))
