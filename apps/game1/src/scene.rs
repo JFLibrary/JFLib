@@ -52,6 +52,8 @@ pub enum Fx {
     Muzzle { at: Vec3, dir: Vec3 },
     /// a tracer from a muzzle to where the shot ended
     Tracer { from: Vec3, to: Vec3 },
+    /// the own shot's tracer: from the muzzle in front of the camera (where the screen shows it) to where it ended
+    TracerOwn { to: Vec3 },
     /// a shot ended on the map: sparks and dust along the surface's normal
     Impact { at: Vec3, normal: Vec3 },
     /// a figure was hit: sparks at its chest
@@ -82,6 +84,9 @@ fn mesh_of(r: &mut Renderer, pos: &[[f32; 3]], nrm: &[[f32; 3]], idx: &[u32]) ->
 
 struct Emitters {
     muzzle_vm: EmitterId,
+    /// the own muzzle flash as made (for the weapon's scale VM_TUNED) and the scale it was last set for
+    muzzle_vm_e: Emitter,
+    muzzle_vm_scale: f64,
     muzzle: EmitterId,
     tracer: EmitterId,
     sparks: EmitterId,
@@ -168,7 +173,7 @@ impl View {
             parts.push((mesh, if jacket { None } else { Some(fmats[p.material as usize]) }, look::group(&p.name), look::in_viewmodel(&p.name)));
         }
         // the weapon in front of the camera (the own jacket: the first colour)
-        s.set_viewmodel(Some(&Viewmodel::new(1.0, 0.02, 4.0)))?;
+        s.set_viewmodel(Some(&Viewmodel::new(look::VM_FOV, 0.02, 4.0)))?;
         let hidden = render3d::Transform { pos: [0.0; 3], rot: [0.0, 0.0, 0.0, 1.0], scale: [0.0; 3] };
         let mut vm = Vec::new();
         for (mesh, mat, _, in_vm) in &parts {
@@ -185,8 +190,8 @@ impl View {
         Ok(Gpu { r, s, fig: FigParts { parts, jackets }, figs: BTreeMap::new(), vm, em })
     }
 
-    /// the figures and the viewmodel into the scene, the effects as particles
-    fn sync(&mut self) -> gpu::Result<()> {
+    /// the figures and the viewmodel into the scene, the effects as particles (a window of this width / height)
+    fn sync(&mut self, aspect: f64) -> gpu::Result<()> {
         let Some(g) = self.gpu.as_mut() else { return Ok(()) };
         let f = &self.frame;
         // figures that went
@@ -214,37 +219,65 @@ impl View {
             }
         }
         // the viewmodel
-        let t = if f.show_vm { game_render3d::transform(&look::viewmodel(self.anchor, &f.vm)) } else { render3d::Transform { pos: [0.0; 3], rot: [0.0, 0.0, 0.0, 1.0], scale: [0.0; 3] } };
+        let t = if f.show_vm { game_render3d::transform(&look::viewmodel(self.anchor, &f.vm, aspect)) } else { render3d::Transform { pos: [0.0; 3], rot: [0.0, 0.0, 0.0, 1.0], scale: [0.0; 3] } };
         for i in &g.vm {
             g.s.set_transform(*i, &t)?;
         }
         // the effects
         g.s.set_time(f.time);
-        let muzzle_cam = look::viewmodel_point(self.anchor, &f.vm, self.muzzle);
+        // the muzzle in front of the camera and where it points; the point of the world the screen shows there (the
+        // own tracer's start)
+        let muzzle_cam = look::viewmodel_point(self.anchor, &f.vm, aspect, self.muzzle);
+        let muzzle_dir = look::viewmodel_dir(self.anchor, &f.vm, aspect);
+        let muzzle_world = look::vm_to_world(muzzle_cam, f.eye, f.yaw, f.pitch, f.fov);
         for fx in self.fx.drain(..) {
             let v = |p: Vec3| [p.x, p.y, p.z];
-            match fx {
-                Fx::MuzzleOwn => g.s.emit(g.em.muzzle_vm, v(muzzle_cam), [0.0, 0.0, -1.0], 10)?,
-                Fx::Muzzle { at, dir } => g.s.emit(g.em.muzzle, v(at), v(dir), 10)?,
-                Fx::Tracer { from, to } => {
-                    let d = to - from;
-                    let len = d.length();
-                    if len > 1.0 {
-                        let life = (len / 260.0) as f32;
-                        g.em.tracer_e.life = [life, life];
-                        g.s.set_emitter(g.em.tracer, &g.em.tracer_e)?;
-                        g.s.emit(g.em.tracer, v(from), v(d * (1.0 / len)), 1)?;
+            let tracer = match fx {
+                Fx::MuzzleOwn => {
+                    // the flash grows and shrinks with the weapon
+                    let scale = look::vm_scale(aspect);
+                    if scale != g.em.muzzle_vm_scale {
+                        let m = (scale / look::VM_TUNED) as f32;
+                        let mut e = g.em.muzzle_vm_e;
+                        e.size = [e.size[0] * m, e.size[1] * m];
+                        e.radius *= m;
+                        e.speed = [e.speed[0] * m, e.speed[1] * m];
+                        g.s.set_emitter(g.em.muzzle_vm, &e)?;
+                        g.em.muzzle_vm_scale = scale;
                     }
+                    g.s.emit(g.em.muzzle_vm, v(muzzle_cam), v(muzzle_dir), 10)?;
+                    None
                 }
+                Fx::Muzzle { at, dir } => {
+                    g.s.emit(g.em.muzzle, v(at), v(dir), 10)?;
+                    None
+                }
+                Fx::Tracer { from, to } => Some((from, to)),
+                Fx::TracerOwn { to } => Some((muzzle_world, to)),
                 Fx::Impact { at, normal } => {
                     g.s.emit(g.em.sparks, v(at), v(normal), 8)?;
                     g.s.emit(g.em.dust, v(at), v(normal), 5)?;
+                    None
                 }
-                Fx::Hit { at } => g.s.emit(g.em.sparks, v(at), [0.0, 1.0, 0.0], 14)?,
+                Fx::Hit { at } => {
+                    g.s.emit(g.em.sparks, v(at), [0.0, 1.0, 0.0], 14)?;
+                    None
+                }
                 Fx::Poof { at, color } => {
                     g.em.poof_e.color = [[color[0], color[1], color[2], 0.9], [color[0] * 0.6, color[1] * 0.6, color[2] * 0.6, 0.0]];
                     g.s.set_emitter(g.em.poof, &g.em.poof_e)?;
                     g.s.emit(g.em.poof, v(at), [0.0, 1.0, 0.0], 40)?;
+                    None
+                }
+            };
+            if let Some((from, to)) = tracer {
+                let d = to - from;
+                let len = d.length();
+                if len > 1.0 {
+                    let life = (len / 260.0) as f32;
+                    g.em.tracer_e.life = [life, life];
+                    g.s.set_emitter(g.em.tracer, &g.em.tracer_e)?;
+                    g.s.emit(g.em.tracer, v(from), v(d * (1.0 / len)), 1)?;
                 }
             }
         }
@@ -254,12 +287,13 @@ impl View {
 
     /// set the camera, sync, prepare (a frame of size w x h follows with record)
     pub fn prepare(&mut self, w: u32, h: u32) -> gpu::Result<()> {
-        self.sync()?;
+        let aspect = w as f64 / h.max(1) as f64;
+        self.sync(aspect)?;
         let f = &self.frame;
         let mut fp = FirstPerson::new(f.eye);
         fp.yaw = f.yaw;
         fp.pitch = f.pitch;
-        let cam = game_render3d::camera(&fp.view(), f.fov, w as f64 / h.max(1) as f64, 0.05, f64::INFINITY);
+        let cam = game_render3d::camera(&fp.view(), f.fov, aspect, 0.05, f64::INFINITY);
         if let Some(g) = self.gpu.as_mut() {
             g.r.set_size(w, h)?;
             g.s.set_camera(&cam);
@@ -328,7 +362,7 @@ fn emitters(s: &mut Scene) -> gpu::Result<Emitters> {
     p.gravity = -1.0;
     p.drag = 3.0;
     let poof = s.add_emitter(&p)?;
-    Ok(Emitters { muzzle_vm, muzzle, tracer, sparks, dust, poof, tracer_e: t, poof_e: p })
+    Ok(Emitters { muzzle_vm, muzzle_vm_e: m, muzzle_vm_scale: look::VM_TUNED, muzzle, tracer, sparks, dust, poof, tracer_e: t, poof_e: p })
 }
 
 impl ui::GpuContent for View {

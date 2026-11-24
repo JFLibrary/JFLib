@@ -6,7 +6,10 @@
 //   FIGURE           the baked figure (.g1m)
 //   Pose             what a frame knows of a figure: feet, yaw, pitch, crouched, on the ground, walk phase, dead
 //   part_transform   a part's transform in the world (game::Transform: position, rotation, scale)
-//   viewmodel        a viewmodel part's transform in the camera's space; muzzle_cam the muzzle there
+//   VM_LAYOUT        the weapon's size and place in front of the camera (one of VM_VARIANTS), right and down on
+//                    every shape of window
+//   viewmodel        a viewmodel part's transform in the camera's space; viewmodel_point the muzzle there,
+//                    vm_to_world the point of the world shown at the same place (the own tracer's start)
 //   PALETTE          the jacket's colour per player (linear rgb)
 //
 // The figure looks along +Z (modeltool's front); yaw 0 looks along -Z, so a figure turns by yaw + pi.
@@ -108,10 +111,57 @@ pub fn model_point(g: Group, p: &Pose, q: Vec3) -> Vec3 {
     t.pos + t.rot.rotate(Vec3::new(q.x * t.scale[0] as f64, q.y * t.scale[1] as f64, q.z * t.scale[2] as f64))
 }
 
-/// the weapon in front of the camera: where its anchor (the middle of the weapon's box) sits in the camera's space,
-/// and its size there
-const VM_OFFSET: Vec3 = Vec3 { x: 0.15, y: -0.16, z: -0.62 };
-const VM_SCALE: f64 = 0.55;
+/// the viewmodel's lens (render3d::Viewmodel's vertical field of view): its own, the game's field of view does not
+/// change the weapon
+pub const VM_FOV: f64 = 1.0;
+/// how far in front of the eye the weapon's anchor sits (m)
+const VM_DEPTH: f64 = 0.62;
+/// below this width / height the weapon's measure is the window's width (a narrow or tall window: it shrinks), at
+/// and above it the height
+const VM_NARROW: f64 = 4.0 / 3.0;
+/// the scale the motions' amplitudes (bobbing, kick, lowering) were tuned at: they grow and shrink with the weapon
+pub const VM_TUNED: f64 = 0.55;
+
+/// the size and place of the weapon in front of the camera: its scale, and where its anchor (the middle of the
+/// weapon's box) sits on the screen, `right` from the right edge and `bottom` above the lower edge, both in screen
+/// heights (on a window narrower than 4:3 in widths / (4/3): it shrinks with the width and stays in the corner)
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VmLayout {
+    pub scale: f64,
+    pub right: f64,
+    pub bottom: f64,
+}
+
+/// the variants of 2026-11-24, 0.6, 0.7 and 0.8 times the weapon of G7h part 1 (scale 0.55, anchored in the
+/// camera's space at x 0.15, y -0.16: on 16:9 a little right of and below the crosshair), each placed so that its
+/// box ends a little below the lower edge and on 16:9 to 21:9 left of the ammunition (0.21 to 0.22 screen heights
+/// from the right edge on 16:9; docs/GAME1.md, "Die Waffe vor der Kamera"); VM_LAYOUT is the one the game draws
+pub const VM_VARIANTS: [(&str, VmLayout); 3] = [
+    ("A", VmLayout { scale: 0.33, right: 0.36, bottom: 0.12 }),
+    ("B", VmLayout { scale: 0.385, right: 0.39, bottom: 0.14 }),
+    ("C", VmLayout { scale: 0.44, right: 0.42, bottom: 0.17 }),
+];
+pub const VM_LAYOUT: VmLayout = VM_VARIANTS[1].1;
+
+/// a sane width / height (16:9 for none)
+fn aspect_or(aspect: f64) -> f64 {
+    if aspect.is_finite() && aspect > 0.0 { aspect } else { 16.0 / 9.0 }
+}
+
+/// the weapon's measure on a window of this width / height, in its heights: 1, or less on a narrow one
+pub fn vm_fit(aspect: f64) -> f64 {
+    (aspect_or(aspect) / VM_NARROW).min(1.0)
+}
+
+/// the weapon's scale on a window of this width / height
+pub fn vm_scale(aspect: f64) -> f64 {
+    VM_LAYOUT.scale * vm_fit(aspect)
+}
+
+fn tan_half(fov: f64) -> f64 {
+    let (s, c) = physics::math::sincos(fov * 0.5);
+    s / c
+}
 
 /// what moves the weapon in front of the camera
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -125,22 +175,61 @@ pub struct VmState {
     pub reload: f64,
 }
 
-/// a viewmodel part's transform in the camera's space (x right, y up, -z forward); anchor: the weapon's middle
-pub fn viewmodel(anchor: Vec3, v: &VmState) -> Transform {
+/// where the anchor rests in the camera's space on a window of this width / height (VmLayout): the lens shows a
+/// point at depth d with x / (d tan(fov/2)) of the half height and of aspect half heights across
+fn vm_rest(aspect: f64) -> Vec3 {
+    let a = aspect_or(aspect);
+    let k = vm_fit(a);
+    let t = tan_half(VM_FOV) * VM_DEPTH;
+    Vec3::new((a - 2.0 * VM_LAYOUT.right * k) * t, (2.0 * VM_LAYOUT.bottom * k - 1.0) * t, -VM_DEPTH)
+}
+
+/// the viewmodel's transform (and its scale in f64): see viewmodel
+fn vm_transform(anchor: Vec3, v: &VmState, aspect: f64) -> (Transform, f64) {
+    let scale = vm_scale(aspect);
+    let m = scale / VM_TUNED;
     let (s, c) = physics::math::sincos(v.bob);
-    let bob = Vec3::new(s * 0.012 * v.bob_amount, -(c * c) * 0.010 * v.bob_amount, 0.0);
-    let back = Vec3::new(0.0, -0.10 * v.reload, 0.06 * v.kick);
+    let bob = Vec3::new(s * 0.012 * v.bob_amount, -(c * c) * 0.010 * v.bob_amount, 0.0) * m;
+    let back = Vec3::new(0.0, -0.10 * v.reload, 0.06 * v.kick) * m;
     let rx = rot_x(0.10 * v.kick - 0.6 * v.reload);
     let ry = Quat::from_axis_angle(Vec3::Y, core::f64::consts::PI);
-    let rot = ry.mul(rx).normalize();
-    // p_cam = offset + bob + back + rot (s (q - anchor))
-    Transform { pos: VM_OFFSET + bob + back - rot.rotate(anchor * VM_SCALE), rot, scale: [VM_SCALE as f32; 3] }
+    // on a window wider than 16:9 the anchor lies further off the axis: the weapon turns outward by as much more
+    // (about its anchor, around the camera's up), so the eye sees the same side of it as on 16:9 and its back does
+    // not spread towards the ammunition
+    let rest = vm_rest(aspect);
+    let wide = physics::math::atan2(rest.x, VM_DEPTH) - physics::math::atan2(vm_rest(16.0 / 9.0).x, VM_DEPTH);
+    let turn = Quat::from_axis_angle(Vec3::Y, -wide.max(0.0));
+    let rot = turn.mul(ry.mul(rx)).normalize();
+    // p_cam = rest + bob + back + rot (s (q - anchor))
+    (Transform { pos: rest + bob + back - rot.rotate(anchor * scale), rot, scale: [scale as f32; 3] }, scale)
+}
+
+/// a viewmodel part's transform in the camera's space (x right, y up, -z forward) on a window of this width /
+/// height; anchor: the weapon's middle (VmLayout: right and down in every shape of window)
+pub fn viewmodel(anchor: Vec3, v: &VmState, aspect: f64) -> Transform {
+    vm_transform(anchor, v, aspect).0
 }
 
 /// a point of the model (q) in the camera's space through the viewmodel's transform
-pub fn viewmodel_point(anchor: Vec3, v: &VmState, q: Vec3) -> Vec3 {
-    let t = viewmodel(anchor, v);
-    t.pos + t.rot.rotate(q * VM_SCALE)
+pub fn viewmodel_point(anchor: Vec3, v: &VmState, aspect: f64, q: Vec3) -> Vec3 {
+    let (t, scale) = vm_transform(anchor, v, aspect);
+    t.pos + t.rot.rotate(q * scale)
+}
+
+/// where the weapon in front of the camera points (the model's forward, +Z, in the camera's space): its muzzle
+/// flash's direction
+pub fn viewmodel_dir(anchor: Vec3, v: &VmState, aspect: f64) -> Vec3 {
+    vm_transform(anchor, v, aspect).0.rot.rotate(Vec3::new(0.0, 0.0, 1.0))
+}
+
+/// a point of the viewmodel's camera space (seen through its lens VM_FOV) -> the point of the world that the
+/// camera at eye, turned by yaw and pitch, with the vertical field of view fov shows at the same place of the
+/// screen, at the same depth: where the own tracer starts (the muzzle on the screen, on every window and field of
+/// view)
+pub fn vm_to_world(p: Vec3, eye: Vec3, yaw: f64, pitch: f64, fov: f64) -> Vec3 {
+    let (dir, right, up) = game::camera::basis(yaw, pitch);
+    let k = tan_half(fov) / tan_half(VM_FOV);
+    eye + right * (p.x * k) + up * (p.y * k) + dir * -p.z
 }
 
 /// the anchor of the viewmodel and the muzzle of a baked figure (model space)
