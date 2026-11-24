@@ -87,7 +87,7 @@ pub(crate) fn content(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
 // ------------------------------------------------------------------ the context menus
 
 // i18n
-static SHAPE_MENU: [Mi; 22] = [
+static SHAPE_MENU: [Mi; 23] = [
     // (JD15, SP-12) the rows of the shape's Actions section first, as in Visio (cmds_actions.rs)
     Mi::List(crate::cmds_actions::ACTION_ROWS, crate::cmds_actions::ACTION_ROWS_MAX, ""),
     Mi::Cmd(CUT), Mi::Cmd(COPY), Mi::Cmd(PASTE), Mi::Sep,
@@ -101,6 +101,8 @@ static SHAPE_MENU: [Mi; 22] = [
     Mi::Sub("Anordnen", &[Mi::Cmd(BRING_FRONT), Mi::Cmd(BRING_FORWARD), Mi::Cmd(SEND_BACK), Mi::Cmd(SEND_BACKWARD)]),
     // (JD18) Verknüpfung mit Zeile aufheben (data_pane.rs)
     Mi::Sub("Daten", &[Mi::Cmd(PANE_DATA), Mi::Cmd(SHAPE_DATA_DEFINE), Mi::Sep, Mi::Cmd(DATA_UNLINK)]),
+    // (JD19, DA-13) a report table's menu (reports.rs; hidden for other shapes)
+    Mi::Cmd(REPORT_REFRESH),
     // (JD8 rest) the shape's links follow its Hyperlink row (cmds_text::LINK_ROWS, ZF-12)
     Mi::Cmd(HYPERLINK), Mi::List(crate::cmds_text::LINK_ROWS, crate::cmds_text::LINK_ROWS_MAX, ""), Mi::Cmd(COMMENT_NEW),
     Mi::Sub("Formatieren", &[Mi::Cmd(FORMAT_TEXT), Mi::Cmd(FORMAT_LINE), Mi::Cmd(FORMAT_FILL), Mi::Cmd(FORMAT_SHADOW)]),

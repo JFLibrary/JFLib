@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Daten exportieren, 16 px</title>
+  <rect class="body" fill="#DCDEE1" x="2" y="3" width="6" height="1"/>
+  <rect class="ink" stroke="#1D2228" x="1.5" y="2.5" width="7" height="11"/>
+  <path class="ink" stroke="#1D2228" d="M2 4.5H8M4.5 5V13M2 8.5H8"/>
+  <rect class="tint" fill="#1F5FA8" x="10" y="8" width="2" height="2"/>
+  <polygon class="tint" fill="#1F5FA8" points="12,6 15,9 12,12"/>
+</svg>

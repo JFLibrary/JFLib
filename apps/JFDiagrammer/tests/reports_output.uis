@@ -1,0 +1,129 @@
+#!args apps/JFDiagrammer/tests/jd19-geraete.vsdx --no-system-fonts --export-dir build --data-dir apps/JFDiagrammer/tests
+# JFDiagrammer, JD19: a report's outputs (EX-12) and Daten exportieren (EX-16) -- jd19-geraete.vsdx
+# and jd19-geraeteliste.vrd (diagramiotest --write-report-fixture).  Durchsuchen... opens the .vrd
+# (its path in the list, its description below); Ausführen writes it as Excel workbook, CSV file
+# and web page into build/ (--export-dir); the CSV comes back through Daten › Benutzerdefinierter
+# Import with its numbers (';' and the decimal comma in German); Inventar goes on the page as a
+# table linked to the predefined report and is refreshed through that link; a definition kept in
+# the drawing is removed (one undo step brings it back); Datei › Exportieren › Daten exportieren
+# writes the shape data of every page as CSV and XLSX.
+wait 100
+cmd 6592
+expect dialog:"Berichte" exists
+click button:"Durchsuchen..."
+expect dialog:"Öffnen" exists
+click #2114060300
+key ctrl+a
+type "jd19-geraeteliste.vrd"
+click button:"Öffnen"
+expect dialog:"Berichte" exists
+expect text:"Geräteliste" exists
+expect text:"Die Geräte mit Kosten und Auslastung, nach Standort gruppiert" exists
+expect button:"Entfernen" enabled
+# ---- as an Excel workbook
+click button:"Ausführen..."
+expect dialog:"Bericht ausführen" exists
+click radio:"Excel-Arbeitsmappe (.xlsx)"
+expect radio:"Kopie der Berichtsdefinition" missing
+click button:"OK"
+wait 600
+expect dialog:"Speichern unter" exists
+click button:"Speichern"
+wait 600
+expect text:"Gespeichert: Geräteliste.xlsx (Zeilen: 10)" exists
+# ---- as CSV and as a web page
+click button:"Ausführen..."
+click radio:"CSV-Datei (.csv)"
+click button:"OK"
+wait 600
+click button:"Speichern"
+wait 600
+expect text:"Gespeichert: Geräteliste.csv (Zeilen: 10)" exists
+click button:"Ausführen..."
+click radio:"Webseite (.html)"
+click button:"OK"
+wait 600
+click button:"Speichern"
+wait 600
+expect text:"Gespeichert: Geräteliste.html (Zeilen: 10)" exists
+# ---- Inventar as a table linked to the predefined report
+click text:"Inventar"
+expect text:"Anzahl der Shapes auf allen Seiten, nach Master-Shape gruppiert." exists
+expect button:"Entfernen" disabled
+click button:"Ausführen..."
+click radio:"Tabellen-Shape"
+click radio:"Verknüpfung mit der Berichtsdefinition"
+click button:"OK"
+expect dialog:"Berichte" missing
+expect listitem:"Inventar" selected
+rclick listitem:"Inventar"
+click menuitem:"Bericht aktualisieren"
+a11y expect announced "Bericht „Inventar“ aktualisiert"
+shot build/JFDiagrammer-report-inventory.png
+# ---- the CSV read back: Daten › Benutzerdefinierter Import (the build folder from the tests')
+cmd 6401
+click radio:"Textdatei (CSV)"
+click button:"Weiter >"
+click button:"Durchsuchen..."
+click #2087714828
+key ctrl+a
+type "../../../build/Geräteliste.csv"
+click button:"Öffnen"
+expect text:"Trennzeichen: Semikolon" exists
+expect text:"Codierung: UTF-8 mit BOM" exists
+click button:"Weiter >"
+expect checkbox:"Auslastung" checked
+click button:"Weiter >"
+click radio:"Zeilen werden anhand ihrer Reihenfolge identifiziert"
+click button:"Fertig stellen"
+expect tab:"Geräteliste.csv" selected
+expect text:"1200" exists
+expect text:"1650" exists
+# ---- a definition of the drawing removed, undone
+cmd 6592
+click text:"Geräteliste"
+click button:"Ändern..."
+expect dialog:"Assistent für Berichtsdefinitionen" exists
+click button:"Weiter >"
+click button:"Weiter >"
+click button:"Weiter >"
+click radio:"In dieser Zeichnung speichern"
+click button:"Fertig stellen"
+expect text:"„Geräteliste“ ist in der Zeichnung gespeichert." exists
+click button:"Entfernen"
+expect text:"„Geräteliste“ wurde aus der Zeichnung entfernt." exists
+click text:"Geräteliste"
+click button:"Entfernen"
+expect text:"„Geräteliste“ wurde aus der Liste entfernt; die Datei bleibt." exists
+expect text:"Geräteliste" missing
+click button:"Schließen"
+key ctrl+z
+cmd 6592
+expect text:"Geräteliste" exists
+click button:"Schließen"
+# ---- Datei › Exportieren › Daten exportieren (EX-16)
+click tab:"Datei"
+click button:"Exportieren"
+click button:"Daten exportieren"
+expect dialog:"Daten exportieren" exists
+expect checkbox:"Kosten" checked
+expect checkbox:"Anzeigetext" checked
+expect checkbox:"Shape-Name" unchecked
+click radio:"Shapes auf allen Seiten"
+click checkbox:"Auslastung"
+click radio:"CSV-Datei (.csv)"
+click button:"Exportieren..."
+wait 600
+expect dialog:"Speichern unter" exists
+click button:"Speichern"
+wait 600
+expect text:"Gespeichert: jd19-geraete Shape-Daten.csv (Zeilen: 5)" exists
+click radio:"Excel-Arbeitsmappe (.xlsx)"
+click button:"Exportieren..."
+wait 600
+click button:"Speichern"
+wait 600
+expect text:"Gespeichert: jd19-geraete Shape-Daten.xlsx (Zeilen: 5)" exists
+shot build/JFDiagrammer-data-export.png
+click button:"Schließen"
+expect dialog:"Daten exportieren" missing

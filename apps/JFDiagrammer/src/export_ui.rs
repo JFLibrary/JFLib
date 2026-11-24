@@ -170,6 +170,14 @@ pub(crate) fn page(app: &mut Diagrammer, ui: &mut Ui) {
             ui.tooltip(&format!("{} · {}", name, t("Noch nicht verfügbar")));
         }
     }
+    // (JD19, EX-16) Daten exportieren: the shape data as a workbook or CSV (reports_export.rs)
+    ui.next_size(-1, 36);
+    ui.next_flags(ST_SUBTLE | ST_ALIGN_START | if has { 0 } else { ST_DISABLED });
+    ui.next_icon(JD_DATA_EXPORT_L);
+    if ui.button(ID + 10, crate::commands::label(crate::commands::DATA_EXPORT)) & EV_ACT != 0 && has {
+        crate::reports_export::open(app, ui);
+    }
+    ui.tooltip(t("Die Shape-Daten der Shapes als Excel-Arbeitsmappe oder CSV-Datei speichern (Inventar)"));
     ui.box_end();
     // ---- the options of the format
     let f = app.export.format.clamp(0, FORMATS.len() as i32 - 1) as usize;

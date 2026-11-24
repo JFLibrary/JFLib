@@ -294,7 +294,7 @@ commands! {
     FORMAT_SHADOW = 0x1605, "Schatten formatieren", 0, 0;
     CONN_RESET = 0x1606, "Verbinder zurücksetzen", 0, 0;
     ADD_TO_MY_SHAPES = 0x1607, "Zu meinen Shapes hinzufügen", 0, 0;
-    COMMENT_NEW = 0x1608, "Neuer Kommentar", 0, 0;
+    COMMENT_NEW = 0x1608, "Neuer Kommentar", 0, JD_COMMENT_NEW_L;
     // (JD15, SP-01) the dialog Shape-Name (dlg_shape_name.rs)
     SHAPE_NAME = 0x1609, "Shape-Name", 0, 0;
     // the stencil's menu (Shapes sidebar)
@@ -361,6 +361,11 @@ commands! {
     DATA_AUTO_LINK_REFRESH = 0x1920, "Nach Aktualisierung automatisch verknüpfen", 0, 0;
     // (JD18, AB-11) the pane Externe Daten's Verknüpfung aufheben: the selected rows' shapes
     DATA_UNLINK_ROWS = 0x1960, "Verknüpfung aufheben", 0, 0;
+    // (JD19) Überprüfen › Berichte, the report table's menu, Datei › Exportieren › Daten
+    // exportieren (reports*.rs)
+    REPORTS = 0x19C0, "Shape-Berichte", JD_SHAPE_REPORTS, JD_SHAPE_REPORTS_L;
+    REPORT_REFRESH = 0x19C1, "Bericht aktualisieren", JD_REPORT_REFRESH, 0;
+    DATA_EXPORT = 0x19C2, "Daten exportieren", JD_DATA_EXPORT, JD_DATA_EXPORT_L;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -596,6 +601,10 @@ static HANDLERS: &[(u32, Handler)] = &[
     (DATA_CONFLICTS, crate::data_refresh::conflicts_open),
     (DATA_AUTO_LINK_REFRESH, crate::data_refresh::toggle_auto_link),
     (DATA_UNLINK_ROWS, crate::data_pane::unlink_rows),
+    // (JD19) shape reports, Daten exportieren (reports*.rs)
+    (REPORTS, crate::reports::open),
+    (REPORT_REFRESH, crate::reports::refresh),
+    (DATA_EXPORT, crate::reports_export::open),
 ];
 
 // toggles: whether the command is on
@@ -695,6 +704,8 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
         // (JD18) the data commands
         && crate::data_cmds::available(app, id)
         && crate::data_pane::available(app, id)
+        // (JD19) the report commands
+        && crate::reports::available(app, id)
 }
 
 /// the toggle is on
