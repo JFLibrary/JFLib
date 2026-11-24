@@ -791,7 +791,7 @@ impl Acme {
     }
 
     /// post, but none sent once `deadline` (ms) is reached: Timeout then (checked before the
-    /// nonce and again before the POST, which a slow newNonce may have delayed)
+    /// nonce, and again right before the POST goes, after a slow newNonce and the signing)
     fn post_until(&self, key: &PrivateKey, kid: Option<&str>, url: &str, payload: Option<&Value>, max: usize, deadline: Option<u64>) -> Result<Answer, AcmeError> {
         let (alg, _) = jws_alg(key)?;
         let in_time = || deadline.map_or(Ok(()), Account::in_time);
@@ -802,7 +802,6 @@ impl Acme {
                 Some(n) => n,
                 None => self.nonce()?,
             };
-            in_time()?;
             let mut protected = Value::object([("alg", Value::string(alg)), ("nonce", Value::string(nonce)), ("url", Value::string(url))]);
             match kid {
                 Some(k) => protected.insert("kid", Value::string(k)),
@@ -811,6 +810,7 @@ impl Acme {
             let body = json::stringify(&jws(key, protected, payload)?).map_err(|_| proto("JWS"))?;
             let mut h = Headers::new();
             h.set("Content-Type", "application/jose+json");
+            in_time()?;
             let a = self.send("POST", url, &h, body.as_bytes(), max)?;
             if a.status < 400 {
                 self.keep_nonce(&a);
