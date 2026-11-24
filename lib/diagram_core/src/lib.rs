@@ -50,6 +50,10 @@
 //   data::*                       (JD18) external data: connections, recordsets with their
 //                                 cached rows, rows bound to shapes (Prop rows, DataLinked),
 //                                 refresh with conflicts, automatic linking (DA-04, DA-05)
+//   shapeops::*                   (JD21) shape operations: Vereinigen, Kombinieren,
+//                                 Fragmentieren, Schneiden, Subtrahieren (SP-08) on geom's plane
+//                                 Booleans, arcs rebuilt as arcs; fit_frame (the box follows the
+//                                 geometry after vertex edits, SP-05), update_alignment_box (SP-16)
 //   field::*                      (JD8) text fields: a Field row's value in its format picture,
 //                                 new fields, the text with its fields, the document's
 //                                 properties (Document::fields: the app's locale and clock)
@@ -86,6 +90,7 @@ mod page;
 pub mod pagesetup;
 pub mod render;
 pub mod route;
+pub mod shapeops;
 mod shape;
 pub mod structure;
 mod sheet;

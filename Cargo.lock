@@ -808,6 +808,10 @@ version = "0.2.1"
 [[package]]
 name = "jflib-diagram-core"
 version = "0.2.1"
+dependencies = [
+ "jflib-geom",
+ "jflib-rt",
+]
 
 [[package]]
 name = "jflib-diagram-io"

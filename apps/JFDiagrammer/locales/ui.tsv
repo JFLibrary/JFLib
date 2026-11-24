@@ -1238,3 +1238,10 @@ Zuletzt angezeigte Linie	Last displayed line	Última línea mostrada	Ultima line
 Zuerst angezeigte Linie	First displayed line	Primera línea mostrada	Prima linea visualizzata	Première ligne affichée
 Größe der Linienübergänge (waagerecht, senkrecht)	Line jump size (horizontal, vertical)	Tamaño de los saltos de línea (horizontal, vertical)	Dimensioni dei salti di linea (orizzontale, verticale)	Taille des sauts de ligne (horizontale, verticale)
 Richtung der Linienübergänge (waagerecht, senkrecht)	Line jump direction (horizontal, vertical)	Dirección de los saltos de línea (horizontal, vertical)	Direzione dei salti di linea (orizzontale, verticale)	Direction des sauts de ligne (horizontale, verticale)
+Vorgänge	Operations	Operaciones	Operazioni	Opérations
+Gesamtmenge	Union	Unión	Unione	Union
+Kombinieren	Combine	Combinar	Combina	Combiner
+In Einzelmengen zerlegen	Fragment	Fragmentar	Frammenta	Fragmenter
+Schnittmenge bilden	Intersect	Intersecar	Interseca	Intersection
+Subtrahieren	Subtract	Restar	Sottrai	Soustraire
+Ausrichtungsfeld aktualisieren	Update Alignment Box	Actualizar cuadro de alineación	Aggiorna casella di allineamento	Mettre à jour la zone d'alignement

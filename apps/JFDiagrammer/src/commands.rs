@@ -392,6 +392,14 @@ commands! {
     DIAGRAM_FLIP_H = 0x1C59, "Diagramm horizontal spiegeln", JD_FLIP_H, 0;
     // (JD21 jumps) the dialog Verbinder-Verhalten (line jumps per connector, jumps_ui.rs)
     CONN_BEHAVIOR = 0x1C20, "Verbinder-Verhalten", 0, 0;
+    // (JD21 ops) the shape operations, Entwicklertools › Shape-Design › Vorgänge in Visio, until
+    // JD23 in Start › Anordnen › Gruppieren › Vorgänge (shapeops_cmds.rs)
+    OP_UNION = 0x1C00, "Gesamtmenge", JD_OP_UNION, 0;
+    OP_COMBINE = 0x1C01, "Kombinieren", JD_OP_COMBINE, 0;
+    OP_FRAGMENT = 0x1C02, "In Einzelmengen zerlegen", JD_OP_FRAGMENT, 0;
+    OP_INTERSECT = 0x1C03, "Schnittmenge bilden", JD_OP_INTERSECT, 0;
+    OP_SUBTRACT = 0x1C04, "Subtrahieren", JD_OP_SUBTRACT, 0;
+    UPDATE_ALIGN_BOX = 0x1C08, "Ausrichtungsfeld aktualisieren", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -657,6 +665,13 @@ static HANDLERS: &[(u32, Handler)] = &[
     // (JD21 jumps) Linienübergänge anzeigen, Verbinder-Verhalten (jumps_ui.rs)
     (LINE_JUMPS, crate::jumps_ui::toggle),
     (CONN_BEHAVIOR, crate::jumps_ui::open),
+    // (JD21 ops) Vorgänge (shapeops_cmds.rs)
+    (OP_UNION, |a, ui| crate::shapeops_cmds::run(a, ui, OP_UNION)),
+    (OP_COMBINE, |a, ui| crate::shapeops_cmds::run(a, ui, OP_COMBINE)),
+    (OP_FRAGMENT, |a, ui| crate::shapeops_cmds::run(a, ui, OP_FRAGMENT)),
+    (OP_INTERSECT, |a, ui| crate::shapeops_cmds::run(a, ui, OP_INTERSECT)),
+    (OP_SUBTRACT, |a, ui| crate::shapeops_cmds::run(a, ui, OP_SUBTRACT)),
+    (UPDATE_ALIGN_BOX, |a, ui| crate::shapeops_cmds::run(a, ui, UPDATE_ALIGN_BOX)),
 ];
 
 // toggles: whether the command is on
@@ -764,6 +779,8 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
         && crate::layout_cmds::available(app, id)
         // (JD21 jumps) Linienübergänge anzeigen, Verbinder-Verhalten
         && crate::jumps_ui::available(app, id)
+        // (JD21 ops) the shape operations
+        && crate::shapeops_cmds::available(app, id)
 }
 
 /// the toggle is on

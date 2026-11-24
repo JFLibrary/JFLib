@@ -1,0 +1,39 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 (SP-08): Gesamtmenge -- two overlapping rectangles and an ellipse become one
+# shape around all three (Start › Anordnen › Gruppieren › Vorgänge until JD23 brings
+# Entwicklertools › Shape-Design › Vorgänge); the inputs are gone, the result is selected, one
+# undo step brings the three back; without a selection the operations are disabled
+cmd 4404
+drag 500,330 640,420
+drag 580,380 720,470
+cmd 4405
+drag 680,300 800,360
+cmd 4400
+# the ellipse alone: Gesamtmenge goes (its own sections), the operations of two shapes do not
+key esc
+click 740,330
+click button:"Gruppieren"
+expect menuitem:"Gesamtmenge" enabled
+expect menuitem:"Kombinieren" disabled
+expect menuitem:"Schnittmenge bilden" disabled
+expect menuitem:"Subtrahieren" disabled
+expect menuitem:"Ausrichtungsfeld aktualisieren" enabled
+key esc
+key ctrl+a
+click button:"Gruppieren"
+expect menuitem:"Gesamtmenge" enabled
+click menuitem:"Gesamtmenge"
+expect listitem:"Sheet.7" selected
+expect listitem:"Sheet.4" missing
+expect listitem:"Sheet.5" missing
+expect listitem:"Sheet.6" missing
+expect listitem:"Sheet.7" rect 500 299 302 176
+expect button:"Breite: 120 mm  Höhe: 70 mm  Winkel: 0°" exists
+# one undo step
+key ctrl+z
+expect listitem:"Sheet.7" missing
+expect listitem:"Sheet.4" exists
+expect listitem:"Sheet.6" exists
+key ctrl+y
+expect listitem:"Sheet.7" exists
+expect listitem:"Sheet.5" missing
