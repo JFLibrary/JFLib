@@ -1,10 +1,10 @@
 # jflib-sheet-io
 
-Spreadsheet import for [JFLib](https://jflib.org): Excel workbooks (`.xlsx`, `.xlsm`, `.xltx`,
-`.xltm`, transitional and strict Office Open XML) and CSV files, both delivered as the same typed
-`Table`. It reads the values a file stores, the cached result of a formula included, and never
-evaluates a formula. It is plain Rust, without the standard library and without a line of
-`unsafe` code.
+Spreadsheet import and export for [JFLib](https://jflib.org): Excel workbooks (`.xlsx`, `.xlsm`,
+`.xltx`, `.xltm`, transitional and strict Office Open XML) and CSV files, both delivered as the
+same typed `Table`, and written back from typed rows. It reads the values a file stores, the
+cached result of a formula included, and never evaluates or writes a formula. It is plain Rust,
+without the standard library and without a line of `unsafe` code.
 
 Why a crate of its own: JFLib keeps one crate per foreign format family, like `dxf`, `gltf` and
 `pdf`. jfWord's `doc_io` would pull its document model, layout and text into every user of a
@@ -36,6 +36,12 @@ if let Value::Date(serial) = grid.get(1, 2) {
 // a CSV file: encoding and delimiter detected, Excel's "sep=;" honoured
 let file = csv::read(&bytes, &csv::Options::default())?;
 let table = csv::to_table(&file, true, true);          // header row, numbers/booleans/dates typed
+
+// writing: a table as a workbook (bold header in a frozen pane, a filter) and as German CSV
+let mut sheet = xlsx::SheetOut::from_table("Bericht", &table);
+sheet.autofilter = true;
+let bytes = xlsx::write(&xlsx::BookOut { sheets: vec![sheet] }, &xlsx::WriteOptions::default())?;
+let text = csv::write_table(&table, &csv::WriteOptions::GERMAN)?;   // ; and 1,5, UTF-8 with BOM
 ```
 
 Values are `Empty`, `Number`, `Text`, `Bool`, `Date` (an OLE Automation date: days since
@@ -59,6 +65,18 @@ Excel's `sep=` line, UTF-8 with and without BOM, UTF-16 (Excel's "Unicode text")
 The delimiter is detected among TAB, `;`, `,` and `|` (`csv::detect_delimiter` says how). It is
 lenient where Excel is: a quote inside an unquoted field is kept, text after a closing quote too.
 German numbers (`1.234,5`) are read when `;` is the delimiter.
+
+What the writers do: `xlsx::write` makes a package Excel opens without repair -- texts as shared
+strings with Excel's `_xHHHH_` escapes, dates as serials with the number formats Excel picks
+itself, booleans, errors, a bold header kept in view, column widths given or estimated, a filter
+-- and refuses what Excel cannot hold (rows, columns, 32 767 characters a cell, sheet names) with
+`xlsx::WriteError` instead of writing a file Excel would repair. `csv::write` writes RFC 4180
+with the delimiter, line end, encoding (UTF-8 with or without BOM, UTF-16, Windows-1252, which
+refuses a character it lacks instead of writing `?`) and decimal separator asked for, dates in
+ISO 8601; `WriteOptions::guard_formulas` puts a `'` before texts a spreadsheet would run as a
+formula (off by default: it changes the data). Both are deterministic and bounded
+(`xlsx::WriteOptions`, `csv::WriteOptions::max_bytes`), and what they write reads back with the readers
+here.
 
 ## Files are untrusted input
 

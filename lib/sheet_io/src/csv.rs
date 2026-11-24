@@ -4,6 +4,9 @@
 //   decode(bytes) -> (String, Encoding)  a BOM decides; else valid UTF-8; else Windows-1252
 //   detect_delimiter(text) -> u8         ; , TAB or |
 //   to_table(&csv, header, infer) -> Table   numbers, booleans and dates typed on request
+//   write(rows, &WriteOptions) / write_table(&table, &WriteOptions) -> Vec<u8>   the other way
+//        (JD19, FEATURES.md EX-12 / EX-16): delimiter, line end, encoding, decimal separator,
+//        an optional guard against formula injection; what is written reads back with read
 //
 // The grammar: a field in quotes may hold the delimiter, line breaks and "" for a quote; records
 // end with CR LF, LF or CR; the last record may end without a line break, and a line break at
@@ -501,7 +504,17 @@ fn number(t: &str, german: bool) -> Option<f64> {
         // d{1,3}(.ddd)* or d+, then , and digits
         let comma = body.iter().position(|&c| c == b',')?;
         let (int, frac) = (&body[..comma], &body[comma + 1..]);
-        if frac.is_empty() || !frac.iter().all(u8::is_ascii_digit) {
+        // the fraction's digits, then an optional exponent (1,5e-07, as `write` puts a number
+        // below 1e-5 or from 1e17 on)
+        let digits = frac.iter().take_while(|c| c.is_ascii_digit()).count();
+        let exp = match frac[digits..].split_first() {
+            None => true,
+            Some((e, rest)) => {
+                let rest = rest.strip_prefix(b"-").or_else(|| rest.strip_prefix(b"+")).unwrap_or(rest);
+                matches!(e, b'e' | b'E') && !rest.is_empty() && rest.iter().all(u8::is_ascii_digit)
+            }
+        };
+        if digits == 0 || !exp {
             return None;
         }
         let groups: Vec<&[u8]> = int.split(|&c| c == b'.').collect();
@@ -552,6 +565,253 @@ fn number(t: &str, german: bool) -> Option<f64> {
         return None;
     }
     Some(if b.first() == Some(&b'-') { -v } else { v })
+}
+
+// ------------------------------------------------------------------ writing
+
+/// How the lines of a CSV file written end.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LineEnd {
+    /// CR LF, as Excel writes and RFC 4180 says
+    CrLf,
+    /// LF, as Unix tools write
+    Lf,
+}
+
+/// How a CSV file is written (`write`, `write_table`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WriteOptions {
+    /// `,` `;` TAB or `|`: the delimiters `detect_delimiter` finds again
+    pub delimiter: u8,
+    /// the line end
+    pub line_end: LineEnd,
+    /// the encoding: UTF-8 with BOM by default (Excel reads UTF-8 without BOM in the ANSI code
+    /// page); UTF-16 is written with its BOM; Windows-1252 refuses a character it lacks
+    /// (`WriteError::Unmappable`) rather than writing `?` for it
+    pub encoding: Encoding,
+    /// the decimal separator of numbers: `.`, or `,` as German Excel writes them (then the
+    /// delimiter cannot be `,`; `to_table` reads them back with `;`)
+    pub decimal: u8,
+    /// a text starting with `=` `+` `-` `@` TAB or CR gets a leading `'`, so a spreadsheet
+    /// opening the file does not run it as a formula (CSV injection).  Off by default: it
+    /// changes the data (every program but Excel shows the `'`, and Excel shows it too in a
+    /// cell read from CSV), so the application decides, by who opens the file.  Only texts:
+    /// a Number -5 stays -5.
+    pub guard_formulas: bool,
+    /// the most bytes of the file written (`WriteError::Limit("max_bytes")`)
+    pub max_bytes: usize,
+}
+
+impl WriteOptions {
+    /// `,`, CR LF, UTF-8 with BOM, `.` as the decimal separator, no formula guard, up to
+    /// `CsvLimits::DEFAULT.bytes` (what `read` takes by default).
+    pub const DEFAULT: WriteOptions = WriteOptions { delimiter: b',', line_end: LineEnd::CrLf, encoding: Encoding::Utf8Bom, decimal: b'.', guard_formulas: false, max_bytes: CsvLimits::DEFAULT.bytes };
+    /// As German Excel opens a CSV file with a double click: `;` and a decimal comma; else
+    /// `DEFAULT`.
+    pub const GERMAN: WriteOptions = WriteOptions { delimiter: b';', decimal: b',', ..WriteOptions::DEFAULT };
+}
+
+impl Default for WriteOptions {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+/// Why a CSV file was not written.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum WriteError {
+    /// a delimiter other than `,` `;` TAB `|`, a decimal separator other than `.` and `,`, or
+    /// `,` as both
+    Options,
+    /// a character the encoding (Windows-1252) does not have
+    Unmappable {
+        /// the record, 0-based (with `write_table` the header is record 0)
+        record: usize,
+        /// the field, 0-based
+        field: usize,
+        /// the character
+        ch: char,
+    },
+    /// over a limit: the name of the field of `WriteOptions`
+    Limit(&'static str),
+}
+
+impl WriteError {
+    /// The error as a sentence in English.
+    pub fn text(&self) -> String {
+        match self {
+            WriteError::Options => String::from("CSV: the delimiter must be , ; TAB or |, the decimal separator . or , and not the delimiter"),
+            WriteError::Unmappable { record, field, ch } => {
+                alloc::format!("CSV: record {}, field {}: the character U+{:04X} is not in Windows-1252", record + 1, field + 1, *ch as u32)
+            }
+            WriteError::Limit(what) => alloc::format!("CSV: over the write limit {what}"),
+        }
+    }
+}
+
+impl core::fmt::Display for WriteError {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        f.write_str(&self.text())
+    }
+}
+
+// a character as its Windows-1252 byte (WHATWG's mapping, the five C1 controls it leaves open
+// included, so `decode` reads every byte back as the character written)
+fn to_windows1252(c: char) -> Option<u8> {
+    let u = c as u32;
+    if u < 0x80 || (0xA0..=0xFF).contains(&u) {
+        return Some(u as u8);
+    }
+    CP1252.iter().position(|&x| x as u32 == u).map(|i| 0x80 + i as u8)
+}
+
+// the file while it is written
+struct Out<'o> {
+    bytes: Vec<u8>,
+    opts: &'o WriteOptions,
+    record: usize,
+    field: usize,
+}
+
+impl<'o> Out<'o> {
+    fn new(opts: &'o WriteOptions) -> Result<Out<'o>, WriteError> {
+        let d = opts.delimiter;
+        if !matches!(d, b',' | b';' | b'\t' | b'|') || !matches!(opts.decimal, b'.' | b',') || d == opts.decimal {
+            return Err(WriteError::Options);
+        }
+        let bom: &[u8] = match opts.encoding {
+            Encoding::Utf8Bom => &[0xef, 0xbb, 0xbf],
+            Encoding::Utf16Le => &[0xff, 0xfe],
+            Encoding::Utf16Be => &[0xfe, 0xff],
+            Encoding::Utf8 | Encoding::Windows1252 => &[],
+        };
+        Ok(Out { bytes: bom.to_vec(), opts, record: 0, field: 0 })
+    }
+
+    fn put(&mut self, s: &str) -> Result<(), WriteError> {
+        match self.opts.encoding {
+            Encoding::Utf8 | Encoding::Utf8Bom => self.bytes.extend_from_slice(s.as_bytes()),
+            Encoding::Utf16Le => s.encode_utf16().for_each(|u| self.bytes.extend_from_slice(&u.to_le_bytes())),
+            Encoding::Utf16Be => s.encode_utf16().for_each(|u| self.bytes.extend_from_slice(&u.to_be_bytes())),
+            Encoding::Windows1252 => {
+                for ch in s.chars() {
+                    let b = to_windows1252(ch).ok_or(WriteError::Unmappable { record: self.record, field: self.field, ch })?;
+                    self.bytes.push(b);
+                }
+            }
+        }
+        if self.bytes.len() > self.opts.max_bytes {
+            return Err(WriteError::Limit("max_bytes"));
+        }
+        Ok(())
+    }
+
+    // one field; `text`: a Text value, which the formula guard looks at
+    fn field(&mut self, s: &str, text: bool) -> Result<(), WriteError> {
+        if self.field > 0 {
+            self.put(match self.opts.delimiter {
+                b';' => ";",
+                b'\t' => "\t",
+                b'|' => "|",
+                _ => ",",
+            })?;
+        }
+        let guard = text && self.opts.guard_formulas && s.starts_with(['=', '+', '-', '@', '\t', '\r']);
+        let d = self.opts.delimiter;
+        let first = if guard { Some('\'') } else { s.chars().next() };
+        let last = s.chars().next_back();
+        // RFC 4180's reasons, white space at an end (kept that way by every reader), and a
+        // first field "sep=" that `read` and Excel would take for the delimiter hint
+        let sep = self.record == 0 && self.field == 0 && s.len() >= 4 && s.as_bytes()[..4].eq_ignore_ascii_case(b"sep=");
+        let quote = sep
+            || s.bytes().any(|b| b == d || b == b'"' || b == b'\r' || b == b'\n')
+            || matches!(first, Some(' ' | '\t'))
+            || matches!(last, Some(' ' | '\t'));
+        if quote {
+            self.put("\"")?;
+        }
+        if guard {
+            self.put("'")?;
+        }
+        if quote && s.contains('"') {
+            let mut parts = s.split('"');
+            if let Some(p) = parts.next() {
+                self.put(p)?;
+            }
+            for p in parts {
+                self.put("\"\"")?;
+                self.put(p)?;
+            }
+        } else {
+            self.put(s)?;
+        }
+        if quote {
+            self.put("\"")?;
+        }
+        self.field += 1;
+        Ok(())
+    }
+
+    fn end(&mut self) -> Result<(), WriteError> {
+        self.put(match self.opts.line_end {
+            LineEnd::CrLf => "\r\n",
+            LineEnd::Lf => "\n",
+        })?;
+        self.record += 1;
+        self.field = 0;
+        Ok(())
+    }
+
+    fn row(&mut self, row: &[Value]) -> Result<(), WriteError> {
+        for v in row {
+            let s: alloc::borrow::Cow<str> = match v {
+                Value::Empty => "".into(),
+                Value::Text(s) => s.as_str().into(),
+                Value::Number(n) | Value::Date(n) if !n.is_finite() => "#NUM!".into(),
+                Value::Number(n) => {
+                    let t = crate::number_text(*n);
+                    if self.opts.decimal == b',' { t.replace('.', ",").into() } else { t.into() }
+                }
+                Value::Date(_) | Value::Bool(_) | Value::Error(_) => v.text().into(),
+            };
+            self.field(&s, matches!(v, Value::Text(_)))?;
+        }
+        self.end()
+    }
+}
+
+/// Write rows as a CSV file: one record a row (rows may differ in length), each ending with the
+/// line end, the last one too.  Fields: a Number as the shortest text that reads back with the
+/// decimal separator of the options, no thousands separators (-0 as 0); NaN and the infinities
+/// as `#NUM!` (as in `xlsx::write`); a Date as ISO 8601 text (`Value::text`: `2026-11-24`,
+/// `2026-11-24 14:05:30`, a time alone `14:05:30`, which `to_table` keeps as text); a Bool as
+/// TRUE / FALSE; an Error as Excel writes it (`#N/A`); Empty as an empty field; a Text as it
+/// is.  A field is quoted when it holds the delimiter, a quote, CR or LF, starts or ends with a
+/// space or TAB, or is a first field `sep=...`; a quote in it is doubled.  CSV has no types:
+/// `read` and `to_table` give a Text that looks like a number back as a Number.
+pub fn write(rows: &[Vec<Value>], opts: &WriteOptions) -> Result<Vec<u8>, WriteError> {
+    let mut out = Out::new(opts)?;
+    for row in rows {
+        out.row(row)?;
+    }
+    Ok(out.bytes)
+}
+
+/// Write a table as a CSV file: a header record of its column names (texts; none for a table
+/// without columns), then its rows (see `write`).
+pub fn write_table(table: &Table, opts: &WriteOptions) -> Result<Vec<u8>, WriteError> {
+    let mut out = Out::new(opts)?;
+    if !table.columns.is_empty() {
+        for name in &table.columns {
+            out.field(name, true)?;
+        }
+        out.end()?;
+    }
+    for row in &table.rows {
+        out.row(row)?;
+    }
+    Ok(out.bytes)
 }
 
 // d.m.yyyy with an optional " HH:MM[:SS]"

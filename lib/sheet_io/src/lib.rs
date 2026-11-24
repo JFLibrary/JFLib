@@ -1,5 +1,6 @@
-// sheet_io -- XLSX and CSV import: workbooks and delimited text as typed tables (JFDiagrammer JD18,
-// FEATURES.md IM-05 / IM-10, decision F6: "CSV und .xlsx in P2 mit XLSX-Leser in JFLib")
+// sheet_io -- XLSX and CSV import and export: workbooks and delimited text as typed tables
+// (JFDiagrammer JD18, FEATURES.md IM-05 / IM-10, decision F6: "CSV und .xlsx in P2 mit XLSX-Leser
+// in JFLib"; the writers JD19, EX-12 shape reports and EX-16 data export as CSV / .xlsx)
 //
 //   xlsx::Workbook::open(bytes, Limits) -> Workbook     the workbook part, its relationships,
 //        the shared strings and the styles (which number formats are dates); not the sheets yet
@@ -11,7 +12,18 @@
 //   csv::read(bytes, &Options) -> Csv                    RFC 4180 and what Excel writes: the
 //        encoding (BOM, UTF-8, else Windows-1252) and the delimiter (; , TAB |) detected
 //   csv::to_table(&csv, header, infer) -> Table          with numbers, booleans and dates typed
+//   xlsx::write(&BookOut, &WriteOptions) -> Vec<u8>      typed rows as a workbook Excel opens
+//        without repair (xlsx_write.rs): shared strings, dates with Excel's number formats, a
+//        bold and frozen header, column widths, a filter; Excel's limits as errors
+//   csv::write(rows, &WriteOptions) / csv::write_table -> Vec<u8>   delimiter, line end,
+//        encoding (UTF-8 with or without BOM, UTF-16, Windows-1252), decimal comma, a guard
+//        against formula injection
 //   Value, CellError, CellRef / parse_ref / col_name, Area / parse_area, civil / serial
+//
+// What is written reads back with the readers here as it was written (the tests check it), with
+// the exceptions each writer names: Excel's newer errors and dates it cannot show become texts,
+// NaN and infinities #NUM!; CSV has no types at all.  Writing is deterministic (no time stamps,
+// the same rows give the same bytes) and bounded (xlsx::WriteOptions, csv::WriteOptions::max_bytes).
 //
 // Why a crate of its own: one crate per foreign format family, like dxf, gltf and pdf.  Not
 // doc_io: that is jfWord's document model, and every user of a spreadsheet reader would pull in
@@ -38,6 +50,7 @@ use alloc::vec::Vec;
 
 pub mod csv;
 pub mod xlsx;
+mod xlsx_write;
 mod xml;
 
 /// A calendar date and wall time (datetime's), what `civil` and `serial` convert.
@@ -99,7 +112,7 @@ impl Value {
     }
 }
 
-fn number_text(v: f64) -> String {
+pub(crate) fn number_text(v: f64) -> String {
     if v == 0.0 { String::from("0") } else { base::f64_format(v) }
 }
 
@@ -538,3 +551,5 @@ rt::test_main!();
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_write;
