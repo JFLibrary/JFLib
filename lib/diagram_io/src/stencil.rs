@@ -57,7 +57,8 @@
 // The JFD_ cells (diagram_core::instance reads them): the document sheet's User.JFD_Name (the
 // title in de|en|es|it|fr) and User.JFD_Category; per master page User.JFD_Name, JFD_Prompt,
 // JFD_Keywords, JFD_Text, JFD_Quick (1 for the first `quick` masters) and JFD_Tr1, JFD_Tr2 ...
-// ("Section.Row.Cell|de|en|es|it|fr" with VSDX section names: Control.Row_1.Tip).
+// ("Section.Row.Cell|de|en|es|it|fr" with VSDX section and cell names: Control.Row_1.Prompt; a
+// source's Tip of a control point is the VSDX cell Prompt, JD21).
 //
 // (JD15) Text fields: a [Field] section (Value, Format, Type ...; `Unit = mm` gives Value the unit
 // the field shows) and "{fld N}" marks in a master's text (diagram_core::field::marked); a mark
@@ -1195,8 +1196,11 @@ fn emit_sections(tx: &mut Transaction, sink: &mut Sink, sheet: SheetRef, section
                         sink.constant(tx, sheet, &a, Value::Num(0.0), Some(unit), c.line)?;
                     }
                     for c in row.cells.iter().filter(|c| !(sec.model == "Field" && c.name == "Unit")) {
-                        let a = CellAddr::row(sk, rk, tx.intern(&c.name));
-                        sink.put(tx, sheet, &a, c, tr.then(|| format!("{}.{rname}.{}", sec.model, c.name)))?;
+                        // (JD21 glue) a control point's Tip is the cell Prompt in VSDX (Visio's
+                        // files; the ShapeSheet window calls it Tip)
+                        let name = if sec.model == "Control" && c.name == "Tip" { "Prompt" } else { c.name.as_str() };
+                        let a = CellAddr::row(sk, rk, tx.intern(name));
+                        sink.put(tx, sheet, &a, c, tr.then(|| format!("{}.{rname}.{name}", sec.model)))?;
                     }
                 }
             }

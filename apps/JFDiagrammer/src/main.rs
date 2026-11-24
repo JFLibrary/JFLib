@@ -47,6 +47,8 @@
 //   src/structures_cff.rs   (JD10) the register Funktionsübergreifendes Flussdiagramm
 //   src/layout_ui.rs  (JD10) Layout-Verhalten per shape, Seite einrichten › Layout und Routing
 //   src/jumps_ui.rs   (JD21) line jumps: Linienübergänge anzeigen, the dialog Verbinder-Verhalten
+//   src/glue_tools.rs (JD21) control points that glue, Kleben an (vertices, handles, guides), the
+//                     connection point tool, several vertices and arcs' handles in vertex editing
 //   src/templates.rs  (JD13) the templates: built-in (build.rs builds them from templates/ into
 //                     .vstx), the own ones, a new drawing from one, Speichern als Vorlage
 //   src/templates_ui.rs  (JD13) Datei › Neu: the catalogue with rendered previews
@@ -185,6 +187,8 @@ mod layout_cmds;
 mod layout_ui;
 // (JD21 jumps) Linienübergänge anzeigen, Verbinder-Verhalten
 mod jumps_ui;
+// (JD21 glue) glued control points, Kleben an, the connection point tool, arcs' handles
+mod glue_tools;
 // (JD13) the legend of a network plan counts its devices
 mod legend;
 mod options;
@@ -358,6 +362,8 @@ pub(crate) struct Diagrammer {
     /// (JD21 autoconn) the connector automatics: a move's split, the tool "once", marked tiles,
     /// the quick shapes bar
     pub autoconn: autoconn::AutoConn,
+    /// (JD21 glue) Kleben an: Shape-Ziehpunkte, Shape-Scheitelpunkte (glue_tools.rs)
+    pub glue: glue_tools::GlueState,
 }
 
 impl Diagrammer {
@@ -434,6 +440,7 @@ impl Diagrammer {
             lay: layout_cmds::LayoutCmds::default(),
             jumps: jumps_ui::JumpsState::default(),
             autoconn: autoconn::AutoConn::default(),
+            glue: glue_tools::GlueState::default(),
             page_views: alloc::vec::Vec::new(),
             view_page: None,
         }

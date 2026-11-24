@@ -75,6 +75,7 @@ LINE_TOOL	Ctrl+6	Ctrl+6	Ctrl+6	Ctrl+6	Ctrl+6
 ARC	Ctrl+7	Ctrl+7	Ctrl+7	Ctrl+7	Ctrl+7
 RECTANGLE	Ctrl+8	Ctrl+8	Ctrl+8	Ctrl+8	Ctrl+8
 ELLIPSE	Ctrl+9	Ctrl+9	Ctrl+9	Ctrl+9	Ctrl+9
+CONN_POINT_TOOL	Ctrl+Shift+1	Ctrl+Shift+1	Ctrl+Shift+1	Ctrl+Shift+1	Ctrl+Shift+1
 ALIGN	F8	F8	F8	F8	F8
 BRING_FRONT	Ctrl+Shift+PgUp	Ctrl+Shift+F	Ctrl+Shift+F	Ctrl+Shift+F	Ctrl+Shift+F
 SEND_BACK	Ctrl+Shift+PgDn	Ctrl+Shift+B	Ctrl+Shift+B	Ctrl+Shift+B	Ctrl+Shift+B

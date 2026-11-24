@@ -1249,3 +1249,17 @@ Einen Verbinder zeichnen	Draw one connector	Dibujar un conector	Disegna un conne
 Schnell-Shape	Top shape	Forma principal	Forma principale	Forme principale
 Shapes ablegen	Drop shapes	Colocar formas	Rilascia forme	Déposer des formes
 {} Shapes abgelegt	{} shapes dropped	{} formas colocadas	{} forme rilasciate	{} formes déposées
+Verbindungspunkt|Tool	Connection Point	Punto de conexión	Punto di connessione	Point de connexion
+Nach innen	Inward	Hacia dentro	Verso l'interno	Vers l'intérieur
+Nach außen	Outward	Hacia fuera	Verso l'esterno	Vers l'extérieur
+Nach innen und außen	Inward & Outward	Hacia dentro y hacia fuera	Verso l'interno e l'esterno	Vers l'intérieur et l'extérieur
+Verbindungspunkt verschieben	Move Connection Point	Mover el punto de conexión	Sposta il punto di connessione	Déplacer le point de connexion
+Verbindungspunkt hinzufügen	Add Connection Point	Agregar punto de conexión	Aggiungi punto di connessione	Ajouter un point de connexion
+Verbindungspunkt löschen	Delete Connection Point	Eliminar el punto de conexión	Elimina il punto di connessione	Supprimer le point de connexion
+Art des Verbindungspunkts	Connection Point Type	Tipo de punto de conexión	Tipo di punto di connessione	Type de point de connexion
+Scheitelpunkte verschieben	Move Vertices	Mover los vértices	Sposta i vertici	Déplacer les sommets
+Scheitelpunkte löschen	Delete Vertices	Eliminar vértices	Elimina vertici	Supprimer les sommets
+Bogen ändern	Change Arc	Cambiar el arco	Modifica l'arco	Modifier l'arc
+Kleben an	Glue to	Pegar a	Incolla a	Coller à
+Shape-Ziehpunkte	Shape handles	Controladores de forma	Maniglie della forma	Poignées de forme
+Shape-Scheitelpunkte	Shape vertices	Vértices de forma	Vertici della forma	Sommets de forme

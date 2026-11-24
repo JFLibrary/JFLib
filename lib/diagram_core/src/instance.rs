@@ -614,7 +614,7 @@ pub fn place(tx: &mut Transaction, page: PageRef, master: MasterRef, x: f64, y: 
         localize_parts(tx, shape, lang)?;
         // (LY-03) the master's layers onto the page
         bring_layers(tx, page, master, shape)?;
-        // translated cells (Controls.Row_1.Tip ...) in this language
+        // translated cells (Control.Row_1.Prompt: a control point's tip ...) in this language
         let ms = tx.doc().master(master).and_then(|m| m.master_shape()).map(|slot| SheetRef::Shape(ShapeRef { owner: Owner::Master(master), slot }));
         for (cell, values) in &texts.translated {
             let Some(v) = values.get(lang).filter(|v| !v.is_empty()) else { continue };

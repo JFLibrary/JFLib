@@ -200,7 +200,8 @@ static START: [Group; 7] = [
         Sm::Row(&[VALIGN_TOP, VALIGN_MIDDLE, VALIGN_BOTTOM]),
         Sm::Row(&[TEXT_LEFT, TEXT_CENTER, TEXT_RIGHT, TEXT_JUSTIFY]),
     ])]),
-    Group("Tools", 0, &[Col::Small(&[Sm::Btn(POINTER), Sm::Btn(CONNECTOR_TOOL), Sm::Btn(TEXT_TOOL)]), Col::Small(&[Sm::Split(DRAW_TOOLS, &DRAW_MENU)])]),
+    // (JD21 glue) Verbindungspunkt (RS-17) under the drawing tools
+    Group("Tools", 0, &[Col::Small(&[Sm::Btn(POINTER), Sm::Btn(CONNECTOR_TOOL), Sm::Btn(TEXT_TOOL)]), Col::Small(&[Sm::Split(DRAW_TOOLS, &DRAW_MENU), Sm::Btn(CONN_POINT_TOOL)])]),
     Group("Formenarten", FORMAT_PANE, &[Col::Small(&[Sm::Menu(FILL, &FILL_MENU), Sm::Menu(LINE_FORMAT, &LINE_MENU)])]),
     Group("Anordnen", 0, &[
         Col::BigMenu(ALIGN, &ALIGN_MENU),

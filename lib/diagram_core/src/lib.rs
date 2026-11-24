@@ -65,6 +65,9 @@
 //                                 after it make room (CN-08), a deleted shape's connectors go
 //                                 and the flow through it heals (CN-09), drops push shapes
 //                                 away (PlowCode)
+//   pointglue::*                  (JD21) control points that glue to connection points and
+//                                 follow them (SP-04), glue to vertices, handles, control points
+//                                 and guides (CN-02), the connection point tool (CN-01)
 //
 // Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 // opening a file (connectors, layout and containers move only when something moves), and a
@@ -93,6 +96,7 @@ mod names;
 pub mod ops;
 mod page;
 pub mod pagesetup;
+pub mod pointglue;
 pub mod render;
 pub mod route;
 pub mod shapeops;

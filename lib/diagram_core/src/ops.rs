@@ -14,6 +14,9 @@
 //   set_pin(tx, eng, shape, at)         the pin to another place, the shape stays
 //   controls / set_control              the yellow control points (SP-04)
 //   vertices / set_vertex / insert_vertex / delete_vertex     Geometry rows (SP-05)
+//   move_vertices / delete_vertices, arc_handles / set_arc_point / set_eccentricity   (JD21,
+//                                       SP-05) several vertices together, the handles of arcs
+//                                       (ops/arcs.rs)
 //   group(tx, eng, owner, shapes) / ungroup(tx, eng, group)   (SP-06)
 //   reorder(tx, shapes, Z::Front | Back | Forward | Backward) (SP-07)
 //   new_shape(tx, eng, owner, Basic::Rectangle | Ellipse | TextBox, a, b)   rectangle and
@@ -78,6 +81,7 @@ use crate::sheet::{CellAddr, Row, RowKey, SecKey, Section};
 use crate::strings::Sym;
 use crate::units::Unit;
 
+mod arcs;
 mod clip;
 mod draw;
 mod picture;
@@ -87,7 +91,8 @@ pub(crate) mod text;
 pub use clip::{copy, paste, Clip};
 pub use draw::{new_arc, new_freeform, quarter_arc, simplify, Arc, Spline};
 pub use picture::{new_picture, probe_picture, PictureFormat, PictureInfo};
-pub use points::{controls, delete_vertex, insert_vertex, set_control, set_vertex, vertices, Control, Vertex};
+pub use arcs::{arc_handles, set_arc_point, set_eccentricity, ArcHandle};
+pub use points::{controls, delete_vertex, delete_vertices, insert_vertex, move_vertices, set_control, set_vertex, vertices, Control, Vertex};
 
 #[cfg(test)]
 mod tests;
