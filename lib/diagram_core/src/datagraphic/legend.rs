@@ -243,6 +243,9 @@ fn entry(tx: &mut Transaction, eng: &mut Engine, page: PageRef, at: [f64; 2], e:
             if let Some(v) = value {
                 let a = named_cell(tx, ks, names::PROPERTY, "msvCalloutField", "Value")?;
                 tx.force_constant(ks, &a, Value::Num(*v), None)?;
+                // the bar alone, without its number
+                let sv = named_cell(tx, ks, names::PROPERTY, "msvCalloutPropShowValue", "Value")?;
+                tx.force_constant(ks, &sv, Value::Num(0.0), Some(Unit::Bool))?;
             }
             if let Some(n) = icon {
                 let a = user_addr(tx, "msvCalloutIconNumber");
@@ -314,6 +317,8 @@ pub fn insert(tx: &mut Transaction, eng: &mut Engine, page: PageRef, horizontal:
         let outer = ops::new_shape(tx, eng, owner, Basic::Rectangle, [0.0, 0.0], [1.0, 1.0])?;
         structure_cells(tx, outer, "List", Some(if horizontal { 0 } else { 2 }), MARGIN)?;
         set_user_bool(tx, SheetRef::Shape(outer), "JFD_DGLegend", true)?;
+        // the containers as wide as the widest
+        set_user_bool(tx, SheetRef::Shape(outer), "JFD_ListStretch", true)?;
         with_heading(tx, outer, &t.title)?;
         tx.set_layers(outer, &[layer])?;
         eng.recalc(tx, &[SheetRef::Shape(outer)])?;

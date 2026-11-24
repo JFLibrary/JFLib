@@ -1,0 +1,141 @@
+# Datengrafik-Element Datenleiste (JD19, DA-07): der Anteil des Werts von Prop.msvCalloutField
+# zwischen Prop.msvCalloutPropMin und Prop.msvCalloutPropMax (User.F, 0 bis 1) bestimmt die
+# Geometrie.  Farben aus dem Design (Normal); gefüllte Teile in der Linienfarbe (FillForegnd = LineColor),
+# kräftig vor dem Shape.  Verborgener Master: die App setzt ihn als Untershape an.
+# Sternbewertung: fünf Sterne nebeneinander, so viele gefüllt wie der gerundete Anteil mal fünf.
+master: DG Star rating
+name.de: Sternbewertung
+name.en: Star rating
+name.es: Valoración con estrellas
+name.it: Valutazione a stelle
+name.fr: Notation par étoiles
+prompt.de: Datengrafik: fünf Sterne, so viele gefüllt, wie der Wert zwischen Minimum und Maximum ausmacht.
+prompt.en: Data graphic: five stars, as many filled as the value makes up between the minimum and the maximum.
+prompt.es: Gráfico de datos: cinco estrellas, tantas rellenas como representa el valor entre el mínimo y el máximo.
+prompt.it: Grafico dati: cinque stelle, tante piene quante ne rappresenta il valore tra il minimo e il massimo.
+prompt.fr: Graphique de données : cinq étoiles, autant de pleines que la valeur entre le minimum et le maximum.
+hidden: true
+
+[Shape]
+Width = 25 mm
+Width.us = 1 in
+Height = 5 mm
+Height.us = 0.2 in
+FillForegnd = LineColor
+FillPattern = 1
+
+[User]
+msvCalloutType:  Value = "Data Bar"
+# der Anteil des Werts zwischen Minimum und Maximum, 0 bis 1
+F:  Value = IFERROR(BOUND((Prop.msvCalloutField-Prop.msvCalloutPropMin)/(Prop.msvCalloutPropMax-Prop.msvCalloutPropMin),0,FALSE,0,1),0)
+# gefüllte Sterne (0 bis 5) und der Radius eines Sterns
+N:  Value = ROUND(User.F*5,0)
+R:  Value = MIN(Width*0.1,Height*0.5)*0.95
+
+[Property]
+msvCalloutField:  Type = 2; Value = 50; Prompt = "Number"; SortKey = "Wert"
+        Label.de = Datenfeld
+        Label.en = Data field
+        Label.es = Campo de datos
+        Label.it = Campo dati
+        Label.fr = Champ de données
+msvCalloutPropMin:  Type = 2; Value = 0; Prompt = "Number"
+        Label.de = Minimalwert
+        Label.en = Minimum value
+        Label.es = Valor mínimo
+        Label.it = Valore minimo
+        Label.fr = Valeur minimale
+msvCalloutPropMax:  Type = 2; Value = 100; Prompt = "Number"
+        Label.de = Maximalwert
+        Label.en = Maximum value
+        Label.es = Valor máximo
+        Label.it = Valore massimo
+        Label.fr = Valeur maximale
+msvCalloutPropShowValue:  Type = 3; Value = FALSE; Prompt = "Bool"
+        Label.de = Wert anzeigen
+        Label.en = Show value
+        Label.es = Mostrar valor
+        Label.it = Mostra valore
+        Label.fr = Afficher la valeur
+msvCalloutPropValueFormat:  Type = 0; Value = ""; Prompt = "Format"
+        Label.de = Wertformat
+        Label.en = Value format
+        Label.es = Formato del valor
+        Label.it = Formato valore
+        Label.fr = Format de la valeur
+
+# Stern 1
+[Geometry]
+NoFill = User.N<1
+MoveTo  X = Width*0.1+User.R*0; Y = Height*0.5+User.R*1
+LineTo  X = Width*0.1+User.R*-0.2469; Y = Height*0.5+User.R*0.3398
+LineTo  X = Width*0.1+User.R*-0.9511; Y = Height*0.5+User.R*0.309
+LineTo  X = Width*0.1+User.R*-0.3994; Y = Height*0.5+User.R*-0.1298
+LineTo  X = Width*0.1+User.R*-0.5878; Y = Height*0.5+User.R*-0.809
+LineTo  X = Width*0.1+User.R*0; Y = Height*0.5+User.R*-0.42
+LineTo  X = Width*0.1+User.R*0.5878; Y = Height*0.5+User.R*-0.809
+LineTo  X = Width*0.1+User.R*0.3994; Y = Height*0.5+User.R*-0.1298
+LineTo  X = Width*0.1+User.R*0.9511; Y = Height*0.5+User.R*0.309
+LineTo  X = Width*0.1+User.R*0.2469; Y = Height*0.5+User.R*0.3398
+LineTo  X = Width*0.1+User.R*0; Y = Height*0.5+User.R*1
+
+# Stern 2
+[Geometry]
+NoFill = User.N<2
+MoveTo  X = Width*0.3+User.R*0; Y = Height*0.5+User.R*1
+LineTo  X = Width*0.3+User.R*-0.2469; Y = Height*0.5+User.R*0.3398
+LineTo  X = Width*0.3+User.R*-0.9511; Y = Height*0.5+User.R*0.309
+LineTo  X = Width*0.3+User.R*-0.3994; Y = Height*0.5+User.R*-0.1298
+LineTo  X = Width*0.3+User.R*-0.5878; Y = Height*0.5+User.R*-0.809
+LineTo  X = Width*0.3+User.R*0; Y = Height*0.5+User.R*-0.42
+LineTo  X = Width*0.3+User.R*0.5878; Y = Height*0.5+User.R*-0.809
+LineTo  X = Width*0.3+User.R*0.3994; Y = Height*0.5+User.R*-0.1298
+LineTo  X = Width*0.3+User.R*0.9511; Y = Height*0.5+User.R*0.309
+LineTo  X = Width*0.3+User.R*0.2469; Y = Height*0.5+User.R*0.3398
+LineTo  X = Width*0.3+User.R*0; Y = Height*0.5+User.R*1
+
+# Stern 3
+[Geometry]
+NoFill = User.N<3
+MoveTo  X = Width*0.5+User.R*0; Y = Height*0.5+User.R*1
+LineTo  X = Width*0.5+User.R*-0.2469; Y = Height*0.5+User.R*0.3398
+LineTo  X = Width*0.5+User.R*-0.9511; Y = Height*0.5+User.R*0.309
+LineTo  X = Width*0.5+User.R*-0.3994; Y = Height*0.5+User.R*-0.1298
+LineTo  X = Width*0.5+User.R*-0.5878; Y = Height*0.5+User.R*-0.809
+LineTo  X = Width*0.5+User.R*0; Y = Height*0.5+User.R*-0.42
+LineTo  X = Width*0.5+User.R*0.5878; Y = Height*0.5+User.R*-0.809
+LineTo  X = Width*0.5+User.R*0.3994; Y = Height*0.5+User.R*-0.1298
+LineTo  X = Width*0.5+User.R*0.9511; Y = Height*0.5+User.R*0.309
+LineTo  X = Width*0.5+User.R*0.2469; Y = Height*0.5+User.R*0.3398
+LineTo  X = Width*0.5+User.R*0; Y = Height*0.5+User.R*1
+
+# Stern 4
+[Geometry]
+NoFill = User.N<4
+MoveTo  X = Width*0.7+User.R*0; Y = Height*0.5+User.R*1
+LineTo  X = Width*0.7+User.R*-0.2469; Y = Height*0.5+User.R*0.3398
+LineTo  X = Width*0.7+User.R*-0.9511; Y = Height*0.5+User.R*0.309
+LineTo  X = Width*0.7+User.R*-0.3994; Y = Height*0.5+User.R*-0.1298
+LineTo  X = Width*0.7+User.R*-0.5878; Y = Height*0.5+User.R*-0.809
+LineTo  X = Width*0.7+User.R*0; Y = Height*0.5+User.R*-0.42
+LineTo  X = Width*0.7+User.R*0.5878; Y = Height*0.5+User.R*-0.809
+LineTo  X = Width*0.7+User.R*0.3994; Y = Height*0.5+User.R*-0.1298
+LineTo  X = Width*0.7+User.R*0.9511; Y = Height*0.5+User.R*0.309
+LineTo  X = Width*0.7+User.R*0.2469; Y = Height*0.5+User.R*0.3398
+LineTo  X = Width*0.7+User.R*0; Y = Height*0.5+User.R*1
+
+# Stern 5
+[Geometry]
+NoFill = User.N<5
+MoveTo  X = Width*0.9+User.R*0; Y = Height*0.5+User.R*1
+LineTo  X = Width*0.9+User.R*-0.2469; Y = Height*0.5+User.R*0.3398
+LineTo  X = Width*0.9+User.R*-0.9511; Y = Height*0.5+User.R*0.309
+LineTo  X = Width*0.9+User.R*-0.3994; Y = Height*0.5+User.R*-0.1298
+LineTo  X = Width*0.9+User.R*-0.5878; Y = Height*0.5+User.R*-0.809
+LineTo  X = Width*0.9+User.R*0; Y = Height*0.5+User.R*-0.42
+LineTo  X = Width*0.9+User.R*0.5878; Y = Height*0.5+User.R*-0.809
+LineTo  X = Width*0.9+User.R*0.3994; Y = Height*0.5+User.R*-0.1298
+LineTo  X = Width*0.9+User.R*0.9511; Y = Height*0.5+User.R*0.309
+LineTo  X = Width*0.9+User.R*0.2469; Y = Height*0.5+User.R*0.3398
+LineTo  X = Width*0.9+User.R*0; Y = Height*0.5+User.R*1
+

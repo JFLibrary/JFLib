@@ -61,6 +61,8 @@
 //   User.visDGOldColors keeps what the shape had (our own text: "cell=I" inherited, "cell=F:..."
 //   an own formula, "cell=V:..." an own constant, for FillForegnd, Char.Color, HideText and the
 //   kind "Kind=Shape") and puts it back when the graphic goes.
+// * The shape, now a group, shows its own geometry behind the callouts (DisplayMode = 1, kept
+//   and put back like the colours).
 // * An item's own position: User.JFD_DGPos = PNT(h,v) with visDGDefaultPos FALSE; a Visio item
 //   without it gets the position its pin in the group is nearest to.
 // * An item of a master written here is an instance of its callout master (Visio writes a copy
@@ -1233,7 +1235,7 @@ pub fn page_layer(tx: &mut Transaction, page: PageRef, name: &str) -> Result<u32
 
 // ---------------------------------------------------------------- old colours
 
-const OLD_CELLS: [&str; 3] = ["FillForegnd", "Char.Color", "HideText"];
+const OLD_CELLS: [&str; 4] = ["FillForegnd", "Char.Color", "HideText", "DisplayMode"];
 
 fn old_addr(tx: &mut Transaction, cell: &str) -> CellAddr {
     match cell {
@@ -1245,7 +1247,7 @@ fn old_addr(tx: &mut Transaction, cell: &str) -> CellAddr {
     }
 }
 
-// what the shape has in a cell: "I" inherited, "F:<formula>" an own formula, "V:<value>"
+// what the shape has in a cell (FillForegnd, Char.Color, HideText, DisplayMode): "I" inherited, "F:<formula>" an own formula, "V:<value>"
 fn old_state(tx: &mut Transaction, sheet: SheetRef, cell: &str) -> String {
     let addr = old_addr(tx, cell);
     let doc = tx.doc();
@@ -1398,6 +1400,9 @@ fn apply_one(tx: &mut Transaction, s: ShapeRef, page: PageRef, g: &DataGraphic, 
         let a = named_cell(tx, sheet, names::CONTROL, "msvDGPosition", cell)?;
         tx.force_constant(sheet, &a, Value::Num(v), if cell == "CanGlue" { Some(Unit::Bool) } else { None })?;
     }
+    // the callouts in front of the shape's own geometry (a group shows itself behind its members)
+    let dm = tx.single("DisplayMode");
+    tx.force_constant(sheet, &dm, Value::Num(1.0), None)?;
     if g.hide_text {
         let a = tx.single("HideText");
         tx.force_constant(sheet, &a, Value::Num(1.0), Some(Unit::Bool))?;
