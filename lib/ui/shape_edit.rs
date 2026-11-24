@@ -36,7 +36,11 @@
 //   SePoint { at, kind, tag, dir, flags }   SP_CONTROL (yellow), SP_CONN (connection points:
 //                       shown while connecting, with SeState::show_points those of every
 //                       visible shape, RA-06; SPF_OUTWARD: shown, no target), SP_VERTEX (shown
-//                       for a single selection when the app lists them: vertex editing)
+//                       for a single selection when the app lists them: vertex editing),
+//                       (JD21) SP_SEGMENT (a midpoint of a connector's piece, a small diamond:
+//                       dragged like a vertex, chosen by no click; dir = half the piece; shown
+//                       while the piece is at least SEG_MIN DIP long on the screen; the pointer
+//                       shows the move across it unless SPF_FREE)
 //   SeGuide { key, vertical, at }   guides (blue, dashed, across the canvas); moves snap to them
 //                       (SeState::snap and snap_guides; an app hides guides by leaving them out)
 //   SeMark { at, dir, tag, owner }  the app's insertion marks (Visio's blue triangle between two
@@ -185,11 +189,20 @@ pub const SEF_NOSNAP: u32 = 0x4_0000; // moves do not snap to it (the dynamic gr
 pub const SP_CONTROL: u8 = 0;
 pub const SP_CONN: u8 = 1;
 pub const SP_VERTEX: u8 = 2;
+/// (JD21) a midpoint of a piece of a connector's way (Visio's midpoint handle): `dir` is half
+/// the piece (world, from the handle to the piece's end); dragging it reports SeEv::Point like a
+/// vertex; hidden (and not hit) while the piece is shorter than SEG_MIN DIP on the screen
+pub const SP_SEGMENT: u8 = 3;
 /// point flags (SePoint::flags)
 pub const SPF_GLUE: u32 = 1; // a control point that glues to connection points (SP-04)
 /// a connection point that points outward only (Visio's Type 1): shown, but no end glues to it
 /// (SS-29)
 pub const SPF_OUTWARD: u32 = 2;
+/// (JD21) a midpoint that moves anywhere (a straight way: a new vertex); without it the
+/// pointer shows that the piece moves across
+pub const SPF_FREE: u32 = 4;
+// (JD21) the shortest piece on the screen whose midpoint shows
+const SEG_MIN: i32 = 24;
 
 /// a frame in world units: the point o + fx u + fy v for fx, fy in 0..1
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -1226,7 +1239,7 @@ impl Ui {
                 let mut best: Option<(f32, u32)> = None;
                 for k in range_of(&sh.points, m.points.len()) {
                     let q = &m.points[k];
-                    if q.kind == SP_CONN {
+                    if q.kind == SP_CONN || !self.seg_shown(q, s) {
                         continue;
                     }
                     let d = dist(p, q.at);
@@ -1540,6 +1553,11 @@ impl Ui {
                 _ => CUR_ARROW,
             },
             SHit::SelHandle(h) => st.multi_box(m).map_or(CUR_ARROW, |b| frame_cursor(&b, h)),
+            // (JD21) a connector's midpoint moves its piece across
+            SHit::Point(_, idx) if m.points.get(idx as usize).is_some_and(|q| q.kind == SP_SEGMENT && q.flags & SPF_FREE == 0) => {
+                let d = m.points[idx as usize].dir;
+                size_cursor([-d[1], d[0]])
+            }
             SHit::Rotate(_) | SHit::SelRotate | SHit::Pin(_) | SHit::End(..) | SHit::Point(..) => CUR_CROSS,
             SHit::Shape(_) if tool == SE_POINTER => CUR_MOVE,
             _ if tool != SE_POINTER => CUR_CROSS,
@@ -1615,9 +1633,10 @@ impl Ui {
                 st.vertex = Some((k, q.tag));
             }
         }
-        // Ctrl + click on a selected shape with vertices: a new vertex
+        // Ctrl + click on a selected shape with vertices (or, JD21, a connector's midpoints): a
+        // new vertex
         if let (SHit::Shape(k), true) = (hit, i.mods & MOD_CTRL != 0 && tool == SE_LINE) {
-            if st.shape(m, k).is_some_and(|s| range_of(&s.points, m.points.len()).any(|j| m.points[j].kind == SP_VERTEX)) {
+            if st.shape(m, k).is_some_and(|s| range_of(&s.points, m.points.len()).any(|j| matches!(m.points[j].kind, SP_VERTEX | SP_SEGMENT))) {
                 st.sel.insert(k);
                 out.push(SeEv::PointInsert { key: k, at: i.p });
                 return G::Hold;
@@ -2344,6 +2363,11 @@ impl Ui {
                         let (x, y) = (fl(p[0] + 0.5) - e, fl(p[1] + 0.5) - e);
                         self.cmd_rrect(x, y, e * 2, e * 2, 0, hair, if chosen { accent } else { bg }, accent, accent);
                     }
+                    // (JD21) a midpoint of a connector's piece: a small diamond
+                    SP_SEGMENT if self.seg_shown(q, vp.scale() as f32) => {
+                        let e = self.dp(4) as f32 + if st.hover == SHit::Point(sh.key, k as u32) { hairf } else { 0.0 };
+                        self.se_diamond(p, e, bg, accent, hairf);
+                    }
                     _ => {}
                 }
             }
@@ -2475,6 +2499,12 @@ impl Ui {
         self.cmd_custom(b[0], b[1], b[2], b[3], Some(Rc::new(Tri { pts, c })), 0, 0);
     }
 
+    // (JD21) whether a point shows at this scale: a connector's midpoint only on a piece at least
+    // SEG_MIN DIP long on the screen; every other kind always
+    fn seg_shown(&self, q: &SePoint, scale: f32) -> bool {
+        q.kind != SP_SEGMENT || 2.0 * len(q.dir) * scale >= self.dp(SEG_MIN) as f32
+    }
+
     // a diamond (a square turned by 45 degrees) of half-diagonal e px at p
     fn se_diamond(&mut self, p: [f32; 2], e: f32, fill: u32, stroke: u32, t: f32) {
         // filled with lines across, then the outline
@@ -2604,9 +2634,18 @@ impl Ui {
                 recs.push((String::from(crate::i18n::tr("Drehgriff")), rot_point(&sh.bx, self.dp(ROT_DIP) as f32 / s), 11));
             }
         }
-        let mut nc = 0;
+        let (mut nc, mut ns) = (0, 0);
         for k in range_of(&sh.points, m.points.len()) {
             let q = &m.points[k];
+            // (JD21) a connector's midpoints count on their own: "Mittelpunkt 1" is the first
+            // piece's (those hidden on the screen are left out, the count goes on)
+            if q.kind == SP_SEGMENT {
+                ns += 1;
+                if self.seg_shown(q, s) {
+                    recs.push((format!("{} {ns}", crate::i18n::tr("Mittelpunkt")), q.at, 16 + k as u32));
+                }
+                continue;
+            }
             let name = match q.kind {
                 SP_CONTROL => crate::i18n::tr("Steuerpunkt"),
                 SP_VERTEX => crate::i18n::tr("Scheitelpunkt"),

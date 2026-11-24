@@ -10,6 +10,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
+- (JD21) `ui.shape_edit`: `SP_SEGMENT`, the midpoint of a piece of a connector's way (Visio's midpoint handle): a small diamond, dragged like a vertex (`SeEv::Point`), hidden while the piece is shorter than 24 DIP on the screen, the pointer shows the move across the piece unless `SPF_FREE`; one `K_BUTTON` per shown midpoint ("Mittelpunkt n", counted per connector); Ctrl + click with the line tool also adds a vertex to a shape that lists midpoints; LIB_TEXTS "Mittelpunkt" (9 languages); nothing changes for apps that list none
 - (JD21) `ui.shape_edit`: the quick shapes bar at a hot connection arrow (Visio's mini toolbar of the AutoConnect arrows): `SeState::quick` (`SeQuick`: name, preview, version; the first four show), the arrow stays hot while the pointer is on the bar, `SeEv::QuickHover` (the tile under the pointer, for a live preview), `SeEv::Quick` (a click), `SeState::quick_hover()`; one `K_BUTTON` per tile ("Schnell-Shape: <name>"); nothing changes for apps that list no quick shapes
 
 - (JD8 rest) `ui.shape_edit`: the freeform tool `SE_FREEFORM` (the pointer's way, reported as
