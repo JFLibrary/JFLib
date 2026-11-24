@@ -2,7 +2,8 @@
 //
 //   connection_points(doc, shape) -> Vec<ConnPoint>   the Connection rows on the page: point,
 //                                    direction (into the shape, as DirX/DirY mean it), Type
-//   glued(doc, shape) -> [Target; 2]  what Begin and End are glued to (the Connect entries)
+//   glued(doc, shape) -> [Target; 2]  what Begin and End are glued to (the Connect entries; glue
+//                                    to a guide reads as None: pointglue.rs)
 //   ends(doc, shape)                 Begin and End on the page
 //   is_one_d / is_connector          a 1-D shape / one that routes (ObjType routable)
 //   style(doc, shape) -> Style       right angle, straight or curved (its cells, else the page's)
@@ -236,6 +237,8 @@ pub fn ends(doc: &Document, shape: ShapeRef) -> Option<([f64; 2], [f64; 2])> {
 fn target_of(doc: &Document, c: &Connect, to: ShapeRef) -> Target {
     match c.to_part {
         Some(3) => return Target::Shape(to),
+        // (JD21 glue) a guide (visGuideX, visGuideY, visGuideIntersect): pointglue.rs
+        Some(1 | 2 | 4) => return Target::None,
         Some(p) if (100..100 + 65536).contains(&p) => return Target::Point { shape: to, row: (p - 100) as u32 },
         _ => {}
     }

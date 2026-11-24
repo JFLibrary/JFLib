@@ -119,6 +119,9 @@ Row_1:  X = 5 mm; Y = Height
         ...
 ```
 
+`Tip` ist der Name aus Visios ShapeSheet-Fenster; in die Datei kommt die Zelle als `Prompt` (so steht
+sie in Visios Dateien, und dort lesen Visio und JFDiagrammer die QuickInfo des Steuerpunkts, JD21).
+
 ### Formeln
 
 - Formeln sind Visios universelle Schreibweise (wie im `F`-Attribut), z. B. `Width*0.5`,

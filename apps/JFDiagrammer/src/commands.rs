@@ -437,6 +437,12 @@ commands! {
     OPEN_GROUP = 0x1C83, "Gruppe öffnen", 0, 0;
     CLOSE_GROUP = 0x1C84, "Gruppe schließen", 0, 0;
     GROUP_BEHAVIOR = 0x1C85, "Verhalten...", 0, 0;
+    // (JD21 glue) Start › Tools › Verbindungspunkt (RS-17, CN-01) and the kinds of a chosen
+    // connection point (its context menu)
+    CONN_POINT_TOOL = 0x1CC0, "Verbindungspunkt|Tool", JD_CONNECTION_POINT, JD_CONNECTION_POINT_L;
+    CPOINT_INWARD = 0x1CC1, "Nach innen", 0, 0;
+    CPOINT_OUTWARD = 0x1CC2, "Nach außen", 0, 0;
+    CPOINT_BOTH = 0x1CC3, "Nach innen und außen", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -727,6 +733,11 @@ static HANDLERS: &[(u32, Handler)] = &[
     (OPEN_GROUP, crate::groups_cmds::open),
     (CLOSE_GROUP, crate::groups_cmds::close),
     (GROUP_BEHAVIOR, crate::groups_cmds::behavior),
+    // (JD21 glue) the connection point tool and its points' kinds (glue_tools.rs)
+    (CONN_POINT_TOOL, |a, _| crate::glue_tools::tool(a)),
+    (CPOINT_INWARD, |a, ui| crate::glue_tools::set_kind(a, ui, CPOINT_INWARD)),
+    (CPOINT_OUTWARD, |a, ui| crate::glue_tools::set_kind(a, ui, CPOINT_OUTWARD)),
+    (CPOINT_BOTH, |a, ui| crate::glue_tools::set_kind(a, ui, CPOINT_BOTH)),
 ];
 
 // toggles: whether the command is on
@@ -808,6 +819,11 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (DIM_HORIZONTAL, |a| a.tool == DIM_HORIZONTAL),
     (DIM_VERTICAL, |a| a.tool == DIM_VERTICAL),
     (DIM_ALIGNED, |a| a.tool == DIM_ALIGNED),
+    // (JD21 glue) the connection point tool, the chosen point's kind
+    (CONN_POINT_TOOL, |a| a.tool == CONN_POINT_TOOL),
+    (CPOINT_INWARD, |a| crate::glue_tools::kind_checked(a, CPOINT_INWARD)),
+    (CPOINT_OUTWARD, |a| crate::glue_tools::kind_checked(a, CPOINT_OUTWARD)),
+    (CPOINT_BOTH, |a| crate::glue_tools::kind_checked(a, CPOINT_BOTH)),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -845,6 +861,8 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
         && crate::addons::available(app, id)
         // (JD21 groups) Shape ändern, the group commands
         && crate::groups_cmds::available(app, id)
+        // (JD21 glue) a connection point's kind
+        && crate::glue_tools::available(app, id)
 }
 
 /// the toggle is on

@@ -109,7 +109,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/autoconn.rs](#diagram_coresrcautoconnrs) · [src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/groups.rs](#diagram_coresrcgroupsrs) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/instance/detach.rs](#diagram_coresrcinstancedetachrs) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/jumps.rs](#diagram_coresrcrenderjumpsrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/replace.rs](#diagram_coresrcreplacers) · [src/route.rs](#diagram_coresrcrouters) · [src/route_edit.rs](#diagram_coresrcroute_editrs) · [src/route_styles.rs](#diagram_coresrcroute_stylesrs) · [src/shapeops.rs](#diagram_coresrcshapeopsrs) · [src/shapeops/frame.rs](#diagram_coresrcshapeopsframers) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/edge.rs](#diagram_coresrcstructureedgers) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/tools.rs](#diagram_coresrctoolsrs) · [src/tools/array.rs](#diagram_coresrctoolsarrayrs) · [src/tools/dimension.rs](#diagram_coresrctoolsdimensionrs) · [src/tools/number.rs](#diagram_coresrctoolsnumberrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/autoconn.rs](#diagram_coresrcautoconnrs) · [src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/groups.rs](#diagram_coresrcgroupsrs) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/instance/detach.rs](#diagram_coresrcinstancedetachrs) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/arcs.rs](#diagram_coresrcopsarcsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/pointglue.rs](#diagram_coresrcpointgluers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/jumps.rs](#diagram_coresrcrenderjumpsrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/replace.rs](#diagram_coresrcreplacers) · [src/route.rs](#diagram_coresrcrouters) · [src/route_edit.rs](#diagram_coresrcroute_editrs) · [src/route_styles.rs](#diagram_coresrcroute_stylesrs) · [src/shapeops.rs](#diagram_coresrcshapeopsrs) · [src/shapeops/frame.rs](#diagram_coresrcshapeopsframers) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/edge.rs](#diagram_coresrcstructureedgers) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/tools.rs](#diagram_coresrctoolsrs) · [src/tools/array.rs](#diagram_coresrctoolsarrayrs) · [src/tools/dimension.rs](#diagram_coresrctoolsdimensionrs) · [src/tools/number.rs](#diagram_coresrctoolsnumberrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/data.rs](#diagram_iosrcdatars) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/textdraw.rs](#diagram_iosrctextdrawrs) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vss/mod.rs](#diagram_iosrcvssmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -7833,7 +7833,7 @@ shapes to SeShape frames (diagram_core for JFDiagrammer).
                                   click and drag them, screen readers name them (a screen
                                   reader's click on an arrow or a mark reports it as a click)
   tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT, SE_PLACE, SE_FREEFORM,
-        SE_ARC
+        SE_ARC, SE_CPOINT (JD21, the connection point tool)
   SeState::quick: Vec<SeQuick>    (JD21) the quick shapes the bar at a hot connection arrow
                                   offers (see below)
 
@@ -7846,11 +7846,14 @@ Model (SeModel, borrowed per call; world units are the canvas's, y down):
   SePoint { at, kind, tag, dir, flags }   SP_CONTROL (yellow), SP_CONN (connection points:
                       shown while connecting, with SeState::show_points those of every
                       visible shape, RA-06; SPF_OUTWARD: shown, no target), SP_VERTEX (shown
-                      for a single selection when the app lists them: vertex editing),
+                      for a single selection when the app lists them: vertex editing);
                       (JD21) SP_SEGMENT (a midpoint of a connector's piece, a small diamond:
                       dragged like a vertex, chosen by no click; dir = half the piece; shown
                       while the piece is at least SEG_MIN DIP long on the screen; the pointer
-                      shows the move across it unless SPF_FREE)
+                      shows the move across it unless SPF_FREE), SP_TARGET (another glue target the app offers: a vertex, a handle,
+                      a control point; shown only as the target under a dragged end), SP_ARC
+                      (an arc's control point, a circle), SP_ECC (an eccentricity handle, a
+                      circle; pairs on a dashed line)
   SeGuide { key, vertical, at }   guides (blue, dashed, across the canvas); moves snap to them
                       (SeState::snap and snap_guides; an app hides guides by leaving them out)
   SeMark { at, dir, tag, owner }  the app's insertion marks (Visio's blue triangle between two
@@ -7891,6 +7894,22 @@ glue); over a shape a dynamic connector's end glues to the whole shape (dynamic 
 shape's frame is highlighted); with Ctrl held a dynamic end swaps the two (CN-03): over a
 connection point it glues to that point's shape as a whole, over a shape to the shape's
 nearest connection point.  Connection points with SPF_OUTWARD are no target for ends (SS-29).
+(JD21, CN-02) Without a connection point in reach an SP_TARGET point of the app is the next
+target (ends, control points, the connector and line tools; not the freeform and the arc
+tool), then (ends and the connector and line tools, SeState::glue_guides) a guide within
+reach: SeGlue::Guide, the end on its line, the guide drawn green.
+
+(JD21, SP-05) Vertex editing: a click chooses a vertex (filled), Shift + click adds one to the
+chosen ones or takes it away (SeState::chosen); a drag on one of several chosen moves them
+together (SeEv::Points, live), Del takes them out (SeEv::PointsDelete; one: PointDelete).  An
+arc's control point (SP_ARC) is chosen alike (the app may list its eccentricity handles then);
+the freeform tool takes back what the pointer goes back over (2 px back along the last piece,
+within 3 px of it).  (JD21, CN-01) The connection point tool (SE_CPOINT): the selection's
+connection points show and are its only handles; a click chooses one (magenta), a drag moves
+it (SeEv::Point), Del takes it out (SeEv::PointDelete), Ctrl + click on, inside or outside the
+single selected shape adds one there (SeEv::PointInsert); a right click on one reports
+SeEv::Context with it chosen (the app's menu of its kind).  Another tool forgets the chosen
+point.
 Ctrl + Shift + click zooms in at the pointer (on a selected shape too), + drag zooms to the
 rectangle (from a selected shape: the copy above), + right click zooms out (ZF-22), + right
 drag pans the view (KB-04).  Keys while the canvas has the focus: Esc
@@ -7962,6 +7981,10 @@ SE_FREEFORM: u32 = 7
 /// draw a quarter ellipse from the press to the release, reported as SeEv::Arc (its ends glue
 /// like a line's)
 SE_ARC: u32 = 8
+/// (JD21) the connection point tool: the connection points of the single selection are
+/// handles (a drag moves one, SeEv::Point; a click chooses it, Del takes it out,
+/// SeEv::PointDelete), Ctrl + click on the selected shape adds one (SeEv::PointInsert)
+SE_CPOINT: u32 = 9
 /// shape flags (SeShape::flags)
 SEF_1D: u32 = 1  // the two ends instead of the eight handles
 SEF_GROUP: u32 = 2  // a group: a second click selects the child under the pointer
@@ -7989,10 +8012,20 @@ SEF_UP: u32 = 0x8_0000
 SP_CONTROL: u8 = 0
 SP_CONN: u8 = 1
 SP_VERTEX: u8 = 2
+/// (JD21) another place an end or a control point glues to (a vertex, a handle or a control
+/// point of a shape: the app makes a connection point there, CN-02): not drawn, never a handle;
+/// the target under a dragged end shows like a connection point
+SP_TARGET: u8 = 3
+/// (JD21) the control point of an arc in vertex editing (a small circle; a drag reports
+/// SeEv::Point, a click chooses it like a vertex)
+SP_ARC: u8 = 4
+/// (JD21) an eccentricity handle of an elliptical arc (a small circle on a dashed line through
+/// the arc's control point; a drag reports SeEv::Point)
+SP_ECC: u8 = 5
 /// (JD21) a midpoint of a piece of a connector's way (Visio's midpoint handle): `dir` is half
 /// the piece (world, from the handle to the piece's end); dragging it reports SeEv::Point like a
 /// vertex; hidden (and not hit) while the piece is shorter than SEG_MIN DIP on the screen
-SP_SEGMENT: u8 = 3
+SP_SEGMENT: u8 = 6
 /// point flags (SePoint::flags)
 SPF_GLUE: u32 = 1  // a control point that glues to connection points (SP-04)
 /// a connection point that points outward only (Visio's Type 1): shown, but no end glues to it
@@ -8077,6 +8110,7 @@ SPF_FREE: u32 = 4
   - `None`
   - `Point { key: u64, tag: u32 }` -- a connection point (its tag) of a shape: static glue
   - `Shape(u64)` -- a whole shape: dynamic glue
+  - `Guide(u64)` -- (JD21) a guide (its key): the end lies on its line (SeState::glue_guides)
 
 - **`enum SeEv`**
   what the user did (ui.shape_edit's result, in order)
@@ -8088,9 +8122,15 @@ SPF_FREE: u32 = 4
   - `Rotate { keys: Vec<u64>, centre: [f32; 2], angle: f32, done: bool }` -- turn `keys` about `centre` by `angle` radians (counter-clockwise as seen)
   - `Pin { key: u64, at: [f32; 2], done: bool }` -- the rotation pin of a shape goes to `at`
   - `End { key: u64, end: u8, at: [f32; 2], glue: SeGlue, done: bool }` -- end 0 (begin) or 1 of a 1D shape goes to `at`, glued to `glue`
-  - `Point { key: u64, idx: u32, tag: u32, at: [f32; 2], glue: SeGlue, done: bool }` -- a control point or a vertex (index `idx` of SeModel::points, the app's tag) goes to `at`
-  - `PointInsert { key: u64, at: [f32; 2] }` -- Ctrl + click on the outline of a shape with vertices listed: add a vertex at `at`
-  - `PointDelete { key: u64, tag: u32 }` -- Del with a vertex chosen: remove it
+  - `Point { key: u64, idx: u32, tag: u32, at: [f32; 2], glue: SeGlue, done: bool }` -- a control point or a vertex (index `idx` of SeModel::points, the app's tag) goes to `at`;
+    (JD21) also an arc's control point, an eccentricity handle, a connection point
+    (SE_CPOINT)
+  - `PointInsert { key: u64, at: [f32; 2] }` -- Ctrl + click on the outline of a shape with vertices listed: add a vertex at `at`;
+    (JD21) with SE_CPOINT on the selected shape: add a connection point there
+  - `PointDelete { key: u64, tag: u32 }` -- Del with a vertex chosen: remove it; (JD21) with SE_CPOINT the chosen connection point
+  - `Points { key: u64, tags: Vec<u32>, total: [f32; 2], done: bool }` -- (JD21) the vertices chosen with Shift (their tags, SeState::chosen) move together by
+    `total` (world units, from the start of the drag; live like Point)
+  - `PointsDelete { key: u64, tags: Vec<u32> }` -- (JD21) Del with several vertices chosen: remove them
   - `Cancel` -- Esc during a live gesture: take the preview back
   - `Connect { tool: u32, a: [f32; 2], ga: SeGlue, b: [f32; 2], gb: SeGlue }` -- the connector or line tool drew from a to b
   - `Draw { tool: u32, a: [f32; 2], b: [f32; 2] }` -- a drawing tool drew the box from a to b (a == b: a click)
@@ -8127,7 +8167,11 @@ SPF_FREE: u32 = 4
   - `snap: bool` -- moves snap to guides and to the dynamic grid at all (off: a page that inhibits snapping,
     SS-39; the grid is DiagramState::snap)
   - `snap_guides: bool` -- moves snap to guides (Ausrichten und Kleben › Führungslinien)
-  - `vertex: Option<(u64, u32)>` -- the vertex chosen with a click (Del removes it): its shape and tag
+  - `vertex: Option<(u64, u32)>` -- the vertex chosen with a click (Del removes it): its shape and tag; (JD21) also an arc's
+    control point, and with SE_CPOINT the chosen connection point
+  - `chosen: BTreeSet<u32>` -- (JD21) the tags of every vertex chosen of that shape (Shift + click adds and takes away;
+    the one in `vertex` among them): a drag moves them together, Del takes them out
+  - `glue_guides: bool` -- (JD21) ends glue to guides (Ausrichten und Kleben › Kleben an Führungslinien)
   - `arrows: bool` -- connection arrows around the shape under the pointer (Ansicht › Verbindungspfeile; see
     the file header)
   - `quick: Vec<SeQuick>` -- (JD21) the quick shapes the bar at a hot connection arrow offers (the first QUICK_MAX;
@@ -57558,6 +57602,9 @@ a file loses nothing, and the behaviour Visio files carry works without translat
                                 CN-05, SS-40), shapes connectors may cross (SS-19)
   route_edit::*                 (JD21) a connector's way by hand: midpoints and vertices
                                 moved, added, removed, the way kept when its shapes move (CN-04)
+  pointglue::*                  (JD21) control points that glue to connection points and
+                                follow them (SP-04), glue to vertices, handles, control points
+                                and guides (CN-02), the connection point tool (CN-01)
 
 Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 opening a file (connectors, layout and containers move only when something moves), and a
@@ -58516,8 +58563,9 @@ Einrasten": equipment into racks, later doors into walls, valves into pipes)
                                    shapes and what they carry; connectors follow in the app)
   reach(doc, owner, paper)         a distance on paper in the page's drawing units
 
-Visio's point-to-point glue of 2-D shapes: a connection point of Type 1 ("outward") on the
-shape that moves meets one of Type 0 or 2 ("inward", "both") on another shape.  The nearest
+Visio's point-to-point glue of 2-D shapes: a connection point of Type 1 ("outward") or 2
+("both", JD21) on the shape that moves meets one of Type 0 or 2 ("inward", "both") on another
+shape.  The nearest
 pair within `reach` (page units) wins.  A container that would take the shape (its
 categories, structure::accepts) and holds the middle of the shape's box is reached from
 anywhere inside it: a server dropped anywhere over a rack goes onto the nearest unit of its
@@ -60157,7 +60205,8 @@ glue -- connection points, glue and the dynamic connector (CN-01..05, CN-12, CN-
 
   connection_points(doc, shape) -> Vec<ConnPoint>   the Connection rows on the page: point,
                                    direction (into the shape, as DirX/DirY mean it), Type
-  glued(doc, shape) -> [Target; 2]  what Begin and End are glued to (the Connect entries)
+  glued(doc, shape) -> [Target; 2]  what Begin and End are glued to (the Connect entries; glue
+                                   to a guide reads as None: pointglue.rs)
   ends(doc, shape)                 Begin and End on the page
   is_one_d / is_connector          a 1-D shape / one that routes (ObjType routable)
   style(doc, shape) -> Style       right angle, straight or curved (its cells, else the page's)
@@ -61138,6 +61187,9 @@ groups, z-order, new shapes, text, copy and paste (JD7: SP-03..07, TX-01, TX-03,
   set_pin(tx, eng, shape, at)         the pin to another place, the shape stays
   controls / set_control              the yellow control points (SP-04)
   vertices / set_vertex / insert_vertex / delete_vertex     Geometry rows (SP-05)
+  move_vertices / delete_vertices, arc_handles / set_arc_point / set_eccentricity   (JD21,
+                                      SP-05) several vertices together, the handles of arcs
+                                      (ops/arcs.rs)
   group(tx, eng, owner, shapes) / ungroup(tx, eng, group)   (SP-06; JD21: glue between a
                                       guide and shapes breaks unless both are grouped, SP-17;
                                       an instance is made plain first: instance::detach)
@@ -61346,6 +61398,55 @@ vertical flip toggles FlipY and makes it 2φ - a.
   move and size a shape's text block (TX-03; `to` from Frame::drag of text_frame, same
   turn): TxtWidth and TxtHeight, then TxtPinX/Y where the frame puts the text's local pin
   (proportional formulas keep their form); LockTextEdit refuses (Invalid)
+
+### `diagram_core/src/ops/arcs.rs`
+
+Source: [`lib/diagram_core/src/ops/arcs.rs`](../lib/diagram_core/src/ops/arcs.rs)
+
+```text
+ops::arcs -- (JD21, SP-05) the handles of arcs in vertex editing: an arc's control point and
+the eccentricity handles of an elliptical arc
+
+  arc_handles(doc, shape) -> Vec<ArcHandle>    per ArcTo, EllipticalArcTo and
+                                               RelEllipticalArcTo row of the shown sections:
+                                               the control point on the page and (absolute
+                                               EllipticalArcTo) the two eccentricity handles
+  set_arc_point(tx, eng, shape, section, row, at)     the control point dragged to `at`
+  set_eccentricity(tx, eng, shape, section, row, at)  an eccentricity handle dragged to `at`
+
+Visio's vertex editing (pencil tool) shows a control point in the middle of an arc segment;
+dragging it bends the arc.  An ArcTo keeps its bow A (the distance of the arc's middle from
+the middle of its chord, positive right of the chord: geometry.rs), the control point is the
+arc's middle; an EllipticalArcTo goes through its control point A, B, which is where the
+handle shows (relative rows: fractions of Width and Height).  A clicked control point of an
+elliptical arc shows two eccentricity handles on a line through it (Visio: "drag the
+eccentricity handles to change the angle and the eccentricity"): the line runs along the
+major axis (C, its angle) and each handle lies D x L from the control point, L a quarter of the
+chord (assumed: Visio's own spacing is not documented).  Dragging one sets C to the
+direction and D to the distance over L (D between 0.01 and 100).  The written cells keep the
+form of their formulas where they are proportional (ops::keep_form); the box follows the
+geometry afterwards (shapeops::fit_frame), as after every vertex edit.
+```
+
+- **`struct ArcHandle`**
+  the handles of one arc row
+  - `section: u32` -- the Geometry section's index (Geometry1 is 0)
+  - `row: u32` -- the row's IX
+  - `at: [f64; 2]` -- the control point on the page (an ArcTo: the arc's middle; an EllipticalArcTo: A, B)
+  - `ecc: Option<[[f64; 2]; 2]>` -- the two eccentricity handles on the page (an absolute EllipticalArcTo only)
+
+- **`fn arc_handles(doc: &Document, shape: ShapeRef) -> Vec<ArcHandle>`**
+  the arc handles of a shape, section by section (hidden sections left out)
+
+- **`fn set_arc_point(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, section: u32, row: u32, at: [f64; 2]) -> Result<(), EditError>`**
+  drag the control point of arc row `row` to the page point `at`: an ArcTo gets the bow that
+  puts its middle at the point's projection onto the chord's normal, an elliptical arc A and B
+  there.  NoRow: not an arc row; Invalid: LockVtxEdit
+
+- **`fn set_eccentricity(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, section: u32, row: u32, at: [f64; 2]) -> Result<(), EditError>`**
+  drag an eccentricity handle of the elliptical arc row `row` to the page point `at`: the
+  major axis (C) turns towards it, the ratio (D) is its distance from the control point over
+  the handles' unit (see the module comment).  NoRow: not an absolute EllipticalArcTo
 
 ### `diagram_core/src/ops/clip.rs`
 
@@ -61562,6 +61663,8 @@ ops::points -- control points (SP-04) and vertices (SP-05) of a shape
   set_control(tx, eng, shape, row, at)         a control point dragged to a page point
   vertices(doc, shape) -> Vec<Vertex>          the points of the Geometry rows on the page
   set_vertex / insert_vertex / delete_vertex   move one, add one after a row, take one out
+  move_vertices / delete_vertices              (JD21, SP-05) several of one shape together
+                                               (Visio: chosen with Shift)
 
 A control point is a row of the Controls section: X and Y in local coordinates, XDyn/YDyn
 the point its rubber band starts from, XCon/YCon how it behaves ([MS-VSDX] Controls; the
@@ -61627,6 +61730,15 @@ Visio does after a vertex edit.
 - **`fn delete_vertex(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, section: u32, row: u32) -> Result<(), EditError>`**
   take a vertex out; at the start of a sub-path the next vertex becomes the start (and the
   closing row of a closed one goes there); a sub-path keeps at least two vertices (Invalid)
+
+- **`fn move_vertices(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, list: &[(u32, u32)], d: [f64; 2]) -> Result<(), EditError>`**
+  (JD21, SP-05) move several vertices of a shape (section, row) together by `d` (page): each
+  as set_vertex moves it (the start of a closed sub-path takes its closing row along), the box
+  follows once at the end; vertices that are not there are left out
+
+- **`fn delete_vertices(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, list: &[(u32, u32)]) -> Result<(), EditError>`**
+  (JD21, SP-05) take several vertices of a shape out, the last rows first so the others keep
+  their numbers; a vertex its sub-path cannot spare (two left) stays
 
 ### `diagram_core/src/page.rs`
 
@@ -61846,6 +61958,138 @@ happens on opening a file (PLAN.md, "Fallen"): only the app's gesture asks.
   \_WALKGLUE has no value of the engine's, so the stored point moves by `d` too (the formula
   stays); static glue follows its formula by itself.  Before, a page that grew to the left or
   down left such connectors behind
+
+### `diagram_core/src/pointglue.rs`
+
+Source: [`lib/diagram_core/src/pointglue.rs`](../lib/diagram_core/src/pointglue.rs)
+
+```text
+pointglue -- (JD21) glue beyond the ends of 1-D shapes: control points that glue (SP-04,
+SS-30), glue to vertices, handles, control points and guides (CN-02), the connection point
+tool (CN-01, RS-17)
+
+  glue_control(tx, eng, shape, row, at, to)    a control point dragged to `at` and glued to a
+                                               connection point (Target::Point) or let go
+                                               (Target::None)
+  glued_controls(doc, shape) -> [(row, Target)]  what its control points are glued to
+  followers(doc, owner, &moved)                 shapes whose control points are glued to these
+                                                shapes: they changed with them (their own glued
+                                                connectors follow in the app)
+  Anchor / anchor_point(tx, eng, target, anchor)  the connection point at a vertex, a handle
+                                                or a control point of `target` (made when it
+                                                has none there yet) -> its IX; glue::glue or
+                                                glue_control glue to it
+  anchor_at(doc, target, anchor)                where that place is on the page
+  glue_guide(tx, eng, shape, end, at, guide)    an end of a 1-D shape on a guide
+  is_glue_guide(doc, g) / guide_of(doc, shape)  a guide ends glue to; the guides its ends are on
+  add_point / move_point / delete_point / set_point_kind / point_kind / point_at   the
+                                                connection point tool: a Connection row added,
+                                                moved, taken out, its Type (0 inward, 1
+                                                outward, 2 both)
+
+The file's record, as Visio writes it (the local files: Ethernet taps glued to computers;
+learn.microsoft.com VisFromParts, VisToParts, Cell.GlueTo; Visio 2002 Developer Reference
+"Creating a Connected Drawing from a Program"):
+* a control point (Controls row k, 0-based position in its section) glued to connection point
+  n of shape N: X and Y = LOC(PNT(Sheet.N!Connections.Xn,Sheet.N!Connections.Yn)) (LOC: a
+  control point's X and Y are local), Connect FromCell=Controls.<row name> FromPart=100+k
+  ToCell=Connections.Xn ToPart=100+n-1.  No trigger cell: the formula follows the target.
+  Control points glue statically only (Visio: "control-handle connectors ... can only glue to
+  a specific point"), to inward points and points of both kinds (Type 0 and 2), not to
+  outward ones.
+* Glue to a vertex, a selection handle or (assumed: Visio's GlueTo lists them for neither
+  ends nor control points) a control point of another shape: Visio adds a connection point
+  there and glues to it ("A connection point is created that is glued to ... new formulas in
+  both the X and Y cells of the connection row").  The row's X and Y here: Geometry<s>.X<r> and
+  .Y<r> of the vertex (relative rows: times Width and Height), Width*fx and Height*fy of the
+  handle, Controls.<row> and Controls.<row>.Y of the control point (assumed); DirX, DirY 0,
+  Type 0.  A row with these formulas that is there already is used again.
+* An end on a guide (assumed, the Visio-Gegenprobe checks it): a horizontal guide gives the
+  end's Y the formula Sheet.G!PinY (vertical: X = Sheet.G!PinX), the other coordinate stays a
+  value; Connect FromCell=BeginX (EndX) FromPart=9 (12) ToSheet=G ToCell=Angle ToPart=2
+  (visGuideY; a vertical guide 1, visGuideX).  GlueTo's text names two connections "to the
+  guide's Angle cell"; one entry per end is written here (glue::glue replaces it like any).
+  Only top-level 1-D shapes and guides that run across or up the page.
+
+The connection point tool (Visio's: Ctrl+click on a selected shape adds a point, a drag moves
+it, Del takes it out; the point's menu sets its kind): a new row's X and Y are Width*k and
+Height*k (proportional, as Visio writes them), DirX and DirY 0, Type 0; a moved point keeps
+the form of its formulas (ops: proportional stays proportional).  Taking a point out lets go
+of what is glued to it (its cells keep their values) and renumbers the rows after it; what is
+glued to them is glued again to the same point under its new number.
+
+Which kinds glue (Visio's Type cell: 0 inward, 1 outward, 2 inward & outward): ends and
+control points glue to points of kind 0 and 2; a 2-D shape's points of kind 1 and 2 dock on
+points of kind 0 and 2 of another shape (dock.rs).  The edit layer leaves kind 1 out as a
+target (SPF_OUTWARD).
+```
+
+- **`enum Anchor`**
+  a place on a shape that gets a connection point when something glues there (CN-02)
+  - `Vertex { section: u32, row: u32 }` -- a vertex: the Geometry section's index (Geometry1 is 0) and the row's IX
+  - `Handle { fx: f64, fy: f64 }` -- a selection handle: fractions of Width and Height (0, 0.5, 1)
+  - `Control(RowKey)` -- a control point (its row of the Controls section)
+
+- **`fn glue_control(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, row: RowKey, at: [f64; 2], to: Target) -> Result<(), EditError>`**
+  drag a control point (its row) to the page point `at` and glue it to `to`: a connection
+  point of kind 0 or 2 of another shape on the same page (static glue, LOC(PNT(..)) formulas
+  and a Connect entry), or nothing (the point placed as ops::set_control places it).  Invalid:
+  a whole shape, a shape inside this one or around it, an outward point; NoRow: no such
+  connection point.  A point that was glued is let go first.  A GUARD on X or Y keeps the
+  point where it is unglued
+
+- **`fn glued_controls(doc: &Document, shape: ShapeRef) -> Vec<(RowKey, Target)>`**
+  the control points of a shape that are glued, with their targets (Connect entries from
+  Controls.&lt;row> to a connection point)
+
+- **`fn followers(doc: &Document, owner: Owner, moved: &[ShapeRef]) -> Vec<ShapeRef>`**
+  the shapes (not among `moved` nor inside them) whose control points are glued to these
+  shapes or to shapes inside them, and those glued to those in turn: their control points
+  moved with the targets (the formulas did it), so their own connectors have to follow
+
+- **`fn anchor_at(doc: &Document, target: ShapeRef, anchor: Anchor) -> Option<[f64; 2]>`**
+  where an anchor of a shape is on the page (None: no such vertex or control point)
+
+- **`fn anchor_point(tx: &mut Transaction, eng: &mut Engine, target: ShapeRef, anchor: Anchor) -> Result<u32, EditError>`**
+  the connection point of `target` at an anchor: an indexed Connection row whose X and Y have
+  the anchor's formulas, else a new one (DirX, DirY, Type 0) -> its IX.  Invalid: a section of
+  named rows, a row without a point (Ellipse, InfiniteLine)
+
+- **`fn is_glue_guide(doc: &Document, g: ShapeRef) -> bool`**
+  whether `g` is a guide an end can glue to (top-level, across or up the page)
+
+- **`fn glue_guide(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, end: End, at: [f64; 2], guide: ShapeRef) -> Result<(), EditError>`**
+  put an end of a 1-D shape on a guide: `at` goes onto the guide's line, the coordinate the
+  guide fixes gets its formula (see the file header), a Connect entry records it; a dynamic
+  connector routes again.  Invalid: not a top-level 1-D shape, not such a guide, another page
+
+- **`fn guide_of(doc: &Document, shape: ShapeRef) -> [Option<ShapeRef>; 2]`**
+  the guides the begin and the end of a 1-D shape are glued to (Connect entries from BeginX or
+  EndX to a guide)
+
+- **`fn point_kind(doc: &Document, shape: ShapeRef, row: u32) -> Option<u8>`**
+  the kind (Type) of connection point `row` of a shape: 0 inward, 1 outward, 2 both
+
+- **`fn point_at(doc: &Document, shape: ShapeRef, row: u32) -> Option<[f64; 2]>`**
+  the page point of connection point `row` (None: no such row)
+
+- **`fn add_point(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, at: [f64; 2]) -> Result<u32, EditError>`**
+  add a connection point at the page point `at` (the connection point tool's Ctrl+click):
+  X = Width\*k, Y = Height\*k (a value where the side is 0), DirX, DirY, Type 0 -> its IX.
+  Invalid: a section of named rows, a shape that cannot be turned back (no local point)
+
+- **`fn move_point(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, row: u32, at: [f64; 2]) -> Result<(), EditError>`**
+  move connection point `row` to the page point `at`: X and Y keep the form of their formulas
+  (Width\*k stays proportional, a value stays a value); what is glued to it follows with the
+  recalculation (ends through glue::update in the app)
+
+- **`fn set_point_kind(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, row: u32, kind: u8) -> Result<(), EditError>`**
+  give connection point `row` the kind `kind` (Type: 0 inward, 1 outward, 2 both)
+
+- **`fn delete_point(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, row: u32) -> Result<(), EditError>`**
+  take connection point `row` out: what is glued to it is let go where it is, the rows after it
+  move one up (Transaction::remove_row) and what is glued to them is glued again under the
+  new number
 
 ### `diagram_core/src/render/mod.rs`
 
@@ -64609,7 +64853,8 @@ and the same bytes.
 The JFD_ cells (diagram_core::instance reads them): the document sheet's User.JFD_Name (the
 title in de|en|es|it|fr) and User.JFD_Category; per master page User.JFD_Name, JFD_Prompt,
 JFD_Keywords, JFD_Text, JFD_Quick (1 for the first `quick` masters) and JFD_Tr1, JFD_Tr2 ...
-("Section.Row.Cell|de|en|es|it|fr" with VSDX section names: Control.Row_1.Tip).
+("Section.Row.Cell|de|en|es|it|fr" with VSDX section and cell names: Control.Row_1.Prompt; a
+source's Tip of a control point is the VSDX cell Prompt, JD21).
 
 (JD15) Text fields: a [Field] section (Value, Format, Type ...; `Unit = mm` gives Value the unit
 the field shows) and "{fld N}" marks in a master's text (diagram_core::field::marked); a mark

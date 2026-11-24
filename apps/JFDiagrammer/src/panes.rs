@@ -120,6 +120,9 @@ static PAGE_MENU: [Mi; 4] = [
     Mi::Sep,
     Mi::Cmd(PAGE_SETUP),
 ];
+// i18n
+// (JD21 glue) the chosen connection point's kind (the connection point tool)
+static CPOINT_MENU: [Mi; 3] = [Mi::Cmd(CPOINT_INWARD), Mi::Cmd(CPOINT_OUTWARD), Mi::Cmd(CPOINT_BOTH)];
 static TAB_MENU: [Mi; 8] = [
     Mi::Cmd(PAGE_INSERT), Mi::Cmd(PAGE_DELETE), Mi::Cmd(PAGE_RENAME), Mi::Cmd(PAGE_DUPLICATE), Mi::Cmd(PAGE_REORDER), Mi::Sep,
     Mi::Cmd(PAGE_SETUP), Mi::Cmd(DRAWING_SCALE),
@@ -140,7 +143,13 @@ pub(crate) fn center(app: &mut Diagrammer, ui: &mut Ui) {
         if app.se.right_taken() {
             return;
         }
-        let menu: &'static [Mi] = if matches!(app.selection_kind(), SEL_SHAPE | SEL_CONTAINER | SEL_TEXT) { &SHAPE_MENU } else { &PAGE_MENU };
+        let menu: &'static [Mi] = if crate::glue_tools::point_menu(app) {
+            &CPOINT_MENU
+        } else if matches!(app.selection_kind(), SEL_SHAPE | SEL_CONTAINER | SEL_TEXT) {
+            &SHAPE_MENU
+        } else {
+            &PAGE_MENU
+        };
         ui.context_menu(i18n::menu(menu));
     });
     if app.fit_again {

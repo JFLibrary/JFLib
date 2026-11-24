@@ -919,6 +919,10 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Element einfügen", "Insert item", "Insérer un élément", "Insertar elemento", "Inserisci elemento", "Element invoegen", "Wstaw element", "إدراج عنصر", "הוספת פריט"],
     // (JD21) a tile of the quick shapes bar at a connection arrow (Visio's Quick Shapes)
     ["Schnell-Shape", "Top shape", "Forme principale", "Forma principal", "Forma principale", "Hoofdvorm", "Główny kształt", "شكل رئيسي", "צורה ראשית"],
+    // (JD21) shape_edit: arcs in vertex editing, the connection point tool
+    ["Bogengriff", "Arc handle", "Poignée d'arc", "Controlador de arco", "Maniglia dell'arco", "Booggreep", "Uchwyt łuku", "مقبض القوس", "ידית קשת"],
+    ["Exzentrizitätsgriff", "Eccentricity handle", "Poignée d'excentricité", "Controlador de excentricidad", "Maniglia di eccentricità", "Excentriciteitsgreep", "Uchwyt mimośrodu", "مقبض الاختلاف المركزي", "ידית אקסצנטריות"],
+    ["Verbindungspunkt", "Connection point", "Point de connexion", "Punto de conexión", "Punto di connessione", "Verbindingspunt", "Punkt połączenia", "نقطة اتصال", "נקודת חיבור"],
     // (JD7) the rulers (ui.ruler)
     ["Lineal", "Ruler", "Règle", "Regla", "Righello", "Liniaal", "Linijka", "مسطرة", "סרגל"],
 ];

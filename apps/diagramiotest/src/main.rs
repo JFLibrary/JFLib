@@ -119,6 +119,10 @@
 //   route     (JD21, route.rs) routing styles with directions, permeable shapes, a way by hand:
 //             the sides the ways use, the routing cells and ways written and read back, routed
 //             again after reading; the local corpus' connectors (right angles, ConFixedCode 0, 3 .. 6)
+//   pointglue (JD21 glue, pointglue.rs) a control point glued to a connection point, new
+//             connection points and their kinds, points made at a vertex and a handle, an end on
+//             a guide: Connect entries, rows and formulas written and read back, following after
+//             reading
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -150,6 +154,8 @@ mod hostile;
 mod hostile_write;
 // (JD21) line jumps
 mod jumps;
+// (JD21 glue) control points, connection points, vertices, handles and guides glued
+mod pointglue;
 mod pkg;
 // (JD12) pdftest's independent PDF reader checks the exported PDFs
 #[path = "../../pdftest/src/reader.rs"]
@@ -399,6 +405,10 @@ fn run() -> i32 {
         // (JD21) routing styles, permeable shapes, a way by hand
         if h.on("route") {
             route::check(&mut h, corpus_dir.clone());
+        }
+        // (JD21 glue) glue of control points, to vertices, handles, guides; new connection points
+        if h.on("pointglue") {
+            pointglue::check(&mut h);
         }
     }
     if h.on("corpus") {

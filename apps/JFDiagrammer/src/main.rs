@@ -52,6 +52,8 @@
 //   src/addons.rs     (JD21) Ansicht › Add-Ons: Shapes nummerieren (dlg_number.rs), vervielfältigen
 //                     (dlg_array.rs), Maßlinien (tools_dim.rs); the container styles as galleries
 //                     (container_styles.rs) and Kategorien (dlg_categories.rs)
+//   src/glue_tools.rs (JD21) control points that glue, Kleben an (vertices, handles, guides), the
+//                     connection point tool, several vertices and arcs' handles in vertex editing
 //   src/templates.rs  (JD13) the templates: built-in (build.rs builds them from templates/ into
 //                     .vstx), the own ones, a new drawing from one, Speichern als Vorlage
 //   src/templates_ui.rs  (JD13) Datei › Neu: the catalogue with rendered previews
@@ -208,6 +210,8 @@ mod layout_ui;
 mod jumps_ui;
 // (JD21 route) a connector's way by hand, routing styles with directions, permeable shapes
 mod route_ui;
+// (JD21 glue) glued control points, Kleben an, the connection point tool, arcs' handles
+mod glue_tools;
 // (JD13) the legend of a network plan counts its devices
 mod legend;
 mod options;
@@ -388,6 +392,8 @@ pub(crate) struct Diagrammer {
     /// (JD21 route) the routing rows of Verbinder-Verhalten, Layout-Verhalten and Seite
     /// einrichten (route_ui.rs)
     pub route: route_ui::RouteState,
+    /// (JD21 glue) Kleben an: Shape-Ziehpunkte, Shape-Scheitelpunkte (glue_tools.rs)
+    pub glue: glue_tools::GlueState,
 }
 
 impl Diagrammer {
@@ -467,6 +473,7 @@ impl Diagrammer {
             addons: addons::Addons::default(),
             groups: groups_cmds::GroupsState::default(),
             route: route_ui::RouteState::default(),
+            glue: glue_tools::GlueState::default(),
             page_views: alloc::vec::Vec::new(),
             view_page: None,
         }

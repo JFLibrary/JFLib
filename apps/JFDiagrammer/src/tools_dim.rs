@@ -119,8 +119,10 @@ pub(crate) fn run(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
 // to it, else free
 fn anchor(doc: &Document, page: PageRef, p: [f64; 2], g: SeGlue) -> Anchor {
     match g {
-        SeGlue::Point { key, tag } => Anchor::Point { shape: shape_of(page, key), row: tag },
-        SeGlue::Shape(key) => {
+        SeGlue::Point { key, tag } if tag & crate::glue_tools::TAG_TARGET == 0 => Anchor::Point { shape: shape_of(page, key), row: tag },
+        // (JD21 glue) a vertex, handle or control point offered as a target (no connection
+        // point yet): tied to the shape's box there, as on the whole shape
+        SeGlue::Point { key, .. } | SeGlue::Shape(key) => {
             let s = shape_of(page, key);
             let f = ops::frame(doc, s);
             match f.local(p) {
@@ -128,7 +130,8 @@ fn anchor(doc: &Document, page: PageRef, p: [f64; 2], g: SeGlue) -> Anchor {
                 _ => Anchor::Free(p),
             }
         }
-        SeGlue::None => Anchor::Free(p),
+        // (JD21 glue) a guide: free
+        SeGlue::None | SeGlue::Guide(_) => Anchor::Free(p),
     }
 }
 

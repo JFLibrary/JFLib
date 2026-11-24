@@ -42,19 +42,19 @@ Leseschlüssel:
 | 2.2 Seiten | 6 | 2 | 0 | 0 | 2 | 4 |
 | 2.3 Ebenen | 4 | 0 | 0 | 1 | 0 | 0 |
 | 2.4 Master, Schablonen und Formatvorlagen | 3 | 2 | 1 | 1 | 1 | 2 |
-| 2.5 Shapes, Geometrie und Gruppen | 6 | 5 | 0 | 3 | 3 | 0 |
+| 2.5 Shapes, Geometrie und Gruppen | 8 | 3 | 0 | 3 | 3 | 0 |
 | 2.6 Format: Linie, Füllung, Schatten, Effekte | 3 | 2 | 0 | 0 | 1 | 1 |
 | 2.7 Text und Felder | 6 | 2 | 0 | 0 | 0 | 2 |
-| 2.8 Verbinder, Kleben, Routing und Layout | 8 | 2 | 0 | 5 | 2 | 0 |
+| 2.8 Verbinder, Kleben, Routing und Layout | 10 | 0 | 0 | 5 | 2 | 0 |
 | 2.9 Container, Listen, Swimlanes, Beschriftungen, Legenden | 5 | 0 | 0 | 2 | 0 | 1 |
 | 2.10 Daten | 2 | 0 | 0 | 1 | 1 | 6 |
 | 2.11 Hyperlinks, QuickInfos und Kommentare | 1 | 0 | 0 | 0 | 0 | 4 |
 | 2.12 Designs (Themes), Varianten und Schnellformatvorlagen | 4 | 0 | 0 | 1 | 0 | 1 |
-| 2.13 ShapeSheet: Abschnitte | 12 | 11 | 0 | 7 | 8 | 1 |
+| 2.13 ShapeSheet: Abschnitte | 13 | 10 | 0 | 7 | 8 | 1 |
 | 2.14 Formel-Engine und Funktionen | 5 | 4 | 0 | 2 | 2 | 1 |
 | 3.1 Fenster, Start und Backstage | 7 | 7 | 0 | 0 | 1 | 3 |
 | 3.2 Titelleiste, Registerzeile und Menüband allgemein | 2 | 3 | 0 | 0 | 1 | 2 |
-| 3.3 Register „Start“ | 21 | 2 | 0 | 1 | 3 | 3 |
+| 3.3 Register „Start“ | 21 | 2 | 0 | 2 | 3 | 2 |
 | 3.4 Register „Einfügen“ | 6 | 2 | 0 | 0 | 0 | 2 |
 | 3.6 Register „Entwurf“ | 7 | 1 | 0 | 1 | 0 | 2 |
 | 3.7 Register „Daten“ | 0 | 1 | 0 | 3 | 0 | 4 |
@@ -65,7 +65,7 @@ Leseschlüssel:
 | 3.12 Zeichenfenster | 6 | 10 | 0 | 0 | 1 | 5 |
 | 3.13 Aufgabenbereiche | 1 | 5 | 0 | 0 | 2 | 5 |
 | 3.14 Statusleiste | 2 | 1 | 0 | 0 | 0 | 1 |
-| 3.15 Drucken und Seite einrichten | 4 | 4 | 0 | 0 | 0 | 1 |
+| 3.15 Drucken und Seite einrichten | 5 | 3 | 0 | 0 | 0 | 1 |
 | 3.16 Tastenkürzel | 9 | 6 | 0 | 0 | 1 | 2 |
 | 3.17 Sprachen und Regionen | 7 | 1 | 0 | 1 | 0 | 2 |
 | 4.0 Regeln für alle Schablonen | 4 | 2 | 0 | 0 | 0 | 2 |
@@ -74,9 +74,9 @@ Leseschlüssel:
 | 5.1 Vorlagen-Infrastruktur | 4 | 0 | 0 | 0 | 0 | 0 |
 | 5.2 Vorlagen nach Kategorie | 6 | 1 | 0 | 2 | 1 | 10 |
 | 5.3 Assistenten und Generatoren | 0 | 0 | 0 | 4 | 0 | 3 |
-| **zusammen** | **188** | **92** | **1** | **52** | **40** | **165** |
+| **zusammen** | **194** | **86** | **1** | **53** | **40** | **164** |
 
-P2-Zeilen, die schon fertig sind (52): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, SP-15, SP-16, CN-06, CN-08, CN-09, CN-10, CN-14, ST-03, ST-09, DA-05, TH-06, SS-11, SS-21, SS-22, SS-26, SS-31, SS-33, SS-36, FX-11, FX-12, RS-28, RW-09, RD-02, RD-03, RD-09, RA-09, LG-05, SH-003, SH-004, SH-007, SH-031, SH-032, SH-033, SH-041, VL-32, VL-38, AS-03, AS-04, AS-11, AS-20.
+P2-Zeilen, die schon fertig sind (53): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, SP-15, SP-16, CN-06, CN-08, CN-09, CN-10, CN-14, ST-03, ST-09, DA-05, TH-06, SS-11, SS-21, SS-22, SS-26, SS-31, SS-33, SS-36, FX-11, FX-12, RS-17, RS-28, RW-09, RD-02, RD-03, RD-09, RA-09, LG-05, SH-003, SH-004, SH-007, SH-031, SH-032, SH-033, SH-041, VL-32, VL-38, AS-03, AS-04, AS-11, AS-20.
 <!-- summary:end -->
 
 ## Offene Entscheidungen des Nutzers
@@ -119,10 +119,6 @@ L = mehr. P2-Teile von P1-Zeilen stehen bei ihrer P2-Etappe.
 |---|---|---|---|
 | JD20 | UI-16 | Bearbeitungs- und Korrektursprachen | S |
 | JD20 | ZF-18 | Alternativtext und Lesereihenfolge für Bildschirmleser (RU-03) | S |
-| JD21 | SP-04, SS-30 | Steuerpunkte kleben (CanGlue: Ethernet, Ringnetz, Bus), Tip als QuickInfo | S |
-| JD21 | SP-05 | Scheitelpunkte: Mehrfachauswahl, Bogen-Griffe | S |
-| JD21 | CN-01, CN-02 | Verbindungspunkt-Werkzeug; Kleben an Scheitelpunkt, Führungslinie, Steuerpunkt | S |
-| JD21 | PR-09 | Layout und Routing: Richtung, Verbinder-Darstellung | S |
 | JD22 | DM-03, RA-07 | Einrast- und Klebeziele, Stärke, Einrastwinkel, im Dokument speichern | S |
 | JD22 | PG-03, ZF-14 | Seitenregister per Ziehen umordnen (`ui.tabs`) | S |
 | JD22 | SP-10, ZF-04, AB-04 | Führungslinien per Klick wählen, verschieben, drehen, Mitnehmen geklebter Shapes, Führungspunkte | M |
@@ -292,8 +288,8 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | SP-01 | Shape-Arten | P1 | teilweise | 2D/1D/Gruppen/Fremdobjekte/Führungslinien: edit_*.uis, pictures.uis, edit_view.uis; context_jd15.uis (Dialog Shape-Name: Name und Name universell) | Führungspunkte; Anzeige „Sheet.n“ statt „Blatt.n“ (Entscheidung offen, siehe oben) |
 | SP-02 | Geometrie darstellen | P1 | fertig | dit render/geometry (alle Zeilenarten, mehrere Abschnitte mit NoFill/NoLine/NoShow), render/corpus; core geometry-Tests | – |
 | SP-03 | Transformation | P1 | fertig | edit_shapes.uis, edit_golden.uis; core ops::tests::every_grip_keeps_the_opposite_edge, rotate_about_a_centre, set_pin_leaves_the_shape_in_place, lock_bits_follow_the_lock_names | – |
-| SP-04 | Steuerpunkte | P1 | teilweise | status_model.uis (ziehen, Rückgängig); core ops::tests::control_points_write_cells_as_visio_does; structures_callout.uis | Steuerpunkte an anderen Shapes kleben (CanGlue; `edit_canvas` verwirft den Kleber außer bei Beschriftungen) |
-| SP-05 | Scheitelpunkte bearbeiten | P1/P2 | teilweise | status_model.uis (ziehen, Strg+Klick fügt ein); shapeops_frame.uis (JD21: der Rahmen folgt der Geometrie); core ops::tests::vertices_move_insert_delete_with_closing_rows, shapeops::tests::frame_follows_vertex_edits, frame_follows_a_shape_with_an_arc | mehrere mit Umschalt; Bogen-Griffe; Segment beim Zeichnen zurücknehmen |
+| SP-04 | Steuerpunkte | P1 | fertig | status_model.uis (ziehen, Rückgängig); glue_control.uis (JD21: Ethernet-Abzweig klebt am Router, folgt ihm, bleibt beim Verschieben des Busses, QuickInfo, Lösen, Rückgängig); structures_callout.uis; core ops::tests::control_points_write_cells_as_visio_does, pointglue::tests (klebt wie Visio: LOC(PNT(..)), Connect von Controls.Row_k; folgt; Rückgängig; Ziel gelöscht); dit pointglue (Rundlauf, folgt nach dem Lesen); Visio-Gegenprobe JD21 offen (JD21-glue.vsdx) | – |
+| SP-05 | Scheitelpunkte bearbeiten | P1/P2 | fertig | status_model.uis (ziehen, Strg+Klick fügt ein); shapeops_frame.uis (JD21: der Rahmen folgt der Geometrie); glue_vertices.uis (JD21: mehrere mit Umschalt ziehen und löschen, Bogengriff, Exzentrizitätsgriffe, Freihand zurücknehmen); core ops::tests::vertices_move_insert_delete_with_closing_rows, ops::arcs::tests, shapeops::tests::frame_follows_vertex_edits, frame_follows_a_shape_with_an_arc | – |
 | SP-06 | Gruppen | P1 | fertig | edit_group.uis (gruppieren, aufheben, Unterauswahl); groups_behavior.uis (JD21: Elemente zuerst, DontMoveChildren, Ablegen in die Gruppe, Gruppentext); core ops::tests::group_inside_a_group_and_setatref, turning_and_flipping_a_group_takes_its_members_along, groups::tests (the_ungroup_warning, an_instance_made_plain_and_ungrouped, dropping_into_a_group_needs_both_cells) | – (Warnung vor dem Aufheben: Master-Instanz und Formeln, die die Gruppe nennen; Visio-Gegenprobe jd21-gruppen.vsdx) |
 | SP-07 | Stapelreihenfolge | P1 | fertig | edit_group.uis; core ops::tests::reorder_front_back_forward_backward | – |
 | SP-08 | Shape-Operationen | P2 | teilweise | shapeops_union.uis, shapeops_combine.uis, shapeops_fragment.uis, shapeops_intersect.uis, shapeops_subtract.uis (Start › Anordnen › Gruppieren › Vorgänge bis JD23); dit shapeops (Bögen bleiben Bögen, Rundlauf der Zeilen und Formeln, gestreckt); core shapeops::tests (Rechtecke, Ellipsen, gedreht, gespiegelt, Gruppen, Löcher, leeres Ergebnis); geom tests (region) | Verbinden, Trimmen, Versatz, Kurve anpassen, benutzerdefiniertes Anpassen; Visio-Gegenprobe der Zeilen und Formeln (jd21-vorgaenge.vsdx) |
@@ -338,8 +334,8 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 
 | ID | Feature | Prio | Stand | Beleg | Fehlt |
 |---|---|---|---|---|---|
-| CN-01 | Verbindungspunkte | P1 | teilweise | beim Verbinden sichtbar (edit_connect.uis), Ansicht › Verbindungspunkte; core glue_tests::connection_points_turn_with_the_shape | Verbindungspunkt-Werkzeug (hinzufügen, verschieben, löschen); Art innen/außen ohne Wirkung |
-| CN-02 | Statisches Kleben | P1 | teilweise | dit edit (statisch an Punkten), draw_tools.uis; core glue_tests::static_glue_writes_visio_cells_and_follows | Kleben an Scheitelpunkt, Führungslinie, Steuerpunkt |
+| CN-01 | Verbindungspunkte | P1 | fertig | beim Verbinden sichtbar (edit_connect.uis), Ansicht › Verbindungspunkte; glue_cpoint.uis (JD21: Verbindungspunkt-Werkzeug hinzufügen, verschieben, Art nach außen wirkt, löschen, Rückgängig); core glue_tests::connection_points_turn_with_the_shape, pointglue::tests::the_connection_point_tool_adds_moves_and_deletes_points; dit pointglue (Art im Rundlauf) | – |
+| CN-02 | Statisches Kleben | P1 | fertig | dit edit (statisch an Punkten), draw_tools.uis; glue_targets.uis (JD21: an Führungslinie, Scheitelpunkt, Shape-Ziehpunkt; folgt); core glue_tests::static_glue_writes_visio_cells_and_follows, pointglue::tests (Anker, Führungslinien); dit pointglue; Visio-Gegenprobe JD21 offen | – |
 | CN-03 | Dynamisches Kleben | P1 | fertig | edit_connect.uis (ganzes Shape, grüne Enden, folgt), canvas_glue.uis (Strg schaltet statisch/dynamisch, mit dem Verbinder-Werkzeug und beim Ziehen eines Endes); core glue_tests::dynamic_glue_* | – |
 | CN-04 | Dynamischer Verbinder | P1 | fertig | edit_connect.uis, edit_golden.uis, route_segment.uis (Mittelpunkte und Scheitelpunkte: Segment verschieben, Stummel und Versatz am Ende, Form bleibt beim Bewegen, Knick per Strg+Klick hinzufügen, Entf entfernt, Verbinder zurücksetzen); Verbinder rechtwinklig/gerade/gebogen/zurücksetzen (core glue_tests::styles_straight_and_curved, a_fixed_route_keeps_its_corners, route_edit::tests); dit route (Weg von Hand nach dem Lesen gehalten) | – |
 | CN-05 | Routing um Hindernisse | P1 | fertig | edit_golden.uis, structures_layout.uis, route_styles.uis (Seite einrichten: Stil und Richtung, Verbinder-Verhalten: Weg), route_permeable.uis; core glue_tests::routes_never_cross_obstacles, a_hundred_obstacles, the_page_scale_and_spacing_count, route_styles::tests (alle Stile in allen Richtungen, Durchlässigkeit); dit route (eine Seite je Stil, Rundlauf) | – |
@@ -434,7 +430,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | SS-26 | Shape-ersetzen-Verhalten | P2 | fertig | dit roundtrip (Abschnitt bleibt erhalten), dit groups (Rundlauf); core replace::tests::the_masters_locks_and_copy_cells (ReplaceLockShapeData/Text/Format, ReplaceCopyCells) | – |
 | SS-28 | Geometrie (mehrere Abschnitte) | P1 | fertig | dit render/geometry (alle Zeilenarten inkl. Spline, Rel*), core geometry-Tests | – |
 | SS-29 | Verbindungspunkte | P1 | fertig | canvas_glue.uis (Type 1 ist kein Ziel, Prompt als QuickInfo); core glue_tests::connection_points_turn_with_the_shape, static_glue_* | – |
-| SS-30 | Steuerelemente (Controls) | P1 | teilweise | status_model.uis; core ops::tests::control_points_write_cells_as_visio_does | CanGlue (SP-04), Tip nicht als QuickInfo |
+| SS-30 | Steuerelemente (Controls) | P1 | fertig | status_model.uis; glue_control.uis (CanGlue, Tip als QuickInfo); core ops::tests::control_points_write_cells_as_visio_does, pointglue::tests | – |
 | SS-31 | Aktionen | P2 | fertig | actions_menu.uis (Menu, Checked, Disabled, Invisible; Klick führt Action aus); core formula::tests::run_action_effects | – (BeginGroup, Effekte wie GOTOPAGE ohne eigene Wirkung, FX-14) |
 | SS-33 | Hyperlinks | P2 | fertig | hyperlink.uis (Beschreibung, Adresse, Unteradresse, Standard), übrige Zellen erhalten | – |
 | SS-34 | Shape-Daten (Property) | P1 | fertig | panes_edit.uis (Typ, Format, Wert, Invisible), Shape-Daten definieren | – (Verify = SP-13, P2) |
@@ -525,7 +521,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | RS-14 | Verbinder | P1 | fertig | tests/edit_connect.uis, tests/status_ribbon.uis (Strg+3, bleibt aktiv) | – |
 | RS-15 | Text | P1 | fertig | tests/edit_text.uis, tests/status_ribbon.uis (Strg+2) | – |
 | RS-16 | Zeichentools | P1 | fertig | tests/draw_tools.uis, tests/status_ribbon.uis (Bleistift, Linie) | – |
-| RS-17 | Verbindungspunkt-Werkzeug | P2 | fehlt | – | (JD21/JD23) |
+| RS-17 | Verbindungspunkt-Werkzeug | P2 | fertig | glue_cpoint.uis (Start › Tools › Verbindungspunkt, Strg+Umschalt+1) | – |
 | RS-18 | Textblock-Werkzeug | P2 | fehlt | – | (JD22) |
 | RS-19 | Schnellformatvorlagen | P2 | teilweise | tests/format.uis, tests/shell_commands.uis | nur im Bereich Shape formatieren, keine Galerie im Menüband; „Designs zulassen“ |
 | RS-20 | Füllung | P1 | fertig | tests/format.uis | – |
@@ -715,7 +711,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | PR-06 | Seitengröße | P1 | fertig | print.uis, status_ui_print.uis, page_setup_ribbon.uis (Automatisch anpassen über Entwurf) | – |
 | PR-07 | Zeichnungsmaßstab | P1 | fertig | page_setup_ribbon.uis, status_ui_print.uis, page_formats.uis (vier Gruppen) | – |
 | PR-08 | Seiteneigenschaften | P1 | fertig | print.uis, status_ui_print.uis, page_formats.uis (Maßeinheit der Seite) | – |
-| PR-09 | Layout und Routing | P1 | teilweise | structures_layout.uis, status_ui_print.uis, autoconn_page.uis („Shapes auf Verbinder teilen“, „Shapes beim Ablegen verschieben“), jumps.uis (Linienübergänge: wo, Stil, Größe, Richtung) | Richtung, Verbinder-Darstellung |
+| PR-09 | Layout und Routing | P1 | fertig | structures_layout.uis, status_ui_print.uis, autoconn_page.uis („Shapes auf Verbinder teilen“, „Shapes beim Ablegen verschieben“), jumps.uis (Linienübergänge: wo, Stil, Größe, Richtung), route_styles.uis (Routing-Stil, Richtung des Routings, Darstellung) | – („Linien trennen und überlappen“ wird gespeichert, wirkt aber nicht: SS-40) |
 
 ### 3.16 Tastenkürzel
 

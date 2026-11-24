@@ -41,6 +41,10 @@
 // (JD21 route) A selected dynamic connector shows the midpoints of its pieces and its vertices
 // (route_ui.rs: moved, added, removed by hand); with the page's DynamicsOff a moved shape does not
 // reroute the connectors it now crosses.
+// (JD21 glue) Control points glue to connection points and follow them, their Tip is their
+// QuickInfo, ends glue to vertices, handles, control points (Kleben an) and guides, the
+// connection point tool (SE_CPOINT), several vertices and arcs' handles in vertex editing
+// (glue_tools.rs).
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -113,8 +117,9 @@ pub(crate) fn shape_of(page: PageRef, key: u64) -> ShapeRef {
 /// the shapes the edit layer sees, made for one state of the drawing
 #[derive(Default)]
 pub(crate) struct Model {
-    /// what it was made for: drawing serial, page, revision, tool, the selection
-    key: (u32, usize, u32, u32, Vec<u64>),
+    /// what it was made for: drawing serial, page, revision, tool, the selection, (JD21 glue)
+    /// the chosen vertex
+    key: (u32, usize, u32, u32, Vec<u64>, Option<(u64, u32)>),
     pub shapes: Vec<SeShape>,
     pub points: Vec<SePoint>,
     pub guides: Vec<SeGuide>,
@@ -138,6 +143,8 @@ pub(crate) fn tool_of(app: &Diagrammer) -> u32 {
     match app.tool {
         CONNECTOR_TOOL => SE_CONNECT,
         LINE_TOOL | PENCIL => SE_LINE,
+        // (JD21 glue) the connection point tool
+        CONN_POINT_TOOL => SE_CPOINT,
         // (JD8 rest) the freeform and the arc tool (cmds_draw.rs)
         FREEFORM => SE_FREEFORM,
         ARC => SE_ARC,
@@ -189,6 +196,8 @@ pub(crate) fn model(app: &mut Diagrammer) {
     let sel: Vec<u64> = app.se.sel.iter().copied().collect();
     // (JD21 groups) the group open on the canvas
     let scope = crate::groups_view::scope(app);
+    // (JD21 glue) the chosen vertex (its arc's handles)
+    let chosen = app.se.vertex;
     let Some(o) = app.opened.as_mut() else {
         app.model = Model::default();
         return;
@@ -198,7 +207,7 @@ pub(crate) fn model(app: &mut Diagrammer) {
         return;
     };
     let page = tab.page;
-    let key = (o.serial, k, o.ed.rev, tool, sel.clone());
+    let key = (o.serial, k, o.ed.rev, tool, sel.clone(), chosen);
     if app.model.key == key && app.model.geo.is_some() {
         return;
     }
@@ -209,6 +218,7 @@ pub(crate) fn model(app: &mut Diagrammer) {
     let geo = Geo { w: d.width, h: d.height, scale: if d.scale > 0.0 { d.scale } else { 1.0 } };
     let doc = &o.doc;
     let owner = Owner::Page(page);
+    let gst = &app.glue;
     let mut m = Model { key, geo: Some(geo), page: Some(page), ..Model::default() };
     m.ver = o.serial.wrapping_mul(7919).wrapping_add(o.ed.rev).wrapping_add(k as u32 * 104_729);
     m.ver ^= crate::groups_view::ver_salt(scope);
@@ -285,6 +295,8 @@ pub(crate) fn model(app: &mut Diagrammer) {
                     _ => 0,
                 };
             }
+            // (JD21 glue) an end on a guide
+            flags |= crate::glue_tools::end_flags(doc, r);
         }
         if s.header().kind == ShapeKind::Group {
             flags |= SEF_GROUP;
@@ -325,6 +337,8 @@ pub(crate) fn model(app: &mut Diagrammer) {
                     m.prompts.push((key_of(r), c.row, p));
                 }
             }
+            // (JD21 glue) Kleben an: vertices, handles, control points
+            crate::glue_tools::targets(gst, doc, r, &geo, &mut m.points);
         }
         // control points and vertices of the selection
         if sel.contains(&k) {
@@ -340,6 +354,8 @@ pub(crate) fn model(app: &mut Diagrammer) {
                 for v in ops::vertices(doc, r) {
                     m.points.push(SePoint { at: geo.world(v.at), kind: SP_VERTEX, tag: v.section << 16 | (v.row & 0xFFFF), dir: [0.0; 2], flags: 0 });
                 }
+                // (JD21 glue) arcs' control points, the chosen arc's eccentricity handles
+                crate::glue_tools::arc_points(doc, r, &geo, chosen.filter(|c| c.0 == k).map(|c| c.1), &mut m.points);
             }
         }
         let p1 = m.points.len() as u32;
@@ -360,6 +376,10 @@ pub(crate) fn model(app: &mut Diagrammer) {
             add(c, key_of(*g), &mut m, &mut o.ed.eng);
         }
     }
+    // (JD21 glue) a selected guide or an open group's children make the list longer: the edit
+    // layer's index of it must change too (SeModel::ver; else a selected guide does not move
+    // with the arrow keys)
+    m.ver = m.ver.wrapping_add((m.shapes.len() as u32).wrapping_mul(0x9E37_79B9));
     drop(view);
     app.model = m;
 }
@@ -459,7 +479,7 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
         ui.cursor_next(cur);
     }
     // (JD15, SS-29) the Prompt of the connection point under the pointer while the points show
-    let prompt = if link.is_none() { prompt_hover(app, ui) } else { None };
+    let prompt = if link.is_none() { prompt_hover(app, ui).or_else(|| crate::glue_tools::control_tip(app, ui)) } else { None };
     ui.next_size(-1, -1);
     ui.diagram(id, &mut app.canvas, &dm, DG_EDIT, paint, ver);
     // (JD15, ZF-08) a page shown again gets its view back instead of the fit the page change
@@ -490,6 +510,11 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
     let follow = link.as_ref().filter(|_| ui.pressed() & (1 << BTN_LEFT) != 0 && ui.mods() & (MOD_CTRL | MOD_SHIFT | MOD_ALT) == MOD_CTRL && ui.last_state() & SS_HOVER as u32 != 0).map(|l| l.0);
     if let Some((key, tip)) = &link {
         ui.tooltip_part(tip, *key);
+    }
+    // (JD21 glue) nothing with a QuickInfo under the pointer: the next one starts afresh (also
+    // after a click on the canvas, which blocks the tooltip of the part it was on)
+    if prompt.is_none() && link.is_none() {
+        ui.tooltip_part("", 0);
     }
     // (JD9) the canvas takes the Shapes panel's tiles (its rectangle is the last one)
     crate::stencils_drop::drop_target(app, ui, id);
@@ -940,6 +965,10 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
     if crate::route_ui::apply(app, ui, &ev) {
         return;
     }
+    // (JD21 glue) glued control points, connection points, arcs, several vertices
+    if crate::glue_tools::apply(app, ui, &ev) {
+        return;
+    }
     // (JD10) a running move (the glow), the Verbindungspfeile, the insert triangles
     crate::structures::track(app, &ev);
     match ev {
@@ -1047,12 +1076,9 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
         SeEv::End { key, end, at, glue: g, done } => {
             let s = shape_of(page, key);
             let p = geo.page(at);
-            let target = target_of(page, g);
             let e = if end == 0 { glue::End::Begin } else { glue::End::End };
-            edit_doc::edit(o, t("Endpunkt verschieben"), done, |tx, eng| {
-                glue::glue(tx, eng, s, e, p, target)?;
-                glue::update(tx, eng, &[s])
-            })
+            // (JD21 glue) also onto a vertex, a handle, a control point, a guide
+            edit_doc::edit(o, t("Endpunkt verschieben"), done, |tx, eng| crate::glue_tools::glue_end(tx, eng, page, s, e, p, g))
         }
         SeEv::Point { key, idx, tag, at, glue: g, done } => {
             let s = shape_of(page, key);
@@ -1096,20 +1122,23 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
         }
         SeEv::Connect { tool, a, ga, b, gb } => {
             let (pa, pb) = (geo.page(a), geo.page(b));
-            let (ta, tb) = (target_of(page, ga), target_of(page, gb));
             let label = if tool == SE_CONNECT { t("Verbinder") } else { t("Linie") };
             // (JD21 autoconn, CN-16) the connector tool draws the connector master marked in the
             // Shapes panel
             let st = &app.stencils;
             let master = conn_master.and_then(|(key, k)| st.entry(key, k)).map(|(l, e)| (&l.doc, e.master));
-            match edit_doc::edit(o, label, true, |tx, eng| {
+            // (JD21 glue) the ends also onto vertices, handles, control points, guides
+            let r = edit_doc::edit(o, label, true, |tx, eng| {
+                let (ta, tb) = crate::glue_tools::connect_targets(tx, eng, page, ga, gb)?;
                 let s = if tool == SE_CONNECT { crate::autoconn::connector(tx, eng, owner, (pa, ta), (pb, tb), master)? } else { glue::new_line(tx, eng, owner, (pa, ta), (pb, tb))? };
+                crate::glue_tools::connect_guides(tx, eng, page, s, (pa, ga), (pb, gb))?;
                 // (JD21 groups) drawn while a group is open: a member of it
                 if scope.is_some() {
                     crate::groups_view::adopt(tx, eng, owner, scope, &[s])?;
                 }
                 Ok(s)
-            }) {
+            });
+            match r {
                 Ok(s) => {
                     select = Some(alloc::vec![key_of(s)]);
                     drawn = tool == SE_CONNECT;
@@ -1219,6 +1248,12 @@ fn app_frame_matches(doc: &Document, geo: &Geo, s: ShapeRef, b: &SeBox) -> bool 
 pub(crate) fn follow(tx: &mut diagram_core::Transaction, eng: &mut diagram_core::formula::Engine, owner: Owner, shapes: &[ShapeRef]) -> Result<(), diagram_core::EditError> {
     let doc = tx.doc();
     let mut deps = glue::dependents(doc, owner, shapes);
+    // (JD21 glue) the connectors of shapes whose control points are glued to these
+    for d in glue::dependents(doc, owner, &diagram_core::pointglue::followers(doc, owner, shapes)) {
+        if !deps.contains(&d) {
+            deps.push(d);
+        }
+    }
     for &s in shapes {
         if glue::is_one_d(doc, s) && !deps.contains(&s) {
             deps.push(s);
@@ -1241,14 +1276,6 @@ pub(crate) fn follow(tx: &mut diagram_core::Transaction, eng: &mut diagram_core:
         return Ok(());
     }
     glue::update(tx, eng, &deps)
-}
-
-fn target_of(page: PageRef, g: SeGlue) -> glue::Target {
-    match g {
-        SeGlue::None => glue::Target::None,
-        SeGlue::Point { key, tag } => glue::Target::Point { shape: shape_of(page, key), row: tag },
-        SeGlue::Shape(key) => glue::Target::Shape(shape_of(page, key)),
-    }
 }
 
 /// delete shapes: connections to them go first (their connectors keep their place); (JD10)

@@ -1551,7 +1551,7 @@ fn localize_shape(tx: &mut Transaction, s: ShapeRef, lang: usize) -> bool {
             }
         }
     }
-    // translated cells (Controls.Row_1.Tip ...) where the shape shows one of their texts
+    // translated cells (Control.Row_1.Prompt ...) where the shape shows one of their texts
     for (c, values) in &texts.translated {
         let want = pick(values, lang);
         if want.is_empty() {

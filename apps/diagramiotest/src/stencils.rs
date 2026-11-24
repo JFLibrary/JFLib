@@ -464,12 +464,12 @@ fn masters(h: &mut H, doc: &Document, us: &Document) {
         // connection points
         let conn = doc.sym("Connection").map_or(0, |c| doc.rows(sheet, SecKey::one(c)).len());
         h.check(&format!("{tag}/connections"), conn == want_conn, format!("{conn} connection points"));
-        // controls with translated tips
+        // controls with translated tips (the cell Prompt, JD21)
         let ctl = doc.sym("Control").map_or(0, |c| doc.rows(sheet, SecKey::one(c)).len());
-        let tips_ok = t.translated.iter().filter(|(r, _)| r.starts_with("Control.") && r.ends_with(".Tip")).count() == want_ctl
+        let tips_ok = t.translated.iter().filter(|(r, _)| r.starts_with("Control.") && r.ends_with(".Prompt")).count() == want_ctl
             && t.translated.iter().all(|(r, v)| {
                 let row = r.split('.').nth(1).unwrap_or("");
-                let here = cell(doc, sheet, Some(("Control", 0)), named(doc, row), "Tip").map(|c| sym_text(doc, c.value)).unwrap_or_default();
+                let here = cell(doc, sheet, Some(("Control", 0)), named(doc, row), "Prompt").map(|c| sym_text(doc, c.value)).unwrap_or_default();
                 v.iter().all(|x| !x.is_empty()) && here == v[0]
             });
         h.check(&format!("{tag}/controls"), ctl == want_ctl && tips_ok, format!("{ctl} controls, translated {:?}", t.translated.iter().map(|(r, v)| format!("{r}={}", v[4])).collect::<Vec<_>>()));
@@ -548,7 +548,7 @@ fn place(h: &mut H, src: &Document) {
     }
     // the arrow's tip in French, the text box's text
     if let Some(&(_, arrow)) = placed.iter().find(|(i, _)| *i == 5) {
-        let tip = cell(&doc, SheetRef::Shape(arrow), Some(("Control", 0)), named(&doc, "Row_1"), "Tip").map(|c| sym_text(&doc, c.value)).unwrap_or_default();
+        let tip = cell(&doc, SheetRef::Shape(arrow), Some(("Control", 0)), named(&doc, "Row_1"), "Prompt").map(|c| sym_text(&doc, c.value)).unwrap_or_default();
         h.check("stencils/place/arrow-tip", tip == "Modifier la largeur du corps", format!("Tip {tip:?}"));
     }
     if let Some(&(_, tb)) = placed.iter().find(|(i, _)| *i == 6) {

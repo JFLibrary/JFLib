@@ -209,7 +209,8 @@ static START: [Group; 7] = [
         Sm::Row(&[VALIGN_TOP, VALIGN_MIDDLE, VALIGN_BOTTOM]),
         Sm::Row(&[TEXT_LEFT, TEXT_CENTER, TEXT_RIGHT, TEXT_JUSTIFY]),
     ])]),
-    Group("Tools", 0, &[Col::Small(&[Sm::Btn(POINTER), Sm::Btn(CONNECTOR_TOOL), Sm::Btn(TEXT_TOOL)]), Col::Small(&[Sm::Split(DRAW_TOOLS, &DRAW_MENU)])]),
+    // (JD21 glue) Verbindungspunkt (RS-17): a small icon under the drawing tools, as in Visio
+    Group("Tools", 0, &[Col::Small(&[Sm::Btn(POINTER), Sm::Btn(CONNECTOR_TOOL), Sm::Btn(TEXT_TOOL)]), Col::Small(&[Sm::Split(DRAW_TOOLS, &DRAW_MENU), Sm::Row(&[CONN_POINT_TOOL])])]),
     Group("Formenarten", FORMAT_PANE, &[Col::Small(&[Sm::Menu(FILL, &FILL_MENU), Sm::Menu(LINE_FORMAT, &LINE_MENU)])]),
     Group("Anordnen", 0, &[
         Col::BigMenu(ALIGN, &ALIGN_MENU),
@@ -449,9 +450,14 @@ impl Col {
                 let l = commands::label(*id);
                 ui.ribbon_button_width(l, large_icon(*id), ST_LARGE | ST_MENU).max(44)
             }
-            Col::Small(items) if compact && items.iter().all(|s| matches!(s, Sm::Btn(_) | Sm::Menu(..) | Sm::Split(..))) => {
-                items.iter().fold(0, |w, s| w.max(if matches!(s, Sm::Btn(_)) { ICON_W } else { ICON_W + 16 }))
-            }
+            // (JD21 glue) a row of icons (Tools' Verbindungspunkt) is as wide either way
+            Col::Small(items) if compact && items.iter().all(|s| matches!(s, Sm::Btn(_) | Sm::Menu(..) | Sm::Split(..) | Sm::Row(_))) => items.iter().fold(0, |w, s| {
+                w.max(match s {
+                    Sm::Btn(_) => ICON_W,
+                    Sm::Row(ids) => ids.len() as i32 * ROW_W,
+                    _ => ICON_W + 16,
+                })
+            }),
             Col::Small(items) => items.iter().fold(0, |w, s| {
                 w.max(match s {
                     Sm::Btn(id) => ui.ribbon_button_width(commands::label(*id), icon(*id), 0),

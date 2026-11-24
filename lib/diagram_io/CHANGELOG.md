@@ -109,3 +109,4 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - An XML part with `<?>` (a processing instruction without a target) made the reader panic, which ends an app built with panic = abort; it is a syntax error now.
 
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+- (JD21) The stencil build tool wrote a control point's `Tip` as a cell named Tip; VSDX names it `Prompt` (as Visio's files do), which is what Visio and JFDiagrammer read as the tip (the translated texts are `Control.Row_k.Prompt` now)

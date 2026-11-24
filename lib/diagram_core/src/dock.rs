@@ -7,8 +7,9 @@
 //                                    shapes and what they carry; connectors follow in the app)
 //   reach(doc, owner, paper)         a distance on paper in the page's drawing units
 //
-// Visio's point-to-point glue of 2-D shapes: a connection point of Type 1 ("outward") on the
-// shape that moves meets one of Type 0 or 2 ("inward", "both") on another shape.  The nearest
+// Visio's point-to-point glue of 2-D shapes: a connection point of Type 1 ("outward") or 2
+// ("both", JD21) on the shape that moves meets one of Type 0 or 2 ("inward", "both") on another
+// shape.  The nearest
 // pair within `reach` (page units) wins.  A container that would take the shape (its
 // categories, structure::accepts) and holds the middle of the shape's box is reached from
 // anywhere inside it: a server dropped anywhere over a rack goes onto the nearest unit of its
@@ -43,6 +44,7 @@ pub struct Snap {
 }
 
 const OUTWARD: u8 = 1;
+const BOTH: u8 = 2;
 
 fn inward(p: &ConnPoint) -> bool {
     p.kind != OUTWARD
@@ -58,7 +60,8 @@ pub fn snap(doc: &Document, owner: Owner, shapes: &[ShapeRef], reach: f64) -> Op
         if glue::is_one_d(doc, s) {
             continue;
         }
-        let outs: Vec<ConnPoint> = glue::connection_points(doc, s).into_iter().filter(|p| p.kind == OUTWARD).collect();
+        // (JD21 glue) points of both kinds (Type 2) dock as well
+        let outs: Vec<ConnPoint> = glue::connection_points(doc, s).into_iter().filter(|p| p.kind == OUTWARD || p.kind == BOTH).collect();
         if outs.is_empty() {
             continue;
         }
