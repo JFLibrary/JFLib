@@ -30,7 +30,7 @@ key tab
 key esc
 key ctrl+s
 expect dialog:"Speichern unter" exists
-expect text:"win" exists
+expect text:"cargo" exists
 key esc
 # one step of undo for the next drawing
 click tab:"Datei"

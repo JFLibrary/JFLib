@@ -28,7 +28,9 @@
 // D-Bus client does not receive.  Browser and Android (web_power.rs): the Screen Wake Lock
 // (INHIBIT_IDLE only; taken again when the tab is visible again), FLAG_KEEP_SCREEN_ON and a
 // partial WakeLock (INHIBIT_SUSPEND).  macOS (apple_power.rs): IOKit power assertions
-// (PreventUserIdleSystemSleep, with INHIBIT_IDLE also PreventUserIdleDisplaySleep); iOS: None.
+// (PreventUserIdleSystemSleep, with INHIBIT_IDLE also PreventUserIdleDisplaySleep).  iOS
+// (apple_power_ios.rs): INHIBIT_IDLE turns UIApplication's idle timer off (no auto-lock while
+// the app is in front); INHIBIT_SUSPEND alone is None (iOS has no sleep but the screen's lock).
 
 use alloc::string::String;
 use core::sync::atomic::{AtomicU32, Ordering};
@@ -110,7 +112,14 @@ mod native;
 #[path = "apple_power.rs"]
 mod native;
 
-#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android", target_os = "macos")))]
+#[cfg(target_os = "ios")]
+#[path = "apple_power_ios.rs"]
+mod native;
+/// (tests) iOS: UIApplication's idleTimerDisabled now
+#[cfg(target_os = "ios")]
+pub use native::ios_idle_timer_off;
+
+#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android", target_os = "macos", target_os = "ios")))]
 mod native {
     pub struct Held;
     pub fn hold(_reason: &str, _what: u32) -> Option<Held> {

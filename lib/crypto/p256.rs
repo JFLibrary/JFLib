@@ -10,7 +10,7 @@
 //
 //   below_p(x)                               x is a coordinate: smaller than p
 //   y_for_x(x, odd) -> Option<[u8; 32]>      the y of a point with this x and parity (None: no such
-//                                            point; variable time, only for public or hashed x)
+//                                            point); no branch on x before the answer
 //   on_curve(point)                          both coordinates in range and the curve equation
 //   mul_point(k, point) -> Option<point>     k * point (None: not on the curve, or the identity)
 //   add_points(a, b) -> Option<point>        a + b (None: not on the curve, or the identity)
@@ -55,7 +55,7 @@ fn sub(a: &Fe, b: &Fe) -> Fe {
     for i in 0..4 {
         (r[i], br) = sbb(a[i], b[i], br);
     }
-    let m = 0u64.wrapping_sub(br);
+    let m = crate::ct_mask(0u64.wrapping_sub(br));
     let mut c = 0;
     for i in 0..4 {
         (r[i], c) = adc(r[i], P[i] & m, c);
@@ -77,7 +77,7 @@ fn add(a: &Fe, b: &Fe) -> Fe {
         (s[i], br) = sbb(r[i], P[i], br);
     }
     let (_, br) = sbb(c, 0, br);
-    let keep_r = 0u64.wrapping_sub(br);
+    let keep_r = crate::ct_mask(0u64.wrapping_sub(br));
     let mut out = [0u64; 4];
     for i in 0..4 {
         out[i] = (r[i] & keep_r) | (s[i] & !keep_r);
@@ -117,7 +117,7 @@ fn mul(a: &Fe, b: &Fe) -> Fe {
         (s[i], br) = sbb(r[i], P[i], br);
     }
     let (_, br) = sbb(t[4], 0, br);
-    let keep_r = 0u64.wrapping_sub(br);
+    let keep_r = crate::ct_mask(0u64.wrapping_sub(br));
     let mut out = [0u64; 4];
     for i in 0..4 {
         out[i] = (r[i] & keep_r) | (s[i] & !keep_r);
@@ -249,7 +249,7 @@ fn scalar_mul(k: &[u8; 32], p: &Pt, b: &Fe) -> Pt {
             // read every entry; keep the wanted one by mask
             let mut sel = id;
             for (i, e) in table.iter().enumerate() {
-                let m = 0u64.wrapping_sub(((i as u8 ^ half) as u64).wrapping_sub(1) >> 63);
+                let m = crate::ct_mask(0u64.wrapping_sub(((i as u8 ^ half) as u64).wrapping_sub(1) >> 63));
                 for j in 0..4 {
                     sel.x[j] = (sel.x[j] & !m) | (e.x[j] & m);
                     sel.y[j] = (sel.y[j] & !m) | (e.y[j] & m);
@@ -270,10 +270,16 @@ fn affine(p: &Pt) -> Option<(Fe, Fe)> {
     Some((from_mont(&mul(&p.x, &zi)), from_mont(&mul(&p.y, &zi))))
 }
 
-/// a scalar in [1, n - 1] from random bytes (None: draw again)
+/// a scalar in [1, n - 1] from random bytes (None: draw again); only the answer is a branch
 pub fn secret_from(random: &[u8; 32]) -> Option<[u8; 32]> {
     let k = from_be(random);
-    (k != [0; 4] && less(&k, &N)).then_some(*random)
+    let mut br = 0;
+    for i in 0..4 {
+        br = sbb(k[i], N[i], br).1;
+    }
+    let any = k[0] | k[1] | k[2] | k[3];
+    let nonzero = (any | any.wrapping_neg()) >> 63;
+    (crate::ct_mask(br & nonzero) == 1).then_some(*random)
 }
 
 /// the public key of a secret scalar: 04 || x || y
@@ -341,20 +347,44 @@ fn curve_rhs(mx: &Fe) -> Fe {
 /// the y of the point with this x and whose lowest bit is `odd`; None when x is out of range or
 /// x^3 - 3x + b has no square root (p = 3 mod 4: the root is a^((p + 1) / 4))
 pub fn y_for_x(x: &[u8; 32], odd: bool) -> Option<[u8; 32]> {
-    if !below_p(x) {
-        return None;
+    let (found, y) = y_for_x_ct(x, odd as u64);
+    (found != 0).then_some(y)
+}
+
+/// y_for_x without a branch on x or odd (0 or 1): (all ones and the y, or 0 and zeros).  EAP-PWD's
+/// hunting and pecking asks it for values of the password, and which rounds find a point must not
+/// show (Dragonblood, CVE-2019-9494 and the cache attacks after it)
+pub(crate) fn y_for_x_ct(x: &[u8; 32], odd: u64) -> (u64, [u8; 32]) {
+    // x < p: x - p borrows; x is taken mod p for the arithmetic either way (x < 2^256 < 2p)
+    let x = from_be(x);
+    let mut d = [0u64; 4];
+    let mut br = 0;
+    for i in 0..4 {
+        (d[i], br) = sbb(x[i], P[i], br);
     }
-    let mx = to_mont(&from_be(x));
+    let below = crate::ct_mask(0u64.wrapping_sub(br));
+    let mut xr = [0u64; 4];
+    for i in 0..4 {
+        xr[i] = (x[i] & below) | (d[i] & !below);
+    }
+    let mx = to_mont(&xr);
     let rhs = curve_rhs(&mx);
-    // (p + 1) / 4 = 2^254 - 2^222 + 2^190 + 2^94
+    // (p + 1) / 4 = 2^254 - 2^222 + 2^190 + 2^94 (pow branches on this public exponent only)
     let e: Fe = [0, 0x0000_0000_4000_0000, 0x4000_0000_0000_0000, 0x3FFF_FFFF_C000_0000];
     let root = pow(&rhs, &e);
-    if mul(&root, &root) != rhs {
-        return None;
-    }
+    let sq = mul(&root, &root);
+    let diff = (0..4).fold(0u64, |a, i| a | (sq[i] ^ rhs[i]));
+    let is_root = ((diff | diff.wrapping_neg()) >> 63) ^ 1;
+    let found = crate::ct_mask(0u64.wrapping_sub(is_root)) & below;
+    // the root or p - root, whichever has the wanted lowest bit
     let y = from_mont(&root);
-    let y = if (y[0] & 1 == 1) == odd { y } else { sub(&[0; 4], &y) };
-    Some(to_be(&y))
+    let neg = sub(&[0; 4], &y);
+    let flip = crate::ct_mask(0u64.wrapping_sub((y[0] & 1) ^ (odd & 1)));
+    let mut out = [0u64; 4];
+    for i in 0..4 {
+        out[i] = ((y[i] & !flip) | (neg[i] & flip)) & found;
+    }
+    (found, to_be(&out))
 }
 
 /// x || y as a point, checked: in range and on the curve
@@ -382,6 +412,24 @@ fn bytes_of(p: &Pt) -> Option<[u8; 64]> {
 /// both coordinates are in range and the point is on the curve
 pub fn on_curve(p: &[u8; 64]) -> bool {
     point_of(p).is_some()
+}
+
+/// x || y as a point this crate computed itself (EAP-PWD's PWE and what is made from it): not
+/// checked, so nothing branches on its secret coordinates
+fn point_known(p: &[u8; 64]) -> Pt {
+    let (x, y) = (from_be(&p[..32]), from_be(&p[32..]));
+    Pt { x: to_mont(&x), y: to_mont(&y), z: to_mont(&[1, 0, 0, 0]) }
+}
+
+/// k * a point this crate computed (point_known)
+pub(crate) fn mul_point_known(k: &[u8; 32], p: &[u8; 64]) -> Option<[u8; 64]> {
+    bytes_of(&scalar_mul(k, &point_known(p), &to_mont(&B)))
+}
+
+/// a (computed here, point_known) + b (from outside: checked)
+pub(crate) fn add_points_known(a: &[u8; 64], b: &[u8; 64]) -> Option<[u8; 64]> {
+    let q = point_of(b)?;
+    bytes_of(&padd(&point_known(a), &q, &to_mont(&B)))
 }
 
 /// k * point (k below n)
@@ -420,7 +468,13 @@ pub fn scalar_add(a: &[u8; 32], b: &[u8; 32]) -> [u8; 32] {
         (s[i], br) = sbb(r[i], N[i], br);
     }
     let (_, br) = sbb(c, 0, br);
-    to_be(&if br == 1 { r } else { s })
+    // a select, not a branch: EAP-PWD adds its secret rand and mask
+    let keep_r = crate::ct_mask(0u64.wrapping_sub(br));
+    let mut out = [0u64; 4];
+    for i in 0..4 {
+        out[i] = (r[i] & keep_r) | (s[i] & !keep_r);
+    }
+    to_be(&out)
 }
 
 /// k lies in [1, n - 1]

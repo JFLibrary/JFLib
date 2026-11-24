@@ -1,7 +1,7 @@
 // cmac -- AES-CMAC (RFC 4493, NIST SP 800-38B): a message authentication code from the AES
 // block cipher, as the MIC of WPA3-Personal's 4-way handshake (AKM 8) and of 802.11w use it
 //
-//   cmac_aes(key, data) -> Option<[u8; 16]>   key: 16 (AES-128) or 32 bytes; None otherwise
+//   cmac_aes(key, data) -> Option<[u8; 16]>   key: 16, 24 or 32 bytes (AES-128/192/256); None otherwise
 
 use crate::aes::Aes;
 
@@ -13,9 +13,8 @@ fn dbl(b: &[u8; 16]) -> [u8; 16] {
         o[i] = (b[i] << 1) | carry;
         carry = b[i] >> 7;
     }
-    if carry != 0 {
-        o[15] ^= 0x87;
-    }
+    // the subkeys come from the key: a mask, not a branch
+    o[15] ^= 0x87 & crate::ct_mask(0u64.wrapping_sub(carry as u64)) as u8;
     o
 }
 

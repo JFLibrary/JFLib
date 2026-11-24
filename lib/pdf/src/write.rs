@@ -14,7 +14,8 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::Write as _;
 
-use img_core::deflate::{zlib_deflate_st, DeflateState};
+use compress::deflate::DeflateState;
+use compress::zlib;
 
 use crate::image::{png_filter, Pixels};
 use crate::obj::{self, num, Fmt};
@@ -66,7 +67,7 @@ impl W {
             self.stream_raw(n, dict, data);
             return;
         }
-        let z = zlib_deflate_st(Some(&mut self.st), data, self.level as i32);
+        let z = zlib::compress_with(Some(&mut self.st), data, self.level as i32);
         let mut d = dict.to_vec();
         if !d.is_empty() {
             d.push(b' ');
@@ -473,7 +474,7 @@ fn samples(w: &mut W, n: u32, mut dict: Vec<u8>, data: &[u8], width: u32, colors
         return;
     }
     let filtered = png_filter(data, width as usize, colors as usize);
-    let z = zlib_deflate_st(Some(&mut w.st), &filtered, w.level as i32);
+    let z = zlib::compress_with(Some(&mut w.st), &filtered, w.level as i32);
     let _ = write!(Fmt(&mut dict), " /Filter /FlateDecode /DecodeParms << /Predictor 15 /Colors {colors} /BitsPerComponent 8 /Columns {width} >>");
     w.stream_raw(n, &dict, &z);
 }

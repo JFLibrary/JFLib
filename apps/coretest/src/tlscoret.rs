@@ -18,7 +18,7 @@ use netpkt::pkt::{Pkt, HEADROOM};
 use netpkt::tcp::{TcpHdr, TcpOpts, ACK, PSH};
 use netpkt::tls::{self, ClientCfg, Core, Event, Failure, Identity, Part};
 use netpkt::x509::{check_chain, Cert, CertSpec, F_BAD_SIGNATURE, F_EXPIRED, F_NAME, F_NOT_YET, F_SELF_SIGNED, F_UNKNOWN_ISSUER};
-use netpkt::{IpAddr, Ipv4, Mac};
+use netpkt::{Ipv4, Mac};
 use plat::net::{IpAddr as NetAddr, SocketAddr, TcpListener, TcpStream};
 
 use crate::T;
@@ -42,7 +42,7 @@ fn ca(n: u8, cn: &str) -> (Cert, Keypair) {
 }
 
 fn spec(k: &Keypair, names: &[&str]) -> CertSpec {
-    CertSpec { serial: [9; 16], cn: String::from(names.first().copied().unwrap_or("x")), org: String::new(), not_before: NOW - DAY, not_after: NOW + DAY, public_key: k.public, is_ca: false, dns: names.iter().map(|n| String::from(*n)).collect(), ips: Vec::new() }
+    CertSpec { serial: [9; 16], cn: String::from(names.first().copied().unwrap_or("x")), org: String::new(), not_before: NOW - DAY, not_after: NOW + DAY, public_key: k.public, is_ca: false, dns: names.iter().map(|n| String::from(*n)).collect(), ..CertSpec::default() }
 }
 
 fn identity(names: &[&str]) -> (Identity, Cert) {
@@ -85,6 +85,7 @@ pub fn run(t: &mut T) {
     certs(t);
     talking(t);
     faults(t);
+    extensions(t);
     refused(t);
     with_netio(t);
     dissector(t);
@@ -115,12 +116,12 @@ fn certs(t: &mut T) {
     let leaf = Cert::parse(&id.chain[0]).unwrap_or_default();
     t.check("a leaf reads", !leaf.is_ca && leaf.issuer_cn == "Labor-CA" && leaf.signed_by(&root) && !leaf.self_signed());
     t.eq("its times", (leaf.not_before, leaf.not_after), (NOW - DAY, NOW + DAY));
-    t.eq("its key", leaf.key, Some(key(2).public));
+    t.eq("its key", leaf.ed25519_key(), Some(key(2).public));
     t.check("a name", leaf.names("web.lab") && leaf.names("WEB.lab."));
     t.check("a wildcard", leaf.names("a.shop.lab") && !leaf.names("shop.lab") && !leaf.names("a.b.shop.lab"));
     t.check("another name", !leaf.names("other.lab"));
     let k = key(3);
-    let with_ip = CertSpec { ips: alloc::vec![IpAddr::V4(Ipv4([10, 0, 0, 1]))], ..spec(&k, &["ip.lab"]) }.sign(None, &k);
+    let with_ip = CertSpec { ips: alloc::vec![netpkt::x509::IpAddr::V4([10, 0, 0, 1])], ..spec(&k, &["ip.lab"]) }.sign(None, &k);
     let c = Cert::parse(&with_ip).unwrap_or_default();
     t.check("an address", c.names("10.0.0.1") && !c.names("10.0.0.2"));
     t.eq("names for a dialog", c.name_list(), alloc::vec![String::from("ip.lab"), String::from("10.0.0.1")]);
@@ -222,7 +223,7 @@ fn talking(t: &mut T) {
     t.check("other seeds, other bytes", run(1, 2) != run(3, 2) && run(1, 2) != run(1, 3));
     // an address: no SNI, the address in the certificate
     let k = key(4);
-    let der = CertSpec { ips: alloc::vec![IpAddr::V4(Ipv4([10, 0, 0, 1]))], dns: Vec::new(), ..spec(&k, &["x"]) }.sign(Some(&root), &key(1));
+    let der = CertSpec { ips: alloc::vec![netpkt::x509::IpAddr::V4([10, 0, 0, 1])], dns: Vec::new(), ..spec(&k, &["x"]) }.sign(Some(&root), &key(1));
     let mut c = Core::client(cfg("10.0.0.1", &root), &seed(1));
     let mut s = Core::server(Identity { chain: alloc::vec![der], key: k }, &seed(2));
     shuttle(&mut c, &mut s, 1 << 20);
@@ -258,7 +259,7 @@ fn faults(t: &mut T) {
         let mut s = Core::server(ident.clone(), &seed(2));
         shuttle(&mut c, &mut s, 1 << 20);
         t.check(&alloc::format!("{}: insecure goes on", name), c.established() && s.established() && c.excused() && c.faults() == fault);
-        let fp = Cert::parse(&ident.chain[0]).map(|x| x.fingerprint()).unwrap_or([0; 32]);
+        let fp = Cert::parse(&ident.chain[0]).map(|x| x.fingerprint_bytes()).unwrap_or([0; 32]);
         let mut c = Core::client(ClientCfg { accept: alloc::vec![fp], ..cfg(host, &root) }, &seed(1));
         let mut s = Core::server(ident.clone(), &seed(2));
         shuttle(&mut c, &mut s, 1 << 20);
@@ -275,6 +276,26 @@ fn faults(t: &mut T) {
     let mut s = Core::server(bad, &seed(2));
     shuttle(&mut c, &mut s, 1 << 20);
     t.eq("insecure still checks the signature", failure(&mut c).map(|f| f.alert), Some(tls::AL_DECRYPT_ERROR));
+}
+
+/// the client takes in a ServerHello only the extensions it offered that belong there (RFC
+/// 8446 4.2, RFC 8701 4), as netio's does
+fn extensions(t: &mut T) {
+    let (root, rk) = ca(1, "Labor-CA");
+    let k = key(2);
+    let id = Identity { chain: alloc::vec![spec(&k, &["web.lab"]).sign(Some(&root), &rk)], key: key(2) };
+    let answer = |extension: &[u8]| {
+        let mut c = Core::client(cfg("web.lab", &root), &seed(1));
+        let mut s = Core::server(id.clone(), &seed(2));
+        s.push(&c.take_out());
+        let flight = s.take_out();
+        c.push(&if extension.is_empty() { flight } else { crate::tlst::sh_with_ext(&flight, extension) });
+        shuttle(&mut c, &mut s, 1 << 20);
+        if c.established() { Some(0) } else { failure(&mut c).filter(|f| f.ours).map(|f| f.alert) }
+    };
+    t.eq("extensions: the server's flight as it is", answer(&[]), Some(0));
+    t.eq("extensions: a GREASE extension in the ServerHello", answer(&[0x0a, 0x0a, 0, 1, 0]), Some(tls::AL_UNSUPPORTED_EXTENSION));
+    t.eq("extensions: server_name in the ServerHello", answer(&[0, 0, 0, 0]), Some(tls::AL_ILLEGAL_PARAMETER));
 }
 
 fn refused(t: &mut T) {
@@ -337,7 +358,7 @@ fn with_netio(t: &mut T) {
     t.check("netio reads our leaf", nleaf.as_ref().is_some_and(|c| c.names("web.lab") && c.signed_by(&nroot)));
     t.check("netio's chain check takes it", nleaf.is_some_and(|c| netio::x509::verify_chain(&[c], core::slice::from_ref(&nroot), NOW, Some("web.lab"), netio::x509::Usage::Server).is_ok()));
     // netio's client, our server
-    let mut c = Conn::client(ClientConfig { trust: Trust::Anchors(alloc::vec![nroot.clone()]), identity: None, server_name: String::from("web.lab") });
+    let mut c = Conn::client(ClientConfig::new(Trust::Anchors(alloc::vec![nroot.clone()]), "web.lab"));
     let mut s = Core::server(Identity { chain: alloc::vec![leaf.clone()], key: k.clone() }, &seed(2));
     for _ in 0..8 {
         let x = c.take_out();
@@ -367,7 +388,7 @@ fn with_netio(t: &mut T) {
     let our_root = Cert::parse(&nca);
     t.check("we read netio's CA", our_root.as_ref().is_some_and(|c| c.is_ca && c.subject_cn == "Netio-CA" && c.subject_org == "JFLib" && c.self_signed()));
     let our_root = our_root.unwrap_or_default();
-    let mut s = Conn::server(ServerConfig { identity: NIdentity { chain: alloc::vec![nleaf], key: sk }, client_auth: None, client_auth_optional: false });
+    let mut s = Conn::server(ServerConfig::new(NIdentity { chain: alloc::vec![nleaf], key: sk.into() }));
     let mut c = Core::client(ClientCfg { name: String::from("web.lab"), anchors: alloc::vec![our_root], now: NOW, insecure: false, accept: Vec::new() }, &seed(1));
     for _ in 0..8 {
         let x = c.take_out();

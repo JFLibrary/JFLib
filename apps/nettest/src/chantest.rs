@@ -1,6 +1,7 @@
 // chantest -- lib/netchan on real loopback sockets: the UDP channel and the channel over a
 // WebSocket, one server for both, echoes, acks, disconnects, timeouts, caps, the protocol id, the
-// app's permissions; netchan's own WebSocket client type against netio's echo server
+// app's permissions; the reliable channel there and back (large messages in chunks, in order);
+// netchan's own WebSocket client type against netio's echo server
 
 use alloc::format;
 use alloc::string::String;
@@ -56,6 +57,7 @@ pub fn pump(server: &mut Server, clients: &mut [Client], seen: &mut [Seen], ms: 
                     ClientEvent::Delivered(_) => s.delivered += 1,
                     ClientEvent::Lost(_) => s.lost += 1,
                     ClientEvent::Disconnected(r) => s.end = Some(r),
+                    _ => {}
                 }
             }
         }
@@ -129,6 +131,35 @@ fn echo_run(c: &mut Ctx, name: &str, server: &mut Server, ep: Endpoint, n: usize
     Some(cl)
 }
 
+/// messages on the reliable channel, sent back by the server: whole and in the order they went
+fn reliable_echo(c: &mut Ctx, name: &str, server: &mut Server, cl: &mut Client) {
+    let sizes = [100_000usize, 17, 1500, 30_000];
+    let msgs: Vec<Vec<u8>> = (0..12).map(|i| (0..sizes[i % 4]).map(|k| (k * 7 + i * 13) as u8).collect()).collect();
+    for m in &msgs {
+        if let Err(e) = cl.send_reliable(m) {
+            c.check(false, || format!("{}: send_reliable: {}", name, e));
+            return;
+        }
+    }
+    let mut back: Vec<Vec<u8>> = Vec::new();
+    let end = plat::time_us() + 20_000_000;
+    while back.len() < msgs.len() && plat::time_us() < end {
+        while let Some(e) = server.poll() {
+            if let ServerEvent::Reliable { id, data } = e {
+                let _ = server.send_reliable(id, &data);
+            }
+        }
+        while let Some(e) = cl.poll() {
+            if let ClientEvent::Reliable(d) = e {
+                back.push(d);
+            }
+        }
+        plat::sleep_ms(1);
+    }
+    let bytes: usize = msgs.iter().map(|m| m.len()).sum();
+    c.check(back == msgs, || format!("{}: reliable: {} of {} messages ({} bytes) back whole and in order", name, back.len(), msgs.len(), bytes));
+}
+
 pub fn run_udp(quick: bool) -> Ctx {
     let mut c = Ctx::new("udp", quick);
     let n = c.n(2000).max(100);
@@ -147,6 +178,7 @@ pub fn run_udp(quick: bool) -> Ctx {
         c.check(cl.rtt_ms() > 0.0 && cl.rtt_ms() < 250.0, || format!("udp: rtt {} ms on loopback", cl.rtt_ms()));
         let id = server.ids().first().copied().unwrap_or(0);
         c.check(server.peer(id).is_some_and(|p| p.0 == Transport::Udp), || String::from("udp: the server's peer is UDP"));
+        reliable_echo(&mut c, "udp", &mut server, &mut cl);
         cl.disconnect();
         let mut none: [Client; 0] = [];
         let ev = pump(&mut server, &mut none, &mut [], 1000, |_| false);
@@ -195,6 +227,26 @@ pub fn run_udp(quick: bool) -> Ctx {
         pump(&mut server, &mut cls, &mut seen, 2000, |s| s[0].end.is_some());
         c.check(seen[0].end == Some(Reason::Protocol), || format!("udp: another protocol id: {:?}", seen[0].end));
     }
+    // a static key: the client that pins it connects and echoes, one with another key is refused
+    let mut keyed = Server::new(scfg());
+    keyed.set_static_key(plat::random_bytes::<32>());
+    let kaddr = keyed.bind_udp(&lo4()).unwrap_or(lo4());
+    let public = keyed.public_key();
+    let pinned = Client::connect(Endpoint::Udp(kaddr), ClientConfig { server_key: public, ..ccfg() });
+    let wrong = Client::connect(Endpoint::Udp(kaddr), ClientConfig { server_key: Some([9; 32]), ..ccfg() });
+    if let (Ok(a), Ok(b)) = (pinned, wrong) {
+        let mut cls = [a, b];
+        let mut seen = [Seen::default(), Seen::default()];
+        pump(&mut keyed, &mut cls, &mut seen, 3000, |s| s[0].connected && s[1].end.is_some());
+        let _ = cls[0].send(b"pinned echo");
+        pump(&mut keyed, &mut cls, &mut seen, 3000, |s| !s[0].msgs.is_empty());
+        let echoed = seen[0].msgs.iter().any(|(_, d)| d == b"pinned echo");
+        c.check(seen[0].connected && echoed, || format!("udp: a client with the server's static key: connected {}, echo {}", seen[0].connected, echoed));
+        c.check(seen[1].end == Some(Reason::ServerKey), || format!("udp: a client with another static key: {:?}", seen[1].end));
+    } else {
+        c.check(false, || String::from("udp: no clients for the static key"));
+    }
+    drop(keyed);
     // nobody listens: ConnectTimeout
     let dead = SocketAddr::new(IpAddr::LOCALHOST_V4, addr.port.wrapping_add(7).max(1024));
     if let Ok(cl) = Client::connect(Endpoint::Udp(dead), ClientConfig { connect_ms: 400, ..ccfg() }) {
@@ -230,6 +282,7 @@ pub fn run_ws(quick: bool) -> Ctx {
         c.check(cl.reliable(), || String::from("ws: reliable"));
         let big = alloc::vec![7u8; 60_000];
         c.check(cl.send(&big).is_ok(), || String::from("ws: 60 KB in one message"));
+        reliable_echo(&mut c, "ws", &mut server, &mut cl);
         cl.disconnect();
         let mut none: [Client; 0] = [];
         let ev = pump(&mut server, &mut none, &mut [], 1000, |_| false);

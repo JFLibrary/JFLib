@@ -25,11 +25,9 @@
 mod android;
 mod cargo;
 mod debfile;
-mod deflate;
 mod json;
 mod linux;
 mod linuxpkg;
-mod lz4;
 mod mac;
 mod msix;
 mod new;

@@ -65,7 +65,7 @@ German numbers (`1.234,5`) are read when `;` is the delimiter.
 `xlsx::Limits` bounds the ZIP container before anything is inflated (parts, sizes, the
 compression ratio), the nesting of the XML, the rows, columns and cells of a sheet, the shared
 strings and their bytes, and the text one sheet may hold (one long shared string in a million
-cells is refused, not copied). The XML reader takes no DTD and no entity but the five predefined
+cells is refused, not copied). The XML reader (jflib-formats' strict `formats::xml::Reader`) takes no DTD and no entity but the five predefined
 ones, so no entity expansion of any kind. No size a file advertises (`<dimension>`, `count`,
 `uniqueCount`) sizes an allocation; cells are stored sparsely, so a cell at `A1` and one at
 `XFD1048576` are two cells, and a table of an area is refused when it would hold more than

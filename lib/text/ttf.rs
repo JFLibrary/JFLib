@@ -770,6 +770,11 @@ impl TtFont {
 
     /// glyph for cp (0 = .notdef).  Symbol fonts ((3,0) cmap) map like GDI: U+0000..U+00FF
     /// and the Windows-1252 characters to U+F000 + their code page byte  [ttf_glyph]
+    /// the CFF or CFF2 outlines of an OpenType font (None: TrueType outlines)
+    pub fn cff(&self) -> Option<&Cff> {
+        self.cff.as_deref()
+    }
+
     pub fn glyph(&self, cp: u32) -> u32 {
         let g = self.cmap_raw(cp);
         if g != 0 || self.flags & TFF_SYMBOL == 0 {

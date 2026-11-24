@@ -58,15 +58,53 @@ let server = Server::start(&addr, ServerConfig::default(), handler); // NetResul
 
 ## TLS and certificates
 
-Between an app's own servers and clients, `netio::tls` speaks TLS 1.3 on both sides with
-ChaCha20-Poly1305, X25519 and Ed25519 certificates of the app's own certificate authority,
-mutual authentication, HelloRetryRequest and key updates. A client that talks to public servers
-(`Trust::System`) also offers AES-128-GCM, RSA and ECDSA certificates and the P-256 key exchange,
-and falls back to TLS 1.2 with ECDHE and AEAD suites only, the extended master secret and the
-TLS 1.3 downgrade check; connections between an app's own parts never fall back. Not here:
-session resumption, 0-RTT, renegotiation and revocation checks.
+`netio::tls` speaks TLS 1.3 as a server and a client with ChaCha20-Poly1305, AES-128-GCM and
+AES-256-GCM; the key exchange X25519MLKEM768 (the post-quantum hybrid that browsers and
+Cloudflare use; a client sends it first, with X25519 besides), X25519, P-256, P-384 and the
+hybrids SecP256r1MLKEM768 and SecP384r1MLKEM1024; certificates and keys of Ed25519, ECDSA (P-256,
+P-384) and RSA, so the same server serves browsers with the certificate of a public CA and an
+app's own agents with certificates of its own CA. A key comes from PEM or DER as OpenSSL and the
+CAs write it (`Identity::from_pem`: PKCS #8, SEC 1, PKCS #1). The server picks its certificate by
+the name the client asks for (SNI) and by the signatures it takes, or by a choice of the program's
+own (`ServerConfig::select`: certificates renewed while it runs), and both sides agree on the
+application protocol (ALPN; https offers http/1.1). Mutual authentication works with every kind
+of key, HelloRetryRequest and key updates both ways. A client that talks to public servers
+(`Trust::System`, or `Trust::Custom` with a check of the program's own: a PKI of its own, pinning,
+Certificate Transparency) also falls back to TLS 1.2 with ECDHE and AEAD suites only, the extended
+master secret (when the server has it; without TLS 1.2 resumption and renegotiation a server
+without it is safe to take) and the TLS 1.3 downgrade check; other connections never fall back.
 
-`netio::x509` parses certificates strictly, builds and signs those of a private Ed25519 CA, and
+TLS 1.3 sessions resume with tickets: a server with `ServerConfig::tickets` (`Tickets`: stateless
+tickets under keys that rotate by themselves, or keys shared by several servers) sends two after
+each handshake, and a client with `ClientConfig::sessions` (`Sessions`, kept per server name,
+trust and client identity, each ticket used once) offers one; the handshake keeps a fresh key
+exchange (psk_dhe_ke) and skips the certificates, a session lasts at most 7 days from the handshake
+that authenticated it, and a resumed server keeps the client's certificate. https resumes by
+itself (`trust::system_connector`, `trust::connector` with a CA). 0-RTT is the server's choice
+(`ServerConfig::early_data`): `tls::connect_early` sends a request with the ClientHello, the
+server takes it only fresh and the first time it sees it, and hands it apart (`read_early`),
+since early data can be replayed. Not here yet: OCSP stapling; not here at all: renegotiation,
+external PSKs, TLS 1.2 resumption. The server is checked against tlsfuzzer with RSA, ECDSA and
+Ed25519 certificates and against OpenSSL's client, curl and Python, the client against TLS-Anvil
+and OpenSSL's server
+([docs/EXTERNAL_SUITES.md](https://github.com/JFLibrary/JFLib/blob/main/docs/EXTERNAL_SUITES.md)).
+
+```rust
+use std::sync::Arc;
+use jflib::netio::tls::{self, ClientConfig, Identity, ServerConfig, Trust};
+
+// a certificate chain and its key as a CA hands them out (PEM), HTTP/1.1 by ALPN
+let identity = Identity::from_pem(&chain_pem, &key_pem)?; // Result<Identity, String>
+let cfg = ServerConfig { alpn: vec![String::from("http/1.1")], ..ServerConfig::new(identity) };
+let tls = tls::accept(Box::new(tcp), cfg.clone()); // Result<TlsStream, TlsError>
+
+// resumption: one Tickets for all connections of the server, one Sessions for a client's
+let cfg = ServerConfig { tickets: Some(Arc::new(tls::Tickets::new())), ..cfg };
+let client = ClientConfig { sessions: Some(Arc::new(tls::Sessions::default())), ..ClientConfig::new(Trust::System(Vec::new()), "example.org") };
+```
+
+`netio::x509` (the crate [`jflib-x509`](https://docs.rs/jflib-x509), which netpkt shares) parses
+certificates strictly, builds and signs certificates of a private CA with any of these keys, and
 verifies chains up to a trusted anchor, name constraints included. For https to a server with
 its own CA, `trust::connector` trusts a CA the app knows or one with a pinned fingerprint, or
 learns the CA on the first connection and hands it back for the user to decide, the way SSH
@@ -112,11 +150,14 @@ A game's channel over UDP and WebSocket, for the desktop and the browser, is
 
 ## Names, SSH and mail
 
-`dns::resolve(host, port)` takes numeric addresses and `localhost` as they are. On Windows it asks
-the system's resolver; elsewhere it reads the hosts file and then asks the name servers of
-`/etc/resolv.conf` itself, over UDP and over TCP when an answer was truncated, and accepts an
-answer only from the server it asked, with the query's id and question. A name server on an IPv6
-link-local address keeps its zone (`nameserver fe80::1%eth0`). There is no DNSSEC, mDNS or cache.
+`dns::resolve(host, port)` takes numeric addresses and `localhost` as they are. On Windows, macOS
+and iOS it asks the system's resolver (`getaddrinfo` on Apple), which knows the name servers of a
+VPN, `.local` over mDNS and iOS's rules (a link-local address it returns keeps its zone); on Linux
+it reads the hosts file and then asks the name servers of `/etc/resolv.conf` itself, over UDP and
+over TCP when an answer was truncated, and accepts an answer only from the server it asked, with
+the query's id and question (a "no such name" too) and only for the asked name or its CNAME chain,
+compared label by label. A name server on an IPv6 link-local address keeps its zone
+(`nameserver fe80::1%eth0`). That resolver has no DNSSEC, mDNS or cache.
 
 `ssh::Client` runs commands on another machine: it connects with curve25519-sha256 and the strict
 key exchange that closes the Terrapin attack, checks the host key against a pinned fingerprint,

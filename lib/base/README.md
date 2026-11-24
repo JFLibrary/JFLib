@@ -1,9 +1,9 @@
 # jflib-base
 
 The portable basics of [JFLib](https://jflib.org) that sit above its runtime and platform layer:
-settings files and typed settings, numbers as text, the command line, text encodings, a bounded
-XML reader, and a handful of tools for programs that simulate, measure or talk to people at a
-console. It is plain Rust, without the standard library and without a line of `unsafe` code.
+settings files and typed settings, numbers as text, the command line, and a handful of tools for
+programs that simulate, measure or talk to people at a console. It is plain Rust, without the
+standard library and without a line of `unsafe` code.
 
 ## Settings
 
@@ -45,14 +45,9 @@ the decimal separator, and `f64_parse` reads it back; the text is the same on x8
 opposites. `utf8_decode` steps through bytes that may not be valid UTF-8, and `Args` answers the
 usual questions about the command line (`value("--out")`, `flag("--quiet")`).
 
-`base::encoding` decodes and encodes text strictly: UTF-8, with or without a byte order mark, and
-UTF-16 in both byte orders, which it recognises by the mark. It never guesses a legacy code page
-and never puts in replacement characters; invalid input is an error.
-
-`base::xml` reads a deliberately small, namespace-aware subset of XML for data exchange. It has no
-DTDs, no entities and no way to fetch anything, refuses what it cannot represent without loss,
-and stops at limits on size, element count and nesting that the caller can set
-(`xml::parse_with` and `xml::Limits`).
+The text encodings and the XML reader that were here until 0.2.1 are in
+[`jflib-formats`](https://crates.io/crates/jflib-formats) now: `base::encoding` and `base::xml`
+are re-exports of `formats::encoding` and `formats::xml`, so existing code keeps compiling.
 
 ## For simulators, servers and consoles
 

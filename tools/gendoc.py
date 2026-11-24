@@ -133,11 +133,14 @@ CRATES = [
      "SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL", "full"),
     ("plat", "the platform layer: windows, input, files, threads, network, processes, desktop services", "full"),
     ("base", "UTF-8, command line, settings files, numbers and text", "full"),
+    ("formats", "bounded JSON with exact numbers, typed JSON records, an XML subset, the text encodings of the web", "full"),
     ("datetime", "timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules", "full"),
     ("crypto", "hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)", "full"),
-    ("compress", "LZ4 block and frame, Zstandard, xxHash32 and xxHash64, codec ids", "full"),
-    ("datastore", "an embedded journal database: JSON collections, transactions, snapshots, crash recovery",
-     "full"),
+    ("x509", "X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's "
+     "builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)", "full"),
+    ("compress", "DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids", "full"),
+    ("datastore", "an embedded journal database: JSON collections, transactions, snapshots, crash recovery, "
+     "secondary indexes, encryption at rest", "full"),
     ("netio", "HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS", "full"),
     ("netpkt", "network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, "
      "syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng", "full"),
@@ -155,7 +158,7 @@ CRATES = [
     ("diagram_io", "Visio file formats (the VSDX family) and diagram exports", "full"),
     ("rt", "the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records",
      "full"),
-    ("pdf", "vector PDF writer with embedded font subsets, links and outlines", "full"),
+    ("pdf", "PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments, drawing pages)", "full"),
     ("diagram_view", "draws diagram pages (the display list of diagram_core) on render2d and gfx", "full"),
     ("dxf", "DXF import (ASCII): tables, blocks and entities of model space, without a GPU", "full"),
     ("physics", "Collision shapes, broad phase and deterministic queries for games", "full"),

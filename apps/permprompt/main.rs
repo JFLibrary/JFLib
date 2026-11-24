@@ -31,6 +31,7 @@ use alloc::string::String;
 use agent_core::{ActionContext, ActionError, ActionResult, ActionSpec, ErrorCode, Value};
 use plat::policy;
 use plat::task::{spawn_blocking, Task};
+use ui::i18n::{t, tf, Catalog};
 use ui::*;
 
 const DESC: AppDesc = AppDesc { title: "permprompt", flags: AF_RESIZABLE, w: 720, h: 1000, min_w: 400, min_h: 300, ..AppDesc::NONE };
@@ -79,12 +80,12 @@ impl P {
     // on the UI thread: refused while the question is open, done again after the answer
     fn write_file(&mut self) {
         if put(&self.ask, b"Brief") {
-            self.write = "geschrieben";
+            self.write = t("geschrieben");
         } else if !policy::questions().is_empty() {
-            self.write = "wartet auf Antwort";
+            self.write = t("wartet auf Antwort");
             self.retry = true;
         } else {
-            self.write = "abgelehnt";
+            self.write = t("abgelehnt");
         }
     }
 }
@@ -96,60 +97,60 @@ fn put(path: &str, data: &[u8]) -> bool {
 }
 
 fn yes(ok: bool) -> &'static str {
-    if ok { "erlaubt" } else { "abgelehnt" }
+    if ok { t("erlaubt") } else { t("abgelehnt") }
 }
 
 impl App for P {
     fn frame(&mut self, ui: &mut Ui) {
-        if let Some(t) = &self.bg {
-            if let Some(ok) = t.take() {
-                self.bg_state = if ok { "geschrieben" } else { "abgelehnt" };
+        if let Some(task) = &self.bg {
+            if let Some(ok) = task.take() {
+                self.bg_state = if ok { t("geschrieben") } else { t("abgelehnt") };
                 self.bg = None;
             }
         }
         ui.box_begin(0, BOX_V | pad(16), 8);
-        ui.text(TS_SUBTITLE, "Rückfragen");
+        ui.text(TS_SUBTITLE, t("Rückfragen"));
         ui.box_begin(0, BOX_H | BOX_WRAP, 8);
-        if ui.button(ui.id("write"), "Datei schreiben") & EV_ACT != 0 {
+        if ui.button(ui.id("write"), t("Datei schreiben")) & EV_ACT != 0 {
             self.write_file();
         }
-        if ui.button(ui.id("bg"), "Im Hintergrund schreiben") & EV_ACT != 0 {
+        if ui.button(ui.id("bg"), t("Im Hintergrund schreiben")) & EV_ACT != 0 {
             let path = self.bg_path.clone();
             self.bg = Some(ui.spawn(async move { spawn_blocking(move || put(&path, b"Sicherung")).await }));
-            self.bg_state = "läuft";
+            self.bg_state = t("läuft");
         }
-        if ui.button(ui.id("mail"), "Mail prüfen") & EV_ACT != 0 {
+        if ui.button(ui.id("mail"), t("Mail prüfen")) & EV_ACT != 0 {
             self.mail = yes(policy::url_allowed("mailto:support@example.org"));
         }
-        if ui.button(ui.id("print"), "Drucken prüfen") & EV_ACT != 0 {
+        if ui.button(ui.id("print"), t("Drucken prüfen")) & EV_ACT != 0 {
             self.print = yes(policy::print_allowed());
         }
-        if ui.button(ui.id("store"), "Antworten überschreiben") & EV_ACT != 0 {
+        if ui.button(ui.id("store"), t("Antworten überschreiben")) & EV_ACT != 0 {
             let ok = plat::write_file("config://permission-decisions.txt", b"always print\n");
-            self.store = if ok { "geschrieben" } else { "abgelehnt" };
+            self.store = if ok { t("geschrieben") } else { t("abgelehnt") };
         }
-        if ui.button(ui.id("beep"), "Klang abspielen") & EV_ACT != 0 {
+        if ui.button(ui.id("beep"), t("Klang abspielen")) & EV_ACT != 0 {
             self.beep = yes(ui.beep(plat::audio::SOUND_INFO));
         }
-        if ui.button(ui.id("hint"), "Hinweis mit Klang") & EV_ACT != 0 {
+        if ui.button(ui.id("hint"), t("Hinweis mit Klang")) & EV_ACT != 0 {
             self.hint.set(1);
         }
         ui.box_end();
-        ui.text(TS_BODY, &format!("Datei: {}", self.write));
-        ui.text(TS_BODY, &format!("Hintergrund: {}", self.bg_state));
-        ui.text(TS_BODY, &format!("Mail: {}", self.mail));
-        ui.text(TS_BODY, &format!("Drucken: {}", self.print));
-        ui.text(TS_BODY, &format!("Antworten: {}", self.store));
-        ui.text(TS_BODY, &format!("Klang: {}", self.beep));
-        ui.text(TS_BODY, &format!("Agent: {} gespeichert", self.saves));
-        ui.text(TS_BODY_STRONG, "Berechtigungen");
+        ui.text(TS_BODY, &tf("Datei: {}", &[self.write]));
+        ui.text(TS_BODY, &tf("Hintergrund: {}", &[self.bg_state]));
+        ui.text(TS_BODY, &tf("Mail: {}", &[self.mail]));
+        ui.text(TS_BODY, &tf("Drucken: {}", &[self.print]));
+        ui.text(TS_BODY, &tf("Antworten: {}", &[self.store]));
+        ui.text(TS_BODY, &tf("Klang: {}", &[self.beep]));
+        ui.text(TS_BODY, &tf("Agent: {} gespeichert", &[&format!("{}", self.saves)]));
+        ui.text(TS_BODY_STRONG, t("Berechtigungen"));
         ui.permissions_page(ui.id("perms"));
         ui.box_end();
         let hint = self.hint.clone();
-        if ui.dialog_begin(ui.id("hintdlg"), "Hinweis", &hint) {
+        if ui.dialog_begin(ui.id("hintdlg"), t("Hinweis"), &hint) {
             ui.dialog_sound(plat::audio::SOUND_WARNING);
-            ui.text(TS_BODY, "Ein Hinweis, der beim Öffnen klingt, sobald Klänge erlaubt sind.");
-            ui.dialog_buttons(Some("OK"), None, None);
+            ui.text(TS_BODY, t("Ein Hinweis, der beim Öffnen klingt, sobald Klänge erlaubt sind."));
+            ui.dialog_buttons(Some(t("OK")), None, None);
         }
         ui.dialog_end();
     }
@@ -160,7 +161,7 @@ impl App for P {
             if arg == 1 {
                 self.write_file();
             } else {
-                self.write = "abgelehnt";
+                self.write = t("abgelehnt");
             }
         }
         true
@@ -181,4 +182,7 @@ impl App for P {
     }
 }
 
-ui::main!(ui::launch(&DESC, P::new(), &style::STYLE));
+ui::main!({
+    i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
+    ui::launch(&DESC, P::new(), &style::STYLE)
+});

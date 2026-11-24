@@ -6,7 +6,7 @@
 //                                               the result is 8 bytes longer
 //   aes_unwrap(kek, wrapped) -> Option<Vec<u8>> None when the integrity check fails
 //
-// kek is a 16- or 32-byte AES key.
+// kek is a 16-, 24- or 32-byte AES key.
 
 use alloc::vec::Vec;
 

@@ -143,13 +143,13 @@ fn scale_div(v: i32, mul: i32, div: i32) -> i32 {
 // resize_dialog()
 fn resize_dialog(p: &mut Kritzel, ui: &mut Ui) {
     let open = p.dlg.rs_open.clone();
-    if ui.dialog_begin(ID_DLG_RESIZE, "Größe ändern und schräg stellen", &open) {
-        ui.text(TS_BODY_STRONG, "Größe ändern");
+    if ui.dialog_begin(ID_DLG_RESIZE, i18n::t("Größe ändern und schräg stellen"), &open) {
+        ui.text(TS_BODY_STRONG, i18n::t("Größe ändern"));
         // percent / pixel
         ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
         let g = &mut p.dlg;
-        ui.radio(ID_DLG_RESIZE + 1, "Prozent", &mut g.rs_mode, 0);
-        ui.radio(ID_DLG_RESIZE + 2, "Pixel", &mut g.rs_mode, 1);
+        ui.radio(ID_DLG_RESIZE + 1, i18n::t("Prozent"), &mut g.rs_mode, 0);
+        ui.radio(ID_DLG_RESIZE + 2, i18n::t("Pixel"), &mut g.rs_mode, 1);
         if g.rs_mode != g.rs_prev {
             g.rs_prev = g.rs_mode;
             let (dw, dh) = (doc_w(&p.doc), doc_h(&p.doc));
@@ -165,32 +165,32 @@ fn resize_dialog(p: &mut Kritzel, ui: &mut Ui) {
         }
         ui.box_end();
         // horizontal / vertical size
-        form_row(ui, "Horizontal:");
+        form_row(ui, i18n::t("Horizontal:"));
         let ev = ui.number_box(ID_DLG_RESIZE + 3, &mut p.dlg.rs_w, &RANGE_SIZE);
         ui.box_end();
         if ev & EV_ACT != 0 && p.dlg.rs_keep != 0 {
             keep_aspect(p, 0);
         }
-        form_row(ui, "Vertikal:");
+        form_row(ui, i18n::t("Vertikal:"));
         let ev = ui.number_box(ID_DLG_RESIZE + 4, &mut p.dlg.rs_h, &RANGE_SIZE);
         ui.box_end();
         if ev & EV_ACT != 0 && p.dlg.rs_keep != 0 {
             keep_aspect(p, 1);
         }
-        if ui.checkbox(ID_DLG_RESIZE + 5, "Seitenverhältnis beibehalten", &mut p.dlg.rs_keep) & EV_ACT != 0
+        if ui.checkbox(ID_DLG_RESIZE + 5, i18n::t("Seitenverhältnis beibehalten"), &mut p.dlg.rs_keep) & EV_ACT != 0
             && p.dlg.rs_keep != 0
         {
             keep_aspect(p, 0);
         }
         ui.spacer(8);
-        ui.text(TS_BODY_STRONG, "Schräg stellen (Grad)");
-        form_row(ui, "Horizontal:");
+        ui.text(TS_BODY_STRONG, i18n::t("Schräg stellen (Grad)"));
+        form_row(ui, i18n::t("Horizontal:"));
         ui.number_box(ID_DLG_RESIZE + 6, &mut p.dlg.rs_skx, &RANGE_SKEW);
         ui.box_end();
-        form_row(ui, "Vertikal:");
+        form_row(ui, i18n::t("Vertikal:"));
         ui.number_box(ID_DLG_RESIZE + 7, &mut p.dlg.rs_sky, &RANGE_SKEW);
         ui.box_end();
-        if ui.dialog_buttons(Some("OK"), None, Some("Abbrechen")) == DLG_PRIMARY {
+        if ui.dialog_buttons(Some(i18n::t("OK")), None, Some(i18n::t("Abbrechen"))) == DLG_PRIMARY {
             ui.cmd_run(CMD_RESIZE_OK, 0);
         }
     }
@@ -233,7 +233,7 @@ fn apply_resize(p: &mut Kritzel, ui: &mut Ui) {
         return;
     }
     if op_skew(p, kx, ky) != 0 {
-        paint_error(p, "Schräg stellen: Das Ergebnis wäre größer als 16384 × 16384 Pixel.");
+        paint_error(p, i18n::t("Schräg stellen: Das Ergebnis wäre größer als 16384 × 16384 Pixel."));
     }
     view_fit(p, ui);
 }
@@ -250,20 +250,20 @@ fn tan1000(deg: i32) -> i32 {
 // props_dialog()
 fn props_dialog(p: &mut Kritzel, ui: &mut Ui) {
     let open = p.dlg.pr_open.clone();
-    if ui.dialog_begin(ID_DLG_PROPS, "Bildeigenschaften", &open) {
-        let t = fmt_cap(format!("Datei: {}", doc_name(&p.doc)), 256);
+    if ui.dialog_begin(ID_DLG_PROPS, i18n::t("Bildeigenschaften"), &open) {
+        let t = fmt_cap(i18n::tf("Datei: {}", &[doc_name(&p.doc)]), 256);
         ui.text(TS_BODY | TX_ELLIPSIS, &t);
-        let t = fmt_cap(format!("Auflösung: 96 DPI · Ebenen: {}", p.doc.nlayers), 256);
+        let t = fmt_cap(i18n::tf("Auflösung: 96 DPI · Ebenen: {}", &[&format!("{}", p.doc.nlayers)]), 256);
         ui.text(TS_BODY | TX_SECONDARY, &t);
         ui.spacer(8);
-        ui.text(TS_BODY_STRONG, "Bildgröße (Pixel)");
-        form_row(ui, "Breite:");
+        ui.text(TS_BODY_STRONG, i18n::t("Bildgröße (Pixel)"));
+        form_row(ui, i18n::t("Breite:"));
         ui.number_box(ID_DLG_PROPS + 1, &mut p.dlg.pr_w, &RANGE_PX);
         ui.box_end();
-        form_row(ui, "Höhe:");
+        form_row(ui, i18n::t("Höhe:"));
         ui.number_box(ID_DLG_PROPS + 2, &mut p.dlg.pr_h, &RANGE_PX);
         ui.box_end();
-        if ui.dialog_buttons(Some("OK"), None, Some("Abbrechen")) == DLG_PRIMARY {
+        if ui.dialog_buttons(Some(i18n::t("OK")), None, Some(i18n::t("Abbrechen"))) == DLG_PRIMARY {
             ui.cmd_run(CMD_PROPS_OK, 0);
         }
     }
@@ -275,9 +275,9 @@ fn props_dialog(p: &mut Kritzel, ui: &mut Ui) {
 // color_dialog()
 fn color_dialog(p: &mut Kritzel, ui: &mut Ui) {
     let open = p.dlg.ec_open.clone();
-    if ui.dialog_begin(ID_DLG_COLOR, "Farben bearbeiten", &open) {
+    if ui.dialog_begin(ID_DLG_COLOR, i18n::t("Farben bearbeiten"), &open) {
         ui.color_picker(ID_DLG_COLOR + 1, &mut p.dlg.ec_col);
-        if ui.dialog_buttons(Some("OK"), None, Some("Abbrechen")) == DLG_PRIMARY {
+        if ui.dialog_buttons(Some(i18n::t("OK")), None, Some(i18n::t("Abbrechen"))) == DLG_PRIMARY {
             ui.cmd_run(CMD_COLOR_OK, 0);
         }
     }

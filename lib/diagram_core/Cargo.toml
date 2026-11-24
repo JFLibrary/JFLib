@@ -18,6 +18,7 @@ doctest = false
 workspace = true
 
 [dependencies]
+formats.workspace = true
 # (JD21) the Boolean operations on plane regions (geom::region) for the shape operations; geom needs
 # only rt
 geom.workspace = true

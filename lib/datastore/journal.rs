@@ -1,14 +1,18 @@
 // journal -- append-only logs of JSON lines, one file per name and month
 // (<dir>/<name>/<yyyymm>.jl): audit entries, session logs.  A line is complete or ignored (a
 // crash during an append leaves at most one partial last line, which readers skip).
+// Encrypted (open_encrypted): every line sealed on its own ("~" + base64url, seal.rs), bound
+// to its journal and month; lines that do not open -- plain ones too -- are skipped.
+// Journal::rekey rewrites the files for another key, or none.
 
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use agent_core::json::{self, Value};
+use formats::json::{self, Value};
 use plat::sync::Mutex;
 
+use crate::seal::Keys;
 use crate::{record_limits, StoreError, StoreResult};
 
 pub struct Journal {
@@ -16,6 +20,8 @@ pub struct Journal {
     /// serialises appends (the files are shared by all threads)
     lock: Mutex<()>,
     durable: bool,
+    /// an encrypted journal's keys
+    keys: Option<Keys>,
 }
 
 fn valid_name(name: &str) -> bool {
@@ -25,10 +31,25 @@ fn valid_name(name: &str) -> bool {
 impl Journal {
     /// journals below `dir`; `durable`: fsync each append
     pub fn open(dir: &str, durable: bool) -> StoreResult<Journal> {
+        Journal::open_keyed(dir, durable, None)
+    }
+
+    /// journals below `dir` whose lines are sealed with a 32-byte key (the key of a Store may
+    /// be used: the journal derives keys of its own)
+    pub fn open_encrypted(dir: &str, durable: bool, key: &[u8; 32]) -> StoreResult<Journal> {
+        Journal::open_keyed(dir, durable, Some(Keys::derive(key)))
+    }
+
+    fn open_keyed(dir: &str, durable: bool, keys: Option<Keys>) -> StoreResult<Journal> {
         if !plat::fs::mkdir_private(dir) {
             return Err(StoreError::Io(format!("cannot create {}", dir)));
         }
-        Ok(Journal { dir: String::from(dir), lock: Mutex::new(()), durable })
+        Ok(Journal { dir: String::from(dir), lock: Mutex::new(()), durable, keys })
+    }
+
+    /// whether the lines are sealed
+    pub fn encrypted(&self) -> bool {
+        self.keys.is_some()
     }
 
     fn file(&self, name: &str, month: u32) -> String {
@@ -40,7 +61,11 @@ impl Journal {
         if !valid_name(name) {
             return Err(StoreError::Io(format!("bad journal name {}", name)));
         }
-        let mut line = json::stringify_with_limits(v, record_limits()).map_err(|_| StoreError::TooLarge)?.into_bytes();
+        let text = json::stringify_with_limits(v, record_limits()).map_err(|_| StoreError::TooLarge)?;
+        let mut line = match &self.keys {
+            Some(k) => k.seal_line(name, month, text.as_bytes()).into_bytes(),
+            None => text.into_bytes(),
+        };
         line.push(b'\n');
         let _g = self.lock.lock();
         let d = plat::fs::join(&self.dir, name);
@@ -98,7 +123,7 @@ impl Journal {
             return Vec::new();
         }
         let Some(b) = plat::read_file(&self.file(name, month)) else { return Vec::new() };
-        b.split(|&c| c == b'\n').filter(|l| !l.is_empty()).filter_map(|l| json::parse_with_limits(l, record_limits()).ok()).collect()
+        b.split(|&c| c == b'\n').filter(|l| !l.is_empty()).filter_map(|l| entry(self.keys.as_ref(), name, month, l)).collect()
     }
 
     /// the newest `n` entries (oldest first), across months
@@ -139,5 +164,60 @@ impl Journal {
             plat::delete(&self.file(name, m));
         }
         plat::delete(&plat::fs::join(&self.dir, name));
+    }
+
+    /// rewrite the journals below `dir` for another key: `from` (None: in the clear) is the
+    /// key they have, `to` the one they get (None: in the clear) -> the files rewritten.  Each
+    /// file is replaced whole (written aside, synced, renamed).  Interrupted, it is run again
+    /// with the same keys: lines that are under `to` already stay.  Lines that open under
+    /// neither (damaged, a third key) stay as they are, unreadable as before.  No Journal may
+    /// be open on `dir` meanwhile (an append could be lost)
+    pub fn rekey(dir: &str, from: Option<&[u8; 32]>, to: Option<&[u8; 32]>) -> StoreResult<usize> {
+        let (from, to) = (from.map(Keys::derive), to.map(Keys::derive));
+        let mut n = 0;
+        for d in plat::fs::read_dir(dir).unwrap_or_default() {
+            if d.kind != plat::fs::FileKind::Dir || !valid_name(&d.name) {
+                continue;
+            }
+            let sub = plat::fs::join(dir, &d.name);
+            for f in plat::fs::read_dir(&sub).unwrap_or_default() {
+                let Some(month) = f.name.strip_suffix(".jl").and_then(|m| m.parse::<u32>().ok()) else { continue };
+                let path = plat::fs::join(&sub, &f.name);
+                let b = plat::read_file(&path).ok_or_else(|| StoreError::Io(format!("cannot read {}", path)))?;
+                let mut out = Vec::with_capacity(b.len());
+                let mut changed = false;
+                for l in b.split(|&c| c == b'\n').filter(|l| !l.is_empty()) {
+                    let line = match (entry(to.as_ref(), &d.name, month, l), entry(from.as_ref(), &d.name, month, l)) {
+                        (Some(_), _) => None,
+                        (None, Some(v)) => {
+                            let text = json::stringify_with_limits(&v, record_limits()).map_err(|_| StoreError::TooLarge)?;
+                            Some(match &to {
+                                Some(k) => k.seal_line(&d.name, month, text.as_bytes()).into_bytes(),
+                                None => text.into_bytes(),
+                            })
+                        }
+                        (None, None) => None,
+                    };
+                    changed |= line.is_some();
+                    out.extend_from_slice(line.as_deref().unwrap_or(l));
+                    out.push(b'\n');
+                }
+                if changed {
+                    if !plat::fs::write_file_private(&path, &out) {
+                        return Err(StoreError::Io(format!("cannot write {}", path)));
+                    }
+                    n += 1;
+                }
+            }
+        }
+        Ok(n)
+    }
+}
+
+/// one line of a journal: JSON, or sealed with `keys` -- the other kind is no entry
+fn entry(keys: Option<&Keys>, name: &str, month: u32, line: &[u8]) -> Option<Value> {
+    match keys {
+        Some(k) => json::parse_with_limits(&k.open_line(name, month, line)?, record_limits()).ok(),
+        None => json::parse_with_limits(line, record_limits()).ok(),
     }
 }

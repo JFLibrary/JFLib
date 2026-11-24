@@ -10,6 +10,10 @@
 //   fingerprint_text(&digest)        "AB:CD:..." for people to compare
 //   system_connector(extra_cas)      https to public servers: the system's CAs (and these),
 //                                    TLS 1.3 or 1.2 (mail servers, update servers, web hooks)
+//
+// The connectors of a CA (system_connector, ServerTrust::Ca) keep the session tickets of the
+// servers they reach (tls::Sessions), so the next request to a server resumes its session
+// (TLS 1.3, no 0-RTT).
 
 use alloc::boxed::Box;
 use alloc::format;
@@ -21,7 +25,7 @@ use plat::net::TcpStream;
 use plat::sync::Mutex;
 
 use crate::client::{Connector, HttpError};
-use crate::tls::{self, ClientConfig, Identity, Trust};
+use crate::tls::{self, ClientConfig, Identity, Sessions, Trust};
 use crate::url::Url;
 use crate::x509::{verify_chain, Cert, Usage};
 use crate::Stream;
@@ -81,21 +85,36 @@ pub fn parse_fingerprint(s: &str) -> Option<[u8; 32]> {
     })
 }
 
-/// https to public servers (the system's certificate authorities and `extra`)
+/// what https offers in ALPN: HTTP/1.1, which a server that speaks other protocols on the same
+/// port tells apart from them (RFC 9325 3.8, against cross-protocol attacks as ALPACA)
+fn http11() -> Vec<String> {
+    alloc::vec![String::from("http/1.1")]
+}
+
+/// https to public servers (the system's certificate authorities and `extra`); resumes the
+/// sessions of servers it reached before
 pub fn system_connector(extra: Vec<Cert>) -> Connector {
+    let sessions = Arc::new(Sessions::default());
     Arc::new(move |url: &Url, tcp: TcpStream| {
-        let cfg = ClientConfig { trust: Trust::System(extra.clone()), identity: None, server_name: url.host.clone() };
+        let cfg = ClientConfig { alpn: http11(), sessions: Some(sessions.clone()), ..ClientConfig::new(Trust::System(extra.clone()), &url.host) };
         tls::connect(Box::new(tcp), cfg).map(|s| Box::new(s) as Box<dyn Stream>).map_err(|e| HttpError::Tls(format!("{}", e)))
     })
 }
 
 pub fn connector(trust: ServerTrust, identity: Option<Identity>, seen: Arc<Mutex<Option<Presented>>>) -> Connector {
+    // the sessions of ServerTrust::Ca; a pin and Ask check the CA of every handshake below
+    let sessions = Arc::new(Sessions::default());
     Arc::new(move |url: &Url, tcp: TcpStream| {
         let host = url.host.clone();
         let cfg = match &trust {
-            ServerTrust::Ca(ca) => ClientConfig { trust: Trust::Anchors(alloc::vec![ca.clone()]), identity: identity.clone(), server_name: host },
+            ServerTrust::Ca(ca) => ClientConfig {
+                identity: identity.clone(),
+                alpn: http11(),
+                sessions: Some(sessions.clone()),
+                ..ClientConfig::new(Trust::Anchors(alloc::vec![ca.clone()]), &host)
+            },
             // the chain is checked below, against the CA it ends in
-            _ => ClientConfig { trust: Trust::Any, identity: identity.clone(), server_name: String::new() },
+            _ => ClientConfig { identity: identity.clone(), alpn: http11(), ..ClientConfig::new(Trust::Any, "") },
         };
         let s = tls::connect(Box::new(tcp), cfg).map_err(|e| HttpError::Tls(format!("{}", e)))?;
         if let ServerTrust::Ca(_) = trust {

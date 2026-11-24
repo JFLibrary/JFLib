@@ -54,7 +54,7 @@ does the same inside the packet an ICMP error quotes.
   versions 1, 2c and 3 with BER and a small built-in MIB, RADIUS and EAP.
 - **Secure protocols without I/O:** SSH-2 and TLS 1.3 as cores for a client or a server that take
   the bytes that arrived and give the bytes to send, with random bytes from a seed, so the same
-  seed gives the same connection; X.509 certificates of a private Ed25519 PKI.
+  seed gives the same connection; X.509 certificates through the crate `jflib-x509`, which netio uses as well.
 - **For browsers and clients:** URI references with relative resolution (RFC 3986), the form
   encoding of HTML, and cookies with a jar (RFC 6265).
 

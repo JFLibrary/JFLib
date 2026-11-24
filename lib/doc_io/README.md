@@ -55,7 +55,8 @@ bodies, for pasting into another JFLib document. `clipboard_rtf_encode` and
 `clipboard_html_encode` give other programs the text with its resolved formatting, and
 `clipboard_rtf_decode` and `clipboard_html_decode` turn what they offer back into paragraphs and
 tables. The RTF reader takes a defined profile, direct formatting, tables, Unicode and the
-single-byte code pages of Windows, and refuses pictures, lists and objects rather than losing
+code pages of Windows (the single-byte ones and the double-byte ones of Japanese, Chinese and
+Korean: 932, 936, 949, 950, by `\ansicpg` or a font's `\fcharset`), and refuses pictures, lists and objects rather than losing
 them; the HTML reader ignores active content and never requests an external resource.
 
 ## Bibliographies

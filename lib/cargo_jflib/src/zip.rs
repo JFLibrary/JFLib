@@ -13,19 +13,6 @@ fn u32_at(b: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_le_bytes(b.get(at..at + 4)?.try_into().ok()?))
 }
 
-/// CRC-32 (IEEE) as zip wants it
-pub(crate) fn crc32(data: &[u8]) -> u32 {
-    let mut table = [0u32; 256];
-    for (i, t) in table.iter_mut().enumerate() {
-        let mut c = i as u32;
-        for _ in 0..8 {
-            c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 };
-        }
-        *t = c;
-    }
-    !data.iter().fold(!0u32, |c, &b| table[((c ^ b as u32) & 0xFF) as usize] ^ (c >> 8))
-}
-
 /// append `files` (name in the zip, contents) to the zip at `path`, stored
 pub(crate) fn append(path: &Path, files: &[(String, Vec<u8>)]) -> Result<(), String> {
     let bad = || format!("{}: not a zip this can extend", path.display());
@@ -40,7 +27,7 @@ pub(crate) fn append(path: &Path, files: &[(String, Vec<u8>)]) -> Result<(), Str
     let mut more = Vec::new();
     for (name, data) in files {
         let at = u32::try_from(out.len()).map_err(|_| bad())?;
-        let (crc, size, n) = (crc32(data), data.len() as u32, name.len() as u16);
+        let (crc, size, n) = (compress::crc32(0, data), data.len() as u32, name.len() as u16);
         let header = |sig: &[u8; 4], central: bool| {
             let mut h = sig.to_vec();
             if central {
@@ -121,7 +108,7 @@ mod tests {
 
     #[test]
     fn crc_of_the_check_string() {
-        assert_eq!(crc32(b"123456789"), 0xCBF4_3926);
+        assert_eq!(compress::crc32(0, b"123456789"), 0xCBF4_3926);
     }
 
     #[test]

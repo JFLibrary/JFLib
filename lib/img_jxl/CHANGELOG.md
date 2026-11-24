@@ -12,6 +12,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - `modular::SqWork` / `SQ_WORK` and `frm::Jf::sq_work`: the squeeze budget of a decode, handed on from frame to frame (`modular::jm_decode` called alone has one of its own).
 
+### Changed
+
+- The Brotli decoder moved to jflib-compress (`compress::brotli`); `img_jxl::brotli::decompress` keeps its signature and codes, `img_jxl::brotli_tab` is gone, and the crate's licence no longer includes Brotli's MIT.
+
 ### Fixed
 
 - Modular images: a squeeze of a channel whose shift is already above 30 is refused (`ERR_HDR`, as libjxl does). Squeeze steps on a 1 x 1 channel added an empty channel each, up to 65536, each inserted into the middle of the list (74 KB took 232 s).

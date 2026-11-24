@@ -1,0 +1,5 @@
+#!args --lang ar
+# no with_library_languages (main.rs): a language without a column gets the English texts, the
+# library's too ("Image" is one), and the window is not mirrored
+expect text:"Selection" exists
+expect text:"Image" exists

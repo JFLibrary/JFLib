@@ -7,34 +7,51 @@
 //   write(|tx| { tx.put(coll, id, v); tx.delete(coll, id); }) -> Result<seq>
 //   update(coll, id, |v| ...)                                     read-modify-write in one txn
 //   compact()                                                     snapshot now
-//   Journal::open(dir, durable) / append(name, yyyymm, &value) / tail(name, n) / read_month(name, yyyymm)
+//   add_index(coll, name, Index::field("owner").unique()) / find / find_one / range
+//                                 secondary indexes in memory (index.rs), unique ones refuse a
+//                                 transaction that breaks them (StoreError::Conflict)
+//   Store::open_encrypted(dir, opts, &key) / rekey(Some(&key) | None)   encryption at rest
+//                                 (seal.rs): snapshots and log sealed, rekey encrypts, changes
+//                                 the key or decrypts
+//   Journal::open(dir, durable) / open_encrypted(dir, durable, &key) / append(name, yyyymm,
+//        &value) / tail(name, n) / read_month(name, yyyymm) / rekey
 //
 // Files in `dir`: LOCK, snap-<seq>.bcs, wal-<first seq>.log; journal/<name>/<yyyymm>.jl.
 //   snapshot: "BCS1" seq:u64 | colls:u32 | per collection name, records:u32 | per record id,
-//             JSON | BLAKE3 of everything before (32 bytes)
+//             JSON | BLAKE3 of everything before (32 bytes); encrypted: "BCE1" (seal.rs)
 //   WAL frame: "BCW1" len:u32 seq:u64 payload BLAKE3(len ‖ seq ‖ payload)[..16]; the payload is
-//             a JSON array of ["put", coll, id, value] / ["del", coll, id]
+//             a JSON array of ["put", coll, id, value] / ["del", coll, id]; encrypted: "BCW2"
+//             and the payload sealed (seal.rs)
 // A transaction is one frame, written and fsynced before it becomes visible.  Opening loads the
 // newest valid snapshot and replays the frames after it.  A torn frame at the very end (a crash
 // during a write) is cut off; a damaged frame with intact data behind it stops the open with
-// StoreError::Corrupt unless Options::repair is set (then the log is cut there).
-// Values are plain JSON: secrets are sealed by the caller (crypto::aead) before they get here.
+// StoreError::Corrupt unless Options::repair is set (then the log is cut there).  An encrypted
+// store always has a snapshot (one at seq 0 when it is new): its key id names the key.  A store
+// opened with the wrong key, or one of the other kind, is StoreError::Key, never repaired.
 #![no_std]
 #![forbid(unsafe_code)]
 
 extern crate alloc;
 
+mod index;
 mod journal;
+mod seal;
 
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use agent_core::json::{self, Limits, Value};
+use core::ops::RangeBounds;
+
+use formats::json::{self, Limits, Value};
 use plat::sync::Mutex;
 
+pub use index::{Index, Key, Order};
 pub use journal::Journal;
+
+use index::Idx;
+use seal::{Keys, Unseal, SNAP_SEALED, WAL_SEALED};
 
 const SNAP_MAGIC: &[u8; 4] = b"BCS1";
 const WAL_MAGIC: &[u8; 4] = b"BCW1";
@@ -59,7 +76,18 @@ pub enum StoreError {
     Corrupt(String),
     /// a record or transaction over the size limits
     TooLarge,
+    /// a transaction or a new index that would give two records the key of a unique index
+    Conflict(String),
+    /// the store is encrypted and no key was given, it is not and one was, or it is sealed
+    /// with another key
+    Key(String),
+    /// no index of this name on the collection (Store::add_index)
+    NoIndex(String),
 }
+
+const ENCRYPTED: &str = "the store is encrypted: open it with its key (Store::open_encrypted)";
+const NOT_ENCRYPTED: &str = "the store is not encrypted: open it with Store::open (rekey encrypts it)";
+const OTHER_KEY: &str = "the store is sealed with another key";
 
 impl core::fmt::Display for StoreError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -68,6 +96,9 @@ impl core::fmt::Display for StoreError {
             StoreError::Io(s) => write!(f, "I/O error: {}", s),
             StoreError::Corrupt(s) => write!(f, "damaged write-ahead log: {}", s),
             StoreError::TooLarge => f.write_str("record too large"),
+            StoreError::Conflict(s) => write!(f, "unique index: {}", s),
+            StoreError::Key(s) => f.write_str(s),
+            StoreError::NoIndex(s) => write!(f, "no index {}", s),
         }
     }
 }
@@ -135,6 +166,35 @@ struct State {
     wal_path: String,
     wal_len: u64,
     snap_seq: u64,
+    /// the keys of an encrypted store
+    keys: Option<Keys>,
+    /// collection -> index name -> index
+    indexes: BTreeMap<String, BTreeMap<String, Idx>>,
+}
+
+impl State {
+    fn index(&self, coll: &str, name: &str) -> StoreResult<&Idx> {
+        self.indexes.get(coll).and_then(|m| m.get(name)).ok_or_else(|| StoreError::NoIndex(format!("{}.{}", coll, name)))
+    }
+
+    /// whether a transaction keeps every unique index unique -> the first conflict
+    fn conflict(&self, ops: &[Op]) -> Option<String> {
+        let mut after: BTreeMap<&str, BTreeMap<&str, Option<&Value>>> = BTreeMap::new();
+        for op in ops {
+            match op {
+                Op::Put(c, i, v) => after.entry(c.as_str()).or_default().insert(i.as_str(), Some(v)),
+                Op::Del(c, i) => after.entry(c.as_str()).or_default().insert(i.as_str(), None),
+            };
+        }
+        for (coll, recs) in &after {
+            for (name, idx) in self.indexes.get(*coll).into_iter().flatten() {
+                if let Some(why) = idx.check(recs) {
+                    return Some(format!("{}.{}: {}", coll, name, why));
+                }
+            }
+        }
+        None
+    }
 }
 
 /// the store (share it between threads by reference or Arc)
@@ -214,6 +274,22 @@ fn encode_snapshot(data: &Data, seq: u64) -> StoreResult<Vec<u8>> {
     Ok(out)
 }
 
+/// a snapshot file -> its data, None when it is damaged; Err(Key) for one of the other kind
+/// (sealed without a key, plain with one) or sealed with another key
+fn load_snapshot(b: &[u8], keys: Option<&Keys>) -> StoreResult<Option<(u64, Data)>> {
+    match (b.get(..4), keys) {
+        (Some(m), None) if m == SNAP_SEALED => Err(StoreError::Key(String::from(ENCRYPTED))),
+        (Some(m), Some(_)) if m == SNAP_MAGIC => Err(StoreError::Key(String::from(NOT_ENCRYPTED))),
+        (_, None) => Ok(decode_snapshot(b)),
+        (_, Some(k)) => match k.open_snapshot(b) {
+            Err(Unseal::OtherKey) => Err(StoreError::Key(String::from(OTHER_KEY))),
+            Err(Unseal::Damaged) => Ok(None),
+            // (the seq of the sealed header and of the snapshot inside agree)
+            Ok((seq, plain)) => Ok(decode_snapshot(&plain).filter(|(s, _)| *s == seq)),
+        },
+    }
+}
+
 fn decode_snapshot(b: &[u8]) -> Option<(u64, Data)> {
     if b.len() < 4 + 8 + 4 + 32 || &b[..4] != SNAP_MAGIC {
         return None;
@@ -277,9 +353,9 @@ fn apply_payload(data: &mut Data, payload: &[u8]) -> bool {
     true
 }
 
-fn frame(seq: u64, payload: &[u8]) -> Vec<u8> {
+fn frame(magic: &[u8; 4], seq: u64, payload: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(FRAME_HEAD + payload.len() + FRAME_TAIL);
-    out.extend_from_slice(WAL_MAGIC);
+    out.extend_from_slice(magic);
     out.extend_from_slice(&(payload.len() as u32).to_le_bytes());
     out.extend_from_slice(&seq.to_le_bytes());
     out.extend_from_slice(payload);
@@ -296,14 +372,22 @@ enum Scan {
     Torn(u64),
     /// valid up to this offset, damaged frame with more data behind it
     Damaged(u64, String),
+    /// a frame of the other kind (sealed without a key, plain with one): never repaired
+    Key(String),
 }
 
-/// replay the frames of a log file with seq > after into data
-fn replay(bytes: &[u8], after: u64, data: &mut Data, last_seq: &mut u64, replayed: &mut u64) -> Scan {
+/// the magic of a frame, plain or sealed
+fn frame_magic(b: &[u8]) -> bool {
+    b == WAL_MAGIC || b == WAL_SEALED
+}
+
+/// replay the frames of a log file with seq > after into data (`keys`: an encrypted store,
+/// whose frames after the snapshot are all sealed)
+fn replay(bytes: &[u8], after: u64, keys: Option<&Keys>, data: &mut Data, last_seq: &mut u64, replayed: &mut u64) -> Scan {
     let mut i = 0usize;
     while i < bytes.len() {
         let rest = &bytes[i..];
-        if rest.len() < FRAME_HEAD + FRAME_TAIL || &rest[..4] != WAL_MAGIC {
+        if rest.len() < FRAME_HEAD + FRAME_TAIL || !frame_magic(&rest[..4]) {
             // an incomplete header, or garbage: torn when nothing valid can follow
             return if rest.len() < FRAME_HEAD + FRAME_TAIL || find_frame(rest).is_none() {
                 Scan::Torn(i as u64)
@@ -335,7 +419,22 @@ fn replay(bytes: &[u8], after: u64, data: &mut Data, last_seq: &mut u64, replaye
             if seq != last_seq.saturating_add(1) && *last_seq != 0 {
                 return Scan::Damaged(i as u64, format!("sequence gap {} -> {}", last_seq, seq));
             }
-            if !apply_payload(data, payload) {
+            let sealed = &rest[..4] == WAL_SEALED;
+            let opened;
+            let plain = match (keys, sealed) {
+                (None, false) => payload,
+                (Some(k), true) => match k.open_frame(seq, payload) {
+                    Some(p) => {
+                        opened = p;
+                        &opened[..]
+                    }
+                    // its checksum holds: changed, not torn
+                    None => return Scan::Damaged(i as u64, format!("frame {} does not authenticate", seq)),
+                },
+                (None, true) => return Scan::Key(String::from(ENCRYPTED)),
+                (Some(_), false) => return Scan::Key(String::from(NOT_ENCRYPTED)),
+            };
+            if !apply_payload(data, plain) {
                 return Scan::Damaged(i as u64, format!("unreadable frame {}", seq));
             }
             *replayed += 1;
@@ -351,7 +450,7 @@ fn replay(bytes: &[u8], after: u64, data: &mut Data, last_seq: &mut u64, replaye
 /// a torn last frame holding those bytes made the store refuse to open instead of cutting it
 fn find_frame(b: &[u8]) -> Option<usize> {
     let mut from = 0;
-    while let Some(k) = b[from..].windows(4).position(|w| w == WAL_MAGIC) {
+    while let Some(k) = b[from..].windows(4).position(frame_magic) {
         let at = from + k;
         let rest = &b[at..];
         if rest.len() >= FRAME_HEAD + FRAME_TAIL {
@@ -380,6 +479,17 @@ impl Store {
     }
 
     pub fn open_with(dir: &str, opts: Options) -> StoreResult<Store> {
+        Store::open_keyed(dir, opts, None)
+    }
+
+    /// open an encrypted store (a new one in an empty or missing folder) with its 32-byte key,
+    /// for example one kept in the system's secret store (plat::secret::secret_get).  A store
+    /// in the clear, or one sealed with another key, is StoreError::Key
+    pub fn open_encrypted(dir: &str, opts: Options, key: &[u8; 32]) -> StoreResult<Store> {
+        Store::open_keyed(dir, opts, Some(Keys::derive(key)))
+    }
+
+    fn open_keyed(dir: &str, opts: Options, keys: Option<Keys>) -> StoreResult<Store> {
         if !plat::fs::mkdir_private(dir) {
             return Err(io("cannot create", dir));
         }
@@ -394,7 +504,11 @@ impl Store {
         let mut snap_seq = 0u64;
         let mut skipped = None;
         for &s in snaps.iter().rev() {
-            if let Some((seq, d)) = plat::read_file(&join(dir, &snap_name(s))).and_then(|b| decode_snapshot(&b)) {
+            let loaded = match plat::read_file(&join(dir, &snap_name(s))) {
+                Some(b) => load_snapshot(&b, keys.as_ref())?,
+                None => None,
+            };
+            if let Some((seq, d)) = loaded {
                 data = d;
                 snap_seq = seq;
                 break;
@@ -420,8 +534,9 @@ impl Store {
             let path = join(dir, &wal_name(w));
             let bytes = plat::read_file(&path).ok_or_else(|| io("cannot read", &path))?;
             let is_last = k + 1 == n;
-            match replay(&bytes, snap_seq, &mut data, &mut last, &mut replayed) {
+            match replay(&bytes, snap_seq, keys.as_ref(), &mut data, &mut last, &mut replayed) {
                 Scan::Clean => {}
+                Scan::Key(why) => return Err(StoreError::Key(why)),
                 Scan::Torn(at) if is_last => {
                     cut(&path, at)?;
                     rec.truncated_bytes = bytes.len() as u64 - at;
@@ -448,8 +563,21 @@ impl Store {
         if wals.is_empty() {
             plat::fs::sync_dir(dir);
         }
-        let st = State { data, seq: last, wal, wal_path, wal_len, snap_seq };
-        Ok(Store { dir: String::from(dir), opts, st: Mutex::new(st), _lock: lock, recovery: rec })
+        let pin = keys.is_some() && snaps.is_empty();
+        let st = State { data, seq: last, wal, wal_path, wal_len, snap_seq, keys, indexes: BTreeMap::new() };
+        let store = Store { dir: String::from(dir), opts, st: Mutex::new(st), _lock: lock, recovery: rec };
+        if pin {
+            // an encrypted store always has a snapshot: its key id names the key, so a wrong
+            // one is StoreError::Key on the next open (a new store: seq 0)
+            let mut st = store.st.lock();
+            store.snapshot(&mut st)?;
+        }
+        Ok(store)
+    }
+
+    /// whether the store is encrypted
+    pub fn encrypted(&self) -> bool {
+        self.st.lock().keys.is_some()
     }
 
     /// what open() found and repaired
@@ -532,12 +660,20 @@ impl Store {
     }
 
     fn commit(&self, st: &mut State, tx: Tx) -> StoreResult<u64> {
-        let payload = encode_ops(&tx.ops)?;
+        // the unique indexes, before anything is written
+        if let Some(why) = st.conflict(&tx.ops) {
+            return Err(StoreError::Conflict(why));
+        }
+        let plain = encode_ops(&tx.ops)?;
+        let seq = st.seq + 1;
+        let (magic, payload) = match &st.keys {
+            Some(k) => (WAL_SEALED, k.seal_frame(seq, &plain)),
+            None => (WAL_MAGIC, plain),
+        };
         if payload.len() > MAX_FRAME {
             return Err(StoreError::TooLarge);
         }
-        let seq = st.seq + 1;
-        let f = frame(seq, &payload);
+        let f = frame(magic, seq, &payload);
         let off = st.wal_len;
         if st.wal.write_at(off, &f) != Some(f.len()) {
             // leave no half frame behind
@@ -553,9 +689,15 @@ impl Store {
         for op in tx.ops {
             match op {
                 Op::Put(c, i, v) => {
+                    for idx in st.indexes.get_mut(&c).into_iter().flat_map(|m| m.values_mut()) {
+                        idx.put(&i, &v);
+                    }
                     st.data.entry(c).or_default().insert(i, v);
                 }
                 Op::Del(c, i) => {
+                    for idx in st.indexes.get_mut(&c).into_iter().flat_map(|m| m.values_mut()) {
+                        idx.remove(&i);
+                    }
                     if let Some(m) = st.data.get_mut(&c) {
                         m.remove(&i);
                     }
@@ -576,18 +718,17 @@ impl Store {
     }
 
     fn snapshot(&self, st: &mut State) -> StoreResult<()> {
-        let bytes = encode_snapshot(&st.data, st.seq)?;
+        let plain = encode_snapshot(&st.data, st.seq)?;
+        let bytes = match &st.keys {
+            Some(k) => k.seal_snapshot(st.seq, &plain),
+            None => plain,
+        };
         let path = join(&self.dir, &snap_name(st.seq));
         if !plat::fs::write_file_private(&path, &bytes) {
             return Err(io("cannot write", &path));
         }
         // the new log starts after the snapshot
-        let wal_path = join(&self.dir, &wal_name(st.seq + 1));
-        let wal = plat::File::open(&wal_path, plat::FO_RW).ok_or_else(|| io("cannot open", &wal_path))?;
-        plat::fs::sync_dir(&self.dir);
-        let old_wal = core::mem::replace(&mut st.wal_path, wal_path);
-        st.wal = wal;
-        st.wal_len = 0;
+        self.start_log(st)?;
         let old_snap = st.snap_seq;
         st.snap_seq = st.seq;
         // older logs and all but the previous snapshot go
@@ -605,8 +746,151 @@ impl Store {
                 }
             }
         }
-        let _ = old_wal;
         Ok(())
+    }
+
+    /// go on in the log that starts after st.seq (the snapshot there is written).  That is the
+    /// open one when nothing was written since it began (a second compact): Windows opens a
+    /// log for writing once, so it is kept, emptied (it holds no frame yet)
+    fn start_log(&self, st: &mut State) -> StoreResult<()> {
+        let wal_path = join(&self.dir, &wal_name(st.seq + 1));
+        if wal_path != st.wal_path {
+            st.wal = plat::File::open(&wal_path, plat::FO_RW).ok_or_else(|| io("cannot open", &wal_path))?;
+            st.wal_path = wal_path;
+        }
+        if !st.wal.set_len(0) {
+            return Err(io("cannot truncate", &st.wal_path));
+        }
+        st.wal_len = 0;
+        plat::fs::sync_dir(&self.dir);
+        Ok(())
+    }
+
+    /// encrypt the store with `key`, change its key, or (None) keep it in the clear again: a
+    /// snapshot under the new key and a new log, then every other snapshot and log goes (they
+    /// are under the old key).  Removed, not wiped: on an SSD nothing promises the old blocks
+    /// are gone.  A crash in between leaves the new snapshot, which the new key opens.  Err(Io)
+    /// after the switch names files under the old key that could not be removed
+    pub fn rekey(&self, key: Option<&[u8; 32]>) -> StoreResult<()> {
+        let mut st = self.st.lock();
+        let keys = key.map(Keys::derive);
+        let plain = encode_snapshot(&st.data, st.seq)?;
+        let bytes = match &keys {
+            Some(k) => k.seal_snapshot(st.seq, &plain),
+            None => plain,
+        };
+        let path = join(&self.dir, &snap_name(st.seq));
+        if !plat::fs::write_file_private(&path, &bytes) {
+            return Err(io("cannot write", &path));
+        }
+        // the new log, empty (no frame can be in it yet: it starts after the snapshot)
+        self.start_log(&mut st)?;
+        st.snap_seq = st.seq;
+        st.keys = keys;
+        let (keep_snap, keep_wal) = (st.seq, st.seq + 1);
+        drop(st);
+        let mut left = Vec::new();
+        for e in plat::fs::read_dir(&self.dir).unwrap_or_default() {
+            let old = parse_hex_name(&e.name, "snap-", ".bcs").is_some_and(|s| s != keep_snap) || parse_hex_name(&e.name, "wal-", ".log").is_some_and(|w| w != keep_wal);
+            if old && !plat::delete(&join(&self.dir, &e.name)) {
+                left.push(e.name);
+            }
+        }
+        plat::fs::sync_dir(&self.dir);
+        if !left.is_empty() {
+            return Err(StoreError::Io(format!("the store has its new key; files under the old one stay: {}", left.join(", "))));
+        }
+        Ok(())
+    }
+
+    // ------------------------------------------------------------------ indexes
+
+    /// index the records of a collection (built now from what is there, kept up to date by
+    /// every commit; replaces an index of the same name).  A unique index over records that
+    /// share a key is refused (Conflict), and from then on every transaction that would make
+    /// two share one.  Indexes are not stored: add them after each open
+    pub fn add_index(&self, coll: &str, name: &str, def: Index) -> StoreResult<()> {
+        let mut st = self.st.lock();
+        let empty = BTreeMap::new();
+        let idx = Idx::build(def, st.data.get(coll).unwrap_or(&empty).iter()).map_err(|why| StoreError::Conflict(format!("{}.{}: {}", coll, name, why)))?;
+        st.indexes.entry(String::from(coll)).or_default().insert(String::from(name), idx);
+        Ok(())
+    }
+
+    /// remove an index -> whether there was one
+    pub fn drop_index(&self, coll: &str, name: &str) -> bool {
+        self.st.lock().indexes.get_mut(coll).is_some_and(|m| m.remove(name).is_some())
+    }
+
+    /// the names of a collection's indexes
+    pub fn index_names(&self, coll: &str) -> Vec<String> {
+        self.st.lock().indexes.get(coll).map(|m| m.keys().cloned().collect()).unwrap_or_default()
+    }
+
+    /// the records that have `key` in the index, ordered by id
+    pub fn find(&self, coll: &str, index: &str, key: &Key) -> StoreResult<Vec<(String, Value)>> {
+        self.range(coll, index, (core::ops::Bound::Included(key.clone()), core::ops::Bound::Included(key.clone())), Order::Asc, usize::MAX)
+    }
+
+    /// the first record that has `key` (the one of a unique index)
+    pub fn find_one(&self, coll: &str, index: &str, key: &Key) -> StoreResult<Option<(String, Value)>> {
+        let k = (core::ops::Bound::Included(key.clone()), core::ops::Bound::Included(key.clone()));
+        Ok(self.range(coll, index, k, Order::Asc, 1)?.pop())
+    }
+
+    /// the records whose keys lie in `keys`, by key and then id (Desc: the other way round),
+    /// at most `limit` (usize::MAX: all); a record with several keys in the range comes once
+    /// for each
+    pub fn range(&self, coll: &str, index: &str, keys: impl RangeBounds<Key>, order: Order, limit: usize) -> StoreResult<Vec<(String, Value)>> {
+        let st = self.st.lock();
+        let idx = st.index(coll, index)?;
+        let mut out = Vec::new();
+        let (Some(recs), true) = (st.data.get(coll), bounds_ok(&keys)) else { return Ok(out) };
+        let r = idx.map.range((keys.start_bound().cloned(), keys.end_bound().cloned()));
+        let mut take = |ids: &mut dyn Iterator<Item = &String>| {
+            for id in ids {
+                if out.len() >= limit {
+                    return false;
+                }
+                if let Some(v) = recs.get(id) {
+                    out.push((id.clone(), v.clone()));
+                }
+            }
+            true
+        };
+        match order {
+            Order::Asc => {
+                for (_, ids) in r {
+                    if !take(&mut ids.iter()) {
+                        break;
+                    }
+                }
+            }
+            Order::Desc => {
+                for (_, ids) in r.rev() {
+                    if !take(&mut ids.iter().rev()) {
+                        break;
+                    }
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// how many records have `key` in the index
+    pub fn count_key(&self, coll: &str, index: &str, key: &Key) -> StoreResult<usize> {
+        Ok(self.st.lock().index(coll, index)?.map.get(key).map_or(0, BTreeSet::len))
+    }
+}
+
+/// bounds BTreeMap::range takes (it panics on a start after the end, and on an empty range
+/// with both ends excluded)
+fn bounds_ok(r: &impl RangeBounds<Key>) -> bool {
+    use core::ops::Bound::{Excluded, Included};
+    match (r.start_bound(), r.end_bound()) {
+        (Included(s) | Excluded(s), Included(e) | Excluded(e)) if s > e => false,
+        (Excluded(s), Excluded(e)) if s == e => false,
+        _ => true,
     }
 }
 

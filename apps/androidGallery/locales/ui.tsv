@@ -384,6 +384,13 @@ Benachrichtigung	Notification
 JFLib Galerie	JFLib Gallery
 Benachrichtigung Nummer {}	Notification number {}
 Bildschirm anlassen	Keep screen on
+noch nicht	not yet
+Geteilt aus der JFLib Galerie	Shared from the JFLib gallery
+Teilen: {}	Share: {}
+offen	open
+geteilt	shared
+abgebrochen	cancelled
+fehlgeschlagen	failed
 JFLib Galerie: Bildschirm an	JFLib Gallery: screen on
 ja	yes
 nein	no

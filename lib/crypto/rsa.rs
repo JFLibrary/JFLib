@@ -1,5 +1,5 @@
 // rsa -- RSA signatures (RFC 8017): PKCS #1 v1.5 and PSS verification with MGF1, PKCS #1 v1.5
-// signing, key generation
+// and PSS signing, key generation
 //
 //   PublicKey::new(n, e)                      big-endian modulus (1024..8192 bits) and exponent
 //   key.verify_pkcs1(hash, digest, sig)       the encoding is rebuilt and compared whole
@@ -9,7 +9,13 @@
 //                                             same key)
 //   PrivateKey::from_parts(n, e, d, p, q)     big-endian numbers, checked against each other
 //   key.sign_pkcs1(hash, digest)              RSASSA-PKCS1-v1_5; the exponent in constant time
+//   key.sign_pss(hash, digest, salt)          RSASSA-PSS with MGF1 of the same hash and the
+//                                             caller's salt (hash.len() random bytes, as TLS 1.3
+//                                             and X.509 use; empty: the same signature each time)
 //   key.n() / e() / d() / p() / q() / iqmp()  big-endian without leading zeros
+//   key.dp() / dq()                           d mod (p - 1), d mod (q - 1) (PKCS #1's
+//                                             RSAPrivateKey; one bit of d at a time, the
+//                                             subtraction kept by mask)
 //
 // Public operations are variable time (that is fine for them).  Signing uses pow_ct; generate is
 // variable time and meant for simulators and tests, where the random bytes are no secret either.
@@ -64,12 +70,7 @@ impl PublicKey {
         if digest.len() != hash.len() {
             return false;
         }
-        let oid_last = match hash {
-            HashAlg::Sha256 => 1,
-            HashAlg::Sha384 => 2,
-            HashAlg::Sha512 => 3,
-        };
-        let oid = [0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, oid_last];
+        let oid = [0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, hash.nist_arc()];
         [true, false].iter().any(|&with_null| {
             let alg_len = oid.len() + if with_null { 2 } else { 0 };
             let mut t = Vec::new();
@@ -178,6 +179,39 @@ fn mul(a: &[u64], b: &[u64]) -> Vec<u64> {
         }
         r[i + b.len()] = c as u64;
     }
+    r
+}
+
+/// a mod m (m > 0) by shift and subtract, a bit of `a` at a time: the steps are the same for
+/// every value of the same lengths, the subtraction is kept or not by a mask
+fn rem_big(a: &[u64], m: &[u64]) -> Vec<u64> {
+    let k = m.len() + 1;
+    let mut r = alloc::vec![0u64; k];
+    let mut t = alloc::vec![0u64; k];
+    for i in (0..a.len() * 64).rev() {
+        // r = 2 r + bit (r < m before, so 2 r + 1 < 2 m fits k limbs)
+        let mut carry = (a[i / 64] >> (i % 64)) & 1;
+        for w in r.iter_mut() {
+            let next = *w >> 63;
+            *w = (*w << 1) | carry;
+            carry = next;
+        }
+        // t = r - m; keep it when there was no borrow
+        let mut borrow = 0u64;
+        for j in 0..k {
+            let y = m.get(j).copied().unwrap_or(0);
+            let (d1, b1) = r[j].overflowing_sub(y);
+            let (d2, b2) = d1.overflowing_sub(borrow);
+            t[j] = d2;
+            borrow = (b1 | b2) as u64;
+        }
+        let keep = crate::ct_mask(borrow.wrapping_sub(1)); // all ones: r >= m
+        for j in 0..k {
+            r[j] = (t[j] & keep) | (r[j] & !keep);
+        }
+    }
+    crate::zeroize_words(&mut t);
+    r.truncate(m.len());
     r
 }
 
@@ -389,14 +423,46 @@ impl PrivateKey {
     pub fn q(&self) -> &[u8] {
         &self.q
     }
-    /// q^-1 mod p, big-endian (what key files keep beside the primes; p > q)
+    /// q^-1 mod p, big-endian (what key files keep beside the primes): q is reduced mod p
+    /// first (a masked remainder), so the primes may come in either order and of any lengths
     pub fn iqmp(&self) -> Vec<u8> {
-        let Some(mp) = Mont::new(&bn::from_be(&self.p, 0)) else {
+        let pl = bn::from_be(&self.p, 0);
+        let Some(mp) = Mont::new(&pl) else {
             return Vec::new();
         };
-        let q = bn::from_be(&self.q, mp.limbs());
-        be_min(&mp.from_mont(&mp.inv_mont(&mp.to_mont(&q))))
+        let mut q = bn::from_be(&self.q, 0);
+        let mut qr = rem_big(&q, &pl);
+        crate::zeroize_words(&mut q);
+        let mut x = mp.to_mont(&qr);
+        crate::zeroize_words(&mut qr);
+        let mut y = mp.from_mont(&mp.inv_mont(&x));
+        crate::zeroize_words(&mut x);
+        let out = be_min(&y);
+        crate::zeroize_words(&mut y);
+        out
     }
+    /// d mod (p - 1)
+    pub fn dp(&self) -> Vec<u8> {
+        self.d_mod(&self.p)
+    }
+
+    /// d mod (q - 1)
+    pub fn dq(&self) -> Vec<u8> {
+        self.d_mod(&self.q)
+    }
+
+    /// d mod (prime - 1): d read at the modulus's length, so the steps do not follow its own;
+    /// the result's leading zero bytes are dropped (its DER shows them anyway)
+    fn d_mod(&self, prime: &[u8]) -> Vec<u8> {
+        let pl = minus_one(&bn::from_be(prime, 0));
+        let mut d = bn::from_be(&self.d, self.m.limbs());
+        let mut r = rem_big(&d, &pl);
+        crate::zeroize_words(&mut d);
+        let out = be_min(&r);
+        crate::zeroize_words(&mut r);
+        out
+    }
+
     /// the public half
     pub fn public(&self) -> Option<PublicKey> {
         PublicKey::new(&self.n(), &self.e)
@@ -408,12 +474,7 @@ impl PrivateKey {
         if digest.len() != hash.len() {
             return None;
         }
-        let oid_last = match hash {
-            HashAlg::Sha256 => 1,
-            HashAlg::Sha384 => 2,
-            HashAlg::Sha512 => 3,
-        };
-        let oid = [0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, oid_last];
+        let oid = [0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, hash.nist_arc()];
         let mut t = Vec::new();
         t.extend_from_slice(&[0x30, (oid.len() + 2 + 2 + 2 + digest.len()) as u8, 0x30, oid.len() as u8 + 2]);
         t.extend_from_slice(&oid);
@@ -428,6 +489,39 @@ impl PrivateKey {
         let at = self.k - t.len();
         em[at - 1] = 0;
         em[at..].copy_from_slice(&t);
+        let x = bn::from_be(&em, self.m.limbs());
+        Some(bn::to_be(&self.m.pow_ct(&x, &self.d), self.k))
+    }
+
+    /// RSASSA-PSS of a digest (EMSA-PSS, RFC 8017 9.1.1) with MGF1 of the same hash: k bytes.
+    /// None when the digest has the wrong length or the modulus is too short for digest and salt
+    pub fn sign_pss(&self, hash: HashAlg, digest: &[u8], salt: &[u8]) -> Option<Vec<u8>> {
+        let h_len = hash.len();
+        let em_bits = self.bits() - 1;
+        let em_len = em_bits.div_ceil(8);
+        if digest.len() != h_len || em_len < h_len + salt.len() + 2 {
+            return None;
+        }
+        // H = Hash(0x00 x 8 || mHash || salt)
+        let mut m = alloc::vec![0u8; 8];
+        m.extend_from_slice(digest);
+        m.extend_from_slice(salt);
+        let h = hash.digest(&m);
+        // DB = PS || 0x01 || salt, masked with MGF1(H); the bits above em_bits cleared
+        let db_len = em_len - h_len - 1;
+        let mut db = alloc::vec![0u8; db_len];
+        db[db_len - salt.len() - 1] = 1;
+        db[db_len - salt.len()..].copy_from_slice(salt);
+        for (d, x) in db.iter_mut().zip(mgf1(hash, &h, db_len)) {
+            *d ^= x;
+        }
+        db[0] &= 0xFF >> (8 * em_len - em_bits);
+        // EM = maskedDB || H || 0xbc in the low em_len bytes of k (below 2^em_bits < n)
+        let mut em = alloc::vec![0u8; self.k];
+        let at = self.k - em_len;
+        em[at..at + db_len].copy_from_slice(&db);
+        em[at + db_len..self.k - 1].copy_from_slice(&h);
+        em[self.k - 1] = 0xbc;
         let x = bn::from_be(&em, self.m.limbs());
         Some(bn::to_be(&self.m.pow_ct(&x, &self.d), self.k))
     }

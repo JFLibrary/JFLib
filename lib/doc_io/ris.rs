@@ -2,7 +2,7 @@
 // Tag semantics: Clarivate RIS / primary Zotero RIS translator mapping; see public API scope.
 use crate::Error;
 use alloc::{collections::BTreeSet, format, string::String, vec::Vec};
-use base::encoding;
+use formats::encoding;
 use doc_core::{Person, Source, SourceKind};
 
 const INPUT_LIMIT: usize = 4 << 20;

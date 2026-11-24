@@ -15,13 +15,18 @@
 // their letters and letter pairs), their affixed forms within Damerau-Levenshtein distance
 // 1..3 (by length), nearest first.  An UPPER word gets upper-case suggestions (searched in
 // lower case), a Title word title-case ones.  The work is bounded (a number of checks, not a
-// clock), so the result is the same on every machine.
+// clock), so the result is the same on every machine: candidate checks (WORK_PASS*), the rules
+// and patterns of the .aff they try (SUG_WORK for the whole search, check.rs: Ctx::work), the
+// affixed forms of the n-gram step (FORMS_WORK); a generator stops once they are spent, so a
+// TRY, KEY, REP or MAP table of any size costs no more than its candidates.
 //
 // simple_sug(word): one edit of pass 1 or two words is a word, checked as written without
 // compounds -- the test check.rs makes for compounds of three or more parts.
 
+use alloc::collections::BTreeSet;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::cell::Cell;
 
 use crate::aff::{has, Flag, ONLYUPCASE};
 use crate::check::{captype, lower, title, upper, Cap, Ctx, Look, Opt, Parts, BREAK_WORK};
@@ -36,6 +41,9 @@ const CPD_STEPS: u32 = 300; // compound search steps per candidate
 const NGRAM_QUICK: usize = 1000; // roots kept by the quick score
 const NGRAM_ROOTS: usize = 40; // ... of them kept by the 1..3-gram score
 const WORD_MAX: usize = 64; // longer words get no suggestions
+const SUG_WORK: u32 = 64_000_000; // rules and patterns of the .aff tried in one search (Ctx::work)
+const FORMS_WORK: u32 = 32_000_000; // rules and pairs tried, forms made by the n-gram step
+const FORM_COST: u32 = 8; // ... of them a form built
 
 struct Sugs {
     out: Vec<String>,
@@ -44,8 +52,17 @@ struct Sugs {
     cpd: bool,
     /// candidates checked as written, without case variants (simple_sug)
     exact: bool,
-    /// the lookups' context (the compound parts the candidates share)
+    /// the lookups' context (the compound parts the candidates share; the work of the .aff's
+    /// tables for the whole search)
     cx: Ctx,
+}
+
+impl Sugs {
+    /// nothing more to do: enough found, or the candidates or the work spent (the generators
+    /// stop here)
+    fn done(&self) -> bool {
+        self.out.len() >= self.max || self.work == 0 || self.cx.work.get() == 0
+    }
 }
 
 impl Dictionary {
@@ -57,7 +74,7 @@ impl Dictionary {
             return Vec::new();
         }
         let cap = captype(w, self.aff.sharps);
-        let mut s = Sugs { out: Vec::new(), max, work: WORK_PASS1, cpd: false, exact: false, cx: Ctx { steps: 0, breaks: BREAK_WORK, parts: Some(Parts::new()) } };
+        let mut s = Sugs { out: Vec::new(), max, work: WORK_PASS1, cpd: false, exact: false, cx: Ctx { steps: 0, work: Cell::new(SUG_WORK), breaks: BREAK_WORK, parts: Some(Parts::new()) } };
         // pass 1: without compounds
         let base: String = if cap == Cap::All { lower(w) } else { String::from(w) };
         self.generate(&base, cap, &mut s, true);
@@ -91,13 +108,17 @@ impl Dictionary {
     }
 
     /// a simple correction of w is a word: one edit of pass 1 or two words, checked as written
-    /// and without compounds (Hunspell's test for compounds of three or more parts, check.rs)
-    pub(crate) fn simple_sug(&self, w: &str) -> bool {
+    /// and without compounds (Hunspell's test for compounds of three or more parts, check.rs);
+    /// `work`: the check's budget (Ctx::work), which this takes from
+    pub(crate) fn simple_sug(&self, w: &str, work: &Cell<u32>) -> bool {
         if w.chars().count() > WORD_MAX {
             return false;
         }
-        let mut s = Sugs { out: Vec::new(), max: 1, work: WORK_SIMPLE, cpd: false, exact: true, cx: Ctx::new(0) };
+        let cx = Ctx::new(0);
+        cx.work.set(work.get());
+        let mut s = Sugs { out: Vec::new(), max: 1, work: WORK_SIMPLE, cpd: false, exact: true, cx };
         self.generate(w, captype(w, self.aff.sharps), &mut s, true);
+        work.set(s.cx.work.get());
         !s.out.is_empty()
     }
 
@@ -112,8 +133,8 @@ impl Dictionary {
         s.work -= 1;
         if s.exact {
             let ok = match c.split_once(' ') {
-                Some((a, b)) => !a.is_empty() && !b.is_empty() && self.exact_ok(a) && self.exact_ok(b),
-                None => self.exact_ok(c),
+                Some((a, b)) => !a.is_empty() && !b.is_empty() && self.exact_ok(a, &mut s.cx) && self.exact_ok(b, &mut s.cx),
+                None => self.exact_ok(c, &mut s.cx),
             };
             if ok {
                 s.out.push(String::from(c));
@@ -143,9 +164,10 @@ impl Dictionary {
     }
 
     // c as written is a word (no case variants, no compounds; suggestion mode)
-    fn exact_ok(&self, c: &str) -> bool {
+    fn exact_ok(&self, c: &str, cx: &mut Ctx) -> bool {
         let opt = Opt { compounds: false, sug: true, upcase: false };
-        matches!(self.look(c, opt, &mut Ctx::new(0)), Look::Hit(_))
+        cx.steps = 0;
+        matches!(self.look(c, opt, cx), Look::Hit(_))
     }
 
     // the generators (full: pass 1; the compound pass leaves out the capitalised forms and
@@ -161,6 +183,9 @@ impl Dictionary {
         }
         // REP
         for r in &self.aff.rep {
+            if s.done() {
+                return;
+            }
             if r.from.is_empty() {
                 continue;
             }
@@ -221,6 +246,9 @@ impl Dictionary {
             }
             for row in &self.aff.key {
                 for (j, &k) in row.iter().enumerate() {
+                    if s.done() {
+                        return;
+                    }
                     if k != c {
                         continue;
                     }
@@ -251,6 +279,9 @@ impl Dictionary {
         let try_chars = self.try_chars();
         for i in 0..=n {
             for &t in &try_chars {
+                if s.done() {
+                    return;
+                }
                 let mut x = cs.clone();
                 x.insert(i, t);
                 self.cand(&mk(&x), cap, s);
@@ -276,6 +307,9 @@ impl Dictionary {
         // a wrong character
         for i in 0..n {
             for &t in &try_chars {
+                if s.done() {
+                    return;
+                }
                 if t != cs[i] {
                     v[i] = t;
                     self.cand(&mk(&v), cap, s);
@@ -322,7 +356,7 @@ impl Dictionary {
     // MAP: every way to replace characters of a related group (one replacement at least)
     #[allow(clippy::too_many_arguments)]
     fn map_rec(&self, w: &str, i: usize, buf: &mut String, changed: bool, cap: Cap, s: &mut Sugs, depth: u32) {
-        if s.work == 0 || s.out.len() >= s.max || depth > 6 {
+        if s.done() || depth > 6 {
             return;
         }
         if i >= w.len() {
@@ -341,10 +375,16 @@ impl Dictionary {
         // replace a group member at i by the others
         for g in &self.aff.map {
             for m in g {
+                if s.done() {
+                    return;
+                }
                 if m.is_empty() || !w[i..].starts_with(m.as_str()) {
                     continue;
                 }
                 for o in g {
+                    if s.done() {
+                        return;
+                    }
                     if o == m {
                         continue;
                     }
@@ -395,19 +435,22 @@ impl Dictionary {
             _ => 3,
         };
         let mut forms: Vec<(usize, usize, String)> = Vec::new(); // distance, -prefix, form
+        let mut seen: BTreeSet<String> = BTreeSet::new();
+        let mut work = FORMS_WORK;
         for &(_, i) in &best {
             let (root, flags) = self.words.entry(i as usize);
-            self.forms(root, flags, &mut |f: String| {
+            self.forms(root, flags, &mut work, (wl, limit), &mut |f: String| {
                 let lf: Vec<char> = f.chars().flat_map(|c| c.to_lowercase()).collect();
                 if lf.len() + limit < wl || lf.len() > wl + limit {
                     return;
                 }
-                let d = damerau(&lw, &lf);
+                let d = damerau_within(&lw, &lf, limit);
                 if d == 0 || d > limit {
                     return;
                 }
                 let pre = lw.iter().zip(lf.iter()).take_while(|(x, y)| x == y).count();
-                if !forms.iter().any(|x| x.2 == f) {
+                if !seen.contains(&f) {
+                    seen.insert(f.clone());
                     forms.push((d, usize::MAX - pre, f));
                 }
             });
@@ -421,37 +464,82 @@ impl Dictionary {
         }
     }
 
-    // f(form) for a root and its affixed forms (one suffix, one prefix, both)
-    fn forms(&self, root: &str, flags: &[Flag], f: &mut dyn FnMut(String)) {
+    // f(form) for a root and its affixed forms (one suffix, one prefix, both) that may lie
+    // within `limit` characters of a word of `wl` (the caller measures them in lower case, which
+    // makes no text shorter: a form of more than wl + limit characters is left out before it is
+    // built, a short one only when it stays short in any case).  Every rule or pair tried takes
+    // one unit of `work` (FORMS_WORK for the whole step), every form built FORM_COST
+    fn forms(&self, root: &str, flags: &[Flag], work: &mut u32, (wl, limit): (usize, usize), f: &mut dyn FnMut(String)) {
         let a = &self.aff;
+        let take = |work: &mut u32, n: u32| {
+            if *work < n {
+                *work = 0;
+                return false;
+            }
+            *work -= n;
+            true
+        };
+        // (a lower-case character is at most three)
+        let fits = |n: usize| n <= wl + limit && n * 3 + limit >= wl;
+        let chars = |t: &str| t.chars().count();
+        let rn = chars(root);
         if !has(flags, a.needaffix) && !has(flags, a.onlyincompound) {
             f(String::from(root));
         }
-        let mut sfx_forms: Vec<(String, usize)> = Vec::new();
-        for (i, r) in a.sfx.iter().enumerate() {
+        // the suffixed forms: built when they fit or a prefix may join them (cross products)
+        let mut sfx_forms: Vec<(String, usize)> = Vec::new(); // form, characters
+        let any_cross_pfx = a.pfx.iter().any(|p| p.cross && has(flags, p.flag));
+        for r in a.sfx.iter() {
+            if !take(work, 1) {
+                return;
+            }
             if has(flags, r.flag) && !r.has(a.onlyincompound) && !r.has(a.needaffix) && root.ends_with(r.strip.as_str()) && r.cond_ok(root, true) {
+                let n = rn - chars(&r.strip) + chars(&r.add);
+                let keep = r.cross && any_cross_pfx;
+                // (the work spent: the next rule ends the loop)
+                if n == 0 || !(fits(n) || keep) || !take(work, FORM_COST) {
+                    continue;
+                }
                 let mut x = String::from(&root[..root.len() - r.strip.len()]);
                 x.push_str(&r.add);
-                if !x.is_empty() {
-                    sfx_forms.push((x.clone(), i));
+                if keep {
+                    sfx_forms.push((x.clone(), n));
+                }
+                if fits(n) {
                     f(x);
                 }
             }
         }
         for p in &a.pfx {
+            if !take(work, 1) {
+                return;
+            }
             if !has(flags, p.flag) || p.has(a.onlyincompound) || p.has(a.needaffix) || !root.starts_with(p.strip.as_str()) || !p.cond_ok(root, false) {
                 continue;
             }
-            let mut x = String::from(&p.add);
-            x.push_str(&root[p.strip.len()..]);
-            f(x);
+            let (pa, ps) = (chars(&p.add), chars(&p.strip));
+            if fits(pa + rn - ps) {
+                if !take(work, FORM_COST) {
+                    return;
+                }
+                let mut x = String::from(&p.add);
+                x.push_str(&root[p.strip.len()..]);
+                f(x);
+            }
             if p.cross {
-                for (sf, i) in &sfx_forms {
-                    if a.sfx[*i].cross && sf.starts_with(p.strip.as_str()) {
-                        let mut y = String::from(&p.add);
-                        y.push_str(&sf[p.strip.len()..]);
-                        f(y);
+                for (sf, n) in &sfx_forms {
+                    if !take(work, 1) {
+                        return;
                     }
+                    if !sf.starts_with(p.strip.as_str()) || !fits(pa + n - ps) {
+                        continue;
+                    }
+                    if !take(work, FORM_COST) {
+                        return;
+                    }
+                    let mut y = String::from(&p.add);
+                    y.push_str(&sf[p.strip.len()..]);
+                    f(y);
                 }
             }
         }
@@ -516,6 +604,38 @@ fn ngram_score(a: &[char], b: &[char]) -> i32 {
         }
     }
     sc
+}
+
+/// damerau(a, b) when it is at most `limit`, else something above it: only the band of the
+/// table within `limit` of the diagonal is filled (a form far longer than the word costs no
+/// more than one of its length)
+pub(crate) fn damerau_within(a: &[char], b: &[char], limit: usize) -> usize {
+    let (n, m) = (a.len(), b.len());
+    if n.abs_diff(m) > limit {
+        return limit + 1;
+    }
+    let big = limit + 1;
+    let mut d = alloc::vec![big; (n + 1) * (m + 1)];
+    let at = |i: usize, j: usize| i * (m + 1) + j;
+    for i in 0..=n.min(limit) {
+        d[at(i, 0)] = i;
+    }
+    for j in 0..=m.min(limit) {
+        d[at(0, j)] = j;
+    }
+    for i in 1..=n {
+        let lo = i.saturating_sub(limit).max(1);
+        let hi = (i + limit).min(m);
+        for j in lo..=hi {
+            let cost = (a[i - 1] != b[j - 1]) as usize;
+            let mut v = (d[at(i - 1, j)] + 1).min(d[at(i, j - 1)] + 1).min(d[at(i - 1, j - 1)] + cost);
+            if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
+                v = v.min(d[at(i - 2, j - 2)] + 1);
+            }
+            d[at(i, j)] = v.min(big);
+        }
+    }
+    d[at(n, m)]
 }
 
 /// the optimal string alignment distance (Damerau-Levenshtein with adjacent swaps)

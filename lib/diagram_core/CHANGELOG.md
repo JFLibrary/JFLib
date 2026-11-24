@@ -97,6 +97,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - (JD15, SS-18) Dynamic glue reads WalkPreference: an end whose bit is set (1 Begin, 2 End: visWalkPrefBegNS, visWalkPrefEndNS) docks on the top or bottom of its shape when that way is as short and has as few bends as the cheapest one
 - (JD15, SL-04) `MasterTexts::matches` searches the QuickInfos in the five languages too
 - (JD21, SP-05) `ops::set_vertex`, `insert_vertex` and `delete_vertex` end with `shapeops::fit_frame`: Width, Height and Pin follow the geometry as in Visio (a shape with LockCalcWH keeps its box)
+- Theme parts are read with jflib-formats' forgiving `formats::xml::Lenient` (`formula::xml::Tree`) instead of a reader of the crate's own: broken markup is read as far as it goes instead of ending the tree there; a character reference that is no character is U+FFFD.
 
 ### Fixed
 

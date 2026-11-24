@@ -1,0 +1,3 @@
+# agenttest is a console self-check of agent_core and of the JSON under it (formats::json): it
+# runs every check and ignores the script (build_rs.py test passes --script); a failing check
+# exits with code 1.  The process tests (ipc_check.py, bridge_check.py) run on their own.

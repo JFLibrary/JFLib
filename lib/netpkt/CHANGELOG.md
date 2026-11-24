@@ -8,9 +8,15 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- `netpkt::x509` is the crate jflib-x509 (one parser for the library, with its strict checks): `CertSpec` is `x509::CertBuilder` (with `server_auth` / `client_auth`), `Cert::fingerprint` is the hex text (the bytes: `fingerprint_bytes`), the Ed25519 key is `ed25519_key()` instead of the field `key`, addresses are `x509::IpAddr`; `check_chain` and the F_* fault bits stay
+
 ### Fixed
 
 - `eapol::Rsne::parse` reads the AKM count: the capabilities come after every AKM suite (they were read as if there were always one), no AKM suite is no element.
+- `tls::Core` as a client: an extension in the ServerHello or EncryptedExtensions that the ClientHello did not offer (an unknown type, a GREASE value) is refused with unsupported_extension (`tls::AL_UNSUPPORTED_EXTENSION`), one it offered in a message that does not answer it with illegal_parameter (RFC 8446 4.2, RFC 8701 4); they were ignored, as in netio's client, where TLS-Anvil found it
+- `tls::Core` as a client ignores the ServerHello's legacy_version, which RFC 8446 4.2.1 says a client must (anything but 0x0303 was protocol_version); supported_versions says the version
 
 ### Security
 

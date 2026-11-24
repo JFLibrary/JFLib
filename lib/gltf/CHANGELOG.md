@@ -12,6 +12,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - `write_document(&Document)`: a document as a .glb (meshes with positions, normals, one uv set and u16 or u32 indices; materials by their factors, alpha mode, cutoff and double-sided; nodes with their local matrices; scenes) that `load` reads back as the same document. Textures, images and lights are refused (`Error::Unsupported`) rather than left out.
 
+### Changed
+
+- The JSON of .gltf and .glb files is read and written with jflib-formats (`formats::json`); the crate no longer depends on jflib-agent-core.
+
 ### Fixed
 
 - Scenes are read and their instances counted without walking every node once per scene (scenes x nodes; nodes without a mesh never reached the limit), and a document keeps at most 64 different notes.

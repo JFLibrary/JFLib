@@ -1219,7 +1219,6 @@ fn prepare(desc: &AppDesc, style: &'static dyn Style) -> (Ui, i32, i32) {
     img_core::io::set_file_io(img_core::io::FileIo { read: plat::read_file, write: plat::write_file });
     img_all::use_core_codecs();
     img_svg::register(); // (svg) .svg / .svgz through img_core::io::load / load_ex
-    plat::set_print_deflate(Some(img_core::deflate::zlib_deflate)); // PDFs of plat::print as the asm's
     img_core::set_parallel(icc_par); // the codecs' parallel parts (YUV bands, ICC grids) on the pool
     gfx::set_parallel(icc_par); // large blits (a canvas's frame at 4K) in row bands on the pool
     let args = Args(plat::args());

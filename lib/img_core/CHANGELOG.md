@@ -8,6 +8,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- JDF_RAW_CMYK: a 4-component JPEG's samples as stored (YCCK after its YCC step, as libjpeg gives them) in the bytes R, G, B and A, for a caller with its own CMYK conversion
+
+### Changed
+
+- `inflate`, `deflate`, `gzip` and `checksum` call jflib-compress, where the code lives now (`compress::deflate`, `zlib`, `gzip`, `crc32`, `adler32`); their functions keep their names, signatures, bytes and `ERR_*` codes. The internal code tables `inflate::{LBASE, LEXT, DBASE, DEXT, CLORDER, rev16}` are gone. The crate's licence is MIT or Apache-2.0 again; the zlib, miniz and stb_image notices moved with the code.
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

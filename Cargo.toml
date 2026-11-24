@@ -10,6 +10,7 @@ default-members = ["lib/jflib"]
 # lib/ in this order is build_rs.py's LIBS: a program's crates link in it
 members = [
     "lib/rt",
+    "lib/formats",
     "lib/agent_core",
     "lib/plat",
     "lib/base",
@@ -47,6 +48,7 @@ members = [
     "lib/doc_view",
     "lib/datetime",
     "lib/crypto",
+    "lib/x509",
     "lib/compress",
     "lib/shader",
     "lib/wgsl",
@@ -185,6 +187,7 @@ homepage = "https://jflib.org"
 # Exact versions: only the way through the crate jflib is promised, the crates below it change together.
 [workspace.dependencies]
 rt = { package = "jflib-rt", path = "lib/rt", version = "=0.2.1" }
+formats = { package = "jflib-formats", path = "lib/formats", version = "=0.2.1" }
 agent_core = { package = "jflib-agent-core", path = "lib/agent_core", version = "=0.2.1" }
 plat = { package = "jflib-plat", path = "lib/plat", version = "=0.2.1" }
 base = { package = "jflib-base", path = "lib/base", version = "=0.2.1" }
@@ -224,6 +227,7 @@ ui = { package = "jflib-ui", path = "lib/ui", version = "=0.2.1" }
 doc_view = { package = "jflib-doc-view", path = "lib/doc_view", version = "=0.2.1" }
 datetime = { package = "jflib-datetime", path = "lib/datetime", version = "=0.2.1" }
 crypto = { package = "jflib-crypto", path = "lib/crypto", version = "=0.2.1" }
+x509 = { package = "jflib-x509", path = "lib/x509", version = "=0.2.1" }
 compress = { package = "jflib-compress", path = "lib/compress", version = "=0.2.1" }
 shader = { package = "jflib-shader", path = "lib/shader", version = "=0.2.1" }
 wgsl = { package = "jflib-wgsl", path = "lib/wgsl", version = "=0.2.1" }
@@ -282,7 +286,7 @@ codegen-units = 16
 strip = "symbols"
 
 # the crates whose speed matters in development builds too (build_rs.py's compute_crate): pixels and
-# codecs stay fast in the tests, Kritzel draws with its own pixel loops, physicstest's references run
+# codecs stay fast in the tests (pdf draws pages), Kritzel draws with its own pixel loops, physicstest's references run
 # hundreds of thousands of queries, modeltool's checks build meshes of a few 100 000 triangles
 [profile.dev.package.jflib-gfx]
 opt-level = 2
@@ -309,6 +313,9 @@ opt-level = 2
 opt-level = 2
 
 [profile.dev.package.jflib-img-core]
+opt-level = 2
+
+[profile.dev.package.jflib-pdf]
 opt-level = 2
 
 [profile.dev.package.jflib-img-png]

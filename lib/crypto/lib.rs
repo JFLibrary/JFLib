@@ -1,6 +1,8 @@
 // crypto -- the primitives BackupCraft (and anything else) builds on, in plain Rust
 //
-//   sha2      Sha256 / Sha384 / Sha512, sha256 / sha384 / sha512(data)         (FIPS 180-4)
+//   sha2      Sha224 / Sha256 / Sha384 / Sha512, sha224 .. sha512(data)       (FIPS 180-4)
+//   sha3      Sha3_224 .. Sha3_512, sha3_224 .. sha3_512(data); Shake128 / Shake256 with any
+//             output length, shake128 / shake256(data, out)                  (FIPS 202)
 //   hmac      Hmac<H>, hmac_sha256 / hmac_sha512, hkdf_sha256 / hkdf_sha512,
 //             pbkdf2_sha256 (import of foreign key files only)                (RFC 2104/5869/8018)
 //   blake2b   Blake2b (keyed, 1..64 byte digests)                             (RFC 7693)
@@ -12,13 +14,16 @@
 //   x25519    Diffie-Hellman over Curve25519                                  (RFC 7748)
 //   ed25519   signatures, strict verification                                 (RFC 8032)
 //   sealbox   anonymous public-key encryption: X25519 + HKDF-SHA256 + XChaCha20-Poly1305
-//   aes, gcm  AES-128/256 (bitsliced, constant time; both directions), AES-GCM seal / open
+//   aes, gcm  AES-128/192/256 (bitsliced, constant time; both directions), AES-GCM seal / open
 //             (FIPS 197, SP 800-38D)
 //   bn        big integers modulo odd numbers (public values: variable time; pow_ct for a
 //             secret exponent)
-//   rsa       RSA PKCS #1 v1.5 and PSS verification                            (RFC 8017)
-//   ecdsa     ECDSA verification on P-256 / P-384                              (FIPS 186-4)
+//   rsa       RSA PKCS #1 v1.5 and PSS verification (MGF1 of the same hash)     (RFC 8017)
+//   ecdsa     ECDSA on P-256 / P-384: verification; signing in constant time with
+//             deterministic nonces (RFC 6979), hedged by optional random bytes; keys; r || s
+//             (IEEE P1363) and DER                                    (FIPS 186-5, RFC 6979)
 //   p256      Diffie-Hellman on P-256 in constant time (complete formulas)      (SEC 1)
+//   p384      Diffie-Hellman on P-384 in constant time (complete formulas)      (SEC 1)
 //   b64       Base64 (standard and URL alphabet, with or without padding)
 //   ct_eq / zeroize / hex
 //   sha1      Sha1, sha1(data); with hmac_sha1, pbkdf2 (any Hash) and pbkdf2_sha1 in hmac:
@@ -27,13 +32,17 @@
 //   cmac      cmac_aes: AES-CMAC                                              (RFC 4493)
 //   md5       Md5, md5(data), md5_parts(parts); with hmac_md5 in hmac: only for protocols
 //             defined with MD5 (RADIUS); broken for collisions                 (RFC 1321, 2104)
-//   rsa also  PrivateKey: generate from the caller's bytes, PKCS #1 v1.5 signing (RFC 8017)
+//   rsa also  PrivateKey: generate from the caller's bytes, PKCS #1 v1.5 and PSS signing
+//             (RFC 8017)
 //   eappwd    the sums of EAP-PWD on P-256: pwe, commit, shared, confirm, keys  (RFC 5931)
+//   mlkem     ML-KEM-512 / 768 / 1024: keygen from a 64-byte seed, encaps, decaps with implicit
+//             rejection, in constant time                                    (FIPS 203)
 //
 // No randomness here: callers pass random bytes in (plat::fill_random on Windows, Linux, Apple
 // and Android; in the browser the page's crypto.getRandomValues), so everything is
 // deterministic and testable.  Secret-dependent work avoids branches and table lookups
-// (field arithmetic with 51-bit limbs, masked conditional swaps and selects).
+// (field arithmetic with 51-bit limbs, masked conditional swaps and selects); every mask made
+// from secret data passes ct_mask, so the optimizer cannot turn a select back into a branch.
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -50,19 +59,23 @@ pub mod chacha;
 pub mod ecdsa;
 pub mod ed25519;
 mod field;
+mod nist;
 pub mod gcm;
 pub mod hmac;
 pub mod p256;
+pub mod p384;
 pub mod poly1305;
 pub mod rsa;
 mod scalar;
 pub mod sealbox;
 pub mod sha2;
+pub mod sha3;
 pub mod x25519;
 pub mod sha1;
 pub mod keywrap;
 pub mod cmac;
 pub mod md5;
+pub mod mlkem;
 pub mod eappwd;
 
 use alloc::string::String;
@@ -70,7 +83,8 @@ use alloc::vec::Vec;
 
 pub use blake3::Blake3;
 pub use hmac::{hkdf_sha256, hkdf_sha512, hmac_sha256, hmac_sha512, pbkdf2_sha256, Hmac};
-pub use sha2::{sha256, sha384, sha512, Sha256, Sha384, Sha512};
+pub use sha2::{sha224, sha256, sha384, sha512, Sha224, Sha256, Sha384, Sha512};
+pub use sha3::{sha3_224, sha3_256, sha3_384, sha3_512, shake128, shake256, Sha3_224, Sha3_256, Sha3_384, Sha3_512, Shake128, Shake256};
 pub use sha1::{sha1, Sha1};
 pub use hmac::{hmac_sha1, pbkdf2, pbkdf2_sha1};
 pub use keywrap::{aes_unwrap, aes_wrap};
@@ -80,7 +94,7 @@ pub use hmac::hmac_md5;
 
 /// a hash function for Hmac / HKDF / PBKDF2
 pub trait Hash: Clone {
-    /// block size in bytes (at most 128)
+    /// block size in bytes (at most 168)
     const BLOCK: usize;
     /// digest size in bytes (at most 64)
     const OUT: usize;
@@ -93,26 +107,73 @@ pub trait Hash: Clone {
 /// the hash functions of signatures
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
+#[allow(non_camel_case_types)]
 pub enum HashAlg {
     Sha256,
     Sha384,
     Sha512,
+    Sha224,
+    Sha3_224,
+    Sha3_256,
+    Sha3_384,
+    Sha3_512,
 }
 
 impl HashAlg {
     pub fn len(self) -> usize {
         match self {
-            HashAlg::Sha256 => 32,
-            HashAlg::Sha384 => 48,
-            HashAlg::Sha512 => 64,
+            HashAlg::Sha224 | HashAlg::Sha3_224 => 28,
+            HashAlg::Sha256 | HashAlg::Sha3_256 => 32,
+            HashAlg::Sha384 | HashAlg::Sha3_384 => 48,
+            HashAlg::Sha512 | HashAlg::Sha3_512 => 64,
         }
     }
 
     pub fn digest(self, data: &[u8]) -> Vec<u8> {
         match self {
+            HashAlg::Sha224 => sha224(data).to_vec(),
             HashAlg::Sha256 => sha256(data).to_vec(),
             HashAlg::Sha384 => sha384(data).to_vec(),
             HashAlg::Sha512 => sha512(data).to_vec(),
+            HashAlg::Sha3_224 => sha3_224(data).to_vec(),
+            HashAlg::Sha3_256 => sha3_256(data).to_vec(),
+            HashAlg::Sha3_384 => sha3_384(data).to_vec(),
+            HashAlg::Sha3_512 => sha3_512(data).to_vec(),
+        }
+    }
+
+    /// HMAC with this hash (RFC 2104): the full tag
+    pub fn hmac(self, key: &[u8], data: &[u8]) -> Vec<u8> {
+        fn mac<H: Hash>(key: &[u8], data: &[u8]) -> Vec<u8> {
+            let mut m = Hmac::<H>::new(key);
+            m.update(data);
+            let mut out = alloc::vec![0u8; H::OUT];
+            m.finish_into(&mut out);
+            out
+        }
+        match self {
+            HashAlg::Sha224 => mac::<Sha224>(key, data),
+            HashAlg::Sha256 => mac::<Sha256>(key, data),
+            HashAlg::Sha384 => mac::<Sha384>(key, data),
+            HashAlg::Sha512 => mac::<Sha512>(key, data),
+            HashAlg::Sha3_224 => mac::<Sha3_224>(key, data),
+            HashAlg::Sha3_256 => mac::<Sha3_256>(key, data),
+            HashAlg::Sha3_384 => mac::<Sha3_384>(key, data),
+            HashAlg::Sha3_512 => mac::<Sha3_512>(key, data),
+        }
+    }
+
+    /// the last arc of the hash's OID under 2.16.840.1.101.3.4.2 (NIST's hash algorithms)
+    pub(crate) fn nist_arc(self) -> u8 {
+        match self {
+            HashAlg::Sha256 => 1,
+            HashAlg::Sha384 => 2,
+            HashAlg::Sha512 => 3,
+            HashAlg::Sha224 => 4,
+            HashAlg::Sha3_224 => 7,
+            HashAlg::Sha3_256 => 8,
+            HashAlg::Sha3_384 => 9,
+            HashAlg::Sha3_512 => 10,
         }
     }
 }
@@ -147,30 +208,58 @@ pub(crate) fn zeroize_words(buf: &mut [u64]) {
     core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
 }
 
-/// lower-case hex
+/// a mask made from secret data (0 or all ones), hidden from the optimizer.  Without it LLVM
+/// sees that the value is one of the two and may compile `(a & m) | (b & !m)` back into a
+/// branch, or a select over all entries of a table into a lookup of one.  On x86-64 with Rust
+/// 1.98 it did both: branches for the final subtractions of p256's field arithmetic and of
+/// scalar::reduce_limbs, a jump table for the window of p256::scalar_mul.  black_box is a best
+/// effort, so the machine code of the secret paths is what has to be checked: tools/ct_check.py
+/// runs them with different secrets and compares the branches they take.
+#[inline(always)]
+pub(crate) fn ct_mask(m: u64) -> u64 {
+    core::hint::black_box(m)
+}
+
+/// lower-case hex (without a table: keys are printed this way too)
 pub fn hex(data: &[u8]) -> String {
-    const D: &[u8; 16] = b"0123456789abcdef";
     let mut s = String::with_capacity(data.len() * 2);
-    for b in data {
-        s.push(D[(b >> 4) as usize] as char);
-        s.push(D[(b & 15) as usize] as char);
+    for &b in data {
+        for n in [b >> 4, b & 15] {
+            // '0' + n, and 'a' - '0' - 10 more above 9
+            let above9 = ct_mask(((9i32 - n as i32) >> 31) as u32 as u64) as u8;
+            s.push((b'0' + n + (above9 & (b'a' - b'0' - 10))) as char);
+        }
     }
     s
 }
 
-/// the bytes of a hex string (upper or lower case; None on odd length or other characters)
+/// the bytes of a hex string (upper or lower case; None on odd length or other characters).
+/// Every character is looked at before the answer, without a branch on it
 pub fn unhex(s: &str) -> Option<Vec<u8>> {
     let b = s.as_bytes();
     if b.len() % 2 != 0 {
         return None;
     }
-    let nib = |c: u8| match c {
-        b'0'..=b'9' => Some(c - b'0'),
-        b'a'..=b'f' => Some(c - b'a' + 10),
-        b'A'..=b'F' => Some(c - b'A' + 10),
-        _ => None,
+    // (value, all ones when c is a hex digit)
+    let nib = |c: u8| -> (u8, u8) {
+        let c = c as i32;
+        let range = |lo: i32, hi: i32| ct_mask((((lo - 1 - c) & (c - hi - 1)) >> 31) as u32 as u64) as u8;
+        let (dig, low, up) = (range(48, 57), range(97, 102), range(65, 70));
+        let v = (dig & (c - 48) as u8) | (low & (c - 87) as u8) | (up & (c - 55) as u8);
+        (v, dig | low | up)
     };
-    b.chunks(2).map(|p| Some(nib(p[0])? << 4 | nib(p[1])?)).collect()
+    let mut good = 0xFFu8;
+    let mut out = Vec::with_capacity(b.len() / 2);
+    for p in b.chunks(2) {
+        let ((hi, a), (lo, z)) = (nib(p[0]), nib(p[1]));
+        good &= a & z;
+        out.push(hi << 4 | lo);
+    }
+    if good == 0 {
+        zeroize(&mut out);
+        return None;
+    }
+    Some(out)
 }
 
 #[inline(always)]

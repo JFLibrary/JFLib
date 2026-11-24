@@ -12,7 +12,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use agent_core::json::{self, Value};
+use formats::json::{self, Value};
 
 /// the largest update.json read
 pub const MAX_MANIFEST: usize = 1 << 20;

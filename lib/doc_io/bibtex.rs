@@ -366,8 +366,8 @@ fn read_field(s: &mut Source, key: &str, field: &str, raw: &str) -> Result<(), E
 /// entire import. Limits: 4 MiB input, 1024 sources, 64 authors, 4096 bytes per scalar,
 /// 2 MiB retained model. ASCII field whitespace follows BibTeX normalization.
 pub fn decode_bibtex(bytes: &[u8]) -> Result<Vec<Source>, Error> {
-    let (text, _) = base::encoding::decode(bytes, INPUT_LIMIT).map_err(|e| match e {
-        base::encoding::Error::Limit => Error::Limit,
+    let (text, _) = formats::encoding::decode(bytes, INPUT_LIMIT).map_err(|e| match e {
+        formats::encoding::Error::Limit => Error::Limit,
         _ => issue(
             "Eingabe",
             "Zeichenkodierung",

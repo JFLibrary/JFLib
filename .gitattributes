@@ -9,3 +9,5 @@ apps/render2dtest/dxf/** -text
 # modeltool's examples and their reports are built into the program (include_str!) and hashed by its checksum:
 # no line-ending conversion on checkout, so the checksum does not depend on the checkout
 apps/modeltool/examples/** -text
+# formats::encoding's multi-byte indexes (tools/gen_encodings.py): little-endian words, byte for byte
+lib/formats/src/cjk.bin binary

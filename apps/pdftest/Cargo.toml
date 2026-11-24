@@ -26,6 +26,7 @@ img_core.workspace = true
 img_jpeg.workspace = true
 text_shape.workspace = true
 pdf.workspace = true
+compress.workspace = true
 
 [build-dependencies]
 jflib-build.workspace = true
