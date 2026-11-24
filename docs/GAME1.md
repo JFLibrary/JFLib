@@ -164,10 +164,10 @@ kommt zurück, wenn der Spieler geht.
 - **Bild**: `render3d` in einer `ui.gpu_view` über das ganze Fenster (der Weg von `apps/gamedemo`), HUD und Menüs mit
   `ui` darüber. Look C, wie entschieden: `Toon { bands: 4, softness: 0.5, rim: 0.2, rim_width: 0.35 }` auf Figuren,
   Waffe und den Teilen mit `#rand`, Randlicht 0 auf Boden und Wänden, keine Umrisse, FXAA, Schatten der Sonne nach der
-  Stufe des Geräts. Die Waffe und die Hände der Figur vor der Kamera (render3ds Viewmodel, eigene Linse 57°), mit
-  Wippen beim Laufen, Rückstoß und Senken beim Nachladen. Partikel: Mündungsfeuer (vor der Kamera und an den Waffen der
-  anderen), Leuchtspuren, Funken und Staub, wo ein Schuss die Karte trifft, eine Wolke in der Farbe der Figur, wenn sie
-  raus ist.
+  Stufe des Geräts. Die Waffe und die Hände der Figur vor der Kamera (render3ds Viewmodel, eigene Linse 57°), klein
+  unten rechts auf jedem Fensterformat ([Die Waffe vor der Kamera](#die-waffe-vor-der-kamera)), mit Wippen beim Laufen,
+  Rückstoß und Senken beim Nachladen. Partikel: Mündungsfeuer (vor der Kamera und an den Waffen der anderen),
+  Leuchtspuren, Funken und Staub, wo ein Schuss die Karte trifft, eine Wolke in der Farbe der Figur, wenn sie raus ist.
 - **HUD**: Leben (Zahl und Balken), Munition („17 / 20“, „lädt …“), Fadenkreuz, Treffermarke (weiß, gelb für Kopf,
   rot für einen Abschuss), roter Rand bei Schaden, Abschussliste oben rechts (6 s; auch „X ist dabei“, „X hat den Raum
   verlassen“), Raumcode und Umlauf oben links, „X hat dich erwischt“, Punktetafel mit Tab. Treffermarke und Abschussliste
@@ -195,6 +195,37 @@ kommt zurück, wenn der Spieler geht.
   Nachrichten wie auf einem Thread) und zieht Raumcodes und Tickets aus dem Zufall des Systems; `--log` schreibt
   Verbindungen und die Zähler je Spieler.
 
+### Die Waffe vor der Kamera
+
+Entschieden am 2026-11-24: kleiner und weiter rechts unten, die Mitte (Fadenkreuz, Ziele) bleibt frei; Look C und die
+Figur, wie die anderen sie sehen, bleiben. Gezeichnet werden die Teile `waffe`, `tank` und `haende` der Figur mit
+render3ds Viewmodel und seiner eigenen Linse (57° senkrecht, `look::VM_FOV`): Das Sichtfeld der Einstellungen
+ändert die Waffe nicht. Ihren Platz beschreibt `VmLayout` in [`look.rs`](../apps/game1/src/look.rs): ein Maßstab und
+wo die Mitte ihres Kastens auf dem Bildschirm liegt, `right` vom rechten und `bottom` über dem unteren Rand, gemessen
+in Bildschirmhöhen, 0,62 m vor dem Auge.
+
+- **Jedes Format**: Auf 16:10, 4:3 und 21:9 liegt sie so weit von der Ecke wie auf 16:9. Ein Fenster schmaler als
+  4:3 (hoch, ein schmales Browserfenster) misst in Breite / (4/3): Die Waffe wird mit der Breite kleiner und bleibt in
+  der Ecke. Breiter als 16:9 liegt sie weiter außen und dreht sich um so viel nach außen, dass man sie von derselben
+  Seite sieht wie auf 16:9 (sonst wüchse ihr hinteres Ende auf 21:9 in die Munitionsanzeige).
+- **Bewegung**: Wippen, Rückstoß und Senken wachsen und schrumpfen mit dem Maßstab (gestimmt waren sie für 0,55), das
+  Mündungsfeuer auch; es kommt aus der Mündung (`@muendung`) in Richtung des Laufs.
+- **Leuchtspur**: Die eigene beginnt an dem Punkt der Welt, den das Bild an der Mündung zeigt (`look::vm_to_world`,
+  auf jedem Format und bei jedem Sichtfeld). Getroffen wird weiter vom Auge aus (Hitscan): Am Spiel, am vorhergesagten
+  Zustand und an den fünf Prüfsummen ändert sich nichts.
+
+| Variante | Maßstab | `right` | `bottom` | Kasten auf 16:9 (1280 × 720, in Ruhe, etwa) |
+| --- | --- | --- | --- | --- |
+| heute (G7h Teil 1) | 0,55 | (Kamera x 0,15, y −0,16) | | x 736–927, y 385–697 |
+| A (0,6 ×) | 0,33 | 0,36 | 0,12 | x 953–1129, y 550 bis unter den Rand |
+| **B (0,7 ×), eingebaut** | 0,385 | 0,39 | 0,14 | x 925–1125, y 521 bis unter den Rand |
+| C (0,8 ×) | 0,44 | 0,42 | 0,17 | x 900–1120, y 485 bis unter den Rand |
+
+Eine andere Variante ist eine Zeile: `VM_LAYOUT = VM_VARIANTS[i].1` in `look.rs`; die Gruppe `render` hält alle drei.
+Die Bilder zur Wahl (derselbe Moment der Übung: heute, A, B, C; B auf 16:10, 4:3, 21:9 und 540 × 960; Nachladen)
+liegen außerhalb des Repositorys. Offen: In einem schmalen hohen Fenster liegt die Munitionsanzeige (die HUD misst
+in Höhen) über der kleinen Waffe.
+
 ## Tests
 
 `python build_rs.py test game1` führt `tests/check.uis` (`--check`: sechs Gruppen), `tests/loopback.uis` (echte Sockets
@@ -208,7 +239,7 @@ auf 127.0.0.1) und `tests/shot.uis` (das Fenster ohne Bildschirm: Startmenü, Ü
 | `match` | 16 Bots eine Minute: sie schießen, treffen, beenden einander und kommen zurück, Tode = Abschüsse + Stürze, keiner steckt in der Karte, Leben in 0–100, mindestens 8 weit weg von ihrem Start, zweimal gleich; ein Spieler in einem vollen Raum nimmt den Platz eines Bots, der beim Gehen zurückkommt; ein Schuss von Hand: 18 Schaden am Körper, 36 am Kopf, die Zähler, raus nach genug Treffern, Rückkehr nach genau 120 Ticks mit Leben, Magazin und Schutz; Lag-Ausgleich im Raum: ein Schuss dorthin, wo das Ziel vor 10 Ticks war, trifft mit dieser Sicht und ohne nicht |
 | `netsim` | Clients mit dem Verstand der Bots über die simulierte Leitung, Referenz ist der Server selbst: klar 4 Clients (einer über WebSocket) – jede erste Vorhersage gleich dem Zustand des Servers, keine Korrektur; typisch 10 s – beschränkt, und bei jeder Korrektur bewegt sich die gezeichnete Figur nicht (Glätten); danach klar – wieder jede Vorhersage exakt; ein Client verlässt den Raum – seine Figur ist 21 ms nach dem LEAVE beim Server weg, die anderen lesen es genau einmal; mit Schießen (4 Bots auf dem Server, 4 Clients) – alle spielen, keine fehlende Basis, kein kaputter Schnappschuss, keiner über 1200 Bytes, Abschüsse; jeder Abschuss seit dem Beitritt kommt bei jedem Client genau einmal und in Reihenfolge an, jeder Treffer bei seinem Schützen (gegen das Buch des Raums) |
 | `lagcomp` | ein Client schießt auf einen anderen, der mit 9 m/s hin und her läuft, und zielt dorthin, wo er ihn sieht: Umlauf 50, 100, 150, 200, 250 ms, mit und ohne Lag-Ausgleich |
-| `render` | das Bild offscreen aus fester Kamera: dasselbe Bild zweimal gleich, Himmel oben, der Hof unten bunt, sechs Figuren ändern die Mitte, die Waffe nur unten rechts, Partikel zeigen sich (kein Bezugsbild) |
+| `render` | ohne GPU: jede Ecke der Waffe durch ihre Linse auf neun Formaten von 9:21 bis 32:9, in Ruhe, mit Rückstoß, gesenkt und wippend – ganz rechts unter dem Fadenkreuz, ein Quadrat von 0,15 Bildschirmhöhen um es frei, in Ruhe links von der Munitionsanzeige; die eigene Leuchtspur beginnt auf dem Bild an der Mündung (Sichtfeld 70–120°). Mit GPU das Bild offscreen aus fester Kamera: dasselbe Bild zweimal gleich, Himmel oben, der Hof unten bunt, sechs Figuren ändern die Mitte, die Waffe nur im Viertel unten rechts und nicht um das Fadenkreuz (16:9, 4:3, 21:9, schmal), Partikel zeigen sich (kein Bezugsbild) |
 
 Ergebnisse nach G7e Teil 2 (auf Windows, Linux, macOS und in Node dieselben Zahlen): Klar: 1423 erste Vorhersagen
 verglichen, 0 verschieden, 0 Korrekturen. Typisch 10 s: 9 Korrekturen (13,5 je Minute und Client), größter Fehler 4 mm, alle
@@ -339,7 +370,8 @@ für die Tasten, Grafik und Lautstärke, Klang; dazu aus diesem Lauf:
   vor), oder soll die Grenze auf rund 400 ms?
 - **Name** des Spiels (und damit die App-Id statt `org.jfreund.game1`).
 - **Die Figur und die Karte** an den Bildern (`build/game1-content/*/sheet.png` nach `tools/content.py`, im Spiel
-  `build/game1_window.png`): Proportionen, Farben, wie groß die Waffe vor der Kamera ist.
+  `build/game1_play.png`): Proportionen, Farben.
+- **Die Waffe vor der Kamera**: B ist eingebaut; bleibt es dabei, oder A oder C ([oben](#die-waffe-vor-der-kamera))?
 - **Die Startwerte** von Bewegung und Waffe (Tabellen oben) nach dem ersten Spielen von Hand.
 
 ## Name
