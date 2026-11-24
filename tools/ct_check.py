@@ -123,8 +123,11 @@ DECLASSIFIED = [
     ("crypto/lib.rs", r"for b in buf\.iter_mut\(\)|\*b = 0", "zeroize's length is the buffer's, which is public"),
     # the Base64 decoder's answer where pem.rs takes it (ARM64 makes the Option's tag without a
     # branch), and the body's tag: Option<String> keeps None in the capacity, which grows with
-    # the characters pushed, and their UTF-8 length is 1 (Base64 is ASCII by construction)
+    # the characters pushed, and their UTF-8 length is 1 (Base64 is ASCII by construction); and
+    # split's answer, which the loop tests on its own line where split's next is a function of
+    # its own (o3, 16 codegen units, Rust 1.98)
     ("netio/pem.rs", r"if let Some\(d\) = crypto::b64::decode\(b\)", "the Base64 decoder's verdict (valid or not) is its public answer"),
+    ("netio/pem.rs", r"for line in text\.split\('\\n'\)", "whether another line follows is where the line ends are, PEM's public layout; no Base64 character is one (memcheck sees the answer come from comparing every character with '\\n')"),
     ("netio/pem.rs", r"match body\.as_mut\(\)", "the body's tag lives in its capacity, which grows by the characters' UTF-8 length: 1, ASCII by construction"),
     ("netio/pem.rs", r".", "PEM's layout (markers, line ends) is public; Base64 characters are none of them"),
     ("netio/ssh.rs", r".", "the OpenSSH key file's layout and fields other than the key are public"),
