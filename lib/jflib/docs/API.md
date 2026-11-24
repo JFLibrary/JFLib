@@ -11153,7 +11153,8 @@ pads -- (G7a part 2) the game pads for the app and the test scripts (plat::pads)
 
   ui.gamepads()            the pads connected now with the edges of their buttons in this batch;
                            the first call starts watching (plat::pad_watch; a headless run: the
-                           script's pads only)
+                           script's pads only); refused by the manifest (no `gamepad`), it starts
+                           once an ask line is answered yes (policy::gamepad_granted)
   ui.gamepads_watching()   pads are being watched (false where the platform has none)
   pads_event(data)         (E_GAMEPAD) the pads anew, the edges added up until the batch's first
                            pass took them (pads_clear_edges); App::command(UIC_GAMEPAD, data) for a
@@ -11175,8 +11176,10 @@ the same list.  plat reports pads as nothing held while no window of the app is 
   goes gives App::command(UIC_GAMEPAD, index | PADEV_\* &lt;&lt; 8).  While none of the app's windows
   has the focus every pad reports nothing held.  Windows: XInput (Xbox-compatible pads); Linux:
   evdev; macOS: GameController; the browser: the Gamepad API (a pad appears after one of its
-  buttons was pressed in the page); Android and iOS: none.  A headless run has the pads of its
-  script (`pad ...`)
+  buttons was pressed in the page); Android and iOS: none.  An app with a PERMISSIONS file needs
+  its line `gamepad` (else no pads, PERMDENY gamepad; `ask gamepad` asks at the first call and
+  watching starts in the frame after a yes).  A headless run has the pads of its script
+  (`pad ...`, no permission: the script's own input)
 - **`fn gamepads_watching(&self) -> bool`**
   (G7a) pads are being watched: ui.gamepads was called and the platform has pads (false on
   Android and iOS, on Windows without XInput); a headless run: after ui.gamepads
@@ -28571,7 +28574,8 @@ net -- TCP, UDP and Unix domain sockets (IPv4 and IPv6) with timeouts
   TcpStream::connect(&addr, timeout_ms) / read / write / write_all / read_exact,
             set_read_timeout / set_write_timeout (ms, None = block), set_nodelay,
             shutdown_write, peer_addr / local_addr, wait_readable(ms)
-  UdpSocket::bind / send_to / recv_from(buf, timeout_ms)
+  UdpSocket::bind / send_to / recv_from(buf, timeout_ms); answers_to(addr), answer_peers()
+            (the answers a socket net.listen allows may send without net.connect, AnswerSet)
   UnixListener::bind(path) / accept() / accept_timeout(ms); connect_unix(path, timeout_ms)
             (bind removes only a socket file nobody listens on; the drop only its own)
             -> UnixStream (the stream calls of TcpStream; addresses and nodelay do not apply)
@@ -28589,7 +28593,9 @@ yet (docs/ANDROID.md).
 
 The app's permissions (policy.rs, net.connect / net.listen) are checked before connect,
 bind, send_to and a name lookup; Unix sockets follow the file rules (fs.write on the path).
-A refusal is NetErrorKind::Denied.
+A refusal is NetErrorKind::Denied.  A UDP socket whose address net.listen allows may answer
+without net.connect: send_to an address it received a datagram from in the last 60 s
+(AnswerSet, at most 1024 addresses per socket: forged sources cannot grow it).
 
 Timeouts are readiness waits (WSAPoll / poll) before each call, never SO_RCVTIMEO: after a
 timed-out blocking receive Windows leaves the connection in an undefined state.  Sockets are
@@ -28710,16 +28716,50 @@ one thread may read while another writes (Arc<TcpStream>).
 - **`fn peer_addr(&self) -> NetResult<SocketAddr>`**
 - **`fn local_addr(&self) -> NetResult<SocketAddr>`**
 
+- **`struct AnswerSet`**
+  (permissions) the peers a UDP socket that `net.listen` allows may answer without a `net.connect` rule: the
+  addresses it received a datagram from in the last [`AnswerSet::KEEP_MS`] (a datagram renews its address; sending
+  to it does not).  At most [`AnswerSet::MAX`] of them: two generations of `MAX / 2`, a full one becomes the old one
+  and the old one goes (so does a generation older than `KEEP_MS`).  Source addresses are not proven: whoever can
+  forge one can open the way to that address for this socket -- as any UDP server answers whoever writes -- but not
+  grow the set past `MAX`; a flood of forged addresses pushes older ones out, and their peers are answered again
+  after their next datagram.  `UdpSocket` keeps one when a manifest restricts the process ([`UdpSocket::bind`]);
+  the times are the caller's (ms of a monotonic clock), so tests drive it directly.
+
+**`impl AnswerSet`**
+
+- **`const MAX: usize = 1024`**
+  the most addresses kept (two generations of half)
+- **`const KEEP_MS: u64 = 60_000`**
+  how long an address may be answered after its last datagram (ms)
+- **`fn new(now_ms: u64) -> AnswerSet`**
+- **`fn heard(&mut self, from: &SocketAddr, now_ms: u64)`**
+  a datagram came from `from` (a port of 0 or an unspecified address is no peer)
+- **`fn may_answer(&mut self, to: &SocketAddr, now_ms: u64) -> bool`**
+  whether `to` sent a datagram within KEEP_MS (and is still kept)
+- **`fn len(&self) -> usize`**
+  the addresses kept now (expired ones included until their generation goes)
+- **`fn is_empty(&self) -> bool`**
+
 - **`struct UdpSocket`**
 
 **`impl UdpSocket`**
 
 - **`fn bind(addr: &SocketAddr) -> NetResult<UdpSocket>`**
-  a socket on addr; a fixed port needs net.listen, port 0 (a client's) does not
+  a socket on addr; a fixed port needs net.listen, port 0 (a client's) does not.  A socket whose address
+  net.listen allows (a fixed port through the check, port 0 when a rule covers it: checked quietly) may answer
+  the addresses it receives datagrams from without a net.connect rule (an [`AnswerSet`] per socket)
 - **`fn send_to(&self, buf: &[u8], to: &SocketAddr) -> NetResult<usize>`**
+  one datagram to `to`: an answer to an address this socket heard from (see bind), else net.connect decides
 - **`fn recv_from(&self, buf: &mut [u8], timeout_ms: u32) -> NetResult<(usize, SocketAddr)>`**
   one datagram within `timeout_ms` (0: block)
 - **`fn local_addr(&self) -> NetResult<SocketAddr>`**
+- **`fn answers_to(&self, to: &SocketAddr) -> bool`**
+  (permissions) whether a datagram to `to` is an answer this socket may send without net.connect: it heard from
+  `to` within AnswerSet::KEEP_MS, and inside a plugin's scope the plugin's net.listen covers the socket's address
+- **`fn answer_peers(&self) -> Option<usize>`**
+  (permissions, tests) the addresses this socket keeps for answers; None: it keeps none (no manifest, or its
+  address is not one net.listen allows)
 
 - **`type UnixStream = TcpStream`**
   a connected Unix domain stream socket (the stream calls of TcpStream)
@@ -29426,13 +29466,17 @@ start-up, then checked by the public file, process, shell, plugin and print func
   fs_allowed(path, FS_READ | FS_WRITE) / process_allowed(program) / url_allowed(url) /
   plugin_allowed(path) / print_allowed() / secrets_allowed(service) / autostart_allowed() /
   audio_allowed()                        -> bool
-  input_global_allowed() / screen_capture_allowed() / location_allowed() / sensors_allowed()
-                                         -> bool
+  input_global_allowed() / screen_capture_allowed() / location_allowed() / sensors_allowed() /
+  gamepad_allowed()                      -> bool
                                          a refusal is recorded (denials) and printed once
                                          per target to stderr: "PERMDENY kind target"
   audio_granted() -> bool                sound is allowed now, without asking or recording a
                                          refusal (ui's dialog sounds stay silent without it)
+  gamepad_granted() -> bool              game pads are allowed now, the same way (ui.gamepads
+                                         starts watching once an ask line was answered yes)
   net_connect_allowed(addr) / net_listen_allowed(addr) / net_name_allowed(host) -> bool
+  net_listen_granted(addr) -> bool       net.listen without asking or recording (a UDP socket on
+                                         port 0: may it answer its peers)
   net_host_allowed(host, port) -> bool   (G7d) a connection to a host as written, name or
                                          address (the browser's WebSocket resolves itself)
   net_resolved(host, addrs)              (resolvers) the addresses of a permitted name:
@@ -29499,6 +29543,9 @@ Manifest: one rule per line, '#' starts a comment, a key may repeat:
                         pixel's colour needs nothing: the user chooses it)
   location              plat::sensors::location_watch (where the device is)
   sensors               plat::sensors::watch (accelerometer, gyroscope, magnetometer, rotation)
+  gamepad               plat::pad_watch (game pads: XInput, evdev, GameController, the
+                        browser's Gamepad API; a Flatpak gets --device=input for it, which
+                        shows the nodes of every input device, keyboards too: tools/pkg_linux.py)
   net.connect HOST:PORT..   TCP connections and UDP datagrams to HOST (a name, *.name for
                         every name below it, an IPv4 / [IPv6] address, a block 10.0.0.0/8
                         or [fd00::]/8, localhost = the loopback addresses, * = any) on PORT
@@ -29507,7 +29554,13 @@ Manifest: one rule per line, '#' starts a comment, a key may repeat:
                         rule, port 53 (DNS) is open too
   net.listen ADDR:PORT..    TCP listeners and UDP sockets with a fixed port on ADDR (an
                         address, a block, localhost or *; 0.0.0.0 / [::] = every interface)
-                        and PORT (port 0 = any free one: the rule needs 0 or *)
+                        and PORT (port 0 = any free one: the rule needs 0 or *).  A UDP socket
+                        whose address it covers may answer: send to an address it received a
+                        datagram from in the last 60 s without a net.connect rule (net.rs
+                        AnswerSet: at most 1024 addresses per socket, so forged source
+                        addresses cannot grow it; inside a plugin's scope the plugin's
+                        net.listen must cover the socket too).  Every other datagram needs
+                        net.connect
   ask KEY ARGS.. ["reason"]   (every key but fs.user) the first access asks the user; a
                         plain rule that covers the access wins over an ask line
   agent.confirm NAME..  agent actions (glob: '*' any run) the user confirms first
@@ -29553,9 +29606,9 @@ STORE: &str = "config://permission-decisions.txt"
   one refused access
   - `kind: &'static str` -- "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart",
     "audio.output", "net.connect", "net.listen", "agent", "input.global", "screen.capture",
-    "location" or "sensors"
+    "location", "sensors" or "gamepad"
   - `target: String` -- the path, program, URL, address, the service of a secret, the agent's action, the
-    chord of a shortcut or "" (print, autostart, audio.output, screen.capture, location, sensors)
+    chord of a shortcut or "" (print, autostart, audio.output, screen.capture, location, sensors, gamepad)
   - `plugin: String` -- the plugin the call was made for ("" = the app itself)
 
 - **`enum Answer`**
@@ -29668,6 +29721,13 @@ STORE: &str = "config://permission-decisions.txt"
 
 - **`fn sensors_allowed() -> bool`**
   whether plat::sensors::watch may read the motion sensors (`sensors`)
+
+- **`fn gamepad_allowed() -> bool`**
+  whether plat::pad_watch may read game pads (`gamepad`)
+
+- **`fn gamepad_granted() -> bool`**
+  whether game pads are allowed now without a question or a recorded refusal: no manifest, a plain `gamepad`
+  line or an ask line already answered with yes (ui.gamepads tries pad_watch again once it is)
 
 - **`fn denials() -> Vec<Denial>`**
   the last refusals, oldest first
@@ -29794,6 +29854,10 @@ STORE: &str = "config://permission-decisions.txt"
 
 - **`fn net_listen_allowed(addr: &crate::net::SocketAddr) -> bool`**
   whether a TCP listener (or a UDP socket with a fixed port) may bind addr
+
+- **`fn net_listen_granted(addr: &crate::net::SocketAddr) -> bool`**
+  whether net.listen allows a socket on addr now, quietly (nothing recorded, nobody asked; an ask line only by its
+  answer): a UDP socket on port 0, which needs no rule, may answer its peers when one covers it (net.rs)
 
 - **`fn net_host_allowed(host: &str, port: u16) -> bool`**
   (G7d) whether a connection to `host` as written (a name, an IPv4 address, an IPv6 address with
@@ -35861,7 +35925,8 @@ controllers (ID_INPUT_JOYSTICK), never keyboards or mice: what cannot be opened 
 ours, and is not opened again until inotify reports it anew.  Nodes are opened read-only and
 without blocking; their events are read whenever the pads are polled (4 ms), not from the window
 loop's poll().  Inside a Flatpak /dev/input exists only with --device=input (Flatpak 1.15.6 and
-newer); without it no pad is found.
+newer; the manifest's `gamepad` line gives it, tools/pkg_linux.py); without it no pad is found.
+Older Flatpak refuses to build with it and ignores it in an installed app (no /dev/input).
 ```
 
 - **`struct EvdevTestNode(usize)`**
@@ -39597,8 +39662,10 @@ pad -- (G7a part 2) game pads: one snapshot per pad in the W3C standard layout a
 and disconnect events, the part every platform shares
 
   pad_watch(on) -> bool      start (on) or stop watching for pads -> false: this platform has none
-                             (Android, iOS: a later stage with touch controls) or the system lacks
-                             the means (Windows without an XInput DLL); nothing runs before
+                             (Android, iOS: a later stage with touch controls), the system lacks
+                             the means (Windows without an XInput DLL) or the app's manifest has
+                             no `gamepad` line (PERMDENY gamepad; docs/PERMISSIONS.md); nothing
+                             runs before
   pad_watching() -> bool     watching now
   pads() -> Vec<Gamepad>     the connected pads by index, with the buttons that went down and up
                              since the last call; takes the E_GAMEPAD that waits
@@ -39622,7 +39689,8 @@ Per platform:
            seat game controllers, not keyboards) with the buttons of a game pad (BTN_SOUTH) and
            two axes; the kernel's gamepad codes mapped to the layout, Sony's and Nintendo's
            north / west buttons the other way round than xpad's; hotplug through inotify on
-           /dev/input (linux_pad.rs).  Inside a Flatpak only with --device=input
+           /dev/input (linux_pad.rs).  Inside a Flatpak only with --device=input (the
+           manifest's `gamepad` line gives it; Flatpak 1.15.6 and newer)
   macOS    GameController: GCController's extendedGamepad, connect and disconnect
            notifications (apple_mac_pad.rs)
   browser  the Gamepad API's pads with the "standard" mapping (others pass their first buttons
@@ -39770,8 +39838,9 @@ PAD_TRIGGER_PRESS: f32 = 30.0 / 255.0
   0ce6)", Firefox's "054c-0ce6-DualSense Wireless Controller" (0: none)
 
 - **`fn pad_watch(on: bool) -> bool`**
-  start (on) or stop watching for game pads -> false: this platform has no pads (Android, iOS) or
-  the system lacks the means (Windows without an XInput DLL).  While watching, pads come and go
+  start (on) or stop watching for game pads -> false: this platform has no pads (Android, iOS), the
+  system lacks the means (Windows without an XInput DLL) or the app's manifest has no `gamepad` line
+  (docs/PERMISSIONS.md: PERMDENY gamepad; nothing is opened then).  While watching, pads come and go
   with E_GAMEPAD events and plat::pads has them; stopping lets every pad go (PADEV_DISCONNECT).
   The browser shows a pad only after one of its buttons was pressed in the page
 

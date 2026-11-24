@@ -427,6 +427,29 @@ Spiele im Browser brauchen 60 Bilder/s und mehr). Im Browser liest die Ansicht a
 und Rücklesen gleich viel Zeit; die Schleier zeigen aber in den Zellen unter der HUD das aktuelle Bild statt des zuletzt
 zurückgekommenen.
 
+**Seit dem 24.11.2026 im Takt des Bildschirms** (vom Nutzer entschieden; Bedingung: Apps in Ruhe bleiben in Ruhe). Statt
+„beschäftigt“ meldet der Worker nach jeder Runde die nächste Frist der App (`jfgui_frame_delay`, `delay` in `batch-complete`),
+und die Seite (`due` in `web/loader.js`) gibt bei 0 die Runde mit dem nächsten `requestAnimationFrame` wie bisher, bei einem
+Zeitgeber, der vor dem nächsten Leerlauf-Takt (33 ms) fällig ist, eine Runde zu seiner Zeit mit dem nächsten Bild der Seite,
+an Stelle dieses Leerlauf-Takts. Ein Timer von 1 ms ist so ein Bild je Bild des Bildschirms; ein Cursor, der blinkt, oder eine
+Uhr weckt die App so oft wie vorher (ein Takt wird durch einen ersetzt). Gemessen mit `tools/tests/web_pacing.mjs` (Chrome 158
+und Firefox 153 ohne Kopf über Playwright, 165-Hz-Bildschirm, je 8 s, der alte Host aus git zum Vergleich; zwei bis drei Läufe,
+die Spannen über die Läufe):
+
+| Fall | Chrome vorher | Chrome nachher | Firefox vorher | Firefox nachher |
+| --- | ---: | ---: | ---: | ---: |
+| Demo, Ansicht über WebGPU (Schritt none / veil / readback), Bilder/s | 30,4 / 30,4 / 27–30 (Abstand p50 31 ms) | 156–161 / 147–159 / 124–136 (Abstand p50 6,1 ms) | kein WebGPU im Firefox von Playwright | – |
+| Demo, Ansicht ohne WebGPU (`?gpu=0`, 640 × 400, Bilder der CPU), Bilder/s | 30,4 | 104,5 | 25,0 (Seite 104 Bilder/s) | 82,2 (Seite 113 Bilder/s) |
+| Demo in Ruhe (pausiert), Runden/s | 29,4–30,4 | 30,2–30,4 | 20,1–29,9 | 11,3–29,6 |
+| `screentest` in Ruhe, Runden/s | 30,3–30,4 | 30,0–30,3 | 21,4–22,1 | 18,0–23,7 |
+| `screentest`, Cursor blinkt (530 ms), Runden/s | 30,2 | 30,0–30,3 | 22,1–28,7 | 12,6–22,2 |
+
+Die Runden in Ruhe sind der Leerlauf-Takt der Seite (`setInterval` 33 ms), vorher wie nachher: Eine App in Ruhe bekommt rund
+30 Runden je Sekunde, auch schon vor der Änderung (eine Ruhe ohne jeden Takt wäre eine eigene Änderung: Aufgaben, Wecken aus
+anderen Threads und Ereignisse der Sockets verlassen sich auf ihn). Firefox ohne Kopf drosselt seine eigenen Bilder von Lauf zu
+Lauf verschieden (die Seite 13 bis 165 Bilder/s), damit auch den Leerlauf-Takt; über 30 Runden kam keiner der Fälle in Ruhe.
+Mit einer Ansicht von 1280 × 800 ohne WebGPU sind die Runden selbst die Grenze (Chrome 130, Firefox 28 Bilder/s).
+
 **Nicht gemessen**: Iris Xe und HD 610 (Linux), der Mac (dort ist die GPU-Ausgabe der UI aus, `DEFAULT_ON_APPLE`: eine Ansicht wird
 jedes Bild zurückgelesen, Schleier greifen erst mit `jfgui_GPU=1`), ein 60-Hz-Monitor, Linux (Wayland meldet über `wp_presentation`,
 wann ein Bild auf dem Bildschirm war; der Weg dahin steht in `uigputest --bench latency`), Weg (b) unter Linux und im Browser.

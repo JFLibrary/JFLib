@@ -409,6 +409,7 @@ impl Ui {
             plock_sim_motion: [0.0; 2],
             pads: Vec::new(),
             pads_on: false,
+            pads_refused: false,
             mpts: Vec::new(),
             mprs: Vec::new(),
             mtilt: [0; 2],

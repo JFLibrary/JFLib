@@ -1,0 +1,3 @@
+#!args --test pad-ask
+# (Rust only) plattest --test pad-ask: game pads behind an ask line: refused while nobody answers, watching
+# after a yes, the decision recorded.

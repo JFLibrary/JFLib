@@ -6,6 +6,8 @@
 // own (controllerWithExtendedGamepad)
 //
 //   plattest --test pad
+//   plattest --test pad-policy   a manifest without `gamepad`: pad_watch refuses, PERMDENY gamepad
+//   plattest --test pad-ask      `ask gamepad`: refused while nobody answers, watching after a yes
 
 use alloc::format;
 #[cfg(target_os = "macos")]
@@ -476,5 +478,37 @@ fn backend(t: &mut T) {
     t.check(pad_watch(true) == want, "pad: pad_watch here");
     pad_watch(false);
     t.check(!pad_poll_test(), "pad: no native backend");
+    evq_clear();
+}
+
+/// --test pad-policy: a manifest without `gamepad`: pad_watch refuses and opens nothing, the refusal is recorded
+/// (Android and iOS have no pads: false before the manifest is asked)
+pub fn t_pad_policy(t: &mut T) {
+    t.check(plat::policy::install("fs.user\n").is_ok(), "pad policy: a manifest installed");
+    t.check(!pad_watch(true) && !pad_watching(), "pad policy: no gamepad: pad_watch refuses, nothing watches");
+    t.check(!plat::policy::gamepad_granted(), "pad policy: not granted");
+    let native = !cfg!(any(target_os = "android", target_os = "ios"));
+    let d = plat::policy::denials();
+    t.check(d.iter().any(|x| x.kind == "gamepad" && x.target.is_empty()) == native, "pad policy: the refusal recorded (PERMDENY gamepad)");
+    t.check(plat::policy::check("gamepad\nask gamepad \"Mit dem Pad spielen\"\n").is_ok(), "pad policy: the right parses (also asked)");
+    t.check(plat::policy::check("gamepad x\n").is_err(), "pad policy: gamepad takes no arguments");
+}
+
+/// --test pad-ask: `ask gamepad`: refused while nobody answers (a console run asks nobody), watching after a yes
+pub fn t_pad_ask(t: &mut T) {
+    let Ok(key) = plat::policy::install("ask gamepad \"Mit dem Pad spielen\"\n") else {
+        t.check(false, "pad ask: the manifest installs");
+        return;
+    };
+    t.check(!pad_watch(true) && !pad_watching(), "pad ask: nobody answers: refused");
+    t.check(!plat::policy::gamepad_granted(), "pad ask: not granted before the answer");
+    key.set_answer(Some(plat::policy::Answer::Once));
+    // (the platforms with pads: the backend starts, as in --test pad)
+    let want = cfg!(any(windows, target_os = "linux", target_os = "macos", target_arch = "wasm32"));
+    t.check(pad_watch(true) == want && pad_watching() == want, "pad ask: allowed: watching starts");
+    t.check(plat::policy::gamepad_granted(), "pad ask: granted after the answer");
+    pad_watch(false);
+    let d = plat::policy::decisions();
+    t.check(d.iter().any(|x| x.rule == "gamepad" && x.reason == "Mit dem Pad spielen"), "pad ask: the decision and its reason recorded");
     evq_clear();
 }

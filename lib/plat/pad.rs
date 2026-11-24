@@ -2,8 +2,10 @@
 // and disconnect events, the part every platform shares
 //
 //   pad_watch(on) -> bool      start (on) or stop watching for pads -> false: this platform has none
-//                              (Android, iOS: a later stage with touch controls) or the system lacks
-//                              the means (Windows without an XInput DLL); nothing runs before
+//                              (Android, iOS: a later stage with touch controls), the system lacks
+//                              the means (Windows without an XInput DLL) or the app's manifest has
+//                              no `gamepad` line (PERMDENY gamepad; docs/PERMISSIONS.md); nothing
+//                              runs before
 //   pad_watching() -> bool     watching now
 //   pads() -> Vec<Gamepad>     the connected pads by index, with the buttons that went down and up
 //                              since the last call; takes the E_GAMEPAD that waits
@@ -27,7 +29,8 @@
 //            seat game controllers, not keyboards) with the buttons of a game pad (BTN_SOUTH) and
 //            two axes; the kernel's gamepad codes mapped to the layout, Sony's and Nintendo's
 //            north / west buttons the other way round than xpad's; hotplug through inotify on
-//            /dev/input (linux_pad.rs).  Inside a Flatpak only with --device=input
+//            /dev/input (linux_pad.rs).  Inside a Flatpak only with --device=input (the
+//            manifest's `gamepad` line gives it; Flatpak 1.15.6 and newer)
 //   macOS    GameController: GCController's extendedGamepad, connect and disconnect
 //            notifications (apple_mac_pad.rs)
 //   browser  the Gamepad API's pads with the "standard" mapping (others pass their first buttons
@@ -415,13 +418,21 @@ pub(crate) fn pad_focused() -> bool {
     }
 }
 
-/// start (on) or stop watching for game pads -> false: this platform has no pads (Android, iOS) or
-/// the system lacks the means (Windows without an XInput DLL).  While watching, pads come and go
+/// start (on) or stop watching for game pads -> false: this platform has no pads (Android, iOS), the
+/// system lacks the means (Windows without an XInput DLL) or the app's manifest has no `gamepad` line
+/// (docs/PERMISSIONS.md: PERMDENY gamepad; nothing is opened then).  While watching, pads come and go
 /// with E_GAMEPAD events and plat::pads has them; stopping lets every pad go (PADEV_DISCONNECT).
 /// The browser shows a pad only after one of its buttons was pressed in the page
 pub fn pad_watch(on: bool) -> bool {
     if on == PADS.lock().watching {
         return true;
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    if on {
+        return false;
+    }
+    if on && !crate::policy::gamepad_allowed() {
+        return false;
     }
     #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
     {
@@ -436,10 +447,6 @@ pub fn pad_watch(on: bool) -> bool {
     }
     #[cfg(target_arch = "wasm32")]
     crate::web::notice(REQUEST_GAMEPAD, &[on as u8]);
-    #[cfg(any(target_os = "android", target_os = "ios"))]
-    if on {
-        return false;
-    }
     PADS.lock().watching = on;
     if !on {
         for i in 0..PAD_MAX {

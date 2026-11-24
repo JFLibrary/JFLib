@@ -127,6 +127,9 @@
 //                                          browser's record; the backend of the platform through
 //                                          a test hook (Windows XINPUT_STATE records, Linux a pipe
 //                                          as a pad's node, macOS controllerWithExtendedGamepad)
+//   plattest --test pad-policy / pad-ask   (t_pad.rs) a manifest without `gamepad`: pad_watch
+//                                          refused (PERMDENY gamepad); `ask gamepad`: refused while
+//                                          nobody answers, watching after a yes
 //   plattest --test a11y-rich / uia-rich / a11y-rich-bus   (t_a11y_rich.rs) a web page's
 //                                          accessibility tree (apps/a11ytest's page): headless
 //                                          model, requests, live regions, the rich update format;
@@ -597,6 +600,8 @@ fn plattest() -> i32 {
         Some("keychar") => t_keychar::t_keychar,       // the layout's character of a key event
         Some("input") => t_input::t_input,             // (G7a) key positions, raw motion, the pointer lock
         Some("pad") => t_pad::t_pad,                   // (G7a part 2) game pads without real input
+        Some("pad-policy") => t_pad::t_pad_policy,     // without `gamepad` (not in "all")
+        Some("pad-ask") => t_pad::t_pad_ask,           // `ask gamepad` (not in "all")
         Some("settings-bus") => t_settings::t_settings_bus, // Linux: against tools/platshared/settings_bus.py
         Some("settings-bus-files") => t_settings::t_settings_bus_files, // Linux: the same, a portal without appearance keys
         Some("a11y-rich") => t_a11y_rich::t_a11y_rich, // a web page's accessibility tree, headless

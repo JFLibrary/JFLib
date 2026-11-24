@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- The permission key `gamepad` (game pads; no arguments, may be asked for) in the check of `PERMISSIONS`.
+
 ### Fixed
 
 - Linux: a project in a folder with a blank in its path (`My Projects/app`) links again. The
