@@ -1,4 +1,5 @@
-// ribbon -- the registers of the ribbon: Start, Einfügen, Entwurf, (JD18) Daten, Ansicht with
+// ribbon -- the registers of the ribbon: Start, Einfügen, Entwurf, (JD18) Daten, (JD19)
+// Überprüfen, Ansicht with
 // every P1 command of FEATURES.md 3.3-3.9, the context registers Container-Tools › Format (RK-01)
 // and Textwerkzeuge › Text (RK-11), and (JD10) Funktionsübergreifendes Flussdiagramm (RK-03)
 // while the page holds one
@@ -47,6 +48,8 @@ pub(crate) enum Reg {
     Text,
     /// (JD10) the cross-functional flowchart's register
     Cff,
+    /// (JD19) Überprüfen, between Daten and Ansicht (last here: the other registers keep their ids)
+    Review,
 }
 
 // the registers' labels (German, translated where drawn)
@@ -57,6 +60,7 @@ const L_INSERT: &str = "Einfügen";
 const L_DESIGN: &str = "Entwurf";
 const L_VIEW: &str = "Ansicht";
 const L_DATA: &str = "Daten";
+const L_REVIEW: &str = "Überprüfen";
 const L_CONTAINER_SET: &str = "Container-Tools";
 const L_CONTAINER: &str = "Format|Register";
 const L_TEXT_SET: &str = "Textwerkzeuge";
@@ -65,7 +69,7 @@ const L_CFF: &str = "Funktionsübergreifendes Flussdiagramm";
 
 /// the registers shown now (the File register first)
 pub(crate) fn tabs(app: &Diagrammer) -> Vec<Reg> {
-    let mut v = alloc::vec![Reg::File, Reg::Start, Reg::Insert, Reg::Design, Reg::Data, Reg::View];
+    let mut v = alloc::vec![Reg::File, Reg::Start, Reg::Insert, Reg::Design, Reg::Data, Reg::Review, Reg::View];
     // (JD13, VL-04) also when the drawing's template brought the register
     if crate::structures::has_cff(app) || crate::templates::has_register(app, "cff") {
         v.push(Reg::Cff);
@@ -87,6 +91,7 @@ pub(crate) fn tab_descs(ui: &Ui, regs: &[Reg]) -> Vec<RibbonTab<'static>> {
             Reg::Insert => RibbonTab::new(t(L_INSERT)),
             Reg::Design => RibbonTab::new(t(L_DESIGN)),
             Reg::Data => RibbonTab::new(t(L_DATA)),
+            Reg::Review => RibbonTab::new(t(L_REVIEW)),
             Reg::View => RibbonTab::new(t(L_VIEW)),
             Reg::Container => RibbonTab::context(tc(L_CONTAINER), t(L_CONTAINER_SET), ui.color(T_OK)),
             Reg::Text => RibbonTab::context(tc(L_TEXT), t(L_TEXT_SET), ui.color(T_WARN)),
@@ -227,6 +232,13 @@ static DATA: [Group; 5] = [
     Group("Erweiterte Datenverknüpfung", 0, &[Col::Small(&[Sm::Btn(DATA_LINK), Sm::Menu(DATA_ADVANCED_DG, &ADVANCED_DG_MENU)])]),
 ];
 
+// (JD19) Überprüfen as Visio's (A 185624): Kommentare (JD20), Berichte (RU-06)
+// i18n
+static REVIEW: [Group; 2] = [
+    Group("Kommentare", 0, &[Col::Big(COMMENT_NEW)]),
+    Group("Berichte", 0, &[Col::Big(REPORTS)]),
+];
+
 // i18n
 static VIEW: [Group; 3] = [
     Group("Anzeigen", 0, &[
@@ -283,6 +295,7 @@ fn groups(reg: Reg) -> &'static [Group] {
         Reg::Insert => &INSERT,
         Reg::Design => &DESIGN,
         Reg::Data => &DATA,
+        Reg::Review => &REVIEW,
         Reg::View => &VIEW,
         Reg::Container => &CONTAINER_FORMAT,
         Reg::Text => &TEXT_TOOLS,
@@ -291,7 +304,7 @@ fn groups(reg: Reg) -> &'static [Group] {
 }
 
 // (JD8 rest) the registers with their own ribbon, in the row's order
-const RIBBONS: [Reg; 8] = [Reg::Start, Reg::Insert, Reg::Design, Reg::Data, Reg::View, Reg::Cff, Reg::Container, Reg::Text];
+const RIBBONS: [Reg; 9] = [Reg::Start, Reg::Insert, Reg::Design, Reg::Data, Reg::Review, Reg::View, Reg::Cff, Reg::Container, Reg::Text];
 
 // the menu of the button whose command is `id`: its register, its popup id, its rows
 fn menu_of(id: u32) -> Option<(Reg, u32, &'static [It])> {

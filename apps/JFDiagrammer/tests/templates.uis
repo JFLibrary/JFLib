@@ -62,8 +62,8 @@ key ctrl+p
 expect combo:"Letter" exists
 expect combo:"Querformat" exists
 key esc
-# the cross-functional flowchart: its register with the blank form already (#107: the seventh
-# register, after Datei .. Ansicht (JD18: Daten before Ansicht); its name is a stencil's title in the Shapes panel too)
+# the cross-functional flowchart: its register with the blank form already (#108: the eighth
+# register, after Datei .. Ansicht (JD18: Daten, JD19: Überprüfen before Ansicht); its name is a stencil's title in the Shapes panel too)
 click tab:"Datei"
 click button:"Neu"
 click button:"Funktionsübergreifendes Flussdiagramm"
@@ -72,8 +72,8 @@ expect button:"Horizontal" checked
 click button:"Leer"
 click button:"Erstellen"
 expect text:"Zeichnung4 – JFDiagrammer" exists
-expect #107 exists
-click #107
+expect #108 exists
+click #108
 expect button:"Bahn" exists
 expect listitem:"Titel" missing
 # the vertical form: the flowchart on the page, lanes side by side
@@ -83,7 +83,7 @@ click button:"Funktionsübergreifendes Flussdiagramm"
 click button:"Vertikal"
 click button:"Erstellen"
 expect text:"Zeichnung5 – JFDiagrammer" exists
-expect #107 exists
+expect #108 exists
 expect listitem:"Titel" exists
 shot build/JFDiagrammer-templates-cff.png
 # the empty drawing has no stencils
@@ -93,4 +93,4 @@ click button:"Leere Zeichnung"
 click button:"Erstellen"
 expect text:"Zeichnung6 – JFDiagrammer" exists
 expect text:"Keine Schablone geöffnet." exists
-expect #107 missing
+expect #108 missing

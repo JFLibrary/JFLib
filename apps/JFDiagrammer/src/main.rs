@@ -81,6 +81,11 @@
 //                     close (UI-12); Öffnen schreibgeschützt and als Kopie (DM-09, UI-06, UI-05)
 //   src/dlg_shape_name.rs  (JD15) the dialog Shape-Name (SP-01)
 //   src/dlg_snap.rs   (JD15) the dialog Ausrichten und Kleben
+//   src/reports*.rs   (JD19) shape reports: reports (Überprüfen › Shape-Berichte, the dialog
+//                     Berichte, running a report as a table shape, .xlsx, .csv, .html; Bericht
+//                     aktualisieren), reports_wizard (Berichtsdefinition), reports_builtin (the
+//                     predefined reports), reports_export (Datei › Exportieren › Daten
+//                     exportieren, EX-16)
 //   src/data_*.rs     (JD18) external data: data_cmds (when the commands run), data_source
 //                     (reading .xlsx/.csv), data_import (Benutzerdefinierter Import), data_pane
 //                     (Externe Daten), data_refresh (aktualisieren, Intervall, Konflikte),
@@ -194,6 +199,11 @@ mod panes;
 mod print_layout;
 mod print_ui;
 mod qat;
+// (JD19) shape reports, Daten exportieren
+mod reports;
+mod reports_builtin;
+mod reports_export;
+mod reports_wizard;
 // (JD13) equipment snaps onto the units of a rack
 mod rack;
 mod ribbon;
@@ -347,6 +357,8 @@ pub(crate) struct Diagrammer {
     pub textdraw: data_textdraw::TextDrawState,
     /// (JD19) data graphics: the field chosen, the tiles, the dialogs
     pub dg: data_graphics::DgState,
+    /// (JD19) the dialog Berichte, the wizard, running reports, Daten exportieren (reports*.rs)
+    pub reports: reports::ReportsState,
 }
 
 impl Diagrammer {
@@ -421,6 +433,7 @@ impl Diagrammer {
             dask: data_ask::AskState::default(),
             textdraw: data_textdraw::TextDrawState::default(),
             dg: data_graphics::DgState::default(),
+            reports: reports::ReportsState::default(),
             page_views: alloc::vec::Vec::new(),
             view_page: None,
         }
@@ -567,6 +580,8 @@ impl App for Diagrammer {
         commands::states(self, ui);
         // (JD15) the lane commands show in a lane's menu only (ST-05); QuickInfos off (UI-13)
         structures_cff::menu_states(self, ui);
+        // (JD19) Bericht aktualisieren in a report table's menu only (DA-13)
+        reports::menu_states(self, ui);
         ui.tooltips_set(self.opts.get(&options::TIPS) != 2);
         stencils_panel::states(self, ui);
         shell::frame(self, ui);
@@ -606,6 +621,8 @@ impl App for Diagrammer {
         data_textdraw::dialog(self, ui);
         // (JD19) Datengrafik bearbeiten, Element bearbeiten, Umbenennen
         data_graphics_dlg::dialogs(self, ui);
+        // (JD19) Berichte, the wizard, Bericht ausführen, Daten exportieren
+        reports::dialog(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

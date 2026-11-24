@@ -57,6 +57,11 @@
 //   field::*                      (JD8) text fields: a Field row's value in its format picture,
 //                                 new fields, the text with its fields, the document's
 //                                 properties (Document::fields: the app's locale and clock)
+//   report::*                     (JD19) shape reports: Visio's report definitions as a model
+//                                 (their XML and the document sheet's visPropRptN rows are
+//                                 diagram_io::report), run into a table with groups and
+//                                 summaries, the table shape on the page and its refresh
+//                                 (DA-09, DA-13, EX-12)
 //
 // What is to come here, by stage of the plan: page layout (CN-13, P2)
 //
@@ -87,6 +92,7 @@ pub mod ops;
 mod page;
 pub mod pagesetup;
 pub mod render;
+pub mod report;
 pub mod route;
 mod shape;
 pub mod structure;

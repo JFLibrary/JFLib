@@ -1297,3 +1297,145 @@ Ein Haken zeigt das Feld als Datengrafik. Die Galerie, Position und Konfiguriere
 „{}“ als Datengrafik zeigen	Show “{}” as a data graphic	Mostrar «{}» como gráfico de datos	Mostra «{}» come grafica dati	Afficher « {} » comme graphique de données
 Datengrafikfeld entfernen	Remove data graphic field	Quitar campo de gráfico de datos	Rimuovi campo grafica dati	Supprimer le champ de graphique de données
 Datengrafikfeld hinzufügen	Add data graphic field	Agregar campo de gráfico de datos	Aggiungi campo grafica dati	Ajouter un champ de graphique de données
+<Anzeigetext>	<Displayed text>	<Texto mostrado>	<Testo visualizzato>	<Texte affiché>
+<Breite>	<Width>	<Ancho>	<Larghezza>	<Largeur>
+<Höhe>	<Height>	<Alto>	<Altezza>	<Hauteur>
+<Master-Name>	<Master shape name>	<Nombre de forma maestra>	<Nome forma master>	<Nom de forme maître>
+<PinX>	<PinX>	<PinX>	<PinX>	<PinX>
+<PinY>	<PinY>	<PinY>	<PinY>	<PinY>
+<Shape-ID>	<Shape ID>	<Id. de forma>	<ID forma>	<ID de forme>
+<Shape-Name>	<Shape name>	<Nombre de forma>	<Nome forma>	<Nom de forme>
+Absteigend	Descending	Descendente	Decrescente	Décroissant
+Alle Eigenschaften anzeigen	Show all properties	Mostrar todas las propiedades	Mostra tutte le proprietà	Afficher toutes les propriétés
+Alle löschen	Delete all	Eliminar todo	Elimina tutto	Tout supprimer
+Anzahl der Shapes auf allen Seiten, nach Master-Shape gruppiert.	Number of shapes on all pages, grouped by master shape.	Número de formas en todas las páginas, agrupadas por forma maestra.	Numero di forme su tutte le pagine, raggruppate per forma master.	Nombre de formes sur toutes les pages, groupées par forme maître.
+Arbeitsspeicher	Memory	Memoria	Memoria	Mémoire
+Assistent für Berichtsdefinitionen	Report Definition Wizard	Asistente para definiciones de informe	Procedura guidata definizione report	Assistant Définition de rapport
+Aufsteigend	Ascending	Ascendente	Crescente	Croissant
+Ausführen...	Run...	Ejecutar...	Esegui...	Exécuter...
+Bedingung	Condition	Condición	Condizione	Condition
+Bericht	Report	Informe	Report	Rapport
+Bericht aktualisieren	Update Report	Actualizar informe	Aggiorna report	Mettre à jour le rapport
+Bericht ausführen	Run Report	Ejecutar informe	Esegui report	Exécuter le rapport
+Bericht entfernen	Remove Report	Quitar informe	Rimuovi report	Supprimer le rapport
+Bericht ändern	Modify Report	Modificar informe	Modifica report	Modifier le rapport
+Bericht „{}“	Report “{}”	Informe «{}»	Report «{}»	Rapport « {} »
+Bericht „{}“ aktualisiert	Report “{}” updated	Informe «{}» actualizado	Report «{}» aggiornato	Rapport « {} » mis à jour
+Berichte	Reports	Informes	Report	Rapports
+Berichtsformat	Report format	Formato del informe	Formato del report	Format du rapport
+Berichtstitel	Report title	Título del informe	Titolo del report	Titre du rapport
+Betriebssystem	Operating system	Sistema operativo	Sistema operativo	Système d'exploitation
+CSV-Datei (.csv)	CSV file (.csv)	Archivo CSV (.csv)	File CSV (.csv)	Fichier CSV (.csv)
+Computer	Computers	Equipos	Computer	Ordinateurs
+Computer und Server mit Betriebssystem, Prozessor, Arbeitsspeicher und Festplatte.	Computers and servers with operating system, processor, memory and hard disk.	Equipos y servidores con sistema operativo, procesador, memoria y disco duro.	Computer e server con sistema operativo, processore, memoria e disco rigido.	Ordinateurs et serveurs avec système d'exploitation, processeur, mémoire et disque dur.
+Dateiformat	File format	Formato de archivo	Formato file	Format de fichier
+Daten exportieren	Export Data	Exportar datos	Esporta dati	Exporter les données
+Den mitgelieferten Bericht „{}“ gibt es nicht.	The built-in report “{}” does not exist.	El informe incluido «{}» no existe.	Il report incluso «{}» non esiste.	Le rapport fourni « {} » n'existe pas.
+Der Bericht braucht einen Namen.	The report needs a name.	El informe necesita un nombre.	Il report deve avere un nome.	Le rapport doit avoir un nom.
+Der Bericht ließ sich nicht auf die Seite stellen: {}	The report could not be put on the page: {}	No se pudo colocar el informe en la página: {}	Impossibile inserire il report nella pagina: {}	Impossible de placer le rapport sur la page : {}
+Der Bericht ließ sich nicht speichern: {}	The report could not be saved: {}	No se pudo guardar el informe: {}	Impossibile salvare il report: {}	Impossible d'enregistrer le rapport : {}
+Der Bericht „{}“ steht als Tabelle auf der Seite (Zeilen: {}).	The report “{}” is on the page as a table (rows: {}).	El informe «{}» está en la página como tabla (filas: {}).	Il report «{}» è nella pagina come tabella (righe: {}).	Le rapport « {} » est sur la page sous forme de tableau (lignes : {}).
+Dezimalstellen	Decimal places	Posiciones decimales	Posizioni decimali	Décimales
+Dezimalstellen: {}	Decimal places: {}	Posiciones decimales: {}	Posizioni decimali: {}	Décimales : {}
+Die Kopie der Berichtsdefinition ist beschädigt ({}).	The copy of the report definition is damaged ({}).	La copia de la definición del informe está dañada ({}).	La copia della definizione del report è danneggiata ({}).	La copie de la définition du rapport est endommagée ({}).
+Die Shape-Daten der Shapes als Excel-Arbeitsmappe oder CSV-Datei speichern (Inventar)	Save the shapes' shape data as an Excel workbook or a CSV file (inventory)	Guardar los datos de forma de las formas como libro de Excel o archivo CSV (inventario)	Salva i dati forma delle forme come cartella di lavoro di Excel o file CSV (inventario)	Enregistrer les données de forme des formes dans un classeur Excel ou un fichier CSV (inventaire)
+Die Tabelle kommt auf die Seite und die Ebene „Bericht“; ihr Kontextmenü aktualisiert sie.	The table goes on the page, on the layer “Report”; its shortcut menu updates it.	La tabla se coloca en la página, en la capa «Informe»; su menú contextual la actualiza.	La tabella va nella pagina, sul livello «Report»; il suo menu di scelta rapida la aggiorna.	Le tableau est placé sur la page, sur le calque « Rapport » ; son menu contextuel le met à jour.
+Die Zeichnung hat keine Berichtsdefinition „{}“ mehr.	The drawing no longer has a report definition “{}”.	El dibujo ya no tiene la definición de informe «{}».	Il disegno non ha più la definizione di report «{}».	Le dessin n'a plus de définition de rapport « {} ».
+Die Zeichnung hat schon einen Bericht dieses Namens.	The drawing already has a report with this name.	El dibujo ya tiene un informe con este nombre.	Il disegno ha già un report con questo nome.	Le dessin a déjà un rapport portant ce nom.
+Doppelte Zeilen ausschließen	Exclude duplicate rows	Excluir filas duplicadas	Escludi righe duplicate	Exclure les lignes en double
+Eigenschaft	Property	Propiedad	Proprietà	Propriété
+Eine Berichtsdefinition in einer Datei (.vrd) lässt sich in anderen Zeichnungen über Durchsuchen... verwenden.	A report definition in a file (.vrd) can be used in other drawings through Browse....	Una definición de informe en un archivo (.vrd) se puede usar en otros dibujos con Examinar....	Una definizione di report in un file (.vrd) si può usare in altri disegni con Sfoglia....	Une définition de rapport dans un fichier (.vrd) peut servir dans d'autres dessins via Parcourir....
+Eine Zeile je Shape, das mindestens eines der gewählten Shape-Daten-Felder hat.	One row per shape that has at least one of the chosen shape data fields.	Una fila por cada forma que tenga al menos uno de los campos de datos de forma elegidos.	Una riga per ogni forma che ha almeno uno dei campi dati forma scelti.	Une ligne par forme qui possède au moins un des champs de données de forme choisis.
+Einheiten anzeigen	Show units	Mostrar unidades	Mostra unità	Afficher les unités
+Erweitert...	Advanced...	Avanzado...	Avanzate...	Avancé...
+Es ist keine Seite zu sehen.	No page is shown.	No se muestra ninguna página.	Nessuna pagina visualizzata.	Aucune page n'est affichée.
+Excel-Arbeitsmappe (.xlsx)	Excel workbook (.xlsx)	Libro de Excel (.xlsx)	Cartella di lavoro di Excel (.xlsx)	Classeur Excel (.xlsx)
+Exportieren...	Export...	Exportar...	Esporta...	Exporter...
+FALSCH	FALSE	FALSO	FALSO	FAUX
+Festgelegte Kriterien	Defined criteria	Criterios definidos	Criteri definiti	Critères définis
+Festplatte	Hard disk	Disco duro	Disco rigido	Disque dur
+Format...	Format...	Formato...	Formato...	Format...
+Gebäude	Building	Edificio	Edificio	Bâtiment
+Gerät	Device	Dispositivo	Dispositivo	Appareil
+Geräte im Rack mit ihren Höheneinheiten; die Summe zeigt den belegten Platz.	Devices in the rack with their rack units; the total shows the space used.	Dispositivos en el rack con sus unidades de altura; la suma muestra el espacio ocupado.	Dispositivi nel rack con le loro unità di altezza; la somma mostra lo spazio occupato.	Appareils de la baie avec leurs unités de hauteur ; la somme indique l'espace occupé.
+Geräte mit IP-Adresse: Netzwerkname, Adressen und Hersteller, nach Netzwerkname sortiert.	Devices with an IP address: network name, addresses and manufacturer, sorted by network name.	Dispositivos con dirección IP: nombre de red, direcciones y fabricante, ordenados por nombre de red.	Dispositivi con indirizzo IP: nome di rete, indirizzi e produttore, ordinati per nome di rete.	Appareils avec une adresse IP : nom réseau, adresses et fabricant, triés par nom réseau.
+Gesamt	Grand total	Total general	Totale generale	Total général
+Gesamtergebnis anzeigen	Show grand total	Mostrar total general	Mostra totale generale	Afficher le total général
+Gespeichert: {} (Zeilen: {})	Saved: {} (rows: {})	Guardado: {} (filas: {})	Salvato: {} (righe: {})	Enregistré : {} (lignes : {})
+Gilt für alle Zahlen des Berichts; Längen zeigen ihre Einheit.	Applies to every number of the report; lengths show their unit.	Se aplica a todos los números del informe; las longitudes muestran su unidad.	Vale per tutti i numeri del report; le lunghezze mostrano la loro unità.	S'applique à tous les nombres du rapport ; les longueurs affichent leur unité.
+Gruppieren nach	Group by	Agrupar por	Raggruppa per	Grouper par
+Gruppiert nach: {}	Grouped by: {}	Agrupado por: {}	Raggruppato per: {}	Groupé par : {}
+Hersteller	Manufacturer	Fabricante	Produttore	Fabricant
+Hersteller, Produkt-, Serien- und Inventarnummern und Standorte der Geräte, nach Hersteller gruppiert.	Manufacturers, product, serial and asset numbers and locations of the devices, grouped by manufacturer.	Fabricantes, números de producto, de serie y de inventario y ubicaciones de los dispositivos, agrupados por fabricante.	Produttori, codici prodotto, numeri di serie e di inventario e sedi dei dispositivi, raggruppati per produttore.	Fabricants, références produit, numéros de série et d'inventaire et sites des appareils, groupés par fabricant.
+Höheneinheiten	Rack units	Unidades de altura	Unità di altezza	Unités de hauteur
+IP-Adresse	IP address	Dirección IP	Indirizzo IP	Adresse IP
+In dieser Zeichnung speichern	Save in this drawing	Guardar en este dibujo	Salva in questo disegno	Enregistrer dans ce dessin
+In einer Datei speichern	Save in a file	Guardar en un archivo	Salva in un file	Enregistrer dans un fichier
+Inventar	Inventory	Inventario	Inventario	Inventaire
+Inventarnummer	Asset number	Número de inventario	Numero di inventario	Numéro d'inventaire
+Jede gewählte Eigenschaft wird eine Spalte des Berichts. Alle Eigenschaften: auch verborgene Shape-Daten und Benutzerzellen.	Every chosen property becomes a column of the report. All properties: hidden shape data and user cells too.	Cada propiedad elegida se convierte en una columna del informe. Todas las propiedades: también los datos de forma ocultos y las celdas de usuario.	Ogni proprietà scelta diventa una colonna del report. Tutte le proprietà: anche i dati forma nascosti e le celle utente.	Chaque propriété choisie devient une colonne du rapport. Toutes les propriétés : aussi les données de forme masquées et les cellules utilisateur.
+Keine Kriterien	No criteria	Sin criterios	Nessun criterio	Aucun critère
+Kopie der Berichtsdefinition	Copy of report definition	Copia de la definición del informe	Copia della definizione del report	Copie de la définition du rapport
+Kriterien: {}	Criteria: {}	Criterios: {}	Criteri: {}	Critères : {}
+MAC-Adresse	MAC address	Dirección MAC	Indirizzo MAC	Adresse MAC
+Maximum	Maximum	Máximo	Massimo	Maximum
+Minimum	Minimum	Mínimo	Minimo	Minimum
+Mit Erweitert... kommen nur die Shapes in den Bericht, deren Eigenschaften die Kriterien erfüllen.	With Advanced..., only the shapes whose properties meet the criteria go into the report.	Con Avanzado..., solo entran en el informe las formas cuyas propiedades cumplen los criterios.	Con Avanzate..., nel report entrano solo le forme le cui proprietà soddisfano i criteri.	Avec Avancé..., seules les formes dont les propriétés remplissent les critères entrent dans le rapport.
+Mitgeliefert (JFDiagrammer)	Built in (JFDiagrammer)	Incluido (JFDiagrammer)	Incluso (JFDiagrammer)	Fourni (JFDiagrammer)
+Mittelwert	Average	Promedio	Media	Moyenne
+Netzwerkausstattung	Network equipment	Equipamiento de red	Apparecchiature di rete	Équipement réseau
+Netzwerkgeräte	Network devices	Dispositivos de red	Dispositivi di rete	Appareils réseau
+Netzwerkname	Network name	Nombre de red	Nome di rete	Nom réseau
+Neu...	New...	Nuevo...	Nuovo...	Nouveau...
+Neuer Bericht	New Report	Nuevo informe	Nuovo report	Nouveau rapport
+Nicht gruppiert	Not grouped	Sin agrupar	Non raggruppato	Non groupé
+Nur Teilergebnisse anzeigen	Show subtotals only	Mostrar solo subtotales	Mostra solo subtotali	Afficher uniquement les sous-totaux
+Nur zeichnungsspezifische Berichte anzeigen	Show only drawing-specific reports	Mostrar solo los informes específicos del dibujo	Mostra solo i report specifici del disegno	Afficher uniquement les rapports propres au dessin
+Pfad	Path	Ruta	Percorso	Chemin
+Produktnummer	Product number	Número de producto	Codice prodotto	Référence produit
+Prozessor	Processor	Procesador	Processore	Processeur
+Rackgeräte	Rack devices	Dispositivos del rack	Dispositivi del rack	Appareils de la baie
+Raum	Room	Sala	Stanza	Salle
+Seriennummer	Serial number	Número de serie	Numero di serie	Numéro de série
+Shape-Berichte	Shape Reports	Informes de formas	Report forme	Rapports de formes
+Shape-Daten: {}	Shape data: {}	Datos de forma: {}	Dati forma: {}	Données de forme : {}
+Shapes auf allen Seiten	Shapes on all pages	Formas en todas las páginas	Forme su tutte le pagine	Formes de toutes les pages
+Shapes auf der aktuellen Seite	Shapes on the current page	Formas de la página actual	Forme della pagina corrente	Formes de la page active
+Sortieren	Sort	Ordenar	Ordina	Trier
+Sortieren nach	Sort by	Ordenar por	Ordina per	Trier par
+Sortieren...	Sort...	Ordenar...	Ordina...	Trier...
+Sortiert nach: {}	Sorted by: {}	Ordenado por: {}	Ordinato per: {}	Trié par : {}
+Spalten mit Teilergebnissen: {}	Columns with subtotals: {}	Columnas con subtotales: {}	Colonne con subtotali: {}	Colonnes avec sous-totaux : {}
+Spaltenreihenfolge	Column order	Orden de las columnas	Ordine delle colonne	Ordre des colonnes
+Subnetzmaske	Subnet mask	Máscara de subred	Subnet mask	Masque de sous-réseau
+Summe	Total	Suma	Somma	Somme
+Tabellen-Shape	Table shape	Forma de tabla	Forma tabella	Forme de tableau
+Teilergebnisse	Subtotals	Subtotales	Subtotali	Sous-totaux
+Teilergebnisse...	Subtotals...	Subtotales...	Subtotali...	Sous-totaux...
+Verknüpfung mit der Berichtsdefinition	Link to report definition	Vínculo a la definición del informe	Collegamento alla definizione del report	Lien vers la définition du rapport
+WAHR	TRUE	VERDADERO	VERO	VRAI
+Webseite (.html)	Web page (.html)	Página web (.html)	Pagina Web (.html)	Page web (.html)
+Welche Eigenschaften soll der Bericht zeigen?	Which properties should the report show?	¿Qué propiedades debe mostrar el informe?	Quali proprietà deve mostrare il report?	Quelles propriétés le rapport doit-il afficher ?
+Welche Shapes sollen in den Bericht?	Which shapes go into the report?	¿Qué formas entran en el informe?	Quali forme entrano nel report?	Quelles formes entrent dans le rapport ?
+Welche Shapes?	Which shapes?	¿Qué formas?	Quali forme?	Quelles formes ?
+Wählen Sie eine Datei.	Choose a file.	Elija un archivo.	Scegliere un file.	Choisissez un fichier.
+Wählen Sie mindestens eine Eigenschaft.	Choose at least one property.	Elija al menos una propiedad.	Scegliere almeno una proprietà.	Choisissez au moins une propriété.
+Zeilen und Teilergebnisse anzeigen	Show rows and subtotals	Mostrar filas y subtotales	Mostra righe e subtotali	Afficher les lignes et les sous-totaux
+csv=CSV-Datei	csv=CSV file	csv=Archivo CSV	csv=File CSV	csv=Fichier CSV
+existiert	exists	existe	esiste	existe
+existiert nicht	does not exist	no existe	non esiste	n'existe pas
+html;htm=Webseite	html;htm=Web page	html;htm=Página web	html;htm=Pagina Web	html;htm=Page web
+vrd=Berichtsdefinition	vrd=Report definition	vrd=Definición de informe	vrd=Definizione di report	vrd=Définition de rapport
+xlsx=Excel-Arbeitsmappe	xlsx=Excel workbook	xlsx=Libro de Excel	xlsx=Cartella di lavoro di Excel	xlsx=Classeur Excel
+Ändern...	Modify...	Modificar...	Modifica...	Modifier...
+Überprüfen	Review	Revisar	Revisione	Révision
+„{}“ ist in der Zeichnung gespeichert.	“{}” is saved in the drawing.	«{}» está guardado en el dibujo.	«{}» è salvato nel disegno.	« {} » est enregistré dans le dessin.
+„{}“ ist keine Berichtsdefinition ({}).	“{}” is not a report definition ({}).	«{}» no es una definición de informe ({}).	«{}» non è una definizione di report ({}).	« {} » n'est pas une définition de rapport ({}).
+„{}“ ist keine Berichtsdefinition.	“{}” is not a report definition.	«{}» no es una definición de informe.	«{}» non è una definizione di report.	« {} » n'est pas une définition de rapport.
+„{}“ ist zu groß für eine Berichtsdefinition.	“{}” is too large for a report definition.	«{}» es demasiado grande para una definición de informe.	«{}» è troppo grande per una definizione di report.	« {} » est trop volumineux pour une définition de rapport.
+„{}“ ließ sich nicht entfernen: {}	“{}” could not be removed: {}	No se pudo quitar «{}»: {}	Impossibile rimuovere «{}»: {}	Impossible de supprimer « {} » : {}
+„{}“ ließ sich nicht lesen.	“{}” could not be read.	No se pudo leer «{}».	Impossibile leggere «{}».	Impossible de lire « {} ».
+„{}“ ließ sich nicht schreiben: {}	“{}” could not be saved: {}	No se pudo guardar «{}»: {}	Impossibile salvare «{}»: {}	Impossible d'enregistrer « {} » : {}
+„{}“ wurde aus der Liste entfernt; die Datei bleibt.	“{}” was removed from the list; the file stays.	«{}» se quitó de la lista; el archivo se conserva.	«{}» è stato rimosso dall'elenco; il file resta.	« {} » a été retiré de la liste ; le fichier reste.
+„{}“ wurde aus der Zeichnung entfernt.	“{}” was removed from the drawing.	«{}» se quitó del dibujo.	«{}» è stato rimosso dal disegno.	« {} » a été supprimé du dessin.
+Teilergebnisse je Spalte	Subtotals per column	Subtotales por columna	Subtotali per colonna	Sous-totaux par colonne

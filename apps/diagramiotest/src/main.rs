@@ -41,6 +41,11 @@
 //   diagramiotest --write-dg DIR         (JD19) jd19-datengrafik.vsdx: data graphics of all four kinds
 //                                         and a legend for the Visio counter-check, jd19-dg.vsdx: the
 //                                         fixture of JFDiagrammer's data_graphics*.uis (datagraphics.rs)
+//   diagramiotest --write-report DIR     (JD19) jd19-bericht.vsdx: shapes with shape data, two
+//                                         report definitions and a report table for the Visio
+//                                         counter-check (reports.rs); --write-report-fixture DIR
+//                                         jd19-geraete.vsdx, the fixture of JFDiagrammer's
+//                                         report scripts
 //   diagramiotest --write-vdx DIR        (JD16) the self-written .vdx / .vsx files and the .vsdx /
 //                                         .vssx JFDiagrammer writes from them (vdx.rs)
 //   diagramiotest --write-vss DIR        (JD17) the sample stencil jd17-schablone.vss (three masters
@@ -96,6 +101,9 @@
 //             stencils/datagraphics, a graphic of all four kinds and a legend written and read
 //             back with the values they show, a refresh reaching the callouts, removal; a graphic
 //             stored the way Visio stores one read, kept and applied
+//   reports   (JD19, reports.rs) shape report definitions in the document sheet (visPropRptN)
+//             written and read back, one as Visio writes it, a broken one kept; the report table
+//             shape's marks and layer; the report run on the read drawing
 //   vdx       (JD16, vdx.rs) the XML formats of 2003-2010: the self-written drawing, stencil and
 //             bitmap read into the model and written as .vsdx / .vssx, hostile files and
 //             limits; macro projects passed through unchanged; document properties
@@ -139,6 +147,8 @@ mod pkg;
 #[path = "../../pdftest/src/reader.rs"]
 mod pdfreader;
 mod render;
+// (JD19) shape reports
+mod reports;
 mod roundtrip;
 mod samples;
 mod stencil_business;
@@ -276,6 +286,14 @@ fn run() -> i32 {
         // (JD19) the data graphics for the Visio counter-check and JFDiagrammer's scripts
         return datagraphics::write(&dir);
     }
+    if let Some(dir) = arg(&args, "--write-report-fixture") {
+        // (JD19) the drawing of JFDiagrammer's report scripts
+        return reports::write_fixture(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-report") {
+        // (JD19) the drawing with report definitions and a report table for the Visio counter-check
+        return reports::write_check(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-vss-overview") {
         // (JD17) every master of each local .vss on one sheet
         return vss::write_overview(&dir, arg(&args, "--corpus"));
@@ -350,6 +368,10 @@ fn run() -> i32 {
         // (JD19) data graphics
         if h.on("datagraphics") {
             datagraphics::run(&mut h);
+        }
+        // (JD19) shape reports (DA-09)
+        if h.on("reports") {
+            reports::run(&mut h);
         }
         // (JD17) the binary stencils of 2003-2010 (subgroups vss/cfb, vss/stream ...)
         vss::run(&mut h);

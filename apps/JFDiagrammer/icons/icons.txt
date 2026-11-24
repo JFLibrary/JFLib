@@ -222,8 +222,11 @@
 16A | proof_language | 16 | P2 | Korrektursprache | Überprüfen · Sprache | Buch mit Globus
 16B | comment_new | 32 | P2 | Neuer Kommentar | Überprüfen · Kommentare | Sprechblase mit Plus
 16C | show_tags | 16 | P2 | Tags anzeigen | Überprüfen · Kommentare | Sprechblase mit Auge
-16D | shape_reports | 32 | P2 | Shape-Berichte | Überprüfen · Berichte | Blatt mit Balken
+16D | shape_reports | 16 32 | P2 | Shape-Berichte | Überprüfen · Berichte | Blatt mit Balken
 16E | protect_document | 32 | P3 | Dokument schützen | Überprüfen · Schützen | Blatt mit Schloss
+# (JD19) the report table's menu, Datei › Exportieren › Daten exportieren (EX-16); numbers from 2C0
+2C0 | report_refresh | 16 | P2 | Bericht aktualisieren | Kontextmenü des Berichts | Berichtsblatt mit Kreispfeil
+2C1 | data_export | 16 32 | P2 | Daten exportieren | Datei · Exportieren | Tabelle mit Pfeil hinaus
 
 [ansicht] Ansicht, Entwicklertools, Hilfe
 00C | task_panes | 16 32 | P1 | Aufgabenbereiche | Ansicht · Fenster | Fenster mit Seitenbereich (abgenommen)
