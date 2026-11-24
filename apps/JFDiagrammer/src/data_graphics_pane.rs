@@ -22,6 +22,8 @@ use ui::*;
 use crate::data_graphics::{self, change, chosen, default_callout, new_item};
 use crate::Diagrammer;
 
+/// the pane's box (panes.rs)
+pub(crate) const ID_PANE_BOX: u32 = 0x7D10_0F00;
 const ID_LIST: u32 = 0x7D10_0000;
 const ID_CHECK: u32 = 0x7D10_1000;
 

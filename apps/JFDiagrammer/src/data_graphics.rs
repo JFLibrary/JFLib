@@ -27,6 +27,7 @@
 // As in Visio a shape shows one data graphic; the gallery and the pane change the graphic the
 // shapes show for the field chosen in the pane, so every shape that shows it follows.
 
+use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::rc::Rc;
 use core::cell::RefCell;
@@ -164,7 +165,24 @@ fn find_targets(app: &Diagrammer) -> Vec<ShapeRef> {
             return out;
         }
     }
-    doc.all_shapes(Owner::Page(p)).filter(|&s| has_data(doc, s)).collect()
+    // the shapes of the page with a row: the recordsets' links read once (not per shape)
+    let linked = linked_on(doc, p);
+    doc.all_shapes(Owner::Page(p)).filter(|&s| doc.shape(s).is_some_and(|x| linked.contains_key(&x.id()))).collect()
+}
+
+// the shapes of a page that are linked to a row (shape ID -> the recordsets)
+fn linked_on(doc: &Document, p: PageRef) -> BTreeMap<u32, Vec<u32>> {
+    let mut out: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
+    let Some(pid) = doc.page(p).map(|x| x.header.id) else { return out };
+    for r in &doc.data.recordsets {
+        for l in r.links.iter().filter(|l| l.page == pid) {
+            let v = out.entry(l.shape).or_default();
+            if !v.contains(&r.id) {
+                v.push(r.id);
+            }
+        }
+    }
+    out
 }
 
 /// the graphic the targets show (the first one that shows one)
@@ -191,8 +209,12 @@ fn find_fields(doc: &Document, ts: &[ShapeRef], g: Option<&DataGraphic>) -> Vec<
     let on = |label: &str| g.is_some_and(|g| g.item_of(&dg::field_expr(label)).is_some());
     let mut out: Vec<PaneField> = Vec::new();
     let mut sets: Vec<u32> = Vec::new();
+    let mut pages: BTreeMap<PageRef, BTreeMap<u32, Vec<u32>>> = BTreeMap::new();
     for &s in ts {
-        for (rs, _) in doc.data_links(s) {
+        let Owner::Page(p) = s.owner else { continue };
+        let linked = pages.entry(p).or_insert_with(|| linked_on(doc, p));
+        let Some(id) = doc.shape(s).map(|x| x.id()) else { continue };
+        for &rs in linked.get(&id).map(|v| v.as_slice()).unwrap_or(&[]) {
             if !sets.contains(&rs) {
                 sets.push(rs);
             }

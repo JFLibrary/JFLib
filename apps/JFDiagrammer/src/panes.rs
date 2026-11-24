@@ -83,7 +83,7 @@ pub(crate) fn content(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
         P_PANZOOM => pan_zoom(app, ui),
         P_EXTERNAL => crate::data_pane::pane(app, ui),
         P_CONFLICTS => crate::data_refresh::pane(app, ui),
-        P_DG_FIELDS => crate::data_graphics_pane::pane(app, ui, ID_PANE + 0x700),
+        P_DG_FIELDS => crate::data_graphics_pane::pane(app, ui, crate::data_graphics_pane::ID_PANE_BOX),
         _ => {}
     }
 }
