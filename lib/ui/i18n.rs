@@ -474,6 +474,7 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Klänge abspielen", "Play sounds", "Jouer des sons", "Reproducir sonidos", "Riprodurre suoni", "Geluiden afspelen", "Odtwarzać dźwięki", "تشغيل الأصوات", "השמעת צלילים"],
     ["Den Standort abfragen", "Get your location", "Connaître votre position", "Consultar su ubicación", "Rilevare la posizione", "Uw locatie opvragen", "Odczytać lokalizację", "معرفة موقعك", "קבלת המיקום שלך"],
     ["Die Bewegungssensoren lesen", "Read the motion sensors", "Lire les capteurs de mouvement", "Leer los sensores de movimiento", "Leggere i sensori di movimento", "De bewegingssensoren lezen", "Odczytać czujniki ruchu", "قراءة مستشعرات الحركة", "קריאת חיישני התנועה"],
+    ["Gamepads lesen", "Read game controllers", "Lire les manettes de jeu", "Leer los mandos de juego", "Leggere i controller di gioco", "Gamecontrollers lezen", "Odczytać kontrolery gier", "قراءة وحدات تحكم الألعاب", "קריאת בקרי משחק"],
     [
         "Eine Netzwerkverbindung aufbauen",
         "Connect to the network",

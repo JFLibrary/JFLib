@@ -2,8 +2,8 @@
 
 An app can declare which files, programs, URL schemes, plugins, printers and network
 addresses it uses, whether it keeps secrets in the system's store, whether it may start
-itself at login, whether it plays sound, whether it may register global shortcuts and whether it
-may take pictures of the screen. The
+itself at login, whether it plays sound, whether it may register global shortcuts, whether it
+may take pictures of the screen and whether it reads game pads. The
 platform layer then refuses everything else that goes through it, in every part of the process:
 the app's own code, the library, codecs, plugins that go through the host API, scripts and agent
 actions. The rules keep honest code honest: they hold against content that steers the app (a
@@ -32,6 +32,7 @@ From then on the rules can only grow by files the user hands over.
 | Checked autostart entry | [`lib/plat/autostart.rs`](../lib/plat/autostart.rs) |
 | Checked sound output (streams, `play`, the system's sounds; `ui.beep`, `ui.dialog_sound`) | [`lib/plat/audio.rs`](../lib/plat/audio.rs), [`lib/ui/sound.rs`](../lib/ui/sound.rs) |
 | Checked global shortcuts and pictures of the screen | [`lib/plat/hotkey.rs`](../lib/plat/hotkey.rs), [`lib/plat/screen.rs`](../lib/plat/screen.rs) |
+| Checked game pads (`pad_watch`; `ui.gamepads` starts once an ask line is answered yes) | [`lib/plat/pad.rs`](../lib/plat/pad.rs), [`lib/ui/pads.rs`](../lib/ui/pads.rs) |
 | UDP answers without `net.connect` (`AnswerSet`) | [`lib/plat/net.rs`](../lib/plat/net.rs) |
 | Install at start-up, the command line's paths | [`lib/plat/boot.rs`](../lib/plat/boot.rs) (console programs reach it through [`rt::boot`](../lib/rt/boot.rs) and `rt::main!`) |
 | OS sandbox from the manifest (`sandbox` line) | [`lib/plat/sandbox.rs`](../lib/plat/sandbox.rs), [`lib/plat/linux_sandbox.rs`](../lib/plat/linux_sandbox.rs) (Landlock + seccomp), [`lib/plat/win_sandbox.rs`](../lib/plat/win_sandbox.rs) (mitigation policies) |
@@ -40,7 +41,7 @@ From then on the rules can only grow by files the user hands over.
 | Agent actions: `Access`, `forbidden`, `confirmation_required` | [`lib/agent_core/src/action.rs`](../lib/agent_core/src/action.rs), the UI's host [`lib/ui/agent.rs`](../lib/ui/agent.rs) |
 | Script commands `perm ...`, `agent ...` | [`lib/ui/auto_perm.rs`](../lib/ui/auto_perm.rs) |
 | Syntax check, hand-over to `rustc` | `app_permissions`, `perm_split`, `Builder.boot_inputs` / `boot_args` in [`build_rs.py`](../build_rs.py), `build_apk` in [`tools/android.py`](../tools/android.py) |
-| Tests | `plattest --test policy` ([`t_policy.rs`](../apps/plattest/t_policy.rs)), `--test permask` ([`t_permask.rs`](../apps/plattest/t_permask.rs): questions without the UI), `--test plugperm` ([`t_plugperm.rs`](../apps/plattest/t_plugperm.rs): plugins), `--test dirs` and `--test trash` (the user folders' variables, `trash` as a write), [`apps/permtest`](../apps/permtest/main.rs) (GUI program; sound refused without `audio.output`), [`apps/permcli`](../apps/permcli/src/main.rs) (`rt::main!` and the programs of `BINS`), [`apps/permprompt`](../apps/permprompt/main.rs) (the dialog, each answer, a worker thread, headless answers, the stored answers, the settings section, agent actions; `tests/sound.uis`: `ask audio.output`, `ui.beep` and the silent dialog sound), [`apps/audiotest`](../apps/audiotest/PERMISSIONS) (`audio.output`: plays), [`apps/sandboxtest`](../apps/sandboxtest/main.rs) (the OS sandbox: raw syscalls that the kernel blocks or allows) |
+| Tests | `plattest --test policy` ([`t_policy.rs`](../apps/plattest/t_policy.rs)), `--test permask` ([`t_permask.rs`](../apps/plattest/t_permask.rs): questions without the UI), `--test plugperm` ([`t_plugperm.rs`](../apps/plattest/t_plugperm.rs): plugins), `--test dirs` and `--test trash` (the user folders' variables, `trash` as a write), `--test pad-policy` and `--test pad-ask` ([`t_pad.rs`](../apps/plattest/t_pad.rs): game pads without and behind `gamepad`), [`apps/permtest`](../apps/permtest/main.rs) (GUI program; sound refused without `audio.output`), [`apps/permcli`](../apps/permcli/src/main.rs) (`rt::main!` and the programs of `BINS`), [`apps/permprompt`](../apps/permprompt/main.rs) (the dialog, each answer, a worker thread, headless answers, the stored answers, the settings section, agent actions; `tests/sound.uis`: `ask audio.output`, `ui.beep` and the silent dialog sound), [`apps/audiotest`](../apps/audiotest/PERMISSIONS) (`audio.output`: plays), [`apps/sandboxtest`](../apps/sandboxtest/main.rs) (the OS sandbox: raw syscalls that the kernel blocks or allows) |
 
 ## The manifest
 
@@ -65,6 +66,7 @@ input.global                          # plat::hotkey_register (global shortcuts)
 screen.capture                        # plat::screen::capture_start (pictures of the screen)
 location                              # plat::sensors::location_watch (where the device is)
 sensors                               # plat::sensors::watch (accelerometer, gyroscope, compass, rotation)
+gamepad                               # plat::pad_watch, ui.gamepads (game pads)
 net.connect api.example.com:443 *.cdn.example.com:443
 net.connect 192.168.0.0/16:631 localhost:8000-8099
 net.listen  127.0.0.1:0               # a local server on a free port
@@ -92,6 +94,7 @@ sandbox                               # let the OS enforce the manifest too (OS 
 | `screen.capture` | – | `plat::screen::capture_start` / `ui.screenshot`: pictures of the whole screen or a part of it (BitBlt, GetImage, the screenshot portal). Picking one pixel's colour (`ui.pick_color`, the colour picker's pipette) needs no right: the user chooses the pixel, as a file in the file dialog |
 | `location` | – | `plat::sensors::location_watch`: where the device is, however it knows (Android's `LocationManager`, the browser's geolocation). The system's own permission comes on top: Android asks `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` (the app's `android/AndroidManifest.xml` must list them: `build_rs.py` refuses to build otherwise), the browser asks by itself. Windows and Linux have no location yet: `LocationState::Unavailable` |
 | `sensors` | – | `plat::sensors::watch`: accelerometer, gravity, gyroscope, magnetic field, the rotation estimate. Android and the browsers ask no permission for them (Safari does), but they tell a lot: how the user walks, what the fingers type. Hence a rule of its own. Windows and Linux have no sensors yet: `SensorState::Unavailable` |
+| `gamepad` | – | `plat::pad_watch` / `ui.gamepads`: game pads (XInput on Windows, evdev on Linux, GameController on macOS, the browser's Gamepad API); without it `pad_watch` gives `false` and nothing is opened. Pads speak only to the app with the focus, like the keyboard, but on Linux reading them means opening `/dev/input` nodes, and a Flatpak gets them only with `--device=input`, which shows the nodes of every input device, keyboards and mice too: hence a rule of its own ([Flatpak](#flatpak)). The pads of a test script (`pad ...` in a headless run) need nothing |
 | `net.connect` | `HOST:PORT` | TCP connections and UDP datagrams (`TcpStream::connect`, `UdpSocket::send_to`, and everything built on them: `netio` HTTP, TLS, SMTP, SSH, WebSocket, `netchan`); in the browser the page's WebSocket (`plat::net::WebSocket`, `netchan`). A UDP socket that `net.listen` allows answers without it ([Network rules](#network-rules)) |
 | `net.listen` | `ADDR:PORT` | `TcpListener::bind` and UDP sockets with a fixed port; such a UDP socket may answer the addresses that send to it |
 | `ask KEY ...` | a rule of any key but `fs.user`, then an optional `"reason"` | the same access after the user agreed ([Asking the user](#asking-the-user)) |
@@ -216,11 +219,9 @@ net.connect backup.example.org:8443
 - The platform layer's own system files: the X11 cookie, ICC profiles, CA bundles, the time
   zone, `PATH` lookups, the portal's and the print dialog's results. These calls use the
   unchecked `*_raw` functions inside `plat`.
-- Game pads (`plat::pad_watch`, `ui.gamepads`): like the keyboard they speak only to the app
-  that has the focus (`plat` reports nothing held while none of its windows is active), and the
-  user presses them for the app. On Linux `plat` opens the evdev nodes of `/dev/input` it may read
-  (udev gives the user of the seat game controllers, never keyboards or mice); a Flatpak sees them
-  only with `--device=input`, which `PACKAGE`'s `flatpak_args=` adds ([PACKAGING.md](PACKAGING.md)).
+- Game pads in an app without a manifest (`plat::pad_watch`, `ui.gamepads`), as before; an app
+  with one needs the line `gamepad` (until 2026-11-24 pads needed no rule). The pads of a test
+  script (`pad ...`) need nothing.
 
 ## The user's files
 
@@ -512,9 +513,28 @@ from the manifest, as defence in depth:
 `tools/pkg_linux.py` derives the Flatpak finish-args from the manifest and is already as narrow
 as it allows: Wayland with X11 as fallback and IPC, the network only with a `net.*` rule, the
 Secret Service only with `secrets`, `--filesystem` holes only for the folders of `fs.*` rules
-(`fs.read` as `:ro`), the host's `recently-used.xbel` only with `recent`, and portals (file
-dialog, `open_url`, printing, autostart, the documents portal for `fs.user`) instead of holes. Inside the Flatpak the kernel enforces those; the
+(`fs.read` as `:ro`), the host's `recently-used.xbel` only with `recent`, `/dev/input` only with
+`gamepad`, and portals (file dialog, `open_url`, printing, autostart, the documents portal for `fs.user`) instead of holes. Inside the Flatpak the kernel enforces those; the
 in-process OS sandbox above stacks on top when the manifest also has a `sandbox` line.
+
+`gamepad` becomes `--device=input`: the whole folder `/dev/input`, the nodes of every input
+device, keyboards and mice too; which of them the app can open follows their rights on the host
+(udev gives the user of the seat the game controllers; keyboards and mice usually belong to the
+group `input`). Flatpak knows it since 1.15.6.
+Older versions refuse it: `flatpak build-finish --device=input` ends with "Unknown device type
+input" (seen with Flatpak 1.14.6 in WSL's Ubuntu 24.04), so `tools/package.py` writes only the
+manifest when the Flatpak it builds with is older; an installed app whose metadata has
+`devices=input;` starts on 1.14.6, the unknown device is left out (no `/dev/input`, no pads, and
+`flatpak info --show-permissions` lists nothing). An app without a manifest does not get it (its
+other holes are wide; add `--device=input` with `PACKAGE`'s `flatpak_args=` when it reads pads).
+
+**Game pads in the other packages.** MSIX: nothing to declare; the list of capabilities has none
+for XInput (`humaninterfacedevice` is the HID API's, which `plat` does not use) and the app is
+full trust, outside an AppContainer. macOS: Apple's "Game Controllers" capability
+(`GCSupportsControllerUserInteraction`) is only for iOS, iPadOS, tvOS and visionOS, and no App
+Sandbox entitlement for `GameController` is documented, so `tools/apple.py` adds none for
+`gamepad`; whether a sandboxed Mac build (a manifest with `sandbox`) sees pads has not been
+checked with a real pad.
 
 ## Refusals
 
@@ -524,15 +544,17 @@ A refused call fails the way a missing or unreadable target fails: `None`, `fals
 `secret_available()` is `false`), `AutostartError::Denied` (autostart),
 `AudioError::Denied` (sound: `sound()` and `ui.beep` give `false`, `audio::available()` is
 `false`; a headless script sees `expect sound none`), `HotkeyError::Denied` (input.global),
-`ScreenError::Denied` (screen.capture), `LocationState::Denied` (location; the guard runs nothing)
-or `SensorState::Denied` (sensors; the guard runs nothing).
+`ScreenError::Denied` (screen.capture), `LocationState::Denied` (location; the guard runs nothing),
+`SensorState::Denied` (sensors; the guard runs nothing) or `false` from `pad_watch` (gamepad:
+nothing is opened, `ui.gamepads` stays empty and `ui.gamepads_watching()` is `false`).
 In addition:
 
 - stderr shows `PERMDENY <kind> <target>` once per target, for example
   `PERMDENY fs.write C:/Users/me/Desktop/out.png`, `PERMDENY net.connect evil.example` or
   `PERMDENY secrets imap.example.org` (the service of the refused secret), `PERMDENY autostart`,
   `PERMDENY audio.output` (once per run, however many sounds), `PERMDENY input.global`,
-  `PERMDENY screen.capture`, `PERMDENY location`, `PERMDENY sensors`, `PERMDENY agent document.delete`; a call on behalf of a plugin ends with ` (plugin NAME)`;
+  `PERMDENY screen.capture`, `PERMDENY location`, `PERMDENY sensors`, `PERMDENY gamepad` (once per run: `ui.gamepads` asks
+  once), `PERMDENY agent document.delete`; a call on behalf of a plugin ends with ` (plugin NAME)`;
   a question put to the user shows as `PERMASK <kind> <target> (<rule>)`;
 - `plat::policy::denials()` returns the last 64 refusals (`kind`, `target`, `plugin`) for a
   log or a diagnostics page;
@@ -605,7 +627,8 @@ In addition:
   "MSIX"); in Flatpak the kernel then enforces the file and network holes as well. Sound in a
   Flatpak needs the sound server's socket (`--socket=pulseaudio`), which also allows
   recording: only an app with `audio.output` (or without a manifest) gets it; `plat` itself
-  records nothing. MSIX needs no capability for playing sound.
+  records nothing. MSIX needs no capability for playing sound. Game pads in a Flatpak need
+  `--device=input` (`gamepad`), which shows the nodes of every input device ([Flatpak](#flatpak)).
 - **Agent mode.** An agent that drives the library's file dialog (`--agent-json`,
   `--agent-mcp`) can choose files like a user. It cannot answer a permission question: while
   one is open the `ui.*` input actions are refused (`unavailable`). Agent mode must be enabled

@@ -7,12 +7,14 @@
 //   fs_allowed(path, FS_READ | FS_WRITE) / process_allowed(program) / url_allowed(url) /
 //   plugin_allowed(path) / print_allowed() / secrets_allowed(service) / autostart_allowed() /
 //   audio_allowed()                        -> bool
-//   input_global_allowed() / screen_capture_allowed() / location_allowed() / sensors_allowed()
-//                                          -> bool
+//   input_global_allowed() / screen_capture_allowed() / location_allowed() / sensors_allowed() /
+//   gamepad_allowed()                      -> bool
 //                                          a refusal is recorded (denials) and printed once
 //                                          per target to stderr: "PERMDENY kind target"
 //   audio_granted() -> bool                sound is allowed now, without asking or recording a
 //                                          refusal (ui's dialog sounds stay silent without it)
+//   gamepad_granted() -> bool              game pads are allowed now, the same way (ui.gamepads
+//                                          starts watching once an ask line was answered yes)
 //   net_connect_allowed(addr) / net_listen_allowed(addr) / net_name_allowed(host) -> bool
 //   net_listen_granted(addr) -> bool       net.listen without asking or recording (a UDP socket on
 //                                          port 0: may it answer its peers)
@@ -82,6 +84,9 @@
 //                         pixel's colour needs nothing: the user chooses it)
 //   location              plat::sensors::location_watch (where the device is)
 //   sensors               plat::sensors::watch (accelerometer, gyroscope, magnetometer, rotation)
+//   gamepad               plat::pad_watch (game pads: XInput, evdev, GameController, the
+//                         browser's Gamepad API; a Flatpak gets --device=input for it, which
+//                         shows the nodes of every input device, keyboards too: tools/pkg_linux.py)
 //   net.connect HOST:PORT..   TCP connections and UDP datagrams to HOST (a name, *.name for
 //                         every name below it, an IPv4 / [IPv6] address, a block 10.0.0.0/8
 //                         or [fd00::]/8, localhost = the loopback addresses, * = any) on PORT
@@ -147,10 +152,10 @@ pub const STORE: &str = "config://permission-decisions.txt";
 pub struct Denial {
     /// "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart",
     /// "audio.output", "net.connect", "net.listen", "agent", "input.global", "screen.capture",
-    /// "location" or "sensors"
+    /// "location", "sensors" or "gamepad"
     pub kind: &'static str,
     /// the path, program, URL, address, the service of a secret, the agent's action, the
-    /// chord of a shortcut or "" (print, autostart, audio.output, screen.capture, location, sensors)
+    /// chord of a shortcut or "" (print, autostart, audio.output, screen.capture, location, sensors, gamepad)
     pub target: String,
     /// the plugin the call was made for ("" = the app itself)
     pub plugin: String,
@@ -247,9 +252,9 @@ pub enum AgentRule {
 }
 
 // the kinds of access (Denial::kind, Question::kind)
-const KINDS: [&str; 16] = [
+const KINDS: [&str; 17] = [
     "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart", "audio.output", "net.connect",
-    "net.listen", "agent", "input.global", "screen.capture", "location", "sensors",
+    "net.listen", "agent", "input.global", "screen.capture", "location", "sensors", "gamepad",
 ];
 
 fn kind_of(rule: &str) -> &'static str {
@@ -297,6 +302,7 @@ struct Policy {
     capture: Option<u16>,
     location: Option<u16>,
     sensors: Option<u16>,
+    gamepad: Option<u16>,
     connect: Vec<NetRule>,
     listen: Vec<NetRule>,
     resolved: Vec<Resolved>,
@@ -531,6 +537,17 @@ pub fn location_allowed() -> bool {
 /// whether plat::sensors::watch may read the motion sensors (`sensors`)
 pub fn sensors_allowed() -> bool {
     decide("sensors", "", &Req::Sensors, false) == Verdict::Allow
+}
+
+/// whether plat::pad_watch may read game pads (`gamepad`)
+pub fn gamepad_allowed() -> bool {
+    decide("gamepad", "", &Req::Gamepad, false) == Verdict::Allow
+}
+
+/// whether game pads are allowed now without a question or a recorded refusal: no manifest, a plain `gamepad`
+/// line or an ask line already answered with yes (ui.gamepads tries pad_watch again once it is)
+pub fn gamepad_granted() -> bool {
+    granted(&Req::Gamepad)
 }
 
 /// the last refusals, oldest first
@@ -856,6 +873,7 @@ enum Req<'a> {
     Capture,
     Location,
     Sensors,
+    Gamepad,
     #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
     Connect([u8; 16], u16),
     #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
@@ -924,6 +942,7 @@ impl Policy {
             Req::Capture => flag(self.capture),
             Req::Location => flag(self.location),
             Req::Sensors => flag(self.sensors),
+            Req::Gamepad => flag(self.gamepad),
             #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
             Req::Connect(ip, port) => {
                 let dns = *port == 53 && self.connect.iter().any(|r| matches!(r.host, Host::Any | Host::Name(_)));
@@ -1601,9 +1620,9 @@ fn scope_name() -> String {
 // ---------------------------------------------------------------- the manifest
 
 // the keys an ask line may carry
-const ASK_KEYS: [&str; 15] = [
+const ASK_KEYS: [&str; 16] = [
     "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart", "audio.output", "net.connect",
-    "net.listen", "input.global", "screen.capture", "location", "sensors",
+    "net.listen", "input.global", "screen.capture", "location", "sensors", "gamepad",
 ];
 
 // a line -> (rule text, reason): the reason is a "quoted text" at the end; '#' outside it
@@ -1716,7 +1735,7 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
                 }
             }
             "fs.user" | "print" | "secrets" | "autostart" | "audio.output" | "input.global" | "screen.capture" | "location"
-            | "sensors" => {
+            | "sensors" | "gamepad" => {
                 if !args.is_empty() {
                     return Err(at("takes no arguments"));
                 }
@@ -1731,6 +1750,7 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
                     "screen.capture" => set(&mut p.capture),
                     "location" => set(&mut p.location),
                     "sensors" => set(&mut p.sensors),
+                    "gamepad" => set(&mut p.gamepad),
                     _ => p.user = true,
                 }
             }
@@ -1817,7 +1837,7 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
             }
             _ => {
                 return Err(at(
-                    "unknown permission (fs.read, fs.write, fs.user, process, url, plugins, print, secrets, autostart, audio.output, net.connect, net.listen, input.global, screen.capture, location, sensors, sandbox, ask, agent.confirm, agent.deny)",
+                    "unknown permission (fs.read, fs.write, fs.user, process, url, plugins, print, secrets, autostart, audio.output, net.connect, net.listen, input.global, screen.capture, location, sensors, gamepad, sandbox, ask, agent.confirm, agent.deny)",
                 ))
             }
         }

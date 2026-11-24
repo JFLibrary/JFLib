@@ -178,6 +178,7 @@ fn what(kind: &str) -> &'static str {
         "agent" => tr("Eine Aktion für den Agenten ausführen"),
         "location" => tr("Den Standort abfragen"),
         "sensors" => tr("Die Bewegungssensoren lesen"),
+        "gamepad" => tr("Gamepads lesen"),
         _ => tr("Zugriff erlauben?"),
     }
 }

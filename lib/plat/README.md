@@ -46,7 +46,11 @@ sticks in -1..=1) and `E_GAMEPAD` says that one came, went or changed. Windows r
 (Xbox-compatible pads), Linux the evdev nodes of game controllers (Xbox, PlayStation and Nintendo
 pads mapped to the layout, hotplug through inotify), macOS GameController, the browser the Gamepad
 API; Android and iOS have none yet. Pads speak only to the app that has the focus, as the keyboard
-does, and need no permission; inside a Flatpak they need `--device=input`.
+does. An app with a `PERMISSIONS` file reads them only with the line `gamepad` (else `pad_watch`
+says `false` and opens nothing, `PERMDENY gamepad`); without the file they work as always. Inside a
+Flatpak they need `--device=input`, which the packages derive from `gamepad` (Flatpak 1.15.6 and
+newer; it shows the nodes of every input device, keyboards too); MSIX and the macOS sandbox need nothing more
+([PERMISSIONS.md](https://github.com/JFLibrary/JFLib/blob/main/docs/PERMISSIONS.md)).
 
 ## Files, the app's folders and permissions
 
