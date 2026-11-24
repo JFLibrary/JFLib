@@ -40,6 +40,8 @@ pub(crate) const P_EXTERNAL: u32 = 15;
 /// (JD18, DA-05) Aktualisierungskonflikte: on the right, shown after a refresh with conflicts
 /// (data_refresh.rs)
 pub(crate) const P_CONFLICTS: u32 = 16;
+/// (JD19, AB-12, DA-08) Datengrafikfelder: on the right (data_graphics_pane.rs)
+pub(crate) const P_DG_FIELDS: u32 = 19;
 
 pub(crate) const ID_DOCK: u32 = 500;
 /// the canvas (JD8 rest: the task panes hand the keyboard back to it after Enter)
@@ -51,7 +53,7 @@ const ID_STATUS: u32 = 0x5800;
 const SIDEBAR_W: i32 = 240;
 
 /// the panels (titles in the current language)
-pub(crate) fn panels() -> [DockPanel<'static>; 7] {
+pub(crate) fn panels() -> [DockPanel<'static>; 8] {
     [
         DockPanel::new(P_SHAPES, t("Shapes"), JD_STENCIL_MENU).at(DOCK_LEFT, 0),
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_FORMAT, crate::tc("Shape formatieren|Bereich"), JD_FILL).at(DOCK_RIGHT, 0) },
@@ -60,6 +62,7 @@ pub(crate) fn panels() -> [DockPanel<'static>; 7] {
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_PANZOOM, t("Verschieben und Zoomen"), JD_ZOOM).at(DOCK_RIGHT, 0) },
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_EXTERNAL, t("Externe Daten"), JD_EXTERNAL_DATA).at(DOCK_BOTTOM, 0) },
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_CONFLICTS, t("Aktualisierungskonflikte"), JD_REFRESH_ALL).at(DOCK_RIGHT, 0) },
+        DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_DG_FIELDS, t("Datengrafikfelder"), JD_DG_FIELDS).at(DOCK_RIGHT, 0) },
     ]
 }
 
@@ -80,6 +83,7 @@ pub(crate) fn content(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
         P_PANZOOM => pan_zoom(app, ui),
         P_EXTERNAL => crate::data_pane::pane(app, ui),
         P_CONFLICTS => crate::data_refresh::pane(app, ui),
+        P_DG_FIELDS => crate::data_graphics_pane::pane(app, ui, ID_PANE + 0x700),
         _ => {}
     }
 }
@@ -100,7 +104,7 @@ static SHAPE_MENU: [Mi; 22] = [
     Mi::Cmd(CFF_LANE_BEFORE), Mi::Cmd(CFF_LANE_AFTER),
     Mi::Sub("Anordnen", &[Mi::Cmd(BRING_FRONT), Mi::Cmd(BRING_FORWARD), Mi::Cmd(SEND_BACK), Mi::Cmd(SEND_BACKWARD)]),
     // (JD18) Verknüpfung mit Zeile aufheben (data_pane.rs)
-    Mi::Sub("Daten", &[Mi::Cmd(PANE_DATA), Mi::Cmd(SHAPE_DATA_DEFINE), Mi::Sep, Mi::Cmd(DATA_UNLINK)]),
+    Mi::Sub("Daten", &[Mi::Cmd(PANE_DATA), Mi::Cmd(SHAPE_DATA_DEFINE), Mi::Sep, Mi::Cmd(DATA_UNLINK), Mi::Sep, Mi::Cmd(DG_EDIT_GRAPHIC), Mi::Cmd(PANE_DG_FIELDS)]),
     // (JD8 rest) the shape's links follow its Hyperlink row (cmds_text::LINK_ROWS, ZF-12)
     Mi::Cmd(HYPERLINK), Mi::List(crate::cmds_text::LINK_ROWS, crate::cmds_text::LINK_ROWS_MAX, ""), Mi::Cmd(COMMENT_NEW),
     Mi::Sub("Formatieren", &[Mi::Cmd(FORMAT_TEXT), Mi::Cmd(FORMAT_LINE), Mi::Cmd(FORMAT_FILL), Mi::Cmd(FORMAT_SHADOW)]),

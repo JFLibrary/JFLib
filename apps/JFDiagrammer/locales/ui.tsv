@@ -1168,3 +1168,132 @@ Shapes ohne X und Y werden in Stufen von oben nach unten angeordnet, Links werde
 {} Shapes und {} Verbinder erstellt	{} shapes and {} connectors created	{} formas y {} conectores creados	{} forme e {} connettori creati	{} formes et {} connecteurs créés
 Die Zeichnung lässt sich nicht erstellen.	The drawing cannot be created.	No se puede crear el dibujo.	Impossibile creare il disegno.	Impossible de créer le dessin.
 Shape-Daten in Zeile {}: {}	Shape data in line {}: {}	Datos de forma en la línea {}: {}	Dati forma nella riga {}: {}	Données de forme à la ligne {} : {}
+Horizontal|Legende	Horizontal	Horizontal	Orizzontale	Horizontale
+Vertikal|Legende	Vertical	Vertical	Verticale	Verticale
+Neue Datengrafik erstellen ...	Create new data graphic ...	Crear gráfico de datos nuevo ...	Crea nuova grafica dati ...	Créer un graphique de données ...
+Datengrafik bearbeiten ...	Edit data graphic ...	Editar gráfico de datos ...	Modifica grafica dati ...	Modifier le graphique de données ...
+Umbenennen|Datengrafik	Rename	Cambiar nombre	Rinomina	Renommer
+Duplizieren|Datengrafik	Duplicate	Duplicar	Duplica	Dupliquer
+Löschen|Datengrafik	Delete	Eliminar	Elimina	Supprimer
+Shapes mit dieser Grafik auswählen	Select shapes with this graphic	Seleccionar formas con este gráfico	Seleziona forme con questa grafica	Sélectionner les formes avec ce graphique
+Keine Datengrafik	No data graphic	Sin gráfico de datos	Nessuna grafica dati	Aucun graphique de données
+Weit links|Position	Far left	Muy a la izquierda	Molto a sinistra	Tout à gauche
+Linker Rand|Position	Left edge	Borde izquierdo	Bordo sinistro	Bord gauche
+Links|Position	Left	Izquierda	Sinistra	Gauche
+Zentriert|Position	Center	Centro	Centro	Centre
+Rechts|Position	Right	Derecha	Destra	Droite
+Rechter Rand|Position	Right edge	Borde derecho	Bordo destro	Bord droit
+Weit rechts|Position	Far right	Muy a la derecha	Molto a destra	Tout à droite
+Unterhalb|Position	Below	Debajo	Sotto	En dessous
+Unterer Rand|Position	Bottom edge	Borde inferior	Bordo inferiore	Bord inférieur
+Unten|Position	Bottom	Abajo	In basso	Bas
+Mittig|Position	Middle	En medio	Al centro	Milieu
+Oben|Position	Top	Arriba	In alto	Haut
+Oberer Rand|Position	Top edge	Borde superior	Bordo superiore	Bord supérieur
+Oberhalb|Position	Above	Encima	Sopra	Au-dessus
+Daten – {}	Data – {}	Datos – {}	Dati – {}	Données – {}
+Datengrafik	Data graphic	Gráfico de datos	Grafica dati	Graphique de données
+Die Datengrafik lässt sich nicht ändern: {}	The data graphic cannot be changed: {}	No se puede cambiar el gráfico de datos: {}	Impossibile modificare la grafica dati: {}	Impossible de modifier le graphique de données : {}
+Hellgrün	Light green	Verde claro	Verde chiaro	Vert clair
+Hellblau	Light blue	Azul claro	Azzurro	Bleu clair
+Orange	Orange	Naranja	Arancione	Orange
+Lila	Purple	Morado	Viola	Violet
+Grau	Gray	Gris	Grigio	Gris
+Dunkelgelb	Dark yellow	Amarillo oscuro	Giallo scuro	Jaune foncé
+Türkis	Turquoise	Turquesa	Turchese	Turquoise
+Text|Datengrafik	Text	Texto	Testo	Texte
+Datenleiste	Data bar	Barra de datos	Barra dei dati	Barre de données
+Symbolsatz	Icon set	Conjunto de iconos	Set di icone	Jeu d'icônes
+Farbe nach Wert	Color by value	Color por valor	Colore per valore	Couleur par valeur
+Position der Datengrafik	Position of the data graphic	Posición del gráfico de datos	Posizione della grafica dati	Position du graphique de données
+zwischen	between	entre	tra	entre
+enthält	contains	contiene	contiene	contient
+enthält nicht	does not contain	no contiene	non contiene	ne contient pas
+Legende	Legend	Leyenda	Legenda	Légende
+Symbol {}	Icon {}	Icono {}	Icona {}	Icône {}
+Wert als Text	Value as text	Valor como texto	Valore come testo	Valeur sous forme de texte
+Datengrafik anwenden	Apply data graphic	Aplicar gráfico de datos	Applica grafica dati	Appliquer le graphique de données
+Datengrafik duplizieren	Duplicate data graphic	Duplicar gráfico de datos	Duplica grafica dati	Dupliquer le graphique de données
+Datengrafik löschen	Delete data graphic	Eliminar gráfico de datos	Elimina grafica dati	Supprimer le graphique de données
+Zahl mit zwei Dezimalstellen	Number with two decimal places	Número con dos decimales	Numero con due decimali	Nombre à deux décimales
+Zahl mit Tausendertrennzeichen	Number with thousands separator	Número con separador de miles	Numero con separatore delle migliaia	Nombre avec séparateur de milliers
+Prozent	Percent	Porcentaje	Percentuale	Pourcentage
+{{dd.MM.yyyy}}	{{dd.MM.yyyy}}	{{dd.MM.yyyy}}	{{dd.MM.yyyy}}	{{dd.MM.yyyy}}
+Links vom Wert	Left of value	A la izquierda del valor	A sinistra del valore	À gauche de la valeur
+Nicht angezeigt	Not shown	No se muestra	Non visualizzata	Non affichée
+Rechts vom Wert	Right of value	A la derecha del valor	A destra del valore	À droite de la valeur
+Unter dem Wert	Below value	Debajo del valor	Sotto il valore	Sous la valeur
+Über dem Wert	Above value	Encima del valor	Sopra il valore	Au-dessus de la valeur
+Kein Rahmen	No border	Sin borde	Nessun bordo	Aucune bordure
+Linie unten	Bottom line	Línea inferior	Linea in basso	Ligne en bas
+Umriss	Outline	Contorno	Contorno	Contour
+Gefüllt	Filled	Relleno	Riempito	Rempli
+Keine Füllung|Datengrafik	No fill	Sin relleno	Nessun riempimento	Aucun remplissage
+[nicht verwendet]	[not used]	[no se usa]	[non utilizzato]	[non utilisé]
+ist gleich	equals	es igual a	è uguale a	est égal à
+ist größer als	is greater than	es mayor que	è maggiore di	est supérieur à
+ist größer als oder gleich	is greater than or equal to	es mayor o igual que	è maggiore o uguale a	est supérieur ou égal à
+ist kleiner als	is less than	es menor que	è minore di	est inférieur à
+ist kleiner als oder gleich	is less than or equal to	es menor o igual que	è minore o uguale a	est inférieur ou égal à
+ist ungleich	does not equal	no es igual a	è diverso da	est différent de
+liegt zwischen	is between	está entre	è compreso tra	est compris entre
+Dunkelblau	Dark blue	Azul oscuro	Blu scuro	Bleu foncé
+Dunkelrot	Dark red	Rojo oscuro	Rosso scuro	Rouge foncé
+Datengrafik bearbeiten	Edit data graphic	Editar gráfico de datos	Modifica grafica dati	Modifier le graphique de données
+Neue Datengrafik	New data graphic	Gráfico de datos nuevo	Nuova grafica dati	Nouveau graphique de données
+Elemente	Items	Elementos	Elementi	Éléments
+Element bearbeiten ...	Edit item ...	Editar elemento ...	Modifica elemento ...	Modifier l'élément ...
+Löschen|Element	Delete	Eliminar	Elimina	Supprimer
+Neues Element ...	New item ...	Elemento nuevo ...	Nuovo elemento ...	Nouvel élément ...
+Standardposition	Default position	Posición predeterminada	Posizione predefinita	Position par défaut
+Horizontal|Position	Horizontal	Horizontal	Orizzontale	Horizontale
+Vertikal|Position	Vertical	Vertical	Verticale	Verticale
+Anzeigeoptionen	Display options	Opciones de presentación	Opzioni di visualizzazione	Options d'affichage
+Shape-Text ausblenden	Hide shape text	Ocultar el texto de la forma	Nascondi il testo della forma	Masquer le texte de la forme
+Rahmen um Elemente an der Standardposition	Border around items at the default position	Borde alrededor de los elementos en la posición predeterminada	Bordo intorno agli elementi nella posizione predefinita	Bordure autour des éléments à la position par défaut
+Übernehmen	Apply	Aplicar	Applica	Appliquer
+Element bearbeiten	Edit item	Editar elemento	Modifica elemento	Modifier l'élément
+Neues Element	New item	Elemento nuevo	Nuovo elemento	Nouvel élément
+Weitere Felder	More fields	Más campos	Altri campi	Autres champs
+Datenfeld	Data field	Campo de datos	Campo dati	Champ de données
+Ausdruck	Expression	Expresión	Espressione	Expression
+Feldnamen in geschweiften Klammern, verbunden mit + - * /	Field names in braces, joined by + - * /	Nombres de campo entre llaves, unidos con + - * /	Nomi dei campi tra parentesi graffe, uniti da + - * /	Noms de champ entre accolades, reliés par + - * /
+Anzeigen als	Displayed as	Mostrar como	Visualizza come	Afficher en tant que
+Position	Position	Posición	Posizione	Position
+Standardposition verwenden	Use default position	Usar la posición predeterminada	Usa la posizione predefinita	Utiliser la position par défaut
+Details	Details	Detalles	Dettagli	Détails
+Eigenes: {}	Custom: {}	Personalizado: {}	Personalizzato: {}	Personnalisé : {}
+[Default]: die Bezeichnung des Datenfelds	[Default]: the name of the data field	[Default]: el nombre del campo de datos	[Default]: il nome del campo dati	[Default] : le nom du champ de données
+Position der Bezeichnung	Label position	Posición de la etiqueta	Posizione dell'etichetta	Position de l'étiquette
+Wertformat	Value format	Formato del valor	Formato del valore	Format de la valeur
+Wert anzeigen	Show value	Mostrar valor	Mostra valore	Afficher la valeur
+Rahmen|Text	Border	Borde	Bordo	Bordure
+Füllung|Text	Fill	Relleno	Riempimento	Remplissage
+Minimalwert	Minimum value	Valor mínimo	Valore minimo	Valeur minimale
+Maximalwert	Maximum value	Valor máximo	Valore massimo	Valeur maximale
+Regeln für die Symbole	Rules for the icons	Reglas para los iconos	Regole per le icone	Règles des icônes
+Der Stil hat keine Symbole.	The style has no icons.	El estilo no tiene iconos.	Lo stile non ha icone.	Le style n'a pas d'icônes.
+Werte des Felds: {}	Values of the field: {}	Valores del campo: {}	Valori del campo: {}	Valeurs du champ : {}
+Jeder Bereich eine Farbe	Each color represents a range of values	Cada color representa un intervalo de valores	Ogni colore rappresenta un intervallo di valori	Chaque couleur représente une plage de valeurs
+Jeder Wert eine Farbe	Each color represents a unique value	Cada color representa un valor único	Ogni colore rappresenta un valore univoco	Chaque couleur représente une valeur unique
+Färbemethode	Coloring method	Método de coloración	Metodo di colorazione	Méthode de coloration
+Eigene: {}	Custom: {}	Personalizado: {}	Personalizzato: {}	Personnalisée : {}
+Löschen|Farbe	Delete	Eliminar	Elimina	Supprimer
+Farbe hinzufügen	Add color	Agregar color	Aggiungi colore	Ajouter une couleur
+Werte der Shapes einsetzen	Insert the shapes' values	Insertar los valores de las formas	Inserisci i valori delle forme	Insérer les valeurs des formes
+Das Element braucht ein Datenfeld.	The item needs a data field.	El elemento necesita un campo de datos.	L'elemento richiede un campo dati.	L'élément a besoin d'un champ de données.
+Datengrafik umbenennen	Rename data graphic	Cambiar nombre del gráfico de datos	Rinomina grafica dati	Renommer le graphique de données
+Es gibt schon eine Datengrafik „{}“.	There is already a data graphic “{}”.	Ya existe un gráfico de datos «{}».	Esiste già una grafica dati «{}».	Il existe déjà un graphique de données « {} ».
+Keine|Datengrafik	None	Ninguno	Nessuna	Aucun
+Wählen Sie ein Feld im Bereich Datengrafikfelder.	Choose a field in the Data Graphic Fields pane.	Elija un campo en el panel Campos de gráfico de datos.	Scegli un campo nel riquadro Campi grafica dati.	Choisissez un champ dans le volet Champs de graphique de données.
+Alle Datengrafiken	All data graphics	Todos los gráficos de datos	Tutte le grafiche dati	Tous les graphiques de données
+Weitere Datengrafiken ...	More data graphics ...	Más gráficos de datos ...	Altre grafiche dati ...	Autres graphiques de données ...
+In dieser Zeichnung	In this drawing	En este dibujo	In questo disegno	Dans ce dessin
+Die Zeichnung hat noch keine Datengrafik.	The drawing has no data graphic yet.	El dibujo aún no tiene ningún gráfico de datos.	Il disegno non ha ancora una grafica dati.	Le dessin n'a pas encore de graphique de données.
+Keine Datenfelder	No data fields	Sin campos de datos	Nessun campo dati	Aucun champ de données
+Verknüpfen Sie Shapes mit Daten, um ihre Felder hier zu sehen.	Link shapes to data to see their fields here.	Vincule formas a datos para ver aquí sus campos.	Collega le forme ai dati per vederne qui i campi.	Liez des formes à des données pour voir leurs champs ici.
+Datengrafik: {}	Data graphic: {}	Gráfico de datos: {}	Grafica dati: {}	Graphique de données : {}
+Ein Haken zeigt das Feld als Datengrafik. Die Galerie, Position und Konfigurieren ändern das gewählte Feld.	A check mark shows the field as a data graphic. The gallery, Position and Configure change the chosen field.	Una marca muestra el campo como gráfico de datos. La galería, Posición y Configurar cambian el campo elegido.	Un segno di spunta mostra il campo come grafica dati. La raccolta, Posizione e Configura modificano il campo scelto.	Une coche affiche le champ comme graphique de données. La galerie, Position et Configurer modifient le champ choisi.
+„{}“ als Datengrafik zeigen	Show “{}” as a data graphic	Mostrar «{}» como gráfico de datos	Mostra «{}» come grafica dati	Afficher « {} » comme graphique de données
+Datengrafikfeld entfernen	Remove data graphic field	Quitar campo de gráfico de datos	Rimuovi campo grafica dati	Supprimer le champ de graphique de données
+Datengrafikfeld hinzufügen	Add data graphic field	Agregar campo de gráfico de datos	Aggiungi campo grafica dati	Ajouter un champ de graphique de données

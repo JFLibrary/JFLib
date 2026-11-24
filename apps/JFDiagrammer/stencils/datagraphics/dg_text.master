@@ -67,13 +67,13 @@ msvCalloutPropValueFormat:  Type = 0; Value = ""; Prompt = "Format"
         Label.it = Formato valore
         Label.fr = Format de la valeur
 msvCalloutPropLabel:  Type = 0; Value = "[Default]"; Prompt = "String"
-        Label.de = Beschriftung
+        Label.de = Bezeichnung
         Label.en = Label
         Label.es = Etiqueta
         Label.it = Etichetta
         Label.fr = Étiquette
 msvCalloutPropLabelPosition:  Type = 1; Value = "Left of Value"; Prompt = "List"; Format = "Not Shown;Left of Value;Right of Value;Above Value;Below Value"
-        Label.de = Position der Beschriftung
+        Label.de = Position der Bezeichnung
         Label.en = Label position
         Label.es = Posición de la etiqueta
         Label.it = Posizione etichetta
