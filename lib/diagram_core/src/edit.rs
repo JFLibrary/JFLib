@@ -141,6 +141,7 @@ pub(crate) enum Op {
     Themes { themes: Box<Vec<Theme>> },
     PartInsert { pos: u32, part: Box<Part> },
     PartRemove { pos: u32 },
+    Data { data: Box<crate::data::DataSets> },
 }
 
 fn cells_mut(doc: &mut Document, sheet: SheetRef, scope: Scope) -> Option<&mut Vec<Cell>> {
@@ -369,6 +370,7 @@ impl Op {
             },
             Op::Settings { settings } => Op::Settings { settings: Box::new(mem::replace(&mut doc.settings, *settings)) },
             Op::Themes { themes } => Op::Themes { themes: Box::new(mem::replace(&mut doc.themes, *themes)) },
+            Op::Data { data } => Op::Data { data: Box::new(mem::replace(&mut doc.data, *data)) },
             Op::PartInsert { pos, part } => {
                 if pos as usize > doc.parts.len() {
                     fail!(Op::PartInsert { pos, part })
@@ -428,7 +430,7 @@ impl Op {
             Op::StyleHeader { style, .. } => {
                 out.insert(SheetRef::Style(*style));
             }
-            Op::Settings { .. } | Op::Themes { .. } | Op::PartInsert { .. } | Op::PartRemove { .. } => {
+            Op::Settings { .. } | Op::Themes { .. } | Op::PartInsert { .. } | Op::PartRemove { .. } | Op::Data { .. } => {
                 out.insert(SheetRef::Document);
             }
         }
@@ -955,7 +957,7 @@ impl<'d> Transaction<'d> {
         }
     }
 
-    fn ensure_named_row(&mut self, sheet: SheetRef, section: Sym, name: &str) -> Result<(SecKey, RowKey), EditError> {
+    pub(crate) fn ensure_named_row(&mut self, sheet: SheetRef, section: Sym, name: &str) -> Result<(SecKey, RowKey), EditError> {
         let sk = SecKey::one(section);
         let rk = RowKey::Named(self.intern(name));
         if !self.doc.has_row(sheet, sk, rk) {
@@ -1410,6 +1412,12 @@ impl<'d> Transaction<'d> {
     /// remove the part at `index` of Document::parts (shapes that name it show no picture)
     pub fn remove_part(&mut self, index: usize) -> Result<(), EditError> {
         self.run(Op::PartRemove { pos: index as u32 }).map_err(|_| EditError::Invalid)
+    }
+
+    /// (JD18) replace the document's external data (data.rs builds the new value; one step
+    /// keeps the old value for undo, the cached rows are shared, not copied)
+    pub fn set_data(&mut self, data: crate::data::DataSets) -> Result<(), EditError> {
+        self.run(Op::Data { data: Box::new(data) })
     }
 
     /// set the picture data of a Foreign shape

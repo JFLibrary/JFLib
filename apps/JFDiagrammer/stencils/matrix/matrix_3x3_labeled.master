@@ -1,0 +1,333 @@
+# Matrix 3x3 mit Beschriftungen (SH-031, JD26): neun Felder mit drei Spaltenköpfen darüber und
+# drei Zeilenköpfen links davon, alle als Teile einer Gruppe mit eigenem Text; die Köpfe in der
+# Variantenfarbe 106 des Designs (in NetLab Schiefer), die Felder in 100, 1 mm Fuge zwischen allen
+# Flächen.  Die Köpfe sind User.M breit (Zeilen) und User.T hoch (Spalten); die Teile folgen der
+# Größe der Gruppe.  Die Köpfe tragen anfangs A, B, C und 1, 2, 3 wie eine Tabelle (kurze
+# Platzhalter passen auch in schmale Köpfe), die Felder keinen Text.
+master: Matrix 3x3 with labels
+name.de: Matrix 3x3 mit Beschriftungen
+name.en: Matrix 3x3 with labels
+name.es: Matriz 3x3 con etiquetas
+name.it: Matrice 3x3 con etichette
+name.fr: Matrice 3x3 avec étiquettes
+prompt.de: Matrix aus neun Feldern mit Zeilen- und Spaltenköpfen. Klicken Sie ein Feld oder einen Kopf zweimal an, um den Text zu ändern.
+prompt.en: Matrix of nine fields with row and column headers. Click a field or a header twice to change its text.
+prompt.es: Matriz de nueve campos con encabezados de filas y columnas. Haga clic dos veces en un campo o un encabezado para cambiar el texto.
+prompt.it: Matrice di nove campi con intestazioni di righe e colonne. Fai clic due volte su un campo o un'intestazione per cambiarne il testo.
+prompt.fr: Matrice de neuf champs avec en-têtes de lignes et de colonnes. Cliquez deux fois sur un champ ou un en-tête pour modifier le texte.
+keywords.de: Matrix, 3x3, Beschriftung, Zeilen, Spalten, Tabelle, Kopfzeile
+keywords.en: matrix, 3x3, labels, rows, columns, table, header
+keywords.es: matriz, 3x3, etiquetas, filas, columnas, tabla, encabezado
+keywords.it: matrice, 3x3, etichette, righe, colonne, tabella, intestazione
+keywords.fr: matrice, 3x3, étiquettes, lignes, colonnes, tableau, en-tête
+
+[Shape]
+Width = 80 mm
+Width.us = 3 in
+Height = 60 mm
+Height.us = 2.25 in
+
+[User]
+# die Breite der Zeilenköpfe, die Höhe der Spaltenköpfe, die Fuge, Breite und Höhe eines Felds
+M:   Value = 10 mm
+     Value.us = 0.4 in
+T:   Value = 8 mm
+     Value.us = 0.3 in
+G:   Value = 1 mm
+     Value.us = 0.04 in
+CW:  Value = (Width-User.M-3*User.G)/3
+RH:  Value = (Height-User.T-3*User.G)/3
+
+[Connection]
+Row  X = User.M+(Width-User.M)*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = (Height-User.T)*0.5; DirX = -1; DirY = 0
+Row  X = User.M+(Width-User.M)*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = (Height-User.T)*0.5; DirX = 1; DirY = 0
+
+# die Spaltenköpfe
+[Part C1]
+text.de: A
+text.en: A
+text.es: A
+text.it: A
+text.fr: A
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.T)
+PinX = GUARD(Sheet.1!User.M+Sheet.1!User.G+Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part C2]
+text.de: B
+text.en: B
+text.es: B
+text.it: B
+text.fr: B
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.T)
+PinX = GUARD(Sheet.1!User.M+2*Sheet.1!User.G+Sheet.1!User.CW+Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part C3]
+text.de: C
+text.en: C
+text.es: C
+text.it: C
+text.fr: C
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.T)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# die Zeilenköpfe
+[Part R1]
+text.de: 1
+text.en: 1
+text.es: 1
+text.it: 1
+text.fr: 1
+
+[Shape]
+Width = GUARD(Sheet.1!User.M)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!Height-Sheet.1!User.T-Sheet.1!User.G-Height*0.5)
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part R2]
+text.de: 2
+text.en: 2
+text.es: 2
+text.it: 2
+text.fr: 2
+
+[Shape]
+Width = GUARD(Sheet.1!User.M)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!Height-Sheet.1!User.T-2*Sheet.1!User.G-Sheet.1!User.RH-Height*0.5)
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part R3]
+text.de: 3
+text.en: 3
+text.es: 3
+text.it: 3
+text.fr: 3
+
+[Shape]
+Width = GUARD(Sheet.1!User.M)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Height*0.5)
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# die Felder, zeilenweise
+[Part F1]
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Sheet.1!User.M+Sheet.1!User.G+Width*0.5)
+PinY = GUARD(Sheet.1!Height-Sheet.1!User.T-Sheet.1!User.G-Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F2]
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Sheet.1!User.M+2*Sheet.1!User.G+Sheet.1!User.CW+Width*0.5)
+PinY = GUARD(Sheet.1!Height-Sheet.1!User.T-Sheet.1!User.G-Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F3]
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!Height-Sheet.1!User.T-Sheet.1!User.G-Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F4]
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Sheet.1!User.M+Sheet.1!User.G+Width*0.5)
+PinY = GUARD(Sheet.1!Height-Sheet.1!User.T-2*Sheet.1!User.G-Sheet.1!User.RH-Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F5]
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Sheet.1!User.M+2*Sheet.1!User.G+Sheet.1!User.CW+Width*0.5)
+PinY = GUARD(Sheet.1!Height-Sheet.1!User.T-2*Sheet.1!User.G-Sheet.1!User.RH-Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F6]
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!Height-Sheet.1!User.T-2*Sheet.1!User.G-Sheet.1!User.RH-Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F7]
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Sheet.1!User.M+Sheet.1!User.G+Width*0.5)
+PinY = GUARD(Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F8]
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Sheet.1!User.M+2*Sheet.1!User.G+Sheet.1!User.CW+Width*0.5)
+PinY = GUARD(Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F9]
+
+[Shape]
+Width = GUARD(Sheet.1!User.CW)
+Height = GUARD(Sheet.1!User.RH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

@@ -1,0 +1,67 @@
+# Gefaltete Ecke (SH-003, JD26): ein Notizblatt, dessen rechte untere Ecke nach innen umgeknickt
+# ist.  Blatt und umgeknickter Lappen sind getrennte Flächen mit einer Fuge von 0,8 mm entlang
+# der beiden Kanten des Lappens (so bleibt der Knick auch in einem Design ohne Shape-Linien zu
+# sehen); das Blatt endet an der Knicklinie.  Row_1 an der linken Ecke des Lappens ändert die
+# Größe des Knicks (Abstand vom rechten Rand, nur waagrecht: der Knick bleibt beim Strecken
+# gleich groß).  Der Text steht auf dem Blatt.
+master: Folded corner
+name.de: Gefaltete Ecke
+name.en: Folded corner
+name.es: Esquina doblada
+name.it: Angolo piegato
+name.fr: Coin plié
+prompt.de: Notizblatt mit umgeknickter Ecke. Mit dem gelben Steuerpunkt ändern Sie die Größe des Knicks.
+prompt.en: Note sheet with a folded corner. Drag the yellow control handle to change the size of the fold.
+prompt.es: Hoja de nota con una esquina doblada. Arrastre el controlador amarillo para cambiar el tamaño del pliegue.
+prompt.it: Foglio per appunti con un angolo piegato. Trascina la maniglia di controllo gialla per cambiare la dimensione della piega.
+prompt.fr: Feuille de note avec un coin plié. Faites glisser la poignée de contrôle jaune pour modifier la taille du pli.
+keywords.de: Notiz, Notizzettel, Blatt, Eselsohr, Ecke, Knick, Hinweis, Dekor
+keywords.en: note, sticky note, sheet, dog-ear, corner, fold, remark, decoration
+keywords.es: nota, hoja, esquina, doblez, pliegue, aviso, decoración
+keywords.it: nota, foglio, orecchia, angolo, piega, avviso, decorazione
+keywords.fr: note, feuille, corne, coin, pli, remarque, décoration
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 30 mm
+Height.us = 1.125 in
+
+[User]
+# die Größe des Knicks (Schenkel des Lappens), die Fuge
+F:  Value = MIN(MAX(Width-Controls.Row_1, 2 mm), Width*0.5, Height*0.5)
+G:  Value = MIN(0.8 mm, User.F*0.15)
+
+# 1 das Blatt bis zur Knicklinie, ohne das Stück unter dem Lappen
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width-User.F-User.G; Y = 0
+LineTo  X = Width-User.F-User.G; Y = User.F+User.G
+LineTo  X = Width; Y = User.F+User.G
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# 2 der umgeknickte Lappen: rechtwinkliges Dreieck mit der Spitze nach innen
+[Geometry]
+MoveTo  X = Width-User.F; Y = 0
+LineTo  X = Width; Y = User.F
+LineTo  X = Width-User.F; Y = User.F
+LineTo  X = Width-User.F; Y = 0
+
+[Controls]
+Row_1:  X = Width-8 mm; Y = 0
+        X.us = Width-0.3 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Größe des Knicks ändern"
+        Tip.en = "Change the size of the fold"
+        Tip.es = "Cambiar el tamaño del pliegue"
+        Tip.it = "Cambia la dimensione della piega"
+        Tip.fr = "Modifier la taille du pli"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

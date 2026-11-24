@@ -52,6 +52,8 @@ const REL_THEME: &str = "http://schemas.openxmlformats.org/officeDocument/2006/r
 const REL_IMAGE: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
 const REL_WINDOWS: &str = "http://schemas.microsoft.com/visio/2010/relationships/windows";
 // relationship kinds whose source is the package itself
+// the macro project's relationship (Office's type)
+const REL_VBA: &str = "http://schemas.microsoft.com/office/2006/relationships/vbaProject";
 const PACKAGE_KINDS: [&str; 4] = [
     "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties",
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
@@ -456,7 +458,9 @@ impl<'d> Plan<'d> {
             }
             if PACKAGE_KINDS.contains(&kind) {
                 self.ensure("", &k, None, kind);
-            } else if kind.starts_with(VISIO_RELS) && !["page", "pages", "master", "masters", "document"].iter().any(|n| vsdx::rel_is(kind, n)) {
+            } else if (kind.starts_with(VISIO_RELS) && !["page", "pages", "master", "masters", "document"].iter().any(|n| vsdx::rel_is(kind, n))) || kind == REL_VBA {
+                // Visio's own kinds and the macro project (JD16: a .vdx's VBProjectData) hang on
+                // the main part
                 self.ensure(&main, &k, None, kind);
             }
         }

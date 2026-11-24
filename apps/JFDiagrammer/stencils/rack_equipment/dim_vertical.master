@@ -1,0 +1,96 @@
+# Bemaßung vertikal (JD15, SH-146): wie die horizontale Bemaßung (dim_horizontal.master), für den
+# senkrechten Abstand der Enden (Feld 0: ABS(Height)).  Die Maßlinie liegt senkrecht auf der x-Lage
+# des gelben Punkts (anfangs links von den Enden), der Text steht um 90° gedreht außen an ihr.
+master: Dimension - vertical
+name.de: Bemaßung - vertikal
+name.en: Dimension - vertical
+name.es: Cota - vertical
+name.it: Quota - verticale
+name.fr: Cote - verticale
+prompt.de: Bemaßung vertikal: zeigt den senkrechten Abstand zwischen ihren Enden. Ziehen Sie den gelben Punkt, um die Maßlinie zu verschieben.
+prompt.en: Vertical dimension: shows the vertical distance between its ends. Drag the yellow handle to move the dimension line.
+prompt.es: Cota vertical: muestra la distancia vertical entre sus extremos. Arrastre el punto amarillo para mover la línea de cota.
+prompt.it: Quota verticale: mostra la distanza verticale tra le sue estremità. Trascina il punto giallo per spostare la linea di quota.
+prompt.fr: Cote verticale : affiche la distance verticale entre ses extrémités. Faites glisser la poignée jaune pour déplacer la ligne de cote.
+keywords.de: Bemaßung, Maß, Maßkette, Höhe, Abstand, vertikal, Rack
+keywords.en: dimension, measure, height, distance, vertical, rack
+keywords.es: cota, medida, altura, distancia, vertical, rack
+keywords.it: quota, misura, altezza, distanza, verticale, rack
+keywords.fr: cote, mesure, hauteur, distance, verticale, baie
+text.de: {fld 0}
+text.en: {fld 0}
+text.es: {fld 0}
+text.it: {fld 0}
+text.fr: {fld 0}
+style: Connector
+scale: 1:20
+
+[Shape]
+BeginX = 250 mm
+BeginX.us = 10 in
+BeginY = 100 mm
+BeginY.us = 4 in
+EndX = 250 mm
+EndX.us = 10 in
+EndY = 1100 mm
+EndY.us = 44 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+Angle = GUARD(0DA)
+BeginArrow = 0
+EndArrow = 0
+TxtPinX = User.X
+TxtPinY = Height*0.5
+TxtWidth = MAX(ABS(Height), 20 mm*User.S)
+TxtHeight = 5 mm*User.S
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = 0 mm
+TxtAngle = 90 deg
+VerticalAlign = 2
+
+[User]
+# Zeichnungs- zu Papiermaß (1 auf einer Seite 1:1, 20 bei 1:20)
+S:   Value = ThePage!DrawingScale/ThePage!PageScale
+# Länge und halbe Breite der Pfeilspitzen, Überstand der Hilfslinien über die Maßlinie
+L:   Value = 3 mm*User.S
+     Value.us = 0.12 in*User.S
+Aw:  Value = 1 mm*User.S
+     Value.us = 0.04 in*User.S
+Ov:  Value = 2 mm*User.S
+     Value.us = 0.08 in*User.S
+# 1, wenn das Ende über dem Anfang liegt, sonst -1 (die Pfeile zeigen nach außen auf die Hilfslinien)
+D:   Value = IF(Height<0,-1,1)
+# die x-Lage der Maßlinie im Kasten (der gelbe Punkt)
+X:   Value = Controls.Line
+
+[Controls]
+Line: X = -6 mm*User.S; Y = Height*0.5
+      X.us = -0.25 in*User.S
+      XDyn = Controls.Line; YDyn = Controls.Line.Y
+      XCon = 2; YCon = 1; CanGlue = FALSE
+      Tip.de = "Maßlinie verschieben"
+      Tip.en = "Move the dimension line"
+      Tip.es = "Mover la línea de cota"
+      Tip.it = "Sposta la linea di quota"
+      Tip.fr = "Déplacer la ligne de cote"
+
+[Field]
+Row  Value = ABS(Height); Unit = mm; Format = "0 u"; Type = 2
+     Unit.us = in
+     Format.us = "0.## u"
+
+# Maßlinie, Pfeile an beiden Enden, Hilfslinien zu Anfang und Ende
+[Geometry]
+NoFill = TRUE
+MoveTo  X = User.X; Y = 0
+LineTo  X = User.X; Y = Height
+MoveTo  X = User.X+User.Aw; Y = User.D*User.L
+LineTo  X = User.X; Y = 0
+LineTo  X = User.X-User.Aw; Y = User.D*User.L
+MoveTo  X = User.X+User.Aw; Y = Height-User.D*User.L
+LineTo  X = User.X; Y = Height
+LineTo  X = User.X-User.Aw; Y = Height-User.D*User.L
+MoveTo  X = 0; Y = 0
+LineTo  X = User.X+User.Ov*IF(User.X<0,-1,1); Y = 0
+MoveTo  X = Width; Y = Height
+LineTo  X = User.X+User.Ov*IF(User.X<Width,-1,1); Y = Height

@@ -1,0 +1,55 @@
+# Zusätzliche Stufe (SH-030, JD26): eine einzelne Stufe zum Anfügen an das Stufendiagramm
+# (step_chart), mit dessen Maßen: 18 mm breit mit 1 mm Fuge (je 0,5 mm links und rechts, so dass
+# sie bündig angelegt dieselbe Fuge zur letzten Stufe hat), 50 mm hoch = die fünfte Stufe des
+# Stufendiagramms in Grundgröße (vier Stufen auf 40 mm).  Ein einfaches Shape mit Text.
+master: Additional step
+name.de: Zusätzliche Stufe
+name.en: Additional step
+name.es: Escalón adicional
+name.it: Gradino aggiuntivo
+name.fr: Marche supplémentaire
+text.de: Stufe
+text.en: Step
+text.es: Paso
+text.it: Passo
+text.fr: Étape
+prompt.de: Einzelne Stufe zum Anfügen an das Stufendiagramm. Legen Sie sie rechts an die letzte Stufe; die Höhe ändern Sie mit dem Ziehpunkt oben.
+prompt.en: Single step to add to the step chart. Place it to the right of the last step; change its height with the top selection handle.
+prompt.es: Escalón suelto para añadir al diagrama de escalones. Colóquelo a la derecha del último escalón; cambie su altura con el controlador superior.
+prompt.it: Gradino singolo da aggiungere al diagramma a gradini. Mettilo a destra dell'ultimo gradino; cambia l'altezza con la maniglia in alto.
+prompt.fr: Marche seule à ajouter au diagramme en escalier. Placez-la à droite de la dernière marche ; modifiez sa hauteur avec la poignée du haut.
+keywords.de: Stufe, Treppe, Stufendiagramm, Erweiterung, Entwicklung, Fortschritt
+keywords.en: step, staircase, step chart, extension, progression, progress
+keywords.es: escalón, escalera, diagrama de escalones, ampliación, progresión, progreso
+keywords.it: gradino, scala, diagramma a gradini, estensione, progressione, progresso
+keywords.fr: marche, escalier, diagramme en escalier, extension, progression, progrès
+
+[Shape]
+Width = 18 mm
+Width.us = 0.75 in
+Height = 50 mm
+Height.us = 1.875 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Width-User.Gp
+TxtHeight = Height
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Fuge zur Nachbarstufe (sichtbar auch in Designs ohne Shape-Linien)
+Gp:  Value = 1 mm
+     Value.us = 0.04 in
+
+[Geometry]
+MoveTo  X = User.Gp*0.5; Y = 0
+LineTo  X = Width-User.Gp*0.5; Y = 0
+LineTo  X = Width-User.Gp*0.5; Y = Height
+LineTo  X = User.Gp*0.5; Y = Height
+LineTo  X = User.Gp*0.5; Y = 0
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width-User.Gp*0.5; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = User.Gp*0.5; Y = Height*0.5; DirX = 1; DirY = 0

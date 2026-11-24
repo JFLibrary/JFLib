@@ -171,7 +171,7 @@ pub(crate) fn available(app: &Diagrammer, id: u32) -> bool {
 
 /// "<prefix>-n" in the UI's language and "<universal>-n" with the smallest n no page has as
 /// Name or NameU (prefix: the German source, "Seite" or "Hintergrund")
-fn free_names(doc: &Document, background: bool) -> (String, String) {
+pub(crate) fn free_names(doc: &Document, background: bool) -> (String, String) {
     let used = |s: &str| doc.pages().any(|p| doc.page(p).is_some_and(|pg| [pg.header.name, pg.header.name_u].iter().flatten().any(|n| doc.str(*n).eq_ignore_ascii_case(s))));
     for n in 1..100_000u32 {
         let num = format!("{n}");

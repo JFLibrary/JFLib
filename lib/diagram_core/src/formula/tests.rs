@@ -1219,7 +1219,6 @@ fn not_computed_functions_are_kept() {
     let cases = [
         (r#"FORMAT(1,"0.0")"#, Keep::NotComputed("FORMAT")),
         ("_WALKGLUE(1)", Keep::NotComputed("_WALKGLUE")),
-        ("RAND()", Keep::NotComputed("RAND")),
         (r#"FONT("Calibri")"#, Keep::NotComputed("FONT")),
         ("Reviewer.X1", Keep::Reference),
         ("Reviewer.X1+FOO()", Keep::Unknown(String::from("FOO"))),
@@ -1393,7 +1392,7 @@ fn master_sheet_ids_map_to_the_instance() {
 
 #[test]
 fn unknown_functions_and_parse_errors_keep_the_value() {
-    let (mut doc, sh) = one(&[("U", "FOO(1)+2", 42.0), ("V", "User.U+1", 0.0), ("P", "1+", 7.0), ("R", "RAND()", 0.5)]);
+    let (mut doc, sh) = one(&[("U", "FOO(1)+2", 42.0), ("V", "User.U+1", 0.0), ("P", "1+", 7.0), ("R", "_WALKGLUE(1)", 0.5)]);
     let (u, v, p, r) = (user_addr(&doc, "U"), user_addr(&doc, "V"), user_addr(&doc, "P"), user_addr(&doc, "R"));
     let mut eng = Engine::new();
     let res = eng.calculate(&doc);
@@ -1404,7 +1403,7 @@ fn unknown_functions_and_parse_errors_keep_the_value() {
         res.get(sh, &p),
         Some(&Outcome::Kept(Keep::Parse(ParseError { pos: 2, kind: ParseErrorKind::UnexpectedEnd })))
     );
-    assert_eq!(res.get(sh, &r), Some(&Outcome::Kept(Keep::NotComputed("RAND"))));
+    assert_eq!(res.get(sh, &r), Some(&Outcome::Kept(Keep::NotComputed("_WALKGLUE"))));
     let mut tx = doc.transaction("Berechnen");
     assert_eq!(res.write(&mut tx).unwrap(), 1);
     tx.commit();
@@ -1413,6 +1412,42 @@ fn unknown_functions_and_parse_errors_keep_the_value() {
         assert_eq!(c.num(), Some(want));
         assert_eq!(c.error(), None);
     }
+}
+
+// (JD15, FX-06) RAND: 0 <= x < 1, the same numbers from the same seed, a new number each time
+// the formula is computed, arguments refused; in a sheet it is computed with the others
+#[test]
+fn rand_with_a_fixed_seed() {
+    let (mut doc, sh) = one(&[("R", "RAND()", 7.0), ("S", "INT(User.R*6)+1", 0.0)]);
+    let draw = |seed: u64| -> Vec<f64> {
+        let mut e = Engine::with_seed(seed);
+        (0..8)
+            .map(|_| match e.evaluate_text(&doc, sh, &probe(), "RAND()") {
+                Ok(Outcome::Value(Val::Num(x))) => x,
+                o => panic!("{o:?}"),
+            })
+            .collect()
+    };
+    let a = draw(42);
+    assert_eq!(a, draw(42), "the same seed, the same numbers");
+    assert_ne!(a, draw(43));
+    assert!(a.iter().all(|x| (0.0..1.0).contains(x)), "{a:?}");
+    assert!(a.windows(2).all(|w| w[0] != w[1]), "{a:?}");
+    assert_eq!(Engine::new().evaluate_text(&doc, sh, &probe(), "RAND(1)"), Ok(Outcome::Value(Val::Err(CellError::Value))));
+    // a die from a sheet's cells
+    let (r, s) = (user_addr(&doc, "R"), user_addr(&doc, "S"));
+    let mut eng = Engine::with_seed(7);
+    let res = eng.calculate(&doc);
+    let x = match res.get(sh, &r) {
+        Some(Outcome::Value(Val::Num(x))) => *x,
+        o => panic!("{o:?}"),
+    };
+    assert!((0.0..1.0).contains(&x));
+    let mut tx = doc.transaction("Berechnen");
+    res.write(&mut tx).unwrap();
+    tx.commit();
+    let die = doc.resolve(sh, &s).num().unwrap();
+    assert!(die == (x * 6.0) as i64 as f64 + 1.0 && (1.0..=6.0).contains(&die), "{x} -> {die}");
 }
 
 #[test]

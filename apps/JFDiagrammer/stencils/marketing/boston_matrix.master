@@ -1,0 +1,345 @@
+# Boston-Matrix (SH-030, JD26): die Portfolio-Matrix der Boston Consulting Group als Gruppe.  Vier
+# Felder mit 2 mm Abstand und je einer Variantenfarbe des Designs (Schnellformatvorlage 100 bis
+# 103), in der üblichen Lage: oben links Stars, oben rechts Fragezeichen, unten links Melkkühe,
+# unten rechts Arme Hunde (je Sprache die dort üblichen Begriffe).  Waagrecht der relative
+# Marktanteil (links hoch, rechts niedrig, wie in der Boston-Matrix üblich), senkrecht das
+# Marktwachstum (unten niedrig, oben hoch).  Spalten- und Zeilentexte sowie die Achsentitel sind
+# Teile in der Formatvorlage Text Only (dunkler Text in allen Designs), die senkrechten um 90°
+# gedreht.  Alle Teile folgen der Größe der Gruppe.
+master: Boston matrix
+name.de: Boston-Matrix
+name.en: Boston matrix
+name.es: Matriz BCG
+name.it: Matrice BCG
+name.fr: Matrice BCG
+prompt.de: Portfolio-Matrix nach der Boston Consulting Group mit relativem Marktanteil und Marktwachstum. Klicken Sie ein Feld oder eine Beschriftung zweimal an, um den Text zu ändern.
+prompt.en: Boston Consulting Group portfolio matrix with relative market share and market growth. Click a field or a label twice to change its text.
+prompt.es: Matriz de cartera del Boston Consulting Group con cuota de mercado relativa y crecimiento del mercado. Haga clic dos veces en un campo o una etiqueta para cambiar el texto.
+prompt.it: Matrice di portafoglio del Boston Consulting Group con quota di mercato relativa e crescita del mercato. Fai clic due volte su un campo o un'etichetta per cambiarne il testo.
+prompt.fr: Matrice de portefeuille du Boston Consulting Group avec part de marché relative et croissance du marché. Cliquez deux fois sur un champ ou une étiquette pour modifier le texte.
+keywords.de: Boston-Matrix, BCG, Portfolio, Marktanteil, Marktwachstum, Stars, Melkkühe, Fragezeichen
+keywords.en: Boston matrix, BCG, portfolio, market share, market growth, stars, cash cows, question marks
+keywords.es: matriz BCG, Boston, cartera, cuota de mercado, crecimiento, estrellas, vacas lecheras, interrogantes
+keywords.it: matrice BCG, Boston, portafoglio, quota di mercato, crescita, stelle, vacche da mungere
+keywords.fr: matrice BCG, Boston, portefeuille, part de marché, croissance, vedettes, vaches à lait, dilemmes
+
+[Shape]
+Width = 110 mm
+Width.us = 4.25 in
+Height = 80 mm
+Height.us = 3 in
+
+[User]
+# die Ränder links und unten für die Beschriftungen, der Abstand der Felder, Breite und Höhe
+# eines Felds
+ML:  Value = 16 mm
+     Value.us = 0.6 in
+MB:  Value = 14 mm
+     Value.us = 0.55 in
+G:   Value = 2 mm
+     Value.us = 0.08 in
+QW:  Value = (Width-User.ML-User.G)*0.5
+QH:  Value = (Height-User.MB-User.G)*0.5
+
+[Connection]
+Row  X = User.ML+(Width-User.ML)*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = User.MB+(Height-User.MB)*0.5; DirX = -1; DirY = 0
+Row  X = User.ML+(Width-User.ML)*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.MB+(Height-User.MB)*0.5; DirX = 1; DirY = 0
+
+[Part Q1]
+text.de: Stars
+text.en: Stars
+text.es: Estrellas
+text.it: Stelle
+text.fr: Vedettes
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!User.ML+Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Q2]
+text.de: Fragezeichen
+text.en: Question marks
+text.es: Interrogantes
+text.it: Punti interrogativi
+text.fr: Dilemmes
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Q3]
+text.de: Melkkühe
+text.en: Cash cows
+text.es: Vacas lecheras
+text.it: Vacche da mungere
+text.fr: Vaches à lait
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!User.ML+Width*0.5)
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Q4]
+text.de: Arme Hunde
+text.en: Dogs
+text.es: Perros
+text.it: Cani
+text.fr: Poids morts
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# die Spaltentexte unter den Feldern, darunter der Titel der waagrechten Achse
+[Part XL1]
+text.de: hoch
+text.en: high
+text.es: alta
+text.it: alta
+text.fr: élevée
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.MB*0.5)
+PinX = GUARD(Sheet.1!User.ML+Width*0.5)
+PinY = GUARD(Sheet.1!User.MB*0.75)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part XL2]
+text.de: niedrig
+text.en: low
+text.es: baja
+text.it: bassa
+text.fr: faible
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.MB*0.5)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!User.MB*0.75)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part XT]
+text.de: Relativer Marktanteil
+text.en: Relative market share
+text.es: Cuota de mercado relativa
+text.it: Quota di mercato relativa
+text.fr: Part de marché relative
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!Width-Sheet.1!User.ML)
+Height = GUARD(Sheet.1!User.MB*0.5)
+PinX = GUARD(Sheet.1!User.ML+Width*0.5)
+PinY = GUARD(Sheet.1!User.MB*0.25)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# die Zeilentexte links der Felder, links davon der Titel der senkrechten Achse (um 90° gedreht)
+[Part YL1]
+text.de: niedrig
+text.en: low
+text.es: bajo
+text.it: bassa
+text.fr: faible
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.ML*0.5)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!User.ML*0.75)
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Height
+TxtHeight = Width
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = 90 deg
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part YL2]
+text.de: hoch
+text.en: high
+text.es: alto
+text.it: alta
+text.fr: élevée
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.ML*0.5)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!User.ML*0.75)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Height
+TxtHeight = Width
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = 90 deg
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part YT]
+text.de: Marktwachstum
+text.en: Market growth
+text.es: Crecimiento del mercado
+text.it: Crescita del mercato
+text.fr: Croissance du marché
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.ML*0.5)
+Height = GUARD(Sheet.1!Height-Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!User.ML*0.25)
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Height
+TxtHeight = Width
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = 90 deg
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

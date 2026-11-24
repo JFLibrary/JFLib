@@ -1,0 +1,147 @@
+# Trichter (SH-032, JD26): ein Trichter aus zwei bis sechs Stufen, die nach unten schmaler werden,
+# und einem Auslauf an der letzten; jede Stufe eine eigene Fläche mit 1 mm Fuge zur nächsten
+# (sichtbar auch in Designs ohne Shape-Linien), Stufen über der Zahl verborgen.  Die Zahl steht in den Shape-Daten
+# (Prop.Levels); Row_1 am oberen Rand rechts ändert sie beim Ziehen nach oben oder unten: jede
+# Stufe ist User.LH hoch, der Auslauf 0,6 Stufen, die Höhe folgt (Ziehen vermehrt die Stufen);
+# zieht man die Höhe selbst, schickt SETATREF die neue Stufenhöhe nach User.LH.  Ein Text in der
+# obersten Stufe.  Gezeichnet wird nach Height/(N+0,6) (User.H1), damit die Stufen auch passen,
+# wenn jemand die Höhe ohne SETATREF setzt.
+master: Funnel
+name.de: Trichter
+name.en: Funnel
+name.es: Embudo
+name.it: Imbuto
+name.fr: Entonnoir
+prompt.de: Trichter für Filter- und Verkaufsstufen. Ziehen Sie den gelben Steuerpunkt nach oben oder unten, um Stufen hinzuzufügen oder zu entfernen.
+prompt.en: Funnel for filter and sales stages. Drag the yellow control handle up or down to add or remove stages.
+prompt.es: Embudo para etapas de filtrado y de ventas. Arrastre el controlador amarillo hacia arriba o hacia abajo para agregar o quitar etapas.
+prompt.it: Imbuto per fasi di filtro e di vendita. Trascina la maniglia di controllo gialla in alto o in basso per aggiungere o togliere fasi.
+prompt.fr: Entonnoir pour les étapes de filtrage et de vente. Faites glisser la poignée de contrôle jaune vers le haut ou le bas pour ajouter ou supprimer des étapes.
+keywords.de: Trichter, Verkaufstrichter, Filter, Stufen, Funnel, Konversion, Auswahl
+keywords.en: funnel, sales funnel, filter, stages, conversion, selection
+keywords.es: embudo, embudo de ventas, filtro, etapas, conversión, selección
+keywords.it: imbuto, funnel di vendita, filtro, fasi, conversione, selezione
+keywords.fr: entonnoir, tunnel de vente, filtre, étapes, conversion, sélection
+
+[Shape]
+Width = 50 mm
+Width.us = 2 in
+Height = SETATREF(User.LH,SETATREFEVAL(SETATREFEXPR()/(User.N+0.6)))*(User.N+0.6)
+TxtPinX = Width*0.5
+TxtPinY = Height-User.H1*0.5
+TxtWidth = Width*0.7
+TxtHeight = User.H1
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Zahl der Stufen (2 bis 6), die Höhe einer Stufe (gespeichert und wie gezeichnet), die Höhe
+# des Auslaufs, die halbe Breite des Auslaufs, die Steigung der Seiten (Einzug je Höhe)
+N:   Value = MIN(MAX(ROUND(Prop.Levels,0),2),6)
+LH:  Value = 10 mm
+     Value.us = 0.4 in
+H1:  Value = Height/(User.N+0.6)
+Sh:  Value = User.H1*0.6
+Nw:  Value = Width*0.1
+K:   Value = (Width*0.5-User.Nw)/(Height-User.Sh)
+Gp:  Value = MIN(1 mm, User.H1*0.1)
+
+[Property]
+Levels:  Type = 2; Format = "0"; Value = 3
+         Label.de = Stufen
+         Label.en = Stages
+         Label.es = Etapas
+         Label.it = Fasi
+         Label.fr = Étapes
+         Prompt.de = Anzahl der Stufen (2 bis 6)
+         Prompt.en = Number of stages (2 to 6)
+         Prompt.es = Número de etapas (de 2 a 6)
+         Prompt.it = Numero di fasi (da 2 a 6)
+         Prompt.fr = Nombre d'étapes (de 2 à 6)
+
+# je Stufe k (von oben): Oberkante, Unterkante (die letzte mit dem Auslauf bis 0)
+[Geometry]
+MoveTo  X = 0*User.K; Y = Height
+LineTo  X = IF(User.N=1,Height-User.Sh,1*User.H1-User.Gp*0.5)*User.K; Y = IF(User.N=1,User.Sh,Height-1*User.H1+User.Gp*0.5)
+LineTo  X = Width*0.5-User.Nw; Y = IF(User.N=1,User.Sh,Height-1*User.H1+User.Gp*0.5)
+LineTo  X = Width*0.5-User.Nw; Y = IF(User.N=1,0,IF(User.N=1,User.Sh,Height-1*User.H1+User.Gp*0.5))
+LineTo  X = Width*0.5+User.Nw; Y = IF(User.N=1,0,IF(User.N=1,User.Sh,Height-1*User.H1+User.Gp*0.5))
+LineTo  X = Width*0.5+User.Nw; Y = IF(User.N=1,User.Sh,Height-1*User.H1+User.Gp*0.5)
+LineTo  X = Width-IF(User.N=1,Height-User.Sh,1*User.H1-User.Gp*0.5)*User.K; Y = IF(User.N=1,User.Sh,Height-1*User.H1+User.Gp*0.5)
+LineTo  X = Width-0*User.K; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Geometry]
+MoveTo  X = (1*User.H1+User.Gp*0.5)*User.K; Y = Height-1*User.H1-User.Gp*0.5
+LineTo  X = IF(User.N=2,Height-User.Sh,2*User.H1-User.Gp*0.5)*User.K; Y = IF(User.N=2,User.Sh,Height-2*User.H1+User.Gp*0.5)
+LineTo  X = Width*0.5-User.Nw; Y = IF(User.N=2,User.Sh,Height-2*User.H1+User.Gp*0.5)
+LineTo  X = Width*0.5-User.Nw; Y = IF(User.N=2,0,IF(User.N=2,User.Sh,Height-2*User.H1+User.Gp*0.5))
+LineTo  X = Width*0.5+User.Nw; Y = IF(User.N=2,0,IF(User.N=2,User.Sh,Height-2*User.H1+User.Gp*0.5))
+LineTo  X = Width*0.5+User.Nw; Y = IF(User.N=2,User.Sh,Height-2*User.H1+User.Gp*0.5)
+LineTo  X = Width-IF(User.N=2,Height-User.Sh,2*User.H1-User.Gp*0.5)*User.K; Y = IF(User.N=2,User.Sh,Height-2*User.H1+User.Gp*0.5)
+LineTo  X = Width-(1*User.H1+User.Gp*0.5)*User.K; Y = Height-1*User.H1-User.Gp*0.5
+LineTo  X = Geometry2.X1; Y = Geometry2.Y1
+
+[Geometry]
+NoShow = User.N<3
+MoveTo  X = (2*User.H1+User.Gp*0.5)*User.K; Y = Height-2*User.H1-User.Gp*0.5
+LineTo  X = IF(User.N=3,Height-User.Sh,3*User.H1-User.Gp*0.5)*User.K; Y = IF(User.N=3,User.Sh,Height-3*User.H1+User.Gp*0.5)
+LineTo  X = Width*0.5-User.Nw; Y = IF(User.N=3,User.Sh,Height-3*User.H1+User.Gp*0.5)
+LineTo  X = Width*0.5-User.Nw; Y = IF(User.N=3,0,IF(User.N=3,User.Sh,Height-3*User.H1+User.Gp*0.5))
+LineTo  X = Width*0.5+User.Nw; Y = IF(User.N=3,0,IF(User.N=3,User.Sh,Height-3*User.H1+User.Gp*0.5))
+LineTo  X = Width*0.5+User.Nw; Y = IF(User.N=3,User.Sh,Height-3*User.H1+User.Gp*0.5)
+LineTo  X = Width-IF(User.N=3,Height-User.Sh,3*User.H1-User.Gp*0.5)*User.K; Y = IF(User.N=3,User.Sh,Height-3*User.H1+User.Gp*0.5)
+LineTo  X = Width-(2*User.H1+User.Gp*0.5)*User.K; Y = Height-2*User.H1-User.Gp*0.5
+LineTo  X = Geometry3.X1; Y = Geometry3.Y1
+
+[Geometry]
+NoShow = User.N<4
+MoveTo  X = (3*User.H1+User.Gp*0.5)*User.K; Y = Height-3*User.H1-User.Gp*0.5
+LineTo  X = IF(User.N=4,Height-User.Sh,4*User.H1-User.Gp*0.5)*User.K; Y = IF(User.N=4,User.Sh,Height-4*User.H1+User.Gp*0.5)
+LineTo  X = Width*0.5-User.Nw; Y = IF(User.N=4,User.Sh,Height-4*User.H1+User.Gp*0.5)
+LineTo  X = Width*0.5-User.Nw; Y = IF(User.N=4,0,IF(User.N=4,User.Sh,Height-4*User.H1+User.Gp*0.5))
+LineTo  X = Width*0.5+User.Nw; Y = IF(User.N=4,0,IF(User.N=4,User.Sh,Height-4*User.H1+User.Gp*0.5))
+LineTo  X = Width*0.5+User.Nw; Y = IF(User.N=4,User.Sh,Height-4*User.H1+User.Gp*0.5)
+LineTo  X = Width-IF(User.N=4,Height-User.Sh,4*User.H1-User.Gp*0.5)*User.K; Y = IF(User.N=4,User.Sh,Height-4*User.H1+User.Gp*0.5)
+LineTo  X = Width-(3*User.H1+User.Gp*0.5)*User.K; Y = Height-3*User.H1-User.Gp*0.5
+LineTo  X = Geometry4.X1; Y = Geometry4.Y1
+
+[Geometry]
+NoShow = User.N<5
+MoveTo  X = (4*User.H1+User.Gp*0.5)*User.K; Y = Height-4*User.H1-User.Gp*0.5
+LineTo  X = IF(User.N=5,Height-User.Sh,5*User.H1-User.Gp*0.5)*User.K; Y = IF(User.N=5,User.Sh,Height-5*User.H1+User.Gp*0.5)
+LineTo  X = Width*0.5-User.Nw; Y = IF(User.N=5,User.Sh,Height-5*User.H1+User.Gp*0.5)
+LineTo  X = Width*0.5-User.Nw; Y = IF(User.N=5,0,IF(User.N=5,User.Sh,Height-5*User.H1+User.Gp*0.5))
+LineTo  X = Width*0.5+User.Nw; Y = IF(User.N=5,0,IF(User.N=5,User.Sh,Height-5*User.H1+User.Gp*0.5))
+LineTo  X = Width*0.5+User.Nw; Y = IF(User.N=5,User.Sh,Height-5*User.H1+User.Gp*0.5)
+LineTo  X = Width-IF(User.N=5,Height-User.Sh,5*User.H1-User.Gp*0.5)*User.K; Y = IF(User.N=5,User.Sh,Height-5*User.H1+User.Gp*0.5)
+LineTo  X = Width-(4*User.H1+User.Gp*0.5)*User.K; Y = Height-4*User.H1-User.Gp*0.5
+LineTo  X = Geometry5.X1; Y = Geometry5.Y1
+
+[Geometry]
+NoShow = User.N<6
+MoveTo  X = (5*User.H1+User.Gp*0.5)*User.K; Y = Height-5*User.H1-User.Gp*0.5
+LineTo  X = IF(User.N=6,Height-User.Sh,6*User.H1-User.Gp*0.5)*User.K; Y = IF(User.N=6,User.Sh,Height-6*User.H1+User.Gp*0.5)
+LineTo  X = Width*0.5-User.Nw; Y = IF(User.N=6,User.Sh,Height-6*User.H1+User.Gp*0.5)
+LineTo  X = Width*0.5-User.Nw; Y = IF(User.N=6,0,IF(User.N=6,User.Sh,Height-6*User.H1+User.Gp*0.5))
+LineTo  X = Width*0.5+User.Nw; Y = IF(User.N=6,0,IF(User.N=6,User.Sh,Height-6*User.H1+User.Gp*0.5))
+LineTo  X = Width*0.5+User.Nw; Y = IF(User.N=6,User.Sh,Height-6*User.H1+User.Gp*0.5)
+LineTo  X = Width-IF(User.N=6,Height-User.Sh,6*User.H1-User.Gp*0.5)*User.K; Y = IF(User.N=6,User.Sh,Height-6*User.H1+User.Gp*0.5)
+LineTo  X = Width-(5*User.H1+User.Gp*0.5)*User.K; Y = Height-5*User.H1-User.Gp*0.5
+LineTo  X = Geometry6.X1; Y = Geometry6.Y1
+
+[Controls]
+Row_1:  X = Width; Y = SETATREF(Prop.Levels,SETATREFEVAL(MIN(MAX(ROUND(SETATREFEXPR()/User.LH-0.6,0),2),6)))*User.LH+User.LH*0.6
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Stufen hinzufügen oder entfernen"
+        Tip.en = "Add or remove stages"
+        Tip.es = "Agregar o quitar etapas"
+        Tip.it = "Aggiungi o togli fasi"
+        Tip.fr = "Ajouter ou supprimer des étapes"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width-User.H1*User.K; Y = Height-User.H1*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = User.H1*User.K; Y = Height-User.H1*0.5; DirX = 1; DirY = 0

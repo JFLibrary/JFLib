@@ -1,0 +1,101 @@
+#!args apps/JFDiagrammer/tests/jd18-link.vsdx --no-system-fonts
+# JFDiagrammer, JD18: Daten › Alle aktualisieren with conflicts (RD-03, DA-05) -- jd18-link.vsdx
+# (diagramiotest --write-link-fixture) caches four rows of „Geräte“; its text file
+# jd18-link.csv has another address for Server A, another place for Server B, no Drucker, a new
+# Switch.  The rows are linked by the boxes' text (Daten verknüpfen), the user types a place of
+# his own for Server B.  The file was not chosen in this run (fs.user): the question, the file
+# dialog at the connection's path, then the refresh: the address follows, Switch is linked by
+# the wizard's comparison (Nach Aktualisierung automatisch verknüpfen), the pane
+# Aktualisierungskonflikte shows the row gone and the user's value; resolved there (with undo).
+# Aktualisierung konfigurieren: every minute -- the interval refreshes by itself, Daten
+# aktualisieren... refreshes the source chosen
+wait 100
+cmd 6413
+click button:"Weiter"
+click button:"Fertig stellen"
+expect text:"4 Shapes wurden verknüpft." exists
+click button:"Schließen"
+# the user's own place for Server B
+click listitem:"Server B"
+cmd 5139
+expect #20792 text "Raum 2"
+click #20792
+key ctrl+a
+type "Lager"
+key enter
+expect #20792 text "Lager"
+# the text file must be chosen first
+cmd 6402
+expect dialog:"Datenquelle suchen" exists
+expect text:"„jd18-link.csv“ wurde in dieser Sitzung noch nicht geöffnet. Wählen Sie die Datei aus, damit die Daten von „Geräte“ aktualisiert werden." exists
+click button:"Durchsuchen…"
+expect dialog:"Öffnen" exists
+expect text:"jd18-link.csv" exists
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+a11y expect announced "„Geräte“ aktualisiert: 2 geänderte, 1 neue, 1 entfernte Zeilen. 1 Shape neu verknüpft. 2 Konflikte."
+# the conflicts
+expect tab:"Aktualisierungskonflikte" selected
+expect link:"Drucker" exists
+expect text:"Die Zeile fehlt in „Geräte“." exists
+expect link:"Server B" exists
+expect text:"Standort: Ihr Wert „Lager“, in der Datenquelle „Raum 3“." exists
+# a click on the shape selects it
+click link:"Drucker"
+expect button:"Breite: 51 mm  Höhe: 25 mm  Winkel: 0°" exists
+# the user's value stayed, the address changed, Switch is linked now
+click tab:"Shape-Daten"
+click listitem:"Server B"
+expect #20792 text "Lager"
+click listitem:"Server A"
+expect #20788 text "10.0.0.11"
+click listitem:"Switch"
+expect #20788 text "10.0.0.253"
+click listitem:"Firewall"
+expect text:"Das Shape hat keine Shape-Daten." exists
+# resolved: the data's value for Server B, Drucker unlinked
+cmd 6422
+expect tab:"Aktualisierungskonflikte" selected
+click button:"Datenwert übernehmen"
+expect text:"Standort: Ihr Wert „Lager“, in der Datenquelle „Raum 3“." missing
+click button:"Verknüpfung aufheben"
+expect text:"Keine Konflikte" exists
+# undo brings the row gone back, then the user's value
+key ctrl+z
+expect link:"Drucker" exists
+expect link:"Server B" missing
+key ctrl+z
+expect link:"Server B" exists
+key ctrl+y
+key ctrl+y
+expect text:"Keine Konflikte" exists
+click tab:"Shape-Daten"
+click listitem:"Server B"
+expect #20792 text "Raum 3"
+# Drucker keeps its last values, no longer linked
+click listitem:"Drucker"
+expect #20788 text "10.0.0.50"
+# every minute: the source is readable in this run now, the interval refreshes it by itself
+cmd 6421
+expect dialog:"Aktualisierung konfigurieren" exists
+expect checkbox:"Aktualisieren alle" unchecked
+click checkbox:"Aktualisieren alle"
+click #2084569092
+key ctrl+a
+type "1"
+click button:"OK"
+expect dialog:"Aktualisierung konfigurieren" missing
+a11y expect announced none
+wait 30000
+a11y expect announced none
+wait 31000
+a11y expect announced "„Geräte“ aktualisiert: 0 geänderte, 0 neue, 0 entfernte Zeilen."
+# Daten aktualisieren...: the source chosen
+cmd 6403
+expect dialog:"Daten aktualisieren" exists
+click button:"Aktualisieren"
+expect dialog:"Daten aktualisieren" exists
+expect text:"„Geräte“ aktualisiert: 0 geänderte, 0 neue, 0 entfernte Zeilen." exists
+click button:"Schließen"
+expect dialog:"Daten aktualisieren" missing
+shot build/JFDiagrammer-data-refresh.png

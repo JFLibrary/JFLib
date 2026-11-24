@@ -10,7 +10,9 @@
 //                               (ShapePlowCode), fixed codes (ShapeFixedCode: do not move in a
 //                               layout 1, ignore connection points 0x20)
 //   load(app, page) / tab(app, ui) / apply(app, page, tx)   the register Layout und Routing of
-//                               Seite einrichten: routing style (RouteStyle), line jumps
+//                               Seite einrichten: (JD15) the placement style and direction
+//                               (PlaceStyle: place_code / place_split), its depth (PlaceDepth)
+//                               and flipping (PlaceFlip), routing style (RouteStyle), line jumps
 //                               (LineJumpCode, LineJumpStyle), the space between shapes
 //                               (AvenueSizeX/Y), the space between lines and shapes
 //                               (LineToNodeX/Y), move shapes away on drop (PlowCode), split
@@ -63,6 +65,13 @@ pub(crate) struct LayoutState {
     pub node: i32,
     pub page_plow: i32,
     pub split: i32,
+    /// (JD15, PG-11) the page's placement: style and direction (PlaceStyle, as read: the code
+    /// stays when neither changes), depth (PlaceDepth), flipping (PlaceFlip)
+    pub place_style: i32,
+    pub place_dir: i32,
+    pub place_code: i32,
+    pub place_depth: i32,
+    pub place_flip: i32,
 }
 
 impl Default for LayoutState {
@@ -83,7 +92,55 @@ impl Default for LayoutState {
             node: 25,
             page_plow: 0,
             split: 0,
+            place_style: 0,
+            place_dir: 0,
+            place_code: 0,
+            place_depth: 0,
+            place_flip: 0,
         }
+    }
+}
+
+/// (JD15, PG-11) the placement styles of the register (Visio's Configure Layout: Flowchart,
+/// Compact Tree, Hierarchy, Radial, Circular) and the directions
+// i18n
+static PLACE_STYLES: [&str; 6] = ["Standard|Routing", "Flussdiagramm", "Kompakte Struktur", "Hierarchie", "Radial", "Kreisförmig"];
+// i18n
+static PLACE_DIRS: [&str; 4] = ["Von oben nach unten", "Von unten nach oben", "Von links nach rechts", "Von rechts nach links"];
+
+/// (JD15, PG-11) style and direction -> PlaceStyle (Visio's visPLOPlace* codes: 1 top to
+/// bottom, 2 left to right, 3 radial, 4 bottom to top, 5 right to left, 6 circular, 7 .. 14 the
+/// compact trees, 15 .. 26 the hierarchies; centred where Visio offers an alignment)
+pub(crate) fn place_code(style: i32, dir: i32) -> i32 {
+    let d = dir.clamp(0, 3) as usize;
+    match style {
+        1 => [1, 4, 2, 5][d],
+        2 => [7, 11, 8, 10][d],
+        3 => [16, 19, 22, 25][d],
+        4 => 3,
+        5 => 6,
+        _ => 0,
+    }
+}
+
+/// (JD15, PG-11) PlaceStyle -> (style, direction) of the register
+pub(crate) fn place_split(code: i32) -> (i32, i32) {
+    match code {
+        1 => (1, 0),
+        4 => (1, 1),
+        2 => (1, 2),
+        5 => (1, 3),
+        3 => (4, 0),
+        6 => (5, 0),
+        7 | 9 => (2, 0),
+        11 | 13 => (2, 1),
+        8 | 12 => (2, 2),
+        10 | 14 => (2, 3),
+        15..=17 => (3, 0),
+        18..=20 => (3, 1),
+        21..=23 => (3, 2),
+        24..=26 => (3, 3),
+        _ => (0, 0),
     }
 }
 
@@ -212,6 +269,11 @@ pub(crate) fn load(app: &mut Diagrammer, page: PageRef) {
     st.node = mm10(num(doc, s, "LineToNodeX"), 2.5 / 25.4);
     st.page_plow = (num(doc, s, "PlowCode").unwrap_or(0.0) == 1.0) as i32;
     st.split = (num(doc, s, "PageShapeSplit").unwrap_or(0.0) == 1.0) as i32;
+    // (JD15, PG-11) the placement
+    st.place_code = num(doc, s, "PlaceStyle").unwrap_or(0.0) as i32;
+    (st.place_style, st.place_dir) = place_split(st.place_code);
+    st.place_depth = (num(doc, s, "PlaceDepth").unwrap_or(0.0) as i32).clamp(0, 3);
+    st.place_flip = (num(doc, s, "PlaceFlip").unwrap_or(0.0) as i32) & 3;
 }
 
 /// the register Layout und Routing (editable)
@@ -221,6 +283,27 @@ pub(crate) fn tab(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
         ui.next_size(210, 0);
         ui.text(TS_BODY, s);
     };
+    // (JD15, PG-11) the placement: style and direction, depth, flipping
+    ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
+    row(ui, t("Platzierungsstil"));
+    let styles: Vec<&str> = PLACE_STYLES.iter().map(|s| crate::tc(s)).collect();
+    ui.next_size(240, 0);
+    ui.combobox(id + 8, &mut st.place_style, &styles);
+    ui.box_end();
+    ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
+    row(ui, t("Richtung"));
+    let dirs: Vec<&str> = PLACE_DIRS.iter().map(|s| t(s)).collect();
+    ui.next_size(240, 0);
+    ui.next_flags(if matches!(st.place_style, 1..=3) { 0 } else { ST_DISABLED });
+    ui.combobox(id + 9, &mut st.place_dir, &dirs);
+    ui.box_end();
+    ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
+    row(ui, t("Tiefe und Spiegelung"));
+    ui.next_size(116, 0);
+    ui.combobox(id + 10, &mut st.place_depth, &[crate::tc("Standard|Routing"), t("Mittel"), t("Tief"), crate::tc("Flach|Tiefe")]);
+    ui.next_size(116, 0);
+    ui.combobox(id + 11, &mut st.place_flip, &[t("Keine"), t("Horizontal"), t("Vertikal"), t("Beide")]);
+    ui.box_end();
     let names: Vec<&str> = ROUTE_STYLES.iter().map(|s| crate::tc(s)).collect();
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     row(ui, t("Routing-Stil"));
@@ -263,7 +346,12 @@ pub(crate) fn commit(app: &mut Diagrammer, ui: &mut Ui) {
     let s = SheetRef::Page(page);
     let inch = |tenths: i32| tenths as f64 / 254.0;
     let lengths = [("AvenueSizeX", inch(st.avenue[0])), ("AvenueSizeY", inch(st.avenue[1])), ("LineToNodeX", inch(st.node)), ("LineToNodeY", inch(st.node))];
+    // (JD15, PG-11) the placement code read stays unless style or direction changed
+    let place = if place_split(st.place_code) == (st.place_style, st.place_dir) { st.place_code } else { place_code(st.place_style, st.place_dir) };
     let codes = [
+        ("PlaceStyle", place as f64),
+        ("PlaceDepth", st.place_depth as f64),
+        ("PlaceFlip", st.place_flip as f64),
         ("RouteStyle", st.page_route as f64),
         ("LineJumpCode", st.jumps as f64),
         ("LineJumpStyle", st.jump_style as f64),
@@ -275,7 +363,8 @@ pub(crate) fn commit(app: &mut Diagrammer, ui: &mut Ui) {
         .iter()
         .map(|&(c, v)| (c, v, Some(Unit::Millimeters)))
         .chain(codes.iter().map(|&(c, v)| (c, v, None)))
-        .filter(|&(c, v, _)| num(&o.doc, s, c).is_none_or(|n| (n - v).abs() > 1e-6))
+        // (JD15) a placement cell the page lacks counts as 0 (Visio's default)
+        .filter(|&(c, v, _)| num(&o.doc, s, c).map_or(!(c.starts_with("Place") && v == 0.0), |n| (n - v).abs() > 1e-6))
         .collect();
     if changes.is_empty() {
         return;

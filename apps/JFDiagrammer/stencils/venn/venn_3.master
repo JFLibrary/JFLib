@@ -1,0 +1,111 @@
+# Venn-Diagramm aus 3 Mengen (SH-007, JD26): drei überlappende Kreise (gestreckt Ellipsen) als
+# Teile einer Gruppe, jede Menge mit eigenem Text.  Die Farben kommen über die
+# Schnellformatvorlage aus dem Design (Variantenfarben 1, 2, 3); die Füllung ist zu 35 %
+# durchscheinend, damit die Schnittmengen sichtbar bleiben (Ausnahme von der Stilregel: ohne
+# Durchsicht verdeckte der obere Kreis die Überlappung).  Die Teile folgen der Größe der Gruppe.
+master: Venn diagram 3 sets
+name.de: Venn-Diagramm aus 3 Mengen
+name.en: Three-set Venn diagram
+name.es: Diagrama de Venn de 3 conjuntos
+name.it: Diagramma di Venn a 3 insiemi
+name.fr: Diagramme de Venn à 3 ensembles
+prompt.de: Drei überlappende Mengen. Klicken Sie eine Menge zweimal an, um ihren Text zu ändern.
+prompt.en: Three overlapping sets. Click a set twice to change its text.
+prompt.es: Tres conjuntos superpuestos. Haga clic dos veces en un conjunto para cambiar su texto.
+prompt.it: Tre insiemi sovrapposti. Fai clic due volte su un insieme per cambiarne il testo.
+prompt.fr: Trois ensembles qui se chevauchent. Cliquez deux fois sur un ensemble pour modifier son texte.
+keywords.de: Venn, Menge, Mengendiagramm, Schnittmenge, Überlappung, Vergleich, drei
+keywords.en: Venn, set, set diagram, intersection, overlap, comparison, three
+keywords.es: Venn, conjunto, diagrama de conjuntos, intersección, superposición, comparación
+keywords.it: Venn, insieme, diagramma degli insiemi, intersezione, sovrapposizione, confronto
+keywords.fr: Venn, ensemble, diagramme d'ensembles, intersection, chevauchement, comparaison
+
+[Shape]
+Width = 60 mm
+Width.us = 2.5 in
+Height = 55 mm
+Height.us = 2.25 in
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.665; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.665; DirX = 1; DirY = 0
+
+# Menge A, oben links
+[Part A]
+text.de: Menge A
+text.en: Set A
+text.es: Conjunto A
+text.it: Insieme A
+text.fr: Ensemble A
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.325)
+PinY = GUARD(Sheet.1!Height*0.665)
+Width = GUARD(Sheet.1!Width*0.6)
+Height = GUARD(Sheet.1!Height*0.65)
+TxtPinX = Width*0.36
+TxtPinY = Height*0.62
+TxtWidth = Width*0.6
+TxtHeight = Height*0.22
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+FillForegndTrans = 35%
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Menge B, oben rechts
+[Part B]
+text.de: Menge B
+text.en: Set B
+text.es: Conjunto B
+text.it: Insieme B
+text.fr: Ensemble B
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.675)
+PinY = GUARD(Sheet.1!Height*0.665)
+Width = GUARD(Sheet.1!Width*0.6)
+Height = GUARD(Sheet.1!Height*0.65)
+TxtPinX = Width*0.64
+TxtPinY = Height*0.62
+TxtWidth = Width*0.6
+TxtHeight = Height*0.22
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+FillForegndTrans = 35%
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Menge C, unten
+[Part C]
+text.de: Menge C
+text.en: Set C
+text.es: Conjunto C
+text.it: Insieme C
+text.fr: Ensemble C
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD(Sheet.1!Height*0.335)
+Width = GUARD(Sheet.1!Width*0.6)
+Height = GUARD(Sheet.1!Height*0.65)
+TxtPinX = Width*0.5
+TxtPinY = Height*0.27
+TxtWidth = Width*0.6
+TxtHeight = Height*0.22
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+FillForegndTrans = 35%
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height

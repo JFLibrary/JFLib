@@ -20,9 +20,11 @@
 //   themes         every part a theme relationship names, raw (doc.themes); a page part's own
 //                  theme relationship sets Page::theme (Visio files pick a page's theme by its
 //                  ThemeIndex cell: JD4 reads that)
+//   data           (JD18) connections.xml, recordsets.xml and the recordset parts: doc.data
+//                  (data.rs; kept as parts when not understood)
 //   everything else  windows.xml, docProps (core, app, custom), the thumbnail, media, comments,
-//                  data connections and recordsets, validation, solutions, the macro project,
-//                  unknown parts: doc.parts as bytes, in package order
+//                  validation, solutions, the macro project, unknown parts: doc.parts as
+//                  bytes, in package order
 //   relationships  every one as read in doc.rels (also the external ones, never followed)
 // Unknown attributes, elements and text go into the Extras of the element they stood in
 // (diagram_core's sheet.rs says how).  Nothing is computed on opening: values stay the cached
@@ -221,6 +223,16 @@ pub enum Error {
         /// a style, master or page ID on the cycle
         id: u32,
     },
+    /// (vss.rs) a binary file of Visio 2003-2010 (.vss, .vsd, .vst) breaks its structure: the
+    /// compound file, the VisioDocument stream or a stream or chunk in it; `offset` is where in
+    /// the stream (0 for the compound file), `what` says how ("version 6 (Visio 2000/2002)" for a
+    /// version this reader does not take)
+    Binary {
+        /// the byte offset in the stream the problem was found at
+        offset: u64,
+        /// what is wrong
+        what: &'static str,
+    },
 }
 
 impl fmt::Display for Error {
@@ -233,6 +245,7 @@ impl fmt::Display for Error {
             Error::Structure { part, line, what } => write!(f, "{part}, line {line}: {what}"),
             Error::Limit(what) => write!(f, "too large: {what}"),
             Error::Cycle { what, id } => write!(f, "cycle of {what} references at ID {id}"),
+            Error::Binary { offset, what } => write!(f, "binary file, offset {offset}: {what}"),
         }
     }
 }
@@ -298,6 +311,14 @@ pub enum Warning {
     UnusedPart {
         /// the part
         part: String,
+    },
+    /// (vdx.rs) something of the XML formats of 2003-2010 that has no place in a file of the
+    /// VSDX family, left out: tab stops, solution XML, data connections, a preview picture, a
+    /// picture of an unknown kind, a macro project that is no OLE file, elements of other
+    /// namespaces
+    LeftOut {
+        /// the element's name (Tab, SolutionXML, DataConnections ...)
+        what: String,
     },
 }
 
@@ -382,11 +403,31 @@ impl fmt::Display for WriteError {
 
 pub use crate::blank::{new_document, Measure};
 
+/// (JD16, DF-04) take the macro project out of a document: the parts a macro-enabled format
+/// carries for it (vbaProject.bin, vbaData.xml) and the relationships to them; Document::macros
+/// becomes false.  For "Speichern als .vsdx" after the user said yes; true when there was one
+pub fn remove_macros(doc: &mut Document) -> bool {
+    let before = doc.parts.len();
+    let gone: Vec<Sym> = doc.parts.iter().filter(|p| macro_name(doc.str(p.name)) || macro_type(doc.str(p.content_type))).map(|p| p.name).collect();
+    doc.parts.retain(|p| !gone.contains(&p.name));
+    let removed = doc.parts.len() != before;
+    let keep: Vec<bool> = doc.rels.iter().map(|r| !r.part.is_some_and(|p| gone.contains(&p)) && !macro_type(doc.str(r.kind))).collect();
+    let mut k = keep.iter();
+    doc.rels.retain(|_| k.next().copied().unwrap_or(true));
+    let had = doc.macros;
+    doc.macros = false;
+    removed || had
+}
+
 /// write a document as a file of the VSDX family (see the module comment); the same document
 /// always gives the same bytes, and a document read from a file and written unchanged reads
 /// back as the same model
 pub fn write(doc: &Document, options: &WriteOptions) -> Result<Vec<u8>, WriteError> {
-    crate::pack::write(doc, options)
+    // (JD18) doc.data goes back as parts: a copy of the document carries them
+    match crate::data::with_parts(doc) {
+        Some(d) => crate::pack::write(&d, options),
+        None => crate::pack::write(doc, options),
+    }
 }
 
 // ---- relationship types and content types ([MS-VSDX] 2.1)
@@ -475,6 +516,8 @@ pub fn read(bytes: &[u8], limits: &Limits) -> Result<Loaded, Error> {
     ld.masters(&main)?;
     ld.pages(&main)?;
     ld.parts();
+    // (JD18) the data parts become doc.data (they stay parts when not understood)
+    crate::data::load(&mut ld.doc, limits);
     ld.check()?;
     Ok(Loaded { doc: ld.doc, format, warnings: ld.warnings, more_warnings: ld.more })
 }
@@ -739,10 +782,18 @@ impl<'p> Loader<'p> {
 
     // cycles (errors) and references that name nothing (warnings)
     fn check(&mut self) -> Result<(), Error> {
-        let doc = &self.doc;
-        let mut warnings = Ws { list: core::mem::take(&mut self.warnings), more: self.more, cap: self.lim.warnings };
-        // styles: per category the based-on chain must end (a style naming itself ends it)
         let main = slash(&self.main);
+        check_doc(&self.doc, &main, &mut self.warnings, &mut self.more, self.lim.warnings)
+    }
+}
+
+/// cycles (errors) and references that name nothing (warnings, at most `cap` kept) of a document
+/// read from a file; `main` names the part of the document element (vdx.rs shares it)
+pub(crate) fn check_doc(doc: &Document, main: &str, list: &mut Vec<Warning>, more: &mut usize, cap: usize) -> Result<(), Error> {
+    {
+        let mut warnings = Ws { list: core::mem::take(list), more: *more, cap };
+        // styles: per category the based-on chain must end (a style naming itself ends it)
+        let main = String::from(main);
         let styles: Vec<(u32, StyleRefs)> = doc.styles().filter_map(|s| doc.style(s)).map(|s| (s.header.id, s.header.based_on)).collect();
         let by_id: BTreeMap<u32, StyleRefs> = styles.iter().copied().collect();
         let getters: [fn(&StyleRefs) -> Option<u32>; 3] = [|r| r.line, |r| r.fill, |r| r.text];
@@ -838,8 +889,8 @@ impl<'p> Loader<'p> {
                 }
             }
         }
-        self.warnings = warnings.list;
-        self.more = warnings.more;
+        *list = warnings.list;
+        *more = warnings.more;
         Ok(())
     }
 }

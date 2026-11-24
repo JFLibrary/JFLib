@@ -14,6 +14,8 @@
 //   Schriftart  Char.Font (THEMEGUARD(FONT("…"))), Char.Size (pt), Char.Style (bits 1 bold,
 //               2 italic, 4 underline; the other bits stay), Char.Strikethru, Char.Color
 //               (format_cells::color_formula)
+//   Zeichen     (JD15) Char.Pos (0 normal, 1 superscript, 2 subscript), Char.Case (0 normal,
+//               1 all capitals, 2 initial capitals), Char.FontScale (%), Char.Letterspace (pt)
 //   Absatz      Para.HorzAlign (0 left .. 3 justified), Para.IndLeft, IndRight, IndFirst (the
 //               page's unit), Para.SpBefore, SpAfter (pt), Para.SpLine (a percentage of the font
 //               size: written negative, -120% = 1.2 lines, Visio's rule for SpLine below 0)
@@ -57,6 +59,11 @@ struct Vals {
     bk: i32,
     bk_color: u32,
     bk_trans: f64,
+    /// (JD15, RS-09) Zeichen: Char.Pos, Char.Case, Char.FontScale (%), Char.Letterspace (pt)
+    pos: i32,
+    case: i32,
+    scale: f64,
+    letterspace: f64,
 }
 
 /// the dialog's state
@@ -131,6 +138,10 @@ pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui) {
         bk,
         bk_color,
         bk_trans: round2(num(app, F::Cell("TextBkgndTrans")).unwrap_or(0.0) * 100.0),
+        pos: num(app, F::Char("Pos")).unwrap_or(0.0).clamp(0.0, 2.0) as i32,
+        case: num(app, F::Char("Case")).unwrap_or(0.0).clamp(0.0, 2.0) as i32,
+        scale: round2(num(app, F::Char("FontScale")).unwrap_or(1.0) * 100.0),
+        letterspace: round2(num(app, F::Char("Letterspace")).unwrap_or(0.0) * 72.0),
     };
     let d = &mut app.txt.text;
     d.shapes = shapes;
@@ -209,7 +220,8 @@ pub(crate) fn dialog(app: &mut Diagrammer, ui: &mut Ui) {
     if !ui.dialog_begin(ID, crate::tc("Text|Dialogfeld"), &open) {
         return;
     }
-    let regs = [t("Schriftart"), t("Absatz"), t("Textblock")];
+    // (JD15, RS-09) Zeichen second, as in Visio
+    let regs = [t("Schriftart"), t("Zeichen"), t("Absatz"), t("Textblock")];
     ui.next_size(480, 0);
     let mut tab = app.txt.text.tab;
     ui.tabs(ID + 1, &mut tab, &regs);
@@ -243,6 +255,21 @@ pub(crate) fn dialog(app: &mut Diagrammer, ui: &mut Ui) {
             }
         }
         1 => {
+            // (JD15, RS-09) Zeichen: position, case, scale, spacing
+            ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
+            label(ui, t("Position|Zeichen"));
+            ui.next_size(160, 0);
+            ui.combobox(ID + 40, &mut v.pos, &[t("Normal"), t("Hochgestellt"), t("Tiefgestellt")]);
+            ui.box_end();
+            ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
+            label(ui, t("Groß-/Kleinschreibung"));
+            ui.next_size(160, 0);
+            ui.combobox(ID + 41, &mut v.case, &[t("Normal"), t("Großbuchstaben"), t("Erster Buchstabe groß")]);
+            ui.box_end();
+            number(ui, ID + 42, t("Skalierung"), &mut v.scale, &RangeF::new(1.0, 600.0, 10.0, 0, 0), "%");
+            number(ui, ID + 43, t("Zeichenabstand"), &mut v.letterspace, &RangeF::new(-100.0, 1000.0, 0.5, 1, 0), "pt");
+        }
+        2 => {
             ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
             label(ui, t("Ausrichtung"));
             ui.next_size(160, 0);
@@ -321,6 +348,19 @@ fn apply(app: &mut Diagrammer, ui: &mut Ui) {
     }
     if let Some(f) = &d.color {
         ch.push((F::Char("Color"), f.clone()));
+    }
+    // (JD15, RS-09) Zeichen
+    if v.pos != v0.pos {
+        ch.push((F::Char("Pos"), format!("{}", v.pos)));
+    }
+    if v.case != v0.case {
+        ch.push((F::Char("Case"), format!("{}", v.case)));
+    }
+    if v.scale != v0.scale {
+        ch.push((F::Char("FontScale"), format!("{}%", v.scale)));
+    }
+    if v.letterspace != v0.letterspace {
+        ch.push((F::Char("Letterspace"), format!("{} pt", v.letterspace)));
     }
     if v.halign != v0.halign {
         ch.push((F::Para("HorzAlign"), format!("{}", v.halign)));

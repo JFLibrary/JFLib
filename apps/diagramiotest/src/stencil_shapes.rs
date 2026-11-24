@@ -303,7 +303,7 @@ fn page_cell(doc: &Document, m: MasterRef, n: &str) -> (f64, Option<Unit>) {
 
 // the formula cells of a document the engine keeps or that come out as an error, and how many
 // values a calculation would change
-fn engine_state(doc: &Document) -> (usize, usize, Vec<String>) {
+pub(crate) fn engine_state(doc: &Document) -> (usize, usize, Vec<String>) {
     let mut d = doc.clone();
     let res = Engine::new().calculate(&d);
     let bad: Vec<String> = res

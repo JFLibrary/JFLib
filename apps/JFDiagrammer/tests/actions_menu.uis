@@ -1,0 +1,38 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD15: a shape's Actions section in its context menu (SP-12) -- the bar of the
+# stencil Blöcke has the row "Enden geschlossen" (Checked = Prop.Closed, Action =
+# SETF(GETREF(Prop.Closed),NOT(Prop.Closed))): the menu shows it at its top, unchecked; a click
+# runs the action in the engine (the ends close, the row is checked), a second click opens them
+# again; Strg+Z takes a click back as one step
+focus #24577
+type "balken offen"
+drag button:"Balken offen/geschlossen" 600,400
+key esc
+rclick 600,400
+expect menuitem:"Enden geschlossen" unchecked
+click menuitem:"Enden geschlossen"
+move 900,650
+rclick 600,400
+expect menuitem:"Enden geschlossen" checked
+key esc
+shot build/JFDiagrammer-actions.png
+key ctrl+z
+rclick 600,400
+expect menuitem:"Enden geschlossen" unchecked
+key esc
+key ctrl+y
+rclick 600,400
+expect menuitem:"Enden geschlossen" checked
+click menuitem:"Enden geschlossen"
+move 900,650
+rclick 600,400
+expect menuitem:"Enden geschlossen" unchecked
+key esc
+# a shape without actions: no rows above Ausschneiden
+click 900,650
+cmd 4404
+drag 800,250 900,300
+cmd 4400
+rclick 850,275
+expect menuitem:"Enden geschlossen" missing
+key esc

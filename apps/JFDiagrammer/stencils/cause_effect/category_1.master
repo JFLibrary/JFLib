@@ -1,0 +1,95 @@
+# Kategorie 1 (SH-041, JD26): eine schräge Gräte mit dem Kasten der Kategorie oben.  Ein 1D-Shape
+# mit aufrechtem Kasten (wie der dynamische Verbinder: Width = EndX-BeginX, Height = EndY-BeginY,
+# Angle 0; lokal (0, 0) ist der Anfang): der Anfang sitzt unter der Mitte des Kastens, das Ende
+# klebt an einem Punkt der Hauptgräte (Wirkung) und wandert mit ihr.  Der Kasten bleibt
+# waagrecht und 30 x 8 mm groß, gleich wie die Gräte liegt.  Auf der Gräte liegen 9
+# Verbindungspunkte (1/10 bis 9/10), an die die Ursachen kleben (Ausnahme von der Stilregel
+# „1D-Shapes haben keine Verbindungspunkte“: die Ursachen brauchen sie).  Linie und Pfeilspitze am
+# Ende aus der Formatvorlage Connector (die Gräte bleibt auch in einem Design ohne Shape-Linien
+# sichtbar), Füllung und Text des Kastens aus Normal.
+master: Category 1
+name.de: Kategorie 1
+name.en: Category 1
+name.es: Categoría 1
+name.it: Categoria 1
+name.fr: Catégorie 1
+text.de: Kategorie
+text.en: Category
+text.es: Categoría
+text.it: Categoria
+text.fr: Catégorie
+prompt.de: Gräte einer Kategorie mit Kasten oben. Ziehen Sie ihr Ende auf die Hauptgräte, die Ursachen auf ihre Gräte.
+prompt.en: Bone of a category with its box at the top. Drag its end onto the main bone and the causes onto its bone.
+prompt.es: Espina de una categoría con su cuadro arriba. Arrastre su extremo sobre la espina principal y las causas sobre su espina.
+prompt.it: Lisca di una categoria con il riquadro in alto. Trascina la sua estremità sulla lisca principale e le cause sulla sua lisca.
+prompt.fr: Arête d'une catégorie avec son cadre en haut. Faites glisser son extrémité sur l'arête principale et les causes sur son arête.
+line_style: Connector
+fill_style: Normal
+text_style: Normal
+keywords.de: Kategorie, Ishikawa, Fischgräte, Gräte, Hauptursache, Mensch, Maschine, Methode
+keywords.en: category, Ishikawa, fishbone, bone, main cause, people, machine, method
+keywords.es: categoría, Ishikawa, espina de pescado, espina, causa principal, personas, máquina, método
+keywords.it: categoria, Ishikawa, lisca di pesce, lisca, causa principale, persone, macchina, metodo
+keywords.fr: catégorie, Ishikawa, arête de poisson, arête, cause principale, personnel, machine, méthode
+
+[Shape]
+BeginX = 15 mm
+BeginX.us = 0.6 in
+BeginY = 35 mm
+BeginY.us = 1.4 in
+EndX = 35 mm
+EndX.us = 1.4 in
+EndY = 5 mm
+EndY.us = 0.2 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+LocPinX = GUARD(Width*0.5)
+LocPinY = GUARD(Height*0.5)
+Angle = GUARD(0DA)
+FlipX = GUARD(FALSE)
+FlipY = GUARD(FALSE)
+TxtPinX = 0
+TxtPinY = User.Bh*0.5
+TxtWidth = User.Bw
+TxtHeight = User.Bh
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = 0 deg
+# Linie, Füllung und Text aus der Verbinder-Liste des Designs (QuickStyleType 3, ausdrücklich:
+# Visio wählt sonst nach der Art des Shapes); Füll- und Schriftstil der Variante wie Normal (100)
+# statt Stil 1 aus Connector
+QuickStyleType = 3
+QuickStyleFillMatrix = 100
+QuickStyleFontMatrix = 100
+
+[User]
+# der Kasten der Kategorie: Breite und Höhe
+Bw:  Value = 30 mm
+     Value.us = 1.2 in
+Bh:  Value = 8 mm
+     Value.us = 0.3 in
+
+# 1 die Gräte vom Anfang zum Ende
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = Height
+
+# 2 der Kasten über dem Anfang
+[Geometry]
+MoveTo  X = -User.Bw*0.5; Y = 0
+LineTo  X = User.Bw*0.5; Y = 0
+LineTo  X = User.Bw*0.5; Y = User.Bh
+LineTo  X = -User.Bw*0.5; Y = User.Bh
+LineTo  X = -User.Bw*0.5; Y = 0
+
+[Connection]
+Row  X = Width*0.1; Y = Height*0.1; DirX = 0; DirY = 0
+Row  X = Width*0.2; Y = Height*0.2; DirX = 0; DirY = 0
+Row  X = Width*0.3; Y = Height*0.3; DirX = 0; DirY = 0
+Row  X = Width*0.4; Y = Height*0.4; DirX = 0; DirY = 0
+Row  X = Width*0.5; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = Width*0.6; Y = Height*0.6; DirX = 0; DirY = 0
+Row  X = Width*0.7; Y = Height*0.7; DirX = 0; DirY = 0
+Row  X = Width*0.8; Y = Height*0.8; DirX = 0; DirY = 0
+Row  X = Width*0.9; Y = Height*0.9; DirX = 0; DirY = 0

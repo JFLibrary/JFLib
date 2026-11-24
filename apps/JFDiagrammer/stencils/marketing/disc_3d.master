@@ -1,0 +1,81 @@
+# 3D-Kreis (SH-030, JD26): eine Scheibe, schräg von oben gesehen: die obere Fläche eine Ellipse
+# (Höhe des Kastens weniger der Dicke), darunter der Rand als Band aus den beiden
+# unteren Halbellipsen, dunkler über SHADE(THEMEVAL("FillColor"),50) mit THEMEGUARD.  Zwei Teile
+# der Gruppe; der Text gehört der Gruppe und steht auf der oberen Fläche.  Row_1 am tiefsten Punkt der oberen Fläche ändert die Dicke (nur senkrecht, Abstand
+# vom unteren Rand: die Dicke bleibt beim Vergrößern).
+master: 3-D circle
+name.de: 3D-Kreis
+name.en: 3-D circle
+name.es: Círculo 3D
+name.it: Cerchio 3D
+name.fr: Cercle 3D
+prompt.de: Runde Scheibe mit Tiefe. Die Dicke ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Round disc with depth. Drag the yellow control handle to change the thickness.
+prompt.es: Disco redondo con profundidad. Arrastre el controlador amarillo para cambiar el grosor.
+prompt.it: Disco rotondo con profondità. Trascina la maniglia di controllo gialla per cambiare lo spessore.
+prompt.fr: Disque rond avec profondeur. Faites glisser la poignée de contrôle jaune pour modifier l'épaisseur.
+keywords.de: Kreis, Scheibe, 3D, Zylinder, Tiefe, räumlich, rund
+keywords.en: circle, disc, 3D, cylinder, depth, three-dimensional, round
+keywords.es: círculo, disco, 3D, cilindro, profundidad, tridimensional
+keywords.it: cerchio, disco, 3D, cilindro, profondità, tridimensionale
+keywords.fr: cercle, disque, 3D, cylindre, profondeur, tridimensionnel
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 30 mm
+Height.us = 1.125 in
+TxtPinX = Width*0.5
+TxtPinY = User.D+User.E*0.5
+TxtWidth = Width*0.8
+TxtHeight = User.E*0.6
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Dicke, die Höhe der oberen Fläche
+D:   Value = MIN(MAX(Controls.Row_1.Y,0),Height*0.5)
+E:   Value = Height-User.D
+
+[Controls]
+Row_1:  X = Width*0.5; Y = 5 mm
+        Y.us = 0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 2; CanGlue = FALSE
+        Tip.de = "Dicke ändern"
+        Tip.en = "Change the thickness"
+        Tip.es = "Cambiar el grosor"
+        Tip.it = "Cambia lo spessore"
+        Tip.fr = "Modifier l'épaisseur"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = User.D+User.E*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.D+User.E*0.5; DirX = 1; DirY = 0
+
+# der Rand, dann die obere Fläche
+[Part Side]
+
+[Shape]
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+MoveTo           X = 0; Y = Sheet.1!User.D+Sheet.1!User.E*0.5
+LineTo           X = 0; Y = Sheet.1!User.E*0.5
+EllipticalArcTo  X = Width; Y = Sheet.1!User.E*0.5; A = Width*0.5; B = 0; C = 0 deg; D = Width/Sheet.1!User.E
+LineTo           X = Width; Y = Sheet.1!User.D+Sheet.1!User.E*0.5
+EllipticalArcTo  X = 0; Y = Sheet.1!User.D+Sheet.1!User.E*0.5; A = Width*0.5; B = Sheet.1!User.D; C = 0 deg; D = Width/Sheet.1!User.E
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Part Face]
+
+[Shape]
+Width = GUARD(Sheet.1!Width)
+Height = GUARD(Sheet.1!User.E)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!User.D+Height*0.5)
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height

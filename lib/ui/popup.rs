@@ -50,6 +50,8 @@
 //   tooltip_part(s, part)               the same for one part of the last widget (an item of
 //                                       a canvas, part != 0): the delay starts again when the
 //                                       part changes, a press hides it until another part
+//   tooltips_set(on) / tooltips_on()    every tooltip of the app on or off (an app's option
+//                                       "no ScreenTips"; on at start)
 // Runtime: accel_dispatch() at the start of uiw_pass_end: runtime-drawn menus, stale
 // popups, command accelerators.
 //
@@ -217,6 +219,8 @@ pub(crate) struct S {
     compact: Vec<((usize, usize), &'static [Mi])>,
     /// (plat::sysmenu) the pass whose main window gave the system's menu bar its menus
     pub(crate) sysmenu_frame: u32,
+    /// tooltips_set(false): no tooltip shows
+    tips_off: bool,
 }
 
 /// per-window state (ui_popup_wb0 .. ui_popup_wb1: popup stack, flyouts, menu bar, tooltip)
@@ -2363,10 +2367,24 @@ impl Ui {
         self.tip_core(s);
     }
 
+    /// tooltips_set(on): every tooltip of the app on (the default) or off -- an app's option
+    /// "no ScreenTips"; a tooltip up hides with the next pass
+    pub fn tooltips_set(&mut self, on: bool) {
+        if self.m.popup.tips_off == on {
+            self.m.popup.tips_off = !on;
+            self.repass();
+        }
+    }
+
+    /// whether tooltips show (tooltips_set)
+    pub fn tooltips_on(&self) -> bool {
+        !self.m.popup.tips_off
+    }
+
     // tip_core(s)
     fn tip_core(&mut self, s: &str) {
         let (id, _) = self.last_widget();
-        if id == 0 {
+        if id == 0 || self.m.popup.tips_off {
             return;
         }
         let w = &mut self.wp.popup;

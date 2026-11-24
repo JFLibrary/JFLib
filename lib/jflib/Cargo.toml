@@ -96,6 +96,7 @@ game.workspace = true
 game_render3d.workspace = true
 geom.workspace = true
 netchan.workspace = true
+sheet_io.workspace = true
 style_winui.workspace = true
 style_classic.workspace = true
 style_kde.workspace = true

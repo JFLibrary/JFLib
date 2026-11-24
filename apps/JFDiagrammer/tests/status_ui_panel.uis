@@ -1,0 +1,104 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD15 (status check of FEATURES 3.11 - 3.13): the context menus of the shape, the
+# page and the page tab, the docked Shapes panel's own menu, the selection rectangle, the
+# keyboard in the stencil's tiles, placing a master several times with Shift held, the overview
+# of Verschieben und Zoomen moving the view
+# SL-01 / AB-01: the Shapes panel's menu -- float, dock right or at the bottom, collapse, hide
+click button:"Weitere Optionen: Shapes"
+expect menuitem:"Lösen" exists
+expect menuitem:"Rechts andocken" exists
+expect menuitem:"Unten andocken" exists
+expect menuitem:"Einklappen" exists
+expect menuitem:"Ausblenden" exists
+key esc
+# ZF-12: the shape's menu and its submenus
+cmd 4404
+drag 400,300 480,360
+drag 600,300 680,360
+cmd 4400
+wait 600
+click 440,330
+rclick 440,330
+expect menuitem:"Ausschneiden" exists
+expect menuitem:"Kopieren" exists
+expect menuitem:"Hyperlink" exists
+expect menuitem:"Zu meinen Shapes hinzufügen" exists
+click menuitem:"Daten"
+expect menuitem:"Shape-Daten definieren" exists
+key esc
+key esc
+rclick 440,330
+click menuitem:"Formatieren"
+expect menuitem:"Linie formatieren" exists
+expect menuitem:"Schatten formatieren" exists
+key esc
+key esc
+rclick 440,330
+click menuitem:"Verbinderart"
+expect menuitem:"Rechtwinklig" exists
+expect menuitem:"Verbinder zurücksetzen" exists
+key esc
+key esc
+rclick 440,330
+click menuitem:"Anordnen"
+expect menuitem:"Eine Ebene nach hinten" exists
+key esc
+key esc
+rclick 440,330
+click menuitem:"Shape"
+expect menuitem:"Größe und Position" exists
+key esc
+key esc
+# ZF-13: the page's menu and the page tab's menu
+wait 600
+click 900,650
+rclick 900,650
+expect menuitem:"Zeichentools" exists
+expect menuitem:"Seite einrichten" exists
+key esc
+rclick tab:"Seite-1"
+expect menuitem:"Seite einfügen" exists
+expect menuitem:"Seite löschen" exists
+expect menuitem:"Seite umbenennen" exists
+expect menuitem:"Diese Seite duplizieren" exists
+expect menuitem:"Seiten neu anordnen" exists
+expect menuitem:"Zeichnungsmaßstab" exists
+key esc
+# ZF-06: a selection rectangle takes the shapes wholly inside it
+drag 380,280 640,400
+expect listitem:"Sheet.4" selected
+expect listitem:"Sheet.5" unselected
+wait 600
+click 900,650
+# KB-15: the tiles -- arrows, End, Home; Ctrl+Enter puts the shape into the drawing
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+focus button:"Rechteck"
+key right
+expect button:"Abgerundetes Rechteck" focused
+key end
+expect button:"Geschweifte Klammer rechts" focused
+key home
+expect button:"Rechteck" focused
+key ctrl+enter
+a11y expect announced "„Rechteck“ abgelegt"
+# ZF-19: with Shift held a clicked tile stays armed: every click places one more
+click button:"Ellipse"
+click 500,600 shift
+expect button:"Ellipse" checked
+click 600,600 shift
+click 700,600
+expect button:"Ellipse" unchecked
+a11y expect announced "„Ellipse.9“ abgelegt"
+# AB-06: Verschieben und Zoomen -- at 200 % the shape is out of view; the frame dragged to the
+# left brings it in
+cmd 5140
+cmd 5125
+click "200 %"
+click "OK"
+expect button:"200 %" exists
+expect listitem:"Sheet.4" missing
+drag 1140,280 1080,250
+expect listitem:"Sheet.4" exists
+expect button:"200 %" exists

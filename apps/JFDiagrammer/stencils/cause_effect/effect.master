@@ -1,0 +1,111 @@
+# Wirkung (SH-041, JD26): die Hauptgräte eines Fischgrätdiagramms mit dem Kopf für die Wirkung.
+# Die Gräte ist eine Linie in halber Höhe mit einer kleinen Spitze am Kopf; der Kopf ein Kasten am
+# rechten Ende, darin der Text.  Auf der Gräte liegen 15 Verbindungspunkte in gleichen Abständen
+# (ohne Richtung): an sie kleben die Kategorien mit ihrem Ende und wandern mit, wenn man die
+# Gräte verschiebt oder streckt.  Row_1 an der oberen linken Ecke des Kopfs ändert seine Breite
+# (Abstand vom rechten Rand, nur waagrecht).  Linie aus der Formatvorlage Connector (die Gräte
+# bleibt auch in einem Design ohne Shape-Linien sichtbar), ohne deren Pfeilspitzen (die Spitze
+# zeichnet das Shape selbst); Füllung und Text aus Normal.
+master: Effect
+line_style: Connector
+fill_style: Normal
+text_style: Normal
+name.de: Wirkung
+name.en: Effect
+name.es: Efecto
+name.it: Effetto
+name.fr: Effet
+text.de: Wirkung
+text.en: Effect
+text.es: Efecto
+text.it: Effetto
+text.fr: Effet
+prompt.de: Hauptgräte mit der Wirkung. Ziehen Sie Kategorien mit ihrem Ende auf die Gräte; die Breite des Kopfs ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Main bone with the effect. Drag categories with their end onto the bone; change the width of the head with the yellow control handle.
+prompt.es: Espina principal con el efecto. Arrastre las categorías con su extremo sobre la espina; cambie el ancho de la cabeza con el controlador amarillo.
+prompt.it: Lisca principale con l'effetto. Trascina le categorie con la loro estremità sulla lisca; cambia la larghezza della testa con la maniglia di controllo gialla.
+prompt.fr: Arête principale avec l'effet. Faites glisser les catégories par leur extrémité sur l'arête ; modifiez la largeur de la tête avec la poignée de contrôle jaune.
+keywords.de: Wirkung, Ishikawa, Fischgräte, Ursache-Wirkung, Problem, Hauptgräte, Qualität
+keywords.en: effect, Ishikawa, fishbone, cause and effect, problem, spine, quality
+keywords.es: efecto, Ishikawa, espina de pescado, causa y efecto, problema, calidad
+keywords.it: effetto, Ishikawa, lisca di pesce, causa-effetto, problema, qualità
+keywords.fr: effet, Ishikawa, arête de poisson, cause à effet, problème, qualité
+
+[Shape]
+Width = 150 mm
+Width.us = 6 in
+Height = 20 mm
+Height.us = 0.75 in
+TxtPinX = Width-User.Hb*0.5
+TxtPinY = Height*0.5
+TxtWidth = User.Hb
+TxtHeight = Height
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+BeginArrow = 0
+EndArrow = 0
+# Linie, Füllung und Text aus der Verbinder-Liste des Designs (QuickStyleType 3, ausdrücklich:
+# Visio wählt sonst nach der Art des Shapes); Füll- und Schriftstil der Variante wie Normal (100)
+# statt Stil 1 aus Connector
+QuickStyleType = 3
+QuickStyleFillMatrix = 100
+QuickStyleFontMatrix = 100
+
+[User]
+# die Breite des Kopfs, das Ende der Gräte (Anfang der Spitze), die Länge der Spitze
+Hb:  Value = MIN(MAX(Width-Controls.Row_1, 10 mm), Width*0.6)
+Hl:  Value = MIN(5 mm, Height*0.4)
+L:   Value = Width-User.Hb-User.Hl
+
+# 1 die Gräte
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = User.L; Y = Height*0.5
+
+# 2 die Spitze am Kopf
+[Geometry]
+MoveTo  X = User.L; Y = Height*0.5+User.Hl*0.4
+LineTo  X = Width-User.Hb; Y = Height*0.5
+LineTo  X = User.L; Y = Height*0.5-User.Hl*0.4
+LineTo  X = User.L; Y = Height*0.5+User.Hl*0.4
+
+# 3 der Kopf
+[Geometry]
+MoveTo  X = Width-User.Hb; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = Width-User.Hb; Y = Height
+LineTo  X = Width-User.Hb; Y = 0
+
+[Controls]
+Row_1:  X = Width-35 mm; Y = Height
+        X.us = Width-1.375 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Breite des Kopfs ändern"
+        Tip.en = "Change the width of the head"
+        Tip.es = "Cambiar el ancho de la cabeza"
+        Tip.it = "Cambia la larghezza della testa"
+        Tip.fr = "Modifier la largeur de la tête"
+
+# die Punkte auf der Gräte (1/16 bis 15/16 ihrer Länge), dann der Kopf unten, rechts, oben
+[Connection]
+Row  X = User.L*1/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = User.L*2/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = User.L*3/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = User.L*4/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = User.L*5/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = User.L*6/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = User.L*7/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = User.L*8/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = User.L*9/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = User.L*10/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = User.L*11/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = User.L*12/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = User.L*13/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = User.L*14/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = User.L*15/16; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = Width-User.Hb*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width-User.Hb*0.5; Y = Height; DirX = 0; DirY = -1

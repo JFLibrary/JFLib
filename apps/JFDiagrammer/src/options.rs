@@ -11,9 +11,17 @@
 //   keys_page(app, ui)        the shortcuts of the current language (read only; own ones go
 //                             into [keys] of the settings file, UI-19 comes later)
 //
-// What the options do today: the language and the region switch at once (LG-02, LG-07), the
-// theme follows "Design"; the rest is stored and waits for its stage (start screen JD13,
-// AutoRecover JD5, live dynamics and units JD7, undo depth JD2's history in the app).
+// What the options do today: the language and the region switch at once (LG-02, LG-07; the
+// region also gives the units of a new drawing and of Datei › Neu), the theme follows "Design",
+// Livevorschau, Verbindungspfeile and Speicherort für persönliche Vorlagen act; (JD15) QuickInfos ›
+// Keine QuickInfos hides every QuickInfo (main.rs, ui.tooltips_set; UI-13), Standardspeicherort
+// für Zeichnungen is where a new drawing's Speichern unter starts (edit_doc.rs, UI-15), Anzahl der
+// Rückgängig-Schritte limits undo for the drawings opened or made after it (UI-18), Eingabetaste
+// beendet die Textbearbeitung (edit_text.rs, TX-01).  The rest is stored and waits for its stage
+// (start screen, AutoRecover, live dynamics, units, the rest of Erweitert).
+// (JD15) Teilweise umschlossene Shapes auswählen works: the marquee and the lasso take touched
+// shapes (ZF-06).
+// (JD15) Shape-Suche anzeigen and Shape-Suche: ein Wort genügt act on the Shapes panel (SL-04).
 
 use alloc::string::String;
 use base::settings::{Key, Schema, Settings};
@@ -72,12 +80,24 @@ pub(crate) const UNITS: Key<usize> = Key::choice("advanced.units", 0, &[("auto",
     .label("Maßeinheit der Seite");
 pub(crate) const DEV: Key<bool> = Key::bool("advanced.developer", false)
     .label("Im Entwicklermodus ausführen");
+// (JD15, ZF-06) the marquee also takes the shapes it only touches (edit_canvas.rs: SeState::partial)
+pub(crate) const PARTIAL_SELECT: Key<bool> = Key::bool("advanced.partial_select", false)
+    .label("Teilweise umschlossene Shapes auswählen");
+// (JD15, SL-04) the shape search: shown or not, every word or one of them (Visio's Advanced
+// options "Show Shape Search pane", "Search for: All of the words (AND) / Any of the words (OR)")
+pub(crate) const SEARCH_SHOW: Key<bool> = Key::bool("advanced.shape_search", true)
+    .label("Shape-Suche anzeigen");
+pub(crate) const SEARCH_ANY: Key<bool> = Key::bool("advanced.shape_search_any", false)
+    .label("Shape-Suche: ein Wort genügt")
+    .help("Aus: Ein Shape muss alle Suchwörter enthalten.");
 
 static SCHEMA: Schema = Schema::new(1, &[
     THEME.d, USER.d, INITIALS.d, START.d, LIVE.d, TIPS.d,
     FORMAT.d, AUTOREC.d, AUTOREC_MIN.d, DRAWINGS.d, TEMPLATES.d,
     UI_LANG.d, REGION.d,
     LIVE_DYN.d, WHEEL_ZOOM.d, CENTER_ZOOM.d, CONNECT_ARROWS.d, SPLIT_CONN.d, DELETE_CONN.d, ENTER_ENDS.d, UNDO_LEVELS.d, UNITS.d, DEV.d,
+    PARTIAL_SELECT.d,
+    SEARCH_SHOW.d, SEARCH_ANY.d,
 ])
 .sections(SECTIONS);
 

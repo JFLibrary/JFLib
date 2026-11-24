@@ -1,0 +1,20 @@
+# Ursache-Wirkung-Diagramm (VL-32, JD26): Fischgrätdiagramm nach Ishikawa, A4 bzw. Letter quer.
+# Das Startdiagramm „Fischgräte (6M)“ ist vorgewählt: die Hauptgräte mit sechs Kategorien, deren
+# Enden an ihr kleben, und zwei Ursachen.  Quellformat: ../README.md
+template: Cause and Effect Diagram
+file: cause_effect
+name.de: Ursache-Wirkung-Diagramm
+name.en: Cause and Effect Diagram
+name.es: Diagrama de causa y efecto
+name.it: Diagramma causa-effetto
+name.fr: Diagramme de cause à effet
+description.de: Fischgrätdiagramm (Ishikawa) mit Haupt- und Nebenursachen für die Analyse von Problemen.
+description.en: Fishbone diagram (Ishikawa) with main and secondary causes for analysing problems.
+description.es: Diagrama de espina de pescado (Ishikawa) con causas principales y secundarias para analizar problemas.
+description.it: Diagramma a lisca di pesce (Ishikawa) con cause principali e secondarie per analizzare i problemi.
+description.fr: Diagramme en arête de poisson (Ishikawa) avec causes principales et secondaires pour analyser les problèmes.
+category: business
+order: 70
+stencils: cause_effect, standard, callouts
+starters: fishbone
+default: fishbone

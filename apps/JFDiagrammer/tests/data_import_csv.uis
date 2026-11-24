@@ -1,0 +1,70 @@
+#!args --no-system-fonts --data-dir apps/JFDiagrammer/tests
+# JFDiagrammer, JD18: Benutzerdefinierter Import of a text file (RD-02, AS-03, IM-05) --
+# data_raeume.csv (own content, written by hand): ';' between the fields, Windows-1252 with
+# umlauts and ß, German decimal commas.  The page shows the delimiter and the encoding found;
+# the numbers come in as numbers.  A second import of the same file without the header row: the
+# columns are F1 ... F4, the header line is a row, the rows' order identifies them; the tab gets a
+# name of its own; the tabs switch the rows shown.
+cmd 6401
+click radio:"Textdatei (CSV)"
+click button:"Weiter >"
+expect text:"Verbindung zu einer Textdatei" exists
+click button:"Durchsuchen..."
+expect dialog:"Öffnen" exists
+expect text:"data_raeume.csv" exists
+click #2087714828
+key ctrl+a
+type "data_raeume.csv"
+click button:"Öffnen"
+expect text:"Trennzeichen: Semikolon" exists
+expect text:"Codierung: Windows-1252" exists
+click button:"Weiter >"
+expect checkbox:"Fläche" checked
+expect text:"Büro Süd" exists
+expect text:"Großraum" exists
+click button:"Weiter >"
+expect checkbox:"Raum (empfohlen)" checked
+click button:"Fertig stellen"
+a11y expect announced "Datenquelle „data_raeume.csv“ importiert"
+expect tab:"data_raeume.csv" selected
+expect button:"Fläche" exists
+expect button:"Nutzung" exists
+expect text:"Büro Süd" exists
+expect text:"Lager Öl" exists
+expect text:"Großraum" exists
+expect text:"24.5" exists
+expect text:"8.25" exists
+# a header click sorts the rows in the pane (numbers by value): Fläche ascending, then descending
+click button:"Fläche"
+expect text:"Lager Öl" rect * 628 * *
+expect text:"8.25" rect * 628 * *
+click button:"Fläche"
+expect text:"96" rect * 628 * *
+# again, without the header row and identified by the rows' order
+cmd 6401
+expect radio:"Textdatei (CSV)" checked
+click button:"Weiter >"
+click button:"Durchsuchen..."
+click #2087714828
+key ctrl+a
+type "data_raeume.csv"
+click button:"Öffnen"
+click checkbox:"Erste Datenzeile enthält Spaltenüberschriften"
+expect checkbox:"Erste Datenzeile enthält Spaltenüberschriften" unchecked
+click button:"Weiter >"
+expect checkbox:"F2" checked
+click button:"Weiter >"
+click radio:"Zeilen werden anhand ihrer Reihenfolge identifiziert"
+expect radio:"Zeilen werden anhand ihrer Reihenfolge identifiziert" checked
+click button:"Fertig stellen"
+expect tab:"data_raeume.csv (2)" selected
+expect button:"F1" exists
+expect button:"Fläche" missing
+expect text:"Raum" exists
+expect text:"Fläche" exists
+# the tabs: the first source again
+click tab:"data_raeume.csv"
+expect tab:"data_raeume.csv" selected
+expect button:"Fläche" exists
+expect text:"Raum" missing
+shot build/JFDiagrammer-data-import-csv.png

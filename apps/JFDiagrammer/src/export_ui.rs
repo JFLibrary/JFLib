@@ -156,11 +156,19 @@ pub(crate) fn page(app: &mut Diagrammer, ui: &mut Ui) {
     }
     ui.spacer(8);
     for (k, name) in [t("Als Webseite speichern"), t("Dateityp ändern")].iter().enumerate() {
+        // (JD15, UI-11) Dateityp ändern: Speichern unter with its file types
+        let works = k == 1;
         ui.next_size(-1, 36);
-        ui.next_flags(ST_SUBTLE | ST_ALIGN_START | ST_DISABLED);
+        ui.next_flags(ST_SUBTLE | ST_ALIGN_START | if works && has { 0 } else { ST_DISABLED });
         ui.next_icon([JD_FILE_DRAWING_L, JD_BS_EXPORT][k]);
-        ui.button(ID + 8 + k as u32, name);
-        ui.tooltip(&format!("{} · {}", name, t("Noch nicht verfügbar")));
+        if ui.button(ID + 8 + k as u32, name) & EV_ACT != 0 && works {
+            app.open_backstage(ui, crate::backstage::PAGE_SAVE_AS);
+        }
+        if works {
+            ui.tooltip(t("Die Zeichnung als anderen Dateityp speichern (Speichern unter)"));
+        } else {
+            ui.tooltip(&format!("{} · {}", name, t("Noch nicht verfügbar")));
+        }
     }
     ui.box_end();
     // ---- the options of the format

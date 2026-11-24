@@ -13,8 +13,10 @@
 // bitmaps, metafiles, OLE objects), connectors (1-D shapes: dynamic connectors and lines),
 // guides (Type Guide), shapes (the rest).  A style matches when it is the shape's line, fill or
 // text style (its own, else its master shape's).  Shapes on hidden or locked layers are not in
-// the canvas' model as selectable ones and are left out; guides cannot be selected on the canvas
-// yet (JD7: SP-10 open), so their box is shown but off.
+// the canvas' model as selectable ones and are left out.  (JD15) Guides are chosen by kind
+// only, while Ansicht › Führungslinien shows them; selected they are drawn in the accent colour,
+// move with the arrow keys and go with Del (a click on the canvas does not select them yet:
+// SP-10).
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -150,8 +152,6 @@ pub(crate) fn dialog(app: &mut Diagrammer, ui: &mut Ui) {
     match st.mode {
         0 => {
             for (k, name) in KINDS.iter().enumerate() {
-                // guides cannot be selected on the canvas yet
-                ui.next_flags(if k == K_GUIDES { ST_DISABLED } else { 0 });
                 ui.checkbox(ID_DLG + 8 + k as u32, t(name), &mut st.kinds[k]);
             }
         }
@@ -189,7 +189,7 @@ fn select(app: &mut Diagrammer, ui: &mut Ui) {
         return;
     }
     let doc = &o.doc;
-    let keys: Vec<u64> = app
+    let mut keys: Vec<u64> = app
         .model
         .shapes
         .iter()
@@ -200,6 +200,11 @@ fn select(app: &mut Diagrammer, ui: &mut Ui) {
         })
         .map(|s| s.key)
         .collect();
+    // (JD15) the guides shown, by kind only (edit_canvas.rs keeps a selected guide selectable)
+    if app.select.mode == 0 && app.select.kinds[K_GUIDES] != 0 && app.view_guides {
+        let guides: Vec<u64> = app.model.guides.iter().map(|g| g.key).filter(|k| !keys.contains(k)).collect();
+        keys.extend(guides);
+    }
     app.se.select(&keys);
     ui.repass();
 }

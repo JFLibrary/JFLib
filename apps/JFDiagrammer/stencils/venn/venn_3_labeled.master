@@ -1,0 +1,181 @@
+# Venn-Diagramm aus 3 Mengen mit Beschriftung (SH-007, JD26): drei überlappende Kreise (gestreckt
+# Ellipsen) wie venn_3.master, dazu drei Beschriftungen mit Hinweislinie: Menge A oben links,
+# Menge B oben rechts, Menge C unten.  Teile der Gruppe: die Mengen (Variantenfarben 1 bis 3 über
+# die Schnellformatvorlage, 35 % durchscheinend wie venn_3.master, ohne eigenen Text) und die
+# Beschriftungen (Formatvorlage Connector, QuickStyleType 3, ohne Pfeilspitzen und ohne
+# Texthintergrund: die Linien bleiben auch in einem Design ohne Shape-Linien sichtbar).  Je eine
+# Hinweislinie läuft senkrecht vom freien Teil der Menge bis an das Textband; die Textbänder oben
+# und unten sind User.Lb hoch (0,1333 der Höhe, 10 mm), die Kreise liegen dazwischen wie in
+# venn_3.master.  Die
+# Teile folgen der Größe der Gruppe.
+master: Venn diagram 3 sets with labels
+name.de: Venn-Diagramm aus 3 Mengen mit Beschriftung
+name.en: Three-set Venn diagram with labels
+name.es: Diagrama de Venn de 3 conjuntos con etiquetas
+name.it: Diagramma di Venn a 3 insiemi con etichette
+name.fr: Diagramme de Venn à 3 ensembles avec étiquettes
+prompt.de: Drei überlappende Mengen mit Beschriftungslinien. Klicken Sie eine Beschriftung zweimal an, um ihren Text zu ändern.
+prompt.en: Three overlapping sets with label lines. Click a label twice to change its text.
+prompt.es: Tres conjuntos superpuestos con líneas de etiqueta. Haga clic dos veces en una etiqueta para cambiar su texto.
+prompt.it: Tre insiemi sovrapposti con linee di etichetta. Fai clic due volte su un'etichetta per cambiarne il testo.
+prompt.fr: Trois ensembles qui se chevauchent avec lignes d'étiquette. Cliquez deux fois sur une étiquette pour modifier son texte.
+keywords.de: Venn, Menge, Mengendiagramm, Beschriftung, Schnittmenge, Überlappung, drei
+keywords.en: Venn, set, set diagram, labels, intersection, overlap, three
+keywords.es: Venn, conjunto, diagrama de conjuntos, etiquetas, intersección, superposición, tres
+keywords.it: Venn, insieme, diagramma degli insiemi, etichette, intersezione, sovrapposizione, tre
+keywords.fr: Venn, ensemble, diagramme d'ensembles, étiquettes, intersection, chevauchement, trois
+
+[Shape]
+Width = 60 mm
+Width.us = 2.5 in
+Height = 75 mm
+Height.us = 3 in
+
+[User]
+# die Höhe der Textbänder oben und unten, die Höhe des Bereichs der Kreise (wie venn_3.master)
+Lb:  Value = Height*0.1333
+Hc:  Value = Height-User.Lb*2
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# Menge A, oben links
+[Part A]
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.325)
+PinY = GUARD(Sheet.1!User.Lb+Sheet.1!User.Hc*0.665)
+Width = GUARD(Sheet.1!Width*0.6)
+Height = GUARD(Sheet.1!User.Hc*0.65)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+FillForegndTrans = 35%
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Menge B, oben rechts
+[Part B]
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.675)
+PinY = GUARD(Sheet.1!User.Lb+Sheet.1!User.Hc*0.665)
+Width = GUARD(Sheet.1!Width*0.6)
+Height = GUARD(Sheet.1!User.Hc*0.65)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+FillForegndTrans = 35%
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Menge C, unten
+[Part C]
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD(Sheet.1!User.Lb+Sheet.1!User.Hc*0.335)
+Width = GUARD(Sheet.1!Width*0.6)
+Height = GUARD(Sheet.1!User.Hc*0.65)
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+FillForegndTrans = 35%
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Beschriftung von A: vom freien Teil von A nach oben
+[Part LA]
+text.de: Menge A
+text.en: Set A
+text.es: Conjunto A
+text.it: Insieme A
+text.fr: Ensemble A
+style: Connector
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.2)
+PinY = GUARD((Sheet.1!User.Lb+Sheet.1!User.Hc*0.8+Sheet.1!Height)*0.5)
+Width = GUARD(Sheet.1!Width*0.4)
+Height = GUARD(Sheet.1!Height-(Sheet.1!User.Lb+Sheet.1!User.Hc*0.8))
+TxtPinX = Width*0.5
+TxtPinY = Height-Sheet.1!User.Lb*0.5
+TxtWidth = Width
+TxtHeight = Sheet.1!User.Lb*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TextBkgnd = 0
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5; Y = 0
+LineTo  X = Width*0.5; Y = Height-Sheet.1!User.Lb
+
+# Beschriftung von B: vom freien Teil von B nach oben
+[Part LB]
+text.de: Menge B
+text.en: Set B
+text.es: Conjunto B
+text.it: Insieme B
+text.fr: Ensemble B
+style: Connector
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.8)
+PinY = GUARD((Sheet.1!User.Lb+Sheet.1!User.Hc*0.8+Sheet.1!Height)*0.5)
+Width = GUARD(Sheet.1!Width*0.4)
+Height = GUARD(Sheet.1!Height-(Sheet.1!User.Lb+Sheet.1!User.Hc*0.8))
+TxtPinX = Width*0.5
+TxtPinY = Height-Sheet.1!User.Lb*0.5
+TxtWidth = Width
+TxtHeight = Sheet.1!User.Lb*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TextBkgnd = 0
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5; Y = 0
+LineTo  X = Width*0.5; Y = Height-Sheet.1!User.Lb
+
+# Beschriftung von C: vom freien Teil von C nach unten
+[Part LC]
+text.de: Menge C
+text.en: Set C
+text.es: Conjunto C
+text.it: Insieme C
+text.fr: Ensemble C
+style: Connector
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((Sheet.1!User.Lb+Sheet.1!User.Hc*0.12)*0.5)
+Width = GUARD(Sheet.1!Width*0.4)
+Height = GUARD(Sheet.1!User.Lb+Sheet.1!User.Hc*0.12)
+TxtPinX = Width*0.5
+TxtPinY = Sheet.1!User.Lb*0.5
+TxtWidth = Width
+TxtHeight = Sheet.1!User.Lb*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TextBkgnd = 0
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5; Y = Height
+LineTo  X = Width*0.5; Y = Sheet.1!User.Lb

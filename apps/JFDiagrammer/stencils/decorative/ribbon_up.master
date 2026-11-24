@@ -1,0 +1,91 @@
+# Band nach oben (SH-003, JD26): ein Spruchband, dessen Enden hinter dem Mittelteil nach oben
+# stehen.  Band und Enden sind getrennte Flächen mit einer Fuge von 0,8 mm (so bleibt das Band
+# auch in einem Design ohne Shape-Linien vorn); die Falten sind ein Abschnitt ohne Füllung.  Row_1 an der Kerbe des linken Endes ändert die Tiefe
+# beider Kerben (anteilig, nur waagrecht).  Der Text steht auf dem Mittelteil.
+master: Ribbon up
+name.de: Band nach oben
+name.en: Ribbon up
+name.es: Cinta hacia arriba
+name.it: Nastro verso l'alto
+name.fr: Ruban vers le haut
+prompt.de: Spruchband mit Enden nach oben für Überschriften. Mit dem gelben Steuerpunkt ändern Sie die Kerben der Enden.
+prompt.en: Banner with its ends raised, for headings. Drag the yellow control handle to change the notches of the ends.
+prompt.es: Cinta con los extremos hacia arriba para títulos. Arrastre el controlador amarillo para cambiar las muescas de los extremos.
+prompt.it: Nastro con le estremità verso l'alto per titoli. Trascina la maniglia di controllo gialla per cambiare le tacche delle estremità.
+prompt.fr: Ruban aux extrémités relevées pour les titres. Faites glisser la poignée de contrôle jaune pour modifier les encoches des extrémités.
+keywords.de: Band, Spruchband, Banner, Schleife, Überschrift, Titel, Dekor
+keywords.en: ribbon, banner, scroll, heading, title, decoration
+keywords.es: cinta, pancarta, banderola, título, encabezado, decoración
+keywords.it: nastro, striscione, banner, titolo, intestazione, decorazione
+keywords.fr: ruban, banderole, bannière, titre, en-tête, décoration
+
+[Shape]
+Width = 60 mm
+Width.us = 2.5 in
+Height = 20 mm
+Height.us = 0.75 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.375
+TxtWidth = Width*0.7
+TxtHeight = Height*0.75
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Tiefe der Kerben, die Fuge zwischen Band und Enden
+N:  Value = MIN(MAX(Controls.Row_1, 0), Width*0.12)
+G:  Value = MIN(0.8 mm, Height*0.04)
+
+# 1 das Band
+[Geometry]
+MoveTo  X = Width*0.15; Y = 0
+LineTo  X = Width*0.85; Y = 0
+LineTo  X = Width*0.85; Y = Height*0.75
+LineTo  X = Width*0.15; Y = Height*0.75
+LineTo  X = Width*0.15; Y = 0
+
+# 2 das linke Ende, ein L um die Ecke des Bands
+[Geometry]
+MoveTo  X = 0; Y = Height*0.25
+LineTo  X = Width*0.15-User.G; Y = Height*0.25
+LineTo  X = Width*0.15-User.G; Y = Height*0.75+User.G
+LineTo  X = Width*0.25; Y = Height*0.75+User.G
+LineTo  X = Width*0.25; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = User.N; Y = Height*0.625
+LineTo  X = 0; Y = Height*0.25
+
+# 3 das rechte Ende
+[Geometry]
+MoveTo  X = Width; Y = Height*0.25
+LineTo  X = Width-User.N; Y = Height*0.625
+LineTo  X = Width; Y = Height
+LineTo  X = Width*0.75; Y = Height
+LineTo  X = Width*0.75; Y = Height*0.75+User.G
+LineTo  X = Width*0.85+User.G; Y = Height*0.75+User.G
+LineTo  X = Width*0.85+User.G; Y = Height*0.25
+LineTo  X = Width; Y = Height*0.25
+
+# 4 die Falten
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.15-User.G; Y = Height*0.75+User.G
+LineTo  X = Width*0.25; Y = Height
+MoveTo  X = Width*0.85+User.G; Y = Height*0.75+User.G
+LineTo  X = Width*0.75; Y = Height
+
+[Controls]
+Row_1:  X = Width*0.05; Y = Height*0.625
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Tiefe der Kerben ändern"
+        Tip.en = "Change the depth of the notches"
+        Tip.es = "Cambiar la profundidad de las muescas"
+        Tip.it = "Cambia la profondità delle tacche"
+        Tip.fr = "Modifier la profondeur des encoches"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.625; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height*0.75; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.625; DirX = 1; DirY = 0

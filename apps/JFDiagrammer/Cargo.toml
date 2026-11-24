@@ -27,6 +27,8 @@ rt.workspace = true
 diagram_core.workspace = true
 diagram_io.workspace = true
 diagram_view.workspace = true
+# (JD18) Excel workbooks and text files as data sources (data_source.rs)
+sheet_io.workspace = true
 render2d.workspace = true
 text.workspace = true
 # (JD12) printing and exporting: surfaces, the PDF's document information

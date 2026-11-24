@@ -32,6 +32,7 @@ dependencies = [
  "jflib-plat",
  "jflib-render2d",
  "jflib-rt",
+ "jflib-sheet-io",
  "jflib-style-netlab",
  "jflib-text",
  "jflib-ui",
@@ -295,6 +296,7 @@ dependencies = [
  "jflib-img-webp",
  "jflib-plat",
  "jflib-rt",
+ "jflib-sheet-io",
  "jflib-ui",
 ]
 
@@ -709,6 +711,7 @@ dependencies = [
  "jflib-render3d",
  "jflib-rt",
  "jflib-shader",
+ "jflib-sheet-io",
  "jflib-simd",
  "jflib-spell",
  "jflib-style-assets",
@@ -1322,6 +1325,18 @@ version = "0.2.1"
 [[package]]
 name = "jflib-shader"
 version = "0.2.1"
+
+[[package]]
+name = "jflib-sheet-io"
+version = "0.2.1"
+dependencies = [
+ "jflib-archive",
+ "jflib-base",
+ "jflib-datetime",
+ "jflib-formats",
+ "jflib-plat",
+ "jflib-rt",
+]
 
 [[package]]
 name = "jflib-simd"

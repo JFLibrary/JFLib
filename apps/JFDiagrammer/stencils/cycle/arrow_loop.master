@@ -1,0 +1,341 @@
+# Pfeilschleife (SH-033, JD26): drei bis acht Kreise auf einer Kreisbahn, zwischen je zwei Kreisen
+# eine offene Pfeilspitze im Uhrzeigersinn.  Teile der Gruppe: zuerst die Bahn mit den Spitzen (nur
+# Linien: Formatvorlage Connector ohne deren Pfeilspitzen, sichtbar auch in Designs ohne
+# Shape-Linien; Spitzen über der Zahl verborgen), darüber die Kreise, jeder mit eigenem Text und
+# eigener Variantenfarbe (100 bis 106, der achte 103).  Die Kreise füllen 0,6 ihres Abstands, so
+# bleibt Platz für die Spitzen.  Die Zahl steht in den Shape-Daten (Prop.Count); Kreise über der
+# Zahl liegen verborgen auf dem letzten.  Die Kreise tragen anfangs ihre Nummer.
+master: Arrow loop
+name.de: Pfeilschleife
+name.en: Arrow loop
+name.es: Bucle de flechas
+name.it: Anello di frecce
+name.fr: Boucle de flèches
+prompt.de: Kreise auf einer Kreisbahn mit Pfeilen für Abläufe, die sich wiederholen. Die Zahl der Kreise stellen Sie in den Shape-Daten ein.
+prompt.en: Circles on a circular path with arrows for processes that repeat. Set the number of circles in the shape data.
+prompt.es: Círculos sobre una trayectoria circular con flechas para procesos que se repiten. Defina el número de círculos en los datos de la forma.
+prompt.it: Cerchi su un percorso circolare con frecce per processi che si ripetono. Imposta il numero di cerchi nei dati della forma.
+prompt.fr: Cercles sur un parcours circulaire avec des flèches pour les processus qui se répètent. Définissez le nombre de cercles dans les données de la forme.
+keywords.de: Schleife, Pfeile, Kreislauf, Kreise, Zyklus, Ablauf, Wiederholung
+keywords.en: loop, arrows, cycle, circles, process, repetition
+keywords.es: bucle, flechas, ciclo, círculos, proceso, repetición
+keywords.it: anello, frecce, ciclo, cerchi, processo, ripetizione
+keywords.fr: boucle, flèches, cycle, cercles, processus, répétition
+
+[Shape]
+Width = 70 mm
+Width.us = 2.75 in
+Height = 70 mm
+Height.us = 2.75 in
+
+[User]
+# die Zahl der Elemente (3 bis 8), der Winkel je Element, der Sinus des halben Winkels; der
+# Durchmesser eines Kreises und der Radius des Rings ihrer Mitten als Anteil der Breite (die
+# Elemente füllen 0.6 ihres Abstands, der Ring reicht bis an den Rand)
+N:   Value = MIN(MAX(ROUND(Prop.Count,0),3),8)
+S:   Value = 2*PI()/User.N
+Sn:  Value = SIN(PI()/User.N)
+Dc:  Value = User.Sn*0.6/(1+0.6*User.Sn)
+Rc:  Value = 0.5-User.Dc*0.5
+# die halbe Länge einer Pfeilspitze (Bogenmaß) und ihre halbe Breite (Anteil der Breite)
+Ad:  Value = 0.07
+Aw:  Value = 0.03
+
+[Property]
+Count:  Type = 2; Format = "0"; Value = 5
+        Label.de = Kreise
+        Label.en = Circles
+        Label.es = Círculos
+        Label.it = Cerchi
+        Label.fr = Cercles
+        Prompt.de = Anzahl der Kreise (3 bis 8)
+        Prompt.en = Number of circles (3 to 8)
+        Prompt.es = Número de círculos (de 3 a 8)
+        Prompt.it = Numero di cerchi (da 3 a 8)
+        Prompt.fr = Nombre de cercles (de 3 à 8)
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# die Bahn und die Spitzen zwischen den Kreisen
+[Part Track]
+style: Connector
+
+[User]
+# der Winkel der Spitze k: zwischen Kreis k und k+1
+U1:  Value = PI()*0.5-0.5*Sheet.1!User.S
+U2:  Value = PI()*0.5-1.5*Sheet.1!User.S
+U3:  Value = PI()*0.5-2.5*Sheet.1!User.S
+U4:  Value = PI()*0.5-3.5*Sheet.1!User.S
+U5:  Value = PI()*0.5-4.5*Sheet.1!User.S
+U6:  Value = PI()*0.5-5.5*Sheet.1!User.S
+U7:  Value = PI()*0.5-6.5*Sheet.1!User.S
+U8:  Value = PI()*0.5-7.5*Sheet.1!User.S
+
+[Shape]
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width*(0.5+Sheet.1!User.Rc); B = Height*0.5; C = Width*0.5; D = Height*(0.5+Sheet.1!User.Rc)
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*COS(User.U1+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*SIN(User.U1+Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+Sheet.1!User.Rc*COS(User.U1-Sheet.1!User.Ad)); Y = Height*(0.5+Sheet.1!User.Rc*SIN(User.U1-Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*COS(User.U1+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*SIN(User.U1+Sheet.1!User.Ad))
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*COS(User.U2+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*SIN(User.U2+Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+Sheet.1!User.Rc*COS(User.U2-Sheet.1!User.Ad)); Y = Height*(0.5+Sheet.1!User.Rc*SIN(User.U2-Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*COS(User.U2+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*SIN(User.U2+Sheet.1!User.Ad))
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*COS(User.U3+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*SIN(User.U3+Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+Sheet.1!User.Rc*COS(User.U3-Sheet.1!User.Ad)); Y = Height*(0.5+Sheet.1!User.Rc*SIN(User.U3-Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*COS(User.U3+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*SIN(User.U3+Sheet.1!User.Ad))
+
+[Geometry]
+NoFill = TRUE
+NoShow = 4>Sheet.1!User.N
+MoveTo  X = Width*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*COS(User.U4+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*SIN(User.U4+Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+Sheet.1!User.Rc*COS(User.U4-Sheet.1!User.Ad)); Y = Height*(0.5+Sheet.1!User.Rc*SIN(User.U4-Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*COS(User.U4+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*SIN(User.U4+Sheet.1!User.Ad))
+
+[Geometry]
+NoFill = TRUE
+NoShow = 5>Sheet.1!User.N
+MoveTo  X = Width*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*COS(User.U5+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*SIN(User.U5+Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+Sheet.1!User.Rc*COS(User.U5-Sheet.1!User.Ad)); Y = Height*(0.5+Sheet.1!User.Rc*SIN(User.U5-Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*COS(User.U5+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*SIN(User.U5+Sheet.1!User.Ad))
+
+[Geometry]
+NoFill = TRUE
+NoShow = 6>Sheet.1!User.N
+MoveTo  X = Width*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*COS(User.U6+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*SIN(User.U6+Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+Sheet.1!User.Rc*COS(User.U6-Sheet.1!User.Ad)); Y = Height*(0.5+Sheet.1!User.Rc*SIN(User.U6-Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*COS(User.U6+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*SIN(User.U6+Sheet.1!User.Ad))
+
+[Geometry]
+NoFill = TRUE
+NoShow = 7>Sheet.1!User.N
+MoveTo  X = Width*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*COS(User.U7+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*SIN(User.U7+Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+Sheet.1!User.Rc*COS(User.U7-Sheet.1!User.Ad)); Y = Height*(0.5+Sheet.1!User.Rc*SIN(User.U7-Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*COS(User.U7+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*SIN(User.U7+Sheet.1!User.Ad))
+
+[Geometry]
+NoFill = TRUE
+NoShow = 8>Sheet.1!User.N
+MoveTo  X = Width*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*COS(User.U8+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc+Sheet.1!User.Aw)*SIN(User.U8+Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+Sheet.1!User.Rc*COS(User.U8-Sheet.1!User.Ad)); Y = Height*(0.5+Sheet.1!User.Rc*SIN(User.U8-Sheet.1!User.Ad))
+LineTo  X = Width*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*COS(User.U8+Sheet.1!User.Ad)); Y = Height*(0.5+(Sheet.1!User.Rc-Sheet.1!User.Aw)*SIN(User.U8+Sheet.1!User.Ad))
+
+# Element 8 (von oben im Uhrzeigersinn): sichtbar ab 8; sonst deckungsgleich mit dem letzten, verborgen
+[Part C8]
+text.de: 8
+text.en: 8
+text.es: 8
+text.it: 8
+text.fr: 8
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(8,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+HideText = 8>Sheet.1!User.N
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+NoShow = 8>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Element 7 (von oben im Uhrzeigersinn): sichtbar ab 7; sonst deckungsgleich mit dem letzten, verborgen
+[Part C7]
+text.de: 7
+text.en: 7
+text.es: 7
+text.it: 7
+text.fr: 7
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(7,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+HideText = 7>Sheet.1!User.N
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+NoShow = 7>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Element 6 (von oben im Uhrzeigersinn): sichtbar ab 6; sonst deckungsgleich mit dem letzten, verborgen
+[Part C6]
+text.de: 6
+text.en: 6
+text.es: 6
+text.it: 6
+text.fr: 6
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(6,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+HideText = 6>Sheet.1!User.N
+QuickStyleLineColor = 105
+QuickStyleFillColor = 105
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Element 5 (von oben im Uhrzeigersinn): sichtbar ab 5; sonst deckungsgleich mit dem letzten, verborgen
+[Part C5]
+text.de: 5
+text.en: 5
+text.es: 5
+text.it: 5
+text.fr: 5
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(5,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+HideText = 5>Sheet.1!User.N
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Element 4 (von oben im Uhrzeigersinn): sichtbar ab 4; sonst deckungsgleich mit dem letzten, verborgen
+[Part C4]
+text.de: 4
+text.en: 4
+text.es: 4
+text.it: 4
+text.fr: 4
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(4,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+HideText = 4>Sheet.1!User.N
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Element 3 (von oben im Uhrzeigersinn): immer sichtbar
+[Part C3]
+text.de: 3
+text.en: 3
+text.es: 3
+text.it: 3
+text.fr: 3
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(3,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Element 2 (von oben im Uhrzeigersinn): immer sichtbar
+[Part C2]
+text.de: 2
+text.en: 2
+text.es: 2
+text.it: 2
+text.fr: 2
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(2,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Element 1 (von oben im Uhrzeigersinn): immer sichtbar
+[Part C1]
+text.de: 1
+text.en: 1
+text.es: 1
+text.it: 1
+text.fr: 1
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(1,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height

@@ -1,0 +1,28 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD15: Datei › Neu -- a double click on a catalogue tile creates the drawing at once
+# (UI-04: the first click opens the preview, the second press lands there); the search over the
+# templates finds them by their names in every language, accents and case aside (UI-05)
+click tab:"Datei"
+expect button:"Standardflussdiagramm" exists
+# the search: an English and a Spanish name, nothing found
+focus #25473
+type "flowchart"
+expect text:"Suchergebnisse" exists
+expect button:"Standardflussdiagramm" exists
+expect button:"Leere Zeichnung" missing
+key ctrl+a
+type "diagrama de flujo basico"
+expect button:"Standardflussdiagramm" exists
+key ctrl+a
+type "zzzz"
+expect text:"Keine Vorlagen gefunden" exists
+expect button:"Standardflussdiagramm" missing
+key ctrl+a
+key backspace
+expect text:"Suchergebnisse" missing
+expect button:"Leere Zeichnung" exists
+# a double click on a tile
+dblclick button:"Standardflussdiagramm"
+expect button:"Zurück" missing
+expect text:"Zeichnung2 – JFDiagrammer" exists
+expect tab:"Standardflussdiagramm-Shapes" selected

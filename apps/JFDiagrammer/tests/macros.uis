@@ -1,0 +1,67 @@
+#!args apps/JFDiagrammer/tests/makro.vsdm --no-system-fonts --save-dir build
+# JFDiagrammer, JD16: a drawing with a macro project (.vsdm, DF-04; makro.vsdm is diagramiotest's
+# self-built sample with a stand-in vbaProject.bin, --write-samples) opens with a notice and the
+# note on Datei › Info that its macros are kept and never run.  Speichern unter as .vsdx asks
+# first: Abbrechen writes nothing, "Mit Makros speichern" offers the name as .vsdm (written, it
+# opens with its macros again), "Ohne Makros speichern" writes a .vsdx without them.  diagramiotest's group vdx checks
+# that the project's bytes pass through unchanged
+expect box:"Hinweise zur Datei" exists
+click tab:"Datei"
+click button:"Info"
+expect text:"Die Zeichnung enthält Makros (VBA). Sie bleiben beim Speichern als .vsdm erhalten und werden nie ausgeführt." exists
+key esc
+# as .vsdx: the question; Abbrechen
+cmd 4100
+expect dialog:"Speichern unter" exists
+click #28940
+key ctrl+a
+type "jd16-makro.vsdx"
+click button:"Speichern"
+expect dialog:"Makros speichern?" exists
+click button:"Abbrechen"
+expect dialog:"Makros speichern?" missing
+expect text:"makro – JFDiagrammer" exists
+# again, with the macros: a .vsdm
+cmd 4100
+click #28940
+key ctrl+a
+type "jd16-makro.vsdx"
+click button:"Speichern"
+click button:"Mit Makros speichern"
+expect dialog:"Makros speichern?" missing
+expect dialog:"Speichern unter" exists
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+expect text:"jd16-makro – JFDiagrammer" exists
+# a new drawing, then the .vsdm again: its macros are there
+cmd 4097
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+expect box:"Hinweise zur Datei" missing
+cmd 4098
+click button:"jd16-makro.vsdm"
+expect text:"jd16-makro – JFDiagrammer" exists
+expect box:"Hinweise zur Datei" exists
+click tab:"Datei"
+click button:"Info"
+expect text:"Die Zeichnung enthält Makros (VBA). Sie bleiben beim Speichern als .vsdm erhalten und werden nie ausgeführt." exists
+key esc
+# without the macros: a .vsdx that opens without them
+cmd 4100
+click #28940
+key ctrl+a
+type "jd16-ohne-makros.vsdx"
+click button:"Speichern"
+expect dialog:"Makros speichern?" exists
+click button:"Ohne Makros speichern"
+expect text:"jd16-ohne-makros – JFDiagrammer" exists
+cmd 4097
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+cmd 4098
+click button:"jd16-ohne-makros.vsdx"
+expect text:"jd16-ohne-makros – JFDiagrammer" exists
+expect box:"Hinweise zur Datei" missing
+click tab:"Datei"
+click button:"Info"
+expect text:"Die Zeichnung enthält Makros (VBA). Sie bleiben beim Speichern als .vsdm erhalten und werden nie ausgeführt." missing

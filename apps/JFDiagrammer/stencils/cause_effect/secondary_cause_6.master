@@ -1,0 +1,71 @@
+# Sekundäre Ursache 6 (SH-041, JD26): eine kurze beschriftete Nebenlinie senkrecht von unten nach
+# oben; ihr Ende mit der Pfeilspitze des Designs (Formatvorlage Connector, wie
+# primary_cause_1.master) klebt an einem Punkt einer primären Ursache.  Ein 1D-Shape mit aufrechtem
+# Kasten (wie die Kategorien: Width = EndX-BeginX, Height = EndY-BeginY, Angle 0; lokal (0, 0) ist
+# der Anfang), damit der Text waagrecht bleibt, gleich wie die Linie liegt: 30 x 5 mm mittig unter
+# dem Anfang, ohne den Texthintergrund der Formatvorlage (TextBkgnd 0).  Die sechs Varianten
+# unterscheiden sich nur in der Lage der Enden.  Auf der Linie liegen 3 Verbindungspunkte (1/4 bis
+# 3/4) für eine weitere Ebene von Ursachen (wie bei den Kategorien und primären Ursachen eine
+# begründete Ausnahme von der Stilregel für 1D-Shapes).
+master: Secondary cause 6
+style: Connector
+name.de: Sekundäre Ursache 6
+name.en: Secondary cause 6
+name.es: Causa secundaria 6
+name.it: Causa secondaria 6
+name.fr: Cause secondaire 6
+text.de: Nebenursache
+text.en: Sub-cause
+text.es: Subcausa
+text.it: Sottocausa
+text.fr: Sous-cause
+prompt.de: Nebenursache, die senkrecht von unten auf eine Ursache zeigt; der Text steht unter ihrem Anfang. Ziehen Sie ihr Ende auf die Linie einer primären Ursache.
+prompt.en: Sub-cause that points vertically from below at a cause; the text is below its start. Drag its end onto the line of a primary cause.
+prompt.es: Subcausa que apunta verticalmente desde abajo a una causa; el texto está bajo su inicio. Arrastre su extremo sobre la línea de una causa primaria.
+prompt.it: Sottocausa che punta verticalmente dal basso verso una causa; il testo è sotto il suo inizio. Trascina la sua estremità sulla linea di una causa primaria.
+prompt.fr: Sous-cause qui pointe verticalement depuis le bas vers une cause ; le texte est au-dessous de son début. Faites glisser son extrémité sur la ligne d'une cause primaire.
+keywords.de: Nebenursache, sekundäre Ursache, Ursache, Ishikawa, Fischgräte, Unterursache
+keywords.en: sub-cause, secondary cause, cause, Ishikawa, fishbone, factor
+keywords.es: subcausa, causa secundaria, causa, Ishikawa, espina de pescado, factor
+keywords.it: sottocausa, causa secondaria, causa, Ishikawa, lisca di pesce, fattore
+keywords.fr: sous-cause, cause secondaire, cause, Ishikawa, arête de poisson, facteur
+
+[Shape]
+BeginX = 15 mm
+BeginX.us = 0.6 in
+BeginY = 6 mm
+BeginY.us = 0.25 in
+EndX = 15 mm
+EndX.us = 0.6 in
+EndY = 18 mm
+EndY.us = 0.75 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+LocPinX = GUARD(Width*0.5)
+LocPinY = GUARD(Height*0.5)
+Angle = GUARD(0DA)
+FlipX = GUARD(FALSE)
+FlipY = GUARD(FALSE)
+TxtPinX = 0
+TxtPinY = -3 mm
+TxtPinY.us = -0.12 in
+TxtWidth = 30 mm
+TxtWidth.us = 1.2 in
+TxtHeight = 5 mm
+TxtHeight.us = 0.2 in
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = 0 deg
+TextBkgnd = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = Height
+
+[Connection]
+Row  X = Width*0.25; Y = Height*0.25; DirX = 0; DirY = 0
+Row  X = Width*0.5; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = Width*0.75; Y = Height*0.75; DirX = 0; DirY = 0

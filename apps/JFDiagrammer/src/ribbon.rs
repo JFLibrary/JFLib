@@ -1,5 +1,5 @@
-// ribbon -- the registers of the ribbon: Start, Einfügen, Entwurf, Ansicht with every P1
-// command of FEATURES.md 3.3-3.9, the context registers Container-Tools › Format (RK-01)
+// ribbon -- the registers of the ribbon: Start, Einfügen, Entwurf, (JD18) Daten, Ansicht with
+// every P1 command of FEATURES.md 3.3-3.9, the context registers Container-Tools › Format (RK-01)
 // and Textwerkzeuge › Text (RK-11), and (JD10) Funktionsübergreifendes Flussdiagramm (RK-03)
 // while the page holds one
 //
@@ -40,6 +40,8 @@ pub(crate) enum Reg {
     Start,
     Insert,
     Design,
+    /// (JD18) Daten
+    Data,
     View,
     Container,
     Text,
@@ -54,6 +56,7 @@ const L_START: &str = "Start";
 const L_INSERT: &str = "Einfügen";
 const L_DESIGN: &str = "Entwurf";
 const L_VIEW: &str = "Ansicht";
+const L_DATA: &str = "Daten";
 const L_CONTAINER_SET: &str = "Container-Tools";
 const L_CONTAINER: &str = "Format|Register";
 const L_TEXT_SET: &str = "Textwerkzeuge";
@@ -62,7 +65,7 @@ const L_CFF: &str = "Funktionsübergreifendes Flussdiagramm";
 
 /// the registers shown now (the File register first)
 pub(crate) fn tabs(app: &Diagrammer) -> Vec<Reg> {
-    let mut v = alloc::vec![Reg::File, Reg::Start, Reg::Insert, Reg::Design, Reg::View];
+    let mut v = alloc::vec![Reg::File, Reg::Start, Reg::Insert, Reg::Design, Reg::Data, Reg::View];
     // (JD13, VL-04) also when the drawing's template brought the register
     if crate::structures::has_cff(app) || crate::templates::has_register(app, "cff") {
         v.push(Reg::Cff);
@@ -83,6 +86,7 @@ pub(crate) fn tab_descs(ui: &Ui, regs: &[Reg]) -> Vec<RibbonTab<'static>> {
             Reg::Start => RibbonTab::new(t(L_START)),
             Reg::Insert => RibbonTab::new(t(L_INSERT)),
             Reg::Design => RibbonTab::new(t(L_DESIGN)),
+            Reg::Data => RibbonTab::new(t(L_DATA)),
             Reg::View => RibbonTab::new(t(L_VIEW)),
             Reg::Container => RibbonTab::context(tc(L_CONTAINER), t(L_CONTAINER_SET), ui.color(T_OK)),
             Reg::Text => RibbonTab::context(tc(L_TEXT), t(L_TEXT_SET), ui.color(T_WARN)),
@@ -150,10 +154,15 @@ static CFF_ORIENT_MENU: [It; 2] = [C(CFF_HORIZONTAL), C(CFF_VERTICAL)];
 static TEXTBOX_MENU: [It; 2] = [C(TEXT_BOX_H), C(TEXT_BOX_V)];
 static ORIENT_MENU: [It; 2] = [C(PORTRAIT), C(LANDSCAPE)];
 // (JD8 rest: pages) the paper sizes with their measures (page_size.rs)
-static SIZE_MENU: [It; 12] = [
+static SIZE_MENU: [It; 14] = [
     C(SIZE_LETTER), C(SIZE_LEGAL), C(SIZE_TABLOID), C(SIZE_EXECUTIVE), C(SIZE_A5), C(SIZE_A4), C(SIZE_A3), C(SIZE_B5), C(SIZE_B4),
+    // (JD15, RW-02) envelopes and the US government sizes below captions
+    Sub("Umschläge", &ENVELOPE_MENU), // i18n
+    Sub("Behördenformate", &GOV_MENU), // i18n
     Sep, C(FIT_DRAWING), C(MORE_SIZES),
 ];
+static ENVELOPE_MENU: [It; 6] = [C(SIZE_ENV_10), C(SIZE_ENV_DL), C(SIZE_ENV_C4), C(SIZE_ENV_C5), C(SIZE_ENV_C6), C(SIZE_ENV_MONARCH)];
+static GOV_MENU: [It; 2] = [C(SIZE_GOV_LETTER), C(SIZE_GOV_LEGAL)];
 // (JD11) the variants' own menus (TH-05: new colours, effects, connectors, fonts, embellishment) are P2
 static THEME_MENU: [It; 0] = [];
 static CONN_MENU: [It; 8] = [C(CONN_RIGHT_ANGLE), C(CONN_STRAIGHT), C(CONN_CURVED), Sep, C(LINE_JUMPS), C(REROUTE), Sep, C(CONNECT_SHAPES)];
@@ -200,6 +209,17 @@ static DESIGN: [Group; 4] = [
         Col::Small(&[Sm::Menu(VAR_FONTS, &THEME_MENU), Sm::Menu(VAR_EMBELLISHMENT, &THEME_MENU)]),
     ]),
     Group("Layout", LAYOUT_ROUTING, &[Col::BigMenu(CONNECTORS, &CONN_MENU)]),
+];
+
+// (JD18) Daten, as Visio's register (FEATURES 3.7); the data graphics wait for JD19
+static REFRESH_MENU: [It; 4] = [C(DATA_REFRESH_ALL), C(DATA_REFRESH), Sep, C(DATA_AUTO_LINK_REFRESH)];
+// i18n
+static DATA: [Group; 5] = [
+    Group("Externe Daten", 0, &[Col::Big(DATA_QUICK_IMPORT), Col::Big(DATA_CUSTOM_IMPORT), Col::BigSplit(DATA_REFRESH_ALL, &REFRESH_MENU), Col::Big(DATA_TEXT_DRAWING)]),
+    Group("Datengrafiken", 0, &[Col::Big(DATA_GRAPHICS), Col::Small(&[Sm::Btn(DG_POSITION), Sm::Btn(DG_CONFIGURE), Sm::Btn(DG_AUTO_SPACE)])]),
+    Group("Daten anzeigen", 0, &[Col::Big(DATA_LEGEND)]),
+    Group("Einblenden/Ausblenden", 0, &[Col::Small(&[Sm::Check(PANE_SHAPE_DATA_WINDOW), Sm::Check(PANE_EXTERNAL_DATA), Sm::Check(PANE_DG_FIELDS)])]),
+    Group("Erweiterte Datenverknüpfung", 0, &[Col::Small(&[Sm::Btn(DATA_LINK), Sm::Btn(DATA_ADVANCED_DG)])]),
 ];
 
 // i18n
@@ -257,6 +277,7 @@ fn groups(reg: Reg) -> &'static [Group] {
         Reg::Cff => &CFF,
         Reg::Insert => &INSERT,
         Reg::Design => &DESIGN,
+        Reg::Data => &DATA,
         Reg::View => &VIEW,
         Reg::Container => &CONTAINER_FORMAT,
         Reg::Text => &TEXT_TOOLS,
@@ -265,7 +286,7 @@ fn groups(reg: Reg) -> &'static [Group] {
 }
 
 // (JD8 rest) the registers with their own ribbon, in the row's order
-const RIBBONS: [Reg; 7] = [Reg::Start, Reg::Insert, Reg::Design, Reg::View, Reg::Cff, Reg::Container, Reg::Text];
+const RIBBONS: [Reg; 8] = [Reg::Start, Reg::Insert, Reg::Design, Reg::Data, Reg::View, Reg::Cff, Reg::Container, Reg::Text];
 
 // the menu of the button whose command is `id`: its register, its popup id, its rows
 fn menu_of(id: u32) -> Option<(Reg, u32, &'static [It])> {
@@ -306,7 +327,8 @@ pub(crate) fn menu_place(id: u32) -> Option<(Reg, u32)> {
 pub(crate) fn menu_usable(app: &Diagrammer, id: u32) -> Option<bool> {
     let (_, _, items) = menu_of(id)?;
     // a split button's action is a command of its own (Neue Seite, Zeichentools)
-    if matches!(id, NEW_PAGE | DRAW_TOOLS | PASTE | TEXT_BOX | BRING_FRONT | SEND_BACK | FONT_COLOR) {
+    // (JD18) Alle aktualisieren is a row of its own menu: asking the rows would ask it again
+    if matches!(id, NEW_PAGE | DRAW_TOOLS | PASTE | TEXT_BOX | BRING_FRONT | SEND_BACK | FONT_COLOR | DATA_REFRESH_ALL) {
         return None;
     }
     Some(any_enabled(app, items))

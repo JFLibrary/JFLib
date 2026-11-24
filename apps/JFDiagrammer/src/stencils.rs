@@ -11,7 +11,9 @@
 //   add_favorite(app, ui, key, entry)   copy a master into "Favoriten" (data://shapes/
 //                               favorites.vssx, created on first use; MS-06, SL-07)
 //   search(app)                 the hits of the panel's query: NameU, the names in all five
-//                               languages, the keywords (SL-04), over every stencil read
+//                               languages, the keywords, (JD15) the QuickInfos (SL-04), over
+//                               every stencil read; every word, or one of them with the option
+//                               "Shape-Suche: ein Wort genügt"
 //   MORE_MENU / command(app, ui, id)   "Weitere Shapes" (SL-05): Meine Shapes, the categories
 //                               with their stencils, Schablone öffnen, Neue Schablone (metric /
 //                               US); the rows of each submenu are Mi::List rows, their commands
@@ -288,7 +290,8 @@ pub(crate) fn open_builtin_in(app: &mut Diagrammer, ui: &mut Ui, k: usize, m: Me
     Some(key)
 }
 
-/// open a stencil file in the panel (Schablone öffnen, Backstage › Öffnen of a .vssx)
+/// open a stencil file in the panel (Schablone öffnen, Backstage › Öffnen of a .vssx; JD16 .vsx,
+/// JD17 .vss: read only, never written back)
 pub(crate) fn open_file(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
     let origin = Origin::File(String::from(path));
     if let Some(key) = app.stencils.find(&origin) {
@@ -303,15 +306,21 @@ pub(crate) fn open_file(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
         ui.repass();
         return false;
     };
-    match vsdx::read(&bytes, &vsdx::Limits::VSDX) {
+    // (JD16) a .vsx by the XML reader of 2003-2010; (JD17) a .vss by the binary one
+    match crate::doc_file::read(&bytes, path) {
         Ok(l) if l.doc.kind == DocKind::Stencil => {
+            let warnings = l.warnings.len() + l.more_warnings;
             let key = app.stencils.add(origin, l.doc, &stem, false);
             app.stencils.show(key);
             app.stencils.error = None;
             ui.recent_add(path);
+            // (JD17) converted, import only: the notice says so (NO-12)
+            if crate::doc_file::is_binary(path) {
+                crate::doc_file::binary_notice(app, &name, warnings);
+            }
         }
         Ok(_) => app.stencils.error = Some(tf("„{}“ ist keine Schablone.", &[&name])),
-        Err(e) => app.stencils.error = Some(format!("{} {e}", tf("„{}“ kann nicht geöffnet werden.", &[&name]))),
+        Err(e) => app.stencils.error = Some(format!("{} {}", tf("„{}“ kann nicht geöffnet werden.", &[&name]), crate::doc_file::error_text(&e))),
     }
     ui.repass();
     true
@@ -523,7 +532,7 @@ pub(crate) fn my_files(ui: &Ui) -> Vec<String> {
     let mut v: Vec<String> = Vec::new();
     plat::dir_list(&dir, &mut |name, is_dir, _| {
         let l = name.to_ascii_lowercase();
-        if !is_dir && (l.ends_with(".vssx") || l.ends_with(".vssm")) && l != "favorites.vssx" {
+        if !is_dir && (l.ends_with(".vssx") || l.ends_with(".vssm") || l.ends_with(".vsx") || l.ends_with(".vss")) && l != "favorites.vssx" {
             v.push(format!("{dir}/{name}"));
         }
     });
@@ -535,11 +544,14 @@ pub(crate) fn my_files(ui: &Ui) -> Vec<String> {
 
 /// the hits of the panel's query (cached while it stays the same)
 pub(crate) fn search(app: &mut Diagrammer) -> &[(u32, usize)] {
+    // (JD15, SL-04) every word or one of them (Optionen › Erweitert); the cache knows which
+    let any = app.opts.get(&crate::options::SEARCH_ANY);
     let st = &mut app.stencils;
-    let q = st.panel.query.trim().to_string();
+    let words_of = st.panel.query.trim().to_string();
+    let q = if any { format!("\u{1}{words_of}") } else { words_of.clone() };
     if q != st.hits_for {
         st.hits.clear();
-        let words: Vec<String> = q.split_whitespace().map(instance::fold).collect();
+        let words: Vec<String> = words_of.split_whitespace().map(instance::fold).collect();
         let words: Vec<&str> = words.iter().map(|s| s.as_str()).collect();
         if !words.is_empty() {
             // the open stencils first, in panel order, then the others read
@@ -548,7 +560,7 @@ pub(crate) fn search(app: &mut Diagrammer) -> &[(u32, usize)] {
             for i in order {
                 let l = &st.loaded[i];
                 for (k, e) in l.entries.iter().enumerate() {
-                    if e.texts.matches(&words, false) {
+                    if e.texts.matches(&words, any) {
                         st.hits.push((l.key, k));
                     }
                 }

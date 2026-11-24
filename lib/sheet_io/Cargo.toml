@@ -1,0 +1,36 @@
+[package]
+name = "jflib-sheet-io"
+description = "XLSX and CSV import: workbooks and delimited text as typed tables"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "sheet_io"
+path = "src/lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# base: numbers (f64_parse / f64_format); archive: ZIP and OPC of the workbooks; datetime: civil dates;
+# formats: the strict XML pull reader of the parts
+base.workspace = true
+archive.workspace = true
+datetime.workspace = true
+formats.workspace = true
+
+# the unit tests (cargo test --lib): a test binary has std's start, panic handler and allocator
+[dev-dependencies]
+rt = { workspace = true, features = ["std"] }
+plat = { workspace = true, features = ["std"] }
+
+# docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
+# of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "wasm32-unknown-unknown", "aarch64-linux-android"]

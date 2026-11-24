@@ -1,0 +1,56 @@
+# Wolke (SH-003, JD26): ein Umriss aus sechs Kreisbögen (gestreckt Ellipsenbögen), wie sechs sich
+# überlappende Kreise, von denen nur der äußere Rand bleibt.  Die Kreise (in einem 40 x 30 mm
+# großen Kasten, ringsum gegen den Uhrzeigersinn ab unten): (20|8) r 8, (31|10) r 9,
+# (28,5|19,5) r 7,5, (19|21) r 9, (9,5|17,5) r 6,5, (8|9) r 8; jeder Bogen läuft vom
+# Schnittpunkt mit dem vorigen Kreis zum Schnittpunkt mit dem nächsten, durch seine Mitte.
+# Alle Punkte anteilig; das Verhältnis der Achsen D = Breite x 0,75 / Höhe hält die Bögen beim
+# Strecken auf ihren Ellipsen.  Keine Steuerpunkte; der Text steht in der Mitte.
+master: Cloud
+name.de: Wolke
+name.en: Cloud
+name.es: Nube
+name.it: Nuvola
+name.fr: Nuage
+prompt.de: Wolke für Wetter, Gedanken und Cloud-Dienste.
+prompt.en: Cloud for weather, thoughts and cloud services.
+prompt.es: Nube para el tiempo, los pensamientos y los servicios en la nube.
+prompt.it: Nuvola per meteo, pensieri e servizi cloud.
+prompt.fr: Nuage pour la météo, les pensées et les services cloud.
+keywords.de: Wolke, Cloud, Wetter, Gedanke, Idee, Internet, Dekor
+keywords.en: cloud, weather, thought, idea, internet, decoration
+keywords.es: nube, tiempo, pensamiento, idea, internet, decoración
+keywords.it: nuvola, cloud, meteo, pensiero, idea, internet, decorazione
+keywords.fr: nuage, cloud, météo, pensée, idée, internet, décoration
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 30 mm
+Height.us = 1.125 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.47
+TxtWidth = Width*0.7
+TxtHeight = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+MoveTo           X = Width*0.3391; Y = Height*0.1083
+EllipticalArcTo  X = Width*0.6473; Y = Height*0.0863; A = Width*0.4893; B = Height*0.0004
+                 C = 0 deg; D = Width*0.75/Height
+EllipticalArcTo  X = Width*0.8941; Y = Height*0.5878; A = Width*0.9631; B = Height*0.1688
+                 C = 0 deg; D = Width*0.75/Height
+EllipticalArcTo  X = Width*0.6513; Y = Height*0.8863; A = Width*0.8396; B = Height*0.8338
+                 C = 0 deg; D = Width*0.75/Height
+EllipticalArcTo  X = Width*0.2622; Y = Height*0.7975; A = Width*0.437; B = Height*0.9957
+                 C = 0 deg; D = Width*0.75/Height
+EllipticalArcTo  X = Width*0.083; Y = Height*0.5163; A = Width*0.1137; B = Height*0.7236
+                 C = 0 deg; D = Width*0.75/Height
+EllipticalArcTo  X = Width*0.3391; Y = Height*0.1083; A = Width*0.0466; B = Height*0.1288
+                 C = 0 deg; D = Width*0.75/Height
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.3333; DirX = -1; DirY = 0
+Row  X = Width*0.475; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.3; DirX = 1; DirY = 0

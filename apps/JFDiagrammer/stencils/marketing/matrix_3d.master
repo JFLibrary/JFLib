@@ -1,0 +1,279 @@
+# 3D-Matrix (SH-030, JD26): vier Blöcke mit Tiefe im Raster 2 x 2, 2 mm Abstand.  Jeder Block sind
+# drei Teile der Gruppe: Deckel und rechte Seite schattiert über Formeln auf die Designfarbe
+# (TINT 40 und SHADE 50 von THEMEVAL("FillColor"), mit THEMEGUARD), die Vorderseite mit Text.
+# Die Blöcke stehen von vorn unten nach hinten oben in der Datei (die Vorderseite eines hinteren
+# Blocks verdeckt den Deckel des Blocks darunter).  Row_1 an der hinteren linken Ecke des Deckels
+# ändert die Tiefe (Abstand vom linken Rand, die Tiefe bleibt beim Vergrößern).  Rounding 0 an
+# allen Flächen: in den abgerundeten Design-Varianten würde jede Fläche für sich gerundet und die
+# Blöcke fielen auseinander.
+master: 3-D matrix
+name.de: 3D-Matrix
+name.en: 3-D matrix
+name.es: Matriz 3D
+name.it: Matrice 3D
+name.fr: Matrice 3D
+prompt.de: Vierfeldermatrix aus Blöcken mit Tiefe. Mit dem gelben Steuerpunkt ändern Sie die Tiefe.
+prompt.en: Four-field matrix of blocks with depth. Drag the yellow control handle to change the depth.
+prompt.es: Matriz de cuatro bloques con profundidad. Arrastre el controlador amarillo para cambiar la profundidad.
+prompt.it: Matrice a quattro blocchi con profondità. Trascina la maniglia di controllo gialla per cambiare la profondità.
+prompt.fr: Matrice de quatre blocs avec profondeur. Faites glisser la poignée de contrôle jaune pour modifier la profondeur.
+keywords.de: Matrix, 3D, Vierfeldermatrix, Blöcke, Tiefe, Portfolio, Quadrant
+keywords.en: matrix, 3D, four-field matrix, blocks, depth, portfolio, quadrant
+keywords.es: matriz, 3D, cuatro campos, bloques, profundidad, cartera, cuadrante
+keywords.it: matrice, 3D, quattro campi, blocchi, profondità, portafoglio, quadrante
+keywords.fr: matrice, 3D, quatre champs, blocs, profondeur, portefeuille, quadrant
+
+[Shape]
+Width = 70 mm
+Width.us = 2.75 in
+Height = 55 mm
+Height.us = 2.25 in
+
+[User]
+# der Abstand der Blöcke, die Tiefe, Breite und Höhe einer Vorderseite
+G:   Value = 2 mm
+     Value.us = 0.08 in
+D:   Value = MIN(MAX(Controls.Row_1,0),Width*0.25,Height*0.25)
+QW:  Value = (Width-User.D-User.G)*0.5
+QH:  Value = (Height-User.D-User.G)*0.5
+
+[Controls]
+Row_1:  X = 5 mm; Y = Height
+        X.us = 0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Tiefe ändern"
+        Tip.en = "Change the depth"
+        Tip.es = "Cambiar la profundidad"
+        Tip.it = "Cambia la profondità"
+        Tip.fr = "Modifier la profondeur"
+
+[Connection]
+Row  X = (Width-User.D)*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = (Height+User.D)*0.5; DirX = -1; DirY = 0
+Row  X = (Width+User.D)*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = (Height-User.D)*0.5; DirX = 1; DirY = 0
+
+# Block 3: Deckel, rechte Seite, Vorderseite
+[Part Q3T]
+
+[User]
+Bx:  Value = 0
+By:  Value = Sheet.1!User.QH
+
+[Shape]
+FillForegnd = THEMEGUARD(TINT(THEMEVAL("FillColor"),40))
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = User.Bx; Y = User.By
+LineTo  X = User.Bx+Sheet.1!User.QW; Y = User.By
+LineTo  X = User.Bx+Sheet.1!User.QW+Sheet.1!User.D; Y = User.By+Sheet.1!User.D
+LineTo  X = User.Bx+Sheet.1!User.D; Y = User.By+Sheet.1!User.D
+LineTo  X = User.Bx; Y = User.By
+
+[Part Q3S]
+
+[User]
+Bx:  Value = Sheet.1!User.QW
+By:  Value = 0
+
+[Shape]
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = User.Bx; Y = User.By
+LineTo  X = User.Bx+Sheet.1!User.D; Y = User.By+Sheet.1!User.D
+LineTo  X = User.Bx+Sheet.1!User.D; Y = User.By+Sheet.1!User.QH+Sheet.1!User.D
+LineTo  X = User.Bx; Y = User.By+Sheet.1!User.QH
+LineTo  X = User.Bx; Y = User.By
+
+[Part Q3]
+text.de: Feld 3
+text.en: Field 3
+text.es: Campo 3
+text.it: Campo 3
+text.fr: Champ 3
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Height*0.5)
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Block 4: Deckel, rechte Seite, Vorderseite
+[Part Q4T]
+
+[User]
+Bx:  Value = (Sheet.1!User.QW+Sheet.1!User.G)
+By:  Value = Sheet.1!User.QH
+
+[Shape]
+FillForegnd = THEMEGUARD(TINT(THEMEVAL("FillColor"),40))
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = User.Bx; Y = User.By
+LineTo  X = User.Bx+Sheet.1!User.QW; Y = User.By
+LineTo  X = User.Bx+Sheet.1!User.QW+Sheet.1!User.D; Y = User.By+Sheet.1!User.D
+LineTo  X = User.Bx+Sheet.1!User.D; Y = User.By+Sheet.1!User.D
+LineTo  X = User.Bx; Y = User.By
+
+[Part Q4S]
+
+[User]
+Bx:  Value = (Sheet.1!User.QW+Sheet.1!User.G)+Sheet.1!User.QW
+By:  Value = 0
+
+[Shape]
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = User.Bx; Y = User.By
+LineTo  X = User.Bx+Sheet.1!User.D; Y = User.By+Sheet.1!User.D
+LineTo  X = User.Bx+Sheet.1!User.D; Y = User.By+Sheet.1!User.QH+Sheet.1!User.D
+LineTo  X = User.Bx; Y = User.By+Sheet.1!User.QH
+LineTo  X = User.Bx; Y = User.By
+
+[Part Q4]
+text.de: Feld 4
+text.en: Field 4
+text.es: Campo 4
+text.it: Campo 4
+text.fr: Champ 4
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD((Sheet.1!User.QW+Sheet.1!User.G)+Width*0.5)
+PinY = GUARD(Height*0.5)
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Block 1: Deckel, rechte Seite, Vorderseite
+[Part Q1T]
+
+[User]
+Bx:  Value = 0
+By:  Value = (Sheet.1!User.QH+Sheet.1!User.G)+Sheet.1!User.QH
+
+[Shape]
+FillForegnd = THEMEGUARD(TINT(THEMEVAL("FillColor"),40))
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = User.Bx; Y = User.By
+LineTo  X = User.Bx+Sheet.1!User.QW; Y = User.By
+LineTo  X = User.Bx+Sheet.1!User.QW+Sheet.1!User.D; Y = User.By+Sheet.1!User.D
+LineTo  X = User.Bx+Sheet.1!User.D; Y = User.By+Sheet.1!User.D
+LineTo  X = User.Bx; Y = User.By
+
+[Part Q1S]
+
+[User]
+Bx:  Value = Sheet.1!User.QW
+By:  Value = (Sheet.1!User.QH+Sheet.1!User.G)
+
+[Shape]
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = User.Bx; Y = User.By
+LineTo  X = User.Bx+Sheet.1!User.D; Y = User.By+Sheet.1!User.D
+LineTo  X = User.Bx+Sheet.1!User.D; Y = User.By+Sheet.1!User.QH+Sheet.1!User.D
+LineTo  X = User.Bx; Y = User.By+Sheet.1!User.QH
+LineTo  X = User.Bx; Y = User.By
+
+[Part Q1]
+text.de: Feld 1
+text.en: Field 1
+text.es: Campo 1
+text.it: Campo 1
+text.fr: Champ 1
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD((Sheet.1!User.QH+Sheet.1!User.G)+Height*0.5)
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Block 2: Deckel, rechte Seite, Vorderseite
+[Part Q2T]
+
+[User]
+Bx:  Value = (Sheet.1!User.QW+Sheet.1!User.G)
+By:  Value = (Sheet.1!User.QH+Sheet.1!User.G)+Sheet.1!User.QH
+
+[Shape]
+FillForegnd = THEMEGUARD(TINT(THEMEVAL("FillColor"),40))
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = User.Bx; Y = User.By
+LineTo  X = User.Bx+Sheet.1!User.QW; Y = User.By
+LineTo  X = User.Bx+Sheet.1!User.QW+Sheet.1!User.D; Y = User.By+Sheet.1!User.D
+LineTo  X = User.Bx+Sheet.1!User.D; Y = User.By+Sheet.1!User.D
+LineTo  X = User.Bx; Y = User.By
+
+[Part Q2S]
+
+[User]
+Bx:  Value = (Sheet.1!User.QW+Sheet.1!User.G)+Sheet.1!User.QW
+By:  Value = (Sheet.1!User.QH+Sheet.1!User.G)
+
+[Shape]
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = User.Bx; Y = User.By
+LineTo  X = User.Bx+Sheet.1!User.D; Y = User.By+Sheet.1!User.D
+LineTo  X = User.Bx+Sheet.1!User.D; Y = User.By+Sheet.1!User.QH+Sheet.1!User.D
+LineTo  X = User.Bx; Y = User.By+Sheet.1!User.QH
+LineTo  X = User.Bx; Y = User.By
+
+[Part Q2]
+text.de: Feld 2
+text.en: Field 2
+text.es: Campo 2
+text.it: Campo 2
+text.fr: Champ 2
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD((Sheet.1!User.QW+Sheet.1!User.G)+Width*0.5)
+PinY = GUARD((Sheet.1!User.QH+Sheet.1!User.G)+Height*0.5)
+Rounding = 0 mm
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

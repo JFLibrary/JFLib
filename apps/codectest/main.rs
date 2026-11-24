@@ -25,6 +25,9 @@
 //                                  tests/archive.uis); exit code 1 on a failure
 //   --jxlref                       JPEG XL fixtures decoded against libjxl's pixels (jxlref.rs;
 //                                  tests/jxlref.uis); exit code 1 on a failure
+//   --sheet [--only NAME]          lib/sheet_io's XLSX and CSV readers against crafted
+//                                  workbooks and texts (sheet_checks.rs; tests/sheet.uis); exit
+//                                  code 1 on a failure
 //
 // Batch file: "CTB1", then records {u32 op, u32 arg, u32 len, u8 data[len]}.
 // Result file: "CTR1", then per record {i32 result, u32 len, u8 data[len]}.  An op handler
@@ -73,6 +76,7 @@ mod ops_tga;
 mod ops_tiff;
 mod ops_zlib;
 mod limits;
+mod sheet_checks;
 
 pub const R_UNKNOWN: i32 = -100;
 
@@ -192,6 +196,9 @@ fn codectest() -> i32 {
     }
     if ct.args.flag("--hostile") {
         return hostile::run(ct.args.value("--only"));
+    }
+    if ct.args.flag("--sheet") {
+        return sheet_checks::run(ct.args.value("--only"));
     }
     if let Some(inp) = ct.args.value("--batch").map(alloc::string::String::from) {
         return run_batch(&mut ct, &inp);

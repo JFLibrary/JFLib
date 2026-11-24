@@ -96,6 +96,8 @@ fn place_world(app: &mut Diagrammer, ui: &mut Ui, key: u32, k: usize, at: [f32; 
             app.se.select(&[edit_canvas::key_of(shape)]);
             // screen readers (and scripts) hear what was dropped
             ui.announce(&tf("„{}“ abgelegt", &[&said]), LIVE_POLITE);
+            // (JD18, SP-13) its fields marked "ask on drop"
+            crate::data_ask::after_drop(app, ui, &[shape]);
         }
         Err(err) => {
             app.stencils.error = Some(tf("Das Shape lässt sich nicht ablegen: {}", &[&alloc::format!("{err:?}")]));

@@ -1,0 +1,179 @@
+# Kreisförmige Pfeile (SH-030, JD26): vier gebogene Blockpfeile im Kreis, im Uhrzeigersinn, als
+# Teile einer Gruppe mit je einer Variantenfarbe des Designs (Schnellformatvorlage 100 bis 103).
+# Jeder Pfeil: Schaft als Ringstück (Mitte bei 0,76 des Radius, Dicke 0,22), Spitze doppelt so
+# breit wie der Schaft, 0,42 rad lang, die Spitze auf dem Mittelkreis; zwischen den Pfeilen je
+# 0,1 rad Luft.  Bögen sind Ellipsenbögen durch die Mitte des Schafts, gestreckt folgt der Kreis
+# der Ellipse.  Der Text gehört der Gruppe und steht in der freien Mitte; die Gruppe hat die
+# Formatvorlage Text Only (ohne Fläche wäre Text aus Normal in Kontrast weiß auf weiß).
+master: Circular arrows
+style: Text Only
+name.de: Kreisförmige Pfeile
+name.en: Circular arrows
+name.es: Flechas circulares
+name.it: Frecce circolari
+name.fr: Flèches circulaires
+text.de: Kreislauf
+text.en: Cycle
+text.es: Ciclo
+text.it: Ciclo
+text.fr: Cycle
+prompt.de: Vier gebogene Pfeile im Kreis für Kreisläufe. Der Text steht in der Mitte; jeder Pfeil hat eine eigene Farbe des Designs.
+prompt.en: Four curved arrows in a circle for cycles. The text is in the middle; each arrow has its own colour of the design.
+prompt.es: Cuatro flechas curvas en círculo para ciclos. El texto está en el centro; cada flecha tiene su propio color del diseño.
+prompt.it: Quattro frecce curve in cerchio per i cicli. Il testo è al centro; ogni freccia ha un proprio colore del tema.
+prompt.fr: Quatre flèches courbes en cercle pour les cycles. Le texte est au centre ; chaque flèche a sa propre couleur du thème.
+keywords.de: Kreislauf, Zyklus, Pfeile, Kreis, Prozess, wiederkehrend, Rückkopplung
+keywords.en: cycle, loop, arrows, circle, process, recurring, feedback
+keywords.es: ciclo, bucle, flechas, círculo, proceso, recurrente, retroalimentación
+keywords.it: ciclo, anello, frecce, cerchio, processo, ricorrente, retroazione
+keywords.fr: cycle, boucle, flèches, cercle, processus, récurrent, rétroaction
+
+[Shape]
+Width = 50 mm
+Width.us = 2 in
+Height = 50 mm
+Height.us = 2 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Width*0.5
+TxtHeight = Height*0.25
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# halbe Luft zwischen zwei Pfeilen und Länge der Spitze (Bogenmaß); Mitte und halbe Dicke
+# des Schafts als Anteil des Radius
+Gap: Value = 0.05
+Hd:  Value = 0.42
+Rm:  Value = 0.76
+T:   Value = 0.11
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# Pfeil 1 (oben beginnend im Uhrzeigersinn)
+[Part A1]
+
+[User]
+# Anfang (Schaftende) und Spitze im Bogenmaß, Grund der Spitze, Mitte des Schafts; die Radien
+# außen und innen am Schaft und an der Spitze
+A0:  Value = PI()*0.5-0*PI()*0.5-Sheet.1!User.Gap
+A1:  Value = PI()*0.5-1*PI()*0.5+Sheet.1!User.Gap
+Ah:  Value = User.A1+Sheet.1!User.Hd
+Am:  Value = (User.A0+User.Ah)*0.5
+Ro:  Value = Sheet.1!User.Rm+Sheet.1!User.T
+Ri:  Value = Sheet.1!User.Rm-Sheet.1!User.T
+Ho:  Value = Sheet.1!User.Rm+2*Sheet.1!User.T
+Hi:  Value = Sheet.1!User.Rm-2*Sheet.1!User.T
+
+[Shape]
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+User.Ro*COS(User.A0)); Y = Height*0.5*(1+User.Ro*SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+User.Ro*COS(User.Ah)); Y = Height*0.5*(1+User.Ro*SIN(User.Ah))
+                 A = Width*0.5*(1+User.Ro*COS(User.Am)); B = Height*0.5*(1+User.Ro*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Ho*COS(User.Ah)); Y = Height*0.5*(1+User.Ho*SIN(User.Ah))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rm*COS(User.A1)); Y = Height*0.5*(1+Sheet.1!User.Rm*SIN(User.A1))
+LineTo           X = Width*0.5*(1+User.Hi*COS(User.Ah)); Y = Height*0.5*(1+User.Hi*SIN(User.Ah))
+LineTo           X = Width*0.5*(1+User.Ri*COS(User.Ah)); Y = Height*0.5*(1+User.Ri*SIN(User.Ah))
+EllipticalArcTo  X = Width*0.5*(1+User.Ri*COS(User.A0)); Y = Height*0.5*(1+User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+User.Ri*COS(User.Am)); B = Height*0.5*(1+User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Pfeil 2 (oben beginnend im Uhrzeigersinn)
+[Part A2]
+
+[User]
+# Anfang (Schaftende) und Spitze im Bogenmaß, Grund der Spitze, Mitte des Schafts; die Radien
+# außen und innen am Schaft und an der Spitze
+A0:  Value = PI()*0.5-1*PI()*0.5-Sheet.1!User.Gap
+A1:  Value = PI()*0.5-2*PI()*0.5+Sheet.1!User.Gap
+Ah:  Value = User.A1+Sheet.1!User.Hd
+Am:  Value = (User.A0+User.Ah)*0.5
+Ro:  Value = Sheet.1!User.Rm+Sheet.1!User.T
+Ri:  Value = Sheet.1!User.Rm-Sheet.1!User.T
+Ho:  Value = Sheet.1!User.Rm+2*Sheet.1!User.T
+Hi:  Value = Sheet.1!User.Rm-2*Sheet.1!User.T
+
+[Shape]
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+User.Ro*COS(User.A0)); Y = Height*0.5*(1+User.Ro*SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+User.Ro*COS(User.Ah)); Y = Height*0.5*(1+User.Ro*SIN(User.Ah))
+                 A = Width*0.5*(1+User.Ro*COS(User.Am)); B = Height*0.5*(1+User.Ro*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Ho*COS(User.Ah)); Y = Height*0.5*(1+User.Ho*SIN(User.Ah))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rm*COS(User.A1)); Y = Height*0.5*(1+Sheet.1!User.Rm*SIN(User.A1))
+LineTo           X = Width*0.5*(1+User.Hi*COS(User.Ah)); Y = Height*0.5*(1+User.Hi*SIN(User.Ah))
+LineTo           X = Width*0.5*(1+User.Ri*COS(User.Ah)); Y = Height*0.5*(1+User.Ri*SIN(User.Ah))
+EllipticalArcTo  X = Width*0.5*(1+User.Ri*COS(User.A0)); Y = Height*0.5*(1+User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+User.Ri*COS(User.Am)); B = Height*0.5*(1+User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Pfeil 3 (oben beginnend im Uhrzeigersinn)
+[Part A3]
+
+[User]
+# Anfang (Schaftende) und Spitze im Bogenmaß, Grund der Spitze, Mitte des Schafts; die Radien
+# außen und innen am Schaft und an der Spitze
+A0:  Value = PI()*0.5-2*PI()*0.5-Sheet.1!User.Gap
+A1:  Value = PI()*0.5-3*PI()*0.5+Sheet.1!User.Gap
+Ah:  Value = User.A1+Sheet.1!User.Hd
+Am:  Value = (User.A0+User.Ah)*0.5
+Ro:  Value = Sheet.1!User.Rm+Sheet.1!User.T
+Ri:  Value = Sheet.1!User.Rm-Sheet.1!User.T
+Ho:  Value = Sheet.1!User.Rm+2*Sheet.1!User.T
+Hi:  Value = Sheet.1!User.Rm-2*Sheet.1!User.T
+
+[Shape]
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+User.Ro*COS(User.A0)); Y = Height*0.5*(1+User.Ro*SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+User.Ro*COS(User.Ah)); Y = Height*0.5*(1+User.Ro*SIN(User.Ah))
+                 A = Width*0.5*(1+User.Ro*COS(User.Am)); B = Height*0.5*(1+User.Ro*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Ho*COS(User.Ah)); Y = Height*0.5*(1+User.Ho*SIN(User.Ah))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rm*COS(User.A1)); Y = Height*0.5*(1+Sheet.1!User.Rm*SIN(User.A1))
+LineTo           X = Width*0.5*(1+User.Hi*COS(User.Ah)); Y = Height*0.5*(1+User.Hi*SIN(User.Ah))
+LineTo           X = Width*0.5*(1+User.Ri*COS(User.Ah)); Y = Height*0.5*(1+User.Ri*SIN(User.Ah))
+EllipticalArcTo  X = Width*0.5*(1+User.Ri*COS(User.A0)); Y = Height*0.5*(1+User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+User.Ri*COS(User.Am)); B = Height*0.5*(1+User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Pfeil 4 (oben beginnend im Uhrzeigersinn)
+[Part A4]
+
+[User]
+# Anfang (Schaftende) und Spitze im Bogenmaß, Grund der Spitze, Mitte des Schafts; die Radien
+# außen und innen am Schaft und an der Spitze
+A0:  Value = PI()*0.5-3*PI()*0.5-Sheet.1!User.Gap
+A1:  Value = PI()*0.5-4*PI()*0.5+Sheet.1!User.Gap
+Ah:  Value = User.A1+Sheet.1!User.Hd
+Am:  Value = (User.A0+User.Ah)*0.5
+Ro:  Value = Sheet.1!User.Rm+Sheet.1!User.T
+Ri:  Value = Sheet.1!User.Rm-Sheet.1!User.T
+Ho:  Value = Sheet.1!User.Rm+2*Sheet.1!User.T
+Hi:  Value = Sheet.1!User.Rm-2*Sheet.1!User.T
+
+[Shape]
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+User.Ro*COS(User.A0)); Y = Height*0.5*(1+User.Ro*SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+User.Ro*COS(User.Ah)); Y = Height*0.5*(1+User.Ro*SIN(User.Ah))
+                 A = Width*0.5*(1+User.Ro*COS(User.Am)); B = Height*0.5*(1+User.Ro*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.Ho*COS(User.Ah)); Y = Height*0.5*(1+User.Ho*SIN(User.Ah))
+LineTo           X = Width*0.5*(1+Sheet.1!User.Rm*COS(User.A1)); Y = Height*0.5*(1+Sheet.1!User.Rm*SIN(User.A1))
+LineTo           X = Width*0.5*(1+User.Hi*COS(User.Ah)); Y = Height*0.5*(1+User.Hi*SIN(User.Ah))
+LineTo           X = Width*0.5*(1+User.Ri*COS(User.Ah)); Y = Height*0.5*(1+User.Ri*SIN(User.Ah))
+EllipticalArcTo  X = Width*0.5*(1+User.Ri*COS(User.A0)); Y = Height*0.5*(1+User.Ri*SIN(User.A0))
+                 A = Width*0.5*(1+User.Ri*COS(User.Am)); B = Height*0.5*(1+User.Ri*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1

@@ -1,0 +1,73 @@
+# Primäre Ursache 2 (SH-041, JD26): das Gegenstück zu Primäre Ursache 1 (primary_cause_1.master):
+# eine waagrechte Linie mit dem Text darüber, von rechts an eine Kategorie: der Anfang liegt
+# rechts, das Ende mit der Pfeilspitze des Designs (Formatvorlage Connector) links und klebt an
+# einem Punkt der Kategorie-Gräte.  Ein 1D-Shape mit aufrechtem Kasten (wie die Kategorien:
+# Width = EndX-BeginX, Height = EndY-BeginY, Angle 0; lokal (0, 0) ist der Anfang): mit Visios
+# 1D-Formeln läge der Kasten um 180° gedreht und der Text stünde kopf.  Der Text steht 30 mm breit
+# über der Mitte der Linie, waagrecht, gleich wie die Linie liegt, ohne den Texthintergrund der
+# Formatvorlage (TextBkgnd 0: er steht nicht auf der Linie).  Auf der Linie liegen
+# 5 Verbindungspunkte (1/6 bis 5/6) für die sekundären Ursachen (wie bei den Kategorien eine
+# begründete Ausnahme von der Stilregel für 1D-Shapes).
+master: Primary cause 2
+style: Connector
+name.de: Primäre Ursache 2
+name.en: Primary cause 2
+name.es: Causa primaria 2
+name.it: Causa primaria 2
+name.fr: Cause primaire 2
+text.de: Ursache
+text.en: Cause
+text.es: Causa
+text.it: Causa
+text.fr: Cause
+prompt.de: Ursache mit Text über der Linie, von rechts. Ziehen Sie ihr Ende auf die Gräte einer Kategorie.
+prompt.en: Cause with its text above the line, from the right. Drag its end onto the bone of a category.
+prompt.es: Causa con el texto sobre la línea, desde la derecha. Arrastre su extremo sobre la espina de una categoría.
+prompt.it: Causa con il testo sopra la linea, da destra. Trascina la sua estremità sulla lisca di una categoria.
+prompt.fr: Cause avec son texte au-dessus de la ligne, depuis la droite. Faites glisser son extrémité sur l'arête d'une catégorie.
+keywords.de: Ursache, primäre Ursache, Ishikawa, Fischgräte, Grund, Einflussgröße
+keywords.en: cause, primary cause, Ishikawa, fishbone, reason, factor
+keywords.es: causa, causa primaria, Ishikawa, espina de pescado, motivo, factor
+keywords.it: causa, causa primaria, Ishikawa, lisca di pesce, motivo, fattore
+keywords.fr: cause, cause primaire, Ishikawa, arête de poisson, raison, facteur
+
+[Shape]
+BeginX = 30 mm
+BeginX.us = 1.2 in
+BeginY = 4 mm
+BeginY.us = 0.15 in
+EndX = 0 mm
+EndY = 4 mm
+EndY.us = 0.15 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+LocPinX = GUARD(Width*0.5)
+LocPinY = GUARD(Height*0.5)
+Angle = GUARD(0DA)
+FlipX = GUARD(FALSE)
+FlipY = GUARD(FALSE)
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5+3 mm
+TxtPinY.us = Height*0.5+0.12 in
+TxtWidth = 30 mm
+TxtWidth.us = 1.2 in
+TxtHeight = 5 mm
+TxtHeight.us = 0.2 in
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = 0 deg
+TextBkgnd = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = Height
+
+[Connection]
+Row  X = Width*1/6; Y = Height*1/6; DirX = 0; DirY = 0
+Row  X = Width*2/6; Y = Height*2/6; DirX = 0; DirY = 0
+Row  X = Width*3/6; Y = Height*3/6; DirX = 0; DirY = 0
+Row  X = Width*4/6; Y = Height*4/6; DirX = 0; DirY = 0
+Row  X = Width*5/6; Y = Height*5/6; DirX = 0; DirY = 0

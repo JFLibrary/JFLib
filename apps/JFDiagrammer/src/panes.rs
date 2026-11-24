@@ -4,14 +4,16 @@
 // ZF-13, SL-08)
 //
 //   P_*                       the panels: Shapes (left), Shape formatieren, Größe und Position,
-//                             Shape-Daten, Verschieben und Zoomen (right, hidden at first;
+//                             Shape-Daten, Verschieben und Zoomen (right), (JD18) Externe
+//                             Daten (under the canvas; all but Shapes hidden at first;
 //                             Ansicht › Aufgabenbereiche shows them, the layout is kept in the
 //                             settings)
 //   panels() / content(app, ui, id)   the panels' descriptions and contents
 //   center(app, ui)           the canvas and the page tabs under it; with an open drawing
 //                             (JD4) the page of the tab drawn by viewer.rs, one tab per page
 //                             (background pages after the others), Alle Seiten as a list
-//   status(app, ui)           page, measures of the selection, zoom
+//   status(app, ui)           page, measures of the selection (a 1-D shape: length and angle,
+//                             JD15 SB-02), zoom (the slider has 100 % in the middle, SB-04)
 //
 // The contents live in their own files: the Shapes panel (JD9, stencils_panel.rs), Shape
 // formatieren (JD11, format_pane.rs), Größe und Position, Shape-Daten, Verschieben und Zoomen
@@ -33,6 +35,11 @@ pub(crate) const P_FORMAT: u32 = 11;
 pub(crate) const P_SIZEPOS: u32 = 12;
 pub(crate) const P_DATA: u32 = 13;
 pub(crate) const P_PANZOOM: u32 = 14;
+/// (JD18, AB-11) Externe Daten: under the canvas, as in Visio (data_pane.rs)
+pub(crate) const P_EXTERNAL: u32 = 15;
+/// (JD18, DA-05) Aktualisierungskonflikte: on the right, shown after a refresh with conflicts
+/// (data_refresh.rs)
+pub(crate) const P_CONFLICTS: u32 = 16;
 
 pub(crate) const ID_DOCK: u32 = 500;
 /// the canvas (JD8 rest: the task panes hand the keyboard back to it after Enter)
@@ -44,13 +51,15 @@ const ID_STATUS: u32 = 0x5800;
 const SIDEBAR_W: i32 = 240;
 
 /// the panels (titles in the current language)
-pub(crate) fn panels() -> [DockPanel<'static>; 5] {
+pub(crate) fn panels() -> [DockPanel<'static>; 7] {
     [
         DockPanel::new(P_SHAPES, t("Shapes"), JD_STENCIL_MENU).at(DOCK_LEFT, 0),
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_FORMAT, crate::tc("Shape formatieren|Bereich"), JD_FILL).at(DOCK_RIGHT, 0) },
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_SIZEPOS, t("Größe und Position"), JD_POSITION).at(DOCK_RIGHT, 0) },
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_DATA, t("Shape-Daten"), JD_SHAPE_DATA).at(DOCK_RIGHT, 0) },
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_PANZOOM, t("Verschieben und Zoomen"), JD_ZOOM).at(DOCK_RIGHT, 0) },
+        DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_EXTERNAL, t("Externe Daten"), JD_EXTERNAL_DATA).at(DOCK_BOTTOM, 0) },
+        DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_CONFLICTS, t("Aktualisierungskonflikte"), JD_REFRESH_ALL).at(DOCK_RIGHT, 0) },
     ]
 }
 
@@ -69,6 +78,8 @@ pub(crate) fn content(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
         P_SIZEPOS => size_pos(app, ui),
         P_DATA => shape_data(app, ui),
         P_PANZOOM => pan_zoom(app, ui),
+        P_EXTERNAL => crate::data_pane::pane(app, ui),
+        P_CONFLICTS => crate::data_refresh::pane(app, ui),
         _ => {}
     }
 }
@@ -76,20 +87,27 @@ pub(crate) fn content(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
 // ------------------------------------------------------------------ the context menus
 
 // i18n
-static SHAPE_MENU: [Mi; 18] = [
+static SHAPE_MENU: [Mi; 22] = [
+    // (JD15, SP-12) the rows of the shape's Actions section first, as in Visio (cmds_actions.rs)
+    Mi::List(crate::cmds_actions::ACTION_ROWS, crate::cmds_actions::ACTION_ROWS_MAX, ""),
     Mi::Cmd(CUT), Mi::Cmd(COPY), Mi::Cmd(PASTE), Mi::Sep,
     Mi::Sub("Gruppierung", &[Mi::Cmd(GROUP), Mi::Cmd(UNGROUP)]),
     // (JD8 rest) ZF-12's Shape ▸
     Mi::Sub("Shape", &[Mi::Cmd(ROTATE_LEFT), Mi::Cmd(ROTATE_RIGHT), Mi::Cmd(FLIP_H), Mi::Cmd(FLIP_V), Mi::Sep, Mi::Cmd(PANE_SIZEPOS)]),
     Mi::Sub("Container", &[Mi::Cmd(CT_ADD), Mi::Cmd(CT_REMOVE), Mi::Sep, Mi::Cmd(CT_SELECT), Mi::Cmd(CT_LOCK), Mi::Cmd(CT_DISBAND)]),
     Mi::Cmd(CONNECT_SHAPES), Mi::Cmd(LAYOUT_BEHAVIOR),
+    // (JD15, ST-05) a lane's commands (hidden for other shapes)
+    Mi::Cmd(CFF_LANE_BEFORE), Mi::Cmd(CFF_LANE_AFTER),
     Mi::Sub("Anordnen", &[Mi::Cmd(BRING_FRONT), Mi::Cmd(BRING_FORWARD), Mi::Cmd(SEND_BACK), Mi::Cmd(SEND_BACKWARD)]),
-    Mi::Sub("Daten", &[Mi::Cmd(PANE_DATA), Mi::Cmd(SHAPE_DATA_DEFINE)]),
+    // (JD18) Verknüpfung mit Zeile aufheben (data_pane.rs)
+    Mi::Sub("Daten", &[Mi::Cmd(PANE_DATA), Mi::Cmd(SHAPE_DATA_DEFINE), Mi::Sep, Mi::Cmd(DATA_UNLINK)]),
     // (JD8 rest) the shape's links follow its Hyperlink row (cmds_text::LINK_ROWS, ZF-12)
     Mi::Cmd(HYPERLINK), Mi::List(crate::cmds_text::LINK_ROWS, crate::cmds_text::LINK_ROWS_MAX, ""), Mi::Cmd(COMMENT_NEW),
     Mi::Sub("Formatieren", &[Mi::Cmd(FORMAT_TEXT), Mi::Cmd(FORMAT_LINE), Mi::Cmd(FORMAT_FILL), Mi::Cmd(FORMAT_SHADOW)]),
     Mi::Sub("Verbinderart", &[Mi::Cmd(CONN_RIGHT_ANGLE), Mi::Cmd(CONN_STRAIGHT), Mi::Cmd(CONN_CURVED), Mi::Sep, Mi::Cmd(CONN_RESET)]),
     Mi::Sep, Mi::Cmd(ADD_TO_MY_SHAPES),
+    // (JD15, SP-01) Shape-Name
+    Mi::Cmd(SHAPE_NAME),
 ];
 // i18n
 static PAGE_MENU: [Mi; 4] = [
@@ -112,6 +130,10 @@ pub(crate) fn center(app: &mut Diagrammer, ui: &mut Ui) {
     // (JD7) the canvas with the rulers and the edit layer (edit_canvas.rs); the shape's menu while
     // a shape is selected, else the page's (the edit layer selects on the right click first)
     crate::edit_canvas::canvas(app, ui, ID_CANVAS, |app, ui| {
+        // (JD15, KB-04) not for a Ctrl + Shift right click (the magnifier) or right drag (a pan)
+        if app.se.right_taken() {
+            return;
+        }
         let menu: &'static [Mi] = if matches!(app.selection_kind(), SEL_SHAPE | SEL_CONTAINER | SEL_TEXT) { &SHAPE_MENU } else { &PAGE_MENU };
         ui.context_menu(i18n::menu(menu));
     });
@@ -221,10 +243,22 @@ fn pan_zoom(app: &mut Diagrammer, ui: &mut Ui) {
 
 // a zoom slider 10 .. 400 % (width -1: the rest of the row)
 fn zoom_slider(app: &mut Diagrammer, ui: &mut Ui, id: u32, w: i32) {
-    let mut z = (app.canvas.vp.zoom * 100.0 + 0.5) as i32;
     ui.next_size(w, 0);
-    if ui.slider(id, &mut z, &Range::new(10, 400, 10, 0)) & (EV_ACT | EV_COMMIT) != 0 {
-        app.set_zoom(z);
+    zoom_slider_here(app, ui, id);
+}
+
+/// (JD15, SB-04, AB-06) the zoom slider with 100 % in the middle: the left half runs from 10 to
+/// 100 %, the right half from 100 to 400 % (Visio's); its value is the position 0 .. 1000 (500:
+/// 100 %), the size comes from next_size
+pub(crate) fn zoom_slider_here(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
+    let z = app.canvas.vp.zoom * 100.0;
+    let mut pos = if z <= 100.0 { (z - 10.0) / 90.0 * 500.0 } else { 500.0 + (z - 100.0) / 300.0 * 500.0 };
+    pos = pos.clamp(0.0, 1000.0);
+    let mut v = (pos + 0.5) as i32;
+    if ui.slider(id, &mut v, &Range::new(0, 1000, 50, 0)) & (EV_ACT | EV_COMMIT) != 0 {
+        let p = v.clamp(0, 1000) as f32;
+        let z = if p <= 500.0 { 10.0 + p / 500.0 * 90.0 } else { 100.0 + (p - 500.0) / 500.0 * 300.0 };
+        app.set_zoom((z + 0.5) as i32);
     }
     ui.tooltip(t("Zoom"));
 }
@@ -247,7 +281,13 @@ pub(crate) fn status(app: &mut Diagrammer, ui: &mut Ui) {
     ui.flyout_end();
     // the selection's measures (JD7: the single selection's); a click opens Größe und Position
     let unit = if crate::edit_canvas::metric(app) { "mm" } else { "in" };
+    // (JD15, SB-02) a 1-D shape: its length (the Width cell) and angle
+    let one_d = app.se.sel.len() == 1 && app.model.shapes.iter().any(|s| app.se.sel.contains(&s.key) && s.flags & SEF_1D != 0);
+    // (a selected guide has no measures)
+    let guide = app.model.guides.iter().any(|g| app.se.sel.contains(&g.key));
     let dims = match crate::edit_canvas::measures(app) {
+        Some(_) if guide => tf("Breite: {}  Höhe: {}  Winkel: {}", &["–", "–", "–"]),
+        Some(v) if one_d => tf("Länge: {}  Winkel: {}", &[&length(v[2], unit), &angle(v[4])]),
         Some(v) => tf("Breite: {}  Höhe: {}  Winkel: {}", &[&length(v[2], unit), &length(v[3], unit), &angle(v[4])]),
         None if app.selection_kind() == SEL_NONE || app.opened.is_some() => tf("Breite: {}  Höhe: {}  Winkel: {}", &["–", "–", "–"]),
         None => tf("Breite: {}  Höhe: {}  Winkel: {}", &["40 mm", "20 mm", "0°"]),

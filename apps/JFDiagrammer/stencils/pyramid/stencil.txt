@@ -1,0 +1,12 @@
+# Pyramiden-Shapes (SH-032, JD26): Pyramiden, Kegel und Trichter mit einstellbarer Zahl der Ebenen
+# (Shape-Daten oder Steuerpunkt; Ziehen vermehrt die Ebenen), dazu einzelne Ebenen zum Stapeln.
+stencil: Pyramid Shapes
+file: pyramid
+name.de: Pyramiden-Shapes
+name.en: Pyramid Shapes
+name.es: Formas de pirámide
+name.it: Forme a piramide
+name.fr: Formes de pyramide
+category: business
+masters: standard_pyramid, inverted_pyramid, pyramid_levels, inverted_cone, standard_pyramid_labeled, inverted_pyramid_labeled, pyramid_labeled, funnel, stepped_pyramid, custom_inverted_level, custom_pyramid_level
+quick: 4

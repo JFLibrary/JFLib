@@ -9,8 +9,11 @@
 //                                      each (PR-03): a page that fits on the paper takes one
 //                                      sheet, a larger one is cut into tiles of the printable
 //                                      area, from the top left, row by row; never cut off
-//   render_sheet(view, tiling, k, dpi, crop, gray) -> Surface   a sheet as pixels (preview,
-//                                      Windows' printers)
+//   render_sheet(view, tiling, k, dpi, crop, gray, grid) -> Surface   a sheet as pixels (preview,
+//                                      Windows' printers); (JD15, PR-05) with the grid's lines
+//                                      under the page when the setup prints the grid
+//                                      (grid_step: the canvas's step at 100 %; the PDF way
+//                                      draws them as hairlines under the items)
 //   print(app, job) -> Result<sheets, message>   the job: the system's print dialog (printer,
 //                                      paper, copies, range), then vector PDF pages where the
 //                                      platform prints PDF (Linux: the portal), else every sheet
@@ -71,11 +74,13 @@ pub(crate) struct PrintSetup {
     pub background: bool,
     /// grey instead of colours
     pub gray: bool,
+    /// (JD15, PR-05) the grid prints under the page (Gitternetz drucken, Visio's PrintGrid)
+    pub grid: bool,
 }
 
 impl Default for PrintSetup {
     fn default() -> PrintSetup {
-        PrintSetup { paper: 0, landscape: false, fit: Fit::Percent(1.0), margins: [0.25; 4], center: [false; 2], background: true, gray: false }
+        PrintSetup { paper: 0, landscape: false, fit: Fit::Percent(1.0), margins: [0.25; 4], center: [false; 2], background: true, gray: false, grid: false }
     }
 }
 
@@ -109,6 +114,7 @@ impl PrintSetup {
             }
         }
         s.center = [num("CenterX").is_some_and(|v| v != 0.0), num("CenterY").is_some_and(|v| v != 0.0)];
+        s.grid = num("PrintGrid").is_some_and(|v| v != 0.0);
         s
     }
 
@@ -198,8 +204,9 @@ fn ceil(v: f64) -> f64 {
 }
 
 /// a sheet as pixels: the paper part `crop` (inches, y up; None: the whole sheet) at `dpi`,
-/// white paper, the page on it through the view's CPU path, grey when asked
-pub(crate) fn render_sheet(view: &mut PageView, t: &Tiling, k: usize, dpi: f64, crop: Option<[f64; 4]>, gray: bool) -> Option<Surface> {
+/// white paper, the page on it through the view's CPU path, grey when asked; (JD15, PR-05)
+/// `grid` > 0: the grid's lines every `grid` page inches under the page
+pub(crate) fn render_sheet(view: &mut PageView, t: &Tiling, k: usize, dpi: f64, crop: Option<[f64; 4]>, gray: bool, grid: f64) -> Option<Surface> {
     let sheet = t.sheets.get(k)?;
     let r = crop.unwrap_or([0.0, 0.0, t.paper.0, t.paper.1]);
     let px = |v: f64| (v * dpi + 0.5) as i64;
@@ -221,6 +228,20 @@ pub(crate) fn render_sheet(view: &mut PageView, t: &Tiling, k: usize, dpi: f64, 
         let p = &sheet.place;
         let page = [(mid[0] - p.e) / p.a, (mid[1] - p.f) / p.d];
         let cam = Camera::new(page, 1.0 / (dpi * p.a));
+        if grid > 0.0 {
+            dc.clip_push(x0 as i32, y0 as i32, (x1 - x0) as i32, (y1 - y0) as i32);
+            dc.set_color(GRID_COLOR);
+            let (pw, ph) = (view.drawing().width, view.drawing().height);
+            for (x, y) in grid_lines(pw, ph, grid) {
+                // page inches -> paper inches -> pixels of the picture
+                match (x, y) {
+                    (Some(x), _) => dc.vline(&mut sf, px(p.a * x + p.e - r[0]) as i32, px(r[3] - (p.d * ph + p.f)) as i32, px(p.d * ph) as i32 + 1),
+                    (_, Some(y)) => dc.hline(&mut sf, px(p.e - r[0]) as i32, px(r[3] - (p.d * y + p.f)) as i32, px(p.a * pw) as i32 + 1),
+                    _ => {}
+                }
+            }
+            dc.clip_pop();
+        }
         view.draw(&mut dc, &mut sf, [x0 as i32, y0 as i32, (x1 - x0) as i32, (y1 - y0) as i32], &cam);
     }
     dc.end();
@@ -228,6 +249,58 @@ pub(crate) fn render_sheet(view: &mut PageView, t: &Tiling, k: usize, dpi: f64, 
         to_gray(&mut sf);
     }
     Some(sf)
+}
+
+// (JD15, PR-05) the printed grid: a light grey, as Visio prints its grid
+const GRID_COLOR: u32 = 0xFFC8_CCD2;
+
+/// (JD15, PR-05) the grid's step on the page (page inches) as the canvas shows it at 100 %:
+/// the first of the canvas's steps (mm or inches of the drawing, edit_canvas::grid_step) that is
+/// at least 1/6 in on the page
+pub(crate) fn grid_step(doc: &Document, page: PageRef) -> f64 {
+    let s = SheetRef::Page(page);
+    let num = |name: &str| doc.sym(name).and_then(|c| doc.resolve(s, &CellAddr::single(c)).num()).filter(|v| v.is_finite() && *v > 0.0);
+    let scale = num("PageScale").unwrap_or(1.0) / num("DrawingScale").unwrap_or(1.0);
+    let metric = doc.sym("PageWidth").map(|c| doc.resolve(s, &CellAddr::single(c)).unit()).map_or(true, |u| {
+        use diagram_core::Unit::*;
+        matches!(u, Some(Millimeters) | Some(Centimeters) | Some(Meters) | Some(Kilometers))
+    });
+    let unit = if metric { scale / 25.4 } else { scale };
+    let steps: &[f64] = if metric { &[0.5, 1.0, 2.0, 2.5, 5.0, 10.0, 20.0, 25.0, 50.0, 100.0, 200.0, 500.0, 1000.0] } else { &[1.0 / 32.0, 1.0 / 16.0, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 6.0, 12.0, 24.0, 60.0, 120.0] };
+    steps.iter().map(|s| s * unit).find(|&s| s >= 1.0 / 6.0).unwrap_or(steps[steps.len() - 1] * unit)
+}
+
+/// the grid's lines of a page of w x h page inches every `step`: (Some(x), None) a vertical
+/// line, (None, Some(y)) a horizontal one (at most 2000 of each)
+fn grid_lines(w: f64, h: f64, step: f64) -> Vec<(Option<f64>, Option<f64>)> {
+    let mut out = Vec::new();
+    if !(step > 1e-6) {
+        return out;
+    }
+    let (nx, ny) = (((w / step) as usize).min(2000), ((h / step) as usize).min(2000));
+    out.extend((0..=nx).map(|k| (Some(k as f64 * step), None)));
+    out.extend((0..=ny).map(|k| (None, Some(k as f64 * step))));
+    out
+}
+
+/// (JD15, PR-05) the drawing with the grid's lines under its items (the PDF way)
+fn with_grid(d: &Drawing, step: f64) -> Drawing {
+    use diagram_core::geometry::{Path, Seg, Sub};
+    let Some(first) = d.items.first() else { return d.clone() };
+    let mut path = Path::default();
+    for l in grid_lines(d.width, d.height, step) {
+        let (a, b) = match l {
+            (Some(x), _) => ([x, 0.0], [x, d.height]),
+            (_, Some(y)) => ([0.0, y], [d.width, y]),
+            _ => continue,
+        };
+        path.subs.push(Sub { start: a, segs: alloc::vec![Seg::Line(b)], closed: false });
+    }
+    let stroke = render::Stroke { color: GRID_COLOR, width: 0.0, dash: Vec::new(), cap: render::Cap::Butt, join: render::Join::Miter };
+    let item = render::Item { shape: first.shape, top: first.top, bbox: [0.0, 0.0, d.width, d.height], role: render::Role::Shape, kind: ItemKind::Stroke { path, stroke } };
+    let mut out = d.clone();
+    out.items.insert(0, item);
+    out
 }
 
 /// the pixels as grey (luma, Rec. 601)
@@ -319,6 +392,8 @@ pub(crate) fn print(app: &mut Diagrammer, job: &Job) -> Result<u32, String> {
     let paper = (pp.w / 72.0, pp.h / 72.0);
     let edges = [pp.l / 72.0, pp.t / 72.0, pp.r / 72.0, pp.b / 72.0];
     let tilings: Vec<Tiling> = views.iter().map(|v| tiling((v.drawing().width, v.drawing().height), &job.setup, paper, edges)).collect();
+    // (JD15, PR-05) the grid's step of each page (0: no grid)
+    let grids: Vec<f64> = job.pages.iter().map(|p| if job.setup.grid { grid_step(doc, *p) } else { 0.0 }).collect();
     let mut n = 0u32;
     let mut printed = 0u32;
     if d.pdf_native() {
@@ -326,8 +401,9 @@ pub(crate) fn print(app: &mut Diagrammer, job: &Job) -> Result<u32, String> {
         let pdf = {
             let mut sheets = Sheets::new(&mut app.fonts);
             for _ in 0..job.copies.max(1) {
-                for (v, tl) in views.iter().zip(&tilings) {
+                for ((v, tl), &grid) in views.iter().zip(&tilings).zip(&grids) {
                     let drawing = if job.setup.gray { gray_drawing(v.drawing()) } else { v.drawing().clone() };
+                    let drawing = if grid > 0.0 { with_grid(&drawing, grid) } else { drawing };
                     for sh in &tl.sheets {
                         n += 1;
                         if !d.wants(n) {
@@ -363,13 +439,13 @@ pub(crate) fn print(app: &mut Diagrammer, job: &Job) -> Result<u32, String> {
         // pictures (Windows: GDI): the printable area of each sheet at PRINT_DPI
         let crop = [edges[0], edges[3], paper.0 - edges[2], paper.1 - edges[1]];
         for _ in 0..job.copies.max(1) {
-            for (v, tl) in views.iter_mut().zip(&tilings) {
+            for ((v, tl), &grid) in views.iter_mut().zip(&tilings).zip(&grids) {
                 for k in 0..tl.sheets.len() {
                     n += 1;
                     if !d.wants(n) {
                         continue;
                     }
-                    let Some(sf) = render_sheet(v, tl, k, PRINT_DPI, Some(crop), job.setup.gray) else {
+                    let Some(sf) = render_sheet(v, tl, k, PRINT_DPI, Some(crop), job.setup.gray, grid) else {
                         d.abort();
                         return Err(String::from(t("Für das Blatt reicht der Speicher nicht.")));
                     };

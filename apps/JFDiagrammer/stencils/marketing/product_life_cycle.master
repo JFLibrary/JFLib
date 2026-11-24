@@ -1,0 +1,361 @@
+# Produktlebenszyklus (SH-030, JD26, in Visio „PLZ“): Achsen Umsatz und Zeit mit offenen Spitzen,
+# die typische Kurve (langsamer Anstieg, steiles Wachstum, Gipfel in der Reife, Rückgang) als
+# Polylinie aus 49 Punkten (vier kubische Stücke, im Skript ausgewertet, als Anteile der
+# Kurvenfläche), die Grenzen der vier gleich breiten Phasen als gestrichelte Linien (LinePattern
+# 2: Ausnahme, damit sie sich von der Kurve abheben) und die Phasentexte Einführung, Wachstum,
+# Reife, Rückgang in einem Band über der Kurve.  Achsen, Kurve und Grenzen sind Teile in der
+# Formatvorlage Connector ohne deren Pfeilspitzen (sichtbar auch in Designs ohne Shape-Linien),
+# alle Texte Teile in Text Only.  Alle Teile folgen der Größe der Gruppe.
+master: Product life cycle
+name.de: Produktlebenszyklus
+name.en: Product life cycle
+name.es: Ciclo de vida del producto
+name.it: Ciclo di vita del prodotto
+name.fr: Cycle de vie du produit
+prompt.de: Umsatzkurve eines Produkts über die Zeit mit den Phasen Einführung, Wachstum, Reife und Rückgang. Klicken Sie eine Beschriftung zweimal an, um ihren Text zu ändern.
+prompt.en: Sales curve of a product over time with the phases introduction, growth, maturity and decline. Click a label twice to change its text.
+prompt.es: Curva de ventas de un producto en el tiempo con las fases introducción, crecimiento, madurez y declive. Haga clic dos veces en una etiqueta para cambiar su texto.
+prompt.it: Curva delle vendite di un prodotto nel tempo con le fasi introduzione, crescita, maturità e declino. Fai clic due volte su un'etichetta per cambiarne il testo.
+prompt.fr: Courbe des ventes d'un produit dans le temps avec les phases lancement, croissance, maturité et déclin. Cliquez deux fois sur une étiquette pour modifier son texte.
+keywords.de: Produktlebenszyklus, PLZ, Lebenszyklus, Umsatz, Einführung, Wachstum, Reife, Rückgang
+keywords.en: product life cycle, PLC, life cycle, sales, introduction, growth, maturity, decline
+keywords.es: ciclo de vida, producto, ventas, introducción, crecimiento, madurez, declive
+keywords.it: ciclo di vita, prodotto, vendite, introduzione, crescita, maturità, declino
+keywords.fr: cycle de vie, produit, ventes, lancement, croissance, maturité, déclin
+
+[Shape]
+Width = 130 mm
+Width.us = 5.25 in
+Height = 70 mm
+Height.us = 2.75 in
+
+[User]
+# die Ränder links (Text Umsatz), unten (Text Zeit) und rechts (für die Pfeilspitze), das Band oben
+# für die Phasentexte, die Länge der Pfeilspitzen; Breite der Phasen zusammen, Höhe der
+# Kurvenfläche
+ML:  Value = 8 mm
+     Value.us = 0.3 in
+MB:  Value = 8 mm
+     Value.us = 0.3 in
+MR:  Value = 4 mm
+     Value.us = 0.15 in
+TB:  Value = 8 mm
+     Value.us = 0.3 in
+L:   Value = 3 mm
+     Value.us = 0.12 in
+PW:  Value = Width-User.ML-User.MR
+CH:  Value = Height-User.MB-User.TB
+
+[Connection]
+Row  X = User.ML+User.PW*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = User.MB+User.CH*0.5; DirX = -1; DirY = 0
+Row  X = User.ML+User.PW*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.MB+User.CH*0.5; DirX = 1; DirY = 0
+
+# die Grenzen der Phasen, gestrichelt
+[Part Borders]
+style: Connector
+
+[Shape]
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+LinePattern = 2
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Sheet.1!User.ML+Sheet.1!User.PW*0.25; Y = Sheet.1!User.MB
+LineTo  X = Sheet.1!User.ML+Sheet.1!User.PW*0.25; Y = Height
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Sheet.1!User.ML+Sheet.1!User.PW*0.5; Y = Sheet.1!User.MB
+LineTo  X = Sheet.1!User.ML+Sheet.1!User.PW*0.5; Y = Height
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Sheet.1!User.ML+Sheet.1!User.PW*0.75; Y = Sheet.1!User.MB
+LineTo  X = Sheet.1!User.ML+Sheet.1!User.PW*0.75; Y = Height
+
+# die Kurve in ihrer Fläche (Anteile von Breite und Höhe)
+[Part Curve]
+style: Connector
+
+[Shape]
+Width = GUARD(Sheet.1!User.PW)
+Height = GUARD(Sheet.1!User.CH)
+PinX = GUARD(Sheet.1!User.ML+Width*0.5)
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0; Y = Height*0.04
+LineTo  X = Width*0.0294; Y = Height*0.0421
+LineTo  X = Width*0.0577; Y = Height*0.0456
+LineTo  X = Width*0.0849; Y = Height*0.0506
+LineTo  X = Width*0.111; Y = Height*0.0572
+LineTo  X = Width*0.1363; Y = Height*0.0656
+LineTo  X = Width*0.1606; Y = Height*0.076
+LineTo  X = Width*0.184; Y = Height*0.0885
+LineTo  X = Width*0.2067; Y = Height*0.1032
+LineTo  X = Width*0.2287; Y = Height*0.1203
+LineTo  X = Width*0.25; Y = Height*0.14
+LineTo  X = Width*0.2654; Y = Height*0.1611
+LineTo  X = Width*0.2817; Y = Height*0.1933
+LineTo  X = Width*0.2986; Y = Height*0.2347
+LineTo  X = Width*0.3162; Y = Height*0.2835
+LineTo  X = Width*0.3342; Y = Height*0.3379
+LineTo  X = Width*0.3526; Y = Height*0.3961
+LineTo  X = Width*0.3712; Y = Height*0.4562
+LineTo  X = Width*0.3901; Y = Height*0.5166
+LineTo  X = Width*0.4089; Y = Height*0.5752
+LineTo  X = Width*0.4277; Y = Height*0.6304
+LineTo  X = Width*0.4463; Y = Height*0.6803
+LineTo  X = Width*0.4646; Y = Height*0.723
+LineTo  X = Width*0.4826; Y = Height*0.7569
+LineTo  X = Width*0.5; Y = Height*0.78
+LineTo  X = Width*0.5216; Y = Height*0.8032
+LineTo  X = Width*0.5419; Y = Height*0.8272
+LineTo  X = Width*0.5612; Y = Height*0.8507
+LineTo  X = Width*0.58; Y = Height*0.8725
+LineTo  X = Width*0.5988; Y = Height*0.8915
+LineTo  X = Width*0.6181; Y = Height*0.9066
+LineTo  X = Width*0.6384; Y = Height*0.9164
+LineTo  X = Width*0.66; Y = Height*0.92
+LineTo  X = Width*0.6755; Y = Height*0.9158
+LineTo  X = Width*0.6918; Y = Height*0.9036
+LineTo  X = Width*0.7091; Y = Height*0.8842
+LineTo  X = Width*0.7272; Y = Height*0.8583
+LineTo  X = Width*0.7461; Y = Height*0.8266
+LineTo  X = Width*0.7658; Y = Height*0.7897
+LineTo  X = Width*0.7863; Y = Height*0.7486
+LineTo  X = Width*0.8075; Y = Height*0.7037
+LineTo  X = Width*0.8294; Y = Height*0.656
+LineTo  X = Width*0.852; Y = Height*0.606
+LineTo  X = Width*0.8752; Y = Height*0.5546
+LineTo  X = Width*0.8991; Y = Height*0.5023
+LineTo  X = Width*0.9235; Y = Height*0.4501
+LineTo  X = Width*0.9485; Y = Height*0.3984
+LineTo  X = Width*0.974; Y = Height*0.3482
+LineTo  X = Width*1; Y = Height*0.3
+
+# die Achsen mit offenen Spitzen
+[Part Axes]
+style: Connector
+
+[Shape]
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Sheet.1!User.ML; Y = Height
+LineTo  X = Sheet.1!User.ML; Y = Sheet.1!User.MB
+LineTo  X = Width; Y = Sheet.1!User.MB
+MoveTo  X = Width-Sheet.1!User.L; Y = Sheet.1!User.MB+Sheet.1!User.L*0.5
+LineTo  X = Width; Y = Sheet.1!User.MB
+LineTo  X = Width-Sheet.1!User.L; Y = Sheet.1!User.MB-Sheet.1!User.L*0.5
+MoveTo  X = Sheet.1!User.ML-Sheet.1!User.L*0.5; Y = Height-Sheet.1!User.L
+LineTo  X = Sheet.1!User.ML; Y = Height
+LineTo  X = Sheet.1!User.ML+Sheet.1!User.L*0.5; Y = Height-Sheet.1!User.L
+
+# die Achsentexte und die Phasen
+[Part YT]
+text.de: Umsatz
+text.en: Sales
+text.es: Ventas
+text.it: Vendite
+text.fr: Ventes
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.ML)
+Height = GUARD(Sheet.1!User.CH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Height
+TxtHeight = Width
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = 90 deg
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part XT]
+text.de: Zeit
+text.en: Time
+text.es: Tiempo
+text.it: Tempo
+text.fr: Temps
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.PW)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!User.ML+Width*0.5)
+PinY = GUARD(Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part P1]
+text.de: Einführung
+text.en: Introduction
+text.es: Introducción
+text.it: Introduzione
+text.fr: Lancement
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.PW*0.25)
+Height = GUARD(Sheet.1!User.TB)
+PinX = GUARD(Sheet.1!User.ML+Sheet.1!User.PW*0.125)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part P2]
+text.de: Wachstum
+text.en: Growth
+text.es: Crecimiento
+text.it: Crescita
+text.fr: Croissance
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.PW*0.25)
+Height = GUARD(Sheet.1!User.TB)
+PinX = GUARD(Sheet.1!User.ML+Sheet.1!User.PW*0.375)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part P3]
+text.de: Reife
+text.en: Maturity
+text.es: Madurez
+text.it: Maturità
+text.fr: Maturité
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.PW*0.25)
+Height = GUARD(Sheet.1!User.TB)
+PinX = GUARD(Sheet.1!User.ML+Sheet.1!User.PW*0.625)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part P4]
+text.de: Rückgang
+text.en: Decline
+text.es: Declive
+text.it: Declino
+text.fr: Déclin
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.PW*0.25)
+Height = GUARD(Sheet.1!User.TB)
+PinX = GUARD(Sheet.1!User.ML+Sheet.1!User.PW*0.875)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

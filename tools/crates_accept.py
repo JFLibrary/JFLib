@@ -1020,11 +1020,14 @@ def accept(targets, out, docs_toolchain="nightly"):
             run.check(r.stdout.strip() == want, f"probe on Linux, one static file: {r.stdout.strip() or r.stderr.strip()[-300:]}")
     # cargo jflib, installed from the packages as a user would: a project of its own (new), its tests, the browser
     tool = out / "tool"
-    # from the unpacked package, what crates.io would hand out (it has no dependencies): cargo install finds a
-    # package in a directory source but then fails to fetch it ("failed to find package with id")
+    # from the unpacked package, what crates.io would hand out: cargo install finds a package in a directory
+    # source but then fails to fetch it ("failed to find package with id").  Its dependency jflib-compress comes
+    # from the packages as well (the source replacement of the projects): crates.io's jflib-compress of the same
+    # version is another file, and the lock in the package names the one packed here
     package = next(vendor.glob("cargo-jflib-*"))
-    if run.cmd("cargo-jflib-install", ["cargo", "install", "--path", package, "--offline", "--force", "--root", tool], out,
-               {"CARGO_TARGET_DIR": str(out / "target-tool")}):
+    packed = ["--config", 'source.crates-io.replace-with="packed"', "--config", f'source.packed.directory="{vendor.as_posix()}"']
+    if run.cmd("cargo-jflib-install", ["cargo", "install", "--path", package, "--offline", "--force", "--root", tool] + packed,
+               out, {"CARGO_TARGET_DIR": str(out / "target-tool")}):
         jenv = dict(env, PATH=str(tool / "bin") + os.pathsep + os.environ.get("PATH", ""))
         made = out / "made"
         shutil.rmtree(made, ignore_errors=True)

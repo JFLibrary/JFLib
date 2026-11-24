@@ -1,0 +1,129 @@
+# Matrix 3 (SH-031, JD26): vier Quadrate mit 2 mm Abstand als Teile einer Gruppe, je mit eigenem
+# Text, in vier Abstufungen der Füllfarbe des Designs: von links oben nach rechts unten heller und
+# dunkler um 36 und 12 Einheiten der Helligkeit (TINT/SHADE auf THEMEVAL("FillColor"), unter
+# THEMEGUARD, damit ein Design die Abstufung nicht überschreibt; keine festen Farben).  Die Stufen
+# liegen beiderseits der Designfarbe, damit der Text des Designs (hell oder dunkel) auf allen
+# lesbar bleibt.  Die Quadrate folgen der Größe der Gruppe.
+master: Matrix 3
+name.de: Matrix 3
+name.en: Matrix 3
+name.es: Matriz 3
+name.it: Matrice 3
+name.fr: Matrice 3
+prompt.de: Vier Quadrate in Abstufungen der Designfarbe als Vierfeldermatrix. Klicken Sie ein Quadrat zweimal an, um seinen Text zu ändern.
+prompt.en: Four squares in shades of the theme colour as a four-field matrix. Click a square twice to change its text.
+prompt.es: Cuatro cuadrados en tonos del color del tema como matriz de cuatro campos. Haga clic dos veces en un cuadrado para cambiar su texto.
+prompt.it: Quattro quadrati in sfumature del colore del tema come matrice a quattro campi. Fai clic due volte su un quadrato per cambiarne il testo.
+prompt.fr: Quatre carrés dans des nuances de la couleur du thème formant une matrice à quatre champs. Cliquez deux fois sur un carré pour modifier son texte.
+keywords.de: Matrix, Abstufung, Farbstufen, Quadrate, Vierfeldermatrix, Intensität, Heatmap
+keywords.en: matrix, gradation, shades, squares, four-field matrix, intensity, heat map
+keywords.es: matriz, gradación, tonos, cuadrados, cuatro cuadrantes, intensidad, mapa de calor
+keywords.it: matrice, gradazione, sfumature, quadrati, quattro quadranti, intensità, mappa di calore
+keywords.fr: matrice, dégradé, nuances, carrés, quatre quadrants, intensité, carte thermique
+
+[Shape]
+Width = 60 mm
+Width.us = 2.25 in
+Height = 60 mm
+Height.us = 2.25 in
+
+[User]
+# der Abstand der Quadrate, Breite und Höhe eines Quadrats
+G:   Value = 2 mm
+     Value.us = 0.08 in
+QW:  Value = (Width-User.G)*0.5
+QH:  Value = (Height-User.G)*0.5
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+[Part F1]
+text.de: Feld 1
+text.en: Field 1
+text.es: Campo 1
+text.it: Campo 1
+text.fr: Champ 1
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+# Stufe 1 von 4: die Füllfarbe des Designs, um 36 von 240 heller
+FillForegnd = THEMEGUARD(TINT(THEMEVAL("FillColor"),36))
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F2]
+text.de: Feld 2
+text.en: Field 2
+text.es: Campo 2
+text.it: Campo 2
+text.fr: Champ 2
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+# Stufe 2 von 4: die Füllfarbe des Designs, um 12 von 240 heller
+FillForegnd = THEMEGUARD(TINT(THEMEVAL("FillColor"),12))
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F3]
+text.de: Feld 3
+text.en: Field 3
+text.es: Campo 3
+text.it: Campo 3
+text.fr: Champ 3
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Height*0.5)
+# Stufe 3 von 4: die Füllfarbe des Designs, um 12 von 240 dunkler
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),12))
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part F4]
+text.de: Feld 4
+text.en: Field 4
+text.es: Campo 4
+text.it: Campo 4
+text.fr: Champ 4
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Height*0.5)
+# Stufe 4 von 4: die Füllfarbe des Designs, um 36 von 240 dunkler
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),36))
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

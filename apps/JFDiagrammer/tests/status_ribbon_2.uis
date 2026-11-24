@@ -1,0 +1,111 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD15 (status of FEATURES 3.1-3.9, the registers Einfügen, Entwurf, Ansicht):
+# what no other script checks -- a container and a callout inserted with nothing selected, the
+# connector tool from Einfügen, Entwurf › Verbinder (straight, curved, right-angled), saving the
+# design as an own one, the option Livevorschau (a tile previews its design on the shape only
+# while it is on), Seitenbreite, the view toggles, and the ribbon of a narrow window
+theme light
+# RE-06: Einfügen › Container with nothing selected: an empty container, selected
+click tab:"Einfügen"
+click button:"Container"
+expect menuitem:"Klar" exists
+expect menuitem:"Abgerundet" exists
+click menuitem:"Akzent"
+expect listitem:"Container" selected
+expect tab:"Format" exists
+key ctrl+z
+expect listitem:"Container" missing
+# RE-07: Einfügen › Beschriftung with nothing selected: the callout alone, selected
+click 1000,700
+click button:"Beschriftung"
+expect menuitem:"Rechteck" exists
+click menuitem:"Sprechblase"
+expect listitem:"Text" selected
+key ctrl+z
+expect listitem:"Text" missing
+# RE-08: Einfügen › Verbinder switches the connector tool on
+click button:"Verbinder"
+click tab:"Start"
+expect button:"Verbinder" checked
+expect button:"Zeigertool" unchecked
+cmd 4400
+# RW-10: two boxes joined by a connector; Entwurf › Verbinder › Gerade, Gebogen, Rechtwinklig
+cmd 4404
+drag 400,250 500,300
+drag 700,450 800,500
+cmd 4401
+drag 450,275 750,475
+cmd 4400
+expect listitem:"Sheet.8" rect 500 273 255 176
+click tab:"Entwurf"
+click #4880
+expect menuitem:"Linienübergänge anzeigen" disabled
+click menuitem:"Gerade"
+expect listitem:"Sheet.8" rect 488 299 226 150
+click #4880
+click menuitem:"Gebogen"
+move button:"Rückgängig"
+wait 1500
+expect text:"Rückgängig: Gebogen (Strg+Z)" exists
+move 1000,700
+click #4880
+click menuitem:"Rechtwinklig"
+expect listitem:"Sheet.8" rect 500 273 255 176
+# RW-05: Alle Designs › Aktuelles Design speichern: the design comes back under Gespeichert
+click button:"Alle Designs"
+click "Aktuelles Design speichern ..."
+expect dialog:"Aktuelles Design speichern" exists
+expect #1566572545 text "NetLab (eigenes)"
+click #1566572545
+key ctrl+a
+type "Mein Design"
+click button:"Speichern"
+expect dialog:"Aktuelles Design speichern" missing
+click button:"Alle Designs"
+expect text:"Gespeichert" exists
+expect button:"Mein Design (gespeichert)" exists
+expect menuitem:"Gespeicherte Designs löschen" enabled
+key esc
+# UI-13, UI-35: Livevorschau -- pointing at Kontrast paints the box in its colours; with the
+# option off it stays in NetLab's
+click 1000,700
+expect pixel 450 290 #D8E7F8
+move button:"Kontrast"
+wait 200
+expect pixel 450 290 #1F5FA8
+move 1000,700
+wait 200
+expect pixel 450 290 #D8E7F8
+click tab:"Datei"
+click button:"Optionen"
+click switch:"Livevorschau aktivieren"
+expect switch:"Livevorschau aktivieren" unchecked
+key esc
+click tab:"Entwurf"
+move button:"Kontrast"
+wait 200
+expect pixel 450 290 #D8E7F8
+move 1000,700
+# RA-05: Seitenbreite fits the page's width (86 % here), An Fenster anpassen the page (67 %)
+click tab:"Ansicht"
+click button:"Seitenbreite"
+expect button:"86 %" exists
+cmd 5126
+expect button:"67 %" exists
+# RA-02, RA-06: the view toggles (Seitenumbrüche and Verbindungspunkte off at first, Dynamisches Gitter on)
+expect checkbox:"Seitenumbrüche" unchecked
+click checkbox:"Seitenumbrüche"
+expect checkbox:"Seitenumbrüche" checked
+expect checkbox:"Verbindungspunkte" unchecked
+click checkbox:"Verbindungspunkte"
+expect checkbox:"Verbindungspunkte" checked
+expect checkbox:"Dynamisches Gitter" checked
+# UI-34: a narrow window -- small buttons show their icons only, Anordnen and Bearbeiten fold
+# into a button each that opens the group
+size 820 700
+click tab:"Start"
+expect button:"Zeigertool" rect * * 28 22
+click button:"Anordnen"
+expect button:"Positionieren" exists
+key esc
+expect button:"Positionieren" missing
