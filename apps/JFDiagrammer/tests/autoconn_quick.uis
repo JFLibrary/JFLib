@@ -34,7 +34,6 @@ click button:"Schnell-Shape: Dreieck"
 a11y expect announced "„Dreieck“ abgelegt"
 expect listitem:"Dreieck" selected
 expect button:"Schnell-Shape: Dreieck" missing
-dump build/autoconn-quick.txt
 key ctrl+z
 expect listitem:"Dreieck" missing
 expect listitem:"Rechteck" exists
