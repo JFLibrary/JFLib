@@ -102,13 +102,15 @@ impl Default for Filter {
     }
 }
 
+#[derive(Clone)]
 struct Slot {
     generation: u32,
     body: Option<Body>,
 }
 
 /// A set of bodies and the queries over them.  Bodies move with [`World::set_iso`]; nothing moves by itself
-/// (no dynamics in this stage).
+/// here (a [`crate::Simulation`] moves the bodies of its World).  A clone answers every query as the original.
+#[derive(Clone)]
 pub struct World {
     slots: Vec<Slot>,
     free: Vec<u32>,
@@ -275,6 +277,72 @@ impl World {
     #[inline]
     fn id_of(&self, index: u32) -> BodyId {
         BodyId { index, generation: self.slots[index as usize].generation }
+    }
+
+    /// the live body in slot `index` with its id (for the simulation, which keeps its data by slot)
+    #[inline]
+    pub(crate) fn at(&self, index: u32) -> Option<(BodyId, &Body)> {
+        let s = self.slots.get(index as usize)?;
+        s.body.as_ref().map(|b| (BodyId { index, generation: s.generation }, b))
+    }
+
+    /// the slots whose box in the trees touches `bx`, in the order of the trees (the caller sorts)
+    pub(crate) fn query_box(&self, bx: &Aabb, mut f: impl FnMut(u32)) {
+        for tree in &self.trees {
+            tree.query(bx, &mut f);
+        }
+    }
+
+    /// the first hit of the ray on a body `pred` accepts (as [`World::ray_cast`]); `pred(slot, body)`
+    pub(crate) fn ray_cast_where(&self, origin: Vec3, dir: Vec3, max_t: f64, pred: impl Fn(u32, &Body) -> bool) -> Option<(BodyId, RayHit)> {
+        let mut best: Option<(BodyId, RayHit)> = None;
+        self.ray_trees(origin, dir, Vec3::ZERO, max_t, |item, tmax| {
+            let id = self.id_of(item);
+            let Some(b) = self.slots[item as usize].body.as_ref() else {
+                return tmax;
+            };
+            if !pred(item, b) {
+                return tmax;
+            }
+            if let Some(h) = query::ray(&b.shape, &b.iso, origin, dir, tmax) {
+                if best.as_ref().is_none_or(|(bid, bh)| earlier(h.t, id, h.triangle, bh.t, *bid, bh.triangle)) {
+                    best = Some((id, h));
+                    return h.t;
+                }
+            }
+            tmax
+        });
+        best
+    }
+
+    /// the first body `pred` accepts that convex `shape`, moved from `iso` by `motion`, touches (as
+    /// [`World::cast`]); `pred(slot, body)`
+    pub(crate) fn cast_where(&self, shape: &Shape, iso: &Iso, motion: Vec3, pred: impl Fn(u32, &Body) -> bool) -> Option<(BodyId, CastHit)> {
+        if !shape.is_convex() {
+            return None;
+        }
+        let bx = shape.aabb(iso);
+        let c = bx.center();
+        let pad = CAST_SKIN + 1e-9 + 1e-12 * max(c.abs().max_elem(), bx.half_extents().max_elem());
+        let ext = bx.half_extents() + Vec3::splat(pad);
+        let mut best: Option<(BodyId, CastHit)> = None;
+        self.ray_trees(c, motion, ext, 1.0, |item, tmax| {
+            let id = self.id_of(item);
+            let Some(b) = self.slots[item as usize].body.as_ref() else {
+                return tmax;
+            };
+            if !pred(item, b) {
+                return tmax;
+            }
+            if let Some(h) = query::cast(shape, iso, motion, &b.shape, &b.iso) {
+                if best.as_ref().is_none_or(|(bid, bh)| earlier(h.fraction, id, h.triangle, bh.fraction, *bid, bh.triangle)) {
+                    best = Some((id, h));
+                    return h.fraction;
+                }
+            }
+            tmax
+        });
+        best
     }
 
     // ------------------------------------------------------------ queries

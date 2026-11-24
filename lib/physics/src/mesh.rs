@@ -554,6 +554,24 @@ impl TriMesh {
         });
     }
 
+    /// every triangle within `margin` of convex `a` (in the mesh's frame) with what a contact manifold needs:
+    /// `f(caller's index, corners, normal from the triangle towards a (the triangle's own on an inactive edge
+    /// or vertex), the separation from GJK / EPA)`, in the order of the tree (the caller sorts)
+    pub(crate) fn near_triangles(&self, a: &Placed, margin: f64, mut f: impl FnMut(u32, [Vec3; 3], Vec3, Sep)) {
+        let bx = a.aabb().expanded(max(margin, 0.0));
+        self.walk_box(false, &bx, |first, count| {
+            for t in first..first + count {
+                let tri = self.tri(t);
+                let b = Placed::new(Core::Triangle(tri), 0.0, None, Vec3::ZERO);
+                let s = gjk::separation(a, &b, a.center() - b.center());
+                if s.dist <= margin {
+                    let n = self.fix_normal(t, &tri, s.pb, s.normal);
+                    f(self.ids[t], tri, n, s);
+                }
+            }
+        });
+    }
+
     /// does convex `a` touch or overlap a triangle
     pub(crate) fn intersects(&self, brute: bool, a: &Placed) -> bool {
         let bx = a.aabb();

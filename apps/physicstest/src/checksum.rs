@@ -211,3 +211,10 @@ pub fn controller() -> (u64, u64) {
     crate::character::checksum(|v| h.u(v));
     (h.h, h.n)
 }
+
+/// the third checksum: rigid bodies, contacts and joints (dynamics.rs, `showcase`)
+pub fn dynamics() -> (u64, u64) {
+    let mut h = Hash { h: 0xcbf2_9ce4_8422_2325, n: 0 };
+    crate::dynamics::checksum(|v| h.u(v));
+    (h.h, h.n)
+}

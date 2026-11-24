@@ -161,7 +161,7 @@ CRATES = [
     ("pdf", "PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments, drawing pages)", "full"),
     ("diagram_view", "draws diagram pages (the display list of diagram_core) on render2d and gfx", "full"),
     ("dxf", "DXF import (ASCII): tables, blocks and entities of model space, without a GPU", "full"),
-    ("physics", "Collision shapes, broad phase and deterministic queries for games", "full"),
+    ("physics", "Collision, deterministic queries and rigid bodies with joints for games", "full"),
     ("game", "The game core: a world of entities and components, a fixed tick, input actions, cameras", "full"),
     ("game_render3d", "The bridge from the game core to render3d: entities with a mesh as scene instances", "full"),
     ("geom", "Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks", "full"),
