@@ -576,7 +576,7 @@ Beispiele geben denselben Bericht wie in `examples/out`.
 | --- | --- | --- | --- |
 | Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung | `0fae175a31a0f15e` | 38 906 bestanden (S1) |
 | Linux x86-64 gegen glibc, in WSL Ubuntu 24.04 | Entwicklung | `0fae175a31a0f15e` | 38 906 bestanden (S1) |
-| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung | `0fae175a31a0f15e` | 38 773 bestanden, die fünf Skripte auch (Metal; Stand Teil 2, vor S1) |
+| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung | `0fae175a31a0f15e` | 38 906 bestanden (S1; die fünf Skripte mit Metal: Stand Teil 2) |
 | WebAssembly in Node 22 (V8): einfach, SIMD, Threads | Entwicklung | `0fae175a31a0f15e` | 38 888 bestanden (S1; alle drei, ohne die 18 der Gruppe `watch`) |
 
 Zusammen 234 941 Werte. Mit JFScript S1 (c970852) und den Warnungen ist die Zahl auf Windows, Linux und in Node
